@@ -52,12 +52,12 @@
 --   5. that the danger clause is capped: a character the worst round could
 --      kill from full HP is not topped up on a promise no heal can keep,
 --      which is what stops "in danger" turning back into the heal-lock;
---   6. the one clause a CAST is exempt from, and the one it is not.  Nobody
---      can say in advance what a cure restores, so the owner's answer is to
---      heal to maximum, and MP pays for it because OT6 refunds MP at every
---      level up.  The solo heal-lock is about spending TURNS, and a cast
---      spends one exactly as a drink does, so `mp` must not reach it -- an
---      `mp` flag that leaked in there would put battle 11's heal-lock back;
+--   6. the magic clause and where it stops.  Nobody can say in advance what
+--      a cure restores, so an unmeasured one heals its target to maximum and
+--      MP pays for it, because OT6 refunds MP at every level up.  The driver
+--      watches what that cast puts back, so from the second cast the size is
+--      known and the ordinary value rule governs the cure too -- taken
+--      literally past that point it costs turns, measured below;
 --   7. that every case ran.  A table-driven test that skips its table
 --      reports the same green as one that passed it.
 --
@@ -116,22 +116,36 @@ local CASES = {
   { name = "a Tonic into a 40-point hole, inside the slack",
     hp = 360, maxhp = 400, restore = 50, roundCost = 0, allies = 2,
     want = "full value" },
-  -- The same 12-point hole cast rather than drunk.  A cure's size is not
-  -- knowable in advance, so there is no hole to weigh it against and the
-  -- answer is to heal to maximum; MP comes back at every level up and a
-  -- Tonic does not.  This is also the minecart ride (#92) -- eight Tonics for
-  -- six fights with no field access between them, and 100+ MP a member
-  -- unspent.
-  { name = "the same small hole cast instead of drunk",
-    hp = 388, maxhp = 400, restore = 50, roundCost = 0, allies = 2,
-    mp = true, want = "to full" },
-  -- And `mp` must not reach the SOLO refusal, which is an argument about
-  -- spending turns rather than about what the heal costs: a cast spends a
-  -- turn exactly as a drink does.  Battle 11's numbers, cast instead of
-  -- drunk, still nil.
-  { name = "a cure alone that cannot out-heal the damage",
+  -- The magic clause.  Nobody can say what a cure restores before it lands,
+  -- so the first cast of a battle has no hole to be weighed against and the
+  -- answer is to heal that target to maximum; MP pays, and MP comes back at
+  -- every level up where a Tonic does not.  This is also the minecart ride
+  -- (#92) -- eight Tonics for six fights with no field access between them,
+  -- and 100+ MP a member unspent.
+  { name = "a cure of unknown size, into any hole at all",
+    hp = 388, maxhp = 400, roundCost = 0, allies = 2,
+    unknown = true, want = "to full" },
+  -- And once it HAS landed the premise behind that clause is gone, so the
+  -- value rule governs the cure too.  Measured on the Zozo street: taken
+  -- literally past the point of knowing, the caster spent twelve turns and
+  -- 65 MP topping up 50-point holes with a cure measured at 148, and the
+  -- fight ran past the step's budget with the party at full HP.
+  { name = "the same small hole with the cure now measured at 148",
+    hp = 388, maxhp = 400, restore = 148, roundCost = 0, allies = 2,
+    want = nil },
+  -- `unknown` must not reach the SOLO refusal in a way that survives
+  -- measurement: that clause is an argument about spending turns, and a cast
+  -- spends a turn exactly as a drink does.  Battle 11's numbers with a
+  -- measured cure, still nil.
+  { name = "a measured cure alone that cannot out-heal the damage",
     hp = 100, maxhp = 168, restore = 50, roundCost = 112, allies = 0,
-    mp = true, want = nil },
+    want = nil },
+  -- The exploratory cast is the exception, and it has to be, because the
+  -- heal-lock clause needs a size and there is not one yet.  One turn, once
+  -- per spell per battle, and it is what produces the number above.
+  { name = "the same character alone with the cure not yet measured",
+    hp = 100, maxhp = 168, roundCost = 112, allies = 0,
+    unknown = true, want = "to full" },
   -- Battle 70's opening, from the mrf-save-room battery: EDGAR at 108/354,
   -- nothing measured yet because nobody has been hit.  246 points of hole
   -- takes 246 of a Potion's 250.
@@ -188,9 +202,10 @@ H.run({ maxFrames = 3000 }, {
     for _, c in ipairs(CASES) do
       local got = H.healDecision(c)
       H.assertEq(tostring(got), tostring(c.want), string.format(
-        "%s: %d/%d hp, heal %d into a hole of %d, round costs %d, %d allies "
-        .. "-> %s", c.name, c.hp, c.maxhp, c.restore, c.maxhp - c.hp,
-        c.roundCost, c.allies, tostring(c.want)))
+        "%s: %d/%d hp, heal %s into a hole of %d, round costs %d, %d allies "
+        .. "-> %s", c.name, c.hp, c.maxhp,
+        c.restore and tostring(c.restore) or "of unknown size",
+        c.maxhp - c.hp, c.roundCost, c.allies, tostring(c.want)))
       ran = ran + 1
     end
   end),

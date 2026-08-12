@@ -585,8 +585,8 @@ M.HEAL_VALUE = 0.75
 --   roundCost   what one round takes off this candidate, measured in the
 --               fight; 0 before the enemy has landed a round
 --   allies      living party members other than the actor deciding
---   mp          true for a cast, which is paid in MP rather than out of the
---               bag, and whose size is not knowable in advance
+--   unknown     this heal's size has not been established, so there is no
+--               hole to weigh it against; heal to maximum instead
 --   value       override for M.HEAL_VALUE
 --
 -- Returns the reason to heal, or nil for "act instead".
@@ -602,14 +602,25 @@ M.HEAL_VALUE = 0.75
 -- repeatedly is how a party runs out of supplies before the fight that needs
 -- them.  M.HEAL_VALUE is how much of the heal has to land.
 --
--- A cure is exempt, because there is no honest way to know in advance what
--- one restores: the power byte is an input to a formula that scales with the
--- caster's magic power and level, so weighing a cast against a hole would be
--- weighing it against a guess.  The owner's answer is to heal to maximum,
--- and it is affordable for the same reason the route prefers casting to
--- drinking at all -- OT6 refunds MP in full at every level up
--- (ot6_progression.asm:3-6), so MP spent in a fight comes back and a Tonic
--- does not.
+-- `unknown` is the magic clause, and it fires exactly while the premise
+-- behind it holds.  A cure's size really is not knowable in advance: the
+-- power byte is an input to a formula that scales with the caster's magic
+-- power and level, so weighing a first cast against a hole would be weighing
+-- it against a guess.  While that is the situation, heal to maximum, which is
+-- affordable for the same reason the route prefers casting to drinking at all
+-- -- OT6 refunds MP in full at every level up (ot6_progression.asm:3-6), so
+-- MP spent in a fight comes back and a Tonic does not.
+--
+-- But newFightDriver watches what its first cast puts back, so from the
+-- second cast of a battle the size IS known, and then the value rule governs
+-- the cure too.  Measured 2026-08-12 on the Zozo street: taken literally past
+-- the point of knowing, "heal everyone to maximum" spent twelve of the
+-- caster's turns and 65 MP topping targets up from 225/280 and 228/289 with a
+-- cure measured at 148, the fight ran past the step's 30000-frame budget with
+-- the party at full HP the whole time, and the run reported a navigation
+-- timeout.  What is left of the owner's clause after that is the whole of it:
+-- top everyone up to maximum rather than to a fraction, and stop when what is
+-- left of the hole is smaller than the heal.
 --
 -- Two clauses sit on top of the value rule.
 --
@@ -621,8 +632,13 @@ M.HEAL_VALUE = 0.75
 -- drink costs him more attacking time than it buys, so he does not drink; he
 -- swings.  That is solo LOCKE against battle 11's soldier, where a Tonic
 -- restoring 50 against 55 to 112 a round bought five drinks and one attack
--- (issue #74).  A cast spends a turn exactly as a drink does, so `mp` does
--- not reach this clause.
+-- (issue #74).  A cast spends a turn exactly as a drink does, so a measured
+-- cure is refused there on the same terms.  An UNMEASURED one is not, because
+-- the clause needs a size and there is not one yet; that is the exploratory
+-- cast that produces the number, and it is taken at most once per spell per
+-- battle in the only shape that matters, since a round big enough to trip the
+-- heal-lock leaves a hole bigger than the cure and so a cast that does not
+-- fill anyone to maximum, which is the cast healWatch can measure.
 --
 -- The second is death.  A target inside one round of dying is worth a heal
 -- the value rule would refuse, because what the turn buys back is that
@@ -638,12 +654,13 @@ M.HEAL_VALUE = 0.75
 function M.healDecision(o)
   local hp, maxhp = o.hp or 0, o.maxhp or 0
   local gain, cost = o.restore or 0, o.roundCost or 0
-  if hp <= 0 or maxhp <= 0 or gain <= 0 then return nil end
+  if hp <= 0 or maxhp <= 0 then return nil end
   local missing = maxhp - hp
   if missing <= 0 then return nil end
   -- the heal-lock: alone against damage the heal cannot out-run, swing
-  if (o.allies or 0) == 0 and gain < cost then return nil end
-  if o.mp then return "to full" end
+  if (o.allies or 0) == 0 and gain > 0 and gain < cost then return nil end
+  if o.unknown then return "to full" end
+  if gain <= 0 then return nil end
   if missing >= gain * (o.value or M.HEAL_VALUE) then return "full value" end
   if hp <= cost and math.min(maxhp, hp + gain) > cost then return "in danger" end
   return nil
@@ -1961,24 +1978,21 @@ function M.newFightDriver(tag, opts)
         local cost = roundCost[c.e] or 0
         -- The cast, offered first.
         --
-        -- A cast is weighed by the same rule with the value clause turned off
-        -- (M.healDecision's `mp`): nobody can say in advance what a cure
-        -- restores, so there is no hole to compare it against, and the
-        -- owner's answer is to heal to maximum.  MP pays for that, and MP
-        -- comes back at every level up.  The one clause a cast is NOT exempt
-        -- from is the solo heal-lock, which is an argument about spending
-        -- turns, and a cast spends a turn exactly as a drink does.
+        -- A cure's size is not knowable in advance -- its magic_prop power is
+        -- an input to a formula that scales with the caster's magic power and
+        -- level, so reading it would be deciding the policy on a guess -- so
+        -- an unmeasured cure goes to M.healDecision as `unknown`, which is
+        -- the owner's magic clause: heal that target to maximum.  That cast
+        -- is also how the number is obtained.  healWatch measures what it put
+        -- back, and from the second cast of the battle the cure is weighed by
+        -- the ordinary value rule, because by then the premise the magic
+        -- clause rests on has stopped being true.
         --
-        -- What the cure restores is still measured, because the heal-lock
-        -- clause needs the number.  The first cast of a spell in a battle is
-        -- how it is obtained: it is offered unconditionally, healWatch
-        -- measures what it put back, and every later cast that battle is
-        -- weighed against the real figure.  A cast that fills the target to
-        -- maximum records nothing, because the HP that moved understates the
-        -- spell -- so under "heal to maximum" the measurement lands exactly
-        -- where it is load-bearing and misses where it is not: a round big
-        -- enough to trip the heal-lock leaves a hole bigger than the cure,
-        -- which is a cast that does not fill anyone up.
+        -- A cast that fills the target to maximum records nothing, because
+        -- the HP that moved understates the spell.  That leaves the
+        -- measurement landing exactly where it is load-bearing: a round big
+        -- enough to trip the solo heal-lock leaves a hole bigger than the
+        -- cure, which is a cast that does not fill anyone up.
         --
         -- The measurement can also miss outright, and then the spell stays
         -- unmeasured and keeps being offered -- the behaviour the cast line
@@ -1992,9 +2006,9 @@ function M.newFightDriver(tag, opts)
             local cell, mpCost = spellCell(actor, spell, true)
             if cell ~= nil then
               local gain = castRestore[spell]
-              local why = gain == nil and "not yet measured"
-                or M.healDecision({ hp = c.hp, maxhp = c.maxhp, restore = gain,
-                     roundCost = cost, allies = allies, mp = true })
+              local why = M.healDecision({ hp = c.hp, maxhp = c.maxhp,
+                restore = gain, roundCost = cost, allies = allies,
+                unknown = gain == nil })
               if why then
                 healSaid = nil
                 M.log(string.format("[%s] actor=%d cure entity %d (%d/%d) with "
@@ -2006,9 +2020,9 @@ function M.newFightDriver(tag, opts)
                          row = cureRow }
               end
               local said = string.format("[%s] actor=%d not curing entity %d "
-                .. "(%d/%d): $%02X restores %d and a round costs %d, so the "
-                .. "turn buys back less than it spends -- acting instead",
-                tag or "fight", actor, c.e, c.hp, c.maxhp, spell, gain, cost)
+                .. "(%d/%d): $%02X restores %d into a hole of %d, so most of "
+                .. "it would be thrown away -- acting instead", tag or "fight",
+                actor, c.e, c.hp, c.maxhp, spell, gain, c.maxhp - c.hp)
               if said ~= healSaid then healSaid = said; M.log(said) end
             end
           end
