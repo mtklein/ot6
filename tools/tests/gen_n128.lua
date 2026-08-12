@@ -216,21 +216,66 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 -- RNG seed is the frame phase at battle init.  A wipe is detected inside the
 -- drive (the party's battle HP all zero, debounced) so the ladder can
 -- reload instead of riding the Annihilated screen into a timeout.
--- Fight 6 uses explicit targeting, and the reason is measured rather than
--- assumed: on the first input-driven attempt the fighter's default targeting
--- attacked the blades for 8500 frames.  Left Blade read 515/sh1 and then
--- 700/sh3 again, so the blades regenerate, while the body sat untouched at
--- 3276/sh7 and the party ran out of HP.  The body's authored break axis is
--- piercing (bosses-wob.md 15, as re-decoded by #23: the bolt/water row was
--- never written, so the physical class is the shipped axis), which is EDGAR's
--- AutoCrossbow.  The override below steers every single-target confirm
--- onto the live $010B slot so the crossbow chips the 7 shields and everyone's
--- damage lands on the body.  Items still target the party
--- (the override skips char-side selects), and a 40-frame give-up keeps
--- an untargetable state from deadlocking a turn.
+-- Fight 6 steers every single-target confirm onto the body, and the reason
+-- is measured rather than assumed: on the first input-driven attempt the
+-- fighter's default targeting attacked the blades for 8500 frames.  Left
+-- Blade read 515/sh1 and then 700/sh3 again, so the blades regenerate, while
+-- the body sat untouched at 3276/sh7 and the party ran out of HP.  The body's
+-- authored break axis is piercing (bosses-wob.md 15, as re-decoded by #23:
+-- the bolt/water row was never written, so the physical class is the shipped
+-- axis), which is EDGAR's AutoCrossbow.
+--
+-- That steering is `opts.focus` on the boss driver.  It used to be a local
+-- override in rideDriver that rotated the target cursor with UP and DOWN,
+-- and it never moved the cursor once (#92).  The reason is geometric:
+-- SelectMonsterUp / SelectMonsterDown (btlgfx_main.asm:17492, :17525) walk to
+-- the next monster by comparing sprite screen positions, and Number 128's
+-- body and its two blades sit side by side, so neither has a vertical
+-- neighbour to walk to.  Measured on attempt 1 of the 2026-08-11 run: seven
+-- target-select episodes in fight 6, zero cursor movements, and four of the
+-- seven ran the 40-frame give-up out and confirmed on whichever part was
+-- already highlighted -- twice on the Left Blade.  ot6.lua's focus machine
+-- leads with LEFT/RIGHT for exactly this reason (its note is the Cranes,
+-- another side-by-side formation) and is the one copy of this that has been
+-- measured working.  The mask it steers to is the monster slot bit:
+-- MonsterMaskTbl is `$01,$02,$04,$08,$10,$20` (btlgfx_main.asm:18220) and
+-- TargetSelectUp/Down index it by the selected monster, so bit N is slot N
+-- and the body's $010B slot 0 is mask $01.  Slot 0 is asserted below when
+-- fight 6 is recorded rather than assumed, because a static focus list
+-- naming the wrong slot would go back to steering nowhere, silently.
+
+-- What the party is carrying and what it has left to spend, read at the
+-- start of every fight on the ride.  There is no field access between the
+-- six fights, so the bag and the MP pools are a fixed supply and this is
+-- the record of how fast the ride burns them.
+local BATTINV = 0x2686                 -- battle inventory, 5 bytes/entry
+local function bagCount(id)
+  for i = 0, 251 do
+    if H.readByte(BATTINV + i * 5) == id then
+      return H.readByte(BATTINV + i * 5 + 3)
+    end
+  end
+  return 0
+end
+local function supplyReport(tag)
+  local who = {}
+  for e = 0, 3 do
+    local maxhp = H.readWord(0x3C1C + e * 2)
+    if maxhp > 0 then
+      who[#who + 1] = string.format("e%d char%d %d/%d hp %d/%d mp bp%d",
+        e, H.readByte(0x3ED8 + e * 2), H.readWord(0x3BF4 + e * 2), maxhp,
+        H.readWord(0x3C08 + e * 2), H.readWord(0x3C30 + e * 2),
+        H.readByte(0x3E9C + e * 2))
+    end
+  end
+  H.log(string.format("[supply %s] tonic=%d potion=%d fenix=%d | %s",
+    tag, bagCount(0xE8), bagCount(0xE9), bagCount(0xF0),
+    table.concat(who, " | ")))
+end
+
 local fights, rideStart = {}, nil
 local function rideDriver(pred, lostRef, maxFrames, what)
-  local ph, hb, battN, wipeN, tgtSpin = 0, 0, 0, 0, 0
+  local ph, hb, battN, wipeN = 0, 0, 0, 0
   -- Policy, revised twice, both times after measured losses.  Round one (run
   -- N0mLGnDD, ladder failing at fights 6/4/6): healPercent 60 reacted too
   -- late to the Mag Roaders' whole-party bursts, and bank=3 wasted BP,
@@ -246,8 +291,12 @@ local function rideDriver(pred, lostRef, maxFrames, what)
   -- to the AutoCrossbow that breaks the body.
   local Ftrash = H.newFightDriver("n128 trash", { tactical = true,
     boost = true, bank = 1, items = true, healPercent = 75, cadence = 12 })
+  -- Fight 6 steers every single-target confirm onto the body through the
+  -- library's own focus machine rather than a local one; see the block
+  -- above rideDriver for why the local one could not work.
   local Fboss = H.newFightDriver("n128 boss", { tactical = true,
-    boost = true, bank = 1, items = true, healPercent = 55, cadence = 12 })
+    boost = true, bank = 1, items = true, healPercent = 55, cadence = 12,
+    focus = { { slot = 0, mask = 0x01 } } })
   return H.driveUntil(function() return lostRef.lost or pred() end, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
@@ -277,6 +326,15 @@ local function rideDriver(pred, lostRef, maxFrames, what)
         H.log(string.format("[ride battle %d] f%d formation = "
           .. "%04X %04X %04X %04X %04X %04X", #fights, H.frame,
           w[1], w[2], w[3], w[4], w[5], w[6]))
+        supplyReport("fight " .. #fights .. " start")
+        if #fights == 6 then
+          -- Fboss's focus list is static, so the slot it names is checked
+          -- here.  A wrong slot steers nowhere and reports nothing, which
+          -- is the failure #92 spent a run finding.
+          H.assertEq(w[1], 0x010b,
+            "fight 6 puts NUMBER 128 in monster slot 0, which is the slot "
+            .. "Fboss's focus list steers to (mask $01)")
+        end
       end
       if battN >= 3 then
         -- a wipe never sets $0069; catch it here so the ladder can act.
@@ -294,38 +352,6 @@ local function rideDriver(pred, lostRef, maxFrames, what)
         end
         local F = (#fights >= 6) and Fboss or Ftrash
         F.frame()
-        -- fight 6: steer single-target confirms onto the body (header)
-        if #fights >= 6 and H.readByte(0x7BC2) == 0x38 then
-          local mons = H.readByte(0x7B7E)
-          if mons ~= 0 then
-            local body = nil
-            for m = 0, 5 do
-              if H.readWord(0x57C0 + m * 2) == 0x010B
-                 and H.readByte(0x3AA8 + m * 2) % 2 == 1 then body = m; break end
-            end
-            if body then
-              local want = 1 << body
-              if mons == want then
-                tgtSpin = 0
-                H.setPad(ph < 4 and { a = true } or {})
-              else
-                tgtSpin = tgtSpin + 1
-                if tgtSpin < 40 then
-                  local cur = 0
-                  for m = 0, 5 do
-                    if mons & (1 << m) ~= 0 then cur = m; break end
-                  end
-                  H.setPad(ph < 4
-                    and { [cur < body and "down" or "up"] = true } or {})
-                else
-                  H.setPad(ph < 4 and { a = true } or {})
-                end
-              end
-            end
-          end
-        else
-          tgtSpin = 0
-        end
         return
       end
       -- Out of battle: a wipe that outruns the in-battle debounce shows
