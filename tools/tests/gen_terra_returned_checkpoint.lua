@@ -393,6 +393,36 @@ H.run({ maxFrames = 160000 }, {
     H.screenshot("checkpoint_f_blackjack")
   end),
 
+  -- 3j. pick the party up off the floor, before the save.
+  --
+  -- The Cranes are what costs the party, and it is not the ride's approach
+  -- that does it: the reunion scene hands the fight a party at FULL HP
+  -- (measured this run -- LOCKE arrives at n128_won on 209/397 and battle 71
+  -- opens at partyhp=448,457,397,312, so #92's minecart retune cannot reach
+  -- this fight either way).  Battle 71 then spends it.  Attempt 1 wiped;
+  -- attempt 2 won and came out EDGAR 0/448, SABIN 274/457, LOCKE 252/397,
+  -- SETZER 28/312, and nothing between there and the save gives any of it
+  -- back -- the whole flashback is played as the WEDGE-actor Maduin, with
+  -- the party off the field, and the finale restores the roster without
+  -- restoring HP.  That is how terra-returned-v1 came to be committed with
+  -- EDGAR at 0/448 and SABIN at 0/457.
+  --
+  -- Here rather than anywhere earlier, because this is the first frame since
+  -- the fight on which the party exists and the player has field control.
+  -- The deck (map 6) is an ordinary field map; the alternative is the
+  -- grounded world map four steps below, where gen_tunnelarmr measured a
+  -- care stop breaking outright.
+  --
+  -- The bag is 15 Tonics, 2 Fenix Downs and no Potions, and nobody here
+  -- (LOCKE, EDGAR, SABIN, SETZER) knows a cure -- an esper's grant is
+  -- battle-only (#96) -- so this drinks.  The default 0.55 threshold is
+  -- deliberate rather than a top-up: it buys the revive and lifts whoever
+  -- the fight left near fatal, and leaves the members in the 60% band alone,
+  -- so the Fenix Down the next segment might need is still there.  If this
+  -- ever runs the bag dry, that is a supply finding for the segment, not a
+  -- reason to lower the exit bar below.
+  H.fieldCare({ tag = "care on the deck after the Cranes" }),
+
   -- 4. takeoff and grounding
   H.navTo(14, 6, { playBattles = "flee", maxFrames = 6000, calmFrames = 8 }),
   (function() local ph = 0
@@ -504,20 +534,15 @@ H.run({ maxFrames = 160000 }, {
   H.waitFrames(45),
   H.call(function()
     H.assertExitContract("terra-returned-v1")
-    -- terra-returned-v1 as committed hands over EDGAR at 0/448 and SABIN at
-    -- 0/457, and this generator has no care stop and had no exit contract on
-    -- the party, so it wrote them out without a word.  Everything below
-    -- inherits it: gen_narshe_mission boots this and used to carry both
-    -- corpses into narshe-mission-v1, which gen_gate_cave_save boots in
-    -- turn.  They arrive already down rather than dying here -- the boot
-    -- state is n128_won, and #92 records that fight being retuned to a win
-    -- the party "arrives worse" from -- so when this fires the answer is a
-    -- care stop before the save, not a lower bar.  Same three conditions as
-    -- tools/audit_party_hp.py; change the two together.
-    --
-    -- NOT EXECUTED.  This generator needs the deep chain down to n128_won,
-    -- which is hours, so this line is compiled and loaded but has never run.
-    -- The identical line in gen_narshe_mission was run and passes.
+    -- RUN, and it fired.  Without the care stop above it named EDGAR at
+    -- 0/448 at this exact point, which is how terra-returned-v1 came to be
+    -- committed with EDGAR and SABIN dead; everything below inherited it,
+    -- since gen_narshe_mission cold-Continues this battery and
+    -- gen_gate_cave_save cold-Continues that one.  The corpses are made in
+    -- battle 71 rather than carried in -- the fight opens at full HP -- so
+    -- the answer was a care stop between the fight and the save, not a lower
+    -- bar.  Same three conditions as tools/audit_party_hp.py; change the two
+    -- together.
     H.assertPartyStanding("terra-returned-v1 exit")
     H.screenshot("checkpoint_f_saved")
   end),
