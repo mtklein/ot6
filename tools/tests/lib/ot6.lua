@@ -838,6 +838,17 @@ end
 -- widely as 60 phases allow, and the seed each attempt actually drew is read
 -- off the store instruction and required to be distinct.  A ladder that plays
 -- one fight twice is the failure mode with no symptom, so it fails the run.
+--
+-- Why the spacing is as wide as it is, rather than merely nonzero.  RNGTbl is
+-- 256 bytes (ff6/src/field/rng_tbl.dat, incbin'd at field/rng_tbl.asm:11) and
+-- $be is an index into it, so two attempts are not independent streams: they
+-- are the same table read from two starting points, 4 entries apart per phase.
+-- Attempts one phase apart share every draw with a shift of four, and a fight
+-- consuming a few hundred randoms walks the whole table several times over
+-- either way.  Distinct seeds are what makes the attempts different fights;
+-- distant seeds are what makes them differ early, before the party's state has
+-- diverged enough to matter.  Three attempts 20 phases apart start 80 table
+-- entries apart, which is the most the cycle allows.
 
 M.SEED_PHASE = 0x021E                   -- wGameTimeFrames
 M.SEED_PERIOD = 60                      -- IncGameTime's 1..60 cycle
