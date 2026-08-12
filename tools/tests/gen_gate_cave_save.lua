@@ -511,18 +511,17 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(sw(0x01BF), 1, "$01BF SET -- the SavePoint script ran")
     H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch")
     H.assertExitContractPreSave("gate-cave-save-v1")
-    -- gate-cave-save-v1 as committed carries TERRA dead at 0/345, and this
+    -- gate-cave-save-v1 used to carry TERRA dead at 0/345, and this
     -- generator had no care stop and no exit contract on the party, so both
     -- the fixture and the checkpoint went out that way.  Same three
     -- conditions as tools/audit_party_hp.py; change the two together.
     --
-    -- RUN, and it passes on the current ROM: 345/345, 397/397, 304/448,
-    -- 350/457, and gate_cave_save.mss comes out clean.  So the committed
-    -- checkpoint's dead TERRA is an artifact of an older route rather than
-    -- something this step still does -- the route reaches the save tile
-    -- upright today, out of a narshe-mission-v1 that is itself still dirty.
-    -- A re-capture should therefore be clean, and this is the line that
-    -- says so if it ever stops being.
+    -- RUN, and it passes, and it never needed a care stop: the dead TERRA
+    -- was an artifact of an older route rather than anything this step
+    -- still does.  Re-captured out of a clean narshe-mission-v1 the party
+    -- reaches the save tile at TERRA 306/306, LOCKE 270/353, EDGAR 338/398
+    -- and SABIN 407/407.  This line is what says so if that ever stops
+    -- being true.
     H.assertPartyStanding("gate-cave-save-v1 exit")
     H.screenshot("step_gh_save_tile")
   end),
