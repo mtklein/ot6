@@ -39,7 +39,7 @@ survivor, it is a casualty the next random encounter has already claimed,
 and the room that kills it will be investigated as a hard room.  Near fatal
 rather than something stricter, because a check that fires on ordinary wear
 gets waived into uselessness, and the data says the gap is wide: across the
-98 fixtures in the tree on 2026-08-11 there were 241 party records, and
+98 .mss files in build/states on 2026-08-11 there were 241 party records, and
 sorted by fraction of max HP they run 0%, 6.5%, then nothing at all until
 36.6%, 36.6%, 38.5%, 48.4% and up.  Max/8 is 12.5%, which sits in the empty
 middle of that gap with room on both sides.  A half-HP bar would have named
@@ -60,10 +60,21 @@ WHO COUNTS AS IN THE PARTY
 
 `$1850 + c` low three bits nonzero, which during the three-scenario split is
 true of all three parties at once and not only the one the player is
-steering.  That is on purpose: at `kefka_doorstep` the player holds party 1
+steering.  That is on purpose: at `kefka_entry` the player holds party 1
 and parties 2 and 3 are queued behind the same fight, so a casualty in
 either is shipping just as much as one on screen.  The report says which
 party each finding is in and marks the active one.
+
+WHICH FILES COUNT AS FIXTURES
+
+Only the ones tools/tests/savestate_graph.py still declares.  build/states
+outlives the graph -- renaming a state leaves the old .mss sitting there
+forever -- and on 2026-08-12 nineteen of the ninety-eight files in it were
+leftovers.  One of them, `kefka_doorstep`, was a pre-rename copy of
+`kefka_entry` from before gen_narshe_battle got its care stop, and it named
+CELES dead at 0/217: a casualty in a route that no longer exists, that no
+regeneration can clear and no generator edit can fix.  It was worked as a
+live bug.  savestate_party.declared_states carries the rest of that story.
 
 Usage:  python3 tools/audit_party_hp.py [--dir build/states] [--selftest] [-v]
 Exit 0 clean, 1 if any fixture ships a casualty or carries a stale waiver.
@@ -80,8 +91,9 @@ import sys
 # `python3 -P` both switch off.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from savestate_party import (ST1_PETRIFY, ST1_WOUND, ST1_ZOMBIE, load_waivers,
-                             read_party, stem_of)
+from savestate_party import (ST1_PETRIFY, ST1_WOUND, ST1_ZOMBIE,
+                             declared_states, load_waivers, read_party,
+                             split_orphans, stem_of)
 
 WAIVERS = "tools/party_hp_waivers.txt"
 
@@ -128,7 +140,7 @@ def describe(m: dict) -> str:
 # the fixtures are generated state that no unit test can stand in for.  This
 # is the part that fails when the check stops checking.
 
-def selftest() -> int:
+def selftest(repo: str = ".") -> int:
     def rec(hp, maxhp, st1=0x00, **kw):
         d = {"name": "TERRA", "level": 9, "hp": hp, "maxhp": maxhp,
              "status1": st1, "party": 1, "active": True}
@@ -137,7 +149,7 @@ def selftest() -> int:
 
     cases = [
         # the three findings this check was written for, as measured
-        (rec(0, 217, 0x80), "DEAD", "kefka_doorstep CELES"),
+        (rec(0, 217, 0x80), "DEAD", "kefka_entry CELES"),
         (rec(0, 136), "DEAD", "returner_hideout TERRA, HP zero"),
         (rec(15, 231), "NEAR FATAL", "camp_escaped SABIN, 6.5%"),
         # the boundary, both sides of it: 231 >> 3 == 28, inclusive
@@ -161,9 +173,34 @@ def selftest() -> int:
             bad.append(f"{what}: expected {want}, got {got}")
     if near_fatal_floor(231) != 28:
         bad.append("near_fatal_floor(231) should be 28")
+
+    # The orphan filter.  Without these three the filter can quietly become
+    # a no-op -- declared_states swallows any exception and returns an empty
+    # set, and split_orphans treats an empty set as "audit everything" -- so
+    # a graph this stops being able to read would put kefka_doorstep back in
+    # the report with no sign that anything changed.
+    live, orph = split_orphans(
+        ["build/states/kefka_entry.mss", "build/states/kefka_doorstep.mss"],
+        {"kefka_entry"})
+    if live != ["build/states/kefka_entry.mss"] or orph != ["kefka_doorstep"]:
+        bad.append(f"split_orphans should keep kefka_entry and drop the "
+                   f"pre-rename kefka_doorstep, got live={live} orphans={orph}")
+    live, orph = split_orphans(["build/states/anything.mss"], set())
+    if live != ["build/states/anything.mss"] or orph != []:
+        bad.append("an unreadable graph must audit everything and orphan "
+                   f"nothing, got live={live} orphans={orph}")
+    # And this is the clause that fails if the graph file moves, or S()
+    # stops carrying a "state" key: an empty set here is indistinguishable
+    # from a clean tree everywhere else.
+    declared = declared_states(repo)
+    if "kefka_entry" not in declared or len(declared) < 50:
+        bad.append(f"declared_states({repo!r}) should read "
+                   f"tools/tests/savestate_graph.py and find kefka_entry "
+                   f"among ~114 states, got {len(declared)}")
+
     for line in bad:
         print(f"  SELFTEST FAIL {line}")
-    print(f"audit_party_hp selftest: {len(cases)} cases, "
+    print(f"audit_party_hp selftest: {len(cases) + 3} cases, "
           f"{len(bad)} failed")
     return 1 if bad else 0
 
@@ -177,7 +214,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.selftest:
-        return selftest()
+        return selftest(args.repo)
 
     waivers = load_waivers(args.repo, WAIVERS)
     used = set()
@@ -186,6 +223,19 @@ def main() -> int:
     if not files:
         print(f"audit_party_hp: no fixtures under {args.dir}")
         return 0
+
+    # Files the graph no longer declares are leftovers from a rename, not
+    # fixtures: no generator writes them, so a casualty in one names a route
+    # that no longer exists and cannot be fixed by editing anything.  See
+    # savestate_party.declared_states for the case that put this here.
+    files, orphans = split_orphans(files, declared_states(args.repo))
+    if not files:
+        print(f"audit_party_hp: {len(orphans)} fixture(s) under {args.dir} "
+              f"and the graph declares NONE of them.  That is the filter "
+              f"broken, not a clean tree;\nrefusing to report green over "
+              f"nothing.  Check {args.dir} and tools/tests/savestate_graph.py "
+              f"agree on names.")
+        return 1
 
     scanned, skipped, bad = 0, [], []
     for p in files:
@@ -216,6 +266,11 @@ def main() -> int:
           + (f", {len(skipped)} unreadable" if skipped else ""))
     for name, err in skipped:
         print(f"  ?    {name}: {err}")
+    if orphans:
+        print(f"  ({len(orphans)} file(s) in {args.dir} that the graph no "
+              f"longer declares, SKIPPED -- they are pre-rename leftovers "
+              f"and\n   nothing regenerates them; delete them: "
+              + ", ".join(orphans) + ")")
 
     for stem, party, hurt in bad:
         for m, why in hurt:

@@ -28,8 +28,11 @@ unconditional in `make test`.
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import zlib
+
+GRAPH = "tools/tests/savestate_graph.py"
 
 CHAR_BLOCK = 0x1600          # WRAM address of the character table
 PARTY = 0x1850               # WRAM address of the party/order bytes
@@ -54,6 +57,58 @@ ST1_OUT = ST1_WOUND | ST1_PETRIFY | ST1_ZOMBIE
 NAMES = {0: "TERRA", 1: "LOCKE", 2: "CYAN", 3: "SHADOW", 4: "EDGAR",
          5: "SABIN", 6: "CELES", 7: "STRAGO", 8: "RELM", 9: "SETZER",
          10: "MOG", 11: "GAU", 12: "GOGO", 13: "UMARO"}
+
+
+def declared_states(repo: str) -> set[str]:
+    """The fixture names this tree's savestate graph still declares.
+
+    Both audits glob `build/states/*.mss`, and that directory outlives the
+    graph: renaming a state writes the new name and leaves the old .mss
+    sitting there, because nothing ever deletes one.  On 2026-08-12
+    build/states held 98 fixtures of which 19 were leftovers -- the whole
+    `*_doorstep` -> `*_entry` rename (1e54ef8), plus mines_chase ->
+    moogle_entry, narshe_escape_start -> narshe_streets, the dev_* scratch
+    states and _scratch_vargas_p2.
+
+    That is not tidiness.  One of those leftovers, kefka_doorstep, was a
+    pre-rename copy of kefka_entry taken before gen_narshe_battle got its
+    care stop (b31ca37), and it carried CELES dead at 0/217.  So the party-hp
+    audit named a casualty that no generator produces, that no regeneration
+    can clear, and that no edit to any generator can fix -- and it was worked
+    as a live route bug.  An orphan cannot be repaired, only deleted, so the
+    audits have to be able to tell one apart from a fixture.
+
+    `tools/tests/savestate_graph.py` is the single list `make savestates`
+    builds from, which makes it the answer to "is this file still a fixture".
+    Reading it is milliseconds and needs no build.ninja and no emulator,
+    which matters because `make test` runs both audits without either.
+
+    Returns an empty set if the graph cannot be read at all; callers treat
+    that as "cannot tell" and fall back to auditing every file, which is the
+    behaviour from before this existed.
+    """
+    path = os.path.join(repo, GRAPH)
+    try:
+        spec = importlib.util.spec_from_file_location("savestate_graph", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return {s["state"] for s in mod.STATES}
+    except Exception:
+        return set()
+
+
+def split_orphans(files: list[str], declared: set[str]):
+    """Partition globbed fixtures into (live, orphan stems).
+
+    With an unreadable graph (`declared` empty) everything is live and
+    nothing is an orphan, so a caller that cannot read the graph audits the
+    whole directory exactly as it used to.
+    """
+    if not declared:
+        return list(files), []
+    live = [p for p in files if stem_of(p) in declared]
+    orphans = sorted(stem_of(p) for p in files if stem_of(p) not in declared)
+    return live, orphans
 
 
 def load_waivers(repo: str, path: str) -> dict[tuple[str, str], str]:

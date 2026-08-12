@@ -41,7 +41,8 @@ import sys
 # but a one-line insert costs nothing and cannot surprise anyone later.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from savestate_party import EMPTY, NAMES, load_waivers, read_party, stem_of
+from savestate_party import (EMPTY, NAMES, declared_states, load_waivers,
+                             read_party, split_orphans, stem_of)
 
 WAIVERS = "tools/equipment_waivers.txt"
 ITEM_PROP = "ff6/src/menu/item_prop_en.dat"
@@ -93,6 +94,18 @@ def main() -> int:
         print(f"audit_equipment: no fixtures under {args.dir}")
         return 0
 
+    # Same reason as the party-hp audit: a .mss the graph no longer declares
+    # is a rename leftover, and a finding in one cannot be fixed by editing
+    # any generator.  savestate_party.declared_states has the case.
+    files, orphans = split_orphans(files, declared_states(args.repo))
+    if not files:
+        print(f"audit_equipment: {len(orphans)} fixture(s) under {args.dir} "
+              f"and the graph declares NONE of them.  That is the filter "
+              f"broken, not a clean tree;\nrefusing to report green over "
+              f"nothing.  Check {args.dir} and tools/tests/savestate_graph.py "
+              f"agree on names.")
+        return 1
+
     scanned, skipped, bad = 0, [], []
     for p in files:
         party, err = read_party(p)
@@ -126,6 +139,11 @@ def main() -> int:
               + " -- the equip mask says so)")
     for name, err in skipped:
         print(f"  ?    {name}: {err}")
+    if orphans:
+        print(f"  ({len(orphans)} file(s) in {args.dir} that the graph no "
+              f"longer declares, SKIPPED -- they are pre-rename leftovers "
+              f"and\n   nothing regenerates them; delete them: "
+              + ", ".join(orphans) + ")")
 
     for name, party, naked in bad:
         who = ", ".join(f"{m['name']} (L{m['level']}, {m['hp']}/{m['maxhp']})"
