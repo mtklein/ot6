@@ -130,6 +130,24 @@ end
 -- line anywhere in the log).  A soft canary hands the verdict back to the
 -- caller, which still has to decide -- and gen_vargas still fails the run if
 -- every attempt loses.
+--
+-- How far this generalises, checked rather than assumed: gen_vargas is the
+-- only one of the ten retry ladders in the tree that was in this position.
+-- The ten are the list in the commit that moved them onto H.newSeedLadder --
+-- battle_brokendeath, gen_esper_tubes, gen_ifrit_magicite, gen_n128,
+-- gen_tunnelarmr, gen_sfigaro, gen_terra_returned_checkpoint, gen_vargas,
+-- probe_cranes_water, and M.clearGateSoldier below.  Only three library calls
+-- arm this canary (M.navTo, M.worldNavTo and M.advanceStory, its three call
+-- sites in this file), and in the other nine every step between an attempt's
+-- spread and its verdict is a raw M.driveUntil or M.waitUntil, which do not.
+-- Two of them reach a navigator through M.talkToObj, but before the fight
+-- rather than after it, and a retry reloads a live-party blob before that
+-- step runs, so neither can meet a wiped party.  Three -- gen_sfigaro,
+-- gen_n128 and probe_cranes_water -- carry comments saying they avoided
+-- advanceStory here deliberately, gen_sfigaro's being "a hard timeout here
+-- would abort the whole generate instead of letting the ladder reload and
+-- retry".  gen_vargas is the one that reached for the shared ride instead,
+-- which is why it is the one that lost its rungs.
 local function wipeCanary(tag, soft)
   local n, said = 0, false
   return function()

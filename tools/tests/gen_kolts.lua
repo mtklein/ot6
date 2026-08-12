@@ -201,32 +201,43 @@ end
 -- line spends Potions inside the fight, so the walk may only spend down to
 -- three of them and uses Tonics for small holes.
 --
--- magic = false, and this is the reason H.fieldCare's own header gives for
--- the option: "set false on a step that wants its MP kept for the fight it is
--- walking toward."  This route IS that step.  It ends one interaction away
--- from VARGAS, and TERRA's MP is the whole of that fight's sustain -- her
--- Cure line is what carries the trio through Gale Cut while the script's hp
--- gates are crossed, and gen_vargas's medic spends her down to 6 MP in every
--- winning run on record.  The general argument for casting (level up refunds
--- MP, a drunk Tonic is gone) is sound in a corridor and does not survive a
--- corridor that ends at a boss: nothing levels up between the last care stop
--- and battle 66.
+-- mpFloor is the third.  Casting stays on; what changes is how much of the
+-- caster's pool this segment is allowed to spend, because a quarter-of-max
+-- floor is an idle-corridor number and this corridor ends at a boss.
 --
--- Measured across five worktrees' fixtures on 2026-08-11, reading TERRA's
--- record straight out of each vargas_entry.mss:
---     wt/multihit, wt/bpwindow (before the cast-first policy)  46/46 MP
---     wt/healpolicy, and two later chains                      21, 26, 31/46
--- and the fights those entry points led to: 46 MP won at bpwindow and
--- multihit; 26 MP lost, with VARGAS at 11065 of 11600 and TERRA out of MP
--- (wt/restage's own failed run); 31 MP won.  The shop stop above buys 25
--- Tonics for exactly this climb and the gil is already spent, so the bag is
--- what the crossing is meant to run on.  What the cast-first policy bought
--- here -- about 16 Tonics and 3 Fenix Downs left unspent -- is worth less
--- than the MP it took away from the boss.
+-- The argument for casting is in H.fieldCare's header and it is sound: OT6
+-- refills HP and MP on level up (ot6_progression.asm:3-6), so MP spent in a
+-- corridor is refunded and a Tonic drunk in one is gone.  The clause it
+-- assumes is a level up between the spending and the next fight.  Nothing
+-- levels up between the last care stop on this mountain and battle 66, and
+-- TERRA is the only member of this party who knows Cure -- LOCKE's and
+-- EDGAR's pools pay for their own abilities, since in OT6 every ability
+-- costs MP -- so on this segment her pool is not a renewable healing budget
+-- at all.  It is the boss's healing, being spent early.
+--
+-- What the fight needs, measured.  gen_vargas's medic spends TERRA from her
+-- entry MP down to 6 in every winning run on record, so the fight consumes
+-- whatever she brings.  Read straight out of five worktrees' vargas_entry.mss
+-- on 2026-08-11, with the battle 66 result each one led to:
+--     wt/multihit, wt/bpwindow  46/46 mp   won
+--     wt/ladder, wt/restage     31/46 mp   won
+--     an earlier chain on the v0.10 tip  26/46 mp   LOST -- VARGAS left at
+--         11065 of 11600, short of even his first script gate, TERRA out of
+--         MP by frame 13283 (wt/restage's own failed run of that step)
+--     wt/healpolicy             21/46 mp   not run
+-- So the fight's threshold sits between 26 and 31, and the entry contract
+-- below asks for two thirds of her maximum (31 of 46) on that basis.
+--
+-- The floor is set above the contract, not equal to it, so a normal run has
+-- headroom and the contract only fires when something has actually changed:
+-- 0.75 of her maximum is 34, and fieldCare stops casting when a cast would
+-- break the floor, so she arrives between 34 and 38.  That still buys this
+-- climb two or three Cures, which is where the item saving comes from; what
+-- it does not buy is the eight or nine casts a quarter-floor allowed.
 local POTION = 0xE9
 local function care(tag, threshold)
   return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.85,
-                       reserve = { [POTION] = 5 }, magic = false })
+                       reserve = { [POTION] = 5 }, mpFloor = 0.75 })
 end
 
 -- crossDoor/seq: a bare step list cannot be spliced into a step list (Lua
@@ -1002,17 +1013,19 @@ H.run({ maxFrames = 400000 }, {
     -- edges later, where it read as a hard fight rather than as a route
     -- that had spent the fight's healing on the walk to it.
     --
-    -- The bar is TERRA's, because she is the fight's only healer once the
-    -- Potions thin out, and it is 3/4 of her own maximum rather than an
-    -- absolute so it survives her levelling.  Where 3/4 comes from: the
-    -- fixtures that won battle 66 handed it 46 of 46 MP, the one that lost
-    -- it handed over 26, and a 31 won.  So the bar sits above the loss and
-    -- below both wins, and every chain generated under the cast-first care
-    -- policy (21, 26, 31) fails it.  If this ever fires, the answer is to
-    -- stop spending her MP on the climb, not to lower the number.
+    -- The bar is TERRA's, because she is the only member of this party who
+    -- knows Cure and therefore the fight's only healer once the Potions thin
+    -- out.  It is two thirds of her own maximum rather than an absolute so it
+    -- survives her levelling, and two thirds is where the measured win/loss
+    -- boundary is: 26 of 46 lost battle 66, 31 and 46 won, and two thirds of
+    -- 46 is 31.  The care stops above ration to a 0.75 floor, deliberately
+    -- above this bar, so a healthy run clears it with room and this fires
+    -- only when the segment's MP budget has actually moved.  If it fires,
+    -- the answer is to stop spending her MP on the climb, not to lower the
+    -- number.
     local terra = 0
     H.assertEq(H.charMaxMp(terra) > 0, true, "TERRA has an MP pool to check")
-    H.assertEq(H.charMp(terra) * 4 >= H.charMaxMp(terra) * 3, true,
+    H.assertEq(H.charMp(terra) * 3 >= H.charMaxMp(terra) * 2, true,
       string.format("TERRA reaches VARGAS with her Cure line intact " ..
         "(%d/%d mp)", H.charMp(terra), H.charMaxMp(terra)))
     -- The party also still has a way to answer a death.  gen_vargas raises
