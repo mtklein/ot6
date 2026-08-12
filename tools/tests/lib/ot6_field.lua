@@ -527,7 +527,12 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --                          entry, A takes the default target);
 --                  "tactical"  read the live command table and use Edgar's
 --                          Tools, Sabin's Blitz, and Fight for everyone else,
---                          with the driver's own item medic line.  It heals
+--                          with the driver's own item medic line.  Which
+--                          Tool is opts.tool (default H.AUTOCROSSBOW); an
+--                          area whose shield rows carry no class key wants
+--                          the element instead, which for Zozo is
+--                          H.BIO_BLASTER.  See newFightDriver's note.
+--                            It heals
 --                          at opts.healPercent (default 55).  That default
 --                          was 35, which was too late: measured on map 98
 --                          (Trilium + Tusker + two Cirpius), a party healing
@@ -633,7 +638,8 @@ function M.navTo(txIn, tyIn, opts)
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
-          healer = opts.healer, magic = opts.magic }) or nil
+          healer = opts.healer, magic = opts.magic,
+          tool = opts.tool }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   local function drop(why)  -- discard the plan, logging why once, not per frame
     if plan or pend then
@@ -864,7 +870,8 @@ function M.advanceStory(pred, maxFrames, opts)
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
-          healer = opts.healer, magic = opts.magic }) or nil
+          healer = opts.healer, magic = opts.magic,
+          tool = opts.tool }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.driveUntil(function()
@@ -1113,7 +1120,8 @@ end
 --                            entry, A takes the default target; the same
 --                            taps page the victory text);
 --                  "tactical" = read the live command table and use Edgar's
---                            Tools, Sabin's Blitz, and Fight for everyone else;
+--                            Tools (opts.tool, default H.AUTOCROSSBOW),
+--                            Sabin's Blitz, and Fight for everyone else;
 --                  "flee"  = hold L+R, the engine's own run mechanic.  On a
 --                            fixture chain this is often the right
 --                            input-driven ending for world encounters,
@@ -1146,7 +1154,8 @@ function M.worldNavTo(txIn, tyIn, opts)
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
-          healer = opts.healer, magic = opts.magic }) or nil
+          healer = opts.healer, magic = opts.magic,
+          tool = opts.tool }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   local hb = -600
   local function resolveT(v) return type(v) == "function" and v() or v end

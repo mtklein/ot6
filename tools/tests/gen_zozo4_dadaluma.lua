@@ -100,6 +100,28 @@ end
 -- (ot6_break.asm:1487-1497), so the fight is won by breaking rather than
 -- chipping.
 --
+-- AND THE THING THAT BREAKS THEM IS THE BIO BLASTER, not a weapon and not
+-- AutoCrossbow.  This is the whole reason the climb kept wiping, and it was
+-- authored on purpose rather than missing.  All four species this town
+-- draws -- SlamDancer $052, Harvester $04e, HadesGigas $053, Gabbldegak
+-- $0df -- carry an Ot6ShieldTbl row of two shields and NO class byte
+-- (ot6_hud.asm:2086-2097), so no weapon and no ability any party can field
+-- ever takes a shield off, and every hit lands at the shielded halving for
+-- the whole fight.  The block comment over those four rows says what the
+-- answer is instead: "the answer is the tool rather than the A button"
+-- (:2084-2085), meaning the vanilla poison weakness all four already carry
+-- (monster_prop.dat +25 = $08) and EDGAR's Bio Blaster, item $a4 -> attack
+-- $7d, element $08, all enemies, 0 MP (ot6_break.asm:203-204, :279-281;
+-- battle_main.asm:6577).  The same comment records the sweep that set the
+-- shield counts: at 2 shields the pack breaks penultimate and the loop wins
+-- 6/6, while "mashing wipes 6/6 in this town" (:2078).
+--
+-- newFightDriver defaults EDGAR to AutoCrossbow, which is pierce-class and
+-- right nearly everywhere else on the route, and there was no way to ask it
+-- for anything else until opts.tool.  So every drive on this climb was
+-- fighting the town with the one Tool that cannot open it.
+local BIO_BLASTER = H.BIO_BLASTER
+--
 -- The wipe check rides along, because a loss still has to report itself as
 -- a loss.  It cannot use H.partyWiped(): out of battle that reads $1600,
 -- which keeps PRE-battle HP, and in battle it defers to
@@ -123,7 +145,7 @@ end
 -- walking.
 local function encounters(what)
   local F = H.newFightDriver(what, { tactical = true, boost = true, bank = 3,
-    items = true, healPercent = 60, cadence = 12 })
+    items = true, healPercent = 60, cadence = 12, tool = BIO_BLASTER })
   local dead = 0
   return function()
     if battleHpAllZero() and not H.hasControl() and H.eventRunning() then
@@ -1024,6 +1046,13 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(map(), 221, "booted on the Zozo street (map 221)")
     H.assertEq(sw(0x034A), 1, "$034A SET -- the gentleman waits")
     H.assertEq(sw(0x0053), 0, "$0053 clear -- the Ramuh scene has not run")
+    -- The climb's whole answer to this town is in the bag rather than on
+    -- anybody's hands, so check it is there.  Without it EDGAR's Tools dive
+    -- finds no matching row, the fight driver drops the plan and re-plans
+    -- every frame, and the drive makes no progress at all -- which reads as
+    -- a stuck walk rather than as a missing item.
+    H.assertEq(H.invCountOf(BIO_BLASTER) > 0, true,
+      "a Bio Blaster is in the bag -- the poison every Zozo body is weak to")
   end),
 
   -- Top the party up before the climb starts.  zozo_arrival ships LOCKE at

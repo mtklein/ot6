@@ -33,7 +33,19 @@
 -- are the Zozo trash: group 78 on the street (Gabbldegak x4, Harvester +
 -- Gabbldegaks, HadesGigas, HadesGigas + Harvester) and group 77 in the
 -- buildings (SlamDancer, Harvester, and mixes of the two with Gabbldegaks),
--- read out of sub_battle_group.dat and rand_battle_group.dat.  Fought
+-- read out of sub_battle_group.dat and rand_battle_group.dat.
+--
+-- Both walks name EDGAR's tool, and it is the Bio Blaster rather than the
+-- default AutoCrossbow.  Every one of those eight formations is built out
+-- of four species that carry an Ot6ShieldTbl row of two shields with NO
+-- class byte (ot6_hud.asm:2086-2097), so no weapon and no ability this
+-- party owns ever takes a shield off and every hit lands at the shielded
+-- halving.  The block comment over those rows names the answer instead --
+-- "the answer is the tool rather than the A button" (:2084-2085) -- and it
+-- is the vanilla poison weakness all four already have (monster_prop.dat
+-- +25 = $08) reached through item $a4 -> attack $7d, element $08, all
+-- enemies, 0 MP (ot6_break.asm:203-204, :279-281; battle_main.asm:6577).
+-- Fought
 -- rather than fled for two reasons: three of those eight formations allow
 -- a pincer, which raises run difficulty from 2 to 6 per monster and would
 -- often spend the whole flee cap before falling back to fighting anyway;
@@ -130,7 +142,8 @@ H.run({ maxFrames = 90000 }, {
   H.fieldCare({ tag = "care before the Zozo streets", threshold = 0.95 }),
 
   -- 1. street -> the clock room: door (42,28) -> 225 {98,61}
-  H.navTo(42, 29, { maxFrames = 30000, playBattles = "tactical" }),
+  H.navTo(42, 29, { maxFrames = 30000, playBattles = "tactical",
+                    tool = H.BIO_BLASTER }),
   H.driveUntil(function() return map() == 225 end, 900, {
     H.hold({ "up" }), H.waitFrames(4),
   }, "into the clock room"),
@@ -141,7 +154,8 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 2. onto the clock tile {98,59} and A+facing-up until the hour menu
-  H.navTo(98, 60, { maxFrames = 20000, playBattles = "tactical" }),
+  H.navTo(98, 60, { maxFrames = 20000, playBattles = "tactical",
+                    tool = H.BIO_BLASTER }),
   H.driveUntil(function() return H.dialogWaiting() end, 900, {
     H.hold({ "up" }), H.waitFrames(6),      -- face/step up onto {98,59}
     H.hold({ "a", "up" }), H.waitFrames(6), -- A+up: $01B4|$01B0 both set

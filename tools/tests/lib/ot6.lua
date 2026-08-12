@@ -535,6 +535,15 @@ end
 M.ELEM_NAMES = { "fire", "ice", "bolt", "poison", "wind", "holy", "earth",
                  "water" }
 
+-- Edgar's two damaging Tools, by item id, for callers of newFightDriver's
+-- opts.tool.  AutoCrossbow is pierce-class and hits every enemy; the Bio
+-- Blaster is element $08 poison and hits every enemy (item $a4 -> attack
+-- $7d, battle_main.asm:6577).  Which one a segment wants is a question
+-- about the bodies it is going to meet, not a preference: see the note over
+-- newFightDriver.
+M.AUTOCROSSBOW = 0xAA
+M.BIO_BLASTER = 0xA4
+
 function M.elemStr(mask)
   local out = {}
   for i, n in ipairs(M.ELEM_NAMES) do
@@ -1721,6 +1730,26 @@ end
 --
 -- Call frame() on every frame battleLoadStarted() is true and idle() on the
 -- falling edge.  frame() sets the controller pad itself.
+--
+-- opts.tool names the Tool Edgar reaches for, defaulting to AutoCrossbow.
+-- AutoCrossbow is the right default because it is the pierce-class Tool and
+-- most of the route's shield rows carry a class key, but an area can be
+-- authored the other way round and Zozo is: all four of its species carry an
+-- Ot6ShieldTbl row with two shields and NO class byte, and the block comment
+-- over those rows says what to do about it in as many words -- "the answer is
+-- the tool rather than the A button" (ff6/src/battle/ot6_hud.asm:2084-2085).
+-- The tool it means is the Bio Blaster, because all four are poison-weak in
+-- vanilla (monster_prop.dat +25 = $08 for $052/$04e/$053/$0df) and the Bio
+-- Blaster is item $a4 -> attack $7d, element $08, all enemies
+-- (ff6/src/battle/ot6_break.asm:203-204, :279-281; battle_main.asm:6577).
+-- With AutoCrossbow in that town nothing chips, ever, and the same table's
+-- own measurement says what that costs: "mashing wipes 6/6 in this town"
+-- (ot6_hud.asm:2078).
+--
+-- The tool has to BE in the bag: the Tools-menu steer looks the id up in the
+-- live list and drops the plan when it is missing, which then re-plans on the
+-- next frame and makes no progress.  A caller that names a tool should assert
+-- H.invCountOf(id) > 0 first, the way the Zozo generators do.
 function M.newFightDriver(tag, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -1744,7 +1773,7 @@ function M.newFightDriver(tag, opts)
   local MLISTPTR = 0x302C
   local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
   local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
-  local AUTOCROSSBOW, PUMMEL = 0xAA, 0x5D
+  local AUTOCROSSBOW, PUMMEL = M.AUTOCROSSBOW, 0x5D
   -- The cures, cheapest first.  Cheapest rather than biggest for the same
   -- reason M.fieldCare picks that way: the loop simply casts again if the
   -- target is still short, so overshoot is only wasted MP.  Under OT6 the
@@ -2092,7 +2121,7 @@ function M.newFightDriver(tag, opts)
     if opts.tactical and opts.tools ~= false and id == 4
        and M.readWord(CURMP + actor * 2) >= 4
        and cmdRow(actor, CMD_TOOLS) then
-      return { kind = "skill", cmd = CMD_TOOLS, skill = AUTOCROSSBOW,
+      return { kind = "skill", cmd = CMD_TOOLS, skill = opts.tool or AUTOCROSSBOW,
                row = cmdRow(actor, CMD_TOOLS), boostLeft = boost }
     end
     if opts.tactical and id == 5 and M.readWord(CURMP + actor * 2) >= 4

@@ -69,10 +69,24 @@
 -- it regenerates the chain and invalidates all of them.
 --
 -- Issue #75: this file writes no emulated game state.  The porch and tower
--- random encounters the old file write-cleared are fought: the same
--- edge-tapped A that pages dialogs opens the command list, confirms
--- Fight and takes the default target, and every walk runs under
--- navTo's playBattles mode.  Budgets grew where a fight can now interrupt.
+-- random encounters the old file write-cleared are fought, and every walk
+-- runs under navTo's playBattles mode.  Budgets grew where a fight can now
+-- interrupt.
+--
+-- Those walks used to spell that mode `true`, which is edge-tapped A: A
+-- opens the command list, A confirms Fight, A takes whatever target the
+-- cursor was already on.  That loses here, and the shield table says so
+-- from a measured sweep -- "mashing wipes 6/6 in this town"
+-- (ot6_hud.asm:2078).  The reason is that all four species map 221 draws
+-- carry two shields and no class byte at all (:2086-2097), so a weapon
+-- swing never chips one and every hit lands halved for the whole fight.
+-- What does chip is the vanilla poison weakness all four carry
+-- (monster_prop.dat +25 = $08) through EDGAR's Bio Blaster, item $a4 ->
+-- attack $7d, element $08, all enemies (ot6_break.asm:203-204;
+-- battle_main.asm:6577).  So these are "tactical" with tool =
+-- H.BIO_BLASTER.  Map 226, the tower itself, draws nothing at all
+-- (map_prop.dat byte +5 bit 7 clear), so this only ever bites on the
+-- porch and the street.
 --
 -- The menu driver is gen_kefka_won's state-fed one, but it looks the layout
 -- up live rather than hard-coding cells: NO_RESET opens with the forced two
@@ -338,7 +352,8 @@ end
 local function talk(sx, sy, dir, what)
   local aPh = 0
   return H.cond(function() return true end, {
-    H.navTo(sx, sy, { maxFrames = 12000, playBattles = true }),
+    H.navTo(sx, sy, { maxFrames = 12000, playBattles = "tactical",
+      tool = H.BIO_BLASTER }),
     H.hold({ dir }), H.waitFrames(8), H.release(), H.waitFrames(4),
     -- a porch/tower encounter that interrupts the approach is FOUGHT by
     -- the same taps; the budget covers a real fight's ATB rounds
@@ -362,7 +377,8 @@ end
 local function bumpTake(sx, sy, dir, what)
   local ph = 0
   return H.cond(function() return true end, {
-    H.navTo(sx, sy, { maxFrames = 12000, playBattles = true }),
+    H.navTo(sx, sy, { maxFrames = 12000, playBattles = "tactical",
+      tool = H.BIO_BLASTER }),
     H.driveUntil(function() return H.dialogWaiting() end, 9000, {
       H.call(function()
         ph = (ph + 1) % 16
@@ -390,7 +406,8 @@ H.run({ maxFrames = 200000 }, {
   -- 1. the top door (33,9) -> 226 {82,37}, then up the tower to TERRA.
   --    Battle-aware: the porch encounter (see the header) fired
   --    exactly here on the first run.
-  H.navTo(33, 10, { maxFrames = 12000, playBattles = true }),
+  H.navTo(33, 10, { maxFrames = 12000, playBattles = "tactical",
+      tool = H.BIO_BLASTER }),
   (function()
     local ph = 0
     return H.driveUntil(function() return map() == 226 end, 9000, {
