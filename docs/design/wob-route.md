@@ -56,6 +56,25 @@ active**.
 The pattern used by `gen_zozo2_arrival`→`gen_zozo5_ramuh` and the
 `Makefile`'s `SAVESTATES` machinery.
 
+### Grinding is allowed, and the route should use it
+
+Owner, 2026-08-12: "don't be afraid to grind a little for xp/gil." The route
+had drifted into taking the shortest path and fleeing almost everything,
+which is not what a player does and is not free: **fleeing earns nothing**,
+so a fled segment arrives at the next shop with no money and the party a
+level short. That is measured, not assumed — flee discipline is why the
+Sabin scenario reaches the ghost merchant about 9,000 gil poorer than the
+old contaminated lineage, and why the South Figaro purse cannot afford the
+Star Pendants that would make Mt Kolts' poison a non-issue.
+
+So a segment may fight for experience or money deliberately, and a step
+that is short of either should say so rather than working around it. Two
+things this does not license. It is not a way to make a losing fight pass:
+a retry ladder still gets three attempts, and a fight lost three times is a
+finding. And the grinding has to be real play through the fight driver like
+everything else, so it costs generation time and has to be worth what it
+buys — say what a grind step is for and what it earned.
+
 ### The chain shape (entry point → drive → generate)
 Each beat is one (or a few) `gen_<beat>.lua` generators. A generator:
 1. `H.loadState(".../build/states/<previous>.mss.lua")` — boots the prior link.
