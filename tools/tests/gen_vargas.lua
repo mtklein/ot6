@@ -56,10 +56,12 @@
 -- The retry ladder is the game's own defeat flow made explicit: the
 -- entry point is captured once at boot (a savestate blob in memory, with no
 -- writes); a party wipe tears the battle down into Game Over instead of
--- the reunion, the attempt's post-fight ride times out on "map 98, calm,
--- SABIN in the party", and the next attempt reloads the entry point blob
--- and takes a different battle RNG phase before the opening A-press,
--- shifting every RNG draw downstream.  Three attempts, then fail.
+-- the reunion, the attempt's post-fight ride ends there rather than on
+-- "map 98, calm, SABIN in the party", and the next attempt reloads the entry
+-- point blob and takes a different battle RNG phase before the opening
+-- A-press, shifting every RNG draw downstream.  Three attempts, then fail.
+-- The ride is passed wipeEndsRide because the shared wipe canary otherwise
+-- raises on the first loss and no ladder here ever reaches rung two.
 --
 -- The generate is verified by reload (gen_sabin_gau's discipline): capture,
 -- reload the capture as the consumer timeline, give it 300 frames, and
@@ -149,6 +151,9 @@ local function resetM()
 end
 resetM()
 local sabinPummeled = false
+-- VARGAS's hp the last time the fight was live, latched per frame so a
+-- lost attempt can say how far it got after the battle RAM is gone
+local lastVargasHp = 0
 
 local function decidePlan(a)
   if a == SABIN_E then return { kind = "pummel" } end
@@ -330,6 +335,7 @@ local function fightAttempt(n)
     H.call(function()
       resetM()
       sabinPummeled = false
+      lastVargasHp = 0
       for k in pairs(healBusy) do healBusy[k] = nil end
     end),
     -- one interaction -> the scene -> battle 66
@@ -353,6 +359,7 @@ local function fightAttempt(n)
         return not H.battleLoadStarted()
       end, 120000, {
         H.call(function()
+          lastVargasHp = vHp()
           if H.frame - hb >= 600 then
             hb = H.frame
             H.log(string.format("[vargas f%d]%s", H.frame, hpLine()))
@@ -372,9 +379,17 @@ local function fightAttempt(n)
       H.log(string.format("[vargas] teardown at f%d (pummeled=%s)",
         H.frame, tostring(sabinPummeled)))
     end),
-    -- the verdict: a win rides _ca828f's tail to a settled map-98 field
-    -- with SABIN in the party; a wipe rides the defeat flow to Game Over
-    -- and this soft-bounded ride gives up instead of erroring.
+    -- the verdict: a win rides _ca828f's tail to a settled map-98 field with
+    -- SABIN in the party; a wipe rides the defeat flow to Game Over, and
+    -- wipeEndsRide is what lets this attempt end there and the next one
+    -- start.  Without it the shared wipe canary raises on the first lost
+    -- attempt and the ladder never reaches its second rung: measured
+    -- 2026-08-11 on the v0.10 tip, attempt 1 wiped with VARGAS at 11065 of
+    -- 11600 and the run ended with no "attempt 2 begins" line in the log, so
+    -- this generator had a four-rung ladder that could only ever run one.
+    -- The soft giveUp bound below stays as the backstop for a lost attempt
+    -- that does not wipe (a stalled reunion, say); the wipe path just no
+    -- longer costs 28000 frames to notice.
     (function()
       local calmN, giveUp = 0, 0
       return H.advanceStory(function()
@@ -387,11 +402,15 @@ local function fightAttempt(n)
         calmN = ok and calmN + 1 or 0
         if calmN >= 30 then fightWon = true; return true end
         return false
-      end, 30000, { playBattles = true })
+      end, 30000, { playBattles = true, wipeEndsRide = true })
     end)(),
     H.logStep(function()
-      return string.format("[vargas] attempt %d verdict: %s", n,
-        fightWon and "WON -- reunion settled" or "lost (retrying)")
+      -- no hpLine() here: the battle module has handed its RAM back by now,
+      -- so $3BF4 would read whatever the field module put there
+      return string.format("[vargas] attempt %d verdict: %s (VARGAS was at " ..
+        "%d when the fight tore down, pummeled=%s)", n,
+        fightWon and "WON -- reunion settled" or "lost (retrying)",
+        lastVargasHp, tostring(sabinPummeled))
     end),
   }, {})
 end
