@@ -174,12 +174,30 @@ recorded "Cirpius at 93.75% of draws" for group 61, and Mt. Kolts's measured
 group-61/62 rates.
 
 At roughly 396 experience and 606 gil a fight on maps 72/73, with the
-experience split three ways:
+experience split three ways, three or four fights would give LOCKE the 427 he
+needs for level 9 and about 1800–2400 gil.
 
-- **3 fights** ≈ 396 experience to LOCKE and ≈ 1820 gil.
-- **4 fights** ≈ 528 experience to LOCKE and ≈ 2420 gil.
+**Measured, and it does not work out that way.** The crossing was switched to
+`playBattles = "tactical"` on 2026-08-12 and `south_figaro` regenerated. The
+whole cave drew **one fight**: gil 3974 → 4230, `+256`, and not a single
+level — TERRA, LOCKE and EDGAR entered at 5/6/7 and left at 5/6/7. The route
+through maps 73 and 72 is short, and the per-step danger counter barely
+accumulates over it.
 
-427 is what LOCKE needs for level 9, so three to four cave fights reach it.
+So the rates above are right per fight and the conclusion drawn from them was
+wrong, because nobody had asked how many fights the crossing draws. Fighting
+what the cave happens to offer pays about a sixth of one Star Pendant. Getting
+1500 out of it means a deliberate pacing step that walks the cave until it has
+drawn six fights, which is a different and larger piece of work than changing
+a battle policy, and it has to justify its generation time.
+
+That trial also cost the route its next contract: with one extra fight in the
+stream, every later formation draw and battle seed shifts, and the same run
+went on to lose LOCKE on the approach to VARGAS, spending all five Fenix Downs
+and failing `char 1 reached VARGAS alive`. One sample cannot separate "the
+change did this" from "the RNG moved", and the change was reverted rather than
+kept on a coin toss. The lesson worth keeping is that this route's downstream
+contracts are tight enough that inserting battles upstream is not free.
 
 ## 6. What that money buys
 
@@ -216,9 +234,26 @@ The budget at the shop, with 3974 gil:
 | the same plus 3 Star Pendant and a MithrilBlade | 5600 | **−1626** |
 
 Three pendants do not fit today and cannot be made to fit by reordering the
-list: they cost more than four times the whole discretionary remainder. With
-three or four cave fights fought on the way in they fit with room, and so
-does the MithrilBlade.
+list: they cost more than four times the whole discretionary remainder. Nor
+does simply fighting the cave pay for them (§5, measured: `+256`). What is
+left, in rough order of how much play each costs:
+
+1. **Cut Fenix Downs from 5 to 3** and free 1000. The comment that set the
+   figure at five recorded a pass that spent all five on map 98; the chain of
+   2026-08-12 spends **one** (5 at `vargas_entry`, 4 at `vargas_won`). The
+   figure is stale against its own justification. This leaves the entry
+   contract's floor of 3 exactly met, with no margin, which is the argument
+   against.
+2. **A deliberate paced grind in the cave**, about six fights for 1500 (§5).
+3. **Visit Figaro Castle's shop 4 before leaving.** Unrelated to pendants but
+   it belongs on the same list: the route opens shop 82 for EDGAR's Tools in
+   that castle and never opens shop 4, which sells Fenix Downs at 500. The
+   party then walks into an unknown cave with no revives, and buying them
+   there instead of in South Figaro would free the South Figaro budget for
+   relics.
+
+A MithrilBlade at 450 is the cheapest item on any of these lists and the one
+with a measured effect on the fight (§7).
 
 ## 7. What battle 11 actually looks like
 
