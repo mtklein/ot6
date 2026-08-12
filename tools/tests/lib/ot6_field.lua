@@ -3125,9 +3125,12 @@ end
 -- 168 hp, lost the gate soldier's HeavyArmor three attempts running, while
 -- sixteen Tonics sat in the bag.  He used none of them, because
 -- the pattern does not read menus.  M.newFightDriver does: it reads
--- the live command table, boosts, and runs its own item medic line, so
--- LOCKE now drinks a Tonic when he is under 60%, which is what a player
--- fighting a soldier alone in an occupied town would do.
+-- the live command table, boosts, and runs its own item medic line.
+-- healPercent is the fraction it tops up at, and it is no longer the whole
+-- rule: M.healDecision decides whether a heal is worth the turn it costs,
+-- and a solo character who cannot out-heal the damage swings instead of
+-- drinking.  That matters here more than anywhere, because LOCKE alone is
+-- the one party shape opts.healer cannot help.
 -- (The field half of this routine is hand-rolled; see the note above on
 -- why advanceStory cannot handle the tail of battle 11.)
 function M.rideOut(what, budget, dstMap)

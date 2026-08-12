@@ -442,8 +442,25 @@ H.run({ maxFrames = 350000 }, {
   -- turn, never swinging) he survives three and attacks two turns in three.
   -- His Fight halves too, and that does not matter: the fight is decided by
   -- breaking (one chip per boosted Fight, measured) and a broken HeavyArmor
-  -- takes 4x.  Measured end to end: shields 3 -> 0 three times over, 495 hp
-  -- -> 0, LOCKE never below 112.
+  -- takes 4x.
+  --
+  -- That was measured end to end (shields 3 -> 0 three times over, 495 hp
+  -- -> 0) and it is NOT what this route does today.  Re-measured 2026-08-12
+  -- on a freshly regenerated chain, twice, six attempts, six distinct battle
+  -- RNG seeds, and the six are identical: LOCKE enters at 168/168 in the back
+  -- row holding item $00 (power 26), his command window opens ONCE, his one
+  -- Fight takes the soldier 495 -> 489 and shields 3 -> 2, the soldier takes
+  -- him to 111, and then the fight ends -- both sides alive, LOCKE at 111 and
+  -- the soldier at 489 -- and the party lands on (47,43), which is the
+  -- scenario reset this step reads as a loss.  Every value in the battle
+  -- freezes ~420 frames before the ride settles, which is the battle module
+  -- torn down under a driver still sampling it, so the ending is at the first
+  -- action and not at the end of the log.
+  --
+  -- It is not an attrition loss and it is not the heal-lock: nothing in the
+  -- bag is ever reached, because one command window is one decision and he
+  -- takes it at full HP.  What ends the battle is not established; finding it
+  -- needs a battle-module trace rather than a driver log.
   H.setRows({ [1] = true }, { tag = "locke solo rows" }),
   H.call(function()
     where("boot")
