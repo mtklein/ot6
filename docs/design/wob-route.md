@@ -56,24 +56,51 @@ active**.
 The pattern used by `gen_zozo2_arrival`→`gen_zozo5_ramuh` and the
 `Makefile`'s `SAVESTATES` machinery.
 
-### Grinding is allowed, and the route should use it
+### The route plays casual
 
-Owner, 2026-08-12: "don't be afraid to grind a little for xp/gil." The route
-had drifted into taking the shortest path and fleeing almost everything,
-which is not what a player does and is not free: **fleeing earns nothing**,
-so a fled segment arrives at the next shop with no money and the party a
-level short. That is measured, not assumed — flee discipline is why the
-Sabin scenario reaches the ghost merchant about 9,000 gil poorer than the
-old contaminated lineage, and why the South Figaro purse cannot afford the
-Star Pendants that would make Mt Kolts' poison a non-issue.
+Owner, 2026-08-12: "we're trying to test a normal playthrough, not a speed
+run. do try to approach things as if a player trying to learn and enjoy the
+game." And, naming the audience: "i believe speed runners call these people
+*casual*. that's our target audience, the casual."
 
-So a segment may fight for experience or money deliberately, and a step
-that is short of either should say so rather than working around it. Two
-things this does not license. It is not a way to make a losing fight pass:
-a retry ladder still gets three attempts, and a fight lost three times is a
-finding. And the grinding has to be real play through the fight driver like
-everything else, so it costs generation time and has to be worth what it
-buys — say what a grind step is for and what it earned.
+That word is the standard, and it is a usable one: when a routing choice is
+open, the question is what a casual player would do, not what the shortest
+correct path is. They are exploring, they do not know what is coming, and
+they are playing to enjoy it.
+
+This is the frame for every routing decision, and the route had drifted a
+long way from it. Nobody chose that; it came from each segment taking the
+locally safe option — flee this encounter, skip that detour, buy the
+cheapest thing that works — and the cost only ever showing up somewhere
+else. What the route currently does is closer to a speed run by a player
+who already knows every answer, and it measures a game nobody is playing.
+
+Concretely, a normal player:
+
+- **Opens the chests.** The route walks past them, so the party is poorer
+  and worse equipped than anyone's would be.
+- **Fights things.** Fleeing earns nothing, which is why the Sabin scenario
+  reaches the ghost merchant about 9,000 gil poorer than the old lineage.
+  Grinding a little for experience or money is expected, not a last resort.
+- **Buys what the next stretch needs**, including things that prevent a
+  problem rather than curing it: three Star Pendants at South Figaro make
+  Mt Kolts' poison a non-issue, where the route instead buys Antidotes and
+  then walks a poisoned character down to 1 HP.
+- **Arrives with a margin.** A party that clears a fight with nothing to
+  spare is a party that a slightly worse roll defeats, and the balance
+  reading taken from it is of a fight harder than the one a player meets.
+
+This matters beyond tidiness: **every balance observation this project has
+recorded was taken by an under-prepared party.** That does not make them
+wrong about what they measured, but it does mean a fight called too hard
+should be re-read against what a normal player would bring before it is
+called that.
+
+Two limits. This is not licence to make a losing fight pass: a retry ladder
+still gets three attempts, and a fight lost three times is a finding, not a
+reason to grind until it is not. And everything here is real play through
+the drivers, so it costs generation time — say what a step is for and what
+it earned.
 
 ### The chain shape (entry point → drive → generate)
 Each beat is one (or a few) `gen_<beat>.lua` generators. A generator:
