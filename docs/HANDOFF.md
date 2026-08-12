@@ -114,6 +114,18 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   moving all three back turned a fight that lost attempt 1 with the party
   arriving intact into one that wins attempt 1 arriving worse (#92).
   Rows are persistent state, so set them deliberately per segment.
+- **FF6 auto-targets nothing. A drive that does not steer a target has not
+  chosen one.** Owner, 2026-08-12: later games in the series pick a sensible
+  target for you; this one never does. The cursor opens where the engine puts
+  it, which for an item is the acting character, and confirming there aims at
+  whoever is holding the menu. This has cost real time once: a comment in
+  `gen_sabin_train` claimed a Fenix Down's target select "initializes on the
+  fallen ally, so the default confirm revives without steering", and the
+  revive branch fired eight times, burned all four Fenix Downs into the
+  actor, and left CYAN dead at 0/319 through the boss fight. A comment
+  fourteen lines below in the same file had the rule right. **"Default
+  target" in a drive's prose means "the engine's pick, unread" — treat every
+  one of them as unverified until someone has watched where it lands.**
 - **The equip audit** (`tools/audit_equipment.py`, a `make test` check with its
   own only-shrinks story-waiver list): check any red segment against it
   before calling the result balance.
