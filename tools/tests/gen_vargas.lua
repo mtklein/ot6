@@ -65,6 +65,15 @@
 -- reload the capture as the consumer timeline, give it 300 frames, and
 -- require the same calm map-98 field before accepting the blob.
 local H = dofile("tools/tests/lib/ot6.lua")
+-- The VARGAS ladder's spread and its collision check (issue #83): each
+-- attempt is held until the game-time frame counter the battle seed is
+-- made of reaches its own phase, and L.report() fails if two attempts drew
+-- one seed, which would make this ladder one fight replayed.  attempts = 4
+-- describes what this file already does -- it fights battle 66 up to four
+-- times -- and only sets the spacing (15 phases instead of 20).  It is not
+-- a licence to widen: three is the doctrine (#74), and this fourth rung
+-- predates it.
+local L = H.newSeedLadder("battle 66", { attempts = 4 })
 local DOOR = "build/states/vargas_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -299,8 +308,8 @@ local function fightAttempt(n)
     H.logStep(function()
       return string.format("[vargas] attempt %d begins at f%d", n, H.frame)
     end),
-    -- attempts past the first rewind to the entry point and shift the RNG by
-    -- idling a per-attempt number of frames before the opening A-press
+    -- attempts past the first rewind to the entry point; every attempt then
+    -- takes its own battle RNG phase, below, before the opening A-press
     H.cond(function() return n > 1 end, {
       H.call(function()
         loadReq = H.requestLoadState(entryBlob)
@@ -309,8 +318,17 @@ local function fightAttempt(n)
       H.call(function()
         H.checkReq(loadReq, "attempt " .. n .. ": entry point reload")
       end),
-      H.waitFrames(30 + n * 37),
+      -- The wait this replaces was 30 + n * 37, so a reloaded attempt had at
+      -- least 104 frames before it pressed anything.  Part of that number was
+      -- the RNG stagger and part of it was letting the loaded state settle;
+      -- only the stagger moved to L.spread, which can legitimately wait zero
+      -- frames.  90 is the settle every other reload in the tree uses.
+      H.waitFrames(90),
     }, {}),
+    -- Outside the n > 1 branch, unlike the wait it replaces: attempt 1 needs
+    -- a phase of its own too, or it sits wherever the route left it and can
+    -- land on another attempt's seed (#83).
+    L.spread(n),                        -- spread the battle RNG phase (#83)
     H.call(function()
       resetM()
       sabinPummeled = false
@@ -446,10 +464,15 @@ H.run({ maxFrames = 700000 }, {
     }, {})
   end)(),
 
+  L.watch(),
   fightAttempt(1),
   fightAttempt(2),
   fightAttempt(3),
   fightAttempt(4),
+  -- Before the verdict, not after: the attempts are evidence only if they
+  -- were DIFFERENT fights, and if they were not, that is what this run should
+  -- report rather than "lost all four" (#83).
+  L.report(),
   H.call(function()
     H.assertEq(fightWon, true,
       "VARGAS beaten within 4 attempts (real damage, real menus)")

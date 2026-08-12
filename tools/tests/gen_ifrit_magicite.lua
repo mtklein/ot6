@@ -76,10 +76,12 @@
 --
 -- THE RETRY LADDER (gen_tunnelarmr's): battle 70 is an event battle, so a
 -- loss is GAME OVER, not a revive.  The entry point is captured as a blob
--- beside the walk, and each attempt reloads it and waits a different
--- number of frames before the A press -- the battle RNG seed is the frame
--- phase at battle init (gen_whelk_poweron's measurement), so each retry
--- genuinely plays a different fight.  Three attempts, then fail loudly.
+-- beside the walk, and each attempt reloads it and takes its own battle RNG
+-- phase before the A press.  The seed is the game-time frame counter at
+-- battle init (`lda $021e / asl2 / sta $be`, battle_main.asm:6174-6176), and
+-- H.newSeedLadder both spreads on it and reads back what each attempt really
+-- drew, so "three attempts" is checked rather than assumed (#83).  Three
+-- attempts, then fail loudly.
 -- The combat CONTRACT for this fight (break observed pre-kill, the
 -- if_self_dead placement guard) stays in battle_brokendeath.lua, booted on
 -- ifrit_entry.mss; this step only needs a real win banked.
@@ -94,6 +96,11 @@
 --   naming both strings -- any OT6_SRAM_CHECKPOINT whose manifest.json declares
 --   a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
+-- The retry ladder's spread and its collision check (issue #83): each
+-- attempt is held until the game-time frame counter the battle seed is
+-- made of reaches its own phase, and L.report() fails if two attempts
+-- drew one seed, which would make this ladder one fight played twice.
+local L = H.newSeedLadder("battle 70")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -302,8 +309,7 @@ local function ifritAttempt(n)
     items = true, healPercent = 60, cadence = 12 })
   return H.cond(function() return fightWon end, {}, {
     H.logStep(function()
-      return string.format("battle 70 attempt %d (phase offset %d) at f%d",
-        n, (n - 1) * 37, H.frame)
+      return string.format("battle 70 attempt %d at f%d", n, H.frame)
     end),
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(fightBlob) end),
@@ -316,7 +322,7 @@ local function ifritAttempt(n)
           "reloaded at the (3,7) entry point")
       end),
     }) or seq({}),
-    H.waitFrames((n - 1) * 37),         -- vary the battle RNG seed
+    L.spread(n),                        -- spread the battle RNG phase (#83)
     -- A into IFRIT -> _cc7937 -> battle 70.  Confirm the formation before
     -- fighting it: this is the fight the step exists to pass through, and a
     -- win over the WRONG battle would look identical in the log without
@@ -557,9 +563,14 @@ H.run({ maxFrames = 300000 }, {
   end)(),
 
   -- 2. battle 70, played with real input, on the phase-spread retry ladder
+  L.watch(),
   ifritAttempt(1),
   ifritAttempt(2),
   ifritAttempt(3),
+  -- Before the verdict, not after: three attempts are evidence only if they
+  -- were three DIFFERENT fights, and if they were not, that is what this run
+  -- should report rather than "lost all three" (#83).
+  L.report(),
   H.call(function()
     H.assertEq(fightWon, true,
       "battle 70 won within 3 attempts (the library fighter: "

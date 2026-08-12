@@ -3066,27 +3066,35 @@ end
 --
 -- Every engagement is a retry sequence (issue #75).  With the HP pin
 -- gone, a lost battle 11 runs _ca85ba, which revives LOCKE on (47,43) and
--- clears both disguise switches, so each fight captures a blob first, and
--- a loss reloads it and re-engages with a different frame offset (the
--- battle RNG seed is the frame phase at init, so each retry plays a
--- different fight).  Success means the party is not on the opening tile
--- and the probe tile is reachable; three losses fail generation.
+-- clears both disguise switches, so each fight captures a blob first, and a
+-- loss reloads it and re-engages on a different battle RNG phase.  The seed
+-- is the game-time frame counter at battle init (`lda $021e / asl2 / sta $be`,
+-- battle_main.asm:6174-6176), so the ladder is spread on $021e itself and
+-- reads back what each attempt drew (M.newSeedLadder, issue #83) rather than
+-- trusting a frame offset to land somewhere new.  Success means the party is
+-- not on the opening tile and the probe tile is reachable; three losses fail
+-- generation.
+--
+-- The ladder is per call, not per run: gen_sfigaro crosses this boundary
+-- three times and each crossing is its own three fights.
 function M.clearGateSoldier(probeX, probeY, tag)
   local blob, won = nil, false
+  local L = M.newSeedLadder((tag or "gate soldier") .. " battle 11")
   local function fightOnce(n)
     local loadReq
     return M.cond(function() return won end, {}, {
       M.logStep(function()
-        return string.format("%s: battle 11 attempt %d (offset %d) at f%d",
-          tag, n, (n - 1) * 37, M.frame)
+        return string.format("%s: battle 11 attempt %d at f%d", tag, n, M.frame)
       end),
       n > 1 and seq({
         M.call(function() loadReq = M.requestLoadState(blob) end),
         M.waitFrames(2),
         M.call(function() M.checkReq(loadReq, tag .. ": pre-fight reload") end),
         M.waitFrames(90),
-        M.waitFrames((n - 1) * 37),      -- vary the battle RNG seed
       }) or seq({}),
+      -- outside the n > 1 block, unlike the wait it replaces: attempt 1 needs
+      -- a phase of its own too, or it can land on attempt 2's seed (#83)
+      L.spread(n),                       -- spread the battle RNG phase (#83)
       M.talkToObj(26, tag .. ": the gate soldier (battle 11)"),
       M.rideOut(tag .. ": ride battle 11 out", 30000, 75),
       M.call(function()
@@ -3174,7 +3182,12 @@ function M.clearGateSoldier(probeX, probeY, tag)
         end),
       })
     end)(),
+    L.watch(),
     fightOnce(1), fightOnce(2), fightOnce(3),
+    -- ...and they were three DIFFERENT fights: distinct battle RNG seeds,
+    -- read off the seeder itself (#83).  "Three losses fail generation" only
+    -- means something if the three were not one fight replayed.
+    L.report(),
     M.call(function()
       -- This fight used to block the route, and the record of it stays
       -- (2026-08-09 correction: sfigaro_town passes now, once LOCKE was

@@ -34,7 +34,9 @@
 -- (the Vector remove_equip; measured on the sibling checkpoint-booted step,
 -- and the equip audit names both).  gen_tunnelarmr's phase-spread retry
 -- ladder wraps the engagement: battle 72 is an event battle, a loss is game
--- over, and the RNG seed is the frame phase at battle init.
+-- over, and the RNG seed is the game-time frame counter at battle init
+-- (`lda $021e / asl2 / sta $be`, battle_main.asm:6174-6176), read back per
+-- attempt so three attempts are checked to be three fights (#83).
 --
 -- The tube-room trigger is gated on facing and button state, and this is the
 -- second place in v0.6 where that matters (the first was the Vector sneak
@@ -72,6 +74,11 @@
 -- can hold on that tile.  gen_zozo3_clock hit the same problem on the clock
 -- tile and solved it the same way.
 local H = dofile("tools/tests/lib/ot6.lua")
+-- The retry ladder's spread and its collision check (issue #83): each
+-- attempt is held until the game-time frame counter the battle seed is
+-- made of reaches its own phase, and L.report() fails if two attempts
+-- drew one seed, which would make this ladder one fight played twice.
+local L = H.newSeedLadder("battle 72")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -154,8 +161,7 @@ local function n024Attempt(n)
     items = true, healPercent = 60, cadence = 12 })
   return H.cond(function() return fightWon end, {}, {
     H.logStep(function()
-      return string.format("battle 72 attempt %d (phase offset %d) at f%d",
-        n, (n - 1) * 37, H.frame)
+      return string.format("battle 72 attempt %d at f%d", n, H.frame)
     end),
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(fightBlob) end),
@@ -168,7 +174,7 @@ local function n024Attempt(n)
           "reloaded at the (25,52) entry point")
       end),
     }) or seq({}),
-    H.waitFrames((n - 1) * 37),         -- vary the battle RNG seed
+    L.spread(n),                        -- spread the battle RNG phase (#83)
     -- A into NUMBER 024 -> battle 72.  Confirm the formation before
     -- fighting it: without the assert, a win over the wrong battle would
     -- look identical in the log.
@@ -350,9 +356,14 @@ H.run({ maxFrames = 300000 }, {
   end)(),
 
   -- 2. battle 72, played with real input, on the phase-spread retry ladder
+  L.watch(),
   n024Attempt(1),
   n024Attempt(2),
   n024Attempt(3),
+  -- Before the verdict, not after: three attempts are evidence only if they
+  -- were three DIFFERENT fights, and if they were not, that is what this run
+  -- should report rather than "lost all three" (#83).
+  L.report(),
   H.call(function()
     H.assertEq(fightWon, true,
       "battle 72 won within 3 attempts (the library fighter: "
