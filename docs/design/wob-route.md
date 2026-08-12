@@ -85,6 +85,12 @@ Concretely, a normal player:
   TunnelArmr fight that blocked the v0.10 release check by losing three
   attempts. A route that skips content reaches a fight the designers
   expected it to reach armed, loses, and reports a balance finding.
+  **Measured 2026-08-12: the route opens none of them.** At least 94 chests
+  sit on maps the chain reaches and every one of the 512 treasure bits at
+  `$1E40` is clear in all 98 savestates and all 12 tracked SRAM
+  checkpoints. `tools/audit_chests.py` prints the list, by map, with what
+  is in each; `tools/chests_opened.txt` is the grow-only record of the ones
+  the route does open, and is empty.
 - **Fights things.** Fleeing earns nothing, which is why the Sabin scenario
   reaches the ghost merchant about 9,000 gil poorer than the old lineage.
   Grinding a little for experience or money is expected, not a last resort.

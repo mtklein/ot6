@@ -1,0 +1,25 @@
+# Chests the route opens, one line per treasure bit.
+#
+#   <treasure bit>	<where it is and what is in it>
+#
+# Read by tools/audit_chests.py, which fails unless the set of treasure bits
+# set in the savestate chain matches this file exactly.  It fails both ways:
+# a chest that stops being opened is a route regression, and a chest that
+# starts being opened has to be written down here.
+#
+# This is a list of wins, not a burn-down list of defects.  The two sibling
+# audits (tools/equipment_waivers.txt, tools/party_hp_waivers.txt) list
+# defects because theirs are individual and each has its own story.  Here the
+# defect is uniform -- the route opens nothing -- so a defect list would be
+# ninety-four lines all saying the same thing, red from the day it landed.
+# A list of wins is empty on day one and grows as the route work lands.
+#
+# It is empty because the measurement on 2026-08-12 was zero: every one of
+# the 512 treasure bits at $1E40 is clear in all 98 savestates in
+# build/states and all 12 tracked SRAM checkpoints.  Run the audit for the
+# list of what is being walked past.
+#
+# The bit number is the game's own unit, not the record's: bits 0-8 of a
+# treasure record's switch word (ff6/src/field/player.asm:782-789).  Twenty-
+# five bits are shared by two or three records, because duplicate map copies
+# have to close the same chest, so one line here can cover more than one map.

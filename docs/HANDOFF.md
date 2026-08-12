@@ -170,6 +170,21 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   So when a checkpoint ships a casualty, check the **bag** at every
   checkpoint below it before concluding that a fight is too hard. Nothing in
   the tree audits supplies.
+- **The route opens no chests at all, and 94 of them are on maps it
+  reaches.** Measured 2026-08-12: every one of the 512 treasure bits at
+  `$1E40` is clear in all 98 savestates in `build/states` and all 12
+  tracked SRAM checkpoints, from power-on to the deepest link.
+  `tools/audit_chests.py` is the check and prints the list by map; the
+  scope number is a lower bound, because a map the route only crosses,
+  with no fixture on it and no map assertion in its generator, is invisible
+  to it (map 72 and its two chests are the known case). Nothing here is a
+  balance question until the route stops walking past a Thunder Rod one
+  room before TunnelArmr, an Atlas Armlet on Mt Kolts, and a Flame Sabre
+  and a ThunderBlade in the Magitek Factory. The chest table's format is in
+  `research/data-formats.md`; the two things a naive decode gets wrong are
+  that the bit index is nine bits, not eight, and that the unit the game
+  tracks is the bit rather than the record, since duplicate map copies
+  share one bit and can hold different items.
 - **A healthier route levels more slowly.** FF6 divides a fight's experience
   among the survivors, so a chain that stops losing members gains levels
   later: the repaired chain reaches `n128_won` at LOCKE 14 / EDGAR 15 /

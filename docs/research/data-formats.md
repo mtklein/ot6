@@ -125,6 +125,62 @@ skills can largely ride the existing element byte; weapon-class chip needs
 the new class table (weapons) + per-skill class tags (free bits at +0x07
 or a small parallel table).
 
+## Treasure chests — `treasure_prop.dat`, 5 B × 286, blocked by map
+
+`ff6/src/field/trigger/treasure_prop.dat`, incbin'd at
+`ff6/src/field/player.asm:916`. Records are grouped by map, and a map's
+block is found through the generated offsets in
+`ff6/include/field/treasure_prop.inc` (`_N := TreasureProp + $XXXX`, 415
+entries, one per field map); at run time the game reaches the same block
+through `TreasurePropPtrs` indexed by the map id in `$82`
+(`player.asm:759-763`). A block runs to the next map's offset, so an empty
+map has two equal offsets.
+
+    +$00  x tile        player.asm:766, compared against $2A
+    +$01  y tile        player.asm:769, compared against $2B
+    +$02  switch word   player.asm:780, 16-bit
+    +$04  content       player.asm:778
+
+`ITEM_SIZE = 5` (`treasure_prop.inc:9`), and the scan loop steps by five
+(`inx5`, `player.asm:773`).
+
+**The switch word carries both the flag and the kind.** Bits 0–8 are the
+index into the treasure-bit array at `$1E40..$1E7F`: `and #$01ff / lsr3`
+picks the byte and `and #$0007` picks the bit (`player.asm:782-789`). The
+index is **nine** bits wide, not eight — only three records in the game
+prove it (256 on map 89, 257 on 378, 258 on 207), so an `and #$00ff`
+decodes 283 of 286 records correctly and aliases the other three.
+
+The kind is the high nibble, tested in this order (`player.asm:797`, `:817`,
+`:830`, `:840`): `$8000` gil, content × 100 (`player.asm:800-803`); `$4000`
+item, content is the item id; `$2000` monster-in-a-box, content is an event
+battle group; `$1000` empty. **Ten records set none of the four**; they
+reach the same empty branch, because the `and #$10 / beq` at
+`player.asm:840-842` branches to the instruction after it either way — the
+vendored disassembly's own comment there is "this has no effect". Whole-game
+tally: 258 item, 11 monster, 7 gil, 10 empty.
+
+**The unit the game tracks is the bit, not the record.** 25 bit indices are
+shared by two or three records, because the game keeps duplicate map copies
+(South Figaro before and after the occupation, the two South Figaro cave
+variants) and one flag has to close the chest in every copy. The copies can
+hold **different items**: bit 19 is a Thunder Rod on map 70, a Tincture on
+map 73 and a Hero Ring on map 90, so opening it in one copy takes that
+copy's item and empties the chest in the others. Count distinct bits, not
+records.
+
+`$1E40..$1E7F` (`ff6/notes/field-ram.txt:1035`) is written only by
+`player.asm:795` and cleared only by `event.asm:5549`, and it sits inside the
+`$1600..$1FFF` block the game copies into a save slot (`CopyGameDataToSRAM`,
+`ff6/src/menu/save.asm:154d`), so the same offset reads a savestate and a
+tracked SRAM checkpoint. `tools/audit_chests.py` reads both.
+
+Related, and needed to name a map in a report: **map_prop byte +$00 is the
+map's title index.** `LoadMapProp` copies 33 bytes from `MapProp + 33 * map`
+to `$0520` (`ff6/src/field/map.asm:143-156`), and `ShowMapTitle` indexes
+`MapTitlePtrs` with `$0520` (`ff6/src/field/text.asm:114`). Index 0 is the
+blank string, which most interiors use.
+
 ## Free space near these tables
 
 $D2B224–D2B2FF (220 B, labeled unused), esper-block tail (~215 B), plus
