@@ -187,6 +187,20 @@ H.run({ maxFrames = 20000 }, {
   H.waitFrames(45),
   H.call(function()
     H.assertExitContract("minecart-platform-v1")
+    -- The floor, asserted before the battery is kept: dead, petrified,
+    -- zombie, or at or below max HP / 8 (the same three conditions as
+    -- tools/audit_party_hp.py; change the two together).  The four
+    -- checkpoints the audit named got this line yesterday; this one is on
+    -- the same lineage and did not have it.  Note what it would NOT have
+    -- caught, since that is the failure this checkpoint actually shipped:
+    -- the battery it was carrying had a standing party and an empty bag --
+    -- 8 Tonics and no Fenix Downs, against the 16 Tonics, 10 Potions and 2
+    -- Fenix Downs at mrf-save-room-v1 -- because the two revives had been
+    -- spent upstream raising the characters n024-entry-save-v1 handed over
+    -- dead.  Nothing complained until terra-returned-v1's care stop, two
+    -- boundaries later, had nothing to raise EDGAR with.  Supplies are not
+    -- checked anywhere; that gap is known and it is not this line's job.
+    H.assertPartyStanding("minecart-platform-v1 exit")
     H.screenshot("checkpoint_d_saved")
   end),
   H.logStep(function()
