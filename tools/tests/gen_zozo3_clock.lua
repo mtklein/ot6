@@ -118,6 +118,17 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(map(), 221, "booted on the Zozo street (map 221)")
   end),
 
+  -- Top the party up before walking a map that draws encounters.
+  -- zozo_arrival ships LOCKE at 69/249 -- 28%, which audit_party_hp passes
+  -- because its bar is max/8.  Measured 2026-08-12: the walk below drew a
+  -- Zozo street pack at (41,39) on its first screen and the tactical driver
+  -- spent the step's whole 30000-frame budget in it without winning, because
+  -- a party that starts a fight at 28% and takes ~116 HP a round never gets
+  -- clear of the heal threshold and never gets its turns back for attacking.
+  -- The fight was not lost -- nobody died -- so nothing reported a fight at
+  -- all; the run reported a navigation timeout.
+  H.fieldCare({ tag = "care before the Zozo streets", threshold = 0.95 }),
+
   -- 1. street -> the clock room: door (42,28) -> 225 {98,61}
   H.navTo(42, 29, { maxFrames = 30000, playBattles = "tactical" }),
   H.driveUntil(function() return map() == 225 end, 900, {

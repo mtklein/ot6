@@ -261,17 +261,62 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   that the bit index is nine bits, not eight, and that the unit the game
   tracks is the bit rather than the record, since duplicate map copies
   share one bit and can hold different items.
+- **Zozo's random encounters have no reachable break class, and the pool
+  out-damages the route party.** Measured 2026-08-12 while `dadaluma_entry`
+  and `zozo_clock_solved` were blocking the v0.10 check. Declaring maps 221
+  and 225 to `tools/check_break_reach.py` and running it against
+  LOCKE/CELES/SABIN/EDGAR reports **all eight** formations of groups 77 and
+  78 as NO REACHABLE BREAK CLASS: HadesGigas, Gabbldegak, Harvester and
+  SlamDancer each carry an `Ot6ShieldTbl` row with no class key at all (rows
+  2091/2094/2096/2099), so no party can break them and every hit lands at
+  the shielded halving. Zozo is not a declared area in that checker, which
+  is why nothing caught it; the two declared areas are the Magitek Facility
+  and the Cave to the Sealed Gate. Runtime cost, same day: one street
+  encounter took the tactical driver 6352 frames at full HP, and the
+  map-225 stair-room formation (three bodies, 350 HP and two shields each,
+  round costs 186/99/137/306 against max HPs of 249/245/280/289) killed a
+  four-member party at levels 11-12 having taken no damage at all across
+  13200 frames. **Declaring the area would turn `make test` red**, so it is
+  recorded here rather than landed.
+- **A party that enters a fight below `healPercent` may never get a turn
+  back.** The other half of the heal policy, and not a bug in it. When the
+  item restores at least what a round costs, `M.healDecision` hands the
+  decision to the fraction rule and tops up anyone under `opts.healPercent`
+  (`lib/ot6.lua:640-646`). On the Zozo street a round took about 45% of each
+  character's max HP and a Tonic restored about the same, so a party
+  starting at 28%/62% fell below the threshold every single round and every
+  actor spent every turn healing: 29 item and 9 heal plans against 18 Fight
+  and 20 skill, 35 of them logged "top-up", and two monsters still at
+  350/350 when the 30000-frame budget expired. Nobody died, so nothing
+  reported a fight; the run reported a navigation timeout. The same
+  encounter at full HP was won in 6352 frames. **A care stop before a walk
+  that can draw encounters is what prevents this**, and the entry HP is the
+  variable to check first when a nav step burns its budget without a
+  casualty.
 - **A healthier route levels more slowly.** FF6 divides a fight's experience
   among the survivors, so a chain that stops losing members gains levels
   later: the repaired chain reaches `n128_won` at LOCKE 14 / EDGAR 15 /
   SABIN 15 where the old one was 15/16/16. Nothing asserts a level at these
   boundaries and every contract still passes, but a fight that was tuned
   against the old numbers is being fought a level down.
-- **A party wipe must be reported as a wipe.** The navigators'
-  `M.partyWiped()` check misses in-battle wipes, because `$1600` keeps
-  pre-battle HP. The filed fix is a battle-module check (`$3BF4` under
-  `battleLoadStarted()`). Three wipes have been mistaken for stuck
-  navigators.
+- **A party wipe must be reported as a wipe, and `M.partyWiped()` cannot
+  report one.** Four wipes have now been mistaken for stuck navigators. The
+  field half misses it because `$1600` keeps pre-battle HP. The battle half,
+  `M.partyWipedInBattle` (`lib/ot6_field.lua:90`), was the filed fix for that
+  and cannot fire: its first line requires `M.battleLoadStarted()`, which
+  returns true only when some slot of `$3BF4` is above 0
+  (`lib/ot6.lua:467-475`), while its own verdict requires every slot with a
+  sane max HP to be 0. For any real party those two cannot both hold, so it
+  returns true only on a garbage table. Confirmed by construction and by
+  measurement: a guarded drive calling `H.partyWiped()` every frame stayed
+  silent across 22000 frames of an all-zero table (2026-08-12,
+  `dadaluma_entry`). **What a wipe does leave** is all four `$3BF4` words at
+  0 with the Game Over event running and control never returning; a live
+  menu zeroes the same words, so the event and control clauses are load
+  bearing. `gen_zozo4_dadaluma`'s `encounters` helper is the worked example,
+  on wipeCanary's own 300-frame debounce. Any drive that is not `navTo`,
+  `worldNavTo` or `advanceStory` has no wipe check at all unless it brings
+  one (`lib/ot6_field.lua:151`).
 - **The fight driver's log goes silent on a wipe, and the silence reads as a
   frozen battle.** Same root cause as the bullet above, one layer up.
   `battleLoadStarted()` calls an all-zero `$3BF4` "not a battle" — its

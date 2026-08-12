@@ -221,6 +221,36 @@ local function moveMeatToFront(keepMenu)
   }, {})
 end
 
+-- Open the main menu if it is not already up.  moveMeatToFront opens it as
+-- a side effect of needing it, but its whole body sits behind "the meat is
+-- not already in slot 0" (`invSlot(DRIED_MEAT) ~= 0`), so when the meat is
+-- already at the front the menu is never opened and the caller is left
+-- pressing buttons at the field.
+--
+-- Measured 2026-08-12, from the two workers of this same generator in one
+-- `make savestates` run.  The `gau_joined` worker left the Mobliz shop with
+-- gil=4203 tonics=99, printed no "main menu for inventory move" line at all
+-- -- so the cond was false and the meat was already in slot 0 -- and
+-- prepareFeed's next step, the Config cursor drive, then spent its whole
+-- 800-frame budget and failed with "timeout after 800 frames driving toward
+-- main-menu cursor on Config".  The `s2_gau_joined` worker reached the same
+-- counter, printed the line, moved the meat from a later slot, and every
+-- step of the identical Config drive satisfied in under 80 frames.
+--
+-- Why the two lineages differ in where the meat lands is UNVERIFIED: the
+-- observable difference is that this one arrived at the counter with
+-- tonic=0 in the bag and s2 arrived with tonic=99, and an emptied stack
+-- plausibly frees the front slot the purchase then takes.  The repair does
+-- not depend on that being the reason -- the drive must not assume a menu
+-- it did not open -- so it is recorded as the open question it is.
+local function openMainMenu(what)
+  return H.cond(function() return H.readByte(ZMENUSTATE) ~= MAIN_MENU end, {
+    H.pressButtons({ "x" }, 4),
+    H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
+      600, what, 5),
+  }, {})
+end
+
 local function prepareFeed()
   return H.cond(function() return true end, {
     H.release(),
@@ -228,6 +258,7 @@ local function prepareFeed()
     moveMeatToFront(true),
     H.release(),
     H.waitFrames(30),
+    openMainMenu("main menu for Config"),
     H.driveUntil(function()
       return H.readByte(ZMENUSTATE) == MAIN_MENU and H.readByte(0x4B) == 5
     end, 800, {

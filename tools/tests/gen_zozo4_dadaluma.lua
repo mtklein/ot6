@@ -56,7 +56,8 @@
 --    `call GameOver`.  Since issue #75 the fight is played; see the
 --    fighter and retry ladder at the fight site.  This file writes no
 --    emulated game state anywhere, and every mid-route encounter on the
---    climb is fought by the same edge-tapped A that pages dialogs.
+--    climb is played by the library fighter -- see `encounters` below for
+--    what blind A taps cost here and what replaced them.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -66,6 +67,83 @@ end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted()
+end
+
+-- ------------------------------------------- mid-route encounters, played --
+-- Every hand-rolled drive below used to fight its mid-route encounters with
+-- blind A taps: tap A, which opens the command list, confirms Fight, takes
+-- whatever target the cursor is already on, and pages the victory text.  The
+-- file's header claimed that was enough because gen_zozo5_ramuh beats this
+-- same pool on these same maps the same way.  On this party it is not.
+--
+-- Measured 2026-08-12 on the first step of this file, door (38,57), twice:
+--
+--   * from the fixture as it ships (LOCKE 69/249), the encounter at (45,55)
+--     took the party from 69/120/280/233 to all zeros between f+1200 and
+--     f+7800;
+--   * with the care stop below healing everyone to full first, the same
+--     step drew the same pool and the party went from 249/195/280/289 to
+--     all zeros by f+7800 anyway.
+--
+-- So the HP was not the whole story here and the drive is the rest of it.
+-- The comparison that settles it is gen_zozo3_clock, which walks the same
+-- street with navTo's playBattles="tactical": at full HP that driver killed
+-- every monster in the formation by f+4800 and finished its step in 6352
+-- frames.  Blind A taps lose the fight the tactical driver wins, because
+-- they never read a menu -- no boost, no item, and every swing aimed at
+-- whatever the cursor happened to be on (FF6 auto-targets nothing; HANDOFF
+-- records what that cost once already).
+--
+-- So these drives play their encounters with the library's fighter, on the
+-- same options M.rideOut uses (lib/ot6_field.lua:3325-3331); bank = 3 is
+-- there because a shielded monster halves damage and a broken one takes 4x
+-- (ot6_break.asm:1487-1497), so the fight is won by breaking rather than
+-- chipping.
+--
+-- The wipe check rides along, because a loss still has to report itself as
+-- a loss.  It cannot use H.partyWiped(): out of battle that reads $1600,
+-- which keeps PRE-battle HP, and in battle it defers to
+-- M.partyWipedInBattle, whose first line requires M.battleLoadStarted() --
+-- and that returns false the moment every slot reads 0, by its own
+-- documented limit (lib/ot6.lua:463-466).  A total wipe therefore satisfies
+-- neither.  What a wipe does leave, measured on both runs above, is all
+-- four $3BF4 words at 0 with the Game Over event running and control never
+-- returning; that held for the remaining 22000 frames of the step.  A live
+-- menu also zeroes those words, which is why the event and control clauses
+-- are in the test, and the 300-frame debounce is the library wipeCanary's.
+local function battleHpAllZero()
+  for e = 0, 3 do
+    if H.readWord(0x3BF4 + e * 2) ~= 0 then return false end
+  end
+  return true
+end
+
+-- Returns a per-drive frame handler.  It answers true on a frame it has
+-- taken over (a battle is up), false when the caller should get on with
+-- walking.
+local function encounters(what)
+  local F = H.newFightDriver(what, { tactical = true, boost = true, bank = 3,
+    items = true, healPercent = 60, cadence = 12 })
+  local dead = 0
+  return function()
+    if battleHpAllZero() and not H.hasControl() and H.eventRunning() then
+      dead = dead + 1
+      if dead >= 300 then
+        error(string.format("%s: THE PARTY IS WIPED -- all four battle-HP " ..
+          "words have read 0 with the event running and no control for 300 " ..
+          "consecutive frames, at (%d,%d) on map %d.  This is a lost fight, " ..
+          "not a stuck walk.", what, H.fieldX(), H.fieldY(), map()), 0)
+      end
+    else
+      dead = 0
+    end
+    if H.battleLoadStarted() then
+      F.frame()
+      return true
+    end
+    F.idle()
+    return false
+  end
 end
 
 -- ----------------------------------------------- the input-driven fighter --
@@ -313,6 +391,7 @@ local function followPath(tx, ty, opts)
   local extra = {}
   for _, w in ipairs(opts.extraWalls or {}) do extra[key(w[1], w[2])] = true end
   local hb = 0
+  local fought = encounters(string.format("followPath (%d,%d)", tx, ty))
   return H.driveUntil(function()
     if opts.arriveMap then
       if map() == opts.arriveMap then H.setPad({}); return true end
@@ -327,16 +406,30 @@ local function followPath(tx, ty, opts)
     H.call(function()
       hb = hb + 1
       if hb % 600 == 0 then
-        H.log(string.format("[path] ->(%d,%d) f+%d at (%d,%d)", tx, ty, hb,
-          H.fieldX(), H.fieldY()))
+        -- Say WHY a stalled walk is stalled.  A bare position heartbeat
+        -- reports the same line for "no path found", "no control" and
+        -- "walking into a body", and the three want different repairs;
+        -- reading that absence as information cost a diagnosis once
+        -- (dadaluma_entry, 2026-08-12).
+        local walls0 = map() == 221 and W221 or W225
+        local mv0 = H.tileAligned()
+          and firstStep(H.fieldX(), H.fieldY(), tx, ty, walls0) or nil
+        -- The raw $3BF4 words, not H.partyHp()'s reading of them: an
+        -- all-zero table is how a wipe presents, and battleLoadStarted()
+        -- calls that "no battle" by its own documented limit
+        -- (lib/ot6.lua:463-466), so btl=false here means either "back on
+        -- the field" or "everybody is dead" and only the words separate them.
+        local raw = {}
+        for e = 0, 3 do raw[#raw + 1] = string.format("%04X",
+          H.readWord(0x3BF4 + e * 2)) end
+        H.log(string.format(
+          "[path] ->(%d,%d) f+%d at (%d,%d) map=%d ctl=%s align=%s dlg=%s "
+          .. "btl=%s ev=%s step=%s bhp=%s", tx, ty, hb, H.fieldX(), H.fieldY(),
+          map(), tostring(H.hasControl()), tostring(H.tileAligned()),
+          tostring(H.dialogWaiting()), tostring(H.battleLoadStarted()),
+          tostring(H.eventRunning()), tostring(mv0), table.concat(raw, ",")))
       end
-      if H.battleLoadStarted() then
-        -- an encounter mid-route is FOUGHT (issue #75): the edge-tapped A
-        -- opens the command list, confirms Fight, takes the default target
-        -- and pages the victory text
-        H.setPad(hb % 8 < 4 and { "a" } or {})
-        return
-      end
+      if fought() then return end
       if H.dialogWaiting() then
         H.setPad(hb % 8 < 4 and { "a" } or {})
         return
@@ -398,6 +491,7 @@ wr(106, 15, "down"); wr(106, 16, "left"); wr(105, 16, "left"); wr(104, 16, "down
 for yy = 17, 26 do wr(104, yy, "down") end             -- (104,26) -> door (104,27)
 local function westRoomCross()
   local hb = 0
+  local fought = encounters("westRoomCross")
   return H.cond(function() return true end, {
     H.driveUntil(function() return map() == 221 end, 30000, {
       H.call(function()
@@ -406,9 +500,7 @@ local function westRoomCross()
           H.log(string.format("[westroom] f+%d at (%d,%d) z%d", hb,
             H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3))
         end
-        if H.battleLoadStarted() then
-          H.setPad(hb % 8 < 4 and { "a" } or {}); return   -- fought, not write-cleared
-        end
+        if fought() then return end
         if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
         -- the (111,15) scene: RIDE it with A -- a direction press here hangs
         if not H.hasControl() or H.eventRunning() then
@@ -446,6 +538,7 @@ br(31, 35, "upright"); br(32, 34, "upright"); br(33, 33, "upright"); br(34, 32, 
 br(34, 31, "left"); br(33, 31, "left"); br(32, 31, "left"); br(31, 31, "up")  -- -> (31,30) door
 local function bridgeCross()
   local hb = 0
+  local fought = encounters("bridgeCross")
   return H.cond(function() return true end, {
     H.driveUntil(function() return map() == 225 end, 24000, {
       H.call(function()
@@ -454,9 +547,7 @@ local function bridgeCross()
           H.log(string.format("[bridge] f+%d at (%d,%d) z%d", hb,
             H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3))
         end
-        if H.battleLoadStarted() then
-          H.setPad(hb % 8 < 4 and { "a" } or {}); return   -- fought, not write-cleared
-        end
+        if fought() then return end
         if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
         if not H.hasControl() then H.setPad({}); return end
         if not H.tileAligned() then H.setPad({}); return end
@@ -742,19 +833,14 @@ local function stairDir(x, y)
 end
 local function stairFollow()
   local hb = 0
+  local fought = encounters("stairFollow")
   return H.driveUntil(function() return map() == 221 end, 24000, {
     H.call(function()
       hb = hb + 1
       if hb % 600 == 0 then
         H.log(string.format("[stair] f+%d at (%d,%d)", hb, H.fieldX(), H.fieldY()))
       end
-      if H.battleLoadStarted() then
-        -- an encounter mid-route is FOUGHT (issue #75): the edge-tapped A
-        -- opens the command list, confirms Fight, takes the default target
-        -- and pages the victory text
-        H.setPad(hb % 8 < 4 and { "a" } or {})
-        return
-      end
+      if fought() then return end
       if H.dialogWaiting() then
         H.setPad(hb % 8 < 4 and { "a" } or {})
         return
@@ -862,6 +948,7 @@ corr(31, 13, { "left" })
 -- other step carries, BEFORE the generation instead of inside it.
 local function corridorFollow()
   local hb, calm = 0, 0
+  local fought = encounters("corridorFollow")
   return H.driveUntil(function()
     local there = H.fieldX() == 30 and H.fieldY() == 13 and settled()
     calm = there and calm + 1 or 0
@@ -877,13 +964,7 @@ local function corridorFollow()
         H.log(string.format("[corridor] f+%d at (%d,%d)", hb,
           H.fieldX(), H.fieldY()))
       end
-      if H.battleLoadStarted() then
-        -- an encounter mid-route is FOUGHT (issue #75): the edge-tapped A
-        -- opens the command list, confirms Fight, takes the default target
-        -- and pages the victory text
-        H.setPad(hb % 8 < 4 and { "a" } or {})
-        return
-      end
+      if fought() then return end
       if H.dialogWaiting() then
         H.setPad(hb % 8 < 4 and { "a" } or {})
         return
@@ -908,6 +989,7 @@ end
 -- facing up so nothing re-fires.  pred names the far strip.
 local function jumpRow(dir, pred, maxFrames, what)
   local evWas, calm, hb, lastFire = false, 0, 0, nil
+  local fought = encounters(what)
   return H.cond(function() return true end, {
     H.driveUntil(function()
       local there = pred() and H.tileAligned()
@@ -923,10 +1005,7 @@ local function jumpRow(dir, pred, maxFrames, what)
             what, H.fieldX(), H.fieldY(), H.readByte(0x1EB6)))
         end
         evWas = ev
-        if H.battleLoadStarted() then
-          H.setPad(hb % 8 < 4 and { "a" } or {})   -- fought, not write-cleared
-          return
-        end
+        if fought() then return end
         if ev or not H.hasControl() then
           H.setPad({})
           return
@@ -946,6 +1025,18 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(sw(0x034A), 1, "$034A SET -- the gentleman waits")
     H.assertEq(sw(0x0053), 0, "$0053 clear -- the Ramuh scene has not run")
   end),
+
+  -- Top the party up before the climb starts.  zozo_arrival ships LOCKE at
+  -- 69/249 -- 28%, which audit_party_hp passes because its bar is max/8 --
+  -- and both Zozo maps draw random encounters (map_prop byte +5 bit 7 set
+  -- for 221 and 225, the same decode gen_zozo3_clock's header records).
+  -- Measured 2026-08-12: the first encounter, eleven tiles into the first
+  -- step at (45,55), killed the whole party.  A player walking into a new
+  -- town at 28% would drink first.  This is not on its own enough -- the
+  -- same encounter killed a full-HP party too, which is what moved these
+  -- drives onto the library fighter (see `encounters`) -- but the two
+  -- together are what a normal player brings to that street.
+  H.fieldCare({ tag = "care before the Zozo climb", threshold = 0.95 }),
 
   -- the climb
   door(38, 57, 225, "P9a street -> interior"),
