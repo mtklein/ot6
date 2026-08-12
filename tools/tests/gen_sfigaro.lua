@@ -446,17 +446,23 @@ H.run({ maxFrames = 350000 }, {
   -- him win it.  The soldier's first action takes him 168 -> 111, which is
   -- the halved physical.  His own Fight takes the HeavyArmor 495 -> 489 and
   -- one shield off three.  The soldier's second action takes him 111 -> 0:
-  -- over 111 damage, roughly double the first and not halved by the row,
-  -- which fits the AI's turn-2 line `attack BATTLE, TEK_LASER, SPECIAL`
-  -- (ai_script.asm:342-357) rolling something other than the physical.  One
-  -- ATB round is about 570 frames at this level, so he gets exactly one
+  -- over 111 damage in ONE hit ($3A70 = 0), and measured row-exempt -- it
+  -- comes through command $0C (`Cmd_0c` / `_actbluemagic0`,
+  -- battle_main.asm:3740) carrying $B3 = $FF, where both weapon swings
+  -- carried $B3 = $DF.  So the back row halves his Fight and the soldier's
+  -- physical and does nothing at all to the thing that kills him.  That is
+  -- the AI's turn-2 line `attack BATTLE, TEK_LASER, SPECIAL`
+  -- (ai_script.asm:342-357) rolling one of the two non-physicals, and the
+  -- macro emits $F0 -- one of three at random, so it comes up 2 turns in 3.
+  -- One ATB round is about 570 frames at this level, so he gets exactly one
   -- action before that hit lands: three shield chips are four turns away
-  -- and he has one.  Healing does not reach either -- 111 of 168 is 66%,
-  -- above the driver's 60% line, and a Tonic does not cover a 111-damage
-  -- hit.  So the back row stays, because it is what buys the one action,
-  -- and it is not a win condition.  What this fight needs is a weapon
-  -- better than the single Dirk in the bag, or fewer shields on a level-13
-  -- monster: a balance decision rather than a routing one.
+  -- and he has one.  Healing does not reach it either -- 111 of 168 is 66%,
+  -- above the driver's 60% line, and no Tonic covers a 111-damage hit.  So
+  -- the back row stays, because it is what buys the one action, and it is
+  -- not a win condition.  What this fight needs is a weapon better than the
+  -- single Dirk in the bag, or fewer shields on a level-13 monster, or a
+  -- soldier that cannot open with a row-exempt one-shot: a balance decision
+  -- rather than a routing one.
   H.setRows({ [1] = true }, { tag = "locke solo rows" }),
   H.call(function()
     where("boot")

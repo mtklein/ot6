@@ -93,18 +93,51 @@
 -- his death at f1957 neither side had a turn, because at this level one
 -- ATB round is about 570 frames.
 --
--- Why he loses is then arithmetic, not a defect.  The soldier's two
--- actions took 57 and >=111; the second is roughly double the first and the
--- back row did not halve it, which fits the AI's turn-2 line
--- `attack BATTLE, TEK_LASER, SPECIAL` (ai_script.asm:342-357, monster $9F
--- via formation 64) rolling something other than the physical.  LOCKE's own
--- Fight took 6 hp off 495 and one shield off three.  He gets one action
--- before the second hit lands, so no reachable sequence of Fights breaks
--- the armour, and healing does not help: 111 is 66% of 168, above the
--- driver's 60% line, and a Tonic does not cover a 111-damage hit anyway.
--- The bag holds exactly one weapon (item $00, the Dirk, power 26 at
--- item_prop_en.dat +$14), so H.equipOptimum is already picking the best
--- there is.
+-- WHAT KILLS HIM, measured rather than inferred (second run, with
+-- ShowAttackName hooked).  Three attack resolutions in the whole fight:
+--
+--   f1384  x=$0008 (monster)  $3A7C=$00  $B3=$DF  $3A70=1   168 -> 111
+--   f1503  x=$0000 (LOCKE)    $3A7C=$00  $B3=$DF  $3A70=1   495 -> 489
+--   f1956  x=$0008 (monster)  $3A7C=$0C  $B3=$FF  $3A70=0   111 -> 0
+--
+-- `$3A7C` is the command byte (`stz $3a7c ; change command to fight`,
+-- battle_main.asm:449).  $00 is Fight, so the first two are weapon swings
+-- and carry `$B3` bit 7 CLEAR, which is what the row code halves — the
+-- soldier's 57 is the halved physical, exactly the "~53" the 2026-08-09
+-- record describes.  The killing action is command **$0C**, `Cmd_0c` /
+-- `_actbluemagic0` (:3740), the monster-magic path, and it carries
+-- `$B3 = $FF`, so **the back row does not halve it** (HANDOFF: "$B3 = $FF
+-- for every command and only the weapon swing clears it").  It lands once,
+-- `$3A70 = 0`, for over 111 — it is one big row-exempt hit, not two small
+-- ones.  That is the AI's turn-2 line `attack BATTLE, TEK_LASER, SPECIAL`
+-- (ai_script.asm:342-357) rolling one of the two non-physicals; the macro
+-- emits `$F0`, one of three at random (ai_script.inc's `attack` macro).
+--
+-- So the fight ends on a single row-exempt special that one-shots LOCKE
+-- from 66% of his HP.  No bag fixes that: the heal rule cannot fire between
+-- 66% and death, and no Tonic covers a 111-damage hit.  His own Fight takes
+-- 6 off 495 and one shield off three, and the bag holds exactly one weapon
+-- (item $00, the Dirk, power 26 at item_prop_en.dat +$14), so
+-- H.equipOptimum is already picking the best there is.
+--
+-- This is why the 2026-08-09 "solo LOCKE beats the gate soldier" record
+-- (95efb39) cannot be reproduced, and two of its own numbers do not survive
+-- checking.  It claims "shields 3 -> 0 three times over, 495 hp -> 0, LOCKE
+-- never below 112", which needs about fourteen monster turns without the
+-- 2-in-3 non-physical roll ever coming up.  And it claims LOCKE "inherits 12
+-- Tonics and 4 Potions"; no locke_scenario fixture has ever held that,
+-- including the Jul-22 file the owner still has, which holds Tonic x2 and
+-- Potion x4 — and gen_sfigaro can only spend from that bag, never add to it.
+-- Checked and NOT the difference: LOCKE's level (8), HP (168) and only
+-- weapon (the Dirk) are identical across all three locke_scenario fixtures
+-- from Jul 22 to Aug 12; HeavyArmor's authored 3 shields and SLASH|PIERCE
+-- weakness are byte-identical at 95efb39 and today (ot6_hud.asm's
+-- Ot6ShieldTbl); the multi-hit dial hooks only the Blitz and Tools command
+-- handlers (ot6_hitcount.asm), so a monster cannot pick a count up from it;
+-- and Ot6FightBoost refuses non-characters outright ("monsters never boost",
+-- ot6_boost.asm:490-492).  The "21 damage a swing" in that record was the
+-- FRONT-row armed swing, measured before the row fix in the same commit;
+-- halved by the row and halved again by a shield it is the 6 measured here.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/locke_scenario.mss.lua"
 
@@ -130,6 +163,8 @@ local BYTES = {
   { "2D6E msgCmd", 0x2D6E },     { "2D6F msgIdx", 0x2D6F },
   { "3408", 0x3408 },            { "3409", 0x3409 },
   { "3219 c0atb", 0x3219 },      { "3221 m0atb", 0x3221 },
+  { "3A70 nAtk", 0x3A70 },       { "3A7C atkIdx", 0x3A7C },
+  { "B3 rowflag", 0x00B3 },
 }
 local WORDS = {
   { "hpC0", 0x3BF4 }, { "hpM0", 0x3BFC },
@@ -216,6 +251,34 @@ H.run({ maxFrames = 60000 }, {
       H.readByte(0x1DD1), H.readByte(0x1DD2), table.concat(bsw, " ")))
     H.log(string.format("pre-battle: obj26 at (%d,%d), party at (%d,%d)",
       H.objX(26), H.objY(26), H.fieldX(), H.fieldY()))
+    -- The bag and LOCKE's record, at the fight rather than at the fixture.
+    -- The 2026-08-09 winning run says it inherited 12 Tonics and 4 Potions
+    -- and swung for 21; whether this run has the same inputs is what
+    -- separates "the route regressed" from "the fight was retuned".
+    local bag = {}
+    for i = 0, 63 do
+      local id, q = H.readByte(0x1869 + i), H.readByte(0x1969 + i)
+      if id ~= 0xFF and q > 0 then
+        bag[#bag + 1] = string.format("$%02X x%d", id, q)
+      end
+    end
+    H.log("pre-battle bag: " .. table.concat(bag, " "))
+    local r = 0x1600 + 37
+    H.log(string.format("pre-battle LOCKE: L%d hp %d/%d gear %02X %02X %02X %02X %02X  gp=%d",
+      H.readByte(r + 8), H.readWord(r + 9), H.readWord(r + 11),
+      H.readByte(r + 0x1F), H.readByte(r + 0x20), H.readByte(r + 0x21),
+      H.readByte(r + 0x22), H.readByte(r + 0x23),
+      H.readByte(0x1860) | (H.readByte(0x1861) << 8) | (H.readByte(0x1862) << 16)))
+    -- Attribute every damage event to an attack rather than guessing from
+    -- its size.  $3A7C is the attack index ExecAttack works from, $3A70 is
+    -- the engine's one multi-hit counter (0 = one attack,
+    -- ot6_hitcount.asm:14-22), and $B3 bit 7 is what the row code reads --
+    -- together they say what struck, how many times, and whether the back
+    -- row halved it.  The 2026-08-09 record has this fight won with every
+    -- monster hit at the halved ~53; the killing hit measured here is over
+    -- 111, so which of the AI's three turn-2 rolls it was, and whether it
+    -- landed once or twice, is the whole question.
+    hook("ShowAttackName", H.sym("ShowAttackName"), 40)
     hook("CheckBattleEnd", H.sym("CheckBattleEnd"), 60)
     hook("LoseBattle", H.sym("LoseBattle"), 8)
     hook("WinBattle", H.sym("WinBattle"), 8)
