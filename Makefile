@@ -253,6 +253,14 @@ savestates: rom graph
 	@# run with `make test` skipped -- so the no-state-write check runs here too.
 	python3 tools/check_state_writes.py
 	ninja -f $(NINJA_FILE) $(if $(NINJAFLAGS),$(NINJAFLAGS),-j$(SAVESTATES_JOBS)) savestates
+	@# Audit what was just generated, here rather than only in the next `make
+	@# test`.  Both read the .mss files directly and cost about a second, and
+	@# the failure they catch -- a fixture shipping a bare-handed or a downed
+	@# party member -- is one every later step inherits silently.  Waiting an
+	@# hour to hear it from a separate target is how returner_hideout shipped
+	@# with two dead characters in it.
+	python3 tools/audit_equipment.py
+	python3 tools/audit_party_hp.py
 	@echo "savestates up to date"
 
 # ---------------------------------------------------------------- smoke ----
