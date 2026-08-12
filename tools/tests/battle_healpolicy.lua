@@ -56,10 +56,23 @@ local CASES = {
   { name = "the same drink, but it is keeping an ally up",
     hp = 100, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
     threshold = 60, want = "covering an ally" },
-  -- Too far gone for the drink to matter: 40 + 50 is still inside a 112
-  -- round, so drinking postpones nothing and costs the swing.
-  { name = "an ally too far gone for the drink to save",
+  -- A party still covers an ally the drink cannot lift clear of the WORST
+  -- round: 40 + 50 loses to a 112 round and survives the 55 the same soldier
+  -- also throws, and roundCost is the worst seen rather than the usual one.
+  -- Requiring the heal to clear it was tried and left EDGAR at 63/398 for all
+  -- of battle 72 with seven Potions in the bag.
+  { name = "an ally the drink cannot lift clear of the worst round",
     hp = 40, maxhp = 168, restore = 50, roundCost = 112, allies = 1,
+    threshold = 60, want = "covering an ally" },
+  -- Alone, the same character swings: the drink costs more attacking time
+  -- than it buys, and there is nobody else's turns to buy back.
+  { name = "the same character alone",
+    hp = 40, maxhp = 168, restore = 50, roundCost = 112, allies = 0,
+    threshold = 60, want = nil },
+  -- A party does not spend the bag on a routine top-up it cannot sustain:
+  -- above one round of danger, with an item that cannot keep up, act.
+  { name = "a party top-up the item cannot sustain",
+    hp = 200, maxhp = 400, restore = 50, roundCost = 150, allies = 2,
     threshold = 60, want = nil },
   -- Battle 70's opening, from the mrf-save-room battery: EDGAR at 108/354,
   -- nothing measured yet because nobody has been hit.  This is the clause

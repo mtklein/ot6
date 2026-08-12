@@ -558,20 +558,32 @@ end
 -- A heal buys back restore/roundCost of a turn and spends a whole one.  When
 -- the item restores at least what a round takes, that trade never runs out --
 -- the candidate can be topped up for ever -- so the fraction rule governs and
--- this behaves the way the driver always did.  When it restores less, the
--- trade is a loss, and the size of the loss does not depend on where the
--- threshold sits: with HP h, a round costing d and a heal giving g < d, a
--- character who spends k of his turns drinking lands h/d + k*(g/d - 1)
--- attacks before he dies, which falls as k rises.  So a character who cannot
--- out-heal the damage does not heal; he swings.
+-- this behaves the way the driver always did.
 --
--- The exception is an ally.  A turn spent on somebody else's survival buys
--- back their whole remaining turn stream rather than a fraction of one, so a
--- losing heal is still worth it when there is somebody to cover and the drink
--- really lifts them out of range of the next round.  With nobody to cover --
--- a solo party -- that exception is empty, which is why solo LOCKE against
--- battle 11's soldier now swings instead of drinking (issue #74: a Tonic
--- restoring 50 against 55-112 a round, five drinks and one attack).
+-- When the item restores less than a round takes, whether the trade is worth
+-- making depends on whose turn is being spent, and there are two cases.
+--
+-- Alone, the healer is also the only attacker, and the arithmetic is settled:
+-- with HP h, a round costing d and a heal giving g < d, a character who
+-- spends k of his turns drinking lands h/d + k*(g/d - 1) attacks before he
+-- dies, which falls as k rises.  Every drink costs him more attacking time
+-- than it buys, at any threshold, so he does not drink; he swings.  That is
+-- solo LOCKE against battle 11's soldier, where a Tonic restoring 50 against
+-- 55 to 112 a round bought five drinks and one attack (issue #74).
+--
+-- In a party the same drink is worth making when somebody is about to die,
+-- because what it buys back is that member's whole remaining turn stream and
+-- what it costs is one turn out of several.  It is not worth making as a
+-- routine top-up: an item that cannot keep up with the damage empties the bag
+-- without changing where the fight is going.  So a party heals the endangered
+-- and stops topping up.
+--
+-- Deliberately NOT required of a party heal: that it lift the target clear of
+-- the worst round seen.  That was tried and it is too strict -- roundCost is a
+-- worst case, not a typical round, and using it as a bar for "would this help"
+-- left EDGAR at 63/398 for the whole of battle 72 with seven Potions in the
+-- bag while the party won around him.  The bar is proved for the solo case and
+-- assumed for the party case, so it is only applied where it is proved.
 --
 -- Lowering healPercent would also have made battle 11 pass, and would have
 -- been the mistake #74 documents: a number that fits one fight and still
@@ -581,14 +593,16 @@ function M.healDecision(o)
   local gain, cost = o.restore or 0, o.roundCost or 0
   if hp <= 0 or maxhp <= 0 then return nil end
   local pct = hp * 100 // maxhp
-  -- inside one round of dying, and the drink puts them back outside it
-  local saves = hp <= cost and hp + gain > cost
+  local endangered = hp <= cost         -- one round could finish them
   if gain >= cost then
+    -- healing outruns the damage, so topping up can be repeated for ever.
+    -- Before the enemy has landed a round cost is 0 and this is the whole
+    -- rule, which is what leaves a fight's opening turn as it always was.
     if pct < (o.threshold or 60) then return "top-up" end
-    if saves then return "in danger" end
+    if endangered then return "in danger" end
     return nil
   end
-  if saves and (o.allies or 0) > 0 then return "covering an ally" end
+  if endangered and (o.allies or 0) > 0 then return "covering an ally" end
   return nil
 end
 
