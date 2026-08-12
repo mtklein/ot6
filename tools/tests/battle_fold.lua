@@ -190,13 +190,21 @@ H.run({ maxFrames = 45000 }, {
     end, emu.callbackType.write, 0x7e3620, 0x7e371f)
     armDamageWatch()
   end),
-  -- one real R edge arms pending 1; the live list then queues the fold
-  H.driveUntil(function()
-    for _, v in ipairs(spells) do if v == FIRE2 then return true end end
-    return false
-  end, 16000, {
+  -- One real R edge arms pending 1; the live list then queues the fold.
+  --
+  -- Issue #91 moved this stop condition off "the fold executed" and onto
+  -- "the cast was charged".  The defect it found is exactly the two coming
+  -- apart -- the folded price charged, the base spell cast -- and a drive
+  -- that waits for the fold reports that as a 16000-frame timeout with
+  -- nothing in it about the price.  The charge is strictly the later of the
+  -- two (measured: $3410 written at f631, the pool moved at f650), so
+  -- stopping here still has the executed id in hand, and every assertion
+  -- below is unchanged.  Measured on the unfixed ROM: this drive is
+  -- satisfied after 158 frames and the run then fails at "the base Fire
+  -- folded to its next tier", with "spells executed: 00 ff 00" in the log.
+  H.driveUntil(function() return mp(terra) ~= mp0 end, 16000, {
     H.call(function() H.setPad(decide()) end),
-  }, "the boosted cast folded"),
+  }, "the boosted cast was charged"),
   H.waitUntil(function() return pend(terra) == 0 end, 900,
     "folded cast resolves", 10),
   H.waitFrames(120),
