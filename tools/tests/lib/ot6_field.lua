@@ -115,16 +115,56 @@ function M.partyWiped()
   return any
 end
 
-local function wipeCanary(tag)
-  local n = 0
+-- The canary returns true once a wipe has held for 300 frames.  It normally
+-- also raises, because for a navigator a wipe is the end of the run and the
+-- alternative is pressing buttons into the Game Over until a budget expires.
+--
+-- `soft` is for the one caller whose whole design is built around losing:
+-- a retry ladder rides its own fight out and reloads on a loss, so for that
+-- ride a wipe is the expected outcome of an attempt rather than a failed
+-- run.  Raising there does not report anything the ladder was not about to
+-- report itself; it just stops the ladder at its first rung, which is how
+-- gen_vargas came to run one attempt while its header and its step list both
+-- said four (measured 2026-08-11 on the v0.10 tip: attempt 1 wiped with
+-- VARGAS at 11065/11600 and the run ended there, with no "attempt 2 begins"
+-- line anywhere in the log).  A soft canary hands the verdict back to the
+-- caller, which still has to decide -- and gen_vargas still fails the run if
+-- every attempt loses.
+--
+-- How far this generalises, checked rather than assumed: gen_vargas is the
+-- only one of the ten retry ladders in the tree that was in this position.
+-- The ten are the list in the commit that moved them onto H.newSeedLadder --
+-- battle_brokendeath, gen_esper_tubes, gen_ifrit_magicite, gen_n128,
+-- gen_tunnelarmr, gen_sfigaro, gen_terra_returned_checkpoint, gen_vargas,
+-- probe_cranes_water, and M.clearGateSoldier below.  Only three library calls
+-- arm this canary (M.navTo, M.worldNavTo and M.advanceStory, its three call
+-- sites in this file), and in the other nine every step between an attempt's
+-- spread and its verdict is a raw M.driveUntil or M.waitUntil, which do not.
+-- Two of them reach a navigator through M.talkToObj, but before the fight
+-- rather than after it, and a retry reloads a live-party blob before that
+-- step runs, so neither can meet a wiped party.  Three -- gen_sfigaro,
+-- gen_n128 and probe_cranes_water -- carry comments saying they avoided
+-- advanceStory here deliberately, gen_sfigaro's being "a hard timeout here
+-- would abort the whole generate instead of letting the ladder reload and
+-- retry".  gen_vargas is the one that reached for the shared ride instead,
+-- which is why it is the one that lost its rungs.
+local function wipeCanary(tag, soft)
+  local n, said = 0, false
   return function()
     n = M.partyWiped() and n + 1 or 0
-    if n == 300 then
+    if n < 300 then return false end
+    if not soft then
       error(string.format("%s: THE PARTY IS WIPED -- every member of the " ..
         "party has read 0 hp for 300 consecutive frames.  This is a lost " ..
         "fight, not a stuck navigator; the frames after a wipe are the " ..
         "Game Over screen and whatever the drive presses into it.", tag), 0)
     end
+    if not said then
+      said = true
+      M.log(string.format("%s: the party is wiped (0 hp for 300 frames); " ..
+        "ending this ride so the caller's ladder can retry", tag))
+    end
+    return true
   end
 end
 
@@ -741,7 +781,10 @@ function M.advanceStory(pred, maxFrames, opts)
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
   local aPhase = 0
   local battN, dlgN = 0, 0
-  local wipeCheck = wipeCanary("advanceStory")
+  -- opts.wipeEndsRide: a wipe ends this ride instead of failing the run, for
+  -- a caller that reloads and tries again.  See wipeCanary's header.
+  local wipeSeen = false
+  local wipeCheck = wipeCanary("advanceStory", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
       and M.newFightDriver("advanceStory",
         { tactical = true, boost = true, items = true,
@@ -750,7 +793,7 @@ function M.advanceStory(pred, maxFrames, opts)
           healer = opts.healer, magic = opts.magic }) or nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.driveUntil(function()
-    local done = pred()
+    local done = wipeSeen or pred()
     if done then M.setPad({}) end
     return done
   end, maxFrames or 20000, {
@@ -765,7 +808,7 @@ function M.advanceStory(pred, maxFrames, opts)
           tostring(M.dialogWaiting()), tostring(M.battleLoadStarted()),
           tostring(M.eventRunning())))
       end
-      wipeCheck()
+      if wipeCheck() then wipeSeen = true; M.setPad({}); return end
       battN = M.battleLoadStarted() and battN + 1 or 0
       dlgN  = M.dialogWaiting() and dlgN + 1 or 0
       if tactical and battN == 0 then tactical.idle() end

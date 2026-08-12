@@ -56,10 +56,12 @@
 -- The retry ladder is the game's own defeat flow made explicit: the
 -- entry point is captured once at boot (a savestate blob in memory, with no
 -- writes); a party wipe tears the battle down into Game Over instead of
--- the reunion, the attempt's post-fight ride times out on "map 98, calm,
--- SABIN in the party", and the next attempt reloads the entry point blob
--- and idles a different number of frames before the opening A-press,
--- shifting every RNG draw downstream.  Four attempts, then fail.
+-- the reunion, the attempt's post-fight ride ends there rather than on
+-- "map 98, calm, SABIN in the party", and the next attempt reloads the entry
+-- point blob and takes a different battle RNG phase before the opening
+-- A-press, shifting every RNG draw downstream.  Three attempts, then fail.
+-- The ride is passed wipeEndsRide because the shared wipe canary otherwise
+-- raises on the first loss and no ladder here ever reaches rung two.
 --
 -- The generate is verified by reload (gen_sabin_gau's discipline): capture,
 -- reload the capture as the consumer timeline, give it 300 frames, and
@@ -68,12 +70,10 @@ local H = dofile("tools/tests/lib/ot6.lua")
 -- The VARGAS ladder's spread and its collision check (issue #83): each
 -- attempt is held until the game-time frame counter the battle seed is
 -- made of reaches its own phase, and L.report() fails if two attempts drew
--- one seed, which would make this ladder one fight replayed.  attempts = 4
--- describes what this file already does -- it fights battle 66 up to four
--- times -- and only sets the spacing (15 phases instead of 20).  It is not
--- a licence to widen: three is the doctrine (#74), and this fourth rung
--- predates it.
-local L = H.newSeedLadder("battle 66", { attempts = 4 })
+-- one seed, which would make this ladder one fight replayed.  Three
+-- attempts, 20 phases apart, which is the widest even spacing the 60-phase
+-- cycle allows and the doctrine's count (#74).
+local L = H.newSeedLadder("battle 66")
 local DOOR = "build/states/vargas_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -151,6 +151,9 @@ local function resetM()
 end
 resetM()
 local sabinPummeled = false
+-- VARGAS's hp the last time the fight was live, latched per frame so a
+-- lost attempt can say how far it got after the battle RAM is gone
+local lastVargasHp = 0
 
 local function decidePlan(a)
   if a == SABIN_E then return { kind = "pummel" } end
@@ -258,6 +261,20 @@ local function pulse()
     local cr, cc = H.readByte(0x8967 + a), H.readByte(0x8963 + a)
     if cr ~= row then return (ph < 5) and { (cr < row) and "down" or "up" } or {} end
     if cc ~= col then return (ph < 5) and { (cc < col) and "right" or "left" } or {} end
+    -- The confirm on the PUMMEL row itself is where the choice is made, and
+    -- it is the only place that is true on every path.  Pummel does not
+    -- always route through the target window -- measured 2026-08-11, a
+    -- winning run where SABIN's turn at f26022 planned pummel, spent 4 MP
+    -- and took VARGAS from 10863 to 10743 with the script then ending the
+    -- fight, while ST_TGT was never entered -- so a flag set only there
+    -- reported pummeled=false on a fight the Pummel had just won.  That
+    -- reads as "the drive never reached the ability", which is the exact
+    -- wrong conclusion, and it was in the log of the failing run this
+    -- branch was sent to diagnose.
+    if not sabinPummeled then
+      sabinPummeled = true
+      H.log(string.format("[vargas] PUMMEL chosen at f%d, V=%d", H.frame, vHp()))
+    end
     return (ph < 5) and { "a" } or {}
   end
   if st == ST_TGT then
@@ -282,15 +299,9 @@ local function pulse()
     end
     if M.plan.kind == "pummel" then
       if M.via ~= "blitz" then return (ph < 5) and { "b" } or {} end
-      if ph < 5 then
-        if not sabinPummeled then
-          sabinPummeled = true
-          H.log(string.format("[vargas] PUMMEL confirmed at f%d, V=%d",
-            H.frame, vHp()))
-        end
-        return { "a" }
-      end
-      return {}
+      -- the target window, when Pummel opens one at all; the flag is
+      -- already set by the row confirm above, which every path passes
+      return (ph < 5) and { "a" } or {}
     end
     return (ph < 5) and { "a" } or {}
   end
@@ -332,6 +343,7 @@ local function fightAttempt(n)
     H.call(function()
       resetM()
       sabinPummeled = false
+      lastVargasHp = 0
       for k in pairs(healBusy) do healBusy[k] = nil end
     end),
     -- one interaction -> the scene -> battle 66
@@ -355,6 +367,7 @@ local function fightAttempt(n)
         return not H.battleLoadStarted()
       end, 120000, {
         H.call(function()
+          lastVargasHp = vHp()
           if H.frame - hb >= 600 then
             hb = H.frame
             H.log(string.format("[vargas f%d]%s", H.frame, hpLine()))
@@ -374,9 +387,17 @@ local function fightAttempt(n)
       H.log(string.format("[vargas] teardown at f%d (pummeled=%s)",
         H.frame, tostring(sabinPummeled)))
     end),
-    -- the verdict: a win rides _ca828f's tail to a settled map-98 field
-    -- with SABIN in the party; a wipe rides the defeat flow to Game Over
-    -- and this soft-bounded ride gives up instead of erroring.
+    -- the verdict: a win rides _ca828f's tail to a settled map-98 field with
+    -- SABIN in the party; a wipe rides the defeat flow to Game Over, and
+    -- wipeEndsRide is what lets this attempt end there and the next one
+    -- start.  Without it the shared wipe canary raises on the first lost
+    -- attempt and the ladder never reaches its second rung: measured
+    -- 2026-08-11 on the v0.10 tip, attempt 1 wiped with VARGAS at 11065 of
+    -- 11600 and the run ended with no "attempt 2 begins" line in the log, so
+    -- this generator had a four-rung ladder that could only ever run one.
+    -- The soft giveUp bound below stays as the backstop for a lost attempt
+    -- that does not wipe (a stalled reunion, say); the wipe path just no
+    -- longer costs 28000 frames to notice.
     (function()
       local calmN, giveUp = 0, 0
       return H.advanceStory(function()
@@ -389,11 +410,15 @@ local function fightAttempt(n)
         calmN = ok and calmN + 1 or 0
         if calmN >= 30 then fightWon = true; return true end
         return false
-      end, 30000, { playBattles = true })
+      end, 30000, { playBattles = true, wipeEndsRide = true })
     end)(),
     H.logStep(function()
-      return string.format("[vargas] attempt %d verdict: %s", n,
-        fightWon and "WON -- reunion settled" or "lost (retrying)")
+      -- no hpLine() here: the battle module has handed its RAM back by now,
+      -- so $3BF4 would read whatever the field module put there
+      return string.format("[vargas] attempt %d verdict: %s (VARGAS was at " ..
+        "%d when the fight tore down, pummeled=%s)", n,
+        fightWon and "WON -- reunion settled" or "lost (retrying)",
+        lastVargasHp, tostring(sabinPummeled))
     end),
   }, {})
 end
@@ -468,14 +493,13 @@ H.run({ maxFrames = 700000 }, {
   fightAttempt(1),
   fightAttempt(2),
   fightAttempt(3),
-  fightAttempt(4),
   -- Before the verdict, not after: the attempts are evidence only if they
   -- were DIFFERENT fights, and if they were not, that is what this run should
-  -- report rather than "lost all four" (#83).
+  -- report rather than "lost all three" (#83).
   L.report(),
   H.call(function()
     H.assertEq(fightWon, true,
-      "VARGAS beaten within 4 attempts (real damage, real menus)")
+      "VARGAS beaten within 3 attempts (real damage, real menus)")
   end),
   H.waitFrames(30),
 

@@ -200,10 +200,44 @@ end
 -- The Potion reserve is the other half of the contract: gen_vargas's medic
 -- line spends Potions inside the fight, so the walk may only spend down to
 -- three of them and uses Tonics for small holes.
+--
+-- mpFloor is the third.  Casting stays on; what changes is how much of the
+-- caster's pool this segment is allowed to spend, because a quarter-of-max
+-- floor is an idle-corridor number and this corridor ends at a boss.
+--
+-- The argument for casting is in H.fieldCare's header and it is sound: OT6
+-- refills HP and MP on level up (ot6_progression.asm:3-6), so MP spent in a
+-- corridor is refunded and a Tonic drunk in one is gone.  The clause it
+-- assumes is a level up between the spending and the next fight.  Nothing
+-- levels up between the last care stop on this mountain and battle 66, and
+-- TERRA is the only member of this party who knows Cure -- LOCKE's and
+-- EDGAR's pools pay for their own abilities, since in OT6 every ability
+-- costs MP -- so on this segment her pool is not a renewable healing budget
+-- at all.  It is the boss's healing, being spent early.
+--
+-- What the fight needs, measured.  gen_vargas's medic spends TERRA from her
+-- entry MP down to 6 in every winning run on record, so the fight consumes
+-- whatever she brings.  Read straight out of five worktrees' vargas_entry.mss
+-- on 2026-08-11, with the battle 66 result each one led to:
+--     wt/multihit, wt/bpwindow  46/46 mp   won
+--     wt/ladder, wt/restage     31/46 mp   won
+--     an earlier chain on the v0.10 tip  26/46 mp   LOST -- VARGAS left at
+--         11065 of 11600, short of even his first script gate, TERRA out of
+--         MP by frame 13283 (wt/restage's own failed run of that step)
+--     wt/healpolicy             21/46 mp   not run
+-- So the fight's threshold sits between 26 and 31, and the entry contract
+-- below asks for two thirds of her maximum (31 of 46) on that basis.
+--
+-- The floor is set above the contract, not equal to it, so a normal run has
+-- headroom and the contract only fires when something has actually changed:
+-- 0.75 of her maximum is 34, and fieldCare stops casting when a cast would
+-- break the floor, so she arrives between 34 and 38.  That still buys this
+-- climb two or three Cures, which is where the item saving comes from; what
+-- it does not buy is the eight or nine casts a quarter-floor allowed.
 local POTION = 0xE9
 local function care(tag, threshold)
   return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.85,
-                       reserve = { [POTION] = 5 } })
+                       reserve = { [POTION] = 5 }, mpFloor = 0.75 })
 end
 
 -- crossDoor/seq: a bare step list cannot be spliced into a step list (Lua
@@ -952,9 +986,10 @@ H.run({ maxFrames = 400000 }, {
     for c = 0, 15 do
       if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
         local base = 0x1600 + 37 * c
-        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d",
+        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d mp=%d/%d",
           c, H.readByte(base), H.readByte(base + 8),
-          H.readWord(base + 9), H.readWord(base + 11)))
+          H.readWord(base + 9), H.readWord(base + 11),
+          H.readWord(base + 13), H.readWord(base + 15)))
       end
     end
     -- The entry point contract (issue #75).  A fixture that hands gen_vargas
@@ -972,6 +1007,27 @@ H.run({ maxFrames = 400000 }, {
         string.format("char %d is at or above half hp (%d/%d)",
           c, H.charHp(c), H.charMaxHp(c)))
     end
+    -- MP is part of the same contract, and it was the half nobody wrote
+    -- down.  HP was checked here and MP was not, so a chain that arrived
+    -- with TERRA at 21 of 46 MP passed this gate and lost battle 66 three
+    -- edges later, where it read as a hard fight rather than as a route
+    -- that had spent the fight's healing on the walk to it.
+    --
+    -- The bar is TERRA's, because she is the only member of this party who
+    -- knows Cure and therefore the fight's only healer once the Potions thin
+    -- out.  It is two thirds of her own maximum rather than an absolute so it
+    -- survives her levelling, and two thirds is where the measured win/loss
+    -- boundary is: 26 of 46 lost battle 66, 31 and 46 won, and two thirds of
+    -- 46 is 31.  The care stops above ration to a 0.75 floor, deliberately
+    -- above this bar, so a healthy run clears it with room and this fires
+    -- only when the segment's MP budget has actually moved.  If it fires,
+    -- the answer is to stop spending her MP on the climb, not to lower the
+    -- number.
+    local terra = 0
+    H.assertEq(H.charMaxMp(terra) > 0, true, "TERRA has an MP pool to check")
+    H.assertEq(H.charMp(terra) * 3 >= H.charMaxMp(terra) * 2, true,
+      string.format("TERRA reaches VARGAS with her Cure line intact " ..
+        "(%d/%d mp)", H.charMp(terra), H.charMaxMp(terra)))
     -- The party also still has a way to answer a death.  gen_vargas raises
     -- TERRA after the fight; an entry point with an empty bag makes that
     -- impossible, and the failure would surface an edge later.
