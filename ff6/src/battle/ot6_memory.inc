@@ -238,6 +238,26 @@ OT6_PIPPEND          := $ed74   ; #42: a deferred pip paint: character slot
 ; near-zero slack looks like.  #33's NMI finding said the same
 ; about vblank transfers; this says it about plain CPU time.
 ;
+; [ How much slack is left, measured 2026-08-11 on the v0.10 branch, #87. ]
+;
+; Twelve.  Ot6RestageGate_ext is polled from the other per-battle-frame site,
+; bank C1's frame loop (btlgfx_main.asm:1749), and it early-outs in 14 cycles
+; while OT6_RESTAGE is zero.  #87's fix was chosen by holding a request
+; standing (Ot6BankMoved raising unconditionally) and shortening the gate's
+; standing path build by build:
+;   standing path 40 cycles (26 over the idle path) ... 1798
+;   standing path 33 cycles (19 over) ................. 1798
+;   standing path 26 cycles (12 over) ................. 1798
+;   request dropped, so the path IS the idle one ...... 1635  (pass)
+; All four are the same build apart from that proc, so the unconditional
+; raise's own per-action cost is controlled.  Twelve cycles per battle frame
+; is over the cliff on this branch, against the 12 NOPs (24 cycles) that
+; passed at Ot6BgHud_ext on v0.9.  Read that as the budget's remaining slack
+; having been spent since, not as the two sites differing by a factor of two:
+; the v0.9 measurement was taken with less OT6 code on the per-frame path.
+; The practical rule for anything landing on either site now is that there is
+; no room, and a feature has to arrive by making the resting path shorter.
+;
 ; [ Scope, re-measured 2026-07-30 on v0.9, issue #67.  The paragraph above is
 ;   not a bank-wide rule; see below before citing it as one. ]
 ;

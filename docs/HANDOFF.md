@@ -68,7 +68,7 @@ moves are invisible to Mesen write callbacks, so sample rather than set a
 watchpoint), and confirm persistent facts through SRAM (`$307ff0`, the codex
 pages) when a context-free channel exists.
 
-**2. Cycle budgets are per site, and only one site has a measured number.**
+**2. Cycle budgets are per site, and there is no room left on any of them.**
 `Ot6BgHud_ext` runs from `WaitFrame` immediately after `WaitVblank` returns,
 once per battle frame, and has under 80 cycles of slack, possibly under 20.
 Measured with bare-NOP controls carrying no feature at all: 12 NOPs pass, 80
@@ -83,6 +83,20 @@ same bare-NOP control in bank `$C2`'s **action** path fails at **nine** NOPs,
 so that path's margin is under 18 cycles. The canary is
 `battle_trueknight` phase 4b, whose covers span reads 1635 intact and 1798
 over.
+
+**Twelve cycles per battle frame is over the cliff on the v0.10 branch.**
+Measured 2026-08-11 landing issue #87, at the other per-battle-frame site,
+`Ot6RestageGate_ext` polled from bank `$C1`'s frame loop
+(`btlgfx_main.asm:1749`). Its idle path is 14 cycles. Shortening its
+standing-request path build by build gave 1798 at 40 cycles, 1798 at 33,
+1798 at 26, and 1635 only once the request was dropped so that the path
+became the idle one. Every build was identical apart from that one proc, so
+this is 12 cycles per battle frame flipping the canary and nothing else.
+Read it as the budget's remaining slack having been spent since v0.9 rather
+than as this site being twice as tight as `Ot6BgHud_ext`: the 12-NOP result
+was taken with less OT6 code on the per-frame path. Either way, plan a
+per-frame change around making the resting path shorter, because there is no
+headroom to spend.
 
 **It is cycles on code that runs, not bytes.** Settled 2026-08-11 landing
 issue #66, with the control that had been missing: nine *unreachable* bytes
