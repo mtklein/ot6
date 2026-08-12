@@ -2956,6 +2956,13 @@ end
 -- counted blind.  The name still says weapon because that is what it is
 -- nearly always used for; the slot is the exception.
 --
+-- One hazard the slot opens up: equipping a Genji Glove, Gauntlet or Merit
+-- Award into a relic row makes the game run Optimum on its own when the
+-- Relic screen is backed out of (CheckReequipRelics tests exactly those
+-- three, equip.asm:2843-2850).  Those three are the whole list, so any
+-- other relic is safe here; a caller that wants one of them owes the
+-- deliberate re-equips afterwards, as HANDOFF records.
+--
 -- The slot matters because a bare slot is not a cosmetic gap.  Measured
 -- 2026-08-12 at zozo_arrival and again at zozo_clock_solved: CELES walks
 -- into Zozo with no body armour and no relics and SABIN with no shield and
@@ -2975,18 +2982,36 @@ function M.equipWeapon(pos, itemId, opts)
   opts = opts or {}
   local slot = opts.slot or 0
   local tag = opts.tag or string.format("equip %02X slot %d", itemId, slot)
-  local ZM, CUR = 0x26, 0x4b
+  -- Two cursors, not one.  $4b carries the main menu, the character list and
+  -- the item list; the SLOT list is its own cursor at $4e (MenuState_55 and
+  -- MenuState_5a both save z4e into z5f, equip.asm:1758, :3005).  Reading
+  -- $4b for the slot row is a seek that never arrives.
+  local ZM, CUR, SLOTCUR = 0x26, 0x4b, 0x4e
   local ST_MAIN, ST_CHAR = 0x05, 0x06
-  local ST_EQOPT, ST_EQSLOT, ST_EQITEM = 0x36, 0x55, 0x57
+  -- The Equip menu holds four slots and the two relic rows are a different
+  -- menu with its own states, so which menu this walks is decided by the
+  -- slot number.  EquipSlotCursorPos has exactly four entries
+  -- (equip.asm:79-84) -- R-Hand, L-Hand, Helmet, Armor -- and the relics are
+  -- main-menu row 3 (SelectMainMenuOptionTbl, field_menu.asm:3420-3428:
+  -- Item, Skills, Equip, Relic, Status, Config, Save), whose Equip option is
+  -- likewise cursor 0 (SelectRelicOptionTbl, equip.asm:2910-2912).  Past
+  -- that the two walks are the same shape: options -> slot -> item, and the
+  -- item list rows are bag indexes at $7e9d8a either way.
+  local relic = slot >= 4
+  local MAINROW = relic and 3 or 2
+  local ST_OPT = relic and 0x59 or 0x36
+  local ST_SLOT = relic and 0x5a or 0x55
+  local ST_ITEM = relic and 0x5b or 0x57
+  local slotRow = relic and (slot - 4) or slot
   local function st() return M.readByte(ZM) end
   return M.seqStep({
     M.driveUntil(function() return st() == ST_MAIN end, 1200,
       { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
     M.waitFrames(20),
     M.driveUntil(function()
-      return st() == ST_MAIN and M.readByte(CUR) == 2
+      return st() == ST_MAIN and M.readByte(CUR) == MAINROW
     end, 900, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
-      tag .. ": cursor on Equip"),
+      tag .. ": cursor on the menu row"),
     M.pressButtons({ "a" }, 2),
     M.waitUntil(function() return st() == ST_CHAR end, 300,
       tag .. ": character select", 5),
@@ -2996,33 +3021,33 @@ function M.equipWeapon(pos, itemId, opts)
     end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
       tag .. ": character cursor"),
     M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_EQOPT end, 300,
+    M.waitUntil(function() return st() == ST_OPT end, 600,
       tag .. ": equip options", 5),
     M.waitFrames(10),
     M.driveUntil(function()
-      return st() == ST_EQOPT and M.readByte(CUR) == 0
+      return st() == ST_OPT and M.readByte(CUR) == 0
     end, 600, { M.pressButtons({ "left" }, 2), M.waitFrames(10) },
-      tag .. ": cursor on Equip option"),
+      tag .. ": cursor on the Equip option"),
     M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_EQSLOT end, 300,
+    M.waitUntil(function() return st() == ST_SLOT end, 300,
       tag .. ": slot select", 5),
     M.waitFrames(10),
     M.driveUntil(function()
-      return st() == ST_EQSLOT and M.readByte(CUR) == slot
+      return st() == ST_SLOT and M.readByte(SLOTCUR) == slotRow
     end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
       tag .. ": slot cursor"),
     M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_EQITEM end, 300,
+    M.waitUntil(function() return st() == ST_ITEM end, 300,
       tag .. ": item list", 5),
     M.waitFrames(10),
     M.driveUntil(function()
-      return st() == ST_EQITEM
+      return st() == ST_ITEM
          and M.readByte(0x1869 + M.readByte(0x9d8a + M.readByte(CUR)))
              == itemId
     end, 1800, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
       tag .. ": list cursor on the item"),
     M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_EQSLOT end, 300,
+    M.waitUntil(function() return st() == ST_SLOT end, 300,
       tag .. ": equipped, back on slots", 5),
     M.driveUntil(function() return M.hasControl() end, 1200,
       { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),

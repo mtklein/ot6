@@ -1067,6 +1067,68 @@ H.run({ maxFrames = 400000 }, {
   -- together are what a normal player brings to that street.
   H.fieldCare({ tag = "care before the Zozo climb", threshold = 0.95 }),
 
+  -- Put on the gear that is already in the bag.  A player who has just been
+  -- told the town is full of thugs opens the menu, and this party arrives
+  -- with six empty slots and exactly six items to fill them: CELES with no
+  -- body armour and no relics, SABIN with no shield and no relics, against
+  -- one LeatherArmor, one Buckler, two Star Pendants, a Peace Ring and a
+  -- Black Belt sitting unused.  Measured at zozo_arrival and again at
+  -- zozo_clock_solved.  It is not cosmetic: CELES's defence is 34 where
+  -- LOCKE runs 44, SABIN 45 and EDGAR 55, and she is the party's only
+  -- healer, so the member most worth keeping upright is the one taking the
+  -- most damage per hit.  The LeatherArmor alone is +28 defence and +19
+  -- magic defence, and the Buckler +16/+10.
+  --
+  -- Equipped by item and never through Optimum, which is the owner's ruling
+  -- (design/wob-route.md SS2) and would be wrong here anyway, since Optimum
+  -- picks by attack power and none of these six has any.  None of them is a
+  -- Genji Glove, Gauntlet or Merit Award either, so backing out of the
+  -- Relic screen does not set the reequip flag and the game does not run
+  -- Optimum behind us (CheckReequipRelics, equip.asm:2843-2850).
+  --
+  -- pos is the character-select row, which is party order: LOCKE 0, CELES
+  -- 1, EDGAR 2, SABIN 3.  slot is 0..5 = R-Hand, L-Hand, Helmet, Armor,
+  -- Relic 1, Relic 2; 4 and 5 live on a different menu and equipWeapon
+  -- knows which walk to take.
+  H.call(function()
+    for _, it in ipairs({ { 0x84, "LeatherArmor" }, { 0x5A, "Buckler" },
+                          { 0xB1, "Star Pendant" }, { 0xB2, "Peace Ring" },
+                          { 0xD5, "Black Belt" } }) do
+      H.assertEq(H.invCountOf(it[1]) > 0, true,
+        string.format("a %s is in the bag to equip", it[2]))
+    end
+    H.assertEq(H.invCountOf(0xB1) >= 2, true,
+      "two Star Pendants -- one each for CELES and SABIN")
+  end),
+  H.equipWeapon(1, 0x84, { slot = 3, tag = "CELES LeatherArmor" }),
+  H.equipWeapon(1, 0xB1, { slot = 4, tag = "CELES Star Pendant" }),
+  H.equipWeapon(1, 0xB2, { slot = 5, tag = "CELES Peace Ring" }),
+  H.equipWeapon(3, 0x5A, { slot = 1, tag = "SABIN Buckler" }),
+  H.equipWeapon(3, 0xB1, { slot = 4, tag = "SABIN Star Pendant" }),
+  H.equipWeapon(3, 0xD5, { slot = 5, tag = "SABIN Black Belt" }),
+  -- Read the slots back rather than trusting six menu drives.  A seek that
+  -- timed out would have failed already, but a drive that landed on the
+  -- wrong row would not, and "the menu was opened" and "the item is worn"
+  -- are different claims.  $1600 + 37*c + $1F + slot, with c the character
+  -- index (CELES 6, SABIN 5) rather than the party row.
+  H.call(function()
+    local function worn(c, s)
+      return H.readByte(0x1600 + 37 * c + 0x1F + s)
+    end
+    for _, w in ipairs({ { 6, 3, 0x84, "CELES wears the LeatherArmor" },
+                         { 6, 4, 0xB1, "CELES wears the Star Pendant" },
+                         { 6, 5, 0xB2, "CELES wears the Peace Ring" },
+                         { 5, 1, 0x5A, "SABIN carries the Buckler" },
+                         { 5, 4, 0xB1, "SABIN wears the Star Pendant" },
+                         { 5, 5, 0xD5, "SABIN wears the Black Belt" } }) do
+      H.assertEq(worn(w[1], w[2]), w[3], w[4])
+    end
+    H.log("[zozo kit] six empty slots filled from the bag")
+  end),
+  -- and top up again: six menu walks cost no HP, but the care stop above
+  -- ran before them and a step between menus can still draw a fight.
+  H.fieldCare({ tag = "care after the equip stop", threshold = 0.95 }),
+
   -- the climb
   door(38, 57, 225, "P9a street -> interior"),
   door(47, 47, 221, "P10b -> roof (35,54)"),
