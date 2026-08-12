@@ -28,11 +28,14 @@ unconditional in `make test`.
 
 from __future__ import annotations
 
+import glob
 import importlib.util
+import json
 import os
 import zlib
 
 GRAPH = "tools/tests/savestate_graph.py"
+CHECKPOINTS = "tools/tests/checkpoints"
 
 CHAR_BLOCK = 0x1600          # WRAM address of the character table
 PARTY = 0x1850               # WRAM address of the party/order bytes
@@ -170,7 +173,7 @@ def biggest_stream(path: str) -> bytes | None:
     return best
 
 
-def find_char_block(raw: bytes) -> int | None:
+def find_char_block(raw: bytes, allow_fallback: bool = True) -> int | None:
     """Offset of $1600 inside the blob, located by the table's own shape.
 
     Records 0..10 carry actor ids whose low nibble is the record index; the
@@ -184,6 +187,13 @@ def find_char_block(raw: bytes) -> int | None:
     survives.  Stop at six: below that the signature starts matching
     ordinary counting data elsewhere in WRAM, and a wrong offset would
     report wrong results, which is worse than reporting nothing.
+
+    `allow_fallback` is the fixed-offset guess below, and it is a fact about
+    Mesen's WRAM dump.  A 32 KiB SRAM checkpoint is long enough to reach that
+    offset and would take the guess without meaning it, so read_party_sram
+    passes False: a checkpoint either matches the signature or reports
+    nothing.  Every checkpoint in the tree matches it at length 11, the
+    least ambiguous the signature gets.
     """
     for n in range(11, 7, -1):
         hits = [b for b in range(0, len(raw) - REC * n)
@@ -196,7 +206,7 @@ def find_char_block(raw: bytes) -> int | None:
     # offset the signature resolves to everywhere it does work, and check
     # it here rather than trusting it: record 0 must be actor 0, and
     # somebody must be in the party.
-    if len(raw) > FALLBACK_CB + REC * 16 + 0x300:
+    if allow_fallback and len(raw) > FALLBACK_CB + REC * 16 + 0x300:
         cb = FALLBACK_CB
         party = cb + (PARTY - CHAR_BLOCK)
         if raw[cb] == 0 and any(raw[party + c] & 0x07 for c in range(16)):
@@ -220,6 +230,16 @@ def read_party(path: str):
     cb = find_char_block(raw)
     if cb is None:
         return None, "character table not located (or ambiguous)"
+    return party_at(raw, cb), None
+
+
+def party_at(raw: bytes, cb: int) -> list[dict]:
+    """The party records, given the blob and where the table starts.
+
+    Split out of read_party when the checkpoint reader arrived: the two
+    differ only in how they get `raw` and `cb`, and the part worth having
+    exactly one copy of is the record layout.
+    """
     party_off = cb + (PARTY - CHAR_BLOCK)
     cur = raw[cb + (CUR_PARTY - CHAR_BLOCK)]
     out = []
@@ -244,7 +264,64 @@ def read_party(path: str):
             "weapon": raw[rec + WEAPON],
             "gear": list(raw[rec + WEAPON:rec + WEAPON + 5]),
         })
-    return out, None
+    return out
+
+
+def read_party_sram(path: str):
+    """Everybody in the party inside a tracked SRAM checkpoint.
+
+    The checkpoints under tools/tests/checkpoints/ are the OTHER thing a
+    generator can boot from: five states cold-Continue out of one instead of
+    resuming a predecessor's .mss, so a casualty in a checkpoint is inherited
+    by every state below it exactly the way a casualty in a fixture is.  The
+    fixture audit could not see them, because a checkpoint is a 32 KiB
+    battery image and not a savestate, and that blind spot is where four of
+    them were sitting: gate-cave-save-v1 with TERRA dead, and
+    n024-entry-save-v1, narshe-mission-v1 and terra-returned-v1 each with
+    EDGAR and SABIN dead.
+
+    The save slot mirrors the $1600 character table record-for-record, so the
+    same shape signature that locates it in a WRAM dump locates it here, and
+    the same record layout reads it.  Cross-checked against an independent
+    measurement: the table resolves at 0x1400 in every checkpoint in the
+    tree, and the four records it reads out of n024-entry-save-v1 (LOCKE
+    353/353 88/98, EDGAR 0/398 81/107, SABIN 0/407 78/104, CELES 349/349
+    106/106) are the same four the emulator logged from live WRAM after
+    booting it.
+
+    Returns (records, None) or (None, reason).
+    """
+    try:
+        raw = open(path, "rb").read()
+    except OSError as e:
+        return None, str(e)
+    # No fixed-offset fallback here: see find_char_block.
+    cb = find_char_block(raw, allow_fallback=False)
+    if cb is None:
+        return None, "character table not located (or ambiguous)"
+    return party_at(raw, cb), None
+
+
+def checkpoint_payloads(repo: str) -> list[tuple[str, str]]:
+    """(checkpoint name, payload path) for every tracked SRAM checkpoint.
+
+    Read off each manifest.json rather than globbing *.sram, so a directory
+    whose manifest names a payload that is not there is skipped here and
+    fails in sram_checkpoint.load, which is the code that owns that error.
+    """
+    out = []
+    pattern = os.path.join(repo, CHECKPOINTS, "*", "manifest.json")
+    for mf in sorted(glob.glob(pattern)):
+        d = os.path.dirname(mf)
+        try:
+            with open(mf) as f:
+                m = json.load(f)
+        except (OSError, ValueError):
+            continue
+        payload = os.path.join(d, m.get("payload", ""))
+        if os.path.isfile(payload):
+            out.append((os.path.basename(d), payload))
+    return out
 
 
 def stem_of(path: str) -> str:
