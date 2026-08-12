@@ -97,6 +97,28 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   audits share one savestate reader, `tools/savestate_party.py`.
   `H.assertPartyStanding` is the same three conditions as a generator exit
   contract, and the two must be changed together.
+- **It reads the tracked SRAM checkpoints as well as the fixtures, and two
+  things in `build/states` are not fixtures at all.** A checkpoint is the
+  other boot source (five states cold-Continue out of one), it is a battery
+  image rather than a savestate, and it is tracked in git, so no
+  regeneration ever refreshes one: a casualty in a checkpoint keeps handing
+  the same corpses down until the file is re-captured. Four are dirty today
+  — `terra-returned-v1` → `narshe-mission-v1` (EDGAR and SABIN dead in both,
+  the second inheriting from the first), `gate-cave-save-v1` (TERRA), and
+  `n024-entry-save-v1` (EDGAR and SABIN). The save slot mirrors the `$1600`
+  table record for record, so the same shape signature finds it, resolving
+  at `0x1400` in all twelve. Separately, the audits now skip `build/states`
+  files that `tools/tests/savestate_graph.py` no longer declares: 19 of the
+  98 there are pre-rename leftovers, and one of them, `kefka_doorstep`, was
+  reported and worked as a live casualty for a session before anyone noticed
+  that no generator writes it.
+- **A checkpoint that hands over a corpse costs the segment its revives.**
+  Measured at `n024-entry-save-v1`: it delivers EDGAR and SABIN dead, the
+  segment carries two Fenix Downs, the care stop before battle 72 spends
+  both raising them, and CELES then dies in the fight with the bag empty. No
+  owned esper grants Life in the WoB, so at that point nothing in the game
+  can raise her, and `esper_tubes_entry` ships her at 0/349 — a fixture that
+  no care stop in its own generator can repair.
 - **A party wipe must be reported as a wipe.** The navigators'
   `M.partyWiped()` check misses in-battle wipes, because `$1600` keeps
   pre-battle HP. The filed fix is a battle-module check (`$3BF4` under
