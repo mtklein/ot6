@@ -288,37 +288,65 @@ end
 local fights, rideStart = {}, nil
 local function rideDriver(pred, lostRef, maxFrames, what)
   local ph, hb, battN, wipeN = 0, 0, 0, 0
-  -- Policy, revised twice, both times after measured losses.  Round one (run
-  -- N0mLGnDD, ladder failing at fights 6/4/6): healPercent 60 reacted too
-  -- late to the Mag Roaders' whole-party bursts, and bank=3 wasted BP,
-  -- because a chip is per boosted hit, so three boost-1 swings out-chip one
-  -- boost-3 swing.  Round two (run R0crCD3T): healPercent 75 improved the
-  -- Roader attrition and then heal-locked the boss fight: under the boss
-  -- and two blades someone is always below 75%%, EDGAR spent every turn on
-  -- the bag, the body took one chip in 4900 frames on attempt 1 and none on
-  -- attempt 2, and the fight stalled until the bag ran dry.  So the policy
-  -- is split: the five Roader fights heal at 75%%, and the boss fight drops
-  -- to 55%% so EDGAR's turns go to the AutoCrossbow that breaks the body.
+  -- Policy, revised three times, every time after measured losses.
   --
-  -- The "the bag spend is small" that used to be written here is not true
-  -- and was never measured.  The bag is eight Tonics, nothing else, and the
-  -- five Roader fights spend all eight: the supply lines below read
-  -- tonic=8 at fight 1 and tonic=0 at fight 6 on every attempt of the
-  -- 2026-08-11 run, and on one attempt the last Tonic went in fight 2.  A
-  -- Tonic is about 50 hp against a 448 hp bar, so the trash fights are
-  -- trading the whole consumable budget for roughly a ninth of one member's
-  -- bar at a time and the boss fight is fought with no healing at all.
-  -- Whether that is the policy's fault or the supply's is #92's open
-  -- question; lowering the Roader threshold only makes the party arrive
-  -- lower, because the Tonics are being spent on damage that was really
-  -- taken.
+  -- Round one (run N0mLGnDD, ladder failing at fights 6/4/6): healPercent 60
+  -- reacted too late to the Mag Roaders' whole-party bursts, and bank=3
+  -- wasted BP, because a chip is per hit, so three boost-1 swings out-chip
+  -- one boost-3 swing.  Round two (run R0crCD3T): healPercent 75 improved
+  -- the Roader attrition and then heal-locked the boss fight -- under the
+  -- boss and two blades someone is always below 75%%, so EDGAR spent every
+  -- turn on the bag and the body took one chip in 4900 frames -- and the
+  -- answer then was to split the thresholds, 75%% for the Roaders and 55%%
+  -- for the boss, so EDGAR's turns went back to the AutoCrossbow.
+  --
+  -- Round three (2026-08-12) reads both of those as the same problem with
+  -- the same real cause, which is that the party had no dedicated healer and
+  -- so any threshold high enough to keep it alive took the break's own turns
+  -- away.  Two measurements settle it.
+  --
+  -- What each turn is worth in fight 6, off this driver's 300-frame dumps:
+  -- EDGAR's boosted AutoCrossbow is 500-750 damage and up to three shields
+  -- in one action, LOCKE's ThunderBlade is ~200 and a shield, and SABIN's
+  -- Pummel is ~190 and no shield at all, because Pummel is bludgeoning
+  -- against a pierce-weak body and slash-weak blades.  So SABIN's turn is
+  -- the one to spend on healing and EDGAR's is the one never to spend.
+  --
+  -- What decides the fight is EDGAR's HP at the door.  Across the six
+  -- attempts of 2026-08-11 and 2026-08-12 the body's low-water mark tracks
+  -- nothing except that: he entered fight 6 at 189 and 147 hp on the two
+  -- attempts that left the body at 3092 and 3054 of 3276, and at 366 hp on
+  -- the one attempt that broke it outright (sh0, 1639 left).  On the 189-hp
+  -- attempt he died at battle frame ~400, before taking a single turn.
+  --
+  -- So: `healer` is SABIN on both drivers, which is what lets the threshold
+  -- be raised without costing the break anything, and the Roader threshold
+  -- goes to 95%% because the five Roader fights are the only chance to heal
+  -- that exists -- there is no field access between the six -- and SABIN's
+  -- turns there are worth even less than they are at the boss.  The bag is
+  -- no longer the healing: it is the reserve for when his MP runs out, which
+  -- is why the eight Tonics now reach fight 6 instead of being drunk by
+  -- fight 3.
+  local SABIN, LOCKE, BOLT = 0x05, 0x01, 0x02
   local Ftrash = H.newFightDriver("n128 trash", { tactical = true,
-    boost = true, bank = 1, items = true, healPercent = 75, cadence = 12 })
+    boost = true, bank = 1, items = true, healer = SABIN,
+    healPercent = 95, cadence = 12 })
   -- Fight 6 steers every single-target confirm onto the body through the
   -- library's own focus machine rather than a local one; see the block
   -- above rideDriver for why the local one could not work.
+  --
+  -- LOCKE's Bolt is on this driver and not on the trash one.  Ramuh's grant
+  -- is being spent on the fight whose element row it was chosen for; the
+  -- Mag Roaders are not worth his MP, and a pool spent on them is a pool the
+  -- boss does not get.  boost=false because the point is the chip rather
+  -- than the damage: a boosted cast folds up a tier and is charged the
+  -- higher tier's MP (battle_subjob scenario C), and one landed hit chips
+  -- one axis whatever tier it was, so the cheap tier buys more chips out of
+  -- the same pool against a body carrying seven shields.
   local Fboss = H.newFightDriver("n128 boss", { tactical = true,
-    boost = true, bank = 1, items = true, healPercent = 55, cadence = 12,
+    boost = true, bank = 1, items = true, healer = SABIN,
+    healPercent = 85, cadence = 12,
+    magic = { [LOCKE] = { spell = BOLT, boost = false } },
     focus = { { slot = 0, mask = 0x01 } } })
   return H.driveUntil(function() return lostRef.lost or pred() end, maxFrames, {
     H.call(function()
@@ -529,6 +557,97 @@ H.run({ maxFrames = 400000 }, {
   --    measured), and the ride is six fights with no field access between
   --    them
   H.equipOptimum({ tag = "n128 kit" }),
+  -- The magicite.  bosses-wob.md 15 calls this fight the sub-job system's
+  -- debut -- "a Ramuh bearer casting Bolt into the body is the first use" --
+  -- and the stones have been owned since Zozo and the tube room ($1A69 reads
+  -- EF 01 9A 00 here, which is the Zozo four, Ifrit and Shiva, and the tube
+  -- six).  Until now this step equipped none of them, so the party rode with
+  -- no Magic command at all: measured on the 2026-08-11 run, every command
+  -- list read Fight / kit / -- / Item, and 117, 104 and 108 MP went unspent
+  -- across all six fights while eight Tonics were drunk dry.  NaturalMagic
+  -- teaches only TERRA and CELES, and CELES left at the tube room, so an
+  -- equipped stone is this party's only route to any spell.
+  --
+  -- Who gets what.  The rule is that the healer's turn has to be the turn
+  -- with the least to lose, and on this formation that is SABIN's, measured
+  -- rather than assumed.  Damage per action in fight 6, read off the boss
+  -- driver's own 300-frame dumps on 2026-08-12:
+  --
+  --   EDGAR AutoCrossbow   500-750, and 3 shields off the body in one action
+  --   LOCKE ThunderBlade   ~200 and a shield (the blade is LIGHTNING, which
+  --                        is the body's own element row, so his ordinary
+  --                        Fight already chips)
+  --   SABIN Pummel         ~190 and no shield at all: Pummel is bludgeoning,
+  --                        the body is pierce-weak and the blades are
+  --                        slash-weak, so his kit chips nothing here
+  --
+  -- So:
+  --
+  --   SABIN <- KIRIN ($11), granting Cure/Regen/Antdot.  He is the only one
+  --     whose turn costs the break nothing, and Kirin is the only cure the
+  --     party owns (genju_prop.asm: Sraphim, Starlet and Phoenix are the
+  --     other cure stones and none of the three is owned).  With no field
+  --     access between the six fights this is the only healing that can be
+  --     carried past the last shop.  Kirin's row is +4 mag.pwr / +2 stamina,
+  --     which is a healer's line.
+  --   LOCKE <- RAMUH ($00), granting Bolt/Rasp: the storm-lancer
+  --     bosses-wob.md 15 names as this fight's sub-job debut, cast into the
+  --     body's authored element row.  Measured at 184 damage and one shield
+  --     per cast against his Fight's ~200 and one shield, so it trades even
+  --     on the board and spends a pool that was otherwise sitting idle -- he
+  --     rode the whole 2026-08-11 run with 108 MP and no way to use it.
+  --   EDGAR <- SIREN ($03), +4 speed and +2 mag.pwr with nothing given up.
+  --     He is the fight's whole damage output and his turns are the ones
+  --     worth having more of, so he is bought speed rather than a spell.
+  --     Ruled out: PHANTOM ($14) is +6 speed but -2 stamina and SHOAT ($05)
+  --     is +6 speed but -2 vigor, and whether either downside costs him
+  --     anything is unmeasured; SIREN's row has no negative to argue about.
+  --
+  -- Ruled out for LOCKE: MADUIN ($06) grants Bolt as well and carries +7
+  -- mag.pwr against Ramuh's +2, so it would hit harder.  Ramuh is chosen
+  -- anyway because the design names Ramuh, and because a chip is per landed
+  -- hit rather than per point of damage (Ot6ClassChip / Ot6Chip run from
+  -- Ot6HitJoin on every landed hit, ot6_break.asm:913-965), so against a
+  -- 7-shield body the cast count matters more than the cast size.  If the
+  -- ride ever needs more damage than this, Maduin is the lever.
+  --
+  -- The positions are the character-select cursor rows, which are party
+  -- order, measured here: EDGAR order 0, SABIN order 1, LOCKE order 2.  They
+  -- are asserted below off what is actually worn rather than trusted.
+  H.equipEsper(1, 0x11, { tag = "KIRIN -> SABIN (Cure)" }),
+  H.equipEsper(2, 0x00, { tag = "RAMUH -> LOCKE (Bolt)" }),
+  H.equipEsper(0, 0x03, { tag = "SIREN -> EDGAR (+4 speed)" }),
+  H.call(function()
+    -- Read back what is worn, keyed by character, so a party order that
+    -- moved equips the wrong person loudly instead of quietly.  A silently
+    -- wrong equip is exactly the failure this fight has already had once
+    -- (#92's focus list steering to a slot nothing was in).
+    local want = { [0x05] = 0x11, [0x01] = 0x00, [0x04] = 0x03 }
+    local names = { [0x05] = "SABIN/KIRIN", [0x01] = "LOCKE/RAMUH",
+                    [0x04] = "EDGAR/SIREN" }
+    for c, esper in pairs(want) do
+      local worn = H.readByte(0x1600 + 37 * c + 0x1E)
+      H.log(string.format("[prep] char %d wears esper %02X", c, worn))
+      H.assertEq(worn, esper, names[c] .. " is worn")
+    end
+  end),
+  -- Back row, all three.  This is free here and it was not free before the
+  -- stones went on.  $B3 is $FF for every command and only a weapon swing
+  -- clears it (HANDOFF's rows note), so Tools, Magic and Blitz are all
+  -- row-exempt: EDGAR fights this boss with AutoCrossbow, SABIN with Cure
+  -- and LOCKE with Bolt, and not one of those three loses a point of output
+  -- in the back row.  What it buys is the halving on the way in, and the
+  -- body's script while a blade is alive is `BATTLE, BATTLE, ICE` and
+  -- `BATTLE, SPECIAL, NET` (ai_script.asm:4725-4746), so most of what it
+  -- throws is physical.  Measured need: on the 2026-08-12 attempt that
+  -- arrived in perfect shape -- EDGAR 448/448, eight Tonics unspent, every
+  -- MP pool near full -- the party still lost, LOCKE dying at battle frame
+  -- 3000 and EDGAR at 6000 with the body on 2473 of 3276, and with no Fenix
+  -- Down and no Life anywhere in the party's reach a death in this fight is
+  -- permanent.  Front row was costing survival to buy output that the back
+  -- row does not take away.
+  H.setRows({ [0x01] = true, [0x04] = true, [0x05] = true },
+            { tag = "back row for the ride" }),
   H.fieldCare({ tag = "care before the ride", threshold = 0.95 }),
   H.navTo(9, 52, { maxFrames = 9000, playBattles = "flee" }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
