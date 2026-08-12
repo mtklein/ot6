@@ -278,21 +278,47 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   four-member party at levels 11-12 having taken no damage at all across
   13200 frames. **Declaring the area would turn `make test` red**, so it is
   recorded here rather than landed.
-- **A party that enters a fight below `healPercent` may never get a turn
-  back.** The other half of the heal policy, and not a bug in it. When the
-  item restores at least what a round costs, `M.healDecision` hands the
-  decision to the fraction rule and tops up anyone under `opts.healPercent`
-  (`lib/ot6.lua:640-646`). On the Zozo street a round took about 45% of each
-  character's max HP and a Tonic restored about the same, so a party
-  starting at 28%/62% fell below the threshold every single round and every
-  actor spent every turn healing: 29 item and 9 heal plans against 18 Fight
-  and 20 skill, 35 of them logged "top-up", and two monsters still at
-  350/350 when the 30000-frame budget expired. Nobody died, so nothing
-  reported a fight; the run reported a navigation timeout. The same
-  encounter at full HP was won in 6352 frames. **A care stop before a walk
-  that can draw encounters is what prevents this**, and the entry HP is the
-  variable to check first when a nav step burns its budget without a
-  casualty.
+- **The in-battle heal rule is "how much of this heal would be wasted", and
+  it does not answer "is this turn affordable".** Owner, 2026-08-12: "the
+  best healing policy is to heal when you expect to get approximately full
+  value out of the heal. if a tonic heals 50 hp, heal when you have 50 hp or
+  more to heal, etc. hard to know with magic... in that case just heal
+  everyone to max." `M.healDecision` is that rule (`lib/ot6.lua`),
+  `M.HEAL_VALUE` is how much of the heal has to land, and `opts.healPercent`
+  is gone; `newFightDriver` raises on it rather than ignoring it. It
+  replaced a rule that topped up anyone under a caller-named fraction of
+  maximum, which deadlocked wherever a round cost about what a heal restored:
+  on the Zozo street a round took about 45% of each character's maximum and a
+  Tonic restored about the same, so a party starting at 28% never climbed
+  clear of the threshold, spent 19 of 25 actions healing, and expired the
+  step's 30000 frames with nobody dead and nothing reporting a fight.
+  Measured 2026-08-12 against the fights the route is constrained by, all
+  four run from the same savestates and checkpoints:
+
+  | step | old fraction rule | value rule |
+  |---|---|---|
+  | `gen_zozo3_clock` | PASS f12623, 19 of 25 actions healing | PASS f9478, 5 of 15 |
+  | `gen_esper_tubes` (battle 72) | PASS f10060, 14 of 26 | PASS f8404, 8 of 17 |
+  | `gen_n128` (six fights) | PASS f32322 | PASS f29842 |
+  | `gen_ifrit_magicite` (battle 70) | PASS f12728, 9 of 26 | loses the ladder |
+
+  **Battle 70 is where the rule runs out, and the reason is the fight's
+  opening.** Before the enemy has landed a round there is no measured round
+  cost, so nothing at all weighs against the value test, and a party that
+  walks in at about 80% of maximum is four characters each carrying an
+  84-point hole -- more than a 50-point Tonic, so every one of them is worth
+  a full-value drink and every actor spends the opening turns drinking.
+  Measured: 57 of 62 actions were heals, three of them Fights, IFRIT never
+  broken, and the ladder ran long enough that Mesen's 600-second wall clock
+  killed the run twice. The old fraction rule never considered an 80%
+  character, which is why it did not have this failure. **Count the plans by
+  kind in the driver's log before reading a lost fight as balance**: an
+  action mix that is nine tenths healing is a policy finding.
+- **A party that enters a fight badly hurt may never get a turn back,
+  whatever the heal rule is.** In-battle healing is bounded by turns, and a
+  care stop between fights costs none, so the entry HP is the variable to
+  check first when a nav step burns its budget without a casualty. The same
+  Zozo encounter at full HP was won in 6352 frames.
 - **A healthier route levels more slowly.** FF6 divides a fight's experience
   among the survivors, so a chain that stops losing members gains levels
   later: the repaired chain reaches `n128_won` at LOCKE 14 / EDGAR 15 /

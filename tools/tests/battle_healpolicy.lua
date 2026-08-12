@@ -112,10 +112,15 @@ local CASES = {
     want = nil },
   -- And the slack, which is the reason the test is not "hole >= heal": at 40
   -- points down a Tonic still lands 80% of itself, and waiting for the last
-  -- ten points means waiting a turn the enemy also gets to use.
+  -- ten points means waiting a turn the enemy also gets to use.  Both sides
+  -- of M.HEAL_VALUE are pinned, so a change to it lands here rather than in
+  -- a lost fight.
   { name = "a Tonic into a 40-point hole, inside the slack",
     hp = 360, maxhp = 400, restore = 50, roundCost = 0, allies = 2,
     want = "full value" },
+  { name = "a Tonic into a 24-point hole, outside the slack",
+    hp = 376, maxhp = 400, restore = 50, roundCost = 0, allies = 2,
+    want = nil },
   -- The magic clause.  Nobody can say what a cure restores before it lands,
   -- so the first cast of a battle has no hole to be weighed against and the
   -- answer is to heal that target to maximum; MP pays, and MP comes back at
@@ -156,12 +161,12 @@ local CASES = {
     hp = 168, maxhp = 168, restore = 50, roundCost = 0, allies = 0,
     want = nil },
   -- The Phantom Train's shape (#74's triage doctrine): a medic whose Potion
-  -- covers a round outright, on a target halfway down.  150 of 250 spills,
-  -- so the value rule refuses -- and he is standing on exactly one round of
-  -- death and the Potion takes him clear of it, so he is healed anyway.
+  -- covers a round outright, on a target halfway down.  A 150-point hole
+  -- takes 150 of the Potion's 250, which is inside the slack, so this is an
+  -- ordinary full-value heal and does not need the danger clause.
   { name = "a medic whose Potion covers the round, on a half-dead target",
     hp = 150, maxhp = 300, restore = 250, roundCost = 150, allies = 2,
-    want = "in danger" },
+    want = "full value" },
   -- One round from death with a small hole: 48 of a Potion's 250 lands, and
   -- the value rule alone would let him die at 71% of maximum.
   { name = "a small hole, and still one round from death",
@@ -174,7 +179,7 @@ local CASES = {
   -- the Zozo street's measured numbers: LOCKE 249 max against a round
   -- measured at 249.
   { name = "endangered by a round no heal can lift him clear of",
-    hp = 220, maxhp = 249, restore = 50, roundCost = 249, allies = 3,
+    hp = 230, maxhp = 249, restore = 50, roundCost = 249, allies = 3,
     want = nil },
   -- A downed member is the Fenix Down branch's business, above this one.
   { name = "a downed member is not a heal candidate",

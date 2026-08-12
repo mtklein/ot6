@@ -569,12 +569,32 @@ function M.itemPower(item)
 end
 
 -- How much of a heal has to land for it to be worth a turn.  1.0 would mean
--- "waste nothing", and that is too strict in practice: it makes a character
--- sitting 49 points down with a 50-point Tonic wait for one more point of
--- damage before drinking, and the turn he waits is a turn the enemy spends
--- putting him further down than the Tonic can reach.  0.75 is the measured
--- pick; the runs behind it are in docs/HANDOFF.md under the heal policy.
-M.HEAL_VALUE = 0.75
+-- "waste nothing", and that is too strict: it makes a character sitting 49
+-- points down with a 50-point Tonic wait for one more point of damage before
+-- drinking, and the turn he waits is a turn the enemy spends putting him
+-- further down than the Tonic can reach.  This is the "approximately" in the
+-- owner's rule, and it is a measured number rather than a taste.
+--
+-- It does two jobs and they pull opposite ways.  It is the bar for healing at
+-- all, where a LOWER value heals more often; and it is the bar bagHeal uses
+-- to choose between a Tonic and a Potion, where a LOWER value reaches for the
+-- Potion sooner and so heals in FEWER turns.  The second effect is the larger
+-- one on this route, because one 250-point Potion covers a hole that would
+-- otherwise take four Tonic turns.
+--
+-- Measured 2026-08-12 over the fights the route is constrained by, from the
+-- same savestates and checkpoints, everything else identical:
+--
+--          gen_zozo3_clock  gen_esper_tubes  gen_n128     gen_ifrit_magicite
+--   0.75   nav timeout      PASS f11940      PASS f29842  loses the ladder
+--   0.50   PASS f9478       PASS f8404       PASS f29842  loses the ladder
+--
+-- So 0.50.  The two fights it decides are decided on turn count rather than
+-- on supplies: at 0.75 a 150-point hole is filled with three Tonics and at
+-- 0.50 with one Potion, and a quarter of a Potion spilled buys back two
+-- turns.  Battle 70 loses at both, and the reason is not this number; it is
+-- recorded in docs/HANDOFF.md under the heal policy.
+M.HEAL_VALUE = 0.50
 
 -- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
 -- kept out here as arithmetic on plain numbers so battle_healpolicy can put
@@ -1787,6 +1807,14 @@ function M.newFightDriver(tag, opts)
   local castRestore = {}               -- spell -> HP a landed cast put back
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
+  -- A heal confirmed by an earlier actor whose HP has not landed yet:
+  -- { target, gain, hp, until_ }.  The next actor to decide adds its `gain`
+  -- to that target's HP before measuring the hole, because the hole a heal
+  -- has to fit is the one that will be left once the heals already committed
+  -- have landed.  Without it the party double-drinks: measured on battle 70,
+  -- actors 2 and 0 both planned a Tonic on entity 0 at exactly 270/354, so
+  -- the second one poured 50 into a hole of 34.
+  local healSent = nil
 
   local function cmdRow(actor, cmd)
     for row = 0, 3 do
@@ -1961,8 +1989,13 @@ function M.newFightDriver(tag, opts)
       -- Potion that wasted half of itself.
       local cands = {}
       for e = 0, 3 do
-        local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
-        if hp > 0 and maxhp > 0 and hp < maxhp then
+        local maxhp = M.readWord(0x3C1C + e * 2)
+        -- count a heal another actor has already committed as landed, so
+        -- two members do not both drink into one hole
+        local hp = hpNow[e] + ((healSent and healSent.target == e)
+                               and healSent.gain or 0)
+        if hp > maxhp then hp = maxhp end
+        if hpNow[e] > 0 and maxhp > 0 and hp < maxhp then
           cands[#cands + 1] =
             { e = e, pct = hp * 100 // maxhp, hp = hp, maxhp = maxhp }
         end
@@ -2321,6 +2354,24 @@ function M.newFightDriver(tag, opts)
         watch.until_ = battleTick + 900
         healWatch = watch
       end
+      -- and remember it as in flight, so the next actor to decide sees the
+      -- hole this heal is about to fill rather than the one on screen
+      -- The window matches healWatch's 900 ticks, which is what the fights
+      -- below were measured with.  It is longer than a confirmed action
+      -- needs, and this record SUPPRESSES healing while it stands, so a
+      -- shorter bound is probably right; it is not measured, so it is not
+      -- taken here.
+      if plan.kind == "item" and plan.item ~= FENIX_DOWN then
+        healSent = { target = plan.target, gain = itemRestoreOf(plan.item),
+                     hp = M.readWord(0x3BF4 + plan.target * 2),
+                     until_ = battleTick + 900 }
+      elseif plan.kind == "heal" then
+        healSent = { target = plan.target,
+                     gain = castRestore[plan.spell]
+                       or M.readWord(0x3C1C + plan.target * 2),
+                     hp = M.readWord(0x3BF4 + plan.target * 2),
+                     until_ = battleTick + 900 }
+      end
       plan, planActor, tgtSpin = nil, nil, 0
       return { "a" }
     end
@@ -2340,7 +2391,7 @@ function M.newFightDriver(tag, opts)
     -- damage decide the next attempt's first turns.
     roundCost, turnSnap = {}, {}
     itemRestore, castRestore = {}, {}
-    healWatch, healSaid = nil, nil
+    healWatch, healSent, healSaid = nil, nil, nil
   end
 
   function F.frame()
@@ -2373,6 +2424,17 @@ function M.newFightDriver(tag, opts)
         healWatch.hp = hp
       elseif battleTick > healWatch.until_ then
         healWatch = nil
+      end
+    end
+    -- The in-flight heal above stops counting the moment its HP shows up, or
+    -- if it never does.  A heal that misses leaves the hole where it was, and
+    -- holding a phantom fill over it would stop anyone healing that member.
+    if healSent then
+      local hp = M.readWord(0x3BF4 + healSent.target * 2)
+      if hp > healSent.hp or hp == 0 or battleTick > healSent.until_ then
+        healSent = nil
+      elseif hp < healSent.hp then
+        healSent.hp = hp
       end
     end
     local menu = M.readByte(MENU)
