@@ -1879,6 +1879,21 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- missing for the other four is a fixture that carries the status, so a row
 -- for them would be a path nothing in the tree has ever run.  Add the row
 -- when a fixture shows the bit, not before.
+--
+-- HOW FAR THIS HAS BEEN WATCHED, 2026-08-12.  The declining half is
+-- measured three times: with the bit set and no Antidote in the bag,
+-- pickStatusCure returns nil and the visit logs `status1 04 -> 04` beside
+-- each Tonic it spends, at gen_kolts's stop before VARGAS and at both of
+-- gen_returner's.  The succeeding half -- bit set, Antidote in the bag,
+-- bit cleared -- has NOT been watched.  Poison turns out to be a rare draw:
+-- it landed once in a full chain regeneration and then not at all in eleven
+-- targeted re-runs of the two generators that fight the formations which
+-- applied it, so the pass-after chain went green without a poisoned
+-- character in it.  Treat the cure as unverified until a run shows
+-- `[care ...] used $F2 on char N: ... status1 04 -> 00`.  What would settle
+-- it is a probe that boots kolts_cave, fights Mt. Kolts trash until a party
+-- member carries $04, and then calls fieldCare -- input-driven throughout,
+-- so it stays inside the no-state-writes rule.
 local CARE_STATUS_CURES = {
   { bit = 0x04, item = CARE_ANTIDOTE, what = "poison" },
 }
