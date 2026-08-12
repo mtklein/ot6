@@ -19,6 +19,24 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   round trip. `opts.magic=false` restores the item-only drive for a step
   that wants its MP kept. On the field item list, A picks a slot up; only a
   second A on the same slot uses it.
+- **The battle fighter prefers casting too, and the grant behind it is
+  battle-only.** `newFightDriver`'s heal branch casts a cure where it can
+  and reaches for the bag where it cannot; `opts.cure=false` is the old
+  item-only drive. It is spelled `cure` rather than `magic` because that
+  driver already spends `opts.magic` on its attack line. Both lines find
+  the spell in the actor's **live** battle Magic list (`$302C`,entity is
+  the engine's own pointer at it; record 0 is the esper row, record n+1 is
+  grid cell n, `+3` is the price `GetMPCost` walks) rather than at a row
+  the caller names, because OT6 compacts that list to the party's union and
+  then prunes it per character (`Ot6UnionEspers` and
+  `Ot6EsperSpellKnown`, `ot6_progression.asm:205`, `:144`), so one spell
+  sits at different cells under different loadouts. **Those two hooks are
+  on the battle spell-list path only** (`battle_main.asm:14455`, `:14628`):
+  a Kirin bearer has Cure in battle and no Magic row at all in the field
+  menu, so `fieldCare` cannot cast a granted cure and still drinks. There
+  is also no revival by magic anywhere in the WoB — no owned esper grants
+  Life (`genju_prop.asm`) — so a segment with no Fenix Down in the bag has
+  no answer to a death at all.
 - **zMosaic (`$B5`) is never cleared, so "was that refused" is an edge, not
   a level.** `MosaicTask` writes `$17 $27 $37 $47 $37 $27 $17 $07` and
   terminates (`field_menu.asm:3820-3844`); nothing re-zeroes it after menu
@@ -42,6 +60,10 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   clears it, so Tools, Magic, Blitz, SwdTech, Throw and Steal are
   row-exempt. Back row wins where damage is break-driven and loses where the
   chipper is a weapon swing (South Figaro vs Phantom Train, both measured).
+  Where **nobody's** chipper is a weapon swing the back row is simply free,
+  and worth taking: Number 128 is fought with Tools, Magic and Magic, and
+  moving all three back turned a fight that lost attempt 1 with the party
+  arriving intact into one that wins attempt 1 arriving worse (#92).
   Rows are persistent state, so set them deliberately per segment.
 - **The equip audit** (`tools/audit_equipment.py`, a `make test` check with its
   own only-shrinks story-waiver list): check any red segment against it
