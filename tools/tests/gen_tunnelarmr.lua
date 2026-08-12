@@ -785,14 +785,14 @@ H.run({ maxFrames = 300000 }, {
   armrAttempt(1),
   armrAttempt(2),
   armrAttempt(3),
+  -- Before the verdict, not after: three attempts are evidence only if they
+  -- were three DIFFERENT fights, and if they were not, that is what this run
+  -- should report rather than "lost all three" (#83).
+  L.report(),
   H.call(function()
     H.assertEq(armrWon, true,
       "TunnelArmr beaten within 3 attempts (Runic + boosted Fights)")
   end),
-  -- ...and they were three DIFFERENT fights: distinct battle RNG seeds,
-  -- read off the seeder itself (#83).  A win is only evidence about the
-  -- encounter if the attempts that lost were not the same fight replayed.
-  L.report(),
 
   -- Ride the tail to the hub; $001E already flipped on map 70 (the attempt
   -- decided on it), and _caad4c warps home.  This is input-driven: nothing

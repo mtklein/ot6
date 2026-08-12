@@ -295,13 +295,15 @@ H.run({ maxFrames = 160000 }, {
   -- frame counter the battle seed is actually made of, and checked (#83).
   L.watch(),
   rideAttempt(1), rideAttempt(2), rideAttempt(3),
+  -- Before the verdict, not after: three attempts are evidence only if they
+  -- were three DIFFERENT rides -- distinct battle RNG seeds on the first
+  -- battle after each attempt's spread -- and if they were not, that is what
+  -- this run should report rather than "lost all three" (#83).
+  L.report(),
   H.call(function()
     H.assertEq(rideWon, true,
       "the Cranes fell and the ride reached the flashback within 3 attempts")
   end),
-  -- ...and they were three DIFFERENT rides: distinct battle RNG seeds on the
-  -- first battle after each attempt's spread, read off the seeder (#83).
-  L.report(),
   H.waitFrames(90),
   H.call(function()
     H.assertEq(map(), 219, "the Esper-World flashback (map 219)")

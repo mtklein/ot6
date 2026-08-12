@@ -463,13 +463,14 @@ H.run({ maxFrames = 700000 }, {
   fightAttempt(2),
   fightAttempt(3),
   fightAttempt(4),
+  -- Before the verdict, not after: the attempts are evidence only if they
+  -- were DIFFERENT fights, and if they were not, that is what this run should
+  -- report rather than "lost all four" (#83).
+  L.report(),
   H.call(function()
     H.assertEq(fightWon, true,
       "VARGAS beaten within 4 attempts (real damage, real menus)")
   end),
-  -- ...and they were four DIFFERENT fights: distinct battle RNG seeds, read
-  -- off the seeder itself (#83).
-  L.report(),
   H.waitFrames(30),
 
   -- ===================================================================== --

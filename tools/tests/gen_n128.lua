@@ -498,15 +498,15 @@ H.run({ maxFrames = 400000 }, {
   rideAttempt(1),
   rideAttempt(2),
   rideAttempt(3),
+  -- Before the verdict, not after: three attempts are evidence only if they
+  -- were three DIFFERENT rides, and if they were not, that is what this run
+  -- should report rather than "lost all three" (#83).
+  L.report(),
   H.call(function()
     H.assertEq(rideWon, true,
       "the minecart ride survived within 3 attempts (six real "
       .. "fights, the library fighter)")
   end),
-  -- ...and they were three DIFFERENT fights: distinct battle RNG seeds,
-  -- read off the seeder itself (#83).  A win is only evidence about the
-  -- encounter if the attempts that lost were not the same fight replayed.
-  L.report(),
   H.waitFrames(90),
 
   H.call(function()

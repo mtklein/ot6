@@ -360,15 +360,15 @@ H.run({ maxFrames = 300000 }, {
   n024Attempt(1),
   n024Attempt(2),
   n024Attempt(3),
+  -- Before the verdict, not after: three attempts are evidence only if they
+  -- were three DIFFERENT fights, and if they were not, that is what this run
+  -- should report rather than "lost all three" (#83).
+  L.report(),
   H.call(function()
     H.assertEq(fightWon, true,
       "battle 72 won within 3 attempts (the library fighter: "
       .. "tactical + boost bank + real items)")
   end),
-  -- ...and they were three DIFFERENT fights: distinct battle RNG seeds,
-  -- read off the seeder itself (#83).  A win is only evidence about the
-  -- encounter if the attempts that lost were not the same fight replayed.
-  L.report(),
   -- ride the post-battle tail out to a settled field ($0649 already
   -- cleared; playBattles=true, though no battle can occur here)
   H.advanceStory(function() return sw(0x0649) == 0 and settled() end, 12000,

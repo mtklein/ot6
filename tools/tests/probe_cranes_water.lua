@@ -444,12 +444,14 @@ H.run({ maxFrames = 320000 }, {
     H.log(string.format("[final] won=%s after %d attempt(s)",
       tostring(won), attempts))
     H.screenshot("cranes_water_end")
+  end),
+  -- Before the verdict, not after: this probe's answer on whether the
+  -- playbook turns the encounter is only worth something if the attempts it
+  -- counted were different fights (#83).
+  L.report(),
+  H.call(function()
     H.assertEq(won, true,
       "the Cranes fall to the vanilla playbook within 3 attempts "
       .. "(Sea Song + Diamond Dust + the tactical kit)")
   end),
-  -- ...and they were different fights.  This probe's verdict on whether the
-  -- playbook turns the encounter is only worth something if the attempts it
-  -- counts were distinct (#83).
-  L.report(),
 })

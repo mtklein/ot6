@@ -571,13 +571,14 @@ H.run({ maxFrames = 350000 }, {
       end)(),
       L.watch(),
       stealAttempt(1), stealAttempt(2), stealAttempt(3),
+      -- Before the verdict, not after: three attempts are evidence only if
+      -- they were three DIFFERENT fights, and if they were not, that is what
+      -- this run should report rather than "not stolen in 3" (#83).
+      L.report(),
       H.call(function()
         H.assertEq(stolen, true,
           "the clothes were STOLEN within 3 attempts")
       end),
-      -- ...and they were three DIFFERENT fights: distinct battle RNG seeds,
-      -- read off the seeder itself (#83).
-      L.report(),
     })
   end)(),
   H.call(function()
