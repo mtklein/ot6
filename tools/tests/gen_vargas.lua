@@ -261,6 +261,20 @@ local function pulse()
     local cr, cc = H.readByte(0x8967 + a), H.readByte(0x8963 + a)
     if cr ~= row then return (ph < 5) and { (cr < row) and "down" or "up" } or {} end
     if cc ~= col then return (ph < 5) and { (cc < col) and "right" or "left" } or {} end
+    -- The confirm on the PUMMEL row itself is where the choice is made, and
+    -- it is the only place that is true on every path.  Pummel does not
+    -- always route through the target window -- measured 2026-08-11, a
+    -- winning run where SABIN's turn at f26022 planned pummel, spent 4 MP
+    -- and took VARGAS from 10863 to 10743 with the script then ending the
+    -- fight, while ST_TGT was never entered -- so a flag set only there
+    -- reported pummeled=false on a fight the Pummel had just won.  That
+    -- reads as "the drive never reached the ability", which is the exact
+    -- wrong conclusion, and it was in the log of the failing run this
+    -- branch was sent to diagnose.
+    if not sabinPummeled then
+      sabinPummeled = true
+      H.log(string.format("[vargas] PUMMEL chosen at f%d, V=%d", H.frame, vHp()))
+    end
     return (ph < 5) and { "a" } or {}
   end
   if st == ST_TGT then
@@ -285,15 +299,9 @@ local function pulse()
     end
     if M.plan.kind == "pummel" then
       if M.via ~= "blitz" then return (ph < 5) and { "b" } or {} end
-      if ph < 5 then
-        if not sabinPummeled then
-          sabinPummeled = true
-          H.log(string.format("[vargas] PUMMEL confirmed at f%d, V=%d",
-            H.frame, vHp()))
-        end
-        return { "a" }
-      end
-      return {}
+      -- the target window, when Pummel opens one at all; the flag is
+      -- already set by the row confirm above, which every path passes
+      return (ph < 5) and { "a" } or {}
     end
     return (ph < 5) and { "a" } or {}
   end
