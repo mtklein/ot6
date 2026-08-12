@@ -74,7 +74,10 @@
 -- his pending boost from the 1 bp every character opens with, A-A-A
 -- confirms the boosted Fight; the same drive that beat the Marshal in
 -- gen_moogle).  Break the shields and the damage window finishes the 1300
--- HP.  A loss on an event battle is game over, so the fight uses a retry
+-- HP.  That only works if LOCKE is holding the Dirk: see the equip stop
+-- below, where he is given it by hand because Optimum picks by power and
+-- hands him a slash blade instead.
+-- A loss on an event battle is game over, so the fight uses a retry
 -- ladder: the entry point blob is captured beside the entry-point generation,
 -- and each attempt reloads it and takes its own battle RNG phase before
 -- stepping onto the trigger.  The seed is the game-time frame counter at
@@ -551,7 +554,37 @@ H.run({ maxFrames = 300000 }, {
   -- at all, but a player opens Equip before walking into a boss tunnel, and
   -- so does this script.  celes_freed keeps its waiver in
   -- tools/equipment_waivers.txt because this stop is the next step.
-  H.equipOptimum({ tag = "celes kit" }),
+  --
+  -- LOCKE's weapon is picked by hand, and Optimum is kept off his slot.
+  -- The bag arrives here with exactly two weapons the pair can hold: the
+  -- MithrilBlade ($0A, power 38, OT6_SLASH) the South Figaro stop bought
+  -- him, and his own Dirk ($00, power 26, OT6_PIERCE), which rides to the
+  -- split unequipped.  TunnelArmr is `5, OT6_PIERCE`
+  -- (ff6/src/battle/ot6_hud.asm:1943), so the Dirk is the only thing in
+  -- this party that can chip a shield off it.  Optimum picks by attack
+  -- power and nothing else, so it hands LOCKE the blade and then hands the
+  -- Dirk to CELES: measured 2026-08-12 on the fail-before run,
+  -- `[celes kit] done: c1=0A c6=00`, which puts the pierce weapon in the
+  -- hand of the character whose entire drive is Runic and who never
+  -- swings.  All three attempts then lost with the shields at 5 of 5 for
+  -- almost the whole fight (seeds $88 / $D8 / $38, boss 1300 -> 783 at
+  -- best), because 0.5x shielded attenuation (Ot6ShieldedMulW,
+  -- ot6_break.asm:1490) never lifts.
+  --
+  -- So: the Dirk goes on LOCKE first, and Optimum runs on CELES's slot
+  -- only.  The order matters both ways -- Optimum first takes the Dirk for
+  -- CELES, and Optimum afterwards on slot 0 would swap the blade straight
+  -- back onto LOCKE, because 38 beats 26.  CELES gets the MithrilBlade the
+  -- swap returns to the bag, plus the helmet upgrade, which is what a
+  -- player would do with a spare sword.  This is issue #81's lesson
+  -- applied to the class axis rather than the element one: for a break
+  -- fight, weigh weapon class against the boss's break axis first.
+  H.equipWeapon(0, 0x00, { tag = "locke takes the Dirk (pierce)" }),
+  H.equipOptimum({ tag = "celes kit", slots = { 1 } }),
+  H.call(function()
+    H.assertEq(H.readByte(0x1600 + 37 * 1 + 0x1f), 0x00,
+      "LOCKE holds the Dirk $00 -- the party's only OT6_PIERCE weapon")
+  end),
 
   -- The rows are re-set for a two-character party.  gen_sfigaro put LOCKE in
   -- the back row, which was right for solo battle 11 (survive long enough to
@@ -669,11 +702,36 @@ H.run({ maxFrames = 300000 }, {
   --   (17,21) --walk--> (10,2)  --> map 70 (55,31)
   warpTo(14, 33, 55, 56, 69, "cave warp A (14,33) -> (55,56)"),
   warpTo(61, 57, 17, 21, 69, "cave warp B (61,57) -> (17,21)"),
+  -- The chests this route walks past, logged rather than opened, for the
+  -- skipped-chest inventory (issue #84).  Decoded from
+  -- ff6/src/field/trigger/treasure_prop.dat with the per-map start offsets
+  -- in ff6/include/field/treasure_prop.inc: map 69 holds an X-Potion at
+  -- (3,18) and a Tincture at (33,23), and map 70 holds one chest, the
+  -- Thunder Rod ($37) at (52,14).  The rod is the one that matters here.
+  -- It is a lightning source that needs nobody's weapon: its equip mask is
+  -- $9180 (item_prop_en.dat +$01), which is Strago, Relm and Gogo, so
+  -- neither LOCKE nor CELES can hold it, but ItemProp+18 is $C7 -- bit 7
+  -- set means "using this item casts spell $07", Bolt 2 (battle_main.asm
+  -- :6603, :6613-6617).  TunnelArmr is weak to bolt (monster_prop.dat
+  -- +$2099 = $84, bolt|water, widened to ice|bolt|water by Ot6ElemAdd), and
+  -- an elemental-weakness hit chips a shield on its own axis
+  -- (Ot6Chip, ot6_break.asm:841).  So the rod is a second break axis for
+  -- one use.  It is not needed for the win once LOCKE holds the Dirk, and
+  -- picking it up is left to the route pass that opens chests deliberately.
+  H.call(function()
+    H.log(string.format(
+      "chests passed on map 69: (3,18) X-Potion %s; (33,23) Tincture %s",
+      H.bfsPath(3, 18) and "reachable" or "not reachable from here",
+      H.bfsPath(33, 23) and "reachable" or "not reachable from here"))
+  end),
   go(10, 2, 70, 55, 31, "cave (10,2) -> map 70 (55,31)"),
   H.call(function()
     H.assertEq(map(), 70, "on map 70 -- the TunnelArmr cave")
     H.assertEq(H.bfsPath(47, 38) ~= nil, true,
       "the TunnelArmr trigger (47,38) is reachable")
+    H.log(string.format("chest passed on map 70: (52,14) Thunder Rod $37 %s",
+      H.bfsPath(52, 14) and "reachable on foot from the (55,31) landing"
+                        or "not reachable from the (55,31) landing"))
     where("map 70")
   end),
 

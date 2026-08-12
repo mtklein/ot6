@@ -295,6 +295,22 @@ which does ride to the split, so he arrives with both classes. The gate
 soldier's HeavyArmor is `3, OT6_SLASH|OT6_PIERCE` (`:2013`), so the blade
 breaks it either way.
 
+**Carrying both classes is not the same as holding the right one, and that
+distinction cost the chain a release check.** Measured 2026-08-12 at
+`celes_freed`: the bag holds one MithrilBlade and one Dirk, CELES arrives
+stripped, and `H.equipOptimum` runs the game's own Optimum command, which
+picks by attack power and nothing else. It gave LOCKE the blade at 38 and
+then gave the Dirk at 26 to CELES — `[celes kit] done: c1=0A c6=00`. CELES's
+whole drive in that fight is Runic, so the party's only pierce weapon spent
+the fight in a hand that never swung, TunnelArmr's shields read 5 of 5
+throughout, and all three attempts were lost over three distinct battle RNG
+seeds. `gen_tunnelarmr` now equips the Dirk onto LOCKE by hand with
+`H.equipWeapon` and runs Optimum on CELES's slot only (`opts.slots`), which
+also hands CELES the blade the swap returns to the bag. The fight is then won
+on attempt 1, shields 5 → 3 → 2 → 0, boss 846 → 520 → 0 inside the break
+window. So the shopping list in §6 was right and the arithmetic of who ends
+up holding what was the missing half.
+
 **The purse is no longer the constraint.** With 3974 at the counter the list
 did not fit — three pendants alone are more than four times the
 discretionary remainder after the existing 3650 of Fenix Downs, Antidotes
