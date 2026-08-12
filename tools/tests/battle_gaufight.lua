@@ -391,7 +391,18 @@ add({
   -- ride the trance: the bench is X-cycled, so if the four-row
   -- menu ever offered a possessed Gau a window, the cycling would land
   -- focus on him and the counter below would catch it.
-  H.repeatN(150, {
+  --
+  -- 400 iterations is about 3600 frames.  It was 150 (~1350), which is one
+  -- Gau turn short of the >= 3 the phase asserts: measured 2026-08-12 on
+  -- the first gau_joined the repaired Veldt crossing produced, the ride
+  -- ended with Cmd_10 re-entered twice and the phase failed on a count, not
+  -- on behaviour -- Gau was still possessed and had still been offered no
+  -- window.  How many turns fit in a fixed window is a property of the
+  -- battle's ATB and the formation, so a threshold that close to the wall
+  -- reports the fixture rather than the mechanism.  Neither assertion is
+  -- relaxed by this: the count still has to reach 3, and "focus never lands
+  -- on Gau" now has to hold across 2.7x as many frames.
+  H.repeatN(400, {
     H.call(function()
       if H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot then
         gauMenus = gauMenus + 1
