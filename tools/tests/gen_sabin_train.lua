@@ -250,17 +250,28 @@ local function makeB47Plan(actor)
   for i = 0, 3 do
     if H.readByte(CMDTBL + actor * 12 + i * 3) == CMD_ITEM then itemRow = i end
   end
-  -- revive first: the longer healing fight gives the ghosts more turns, and
-  -- a member who dies here enters the boss fight dead (measured: SHADOW at
-  -- 0/197 s80 at every b68 entry).  A Fenix Down's target select
-  -- initializes on the fallen ally, so the default confirm revives without
-  -- steering.
+  -- Revive first: the longer healing fight gives the ghosts more turns, and a
+  -- member who dies here enters the boss fight dead.
+  --
+  -- The revive is steered onto the fallen ally.  It used to confirm the
+  -- default target on the claim that "a Fenix Down's target select
+  -- initializes on the fallen ally", and that claim is false: measured
+  -- 2026-08-12 on the s2_train_done run, CYAN went down at f8014, this branch
+  -- planned a revive eight times, all four Fenix Downs in the bag were
+  -- consumed, and CYAN was still 0/319 s80 at the end of the fight, through
+  -- the strip walk, through battle 68, and into the generated savestate --
+  -- which is what failed s2_train_done's party-standing check.  The default
+  -- target for an item is the acting character, which is why the topup branch
+  -- below can say "self-target only heals the actor" two comments later and
+  -- be right; the same default is exactly wrong for a revive.  Steering here
+  -- is the same machine b68's fighter already uses for its heals, which is
+  -- the line that did revive CYAN twice when it was measured.
   for e = 0, 3 do
     if pMaxHP(e) > 0 and pHP(e) == 0 and itemRow
        and battInvIdx(FENIX_DOWN) then
       H.log(string.format("[b47] revive: e%d is down -- FENIX DOWN [%s]",
         e, partyLine()))
-      return { kind = "item", item = FENIX_DOWN, row = itemRow }
+      return { kind = "item", item = FENIX_DOWN, row = itemRow, target = e }
     end
   end
   -- Poison is where the strip's HP goes (see the section note): cure it
@@ -338,8 +349,37 @@ local function b47Button()
     return { "a" }
   end
   if st == ST_TGT then
-    fPlan, fPlanActor = nil, nil
-    return { "a" }          -- item: default self; Fight: default enemy
+    -- No named target: take the default, which is the acting character for
+    -- an item and the enemy for Fight.  That is what the topups want.
+    if plan.target == nil then
+      fPlan, fPlanActor = nil, nil
+      return { "a" }
+    end
+    -- A named target (the revive) is steered, the same way the b68 fighter
+    -- steers its heals: off the monster side first, then down or up the
+    -- party column until the live character mask is the one slot we mean.
+    local chars = H.readByte(TGTCHARS)
+    local mons = H.readByte(TGTMONS)
+    if mons ~= 0 then return { "right" } end
+    local wantMask = 1 << plan.target
+    if chars == wantMask then
+      fPlan, fPlanActor = nil, nil
+      return { "a" }
+    end
+    plan.tgtStall = (plan.tgtStall or 0) + 1
+    if plan.tgtStall > 20 then
+      -- Unlike b68's heals, a revive on the wrong ally is a wasted Fenix
+      -- Down out of a bag of four, so this gives up on the turn instead of
+      -- confirming somewhere harmless.  Backing out re-plans next menu.
+      H.log(string.format("[b47] revive steer stalled (chars=%02X want=%02X)" ..
+        " -- backing out rather than spending the Fenix Down on the wrong " ..
+        "ally", chars, wantMask))
+      fPlan, fPlanActor = nil, nil
+      return { "b" }
+    end
+    local cur = 0
+    for b = 0, 3 do if chars & (1 << b) ~= 0 then cur = b; break end end
+    return { cur < plan.target and "down" or "up" }
   end
   if st == ST_TOOLS then return { "b" } end
   return nil
