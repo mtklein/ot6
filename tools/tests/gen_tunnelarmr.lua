@@ -759,7 +759,16 @@ H.run({ maxFrames = 300000 }, {
   -- order below works with it: the glove goes on first, the forced pick
   -- fills the slots this fight does not care about, and both weapon hands
   -- are then overwritten by name.
-  H.call(function() gearLine("boot, before the equip stop") end),
+  H.call(function()
+    gearLine("boot, before the equip stop")
+    -- Named before anything is driven, because a missing item makes
+    -- menuEquip's list seek time out rather than say what is wrong.
+    H.assertEq(H.invCountOf(GENJI_GLOVE), 1,
+      "the Genji Glove rode the split in the bag (gen_banon, issue #106)")
+    H.assertEq(H.invCountOf(MITHRILKNIFE) >= 1, true,
+      "the spare MithrilKnife rode the split too (gen_kolts' weapon shop)")
+    H.assertEq(H.invCountOf(DIRK) >= 1, true, "LOCKE's own Dirk is in the bag")
+  end),
   -- 1. The glove.  It is in the bag because gen_banon refuses BANON three
   --    times for it (#106), and it rides the scenario split unequipped the
   --    way LOCKE's Dirk does.
