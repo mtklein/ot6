@@ -43,6 +43,18 @@ So `H.equipOptimum`'s report during `gen_sfigaro` — item `$00`, power 26, the
 only weapon available — is complete and correct. There is nothing better in
 the bag to find.
 
+**The equipment audit's "LOCKE is bare" fixtures are stale, not wrong.**
+`tools/audit_equipment.py` reports `gear FF FF FF FF FF` for him in every
+`sfigaro_*` fixture, and that is what those files hold: `sfigaro_town.mss` is
+dated 2026-07-22 in every worktree on this machine and in the owner's
+checkout, and `gen_sfigaro` did not gain its `H.equipOptimum` stop until
+`969894e` on 2026-08-09. A fixture generated before the code existed cannot
+carry its effect. Regenerating the chain on 2026-08-12 shows the drive
+working: `[locke kit] someone is bare-handed (c1=FF) -- opening Equip`, six
+menu steps, `[locke kit] done: c1=00`. Nothing needs fixing in the audit or
+in `gen_sfigaro`; the fixtures need regenerating, and they cannot be until
+the fight in §7 is winnable.
+
 ## 2. The better weapons are equipped on characters in other scenarios
 
 At the split the party's weapons are:
@@ -208,29 +220,64 @@ list: they cost more than four times the whole discretionary remainder. With
 three or four cave fights fought on the way in they fit with room, and so
 does the MithrilBlade.
 
-## 7. What this does not do
+## 7. What battle 11 actually looks like
 
-It does not win battle 11, and the arithmetic says so before anyone spends
-generation time finding out.
+Measured 2026-08-12 on the chain regenerated for this file, three attempts,
+seeds `$38` / `$88` / `$D8`. All three lost, so `sfigaro_town` cannot be
+generated at all on this ROM today, and the Locke chain is blocked there.
 
-`probe_battle11.lua` recorded solo LOCKE at level 8 taking 168 → 111 to the
-soldier's first action and 111 → 0 to his second, the second being
-row-exempt. Against the max-HP table in §4:
+The shape is not the one the issue was working from. LOCKE is not stuck
+chipping and dying in two turns. He breaks the armour and gets into the
+damage phase, and then loses a race. Attempt 3, monster HP and shields
+straight off the driver's log:
 
-- level 9 (194) survives that pair with 26 left, so it buys one more action.
-- surviving a third such hit needs more than 279 max HP, about level 12.
-- surviving a fourth needs more than 390, about level 15.
+| frame | monster | note |
+|---|---|---|
+| f+300 | 490 / sh2 | a chip does 5 |
+| f+900 | 485 / sh1 | |
+| f+2400 | **393 / sh0** | broken; the breaking hit lands 92 |
+| f+3300 | 371 / sh0 | an ordinary Fight does 22 |
+| f+3900 | 349 / sh0 | |
+| f+4200 | 255 / sh0 | a boosted Fight lands 94 |
+| **f+4500** | **255 / sh3** | **the break expires and all three shields return** |
+| f+5100 | 250 / sh2 | chipping again, 5 a hit |
 
-Level 12 is roughly 3300 more experience for LOCKE, about 25 cave fights;
-level 15 is about 8000, about 60. Neither is a casual amount of play. A
-better weapon does not help the turn count either, because a shield chip goes
-by weapon class and costs one hit whatever the weapon is
-(`docs/HANDOFF.md`), so the MithrilBlade changes the damage after the break
-and not the number of turns to reach it.
+The break window is the fight. `OT6_BREAK_TICKS` is `$10`, which is 2159
+frames (`docs/HANDOFF.md`), and the measured gap from `sh0` to `sh3` here is
+about 2100. Inside one window LOCKE takes the soldier from 485 to 255, which
+is 230 of 495. He needs a bit over two clean windows and each one costs three
+chip turns to re-open, and he does not survive that long.
 
-**Unverified, and worth settling before anyone grinds for this reason:**
-whether the soldier's killing action scales with the target's level. It comes
-through command `$0C` (`Cmd_0c` / `_actbluemagic0`,
-`ff6/src/battle/battle_main.asm:3740`). If its damage tracks LOCKE's level or
-maximum HP then levelling him never reaches the fight at all, and the two
-bullets above are optimistic rather than merely expensive.
+What ends it is healing, not damage. His own HP went 168 → 113 → 27, he drank
+the bag's single Potion back to 168, took 52 more, and then sat at 116 until a
+row-exempt special of 111 or more killed him. The driver refused every Tonic
+on the way, and said why: *"$E8 restores 50 and a round costs 86, so the turn
+buys back less than it spends"*. Eleven Tonics in the bag were worth nothing
+to him.
+
+So all three levers in this file bear on the fight, which is the opposite of
+what §6 would suggest on its own:
+
+- **A weapon.** The MithrilBlade is power 38 against the Dirk's 26. The
+  22-damage Fights and the 92/94 breaking hits all scale off that, and they
+  are what has to fit inside a 2159-frame window.
+- **Levels.** He dies from 116 to a hit of 111+. Level 10 is 221 max HP and
+  level 11 is 249 (§4), which is the difference between one special killing
+  him from most of his bar and not.
+- **Potions.** The single most direct one, and the route gives it away. The
+  bag holds 5 Potions at `vargas_entry` and 0 at `vargas_won`: the Vargas
+  medic drinks all five. LOCKE reaches his solo fight with the one Potion the
+  river dropped. **No shop he can reach sells Potions** — not South Figaro's
+  shop 8, not Figaro Castle's shop 4, and the nearest vendor is Narshe's shop
+  3 in a different walkable region (`south-figaro-shop-route.md` §2) — so they
+  cannot be replaced, only not spent.
+
+None of this is a balance change, and the fight should not be re-tuned until
+a LOCKE who is armed, a level or two up, and carrying more than one usable
+heal has been put in front of it.
+
+**Unverified, and worth settling first:** whether the soldier's killing action
+scales with the target's level. It comes through command `$0C` (`Cmd_0c` /
+`_actbluemagic0`, `ff6/src/battle/battle_main.asm:3740`). If its damage tracks
+LOCKE's level or maximum HP then the levelling lever above is worth less than
+it looks, and the weapon and the Potions carry the whole fix.
