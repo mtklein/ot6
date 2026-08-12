@@ -300,20 +300,21 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   | `gen_zozo3_clock` | PASS f12623, 19 of 25 actions healing | PASS f9478, 5 of 15 |
   | `gen_esper_tubes` (battle 72) | PASS f10060, 14 of 26 | PASS f8404, 8 of 17 |
   | `gen_n128` (six fights) | PASS f32322 | PASS f29842 |
-  | `gen_ifrit_magicite` (battle 70) | PASS f12728, 9 of 26 | loses the ladder |
+  | `gen_ifrit_magicite` (battle 70) | PASS f12728, 9 of 26 | PASS f26898, 61 of 85 |
 
-  **Battle 70 is where the rule runs out, and the reason is the fight's
-  opening.** Before the enemy has landed a round there is no measured round
-  cost, so nothing at all weighs against the value test, and a party that
-  walks in at about 80% of maximum is four characters each carrying an
-  84-point hole -- more than a 50-point Tonic, so every one of them is worth
-  a full-value drink and every actor spends the opening turns drinking.
-  Measured: 57 of 62 actions were heals, three of them Fights, IFRIT never
-  broken, and the ladder ran long enough that Mesen's 600-second wall clock
-  killed the run twice. The old fraction rule never considered an 80%
-  character, which is why it did not have this failure. **Count the plans by
-  kind in the driver's log before reading a lost fight as balance**: an
-  action mix that is nine tenths healing is a policy finding.
+  **Battle 70 is where the rule costs more than it saves, and the reason is
+  the fight's opening.** Before the enemy has landed a round there is no
+  measured round cost, so nothing at all weighs against the value test, and a
+  party that walks in at about 80% of maximum is four characters each
+  carrying an 84-point hole -- more than a 50-point Tonic, so every one of
+  them is worth a full-value drink and every actor spends the opening turns
+  drinking. It still wins, but it takes 26898 frames against 12728, three
+  times the actions with 72% of them heals, and the first run of it was
+  killed by Mesen's 600-second wall clock and only passed on the harness's
+  own retry. The old fraction rule never considered an 80% character, which
+  is why it did not have this problem. **Count the plans by kind in the
+  driver's log before reading a slow or lost fight as balance**: an action
+  mix that is three quarters healing is a policy finding.
 - **A party that enters a fight badly hurt may never get a turn back,
   whatever the heal rule is.** In-battle healing is bounded by turns, and a
   care stop between fights costs none, so the entry HP is the variable to

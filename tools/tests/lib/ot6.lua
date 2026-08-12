@@ -586,14 +586,15 @@ end
 -- same savestates and checkpoints, everything else identical:
 --
 --          gen_zozo3_clock  gen_esper_tubes  gen_n128     gen_ifrit_magicite
---   0.75   nav timeout      PASS f11940      PASS f29842  loses the ladder
---   0.50   PASS f9478       PASS f8404       PASS f29842  loses the ladder
+--   0.75   nav timeout      PASS f11940      PASS f29842  killed at the cap
+--   0.50   PASS f9478       PASS f8404       PASS f29842  PASS f26898
 --
 -- So 0.50.  The two fights it decides are decided on turn count rather than
 -- on supplies: at 0.75 a 150-point hole is filled with three Tonics and at
 -- 0.50 with one Potion, and a quarter of a Potion spilled buys back two
--- turns.  Battle 70 loses at both, and the reason is not this number; it is
--- recorded in docs/HANDOFF.md under the heal policy.
+-- turns.  Battle 70 is slower than the old rule at both settings and this
+-- number is not what would fix it; the cause is recorded in
+-- docs/HANDOFF.md under the heal policy.
 M.HEAL_VALUE = 0.50
 
 -- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
