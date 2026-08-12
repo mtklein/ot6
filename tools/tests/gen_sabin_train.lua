@@ -144,11 +144,31 @@ local function invCount(id)
   end
   return 0
 end
+-- All four battle status bytes, not just the first.  The fight log used to
+-- print status 1 alone ($3EE4, stride 2), which carries wound/poison/dark and
+-- nothing else; every status that costs a character their turn lives in the
+-- other three -- Berserk $10 and Muddled $20 and Sleep $80 in status 2
+-- ($3EE5), Stop $10 in status 3 ($3EF8) (ff6/notes/battle-lists.txt:632-647,
+-- addresses at ff6/notes/battle-ram.txt:1098-1101).  That gap cost a
+-- diagnosis: a run where SABIN took one turn in fourteen and chipped once
+-- read as "SABIN was not served a menu" because the byte that would have
+-- said why was not being printed.  Statuses 2-4 are appended only when one
+-- of them is set, so the common line stays the width it was.
+local function statusStr(e)
+  local s1 = H.readByte(0x3EE4 + e * 2)
+  local s2 = H.readByte(0x3EE5 + e * 2)
+  local s3 = H.readByte(0x3EF8 + e * 2)
+  local s4 = H.readByte(0x3EF9 + e * 2)
+  if s2 == 0 and s3 == 0 and s4 == 0 then
+    return string.format("s%02X", s1)
+  end
+  return string.format("s%02X/%02X/%02X/%02X", s1, s2, s3, s4)
+end
 local function partyLine()
   local p = {}
   for e = 0, 3 do
-    p[#p + 1] = string.format("%d/%d(%dmp,s%02X)", pHP(e), pMaxHP(e),
-      pMP(e), H.readByte(0x3EE4 + e * 2))
+    p[#p + 1] = string.format("%d/%d(%dmp,%s)", pHP(e), pMaxHP(e),
+      pMP(e), statusStr(e))
   end
   return table.concat(p, " ")
 end
@@ -861,20 +881,34 @@ local function b68Observe()
      or (H.readByte(RVPC(gSlot)) & OT6_BLUDG) == OT6_BLUDG then
     b68.bludgRevealed = true
   end
+  -- Every hit the train takes, attributed.  Without this the log only shows
+  -- the turns the driver planned, and a fight can lose most of the train's
+  -- HP to damage nobody in the log dealt -- a berserked party member, a
+  -- counter, a status tick.  $3410 is the attack index the engine last
+  -- resolved (the chip rows below already read it).
+  if b68.lastHP and hp < b68.lastHP then
+    b68Log(string.format("train -%d -> %d at f%d: lastSkill=$%02X sh=%d [%s]",
+      b68.lastHP - hp, hp, H.frame, H.readByte(0x3410), shields, partyLine()))
+  end
   if b68.lastSH and shields < b68.lastSH then
     local row = string.format(
       "chip %d->%d at f%d: lastSkill=$%02X trainHP=%d sabinMP=%d [%s]",
       b68.lastSH, shields, H.frame, H.readByte(0x3410), hp,
       sabinE and pMP(sabinE) or -1, partyLine())
     b68.chips[#b68.chips + 1] = row
+    -- Shields off, not chip rows.  A double-hitting Pummel takes two shields
+    -- in one transition (6->5->4->2 is three rows and four shields), so the
+    -- row count undercounts the break and cannot be the thing asserted on.
+    b68.shieldsOff = (b68.shieldsOff or 0) + (b68.lastSH - shields)
     b68Log(row)
     b68.plan = nil                            -- re-plan on fresh numbers
   end
   if shields == 0 and b68.brokeAt == nil and (b68.lastSH or 6) > 0 then
     b68.brokeAt = H.frame
+    b68.brokeHP = hp
     b68Log(string.format(
-      "*** BREAK COMPLETE at f%d with the train ALIVE at %d HP -- the " ..
-      "proof obligation holds (casts=%d)", H.frame, hp, b68.casts))
+      "*** BREAK COMPLETE at f%d: six shields off with the train at %d of " ..
+      "1900 HP (casts=%d)", H.frame, hp, b68.casts))
     H.screenshot("train_b68_broken")
   end
   if hp == 0 and b68.killedAt == nil and b68.lastHP and b68.lastHP > 0 then
