@@ -1088,11 +1088,23 @@ def main() -> int:
             preamble.append("}\n")
 
     # OT6 symbol addresses: derive them from this tree's ff6-en.dbg the same
-    # way OT6_STATES embeds sidecars.  Only symbols the script names via
-    # H.sym("...") are collected, so the injection is inert for every test
-    # that does not use it (no reference -> no table emitted).  See ot6.lua
-    # M.sym for the accessor and the error on a missing symbol.
-    sym_names = list(dict.fromkeys(_SYM_REF.findall(script)))
+    # way OT6_STATES embeds sidecars.  Only symbols named via H.sym("...")
+    # are collected, so the injection is inert for a tree that names none
+    # (no reference -> no table emitted).  See ot6.lua M.sym for the
+    # accessor and the error on a missing symbol.
+    #
+    # The scan covers the libs as well as the test, because the libs are
+    # inlined into every composed script and so can call H.sym exactly as a
+    # test can.  Scanning only the test meant they could not: a sym() inside
+    # ot6_field.lua composed with no OT6_SYMS entry and raised "not in
+    # ff6-en.dbg" at runtime against a .dbg that had the record all along
+    # (measured on M.spellMpCost naming MagicProp, 2026-08-11).
+    # Over-collecting is inert -- an unused entry costs one table row -- so
+    # the price of the wider scan is that every composed script now carries
+    # the union of the names the libs mention.
+    sym_text = "\n".join([script, lib, FIELD.read_text(),
+                          CONTRACT.read_text()])
+    sym_names = list(dict.fromkeys(_SYM_REF.findall(sym_text)))
     if sym_names:
         syms, ambig = parse_dbg_syms(DBG, sym_names)
         preamble.append(f"-- OT6 symbols from {DBG} (via lib/compose.py)\n")
@@ -1123,7 +1135,9 @@ def main() -> int:
         # comment-only ambiguity is recorded in OT6_SYMS_AMBIG instead, and
         # H.sym raises the same message if the name is called.
         if ambig:
-            inert = set(comment_only_refs(script, ambig))
+            # over the same text the names were collected from, so a live
+            # call in a lib is not mistaken for prose in the test
+            inert = set(comment_only_refs(sym_text, ambig))
             for name, cands in sorted(ambig.items()):
                 where = ", ".join(f"{s}=0x{a:06X}" for s, a in cands)
                 msg = (f"symbol {name} is AMBIGUOUS in ff6/rom/ff6-en.dbg "

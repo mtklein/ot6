@@ -787,21 +787,60 @@ In `$1A` left and right are normal column movement (`MoveListCursor`,
 
 ---
 
-## 9. What I could not determine from the source
+## 9. What has been observed running, and what has not
+
+The magic recipe in §8 was executed on 2026-08-11 by `M.fieldCare`'s cast
+path and traced frame by frame (`tools/tests/field_healpolicy.lua`, case 3,
+at `zozo_arrival`). The observed `zMenuState` sequence for one Cure, with
+frame counts:
+
+```
+$05 x20 -> $06 x2 -> $00 x1 -> $02 x8 -> $09 x7 -> $01 x1 -> $02 x8
+-> $0A x10 -> $1A x12 -> $02 x8 -> $3A x5 -> $01 x1 -> $02 x8 -> $3B x4
+-> [A: the spell lands] -> $00 x1 -> $02 x8 -> $3C x7 -> $01 x1 -> $02 x8
+-> $1A x9 -> $0A x11 -> $00 x1 -> $02 x8 -> $04 x6 -> $01 x1 -> $02 x8
+-> $05 x13 -> $02 x8 -> out
+```
+
+Every state number, every fade shape and every button rule in §5 and §8
+held. Two notes:
+
+- The `$3C` above is the **close drive's own B**, not the game leaving `$3B`.
+  After a successful cast the window stays on `$3B`, exactly as `_c32bde`
+  (`field_menu.asm:3010-3024`) says it should while the caster can still
+  afford the spell, which is what makes a second target cost nothing but
+  cursor moves.
+- The one-frame `$00` before a fade is often missed by a per-frame sampler
+  and shows as a bare `$02 x8`. That is the sampler, not the game.
+
+Also measured at the same fixture:
+
+- **Cure `$2D` costs 5 MP**, Cure 2 `$2E` 25, Cure 3 `$2F` 40, read from
+  `MagicProp+5`, which is what `_c3510d` prices from.
+- **A refusal is an edge, not a level.** Driving a Tonic onto a full-HP
+  EDGAR sets `zMosaic`, and 40 frames later `$B5` still reads `$07`: the
+  cell is never cleared (§3), so only `$B5 & $F0` distinguishes "a refusal
+  just happened" from "a refusal happened at some point this visit".
+- **`$1A` left/right are safe and are a ±1 move on the list index**, so a
+  cursor drive can fix the column with left/right and the row with up/down.
+
+Still not determined from the source:
 
 - **Whether Cure `$2D` has `MagicProp & $20`** (party-targetable), i.e.
-  whether left/right in `$3B` flips to `$3D` for Cure. `MagicProp` is
-  `.import`ed into `skills.asm` (`skills.asm:29`) and lives outside
-  `src/menu`; I did not read the data table. Probe: in `$3B` with Cure
-  selected, tap Left once and read `$26`; `$3D` means the bit is set.
-- **Whether `MagicProp+3 & $01` is set for Cure** (usable outside battle). Same
-  table. The observable proxy is `$7E9E09[i] == $20`, which the game uses
-  as the gate, so a fixture does not need the ROM value.
 - **The exact `UpdateEquip` rules that set the HP/MP boost bits** at `+$0C`/`+$10`.
   Probe named in §4.
 - **Whether inventory slot 255 is unreachable.** Probe named in §2.2.
-- **Fail-before/pass-after**: none of this was executed. Every state number,
-  cell address and button rule above comes from reading the assembly, not from
-  observing the running game. The first fixture built on it should log
-  `$26` every frame across one full heal and one full cast and diff that trace
-  against §8, which checks the whole document at once.
+
+The two `MagicProp` questions that used to sit here are answered. Read out
+of `build/ot6.sfc` at `$C46AC0 & $3FFFFF` with a 14-byte stride:
+
+| spell | `+0` targeting | `$20` all-targets | `+3` | outside battle | MP | power |
+|---|---|---|---|---|---|---|
+| Cure `$2D` | `$21` | set | `$09` | set | 5 | 10 |
+| Cure 2 `$2E` | `$21` | set | `$09` | set | 25 | 28 |
+| Cure 3 `$2F` | `$21` | set | `$09` | set | 40 | 66 |
+| Life `$30` | `$01` | clear | `$0B` | set | 30 | 2 |
+
+So trap 4 does apply to every Cure tier: left or right in `$3B` with one of
+them selected flips to the all-targets state `$3D`. Life is single-target
+and would not, but a driver has no reason to press those buttons on either.

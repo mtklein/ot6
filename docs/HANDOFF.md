@@ -6,12 +6,31 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
 
 ## Measured facts (do not re-derive)
 
-- **fieldCare** drives the real Item→use→target windows. On the field item
-  list, A picks a slot up; only a second A on the same slot uses it.
-  Its world-map exit is broken: `careBackOnMap`'s check passes at a moment
-  that is not "world module running". Use care on the field, not on the
-  world map, until that is fixed. Its exit also reads a one-frame transient
-  and can leave the menu open; it needs a debounce.
+- **fieldCare drives the real menus and prefers casting to drinking.** It
+  walks Item→use→target for a consumable and Skills→Magic→spell→target for a
+  cure spell, and it reaches for the bag only when nobody can cast, when the
+  MP is short, or when the target is KO'd and wants a Fenix Down. The reason
+  is OT6's own rule that level up restores HP and MP in full
+  (`ot6_progression.asm:3-6`, called from `battle_main.asm:16251`): MP spent
+  in a corridor is refunded and a Tonic is not. Measured at
+  gen_ifrit_magicite's stop before battle 70: 3 Potions before, 0 items and
+  25 MP after, in fewer frames (143 against 229), because a second cast for
+  the same caster never leaves `$3B` while each item use pays a full fade
+  round trip. `opts.magic=false` restores the item-only drive for a step
+  that wants its MP kept. On the field item list, A picks a slot up; only a
+  second A on the same slot uses it.
+- **zMosaic (`$B5`) is never cleared, so "was that refused" is an edge, not
+  a level.** `MosaicTask` writes `$17 $27 $37 $47 $37 $27 $17 $07` and
+  terminates (`field_menu.asm:3820-3844`); nothing re-zeroes it after menu
+  init (`menu_init_2.asm:506`). Measured: 40 frames after a real refusal
+  `$B5` reads `$07`. Test `$B5 & $F0`, which is nonzero only while the
+  animation runs, or every plan after the first refusal reads as refused.
+- **fieldCare's world-map exit is debounced, not fixed at the root.**
+  `careBackOnMap` on its own still passes at a moment that is not "world
+  module running"; `careClose` is what makes the drive safe, by requiring 30
+  consecutive satisfying frames plus "not parked on any menu screen" in
+  world mode. Field mode takes the raw first true frame, and debouncing it
+  there hangs instead. gen_sabin_gau cares on the overworld and passes.
 - **`opts.playBattles="flee"` vs `"tactical"` vs `true`**: fleeing means
   standing still while the formation takes free rounds. Blind-A
   `opts.playBattles=true` stalls or wipes the party on any segment that can
