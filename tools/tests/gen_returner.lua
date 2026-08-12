@@ -166,6 +166,24 @@ local function crossTo(tx, ty, dstMap, what, maxF)
   })
 end
 
+-- The care layer, which this route did not have.  Every fight on it is
+-- fought for real (see the header), the walk is long, and nothing here ever
+-- opened a menu, so the party arrived at the hideout in whatever state the
+-- encounters left it.  Measured 2026-08-11 on the v0.10 integration tip, out
+-- of wt/restage's own returner_hideout.mss: TERRA 0/136 and LOCKE 0/168 --
+-- half the party dead -- with five Fenix Downs and fifteen Tonics sitting in
+-- the bag.  That fixture was accepted, and the failure surfaced one edge
+-- later in gen_banon, where Banon's speech cuts the party down to TERRA
+-- alone (`party_chars TERRA`, event_main.asm:36475) and the wipe canary
+-- correctly reported a party in which every member had 0 hp.
+--
+-- H.fieldCare revives from the bag before it heals, so one call answers both,
+-- and it does not open the menu at all when nobody needs anything, which is
+-- why it can sit after every fight without costing a quiet route any frames.
+local function care(tag)
+  return H.fieldCare({ tag = "care " .. tag, threshold = 0.85 })
+end
+
 -- Issue #75: the input-driven world walk (see the header on zero writes).
 -- One round walks toward the hideout until either the entrance fires (the
 -- party leaves the world map) or the encounter roll wins.  $E8 bit5 is set as
@@ -206,6 +224,10 @@ local function worldRound(n, tx, ty)
         H.log(string.format("world segment round %d: fight done, reloaded at " ..
           "(%d,%d) f%d", n, H.worldX(), H.worldY(), H.frame))
       end),
+      -- and patch the party up before walking into the next roll.  A death
+      -- answered here costs one Fenix Down; a death carried to the hideout
+      -- is the fixture defect above.
+      care(string.format("world round %d", n)),
     }, {}),
   }, {})
 end
@@ -298,6 +320,11 @@ H.run({ maxFrames = 220000 }, {
     where("north of Mt. Kolts")
     H.screenshot("returner_worldout")
   end),
+  -- The mountain's own encounters are behind the party now; the overworld's
+  -- are ahead.  Care here rather than only at the far end, so the world walk
+  -- starts from a whole party instead of carrying the descent's casualties
+  -- through twelve more rolls.
+  care("off the mountain"),
 
   -- ===================================================================== --
   -- Phase 2: the world step.  (98,93) -> (104,64), the hideout's door.
@@ -321,6 +348,9 @@ H.run({ maxFrames = 220000 }, {
   worldRound(10, 104, 64), worldRound(11, 104, 64), worldRound(12, 104, 64),
   H.release(),
   settleField(108),
+  -- The hideout has no encounters of its own, so this is the last chance to
+  -- put the party back together before the fixture is written.
+  care("at the hideout"),
   H.call(function()
     H.assertEq(map(), 108, "on map 108, the RETURNER HIDEOUT")
     H.assertEq(H.hasControl(), true, "controllable")
@@ -333,10 +363,30 @@ H.run({ maxFrames = 220000 }, {
     for c = 0, 15 do
       if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
         local base = 0x1600 + 37 * c
-        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d",
+        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d mp=%d/%d",
           c, H.readByte(base), H.readByte(base + 8),
-          H.readWord(base + 9), H.readWord(base + 11)))
+          H.readWord(base + 9), H.readWord(base + 11),
+          H.readWord(base + 13), H.readWord(base + 15)))
       end
+    end
+    -- The exit contract, which this generator did not have and gen_kolts
+    -- has had since 2026-08-06 for the same reason.  A fixture with a dead
+    -- character in it is not a savestate of the story reaching the hideout;
+    -- it is a savestate of the route losing on the way, and every step that
+    -- boots from it inherits the loss.  gen_banon inherits it worst: the
+    -- speech reduces the party to TERRA alone, so a dead TERRA here is a
+    -- whole dead party there, and that is how this presented -- as a wipe
+    -- inside a hideout that has no encounters at all.
+    --
+    -- Half HP is the same bar gen_kolts uses.  A failure here means the
+    -- descent and the world walk cost more than the bag could answer, which
+    -- is a finding about supplies and not a reason to lower the bar.
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c) > 0, true,
+        string.format("char %d reached the hideout alive", c))
+      H.assertEq(H.charHp(c) * 2 >= H.charMaxHp(c), true,
+        string.format("char %d is at or above half hp (%d/%d)",
+          c, H.charHp(c), H.charMaxHp(c)))
     end
     where("returner hideout")
     H.screenshot("returner_hideout")
