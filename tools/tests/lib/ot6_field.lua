@@ -3036,9 +3036,24 @@ end
 -- battle 70 the nulled pick is the correct one and the element-aware
 -- alternative lost all three attempts.  When the guard fires, the fix is
 -- a deliberate M.equipWeapon for that fight, not a change here.
+--
+-- `opts.slots` names which character-select slots Optimum runs on, in
+-- order; the default is every slot, which is what every caller before
+-- gen_tunnelarmr wanted.  It exists because power-greedy Optimum and a
+-- deliberate M.equipWeapon cannot both have the same slot: measured
+-- 2026-08-12 at celes_freed, the bag holds one MithrilBlade (power 38,
+-- slash) and one Dirk (power 26, pierce), and running Optimum over both
+-- slots gives LOCKE the blade and CELES the Dirk (`[celes kit] done:
+-- c1=0A c6=00`) -- the pierce weapon in the hand of the character whose
+-- whole drive is Runic, against a boss that is `5, OT6_PIERCE`
+-- (ot6_hud.asm:1943).  Equipping LOCKE first and then letting Optimum
+-- have his slot back just undoes it, because 38 beats 26.  So the caller
+-- equips the slot it cares about with M.equipWeapon and leaves that slot
+-- out of this list.
 function M.equipOptimum(opts)
   opts = opts or {}
   local tag = opts.tag or "equip"
+  local slots = opts.slots or { 0, 1, 2, 3 }
   local ZM, CUR = 0x26, 0x4b
   local ST_MAIN, ST_CHAR, ST_OPT = 0x05, 0x06, 0x36
 
@@ -3138,22 +3153,26 @@ function M.equipOptimum(opts)
     }, {})
   end
 
-  return M.cond(anyBare, {
+  -- built up rather than written out, because opts.slots decides both which
+  -- slots run and in what order
+  local walk = {
     M.logStep(function()
       return string.format("[%s] someone is bare-handed (%s) -- opening " ..
-        "Equip", tag, kitLine())
+        "Equip on slots %s", tag, kitLine(), table.concat(slots, ","))
     end),
-    oneSlot(0), oneSlot(1), oneSlot(2), oneSlot(3),
-    M.logStep(function()
-      return string.format("[%s] done: %s", tag, kitLine())
-    end),
-    M.call(function()
-      for _, c in ipairs(M.partyMembers()) do
-        M.assertEq(bare(c), false, string.format(
-          "char %d is holding a weapon after Optimum", c))
-      end
-    end),
-  }, {
+  }
+  for _, slot in ipairs(slots) do walk[#walk + 1] = oneSlot(slot) end
+  walk[#walk + 1] = M.logStep(function()
+    return string.format("[%s] done: %s", tag, kitLine())
+  end)
+  walk[#walk + 1] = M.call(function()
+    for _, c in ipairs(M.partyMembers()) do
+      M.assertEq(bare(c), false, string.format(
+        "char %d is holding a weapon after Optimum", c))
+    end
+  end)
+
+  return M.cond(anyBare, walk, {
     M.logStep(function()
       return string.format("[%s] everyone is already armed: %s", tag,
         kitLine())
