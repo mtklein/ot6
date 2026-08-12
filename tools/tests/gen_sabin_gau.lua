@@ -299,6 +299,17 @@ local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
 -- the grind does: BFS-step toward (tx,ty), and on any battle steer each
 -- actor to Fight (command row 0), dump banked boost, self-Tonic under 40%,
 -- until the battle tears down.  No GAU on stage here, so no feed branch.
+--
+-- The "unrunnable" measurement is one formation at one tile, not a rule
+-- about the Veldt: nothing in the run path reads the Veldt flag ($11E4 is
+-- read at battle_main.asm:14150, :14211 and :15779 only, none of them the
+-- run code), so whether a given pack can be fled is that formation's own
+-- data.  Do not widen it to "no Veldt battle can be fled" without a
+-- decode of the pool.
+--
+-- Every caller that crosses open Veldt now passes opts.segment and runs
+-- behind a ladder with an H.fieldCare stop between battles.  Do not add a
+-- bare continuous one back: all three of them wiped a party that way.
 local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
   opts = opts or {}
   local tick, dirFlip, hb = 0, false, -1800
@@ -446,10 +457,19 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     -- basically never holds on the Veldt (the danger bit stays hot
     -- between reloads), so a no-battle segment that arrived would
     -- otherwise sit on the tile burning its whole budget into a raise.
+    -- The tile clause is for a walk that ENDS on a tile.  An
+    -- arriveOffWorld walk ends by leaving the world, and its goal tile is
+    -- a town entrance that fires when the tile is ENTERED, so a segment
+    -- that exits while parked on it strands the walk: measured 2026-08-12,
+    -- transit segments 5 through 20 each satisfied in 0 frames standing on
+    -- (220,115) while Mobliz never loaded, and all three ladder attempts
+    -- ran out of segments with the party healthy.
     if opts.segment and H.worldMode() and H.worldHasControl()
        and H.worldAligned() and not H.battleLoadStarted() then
       if fought >= 1 then return true end
-      if H.worldX() == tx and H.worldY() == ty then return true end
+      if not arriveOffWorld and H.worldX() == tx and H.worldY() == ty then
+        return true
+      end
     end
     -- SEGMENT TIMEOUT IS A LADDER LOSS, NOT A RUN ABORT.  A segment
     -- runs behind the route/staging ladder, so a draw that will not
@@ -604,8 +624,13 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       if p and #p > 0 then
         H.setPad({ [p[1]] = true })
       else
-        -- no path (a fresh danger reload can transiently block): wander
-        dirFlip = not dirFlip
+        -- No path.  Two causes: a fresh danger reload can transiently
+        -- block one, and a walk parked ON its goal tile has an empty one,
+        -- which is how an arriveOffWorld transit re-enters a town
+        -- entrance it is already standing on.  Flip on a period rather
+        -- than per frame: a direction that changes every frame never
+        -- completes a step, so the old per-frame flip could only jitter.
+        dirFlip = (H.frame // 24) % 2 == 0
         H.setPad({ [dirFlip and "left" or "right"] = true })
       end
     end),
@@ -1028,6 +1053,77 @@ local function genAttempt(n)
   }, {})
 end
 
+-- The shore -> Mobliz transit ladder.  Same shape as the staging walk
+-- below and built for the same measured reason: the transit was the last
+-- bare worldWalkFight in this file, one continuous drive with no care stop
+-- and no ladder, and it wiped the party at f30934 carrying 30 Tonics and 9
+-- Fenix Downs.  That is the heal-RATE deficit the staging walk's comment
+-- already names -- in-battle healing is bounded by turns, a Tonic turn
+-- restores 50 while the pack deals more than that per round to each of two
+-- characters, and bag depth cannot fix a rate.  Field care between battles
+-- can, because a menu on the world map costs no battle turns.
+--
+-- Fighting the crossing earns nothing but gil: a Veldt battle's experience
+-- sum is skipped monster by monster while $11E4 bit 1 is set
+-- (battle_main.asm:15778-15781), which is why the party cannot level its
+-- way out of this stretch and why the answer has to be the heal rate.
+local transitBlob, transitDone = nil, false
+local function transitCheckpoint()
+  local ckReq
+  return H.cond(function() return true end, {
+    H.call(function() ckReq = H.requestSaveState() end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(ckReq, "shore-transit checkpoint")
+      transitBlob = ckReq.blob
+      H.log(string.format("[gau] shore-transit checkpoint captured " ..
+        "(%d bytes) f%d [%s]", #transitBlob, H.frame, partyLine()))
+    end),
+  }, {})
+end
+local function transitAttempt(n)
+  local ldReq
+  local steps = {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("[gau] shore transit ATTEMPT %d -- reloading " ..
+          "(%s)", n, tostring(lost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(transitBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "transit attempt " .. n) end),
+      H.waitFrames(60 + (n - 1) * 17),
+    }, {}),
+    H.call(function() lost, wipeN = nil, 0 end),
+  }
+  -- The transit ends OFF the world (Mobliz's entrance tile loads map 157),
+  -- so "still on the world" is the loop condition rather than a tile test.
+  for i = 1, 20 do
+    steps[#steps + 1] = H.cond(function()
+      return lost == nil and H.worldMode()
+    end, {
+      worldWalkFight(220, 115, 12000,
+        string.format("transit a%d seg %d", n, i), true, { segment = true }),
+      H.cond(function() return lost == nil and H.worldMode() end, {
+        H.fieldCare({ tag = string.format("transit a%d care %d", n, i),
+                      threshold = 0.9, maxFrames = 12000 }),
+      }, {}),
+    }, {})
+  end
+  steps[#steps + 1] = H.call(function()
+    if lost == nil and not H.worldMode() then
+      transitDone = true
+      H.log(string.format("[gau] shore transit attempt %d ARRIVED at " ..
+        "Mobliz f%d [%s]", n, H.frame, partyLine()))
+    elseif lost == nil then
+      lost = string.format("transit attempt %d never reached Mobliz in 20 " ..
+        "segments; at (%d,%d) f%d", n, H.worldX(), H.worldY(), H.frame)
+      H.log("[gau] " .. lost)
+    end
+  end)
+  return H.cond(function() return not transitDone end, steps, {})
+end
+
 -- The staging-walk ladder (see the SIEGE comment at the call site): the
 -- checkpoint is cut on the live world just south of Mobliz, and an
 -- attempt is the whole segmented siege -- fight one battle, field-care,
@@ -1197,12 +1293,27 @@ H.run({ maxFrames = 500000 }, {
     return H.worldMode() end }),
   H.waitUntil(function() return H.worldMode() and H.worldHasControl() end,
     3000, "on the world", 5),
-  worldWalkFight(220, 115, 60000, "shore -> Mobliz", true),
+  -- Top up before stepping onto the Veldt.  falls_done ships the party
+  -- hurt -- SABIN 173/289 and CYAN 238/319 on the fixture measured
+  -- 2026-08-12, straight out of battle 18 with no care stop behind it --
+  -- while 30 Tonics and 9 Fenix Downs sit in the bag.  A player who had
+  -- just gone over a waterfall would drink before walking into open
+  -- country, and the crossing is where that 197 HP decides a battle.
+  H.fieldCare({ tag = "care before the Veldt crossing", threshold = 0.95,
+                maxFrames = 12000 }),
+  H.waitUntil(function()
+    return H.worldMode() and H.worldHasControl() and H.worldAligned()
+  end, 6000, "world live before the crossing", 5),
+  transitCheckpoint(),
+  transitAttempt(1),
+  transitAttempt(2),
+  transitAttempt(3),
   H.call(function()
-    if lost ~= nil then
+    if not transitDone then
       error("gau: the Veldt transit to Mobliz was lost -- " .. tostring(lost)
         .. " (a #74-style balance finding; do not rig)", 0)
     end
+    lost, wipeN = nil, 0
   end),
   settle(157, "Mobliz"),
   H.navTo(26, 22, { maxFrames = 10000, playBattles = "flee", arrive = function()
