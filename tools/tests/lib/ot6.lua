@@ -642,6 +642,10 @@ M.RANDBTL = 0x57BD
 -- fills near the end of its setup, so the species stash and the slot mask
 -- are already written; the wait is slack, not a measured requirement.
 local GUARD_SETTLE = 30
+-- and how long it may keep reading nonsense before that becomes the
+-- finding.  Ten seconds: far past any battle's setup, far short of the
+-- shortest fight.
+local GUARD_UNREADABLE = 600
 
 M.absorbGuardBattles = 0        -- battles inspected; the positive control
 M.absorbGuardClashes = 0
@@ -657,20 +661,34 @@ function M.absorbGuardTick()
   if not guardArmed then return nil end
   guardSettle = guardSettle + 1
   if guardSettle < GUARD_SETTLE then return nil end
-  guardArmed = false
-  M.absorbGuardBattles = M.absorbGuardBattles + 1
 
+  -- A species outside 0..383 means the slot mask and the species stash
+  -- are not both filled yet, which is also what junk looks like on a
+  -- playline that has not fought a battle (probe_57ba_strip measured $ff
+  -- riding the srm boot line, and M.battleLoadStarted reads a shape
+  -- rather than a flag).  Keep waiting rather than failing a run on a
+  -- transient; if it never resolves, fail, because a guard that cannot
+  -- read its data must not report the same green as one that read it and
+  -- found nothing.
   local species = M.formationSpecies()
+  local unreadable
   for _, s in ipairs(species) do
-    if s.species >= 384 then
-      return string.format("absorb guard: slot %d of the formation reads "
-        .. "species $%04X, which is not a monster record (0..383) -- the "
-        .. "guard cannot say whether this fight absorbs anything, and a "
-        .. "guard that cannot read its data must not report green",
-        s.slot, s.species)
-    end
+    if s.species >= 384 then unreadable = s end
+  end
+  if unreadable then
+    if guardSettle < GUARD_UNREADABLE then return nil end
+    guardArmed = false
+    return string.format("absorb guard: %d frames into this battle slot %d "
+      .. "of the formation still reads species $%04X, which is not a monster "
+      .. "record (0..383), so the guard cannot say whether this fight "
+      .. "absorbs anything.  $57c0 is written per entity by Ot6SeedShields "
+      .. "and $3F45's low six bits say which slots are real; one of the two "
+      .. "is not what this code thinks it is.",
+      guardSettle, unreadable.slot, unreadable.species)
   end
 
+  guardArmed = false
+  M.absorbGuardBattles = M.absorbGuardBattles + 1
   local clashes = M.absorbClashesFor(M.partyWeapons(), species)
   M.absorbGuardClashes = M.absorbGuardClashes + #clashes
   if #clashes == 0 then return nil end
