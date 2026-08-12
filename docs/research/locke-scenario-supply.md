@@ -1,9 +1,15 @@
 # What LOCKE brings to his scenario, and where it comes from
 
-Solo LOCKE fights the South Figaro gate soldier (battle 11) with a Dirk at
-level 8. This file records where that loadout comes from, what the route
-spends, and what the ground before the three-way split is worth if it is
-played instead of fled. Issue #100.
+Solo LOCKE fights the South Figaro gate soldier (battle 11). This file
+records where his loadout comes from, what the route spends, and what the
+ground before the three-way split is worth if it is played instead of fled.
+Issue #100.
+
+Until 2026-08-12 he arrived at level 8 with a Dirk and lost that fight on all
+three attempts. He now arrives at level 10 with a MithrilBlade and a Heavy
+Shld and wins it on the first, because the route stops in South Figaro the
+way a player would: §8 is the grind outside the west gate, §6 is what it
+pays for, §7 is the fight before and after.
 
 Every number below is read from the generated fixtures with
 `tools/savestate_party.py`'s reader (no emulator) or decoded from the
@@ -134,6 +140,12 @@ Returner Hideout, with the full party, and experience is divided by the
 number of living allies (`ldx $3a76 ; number of allies alive` then `Div`,
 `ff6/src/battle/battle_main.asm:15797-15803`). Gil is not divided.
 
+**That window is open, and the route now uses it.** LOCKE is in the party
+from Mt Kolts through the hideout, and the earliest encounter-bearing ground
+in it is the world map outside South Figaro's west gate, where the town's
+four shops and its inn are also standing. §8 has the corridor and what it
+earns.
+
 LOCKE's measured maximum HP by level, from the fixture tree:
 
 | level | 6 | 8 | 9 | 10 | 11 | 13 | 14 | 15 |
@@ -199,18 +211,20 @@ change did this" from "the RNG moved", and the change was reverted rather than
 kept on a coin toss. The lesson worth keeping is that this route's downstream
 contracts are tight enough that inserting battles upstream is not free.
 
-## 6. What that money buys
+## 6. What the money buys, and what the route buys with it
 
-South Figaro's four shops are all open at this point in the story
-(`docs/research/south-figaro-shop-route.md` §0, §7). Stock and row indices,
-decoded from `shop_prop.dat`:
+South Figaro's four shops and its inn are all open at this point in the story
+(`docs/research/south-figaro-shop-route.md` §0, §5, §7). Stock and row
+indices, decoded from `shop_prop.dat`:
 
-| shop | type | map | wanted item | row | price |
-|---|---|---|---|---|---|
-| 5 | Weapon | 77 | MithrilBlade `$0A`, power 38 | 2 | 450 |
-| 7 | Relics | 76 | Star Pendant `$B1` | 2 | 500 |
-| 8 | Item | 85 | Fenix Down `$F0` | 5 | 500 |
-| 8 | Item | 85 | Tonic `$E8` | 0 | 50 |
+| shop | type | map | doorstep on 75 | talk spot | wanted item | row | price |
+|---|---|---|---|---|---|---|---|
+| 5 | Weapon | 77 | (29,19) | (103,11) | MithrilBlade `$0A`, power 38 | 2 | 450 |
+| 6 | Armor | 77 | (35,19) | (114,12) | Heavy Shld `$5B`, def 22 / mdef 14 | 1 | 400 |
+| 7 | Relics | 76 | (15,39) | (51,11) | Star Pendant `$B1` | 2 | 500 |
+| 8 | Item | 85 | (44,32) | (106,54) | Fenix Down `$F0` | 5 | 500 |
+| 8 | Item | 85 | | | Tonic `$E8` | 0 | 50 |
+| inn | — | 76 | (15,39) | (81,19) | full HP + MP, every status cleared | — | 80 |
 
 - **Star Pendant** is `item_prop_en.dat` `+$06 = $04`. `CalcEquipEffect`
   loads `ItemProp+6` into `$11D2`, the status 1 and 2 protection word
@@ -223,96 +237,145 @@ decoded from `shop_prop.dat`:
 - **MithrilBlade** is the best weapon in shop 5 that LOCKE can hold.
   RegalCutlass is stronger at power 54 but its mask is `$8051` — TERRA,
   EDGAR and CELES only.
+- **Heavy Shld** matters because LOCKE is the only member of this party with
+  an empty left hand: measured at `south_figaro`, TERRA and EDGAR both carry
+  Bucklers already and LOCKE's shield slot reads `$FF`.
+- **The inn restores everything.** `_ca789f` → `_cacd3c` → `_cacf67` ends in
+  `_cacfbd` (`event_main.asm:31862-31875`), which is `and_status
+  {MAGITEK, INTERCEPTOR}` + `max_hp` + `max_mp` on all four slots: full HP,
+  full MP, and every other persistent status bit cleared, KO and poison
+  included.
 
-The budget at the shop, with 3974 gil:
+**Taking EDGAR's MithrilBlade instead of buying one does not work**, and it
+is worth writing down because it is the obvious saving. LOCKE carries
+exactly one weapon into his solo scenario — `remove_equip` returns only what
+he is *wearing* to the shared bag — and TunnelArmr, at the end of that
+scenario, is `5, OT6_PIERCE` (`ff6/src/battle/ot6_hud.asm:1943`). Handing
+him a slash blade and nothing else leaves that boss unbreakable by the party
+that has to face it. Buying one leaves his own Dirk unequipped in the bag,
+which does ride to the split, so he arrives with both classes. The gate
+soldier's HeavyArmor is `3, OT6_SLASH|OT6_PIERCE` (`:2013`), so the blade
+breaks it either way.
 
-| list | cost | left |
+**The purse is no longer the constraint.** With 3974 at the counter the list
+did not fit — three pendants alone are more than four times the
+discretionary remainder after the existing 3650 of Fenix Downs, Antidotes
+and Tonics. §8's grind changes the arithmetic rather than the list: the
+route now buys the insurance first out of 3974, earns about 9500 more
+outside the gate, and spends 4880 of it on the rest.
+
+Measured on the chain of 2026-08-12, at the moment the party leaves town:
+
+| | before | after |
 |---|---|---|
-| 5 Fenix Down + 20 Tonic (as of `bc0a894`) | 3500 | 474 |
-| the same plus 3 Antidote | 3650 | 324 |
-| the same plus 3 Star Pendant | 5150 | **−1176** |
-| the same plus 3 Star Pendant and a MithrilBlade | 5600 | **−1626** |
-
-Three pendants do not fit today and cannot be made to fit by reordering the
-list: they cost more than four times the whole discretionary remainder. Nor
-does simply fighting the cave pay for them (§5, measured: `+256`). What is
-left, in rough order of how much play each costs:
-
-1. **Cut Fenix Downs from 5 to 3** and free 1000. The comment that set the
-   figure at five recorded a pass that spent all five on map 98; the chain of
-   2026-08-12 spends **one** (5 at `vargas_entry`, 4 at `vargas_won`). The
-   figure is stale against its own justification. This leaves the entry
-   contract's floor of 3 exactly met, with no margin, which is the argument
-   against.
-2. **A deliberate paced grind in the cave**, about six fights for 1500 (§5).
-3. **Visit Figaro Castle's shop 4 before leaving.** Unrelated to pendants but
-   it belongs on the same list: the route opens shop 82 for EDGAR's Tools in
-   that castle and never opens shop 4, which sells Fenix Downs at 500. The
-   party then walks into an unknown cave with no revives, and buying them
-   there instead of in South Figaro would free the South Figaro budget for
-   relics.
-
-A MithrilBlade at 450 is the cheapest item on any of these lists and the one
-with a measured effect on the fight (§7).
+| gil | 324 | 4996 |
+| Tonic / Potion / Fenix Down / Antidote | 25 / 5 / 5 / 3 | 40 / 5 / 8 / 3 |
+| LOCKE | L6, Dirk, no shield | L9, MithrilBlade, Heavy Shld, Star Pendant |
+| TERRA / EDGAR | L5 / L7 | L8 / L9, both wearing Star Pendants |
+| party HP and MP | walked in hurt | full, from the inn |
 
 ## 7. What battle 11 actually looks like
 
-Measured 2026-08-12 on the chain regenerated for this file, three attempts,
-seeds `$38` / `$88` / `$D8`. All three lost, so `sfigaro_town` cannot be
-generated at all on this ROM today, and the Locke chain is blocked there.
+**With the stop in, LOCKE wins it on the first attempt, three times over.**
+Measured 2026-08-12 on the regenerated chain: `gen_sfigaro` passes end to
+end, and all three of its gate-soldier engagements (the opening fight and
+the two re-fights the map-75 reloads force) are won on attempt 1. He arrives
+at level 10 with 221 HP, equip Optimum arms him with the MithrilBlade the
+route bought (`[locke kit] done: c1=0A`), and the opening fight runs
+HeavyArmor 495 → 0 in about 7700 frames while his own HP sits at 170 of 221
+from the third round onward. `sfigaro_town` and `sfigaro_passage` generate.
 
-The shape is not the one the issue was working from. LOCKE is not stuck
-chipping and dying in two turns. He breaks the armour and gets into the
-damage phase, and then loses a race. Attempt 3, monster HP and shields
-straight off the driver's log:
+The fail-before, on the same day and the same ROM with the town stop removed:
+all three attempts lost, three distinct battle RNG seeds (`$54`, `$A4`,
+`$04`), and the assertion `battle 11 won within 3 attempts` red. That is the
+state the Locke chain had been blocked in.
 
-| frame | monster | note |
+What the fight looked like when it was lost, for the record: LOCKE breaks the
+armour and gets into the damage phase, and then loses a race. Chips do 5, the
+breaking hit lands 92, ordinary Fights 22 and boosted ones 94. `OT6_BREAK_TICKS`
+is `$10`, which is 2159 frames, and inside one window he took the soldier from
+485 to 255. Then the window expired and all three shields came back. What ended
+it was healing: his own HP went 168 → 113 → 27, he drank the bag's single
+Potion back to 168, took 52 more, and sat at 116 until a row-exempt special of
+111 or more killed him. The driver refused every Tonic on the way and said why:
+*"$E8 restores 50 and a round costs 86, so the turn buys back less than it
+spends"*.
+
+Level 10 answers that directly. 221 maximum HP is the difference between one
+special killing him from most of his bar and not, and the MithrilBlade's
+power 38 against the Dirk's 26 shortens the race it has to be survived for.
+
+**Two of the three losing attempts are suspect, and this is unresolved.**
+In the fail-before run, attempts 1 and 3 both ended with the log reading
+`monhp=0/sh0` — the HeavyArmor at zero — and LOCKE alive at 114 and 111 of
+168, and both were scored `LOST (scenario reset) at (30,43)`. (30,43) is not
+the reset tile; a real loss lands on (47,43), which is where attempt 2 ended.
+`M.clearGateSoldier` decides a win by asking whether the party is off the
+reset tile *and* `H.bfsPath` can reach the probe tile, and on those two
+attempts the path query said no. The same test scored the same position a
+win in the passing run. So either the fight was already winnable at level 8
+on two seeds in three and the reachability probe called both wins losses, or
+something ends that fight with the monster at zero and the lane still shut.
+Nobody has instrumented it. Until somebody does, the honest statement is
+that the fail-before was red and the after is green, and that the size of
+the improvement the town stop is responsible for is not established.
+
+## 8. The paced grind outside the west gate
+
+The corridor, derived statically from `world_1_tilemap.dat` and
+`WorldTileProp` and then walked by `tools/tests/probe_sfiggrind.lua`:
+
+- The southern walkable region is **422 tiles** (the same figure
+  `gen_kolts.lua`'s header records for the cave crossing, from an
+  independent flood fill), 371 of them battle-bg 0 and 51 bg 3.
+- Sector index is `(tileY & $E0) | ((tileX >> 3) & $1C)`
+  (`ff6/src/field/battle.asm:122-136`); South Figaro's is 104, and
+  `WorldBattleRate[26]` is `$00`, so **every tile in the region draws at the
+  normal rate**. bg 0 selects `WorldBattleGroup[104] = 3` — GreaseMonk,
+  Rhodox, Rhinotaur — and bg 3 selects group 4.
+- Group 3 is worth an expected **358 experience and 720 gil a fight** once
+  OT6's `Ot6RewardMulW = $0020` doubling is applied
+  (`ff6/src/battle/ot6_break.asm:695-696`).
+- The per-step danger increment is **halved** by the paired knob
+  (`Ot6DangerMulW = $0008`, `:693-694`), so the world's vanilla `$00C0`
+  becomes `$0060` and a fight is expected about every 37 steps.
+- The lap is **(100,105) ↔ (87,105)**, 13 steps each way on row 105, with no
+  world entrance or event trigger on it.
+
+Two things had to be derived before it would run.
+
+- **The first hop out of town is north.** Leaving by map 75's x=0 column
+  lands at world (84,112), and (85,112) and (86,112) are two of South
+  Figaro's own four entrance tiles (`short_entrance.dat`, world list). The
+  23-step shortest path east from the exit has both on it, so a plan
+  straight to the corridor walks back into the town. The route stages at
+  (84,108) first, and `H.worldNavTo` has no `avoid` option to correct it
+  with afterwards.
+- **The grind stays on the world map.** The danger counter is zeroed by
+  every battle and by every map load, so a lap that ducks into town throws
+  away whatever it had accumulated.
+
+Measured on the generated chain, 22 laps, about 39700 frames:
+
+| | at `south_figaro` | after the grind |
 |---|---|---|
-| f+300 | 490 / sh2 | a chip does 5 |
-| f+900 | 485 / sh1 | |
-| f+2400 | **393 / sh0** | broken; the breaking hit lands 92 |
-| f+3300 | 371 / sh0 | an ordinary Fight does 22 |
-| f+3900 | 349 / sh0 | |
-| f+4200 | 255 / sh0 | a boosted Fight lands 94 |
-| **f+4500** | **255 / sh3** | **the break expires and all three shields return** |
-| f+5100 | 250 / sh2 | chipping again, 5 a hit |
+| gil | 324 (post-shop) | 9876 |
+| TERRA | L5, 94 HP | L8, 160 HP |
+| LOCKE | L6, 122 HP, 814 xp | L9, 194 HP, 2364 xp |
+| EDGAR | L7, 145 HP | L9, 195 HP |
+| Tonics spent | — | 4 |
 
-The break window is the fight. `OT6_BREAK_TICKS` is `$10`, which is 2159
-frames (`docs/HANDOFF.md`), and the measured gap from `sh0` to `sh3` here is
-about 2100. Inside one window LOCKE takes the soldier from 485 to 255, which
-is 230 of 495. He needs a bit over two clean windows and each one costs three
-chip turns to re-open, and he does not survive that long.
+So **a lap is worth about 434 gil and 70 LOCKE experience**, and the whole
+grind cost four Tonics — OT6 restores HP and MP in full on level up
+(`ot6_progression.asm:3-6`), which is most of the healing a levelling party
+needs, and the inn covers the rest for 80 GP.
 
-What ends it is healing, not damage. His own HP went 168 → 113 → 27, he drank
-the bag's single Potion back to 168, took 52 more, and then sat at 116 until a
-row-exempt special of 111 or more killed him. The driver refused every Tonic
-on the way, and said why: *"$E8 restores 50 and a round costs 86, so the turn
-buys back less than it spends"*. Eleven Tonics in the bag were worth nothing
-to him.
+The stop is bounded by LOCKE's experience rather than by a lap count: 2250,
+which lands him at level 10 for the gate soldier once Mt Kolts, VARGAS and
+the hideout have added their measured +943. It is a level or two, not an
+open-ended grind, and 24 laps is the hard ceiling in the generator.
 
-So all three levers in this file bear on the fight, which is the opposite of
-what §6 would suggest on its own:
-
-- **A weapon.** The MithrilBlade is power 38 against the Dirk's 26. The
-  22-damage Fights and the 92/94 breaking hits all scale off that, and they
-  are what has to fit inside a 2159-frame window.
-- **Levels.** He dies from 116 to a hit of 111+. Level 10 is 221 max HP and
-  level 11 is 249 (§4), which is the difference between one special killing
-  him from most of his bar and not.
-- **Potions.** The single most direct one, and the route gives it away. The
-  bag holds 5 Potions at `vargas_entry` and 0 at `vargas_won`: the Vargas
-  medic drinks all five. LOCKE reaches his solo fight with the one Potion the
-  river dropped. **No shop he can reach sells Potions** — not South Figaro's
-  shop 8, not Figaro Castle's shop 4, and the nearest vendor is Narshe's shop
-  3 in a different walkable region (`south-figaro-shop-route.md` §2) — so they
-  cannot be replaced, only not spent.
-
-None of this is a balance change, and the fight should not be re-tuned until
-a LOCKE who is armed, a level or two up, and carrying more than one usable
-heal has been put in front of it.
-
-**Unverified, and worth settling first:** whether the soldier's killing action
-scales with the target's level. It comes through command `$0C` (`Cmd_0c` /
-`_actbluemagic0`, `ff6/src/battle/battle_main.asm:3740`). If its damage tracks
-LOCKE's level or maximum HP then the levelling lever above is worth less than
-it looks, and the weapon and the Potions carry the whole fix.
+It cost `gen_kolts` its runtime: the generator now runs 87749 frames against
+34642 before, which is past `run.sh`'s 600-second wall-clock default on a
+loaded machine, so the savestate graph gained a `timeout=` field and those
+three states use 1800.
