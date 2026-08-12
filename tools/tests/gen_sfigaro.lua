@@ -432,18 +432,31 @@ H.run({ maxFrames = 350000 }, {
   -- menu before walking into an occupied town, and so does this script.
   H.equipOptimum({ tag = "locke kit" }),
 
-  -- The back row is what wins battle 11.  The note that used to sit here
-  -- said front row, on a comparison that was never run: "front and back
-  -- measure identically" came from two runs with no equipment, where LOCKE
-  -- did eight damage either way because he was punching.
+  -- The back row halves the soldier's physical.  It does not win battle 11.
+  -- The note that used to sit here said front row, on a comparison that was
+  -- never run: "front and back measure identically" came from two runs with
+  -- no equipment, where LOCKE did eight damage either way because he was
+  -- punching.  The note that replaced it claimed the back row won the fight
+  -- ("shields 3 -> 0 three times over, 495 hp -> 0, LOCKE never below 112")
+  -- and that is falsified, so it is gone rather than left for contrast.
   --
-  -- Armed and in the back, the HeavyArmor's ~110 a hit becomes ~53, so
-  -- instead of one hit leaving him where the next one kills (healing every
-  -- turn, never swinging) he survives three and attacks two turns in three.
-  -- His Fight halves too, and that does not matter: the fight is decided by
-  -- breaking (one chip per boosted Fight, measured) and a broken HeavyArmor
-  -- takes 4x.  Measured end to end: shields 3 -> 0 three times over, 495 hp
-  -- -> 0, LOCKE never below 112.
+  -- Measured 2026-08-12 end to end (probe_battle11.lua, and the same shape
+  -- on the six seeds this generator drew the day before): armed and in the
+  -- back row, solo LOCKE loses this fight, and nothing available here makes
+  -- him win it.  The soldier's first action takes him 168 -> 111, which is
+  -- the halved physical.  His own Fight takes the HeavyArmor 495 -> 489 and
+  -- one shield off three.  The soldier's second action takes him 111 -> 0:
+  -- over 111 damage, roughly double the first and not halved by the row,
+  -- which fits the AI's turn-2 line `attack BATTLE, TEK_LASER, SPECIAL`
+  -- (ai_script.asm:342-357) rolling something other than the physical.  One
+  -- ATB round is about 570 frames at this level, so he gets exactly one
+  -- action before that hit lands: three shield chips are four turns away
+  -- and he has one.  Healing does not reach either -- 111 of 168 is 66%,
+  -- above the driver's 60% line, and a Tonic does not cover a 111-damage
+  -- hit.  So the back row stays, because it is what buys the one action,
+  -- and it is not a win condition.  What this fight needs is a weapon
+  -- better than the single Dirk in the bag, or fewer shields on a level-13
+  -- monster: a balance decision rather than a routing one.
   H.setRows({ [1] = true }, { tag = "locke solo rows" }),
   H.call(function()
     where("boot")

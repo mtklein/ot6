@@ -3358,21 +3358,34 @@ function M.clearGateSoldier(probeX, probeY, tag)
     -- means something if the three were not one fight replayed.
     L.report(),
     M.call(function()
-      -- This fight used to block the route, and the record of it stays
-      -- (2026-08-09 correction: sfigaro_town passes now, once LOCKE was
-      -- armed, in the back row, healed between rounds, and breaking the
-      -- armour, one shield chip per boosted Fight and 4x once
-      -- broken).  The original measurement, kept because its numbers keep
-      -- being asked for: solo LOCKE, level 8, 168 hp, correctly equipped
-      -- through the real Equip -> Optimum walk, healing himself with
-      -- Tonics, dealt ~21 damage per 300 frames to a level-13 HeavyArmor
-      -- with 495 hp and took ~117 back.  Bare-handed, which is how the
-      -- chain delivered him until H.equipOptimum landed, it was eight
-      -- damage a swing, and front row and back row measured identically
-      -- bare-handed, which is why the row setting went unnoticed for three
-      -- runs.  Its weaknesses are bolt and water (monster_prop +25 = $84)
-      -- and solo LOCKE can reach neither.  Do not widen the attempt
-      -- sequence until it succeeds by chance; that is the #74 mistake.
+      -- This fight blocks the route today, and the assert below is the
+      -- report of that rather than a flaky step.  A note here used to say
+      -- it passed once LOCKE was armed, in the back row, healed between
+      -- rounds and breaking the armour; that is falsified and removed.
+      --
+      -- Measured 2026-08-12 by probe_battle11.lua, which hooks the battle
+      -- module's own end-of-battle decision: solo LOCKE, level 8, 168 hp,
+      -- armed through the real Equip -> Optimum walk and in the back row,
+      -- IS KILLED by the level-13 HeavyArmor's second action and the party
+      -- is wiped.  168 -> 111 on its first (the halved physical), his one
+      -- Fight takes it 495 -> 489 and one shield off three, then 111 -> 0.
+      -- CheckBattleEnd sees $3A74 = 0 and calls LoseBattle with battle
+      -- message $29 "annihilated" (battle_main.asm:12170, :12822-12830),
+      -- which sets $3EBC.0 -- battle switch $40 -- and the event's
+      -- `if_b_switch $40` then falls through to the scenario reset.  So the
+      -- loss branch below is reading a real, ordinary loss.
+      -- One ATB round is about 570 frames at this level, so he gets one
+      -- action per fight and three shield chips are four away.  Healing
+      -- cannot close it: 111 of 168 is 66%, above the driver's 60% line,
+      -- and no Tonic covers a 111-damage hit.  Its weaknesses are bolt and
+      -- water (monster_prop +25 = $84) and solo LOCKE can reach neither.
+      -- Bare-handed -- how the chain delivered him until H.equipOptimum
+      -- landed -- it was eight damage a swing, and front row and back row
+      -- measured identically bare-handed, which is why the row setting went
+      -- unnoticed for three runs.
+      -- Do not widen the attempt sequence until it succeeds by chance; that
+      -- is the #74 mistake, and it would be a re-roll of a fight whose
+      -- outcome does not depend on the seed.
       M.assertEq(won, true,
         tag .. ": battle 11 won within 3 attempts (boosted Fights)")
       M.assertEq(M.bfsPath(probeX, probeY) ~= nil, true,

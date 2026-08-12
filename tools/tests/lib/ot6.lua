@@ -366,9 +366,31 @@ function M.screenshot(tag)
 end
 
 -- ----------------------------------------------------- FF6 battle signals --
--- $7E3F46: 6 x 16-bit monster IDs for the current battle ($FFFF = empty
--- slot; note monster #0 "Guard" is a valid 0x0000).  $7E3BF4: 4 x 16-bit
--- party battle HP ($FFFF outside battle).
+-- $7E3BF4: 4 x 16-bit party battle HP ($FFFF outside battle).
+--
+-- $7E3F46 is NOT six 16-bit monster IDs, which is what this said until
+-- 2026-08-12 and what the two readers below still assume.  LoadBattleProp
+-- copies the 15-byte formation record verbatim to $3F44
+-- (battle_main.asm:8243-8250, `lda f:BattleMonsters,x / sta $3f44,y` for
+-- eight words), and that record is: +$00 mold/bg1 bits, +$01 monsters
+-- present, +$02..$07 six 8-BIT monster ID low bytes, +$08..$0D six packed
+-- xxxxyyyy positions, +$0E the six ID high bits.  So the IDs land at
+-- $3F46..$3F4B one byte each, the positions at $3F4C..$3F51, and the MSB
+-- mask at $3F52 (ff6/notes/battle-ram.txt:1117-1152; confirmed against
+-- formation 43, whose Merchant reads $13A exactly as gen_sfigaro's header
+-- says, and formation 504, whose all-$1FF empty record ot6_hud.asm:1796
+-- documents).
+--
+-- Reading it as words therefore mixes ID bytes together and then reads two
+-- position bytes as a third and fourth "monster".  Measured on battle 11,
+-- formation 64, one monster ($09F): monstersPresent() answers 4, and the
+-- gen_sfigaro fight log prints "monhp=495/sh3,0/sh0 monsters=4" for a
+-- single soldier.  Nothing has gone wrong from that yet -- battleActive()
+-- only asks whether the count is above zero, and the Cranes' opts.focus
+-- liveness pre-check is backed by a real $3BFC hp read on the same slot --
+-- so the decode is left alone here rather than changed blind: both call
+-- sites were measured against the current numbers and re-measuring them is
+-- its own job.  Do not add a third reader on top of it.
 M.MONSTER_IDS = 0x3F46
 M.BATTLE_HP = 0x3BF4
 
@@ -384,6 +406,10 @@ M.SHADOW = 0xECF1
 M.SHADOW_STRIDE = 14
 function M.shadowLine(line) return M.SHADOW + line * M.SHADOW_STRIDE end
 
+-- Six words off $3F46.  See the note above: these are not monster IDs, and
+-- the count below is not a monster count.  Both are kept as they were
+-- measured; the real per-slot ID is `readByte(0x3F46 + slot)` plus bit
+-- `slot` of `readByte(0x3F52)`, and $3F45 is the present mask.
 function M.monsterIds()
   local ids = {}
   for i = 0, 5 do ids[i + 1] = M.readWord(M.MONSTER_IDS + i * 2) end
