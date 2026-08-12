@@ -121,6 +121,21 @@ H.run({ maxFrames = 20000 }, {
       "$01BF SET -- the NEW 273 save point runs the shared SavePoint script")
     H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch took")
     H.assertExitContractPreSave("n024-entry-save-v1")
+    -- n024-entry-save-v1 as committed hands over EDGAR at 0/398 and SABIN
+    -- at 0/407, and this is the checkpoint whose cost was measured end to
+    -- end.  The segment below it carries two Fenix Downs; gen_esper_tubes'
+    -- care stop spends both raising these two, logs fenix=0, and then CELES
+    -- dies in battle 72 with nothing left to raise her -- no owned esper
+    -- grants Life in the WoB -- so esper_tubes_entry ships her at 0/349 and
+    -- no care stop in that generator can repair it.  A corpse in a
+    -- checkpoint does not only propagate, it spends the segment's revives
+    -- on arrival.  Same three conditions as tools/audit_party_hp.py; change
+    -- the two together.
+    --
+    -- NOT EXECUTED.  This generator needs the deep chain down to
+    -- n024_entry, so the line is compiled and loaded but has never run.
+    -- The identical line in gen_narshe_mission was run and passes.
+    H.assertPartyStanding("n024-entry-save-v1 exit")
     H.screenshot("checkpoint_c_save_tile")
   end),
 
