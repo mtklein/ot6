@@ -109,11 +109,48 @@
 -- flag _cb002b sets as soon as it fires, is still clear, which catches the
 -- trigger by outcome whichever tile the navigator chose.
 -- Issue #75, zero-write: every navigator here runs with opts.playBattles.
--- The hideout has no random encounters (its maps carry no encounter
--- territory) so nothing should reach the battle branch; playBattles
--- mode makes that a property of the code path rather than an assumption: if a
--- battle did fire, it would be fought with real input rather than
--- write-cleared.
+-- The hideout draws no random encounters, and that is now stated as a fact
+-- rather than as a description of the map layout: maps 108, 109, 110 and 112
+-- all have bit 7 clear in map_prop byte $0525, and CheckBattleSub tests
+-- that bit and returns before it will roll anything
+-- (ff6/src/field/battle.asm:332-333).  playBattles mode makes the battle
+-- branch a property of the code path rather than an assumption: if a battle
+-- did fire, it would be fought with real input rather than write-cleared.
+--
+-- THE MODE IS "tactical", and the choice is deliberate rather than a default.
+-- The spelling used to be `true`, which is the blind branch: no menus, no
+-- items, no flee, edge-tapped A and nothing else.  That branch is the one
+-- that walked BANON's escort into a wipe at terra_clifftop while its log said
+-- "navTo timeout" (ot6_field.lua's own comment at the branch says so), and it
+-- has no business on this segment even when it can never run.  Between the
+-- two real modes:
+--
+--   * "flee" means standing still while the formation takes free rounds
+--     (M.FLEE_CAP's block comment).  From the speech to the departure TERRA
+--     is the entire party -- Banon's script does `party_chars TERRA` and
+--     deletes the other three -- so every free round lands on one character,
+--     and she is the one this segment has been arriving poisoned.
+--   * BANON is in the party for the last stretch, and his death is not a
+--     wipe you retry: BattleEnd_03 is "banon died" and it goes to LoseBattle,
+--     which sets the game-over flag (battle_main.asm:12300-12307, :16039).
+--     There is no attempt 2 to spend here.
+--
+-- So the contingency wants the driver that reads the command table, uses
+-- Edgar's Tools and Sabin's Blitz, and heals at 55% off its own item line.
+-- The usual argument against tactical -- that it costs more frames per
+-- encounter than a run -- does not apply to a segment that cannot roll one.
+--
+-- HP AND POISON.  Two care stops, one on arrival and one before the save.
+-- This generator used to have none, on the reasoning that a hideout with no
+-- encounters cannot cost the party anything, and that is exactly wrong for a
+-- status: poison drains max HP/32 per step with a floor of 1
+-- (ff6/src/field/player.asm:593-613), and this route walks a few hundred
+-- steps across five crossings.  banon_joined shipped TERRA at 1 of 136 with
+-- status 04 because the bit arrived with her from returner_hideout and
+-- nothing here looked at it.  The arrival stop is the one that matters --
+-- clearing the bit before the walking rather than after it -- and the exit
+-- stop is what makes H.assertPartyStanding at the bottom a contract the
+-- generator can meet rather than one it can only report.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/returner_hideout.mss.lua"
 
@@ -133,6 +170,25 @@ local function where(tag)
     "$015A=%d $015B=%d $015C=%d $0421=%d $016B=%d",
     tag, H.frame, map(), H.fieldX(), H.fieldY(), sw(0x0011), sw(0x0013),
     sw(0x0018), sw(0x015A), sw(0x015B), sw(0x015C), sw(0x0421), sw(0x016B)))
+end
+
+-- HP, status 1 and the poison cure, at both ends of the walk.  Status is on
+-- the line because it is the whole reason this generator grew a care stop:
+-- an HP-only roster reported banon_joined's TERRA as healthy at every point
+-- of the route except the last one, where poison had already ground her to
+-- 1 of 136.  ANTIDOTE is $F2 (ff6/src/text/item_name_en.json entry 242).
+local ANTIDOTE = 0xF2
+local function roster(tag)
+  local out = {}
+  for c = 0, 15 do
+    if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
+      local base = 0x1600 + 37 * c
+      out[#out + 1] = string.format("c%d %d/%d hp status1=%02X", c,
+        H.readWord(base + 9), H.readWord(base + 11), H.readByte(base + 20))
+    end
+  end
+  H.log(string.format("[roster %s] %s | antidote=%d", tag,
+    table.concat(out, "  "), H.invCountOf(ANTIDOTE)))
 end
 
 local function seq(steps) return H.cond(function() return true end, steps) end
@@ -157,7 +213,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { playBattles = true }),
+    end), maxF or 12000, { playBattles = "tactical" }),
     H.waitFrames(30),
   })
 end
@@ -178,7 +234,7 @@ local function crossTo(tx, ty, dstMap, what)
         what, H.fieldX(), H.fieldY(), tx, ty, dstMap)
     end),
     H.navTo(tx, ty, { maxFrames = 20000, arrive = mapChanged(),
-      playBattles = true }),
+      playBattles = "tactical" }),
     H.release(),
     settleField(dstMap),
     H.call(function()
@@ -198,7 +254,7 @@ local function crossDoorHold(sx, sy, dir, dstMap, what)
         what, sx, sy, dir, dstMap)
     end),
     H.navTo(sx, sy, { maxFrames = 20000, arrive = mapChanged(),
-      playBattles = true }),
+      playBattles = "tactical" }),
     H.release(),
     H.driveUntil(function() return map() ~= 109 and map() ~= 110
                             or map() == dstMap end, 1800, {
@@ -263,7 +319,7 @@ local function talkToObj(obj, what, maxF)
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
       maxFrames = maxF or 20000,
-      playBattles = true,
+      playBattles = "tactical",
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -321,7 +377,7 @@ local function rideTo(pred, what, maxF)
     H.advanceStory(function()
       return pred() and H.hasControl() and H.tileAligned() and bright() >= 15
          and not H.battleLoadStarted()
-    end, maxF or 25000, { playBattles = true }),
+    end, maxF or 25000, { playBattles = "tactical" }),
     H.waitFrames(20),
     H.call(function() where(what) end),
   })
@@ -335,7 +391,16 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(sw(0x0011), 0, "$0011 clear -- the speech has not run")
     where("booted")
+    roster("booted")
   end),
+
+  -- The arrival care stop, and it is deliberately the first thing that
+  -- happens.  Everything below this line is walking, and walking is what
+  -- costs a poisoned character their HP; clearing the bit after the five
+  -- crossings would restore the HP but not the hundreds of steps' worth
+  -- already spent.  It is a no-op that only logs when nobody needs anything,
+  -- so the cost on a clean predecessor is a few frames.
+  H.fieldCare({ tag = "care on arrival", threshold = 0.85 }),
 
   -- ===================================================================== --
   -- Phase 1: in, past the greeter.  The vestibule on map 109 reaches five
@@ -467,7 +532,7 @@ H.run({ maxFrames = 200000 }, {
   H.advanceStory(function()
     return map() == 112 and sw(0x0018) == 1 and H.hasControl()
        and H.tileAligned() and bright() >= 15 and not H.battleLoadStarted()
-  end, 50000, { playBattles = true }),
+  end, 50000, { playBattles = "tactical" }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 112, "on map 112 -- the passage to the Lete River")
@@ -494,7 +559,25 @@ H.run({ maxFrames = 200000 }, {
       end
     end
     where("banon joined")
+    roster("before the exit care stop")
     H.screenshot("banon_joined")
+  end),
+
+  -- The exit care stop.  The departure scene has just put EDGAR, SABIN and
+  -- BANON back in the party, so this is the first moment all four records
+  -- are visible to a care stop, and anything the walk cost -- or any status
+  -- the three of them were carrying while the story had them out of the
+  -- party -- is repairable here and nowhere later.
+  H.fieldCare({ tag = "care before the raft", threshold = 0.85 }),
+  H.call(function()
+    roster("banon_joined exit")
+    -- The exit contract: nobody dead, petrified, zombie, poisoned, or at or
+    -- below max HP / 8 (H.assertPartyStanding, the same conditions
+    -- tools/audit_party_hp.py applies tree-wide).  This generator had none,
+    -- which is why banon_joined shipped TERRA poisoned at 1 of 136 and the
+    -- audit was the thing that found it, two steps and a `make savestates`
+    -- later.  Failing here instead means the fixture is never written.
+    H.assertPartyStanding("banon_joined exit")
   end),
   H.saveState("banon_joined.mss"),
   H.logStep(function()

@@ -65,6 +65,18 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   `maxFrames` is a walking budget**, so a route whose maps can draw
   encounters needs an allowance on top of it or the fight expires the step
   and reports a navigation timeout for something that is not one.
+  **Whether a map can draw one at all is a data question with an answer**:
+  `CheckBattleSub` reads map_prop byte `$0525` and returns on bit 7 clear
+  (`ff6/src/field/battle.asm:318`, `:332-333`), which is what makes the
+  Returner Hideout (108/109/110), the map-112 passage and the Lete River
+  arrival map (113) encounter-free. Say that rather than "these maps carry no
+  encounter territory"; a segment that cannot roll one still wants a real
+  mode, because the mode is what runs if the assumption is ever wrong.
+  gen_banon and gen_lete were the last two steps spelling it `true` and are
+  now `"tactical"`: fleeing is wrong there because TERRA is a party of one
+  for most of the hideout and BANON is aboard for the rest, and BANON dying
+  is a Game Over rather than a wipe (`BattleEnd_03` ->`LoseBattle`,
+  `battle_main.asm:12305-12307`, `:16039`).
 - **Rows**: `$B3 = $FF` for every command and only the weapon swing
   clears it, so Tools, Magic, Blitz, SwdTech, Throw and Steal are
   row-exempt. Back row wins where damage is break-driven and loses where the
@@ -90,13 +102,33 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   failing (`OT6_RANDBTL`, `ot6_boost.asm:14-29`).
 - **The party-hp audit** (`tools/audit_party_hp.py`, same shape, same kind of
   waiver list) is the other half of that: no fixture ships a party member
-  dead, petrified, zombie, or at or below max HP / 8. Max/8 is the game's own
-  near-fatal line (`battle_main.asm:11544-11549`), and the bar is there rather
-  than at half HP because the measured distribution has a wide gap — 241 party
-  records across 98 fixtures run 0%, 6.5%, then nothing until 36.6%. Both
-  audits share one savestate reader, `tools/savestate_party.py`.
-  `H.assertPartyStanding` is the same three conditions as a generator exit
+  dead, petrified, zombie, poisoned, or at or below max HP / 8. Max/8 is the
+  game's own near-fatal line (`battle_main.asm:11544-11549`), and the bar is
+  there rather than at half HP because the measured distribution has a wide
+  gap — 241 party records across 98 fixtures run 0%, 6.5%, then nothing until
+  36.6%. Both audits share one savestate reader, `tools/savestate_party.py`.
+  `H.assertPartyStanding` is the same four conditions as a generator exit
   contract, and the two must be changed together.
+- **Poison is the one status that walking makes worse, and no HP bar can see
+  it coming.** `DoPoisonDmg` (`ff6/src/field/player.asm:551`, called per step
+  from `:521`) takes max HP/32 off every poisoned character on every step and
+  floors the result at 1 (`:593-613`), so a character who leaves a fight
+  poisoned reaches the end of any walk of length at exactly 1 HP, whatever
+  they had when the fight ended. Measured 2026-08-12 end to end: a map-98
+  formation put status `04` on TERRA, gen_kolts's care stop before VARGAS cast
+  her back to 136/136 and left the bit standing, gen_returner's two care stops
+  each spent Tonics undoing damage the bit immediately redid, gen_returner's
+  own exit contract passed her at 136/136 **because a half-HP bar cannot see a
+  status**, and five crossings of the Returner Hideout — a place that cannot
+  draw an encounter at all — delivered her to `banon_joined` at 1 of 136.
+  `M.fieldCare` clears it (`CARE_STATUS_CURES`, one row today), and the
+  Antidote comes from South Figaro's shop 8 row 1
+  (`ff6/src/menu/shop_prop.dat` record 8), which gen_kolts now buys three of:
+  that counter is the last one before Mt. Kolts and the hideout, so a party
+  that leaves it without one has nothing that clears the bit. Every other
+  curable status-1 bit is a combat handicap that walking does not compound,
+  which is why only poison is in the audit and only poison is in `fieldCare`'s
+  cure table.
 - **It reads the tracked SRAM checkpoints as well as the fixtures, and two
   things in `build/states` are not fixtures at all.** A checkpoint is the
   other boot source (five states cold-Continue out of one), it is a battery

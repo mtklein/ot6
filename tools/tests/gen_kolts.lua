@@ -593,17 +593,54 @@ local function shopTrip()
     -- after the fight to raise TERRA and the entry-point contract below
     -- refuses to generate without it.
     buyTo(0xF0, 5, 5, 500, "FENIX DOWN to 5"),
+    -- Three Antidotes, and this shop is the only reason the route can answer
+    -- poison at all.  Measured here 2026-08-12: the map-98 approach fight
+    -- put status 04 on TERRA, the care stop before VARGAS cast her back to
+    -- 136/136 and left the bit standing, and it rode her through gen_vargas
+    -- and gen_returner into the hideout, where poison drains max HP/32 on
+    -- every step with a floor of 1 (ff6/src/field/player.asm:593-613).  Five
+    -- crossings later banon_joined shipped her at 1 of 136, and lete_river
+    -- and the whole Lete River inherited it.
+    --
+    -- This counter is the last one before the damage: the route from here is
+    -- the world map, Mt. Kolts, VARGAS, the world map again and the Returner
+    -- Hideout, and there is no shop anywhere on it.  Eight of the 128 shop
+    -- records stock $F2, but which towns they belong to is not established
+    -- here -- event_main.asm is a dump of separately-addressed scripts and
+    -- adjacency in it means nothing -- so the claim is only the one the
+    -- route makes: nothing between this counter and the hideout sells an
+    -- Antidote.  No owned esper grants a status cure either (genju_prop.asm),
+    -- so a party that walks out of here without one carries the bit until
+    -- the next town that has them.
+    --
+    -- Row 1: shop 8's stock is Tonic, Antidote, Soft, Eyedrop, $FB, Fenix
+    -- Down, Sleeping Bag, Tent (menu/shop_prop.dat record 8), and buyTo
+    -- checks the row really holds $F2 before any money moves.
+    --
+    -- Three at 50 gil each is 150, against 2500 on the Fenix Downs above, so
+    -- this is not a real claim on the purse -- but it is placed before the
+    -- Tonics deliberately, because the Tonic line is the marginal one that
+    -- clamps to whatever gil is left, and a poisoned character loses every
+    -- point of HP a Tonic would have bought them.  Three rather than one
+    -- because the mountain can poison more than once and the count has to
+    -- survive gen_vargas, gen_returner and gen_banon's own care stops.
+    buyTo(0xF2, 1, 3, 50, "ANTIDOTE to 3"),
     buyTo(0xE8, 0, 25, 50, "TONIC to 25"),
     tapUntil("b", inState(0x25), "shop: back to the options window"),
     tapUntil("b", function() return H.hasControl() and map() == 85 end,
       "shop: closed"),
     H.release(), H.waitFrames(30),
     H.call(function()
-      H.log(string.format("[shop] done: gil=%d tonic=%d potion=%d fenix=%d",
-        gil(), invCount(0xE8), invCount(0xE9), invCount(0xF0)))
+      H.log(string.format(
+        "[shop] done: gil=%d tonic=%d potion=%d fenix=%d antidote=%d",
+        gil(), invCount(0xE8), invCount(0xE9), invCount(0xF0),
+        invCount(0xF2)))
       H.assertEq(invCount(0xF0) >= 3, true,
         "the party leaves with Fenix Downs -- a death is answerable now")
       H.assertEq(invCount(0xE8) >= 10, true, "Tonics restocked for the climb")
+      H.assertEq(invCount(0xF2) >= 2, true,
+        "the party leaves with Antidotes -- poison is answerable now, and " ..
+        "there is no other counter between here and the Returner Hideout")
     end),
     H.navTo(104, 57, { maxFrames = 20000, playBattles = "flee" }),
     H.release(), H.waitFrames(20),
@@ -774,7 +811,10 @@ H.run({ maxFrames = 400000 }, {
   -- Tonics were gone and the Potions were down to the reserve, and the run
   -- before that lost LOCKE outright with no Fenix Down to raise him.  Running
   -- out of supplies is a real finding, and the shop is thirty seconds off the
-  -- path.
+  -- path.  The same argument brought the Antidote line in on 2026-08-12: the
+  -- bag could not answer poison either, and unlike a death, poison is not
+  -- something the mountain finishes with you -- it rides out of the fight and
+  -- costs max HP/32 on every step from here to Narshe.
   --
   -- The route is derived in docs/research/south-figaro-shop-route.md and
   -- the hazards it names are handled here:

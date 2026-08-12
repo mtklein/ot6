@@ -1704,10 +1704,12 @@ function M.stepOff(dirs, maxFrames, what)
 end
 
 -- --------------------------------------------------------- field care --
--- M.fieldCare: open the field menu and heal or revive the party with real
--- presses, then close it again.  No state writes (issue #75); every
+-- M.fieldCare: open the field menu and revive, cure and heal the party with
+-- real presses, then close it again.  No state writes (issue #75); every
 -- point of HP this restores is restored by the game's own item code,
--- driven the way a player drives it.
+-- driven the way a player drives it.  The status pass is CARE_STATUS_CURES
+-- below, and it is one bit today: poison, because poison is the only status
+-- that walking makes worse.
 --
 -- The input-driven routes run from random encounters, and a run costs HP:
 -- the party takes a round or two of hits every time the run roll fails.
@@ -1845,7 +1847,56 @@ local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
 local CARE_SEL, CARE_MAGIC_SEL = 0x28, 0x99   -- zSelIndex, chosen list index
 local CARE_MAGIC_GATE = 0x7a                  -- zSkillsTextColor[1] = Magic
 local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
+local CARE_ANTIDOTE = 0xF2
 local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
+
+-- ---- clearing a status, and why this list has one entry ----
+--
+-- Status 1 is `weicmpzd` (ff6/notes/field-ram.txt:900-907): $80 wound, $40
+-- petrify, $20 imp, $10 clear, $08 magitek, $04 poison, $02 zombie, $01
+-- dark.  Five of those bits have a bag item that clears them, and
+-- CheckCanUseItem accepts each item only on a target actually carrying its
+-- bit (item.asm:2243-2323): Soft on petrify, Green Cherry on imp, Antidote
+-- on poison, Revivify on zombie, Eyedrop on dark, Remedy on any of
+-- petrify/imp/poison/dark at once.  The antidote arm is :2318-2322, and it
+-- is `and #$04 / beq invalid`, so an Antidote offered to a character who is
+-- not poisoned is refused rather than wasted.
+--
+-- Only poison is in this table, and the reason is that poison is the only
+-- one of them that walking makes worse.  DoPoisonDmg drains max HP/32
+-- from every poisoned character on every step and floors the result at 1
+-- (`ff6/src/field/player.asm:593-613`), so a character who leaves a fight
+-- poisoned arrives at the end of any walk of length at exactly 1 HP,
+-- whatever they had when the fight ended.  That is what banon_joined and
+-- lete_river were: TERRA at 1 of 136 after five crossings of a hideout that
+-- cannot draw an encounter at all.  Every other curable bit is a combat
+-- handicap that costs nothing to carry down a corridor.
+--
+-- Adding one is one row here, and the drive needs no other change -- the
+-- item path already routes $05 -> $08 -> $19 -> $70 for any item id, and
+-- the landing check below watches the status byte as well as the bag count,
+-- which is the only signal a cure that restores no HP produces.  What is
+-- missing for the other four is a fixture that carries the status, so a row
+-- for them would be a path nothing in the tree has ever run.  Add the row
+-- when a fixture shows the bit, not before.
+--
+-- HOW FAR THIS HAS BEEN WATCHED, 2026-08-12.  The declining half is
+-- measured three times: with the bit set and no Antidote in the bag,
+-- pickStatusCure returns nil and the visit logs `status1 04 -> 04` beside
+-- each Tonic it spends, at gen_kolts's stop before VARGAS and at both of
+-- gen_returner's.  The succeeding half -- bit set, Antidote in the bag,
+-- bit cleared -- has NOT been watched.  Poison turns out to be a rare draw:
+-- it landed once in a full chain regeneration and then not at all in eleven
+-- targeted re-runs of the two generators that fight the formations which
+-- applied it, so the pass-after chain went green without a poisoned
+-- character in it.  Treat the cure as unverified until a run shows
+-- `[care ...] used $F2 on char N: ... status1 04 -> 00`.  What would settle
+-- it is a probe that boots kolts_cave, fights Mt. Kolts trash until a party
+-- member carries $04, and then calls fieldCare -- input-driven throughout,
+-- so it stays inside the no-state-writes rule.
+local CARE_STATUS_CURES = {
+  { bit = 0x04, item = CARE_ANTIDOTE, what = "poison" },
+}
 local MAGIC_LIST, MAGIC_COLOUR = 0x7E9D89, 0x7E9E09
 
 -- The menu screens the drive can be parked on.  Every other value of $26 is
@@ -2016,6 +2067,18 @@ end
 --               (max HP), `lsr3`, `cmp $3bf4,y` (current HP), and near
 --               fatal goes into the status-to-set when the carry says
 --               max/8 >= current (battle_main.asm:11544-11549)
+--   poisoned:   $04 in status 1, which is a casualty in slow motion rather
+--               than a handicap.  DoPoisonDmg drains max HP/32 from
+--               every poisoned character on every step and floors the result
+--               at 1 (ff6/src/field/player.asm:593-613), so the walk itself
+--               converts the bit into 1 HP and then holds it there.  A
+--               fixture that ships poison is a fixture that will hand the
+--               next generator a character the next encounter has already
+--               claimed, whatever HP the record reads today.  Measured:
+--               banon_joined and lete_river shipped TERRA at 1 of 136 with
+--               status 04, and the near-fatal clause above is what caught
+--               them -- at the end, after the grind, rather than at the
+--               fight that applied the bit.
 --
 -- Near fatal rather than dead-only because a member at 15 of 231 is a
 -- casualty the next random encounter has already collected.  Near fatal
@@ -2028,9 +2091,14 @@ end
 -- gen_returner require half HP at their exits, and gen_kolts additionally
 -- rations TERRA's MP to what VARGAS needs.  Passing this helper only means
 -- the fixture is not a casualty report.
+-- $C6, not $C2: the game's own can-be-healed mask is $C2 (wound, petrify,
+-- zombie) and stays $C2 everywhere this file asks the game's own question,
+-- because the menu serves a poisoned character perfectly well.  The exit
+-- contract asks a different question -- is this fixture safe to hand down --
+-- and poison fails that one.
 function M.standing(c)
   local hp, mx = M.charHp(c), M.charMaxHp(c)
-  return hp > 0 and (M.charStatus1(c) & 0xC2) == 0 and hp > (mx >> 3)
+  return hp > 0 and (M.charStatus1(c) & 0xC6) == 0 and hp > (mx >> 3)
 end
 
 -- Assert it for everyone assigned to a party, with the numbers in the
@@ -2042,8 +2110,10 @@ function M.assertPartyStanding(tag)
   for _, c in ipairs(M.partyMembers()) do
     M.assertEq(M.standing(c), true, string.format(
       "%s: char %d is on their feet (%d/%d hp, near fatal at or below %d, "
-      .. "status1 %02X)", tag, c, M.charHp(c), M.charMaxHp(c),
-      M.charMaxHp(c) >> 3, M.charStatus1(c)))
+      .. "status1 %02X%s)", tag, c, M.charHp(c), M.charMaxHp(c),
+      M.charMaxHp(c) >> 3, M.charStatus1(c),
+      (M.charStatus1(c) & 0x04) ~= 0
+        and " -- POISONED, and every step drains max/32" or ""))
   end
 end
 
@@ -2176,8 +2246,9 @@ function M.fieldCare(opts)
         M.charHp(w.char), M.charMaxHp(w.char),
         M.charMp(w.caster), M.charMaxMp(w.caster))
     end
-    return string.format("%s char %d with $%02X (%d/%d hp)", w.why, w.char,
-      w.item, M.charHp(w.char), M.charMaxHp(w.char))
+    return string.format("%s char %d with $%02X (%d/%d hp, status1 %02X)",
+      w.why, w.char, w.item, M.charHp(w.char), M.charMaxHp(w.char),
+      M.charStatus1(w.char))
   end
 
   -- Whoever the drive last set the Skills screens up for stays the caster
@@ -2235,17 +2306,43 @@ function M.fieldCare(opts)
     return nil
   end
 
-  -- Pick in the order a player would: revive first, then top up whoever is
-  -- worst off, casting where the party can cast and reaching for the bag
-  -- where it cannot.  Members are tried worst-first rather than only the
-  -- worst being tried, so one member nobody can help does not stop the rest
-  -- from being served.
+  -- Everything the bag can do about a status this character is carrying.
+  -- Ordered before healing rather than after it, because poison drains on
+  -- every step (player.asm:593-613): HP restored while the bit is still set
+  -- starts draining again the moment the menu closes, so curing first is
+  -- both what a player does and the cheaper order.  A dead, petrified or
+  -- zombie target is skipped, because CheckCanUseItem's own first test is
+  -- the wound branch (item.asm:2282-2286) and a Fenix Down is the only
+  -- thing it accepts there; the revive pass above is what serves them.
+  local function pickStatusCure(target)
+    if M.charHp(target) == 0 or (M.charStatus1(target) & 0xC2) ~= 0 then
+      return nil
+    end
+    for _, cure in ipairs(CARE_STATUS_CURES) do
+      if (M.charStatus1(target) & cure.bit) ~= 0 then
+        local w = { kind = "item", char = target, item = cure.item,
+                    why = "cure " .. cure.what }
+        if avail(cure.item) > 0 and not failed[key(w)] then return w end
+      end
+    end
+    return nil
+  end
+
+  -- Pick in the order a player would: revive first, then clear a status the
+  -- bag can clear, then top up whoever is worst off, casting where the party
+  -- can cast and reaching for the bag where it cannot.  Members are tried
+  -- worst-first rather than only the worst being tried, so one member nobody
+  -- can help does not stop the rest from being served.
   local function pick()
     for _, c in ipairs(M.partyMembers()) do
       local w = { kind = "item", char = c, item = CARE_FENIX, why = "revive" }
       if M.charHp(c) == 0 and avail(CARE_FENIX) > 0 and not failed[key(w)] then
         return w
       end
+    end
+    for _, c in ipairs(M.partyMembers()) do
+      local w = pickStatusCure(c)
+      if w ~= nil then return w end
     end
     local hurt = {}
     for _, c in ipairs(M.partyMembers()) do
@@ -2347,11 +2444,16 @@ function M.fieldCare(opts)
       return
     end
 
-    -- check whether the last confirm landed
+    -- check whether the last confirm landed.  An Antidote restores no HP, so
+    -- the status byte is watched as well: without it the only evidence a
+    -- status cure landed is the bag count, and a plan whose landing is read
+    -- off one signal is a plan that hangs the moment that signal is the one
+    -- the item does not move.
     if pending then
       local landed
       if pending.kind == "item" then
         landed = M.charHp(pending.char) ~= pending.hp
+              or M.charStatus1(pending.char) ~= pending.st1
               or M.invCountOf(pending.item) < pending.qty
       else
         landed = M.charHp(pending.char) ~= pending.hp
@@ -2360,9 +2462,11 @@ function M.fieldCare(opts)
       if landed then
         if pending.kind == "item" then
           M.log(string.format(
-            "[%s] used $%02X on char %d: %d -> %d hp, %d left",
+            "[%s] used $%02X on char %d: %d -> %d hp, status1 %02X -> %02X, " ..
+            "%d left",
             tag, pending.item, pending.char, pending.hp,
-            M.charHp(pending.char), M.invCountOf(pending.item)))
+            M.charHp(pending.char), pending.st1,
+            M.charStatus1(pending.char), M.invCountOf(pending.item)))
         else
           M.log(string.format(
             "[%s] char %d cast $%02X on char %d: %d -> %d hp, caster %d -> %d mp",
@@ -2421,6 +2525,7 @@ function M.fieldCare(opts)
           if cur == slot then
             pending = { kind = "item", char = want.char, item = want.item,
                         hp = M.charHp(want.char),
+                        st1 = M.charStatus1(want.char),
                         qty = M.invCountOf(want.item) }
             held = { "a" }
           else
@@ -2504,16 +2609,25 @@ function M.fieldCare(opts)
 
   -- The roster line carries MP as well as HP now.  MP is what the policy
   -- spends, so a before/after pair that prints only HP cannot show what a
-  -- visit cost or what casting saved.
+  -- visit cost or what casting saved.  It carries status 1 as well, for the
+  -- same reason: a poisoned character reads as a healthy one on an HP/MP
+  -- line right up until the walk grinds them to 1, so a stop that could not
+  -- clear a status has to say so in its own log rather than leave the next
+  -- generator's roster to imply it.  A zero status prints nothing, so the
+  -- ordinary line is unchanged.
   local function roster(what)
     local out = {}
     for _, c in ipairs(M.partyMembers()) do
-      out[#out + 1] = string.format("c%d %d/%d hp %d/%d mp", c, M.charHp(c),
-        M.charMaxHp(c), M.charMp(c), M.charMaxMp(c))
+      local st = M.charStatus1(c)
+      out[#out + 1] = string.format("c%d %d/%d hp %d/%d mp%s", c, M.charHp(c),
+        M.charMaxHp(c), M.charMp(c), M.charMaxMp(c),
+        st ~= 0 and string.format(" status1=%02X", st) or "")
     end
-    return string.format("[%s] %s: %s | tonic=%d potion=%d fenix=%d",
+    return string.format(
+      "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d",
       tag, what, table.concat(out, "  "), M.invCountOf(CARE_TONIC),
-      M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX))
+      M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX),
+      M.invCountOf(CARE_ANTIDOTE))
   end
 
   return M.cond(anyNeed, {
