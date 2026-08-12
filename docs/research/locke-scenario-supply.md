@@ -246,6 +246,44 @@ indices, decoded from `shop_prop.dat`:
   full MP, and every other persistent status bit cleared, KO and poison
   included.
 
+### The 80 GP is paid on purpose: there is no free bed on this road
+
+Every player-invocable rest in the script goes through `_cacd3c` or
+`_cacd31`, which are the same routine with and without the sleep jingle, and
+both end in `_cacf67` → `_cacfbd`. **So every rest in the game restores
+exactly the same thing**, and a free one would be strictly better if one were
+reachable. Fifteen call sites: twelve are preceded by `take_gil` in their own
+branch (80 to 1500), one takes 1, and three are free —
+
+| free rest | where | reachable from South Figaro |
+|---|---|---|
+| `EventTrigger::_59` `{47,52}` → `_ca71bf` | Figaro Castle, map 59 | no — different walkable region, and the castle submerges |
+| `EventTrigger::_123` `{4,12}` → `_cb827d` | map 123, gated on `$0032` | no |
+| `NPCProp::_109` / `_111` → `_caf64b` / `_caf64e` | **the Returner Hideout, maps 109 and 111** | not yet — it is the far end of this arc |
+
+**Duncan's house is real, and it is inside the town.** Map 86's title index
+(`map_prop.dat` byte 0 = `$1C`) is `map_title_en` 28, `DUNCAN'S HOUSE`, and
+his wife is `NPCProp::_86`'s first record, the `OLD_WOMAN` at `{54,51}`
+running `_ca7a90`; at this point in the story her branch is `_ca7b20`,
+`dlg $00B9` — *"My husband, Duncan, is a world-famous martial artist! He's
+taking his disciples to Mt. Kolts for meditation and training."* It is
+entered from map 75 `(46,39)` → map 86 `(49,54)`, one door off the street
+this route already walks, and `EventTrigger::_86` holds eight triggers, all
+of them exit redirects. **There is no bed in it.**
+
+**The hut on the road north of town has no bed either.** World `(90,99)` →
+map 93 `(7,14)` is a real building between South Figaro and Mt Kolts, and it
+is the one Sabin was staying in: its single NPC runs `_ca8198`, where the
+MAN says he *"left a couple of days ago after he heard Master Duncan was
+slain… He headed into the mountains."* `EventTrigger::_93` is **empty** — the
+map has no triggers at all, so nothing on it can be slept in.
+
+So the route pays the inn, deliberately. At 434 gil a lap the 80 GP is about
+a fifth of one lap, and one rest across the whole 22-lap stop is under 1% of
+what the stop earns. The thing worth carrying forward is the third row of
+that table: **the Returner Hideout's beds are free**, which is where issue
+#101's Lete River grind will want to rest.
+
 **Taking EDGAR's MithrilBlade instead of buying one does not work**, and it
 is worth writing down because it is the obvious saving. LOCKE carries
 exactly one weapon into his solo scenario — `remove_equip` returns only what

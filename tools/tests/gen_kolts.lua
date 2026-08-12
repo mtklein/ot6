@@ -990,6 +990,21 @@ local function talkOut(obj, done, what, budget)
   })
 end
 
+-- The 80 GP is paid on purpose.  Every player-invocable rest in the script
+-- goes through `_cacd3c`/`_cacd31`, which both end in `_cacf67` ->
+-- `_cacfbd`, so every rest in the game restores the same thing and a free
+-- one would be strictly better.  There is not one on this road.  Of the
+-- fifteen call sites, twelve take gil, one takes 1, and the three free ones
+-- are Figaro Castle's bed (`EventTrigger::_59` {47,52}), map 123's, and the
+-- Returner Hideout's own NPCs on maps 109/111 -- none reachable from here.
+-- Duncan's house is real and is map 86, INSIDE the town (map_prop byte 0 =
+-- $1C -> map_title_en 28, "DUNCAN'S HOUSE"; his wife is NPCProp::_86's
+-- OLD_WOMAN at {54,51}), and `EventTrigger::_86`'s eight triggers are all
+-- exit redirects -- no bed.  The hut on the road at world (90,99) -> map 93
+-- is where SABIN was staying, and `EventTrigger::_93` is empty, so there is
+-- nothing on it to sleep in either.  At 434 gil a lap the inn costs about a
+-- fifth of one lap, once.
+--
 -- `dlg $0B89` is "80 GP per night! Well?  0: Yes  1: No", and `take_gil 80`
 -- sets $01BE when the party cannot pay, in which case the script says
 -- "……Not enough money." and does not rest -- so the gold is asserted before
