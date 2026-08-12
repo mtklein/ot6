@@ -318,6 +318,12 @@ local function fightAttempt(n)
       H.call(function()
         H.checkReq(loadReq, "attempt " .. n .. ": entry point reload")
       end),
+      -- The wait this replaces was 30 + n * 37, so a reloaded attempt had at
+      -- least 104 frames before it pressed anything.  Part of that number was
+      -- the RNG stagger and part of it was letting the loaded state settle;
+      -- only the stagger moved to L.spread, which can legitimately wait zero
+      -- frames.  90 is the settle every other reload in the tree uses.
+      H.waitFrames(90),
     }, {}),
     -- Outside the n > 1 branch, unlike the wait it replaces: attempt 1 needs
     -- a phase of its own too, or it sits wherever the route left it and can
