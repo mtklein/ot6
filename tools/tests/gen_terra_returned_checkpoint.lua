@@ -155,7 +155,7 @@ local function rideAttempt(n)
     L.spread(n),                         -- spread the battle RNG phase (#83)
     (function()
       local F = H.newFightDriver("terra ride", { tactical = true,
-        boost = true, bank = 2, items = true, healer = 9, healPercent = 45,
+        boost = true, bank = 2, items = true, healer = 9,
         tools = false, cadence = 12, summon = summonChars,
         focus = { { slot = 0, mask = 0x01 } } })
       local ph, battN, wasBatt = 0, 0, false

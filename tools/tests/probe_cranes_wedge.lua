@@ -168,7 +168,7 @@ H.run({ maxFrames = 200000 }, {
     local F = H.newFightDriver("cranes probe",
       TIMELINE == "A"
         and { tactical = true, boost = true, bank = 1, items = true,
-              healPercent = 45, cadence = 12 }
+              cadence = 12 }
         or  { tactical = false, boost = false, items = false, cadence = 12 })
     local ph, battN, wasBatt = 0, 0, false
     local quiet, lastX, lastY, lastDump = 0, -1, -1, 0

@@ -363,7 +363,7 @@ local function circuitRunner()
   local stuckAt, cappedAt = nil, nil
   local inFight, ph = false, 0
   local F = H.newFightDriver("banquet window", { tactical = true,
-    boost = true, bank = 1, items = true, healPercent = 60, cadence = 12 })
+    boost = true, bank = 1, items = true, cadence = 12 })
   return {
     tick = function(self)
       -- a fight soldier's talk opens battle 26/27 mid-chase: hand the
@@ -758,7 +758,7 @@ local steps = {
   H.call(function() dinner.preBattle30 = var0() end),
   (function()
     local F = H.newFightDriver("b30", { tactical = true, boost = true,
-      bank = 1, items = true, healPercent = 60, cadence = 12 })
+      bank = 1, items = true, cadence = 12 })
     local hb = 0
     return H.driveUntil(function() return not H.battleLoadStarted() end,
       20000, {

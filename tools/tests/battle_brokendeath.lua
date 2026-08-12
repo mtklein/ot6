@@ -247,7 +247,7 @@ local function attempt(n)
   local startFrame = nil           -- first frame of THIS attempt's battle
   local hb = 0
   local F = H.newFightDriver("brokendeath", { tactical = true, boost = true,
-    bank = 3, items = true, healPercent = 60, cadence = 12 })
+    bank = 3, items = true, cadence = 12 })
   local function mname(m)
     return m == ISLOT and "IFRIT" or m == SSLOT and "SHIVA" or ("slot " .. m)
   end

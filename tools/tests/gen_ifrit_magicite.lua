@@ -306,7 +306,7 @@ local function ifritAttempt(n)
   local sawBreak, ideathFrame, ideathTicks, sdeathFrame = false, nil, nil, nil
   local hb, ph, giveUp = 0, 0, 0
   local F = H.newFightDriver("b70", { tactical = true, boost = true, bank = 3,
-    items = true, healPercent = 60, cadence = 12 })
+    items = true, cadence = 12 })
   return H.cond(function() return fightWon end, {}, {
     H.logStep(function()
       return string.format("battle 70 attempt %d at f%d", n, H.frame)
@@ -520,12 +520,16 @@ H.run({ maxFrames = 300000 }, {
   --    THIS fight, gen_esper_tubes:331 before battle 72, gen_n128:469,
   --    gen_banquet_done:570); this one was the only boss step with no
   --    H.fieldCare at all, and that omission is what lost the ladder.
-  --    Measured on the unhealed run: the fight driver's healPercent=60 is
-  --    already unmet at the fight's first frame, so it opens in a heal
-  --    deadlock and never leaves it -- 87 of 100 actions across all three
-  --    attempts were item uses, LOCKE attacked exactly zero times, and
-  --    attempts 1 and 2 ended with IFRIT untouched at 3300 hp / 6 shields.
-  --    Threshold and tag match battle_brokendeath's call for this fight.
+  --    Measured on the unhealed run, under the fraction rule the heal policy
+  --    used to carry: the party is already under its threshold on the
+  --    fight's first frame, so it opens in a heal deadlock and never leaves
+  --    it -- 87 of 100 actions across all three attempts were item uses,
+  --    LOCKE attacked exactly zero times, and attempts 1 and 2 ended with
+  --    IFRIT untouched at 3300 hp / 6 shields.  The care stop is the right
+  --    prep whatever the in-fight rule is, because a party that walks in at
+  --    31% spends the fight's own turns filling a hole it could have filled
+  --    for free between fights.  Threshold and tag match
+  --    battle_brokendeath's call for this fight.
   H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
   H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
   H.call(function()

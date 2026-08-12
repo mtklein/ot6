@@ -568,6 +568,14 @@ function M.itemPower(item)
     + item * ITEM_REC + ITEM_POWER)
 end
 
+-- How much of a heal has to land for it to be worth a turn.  1.0 would mean
+-- "waste nothing", and that is too strict in practice: it makes a character
+-- sitting 49 points down with a 50-point Tonic wait for one more point of
+-- damage before drinking, and the turn he waits is a turn the enemy spends
+-- putting him further down than the Tonic can reach.  0.75 is the measured
+-- pick; the runs behind it are in docs/HANDOFF.md under the heal policy.
+M.HEAL_VALUE = 0.75
+
 -- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
 -- kept out here as arithmetic on plain numbers so battle_healpolicy can put
 -- the measured cases through it without an emulated fight.
@@ -577,78 +585,67 @@ end
 --   roundCost   what one round takes off this candidate, measured in the
 --               fight; 0 before the enemy has landed a round
 --   allies      living party members other than the actor deciding
---   threshold   the top-up fraction, opts.healPercent
 --   mp          true for a cast, which is paid in MP rather than out of the
---               bag; see the party clause below for the one thing it changes
+--               bag, and whose size is not knowable in advance
+--   value       override for M.HEAL_VALUE
 --
 -- Returns the reason to heal, or nil for "act instead".
 --
--- A heal buys back restore/roundCost of a turn and spends a whole one.  When
--- the item restores at least what a round takes, that trade never runs out --
--- the candidate can be topped up for ever -- so the fraction rule governs and
--- this behaves the way the driver always did.
+-- The rule is the owner's, 2026-08-12: "the best healing policy is to heal
+-- when you expect to get approximately full value out of the heal.  if a
+-- tonic heals 50 hp, heal when you have 50 hp or more to heal, etc.  hard to
+-- know with magic... in that case just heal everyone to max."
 --
--- When the item restores less than a round takes, whether the trade is worth
--- making depends on whose turn is being spent, and there are two cases.
+-- So the question is how much of this heal would be thrown away, not what
+-- fraction of their health the target has left.  Drinking a 50-point Tonic
+-- into a 12-point hole throws away three quarters of it, and doing that
+-- repeatedly is how a party runs out of supplies before the fight that needs
+-- them.  M.HEAL_VALUE is how much of the heal has to land.
 --
--- Alone, the healer is also the only attacker, and the arithmetic is settled:
--- with HP h, a round costing d and a heal giving g < d, a character who
--- spends k of his turns drinking lands h/d + k*(g/d - 1) attacks before he
--- dies, which falls as k rises.  Every drink costs him more attacking time
--- than it buys, at any threshold, so he does not drink; he swings.  That is
--- solo LOCKE against battle 11's soldier, where a Tonic restoring 50 against
--- 55 to 112 a round bought five drinks and one attack (issue #74).
+-- A cure is exempt, because there is no honest way to know in advance what
+-- one restores: the power byte is an input to a formula that scales with the
+-- caster's magic power and level, so weighing a cast against a hole would be
+-- weighing it against a guess.  The owner's answer is to heal to maximum,
+-- and it is affordable for the same reason the route prefers casting to
+-- drinking at all -- OT6 refunds MP in full at every level up
+-- (ot6_progression.asm:3-6), so MP spent in a fight comes back and a Tonic
+-- does not.
 --
--- In a party the same drink is worth making when somebody is about to die,
--- because what it buys back is that member's whole remaining turn stream and
--- what it costs is one turn out of several.  It is not worth making as a
--- routine top-up: an item that cannot keep up with the damage empties the bag
--- without changing where the fight is going.  So a party heals the endangered
--- and stops topping up.
+-- Two clauses sit on top of the value rule.
 --
--- `mp` is where a cast parts company with a drink, and only there.  That
--- last refusal is an argument about the BAG: a fixed supply, spent down on
--- top-ups that change nothing, and gone for the fights after this one.  MP is
--- not a fixed supply -- OT6 refunds it in full at every level up
--- (ot6_progression.asm:3-6) and it is only bounded per fight -- so a party's
--- caster tops up on the fraction rule with a cure that cannot keep up, where
--- it would have put the Tonic back in the bag.  Refusing there would undo the
--- thing the cast line was added for: the minecart ride spent all eight Tonics
--- on the Mag Roaders and reached the boss with nothing, while every member
--- carried 100+ MP unspent (#92).
+-- The first is the heal-lock, and it is the thing the fraction rule's
+-- replacement had to keep.  Alone, the healer is also the only attacker, and
+-- the arithmetic is settled: with HP h, a round costing d and a heal giving
+-- g < d, a character who spends k of his turns drinking lands
+-- h/d + k*(g/d - 1) attacks before he dies, which falls as k rises.  Every
+-- drink costs him more attacking time than it buys, so he does not drink; he
+-- swings.  That is solo LOCKE against battle 11's soldier, where a Tonic
+-- restoring 50 against 55 to 112 a round bought five drinks and one attack
+-- (issue #74).  A cast spends a turn exactly as a drink does, so `mp` does
+-- not reach this clause.
 --
--- The SOLO refusal is not about the bag and `mp` does not touch it.  There
--- the argument is about turns, and a cast spends a turn exactly as a drink
--- does; the k-attacks arithmetic above does not mention what was drunk.
---
--- Deliberately NOT required of a party heal: that it lift the target clear of
--- the worst round seen.  That was tried and it is too strict -- roundCost is a
--- worst case, not a typical round, and using it as a bar for "would this help"
--- left EDGAR at 63/398 for the whole of battle 72 with seven Potions in the
--- bag while the party won around him.  The bar is proved for the solo case and
--- assumed for the party case, so it is only applied where it is proved.
---
--- Lowering healPercent would also have made battle 11 pass, and would have
--- been the mistake #74 documents: a number that fits one fight and still
--- heals at the wrong moments in every other thin-bag fight.
+-- The second is death.  A target inside one round of dying is worth a heal
+-- the value rule would refuse, because what the turn buys back is that
+-- member's whole remaining turn stream and a Fenix Down besides.  It is
+-- required to actually change the outcome: the heal has to lift them clear
+-- of the worst round seen, capped at their maximum, so a character the worst
+-- round could kill from full HP is not topped up on a promise no heal can
+-- keep.  That cap is what makes the clause safe to keep -- the uncapped
+-- version was tried as the ONLY way a party could heal and left EDGAR at
+-- 63/398 for all of battle 72 with seven Potions in the bag, which under the
+-- value rule cannot happen, because a 335-point hole is full value for a
+-- Potion and gets one long before anyone is in danger.
 function M.healDecision(o)
   local hp, maxhp = o.hp or 0, o.maxhp or 0
   local gain, cost = o.restore or 0, o.roundCost or 0
-  if hp <= 0 or maxhp <= 0 then return nil end
-  local pct = hp * 100 // maxhp
-  local endangered = hp <= cost         -- one round could finish them
-  if gain >= cost then
-    -- healing outruns the damage, so topping up can be repeated for ever.
-    -- Before the enemy has landed a round cost is 0 and this is the whole
-    -- rule, which is what leaves a fight's opening turn as it always was.
-    if pct < (o.threshold or 60) then return "top-up" end
-    if endangered then return "in danger" end
-    return nil
-  end
-  if (o.allies or 0) > 0 then
-    if o.mp and pct < (o.threshold or 60) then return "top-up" end
-    if endangered then return "covering an ally" end
-  end
+  if hp <= 0 or maxhp <= 0 or gain <= 0 then return nil end
+  local missing = maxhp - hp
+  if missing <= 0 then return nil end
+  -- the heal-lock: alone against damage the heal cannot out-run, swing
+  if (o.allies or 0) == 0 and gain < cost then return nil end
+  if o.mp then return "to full" end
+  if missing >= gain * (o.value or M.HEAL_VALUE) then return "full value" end
+  if hp <= cost and math.min(maxhp, hp + gain) > cost then return "in danger" end
   return nil
 end
 
@@ -1723,6 +1720,15 @@ end
 -- falling edge.  frame() sets the controller pad itself.
 function M.newFightDriver(tag, opts)
   opts = opts or {}
+  -- Refuse the retired knob rather than ignore it.  Every call site that
+  -- named a fraction was tuning the rule M.healDecision replaced, and a
+  -- number silently dropped on the floor is how a caller goes on believing it
+  -- steers something.
+  if opts.healPercent ~= nil then
+    error("opts.healPercent is gone.  M.healDecision heals by how much of "
+      .. "the heal would land, not by a fraction of maximum HP; drop the "
+      .. "option rather than re-tuning it")
+  end
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
   local CMDTBL, CMDROW, BCHID, BP, CURMP =
     0x202E, 0x890F, 0x3ED8, 0x3E9C, 0x3C08
@@ -1799,6 +1805,27 @@ function M.newFightDriver(tag, opts)
   -- of steering the policy wrong for a whole fight.
   local function itemRestoreOf(item)
     return itemRestore[item] or M.itemPower(item)
+  end
+
+  -- Which of the bag's heals fits a hole this size.  The owner's rule applied
+  -- to the choice as well as to the decision: take the biggest heal that
+  -- still lands nearly in full, and when nothing fits fall back to the
+  -- smallest one the bag holds, which wastes the least.  The old rule reached
+  -- for a Potion at a hole of 80 and threw away 170 of its 250 every time.
+  -- Sorted by what each is measured to restore rather than by a fixed order,
+  -- so a retuned item sorts itself.
+  local function bagHeal(missing)
+    local avail = {}
+    for _, id in ipairs({ POTION, TONIC }) do
+      if battInvIdx(id) then avail[#avail + 1] = id end
+    end
+    table.sort(avail, function(a, b)
+      return itemRestoreOf(a) > itemRestoreOf(b)
+    end)
+    for _, id in ipairs(avail) do
+      if missing >= itemRestoreOf(id) * M.HEAL_VALUE then return id end
+    end
+    return avail[#avail]
   end
 
   -- Where a spell sits in this actor's live battle Magic list, and what the
@@ -1904,19 +1931,23 @@ function M.newFightDriver(tag, opts)
       end
       -- Whom to heal, with what, and whether it is worth the turn it costs.
       -- M.healDecision is the policy and carries its reasoning; this is the
-      -- part that reads the fight.  A candidate is anyone hurt enough to top
-      -- up or standing inside one round of death, neediest first, and each is
-      -- offered a cast before the bag for the reasons at opts.cure above.
-      -- The first offer the policy says yes to gets the turn.
-      local threshold = opts.healPercent or 60
+      -- part that reads the fight.  A candidate is anyone alive and below
+      -- maximum, neediest first, and each is offered a cast before the bag
+      -- for the reasons at opts.cure above.  The first offer the policy says
+      -- yes to gets the turn.
+      --
+      -- Everyone below maximum, rather than everyone under a fraction: the
+      -- policy asks how much of the heal would be wasted, and a fraction gate
+      -- in front of it answers a different question and gets it wrong in both
+      -- directions.  A 400-HP character at 87% is a full Tonic down and would
+      -- never have been offered one; a 250-HP character at 59% was offered a
+      -- Potion that wasted half of itself.
       local cands = {}
       for e = 0, 3 do
         local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
-        if hp > 0 and maxhp > 0 then
-          local pct = hp * 100 // maxhp
-          if pct < threshold or hp <= (roundCost[e] or 0) then
-            cands[#cands + 1] = { e = e, pct = pct, hp = hp, maxhp = maxhp }
-          end
+        if hp > 0 and maxhp > 0 and hp < maxhp then
+          cands[#cands + 1] =
+            { e = e, pct = hp * 100 // maxhp, hp = hp, maxhp = maxhp }
         end
       end
       table.sort(cands, function(a, b) return a.pct < b.pct end)
@@ -1930,36 +1961,31 @@ function M.newFightDriver(tag, opts)
         local cost = roundCost[c.e] or 0
         -- The cast, offered first.
         --
-        -- The policy weighs a heal against what a round takes, and a cast is
-        -- weighed by the same rule with one clause turned off: see
-        -- M.healDecision's `mp`.  In short, the part of the rule that refuses
-        -- a losing heal in a PARTY is an argument about the bag being a fixed
-        -- supply, and MP is not that; the part that refuses one ALONE is an
-        -- argument about spending turns, and a cast spends a turn exactly as
-        -- a drink does.
+        -- A cast is weighed by the same rule with the value clause turned off
+        -- (M.healDecision's `mp`): nobody can say in advance what a cure
+        -- restores, so there is no hole to compare it against, and the
+        -- owner's answer is to heal to maximum.  MP pays for that, and MP
+        -- comes back at every level up.  The one clause a cast is NOT exempt
+        -- from is the solo heal-lock, which is an argument about spending
+        -- turns, and a cast spends a turn exactly as a drink does.
         --
-        -- The rule needs a number for what the cure restores, and unlike an
-        -- item there is no honest prior for one.  An item's +$14 power byte
-        -- reads back as the HP it gives (Tonic 50, and 50 is what a Tonic was
-        -- measured restoring); a cure's magic_prop power is an input to a
-        -- formula that scales with the caster's magic power and level, so
-        -- reading it would be deciding the policy on a guess.  So the first
-        -- cast of a spell in a battle is how the number is obtained: it is
-        -- offered unconditionally, healWatch measures what it put back, and
-        -- every later cast that battle is weighed against the real figure.
-        -- One exploratory turn, paid in the resource this branch exists to
-        -- spend, and only ever on somebody already hurt enough to be a
-        -- candidate.
+        -- What the cure restores is still measured, because the heal-lock
+        -- clause needs the number.  The first cast of a spell in a battle is
+        -- how it is obtained: it is offered unconditionally, healWatch
+        -- measures what it put back, and every later cast that battle is
+        -- weighed against the real figure.  A cast that fills the target to
+        -- maximum records nothing, because the HP that moved understates the
+        -- spell -- so under "heal to maximum" the measurement lands exactly
+        -- where it is load-bearing and misses where it is not: a round big
+        -- enough to trip the heal-lock leaves a hole bigger than the cure,
+        -- which is a cast that does not fill anyone up.
         --
-        -- The measurement can miss, and then the spell simply stays
-        -- unmeasured and keeps being offered -- which is the behaviour the
-        -- cast line shipped with, so a miss costs nothing it did not already
-        -- cost.  Measured missing on battle 70: CELES's Cure was planned on
-        -- EDGAR at 183/354 and an ally's Potion landed on him first, so the
-        -- cast healed a full target and moved no HP.  It needs an ally to
-        -- happen at all, and with an ally present a cast is allowed anyway
-        -- (the party clause), so it cannot reach the solo refusal, which is
-        -- the one this number is load-bearing for.
+        -- The measurement can also miss outright, and then the spell stays
+        -- unmeasured and keeps being offered -- the behaviour the cast line
+        -- shipped with, so a miss costs nothing it did not already cost.
+        -- Measured missing on battle 70: CELES's Cure was planned on EDGAR at
+        -- 183/354 and an ally's Potion landed on him first, so the cast
+        -- healed a full target and moved no HP.
         if cureRow ~= nil then
           for _, spell in ipairs(type(opts.cure) == "table" and opts.cure
                                  or CURES) do
@@ -1968,8 +1994,7 @@ function M.newFightDriver(tag, opts)
               local gain = castRestore[spell]
               local why = gain == nil and "not yet measured"
                 or M.healDecision({ hp = c.hp, maxhp = c.maxhp, restore = gain,
-                     roundCost = cost, allies = allies, threshold = threshold,
-                     mp = true })
+                     roundCost = cost, allies = allies, mp = true })
               if why then
                 healSaid = nil
                 M.log(string.format("[%s] actor=%d cure entity %d (%d/%d) with "
@@ -1988,28 +2013,25 @@ function M.newFightDriver(tag, opts)
             end
           end
         end
-        -- then the bag
-        local item = row ~= nil
-                 and ((c.maxhp - c.hp >= 80 and battInvIdx(POTION)) and POTION
-                   or battInvIdx(TONIC) and TONIC
-                   or battInvIdx(POTION) and POTION) or nil
+        -- then the bag, with whichever heal fits the hole best
+        local item = row ~= nil and bagHeal(c.maxhp - c.hp) or nil
         if item then
           local gain = itemRestoreOf(item)
           local why = M.healDecision({ hp = c.hp, maxhp = c.maxhp,
-            restore = gain, roundCost = cost, allies = allies,
-            threshold = threshold })
+            restore = gain, roundCost = cost, allies = allies })
           if why then
             healSaid = nil
             M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with " ..
-              "$%02X -- restores %d, a round costs %d (%s)", tag or "fight",
-              actor, c.e, c.hp, c.maxhp, item, gain, cost, why))
+              "$%02X -- restores %d into a hole of %d, a round costs %d (%s)",
+              tag or "fight", actor, c.e, c.hp, c.maxhp, item, gain,
+              c.maxhp - c.hp, cost, why))
             return { kind = "item", item = item, target = c.e, row = row,
                      idx = battInvIdx(item) }
           end
           local said = string.format("[%s] actor=%d not healing entity %d " ..
-            "(%d/%d): $%02X restores %d and a round costs %d, so the turn "
-            .. "buys back less than it spends -- acting instead",
-            tag or "fight", actor, c.e, c.hp, c.maxhp, item, gain, cost)
+            "(%d/%d): $%02X restores %d into a hole of %d, so most of it "
+            .. "would be thrown away -- acting instead", tag or "fight",
+            actor, c.e, c.hp, c.maxhp, item, gain, c.maxhp - c.hp)
           if said ~= healSaid then healSaid = said; M.log(said) end
         end
       end

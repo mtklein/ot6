@@ -123,7 +123,7 @@ end
 -- walking.
 local function encounters(what)
   local F = H.newFightDriver(what, { tactical = true, boost = true, bank = 3,
-    items = true, healPercent = 60, cadence = 12 })
+    items = true, cadence = 12 })
   local dead = 0
   return function()
     if battleHpAllZero() and not H.hasControl() and H.eventRunning() then

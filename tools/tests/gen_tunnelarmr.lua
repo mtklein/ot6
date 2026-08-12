@@ -281,7 +281,7 @@ local function safeWalk(tx, ty, what, budget)
   -- budget ran out (the same failure the header describes on map 87).  Same
   -- flee-then-tactical-fallback shape as navTo's playBattles="flee" branch.
   local F = H.newFightDriver(what or "safeWalk",
-    { tactical = true, boost = true, bank = 3, items = true, healPercent = 55,
+    { tactical = true, boost = true, bank = 3, items = true,
       healer = 6 })
   local battN = 0
   return seq({

@@ -158,7 +158,7 @@ local function n024Attempt(n)
   local sawBreak, deathFrame, deathTicks = nil, nil, nil
   local hb, ph, giveUp = 0, 0, 0
   local F = H.newFightDriver("b72", { tactical = true, boost = true, bank = 3,
-    items = true, healPercent = 60, cadence = 12 })
+    items = true, cadence = 12 })
   return H.cond(function() return fightWon end, {}, {
     H.logStep(function()
       return string.format("battle 72 attempt %d at f%d", n, H.frame)

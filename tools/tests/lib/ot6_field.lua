@@ -527,14 +527,12 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --                          entry, A takes the default target);
 --                  "tactical"  read the live command table and use Edgar's
 --                          Tools, Sabin's Blitz, and Fight for everyone else,
---                          with the driver's own item medic line.  It heals
---                          at opts.healPercent (default 55).  That default
---                          was 35, which was too late: measured on map 98
---                          (Trilium + Tusker + two Cirpius), a party healing
---                          only below a third spent five Fenix Downs on one
---                          step, where healing earlier would have spent
---                          Tonics at fifty gil instead of Fenix Downs at
---                          five hundred;
+--                          with the driver's own item medic line.  When it
+--                          heals is M.healDecision's business and no longer a
+--                          fraction the caller names: a heal goes in when the
+--                          hole is about the size of the heal, so most of the
+--                          heal lands.  opts.healPercent used to name that
+--                          fraction and is gone;
 --                  "flee"  hold L+R, the engine's own run mechanic.  A
 --                          fled battle does not count as a win, so win-only
 --                          rolls (SHADOW's 1/16 post-battle leave,
@@ -631,7 +629,6 @@ function M.navTo(txIn, tyIn, opts)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
       and M.newFightDriver("navTo",
         { tactical = true, boost = true, items = true,
-          healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
@@ -862,7 +859,6 @@ function M.advanceStory(pred, maxFrames, opts)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
       and M.newFightDriver("advanceStory",
         { tactical = true, boost = true, items = true,
-          healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
@@ -1144,7 +1140,6 @@ function M.worldNavTo(txIn, tyIn, opts)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
       and M.newFightDriver("worldNavTo",
         { tactical = true, boost = true, items = true,
-          healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
@@ -3313,11 +3308,10 @@ end
 -- sixteen Tonics sat in the bag.  He used none of them, because
 -- the pattern does not read menus.  M.newFightDriver does: it reads
 -- the live command table, boosts, and runs its own item medic line.
--- healPercent is the fraction it tops up at, and it is no longer the whole
--- rule: M.healDecision decides whether a heal is worth the turn it costs,
--- and a solo character who cannot out-heal the damage swings instead of
--- drinking.  That matters here more than anywhere, because LOCKE alone is
--- the one party shape opts.healer cannot help.
+-- M.healDecision decides whether a heal is worth the turn it costs, and a
+-- solo character who cannot out-heal the damage swings instead of drinking.
+-- That matters here more than anywhere, because LOCKE alone is the one party
+-- shape opts.healer cannot help.
 -- (The field half of this routine is hand-rolled; see the note above on
 -- why advanceStory cannot handle the tail of battle 11.)
 function M.rideOut(what, budget, dstMap)
@@ -3328,8 +3322,7 @@ function M.rideOut(what, budget, dstMap)
     -- (Ot6ShieldedMulW, ot6_break.asm:1487-1497), so the fight is won by
     -- breaking the shield rather than by chipping, and a boosted Fight is
     -- what chips.
-    { tactical = true, boost = true, bank = 3, items = true,
-      healPercent = 60, cadence = 12 })
+    { tactical = true, boost = true, bank = 3, items = true, cadence = 12 })
   return seq({
     M.driveUntil(function()
       local ok = M.hasControl() and M.tileAligned()

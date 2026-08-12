@@ -288,22 +288,10 @@ end
 local fights, rideStart = {}, nil
 local function rideDriver(pred, lostRef, maxFrames, what)
   local ph, hb, battN, wipeN = 0, 0, 0, 0
-  -- Policy, revised three times, every time after measured losses.
-  --
-  -- Round one (run N0mLGnDD, ladder failing at fights 6/4/6): healPercent 60
-  -- reacted too late to the Mag Roaders' whole-party bursts, and bank=3
-  -- wasted BP, because a chip is per hit, so three boost-1 swings out-chip
-  -- one boost-3 swing.  Round two (run R0crCD3T): healPercent 75 improved
-  -- the Roader attrition and then heal-locked the boss fight -- under the
-  -- boss and two blades someone is always below 75%%, so EDGAR spent every
-  -- turn on the bag and the body took one chip in 4900 frames -- and the
-  -- answer then was to split the thresholds, 75%% for the Roaders and 55%%
-  -- for the boss, so EDGAR's turns went back to the AutoCrossbow.
-  --
-  -- Round three (2026-08-12) reads both of those as the same problem with
-  -- the same real cause, which is that the party had no dedicated healer and
-  -- so any threshold high enough to keep it alive took the break's own turns
-  -- away.  Two measurements settle it.
+  -- Policy: who heals, decided by what each character's turn is worth.  When
+  -- to heal is M.healDecision's and is not set here; this ride used to carry
+  -- two hand-tuned fractions (95%% for the Roaders, 85%% for the boss) and
+  -- they went with the fraction rule they tuned.
   --
   -- What each turn is worth in fight 6, off this driver's 300-frame dumps:
   -- EDGAR's boosted AutoCrossbow is 500-750 damage and up to three shields
@@ -319,18 +307,16 @@ local function rideDriver(pred, lostRef, maxFrames, what)
   -- the one attempt that broke it outright (sh0, 1639 left).  On the 189-hp
   -- attempt he died at battle frame ~400, before taking a single turn.
   --
-  -- So: `healer` is SABIN on both drivers, which is what lets the threshold
-  -- be raised without costing the break anything, and the Roader threshold
-  -- goes to 95%% because the five Roader fights are the only chance to heal
-  -- that exists -- there is no field access between the six -- and SABIN's
-  -- turns there are worth even less than they are at the boss.  The bag is
-  -- no longer the healing: it is the reserve for when his MP runs out, which
-  -- is why the eight Tonics now reach fight 6 instead of being drunk by
-  -- fight 3.
+  -- So `healer` is SABIN on both drivers.  That is the clause that keeps the
+  -- break's own turns out of the medic line however much healing the fight
+  -- turns out to need, and it matters most across the five Roader fights,
+  -- which are the only chance to heal that exists -- there is no field access
+  -- between the six.  The bag is not the healing there: it is the reserve for
+  -- when SABIN's MP runs out, which is why the eight Tonics reach fight 6
+  -- instead of being drunk by fight 3.
   local SABIN, LOCKE, BOLT = 0x05, 0x01, 0x02
   local Ftrash = H.newFightDriver("n128 trash", { tactical = true,
-    boost = true, bank = 1, items = true, healer = SABIN,
-    healPercent = 95, cadence = 12 })
+    boost = true, bank = 1, items = true, healer = SABIN, cadence = 12 })
   -- Fight 6 steers every single-target confirm onto the body through the
   -- library's own focus machine rather than a local one; see the block
   -- above rideDriver for why the local one could not work.
@@ -344,8 +330,7 @@ local function rideDriver(pred, lostRef, maxFrames, what)
   -- one axis whatever tier it was, so the cheap tier buys more chips out of
   -- the same pool against a body carrying seven shields.
   local Fboss = H.newFightDriver("n128 boss", { tactical = true,
-    boost = true, bank = 1, items = true, healer = SABIN,
-    healPercent = 85, cadence = 12,
+    boost = true, bank = 1, items = true, healer = SABIN, cadence = 12,
     magic = { [LOCKE] = { spell = BOLT, boost = false } },
     focus = { { slot = 0, mask = 0x01 } } })
   return H.driveUntil(function() return lostRef.lost or pred() end, maxFrames, {

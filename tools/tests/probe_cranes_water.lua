@@ -23,7 +23,7 @@
 --     (engine latch $3f2e), then falls back to the measured tactical kit
 --     (boosted Tools/Blitz/Fights, bank 1), all of which is element-clean,
 --     so the party never feeds an absorb;
---   * medic doctrine healPercent 55 (the n128 boss split), cadence 12;
+--   * medic doctrine: healer 9, M.healDecision's own timing, cadence 12;
 --   * the standard 3-attempt retry ladder, 37-frame phase spread, off a
 --     pre-trigger savestate blob (clearGateSoldier's idiom), so a wipe
 --     reloads and replays a different fight.
@@ -252,7 +252,7 @@ local function attempt(n)
       -- entry's liveness check drops out and the default confirm takes the
       -- Right.  bank=2 helps: a 2-BP Pummel lands -796 on the shielded Left.
       F = H.newFightDriver("cranes water", { tactical = true, boost = true,
-        bank = 2, items = true, healer = 9, healPercent = 45, tools = false,
+        bank = 2, items = true, healer = 9, tools = false,
         cadence = 12, summon = summonChars, traceTgt = true,
         focus = { { slot = 0, mask = 0x01 } } })
       local ph, battN, wasBatt = 0, 0, false
