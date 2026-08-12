@@ -795,6 +795,233 @@ function M.enterEncounter()
   })
 end
 
+-- ----------------------------------------------------- battle rng seed --
+-- The retry ladder's mechanism, measured (issue #83) rather than assumed.
+--
+-- A battle's whole RNG stream hangs off one byte, seeded once at battle
+-- init (ff6/src/battle/battle_main.asm:6174-6176, inside InitBattle
+-- at :6138):
+--
+--     lda     $021e       ; low byte of game time (frames)
+--     asl2
+--     sta     $be         ; set random number seed
+--
+-- $021e is wGameTimeFrames (ff6/src/menu/menu_ram.inc:343, the last byte of
+-- the $021b hours/minutes/seconds/frames block).  IncGameTime
+-- (ff6/src/menu/menu_common.asm:3522-3549) runs it 1..60 and wraps, and it is
+-- ticked once per vblank from the field, world and battle NMIs
+-- (field/reset.asm:286, world/interrupt.asm:33/320/584,
+-- btlgfx/btlgfx_main.asm:1763) and from the menu (menu_common.asm:3496).  A
+-- is 8-bit at the store, so the seed is (frames * 4) & $FF: 60 values, 4..240,
+-- one per phase.  $be is then the index every battle Rand/RandA/RandCarry
+-- walks through RNGTbl (battle_main.asm:12640-12666).
+--
+-- So the ladder's premise holds -- waiting frames before a fight does move
+-- the seed -- but the constant it used did not follow from it.  Measured with
+-- probe_ladder_seed.lua on battle_entry's first encounter:
+--
+--   * attempts 2 and 3 reload the entry blob and then spend a fixed ~92
+--     frames of trampoline and settle before their own (n-1)*37, so they land
+--     37 apart reliably;
+--   * attempt 1 runs in place, so its phase is whatever the generator's own
+--     step layout leaves between the blob capture and the entry drive.  That
+--     term is not measured anywhere.  Re-running one ladder with 36 frames of
+--     lead in front of attempt 1 put attempts 1 and 2 on the same seed $9C
+--     with attempt 3 at $4C -- #80's reported signature, one fight played
+--     twice;
+--   * the drive from the wait to InitBattle took 96..99 frames across six
+--     attempts, so even a reliable 37 arrives at the seed as 40.  The stagger
+--     is not preserved by construction.
+--
+-- newSeedLadder replaces the constant with the counter it is trying to move:
+-- each attempt waits until $021e reaches its own target phase, spaced as
+-- widely as 60 phases allow, and the seed each attempt actually drew is read
+-- off the store instruction and required to be distinct.  A ladder that plays
+-- one fight twice is the failure mode with no symptom, so it fails the run.
+
+M.SEED_PHASE = 0x021E                   -- wGameTimeFrames
+M.SEED_PERIOD = 60                      -- IncGameTime's 1..60 cycle
+
+-- The live phase, and the seed a battle initialising right now would draw.
+function M.seedPhase() return M.readByte(M.SEED_PHASE) end
+function M.seedOf(phase) return (phase * 4) & 0xFF end
+
+-- Address of the `sta $be` store, found by its bytes rather than copied:
+-- AD 1E 02 (lda abs $021e), 0A 0A (asl a, asl a), 85 BE (sta dp $be), scanned
+-- forward from InitBattle.  battle_main moves whenever a hook shim changes
+-- size, and a stale literal here would silently watch the wrong instruction
+-- and report a green ladder forever.  Requiring exactly one match makes a
+-- moved or rewritten seeder an error rather than a miss.
+local SEED_SIG = { 0xAD, 0x1E, 0x02, 0x0A, 0x0A, 0x85, 0xBE }
+local seedStoreAddr = nil
+function M.seedStoreAddr()
+  if seedStoreAddr then return seedStoreAddr end
+  local base = M.sym("InitBattle") & 0x3FFFFF   -- HiROM: cpu addr -> file offset
+  local hits = {}
+  for off = 0, 0x200 - #SEED_SIG do
+    local ok = true
+    for i = 1, #SEED_SIG do
+      if M.readRomByte(base + off + i - 1) ~= SEED_SIG[i] then ok = false break end
+    end
+    if ok then hits[#hits + 1] = base + off end
+  end
+  if #hits ~= 1 then
+    error(string.format("battle seed store (lda $021e/asl2/sta $be) not uniquely "
+      .. "located within InitBattle+$200: %d matches.  battle_main.asm:6174-6176 "
+      .. "is what this looks for; if the seeder changed, this lib changes with it.",
+      #hits), 0)
+  end
+  seedStoreAddr = (hits[1] | 0xC00000) + 5      -- +5 skips lda(3) + asl(1) + asl(1)
+  return seedStoreAddr
+end
+
+-- A retry ladder that cannot quietly play one fight twice.
+--
+--   local L = H.newSeedLadder("battle 70")
+--   H.run({...}, {
+--     ...
+--     L.watch(),                  -- once, before the first attempt
+--     attempt(1), attempt(2), attempt(3),
+--     L.report(),                 -- once, after the last
+--   })
+--
+-- and inside attempt(n), where `H.waitFrames((n - 1) * 37)` used to sit:
+--
+--     L.spread(n),
+--
+-- spread(n) latches attempt 1's phase and then holds each later attempt until
+-- $021e reaches base + 20*(n-1), which is the widest even spacing three
+-- attempts fit into the 60-phase cycle.  The seed the fight actually drew is
+-- captured at the store and checked by report(): distinct across attempts, and
+-- present for every attempt that ran, so a watcher that never fired fails
+-- rather than passing silently.
+--
+-- opts.attempts (default 3) only sets the spacing.  It is not a licence to
+-- widen the ladder: three is the doctrine (#74), and a ladder that loses three
+-- different fights is reporting a finding.
+function M.newSeedLadder(tag, opts)
+  opts = opts or {}
+  local attempts = opts.attempts or 3
+  local gap = opts.gap or (M.SEED_PERIOD // attempts)
+  local L = { tag = tag or "ladder", seeds = {}, extras = {}, targets = {} }
+  local base, cur, watching = nil, 0, false
+
+  -- Every attempt that called spread(), in order, with the seed its first
+  -- battle drew.  Later seedings inside the same attempt (a fled random
+  -- encounter on the way back to the fight) are counted but not compared:
+  -- what decides "same fight twice" is the first battle after the spread.
+  L.watch = function()
+    return M.call(function()
+      if watching then return end
+      watching = true
+      local addr = M.seedStoreAddr()
+      M.log(string.format("[%s] watching the battle seed store at $%06X "
+        .. "(InitBattle=$%06X)", L.tag, addr, M.sym("InitBattle")))
+      emu.addMemoryCallback(function()
+        if cur == 0 then return end               -- battles before the ladder
+        -- Mesen fires exec callbacks before the instruction runs, so A is the
+        -- value about to land in $be.
+        local seed = emu.getState()["cpu.a"] & 0xff
+        local phase = M.seedPhase()
+        if L.seeds[cur] then
+          L.extras[cur] = (L.extras[cur] or 0) + 1
+          return
+        end
+        L.seeds[cur] = { seed = seed, phase = phase, frame = M.frame }
+        M.log(string.format("[%s] attempt %d seeded $be=$%02X from $021e=%d at f%d",
+          L.tag, cur, seed, phase, M.frame))
+      end, emu.callbackType.exec, addr, addr)
+    end)
+  end
+
+  -- The spread, derived from the counter the seed is made of.  Replaces
+  -- H.waitFrames((n - 1) * 37).  opts.forcePhase pins the target outright and
+  -- exists so a negative control can drive two attempts onto one seed and
+  -- watch report() fail; nothing else should pass it.
+  L.spread = function(n, sopts)
+    sopts = sopts or {}
+    local target = nil
+    return seqStep({
+      M.call(function()
+        assert(watching, L.tag .. ": L.watch() must run before L.spread()")
+        cur = n
+        L.seeds[n] = nil                          -- this attempt's own fight
+        local now = M.seedPhase()
+        local forced = sopts.forcePhase
+        if type(forced) == "function" then forced = forced() end
+        if n == 1 and not forced then base = now end
+        assert(base, L.tag .. ": spread(1) must run before spread(" .. n .. ")")
+        target = forced or (((base - 1) + gap * (n - 1)) % M.SEED_PERIOD) + 1
+        L.targets[n] = target
+        M.log(string.format("[%s] attempt %d: phase %d -> target %d "
+          .. "(seed $%02X), base %d gap %d%s",
+          L.tag, n, now, target, M.seedOf(target), base, gap,
+          forced and "  [forcePhase -- negative control]" or ""))
+      end),
+      -- Not M.waitUntil: `target` is only known once the step above has run,
+      -- and waitUntil bakes its description at construction time.  The budget
+      -- is three cycles; one is enough if the clock ticks once per frame, so a
+      -- timeout here means it does not tick at this point in the route, which
+      -- is a finding about the seed rather than about the wait.
+      (function()
+        local waited = 0
+        return {
+          tick = function()
+            if M.seedPhase() == target then
+              M.log(string.format("[%s] attempt %d on phase %d after %d frames",
+                L.tag, n, target, waited))
+              return "done"
+            end
+            waited = waited + 1
+            if waited > M.SEED_PERIOD * 3 then
+              error(string.format("%s: attempt %d never reached game-time phase "
+                .. "%d in %d frames (now %d).  $021e is not advancing here, so "
+                .. "no wait of any length can move the battle seed at this point "
+                .. "in the route.", L.tag, n, target, waited, M.seedPhase()), 0)
+            end
+            return "frame"
+          end,
+          reset = function() waited = 0 end,
+        }
+      end)(),
+    })
+  end
+
+  -- The check.  Fails on a repeated seed, and fails when nothing was
+  -- recorded, so a watcher pointed at the wrong instruction cannot report the
+  -- same green as a ladder that genuinely spread.
+  L.report = function()
+    return M.call(function()
+      local ran = {}
+      for n = 1, attempts do if L.seeds[n] then ran[#ran + 1] = n end end
+      assert(#ran > 0, L.tag .. ": no battle seeding was recorded for any "
+        .. "attempt.  Either no attempt reached a battle, or the seed watcher "
+        .. "never fired -- both make the distinctness check vacuous.")
+      local bySeed = {}
+      for _, n in ipairs(ran) do
+        local s = L.seeds[n]
+        M.log(string.format("[%s] attempt %d drew $be=$%02X (phase %d, f%d%s)",
+          L.tag, n, s.seed, s.phase, s.frame,
+          L.extras[n] and (", " .. L.extras[n] .. " later battles") or ""))
+        local prev = bySeed[s.seed]
+        if prev then
+          error(string.format("%s: attempts %d and %d both drew battle RNG seed "
+            .. "$%02X (game-time phase %d).  Same seed and the same route is "
+            .. "the same fight, so these %d attempts are fewer than %d "
+            .. "different fights and their verdict is not evidence about the "
+            .. "encounter.  Spread the attempts, do not widen the ladder (#74).",
+            L.tag, prev, n, s.seed, s.phase, #ran, #ran), 0)
+        end
+        bySeed[s.seed] = n
+      end
+      M.log(string.format("[%s] %d attempt(s), %d distinct battle RNG seeds",
+        L.tag, #ran, #ran))
+    end)
+  end
+
+  return L
+end
+
 -- ------------------------------------------------------- field state --
 -- Live reads of the field engine's party/story state.  These are shared, so
 -- they live in the battle core: suite battle tests that boot on a field
