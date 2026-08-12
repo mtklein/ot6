@@ -1932,6 +1932,67 @@ function M.partyMembers()
   return out
 end
 
+-- ------------------------------------------------- the exit contract ------
+-- Why this is a shared helper rather than four hand-written loops.
+--
+-- returner_hideout shipped with TERRA at 0/136 and LOCKE at 0/168 and five
+-- Fenix Downs unused in the bag.  Two steps later Banon's speech cut the
+-- party down to TERRA alone, so a hideout with no encounters in it produced
+-- a party wipe, and the wipe was investigated as a bug in the hideout.  A
+-- generator that ships a casualty is not saving the story getting
+-- somewhere; it is saving the route losing on the way, and every step that
+-- boots from that fixture inherits the loss.
+--
+-- tools/audit_party_hp.py is the tree-wide net for this and it is the same
+-- three conditions, deliberately: the net only catches a bad fixture after
+-- a `make savestates` measured in hours, while this fails the generator at
+-- the moment it was about to save.  If you change one, change the other, or
+-- a generator will pass its own exit contract and fail the audit.
+--
+--   dead:       HP 0, or wound in status 1
+--   petrified
+--   or zombie:  the other two bits of $C2, which is the mask the game
+--               itself applies when it asks whether a character can be
+--               healed (CheckCanUseItem, item.asm:2249-2258) or picked for
+--               Skills (CheckSkillValid, field_menu.asm:722-731).  A
+--               petrified character is not dead and a Fenix Down will not
+--               raise them either
+--   near fatal: HP at or below max HP / 8, which is the game's own
+--               arithmetic and not a number chosen here: `lda $3c1c,y`
+--               (max HP), `lsr3`, `cmp $3bf4,y` (current HP), and near
+--               fatal goes into the status-to-set when the carry says
+--               max/8 >= current (battle_main.asm:11544-11549)
+--
+-- Near fatal rather than dead-only because a member at 15 of 231 is a
+-- casualty the next random encounter has already collected.  Near fatal
+-- rather than something stricter because a bar that fires on ordinary wear
+-- gets waived away; audit_party_hp.py's header carries the measurement that
+-- put the line there.
+--
+-- This is the FLOOR, not the readiness bar.  A generator walking into a
+-- known fight should assert more than this and several do: gen_kolts and
+-- gen_returner require half HP at their exits, and gen_kolts additionally
+-- rations TERRA's MP to what VARGAS needs.  Passing this helper only means
+-- the fixture is not a casualty report.
+function M.standing(c)
+  local hp, mx = M.charHp(c), M.charMaxHp(c)
+  return hp > 0 and (M.charStatus1(c) & 0xC2) == 0 and hp > (mx >> 3)
+end
+
+-- Assert it for everyone assigned to a party, with the numbers in the
+-- message so a failure names the casualty instead of just failing.  During
+-- the three-scenario split that is all three parties at once rather than
+-- only the one being steered, which is intended: a party queued behind the
+-- same fight ships in the same fixture.
+function M.assertPartyStanding(tag)
+  for _, c in ipairs(M.partyMembers()) do
+    M.assertEq(M.standing(c), true, string.format(
+      "%s: char %d is on their feet (%d/%d hp, near fatal at or below %d, "
+      .. "status1 %02X)", tag, c, M.charHp(c), M.charMaxHp(c),
+      M.charMaxHp(c) >> 3, M.charStatus1(c)))
+  end
+end
+
 function M.invSlotOf(id)
   for i = 0, 255 do
     if M.readByte(0x1869 + i) == id and M.readByte(0x1969 + i) > 0 then

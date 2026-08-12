@@ -191,6 +191,35 @@ H.run({ maxFrames = 120000 }, {
       H.fieldY(), H.frame))
   end),
 
+  -- ===================================================================== --
+  -- Heal, before the finale takes the party out to the world map.
+  --
+  -- Three fights, no healing anywhere in the route, and a full bag:
+  -- camp_escaped shipped with SABIN at 15 of 231 hp and eight Potions and
+  -- five Tonics unspent (tools/audit_party_hp.py, 2026-08-11).  Fifteen hit
+  -- points is not a survivor, it is a casualty the walk to the Phantom
+  -- Forest has already collected, and every step that boots this fixture
+  -- inherits it.  Same shape as returner_hideout, which shipped two dead
+  -- and produced a party wipe in a room with no encounters at all.
+  --
+  -- The stop goes HERE, past battle 17 and before the finale, rather than
+  -- on the world map at the other end.  Map 119 at y<=21 is a plain field
+  -- map with real control: the escape's triggers re-fire only while the
+  -- party is aligned ON one (CheckEventTriggers has no once-per-tile latch,
+  -- field/event.asm:5740-5786) and battle 17's is at (36,22), a tile below
+  -- where this lands.  World-map care has one measured failure against it --
+  -- gen_tunnelarmr had its stop there and the world DP cells $E0/$E2 came
+  -- back reading (175,0) garbage with the world engine never resuming
+  -- (gen_tunnelarmr.lua:649-654) -- and there is no reason to spend that
+  -- risk when a field map sits one step earlier.
+  --
+  -- This party is CYAN, SHADOW and SABIN, none of whom knows a cure spell,
+  -- so fieldCare will drink rather than cast whatever the magic option says.
+  -- It picks Tonic or Potion by the size of the hole, so SHADOW's small one
+  -- does not cost a Potion.  It is a no-op that never opens the menu on a
+  -- run where the three fights happened to cost nothing.
+  H.fieldCare({ tag = "post-escape care", threshold = 0.9 }),
+
   -- Finale: up the x=37 column into the y=14 row -> _cb1a23 dismount cutscene
   -- -> world (179,71).  holdCross UP rides it (tap-A the dialogs) onto the
   -- world map; done when the world module owns the party.
@@ -210,6 +239,20 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(sw(0x0044), 0, "$0044 clear -- scenario not done yet")
     H.assertEq(inParty(5), true, "SABIN still in the party")
     H.assertEq(inParty(2), true, "CYAN still in the party")
+    -- The exit contract.  The care stop above is the fix; this is what makes
+    -- the generator fail loudly instead of shipping a bad fixture if the
+    -- care ever stops working or the bag ever runs out.  A failure here is a
+    -- finding about supplies, not a reason to lower the bar.
+    for c = 0, 15 do
+      if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
+        local base = 0x1600 + 37 * c
+        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d mp=%d/%d",
+          c, H.readByte(base), H.readByte(base + 8),
+          H.readWord(base + 9), H.readWord(base + 11),
+          H.readWord(base + 13), H.readWord(base + 15)))
+      end
+    end
+    H.assertPartyStanding("camp_escaped")
     H.log(string.format("[camp_escaped] f%d world (%d,%d) worldId=%d br=%d "..
       "battles: %s", H.frame, H.worldX(), H.worldY(), H.worldId(), bright(),
       table.concat(battles, " ")))

@@ -640,6 +640,14 @@ H.run({ maxFrames = 600000 }, {
     for id = 0x061C, 0x0627 do
       H.assertEq(sw(id), 1, string.format("raider $%04X marching", id))
     end
+    -- All three parties, not just the one being steered: the split has
+    -- already happened, parties 2 and 3 are queued behind the same fight,
+    -- and from here on nothing can heal them without a Y switch this
+    -- generator never makes.  If this ever fires it is a finding about the
+    -- walk to BANON, which plays its battles; the fix would be a care stop
+    -- BEFORE the assignment, while one menu visit can still reach all
+    -- seven.
+    H.assertPartyStanding("narshe_battle")
     H.screenshot("narshe_battle")
   end),
   H.saveState("narshe_battle.mss"),
@@ -673,10 +681,49 @@ H.run({ maxFrames = 600000 }, {
         "finding (#74-style); do not rig this segment", tostring(descLost)), 0)
     end
   end),
+
+  -- Heal, before the entry point is captured.  The descent fights every
+  -- collision it walks into and nothing in it heals, so the fixture this
+  -- step generates shipped CELES dead at 0/217 with a Fenix Down still in
+  -- the bag (measured on the pre-rename kefka_doorstep artifact,
+  -- tools/audit_party_hp.py, 2026-08-11).  Everything downstream boots that:
+  -- the KEFKA ladder below, battle_kefka, gen_kefka_won.  A two-character
+  -- party walking into KEFKA reads as a hard boss rather than as a descent
+  -- that lost somebody, which is exactly the misreading this whole class of
+  -- bug produces.
+  --
+  -- Party 1 is TERRA, EDGAR and CELES, and TERRA and CELES both know Cure,
+  -- so this casts and only reaches for the bag to revive.  mpFloor 0.75
+  -- because KEFKA is the very next fight and both healers are in this
+  -- party: a caster drained in the corridor walks into the boss with no
+  -- Cure.  0.75 was measured to keep essentially all of the item saving
+  -- while leaving the caster ready.
+  --
+  -- It cannot heal parties 2 and 3 -- the menu shows the active party and
+  -- this generator never switches with Y -- but it does not need to: they
+  -- never leave the staging tile.  The assertion below covers them anyway.
+  H.fieldCare({ tag = "care before KEFKA", threshold = 0.95,
+                mpFloor = 0.75 }),
+
   H.call(function()
     H.assertEq(H.fieldX() == 19 and H.fieldY() == 36, true,
       "party 1 at (19,36), KEFKA one tile below")
     H.assertEq(H.readByte(0x1a6d), 1, "still party 1")
+    for c = 0, 15 do
+      if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
+        local base = 0x1600 + 37 * c
+        H.log(string.format("char %2d party=%d level=%d hp=%d/%d mp=%d/%d",
+          c, H.readByte(0x1850 + c) & 0x07, H.readByte(base + 8),
+          H.readWord(base + 9), H.readWord(base + 11),
+          H.readWord(base + 13), H.readWord(base + 15)))
+      end
+    end
+    -- The exit contract.  The care stop above is the fix; this is what makes
+    -- the generator fail loudly instead of shipping a casualty into the
+    -- KEFKA fight and everything downstream of it.  A failure here means the
+    -- descent cost more than the bag could answer, which is a finding about
+    -- supplies and not a reason to lower the bar.
+    H.assertPartyStanding("kefka_entry")
     H.log(string.format("[entry point] f%d after %d fights (all attempts)",
       H.frame, fights))
     H.screenshot("kefka_entry")
