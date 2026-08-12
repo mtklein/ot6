@@ -522,8 +522,8 @@ done:   rtl
 ; ---- #64: the folded tier is also priced as that tier (v0.9) ----
 ;
 ; It used to be "bp stays the only price": GetMPCost runs four instructions
-; before this hook (battle_main.asm:13159) and banks the cost of whatever
-; $3a7b held at that point (the base spell) into $3620,y at :13163.  The fold
+; before this hook (battle_main.asm:13245) and banks the cost of whatever
+; $3a7b held at that point (the base spell) into $3620,y at :13249.  The fold
 ; then rewrote $3a7b behind it, so 2 BP bought a Fire 3 (51 MP of spell)
 ; for Fire's 4.  Boost was a discount on the magic list: the folded
 ; cast beat three separate casts on both axes, fewer turns and less MP.
@@ -628,7 +628,7 @@ done:   rtl
         sta     $3a7b           ; queue the folded tier
         jsl     Ot6SpellMP      ; #64: and price it as that tier.  x is still
         sta     $3620,y         ;   the actor, y still the queue slot, so this
-                                ;   overwrites the base cost :13163 just banked
+                                ;   overwrites the base cost :13249 just banked
 @keep:  pla
         plp
         rtl
@@ -854,7 +854,7 @@ Ot6FoldTbl:
 ;                 drawer (btlgfx_main.asm:13027, :19690, :854)
 ;   the confirm   `lda $2093,x / bmi` refuses a disabled row
 ;                 (btlgfx_main.asm:19659-19663)
-;   the charge    GetMPCost's character arm, `lda a:$0003,x`  (:13210)
+;   the charge    GetMPCost's character arm, `lda a:$0003,x`  (:13296)
 ;
 ; Three of those four live in bank C1, which is linked as a stock object into
 ; both the shipped and the nomp ROM, so a hook in any of them would shift the
