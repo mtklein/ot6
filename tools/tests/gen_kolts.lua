@@ -1087,13 +1087,33 @@ end
 -- carry Bucklers already), so a shield is a straight +22 defense / +14
 -- magic defense on him for 400 gil, and equip Optimum will put it back on
 -- after the story strips him.
+--
+-- A MithrilKnife is bought as well and nobody equips it here (issue #106).
+-- It is row 1 of the same shop, 300 gil out of a five-figure purse, power 30
+-- and OT6_PIERCE (ot6_class.asm:49).  It is bought for a fight three links
+-- past the scenario split: the Returner Hideout now hands the party a Genji
+-- Glove, which lets LOCKE hold two weapons at once, and TunnelArmr is
+-- `5, OT6_PIERCE`, so two PIERCE weapons chip two shields a swing instead of
+-- one.  What carries it there is the bag, by the same fact the Dirk
+-- paragraph above rests on: an unequipped item rides the split.
+--
+-- It is also what keeps CELES armed.  Without this purchase the Locke
+-- scenario holds exactly two weapons, so arming LOCKE with both hands leaves
+-- her with nothing, and tools/audit_equipment.py refuses a fixture that
+-- ships a bare-handed party member.  One extra knife is what lets LOCKE
+-- dual-wield pierce and CELES hold the MithrilBlade.
+--
+-- And it is what a player does at the last counter before the mountain:
+-- docs/design/wob-route.md section 2, buy what the next stretch needs.
 local MITHRILBLADE, HEAVYSHLD, STARPENDANT = 0x0A, 0x5B, 0xB1
+local MITHRILKNIFE = 0x01
 
 local function gearTrip()
   return seq({
     enterDoor(29, 19, 77, "weapon shop"),
     counterShop(103, 11, "shop 5 (weapon)"),
     buyTo(MITHRILBLADE, 2, 1, 450, "MITHRILBLADE to 1"),
+    buyTo(MITHRILKNIFE, 1, 1, 300, "MITHRILKNIFE to 1"),
     closeShop(77, "shop 5"),
     leaveDoor(103, 16, "shop 5"),
     enterDoor(35, 19, 77, "armor shop"),
@@ -1105,6 +1125,9 @@ local function gearTrip()
       H.assertEq(invCount(MITHRILBLADE) >= 1, true,
         "the MithrilBlade is in the bag")
       H.assertEq(invCount(HEAVYSHLD) >= 1, true, "the Heavy Shld is in the bag")
+      H.assertEq(invCount(MITHRILKNIFE) >= 1, true,
+        "a spare MithrilKnife is in the bag -- nobody wears it here; it is " ..
+        "LOCKE's second PIERCE weapon at TunnelArmr, past the split")
     end),
     equipGear(posOf(1), 0, MITHRILBLADE, "locke blade"),
     equipGear(posOf(1), 1, HEAVYSHLD, "locke shield"),
