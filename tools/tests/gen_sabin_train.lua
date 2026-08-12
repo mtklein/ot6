@@ -103,6 +103,7 @@ local GHOSTTRAIN = 0x0106
 local OT6_BLUDG, HOLY = 0x04, 0x20
 local PUMMEL, AURABOLT, SUPLEX = 0x5D, 0x5E, 0x5F
 local SHURIKEN = 0x41                   -- the ghost merchant's row 6
+local FIRE_SKEAN = 0xAB                 -- his row 7, OT6's (const.inc:271)
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_TOOLS = 0x05, 0x30     -- command list; tools-shell blitz list
 local ST_ITEM, ST_TGT = 0x0A, 0x38      -- item select; target select
@@ -168,10 +169,29 @@ local function battInvIdx(id)
   return nil
 end
 
--- navTo, always fleeing (the corridor policy; see the header)
+-- navTo, always fleeing (the corridor policy; see the header).
+--
+-- Every leg of this route walks a map with a live random pool, and each leg's
+-- maxFrames below is a *walking* budget measured off a leg that met no
+-- encounter.  That was fine until one of the pools pincered the party: FF6
+-- forbids running from a pincer until one side is cleared, so the flee spends
+-- its whole cap and the tactical fallback then has to win the fight, all
+-- inside the leg's budget.  Measured 2026-08-11 at 141 (105,8), three Bombs,
+-- 4000-frame leg: 1800 frames of held L+R that the engine never rolled for,
+-- then the fallback still fighting when the budget ran out -- reported as
+-- "timeout after 4000 frames driving toward navTo", which named the
+-- navigator for something that was not a navigation problem at all.
+--
+-- So the encounter allowance is added here, once, on top of whatever walking
+-- budget the leg asked for, instead of being folded into twenty-six
+-- hand-tuned numbers where it would read as route knowledge.  A leg that
+-- meets nothing still returns the moment it arrives; the allowance only costs
+-- frames when a leg genuinely has to fight.
+local ENCOUNTER_ALLOWANCE = 12000
 local function nav(x, y, o)
   o = o or {}
   o.playBattles = "flee"
+  o.maxFrames = (o.maxFrames or 20000) + ENCOUNTER_ALLOWANCE
   return H.navTo(x, y, o)
 end
 
@@ -494,22 +514,34 @@ local function closeShop()
   }, "shop closed")
 end
 
--- ------------------------------------------- battle 68: the pacifist line --
+-- ------------------------------------------- battle 68: the break, in full --
 -- The per-turn engine.  One button per 30-frame pulse, every press decided
 -- from the live menu state (command cursor $890F+actor, blitz grid
 -- $895F/$8963/$8967+actor, item index $8947+actor, target masks
 -- $7B7D/$7B7E), steering by d-pad, confirming with A, never poking a cursor
 -- cell.  Plans are built fresh at each actor's settled command menu:
---   SABIN  shields>0: AuraBolt while the remaining chips stay fundable
---          (mp-10 >= 4*(chips-1)), else Pummel (4 MP, the bludgeon chip);
---          mp<4 with shields up is the branch measured as impossible, which
---          logs the arithmetic and fails, as a #74 data point.
+--   SABIN  shields>0: AuraBolt first (10 MP, the holy reveal and chip 1),
+--          then Pummel every turn (4 MP, two hits, two chips).  Out of MP
+--          with shields still up, he logs the arithmetic and Fights, which
+--          is the #74 data point rather than a run failure.
 --          shields==0 (broken, train alive): dump banked boost on Fight.
+--   SHADOW shields>0: throw a Fire Skean while any are in the bag -- fire is
+--          one of GhostTrain's three weaknesses, so each one chips.  This is
+--          the second chipper #74 is about.  Otherwise he is a medic under
+--          45% and throws Shurikens the rest of the time.
 --   MEDICS shields>0: Tonic/Potion on the neediest living member (Potion
 --          when >=150 HP is missing and one is in the bag); Fenix Down is
 --          never picked; with the bag empty they Fight and log that.
 --          shields==0: dump boost on Fight, because the break is complete,
 --          the proof obligation is met, and the Broken window wants damage.
+--
+-- What changed for this fight in v0.10, and why the break is now reachable at
+-- all.  Before it, the party delivered one chip a round and only through
+-- SABIN, so the train (1900 HP) died at 1 shield standing every time it was
+-- measured -- @VanoraSC's report, and the structural finding on #74.  Two
+-- v0.10 changes move it: Pummel hits twice (#54), which halves the MP price
+-- of a chip and doubles SABIN's rate, and the ghost merchant stocks a Fire
+-- Skean, which gives SHADOW the key bosses-wob.md §8 always assumed he had.
 local b68 = {
   casts = 0, chips = {}, plan = nil, planActor = nil,
   brokeAt = nil, impossible = nil, itemsOut = false,
@@ -577,7 +609,19 @@ local function makePlan(actor)
   --           throws.  Availability is read from the battle inventory
   --           ($2686), not the field bag, because mid-battle field reads
   --           are measurably wrong (the b47 machine's own trap note).
+  --
+  -- All three thresholds tighten to 40% once the shields are down.  The
+  -- section comment above has always said that -- "the break is complete, the
+  -- proof obligation is met, and the Broken window wants damage" -- and the
+  -- code did not do it: CYAN went on healing at 75% through a window that is
+  -- 2159 frames long and multiplies damage by four (OT6_BREAK_TICKS,
+  -- ff6/src/battle/ot6_break.asm:1).  Spending it on Tonics is how a fight
+  -- that is already won gets lost, and every round it runs long is another
+  -- round of the train's party-wide spike.
   local hp, mx = pHP(actor), pMaxHP(actor)
+  local broken = shields == 0
+  local cyanLimit, sabinLimit, shadowLimit = 15, 13, 9
+  if broken then cyanLimit, sabinLimit, shadowLimit = 8, 8, 8 end
   local function healPlan(tgt, miss)
     local item = nil
     if miss >= 100 and battInvIdx(POTION) then item = POTION
@@ -590,46 +634,91 @@ local function makePlan(actor)
     return { kind = "item", item = item, target = tgt,
              row = cmdRowOf(actor, CMD_ITEM) }
   end
-  if actor == sabinE and mx > 0 and hp > 0 and hp * 20 < mx * 13 then
+  if actor == sabinE and mx > 0 and hp > 0 and hp * 20 < mx * sabinLimit then
     local p = healPlan(actor, mx - hp)
     if p then return p end
   end
   if actor == cyanE then
-    local tgt, miss = neediest(15)              -- anyone under 75%
+    local tgt, miss = neediest(cyanLimit)
     if tgt then
       local p = healPlan(tgt, miss)
       if p then return p end
     end
   end
   if actor == shadowE then
-    local tgt, miss = neediest(9)               -- someone under 45%
+    local tgt, miss = neediest(shadowLimit)
     if tgt then
       local p = healPlan(tgt, miss)
       if p then return p end
     end
   end
-  if mx > 0 and hp > 0 and hp * 2 < mx then     -- fallback: stay alive
-    local tgt, miss = neediest(15)
+  if mx > 0 and hp > 0 and hp * 20 < mx * (broken and 8 or 10) then
+    local tgt, miss = neediest(cyanLimit)       -- fallback: stay alive
     if tgt == nil then tgt, miss = actor, mx - hp end
     local p = healPlan(tgt, miss)
     if p then return p end
   end
-  -- healthy: SABIN's next two turns are the mechanism proofs.  AuraBolt
-  -- chips holy off the 6-shield row and Pummel chips the OT6_BLUDG class; a
-  -- missed cast re-plans the same skill, keyed off the shield count.
-  if actor == sabinE then
-    if shields == 6 and pMP(sabinE) >= 10 then
-      b68Log(string.format("plan chip 1: AURABOLT (mp %d, trainHP %d) [%s]",
-        pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+  -- healthy, shields still up: chip.  SABIN's first turn is the holy proof --
+  -- AuraBolt reveals HOLY and takes the first shield off the 6 -- and every
+  -- turn after it is Pummel, which is both the OT6_BLUDG proof and, since
+  -- v0.10 gave it two hits (#54), the cheapest chipper in the party: a shield
+  -- chips once per landed hit (Ot6HitJoin runs Ot6ClassChip per hit,
+  -- ff6/src/battle/ot6_break.asm:918-928), so Pummel is 2 chips for 4 MP
+  -- where Suplex is 1 for 13.  Six shields therefore cost 10 + 4 + 4 + 4 = 22
+  -- MP across four of SABIN's turns, which is what makes the break reachable
+  -- now and was not before: with a single-hit Pummel the same six shields
+  -- wanted 10 + 4 + 13 x 4 = 66 MP, more than he carries, and the train died
+  -- first.
+  --
+  -- AuraBolt is keyed on the reveal it exists to produce rather than on a
+  -- shield count.  It used to fire at shields == 6, which was the same thing
+  -- while SABIN was the only chipper, since nothing else could take a shield
+  -- before his first turn.  With SHADOW throwing skeans that stopped being
+  -- true: measured, a skean chipped 6->5 before SABIN's first menu, the branch
+  -- never ran, and the run failed its own holy-reveal assertion after winning
+  -- the fight.  Ot6Chip refuses to reveal anything on a broken monster
+  -- (ff6/src/battle/ot6_break.asm:844-847), so the reveal has to land while
+  -- shields are still up, which is what this condition says.  A missed cast
+  -- re-plans the same skill for the same reason.
+  if actor == sabinE and shields > 0 then
+    if not b68.holyRevealed and pMP(sabinE) >= 10 then
+      b68Log(string.format("plan chip 1: AURABOLT (mp %d, sh %d, trainHP %d) " ..
+        "[%s]", pMP(sabinE), shields, H.readWord(MHP(gSlot)), partyLine()))
       return { kind = "blitz", skill = AURABOLT,
                row = cmdRowOf(actor, CMD_BLITZ) }
     end
-    if shields == 5 and pMP(sabinE) >= 4 then
-      b68Log(string.format("plan chip 2: PUMMEL (mp %d, trainHP %d) [%s]",
-        pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+    if pMP(sabinE) >= 4 then
+      b68Log(string.format("plan chip: PUMMEL x2 (mp %d, sh %d, trainHP %d) [%s]",
+        pMP(sabinE), shields, H.readWord(MHP(gSlot)), partyLine()))
       return { kind = "blitz", skill = PUMMEL,
                row = cmdRowOf(actor, CMD_BLITZ) }
     end
+    b68Log(string.format("SABIN is out of chip MP at %d shields (mp %d): " ..
+      "Pummel costs 4 and AuraBolt 10, so the rest of this break is not " ..
+      "fundable and he falls back to Fight", shields, pMP(sabinE)))
+  end
+  -- SHADOW is the second chipper, the half of #74 that had no key in the
+  -- scenario until the ghost merchant started stocking skeans.  Throwing a
+  -- Fire Skean resolves to attack $51, element fire (ThrowToolsItemTbl /
+  -- ThrowToolsOffsetTbl, battle_main.asm:6648-6655), and GhostTrain $106 is
+  -- weak to fire, so it chips through Ot6Chip's element path.  He throws them
+  -- while shields are up and goes back to Shurikens once the break is done,
+  -- because a skean's only advantage after that is damage he can get cheaper.
+  --
+  -- He waits for the holy reveal before the first one, so SABIN's opener is
+  -- never pre-empted.  Measured: on an attempt where SHADOW acted first and
+  -- his skean took the sixth shield, AuraBolt then cost a whole turn and 10 MP
+  -- for one chip where Pummel would have given two for four, the break came a
+  -- round later, and the attempt was lost.  Ordering them costs nothing -- the
+  -- same actions happen, one turn apart -- and it reads as the line a player
+  -- would take: find the weakness, then spend the expensive key on it.
+  if actor == shadowE and shields > 0 and b68.holyRevealed
+     and battInvIdx(FIRE_SKEAN) then
+    b68Log(string.format("throw: SHADOW FIRE SKEAN (%d left, sh %d) " ..
+      "trainHP=%d [%s]", invCount(FIRE_SKEAN), shields,
+      H.readWord(MHP(gSlot)), partyLine()))
+    return { kind = "throw", item = FIRE_SKEAN,
+             row = cmdRowOf(actor, CMD_THROW) }
   end
   -- the damage kit, per the owner's line: SHADOW throws Shurikens (the
   -- throw list confirms onto the default enemy target), SABIN spends
@@ -805,8 +894,20 @@ end
 -- ------------------------------------------------- the battle-47 ladder --
 -- Checkpoint before the trap-ghost talk; an attempt is talk -> fight ->
 -- mob scene -> settled back on 142.  A wipe (GameOver park) or a
--- walked-off SHADOW (the 1/16 win roll; $4B is story-clear here) reloads
--- with a 17-frame stagger, which shifts the timeline and re-rolls.
+-- walked-off SHADOW (the 1/16 win roll; $4B is story-clear here) reloads and
+-- retries on a different battle RNG phase.
+--
+-- Both ladders here go through H.newSeedLadder rather than the fixed 17- and
+-- 23-frame staggers they used to carry.  A battle's whole RNG stream hangs
+-- off one seed taken from the game-time frame counter at battle init, so a
+-- constant stagger does not guarantee a different fight: it guarantees a
+-- different number of frames, and the drive between the wait and InitBattle
+-- is not constant (#83).  The spread waits on the counter the seed is made
+-- of, and report() reads back what each attempt actually drew and fails if
+-- two of them are the same, so "lost all three" from this step now means
+-- three different fights were lost.
+local L47 = H.newSeedLadder("battle 47")
+local L68 = H.newSeedLadder("battle 68")
 local b47Blob, b47won = nil, false
 local function b47Won() return b47won end
 local function b47Checkpoint()
@@ -833,8 +934,9 @@ local function b47Attempt(n)
       H.call(function() ldReq = H.requestLoadState(b47Blob) end),
       H.waitFrames(2),
       H.call(function() H.checkReq(ldReq, "b47 attempt " .. n) end),
-      H.waitFrames(60 + (n - 1) * 17),
+      H.waitFrames(60),                 -- settle the reload before driving
     }, {}),
+    L47.spread(n),                      -- spread the battle RNG phase (#83)
     H.call(function()
       lost, fightTier, wipeN = nil, n, 0
       b47Heals, fPlan, fPlanActor = 0, nil, nil
@@ -914,8 +1016,9 @@ local function b68Attempt(n)
       H.call(function() ldReq = H.requestLoadState(b68Blob) end),
       H.waitFrames(2),
       H.call(function() H.checkReq(ldReq, "b68 attempt " .. n) end),
-      H.waitFrames(60 + (n - 1) * 23),
+      H.waitFrames(60),                 -- settle the reload before driving
     }, {}),
+    L68.spread(n),                      -- spread the battle RNG phase (#83)
     H.call(function()
       lost, wipeN = nil, 0
       b68.casts, b68.chips = 0, {}
@@ -1052,9 +1155,19 @@ local function b68Attempt(n)
         H.log("[train] " .. lost)
       end
       if lost == nil then
-        -- the win is the obligation, and the two chips are the mechanism
-        -- proofs (they are SABIN's first two turns, so a win means they
-        -- had every chance to land)
+        -- The win is the obligation and the break is now part of it.  This
+        -- used to ask only for two chips, because two was all the party could
+        -- deliver: the train died with shields standing every time it was
+        -- measured, which is the structural finding on #74.  v0.10's
+        -- double-hitting Pummel and the merchant's skeans changed that, and
+        -- the line above stops chipping only when the shields are gone or
+        -- SABIN's MP is under 4 -- he carries 56 and the six shields cost 18 --
+        -- so a full break is a property of the line rather than a lucky
+        -- attempt, and a win that does not carry one is a regression worth
+        -- failing on.  Measured across four attempts on two runs: every one
+        -- broke all six, with the train alive at 964, 863, 964 and 472 HP.
+        H.assertEq(b68.brokeAt ~= nil, true,
+          "all six shields came off before the train died (#74's break)")
         H.assertEq(#b68.chips >= 2, true,
           "at least two shield chips landed (the mechanism proofs)")
         H.assertEq(b68.holyRevealed, true,
@@ -1162,16 +1275,31 @@ H.run({ maxFrames = 400000 }, {
   -- is what the #74 thread suggested
   buyItem(SHURIKEN, 6, function() return 10 - invCount(SHURIKEN) end,
     "SHURIKEN to 10"),
-  buyItem(POTION, 1, function() return 15 - invCount(POTION) end,
-    "POTION to 15"),
+  -- SHADOW's chip, and the second half of #74's fix.  Row 7 is OT6's own
+  -- slot: two Fire Skeans at 500 GP each, thrown at the Ghost Train, chip a
+  -- shield apiece off its fire weakness, which is the second chipper
+  -- bosses-wob.md §8 always budgeted for and no shop in the scenario sold.
+  -- Bought before the Potions on purpose, so a poorer purse upstream shorts
+  -- the marginal Potion rather than the break.
+  buyItem(FIRE_SKEAN, 7, function() return 2 - invCount(FIRE_SKEAN) end,
+    "FIRE SKEAN to 2"),
+  -- Potions drop from 15 to 11 to pay for them: 4 Potions is 1200 GP against
+  -- the skeans' 1000, so the purse that leaves this shop is 1634 rather than
+  -- the 1434 the Potion-heavy list left, and the scenario's later stops are
+  -- funded a little better than before rather than worse.  11 is still above
+  -- the medic line's floor asserted below.
+  buyItem(POTION, 1, function() return 11 - invCount(POTION) end,
+    "POTION to 11"),
   closeShop(),
   H.call(function()
-    H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
-      gil(), invCount(TONIC), invCount(POTION)))
+    H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d skeans=%d",
+      gil(), invCount(TONIC), invCount(POTION), invCount(FIRE_SKEAN)))
     H.assertEq(invCount(TONIC) >= 12, true,
       "at least 12 Tonics for the medic line (bought)")
     H.assertEq(invCount(POTION) >= 8, true,
       "at least 8 Potions for the medic line (bought)")
+    H.assertEq(invCount(FIRE_SKEAN) >= 2, true,
+      "two Fire Skeans for SHADOW's chip (bought, #74)")
   end),
 
   -- Car B's aisle gets a plain held walk first, and only then bfs.  On the
@@ -1209,9 +1337,13 @@ H.run({ maxFrames = 400000 }, {
 
   -- ---- battle 47, with real input, behind the ladder ----
   b47Checkpoint(),
+  L47.watch(),
   b47Attempt(1),
   b47Attempt(2),
   b47Attempt(3),
+  -- Before the verdict, not after: three attempts are evidence only if they
+  -- were three different fights (#83).
+  L47.report(),
   H.call(function()
     if not b47Won() then
       error(string.format("train: battle 47 did not complete cleanly on " ..
@@ -1310,11 +1442,32 @@ H.run({ maxFrames = 400000 }, {
   -- party into every attempt's starting state.
   H.fieldCare({ tag = "pre-smokestack care", threshold = 0.95 }),
 
-  -- ---- battle 68: the Ghost Train, the pacifist line, the ladder ----
+  -- The strip is where SHADOW can still be lost, and it is worth saying so
+  -- here rather than three steps later.  Fleeing rolls nothing, but a
+  -- formation that refuses the run gets fought out, and a win rolls his 1/16
+  -- walk-off (battle_main.asm:11976-11991).  He is checked at the end of the
+  -- run too, but by then the failure reads as a missing party entity inside
+  -- battle 68's setup; naming it at the last point he was definitely aboard
+  -- says which walk lost him.  This is also the checkpoint's entry contract:
+  -- every b68 attempt reloads a blob taken below, so a SHADOW who is gone now
+  -- is gone from all three attempts.
+  H.call(function()
+    H.assertEq(inParty(3), true,
+      "SHADOW still aboard after the strip walk (a fought-out corridor " ..
+      "encounter rolls his 1/16 leave; a fled one does not)")
+    H.log(string.format("[train] pre-smokestack bag: tonics=%d potions=%d " ..
+      "skeans=%d shurikens=%d fenix=%d gil=%d", invCount(TONIC),
+      invCount(POTION), invCount(FIRE_SKEAN), invCount(SHURIKEN),
+      invCount(FENIX_DOWN), gil()))
+  end),
+
+  -- ---- battle 68: the Ghost Train, the break, the ladder ----
   b68Checkpoint(),
+  L68.watch(),
   b68Attempt(1),
   b68Attempt(2),
   b68Attempt(3),
+  L68.report(),
   H.call(function()
     if not b68Won() then
       error(string.format("train: battle 68 did not complete cleanly on " ..
@@ -1359,12 +1512,28 @@ H.run({ maxFrames = 400000 }, {
     for _, row in ipairs(b68.chips) do H.log("[b68 record] " .. row) end
     H.log(string.format("[b68 record] brokeAt=%s killedAt=%s casts=%d",
       tostring(b68.brokeAt), tostring(b68.killedAt), b68.casts))
+  end),
+
+  -- A full break costs more HP than the old line that stopped at five
+  -- shields, and the ride out does not heal: the first run to complete the
+  -- break saved SHADOW at 38/197, which clears the party-hp audit's near-fatal
+  -- floor (max/8 = 24) by fourteen points and is no state to hand the Baren
+  -- Falls step.  The bag that funded the fight still has Tonics in it and the
+  -- world map is a healing surface, so spend them here rather than shipping
+  -- the fixture thin.  0.9 rather than full, because a Tonic is 50 HP and the
+  -- last few points cost a whole item each.
+  H.fieldCare({ tag = "post-train care", threshold = 0.9 }),
+  H.call(function()
+    -- The same three conditions as tools/audit_party_hp.py, and the two are
+    -- changed together: the audit is the net after a full `make savestates`,
+    -- this is the trip-wire at the moment the state was about to be saved.
+    H.assertPartyStanding("train_done")
     H.screenshot("train_done")
   end),
   H.saveState("train_done.mss"),
   H.logStep(function()
     return string.format("train_done generated at frame %d world (%d,%d) -- " ..
-      "battle 68 won (chips + Shurikens + Suplex, no writes)",
+      "battle 68 won, all six shields broken with the train alive",
       H.frame, H.worldX(), H.worldY())
   end),
 })

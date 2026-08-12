@@ -54,8 +54,17 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   `opts.playBattles=true` stalls or wipes the party on any segment that can
   draw an encounter.
   `M.FLEE_CAP` default 1800, per-call `opts.fleeCap` (the South Figaro
-  escape route uses 420). Cave pincer formations cannot be fled at all,
-  which is FF6's own rule.
+  escape route uses 420). Pincer formations cannot be fled at all, which is
+  FF6's own rule, and **the flee reads that off `$b1` bit 1 rather than
+  waiting out the cap**: `Cmd_2a` checks that bit first and answers "Can't
+  run away!!" (`battle_main.asm:5729-5731`), so once it has held for 60
+  frames the fight goes to the tactical driver while the party still has its
+  HP. Measured on the Phantom Train's front strip, where a pincer of three
+  Bombs held the whole 1800 with the run counters at 20/21/12 against a
+  difficulty of 6 and a full party came out at 22/0/39. **A nav step's
+  `maxFrames` is a walking budget**, so a route whose maps can draw
+  encounters needs an allowance on top of it or the fight expires the step
+  and reports a navigation timeout for something that is not one.
 - **Rows**: `$B3 = $FF` for every command and only the weapon swing
   clears it, so Tools, Magic, Blitz, SwdTech, Throw and Steal are
   row-exempt. Back row wins where damage is break-driven and loses where the

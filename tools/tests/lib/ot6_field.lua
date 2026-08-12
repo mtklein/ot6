@@ -168,6 +168,93 @@ local function wipeCanary(tag, soft)
   end
 end
 
+-- The corridor flee policy, one driver per navigator call.  The three
+-- navigators below used to carry three byte-for-byte copies of it.
+--
+-- L+R is the engine's own run mechanic.  At the cap the run has failed and
+-- the party is only taking damage, so the battle is fought out instead.  The
+-- fallback is the tactical driver rather than a blind A-tap, because a party
+-- that has already spent the cap being hit needs its own item menu more than
+-- it needs a first command row.
+--
+-- Before the cap there is a shorter answer, because some formations do not
+-- roll for the run at all.  $b1 bit 1 is the engine's own can't-run flag:
+-- UpdateMonsterGfxBuf clears bits 1-2 every pass and sets bit 1 back on for a
+-- pincer ($201f == 2, both sides occupied) or a live $3a42, and bit 2 with it
+-- for a harder-to-run monster (battle_main.asm:15630-15641, :15655-15661,
+-- :15696-15699).  Cmd_2a checks that bit before anything else and answers
+-- "Can't run away!!" (battle_main.asm:5729-5731), so while it is set the run
+-- counters can climb past the difficulty forever and nobody leaves.  Holding
+-- L+R into that is free damage with no roll behind it, so this reads the flag
+-- and hands the fight to the tactical driver while the party still has its HP.
+--
+-- Measured on the Phantom Train's front strip (2026-08-11, this is the bug
+-- that made train_done stop generating): three Bombs pincered the party at
+-- 141 (105,8), $b1 read $22 -- bit 1 can't-run plus bit 5, which the pincer
+-- sets by falling into the back attack's tail (battle_main.asm:7904-7913) --
+-- and across the full 1800 the run counters went 7,9,3 then 20,21,12 against
+-- a difficulty of 6 while nobody escaped.  The party entered that fight at
+-- 231/197/254 and the fallback inherited it at 22/0/39.
+--
+-- The periodic line is the measurement that was missing while all of that was
+-- happening: "no release after 1800 frames" says the run failed and nothing
+-- about why, and "the roll kept losing" and "the engine was never asked to
+-- roll" want different fixes.  Every cell in it is the engine's own run
+-- machinery:
+--   $2f45  characters-are-running, set only while L+R reads as held and
+--          nothing is blocking it (btlgfx_main.asm:1609-1621)
+--   $3a3b  run difficulty: 2 per live monster, 6 for a harder-to-run one
+--          (battle_main.asm:15642-15667)
+--   $3d70  per-character run counter, +rand(run factor)+1 per check; the
+--          character escapes once it reaches the difficulty
+--          (battle_main.asm:15583-15590)
+--   $b1    bit 1 can't-run, bit 2 harder-to-run, bit 5 back attack/pincer
+--   $2f4b  bit 0 the formation's own "no running with L+R"
+--   $7EE9EF / $7E629A  battle time stopped / menus force-closed, either of
+--          which suppresses $2f45 outright (btlgfx_main.asm:1611-1613)
+local CANT_RUN = 0x02           -- $b1 bit 1
+local REFUSAL_FRAMES = 60       -- consecutive frames of it before believing it
+
+local function newFlee(opts, tactical)
+  local cap = opts.fleeCap or M.FLEE_CAP
+  local refusedN, said = 0, false
+  -- battN is the caller's per-battle counter and it is 3 on the first frame
+  -- that reaches here, so that value is the new-battle edge.
+  return function(battN)
+    if battN <= 3 then refusedN, said = 0, false end
+    refusedN = ((M.readByte(0x00b1) & CANT_RUN) ~= 0) and refusedN + 1 or 0
+    if battN % 600 == 3 then
+      M.log(string.format(
+        "flee: held %d of %d frames -- running=%d difficulty=%d " ..
+        "counters=%d,%d,%d,%d $b1=%02X $2f4b=%02X timeStopped=%d menusShut=%d",
+        battN, cap, M.readByte(0x2f45), M.readByte(0x3a3b),
+        M.readByte(0x3d70), M.readByte(0x3d72), M.readByte(0x3d74),
+        M.readByte(0x3d76), M.readByte(0x00b1), M.readByte(0x2f4b),
+        M.readByte(0x7EE9EF), M.readByte(0x7E629A)))
+    end
+    if refusedN >= REFUSAL_FRAMES then
+      if not said then
+        said = true
+        M.log(string.format("flee: this formation refuses the run ($b1 bit 1 " ..
+          "held %d frames -- a pincer, or a monster nobody runs from) after " ..
+          "%d frames; fighting it out instead of standing still for the cap",
+          refusedN, battN))
+      end
+      tactical.frame()
+      return
+    end
+    if battN <= cap then
+      M.setPad({ l = true, r = true })
+      return
+    end
+    if battN == cap + 1 then
+      M.log(string.format("flee: no release after %d frames; " ..
+        "fighting this formation out", cap))
+    end
+    tactical.frame()
+  end
+end
+
 
 -- Field navigation, so routes are coordinate-aware instead of blind
 -- timed holds (which desync on any map).  Movement is grid-oriented, one
@@ -547,6 +634,7 @@ function M.navTo(txIn, tyIn, opts)
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic }) or nil
+  local flee = tactical and newFlee(opts, tactical) or nil
   local function drop(why)  -- discard the plan, logging why once, not per frame
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -593,21 +681,7 @@ function M.navTo(txIn, tyIn, opts)
           return
         end
         if opts.playBattles == "flee" then
-          -- L+R is the engine's own run mechanic.  At M.FLEE_CAP frames the
-          -- run has failed and the party is only taking damage, so the
-          -- battle is fought out instead.  The fallback is the tactical
-          -- driver rather than a blind A-tap, because a party that has
-          -- already spent M.FLEE_CAP frames being hit needs its own item
-          -- menu more than it needs a first command row.
-          if battN <= (opts.fleeCap or M.FLEE_CAP) then
-            M.setPad({ l = true, r = true })
-            return
-          end
-          if battN == (opts.fleeCap or M.FLEE_CAP) + 1 then
-            M.log(string.format("flee: no release after %d frames; " ..
-              "fighting this formation out", opts.fleeCap or M.FLEE_CAP))
-          end
-          tactical.frame()
+          flee(battN)
           return
         end
         if tactical then tactical.frame(); return end
@@ -791,6 +865,7 @@ function M.advanceStory(pred, maxFrames, opts)
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic }) or nil
+  local flee = tactical and newFlee(opts, tactical) or nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.driveUntil(function()
     local done = wipeSeen or pred()
@@ -830,15 +905,7 @@ function M.advanceStory(pred, maxFrames, opts)
         -- by tap-A, which is how the party reached VARGAS with TERRA dead and
         -- EDGAR on 1 hp.  Same contract as navTo's, cap included.
         if opts.playBattles == "flee" then
-          if battN <= (opts.fleeCap or M.FLEE_CAP) then
-            M.setPad({ l = true, r = true })
-            return
-          end
-          if battN == (opts.fleeCap or M.FLEE_CAP) + 1 then
-            M.log(string.format("flee: no release after %d frames; " ..
-              "fighting this formation out", opts.fleeCap or M.FLEE_CAP))
-          end
-          tactical.frame()
+          flee(battN)
           return
         end
         if tactical then tactical.frame(); return end
@@ -1080,6 +1147,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic }) or nil
+  local flee = tactical and newFlee(opts, tactical) or nil
   local hb = -600
   local function resolveT(v) return type(v) == "function" and v() or v end
   return M.driveUntil(function()
@@ -1113,21 +1181,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           return
         end
         if opts.playBattles == "flee" then
-          -- L+R is the engine's own run mechanic.  At M.FLEE_CAP frames the
-          -- run has failed and the party is only taking damage, so the
-          -- battle is fought out instead.  The fallback is the tactical
-          -- driver rather than a blind A-tap, because a party that has
-          -- already spent M.FLEE_CAP frames being hit needs its own item
-          -- menu more than it needs a first command row.
-          if battN <= (opts.fleeCap or M.FLEE_CAP) then
-            M.setPad({ l = true, r = true })
-            return
-          end
-          if battN == (opts.fleeCap or M.FLEE_CAP) + 1 then
-            M.log(string.format("flee: no release after %d frames; " ..
-              "fighting this formation out", opts.fleeCap or M.FLEE_CAP))
-          end
-          tactical.frame()
+          flee(battN)
           return
         end
         if tactical then tactical.frame(); return end
