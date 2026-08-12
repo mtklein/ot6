@@ -46,6 +46,17 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
 - **The equip audit** (`tools/audit_equipment.py`, a `make test` check with its
   own only-shrinks story-waiver list): check any red segment against it
   before calling the result balance.
+- **Absorb fails the run; null does not, and must not.** The absorb guard
+  in `M.run`'s frame callback (`lib/ot6.lua`, `battle_absorbguard.lua` is
+  the check) reads the formation's species and everyone's equipped weapon
+  once per battle and aborts when an element is absorbed, because then
+  every swing heals the enemy — the Cranes, where Optimum's ThunderBlades
+  healed a bolt-absorbing boss for up to 943 a swing. Do **not** widen it
+  to null. On battle 70 both siblings null bolt and the ThunderBlade pick
+  is still correct, because that fight is won by chipping shields and a
+  chip goes by weapon **class**; the element-aware equip swapped to
+  daggers and lost all three attempts. Random encounters log instead of
+  failing (`OT6_RANDBTL`, `ot6_boost.asm:14-29`).
 - **A party wipe must be reported as a wipe.** The navigators'
   `M.partyWiped()` check misses in-battle wipes, because `$1600` keeps
   pre-battle HP. The filed fix is a battle-module check (`$3BF4` under

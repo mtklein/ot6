@@ -2753,6 +2753,17 @@ end
 -- A no-op, with the menu never opened, when everyone already holds a
 -- weapon, so a route can call it after any story beat and pay only where
 -- something was taken away.
+--
+-- Optimum picks by attack power and knows nothing about elements, which
+-- is how the Cranes got armed with ThunderBlades against a boss that
+-- absorbs bolt.  That case is caught rather than corrected: the absorb
+-- guard in M.run fails the run at battle start when an equipped weapon's
+-- element is absorbed by anything in the formation (issue #81; the block
+-- above M.ELEM_NAMES in lib/ot6.lua carries the reasoning).  It
+-- deliberately says nothing about a merely NULLED element, because on
+-- battle 70 the nulled pick is the correct one and the element-aware
+-- alternative lost all three attempts.  When the guard fires, the fix is
+-- a deliberate M.equipWeapon for that fight, not a change here.
 function M.equipOptimum(opts)
   opts = opts or {}
   local tag = opts.tag or "equip"
