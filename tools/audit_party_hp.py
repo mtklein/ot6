@@ -263,8 +263,17 @@ def selftest(repo: str = ".") -> int:
         # WRAM after booting this checkpoint.  If the save layout ever
         # moves, this is what says so instead of the reader quietly
         # locating the wrong table or none at all.
-        want = {"LOCKE": (353, 353, 0x00), "EDGAR": (0, 398, 0x80),
-                "SABIN": (0, 407, 0x80), "CELES": (349, 349, 0x00)}
+        #
+        # Updated 2026-08-12 because the checkpoint itself was re-captured,
+        # not because the reader changed.  It used to hand over EDGAR and
+        # SABIN dead (0/398 and 0/407, status $80), which is the defect the
+        # re-capture cleared: battle 70 stopped killing them once the fight
+        # driver began casting CELES's cures instead of drinking, so the
+        # segment's two Fenix Downs are no longer spent on arrival.  SABIN
+        # at 278/363 is the fight's ordinary wear.  The expectation follows
+        # the measurement here; the reader is still what is under test.
+        want = {"LOCKE": (314, 314, 0x00), "EDGAR": (354, 354, 0x00),
+                "SABIN": (278, 363, 0x00), "CELES": (151, 349, 0x00)}
         got = {m["name"]: (m["hp"], m["maxhp"], m["status1"])
                for m in (party or [])}
         if err or got != want:
