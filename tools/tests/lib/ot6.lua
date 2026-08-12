@@ -946,8 +946,8 @@ function M.newSeedLadder(tag, opts)
       M.call(function()
         assert(watching, L.tag .. ": L.watch() must run before L.spread()")
         cur = n
-        L.spreads[n] = true               -- this attempt owes report() a seed
-        L.seeds[n] = nil                          -- this attempt's own fight
+        L.spreads[n] = true     -- this attempt now owes report() a seed
+        L.seeds[n] = nil        -- and it is the first fight after THIS spread
         local now = M.seedPhase()
         local forced = sopts.forcePhase
         if type(forced) == "function" then forced = forced() end
