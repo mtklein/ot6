@@ -94,6 +94,20 @@ Concretely, a normal player:
 - **Fights things.** Fleeing earns nothing, which is why the Sabin scenario
   reaches the ghost merchant about 9,000 gil poorer than the old lineage.
   Grinding a little for experience or money is expected, not a last resort.
+- **Equips deliberately, and never through Optimum.** Owner, 2026-08-12:
+  "you really should stop using auto equip. it goes wrong so so often,
+  instead think about what equipment will be useful and equip that." The
+  game's Optimum command picks by attack power and knows nothing about
+  elements, break classes, or which character is going to swing, and it has
+  produced three separate multi-hour investigations: Thunder Blades against
+  the lightning-absorbing Crane, where every swing healed the boss; the
+  party's only pierce weapon handed to the character who spends TunnelArmr
+  on Runic and never attacks, so no shield was ever chipped; and a nulled
+  element at battle 70 that was harmless only by luck. Two guards were filed
+  against it (#81, #105) before the simpler answer: use `H.equipWeapon` and
+  the targeted drives, decide the loadout for the segment ahead, and say in
+  one line why. A slot with nothing worth deciding still gets equipped on
+  purpose rather than delegated.
 - **Buys what the next stretch needs**, including things that prevent a
   problem rather than curing it: three Star Pendants at South Figaro make
   Mt Kolts' poison a non-issue, where the route instead buys Antidotes and
