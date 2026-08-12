@@ -37,11 +37,90 @@
 --      fail would print the same green as one that checked something.  The
 --      control is a real pair of attempts, not a poked table: identical route,
 --      identical seed, which is exactly how the old ladder degenerated.
+--
+-- Cases 4 and 5 are about the hold rather than the check, and they are the
+-- reason spread() counts the counter's movement instead of matching its value.
+-- The harness samples $021e once per emulated frame; the counter's tick sits
+-- at the end of a vblank handler long enough to straddle that boundary, so a
+-- quarter of the phases are written and overwritten between two samples and
+-- an equality test can never see them.  sfigaro_town's battle 11 hit it: 181
+-- frames waiting for phase 7 while the counter ticked 180 times and passed
+-- through 7 three times, reported as "$021e is not advancing here".  Case 4
+-- drives the hold with that exact aliasing and requires it to release; case 5
+-- drives it with a counter that genuinely never moves and requires it to fail,
+-- because "cannot spread" must never quietly become "play the same fight
+-- twice".
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 
 local blob = nil
+
+-- Tick one step per frame until it finishes or raises, keeping the error
+-- instead of letting it end the run.  The spread is a step, and two of the
+-- cases below are about what it does over time rather than what it returns.
+local function drive(mk, out, budget, what)
+  local step = nil
+  return H.seqStep({
+    H.call(function() step = mk(); out.frames = 0 end),
+    H.driveUntil(function() return out.done end, budget, {
+      H.call(function()
+        if out.done then return end
+        out.frames = out.frames + 1
+        local ok, r = pcall(function() return step:tick() end)
+        if not ok then out.done, out.err = true, r
+        elseif r == "done" then out.done = true end
+      end),
+    }, what),
+  })
+end
+
+-- A sampler that aliases the way the real one does.  $021e is ticked at the
+-- end of the owning module's vblank handler (ff6/src/field/reset.asm:286),
+-- which is long enough to finish either just inside the emulated frame or
+-- just past it, so the tick straddles the frame boundary the harness samples
+-- on: measured 2026-08-12 on sfigaro_town's battle 11, frames held 2, 1, 0, 1
+-- ticks on a four-frame beat and every phase congruent to 3 mod 4 lived and
+-- died between two samples.  This reproduces that sequence exactly: the
+-- counter still advances 60 phases per 60 frames, and a quarter of them are
+-- never what a sample returns.
+local BEAT = { 2, 1, 0, 1 }
+local function sampleSeq(start, count)          -- the beat, as plain data
+  local out, cur = {}, start
+  for i = 0, count - 1 do
+    out[#out + 1] = cur
+    cur = (cur - 1 + BEAT[i % 4 + 1]) % H.SEED_PERIOD + 1
+  end
+  return out
+end
+-- The same walk, stepped once per emulated frame rather than once per call,
+-- because the spread reads the counter more than once in the frame it starts.
+local function aliasedSampler(start)
+  local i, cur, atFrame = 0, start, nil
+  return function()
+    if atFrame ~= H.frame then
+      if atFrame ~= nil then
+        cur = (cur - 1 + BEAT[i % 4 + 1]) % H.SEED_PERIOD + 1
+        i = i + 1
+      end
+      atFrame = H.frame
+    end
+    return cur
+  end
+end
+-- The first phase at least `away` ahead of `start` that the sampler never
+-- returns.  `away` keeps the case honest: a blind phase one step ahead would
+-- be reached by any implementation, so the target is put most of a cycle out
+-- and the hold has to accumulate across both the repeats and the double steps.
+local function neverSampled(start, away)
+  local seen = {}
+  for _, v in ipairs(sampleSeq(start, H.SEED_PERIOD * 4)) do seen[v] = true end
+  for d = away, H.SEED_PERIOD - 1 do
+    local v = (start - 1 + d) % H.SEED_PERIOD + 1
+    if not seen[v] then return v end
+  end
+  return nil
+end
 
 -- Capture the entry-point blob every attempt reloads.
 local function captureBlob()
@@ -154,6 +233,64 @@ H.run({ maxFrames = 8000 }, {
           "an attempt that took a phase and drew no seed FAILS the ladder")
         H.assertEq(tostring(err):find("drew no seed") ~= nil, true,
           "and it names the attempt rather than reporting a bare pass")
+      end),
+    })
+  end)(),
+
+  -- 4. The spread must not need to SEE its target phase.  The harness samples
+  -- $021e once per emulated frame and the counter's tick straddles that
+  -- boundary, so a quarter of the phases are written and overwritten between
+  -- two samples.  sfigaro_town's battle 11 asked for phase 7, which was one of
+  -- them, and the old equality wait reported the counter as stopped after 181
+  -- frames of it ticking 180 times.  Same arithmetic here: the counter still
+  -- covers 60 phases per 60 frames and the target is a phase this sampler
+  -- never returns.
+  (function()
+    local START = 1
+    local blind = neverSampled(START, 30)
+    local A = H.newSeedLadder("aliasing control",
+                              { phaseSource = aliasedSampler(START) })
+    local out = {}
+    return H.seqStep({
+      H.call(function()
+        H.assertEq(blind ~= nil, true,
+          "the aliased sampler really does hide a phase from the harness")
+        H.log("aliasing control: phase " .. tostring(blind) ..
+          " is never what a sample returns")
+      end),
+      A.watch(),
+      A.spread(1),
+      drive(function() return A.spread(2, { forcePhase = blind }) end, out,
+            400, "aliasing control: spread onto a phase never sampled"),
+      H.call(function()
+        H.assertEq(out.err, nil,
+          "the spread RELEASES on a target the sampler never shows, rather "
+          .. "than reporting a stopped counter: " .. tostring(out.err))
+        H.assertEq(out.frames >= 25 and out.frames <= H.SEED_PERIOD + 5, true,
+          string.format("after most of a cycle of held frames, and inside one "
+            .. "full cycle (%d frames)", out.frames))
+      end),
+    })
+  end)(),
+
+  -- 5. ...and a counter that really is stopped still fails.  This is the half
+  -- that must not become "wait a bit and hope": a ladder that cannot spread
+  -- has to say so rather than run a second attempt on the first one's seed.
+  (function()
+    local S = H.newSeedLadder("stopped counter control",
+                              { phaseSource = function() return 30 end })
+    local out = {}
+    return H.seqStep({
+      S.watch(),
+      S.spread(1),
+      drive(function() return S.spread(2, { forcePhase = 10 }) end, out,
+            400, "stopped counter control: spread on a counter that never moves"),
+      H.call(function()
+        H.assertEq(out.err ~= nil, true,
+          "a spread on a counter that never moves FAILS rather than releasing")
+        H.assertEq(tostring(out.err):find("has not moved at all") ~= nil, true,
+          "and it reports the stopped counter, with where to put the spread "
+          .. "instead: " .. tostring(out.err))
       end),
     })
   end)(),
