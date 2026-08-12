@@ -57,6 +57,15 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   chip goes by weapon **class**; the element-aware equip swapped to
   daggers and lost all three attempts. Random encounters log instead of
   failing (`OT6_RANDBTL`, `ot6_boost.asm:14-29`).
+- **The party-hp audit** (`tools/audit_party_hp.py`, same shape, same kind of
+  waiver list) is the other half of that: no fixture ships a party member
+  dead, petrified, zombie, or at or below max HP / 8. Max/8 is the game's own
+  near-fatal line (`battle_main.asm:11544-11549`), and the bar is there rather
+  than at half HP because the measured distribution has a wide gap — 241 party
+  records across 98 fixtures run 0%, 6.5%, then nothing until 36.6%. Both
+  audits share one savestate reader, `tools/savestate_party.py`.
+  `H.assertPartyStanding` is the same three conditions as a generator exit
+  contract, and the two must be changed together.
 - **A party wipe must be reported as a wipe.** The navigators'
   `M.partyWiped()` check misses in-battle wipes, because `$1600` keeps
   pre-battle HP. The filed fix is a battle-module check (`$3BF4` under

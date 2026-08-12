@@ -1,0 +1,25 @@
+# Fixtures where a party member being down is the STORY, not a bug.
+#
+# Format:  <fixture>\t<CHARACTER>\t<why, and which step puts them back up>
+#
+# The rule this waives is tools/audit_party_hp.py: no fixture ships a party
+# member dead, petrified, zombified, or at or below max HP / 8, which is the
+# game's own near-fatal line (battle_main.asm:11544-11549).
+#
+# A waiver is only legitimate when the game itself is what put the character
+# down and the fixture captures that moment -- a story event that writes a
+# character out, not a fight nobody healed after.  The difference has to be
+# visible in the reason column: name the event, or name the step that heals
+# them.  "This fight is hard" and "the route cannot afford the Fenix Down"
+# are never reasons; the second one is a finding about supplies.
+#
+# Like the equipment waivers and the state-write list, this is a BURN-DOWN:
+# a line that matches nothing fails the run, so a fixture that gets healed
+# upstream cannot quietly keep its exemption.
+#
+# It is empty, and every finding so far has turned out to be a route that
+# lost somebody and kept walking.  If you are about to add the first line,
+# check docs/design/wob-route.md and docs/design/bosses-wob.md first: they
+# are authoritative on who is in the party at each point, and a character
+# the story has genuinely written out is usually not in $1850 at all, which
+# means this check never looks at them and no waiver is needed.
