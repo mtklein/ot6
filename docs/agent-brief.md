@@ -31,15 +31,29 @@ vocabulary and it was removed on 2026-08-11; do not reintroduce it.
     area, range                         not   band
     tier                                not   rung
     baseline                            not   ruler
+    saved game, savestate               not   fixture
+    re-made against this build          not   fresh
+    made by an older build              not   stale
 
 The Lua option is `opts.playBattles`, not `opts.honest`. `make savestates`,
 not `make frontier`. Savestates are `*_entry`, not `*_doorstep`.
 
+The last three are new on 2026-08-12 and correct an earlier judgement.
+"Fixture" was kept as ordinary industry English; the owner reads these
+reports and does not know the word, which is the only test that matters.
+"Fresh" and "stale" are worse, because they sound like plain English while
+carrying a specific meaning nobody outside this repo would guess: a saved
+game is made by loading the previous one and playing forward, so when the
+code or the ROM changes, one made by the older version no longer matches and
+has to be re-made by playing that stretch again. Say that, or say "re-made
+against this build". `--check-states` still prints STALE; explain it rather
+than repeating it.
+
 Kept because they are the product rather than jargon: break, boost, chip,
 shield, kit, magicite, esper, Rage, Blitz, SwdTech, BP, MP. Also kept:
-ordinary industry words (fixture, savestate, suite, probe, harness,
-regression, provenance, waiver), "gate" for a code guard such as `Ot6Gate`,
-battery for battery-backed SRAM, and place names.
+ordinary industry words (savestate, suite, probe, harness, regression,
+provenance, waiver), "gate" for a code guard such as `Ot6Gate`, battery for
+battery-backed SRAM, and place names.
 
 Do not write in a persuasive-essay register. No antithesis, no
 personification, no maxims, no sentence fragments for emphasis, no capitals
