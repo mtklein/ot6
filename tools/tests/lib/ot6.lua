@@ -465,6 +465,250 @@ function M.battleActive()
   return M.battleLoadStarted() and M.monstersPresent() > 0 and M.screenLooksAlive()
 end
 
+-- --------------------------------------------- absorbed-weapon guard --
+-- Fail the run when a character enters a fight holding a weapon whose
+-- element something in the formation ABSORBS, because then every swing
+-- heals the enemy.
+--
+-- Why this exists.  Measured 2026-08-10 on the airship Cranes:
+-- H.equipOptimum drives the game's own Optimum command, which picks by
+-- attack power and knows nothing about elements, and it armed LOCKE and
+-- EDGAR with ThunderBlades (item $0F, element bolt).  Left Crane $010D
+-- absorbs bolt, so every Fight healed the boss (+160/+198 a pair swing,
+-- +943 boosted) and advanced its Giga Volt counter.  The fight was
+-- reported as honestly unwinnable and nearly became a request for a
+-- tuning change.  The record is at M.equipWeapon below.
+--
+-- Why ABSORB only, and why a check rather than a swap.  The obvious
+-- generalisation -- prefer an element-clean weapon -- was written and
+-- measured WORSE.  On battle 70 the same weapon on the same two
+-- characters is merely NULLED (monster_prop.dat +$18 reads $FC for both
+-- Ifrit $0109 and Shiva $0108), and the swing was never where the damage
+-- came from: that fight is won by chipping shields, and a chip goes by
+-- weapon CLASS rather than element.  ThunderBlade is a sword, so
+-- ot6_class.asm:58-64 makes it OT6_SLASH, and slashing is Shiva's break
+-- axis.  The element-aware equip swapped to daggers (OT6_PIERCE), sold
+-- the chip that wins the fight, and lost all three attempts.  So null is
+-- a human judgement about class against the boss's break axis; absorb is
+-- the one case with no upside on either side of the trade.  A check that
+-- fails is the right shape for it, because it tells someone to think
+-- instead of choosing for them.
+--
+-- Where the numbers come from, each confirmed against behaviour that was
+-- already recorded rather than taken on trust:
+--   * monster_prop.dat, 32-byte records, +23 absorb (+24 null, +25 weak;
+--     HANDOFF "canonical facts", tools/check_boss_rows.py:88-92).  Ifrit
+--     $0109 reads absorb $01 fire and Shiva $0108 absorb $02 ice, which
+--     is bosses-wob.md's "fire heals Ifrit"; Whelk $0100 reads absorb $04
+--     bolt, which is the game's own tutorial; Crane $010D reads absorb
+--     $04 bolt, which is the Cranes measurement above.
+--   * item_prop_en.dat, 30-byte records, +$00 type (&$07 == 1 is a
+--     weapon) and +$0F element (research/data-formats.md "Items").
+--     ThunderBlade $0F reads element $04 bolt, power 108, matching the
+--     Cranes record.
+M.ELEM_NAMES = { "fire", "ice", "bolt", "poison", "wind", "holy", "earth",
+                 "water" }
+
+function M.elemStr(mask)
+  local out = {}
+  for i, n in ipairs(M.ELEM_NAMES) do
+    if (mask >> (i - 1)) & 1 == 1 then out[#out + 1] = n end
+  end
+  return #out > 0 and table.concat(out, "|") or "-"
+end
+
+local ITEM_REC, ITEM_TYPE, ITEM_ELEM = 30, 0x00, 0x0F
+local MON_REC, MON_ABSORB = 32, 23
+
+-- Item +$0F, but only for records the game itself calls a weapon: +$00's
+-- low three bits are the type (1 = weapon) and $80 marks an unused record
+-- (data-formats.md).  A shield in the left hand must not be read as one.
+function M.weaponElement(item)
+  if item == nil or item > 0xFF then return 0 end
+  local base = (M.sym("ItemProp") & 0x3FFFFF) + item * ITEM_REC
+  local t = M.readRomByte(base + ITEM_TYPE)
+  if (t & 0x80) ~= 0 or (t & 0x07) ~= 1 then return 0 end
+  return M.readRomByte(base + ITEM_ELEM)
+end
+
+function M.monsterAbsorb(species)
+  return M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF)
+    + species * MON_REC + MON_ABSORB)
+end
+
+-- Both hands of every party member, as { char = c, hand = "R"|"L",
+-- item = id }.  The left hand is usually a shield and weaponElement()
+-- returns 0 for one, but a Genji Glove really does put a second weapon
+-- there, so both slots are read.  $1600 + 37*c + $1F/$20, the same record
+-- audit_equipment.py and M.equipOptimum read.
+function M.partyWeapons()
+  local out = {}
+  for c = 0, 15 do
+    if (M.readByte(0x1850 + c) & 0x07) ~= 0 then
+      for i, hand in ipairs({ "R", "L" }) do
+        local item = M.readByte(0x1600 + 37 * c + 0x1E + i)
+        if item ~= 0xFF then
+          out[#out + 1] = { char = c, hand = hand, item = item }
+        end
+      end
+    end
+  end
+  return out
+end
+
+-- The formation's species, from OT6's own per-slot stash rather than from
+-- vanilla's $3F46.  Two reasons: OT6_SPECIES ($57c0, six words) is
+-- written per entity by Ot6SeedShields at monster-load time
+-- (ff6/src/battle/ot6_break.asm:70-78), so it carries a monster that is
+-- loaded but not on stage -- gen_ifrit_magicite.lua:340 asserts SHIVA
+-- $0108 is there from the first frame of battle 70 -- and $3F46 is six
+-- BYTES in vanilla's map (ff6/notes/battle-ram.txt:1123-1128), which is
+-- not wide enough for a 0..383 species and is not what the word reads in
+-- M.monsterIds() give.
+--
+-- Which slots are real comes from the formation's own occupied-slot mask.
+-- battle-ram.txt:1119-1121 draws the pair as "+$3F44 mmmmbbbb bbpppppp",
+-- mold / bg1-monsters / monsters-present, and the two bytes are in the
+-- order printed: the low six bits of the SECOND byte, $3F45, are the slot
+-- mask.  Measured on the whelk fight, whose formation is $0100 in slot 0
+-- and $0134 in slot 1: $3F44 reads $80 (mold 8) and $3F45 reads $03.
+-- Reading the pair as one little-endian word and masking its low six bits
+-- gives 0, which is what the first draft of this did, and it made the
+-- guard silently check nothing.
+--
+-- OT6_SPECIES is not cleared between battles, so without the mask a short
+-- formation would be checked against the tail of the previous one.
+-- Formation 504, the Imperial Camp Kefka fight, is legitimately empty
+-- (bosses-wob.md:267-268), so a zero mask is "nothing to check" rather
+-- than an error.
+M.FORMATION_MASK = 0x3F45
+function M.formationSpecies()
+  local mask = M.readByte(M.FORMATION_MASK) & 0x3F
+  local out = {}
+  for slot = 0, 5 do
+    if (mask >> slot) & 1 == 1 then
+      out[#out + 1] = { slot = slot, species = M.readWord(M.FORMATION + slot * 2) }
+    end
+  end
+  return out
+end
+
+-- The decision, with both inputs handed in, so a test can put a known
+-- clash through the same ROM reads and the same masks that the live guard
+-- uses.  Without that a green guard and a guard that never ran look the
+-- same.
+function M.absorbClashesFor(weapons, species)
+  local out = {}
+  for _, w in ipairs(weapons) do
+    local elem = M.weaponElement(w.item)
+    if elem ~= 0 then
+      for _, s in ipairs(species) do
+        local hit = M.monsterAbsorb(s.species) & elem
+        if hit ~= 0 then
+          out[#out + 1] = { char = w.char, hand = w.hand, item = w.item,
+                            elem = elem, slot = s.slot,
+                            species = s.species, absorbed = hit }
+        end
+      end
+    end
+  end
+  return out
+end
+
+function M.clashStr(c)
+  return string.format(
+    "char %d's %s-hand item $%02X (%s) is ABSORBED by slot %d species $%04X",
+    c.char, c.hand, c.item, M.elemStr(c.absorbed), c.slot, c.species)
+end
+
+function M.absorbClashes()
+  return M.absorbClashesFor(M.partyWeapons(), M.formationSpecies())
+end
+
+-- Random encounters are excluded.  OT6_RANDBTL ($57bd) is a normalized
+-- 0/1 flag latched in Ot6InitBP from the field trigger's marker and then
+-- cleared, so an event battle always reads 0 and a marker can never leak
+-- past one battle (ff6/src/battle/ot6_boost.asm:14-29).  Both measured
+-- disasters were scripted fights, where the party stands and swings; a
+-- random encounter that happens to absorb is usually fled or over in a
+-- round, and failing a multi-hour chain for one would bury the finding
+-- this guard exists to surface.  A clash in a random encounter is logged
+-- instead, which is how we would learn that the line is in the wrong
+-- place.
+M.RANDBTL = 0x57BD
+
+-- How long after M.battleLoadStarted() turns true before the formation is
+-- read.  The gate watches the party HP table, which the battle module
+-- fills near the end of its setup, so the species stash and the slot mask
+-- are already written; the wait is slack, not a measured requirement.
+local GUARD_SETTLE = 30
+-- and how long it may keep reading nonsense before that becomes the
+-- finding.  Ten seconds: far past any battle's setup, far short of the
+-- shortest fight.
+local GUARD_UNREADABLE = 600
+
+M.absorbGuardBattles = 0        -- battles inspected; the positive control
+M.absorbGuardClashes = 0
+local guardArmed, guardSettle = true, 0
+
+-- Returns an error message, or nil.  M.run calls this once per battle and
+-- routes a message through its own FAIL path.
+function M.absorbGuardTick()
+  if not M.battleLoadStarted() then
+    guardArmed, guardSettle = true, 0
+    return nil
+  end
+  if not guardArmed then return nil end
+  guardSettle = guardSettle + 1
+  if guardSettle < GUARD_SETTLE then return nil end
+
+  -- A species outside 0..383 means the slot mask and the species stash
+  -- are not both filled yet, which is also what junk looks like on a
+  -- playline that has not fought a battle (probe_57ba_strip measured $ff
+  -- riding the srm boot line, and M.battleLoadStarted reads a shape
+  -- rather than a flag).  Keep waiting rather than failing a run on a
+  -- transient; if it never resolves, fail, because a guard that cannot
+  -- read its data must not report the same green as one that read it and
+  -- found nothing.
+  local species = M.formationSpecies()
+  local unreadable
+  for _, s in ipairs(species) do
+    if s.species >= 384 then unreadable = s end
+  end
+  if unreadable then
+    if guardSettle < GUARD_UNREADABLE then return nil end
+    guardArmed = false
+    return string.format("absorb guard: %d frames into this battle slot %d "
+      .. "of the formation still reads species $%04X, which is not a monster "
+      .. "record (0..383), so the guard cannot say whether this fight "
+      .. "absorbs anything.  $57c0 is written per entity by Ot6SeedShields "
+      .. "and $3F45's low six bits say which slots are real; one of the two "
+      .. "is not what this code thinks it is.",
+      guardSettle, unreadable.slot, unreadable.species)
+  end
+
+  guardArmed = false
+  M.absorbGuardBattles = M.absorbGuardBattles + 1
+  local clashes = M.absorbClashesFor(M.partyWeapons(), species)
+  M.absorbGuardClashes = M.absorbGuardClashes + #clashes
+  if #clashes == 0 then return nil end
+
+  local lines = {}
+  for _, c in ipairs(clashes) do lines[#lines + 1] = "  " .. M.clashStr(c) end
+  local body = table.concat(lines, "\n")
+
+  if M.readByte(M.RANDBTL) ~= 0 then
+    M.log("absorb guard: RANDOM encounter, not failed on:\n" .. body)
+    return nil
+  end
+  return "absorb guard: someone entered this fight holding a weapon the "
+    .. "formation ABSORBS, so every swing HEALS it:\n" .. body
+    .. "\nThis is the Cranes bug (issue #81).  Pick the weapon deliberately "
+    .. "for this fight with H.equipWeapon -- weigh class against the boss's "
+    .. "break axis first and element second -- rather than leaving "
+    .. "H.equipOptimum's power-greedy pick in place."
+end
+
 -- ------------------------------------------------------- the step runner --
 -- A step is a table { tick = function(self) return "frame"|"done" end }.
 -- "frame" = consumed this frame, call again next frame; "done" = advance.
@@ -1772,7 +2016,16 @@ function M.run(opts, steps)
       emu.stop(2)
       return
     end
-    local ok, r = pcall(root.tick, root)
+    -- The absorb guard rides here rather than inside the battle drivers
+    -- because a route need not use one: gen_ifrit_magicite plays battle 70
+    -- with its own tactical driver, and a guard hung off M.fightBattle
+    -- would not see that fight at all.  Every test in the tree goes
+    -- through this one callback.
+    local ok, r = pcall(function()
+      local bad = M.absorbGuardTick()
+      if bad then error(bad, 0) end
+      return root:tick()
+    end)
     if not ok then
       finished = true
       M.log("FAIL: " .. tostring(r))
