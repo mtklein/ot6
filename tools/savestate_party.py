@@ -51,10 +51,13 @@ FALLBACK_CB = 0x1844
 # magitek, poison, zombie, dark.
 ST1_WOUND = 0x80
 ST1_PETRIFY = 0x40
+ST1_POISON = 0x04
 ST1_ZOMBIE = 0x02
 # The mask the game itself applies when it asks whether a character can be
 # healed (CheckCanUseItem, `item.asm:2249-2258`) or picked for Skills
-# (CheckSkillValid, `field_menu.asm:722-731`).
+# (CheckSkillValid, `field_menu.asm:722-731`).  Poison is deliberately not
+# in it: the menu serves a poisoned character quite happily, and that is a
+# different question from whether a fixture may ship one.
 ST1_OUT = ST1_WOUND | ST1_PETRIFY | ST1_ZOMBIE
 
 NAMES = {0: "TERRA", 1: "LOCKE", 2: "CYAN", 3: "SHADOW", 4: "EDGAR",

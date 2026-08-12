@@ -2050,6 +2050,18 @@ end
 --               (max HP), `lsr3`, `cmp $3bf4,y` (current HP), and near
 --               fatal goes into the status-to-set when the carry says
 --               max/8 >= current (battle_main.asm:11544-11549)
+--   poisoned:   $04 in status 1, which is a casualty in slow motion rather
+--               than a handicap.  UpdateStepCounter drains max HP/32 from
+--               every poisoned character on every step and floors the result
+--               at 1 (ff6/src/field/player.asm:593-609), so the walk itself
+--               converts the bit into 1 HP and then holds it there.  A
+--               fixture that ships poison is a fixture that will hand the
+--               next generator a character the next encounter has already
+--               claimed, whatever HP the record reads today.  Measured:
+--               banon_joined and lete_river shipped TERRA at 1 of 136 with
+--               status 04, and the near-fatal clause above is what caught
+--               them -- at the end, after the grind, rather than at the
+--               fight that applied the bit.
 --
 -- Near fatal rather than dead-only because a member at 15 of 231 is a
 -- casualty the next random encounter has already collected.  Near fatal
@@ -2062,9 +2074,14 @@ end
 -- gen_returner require half HP at their exits, and gen_kolts additionally
 -- rations TERRA's MP to what VARGAS needs.  Passing this helper only means
 -- the fixture is not a casualty report.
+-- $C6, not $C2: the game's own can-be-healed mask is $C2 (wound, petrify,
+-- zombie) and stays $C2 everywhere this file asks the game's own question,
+-- because the menu serves a poisoned character perfectly well.  The exit
+-- contract asks a different question -- is this fixture safe to hand down --
+-- and poison fails that one.
 function M.standing(c)
   local hp, mx = M.charHp(c), M.charMaxHp(c)
-  return hp > 0 and (M.charStatus1(c) & 0xC2) == 0 and hp > (mx >> 3)
+  return hp > 0 and (M.charStatus1(c) & 0xC6) == 0 and hp > (mx >> 3)
 end
 
 -- Assert it for everyone assigned to a party, with the numbers in the
@@ -2076,8 +2093,10 @@ function M.assertPartyStanding(tag)
   for _, c in ipairs(M.partyMembers()) do
     M.assertEq(M.standing(c), true, string.format(
       "%s: char %d is on their feet (%d/%d hp, near fatal at or below %d, "
-      .. "status1 %02X)", tag, c, M.charHp(c), M.charMaxHp(c),
-      M.charMaxHp(c) >> 3, M.charStatus1(c)))
+      .. "status1 %02X%s)", tag, c, M.charHp(c), M.charMaxHp(c),
+      M.charMaxHp(c) >> 3, M.charStatus1(c),
+      (M.charStatus1(c) & 0x04) ~= 0
+        and " -- POISONED, and every step drains max/32" or ""))
   end
 end
 

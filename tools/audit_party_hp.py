@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report fixtures that ship a party member dead or one hit from it.
+"""Report fixtures that ship a party member dead, one hit from it, or poisoned.
 
 Why this exists.  `returner_hideout` shipped with half the party dead: TERRA
 at 0/136 and LOCKE at 0/168, five Fenix Downs unused in the bag, and no
@@ -29,7 +29,7 @@ remedy is different in kind; the closing message says what it is.
 
 WHERE THE LINE IS, AND WHY THERE
 
-Three conditions fail, and they are the game's own, not invented here:
+Four conditions fail, and they are the game's own, not invented here:
 
   - **Dead**: current HP 0, or wound in status 1.
   - **Petrified or zombie**: the other two bits in `$C2`, which is the mask
@@ -38,11 +38,30 @@ Three conditions fail, and they are the game's own, not invented here:
     Skills (CheckSkillValid, `ff6/src/menu/field_menu.asm:722-731`).  A
     petrified character is not dead and cannot be revived with a Fenix Down
     either; shipping one is the same failure wearing a different status bit.
+  - **Poisoned**: `$04` in status 1.  Poison is not in the game's own
+    can-be-healed mask and does not belong there -- the menu serves a
+    poisoned character perfectly well -- but it is the one status the act of
+    walking converts into a casualty.  UpdateStepCounter drains max HP/32
+    from every poisoned character on every step and floors the result at 1
+    (`ff6/src/field/player.asm:593-609`), so a character who leaves a fight
+    poisoned reaches the end of any walk of length at exactly 1 HP no matter
+    what they had when the fight ended.  banon_joined and lete_river are the
+    measured case: TERRA at 1 of 136 with status 04 after five crossings of
+    a Returner Hideout that cannot draw an encounter at all (its map_prop
+    byte `$0525` has bit 7 clear, `ff6/src/field/battle.asm:332-333`).  The
+    near-fatal clause below did catch them, but only at the far end of the
+    grind; this clause names the bit at the fixture that first carries it,
+    which is the fixture whose generator can still do something about it.
   - **Near fatal**: current HP at or below max HP / 8.  That is the game's
     arithmetic, not a number picked to fit: `lda $3c1c,y` (max HP), `lsr3`,
     `cmp $3bf4,y` (current HP), and near-fatal goes into the status-to-set
     when the carry says max/8 >= current (`ff6/src/battle/battle_main.asm:
     11544-11549`).
+
+Poison is curable on the route, so this is a bar the tree can meet rather
+than one it can only waive: `M.fieldCare` learned the Antidote alongside
+this clause, and shop 8 in South Figaro -- the shop gen_kolts already walks
+into -- stocks Antidotes on row 1 (`ff6/src/menu/shop_prop.dat` record 8).
 
 Near fatal rather than dead-only, because a member at 15 of 231 is not a
 survivor, it is a casualty the next random encounter has already claimed,
@@ -102,7 +121,7 @@ import sys
 # `python3 -P` both switch off.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from savestate_party import (ST1_PETRIFY, ST1_WOUND, ST1_ZOMBIE,
+from savestate_party import (ST1_PETRIFY, ST1_POISON, ST1_WOUND, ST1_ZOMBIE,
                              checkpoint_payloads, declared_states,
                              load_waivers, read_party, read_party_sram,
                              split_orphans, stem_of)
@@ -134,6 +153,11 @@ def classify(m: dict) -> str | None:
         return "PETRIFIED"
     if st1 & ST1_ZOMBIE:
         return "ZOMBIE"
+    # Ahead of NEAR FATAL, because a poisoned character at 1 HP is both and
+    # only one of the two labels says what to do about it.  The HP is in
+    # describe() either way.
+    if st1 & ST1_POISON:
+        return "POISONED"
     if m["maxhp"] and m["hp"] <= near_fatal_floor(m["maxhp"]):
         return "NEAR FATAL"
     return None
@@ -175,8 +199,23 @@ def selftest(repo: str = ".") -> int:
         # the other two bits of the game's own $C2 mask
         (rec(200, 217, 0x40), "PETRIFIED", "petrify"),
         (rec(200, 217, 0x02), "ZOMBIE", "zombie"),
+        # poison, which the HP alone cannot report.  The first case is the
+        # one the near-fatal clause never sees: TERRA the moment the fight
+        # that poisoned her ends, still at 118 of 136, on a route with a
+        # hideout to walk.  The second is the same character at the far end
+        # of that walk, which is what banon_joined and lete_river shipped.
+        (rec(118, 136, 0x04), "POISONED", "poisoned and nowhere near fatal"),
+        (rec(1, 136, 0x04), "POISONED", "banon_joined TERRA, ground to 1"),
+        # and dead-with-poison is still reported as dead: a Fenix Down is
+        # the only thing the game will accept there (item.asm:2278-2285)
+        (rec(0, 136, 0x84), "DEAD", "wound wins over poison"),
         # magitek ($08) is 18 records in the tree and is not a casualty
         (rec(147, 231, 0x08), None, "magitek status alone"),
+        # nor is dark ($01) or imp ($20): both are combat handicaps that
+        # walking does not make worse, which is the whole basis for poison
+        # being in the list and them not being in it
+        (rec(147, 231, 0x01), None, "dark alone"),
+        (rec(147, 231, 0x20), None, "imp alone"),
     ]
     bad = []
     for m, want, what in cases:
@@ -368,7 +407,13 @@ def main() -> int:
               f"no encounters: a story event cut the party down to the one\n"
               f"member who was already dead.  Give the step where the damage "
               f"happens an H.fieldCare stop, and give the generator an exit\n"
-              f"assertion so it fails loudly instead of shipping the fixture.")
+              f"assertion so it fails loudly instead of shipping the fixture.\n"
+              f"A POISONED line wants the same two things and one more: the "
+              f"Antidote has to be IN the bag for fieldCare to reach for it,\n"
+              f"and poison drains max HP/32 every step "
+              f"(ff6/src/field/player.asm:593-609), so a fixture that ships "
+              f"the bit\nhands the next generator a character at 1 HP however "
+              f"healthy this one's HP column looks.")
     if cp_bad:
         print(f"\n{len(cp_bad)} CHECKPOINT(s) SHIP A CASUALTY, which is the "
               f"same defect one level down and costs more to clear.  A\n"
