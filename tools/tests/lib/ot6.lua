@@ -517,7 +517,7 @@ function M.elemStr(mask)
   return #out > 0 and table.concat(out, "|") or "-"
 end
 
-local ITEM_REC, ITEM_TYPE, ITEM_ELEM = 30, 0x00, 0x0F
+local ITEM_REC, ITEM_TYPE, ITEM_ELEM, ITEM_POWER = 30, 0x00, 0x0F, 0x14
 local MON_REC, MON_ABSORB = 32, 23
 
 -- Item +$0F, but only for records the game itself calls a weapon: +$00's
@@ -529,6 +529,67 @@ function M.weaponElement(item)
   local t = M.readRomByte(base + ITEM_TYPE)
   if (t & 0x80) ~= 0 or (t & 0x07) ~= 1 then return 0 end
   return M.readRomByte(base + ITEM_ELEM)
+end
+
+-- Item +$14, the power byte (data-formats.md "Items").  For a consumable
+-- that is how much it heals: $E8 Tonic reads 50 and $E9 Potion reads 250 on
+-- this ROM.  It is the engine's input rather than its output, so a caller
+-- that can watch a use land should prefer what it measures; newFightDriver
+-- uses this as the prior and replaces it with the observed number.
+function M.itemPower(item)
+  if item == nil or item > 0xFF then return 0 end
+  return M.readRomByte((M.sym("ItemProp") & 0x3FFFFF)
+    + item * ITEM_REC + ITEM_POWER)
+end
+
+-- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
+-- kept out here as arithmetic on plain numbers so battle_healpolicy can put
+-- the measured cases through it without an emulated fight.
+--
+--   hp, maxhp   the candidate's HP
+--   restore     what the item in hand actually gives back
+--   roundCost   what one round takes off this candidate, measured in the
+--               fight; 0 before the enemy has landed a round
+--   allies      living party members other than the actor deciding
+--   threshold   the top-up fraction, opts.healPercent
+--
+-- Returns the reason to heal, or nil for "act instead".
+--
+-- A heal buys back restore/roundCost of a turn and spends a whole one.  When
+-- the item restores at least what a round takes, that trade never runs out --
+-- the candidate can be topped up for ever -- so the fraction rule governs and
+-- this behaves the way the driver always did.  When it restores less, the
+-- trade is a loss, and the size of the loss does not depend on where the
+-- threshold sits: with HP h, a round costing d and a heal giving g < d, a
+-- character who spends k of his turns drinking lands h/d + k*(g/d - 1)
+-- attacks before he dies, which falls as k rises.  So a character who cannot
+-- out-heal the damage does not heal; he swings.
+--
+-- The exception is an ally.  A turn spent on somebody else's survival buys
+-- back their whole remaining turn stream rather than a fraction of one, so a
+-- losing heal is still worth it when there is somebody to cover and the drink
+-- really lifts them out of range of the next round.  With nobody to cover --
+-- a solo party -- that exception is empty, which is why solo LOCKE against
+-- battle 11's soldier now swings instead of drinking (issue #74: a Tonic
+-- restoring 50 against 55-112 a round, five drinks and one attack).
+--
+-- Lowering healPercent would also have made battle 11 pass, and would have
+-- been the mistake #74 documents: a number that fits one fight and still
+-- heals at the wrong moments in every other thin-bag fight.
+function M.healDecision(o)
+  local hp, maxhp = o.hp or 0, o.maxhp or 0
+  local gain, cost = o.restore or 0, o.roundCost or 0
+  if hp <= 0 or maxhp <= 0 then return nil end
+  local pct = hp * 100 // maxhp
+  -- inside one round of dying, and the drink puts them back outside it
+  local saves = hp <= cost and hp + gain > cost
+  if gain >= cost then
+    if pct < (o.threshold or 60) then return "top-up" end
+    if saves then return "in danger" end
+    return nil
+  end
+  if saves and (o.allies or 0) > 0 then return "covering an ally" end
+  return nil
 end
 
 function M.monsterAbsorb(species)
@@ -1618,6 +1679,13 @@ function M.newFightDriver(tag, opts)
   local menuStreak, tick, battleTick = 0, 0, 0
   local plan, planActor, held = nil, nil, {}
   local tgtSpin = 0                    -- frames spent undecided in ST_TGT
+  -- The two numbers the heal policy weighs against each other, both measured
+  -- in the fight rather than assumed.  See the policy note in makePlan.
+  local roundCost = {}                 -- entity -> worst HP lost per own turn
+  local turnSnap = {}                  -- actor -> party HP at its last turn
+  local restoreSeen = {}               -- item -> HP a landed use put back
+  local healWatch = nil                -- a confirmed heal, awaiting its effect
+  local healSaid = nil                 -- last refusal logged, to log it once
 
   local function cmdRow(actor, cmd)
     for row = 0, 3 do
@@ -1643,16 +1711,43 @@ function M.newFightDriver(tag, opts)
     return nil
   end
 
+  -- What one use of an item gives back.  The prior is M.itemPower, the +$14
+  -- power byte: 50 for a Tonic and 250 for a Potion, and a Tonic was measured
+  -- restoring about 50 in battle 11.  It is a prior and not the answer,
+  -- because power is an input to the engine's heal routine rather than its
+  -- output.  The first use that lands replaces it with the HP that actually
+  -- came back (F.frame's healWatch), so a retuned item, or one whose power
+  -- does not pass through straight, corrects itself within one heal instead
+  -- of steering the policy wrong for a whole fight.
+  local function restoreOf(item)
+    return restoreSeen[item] or M.itemPower(item)
+  end
+
   local function makePlan(actor)
+    -- What a round costs this party, measured rather than assumed.  For each
+    -- entity, the most HP it has lost between two consecutive turns of the
+    -- actor now deciding: that is the damage that will land before this actor
+    -- can act again, which is the number any heal has to beat.  It is zero
+    -- until the enemy has actually taken a round, which is what makes the
+    -- opening turn fall through to the fraction rule below.
+    local hpNow = {}
+    for e = 0, 3 do hpNow[e] = M.readWord(0x3BF4 + e * 2) end
+    if turnSnap[actor] then
+      for e = 0, 3 do
+        local lost = turnSnap[actor][e] - hpNow[e]
+        if lost > (roundCost[e] or 0) then roundCost[e] = lost end
+      end
+    end
+    turnSnap[actor] = hpNow
     -- opts.healer = <battle chid>: only that character runs the item
     -- healing line; everyone else attacks.  Measured need (2026-08-09, the
     -- escape cave): with every actor healing, a party whose only damage is
     -- LOCKE's Fight heal-locks, because one enemy round costs more HP than
     -- the Tonic his turn restores, so he never attacks, the monster never
     -- dies, and the bag drains to a wipe.  A player splits the jobs, with
-    -- the safe back-row member healing and the fighter fighting.  Unset
-    -- means the earlier behavior, in which every actor may heal, which is
-    -- right for solo parties.
+    -- the safe back-row member healing and the fighter fighting.  This is
+    -- role assignment, not the fix for that heal-lock -- the policy below is,
+    -- because a solo party has nobody to hand the job to.
     local mayHeal = opts.healer == nil
         or M.readByte(BCHID + actor * 2) == opts.healer
     local row = (opts.items and mayHeal) and cmdRow(actor, CMD_ITEM) or nil
@@ -1666,26 +1761,51 @@ function M.newFightDriver(tag, opts)
                    idx = battInvIdx(FENIX_DOWN) }
         end
       end
-      local target, worst = nil, 101
+      -- Whom to heal, and whether healing is worth the turn it costs.
+      -- M.healDecision is the policy and carries its reasoning; this is the
+      -- part that reads the fight.  A candidate is anyone hurt enough to top
+      -- up or standing inside one round of death, neediest first, and the
+      -- first one the policy says yes to gets the turn.
       local threshold = opts.healPercent or 60
+      local cands = {}
       for e = 0, 3 do
-        local hp, maxhp = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+        local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
         if hp > 0 and maxhp > 0 then
           local pct = hp * 100 // maxhp
-          if pct < threshold and pct < worst then target, worst = e, pct end
+          if pct < threshold or hp <= (roundCost[e] or 0) then
+            cands[#cands + 1] = { e = e, pct = pct, hp = hp, maxhp = maxhp }
+          end
         end
       end
-      if target ~= nil then
-        local hp, maxhp = M.readWord(0x3BF4 + target * 2),
-                          M.readWord(0x3C1C + target * 2)
-        local item = (maxhp - hp >= 80 and battInvIdx(POTION)) and POTION
+      table.sort(cands, function(a, b) return a.pct < b.pct end)
+      local allies = 0
+      for e = 0, 3 do
+        if e ~= actor and hpNow[e] > 0 and M.readWord(0x3C1C + e * 2) > 0 then
+          allies = allies + 1
+        end
+      end
+      for _, c in ipairs(cands) do
+        local item = (c.maxhp - c.hp >= 80 and battInvIdx(POTION)) and POTION
                   or battInvIdx(TONIC) and TONIC
                   or battInvIdx(POTION) and POTION or nil
         if item then
-          M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with $%02X",
-            tag or "fight", actor, target, hp, maxhp, item))
-          return { kind = "item", item = item, target = target, row = row,
-                   idx = battInvIdx(item) }
+          local gain, cost = restoreOf(item), roundCost[c.e] or 0
+          local why = M.healDecision({ hp = c.hp, maxhp = c.maxhp,
+            restore = gain, roundCost = cost, allies = allies,
+            threshold = threshold })
+          if why then
+            healSaid = nil
+            M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with " ..
+              "$%02X -- restores %d, a round costs %d (%s)", tag or "fight",
+              actor, c.e, c.hp, c.maxhp, item, gain, cost, why))
+            return { kind = "item", item = item, target = c.e, row = row,
+                     idx = battInvIdx(item) }
+          end
+          local said = string.format("[%s] actor=%d not healing entity %d " ..
+            "(%d/%d): $%02X restores %d and a round costs %d, so the turn "
+            .. "buys back less than it spends -- acting instead",
+            tag or "fight", actor, c.e, c.hp, c.maxhp, item, gain, cost)
+          if said ~= healSaid then healSaid = said; M.log(said) end
         end
       end
     end
@@ -1913,6 +2033,16 @@ function M.newFightDriver(tag, opts)
           .. "mons=%02X", tag or "fight", plan.kind, actor,
           M.readByte(TGTCHARS), M.readByte(TGTMONS)))
       end
+      -- Watch what the heal we just confirmed is actually worth.  The plan's
+      -- restore estimate comes off the item's power byte; the number that
+      -- decides the policy should be the one the engine produced, so the
+      -- first landed use of each item replaces the estimate (restoreOf).
+      if plan.kind == "item" and plan.item ~= FENIX_DOWN
+         and restoreSeen[plan.item] == nil then
+        healWatch = { item = plan.item, target = plan.target,
+                      hp = M.readWord(0x3BF4 + plan.target * 2),
+                      until_ = battleTick + 900 }
+      end
       plan, planActor, tgtSpin = nil, nil, 0
       return { "a" }
     end
@@ -1926,10 +2056,34 @@ function M.newFightDriver(tag, opts)
   function F.idle()
     menuStreak, tick, battleTick = 0, 0, 0
     plan, planActor, held = nil, nil, {}
+    -- Everything the heal policy measured belongs to the battle that just
+    -- ended.  A retry ladder replays the same fight from a reload, and
+    -- carrying a round cost across the boundary would let one attempt's
+    -- damage decide the next attempt's first turns.
+    roundCost, turnSnap, restoreSeen = {}, {}, {}
+    healWatch, healSaid = nil, nil
   end
 
   function F.frame()
     battleTick = battleTick + 1
+    -- The landed value of a heal, watched from its confirmation until the HP
+    -- moves.  HP falling first is the enemy acting between the confirm and
+    -- the item, so the baseline follows it down rather than reading the
+    -- rebound as a bigger heal than it was.
+    if healWatch then
+      local hp = M.readWord(0x3BF4 + healWatch.target * 2)
+      if hp > healWatch.hp then
+        restoreSeen[healWatch.item] = hp - healWatch.hp
+        M.log(string.format("[%s] $%02X restored %d hp on entity %d " ..
+          "(measured; the item's power byte was the estimate)",
+          tag or "fight", healWatch.item, hp - healWatch.hp, healWatch.target))
+        healWatch = nil
+      elseif hp < healWatch.hp then
+        healWatch.hp = hp
+      elseif battleTick > healWatch.until_ then
+        healWatch = nil
+      end
+    end
     local menu = M.readByte(MENU)
     if battleTick == 1 or battleTick % 300 == 0 then
       local actor, state = M.readByte(ACTOR) & 3, M.readByte(MSTATE)
@@ -1957,11 +2111,17 @@ function M.newFightDriver(tag, opts)
             M.readWord(0x3BFC + s2 * 2), M.readByte(0x3E40 + s2 * 2))
         end
       end
+      -- What a round has cost each member so far, beside their HP: it is what
+      -- the heal policy decides on, and without it a log shows a driver
+      -- declining to heal without showing why.
+      local cost = {}
+      for e = 0, 3 do cost[#cost + 1] = tostring(roundCost[e] or 0) end
       M.log(string.format("[%s] battle f+%d menu=%02X state=%02X actor=%d " ..
-        "cursor=%d cmds=%s partyhp=%s monhp=%s monsters=%d", tag or "fight",
-        battleTick, menu, state, actor, M.readByte(CMDROW + actor) & 3,
+        "cursor=%d cmds=%s partyhp=%s roundcost=%s monhp=%s monsters=%d",
+        tag or "fight", battleTick, menu, state,
+        actor, M.readByte(CMDROW + actor) & 3,
         table.concat(rows, ","), table.concat(hp, ","),
-        table.concat(mhp, ","), M.monstersPresent()))
+        table.concat(cost, ","), table.concat(mhp, ","), M.monstersPresent()))
     end
     if menu == 0 then
       -- Text pages, victory screens, and the command-window handoff all need
