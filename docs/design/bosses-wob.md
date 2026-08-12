@@ -350,15 +350,41 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
 - **The break completes now, measured.** For four releases the train died
   with shields still standing, which is what the report on #74 said and what
   every measured line reproduced. The input-driven playthrough
-  (`gen_sabin_train.lua`) now takes all six off with the train alive, and
-  both v0.10 changes are load-bearing. One winning ledger, verbatim: Aura
-  Bolt 6→5 (holy), Fire Skean 5→4 (fire), Pummel 4→2 (two hits, two chips),
-  Fire Skean 2→1, Pummel 1→0 with the train alive at 863 of 1900, dead 2306
-  frames later. Sabin spends 18 MP of his 56 on the whole break, because a
+  (`gen_sabin_train.lua`) now takes all six off, and both v0.10 changes are
+  load-bearing. One winning ledger, verbatim: Aura Bolt 6→5 (holy), Fire
+  Skean 5→4 (fire), Pummel 4→2 (two hits, two chips), Fire Skean 2→1,
+  Pummel 1→0. Sabin spends 18 MP of his 56 on the whole break, because a
   double-hitting Pummel is 2 MP a chip where Suplex is 13. The fight stays
   close: the party carries about 680 HP against a party-wide spike of
   roughly 150 each, so a three-attempt ladder still loses attempts, and the
   Broken window (2159 frames, damage ×4) is where it is won.
+- **The gap between the last chip and the kill is not a fixed number, and
+  nothing asserts it.** It was 389 of 1900 HP when #74 was closed. On
+  2026-08-12 it measured 279 HP and 1213 frames on one run and 0 HP and 0
+  frames on another — the sixth chip and the kill landing together — with
+  no change to the fight, only to the party, which by then had two more
+  levels and a real shopping list upstream (`wob-route.md` §2). The gap is
+  the race between the chip pace and the party's own damage output, so it
+  closes as the party improves. What the playthrough asserts is that six
+  chips land; the gap is logged next to it and nothing goes red when it
+  moves. Owner ruling, 2026-08-12: "absolutely do not let you being good at
+  the game be a release blocker."
+- **Whether the break lands is mostly whether Sabin keeps his turns.**
+  Evil Toot's random statuses include **Berserk**, and a berserked Sabin is
+  out of the break entirely: he is never served a command menu again, so he
+  chips nothing and auto-Fights instead, which spends the fight's clock on
+  killing the train sooner. Measured 2026-08-12: Aura Bolt took the first
+  shield, Berserk (status 2 `$10`) landed about 1200 frames later, and the
+  train then took eleven unattributed ~70-damage hits from him and died
+  with three shields standing — #74's original shape, reproduced by a
+  status roll rather than by the design gap. **Imp** does the same thing
+  more bluntly, because Blitz cannot be selected at all. Neither has a cure
+  in this scenario: the ghost merchant sells Tonic, Potion, Antidote, Green
+  Cherry, Fenix Down, Sleeping Bag, Shuriken and the spliced Fire Skean,
+  and Green Cherry only answers Muddled. Across five measured attempts the
+  break landed on two, so the three-attempt ladder is carrying this step
+  rather than decorating it. Read that as the live constraint before
+  re-tuning anything here.
 - **Jank ✦: Suplex still works.** It is also mechanically consistent
   now: Suplex is bludgeoning and the train is bludgeon-weak. The
   undead flag stays as well, so one Fenix Down kills the train

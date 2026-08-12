@@ -144,11 +144,31 @@ local function invCount(id)
   end
   return 0
 end
+-- All four battle status bytes, not just the first.  The fight log used to
+-- print status 1 alone ($3EE4, stride 2), which carries wound/poison/dark and
+-- nothing else; every status that costs a character their turn lives in the
+-- other three -- Berserk $10 and Muddled $20 and Sleep $80 in status 2
+-- ($3EE5), Stop $10 in status 3 ($3EF8) (ff6/notes/battle-lists.txt:632-647,
+-- addresses at ff6/notes/battle-ram.txt:1098-1101).  That gap cost a
+-- diagnosis: a run where SABIN took one turn in fourteen and chipped once
+-- read as "SABIN was not served a menu" because the byte that would have
+-- said why was not being printed.  Statuses 2-4 are appended only when one
+-- of them is set, so the common line stays the width it was.
+local function statusStr(e)
+  local s1 = H.readByte(0x3EE4 + e * 2)
+  local s2 = H.readByte(0x3EE5 + e * 2)
+  local s3 = H.readByte(0x3EF8 + e * 2)
+  local s4 = H.readByte(0x3EF9 + e * 2)
+  if s2 == 0 and s3 == 0 and s4 == 0 then
+    return string.format("s%02X", s1)
+  end
+  return string.format("s%02X/%02X/%02X/%02X", s1, s2, s3, s4)
+end
 local function partyLine()
   local p = {}
   for e = 0, 3 do
-    p[#p + 1] = string.format("%d/%d(%dmp,s%02X)", pHP(e), pMaxHP(e),
-      pMP(e), H.readByte(0x3EE4 + e * 2))
+    p[#p + 1] = string.format("%d/%d(%dmp,%s)", pHP(e), pMaxHP(e),
+      pMP(e), statusStr(e))
   end
   return table.concat(p, " ")
 end
@@ -230,17 +250,28 @@ local function makeB47Plan(actor)
   for i = 0, 3 do
     if H.readByte(CMDTBL + actor * 12 + i * 3) == CMD_ITEM then itemRow = i end
   end
-  -- revive first: the longer healing fight gives the ghosts more turns, and
-  -- a member who dies here enters the boss fight dead (measured: SHADOW at
-  -- 0/197 s80 at every b68 entry).  A Fenix Down's target select
-  -- initializes on the fallen ally, so the default confirm revives without
-  -- steering.
+  -- Revive first: the longer healing fight gives the ghosts more turns, and a
+  -- member who dies here enters the boss fight dead.
+  --
+  -- The revive is steered onto the fallen ally.  It used to confirm the
+  -- default target on the claim that "a Fenix Down's target select
+  -- initializes on the fallen ally", and that claim is false: measured
+  -- 2026-08-12 on the s2_train_done run, CYAN went down at f8014, this branch
+  -- planned a revive eight times, all four Fenix Downs in the bag were
+  -- consumed, and CYAN was still 0/319 s80 at the end of the fight, through
+  -- the strip walk, through battle 68, and into the generated savestate --
+  -- which is what failed s2_train_done's party-standing check.  The default
+  -- target for an item is the acting character, which is why the topup branch
+  -- below can say "self-target only heals the actor" two comments later and
+  -- be right; the same default is exactly wrong for a revive.  Steering here
+  -- is the same machine b68's fighter already uses for its heals, which is
+  -- the line that did revive CYAN twice when it was measured.
   for e = 0, 3 do
     if pMaxHP(e) > 0 and pHP(e) == 0 and itemRow
        and battInvIdx(FENIX_DOWN) then
       H.log(string.format("[b47] revive: e%d is down -- FENIX DOWN [%s]",
         e, partyLine()))
-      return { kind = "item", item = FENIX_DOWN, row = itemRow }
+      return { kind = "item", item = FENIX_DOWN, row = itemRow, target = e }
     end
   end
   -- Poison is where the strip's HP goes (see the section note): cure it
@@ -318,8 +349,37 @@ local function b47Button()
     return { "a" }
   end
   if st == ST_TGT then
-    fPlan, fPlanActor = nil, nil
-    return { "a" }          -- item: default self; Fight: default enemy
+    -- No named target: take the default, which is the acting character for
+    -- an item and the enemy for Fight.  That is what the topups want.
+    if plan.target == nil then
+      fPlan, fPlanActor = nil, nil
+      return { "a" }
+    end
+    -- A named target (the revive) is steered, the same way the b68 fighter
+    -- steers its heals: off the monster side first, then down or up the
+    -- party column until the live character mask is the one slot we mean.
+    local chars = H.readByte(TGTCHARS)
+    local mons = H.readByte(TGTMONS)
+    if mons ~= 0 then return { "right" } end
+    local wantMask = 1 << plan.target
+    if chars == wantMask then
+      fPlan, fPlanActor = nil, nil
+      return { "a" }
+    end
+    plan.tgtStall = (plan.tgtStall or 0) + 1
+    if plan.tgtStall > 20 then
+      -- Unlike b68's heals, a revive on the wrong ally is a wasted Fenix
+      -- Down out of a bag of four, so this gives up on the turn instead of
+      -- confirming somewhere harmless.  Backing out re-plans next menu.
+      H.log(string.format("[b47] revive steer stalled (chars=%02X want=%02X)" ..
+        " -- backing out rather than spending the Fenix Down on the wrong " ..
+        "ally", chars, wantMask))
+      fPlan, fPlanActor = nil, nil
+      return { "b" }
+    end
+    local cur = 0
+    for b = 0, 3 do if chars & (1 << b) ~= 0 then cur = b; break end end
+    return { cur < plan.target and "down" or "up" }
   end
   if st == ST_TOOLS then return { "b" } end
   return nil
@@ -844,6 +904,32 @@ local function b68Button()
     for b = 0, 3 do if chars & (1 << b) ~= 0 then cur = b; break end end
     return { cur < plan.target and "down" or "up" }
   end
+  -- Any other menu state: hands off for a few pulses, then back out.
+  --
+  -- Hands-off alone was a wedge.  Measured 2026-08-12 on train_done attempt
+  -- 1: SHADOW entered the fight Imp'd (status 1 $20, caught from a fled
+  -- corridor encounter after the pre-smokestack care), the throw plan's row
+  -- steering could not settle on a command the engine refuses, and the
+  -- absolute-jump fallback opened the ROW window instead -- menu state $24
+  -- (UpdateMenuState_24, ff6/src/btlgfx/btlgfx_main.asm:19239).  Nothing here
+  -- handled $24, so the driver held no buttons for 1500 frames while the
+  -- train killed the party, and the attempt was spent on a stall rather than
+  -- on a fight.  $00 and $01 are excluded because they are the ordinary
+  -- between-turns states and B in them is not wanted.
+  if st ~= 0x00 and st ~= 0x01 then
+    b68.oddN = (b68.oddState == st) and (b68.oddN or 0) + 1 or 1
+    b68.oddState = st
+    if b68.oddN >= 4 then
+      b68Log(string.format("unhandled menu state $%02X for %d pulses " ..
+        "(actor=%d plan=%s) -- backing out", st, b68.oddN, actor,
+        plan and plan.kind or "-"))
+      b68.oddN = 0
+      b68.plan, b68.planActor = nil, nil
+      return { "b" }
+    end
+  else
+    b68.oddN = 0
+  end
   return nil                                  -- transitions: hands off
 end
 
@@ -861,20 +947,34 @@ local function b68Observe()
      or (H.readByte(RVPC(gSlot)) & OT6_BLUDG) == OT6_BLUDG then
     b68.bludgRevealed = true
   end
+  -- Every hit the train takes, attributed.  Without this the log only shows
+  -- the turns the driver planned, and a fight can lose most of the train's
+  -- HP to damage nobody in the log dealt -- a berserked party member, a
+  -- counter, a status tick.  $3410 is the attack index the engine last
+  -- resolved (the chip rows below already read it).
+  if b68.lastHP and hp < b68.lastHP then
+    b68Log(string.format("train -%d -> %d at f%d: lastSkill=$%02X sh=%d [%s]",
+      b68.lastHP - hp, hp, H.frame, H.readByte(0x3410), shields, partyLine()))
+  end
   if b68.lastSH and shields < b68.lastSH then
     local row = string.format(
       "chip %d->%d at f%d: lastSkill=$%02X trainHP=%d sabinMP=%d [%s]",
       b68.lastSH, shields, H.frame, H.readByte(0x3410), hp,
       sabinE and pMP(sabinE) or -1, partyLine())
     b68.chips[#b68.chips + 1] = row
+    -- Shields off, not chip rows.  A double-hitting Pummel takes two shields
+    -- in one transition (6->5->4->2 is three rows and four shields), so the
+    -- row count undercounts the break and cannot be the thing asserted on.
+    b68.shieldsOff = (b68.shieldsOff or 0) + (b68.lastSH - shields)
     b68Log(row)
     b68.plan = nil                            -- re-plan on fresh numbers
   end
   if shields == 0 and b68.brokeAt == nil and (b68.lastSH or 6) > 0 then
     b68.brokeAt = H.frame
+    b68.brokeHP = hp
     b68Log(string.format(
-      "*** BREAK COMPLETE at f%d with the train ALIVE at %d HP -- the " ..
-      "proof obligation holds (casts=%d)", H.frame, hp, b68.casts))
+      "*** BREAK COMPLETE at f%d: six shields off with the train at %d of " ..
+      "1900 HP (casts=%d)", H.frame, hp, b68.casts))
     H.screenshot("train_b68_broken")
   end
   if hp == 0 and b68.killedAt == nil and b68.lastHP and b68.lastHP > 0 then
@@ -1023,11 +1123,13 @@ local function b68Attempt(n)
       lost, wipeN = nil, 0
       b68.casts, b68.chips = 0, {}
       b68.plan, b68.planActor = nil, nil
-      b68.brokeAt, b68.killedAt = nil, nil
+      b68.brokeAt, b68.killedAt, b68.brokeHP = nil, nil, nil
+      b68.shieldsOff = 0
       b68.holyRevealed, b68.bludgRevealed = false, false
       b68.itemsOut = false
       b68.lastSH, b68.lastHP = nil, nil
       b68.tornDown, b68.mstreak, b68.sabinDeadN = 0, 0, 0
+      b68.oddState, b68.oddN, b68.sabinImpN = nil, 0, 0
       gSlot, sabinE, cyanE, shadowE = nil, nil, nil, nil
     end),
     H.cond(function() return lost ~= nil end, { H.waitFrames(1) }, {
@@ -1118,6 +1220,35 @@ local function b68Attempt(n)
           else
             b68.sabinDeadN = 0
           end
+          -- SABIN Imp'd pre-break: also the end of the chip engine, and it
+          -- has to be recognised or the attempt livelocks.  An Imp'd
+          -- character cannot use Blitz, so steering the command cursor onto
+          -- the Blitz row does not open the blitz list; it opens the ROW
+          -- window instead (menu state $24,
+          -- ff6/src/btlgfx/btlgfx_main.asm:19239).  Measured 2026-08-12 on
+          -- train_done attempt 1: SABIN and SHADOW came into the fight
+          -- Imp'd (status 1 $20) off a fled corridor encounter, and the
+          -- fighter then cycled plan AuraBolt -> $24 -> back out -> plan
+          -- AuraBolt for the rest of the attempt's budget, landing no chips
+          -- and spending 145000 frames finding that out.  Imp cannot be
+          -- cured here either: the ghost merchant's stock is Tonic, Potion,
+          -- Antidote, Green Cherry, Fenix Down, Sleeping Bag, Shuriken and
+          -- the spliced Fire Skean (shop record 85, ff6/src/menu/
+          -- shop_prop.dat), and none of those touches Imp.  So this is a
+          -- lost attempt, declared early, and the reload re-rolls the
+          -- corridor encounter that caused it.
+          if (H.readByte(0x3EE4 + sabinE * 2) & 0x20) ~= 0
+             and H.readByte(SH(gSlot)) > 0 then
+            b68.sabinImpN = (b68.sabinImpN or 0) + 1
+            if b68.sabinImpN >= 90 and not lost then
+              lost = string.format("SABIN is Imp'd pre-break at f%d, so no " ..
+                "Blitz and no more chips (shields=%d casts=%d) [%s]",
+                H.frame, H.readByte(SH(gSlot)), b68.casts, partyLine())
+              H.log("[b68] LOST -- " .. lost)
+            end
+          else
+            b68.sabinImpN = 0
+          end
           if lost then H.setPad({}); return end
           tick = tick + 1
           local ph = tick % 30
@@ -1154,9 +1285,42 @@ local function b68Attempt(n)
           "(the 1/16 roll) at f%d -- a shifted retry re-rolls it", H.frame)
         H.log("[train] " .. lost)
       end
+      -- A win that did not break is a LOST attempt, not a failed run.
+      --
+      -- It used to be a failed run: the assertion below fired inside the
+      -- attempt, so the first win without a break aborted the step and the
+      -- remaining attempts were never played.  Measured 2026-08-12 on
+      -- train_done, that is exactly what happened -- attempt 1 wiped,
+      -- attempt 2 won with three shields standing, and attempt 3 never ran,
+      -- even though the ladder existed to absorb precisely that roll.
+      --
+      -- What decides the roll is whether SABIN keeps his turns.  The train
+      -- hands out statuses party-wide (bosses-wob.md section 8 calls the
+      -- move Evil Toot), and Berserk (status 2 $10) takes SABIN out of the
+      -- chip line entirely: he stops being served a command menu and
+      -- auto-Fights instead, which both stops the chips and speeds the kill
+      -- up.  Measured on that same attempt 2: AuraBolt took the first shield
+      -- at f30484, $10 was set on him by f31642, he never chose another
+      -- action, and the train took eleven unattributed ~70-damage hits from
+      -- him before dying at three shields.  Berserk has no cure in the bag
+      -- and none in the shop, so surviving it is what the retries are for.
+      --
+      -- This is not a wider ladder: it is still three attempts, and three
+      -- attempts that all fail to break still fail the step, which is the
+      -- finding #74 would want reported.
+      if lost == nil and (b68.shieldsOff or 0) < 6 then
+        lost = string.format("battle 68 won at f%d but only %d of 6 shields " ..
+          "came off -- the break did not complete, so this attempt does not " ..
+          "meet the step's obligation (casts=%d) [%s]", H.frame,
+          b68.shieldsOff or 0, b68.casts, partyLine())
+        H.log("[b68] LOST -- " .. lost)
+        for _, row in ipairs(b68.chips) do
+          H.log("[b68 attempt " .. n .. "] " .. row)
+        end
+      end
       if lost == nil then
-        -- The win is the obligation and the break is now part of it.  This
-        -- used to ask only for two chips, because two was all the party could
+        -- The win is the obligation and the break is part of it.  This used
+        -- to ask only for two chips, because two was all the party could
         -- deliver: the train died with shields standing every time it was
         -- measured, which is the structural finding on #74.  v0.10's
         -- double-hitting Pummel and the merchant's skeans changed that, and
@@ -1164,10 +1328,35 @@ local function b68Attempt(n)
         -- SABIN's MP is under 4 -- he carries 56 and the six shields cost 18 --
         -- so a full break is a property of the line rather than a lucky
         -- attempt, and a win that does not carry one is a regression worth
-        -- failing on.  Measured across four attempts on two runs: every one
-        -- broke all six, with the train alive at 964, 863, 964 and 472 HP.
-        H.assertEq(b68.brokeAt ~= nil, true,
-          "all six shields came off before the train died (#74's break)")
+        -- failing on.
+        --
+        -- What is asserted is that six chips land, which is the claim the
+        -- fix makes and the whole content of the outside report: for four
+        -- releases the break was unreachable.  What is NOT asserted is that
+        -- the break precedes the kill, and the difference matters, because
+        -- the margin between them is not a property of the fix.  It is the
+        -- race between the chip pace and the party's own damage, so it
+        -- shrinks every time the party gets stronger.  Owner ruling
+        -- 2026-08-12: "absolutely do not let you being good at the game be a
+        -- release blocker."  Measured: the margin was 389 of 1900 HP on
+        -- 2026-08-12 and reached zero -- the sixth chip and the kill on the
+        -- same frame -- once the route started playing like a casual player
+        -- (two levels and real shopping upstream, docs/design/wob-route.md
+        -- section 2), which is a change we wanted.  A check that goes red on
+        -- that is measuring the party, not the break.
+        --
+        -- The margin is logged instead, both ways: the HP the train had left
+        -- when the sixth shield came off, and the frames between that and
+        -- the kill.  A reader who wants to know whether the fight is
+        -- drifting has the numbers; nothing fails on them.
+        H.assertEq((b68.shieldsOff or 0) >= 6, true,
+          "six chips landed -- all six shields came off (#74's break)")
+        H.log(string.format(
+          "[b68] break margin: train at %s of 1900 HP when the sixth shield " ..
+          "came off, dead %s frames later (brokeAt=%s killedAt=%s)",
+          tostring(b68.brokeHP), b68.brokeAt and b68.killedAt
+            and tostring(b68.killedAt - b68.brokeAt) or "?",
+          tostring(b68.brokeAt), tostring(b68.killedAt)))
         H.assertEq(#b68.chips >= 2, true,
           "at least two shield chips landed (the mechanism proofs)")
         H.assertEq(b68.holyRevealed, true,
@@ -1510,8 +1699,9 @@ H.run({ maxFrames = 400000 }, {
     H.log(string.format("[train_done] f%d world (%d,%d)",
       H.frame, H.worldX(), H.worldY()))
     for _, row in ipairs(b68.chips) do H.log("[b68 record] " .. row) end
-    H.log(string.format("[b68 record] brokeAt=%s killedAt=%s casts=%d",
-      tostring(b68.brokeAt), tostring(b68.killedAt), b68.casts))
+    H.log(string.format("[b68 record] shieldsOff=%d brokeAt=%s killedAt=%s " ..
+      "brokeHP=%s casts=%d", b68.shieldsOff or 0, tostring(b68.brokeAt),
+      tostring(b68.killedAt), tostring(b68.brokeHP), b68.casts))
   end),
 
   -- A full break costs more HP than the old line that stopped at five
@@ -1533,7 +1723,8 @@ H.run({ maxFrames = 400000 }, {
   H.saveState("train_done.mss"),
   H.logStep(function()
     return string.format("train_done generated at frame %d world (%d,%d) -- " ..
-      "battle 68 won, all six shields broken with the train alive",
+      "battle 68 won with all six shields chipped off (the margin to the " ..
+      "kill is in the [b68] break margin line, not asserted)",
       H.frame, H.worldX(), H.worldY())
   end),
 })
