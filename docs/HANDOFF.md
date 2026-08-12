@@ -124,6 +124,26 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   pre-battle HP. The filed fix is a battle-module check (`$3BF4` under
   `battleLoadStarted()`). Three wipes have been mistaken for stuck
   navigators.
+- **The fight driver's log goes silent on a wipe, and the silence reads as a
+  frozen battle.** Same root cause as the bullet above, one layer up.
+  `battleLoadStarted()` calls an all-zero `$3BF4` "not a battle" — its
+  documented and accepted limit (`lib/ot6.lua:436-440`) — so the frame the
+  last character reaches 0, `rideOut` falls to `F.idle()`, `battleTick`
+  resets, and no further `battle f+N` line is printed for the rest of the
+  run. The last line printed is the last frame somebody was alive, and it is
+  followed by nothing. Read backwards from the log that is a battle whose HP,
+  monster HP, shields, menu byte and menu state all stopped changing while a
+  driver kept sampling. It is a death. Battle 11 (the South Figaro gate
+  soldier) was diagnosed three times as a balance wall and once, on this
+  signature, as an unknown teardown mechanism, over six RNG seeds, before
+  `probe_battle11.lua` hooked `LoseBattle` and found LOCKE at 0 with
+  `$3EE4 = $80` and battle message `$29` "annihilated". **A run of identical
+  driver lines ending in silence is the shape of a wipe**; before theorising
+  about the battle module, hook `LoseBattle` (`battle_main.asm:16039`) or
+  read `$3BF4` yourself. That fight's own loss branch is fine: `LoseBattle`
+  sets `$3EBC.0`, which is battle switch `$40`, and `if_b_switch $40` jumps
+  when the bit is **clear** (`field/event.asm:4053-4060`), so a set bit falls
+  through to `_ca85ba`, the scenario reset on map 75 (47,43).
 - **Retry ladders are 3 attempts, and go through `H.newSeedLadder`.** A
   battle's whole RNG stream hangs off `$be`, seeded once at battle init from
   the game-time frame counter: `lda $021e / asl2 / sta $be`
@@ -200,16 +220,36 @@ basis, and moved the surviving one below a test that makes it run rarely. The
 `ff6/src/battle/ot6_memory.inc`. (This is distinct from the vblank-TRANSFER
 budget, which is about VRAM words, not cycles.)
 
-**3. `H.sym` resolves a duplicate symbol name to the wrong address, with no
-error.** `parse_dbg_syms` (`tools/tests/lib/compose.py:218-250`) walks
-`ff6-en.dbg` taking **the first** `type=lab` record for each wanted name and
-then skips that name forever (`if name in out: continue`, `:241`). `ExecCmd`
-is defined twice — `$C09B1B` and the battle one at `$C213E6` — so a probe that
-hooks `ExecCmd` gets the wrong module's address, its instrumentation window
-never closes, and every later event is misattributed without anything
-reporting a problem. Before hooking a symbol by name, check how many label
-records in the `.dbg` carry it; if more than one, use the address directly or
-attribute by something else.
+**3. A symbol only reaches `H.sym` if the source spells its name out, and a
+duplicate name has to be disambiguated by segment.** Two separate hazards
+share this one entry because a probe meets both in the same line of code.
+
+`parse_dbg_syms` (`tools/tests/lib/compose.py:473-540`) no longer takes the
+first `type=lab` record: a name defined at two distinct addresses goes into
+`OT6_SYMS_AMBIG` instead of `OT6_SYMS`, and `H.sym` raises naming both
+segments. So the old silent failure — `ExecCmd` resolving to field code
+`$C09B1B` instead of the battle dispatcher at `$C213EA`, an instrumentation
+window that never closes, every later event misattributed — now reports
+itself. Disambiguate with the ca65 segment: `H.sym("ExecCmd@battle_code")`.
+3838 of this ROM's 98483 label names are non-unique, so expect it.
+
+What is still silent is the other half: `compose.py` builds `OT6_SYMS` by
+scanning the **source text** for literal `sym("Name")` occurrences
+(`:439-449`), so `H.sym(name)` with a variable resolves nothing and raises
+"symbol not in ff6-en.dbg — rebuild the ROM" at run time, which reads as a
+stale build rather than as a spelling problem. Loop over a table of
+`{ label, H.sym("Label") }` pairs, never over a table of strings.
+
+**3a. A Lua syntax error in a test produces no output at all — the run just
+burns to the wall-clock cap.** Nothing in `run.log` says "syntax error";
+the file loads, registers no callbacks, and Mesen's testrunner kills it at
+600 s with the same `code=255` signature as core contention (trap 9). Two
+600-second kills were spent on one `end()` that should have been `end)()`
+before the cause was found (2026-08-12, `probe_battle11.lua`). The tell is
+that **no `[ot6]` line appears at all**, not even `loadState`'s: a run that
+reached frame 1 always prints one. There is no Lua binary on this machine to
+check syntax with, so bisect against a three-line script that boots a fixture
+and logs — that costs about 90 s with `OT6_TIMEOUT=90`.
 
 **4. A mismatched ROM/fixture pair presents as "timeout waiting for main
 menu".** Savestates are ROM-coupled. When a fixture was generated from a
