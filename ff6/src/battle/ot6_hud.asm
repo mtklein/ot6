@@ -1594,6 +1594,54 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; character's BP bank), 1-3 lines left in an active cycle. one line per frame:
 ; the nmi's _c15d99 drains a single $80-byte line buffer ($5e4d) per frame,
 ; which is exactly why vanilla's state $0d stages one row-pair per tick.
+;
+; A REQUEST NOBODY CAN CONSUME IS DROPPED ON THE SPOT (#87), and that is a
+; performance requirement rather than tidiness.  This proc is polled once per
+; battle frame from bank C1's frame loop (btlgfx_main.asm:1749), the battle
+; loop's per-iteration budget is nearly full, and going over costs a missed
+; vblank on every iteration: 163 frames on battle_trueknight's covers phase,
+; which is the whole battle running about 10% slower (ot6_memory.inc, the
+; block comment over OT6_BRKLIVE).  So the byte's resting value is what the
+; budget is set by, and it has to come back to zero promptly.
+;
+; This used to have a fourth arm, @wait, which held a fresh request while the
+; menu was open in any state that is not a browse state, on the theory that
+; the state would come back.  At the battle command window ($7bc2 = $05) it
+; never does, and boosting there is ordinary play, so the request stood for
+; the rest of the menu and the long path ran on every battle frame.  Measured
+; input-driven in battle_boost: R at the command window read
+; `00 00 80 80 80 ...` and never came back, and reads `00 00 80 00 00 ...`
+; now.
+;
+; Making the standing path cheap instead was the other candidate on #87, and
+; it is ruled out by measurement rather than by preference.  With a request
+; deliberately left standing (Ot6BankMoved raising unconditionally, which is
+; the shape #77 measured at 1798), battle_trueknight phase 4b reads:
+;
+;   gate as it stood, 40 cycles while a request stands .......... 1798  fail
+;   cheapest arm that still tells fresh from mid-cycle, 33 ...... 1798  fail
+;   floor: menu state only, no $7bca, no re-read, 26 ............ 1798  fail
+;   this fix: drop the request, so the path is the 14-cycle idle
+;     one from the frame after the press onwards ................ 1635  pass
+;
+; Every row of that table is the same build except for this proc, so the
+; unconditional raise's own per-action cost is controlled rather than
+; assumed: it is present in the passing row too.
+;
+; The floor build is not even correct -- it drops the stale-flag test and
+; never hands $7ba5 back, which is issue #36 waiting to happen -- and it is
+; only twelve cycles over idle, and it still went over the cliff.  There is
+; no cheap standing path.  Only zero is cheap.
+;
+; What is given up: a request raised on a frame when the list is not browsing
+; (mid-scroll, $7bc2 = $17/$18; mid-open, $0d) is dropped instead of held for
+; the browse state that follows.  That is acceptable because the behavioural
+; half of a boost edge does not ride on this byte at all -- Ot6Boost calls
+; Ot6RecheckMagic on the same instruction stream, so prices, greys and the
+; A-button's refusal are already correct -- and because both of those states
+; are staging the rows themselves, from live data, while they run.  The
+; residue is that row-pairs staged before the press keep the old fold until
+; the next press or the next open, which is cosmetic and self-healing.
 
 .proc Ot6RestageGate_ext
         .a8
@@ -1604,9 +1652,9 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         beq     @drop
         lda     $7bc2           ; the per-frame menu state: $0e = magic list,
         cmp     #$0e            ;   $30 = kit window; either one up and
-        beq     @browse         ;   browsing (idle machinery).  a scroll or a
-        cmp     #$30            ;   close moves the state off both, and @wait
-        bne     @wait           ;   holds a fresh request until it comes back
+        beq     @browse         ;   browsing (idle machinery).  in any other
+        cmp     #$30            ;   state nothing can consume a request, so
+        bne     @drop           ;   drop it rather than hold it (#87)
 @browse:
         lda     $7ba9           ; a line transfer is still queued:
         bne     @no             ; let the nmi drain it first
@@ -1639,8 +1687,6 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         lda     #$03            ; three more, one per frame
         sta     f:$7e0000+OT6_RESTAGE
         rtl
-@wait:  lda     f:$7e0000+OT6_RESTAGE
-        bmi     @no             ; fresh request: keep it until browsable
 @drop:  lda     f:$7e0000+OT6_RESTAGE
         bmi     :+              ; $80 = cycle never started: $7ba5 not ours
         ; a started cycle (flag 1-3) ends here, complete or abandoned.  the

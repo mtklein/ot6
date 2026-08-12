@@ -121,30 +121,14 @@
 ; once per battle frame and none of these writers is per-frame code.
 ;
 ; THE MENU-STATE TEST IS NOT AN OPTIMISATION, and neither is its narrowness.
-; Both were measured, and both fix a regression the unconditional version had:
+; It was measured, and it fixes a regression the unconditional version had:
 ;
-;   battle_trueknight phase 4b (the per-battle-frame budget canary)
-;     pre-change ..................................... 1635 frames  (pass)
-;     request raised unconditionally ................. 1798 frames  (fail)
-;     request raised only while a list browses ....... 1635 frames  (pass)
 ;   battle_levelup (six earned world encounters, same savestate)
 ;     pre-change ..................................... pass
 ;     request raised for the magic list as well ...... fail
 ;     request raised only for the kit window ......... pass
 ;
-; The first one.  1798 is the exact saturating cost of one missed vblank per
-; battle-loop iteration, the cliff documented at OT6_BRKLIVE (ot6_memory.inc),
-; and the cause is the gate's shape rather than anything expensive here.  The
-; gate early-outs in about 14 cycles while OT6_RESTAGE is zero and takes
-; roughly 40 while a request stands, and its @wait arm HOLDS a fresh request
-; rather than dropping it whenever the menu is open in a state that is not a
-; browse state.  battle_trueknight's characters carry Fight-only command
-; lists, so their menus sit in command select, so an unconditional request
-; raised at every ActionEnd stood forever and moved the gate's long path onto
-; every battle frame.  Refusing to raise a request nothing can consume keeps
-; the byte at zero, which is what the per-frame path is budgeted for.
-;
-; The second one.  The magic list ($0e) does not read the BP bank at all: its
+; The magic list ($0e) does not read the BP bank at all: its
 ; greys are Ot6AbilityGrey's MP test and its prices are Ot6FoldPrices' fold of
 ; the caster's own PENDING boost, which #64 already requests from Ot6Boost at
 ; the L/R edge.  Raising a request for it here re-staged four rows under the
@@ -152,10 +136,22 @@
 ; content change behind it, and it moved battle_levelup off its outcome.  So
 ; the test is for $30 and nothing else.
 ;
-; Neither narrowing costs coverage: the only reader of the bank that can be
+; The narrowing costs no coverage: the only reader of the bank that can be
 ; stale is a kit window whose rows are already staged, which is exactly the
 ; state being tested for.  A kit window still opening ($2e) stages from the
 ; live bank on its own.
+;
+; It used to carry a second reason, and that reason has moved (#87).  Raising
+; unconditionally also read 1798 on battle_trueknight phase 4b, the frame
+; budget canary, because the gate's old @wait arm HELD a fresh request that no
+; open window could consume and so ran its long path on every battle frame.
+; That was the gate's defect rather than this proc's, it was reachable from
+; the pad without any of these writers (press R at the command window), and it
+; is fixed in the gate: the request is dropped now, and the same unconditional
+; build reads 1635.  So this test survives on the battle_levelup measurement
+; alone.  Do not widen it back on the strength of the frame budget being
+; fixed; widening it re-staged four rows under the player's cursor for a value
+; those rows do not draw.
 ;
 ; entry: jsr from bank F0, a8, index width either (no index addressing and no
 ; pushes, so it is callable from Ot6CoverBP and Ot6RunicBP under their .i8

@@ -3,13 +3,18 @@
 --   R raises the active character's pending boost (cap 3, never past bp),
 --   L lowers it, the party-window pip cell tracks live, and the boosted
 --   action consumes the points (and skips that turn's +1 regen).
+--   ...and the repaint request that press raises is spent or dropped rather
+--   than left standing, which is issue #87 (see the first R press below).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
+local MSTATE, RESTAGE = 0x7BC2, 0x57D4   -- menu state; the gate's request byte
+local ST_CMD = 0x05                      -- the battle command window
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end
 local function bp(slot) return H.readByte(0x3e9c + slot*2) end
 local actor
 local cellSeen, cellFrames = {}, 0
 local markSeen, parkFrames = {}, 0
+local restageTrace = {}                  -- #87: OT6_RESTAGE, sampled per frame
 
 -- sfx request counters: boost feedback must be audible. Each request is an
 -- inc (nonzero write) consumed by UpdateSfx's stz, so count nonzero writes.
@@ -104,8 +109,75 @@ H.run({ maxFrames = 30000 }, {
       H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8)))
     sfxWatch()
   end),
-  H.pressButtons({ "r" }, 6), H.waitFrames(20),
-  H.call(function() H.assertEq(pend(actor), 1, "R raises pending to 1") end),
+  -- The first R press, sampled per frame -- issue #87.
+  --
+  -- Ot6Boost's @refold arm raises OT6_RESTAGE = $80 on every L/R edge,
+  -- whatever window is up (ot6_hud.asm, `sta OT6_RESTAGE ; open lists
+  -- re-fold their names`), because the two windows that draw a folded name
+  -- have to redraw it.  Here no such window is open: the press lands at the
+  -- command window ($7bc2 = $05), so nothing can consume the request.
+  --
+  -- Ot6RestageGate_ext is polled once per battle frame from bank C1's frame
+  -- loop (btlgfx_main.asm:1749).  It early-outs in ~14 cycles while the byte
+  -- is zero and takes ~40 while a request stands, and the battle loop's
+  -- per-iteration budget is close enough to full that the difference costs a
+  -- missed vblank -- the same cliff battle_trueknight phase 4b watches, worth
+  -- 163 frames per battle there.  So a request that stands is not a cosmetic
+  -- problem: it makes the rest of the battle run about 10% slower.
+  --
+  -- Before the fix the gate's @wait arm held a fresh request for as long as
+  -- the menu was open in any non-browse state, which is what the command
+  -- window is, so the byte read $80 for every frame of this window and every
+  -- frame after it until the player closed the menu.  The trace below is the
+  -- discriminator: a single reading cannot tell "spent" from "never raised",
+  -- because both are 0.  The values in between are the signal.
+  --
+  -- The press keeps the original 6-frame hold and 22 idle frames (28 frames
+  -- total, as `H.pressButtons({"r"}, 6)` plus `H.waitFrames(20)` was), so the
+  -- ledger and the timing the later phases ride on are unchanged.
+  H.call(function()
+    restageTrace = {}
+    H.assertEq(H.readByte(RESTAGE), 0,
+      "no repaint request is outstanding before the press")
+  end),
+  H.hold({ r = true }),
+  H.repeatN(6, {
+    H.call(function() restageTrace[#restageTrace + 1] = H.readByte(RESTAGE) end),
+    H.waitFrames(1),
+  }),
+  H.release(),
+  H.repeatN(22, {
+    H.call(function() restageTrace[#restageTrace + 1] = H.readByte(RESTAGE) end),
+    H.waitFrames(1),
+  }),
+  H.call(function()
+    local seen, sawFresh = {}, false
+    for _, v in ipairs(restageTrace) do
+      seen[#seen + 1] = string.format("%02x", v)
+      if v == 0x80 then sawFresh = true end
+    end
+    H.log(string.format("[#87] restage across the press: %s -> %02x "
+      .. "(mstate=%02x next=%02x)", table.concat(seen, " "),
+      H.readByte(RESTAGE), H.readByte(MSTATE), H.readByte(MSTATE + 1)))
+    -- positive control: the press has to have reached Ot6Boost at all.  The
+    -- pending bank and the request are the same instruction stream, so a
+    -- pending of 1 proves the request was raised even on a build that then
+    -- drops it, and it is the original assertion of this step.
+    H.assertEq(pend(actor), 1, "R raises pending to 1")
+    H.assertEq(H.readByte(MSTATE), ST_CMD,
+      "the press landed at the command window, where no list can consume a "
+      .. "repaint request")
+    H.assertEq(sawFresh, true,
+      "and the fresh request ($80) was visible in the trace, so this step "
+      .. "cannot pass by the raise having been removed")
+    H.assertEq(H.readByte(RESTAGE), 0, string.format(
+      "#87: the request is gone 28 frames later (trace %s).  A request no "
+      .. "open window can consume must be dropped, not held: the gate's long "
+      .. "path is ~26 cycles more than its idle path and it runs once per "
+      .. "battle frame, which is a missed vblank per battle-loop iteration "
+      .. "for the rest of the menu (see battle_trueknight phase 4b)",
+      table.concat(seen, " ")))
+  end),
   H.pressButtons({ "r" }, 6), H.waitFrames(20),
   H.pressButtons({ "r" }, 6), H.waitFrames(20),
   H.call(function() H.assertEq(pend(actor), 3, "pending reaches 3") end),
