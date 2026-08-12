@@ -43,6 +43,24 @@
 -- 350-hp body dies to halved damage before a break can pay for the turns
 -- it costs.  The break earns its keep on the bodies that do not: HadesGigas
 -- at 1200 hp and defence 125, Harvester at 428 and 105.
+--
+-- Which is what map 225 then showed, on formation 108 -- SlamDancer 392 hp
+-- plus two Harvesters at 428, both halves drawing it at f1526 off the same
+-- seed from a full-HP party:
+--
+--   autocrossbow  all six shields still up past f+10200, and by then the
+--                 party had gone 249/245/280/289 -> 44/0/246/36 with two
+--                 members killed and raised, while one Harvester healed
+--                 itself from 266 back to 428/428.  At the shielded halving
+--                 the party cannot out-damage that heal, so the fight is
+--                 not close: it is a stalemate the party loses slowly, and
+--                 it never finished inside the run's wall clock.  That is
+--                 the fight that blocked dadaluma_entry.
+--   bioblaster    all three bodies 2 -> 1 on one action at f+1721.
+--
+-- The bio half's own ending was not observed: the run was killed for the
+-- machine's sake before it finished.  What is measured is the chip, not the
+-- win.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -93,6 +111,7 @@ local blob = nil
 -- the engine and draw the same encounter.
 local DIRS = { "left", "right", "up", "down" }
 local PACE_CAP = 9000
+local FIGHT_CAP = 12000
 local function half(name, tool)
   local hb, battN, done, minShield, startShield = 0, 0, nil, nil, nil
   local dirI, lastX, lastY, stall, steps = 1, -1, -1, 0, 0
@@ -137,6 +156,19 @@ local function half(name, tool)
         if (H.frame - f0) % 600 == 0 then
           H.log(string.format("[%s] f+%d party [%s] vs %s", name,
             H.frame - f0, partyLine(), monsterLine()))
+        end
+        -- A fight that is neither won nor lost is a RESULT, and it has to
+        -- end itself or it eats the wall clock and the run reports nothing
+        -- at all.  Measured on map 225's two-Harvester draw: at the
+        -- shielded halving the party cannot out-damage a Harvester's own
+        -- heal, so the fight ran past f+10200 with all six shields still
+        -- up, two members killed and revived, and one Harvester back at
+        -- 428/428 from 266.  That is a stalemate the party loses slowly,
+        -- and it is worth naming rather than waiting out.
+        if (H.frame - f0) > FIGHT_CAP then
+          finish("STALEMATE")
+          H.setPad({})
+          return
         end
         F.frame()
         return
@@ -222,7 +254,11 @@ H.run({ maxFrames = 200000 }, {
     })
   end)(),
 
-  half("autocrossbow", H.AUTOCROSSBOW),
+  -- The Bio Blaster half runs FIRST, deliberately.  Both halves replay the
+  -- same input off the same checkpoint, so the order does not change which
+  -- fight either of them draws, and a run that loses its second half to the
+  -- wall clock should lose the control rather than the measurement.
+  half("bioblaster", H.BIO_BLASTER),
 
   (function()
     local req
@@ -234,7 +270,7 @@ H.run({ maxFrames = 200000 }, {
     })
   end)(),
 
-  half("bioblaster", H.BIO_BLASTER),
+  half("autocrossbow", H.AUTOCROSSBOW),
 
   H.call(function()
     H.log("[probe] ---- both halves ----")
