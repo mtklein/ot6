@@ -48,7 +48,9 @@
 --    other; they connect through map 109.  So map 109's three doors to map
 --    110 lead to three different destinations rather than three ways to one
 --    place:
---        (11, 8) -> 110 (44,27)   east   (unreachable from the escort end)
+--        (11, 8) -> 110 (44,27)   east   (unreachable from the escort end
+--                                         BEFORE the speech; 22 steps after
+--                                         it, measured 2026-08-12)
 --        (14,17) -> 110 (22,53)   west
 --        (25,15) -> 110 (42,44)   east   <- the one Banon is behind
 --    Banon, Edgar, the save point and the door to the river are all in the
@@ -111,14 +113,22 @@
 -- needs it equips it in the scenario that needs it; gen_tunnelarmr is the
 -- first taker.
 --
--- Three refusals rather than one, and the reason is that one is not enough
--- ON THIS ROUTE.  _caf966 (:36741) hands the glove over on a single refusal
--- ($0014 set, $0013 and $0017 clear), but it belongs to the guard at map 110
--- (44,14) -- npc_prop.asm:4422, spawn switch $041E, which reads 1 at
--- returner_hideout -- and that NPC sits behind map 109's (11,8) door, the
--- one this file's map notes record as unreachable from the escort's end.
--- Whether the speech's `switch $0414=0` opens that corridor is measured and
--- logged below rather than assumed, but the route does not depend on it.
+-- Three refusals rather than one.  There is a cheaper way to the same glove
+-- and this route does not take it yet.  _caf966 (:36741) hands it over on a
+-- SINGLE refusal ($0014 set, $0013 and $0017 clear), from the guard at map
+-- 110 (44,14) -- npc_prop.asm:4422, spawn switch $041E, which reads 1 at
+-- returner_hideout -- who stands behind map 109's (11,8) door.  The map
+-- notes above record that door unreachable, and that reading was taken
+-- before the speech: measured 2026-08-12 one refusal in, (11,8) is 22 steps
+-- away and (11,15) is 15.  The speech's `switch $0414=0` despawns the NPC
+-- whose spawn tile is (11,15) and is the likely reason, though the before
+-- and after were not measured against each other, so that mechanism is
+-- unverified.  Three refusals is what this route walks because it needs no
+-- new crossings and the script guarantees the outcome; the one-refusal
+-- variant is a follow-up, and it buys only walking time, because taking the
+-- glove sets $0017 and _cafac3's first line then routes a later Yes past
+-- both `give_item GAUNTLET` sites.  The measurement is still logged below so
+-- the follow-up starts from evidence rather than from this paragraph.
 --
 -- What answering NO costs elsewhere: nothing that is read.  $0013 is set
 -- only by _cafba6 (:37140) on the Yes path and tested only by _caf966's own
