@@ -47,9 +47,9 @@
 
 
 def S(state, *, gen=None, prev=None, checkpoint=None, seed=None, stack=None,
-      after=None):
+      after=None, timeout=None):
     return {"state": state, "gen": gen, "prev": prev, "checkpoint": checkpoint,
-            "seed": seed, "stack": stack, "after": after}
+            "seed": seed, "stack": stack, "after": after, "timeout": timeout}
 
 
 STATES = [
@@ -100,9 +100,13 @@ STATES = [
     S("figaro_matron", gen="gen_edgar", prev="figaro_intro"),
     S("figaro_cleared", gen="gen_edgar", prev="figaro_matron"),
     # gen_kolts: the chocobo dismount, the South Figaro cave, and the mountain
-    S("south_figaro", gen="gen_kolts", prev="figaro_cleared"),
-    S("kolts_entry", gen="gen_kolts", prev="south_figaro"),
-    S("vargas_entry", gen="gen_kolts", prev="kolts_entry"),
+    # timeout=1800: gen_kolts gained the South Figaro stop (the paced grind
+    # on the world map outside the gate, the other three shops and the inn)
+    # on 2026-08-12 and now runs past 80000 emulated frames, which is over
+    # run.sh's 600 s default on a loaded machine.
+    S("south_figaro", gen="gen_kolts", prev="figaro_cleared", timeout=1800),
+    S("kolts_entry", gen="gen_kolts", prev="south_figaro", timeout=1800),
+    S("vargas_entry", gen="gen_kolts", prev="kolts_entry", timeout=1800),
     # gen_kolts_pool: one crossing past kolts_entry onto map 100 shelf F.
     # That map (95) is transit only and carries no encounter group --
     # 437 paced tiles there drew nothing -- so balance runs that want the

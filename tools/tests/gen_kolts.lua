@@ -653,7 +653,535 @@ local function shopTrip()
   })
 end
 
-H.run({ maxFrames = 400000 }, {
+-- ================================================================ the stop --
+-- Everything below is the South Figaro stop as a player would take it:
+-- fight the ground outside the gate for a while, then spend what that paid
+-- on the four shops and a night at the inn.  It was written and driven in
+-- probe_sfiggrind.lua and probe_sfigshops.lua first, because this file's own
+-- run is minutes long and a mis-derived coordinate here costs all of them.
+--
+-- Why the stop is here at all: `docs/design/wob-route.md` §2 -- the route
+-- plays casual -- and LOCKE's level, which is fixed from `banon_joined`
+-- onward because he leaves the party there.  Mt Kolts through the Returner
+-- Hideout is the only window in which it can still move, and the world map
+-- outside this town is the earliest encounter-bearing ground in it.
+
+-- ------------------------------------------------------------ the grind --
+-- The corridor, derived from world_1_tilemap.dat + WorldTileProp and then
+-- walked in probe_sfiggrind.lua:
+--   * the southern walkable region is 422 tiles (the same figure this
+--     file's header records for the cave crossing), 371 of them battle-bg 0
+--     and 51 bg 3.  Sector (86,111) is `WorldBattleRate[26] = $00`, so every
+--     tile in it draws at the normal rate; bg 0 selects
+--     `WorldBattleGroup[104] = 3` -- GreaseMonk / Rhodox / Rhinotaur, an
+--     expected 358 xp and 720 gil a fight once OT6's `Ot6RewardMulW = $0020`
+--     doubling is applied (ot6_break.asm:693-696).
+--   * the per-step danger increment is HALVED by the same pair of knobs
+--     (`Ot6DangerMulW = $0008`), so the world's vanilla $00C0 becomes $0060
+--     and a fight is expected about every 37 steps.
+--   * leaving town by the x=0 column lands at world (84,112), and (85,112)
+--     and (86,112) are two of South Figaro's own four entrance tiles.  A
+--     plan straight east from there walks onto them and back into the town:
+--     the 23-step shortest path (84,112) -> (100,105) has both on it.  So
+--     the first hop is NORTH to (84,108), and worldNavTo has no `avoid`
+--     option to fix it with afterwards.
+--   * the lap is (100,105) <-> (87,105), 13 steps each way on row 105, with
+--     no world entrance or event trigger on it.  The whole grind stays on
+--     the world map, because the danger counter is zeroed by every battle
+--     and every map load, so a lap that ducks into town throws away
+--     whatever it had accumulated.
+--
+-- Measured 2026-08-12, 16 laps from `south_figaro`, ~31000 frames:
+-- gil 3974 -> 12782, TERRA L5 -> L8, LOCKE L6 -> L8 (814 -> 2036 xp),
+-- EDGAR L7 -> L9, nobody below half hp at any lap boundary.  So a lap is
+-- worth roughly 550 gil and 75 LOCKE experience.
+local LOCKE = 1
+local function expOf(c)
+  local b = 0x1600 + 37 * c + 0x11        -- 3 bytes
+  return H.readByte(b) + (H.readByte(b + 1) << 8) + (H.readByte(b + 2) << 16)
+end
+local function levelOf(c) return H.readByte(0x1600 + 37 * c + 8) end
+
+-- The target is LOCKE's TOTAL experience at the end of the grind, not a
+-- level, because the level he reaches his own scenario with is this number
+-- plus whatever Mt Kolts, VARGAS and the hideout add: measured at +943 on
+-- the chain of 2026-08-12 (814 at south_figaro, 1757 at banon_joined).
+-- Level 10 is 2976 total and level 11 is 3936 (8 * sum(LevelUpExp[2..L]),
+-- CalcLevelExpTotal, ff6/src/menu/status.asm:580-605), so 2250 here lands
+-- him at level 10 with about 220 to spare -- two levels above the 8 he has
+-- had for every measurement of the gate soldier so far, and the "a level up
+-- or two" the owner asked for rather than an open-ended grind.
+local EXP_TARGET = 2250
+local grindLaps = 0
+local function grindDone() return expOf(LOCKE) >= EXP_TARGET end
+local function lap(n)
+  return H.cond(function() return not grindDone() end, {
+    H.logStep(function()
+      return string.format("grind lap %d: LOCKE L%d xp=%d/%d gil=%d f%d", n,
+        levelOf(LOCKE), expOf(LOCKE), EXP_TARGET, gil(), H.frame)
+    end),
+    H.worldNavTo(100, 105, { maxFrames = 40000, playBattles = "tactical",
+                             reserve = { [POTION] = 3 } }),
+    H.release(),
+    H.worldNavTo(87, 105, { maxFrames = 40000, playBattles = "tactical",
+                            reserve = { [POTION] = 3 } }),
+    H.release(),
+    H.call(function() grindLaps = n; where("grind lap " .. n) end),
+    care("grind lap " .. n, 0.85),
+  }, {})
+end
+
+local function grindTrip()
+  return seq({
+    -- out of town by the x=0 column -> world (84,112)
+    H.navTo(1, 28, { maxFrames = 30000, playBattles = "flee",
+                     avoid = M75_AVOID }),
+    H.release(), H.waitFrames(30),
+    H.driveUntil(function() return H.worldMode() end, 900, {
+      H.hold({ "left" }), H.waitFrames(8),
+    }, "leave South Figaro for the grind (x=0 column)"),
+    H.release(),
+    settleWorld("outside the gate"),
+    H.worldNavTo(84, 108, { maxFrames = 20000, playBattles = "tactical" }),
+    H.release(),
+    H.call(function()
+      H.assertEq(H.worldMode(), true,
+        "still outside -- the town's own entrance tiles were stepped around")
+      H.assertEq(H.worldX(), 84, "staged north of the gate, x=84")
+      H.assertEq(H.worldY(), 108, "staged north of the gate, y=108")
+      where("grind start")
+    end),
+    lap(1), lap(2), lap(3), lap(4), lap(5), lap(6), lap(7), lap(8), lap(9),
+    lap(10), lap(11), lap(12), lap(13), lap(14), lap(15), lap(16), lap(17),
+    lap(18), lap(19), lap(20), lap(21), lap(22), lap(23), lap(24),
+    H.call(function()
+      H.log(string.format(
+        "[grind] %d laps: LOCKE L%d xp=%d (target %d), gil=%d",
+        grindLaps, levelOf(LOCKE), expOf(LOCKE), EXP_TARGET, gil()))
+      H.assertEq(expOf(LOCKE) >= EXP_TARGET, true,
+        string.format("the grind reached its experience target in %d laps " ..
+          "(LOCKE %d of %d)", grindLaps, expOf(LOCKE), EXP_TARGET))
+    end),
+    -- back in at (86,111) -> map 75 (1,28)
+    H.worldNavTo(86, 111, { maxFrames = 40000, playBattles = "tactical",
+      arrive = function() return not H.worldMode() end }),
+    H.release(),
+    settleField("back in town", 75),
+    H.call(function()
+      H.assertEq(map(), 75, "back inside South Figaro after the grind")
+      where("grind done")
+      H.screenshot("sfigaro_grind_done")
+    end),
+  })
+end
+
+-- ------------------------------------------------- the other three shops --
+-- Doorsteps, merchants and talk spots are docs/research/
+-- south-figaro-shop-route.md §10 (§5 for the inn), derived statically there
+-- and walked here.  All three doors are $F7 bump doors, so the door tile can
+-- never be the goal of a navTo: CheckDoor opens the $05/$15 pair only for a
+-- party standing directly below it (field/player.asm:958-1010).
+local function enterDoor(mx, my, dstMap, what)
+  return seq({
+    H.logStep(function()
+      return string.format("%s: doormat (%d,%d) -> map %d", what, mx, my, dstMap)
+    end),
+    H.navTo(mx, my, { maxFrames = 30000, playBattles = "flee",
+                      avoid = M75_AVOID }),
+    H.release(), H.waitFrames(20),
+    H.call(function()
+      H.assertEq(H.fieldX(), mx, what .. ": on the doormat, x=" .. mx)
+      H.assertEq(H.fieldY(), my, what .. ": on the doormat, y=" .. my)
+    end),
+    H.driveUntil(function() return map() == dstMap end, 1800, {
+      H.hold({ "up" }), H.waitFrames(8),
+    }, what .. ": hold UP into the door"),
+    H.release(),
+    settleField(what, dstMap),
+    H.call(function()
+      H.assertEq(map(), dstMap, what .. ": inside map " .. dstMap)
+      where(what)
+    end),
+  })
+end
+
+-- Leave an interior by walking back onto its arrival tile and holding DOWN
+-- through the door under it.
+local function leaveDoor(ax, ay, what)
+  return seq({
+    H.navTo(ax, ay, { maxFrames = 20000, playBattles = "flee" }),
+    H.release(), H.waitFrames(20),
+    H.driveUntil(function() return map() == 75 end, 1800, {
+      H.hold({ "down" }), H.waitFrames(8),
+    }, what .. ": back out to the town"),
+    H.release(),
+    settleField("back in town", 75),
+  })
+end
+
+-- Stand on (sx,sy), face UP, tap A until the shop options window is up.
+-- CheckNPCs reaches one tile past a counter (p1 & 7 == 7,
+-- field/player.asm:188-200), which is why these talk spots are two tiles
+-- below the merchant rather than adjacent to him.
+local function counterShop(sx, sy, what)
+  return seq({
+    H.navTo(sx, sy, { maxFrames = 20000, playBattles = "flee" }),
+    H.release(), H.waitFrames(20),
+    H.driveUntil(inState(0x25), 6000, {
+      H.call(function()
+        if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
+        if H.fieldX() ~= sx or H.fieldY() ~= sy then H.setPad({}); return end
+        if H.readByte(0x087f + H.readWord(0x0803)) ~= FACE.up then
+          H.setPad({ up = true }); return
+        end
+        H.setPad((H.frame % 8 < 4) and { "a" } or {})
+      end),
+    }, what .. ": counter talk opens the shop"),
+    H.release(),
+    tapUntil("a", inState(0x26), what .. ": the buy list opens"),
+    H.release(), H.waitFrames(20),
+    H.call(function()
+      local rows = {}
+      for r = 0, 7 do rows[#rows + 1] = string.format("%02X", rowItem(r)) end
+      H.log("[shop] " .. what .. " stock: " .. table.concat(rows, " "))
+    end),
+  })
+end
+
+local function closeShop(onMap, what)
+  return seq({
+    tapUntil("b", inState(0x25), what .. ": back to the options window"),
+    tapUntil("b", function() return H.hasControl() and map() == onMap end,
+      what .. ": closed"),
+    H.release(), H.waitFrames(30),
+  })
+end
+
+-- ------------------------------------------------------------ the equips --
+-- Two menus, not one.  Equip (main menu row 2) reaches R-Hand / L-Hand /
+-- Head / Body and nothing else: `EquipSlotCursorProp` is `{1, 4}`, four rows
+-- (ff6/src/menu/equip.asm:76-77).  Relics have their own menu (main row 3)
+-- with a two-slot cursor (`RelicSlotCursorProp` `{1, 2}`, :200-201) and its
+-- own state chain $59 -> $5a -> $5b.  A first draft drove relics through the
+-- Equip menu and would have hunted a fifth slot that does not exist.
+-- Main menu rows are Item / Skills / Equip / Relic / Status / Config / Save
+-- (`SelectMainMenuOptionTbl`, ff6/src/menu/field_menu.asm:3420-3427).
+local ZM, CUR = 0x26, 0x4b
+local ST_MAIN, ST_CHAR = 0x05, 0x06
+local ST_EQOPT, ST_EQSLOT, ST_EQITEM = 0x36, 0x55, 0x57
+local ST_RLOPT, ST_RLSLOT, ST_RLITEM = 0x59, 0x5a, 0x5b
+
+-- char-select position of a character id, answered from $1850 rather than
+-- from the menu's own $69+slot copy, which is stale on the field.  It is
+-- resolved lazily because every step in an H.run list is CONSTRUCTED before
+-- the boot state is loaded.
+local function posOf(c)
+  return function()
+    for i, m in ipairs(H.partyMembers()) do
+      if m == c then return i - 1 end
+    end
+    return 0
+  end
+end
+
+local function menuEquip(mainRow, pos, slot, slotState, itemState, itemId, tag)
+  local optState = (slotState == ST_EQSLOT) and ST_EQOPT or ST_RLOPT
+  local ph = 0
+  local function tap(btn) ph = (ph + 1) % 12; H.setPad(ph < 4 and { btn } or {}) end
+  local function st() return H.readByte(ZM) end
+  local function seek(state, wantIn, back, fwd, label)
+    local function want()
+      return type(wantIn) == "function" and wantIn() or wantIn
+    end
+    return H.driveUntil(function()
+      return st() == state and H.readByte(CUR) == want()
+    end, 1800, {
+      H.call(function()
+        if st() ~= state then H.setPad({}); return end
+        local cur = H.readByte(CUR)
+        ph = (ph + 1) % 12
+        H.setPad(ph < 4 and { [cur < want() and fwd or back] = true } or {})
+      end),
+    }, tag .. ": " .. label)
+  end
+  local function press(state, label)
+    return seq({
+      H.driveUntil(function() return st() == state end, 1800, {
+        H.call(function() tap("a") end),
+      }, tag .. ": " .. label),
+      H.release(), H.waitFrames(10),
+    })
+  end
+  return seq({
+    H.driveUntil(function() return st() == ST_MAIN end, 1800, {
+      H.call(function() tap("x") end),
+    }, tag .. ": main menu"),
+    H.release(), H.waitFrames(10),
+    seek(ST_MAIN, mainRow, "up", "down", "main cursor"),
+    H.release(), H.waitFrames(10),
+    press(ST_CHAR, "character select"),
+    seek(ST_CHAR, pos, "up", "down", "character cursor"),
+    H.release(), H.waitFrames(10),
+    press(optState, "options row"),
+    seek(optState, 0, "left", "right", "cursor on Equip"),
+    H.release(), H.waitFrames(10),
+    press(slotState, "slot select"),
+    seek(slotState, slot, "up", "down", "slot cursor"),
+    H.release(), H.waitFrames(10),
+    press(itemState, "item list"),
+    -- the list rows at $7e9d8a are bag indexes into $1869, so this compares
+    -- the item id under the cursor rather than counting rows; the list is
+    -- pre-filtered by GetValidEquip, so an un-equippable item makes the seek
+    -- time out rather than equip something else
+    H.driveUntil(function()
+      return st() == itemState
+         and H.readByte(0x1869 + H.readByte(0x9d8a + H.readByte(CUR))) == itemId
+    end, 3000, {
+      H.call(function()
+        if st() ~= itemState then H.setPad({}); return end
+        tap("down")
+      end),
+    }, tag .. ": list cursor on the item"),
+    H.release(), H.waitFrames(10),
+    H.driveUntil(function() return st() == slotState end, 1800, {
+      H.call(function() tap("a") end),
+    }, tag .. ": equipped, back on the slot list"),
+    H.release(),
+    H.driveUntil(function() return H.hasControl() end, 2400, {
+      H.call(function() tap("b") end),
+    }, tag .. ": back out to the field"),
+    H.release(), H.waitFrames(20),
+  })
+end
+local function equipGear(pos, slot, itemId, tag)
+  return menuEquip(2, pos, slot, ST_EQSLOT, ST_EQITEM, itemId, tag)
+end
+local function equipRelic(pos, slot, itemId, tag)
+  return menuEquip(3, pos, slot, ST_RLSLOT, ST_RLITEM, itemId, tag)
+end
+
+-- -------------------------------------------------- the relic shop + inn --
+-- Both are on map 76, which is two disjoint regions joined by a same-map
+-- short entrance: region A (the relic shop) is where map 75's door lands,
+-- and (48,3) -> (69,10) is the only way to region B (the inn).
+--
+-- The relic demonstrator (NPC index 4 = object 20, spawn switch $0358)
+-- stands on (51,11), the only tile the shopkeeper at {51,9} can be
+-- counter-talked from.  His own scene ends `switch $0358=0`
+-- (event_main.asm:18394) and he walks off, so he is talked to first.
+local function talkOut(obj, done, what, budget)
+  local calm, ph = 0, 0
+  return seq({
+    H.talkToObj(obj, what),
+    H.driveUntil(function()
+      local ok = H.hasControl() and H.tileAligned() and bright() >= 15
+             and not H.dialogWaiting() and not H.eventRunning()
+             and not H.battleLoadStarted() and done()
+      calm = ok and calm + 1 or 0
+      return calm >= 30
+    end, budget or 20000, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        if H.hasControl() and not H.dialogWaiting() then H.setPad({}); return end
+        H.setPad(ph < 4 and { "a" } or {})
+      end),
+    }, what .. ": ride it out"),
+    H.release(),
+  })
+end
+
+-- `dlg $0B89` is "80 GP per night! Well?  0: Yes  1: No", and `take_gil 80`
+-- sets $01BE when the party cannot pay, in which case the script says
+-- "……Not enough money." and does not rest -- so the gold is asserted before
+-- the talk rather than the rest being assumed.  What it restores is
+-- `and_status {MAGITEK, INTERCEPTOR}` + `max_hp` + `max_mp` on all four
+-- slots (_cacfbd, event_main.asm:31862-31875): full HP, full MP, and every
+-- other persistent status bit cleared -- KO and poison included.  That last
+-- part is why this stop is the right place to end the town visit: TERRA
+-- walks out of it with the full Cure line the VARGAS entry contract asks
+-- for, whatever the grind spent.
+local CH_SEL, CH_MAX = 0x056E, 0x056F
+local function innRest(what)
+  local ph, ci, calm = 0, 0, 0
+  local inChoice = false
+  return seq({
+    H.call(function()
+      H.assertEq(gil() >= 80, true, what .. ": the party can pay the 80 GP")
+    end),
+    H.navTo(81, 19, { maxFrames = 20000, playBattles = "flee" }),
+    H.release(), H.waitFrames(20),
+    H.call(function()
+      H.assertEq(H.fieldX(), 81, what .. ": on the innkeeper's talk spot x=81")
+      H.assertEq(H.fieldY(), 19, what .. ": on the innkeeper's talk spot y=19")
+    end),
+    H.driveUntil(function()
+      return H.eventRunning() or H.dialogWaiting()
+    end, 6000, {
+      H.call(function()
+        if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
+        if H.readByte(0x087f + H.readWord(0x0803)) ~= FACE.up then
+          H.setPad({ up = true }); return
+        end
+        H.setPad((H.frame % 8 < 4) and { "a" } or {})
+      end),
+    }, what .. ": engage the innkeeper"),
+    H.release(),
+    H.driveUntil(function()
+      local ok = H.hasControl() and H.tileAligned() and bright() >= 15
+             and not H.dialogWaiting() and not H.eventRunning()
+      calm = ok and calm + 1 or 0
+      return calm >= 30
+    end, 30000, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        local chMax = (not H.battleLoadStarted()) and H.readByte(CH_MAX) or 0
+        if chMax >= 2 then
+          if not H.dialogWaiting() then H.setPad({}); return end
+          if not inChoice then
+            inChoice = true; ci = ci + 1
+            H.log(string.format(
+              "%s: choice #%d up (%d options) -- taking 0 (Yes)",
+              what, ci, chMax))
+          end
+          if H.readByte(CH_SEL) > 0 then H.setPad(ph < 4 and { "up" } or {})
+          else H.setPad(ph < 4 and { "a" } or {}) end
+          return
+        end
+        inChoice = false
+        if H.hasControl() and not H.dialogWaiting() then H.setPad({}); return end
+        H.setPad(ph < 4 and { "a" } or {})
+      end),
+    }, what .. ": the night passes"),
+    H.release(), H.waitFrames(30),
+  })
+end
+
+-- The gear pass.  LOCKE's own Dirk is power 26 and pierce; the MithrilBlade
+-- is power 38 and slash, and it is the best thing in shop 5 he can hold
+-- (RegalCutlass is 54 but its equip mask is $8051 -- TERRA, EDGAR, CELES).
+-- He BUYS one rather than taking EDGAR's, which was the cheaper idea and is
+-- wrong: LOCKE carries exactly one weapon into his solo scenario, because
+-- the Returner Hideout's `remove_equip` returns only what he is WEARING to
+-- the bag, and TunnelArmr is `5, OT6_PIERCE` (ot6_hud.asm:1943).  Buying
+-- leaves his Dirk unequipped in the shared bag, which does ride to the
+-- split, so his scenario has both classes.  The gate soldier's HeavyArmor is
+-- `3, OT6_SLASH|OT6_PIERCE` (:2013), so the blade breaks it either way.
+--
+-- The Heavy Shld is the other half: LOCKE is the only member of this party
+-- with an EMPTY left hand (measured at south_figaro -- TERRA and EDGAR both
+-- carry Bucklers already), so a shield is a straight +22 defense / +14
+-- magic defense on him for 400 gil, and equip Optimum will put it back on
+-- after the story strips him.
+local MITHRILBLADE, HEAVYSHLD, STARPENDANT = 0x0A, 0x5B, 0xB1
+
+local function gearTrip()
+  return seq({
+    enterDoor(29, 19, 77, "weapon shop"),
+    counterShop(103, 11, "shop 5 (weapon)"),
+    buyTo(MITHRILBLADE, 2, 1, 450, "MITHRILBLADE to 1"),
+    closeShop(77, "shop 5"),
+    leaveDoor(103, 16, "shop 5"),
+    enterDoor(35, 19, 77, "armor shop"),
+    counterShop(114, 12, "shop 6 (armor)"),
+    buyTo(HEAVYSHLD, 1, 1, 400, "HEAVY SHLD to 1"),
+    closeShop(77, "shop 6"),
+    leaveDoor(114, 16, "shop 6"),
+    H.call(function()
+      H.assertEq(invCount(MITHRILBLADE) >= 1, true,
+        "the MithrilBlade is in the bag")
+      H.assertEq(invCount(HEAVYSHLD) >= 1, true, "the Heavy Shld is in the bag")
+    end),
+    equipGear(posOf(1), 0, MITHRILBLADE, "locke blade"),
+    equipGear(posOf(1), 1, HEAVYSHLD, "locke shield"),
+    H.call(function()
+      H.assertEq(H.readByte(0x1600 + 37 * 1 + 0x1f), MITHRILBLADE,
+        "LOCKE holds the MithrilBlade")
+      H.assertEq(H.readByte(0x1600 + 37 * 1 + 0x20), HEAVYSHLD,
+        "LOCKE holds the Heavy Shld")
+      H.assertEq(invCount(0x00) >= 1, true,
+        "and his own Dirk is unequipped in the shared bag, which is what " ..
+        "carries a pierce weapon into his solo scenario for TunnelArmr")
+      where("locke armed")
+    end),
+  })
+end
+
+-- The relic pass and the night.  Three Star Pendants are `+$06 = $04` into
+-- $11D2, the status 1 and 2 protection word (CalcEquipEffect,
+-- battle_main.asm:2513-2517), and STATUS1::POISON is BIT_2
+-- (ff6/include/const.inc:1491), so they are poison immunity for the whole
+-- party.  That is the thing wob-route.md §2 names: the route used to buy
+-- Antidotes and then walk a poisoned character down to 1 hp, because
+-- DoPoisonDmg takes max HP/32 on every step with a floor of 1
+-- (field/player.asm:593-613).  The Antidotes stay bought as well; they cost
+-- 150 against a purse the grind put five figures into, and nothing has yet
+-- measured a poisoned party member on this route WITH the pendants on.
+local function relicTrip()
+  return seq({
+    enterDoor(15, 39, 76, "the relic shop and the inn"),
+    H.call(function()
+      H.assertEq(sw(0x0358), 1,
+        "$0358 set -- the relic demonstrator is standing on the talk spot")
+      H.log(string.format("demonstrator (obj 20) at (%d,%d)",
+        objX(20), objY(20)))
+    end),
+    talkOut(20, function() return sw(0x0358) == 0 end,
+      "the relic demonstrator (_ca78dc)"),
+    H.call(function()
+      H.assertEq(sw(0x0358), 0, "the demonstrator has gone ($0358 cleared)")
+    end),
+    counterShop(51, 11, "shop 7 (relics)"),
+    buyTo(STARPENDANT, 2, 3, 500, "STAR PENDANT to 3"),
+    closeShop(76, "shop 7"),
+    H.call(function()
+      H.assertEq(invCount(STARPENDANT), 3, "three Star Pendants in the bag")
+    end),
+    equipRelic(posOf(0), 0, STARPENDANT, "terra pendant"),
+    equipRelic(posOf(1), 0, STARPENDANT, "locke pendant"),
+    equipRelic(posOf(4), 0, STARPENDANT, "edgar pendant"),
+    H.call(function()
+      for _, c in ipairs({ 0, 1, 4 }) do
+        H.assertEq(H.readByte(0x1600 + 37 * c + 0x23) == STARPENDANT
+                or H.readByte(0x1600 + 37 * c + 0x24) == STARPENDANT, true,
+          string.format("char %d wears a Star Pendant -- Mt Kolts cannot " ..
+            "poison this party", c))
+      end
+      where("pendants on")
+    end),
+    -- region A -> region B, the inn wing
+    H.navTo(48, 3, { maxFrames = 20000, playBattles = "flee",
+      arrive = function() return H.fieldX() == 69 and H.fieldY() == 10 end }),
+    H.release(),
+    settleField("inn wing", 76),
+    H.call(function()
+      H.assertEq(H.fieldX(), 69, "through the staircase warp, x=69")
+      H.assertEq(H.fieldY(), 10, "through the staircase warp, y=10")
+    end),
+    innRest("the inn"),
+    H.call(function()
+      where("after the night")
+      for _, c in ipairs(H.partyMembers()) do
+        H.assertEq(H.charHp(c), H.charMaxHp(c),
+          string.format("char %d woke at full hp", c))
+        H.assertEq(H.charMp(c), H.charMaxMp(c),
+          string.format("char %d woke at full mp", c))
+      end
+      H.screenshot("sfigaro_inn")
+    end),
+    -- back out: region B -> region A -> map 75
+    H.navTo(70, 11, { maxFrames = 20000, playBattles = "flee",
+      arrive = function() return H.fieldX() == 49 and H.fieldY() == 4 end }),
+    H.release(),
+    settleField("relic wing", 76),
+    leaveDoor(52, 14, "the inn's building"),
+    H.call(function()
+      H.assertEq(map(), 75, "back on map 75 with the shopping done")
+      where("town stop done")
+    end),
+  })
+end
+
+H.run({ maxFrames = 700000 }, {
   H.loadState(CLEARED),
   H.waitFrames(20),
   H.call(function()
@@ -838,6 +1366,33 @@ H.run({ maxFrames = 400000 }, {
   --   * maps 75 and 85 have no encounters (map_prop byte 5 = 0), so this
   --     detour is walked, not fought.
   shopTrip(),
+
+  -- The grind, then the rest of the shopping it pays for, then a night at
+  -- the inn.  The order is deliberate: shop 8 above is the insurance (the
+  -- party crosses the cave and reaches this counter with ZERO Fenix Downs,
+  -- measured), the grind is what turns 324 gil into five figures, and the
+  -- inn is last so the party leaves town at full hp and full mp whatever
+  -- the grind spent.
+  grindTrip(),
+  gearTrip(),
+
+  -- Back to the item shop with the grind's money.  The first visit could
+  -- only afford 5 revives and 25 Tonics out of 3974; the mountain is nine
+  -- crossings and the map-98 approach on top, and this is still the last
+  -- counter before the Returner Hideout.
+  enterDoor(44, 32, 85, "item shop (second visit)"),
+  counterShop(106, 54, "shop 8 (item, top-up)"),
+  buyTo(0xF0, 5, 8, 500, "FENIX DOWN to 8"),
+  buyTo(0xE8, 0, 40, 50, "TONIC to 40"),
+  closeShop(85, "shop 8"),
+  leaveDoor(104, 57, "the item shop"),
+  H.call(function()
+    H.assertEq(invCount(0xF0) >= 6, true,
+      "the mountain is walked with real revives now")
+    where("restocked")
+  end),
+
+  relicTrip(),
 
   -- The rows are set once, here, and they carry in the save from here to the
   -- end of the chain (the bit is $1850+c bit $20, party state, not battle

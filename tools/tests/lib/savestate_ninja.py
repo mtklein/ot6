@@ -98,7 +98,8 @@ LIB_HALVES = (
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 STACK_RE = re.compile(r"^[A-Za-z0-9]+_$")
-FIELDS = {"state", "gen", "prev", "checkpoint", "seed", "stack", "after"}
+FIELDS = {"state", "gen", "prev", "checkpoint", "seed", "stack", "after",
+          "timeout"}
 
 
 def checkpoint_inputs(root, key):
@@ -159,6 +160,19 @@ def validate(states, root):
                 err(e, f"checkpoint {checkpoint!r} has no manifest.json")
             elif not checkpoint_inputs(root, checkpoint)[1:]:
                 err(e, f"checkpoint {checkpoint!r} has no *.sram payload")
+        # timeout=: run.sh's wall-clock cap for THIS edge only.  The default
+        # is 600 s and it is not enough for every generator: the South Figaro
+        # stop pushed gen_kolts past 80000 emulated frames, and the cap is
+        # wall clock, so `nice` does not protect it and a loaded machine
+        # turns a working generator into a timeout kill (trap 9).  Raising it
+        # per edge is better than raising the global default, which would
+        # also lengthen the time a genuinely hung run takes to report.
+        timeout = e.get("timeout")
+        if timeout is not None and not (isinstance(timeout, int)
+                                        and 60 <= timeout <= 7200):
+            err(e, f"timeout {timeout!r} must be an int between 60 and 7200")
+        if timeout is not None and not gen:
+            err(e, "timeout= requires gen=")
         stack = e.get("stack")
         if stack and not STACK_RE.match(stack):
             err(e, f"stack prefix {stack!r} must end in '_'")
@@ -281,6 +295,8 @@ def emit(states, root):
             ancestor = f"tools/tests/checkpoints/{key}/manifest.json"
         if e.get("stack"):
             env.append(f"OT6_STACK={e['stack']}")
+        if e.get("timeout"):
+            env.append(f"OT6_TIMEOUT={e['timeout']}")
         if e.get("after"):
             order = f" || build/states/{e['after']}.mss.lua"
         w(f"build {outs} build/states/{s}.stamp: generate{explicit} | "
