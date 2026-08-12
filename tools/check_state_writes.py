@@ -225,14 +225,36 @@ WAIVER_HEADER = """\
 #
 # After a cleanup wave:  python3 tools/check_state_writes.py --regen-waivers
 # regenerates this file from the corpus; the diff must be pure deletion.
+# Regeneration preserves the third field below, so a classification survives
+# a cleanup wave.
 #
-# format: <path relative to repo root> <TAB> <token>
+# format: <path relative to repo root> <TAB> <token> [<TAB> quarantine: why]
+#
+# A line with no third field is CONVERSION WORK STILL OWED: the file writes
+# game state and someone has to replace that with real input.
+#
+# A line marked `quarantine:` is not owed.  It is a mechanism test injecting
+# something the game can only produce rarely or never on cue -- deliberate
+# VRAM corruption for the font-restore path, the 1-in-65536 zero-checksum
+# save, a legacy save layout that no current version writes.  The owner ruled
+# these stay: the bar is that a PLAYTHROUGH is real, and instrumenting a
+# mechanism is not a claim about play.  They carry the loud header
+# battle_loadgate.lua models, and they may never generate a savestate.
+#
+# The distinction is what makes #75's finish line checkable: the program is
+# done when every remaining line is a quarantine line, and until then the
+# unmarked count is the work left.  Do not mark a line to make that number
+# smaller.
 """
 
 
 def load_waivers(path: str):
-    """{(file, token)} from the waiver file; missing file = empty set."""
-    waivers = set()
+    """{(file, token): reason-or-None} from the waiver file.
+
+    A third field beginning `quarantine:` classifies the line as a sanctioned
+    mechanism test rather than conversion work still owed; missing third field
+    means owed.  Missing file = empty."""
+    waivers = {}
     if not os.path.exists(path):
         return waivers
     with open(path, encoding="utf-8") as f:
@@ -241,20 +263,35 @@ def load_waivers(path: str):
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) != 2 or not parts[0] or not parts[1]:
+            if len(parts) not in (2, 3) or not parts[0] or not parts[1]:
                 raise SystemExit(
                     "check_state_writes: %s:%d: malformed waiver line %r "
-                    "(want <path>\\t<token>)" % (path, lineno, line))
-            waivers.add((parts[0], parts[1]))
+                    "(want <path>\\t<token>[\\tquarantine: why])"
+                    % (path, lineno, line))
+            reason = None
+            if len(parts) == 3:
+                if not parts[2].startswith("quarantine:"):
+                    raise SystemExit(
+                        "check_state_writes: %s:%d: third field must begin "
+                        "'quarantine:', got %r" % (path, lineno, parts[2]))
+                reason = parts[2]
+            waivers[(parts[0], parts[1])] = reason
     return waivers
 
 
-def write_waivers(path: str, hits) -> int:
+def write_waivers(path: str, hits, existing=None) -> int:
+    """Rewrite the list from the corpus, preserving classifications.
+
+    A quarantine mark is a judgement someone made about a file; regenerating
+    after a cleanup wave must not silently discard it and turn a sanctioned
+    mechanism test back into apparent conversion work."""
+    existing = existing or {}
     pairs = sorted({(rel, tok) for rel, _line, tok in hits})
     with open(path, "w", encoding="utf-8") as f:
         f.write(WAIVER_HEADER)
         for rel, tok in pairs:
-            f.write("%s\t%s\n" % (rel, tok))
+            reason = existing.get((rel, tok))
+            f.write("%s\t%s%s\n" % (rel, tok, "\t" + reason if reason else ""))
     return len(pairs)
 
 
@@ -262,7 +299,7 @@ def compare(hits, waivers):
     """(unwaived hits, stale waiver pairs)."""
     fired = {(rel, tok) for rel, _line, tok in hits}
     unwaived = [h for h in hits if (h[0], h[2]) not in waivers]
-    stale = sorted(waivers - fired)
+    stale = sorted(set(waivers) - fired)
     return unwaived, stale
 
 
@@ -273,9 +310,17 @@ def run_check(root: str, waiver_path: str, verbose: bool) -> int:
     waivers = load_waivers(waiver_path)
     unwaived, stale = compare(hits, waivers)
 
+    owed = sorted(k for k, v in waivers.items() if v is None)
+    quarantined = len(waivers) - len(owed)
+
     print("state-write check (%s/**/*.lua)" % TESTS_DIR)
     print("  scanned %d files: %d state-write sites, %d waived (file,token) "
           "pairs" % (nfiles, len(hits), len(waivers)))
+    print("  %d still owed a conversion, %d sanctioned quarantine"
+          % (len(owed), quarantined))
+    if not owed:
+        print("  the list is now the quarantine roster: no conversion work "
+              "is recorded as owed (issue #75's finish line)")
 
     if verbose:
         for rel, line, tok in hits:
@@ -377,7 +422,7 @@ local sneak = __OT6_EMU_RAW.write(0x1a, 4)
                "unwaivered hits must fail: %r %r" % (unwaived, stale))
 
         # regen: both hits collapse to one (file, token) pair, then pass
-        npairs = write_waivers(wpath, hits)
+        npairs = write_waivers(wpath, hits, load_waivers(wpath))
         expect(npairs == 1, "regen: want 1 pair, got %d" % npairs)
         unwaived, stale = compare(hits, load_waivers(wpath))
         expect(not unwaived and not stale,
@@ -401,7 +446,7 @@ local sneak = __OT6_EMU_RAW.write(0x1a, 4)
                "stale waiver must be reported: %r %r" % (unwaived, stale))
 
         # regen after the wave: the list shrinks to nothing and passes
-        npairs = write_waivers(wpath, hits)
+        npairs = write_waivers(wpath, hits, load_waivers(wpath))
         expect(npairs == 0, "post-wave regen: want 0 pairs, got %d" % npairs)
         unwaived, stale = compare(hits, load_waivers(wpath))
         expect(not unwaived and not stale,

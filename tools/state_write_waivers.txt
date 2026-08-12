@@ -34,26 +34,26 @@ tools/tests/battle_class.lua	.writeByte(
 tools/tests/battle_class.lua	.writeWord(
 tools/tests/battle_clockwork.lua	.writeByte(
 tools/tests/battle_clockwork.lua	.writeWord(
-tools/tests/battle_codex.lua	.writeByte(
-tools/tests/battle_codex.lua	.writeWord(
-tools/tests/battle_codex.lua	emu.write
+tools/tests/battle_codex.lua	.writeByte(	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
+tools/tests/battle_codex.lua	.writeWord(	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
+tools/tests/battle_codex.lua	emu.write	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
 tools/tests/battle_dancemp.lua	.writeWord(
 tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(
 tools/tests/battle_dotchip.lua	.writeByte(
 tools/tests/battle_dotchip.lua	.writeWord(
-tools/tests/battle_fontrestore.lua	.writeByte(
-tools/tests/battle_fontrestore.lua	emu.write
+tools/tests/battle_fontrestore.lua	.writeByte(	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
+tools/tests/battle_fontrestore.lua	emu.write	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
 tools/tests/battle_gaufight.lua	.writeByte(
-tools/tests/battle_loadgate.lua	.writeWord(
+tools/tests/battle_loadgate.lua	.writeWord(	quarantine: unit test of the harness's own load-gate predicate, not of play
 tools/tests/battle_mpcost.lua	.writeWord(
 tools/tests/battle_rage.lua	.writeByte(
 tools/tests/battle_rage.lua	.writeWord(
-tools/tests/battle_reveal.lua	emu.write
+tools/tests/battle_reveal.lua	emu.write	quarantine: seed-entry mask only reachable via a Cmd_20 reload; phase 2 converted
 tools/tests/battle_runic.lua	.writeByte(
 tools/tests/battle_runic.lua	.writeWord(
-tools/tests/battle_slots.lua	.writeByte(
-tools/tests/battle_slots.lua	.writeWord(
+tools/tests/battle_slots.lua	.writeByte(	quarantine: reels free-run at frame rate, so no input selects an icon on cue
+tools/tests/battle_slots.lua	.writeWord(	quarantine: reels free-run at frame rate, so no input selects an icon on cue
 tools/tests/battle_steal.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeByte(
@@ -113,4 +113,4 @@ tools/tests/probe_v07_i_negative.lua	.writeByte(
 tools/tests/probe_v07_j_negative.lua	.writeByte(
 tools/tests/probe_vargas.lua	.writeByte(
 tools/tests/probe_vargas.lua	.writeWord(
-tools/tests/save_checksum.lua	emu.write
+tools/tests/save_checksum.lua	emu.write	quarantine: the 1-in-65536 zero-checksum save (owner-named)
