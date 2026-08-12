@@ -111,7 +111,7 @@
 -- Issue #75, zero-write: every navigator here runs with opts.playBattles.
 -- The hideout draws no random encounters, and that is now stated as a fact
 -- rather than as a description of the map layout: maps 108, 109, 110 and 112
--- all have bit 7 clear in map_prop byte $0525, and UpdateStepCounter tests
+-- all have bit 7 clear in map_prop byte $0525, and CheckBattleSub tests
 -- that bit and returns before it will roll anything
 -- (ff6/src/field/battle.asm:332-333).  playBattles mode makes the battle
 -- branch a property of the code path rather than an assumption: if a battle
@@ -144,7 +144,7 @@
 -- This generator used to have none, on the reasoning that a hideout with no
 -- encounters cannot cost the party anything, and that is exactly wrong for a
 -- status: poison drains max HP/32 per step with a floor of 1
--- (ff6/src/field/player.asm:593-609), and this route walks a few hundred
+-- (ff6/src/field/player.asm:593-613), and this route walks a few hundred
 -- steps across five crossings.  banon_joined shipped TERRA at 1 of 136 with
 -- status 04 because the bit arrived with her from returner_hideout and
 -- nothing here looked at it.  The arrival stop is the one that matters --

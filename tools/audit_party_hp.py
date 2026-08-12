@@ -41,9 +41,9 @@ Four conditions fail, and they are the game's own, not invented here:
   - **Poisoned**: `$04` in status 1.  Poison is not in the game's own
     can-be-healed mask and does not belong there -- the menu serves a
     poisoned character perfectly well -- but it is the one status the act of
-    walking converts into a casualty.  UpdateStepCounter drains max HP/32
+    walking converts into a casualty.  DoPoisonDmg drains max HP/32
     from every poisoned character on every step and floors the result at 1
-    (`ff6/src/field/player.asm:593-609`), so a character who leaves a fight
+    (`ff6/src/field/player.asm:593-613`), so a character who leaves a fight
     poisoned reaches the end of any walk of length at exactly 1 HP no matter
     what they had when the fight ended.  banon_joined and lete_river are the
     measured case: TERRA at 1 of 136 with status 04 after five crossings of
@@ -207,7 +207,7 @@ def selftest(repo: str = ".") -> int:
         (rec(118, 136, 0x04), "POISONED", "poisoned and nowhere near fatal"),
         (rec(1, 136, 0x04), "POISONED", "banon_joined TERRA, ground to 1"),
         # and dead-with-poison is still reported as dead: a Fenix Down is
-        # the only thing the game will accept there (item.asm:2278-2285)
+        # the only thing the game will accept there (item.asm:2282-2286)
         (rec(0, 136, 0x84), "DEAD", "wound wins over poison"),
         # magitek ($08) is 18 records in the tree and is not a casualty
         (rec(147, 231, 0x08), None, "magitek status alone"),
@@ -411,7 +411,7 @@ def main() -> int:
               f"A POISONED line wants the same two things and one more: the "
               f"Antidote has to be IN the bag for fieldCare to reach for it,\n"
               f"and poison drains max HP/32 every step "
-              f"(ff6/src/field/player.asm:593-609), so a fixture that ships "
+              f"(ff6/src/field/player.asm:593-613), so a fixture that ships "
               f"the bit\nhands the next generator a character at 1 HP however "
               f"healthy this one's HP column looks.")
     if cp_bad:

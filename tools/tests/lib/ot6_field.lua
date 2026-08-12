@@ -1856,14 +1856,16 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- petrify, $20 imp, $10 clear, $08 magitek, $04 poison, $02 zombie, $01
 -- dark.  Five of those bits have a bag item that clears them, and
 -- CheckCanUseItem accepts each item only on a target actually carrying its
--- bit (item.asm:2287-2323): Soft on petrify, Green Cherry on imp, Antidote
+-- bit (item.asm:2243-2323): Soft on petrify, Green Cherry on imp, Antidote
 -- on poison, Revivify on zombie, Eyedrop on dark, Remedy on any of
--- petrify/imp/poison/dark at once.
+-- petrify/imp/poison/dark at once.  The antidote arm is :2318-2322, and it
+-- is `and #$04 / beq invalid`, so an Antidote offered to a character who is
+-- not poisoned is refused rather than wasted.
 --
 -- Only poison is in this table, and the reason is that poison is the only
--- one of them that walking makes worse.  UpdateStepCounter drains max HP/32
+-- one of them that walking makes worse.  DoPoisonDmg drains max HP/32
 -- from every poisoned character on every step and floors the result at 1
--- (`ff6/src/field/player.asm:593-609`), so a character who leaves a fight
+-- (`ff6/src/field/player.asm:593-613`), so a character who leaves a fight
 -- poisoned arrives at the end of any walk of length at exactly 1 HP,
 -- whatever they had when the fight ended.  That is what banon_joined and
 -- lete_river were: TERRA at 1 of 136 after five crossings of a hideout that
@@ -2051,9 +2053,9 @@ end
 --               fatal goes into the status-to-set when the carry says
 --               max/8 >= current (battle_main.asm:11544-11549)
 --   poisoned:   $04 in status 1, which is a casualty in slow motion rather
---               than a handicap.  UpdateStepCounter drains max HP/32 from
+--               than a handicap.  DoPoisonDmg drains max HP/32 from
 --               every poisoned character on every step and floors the result
---               at 1 (ff6/src/field/player.asm:593-609), so the walk itself
+--               at 1 (ff6/src/field/player.asm:593-613), so the walk itself
 --               converts the bit into 1 HP and then holds it there.  A
 --               fixture that ships poison is a fixture that will hand the
 --               next generator a character the next encounter has already
@@ -2291,11 +2293,11 @@ function M.fieldCare(opts)
 
   -- Everything the bag can do about a status this character is carrying.
   -- Ordered before healing rather than after it, because poison drains on
-  -- every step (player.asm:593-609): HP restored while the bit is still set
+  -- every step (player.asm:593-613): HP restored while the bit is still set
   -- starts draining again the moment the menu closes, so curing first is
   -- both what a player does and the cheaper order.  A dead, petrified or
   -- zombie target is skipped, because CheckCanUseItem's own first test is
-  -- the wound branch (item.asm:2278-2285) and a Fenix Down is the only
+  -- the wound branch (item.asm:2282-2286) and a Fenix Down is the only
   -- thing it accepts there; the revive pass above is what serves them.
   local function pickStatusCure(target)
     if M.charHp(target) == 0 or (M.charStatus1(target) & 0xC2) ~= 0 then

@@ -26,7 +26,7 @@
 -- Issue #75, zero-write: both navigators run with opts.playBattles.  Maps
 -- 112 and 113 roll no encounters, and that is a fact about the data rather
 -- than an impression: both have bit 7 clear in map_prop byte $0525, and
--- UpdateStepCounter tests that bit and returns before it will roll anything
+-- CheckBattleSub tests that bit and returns before it will roll anything
 -- (ff6/src/field/battle.asm:332-333).  playBattles mode makes the battle
 -- branch a property of the code path rather than an assumption: a battle
 -- here would be fought with real input, never write-cleared.
@@ -45,7 +45,7 @@
 -- A care stop before the save, for the reason gen_banon has two: the audit
 -- named lete_river alongside banon_joined, TERRA at 1 of 136 with status 04,
 -- and poison drains max HP/32 on every step
--- (ff6/src/field/player.asm:593-609).  Eighteen tiles is not where that
+-- (ff6/src/field/player.asm:593-613).  Eighteen tiles is not where that
 -- damage was done -- it arrives with the fixture -- but this is the last
 -- stop before the river, which is long, forced and full of battles, and
 -- H.assertPartyStanding below refuses to write a fixture that would start
