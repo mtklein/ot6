@@ -522,8 +522,8 @@ done:   rtl
 ; ---- #64: the folded tier is also priced as that tier (v0.9) ----
 ;
 ; It used to be "bp stays the only price": GetMPCost runs four instructions
-; before this hook (battle_main.asm:13159) and banks the cost of whatever
-; $3a7b held at that point (the base spell) into $3620,y at :13163.  The fold
+; before this hook (battle_main.asm:13245) and banks the cost of whatever
+; $3a7b held at that point (the base spell) into $3620,y at :13249.  The fold
 ; then rewrote $3a7b behind it, so 2 BP bought a Fire 3 (51 MP of spell)
 ; for Fire's 4.  Boost was a discount on the magic list: the folded
 ; cast beat three separate casts on both axes, fewer turns and less MP.
@@ -543,6 +543,39 @@ done:   rtl
 ; does not depend on any menu-side recheck having run first.
 ; Ot6FoldPrices keeps the displayed price agreeing with it.
 ;
+; ---- #91: "it cannot race" was not true of the counterattack guard ----
+;
+; The paragraph above says the charge does not depend on any menu-side
+; recheck having run first.  That held for the fold arm and not for the
+; guard.  GetMPCost's character arm reads the caster's spell-list cost byte
+; (battle_main.asm:13296), which is the byte Ot6FoldPrices already moved to
+; the folded tier's price when the boost went up, so by the time this proc
+; runs $3620,y is ALREADY the folded price.  Any early-out here therefore
+; leaves the folded price standing on an unfolded spell.
+;
+; The guard's old test was $b1.0, "a counterattack is executing".  That flag
+; is global: ExecRetal sets it for its whole run (:12676), and the
+; immediate-action path sets it too (:5806), while UpdateBattleTime ->
+; GetPlayerAction -> CreateNormalAction (:2697, :12919) runs from the
+; battle-graphics frame wait, including the waits inside those.  So an
+; ordinary menu action that happened to be drained during someone else's
+; counterattack took the counter's early-out: base Fire cast, Fire 2's 20 MP
+; charged.  Measured
+; 2026-08-11 on worldmap_narshe: at the queue write $b1 = $01 while every
+; character's $32cd read $ff, so no counterattack was pending for anyone --
+; the flag alone cannot tell whose action is being queued.  It is timing,
+; not menu position: a boost pressed at the target cursor reproduced it
+; identically once it landed in the same frame window, which is why
+; battle_lateboost (whose cast is a second turn) never saw it.
+;
+; What the narrowed test still misses: a SECOND counterattack queued for one
+; actor while the first is pending chains onto the command list without
+; CreateRetalAction updating $32cd,x (:13206-13211), so its pointer will not
+; match and it would fold.  Left alone deliberately.  Monsters are already
+; excluded below, and a character's counterattack does not reach this proc's
+; command test -- it has to be command $02/$17/$0c on a tier-family head --
+; so the case has no known reachable instance.
+;
 ; Untaught tiers still fold, and that is now a decision rather than an
 ; inheritance.  Folding is source-agnostic (design/magicite.md): a borrowed
 ; Fire folds to Fire 3 whether or not the caster ever learned Fire 3, and
@@ -560,12 +593,23 @@ done:   rtl
         longi
         .i16
         pha
-        lda     $b1             ; a counter's fold would be free the same
-        lsr                     ;   way: ai counter scripts (a raged gau's)
-        bcs     @keep           ;   route through CreateAction under
-                                ;   ExecRetal's $b1.0, and no ActionEnd
-                                ;   ever charges what they queue
-        lda     $3a7a           ; command
+        ; A counterattack must not fold: no ActionEnd ever charges what a
+        ; counter queues (ai counter scripts, a raged gau's, route through
+        ; CreateAction), so its fold would be free.  The test is whether THIS
+        ; action is the counterattack, not whether one is running -- see the
+        ; header's #91 paragraph.  y/2 is the command-list pointer this call
+        ; is queueing, and CreateRetalAction has already written that pointer
+        ; to the actor's counterattack slot $32cd,x (battle_main.asm:13211);
+        ; CreateNormalAction writes $32cc,x instead (:13228), so the two
+        ; never match for an ordinary action.
+        lda     $b1             ; is a counterattack executing at all?
+        lsr                     ;   ($b1.0, set by ExecRetal, :12676)
+        bcc     @cmd            ; no: nothing to disambiguate
+        tya                     ; the queue slot, pointer * 2
+        lsr                     ;   -> the pointer just queued
+        cmp     $32cd,x         ; the actor's pending counterattack pointer
+        beq     @keep           ;   the same: this action IS the counter
+@cmd:   lda     $3a7a           ; command
         cmp     #$02
         beq     @cmdok          ; $02 magic
         cmp     #$17
@@ -584,7 +628,7 @@ done:   rtl
         sta     $3a7b           ; queue the folded tier
         jsl     Ot6SpellMP      ; #64: and price it as that tier.  x is still
         sta     $3620,y         ;   the actor, y still the queue slot, so this
-                                ;   overwrites the base cost :13163 just banked
+                                ;   overwrites the base cost :13249 just banked
 @keep:  pla
         plp
         rtl
@@ -810,7 +854,7 @@ Ot6FoldTbl:
 ;                 drawer (btlgfx_main.asm:13027, :19690, :854)
 ;   the confirm   `lda $2093,x / bmi` refuses a disabled row
 ;                 (btlgfx_main.asm:19659-19663)
-;   the charge    GetMPCost's character arm, `lda a:$0003,x`  (:13210)
+;   the charge    GetMPCost's character arm, `lda a:$0003,x`  (:13296)
 ;
 ; Three of those four live in bank C1, which is linked as a stock object into
 ; both the shipped and the nomp ROM, so a hook in any of them would shift the
