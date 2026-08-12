@@ -47,9 +47,9 @@ shared by two or three records, because the game keeps duplicate map copies
 (South Figaro before and after the occupation, the two South Figaro cave
 variants) and one flag has to close the chest in every copy.  Bit 19 is
 shared by maps 70, 73 and 90 and the three copies hold DIFFERENT items --
-Thunder Rod, Tincture, Tincture -- so opening it in one copy takes that copy's
-item and empties the chest in the others.  Everything below counts distinct
-bits and names every map a bit appears on.
+Thunder Rod, Tincture, Hero Ring -- so opening it in one copy takes that
+copy's item and empties the chest in the others.  Everything below counts
+distinct bits and names every map a bit appears on.
 
 WHICH MAPS THE ROUTE VISITS, AND WHAT IT OPENS.  "What it opens" is exact:
 the treasure bits live at $1E40..$1E7F (`ff6/notes/field-ram.txt:1035`,
@@ -83,7 +83,7 @@ WHAT THE CHECK IS.  `tools/chests_opened.txt` is a grow-only list of the
 chests the route does open, one line per treasure bit, and the audit fails
 unless the measured set matches it exactly.  It is the inverse of the
 burn-down waiver lists in `audit_equipment.py` and `audit_party_hp.py`, and
-deliberately so: those list defects, and a defect list here would be 95
+deliberately so: those list defects, and a defect list here would be 94
 identical lines saying "the route does not open chests", which is noise from
 the day it lands and stays noise for weeks.  A list of wins is empty today,
 costs nothing to read, and still fails in both directions -- a route that
@@ -145,11 +145,11 @@ MAP_PROP = "ff6/src/field/map_prop.dat"
 MAP_TITLES = "ff6/src/text/map_title_en.json"
 GENERATORS = "tools/tests/gen_*.lua"
 
-REC_SIZE = 5                 # treasure_prop.inc:9, and `inx5` at player.asm:773
+REC_SIZE = 5                 # treasure_prop.inc:9; `inx5` at player.asm:773
 TREASURE_BITS = 0x1E40       # field-ram.txt:1035, 64 bytes = 512 bits
 EVENT_BITS = 0x1E80          # field-ram.txt:1037, $1E80..$1F5F
-MAP_ID = 0x1F64              # the live map index; H.mapId() reads the same word
-MAP_PROP_SIZE = 33           # LoadMapProp copies 33 bytes (field/map.asm:143-156)
+MAP_ID = 0x1F64              # live map index; H.mapId() reads the same word
+MAP_PROP_SIZE = 33           # LoadMapProp copies 33 (field/map.asm:143-156)
 
 
 def off(addr: int) -> int:
@@ -157,14 +157,14 @@ def off(addr: int) -> int:
     return addr - CHAR_BLOCK
 
 
-# ------------------------------------------------------------ the chest table --
+# ---------------------------------------------------------- the chest table --
 
 class Chest:
     """One treasure record, and the bit that says whether it is open."""
 
     def __init__(self, map_id: int, index: int, raw: bytes, names: list[str]):
         self.map = map_id
-        self.index = index                       # record number within the file
+        self.index = index                      # record number in the file
         self.x, self.y = raw[0], raw[1]
         switch = raw[2] | (raw[3] << 8)
         self.bit = switch & 0x01FF               # player.asm:782-789
@@ -249,7 +249,7 @@ def map_titles(repo: str) -> dict[int, str]:
     return out
 
 
-# ------------------------------------------------------------- what is opened --
+# ----------------------------------------------------------- what is opened --
 
 def read_state(raw: bytes | None):
     """(opened bit set, event bits set, map id) out of one blob, or None.
@@ -273,7 +273,7 @@ def read_state(raw: bytes | None):
     return opened, live, map_id
 
 
-# -------------------------------------------------------------- route coverage --
+# ----------------------------------------------------------- route coverage --
 
 # Positive map equalities.  Every one of these is an assertion or an arrival
 # predicate that HELD in a green chain, so each is proof the route reached
@@ -393,7 +393,8 @@ def selftest(repo: str = ".") -> int:
     # in the game and the one a reader would notice.
     m30gil = [c.what for c in by_map.get(30, []) if c.kind == "gil"]
     if m30gil != ["5000 gil"]:
-        bad.append(f"map 30's gil chest should read 5000 gil, decoded {m30gil}")
+        bad.append("map 30's gil chest should read 5000 gil, decoded "
+                   f"{m30gil}")
 
     # The reader, against a synthetic blob.  A save slot is $0A00 bytes of
     # $1600..$1FFF (save.asm:154d), so a blob of that length with $1600 at 0
@@ -418,7 +419,8 @@ def selftest(repo: str = ".") -> int:
     else:
         opened, live, map_id = got
         if opened != {want}:
-            bad.append(f"a slot with only bit {want} set read back as {opened}")
+            bad.append(f"a slot with only bit {want} set read back as "
+                       f"{opened}")
         if live != 8:
             bad.append(f"event-bit control read {live} bits, expected 8")
         if map_id != 75:
@@ -453,7 +455,8 @@ def main() -> int:
 
     chests, err = load_chests(args.repo)
     if err or not chests:
-        print(f"audit_chests: {err or 'the treasure table decoded to nothing'}")
+        print("audit_chests: "
+              + (err or "the treasure table decoded to nothing"))
         return 1
     known_bits = {c.bit for c in chests}
     titles = map_titles(args.repo)

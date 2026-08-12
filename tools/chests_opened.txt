@@ -11,7 +11,7 @@
 # audits (tools/equipment_waivers.txt, tools/party_hp_waivers.txt) list
 # defects because theirs are individual and each has its own story.  Here the
 # defect is uniform -- the route opens nothing -- so a defect list would be
-# ninety-five lines all saying the same thing, red from the day it landed.
+# ninety-four lines all saying the same thing, red from the day it landed.
 # A list of wins is empty on day one and grows as the route work lands.
 #
 # It is empty because the measurement on 2026-08-12 was zero: every one of
