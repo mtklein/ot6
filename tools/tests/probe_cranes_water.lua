@@ -34,6 +34,11 @@
 -- Terminates on map 219 (the flashback, meaning the ride continued past
 -- the Cranes) or after 3 losses.  Not a suite test; no fixture output.
 local H = dofile("tools/tests/lib/ot6.lua")
+-- The ride ladder's spread and its collision check (issue #83): each
+-- attempt is held until the game-time frame counter the battle seed is
+-- made of reaches its own phase, and L.report() fails if two attempts drew
+-- one seed, which would make this probe one Cranes fight played twice.
+local L = H.newSeedLadder("cranes water")
 
 local ZMENUSTATE, ZCURSOR = 0x26, 0x4b
 local ST_MAIN, ST_CHAR, ST_SKILLS, ST_LIST, ST_DETAIL = 0x05, 0x06, 0x0a, 0x1e, 0x4d
@@ -206,15 +211,14 @@ local function attempt(n)
   local wiped, wipedStreak = false, 0
   return H.cond(function() return won end, {}, {
     H.logStep(function()
-      return string.format("cranes-water attempt %d (offset %d) at f%d",
-        n, (n - 1) * 37, H.frame)
+      return string.format("cranes-water attempt %d at f%d", n, H.frame)
     end),
     (n > 1) and H.seqStep({
       H.call(function() loadReq = H.requestLoadState(blob) end),
       H.waitFrames(2),
       H.call(function() H.checkReq(loadReq, "pre-attempt reload") end),
     }) or H.waitFrames(1),
-    H.waitFrames(90 + (n - 1) * 37),     -- vary the battle RNG seed
+    H.waitFrames(90),                    -- settle after the reload
     H.navTo(54, 40, { playBattles = "flee", maxFrames = 25000 }),
     (function() local ph = 0
       return H.driveUntil(function() return map() == 6 end, 9000, {
@@ -227,6 +231,10 @@ local function attempt(n)
       }, "held LEFT onto the reunion trigger -> the Blackjack deck")
     end)(),
     H.release(),
+    -- Here rather than up by the reload: the navTo above flees random
+    -- encounters, and the seed that decides this attempt is the Cranes'
+    -- (#83).  The spread is what the first battle after it draws.
+    L.spread(n),                         -- spread the battle RNG phase (#83)
     (function()
       -- attempt-1 results (2026-08-10, this file's first run): the bag is
       -- 15 Tonics / 0 Potions, so an every-actor 55% medic line heal-locks
@@ -429,6 +437,7 @@ H.run({ maxFrames = 320000 }, {
     })
   end)(),
 
+  L.watch(),
   attempt(1), attempt(2), attempt(3),
 
   H.call(function()
@@ -439,4 +448,8 @@ H.run({ maxFrames = 320000 }, {
       "the Cranes fall to the vanilla playbook within 3 attempts "
       .. "(Sea Song + Diamond Dust + the tactical kit)")
   end),
+  -- ...and they were different fights.  This probe's verdict on whether the
+  -- playbook turns the encounter is only worth something if the attempts it
+  -- counts were distinct (#83).
+  L.report(),
 })

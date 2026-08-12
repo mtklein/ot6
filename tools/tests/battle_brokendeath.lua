@@ -93,10 +93,10 @@
 -- CELES arrives at 221/349 and the bag is the Vector chain's leavings, and the
 -- first library-fighter run on it fought well (heals and all three Fenix
 -- revives landed) and still wiped at phase 0.  The battle RNG seed is the
--- frame phase at battle init (gen_whelk_poweron's measurement), so the
--- test tops the party up through the real field Item menu (H.fieldCare),
--- captures the entry point as a blob, and replays up to three phase-spread
--- attempts.  An attempt only counts as the observation when a boss died
+-- game-time frame counter at battle init (`lda $021e / asl2 / sta $be`,
+-- battle_main.asm:6174-6176), so the test tops the party up through the real
+-- field Item menu (H.fieldCare), captures the entry point as a blob, and
+-- replays up to three attempts on distinct phases, checked (#83).  An attempt only counts as the observation when a boss died
 -- with its broken timer running; anything else, a wipe or a kill that
 -- landed after the window lapsed, reloads and re-rolls.  That is
 -- TAS-style setup for the observation rather than assertion-weakening: the
@@ -109,6 +109,11 @@
 -- species.  The earlier any-matching-slot scan picked ghost slot 2 and
 -- watched a corpse that never moved.
 local H = dofile("tools/tests/lib/ot6.lua")
+-- The retry ladder's spread and its collision check (issue #83): each
+-- attempt is held until the game-time frame counter the battle seed is
+-- made of reaches its own phase, and L.report() fails if two attempts
+-- drew one seed, which would make this ladder one fight played twice.
+local L = H.newSeedLadder("battle 70")
 
 local STATE = "build/states/ifrit_entry.mss.lua"
 local IFRIT, SHIVA = 0x0109, 0x0108
@@ -248,8 +253,7 @@ local function attempt(n)
   end
   return H.cond(function() return won ~= nil end, {}, {
     H.logStep(function()
-      return string.format("battle 70 attempt %d (phase offset %d) at f%d",
-        n, (n - 1) * 37, H.frame)
+      return string.format("battle 70 attempt %d at f%d", n, H.frame)
     end),
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(fightBlob) end),
@@ -260,7 +264,7 @@ local function attempt(n)
         H.assertEq(H.hasControl(), true, "reloaded controllable at the entry point")
       end),
     }) or seq({}),
-    H.waitFrames((n - 1) * 37),          -- vary the battle RNG seed
+    L.spread(n),                        -- spread the battle RNG phase (#83)
 
     -- one real A-press into battle 70
     H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
@@ -389,9 +393,15 @@ H.run({ maxFrames = 250000 }, {
   end)(),
 
   -- 3. the fight, on the phase-spread ladder
+  L.watch(),
   attempt(1),
   attempt(2),
   attempt(3),
+  -- ...and they were three DIFFERENT fights: distinct battle RNG seeds, read
+  -- off the seeder itself (#83).  This test needs a mid-break kill to happen
+  -- at all, so a ladder that replayed one fight would look like a hard-to-hit
+  -- case rather than like a broken spread.
+  L.report(),
 
   -- 4. The property under test: a mid-break kill happened, and the
   -- `if_self_dead` script still ran and ended the fight.

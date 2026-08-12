@@ -41,7 +41,7 @@
 -- this fight (measured, $202e+slot*12: Terra reads 1d,ff,02,01 and VICKS
 -- reads 1d,ff,ff,01), and which of them holds the first menu follows from
 -- the battle RNG seed, which battle init takes from the game-time frame
--- counter (`lda $021e / asl2 / sta $be`, battle_main.asm:6092-6094).  On
+-- counter (`lda $021e / asl2 / sta $be`, battle_main.asm:6174-6176).  On
 -- release-0.2.1 the roll gave VICKS, the magic list never opened, and this
 -- probe failed, while the item list had drawn eight rows into $5762-$5767
 -- and exercised the overlap path more thoroughly than the runs that passed.

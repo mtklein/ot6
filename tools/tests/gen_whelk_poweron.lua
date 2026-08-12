@@ -262,7 +262,7 @@ end, emu.callbackType.write, 0x7E5755, 0x7E5761)
 -- WHY A SWEEP AND NOT A SEARCH, and why the settle above is arbitrary now.
 --
 -- Battle init seeds the RNG index from the game-time frame counter --
--- `lda $021e / asl2 / sta $be` (battle_main.asm:6092-6094) -- and $021E
+-- `lda $021e / asl2 / sta $be` (battle_main.asm:6174-6176) -- and $021E
 -- ticks once per frame, wrapping at 60 (time_calc, C3/13C8-C3/1410).  So the
 -- entry point's frame phase picks one of sixty battle seeds, InitGauge draws
 -- the starting ATB gauges off it (battle_main.asm:6230+), and that decides

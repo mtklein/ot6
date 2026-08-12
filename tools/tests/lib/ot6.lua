@@ -1016,6 +1016,11 @@ function M.newSeedLadder(tag, opts)
       end
       M.log(string.format("[%s] %d attempt(s), %d distinct battle RNG seeds",
         L.tag, #ran, #ran))
+      -- Go inert.  The exec callback cannot be removed from outside one (Mesen
+      -- wants that on the CPU's own thread), and clearGateSoldier builds a
+      -- fresh ladder per engagement, so a finished ladder's watcher would
+      -- otherwise keep charging later battles to its last attempt.
+      cur = 0
     end)
   end
 

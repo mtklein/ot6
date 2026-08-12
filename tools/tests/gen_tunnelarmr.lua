@@ -76,14 +76,21 @@
 -- gen_moogle).  Break the shields and the damage window finishes the 1300
 -- HP.  A loss on an event battle is game over, so the fight uses a retry
 -- ladder: the entry point blob is captured beside the entry-point generation,
--- and each attempt reloads it and waits a different number of frames before
--- stepping onto the trigger.  The battle RNG seed is the frame phase at
--- battle init (gen_whelk_poweron's finding), so each retry replays a
--- different fight.  This file also carried gen_sfigaro's battle toolkit
+-- and each attempt reloads it and takes its own battle RNG phase before
+-- stepping onto the trigger.  The seed is the game-time frame counter at
+-- battle init (`lda $021e / asl2 / sta $be`, battle_main.asm:6174-6176), and
+-- H.newSeedLadder reads back what each attempt really drew, so "a different
+-- fight" is checked rather than assumed (#83).  This file also carried
+-- gen_sfigaro's battle toolkit
 -- (rideOut's HP pin and battle-clear write, clearGateSoldier, and
 -- stealDriver's command-table pokes) without calling any of it; that unused
 -- code was deleted in the same pass.
 local H = dofile("tools/tests/lib/ot6.lua")
+-- The retry ladder's spread and its collision check (issue #83): each
+-- attempt is held until the game-time frame counter the battle seed is
+-- made of reaches its own phase, and L.report() fails if two attempts
+-- drew one seed, which would make this ladder one fight played twice.
+local L = H.newSeedLadder("TunnelArmr")
 local DOOR = "build/states/celes_freed.mss.lua"
 
 -- map compares stay masked: loaders leave flag bits in $1F64's high byte
@@ -447,8 +454,7 @@ local function armrAttempt(n)
   local loadReq
   return H.cond(function() return armrWon end, {}, {
     H.logStep(function()
-      return string.format("TunnelArmr attempt %d (phase offset %d) at f%d",
-        n, (n - 1) * 37, H.frame)
+      return string.format("TunnelArmr attempt %d at f%d", n, H.frame)
     end),
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(armrBlob) end),
@@ -461,7 +467,7 @@ local function armrAttempt(n)
           "reloaded at the (47,37) entry point")
       end),
     }) or seq({}),
-    H.waitFrames((n - 1) * 37),         -- vary the battle RNG seed
+    L.spread(n),                        -- spread the battle RNG phase (#83)
     H.driveUntil(function() return H.battleLoadStarted() end, 6000, {
       H.call(function()
         aPh = (aPh + 1) % 8
@@ -775,6 +781,7 @@ H.run({ maxFrames = 300000 }, {
   -- win routes every hit through Ot6ShieldedDmg, so this is the first
   -- generated state in the chain whose TunnelArmr had his shields broken.
   -- ===================================================================== --
+  L.watch(),
   armrAttempt(1),
   armrAttempt(2),
   armrAttempt(3),
@@ -782,6 +789,10 @@ H.run({ maxFrames = 300000 }, {
     H.assertEq(armrWon, true,
       "TunnelArmr beaten within 3 attempts (Runic + boosted Fights)")
   end),
+  -- ...and they were three DIFFERENT fights: distinct battle RNG seeds,
+  -- read off the seeder itself (#83).  A win is only evidence about the
+  -- encounter if the attempts that lost were not the same fight replayed.
+  L.report(),
 
   -- Ride the tail to the hub; $001E already flipped on map 70 (the attempt
   -- decided on it), and _caad4c warps home.  This is input-driven: nothing

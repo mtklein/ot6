@@ -51,9 +51,19 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   pre-battle HP. The filed fix is a battle-module check (`$3BF4` under
   `battleLoadStarted()`). Three wipes have been mistaken for stuck
   navigators.
-- **Retry ladders are 3 attempts, phase-spread by 37 frames** (battle RNG
-  seed = frame phase at init). Do not widen a ladder until it succeeds by
-  chance; a ladder that loses all three attempts is reporting a finding.
+- **Retry ladders are 3 attempts, and go through `H.newSeedLadder`.** A
+  battle's whole RNG stream hangs off `$be`, seeded once at battle init from
+  the game-time frame counter: `lda $021e / asl2 / sta $be`
+  (`battle_main.asm:6174-6176`), so the phase has period 60 and picks one of
+  sixty seeds. `L.spread(n)` holds each attempt until `$021e` reaches its own
+  phase; `L.report()` reads the seed off the store instruction and fails if
+  two attempts drew the same one. The old fixed 37-frame stagger did not
+  guarantee that: attempt 1 sat at whatever phase the route happened to leave
+  it, and one lead value in sixty put it on attempt 2's seed — a ladder
+  playing one fight twice, with no symptom (#83; `battle_seedladder.lua` is
+  the check, `probe_ladder_seed.lua` the measurement). Do not widen a ladder
+  until it succeeds by chance; a ladder that loses all three attempts is
+  reporting a finding.
 - **Every saved checkpoint is generated through the game's own save routine,
   never synthesised.**
 

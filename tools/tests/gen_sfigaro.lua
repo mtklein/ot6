@@ -67,9 +67,10 @@
 --     The old HP pin is gone, so a loss now happens (the _ca85ba scenario
 --     reset: dumped on (47,43), disguises cleared) and is handled the
 --     way a player handles it, with a phase-spread retry ladder around
---     every engagement (a blob captured before the talk, reloaded with a
---     different frame offset; the battle RNG seed is the frame phase at
---     init, gen_whelk_poweron's measurement).
+--     every engagement (a blob captured before the talk, reloaded and then
+--     held to its own phase of the game-time frame counter the battle seed
+--     is made of: `lda $021e / asl2 / sta $be`, battle_main.asm:6174-6176.
+--     H.newSeedLadder reads back what each attempt drew, #83).
 --   * the cider runner's Merchant is stolen from by real menu input
 --     through the #55 thief submenu, with the boost banked by real input:
 --     LOCKE opens with 1 bp and regens +1 per unboosted action
@@ -84,6 +85,11 @@
 -- The stealDriver that poked STEAL into every command cell and forced
 -- banked+pending boost to the cap, and the pinParty HP writes, are gone.
 local H = dofile("tools/tests/lib/ot6.lua")
+-- The cider-steal ladder's spread and its collision check (issue #83): each
+-- attempt is held until the game-time frame counter the battle seed is made
+-- of reaches its own phase, and L.report() fails if two attempts drew one
+-- seed, which would make this ladder one fight played twice.
+local L = H.newSeedLadder("cider steal")
 local DOOR = "build/states/locke_scenario.mss.lua"
 
 -- map compares stay masked: loaders leave flag bits in $1F64's high byte
@@ -480,16 +486,18 @@ H.run({ maxFrames = 350000 }, {
       local loadReq
       return H.cond(function() return stolen end, {}, {
         H.logStep(function()
-          return string.format("cider steal attempt %d (offset %d) at f%d",
-            n, (n - 1) * 37, H.frame)
+          return string.format("cider steal attempt %d at f%d", n, H.frame)
         end),
         n > 1 and seq({
           H.call(function() loadReq = H.requestLoadState(blob) end),
           H.waitFrames(2),
           H.call(function() H.checkReq(loadReq, "cider: pre-talk reload") end),
           H.waitFrames(90),
-          H.waitFrames((n - 1) * 37),    -- vary the battle RNG seed
         }) or seq({}),
+        -- Outside the n > 1 block, unlike the wait it replaces: attempt 1 has
+        -- to take a phase of its own too, or it sits wherever the route left
+        -- it and can land on attempt 2's seed (#83).
+        L.spread(n),                     -- spread the battle RNG phase (#83)
         H.talkToObj(22, "the cider runner"),
         -- ride the two dialogs into the fight directly: advanceStory's
         -- playBattles mode would blind-tap A in the fight, and A on the
@@ -561,11 +569,15 @@ H.run({ maxFrames = 350000 }, {
           end),
         })
       end)(),
+      L.watch(),
       stealAttempt(1), stealAttempt(2), stealAttempt(3),
       H.call(function()
         H.assertEq(stolen, true,
           "the clothes were STOLEN within 3 attempts")
       end),
+      -- ...and they were three DIFFERENT fights: distinct battle RNG seeds,
+      -- read off the seeder itself (#83).
+      L.report(),
     })
   end)(),
   H.call(function()

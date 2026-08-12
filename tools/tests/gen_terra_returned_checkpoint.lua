@@ -47,6 +47,11 @@
 -- See gen_mrf_save_room_checkpoint.lua for the codex-witness seeding and the
 -- $307ff0 sentinel this file reuses.
 local H = dofile("tools/tests/lib/ot6.lua")
+-- The ride ladder's spread and its collision check (issue #83): each attempt
+-- is held until the game-time frame counter the battle seed is made of
+-- reaches its own phase, and L.report() fails if two attempts drew one seed,
+-- which would make this ladder one Cranes fight played twice.
+local L = H.newSeedLadder("cranes ride")
 
 local ZMENUSTATE = 0x26
 local saveArg = nil
@@ -135,8 +140,7 @@ local function rideAttempt(n)
   local loadReq
   return H.cond(function() return rideWon end, {}, {
     H.logStep(function()
-      return string.format("cranes ride attempt %d (stagger %d) at f%d",
-        n, 7 + (n - 1) * 37, H.frame)
+      return string.format("cranes ride attempt %d at f%d", n, H.frame)
     end),
     (n > 1) and H.seqStep({
       H.call(function() loadReq = H.requestLoadState(rideBlob) end),
@@ -148,7 +152,7 @@ local function rideAttempt(n)
     pressWalk("left", function() return map() == 6 end, 9000,
       "held LEFT onto the reunion trigger -> the Blackjack deck"),
     H.release(),
-    H.waitFrames(7 + (n - 1) * 37),      -- re-roll the battle RNG phase
+    L.spread(n),                         -- spread the battle RNG phase (#83)
     (function()
       local F = H.newFightDriver("terra ride", { tactical = true,
         boost = true, bank = 2, items = true, healer = 9, healPercent = 45,
@@ -283,15 +287,21 @@ H.run({ maxFrames = 160000 }, {
     })
   end)(),
 
-  -- The ride, as a 3-attempt phase-spread ladder (the doctrine).  The
-  -- 7-frame base stagger stays: the first two July cut attempts crashed
-  -- the EMULATOR at the identical battle frame twice, because same
-  -- inputs = same deterministic trajectory; the shift re-rolls it.
+  -- The ride, as a 3-attempt phase-spread ladder (the doctrine).  Some shift
+  -- between attempts has always been necessary: the first two July cut
+  -- attempts crashed the EMULATOR at the identical battle frame twice,
+  -- because same inputs = same deterministic trajectory.  The shift used to
+  -- be a 7-frame base plus 37 per attempt; it is now taken from the game-time
+  -- frame counter the battle seed is actually made of, and checked (#83).
+  L.watch(),
   rideAttempt(1), rideAttempt(2), rideAttempt(3),
   H.call(function()
     H.assertEq(rideWon, true,
       "the Cranes fell and the ride reached the flashback within 3 attempts")
   end),
+  -- ...and they were three DIFFERENT rides: distinct battle RNG seeds on the
+  -- first battle after each attempt's spread, read off the seeder (#83).
+  L.report(),
   H.waitFrames(90),
   H.call(function()
     H.assertEq(map(), 219, "the Esper-World flashback (map 219)")

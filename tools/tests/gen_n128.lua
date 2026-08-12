@@ -115,6 +115,11 @@
 -- balance work has a measurement to stand on rather than
 -- docs/design/bosses-wob.md §15's "three".
 local H = dofile("tools/tests/lib/ot6.lua")
+-- The retry ladder's spread and its collision check (issue #83): each
+-- attempt is held until the game-time frame counter the battle seed is
+-- made of reaches its own phase, and L.report() fails if two attempts
+-- drew one seed, which would make this ladder one fight played twice.
+local L = H.newSeedLadder("minecart ride")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -352,8 +357,7 @@ local function rideAttempt(n)
   local lostRef = { lost = false }
   return H.cond(function() return rideWon end, {}, {
     H.logStep(function()
-      return string.format("minecart ride attempt %d (phase offset %d) at f%d",
-        n, (n - 1) * 37, H.frame)
+      return string.format("minecart ride attempt %d at f%d", n, H.frame)
     end),
     n > 1 and seq({
       H.call(function()
@@ -369,7 +373,7 @@ local function rideAttempt(n)
           "reloaded beside CID")
       end),
     }) or seq({}),
-    H.waitFrames((n - 1) * 37),         -- vary the battle RNG seed
+    L.spread(n),                        -- spread the battle RNG phase (#83)
     -- A into CID -> _cc8022 -> ... -> `cutscene TRAIN`
     (function() local ph = 0
       return H.driveUntil(function() return sw(0x02BC) == 1 end, 20000, {
@@ -490,6 +494,7 @@ H.run({ maxFrames = 400000 }, {
   end)(),
 
   -- 2. the ride, on the phase-spread retry ladder
+  L.watch(),
   rideAttempt(1),
   rideAttempt(2),
   rideAttempt(3),
@@ -498,6 +503,10 @@ H.run({ maxFrames = 400000 }, {
       "the minecart ride survived within 3 attempts (six real "
       .. "fights, the library fighter)")
   end),
+  -- ...and they were three DIFFERENT fights: distinct battle RNG seeds,
+  -- read off the seeder itself (#83).  A win is only evidence about the
+  -- encounter if the attempts that lost were not the same fight replayed.
+  L.report(),
   H.waitFrames(90),
 
   H.call(function()
