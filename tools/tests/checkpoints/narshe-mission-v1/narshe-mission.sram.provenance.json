@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v1",
-  "payload_sha256": "2106786a66b065f3936f45de056e322ee9d5973d97dbb0a34b6da8d039c99113",
-  "generator_sig": "3b89a58a87e10eefef5785ff98f4034d0d43a0b4163df5176b20a7e207cfefba gen_narshe_mission tools/tests/checkpoints/terra-returned-v1/manifest.json tools/tests/checkpoints/terra-returned-v1/terra-returned.sram",
+  "payload_sha256": "d8e7c1b558bdf3522736d3fc8e29f033cb291d89cf81d8945220039214013412",
+  "generator_sig": "b75cf971dc3ad3e7ca6078190c42e06a0468f89f73782802bbceefeefb1740ad gen_narshe_mission tools/tests/checkpoints/terra-returned-v1/manifest.json tools/tests/checkpoints/terra-returned-v1/terra-returned.sram",
   "ancestors": [
     {
       "path": "tools/tests/checkpoints/terra-returned-v1/manifest.json",
-      "sha256": "7189646178dad2d56445b9ef3bd98d4cca13ab39084cdbfd2be25240643eb417"
+      "sha256": "b63a06efc736da5e56d3ff0217d47985b3fa57ed00dee12de4c4d43d981b2059"
     }
   ]
 }

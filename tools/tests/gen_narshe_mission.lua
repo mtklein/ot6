@@ -218,12 +218,15 @@ H.run({ maxFrames = 40000 }, {
   end),
 
   -- ---- pick the party up off the floor -----------------------------------
-  -- This step takes no damage at all -- it fought nothing on a measured run
-  -- -- and still shipped EDGAR at 0/448 and SABIN at 0/457.  It inherits
-  -- them: terra-returned-v1, the checkpoint this cold-Continues out of,
-  -- hands both over dead, and nothing here ever picked them up.  The
-  -- fixture then carried that into narshe-mission-v1, the checkpoint this
-  -- generator writes, and gen_gate_cave_save boots that in turn.
+  -- This step takes no damage at all -- it fought nothing on any measured
+  -- run -- and it still used to ship EDGAR at 0/448 and SABIN at 0/457,
+  -- because it inherited them: terra-returned-v1, the checkpoint this
+  -- cold-Continues out of, handed both over dead, and nothing here ever
+  -- picked them up.  That is fixed upstream now, where it belonged --
+  -- terra-returned-v1's own care stop raises them on the Blackjack deck --
+  -- so this stop is no longer undoing somebody else's loss.  It stays,
+  -- because a step that walks into a scripted scene should not walk into it
+  -- hurt, and because the checkpoint it writes is a tracked battery.
   --
   -- Here rather than at the far end.  Map 20 at (38,61) is a plain field map
   -- with real control, which is what a care stop wants; the exit is the
@@ -232,10 +235,14 @@ H.run({ maxFrames = 40000 }, {
   -- never resuming).  It is also before the mission meeting, which runs
   -- with playBattles=true, so the party walks into that upright.
   --
-  -- The supply is exactly two Fenix Downs for exactly two corpses, and no
-  -- Potions -- 15 Tonics and 2 Antidotes is the whole bag.  Nobody in this
-  -- party (LOCKE, EDGAR, SABIN, SETZER) knows a cure, and an esper's grant
-  -- is battle-only (#96), so this drinks whatever the threshold asks for.
+  -- The bag arriving here is thin and stays thin: 4 Tonics, no Potions and
+  -- no Fenix Downs on the measured re-cut, because battle 71 one boundary
+  -- back spends both revives.  Nobody in this party (LOCKE, EDGAR, SABIN,
+  -- SETZER) knows a cure, and an esper's grant is battle-only (#96), so
+  -- this drinks whatever the threshold asks for -- one Tonic, on that run.
+  -- If it ever arrives with a corpse it will have nothing to raise them
+  -- with, and that is a supply finding for the segment above, not a reason
+  -- to lower the exit bar.
   H.fieldCare({ tag = "care on arrival in Narshe", threshold = 0.55 }),
 
   -- ---- the escort trigger row and the mission meeting --------------------
