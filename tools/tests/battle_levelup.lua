@@ -97,8 +97,23 @@ end
 -- planned only while her battle MP covers the list's own cost cell (entry+3
 -- of the $2092 spell list, the price source at ot6_boost.asm:725), so a
 -- drained pool falls back to Fight instead of buzzing the greyed row.
+--
+-- Two rules keep the cast from being a coin flip, both copied from
+-- battle_bushidogrey's drive, which had already been through this:
+--   * nothing is pressed in the transitional state $01, and unrecognised
+--     states get B rather than A.  The A-mash this file used to run in every
+--     unrecognised state lands on the command window the frame it goes live
+--     and confirms row 0 (Fight) before the driver can walk the cursor down to
+--     Magic; battle_mpcost.lua names the same hazard ("it can land on a
+--     just-opened window and confirm a bystander's Fight").  Measured
+--     2026-08-11 on this fixture: Terra planned Fire in all six battles and
+--     reached the magic list in none of them, ST_CMD ($05) going straight to
+--     ST_TGT ($38) two frames after the driver first saw it.
+--   * the planned-vs-reached counts below are asserted, so a driver that
+--     loses that race again fails saying so instead of quietly leaving the
+--     MP negative control with nothing to observe.
 local MENU, ACTOR, MSTATE, CMDTBL = 0x7BCA, 0x62CA, 0x7BC2, 0x202E
-local ST_CMD, ST_MAGIC, ST_TGT = 0x05, 0x0E, 0x38
+local ST_TRANS, ST_CMD, ST_MAGIC, ST_TGT = 0x01, 0x05, 0x0E, 0x38
 local FIRE = 0x00
 local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
 local function spellEntry(slot, id)
@@ -111,6 +126,9 @@ local function spellEntry(slot, id)
   return nil, nil
 end
 local lastActor, mfM, actM = nil, 0, nil
+-- how the cast attempt went, so a lost menu race is reported as itself
+local firePlanned, fireListSeen = 0, 0
+local listThisTurn = false
 local function battleReset() lastActor = nil end
 local function battlePulse()
   if H.readByte(MENU) == 0 then
@@ -122,16 +140,23 @@ local function battlePulse()
   if lastActor ~= a then
     lastActor, mfM = a, 0
     actM = "fight"
+    listThisTurn = false
     if H.readByte(0x3ED8 + a * 2) == 0x00 then
       local i, cost = spellEntry(a, FIRE)
       if i ~= nil and H.readWord(0x3C08 + a * 2) >= (cost or 255) then
         actM = "fire"
+        firePlanned = firePlanned + 1
       end
     end
   end
   mfM = mfM + 1
   local hold = (mfM % 10) < 5
   local st, btn = H.readByte(MSTATE), nil
+  if st == ST_TRANS then
+    -- the window is being built: any press here is read by whatever opens
+    H.setPad({})
+    return
+  end
   if st == ST_CMD then
     btn = "a"
     if actM == "fire" then
@@ -148,6 +173,10 @@ local function battlePulse()
   elseif st == ST_MAGIC then
     if actM ~= "fire" then btn = "b"
     else
+      if not listThisTurn then
+        listThisTurn = true
+        fireListSeen = fireListSeen + 1
+      end
       local i = spellEntry(a, FIRE)
       if i == nil then actM = "fight"; btn = "b"
       else
@@ -162,7 +191,7 @@ local function battlePulse()
   elseif st == ST_TGT then
     btn = "a"
   else
-    btn = "a"          -- transitional states and battle messages
+    btn = "b"          -- every other window: back out, never confirm blind
   end
   H.setPad((hold and btn) and { [btn] = true } or {})
 end
@@ -282,8 +311,9 @@ local function battleLeg(n)
           if curMp(c) < (maxMp(c) & 0x3FFF) then mpNegSeen = true end
         end
       end
-      H.log(string.format("after battle %d: positives=%d hpNeg=%s mpNeg=%s",
-        n, positives, tostring(hpNegSeen), tostring(mpNegSeen)))
+      H.log(string.format("after battle %d: positives=%d hpNeg=%s mpNeg=%s "
+        .. "casts planned=%d reached-list=%d", n, positives,
+        tostring(hpNegSeen), tostring(mpNegSeen), firePlanned, fireListSeen))
     end),
   }
   if n <= 2 then
@@ -311,9 +341,20 @@ add({
     H.assertEq(hpNegSeen, true,
       "a non-leveler really ended a battle below max HP -- the HP negative "
       .. "was non-vacuous")
-    H.assertEq(mpNegSeen, true,
+    -- the MP arm is only observable if the driver actually spent MP, so say
+    -- which half failed.  A planned cast that never reached the magic list is
+    -- the driver losing the command-window race, not a level-up defect.
+    H.assertEq(fireListSeen >= 1, true, string.format(
+      "the driver reached TERRA's magic list -- planned a cast on %d turns "
+      .. "and got into the list on %d.  planned>0 with reached==0 means the "
+      .. "command window was confirmed on row 0 (Fight) before the cursor "
+      .. "walked to Magic; fix the drive, do not relax the MP control below",
+      firePlanned, fireListSeen))
+    H.assertEq(mpNegSeen, true, string.format(
       "a non-leveler really ended a battle below max MP -- the MP negative "
-      .. "was non-vacuous (Terra's own post-level casts)")
+      .. "was non-vacuous (Terra's own post-level casts; %d planned, %d "
+      .. "reached the list across %d battles)",
+      firePlanned, fireListSeen, battles))
     H.log("[levelup] earned positive + live negatives, zero writes")
   end),
 })
