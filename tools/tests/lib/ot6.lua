@@ -1593,6 +1593,11 @@ end
 -- cadence proven in the menus, because inputs presented while a battle window
 -- is opening are discarded.
 --
+-- Healing prefers a cure spell to the bag, the way M.fieldCare does on the
+-- field side; opts.cure=false is the item-only drive this had before.  Any
+-- character whose live battle Magic list holds a cure can be the healer,
+-- which in OT6 usually means whoever is wearing the stone that grants one.
+--
 -- Call frame() on every frame battleLoadStarted() is true and idle() on the
 -- falling edge.  frame() sets the controller pad itself.
 function M.newFightDriver(tag, opts)
@@ -1607,13 +1612,25 @@ function M.newFightDriver(tag, opts)
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
   local BLCOL, BLROW = 0x8963, 0x8967
   -- the magic list's cursor triple (btlgfx_main UpdateMenuState_0e:
-  -- scroll+row is the absolute grid row, col the column; master record
-  -- rec maps to cell (rec-1)//2 , (rec-1)%2, the mapping battle_brokendeath
-  -- measured and used to drive Celes's Ice at record 8)
+  -- scroll+row is the absolute grid row, col the column; grid cell N sits at
+  -- row N//2, column N%2, the mapping battle_brokendeath measured and
+  -- gen_vargas's Cure drive uses)
   local MSCROLL, MCOL, MROW = 0x8913, 0x8917, 0x891B
+  -- $302C,entity is the engine's own pointer at that character's compacted
+  -- battle Magic list ($208E/$21CA/$2306/$2442; GetMPCost walks it,
+  -- battle_main.asm:13201-13210, and so does CheckMagicEnabled, :14692).
+  -- Record 0 is the esper row and record n+1 is grid cell n.
+  local MLISTPTR = 0x302C
   local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
   local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
   local AUTOCROSSBOW, PUMMEL = 0xAA, 0x5D
+  -- The cures, cheapest first.  Cheapest rather than biggest for the same
+  -- reason M.fieldCare picks that way: the loop simply casts again if the
+  -- target is still short, so overshoot is only wasted MP.  Under OT6 the
+  -- upper tiers are folds of the base spell rather than separate grants
+  -- (battle_esperstats: KIRIN grants Cure and NOT Cure 2), so in practice
+  -- only the first of these is ever found in the list.
+  local CURES = { 0x2D, 0x2E, 0x2F }
   local F = {}
   local menuStreak, tick, battleTick = 0, 0, 0
   local plan, planActor, held = nil, nil, {}
@@ -1643,6 +1660,44 @@ function M.newFightDriver(tag, opts)
     return nil
   end
 
+  -- Where a spell sits in this actor's live battle Magic list, and what the
+  -- engine has priced it at.  Returns the grid cell (the number the cursor
+  -- walk below steers to) and the MP cost, or nil if the actor cannot cast
+  -- it right now.
+  --
+  -- Read live, per actor, rather than taken from the caller, because in OT6
+  -- the list is runtime state twice over: it is compacted to the union of
+  -- what the party knows (InitSpellList), and Ot6UnionEspers /
+  -- Ot6EsperSpellKnown (ot6_progression.asm:144, :205) add each equipped
+  -- esper's spells to its holder alone.  So the same spell sits at different
+  -- cells for different loadouts, and a caller-supplied row number would
+  -- silently steer to whatever else the compaction put there.  The row
+  -- layout is +0 id, +1 flags (bit 7 = greyed), +2 targeting, +3 MP cost
+  -- (battle_preview.lua:59-66).  The price is read here rather than out of
+  -- magic_prop_en.dat because the engine's copy is the one it charges.
+  --
+  -- `strict` picks how hard to refuse.  Deciding what to do (strict) asks
+  -- the game's own greyed bit as well, which is the authority on castability
+  -- (CheckMagicEnabled, battle_main.asm:14822-14840).  Steering a list that
+  -- is already open (not strict) asks only the live MP, because the greyed
+  -- bit is refreshed by UpdateEnabledMagic on the action boundary (:1369)
+  -- and a bit that has gone stale under an open window would drop a plan
+  -- that was fine, spending the healer's turn on a B press.
+  local function spellCell(actor, id, strict)
+    local base = M.readWord(MLISTPTR + actor * 2)
+    if base < 0x2000 or base > 0x2600 then return nil end
+    for cell = 0, 53 do
+      local a = base + (cell + 1) * 4
+      if M.readByte(a) == id then
+        local cost = M.readByte(a + 3)
+        if M.readWord(CURMP + actor * 2) < cost then return nil end
+        if strict and (M.readByte(a + 1) & 0x80) ~= 0 then return nil end
+        return cell, cost
+      end
+    end
+    return nil
+  end
+
   local function makePlan(actor)
     -- opts.healer = <battle chid>: only that character runs the item
     -- healing line; everyone else attacks.  Measured need (2026-08-09, the
@@ -1656,14 +1711,39 @@ function M.newFightDriver(tag, opts)
     local mayHeal = opts.healer == nil
         or M.readByte(BCHID + actor * 2) == opts.healer
     local row = (opts.items and mayHeal) and cmdRow(actor, CMD_ITEM) or nil
-    if row ~= nil then
-      for e = 0, 3 do
-        if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
-           and battInvIdx(FENIX_DOWN) then
-          M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down",
-            tag or "fight", actor, e))
-          return { kind = "item", item = FENIX_DOWN, target = e, row = row,
-                   idx = battInvIdx(FENIX_DOWN) }
+    -- opts.cure = false turns the cast line off and leaves healing to the
+    -- bag, the way this driver worked before.  Anything else is the list of
+    -- cure spells to try, cheapest first, defaulting to CURES.
+    --
+    -- Why casting comes first.  M.fieldCare learned the same preference on
+    -- the field side and the reason carries over: OT6 refunds MP in full at
+    -- every level up (ot6_progression.asm:3-6, called from
+    -- battle_main.asm:16251) and never refunds a Tonic.  In battle there is
+    -- a second reason, measured on this ride: a segment can run six fights
+    -- with no field access between them, so the bag is a fixed supply while
+    -- MP is only bounded per fight.  The five Mag Roader fights spent all
+    -- eight of the party's Tonics and left the boss to be fought with
+    -- nothing (#92).
+    --
+    -- The option is named `cure` rather than `magic` only because this
+    -- driver already spends `opts.magic` on the attack line below.  It is
+    -- fieldCare's opts.magic under another name.
+    local cureRow = mayHeal and opts.cure ~= false
+        and cmdRow(actor, CMD_MAGIC) or nil
+    if row ~= nil or cureRow ~= nil then
+      -- Revival stays item-only.  Life ($33) is not on any route this
+      -- library drives yet: no esper in the WoB grants it (genju_prop.asm)
+      -- and only Terra and Celes learn it innately, so a cast branch here
+      -- would be a branch nothing has ever taken.
+      if row ~= nil then
+        for e = 0, 3 do
+          if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
+             and battInvIdx(FENIX_DOWN) then
+            M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down",
+              tag or "fight", actor, e))
+            return { kind = "item", item = FENIX_DOWN, target = e, row = row,
+                     idx = battInvIdx(FENIX_DOWN) }
+          end
         end
       end
       local target, worst = nil, 101
@@ -1678,9 +1758,24 @@ function M.newFightDriver(tag, opts)
       if target ~= nil then
         local hp, maxhp = M.readWord(0x3BF4 + target * 2),
                           M.readWord(0x3C1C + target * 2)
-        local item = (maxhp - hp >= 80 and battInvIdx(POTION)) and POTION
-                  or battInvIdx(TONIC) and TONIC
-                  or battInvIdx(POTION) and POTION or nil
+        if cureRow ~= nil then
+          for _, spell in ipairs(type(opts.cure) == "table" and opts.cure
+                                 or CURES) do
+            local cell, cost = spellCell(actor, spell, true)
+            if cell ~= nil then
+              M.log(string.format("[%s] actor=%d cure entity %d (%d/%d) with "
+                .. "$%02X, cell %d, %d MP of %d", tag or "fight", actor,
+                target, hp, maxhp, spell, cell, cost,
+                M.readWord(CURMP + actor * 2)))
+              return { kind = "heal", spell = spell, target = target,
+                       row = cureRow }
+            end
+          end
+        end
+        local item = row ~= nil
+                 and ((maxhp - hp >= 80 and battInvIdx(POTION)) and POTION
+                   or battInvIdx(TONIC) and TONIC
+                   or battInvIdx(POTION) and POTION) or nil
         if item then
           M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with $%02X",
             tag or "fight", actor, target, hp, maxhp, item))
@@ -1725,19 +1820,35 @@ function M.newFightDriver(tag, opts)
        and cmdRow(actor, CMD_MAGIC) then
       return { kind = "summon", row = cmdRow(actor, CMD_MAGIC) }
     end
-    -- opts.magic = { [charId] = { rec = N, mp = cost } }: the attack-magic
-    -- line, the same shape as the tactical skills.  Open the Magic list
-    -- through the $7BC2 state machine, steer to master record N against
-    -- the live cursor cells, and confirm on the default enemy target.  The
-    -- caller supplies the record number, which is a measured grid position
-    -- rather than a spell id, and the MP cost; a character below the cost
-    -- falls through to the branches below, so a mage out of MP Fights
-    -- instead of wedging the menu.
+    -- opts.magic = { [charId] = { spell = id, boost = false } }: the
+    -- attack-magic line, the same shape as the tactical skills.  Open the
+    -- Magic list through the $7BC2 state machine, steer to the spell's own
+    -- cell against the live cursor cells, and confirm on the enemy the focus
+    -- list picks (or the default enemy target when there is no focus list).
+    --
+    -- The caller names a spell id, not a grid row.  It used to name the row,
+    -- with the MP price as a second caller-supplied number, and both are
+    -- wrong to hand in: the compacted list's rows move with the party's
+    -- loadout, and OT6 prices a folded cast at the tier it folds to
+    -- (battle_subjob scenario C: a boosted Bolt executes as Bolt 3 and is
+    -- charged Bolt 3's 53 MP).  spellCell answers both from the engine.  A
+    -- character who cannot pay falls through to the branches below, so a
+    -- mage out of MP Fights instead of wedging the menu.
+    --
+    -- opts.magic[id].boost = false keeps the cast at its base tier, which is
+    -- what a caller wants when the point is the element rather than the
+    -- damage and the BP is owed to somebody's break.
     local mg = opts.magic and opts.magic[id]
-    if mg and M.readWord(CURMP + actor * 2) >= (mg.mp or 8)
-       and cmdRow(actor, CMD_MAGIC) then
-      return { kind = "magic", rec = mg.rec, row = cmdRow(actor, CMD_MAGIC),
-               boostLeft = boost }
+    if mg and cmdRow(actor, CMD_MAGIC) then
+      local cell, cost = spellCell(actor, mg.spell, true)
+      if cell ~= nil then
+        M.log(string.format("[%s] actor=%d cast $%02X, cell %d, %d MP of %d",
+          tag or "fight", actor, mg.spell, cell, cost,
+          M.readWord(CURMP + actor * 2)))
+        return { kind = "magic", spell = mg.spell,
+                 row = cmdRow(actor, CMD_MAGIC),
+                 boostLeft = mg.boost == false and 0 or boost }
+      end
     end
     -- opts.tools = false disables the Tools line while keeping the rest of
     -- the tactical kit.  Measured need (2026-08-10, the Cranes): AutoCrossbow
@@ -1808,9 +1919,15 @@ function M.newFightDriver(tag, opts)
     if st == ST_ESPER and plan.kind == "summon" then
       return { "a" }
     end
-    if st == ST_MAGIC and plan.kind == "magic" then
-      local idx = plan.rec - 1
-      local wr, wc = idx // 2, idx % 2
+    if st == ST_MAGIC and (plan.kind == "magic" or plan.kind == "heal") then
+      -- The same two-column walk for both magic lines.  The cell was
+      -- resolved at plan time, but the list is rebuilt when the window
+      -- opens, so it is re-read here: a cell that has moved (or a spell the
+      -- engine has since greyed) drops the plan rather than steering to
+      -- whatever now occupies the old row.
+      local cell = spellCell(actor, plan.spell, false)
+      if cell == nil then plan, planActor = nil, nil; return { "b" } end
+      local wr, wc = cell // 2, cell % 2
       local ar = M.readByte(MSCROLL + actor) + M.readByte(MROW + actor)
       local col = M.readByte(MCOL + actor)
       if ar < wr then return { "down" } end
@@ -1832,7 +1949,11 @@ function M.newFightDriver(tag, opts)
       return { "a" }
     end
     if st == ST_TGT then
-      if plan.kind == "item" then
+      -- Both ally-targeted lines steer the same way: an item and a cure
+      -- differ only in which window chose them.  gen_vargas's hand-written
+      -- Cure drive already crossed sides and walked $7B7D exactly like its
+      -- Potion drive (gen_vargas.lua:281-300); this is that, shared.
+      if plan.kind == "item" or plan.kind == "heal" then
         local chars, mons = M.readByte(TGTCHARS), M.readByte(TGTMONS)
         if mons ~= 0 then return { "right" } end
         -- Neither side is selected.  The old code fell into the
@@ -1878,10 +1999,11 @@ function M.newFightDriver(tag, opts)
       -- level 3, whose damage wiped the party ($010D at 1800/1800 across
       -- three attempts' close dumps).
       -- Focus picks the first entry whose slot is still alive; single-
-      -- target plans steer to its mask (summons and items keep their own
-      -- targeting), and the tgtSpin backstop still confirms rather than
+      -- target plans steer to its mask (summons, items and cures keep their
+      -- own targeting), and the tgtSpin backstop still confirms rather than
       -- holding the turn open.
-      if opts.focus and plan.kind ~= "item" and plan.kind ~= "summon" then
+      if opts.focus and plan.kind ~= "item" and plan.kind ~= "summon"
+         and plan.kind ~= "heal" then
         local want = nil
         for _, e in ipairs(opts.focus) do
           local mid = M.readWord(M.MONSTER_IDS + e.slot * 2)
