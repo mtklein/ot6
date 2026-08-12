@@ -178,6 +178,20 @@ test: rom nomp-rom graph
 	@# build/states, because `make test` must not require the generated
 	@# savestates.
 	python3 tools/audit_equipment.py
+	@# Nobody ships a casualty.  Sixty-eight generators fight battles and
+	@# three of them checked that their party was still standing at the end,
+	@# so returner_hideout shipped with TERRA and LOCKE at zero HP and five
+	@# unused Fenix Downs in the bag; two steps later a story event cut the
+	@# party down to TERRA and a room with no encounters produced a wipe that
+	@# was investigated as a bug in the room.  Same shape as the equipment
+	@# audit above -- reads the .mss files directly, same only-shrinks waiver
+	@# list, silent on an empty build/states.  The bar is the game's own
+	@# near-fatal line, max HP / 8, not half HP: see the script's header for
+	@# the measured gap that put it there.  The selftest is what fails if the
+	@# classifier stops classifying, since a green run over generated
+	@# fixtures and a green run over a broken predicate look identical.
+	python3 tools/audit_party_hp.py --selftest
+	python3 tools/audit_party_hp.py
 	python3 tools/tests/lib/savestate_ninja.py --selftest
 	sh tools/tests/lib/savestate_ninja_selftest.sh
 	sh tools/tests/lib/savestate_stamp_selftest.sh
