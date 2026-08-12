@@ -359,6 +359,16 @@ def selftest(repo: str = ".") -> int:
     if rods != [(4, 52, "Fire Rod"), (45, 7, "Ice Rod")]:
         bad.append("map 351 should be Fire Rod at (4,52) and Ice Rod at "
                    f"(45,7), decoded {rods}")
+    # The lead that opened issue #84: an agent decoding the Mt Kolts tent got
+    # as far as item $F7 and flagged the record layout unverified.  The
+    # layout did need deriving, but that reading was right -- $F7 is a Tent
+    # and it is in the Mt Kolts blocks, on maps 96, 97 and 100.
+    tents = sorted((c.map, c.what) for c in chests
+                   if c.content == 0xF7 and c.kind == "item"
+                   and 95 <= c.map <= 100)
+    if tents != [(96, "Tent"), (97, "Tent"), (100, "Tent")]:
+        bad.append("item $F7 should decode as a Tent in the Mt Kolts blocks "
+                   f"on maps 96, 97 and 100; decoded {tents}")
     # docs/design/bosses-wob.md:386: map 153, a monster-in-a-box whose
     # content is event battle group 34.
     m153 = [c for c in by_map.get(153, []) if c.kind == "monster"]
