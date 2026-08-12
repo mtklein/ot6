@@ -15,6 +15,40 @@ can be weeks behind `main`. Every dispatch should name the copy in your
 own worktree; if one points you at the owner's tree, read your own copy
 instead and say so in your report.
 
+## How to write
+
+Plain language, and no invented jargon. The repo used to run a private
+vocabulary and it was removed on 2026-08-11; do not reintroduce it.
+
+    generate / regenerate a savestate   not   mint / re-mint
+    step, segment                       not   leg
+    checkpoint                          not   anchor
+    entry point                         not   doorstep
+    how far the game is playable        not   the frontier
+    killed by the timeout               not   reaped
+    input-driven                        not   honest
+    test, check                         not   gate (except a code guard)
+    area, range                         not   band
+    tier                                not   rung
+    baseline                            not   ruler
+
+The Lua option is `opts.playBattles`, not `opts.honest`. `make savestates`,
+not `make frontier`. Savestates are `*_entry`, not `*_doorstep`.
+
+Kept because they are the product rather than jargon: break, boost, chip,
+shield, kit, magicite, esper, Rage, Blitz, SwdTech, BP, MP. Also kept:
+ordinary industry words (fixture, savestate, suite, probe, harness,
+regression, provenance, waiver), "gate" for a code guard such as `Ot6Gate`,
+battery for battery-backed SRAM, and place names.
+
+Do not write in a persuasive-essay register. No antithesis, no
+personification, no maxims, no sentence fragments for emphasis, no capitals
+for volume (caps only for literal tokens such as PASS or `$FF`), no
+em-dash punchlines. Lead with the conclusion rather than building to it.
+This applies to commit messages, docs, code comments and your report.
+Commit messages still run long and explain what you ruled out; plain does
+not mean short.
+
 ## Choosing your method
 
 You choose your own method. If a rule below gets in the way of doing the job
