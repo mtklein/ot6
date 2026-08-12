@@ -77,6 +77,34 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   for most of the hideout and BANON is aboard for the rest, and BANON dying
   is a Game Over rather than a wipe (`BattleEnd_03` ->`LoseBattle`,
   `battle_main.asm:12305-12307`, `:16039`).
+- **A Veldt battle pays gil and no experience, so no stretch of the route
+  can be levelled out of from inside it.** `WinBattle` skips the
+  experience accumulation monster by monster while `$11E4` bit 1 is set and
+  falls straight into the gold sum (`battle_main.asm:15778-15781`); OT6's
+  own reward scale runs after and leaves a zero sum zero, which
+  `ot6_break.asm:758-760` already records. The Veldt flag does not touch
+  running: `$11E4` is read at `:14150`, `:14211` and `:15779` only, none of
+  them the run path, so "these packs are unrunnable" is a fact about a
+  formation rather than about the Veldt. If a party ever does need levels
+  before Mobliz, the Sabin scenario's own encounter-rolling maps are the
+  Phantom Forest (132/133/135) and the Phantom Train (141/142/145/149) --
+  decoded from `map_prop.dat` byte +5 bit 7 and the
+  `sub_battle_group`/`rand_battle_group`/`battle_monsters` chain -- so the
+  Lete River loop (#101) is not the only option and is not upstream-cheap.
+- **A world walk that fights its random encounters must be segmented with a
+  care stop between battles, or it wipes.** In-battle healing is bounded by
+  turns: one Tonic turn restores 50 while a Veldt pack deals more than that
+  per round to each of two characters, so a deeper bag cannot fix a heal
+  RATE deficit and a field menu between battles can, because it costs no
+  battle turns. All three of `gen_sabin_gau`'s Veldt walks wiped a party as
+  one continuous drive before being converted, the shore-to-Mobliz transit
+  last, on 2026-08-12 at f30934 with 30 Tonics and 9 Fenix Downs still in
+  the bag. The converted shape is checkpoint, then N segments of "fight one
+  battle, `H.fieldCare`, repeat", behind a three-attempt ladder on a
+  17-frame stagger. One wrinkle for a transit whose goal is a town
+  entrance: the segment exit must not fire on standing at the goal tile,
+  because that tile fires on being entered, and a segment that exits while
+  parked on it strands the walk.
 - **Rows**: `$B3 = $FF` for every command and only the weapon swing
   clears it, so Tools, Magic, Blitz, SwdTech, Throw and Steal are
   row-exempt. Back row wins where damage is break-driven and loses where the
