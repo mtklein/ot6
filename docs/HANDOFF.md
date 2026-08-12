@@ -398,10 +398,14 @@ everything, and keep to one heavy run at a time per machine.
 
 - **Work on `main`.** It carries our best latest work and gets no special
   protection; there is no long-lived integration branch to accumulate on.
-  Land agent branches onto it as they are reviewed. A release cuts
-  `release/v0.x` at the point it starts, so a later fix can be cherry-picked
-  onto the release without holding anything back from `main` (owner,
-  2026-08-12, replacing the rule that said otherwise).
+  Land agent branches onto it as they are reviewed (owner, 2026-08-12,
+  replacing the rule that said otherwise).
+- **Cut `release/v0.x` when the release starts, not when it ships.** Do it
+  while the release is still being decided, because reconstructing the point
+  it should have branched from is guesswork afterwards. The branch is what
+  receives a cherry-picked fix; the tag only names a commit and cannot take
+  one, so a tag alone is not enough. Nothing is ever held back from `main`
+  to feed a release.
 - Delegated work gets [agent-brief.md](agent-brief.md) included by reference.
   **Cite the copy in the agent's own worktree**, never the owner's checkout,
   which can be on a release branch and weeks stale.
