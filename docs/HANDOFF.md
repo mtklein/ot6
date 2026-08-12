@@ -102,23 +102,38 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   other boot source (five states cold-Continue out of one), it is a battery
   image rather than a savestate, and it is tracked in git, so no
   regeneration ever refreshes one: a casualty in a checkpoint keeps handing
-  the same corpses down until the file is re-captured. Four are dirty today
-  — `terra-returned-v1` → `narshe-mission-v1` (EDGAR and SABIN dead in both,
-  the second inheriting from the first), `gate-cave-save-v1` (TERRA), and
-  `n024-entry-save-v1` (EDGAR and SABIN). The save slot mirrors the `$1600`
-  table record for record, so the same shape signature finds it, resolving
-  at `0x1400` in all twelve. Separately, the audits now skip `build/states`
-  files that `tools/tests/savestate_graph.py` no longer declares: 19 of the
-  98 there are pre-rename leftovers, and one of them, `kefka_doorstep`, was
-  reported and worked as a live casualty for a session before anyone noticed
-  that no generator writes it.
-- **A checkpoint that hands over a corpse costs the segment its revives.**
-  Measured at `n024-entry-save-v1`: it delivers EDGAR and SABIN dead, the
-  segment carries two Fenix Downs, the care stop before battle 72 spends
-  both raising them, and CELES then dies in the fight with the bag empty. No
-  owned esper grants Life in the WoB, so at that point nothing in the game
-  can raise her, and `esper_tubes_entry` ships her at 0/349 — a fixture that
-  no care stop in its own generator can repair.
+  the same corpses down until the file is re-captured. All twelve are clean
+  today; the four that were not (`terra-returned-v1` → `narshe-mission-v1`,
+  `gate-cave-save-v1`, `n024-entry-save-v1`) were re-cut on 2026-08-12. The
+  save slot mirrors the `$1600` table record for record, so the same shape
+  signature finds it, resolving at `0x1400` in all twelve. Separately, the
+  audits skip `build/states` files that `tools/tests/savestate_graph.py` no
+  longer declares: 19 of the 98 there are pre-rename leftovers, and one of
+  them, `kefka_doorstep`, was reported and worked as a live casualty for a
+  session before anyone noticed that no generator writes it.
+- **A checkpoint that hands over a corpse costs the segment its revives, and
+  the bill lands boundaries later.** Measured end to end on the 2026-08-12
+  re-cut. `n024-entry-save-v1` delivered EDGAR and SABIN dead; the segment
+  carried two Fenix Downs; the care stop before battle 72 spent both raising
+  them; CELES then died in that fight with the bag empty, and no owned esper
+  grants Life in the WoB, so `esper_tubes_entry` shipped her at 0/349. The
+  part that is expensive to rediscover is what happened **after** that. The
+  two spent revives never came back, so `minecart-platform-v1` was cut with
+  8 Tonics and no Fenix Downs (against 16 Tonics, 10 Potions and 2 Fenix
+  Downs at `mrf-save-room-v1`), `n128_won` inherited that bag, and battle 71
+  killed EDGAR at the Cranes with nothing in the game able to raise him.
+  Fixing the source fixed all of it without a single balance change: battle
+  70 stopped killing anyone once the fight driver cast CELES's Cures instead
+  of drinking, and the restored supply then carried through to the Cranes.
+  So when a checkpoint ships a casualty, check the **bag** at every
+  checkpoint below it before concluding that a fight is too hard. Nothing in
+  the tree audits supplies.
+- **A healthier route levels more slowly.** FF6 divides a fight's experience
+  among the survivors, so a chain that stops losing members gains levels
+  later: the repaired chain reaches `n128_won` at LOCKE 14 / EDGAR 15 /
+  SABIN 15 where the old one was 15/16/16. Nothing asserts a level at these
+  boundaries and every contract still passes, but a fight that was tuned
+  against the old numbers is being fought a level down.
 - **A party wipe must be reported as a wipe.** The navigators'
   `M.partyWiped()` check misses in-battle wipes, because `$1600` keeps
   pre-battle HP. The filed fix is a battle-module check (`$3BF4` under
