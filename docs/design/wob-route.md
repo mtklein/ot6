@@ -77,8 +77,14 @@ who already knows every answer, and it measures a game nobody is playing.
 
 Concretely, a normal player:
 
-- **Opens the chests.** The route walks past them, so the party is poorer
-  and worse equipped than anyone's would be.
+- **Opens the chests — almost all of them.** Owner, 2026-08-12: "human
+  players love to open chests to find out what's inside. a typical run will
+  open almost every chest you see." So opening is the default and skipping
+  one needs a reason, not the other way round. This is not tidiness: a
+  Thunder Rod sits in a chest in the South Figaro cave, one room before the
+  TunnelArmr fight that blocked the v0.10 release check by losing three
+  attempts. A route that skips content reaches a fight the designers
+  expected it to reach armed, loses, and reports a balance finding.
 - **Fights things.** Fleeing earns nothing, which is why the Sabin scenario
   reaches the ghost merchant about 9,000 gil poorer than the old lineage.
   Grinding a little for experience or money is expected, not a last resort.
