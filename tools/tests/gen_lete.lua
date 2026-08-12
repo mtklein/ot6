@@ -23,11 +23,33 @@
 -- Map 112 has no NPCs and no event triggers at all (NPCProp::_112 and
 -- EventTrigger::_112 are both empty), so nothing else here can fire.
 --
--- Issue #75, zero-write: both navigators run with opts.playBattles.  Map
--- 112 rolls no encounters, so the battle branch should never fire.
--- playBattles mode makes that a property of the code path rather than an
--- assumption: a battle here would be fought with real input, never
--- write-cleared.
+-- Issue #75, zero-write: both navigators run with opts.playBattles.  Maps
+-- 112 and 113 roll no encounters, and that is a fact about the data rather
+-- than an impression: both have bit 7 clear in map_prop byte $0525, and
+-- UpdateStepCounter tests that bit and returns before it will roll anything
+-- (ff6/src/field/battle.asm:332-333).  playBattles mode makes the battle
+-- branch a property of the code path rather than an assumption: a battle
+-- here would be fought with real input, never write-cleared.
+--
+-- THE MODE IS "tactical", for the reason gen_banon's header gives at
+-- length.  The spelling was `true`, the blind branch -- no menus, no items,
+-- no flee -- which is the branch that wiped a party at terra_clifftop while
+-- reporting a navigation timeout.  Between the two real modes, "flee" means
+-- standing still while the formation takes free rounds, and BANON is in the
+-- party here: BattleEnd_03 is "banon died" and it goes to LoseBattle, which
+-- sets the game-over flag (battle_main.asm:12300-12307, :16039), so a death
+-- on this map is not a wipe to retry but the end of the run.  The usual
+-- argument for fleeing -- that a run is cheaper in frames than a fight --
+-- buys nothing on a map that cannot roll an encounter.
+--
+-- A care stop before the save, for the reason gen_banon has two: the audit
+-- named lete_river alongside banon_joined, TERRA at 1 of 136 with status 04,
+-- and poison drains max HP/32 on every step
+-- (ff6/src/field/player.asm:593-609).  Eighteen tiles is not where that
+-- damage was done -- it arrives with the fixture -- but this is the last
+-- stop before the river, which is long, forced and full of battles, and
+-- H.assertPartyStanding below refuses to write a fixture that would start
+-- it poisoned.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/banon_joined.mss.lua"
 
@@ -51,7 +73,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { playBattles = true }),
+    end), maxF or 12000, { playBattles = "tactical" }),
     H.waitFrames(30),
   })
 end
@@ -93,7 +115,7 @@ H.run({ maxFrames = 40000 }, {
     return string.format("cross: (%d,%d) -> (8,60) -> map 113 (30,50)",
       H.fieldX(), H.fieldY())
   end),
-  H.navTo(8, 60, { maxFrames = 20000, playBattles = true, arrive = function()
+  H.navTo(8, 60, { maxFrames = 20000, playBattles = "tactical", arrive = function()
     return map() ~= 112
   end }),
   H.release(),
@@ -113,14 +135,30 @@ H.run({ maxFrames = 40000 }, {
     for c = 0, 15 do
       if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
         local base = 0x1600 + 37 * c
-        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d",
+        -- status 1 is on this line now.  Without it the roster reported
+        -- lete_river's TERRA as a healthy character until poison had already
+        -- taken her to 1 of 136, and the fixture that could still have been
+        -- repaired was several generators upstream by then.
+        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d status1=%02X",
           c, H.readByte(base), H.readByte(base + 8),
-          H.readWord(base + 9), H.readWord(base + 11)))
+          H.readWord(base + 9), H.readWord(base + 11), H.readByte(base + 20)))
       end
     end
-    H.log(string.format("[lete_river] f%d map=%d (%d,%d)",
-      H.frame, map(), H.fieldX(), H.fieldY()))
+    H.log(string.format("[lete_river] f%d map=%d (%d,%d) antidote=%d",
+      H.frame, map(), H.fieldX(), H.fieldY(), H.invCountOf(0xF2)))
     H.screenshot("lete_river")
+  end),
+
+  -- The last stop before the river, which is long, forced and full of
+  -- battles.  Anything not repaired here is carried into it.
+  H.fieldCare({ tag = "care before the river", threshold = 0.85 }),
+  H.call(function()
+    -- The exit contract: nobody dead, petrified, zombie, poisoned, or at or
+    -- below max HP / 8 (H.assertPartyStanding, the same conditions
+    -- tools/audit_party_hp.py applies tree-wide).  This generator had none,
+    -- which is how lete_river shipped TERRA at 1 of 136 with status 04 into
+    -- the fixture gen_scenario rides the whole river from.
+    H.assertPartyStanding("lete_river exit")
   end),
   H.saveState("lete_river.mss"),
   H.logStep(function()
