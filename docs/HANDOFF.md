@@ -261,23 +261,38 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   that the bit index is nine bits, not eight, and that the unit the game
   tracks is the bit rather than the record, since duplicate map copies
   share one bit and can hold different items.
-- **Zozo's random encounters have no reachable break class, and the pool
-  out-damages the route party.** Measured 2026-08-12 while `dadaluma_entry`
-  and `zozo_clock_solved` were blocking the v0.10 check. Declaring maps 221
-  and 225 to `tools/check_break_reach.py` and running it against
-  LOCKE/CELES/SABIN/EDGAR reports **all eight** formations of groups 77 and
-  78 as NO REACHABLE BREAK CLASS: HadesGigas, Gabbldegak, Harvester and
-  SlamDancer each carry an `Ot6ShieldTbl` row with no class key at all (rows
-  2091/2094/2096/2099), so no party can break them and every hit lands at
-  the shielded halving. Zozo is not a declared area in that checker, which
-  is why nothing caught it; the two declared areas are the Magitek Facility
-  and the Cave to the Sealed Gate. Runtime cost, same day: one street
-  encounter took the tactical driver 6352 frames at full HP, and the
-  map-225 stair-room formation (three bodies, 350 HP and two shields each,
-  round costs 186/99/137/306 against max HPs of 249/245/280/289) killed a
-  four-member party at levels 11-12 having taken no damage at all across
-  13200 frames. **Declaring the area would turn `make test` red**, so it is
-  recorded here rather than landed.
+- **Zozo is broken by an element, not by a class, and the missing class
+  bytes are authored rather than absent.** `tools/check_break_reach.py`
+  reports all eight formations of groups 77 and 78 as NO REACHABLE BREAK
+  CLASS when maps 221 and 225 are declared to it, because HadesGigas,
+  Gabbldegak, Harvester and SlamDancer each carry an `Ot6ShieldTbl` row of
+  two shields with no class key (`ot6_hud.asm:2086-2097`). That reading is
+  right about the bytes and wrong about what they mean: the block comment
+  directly above those four rows says "the answer is the tool rather than
+  the A button" (`:2084-2085`), and the tool is EDGAR's Bio Blaster,
+  because all four are already poison-weak in vanilla (`monster_prop.dat`
+  +25 = `$08`) and the Bio Blaster is item `$a4` -> attack `$7d`, element
+  `$08`, all enemies, 0 MP (`ot6_break.asm:203-204`, `:279-281`;
+  `battle_main.asm:6577`). The same comment carries the sweep that set the
+  counts at 2: at that count the pack breaks penultimate and the loop wins
+  6/6, while "mashing wipes 6/6 in this town" (`:2078`). So the checker's
+  model is what is incomplete — it credits only class keys and knows
+  nothing about a reachable element — and declaring the area would turn
+  `make test` red on a fight the game has an answer to. Measured
+  2026-08-12 with `probe_zozo_tool.lua`, one boot, one checkpoint, the same
+  pacing walk twice with identical input so both halves drew the same
+  formation off the same battle seed: with AutoCrossbow **not one of the
+  eight shields moved in the whole fight**, and with the Bio Blaster all
+  four bodies went 2 -> 1 on the same frame, the group chip the comment
+  describes. Which tool is better is per formation rather than settled:
+  on four 350-HP Gabbldegaks at full HP AutoCrossbow still won faster
+  (3251 frames against 5276) because its power is 125 against 20 and a
+  350-HP body dies to halved damage before a break repays the turns. The
+  break earns its keep on the bodies that do not — HadesGigas at 1200 HP
+  and defence 125, Harvester at 428 and 105. `newFightDriver`'s
+  `opts.tool` is how a caller says which; before it, the driver could only
+  ever reach for AutoCrossbow, which is why the climb never chipped
+  anything.
 - **A party that enters a fight below `healPercent` may never get a turn
   back.** The other half of the heal policy, and not a bug in it. When the
   item restores at least what a round costs, `M.healDecision` hands the

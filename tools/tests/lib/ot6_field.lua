@@ -2939,14 +2939,30 @@ function M.equipEsper(pos, esperIdx, opts)
   })
 end
 
--- M.equipWeapon: put a specific weapon in the main hand of the character
+-- M.equipWeapon: put a specific item in one gear slot of the character
 -- at char-select position `pos`, through the real Equip menu.  States
 -- (equip.asm): $36 options (cursor 0 = Equip) -> $55 slot select (default
 -- slot 0 = R-Hand) -> $57 item select, whose list rows at $7e9d8a are bag
 -- indexes into $1869 (MenuState_57 @992d reads that), so the seek
 -- compares the item id under the cursor rather than guessing a row.  The
--- list is pre-filtered by GetValidEquip, so an un-equippable weapon makes
+-- list is pre-filtered by GetValidEquip, so an un-equippable item makes
 -- the seek time out rather than equip something else.
+--
+-- opts.slot names the slot, 0..5 = R-Hand, L-Hand, Helmet, Armor, Relic 1,
+-- Relic 2, and it defaults to 0, which is what every caller before the Zozo
+-- readiness sweep wanted.  The slot list is one vertical column and the
+-- cursor lands on row 0, so the seek is that many DOWN presses, read back
+-- off the same cursor byte the character and item seeks use rather than
+-- counted blind.  The name still says weapon because that is what it is
+-- nearly always used for; the slot is the exception.
+--
+-- The slot matters because a bare slot is not a cosmetic gap.  Measured
+-- 2026-08-12 at zozo_arrival and again at zozo_clock_solved: CELES walks
+-- into Zozo with no body armour and no relics and SABIN with no shield and
+-- no relics, while a LeatherArmor, a Buckler, two Star Pendants, a Peace
+-- Ring and a Black Belt sit in the bag -- six items for the six empty
+-- slots.  CELES's defence is 34 where the rest of the party runs 44 to 55,
+-- and she is the only healer.
 --
 -- equipOptimum is not enough, measured 2026-08-10 on the Cranes:
 -- Optimum picks by attack power and armed LOCKE and EDGAR with Thunder
@@ -2957,7 +2973,8 @@ end
 -- input-driven route had it until this function.
 function M.equipWeapon(pos, itemId, opts)
   opts = opts or {}
-  local tag = opts.tag or string.format("equip weapon %02X", itemId)
+  local slot = opts.slot or 0
+  local tag = opts.tag or string.format("equip %02X slot %d", itemId, slot)
   local ZM, CUR = 0x26, 0x4b
   local ST_MAIN, ST_CHAR = 0x05, 0x06
   local ST_EQOPT, ST_EQSLOT, ST_EQITEM = 0x36, 0x55, 0x57
@@ -2988,8 +3005,12 @@ function M.equipWeapon(pos, itemId, opts)
       tag .. ": cursor on Equip option"),
     M.pressButtons({ "a" }, 2),
     M.waitUntil(function() return st() == ST_EQSLOT end, 300,
-      tag .. ": slot select (R-Hand)", 5),
+      tag .. ": slot select", 5),
     M.waitFrames(10),
+    M.driveUntil(function()
+      return st() == ST_EQSLOT and M.readByte(CUR) == slot
+    end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+      tag .. ": slot cursor"),
     M.pressButtons({ "a" }, 2),
     M.waitUntil(function() return st() == ST_EQITEM end, 300,
       tag .. ": item list", 5),
@@ -2999,7 +3020,7 @@ function M.equipWeapon(pos, itemId, opts)
          and M.readByte(0x1869 + M.readByte(0x9d8a + M.readByte(CUR)))
              == itemId
     end, 1800, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
-      tag .. ": list cursor on the weapon"),
+      tag .. ": list cursor on the item"),
     M.pressButtons({ "a" }, 2),
     M.waitUntil(function() return st() == ST_EQSLOT end, 300,
       tag .. ": equipped, back on slots", 5),

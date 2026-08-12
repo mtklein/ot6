@@ -21,6 +21,28 @@
 --
 -- It asserts nothing about which half wins.  A probe that demanded the
 -- answer it expected would agree with itself; the numbers are the output.
+--
+-- It boots zozo_clock_solved rather than zozo_arrival, so the pool is map
+-- 225's group 77 -- SlamDancer 392 hp def 115, Harvester 428 hp def 105,
+-- and mixes of the two with Gabbldegaks.  That is the pool that wiped the
+-- climb, and it is the pool where the break can be worth its turns.
+--
+-- Measured first on zozo_arrival, map 221's group 78, at full HP, and the
+-- numbers are here because they are the reason the map was changed rather
+-- than because they settle anything.  The draw was formation 104, four
+-- Gabbldegak at 350 hp and 2 shields each:
+--
+--   autocrossbow  WON in 3251 frames, shields 8 -> 8   party -186 hp
+--   bioblaster    WON in 5276 frames, shields 8 -> 1   party -160 hp
+--
+-- So the shield claim held exactly: with AutoCrossbow not one of the eight
+-- shields moved in the whole fight, and with the Bio Blaster all four
+-- bodies went 2 -> 1 on the same frame (f+1746), which is the group chip
+-- the table's comment describes.  But AutoCrossbow still won that fight
+-- FASTER, because its power is 125 against the Bio Blaster's 20, and a
+-- 350-hp body dies to halved damage before a break can pay for the turns
+-- it costs.  The break earns its keep on the bodies that do not: HadesGigas
+-- at 1200 hp and defence 125, Harvester at 428 and 105.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -70,9 +92,10 @@ local blob = nil
 -- pure function of the tile, so the two halves present identical input to
 -- the engine and draw the same encounter.
 local DIRS = { "left", "right", "up", "down" }
+local PACE_CAP = 9000
 local function half(name, tool)
   local hb, battN, done, minShield, startShield = 0, 0, nil, nil, nil
-  local dirI, lastX, lastY = 1, -1, -1
+  local dirI, lastX, lastY, stall, steps = 1, -1, -1, 0, 0
   local F = H.newFightDriver(name, { tactical = true, boost = true, bank = 3,
     items = true, healPercent = 60, cadence = 12, tool = tool })
   local f0 = nil
@@ -142,33 +165,44 @@ local function half(name, tool)
         return
       end
       F.idle()
+      -- A walk that draws nothing must SAY so.  Without this the half is
+      -- silent from the checkpoint to the encounter, and "the pacer is not
+      -- stepping" and "the pacer is stepping and has not rolled yet" print
+      -- the same nothing.  $1f6e is the step-danger accumulator every step
+      -- adds the map's rate to (field/battle.asm:350-388), so it moving is
+      -- the proof that steps are happening.
+      if hb % 300 == 0 then
+        H.log(string.format("[%s] pacing f+%d at (%d,%d) danger=$%04X ctl=%s "
+          .. "align=%s steps=%d", name, hb, H.fieldX(), H.fieldY(),
+          H.readWord(0x1F6E), tostring(H.hasControl()),
+          tostring(H.tileAligned()), steps))
+      end
       if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
       if not H.hasControl() then H.setPad({}); return end
-      if not H.tileAligned() then return end
-      if hb > 30000 then finish("NO ENCOUNTER"); H.setPad({}); return end
+      if hb > PACE_CAP then finish("NO ENCOUNTER"); H.setPad({}); return end
       local x, y = H.fieldX(), H.fieldY()
-      if x == lastX and y == lastY then
-        dirI = dirI % #DIRS + 1              -- refused or blocked: try another
+      if x ~= lastX or y ~= lastY then
+        if lastX >= 0 then steps = steps + 1 end
+        stall = 0
+      else
+        stall = stall + 1
+        if stall > 40 then dirI = dirI % #DIRS + 1; stall = 0 end
       end
       lastX, lastY = x, y
-      for k = 0, #DIRS - 1 do
-        local mv = DIRS[(dirI - 1 + k) % #DIRS + 1]
-        if H.canStep(x, y, mv) then
-          dirI = (dirI - 1 + k) % #DIRS + 1
-          H.setPad({ [H.movePress(mv)] = true })
-          return
-        end
-      end
-      H.setPad({})
+      -- Held, not pulsed, and not canStep-gated: this is open street, the
+      -- point is to accumulate steps rather than to reach a tile, and a
+      -- direction the map refuses just leaves the position unchanged, which
+      -- the stall counter above turns into the next direction.
+      H.setPad({ [DIRS[dirI]] = true })
     end),
   }, name)
 end
 
 H.run({ maxFrames = 200000 }, {
-  H.loadState("build/states/zozo_arrival.mss.lua"),
+  H.loadState("build/states/zozo_clock_solved.mss.lua"),
   H.waitFrames(150),
   H.call(function()
-    H.assertEq(map(), 221, "booted on the Zozo street (map 221)")
+    H.assertEq(map(), 225, "booted inside Zozo (map 225)")
     H.assertEq(H.invCountOf(H.BIO_BLASTER) > 0, true, "Bio Blaster in the bag")
     H.assertEq(H.invCountOf(H.AUTOCROSSBOW) > 0, true, "AutoCrossbow in the bag")
   end),
