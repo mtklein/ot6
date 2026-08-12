@@ -192,6 +192,19 @@ test: rom nomp-rom graph
 	@# fixtures and a green run over a broken predicate look identical.
 	python3 tools/audit_party_hp.py --selftest
 	python3 tools/audit_party_hp.py
+	@# What the route walks past.  A normal player opens almost every chest;
+	@# this route opens none of the 94 on the maps it reaches, and one of them
+	@# is the Thunder Rod a room before the TunnelArmr fight that was losing
+	@# all three attempts.  Reads the treasure table out of the ff6 sources and
+	@# the opened-flags out of the savestates and the tracked SRAM checkpoints,
+	@# so it has real data even before `make savestates` has run.  The check is
+	@# tools/chests_opened.txt, a GROW-only list of the chests the route does
+	@# open -- the inverse of the two waiver lists above, because here the
+	@# defect is uniform and a defect list would be 94 identical lines.  The
+	@# selftest is what fails if the decoder stops decoding; the count of
+	@# chests found is deliberately not checked, only which ones are opened.
+	python3 tools/audit_chests.py --selftest
+	python3 tools/audit_chests.py
 	python3 tools/tests/lib/savestate_ninja.py --selftest
 	sh tools/tests/lib/savestate_ninja_selftest.sh
 	sh tools/tests/lib/savestate_stamp_selftest.sh
@@ -261,6 +274,10 @@ savestates: rom graph
 	@# with two dead characters in it.
 	python3 tools/audit_equipment.py
 	python3 tools/audit_party_hp.py
+	@# Same reason, one step out: a route change that was supposed to start
+	@# opening chests and did not is cheaper to hear about here than an hour
+	@# later from `make test`.
+	python3 tools/audit_chests.py
 	@echo "savestates up to date"
 
 # ---------------------------------------------------------------- smoke ----
