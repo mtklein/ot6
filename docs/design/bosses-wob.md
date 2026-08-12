@@ -691,9 +691,20 @@ the Beat B note in `wob-route.md`.)
 
 - Blades regenerate a few turns after dying (vanilla ✦), and regrown
   blades return at full shields. Their weakness row stays revealed.
-- **Telegraph:** both blades rise → the whole-side sweep (Gale Cut —
-  audit list). Breaking *either blade* cancels it. This is the first
-  fight where breaking a part is the answer.
+- **Telegraph:** the whole-side sweep (Gale Cut — audit list) is a
+  *proposal*, and it is the other way round from the script this ROM
+  builds. In `AIScript::_267` (`ff6/src/battle/ai_script.asm:4725-4746`;
+  the label index is the monster id, 267 = `$010B`), Gale Cut sits behind
+  `if_num_monsters 1`: the body Hastes itself and then runs Gale Cut,
+  Atomic Ray, Blaster and Shock Wave **once both blades are dead**. While
+  a blade is alive it runs `BATTLE, BATTLE, ICE` and `BATTLE, SPECIAL,
+  NET`. So killing the blades is what turns the sweep on, and a party
+  that leaves them standing keeps the body on its mild script.
+  "Breaking either blade cancels it" is a design intent to build, not
+  vanilla behaviour to inherit — the same shape of error §16 had to
+  correct about the Cranes' charge. Until it is built this is not the
+  fight where breaking a part is the answer, and a drive tuned as if it
+  were will make the fight harder rather than easier.
 - **Break story:** this is the first battle after Zozo gives you four
   espers, and a Ramuh bearer casting Bolt into the body is the first
   use of the sub-job system (magicite.md's storm-lancer).

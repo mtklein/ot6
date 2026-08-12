@@ -273,6 +273,18 @@ local function supplyReport(tag)
     table.concat(who, " | ")))
 end
 
+-- What each attempt's boss fight looked like, so a lost ladder reports a
+-- measurement instead of "got false, want true".  One row per attempt: what
+-- the party brought into fight 6 and how far down the body got.
+local fight6 = {}
+local function fight6Row()
+  local r = fight6[#fight6]
+  if r == nil then return "fight 6 never reached" end
+  return string.format("in %d/%d/%d hp, %d tonic %d potion %d fenix; "
+    .. "body $010B %d/3276 sh%d at its lowest",
+    r.hp[1], r.hp[2], r.hp[3], r.tonic, r.potion, r.fenix, r.low, r.lowSh)
+end
+
 local fights, rideStart = {}, nil
 local function rideDriver(pred, lostRef, maxFrames, what)
   local ph, hb, battN, wipeN = 0, 0, 0, 0
@@ -280,15 +292,26 @@ local function rideDriver(pred, lostRef, maxFrames, what)
   -- N0mLGnDD, ladder failing at fights 6/4/6): healPercent 60 reacted too
   -- late to the Mag Roaders' whole-party bursts, and bank=3 wasted BP,
   -- because a chip is per boosted hit, so three boost-1 swings out-chip one
-  -- boost-3 swing.  Round two (run R0crCD3T): healPercent 75 fixed the
-  -- Roader attrition (the party reached fight 6 at full HP) and
-  -- then heal-locked the boss fight: under the boss and two blades
-  -- someone is always below 75%%, EDGAR spent every turn on the bag, the
-  -- body took one chip in 4900 frames on attempt 1 and none on attempt 2,
-  -- and the fight stalled until the bag ran dry.  So the policy is split:
-  -- the five Roader fights heal at 75%% (they end quickly, so the bag
-  -- spend is small), and the boss fight drops to 55%% so EDGAR's turns go
-  -- to the AutoCrossbow that breaks the body.
+  -- boost-3 swing.  Round two (run R0crCD3T): healPercent 75 improved the
+  -- Roader attrition and then heal-locked the boss fight: under the boss
+  -- and two blades someone is always below 75%%, EDGAR spent every turn on
+  -- the bag, the body took one chip in 4900 frames on attempt 1 and none on
+  -- attempt 2, and the fight stalled until the bag ran dry.  So the policy
+  -- is split: the five Roader fights heal at 75%%, and the boss fight drops
+  -- to 55%% so EDGAR's turns go to the AutoCrossbow that breaks the body.
+  --
+  -- The "the bag spend is small" that used to be written here is not true
+  -- and was never measured.  The bag is eight Tonics, nothing else, and the
+  -- five Roader fights spend all eight: the supply lines below read
+  -- tonic=8 at fight 1 and tonic=0 at fight 6 on every attempt of the
+  -- 2026-08-11 run, and on one attempt the last Tonic went in fight 2.  A
+  -- Tonic is about 50 hp against a 448 hp bar, so the trash fights are
+  -- trading the whole consumable budget for roughly a ninth of one member's
+  -- bar at a time and the boss fight is fought with no healing at all.
+  -- Whether that is the policy's fault or the supply's is #92's open
+  -- question; lowering the Roader threshold only makes the party arrive
+  -- lower, because the Tonics are being spent on damage that was really
+  -- taken.
   local Ftrash = H.newFightDriver("n128 trash", { tactical = true,
     boost = true, bank = 1, items = true, healPercent = 75, cadence = 12 })
   -- Fight 6 steers every single-target confirm onto the body through the
@@ -334,6 +357,12 @@ local function rideDriver(pred, lostRef, maxFrames, what)
           H.assertEq(w[1], 0x010b,
             "fight 6 puts NUMBER 128 in monster slot 0, which is the slot "
             .. "Fboss's focus list steers to (mask $01)")
+          fight6[#fight6 + 1] = {
+            hp = { H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8) },
+            tonic = bagCount(0xE8), potion = bagCount(0xE9),
+            fenix = bagCount(0xF0),
+            low = H.readWord(0x3BFC), lowSh = H.readByte(0x3E40),
+          }
         end
       end
       if battN >= 3 then
@@ -351,6 +380,10 @@ local function rideDriver(pred, lostRef, maxFrames, what)
             #fights, H.frame))
         end
         local F = (#fights >= 6) and Fboss or Ftrash
+        if #fights >= 6 and fight6[#fight6] then
+          local r, hp = fight6[#fight6], H.readWord(0x3BFC)
+          if hp < r.low then r.low, r.lowSh = hp, H.readByte(0x3E40) end
+        end
         F.frame()
         return
       end
@@ -429,8 +462,8 @@ local function rideAttempt(n)
         H.log(string.format("minecart ride SURVIVED on attempt %d, f%d "
           .. "(%d fights fought)", n, H.frame, #fights))
       else
-        H.log(string.format("attempt %d LOST (wipe in fight %d), f%d",
-          n, #fights, H.frame))
+        H.log(string.format("attempt %d LOST (wipe in fight %d), f%d -- %s",
+          n, #fights, H.frame, fight6Row()))
       end
     end),
   })
@@ -529,9 +562,20 @@ H.run({ maxFrames = 400000 }, {
   -- should report rather than "lost all three" (#83).
   L.report(),
   H.call(function()
+    -- Carry the boss fight's numbers into the verdict.  A ladder that loses
+    -- all three is reporting a finding rather than a flake (#83), and the
+    -- finding is only useful if the reader can see how close it came and
+    -- what the party had left.  Attempt rows are logged in full; the
+    -- assertion string carries the last one, which is what a red run shows.
+    for i, r in ipairs(fight6) do
+      H.log(string.format("[fight 6] attempt %d: party %d/%d/%d hp, "
+        .. "%d tonic %d potion %d fenix, body $010B down to %d/3276 sh%d",
+        i, r.hp[1], r.hp[2], r.hp[3], r.tonic, r.potion, r.fenix,
+        r.low, r.lowSh))
+    end
     H.assertEq(rideWon, true,
       "the minecart ride survived within 3 attempts (six real "
-      .. "fights, the library fighter)")
+      .. "fights, the library fighter) -- last attempt reached " .. fight6Row())
   end),
   H.waitFrames(90),
 
