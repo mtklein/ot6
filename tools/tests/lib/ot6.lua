@@ -1078,10 +1078,45 @@ end
 --     is not preserved by construction.
 --
 -- newSeedLadder replaces the constant with the counter it is trying to move:
--- each attempt waits until $021e reaches its own target phase, spaced as
--- widely as 60 phases allow, and the seed each attempt actually drew is read
--- off the store instruction and required to be distinct.  A ladder that plays
--- one fight twice is the failure mode with no symptom, so it fails the run.
+-- each attempt holds until $021e has advanced to its own target phase, spaced
+-- as widely as 60 phases allow, and the seed each attempt actually drew is
+-- read off the store instruction and required to be distinct.  A ladder that
+-- plays one fight twice is the failure mode with no symptom, so it fails the
+-- run.
+--
+-- WHY THE HOLD COUNTS MOVEMENT INSTEAD OF MATCHING THE TARGET VALUE.  It used
+-- to wait for `$021e == target`, sampled once per emulated frame, and that
+-- cannot see every phase.  $021e is ticked at the very END of the owning
+-- module's vblank handler -- ff6/src/field/reset.asm:286 sits after every
+-- palette, sprite, tilemap and dialog transfer FieldNMI performs -- and that
+-- handler is long enough to finish either just inside the frame or just past
+-- it.  Measured 2026-08-12 on sfigaro_town's battle 11, in the 181 frames the
+-- old wait spent failing (map 75, party standing still after a lost attempt):
+--
+--   * IncGameTime ran 180 times in 180 frames, one per frame on average,
+--     exactly as designed -- the counter was never stopped;
+--   * the tick executed at scanline 247, then 257, then 1 of the following
+--     frame, straddling scanline 0, which is where the harness samples
+--     (M.run's startFrame callback);
+--   * so frames held 2, 1, 0, 1 ticks on a stable four-frame beat, and the
+--     once-per-frame sample stepped +2, +1, 0, +1;
+--   * every phase congruent to 3 mod 4 therefore existed only between two
+--     sample points.  Phase 7, the target, was written at scanline 1 of a
+--     frame and overwritten at scanline 257 of the SAME frame, every cycle.
+--     No wait of any length could have matched it.
+--
+-- The field NMI's own $45/$46 counters step in the same 0/+2 pattern, which
+-- is what rules out a second caller ticking the clock instead.
+--
+-- So the hold accumulates the counter's own movement: it sums each frame's
+-- delta and releases once the counter has moved as far as the target was
+-- away.  That lands on the target when the sample can see it and one or two
+-- phases past it when it cannot, which 20-phase spacing does not care about,
+-- and it is report() -- the seed each attempt really drew -- that guarantees
+-- the attempts were different fights.  A counter that is genuinely stopped
+-- moves nothing, and that still fails the run rather than falling back to
+-- "wait a bit and hope": a ladder that cannot spread must not be able to
+-- quietly play one fight twice.
 --
 -- Why the spacing is as wide as it is, rather than merely nonzero.  RNGTbl is
 -- 256 bytes (ff6/src/field/rng_tbl.dat, incbin'd at field/rng_tbl.asm:11) and
@@ -1145,19 +1180,26 @@ end
 --     L.spread(n),
 --
 -- spread(n) latches attempt 1's phase and then holds each later attempt until
--- $021e reaches base + 20*(n-1), which is the widest even spacing three
--- attempts fit into the 60-phase cycle.  The seed the fight actually drew is
--- captured at the store and checked by report(): distinct across attempts, and
--- present for every attempt that ran, so a watcher that never fired fails
--- rather than passing silently.
+-- $021e has advanced to base + 20*(n-1), which is the widest even spacing
+-- three attempts fit into the 60-phase cycle.  The seed the fight actually
+-- drew is captured at the store and checked by report(): distinct across
+-- attempts, and present for every attempt that ran, so a watcher that never
+-- fired fails rather than passing silently.
 --
 -- opts.attempts (default 3) only sets the spacing.  It is not a licence to
 -- widen the ladder: three is the doctrine (#74), and a ladder that loses three
 -- different fights is reporting a finding.
+--
+-- opts.phaseSource replaces the live read of $021e, and exists so
+-- battle_seedladder can drive the hold with samplers a real route cannot be
+-- made to produce on demand: one that aliases the way the field NMI's straddle
+-- makes the real one alias (a quarter of the phases never visible), and one
+-- that never moves at all.  A generator's ladder reads the counter.
 function M.newSeedLadder(tag, opts)
   opts = opts or {}
   local attempts = opts.attempts or 3
   local gap = opts.gap or (M.SEED_PERIOD // attempts)
+  local phaseOf = opts.phaseSource or M.seedPhase
   local L = { tag = tag or "ladder", seeds = {}, extras = {}, targets = {},
               spreads = {} }
   local base, cur, watching = nil, 0, false
@@ -1191,9 +1233,10 @@ function M.newSeedLadder(tag, opts)
   end
 
   -- The spread, derived from the counter the seed is made of.  Replaces
-  -- H.waitFrames((n - 1) * 37).  opts.forcePhase pins the target outright and
-  -- exists so a negative control can drive two attempts onto one seed and
-  -- watch report() fail; nothing else should pass it.
+  -- H.waitFrames((n - 1) * 37).  sopts.forcePhase pins the target outright and
+  -- exists for battle_seedladder's controls -- driving two attempts onto one
+  -- seed to watch report() fail, and naming a phase the sampler cannot see to
+  -- watch the hold release anyway.  A generator does not pass it.
   L.spread = function(n, sopts)
     sopts = sopts or {}
     local target = nil
@@ -1203,7 +1246,7 @@ function M.newSeedLadder(tag, opts)
         cur = n
         L.spreads[n] = true     -- this attempt now owes report() a seed
         L.seeds[n] = nil        -- and it is the first fight after THIS spread
-        local now = M.seedPhase()
+        local now = phaseOf()
         local forced = sopts.forcePhase
         if type(forced) == "function" then forced = forced() end
         if n == 1 and not forced then base = now end
@@ -1213,32 +1256,67 @@ function M.newSeedLadder(tag, opts)
         M.log(string.format("[%s] attempt %d: phase %d -> target %d "
           .. "(seed $%02X), base %d gap %d%s",
           L.tag, n, now, target, M.seedOf(target), base, gap,
-          forced and "  [forcePhase -- negative control]" or ""))
+          forced and "  [forcePhase -- a control, not a route]" or ""))
       end),
       -- Not M.waitUntil: `target` is only known once the step above has run,
-      -- and waitUntil bakes its description at construction time.  The budget
-      -- is three cycles; one is enough if the clock ticks once per frame, so a
-      -- timeout here means it does not tick at this point in the route, which
-      -- is a finding about the seed rather than about the wait.
+      -- and waitUntil bakes its description at construction time.  And not an
+      -- equality test on the sampled phase, which is unreachable for a quarter
+      -- of the phases whenever the owning module's vblank handler straddles
+      -- the emulator's frame boundary -- see the measurement in the header
+      -- above.  This sums the counter's own movement and releases once it has
+      -- moved as far as the target was away, so it lands on the target or one
+      -- or two phases past it.  The budget is three cycles; one is enough at
+      -- the one tick per frame every vblank handler gives, so running out
+      -- means the counter is stopped or crawling, which is a finding about
+      -- where the spread was placed rather than about the length of the wait.
       (function()
-        local waited = 0
+        local waited, moved, need, prev, still = 0, 0, nil, nil, 0
         return {
           tick = function()
-            if M.seedPhase() == target then
-              M.log(string.format("[%s] attempt %d on phase %d after %d frames",
-                L.tag, n, target, waited))
+            local now = phaseOf()
+            if need == nil then
+              need, prev = (target - now) % M.SEED_PERIOD, now
+            else
+              local step = (now - prev) % M.SEED_PERIOD
+              prev, moved = now, moved + step
+              still = step == 0 and still + 1 or 0
+            end
+            if moved >= need then
+              M.log(string.format("[%s] attempt %d released on phase %d "
+                .. "(target %d) after %d frames, %d of the %d phases asked for",
+                L.tag, n, now, target, waited, moved, need))
               return "done"
             end
             waited = waited + 1
+            if still >= M.SEED_PERIOD then
+              error(string.format("%s: attempt %d asked the game-time frame "
+                .. "counter for %d phases of movement and it has not moved at "
+                .. "all in %d frames (phase %d throughout).  $021e is ticked "
+                .. "from the vblank handler of whichever module owns the frame "
+                .. "(field reset.asm:286, world interrupt.asm:33/320/584, "
+                .. "battle btlgfx_main.asm:1763, menu menu_common.asm:3496); "
+                .. "if none of those is running here, no wait of any length "
+                .. "moves the battle seed and this attempt cannot be a "
+                .. "different fight from the last one.  Put the spread "
+                .. "somewhere in this step where the game is running -- before "
+                .. "the reload, or after the drive that follows it -- rather "
+                .. "than waiting longer here.",
+                L.tag, n, need, still, now), 0)
+            end
             if waited > M.SEED_PERIOD * 3 then
-              error(string.format("%s: attempt %d never reached game-time phase "
-                .. "%d in %d frames (now %d).  $021e is not advancing here, so "
-                .. "no wait of any length can move the battle seed at this point "
-                .. "in the route.", L.tag, n, target, waited, M.seedPhase()), 0)
+              error(string.format("%s: attempt %d asked the game-time frame "
+                .. "counter for %d phases of movement and got %d in %d frames "
+                .. "(phase %d now).  It is advancing, but far under the one "
+                .. "tick per frame a running module gives it, so the spread "
+                .. "cannot be taken here.  Move it to a point in the step where "
+                .. "the game is running normally.",
+                L.tag, n, need, moved, waited, now), 0)
             end
             return "frame"
           end,
-          reset = function() waited = 0 end,
+          reset = function()
+            waited, moved, need, prev, still = 0, 0, nil, nil, 0
+          end,
         }
       end)(),
     })

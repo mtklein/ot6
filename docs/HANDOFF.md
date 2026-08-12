@@ -75,8 +75,9 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   battle's whole RNG stream hangs off `$be`, seeded once at battle init from
   the game-time frame counter: `lda $021e / asl2 / sta $be`
   (`battle_main.asm:6174-6176`), so the phase has period 60 and picks one of
-  sixty seeds. `L.spread(n)` holds each attempt until `$021e` reaches its own
-  phase; `L.report()` reads the seed off the store instruction and fails if
+  sixty seeds. `L.spread(n)` holds each attempt until `$021e` has *moved* as
+  far as its own phase is away (movement, not an equality test — trap 10);
+  `L.report()` reads the seed off the store instruction and fails if
   two attempts drew the same one. The old fixed 37-frame stagger did not
   guarantee that: attempt 1 sat at whatever phase the route happened to leave
   it, and one lead value in sixty put it on attempt 2's seed — a ladder
@@ -189,6 +190,20 @@ Mesen's testrunner wall-clock kill. The signature is several savestates
 failing to generate with `code=255` at once while the same ones succeed in
 isolation. Lower `-j` and retry rather than debugging the generator. Bound a
 full `make savestates` with `NINJAFLAGS=-j4` when other agents are live.
+
+**10. A once-per-frame sample cannot see every value of a once-per-frame
+counter.** `$021e` is ticked at the very end of the owning module's vblank
+handler (`field/reset.asm:286`, after every transfer `FieldNMI` performs), and
+that handler is long enough to finish either just inside the emulated frame or
+just past it. Measured 2026-08-12 on map 75: the ticks ran at scanlines 247,
+257 and then 1 of the following frame, straddling scanline 0 — which is where
+`M.run`'s `startFrame` callback samples. Frames therefore held 2, 1, 0, 1 ticks
+on a stable four-frame beat, and every phase congruent to 3 mod 4 was written
+and overwritten inside one frame. 180 ticks in 180 frames, a quarter of the
+values never present when the harness looked. A `read() == wanted` wait on any
+counter the game ticks per vblank can hang forever on a value the counter
+really does pass through; wait on accumulated movement instead. This cost
+sfigaro_town a regeneration, reported as "$021e is not advancing here".
 
 Also measured, and cheaper to read here than to rediscover: capture-calm does
 not imply reload-calm, so every generator reloads its own capture and
