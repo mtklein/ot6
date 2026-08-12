@@ -119,6 +119,19 @@ A **full** `make savestates` is the case that provokes it, because it
 parallelises hard on its own. Bound it (`NINJAFLAGS=-j4`) when other
 agents are live.
 
+## Never kill emulators machine-wide
+
+`pkill -f Mesen`, `killall Mesen` and anything else that matches on the
+program name kill every other worktree's runs too, and those runs are hours
+long. Two agents did this on 2026-08-11, and each time somebody else's
+generation died with no explanation at the far end. The symptom for the
+victim is exit 143 partway through a step that was working, which reads
+exactly like a real failure and costs a re-run to disprove.
+
+Kill by what you started. Keep the pid, or match on your own worktree path,
+which is unique to you. If you need to clear something you did not start,
+say so in your report and leave it alone.
+
 ## Reporting
 
 State what you did, what you measured, and what you could not establish. A
