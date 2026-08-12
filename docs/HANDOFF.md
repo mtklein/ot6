@@ -100,6 +100,16 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   chip goes by weapon **class**; the element-aware equip swapped to
   daggers and lost all three attempts. Random encounters log instead of
   failing (`OT6_RANDBTL`, `ot6_boost.asm:14-29`).
+- **Optimum also decides which character holds which class, and that is the
+  half nothing checks.** It runs per character and picks by attack power, so a
+  bag holding one weapon of each class arms the strongest hand with the wrong
+  class and leaves the right one for whoever is next. Measured 2026-08-12 on
+  TunnelArmr (`5, OT6_PIERCE`, `ot6_hud.asm:1943`): LOCKE took the MithrilBlade
+  at 38 and CELES took the Dirk at 26, CELES spends that fight on Runic and
+  never swings, so no shield was ever chipped and all three attempts lost over
+  three distinct seeds. The fix is `H.equipWeapon` for the slot that matters
+  and `H.equipOptimum{slots=…}` for the rest, in that order: Optimum run
+  afterwards on the same slot swaps the power pick straight back.
 - **The party-hp audit** (`tools/audit_party_hp.py`, same shape, same kind of
   waiver list) is the other half of that: no fixture ships a party member
   dead, petrified, zombie, poisoned, or at or below max HP / 8. Max/8 is the
