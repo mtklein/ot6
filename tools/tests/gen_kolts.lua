@@ -200,10 +200,33 @@ end
 -- The Potion reserve is the other half of the contract: gen_vargas's medic
 -- line spends Potions inside the fight, so the walk may only spend down to
 -- three of them and uses Tonics for small holes.
+--
+-- magic = false, and this is the reason H.fieldCare's own header gives for
+-- the option: "set false on a step that wants its MP kept for the fight it is
+-- walking toward."  This route IS that step.  It ends one interaction away
+-- from VARGAS, and TERRA's MP is the whole of that fight's sustain -- her
+-- Cure line is what carries the trio through Gale Cut while the script's hp
+-- gates are crossed, and gen_vargas's medic spends her down to 6 MP in every
+-- winning run on record.  The general argument for casting (level up refunds
+-- MP, a drunk Tonic is gone) is sound in a corridor and does not survive a
+-- corridor that ends at a boss: nothing levels up between the last care stop
+-- and battle 66.
+--
+-- Measured across five worktrees' fixtures on 2026-08-11, reading TERRA's
+-- record straight out of each vargas_entry.mss:
+--     wt/multihit, wt/bpwindow (before the cast-first policy)  46/46 MP
+--     wt/healpolicy, and two later chains                      21, 26, 31/46
+-- and the fights those entry points led to: 46 MP won at bpwindow and
+-- multihit; 26 MP lost, with VARGAS at 11065 of 11600 and TERRA out of MP
+-- (wt/restage's own failed run); 31 MP won.  The shop stop above buys 25
+-- Tonics for exactly this climb and the gil is already spent, so the bag is
+-- what the crossing is meant to run on.  What the cast-first policy bought
+-- here -- about 16 Tonics and 3 Fenix Downs left unspent -- is worth less
+-- than the MP it took away from the boss.
 local POTION = 0xE9
 local function care(tag, threshold)
   return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.85,
-                       reserve = { [POTION] = 5 } })
+                       reserve = { [POTION] = 5 }, magic = false })
 end
 
 -- crossDoor/seq: a bare step list cannot be spliced into a step list (Lua
@@ -952,9 +975,10 @@ H.run({ maxFrames = 400000 }, {
     for c = 0, 15 do
       if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
         local base = 0x1600 + 37 * c
-        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d",
+        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d mp=%d/%d",
           c, H.readByte(base), H.readByte(base + 8),
-          H.readWord(base + 9), H.readWord(base + 11)))
+          H.readWord(base + 9), H.readWord(base + 11),
+          H.readWord(base + 13), H.readWord(base + 15)))
       end
     end
     -- The entry point contract (issue #75).  A fixture that hands gen_vargas
@@ -972,6 +996,25 @@ H.run({ maxFrames = 400000 }, {
         string.format("char %d is at or above half hp (%d/%d)",
           c, H.charHp(c), H.charMaxHp(c)))
     end
+    -- MP is part of the same contract, and it was the half nobody wrote
+    -- down.  HP was checked here and MP was not, so a chain that arrived
+    -- with TERRA at 21 of 46 MP passed this gate and lost battle 66 three
+    -- edges later, where it read as a hard fight rather than as a route
+    -- that had spent the fight's healing on the walk to it.
+    --
+    -- The bar is TERRA's, because she is the fight's only healer once the
+    -- Potions thin out, and it is 3/4 of her own maximum rather than an
+    -- absolute so it survives her levelling.  Where 3/4 comes from: the
+    -- fixtures that won battle 66 handed it 46 of 46 MP, the one that lost
+    -- it handed over 26, and a 31 won.  So the bar sits above the loss and
+    -- below both wins, and every chain generated under the cast-first care
+    -- policy (21, 26, 31) fails it.  If this ever fires, the answer is to
+    -- stop spending her MP on the climb, not to lower the number.
+    local terra = 0
+    H.assertEq(H.charMaxMp(terra) > 0, true, "TERRA has an MP pool to check")
+    H.assertEq(H.charMp(terra) * 4 >= H.charMaxMp(terra) * 3, true,
+      string.format("TERRA reaches VARGAS with her Cure line intact " ..
+        "(%d/%d mp)", H.charMp(terra), H.charMaxMp(terra)))
     -- The party also still has a way to answer a death.  gen_vargas raises
     -- TERRA after the fight; an entry point with an empty bag makes that
     -- impossible, and the failure would surface an edge later.
