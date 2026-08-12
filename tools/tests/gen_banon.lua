@@ -48,7 +48,9 @@
 --    other; they connect through map 109.  So map 109's three doors to map
 --    110 lead to three different destinations rather than three ways to one
 --    place:
---        (11, 8) -> 110 (44,27)   east   (unreachable from the escort end)
+--        (11, 8) -> 110 (44,27)   east   (unreachable from the escort end
+--                                         BEFORE the speech; 22 steps after
+--                                         it, measured 2026-08-12)
 --        (14,17) -> 110 (22,53)   west
 --        (25,15) -> 110 (42,44)   east   <- the one Banon is behind
 --    Banon, Edgar, the save point and the door to the river are all in the
@@ -66,30 +68,88 @@
 --    crossed by a plain navTo.  Getting this wrong reads as "no path" and
 --    looks like a partition bug, which is what cost the first pass.
 --
--- The decision prompt, and why option 0 is safe here:
+-- THE DECISION PROMPT IS ANSWERED "NO" THREE TIMES, AND THAT IS WHAT THIS
+-- STEP IS FOR (issue #106).  The prompt is
 --       dlg $0131  "Will you become our last ray of hope?  0: Yes  1: No"
 --       choice _cafac3, _cafc98                        (event_main.asm:36965)
---   Option 0 is Yes.  advanceStory's A-press always takes option 0, so this
---   prompt needs no special handling, but that is verified rather than
---   assumed, and $0013 afterwards is what shows the Yes branch ran.  (The
---   river's prompts are not all like this: see gen_lete.lua, where option 0
---   at the second fork is the vanilla infinite loop.)
+-- and the two branches hand out different relics.  Read out of the scripts:
 --
--- The Yes branch does the whole departure in one scene, which is what keeps
--- this link short and is not what the NPC layout suggests.  _cafac3 falls
--- through to _cafb99 (:37120), which is
---       call _cafba6      ; despawn the hideout, set $0013
---       call _cb0080      ; the departure scene, called directly
--- so there is no "now go find everyone" step.  _cb0080 (:37934) gathers the
--- party on map 109, runs Banon's "We've no time to dilly-dally" speech at
--- _cb0106 (:38020) and ends `call _cafff0` (:37855), which puts EDGAR and
--- SABIN back in the party, drops LOCKE (he is off to South Figaro), loads
--- map 112 at (7,42), calls _cafdb9 to make BANON a real party member, and
--- sets $0018, the switch _cb059f requires before the raft will board anyone.
+--   * Option 0, first time asked, gives TERRA a GAUNTLET.  _cafac3 (:36973)
+--     tests $0017 (has the glove already been handed over) and then the
+--     party's facing, and both facing variants -- _cafac3's own body and
+--     _cafb31 (:37047) -- run `give_item GAUNTLET` (:37019, :37092).  That
+--     is what this route used to take: measured on the pre-change fixture,
+--     banon_joined's bag held one Gauntlet and no Genji Glove.
+--   * Option 1, three times, gives TERRA a GENJI GLOVE.  Refusal 1 lands on
+--     _cafcd8 (:37322), which sets $0014 and teleports the party to map 109
+--     (9,29); refusal 2 lands on _cafd30 (:37373), which sets $0015 the same
+--     way; refusal 3 lands on _cafd86 (:37426), which sets $0016, despawns
+--     BANON from map 108 ($0421=0) and calls _cafdcb (:37461), the forced
+--     departure.  That scene ends `remove_equip LOCKE / if_switch $0017=1,
+--     _caffe8 / dlg $0137 / give_item GENJI_GLOVE` (:37816-37834) and then
+--     joins the Yes path's own tail at `call _cafff0`.
+--
+-- The two are exclusive, so this is a trade rather than free content, and
+-- the trade is worth taking.  A Genji Glove lets one character equip two
+-- weapons (equip.asm:2834-2872, the CheckReequipRelics list it shares with
+-- the Gauntlet and the Merit Award), and in OT6 a shield chip goes by weapon
+-- CLASS, looked up per hand per swing (Ot6WeaponClass reads $3ca8,x with x
+-- carrying the hand, ot6_break.asm:1593-1619), so two weapons on one
+-- character is two break classes on one character.  Ot6FightBoost's own
+-- comment (ot6_boost.asm:481-484) records the other half: an empty off-hand
+-- whiffs, so a boosted Fight is +1 real hit per BP for a one-weapon
+-- character and twice that for a glove pair.  The Gauntlet by contrast only
+-- lets a two-handed weapon share a hand with a shield
+-- (battle_main.asm:6894), and this ROM's route holds no two-handed weapon
+-- for many hours; nothing in the tree has ever equipped the one it was
+-- already being given.
+--
+-- The other copy of the glove the route knows about is a chest in the Sealed
+-- Gate basement, many hours later.  This one is BEFORE the scenario split,
+-- and the bag is shared across the split -- LOCKE's own Dirk goes into it by
+-- `remove_equip LOCKE` here (:38565 on the Yes path, :37816 on this one) and
+-- is still there at celes_freed, in the Locke scenario -- so the glove is
+-- left in the bag rather than equipped on anyone at this point.  Whoever
+-- needs it equips it in the scenario that needs it; gen_tunnelarmr is the
+-- first taker.
+--
+-- Three refusals rather than one.  There is a cheaper way to the same glove
+-- and this route does not take it yet.  _caf966 (:36741) hands it over on a
+-- SINGLE refusal ($0014 set, $0013 and $0017 clear), from the guard at map
+-- 110 (44,14) -- npc_prop.asm:4422, spawn switch $041E, which reads 1 at
+-- returner_hideout -- who stands behind map 109's (11,8) door.  The map
+-- notes above record that door unreachable, and that reading was taken
+-- before the speech: measured 2026-08-12 one refusal in, (11,8) is 22 steps
+-- away and (11,15) is 15.  The speech's `switch $0414=0` despawns the NPC
+-- whose spawn tile is (11,15) and is the likely reason, though the before
+-- and after were not measured against each other, so that mechanism is
+-- unverified.  Three refusals is what this route walks because it needs no
+-- new crossings and the script guarantees the outcome; the one-refusal
+-- variant is a follow-up, and it buys only walking time, because taking the
+-- glove sets $0017 and _cafac3's first line then routes a later Yes past
+-- both `give_item GAUNTLET` sites.  The measurement is still logged below so
+-- the follow-up starts from evidence rather than from this paragraph.
+--
+-- What answering NO costs elsewhere: nothing that is read.  $0013 is set
+-- only by _cafba6 (:37140) on the Yes path and tested only by _caf966's own
+-- guard (:36742), so it stays clear here and the exit assertion below says
+-- so.  $0014/$0015/$0016 are tested nowhere but inside this scene.  Both
+-- paths converge on _cafff0 (:37852), which is what puts EDGAR and SABIN
+-- back in the party, drops LOCKE (he is off to South Figaro), loads map 112
+-- at (7,42), calls _cafdb9 to make BANON a real party member, and leads to
+-- $0018, the switch _cb059f requires before the raft will board anyone.
 -- Banon is character 14 and the disassembly calls him WEDGE: const.inc:397
 -- and :398 define WEDGE and BANON to the same 14 and the symbol picker took
 -- the first, so `char_party WEDGE, 1` at :37457 is Banon joining, and
 -- $185E rather than $1855 is the byte that records it.
+--
+-- Answering option 1 needs its own drive.  advanceStory taps A at any
+-- waiting dialog and a blind A always confirms row 0, so the refusal driver
+-- below reads the choice cell instead: $056F is the number of choices, live
+-- only while the text engine is waiting for a keypress, and $056E is the
+-- 0-based row, incremented by DOWN/RIGHT and clamped at $056F-1
+-- (field/text.asm:368-408).  $056D debounces a held direction to one move,
+-- which the 4-on/4-off tap phase already satisfies.
 --
 -- One trigger this route deliberately does not assert against.  Map 109's
 -- (25,23) trigger is _cb002b (:37880), the scrap-of-paper gag, and it opens
@@ -167,9 +227,11 @@ local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 
 local function where(tag)
   H.log(string.format("[%s] f%d map=%d (%d,%d) $0011=%d $0013=%d $0018=%d " ..
-    "$015A=%d $015B=%d $015C=%d $0421=%d $016B=%d",
+    "$015A=%d $015B=%d $015C=%d $0421=%d $016B=%d " ..
+    "| refusals $0014=%d $0015=%d $0016=%d relic $0017=%d",
     tag, H.frame, map(), H.fieldX(), H.fieldY(), sw(0x0011), sw(0x0013),
-    sw(0x0018), sw(0x015A), sw(0x015B), sw(0x015C), sw(0x0421), sw(0x016B)))
+    sw(0x0018), sw(0x015A), sw(0x015B), sw(0x015C), sw(0x0421), sw(0x016B),
+    sw(0x0014), sw(0x0015), sw(0x0016), sw(0x0017)))
 end
 
 -- HP, status 1 and the poison cure, at both ends of the walk.  Status is on
@@ -178,6 +240,8 @@ end
 -- of the route except the last one, where poison had already ground her to
 -- 1 of 136.  ANTIDOTE is $F2 (ff6/src/text/item_name_en.json entry 242).
 local ANTIDOTE = 0xF2
+-- The two relics the decision chooses between (same file, entries 208/209).
+local GAUNTLET, GENJI_GLOVE = 0xD0, 0xD1
 local function roster(tag)
   local out = {}
   for c = 0, 15 do
@@ -371,6 +435,51 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
+-- Talk to BANON and answer his prompt with option 1, "No".  One driver
+-- covers the whole exchange rather than a talk step and a separate answer
+-- step, because the exchange is one closed loop with three states and the
+-- loop is what makes it safe to re-enter: whatever the text engine is doing
+-- this frame, the pad is decided from what is on screen.
+--
+--   a choice list is up ($056F >= 2)     -> walk $056E onto row 1, then A
+--   an ordinary page is waiting          -> edge-A to page it
+--   anything else (animation, map load)  -> empty pad
+--
+-- Never a blind A while a list is up: that is what confirms row 0, which is
+-- Yes.  The terminator is the switch the refusal branch sets rather than the
+-- prompt closing, so an A that lands one frame early (or a prompt that
+-- somehow reopens) is retried by the same loop instead of silently taking
+-- the other branch.  `swId` is $0014, $0015 and $0016 for refusals 1, 2 and
+-- 3 (event_main.asm:37325, :37376, :37429).
+local function refuseBanon(n, swId, swName)
+  local what = string.format("BANON refusal %d (option 1 = No, -> %s)",
+    n, swName)
+  local ph = 0
+  return seq({
+    talkToObj(16, string.format("BANON (refusal %d)", n)),
+    H.driveUntil(function() return sw(swId) == 1 end, 12000, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        if H.readByte(0x056f) >= 2 then
+          if H.readByte(0x056e) ~= 1 then
+            H.setPad(ph < 4 and { down = true } or {})
+          else
+            H.setPad(ph < 4 and { "a" } or {})
+          end
+          return
+        end
+        if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
+        H.setPad({})
+      end),
+    }, what),
+    H.release(),
+    H.call(function()
+      H.assertEq(sw(swId), 1, what .. ": the No branch ran")
+      where(string.format("after refusal %d", n))
+    end),
+  })
+end
+
 -- ride whatever scene just started until `pred` holds on a settled field
 local function rideTo(pred, what, maxF)
   return seq({
@@ -383,7 +492,10 @@ local function rideTo(pred, what, maxF)
   })
 end
 
-H.run({ maxFrames = 200000 }, {
+-- 200000 covered the single Yes.  Three refusals add two return trips across
+-- the vestibule, two extra map loads of 108, and the forced departure scene,
+-- which is longer than the Yes departure.
+H.run({ maxFrames = 320000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -518,25 +630,82 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ===================================================================== --
-  -- Phase 5: the decision.  Out to 108 and answer Yes (option 0).  The Yes
-  -- branch runs the entire departure without another input: _cafb99 calls
-  -- _cafba6 then _cb0080 directly, and _cb0080 ends in _cafff0, which lands
-  -- the party on map 112 with BANON aboard and $0018 set.
+  -- Phase 5: the decision, refused three times for the Genji Glove (#106).
+  -- Refusals 1 and 2 each end with `load_map 109, {9,29}`, so the party is
+  -- put back in the vestibule it came from and walks the same short crossing
+  -- back to BANON.  The greeter is not in the way for either return trip:
+  -- _cafcd8 sets $0413=0 on the first refusal, which is asserted below.
+  -- Refusal 3 despawns BANON instead and runs the forced departure
+  -- (_cafdcb), which hands over the glove and lands the party on map 112
+  -- with BANON aboard and $0018 set.
   -- ===================================================================== --
   crossTo(9, 30, 108, "H6 map 109 -> map 108 (to BANON)"),
   H.call(function()
     H.assertEq(objX(16), 14, "BANON obj 16 at x=14")
     H.assertEq(objY(16), 49, "BANON obj 16 at y=49")
+    H.assertEq(H.invCountOf(GENJI_GLOVE), 0, "no Genji Glove in the bag yet")
+    H.assertEq(H.invCountOf(GAUNTLET), 0, "no Gauntlet in the bag yet")
   end),
-  talkToObj(16, "BANON (the decision, option 0 = Yes)"),
+
+  refuseBanon(1, 0x0014, "$0014"),
+  settleField(109),
+  H.call(function()
+    H.assertEq(map(), 109, "refusal 1 put the party back on map 109")
+    H.assertEq(sw(0x0413), 0, "$0413 clear -- _cafcd8 despawned the greeter")
+    H.assertEq(H.invCountOf(GAUNTLET), 0,
+      "the No branch handed over no Gauntlet")
+    -- Free measurement, not a route dependency (see the header): _caf966
+    -- would hand the glove over right now, from the guard at map 110
+    -- (44,14), if map 109's (11,8) door could be reached.  This file's map
+    -- notes recorded that door unreachable from the escort's end, and the
+    -- speech has since despawned the NPC at (11,15) ($0414=0).  Log which it
+    -- is so a later pass can take the one-refusal variant on evidence.
+    H.log(string.format(
+      "one-refusal variant: $0414=%d, (11,8) door %s, (11,15) %s, " ..
+      "(11,9) %s -- the glove NPC is map 110 (44,14) behind it",
+      sw(0x0414),
+      H.bfsPath(11, 8) and (#H.bfsPath(11, 8) .. " steps") or "NO PATH",
+      H.bfsPath(11, 15) and (#H.bfsPath(11, 15) .. " steps") or "NO PATH",
+      H.bfsPath(11, 9) and (#H.bfsPath(11, 9) .. " steps") or "NO PATH"))
+  end),
+
+  crossTo(9, 30, 108, "H7 map 109 -> map 108 (back to BANON, refusal 2)"),
+  refuseBanon(2, 0x0015, "$0015"),
+  settleField(109),
+  H.call(function()
+    H.assertEq(map(), 109, "refusal 2 put the party back on map 109")
+  end),
+
+  crossTo(9, 30, 108, "H8 map 109 -> map 108 (back to BANON, refusal 3)"),
+  H.call(function()
+    H.assertEq(sw(0x0421), 1, "$0421 still set -- BANON is still on map 108")
+  end),
+  -- The third refusal does not hand control back on map 109: _cafd86 sets
+  -- $0016, clears $0421 and calls _cafdcb, which runs the whole forced
+  -- departure.  So this one is followed by the ride to map 112 rather than
+  -- by a settle.
+  refuseBanon(3, 0x0016, "$0016"),
   H.advanceStory(function()
     return map() == 112 and sw(0x0018) == 1 and H.hasControl()
        and H.tileAligned() and bright() >= 15 and not H.battleLoadStarted()
-  end, 50000, { playBattles = "tactical" }),
+  end, 60000, { playBattles = "tactical" }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 112, "on map 112 -- the passage to the Lete River")
-    H.assertEq(sw(0x0013), 1, "$0013 set -- the YES branch ran (_cafac3)")
+    -- The switches the answer changed.  $0013 is set only by _cafba6 on the
+    -- Yes path and read only by _caf966's own guard, so a route that never
+    -- says yes leaves it clear for good; this assertion used to require it
+    -- set and is inverted here because the route's answer changed, not
+    -- because it was failing.
+    H.assertEq(sw(0x0013), 0,
+      "$0013 clear -- the YES branch never ran (_cafba6 not called)")
+    H.assertEq(sw(0x0016), 1, "$0016 set -- the third refusal ran (_cafd86)")
+    H.assertEq(sw(0x0017), 1, "$0017 set -- the relic was handed over")
+    -- The point of the whole detour.  give_item at :37834, once.
+    H.assertEq(H.invCountOf(GENJI_GLOVE), 1,
+      "a Genji Glove is in the bag (event_main.asm:37834)")
+    H.assertEq(H.invCountOf(GAUNTLET), 0,
+      "and no Gauntlet -- the two are exclusive, this is the trade")
     H.assertEq(sw(0x0018), 1, "$0018 set -- _cb059f will let the raft board")
     H.assertEq(sw(0x016B), 0,
       "$016B clear -- the scrap-of-paper prompt never fired")

@@ -165,7 +165,9 @@ def main() -> int:
         print(f"\n{len(bad)} fixture(s) hand a party member NOTHING TO FIGHT "
               f"WITH.  A bare-handed character reads exactly like a balance\n"
               f"wall -- solo LOCKE punched a 495-hp HeavyArmor for 8 a swing "
-              f"before anyone looked.  Give the step an H.equipOptimum stop.")
+              f"before anyone looked.  Give the step an equip stop that names\n"
+              f"the items it wants; Optimum picks by attack power and knows "
+              f"nothing about elements, weapon class, or who swings.")
         return 1
     print("  OK -- everybody in every party is holding something")
     return 0

@@ -128,16 +128,52 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   chip goes by weapon **class**; the element-aware equip swapped to
   daggers and lost all three attempts. Random encounters log instead of
   failing (`OT6_RANDBTL`, `ot6_boost.asm:14-29`).
-- **Optimum also decides which character holds which class, and that is the
-  half nothing checks.** It runs per character and picks by attack power, so a
-  bag holding one weapon of each class arms the strongest hand with the wrong
-  class and leaves the right one for whoever is next. Measured 2026-08-12 on
-  TunnelArmr (`5, OT6_PIERCE`, `ot6_hud.asm:1943`): LOCKE took the MithrilBlade
-  at 38 and CELES took the Dirk at 26, CELES spends that fight on Runic and
-  never swings, so no shield was ever chipped and all three attempts lost over
-  three distinct seeds. The fix is `H.equipWeapon` for the slot that matters
-  and `H.equipOptimum{slots=…}` for the rest, in that order: Optimum run
-  afterwards on the same slot swaps the power pick straight back.
+- **Do not use Optimum. Decide what equipment the segment needs and equip
+  that** (owner, 2026-08-12). It runs per character and picks by attack power
+  and nothing else, and it has produced three separate multi-hour
+  investigations: the Cranes (ThunderBlades against a bolt-absorbing boss),
+  battle 70 (two characters armed into a nulled element, harmless by luck),
+  and TunnelArmr (`5, OT6_PIERCE`, `ot6_hud.asm:1943`), where LOCKE took the
+  MithrilBlade at 38 and CELES took the Dirk at 26 — CELES spends that fight
+  on Runic and never swings, so no shield was ever chipped and all three
+  attempts lost over three distinct seeds. Equip by item, with an ordered
+  preference list where a slot has more than one acceptable answer.
+- **Equipping a Genji Glove, Gauntlet or Merit Award makes the game run
+  Optimum by itself, so "we stopped calling it" is not "it never runs."**
+  Backing out of the Relic screen after one of those three changes sets the
+  reequip flag (`CheckReequipRelics`, `ff6/src/menu/equip.asm:2834`); the
+  message routine reads the mode off Config byte `$1D4E` bit `$10`, Optimum
+  by default (`:2804`); and menu state `$6d` then calls `EquipOptimum`
+  (`ff6/src/menu/field_menu.asm:310-315`). The blast radius is one character
+  — both `EquipOptimum` and `EquipRemoveAll` resolve the target through
+  `GetSelCharPropPtr` (`equip.asm:1507`, `:1462`) — and it cannot be avoided
+  through the real menu, so a call site equips the relic FIRST and overwrites
+  the slots it cares about afterwards. Config option 7 does switch the mode
+  to Empty (`config.asm:1048-1058`, drawn at `:767-786`) and the setting
+  survives a save (`save.asm:239-241` keeps `$1D4E & $70`; new game clears it
+  at `field/init.asm:250`), but Empty means `EquipRemoveAll` strips all four
+  gear slots, so it trades a wrong pick for a bare character and every call
+  site would then owe four deliberate equips instead of two.
+- **A second weapon doubles a character's chip rate under boost, and it can
+  add a second break class.** This is a fact about boost, weapons and the
+  break loop rather than about any one fight. A chip goes by weapon class,
+  looked up per hand per swing (`Ot6WeaponClass` reads `$3ca8,x` with the
+  hand in x, `ot6_break.asm:1593-1619`), and `Ot6FightBoost` adds two swings
+  per point of pending boost while swings alternate hands and an empty hand
+  whiffs (`ot6_boost.asm:481-484`). So at pending boost 1 a one-weapon
+  character swings three times and lands two, and a Genji Glove pair swings
+  four times and lands four: twice the chips per turn, every turn, in a game
+  whose whole loop is chipping shields. Put two weapons of the same class in
+  the hands and both chip the same axis; put two classes in and the character
+  covers both.
+  Measured 2026-08-12 on TunnelArmr (`5, OT6_PIERCE`) from `celes_freed`,
+  full-HP parties: two pierce hands took the shields 5 → 1 on the first
+  boosted Fight and the party came out with LOCKE untouched at 249/249; one
+  hand and a shield took them 5 → 3, needed three turns to break, and came
+  out LOCKE 20/249 with CELES dead. The route's glove comes from the Returner
+  Hideout and costs the Gauntlet — the two answers there are exclusive
+  (`event_main.asm:37019`/`:37092` against `:37834`) — and nothing in the
+  tree has ever equipped a Gauntlet.
 - **The party-hp audit** (`tools/audit_party_hp.py`, same shape, same kind of
   waiver list) is the other half of that: no fixture ships a party member
   dead, petrified, zombie, poisoned, or at or below max HP / 8. Max/8 is the

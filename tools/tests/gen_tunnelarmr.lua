@@ -74,9 +74,10 @@
 -- his pending boost from the 1 bp every character opens with, A-A-A
 -- confirms the boosted Fight; the same drive that beat the Marshal in
 -- gen_moogle).  Break the shields and the damage window finishes the 1300
--- HP.  That only works if LOCKE is holding the Dirk: see the equip stop
--- below, where he is given it by hand because Optimum picks by power and
--- hands him a slash blade instead.
+-- HP.  That only works if LOCKE's hands hold PIERCE weapons: see the equip
+-- stop below, where he is given a Genji Glove and a pierce weapon in each
+-- hand by name, because a shield chip goes by weapon class and nothing that
+-- picks by attack power knows that.
 -- A loss on an event battle is game over, so the fight uses a retry
 -- ladder: the entry point blob is captured beside the entry-point generation,
 -- and each attempt reloads it and takes its own battle RNG phase before
@@ -362,6 +363,193 @@ local function settleWorld(n)
   end
 end
 
+-- ------------------------------------------------------------ the equips --
+-- Two menus, not one, and this drive is gen_kolts's `menuEquip` copied here
+-- rather than shared.  Sharing it means editing tools/tests/lib/ot6_field.lua,
+-- which every generated state latches on by content, so a one-line library
+-- edit regenerates all 114 of them.  ISSUE #107 OWNS THE PROMOTION: that
+-- pass has to edit the library anyway, so moving menuEquip, posOf,
+-- preferItem and fillSlot there belongs with it rather than costing a second
+-- full regeneration here.  The states and rules are gen_kolts's, verified
+-- there:
+--   Equip is main menu row 2 and reaches R-Hand / L-Hand / Head / Body
+--   (EquipSlotCursorProp is {1, 4}, equip.asm:76-77); Relic is main row 3
+--   with a two-slot cursor (RelicSlotCursorProp {1, 2}, :200-201) and its
+--   own state chain $59 -> $5a -> $5b.  Main menu rows are Item / Skills /
+--   Equip / Relic / Status / Config / Save (SelectMainMenuOptionTbl,
+--   field_menu.asm:3420-3427).
+local ZM, CUR = 0x26, 0x4b
+local ST_MAIN, ST_CHAR = 0x05, 0x06
+local ST_EQOPT, ST_EQSLOT, ST_EQITEM = 0x36, 0x55, 0x57
+local ST_RLOPT, ST_RLSLOT, ST_RLITEM = 0x59, 0x5a, 0x5b
+
+local CH_LOCKE, CH_CELES = 1, 6
+local DIRK, MITHRILKNIFE, GUARDIAN, MITHRILBLADE = 0x00, 0x01, 0x02, 0x0A
+local GENJI_GLOVE, HEAVYSHLD = 0xD1, 0x5B
+local LEATHERHAT, PLUMEDHAT, BANDANA = 0x69, 0x6B, 0x6E
+local LEATHERARMOR, IRONARMOR = 0x84, 0x87
+local EMPTY = 0xFF
+-- Weapon records $00-$09 are the daggers and every one of them is
+-- OT6_PIERCE (ot6_class.asm:47-57).  The assertions below test this rather
+-- than a named item, because what the fight needs is the CLASS in both
+-- hands; which pierce weapon ends up in which hand is a damage question.
+local PIERCE = {}
+for id = 0x00, 0x09 do PIERCE[id] = true end
+
+-- a character's equipment bytes: +$1F weapon, +$20 shield, +$21 helmet,
+-- +$22 armor, +$23/+$24 relics (ff6/notes/field-ram.txt:905-923)
+local function gear(c, off) return H.readByte(0x1600 + 37 * c + off) end
+local function wearsRelic(c, id)
+  return gear(c, 0x23) == id or gear(c, 0x24) == id
+end
+
+-- char-select position of a character id, answered from $1850 rather than
+-- from the menu's own $69+slot copy, which is stale on the field.  Resolved
+-- lazily because every step in an H.run list is CONSTRUCTED before the boot
+-- state is loaded.
+local function posOf(c)
+  return function()
+    for i, m in ipairs(H.partyMembers()) do
+      if m == c then return i - 1 end
+    end
+    return 0
+  end
+end
+
+local function menuEquip(mainRow, pos, slot, slotState, itemState, itemId, tag)
+  local optState = (slotState == ST_EQSLOT) and ST_EQOPT or ST_RLOPT
+  local ph = 0
+  local function tap(btn) ph = (ph + 1) % 12; H.setPad(ph < 4 and { btn } or {}) end
+  local function st() return H.readByte(ZM) end
+  local function seek(state, wantIn, back, fwd, label)
+    local function want()
+      return type(wantIn) == "function" and wantIn() or wantIn
+    end
+    return H.driveUntil(function()
+      return st() == state and H.readByte(CUR) == want()
+    end, 1800, {
+      H.call(function()
+        if st() ~= state then H.setPad({}); return end
+        local cur = H.readByte(CUR)
+        ph = (ph + 1) % 12
+        H.setPad(ph < 4 and { [cur < want() and fwd or back] = true } or {})
+      end),
+    }, tag .. ": " .. label)
+  end
+  local function press(state, label)
+    return seq({
+      H.driveUntil(function() return st() == state end, 1800, {
+        H.call(function() tap("a") end),
+      }, tag .. ": " .. label),
+      H.release(), H.waitFrames(10),
+    })
+  end
+  return seq({
+    H.driveUntil(function() return st() == ST_MAIN end, 1800, {
+      H.call(function() tap("x") end),
+    }, tag .. ": main menu"),
+    H.release(), H.waitFrames(10),
+    seek(ST_MAIN, mainRow, "up", "down", "main cursor"),
+    H.release(), H.waitFrames(10),
+    press(ST_CHAR, "character select"),
+    seek(ST_CHAR, pos, "up", "down", "character cursor"),
+    H.release(), H.waitFrames(10),
+    press(optState, "options row"),
+    seek(optState, 0, "left", "right", "cursor on Equip"),
+    H.release(), H.waitFrames(10),
+    press(slotState, "slot select"),
+    seek(slotState, slot, "up", "down", "slot cursor"),
+    H.release(), H.waitFrames(10),
+    press(itemState, "item list"),
+    -- the list rows at $7e9d8a are bag indexes into $1869, so this compares
+    -- the item id under the cursor rather than counting rows; the list is
+    -- pre-filtered by GetValidEquip, so an un-equippable item makes the seek
+    -- time out rather than equip something else
+    H.driveUntil(function()
+      return st() == itemState
+         and H.readByte(0x1869 + H.readByte(0x9d8a + H.readByte(CUR))) == itemId
+    end, 3000, {
+      H.call(function()
+        if st() ~= itemState then H.setPad({}); return end
+        tap("down")
+      end),
+    }, tag .. ": list cursor on the item"),
+    H.release(), H.waitFrames(10),
+    H.driveUntil(function() return st() == slotState end, 1800, {
+      H.call(function() tap("a") end),
+    }, tag .. ": equipped, back on the slot list"),
+    H.release(),
+    -- Backing out of the RELIC menu after a glove/gauntlet/merit-award
+    -- change runs the game's own forced re-equip on this character, which
+    -- shows a four-second message (menu state $6c) before it fires, so the
+    -- budget here is larger than the equip menu's needs.  See the block
+    -- above the equip stop.
+    H.driveUntil(function() return H.hasControl() end, 3600, {
+      H.call(function() tap("b") end),
+    }, tag .. ": back out to the field"),
+    H.release(), H.waitFrames(20),
+  })
+end
+local function equipGear(pos, slot, itemId, tag)
+  return menuEquip(2, pos, slot, ST_EQSLOT, ST_EQITEM, itemId, tag)
+end
+local function equipRelic(pos, slot, itemId, tag)
+  return menuEquip(3, pos, slot, ST_RLSLOT, ST_RLITEM, itemId, tag)
+end
+
+-- Put `id` in a slot only if the slot is still empty and the bag holds one.
+-- Both halves matter: an item that is not in the bag makes menuEquip's list
+-- seek time out rather than fail cleanly, and a slot that is already filled
+-- does not want overwriting with a worse thing.
+local function fillSlot(c, slot, off, ids, tag)
+  local steps = {}
+  for _, id in ipairs(ids) do
+    steps[#steps + 1] = H.cond(function()
+      return gear(c, off) == EMPTY and H.invCountOf(id) > 0
+    end, { equipGear(posOf(c), slot, id,
+                     string.format("%s $%02X", tag, id)) }, {})
+  end
+  return seq(steps)
+end
+
+-- Put the best of `ids` (best first) in a slot that is already occupied,
+-- skipping the whole thing when the slot already holds that item or a better
+-- one from the same list.  This is a preference order written out by hand,
+-- not a search: it says which weapon this fight wants and in what order to
+-- settle for less, and it stops as soon as the slot is satisfied.
+local function preferItem(c, slot, off, ids, tag)
+  local steps = {}
+  for rank, id in ipairs(ids) do
+    steps[#steps + 1] = H.cond(function()
+      for r = 1, rank do
+        if gear(c, off) == ids[r] then return false end
+      end
+      return H.invCountOf(id) > 0
+    end, { equipGear(posOf(c), slot, id,
+                     string.format("%s $%02X", tag, id)) }, {})
+  end
+  return seq(steps)
+end
+
+local function gearLine(tag)
+  local out = {}
+  for _, c in ipairs(H.partyMembers()) do
+    out[#out + 1] = string.format(
+      "c%d wpn=%02X shld=%02X helm=%02X armor=%02X rel=%02X/%02X",
+      c, gear(c, 0x1f), gear(c, 0x20), gear(c, 0x21), gear(c, 0x22),
+      gear(c, 0x23), gear(c, 0x24))
+  end
+  local bag = {}
+  for i = 0, 255 do
+    local id, n = H.readByte(0x1869 + i), H.readByte(0x1969 + i)
+    if id ~= EMPTY and n > 0 then
+      bag[#bag + 1] = string.format("%02Xx%d", id, n)
+    end
+  end
+  H.log(string.format("[gear %s] %s | bag: %s", tag,
+    table.concat(out, " | "), table.concat(bag, " ")))
+end
+
 -- ----------------------------------------------- the real TunnelArmr win --
 -- Battle 67, formation 436: TunnelArmr $0104, 1300 HP behind 5 OT6_PIERCE
 -- shields.  It is an event battle, so a loss is game over rather than a
@@ -555,35 +743,143 @@ H.run({ maxFrames = 300000 }, {
   -- so does this script.  celes_freed keeps its waiver in
   -- tools/equipment_waivers.txt because this stop is the next step.
   --
-  -- LOCKE's weapon is picked by hand, and Optimum is kept off his slot.
-  -- The bag arrives here with exactly two weapons the pair can hold: the
-  -- MithrilBlade ($0A, power 38, OT6_SLASH) the South Figaro stop bought
-  -- him, and his own Dirk ($00, power 26, OT6_PIERCE), which rides to the
-  -- split unequipped.  TunnelArmr is `5, OT6_PIERCE`
-  -- (ff6/src/battle/ot6_hud.asm:1943), so the Dirk is the only thing in
-  -- this party that can chip a shield off it.  Optimum picks by attack
-  -- power and nothing else, so it hands LOCKE the blade and then hands the
-  -- Dirk to CELES: measured 2026-08-12 on the fail-before run,
-  -- `[celes kit] done: c1=0A c6=00`, which puts the pierce weapon in the
-  -- hand of the character whose entire drive is Runic and who never
-  -- swings.  All three attempts then lost with the shields at 5 of 5 for
-  -- almost the whole fight (seeds $88 / $D8 / $38, boss 1300 -> 783 at
-  -- best), because 0.5x shielded attenuation (Ot6ShieldedMulW,
-  -- ot6_break.asm:1490) never lifts.
+  -- EVERY SLOT IN THIS STOP IS DECIDED HERE, BY ITEM.  Nothing calls
+  -- Optimum (owner, 2026-08-12: it goes wrong too often; decide what
+  -- equipment is useful and equip that).  The record behind the ruling is
+  -- three multi-hour investigations -- the Cranes' ThunderBlades against a
+  -- bolt-absorbing boss, this fight, and battle 70 -- all of them a routine
+  -- that picks by attack power and knows nothing else.
   --
-  -- So: the Dirk goes on LOCKE first, and Optimum runs on CELES's slot
-  -- only.  The order matters both ways -- Optimum first takes the Dirk for
-  -- CELES, and Optimum afterwards on slot 0 would swap the blade straight
-  -- back onto LOCKE, because 38 beats 26.  CELES gets the MithrilBlade the
-  -- swap returns to the bag, plus the helmet upgrade, which is what a
-  -- player would do with a spare sword.  This is issue #81's lesson
-  -- applied to the class axis rather than the element one: for a break
-  -- fight, weigh weapon class against the boss's break axis first.
-  H.equipWeapon(0, 0x00, { tag = "locke takes the Dirk (pierce)" }),
-  H.equipOptimum({ tag = "celes kit", slots = { 1 } }),
+  -- What it did here.  The bag used to arrive with exactly two weapons this
+  -- pair can hold, the MithrilBlade ($0A, power 38, OT6_SLASH) and LOCKE's
+  -- own Dirk ($00, power 26, OT6_PIERCE).  TunnelArmr is `5, OT6_PIERCE`
+  -- (ff6/src/battle/ot6_hud.asm:1943), so the Dirk was the only thing in the
+  -- party that could chip it, and Optimum handed LOCKE the blade and CELES
+  -- the Dirk: measured 2026-08-12, `[celes kit] done: c1=0A c6=00`, the
+  -- pierce weapon in the hand of the character whose entire drive is Runic
+  -- and who never swings.  All three attempts lost with the shields at 5 of
+  -- 5 for almost the whole fight (seeds $88 / $D8 / $38, boss 1300 -> 783 at
+  -- best), because the 0.5x shielded attenuation (Ot6ShieldedMulW,
+  -- ot6_break.asm:1490) never lifted.
+  --
+  -- What happens now, and why it is better than the hand-equipped Dirk that
+  -- replaced Optimum first.  LOCKE wears the Genji Glove the Returner
+  -- Hideout hands over (#106; gen_banon refuses BANON three times for it),
+  -- which lets his left hand hold a weapon instead of a shield
+  -- (equip.asm:2834-2872).  OT6 looks a swing's break class up per hand
+  -- (Ot6WeaponClass reads $3ca8,x with the hand in x,
+  -- ot6_break.asm:1593-1619), so two weapons is two chipping hands, and
+  -- Ot6FightBoost swings both of them for every point of pending boost
+  -- (ot6_boost.asm:481-484).  Both hands are PIERCE -- the Dirk and the
+  -- MithrilKnife ($01, power 30) gen_kolts buys at South Figaro for exactly
+  -- this -- so his boosted Fight chips two shields where it used to chip
+  -- one, and the MithrilBlade goes to CELES so that nobody is bare.
+  --
+  -- Measured 2026-08-12, three configurations, all from celes_freed with the
+  -- party at full HP, each fighting its own battle RNG seed:
+  --
+  --   Guardian 59 + MithrilKnife 30, what ships (seed $48): first boosted
+  --     Fight took the shields 5 -> 1 and 331 HP off, the second took them
+  --     to 0, boss dead on LOCKE's third turn.  Won attempt 1 with LOCKE
+  --     untouched at 249/249 and CELES at 212/245.
+  --   Dirk 26 + MithrilKnife 30 (seed $CC): same 5 -> 1 -> 0 shield line,
+  --     boss dead on LOCKE's fourth turn.  Won attempt 1 with LOCKE at
+  --     186/249 and CELES untouched.
+  --   one hand and a shield, the configuration this replaced (seed $A8):
+  --     first boosted Fight took the shields 5 -> 3, three turns to break
+  --     them, boss dead on LOCKE's sixth turn.  Won attempt 1 with LOCKE at
+  --     20/249 and CELES DEAD.
+  --
+  -- The two glove rows differ only in main-hand power and cost a turn; the
+  -- third differs in chip rate and costs three turns and a character.
+  --
+  -- The chip counts are the part that is not a seed artifact, and they match
+  -- Ot6FightBoost's arithmetic exactly: at pending boost 1 a one-weapon
+  -- character swings three times and the empty hand whiffs one of them, so
+  -- two hits and two chips; a glove pair swings four times and all four
+  -- land, so four chips.  Twice the chipping is why the break window opens a
+  -- turn and a half earlier, and arriving with a live CELES rather than a
+  -- corpse is what that turn and a half buys.
+  --
+  -- ONE THING STILL RUNS OPTIMUM AND IT IS NOT US.  Backing out of the
+  -- Relic menu after equipping a Genji Glove, Gauntlet or Merit Award makes
+  -- the game re-equip that character itself: CheckReequipRelics
+  -- (equip.asm:2834) sets the flag, the message routine picks the mode off
+  -- Config byte $1D4E bit $10 with Optimum the default (:2804), and menu
+  -- state $6d then calls EquipOptimum on the SELECTED character only
+  -- (field_menu.asm:310-315, and EquipOptimum's own GetSelCharPropPtr,
+  -- equip.asm:1507).  It cannot be avoided through the real menu, so the
+  -- order below works with it: the glove goes on first, the forced pick
+  -- fills the slots this fight does not care about, and both weapon hands
+  -- are then overwritten by name.
   H.call(function()
-    H.assertEq(H.readByte(0x1600 + 37 * 1 + 0x1f), 0x00,
-      "LOCKE holds the Dirk $00 -- the party's only OT6_PIERCE weapon")
+    gearLine("boot, before the equip stop")
+    -- Named before anything is driven, because a missing item makes
+    -- menuEquip's list seek time out rather than say what is wrong.
+    H.assertEq(H.invCountOf(GENJI_GLOVE), 1,
+      "the Genji Glove rode the split in the bag (gen_banon, issue #106)")
+    H.assertEq(H.invCountOf(MITHRILKNIFE) >= 1, true,
+      "the spare MithrilKnife rode the split too (gen_kolts' weapon shop)")
+    H.assertEq(H.invCountOf(DIRK) >= 1, true, "LOCKE's own Dirk is in the bag")
+  end),
+  -- 1. The glove.  It is in the bag because gen_banon refuses BANON three
+  --    times for it (#106), and it rides the scenario split unequipped the
+  --    way LOCKE's Dirk does.
+  equipRelic(posOf(CH_LOCKE), 0, GENJI_GLOVE, "locke genji glove"),
+  H.call(function()
+    H.assertEq(wearsRelic(CH_LOCKE, GENJI_GLOVE), true,
+      "LOCKE wears the Genji Glove -- his left hand can hold a weapon")
+    gearLine("after the glove, forced re-equip included")
+  end),
+  -- 2. Both hands, off hand first.  The order is what makes this work
+  --    whichever way the forced Optimum went: it will have put the two
+  --    highest-power weapons LOCKE can hold in his hands, and menuEquip can
+  --    only pick an item that is IN THE BAG, so filling the off hand first
+  --    releases whatever was there and puts the main hand's pick back in
+  --    reach.  Both lists are pierce-only in preference order, and each step
+  --    is skipped when the hand already holds that item or a better one.
+  --
+  --    The Guardian is the main hand's first choice: $02, power 59,
+  --    OT6_PIERCE, and LOCKE is one of the few who can hold it.  It reaches
+  --    this fixture as LOCKE's boosted steal off the South Figaro merchant
+  --    in gen_sfigaro (monster 314, `monster_steal GUARDIAN, PLUMED_HAT`,
+  --    monster_items.asm:1901), which that step's ladder makes certain.  The
+  --    fallbacks are the MithrilKnife (30) and the Dirk (26), so a lineage
+  --    that stops delivering it still arms both hands with the right class.
+  preferItem(CH_LOCKE, 1, 0x20, { MITHRILKNIFE, DIRK }, "locke off hand"),
+  preferItem(CH_LOCKE, 0, 0x1f, { GUARDIAN, MITHRILKNIFE, DIRK },
+             "locke main hand"),
+  H.call(function()
+    gearLine("locke armed")
+    H.assertEq(PIERCE[gear(CH_LOCKE, 0x1f)] == true, true,
+      string.format("LOCKE's right hand holds an OT6_PIERCE weapon ($%02X)",
+        gear(CH_LOCKE, 0x1f)))
+    H.assertEq(PIERCE[gear(CH_LOCKE, 0x20)] == true, true,
+      string.format("LOCKE's left hand holds an OT6_PIERCE weapon ($%02X) " ..
+        "-- both hands chip the class TunnelArmr is shielded on",
+        gear(CH_LOCKE, 0x20)))
+  end),
+  -- 3. CELES.  Her gear does not decide this fight -- she spends it on
+  --    Runic, which needs no weapon and pays no row penalty -- but she
+  --    arrives from the capture scene with nothing, the equip audit refuses
+  --    a bare-handed fixture, and every point of defense is a turn she does
+  --    not spend being revived.  So she gets the best of what the bag has,
+  --    named rather than chosen by Optimum: the MithrilBlade LOCKE's hands
+  --    just released, the Heavy Shld his glove freed, and a hat and body
+  --    from the ordered candidate lists.
+  H.cond(function()
+    return gear(CH_CELES, 0x1f) ~= MITHRILBLADE
+       and H.invCountOf(MITHRILBLADE) > 0
+  end, { equipGear(posOf(CH_CELES), 0, MITHRILBLADE,
+                   "celes weapon: MithrilBlade") }, {}),
+  fillSlot(CH_CELES, 1, 0x20, { HEAVYSHLD }, "celes shield"),
+  fillSlot(CH_CELES, 2, 0x21, { BANDANA, PLUMEDHAT, LEATHERHAT },
+           "celes helmet"),
+  fillSlot(CH_CELES, 3, 0x22, { IRONARMOR, LEATHERARMOR }, "celes body"),
+  H.call(function()
+    gearLine("celes armed")
+    H.assertEq(gear(CH_CELES, 0x1f) ~= EMPTY, true,
+      "CELES is holding a weapon -- audit_equipment refuses a bare fixture")
   end),
 
   -- The rows are re-set for a two-character party.  gen_sfigaro put LOCKE in
