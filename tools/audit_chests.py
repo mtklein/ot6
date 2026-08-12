@@ -162,12 +162,11 @@ def off(addr: int) -> int:
 class Chest:
     """One treasure record, and the bit that says whether it is open."""
 
-    def __init__(self, map_id: int, index: int, raw: bytes, names: list[str]):
+    def __init__(self, map_id: int, raw: bytes, names: list[str]):
         self.map = map_id
-        self.index = index                      # record number in the file
         self.x, self.y = raw[0], raw[1]
         switch = raw[2] | (raw[3] << 8)
-        self.bit = switch & 0x01FF               # player.asm:782-789
+        self.bit = switch & 0x01FF              # player.asm:782-789
         self.content = raw[4]
         kind = switch >> 8
         if kind & 0x80:
@@ -223,8 +222,7 @@ def load_chests(repo: str) -> tuple[list[Chest], str | None]:
             return [], (f"map {map_id}'s block is ${lo:04X}..${hi:04X}, which "
                         f"is not a whole number of {REC_SIZE}-byte records")
         for o in range(lo, hi, REC_SIZE):
-            out.append(Chest(map_id, o // REC_SIZE,
-                             data[o:o + REC_SIZE], names))
+            out.append(Chest(map_id, data[o:o + REC_SIZE], names))
     return out, None
 
 
