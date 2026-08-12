@@ -58,8 +58,8 @@
 -- writes); a party wipe tears the battle down into Game Over instead of
 -- the reunion, the attempt's post-fight ride times out on "map 98, calm,
 -- SABIN in the party", and the next attempt reloads the entry point blob
--- and idles a different number of frames before the opening A-press,
--- shifting every RNG draw downstream.  Four attempts, then fail.
+-- and takes a different battle RNG phase before the opening A-press,
+-- shifting every RNG draw downstream.  Three attempts, then fail.
 --
 -- The generate is verified by reload (gen_sabin_gau's discipline): capture,
 -- reload the capture as the consumer timeline, give it 300 frames, and
@@ -68,12 +68,10 @@ local H = dofile("tools/tests/lib/ot6.lua")
 -- The VARGAS ladder's spread and its collision check (issue #83): each
 -- attempt is held until the game-time frame counter the battle seed is
 -- made of reaches its own phase, and L.report() fails if two attempts drew
--- one seed, which would make this ladder one fight replayed.  attempts = 4
--- describes what this file already does -- it fights battle 66 up to four
--- times -- and only sets the spacing (15 phases instead of 20).  It is not
--- a licence to widen: three is the doctrine (#74), and this fourth rung
--- predates it.
-local L = H.newSeedLadder("battle 66", { attempts = 4 })
+-- one seed, which would make this ladder one fight replayed.  Three
+-- attempts, 20 phases apart, which is the widest even spacing the 60-phase
+-- cycle allows and the doctrine's count (#74).
+local L = H.newSeedLadder("battle 66")
 local DOOR = "build/states/vargas_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -468,14 +466,13 @@ H.run({ maxFrames = 700000 }, {
   fightAttempt(1),
   fightAttempt(2),
   fightAttempt(3),
-  fightAttempt(4),
   -- Before the verdict, not after: the attempts are evidence only if they
   -- were DIFFERENT fights, and if they were not, that is what this run should
-  -- report rather than "lost all four" (#83).
+  -- report rather than "lost all three" (#83).
   L.report(),
   H.call(function()
     H.assertEq(fightWon, true,
-      "VARGAS beaten within 4 attempts (real damage, real menus)")
+      "VARGAS beaten within 3 attempts (real damage, real menus)")
   end),
   H.waitFrames(30),
 
