@@ -19,6 +19,24 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   round trip. `opts.magic=false` restores the item-only drive for a step
   that wants its MP kept. On the field item list, A picks a slot up; only a
   second A on the same slot uses it.
+- **The battle fighter prefers casting too, and the grant behind it is
+  battle-only.** `newFightDriver`'s heal branch casts a cure where it can
+  and reaches for the bag where it cannot; `opts.cure=false` is the old
+  item-only drive. It is spelled `cure` rather than `magic` because that
+  driver already spends `opts.magic` on its attack line. Both lines find
+  the spell in the actor's **live** battle Magic list (`$302C`,entity is
+  the engine's own pointer at it; record 0 is the esper row, record n+1 is
+  grid cell n, `+3` is the price `GetMPCost` walks) rather than at a row
+  the caller names, because OT6 compacts that list to the party's union and
+  then prunes it per character (`Ot6UnionEspers` and
+  `Ot6EsperSpellKnown`, `ot6_progression.asm:205`, `:144`), so one spell
+  sits at different cells under different loadouts. **Those two hooks are
+  on the battle spell-list path only** (`battle_main.asm:14455`, `:14628`):
+  a Kirin bearer has Cure in battle and no Magic row at all in the field
+  menu, so `fieldCare` cannot cast a granted cure and still drinks. There
+  is also no revival by magic anywhere in the WoB — no owned esper grants
+  Life (`genju_prop.asm`) — so a segment with no Fenix Down in the bag has
+  no answer to a death at all.
 - **zMosaic (`$B5`) is never cleared, so "was that refused" is an edge, not
   a level.** `MosaicTask` writes `$17 $27 $37 $47 $37 $27 $17 $07` and
   terminates (`field_menu.asm:3820-3844`); nothing re-zeroes it after menu
@@ -36,12 +54,25 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   `opts.playBattles=true` stalls or wipes the party on any segment that can
   draw an encounter.
   `M.FLEE_CAP` default 1800, per-call `opts.fleeCap` (the South Figaro
-  escape route uses 420). Cave pincer formations cannot be fled at all,
-  which is FF6's own rule.
+  escape route uses 420). Pincer formations cannot be fled at all, which is
+  FF6's own rule, and **the flee reads that off `$b1` bit 1 rather than
+  waiting out the cap**: `Cmd_2a` checks that bit first and answers "Can't
+  run away!!" (`battle_main.asm:5729-5731`), so once it has held for 60
+  frames the fight goes to the tactical driver while the party still has its
+  HP. Measured on the Phantom Train's front strip, where a pincer of three
+  Bombs held the whole 1800 with the run counters at 20/21/12 against a
+  difficulty of 6 and a full party came out at 22/0/39. **A nav step's
+  `maxFrames` is a walking budget**, so a route whose maps can draw
+  encounters needs an allowance on top of it or the fight expires the step
+  and reports a navigation timeout for something that is not one.
 - **Rows**: `$B3 = $FF` for every command and only the weapon swing
   clears it, so Tools, Magic, Blitz, SwdTech, Throw and Steal are
   row-exempt. Back row wins where damage is break-driven and loses where the
   chipper is a weapon swing (South Figaro vs Phantom Train, both measured).
+  Where **nobody's** chipper is a weapon swing the back row is simply free,
+  and worth taking: Number 128 is fought with Tools, Magic and Magic, and
+  moving all three back turned a fight that lost attempt 1 with the party
+  arriving intact into one that wins attempt 1 arriving worse (#92).
   Rows are persistent state, so set them deliberately per segment.
 - **The equip audit** (`tools/audit_equipment.py`, a `make test` check with its
   own only-shrinks story-waiver list): check any red segment against it
@@ -66,6 +97,28 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   audits share one savestate reader, `tools/savestate_party.py`.
   `H.assertPartyStanding` is the same three conditions as a generator exit
   contract, and the two must be changed together.
+- **It reads the tracked SRAM checkpoints as well as the fixtures, and two
+  things in `build/states` are not fixtures at all.** A checkpoint is the
+  other boot source (five states cold-Continue out of one), it is a battery
+  image rather than a savestate, and it is tracked in git, so no
+  regeneration ever refreshes one: a casualty in a checkpoint keeps handing
+  the same corpses down until the file is re-captured. Four are dirty today
+  — `terra-returned-v1` → `narshe-mission-v1` (EDGAR and SABIN dead in both,
+  the second inheriting from the first), `gate-cave-save-v1` (TERRA), and
+  `n024-entry-save-v1` (EDGAR and SABIN). The save slot mirrors the `$1600`
+  table record for record, so the same shape signature finds it, resolving
+  at `0x1400` in all twelve. Separately, the audits now skip `build/states`
+  files that `tools/tests/savestate_graph.py` no longer declares: 19 of the
+  98 there are pre-rename leftovers, and one of them, `kefka_doorstep`, was
+  reported and worked as a live casualty for a session before anyone noticed
+  that no generator writes it.
+- **A checkpoint that hands over a corpse costs the segment its revives.**
+  Measured at `n024-entry-save-v1`: it delivers EDGAR and SABIN dead, the
+  segment carries two Fenix Downs, the care stop before battle 72 spends
+  both raising them, and CELES then dies in the fight with the bag empty. No
+  owned esper grants Life in the WoB, so at that point nothing in the game
+  can raise her, and `esper_tubes_entry` ships her at 0/349 — a fixture that
+  no care stop in its own generator can repair.
 - **A party wipe must be reported as a wipe.** The navigators'
   `M.partyWiped()` check misses in-battle wipes, because `$1600` keeps
   pre-battle HP. The filed fix is a battle-module check (`$3BF4` under

@@ -17,6 +17,16 @@ directly with no emulator (the whole tree in about a second, against a
 test`, and it carries a waiver list that may only shrink, where an entry
 matching nothing fails as stale.
 
+It reads the tracked SRAM checkpoints too, and that half is not an extra.
+A checkpoint is the other thing a generator can boot from -- five states
+cold-Continue out of one instead of resuming a predecessor's .mss -- so a
+casualty in one is inherited just as widely, and it is worse to leave
+uncaught: a checkpoint is a binary tracked in git, so no `make savestates`
+ever refreshes it, and it goes on handing over the same dead characters
+until somebody re-captures it.  Four were sitting there when this half was
+added.  The report keeps them separate from the fixtures because the
+remedy is different in kind; the closing message says what it is.
+
 WHERE THE LINE IS, AND WHY THERE
 
 Three conditions fail, and they are the game's own, not invented here:
@@ -39,7 +49,7 @@ survivor, it is a casualty the next random encounter has already claimed,
 and the room that kills it will be investigated as a hard room.  Near fatal
 rather than something stricter, because a check that fires on ordinary wear
 gets waived into uselessness, and the data says the gap is wide: across the
-98 fixtures in the tree on 2026-08-11 there were 241 party records, and
+98 .mss files in build/states on 2026-08-11 there were 241 party records, and
 sorted by fraction of max HP they run 0%, 6.5%, then nothing at all until
 36.6%, 36.6%, 38.5%, 48.4% and up.  Max/8 is 12.5%, which sits in the empty
 middle of that gap with room on both sides.  A half-HP bar would have named
@@ -60,13 +70,25 @@ WHO COUNTS AS IN THE PARTY
 
 `$1850 + c` low three bits nonzero, which during the three-scenario split is
 true of all three parties at once and not only the one the player is
-steering.  That is on purpose: at `kefka_doorstep` the player holds party 1
+steering.  That is on purpose: at `kefka_entry` the player holds party 1
 and parties 2 and 3 are queued behind the same fight, so a casualty in
 either is shipping just as much as one on screen.  The report says which
 party each finding is in and marks the active one.
 
+WHICH FILES COUNT AS FIXTURES
+
+Only the ones tools/tests/savestate_graph.py still declares.  build/states
+outlives the graph -- renaming a state leaves the old .mss sitting there
+forever -- and on 2026-08-12 nineteen of the ninety-eight files in it were
+leftovers.  One of them, `kefka_doorstep`, was a pre-rename copy of
+`kefka_entry` from before gen_narshe_battle got its care stop, and it named
+CELES dead at 0/217: a casualty in a route that no longer exists, that no
+regeneration can clear and no generator edit can fix.  It was worked as a
+live bug.  savestate_party.declared_states carries the rest of that story.
+
 Usage:  python3 tools/audit_party_hp.py [--dir build/states] [--selftest] [-v]
-Exit 0 clean, 1 if any fixture ships a casualty or carries a stale waiver.
+Exit 0 clean, 1 if any fixture or checkpoint ships a casualty, or if a
+waiver has gone stale.
 """
 
 from __future__ import annotations
@@ -80,8 +102,10 @@ import sys
 # `python3 -P` both switch off.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from savestate_party import (ST1_PETRIFY, ST1_WOUND, ST1_ZOMBIE, load_waivers,
-                             read_party, stem_of)
+from savestate_party import (ST1_PETRIFY, ST1_WOUND, ST1_ZOMBIE,
+                             checkpoint_payloads, declared_states,
+                             load_waivers, read_party, read_party_sram,
+                             split_orphans, stem_of)
 
 WAIVERS = "tools/party_hp_waivers.txt"
 
@@ -128,7 +152,7 @@ def describe(m: dict) -> str:
 # the fixtures are generated state that no unit test can stand in for.  This
 # is the part that fails when the check stops checking.
 
-def selftest() -> int:
+def selftest(repo: str = ".") -> int:
     def rec(hp, maxhp, st1=0x00, **kw):
         d = {"name": "TERRA", "level": 9, "hp": hp, "maxhp": maxhp,
              "status1": st1, "party": 1, "active": True}
@@ -137,7 +161,7 @@ def selftest() -> int:
 
     cases = [
         # the three findings this check was written for, as measured
-        (rec(0, 217, 0x80), "DEAD", "kefka_doorstep CELES"),
+        (rec(0, 217, 0x80), "DEAD", "kefka_entry CELES"),
         (rec(0, 136), "DEAD", "returner_hideout TERRA, HP zero"),
         (rec(15, 231), "NEAR FATAL", "camp_escaped SABIN, 6.5%"),
         # the boundary, both sides of it: 231 >> 3 == 28, inclusive
@@ -161,9 +185,57 @@ def selftest() -> int:
             bad.append(f"{what}: expected {want}, got {got}")
     if near_fatal_floor(231) != 28:
         bad.append("near_fatal_floor(231) should be 28")
+
+    # The orphan filter.  Without these three the filter can quietly become
+    # a no-op -- declared_states swallows any exception and returns an empty
+    # set, and split_orphans treats an empty set as "audit everything" -- so
+    # a graph this stops being able to read would put kefka_doorstep back in
+    # the report with no sign that anything changed.
+    live, orph = split_orphans(
+        ["build/states/kefka_entry.mss", "build/states/kefka_doorstep.mss"],
+        {"kefka_entry"})
+    if live != ["build/states/kefka_entry.mss"] or orph != ["kefka_doorstep"]:
+        bad.append(f"split_orphans should keep kefka_entry and drop the "
+                   f"pre-rename kefka_doorstep, got live={live} orphans={orph}")
+    live, orph = split_orphans(["build/states/anything.mss"], set())
+    if live != ["build/states/anything.mss"] or orph != []:
+        bad.append("an unreadable graph must audit everything and orphan "
+                   f"nothing, got live={live} orphans={orph}")
+    # And this is the clause that fails if the graph file moves, or S()
+    # stops carrying a "state" key: an empty set here is indistinguishable
+    # from a clean tree everywhere else.
+    declared = declared_states(repo)
+    if "kefka_entry" not in declared or len(declared) < 50:
+        bad.append(f"declared_states({repo!r}) should read "
+                   f"tools/tests/savestate_graph.py and find kefka_entry "
+                   f"among ~114 states, got {len(declared)}")
+
+    # The checkpoint half.  It reads files that are tracked in git rather
+    # than generated, so "no checkpoints found" and "all checkpoints clean"
+    # print the same nothing -- these two are what tell them apart.
+    payloads = dict(checkpoint_payloads(repo))
+    if "n024-entry-save-v1" not in payloads or len(payloads) < 5:
+        bad.append(f"checkpoint_payloads({repo!r}) should find "
+                   f"n024-entry-save-v1 among the tracked checkpoints, "
+                   f"got {sorted(payloads)}")
+    else:
+        party, err = read_party_sram(payloads["n024-entry-save-v1"])
+        # The four records the emulator independently logged out of live
+        # WRAM after booting this checkpoint.  If the save layout ever
+        # moves, this is what says so instead of the reader quietly
+        # locating the wrong table or none at all.
+        want = {"LOCKE": (353, 353, 0x00), "EDGAR": (0, 398, 0x80),
+                "SABIN": (0, 407, 0x80), "CELES": (349, 349, 0x00)}
+        got = {m["name"]: (m["hp"], m["maxhp"], m["status1"])
+               for m in (party or [])}
+        if err or got != want:
+            bad.append(f"read_party_sram(n024-entry-save-v1) should read the "
+                       f"four records the emulator logged from it, "
+                       f"got {err or got}")
+
     for line in bad:
         print(f"  SELFTEST FAIL {line}")
-    print(f"audit_party_hp selftest: {len(cases)} cases, "
+    print(f"audit_party_hp selftest: {len(cases) + 5} cases, "
           f"{len(bad)} failed")
     return 1 if bad else 0
 
@@ -177,7 +249,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.selftest:
-        return selftest()
+        return selftest(args.repo)
 
     waivers = load_waivers(args.repo, WAIVERS)
     used = set()
@@ -187,6 +259,33 @@ def main() -> int:
         print(f"audit_party_hp: no fixtures under {args.dir}")
         return 0
 
+    # Files the graph no longer declares are leftovers from a rename, not
+    # fixtures: no generator writes them, so a casualty in one names a route
+    # that no longer exists and cannot be fixed by editing anything.  See
+    # savestate_party.declared_states for the case that put this here.
+    files, orphans = split_orphans(files, declared_states(args.repo))
+    if not files:
+        print(f"audit_party_hp: {len(orphans)} fixture(s) under {args.dir} "
+              f"and the graph declares NONE of them.  That is the filter "
+              f"broken, not a clean tree;\nrefusing to report green over "
+              f"nothing.  Check {args.dir} and tools/tests/savestate_graph.py "
+              f"agree on names.")
+        return 1
+
+    def casualties(name: str, party: list) -> list:
+        """The members of one party that must not ship, waivers applied."""
+        hurt = []
+        for m in party:
+            why = classify(m)
+            if why is None:
+                continue
+            key = (name, m["name"])
+            if key in waivers:
+                used.add(key)
+                continue
+            hurt.append((m, why))
+        return hurt
+
     scanned, skipped, bad = 0, [], []
     for p in files:
         party, err = read_party(p)
@@ -195,16 +294,7 @@ def main() -> int:
             continue
         scanned += 1
         stem = stem_of(p)
-        hurt = []
-        for m in party:
-            why = classify(m)
-            if why is None:
-                continue
-            key = (stem, m["name"])
-            if key in waivers:
-                used.add(key)
-                continue
-            hurt.append((m, why))
+        hurt = casualties(stem, party)
         if hurt:
             bad.append((stem, party, hurt))
         elif args.verbose:
@@ -212,19 +302,54 @@ def main() -> int:
                            for m in party)
             print(f"  ok   {stem:34s} {who}")
 
+    # The checkpoints are the other thing a generator can boot from, and a
+    # casualty in one is inherited by everything below it exactly as a
+    # casualty in a fixture is.  They are reported apart from the fixtures
+    # because the remedy is different: a fixture is repaired by editing its
+    # generator and regenerating, while a checkpoint is a tracked binary in
+    # git and has to be re-captured through its own chain.
+    cp_scanned, cp_skipped, cp_bad = 0, [], []
+    for name, payload in checkpoint_payloads(args.repo):
+        party, err = read_party_sram(payload)
+        if err:
+            cp_skipped.append((name, err))
+            continue
+        cp_scanned += 1
+        hurt = casualties(name, party)
+        if hurt:
+            cp_bad.append((name, party, hurt))
+        elif args.verbose:
+            who = " ".join(f"{m['name']}={m['hp']}/{m['maxhp']}"
+                           for m in party)
+            print(f"  ok   {name:34s} {who}  (checkpoint)")
+
     print(f"party hp audit: {scanned} fixtures read"
-          + (f", {len(skipped)} unreadable" if skipped else ""))
+          + (f", {len(skipped)} unreadable" if skipped else "")
+          + f"; {cp_scanned} checkpoints read"
+          + (f", {len(cp_skipped)} unreadable" if cp_skipped else ""))
     for name, err in skipped:
         print(f"  ?    {name}: {err}")
+    for name, err in cp_skipped:
+        print(f"  ?    checkpoint {name}: {err}")
+    if orphans:
+        print(f"  ({len(orphans)} file(s) in {args.dir} that the graph no "
+              f"longer declares, SKIPPED -- they are pre-rename leftovers "
+              f"and\n   nothing regenerates them; delete them: "
+              + ", ".join(orphans) + ")")
 
-    for stem, party, hurt in bad:
-        for m, why in hurt:
-            print(f"  {why:10s} {stem}: {describe(m)}")
-        for m in party:
-            print(f"         {m['name']:7s} {m['hp']:5d}/{m['maxhp']:<5d} hp "
-                  f"{m['mp']:4d}/{m['maxmp']:<4d} mp  "
-                  f"status {m['status1']:02X}/{m['status4']:02X}  "
-                  f"party {m['party']}{'*' if m['active'] else ''}")
+    def report(entries, what):
+        for name, party, hurt in entries:
+            for m, why in hurt:
+                print(f"  {why:10s} {what}{name}: {describe(m)}")
+            for m in party:
+                print(f"         {m['name']:7s} "
+                      f"{m['hp']:5d}/{m['maxhp']:<5d} hp "
+                      f"{m['mp']:4d}/{m['maxmp']:<4d} mp  "
+                      f"status {m['status1']:02X}/{m['status4']:02X}  "
+                      f"party {m['party']}{'*' if m['active'] else ''}")
+
+    report(bad, "")
+    report(cp_bad, "checkpoint ")
 
     stale = sorted(set(waivers) - used)
     if stale:
@@ -244,8 +369,27 @@ def main() -> int:
               f"member who was already dead.  Give the step where the damage "
               f"happens an H.fieldCare stop, and give the generator an exit\n"
               f"assertion so it fails loudly instead of shipping the fixture.")
+    if cp_bad:
+        print(f"\n{len(cp_bad)} CHECKPOINT(s) SHIP A CASUALTY, which is the "
+              f"same defect one level down and costs more to clear.  A\n"
+              f"checkpoint is a tracked battery image in git, so no "
+              f"regeneration touches it: every state that cold-Continues out\n"
+              f"of one starts from these bytes and inherits the loss, and the "
+              f"segment then spends its revives undoing it.  Measured at\n"
+              f"n024-entry-save-v1: it hands over EDGAR and SABIN dead, the "
+              f"care stop before battle 72 spends both of the segment's two\n"
+              f"Fenix Downs raising them, and when CELES dies in the fight "
+              f"there is nothing left to raise her with -- no esper grants\n"
+              f"Life anywhere in the WoB -- so esper_tubes_entry ships her at "
+              f"0/349 and no care stop in that generator can fix it.\n"
+              f"The repair is to re-capture the checkpoint through its own "
+              f"chain with a care stop in the generator that writes it, and\n"
+              f"an H.assertPartyStanding before it saves.  Do not waive one: "
+              f"a supply that ran out is a finding, not a story.")
+    if bad or cp_bad:
         return 1
-    print("  OK -- every party member in every fixture is on their feet")
+    print("  OK -- every party member in every fixture and checkpoint is on "
+          "their feet")
     return 0
 
 

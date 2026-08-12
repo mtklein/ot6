@@ -504,6 +504,21 @@ H.run({ maxFrames = 160000 }, {
   H.waitFrames(45),
   H.call(function()
     H.assertExitContract("terra-returned-v1")
+    -- terra-returned-v1 as committed hands over EDGAR at 0/448 and SABIN at
+    -- 0/457, and this generator has no care stop and had no exit contract on
+    -- the party, so it wrote them out without a word.  Everything below
+    -- inherits it: gen_narshe_mission boots this and used to carry both
+    -- corpses into narshe-mission-v1, which gen_gate_cave_save boots in
+    -- turn.  They arrive already down rather than dying here -- the boot
+    -- state is n128_won, and #92 records that fight being retuned to a win
+    -- the party "arrives worse" from -- so when this fires the answer is a
+    -- care stop before the save, not a lower bar.  Same three conditions as
+    -- tools/audit_party_hp.py; change the two together.
+    --
+    -- NOT EXECUTED.  This generator needs the deep chain down to n128_won,
+    -- which is hours, so this line is compiled and loaded but has never run.
+    -- The identical line in gen_narshe_mission was run and passes.
+    H.assertPartyStanding("terra-returned-v1 exit")
     H.screenshot("checkpoint_f_saved")
   end),
   H.logStep(function()

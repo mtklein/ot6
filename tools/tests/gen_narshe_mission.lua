@@ -217,6 +217,27 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(sw(0x0076), 0, "$0076 CLEAR -- the mission meeting is ahead")
   end),
 
+  -- ---- pick the party up off the floor -----------------------------------
+  -- This step takes no damage at all -- it fought nothing on a measured run
+  -- -- and still shipped EDGAR at 0/448 and SABIN at 0/457.  It inherits
+  -- them: terra-returned-v1, the checkpoint this cold-Continues out of,
+  -- hands both over dead, and nothing here ever picked them up.  The
+  -- fixture then carried that into narshe-mission-v1, the checkpoint this
+  -- generator writes, and gen_gate_cave_save boots that in turn.
+  --
+  -- Here rather than at the far end.  Map 20 at (38,61) is a plain field map
+  -- with real control, which is what a care stop wants; the exit is the
+  -- world map at the checkpoint-G tile, where gen_tunnelarmr measured its
+  -- own stop breaking ($E0/$E2 reading (175,0) garbage, the world engine
+  -- never resuming).  It is also before the mission meeting, which runs
+  -- with playBattles=true, so the party walks into that upright.
+  --
+  -- The supply is exactly two Fenix Downs for exactly two corpses, and no
+  -- Potions -- 15 Tonics and 2 Antidotes is the whole bag.  Nobody in this
+  -- party (LOCKE, EDGAR, SABIN, SETZER) knows a cure, and an esper's grant
+  -- is battle-only (#96), so this drinks whatever the threshold asks for.
+  H.fieldCare({ tag = "care on arrival in Narshe", threshold = 0.55 }),
+
   -- ---- the escort trigger row and the mission meeting --------------------
   -- The trigger row is (37-39,51) (event_trigger.asm:114-116); park two
   -- tiles below it and enter with a held press, then ride the scene.
@@ -268,6 +289,16 @@ H.run({ maxFrames = 40000 }, {
     -- everything the boundary declares except the sram witnesses, which
     -- only the save itself can put into the battery
     H.assertExitContractPreSave("narshe-mission-v1")
+    -- The floor, asserted at the exit: dead, petrified, zombie, or at or
+    -- below max HP / 8 (H.assertPartyStanding, the same three conditions as
+    -- tools/audit_party_hp.py; change the two together).  It goes here
+    -- rather than only in the audit because this generator writes a tracked
+    -- checkpoint as well as a fixture, and the audit's net only closes after
+    -- a `make savestates` measured in hours while a bad checkpoint is a
+    -- committed binary that no regeneration ever cleans.  If this fires, the
+    -- care stop above ran out of bag: that is a supply finding to report,
+    -- not a reason to lower the bar.
+    H.assertPartyStanding("narshe_mission exit")
     H.screenshot("step_fg_g_tile")
   end),
   -- The step's savestate is generated here, before the menu rather than

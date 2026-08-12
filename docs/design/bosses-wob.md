@@ -347,6 +347,18 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   about 7,500 GP and a list that already spends about 5,700, the break is
   something the player buys with the scenario's last money rather than
   something the shop hands over.
+- **The break completes now, measured.** For four releases the train died
+  with shields still standing, which is what the report on #74 said and what
+  every measured line reproduced. The input-driven playthrough
+  (`gen_sabin_train.lua`) now takes all six off with the train alive, and
+  both v0.10 changes are load-bearing. One winning ledger, verbatim: Aura
+  Bolt 6→5 (holy), Fire Skean 5→4 (fire), Pummel 4→2 (two hits, two chips),
+  Fire Skean 2→1, Pummel 1→0 with the train alive at 863 of 1900, dead 2306
+  frames later. Sabin spends 18 MP of his 56 on the whole break, because a
+  double-hitting Pummel is 2 MP a chip where Suplex is 13. The fight stays
+  close: the party carries about 680 HP against a party-wide spike of
+  roughly 150 each, so a three-attempt ladder still loses attempts, and the
+  Broken window (2159 frames, damage ×4) is where it is won.
 - **Jank ✦: Suplex still works.** It is also mechanically consistent
   now: Suplex is bludgeoning and the train is bludgeon-weak. The
   undead flag stays as well, so one Fenix Down kills the train

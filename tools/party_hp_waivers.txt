@@ -2,9 +2,14 @@
 #
 # Format:  <fixture>\t<CHARACTER>\t<why, and which step puts them back up>
 #
-# The rule this waives is tools/audit_party_hp.py: no fixture ships a party
-# member dead, petrified, zombified, or at or below max HP / 8, which is the
-# game's own near-fatal line (battle_main.asm:11544-11549).
+# The first column is a fixture stem (`camp_escaped`) or a tracked checkpoint
+# directory name (`n024-entry-save-v1`); the audit reads both and the two
+# name spaces do not collide.
+#
+# The rule this waives is tools/audit_party_hp.py: no fixture and no
+# checkpoint ships a party member dead, petrified, zombified, or at or below
+# max HP / 8, which is the game's own near-fatal line
+# (battle_main.asm:11544-11549).
 #
 # A waiver is only legitimate when the game itself is what put the character
 # down and the fixture captures that moment -- a story event that writes a
@@ -23,3 +28,12 @@
 # are authoritative on who is in the party at each point, and a character
 # the story has genuinely written out is usually not in $1850 at all, which
 # means this check never looks at them and no waiver is needed.
+#
+# The nearest thing to a hard case so far was CELES dead in esper_tubes_entry,
+# next door to the tube-room set piece where the story does move people
+# around.  It is not a waiver: wob-route.md:40 puts LOCKE, EDGAR, SABIN and
+# CELES in the party for the whole `n024_entry` .. `esper_tubes_entry` run,
+# and she dies in battle 72 with the segment's last Fenix Down already spent
+# on the two characters n024-entry-save-v1 handed over dead.  That is a
+# supply finding and an upstream checkpoint to re-capture, which line 14
+# already refuses.

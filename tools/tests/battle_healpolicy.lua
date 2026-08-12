@@ -39,7 +39,15 @@
 --      round has been measured, and the character standing inside one round
 --      of death with a heal big enough to matter.  Without these, "never
 --      heal" would pass the file, and never healing loses battle 70;
---   4. that every case ran.  A table-driven test that skips its table
+--   4. the one clause a CAST is exempt from, and the one it is not.  A heal
+--      that cannot keep up is refused in a party because the bag is a fixed
+--      supply, and MP is not, so a caster tops up where a drinker would not
+--      (#92, the minecart ride).  Alone the refusal is about spending turns
+--      instead, and a cast spends one exactly as a drink does, so `mp`
+--      changes nothing there.  Both halves are asserted, because an `mp`
+--      flag that leaked into the solo clause would look like a fix for the
+--      ride and would put battle 11's heal-lock back;
+--   5. that every case ran.  A table-driven test that skips its table
 --      reports the same green as one that passed it.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -74,6 +82,22 @@ local CASES = {
   { name = "a party top-up the item cannot sustain",
     hp = 200, maxhp = 400, restore = 50, roundCost = 150, allies = 2,
     threshold = 60, want = nil },
+  -- The same numbers cast rather than drunk.  That refusal is an argument
+  -- about the bag being a fixed supply, and MP is not one: OT6 refunds it at
+  -- every level up and it is only bounded per fight.  So a party's caster
+  -- tops up with a cure that cannot keep up, where it would have left the
+  -- Tonic in the bag.  This is the minecart ride (#92) -- eight Tonics for
+  -- six fights with no field access between them, and 100+ MP a member
+  -- unspent.
+  { name = "the same top-up cast instead of drunk",
+    hp = 200, maxhp = 400, restore = 50, roundCost = 150, allies = 2,
+    threshold = 60, mp = true, want = "top-up" },
+  -- And `mp` must not reach the SOLO refusal, which is an argument about
+  -- spending turns rather than about the bag: a cast spends a turn exactly
+  -- as a drink does.  Battle 11's numbers, cast instead of drunk, still nil.
+  { name = "a cure alone that cannot out-heal the damage",
+    hp = 100, maxhp = 168, restore = 50, roundCost = 112, allies = 0,
+    threshold = 60, mp = true, want = nil },
   -- Battle 70's opening, from the mrf-save-room battery: EDGAR at 108/354,
   -- nothing measured yet because nobody has been hit.  This is the clause
   -- that keeps the driver's old opening behaviour, and #80 turns on it.
