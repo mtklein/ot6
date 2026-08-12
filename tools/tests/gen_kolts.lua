@@ -600,10 +600,18 @@ local function shopTrip()
     -- and gen_returner into the hideout, where poison drains max HP/32 on
     -- every step with a floor of 1 (ff6/src/field/player.asm:593-613).  Five
     -- crossings later banon_joined shipped her at 1 of 136, and lete_river
-    -- and the whole Lete River inherited it.  Nothing between here and Narshe
-    -- sells an Antidote, and no esper grants a status cure, so a party that
-    -- leaves this counter without one has no answer to poison for the rest
-    -- of the World of Balance.
+    -- and the whole Lete River inherited it.
+    --
+    -- This counter is the last one before the damage: the route from here is
+    -- the world map, Mt. Kolts, VARGAS, the world map again and the Returner
+    -- Hideout, and there is no shop anywhere on it.  Eight of the 128 shop
+    -- records stock $F2, but which towns they belong to is not established
+    -- here -- event_main.asm is a dump of separately-addressed scripts and
+    -- adjacency in it means nothing -- so the claim is only the one the
+    -- route makes: nothing between this counter and the hideout sells an
+    -- Antidote.  No owned esper grants a status cure either (genju_prop.asm),
+    -- so a party that walks out of here without one carries the bit until
+    -- the next town that has them.
     --
     -- Row 1: shop 8's stock is Tonic, Antidote, Soft, Eyedrop, $FB, Fenix
     -- Down, Sleeping Bag, Tent (menu/shop_prop.dat record 8), and buyTo
@@ -632,7 +640,7 @@ local function shopTrip()
       H.assertEq(invCount(0xE8) >= 10, true, "Tonics restocked for the climb")
       H.assertEq(invCount(0xF2) >= 2, true,
         "the party leaves with Antidotes -- poison is answerable now, and " ..
-        "nothing between here and Narshe sells another one")
+        "there is no other counter between here and the Returner Hideout")
     end),
     H.navTo(104, 57, { maxFrames = 20000, playBattles = "flee" }),
     H.release(), H.waitFrames(20),
