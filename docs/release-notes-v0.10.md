@@ -6,9 +6,16 @@ records the differences between the original ROM and the modified ROM.
 
 ## How to play
 
-Apply ot6-v0.10.bps to a Final Fantasy III (USA) 1.0 ROM (sha1
-4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7) using any BPS patcher (Flips,
-beat). The patcher will reject any other ROM.
+You need a Final Fantasy III (USA) 1.0 ROM (sha1
+4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7). Anything else will be rejected.
+
+The easy way: put `Final Fantasy III (USA).bps` in the same folder as your
+ROM, keeping both names as they are, and open the ROM. Most emulators —
+Mesen, bsnes, Snes9x and others — notice a patch sitting beside a ROM of the
+same name and apply it as they load. Your ROM file is not modified.
+
+If your emulator does not do that, apply the patch yourself with any BPS
+patcher (Flips, beat) and open the result instead.
 
 Play from the beginning through the end of the Magitek Research Facility
 and Terra's return, then stop.

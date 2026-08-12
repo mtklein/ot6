@@ -65,15 +65,27 @@ release-test:
 	$(MAKE) savestates-test
 	@echo "release gate green — base + the complete savestate chain"
 
+# The release patch is named for the ROM on purpose, which is the opposite of
+# the `patch` rule above and for the same reason.  Emulators that support
+# soft-patching apply a .bps sitting beside a ROM of the same basename, so a
+# player drops both in a folder and opens the ROM.  That is a hazard in our
+# build directory, where it would silently patch the base ROM out from under a
+# test, and a feature in a player's, where it removes the one step most likely
+# to go wrong.  The version lives in the directory name instead, so two
+# releases can sit side by side.
 release: release-test tested
-	@mkdir -p build/release
-	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc "build/release/ot6-v$(VERSION).bps"
+	@rm -rf "build/release/ot6-v$(VERSION)"
+	@mkdir -p "build/release/ot6-v$(VERSION)"
+	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc \
+		"build/release/ot6-v$(VERSION)/$(basename $(BASE)).bps"
 	@if [ -f "docs/release-notes-v$(VERSION).md" ]; then \
-		cp "docs/release-notes-v$(VERSION).md" build/release/RELEASE_NOTES.md; \
+		cp "docs/release-notes-v$(VERSION).md" \
+			"build/release/ot6-v$(VERSION)/RELEASE_NOTES.md"; \
 	else \
-		sed 's/X\.Y/$(VERSION)/g' docs/release-notes-template.md > build/release/RELEASE_NOTES.md; \
+		sed 's/X\.Y/$(VERSION)/g' docs/release-notes-template.md \
+			> "build/release/ot6-v$(VERSION)/RELEASE_NOTES.md"; \
 	fi
-	@ls -la build/release/
+	@ls -la "build/release/ot6-v$(VERSION)/"
 
 # One GUI instance only: battery saves flush on exit, so a second instance
 # exiting later overwrites the first one's in-game saves with no warning.
