@@ -130,7 +130,7 @@ H.run({ maxFrames = 8000 }, {
       "and it failed for the seed collision, not for some other reason")
   end),
 
-  -- 3. The other way report() can be vacuous: nothing recorded at all.
+  -- 3. The other two ways report() could be vacuous.
   H.call(function()
     local EMPTY = H.newSeedLadder("empty control")
     local ok, err = pcall(EMPTY.report().tick)
@@ -139,4 +139,22 @@ H.run({ maxFrames = 8000 }, {
     H.assertEq(tostring(err):find("no battle seeding was recorded") ~= nil, true,
       "and it says so")
   end),
+
+  -- An attempt that takes a phase and then never fights is the subtler one:
+  -- the other attempts still compare fine, so the ladder would report green
+  -- while covering one fewer fight than it claims.  SILENT spreads and stops.
+  (function()
+    local SILENT = H.newSeedLadder("silent-attempt control")
+    return H.seqStep({
+      SILENT.watch(),
+      SILENT.spread(1),
+      H.call(function()
+        local ok, err = pcall(SILENT.report().tick)
+        H.assertEq(ok, false,
+          "an attempt that took a phase and drew no seed FAILS the ladder")
+        H.assertEq(tostring(err):find("drew no seed") ~= nil, true,
+          "and it names the attempt rather than reporting a bare pass")
+      end),
+    })
+  end)(),
 })

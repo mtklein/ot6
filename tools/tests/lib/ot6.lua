@@ -903,7 +903,8 @@ function M.newSeedLadder(tag, opts)
   opts = opts or {}
   local attempts = opts.attempts or 3
   local gap = opts.gap or (M.SEED_PERIOD // attempts)
-  local L = { tag = tag or "ladder", seeds = {}, extras = {}, targets = {} }
+  local L = { tag = tag or "ladder", seeds = {}, extras = {}, targets = {},
+              spreads = {} }
   local base, cur, watching = nil, 0, false
 
   -- Every attempt that called spread(), in order, with the seed its first
@@ -945,6 +946,7 @@ function M.newSeedLadder(tag, opts)
       M.call(function()
         assert(watching, L.tag .. ": L.watch() must run before L.spread()")
         cur = n
+        L.spreads[n] = true               -- this attempt owes report() a seed
         L.seeds[n] = nil                          -- this attempt's own fight
         local now = M.seedPhase()
         local forced = sopts.forcePhase
@@ -992,8 +994,23 @@ function M.newSeedLadder(tag, opts)
   -- same green as a ladder that genuinely spread.
   L.report = function()
     return M.call(function()
-      local ran = {}
-      for n = 1, attempts do if L.seeds[n] then ran[#ran + 1] = n end end
+      local ran, silent = {}, {}
+      for n = 1, attempts do
+        if L.seeds[n] then ran[#ran + 1] = n
+        elseif L.spreads[n] then silent[#silent + 1] = n end
+      end
+      -- An attempt that took a phase and then drew no seed is a battle the
+      -- watcher missed, not an attempt that skipped the fight: every ladder
+      -- here spreads immediately before an engagement it cannot avoid.  Say so
+      -- rather than comparing whatever is left, which is how a check quietly
+      -- stops covering the thing it names.  Checked before the empty case
+      -- below, because it is the more specific account of the same symptom.
+      assert(#silent == 0, string.format(
+        "%s: attempt(s) %s took a battle RNG phase and then drew no seed.  The "
+        .. "watcher is on `sta $be` at battle init, so either that attempt "
+        .. "never reached a battle -- in which case this ladder's shape moved "
+        .. "and the spread is in the wrong place -- or the watcher missed one.",
+        L.tag, table.concat(silent, ", ")))
       assert(#ran > 0, L.tag .. ": no battle seeding was recorded for any "
         .. "attempt.  Either no attempt reached a battle, or the seed watcher "
         .. "never fired -- both make the distinctness check vacuous.")
