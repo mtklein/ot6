@@ -24,11 +24,17 @@
 --     reads $FFE1, bit 2 clear, read as the experiment's control rather than
 --     written), and its real 777-MP pool is the Facility-scale target the
 --     Osmose reprice exists for.
---   * the 7-MP boundary is earned: Celes's real 106-MP pool is walked
---     down by real casts of her own kit (Shell 15 and Cure 5) until it reads
---     5..7, and the greys are then read off the live list.  106 = 1 (mod 5)
---     and both prices are multiples of 5, so those two alone land the pool on
---     exactly 6; no third adjuster is needed.
+--   * the 7-MP boundary is earned: Celes's real pool, the 76 of 106 the
+--     fixture carries, is walked down by real casts of her own kit until it
+--     reads 5..7, and the greys are then read off the live list.  Shells
+--     (15) for the distance, then Cure (5) or Antdot (3) chosen from where
+--     the pool actually is, which reaches every value in the window from any
+--     pool of 8 or more.
+--   * the party is cared for before the fight and everyone but Celes plays
+--     medic during it.  Neither is decoration: the fixture ships her at 151
+--     of 349, and Number 024 is level 24 against a party that never attacks
+--     for the dozen turns these arms take.  Both halves of that were
+--     measured as wipes, and a wipe here reports as a drive timeout.
 --   * the once-per-battle latch: the summon is offered at battle start,
 --     spent during the run, and the row greys at her next real window, from
 --     the natural refresh with no $3204 pokes.  The re-offer half is a second
@@ -54,6 +60,7 @@ local FIRE, ICE, DRAIN, SHELL, OSMOSE, CURE = 0x00, 0x01, 0x04, 0x25, 0x29, 0x2D
 -- taken through it.  Removed rather than corrected: Celes learns Scan at
 -- level 18 (field/event.asm:1268) and is level 14 at this fixture's
 -- checkpoint, so a correct SCAN constant would name a spell she cannot cast.
+local ANTDOT = 0x32                      -- the 3-MP row the boundary tail steps with
 local INFERNO, DDUST = 0x37, 0x38        -- summon attack ids (esper + $36)
 local IFRIT, SHIVA = 0x01, 0x02          -- esper indices (GenjuProp order)
 
@@ -230,7 +237,24 @@ local castRec = nil                      -- list record to cast in "cast"
 -- moved into the library as H.targetCursor)
 local tc = H.targetCursor({ mask = 0x7B7D,
                             dirs = { "down", "up", "left", "right" } })
+-- Where is the machine?  A drive that stalls in this file used to report
+-- only "timeout after N frames", and the two things that actually stop it --
+-- the fight ending, and the party being ground down by a level-24 boss --
+-- look identical from outside.
+local hbF = -600
+local function heartbeat()
+  if H.frame - hbF < 600 then return end
+  hbF = H.frame
+  local hps = {}
+  for s = 0, 3 do hps[#hps+1] = tostring(H.readWord(0x3BF4 + s*2)) end
+  H.log(string.format("[hb f%d] live=%s menu=%02x actor=%d mstate=%02x "
+    .. "mons=%d hp=%s celes=%s locke=%s", H.frame,
+    tostring(H.battleLoadStarted()), H.readByte(MENU), H.readByte(ACTOR),
+    H.readByte(MSTATE), H.monstersPresent(), table.concat(hps, "/"),
+    celesMode, lockeMode))
+end
 local function decide()
+  heartbeat()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
   end
@@ -258,10 +282,18 @@ local function decide()
     else btn = "b" end
     return btn and { [btn] = true } or {}
   end
-  if act == locke then                          -- the medic line
-    -- heal only when somebody is hurt; a healthy party defers so
-    -- the arms finish before the L24 boss's focus fire adds up (measured:
-    -- boot A's always-item healer died before the Inferno arm)
+  if act ~= celes then                          -- the medic line
+    -- Everyone who is not CELES is a medic, and it takes all of them.  The
+    -- arms below are long -- the boundary walk alone is a dozen of her
+    -- turns -- and Number 024 is level 24 hitting a party that never fights
+    -- back.  Measured 2026-08-13 with LOCKE as the sole healer and the
+    -- other two deferring: LOCKE died about 7000 frames into boot B and the
+    -- party wiped about 5000 frames later, which surfaced as a 60000-frame
+    -- timeout on the Shell walk.
+    --
+    -- Heal only when somebody is hurt; a healthy party defers, so the arms
+    -- still finish before the boss's focus fire adds up (measured: boot A's
+    -- always-item healer died before the Inferno arm).
     local hurt = false
     for s2 = 0, 3 do
       local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
@@ -269,15 +301,30 @@ local function decide()
     end
     if st == ST_CMD and not hurt then btn = "x"
     elseif st == ST_CMD then
-      local want = cmdRowOf(locke, CMD_ITEM)
-      local cur = H.readByte(CMDROW + locke) & 3
-      if cur == want then btn = "a"
-      else btn = (cur < want) and "down" or "up" end
+      local want = cmdRowOf(act, CMD_ITEM)
+      if want == nil then btn = "x"
+      else
+        local cur = H.readByte(CMDROW + act) & 3
+        if cur == want then btn = "a"
+        else btn = (cur < want) and "down" or "up" end
+      end
     elseif st == ST_ITEM then
-      local want = bagIdxOf({ TONIC, POTION })
+      -- A Tonic's 50 does not cover a round from this boss, so somebody
+      -- badly hurt gets the Potion: measured on the care stop above, one
+      -- took CELES from 151 to a full 349.  Tonics carry the rest.
+      local worstPct = 101
+      for s2 = 0, 3 do
+        local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
+        if h > 0 and m > 0 then
+          local pct = h * 100 // m
+          if pct < worstPct then worstPct = pct end
+        end
+      end
+      local want = (worstPct < 45) and bagIdxOf({ POTION }) or nil
+      want = want or bagIdxOf({ TONIC, POTION })
       if want == nil then btn = "b"
       else
-        local cur = H.readByte(0x8947 + locke) + H.readByte(0x894F + locke)
+        local cur = H.readByte(0x8947 + act) + H.readByte(0x894F + act)
         if cur < want then btn = "down"
         elseif cur > want then btn = "up"
         else btn = "a" end
@@ -341,8 +388,6 @@ local function decide()
       elseif st == ST_ESPER then btn = "b"
       else btn = "b" end
     end
-  else
-    btn = (st == ST_CMD) and "x" or "b"   -- the two KO'd slots, if ever up
   end
   return btn and { [btn] = true } or {}
 end
@@ -415,6 +460,14 @@ H.run({ maxFrames = 150000 }, {
   end),
   equipOn(3, SHIVA, 6, "A/celes-shiva"),
   equipOn(2, IFRIT, 1, "A/locke-ifrit"),
+  -- A real care stop before the fight.  The fixture ships CELES at 151 of
+  -- 349 -- 43%, which clears the party-hp audit's max/8 bar and does not
+  -- clear a level-24 boss: measured 2026-08-13, she was dead within 2500
+  -- frames of the divines resolving and arm 5, which waits for her next
+  -- window, then spent its whole budget waiting for a window that was never
+  -- coming.  Item-only, because her MP pool is what several arms below
+  -- measure and fieldCare would otherwise spend it casting her own Cure.
+  H.fieldCare({ tag = "before battle 72", threshold = 0.95, magic = false }),
   enterBoss("bootA"),
   H.call(function()
     -- 1. Ifrit: the Furnace's prices, on Locke's real granted list
@@ -500,28 +553,20 @@ H.run({ maxFrames = 150000 }, {
       "[latch] her Ice row stays live -- the grey is the summon row's own")
   end),
 
-  -- ==================== boot B: the re-offer, Osmose, and the boundary ==
-  H.loadState(STATE),
-  H.waitFrames(60),
-  equipOn(3, SHIVA, 6, "B/celes-shiva"),
-  enterBoss("bootB"),
-  H.call(function()
-    -- 7. the re-offer half of once-per-battle: a fresh battle offers the
-    -- summon again (boot A's was spent and greyed when its battle ended)
-    H.assertEq(esperEnabled(celes), true,
-      "[latch] a NEW battle offers the summon again -- the latch is "
-      .. "per-battle, not forever")
-    H.assertEq(H.readWord(SUMMONED) & mask(celes), 0,
-      "[latch] ...because battle init cleared $3f2e")
-    R.mp0 = mp(celes)
-    H.assertEq(R.mp0, 106, "[drain] her real pool opens full (106)")
-  end),
-  -- 8. drain by real casts to a low pool, then Osmose the boss
-  H.call(function()
-    celesMode = "cast"; castRec = recOf(celes, SHELL)
-  end),
-  driveTo(function() return mp(celes) < 35 end, 60000,
-    "real Shell casts walk the pool down"),
+  -- 6. Osmose, in boot A rather than boot B.  It reads the boss's real
+  -- 777-MP pool and CELES's own, and neither is a boot-B fact; what put it
+  -- there was the old drain that ran before it.  Boot B's own arm is a walk
+  -- a dozen turns long, and every turn is a round of a level-24 boss
+  -- against a party that never attacks, so moving one cast out of that
+  -- battle and into this shorter one is worth doing on its own.
+  -- There used to be a Shell walk here first, to make the refill dramatic
+  -- by starting it from a low pool.  It bought nothing the assertions
+  -- check -- they are the 8-MP debit, the boss's pool dropping, and the
+  -- caster ending net positive, and all three hold from 76 -- and it cost
+  -- three of her turns.  Every turn here is a round of a level-24 boss
+  -- against a party that never attacks, and the arms below need a dozen
+  -- more: measured 2026-08-13, the party wiped partway through the
+  -- boundary walk and the run reported it as a 60000-frame timeout.
   (function()
     local m0, g0
     return H.repeatN(1, {
@@ -549,30 +594,67 @@ H.run({ maxFrames = 150000 }, {
       end),
     })
   end)(),
-  -- 9. the 7-MP boundary, earned.  The Osmose refill clamped her to the
-  -- full 106, and 106 = 1 (mod 5): Shell (15) and Cure (5) both preserve
-  -- that residue, so kit casts alone land the pool at exactly 6, inside
-  -- the 5..7 window with no finer adjustment needed.  (A 3-MP adjuster was
-  -- tried first and abandoned when the pool did not move across repeated
-  -- casts.  It was labelled Scan and filed as issue #76, "publishes 3 and
-  -- charges 0"; the id behind the label was $32, Antdot, and Celes cannot cast
-  -- Scan at this level at all.  Whatever stalled that drive, it was not a
-  -- price that lies: battle_costtable pins all 54 published magic prices, and
-  -- the charge is that same byte.  See the constant block above.)  The residue
-  -- invariant is asserted so a future wallet change fails here instead of
-  -- wedging the drive.
+
+  -- ============================ boot B: the re-offer and the boundary ==
+  H.loadState(STATE),
+  H.waitFrames(60),
+  equipOn(3, SHIVA, 6, "B/celes-shiva"),
+  H.fieldCare({ tag = "before battle 72 (boot B)", threshold = 0.95,
+                magic = false }),
+  enterBoss("bootB"),
   H.call(function()
-    H.assertEq(mp(celes) % 5, 1,
-      "[boundary] the pool's mod-5 residue makes a pure Shell/Cure walk "
-      .. "land on exactly 6")
+    -- 7. the re-offer half of once-per-battle: a fresh battle offers the
+    -- summon again (boot A's was spent and greyed when its battle ended)
+    H.assertEq(esperEnabled(celes), true,
+      "[latch] a NEW battle offers the summon again -- the latch is "
+      .. "per-battle, not forever")
+    H.assertEq(H.readWord(SUMMONED) & mask(celes), 0,
+      "[latch] ...because battle init cleared $3f2e")
+    R.mp0 = mp(celes)
+    -- The fixture no longer ships her full: she arrives at 76 of 106, and
+    -- the care stop above is deliberately item-only so that it heals her HP
+    -- without topping the pool up.  The boundary walk below rests on this
+    -- number: 76 = 1 (mod 5), and Shell (15) and Cure (5) both preserve the
+    -- residue, so kit casts alone land on exactly 6.  The maximum is pinned
+    -- beside it so a fixture that ships a different pool says which of the
+    -- two numbers moved.
+    H.assertEq(R.mp0, 76,
+      "[drain] her real pool opens at the 76 the fixture carries")
+    -- $3BF4 hp, $3C08 mp, $3C1C max hp, $3C30 max mp: one 20-byte stride
+    H.assertEq(H.readWord(0x3C30 + celes*2), 106,
+      "[drain] and her maximum is 106")
+  end),
+  -- 7. the 7-MP boundary, earned by real casts of her own kit: Shells (15)
+  -- to bring the pool down in big steps, then a tail that steps onto the
+  -- 5..7 window exactly.
+  --
+  -- The tail used to be Cure alone, on the argument that 106 = 1 (mod 5)
+  -- and both Shell and Cure preserve the residue, so the walk had to land
+  -- on 6.  That is arithmetic about an ideal walk rather than about this
+  -- one: measured 2026-08-13, the pool arrived at the tail reading 13 and
+  -- not 16, one cast in the Shell phase having cost 3 rather than 15, and a
+  -- Cure-only tail then stepped 13 -> 8 -> 3, straight past the window.
+  -- (Antdot, $32, is the 3-MP row; it is the id issue #76 was filed against
+  -- under the label Scan, which CELES cannot cast at this level at all.
+  -- Whichever cell the grid walk actually landed on, a tail that can only
+  -- subtract 5 cannot recover from an odd residue.)
+  --
+  -- So the tail picks its spell from where the pool actually is: Cure (5)
+  -- down to 10, then Antdot (3) from 8 or 9, which reaches every value in
+  -- 5..7 from any pool of 8 or more.  The window assertion below is
+  -- unchanged and still the thing being proved; this only stops the drive
+  -- from walking past it.
+  H.call(function()
     celesMode = "cast"; castRec = recOf(celes, SHELL)
   end),
   driveTo(function() return mp(celes) < 31 end, 60000,
-    "Shell casts again (the Osmose refilled her)"),
+    "Shell casts walk the pool toward the boundary"),
   (function()
     local function step()
       local m = mp(celes)
-      if m > 7 then return CURE else return nil end
+      if m >= 10 then return CURE end
+      if m >= 8 then return ANTDOT end
+      return nil
     end
     local n = 0
     return H.repeatN(1, {
