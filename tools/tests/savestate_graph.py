@@ -349,7 +349,12 @@ STATES = [
     # gen_zozo2_arrival: out of the west castle, the long south-then-north
     # world hook around Zozo's mountain ring (177 steps), onto {22,92} ->
     # map 221's street.
-    S("zozo_arrival", gen="gen_zozo2_arrival", prev="figaro_submerged"),
+    # timeout=3600: the crossing is fought rather than fled and carries the
+    # grind that lifts the party to Zozo's level tier (the generator's header
+    # has the decode and the numbers), so this step runs several hundred
+    # thousand emulated frames where the fleeing version ran ~90000.
+    S("zozo_arrival", gen="gen_zozo2_arrival", prev="figaro_submerged",
+      timeout=3600),
     # gen_zozo3_clock: the street's CAFE door (42,28) -> the clock room (map
     # 225) -> the clock tile {98,59} -> 6:10:50 across three CHAINED choice
     # dialogs, each verified by its own $01F* latch -> the hidden staircase
