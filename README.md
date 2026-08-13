@@ -7,8 +7,8 @@ boost-point turn economy.
 
 ## Status
 
-v0.9 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.9)). The game is
+v0.10 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.10)). The game is
 playable from the start through the Raid on Vector: the Magitek Research
 Facility, Number 024, the minecart and Number 128, the Cranes, the escape,
 and Terra's return.
@@ -22,7 +22,7 @@ can already do rather than replacing it. Blitz is a menu, Steal guarantees the
 rare at three boost pips, and level-ups fully restore HP and MP.
 
 Route work is on the Sealed Gate: the Narshe mission handoff, the cave, the
-Esper attack, the Imperial banquet, and the Thamasa handoff. v0.10 is meant to
+Esper attack, the Imperial banquet, and the Thamasa handoff. v0.11 is meant to
 make the game playable to the end of the World of Balance.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and how far the game is
