@@ -349,11 +349,19 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   to 0. Every actor then spent every turn healing or reviving him, so the Bio
   Blaster the town is authored around was never fired, the two shields never
   came off, damage stayed halved for the whole fight, and the party lost.
-  Read that as a rate problem rather than a level problem: two levels moved
-  the wipe from the first encounter on the street to the sixth in the stair
-  room, and merely not being one-shot would need two more on top, while
-  surviving two of those rounds would need about thirteen. The lever is
-  whatever makes the break land early, not the party's level.
+  It is a rate problem rather than a level problem. Two levels moved the wipe
+  from the first encounter on the street to the sixth in the stair room, and
+  merely not being one-shot would need two more on top, while surviving two
+  of those rounds would need about thirteen. **What actually fixed it was the
+  back row**, which halves the physical half and costs this party nothing:
+  SABIN fights the town with Pummel and CELES casts, both row-exempt, and no
+  weapon of any class chips a Zozo body anyway, so there is no swing to
+  protect. After it the same climb won every encounter and the corridor's
+  1200-HP HadesGigas went 1200 → 977 → 771/sh1 → 280/sh0 → 0 with the party
+  sitting at 277/349/398/407 throughout. The general form: when a fight is
+  being lost to the size of one round rather than to the length of the fight,
+  look at rows and at what is stopping the break from landing before looking
+  at levels.
 - **A party wipe must be reported as a wipe, and `M.partyWiped()` cannot
   report one.** Four wipes have now been mistaken for stuck navigators. The
   field half misses it because `$1600` keeps pre-battle HP. The battle half,
