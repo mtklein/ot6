@@ -43,6 +43,41 @@ local function pulseAdvance()
   H.setPad(aPhase < 4 and { "a", "start" } or {})
 end
 
+-- ------------------------------------------------------- CELES's kit back --
+-- The opera takes CELES's gear off and gives it to the bag: the performance
+-- intro runs `remove_equip CELES` beside `char_party CELES, 7`
+-- (event_main.asm:27273, and :27785 on the other fork).  Nothing in the
+-- chain ever put it back, so she rejoined for the Blackjack with all five
+-- equipment bytes at $FF and walked into Vector that way -- the class of
+-- fixture bug tools/audit_equipment.py exists to catch.
+--
+-- She gets back exactly what the opera took, by item, never through
+-- Optimum (wob-route.md section 2).  Measured at opera_open, the step
+-- before the strip, she wore `0A 5B 6A 84 B1`, and all five sit in the bag
+-- here: MithrilBlade $0A, Heavy Shld $5B, Hair Band $6A, LeatherArmor $84,
+-- Star Pendant $B1.  The weapon is the one that matters for what comes
+-- next: $0A is OT6_SLASH (ot6_class.asm:59) and it is the only slash
+-- weapon in this bag that she can hold -- LOCKE's Guardian and the spare
+-- daggers are all pierce -- so it is what keeps the party's break coverage
+-- on both classes through the Magitek Research Facility, where Ifrit is
+-- pierce and Shiva is slash (wob-route.md section 1).
+local EMPTY = 0xFF
+local CH_CELES = 6
+local function gear(c, off) return H.readByte(0x1600 + 37 * c + off) end
+local function ordOf(c) return (H.readByte(0x1850 + c) >> 3) & 0x03 end
+
+-- Fill one empty gear slot from the bag.  Both guards matter, for
+-- gen_tunnelarmr's fillSlot reasons: H.equipWeapon's list seek walks the
+-- menu's pre-filtered rows, so an item the bag does not hold makes it time
+-- out rather than fail cleanly, and a slot that already holds something
+-- does not want overwriting.  Slot n's byte is +$1F+n (R-Hand, L-Hand,
+-- Helmet, Armor, Relic 1, Relic 2; ff6/notes/field-ram.txt:905-923).
+local function fill(c, pos, slot, id, tag)
+  return H.cond(function()
+    return gear(c, 0x1F + slot) == EMPTY and H.invCountOf(id) > 0
+  end, { H.equipWeapon(pos, id, { slot = slot, tag = tag }) }, {})
+end
+
 -- ----------------------------------------------- the input-driven fighter --
 -- gen_narshe_battle's menu-episode machine for the Ultros 2 fight; party is
 -- #21's canonical LOCKE+CELES+SABIN+EDGAR.
@@ -361,7 +396,45 @@ H.run({ maxFrames = 400000 }, {
     end, 6000, "a settled, controllable world frame to generate on", 1)
   end)(),
 
+  -- ------------------------------------------------- CELES's kit, restored --
+  -- Here rather than earlier because this is the first frame after the
+  -- arrival cutscene where she is back in the party and the player has the
+  -- menu; the whole opera between the strip and this point is scripted.
+  -- The char-select row is asserted rather than assumed: H.equipWeapon
+  -- seeks the cursor to a fixed row, and the row is the party's order field
+  -- ($1850 bits 3-4), so a reordered party would otherwise dress the wrong
+  -- character.
   H.call(function()
+    H.assertEq(ordOf(CH_CELES), 3, "CELES is char-select row 3")
+    H.log(string.format("[kit] CELES gear before: %02X %02X %02X %02X %02X",
+      gear(CH_CELES, 0x1F), gear(CH_CELES, 0x20), gear(CH_CELES, 0x21),
+      gear(CH_CELES, 0x22), gear(CH_CELES, 0x23)))
+  end),
+  fill(CH_CELES, 3, 0, 0x0A, "CELES MithrilBlade"),
+  fill(CH_CELES, 3, 1, 0x5B, "CELES Heavy Shld"),
+  fill(CH_CELES, 3, 2, 0x6A, "CELES Hair Band"),
+  fill(CH_CELES, 3, 3, 0x84, "CELES LeatherArmor"),
+  fill(CH_CELES, 3, 4, 0xB1, "CELES Star Pendant"),
+  -- Settle again: closing the menu over the world map costs frames the same
+  -- way the arrival redraw does, and the fixture has to be generated on a
+  -- real world frame for the reasons in the block above.
+  (function()
+    local calm = 0
+    return H.waitUntil(function()
+      calm = (map() == 0 and H.worldHasControl() and H.worldAligned())
+             and calm + 1 or 0
+      return calm >= 45
+    end, 6000, "a settled world frame again after the equip stop", 1)
+  end)(),
+
+  H.call(function()
+    -- The exit contract for the kit.  Without it a silently no-op equip
+    -- stop and a working one both report the same green.
+    H.assertEq(gear(CH_CELES, 0x1F) ~= EMPTY, true,
+      "CELES leaves the Blackjack holding a weapon")
+    H.log(string.format("[kit] CELES gear after:  %02X %02X %02X %02X %02X",
+      gear(CH_CELES, 0x1F), gear(CH_CELES, 0x20), gear(CH_CELES, 0x21),
+      gear(CH_CELES, 0x22), gear(CH_CELES, 0x23)))
     H.assertEq(sw(0x034B), 0, "$034B clear -- Ultros 2 / Opera complete")
     H.assertEq(sw(0x005D), 1, "$005D set -- Setzer accepted the bargain")
     H.assertEq(sw(0x005E), 1, "$005E set -- Blackjack arrival completed")
