@@ -227,7 +227,26 @@ local function openToolsWindow(what)
   })
 end
 
-H.run({ maxFrames = 200000 }, {
+local function liveBattle()
+  return H.battleLoadStarted() and H.monstersPresent() > 0
+end
+
+-- the same open, but it gives up the moment the battle ends rather than
+-- burning its whole budget: the boundary arm below retries on a fresh fight
+local function openToolsWindowOrEnd(what)
+  return H.repeatN(1, {
+    H.call(function() mode = "open" end),
+    H.driveUntil(function()
+      return not liveBattle()
+        or (H.readByte(MENU) ~= 0
+            and H.readByte(ACTOR) == edgarSlot
+            and H.readByte(MSTATE) == ST_TOOLS)
+    end, 30000, { H.call(pulse), H.waitFrames(1) }, what),
+    H.waitFrames(20),
+  })
+end
+
+H.run({ maxFrames = 300000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),
@@ -282,38 +301,114 @@ H.run({ maxFrames = 200000 }, {
       "the rich-pool pass had Bio Blaster white -- the row that must grey below")
   end),
 
-  -- 2. spend to the boundary with the tools themselves ----------------------
-  H.call(function() mode = "spend" end),
-  H.driveUntil(function() return pool() <= 7 end, 120000,
-    { H.call(pulse), H.waitFrames(1) }, "the pool is spent into the boundary"),
-  H.call(function()
-    local mp = pool()
-    H.log(string.format("pool after real casts: %d MP", mp))
-    H.assertEq(mp >= 4 and mp <= 7, true,
-      "the spend plan parked the pool in [4,7]: Bio Blaster unaffordable, "
-      .. "AutoCrossbow affordable -- both states on one screen")
-  end),
-
-  -- ... and the boundary window: grey and white side by side ----------------
-  openToolsWindow("edgar's tools window, spent pool"),
-  H.call(function()
-    local mp = pool()
-    H.screenshot("tools_grey_display")
-    local aBio = attrOf(NM[BIOBLASTER].g)
-    local aNoise = attrOf(NM[NOISEBLASTER].g)
-    local aXbow = attrOf(NM[AUTOCROSSBOW].g)
-    local fmt = function(a) return a and string.format("$%02x", a) or "nil" end
-    H.log(string.format("spent pool (%d MP): Bio=%s Noise=%s Xbow=%s",
-      mp, fmt(aBio), fmt(aNoise), fmt(aXbow)))
-    H.assertEq(aBio, GREY, string.format(
-      "Bio Blaster (cost 8, MP %d) renders grey -- the charge priced it out", mp))
-    H.assertEq(aXbow, WHITE, string.format(
-      "AutoCrossbow (cost 4, MP %d) renders white -- still affordable", mp))
-    H.assertEq(aNoise, (mp >= 6) and WHITE or GREY,
-      "NoiseBlaster follows its own affordability line")
-    H.assertEq(aBio - aXbow, 0x04,
-      "grey - white == $04, magic's own disabled-bit delta")
-    H.log("PASSED: the tools window greys exactly what the SPENT pool cannot "
-      .. "afford -- the charge and the grey read the same cell")
-  end),
+  -- 2. spend to the boundary with the tools themselves, and read the window
+  --    WHILE the pool is still there ---------------------------------------
+  --
+  -- The spend and the read have to happen inside the same fight.  OT6 gives
+  -- back HP and MP in full on a level up (ot6_progression.asm:3-6, called
+  -- from battle_main.asm:16251), and a level up lands on the victory screen,
+  -- so a boundary reached on the last turn of a fight is gone before the
+  -- next window opens.  Measured 2026-08-13 on the failing run: the pool was
+  -- parked at 7, the fight ended, EDGAR levelled, and the window that the
+  -- assertion read was drawn on a refilled 68 -- correctly white, against an
+  -- assertion that had been told the pool was 7.  The old code asserted the
+  -- pool at one moment and read the window at another with a battle boundary
+  -- allowed in between.
+  --
+  -- There is no step that just waits for that fight to end, either.  This
+  -- driver's only attack is EDGAR's tools, and planCast stops casting once
+  -- the pool is parked, so with the boundary reached nobody left in the
+  -- party can kill anything: two versions that tried to "let the fight
+  -- finish" simply burned their budget with a submenu held open, which
+  -- freezes battle time on top of it.
+  --
+  -- So each attempt reads twice: once in the fight that reached the
+  -- boundary, and, if that fight has already ended (the cast that parks the
+  -- pool is often the one that kills the last monster), once at the start of
+  -- the next fight, where EDGAR has a full turn cycle and nothing has died.
+  -- MP persists across battles; the only thing that undoes the boundary is a
+  -- level up on the way out, and then the next attempt spends again.
+  --
+  -- Three attempts, the house limit.
+  (function()
+    local done = false
+    local function inWindow() local m = pool() return m >= 4 and m <= 7 end
+    local function reseat()
+      -- a fresh fight can seat EDGAR in a different slot
+      for s = 0, 3 do
+        if H.readByte(0x3ED8 + s * 2) == EDGAR then edgarSlot = s end
+      end
+    end
+    local function tryRead(tag)
+      return H.cond(function() return not done and liveBattle() and inWindow() end, {
+        H.call(function()
+          reseat()
+          H.log(string.format("%s: EDGAR slot %d, pool %d MP",
+            tag, edgarSlot, pool()))
+          mode = "open"
+        end),
+        openToolsWindowOrEnd("edgar's tools window, " .. tag),
+        H.cond(function()
+          return liveBattle() and H.readByte(MSTATE) == ST_TOOLS
+            and H.readByte(ACTOR) == edgarSlot and inWindow()
+        end, {
+          H.call(function()
+            local mp = pool()
+            H.screenshot("tools_grey_display")
+            local aBio = attrOf(NM[BIOBLASTER].g)
+            local aNoise = attrOf(NM[NOISEBLASTER].g)
+            local aXbow = attrOf(NM[AUTOCROSSBOW].g)
+            local fmt = function(a)
+              return a and string.format("$%02x", a) or "nil"
+            end
+            H.log(string.format("spent pool (%d MP): Bio=%s Noise=%s Xbow=%s",
+              mp, fmt(aBio), fmt(aNoise), fmt(aXbow)))
+            H.assertEq(mp >= 4 and mp <= 7, true,
+              "the pool is STILL in [4,7] at the read: Bio Blaster "
+              .. "unaffordable, AutoCrossbow affordable, both on one screen")
+            H.assertEq(aBio, GREY, string.format(
+              "Bio Blaster (cost 8, MP %d) renders grey -- the charge "
+              .. "priced it out", mp))
+            H.assertEq(aXbow, WHITE, string.format(
+              "AutoCrossbow (cost 4, MP %d) renders white -- still "
+              .. "affordable", mp))
+            H.assertEq(aNoise, (mp >= 6) and WHITE or GREY,
+              "NoiseBlaster follows its own affordability line")
+            H.assertEq(aBio - aXbow, 0x04,
+              "grey - white == $04, magic's own disabled-bit delta")
+            done = true
+          end),
+        }, {}),
+      }, {})
+    end
+    local function attempt(n)
+      return H.cond(function() return done end, {}, {
+        -- spend across as many fights as it takes: a cave fight is about one
+        -- EDGAR turn long and the pool starts at 51, so the walk down is not
+        -- something one fight can do.
+        H.call(function() mode = "spend" end),
+        H.driveUntil(function() return pool() <= 7 end, 150000,
+          { H.call(pulse), H.waitFrames(1) },
+          "the pool is spent into the boundary (attempt " .. n .. ")"),
+        tryRead("the fight that spent it (attempt " .. n .. ")"),
+        H.cond(function() return done end, {}, {
+          H.call(function() mode = "spend" end),
+          H.driveUntil(function() return liveBattle() end, 40000,
+            { H.call(pulse), H.waitFrames(1) },
+            "the next battle to read the boundary in (attempt " .. n .. ")"),
+          tryRead("the next fight's first turn (attempt " .. n .. ")"),
+        }),
+      })
+    end
+    return H.repeatN(1, {
+      attempt(1), attempt(2), attempt(3),
+      H.call(function()
+        H.assertEq(done, true,
+          "the boundary window was read while the pool was still parked in "
+          .. "[4,7], within three attempts")
+        H.log("PASSED: the tools window greys exactly what the SPENT pool "
+          .. "cannot afford -- the charge and the grey read the same cell")
+      end),
+    })
+  end)(),
 })

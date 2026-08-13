@@ -201,6 +201,22 @@ local function reachWindow(m, what)
   })
 end
 
+-- Wait for the wallet's own header to be on screen before reading it.
+-- $30 being up is not the same moment as the wallet being painted: it is
+-- staged at open and flushed on a following nmi, and measured 2026-08-13 the
+-- REOPEN in arm 2 read blank at +10 and +20 frames and painted at +30, where
+-- the first open in arm 1 painted inside the fixed 20.  A fixed settle was
+-- riding that margin and the file went red on the wrong side of it.  This
+-- waits for the two header glyphs and nothing else, so the value assertions
+-- still do all the work, and a wallet that never paints times out here with
+-- its tag rather than passing.
+local function settleWallet(tag)
+  return H.driveUntil(function()
+    local w = walletWords()
+    return (w[1] & 0xFF) == GLYPH_M and (w[2] & 0xFF) == GLYPH_P
+  end, 600, { H.waitFrames(1) }, tag .. ": the wallet header paints")
+end
+
 local sabinPre = nil
 
 H.run({ maxFrames = 150000 }, {
@@ -255,6 +271,7 @@ H.run({ maxFrames = 150000 }, {
   -- 1. the wallet on SABIN's real Blitz window ------------------------------
   reachWindow({ char = SABIN, cmd = CMD_BLITZ, state = ST_TOOLS, hold = true },
     "sabin's blitz window"),
+  settleWallet("sabin"),
   H.call(function()
     sabinPre = mpOf(slotOf[SABIN])
     assertWallet("sabin", sabinPre)
@@ -273,6 +290,7 @@ H.run({ maxFrames = 150000 }, {
   end),
   reachWindow({ char = SABIN, cmd = CMD_BLITZ, state = ST_TOOLS, hold = true },
     "the payer's blitz window reopens"),
+  settleWallet("post-charge reopen"),
   H.call(function()
     H.assertEq(H.readByte(ACTOR), slotOf[SABIN],
       "the reopened list belongs to the character who paid")
@@ -285,6 +303,7 @@ H.run({ maxFrames = 150000 }, {
   -- 3. the second caster: EDGAR's Tools window paints EDGAR's pool ----------
   reachWindow({ char = EDGAR, cmd = CMD_TOOLS, state = ST_TOOLS, hold = true },
     "edgar's tools window"),
+  settleWallet("edgar"),
   H.call(function()
     local e = mpOf(slotOf[EDGAR])
     assertWallet("edgar", e)

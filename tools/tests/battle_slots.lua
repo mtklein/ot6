@@ -39,11 +39,17 @@
 --        value is asserted; asserting one would need the poke this file
 --        just gave up, and the rig's tier-1 hands-off half lives in the
 --        quarantine lab where the byte can be planted.
---     H2 (2 bp, banked by two real unboosted spins): latch = 2, the rig
+--     H2 (2 bp): latch = 2, the rig
 --        forced benevolent ($00, or $3c under a real joker gate), read
 --        rather than written, with reel-2 help blessed toward the icon reel 1
 --        stopped on, vanilla's 4-icon budget stored by the $f0 hook,
---        and the 2-bp charge.
+--        and the 2-bp charge.  H2 is played in a SECOND drawn battle: a bank
+--        does not cross a battle boundary (Ot6InitBP re-seeds 1), so earning
+--        2 bp inside H1's fight made that fight four Slot resolutions long,
+--        and no formation this checkpoint's pool deals survives four.  The
+--        second fight opens at 1 bp, one plain spin banks the 2, and both
+--        fights are two resolutions.  The re-seed is asserted rather than
+--        assumed on the way in.
 --
 --   Labeled quarantine lab (issue #75): the icon and rig-byte arms.
 --   No player input selects a reel icon: the reels free-run at frame rate
@@ -143,19 +149,57 @@ end
 
 -- wait for a character's menu; consume any other character's menu with a
 -- real Defend (right swaps Fight->Def, then A)
+local stallShot = nil
 local function menuFor(charId, what)
   local ph = 0
+  local hb = -600
+  local started = nil
   local function up()
     return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == slotOf[charId]
   end
   return H.driveUntil(up, 30000, {
     H.call(function()
       ph = ph + 1
+      started = started or H.frame
+      -- Where is the machine?  A menu that never arrives is usually a battle
+      -- that has ended or a party that is dying, and neither says so on its
+      -- own: the drive just stops logging until the budget runs out.
+      if H.frame - hb >= 600 then
+        hb = H.frame
+        local hps, st1, st4, atb = {}, {}, {}, {}
+        for s = 0, 3 do
+          hps[#hps+1] = tostring(H.readWord(0x3BF4 + s*2))
+          st1[#st1+1] = string.format("%02x", H.readByte(0x3EE4 + s*2))
+          st4[#st4+1] = string.format("%02x", H.readByte(0x3EF4 + s*2))
+          atb[#atb+1] = string.format("%02x", H.readByte(0x3218 + s*2))
+        end
+        H.log(string.format("  [%s hb f%d] live=%s menu=%02x actor=%d "
+          .. "mstate=%02x mons=%d hp=%s st1=%s st4=%s atb=%s", what, H.frame,
+          tostring(H.battleLoadStarted()), H.readByte(MENU),
+          H.readByte(ACTOR), H.readByte(MSTATE), H.monstersPresent(),
+          table.concat(hps, "/"), table.concat(st1, "/"),
+          table.concat(st4, "/"), table.concat(atb, "/")))
+        -- One picture of a wait that has clearly stalled.  It is what
+        -- identified this arm's failure in a single run: the screen read
+        -- "Got 256 Exp. point(s)", so the battle had been won and no menu
+        -- was ever going to arrive.
+        if stallShot == nil and H.frame - started > 3000 then
+          stallShot = true
+          H.screenshot("slots_stall")
+        end
+      end
       if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= slotOf[charId] then
-        local step = ph % 40
-        if step < 4 then H.setPad({ right = true })
-        elseif step >= 20 and step < 24 then H.setPad({ a = true })
-        else H.setPad({}) end
+        -- Defer rather than Defend.  A Defend is "right then A", and when the
+        -- right press does not take, the A confirms Fight instead: measured
+        -- 2026-08-13, the formation went from five live monsters to a
+        -- victory screen inside one 600-frame window while this arm was
+        -- waiting for SETZER, and the wait then sat on "Got 256 Exp.
+        -- point(s)" for its whole budget.  H2 needs a bank of 2 that only
+        -- exists inside this battle -- Ot6InitBP re-seeds 1 in the next one
+        -- -- so the party must not win the fight out from under it.  X hands
+        -- the turn on without acting.
+        local step = ph % 24
+        if step < 4 then H.setPad({ x = true }) else H.setPad({}) end
       else
         H.setPad({})
       end
@@ -215,6 +259,72 @@ local function waitStopH(r, what)
   return H.waitUntil(function() return H.readByte(STOP[r]) ~= 0 end, 900, what, 2)
 end
 
+-- Walk the plain until an encounter worth spinning in turns up, then take
+-- the party's slots off it.  Used twice: once for the battle H1 is played
+-- in, once for the fresh battle H2 needs (see the comment at that call).
+-- The floor is two live bodies and 900 total max HP, which is what a
+-- formation needs to still be standing after two Slot resolutions.
+local function drawBattle(tag, tries)
+  local steps = { H.call(function() H.vars.suitable = false end) }
+  local pattern = { "down", "down", "right", "right", "down", "down",
+                    "left", "left" }
+  for n = 1, tries do
+    local w = {
+      (function()
+        local ph = 0
+        return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+          H.call(function()
+            ph = ph + 1
+            H.setPad({ [pattern[(math.floor(ph / 20) % #pattern) + 1]] = true })
+          end),
+        }, tag .. ": a real world encounter fires (draw " .. n .. ")")
+      end)(),
+      H.release(),
+      H.waitUntil(function() return H.battleActive() end, 900,
+        tag .. ": battle active (draw " .. n .. ")", 30),
+      H.waitFrames(240),
+      H.call(function()
+        msPresent = {}
+        for m = 0, 5 do
+          if H.readByte(0x3AA8 + m * 2) % 2 == 1 then
+            msPresent[#msPresent + 1] = m
+          end
+        end
+        local mhp = 0
+        for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
+        H.vars.suitable = (#msPresent >= 2 and mhp >= 900)
+        H.log(string.format("%s draw %d: %d bodies, %d total max HP -> %s",
+          tag, n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
+      end),
+      H.cond(function() return not H.vars.suitable end, {
+        H.fleeBattle(9000),
+        H.waitUntil(function()
+          return H.worldMode() and H.worldHasControl()
+        end, 1200, tag .. ": back on the plain after draw " .. n, 10),
+        H.waitFrames(30),
+      }, {}),
+    }
+    if n == 1 then
+      for _, s in ipairs(w) do steps[#steps + 1] = s end
+    else
+      steps[#steps + 1] = H.cond(function() return not H.vars.suitable end, w, {})
+    end
+  end
+  steps[#steps + 1] = H.call(function()
+    H.assertEq(H.vars.suitable, true,
+      tag .. ": the pool dealt a two-resolution formation")
+    for s = 0, 3 do
+      local id = H.readByte(0x3ED8 + s * 2)
+      if id ~= 0xFF then slotOf[id] = s end
+    end
+    H.assertEq(slotOf[SETZER] ~= nil, true, tag .. ": SETZER present")
+    actor = slotOf[SETZER]
+    H.log(string.format("%s: setzer slot %d monsters={%s} joker=$%02x",
+      tag, actor, table.concat(msPresent, ","), H.readByte(JOKER)))
+  end)
+  return steps
+end
+
 -- one full spin played through real input at the current pending tier;
 -- asserts run via `checks`
 local function playedSpin(tag, checks)
@@ -265,66 +375,11 @@ add({
   H.waitFrames(30),
 })
 
--- walk the plain and choose the draw (slotsboot's check; this run needs four
--- resolutions, so the floor is higher)
-add({ H.call(function() H.vars.suitable = false end) })
-for n = 1, 6 do
-  local w = {
-    (function()
-      local ph = 0
-      local pattern = { "down", "down", "right", "right", "down", "down",
-                        "left", "left" }
-      return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-        H.call(function()
-          ph = ph + 1
-          local dir = pattern[(math.floor(ph / 20) % #pattern) + 1]
-          H.setPad({ [dir] = true })
-        end),
-      }, "a real world encounter fires (draw " .. n .. ")")
-    end)(),
-    H.release(),
-    H.waitUntil(function() return H.battleActive() end, 900,
-      "battle active (draw " .. n .. ")", 30),
-    H.waitFrames(240),
-    H.call(function()
-      msPresent = {}
-      for m = 0, 5 do
-        if H.readByte(0x3AA8 + m * 2) % 2 == 1 then
-          msPresent[#msPresent + 1] = m
-        end
-      end
-      local mhp = 0
-      for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
-      H.vars.suitable = (#msPresent >= 2 and mhp >= 900)
-      H.log(string.format("draw %d: %d bodies, %d total max HP -> %s",
-        n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
-    end),
-    H.cond(function() return not H.vars.suitable end, {
-      H.fleeBattle(9000),
-      H.waitUntil(function()
-        return H.worldMode() and H.worldHasControl()
-      end, 1200, "back on the plain after fleeing draw " .. n, 10),
-      H.waitFrames(30),
-    }, {}),
-  }
-  if n == 1 then add(w)
-  else add({ H.cond(function() return not H.vars.suitable end, w, {}) }) end
-end
+-- walk the plain and choose the draw (slotsboot's check)
+add(drawBattle("H1 battle", 6))
 
 add({
-  H.call(function()
-    H.assertEq(H.vars.suitable, true,
-      "the pool dealt a four-resolution formation within six draws")
-    for s = 0, 3 do
-      local id = H.readByte(0x3ED8 + s * 2)
-      if id ~= 0xFF then slotOf[id] = s end
-    end
-    H.assertEq(slotOf[SETZER] ~= nil, true, "SETZER present")
-    actor = slotOf[SETZER]
-    H.log(string.format("setzer slot %d monsters={%s} joker=$%02x",
-      actor, table.concat(msPresent, ","), H.readByte(JOKER)))
-    armWatches()
-  end),
+  H.call(function() armWatches() end),
 
   -- ---------------------------------------------- H1: the tier-1 spin
   menuFor(SETZER, "setzer menu (H1)"),
@@ -375,7 +430,7 @@ add({
       "H1: 1 bp - 1 spent = 0, regen skipped on a boosted turn")
   end),
 
-  -- ------------------------------- bank 2 bp with two unboosted spins
+  -- --------------------------- bank the first pip back with a plain spin
   menuFor(SETZER, "setzer menu (bank spin 1)"),
 })
 add(playedSpin("bank1", {}))
@@ -387,6 +442,37 @@ add({
     end),
     H.waitFrames(1),
   }, "bank1: unboosted spin regens 0 -> 1"),
+})
+
+-- H2 is played in a SECOND battle, and that is forced rather than chosen.
+-- The bank does not cross a battle boundary -- Ot6InitBP re-seeds 1 in
+-- every fight -- so the old shape earned 2 bp inside H1's fight, which made
+-- it four Slot resolutions long: H1, two bank spins, H2.  This pool has no
+-- formation that survives four.  Measured 2026-08-13, the whole draw pool
+-- from this checkpoint deals 745, 1160 or 1246 total max HP over six draws,
+-- and the party clears that in three spins: the H2 wait sat for its full
+-- 30000-frame budget on a screen reading "Got 256 Exp. point(s)".
+--
+-- A fresh fight opens at 1 bp, so one plain spin banks the 2 that H2 needs
+-- and the fight is only two resolutions long, which the same formations do
+-- survive.  Nothing is given up: the boundary re-seed is asserted on the
+-- way in, so the fresh battle's opening bank is checked rather than
+-- assumed, and both regen steps (0 -> 1 in the first fight, 1 -> 2 in the
+-- second) are still real unboosted spins.
+add({
+  H.fleeBattle(12000),
+  H.waitUntil(function()
+    return H.worldMode() and H.worldHasControl()
+  end, 1800, "back on the plain for H2's own battle", 10),
+  H.waitFrames(60),
+})
+add(drawBattle("H2 battle", 6))
+add({
+  H.call(function()
+    H.assertEq(bp(actor), 1,
+      "the second battle re-seeds the bank at Ot6InitBP's 1 -- a bank is "
+      .. "per battle, which is why H2 gets its own")
+  end),
   menuFor(SETZER, "setzer menu (bank spin 2)"),
 })
 add(playedSpin("bank2", {}))

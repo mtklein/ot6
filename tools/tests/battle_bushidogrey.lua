@@ -15,28 +15,30 @@
 -- party by poke (char id, Bushido-only $202E, the weapon SWDTECH flag
 -- written, $2020 ceiling pinned to 4) and set bp and MP per pass.  On
 -- camp_escaped Cyan is real: his katana carries the SWDTECH flag ($3BA4
--- bit 1 reads $82, never written), his real learned window is two rows,
--- Dispatch ($55, 4 MP, boost 1) and Retort ($56, 10 MP, boost 2), following
--- menu_blitzpage: the window is whatever the save holds.  Every value below
+-- bit 1 reads $82, never written), his real learned window is three rows,
+-- Dispatch ($55, 4 MP, boost 1), Retort ($56, 10 MP, boost 2) and Slash
+-- ($57, 13 MP, boost 3), following
+-- menu_blitzpage: the window is whatever the save holds.  How many rows that
+-- is comes from his level, through BushidoLevelTbl (event.asm:1235); he
+-- arrives here at level 12 and the third threshold is 12.  Every value below
 -- is a ledger of real actions:
 --
 --   bp: opens at Ot6InitBP's 1; +1 per item turn; minus the row's boost per
 --       tech (every tech is a boosted action, so its turn regens nothing).
---   MP: his real 67, walked down by real Retort casts (5 x 10 MP plus the
---       ledger's two Dispatches = 59 -> 9, inside the 4..9 window where
---       Dispatch is payable and Retort is not).
+--       It opens at 1 in EVERY battle, so a ledger that spans a battle
+--       boundary is not a ledger -- see pass 4.
+--   MP: his real 76, spent 4 a Dispatch and 10 a Retort.
 --
 -- Battles are real world encounters off the fixture tile; when the ledger's
 -- casts end one (Dispatch kills; Retort is the counter stance and mostly
--- does not), the drive paces to the next.  bp and MP persist across
--- battles, so the ledger continues.  SHADOW heals with real items, and
--- KO'd SABIN sits the fight out, which is his real state at this fixture.
+-- does not), the drive paces to the next.  MP persists across battles, the
+-- bank does not.  SHADOW heals with real items.
 --
 -- What is asserted (attribute byte = the odd/high byte of each name tile's
--- tilemap word, $21 white / $25 grey), with the original's four passes mapped
--- onto the real two-row window:
---   1. BP grey at the natural bank: bp 1, MP 67, so Retort (boost 2 > 1) is
---      grey while Dispatch (boost 1) is white.  grey - white == $04.
+-- tilemap word, $21 white / $25 grey):
+--   1. BP grey at the natural bank: bp 1, so Retort (boost 2 > 1) and Slash
+--      (boost 3 > 1) are grey while Dispatch (boost 1) is white.
+--      grey - white == $04.
 --   2. both clear: one real item turn banks bp 2, and Retort goes white, so
 --      the grey tracks the bank rather than being unconditional.
 --   3. the open window ACCEPTS A REPAINT REQUEST (#77).  Passes 1, 2, 4 and 5
@@ -53,12 +55,15 @@
 --      after, the gate spends it within a few frames and leaves the window up
 --      with its rows still right.  See the pass for why the bank move itself
 --      is not what is driven here.
---   4. zero BP greys everything (#38): two Dispatches spend the bank to 0,
---      both rows grey, and the names are still drawn, greyed rather than
---      absent.
---   5. MP grey: the bank is rebuilt (bp >= 2, isolating MP) while real
---      Retorts walk the pool to 9, so Dispatch (4) is white and Retort (10)
---      is grey, this time for the other reason.
+--   4. zero BP greys everything (#38): one real Retort takes a bank of 2 to
+--      0, all three rows grey, and the names are still drawn, greyed rather
+--      than absent.  The read checks the bank the rows were STAGED with,
+--      because a battle boundary re-seeds the bank to 1 behind a ledger that
+--      only watches the number it drove to.
+--   5. MP grey, a labeled isolation arm: the bank is rebuilt (bp >= 2,
+--      isolating MP), one write puts the pool at 7, and Dispatch (4) is
+--      white while Retort (10) is grey, this time for the other reason.
+--      The pass says why the walk cannot be driven on this pool's economy.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
 
@@ -102,7 +107,8 @@ local function glyphs(s)
   end
   return t
 end
-local NM = { Dispatch = glyphs("Dispatch"), Retort = glyphs("Retort") }
+local NM = { Dispatch = glyphs("Dispatch"), Retort = glyphs("Retort"),
+             Slash = glyphs("Slash") }
 local function findName(seq)
   local vr = emu.memType.snesVideoRam
   for w = 0x6000, 0x7FF0 do
@@ -254,7 +260,14 @@ local function parkRead(tag)
       return H.battleLoadStarted()
         and (H.readByte(ACTOR) & 3) == cyan and H.readByte(MSTATE) == ST_TOOLS
     end, 30000, tag),
-    H.call(function() H.setPad({}) end),
+    H.call(function()
+      H.setPad({})
+      -- The bank AT STAGE TIME, which is the number the row decorator read.
+      -- Logged beside the bank at read time below, because those two being
+      -- different is the one way a correct decorator draws a wrong row.
+      H.log(string.format("  [%s] staged at bp=%d pend=%d actor=%d cyan=%d",
+        tag, bp(), pend(), H.readByte(ACTOR) & 3, cyan))
+    end),
     H.waitFrames(20),
   })
 end
@@ -289,12 +302,15 @@ H.run({ maxFrames = 150000 }, {
   -- 1. BP grey at the natural bank -----------------------------------------
   parkRead("submenu at the opening bank"),
   H.call(function()
-    local aD, aR = attrOf(NM.Dispatch), attrOf(NM.Retort)
-    H.log(string.format("bp=1 mp=%d -> attr Dispatch=%s Retort=%s",
-      mp(), tostring(aD), tostring(aR)))
+    local aD, aR, aS = attrOf(NM.Dispatch), attrOf(NM.Retort), attrOf(NM.Slash)
+    H.log(string.format("bp=1 mp=%d -> attr Dispatch=%s Retort=%s Slash=%s",
+      mp(), tostring(aD), tostring(aR), tostring(aS)))
     H.assertEq(aD, WHITE, "Dispatch (boost 1 <= bp 1) is white")
     H.assertEq(aR, GREY,
       "Retort (boost 2 > bp 1) is GREY -- the BP reason, with MP abundant")
+    H.assertEq(aS, GREY,
+      "Slash (boost 3 > bp 1) is GREY too -- the third row he learned at "
+      .. "level 12, on the same BP reason")
     H.assertEq(aR - aD, 0x04, "grey - white == $04, magic's own disabled-bit delta")
     H.screenshot("bushidogrey_bp")
   end),
@@ -397,22 +413,94 @@ H.run({ maxFrames = 150000 }, {
   end),
 
   -- 4. zero BP greys everything (#38) ---------------------------------------
-  -- two real Dispatches spend the bank to 0 (each row-0 tech is a 1-boost
-  -- action: it charges a pip and its turn regens nothing)
-  H.call(function() cyanMode = "tech:0" end),
-  driveTo(function() return bp() == 0 end, 40000,
-    "two real Dispatches spend the bank to 0"),
-  parkRead("submenu at a 0 bank"),
-  H.call(function()
-    local aD, aR = attrOf(NM.Dispatch), attrOf(NM.Retort)
-    H.log(string.format("bp=0 mp=%d -> attr Dispatch=%s Retort=%s",
-      mp(), tostring(aD), tostring(aR)))
-    H.assertEq(aD ~= nil and aR ~= nil, true,
-      "both names are still DRAWN at 0 bp -- greyed, not absent (#38)")
-    H.assertEq(aD, GREY, "Dispatch (boost 1 > 0) is grey")
-    H.assertEq(aR, GREY, "Retort (boost 2 > 0) is grey")
-    H.screenshot("bushidogrey_zero")
-  end),
+  -- The bank has to still be 0 at the moment the rows are STAGED, and the
+  -- obvious drive does not guarantee that.  Two Dispatches spend a bank of 2
+  -- to 0, but a Dispatch also kills this trash, and the next encounter's
+  -- Ot6InitBP hands every character a fresh 1: measured 2026-08-13, the read
+  -- landed on banks 1/1/1/1 and the decorator correctly drew Dispatch white
+  -- for a bank of 1.  The row decorator was never wrong; the ledger was.
+  --
+  -- Retort is the lever.  It costs boost 2, so one cast takes a bank of 2
+  -- straight to 0, and it is the counter stance rather than a hit, so it
+  -- does not end the fight the way a Dispatch does.  The read then checks
+  -- the bank it was staged with, not the bank it was driven to, and the arm
+  -- is a three-attempt ladder (the house limit) because the trash can still
+  -- flee or kill the fight out from under an attempt.
+  (function()
+    local done = false
+    local function liveBattle()
+      return H.battleLoadStarted() and H.monstersPresent() > 0
+    end
+    local function oneAttempt(n)
+      return H.cond(function() return done end, {}, {
+        driveTo(function() return liveBattle() end, 30000,
+          "a live battle for the 0-bank arm (attempt " .. n .. ")"),
+        H.call(function()
+          for slot = 0, 3 do
+            local id = H.readByte(0x3ED8 + slot*2)
+            if id == 0x02 then cyan = slot end
+            if id == 0x03 then shadow = slot end
+          end
+          cyanMode = "item"
+        end),
+        driveTo(function() return not liveBattle() or bp() >= 2 end, 40000,
+          "the bank reaches 2 (attempt " .. n .. ")"),
+        H.cond(function() return liveBattle() and bp() >= 2 end, {
+          H.call(function() cyanMode = "tech:1" end),
+          driveTo(function() return not liveBattle() or bp() == 0 end, 40000,
+            "one real Retort (boost 2) empties the bank (attempt " .. n .. ")"),
+          H.cond(function() return liveBattle() and bp() == 0 end, {
+            H.call(function() cyanMode = "park:" end),
+            driveTo(function()
+              return not liveBattle()
+                or ((H.readByte(ACTOR) & 3) == cyan
+                    and H.readByte(MSTATE) == ST_TOOLS)
+            end, 30000, "the submenu parks on the 0 bank (attempt " .. n .. ")"),
+            H.call(function() H.setPad({}) end),
+            H.waitFrames(20),
+            H.cond(function()
+              return liveBattle() and H.readByte(MSTATE) == ST_TOOLS
+                and bp() == 0
+            end, {
+              H.call(function()
+                local aD = attrOf(NM.Dispatch)
+                local aR = attrOf(NM.Retort)
+                local aS = attrOf(NM.Slash)
+                H.log(string.format("bp=%d pend=%d banks=%d/%d/%d/%d mp=%d " ..
+                  "-> attr Dispatch=%s Retort=%s Slash=%s",
+                  bp(), pend(),
+                  H.readByte(0x3E9C), H.readByte(0x3E9E), H.readByte(0x3EA0),
+                  H.readByte(0x3EA2), mp(),
+                  tostring(aD), tostring(aR), tostring(aS)))
+                H.assertEq(aD ~= nil and aR ~= nil and aS ~= nil, true,
+                  "all three names are still DRAWN at 0 bp -- greyed, not "
+                  .. "absent (#38)")
+                H.assertEq(aD, GREY, "Dispatch (boost 1 > 0) is grey")
+                H.assertEq(aR, GREY, "Retort (boost 2 > 0) is grey")
+                H.assertEq(aS, GREY, "Slash (boost 3 > 0) is grey")
+                H.screenshot("bushidogrey_zero")
+                done = true
+              end),
+            }, {}),
+          }, {}),
+        }, {}),
+        H.cond(function() return done end, {}, {
+          H.call(function() cyanMode = "defer" end),
+          driveTo(function() return not H.battleLoadStarted() end, 60000,
+            "the failed attempt's battle drains away (attempt " .. n .. ")"),
+          H.waitFrames(240),
+        }),
+      })
+    end
+    return H.repeatN(1, {
+      oneAttempt(1), oneAttempt(2), oneAttempt(3),
+      H.call(function()
+        H.assertEq(done, true,
+          "the 0-bank arm read a window that was STAGED on a 0 bank within "
+          .. "three attempts")
+      end),
+    })
+  end)(),
 
   -- 5. MP grey: a labeled isolation arm (owner calibration).
   -- The input-driven walk was tried three ways and measured out of reach on
