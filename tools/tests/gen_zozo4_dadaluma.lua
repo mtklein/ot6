@@ -1173,6 +1173,44 @@ H.run({ maxFrames = 400000 }, {
     end
     H.log("[zozo kit] six empty slots filled from the bag")
   end),
+  -- CELES and SABIN to the back row.  Physical damage taken is halved there
+  -- and only a weapon swing pays for it: ExecCmd sets $B3 = $FF at the top
+  -- of every command (battle_main.asm:3131-3133) and only the swing setup
+  -- _c2299f clears the ignore-row bit (:7127-7133), so Tools, Blitz and
+  -- Magic are row-exempt.  This is the case HANDOFF calls free: SABIN
+  -- fights this town and DADALUMA with Pummel and CELES casts, so neither
+  -- of them loses anything, while LOCKE stays in front because his swing is
+  -- what chips DADALUMA's pierce row.  Nothing is given up against the
+  -- town's own four species either, since none of them has a class key at
+  -- all and no weapon of any class takes a shield off them.
+  --
+  -- EDGAR is already in the back row and is left there: gen_kolts put him
+  -- there at the South Figaro stop because he fights with Tools, which are
+  -- row-exempt.  This step asserts only LOCKE's row and logs the rest, since
+  -- changing a row somebody else set deliberately is not this step's call.
+  --
+  -- It is here because of what a full-HP party still lost to on 2026-08-13:
+  -- in the stair room at (53,30) on map 225 one round cost 269, 224, 241
+  -- and 363 against maximums of 314, 349, 398 and 363, so SABIN went from
+  -- full to 0 in a round, and every actor then spent every turn reviving or
+  -- healing him instead of firing the Bio Blaster.  Halving the physical
+  -- half of that is the cheapest thing that breaks the loop.
+  H.setRows({ [5] = true, [6] = true }, { tag = "CELES and SABIN back row" }),
+  H.call(function()
+    for _, c in ipairs({ 5, 6 }) do
+      H.assertEq((H.readByte(0x1850 + c) & 0x20) ~= 0, true,
+        string.format("char %d is in the back row for the climb", c))
+    end
+    H.assertEq((H.readByte(0x1850 + 1) & 0x20) == 0, true,
+      "LOCKE stays in front -- his swing chips DADALUMA's pierce row")
+    local out = {}
+    for _, c in ipairs(H.partyMembers()) do
+      out[#out + 1] = string.format("c%d=%s", c,
+        (H.readByte(0x1850 + c) & 0x20) ~= 0 and "back" or "front")
+    end
+    H.log("[zozo rows] " .. table.concat(out, " "))
+  end),
+
   -- and top up again: six menu walks cost no HP, but the care stop above
   -- ran before them and a step between menus can still draw a fight.
   H.fieldCare({ tag = "care after the equip stop", threshold = 0.95 }),
@@ -1253,13 +1291,31 @@ H.run({ maxFrames = 400000 }, {
   (function()
     local dadaBlob, dadaWon = nil, false
     local dadaLost = nil
+    -- A STALL IS A LOSS, and it has to be one here or the ladder is not a
+    -- ladder.  `F.lost` only fires on a wipe; a fight that neither wins nor
+    -- wipes inside the budget used to reach driveUntil's own raise, which
+    -- ends the whole run on attempt 1 and leaves attempts 2 and 3 unplayed.
+    -- Measured 2026-08-13: attempt 1 lost LOCKE and EDGAR in the first four
+    -- rounds, DADALUMA called his two Iron Fists, and the surviving pair
+    -- ground at his 2784 of 3270 until the budget ran out -- reported as
+    -- "timeout after 40000 frames", which reads as a harness fault rather
+    -- than as the fight the party could not finish.  The soft limit is set
+    -- under the hard one so the hard one stays a backstop.
     local function fightBody(tier)
       local F = mkFighter(tier, "dadaluma")
       local battN = 0
+      local started = nil
       return H.driveUntil(function()
+        if started == nil then started = H.frame end
         if F.lost then
           dadaLost = F.lost
           return true                 -- reload beats riding the GameOver
+        end
+        if H.frame - started >= 39000 then
+          dadaLost = string.format(
+            "stalled -- 39000 frames with no win and no wipe (tier %d)", tier)
+          H.log("[dadaluma] " .. dadaLost)
+          return true
         end
         return sw(0x034A) == 0 and map() == 221 and H.hasControl()
           and H.tileAligned() and bright() >= 15
