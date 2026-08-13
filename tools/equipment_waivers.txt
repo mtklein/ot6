@@ -23,3 +23,5 @@
 
 locke_scenario	LOCKE	the scenario opens with him stripped and captured; gen_sfigaro's H.equipOptimum arms him before the gate soldier
 celes_freed	CELES	the capture scene stripped her and gen_celes frees her still bare; gen_tunnelarmr's equip stop arms her by item at boot, the very next step
+opera_backstage	CELES	the opera's performance intro strips her (remove_equip CELES, event_main.asm:27273 and :27785) and parks her in party 7 so she can play Maria; she is a costumed actor rather than a fighter, and map 234 cannot draw a battle (map_prop.dat +$05 bit 7 clear -- the flag CheckRandomBattle reads at field/battle.asm:332)
+opera_stage	CELES	the same strip one step on: she is the solo on-stage Maria with LOCKE parked in party 6, and map 238 likewise cannot draw a battle (map_prop.dat +$05 bit 7 clear).  She is out of the party entirely for the rafter chase, and gen_opera7_blackjack's equip stop arms her by item at the Blackjack, the first fixture where she is a walking party member again
