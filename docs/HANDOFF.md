@@ -573,7 +573,15 @@ everything, and keep to one heavy run at a time per machine.
   both title index 49).
 - **The item equip mask is `item_prop_en.dat` offset `+$01`, 16-bit, bit N =
   actor N** (`research/data-formats.md`). Byte `+$00` also looks like a mask
-  and always claims Terra.
+  and always claims Terra. What `+$00` actually carries is the item type in
+  its low three bits, `$01` = weapon and `$03` = shield, and the mask only
+  means anything once that has been tested — `GetValidWeapons` does both
+  reads in that order (`ff6/src/menu/equip.asm:1594-1601`). Answering "is
+  this record a weapon" from the id instead is wrong: `$5A..$68` are
+  shields, and counting them as weapons made `audit_equipment.py` report GAU
+  as re-equippable. The only weapon record in the game his mask claims is
+  `$24` Imp Halberd, which no shop stocks, so he is in UMARO's position and
+  the audit excludes both from the data rather than from a list.
 - **`monster_prop.dat` `+23` is absorb, `+25` is weak** — `check_boss_rows.py`
   and `check_break_reach.py` enforce doc/data agreement inside `make test`.
 - **`OT6_BREAK_TICKS` is `$10`** (`ff6/src/battle/ot6_break.asm:1`) and gives
