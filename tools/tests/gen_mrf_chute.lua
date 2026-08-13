@@ -179,6 +179,33 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("mrf_entry"))
   end),
 
+  -- 0. Care, before the crossing and again after it.
+  --
+  -- The upper floor draws random battles (map 262, map_prop.dat +$05 bit 7
+  -- set -- the flag CheckRandomBattle tests at field/battle.asm:332), the
+  -- crossing below is 38 tiles of it, and this step flees what it meets, so
+  -- nothing in it heals.  The party arrives here with EDGAR around 187/398,
+  -- which is a party walking into an encounter area at half strength, and
+  -- on 2026-08-13 that cost him: he took a fatal hit in a fled fight and
+  -- mrf_chute, mrf_263, mrf_kefka and ifrit_entry all shipped him dead
+  -- (tools/audit_party_hp.py).  The generator had no care stop and no exit
+  -- contract, so it wrote the fixture and said nothing.
+  --
+  -- Two stops rather than one, and they do different jobs.  This one is the
+  -- preparation a player would do before crossing: a full EDGAR is a lot
+  -- harder to kill than a half one.  The one before the save is the repair,
+  -- because being careful is not the same as being lucky, and the fixture is
+  -- what everything downstream boots.  H.assertPartyStanding below is the
+  -- contract that makes both of them mean something: without it a care stop
+  -- that silently did nothing reports the same green as one that worked.
+  --
+  -- Threshold 0.85 rather than a boss step's 0.95: what follows is trash
+  -- encounters and a scripted ride, and gen_ifrit_magicite already runs its
+  -- own 0.95 stop before battle 70.  The bag holds three Fenix Downs, nine
+  -- Potions, five Tonics and an Elixir at this point.
+  H.fieldCare({ tag = "care before the upper-floor crossing",
+                threshold = 0.85 }),
+
   -- 1. across the upper floor to {19,22}, one tile above the door frames.
   H.navTo(19, 22, { maxFrames = 50000, playBattles = "flee",
     arrive = function() return H.fieldY() >= 40 end }),
@@ -196,6 +223,9 @@ H.run({ maxFrames = 60000 }, {
     16000, "DOWN through the door frames onto the chute -> (10,45)"),
 
   H.waitFrames(60),
+  -- The repair half of the care stop: whatever the crossing cost, it is
+  -- fixed here rather than shipped.  See the block above section 1.
+  H.fieldCare({ tag = "care after the crossing", threshold = 0.85 }),
   H.call(function()
     H.assertEq(mapTitleHere(), "MAGITEK FACTORY", "still in the MAGITEK FACTORY")
     H.assertEq(map(), 262, "still on map 262 -- the chute is intra-map")
@@ -205,6 +235,11 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("[mrf_chute] f%d map=%d (%d,%d)",
       H.frame, map(), H.fieldX(), H.fieldY()))
     H.log(partyReport("mrf_chute"))
+    -- The exit contract.  A failure here means the crossing cost more than
+    -- the bag could answer, which is a finding about supplies rather than a
+    -- reason to lower the bar; it is not a reason to ship the casualty into
+    -- every step below this one.
+    H.assertPartyStanding("mrf_chute exit")
     H.screenshot("mrf_chute")
   end),
   H.saveState("mrf_chute.mss"),
