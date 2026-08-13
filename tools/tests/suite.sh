@@ -86,11 +86,17 @@ TESTS="$SUITE"
 # pin every run, so this env applies to exactly the one invocation.
 ram_env_for() {
   case "$1" in
-    # battle_reveal_poweron additionally cold-boots the tracked post-opera
-    # battery (issue #75): its slot-3 page is the real persistent knowledge
-    # New Game must preserve, and its valid stale transient page is the
-    # knowledge New Game must wipe.
-    battle_reveal_poweron) echo "OT6_RAM_POWERON=AllOnes OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/post-opera-v1" ;;
+    # battle_reveal_poweron additionally cold-boots a tracked battery (issue
+    # #75): its slot-3 page is the real persistent knowledge New Game must
+    # preserve, and its valid stale transient page is the knowledge New Game
+    # must wipe.  Which battery is not free: it has to carry both, and that
+    # is a property of the battery rather than of the test.  post-opera-v1
+    # was the original pick and carries neither -- measured 2026-08-13, its
+    # slot-3 and transient pages hold the 'O8' magic and zero knowledge
+    # bytes, where every other tracked battery holds 2 to 13.
+    # terra-returned-v1 is slot 3, layout ot6-codex-o8-v1, slot-3 page 11
+    # bytes, transient page 2.
+    battle_reveal_poweron) echo "OT6_RAM_POWERON=AllOnes OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1" ;;
     # battle_slotsboot cold-Continues the tracked terra-returned battery --
     # the same checkpoint hand-off the Makefile's SMOKE_CHECKPOINT_* map gives
     # the smoke generators that use one (run.sh materializes it before boot).

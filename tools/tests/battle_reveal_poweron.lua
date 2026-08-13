@@ -7,11 +7,11 @@
 -- asserts a fresh, never-chipped enemy shows '?'.
 --
 -- suite.sh runs this under OT6_RAM_POWERON=AllOnes (deterministic and dirty)
--- and OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/post-opera-v1.  Issue #75
+-- and OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1.  Issue #75
 -- conversion: the SRAM save used to be forged, with slot 1's codex hand-stamped
 -- 'O8' so all 384 species knew everything, and the transient page's
--- magic zeroed to force the invalid path.  It is now the tracked
--- post-opera checkpoint (an SRAM save written by the game's own Save UI on
+-- magic zeroed to force the invalid path.  It is now a tracked
+-- checkpoint (an SRAM save written by the game's own Save UI on
 -- the input-driven chain, provenance in its manifest), whose slot 3 carries an
 -- earned codex page and whose transient page arrives valid with the
 -- pre-save chain's knowledge still in it.  That valid stale transient is
@@ -26,6 +26,20 @@
 -- (The old staging populated slot 1 specifically.  Nothing in the claim
 -- needs slot 1: "the persistent page survives and is not consulted" is
 -- slot-agnostic, and the checkpoint's slot 3 pins it against real bytes.)
+--
+-- Which checkpoint is not free, and post-opera-v1 was the wrong one.  Both
+-- positive controls below need a page with something in it, and measured
+-- 2026-08-13 post-opera-v1's slot-3 and transient pages hold the 'O8' magic
+-- and nothing else: 0 knowledge bytes in each, against 2 to 13 in every
+-- other tracked battery.  That is not a codex that fails to record --
+-- blackjack.mss, the state post-opera-v1 was cut from, carries 48 knowledge
+-- bytes in its own transient page today -- it is a battery cut on
+-- 2026-08-10 from an older blackjack whose page was empty, and whose
+-- manifest still binds an ancestor hash the tree no longer has.  Nothing in
+-- `make test` checks a checkpoint's ancestor binding, so it went unreported.
+-- terra-returned-v1 carries 11 bytes in slot 3 and 2 in the transient page,
+-- is the same slot and the same persistent_layout, and is already
+-- cold-booted by battle_slots and battle_slotsboot.
 --
 -- This complements battle_reveal, which pokes the masks at seed entry, after
 -- InitBattle's clear, to exercise the seed's own zeroing and the Cmd_20 reload
