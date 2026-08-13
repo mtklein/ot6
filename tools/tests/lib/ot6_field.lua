@@ -87,22 +87,39 @@ M.FLEE_CAP = 1800
 -- to "not in battle".  gen_sabin_trench's ride held LEFT at a Game Over
 -- through three full 60000-frame budgets for that reason.
 -- Any driver keying on that pattern needs this check beside it.
+-- Corrected 2026-08-13: this could never fire, and had not once since it was
+-- written.  It opened with M.battleLoadStarted(), which returns false unless
+-- some slot has current HP above zero, and then required every sane slot to
+-- read zero.  The two conditions contradict each other, so the function that
+-- exists to notice a dead party required a live one.
+--
+-- Measured cost, twice in one day: gen_zozo4_dadaluma reported "timeout
+-- driving toward followPath" when the party had been dead for eleven tiles
+-- and the remaining 22000 frames were the Game Over event playing out, and
+-- gen_sabin_trench held LEFT through three 60000-frame budgets at a Game
+-- Over.  Each cost about an hour to attribute.
+--
+-- The right test is the max-HP table rather than the current-HP one.  A
+-- battle's $3C1C reads sane maxima whether or not anybody is standing, so it
+-- says "a battle is loaded"; $3BF4 then says who is alive.  Outside a battle
+-- both read garbage and the maxima fail the range check, which is what keeps
+-- this from firing on the field.  The signature is the one gen_zozo4 proved
+-- in place before it was lifted here.
 function M.partyWipedInBattle()
-  if not M.battleLoadStarted() then return false end
-  local want = 0
-  for c = 0, 15 do
-    if (M.readByte(0x1850 + c) & 0x07) ~= 0 then want = want + 1 end
-  end
-  if want < 1 or want > 4 then return false end
   local sane, alive = 0, 0
   for e = 0, 3 do
     local mx = M.readWord(0x3c1c + e * 2)
-    if mx > 0 and mx < 1000 then
+    if mx > 0 and mx < 10000 then
       sane = sane + 1
       if M.readWord(0x3bf4 + e * 2) > 0 then alive = alive + 1 end
     end
   end
-  return sane >= want and alive == 0
+  if sane == 0 then return false end
+  local want = 0
+  for c = 0, 15 do
+    if (M.readByte(0x1850 + c) & 0x07) ~= 0 then want = want + 1 end
+  end
+  return want >= 1 and want <= 4 and sane >= math.min(want, 4) and alive == 0
 end
 
 function M.partyWiped()

@@ -30,18 +30,45 @@ ROM="Final Fantasy III (USA).sfc"
 # files; real drift (a local edit after seeding) still regenerates
 # through the latch edges' content compare, proven in
 # savestate_ninja_selftest.sh.
-MAIN_BRANCH=$(git -C "$MAIN" branch --show-current 2>/dev/null || echo '?')
 HERE_BRANCH=$(git branch --show-current 2>/dev/null || echo '?')
-if [ -d "$MAIN/build/states" ] && [ ! -d "$HERE/build/states" ]; then
-  mkdir -p "$HERE/build"
-  cp -Rp "$MAIN/build/states" "$HERE/build/states"
-  if [ -d "$MAIN/build/ninja" ] && [ ! -d "$HERE/build/ninja" ]; then
-    cp -Rp "$MAIN/build/ninja" "$HERE/build/ninja"
+
+# Seed from whichever tree actually has usable saved games, not from the main
+# checkout by reflex.
+#
+# The main checkout regenerates rarely -- it is the one somebody plays from --
+# so seeding from it hands a new worktree months-old saved games far more often
+# than not. On 2026-08-13 that cost two agents real time in one day: one
+# diagnosed a boss fight against a party from a route that no longer existed,
+# and another had to hand-copy files out of a sibling worktree before it could
+# reproduce anything. Meanwhile a worktree on the same commit, with saved games
+# that verify, was usually sitting right there.
+#
+# So: prefer a sibling on the same commit as us whose own saved games verify.
+# Same commit means the same generators and the same library, so what verifies
+# there verifies here -- that is exactly what compose.py hashes. Anything else
+# falls back to the main checkout, which is no worse than before.
+HERE_HEAD=$(git rev-parse HEAD 2>/dev/null || echo '?')
+SEED=""
+if [ ! -d "$HERE/build/states" ]; then
+  for cand in $(git worktree list --porcelain | awk '/^worktree /{print $2}'); do
+    [ "$cand" = "$HERE" ] && continue
+    [ -d "$cand/build/states" ] || continue
+    [ "$(git -C "$cand" rev-parse HEAD 2>/dev/null)" = "$HERE_HEAD" ] || continue
+    if (cd "$cand" && python3 tools/tests/lib/compose.py --check-states) >/dev/null 2>&1
+    then SEED="$cand"; break; fi
+  done
+  [ -n "$SEED" ] || SEED="$MAIN"
+  if [ -d "$SEED/build/states" ]; then
+    mkdir -p "$HERE/build"
+    cp -Rp "$SEED/build/states" "$HERE/build/states"
+    [ -d "$SEED/build/ninja" ] && [ ! -d "$HERE/build/ninja" ] && \
+      cp -Rp "$SEED/build/ninja" "$HERE/build/ninja"
   fi
 fi
 
+SEED_BRANCH=$(git -C "${SEED:-$MAIN}" branch --show-current 2>/dev/null || echo '?')
 echo "worktree ready: ROM copied, Mesen/flips linked"
-echo "seeded from $MAIN ($MAIN_BRANCH) into $HERE_BRANCH"
+echo "seeded from ${SEED:-$MAIN} ($SEED_BRANCH) into $HERE_BRANCH"
 
 # ------------------------------------------------------- is the seed fresh?
 # This block used to be a branch-name guess: "$MAIN_BRANCH != $HERE_BRANCH,
