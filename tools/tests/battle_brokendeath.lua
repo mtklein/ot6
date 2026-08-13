@@ -49,8 +49,10 @@
 -- hit killed him mid-break.  Issue #75's rule (inputs in, observations
 -- out, never write emulated state) retired all of that.  This version
 -- reaches the same observation through real play: the party re-equips
--- through the real field Equip menu (H.equipOptimum, since the fixture arrives
--- with LOCKE and CELES bare-handed, from the Vector remove_equip), and
+-- through the real field Equip menu (H.equipOptimum, which since 2026-08-13
+-- has little left to do: gen_vector_entry now arms LOCKE and CELES by item
+-- in Albrook, so the fixture no longer arrives with the two of them
+-- bare-handed), and
 -- the fight uses the library's shared observed-menu fighter.
 --
 -- The staging that is gone is itself asserted against: shields must read
@@ -370,11 +372,19 @@ H.run({ maxFrames = 250000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
 
-  -- 1. the player's prep, all through real menus: re-equip the
-  --    remove_equip'd party (H.equipOptimum, the library version of
-  --    the hand-rolled walk this file used to carry), then top up HP with
-  --    the bag's own items (H.fieldCare).  This fixture delivers CELES
-  --    at 221/349, and the first ladder-less run wiped from that deficit.
+  -- 1. the player's prep, all through real menus: H.equipOptimum (the
+  --    library version of the hand-rolled walk this file used to carry),
+  --    then top up HP with the bag's own items (H.fieldCare).  This fixture
+  --    delivers CELES at 221/349, and the first ladder-less run wiped from
+  --    that deficit.
+  --
+  --    The equip call is no longer repairing a stripped party: since
+  --    2026-08-13 gen_vector_entry arms LOCKE and CELES by item before the
+  --    walk to Vector, so this arrives holding Guardian and MithrilKnife.
+  --    What it does now is let Optimum re-pick by power, which is a
+  --    routing choice wob-route.md section 2 rules out for the route
+  --    itself; whether this test should equip deliberately instead is open,
+  --    and it passes either way.
   H.equipOptimum({ tag = "brokendeath kit" }),
   H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
 
