@@ -168,6 +168,54 @@ local function encounters(what)
   end
 end
 
+-- ------------------------------------------------- a care stop per step --
+-- HANDOFF's rule for any walk that fights its encounters: heal BETWEEN the
+-- battles, not only inside them.  In-battle healing is bounded by turns, so
+-- a deeper bag cannot fix a heal RATE deficit and a field menu between
+-- fights can, because it costs no battle turns.  This climb had one care
+-- stop at the bottom and none after it.
+--
+-- Measured 2026-08-13 from a zozo_arrival at LOCKE 13 / EDGAR 14 / SABIN 14
+-- / CELES 13, everyone at full HP: the party won five of this town's
+-- encounters back to back and lost the sixth, in the stair room at (53,30)
+-- on map 225.  It entered that fight at 189/314, 349/349, 398/398, 305/310,
+-- and one SlamDancer round cost 189, 225, 234 and 223 -- so LOCKE, the one
+-- who had not been topped up since the bottom of the climb, died to a round
+-- everyone else survived, and the fight was then three against four.  The
+-- bag's only healing item is a Tonic at 50 against that round, which is the
+-- rate deficit exactly.
+--
+-- The stop is skipped rather than forced when the party is not settled: a
+-- few of the drives below end on a scene beam or a z-loop, and a menu drive
+-- launched into one of those hangs instead of healing.  A skip logs, so
+-- "the stop did nothing" and "the stop never ran" do not read the same.
+--
+-- The 120-frame margin after `settled` is not padding.  A stop placed on the
+-- frame a walk finishes can land within a few frames of a battle teardown,
+-- and `settled` does not cover the menu module's own RAM: measured
+-- 2026-08-13 at (29,39) on map 221, a stop opened four frames after
+-- followPath ended, reached state $05, and then read the menu's on-screen
+-- character list ($69..$6C) without CELES in it -- "dropping plan (caster
+-- not on screen)" for a caster who was in the party the whole time.  The
+-- item plan it fell back to then made no progress for its whole 24000-frame
+-- budget.  Both are consistent with the list not being populated yet; that
+-- is the hypothesis the margin is against, and it is unverified beyond the
+-- one observation.
+local function climbCare(what)
+  return H.cond(function() return true end, {
+    H.waitUntilSoft(settled, 1200, "climbCare " .. what),
+    H.cond(settled, {
+      H.waitFrames(120),
+      H.fieldCare({ tag = "care " .. what, threshold = 0.9 }),
+    }, {
+      H.logStep(function()
+        return string.format("[care %s] SKIPPED -- not settled at (%d,%d) " ..
+          "on map %d after 1200 frames", what, H.fieldX(), H.fieldY(), map())
+      end),
+    }),
+  })
+end
+
 -- ----------------------------------------------- the input-driven fighter --
 -- gen_narshe_battle's menu-episode machine (gen_scenario's cadence) for the
 -- DADALUMA fight.  Party here is LOCKE+CELES+SABIN+EDGAR (#21's canonical
@@ -1129,23 +1177,34 @@ H.run({ maxFrames = 400000 }, {
   -- ran before them and a step between menus can still draw a fight.
   H.fieldCare({ tag = "care after the equip stop", threshold = 0.95 }),
 
-  -- the climb
+  -- the climb.  Every step that can draw a fight is followed by a care stop
+  -- (climbCare above): the party won five of this town's encounters in a row
+  -- and lost the sixth with nobody topped up in between.
   door(38, 57, 225, "P9a street -> interior"),
+  climbCare("after P9a"),
   door(47, 47, 221, "P10b -> roof (35,54)"),
+  climbCare("after P10b"),
   door(34, 50, 225, "P11a -> stair room"),
+  climbCare("after P11a"),
   followPath(52, 30, { maxFrames = 18000 }),
+  climbCare("before the stair climb"),
   stairFollow(),
   H.waitUntil(settled, 2400, "U1 settled", 5),
   H.waitFrames(150),
+  climbCare("after the stair climb"),
   followPath(29, 39, { maxFrames = 18000 }),
+  climbCare("before the J39 row"),
   jumpRow("left", function()
     return H.fieldX() <= 18 and H.fieldY() == 39
   end, 9000, "J39 row westbound"),
   door(15, 39, 225, "P17a -> west room"),
+  climbCare("after P17a"),
   -- P18b: cross the west room to (104,27)->221.  followPath mispredicts +
   -- HANGS on the (111,15) scene-beam here; westRoomCross rides it (see above).
   westRoomCross(),
+  climbCare("after the west room"),
   followPath(18, 33, { maxFrames = 12000 }),
+  climbCare("before the J33 row"),
   jumpRow("right", function()
     return H.fieldX() >= 28 and H.fieldY() == 33
   end, 9000, "J33 row eastbound"),
@@ -1158,6 +1217,7 @@ H.run({ maxFrames = 400000 }, {
   -- encounter, not a warp (see bridgeClimb's header + wob-route sixth pass).
   bridgeClimb(),
   corridorFollow(),
+  climbCare("at the entry point"),
 
   -- the entry point: one A-press from battle 69.  The extra beat plus the
   -- settled assert keep this generated savestate trustworthy: the state is
