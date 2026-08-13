@@ -1,4 +1,4 @@
--- @suite savestate=zozo_arrival
+-- @suite savestate=zozo_clock_solved
 -- field_healpolicy.lua -- H.fieldCare's healing policy: cast a cure spell
 -- when somebody can, drink from the bag when nobody can.  Reads and pad
 -- presses only (issue #75).
@@ -9,22 +9,41 @@
 -- (ot6_progression.asm:3-6, called from battle_main.asm:16251), so MP spent
 -- in a corridor comes back and a Tonic drunk in one does not.
 --
--- The fixture is zozo_arrival, the smallest formation that separates the
--- two branches: LOCKE at 91/249 knowing no spell at all, CELES untouched
--- with a full 77 MP and Cure known, and a bag of 6 Tonics and 13 Potions.
--- One starting state therefore drives the same visit four ways, and the
--- difference between the first two IS the consumable saving.
+-- The fixture is zozo_clock_solved: somebody hurt who knows no spell at all,
+-- CELES with Cure known and MP to spend, and a bag of Tonics.  One starting
+-- state therefore drives the same visit four ways, and the difference
+-- between the first two IS the consumable saving.
+--
+-- NOTHING BELOW IS WRITTEN AS A LITERAL FROM THAT FIXTURE, and that is a
+-- correction rather than a style preference.  This test used to be
+-- zozo_arrival's, and it named LOCKE at 91 of 249, CELES at exactly 77 MP,
+-- EDGAR at exactly 280, and exactly 6 Tonics.  On 2026-08-13 the route
+-- started fighting and grinding its way to Zozo and healing between the
+-- fights, so zozo_arrival began arriving with all four at full HP -- a
+-- better fixture and a broken test, which failed on "LOCKE is the one who
+-- needs it (314/314)".  The subject here is the RELATIONSHIP between the
+-- branches (bag versus MP, and which of the two the policy reaches for),
+-- never any particular number, so the roles are resolved from the fixture
+-- at load: the patient is whoever is furthest below their maximum and knows
+-- no cure, the healer is whoever knows Cure, and the refusal target is
+-- whoever is already at full.
+--
+-- The one thing that is still a fixture assumption is that SOMEBODY is
+-- meaningfully hurt.  That is checked as a precondition and fails loudly if
+-- a future regeneration lands this state with the party at full, which is
+-- the right outcome: a heal-policy test on a party that needs no healing
+-- passes without testing anything.
 --
 -- What this pins down:
 --   1. M.calcMaxHpMp unpacks the boost code the way CalcMaxHPMP does.  A
 --      table check against literal words rather than a fixture, because no
 --      World of Balance roster has a boost bit set, so no route reaches the
 --      arms that were wrong.
---   2. opts.magic=false: LOCKE is healed out of the bag.  Consumables go
---      down and nobody's MP moves.
---   3. The default policy: LOCKE is healed by CELES casting Cure.  Her MP
---      goes down, the bag is untouched, and he ends at least as healthy as
---      the item run left him.
+--   2. opts.magic=false: the patient is healed out of the bag.  Consumables
+--      go down and nobody's MP moves.
+--   3. The default policy: the patient is healed by the caster casting Cure.
+--      Her MP goes down, the bag is untouched, and the patient ends at least
+--      as healthy as the item run left him.
 --   4. opts.mpFloor past her whole pool: she declines and the bag pays.
 --      That is the branch a step takes when it wants its MP for the fight
 --      it is walking toward.
@@ -45,9 +64,42 @@
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/field_healpolicy.lua
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local ZOZO = "build/states/zozo_arrival.mss.lua"
-local LOCKE, EDGAR, CELES = 1, 4, 6
+local ZOZO = "build/states/zozo_clock_solved.mss.lua"
+local CURE = 0x2D
 local refuseState = nil       -- the menu state the case-5 refusal came from
+local refuseTonics = nil      -- the bag's Tonic count before that refusal
+
+-- The three roles, resolved from the booted fixture rather than named.
+-- PATIENT is the member furthest below their own maximum who cannot cure
+-- themselves, HEALER is a member who knows Cure, and FULL is somebody
+-- already at their maximum, which case 5 needs so the game refuses a Tonic.
+local PATIENT, HEALER, FULL = nil, nil, nil
+
+local function resolveRoles()
+  local worst = 1.0
+  for _, c in ipairs(H.partyMembers()) do
+    local frac = H.charHp(c) / H.charMaxHp(c)
+    if H.knowsSpell(c, CURE) then
+      HEALER = HEALER or c
+    elseif frac < worst then
+      worst, PATIENT = frac, c
+    end
+    if H.charHp(c) == H.charMaxHp(c) then FULL = FULL or c end
+  end
+  H.assertEq(PATIENT ~= nil, true,
+    "the fixture has somebody hurt who knows no cure -- the case this " ..
+    "whole test is about")
+  H.assertEq(HEALER ~= nil, true, "the fixture has a caster who knows Cure")
+  H.assertEq(FULL ~= nil, true,
+    "the fixture has somebody at full HP for the refusal case")
+  H.assertEq(H.charHp(PATIENT) < H.charMaxHp(PATIENT) * 0.95, true,
+    string.format("the patient is below the threshold these cases heal to " ..
+      "(char %d, %d/%d)", PATIENT, H.charHp(PATIENT), H.charMaxHp(PATIENT)))
+  H.log(string.format("roles: patient=char %d (%d/%d hp), healer=char %d " ..
+    "(%d/%d mp), full=char %d", PATIENT, H.charHp(PATIENT),
+    H.charMaxHp(PATIENT), HEALER, H.charMp(HEALER), H.charMaxMp(HEALER),
+    FULL))
+end
 
 -- ZMENUSTATE trace: one entry per distinct value, with a frame count, so a
 -- 300-frame visit reads as a dozen lines instead of 300.
@@ -99,23 +151,21 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
   H.call(function()
-    H.assertEq(H.knowsSpell(CELES, 0x2D), true, "CELES knows Cure here")
-    H.assertEq(H.knowsSpell(LOCKE, 0x2D), false, "LOCKE does not")
-    H.assertEq(H.charHp(LOCKE) < H.charMaxHp(LOCKE) * 0.5, true,
-      string.format("LOCKE is the one who needs it (%d/%d)",
-        H.charHp(LOCKE), H.charMaxHp(LOCKE)))
-    itemRun.bag, itemRun.mp = bag(), H.charMp(CELES)
+    resolveRoles()
+    H.assertEq(H.knowsSpell(HEALER, CURE), true, "the healer knows Cure here")
+    H.assertEq(H.knowsSpell(PATIENT, CURE), false, "the patient does not")
+    itemRun.bag, itemRun.mp = bag(), H.charMp(HEALER)
   end),
   H.fieldCare({ tag = "zozo bag", threshold = 0.95, magic = false }),
   H.call(function()
     itemRun.spent = itemRun.bag - bag()
-    itemRun.hp = H.charHp(LOCKE)
-    H.log(string.format("bag branch: %d consumables spent, CELES mp %d -> %d, "
-      .. "LOCKE %d/%d", itemRun.spent, itemRun.mp, H.charMp(CELES),
-      itemRun.hp, H.charMaxHp(LOCKE)))
+    itemRun.hp = H.charHp(PATIENT)
+    H.log(string.format("bag branch: %d consumables spent, healer mp %d -> " ..
+      "%d, patient %d/%d", itemRun.spent, itemRun.mp, H.charMp(HEALER),
+      itemRun.hp, H.charMaxHp(PATIENT)))
     H.assertEq(itemRun.spent > 0, true,
       "with magic off the bag is what pays")
-    H.assertEq(H.charMp(CELES), itemRun.mp,
+    H.assertEq(H.charMp(HEALER), itemRun.mp,
       "and no MP is spent doing it")
     H.assertEq(H.hasControl() and H.tileAligned(), true,
       "the menu is closed and the party has control back")
@@ -126,33 +176,33 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
   H.call(function()
-    magicRun.bag, magicRun.mp = bag(), H.charMp(CELES)
+    magicRun.bag, magicRun.mp = bag(), H.charMp(HEALER)
     trace, tracing = {}, true
   end),
   H.fieldCare({ tag = "zozo cast", threshold = 0.95 }),
   H.call(function()
     tracing = false
     magicRun.spent = magicRun.bag - bag()
-    magicRun.hp = H.charHp(LOCKE)
+    magicRun.hp = H.charHp(PATIENT)
     H.log("ZMENUSTATE trace: " .. traceText())
-    H.log(string.format("cast branch: %d consumables spent, CELES mp %d -> %d, "
-      .. "LOCKE %d/%d", magicRun.spent, magicRun.mp, H.charMp(CELES),
-      magicRun.hp, H.charMaxHp(LOCKE)))
-    H.assertEq(H.charMp(CELES) < magicRun.mp, true,
-      "CELES paid for the heal out of her own MP")
+    H.log(string.format("cast branch: %d consumables spent, healer mp %d -> " ..
+      "%d, patient %d/%d", magicRun.spent, magicRun.mp, H.charMp(HEALER),
+      magicRun.hp, H.charMaxHp(PATIENT)))
+    H.assertEq(H.charMp(HEALER) < magicRun.mp, true,
+      "the healer paid for the heal out of her own MP")
     H.assertEq(magicRun.spent, 0,
       "and the bag was not opened at all")
     H.assertEq(magicRun.hp >= itemRun.hp, true, string.format(
-      "casting left LOCKE at least as healthy as drinking did (%d vs %d)",
-      magicRun.hp, itemRun.hp))
-    H.assertEq(magicRun.hp >= H.charMaxHp(LOCKE) * 0.95, true, string.format(
-      "LOCKE is back above the threshold (%d/%d)",
-      magicRun.hp, H.charMaxHp(LOCKE)))
+      "casting left the patient at least as healthy as drinking did " ..
+      "(%d vs %d)", magicRun.hp, itemRun.hp))
+    H.assertEq(magicRun.hp >= H.charMaxHp(PATIENT) * 0.95, true,
+      string.format("the patient is back above the threshold (%d/%d)",
+        magicRun.hp, H.charMaxHp(PATIENT)))
     H.assertEq(H.hasControl() and H.tileAligned(), true,
       "the menu is closed and the party has control back")
     H.log(string.format(
       "SAVING at this stop: %d consumables, paid for with %d MP",
-      itemRun.spent - magicRun.spent, magicRun.mp - H.charMp(CELES)))
+      itemRun.spent - magicRun.spent, magicRun.mp - H.charMp(HEALER)))
   end),
 
   -- 4. the MP floor.  Same fixture and the same caster as case 3, with the
@@ -163,15 +213,17 @@ H.run({ maxFrames = 200000 }, {
   H.loadState(ZOZO),
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
-  H.call(function() magicRun.floorBag = bag() end),
+  H.call(function()
+    magicRun.floorBag, magicRun.floorMp = bag(), H.charMp(HEALER)
+  end),
   H.fieldCare({ tag = "zozo mp floor", threshold = 0.95, mpFloor = 999 }),
   H.call(function()
-    H.assertEq(H.charMp(CELES), 77,
-      "the floor kept every point of CELES's MP")
+    H.assertEq(H.charMp(HEALER), magicRun.floorMp,
+      "the floor kept every point of the healer's MP")
     H.assertEq(magicRun.floorBag - bag() > 0, true,
       "so the bag paid instead")
-    H.assertEq(H.charHp(LOCKE) >= H.charMaxHp(LOCKE) * 0.95, true,
-      "and LOCKE is topped up either way")
+    H.assertEq(H.charHp(PATIENT) >= H.charMaxHp(PATIENT) * 0.95, true,
+      "and the patient is topped up either way")
   end),
 
   -- 5. the refusal cell, measured rather than assumed.
@@ -192,10 +244,11 @@ H.run({ maxFrames = 200000 }, {
   H.loadState(ZOZO),
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
+  H.call(function() refuseTonics = H.invCountOf(0xE8) end),
   (function()
     -- A refusal driven by hand, because no fixture on the route produces
     -- one: M.fieldCare's own planner never proposes a pair the game will
-    -- turn down.  Tonic ($E8) on EDGAR, who is at 280/280.
+    -- turn down.  A Tonic ($E8) on whoever the fixture ships at full HP.
     local TONIC = 0xE8
     local phase, done = 0, false
     local function steer(cur, row)
@@ -219,7 +272,7 @@ H.run({ maxFrames = 200000 }, {
           held = (H.readByte(0x4B) == H.invSlotOf(TONIC)) and { "a" } or { "b" }
         elseif st == 0x70 then
           local slot
-          for s = 0, 3 do if H.readByte(0x69 + s) == EDGAR then slot = s end end
+          for s = 0, 3 do if H.readByte(0x69 + s) == FULL then slot = s end end
           held = steer(H.readByte(0x4B), slot)
         elseif st == 0x17 or st == 0x77 then held = { "b" }
         elseif st ~= 0x00 and st ~= 0x01 and st ~= 0x02 and st ~= 0x07
@@ -228,7 +281,7 @@ H.run({ maxFrames = 200000 }, {
         else H.setPad({}); return end
         H.setPad(phase < 4 and held or {})
       end),
-    }, "drive a Tonic onto a full-HP EDGAR")
+    }, "drive a Tonic onto the full-HP member")
   end)(),
   H.release(),
   H.call(function()
@@ -236,8 +289,9 @@ H.run({ maxFrames = 200000 }, {
       "the refusal came from the item target window, not somewhere else")
     H.assertEq((H.readByte(0xB5) & 0xF0) ~= 0, true,
       "and it is announced in zMosaic's high nibble")
-    H.assertEq(H.invCountOf(0xE8), 6, "the Tonic was not spent")
-    H.assertEq(H.charHp(EDGAR), 280, "EDGAR is untouched")
+    H.assertEq(H.invCountOf(0xE8), refuseTonics, "the Tonic was not spent")
+    H.assertEq(H.charHp(FULL), H.charMaxHp(FULL),
+      "the refusal target is untouched, still at full HP")
   end),
   H.waitFrames(40),
   H.call(function()
