@@ -55,6 +55,16 @@ local locke
 local function bp() return H.readByte(0x3E9C + locke*2) end
 local function pend() return H.readByte(0x3E9D + locke*2) end
 local function mp() return H.readWord(0x3C08 + locke*2) end
+-- $3C08 is the BATTLE MP table and means nothing on the field (it read 20302
+-- there, which is trap 1: a WRAM cell means what its owning module says it
+-- means).  The segmented drain below crosses battle boundaries, so it asks
+-- for the pool through this instead: LOCKE is character 1 and the field
+-- record is 37 bytes from $1600 with current MP at +$0d, the same read
+-- battle_toolsgrey uses for EDGAR.
+local function poolMp()
+  if H.battleLoadStarted() and locke then return mp() end
+  return H.readWord(0x160d + 37 * 1)
+end
 local function stealRare(s)   return H.readByte(0x3308 + 8 + s*2) end
 local function stealCommon(s) return H.readByte(0x3309 + 8 + s*2) end
 local function cmdRowOf(slot, cmd)
@@ -108,7 +118,22 @@ end
 local mf = 0
 local drive = { wantBp = 0, wantPend = 0, target = nil }
 local tc = H.targetCursor({ mask = 0x7B7E })
+-- Where is the machine?  A drive that stalls here used to report only
+-- "timeout after N frames"; the party's HP is what tells a stuck menu apart
+-- from a party that has been ground down over a long unboosted drain.
+local hb = -600
+local function heartbeat()
+  if H.frame - hb < 600 then return end
+  hb = H.frame
+  local hps = {}
+  for s = 0, 3 do hps[#hps+1] = tostring(H.readWord(0x3BF4 + s*2)) end
+  H.log(string.format("[hb f%d] batt=%s menu=%02x actor=%d mstate=%02x "
+    .. "bp=%d pend=%d mp=%d hp=%s", H.frame,
+    tostring(H.battleLoadStarted()), H.readByte(MENU), H.readByte(ACTOR),
+    H.readByte(MSTATE), bp(), pend(), mp(), table.concat(hps, "/")))
+end
 local function decide()
+  heartbeat()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
   end
@@ -324,31 +349,99 @@ H.run({ maxFrames = 150000 }, {
   -- miss, is refused by the universal insufficient-mp fizzle: nothing
   -- taken, MP untouched.  The OFF build charges 0, so there is nothing to
   -- refuse, and this half runs only under the flag, as in battle_mpcost.lua.
+  --
+  -- The drain is segmented, and it has to be.  Nobody but LOCKE acts during
+  -- it -- every other character defers, on purpose, because a party that
+  -- kills the pack wins the fight, and a won fight can hand out a level, and
+  -- OT6 restores MP in full on a level up (ot6_progression.asm:3-6), which
+  -- is the one thing that would undo the poverty this arm is earning.  So
+  -- the desert gets free rounds against a party that never fights back, and
+  -- eight steals is a long time to give it: measured 2026-08-13, one
+  -- continuous drain took the party 75/60/36 -> 63/48/0 -> 39/5/0 -> 11/0/0
+  -- and then wiped in the next encounter, which surfaced as a 30000-frame
+  -- timeout on the refused steal rather than as a wipe (HANDOFF: the fight
+  -- driver's log goes silent on a wipe).
+  --
+  -- The segmented shape is the route's own answer to the same problem: a few
+  -- steals, flee (a flee pays no experience, so the pool stays drained), a
+  -- real field care stop, then back in.  Six rounds is enough for a 31-MP
+  -- pool at 4 MP a steal with room to spare.
   H.cond(function() return mode == "on" end, {
     H.call(function()
       drive.target = nil                         -- any monster will do
       drive.wantBp, drive.wantPend = 0, 0        -- pure unboosted attempts
     end),
     (function()
-      local guard = 0
-      return H.driveUntil(function()
-        return mp() < STEAL_COST
-      end, 60000, {
-        H.call(function()
-          guard = guard + 1
-          if guard % 600 == 0 then
-            H.log(string.format("draining: mp=%d", mp()))
-          end
-          H.setPad(decide())
-        end),
-      }, "the pool drained below one steal by real attempts")
+      local steps = {}
+      local function partyHurt()
+        for s = 0, 3 do
+          local h, m = H.readWord(0x3BF4 + s*2), H.readWord(0x3C1C + s*2)
+          if m > 0 and m < 9999 and h * 100 // m < 55 then return true end
+        end
+        return false
+      end
+      for round = 1, 6 do
+        steps[#steps+1] = H.cond(function() return poolMp() < STEAL_COST end, {}, {
+          -- in the first round the battle from arm 2 is still up
+          H.cond(function() return H.battleLoadStarted() end, {}, {
+            H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
+              H.call(function()
+                if not H.worldMode() or not H.worldHasControl() then
+                  H.setPad({}); return
+                end
+                H.setPad(((H.frame // 120) % 2 == 0) and { left = true }
+                  or { right = true })
+              end),
+            }, "drain round " .. round .. ": an encounter"),
+            H.release(),
+            H.waitUntil(function() return H.battleActive() end, 900,
+              "drain round " .. round .. ": battle active", 30),
+            H.waitFrames(90),
+            H.call(function()
+              locke = nil
+              for slot = 0, 3 do
+                if H.readByte(0x3ED8 + slot*2) == 0x01 then locke = slot end
+              end
+              H.assertEq(locke ~= nil, true,
+                "LOCKE is really in this party (drain round " .. round .. ")")
+            end),
+          }),
+          -- steal until the pool is spent or the party has taken enough
+          H.driveUntil(function()
+            return poolMp() < STEAL_COST or not H.battleLoadStarted()
+              or partyHurt()
+          end, 25000, {
+            H.call(function() H.setPad(decide()) end),
+          }, "drain round " .. round .. ": steals"),
+          H.call(function()
+            H.setPad({})
+            H.log(string.format("drain round %d: mp=%d", round, poolMp()))
+          end),
+          H.cond(function() return H.battleLoadStarted() end, {
+            H.fleeBattle(12000),
+            H.waitFrames(240),
+          }, {}),
+          -- a real field care stop between rounds, the route's own pattern
+          H.cond(function() return poolMp() < STEAL_COST end, {}, {
+            H.fieldCare({ tag = "drain round " .. round, threshold = 0.9 }),
+          }),
+        })
+      end
+      return H.repeatN(1, steps)
     end)(),
     H.call(function()
       H.setPad({})
-      H.log(string.format("drained: mp=%d (< %d)", mp(), STEAL_COST))
+      H.log(string.format("drained: mp=%d (< %d)", poolMp(), STEAL_COST))
+      H.assertEq(poolMp() < STEAL_COST, true,
+        "the pool really was drained below one steal by real attempts")
     end),
-    H.fleeBattle(12000),
-    H.waitFrames(240),
+    H.cond(function() return H.battleLoadStarted() end, {
+      H.fleeBattle(12000),
+      H.waitFrames(240),
+    }, {}),
+    -- and one more care stop, so the refusal battle is not fought by a party
+    -- that is about to die in it
+    H.fieldCare({ tag = "before the refusal battle", threshold = 0.9 }),
     enterDesertBattle(2),
     H.call(function() drive.target = rareT end),
     oneSteal("unaffordable steal (earned poverty)", 3, 3, 400),
