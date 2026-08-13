@@ -223,9 +223,14 @@ local function lap(n)
   }, {})
 end
 
+-- The lap cap is a bound on a runaway, not a plan: the loop exits on the
+-- target, and a lap it skips costs one predicate call.  36 is set against
+-- the measured rate -- about 200 experience each a fight, a fight about
+-- every 37 steps, 26 steps a lap -- so it covers roughly 2600 experience,
+-- comfortably more than the largest gap seen at this point in the route.
 local function grind()
   local steps = {}
-  for n = 1, 24 do steps[#steps + 1] = lap(n) end
+  for n = 1, 36 do steps[#steps + 1] = lap(n) end
   steps[#steps + 1] = H.call(function()
     H.log(string.format("[grind] %d laps: LOCKE L%d xp=%d (target %d), " ..
       "gil=%d, f%d", grindLaps, levelOf(LOCKE), expOf(LOCKE), EXP_TARGET,
@@ -255,11 +260,13 @@ local function door(nx, ny, dir, m, what)
   })
 end
 
--- maxFrames: the fleeing version of this step ran inside 90000.  The fought
--- crossing adds about five battles, and the grind laps add the rest; each
--- group-10 fight has measured in the same range as the Zozo street's 6352
--- frames, so the budget is raised with room rather than tuned to a run.
-H.run({ maxFrames = 400000 }, {
+-- maxFrames: the fleeing version of this step ran inside 90000.  Measured
+-- 2026-08-13, the fought crossing alone reaches the grind column at f25743
+-- having fought four battles, and the grind is the larger half; a group-10
+-- fight runs in the same range as the Zozo street's measured 6352 frames.
+-- 600000 is the lap cap's worth of that with room, rather than a number
+-- tuned to one run.
+H.run({ maxFrames = 600000 }, {
   H.loadState("build/states/figaro_submerged.mss.lua"),
   H.waitFrames(30),
   H.call(function()
