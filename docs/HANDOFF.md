@@ -214,7 +214,14 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   that leaves it without one has nothing that clears the bit. Every other
   curable status-1 bit is a combat handicap that walking does not compound,
   which is why only poison is in the audit and only poison is in `fieldCare`'s
-  cure table.
+  cure table. **The cure itself is now watched rather than assumed**, which it
+  was not until 2026-08-13: gen_zozo2_arrival's fought crossing poisoned SABIN
+  and its next care stop logged `used $F2 on char 5: 206 -> 206 hp, status1 04
+  -> 00, 3 left`, the exact line this entry used to ask for. The row also
+  carries a Remedy as a fallback now, because its arm accepts a poisoned
+  target (`and #$65` isolates petrify, imp, poison and dark,
+  `ff6/src/menu/item.asm:2311-2315`) and a party can easily be holding
+  Remedies and no Antidote.
 - **It reads the tracked SRAM checkpoints as well as the fixtures, and two
   things in `build/states` are not fixtures at all.** A checkpoint is the
   other boot source (five states cold-Continue out of one), it is a battery
@@ -314,6 +321,39 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   SABIN 15 where the old one was 15/16/16. Nothing asserts a level at these
   boundaries and every contract still passes, but a fight that was tuned
   against the old numbers is being fought a level down.
+- **The world map between the west Figaro castle and Zozo is the route's
+  levelling ground, and it is worth about 229 experience a head a fight.**
+  158 of the crossing's 177 tiles are world battle group 10 — Vulture 15,
+  Iron Fist 15, Mind Candy 15 — with 4, 11 and 1 tiles of groups 12, 9 and
+  11. Decoded from `world_1_tilemap.dat` and `WorldTileProp` (`$EE9B14`)
+  through the chain `CheckBattleWorld` walks (`ff6/src/field/battle.asm:97-214`):
+  zone = `(tileY & $E0) | ((tileX >> 3) & $1C)`, group =
+  `WorldBattleGroup[zone | BattleBGGroupTbl[bg]]`, four formations at
+  `RandBattleGroup[group * 8]` drawn 31.25/31.25/31.25/6.25%. Group 10 pays
+  an expected 918 experience and 1504 gil a fight after `Ot6RewardMulW =
+  $0020` doubles it (`ot6_break.asm:693-696`), and `WinBattle` divides
+  experience by the number of allies alive (`battle_main.asm:15790-15800`).
+  A fight lands about every 37 steps, since the same knob pair halves the
+  danger increment. The lap corridor is `(34,99)` to `(34,112)`: group 10 end
+  to end, and clean of all 45 world-0 `ShortEntrance` records and all 9
+  map-0 `EventTrigger` records, which BFS knows nothing about. Measured
+  2026-08-13: the fought crossing plus 8 laps took the party from LOCKE 11 /
+  EDGAR 12 / SABIN 12 / CELES 11 to 13 / 14 / 14 / 13 and 13662 gil to 31758,
+  in 51921 frames against the fleeing version's 9585.
+- **Zozo's random encounters can cost a character more than their whole HP
+  bar in one round, and no amount of "grind a little" closes that.** Measured
+  2026-08-13 in the stair room, map 225 at (53,30), against a party of LOCKE
+  13 / CELES 13 / EDGAR 14 / SABIN 14 that entered at full HP: one monster of
+  295 HP and 2 shields cost the four of them 269, 224, 241 and 363 in a
+  round, against maximums of 314, 349, 398 and 363. SABIN was taken from full
+  to 0. Every actor then spent every turn healing or reviving him, so the Bio
+  Blaster the town is authored around was never fired, the two shields never
+  came off, damage stayed halved for the whole fight, and the party lost.
+  Read that as a rate problem rather than a level problem: two levels moved
+  the wipe from the first encounter on the street to the sixth in the stair
+  room, and merely not being one-shot would need two more on top, while
+  surviving two of those rounds would need about thirteen. The lever is
+  whatever makes the break land early, not the party's level.
 - **A party wipe must be reported as a wipe, and `M.partyWiped()` cannot
   report one.** Four wipes have now been mistaken for stuck navigators. The
   field half misses it because `$1600` keeps pre-battle HP. The battle half,
