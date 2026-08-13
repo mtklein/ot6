@@ -34,9 +34,13 @@
 --      proof main commit 5d00086 deferred to "the vargas-entry fixture".  Holy
 --      is the only way that shield can move on that turn: it is checked
 --      against the recorded skill id, and Sabin is alone on the field.
---   5. bludgeoning chips.  Pummel (Blitz 0, skill $5d, OT6_BLUDG per
---      Ot6SkillClassTbl, ot6_class.asm:193) takes another shield and reveals
---      class $04.
+--   5. bludgeoning chips, twice.  Pummel (Blitz 0, skill $5d, OT6_BLUDG per
+--      Ot6SkillClassTbl, ot6_class.asm:193) takes two shields, 3 -> 1, and
+--      reveals class $04.  Two rather than one because Pummel is x2
+--      (Ot6HitCountTbl, ot6_hitcount.asm) and each hit is its own
+--      ExecAttack -> CalcTargetDmg pass, so each is its own chip: the gauge
+--      takes two separate writes in the one action, which is asserted
+--      beside the end value.
 --   6. the fight ends to the script.  Vargas's reaction script
 --      (ai_script.asm:4385-4388) answers `if_attack PUMMEL` with
 --      `battle_event $09 / kill_monsters ALL, FADE_HORIZONTAL`, and that,
@@ -703,9 +707,14 @@ H.run({ maxFrames = 150000 }, {
     blitzFired = false
     mode = "pummel"
   end),
-  H.driveUntil(function() return #shWrites > nBefore end, 15000, {
+  -- Two writes, not one: Pummel is x2 (Ot6HitCountTbl,
+  -- ff6/src/battle/ot6_hitcount.asm), and an extra count is a whole extra
+  -- ExecAttack -> CalcTargetDmg pass, so it is a whole extra chip
+  -- opportunity against a bludgeoning-weak target.  Waiting for the first
+  -- write and reading the gauge would race the second.
+  H.driveUntil(function() return #shWrites >= nBefore + 2 end, 15000, {
     fightDriver(),
-  }, "PUMMEL reaches the gauge"),
+  }, "PUMMEL's two hits both reach the gauge"),
   -- #33: the class chip defers the same way the element chips do
   H.call(function() mode = "hold" end),
   H.driveUntil(function()
@@ -720,7 +729,9 @@ H.run({ maxFrames = 150000 }, {
     -- measured: pummelVhp still held the bio-confirm value here)
     pummelVhp = H.readWord(MHP(vSlot))
     H.assertEq(H.readByte(0x3410), PUMMEL, "the resolved skill was Pummel ($5d)")
-    H.assertEq(shields(), 2, "PUMMEL took a shield: 3 -> 2")
+    H.assertEq(shields(), 1, "PUMMEL took TWO shields: 3 -> 1 (x2, one chip a hit)")
+    H.assertEq(#shWrites - nBefore, 2,
+      "and it was two separate gauge writes, one per hit, not one write of two")
     H.assertEq(H.readByte(RVC(vSlot)) & OT6_BLUDG, OT6_BLUDG,
       "and REVEALED the bludgeoning class ($04)")
     H.assertEq(H.readByte(RVE(vSlot)), POISON | HOLY,
