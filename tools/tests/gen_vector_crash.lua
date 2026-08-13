@@ -139,6 +139,28 @@ local function assertGateParty(where)
   H.assertEq(partyOf(0x05), 1, "SABIN in party 1 -- " .. where)
 end
 
+-- ------------------------------------------------------------ TERRA's kit --
+-- The `gate-cave-save-v1` checkpoint this step cold-boots carries TERRA with
+-- all five equipment bytes at $FF, because it was cut before
+-- gen_gate_cave_save gained its equip stop.  So the same stop runs again
+-- here, on the same items out of the same bag, and it is a no-op the day
+-- that checkpoint is re-cut -- the guards below skip a slot that is already
+-- filled.  The reasoning for the items is in gen_gate_cave_save's header:
+-- $0E Blizzard is slash and ice, which is the Sealed Gate area's class key
+-- (65.63 % of draws, against pierce's 0.00 %) and an element nothing there
+-- absorbs (break-coverage-sealed-gate.md section 5); $6A and $84 are the
+-- bag's spare hat and armour, and it holds no spare shield.
+local EMPTY = 0xFF
+local CH_TERRA = 0
+local function gear(c, off) return H.readByte(0x1600 + 37 * c + off) end
+local function ordOf(c) return (H.readByte(0x1850 + c) >> 3) & 0x03 end
+
+local function fill(c, pos, slot, id, tag)
+  return H.cond(function()
+    return gear(c, 0x1F + slot) == EMPTY and H.invCountOf(id) > 0
+  end, { H.equipWeapon(pos, id, { slot = slot, tag = tag }) }, {})
+end
+
 H.run({ maxFrames = 240000 }, {
   -- ---- the cold Continue and the entry contract (issue #25) -------------
   H.waitFrames(350),
@@ -172,6 +194,37 @@ H.run({ maxFrames = 240000 }, {
     return H.fieldY() >= 55 and H.tileAligned()
   end, 1200, "held DOWN off the save-point re-entry tile"),
   H.navTo(73, 58, { playBattles = "flee", maxFrames = 9000 }),
+
+  -- ---- 1b. TERRA's kit ---------------------------------------------------
+  -- Here rather than on the boot tile: the boot tile is the save point's
+  -- own trigger and it re-enters every frame, so H.hasControl() never
+  -- settles there and H.equipWeapon's back-out drive could not finish.
+  -- (73,58) is off the trigger, still inside the save room, and still
+  -- before the drop into map 384, which is the first map of the cave
+  -- proper.  The char-select row is asserted rather than assumed: the row
+  -- is the party's order field ($1850 bits 3-4), so a differently ordered
+  -- party would dress the wrong character.
+  H.call(function()
+    H.assertEq(ordOf(CH_TERRA), 0, "TERRA is char-select row 0")
+    H.log(string.format("[kit] TERRA gear before: %02X %02X %02X %02X",
+      gear(CH_TERRA, 0x1F), gear(CH_TERRA, 0x20), gear(CH_TERRA, 0x21),
+      gear(CH_TERRA, 0x22)))
+  end),
+  fill(CH_TERRA, 0, 0, 0x0E, "TERRA Blizzard"),
+  fill(CH_TERRA, 0, 2, 0x6A, "TERRA Hair Band"),
+  fill(CH_TERRA, 0, 3, 0x84, "TERRA LeatherArmor"),
+  H.waitUntil(landed(386, 10), 2400,
+    "save-room control back after the equip stop", 1),
+  H.call(function()
+    -- The exit contract for the kit.  Without it an equip stop that
+    -- silently did nothing and one that worked report the same green.
+    H.assertEq(gear(CH_TERRA, 0x1F) ~= EMPTY, true,
+      "TERRA leaves the save room holding a weapon")
+    H.log(string.format("[kit] TERRA gear after:  %02X %02X %02X %02X",
+      gear(CH_TERRA, 0x1F), gear(CH_TERRA, 0x20), gear(CH_TERRA, 0x21),
+      gear(CH_TERRA, 0x22)))
+  end),
+
   pressWalk("down", function() return map() == 384 end, 1200,
     "held DOWN off 386 (73,59) -> 384 (64,12)"),
   H.waitUntil(landed(384, 10), 2400, "384 re-entry", 1),

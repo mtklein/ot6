@@ -222,6 +222,49 @@ local function cellOf(charId)
   return nil
 end
 
+-- ------------------------------------------------------------ TERRA's kit --
+-- TERRA rejoins the party in the swap room below holding nothing.  The
+-- Battle for Narshe's tail strips her when she turns into an esper and flies
+-- off (`remove_equip TERRA` beside `delete_obj TERRA`,
+-- event_main.asm:106887), her gear went back to the bag, and the whole
+-- search for her ran without her, so the seating below is the first moment
+-- anyone could put a kit on her -- and until this stop nobody did, which
+-- shipped her bare into the Imperial Base and the Sealed Gate cave.
+--
+-- Equipped by item, never through Optimum (wob-route.md section 2), and the
+-- items are chosen for the area this step walks into:
+--   $0E Blizzard -- power 108 against the MithrilBlade's 38, OT6_SLASH
+--       (ot6_class.asm:63), element ice (ItemProp +$0F = $02).  Both axes
+--       are the area's: break-coverage-sealed-gate.md section 5 measures
+--       slash keying 65.63 % of draws and pierce 0.00 %, and LOCKE and
+--       EDGAR arrive carrying pierce ($02 and $01), so she is the second
+--       slash swinger next to SABIN.  Ice keys 40.63 % of draws and feeds
+--       an absorber in 0.00 % of them, which is the check the Thunder
+--       Blade/Crane disaster is remembered for.
+--   $6A Hair Band, $84 LeatherArmor -- the spares in the bag.
+-- Her shield row stays empty because the bag holds no spare shield: LOCKE,
+-- EDGAR and SABIN are wearing the three it has.  The relic rows stay empty
+-- for the same reason the rest of the party's are empty here, and because
+-- the one spare that would tempt a filler is a Gauntlet, which makes the
+-- game run its own Optimum when the Relic screen is backed out
+-- (CheckReequipRelics, equip.asm:2843-2850).
+local EMPTY = 0xFF
+local CH_TERRA = 0
+local function gear(c, off) return H.readByte(0x1600 + 37 * c + off) end
+local function ordOf(c) return (H.readByte(0x1850 + c) >> 3) & 0x03 end
+
+-- Fill one empty gear slot from the bag.  Both guards matter, for
+-- gen_tunnelarmr's fillSlot reasons: H.equipWeapon's list seek walks the
+-- menu's pre-filtered rows, so an item the bag does not hold makes it time
+-- out rather than fail cleanly, and a slot that already holds something
+-- does not want overwriting.  Slot n's byte is +$1F+n (R-Hand, L-Hand,
+-- Helmet, Armor, Relic 1, Relic 2; ff6/notes/field-ram.txt:905-923).
+local function fill(c, pos, slot, id, tag)
+  return H.cond(function()
+    return gear(c, 0x1F + slot) == EMPTY and H.invCountOf(id) > 0
+  end, { H.equipWeapon(pos, id, { slot = slot, tag = tag }) }, {})
+end
+
 local function landed(m, n)
   local cnt, hb = 0, -600
   return function()
@@ -334,6 +377,32 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(partyOf(0x05), 1, "SABIN in party 1")
     H.assertEq(partyOf(0x09), 0, "SETZER benched")
     H.screenshot("step_gh_swapped")
+  end),
+
+  -- ---- 2b. TERRA's kit, the moment she is seated -------------------------
+  -- The char-select row is asserted rather than assumed: H.equipWeapon
+  -- seeks the cursor to a fixed row, and the row is the party's order field
+  -- ($1850 bits 3-4), so a party seated in a different order would dress
+  -- the wrong character.  The menu above just wrote that order, TERRA into
+  -- the first empty cell, so this also checks the seating did what it says.
+  H.call(function()
+    H.assertEq(ordOf(CH_TERRA), 0, "TERRA is char-select row 0")
+    H.log(string.format("[kit] TERRA gear before: %02X %02X %02X %02X",
+      gear(CH_TERRA, 0x1F), gear(CH_TERRA, 0x20), gear(CH_TERRA, 0x21),
+      gear(CH_TERRA, 0x22)))
+  end),
+  fill(CH_TERRA, 0, 0, 0x0E, "TERRA Blizzard"),
+  fill(CH_TERRA, 0, 2, 0x6A, "TERRA Hair Band"),
+  fill(CH_TERRA, 0, 3, 0x84, "TERRA LeatherArmor"),
+  H.waitUntil(landed(7, 10), 2400, "map 7 control back after the equip stop", 1),
+  H.call(function()
+    -- The exit contract for the kit.  Without it an equip stop that
+    -- silently did nothing and one that worked report the same green.
+    H.assertEq(gear(CH_TERRA, 0x1F) ~= EMPTY, true,
+      "TERRA leaves the swap room holding a weapon")
+    H.log(string.format("[kit] TERRA gear after:  %02X %02X %02X %02X",
+      gear(CH_TERRA, 0x1F), gear(CH_TERRA, 0x20), gear(CH_TERRA, 0x21),
+      gear(CH_TERRA, 0x22)))
   end),
 
   -- ---- 3. wheel, fly to the base pass, walk the base, into the cave ------
