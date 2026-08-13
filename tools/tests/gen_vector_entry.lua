@@ -101,6 +101,54 @@ local function mapTitleHere()
   return s
 end
 
+-- ------------------------------------------------- LOCKE's and CELES's kit --
+-- The checkpoint boots them holding nothing at all: `post-opera-v1` reads
+-- LOCKE `FF FF FF FF FF` and CELES the same, with LOCKE's own Guardian
+-- sitting in the bag.  That is the story's doing -- the opera strips CELES
+-- (`remove_equip CELES`, event_main.asm:27273/:27785) and nothing in the
+-- chain ever put either kit back -- and until this stop it rode all the way
+-- through the Magitek Research Facility, whose maps 262, 263 and 264 all
+-- draw random battles (map_prop.dat +$05 bit 7 set, the flag
+-- CheckRandomBattle tests at field/battle.asm:332).  Two characters
+-- punching that arc is exactly the fixture bug tools/audit_equipment.py
+-- exists to catch.
+--
+-- Equipped by item, never through Optimum (wob-route.md section 2).  What
+-- the checkpoint's bag holds, and who gets it:
+--   LOCKE  $02 Guardian (power 59, and LOCKE is the only actor whose equip
+--          mask claims it), $5A Buckler, $69 Leather Hat, $84 LeatherArmor
+--   CELES  $01 MithrilKnife (power 30; the Dirk's 26 is the only other
+--          weapon in the bag she can hold), the second $5A Buckler,
+--          $6A Hair Band, $84 LeatherArmor
+-- Both weapons are OT6_PIERCE (ot6_class.asm:48-50), which is deliberate:
+-- EDGAR and SABIN arrive holding $0A and $53, both OT6_SLASH (:59, :140),
+-- so the party covers both classes across the arc's two set-piece espers --
+-- Ifrit is pierce and Shiva is slash (wob-route.md section 1).  The bag has
+-- no slash weapon either of these two can hold, so there is no better
+-- split available here.
+--
+-- The relic rows are left alone on purpose.  The bag's spare relics are a
+-- Gauntlet, a Peace Ring and a Black Belt, and equipping a Gauntlet makes
+-- the game run its own Optimum when the Relic screen is backed out
+-- (CheckReequipRelics, equip.asm:2843-2850), which is the thing this route
+-- is not allowed to do.
+local EMPTY = 0xFF
+local CH_LOCKE, CH_CELES = 1, 6
+local function gear(c, off) return H.readByte(0x1600 + 37 * c + off) end
+local function ordOf(c) return (H.readByte(0x1850 + c) >> 3) & 0x03 end
+
+-- Fill one empty gear slot from the bag.  Both guards matter, for
+-- gen_tunnelarmr's fillSlot reasons: H.equipWeapon's list seek walks the
+-- menu's pre-filtered rows, so an item the bag does not hold makes it time
+-- out rather than fail cleanly, and a slot that already holds something
+-- does not want overwriting.  Slot n's byte is +$1F+n (R-Hand, L-Hand,
+-- Helmet, Armor, Relic 1, Relic 2; ff6/notes/field-ram.txt:905-923).
+local function fill(c, pos, slot, id, tag)
+  return H.cond(function()
+    return gear(c, 0x1F + slot) == EMPTY and H.invCountOf(id) > 0
+  end, { H.equipWeapon(pos, id, { slot = slot, tag = tag }) }, {})
+end
+
 -- Robust world walk to (tx,ty): re-plan a worldBfs each time the plan runs
 -- out, press the next step, and flee any random encounter with the game's
 -- L+R run mechanic.  No edge is ever
@@ -187,6 +235,48 @@ H.run({ maxFrames = 160000 }, {
       map(), mapTitleHere(), H.fieldX(), H.fieldY()))
     H.screenshot("v06_control_albrook")
   end),
+
+  -- ---- the equip stop, in Albrook -----------------------------------------
+  -- Here, and not on the world map the checkpoint boots onto: H.equipWeapon
+  -- ends by driving back to H.hasControl(), which reads the field party
+  -- object's movement type ($087c+$0803 low nibble = 2, lib/ot6.lua:1580-1587)
+  -- and is a field-mode answer.  Albrook is the first field map the step
+  -- stands on, the party is already standing in it for the control probe
+  -- above, and it is a town, which is where a player would open the menu
+  -- anyway.  Everything after this is the world walk and then Vector.
+  --
+  -- The char-select rows are asserted rather than assumed: H.equipWeapon
+  -- seeks the cursor to a fixed row and the row is the party's order field
+  -- ($1850 bits 3-4), so a reordered party would dress the wrong character.
+  H.call(function()
+    H.assertEq(ordOf(CH_LOCKE), 2, "LOCKE is char-select row 2")
+    H.assertEq(ordOf(CH_CELES), 3, "CELES is char-select row 3")
+    for _, c in ipairs({ CH_LOCKE, CH_CELES }) do
+      H.log(string.format("[kit] char %d gear before: %02X %02X %02X %02X",
+        c, gear(c, 0x1F), gear(c, 0x20), gear(c, 0x21), gear(c, 0x22)))
+    end
+  end),
+  fill(CH_LOCKE, 2, 0, 0x02, "LOCKE Guardian"),
+  fill(CH_LOCKE, 2, 1, 0x5A, "LOCKE Buckler"),
+  fill(CH_LOCKE, 2, 2, 0x69, "LOCKE Leather Hat"),
+  fill(CH_LOCKE, 2, 3, 0x84, "LOCKE LeatherArmor"),
+  fill(CH_CELES, 3, 0, 0x01, "CELES MithrilKnife"),
+  fill(CH_CELES, 3, 1, 0x5A, "CELES Buckler"),
+  fill(CH_CELES, 3, 2, 0x6A, "CELES Hair Band"),
+  fill(CH_CELES, 3, 3, 0x84, "CELES LeatherArmor"),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end,
+    1200, "Albrook control back after the equip stop", 5),
+  H.call(function()
+    -- The exit contract for the kit.  Without it an equip stop that
+    -- silently did nothing and one that worked report the same green.
+    H.assertEq(gear(CH_LOCKE, 0x1F) ~= EMPTY, true, "LOCKE holds a weapon")
+    H.assertEq(gear(CH_CELES, 0x1F) ~= EMPTY, true, "CELES holds a weapon")
+    for _, c in ipairs({ CH_LOCKE, CH_CELES }) do
+      H.log(string.format("[kit] char %d gear after:  %02X %02X %02X %02X",
+        c, gear(c, 0x1F), gear(c, 0x20), gear(c, 0x21), gear(c, 0x22)))
+    end
+  end),
+
   -- Back out.  Map 323's world exits are LONG entrances on its west and
   -- north edges (decoded from LongEntrance, $EDF480/$EDF882): a vertical
   -- run at x=0, y=0..29 -> world (137,203), and two horizontal runs at
