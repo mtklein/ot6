@@ -13,12 +13,13 @@
 # a BURN-DOWN: a line that matches nothing fails the run, so a fixture that
 # gets armed upstream cannot quietly keep its exemption.
 #
-# UMARO is not listed and never needs to be: the equip mask
-# (item_prop_en.dat +$01, bit N = actor N) says he can hold exactly one
-# weapon record in this ROM, so audit_equipment excludes him from the data
-# rather than from a list.
+# UMARO and GAU are not listed and never need to be: the game's own weapon
+# test (ItemProp +$00 & $07 == $01) and equip mask (+$01, bit N = actor N)
+# say each of them can hold exactly one weapon record in this ROM -- UMARO
+# the Bone Club, GAU the $24 Imp Halberd, which no shop stocks -- so
+# audit_equipment excludes them from the data rather than from a list.
+# Their waiver lines were deleted on 2026-08-13 when the audit started
+# reading the type byte instead of assuming records $00..$5F were weapons.
 
 locke_scenario	LOCKE	the scenario opens with him stripped and captured; gen_sfigaro's H.equipOptimum arms him before the gate soldier
-gau_joined	GAU	GAU joins off the Veldt wearing nothing, which is the character
-s2_gau_joined	GAU	same join, second-scenario variant
 celes_freed	CELES	the capture scene stripped her and gen_celes frees her still bare; gen_tunnelarmr's equip stop arms her by item at boot, the very next step

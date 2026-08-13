@@ -47,20 +47,33 @@ from savestate_party import (EMPTY, NAMES, declared_states, load_waivers,
 WAIVERS = "tools/equipment_waivers.txt"
 ITEM_PROP = "ff6/src/menu/item_prop_en.dat"
 
-WEAPON_IDS = range(0x00, 0x60)
+ITEM_REC = 30                # bytes per item_prop_en.dat record
+ITEM_TYPE_WEAPON = 0x01      # ItemProp +$00 & $07
 
 
 def equippable_weapons(repo: str) -> dict[int, int]:
     """How many weapon records each actor may hold, read from the ROM data.
 
-    UMARO is bare-handed in ten fixtures, and that is correct, because the
-    game will not let him hold anything.  That is derived here rather than
-    hardcoded: the equip mask is `item_prop_en.dat` offset +$01, 16-bit,
-    bit N = actor N (HANDOFF, "canonical facts you should not re-derive";
-    byte +$00 always looks like a mask and always claims Terra, which is
-    the mistake that entry exists to prevent).  An actor who can hold one
-    weapon or none cannot be re-equipped and must not be reported as a
-    finding, or the real findings get buried.
+    UMARO and GAU are bare-handed in a dozen fixtures between them, and that
+    is correct, because the game will not let either of them hold anything.
+    That is derived here rather than hardcoded, using the game's own two
+    reads from `GetValidWeapons` (`ff6/src/menu/equip.asm:1594-1601`): a
+    record is a weapon when `ItemProp +$00 & $07 == $01`, and the equip mask
+    is the 16-bit field at +$01, bit N = actor N (HANDOFF, "canonical facts
+    you should not re-derive"; byte +$00 also always looks like a mask and
+    always claims Terra, which is the mistake that entry exists to prevent).
+    An actor who can hold one weapon or none cannot be re-equipped and must
+    not be reported as a finding, or the real findings get buried.
+
+    The type test replaced a `range(0x00, 0x60)` stand-in for "is this a
+    weapon" on 2026-08-13.  Records $5A..$68 are shields, so the stand-in
+    counted the Buckler, the Mithril Shld and the Aegis Shld as weapons for
+    GAU and put him at four, which kept him in the report.  He holds exactly
+    one weapon record in this ROM, $24 Imp Halberd, and no shop in the game
+    stocks it (no record in `ff6/src/menu/shop_prop.dat` lists it), so the
+    route cannot arm him and reporting him buries the real findings.  Record
+    $FF is skipped: it is the empty-slot sentinel, and its record is typed
+    as a weapon with a mask that claims actors 0-7.
     """
     path = os.path.join(repo, ITEM_PROP)
     try:
@@ -70,9 +83,11 @@ def equippable_weapons(repo: str) -> dict[int, int]:
     out = {}
     for actor in range(16):
         out[actor] = sum(
-            1 for i in WEAPON_IDS
-            if (int.from_bytes(data[i * 30 + 1:i * 30 + 3], "little")
-                >> actor) & 1)
+            1 for i in range(0x100)
+            if i != EMPTY
+            and (data[i * ITEM_REC] & 0x07) == ITEM_TYPE_WEAPON
+            and (int.from_bytes(data[i * ITEM_REC + 1:i * ITEM_REC + 3],
+                                "little") >> actor) & 1)
     return out
 
 
