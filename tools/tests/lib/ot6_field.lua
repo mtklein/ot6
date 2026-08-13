@@ -1856,7 +1856,7 @@ local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
 local CARE_SEL, CARE_MAGIC_SEL = 0x28, 0x99   -- zSelIndex, chosen list index
 local CARE_MAGIC_GATE = 0x7a                  -- zSkillsTextColor[1] = Magic
 local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
-local CARE_ANTIDOTE = 0xF2
+local CARE_ANTIDOTE, CARE_REMEDY = 0xF2, 0xF5
 local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 
 -- ---- clearing a status, and why this list has one entry ----
@@ -1889,22 +1889,28 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- for them would be a path nothing in the tree has ever run.  Add the row
 -- when a fixture shows the bit, not before.
 --
--- HOW FAR THIS HAS BEEN WATCHED, 2026-08-12.  The declining half is
--- measured three times: with the bit set and no Antidote in the bag,
+-- A row carries an ORDERED list of items rather than one, tried in order and
+-- skipped when the bag has none of that one.  The Antidote is first because
+-- it is the cheap single-purpose answer; the Remedy is the fallback, and its
+-- arm does accept a poisoned target -- `and #$65` isolates petrify, imp,
+-- poison and dark (ff6/src/menu/item.asm:2311-2315).  Without the fallback a
+-- party holding Remedies and no Antidote carries the bit for the rest of the
+-- route, and that is measured rather than hypothetical: CELES took poison in
+-- the first fight of gen_zozo2_arrival's crossing on 2026-08-13 with two
+-- Remedies and no Antidote in the bag, and all twelve care stops after it
+-- spent a Cure undoing damage the bit immediately redid.
+--
+-- HOW FAR THIS HAS BEEN WATCHED.  The declining half is measured three
+-- times: with the bit set and nothing in the bag that clears it,
 -- pickStatusCure returns nil and the visit logs `status1 04 -> 04` beside
 -- each Tonic it spends, at gen_kolts's stop before VARGAS and at both of
--- gen_returner's.  The succeeding half -- bit set, Antidote in the bag,
--- bit cleared -- has NOT been watched.  Poison turns out to be a rare draw:
+-- gen_returner's.  The succeeding half -- bit set, a cure in the bag, bit
+-- cleared -- was unwatched until 2026-08-13, because poison is a rare draw:
 -- it landed once in a full chain regeneration and then not at all in eleven
 -- targeted re-runs of the two generators that fight the formations which
--- applied it, so the pass-after chain went green without a poisoned
--- character in it.  Treat the cure as unverified until a run shows
--- `[care ...] used $F2 on char N: ... status1 04 -> 00`.  What would settle
--- it is a probe that boots kolts_cave, fights Mt. Kolts trash until a party
--- member carries $04, and then calls fieldCare -- input-driven throughout,
--- so it stays inside the no-state-writes rule.
+-- apply it.  The Zozo crossing is the run that finally carried it.
 local CARE_STATUS_CURES = {
-  { bit = 0x04, item = CARE_ANTIDOTE, what = "poison" },
+  { bit = 0x04, items = { CARE_ANTIDOTE, CARE_REMEDY }, what = "poison" },
 }
 local MAGIC_LIST, MAGIC_COLOUR = 0x7E9D89, 0x7E9E09
 
@@ -2329,9 +2335,11 @@ function M.fieldCare(opts)
     end
     for _, cure in ipairs(CARE_STATUS_CURES) do
       if (M.charStatus1(target) & cure.bit) ~= 0 then
-        local w = { kind = "item", char = target, item = cure.item,
-                    why = "cure " .. cure.what }
-        if avail(cure.item) > 0 and not failed[key(w)] then return w end
+        for _, item in ipairs(cure.items) do
+          local w = { kind = "item", char = target, item = item,
+                      why = "cure " .. cure.what }
+          if avail(item) > 0 and not failed[key(w)] then return w end
+        end
       end
     end
     return nil
@@ -2633,10 +2641,10 @@ function M.fieldCare(opts)
         st ~= 0 and string.format(" status1=%02X", st) or "")
     end
     return string.format(
-      "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d",
+      "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d remedy=%d",
       tag, what, table.concat(out, "  "), M.invCountOf(CARE_TONIC),
       M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX),
-      M.invCountOf(CARE_ANTIDOTE))
+      M.invCountOf(CARE_ANTIDOTE), M.invCountOf(CARE_REMEDY))
   end
 
   return M.cond(anyNeed, {
