@@ -15,9 +15,6 @@ open the ROM. Most emulators — Mesen, bsnes, Snes9x and others — notice a
 patch sitting beside a ROM of the same name and apply it as they load. Your
 ROM file is not modified.
 
-The patch is inside a zip because the matching name is the whole trick, and
-GitHub rewrites spaces and brackets in a file you attach to a release.
-
 If your emulator does not do that, apply the patch yourself with any BPS
 patcher (Flips, beat) and open the result instead.
 
