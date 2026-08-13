@@ -11,20 +11,19 @@
 -- Issue #75 conversion.  The old apparatus installed a triple-CYAN party by
 -- poke, wrote the katana flag, pinned $2020/bp/MP/HP/shields, stopped the
 -- guards, and poked every cursor.  On camp_escaped Cyan is real (the
--- bushidogrey and mpcost kit: katana SWDTECH flag $3BA4 bit 1 reads $82; two
--- techs learned, with $2020's low byte reading his true ceiling of 1, under
+-- bushidogrey and mpcost kit: katana SWDTECH flag $3BA4 bit 1 reads $82; three
+-- techs learned, with $2020's low byte reading his true ceiling of 2, under
 -- the same garbage high byte issue #4 documents InitSkills leaving), and
 -- the input-driven arms run against his real window {Dispatch $55 at 4, Retort
--- $56 at 10} with cursor rows walked rather than poked:
+-- $56 at 10, Slash $57 at 13} with cursor rows walked rather than poked:
 --
 --   1. the numeral gauge is gone: opening SwdTech lands in $30, and a watch
 --      shows $37 never appears on the way.
---   2. the real window: WIN[1] = {Dispatch, Retort} at rows 0 and 1 with
---      their authored costs, and the right column and rows 2-3 $ff.  This is
---      the short-learned-set arm of the enumeration, previously only
---      reachable by poke.
---   3. names: Dispatch and Retort draw (from BushidoName), and "Slash", the
---      first tech he has not learned, is nowhere in the window.
+--   2. the real window: WIN[2] = {Dispatch, Retort, Slash} at rows 0, 1 and 2
+--      with their authored costs, and the right column and row 3 $ff.
+--   3. names: Dispatch, Retort and Slash draw (from BushidoName), and
+--      "Quadra" -- the first word of Quadra Slam, the first tech he has not
+--      learned -- is nowhere in the window.
 --   4. a row beyond current BP cannot commit: at the natural opening bank
 --      of 1, confirming row 1 (boost 2) is refused, the submenu stays, and
 --      nothing is banked.
@@ -35,10 +34,19 @@
 --      even row 0 is refused, because there is no free Bushido, while the
 --      rows still enumerate, shown rather than emptied.
 --
+--   How many techs he has is a fact about his level, not a constant.
+--   BushidoLevelTbl is 1, 6, 12, 15, 24, 34, 44, 70
+--   (ff6/src/field/event.asm:1235-1236), read by UpdateCyan at :1181-1199,
+--   so the count changes as the route's levels change.  He arrives at
+--   camp_escaped at level 12 today, which is the third threshold: Dispatch,
+--   Retort and Slash.  He used to arrive at 11 and the window was two rows.
+--   If this file's ceiling assertion goes red again, check his level at the
+--   savestate before suspecting the feature.
+--
 --   Labeled isolation arms (owner ruling 2026-08-10).  Cyan's real
---   learned set is two techs and stays that way without the leveled-grind
---   tier the owner declined, so the ceiling sweep, the moving-window
---   enumeration at N=1,3,4,5,6,8, including Oblivion (tech 7, id $5c,
+--   learned set is short and stays short at these levels, so the
+--   ceiling sweep, the moving-window
+--   enumeration at N=1,2,4,5,6,8, including Oblivion (tech 7, id $5c,
 --   the named tech-8 ceiling arm), keeps its $2020 pokes, recorded here,
 --   with the real ceiling restored after.  The class-chip and reveal half of
 --   the old confirm arm is also labeled: every SwdTech is authored slash
@@ -65,7 +73,8 @@ local DMG_CAP = 240                   -- a Dispatch measures ~117 here; an
 
 local TECH = { [0] = "Dispatch", "Retort", "Slash", "Quadra Slam",
                "Empowerer", "Stunner", "Quadra Slice", "Cleave" }
-local COST = { [0x55] = 4, [0x56] = 10, [0x58] = 16, [0x5c] = 99 }
+-- Ot6AbilityCostTbl's SwdTech rows (ff6/src/battle/ot6_boost.asm:1503-1510)
+local COST = { [0x55] = 4, [0x56] = 10, [0x57] = 13, [0x58] = 16, [0x5c] = 99 }
 local WIN = {
   [0] = { 0 },
   [1] = { 0, 1 },
@@ -305,9 +314,17 @@ H.run({ maxFrames = 150000 }, {
       "CYAN and SHADOW really fight this")
     H.assertEq(H.readByte(0x3BA4 + cyan*2) & 0x02, 0x02,
       "his real katana carries the SWDTECH flag (read, not written)")
+    -- Name the cause before the effect: the ceiling below is derived from
+    -- his level, so a route that levels him differently should say so here
+    -- rather than read as a broken feature.  Character record 2 is CYAN;
+    -- +$08 is level ($1600 + c*37, tools/savestate_party.py's layout).
+    H.assertEq(H.readByte(0x1600 + 2*37 + 8), 12,
+      "CYAN arrives at camp_escaped at level 12 -- BushidoLevelTbl's third "
+      .. "threshold (event.asm:1235), which is what sets the ceiling below")
     R.ceiling = H.readWord(KNOWN)
-    H.assertEq(R.ceiling & 0xFF, 1,
-      "his REAL ceiling is 1 (two techs learned; the high byte carries "
+    H.assertEq(R.ceiling & 0xFF, 2,
+      "his REAL ceiling is 2 (three techs learned at level 12, "
+      .. "BushidoLevelTbl 1/6/12; the high byte carries "
       .. "InitSkills' garbage, the #4 regression's true shape)")
     H.assertEq(bp(), 1, "the natural opening bank (Ot6InitBP)")
     emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
@@ -324,12 +341,17 @@ H.run({ maxFrames = 150000 }, {
       "SwdTech opened the tools-shell submenu (state $30)")
     H.assertEq(sawNumeral, false,
       "the vanilla numeral gauge (state $37) never opened")
-    checkWindow(1, "real ceiling")
-    H.log("his real window {Dispatch,Retort} packs rows 0/1 at 1x/2x")
+    checkWindow(2, "real ceiling")
+    H.log("his real window {Dispatch,Retort,Slash} packs rows 0/1/2 at 1x/2x/3x")
     H.assertEq(findName(glyphs("Dispatch")) ~= nil, true, "\"Dispatch\" is drawn")
     H.assertEq(findName(glyphs("Retort")) ~= nil, true, "\"Retort\" is drawn")
-    H.assertEq(findName(glyphs("Slash")), nil,
-      "\"Slash\" -- the first tech he has NOT learned -- is nowhere drawn")
+    H.assertEq(findName(glyphs("Slash")) ~= nil, true, "\"Slash\" is drawn")
+    -- glyphs() has no mapping for a space, so match the first word.  It is
+    -- unambiguous here: Quadra Slam (tech 3) and Quadra Slice (tech 6) are
+    -- both above his ceiling, so neither may be drawn.
+    H.assertEq(findName(glyphs("Quadra")), nil,
+      "\"Quadra\" -- Quadra Slam is the first tech he has NOT learned -- "
+      .. "is nowhere drawn")
   end),
 
   -- 4. a row beyond the bank cannot commit ---------------------------------
@@ -396,7 +418,12 @@ H.run({ maxFrames = 150000 }, {
   --     reads one window of the WIN table.
   (function()
     local steps = {}
-    for _, ceil in ipairs({ 0, 2, 3, 4, 5, 7 }) do
+    -- Ceiling 1 (the two-row window) is swept here now that his real ceiling
+    -- is 2: it was the natural case while he arrived at level 11 and is
+    -- poke-only at level 12, so it moves into the sweep rather than being
+    -- dropped.  Ceiling 2 leaves the sweep because the arms above cover it
+    -- naturally.
+    for _, ceil in ipairs({ 0, 1, 3, 4, 5, 7 }) do
       steps[#steps+1] = H.call(function()
         H.setPad({})
       end)
