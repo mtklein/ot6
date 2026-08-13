@@ -394,7 +394,11 @@ STATES = [
     S("opera_dance_done", gen="gen_opera5_dance", prev="opera_stage"),
     # gen_opera6_rafter: the RAFTER CHASE -> ultros2_entry, one
     # interaction before battle 104 (Ultros II).
-    S("ultros2_entry", gen="gen_opera6_rafter", prev="opera_dance_done"),
+    # timeout=1800: the catwalk crossing is a three-attempt ladder and each
+    # attempt can spend the chase's whole 18000-frame clock, so the worst
+    # case is about three times what the old single-pass crossing cost.
+    S("ultros2_entry", gen="gen_opera6_rafter", prev="opera_dance_done",
+      timeout=1800),
     # gen_opera7_blackjack: battle 104 (the route writes the battle-clearing
     # flag) -> Setzer's coin-toss bargain -> first stable controllable
     # world-map frame after the Blackjack lands outside Vector.  The v0.5
