@@ -79,6 +79,15 @@ the manual steps at each bullet).
   script). Its home folder on macOS is `~/Library/Application
   Support/Mesen2/`; an existing `settings.json` (even `{}`) skips the
   wizard. Already handled here.
+- **A `{}` profile skips the wizard but connects no controller, and the
+  harness injects input with `emu.setInput(pad, 0)`.** With no
+  SnesController on port 0 that call is inert, so every button press does
+  nothing: the game sits at the title and every checkpoint Continue and
+  new-game drive fails deterministically, presenting exactly like a stale
+  checkpoint or a broken ROM. `pin_test_saves.py` now forces
+  `Snes.Port1.Type = SnesController` for this reason (#120), so a fresh
+  install works; if you drive Mesen yourself outside the harness, connect a
+  controller first.
 - **Move that home folder with `CFFIXED_USER_HOME`, not `$HOME`.** Mesen
   resolves it via .NET's `SpecialFolder.ApplicationData`, which on macOS
   goes through `NSSearchPathForDirectoriesInDomains` and reads the home

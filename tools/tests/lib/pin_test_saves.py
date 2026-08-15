@@ -60,6 +60,17 @@ snes["RamPowerOnState"] = ram
 # screenshots and the framebuffer embedded in savestates vary run-to-run
 # (and under parallel load) unless every frame renders.
 snes["DisableFrameSkipping"] = True
+# Controller pin.  The harness injects input with emu.setInput(pad, 0), which
+# is inert unless port 0 is a configured SnesController (see the "Controller
+# input" note in tools/tests/lib/ot6.lua).  Unlike the pins above, this one
+# cannot fall back to a Mesen default: a source profile that never connected a
+# controller -- a fresh install, a hand-written settings.json, CI -- leaves
+# port 0 empty, and then every button press does nothing.  The game sits at the
+# title and every checkpoint Continue and new-game drive fails deterministically,
+# presenting exactly like a stale checkpoint or a broken ROM (#120, cost hours
+# on 2026-08-15).  Force the type rather than setdefault it: the harness needs a
+# SnesController on port 0 whatever the play profile happened to connect.
+snes.setdefault("Port1", {})["Type"] = "SnesController"
 # Audio is inert under --testrunner (no device opened); pinned off anyway.
 cfg.setdefault("Audio", {})["EnableAudio"] = False
 
