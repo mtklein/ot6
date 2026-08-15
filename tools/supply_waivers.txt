@@ -1,0 +1,12 @@
+# supply_waivers.txt -- sanctioned zero-revive cliffs for tools/audit_supplies.py.
+#
+# One fixture name per line: its drop to zero Fenix Downs across a boundary is
+# deliberate and safe.  This list must only SHRINK -- a name that no longer
+# names a cliff FAILS the audit as stale, so a fixture that stops dropping
+# cannot keep its waiver.  Waive only where the segment ahead genuinely cannot
+# lose a member; a supply that ran out on a live route is a finding, not a
+# story.
+#
+# format: <fixture name>   # why the drop is deliberate
+
+magicite_ifrit_shiva   # the Ifrit & Shiva magicite-demo fixture: its driver deliberately spends the two Fenix Downs on real revival (gen_ifrit_magicite, "Fenix Down revival -- the same configuration that beat VARGAS"), and it dead-ends at n024_entry (a leaf, nothing boots from it). The mainline route past here continues from the re-cut n024-entry-save-v1 checkpoint, which carries two Fenix Downs, so this spend leaks nothing downstream.

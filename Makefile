@@ -211,6 +211,15 @@ test: rom nomp-rom graph
 	@# fixtures and a green run over a broken predicate look identical.
 	python3 tools/audit_party_hp.py --selftest
 	python3 tools/audit_party_hp.py
+	@# The supply half of the party-hp audit (#98).  A bag that spent its
+	@# revives and was never refilled is invisible to the two audits above --
+	@# everyone in the empty-bag fixture is alive and armed -- and that gap let
+	@# an empty bag cross three checkpoint boundaries to a death at the Cranes
+	@# with no Fenix Down to answer it.  Flags the cliff: zero revives where the
+	@# fixture it was generated from carried some.  Same reader, same only-shrinks
+	@# waiver, silent on an empty build/states.
+	python3 tools/audit_supplies.py --selftest
+	python3 tools/audit_supplies.py
 	@# What the route walks past.  A normal player opens almost every chest;
 	@# this route opens none of the 94 on the maps it reaches, and one of them
 	@# is the Thunder Rod a room before the TunnelArmr fight that was losing
@@ -293,6 +302,7 @@ savestates: rom graph
 	@# with two dead characters in it.
 	python3 tools/audit_equipment.py
 	python3 tools/audit_party_hp.py
+	python3 tools/audit_supplies.py
 	@# Same reason, one step out: a route change that was supposed to start
 	@# opening chests and did not is cheaper to hear about here than an hour
 	@# later from `make test`.
