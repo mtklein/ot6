@@ -381,17 +381,21 @@ end
 -- says, and formation 504, whose all-$1FF empty record ot6_hud.asm:1796
 -- documents).
 --
--- Reading it as words therefore mixes ID bytes together and then reads two
--- position bytes as a third and fourth "monster".  Measured on battle 11,
--- formation 64, one monster ($09F): monstersPresent() answers 4, and the
--- gen_sfigaro fight log prints "monhp=495/sh3,0/sh0 monsters=4" for a
--- single soldier.  Nothing has gone wrong from that yet -- battleActive()
--- only asks whether the count is above zero, and the Cranes' opts.focus
--- liveness pre-check is backed by a real $3BFC hp read on the same slot --
--- so the decode is left alone here rather than changed blind: both call
--- sites were measured against the current numbers and re-measuring them is
--- its own job.  Do not add a third reader on top of it.
-M.MONSTER_IDS = 0x3F46
+-- Reading it as words therefore mixed ID bytes together and read two position
+-- bytes as a third and fourth "monster".  Measured on battle 11, formation 64,
+-- one monster ($09F): the old word decode answered 4, and the gen_sfigaro
+-- fight log printed "monhp=495/sh3,0/sh0 monsters=4" for a single soldier.
+-- Nothing broke from it because both call sites only ask whether the count is
+-- above zero, but a present-count guard that is wrong about how many are
+-- present is the kind of thing that reads correct until it doesn't (#94).  So:
+-- monstersPresent() counts the present mask ($3F45 low six bits), and
+-- monsterIds() decodes the six bytes plus their MSBs, so both are right
+-- whichever site reads them.  For a monster's SPECIES (0..383) prefer
+-- OT6_SPECIES ($57c0, M.formationSpecies): it is full-width and carries
+-- off-stage loads too; these ID low bytes only tell present slots apart.
+M.MONSTER_IDS = 0x3F46          -- +$02..$07: six 8-bit ID low bytes
+M.MONSTER_PRESENT = 0x3F45      -- +$01, low 6 bits: bit i set => slot i on stage
+M.MONSTER_ID_MSB = 0x3F52       -- +$0E, --abcdef: bit (5-slot) is slot's ID high bit
 M.BATTLE_HP = 0x3BF4
 
 -- OT6 HUD tilemap shadow: 6 lines x stride 14 (+0 cur addr, +2 prev addr,
@@ -406,20 +410,35 @@ M.SHADOW = 0xECF1
 M.SHADOW_STRIDE = 14
 function M.shadowLine(line) return M.SHADOW + line * M.SHADOW_STRIDE end
 
--- Six words off $3F46.  See the note above: these are not monster IDs, and
--- the count below is not a monster count.  Both are kept as they were
--- measured; the real per-slot ID is `readByte(0x3F46 + slot)` plus bit
--- `slot` of `readByte(0x3F52)`, and $3F45 is the present mask.
+-- Six entries, one per monster slot: the on-stage slots carry their decoded
+-- ID (the low byte at $3F46+slot widened by that slot's MSB in $3F52), and the
+-- empty slots read $FFFF.  Six bytes, not six words -- see the note above
+-- (#94).  Kept six-wide because every caller indexes ids[1..6]; monstersPresent
+-- counts the mask directly.
 function M.monsterIds()
+  local mask = M.readByte(M.MONSTER_PRESENT) & 0x3F
+  local msb = M.readByte(M.MONSTER_ID_MSB)
   local ids = {}
-  for i = 0, 5 do ids[i + 1] = M.readWord(M.MONSTER_IDS + i * 2) end
+  for slot = 0, 5 do
+    if (mask & (1 << slot)) ~= 0 then
+      ids[slot + 1] = M.readByte(M.MONSTER_IDS + slot)
+                    | (((msb >> (5 - slot)) & 1) << 8)
+    else
+      ids[slot + 1] = 0xFFFF
+    end
+  end
   return ids
 end
 
+-- How many monsters are on stage: popcount of the present mask's low six bits
+-- ($3F45, battle-ram.txt:1119-1128).  Measured on the whelk ($3F45 = $03 ->
+-- 2), where the old word decode answered 4.
 function M.monstersPresent()
+  local mask = M.readByte(M.MONSTER_PRESENT) & 0x3F
   local n = 0
-  for _, id in ipairs(M.monsterIds()) do
-    if id ~= 0xFFFF then n = n + 1 end
+  while mask ~= 0 do
+    n = n + (mask & 1)
+    mask = mask >> 1
   end
   return n
 end
