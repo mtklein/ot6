@@ -7,23 +7,27 @@ boost-point turn economy.
 
 ## Status
 
-v0.10 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.10)). The game is
+v0.11 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.11)). The game is
 playable from the start through the Raid on Vector: the Magitek Research
 Facility, Number 024, the minecart and Number 128, the Cranes, the escape,
-and Terra's return.
+and Terra's return. v0.11 is a small themed release — magicite you can heal
+with between fights — and does not extend that range; it is the next step in
+a run of small, frequent releases.
 
 Break and boost are the two central systems. Enemies carry shields and hidden
 weaknesses, hitting a weakness chips a shield, and breaking drops defenses
 hard. Boost banks turns and folds spell tiers (Fire → Fira → Firaga).
 Magicite work as sub-jobs: equip an esper and its spells join your Magic list,
-along with a stat bump, while you hold it. That adds to what the born mages
-can already do rather than replacing it. Blitz is a menu, Steal guarantees the
-rare at three boost pips, and level-ups fully restore HP and MP.
+along with a stat bump, while you hold it — in battle and, as of v0.11, in the
+field menu too, so you can heal and cure status between fights with the
+magicite you carry. That adds to what the born mages can already do rather than
+replacing it. Blitz is a menu, Steal guarantees the rare at three boost pips,
+and level-ups fully restore HP and MP.
 
 Route work is on the Sealed Gate: the Narshe mission handoff, the cave, the
-Esper attack, the Imperial banquet, and the Thamasa handoff. v0.11 is meant to
-make the game playable to the end of the World of Balance.
+Esper attack, the Imperial banquet, and the Thamasa handoff. A later release
+(v0.12) is meant to make the game playable to the end of the World of Balance.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and how far the game is
 playable, [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design,

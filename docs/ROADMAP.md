@@ -35,10 +35,18 @@ Phantom Train fix (#74, reported from outside), Scan charging the price it
 publishes (#76), the kit window repainting a changed BP bank (#77), and a
 Broken monster no longer taking the turns that leak past the gate (#66).
 
-Extending play to the end of the World of Balance moves to a later release.
-It needs the rest of the kits and espers, the wide weakness pass, and route
-and tuning work through the Sealed Gate, Thamasa and the Floating Continent,
-which is more than one release of work.
+**v0.11 is a small release too**, and does not extend how far the game is
+playable either. Its theme is magicite between fights: an equipped esper now
+grants its spells in the field menu, not only in battle (#96), so a character
+wearing a healing esper cures status and tops off HP on the walk instead of
+drinking a Tonic beside a full MP pool. It also carries a Zozo z-loop
+encounter hang fix and break tuning for the opera's forced rafter chase. This
+is the pattern going forward: small, frequent, themed releases.
+
+Extending play to the end of the World of Balance is now v0.12. It needs the
+rest of the kits and espers, the wide weakness pass, and route and tuning work
+through the Sealed Gate, Thamasa and the Floating Continent, which is more than
+one release of work.
 
 **On versions:** 0.9 is followed by 0.10, not 1.0; these are ordinary
 increments, not a countdown. 1.0 is a long way off: the end of the World of

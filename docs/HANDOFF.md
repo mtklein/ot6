@@ -19,8 +19,8 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   round trip. `opts.magic=false` restores the item-only drive for a step
   that wants its MP kept. On the field item list, A picks a slot up; only a
   second A on the same slot uses it.
-- **The battle fighter prefers casting too, and the grant behind it is
-  battle-only.** `newFightDriver`'s heal branch casts a cure where it can
+- **The battle fighter prefers casting too, and after #96 the field carer
+  casts a granted cure as well.** `newFightDriver`'s heal branch casts a cure where it can
   and reaches for the bag where it cannot; `opts.cure=false` is the old
   item-only drive. It is spelled `cure` rather than `magic` because that
   driver already spends `opts.magic` on its attack line. Both lines find
@@ -30,10 +30,15 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   the caller names, because OT6 compacts that list to the party's union and
   then prunes it per character (`Ot6UnionEspers` and
   `Ot6EsperSpellKnown`, `ot6_progression.asm:205`, `:144`), so one spell
-  sits at different cells under different loadouts. **Those two hooks are
-  on the battle spell-list path only** (`battle_main.asm:14455`, `:14628`):
-  a Kirin bearer has Cure in battle and no Magic row at all in the field
-  menu, so `fieldCare` cannot cast a granted cure and still drinks. There
+  sits at different cells under different loadouts. Those two hooks are on
+  the battle spell-list path (`battle_main.asm:14455`, `:14628`); **#96 (v0.11)
+  added the field equivalent**, `Ot6FieldSpellKnown`, spliced byte-exact into
+  the menu's `_c350ae` spell-list read (`ot6_progression.asm`, `menu/skills.asm`).
+  So a Kirin bearer now has Cure in the field Magic menu as well as in battle,
+  and `fieldCare` casts that granted cure instead of drinking beside a full MP
+  pool. `M.knowsSpell` reads the same GenjuProp grant so the Lua planner agrees
+  with what the menu draws, and unequipping removes the grant without ever
+  writing the permanent-learn byte. There
   is also no revival by magic anywhere in the WoB — no owned esper grants
   Life (`genju_prop.asm`) — so a segment with no Fenix Down in the bag has
   no answer to a death at all.
