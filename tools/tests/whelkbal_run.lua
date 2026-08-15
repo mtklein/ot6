@@ -1,3 +1,4 @@
+-- @manual Whelk break-loop measurement instrument, run by hand
 -- whelkbal_run.lua -- boss break-loop measurement on the Whelk fight
 -- (M6 groundwork; the boss-row companion to bal_mines.lua).
 --

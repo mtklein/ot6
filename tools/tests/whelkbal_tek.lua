@@ -1,3 +1,4 @@
+-- @manual Whelk TekMissile chip measurement instrument, run by hand
 -- whelkbal_tek.lua -- the tutorial's first mechanical win, driven live:
 -- TekMissile (flags3 $20, skill class PIERCE) chips the Whelk head's authored
 -- shields 4 -> 3. This is the hit the boss measurement caught dealing ~517

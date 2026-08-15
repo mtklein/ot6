@@ -1,3 +1,4 @@
+-- @manual balance instrument over the mines random-encounter pool, run by hand
 -- bal_mines.lua -- the first real balance measurement (M6 groundwork).
 -- Multi-battle auto-battler over the LIVE random-encounter pool of the
 -- mines chase map (map 50), from the mines_chase.mss fixture: OCTO

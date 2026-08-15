@@ -1,3 +1,4 @@
+-- @manual auto-battler balance probe (balance-metrics.md), run by hand
 -- metrics_battle: auto-battler balance probe.  It loads an entry-point state,
 -- enters the fight, and plays it with a swappable input policy while
 -- recording what the balance work needs (docs/design/balance-metrics.md):

@@ -1,3 +1,4 @@
+-- @manual balance instrument (damage-per-BP), run by hand for tuning
 -- bal_dpb.lua -- damage-per-BP by target state (Measurement #5, the core
 -- boost-pedagogy result). This is a controlled A/B lab rather than a live
 -- auto-battler: the mines pool is too fragile to express boosts (trash dies in

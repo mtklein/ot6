@@ -1,3 +1,4 @@
+-- @manual measurement of mines encounter rate and reward parity, run by hand
 -- mines_pace.lua -- Measurement #4: encounter-rate and reward parity on
 -- the mines chase map (map 50). Companion to bal_mines.lua; same fixture
 -- (mines_chase.mss: Terra L5 alone at the map entry), same two-tile

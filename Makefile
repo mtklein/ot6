@@ -181,6 +181,13 @@ test: rom nomp-rom graph
 	@# any NEW write anywhere in tools/tests/**/*.lua fails here.
 	python3 tools/check_state_writes.py --selftest
 	python3 tools/check_state_writes.py
+	@# Every test-shaped file declares whether it runs: a suite member
+	@# (-- @suite) or a hand-run instrument (-- @manual).  A file with neither
+	@# is invisible -- whelkbal_tek sat failing on main because it had no
+	@# @suite marker and nothing looked (#78).  gen_/probe/shot_ carry their
+	@# status in the name and are exempt.
+	python3 tools/check_test_registration.py --selftest
+	python3 tools/check_test_registration.py
 	@# Nobody fights bare-handed.  The game strips characters at story beats
 	@# and returns their gear to inventory; no generator step ever put it back, so LOCKE
 	@# was unarmed in 42 fixtures and CELES in 29, and solo LOCKE punching a

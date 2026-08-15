@@ -1,3 +1,4 @@
+-- @manual quick first-battle smoke, run by hand during battle/break bring-up
 -- battle_smoke.lua -- load the captured first-battle savestate and assert
 -- battle state is live.  Run with:
 --

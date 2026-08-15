@@ -1,3 +1,4 @@
+-- @manual balance instrument (party damage parity), run by hand
 -- bal_party.lua -- the multi-character balance measurement. bal_mines.lua's
 -- protocol (seeded draws, loadState-independent battles, paired samples
 -- across policies) run against a party instead of solo Terra, with every

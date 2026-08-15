@@ -1,3 +1,4 @@
+-- @manual isolation instrument for Shadow's assassinate divine; becomes a @suite member when a boss+Shadow entry fixture exists (see header)
 -- battle_assassinate.lua -- Shadow's divine: instant-kill a Broken non-boss.
 --
 --   tools/tests/run.sh tools/tests/battle_assassinate.lua

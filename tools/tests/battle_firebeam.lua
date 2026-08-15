@@ -1,3 +1,4 @@
+-- @manual Fire Beam field-entry check; Fire Beam coverage now lives in battle_banner/break/class/reveal, so this is a retire candidate (#78)
 -- battle_firebeam.lua -- enter the first guard battle from the field, with no
 -- mid-battle savestate load, and fire the first MagiTek command (Fire Beam) at
 -- a guard.
