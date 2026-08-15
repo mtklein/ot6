@@ -746,6 +746,15 @@ the Beat B note in `wob-route.md`.)
 - **Break story:** this is the first battle after Zozo gives you four
   espers, and a Ramuh bearer casting Bolt into the body is the first
   use of the sub-job system (magicite.md's storm-lancer).
+- **No revival on the ride (#97).** Six fights back to back with no field
+  access between them, and nothing that raises the dead anywhere in reach:
+  the bag holds no Fenix Down, no shop lies past the checkpoint, and no
+  owned esper grants Life anywhere in the WoB. So a death at any point on
+  the ride is permanent. The winning run is comfortable — the margin *is*
+  the safety net — but this is also the sub-job debut, so a first-time
+  player is being taught to equip espers in the one place a mistake cannot
+  be undone. A tuning call to make deliberately (seed a Fenix Down, or
+  accept it) rather than by omission.
 - **Jank:** regrowth timing stays vanilla; the minecart shooter
   around it stays byte-for-byte.
 
