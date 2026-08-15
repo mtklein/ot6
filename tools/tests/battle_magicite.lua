@@ -232,6 +232,7 @@ end
 local mf = 0
 local celesMode = "defer"                -- "defer"|"summon"|"cast"|"park"
 local lockeMode = "medic"                -- "medic"|"summon"
+local partyCare = true                    -- false briefly for menu assertions
 local castRec = nil                      -- list record to cast in "cast"
 -- the character-target latch and steer code (measured in battle_steal and
 -- moved into the library as H.targetCursor)
@@ -282,7 +283,9 @@ local function decide()
     else btn = "b" end
     return btn and { [btn] = true } or {}
   end
-  if act ~= celes then                          -- the medic line
+  if act ~= celes and not partyCare then
+    btn = (st == ST_CMD) and "x" or "b"
+  elseif act ~= celes then                      -- the medic line
     -- Everyone who is not CELES is a medic, and it takes all of them.  The
     -- arms below are long -- the boundary walk alone is a dozen of her
     -- turns -- and Number 024 is level 24 hitting a party that never fights
@@ -416,6 +419,7 @@ local function enterBoss(tag)
       end
       H.assertEq(locke ~= nil and celes ~= nil, true,
         tag .. ": LOCKE and CELES really fight this")
+      partyCare = true
       spells, mpWrites = {}, {}
       emu.addMemoryCallback(function(_, v)
         spells[#spells + 1] = v
@@ -506,16 +510,29 @@ H.run({ maxFrames = 150000 }, {
         lm0 = mp(locke)
         celesMode = "summon"
       end),
-      driveTo(function() return sawSpell(DDUST) end, 20000,
-        "Diamond Dust ($38) reaches $3410"),
+      driveTo(function()
+        return H.readWord(SUMMONED) & mask(celes) ~= 0
+           and mp(celes) == R.mp0 - DDUST_MP
+      end, 20000, "Celes's Diamond Dust is really queued and paid for"),
       H.call(function()
         celesMode = "defer"
+      end),
+      driveTo(function() return bossHp() < R.hp0 end, 5000,
+        "Diamond Dust resolves against NUMBER 024"),
+      H.call(function()
+        -- $3410 is a shared numeric ability id: a monster action can also
+        -- write $37/$38.  Take the damage baseline only after Celes's latch,
+        -- debit and HP change have jointly identified her real summon.
+        R.hpMid = bossHp()
         lockeMode = "summon"
       end),
-      driveTo(function() return sawSpell(INFERNO) end, 20000,
-        "Inferno ($37) reaches $3410"),
+      driveTo(function()
+        return H.readWord(SUMMONED) & mask(locke) ~= 0
+           and mp(locke) == lm0 - INFERNO_MP
+      end, 20000, "Locke's Inferno is really queued and paid for"),
       H.call(function() lockeMode = "medic" end),
-      H.waitFrames(300),
+      driveTo(function() return bossHp() < R.hpMid end, 5000,
+        "Inferno resolves against NUMBER 024"),
       H.call(function()
         H.log(string.format("[divines] boss hp %d->%d->%d st3=%02x | celes "
           .. "mp %d->%d | locke mp %d->%d | $3f2e=%04x", R.hp0, R.hpMid or -1,
@@ -539,18 +556,15 @@ H.run({ maxFrames = 150000 }, {
     })
   end)(),
   -- 5. the spent summon greys at her next real window (natural refresh)
-  H.call(function() celesMode = "park" end),
+  H.call(function() partyCare = false; celesMode = "park" end),
   driveTo(function()
     return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
   end, 20000, "her next window's list is open"),
   H.call(function()
     H.setPad({})
-    H.assertEq(esperEnabled(celes), false,
-      "[latch] a spent summon greys the esper row (MP 79 >= 27, so the "
-      .. "grey can only be the $3f2e latch)")
     H.assertEq(esperCost(celes), DDUST_MP, "[latch] ...still priced at 27")
     H.assertEq(recEnabled(celes, recOf(celes, ICE)), true,
-      "[latch] her Ice row stays live -- the grey is the summon row's own")
+      "[latch] her Ice row stays live after the summon")
   end),
 
   -- 6. Osmose, in boot A rather than boot B.  It reads the boss's real
@@ -576,8 +590,13 @@ H.run({ maxFrames = 150000 }, {
         celesMode = "cast"; castRec = recOf(celes, OSMOSE)
         H.log(string.format("[osmose] casting at mp=%d, boss pool=%d", m0, g0))
       end),
-      driveTo(function() return sawSpell(OSMOSE) end, 20000,
-        "Osmose ($29) reaches $3410"),
+      driveTo(function()
+        local debited = false
+        for _, v in ipairs(mpWrites) do
+          if (v & 0xff) == ((m0 - OSMOSE_MP) & 0xff) then debited = true end
+        end
+        return debited and bossMp() < g0
+      end, 20000, "Celes's Osmose is really charged and drains the boss"),
       H.call(function() celesMode = "defer" end),
       H.waitFrames(240),
       H.call(function()
@@ -595,6 +614,23 @@ H.run({ maxFrames = 150000 }, {
     })
   end)(),
 
+  -- Now that Osmose has restored her above 27 MP, the spent summon row's
+  -- grey cannot be explained by price.  Re-open the same live list and bind
+  -- the verdict uniquely to the once-per-battle latch.
+  H.call(function() partyCare = false; celesMode = "park" end),
+  driveTo(function()
+    return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
+  end, 20000, "her refilled post-summon list is open"),
+  H.call(function()
+    H.setPad({})
+    H.assertEq(mp(celes) >= DDUST_MP, true,
+      "[latch] Osmose restored enough MP to afford another summon")
+    H.assertEq(esperEnabled(celes), false,
+      "[latch] the affordable spent summon is grey from $3f2e")
+    H.assertEq(recEnabled(celes, recOf(celes, ICE)), true,
+      "[latch] an ordinary affordable spell remains live beside it")
+  end),
+
   -- ============================ boot B: the re-offer and the boundary ==
   H.loadState(STATE),
   H.waitFrames(60),
@@ -611,18 +647,22 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(H.readWord(SUMMONED) & mask(celes), 0,
       "[latch] ...because battle init cleared $3f2e")
     R.mp0 = mp(celes)
-    -- The fixture no longer ships her full: she arrives at 76 of 106, and
+    -- The fixture no longer ships her full: she arrives at 41 of 106, and
     -- the care stop above is deliberately item-only so that it heals her HP
     -- without topping the pool up.  The boundary walk below rests on this
-    -- number: 76 = 1 (mod 5), and Shell (15) and Cure (5) both preserve the
+    -- number: 41 = 1 (mod 5), and Shell (15) and Cure (5) both preserve the
     -- residue, so kit casts alone land on exactly 6.  The maximum is pinned
     -- beside it so a fixture that ships a different pool says which of the
     -- two numbers moved.
-    H.assertEq(R.mp0, 76,
-      "[drain] her real pool opens at the 76 the fixture carries")
+    H.assertEq(R.mp0, 41,
+      "[drain] her real pool opens at the 41 the fixture carries")
     -- $3BF4 hp, $3C08 mp, $3C1C max hp, $3C30 max mp: one 20-byte stride
     H.assertEq(H.readWord(0x3C30 + celes*2), 106,
       "[drain] and her maximum is 106")
+    -- The boundary is only five of her turns from this 41-MP start.  Defer
+    -- the bench so an unrelated item-target cursor cannot own the menu while
+    -- the MP experiment is running.
+    partyCare = false
   end),
   -- 7. the 7-MP boundary, earned by real casts of her own kit: Shells (15)
   -- to bring the pool down in big steps, then a tail that steps onto the

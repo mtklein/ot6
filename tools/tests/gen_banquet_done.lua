@@ -37,12 +37,14 @@
 --     than as a lower tier at the messenger.
 --   * The troopers' challenge (battle 30: 3x Sp Forces $0c2, 700 hp
 --     each, weak poison; §5.4) runs after the window inside its own
---     7200-frame timer and is fought with the library fighter
---     (H.newFightDriver tactical/boost/bank/items, the configuration
---     that has beaten every boss in this conversion wave).  The clean
+--     7200-frame timer and is fought with the library fighter.  The route
+--     names EDGAR's Bio Blaster because all three bodies are poison-weak;
+--     leaving the generic tactical default in place meant AutoCrossbow and
+--     healing consumed the whole clock, and a kill on the expiry boundary
+--     correctly failed the clean-win receipt.  The clean
 --     flags ($1dd1 & $31 == 0) are asserted: a win that arrived by
 --     timer-expiry pays nothing and must fail.
---   * The party prepares before entering the castle, with H.equipOptimum
+--   * The party prepares before entering the castle, with named equipment
 --     and H.fieldCare through the real menus, outside the window, where
 --     frames are free (the checkpoint-descended party arrives hurt and
 --     partly unequipped on every step this wave has measured).
@@ -572,7 +574,16 @@ local steps = {
   -- ---- 1b. the player's prep, outside the window, where frames are free ----
   -- (the checkpoint-descended party arrives hurt and partly unequipped on
   -- every step this wave has measured, and the challenge is a real fight now)
-  H.equipOptimum({ tag = "banquet kit" }),
+  -- The crash checkpoint may predate TERRA's deliberate re-equip, so make
+  -- the same Sealed-Gate choice here as the upstream route: Blizzard gives
+  -- the area's dominant slash/ice coverage without feeding an absorber.
+  -- LOCKE's existing pierce kit is restated as an exact contract.
+  H.equipLoadout(0, {
+    { 0, 0x0E }, { 2, 0x6A }, { 3, 0x84 },
+  }, { tag = "TERRA banquet kit" }),
+  H.equipLoadout(1, {
+    { 0, 0x02 }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+  }, { tag = "LOCKE banquet kit" }),
   H.fieldCare({ tag = "care before the banquet", threshold = 0.95 }),
 
   -- ---- 2. the castle and the dais ------------------------------------------
@@ -758,7 +769,8 @@ local steps = {
   H.call(function() dinner.preBattle30 = var0() end),
   (function()
     local F = H.newFightDriver("b30", { tactical = true, boost = true,
-      bank = 1, items = true, healPercent = 60, cadence = 12 })
+      bank = 1, items = true, healPercent = 60, cadence = 12,
+      tool = H.BIO_BLASTER })
     local hb = 0
     return H.driveUntil(function() return not H.battleLoadStarted() end,
       20000, {

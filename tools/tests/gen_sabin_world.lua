@@ -355,6 +355,10 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(H.worldY(), 36, "world y = 36")
     H.assertEq(inParty(5), true, "SABIN in the party")
     H.assertEq(inParty(3), false, "SHADOW not yet")
+    H.assertEq(H.invCountOf(0xF4) >= 2, true,
+      "SABIN's scenario inherits at least two Softs from the common route")
+    H.assertEq(H.invCountOf(0xB5) >= 1, true,
+      "SABIN's scenario inherits a Jewel Ring from the common route")
     H.log(string.format("[sabin_world] f%d world (%d,%d)",
       H.frame, H.worldX(), H.worldY()))
     H.screenshot("sabin_world")
@@ -391,6 +395,10 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sw(0x000B), 1, "$000B set -- the house scene has played")
     H.assertEq(inParty(3), true, "SHADOW in the party")
     H.assertEq(inParty(5), true, "SABIN still in the party")
+    H.assertEq(H.invCountOf(0xF4) >= 2, true,
+      "the Soft reserve survives SHADOW joining")
+    H.assertEq(H.invCountOf(0xB5) >= 1, true,
+      "the Jewel Ring survives SHADOW joining")
     H.assertEq(nameMenusSeen, 1, "exactly one name menu (SHADOW)")
     H.log(string.format("[house] SHADOW joined at f%d, party at (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))

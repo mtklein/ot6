@@ -459,8 +459,15 @@ H.run({ maxFrames = 150000 }, {
   -- The story's remove_equip returns gear to inventory (EventCmd_8d) and
   -- nothing in the chain has ever put it back on, so every "measured"
   -- fight down this whole arc was measured with a character punching.
-  -- A no-op when everyone is already holding something.
-  H.equipOptimum({ tag = "passage kit" }),
+  -- LOCKE still has the occupied-town kit this route deliberately equipped:
+  -- his Dirk, Leather Hat and LeatherArmor.  Keep naming that known loadout
+  -- here so this cold checkpoint is self-contained, without inventing gear
+  -- that the route has not acquired.
+  H.equipLoadout(1, {
+    { 0, 0x00 }, -- Dirk
+    { 2, 0x69 }, -- Leather Hat
+    { 3, 0x84 }, -- LeatherArmor
+  }, { tag = "LOCKE passage kit" }),
 
   -- ===================================================================== --
   -- PHASE 1: the passage -> the rich man's house -> town.  The passage

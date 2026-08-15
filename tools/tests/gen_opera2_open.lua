@@ -12,9 +12,9 @@
 -- {118,24} with control and $0340=1/$010E=1.  Travel checkpoints: 209's
 -- {118,29} door -> Jidoor {16,14}; Jidoor's south edge (long-entrance
 -- src{0,63} HORIZ len31) -> world {27,132}; world -> opera approach
--- {45,153} -> step DOWN.  Issue #75: no state writes; strays are fought
--- by the drivers' own edge-tapped A, and walks run under the playBattles
--- nav modes.
+-- {45,153} -> step DOWN.  Issue #75: no state writes; the exposed world leg
+-- flees random encounters, and the remaining walks run under the
+-- playBattles nav modes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -106,6 +106,12 @@ H.run({ maxFrames = 250000 }, {
   H.waitFrames(150),
   H.call(function() H.log(string.format("[jidoor] at (%d,%d)", H.fieldX(), H.fieldY())) end),
 
+  -- The party can arrive here carrying the damage from the long Zozo-to-
+  -- Jidoor leg.  Recover in town before crossing the exposed world road;
+  -- otherwise a failed run roll can turn ordinary travel into a fixture
+  -- wipe even though the bag and Cure are available.
+  H.fieldCare({ tag = "care before the opera road", threshold = 0.95 }),
+
   -- 3. Jidoor -> the south edge -> world {27,132}: navTo above the edge, push down
   H.navTo(16, 61, { maxFrames=24000, playBattles=true }),
   (function() local hb=0
@@ -120,7 +126,7 @@ H.run({ maxFrames = 250000 }, {
   H.call(function() H.log(string.format("[world] Jidoor exit at (%d,%d)", H.worldX(), H.worldY())) end),
 
   -- 4. world -> the opera-house approach {45,153}, step DOWN -> map 237
-  H.worldNavTo(45, 153, { maxFrames=60000, playBattles=true, arrive=function() return not H.worldMode() end }),
+  H.worldNavTo(45, 153, { maxFrames=60000, playBattles="flee", arrive=function() return not H.worldMode() end }),
   H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end, 2000, "opera approach", 5),
   (function() local hb=0
     return H.driveUntil(function() return not H.worldMode() and map()==237 end, 4000, {

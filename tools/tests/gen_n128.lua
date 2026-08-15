@@ -556,7 +556,18 @@ H.run({ maxFrames = 400000 }, {
   --    hurt (which every checkpoint-booted step in this wave has
   --    measured), and the ride is six fights with no field access between
   --    them
-  H.equipOptimum({ tag = "n128 kit" }),
+  -- Preserve the minecart checkpoint's measured kit by name.  The party's
+  -- damage in this ride comes from Tools, Blitz and magicite, so this is a
+  -- readiness contract, not an invitation for Optimum to reshuffle classes.
+  H.equipLoadout(1, {
+    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+  }, { tag = "LOCKE minecart kit" }),
+  H.equipLoadout(4, {
+    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+  }, { tag = "EDGAR minecart kit" }),
+  H.equipLoadout(5, {
+    { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 },
+  }, { tag = "SABIN minecart kit" }),
   -- The magicite.  bosses-wob.md 15 calls this fight the sub-job system's
   -- debut -- "a Ramuh bearer casting Bolt into the body is the first use" --
   -- and the stones have been owned since Zozo and the tube room ($1A69 reads

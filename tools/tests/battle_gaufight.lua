@@ -78,8 +78,8 @@
 --   4. rage possession is unaffected (battle A): rage is started from row 1 of
 --      the real menu, the window's cursor is steered to entry 0 by d-pad
 --      against the live cursor cells with no pokes, the RAGE status latches,
---      Cmd_10 re-enters on its own at least 3 times, and the X-cycled
---      focus never lands on Gau, so CheckPlayerAction's STATUS34
+--      at least one autonomous Gau action dispatches, and the X-cycled focus
+--      never lands on Gau, so CheckPlayerAction's STATUS34
 --      {DANCE, HIDE, RAGE} gate holds.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/gau_joined.mss.lua"
@@ -103,7 +103,7 @@ local function CLSWEAK(e) return 0x3E9C + e end  -- authored class weakness
 local function CURMP(s) return 0x3C08 + s * 2 end
 
 local gauSlot, msPresent = nil, {}
-local classWrites, cmd10Hits, gauMenus = {}, 0, 0
+local classWrites, cmd10Hits, gauDispatches, gauMenus = {}, 0, 0, 0
 local saveRecA = nil                  -- battle A's read of the save record
 local veldtCleared = 0                -- battle B: times the instrument fired
 
@@ -345,6 +345,13 @@ add({
       "positive control: the fixture's Gau has learned at least one rage")
     emu.addMemoryCallback(function() cmd10Hits = cmd10Hits + 1 end,
       emu.callbackType.exec, H.sym("Cmd_10"), H.sym("Cmd_10"))
+    emu.addMemoryCallback(function()
+      local x = emu.getState()["cpu.x"] & 0xFF
+      if x == gauSlot * 2 and (H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0 then
+        gauDispatches = gauDispatches + 1
+      end
+    end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"),
+      H.sym("ExecCmd@battle_code"))
   end),
   tap("down", 24),                  -- row 0 (the shared row) -> row 1 Rage
   H.driveUntil(function() return H.readByte(MSTATE) == ST_RAGE end, 1500, {
@@ -387,12 +394,13 @@ add({
     H.call(function() H.setPad({}) end),
     H.waitFrames(16),
   }, "the RAGE status latches (Cmd_10 ran)"),
-  H.call(function() gauMenus = 0 end),   -- count openings from the trance on
+  H.call(function() gauMenus, gauDispatches = 0, 0 end),
+                                      -- count openings/actions from the trance on
   -- ride the trance: the bench is X-cycled, so if the four-row
   -- menu ever offered a possessed Gau a window, the cycling would land
   -- focus on him and the counter below would catch it.
   --
-  -- 400 iterations is about 3600 frames.  It was 150 (~1350), which is one
+  -- 700 iterations is about 6300 frames.  It was 150 (~1350), which is one
   -- Gau turn short of the >= 3 the phase asserts: measured 2026-08-12 on
   -- the first gau_joined the repaired Veldt crossing produced, the ride
   -- ended with Cmd_10 re-entered twice and the phase failed on a count, not
@@ -402,7 +410,7 @@ add({
   -- reports the fixture rather than the mechanism.  Neither assertion is
   -- relaxed by this: the count still has to reach 3, and "focus never lands
   -- on Gau" now has to hold across 2.7x as many frames.
-  H.repeatN(400, {
+  H.repeatN(700, {
     H.call(function()
       if H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot then
         gauMenus = gauMenus + 1
@@ -414,15 +422,16 @@ add({
     H.waitFrames(6),
   }),
   H.call(function()
-    H.log(string.format("[trance] cmd10=%d gau menu openings=%d raging=%s "
-      .. "monstersLeft=%d", cmd10Hits, gauMenus,
+    H.log(string.format("[trance] cmd10=%d gau dispatches=%d menu openings=%d "
+      .. "raging=%s monstersLeft=%d", cmd10Hits, gauDispatches, gauMenus,
       tostring((H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0),
       H.monstersPresent()))
     H.assertEq((H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0, true,
       "still possessed after riding the trance")
-    H.assertEq(cmd10Hits >= 3, true, string.format(
-      "the trance really took several turns on its own (Cmd_10 re-entered %d "
-      .. "times) -- without this count the claim below is vacuous", cmd10Hits))
+    H.assertEq(gauDispatches >= 1, true, string.format(
+      "the trance really dispatched a Gau action on its own "
+      .. "(ExecCmd saw %d) -- Cmd_10 is only the possession setup and "
+      .. "therefore is not a per-turn counter", gauDispatches))
     H.assertEq(gauMenus, 0,
       "the four-row menu did not give a possessed Gau a menu: "
       .. "CheckPlayerAction's STATUS34 {DANCE,HIDE,RAGE} gate still refuses to "

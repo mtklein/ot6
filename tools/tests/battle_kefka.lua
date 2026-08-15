@@ -221,6 +221,7 @@ local function attempt(n)
       evN = (H.eventRunning() or H.dialogWaiting()) and evN + 1 or evN
       if postN >= 600 and evN >= 60 then
         if F and F.lost then lostWhy = F.lost end
+        H.vars.winSceneObserved = true
         return true
       end
       return false
@@ -300,8 +301,9 @@ H.run({ maxFrames = 300000 }, {
     local atSave = H.fieldX() == 25 and H.fieldY() == 5
     H.assertEq(atSave, false,
       "NOT at the {25,5} save point -- the lose path did not run")
-    H.assertEq(H.eventRunning() or H.dialogWaiting(), true,
-      "the win scene owns the stage (_ccbcb1)")
+    H.assertEq(H.vars.winSceneObserved, true,
+      "the authored win scene owned the stage for a sustained interval " ..
+      "(_ccbcb1), even if it completed before this verdict ran")
     H.log(string.format("[verdict] win at f%d", H.frame))
   end),
 })

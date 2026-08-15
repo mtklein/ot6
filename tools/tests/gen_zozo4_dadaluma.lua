@@ -121,6 +121,19 @@ end
 -- for anything else until opts.tool.  So every drive on this climb was
 -- fighting the town with the one Tool that cannot open it.
 local BIO_BLASTER = H.BIO_BLASTER
+local CELES = 6
+-- Zozo's groups use every formation slot across their eight possible draws.
+-- Once EDGAR's MP is below Bio Blaster's 8-MP price, every remaining action
+-- is single-target; steer those confirms through the live slots instead of
+-- leaving the cursor on a defeated middle Gabbldegak.  Target-mask bits are
+-- the formation slots (the same measured mapping used by the N128 and Cranes
+-- drivers), so the list is deliberately explicit rather than inferred from
+-- screen coordinates.
+local ZOZO_FOCUS = {
+  { slot = 0, mask = 0x01 }, { slot = 1, mask = 0x02 },
+  { slot = 2, mask = 0x04 }, { slot = 3, mask = 0x08 },
+  { slot = 4, mask = 0x10 }, { slot = 5, mask = 0x20 },
+}
 --
 -- The wipe check rides along, because a loss still has to report itself as
 -- a loss.  It cannot use H.partyWiped(): out of battle that reads $1600,
@@ -144,8 +157,13 @@ end
 -- taken over (a battle is up), false when the caller should get on with
 -- walking.
 local function encounters(what)
+  -- CELES is the party's prepared healer; naming her here keeps LOCKE,
+  -- EDGAR and SABIN on offense.  Leaving the role implicit measured a
+  -- 157-hp survivor wiping the party while every available turn queued a
+  -- revive or top-up, and spent all three reserved Potions one fight prior.
   local F = H.newFightDriver(what, { tactical = true, boost = true, bank = 3,
-    items = true, healPercent = 60, cadence = 12, tool = BIO_BLASTER })
+    items = true, healPercent = 60, healer = CELES, cadence = 12,
+    tool = BIO_BLASTER, focus = ZOZO_FOCUS })
   local dead = 0
   return function()
     if battleHpAllZero() and not H.hasControl() and H.eventRunning() then
@@ -460,14 +478,20 @@ local function followPath(tx, ty, opts)
   opts = opts or {}
   local extra = {}
   for _, w in ipairs(opts.extraWalls or {}) do extra[key(w[1], w[2])] = true end
-  local hb = 0
+  local hb, foughtOne = 0, false
   local fought = encounters(string.format("followPath (%d,%d)", tx, ty))
   return H.driveUntil(function()
     if opts.arriveMap then
       if map() == opts.arriveMap then H.setPad({}); return true end
-      return false
+    elseif H.fieldX() == tx and H.fieldY() == ty and H.tileAligned() then
+      H.setPad({})
+      return true
     end
-    if H.fieldX() == tx and H.fieldY() == ty and H.tileAligned() then
+    -- A long door approach can draw several fights.  Let its caller stop
+    -- after each win, use the field menu, then resume; otherwise a monster's
+    -- final round can leave a victorious party at single-digit HP and the
+    -- very next encounter begins before the care stop at the door.
+    if opts.stopAfterBattle and foughtOne and settled() then
       H.setPad({})
       return true
     end
@@ -499,7 +523,7 @@ local function followPath(tx, ty, opts)
           tostring(H.dialogWaiting()), tostring(H.battleLoadStarted()),
           tostring(H.eventRunning()), tostring(mv0), table.concat(raw, ",")))
       end
-      if fought() then return end
+      if fought() then foughtOne = true; return end
       if H.dialogWaiting() then
         H.setPad(hb % 8 < 4 and { "a" } or {})
         return
@@ -521,14 +545,31 @@ local function followPath(tx, ty, opts)
 end
 
 local function door(sx, sy, destMap, what)
-  return H.cond(function() return true end, {
+  local legs = {}
+  -- Eight encounter-sized legs is well above the four measured on the
+  -- longest street approach.  Each leg returns after one battle and heals;
+  -- once the door has loaded, the remaining conditional legs are skipped.
+  for n = 1, 8 do
+    legs[#legs + 1] = H.cond(function() return map() ~= destMap end, {
+      followPath(sx, sy, { arriveMap = destMap, maxFrames = 30000,
+                           stopAfterBattle = true }),
+      climbCare(string.format("during %s (leg %d)", what, n)),
+    }, {})
+  end
+  legs[#legs + 1] = H.cond(function() return map() ~= destMap end, {
     followPath(sx, sy, { arriveMap = destMap, maxFrames = 30000 }),
-    H.waitUntil(settled, 2400, what .. " settled", 5),
-    -- door loads finalize the decompressed prop table LATE (gen_zozo2's
-    -- measured rule); settle before any pathfinding reads it
-    H.waitFrames(150),
-    H.logStep(function() return string.format("%s: landed map %d (%d,%d)",
-      what, map(), H.fieldX(), H.fieldY()) end),
+  }, {})
+  legs[#legs + 1] = H.call(function()
+    H.assertEq(map(), destMap, what .. ": reached the destination map")
+  end)
+  legs[#legs + 1] = H.waitUntil(settled, 2400, what .. " settled", 5)
+  -- door loads finalize the decompressed prop table LATE (gen_zozo2's
+  -- measured rule); settle before any pathfinding reads it
+  legs[#legs + 1] = H.waitFrames(150)
+  legs[#legs + 1] = H.logStep(function() return string.format(
+    "%s: landed map %d (%d,%d)", what, map(), H.fieldX(), H.fieldY()) end)
+  return H.cond(function() return true end, {
+    table.unpack(legs),
   })
 end
 
@@ -670,7 +711,7 @@ end
 -- as low as it ever gets.  So each climb attempt:
 --   1. BURNS the pending encounter at the BASE, on flat ground: pace
 --      (30,61)<->(30,60) until the roll fires on a safe tile, then FIGHT
---      it with real input (tap-A).  The counter is now zero.
+--      it with the route's tactical battle driver.  The counter is now zero.
 --   2. climbs the BRIDGE2 ladder immediately, watching for the hang
 --      signature (control lost, no battle latch, position frozen, the
 --      event PC inside RandBattle) -- a roll that lands on one of the
@@ -717,18 +758,15 @@ end
 -- GROUND, fight it with real input, and settle.  Bounded; a base that never
 -- rolls within the budget just proceeds with whatever the counter holds.
 local function burnStep()
-  local hb, fought, battN = 0, false, 0
+  local hb, fought = 0, false
+  local play = encounters("bridge2 burn")
   return H.driveUntil(function()
     return (fought and settled()) or (not fought and hb > 6000 and settled())
   end, 12000, {
     H.call(function()
       hb = hb + 1
-      battN = H.battleLoadStarted() and battN + 1 or 0
-      if battN >= 3 then
-        fought = true
-        H.setPad(hb % 8 < 4 and { "a" } or {})   -- fight it, with real input
-        return
-      end
+      if H.battleLoadStarted() then fought = true end
+      if play() then return end
       if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
       if not H.hasControl() then H.setPad({}); return end
       if not H.tileAligned() then H.setPad({}); return end
@@ -853,31 +891,48 @@ local function climbAttempt(n)
   }, {})
 end
 local function bridgeClimb()
-  local ckReq
+  local hb, stuckN, lx, ly = 0, 0, -1, -1
   return H.cond(function() return true end, {
-    H.call(function() ckReq = H.requestSaveState() end),
-    H.waitFrames(2),
+    H.driveUntil(function() return map() == 221 end, 30000, {
+      H.call(function()
+        hb = hb + 1
+        local x, y = H.fieldX(), H.fieldY()
+        if hb % 600 == 0 then
+          H.log(string.format("[bridge2] f+%d at (%d,%d) z%d ctl=%s " ..
+            "danger=$%04X", hb, x, y, H.readByte(0x00b2) & 3,
+            tostring(H.hasControl()), H.readWord(0x1f6e)))
+        end
+        if H.battleLoadStarted() then
+          error(string.format("[bridge2] product regression: a random battle " ..
+            "started inside map 225's protected shaft at (%d,%d)", x, y), 0)
+        end
+        local frozen = x == lx and y == ly and not H.hasControl()
+          and not H.dialogWaiting()
+        lx, ly = x, y
+        stuckN = frozen and stuckN + 1 or 0
+        if stuckN >= 900 then
+          error(hangLine("[bridge2] product regression: the shaft hung"), 0)
+        end
+        if H.dialogWaiting() then
+          H.setPad(hb % 8 < 4 and { "a" } or {})
+          return
+        end
+        if not H.hasControl() or H.eventRunning() then H.setPad({}); return end
+        if not H.tileAligned() then H.setPad({}); return end
+        local dir = BRIDGE2[key(x, y)]
+        if dir and H.canStep(x, y, dir) then
+          H.setPad({ [PRESS[dir]] = true })
+        else
+          H.setPad({})
+        end
+      end),
+    }, "bridge room climb with protected encounter-free shaft"),
+    H.waitUntil(settled, 2400, "top roof settled", 5),
+    H.waitFrames(150),
     H.call(function()
-      H.checkReq(ckReq, "pre-climb checkpoint")
-      climbBlob = ckReq.blob
-      H.log(string.format("[bridge2] pre-climb checkpoint captured " ..
-        "(%d bytes) at (%d,%d) danger=$%04X", #climbBlob, H.fieldX(),
-        H.fieldY(), H.readWord(0x1f6e)))
-    end),
-    climbAttempt(1),
-    climbAttempt(2),
-    climbAttempt(3),
-    climbAttempt(4),
-    climbAttempt(5),
-    H.call(function()
-      if not climbDone then
-        error("[bridge2] the shaft could not be crossed in 5 " ..
-          "attempts -- last: " .. tostring(climbFail) .. " -- this is the " ..
-          "PRODUCT BUG the header describes (a random encounter rolled on " ..
-          "the ambiguous-z beams of map 225's shaft never settles and " ..
-          "never latches battleLoadStarted; a human player softlocks the " ..
-          "same way).  Fix it game-side; do not suppress it here.", 0)
-      end
+      H.assertEq(map(), 221, "the protected bridge shaft reaches the top roof")
+      H.log(string.format("[bridge2] crossed directly in %d frames; " ..
+        "danger stayed $%04X", hb, H.readWord(0x1f6e)))
     end),
   })
 end
@@ -1103,9 +1158,9 @@ H.run({ maxFrames = 400000 }, {
       "a Bio Blaster is in the bag -- the poison every Zozo body is weak to")
   end),
 
-  -- Top the party up before the climb starts.  zozo_arrival ships LOCKE at
-  -- 69/249 -- 28%, which audit_party_hp passes because its bar is max/8 --
-  -- and both Zozo maps draw random encounters (map_prop byte +5 bit 7 set
+  -- Top the party up before the climb starts.  Earlier versions of
+  -- zozo_arrival could hand this step a badly hurt party, and both Zozo
+  -- maps draw random encounters (map_prop byte +5 bit 7 set
   -- for 221 and 225, the same decode gen_zozo3_clock's header records).
   -- Measured 2026-08-12: the first encounter, eleven tiles into the first
   -- step at (45,55), killed the whole party.  A player walking into a new
@@ -1117,11 +1172,13 @@ H.run({ maxFrames = 400000 }, {
 
   -- Put on the gear that is already in the bag.  A player who has just been
   -- told the town is full of thugs opens the menu, and this party arrives
-  -- with six empty slots and exactly six items to fill them: CELES with no
-  -- body armour and no relics, SABIN with no shield and no relics, against
-  -- one LeatherArmor, one Buckler, two Star Pendants, a Peace Ring and a
-  -- Black Belt sitting unused.  Measured at zozo_arrival and again at
-  -- zozo_clock_solved.  It is not cosmetic: CELES's defence is 34 where
+  -- with five empty slots and exactly five items to fill them: CELES with no
+  -- body armour and no relics, and SABIN with no shield or second relic,
+  -- against one LeatherArmor, one Buckler, one Star Pendant, a Peace Ring
+  -- and a Black Belt sitting unused.  SABIN already wears the other Star
+  -- Pendant bought for the scenario route; preserve useful inherited gear
+  -- instead of taking it off merely to put it back on.  It is not cosmetic:
+  -- CELES's defence is 34 where
   -- LOCKE runs 44, SABIN 45 and EDGAR 55, and she is the party's only
   -- healer, so the member most worth keeping upright is the one taking the
   -- most damage per hit.  The LeatherArmor alone is +28 defence and +19
@@ -1145,14 +1202,13 @@ H.run({ maxFrames = 400000 }, {
       H.assertEq(H.invCountOf(it[1]) > 0, true,
         string.format("a %s is in the bag to equip", it[2]))
     end
-    H.assertEq(H.invCountOf(0xB1) >= 2, true,
-      "two Star Pendants -- one each for CELES and SABIN")
+    H.assertEq(H.readByte(0x1600 + 37 * 5 + 0x1F + 4), 0xB1,
+      "SABIN retains the scenario route's Star Pendant")
   end),
   H.equipWeapon(1, 0x84, { slot = 3, tag = "CELES LeatherArmor" }),
   H.equipWeapon(1, 0xB1, { slot = 4, tag = "CELES Star Pendant" }),
   H.equipWeapon(1, 0xB2, { slot = 5, tag = "CELES Peace Ring" }),
   H.equipWeapon(3, 0x5A, { slot = 1, tag = "SABIN Buckler" }),
-  H.equipWeapon(3, 0xB1, { slot = 4, tag = "SABIN Star Pendant" }),
   H.equipWeapon(3, 0xD5, { slot = 5, tag = "SABIN Black Belt" }),
   -- Read the slots back rather than trusting six menu drives.  A seek that
   -- timed out would have failed already, but a drive that landed on the
@@ -1171,7 +1227,8 @@ H.run({ maxFrames = 400000 }, {
                          { 5, 5, 0xD5, "SABIN wears the Black Belt" } }) do
       H.assertEq(worn(w[1], w[2]), w[3], w[4])
     end
-    H.log("[zozo kit] six empty slots filled from the bag")
+    H.log("[zozo kit] inherited Star Pendant preserved; five empty slots " ..
+      "filled from the bag")
   end),
   -- CELES and SABIN to the back row.  Physical damage taken is halved there
   -- and only a weapon swing pays for it: ExecCmd sets $B3 = $FF at the top
@@ -1235,7 +1292,23 @@ H.run({ maxFrames = 400000 }, {
   jumpRow("left", function()
     return H.fieldX() <= 18 and H.fieldY() == 39
   end, 9000, "J39 row westbound"),
-  door(15, 39, 225, "P17a -> west room"),
+  -- P17a is a walk-on short entrance, and the shared navigator was measured
+  -- crossing it directly (probe_climb).  The custom all-z pathfinder can
+  -- instead oscillate between (14,40) and (15,40): one failed run farmed
+  -- three encounters on those two tiles, killed a HadesGigas, then entered
+  -- the next fight before the care stop with three casualties.  Use the
+  -- live-z navigator for this door so the three-tile approach stays three
+  -- tiles and the care stop below remains between encounters.
+  H.navTo(15, 39, {
+    arrive = function() return map() == 225 end,
+    maxFrames = 30000, playBattles = "tactical", healer = CELES,
+    healPercent = 60, tool = BIO_BLASTER,
+  }),
+  H.waitUntil(settled, 2400, "P17a -> west room settled", 5),
+  H.waitFrames(150),
+  H.logStep(function() return string.format(
+    "P17a -> west room: landed map %d (%d,%d)",
+    map(), H.fieldX(), H.fieldY()) end),
   climbCare("after P17a"),
   -- P18b: cross the west room to (104,27)->221.  followPath mispredicts +
   -- HANGS on the (111,15) scene-beam here; westRoomCross rides it (see above).
@@ -1380,6 +1453,9 @@ H.run({ maxFrames = 400000 }, {
     })
   end)(),
   H.waitFrames(60),
+  -- A won boss fight can still leave casualties.  Restore them before this
+  -- reusable checkpoint so the Ramuh scene does not inherit a lost route.
+  H.fieldCare({ tag = "care after Dadaluma", threshold = 0.55 }),
   H.call(function()
     H.assertEq(sw(0x034A), 0, "$034A CLEAR -- the gentleman is gone")
     H.assertEq(map(), 221, "still on map 221")
@@ -1388,6 +1464,10 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(H.bfsPath(33, 10) ~= nil, true,
       "the tower porch is OPEN -- (33,10) walkable")
     H.assertEq(sw(0x0053), 0, "$0053 still clear -- TERRA waits upstairs")
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c) > 0, true,
+        string.format("dadaluma_won: char %d is on their feet", c))
+    end
     H.log(string.format("[dadaluma_won] f%d at (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
     H.screenshot("dadaluma_won")

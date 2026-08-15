@@ -92,15 +92,17 @@ end
 
 -- battle-menu model (battle_vargas / gen_sabin_train's map; all READS)
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
-local CMD_FIGHT, CMD_ITEM, CMD_SWDTECH, CMD_BLITZ, CMD_LEAP =
-  0x00, 0x01, 0x07, 0x0A, 0x11
+local ST_CMD, ST_ITEM, ST_RAGE, ST_TGT, ST_TOOLS =
+  0x05, 0x0A, 0x1E, 0x38, 0x30
+local CMD_FIGHT, CMD_ITEM, CMD_SWDTECH, CMD_BLITZ, CMD_RAGE, CMD_LEAP =
+  0x00, 0x01, 0x07, 0x0A, 0x10, 0x11
 local RETORT, PUMMEL, SUPLEX = 0x56, 0x5D, 0x5F
 local CMDTBL, CMDROW, ITEMLIST = 0x202E, 0x890F, 0x4005
 -- item cursor = scroll ($8947) + row-on-screen ($894F), get_item_poi's
 -- own sum (measured, probe_itemuse)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local BLCOL, BLROW = 0x8963, 0x8967
+local RAGESCR, RAGECOL, RAGEROW = 0x892B, 0x892F, 0x8933
 local BATTINV = 0x2686
 local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
 local BP = 0x3E9C
@@ -384,13 +386,18 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     end
     -- Gau's shared row is terrain-dependent: LEAP on the Veldt, FIGHT off it.
     -- Read the built list.  Never select Leap on this fixture-generating
-    -- route (it deliberately removes Gau); switch to another ready actor
-    -- instead.  If this same driver reaches an off-Veldt fight, use the
-    -- real Fight row.
+    -- route (it deliberately removes Gau).  On the Veldt, use his actual
+    -- attack verb instead: Rage row 1, entry 0 (Brawler from InitRage).
+    -- Skipping Gau made every post-join encounter a two-character fight;
+    -- the Nautiloid/Exocite/Pterodon pack then outdamaged Tonics on three
+    -- staggered timelines.  Off the Veldt the real Fight row remains valid.
     if fed and actor == 2 then
       local row0 = H.readByte(CMDTBL + actor * 12)
       if row0 == CMD_FIGHT then return { kind = "fight", boostLeft = 0 } end
-      if row0 == CMD_LEAP then return { kind = "switch" } end
+      local rageRow = cmdRowOf(actor, CMD_RAGE)
+      if row0 == CMD_LEAP and rageRow then
+        return { kind = "rage", row = rageRow }
+      end
       return { kind = "switch" }
     end
     local blitzRow = cmdRowOf(actor, CMD_BLITZ)
@@ -437,6 +444,14 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
       if cur < want then return { "down" } end
       if cur > want then return { "up" } end
+      return { "a" }
+    end
+    if st == ST_RAGE and plan.kind == "rage" then
+      local scroll = H.readByte(RAGESCR + actor)
+      local col = H.readByte(RAGECOL + actor)
+      local row = H.readByte(RAGEROW + actor)
+      if col > 0 then return { "left" } end
+      if scroll + row > 0 then return { "up" } end
       return { "a" }
     end
     if st == ST_TGT then

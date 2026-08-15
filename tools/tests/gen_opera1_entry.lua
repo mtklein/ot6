@@ -55,46 +55,88 @@ end
 -- indefinitely (measured, probe_opera_world.lua).  This grinds through
 -- instead: re-plan a worldBfs each time the plan runs out, press the next
 -- step.  No edge is ever condemned, so a battle-restored tile is retried
--- until a step lands.  Arrives at (tx,ty) or when the party leaves the world
--- (an entrance fired).
+-- until a step lands.  Arrival is the requested controlled world tile;
+-- importantly, battle transitions also clear worldMode(), so that flag alone
+-- cannot distinguish entering a town from starting a random encounter.
 --
 -- Encounters are handled with real input (issue #75; no battle-clear
--- write): first the engine's own run mechanic, a held L+R, which is what a
--- player does to world encounters; a formation that has not broken after ~20
--- real seconds is treated as unrunnable and fought by edge-tapped A instead
--- (A confirms Fight with the default target; the same taps page the victory
--- text).  Either ending reloads the world on the same tile and the grind
--- re-plans.
+-- write): hold the engine's own L+R run mechanic through the complete battle
+-- transition, which is what a player does to ordinary world encounters.  A
+-- bounded escape makes a genuinely unrunnable formation fail explicitly
+-- instead of silently switching to a second, more fragile combat policy.
 local function worldGrind(tx, ty, what)
-  local plan, idx, ph, battN = nil, 1, 0, 0
+  local plan, idx, step = nil, 1, nil
+  local battN, battleFrames, hb = 0, 0, -600
+  local DW = { up = { 0, -1 }, down = { 0, 1 },
+               left = { -1, 0 }, right = { 1, 0 } }
+  local sawBattle = false
   return H.driveUntil(function()
-    return (not H.worldMode()) or (H.worldX()==tx and H.worldY()==ty
-      and H.worldHasControl() and H.worldAligned())
+    return H.worldMode() and H.worldX()==tx and H.worldY()==ty
+      and H.worldHasControl() and H.worldAligned()
   end, 90000, {
     H.call(function()
-      ph = (ph + 1) % 8
       battN = H.battleLoadStarted() and battN + 1 or 0
       if battN > 0 then
-        plan = nil
+        plan, step, sawBattle = nil, nil, true
         if battN == 3 then
           local w = H.formationWords()
           H.log(string.format("[grind] battle up f%d (%04X %04X %04X %04X " ..
-            "%04X %04X) -- flee first, fight if unrunnable", H.frame,
+            "%04X %04X) -- fleeing with L+R", H.frame,
             w[1], w[2], w[3], w[4], w[5], w[6]))
         end
-        if battN < 1200 then
-          H.setPad({ l = true, r = true })     -- flee, with real input
-        else
-          H.setPad(ph < 4 and { "a" } or {})   -- unrunnable: fight it
+        battleFrames = battleFrames + 1
+        if battleFrames > 2400 then
+          error("world encounter did not yield to 2400 frames of L+R", 0)
         end
+        H.setPad({ l = true, r = true })
         return
       end
-      if not H.worldMode() then H.setPad({}); return end
-      if not H.worldHasControl() then plan=nil; H.setPad({}); return end
+      if not H.worldMode() then
+        if sawBattle then battleFrames = battleFrames + 1 end
+        if battleFrames > 2400 then
+          error("world encounter did not return to the map after 2400 frames", 0)
+        end
+        plan, step = nil, nil
+        H.setPad({ l = true, r = true }); return
+      end
+      if sawBattle then
+        H.log(string.format("[grind] fled; world resumed at (%d,%d)",
+          H.worldX(), H.worldY()))
+        sawBattle, battleFrames = false, 0
+      end
+      if not H.worldHasControl() then
+        plan, step = nil, nil; H.setPad({}); return
+      end
       if not H.worldAligned() then return end
-      if not plan or idx > #plan then plan = H.worldBfs(tx, ty); idx = 1 end
-      if not plan then H.setPad({}); return end
-      local dir = plan[idx]; idx = idx + 1
+      local x, y = H.worldX(), H.worldY()
+      if step then
+        if x == step.tx and y == step.ty then
+          step = nil; idx = idx + 1
+        elseif x ~= step.fx or y ~= step.fy then
+          plan, step = nil, nil
+        else
+          step.held = step.held + 1
+          if step.held > 90 then
+            plan, step = nil, nil; H.setPad({}); return
+          end
+          H.setPad({ [step.dir] = true }); return
+        end
+      end
+      if not plan or idx > #plan then
+        plan = H.worldBfs(tx, ty); idx = 1
+        if not plan then
+          if H.frame - hb >= 600 then
+            hb = H.frame
+            H.log(string.format("[grind] NO PATH (%d,%d)->(%d,%d) f%d",
+              x, y, tx, ty, H.frame))
+          end
+          H.setPad({}); return
+        end
+      end
+      local dir = plan[idx]
+      local d = DW[dir]
+      step = { dir = dir, fx = x, fy = y,
+               tx = (x + d[1]) & 0xFF, ty = (y + d[2]) & 0xFF, held = 0 }
       H.setPad({ [dir] = true })
     end),
   }, what or string.format("worldGrind (%d,%d)", tx, ty))
@@ -131,6 +173,12 @@ H.run({ maxFrames = 250000 }, {
   -- (worldGrind rather than worldNavTo, because of the (34,103) battle-zone
   -- blocklist problem)
   worldGrind(27, 129, "world walk -> Jidoor approach (27,129)"),
+  H.call(function()
+    H.log(string.format("[world] approach stop: world=%s map=%d world=(%d,%d) " ..
+      "field=(%d,%d) control=%s aligned=%s", tostring(H.worldMode()), map(),
+      H.worldX(), H.worldY(), H.fieldX(), H.fieldY(),
+      tostring(H.worldHasControl()), tostring(H.worldAligned())))
+  end),
   H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end,
     2000, "at Jidoor approach", 5),
   (function() local hb=0
@@ -156,6 +204,10 @@ H.run({ maxFrames = 250000 }, {
       end) }, "bump up into the (16,12) door -> map 209") end)(),
   H.waitUntil(function() return map()==209 and settled() end, 2400, "map 209 control", 5),
   H.waitFrames(150),
+  -- The Zozo-to-Jidoor road may cost several failed run rolls.  Recover in
+  -- town before banking the plot checkpoint so it represents arrival, not
+  -- a party that happened to stagger through the door.
+  H.fieldCare({ tag = "care on arrival in Jidoor", threshold = 0.55 }),
   H.call(function()
     H.assertEq(map(), 209, "in the opera-plot room (map 209)")
     H.log(string.format("[map209] landed at (%d,%d) $0331=%d $0340=%d",
@@ -183,6 +235,10 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(settled(), true, "entry point is QUIET")
     H.assertEq(sw(0x0331), 0, "$0331 CLEAR -- the letter has not appeared yet")
     H.assertEq(sw(0x0340), 0, "$0340 CLEAR -- the opera is not open yet")
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c) > 0, true,
+        string.format("opera_entry: char %d is on their feet", c))
+    end
     H.log(string.format("[opera_entry] f%d map=%d (%d,%d) face=%d",
       H.frame, map(), H.fieldX(), H.fieldY(), facing()))
     H.screenshot("opera_entry")

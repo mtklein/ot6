@@ -142,7 +142,8 @@ local function crossRafters(tx, ty, maxF, patience, hold, res, what)
   local hb, stuck, clearing, battN, wipeN = 0, 0, 0, 0, 0
   local refusedN, held, lost = 0, 0, nil
   local fight = H.newFightDriver("rafters",
-    { tactical = true, boost = true, items = true, healPercent = 55 })
+    { tactical = true, boost = true, items = true, healPercent = 70,
+      healer = 0x01 })
   -- Try the run for 60 frames, then fight it out.  Running would have been
   -- the cheap answer, and it would still have cleared the corridor: the
   -- rat's event is `battle 25` followed by `if_b_switch $40` -> hide_obj +
@@ -379,6 +380,12 @@ end
 -- of frames of the field RNG puts them somewhere else by the time the party
 -- starts walking.
 local crossed = { ok = false }
+-- Arrival alone is not enough: the generated entry point still needs time to
+-- turn toward Ultros and let a nearby rat wander clear before it is safe to
+-- bank.  Keep enough clock here for that short settling phase, otherwise the
+-- ladder should spend its next seed instead of accepting a technically
+-- successful but brittle crossing.
+local MIN_CROSS_TIMER = 900
 local catwalkBlob = nil                -- captured on the catwalk, below
 local function crossAttempt(n, hold)
   local loadReq
@@ -402,6 +409,12 @@ local function crossAttempt(n, hold)
     crossRafters(14, 7, 25000, 900, hold, crossed,
       string.format("cross the rafters to Ultros (attempt %d)", n)),
     H.call(function()
+      if crossed.ok and H.readWord(0x1189) < MIN_CROSS_TIMER then
+        H.log(string.format("[rafters] attempt %d reached Ultros with only %d " ..
+          "frames left; reserving the next rat arrangement for a safer entry",
+          n, H.readWord(0x1189)))
+        crossed.ok = false
+      end
       H.log(string.format("[rafters] attempt %d %s at (%d,%d), timer %d left, rats: %s",
         n, crossed.ok and "ARRIVED" or "did not arrive",
         H.fieldX(), H.fieldY(), H.readWord(0x1189), ratLine()))
@@ -420,6 +433,22 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(sw(0x0058), 0, "$0058 CLEAR -- Ultros has not dropped in yet")
     H.assertEq(sw(0x0345), 1, "$0345 SET -- the ENVELOPE (Ultros) is at 238 {99,20}")
     dumpsw("BOOT"); H.screenshot("rafter_boot")
+  end),
+
+  -- The opera field menu exposes only LOCKE even though EDGAR and SABIN join
+  -- its battles.  Kirin turns his otherwise idle MP into ~200-HP Cures; he
+  -- is the designated healer in crossRafters, leaving EDGAR's Tools and
+  -- SABIN's Blitzes uninterrupted instead of having all three spend turns
+  -- on 50-HP Tonics while the rat pack deals 90-218 damage per round.
+  H.equipEsper(0, 0x11, { tag = "KIRIN -> LOCKE for the rafters" }),
+  H.call(function()
+    H.log(string.format("[prep] esper wear: LOCKE=%02X EDGAR=%02X SABIN=%02X CELES=%02X",
+      H.readByte(0x1600 + 37 * 0x01 + 0x1E),
+      H.readByte(0x1600 + 37 * 0x04 + 0x1E),
+      H.readByte(0x1600 + 37 * 0x05 + 0x1E),
+      H.readByte(0x1600 + 37 * 0x06 + 0x1E)))
+    H.assertEq(H.readByte(0x1600 + 37 * 0x01 + 0x1E), 0x11,
+      "LOCKE wears KIRIN for Cure in the rat fights")
   end),
 
   -- Step 1: walk into the envelope at {99,20} -> _cabf31 -> $0058=1.
@@ -486,9 +515,9 @@ H.run({ maxFrames = 250000 }, {
   H.waitUntil(function() return map()==232 and settled() end,1000,"left room",3),
   H.driveUntil(function() return H.fieldY()==13 end,500,{H.hold({"up"})},"leave left landing"),
   H.navTo(117,5,{maxFrames=2500,playBattles=true}),
-  -- The five rat gates stay live (see the header): the catwalk is crossed
-  -- with navTo's playBattles mode, and a rat that collides fires battle 25,
-  -- fought by the same taps; a win despawns it and clears its gate.
+  -- The five rat gates stay live (see the header).  A rat collision fires
+  -- battle 25; crossRafters drives that fight tactically, and a win despawns
+  -- the rat and clears its gate.
   H.navTo(117,3,{maxFrames=6000,playBattles=true,arrive=function() return map()==235 end}),
   H.waitUntil(function() return map()==235 and settled() end,1500,"framework",3),
   H.call(function() H.log("[rats] on 235: " .. ratLine()) end),
@@ -539,7 +568,7 @@ H.run({ maxFrames = 250000 }, {
   crossAttempt(3, 601),
   H.call(function()
     H.assertEq(crossed.ok, true,
-      "the rafters were crossed inside the chase clock within three attempts")
+      "the rafters were crossed with safe clock margin within three attempts")
   end),
   -- face Ultros by input: his NPC occupies {15,7}, so a short RIGHT press
   -- is a blocked step that turns the party in place

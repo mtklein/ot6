@@ -45,39 +45,17 @@ local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end
 local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 
--- drive the world toward (tx,ty), fleeing random encounters (hold L+R: no
+-- Drive the world toward (tx,ty), fleeing random encounters (hold L+R: no
 -- win, no leave roll, no writes; see the header), and stop when the map
--- index leaves the world (an entrance fired) or the party arrives.  worldBfs
--- plans; the press is held through per the world latch.
+-- index leaves the world (an entrance fired) or the party arrives.  Keep this
+-- route on the shared navigator: besides planning, it owns battle detection,
+-- the flee driver, wipe checks, and the post-battle world reload handshake.
 local function worldToMap(tx, ty, what, budget)
-  local plan, idx, phase, hb = nil, 1, 0, -600
-  return H.driveUntil(function()
-    return not H.worldMode()
-        or (H.worldX() == tx and H.worldY() == ty and H.worldHasControl())
-  end, budget or 25000, {
-    H.call(function()
-      phase = (phase + 1) % 8
-      if H.frame - hb >= 600 then
-        hb = H.frame
-        H.log(string.format("world[%s] f%d (%d,%d) wctl=%s", what, H.frame,
-          H.worldX(), H.worldY(), tostring(H.worldHasControl())))
-      end
-      if H.battleLoadStarted() then
-        plan = nil
-        H.setPad({ l = true, r = true })   -- flee, with real input
-        return
-      end
-      if not H.worldHasControl() then H.setPad({}); return end
-      if not H.worldAligned() then return end
-      if bright() < 15 then H.setPad({}); return end
-      if not plan or idx > #plan then
-        plan = H.worldBfs(tx, ty); idx = 1
-        if not plan then error("worldToMap: no path to ("..tx..","..ty..")", 0) end
-      end
-      local dir = plan[idx]; idx = idx + 1
-      H.setPad({ [dir] = true })
-    end),
-  }, "world->" .. what)
+  return H.worldNavTo(tx, ty, {
+    maxFrames = budget or 25000,
+    playBattles = "flee",
+    arrive = function() return not H.worldMode() end,
+  })
 end
 
 -- edge tiles double as map exits, so a navTo whose target sits next to

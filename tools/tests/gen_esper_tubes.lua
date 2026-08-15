@@ -29,7 +29,7 @@
 -- EDGAR's AutoCrossbow (piercing).  The drive is H.newFightDriver
 -- (tactical, boost bank, and real Item heals and revival, the configuration
 -- that has beaten VARGAS, battle 70 and the brokendeath guard), after
--- the player's own prep (H.equipOptimum and H.fieldCare), because the
+-- the player's own prep (a named loadout and H.fieldCare), because the
 -- July-cut checkpoint delivers the party hurt and LOCKE/CELES bare-handed
 -- (the Vector remove_equip; measured on the sibling checkpoint-booted step,
 -- and the equip audit names both).  gen_tunnelarmr's phase-spread retry
@@ -333,7 +333,21 @@ H.run({ maxFrames = 300000 }, {
   --    (Equip -> Optimum, a no-op for anyone armed) and top HP up from
   --    the bag before the retry blob, so every attempt replays a
   --    prepared party
-  H.equipOptimum({ tag = "n024 kit" }),
+  -- The checkpoint normally already carries this exact set from battle 70;
+  -- spelling it out here keeps this cold-booted leg self-contained without
+  -- giving Optimum permission to reshuffle weapon classes.
+  H.equipLoadout(1, {
+    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+  }, { tag = "LOCKE Number-024 kit" }),
+  H.equipLoadout(4, {
+    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+  }, { tag = "EDGAR Number-024 kit" }),
+  H.equipLoadout(5, {
+    { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 },
+  }, { tag = "SABIN Number-024 kit" }),
+  H.equipLoadout(6, {
+    { 0, 0x0A }, { 2, 0x6A }, { 3, 0x84 },
+  }, { tag = "CELES Number-024 kit" }),
   H.fieldCare({ tag = "care before battle 72", threshold = 0.95 }),
   H.navTo(25, 52, { maxFrames = 6000, playBattles = "flee" }),
   H.call(function()

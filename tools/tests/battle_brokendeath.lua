@@ -48,11 +48,8 @@
 -- timer to $10 by direct write, and clamped his HP to 12 so the next landed
 -- hit killed him mid-break.  Issue #75's rule (inputs in, observations
 -- out, never write emulated state) retired all of that.  This version
--- reaches the same observation through real play: the party re-equips
--- through the real field Equip menu (H.equipOptimum, which since 2026-08-13
--- has little left to do: gen_vector_entry now arms LOCKE and CELES by item
--- in Albrook, so the fixture no longer arrives with the two of them
--- bare-handed), and
+-- reaches the same observation through real play: the party confirms its
+-- named battle-70 loadout through the real field Equip menu, and
 -- the fight uses the library's shared observed-menu fighter.
 --
 -- The staging that is gone is itself asserted against: shields must read
@@ -372,20 +369,24 @@ H.run({ maxFrames = 250000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
 
-  -- 1. the player's prep, all through real menus: H.equipOptimum (the
-  --    library version of the hand-rolled walk this file used to carry),
-  --    then top up HP with the bag's own items (H.fieldCare).  This fixture
-  --    delivers CELES at 221/349, and the first ladder-less run wiped from
-  --    that deficit.
-  --
-  --    The equip call is no longer repairing a stripped party: since
-  --    2026-08-13 gen_vector_entry arms LOCKE and CELES by item before the
-  --    walk to Vector, so this arrives holding Guardian and MithrilKnife.
-  --    What it does now is let Optimum re-pick by power, which is a
-  --    routing choice wob-route.md section 2 rules out for the route
-  --    itself; whether this test should equip deliberately instead is open,
-  --    and it passes either way.
-  H.equipOptimum({ tag = "brokendeath kit" }),
+  -- 1. the player's prep, all through real menus: preserve this fixture's
+  --    actual named kit, then top up HP with the bag's own items
+  --    (H.fieldCare).  The old arm asked this independent lineage for the
+  --    checkpoint lineage's two ThunderBlades; neither exists in this save,
+  --    so that was a fixture fabrication disguised as menu input.  EDGAR's
+  --    MithrilBlade supplies slash, while the daggers and Tools cover pierce.
+  H.equipLoadout(1, {
+    { 0, 0x02 }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+  }, { tag = "LOCKE battle-70 kit" }),
+  H.equipLoadout(4, {
+    { 0, 0x0A }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+  }, { tag = "EDGAR battle-70 kit" }),
+  H.equipLoadout(5, {
+    { 0, 0x53 }, { 2, 0x69 }, { 3, 0x86 },
+  }, { tag = "SABIN battle-70 kit" }),
+  H.equipLoadout(6, {
+    { 0, 0x01 }, { 1, 0x5A }, { 2, 0x6A }, { 3, 0x84 },
+  }, { tag = "CELES battle-70 kit" }),
   H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
 
   -- 2. capture the prepared entry point as the retry ladder's reload blob

@@ -346,9 +346,18 @@ local function descentBody(tier)
   }
   local wi = 1
   local battN, holdF, axis = 0, 0, 1
+  local elapsed = 0
   local hb = -600
   local F = mkFighter(tier, "descent")
   return H.driveUntil(function()
+    elapsed = elapsed + 1
+    if elapsed >= 88000 and descLost == nil then
+      descLost = string.format("descent episode unresolved after %d frames " ..
+        "at (%d,%d), waypoint %d/%d (tier %d) -- retrying the defense " ..
+        "checkpoint", elapsed, H.fieldX(), H.fieldY(), wi, #WAY, tier)
+      H.log("[descent] LOST -- " .. descLost)
+      return true
+    end
     if F.lost and not H.battleLoadStarted() then
       descLost = F.lost
       return true                       -- wiped; the ladder decides
@@ -419,7 +428,11 @@ local function descentAttempt(n)
       H.waitFrames(60),
     }, {}),
     H.call(function() descLost = nil end),
-    descentBody(n),
+    -- There is no value in a deliberately Fight-only opening trial here:
+    -- EDGAR was selected for this party specifically because AutoCrossbow
+    -- clears the four-enemy waves.  Attempt 1 uses that authored kit; later
+    -- attempts add CELES's Runic and vary the battle timeline.
+    descentBody(math.min(n + 1, 3)),
     H.release(),
     H.waitFrames(10),
     H.call(function()
@@ -551,15 +564,6 @@ H.run({ maxFrames = 600000 }, {
       H.fieldX(), H.fieldY(), sw(0x001E), sw(0x0021), sw(0x0044)))
   end),
 
-  -- Equip the reunited party.  Everything after this point (the Narshe
-  -- defense, Kefka, Zozo, the Opera, Vector) inherits whatever
-  -- the party is holding here, and tools/audit_equipment.py reports that as
-  -- nothing for LOCKE in 42 fixtures and CELES in 29.  The story's
-  -- remove_equip returns gear to inventory and no step has put it back.
-  -- This is a no-op when everyone is already armed, so it costs nothing once
-  -- the upstream steps are fixed too.
-  H.equipOptimum({ tag = "reunion kit" }),
-
   -- ==================================================================== --
   -- 1. BANON {20,7}: stand at (20,8), face up, clean A.  "Prepared?" ->
   --    Yes -> the map-5 info scene -> party_menu 3, RESET.
@@ -650,6 +654,27 @@ H.run({ maxFrames = 600000 }, {
     H.assertPartyStanding("narshe_battle")
     H.screenshot("narshe_battle")
   end),
+
+  -- The old power-only Optimum call at the reunion staging was a no-op: the
+  -- active character there is the scenario Moogle, while the seven heroes
+  -- are only an assignment pool.  After the split the actual combined
+  -- lineage has no spare Dirk or LeatherArmor anyway -- LOCKE still owns
+  -- those -- and CELES already carries the MithrilBlade deliberately handed
+  -- to her by the TunnelArmr route.  Preserve and name that intent rather
+  -- than inventing equipment the playthrough did not acquire.
+  H.call(function()
+    H.assertEq(H.readByte(0x1600 + 37 * 6 + 0x1F), 0x0A,
+      "CELES retains the TunnelArmr route's MithrilBlade for reunion")
+  end),
+  -- This party's authored verbs are all row-exempt: TERRA's Magic, EDGAR's
+  -- Tools and CELES's Runic.  The descent is a physical gauntlet and the
+  -- combined lineage legitimately has no spare body armor for CELES, so the
+  -- back row is the player's available defensive preparation.  Tier 1 may
+  -- still spend early turns on Fight (and accept its damage penalty); from
+  -- tier 2 onward the route uses the three verbs this formation was built
+  -- around.
+  H.setRows({ [0] = true, [4] = true, [6] = true },
+    { tag = "Narshe defense rows" }),
   H.saveState("narshe_battle.mss"),
 
   -- ==================================================================== --

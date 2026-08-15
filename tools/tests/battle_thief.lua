@@ -366,14 +366,15 @@ H.run({ maxFrames = 120000 }, {
     H.log("PASSED phase 4: Bestow moves a boost point from Locke to an ally")
   end),
 
-  -- 7: the caps.  Bank both actors to Ot6ActionEnd's cap of 5 by counted
-  -- item turns, interleaved, because a deferred ally who waits her turn out
+  -- 7: the caps.  Bank both actors to Ot6ActionEnd's cap of 5, interleaved,
+  -- using non-damaging Steal for Locke and item turns for the ally.  A
+  -- deferred ally who waits her turn out
   -- for another 30k frames dies to the desert chip damage (measured: the
   -- serial version timed out on her bank), while item turns heal.
   -- Then a fourth Locke turn must bank nothing, which is the cap, asserted;
   -- Filch at cap chips but banks nothing; and a Bestow to the capped
   -- ally is a no-op.
-  H.call(function() modeOf[locke] = "item"; modeOf[ally] = "item" end),
+  H.call(function() modeOf[locke] = "kit:0"; modeOf[ally] = "item" end),
   driveTo(function() return bp(locke) == 5 and bp(ally) == 5 end, 60000,
     "interleaved item turns walk both banks to the cap"),
   H.call(function() modeOf[ally] = "defer" end),
@@ -381,13 +382,18 @@ H.run({ maxFrames = 120000 }, {
     local turns0
     return H.repeatN(1, {
       H.call(function() H.vars.mpCap = mp() end),
-      -- one MORE item turn: the bank must stay 5.  The turn is detected by
-      -- the bag shrinking (mp does not move on an item turn).
-      H.call(function() turns0 = H.readByte(0x2686 + (bagIdxOf({TONIC, POTION}) or 0)*5 + 3) end),
+      -- one MORE item turn: the bank must stay 5.  Locke's three Steal
+      -- banks above preserve enough of the fixture's real bag for this
+      -- positive control.
+      H.call(function()
+        modeOf[locke] = "item"
+        local i = bagIdxOf({TONIC, POTION})
+        turns0 = i and H.readByte(0x2686 + i*5 + 3) or -1
+      end),
       driveTo(function()
         local i = bagIdxOf({TONIC, POTION})
         return i ~= nil and H.readByte(0x2686 + i*5 + 3) ~= turns0
-      end, 20000, "a fourth item turn at the cap"),
+      end, 20000, "an item turn at the cap"),
       H.waitFrames(180),
       H.call(function()
         H.assertEq(bp(locke), 5,

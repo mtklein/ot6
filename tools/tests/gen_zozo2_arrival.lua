@@ -113,7 +113,7 @@ end
 -- 3-byte total experience.  Printed at every hop so the walk's damage and
 -- levelling are legible step by step rather than only at the end.
 local POTION, TONIC, FENIX = 0xE9, 0xE8, 0xF0
-local LOCKE = 1
+local LOCKE, CELES = 1, 6
 
 local function invCount(id)
   for i = 0, 255 do
@@ -168,8 +168,15 @@ local function walk(x, y, what, opts)
     H.logStep(function()
       return string.format("%s -> world (%d,%d): %s", what, x, y, rosterLine())
     end),
+    -- CELES owns recovery while the other three keep attacking.  Without a
+    -- named medic, a measured group-10 fight reached its last enemy at 51
+    -- hp and every actor abandoned the kill to queue redundant Fenix Downs
+    -- on EDGAR; the party died with the threat one Pummel from finished.
+    -- This is the same explicit role assignment newFightDriver documents for
+    -- avoiding party heal-locks, and leaves CELES free to Cure from safety.
     H.worldNavTo(x, y, { maxFrames = 40000, playBattles = "tactical",
-                         healPercent = 60, reserve = { [POTION] = 3 },
+                         healPercent = 60, healer = CELES,
+                         reserve = { [POTION] = 3 },
                          arrive = opts.arrive }),
     H.release(),
   })
@@ -288,6 +295,12 @@ H.run({ maxFrames = 600000 }, {
   --    {12,43}, then door (12,50) -> 55 {28,40}, the lower gate yard.
   door(28, 31, "down", 59, "terrace -> vestibule"),
   door(12, 49, "down", 55, "vestibule -> gate yard"),
+
+  -- SABIN's Pummel is row-exempt, so the back row is pure defense on this
+  -- physical crossing.  LOCKE stays in front because his Fight chips the
+  -- generated pierce/slash rows; EDGAR and CELES already inherit back-row
+  -- assignments from the Narshe defense.
+  H.setRows({ [5] = true }, { tag = "Zozo crossing rows" }),
 
   -- 3. off the castle onto the world: row y=43 is the exit
   H.navTo(28, 42, { maxFrames = 12000, playBattles = "tactical" }),

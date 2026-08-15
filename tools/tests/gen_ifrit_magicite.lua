@@ -55,7 +55,7 @@
 -- section 13: Ifrit 6 shields weak ice + piercing, Shiva 6 weak fire +
 -- slashing, vanilla's tag fight):
 --
---   * THE PARTY RE-EQUIPS FIRST -- H.equipOptimum through the real field
+--   * THE PARTY RE-EQUIPS FIRST -- a named loadout through the real field
 --     Equip menu.  The Vector infiltration's `remove_equip`
 --     (event_main.asm:11979-11988) stripped everyone and returned the gear
 --     TO INVENTORY, and no generator between there and here ever re-equipped,
@@ -511,7 +511,21 @@ H.run({ maxFrames = 300000 }, {
   --    best weapon for this fight, and Optimum's power-greedy pick is right
   --    here by accident. A deliberate equip has to weigh class against the
   --    boss's break axis; element alone is the wrong axis (issue #81).
-  H.equipOptimum({ tag = "ifrit kit" }),
+  -- Name the loadout instead of delegating it to attack-power-only
+  -- Optimum.  ThunderBlade is deliberate in this one fight: bolt is nulled,
+  -- not absorbed, and its slashing class is the available answer to Shiva.
+  H.equipLoadout(1, {
+    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+  }, { tag = "LOCKE Ifrit/Shiva kit" }),
+  H.equipLoadout(4, {
+    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+  }, { tag = "EDGAR Ifrit/Shiva kit" }),
+  H.equipLoadout(5, {
+    { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 },
+  }, { tag = "SABIN Ifrit/Shiva kit" }),
+  H.equipLoadout(6, {
+    { 0, 0x0A }, { 2, 0x6A }, { 3, 0x84 },
+  }, { tag = "CELES Ifrit/Shiva kit" }),
   -- 1b. the rest of the player's prep: HEAL.  The checkpoint battery was cut
   --    with EDGAR at 108/354 and SABIN at 113/363, both about 31%, and a cold
   --    Continue restores exactly that -- FF6's save point saves without
@@ -533,7 +547,7 @@ H.run({ maxFrames = 300000 }, {
       "back at the entry point, armed")
     H.log(partyReport("ifrit entry point, armed"))
     -- The prep above has to be checked, not assumed: a fieldCare that
-    -- silently no-ops and an equipOptimum that silently no-ops both leave a
+    -- silently no-ops and an equipment drive that silently no-ops both leave a
     -- party that loses the fight for a reason the battle log does not name.
     -- That is exactly how this step failed before -- it read as a balance
     -- wall.  Require the numbers the prep is supposed to produce.

@@ -118,7 +118,7 @@
 -- 66% and death, and no Tonic covers a 111-damage hit.  His own Fight takes
 -- 6 off 495 and one shield off three, and the bag holds exactly one weapon
 -- (item $00, the Dirk, power 26 at item_prop_en.dat +$14), so
--- H.equipOptimum is already picking the best there is.
+-- The named loadout already puts on the best gear there is.
 --
 -- This is why the 2026-08-09 "solo LOCKE beats the gate soldier" record
 -- (95efb39) cannot be reproduced, and two of its own numbers do not survive
@@ -237,7 +237,11 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(map(), 75, "booted on map 75, occupied South Figaro")
     H.assertEq(H.hasControl(), true, "controllable")
   end),
-  H.equipOptimum({ tag = "locke kit" }),
+  H.equipLoadout(1, {
+    { 0, 0x00 }, -- Dirk: the only weapon in this checkpoint's bag
+    { 2, 0x69 }, -- Leather Hat
+    { 3, 0x84 }, -- LeatherArmor
+  }, { tag = "LOCKE battle-11 control kit" }),
   H.setRows({ [1] = true }, { tag = "locke solo rows" }),
 
   H.call(function()

@@ -625,6 +625,17 @@ local function shopTrip()
     -- because the mountain can poison more than once and the count has to
     -- survive gen_vargas, gen_returner and gen_banon's own care stops.
     buyTo(0xF2, 1, 3, 50, "ANTIDOTE to 3"),
+    -- This is also the common party's last provision stop before the
+    -- scenario split.  Two Softs answer Petrify on the long branches; the
+    -- need was measured on the Phantom Train, where a forced corridor fight
+    -- petrified SHADOW before a clean boss win.  Soft is row 2 and costs 200
+    -- gil.  The first measured run bought two and spent both before even
+    -- reaching Mt. Kolts when the party had no immunity.  The relic stop
+    -- below now gives all three Jewel Rings, so these two are recovery for
+    -- an exceptional hit rather than the primary defense.  Buy them before
+    -- the marginal Tonic line so the party keeps an answer instead of more
+    -- 50-HP heals.
+    buyTo(0xF4, 2, 2, 200, "SOFT to 2"),
     buyTo(0xE8, 0, 25, 50, "TONIC to 25"),
     tapUntil("b", inState(0x25), "shop: back to the options window"),
     tapUntil("b", function() return H.hasControl() and map() == 85 end,
@@ -641,6 +652,9 @@ local function shopTrip()
       H.assertEq(invCount(0xF2) >= 2, true,
         "the party leaves with Antidotes -- poison is answerable now, and " ..
         "there is no other counter between here and the Returner Hideout")
+      H.assertEq(invCount(0xF4) >= 2, true,
+        "the party leaves with two Softs -- Petrify recovery backs up the " ..
+        "route, not merely the next encounter")
     end),
     H.navTo(104, 57, { maxFrames = 20000, playBattles = "flee" }),
     H.release(), H.waitFrames(20),
@@ -1082,11 +1096,16 @@ end
 -- split, so his scenario has both classes.  The gate soldier's HeavyArmor is
 -- `3, OT6_SLASH|OT6_PIERCE` (:2013), so the blade breaks it either way.
 --
--- The Heavy Shld is the other half: LOCKE is the only member of this party
--- with an EMPTY left hand (measured at south_figaro -- TERRA and EDGAR both
--- carry Bucklers already), so a shield is a straight +22 defense / +14
--- magic defense on him for 400 gil, and equip Optimum will put it back on
--- after the story strips him.
+-- Two Heavy Shlds and a Plumed Hat are the other half.  LOCKE is the only member of this
+-- party with an EMPTY left hand (measured at south_figaro -- TERRA and EDGAR
+-- both carry Bucklers already), so one is a straight +22 defense / +14 magic
+-- defense on him for 400 gil.  The second stays in the common bag for
+-- CYAN's Phantom Train loadout.  That spare matters when LOCKE's scenario is
+-- completed first: CELES keeps his branch's shield equipped while the player
+-- switches to SABIN, so one purchased shield cannot serve both parties.
+-- The hat is the same scenario-order provision for SHADOW: CELES retains the
+-- common route's Leather Hat on LOCKE's branch, while the Plumed Hat remains
+-- in the bag and fits everyone.
 --
 -- A MithrilKnife is bought as well and nobody equips it here (issue #106).
 -- It is row 1 of the same shop, 300 gil out of a five-figure purse, power 30
@@ -1105,7 +1124,8 @@ end
 --
 -- And it is what a player does at the last counter before the mountain:
 -- docs/design/wob-route.md section 2, buy what the next stretch needs.
-local MITHRILBLADE, HEAVYSHLD, STARPENDANT = 0x0A, 0x5B, 0xB1
+local MITHRILBLADE, HEAVYSHLD, PLUMEDHAT, STARPENDANT = 0x0A, 0x5B, 0x6B, 0xB1
+local JEWELRING = 0xB5
 local MITHRILKNIFE = 0x01
 
 local function gearTrip()
@@ -1118,13 +1138,17 @@ local function gearTrip()
     leaveDoor(103, 16, "shop 5"),
     enterDoor(35, 19, 77, "armor shop"),
     counterShop(114, 12, "shop 6 (armor)"),
-    buyTo(HEAVYSHLD, 1, 1, 400, "HEAVY SHLD to 1"),
+    buyTo(HEAVYSHLD, 1, 2, 400, "HEAVY SHLD to 2"),
+    buyTo(PLUMEDHAT, 3, 1, 250, "PLUMED HAT to 1"),
     closeShop(77, "shop 6"),
     leaveDoor(114, 16, "shop 6"),
     H.call(function()
       H.assertEq(invCount(MITHRILBLADE) >= 1, true,
         "the MithrilBlade is in the bag")
-      H.assertEq(invCount(HEAVYSHLD) >= 1, true, "the Heavy Shld is in the bag")
+      H.assertEq(invCount(HEAVYSHLD) >= 2, true,
+        "two Heavy Shlds cover both scenario orders")
+      H.assertEq(invCount(PLUMEDHAT) >= 1, true,
+        "the Plumed Hat covers SHADOW in either scenario order")
       H.assertEq(invCount(MITHRILKNIFE) >= 1, true,
         "a spare MithrilKnife is in the bag -- nobody wears it here; it is " ..
         "LOCKE's second PIERCE weapon at TunnelArmr, past the split")
@@ -1136,6 +1160,8 @@ local function gearTrip()
         "LOCKE holds the MithrilBlade")
       H.assertEq(H.readByte(0x1600 + 37 * 1 + 0x20), HEAVYSHLD,
         "LOCKE holds the Heavy Shld")
+      H.assertEq(invCount(HEAVYSHLD) >= 1, true,
+        "a second Heavy Shld remains in the common bag for CYAN")
       H.assertEq(invCount(0x00) >= 1, true,
         "and his own Dirk is unequipped in the shared bag, which is what " ..
         "carries a pierce weapon into his solo scenario for TunnelArmr")
@@ -1154,6 +1180,13 @@ end
 -- (field/player.asm:593-613).  The Antidotes stay bought as well; they cost
 -- 150 against a purse the grind put five figures into, and nothing has yet
 -- measured a poisoned party member on this route WITH the pendants on.
+--
+-- Three Jewel Rings fill the free second relic slots.  Their same +$06 byte
+-- is $40, STATUS1::PETRIFY, so the party prevents the condition instead of
+-- routinely spending Softs after it.  The first recovery-only attempt bought
+-- two Softs and consumed both before Mt. Kolts; immunity preserves that small
+-- backup for the scenario branches.  The relic shop is after the gil grind,
+-- so the 3000 GP does not compete with the item shop's Fenix/Tonic budget.
 local function relicTrip()
   return seq({
     enterDoor(15, 39, 76, "the relic shop and the inn"),
@@ -1170,19 +1203,28 @@ local function relicTrip()
     end),
     counterShop(51, 11, "shop 7 (relics)"),
     buyTo(STARPENDANT, 2, 3, 500, "STAR PENDANT to 3"),
+    buyTo(JEWELRING, 3, 3, 1000, "JEWEL RING to 3"),
     closeShop(76, "shop 7"),
     H.call(function()
       H.assertEq(invCount(STARPENDANT), 3, "three Star Pendants in the bag")
+      H.assertEq(invCount(JEWELRING), 3, "three Jewel Rings in the bag")
     end),
     equipRelic(posOf(0), 0, STARPENDANT, "terra pendant"),
     equipRelic(posOf(1), 0, STARPENDANT, "locke pendant"),
     equipRelic(posOf(4), 0, STARPENDANT, "edgar pendant"),
+    equipRelic(posOf(0), 1, JEWELRING, "terra jewel ring"),
+    equipRelic(posOf(1), 1, JEWELRING, "locke jewel ring"),
+    equipRelic(posOf(4), 1, JEWELRING, "edgar jewel ring"),
     H.call(function()
       for _, c in ipairs({ 0, 1, 4 }) do
         H.assertEq(H.readByte(0x1600 + 37 * c + 0x23) == STARPENDANT
                 or H.readByte(0x1600 + 37 * c + 0x24) == STARPENDANT, true,
           string.format("char %d wears a Star Pendant -- Mt Kolts cannot " ..
             "poison this party", c))
+        H.assertEq(H.readByte(0x1600 + 37 * c + 0x23) == JEWELRING
+                or H.readByte(0x1600 + 37 * c + 0x24) == JEWELRING, true,
+          string.format("char %d wears a Jewel Ring -- Mt Kolts cannot " ..
+            "petrify this party", c))
       end
       where("pendants on")
     end),
@@ -1417,11 +1459,13 @@ H.run({ maxFrames = 700000 }, {
   -- Back to the item shop with the grind's money.  The first visit could
   -- only afford 5 revives and 25 Tonics out of 3974; the mountain is nine
   -- crossings and the map-98 approach on top, and this is still the last
-  -- counter before the Returner Hideout.
+  -- counter before the Returner Hideout.  Seven revives and thirty Tonics
+  -- leave a generous field-care reserve while preserving 4580 GP for the
+  -- three Star Pendants, three Jewel Rings, and the 80 GP inn stay below.
   enterDoor(44, 32, 85, "item shop (second visit)"),
   counterShop(106, 54, "shop 8 (item, top-up)"),
-  buyTo(0xF0, 5, 8, 500, "FENIX DOWN to 8"),
-  buyTo(0xE8, 0, 40, 50, "TONIC to 40"),
+  buyTo(0xF0, 5, 7, 500, "FENIX DOWN to 7"),
+  buyTo(0xE8, 0, 30, 50, "TONIC to 30"),
   closeShop(85, "shop 8"),
   leaveDoor(104, 57, "the item shop"),
   H.call(function()
@@ -1475,6 +1519,11 @@ H.run({ maxFrames = 700000 }, {
     where("kolts entry point")
   end),
   care("kolts entry point"),
+  H.call(function()
+    H.assertEq(invCount(0xF4) >= 2, true,
+      "at least two Softs survive the South Figaro-to-Kolts journey -- " ..
+      "the scenario branches still have a Petrify answer")
+  end),
   H.call(function() H.screenshot("kolts_entry") end),
   H.saveState("kolts_entry.mss"),
   H.logStep(function()

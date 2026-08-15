@@ -52,6 +52,9 @@ working because stacked artifacts are ordinary files on the same .rom-copy
 clock.
 """
 import hashlib
+import contextlib
+import importlib.util
+import io
 import os
 import re
 import subprocess
@@ -79,6 +82,25 @@ DBG = ROOT / "ff6" / "rom" / "ff6-en.dbg"
 # format).  Composition reads it to decide, per script, whether to arm the
 # runtime write gate below, so the same only-shrinks rule is enforced twice.
 WAIVERS = ROOT / "tools" / "state_write_waivers.txt"
+
+
+def declared_states(root):
+    """Fixture names in this tree's current savestate graph.
+
+    Keep compose.py self-contained: several harness self-tests copy only the
+    tests/lib directory into a tiny fake tree, so importing the audits'
+    tools/savestate_party.py helper would make parallel composition depend on
+    a file those intentionally minimal trees do not carry.  An unreadable or
+    absent graph returns the conservative empty-set fallback.
+    """
+    path = Path(root) / "tools" / "tests" / "savestate_graph.py"
+    try:
+        spec = importlib.util.spec_from_file_location("savestate_graph", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return {s["state"] for s in mod.STATES}
+    except Exception:
+        return set()
 
 
 def load_write_waivers(path):
@@ -310,9 +332,24 @@ def check_states(root):
     Exit 0 = every stamped fixture matches its sources; 1 = some do not.
     """
     states = root / "build" / "states"
-    stamps = sorted(states.glob("*.stamp"))
+    all_stamps = sorted(states.glob("*.stamp"))
+    declared = declared_states(str(root))
+    # build/states outlives the graph: renames leave the old artifact and
+    # stamp behind forever.  Those files are not fixtures any more, cannot be
+    # regenerated, and may name checkpoint inputs that no longer exist.  The
+    # party/equipment/chest audits already distinguish this same debris from
+    # live fixtures through declared_states(); provenance must ask the same
+    # question or an unrelated pre-rename stamp can break every release.
+    if declared:
+        stamps = [s for s in all_stamps if s.stem in declared]
+        orphans = [s for s in all_stamps if s.stem not in declared]
+    else:
+        # An unreadable graph means "cannot tell", so retain the conservative
+        # historical behavior and check everything rather than silently skip.
+        stamps, orphans = all_stamps, []
     if not stamps:
-        print("no generated fixtures in this tree (build/states is unseeded); "
+        print("no generated fixtures in this tree "
+              "(none declared; build/states is unseeded); "
               "tests that need a generated savestate will report SKIPPED, "
               "not fail")
         return 0
@@ -323,7 +360,9 @@ def check_states(root):
             stale.append((s.stem, msg))
     if not stale:
         print(f"fixtures: {len(stamps)}/{len(stamps)} fresh "
-              f"(sources, artifact and ancestor bindings all verify)")
+              f"(sources, artifact and ancestor bindings all verify)" +
+              (f"; {len(orphans)} obsolete build stamp(s) ignored" if orphans
+               else ""))
         return 0
     print(f"fixtures: {len(stale)} of {len(stamps)} are STALE or UNBOUND -- "
           f"generated from sources this tree no longer has, or carrying bytes "
@@ -960,6 +999,22 @@ def selftest() -> int:
         (st / "child.mss").unlink()
         has("a stamp whose .mss is gone is UNBOUND",
             stamp_check("child", root), "child.mss does not")
+
+        # --check-states is about the current graph, not every artifact a
+        # previous graph happened to leave in build/states.  In particular,
+        # an orphan may name a checkpoint path that was removed with its old
+        # generator; the old implementation tried to hash that missing input
+        # and crashed before it could check any live fixture.
+        (root / "tools" / "tests" / "savestate_graph.py").write_text(
+            'STATES = [{"state": "fake"}]\n')
+        (st / "orphan.stamp").write_text(
+            "deadbeef gen_fake missing/checkpoint.json\n")
+        report = io.StringIO()
+        with contextlib.redirect_stdout(report):
+            graph_rc = check_states(root)
+        check("whole-tree freshness ignores stamps the graph no longer declares",
+              (graph_rc, "3 obsolete build stamp(s) ignored" in report.getvalue()),
+              (0, True))
 
     print("selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1

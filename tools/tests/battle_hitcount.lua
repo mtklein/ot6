@@ -82,6 +82,9 @@ local MAGIC_REC, ITEM_REC = 14, 30
 local log, refs = {}, {}
 
 local function arm()
+  refs.cmd = emu.addMemoryCallback(function()
+    log[#log + 1] = { k = "cmd", frame = H.frame, id = H.readByte(0x00B6) }
+  end, emu.callbackType.exec, H.sym("Cmd_0a"), H.sym("Cmd_0a"))
   refs.count = emu.addMemoryCallback(function()
     log[#log + 1] = { k = "hook", frame = H.frame,
                       id = emu.getState()["cpu.a"] & 0xFF,
@@ -116,7 +119,17 @@ local function castsOf(id)
   return n
 end
 
+local function playerBlitzesOf(id)
+  local n = 0
+  for _, e in ipairs(log) do
+    if e.k == "cmd" and e.id == id then n = n + 1 end
+  end
+  return n
+end
+
 local function disarm()
+  emu.removeMemoryCallback(refs.cmd, emu.callbackType.exec,
+    H.sym("Cmd_0a"), H.sym("Cmd_0a"))
   emu.removeMemoryCallback(refs.count, emu.callbackType.exec,
     H.sym("Ot6HitCount"), H.sym("Ot6HitCount"))
   emu.removeMemoryCallback(refs.join, emu.callbackType.exec,
@@ -364,8 +377,11 @@ H.run({ maxFrames = 120000 }, {
   -- Cmd_0a shim is missing fails on the named assertion below instead of
   -- timing out here with nothing to say.
   H.call(function() want = AURABOLT end),
-  drive(function() return castsOf(AURABOLT) >= 1 end, 20000,
-    "Sabin casts AuraBolt"),
+  -- $3410 is shared by player and monster abilities; a ledge monster can
+  -- write AuraBolt's numeric id before Sabin acts.  Bind the drive to the
+  -- real Blitz command handler instead.
+  drive(function() return playerBlitzesOf(AURABOLT) >= 1 end, 20000,
+    "Sabin's AuraBolt enters Cmd_0a"),
   -- keep the battle running for the action to resolve, on a fixed budget
   -- rather than a predicate, so the verdict below is an assertion that names
   -- what is wrong instead of a timeout that does not

@@ -85,7 +85,7 @@ local ST_CMD, ST_ITEM, ST_MAGIC, ST_ESPER, ST_TGT, ST_TRANS =
 local CMD_MAGIC, CMD_ITEM = 0x02, 0x01
 local MSCROLL, MCOL, MROW = 0x8913, 0x8917, 0x891B
 local LISTS = { [0] = 0x208e, [1] = 0x21ca, [2] = 0x2306, [3] = 0x2442 }
-local TONIC, POTION = 0xE8, 0xE9
+local TONIC, POTION, TINCTURE = 0xE8, 0xE9, 0xEB
 
 local locke, celes
 local function mp(slot) return H.readWord(0x3C08 + slot*2) end
@@ -295,7 +295,11 @@ local function decide()
         if cur == want then btn = "a"
         else btn = (cur < want) and "down" or "up" end
       elseif st == ST_ITEM then
-        local want = bagIdxOf({ TONIC, POTION })
+        -- The fixture now reaches this fight with 41/106 MP.  Its chest
+        -- Tincture is the player's real way to restore enough for the 53-MP
+        -- folded tier, and the same item turn earns the second BP.
+        local want = mp(celes) < BOLT3_MP and bagIdxOf({ TINCTURE })
+          or bagIdxOf({ TONIC, POTION })
         if want == nil then btn = "b"
         else
           local cur = H.readByte(0x8947 + celes) + H.readByte(0x894F + celes)

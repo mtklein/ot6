@@ -1,4 +1,4 @@
--- @suite savestate=worldmap_narshe slow
+-- @suite savestate=gau_joined slow
 -- codex_ctx.lua -- a battle entered from the world map after a menu save
 -- selects the saved game's codex page rather than the transient page
 -- (issue #29).
@@ -29,12 +29,11 @@
 --      never-saved chain's fights populated the transient page (lifecycle
 --      0 writes go there) while all three save-slot pages read
 --      empty, asserted byte-for-byte.
---   1. walk onto the grass area (82,52) and save into empty slot 3 via the
+--   1. stand on the Veldt at (214,149) and save into empty slot 3 via the
 --      real Save command, pad input only (save-drive rule).  SaveAs copies
 --      the transient payload, so at this instant the two pages are equal.
---   2. walk back into the grass area and fight until a battle teaches
---      something (Terra's real Fire on the pool's fire-weak staple, species
---      $17, measured weak $81 with 2 shields).  The chip path's persistent
+--   2. fight until the Veldt's varied formations teach something through
+--      the party's real weapon classes.  The chip path's persistent
 --      store consults Ot6CodexActive mid-battle, so the page
 --      diff is the write half of the guarantee: every changed byte must
 --      land in the slot-3 page and none in the transient page (lifecycle
@@ -50,7 +49,7 @@
 --      the check to the next encounter, with bounded retries, fled with the
 --      real run mechanic.)
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/worldmap_narshe.mss.lua"
+local STATE = "build/states/gau_joined.mss.lua"
 
 local ZMENUSTATE = 0x26
 local MAIN_MENU = 0x05
@@ -94,18 +93,14 @@ end
 local taught, taughtN = {}, 0
 local slot3Before, tempBefore = nil, nil
 
--- the in-battle action driver (codex_saveas's, measured): TERRA casts
--- Fire through the live magic menu, everyone else Fights; 4-frame-held
--- presses on a 5-on/5-off cadence
+-- the in-battle action driver (codex_saveas's, measured): everyone Fights;
+-- 4-frame-held presses on a 5-on/5-off cadence.  On gau_joined that means
+-- Cyan's blade plus Sabin and Gau's bludgeoning hands, against the Veldt's
+-- varied species rather than one exhausted Narshe pool.
 local lastActor, mfM, actM = nil, 0, nil
--- TERRA's cast is the only teach this kit has in the fire-weak area, and
--- it only lands reliably in the first battle after a stretch of world
--- control, measured across five drive variants: in back-to-back
--- battles her window sits in the queue-wait state $01 for whole fights
--- (X-defers, committed Defends, and a fully parked partner all measured
--- worse), while battle one of every timeline casts within
--- two turns.  So the route below is arranged to make the first
--- post-save encounter a grass one, and the driver stays simple.
+-- The driver retains its Terra/Fire branch because this file shares the
+-- proven menu walker, but this fixture has no Terra: every live action here
+-- takes the ordinary Fight branch.
 local function battleReset()
   lastActor = nil
 end
@@ -169,46 +164,27 @@ local function battlePulse()
   H.setPad((hold and btn) and { [btn] = true } or {})
 end
 
--- a world patrol beat along the Narshe to Figaro corridor (the
--- fixture nav's own waypoints: x=82 from the grass area down to the
--- desert edge).  A goal that cannot be planned rotates to the next, so
--- an unreachable point stalls nothing.
--- the grass area's two-point beat along the corridor column x=82 (the
--- fixture nav's own waypoints)
-local GOALS = { { 82, 44 }, { 82, 60 } }
-local plan, planIdx, goalI = nil, 1, 1
+-- gen_sabin_gau's proven Veldt pacing: alternate left/right at tile
+-- boundaries.  North from this fixture is a map entrance, so a generic
+-- four-direction beat can legitimately leave the overworld.
+local veldtFlip = false
 local hbP = -600
 local function patrolPulse()
   if H.frame - hbP >= 600 then
     hbP = H.frame
     H.log(string.format("[patrol f%d] mode=%s ctl=%s aligned=%s at (%d,%d) " ..
-      "goal=%d plan=%s", H.frame, tostring(H.worldMode()),
+      "veldt=%s", H.frame, tostring(H.worldMode()),
       tostring(H.worldHasControl()), tostring(H.worldAligned()),
-      H.worldX(), H.worldY(), goalI, plan and #plan or "nil"))
+      H.worldX(), H.worldY(), tostring(veldtFlip)))
   end
   if not H.worldMode() then H.setPad({}); return end
-  if not H.worldHasControl() then plan = nil; H.setPad({}); return end
+  if not H.worldHasControl() then H.setPad({}); return end
   if not H.worldAligned() then return end
-  if not plan or planIdx > #plan then
-    local g = GOALS[goalI]
-    if H.worldX() == g[1] and H.worldY() == g[2] then
-      goalI = (goalI % #GOALS) + 1
-      g = GOALS[goalI]
-    end
-    plan = H.worldBfs(g[1], g[2]); planIdx = 1
-    if not plan or #plan == 0 then
-      plan = nil
-      goalI = (goalI % #GOALS) + 1
-      H.setPad({})
-      return
-    end
-  end
-  local dir = plan[planIdx]; planIdx = planIdx + 1
-  if not dir then H.setPad({}); return end
-  H.setPad({ [dir] = true })
+  veldtFlip = not veldtFlip
+  H.setPad({ [veldtFlip and "left" or "right"] = true })
 end
 
-H.run({ maxFrames = 90000 }, {
+local actions = {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
@@ -237,15 +213,8 @@ H.run({ maxFrames = 90000 }, {
       known))
   end),
 
-  -- Park on the grass area, off the Narshe entrance tile: closing a world
-  -- menu ends in ReloadMap, which re-fires the entrance under the party's
-  -- feet (measured: closing on the fixture tile dropped the party into a
-  -- town), so the save happens on a plain corridor tile.  Grass rather
-  -- than the old Figaro park because the first post-save encounter must
-  -- be a teachable one (see the drive note above): from Figaro the nav's
-  -- accrued danger popped a desert fight ~300 frames out, and that pool
-  -- (species $5C/$5D, weak $8A, slash-only class rows) cannot be taught
-  -- by fire and pierce, measured across two timelines.
+  -- Park on the fixture's plain Veldt tile.  It is not a town entrance, so
+  -- ReloadMap on menu close cannot pull the party off the overworld.
   -- issue #75: this walk really can be interrupted -- the note above
   -- records a desert fight popping ~300 frames out of the old Figaro park
   -- -- and it used to be the library's flag write that ended it.  Fled
@@ -253,7 +222,7 @@ H.run({ maxFrames = 90000 }, {
   -- exactly what this test's discriminator is made of: an incidental win
   -- here would teach the transient page before the save copies it, and
   -- muddy the page diff step 2 asserts.  A fled battle teaches nothing.
-  H.worldNavTo(82, 52, { maxFrames = 15000, playBattles = "flee" }),
+  H.worldNavTo(214, 149, { maxFrames = 15000, playBattles = "flee" }),
 
   -- 1. save into slot 3, pad input only (save-drive rule; the cursor is
   -- read back, never written).
@@ -297,17 +266,15 @@ H.run({ maxFrames = 90000 }, {
   -- check that the world module is back is the exact parked tile.
   H.driveUntil(function()
     return H.worldMode() and H.worldAligned() and bright() >= 15
-       and H.worldX() == 82 and H.worldY() == 52
+       and H.worldX() == 214 and H.worldY() == 149
   end, 4000, {
     H.pressButtons({ "b" }, 4), H.waitFrames(20),
   }, "world control after menu close"),
 
-  -- 2. the write half: walk back toward the grass area, fight whatever
+  -- 2. the write half: pace the Veldt, fight whatever
   -- interrupts, and after each battle diff both pages.  The first battle that
   -- teaches must have written the slot-3 page and only it.  (Desert
-  -- encounters on the way teach nothing to this kit; measured: species
-  -- $5C/$5D are weak $8A and slash, while Terra has fire and Locke pierce,
-  -- so the loop keeps walking.)
+  -- encounters teach nothing to this kit, the loop keeps walking.)
   -- This is one single-call state machine: H.cond latches its branch on the
   -- first tick inside a driveUntil body (measured: the branch chosen on frame
   -- one replayed for the whole loop and the battle accounting never ran), so
@@ -371,77 +338,86 @@ H.run({ maxFrames = 90000 }, {
   -- knowledge only the slot-3 page carries.  Encounters without a taught
   -- species are fled (1914283's idiom; no submenu is open at seed, so a
   -- bare L+R hold releases) and retried, with a bound on the retries.
-  -- Same single-call shape (H.cond latches, see above): patrol; at each
-  -- encounter, sample the seed ~90 frames after the monsters populate and
-  -- before any input, then flee (1914283's idiom; no submenu is open at
-  -- seed, so a bare L+R hold releases); untaught pools defer to the next
-  -- encounter, with a bound.
-  (function()
-    local tries, checked = 0, 0
-    local wasIn, seedFrame, sampled = false, nil, false
-    local function seedCheck()
-      tries = tries + 1
-      local n = 0
-      for slot = 0, 5 do
-        if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-          local off = 8 + slot * 2
-          local sp = H.readWord(0x57C0 + slot * 2)
-          local t = taught[sp]
-          if t then
-            local revE = H.readByte(0x3e89 + off)
-            local revC = H.readByte(0x3e9d + off)
-            if t.elem ~= 0 then
-              H.assertEq(revE & t.elem, t.elem, string.format(
-                "monster slot %d (species $%03X) entered PRE-REVEALED " ..
-                "with the post-save elem bits -- only the slot-3 page " ..
-                "holds them", slot, sp))
-            end
-            if t.class ~= 0 then
-              H.assertEq(revC & t.class, t.class, string.format(
-                "monster slot %d (species $%03X) entered PRE-REVEALED " ..
-                "with the post-save class bits", slot, sp))
-            end
-            n = n + 1
-          end
+  -- The Veldt advances through its formation table rather than immediately
+  -- repeating the fight that taught the discriminator.  Search it as a
+  -- sequence of player-shaped episodes: seed-check one battle, resolve it,
+  -- then recover on the field before looking for the next.  Besides keeping
+  -- the party alive through unrunnable set pieces, the explicit field-care
+  -- boundary proves that ordinary menu use does not disturb lifecycle 3.
+}
+
+local readChecked, readTries = 0, 0
+
+local function checkReadSeed()
+  readTries = readTries + 1
+  local n = 0
+  for slot = 0, 5 do
+    if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
+      local off = 8 + slot * 2
+      local sp = H.readWord(0x57C0 + slot * 2)
+      local t = taught[sp]
+      if t then
+        local revE = H.readByte(0x3e89 + off)
+        local revC = H.readByte(0x3e9d + off)
+        if t.elem ~= 0 then
+          H.assertEq(revE & t.elem, t.elem, string.format(
+            "monster slot %d (species $%03X) entered PRE-REVEALED " ..
+            "with the post-save elem bits -- only the slot-3 page holds them",
+            slot, sp))
         end
+        if t.class ~= 0 then
+          H.assertEq(revC & t.class, t.class, string.format(
+            "monster slot %d (species $%03X) entered PRE-REVEALED " ..
+            "with the post-save class bits", slot, sp))
+        end
+        n = n + 1
       end
-      checked = checked + n
-      H.log(string.format("[ctx] seed check try %d: %d taught monster(s) " ..
-        "verified", tries, n))
     end
-    return H.driveUntil(function()
-      if (checked > 0 or tries >= 6) and not H.battleLoadStarted() then
-        H.vars.ctxChecked = checked
-        return true
-      end
-      return false
-    end, 40000, {
-      H.call(function()
-        local inB = H.battleLoadStarted()
-        if not inB then
-          wasIn, seedFrame, sampled = false, nil, false
-          patrolPulse()
-          return
-        end
-        if not wasIn then wasIn = true end
-        if not sampled then
-          if seedFrame == nil and H.monstersPresent() > 0 then
-            seedFrame = H.frame
-          end
-          if seedFrame and H.frame - seedFrame >= 90 then
-            seedCheck()
-            sampled = true
-          end
-          H.setPad({})
-          return
-        end
-        H.setPad({ l = true, r = true })   -- flee out, checked or not
-      end),
-    }, "a seeded battle surfaces the slot-3 page")
-  end)(),
-  H.call(function()
-    H.assertEq((H.vars.ctxChecked or 0) > 0, true,
-      "READ HALF: at least one taught-species monster was checked at seed")
-    H.log("[ctx] read half verified: the post-menu battle merged the SAVED page")
-  end),
-})
+  end
+  readChecked = readChecked + n
+  H.log(string.format("[ctx] seed check try %d: %d taught monster(s) verified",
+    readTries, n))
+end
+
+local function resolveReadBattle(n)
+  local frames = 0
+  return H.driveUntil(function() return not H.battleLoadStarted() end, 15000, {
+    H.call(function()
+      frames = frames + 1
+      -- Ordinary runnable formations release quickly.  If this is one of the
+      -- Veldt's unrunnable set pieces, stop donating HP to a futile escape
+      -- after ten seconds and win it through the real battle menus instead.
+      if frames < 600 then H.setPad({ l = true, r = true })
+      else battlePulse() end
+    end),
+  }, "resolve read-half battle " .. n)
+end
+
+local function readTry(n)
+  return H.cond(function() return readChecked == 0 end, {
+    H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
+      H.call(patrolPulse),
+    }, "find read-half encounter " .. n),
+    H.waitUntil(function() return H.monstersPresent() > 0 end, 1200,
+      "read-half monsters populate " .. n, 5),
+    H.waitFrames(90),
+    H.call(checkReadSeed),
+    H.call(battleReset),
+    resolveReadBattle(n),
+    H.cond(function() return readChecked == 0 end, {
+      H.waitUntil(function()
+        return H.worldMode() and H.worldHasControl() and H.worldAligned()
+      end, 2400, "world control after read-half battle " .. n, 5),
+      H.fieldCare({ tag = "codex read search " .. n, threshold = 0.95 }),
+    }, {}),
+  }, {})
+end
+
+for n = 1, 20 do actions[#actions + 1] = readTry(n) end
+actions[#actions + 1] = H.call(function()
+  H.assertEq(readChecked > 0, true,
+    "READ HALF: at least one taught-species monster was checked at seed")
+  H.log("[ctx] read half verified: the post-menu battle merged the SAVED page")
+end)
+
+H.run({ maxFrames = 300000 }, actions)

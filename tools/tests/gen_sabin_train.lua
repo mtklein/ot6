@@ -120,6 +120,8 @@ local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E -- live target-cursor masks
 local BP = 0x3E9C                       -- banked boost points, +slot*2
 local TONIC, POTION, ANTIDOTE, FENIX_DOWN = 0xE8, 0xE9, 0xF2, 0xF0
+local BUCKLER, HEAVY_SHLD = 0x5A, 0x5B
+local PLUMED_HAT, STAR_PENDANT, JEWEL_RING = 0x6B, 0xB1, 0xB5
 local function SH(s)  return 0x3E38 + (8 + s * 2) end
 local function SMX(s) return 0x3E39 + (8 + s * 2) end
 local function RVE(s) return 0x3E89 + (8 + s * 2) end
@@ -1390,6 +1392,28 @@ H.run({ maxFrames = 400000 }, {
     -- behind retry ladders that treat a walked-off SHADOW as a loss and
     -- reload with a stagger.
   end),
+
+  -- A player's boss prep starts before the train leaves.  The inherited
+  -- The common route buys a second Heavy Shld specifically so it is in the
+  -- bag in either scenario order: LOCKE/CELES can retain the first while the
+  -- player switches to SABIN's scenario.  Move CYAN to that stronger shield,
+  -- pass his Buckler to SABIN, and give SHADOW the common route's Plumed
+  -- Hat.  SABIN also gets the
+  -- Star Pendant: his Blitzes are the only reliable source of the six-shield
+  -- break, so losing his turns and field HP to Poison is the worst use of
+  -- the one status-proof relic available here.
+  --
+  -- Name every choice through the real Equip menu (#107).  The order is a
+  -- contract: CYAN must release the Buckler before SABIN can select it.
+  H.equipLoadout(2, {
+    { 1, HEAVY_SHLD },
+  }, { tag = "CYAN Phantom Train kit" }),
+  H.equipLoadout(5, {
+    { 1, BUCKLER }, { 4, STAR_PENDANT }, { 5, JEWEL_RING },
+  }, { tag = "SABIN Phantom Train kit" }),
+  H.equipLoadout(3, {
+    { 2, PLUMED_HAT },
+  }, { tag = "SHADOW Phantom Train kit" }),
 
   -- The back row loses this fight, measured twice.  The back row won the
   -- South Figaro gate outright (solo LOCKE: unwinnable from the front rank,

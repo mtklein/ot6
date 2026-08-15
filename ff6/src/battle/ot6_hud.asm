@@ -2102,6 +2102,18 @@ Ot6ShieldTbl:
         .byte   6, OT6_PIERCE|OT6_BLUDG ; dadaluma: break the crouch
         .word   $006c
         .byte   2, OT6_PIERCE|OT6_BLUDG ; iron fist
+        ; The opera's timed rafter chase forces Locke + Edgar + Sabin through
+        ; packs of as many as five rats.  The generic formula gives every rat
+        ; four shields: twenty chips before the first pack can be broken, on a
+        ; clock that keeps running in battle.  Two is the measured early-trash
+        ; count used at Kolts and Zozo, and makes the break window part of the
+        ; chase rather than consuming it.  Both classes are carried by the
+        ; forced party (dagger/autocrossbow and Pummel); no element is reachable
+        ; here, and neither species has a relevant status/relic answer.
+        .word   $0073
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; sewer rat
+        .word   $00d1
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; vermin
         .word   $012d
         .byte   6, OT6_SLASH|OT6_PIERCE ; ultros 2: same row, one more shield
         .word   $0109

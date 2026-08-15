@@ -543,6 +543,7 @@ H.run({ maxFrames = 200000 }, {
   end)(),
   H.waitUntil(landed(221, 20), 3000, "control after the walk-down", 5),
   H.waitFrames(30),
+  H.fieldCare({ tag = "care before leaving Zozo", threshold = 0.55 }),
   H.call(function()
     H.assertEq(map(), 221, "back on the street (map 221)")
     H.assertEq(sw(0x0054), 1, "$0054 SET -- the stop line")
@@ -584,6 +585,10 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(partyOf(EDGAR), 1, "EDGAR in party 1 (pierce + Tools)")
     H.assertEq(partyOf(CYAN), 0, "CYAN stays behind")
     H.assertEq(partyOf(GAU), 0, "GAU stays behind")
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c) > 0, true,
+        string.format("zozo_done: char %d is on their feet", c))
+    end
     H.log(string.format("[zozo_done] f%d map=%d (%d,%d)",
       H.frame, map(), H.fieldX(), H.fieldY()))
     H.screenshot("zozo_done")

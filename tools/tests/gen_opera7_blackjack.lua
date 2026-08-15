@@ -427,6 +427,13 @@ H.run({ maxFrames = 400000 }, {
     end, 6000, "a settled world frame again after the equip stop", 1)
   end)(),
 
+  -- Ultros can leave somebody barely standing even on a decisive win.  The
+  -- Blackjack arrival is the first player-controlled field menu after that
+  -- fight, so use it as the natural recovery stop before banking the route's
+  -- terminal fixture.  This also makes the release checkpoint friendly to a
+  -- human who starts playing from it, rather than merely technically alive.
+  H.fieldCare({ tag = "post-opera recovery", threshold = 0.60 }),
+
   H.call(function()
     -- The exit contract for the kit.  Without it a silently no-op equip
     -- stop and a working one both report the same green.
@@ -442,6 +449,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(map(), 0, "on the World of Balance map")
     H.assertEq(H.worldHasControl(), true, "world map is controllable")
     H.assertEq(H.worldAligned(), true, "world position is tile-aligned")
+    H.assertPartyStanding("the Blackjack checkpoint")
     H.log(string.format("[blackjack] f%d world (%d,%d), parked airship expected at (137,202)",
       H.frame, H.worldX(), H.worldY()))
     H.screenshot("blackjack")

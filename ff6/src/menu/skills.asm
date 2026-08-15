@@ -987,17 +987,14 @@ _c350a2:
         beq     _50c5
 
 _c350ae:
-@50ae:  sta     hWRMPYA
-        lda     #$36
-        sta     hWRMPYB
-        clr_a
-        lda     $e0
-        longa
-        adc     hRDMPYL
-        tax
-        shorta
-        lda     $1a6e,x
+; OT6 #96: ask the shared-bank helper for the effective learned status.  The
+; actor id is already in A and $e0 is already the spell id; the helper adds the
+; equipped esper's live grant to the vanilla $1a6e read.  Keep this splice
+; exactly the original 23 bytes: field savestates can hold live C3 return
+; addresses, so moving _50c5 or anything after it would invalidate them.
+@50ae:  jsl     Ot6FieldSpellKnown
         rts
+        .res    18, $ea
 
 _50c5:  stz     $e1
 @50c7:  clr_a

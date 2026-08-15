@@ -430,7 +430,15 @@ H.run({ maxFrames = 350000 }, {
   -- remove_equip returns gear to inventory (EventCmd_8d) and the chain of
   -- generated savestates never put it back on.  A player opens the Equip
   -- menu before walking into an occupied town, and so does this script.
-  H.equipOptimum({ tag = "locke kit" }),
+  -- The choice is explicit: his own Dirk supplies the only weapon class
+  -- available here, and the Leather Hat and LeatherArmor are the only
+  -- defensive pieces in the bag.  Relics stay empty; the Gauntlet would
+  -- make the game invoke Optimum itself when the Relic menu closes.
+  H.equipLoadout(1, {
+    { 0, 0x00 }, -- Dirk
+    { 2, 0x69 }, -- Leather Hat
+    { 3, 0x84 }, -- LeatherArmor
+  }, { tag = "LOCKE occupied-town kit" }),
 
   -- The back row halves the soldier's physical.  It does not win battle 11.
   -- The note that used to sit here said front row, on a comparison that was

@@ -80,6 +80,7 @@ local base = {}             -- per-char pre-battle latch
 local positives = 0
 local hpNegSeen, mpNegSeen = false, false
 local battles = 0
+local battleHpDeficit = false
 local function done()
   return positives >= 1 and hpNegSeen and mpNegSeen
 end
@@ -129,7 +130,10 @@ local lastActor, mfM, actM = nil, 0, nil
 -- how the cast attempt went, so a lost menu race is reported as itself
 local firePlanned, fireListSeen = 0, 0
 local listThisTurn = false
-local function battleReset() lastActor = nil end
+local function battleReset()
+  lastActor = nil
+  battleHpDeficit = false
+end
 local function battlePulse()
   if H.readByte(MENU) == 0 then
     lastActor = nil
@@ -137,6 +141,18 @@ local function battlePulse()
     return
   end
   local a = H.readByte(ACTOR)
+  -- Once the positive has fired, deliberately give the enemies time to
+  -- make the HP negative non-vacuous.  This is still ordinary input: the
+  -- party Defends until somebody is hurt, then resumes the normal win.
+  if positives >= 1 and not hpNegSeen and not battleHpDeficit then
+    for s = 0, 3 do
+      local id = H.readByte(0x3ED8 + s * 2)
+      if id ~= 0xFF and H.readWord(0x3BF4 + s * 2)
+          < H.readWord(0x3C1C + s * 2) then
+        battleHpDeficit = true
+      end
+    end
+  end
   if lastActor ~= a then
     lastActor, mfM = a, 0
     actM = "fight"
@@ -155,6 +171,18 @@ local function battlePulse()
   if st == ST_TRANS then
     -- the window is being built: any press here is read by whatever opens
     H.setPad({})
+    return
+  end
+  if positives >= 1 and not hpNegSeen and not battleHpDeficit then
+    if st == ST_CMD then
+      -- Right from the command list selects Defend; alternate the direction
+      -- and confirmation edges so neither is swallowed by the opening frame.
+      local q = mfM % 40
+      btn = (q < 10) and "right" or ((q >= 20 and q < 30) and "a" or nil)
+    else
+      btn = "b"
+    end
+    H.setPad((hold and btn) and { [btn] = true } or {})
     return
   end
   if st == ST_CMD then

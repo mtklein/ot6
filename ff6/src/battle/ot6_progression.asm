@@ -184,6 +184,82 @@
 
 ; ------------------------------------------------------------------------------
 
+; [ #96: equipped esper grants its spells in the field Magic list too ]
+;
+; Field-menu `_c350ae` used to return the selected actor's raw $1a6e learn
+; byte.  That contradicted the battle-side grant above: a stone's spell was
+; castable in battle but absent between fights.  This is the field equivalent
+; of Ot6EsperSpellKnown.  It returns $ff when the spell is either innately
+; learned or present in the actor's equipped esper row, otherwise the untouched
+; learn percentage.  Unequipping therefore removes only the grant.
+;
+; Contract: called by JSL from menu/skills.asm in a8/i16, A = actor id,
+; Y = the selected character-record pointer, and the menu's $e0 = spell id.
+; The actor indexes the learned table; Y indexes the equipped-esper byte.  Do
+; not derive one from the other: transformed/later-game roster records need not
+; have actor id == record slot.  Preserves Y exactly as vanilla `_c350ae` did;
+; X is scratch there already.  Every WRAM access is long because this lives in
+; bank F0 and must not inherit the menu's DBR by accident.
+.proc Ot6FieldSpellKnown
+        .a8
+        .i16
+        phy
+        longa
+        and     #$00ff
+        tay                     ; Y = actor id, clean 16-bit
+        shorta
+        tya
+        sta     hWRMPYA
+        lda     #$36
+        sta     hWRMPYB
+        nop3                    ; let the hardware product settle
+        lda     f:$7e00e0       ; field menu's current spell id
+        longa
+        and     #$00ff
+        clc
+        adc     hRDMPYL         ; actor * 54 + spell
+        tax
+        shorta
+        lda     f:$7e1a6e,x     ; vanilla learned status
+        inc
+        beq     @known          ; $ff stays known without consulting the stone
+        dec
+        ply                     ; recover the selected record pointer supplied
+        phy                     ; by C3, while keeping the preservation frame
+        pha                     ; now preserve the real partial/zero status;
+                                ; it must sit ABOVE the 16-bit saved Y
+        tyx                     ; long addressing supports X, not Y
+        lda     f:$7e001e,x     ; that record's equipped esper
+        bmi     @vanilla        ; $ff = none
+        sta     hWRMPYA
+        lda     #11
+        sta     hWRMPYB
+        nop3
+        ldx     hRDMPYL         ; X = GenjuProp row offset
+        lda     f:$7e00e0
+        cmp     f:GenjuProp+1,x
+        beq     @granted
+        cmp     f:GenjuProp+3,x
+        beq     @granted
+        cmp     f:GenjuProp+5,x
+        beq     @granted
+        cmp     f:GenjuProp+7,x
+        beq     @granted
+        cmp     f:GenjuProp+9,x
+        beq     @granted
+@vanilla:
+        pla                     ; untouched learned percentage
+        ply
+        rtl
+@granted:
+        pla                     ; discard the saved vanilla status
+@known: lda     #$ff
+        ply
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ M5: seed the master spell-list union with equipped espers' granted spells ]
 ;
 ; Called once from InitSpellList (battle_main.asm) right after its actor loop
@@ -598,4 +674,3 @@ Ot6EsperStatTbl:
         esper_stat    0,   0,   0,   0   ; 26 phoenix
         calc_size Ot6EsperStatTbl
 .assert sizeof_Ot6EsperStatTbl = 27 * 2, error, "Ot6EsperStatTbl must be 2 bytes per esper for 27 espers"
-

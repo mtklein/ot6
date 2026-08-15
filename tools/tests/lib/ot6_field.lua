@@ -1873,10 +1873,10 @@ local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
 local CARE_SEL, CARE_MAGIC_SEL = 0x28, 0x99   -- zSelIndex, chosen list index
 local CARE_MAGIC_GATE = 0x7a                  -- zSkillsTextColor[1] = Magic
 local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
-local CARE_ANTIDOTE, CARE_REMEDY = 0xF2, 0xF5
+local CARE_ANTIDOTE, CARE_SOFT, CARE_REMEDY = 0xF2, 0xF4, 0xF5
 local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 
--- ---- clearing a status, and why this list has one entry ----
+-- ---- clearing a status, when a fixture proves the route needs it ----
 --
 -- Status 1 is `weicmpzd` (ff6/notes/field-ram.txt:900-907): $80 wound, $40
 -- petrify, $20 imp, $10 clear, $08 magitek, $04 poison, $02 zombie, $01
@@ -1888,8 +1888,8 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- is `and #$04 / beq invalid`, so an Antidote offered to a character who is
 -- not poisoned is refused rather than wasted.
 --
--- Only poison is in this table, and the reason is that poison is the only
--- one of them that walking makes worse.  DoPoisonDmg drains max HP/32
+-- Poison was the first row in this table, because it is the only status that
+-- walking makes worse.  DoPoisonDmg drains max HP/32
 -- from every poisoned character on every step and floors the result at 1
 -- (`ff6/src/field/player.asm:593-613`), so a character who leaves a fight
 -- poisoned arrives at the end of any walk of length at exactly 1 HP,
@@ -1903,8 +1903,12 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- the landing check below watches the status byte as well as the bag count,
 -- which is the only signal a cure that restores no HP produces.  What is
 -- missing for the other four is a fixture that carries the status, so a row
--- for them would be a path nothing in the tree has ever run.  Add the row
--- when a fixture shows the bit, not before.
+-- for them would be a path nothing in the tree has ever run.  Petrify earned
+-- its row on 2026-08-13: a forced Phantom Train corridor fight left SHADOW
+-- petrified, the boss was then broken and beaten cleanly, and train_done
+-- correctly refused to ship a stone party member.  The South Figaro
+-- provision stop now carries Soft for that journey, so fieldCare uses the
+-- ordinary item when the bit is present and otherwise leaves it in the bag.
 --
 -- A row carries an ORDERED list of items rather than one, tried in order and
 -- skipped when the bag has none of that one.  The Antidote is first because
@@ -1927,6 +1931,7 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- targeted re-runs of the two generators that fight the formations which
 -- apply it.  The Zozo crossing is the run that finally carried it.
 local CARE_STATUS_CURES = {
+  { bit = 0x40, items = { CARE_SOFT, CARE_REMEDY }, what = "petrify" },
   { bit = 0x04, items = { CARE_ANTIDOTE, CARE_REMEDY }, what = "poison" },
 }
 local MAGIC_LIST, MAGIC_COLOUR = 0x7E9D89, 0x7E9E09
@@ -2037,16 +2042,24 @@ function M.charStatus1(c) return M.readByte(0x1600 + 37 * c + 20) end
 -- the World of Balance roster and stop agreeing later, so read it.
 function M.charActor(c) return M.readByte(0x1600 + 37 * c) end
 
--- Does this character know the spell outright?  $FF is fully learned;
--- anything from 1 to 254 is a partial learn percentage and does not cast
--- (ff6/notes/field-ram.txt:939-940).  A spell list is runtime state: it
--- depends on level, on espers equipped along the way, and on which fixture
--- the party arrived from, so it is read rather than inferred.  Measured at
--- eight World of Balance fixtures (probe_healers.lua, 2026-08-11): only
--- TERRA and CELES know Cure; LOCKE, EDGAR, SABIN, CYAN and GAU know no
--- cure spell at any point in the chain.
+-- Can this character cast the spell from the field Magic menu?  $FF in the
+-- learned table is permanent knowledge; #96 also makes an equipped esper's
+-- GenjuProp spell ids live while worn, matching the battle list.  Read both
+-- sources exactly as the game does so fieldCare will spend that granted MP
+-- before drinking from the bag.  Unequipping removes the second source and
+-- never writes the first.
 function M.knowsSpell(c, spell)
-  return M.readByte(0x1A6E + 54 * M.charActor(c) + spell) == 0xFF
+  local actor = M.charActor(c)
+  if M.readByte(0x1A6E + 54 * actor + spell) == 0xFF then return true end
+  -- `c` selects the roster record; `actor` selects the learned table.  They
+  -- agree in the World of Balance and are not an ABI synonym later.
+  local esper = M.readByte(0x1600 + 37 * c + 0x1E)
+  if esper >= 0x80 then return false end
+  local row = (M.sym("GenjuProp") & 0x3FFFFF) + 11 * esper
+  for _, off in ipairs({ 1, 3, 5, 7, 9 }) do
+    if M.readRomByte(row + off) == spell then return true end
+  end
+  return false
 end
 
 -- MP cost of a spell, read from the ROM's own table.  The field menu prices
@@ -2658,10 +2671,11 @@ function M.fieldCare(opts)
         st ~= 0 and string.format(" status1=%02X", st) or "")
     end
     return string.format(
-      "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d remedy=%d",
+      "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d soft=%d remedy=%d",
       tag, what, table.concat(out, "  "), M.invCountOf(CARE_TONIC),
       M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX),
-      M.invCountOf(CARE_ANTIDOTE), M.invCountOf(CARE_REMEDY))
+      M.invCountOf(CARE_ANTIDOTE), M.invCountOf(CARE_SOFT),
+      M.invCountOf(CARE_REMEDY))
   end
 
   return M.cond(anyNeed, {
@@ -3029,6 +3043,9 @@ function M.equipWeapon(pos, itemId, opts)
   local ST_ITEM = relic and 0x5b or 0x57
   local slotRow = relic and (slot - 4) or slot
   local function st() return M.readByte(ZM) end
+  local function targetPos()
+    return type(pos) == "function" and pos() or pos
+  end
   return M.seqStep({
     M.driveUntil(function() return st() == ST_MAIN end, 1200,
       { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
@@ -3042,7 +3059,7 @@ function M.equipWeapon(pos, itemId, opts)
       tag .. ": character select", 5),
     M.waitFrames(10),
     M.driveUntil(function()
-      return st() == ST_CHAR and M.readByte(CUR) == pos
+      return st() == ST_CHAR and M.readByte(CUR) == targetPos()
     end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
       tag .. ": character cursor"),
     M.pressButtons({ "a" }, 2),
@@ -3078,6 +3095,61 @@ function M.equipWeapon(pos, itemId, opts)
       { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),
     M.waitFrames(20),
   })
+end
+
+-- M.equipLoadout: equip one named character by item, never by Optimum.
+-- `items` is an ordered list of `{ slot, item }` pairs, where slot 0..5 is
+-- R-Hand, L-Hand, Helmet, Armor, Relic 1, Relic 2.  The character-select
+-- row is read from the live party record after the run starts, so callers
+-- name the character rather than assuming a party order.  An item already
+-- in its intended slot is a no-op; every other item must be in the bag or
+-- the run fails before opening a menu whose list can never find it.
+--
+-- This is the deliberate counterpart to equipOptimum.  A route states the
+-- loadout it wants and why at the call site; this helper only makes that
+-- decision resilient to an upstream step having already equipped part of it.
+function M.equipLoadout(charId, items, opts)
+  opts = opts or {}
+  local tag = opts.tag or string.format("character %d loadout", charId)
+  local base = 0x1600 + 37 * charId
+  local pos
+  local steps = {
+    M.call(function()
+      local partyByte = M.readByte(0x1850 + charId)
+      local active = M.readByte(0x1A6D) & 0x07
+      M.assertEq(partyByte & 0x07, active,
+        tag .. ": character is in the active party")
+      pos = (partyByte >> 3) & 0x03
+      M.log(string.format("[%s] char=%d row=%d before=%02X %02X %02X %02X %02X %02X",
+        tag, charId, pos, M.readByte(base + 0x1F), M.readByte(base + 0x20),
+        M.readByte(base + 0x21), M.readByte(base + 0x22),
+        M.readByte(base + 0x23), M.readByte(base + 0x24)))
+    end),
+  }
+  for _, spec in ipairs(items) do
+    local slot, item = spec[1], spec[2]
+    steps[#steps + 1] = M.cond(function()
+      if M.readByte(base + 0x1F + slot) == item then return false end
+      M.assertEq(M.invCountOf(item) > 0, true, string.format(
+        "%s: item $%02X for slot %d is in the bag", tag, item, slot))
+      return true
+    end, {
+      M.equipWeapon(function() return pos end, item,
+        { slot = slot, tag = string.format("%s slot %d item $%02X", tag, slot, item) }),
+    }, {})
+  end
+  steps[#steps + 1] = M.call(function()
+    for _, spec in ipairs(items) do
+      local slot, item = spec[1], spec[2]
+      M.assertEq(M.readByte(base + 0x1F + slot), item, string.format(
+        "%s: slot %d holds item $%02X", tag, slot, item))
+    end
+    M.log(string.format("[%s] char=%d after=%02X %02X %02X %02X %02X %02X",
+      tag, charId, M.readByte(base + 0x1F), M.readByte(base + 0x20),
+      M.readByte(base + 0x21), M.readByte(base + 0x22),
+      M.readByte(base + 0x23), M.readByte(base + 0x24)))
+  end)
+  return M.seqStep(steps)
 end
 
 -- --------------------------------------------------------------- equip --

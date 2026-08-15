@@ -790,6 +790,10 @@ H.run({ maxFrames = 250000 }, {
        and H.hasControl() and H.tileAligned() and bright() >= 15
   end, "control back at the escape's starting line (14,30)", 25000),
   H.waitFrames(30),
+  -- The courtyard waves can legitimately leave a winner on the floor.  Bank
+  -- a usable player checkpoint, not the casualty: spend the party's real
+  -- supplies now, while ordinary field-menu control is available.
+  H.fieldCare({ tag = "care after the Doma defence", threshold = 0.60 }),
   H.call(function()
     H.assertEq(map(), 119, "map 119 -- the Doma courtyard")
     H.assertEq(H.fieldX(), 14, "at x=14, the escape's starting line")
@@ -799,6 +803,10 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(inParty(2), true, "CYAN in the party")
     H.assertEq(sw(0x0036), 1, "$0036 set -- the courtyard defence is won")
     H.assertEq(sw(0x0044), 0, "$0044 clear -- the scenario is not done")
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c) > 0, true,
+        string.format("doma_defended: char %d is on their feet", c))
+    end
     -- SABIN and CYAN are mounted on Magitek here -- a cosmetic sprite the
     -- field walks normally.  $087C reads 2 (user-controlled), NOT a vehicle
     -- movement type, confirming on this map the survey's raft note: the

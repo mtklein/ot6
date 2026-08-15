@@ -347,6 +347,8 @@ Loop2:  lda     $1a
 Done:   rts
 
 :       stz     $57                     ; disable random battle
+        jsl     Ot6AllowSubBattle       ; ot6: Zozo's z-loop shaft cannot
+        bcc     Done                    ;   safely enter a random battle
         ldx     $078c                   ; increment number of steps on map
         inx
         stx     $078c

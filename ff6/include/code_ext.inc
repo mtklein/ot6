@@ -79,6 +79,8 @@ CODE_EXT_INC = 1
 .global Ot6PreviewList_ext
 .global Ot6EsperSpellKnown       ; M5 espers-as-sub-jobs: equipped esper grants
                                  ;   its spells to the in-battle Magic list
+.global Ot6FieldSpellKnown       ; #96: the same live grant in the field Magic
+                                 ;   list (and therefore between-battle casting)
 .global Ot6UnionEspers           ; M5: seed the master-list union with equipped
                                  ;   espers' spells so the compacted list has slots
 .global Ot6EsperStatMod          ; M5: while-equipped stat mod -- an equipped esper
@@ -105,7 +107,7 @@ OT6_SM_NEG = $8
                                  ;   stock C1 object jsl's it in both builds)
 .global Ot6RestageGate_ext
 .global Ot6FontRestoreMark_ext
-.global Ot6DangerStep, Ot6MarkRandom
+.global Ot6DangerStep, Ot6MarkRandom, Ot6AllowSubBattle
 .global Ot6EntryExitVeil_ext
 .global Ot6ScriptBegin_ext, Ot6ScriptEnd_ext
 .global Ot6C1Rtl, DrawMagicListText, _c15a17, _c15729, WaitTfrVRAM_far

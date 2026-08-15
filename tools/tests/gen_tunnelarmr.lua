@@ -750,9 +750,10 @@ H.run({ maxFrames = 300000 }, {
   -- bolt-absorbing boss, this fight, and battle 70 -- all of them a routine
   -- that picks by attack power and knows nothing else.
   --
-  -- What it did here.  The bag used to arrive with exactly two weapons this
-  -- pair can hold, the MithrilBlade ($0A, power 38, OT6_SLASH) and LOCKE's
-  -- own Dirk ($00, power 26, OT6_PIERCE).  TunnelArmr is `5, OT6_PIERCE`
+  -- What it did here.  The pair arrives owning exactly two weapons they can
+  -- hold beyond LOCKE's equipped Dirk: the MithrilBlade ($0A, power 38,
+  -- OT6_SLASH) and a spare MithrilKnife ($01, power 30, OT6_PIERCE).
+  -- TunnelArmr is `5, OT6_PIERCE`
   -- (ff6/src/battle/ot6_hud.asm:1943), so the Dirk was the only thing in the
   -- party that could chip it, and Optimum handed LOCKE the blade and CELES
   -- the Dirk: measured 2026-08-12, `[celes kit] done: c1=0A c6=00`, the
@@ -820,11 +821,14 @@ H.run({ maxFrames = 300000 }, {
       "the Genji Glove rode the split in the bag (gen_banon, issue #106)")
     H.assertEq(H.invCountOf(MITHRILKNIFE) >= 1, true,
       "the spare MithrilKnife rode the split too (gen_kolts' weapon shop)")
-    H.assertEq(H.invCountOf(DIRK) >= 1, true, "LOCKE's own Dirk is in the bag")
+    H.assertEq(gear(CH_LOCKE, 0x1f) == DIRK
+            or gear(CH_LOCKE, 0x20) == DIRK
+            or H.invCountOf(DIRK) >= 1, true,
+      "LOCKE still owns his Dirk (equipped by #107 or carried in the bag)")
   end),
   -- 1. The glove.  It is in the bag because gen_banon refuses BANON three
-  --    times for it (#106), and it rides the scenario split unequipped the
-  --    way LOCKE's Dirk does.
+  --    times for it (#106), while #107 deliberately carries LOCKE's Dirk
+  --    through the split in his main hand.
   equipRelic(posOf(CH_LOCKE), 0, GENJI_GLOVE, "locke genji glove"),
   H.call(function()
     H.assertEq(wearsRelic(CH_LOCKE, GENJI_GLOVE), true,
