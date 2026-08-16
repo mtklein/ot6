@@ -228,8 +228,8 @@ H.run({ maxFrames = 160000 }, {
   -- THE WALL, RESOLVED (2026-08-10, probe_cranes_water -- superseding the
   -- "unwinnable in normal play as tuned" record that stood here; the full
   -- wall history lives in that file's header and probe_cranes_wedge's):
-  -- the wall was a LOADOUT bug, not balance.  H.equipOptimum had armed
-  -- LOCKE and EDGAR with THUNDER BLADES ($0F: slash, LIGHTNING), and the
+    -- the wall was a LOADOUT bug, not balance.  The game's own Optimum had
+    -- armed LOCKE and EDGAR with THUNDER BLADES ($0F: slash, LIGHTNING), and the
   -- Left Crane ABSORBS lightning (monster_prop +23 = $04) -- every Fight
   -- healed the boss and walked its Giga Volt counter (_269's if_element
   -- LIGHTNING ladder).  The prior wipe timelines' "chip pace vs survival"

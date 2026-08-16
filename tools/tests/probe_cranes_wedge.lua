@@ -24,7 +24,7 @@
 -- ==================== SUPERSEDED (2026-08-10, evening) ===================
 -- The "unwinnable as tuned" conclusion below is withdrawn: it was a
 -- loadout bug rather than a balance problem.  Every wipe in this record
--- was fought with Thunder Blades (equipOptimum's power pick) into a
+-- was fought with Thunder Blades (the game's Optimum power pick) into a
 -- lightning-absorbing Crane, so the party healed and charged the boss on
 -- each swing.  With the vanilla playbook (Bismark/Shiva/Carbunkl worn,
 -- daggers, back rows, focus-fire) the fight falls on attempt 1:

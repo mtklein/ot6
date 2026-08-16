@@ -516,9 +516,9 @@ end
 -- heals the enemy.
 --
 -- Why this exists.  Measured 2026-08-10 on the airship Cranes:
--- H.equipOptimum drives the game's own Optimum command, which picks by
--- attack power and knows nothing about elements, and it armed LOCKE and
--- EDGAR with ThunderBlades (item $0F, element bolt).  Left Crane $010D
+-- the game's own Equip -> Optimum picks by attack power and knows nothing
+-- about elements, and it armed LOCKE and EDGAR with ThunderBlades
+-- (item $0F, element bolt).  Left Crane $010D
 -- absorbs bolt, so every Fight healed the boss (+160/+198 a pair swing,
 -- +943 boosted) and advanced its Giga Volt counter.  The fight was
 -- reported as honestly unwinnable and nearly became a request for a
@@ -689,7 +689,7 @@ end
 -- item = id }.  The left hand is usually a shield and weaponElement()
 -- returns 0 for one, but a Genji Glove really does put a second weapon
 -- there, so both slots are read.  $1600 + 37*c + $1F/$20, the same record
--- audit_equipment.py and M.equipOptimum read.
+-- audit_equipment.py and the equipment audits read.
 function M.partyWeapons()
   local out = {}
   for c = 0, 15 do
@@ -855,7 +855,7 @@ function M.absorbGuardTick()
     .. "\nThis is the Cranes bug (issue #81).  Pick the weapon deliberately "
     .. "for this fight with H.equipWeapon -- weigh class against the boss's "
     .. "break axis first and element second -- rather than leaving "
-    .. "H.equipOptimum's power-greedy pick in place."
+    .. "the game's power-greedy Optimum pick in place."
 end
 
 -- ------------------------------------------------------- the step runner --

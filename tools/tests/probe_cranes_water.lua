@@ -147,8 +147,8 @@ end
 -- select (default slot 0 = R-Hand) -> $57 item select, whose list rows at
 -- $7e9d8a are bag indexes into $1869 (MenuState_57 @992d reads that), so
 -- the seek compares the id under the cursor rather than a guessed row.
--- Reason (measured 2026-08-10): H.equipOptimum armed LOCKE and EDGAR with
--- Thunder Blades ($0F, slash class, lightning element), and the Left Crane
+-- Reason (measured 2026-08-10): the game's own Optimum armed LOCKE and EDGAR
+-- with Thunder Blades ($0F, slash class, lightning element), and the Left Crane
 -- absorbs lightning: every Fight healed it (a +160/+198 pair heals it to
 -- full, +943 boosted) and charged its Giga Volt counter, so the party was
 -- feeding the attack that wiped it one swing at a time.  The bag carries

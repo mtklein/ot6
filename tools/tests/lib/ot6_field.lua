@@ -3037,13 +3037,13 @@ end
 -- slots.  CELES's defence is 34 where the rest of the party runs 44 to 55,
 -- and she is the only healer.
 --
--- equipOptimum is not enough, measured 2026-08-10 on the Cranes:
--- Optimum picks by attack power and armed LOCKE and EDGAR with Thunder
+-- The game's own Optimum is not enough, measured 2026-08-10 on the Cranes:
+-- it picks by attack power and armed LOCKE and EDGAR with Thunder
 -- Blades ($0F: slash class, lightning element), and the Left Crane
 -- absorbs lightning, so every Fight healed the boss (+160/+198 pair
 -- heals, +943 boosted) and advanced its Giga Volt charge counter.  An
--- element-aware weapon swap is ordinary fight preparation, and no
--- input-driven route had it until this function.
+-- element-aware weapon swap is ordinary fight preparation, and this
+-- function is where an input-driven route makes it.
 function M.equipWeapon(pos, itemId, opts)
   opts = opts or {}
   local slot = opts.slot or 0
@@ -3132,9 +3132,10 @@ end
 -- in its intended slot is a no-op; every other item must be in the bag or
 -- the run fails before opening a menu whose list can never find it.
 --
--- This is the deliberate counterpart to equipOptimum.  A route states the
--- loadout it wants and why at the call site; this helper only makes that
--- decision resilient to an upstream step having already equipped part of it.
+-- This is the deliberate counterpart to the game's own Equip -> Optimum.
+-- A route states the loadout it wants and why at the call site; this helper
+-- only makes that decision resilient to an upstream step having already
+-- equipped part of it.
 function M.equipLoadout(charId, items, opts)
   opts = opts or {}
   local tag = opts.tag or string.format("character %d loadout", charId)
@@ -3177,186 +3178,6 @@ function M.equipLoadout(charId, items, opts)
       M.readByte(base + 0x23), M.readByte(base + 0x24)))
   end)
   return M.seqStep(steps)
-end
-
--- --------------------------------------------------------------- equip --
--- M.equipOptimum: put the party's gear back on, through the real field
--- Equip -> Optimum walk.  Reads and pad presses only (issue #75).
---
--- This is a library function because more than one fixture needs it.  The
--- game strips characters and returns their gear to inventory at story
--- beats (`remove_equip` / EventCmd_8d), and the chain of generated
--- savestates never put it back.  battle_brokendeath found this at the
--- Vector infiltration and drove Equip -> Optimum by hand to fix its own
--- fixture.  Measured 2026-08-09, solo LOCKE starts his whole
--- South Figaro scenario with $1600+37*1+$1F..$23 all reading $FF, so no
--- weapon, no armor, no relics, and his own Dirk sitting in the bag, and
--- then fought a level-13, 495-hp HeavyArmor barehanded for eight
--- damage a swing across three lost attempts.  That looks like a
--- balance finding but is not one.  A player opens the Equip
--- menu, and so does this.
---
--- Menu path (battle_brokendeath.lua:118-152, verified live there):
---   $05 main, cursor row 2 = Equip -A-> $06 character select -A-> $36 the
---   option row, which is horizontal: Equip / Optimum / Rmove / Empty, so
---   Optimum is cursor 1, one press right.  A runs EquipOptimum in place.
---
--- A no-op, with the menu never opened, when everyone already holds a
--- weapon, so a route can call it after any story beat and pay only where
--- something was taken away.
---
--- Optimum picks by attack power and knows nothing about elements, which
--- is how the Cranes got armed with ThunderBlades against a boss that
--- absorbs bolt.  That case is caught rather than corrected: the absorb
--- guard in M.run fails the run at battle start when an equipped weapon's
--- element is absorbed by anything in the formation (issue #81; the block
--- above M.ELEM_NAMES in lib/ot6.lua carries the reasoning).  It
--- deliberately says nothing about a merely NULLED element, because on
--- battle 70 the nulled pick is the correct one and the element-aware
--- alternative lost all three attempts.  When the guard fires, the fix is
--- a deliberate M.equipWeapon for that fight, not a change here.
---
--- `opts.slots` names which character-select slots Optimum runs on, in
--- order; the default is every slot, which is what every caller before
--- gen_tunnelarmr wanted.  It exists because power-greedy Optimum and a
--- deliberate M.equipWeapon cannot both have the same slot: measured
--- 2026-08-12 at celes_freed, the bag holds one MithrilBlade (power 38,
--- slash) and one Dirk (power 26, pierce), and running Optimum over both
--- slots gives LOCKE the blade and CELES the Dirk (`[celes kit] done:
--- c1=0A c6=00`) -- the pierce weapon in the hand of the character whose
--- whole drive is Runic, against a boss that is `5, OT6_PIERCE`
--- (ot6_hud.asm:1943).  Equipping LOCKE first and then letting Optimum
--- have his slot back just undoes it, because 38 beats 26.  So the caller
--- equips the slot it cares about with M.equipWeapon and leaves that slot
--- out of this list.
-function M.equipOptimum(opts)
-  opts = opts or {}
-  local tag = opts.tag or "equip"
-  local slots = opts.slots or { 0, 1, 2, 3 }
-  local ZM, CUR = 0x26, 0x4b
-  local ST_MAIN, ST_CHAR, ST_OPT = 0x05, 0x06, 0x36
-
-  local function weapon(c) return M.readByte(0x1600 + 37 * c + 0x1f) end
-  local function bare(c) return weapon(c) == 0xFF end
-  local function anyBare()
-    for _, c in ipairs(M.partyMembers()) do
-      if bare(c) then return true end
-    end
-    return false
-  end
-  local function kitLine()
-    local out = {}
-    for _, c in ipairs(M.partyMembers()) do
-      out[#out + 1] = string.format("c%d=%02X", c, weapon(c))
-    end
-    return table.concat(out, " ")
-  end
-
-  local phase = 0
-  local function tap(btn)
-    phase = (phase + 1) % 12
-    M.setPad(phase < 4 and { btn } or {})
-  end
-
-  -- one slot, start to finish; slots are the menu's 0..3, and every party
-  -- member gets one whether or not that member is the bare one, because
-  -- Optimum on an already-equipped character is a no-op the game handles
-  -- itself
-  local function oneSlot(slot)
-    -- Guard on the party rather than on zCharID: $69+slot is the menu's own
-    -- copy and it is stale on the field, so a solo scenario read "slot 1 =
-    -- char 255" as occupied and then hung trying to walk a cursor onto a
-    -- slot that is not there.  #M.partyMembers() is answered by $1850 and is
-    -- correct whether or not a menu has ever been open.
-    return M.cond(function() return #M.partyMembers() > slot end, {
-      M.driveUntil(function() return M.readByte(ZM) == ST_MAIN end, 1800, {
-        M.call(function() tap("x") end),
-      }, tag .. ": main menu"),
-      M.release(), M.waitFrames(10),
-      M.driveUntil(function()
-        return M.readByte(ZM) == ST_MAIN and M.readByte(CUR) == 2
-      end, 1200, {
-        M.call(function()
-          local cur = M.readByte(CUR)
-          phase = (phase + 1) % 12
-          M.setPad(phase < 4 and { [cur < 2 and "down" or "up"] = true } or {})
-        end),
-      }, tag .. ": main cursor on Equip"),
-      M.release(), M.waitFrames(10),
-      M.driveUntil(function() return M.readByte(ZM) == ST_CHAR end, 1200, {
-        M.call(function() tap("a") end),
-      }, tag .. ": character select"),
-      M.release(), M.waitFrames(10),
-      M.driveUntil(function()
-        return M.readByte(ZM) == ST_CHAR and M.readByte(CUR) == slot
-      end, 1200, {
-        M.call(function()
-          local cur = M.readByte(CUR)
-          phase = (phase + 1) % 12
-          M.setPad(phase < 4
-            and { [cur < slot and "down" or "up"] = true } or {})
-        end),
-      }, tag .. ": cursor on slot " .. slot),
-      M.release(), M.waitFrames(10),
-      M.driveUntil(function() return M.readByte(ZM) == ST_OPT end, 1200, {
-        M.call(function() tap("a") end),
-      }, tag .. ": equip options"),
-      M.release(), M.waitFrames(10),
-      M.driveUntil(function()
-        return M.readByte(ZM) == ST_OPT and M.readByte(CUR) == 1
-      end, 1200, {
-        M.call(function()
-          local cur = M.readByte(CUR)
-          phase = (phase + 1) % 12
-          M.setPad(phase < 4 and { [cur < 1 and "right" or "left"] = true } or {})
-        end),
-      }, tag .. ": cursor on Optimum"),
-      M.release(), M.waitFrames(10),
-      -- EquipOptimum runs in place: the state does not change, so there is
-      -- nothing to drive toward; one edge press is enough.
-      M.pressButtons({ "a" }, 4),
-      M.release(), M.waitFrames(60),
-      M.logStep(function()
-        return string.format("[%s] slot %d (char %d): %s", tag, slot,
-          M.readByte(0x69 + slot), kitLine())
-      end),
-      -- back to the field before the next slot, so every pass starts from
-      -- the same place rather than from wherever the last one stopped
-      M.driveUntil(careClose(function()
-        local zm = M.readByte(ZM)
-        return zm ~= ST_MAIN and zm ~= ST_CHAR and zm ~= ST_OPT
-      end), 2400, {
-        M.call(function() tap("b") end),
-      }, tag .. ": back to the field"),
-      M.release(), M.waitFrames(20),
-    }, {})
-  end
-
-  -- built up rather than written out, because opts.slots decides both which
-  -- slots run and in what order
-  local walk = {
-    M.logStep(function()
-      return string.format("[%s] someone is bare-handed (%s) -- opening " ..
-        "Equip on slots %s", tag, kitLine(), table.concat(slots, ","))
-    end),
-  }
-  for _, slot in ipairs(slots) do walk[#walk + 1] = oneSlot(slot) end
-  walk[#walk + 1] = M.logStep(function()
-    return string.format("[%s] done: %s", tag, kitLine())
-  end)
-  walk[#walk + 1] = M.call(function()
-    for _, c in ipairs(M.partyMembers()) do
-      M.assertEq(bare(c), false, string.format(
-        "char %d is holding a weapon after Optimum", c))
-    end
-  end)
-
-  return M.cond(anyBare, walk, {
-    M.logStep(function()
-      return string.format("[%s] everyone is already armed: %s", tag,
-        kitLine())
-    end),
-  })
 end
 
 -- ------------------------------------------- South Figaro shared toolkit --
@@ -3694,8 +3515,8 @@ function M.clearGateSoldier(probeX, probeY, tag)
       -- cannot close it: 111 of 168 is 66%, above the driver's 60% line,
       -- and no Tonic covers a 111-damage hit.  Its weaknesses are bolt and
       -- water (monster_prop +25 = $84) and solo LOCKE can reach neither.
-      -- Bare-handed -- how the chain delivered him until H.equipOptimum
-      -- landed -- it was eight damage a swing, and front row and back row
+        -- Bare-handed -- how the chain delivered him until a deliberate
+        -- equip landed -- it was eight damage a swing, and front row and back row
       -- measured identically bare-handed, which is why the row setting went
       -- unnoticed for three runs.
       -- Do not widen the attempt sequence until it succeeds by chance; that
