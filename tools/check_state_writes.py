@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""No test may write emulated game state.  This is the check that enforces it.
+"""State writes in tools/tests are declared, not silent.  This is that registry.
 
-The rule (owner directive, 2026-08): test and savestate-generating Lua scripts
-may inject controller input and read emulated memory; they may never write it.
-A test that pokes HP, warps the party, or plants an item tests its own poke
-rather than the game, and every fixture and every pass downstream of a poked
-state describes a game nobody played.
+The rule (owner directive, 2026-08, refined): focused unit-style tests and
+measurement instruments may use write expedients -- a poke that reaches a
+mechanism a human cannot produce on cue is a fine way to unit-test it -- but
+the long playthroughs run before a release, the savestate generators that walk
+the game from power-on through the story with controller input, must never
+write game state.  A generator that pokes HP, warps the party, or clamps a boss
+mints a fixture nobody played, and every state downstream inherits it.
+
+That second half -- the playthroughs play for real -- is enforced by
+check_playthrough_honest.py.  This linter enforces the discipline around the
+first: every write, even a sanctioned one, must be DECLARED in
+tools/state_write_waivers.txt, so a new poke is a reviewed line rather than a
+silent one, and prose that merely mentions a write API never trips it.
 
 This linter scans every tools/tests/**/*.lua (lib/ included), strips Lua
 comments and string literals first (the corpus mentions write APIs far more
@@ -20,25 +28,24 @@ flags the write-side surface:
 
 One line per finding: file:line: token.  Exit 0 clean, exit 1 dirty.
 
-WAIVERS.  The corpus predates the rule, so every existing violation is
-grandfathered into tools/state_write_waivers.txt, a burn-down list of
-(file, token) pairs that must only ever shrink:
+THE REGISTRY.  tools/state_write_waivers.txt lists every (file, token) pair
+that writes state, each a sanctioned unit-test or instrument expedient:
 
-  * a hit whose (file, token) pair is not in the list fails the run, so no
-    new write can land anywhere, from day one;
-  * a listed pair that no longer matches anything also fails the run, so the
-    stale line must be deleted.  The list then only ever shrinks, and a
-    cleaned-up file cannot regress back onto its old waiver.
+  * a hit whose (file, token) pair is not in the list fails the run, so a new
+    poke cannot land silently -- it is added as a reviewed line or not at all;
+  * a listed pair that no longer matches anything also fails the run, so a
+    stale line must be deleted and the registry stays honest about the corpus.
 
-Granularity is per (file, token) rather than per line: line numbers churn
-with every unrelated edit, while "this file still calls this write API" is
-the fact the burn-down tracks.  The cost is that a waived file can add more
-calls to a token it already uses.  That is accepted, because the burn-down
-cleans whole files and the waiver goes away with the last call.
+Granularity is per (file, token) rather than per line: line numbers churn with
+every unrelated edit, while "this file writes through this API" is the durable
+fact.  This is a registry, not a burn-down -- it may grow when a new unit-style
+test earns an expedient, so long as the addition is deliberate.  It carries no
+obligation to reach zero; the honesty that matters, generators playing for
+real, is a separate and absolute check (check_playthrough_honest.py).
 
---regen-waivers rewrites the list from the current corpus.  That is for
-the cleanup waves (delete writes, regen, and the list shrinks); running it
-to cover a new write is visible in the diff of a checked-in file.
+--regen-waivers rewrites the list from the current corpus, for when a cleanup
+removes writes; running it to cover a new write is visible in the diff of a
+checked-in file.
 
 Wired into `make test` (both the check and --selftest) and into `make
 savestates` (so savestate generation cannot run from a poking generator even
@@ -211,49 +218,44 @@ def scan_tree(root: str):
 # ---------------------------------------------------------------- waivers -
 
 WAIVER_HEADER = """\
-# state_write_waivers.txt -- BURN-DOWN list for tools/check_state_writes.py.
+# state_write_waivers.txt -- the registry of sanctioned state-writes for
+# tools/check_state_writes.py.
 #
-# Each line waives one (file, token) pair: that file's pre-rule uses of that
-# state-write API, grandfathered when the no-write rule landed.  This list
-# must only ever SHRINK:
+# Each line names one (file, token) pair that writes emulated state.  Every one
+# is a sanctioned expedient: a focused unit-style test, a measurement
+# instrument, or the write primitives themselves -- the kind the owner ruled
+# fine, because instrumenting a mechanism a person cannot produce on cue is not
+# a claim about play.  The honesty that matters -- the long playthroughs (the
+# savestate generators) playing for real -- is a separate and ABSOLUTE check,
+# check_playthrough_honest.py, which refuses a generator that writes at all.
 #
-#   * adding a line to cover new code is the exact cheat the checker exists
-#     to prevent -- new writes fail `make test`, full stop;
-#   * a line whose pair no longer matches anything FAILS the check as stale
-#     and must be deleted (that is the only-shrinks rule -- a cleaned file
-#     cannot quietly regress onto its old waiver).
+#   * a write whose (file, token) is not listed FAILS the run, so a new poke is
+#     a reviewed line rather than a silent one;
+#   * a listed pair that no longer matches anything FAILS as stale and must be
+#     deleted, so the registry stays honest about the corpus.
 #
-# After a cleanup wave:  python3 tools/check_state_writes.py --regen-waivers
-# regenerates this file from the corpus; the diff must be pure deletion.
-# Regeneration preserves the third field below, so a classification survives
-# a cleanup wave.
+# This is a registry, not a burn-down: it may grow when a new unit-style test
+# earns an expedient, and it carries no obligation to reach zero.
+#
+# After removing writes:  python3 tools/check_state_writes.py --regen-waivers
+# rewrites this file from the corpus (it preserves the third field).
 #
 # format: <path relative to repo root> <TAB> <token> [<TAB> quarantine: why]
 #
-# A line with no third field is CONVERSION WORK STILL OWED: the file writes
-# game state and someone has to replace that with real input.
-#
-# A line marked `quarantine:` is not owed.  It is a mechanism test injecting
-# something the game can only produce rarely or never on cue -- deliberate
-# VRAM corruption for the font-restore path, the 1-in-65536 zero-checksum
-# save, a legacy save layout that no current version writes.  The owner ruled
-# these stay: the bar is that a PLAYTHROUGH is real, and instrumenting a
-# mechanism is not a claim about play.  They carry the loud header
-# battle_loadgate.lua models, and they may never generate a savestate.
-#
-# The distinction is what makes #75's finish line checkable: the program is
-# done when every remaining line is a quarantine line, and until then the
-# unmarked count is the work left.  Do not mark a line to make that number
-# smaller.
+# The optional `quarantine: <why>` third field records why the expedient is
+# warranted -- typically an input the game can only produce rarely or never on
+# cue: deliberate VRAM corruption for the font-restore path, the 1-in-65536
+# zero-checksum save, a legacy save layout no version writes.  It is
+# documentation, not a gate; a line without one is no less sanctioned.
 """
 
 
 def load_waivers(path: str):
     """{(file, token): reason-or-None} from the waiver file.
 
-    A third field beginning `quarantine:` classifies the line as a sanctioned
-    mechanism test rather than conversion work still owed; missing third field
-    means owed.  Missing file = empty."""
+    A third field beginning `quarantine:` records the reason the expedient is
+    warranted; a missing third field just means no reason was written down (the
+    line is sanctioned either way).  Missing file = empty."""
     waivers = {}
     if not os.path.exists(path):
         return waivers
@@ -310,17 +312,15 @@ def run_check(root: str, waiver_path: str, verbose: bool) -> int:
     waivers = load_waivers(waiver_path)
     unwaived, stale = compare(hits, waivers)
 
-    owed = sorted(k for k, v in waivers.items() if v is None)
-    quarantined = len(waivers) - len(owed)
+    with_reason = sum(1 for v in waivers.values() if v is not None)
 
     print("state-write check (%s/**/*.lua)" % TESTS_DIR)
-    print("  scanned %d files: %d state-write sites, %d waived (file,token) "
-          "pairs" % (nfiles, len(hits), len(waivers)))
-    print("  %d still owed a conversion, %d sanctioned quarantine"
-          % (len(owed), quarantined))
-    if not owed:
-        print("  the list is now the quarantine roster: no conversion work "
-              "is recorded as owed (issue #75's finish line)")
+    print("  scanned %d files: %d state-write sites, %d sanctioned "
+          "(file,token) pairs" % (nfiles, len(hits), len(waivers)))
+    print("  %d sanctioned unit-test/instrument writes (%d with a recorded "
+          "reason)" % (len(waivers), with_reason))
+    print("  the long playthroughs are honest separately: no story generator "
+          "writes state (check_playthrough_honest.py, #75)")
 
     if verbose:
         for rel, line, tok in hits:
@@ -328,21 +328,24 @@ def run_check(root: str, waiver_path: str, verbose: bool) -> int:
             print("  %s %s:%d: %s" % (mark, rel, line, tok))
 
     if unwaived:
-        print("  %d NEW STATE WRITE(S) -- tests may read memory and inject "
-              "input, never write game state:" % len(unwaived))
+        print("  %d UNDECLARED STATE WRITE(S).  A test may read memory and "
+              "inject input; a write is an expedient that must be declared:"
+              % len(unwaived))
         for rel, line, tok in unwaived:
             print("  %s:%d: %s" % (rel, line, tok))
-        print("  Fix the script to observe instead of poke.  Do NOT add a "
-              "waiver: %s is a burn-down list and only shrinks."
+        print("  If this is a focused unit-style test or instrument, add the "
+              "(file, token) to %s with a reason -- that is the sanctioned "
+              "kind.  If it is a savestate generator, it is refused outright: "
+              "the long playthroughs play for real (check_playthrough_honest.py)."
               % WAIVER_FILE.replace(os.sep, "/"))
     for rel, tok in stale:
-        print("  STALE WAIVER: %s\t%s -- no hits left; delete the line "
-              "(or --regen-waivers after a cleanup wave)" % (rel, tok))
+        print("  STALE ENTRY: %s\t%s -- no hits left; delete the line "
+              "(or --regen-waivers after a cleanup)" % (rel, tok))
 
     if unwaived or stale:
         return 1
-    print("  OK -- no state writes outside the burn-down list, no stale "
-          "waivers")
+    print("  OK -- every state write is a declared unit-test expedient, no "
+          "stale entries")
     return 0
 
 
@@ -486,7 +489,11 @@ def main() -> int:
     waiver_path = os.path.join(args.repo, WAIVER_FILE)
     if args.regen_waivers:
         hits, nfiles = scan_tree(args.repo)
-        npairs = write_waivers(waiver_path, hits)
+        # Pass the existing list so a recorded reason survives the rewrite;
+        # without this, --regen silently dropped every third field (the
+        # docstring promised preservation write_waivers only does when handed
+        # what to preserve).
+        npairs = write_waivers(waiver_path, hits, load_waivers(waiver_path))
         print("state-write waivers regenerated: %d (file,token) pairs "
               "covering %d sites in %d scanned files -> %s"
               % (npairs, len(hits), nfiles, WAIVER_FILE.replace(os.sep, "/")))

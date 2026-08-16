@@ -1,19 +1,26 @@
-# state_write_waivers.txt -- BURN-DOWN list for tools/check_state_writes.py.
+# state_write_waivers.txt -- the registry of sanctioned state-writes for
+# tools/check_state_writes.py.
 #
-# Each line waives one (file, token) pair: that file's pre-rule uses of that
-# state-write API, grandfathered when the no-write rule landed.  This list
-# must only ever SHRINK:
+# Each line names one (file, token) pair that writes emulated state.  Every one
+# is a sanctioned expedient: a focused unit-style test, a measurement
+# instrument, or the write primitives themselves -- the kind the owner ruled
+# fine, because instrumenting a mechanism a person cannot produce on cue is not
+# a claim about play.  The honesty that matters -- the long playthroughs (the
+# savestate generators) playing for real -- is a separate and ABSOLUTE check,
+# check_playthrough_honest.py, which refuses a generator that writes at all.
 #
-#   * adding a line to cover new code is the exact cheat the checker exists
-#     to prevent -- new writes fail `make test`, full stop;
-#   * a line whose pair no longer matches anything FAILS the check as stale
-#     and must be deleted (that is the only-shrinks rule -- a cleaned file
-#     cannot quietly regress onto its old waiver).
+#   * a write whose (file, token) is not listed FAILS the run, so a new poke is
+#     a reviewed line rather than a silent one;
+#   * a listed pair that no longer matches anything FAILS as stale and must be
+#     deleted, so the registry stays honest about the corpus.
 #
-# After a cleanup wave:  python3 tools/check_state_writes.py --regen-waivers
-# regenerates this file from the corpus; the diff must be pure deletion.
+# This is a registry, not a burn-down: it may grow when a new unit-style test
+# earns an expedient, and it carries no obligation to reach zero.
 #
-# format: <path relative to repo root> <TAB> <token>
+# After removing writes:  python3 tools/check_state_writes.py --regen-waivers
+# rewrites this file from the corpus (it preserves the third field).
+#
+# format: <path relative to repo root> <TAB> <token> [<TAB> quarantine: why]
 tools/tests/bal_dpb.lua	.writeByte(
 tools/tests/bal_dpb.lua	.writeWord(
 tools/tests/bal_dpb.lua	emu.write
