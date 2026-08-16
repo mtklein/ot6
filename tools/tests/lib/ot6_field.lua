@@ -27,6 +27,33 @@ assert(type(M) == "table",
   "ot6_field.lua is inlined by lib/compose.py after lib/ot6.lua and " ..
   "receives the core module table; it cannot be loaded on its own")
 
+-- The nav-encounter fallback, formerly the kill-bit (#75, the honesty
+-- program's chief cheat).  navTo/worldNavTo/advanceStory reach here when a
+-- step draws a random encounter without declaring how to handle it
+-- (opts.playBattles).  It used to mark every present monster dead ($3EEC bit
+-- 7) and walk on -- a written game state, and the biggest single contaminant
+-- in the fixture tree.
+--
+-- It is gone, and it was gone before it was removed: a serial `make savestates`
+-- with this centralised from its seven identical copies and made to log on
+-- first fire recorded ZERO fires across all 114 fixtures.  Every step that can
+-- draw an encounter already declares playBattles="flee"/"tactical", so the
+-- fallback is never reached in generation.  So there is no state to write and
+-- nothing to convert: the write is deleted, and the caller's A-tap fallback
+-- handles the (never-taken) path.  A step that ever does reach here without
+-- declaring playBattles gets a loud warning and is fought by blind A-taps,
+-- which shows up as a wipe or a timeout -- the honest signal to declare it,
+-- not a silent rig.
+M._killbitFired = false
+function M.killbit(_slot)
+  if not M._killbitFired then
+    M.log("[killbit] a nav step drew a random encounter without opts.playBattles "
+      .. "-- the kill-bit cheat is removed (#75), so it is fought by blind "
+      .. 'A-taps; declare playBattles="flee"/"tactical" on this step')
+    M._killbitFired = true
+  end
+end
+
 -- How long playBattles="flee" holds L+R before it accepts that this
 -- formation is not going to release the party and fights the battle out
 -- instead.  The run mechanic is a per-round roll against level/speed, so a
@@ -724,7 +751,7 @@ function M.navTo(txIn, tyIn, opts)
         if M.monstersPresent() > 0 and not opts.playBattles then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
+              M.killbit(slot)
             end
           end
         end
@@ -949,7 +976,7 @@ function M.advanceStory(pred, maxFrames, opts)
         if M.monstersPresent() > 0 and not opts.playBattles then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
+              M.killbit(slot)
             end
           end
         end
@@ -1227,7 +1254,7 @@ function M.worldNavTo(txIn, tyIn, opts)
         if M.monstersPresent() > 0 and not opts.playBattles then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
+              M.killbit(slot)
             end
           end
         end
@@ -1517,7 +1544,7 @@ function M.phaseWalk(tx, ty, spec)
         begunSeg, hp0, obsStart = -1, nil, nil
         for s = 0, 5 do
           if M.readByte(0x3aa8 + s * 2) % 2 == 1 then
-            M.writeByte(0x3eec + s * 2, M.readByte(0x3eec + s * 2) | 0x80)
+            M.killbit(s)
           end
         end
         M.setPad(aPhase < 4 and { "a" } or {})
@@ -1628,7 +1655,7 @@ function M.chaseTalk(objIdx, maxFrames, what, opts)
       if M.battleLoadStarted() then
         for s = 0, 5 do
           if M.readByte(0x3aa8 + s * 2) % 2 == 1 then
-            M.writeByte(0x3eec + s * 2, M.readByte(0x3eec + s * 2) | 0x80)
+            M.killbit(s)
           end
         end
         M.setPad(ph < 4 and { "a" } or {})
@@ -1687,7 +1714,7 @@ function M.tapLever(swId, maxFrames, what)
       if M.battleLoadStarted() then
         for s = 0, 5 do
           if M.readByte(0x3aa8 + s * 2) % 2 == 1 then
-            M.writeByte(0x3eec + s * 2, M.readByte(0x3eec + s * 2) | 0x80)
+            M.killbit(s)
           end
         end
         M.setPad({ "a" }); return
@@ -1716,7 +1743,7 @@ function M.stepOff(dirs, maxFrames, what)
       if M.battleLoadStarted() then
         for s = 0, 5 do
           if M.readByte(0x3aa8 + s * 2) % 2 == 1 then
-            M.writeByte(0x3eec + s * 2, M.readByte(0x3eec + s * 2) | 0x80)
+            M.killbit(s)
           end
         end
         M.setPad({ "a" }); return
