@@ -181,6 +181,16 @@ test: rom nomp-rom graph
 	@# any NEW write anywhere in tools/tests/**/*.lua fails here.
 	python3 tools/check_state_writes.py --selftest
 	python3 tools/check_state_writes.py
+	@# The long playthroughs play for real (#75, owner rule).  Expedients are
+	@# fine in focused unit tests, but a savestate generator that walks the
+	@# story must never write game state -- pinning HP, clamping a boss,
+	@# kill-bitting a fight mints a fixture no player reached, and everything
+	@# that boots from it inherits the lie.  Generators are honest by default;
+	@# the one standalone unit fixture off the story spine that writes
+	@# (gen_battle2's sprite check) is named in the script.  Suite-test
+	@# expedients are check_state_writes' business, not this one's.
+	python3 tools/check_playthrough_honest.py --selftest
+	python3 tools/check_playthrough_honest.py
 	@# Every test-shaped file declares whether it runs: a suite member
 	@# (-- @suite) or a hand-run instrument (-- @manual).  A file with neither
 	@# is invisible -- whelkbal_tek sat failing on main because it had no
