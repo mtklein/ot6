@@ -2203,6 +2203,77 @@ function M.invCountOf(id)
   return s and M.readByte(0x1969 + s) or 0
 end
 
+-- Is treasure bit N (0..511, the global index audit_chests reports) set?
+-- $1E40 is the 64-byte treasure bitfield (field-ram.txt:1035); the bit is
+-- the unit the game tracks, so duplicate map copies share one.
+function M.chestOpen(bit)
+  return (M.readByte(0x1E40 + (bit >> 3)) & (1 << (bit & 7))) ~= 0
+end
+
+-- M.openChest: open one treasure chest through the real field interaction,
+-- the #84 chest rule's pickup idiom (owner: if a chest is visible on the
+-- screen, a human walks over and opens it).  navTo the stand tile, face the
+-- chest (a short held press against its solid tile turns without stepping),
+-- edge-A until the "Received!" dialog answers (the same clean-edge rule
+-- gen_zozo5's talk() measured: CheckNPCs starves under held directions),
+-- dismiss it, and assert the game's own record -- the treasure bit.
+--
+-- Idempotent on the bit: duplicate map copies share one bit and different
+-- contents (the audit's known trap), so a chest already opened -- including
+-- its twin on a copy map -- is a logged no-op rather than a timeout against
+-- a chest that will never answer.
+--
+--   H.openChest{ stand = {65,29}, face = "up", bit = 11,
+--                what = "Fenix Down", item = 0xF0,     -- item: optional
+--                nav = { playBattles = "flee" } }      -- navTo overrides
+--
+-- `item` adds a bag-delta assertion; gil and empty chests assert the bit
+-- alone (the gil counter and the empty dialog are logged, not asserted).
+function M.openChest(o)
+  local tag = string.format("chest bit %d (%s)", o.bit, o.what or "?")
+  local before
+  local aPh = 0
+  local nav = { maxFrames = 15000, playBattles = "tactical" }
+  for k, v in pairs(o.nav or {}) do nav[k] = v end
+  return M.cond(function()
+    if M.chestOpen(o.bit) then
+      M.log(string.format("[chest] %s: already open (shared bit or rerun), "
+        .. "skipping", tag))
+      return false
+    end
+    return true
+  end, {
+    M.navTo(o.stand[1], o.stand[2], nav),
+    M.call(function()
+      before = o.item and M.invCountOf(o.item) or nil
+    end),
+    M.hold({ o.face }), M.waitFrames(8), M.release(), M.waitFrames(4),
+    M.driveUntil(function() return M.dialogWaiting() end, 6000, {
+      M.call(function()
+        aPh = (aPh + 1) % 12
+        M.setPad(aPh < 4 and { a = true } or {})
+      end),
+    }, tag .. ": the chest answered"),
+    M.driveUntil(function() return not M.dialogWaiting() end, 600, {
+      M.call(function()
+        aPh = (aPh + 1) % 8
+        M.setPad(aPh < 4 and { a = true } or {})
+      end),
+    }, tag .. ": dialog dismissed"),
+    M.call(function()
+      M.setPad({})
+      M.assertEq(M.chestOpen(o.bit), true, tag .. ": treasure bit set")
+      if o.item then
+        local now = M.invCountOf(o.item)
+        M.assertEq(now, before + 1,
+          string.format("%s: bag %d -> %d of item $%02X", tag, before, now,
+            o.item))
+      end
+      M.log(string.format("[chest] %s: OPENED", tag))
+    end),
+  }, {})
+end
+
 -- M.buyItem: buy `qtyFn()` more of shop row `row`, closed-loop,
 -- with the shop already open at its options window (menu state $25).
 -- Promoted from gen_sabin_train/gen_sabin_gau, where two identical
