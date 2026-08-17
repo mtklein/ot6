@@ -186,6 +186,21 @@ H.run({ maxFrames = 90000 }, {
     return H.fieldY() > 59 and H.hasControl() and H.tileAligned()
   end, 900, { H.hold({ "down" }), H.waitFrames(4) }, "off the clock tile"),
   H.release(),
+  -- Pin the wait to (98,60) exactly.  The held press can carry one extra
+  -- step onto (98,61) -- the revealed staircase's own trigger tile -- and
+  -- standing there flickers eventRunning the same way the clock tile does,
+  -- so the calm wait below can never hold (the enumeration regen after the
+  -- #84 wave measured exactly that: ev=true at (98,61), 1200-frame
+  -- timeout).  One tap back up is the same stood-on-trigger cure the step
+  -- above documents.
+  H.driveUntil(function()
+    return H.fieldY() == 60 and H.tileAligned()
+  end, 600, {
+    H.call(function()
+      H.setPad(H.fieldY() > 60 and { up = true } or {})
+    end),
+  }, "pinned off the staircase trigger"),
+  H.call(function() H.setPad({}) end),
   H.waitUntil(landed(225, 20), 1200, "calm after the shake", 1),
   H.waitFrames(30),
   H.call(function()

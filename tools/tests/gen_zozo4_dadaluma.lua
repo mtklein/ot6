@@ -156,7 +156,12 @@ end
 -- Returns a per-drive frame handler.  It answers true on a frame it has
 -- taken over (a battle is up), false when the caller should get on with
 -- walking.
-local function encounters(what)
+-- onWipe: optional soft sink.  Without it a wipe is a hard FAIL (the right
+-- default: an unladdered drive that wiped has nothing to recover to).  A
+-- retry ladder passes one, gets the wipe line as a value instead of an
+-- error, and reloads its checkpoint; after the sink fires this callback
+-- goes inert (the game is on its Game Over path and only a reload helps).
+local function encounters(what, onWipe)
   -- CELES is the party's prepared healer; naming her here keeps LOCKE,
   -- EDGAR and SABIN on offense.  Leaving the role implicit measured a
   -- 157-hp survivor wiping the party while every available turn queued a
@@ -165,14 +170,24 @@ local function encounters(what)
     items = true, healPercent = 60, healer = CELES, cadence = 12,
     tool = BIO_BLASTER, focus = ZOZO_FOCUS })
   local dead = 0
+  local wiped = false
   return function()
+    if wiped then H.setPad({}); return true end
     if battleHpAllZero() and not H.hasControl() and H.eventRunning() then
       dead = dead + 1
       if dead >= 300 then
-        error(string.format("%s: THE PARTY IS WIPED -- all four battle-HP " ..
-          "words have read 0 with the event running and no control for 300 " ..
-          "consecutive frames, at (%d,%d) on map %d.  This is a lost fight, " ..
-          "not a stuck walk.", what, H.fieldX(), H.fieldY(), map()), 0)
+        local msg = string.format("%s: THE PARTY IS WIPED -- all four " ..
+          "battle-HP words have read 0 with the event running and no " ..
+          "control for 300 consecutive frames, at (%d,%d) on map %d.  " ..
+          "This is a lost fight, not a stuck walk.",
+          what, H.fieldX(), H.fieldY(), map())
+        if onWipe then
+          wiped = true
+          onWipe(msg)
+          H.setPad({})
+          return true
+        end
+        error(msg, 0)
       end
     else
       dead = 0
@@ -961,32 +976,85 @@ local function stairDir(x, y)
   if x > 54 then return { "left" } end
   return { "up" }
 end
-local function stairFollow()
+-- The stair climb is a retry ladder now (the house 3 attempts): the
+-- enumeration regen after the #84 wave measured a real wipe here -- the
+-- shifted arrival state met a stair-room pack that killed the full-prep
+-- party (HANDOFF's Zozo record: one round can exceed a whole HP bar).  An
+-- attempt that wipes or stalls reloads the pre-stair checkpoint; the
+-- (n-1)*29-frame stagger before the re-climb moves every subsequent battle
+-- seed ($021e advances while we wait), which is what varies the draw.
+local stairSaveReq, stairFail, stairDone = nil, nil, false
+local function stairAttempt(n)
   local hb = 0
-  local fought = encounters("stairFollow")
-  return H.driveUntil(function() return map() == 221 end, 24000, {
+  local fought
+  return H.cond(function() return not stairDone end, {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("[stair] ATTEMPT %d -- reloading the pre-stair " ..
+          "checkpoint (%s)", n, tostring(stairFail))
+      end),
+      H.call(function()
+        local r = H.requestLoadState(stairSaveReq.blob)
+        stairSaveReq.reload = r
+      end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(stairSaveReq.reload, "stair attempt " .. n) end),
+      H.waitFrames(60 + (n - 1) * 29),
+    }, {}),
     H.call(function()
-      hb = hb + 1
-      if hb % 600 == 0 then
-        H.log(string.format("[stair] f+%d at (%d,%d)", hb, H.fieldX(), H.fieldY()))
-      end
-      if fought() then return end
-      if H.dialogWaiting() then
-        H.setPad(hb % 8 < 4 and { "a" } or {})
-        return
-      end
-      if not H.hasControl() then H.setPad({}); return end
-      if not H.tileAligned() then return end
-      local x, y = H.fieldX(), H.fieldY()
-      for _, mv in ipairs(stairDir(x, y)) do
-        if H.canStep(x, y, mv) then
-          H.setPad({ [H.movePress(mv)] = true })
+      stairFail = nil
+      hb = 0
+      fought = encounters("stairFollow attempt " .. n,
+        function(msg) stairFail = msg end)
+    end),
+    H.driveUntil(function()
+      return map() == 221 or stairFail ~= nil
+    end, 26000, {
+      H.call(function()
+        hb = hb + 1
+        if hb >= 24000 then
+          stairFail = string.format("[stair] attempt %d TIMED OUT at (%d,%d)",
+            n, H.fieldX(), H.fieldY())
           return
         end
+        if hb % 600 == 0 then
+          H.log(string.format("[stair] f+%d at (%d,%d)", hb, H.fieldX(), H.fieldY()))
+        end
+        if fought() then return end
+        if H.dialogWaiting() then
+          H.setPad(hb % 8 < 4 and { "a" } or {})
+          return
+        end
+        if not H.hasControl() then H.setPad({}); return end
+        if not H.tileAligned() then return end
+        local x, y = H.fieldX(), H.fieldY()
+        for _, mv in ipairs(stairDir(x, y)) do
+          if H.canStep(x, y, mv) then
+            H.setPad({ [H.movePress(mv)] = true })
+            return
+          end
+        end
+        H.setPad({})
+      end),
+    }, "stair conveyor -> P12b, attempt " .. n),
+    H.cond(function() return stairFail == nil end, {
+      H.call(function() stairDone = true end),
+    }, {}),
+  }, {})
+end
+local function stairFollow()
+  return H.cond(function() return true end, {
+    H.call(function() stairSaveReq = H.requestSaveState() end),
+    H.waitFrames(2),
+    H.call(function() H.checkReq(stairSaveReq, "pre-stair checkpoint") end),
+    stairAttempt(1), stairAttempt(2), stairAttempt(3),
+    H.call(function()
+      if not stairDone then
+        error("the stair climb failed all three attempts -- a finding, not " ..
+          "a retry candidate: " .. tostring(stairFail), 0)
       end
-      H.setPad({})
     end),
-  }, "stair conveyor -> P12b")
+  })
 end
 
 -- the TOP-roof z-loop corridor, (30,22) -> (30,13): route direction(s) as
