@@ -175,6 +175,13 @@ test: rom nomp-rom graph
 	@# reason compose.py and sram_checkpoint.py sit on these lines.
 	python3 tools/check_boss_rows.py
 	python3 tools/check_break_reach.py
+	@# The encounter question, kept mechanical (#82): audit_encounters.py
+	@# answers "can map N draw a battle, from which formations, can they be
+	@# fled" for route authoring.  Only its selftest runs here -- the tool is
+	@# a query, not a tree-wide assertion -- pinning the decode to the
+	@# measurements that validated it (map 98's recorded pool, Zozo's
+	@# pincers, the Hideout's silence) so drift fails loudly.
+	python3 tools/audit_encounters.py --selftest
 	@# No test may WRITE emulated game state (input injection and memory
 	@# reads only).  Pre-rule violations are grandfathered in
 	@# tools/state_write_waivers.txt, a burn-down list that only shrinks;
