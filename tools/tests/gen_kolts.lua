@@ -726,8 +726,26 @@ local function levelOf(c) return H.readByte(0x1600 + 37 * c + 8) end
 -- had for every measurement of the gate soldier so far, and the "a level up
 -- or two" the owner asked for rather than an open-ended grind.
 local EXP_TARGET = 2250
+-- The gil floor is the other half of the grind's contract, added 2026-08-17.
+-- The grind used to stop on the experience target alone, and the town's
+-- whole shopping list leaned on the gil that many laps happened to pay:
+-- gearTrip is 1800, the item top-up runs to about 1300, the relic counter
+-- is 4500 and the inn is 80, about 7680 end to end.  When the upstream
+-- chain started delivering LOCKE with more experience (the Narshe mines
+-- chest pickups, #84, plus the progression rework), the same target was met
+-- in 14 laps instead of 16 and the route reached the relic counter 534 gil
+-- short: measured 2026-08-17, grind end at 7146 gil, Star Pendants bought,
+-- and only two of the three Jewel Rings affordable -- the exact-count
+-- contract below the relic buys caught it.  So the grind now runs until
+-- BOTH targets hold.  8000 covers the measured 7680 with margin for the
+-- item top-up's variable Tonic line; at the measured 400-800 gil a lap the
+-- floor costs one or two extra laps, whose experience (about 115 a lap)
+-- stays well inside the level-11 boundary the EXP_TARGET comment derives.
+local GIL_TARGET = 8000
 local grindLaps = 0
-local function grindDone() return expOf(LOCKE) >= EXP_TARGET end
+local function grindDone()
+  return expOf(LOCKE) >= EXP_TARGET and gil() >= GIL_TARGET
+end
 local function lap(n)
   return H.cond(function() return not grindDone() end, {
     H.logStep(function()
@@ -775,6 +793,9 @@ local function grindTrip()
       H.assertEq(expOf(LOCKE) >= EXP_TARGET, true,
         string.format("the grind reached its experience target in %d laps " ..
           "(LOCKE %d of %d)", grindLaps, expOf(LOCKE), EXP_TARGET))
+      H.assertEq(gil() >= GIL_TARGET, true,
+        string.format("the grind paid for the town's whole shopping list " ..
+          "(%d of %d gil)", gil(), GIL_TARGET))
     end),
     -- back in at (86,111) -> map 75 (1,28)
     H.worldNavTo(86, 111, { maxFrames = 40000, playBattles = "tactical",
