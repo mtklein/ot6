@@ -402,10 +402,11 @@ H.run({ maxFrames = 400000 }, {
         if H.frame - hb >= 600 then
           hb = H.frame
           H.log(string.format(
-            "tail f%d map=%d (%d,%d) dlg=%s ev=%s zapN=%d battN=%d",
+            "tail f%d map=%d (%d,%d) dlg=%s ev=%s zapN=%d battN=%d evpc=%02X%02X%02X",
             H.frame, map(), H.fieldX(), H.fieldY(),
             tostring(H.dialogWaiting()), tostring(H.eventRunning()),
-            zapN, battN))
+            zapN, battN,
+            H.readByte(0x00e7), H.readByte(0x00e6), H.readByte(0x00e5)))
         end
         if zapN > 0 then
           -- the morph set-piece: silence through the load, then edge-tap
@@ -476,6 +477,25 @@ H.run({ maxFrames = 400000 }, {
     H.log(string.format("[kefka_won] f%d map=%d (%d,%d)",
       H.frame, H.mapId(), H.fieldX(), H.fieldY()))
     H.screenshot("kefka_won")
+  end),
+
+  -- #84: Elixir, visible on the walk (the chest at (55,30), five tiles from
+  -- the reload spot).  Its twin Elixir at (105,14), bit 10, is in the Elder
+  -- room, which no controllable frame of this file can reach: the streets
+  -- from either Arvis door connect only to the south gate and mine 50, and
+  -- the one entrance chain onward (50 -> 49 -> 48 -> the west streets ->
+  -- the Elder door at 20 (18,22)) crosses map 49's tripwire maze
+  -- (EventTrigger::_49, twenty triggers over x=106-116 y=12-23), measured
+  -- pathless after the (112,13) trigger fires (probe_n30_chests).
+  H.openChest{ stand = { 55, 31 }, face = "up", bit = 2, what = "Elixir",
+               nav = { playBattles = "tactical" } },
+  -- back to the reload spot, approached from the north so the saved facing
+  -- stays DOWN, the way _ccc1b5's reload left it
+  H.navTo(60, 36, { playBattles = "tactical" }),
+  H.navTo(60, 37, { playBattles = "tactical" }),
+  H.call(function()
+    H.assertEq(map() == 30 and H.fieldX() == 60 and H.fieldY() == 37, true,
+      "back at {60,37} for the exit contract")
   end),
   H.saveState("kefka_won.mss"),
   H.logStep(function()

@@ -600,11 +600,16 @@ wr(109, 13, "upleft"); wr(108, 12, "left")
 wr(107, 12, "down"); wr(107, 13, "down"); wr(107, 14, "down"); wr(107, 15, "left")
 wr(106, 15, "down"); wr(106, 16, "left"); wr(105, 16, "left"); wr(104, 16, "down")
 for yy = 17, 26 do wr(104, yy, "down") end             -- (104,26) -> door (104,27)
-local function westRoomCross()
+-- stopPred: nil = the whole crossing (drive until map 221); a predicate
+-- stops the table-drive early on map 225 -- the #84 chest detour below
+-- pauses the descent at (104,16), the left chamber's floor, and a second
+-- westRoomCross() resumes the same table to the door.
+local function westRoomCross(stopPred, label)
   local hb = 0
   local fought = encounters("westRoomCross")
+  local donePred = stopPred or function() return map() == 221 end
   return H.cond(function() return true end, {
-    H.driveUntil(function() return map() == 221 end, 30000, {
+    H.driveUntil(function() return donePred() end, 30000, {
       H.call(function()
         hb = hb + 1
         if hb % 600 == 0 then
@@ -626,7 +631,7 @@ local function westRoomCross()
           H.setPad({})
         end
       end),
-    }, "west room -> (104,27) exit"),
+    }, label or "west room -> (104,27) exit"),
     H.waitUntil(settled, 2400, "W33 strip settled", 5),
     H.waitFrames(150),
     H.logStep(function() return string.format(
@@ -1312,6 +1317,21 @@ H.run({ maxFrames = 400000 }, {
   climbCare("after P17a"),
   -- P18b: cross the west room to (104,27)->221.  followPath mispredicts +
   -- HANGS on the (111,15) scene-beam here; westRoomCross rides it (see above).
+  -- #84: the clock-shelf pair (Tincture/Potion at (104,9)/(105,9)) hangs
+  -- over this crossing's x=104 descent and is reachable from no other
+  -- generator: zozo3's component BFS reads every adjacent tile NO PATH
+  -- (probe_zozo3_chests), and only this crossing's tiles see them under the
+  -- measured camera.  Pause the table-drive on the left chamber's floor,
+  -- detour up the column, then resume the same table to the door.
+  westRoomCross(function()
+    return map() == 225 and H.fieldX() == 104 and H.fieldY() == 16
+  end, "west room -> the (104,16) chest pause"),
+  H.openChest{ stand = { 104, 10 }, face = "up", bit = 239,
+               what = "Tincture", item = 0xEB,
+               nav = { playBattles = "tactical", tool = H.BIO_BLASTER } },
+  H.openChest{ stand = { 105, 10 }, face = "up", bit = 240,
+               what = "Potion", item = 0xE9,
+               nav = { playBattles = "tactical", tool = H.BIO_BLASTER } },
   westRoomCross(),
   climbCare("after the west room"),
   followPath(18, 33, { maxFrames = 12000 }),

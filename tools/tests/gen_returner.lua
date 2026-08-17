@@ -293,6 +293,16 @@ H.run({ maxFrames = 220000 }, {
     H.assertEq(H.fieldX(), 8, "landed at x=8 on shelf A")
     H.assertEq(H.fieldY(), 48, "landed at y=48 on shelf A")
   end),
+  -- #84: the Tent chest at (8,52), visible on the walk down shelf A.  The
+  -- shelf's only entrance is the (8,48) landing above (short_entrance.dat),
+  -- so this generator is the one that can open it honestly; gen_kolts_cave
+  -- never crosses Vargas's ledge and cannot reach it.  The stand tile is
+  -- planned off (7,48) first, the same entrance hazard the (17,59) plan
+  -- below avoids.
+  planAvoids(8, 53, { { 7, 48 } }, "shelf A -> the Tent chest"),
+  H.openChest{ stand = { 8, 53 }, face = "up", bit = 40, what = "Tent",
+               nav = { playBattles = true } },
+  care("after the Tent chest"),
   -- (7,48) is one tile west and goes straight back to map 98
   planAvoids(17, 59, { { 7, 48 } }, "shelf A -> the north door"),
   crossTo(17, 59, 101, "M2 shelf A -> map 101, the north gatehouse"),

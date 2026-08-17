@@ -3,7 +3,9 @@
 -- "She's up there!" guard scene at (38,8) (_cca279: guards surround,
 -- posture, and leave; a cutscene with no input needed), continue to the
 -- mine mouth at (26,8) -> map 50 (mines chase map) at (78,58), and generate
--- mines_chase.mss at the first calm tile inside.  Then north through the
+-- mines_chase.mss at the first calm tile inside.  Then open the two map-50
+-- chests visible from the walk (#84): the Fenix Down at (65,28) and the
+-- Sleeping Bag at (52,33), each from the tile below.  Then north through the
 -- mines, clearing random encounters and logging their species, to
 -- (55,12), one tile short of the trigger at (55,11) that starts the
 -- bridge-collapse -> Kefka flashback -> Moogle-defense chain (a
@@ -98,6 +100,15 @@ H.run({ maxFrames = 50000 }, {
     H.screenshot("mines_chase")
   end),
   H.saveState("mines_chase.mss"),
+
+  -- #84: Fenix Down, visible on the walk
+  H.openChest{ stand = { 65, 29 }, face = "up", bit = 11,
+               what = "Fenix Down", item = 0xF0,
+               nav = { playBattles = true } },
+  -- #84: Sleeping Bag, visible on the walk
+  H.openChest{ stand = { 52, 34 }, face = "up", bit = 12,
+               what = "Sleeping Bag",
+               nav = { playBattles = true } },
 
   -- north to one tile short of the collapse trigger at (55,11).  Guards
   -- chase through this map (vanilla: mobile NPCs whose touch fires a

@@ -31,6 +31,11 @@
 -- encounters are run from with held L+R and no state writes; the old
 -- danger-counter suppression is gone), the settle, and the tail that checks
 -- an encounter does fire.
+--
+-- Since #84 the walk also opens the mountain's visible chests (treasure
+-- bits 37/38/39) on a circuit through shelves D/E/C and cave pockets S/Q
+-- before parking on the spawn tile; the comment above the circuit has the
+-- geography, and why bit 40's Tent is not honestly reachable from here.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local POOL = "build/states/kolts_pool.mss.lua"
@@ -65,7 +70,35 @@ local function mapChanged()
   end
 end
 
-H.run({ maxFrames = 60000 }, {
+-- #84's chest circuit needs every warp and event tile per map in an avoid
+-- list, because on this mountain nearly every arrival tile lands adjacent
+-- to another warp trigger (the bridge's return stair is one tile from its
+-- own down-ramp, shelf C's two exits are a tile apart, and so on).  navTo
+-- exempts each leg's own goal, so one list per map serves every leg on it.
+-- Tiles from short_entrance.dat/long_entrance.dat plus map 96's two
+-- glimpse-scene triggers (gen_kolts:293-294).
+local A100 = { { 7, 13 }, { 19, 17 }, { 43, 24 }, { 50, 33 }, { 34, 7 },
+               { 7, 29 }, { 9, 37 }, { 30, 52 }, { 58, 45 }, { 7, 48 },
+               { 17, 59 }, { 56, 7 }, { 31, 36 } }
+local A96  = { { 15, 21 }, { 16, 21 }, { 22, 21 }, { 16, 22 }, { 14, 12 },
+               { 15, 12 }, { 12, 8 }, { 12, 9 }, { 29, 25 }, { 25, 15 } }
+local A102 = { { 42, 50 }, { 43, 50 }, { 35, 50 }, { 50, 46 } }
+
+-- one arrival check per circuit leg: right map, and (when the arrival tile
+-- is fixed) the exact tile, so a mis-warp fails here with the tile in the
+-- message instead of five legs later
+local function at(tag, m, x, y)
+  return H.call(function()
+    H.assertEq(map(), m, tag .. ": on map " .. m)
+    where(tag)
+    if x then
+      H.assertEq(H.fieldX(), x, tag .. ": at x=" .. x)
+      H.assertEq(H.fieldY(), y, tag .. ": at y=" .. y)
+    end
+  end)
+end
+
+H.run({ maxFrames = 120000 }, {
   H.loadState(POOL),
   H.waitFrames(30),
   settleField("shelf F", 100),
@@ -82,6 +115,112 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(map(), 96, "crossed onto map 96, the Mt. Kolts cave")
     where("cave arrival")
   end),
+
+  -- ===================================================================== --
+  -- #84: the route's visible Mt. Kolts chests.  Region P and shelf F hold
+  -- none of them: the Atlas Armlet sits on ledge E off shelf D, the
+  -- Guardian in cave pocket S off D, and the Tent in cave pocket Q off
+  -- shelf C, so a player who walks over to them makes the mountain's chest
+  -- circuit: P -> D -> E -> D -> S -> D -> R -> the bridge (102) -> C -> Q
+  -- and back the same way (the bridge's (50,46) stair is the one link back
+  -- up, long_entrance.dat map 102).  Warp graph decoded from
+  -- short_entrance.dat/long_entrance.dat; gen_kolts:1571-1593 names the
+  -- shelves.  Dry-walked end to end before landing here
+  -- (probe_kolts_cave_circuit, 2026-08-17: ~8100 frames, three fled
+  -- encounters, all three bits set).  Maps 96 and 97 are duplicate cave
+  -- copies sharing treasure bits 37/38; this walk crosses only 96, and
+  -- H.openChest is idempotent on the bit, so 97's twins are covered.
+  -- The fourth chest the measurement lists for map 100, the Tent at
+  -- (8,52) bit 40, is on shelf A, and shelf A's only entrance is map 98's
+  -- (23,32) exit -- past VARGAS (gen_kolts:1586-1589).  No point of this
+  -- generator's walk can reach it honestly, so it is not opened here.
+
+  -- P -> shelf D
+  H.navTo(22, 21, { maxFrames = 20000, playBattles = "flee", avoid = A96,
+           arrive = mapChanged() }),
+  H.release(), settleField("shelf D", 100), at("shelf D", 100, 44, 24),
+
+  -- D -> ledge E, a same-map warp ((56,7) -> (30,36)), so the arrive
+  -- predicate keys on the x jump rather than a map change
+  H.navTo(56, 7, { maxFrames = 25000, playBattles = "flee", avoid = A100,
+           arrive = function() return H.fieldX() <= 32 end }),
+  H.release(), settleField("ledge E", 100), at("ledge E", 100, 30, 36),
+  -- #84: Atlas Armlet, visible on the walk
+  H.openChest{ stand = { 30, 34 }, face = "up", bit = 39,
+               what = "Atlas Armlet",
+               nav = { playBattles = "flee", avoid = A100 } },
+
+  -- E -> D (the same warp pair, back: (31,36) -> (57,7))
+  H.navTo(31, 36, { maxFrames = 15000, playBattles = "flee", avoid = A100,
+           arrive = function() return H.fieldX() >= 50 end }),
+  H.release(), settleField("D again", 100), at("D again", 100, 57, 7),
+
+  -- D -> cave pocket S
+  H.navTo(50, 33, { maxFrames = 25000, playBattles = "flee", avoid = A100,
+           arrive = mapChanged() }),
+  H.release(), settleField("cave S", 96), at("cave S", 96, 28, 25),
+  -- #84: Guardian, visible on the walk.  The chest hangs one tile south of
+  -- the arrival, so it is opened from above, facing down.
+  H.openChest{ stand = { 28, 26 }, face = "down", bit = 38, what = "Guardian",
+               nav = { playBattles = "flee", avoid = A96 } },
+
+  -- S -> D
+  H.navTo(29, 25, { maxFrames = 15000, playBattles = "flee", avoid = A96,
+           arrive = mapChanged() }),
+  H.release(), settleField("D third", 100), at("D third", 100, 51, 33),
+
+  -- D -> cave R.  R's arrival tile (14,12) is the second glimpse trigger,
+  -- so the settle plays that scene out; no exact-tile assert because the
+  -- scene can nudge the party.
+  H.navTo(34, 7, { maxFrames = 25000, playBattles = "flee", avoid = A100,
+           arrive = mapChanged() }),
+  H.release(), settleField("cave R", 96, 24000), at("cave R", 96),
+
+  -- R -> the bridge (the long entrance at (12,8))
+  H.navTo(12, 8, { maxFrames = 20000, playBattles = "flee", avoid = A96,
+           arrive = mapChanged() }),
+  H.release(), settleField("bridge", 102), at("bridge", 102, 51, 46),
+
+  -- bridge -> shelf C
+  H.navTo(43, 50, { maxFrames = 20000, playBattles = "flee", avoid = A102,
+           arrive = mapChanged() }),
+  H.release(), settleField("shelf C", 100), at("shelf C", 100, 6, 29),
+
+  -- C -> cave pocket Q
+  H.navTo(9, 37, { maxFrames = 20000, playBattles = "flee", avoid = A100,
+           arrive = mapChanged() }),
+  H.release(), settleField("cave Q", 96), at("cave Q", 96, 25, 16),
+  -- #84: Tent, visible on the walk
+  H.openChest{ stand = { 27, 15 }, face = "up", bit = 37, what = "Tent",
+               nav = { playBattles = "flee", avoid = A96 } },
+
+  -- Q -> C
+  H.navTo(25, 15, { maxFrames = 15000, playBattles = "flee", avoid = A96,
+           arrive = mapChanged() }),
+  H.release(), settleField("C second", 100), at("C second", 100, 9, 36),
+
+  -- C -> the bridge
+  H.navTo(7, 29, { maxFrames = 20000, playBattles = "flee", avoid = A100,
+           arrive = mapChanged() }),
+  H.release(), settleField("bridge second", 102),
+  at("bridge second", 102, 43, 51),
+
+  -- bridge -> R, up the (50,46) stair
+  H.navTo(50, 46, { maxFrames = 20000, playBattles = "flee", avoid = A102,
+           arrive = mapChanged() }),
+  H.release(), settleField("R second", 96), at("R second", 96, 11, 8),
+
+  -- R -> D
+  H.navTo(15, 12, { maxFrames = 20000, playBattles = "flee", avoid = A96,
+           arrive = mapChanged() }),
+  H.release(), settleField("D fourth", 100), at("D fourth", 100, 35, 7),
+
+  -- D -> P.  The return lands on (21,21), P's other arrival tile, and the
+  -- existing off-trigger step below walks the last stretch to (18,22).
+  H.navTo(43, 24, { maxFrames = 25000, playBattles = "flee", avoid = A100,
+           arrive = mapChanged() }),
+  H.release(), settleField("P return", 96), at("P return", 96, 21, 21),
+  -- ===================================================================== --
 
   -- Step off the trigger before saving.  The crossing lands on (16,22),
   -- and that tile is one of the two event triggers that open each Kolts
@@ -102,6 +241,10 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldY(), 22, "spawn tile is (18,22), not the trigger")
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(H.tileAligned(), true, "tile-aligned")
+    -- #84: the fixture ships with the circuit's three treasure bits set
+    H.assertEq(H.chestOpen(37), true, "Tent bit 37 open (cave Q)")
+    H.assertEq(H.chestOpen(38), true, "Guardian bit 38 open (cave S)")
+    H.assertEq(H.chestOpen(39), true, "Atlas Armlet bit 39 open (ledge E)")
     H.log(string.format("[kolts_cave] danger counter at generation: %04X (unrigged -- "
       .. "whatever the walk accumulated)", H.readWord(0x1f6e)))
     where("cave spawn")

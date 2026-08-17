@@ -578,6 +578,15 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(invCount(0xA3), 1, "NoiseBlaster bought")
     where("shop done")
   end),
+  -- #84: the alcove's two chests, visible from this room and reachable only
+  -- here -- the alcove is a closed room whose one way in is the D4 door
+  -- (probe_fig59_chests: every stand tile is NO PATH from any other map-59
+  -- walk; the visibility union had mis-credited these to gen_zozo2_arrival
+  -- through audit_chests' crossDoor blind spot).
+  H.openChest{ stand = { 43, 13 }, face = "up", bit = 14, what = "Tonic",
+               item = 0xE8 },
+  H.openChest{ stand = { 44, 13 }, face = "up", bit = 15, what = "Antidote",
+               item = 0xF2 },
   crossDoor(44, 19, 59, 32, 23, "D5 shop alcove -> throne hall"),
 
   -- ==================================================================== --

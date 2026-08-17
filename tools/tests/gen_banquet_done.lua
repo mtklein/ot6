@@ -917,6 +917,35 @@ local steps = {
   -- ---- 8. out of the castle, out of Vector ----------------------------------
   H.stepOff({ "down", "left", "right" }, 2400,
     "off the messenger trigger tile"),
+
+  -- #84: the corridor alcove's two chests, visible on the walk.  The alcove
+  -- (24..25, 48..53) is its own walking component, entered by the same-map
+  -- door (15,21) -> (24,52) and left by (24,53) -> (15,23) (the
+  -- ShortEntrance decode; probe_chest250 walked the round trip and measured
+  -- the stand tiles at 3 and 4 steps from the landing).  The pickups run
+  -- here, after the messenger, because the timer expired at the dinner and
+  -- frames are free; the window circuit itself is timed.
+  H.navTo(15, 22, { maxFrames = 9000, playBattles = "flee" }),
+  pressWalk("up", function()
+    return H.fieldY() >= 45 and H.tileAligned()
+  end, 900, "held UP onto (15,21) -> the chest alcove (24,52)"),
+  H.release(),
+  H.waitUntil(landed(250, 10), 2400, "the chest alcove", 1),
+  -- #84: Back Guard, visible on the walk
+  H.openChest{ stand = { 24, 49 }, face = "up", bit = 77,
+               what = "Back Guard",
+               nav = { playBattles = "flee" } },
+  -- #84: X-Potion, visible on the walk
+  H.openChest{ stand = { 25, 49 }, face = "up", bit = 78,
+               what = "X-Potion",
+               nav = { playBattles = "flee" } },
+  H.navTo(24, 52, { maxFrames = 3000, playBattles = "flee" }),
+  pressWalk("down", function()
+    return H.fieldY() <= 30 and H.tileAligned()
+  end, 900, "held DOWN onto (24,53) -> back to the corridor (15,23)"),
+  H.release(),
+  H.waitUntil(landed(250, 10), 2400, "back in the corridor", 1),
+
   H.navTo(23, 33, { maxFrames = 20000, playBattles = "flee" }),
   pressWalk("down", function() return map() == 243 end, 1200,
     "door 250 (22..24,34) -> 243 (15,10)"),

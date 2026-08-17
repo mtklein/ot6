@@ -141,6 +141,14 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("mrf_facility")
   end),
 
+  -- #84: Break Blade, visible on the walk (map 271's one chest, bit 94 at
+  -- (8,37); probe_chest271 measured the stand tiles from the (31,28)
+  -- landing: (8,38) below it 33 steps, (9,37) beside it 31, and the (3,27)
+  -- exit stays reachable at 37).
+  H.openChest{ stand = { 8, 38 }, face = "up", bit = 94,
+               what = "Break Blade",
+               nav = { playBattles = "flee" } },
+
   -- 271 {3,27} -> 273 {30,60}
   H.navTo(3, 27, { maxFrames = 25000, playBattles = "flee", arrive = function() return map() == 273 end }),
   H.waitUntil(function() return map() == 273 and settled() end, 6000,

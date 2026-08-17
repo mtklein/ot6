@@ -741,7 +741,7 @@ local EXP_TARGET = 2250
 -- item top-up's variable Tonic line; at the measured 400-800 gil a lap the
 -- floor costs one or two extra laps, whose experience (about 115 a lap)
 -- stays well inside the level-11 boundary the EXP_TARGET comment derives.
-local GIL_TARGET = 8000
+local GIL_TARGET = 8300   -- +250: the second Plumed Hat (#84 wave)
 local grindLaps = 0
 local function grindDone()
   return expOf(LOCKE) >= EXP_TARGET and gil() >= GIL_TARGET
@@ -1160,7 +1160,7 @@ local function gearTrip()
     enterDoor(35, 19, 77, "armor shop"),
     counterShop(114, 12, "shop 6 (armor)"),
     buyTo(HEAVYSHLD, 1, 2, 400, "HEAVY SHLD to 2"),
-    buyTo(PLUMEDHAT, 3, 1, 250, "PLUMED HAT to 1"),
+    buyTo(PLUMEDHAT, 3, 2, 250, "PLUMED HAT to 2 -- one per scenario order, the Heavy Shld precedent: the Locke lineage wears one onto a head before the split hands the bag to SABIN's train"),
     closeShop(77, "shop 6"),
     leaveDoor(114, 16, "shop 6"),
     H.call(function()
@@ -1168,8 +1168,10 @@ local function gearTrip()
         "the MithrilBlade is in the bag")
       H.assertEq(invCount(HEAVYSHLD) >= 2, true,
         "two Heavy Shlds cover both scenario orders")
-      H.assertEq(invCount(PLUMEDHAT) >= 1, true,
-        "the Plumed Hat covers SHADOW in either scenario order")
+      H.assertEq(invCount(PLUMEDHAT) >= 2, true,
+        "two Plumed Hats cover SHADOW in either scenario order (#84 wave: "
+        .. "one hat was worn by the Locke lineage and s2_train found the bag "
+        .. "empty)")
       H.assertEq(invCount(MITHRILKNIFE) >= 1, true,
         "a spare MithrilKnife is in the bag -- nobody wears it here; it is " ..
         "LOCKE's second PIERCE weapon at TunnelArmr, past the split")

@@ -696,6 +696,14 @@ H.run({ maxFrames = 350000 }, {
       H.maptile(4, 15), H.readByte(0x7E7600 + H.maptile(4, 15))))
   end),
 
+  -- #84: Tonic, visible on the walk.  Map 86's (15,10) chest sits in this
+  -- same house the grandson guards; the celes walk never enters this room
+  -- (its map-86 tiles are the passage and the rich man's house), so the
+  -- pickup lives here rather than in gen_celes.
+  H.openChest{ stand = { 15, 11 }, face = "up", bit = 30, what = "Tonic",
+               item = 0xE8,
+               nav = { playBattles = true } },
+
   go(4, 15, 86, 7, 51, "E4 map 86 (4,15) -> (7,51) [the secret passage]"),
   H.call(function()
     H.assertEq(map(), 86, "still map 86 -- the passage is a same-map warp")

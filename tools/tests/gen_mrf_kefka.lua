@@ -161,6 +161,18 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("mrf_263"))
   end),
 
+  -- #84: map 263's three visible chests, opened in the pre-ride window --
+  -- the only honest access.  probe_mrf263_chests measured the map as two
+  -- components joined only by the scripted {24,18} ride: from this boot all
+  -- three stands path clean of every scripted tile (44/69/62 steps), while
+  -- gen_ifrit_entry's post-Kefka component reaches none of them.
+  H.openChest{ stand = { 15, 55 }, face = "left", bit = 89,
+               what = "Gold Helmet", nav = { playBattles = "flee" } },
+  H.openChest{ stand = { 33, 57 }, face = "left", bit = 93,
+               what = "Gold Armor", nav = { playBattles = "flee" } },
+  H.openChest{ stand = { 43, 46 }, face = "left", bit = 92,
+               what = "Tent", nav = { playBattles = "flee" } },
+
   -- 1. two steps east onto {24,18} -> the ride -> {40,30}
   H.navTo(23, 18, { maxFrames = 12000, playBattles = "flee" }),
   tapInto("right", function() return H.fieldX() == 40 and H.fieldY() == 30 end,

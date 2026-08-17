@@ -214,6 +214,13 @@ H.run({ maxFrames = 250000 }, {
       H.fieldX(), H.fieldY(), sw(0x0331), sw(0x0340)))
   end),
 
+  -- #84: Tincture, visible on the walk (map 209's one chest, bit 66 at
+  -- (125,11); probe_chest209 measured the stand tile: only (125,12) below
+  -- it is reachable, 14 steps from the park tile).
+  H.openChest{ stand = { 125, 12 }, face = "up", bit = 66,
+               what = "Tincture", item = 0xEB,
+               nav = { playBattles = true } },
+
   -- 4. up to {117,20}, directly below the IMPRESARIO ({117,19}); face UP.
   H.navTo(117, 20, { maxFrames=12000, playBattles=true }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(6),

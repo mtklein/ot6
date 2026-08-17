@@ -166,6 +166,18 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("mrf_chute"))
   end),
 
+  -- #84: the boot component's two visible chests, opened BEFORE the one-way
+  -- conveyor (probe_mrf262_chests: both NO PATH from the far side).  The
+  -- Gold Shld is opened from above, facing down -- its only reachable stand.
+  H.openChest{ stand = { 7, 45 }, face = "up", bit = 84,
+               what = "X-Potion", nav = { playBattles = "flee" } },
+  -- Gold Shld bit 86 (14,53): NOT opened -- pending investigation.  Its
+  -- only reachable stand is (14,52) face down, the same shape sfigaro's
+  -- Eyedrop opens with, but 6000 frames of clean A-edges never raise a
+  -- dialog (the run's own timeout).  The screenshot shows the chest present;
+  -- something eats the interaction (an object gate?), and the wave's rule is
+  -- evidence before force.
+
   -- 1. one right step onto {11,45} -> the conveyor -> {20,45}
   tapInto("right", function() return H.fieldX() == 20 and H.fieldY() == 45 end,
     9000, "RIGHT onto the {11,45} conveyor -> (20,45)"),
@@ -186,6 +198,16 @@ H.run({ maxFrames = 60000 }, {
     })
     H.screenshot("mrf_conveyor")
   end),
+
+  -- #84: the far component's two visible chests, including the ThunderBlade
+  -- HANDOFF has always named as the route's walked-past weapon.  The
+  -- Tincture at (17,27) is NOT here: all four of its stands read NO PATH
+  -- from every foothold (upper floor, boot, post-conveyor) -- visible only
+  -- mid-ride, the Flame Sabre case -- recorded as a rule exception.
+  H.openChest{ stand = { 25, 45 }, face = "up", bit = 87,
+               what = "ThunderBlade", nav = { playBattles = "flee" } },
+  H.openChest{ stand = { 24, 52 }, face = "right", bit = 85,
+               what = "Remedy", item = 0xF5, nav = { playBattles = "flee" } },
 
   -- 2. across to {22,52} and one tapped DOWN onto {22,53} -> map 263
   H.navTo(22, 52, { maxFrames = 40000, playBattles = "flee",

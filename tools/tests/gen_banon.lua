@@ -548,6 +548,11 @@ H.run({ maxFrames = 320000 }, {
     H.screenshot("banon_escorted")
   end),
 
+  -- #84: Green Cherry, visible on the walk (the escort ends at (22,21),
+  -- four tiles from it)
+  H.openChest{ stand = {26, 22}, face = "up", bit = 41, what = "Green Cherry",
+               nav = { playBattles = "tactical" } },
+
   -- ===================================================================== --
   -- PHASE 2: THE SPEECH.  Door C is the only way to Banon's half of map
   -- 110, and it is a door tile, so it is staged rather than planned through.
@@ -597,6 +602,11 @@ H.run({ maxFrames = 320000 }, {
   rideTo(function() return sw(0x015A) == 1 end, "locke done"),
   H.call(function() H.assertEq(sw(0x015A), 1, "$015A set (LOCKE)") end),
 
+  -- #84: Fenix Down, visible on the walk (the west room's chest, one tile
+  -- from LOCKE)
+  H.openChest{ stand = {28, 50}, face = "up", bit = 42, what = "Fenix Down",
+               item = 0xF0, nav = { playBattles = "tactical" } },
+
   -- west room -> map 109 by the floor-tile door (22,54)
   crossTo(22, 54, 109, "H3 map 110 WEST -> map 109 (for SABIN)"),
   talkToObj(19, "SABIN ($015B)"),
@@ -611,6 +621,11 @@ H.run({ maxFrames = 320000 }, {
     H.assertEq(sw(0x015C), 1, "$015C set (EDGAR)")
     where("three of three")
   end),
+
+  -- #84: Potion, visible on the walk (the east half's chest, three tiles
+  -- from EDGAR; this is the last time the route stands in the east)
+  H.openChest{ stand = {55, 49}, face = "up", bit = 48, what = "Potion",
+               item = 0xE9, nav = { playBattles = "tactical" } },
 
   -- ===================================================================== --
   -- Phase 4: the greeter unlocks Banon.  With all three set, _caf68a's

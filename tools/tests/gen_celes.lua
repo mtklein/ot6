@@ -475,6 +475,13 @@ H.run({ maxFrames = 150000 }, {
   -- house (map 86 (6,36)); its (8,25) door returns to occupied town.
   -- ===================================================================== --
   go(3, 53, 86, 6, 36, "P1 passage (3,53) -> rich house (6,36)"),
+
+  -- #84: Elixir, visible on the walk from the (6,36) landing to the (8,25)
+  -- door.  Bit 31 is map 86's second chest; the audit lists no item assert
+  -- for it here (Elixirs have no id verified elsewhere in this tree).
+  H.openChest{ stand = { 7, 32 }, face = "up", bit = 31, what = "Elixir",
+               nav = { playBattles = true } },
+
   go(8, 25, 75, 22, 13, "P2 rich house (8,25) -> town (22,13)"),
 
   -- ===================================================================== --

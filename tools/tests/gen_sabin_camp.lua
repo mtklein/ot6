@@ -3,6 +3,10 @@
 --   camp_intro.mss  map 117 at (36,2), SABIN + SHADOW, controllable, with
 --                   $02E2 set so the gate cutscene cannot re-fire
 --
+-- The #84 chest rule adds one pickup on the way out: the Star Pendant at
+-- (45,5), which sits behind the sealed-chest gag until the gag is played
+-- (the step-3 comment below has the mechanism).
+--
 -- Walking one tile south hands the game to CYAN, on another map, for ~9,000
 -- frames.  That is the whole content of this step, and it is not what the
 -- route map suggests.  Stepping from the camp gate onto (36,3) fires
@@ -201,11 +205,14 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- No `choice` exists anywhere on this step -- map 117's only prompt is the
--- sealed-chest gag _cb0dbe (:40058) on obj 29 at {45,5}, which the route
--- never touches, and map 120 has none at all.  CHOICES stays empty so an
--- unexpected prompt is a hard failure rather than a blind A-press.
-local CHOICES = {}
+-- Map 117's only prompt is the sealed-chest gag _cb0dbe (:40058) on obj 29
+-- at {45,5}, and the #84 chest pickup below now fires it ON PURPOSE: the
+-- route answers option 0 (Kick it), the branch whose tail deletes the NPC
+-- covering the treasure record (see the pickup's own comment).  One entry
+-- per kick attempt, because a retry reloads a checkpoint from before the
+-- prompt and replays it.  Map 120 still has no prompt at all, and any
+-- prompt beyond these stays a hard failure rather than a blind A-press.
+local CHOICES = { { want = 0 }, { want = 0 } }
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
@@ -597,7 +604,7 @@ local function cmdAttempt(n)
   }, {})
 end
 
-H.run({ maxFrames = 120000 }, {
+H.run({ maxFrames = 150000 }, {  -- the #84 chest pickup rides on the end
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -680,6 +687,87 @@ H.run({ maxFrames = 120000 }, {
   H.navTo(36, 5, { maxFrames = 4000, playBattles = "tactical" }),
   rideUntil(landedField(117, 10), "camp control settled off the trigger", 6000),
   H.waitFrames(30),
+
+  -- ==================================================================== --
+  -- 3. #84: the Star Pendant chest at (45,5), visible on this walk.  The
+  -- treasure record (bit 50) is covered by an NPC standing on the chest
+  -- tile: obj 29 (NPC_14 in npc_prop.asm ::_117, {45,5}, event bit $04EE),
+  -- stood up when the commander scene set $04EE=1 (:40027).  CheckNPCs runs
+  -- before CheckTreasure (field/player.asm:515-516), so while the NPC is
+  -- there an A-press gets the sealed-chest gag _cb0dbe (:40058) -- a
+  -- three-way prompt -- and the treasure can never answer.  Option 0
+  -- (Kick it, _cb0dcc) is taken: its tail is `switch $04EE=0 / delete_obj
+  -- NPC_14` (:40113-40115), which uncovers the record, and the kick
+  -- animation returns the party to the tile it interacted from (DOWN 2,
+  -- then jump_high UP 2), so the chest is opened from where the party
+  -- already stands.  (Option 1, Hit it, also deletes the NPC but ends on a
+  -- jump_low ledge drop below the chest.)  The branch fights battle 42
+  -- (group 42 = formation 62/46, two-three Dobermans) followed by the
+  -- _ca5ea9 GameOver gate (:40098-40099); it is fought for real by the
+  -- same rideUntil fighter as the commander, and a loss reloads a
+  -- checkpoint taken here at (36,5) -- one retry, second CHOICES entry --
+  -- rather than timing out at the parked event PC.
+  -- ==================================================================== --
+  (function()
+    local ckReq, chestBlob
+    local function kickAttempt(n)
+      return H.cond(function() return sw(0x04EE) == 1 and lost == nil end, {
+        H.call(function() lost, fightTier = nil, n end),
+        talkToObj(29, "the sealed-chest gag (_cb0dbe, Kick it -> battle 42)",
+          20000),
+        rideUntil(function()
+          return lost ~= nil
+             or (sw(0x04EE) == 0 and map() == 117 and H.hasControl()
+                 and H.tileAligned() and bright() >= 15 and not inBattle())
+        end, "the kicked chest settled (attempt " .. n .. ")", 20000),
+        H.release(),
+        H.waitFrames(30),
+      }, {})
+    end
+    local ldReq
+    return seq({
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "chest checkpoint")
+        chestBlob = ckReq.blob
+        H.log(string.format("camp: chest checkpoint captured (%d bytes) " ..
+          "at f%d", #chestBlob, H.frame))
+      end),
+      kickAttempt(1),
+      H.cond(function() return lost ~= nil end, {
+        H.logStep(function()
+          return string.format("camp: chest ATTEMPT 2 -- reloading after " ..
+            "a loss (%s)", tostring(lost))
+        end),
+        H.call(function() ldReq = H.requestLoadState(chestBlob) end),
+        H.waitFrames(2),
+        H.call(function() H.checkReq(ldReq, "chest attempt 2: reload") end),
+        H.waitFrames(77),               -- the stagger shifts every later roll
+        H.call(function() lost = nil end),
+        kickAttempt(2),
+      }, {}),
+      H.call(function()
+        if lost ~= nil or sw(0x04EE) == 1 then
+          error(string.format("camp: the chest-kick sentry fight (battle " ..
+            "42) was lost on both attempts -- last loss: %s -- the " ..
+            "per-attempt numbers above are the balance finding " ..
+            "(#74-style); do not rig this segment", tostring(lost)), 0)
+        end
+      end),
+    })
+  end)(),
+  -- #84: Star Pendant, visible on the walk
+  H.openChest{ stand = { 45, 6 }, face = "up", bit = 50,
+               what = "Star Pendant", item = 0xB1,
+               nav = { playBattles = "tactical" } },
+  -- Back to (36,5), the tile camp_intro has always saved on, so the next
+  -- step's walk starts where it always did.
+  H.navTo(36, 5, { maxFrames = 6000, playBattles = "tactical" }),
+  rideUntil(landedField(117, 10), "back at (36,5) with the chest opened",
+    6000),
+  H.waitFrames(30),
+
   H.call(function()
     H.assertEq(map(), 117, "map 117 -- back in the Imperial Camp")
     H.assertEq(H.hasControl(), true, "controllable")
@@ -695,6 +783,9 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(sw(0x02E2), 1, "$02E2 set -- the gate tiles are inert now")
     H.assertEq(sw(0x002B), 0, "$002B clear -- the LEO scene is still ahead")
     H.assertEq(sw(0x0044), 0, "$0044 clear -- the scenario is not done")
+    H.assertEq(H.chestOpen(50), true,
+      "#84: the Star Pendant chest (bit 50) is opened")
+    H.assertEq(sw(0x04EE), 0, "$04EE clear -- the gag NPC is off the chest")
     H.log("[camp] battles seen: " .. table.concat(battles, " "))
     for c = 0, 15 do
       if inParty(c) then

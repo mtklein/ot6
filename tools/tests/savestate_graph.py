@@ -118,7 +118,10 @@ STATES = [
     # at 93.75% of draws: the mountain's most common fight, and the one the
     # trash-weakness pass is built around.  kolts_pool cannot draw it, so it
     # needs its own.
-    S("kolts_cave", gen="gen_kolts_cave", prev="kolts_pool"),
+    # timeout=1800: since the #84 chest circuit (shelves D/E/C, cave pockets
+    # S/Q, and back) the run walks well past run.sh's 600 s default on a
+    # loaded machine, same as gen_kolts above.
+    S("kolts_cave", gen="gen_kolts_cave", prev="kolts_pool", timeout=1800),
     # gen_vargas: the fight itself, finished by Pummel, and the reunion
     S("vargas_won", gen="gen_vargas", prev="vargas_entry"),
 
