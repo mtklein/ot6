@@ -1411,6 +1411,68 @@ H.run({ maxFrames = 700000 }, {
     return string.format("south_figaro generated at frame %d", H.frame)
   end),
 
+  -- The town's seven visible chests (#84), all on map 75, opened in walk
+  -- order from the gate toward the item shop door at (44,32).  Maps 75/85
+  -- have no encounters, so every pickup walk matches the neighbouring navTo
+  -- calls (playBattles="flee") and avoids the same short entrances the shop
+  -- walk does.  Every stand/face pair below was measured from south_figaro
+  -- in probe_kolts_chests.lua before it was inserted here; stand-below-face-
+  -- up only holds for three of the seven, because South Figaro shelves its
+  -- chests: the tile below the Tonic at (6,31) and the Green Cherry at
+  -- (14,28) is not reachable (walkability dumps in the probe run), so both
+  -- open from the side.  (These pickups all run after the saveState above,
+  -- so south_figaro.mss itself does not carry the treasure bits; kolts_entry
+  -- and vargas_entry do.)
+  -- #84: Tonic, visible on the walk
+  H.openChest{ stand = {5, 31}, face = "right", bit = 24, what = "Tonic",
+               item = 0xE8, nav = { playBattles = "flee", avoid = M75_AVOID } },
+  -- #84: Green Cherry, visible on the walk
+  H.openChest{ stand = {13, 28}, face = "right", bit = 25,
+               what = "Green Cherry",
+               nav = { playBattles = "flee", avoid = M75_AVOID } },
+  -- #84: Warp Stone, visible on the walk
+  H.openChest{ stand = {11, 24}, face = "up", bit = 231, what = "Warp Stone",
+               nav = { playBattles = "flee", avoid = M75_AVOID } },
+
+  -- #84: Fenix Down, visible on the walk.  Its yard at (22..25,15..19) is
+  -- fenced off the street -- measured: BFS reaches no tile beside the chest
+  -- from the party's region -- and the way in is through the house between
+  -- them, the classic South Figaro back door: doormat (15,20), bump door up
+  -- into map 81 at (4,16); inside, (16,16) -> map 75 (23,17) opens in the
+  -- yard (short_entrance.dat maps 75/81).  The interior walks avoid the
+  -- house's other exit tile so a shortest path cannot warp out early.
+  enterDoor(15, 20, 81, "chest yard house"),
+  H.navTo(16, 15, { maxFrames = 20000, playBattles = "flee",
+                    avoid = { { 4, 17 }, { 16, 16 } } }),
+  H.release(), H.waitFrames(20),
+  H.driveUntil(function() return map() == 75 end, 1800, {
+    H.hold({ "down" }), H.waitFrames(8),
+  }, "chest yard: out the back door onto (23,17)"),
+  H.release(),
+  settleField("chest yard", 75),
+  H.call(function()
+    H.assertEq(map(), 75, "in the chest yard, back on map 75")
+  end),
+  H.openChest{ stand = {22, 19}, face = "up", bit = 20, what = "Fenix Down",
+               item = 0xF0, nav = { playBattles = "flee" } },
+  enterDoor(23, 17, 81, "chest yard house, back through"),
+  H.navTo(4, 16, { maxFrames = 20000, playBattles = "flee",
+                   avoid = { { 16, 16 }, { 4, 17 } } }),
+  H.release(), H.waitFrames(20),
+  H.driveUntil(function() return map() == 75 end, 1800, {
+    H.hold({ "down" }), H.waitFrames(8),
+  }, "chest yard: back out to the street"),
+  H.release(),
+  settleField("back in town", 75),
+  H.call(function()
+    H.assertEq(map(), 75, "back on the street with the Fenix Down")
+  end),
+
+  -- #84: Tonic, visible on the walk (the stand/face pair probe_openchest.lua
+  -- measured)
+  H.openChest{ stand = {32, 17}, face = "up", bit = 21, what = "Tonic",
+               item = 0xE8, nav = { playBattles = "flee", avoid = M75_AVOID } },
+
   -- ===================================================================== --
   -- PHASE 3b: the item shop.  The party walks through a town on the way to a
   -- boss carrying a bag that cannot answer a death, and until now it walked
@@ -1473,6 +1535,19 @@ H.run({ maxFrames = 700000 }, {
       "the mountain is walked with real revives now")
     where("restocked")
   end),
+
+  -- The two chests in the south yard, six tiles below the relic shop's door
+  -- at (15,39), picked up on the walk to it.  They stack on one column:
+  -- Antidote at (15,45), Eyedrop at (15,47), and the tile between them,
+  -- (15,46), is the one walkable stand (the tile below the Eyedrop is not;
+  -- probe_kolts_chests.lua's walkability dump).  So both open from (15,46),
+  -- facing opposite ways.
+  -- #84: Antidote, visible on the walk
+  H.openChest{ stand = {15, 46}, face = "up", bit = 22, what = "Antidote",
+               item = 0xF2, nav = { playBattles = "flee", avoid = M75_AVOID } },
+  -- #84: Eyedrop, visible on the walk
+  H.openChest{ stand = {15, 46}, face = "down", bit = 23, what = "Eyedrop",
+               nav = { playBattles = "flee", avoid = M75_AVOID } },
 
   relicTrip(),
 
