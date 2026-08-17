@@ -26,8 +26,10 @@ replacing it. Blitz is a menu, Steal guarantees the rare at three boost pips,
 and level-ups fully restore HP and MP.
 
 Route work is on the Sealed Gate: the Narshe mission handoff, the cave, the
-Esper attack, the Imperial banquet, and the Thamasa handoff. A later release
-(v0.12) is meant to make the game playable to the end of the World of Balance.
+Esper attack, the Imperial banquet, and the Thamasa handoff. An arc of three
+small releases (v0.12 the Sealed Gate, v0.13 Thamasa, v0.14 the Floating
+Continent) is meant to make the game playable to the end of the World of
+Balance.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and how far the game is
 playable, [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design,

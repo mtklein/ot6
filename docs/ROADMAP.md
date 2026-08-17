@@ -43,10 +43,25 @@ drinking a Tonic beside a full MP pool. It also carries a Zozo z-loop
 encounter hang fix and break tuning for the opera's forced rafter chase. This
 is the pattern going forward: small, frequent, themed releases.
 
-Extending play to the end of the World of Balance is now v0.12. It needs the
-rest of the kits and espers, the wide weakness pass, and route and tuning work
-through the Sealed Gate, Thamasa and the Floating Continent, which is more than
-one release of work.
+Extending play to the end of the World of Balance is an **arc of three small
+releases**, not one big one (restructured 2026-08-16, keeping the
+small-frequent-releases pattern):
+
+- **v0.12 — The Sealed Gate**: Terra's return through the Narshe mission
+  handoff, the cave, the Esper attack on Vector, the Imperial banquet, and the
+  voyage to the Crescent Island landing. The route already reaches
+  `banquet_done` honestly; what remains is the enabling tooling, the
+  chest-policy baseline, the voyage routing, and the stretch's weakness
+  authoring and tuning.
+- **v0.13 — Thamasa**: Strago and Relm join with the curated-kit machinery
+  (learn many, equip few), the burning house and FlameEater, Ultros ③, and
+  Kefka's massacre with Leo playable, ending at the repaired Blackjack.
+- **v0.14 — The Floating Continent**: the IAF gauntlet, the Floating
+  Continent, AtmaWeapon, and the escape into the World of Ruin landing. Tier 6
+  is reached here.
+
+Each release still needs its share of the kits, espers, and the wide weakness
+pass — that spread is the point of the arc.
 
 **On versions:** 0.9 is followed by 0.10, not 1.0; these are ordinary
 increments, not a countdown. 1.0 is a long way off: the end of the World of
@@ -61,6 +76,11 @@ make that the better release.
 **Design canon:** on damage verbs boost multiplies; on chance verbs
 boost guarantees. Steal ships it (3 BP = a guaranteed steal of the rare);
 Dance / Sketch / Slot / Rage inherit it when their characters arrive.
+Two owner rulings from the arc replan (2026-08-16): **the vanilla Sketch bug
+is preserved untouched** — unboosted Sketch keeps its original roll and its
+original bug, ruins left standing, neither fixed nor designed onto (#123) —
+and **the Floating Continent escape waits for Shadow**: the humane line is
+the routed canon (#121).
 
 **Release discipline:** every distributable is built through `make patch`,
 which refuses any ROM the test suite has not stamped green. The human bar
