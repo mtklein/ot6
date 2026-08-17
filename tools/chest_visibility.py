@@ -5,18 +5,20 @@ The rule (owner, 2026-08-16, #84): if a chest is visible on the screen, a
 human walks over and opens it.  The route emulates a human, so the set of
 chests the route should open is not an editorial list -- it is a measurement:
 take the tiles the party actually stood on (the [tiles] trace lines M.run
-emits, harvested from a regen log), widen each to what the screen shows (the
-camera centers the party; the field view is 16x14 tiles, so half-extents
-+-8/+-7 -- inclusive on both sides, deliberately generous by the sliver of a
-tile at the frame's edge, because a human notices a chest sliding INTO frame),
-and intersect with the treasure table audit_chests.py already decodes.
+emits, harvested from a regen log), widen each to what the screen actually
+shows, and intersect with the treasure table audit_chests.py already decodes.
 
-Near a map border the real camera clamps and shows deeper into the map than
-the party-centered window, so this model can UNDER-report visibility for a
-path hugging a border.  That bias is safe (it never claims a human saw what
-they could not) and is noted per-chest by the nearest-approach distance: a
-chest reported not-visible at distance 9-10 is worth an eyeball before
-trusting.
+"What the screen shows" is the MEASURED camera, not a model
+(probe_chestcam.lua, 2026-08-16): with the party at pixel (px,py) the live
+BG1 scroll reads exactly (px-112, py-112), clamped at zero on each axis, and
+the view is 256x224 -- read off $5B/$5F with the party parked mid-route, so
+the number includes whatever the engine really does.  A chest tile is
+visible from a party tile iff the chest's 16px rect overlaps that view.  The
+one remaining approximation: the far-edge clamp (scroll <= map size - view)
+is not applied because map pixel sizes are not decoded here; that clamp only
+ever shows MORE map for a party hugging a right/bottom border, so the report
+can UNDER-count visibility there -- the safe direction -- and the
+nearest-approach distances flag anything close enough to care.
 
 Usage:
   python3 tools/chest_visibility.py [--repo ROOT] LOG [LOG...]
@@ -40,7 +42,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from audit_chests import load_chests, map_titles
 
-HALF_X, HALF_Y = 8, 7        # 16x14-tile field view, party-centered
+# The measured camera (probe_chestcam.lua): scroll = party px - CAM_OFF,
+# clamped at 0; the visible rect is VIEW_W x VIEW_H from there.
+CAM_OFF_X, CAM_OFF_Y = 112, 112
+VIEW_W, VIEW_H = 256, 224
+TILE = 16
 TILES_RE = re.compile(r"\[tiles\] map=(\d+) n=\d+ xy=(\S+)")
 
 
@@ -60,21 +66,30 @@ def harvest(paths):
     return walked
 
 
+def visible_from(tx, ty, cx, cy):
+    """Is chest tile (cx,cy) inside the measured view from party tile
+    (tx,ty)?  Pixel math throughout: the party pixel is tile*16, the scroll
+    is that minus the measured offset (clamped at 0), the chest occupies its
+    full 16px tile and any overlap counts -- a sliver of chest in frame is a
+    chest a human notices."""
+    sx = max(tx * TILE - CAM_OFF_X, 0)
+    sy = max(ty * TILE - CAM_OFF_Y, 0)
+    return (cx * TILE + TILE - 1 >= sx and cx * TILE <= sx + VIEW_W - 1
+            and cy * TILE + TILE - 1 >= sy and cy * TILE <= sy + VIEW_H - 1)
+
+
 def nearest(walked, cx, cy):
-    """Chebyshev-ish nearest approach, reported per-axis-max so it compares
-    directly against the (HALF_X, HALF_Y) window."""
+    """Per-axis tile distances at the closest approach, for the report."""
     best = None
     for x, y in walked:
-        d = max(abs(cx - x) * HALF_Y, abs(cy - y) * HALF_X)  # normalized
         raw = (abs(cx - x), abs(cy - y))
-        if best is None or d < best[0]:
-            best = (d, raw)
-    return best[1] if best else (999, 999)
+        if best is None or max(raw) < max(best):
+            best = raw
+    return best if best else (999, 999)
 
 
 def visible(walked, cx, cy):
-    return any(abs(cx - x) <= HALF_X and abs(cy - y) <= HALF_Y
-               for x, y in walked)
+    return any(visible_from(x, y, cx, cy) for x, y in walked)
 
 
 def selftest():
@@ -97,10 +112,21 @@ def selftest():
     os.unlink(path)
     check("harvest unions per map", w[242], {(56, 35), (57, 36), (10, 10)})
     check("harvest keeps maps apart", w[98], {(5, 5)})
-    check("just inside the window", visible({(10, 10)}, 18, 17), True)
-    check("one past x", visible({(10, 10)}, 19, 10), False)
-    check("one past y", visible({(10, 10)}, 10, 18), False)
-    check("corner inclusive", visible({(10, 10)}, 2, 3), True)
+    # The live measurement itself (probe_chestcam, 2026-08-16): party tile
+    # (13,31) -> scroll (96,384) read off $5B/$5F, and the Flame Sabre chest
+    # (3,25) at px 48..63 x 400..415 sits left of the view.  If the formula
+    # constants drift, this is what says so.
+    check("the measured mid-chute frame excludes the Flame Sabre",
+          visible_from(13, 31, 3, 25), False)
+    # One tile changes it: from (10,32) the view starts at (48,400) and the
+    # chest's rect starts exactly there -- visible on both axes.
+    check("from (10,32) the Flame Sabre is exactly in frame",
+          visible_from(10, 32, 3, 25), True)
+    check("from (10,33) the chest row is 1px above the view",
+          visible_from(10, 33, 3, 25), False)
+    # The zero clamp: a party against the top-left corner sees the corner.
+    check("corner clamp shows tile (0,0)", visible_from(3, 3, 0, 0), True)
+    check("far chest is out", visible_from(10, 10, 40, 10), False)
 
     print("chest_visibility selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1

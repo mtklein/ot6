@@ -182,6 +182,11 @@ test: rom nomp-rom graph
 	@# measurements that validated it (map 98's recorded pool, Zozo's
 	@# pincers, the Hideout's silence) so drift fails loudly.
 	python3 tools/audit_encounters.py --selftest
+	@# The chest-visibility model (#84) stays pinned to its measured camera:
+	@# the selftest carries the probe_chestcam live read (party (13,31) ->
+	@# scroll (96,384)) as fixed cases, so a drift in the constants or the
+	@# overlap math fails here rather than mis-listing what a human can see.
+	python3 tools/chest_visibility.py --selftest
 	@# No test may WRITE emulated game state (input injection and memory
 	@# reads only).  Pre-rule violations are grandfathered in
 	@# tools/state_write_waivers.txt, a burn-down list that only shrinks;
