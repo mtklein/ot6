@@ -2540,6 +2540,49 @@ end
 -- The runner.  steps: list of step objects.  opts.maxFrames: global budget.
 local runnerStarted = false
 
+-- ---- the tile trace (#84) --------------------------------------------------
+-- Records which tiles the party actually stood on, per map, and emits them
+-- as [tiles] log lines at each map change and at run end.  Read-only: three
+-- byte-reads a frame and a log line, nothing written, so the honesty rules
+-- are untouched.  The consumer is the chest-visibility rule -- the owner's
+-- "if a chest is visible on the screen, a human walks over and opens it" --
+-- which wants the route's real walked path measured rather than reasoned;
+-- tools/chest_visibility.py harvests these lines from a regen log and
+-- intersects them with the chest table.  Samples only at tileAligned(),
+-- which is also what keeps a mid-step direction-skewed coordinate (the
+-- tileAligned comment above) out of the record; battle and menu frames
+-- re-record the frozen field tile, which the dedupe absorbs.
+local traceMap, traceSet, traceCount = nil, {}, 0
+local function traceFlush()
+  if traceMap == nil or traceCount == 0 then return end
+  local keys = {}
+  for k in pairs(traceSet) do keys[#keys + 1] = k end
+  table.sort(keys)
+  local line = {}
+  for i, k in ipairs(keys) do
+    line[#line + 1] = k
+    if #line == 120 or i == #keys then
+      M.log(string.format("[tiles] map=%d n=%d xy=%s",
+        traceMap, traceCount, table.concat(line, ",")))
+      line = {}
+    end
+  end
+  traceSet, traceCount = {}, 0
+end
+local function traceTick()
+  if not M.tileAligned() then return end
+  local m = M.mapId() & 0x1ff
+  if m ~= traceMap then
+    traceFlush()
+    traceMap = m
+  end
+  local k = M.fieldX() .. ":" .. M.fieldY()
+  if not traceSet[k] then
+    traceSet[k] = true
+    traceCount = traceCount + 1
+  end
+end
+
 function M.run(opts, steps)
   assert(not runnerStarted, "ot6.run() called twice")
   runnerStarted = true
@@ -2553,6 +2596,7 @@ function M.run(opts, steps)
     M.frame = M.frame + 1
     if M.frame > budget then
       finished = true
+      traceFlush()
       M.log("FAIL: frame budget exceeded (" .. budget .. " frames)")
       emu.stop(2)
       return
@@ -2561,18 +2605,22 @@ function M.run(opts, steps)
     -- because a route need not use one: gen_ifrit_magicite plays battle 70
     -- with its own tactical driver, and a guard hung off M.fightBattle
     -- would not see that fight at all.  Every test in the tree goes
-    -- through this one callback.
+    -- through this one callback.  The tile trace rides here for the same
+    -- reason: every walk in the tree passes this frame.
     local ok, r = pcall(function()
+      traceTick()
       local bad = M.absorbGuardTick()
       if bad then error(bad, 0) end
       return root:tick()
     end)
     if not ok then
       finished = true
+      traceFlush()
       M.log("FAIL: " .. tostring(r))
       emu.stop(1)
     elseif r == "done" then
       finished = true
+      traceFlush()
       M.log("PASS (frame " .. M.frame .. ")")
       emu.stop(0)
     end
