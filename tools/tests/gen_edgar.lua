@@ -608,7 +608,13 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(invCount(0xA4), 1, "BioBlaster carried")
     H.assertEq(invCount(0xA3), 1, "NoiseBlaster carried")
     H.assertEq(invCount(0xAA), 1, "AutoCrossbow carried")
-    H.assertEq(gil(), 3974, "gil after the two purchases")
+    -- gil: each purchase asserted its exact delta at buy time (the shop
+    -- phase's before-gil==price checks), which is the property this block
+    -- used to re-assert as the absolute 3974.  An absolute here re-encodes
+    -- the whole upstream route's encounter luck -- the #84 chest pickups
+    -- changed the mines walk, its encounter draws, and therefore the gil
+    -- that arrives -- so the absolute broke on a route change that was
+    -- correct.  The deltas own this property now.
     for c = 0, 5 do
       local base = 0x1600 + 37 * c
       H.log(string.format("char %d: actor=%02X level=%d hp=%d/%d party=%d",

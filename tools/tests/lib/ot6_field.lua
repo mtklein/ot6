@@ -2235,6 +2235,16 @@ function M.openChest(o)
   local aPh = 0
   local nav = { maxFrames = 15000, playBattles = "tactical" }
   for k, v in pairs(o.nav or {}) do nav[k] = v end
+  -- The turn is closed-loop: hold the direction until the facing byte
+  -- ($087F,y) reads back the wanted value, the rule gen_edgar's talkTo
+  -- measured (a short fixed press can fail to set the byte at all).  This
+  -- used to be a fixed 8-frame hold, and that shipped a measured failure:
+  -- gen_banon's map-109 pot at (26,21), approached rightward onto (26,22),
+  -- tapped A for 6000 frames with the turn never taken, while a probe on the
+  -- same tile that held UP until $087F read 0 opened it first try
+  -- (probe_banon_chests, 2026-08-17).  The facing tile is the chest, which
+  -- is solid, so the held direction can press but never step.
+  local FACE_VAL = { up = 0, right = 1, down = 2, left = 3 }
   return M.cond(function()
     if M.chestOpen(o.bit) then
       M.log(string.format("[chest] %s: already open (shared bit or rerun), "
@@ -2247,7 +2257,12 @@ function M.openChest(o)
     M.call(function()
       before = o.item and M.invCountOf(o.item) or nil
     end),
-    M.hold({ o.face }), M.waitFrames(8), M.release(), M.waitFrames(4),
+    M.driveUntil(function()
+      return M.readByte(0x087f + M.readWord(0x0803)) == FACE_VAL[o.face]
+    end, 300, {
+      M.call(function() M.setPad({ [o.face] = true }) end),
+    }, tag .. ": faced " .. o.face),
+    M.release(), M.waitFrames(4),
     M.driveUntil(function() return M.dialogWaiting() end, 6000, {
       M.call(function()
         aPh = (aPh + 1) % 12
