@@ -17,9 +17,32 @@ declared areas (docs/design/break-coverage-vector.md SS10.2 item 3):
     classes each member can field (item_prop_en.dat equip mask at +$01,
     16-bit, bit N = actor N, per docs/research/data-formats.md; classes from
     Ot6WeapClassTbl / Ot6SkillClassTbl in ot6_class.asm),
-  * and assert every formation has at least one break-class key
-    (Ot6ShieldTbl row's class byte, else the generated floor) that some
-    member can field.
+  * and assert every formation has a reachable chip on at least one axis:
+    a break-class key (Ot6ShieldTbl row's class byte, else the generated
+    floor) that some member can field, OR an element some body is weak to
+    (monster_prop.dat +25 OR'd with Ot6ElemAddTbl's adds, the same merge
+    Ot6SeedShields performs) that some member can deliver.
+
+The element axis is #116's fix.  The checker used to credit class keys only,
+which read Zozo as NO REACHABLE BREAK CLASS: HadesGigas, Gabbldegak,
+Harvester and SlamDancer carry Ot6ShieldTbl rows with no class key on
+purpose -- "the answer is the tool rather than the A button" (ot6_hud.asm) --
+and all four are poison-weak, opened by Edgar's Bio Blaster (item $a4 ->
+attack $7d, element $08).  Measured 2026-08-12 with probe_zozo_tool.lua:
+AutoCrossbow moved not one of the eight shields, the Bio Blaster chipped all
+four bodies on the same frame.  The model was incomplete, not the data, and
+Zozo could not be declared without turning `make test` red on a fight the
+game has an answer to.  It is declared now.
+
+"Can deliver" mirrors "can field": weapon elements (item_prop +$0F) ride the
+same equip-mask-plus-swing-command rule, tool elements ride Tools ownership
+(tool item -> attack id - $27 -> magic_prop +$01), and kit-ability elements
+(AuraBolt's holy) ride SwdTech/Blitz ownership.  Spell elements are runtime
+state -- a spell list depends on the save -- so they are NOT credited; no
+declared area needs one, and an area that ever does should declare it as
+data the way parties are declared.  Element rows are authored against
+absorb/null (the ot6_break.asm authoring rule), and the checker masks both
+off defensively so a data drift cannot credit a chip that heals.
 
 "Can field" is game-wide equippability plus command ownership.  Both halves
 are read from the same place the game reads them, the four battle-command
@@ -76,6 +99,20 @@ def class_str(mask):
     return "|".join(n for n, b in CLASS_BIT.items() if mask & b)
 
 
+# element bits, vanilla's own order.  Anchored to measured records rather
+# than to a manual: tusker weak $01 is fire, sand ray weak $82 is ice|water,
+# Bio Blaster's attack element is $08 poison, AuraBolt's is $20 holy, and
+# the ThunderBlade's weapon element is $04 bolt (all verified at load).
+ELEM_BIT = {"fire": 0x01, "ice": 0x02, "bolt": 0x04, "poison": 0x08,
+            "wind": 0x10, "holy": 0x20, "earth": 0x40, "water": 0x80}
+
+
+def elem_str(mask):
+    if mask & 0xFF == 0:
+        return "(none)"
+    return "|".join(n for n, b in ELEM_BIT.items() if mask & b)
+
+
 # actor bit = actor index (CharEquipMaskTbl is an identity table --
 # ff6/src/menu/equip.asm:2287; docs/research/data-formats.md, PINNED)
 ACTORS = ["TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES",
@@ -89,8 +126,12 @@ ACTOR_ID = {n: i for i, n in enumerate(ACTORS)}
 # appears in no row below and is credited to nobody.
 COMMAND_ABILITIES = {
     "BUSHIDO": tuple(range(0x55, 0x5D)),        # swdtech
-    "BLITZ": (0x5D, 0x5F, 0x64),
+    "BLITZ": tuple(range(0x5D, 0x65)),          # blitz
 }
+# The full id ranges, not only the classed subset the old tuple carried: a
+# lookup in skill_class filters the class side (an unclassed ability grants
+# no class), and the element side reads magic_prop for every id the command
+# resolves (AuraBolt $5e carries holy and no class row at all).
 
 # Tools are type-0 items resolved through the Tools command; their class bytes
 # live in Ot6WeapClassTbl at the item id (ot6_class.asm:149-158).
@@ -177,6 +218,26 @@ AREAS = {
             },
         ],
     },
+    # Zozo (#116).  Declarable only once the checker understood the element
+    # axis: HadesGigas, Gabbldegak, Harvester and SlamDancer carry authored
+    # no-class shield rows ("the answer is the tool rather than the A
+    # button", ot6_hud.asm) and are opened by their poison weakness through
+    # Edgar's Bio Blaster.  Party per the measured climb (HANDOFF, the Zozo
+    # crossing record).  Maps 221 and 225 are the encounter-bearing climb
+    # maps, groups 77 and 78.
+    "zozo": {
+        "doc": "ot6_hud.asm's Zozo block + HANDOFF 'Zozo is broken by an "
+               "element, not by a class'",
+        "min_formations": 8,    # groups 77+78, four formations each
+        "steps": [
+            {
+                "name": "the climb, four (LOCKE CELES EDGAR SABIN)",
+                "party": ["LOCKE", "CELES", "EDGAR", "SABIN"],
+                "maps": [221, 225],
+                "events": [],
+            },
+        ],
+    },
 }
 
 # --------------------------------------------------------------------------
@@ -194,11 +255,19 @@ HUD_ASM = "ff6/src/battle/ot6_hud.asm"
 FLOOR_INC = "ff6/src/battle/ot6_break_floor.inc"
 CHAR_PROP = "ff6/src/field/char_prop.asm"          # 22 B/actor; +2..+5 cmds
 
+MAGIC_PROP = "ff6/src/battle/magic_prop_en.dat"   # 14 B/attack; +1 element
+
 MAP_REC = 33
 ITEM_REC = 30
 FORM_REC = 15
+MAGIC_REC = 14
 N_FORMS = 576
 N_SPECIES = 384
+
+OFF_WEAP_ELEM = 0x0F      # item_prop weapon element (data-formats.md)
+OFF_ATK_ELEM = 0x01       # magic_prop attack element (data-formats.md)
+TOOL_ATK_DELTA = 0x27     # tool item id - $27 = its attack id; anchored to
+                          # ot6_break.asm's "item $a4 -> attack $7d" at load
 
 
 def _eval_expr(expr, where):
@@ -219,6 +288,7 @@ class Data:
         self.event = self._read(EVENT_GROUP)
         self.monsters = self._read(MONSTERS)
         self.items = self._read(ITEM_PROP)
+        self.magic = self._read(MAGIC_PROP)
         with open(os.path.join(root, MONSTER_NAMES), encoding="utf-8") as f:
             self.names = json.load(f)["text"]
         self.weap_class = self._parse_weap_tbl()
@@ -226,6 +296,39 @@ class Data:
         self.shield_tbl = self._parse_shield_tbl()
         self.floor = self._parse_floor()
         self.commands = self._parse_commands()
+        # The element side reads monster_prop and Ot6ElemAddTbl through
+        # check_boss_rows' Data, the checker that already owns those parses
+        # (effective_weak is the same merge Ot6SeedShields performs).
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import check_boss_rows
+        self.boss = check_boss_rows.Data(root)
+        self._check_element_anchors()
+
+    def _check_element_anchors(self):
+        """The offsets the element axis rides, proven against records the
+        source cites rather than trusted: ot6_break.asm names Bio Blaster as
+        item $a4 -> attack $7d with element $08 and AuraBolt $5e as $20, and
+        the Cranes record names the ThunderBlade $0f as bolt.  A drift in any
+        layout fails here, loudly, before a verdict is computed from it."""
+        checks = [
+            (self.attack_elem(0xA4 - TOOL_ATK_DELTA), 0x08,
+             "Bio Blaster attack element (magic_prop $7d +$01)"),
+            (self.attack_elem(0x5E), 0x20,
+             "AuraBolt attack element (magic_prop $5e +$01)"),
+            (self.weapon_elem(0x0F), 0x04,
+             "ThunderBlade weapon element (item_prop $0f +$0f)"),
+        ]
+        for got, want, what in checks:
+            if got != want:
+                raise SystemExit("check_break_reach: element anchor drifted: "
+                                 "%s reads $%02x, expected $%02x"
+                                 % (what, got, want))
+
+    def weapon_elem(self, it):
+        return self.items[it * ITEM_REC + OFF_WEAP_ELEM]
+
+    def attack_elem(self, atk):
+        return self.magic[atk * MAGIC_REC + OFF_ATK_ELEM]
 
     def _read(self, rel):
         with open(os.path.join(self.root, rel), "rb") as f:
@@ -444,10 +547,55 @@ class Data:
                 mask |= self.weap_class[it] & 0x0F
         return mask
 
+    def actor_elems(self, name):
+        """Elements actor NAME can deliver, the mirror of actor_classes:
+        weapon elements under the same equip-mask-plus-swing rule, tool
+        attack elements for Tools owners, kit-ability elements for
+        SwdTech/Blitz owners.  Spell elements are runtime state and are
+        deliberately absent (module docstring).  NULLBRK weapons chip
+        nothing on either axis and grant nothing."""
+        a = ACTOR_ID[name]
+        cmds = self.commands[name]
+        mask = 0
+        if name in MIMIC_ONLY:
+            return 0
+        if SWING_COMMAND in cmds or name in AUTO_SWINGERS:
+            for it in range(256):
+                rec = self.items[it * ITEM_REC:(it + 1) * ITEM_REC]
+                if rec[0] & 0x07 != 1:          # not a weapon
+                    continue
+                if not (int.from_bytes(rec[1:3], "little") >> a) & 1:
+                    continue
+                if self.weap_class[it] & NULLBRK:
+                    continue
+                mask |= self.weapon_elem(it)
+        for cmd, sids in COMMAND_ABILITIES.items():
+            if cmd not in cmds:
+                continue
+            for sid in sids:
+                mask |= self.attack_elem(sid)
+        if "TOOLS" in cmds:
+            for it in TOOLS_RANGE:
+                if self.weap_class[it] & NULLBRK:
+                    continue
+                mask |= self.attack_elem(it - TOOL_ATK_DELTA)
+        return mask
+
+    def species_break_elems(self, sp):
+        """Elements a chip lands on for one body: the effective weak byte
+        (monster_prop +25 merged with Ot6ElemAddTbl, check_boss_rows'
+        effective_weak -- the same merge Ot6SeedShields performs), minus
+        anything the body absorbs or nulls.  The authoring rule already
+        forbids weak-and-absorbed rows; the mask is defense against drift."""
+        return (self.boss.effective_weak(sp)
+                & ~self.boss.vanilla_absorb(sp)
+                & ~self.boss.vanilla_null(sp))
+
 
 # --------------------------------------------------------------------------
 
-def check_area(data, area_name, area, party_override, drop_mask, verbose):
+def check_area(data, area_name, area, party_override, drop_mask,
+               drop_elem_mask, verbose):
     problems = []
     checked = 0
 
@@ -457,13 +605,16 @@ def check_area(data, area_name, area, party_override, drop_mask, verbose):
             if who not in ACTOR_ID:
                 raise SystemExit("check_break_reach: unknown actor %r" % who)
         fieldable = 0
+        deliverable = 0
         per_actor = {}
         for who in party:
             per_actor[who] = data.actor_classes(who) & ~drop_mask
             fieldable |= per_actor[who]
+            deliverable |= data.actor_elems(who) & ~drop_elem_mask
         if verbose:
-            print("  step %r party=%s fields %s (%s)"
+            print("  step %r party=%s fields %s, delivers %s (%s)"
                   % (step["name"], ",".join(party), class_str(fieldable),
+                     elem_str(deliverable),
                      " ".join("%s=%s" % (w, class_str(m))
                               for w, m in per_actor.items())))
 
@@ -500,28 +651,36 @@ def check_area(data, area_name, area, party_override, drop_mask, verbose):
                 continue
             checked += 1
             keys = 0
+            ekeys = 0
             gaugeless_only = True
             parts = []
             for sp, n in bodies:
                 cls, src, gaugeless = data.species_class(sp)
+                elems = data.species_break_elems(sp)
                 if not gaugeless:
                     gaugeless_only = False
                     keys |= cls
-                parts.append("%s($%03x)x%d=%s[%s]"
+                    ekeys |= elems
+                parts.append("%s($%03x)x%d=%s/%s[%s]"
                              % (data.names[sp], sp, n,
-                                class_str(cls) if not gaugeless else "no gauge", src))
+                                class_str(cls) if not gaugeless else "no gauge",
+                                elem_str(elems), src))
             if verbose:
-                print("    %s formation $%03x: %s -> keys %s"
-                      % (where, f, " ".join(parts), class_str(keys)))
+                print("    %s formation $%03x: %s -> keys %s elems %s"
+                      % (where, f, " ".join(parts), class_str(keys),
+                         elem_str(ekeys)))
             if gaugeless_only:
                 continue    # nothing in the fight carries a gauge at all
-            if keys & fieldable == 0:
+            if keys & fieldable == 0 and ekeys & deliverable == 0:
                 problems.append(
-                    "area %s / %s / formation $%03x: NO REACHABLE BREAK CLASS\n"
+                    "area %s / %s / formation $%03x: NO REACHABLE CHIP ON "
+                    "EITHER AXIS\n"
                     "    bodies: %s\n"
-                    "    formation keys %s vs party {%s} fielding %s"
+                    "    formation class keys %s vs party {%s} fielding %s;\n"
+                    "    weak elements %s vs party delivering %s"
                     % (area_name, where, f, " ".join(parts),
-                       class_str(keys), ",".join(party), class_str(fieldable)))
+                       class_str(keys), ",".join(party), class_str(fieldable),
+                       elem_str(ekeys), elem_str(deliverable)))
 
     if checked < area["min_formations"]:
         problems.append(
@@ -544,6 +703,10 @@ def main():
     ap.add_argument("--drop-class", action="append", default=[],
                     choices=sorted(CLASS_BIT),
                     help="pretend no member can field this class (repeatable)")
+    ap.add_argument("--drop-elem", action="append", default=[],
+                    choices=sorted(ELEM_BIT),
+                    help="pretend no member can deliver this element "
+                         "(repeatable; failure demo for element-keyed areas)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -553,6 +716,9 @@ def main():
     drop_mask = 0
     for c in args.drop_class:
         drop_mask |= CLASS_BIT[c]
+    drop_elem_mask = 0
+    for e in args.drop_elem:
+        drop_elem_mask |= ELEM_BIT[e]
 
     data = Data(args.repo)
     names = [args.area] if args.area else sorted(AREAS)
@@ -561,12 +727,14 @@ def main():
     print("break-class encounter/party reachability check")
     for bn in names:
         problems, checked = check_area(data, bn, AREAS[bn], party_override,
-                                       drop_mask, args.verbose)
+                                       drop_mask, drop_elem_mask, args.verbose)
         mode = ""
         if party_override:
             mode += " party-override=%s" % ",".join(party_override)
         if drop_mask:
             mode += " dropped=%s" % class_str(drop_mask)
+        if drop_elem_mask:
+            mode += " dropped-elems=%s" % elem_str(drop_elem_mask)
         print("  area %-16s: %d formations checked%s" % (bn, checked, mode))
         all_problems.extend(problems)
         total += checked
@@ -578,8 +746,8 @@ def main():
             print("  " + p.replace("\n", "\n  "))
             print()
         return 1
-    print("  OK -- every checked formation has a break-class key the step's "
-          "party can field")
+    print("  OK -- every checked formation has a chip the step's party can "
+          "reach, by class key or by weak element")
     return 0
 
 

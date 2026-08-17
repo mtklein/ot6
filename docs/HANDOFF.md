@@ -287,10 +287,12 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   `$08`, all enemies, 0 MP (`ot6_break.asm:203-204`, `:279-281`;
   `battle_main.asm:6577`). The same comment carries the sweep that set the
   counts at 2: at that count the pack breaks penultimate and the loop wins
-  6/6, while "mashing wipes 6/6 in this town" (`:2078`). So the checker's
-  model is what is incomplete — it credits only class keys and knows
-  nothing about a reachable element — and declaring the area would turn
-  `make test` red on a fight the game has an answer to. Measured
+  6/6, while "mashing wipes 6/6 in this town" (`:2078`). The checker's model
+  used to be the incomplete half — it credited only class keys, which is why
+  Zozo could not be declared to it without turning `make test` red on a
+  fight the game has an answer to; #116 taught it the element axis
+  (weapon/tool/kit-ability elements against the effective weak byte, absorb
+  and null masked off), and the `zozo` area is declared and green. Measured
   2026-08-12 with `probe_zozo_tool.lua`, one boot, one checkpoint, the same
   pacing walk twice with identical input so both halves drew the same
   formation off the same battle seed: with AutoCrossbow **not one of the
