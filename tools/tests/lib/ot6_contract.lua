@@ -581,6 +581,73 @@ M.contracts["banquet-done-v1"] = {
   },
 }
 
+-- crescent-landing-v1: boundary K, the v0.7 stop line (sealed-gate-route.md
+-- section 1 segment 7), a world SRAM save on the Crescent Island landing
+-- tile (232,150), where the voyage's landing sail puts the party
+-- (event_main.asm:69188), on foot and controllable.  Exercised by
+-- gen_voyage: the J->K walk to Albrook, the pier scene, the Albrook night
+-- window (left mid-window and re-entered, the survey's open question 7,
+-- measured by the same run that cut this), the two sails, and the landing.
+--
+-- The main facts are the roster and the dead airship.  SHADOW joins at the
+-- landing (`char_party SHADOW, 1` + `$02F3=1` + `norm_lvl`,
+-- :69154-69163), so the #21 count control reads three: TERRA LOCKE SHADOW.
+-- The airship stays dead ($007A=1, $0246=0) and the wreck's save cells
+-- still read the crash site, so every v0.8 step plans on foot.
+--
+-- $02FB corrects the survey's segment-7 sketch.  The survey said GAU
+-- follows and refuses to board ($02FB=0); the port trigger's guard
+-- (`set_case PARTY_CHARS`, :67906) reads the char objects' party fields
+-- (EventCmd_de, ff6/src/field/event.asm:4308-4348), the banquet tail
+-- forced the party to TERRA+LOCKE with `char_party GAU, 0` (:99089), and
+-- no script between the banquet and the pier ever puts GAU back in party 1
+-- (the Vector 253 (41,13) GAU NPC's talk is flavor + delete_obj, _cc929f),
+-- so the refusal cannot fire on this chain and GAU stays available.
+M.contracts["crescent-landing-v1"] = {
+  slot = 3,
+  ram = {
+    { 0x1f60, 0xFF, 232, "world x (save-block cell $1f60): the Crescent landing" },
+    { 0x1f61, 0xFF, 150, "world y (save-block cell $1f61)" },
+    { 0x1f62, 0xFF, 83, "dead Blackjack x -- the wreck never moves" },
+    { 0x1f63, 0xFF, 238, "dead Blackjack y" },
+    { 0x11FA, 0x03, 0x00, "ON FOOT" },
+    { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  switches = {
+    { 0x007D, 1, "the banquet tail stands -- the port opened (:99133)" },
+    { 0x0083, 1, "'Right...let's go' -- the voyage began (:68379)" },
+    { 0x0086, 1, "the second sail arrived (:69018)" },
+    { 0x0089, 1, "Leo's split briefing was given (:69030)" },
+    { 0x0087, 1, "the Albrook night was slept (:91497)" },
+    { 0x0084, 1, "the night window opened (:68350; no writer ever clears it)" },
+    { 0x0085, 1, "the night window opened (:68351; no writer ever clears it)" },
+    { 0x0079, 1, "the Sealed Gate scene stands" },
+    { 0x007A, 1, "THE AIRSHIP IS STILL DEAD -- v0.8 is on foot" },
+    { 0x0246, 0, "no active airship" },
+    { 0x02F3, 1, "SHADOW available -- joined at the landing (:69160)" },
+    { 0x02E3, 1, "SHADOW initialized (:69158)" },
+    { 0x02F6, 0, "CELES still out of the roster (no writer in the voyage)" },
+    { 0x02FB, 1, "GAU still available -- the port refusal cannot fire on "
+      .. "this chain (see the header note; corrects the survey)" },
+    { 0x009D, 0, "the v0.8 area tail is ahead (:77992)" },
+  },
+  party = {
+    size = 3,                     -- the #21 control: TERRA LOCKE SHADOW
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x03, "SHADOW (joined at the landing)" },
+    },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)

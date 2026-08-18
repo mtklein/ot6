@@ -1,0 +1,20 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "crescent-landing.sram",
+  "size": 32768,
+  "slot": 3,
+  "milestone": "crescent-landing",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "sha256": "e681e939e78627bb0537652c7699dcc32dd05af4325cc3f85c9ed69082e3f445",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "e681e939e78627bb0537652c7699dcc32dd05af4325cc3f85c9ed69082e3f445",
+    "generator_sig": "524bbb8f7f8b5947e084ee6f64ec3387d0a1f508b62beec625f832c8914bb0bd gen_voyage tools/tests/checkpoints/banquet-done-v1/manifest.json tools/tests/checkpoints/banquet-done-v1/banquet-done.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/banquet-done-v1/manifest.json",
+        "sha256": "fdceff95d11570dfe0e6d2fc112e5de95cdff54dfa14fb9b19db2cc1cff2f0cf"
+      }
+    ]
+  }
+}

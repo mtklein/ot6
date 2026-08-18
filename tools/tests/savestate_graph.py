@@ -565,4 +565,23 @@ STATES = [
     #     tools/tests/run.sh tools/tests/gen_banquet_done.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/banquet-done-v1
     S("banquet_done", gen="gen_banquet_done", checkpoint="vector-crash-v1"),
+    # ---- boundary J -> boundary K (v0.12: sealed-gate-route.md seg 7) ------
+    # Step J->K, whole in one generator: cold-boot the banquet-done-v1
+    # checkpoint (world (120,188)), the 33-step walk to Albrook, the port,
+    # the pier scene (name_menu SHADOW committed with START), the Albrook
+    # night window -- LEFT MID-WINDOW to the world and re-entered, which is
+    # the survey's open question 7 measured in the same run -- the inn
+    # night, "Right...let's go", the two sail scenes, and the Crescent
+    # Island landing at world (232,150), party TERRA LOCKE SHADOW, then the
+    # world SRAM save -- boundary K, `crescent-landing-v1`.  timeout=1800:
+    # the run is a whole story segment (two town crossings, five scripted
+    # scenes, two sails) and runs past run.sh's 600 s default on a loaded
+    # machine, gen_kolts's precedent.  Re-cutting the SRAM is a deliberate
+    # by-hand operation:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/banquet-done-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/crescent-landing-v1/crescent-landing.sram \
+    #     tools/tests/run.sh tools/tests/gen_voyage.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/crescent-landing-v1
+    S("crescent_landing", gen="gen_voyage", checkpoint="banquet-done-v1",
+      timeout=1800),
 ]
