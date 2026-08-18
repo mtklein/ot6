@@ -34,7 +34,7 @@ end
 -- (8 element icons and 16 hud glyphs), which must equal their bank-F0 data.
 -- Derivation mirrors H.glyphCanary (signature scan; cell table precedes
 -- the glyph data in rom) so art edits never stale this test.
-local SMALLFONT_ROM = 0x047FC0          -- C4/7FC0 in the headerless image
+local SMALLFONT_ROM = H.sym("SmallFontGfx") & 0x3FFFFF  -- headerless-image offset
 local function claimedCells()
   local rom = emu.memType.snesPrgRom
   local function findSig(sig)

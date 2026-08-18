@@ -186,7 +186,8 @@ _npc_in_progress .set 0
 
 ; c4/1a10
 NPCPropPtrs:
-        fixed_block $50b0
+        ; OT6: grown $50b0 -> $5140 (+16 NPC records); see event_trigger.asm.
+        fixed_block $5140
         ptr_tbl NPCProp
         end_ptr NPCProp
 

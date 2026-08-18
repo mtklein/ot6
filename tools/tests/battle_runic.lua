@@ -36,8 +36,8 @@
 -- stance; the only difference is the spell's own runic-able flag,
 -- MagicProp byte 3 bit 3, the gate RunicEffect tests at :8486-8488.
 -- Every id that reaches $3410 is classified by reading that byte out of
--- the ROM (C4/6AC0 -> PRG 0x046AC0), so the test asserts against the
--- shipped data rather than a hardcoded spell list:
+-- the ROM (MagicProp via H.sym, so C4 segment growth never stales it), so
+-- the test asserts against the shipped data rather than a hardcoded list:
 --   negative: magitek status left on, so muddle rolls MagiTek beams
 --     (bit 3 clear across the whole range; runs land on $81/$84).
 --     The stance stays up, MP is flat, and BP is flat.
@@ -105,7 +105,7 @@ local STATE = "build/states/battle_entry.mss.lua"
 local CELES = 0x06                   -- character id, $3ED8 stride 2
 local CMD_RUNIC, CMD_MAGIC = 0x0b, 0x02
 local RUNIC_BIT = 0x04               -- $3E4C.2, set by Cmd_0b
-local MAGIC_PROP = 0x046AC0          -- MagicProp C4/6AC0 -> PRG offset
+local MAGIC_PROP = H.sym("MagicProp") & 0x3FFFFF   -- PRG offset, survives C4 growth
 local MUDDLE, MAGITEK, STOP = 0x20, 0x08, 0x10
 -- Ot6PipCellTbl (ot6.asm): pip cluster cell per spendable bp 0-5
 local PIP = { [0] = 0x72, 0x73, 0x75, 0x76, 0x77, 0x79 }

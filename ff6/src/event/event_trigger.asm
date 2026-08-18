@@ -17,7 +17,9 @@
 
 ; c4/0000
 EventTriggerPtrs:
-        fixed_block $1a10
+        ; OT6: grown $1a10 -> $1a60 (+16 trigger slots); every downstream
+        ; C4 segment shifts and relinks (thamasa-route.md §6, issue #125).
+        fixed_block $1a60
         ptr_tbl EventTrigger
         end_ptr EventTrigger
 

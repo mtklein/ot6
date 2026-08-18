@@ -49,7 +49,7 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local MAGIC_PROP = 0x046AC0
+local MAGIC_PROP = H.sym("MagicProp") & 0x3FFFFF
 local function runicable(id)
   return H.readRomByte(MAGIC_PROP + id * 14 + 3) & 0x08 ~= 0
 end

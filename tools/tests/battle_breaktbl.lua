@@ -231,13 +231,13 @@ check(rb(MPROP + 0x0117 * MREC + OFF_WEAK) == 0x00,
 -- shape of the hole, and it is why "the merchant already sells something
 -- throwable" was not enough.
 --
--- ShopProp is `.incbin shop_prop.dat` spliced at shop.asm; link map:
--- shop_prop C47AC0..C47F3F, so PRG offset = $C47AC0 - $C00000 = $047AC0.
--- 128 records of 9 bytes: byte 0 = type (bits 0-2) and price adjustment
--- (bits 3-5), bytes 1-8 = eight item ids, $FF empty.  magic_prop C46AC0 ->
--- $046AC0, 14-byte records, +$01 element.
-local SHOPPROP, SHOPREC = 0x047AC0, 9
-local MAGICPROP, MAGICREC = 0x046AC0, 14
+-- ShopProp is `.incbin shop_prop.dat` spliced at shop.asm.  PRG offsets
+-- come from the dbg symbols (& 0x3FFFFF maps HiROM CPU -> file) so bank-C4
+-- segment growth never stales them.  ShopProp: 128 records of 9 bytes:
+-- byte 0 = type (bits 0-2) and price adjustment (bits 3-5), bytes 1-8 =
+-- eight item ids, $FF empty.  MagicProp: 14-byte records, +$01 element.
+local SHOPPROP, SHOPREC = H.sym("ShopProp") & 0x3FFFFF, 9
+local MAGICPROP, MAGICREC = H.sym("MagicProp") & 0x3FFFFF, 14
 local GHOST_MERCHANT = 85               -- car B, `shop_menu 85` (_cbad44)
 local GHOSTTRAIN = 0x0106
 

@@ -41,7 +41,7 @@ local VR = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 local MAP0 = 0x5400 * 2
 local FONT0 = 0x5800 * 2
-local SMALLFONT_ROM = 0x047FC0     -- SmallFontGfx C4/7FC0 (file offset)
+local SMALLFONT_ROM = H.sym("SmallFontGfx") & 0x3FFFFF   -- file offset
 
 -- BG3 per-scanline scroll table: 224 entries of [hofs.w vofs.w]
 local SCROLL0 = 0x4af5
