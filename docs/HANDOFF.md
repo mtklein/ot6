@@ -547,6 +547,16 @@ failing to generate with `code=255` at once while the same ones succeed in
 isolation. Lower `-j` and retry rather than debugging the generator. Bound a
 full `make savestates` with `NINJAFLAGS=-j4` when other agents are live.
 
+The same no-verdict wall-clock kill has a second cause with an opposite fix:
+**a top-level Lua error in the test script**. The script dies before any
+callback registers, no `emu.stop` ever runs, and the testrunner idles to the
+cap — indistinguishable from starvation in the suite line. Discriminate
+before retrying: a starved run shows normal `[ot6]` progress that simply
+stops; an errored one produces none of the test's own output (check the
+retained `run.log`), and reruns hang solo on an idle machine too. Measured
+2026-08-18: a `H.sym()` call added to `battle_breaktbl.lua`, the one test
+that never dofiles the lib, burned two starvation-shaped diagnosis rounds.
+
 **10. A once-per-frame sample cannot see every value of a once-per-frame
 counter.** `$021e` is ticked at the very end of the owning module's vblank
 handler (`field/reset.asm:286`, after every transfer `FieldNMI` performs), and
