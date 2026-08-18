@@ -20,6 +20,8 @@
 -- it survives future row insertions and shifts the way school locates its
 -- data through the dialog pointer table.
 
+local H = dofile("tools/tests/lib/ot6.lua")   -- only for H.sym address lookups
+
 local PRG = emu.memType.snesPrgRom
 local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04
 local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80
