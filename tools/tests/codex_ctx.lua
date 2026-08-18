@@ -97,20 +97,133 @@ local slot3Before, tempBefore = nil, nil
 -- 4-frame-held presses on a 5-on/5-off cadence.  On gau_joined that means
 -- Cyan's blade plus Sabin and Gau's bludgeoning hands, against the Veldt's
 -- varied species rather than one exhausted Narshe pool.
+--
+-- Teach steering (follows the fixture, 2026-08-18): the #84 chest wave's
+-- longer route fought more species before this savestate, so the chain
+-- arrives with 32 transient codex bytes instead of the handful it used to
+-- carry, and every chip a plain all-Fight drive can produce against the
+-- Veldt's replay cycle is already taught.  Measured on the re-made
+-- gau_joined: 45 straight all-Fight battles taught 0 bytes.  The one
+-- pairing still open is species $A8's bludgeon weakness ($04,
+-- gen_break_floor's row), and the only bludgeon attack this party can
+-- actually deliver is Sabin's Pummel (blitz $5D, class $04 in
+-- Ot6SkillClassTbl): Cyan and Sabin both SWING slash $01 (Kotetsu $2b and
+-- MetalKnuckle $53 rows of Ot6WeapClassTbl), and Gau's bare-hand bludgeon
+-- never happens because his Veldt command row is Leap/Rage/-/Item
+-- ($11,$10,$ff,$01 -- no Fight; the atkclass write watch saw only $01
+-- swings across 16 battles).  So: when a live monster's weak mask still
+-- has a bit some party member can newly reveal, that member delivers it
+-- (Fight for a weapon-class match, the Pummel list walk for the blitz),
+-- the other characters Defend, and Gau -- who has no Fight row to swap
+-- into Def -- burns his turn on a Tonic; when nothing present is
+-- teachable, everyone taps A and the filler battle ends fast.  All of it
+-- is read from the battle's own seeded state (weak mask $3e9c+off,
+-- revealed bits $3e9d+off -- the same bytes checkReadSeed pins), so
+-- nothing here pins a species id and the steer retires itself the moment
+-- the chip lands.
+local ST_TOOLS, ST_ITEM = 0x30, 0x0A
+local CMD_FIGHT, CMD_ITEM, CMD_BLITZ = 0x00, 0x01, 0x0A
+local ITEMLIST, PUMMEL, PUMMEL_COST, TONIC = 0x4005, 0x5D, 4, 0xE8
+local WEAPCLASS = H.sym("Ot6WeapClassTbl") & 0x3FFFFF
+local function attackClassOf(slot)
+  return H.readRomByte(WEAPCLASS + H.readByte(0x3ca8 + slot * 2))
+end
+local function cmdCellOf(slot, cmd)
+  for i = 0, 3 do
+    if H.readByte(CMDTBL + slot * 12 + i * 3) == cmd then return i end
+  end
+  return nil
+end
+local function mpOf(slot) return H.readWord(0x3C08 + slot * 2) end
+local function battleBagIdxOf(id)
+  for i = 0, 251 do
+    if H.readByte(0x2686 + i * 5) == id
+       and H.readByte(0x2686 + i * 5 + 3) > 0 then return i end
+  end
+  return nil
+end
+local function canTeach(cls)
+  for m = 0, 5 do
+    if H.readByte(0x3aa8 + m * 2) % 2 == 1 then
+      local off = 8 + m * 2
+      local weak, rev = H.readByte(0x3e9c + off), H.readByte(0x3e9d + off)
+      if weak & ~rev & cls ~= 0 then return true end
+    end
+  end
+  return false
+end
+-- how this slot can still teach something present: "fight" (its weapon's
+-- class, which needs a Fight command to swing), "blitz" (Pummel's $04,
+-- which needs the Blitz command and its 4 MP), or nil
+local function teachRoleOf(slot)
+  if cmdCellOf(slot, CMD_FIGHT) ~= nil
+     and canTeach(attackClassOf(slot)) then return "fight" end
+  if cmdCellOf(slot, CMD_BLITZ) ~= nil and mpOf(slot) >= PUMMEL_COST
+     and canTeach(0x04) then return "blitz" end
+  return nil
+end
+local function teacherPresent()
+  for s = 0, 3 do
+    if H.readByte(0x3ED8 + s * 2) ~= 0xFF
+       and H.readWord(0x3BF4 + s * 2) > 0
+       and teachRoleOf(s) ~= nil then return true end
+  end
+  return false
+end
+-- Per-battle diagnostics.  A red here used to say only "taught 0 bytes";
+-- the three lines these feed (the [dbg] seeded-state dump, the [steer]
+-- role log, and the per-battle attack-class tally) are what located the
+-- 2026-08-18 teach drought, and they name the next one from the log alone.
 local lastActor, mfM, actM = nil, 0, nil
+local dbgLogged = false                 -- one [dbg] line per battle
+local steerLogged = {}                  -- one [steer] line per actor per battle
+local atkSeen = {}                      -- OT6_ATKCLASS writes, tallied per battle
+emu.addMemoryCallback(function(_, v)
+  atkSeen[v] = (atkSeen[v] or 0) + 1
+end, emu.callbackType.write, 0x7e57b8, 0x7e57b8)
 -- The driver retains its Terra/Fire branch because this file shares the
 -- proven menu walker, but this fixture has no Terra: every live action here
 -- takes the ordinary Fight branch.
 local function battleReset()
   lastActor = nil
+  dbgLogged = false
+  steerLogged = {}
+  atkSeen = {}
 end
 local fightSpecies = {}
 local function battlePulse()
   if H.monstersPresent() > 0 then
+    local anyAlive = false
     for s = 0, 5 do
       if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
+        anyAlive = true
         fightSpecies[H.readWord(0x57C0 + s * 2)] = true
       end
+    end
+    if anyAlive and not dbgLogged then
+      dbgLogged = true
+      local t = {}
+      for s = 0, 3 do
+        local cmds = {}
+        for i = 0, 3 do
+          cmds[#cmds + 1] = string.format("%02x",
+            H.readByte(CMDTBL + s * 12 + i * 3))
+        end
+        t[#t + 1] = string.format("c%d id=%02x hp=%d hand=%02x cls=%02x cmd=%s",
+          s, H.readByte(0x3ED8 + s * 2), H.readWord(0x3BF4 + s * 2),
+          H.readByte(0x3ca8 + s * 2), attackClassOf(s),
+          table.concat(cmds, ","))
+      end
+      for m = 0, 5 do
+        if H.readByte(0x3aa8 + m * 2) % 2 == 1 then
+          local off = 8 + m * 2
+          t[#t + 1] = string.format("m%d sp=%04x weak=%02x rev=%02x sh=%d/%d",
+            m, H.readWord(0x57C0 + m * 2), H.readByte(0x3e9c + off),
+            H.readByte(0x3e9d + off), H.readByte(0x3e38 + off),
+            H.readByte(0x3e39 + off))
+        end
+      end
+      H.log("[dbg] " .. table.concat(t, " | "))
     end
   end
   if H.readByte(MENU) == 0 then
@@ -127,6 +240,45 @@ local function battlePulse()
   local hold = (mfM % 10) < 5
   local st, btn = H.readByte(MSTATE), nil
   if st == ST_CMD then
+    -- teach steering (see the header above)
+    if actM ~= "fire" and teacherPresent() then
+      local role = teachRoleOf(a)
+      if not steerLogged[a] then
+        steerLogged[a] = true
+        H.log(string.format("[steer] slot %d (cls %02x): %s",
+          a, attackClassOf(a), role or "step aside"))
+      end
+      if role == "blitz" then
+        -- the teacher: walk onto the Blitz row; the ST_TOOLS branch below
+        -- takes the list to Pummel
+        local cell = cmdCellOf(a, CMD_BLITZ)
+        btn = "a"
+        local cur = H.readByte(0x890F + a)
+        if cur ~= cell then btn = (cur < cell) and "down" or "up" end
+        H.setPad(hold and { [btn] = true } or {})
+        return
+      elseif role == nil and cmdCellOf(a, CMD_FIGHT) ~= nil then
+        -- a bystander with a Fight row: real Defend (right swaps
+        -- Fight->Def, then A), slow cadence so the swap settles
+        local step = mfM % 40
+        if step < 4 then H.setPad({ right = true })
+        elseif step >= 20 and step < 24 then H.setPad({ a = true })
+        else H.setPad({}) end
+        return
+      elseif role == nil then
+        -- Gau: no Fight row to swap into Def, so burn the turn on a real
+        -- Tonic (the ST_ITEM branch below picks it)
+        local cell = cmdCellOf(a, CMD_ITEM)
+        btn = "a"
+        if cell ~= nil then
+          local cur = H.readByte(0x890F + a)
+          if cur ~= cell then btn = (cur < cell) and "down" or "up" end
+        end
+        H.setPad(hold and { [btn] = true } or {})
+        return
+      end
+      -- role "fight": fall through to the plain swing below
+    end
     btn = "a"
     if actM == "fire" then
       local cell = nil
@@ -138,6 +290,33 @@ local function battlePulse()
         local cur = H.readByte(0x890F + a)
         if cur ~= cell then btn = (cur < cell) and "down" or "up" end
       end
+    end
+  elseif st == ST_TOOLS then
+    -- the blitz teacher's list (the tools-shell submenu): walk to Pummel
+    -- and confirm; anyone else backs out
+    if actM ~= "fire" and teachRoleOf(a) == "blitz" then
+      local entry = nil
+      for i = 0, 7 do
+        if H.readByte(ITEMLIST + i * 3) == PUMMEL then entry = i end
+      end
+      if entry == nil then H.setPad({}) return end   -- list still building
+      local row, col = entry // 2, entry % 2
+      local cr, cc = H.readByte(0x8967 + a), H.readByte(0x8963 + a)
+      btn = "a"
+      if cr ~= row then btn = (cr < row) and "down" or "up"
+      elseif cc ~= col then btn = (cc < col) and "right" or "left" end
+    else
+      btn = "b"
+    end
+  elseif st == ST_ITEM then
+    -- Gau's turn-burn: the Tonic row of the battle bag
+    local want = battleBagIdxOf(TONIC)
+    if want == nil then btn = "b"
+    else
+      local cur = H.readByte(0x8947 + a) + H.readByte(0x894F + a)
+      btn = "a"
+      if cur < want then btn = "down"
+      elseif cur > want then btn = "up" end
     end
   elseif st == ST_MAGIC then
     if actM ~= "fire" then btn = "b"
@@ -180,6 +359,14 @@ local function patrolPulse()
   if not H.worldMode() then H.setPad({}); return end
   if not H.worldHasControl() then H.setPad({}); return end
   if not H.worldAligned() then return end
+  -- Stay on the Veldt: battle re-entry drifts the beat west a tile at a
+  -- time, and by (202,149) the encounters are the desert's (species $08
+  -- and $0E showed up in the read half's seed checks, 2026-08-18), which
+  -- dilutes the search for the taught species.  Herd the walk back into
+  -- a band around the parked tile before resuming the alternating beat.
+  local x = H.worldX()
+  if x < 210 then H.setPad({ right = true }); return end
+  if x > 220 then H.setPad({ left = true }); return end
   veldtFlip = not veldtFlip
   H.setPad({ [veldtFlip and "left" or "right"] = true })
 end
@@ -301,13 +488,23 @@ local actions = {
       slot3Before = snapPage(SLOT3)
       local sp = {}
       for k in pairs(fightSpecies) do sp[#sp + 1] = string.format("%04X", k) end
+      local ac = {}
+      for k, n in pairs(atkSeen) do
+        ac[#ac + 1] = string.format("%02x*%d", k, n)
+      end
       H.log(string.format("[ctx] battle %d done, taught %d byte(s) so far " ..
-        "(species %s)", fights, taughtN, table.concat(sp, " ")))
+        "(species %s; atkclass %s)", fights, taughtN,
+        table.concat(sp, " "), table.concat(ac, " ")))
       fightSpecies = {}
     end
+    -- The bail-out follows the fixture: the teachable pairing (species $A8,
+    -- see the teach-steering header) sits fourth in the re-made state's
+    -- eight-formation Veldt cycle, so one full cycle plus slack bounds the
+    -- search; 6 used to be enough when the shorter pre-#84 chain left the
+    -- first formation's species unchipped.
     return H.driveUntil(function()
-      return (taughtN > 0 or fights >= 6) and not H.battleLoadStarted()
-    end, 40000, {
+      return (taughtN > 0 or fights >= 16) and not H.battleLoadStarted()
+    end, 60000, {
       H.call(function()
         local inBattle = H.battleLoadStarted()
         if wasInBattle and not inBattle then account() end
@@ -351,6 +548,14 @@ local readChecked, readTries = 0, 0
 local function checkReadSeed()
   readTries = readTries + 1
   local n = 0
+  local seen = {}
+  for slot = 0, 5 do
+    if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
+      seen[#seen + 1] = string.format("%04X", H.readWord(0x57C0 + slot * 2))
+    end
+  end
+  H.log(string.format("[ctx] seed check try %d sees: %s", readTries,
+    table.concat(seen, " ")))
   for slot = 0, 5 do
     if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
       local off = 8 + slot * 2
@@ -400,6 +605,17 @@ local function readTry(n)
     }, "find read-half encounter " .. n),
     H.waitUntil(function() return H.monstersPresent() > 0 end, 1200,
       "read-half monsters populate " .. n, 5),
+    -- wait for the alive bits the check reads, not a blind settle: the
+    -- $3aa8 bits land after monstersPresent() goes positive (measured:
+    -- the write half's first-frame state dump saw zero alive bits with
+    -- monsters already counted), and a check that runs before them sees
+    -- an empty battle and defers a species it was looking at
+    H.waitUntil(function()
+      for slot = 0, 5 do
+        if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then return true end
+      end
+      return false
+    end, 900, "read-half alive bits seed " .. n, 5),
     H.waitFrames(90),
     H.call(checkReadSeed),
     H.call(battleReset),
@@ -413,7 +629,12 @@ local function readTry(n)
   }, {})
 end
 
-for n = 1, 20 do actions[#actions + 1] = readTry(n) end
+-- The retry bound follows the fixture: the re-made chain's Veldt pool
+-- draws the taught species (see the teach-steering header) about one
+-- battle in seven, measured across the write half's cycles, and one run's
+-- read half missed it in 20 straight draws, so 20 was a ~90% bound.
+-- Forty puts a miss under one run in three hundred.
+for n = 1, 40 do actions[#actions + 1] = readTry(n) end
 actions[#actions + 1] = H.call(function()
   H.assertEq(readChecked > 0, true,
     "READ HALF: at least one taught-species monster was checked at seed")

@@ -207,14 +207,27 @@ end
 -- REOPEN in arm 2 read blank at +10 and +20 frames and painted at +30, where
 -- the first open in arm 1 painted inside the fixed 20.  A fixed settle was
 -- riding that margin and the file went red on the wrong side of it.  This
--- waits for the two header glyphs and nothing else, so the value assertions
--- still do all the work, and a wallet that never paints times out here with
--- its tag rather than passing.
+-- waits for the two header glyphs, so the value assertions still do all the
+-- work, and a wallet that never paints times out here with its tag rather
+-- than passing.
+--
+-- The settle drives pulse() rather than waiting bare (2026-08-18): the
+-- driver already expects packs to die mid-arm and paces to the next
+-- encounter (the run-3 note above), but the old input-less 600-frame wait
+-- here did not.  Measured on the re-made vargas_won: the Edgar arm's window
+-- predicate matched just as a bystander Fight ended the pack, the victory
+-- played out under the hands-off wait, and the paint never came.  Driving
+-- pulse keeps the same window predicate alongside the glyphs, so a settle
+-- that loses its battle re-encounters and reopens instead of timing out.
 local function settleWallet(tag)
   return H.driveUntil(function()
+    if not (H.battleLoadStarted() and H.readByte(MENU) ~= 0
+            and H.readByte(ACTOR) == slotOf[mode.char]
+            and H.readByte(MSTATE) == mode.state) then return false end
     local w = walletWords()
     return (w[1] & 0xFF) == GLYPH_M and (w[2] & 0xFF) == GLYPH_P
-  end, 600, { H.waitFrames(1) }, tag .. ": the wallet header paints")
+  end, 30000, { H.call(pulse), H.waitFrames(1) },
+    tag .. ": the wallet header paints")
 end
 
 local sabinPre = nil

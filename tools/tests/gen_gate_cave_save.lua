@@ -470,11 +470,17 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("right", function() return not H.worldMode() and map() == 382 end,
     900, "(169,194) -> CAVE TO THE SEALED GATE (382)"),
   H.waitUntil(landed(382, 10), 2400, "382 landing", 1),
+  -- #84: Assassin, visible on the walk down the cave mouth
+  H.openChest{ stand = { 36, 40 }, face = "up", bit = 122, what = "Assassin",
+               nav = { playBattles = "flee" } },
   H.navTo(31, 42, { playBattles = "flee", maxFrames = 15000,
     arrive = function() return map() == 383 end }),
   pressWalk("down", function() return map() == 383 end, 900,
     "door (31,43) -> BASEMENT 1 (383)"),
   H.waitUntil(landed(383, 10), 2400, "383 landing", 1),
+  -- #84: Tempest, visible from the corridor down to the timed floor
+  H.openChest{ stand = { 48, 57 }, face = "up", bit = 123, what = "Tempest",
+               nav = { playBattles = "flee" } },
   H.navTo(53, 57, { playBattles = "flee", maxFrames = 20000,
     arrive = function() return map() == 385 end }),
   pressWalk("down", function() return map() == 385 end, 900,
@@ -490,10 +496,42 @@ H.run({ maxFrames = 200000 }, {
     1800, "held RIGHT onto the cycle-A arming trigger (3,2)"),
   H.waitUntil(function() return sw(0x01F0) == 1 end, 900,
     "cycle A armed ($01F0)", 2),
+  -- #84: Coin Toss, visible from the entry row.  phaseWalk is the room's
+  -- only honest mover (navTo would condemn the swapped half), and
+  -- openChest's own navTo is a no-op on the tile it already stands on.
+  -- The chest's only usable neighbor is (3,7) (measured, probe_385_grids
+  -- 2026-08-17: (3,9) is walled in both phases and (2,8) is a sealed
+  -- pocket whose only open edge is through the chest tile), which is on the
+  -- cycle-B hurt list and walled in phase B, so the walker arrives in
+  -- phase A, the chest is opened fast (calmFrames=4), and the party steps
+  -- straight off east to (4,7), open and hurt-free in both phases.
+  H.phaseWalk(3, 7, spec385({ maxFrames = 20000,
+    what = "phaseWalk to the Coin Toss chest stand (3,7)" })),
+  H.openChest{ stand = { 3, 7 }, face = "down", bit = 133, what = "Coin Toss",
+               nav = { playBattles = "flee", calmFrames = 4 } },
+  (function() local ph = 0
+    return H.driveUntil(function()
+      return H.fieldX() == 4 and H.fieldY() == 7 and H.tileAligned()
+    end, 600, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
+        H.setPad({ right = true })
+      end),
+    }, "step off the hurt-in-B stand -> (4,7)")
+  end)(),
   H.phaseWalk(11, 3, spec385({ maxFrames = 20000,
     what = "phaseWalk across row 2 to the cycle-B trigger (11,3)" })),
   H.waitUntil(function() return sw(0x01F1) == 1 end, 900,
     "cycle B armed ($01F1)", 2),
+  -- #84: X-Potion, visible from the cycle-B trigger row, opened from ABOVE:
+  -- (14,5) is walled in both phases and (14,3) is open and hurt-free in
+  -- both (measured, probe_385_grids 2026-08-17)
+  H.phaseWalk(14, 3, spec385({ maxFrames = 20000,
+    avoid = { { 3, 2 }, { 10, 2 } },
+    what = "phaseWalk east to the X-Potion chest stand (14,3)" })),
+  H.openChest{ stand = { 14, 3 }, face = "down", bit = 134, what = "X-Potion",
+               nav = { playBattles = "flee" } },
   H.phaseWalk(13, 12, spec385({ maxFrames = 30000,
     avoid = { { 3, 2 }, { 10, 2 } },
     what = "phaseWalk down the east half to (13,12)" })),
@@ -508,6 +546,17 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- 5. BASEMENT 3's south loop, the door switch, the save point --------
+  -- #84: the Ether at (29,23), visible on the walk and opened from ABOVE
+  -- ((29,24) is not walkable; measured, probe_gate_chests/probe_gate_bfs
+  -- 2026-08-17).  The map's other four chests are not this generator's:
+  -- the pre-lever walking component here is 290 tiles and M.bfsPath finds
+  -- NO PATH to any stand beside the Genji Glove (47,11), Ether (71,30),
+  -- Elixir (88,23) or Magicite (113,6) -- they sit in the east half behind
+  -- gen_vector_crash's (71,15) lever (persistent $0174) and (58,18) span
+  -- switch (the "(46..41,11) west bridge" of that file's traverse notes),
+  -- so they are that walk's pickups.
+  H.openChest{ stand = { 29, 22 }, face = "down", bit = 124, what = "Ether",
+               nav = { playBattles = "flee", maxFrames = 20000 } },
   H.navTo(62, 11, { playBattles = "flee", maxFrames = 30000 }),
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x0173) == 1 end, 3000, {
@@ -531,6 +580,15 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.fieldX(), 73, "386 arrival x (short entrance 384 (64,10))")
     H.assertEq(H.fieldY(), 58, "386 arrival y")
   end),
+  -- #84: Tent, visible from the save point
+  H.openChest{ stand = { 77, 53 }, face = "up", bit = 68, what = "Tent",
+               nav = { playBattles = "flee" } },
+  -- The chest detours above added real fled and fought-out encounters to
+  -- this step, and a bad draw lands here drained (measured 2026-08-17:
+  -- LOCKE at 21/353 after three fought-out formations), which
+  -- assertPartyStanding below rightly refuses to save.  Map 386 draws no
+  -- encounters, so the care stop lives here, right before the save.
+  H.fieldCare({ tag = "care before the gate-cave save", threshold = 0.95 }),
   H.navTo(74, 54, { playBattles = "flee", maxFrames = 9000 }),
   -- tapInto the save tile: a HELD press walks straight THROUGH (74,53)
   -- without firing the SavePoint trigger (measured, probe_v07_386tile --
@@ -585,12 +643,13 @@ H.run({ maxFrames = 200000 }, {
     -- the fixture and the checkpoint went out that way.  Same three
     -- conditions as tools/audit_party_hp.py; change the two together.
     --
-    -- RUN, and it passes, and it never needed a care stop: the dead TERRA
-    -- was an artifact of an older route rather than anything this step
-    -- still does.  Re-captured out of a clean narshe-mission-v1 the party
-    -- reaches the save tile at TERRA 306/306, LOCKE 270/353, EDGAR 338/398
-    -- and SABIN 407/407.  This line is what says so if that ever stops
-    -- being true.
+    -- RUN, and it passed with no care stop until the #84 chest detours
+    -- added real encounters: the dead TERRA was an artifact of an older
+    -- route, and a clean pre-#84 run reached this tile at TERRA 306/306,
+    -- LOCKE 270/353, EDGAR 338/398 and SABIN 407/407.  On 2026-08-17 a
+    -- three-fought-out-draws run reached it with LOCKE at 21/353 and this
+    -- line refused it, which is what the fieldCare stop on 386 above is
+    -- for.  This line is what says so if the care stop ever stops working.
     H.assertPartyStanding("gate-cave-save-v1 exit")
     H.screenshot("step_gh_save_tile")
   end),

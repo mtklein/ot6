@@ -203,15 +203,18 @@ STATES = [
     # -- the maze decoded and driven, and battle 68 fought with real Blitz
     # inputs: the 6-shield OT6_BLUDG row chip-proven at runtime.  Ends on the
     # world map at (178,93) with $003A/$003B set.
-    S("train_done", gen="gen_sabin_train", prev="forest_done"),
+    # timeout=1800: the #84 wave made the long runs longer (pickups, care
+    # stops, fought detour encounters); both of these blew the default cap
+    # with code=255 twice, at -j4 and -j2, once the wave landed.
+    S("train_done", gen="gen_sabin_train", prev="forest_done", timeout=1800),
     # gen_sabin_falls: Baren Falls -- the jump, battle 18 mid-fall (RIZOPAS
     # surfaces in slot 5 off the piranhas' death script), SHADOW's exit, GAU
     # named on the Veldt shore.
-    S("falls_done", gen="gen_sabin_falls", prev="train_done"),
+    S("falls_done", gen="gen_sabin_falls", prev="train_done", timeout=1800),
     # gen_sabin_gau: Mobliz's Dried Meat, the Veldt grind (GAU appears on the
     # 3/8 end-of-battle roll), and his return-visit self-recruit -- the
     # generator header documents the one concession ($3EBD bit 1).
-    S("gau_joined", gen="gen_sabin_gau", prev="falls_done"),
+    S("gau_joined", gen="gen_sabin_gau", prev="falls_done", timeout=1800),
     # gen_sabin_trench: Crescent Mountain's helmet chain (GAU-gated), the
     # Serpent Trench ridden as a real VEHICLE script, Nikeah, and the ferry's
     # option-1 prompt -- $0044=1 and the hub.  SABIN's scenario closes here.
@@ -222,7 +225,7 @@ STATES = [
     # cafe's cider runner -- STOLEN from, not killed, because the merchant's
     # clothes come off the steal's reaction script and nothing else -- then
     # the old man's password and the rich man's secret passage.
-    S("sfigaro_town", gen="gen_sfigaro", prev="locke_scenario"),
+    S("sfigaro_town", gen="gen_sfigaro", prev="locke_scenario", timeout=1800),
     S("sfigaro_passage", gen="gen_sfigaro", prev="sfigaro_town"),
     # gen_celes: the passage, the rich man's mansion (a warp maze, entered by
     # a deep door), the basement, the Celes chains cutscene + naming menu,

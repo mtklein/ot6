@@ -22,10 +22,11 @@
 --      pairs are one-way: (4,36)->(121,22) is the return) and the west
 --      walk to the gate door row (9..11,27), a 3-tile long entrance,
 --      len 2 H, so the entry point must sit off that row.
---      The (58,18) span switch, the (89,29)/(96,18)/(99,18) walk-overs
---      and the (112,16)/(99,13) toggles are not on this route: the span
---      only opens the (46..41,11) west bridge (a dead end for the
---      traverse) and the walk-overs serve the treasure alcove.
+--      The (89,29)/(96,18)/(99,18) walk-overs and the (112,16)/(99,13)
+--      toggles are not on this route: the walk-overs serve the treasure
+--      alcove.  The (58,18) span switch used to be off-route too; #84 put
+--      it back on, because its (46..41,11) west bridge is the Genji Glove
+--      shelf (the traverse's chest detours are step 2's, below).
 --   3. the sealed gate scene (map 391; entry (8,21) is the scene trigger,
 --      _cb39ca, :45953): ridden with no input via advanceStory, battles 121
 --      and 122 in opts.spare.  The $17b dummy cannot be lost and must
@@ -161,7 +162,9 @@ local function fill(c, pos, slot, id, tag)
   end, { H.equipWeapon(pos, id, { slot = slot, tag = tag }) }, {})
 end
 
-H.run({ maxFrames = 240000 }, {
+-- #84: budget raised 240000 -> 260000 for the four chest detours (the
+-- probe measured them at ~8500 frames including fled encounters)
+H.run({ maxFrames = 260000 }, {
   -- ---- the cold Continue and the entry contract (issue #25) -------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -234,16 +237,61 @@ H.run({ maxFrames = 240000 }, {
     H.assertEq(H.fieldY(), 12, "384 re-entry y")
   end),
 
+  -- ---- 1c. the Genji shelf (#84) ------------------------------------------
+  -- #84: Genji Glove (47,11), visible on the walk.  It sits at the east end
+  -- of the (46..41,11) west bridge, which only the (58,18) span switch
+  -- ($01F9, _cb2fe7, event_main.asm:45071) opens; that switch's event
+  -- scripts a 6-tile descent (the party ends at (58,24)) and the switch
+  -- tile is unreachable afterwards, so this is a one-way detour taken
+  -- before the (71,15) lever, exactly the probe_vc_chests order (measured
+  -- 2026-08-17: pre-span, every stand around all four east chests is
+  -- NO PATH from the 290-tile doorway component; post-span the bridge
+  -- opens and (71,15) is still reachable from it).
+  H.navTo(58, 18, { playBattles = "flee", maxFrames = 20000 }),
+  (function() local ph = 0
+    return H.driveUntil(function() return sw(0x01F9) == 1 end, 3000, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        if H.battleLoadStarted() then
+          H.setPad({ l = true, r = true }); return
+        end
+        if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
+        H.setPad(ph < 4 and { up = true, a = true } or { up = true })
+      end),
+    }, "face-UP+A on (58,18) -> $01F9 (the west span); scripted descent")
+  end)(),
+  H.waitUntil(landed(384, 15), 3600, "control back after the span descent", 5),
+  H.waitFrames(30),
+  H.openChest{ stand = { 46, 11 }, face = "right", bit = 125,
+               what = "Genji Glove",
+               nav = { playBattles = "flee", maxFrames = 25000 } },
+
   -- ---- 2. the west traverse: two levers, one teleport ---------------------
   H.navTo(71, 15, { playBattles = "flee", maxFrames = 20000 }),
   tapLever(0x0174, 900, "tap-once UP+A on (71,15) -> $0174 (the x=76 column)"),
   stepOff({ "down", "left", "right", "up" }, 2400,
     "step off the (71,15) re-entry trigger"),
+  -- #84: Ether (71,30) and Elixir (88,23), visible on the walk; both open
+  -- only after the (71,15) lever extends the x=76 column bridge (measured,
+  -- probe_vc_chests 2026-08-17: NO PATH to any stand before it, and the
+  -- east chest row opens from the side -- (88,24) stays NO PATH, (89,23)
+  -- is the Elixir's stand)
+  H.openChest{ stand = { 71, 31 }, face = "up", bit = 128, what = "Ether",
+               nav = { playBattles = "flee", maxFrames = 25000 } },
+  H.openChest{ stand = { 89, 23 }, face = "left", bit = 126, what = "Elixir",
+               nav = { playBattles = "flee", maxFrames = 25000 } },
   H.navTo(104, 17, { playBattles = "flee", maxFrames = 30000 }),
   tapLever(0x01F5, 900, "tap-once UP+A on (104,17) -> $01F5 (the tower)"),
   H.release(),
   stepOff({ "down", "left", "right" }, 2400,
     "step off the (104,17) toggle (a further A press would toggle it back)"),
+  -- #84: Magicite (113,6), visible on the walk; its only stand is (114,6),
+  -- inside the tower region the (104,17) toggle flips, so it opens here and
+  -- not a step earlier (measured, probe_vc_chests 2026-08-17: every
+  -- neighbor NO PATH pre-toggle, and the (121,22) descent stays reachable
+  -- from the stand afterwards)
+  H.openChest{ stand = { 114, 6 }, face = "left", bit = 127, what = "Magicite",
+               nav = { playBattles = "flee", maxFrames = 25000 } },
   H.navTo(121, 22, { playBattles = "flee", maxFrames = 20000 }),
   pressWalk("down", function()
     return H.fieldX() <= 8 and H.tileAligned()
@@ -403,6 +451,11 @@ H.run({ maxFrames = 240000 }, {
   -- ---- 7. the world battery save at the crash site, boundary I ------------
   H.call(function()
     H.assertExitContractPreSave("vector-crash-v1")
+    -- #84: the checkpoint ships with the east traverse's four treasure bits
+    H.assertEq(H.chestOpen(125), true, "Genji Glove bit 125 open (384 (47,11))")
+    H.assertEq(H.chestOpen(126), true, "Elixir bit 126 open (384 (88,23))")
+    H.assertEq(H.chestOpen(127), true, "Magicite bit 127 open (384 (113,6))")
+    H.assertEq(H.chestOpen(128), true, "Ether bit 128 open (384 (71,30))")
     H.screenshot("step_hi_i_tile")
   end),
   -- The step's savestate is generated here, before the menu, because the

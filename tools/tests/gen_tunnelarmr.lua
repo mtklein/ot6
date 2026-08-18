@@ -905,8 +905,46 @@ H.run({ maxFrames = 300000 }, {
   -- ===================================================================== --
   go(57, 13, 83, 35, 14, "celes room -> corridor"),
   go(45, 12, 84, 8, 57, "corridor (45,12) -> map 84 (8,57)"),
+  -- #84: the clock map's four chests, all visible on the walk to and from
+  -- the clock.  Stand tiles are measured, not guessed (probe_chests_8487,
+  -- 2026-08-17): the 500-gil chest is approached from ABOVE ((7,53) is
+  -- wall), and the 1500-gil/empty pair from below via the (20..22,56..57)
+  -- pocket ((21,55) and (22,54) are walls).  The gil chests carry no item,
+  -- so the treasure bit is the whole assert; the empty one is opened too,
+  -- because the rule is behavioral -- a human checks what is inside.
+  -- #84: 500 gil, visible on the walk
+  H.openChest{ stand = { 7, 51 }, face = "down", bit = 26, what = "500 gil",
+               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+  -- #84: 1000 gil, visible on the walk ((12,54) is the benign ticking-clock
+  -- dialog trigger _ca793e; navTo taps A through it before the pickup)
+  H.openChest{ stand = { 12, 54 }, face = "down", bit = 28, what = "1000 gil",
+               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+  -- #84: 1500 gil, visible on the walk
+  H.openChest{ stand = { 21, 57 }, face = "up", bit = 27, what = "1500 gil",
+               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+  -- #84: empty chest, visible on the walk
+  H.openChest{ stand = { 22, 56 }, face = "up", bit = 29, what = "(empty)",
+               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   windClock(),
   go(15, 51, 87, 20, 33, "clock passage (15,51) -> map 87 (20,33)"),
+  -- #84: BASEMENT 1's shelf pair, visible from the corridor the crossing
+  -- walks (the chests sit in the y=33 wall row; the y=34 tiles under them
+  -- are the only reachable neighbours -- probe_chests_8487, 2026-08-17).
+  -- Item ids are not asserted: neither is in the recipe's verified table.
+  -- The shelf detour roughly doubles this map's encounter exposure, and the
+  -- first validation run measured what that costs: seven basement pincers
+  -- fought out back-to-back with no healing between them wiped LOCKE+CELES
+  -- on the exit crossing (run sfigaro_escape.oNR7Tl59, 2026-08-17).  So the
+  -- detour is bracketed with the town care idiom: full hp into the shelf
+  -- walk, full hp into the exit crossing.
+  H.fieldCare({ tag = "care before the basement shelf", threshold = 0.95 }),
+  -- #84: RegalCutlass, visible on the walk
+  H.openChest{ stand = { 47, 34 }, face = "up", bit = 34, what = "RegalCutlass",
+               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+  -- #84: Heavy Shld, visible on the walk
+  H.openChest{ stand = { 48, 34 }, face = "up", bit = 35, what = "Heavy Shld",
+               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+  H.fieldCare({ tag = "care before the basement exit", threshold = 0.95 }),
   go(57, 48, 86, 49, 31, "map 87 (57,48) -> map 86 (49,31)"),
 
   -- ===================================================================== --

@@ -68,12 +68,68 @@ local function landed(m, n)
     cnt = ok and cnt + 1 or 0
     if not ok and H.frame - hb >= 600 then
       hb = H.frame
-      H.log(string.format("landed(%d) f%d: map=%d ctl=%s dlg=%s ev=%s (%d,%d)",
+      -- btl, the event PC and the battle-HP words are here because a
+      -- heartbeat without them once read as "a held scene": a random
+      -- encounter that nothing was fighting shows exactly ctl=false ev=true,
+      -- and only these three separate it from a script (gen_zozo4's hangLine
+      -- is the idiom).
+      local raw = {}
+      for e = 0, 3 do raw[#raw + 1] = string.format("%04X",
+        H.readWord(0x3BF4 + e * 2)) end
+      H.log(string.format("landed(%d) f%d: map=%d ctl=%s dlg=%s ev=%s " ..
+        "btl=%s evPC=%02X:%02X%02X bhp=%s (%d,%d)",
         m, H.frame, map(), tostring(H.hasControl()),
         tostring(H.dialogWaiting()), tostring(H.eventRunning()),
-        H.fieldX(), H.fieldY()))
+        tostring(H.battleLoadStarted()),
+        H.readByte(0x00e7), H.readByte(0x00e6), H.readByte(0x00e5),
+        table.concat(raw, ","), H.fieldX(), H.fieldY()))
     end
     return cnt >= (n or 20)
+  end
+end
+
+-- A rolled encounter must be FOUGHT, not sat through.  The two hand-rolled
+-- drives after the clock (stepping off the trigger tile, and the calm wait
+-- before the save) used to carry no battle handling at all, and map 225
+-- rolls random battles on every step.  Measured 2026-08-17 on the failing
+-- post-wave run, replayed with the heartbeat instrumented: the step off the
+-- clock tile chained one extra step onto (98,61) -- the arrival-instant
+-- pad-latch hazard gen_zozo4's corridor documents -- that step rolled an
+-- encounter (btl=true, evPC=$CA0029, inside RandBattle), and with nobody
+-- fighting it the pack took the party from four standing to one across the
+-- wait's whole budget (bhp 0000,0051,0073,0080 -> 0000,0051,0000,0000).
+-- What read as "a held scene carrying the party" was a live, unfought
+-- battle.  This is gen_zozo4's `encounters` rider, on the same options this
+-- file's own navTo steps use; a wipe is a hard FAIL because these two
+-- drives have no checkpoint to retry from.
+local function battleHpAllZero()
+  for e = 0, 3 do
+    if H.readWord(0x3BF4 + e * 2) ~= 0 then return false end
+  end
+  return true
+end
+local function encounters(what)
+  local F = H.newFightDriver(what, { tactical = true, boost = true,
+    items = true, healPercent = 55, tool = H.BIO_BLASTER })
+  local dead = 0
+  return function()
+    if battleHpAllZero() and not H.hasControl() and H.eventRunning() then
+      dead = dead + 1
+      if dead >= 300 then
+        error(string.format("%s: THE PARTY IS WIPED -- all four battle-HP " ..
+          "words have read 0 with the event running and no control for 300 " ..
+          "consecutive frames, at (%d,%d) on map %d.  This is a lost fight, " ..
+          "not a stuck walk.", what, H.fieldX(), H.fieldY(), map()), 0)
+      end
+    else
+      dead = 0
+    end
+    if H.battleLoadStarted() then
+      F.frame()
+      return true
+    end
+    F.idle()
+    return false
   end
 end
 
@@ -182,26 +238,68 @@ H.run({ maxFrames = 90000 }, {
   -- its early EventReturn, but the event PC still enters, so eventRunning
   -- flickers and hasControl never holds.  This is the same stood-on-trigger
   -- hazard gen_mines_chase documents; walk one tile south to leave it.
-  H.driveUntil(function()
-    return H.fieldY() > 59 and H.hasControl() and H.tileAligned()
-  end, 900, { H.hold({ "down" }), H.waitFrames(4) }, "off the clock tile"),
+  --
+  -- The press is PULSED, never held: press down only while aligned on the
+  -- clock tile, clear it the instant the step is in flight.  The previous
+  -- H.hold here was still down at the arrival instant, and the engine
+  -- latches a second step before the drive can react (the corridor-chaining
+  -- hazard gen_zozo4 documents) -- so the party was CARRIED onto (98,61),
+  -- and the extra step rolled the random encounter the header of
+  -- `encounters` describes.  An earlier reading of that heartbeat called
+  -- the carry "something scripted"; it was our own held pad.
+  (function()
+    local hb = 0
+    local fought = encounters("off the clock tile")
+    return H.driveUntil(function()
+      return H.fieldY() > 59 and H.hasControl() and H.tileAligned()
+    end, 9000, {
+      H.call(function()
+        hb = hb + 1
+        if fought() then return end
+        if H.dialogWaiting() then
+          H.setPad(hb % 8 < 4 and { "a" } or {})
+          return
+        end
+        -- no hasControl gate on the press: on the trigger tile the event
+        -- re-enters every frame, so control FLICKERS, and a press gated on
+        -- it can starve.  Pad input during the event frames is ignored, so
+        -- pressing through the flicker is what the old hold did too; the
+        -- alignment gate alone is what stops the chained second step.
+        if H.tileAligned() and H.fieldY() <= 59 then
+          H.setPad({ down = true })
+        else
+          H.setPad({})
+        end
+      end),
+    }, "off the clock tile")
+  end)(),
   H.release(),
-  -- Pin the wait to (98,60) exactly.  The held press can carry one extra
-  -- step onto (98,61) -- the revealed staircase's own trigger tile -- and
-  -- standing there flickers eventRunning the same way the clock tile does,
-  -- so the calm wait below can never hold (the enumeration regen after the
-  -- #84 wave measured exactly that: ev=true at (98,61), 1200-frame
-  -- timeout).  One tap back up is the same stood-on-trigger cure the step
-  -- above documents.
-  H.driveUntil(function()
-    return H.fieldY() == 60 and H.tileAligned()
-  end, 600, {
-    H.call(function()
-      H.setPad(H.fieldY() > 60 and { up = true } or {})
-    end),
-  }, "pinned off the staircase trigger"),
+  -- The calm wait still actively pins the party at (98,60): if a fight or
+  -- any residual nudge leaves it south of 60, tap back up (the
+  -- stood-on-trigger cure applied continuously), and fight anything the
+  -- pacing rolls.  The budget covers one full tactical fight -- this
+  -- file's own street fights ran 4000-7000 frames -- where the old 2400
+  -- could time out on a fight it was winning.
+  (function()
+    local hb = 0
+    local fought = encounters("calm after the shake")
+    return H.driveUntil(landed(225, 20), 12000, {
+      H.call(function()
+        hb = hb + 1
+        if fought() then return end
+        if H.dialogWaiting() then
+          H.setPad(hb % 8 < 4 and { "a" } or {})
+          return
+        end
+        if H.hasControl() and H.tileAligned() and H.fieldY() > 60 then
+          H.setPad({ up = true })
+        else
+          H.setPad({})
+        end
+      end),
+    }, "calm after the shake, pinned at (98,60)")
+  end)(),
   H.call(function() H.setPad({}) end),
-  H.waitUntil(landed(225, 20), 1200, "calm after the shake", 1),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(sw(0x01F0), 1, "$01F0 SET -- clock solved, stairs open")

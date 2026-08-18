@@ -23,3 +23,54 @@
 # treasure record's switch word (ff6/src/field/player.asm:782-789).  Twenty-
 # five bits are shared by two or three records, because duplicate map copies
 # have to close the same chest, so one line here can cover more than one map.
+2	map 30 Elder's House, Elixir (55,30) -- the #84 wave
+11	map 50 mines chase, Fenix Down (65,28)
+12	map 50 mines chase, Sleeping Bag (52,33)
+14	map 59 Figaro shop alcove, Tonic (43,12)
+15	map 59 Figaro shop alcove, Antidote (44,12)
+20	map 75 South Figaro, Fenix Down (22,18)
+21	map 75 South Figaro, Tonic (32,16)
+22	map 75 South Figaro, Antidote (15,45)
+23	map 75 South Figaro, Eyedrop (15,47)
+24	map 75 South Figaro, Tonic (6,31)
+25	map 75 South Figaro, Green Cherry (14,28)
+26	map 84 Figaro cave, 500 gil (7,52)
+27	map 84 Figaro cave, 1500 gil (21,56)
+28	map 84 Figaro cave, 1000 gil (12,55)
+29	map 84 Figaro cave, empty chest (22,55) -- a human opens it too
+30	map 86 grandson's house, Tonic (15,10)
+31	map 86 rich man's house, Elixir (7,31)
+34	map 87 Figaro basement, RegalCutlass (47,33)
+35	map 87 Figaro basement, Heavy Shld (48,33)
+37	maps 96/97 Mt. Kolts, Tent (27,14) -- shared bit, two copies
+38	maps 96/97 Mt. Kolts, Guardian (28,27) -- shared bit
+39	map 100 Mt. Kolts, Atlas Armlet (30,33)
+40	map 100 shelf A, Tent (8,52) -- opened by gen_returner past Vargas
+41	map 109 Returners' Hideout, Green Cherry (26,21)
+42	map 110 hideout west, Fenix Down (28,49)
+48	map 110 hideout east, Potion (55,48)
+50	map 117 Imperial Camp, Star Pendant (45,5) -- the sealed-chest gag, kicked
+66	map 209 Owzer's House, Tincture (125,11)
+68	map 386 gate cave, Tent (77,52)
+77	map 250 Vector, Back Guard (24,48)
+78	map 250 Vector, X-Potion (25,48)
+81	map 252 banquet hall, Tincture (42,55) -- opened inside the timed window
+84	map 262 factory, X-Potion (7,44)
+85	map 262 factory, Remedy (25,52)
+87	map 262 factory, ThunderBlade (25,44) -- HANDOFF's walked-past weapon
+89	map 263 factory, Gold Helmet (14,55)
+92	map 263 factory, Tent (42,46)
+93	map 263 factory, Gold Armor (32,57)
+94	map 271 research facility, Break Blade (8,37)
+122	map 382 gate cave, Assassin (36,39)
+123	map 383 gate cave, Tempest (48,56)
+124	map 384 gate cave west, Ether (29,23)
+125	map 384 gate cave east, Genji Glove (47,11) -- the span-switch bridge
+126	map 384 gate cave east, Elixir (88,23)
+127	map 384 gate cave east, Magicite (113,6) -- behind the (104,17) toggle
+128	map 384 gate cave east, Ether (71,30)
+133	map 385 gate cave timed floor, Coin Toss (3,8)
+134	map 385 gate cave timed floor, X-Potion (14,4)
+231	map 75 South Figaro, Warp Stone (11,23)
+239	map 225 Zozo clock shelf, Tincture (104,9)
+240	map 225 Zozo clock shelf, Potion (105,9)

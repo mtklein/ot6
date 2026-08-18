@@ -364,6 +364,7 @@ local function circuitRunner()
   local cur, curWhat, curLatch = nil, nil, nil
   local stuckAt, cappedAt = nil, nil
   local inFight, ph = false, 0
+  local chestTries = 0
   local F = H.newFightDriver("banquet window", { tactical = true,
     boost = true, bank = 1, items = true, healPercent = 60, cadence = 12 })
   return {
@@ -424,6 +425,38 @@ local function circuitRunner()
         ph = (ph + 1) % 8
         H.setPad(H.dialogWaiting() and (ph < 4 and { "a" } or {}) or {})
         return "frame"
+      end
+      -- #84: the Tincture at 252 (42,55), visible on the walk -- the six
+      -- 252 soldiers stand around it.  Taken INSIDE the window, the first
+      -- settled moment the circuit stands on this map, because the window
+      -- is the only time the room is honestly round-trippable: after the
+      -- banquet the (35,60) return stair refuses the real step ("edge
+      -- (35,59)->down blocked in reality", three runs, 2026-08-17) and the
+      -- (35,48) stair lands in a pocket with no path back to the corridor,
+      -- while the circuit crosses both stairs mid-window fine.  Cost is
+      -- ~600 frames against the measured ~5900 idle frames the window ends
+      -- with; a chest opens no score, so the cap guard is unaffected.  The
+      -- stand tile is picked live (the soldiers wander onto any fixed
+      -- neighbour), and five aborted picks give up loudly rather than
+      -- burning the window.
+      if map() == 252 and not H.chestOpen(81) and chestTries < 5 then
+        local stand =
+          (H.bfsPath(41, 55) and { { 41, 55 }, "right" })
+          or (H.bfsPath(42, 54) and { { 42, 54 }, "down" })
+          or (H.bfsPath(42, 56) and { { 42, 56 }, "up" })
+        if stand then
+          chestTries = chestTries + 1
+          curWhat, curLatch = "252 Tincture chest", nil
+          routeLog[#routeLog + 1] = string.format(
+            "f%-6d t=%-5d chest  252 Tincture (try %d)",
+            H.frame, timerCount(), chestTries)
+          -- $EB: the id gen_opera1_entry's Tincture pickup already asserts
+          cur = H.openChest{ stand = stand[1], face = stand[2], bit = 81,
+                             what = "Tincture", item = 0xEB,
+                             nav = { playBattles = "flee", maxFrames = 2500,
+                                     noPathRetries = 3 } }
+          return "frame"
+        end
       end
       if var0() >= TALK_BELOW then
         if not cappedAt then

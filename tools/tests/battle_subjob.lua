@@ -435,8 +435,16 @@ H.run({ maxFrames = 150000 }, {
   -- C: bank the second bp with one real item turn, then two real R edges
   -- and a real cursor walk cast the granted Bolt as a fold
   H.call(function() celesMode = "item" end),
-  driveTo(function() return bp(celes) >= 2 end, 20000,
-    "[C] second bp banked by a real item turn"),
+  -- The predicate waits for BOTH facts the cast below needs.  Measured on
+  -- the re-made fixture (2026-08-18): the bank alone read 2 after 294
+  -- frames, before her item turn had resolved (the pool still read the 41
+  -- she arrives with) -- bp also arrives through the earn paths
+  -- (Ot6RunicBP/Ot6CoverBP beside Ot6ActionEnd's regen), so gating on bp
+  -- alone let the phase race past the Tincture.
+  driveTo(function()
+    return bp(celes) >= 2 and mp(celes) >= BOLT3_MP
+  end, 20000,
+    "[C] second bp banked and the Tincture restore landed (real item turn)"),
   H.call(function()
     R.mp0 = mp(celes)
     H.assertEq(R.mp0 >= BOLT3_MP, true,

@@ -878,9 +878,24 @@ local function jitterStep(k)
     H.call(function() H.setPad({}) end),
   }, {})
 end
+-- NOTE: this ladder (climbAttempt/burnStep/jitterStep/climbBody) is not on
+-- the live route today -- the run list crosses the shaft with bridgeClimb(),
+-- which treats any in-shaft encounter as a product regression.  The ladder
+-- is kept as the fallback for a shaft that rolls encounters again, and
+-- attempt 1 now captures the checkpoint its reload path loads: before this,
+-- climbBlob was declared and reloaded but never assigned, so any attempt
+-- past the first would have called requestLoadState(nil).
 local function climbAttempt(n)
-  local ldReq
+  local ldReq, ckReq
   return H.cond(function() return not climbDone end, {
+    H.cond(function() return n == 1 end, {
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "pre-climb checkpoint")
+        climbBlob = ckReq.blob
+      end),
+    }, {}),
     H.cond(function() return n > 1 end, {
       H.logStep(function()
         return string.format("[bridge2] ATTEMPT %d -- reloading the " ..
@@ -954,6 +969,83 @@ local function bridgeClimb()
       H.log(string.format("[bridge2] crossed directly in %d frames; " ..
         "danger stayed $%04X", hb, H.readWord(0x1f6e)))
     end),
+  })
+end
+
+-- THE U1 CRANE-ROOF CROSSING (map 221): from the stair room's exit door the
+-- party lands at (30,43) and must reach (29,39), the J39 jump row's east
+-- end.  Two prior drives both failed here and the failures are on the
+-- record:
+--  * followPath(29,39) oscillated on the (30..32,43) strip for its whole
+--    18000-frame budget (measured 2026-08-17) -- the file's own all-z-BFS
+--    hazard, on the "/" beam this crossing climbs.
+--  * navTo(29,39), the wave's repair for that, walked the party OFF THE
+--    REGION: navTo's BFS does not model door tiles, and its 5-step plan
+--    from (30,43) crossed (30,42) -- a short-entrance source (DOORS221)
+--    leading back into the stair room at 225 (47,10), from which nothing
+--    on map 225 reaches (29,39).  The run died on "no path
+--    (47,10)->(29,39)" after 20 retries (measured 2026-08-17, /tmp/fz4b).
+--    The wave-era comment blaming "a different stair exit door" was wrong:
+--    the failing run's own tile trail exits by the same 225 (46,9) door to
+--    the same (30,43) landing the passing pre-wave run used.
+-- So the crossing is a measured per-tile table like bridgeCross.  The tiles
+-- are probe_u1route.lua's live-map BFS route from (30,43), which is
+-- IDENTICAL at all four z seeds and matches the passing baseline's tile
+-- trail exactly (base_regen.log, [tiles] map=221 after the stair segment,
+-- (31,44)/(32,44) included): the crossing is one more of this map's z-loop
+-- tiers -- $0B drop (31,44), $41 beam base (32,44), $44/$44 chain
+-- (33,43)/(34,42), $49 top (35,41) -- then west along the y=40 strip and
+-- north to (29,39).  The beam MUST be entered at its (32,44) base: a first
+-- cut of this table walked east along y=43 instead and parked at (33,43)
+-- forever, because a $44 tile's diagonal is z-suppressed at z=2
+-- (player.asm's c&$04 + z==2 rule) and only stepping off the $41 base
+-- flips the party to the z where the chain is alive (measured 2026-08-17:
+-- 24000 frames at (33,43) z2 with canStep refusing "upright").  canStep
+-- gates every move on the live z, and door (30,42) is never on the table.
+local U1CROSS = {}
+local function u1(x, y, dir) U1CROSS[key(x, y)] = dir end
+u1(30, 43, "right"); u1(31, 43, "down"); u1(31, 44, "right")    -- to the base
+u1(32, 44, "upright")                                           -- $41 base
+u1(33, 43, "upright"); u1(34, 42, "upright"); u1(35, 41, "up")  -- the "/" beam
+u1(35, 40, "left"); u1(34, 40, "left"); u1(33, 40, "left")
+u1(32, 40, "left"); u1(31, 40, "left")
+u1(30, 40, "up"); u1(30, 39, "left")                            -- -> (29,39)
+local function u1Cross()
+  local hb = 0
+  local fought = encounters("u1Cross")
+  return H.cond(function() return true end, {
+    H.driveUntil(function()
+      if H.fieldX() == 29 and H.fieldY() == 39 and H.tileAligned() then
+        H.setPad({})
+        return true
+      end
+      return false
+    end, 24000, {
+      H.call(function()
+        hb = hb + 1
+        if hb % 600 == 0 then
+          H.log(string.format("[u1] f+%d at (%d,%d) z%d ctl=%s", hb,
+            H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3,
+            tostring(H.hasControl())))
+        end
+        if fought() then return end
+        if H.dialogWaiting() then
+          H.setPad(hb % 8 < 4 and { "a" } or {})
+          return
+        end
+        if not H.hasControl() then H.setPad({}); return end
+        if not H.tileAligned() then H.setPad({}); return end
+        local x, y = H.fieldX(), H.fieldY()
+        local dir = U1CROSS[key(x, y)]
+        if dir and H.canStep(x, y, dir) then
+          H.setPad({ [PRESS[dir]] = true })
+        else
+          H.setPad({})
+        end
+      end),
+    }, "U1 crane roof -> (29,39), the J39 row"),
+    H.logStep(function() return string.format(
+      "u1Cross: at (%d,%d) on map %d", H.fieldX(), H.fieldY(), map()) end),
   })
 end
 
@@ -1360,7 +1452,10 @@ H.run({ maxFrames = 400000 }, {
   H.waitUntil(settled, 2400, "U1 settled", 5),
   H.waitFrames(150),
   climbCare("after the stair climb"),
-  followPath(29, 39, { maxFrames = 18000 }),
+  -- u1Cross, not followPath (which oscillated on the strip) and not navTo
+  -- (which walked into the (30,42) door and off the region) -- both
+  -- failures and the measured baseline route are in u1Cross's header.
+  u1Cross(),
   climbCare("before the J39 row"),
   jumpRow("left", function()
     return H.fieldX() <= 18 and H.fieldY() == 39
@@ -1400,6 +1495,12 @@ H.run({ maxFrames = 400000 }, {
   H.openChest{ stand = { 105, 10 }, face = "up", bit = 240,
                what = "Potion", item = 0xE9,
                nav = { playBattles = "tactical", tool = H.BIO_BLASTER } },
+  -- back ONTO the direction table before resuming it: the table-drive
+  -- presses nothing on a tile it has no entry for, and (105,10) is such a
+  -- tile -- the resume stalled its whole budget there (the closing agent's
+  -- west-room timeout).
+  H.navTo(104, 16, { maxFrames = 8000, playBattles = "tactical",
+                     tool = H.BIO_BLASTER }),
   westRoomCross(),
   climbCare("after the west room"),
   followPath(18, 33, { maxFrames = 12000 }),

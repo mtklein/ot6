@@ -350,6 +350,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
   local calm = 0
   local fought, wasBattle = 0, false
   local stuckN, battleFrames, segFrames = 0, 0, 0
+  local segCalm, coasting = 0, false
   local function makePlan(actor)
     -- `worldWalkFight()` episodes are constructed before H.run starts, so
     -- resolve this at execution time.  The field party byte is repurposed in
@@ -498,24 +499,41 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     -- opts.segment: hand control back after any ONE fought battle, once
     -- the world is live again -- the caller interleaves H.fieldCare
     -- between battles, healing on the FIELD where it costs no battle
-    -- turns (the sustain arithmetic below is why).  A segment also
-    -- exits the INSTANT it stands parked on its target: calm>=30
-    -- basically never holds on the Veldt (the danger bit stays hot
-    -- between reloads), so a no-battle segment that arrived would
-    -- otherwise sit on the tile burning its whole budget into a raise.
-    -- The tile clause is for a walk that ENDS on a tile.  An
-    -- arriveOffWorld walk ends by leaving the world, and its goal tile is
-    -- a town entrance that fires when the tile is ENTERED, so a segment
-    -- that exits while parked on it strands the walk: measured 2026-08-12,
-    -- transit segments 5 through 20 each satisfied in 0 frames standing on
-    -- (220,115) while Mobliz never loaded, and all three ladder attempts
-    -- ran out of segments with the party healthy.
+    -- turns (the sustain arithmetic below is why).  The tile clause is
+    -- for a walk that ENDS on a tile.  An arriveOffWorld walk ends by
+    -- leaving the world, and its goal tile is a town entrance that fires
+    -- when the tile is ENTERED, so a segment that exits while parked on
+    -- it strands the walk: measured 2026-08-12, transit segments 5
+    -- through 20 each satisfied in 0 frames standing on (220,115) while
+    -- Mobliz never loaded, and all three ladder attempts ran out of
+    -- segments with the party healthy.
+    --
+    -- The exit COASTS for 60 quiet frames rather than firing the instant
+    -- the condition first reads true.  Measured 2026-08-17 on
+    -- s2_gau_joined (route a1 fence north seg 1, deterministic across
+    -- four runs): the arrival step's encounter roll lands AFTER a
+    -- one-frame exit read -- $E8 read $00 at the handoff and $28 (bit5
+    -- battle pending, bit3 once-per-tile) within 15 frames, with no
+    -- input pressed in between, so the battle was already owed and fired
+    -- on its own.  An instant exit handed that battle to the fieldCare
+    -- stop behind it, whose menu opener pressed X into the battle for
+    -- its whole 1800-frame budget.  While coasting the driver presses
+    -- nothing (an earlier draft of parked-waiting jittered left/right,
+    -- and every one of those steps was a fresh encounter roll); if the
+    -- owed battle declares itself the quiet count resets, this walk's
+    -- own driver fights it, and the exit coasts again from the far side.
+    -- So the care stop only ever opens on a world that has stayed quiet
+    -- for a full second, 4x the measured 15-frame roll latency.
     if opts.segment and H.worldMode() and H.worldHasControl()
-       and H.worldAligned() and not H.battleLoadStarted() then
-      if fought >= 1 then return true end
-      if not arriveOffWorld and H.worldX() == tx and H.worldY() == ty then
-        return true
-      end
+       and H.worldAligned() and not H.battleLoadStarted()
+       and (fought >= 1
+            or (not arriveOffWorld and H.worldX() == tx
+                and H.worldY() == ty)) then
+      segCalm = segCalm + 1
+      coasting = true
+      if segCalm >= 60 then return true end
+    else
+      segCalm, coasting = 0, false
     end
     -- SEGMENT TIMEOUT IS A LADDER LOSS, NOT A RUN ABORT.  A segment
     -- runs behind the route/staging ladder, so a draw that will not
@@ -666,6 +684,10 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
         return
       end
       stuckN = 0
+      -- Coasting toward a segment exit (see the predicate): stand still.
+      -- A step here would start a fresh encounter roll, which is the
+      -- exact race the coast exists to flush out.
+      if coasting then H.setPad({}); return end
       local p = H.worldBfs(tx, ty)
       if p and #p > 0 then
         H.setPad({ [p[1]] = true })

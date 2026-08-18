@@ -1424,6 +1424,18 @@ function M.phaseWalk(tx, ty, spec)
   local hb = -300
   local battN, aPhase = 0, 0
 
+  -- Encounters are fled with the shared corridor policy (the same driver
+  -- navTo's playBattles="flee" runs), and a wipe is named a wipe.  This
+  -- branch used to lean on the kill-bit cheat; #75 removed that, which
+  -- silently left any encounter here fought by blind A-taps -- measured
+  -- 2026-08-17 on gate_cave_save, where a Zombone draw during a crossing
+  -- ended in "no clock edge observed" instead of a fight report.
+  local wipeCheck = wipeCanary("phaseWalk")
+  local tactical = M.newFightDriver("phaseWalk",
+    { tactical = true, boost = true, items = true,
+      healPercent = spec.healPercent or 55 })
+  local flee = newFlee(spec, tactical)
+
   local function curPhase() return swv(swB) == 1 and "b" or "a" end
   local function otherOf(p) return p == "a" and "b" or "a" end
   local function fsf() return lastFlip and (M.frame - lastFlip) or -1 end
@@ -1534,20 +1546,17 @@ function M.phaseWalk(tx, ty, spec)
   end, spec.maxFrames or 30000, {
     M.call(function()
       aPhase = (aPhase + 1) % 8
+      wipeCheck()
       battN = M.battleLoadStarted() and battN + 1 or 0
+      if tactical and battN == 0 then tactical.idle() end
       if battN >= 3 then
         if plan or lastFlip then
-          M.log(string.format("[phaseWalk] encounter at f%d -- battle-clear write, "
+          M.log(string.format("[phaseWalk] encounter at f%d -- flee, "
             .. "then re-observe", M.frame))
         end
         plan, grids, lastFlip, lastB = nil, {}, nil, nil
         begunSeg, hp0, obsStart = -1, nil, nil
-        for s = 0, 5 do
-          if M.readByte(0x3aa8 + s * 2) % 2 == 1 then
-            M.killbit(s)
-          end
-        end
-        M.setPad(aPhase < 4 and { "a" } or {})
+        flee(battN)
         return
       end
       if battN > 0 then M.setPad({}); return end

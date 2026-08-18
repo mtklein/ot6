@@ -38,8 +38,10 @@
 --   BushidoLevelTbl is 1, 6, 12, 15, 24, 34, 44, 70
 --   (ff6/src/field/event.asm:1235-1236), read by UpdateCyan at :1181-1199,
 --   so the count changes as the route's levels change.  He arrives at
---   camp_escaped at level 12 today, which is the third threshold: Dispatch,
---   Retort and Slash.  He used to arrive at 11 and the window was two rows.
+--   camp_escaped at level 13 today (the #84 chest wave's extra fights moved
+--   him up from 12), which still sits between the third threshold (12) and
+--   the fourth (15), so the window stays three rows: Dispatch, Retort and
+--   Slash.  He used to arrive at 11 and the window was two rows.
 --   If this file's ceiling assertion goes red again, check his level at the
 --   savestate before suspecting the feature.
 --
@@ -318,12 +320,15 @@ H.run({ maxFrames = 150000 }, {
     -- his level, so a route that levels him differently should say so here
     -- rather than read as a broken feature.  Character record 2 is CYAN;
     -- +$08 is level ($1600 + c*37, tools/savestate_party.py's layout).
-    H.assertEq(H.readByte(0x1600 + 2*37 + 8), 12,
-      "CYAN arrives at camp_escaped at level 12 -- BushidoLevelTbl's third "
-      .. "threshold (event.asm:1235), which is what sets the ceiling below")
+    -- 13 follows the fixture: the #84 chest wave's extra fights level him
+    -- 12 -> 13, still short of BushidoLevelTbl's fourth threshold (15), so
+    -- the three-tech ceiling below is unchanged.
+    H.assertEq(H.readByte(0x1600 + 2*37 + 8), 13,
+      "CYAN arrives at camp_escaped at level 13 -- past BushidoLevelTbl's "
+      .. "third threshold (event.asm:1235), which is what sets the ceiling below")
     R.ceiling = H.readWord(KNOWN)
     H.assertEq(R.ceiling & 0xFF, 2,
-      "his REAL ceiling is 2 (three techs learned at level 12, "
+      "his REAL ceiling is 2 (three techs learned at level 13, "
       .. "BushidoLevelTbl 1/6/12; the high byte carries "
       .. "InitSkills' garbage, the #4 regression's true shape)")
     H.assertEq(bp(), 1, "the natural opening bank (Ot6InitBP)")
@@ -420,8 +425,8 @@ H.run({ maxFrames = 150000 }, {
     local steps = {}
     -- Ceiling 1 (the two-row window) is swept here now that his real ceiling
     -- is 2: it was the natural case while he arrived at level 11 and is
-    -- poke-only at level 12, so it moves into the sweep rather than being
-    -- dropped.  Ceiling 2 leaves the sweep because the arms above cover it
+    -- poke-only from level 12 on, so it moves into the sweep rather than
+    -- being dropped.  Ceiling 2 leaves the sweep because the arms above cover it
     -- naturally.
     for _, ceil in ipairs({ 0, 1, 3, 4, 5, 7 }) do
       steps[#steps+1] = H.call(function()

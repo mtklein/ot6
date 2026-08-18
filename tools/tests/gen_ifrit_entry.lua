@@ -206,6 +206,22 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("mrf_264_landing")
   end),
 
+  -- Repair whatever the map-263 crossing cost before anything downstream
+  -- is measured or captured.  The crossing above runs playBattles="flee",
+  -- and a fled encounter is not a free one: the enemies keep swinging for
+  -- the whole hold.  Measured 2026-08-18 on the chest-wave regeneration:
+  -- a 263 encounter fired at (40,43), the flee held ~1200 frames to
+  -- disengage, SABIN left it at 0 HP, and with no care stop and no exit
+  -- contract this generator shipped him dead in ifrit_entry.mss --
+  -- audit_party_hp was the only thing that noticed.  Same two-part shape
+  -- as gen_mrf_chute's stops: fieldCare is the repair, and
+  -- H.assertPartyStanding at the exit below is the contract that keeps a
+  -- stop that silently did nothing from reporting the same green as one
+  -- that worked.  Threshold 0.85 for the same reason as mrf_chute's:
+  -- what remains here is trash encounters, and gen_ifrit_magicite runs
+  -- its own 0.95 stop before battle 70.
+  H.fieldCare({ tag = "care after the 263 crossing", threshold = 0.85 }),
+
   -- 1b. The boundary detour (issue #25).  This step is A->B's terminal, so
   --     before parking on the fight's entry point it walks the {3,5} door
   --     into the map-270 save room, stands on the save point, and asserts
@@ -280,6 +296,11 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.readByte(0x1A69) & 0x02, 0, "IFRIT not yet owned ($1A69 bit1)")
     H.assertEq(H.readByte(0x1A69) & 0x04, 0, "SHIVA not yet owned ($1A69 bit2)")
     H.assertEq(H.readByte(0x1A69) & 0x01, 0x01, "RAMUH owned from Zozo ($1A69 bit0)")
+    -- The casualty contract (see the care stop after the 263 crossing):
+    -- this fixture is what gen_ifrit_magicite and the magicite chain boot,
+    -- so a party member down or near fatal here is a loss shipped
+    -- downstream, not a state of the story getting somewhere.
+    H.assertPartyStanding("ifrit_entry")
     H.log(string.format("[ifrit_entry] f%d map=%d (%d,%d) face=%d $1A69=%02X",
       H.frame, map(), H.fieldX(), H.fieldY(),
       H.readByte(0x087f + H.readWord(0x0803)), H.readByte(0x1A69)))

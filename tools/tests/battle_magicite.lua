@@ -294,15 +294,27 @@ local function decide()
     -- party wiped about 5000 frames later, which surfaced as a 60000-frame
     -- timeout on the Shell walk.
     --
-    -- Heal only when somebody is hurt; a healthy party defers, so the arms
-    -- still finish before the boss's focus fire adds up (measured: boot A's
-    -- always-item healer died before the Inferno arm).
+    -- Heal only when somebody is badly hurt; a healthy party defers, so the
+    -- arms still finish before the boss's focus fire adds up (measured:
+    -- boot A's always-item healer died before the Inferno arm).
+    --
+    -- The threshold and the empty-bag defer follow the fixture
+    -- (2026-08-18): n024_entry now arrives with 7 Tonics and NO Potions
+    -- (the #84 route's care stops spent them), and the old 70% threshold
+    -- burned all seven inside the opening ~3500 frames.  The medic then
+    -- looped forever on a dry bag -- open Item, find nothing, close, reopen
+    -- (measured: the state histogram sat at $05/$09/$0a/$01 while the
+    -- actor-0 window held the queue, which is the Inferno-arm timeout's
+    -- whole mechanism) -- so a medic with nothing to give now defers the
+    -- turn instead of opening the list, and the bar for spending one of
+    -- the seven is the old badly-hurt line.
     local hurt = false
     for s2 = 0, 3 do
       local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
-      if h > 0 and m > 0 and h * 100 // m < 70 then hurt = true end
+      if h > 0 and m > 0 and h * 100 // m < 45 then hurt = true end
     end
-    if st == ST_CMD and not hurt then btn = "x"
+    local bagHasHeal = bagIdxOf({ TONIC, POTION }) ~= nil
+    if st == ST_CMD and not (hurt and bagHasHeal) then btn = "x"
     elseif st == ST_CMD then
       local want = cmdRowOf(act, CMD_ITEM)
       if want == nil then btn = "x"
@@ -313,8 +325,7 @@ local function decide()
       end
     elseif st == ST_ITEM then
       -- A Tonic's 50 does not cover a round from this boss, so somebody
-      -- badly hurt gets the Potion: measured on the care stop above, one
-      -- took CELES from 151 to a full 349.  Tonics carry the rest.
+      -- badly hurt gets the Potion when one exists; Tonics carry the rest.
       local worstPct = 101
       for s2 = 0, 3 do
         local h, m = hp(s2), H.readWord(0x3C1C + s2*2)

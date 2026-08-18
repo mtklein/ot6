@@ -68,6 +68,15 @@ local STATE = "build/states/moogle_defense.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_DANCE, ST_TGT = 0x05, 0x21, 0x38
+-- The bystanders' "right swaps Fight->Def, then A" turn consumption passes
+-- through menu state $27, the def. confirmation (btlgfx_main.asm:19186:
+-- right on Fight enters it, A there queues command $15).  Measured
+-- 2026-08-18 on the re-made moogle_defense: the old catch-all "b on any
+-- non-command state" canceled $27 before the A of the 40-frame cadence
+-- could land, so a bystander whose Def the arm needed oscillated
+-- $05 <-> $27 without ever consuming its turn, MOG's window never came
+-- back, and the input-driven phases timed out.  $27 takes the A instead.
+local ST_DEF = 0x27
 local CMD_DANCE = 0x13
 local CMDTBL = 0x202E
 local MOG = 0x0A
@@ -180,6 +189,15 @@ local function mogMenu(what)
   end, 30000, {
     H.call(function()
       ph = ph + 1
+      if H.frame - hb >= 600 then
+        hb = H.frame
+        H.log(string.format("[mogmenu f%d] batt=%s mons=%d menu=%02x actor=%d "
+          .. "mstate=%02x party=%d mogHp=%d", H.frame,
+          tostring(H.battleLoadStarted()), H.monstersPresent(),
+          H.readByte(MENU), H.readByte(ACTOR), H.readByte(MSTATE),
+          H.readByte(FIGHTPARTY),
+          mogSlot and H.readWord(0x3BF4 + mogSlot * 2) or -1))
+      end
       if not H.battleLoadStarted() then H.setPad({}) return end
       if H.readByte(MENU) == 0 then
         H.setPad(ph % 8 < 4 and { a = true } or {})
@@ -189,7 +207,8 @@ local function mogMenu(what)
       if a ~= mogSlot then
         local st = H.readByte(MSTATE)
         local step = ph % 40
-        if st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
+        if st == ST_DEF then H.setPad(ph % 10 < 5 and { a = true } or {})
+        elseif st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
         elseif step < 4 then H.setPad({ right = true })    -- Fight -> Def
         elseif step >= 20 and step < 24 then H.setPad({ a = true })
         else H.setPad({}) end
@@ -390,7 +409,8 @@ H.run({ maxFrames = 250000 }, {
       if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= mogSlot then
         local st = H.readByte(MSTATE)
         local step = ph % 40
-        if st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
+        if st == ST_DEF then H.setPad(ph % 10 < 5 and { a = true } or {})
+        elseif st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
         elseif step < 4 then H.setPad({ right = true })
         elseif step >= 20 and step < 24 then H.setPad({ a = true })
         else H.setPad({}) end
@@ -464,7 +484,8 @@ H.run({ maxFrames = 250000 }, {
       if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= mogSlot then
         local st = H.readByte(MSTATE)
         local step = ph % 40
-        if st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
+        if st == ST_DEF then H.setPad(ph % 10 < 5 and { a = true } or {})
+        elseif st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
         elseif step < 4 then H.setPad({ right = true })
         elseif step >= 20 and step < 24 then H.setPad({ a = true })
         else H.setPad({}) end
@@ -494,7 +515,8 @@ H.run({ maxFrames = 250000 }, {
       elseif H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= mogSlot then
         local st = H.readByte(MSTATE)
         local step = ph % 40
-        if st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
+        if st == ST_DEF then H.setPad(ph % 10 < 5 and { a = true } or {})
+        elseif st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
         elseif step < 4 then H.setPad({ right = true })
         elseif step >= 20 and step < 24 then H.setPad({ a = true })
         else H.setPad({}) end

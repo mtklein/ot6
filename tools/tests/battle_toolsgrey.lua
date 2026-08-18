@@ -39,12 +39,27 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_CMD, ST_TOOLS, ST_TGT = 0x05, 0x30, 0x38
-local CMD_TOOLS = 0x09
+local ST_CMD, ST_ITEM, ST_TOOLS, ST_TGT = 0x05, 0x0A, 0x30, 0x38
+local CMD_TOOLS, CMD_ITEM = 0x09, 0x01
 local CMDTBL, ITEMLIST = 0x202E, 0x4005
 local EDGAR = 0x04
 local WHITE, GREY = 0x21, 0x25
 local BIOBLASTER, NOISEBLASTER, AUTOCROSSBOW = 0xA4, 0xA3, 0xAA
+local TONIC, POTION = 0xE8, 0xE9
+
+-- the medics' battle-bag scan and target steerer (battle_magicite's medic
+-- line; see the bystander branch in pulse below)
+local function bagIdxOf(ids)
+  for i = 0, 251 do
+    local id = H.readByte(0x2686 + i * 5)
+    for _, w in ipairs(ids) do
+      if id == w and H.readByte(0x2686 + i * 5 + 3) > 0 then return i end
+    end
+  end
+  return nil
+end
+local tc = H.targetCursor({ mask = 0x7B7D,
+                            dirs = { "down", "up", "left", "right" } })
 
 local COSTTBL = H.sym("Ot6AbilityCostTbl") & 0x3FFFFF
 local function costOf(id)
@@ -130,6 +145,7 @@ end
 -- ------------------------------------------------------------------------
 local mode = "spend"
 local ph, lane, hb = 0, nil, -600
+local lastMap = nil                     -- names any walk off map 96 (see pulse)
 local BACK = { left = "right", right = "left", up = "down", down = "up" }
 local function pulse()
   ph = ph + 1
@@ -144,6 +160,16 @@ local function pulse()
   if not H.battleLoadStarted() then
     -- field: pace the lane for the next encounter; page victory/EXP dialogs
     -- with A until control returns (the battle_walletmp run-4 hazard)
+    -- a map change off 96 is how the 2026-08-18 wipe surfaced (game over,
+    -- then the attract-mode intro maps); name it when it happens again
+    if map() ~= lastMap then
+      H.log(string.format("[mapchg f%d] map %d -> %d at (%d,%d) ctl=%s "
+        .. "aligned=%s lane=%s", H.frame, lastMap or -1, map(),
+        H.fieldX(), H.fieldY(), tostring(H.hasControl()),
+        tostring(H.tileAligned()),
+        lane and string.format("(%d,%d)%s", lane.ax, lane.ay, lane.out) or "nil"))
+      lastMap = map()
+    end
     if not (H.hasControl() and H.tileAligned()) then
       H.setPad(ph % 8 < 4 and { a = true } or {})
       return
@@ -170,7 +196,56 @@ local function pulse()
   end
   local a = H.readByte(ACTOR)
   if a ~= edgarSlot then
-    -- a bystander's window: real Defend (right, then A), slow cadence
+    -- A bystander's window: heal a hurting party with real Item turns
+    -- first, then real Defend (right, then A), slow cadence.  The medic
+    -- half follows the re-made fixture (2026-08-18): kolts_cave now
+    -- arrives at 69/160, 130/194, 170/222 -- gen_kolts's #84 chest detours
+    -- walk more fights before the save -- and the defend-only version of
+    -- this branch was ground down mid-spend: the run ended in a game over
+    -- and the attract-mode intro march (the "paced off map 96 (now 19)"
+    -- red).  Heals keep the file's design intact: the driver's only attack
+    -- stays EDGAR's tools.  The plan is battle_magicite's medic line:
+    -- Potion for somebody badly hurt, Tonic for the rest, worst-HP target.
+    local st = H.readByte(MSTATE)
+    tc.observe()
+    local worst, wpct = nil, 101
+    for s = 0, 3 do
+      local h, m = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2)
+      if h > 0 and m > 0 then
+        local pct = h * 100 // m
+        if pct < wpct then worst, wpct = s, pct end
+      end
+    end
+    if wpct < 55 then                   -- somebody needs the heal
+      if st == ST_CMD then
+        local want = nil
+        for i = 0, 3 do
+          if H.readByte(CMDTBL + a * 12 + i * 3) == CMD_ITEM then want = i end
+        end
+        if want == nil then H.setPad(edge and { x = true } or {}) return end
+        local cur = H.readByte(0x890F + a)
+        if cur == want then H.setPad(edge and { a = true } or {})
+        elseif cur < want then H.setPad(edge and { down = true } or {})
+        else H.setPad(edge and { up = true } or {}) end
+      elseif st == ST_ITEM then
+        local slow = ph % 30 < 5
+        local want = (wpct < 45) and bagIdxOf({ POTION }) or nil
+        want = want or bagIdxOf({ TONIC, POTION })
+        if want == nil then H.setPad(slow and { b = true } or {}) return end
+        local cur = H.readByte(0x8947 + a) + H.readByte(0x894F + a)
+        if cur < want then H.setPad(slow and { down = true } or {})
+        elseif cur > want then H.setPad(slow and { up = true } or {})
+        else H.setPad(slow and { a = true } or {}) end
+      elseif st == ST_TGT then
+        local btn = tc.steer(worst, ph)
+        H.setPad(btn and { [btn] = true } or {})
+      elseif st == 0x01 then
+        H.setPad({})
+      else
+        H.setPad(edge and { b = true } or {})
+      end
+      return
+    end
     local step = ph % 40
     if step < 4 then H.setPad({ right = true })
     elseif step >= 20 and step < 24 then H.setPad({ a = true })
