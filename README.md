@@ -7,13 +7,13 @@ boost-point turn economy.
 
 ## Status
 
-v0.11 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.11)). The game is
-playable from the start through the Raid on Vector: the Magitek Research
-Facility, Number 024, the minecart and Number 128, the Cranes, the escape,
-and Terra's return. v0.11 is a small themed release — magicite you can heal
-with between fights — and does not extend that range; it is the next step in
-a run of small, frequent releases.
+v0.12 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.12)). The game is
+playable from the start through the whole Sealed Gate arc: Terra's return,
+the Narshe mission handoff, the Cave to the Sealed Gate, the Esper attack on
+Vector, the Imperial banquet, and the voyage to the Crescent Island landing.
+v0.12 is the first release of the end-of-World-of-Balance arc
+(v0.12–v0.14).
 
 Break and boost are the two central systems. Enemies carry shields and hidden
 weaknesses, hitting a weakness chips a shield, and breaking drops defenses
@@ -25,11 +25,9 @@ magicite you carry. That adds to what the born mages can already do rather than
 replacing it. Blitz is a menu, Steal guarantees the rare at three boost pips,
 and level-ups fully restore HP and MP.
 
-Route work is on the Sealed Gate: the Narshe mission handoff, the cave, the
-Esper attack, the Imperial banquet, and the Thamasa handoff. An arc of three
-small releases (v0.12 the Sealed Gate, v0.13 Thamasa, v0.14 the Floating
-Continent) is meant to make the game playable to the end of the World of
-Balance.
+Route work is on Thamasa next: Strago and Relm, the curated kits, the
+burning house, and the massacre (v0.13), then the Floating Continent
+(v0.14) finishes the arc to the end of the World of Balance.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and how far the game is
 playable, [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design,

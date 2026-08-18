@@ -47,12 +47,13 @@ Extending play to the end of the World of Balance is an **arc of three small
 releases**, not one big one (restructured 2026-08-16, keeping the
 small-frequent-releases pattern):
 
-- **v0.12 — The Sealed Gate**: Terra's return through the Narshe mission
-  handoff, the cave, the Esper attack on Vector, the Imperial banquet, and the
-  voyage to the Crescent Island landing. The route already reaches
-  `banquet_done` honestly; what remains is the enabling tooling, the
-  chest-policy baseline, the voyage routing, and the stretch's weakness
-  authoring and tuning.
+- **v0.12 — The Sealed Gate** (shipped 2026-08-18): Terra's return through
+  the Narshe mission handoff, the cave, the Esper attack on Vector, the
+  Imperial banquet, and the voyage to the Crescent Island landing — plus
+  Locke's Thief page in the field Skills menu (#68) and the chest rule made
+  real: the release playthrough opens every chest a player would see (51,
+  measured by camera), so the whole route is tuned against how people
+  actually play.
 - **v0.13 — Thamasa**: Strago and Relm join with the curated-kit machinery
   (learn many, equip few), the burning house and FlameEater, Ultros ③, and
   Kefka's massacre with Leo playable, ending at the repaired Blackjack.
