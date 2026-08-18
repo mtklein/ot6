@@ -1,5 +1,13 @@
 # OT6 v0.8 — Thamasa route survey
 
+> **Status 2026-08-18:** this survey predates the arc restructure; its
+> milestone names map v0.7→v0.12, v0.8→v0.13, v0.9→v0.14. Checkpoint K
+> now exists as the shipped `crescent-landing-v1` (v0.12). The §6.1
+> measurements were re-verified byte-for-byte against the v0.12 ROM
+> (sha1 `94562a4d…`): trailing pads 13/76, free gap `$1540`, all hold.
+> Execution is tracked in #127 (route), #122/#123/#124/#125 (specs in
+> comments), and the week plan #126. The survey body is unedited below.
+
 Scope per ROADMAP v0.8: the v0.7 stop line — checkpoint K, world (232,150),
 party TERRA·LOCKE·SHADOW (`sealed-gate-route.md` §1 segment 7) — through
 Thamasa town, Strago joining, the burning house and FlameEater, Relm joining,
