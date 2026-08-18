@@ -90,7 +90,17 @@ local DD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 },
              right = { 1, 0 }, upleft = { -1, -1 }, upright = { 1, -1 },
              downleft = { -1, 1 }, downright = { 1, 1 } }
 local function planAvoids(tx, ty, bad, what)
-  return H.call(function()
+  -- Poll before asserting: an NPC standing in a one-tile corridor blocks
+  -- the object map exactly while its scene runs (navTo's own noPathRetries
+  -- rationale, lib ot6_field.lua).  This pre-check used to sample ONCE, so
+  -- any timing shift landing the sample inside such a window failed the
+  -- whole route -- measured 2026-08-18, when #122's battle-init cycles
+  -- moved this generator's map-49 arrival into one.  Same cadence as navTo:
+  -- 45-frame polls, 20 tries' worth of budget, then the hard assert stands.
+  return H.cond(function() return true end, {
+    H.waitUntil(function() return H.bfsPath(tx, ty) ~= nil end,
+                900, what .. ": a path exists (45f poll)", 45),
+    H.call(function()
     local p = H.bfsPath(tx, ty)
     H.assertEq(p ~= nil, true, what .. ": a path exists")
     local x, y, hx, hy = H.fieldX(), H.fieldY(), nil, nil
@@ -103,7 +113,8 @@ local function planAvoids(tx, ty, bad, what)
     H.log(string.format("%s: %d steps, clean: %s", what, #p, tostring(hx == nil)))
     H.assertEq(hx == nil, true, what .. ": plan avoids the forbidden tiles" ..
       (hx and string.format(" (hits %d,%d)", hx, hy) or ""))
-  end)
+  end),
+  })
 end
 
 -- The maze needs a hold-walker rather than navTo.  Measured on map 49: the

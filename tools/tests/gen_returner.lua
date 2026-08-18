@@ -239,7 +239,12 @@ end
 -- generalised from a row to a tile set: map 98's neighbours are point exits
 -- rather than rows.)
 local function planAvoids(tx, ty, bad, what)
-  return H.call(function()
+  -- Poll before asserting (the gen_terra_clifftop fix, 2026-08-18): a
+  -- transient NPC in a corridor fails a single-sample BFS pre-check.
+  return H.cond(function() return true end, {
+    H.waitUntil(function() return H.bfsPath(tx, ty) ~= nil end,
+                900, what .. ": a path exists (45f poll)", 45),
+    H.call(function()
     local p = H.bfsPath(tx, ty)
     H.assertEq(p ~= nil, true, what .. ": a path exists")
     local DD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 },
@@ -261,7 +266,8 @@ local function planAvoids(tx, ty, bad, what)
     H.assertEq(hit == nil, true, what .. ": plan stays off this map's " ..
       "other entrance tiles" ..
       (hit and string.format(" (hit %d,%d)", hit[1], hit[2]) or ""))
-  end)
+  end),
+  })
 end
 
 -- 120000 was the battle-clear-write budget; input-driven fights spend real

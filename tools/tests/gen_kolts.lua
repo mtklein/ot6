@@ -415,7 +415,12 @@ end
 -- map's world-exit row.  BFS models passability, not entrance triggers, so
 -- this check is what keeps a shortest path from walking out of the mountain.
 local function planAvoidsRow(tx, ty, badY, what)
-  return H.call(function()
+  -- Poll before asserting (the gen_terra_clifftop fix, 2026-08-18): a
+  -- transient NPC in a corridor fails a single-sample BFS pre-check.
+  return H.cond(function() return true end, {
+    H.waitUntil(function() return H.bfsPath(tx, ty) ~= nil end,
+                900, what .. ": a path exists (45f poll)", 45),
+    H.call(function()
     local p = H.bfsPath(tx, ty)
     H.assertEq(p ~= nil, true, what .. ": a path exists")
     local x, y = H.fieldX(), H.fieldY()
@@ -431,7 +436,8 @@ local function planAvoidsRow(tx, ty, badY, what)
     H.log(string.format("%s: %d steps, touches y=%d: %s",
       what, #p, badY, tostring(hit)))
     H.assertEq(hit, false, what .. ": plan stays off the world-exit row " .. badY)
-  end)
+  end),
+  })
 end
 
 -- ------------------------------------------------------------- the shop --

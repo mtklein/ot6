@@ -82,7 +82,12 @@ local DD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 },
              right = { 1, 0 }, upleft = { -1, -1 }, upright = { 1, -1 },
              downleft = { -1, 1 }, downright = { 1, 1 } }
 local function planAvoids(tx, ty, bad, what)
-  return H.call(function()
+  -- Poll before asserting (the gen_terra_clifftop fix, 2026-08-18): a
+  -- transient NPC in a corridor fails a single-sample BFS pre-check.
+  return H.cond(function() return true end, {
+    H.waitUntil(function() return H.bfsPath(tx, ty) ~= nil end,
+                900, what .. ": a path exists (45f poll)", 45),
+    H.call(function()
     local p = H.bfsPath(tx, ty)
     H.assertEq(p ~= nil, true, what .. ": a path exists")
     local x, y, hx, hy = H.fieldX(), H.fieldY(), nil, nil
@@ -95,7 +100,8 @@ local function planAvoids(tx, ty, bad, what)
     H.log(string.format("%s: %d steps, clean: %s", what, #p, tostring(hx == nil)))
     H.assertEq(hx == nil, true, what .. ": plan avoids the other entrance" ..
       (hx and string.format(" (hits %d,%d)", hx, hy) or ""))
-  end)
+  end),
+  })
 end
 
 H.run({ maxFrames = 40000 }, {
