@@ -1300,22 +1300,27 @@ InitMagicMenu:
 
 SkillsOption_04:
 @216e:  stz     $4a
+.if LANG_EN
+        ; issue #122: Lore opens the 5-slot loadout configurator, not the
+        ; vanilla browse list; the SkillsOption_05 repoint, re-applied for
+        ; Strago.  The browse's only job was naming what he knows; the
+        ; configurator names it, prices it (the vanilla MagicProp MP each
+        ; lore charges), and lets him carry five of it into the fight.  All
+        ; state logic is bank-F0; Ot6LoreInitC3 does the C3 framework draw.
+        ; The vanilla browse (_c351f9 / menu state $1b) stays assembled for
+        ; the non-EN branch, as the SwdTech and Rage browses did.
+        ldy     #$0100
+        sty     zBG2HScroll
+        sty     zBG3HScroll
+        jsr     Ot6LoreInitC3
+        lda     #$01
+        sta     $4a                     ; init done (state $80 self-init sentinel)
+        lda     #MENU_STATE_LORELOAD    ; $80
+        sta     zMenuState
+        rts
+.else
         jsr     CreateScrollArrowTask1
         longa
-.if LANG_EN
-        lda     #$0600
-        sta     wTaskSpeedY,x
-        lda     #$0068
-        sta     wTaskSpeedX,x
-        shorta
-        jsr     LoadLoreCursor
-        jsr     InitLoreCursor
-        lda     #$10
-        sta     $5c
-        lda     #$08
-        sta     $5a
-        lda     #$01
-.else
         lda     #$2000
         sta     wTaskSpeedY,x
         lda     #$0060
@@ -1328,7 +1333,6 @@ SkillsOption_04:
         lda     #$09
         sta     $5a
         lda     #$02
-.endif
         sta     $5b
         ldy     #$0100
         sty     zBG2HScroll
@@ -1337,6 +1341,7 @@ SkillsOption_04:
         lda     #$1b
         sta     zMenuState
         rts
+.endif
 
 ; ------------------------------------------------------------------------------
 
@@ -2761,6 +2766,7 @@ ReloadSkillsMenu:
 .if LANG_EN
         .include "ot6_loadout_page.asm"      ; SwdTech: MenuState_7b
         .include "ot6_rage_page.asm"         ; Rage:    MenuState_7c
+        .include "ot6_lore_page.asm"         ; Lore:    MenuState_80 (#122)
 .endif   ; LANG_EN
 
 ; ------------------------------------------------------------------------------

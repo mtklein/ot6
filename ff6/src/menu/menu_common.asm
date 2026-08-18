@@ -430,6 +430,11 @@ MenuStateTbl:
         .addr   MenuState_7d
         .addr   MenuState_7e
         .addr   MenuState_7f
+.if LANG_EN
+        .addr   MenuState_80            ; issue #122: Strago's lore loadout configurator
+.else
+        .addr   0
+.endif
 
 ; ------------------------------------------------------------------------------
 

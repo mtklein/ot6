@@ -14411,6 +14411,16 @@ InitSpellList:
 @555e:  sta     $11a0,x     ; clear spell data
         dex
         bpl     @555e
+        ; ot6 #122: Strago's 5-slot lore loadout.  The walk below is vanilla
+        ; except for its source: Ot6LoreMask writes the EFFECTIVE 3-byte mask
+        ; (the curated five, or AUTO's first-five window) to $ee/$ef/$f0 and
+        ; the bit test reads that instead of the raw $1d29 collection.  Count
+        ; $3a87, both list tables, the menu draw and the confirm all narrow
+        ; from which bits pass, with no further change.  ($f0 doubles as this
+        ; proc's own pointer scratch at @5589; the walk is done with the mask
+        ; before that store.)  Learning stays unlimited: LearnLore and the
+        ; bitfield are untouched.
+        jsl     Ot6LoreMask
         ldy     #$17
         ldx     #$02
         clr_a
@@ -14419,7 +14429,7 @@ InitSpellList:
         bcc     @556f
         ror
         dex
-@556f:  bit     $1d29,x     ; known lores
+@556f:  bit     $ee,x       ; the effective lore mask (was: bit $1d29,x)
         beq     @5584
         inc     $3a87
         pha

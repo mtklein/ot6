@@ -45,6 +45,13 @@ CODE_EXT_INC = 1
 .global Ot6LoadoutIsAuto         ; #49: is the loadout AUTO (all-zero) or MANUAL?
 .global Ot6RageIsAuto            ;   one per page -- the pages STATE the mode now,
                                  ;   and must not re-derive it from the save bytes
+.global Ot6LoreOpen              ; #122 Strago's lore loadout: the same split a
+.global Ot6LoreInput             ;   third time -- F0 owns every decision, the C3
+.global Ot6LoreShow              ;   page draws.  Show resolves a slot, Count is
+.global Ot6LoreCount             ;   the LEARNED score (max 24), IsAuto states
+.global Ot6LoreIsAuto            ;   the mode, RowCost reads the vanilla MagicProp
+.global Ot6LoreRowCost           ;   price for a lore row (per-row, un-gated:
+                                 ;   lore MP is vanilla data, not an OT6 add)
 .global Ot6SkillIconGlyph        ; #53: attack id -> ELEMENT glyph, else its
                                  ;   break-class glyph, else $ff.  The rtl
                                  ;   wrapper over Ot6ElemGlyphFor, so the field

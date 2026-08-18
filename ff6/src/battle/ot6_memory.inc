@@ -69,6 +69,26 @@ OT6_RAGEROWS         = 4
 .assert (OT6_RAGELOAD & $ffff) + OT6_RAGESLOTS - 1 <= $1ffd, error, "rage loadout must sit inside the checksum window"
 .assert (OT6_RAGELOAD & $ffff) = (OT6_LOADOUT & $ffff) + 2, error, "rage loadout must follow the bushido word without a gap"
 
+; #122 (the Ot6RageLoad ruling, re-applied): Strago's 5-slot lore loadout, one
+; byte per slot, in the next five bytes of the same scrap.  byte = lore id + 1
+; (ids 0..23, the $1d29-$1d2b bitfield's 24 bits); $00 = unset; all five zero
+; = AUTO (the first five known lores in id order).  Same zero-sentinel
+; migration as both loadouts above: every existing save and tracked checkpoint
+; reads zeros here (kit-gau.md §4.2 measured the whole $1e1d-$1e28 span), and
+; zeros decode as AUTO, so no persistent_layout bump.  Five and not eight by
+; owner-adjacent ruling (#122 spec): Gau's rages ARE his kit, so they get the
+; kit-length list; Strago's lores are one verb inside an 8-row kit that also
+; carries Analyze and Aqua Rake, so his curation slice is smaller.
+; Remaining scrap after this: $1e2c-$1e3f.
+OT6_LORELOAD         := $7e1e27
+OT6_LORESLOTS        = 5
+OT6_LORECOLS         = 1
+OT6_LOREROWS         = 5
+.assert OT6_LORECOLS * OT6_LOREROWS = OT6_LORESLOTS, error, "lore page geometry must cover every slot exactly once"
+.assert (OT6_LORELOAD & $ffff) >= $1600, error, "lore loadout must sit inside the save block"
+.assert (OT6_LORELOAD & $ffff) + OT6_LORESLOTS - 1 <= $1ffd, error, "lore loadout must sit inside the checksum window"
+.assert (OT6_LORELOAD & $ffff) = (OT6_RAGELOAD & $ffff) + OT6_RAGESLOTS, error, "lore loadout must follow the rage bytes without a gap"
+
 ; Battle-only scratch. InitBattle clears through $3ed3. OT6_DIVINE_USED is
 ; one per-character bitmask; the walkers use the interleaved even words.
 OT6_DIVINE_USED      := $3ecb

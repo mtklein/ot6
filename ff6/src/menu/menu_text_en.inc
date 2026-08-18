@@ -268,6 +268,17 @@ MENU_TEXT_INC = 1
 ; lines up with the grid above it instead of floating.
 .define OT6_RAGE_MODE_HINT              BG1A, {16, 13}, {"Y=AUTO"}
 
+; #122: Strago's lore loadout page, the third configurator.  Single column of
+; five, so the control hint and the revert hint share row 3 (the rage page's
+; columns 3 and 16), the per-row price owns column 16 of the slot rows, and
+; row 15 carries the LEARNED count (max 24: two digits) beside the mode word.
+; The empty marker is shared with the rage page (OT6_RAGE_EMPTY: AttackName
+; and MonsterName rows are both 10 cells).
+.define OT6_LORE_TITLE                  BG1A, {3, 1},  {"LORE LOADOUT"}
+.define OT6_LORE_HINT                   BG1A, {3, 3},  {"L/R SWAPS"}
+.define OT6_LORE_MODE_HINT              BG1A, {16, 3}, {"Y=AUTO"}
+.define OT6_LORE_LEARNED                BG1A, {3, 15}, {"LEARNED"}
+
 ; ------------------------------------------------------------------------------
 
 ; OT6 (#49): AUTO vs MANUAL, the state neither loadout page showed.

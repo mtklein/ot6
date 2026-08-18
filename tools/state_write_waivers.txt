@@ -21,6 +21,12 @@
 # rewrites this file from the corpus (it preserves the third field).
 #
 # format: <path relative to repo root> <TAB> <token> [<TAB> quarantine: why]
+#
+# The optional `quarantine: <why>` third field records why the expedient is
+# warranted -- typically an input the game can only produce rarely or never on
+# cue: deliberate VRAM corruption for the font-restore path, the 1-in-65536
+# zero-checksum save, a legacy save layout no version writes.  It is
+# documentation, not a gate; a line without one is no less sanctioned.
 tools/tests/bal_dpb.lua	.writeByte(
 tools/tests/bal_dpb.lua	.writeWord(
 tools/tests/bal_dpb.lua	emu.write
@@ -53,6 +59,7 @@ tools/tests/battle_fontrestore.lua	.writeByte(	quarantine: deliberate VRAM corru
 tools/tests/battle_fontrestore.lua	emu.write	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
 tools/tests/battle_gaufight.lua	.writeByte(
 tools/tests/battle_loadgate.lua	.writeWord(	quarantine: unit test of the harness's own load-gate predicate, not of play
+tools/tests/battle_lore.lua	.writeByte(
 tools/tests/battle_mpcost.lua	.writeWord(
 tools/tests/battle_rage.lua	.writeByte(
 tools/tests/battle_rage.lua	.writeWord(
@@ -73,6 +80,19 @@ tools/tests/lib/ot6.lua	emu.write
 tools/tests/lib/ot6.lua	emu.writeWord
 tools/tests/menu_blitzpage.lua	.writeByte(
 tools/tests/menu_esperdetail_tube6.lua	.writeByte(
+# menu_lorepage.lua (#122): unit-style expedient, the menu_ragepage.lua
+# precedent.  Strago is unreachable by play until the v0.13 route lands (he
+# joins in that unrouted stretch), so no savestate in the chain contains him;
+# the test boots the shallowest field state (arvis_wake) and pokes Strago
+# into the party by hand -- both the field-object settings byte that stands
+# him up as the party's one HUD slot and the $1600+37*7 character-record
+# fields (commands, stats, equipment) that a real join would install, all
+# sourced from the ROM's own CharProp "New Game defaults" table rather than
+# fabricated.  Follow-up: convert to an honest savestate once v0.13 makes a
+# real post-join Strago fixture possible, the same conversion menu_ragepage.lua
+# itself went through (issue #75) once gau_joined existed.
+tools/tests/menu_lorepage.lua	.writeByte(	quarantine: Strago is unreachable by play until the v0.13 route lands (menu_ragepage.lua precedent)
+tools/tests/menu_lorepage.lua	.writeWord(	quarantine: Strago is unreachable by play until the v0.13 route lands (menu_ragepage.lua precedent)
 tools/tests/menu_ragepage.lua	.writeByte(
 tools/tests/menu_swdtechpage.lua	.writeByte(
 tools/tests/metrics_battle.lua	.writeByte(

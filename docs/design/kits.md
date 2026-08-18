@@ -565,8 +565,13 @@ player prunes the kit all game. Same model, different collection verbs:
 - **Strago — Scholar (bludgeoning: rod)**: Lores by observation ✦
   (Cyrus/Hikari). Aqua Rake free ✦; **Analyze** cheap and early ✦
   (full weakness reveal, the party's scouting tool). Learns every lore
-  he sees cast, equips 5. Divine: a taught-only capstone lore
-  (Grand Train candidate, WoR).
+  he sees cast, **equips 5** (settled 2026-08-18 with the #122 build,
+  re-asked against Gau's 8 per kit-gau.md §11.1: Gau's rages ARE his
+  kit, so they get the kit-length list; Strago's lores are one verb
+  inside an 8-row kit that also carries Analyze and Aqua Rake, so his
+  curation slice is smaller). Machinery: `OT6_LORELOAD`, the third
+  loadout configurator (ot6_lore.asm / ot6_lore_page.asm). Divine: a
+  taught-only capstone lore (Grand Train candidate, WoR).
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon);
@@ -576,6 +581,7 @@ player prunes the kit all game. Same model, different collection verbs:
 
 1. Trance's gate: Broken-enemies-only, the full 5-BP bank, or
    either? (It kept the divine slot now that Ultima rides Fire.)
-2. Strago's curated slot count: 5, or 6?
+2. ~~Strago's curated slot count: 5, or 6?~~ **Settled: 5** (2026-08-18,
+   the #122 build; reasoning in the Curated kits entry above).
 3. Does Bestow (Locke) step on Hired Help (Setzer), or is
    BP-vs-GP economy distinct enough?

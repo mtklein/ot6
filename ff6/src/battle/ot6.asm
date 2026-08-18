@@ -49,6 +49,7 @@
         .include "ot6_steal.asm"        ; locke: boost on the steal roll
         .include "ot6_slot.asm"         ; setzer: boost-tiered reels
         .include "ot6_rage.asm"         ; gau: rage loadout, page, and coin
+        .include "ot6_lore.asm"         ; strago #122: lore loadout + mask
         .include "ot6_cover.asm"        ; true knight: a cover pays a boost point
         .include "ot6_thief.asm"        ; locke #55: steal submenu, filch, bestow
         .include "ot6_hud.asm"
