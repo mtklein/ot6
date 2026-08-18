@@ -182,14 +182,14 @@ Ot6WeapClassTbl:
 ;     ("three beams and a tekmissile").
 
 Ot6SkillClassTbl:
-        .byte   $55, OT6_SLASH  ; dispatch (fang)
-        .byte   $56, OT6_SLASH  ; retort (sky)
-        .byte   $57, OT6_SLASH  ; slash (tiger)
-        .byte   $58, OT6_SLASH  ; quadra slam (flurry: chips per hit)
-        .byte   $59, OT6_SLASH  ; empowerer (dragon)
-        .byte   $5a, OT6_SLASH  ; stunner (eclipse)
-        .byte   $5b, OT6_SLASH  ; quadra slice (tempest)
-        .byte   $5c, OT6_SLASH  ; cleave (oblivion)
+        .byte   $55, OT6_SLASH  ; dispatch
+        .byte   $56, OT6_SLASH  ; retort
+        .byte   $57, OT6_SLASH  ; slash
+        .byte   $58, OT6_SLASH  ; quadra slam (chips per hit)
+        .byte   $59, OT6_SLASH  ; empowerer
+        .byte   $5a, OT6_SLASH  ; stunner
+        .byte   $5b, OT6_SLASH  ; quadra slice
+        .byte   $5c, OT6_SLASH  ; cleave
         .byte   $5d, OT6_BLUDG  ; pummel
         .byte   $5f, OT6_BLUDG  ; suplex (the train is bludgeon-weak)
         .byte   $64, OT6_BLUDG  ; bum rush
