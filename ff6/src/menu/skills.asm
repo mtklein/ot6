@@ -64,7 +64,11 @@ InitSkillsCursor:
 ; skills cursor data
 ; NOTE: this is the only cursor that doesn't have an initial position of (0,0)
 SkillsCursorProp:
+.if LANG_EN
+        cursor_prop {0, 1}, {1, 8}, NO_X_WRAP   ; issue #68: + the Thief row
+.else
         cursor_prop {0, 1}, {1, 7}, NO_X_WRAP
+.endif
 
 ; skills cursor positions
 SkillsCursorPos:
@@ -75,6 +79,9 @@ SkillsCursorPos:
         cursor_pos {0, 100}
         cursor_pos {0, 116}
         cursor_pos {0, 132}
+.if LANG_EN
+        cursor_pos {0, 148}     ; issue #68: Thief, BG3A row 19 (y = 8n - 4)
+.endif
 
 ; ------------------------------------------------------------------------------
 
@@ -367,6 +374,12 @@ _c34c80:
         sta     zTextColor
         ldy     #near SkillsDanceText
         jsr     DrawPosKana
+.if LANG_EN
+        lda     zSkillsTextColor::Thief ; issue #68: the 8th row, Locke's page
+        sta     zTextColor
+        ldy     #near SkillsThiefText
+        jsr     DrawPosKana
+.endif
         jmp     TfrBG3ScreenAB
 
 ; ------------------------------------------------------------------------------
@@ -392,7 +405,11 @@ _c34d3d:
         ldx     z0
 @4d41:  sta     zSkillsTextColor,x
         inx
+.if LANG_EN
+        cpx     #$0008      ; issue #68: + zSkillsTextColor::Thief
+.else
         cpx     #$0007
+.endif
         bne     @4d41
         jsr     _c34edd
         phy
@@ -430,6 +447,11 @@ _c34d78:
         .byte   BATTLE_CMD::LORE
         .byte   BATTLE_CMD::RAGE
         .byte   BATTLE_CMD::DANCE
+.if LANG_EN
+        .byte   BATTLE_CMD::STEAL       ; issue #68: Steal owners get the Thief
+                                        ;   row white; the loop above greys it
+                                        ;   for everyone else automatically
+.endif
         calc_size _c34d78
 
 ; ------------------------------------------------------------------------------
@@ -467,7 +489,15 @@ DrawMagicMenu:
 .if LANG_EN
 
 SkillsOptionsWindow1:                   make_window BG2A, {1, 1}, {7, 4}
-SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {7, 10}
+SkillsOptionsWindow2:                   make_window BG2A, {1, 7}, {7, 12}
+                                        ; issue #68: 10 -> 12, one more text
+                                        ;   row (Thief at BG3A row 19).  The
+                                        ;   window's 2 height units per text
+                                        ;   row, measured: at 10 the frame
+                                        ;   closed under Dance and the Thief
+                                        ;   row floated outside it
+                                        ;   (skillspage_8rows_locke.png, first
+                                        ;   probe run).
 SkillsCharWindow1:                      make_window BG2A, {1, 6}, {28, 5}
 SkillsMagicWindow1:                     make_window BG2A, {1, 13}, {28, 12}
 SkillsDescWindow1:                      make_window BG2A, {1, 1}, {28, 3}
@@ -2125,6 +2155,127 @@ Ot6BlitzCursorPos:
         cursor_pos {8, 116 + yy * 12}
         .endrep
 
+; ==============================================================================
+; The field Thief page (issue #68): the Skills row Locke's kit missed in v0.9
+;
+; #55 gave Steal a battle submenu -- Steal / Filch / Bestow, priced -- and the
+; field Skills page for it was the acceptance criterion that did not ship.
+; This is that page: the Blitz page's shape with the staging removed.  There is
+; no learned set (the three rows exist from the moment Locke does, granted at
+; join with Steal), so there is no GetBlitzList twin, no locked marker, and no
+; $1d28-style mask; every row draws white with its name and its price.
+;
+; The geometry is the Blitz page's own (#43): rows 1/3/5 of this window's eight
+; usable odd rows, name at column 3 flush against the cursor at x=8
+; (cursor_x = 8*col - 16), price at column 16 through Ot6LoadoutDrawCost, the
+; one field-menu price drawer (#56).
+;
+; Two deliberate departures from the Blitz rows, both because the thief ids
+; $56-$58 are AttackName PAD slots inside SwdTech's attack-id range $55-$5c
+; (Ot6ThiefListOpen's derivation, ot6_thief.asm):
+;
+;   * the price goes through Ot6ThiefCost, not Ot6LoadoutCost.  Ot6CostFor's
+;     single-scan table keys SwdTech's boost rows on those same ids, so
+;     Ot6LoadoutCost($56) is a boosted SwdTech price, not Steal's.
+;     Ot6ThiefCost is the shim #55 built for exactly this: Steal resolves
+;     through Ot6StealCost (#52's one authority for the 4) and Filch/Bestow
+;     through Ot6ThiefCostTbl, the same split the battle charge makes, and it
+;     returns 0 under nomp so the shared menu object stays byte-identical
+;     across the A/B builds (no flag-conditional bytes here).
+;   * there is no probe-icon column.  Ot6SkillIconGlyph walks Ot6SkillClassTbl,
+;     which keys $56/$57/$58 to Retort/Slash/Quadra Slam's slash class, so the
+;     column would teach SwdTech's break classes on thief rows.  The battle
+;     thief submenu draws no icon either (the tools-shell icon path is gated to
+;     the real-tools staging state), so name + price is also what keeps the two
+;     lists saying the same thing.
+;
+; The description window stays blank: the thief rows have no entry in any of
+; the cf-bank desc assets (those are fixed_block segments), so DrawThiefMenu
+; stages $ff into $7e9d89[0..2] and LoadThiefDesc runs the same LoadBigText
+; path an unlearned Blitz row uses, which renders the empty string.  Staging
+; every frame matters: without it the box keeps whatever the previous page
+; (say a Blitz description) left in the $7e9ec9 buffer.
+MENU_STATE_THIEF = $30                  ; vanilla $30-$32 are unused (menu_misc
+                                        ;   .asm "menu state $30-$32: unused");
+                                        ;   nothing in the tree stores $30 to
+                                        ;   zMenuState, so the slot is free
+
+OT6_THIEF_ATK0 = $56                    ; Steal; Filch $57, Bestow $58
+                                        ;   (ot6_thief.asm OT6_THIEF_*)
+
+; [ draw thief menu ]
+
+DrawThiefMenu:
+        jsr     ClearBG1ScreenA
+        jsr     Ot6ThiefPageDraw
+        lda     #$2c
+        sta     zTextColor
+        ldy     #near SkillsThiefTitleText
+        jsr     DrawPosKana
+        jsr     CreateSubPortraitTask
+        jmp     InitDMA1BG3ScreenB
+
+; ---- draw the three rows ----
+Ot6ThiefPageDraw:
+        ldx     #$0000
+@lp:    stx     $e2                     ; row index 0..2 (word: $e2/$e3)
+        lda     #$ff
+        sta     f:$7e9d89,x             ; no description asset: LoadBigText's
+                                        ;   $ff arm renders the empty string
+        lda     $e2
+        asl
+        inc
+        sta     $e6                     ; row = 1 + i*2: odd rows 1/3/5 (#43)
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+        lda     $e2
+        clc
+        adc     #OT6_THIEF_ATK0 - OT6_ATTACKNAME_0
+        sta     $e5                     ; AttackName record index (5/6/7)
+        ldx     #OT6_BLITZ_NAME_COL
+        jsr     Ot6BlitzDrawName
+        lda     $e2
+        clc
+        adc     #OT6_THIEF_ATK0         ; row id
+        jsl     Ot6ThiefCost            ; F0: A = MP cost (0 under nomp); the
+                                        ;   thief-keyed shim, NOT Ot6LoadoutCost
+                                        ;   (see the header: $56-$58 collide
+                                        ;   with SwdTech's cost keys)
+        ldx     #OT6_BLITZ_COST_COL
+        jsr     Ot6LoadoutDrawCost      ; #56: the one field-menu price drawer
+        ldx     $e2
+        inx
+        cpx     #$0003
+        bcc     @lp
+        rts
+
+; ---- the page's own cursor: one column, three rows ----
+; The Blitz table's rule (y = 116 + n*12, x = 8 under text at column 3),
+; truncated to the three rows this page has.  Wrap stays on, as it is there.
+LoadThiefCursor:
+        ldy     #near Ot6ThiefCursorProp
+        jmp     LoadCursor
+
+UpdateThiefCursor:
+        jsr     MoveCursor
+
+InitThiefCursor:
+        ldy     #near Ot6ThiefCursorPos
+        jmp     UpdateCursorPos
+
+Ot6ThiefCursorProp:
+        cursor_prop {0, 0}, {1, 3}
+Ot6ThiefCursorPos:
+        .repeat 3, yy
+        cursor_pos {8, 116 + yy * 12}
+        .endrep
+
+; [ load thief description: always the empty string (see the header) ]
+LoadThiefDesc:
+        jmp     LoadBigText             ; $7e9d89[0..2] hold $ff (staged by
+                                        ;   Ot6ThiefPageDraw), so the $ff arm
+                                        ;   runs and no pointer table is read
+
 .endif   ; LANG_EN
 
 ; ------------------------------------------------------------------------------
@@ -3363,6 +3514,9 @@ SkillsBlitzText:                pos_text SKILLS_LIST_BLITZ
 SkillsLoreText:                 pos_text SKILLS_LIST_LORE
 SkillsRageText:                 pos_text SKILLS_LIST_RAGE
 SkillsDanceText:                pos_text SKILLS_LIST_DANCE
+.if LANG_EN
+SkillsThiefText:                pos_text SKILLS_LIST_THIEF      ; issue #68
+.endif
 
 SkillsCharLabelTextList:
         .addr   SkillsCharLevelText
@@ -3382,6 +3536,9 @@ SkillsMPCostText:               pos_text SKILLS_MP_COST
 SkillsLoreTitleText:            pos_text SKILLS_LORE_TITLE
 SkillsRageTitleText:            pos_text SKILLS_RAGE_TITLE
 SkillsDanceTitleText:           pos_text SKILLS_DANCE_TITLE
+.if LANG_EN
+SkillsThiefTitleText:           pos_text SKILLS_THIEF_TITLE     ; issue #68
+.endif
 SkillsGenjuTitleText:           pos_text SKILLS_GENJU_TITLE
 SkillsBlitzTitleText:           pos_text SKILLS_BLITZ_TITLE
 SkillsBushidoTitleText:         pos_text SKILLS_BUSHIDO_TITLE

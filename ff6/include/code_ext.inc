@@ -63,6 +63,12 @@ CODE_EXT_INC = 1
 .global Ot6LoadoutCost           ;   ALWAYS-defined price shim (flag-gated body):
                                  ;   forwards to Ot6CostFor under OT6_MP_COSTS,
                                  ;   returns 0 under nomp so the shared menu links
+.global Ot6ThiefCost             ;   ALWAYS-defined price shim for the thief row
+                                 ;   ids $56-$58 (Steal via Ot6StealCost, Filch/
+                                 ;   Bestow via Ot6ThiefCostTbl; 0 under nomp).
+                                 ;   #68's field Thief page prices through it --
+                                 ;   NOT Ot6CostFor, whose table keys those ids
+                                 ;   as SwdTech boost rows
 .global Ot6BlitzRowDecorate      ; menu-bank: DrawToolsListText's blitz row shim
                                  ;   (name->$0f swap always; MP cost only under
                                  ;   OT6_MP_COSTS). ALWAYS defined -- the stock C1

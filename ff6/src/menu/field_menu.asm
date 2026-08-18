@@ -727,7 +727,13 @@ CheckSkillValid:
 @1e90:  cmp     zSkillsTextColor,x       ; branch if at least one is not disabled
         bne     @1e9c
         inx
+.if LANG_EN
+        cpx     #$0008          ; issue #68: + the Thief row.  Without this an
+                                ;   early Locke (Steal, no Magic) could not
+                                ;   open his own Skills menu at all.
+.else
         cpx     #$0007
+.endif
         bne     @1e90
         bra     @1eb1
 
@@ -1117,6 +1123,9 @@ SkillsOptionTbl:
         .addr   SkillsOption_04
         .addr   SkillsOption_05
         .addr   SkillsOption_06
+.if LANG_EN
+        .addr   SkillsOption_07         ; issue #68: thief (the 8th row)
+.endif
 
 ; ------------------------------------------------------------------------------
 
@@ -1393,6 +1402,27 @@ SkillsOption_06:
         lda     #$1c
         sta     zMenuState
         rts
+
+.if LANG_EN
+; ------------------------------------------------------------------------------
+
+; [ skills menu $07: thief (init) ]
+
+; issue #68: SkillsOption_03's shape with the thief page's pieces.  The page
+; state is $30, a vanilla-unused menu state slot (see MenuState_30_Thief and
+; the note at MENU_STATE_THIEF, skills.asm).
+SkillsOption_07:
+        stz     $4a
+        jsr     LoadThiefCursor
+        jsr     InitThiefCursor
+        ldy     #$0100
+        sty     zBG2HScroll
+        sty     zBG3HScroll
+        jsr     DrawThiefMenu
+        lda     #MENU_STATE_THIEF       ; $30
+        sta     zMenuState
+        rts
+.endif
 
 ; ------------------------------------------------------------------------------
 
@@ -2622,6 +2652,28 @@ MenuState_33:
         beq     @298d
         jsr     ReloadSkillsMenu
 @298d:  rts
+
+.if LANG_EN
+; ------------------------------------------------------------------------------
+
+; [ menu state $30: thief menu (issue #68) ]
+
+; MenuState_33's shape: cursor over the rows, B backs out to the skills list,
+; A is a no-op -- an info page, exactly as the field Blitz page behaves.  The
+; desc loader stages the empty string every frame (LoadThiefDesc, skills.asm)
+; so a description left by another page cannot linger in the box.
+MenuState_30_Thief:
+        lda     #$10
+        trb     z45
+        jsr     InitDMA1BG1ScreenA
+        jsr     UpdateThiefCursor
+        jsr     LoadThiefDesc
+        lda     z08+1
+        bit     #>JOY_B
+        beq     @done30
+        jsr     ReloadSkillsMenu
+@done30: rts
+.endif
 
 ; ------------------------------------------------------------------------------
 

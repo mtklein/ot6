@@ -337,7 +337,15 @@ MenuStateTbl:
         .addr   MenuState_2d
         .addr   MenuState_2e
         .addr   MenuState_2f
+.if LANG_EN
+        .addr   MenuState_30_Thief      ; issue #68: the field Thief page.
+                                        ;   $30 was vanilla-unused (menu_misc
+                                        ;   .asm: "menu state $30-$32: unused",
+                                        ;   and nothing stores $30 to
+                                        ;   zMenuState), so the slot is free.
+.else
         .addr   MenuState_30
+.endif
         .addr   MenuState_31
         .addr   MenuState_32
         .addr   MenuState_33

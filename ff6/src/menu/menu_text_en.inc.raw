@@ -83,6 +83,7 @@ MENU_TEXT_INC = 1
 .define SKILLS_LIST_LORE                BG3A, {2, 13}, {$8b,$a8,$ab,$9e,$00}  ; Lore
 .define SKILLS_LIST_RAGE                BG3A, {2, 15}, {$91,$9a,$a0,$9e,$00}  ; Rage
 .define SKILLS_LIST_DANCE               BG3A, {2, 17}, {$83,$9a,$a7,$9c,$9e,$00}  ; Dance
+.define SKILLS_LIST_THIEF               BG3A, {2, 19}, {$93,$a1,$a2,$9e,$9f,$00}  ; Thief
 
 .define SKILLS_MP_COST                  BG3B, {23, 5}, {$8c,$8f,$c7,$ff,$ff,$ff,$ff,$00}  ; MP_    
 .define SKILLS_LORE_TITLE               BG3B, {23, 5}, {$8b,$a8,$ab,$9e,$00}  ; Lore
@@ -91,6 +92,7 @@ MENU_TEXT_INC = 1
 .define SKILLS_GENJU_TITLE              BG3B, {23, 5}, {$84,$ac,$a9,$9e,$ab,$ac,$00}  ; Espers
 .define SKILLS_BLITZ_TITLE              BG3B, {23, 5}, {$81,$a5,$a2,$ad,$b3,$00}  ; Blitz
 .define SKILLS_BUSHIDO_TITLE            BG3B, {23, 5}, {$92,$b0,$9d,$93,$9e,$9c,$a1,$00}  ; SwdTech
+.define SKILLS_THIEF_TITLE              BG3B, {23, 5}, {$93,$a1,$a2,$9e,$9f,$00}  ; Thief
 
 .define SKILLS_CHAR_LEVEL               BG1B, {18, 7}, {$8b,$95,$00}  ; LV
 .define SKILLS_CHAR_HP                  BG1B, {18, 9}, {$87,$8f,$00}  ; HP
