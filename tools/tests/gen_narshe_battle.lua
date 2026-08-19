@@ -337,14 +337,29 @@ end
 -- waypoint is a route or model failure rather than a fight outcome).
 local descBlob, descDone = nil, false
 local descLost = nil
-local function descentBody(tier)
-  local WAY = {
-    { 18, 11 }, { 18, 13 }, { 18, 16 }, { 17, 17 }, { 17, 20 },
-    { 16, 21 }, { 15, 22 }, { 14, 23 }, { 13, 24 }, { 14, 26 },
-    { 15, 27 }, { 16, 28 }, { 18, 28 }, { 18, 30 }, { 18, 33 },
-    { 18, 34 }, { 19, 35 }, { 19, 36 },
-  }
-  local wi = 1
+local WAY = {
+  { 18, 11 }, { 18, 13 }, { 18, 16 }, { 17, 17 }, { 17, 20 },
+  { 16, 21 }, { 15, 22 }, { 14, 23 }, { 13, 24 }, { 14, 26 },
+  { 15, 27 }, { 16, 28 }, { 18, 28 }, { 18, 30 }, { 18, 33 },
+  { 18, 34 }, { 19, 35 }, { 19, 36 },
+}
+-- #122 added a few dozen cycles to every battle's init, which shifted the
+-- descent's RNG alignment chain-wide.  The retained run this fixed against
+-- (build/test-runs/narshe_battle.*) measured waypoints 13-16 -- (18,28)
+-- through (18,34) -- as a raider (formation FFFF 001C 0065 ...) the same
+-- march bumps into two to four times in a row with no rest between.  TERRA
+-- (slot 0, 241 hp, the squishiest of the three and the only actor whose
+-- scripted plan ever lands a hit on $001C -- EDGAR's AutoCrossbow and
+-- CELES's Runic never touch it, see the header) does not reliably survive
+-- that stretch, and once she is down nobody's plan can chip $001C at all:
+-- $0065 dies to AutoCrossbow, $001C sits untouched at full HP, and the
+-- fight cannot end (measured: battle #13 stalled at hp=355 sh=3 for the
+-- full 88000-frame episode budget, all 3 attempts, identically).  A player
+-- would rest before a gauntlet like that; WAY_CARE_AFTER is the same call,
+-- landing right before it.
+local WAY_CARE_AFTER = 12
+local function descentBody(tier, wi0, wi1)
+  local wi = wi0
   local battN, holdF, axis = 0, 0, 1
   local elapsed = 0
   local hb = -600
@@ -369,7 +384,7 @@ local function descentBody(tier)
       H.log("[descent] " .. descLost)
       return true
     end
-    return wi > #WAY and H.hasControl() and H.tileAligned()
+    return wi > wi1 and H.hasControl() and H.tileAligned()
   end, 90000, {
     H.call(function()
       battN = H.battleLoadStarted() and battN + 1 or 0
@@ -389,12 +404,12 @@ local function descentBody(tier)
         return
       end
       if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
-      while wi <= #WAY and H.fieldX() == WAY[wi][1]
+      while wi <= wi1 and H.fieldX() == WAY[wi][1]
             and H.fieldY() == WAY[wi][2] do
         wi = wi + 1
         holdF, axis = 0, 1
       end
-      if wi > #WAY then H.setPad({}); return end
+      if wi > wi1 then H.setPad({}); return end
       local tx, ty = WAY[wi][1], WAY[wi][2]
       local dx, dy = tx - H.fieldX(), ty - H.fieldY()
       holdF = holdF + 1
@@ -412,10 +427,12 @@ local function descentBody(tier)
       end
       H.setPad({ [press] = true })
     end),
-  }, "the descent to Kefka's entry point (tier " .. tier .. ")")
+  }, string.format("the descent to Kefka's entry point (tier %d, wp %d-%d)",
+    tier, wi0, wi1))
 end
 local function descentAttempt(n)
   local ldReq
+  local tier = math.min(n + 1, 3)
   return H.cond(function() return not descDone end, {
     H.cond(function() return n > 1 end, {
       H.logStep(function()
@@ -432,9 +449,22 @@ local function descentAttempt(n)
     -- EDGAR was selected for this party specifically because AutoCrossbow
     -- clears the four-enemy waves.  Attempt 1 uses that authored kit; later
     -- attempts add CELES's Runic and vary the battle timeline.
-    descentBody(math.min(n + 1, 3)),
+    descentBody(tier, 1, WAY_CARE_AFTER),
     H.release(),
     H.waitFrames(10),
+    -- The rest a player takes before the recurring 001C+0065 raider
+    -- corridor (waypoints 13-16, see WAY_CARE_AFTER above).  Skipped when
+    -- this attempt already lost above it, so a failed care roll does not
+    -- masquerade as a fresh attempt.
+    H.cond(function() return descLost == nil end, {
+      H.fieldCare({ tag = "care before the raider corridor " .. n,
+                    threshold = 0.85, mpFloor = 0.5 }),
+    }, {}),
+    H.cond(function() return descLost == nil end, {
+      descentBody(tier, WAY_CARE_AFTER + 1, #WAY),
+      H.release(),
+      H.waitFrames(10),
+    }, {}),
     H.call(function()
       if descLost == nil then
         descDone = true
