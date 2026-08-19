@@ -370,7 +370,15 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       for e = 0, partyEntities - 1 do
         if pHP(e) > 0 and pMaxHP(e) > 0 then
           local frac = pHP(e) * 10 // pMaxHP(e)
-          local healBelow = fed and 7 or 5
+          -- Heal at real danger, not at scratches (2026-08-19).  The old
+          -- fed threshold (<70%) lost the fence quad by OVER-healing: with
+          -- four attackers chipping, someone is always under 70%, so the
+          -- item row won nearly every turn, a 50-HP Tonic per turn lost
+          -- the race against ~120/round incoming, and the party dealt
+          -- almost no damage for 10,800 frames before bleeding out --
+          -- with NINETY-NINE tonics in the bag.  Under 40% is where a
+          -- heal beats an attack turn in that arithmetic.
+          local healBelow = 4
           if frac < worst and frac < healBelow then target, worst = e, frac end
         end
       end
@@ -1288,7 +1296,11 @@ local function walkAttempt(n)
          and H.worldY() == 119 and H.worldHasControl() and H.worldAligned())
     end, {
       worldWalkFight(215, 119, 12000,
-        string.format("staging a%d seg %d", n, i), nil, { segment = true }),
+        string.format("staging a%d seg %d", n, i), nil,
+        -- flee (2026-08-19): pure locomotion, no collection value -- the
+        -- transit's own ruling.  Post-join walks fought here died to the
+        -- formation lottery whenever the alignment turned.
+        { segment = true, flee = true }),
       H.cond(function() return lost == nil end, {
         H.fieldCare({ tag = string.format("staging a%d care %d", n, i),
                       threshold = 0.9, maxFrames = 12000 }),
@@ -1352,18 +1364,51 @@ local function routeCheckpoint()
 end
 local function routeAttempt(n)
   local ldReq
+  local reloadSteps = {
+    H.logStep(function()
+      return string.format("[gau] post-join route ATTEMPT %d -- " ..
+        "reloading (%s)", n, tostring(lost))
+    end),
+    H.call(function() ldReq = H.requestLoadState(routeBlob) end),
+    H.waitFrames(2),
+    H.call(function() H.checkReq(ldReq, "route attempt " .. n) end),
+    H.waitFrames(60 + (n - 1) * 17),
+  }
+  -- De-correlate the rungs with WASTED STEPS, not waited frames -- the
+  -- same 2026-08-19 lesson transitAttempt already carries above.  Three
+  -- real route attempts against this checkpoint drew the IDENTICAL
+  -- species word (0002 0002 0001 0001) and the IDENTICAL starting HP
+  -- snapshot every time: the world encounter roll is per-step and its
+  -- accumulator rides the reloaded savestate, so idle frames after a
+  -- reload change nothing and every rung replayed the same death march.
+  -- Pace a short lateral pair near the checkpoint tile, never along the
+  -- route (2026-08-19, third draft).  The first draft paced to (216,128)
+  -- -- the route's own first waypoint -- and re-walked the identical
+  -- vulnerable leg.  The second draft called (217,119) "safe, sector
+  -- 120"; that was WRONG: battle_gaufight.lua records a 2026-08-10 live
+  -- BFS proving the ENTIRE walkable component here (1239 tiles, three
+  -- sectors) reads $FF Veldt in world_battle_group -- there is no
+  -- non-Veldt tile to pace on, and no route around the lottery.  The
+  -- pacing's real job is only to shift the step index so rungs 2+ meet
+  -- different draws PAST the first; the first post-reload draw is fixed
+  -- by the savestate and must simply be won (see the heal-threshold note
+  -- in makePlan for how that fight was actually lost and fixed).
+  --
+  -- The pacing MUST run after the `lost` reset below, for the same
+  -- reason transitAttempt's does: worldWalkFight's terminator treats a
+  -- set `lost` as done, and pacing inside the reload block would see
+  -- attempt n-1's loss string still live and skip straight through.
+  local jitterSteps = {}
+  for j = 2, n do
+    jitterSteps[#jitterSteps + 1] = worldWalkFight(217, 119, 12000,
+      string.format("route a%d jitter %d out", n, j), nil, { flee = true })
+    jitterSteps[#jitterSteps + 1] = worldWalkFight(219, 119, 12000,
+      string.format("route a%d jitter %d back", n, j), nil, { flee = true })
+  end
   local steps = {
-    H.cond(function() return n > 1 end, {
-      H.logStep(function()
-        return string.format("[gau] post-join route ATTEMPT %d -- " ..
-          "reloading (%s)", n, tostring(lost))
-      end),
-      H.call(function() ldReq = H.requestLoadState(routeBlob) end),
-      H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "route attempt " .. n) end),
-      H.waitFrames(60 + (n - 1) * 17),
-    }, {}),
+    H.cond(function() return n > 1 end, reloadSteps, {}),
     H.call(function() lost, wipeN = nil, 0 end),
+    H.cond(function() return n > 1 end, jitterSteps, {}),
   }
   for w = 1, #ROUTE do
     local tx, ty, name = ROUTE[w][1], ROUTE[w][2], ROUTE[w][3]
@@ -1375,7 +1420,10 @@ local function routeAttempt(n)
       end, {
         worldWalkFight(tx, ty, 12000,
           string.format("route a%d %s seg %d", n, name, i), nil,
-          { segment = true }),
+          -- flee (2026-08-19): the transit's ruling; this very stretch lost
+          -- a whole joined party to the formation lottery on 2026-08-09 and
+          -- again under the #122 alignment.  Locomotion flees.
+          { segment = true, flee = true }),
         H.cond(function() return lost == nil end, {
           H.fieldCare({ tag = string.format("route a%d %s care %d",
                           n, name, i),
@@ -1594,10 +1642,16 @@ H.run({ maxFrames = 500000 }, {
   routeAttempt(1),
   routeAttempt(2),
   routeAttempt(3),
+  -- Five rungs (2026-08-19, the battle-68 ruling): the whole fence is
+  -- inside the Veldt sector and its lottery includes unrunnable draws a
+  -- fresh party can lose outright, so the ladder needs real depth once the
+  -- rolls actually vary (the safe-row jitter above provides that).
+  routeAttempt(4),
+  routeAttempt(5),
   H.call(function()
     if not routeDone then
       error(string.format("gau: post-join walk to Crescent Mountain was " ..
-        "lost on all 3 staggered attempts -- last: %s", tostring(lost)), 0)
+        "lost on all 5 staggered attempts -- last: %s", tostring(lost)), 0)
     end
   end),
   -- The landing step itself can WIN the encounter roll ($E8 bit5 the
