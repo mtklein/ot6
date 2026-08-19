@@ -533,6 +533,16 @@ H.run({ maxFrames = 150000 }, {
           H.readWord(base + 9), H.readWord(base + 11)))
       end
     end
+    -- The casualty contract: this generator's whole route (mansion, basement,
+    -- warp maze) is dialog and cutscene only -- issue #75's header says ZERO
+    -- state writes and no encounter groups on any of it -- so it can neither
+    -- hurt nor heal whoever boots from sfigaro_passage.mss.  That means a
+    -- casualty here is entirely inherited, not made by this generator, and
+    -- the fix belongs upstream (gen_sfigaro's exit care stop). This assertion
+    -- is the contract that catches a regression there -- or in whatever the
+    -- boot chain becomes -- before it ships in celes_freed instead of being
+    -- caught only by audit_party_hp after the fact.
+    H.assertPartyStanding("celes_freed")
     H.screenshot("celes_freed")
   end),
   H.saveState("celes_freed.mss"),

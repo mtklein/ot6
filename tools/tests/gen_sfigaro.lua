@@ -704,6 +704,26 @@ H.run({ maxFrames = 350000 }, {
                item = 0xE8,
                nav = { playBattles = true } },
 
+  -- Repair whatever BEAT 1's gate-soldier fights (B1, R1, R2 -- solo LOCKE,
+  -- fought up to three times because he respawns on every map-75 reload)
+  -- and the town/passage crossings since cost, before anything downstream is
+  -- measured or captured.  Every one of those crossings runs
+  -- playBattles = true, and a fought or fled encounter is not a free one.
+  -- Measured 2026-08-18 on the chest-wave regeneration: with no care stop
+  -- and no exit contract here, this generator shipped LOCKE at 16/249 (near
+  -- fatal) in sfigaro_passage.mss -- and because gen_celes performs ZERO
+  -- state writes of its own (its header says so; the route draws no
+  -- battles), that same 16/249 LOCKE rode straight through into
+  -- celes_freed.mss untouched. audit_party_hp was the only thing that
+  -- noticed either one. Same two-part shape as gen_ifrit_entry's
+  -- post-crossing repair: fieldCare is the repair (LOCKE is solo here with
+  -- no heal spell, so this reaches for the bag's Tonics/Potions -- see the
+  -- gate soldier's own "care before" stops upstream for what is in supply),
+  -- and H.assertPartyStanding at the exit is the contract that keeps a stop
+  -- that silently did nothing from reporting the same green as one that
+  -- worked.
+  H.fieldCare({ tag = "care before the secret passage", threshold = 0.85 }),
+
   go(4, 15, 86, 7, 51, "E4 map 86 (4,15) -> (7,51) [the secret passage]"),
   H.call(function()
     H.assertEq(map(), 86, "still map 86 -- the passage is a same-map warp")
@@ -711,6 +731,12 @@ H.run({ maxFrames = 350000 }, {
     H.assertEq(H.tileAligned(), true, "tile-aligned")
     H.assertEq(H.battleLoadStarted(), false, "no battle")
     where("sfigaro_passage")
+    -- The casualty contract (see the care stop above): this fixture is what
+    -- gen_celes boots from, and gen_celes performs zero state writes of its
+    -- own, so a party member down or near fatal here is a loss shipped
+    -- straight through to celes_freed, not a state of the story getting
+    -- somewhere.
+    H.assertPartyStanding("sfigaro_passage")
     H.screenshot("sfigaro_passage")
   end),
   H.saveState("sfigaro_passage.mss"),

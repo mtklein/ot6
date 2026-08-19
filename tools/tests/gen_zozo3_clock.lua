@@ -301,10 +301,32 @@ H.run({ maxFrames = 90000 }, {
   end)(),
   H.call(function() H.setPad({}) end),
   H.waitFrames(30),
+
+  -- Repair whatever the two random-encounter fights above cost before
+  -- capture.  `encounters` fights rather than flees (the header explains
+  -- why), and a fought fight is not a free one: measured 2026-08-18 on the
+  -- chest-wave regeneration, the step off the clock tile and the calm wait
+  -- after it between them left LOCKE and EDGAR at 0 hp (status1 80 --
+  -- WOUNDED) and CELES near-fatal, and with no care stop and no exit
+  -- contract this generator shipped two dead party members in
+  -- zozo_clock_solved -- audit_party_hp was the only thing that noticed.
+  -- Same two-part shape as gen_ifrit_entry's post-crossing repair: fieldCare
+  -- is the repair (Fenix Down revives the wounded first, CELES's Cure and
+  -- the bag's Tonics/Potions cover the rest -- both are in supply here, see
+  -- the "care before the Zozo streets" stop above), and H.assertPartyStanding
+  -- at the exit is the contract that keeps a stop that silently did nothing
+  -- from reporting the same green as one that worked.
+  H.fieldCare({ tag = "care after the clock encounters", threshold = 0.85 }),
+
   H.call(function()
     H.assertEq(sw(0x01F0), 1, "$01F0 SET -- clock solved, stairs open")
     H.log(string.format("[zozo_clock_solved] f%d map=%d (%d,%d)",
       H.frame, map(), H.fieldX(), H.fieldY()))
+    -- The casualty contract (see the care stop above): this fixture is what
+    -- field_healpolicy.lua, probe_zozo3_chests.lua and probe_zozo_tool.lua
+    -- boot from, so a party member down or near fatal here is a loss shipped
+    -- downstream, not a state of the story getting somewhere.
+    H.assertPartyStanding("zozo_clock_solved")
     H.screenshot("zozo_clock_solved")
   end),
   H.saveState("zozo_clock_solved.mss"),
