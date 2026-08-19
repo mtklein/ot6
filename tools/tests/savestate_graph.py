@@ -606,4 +606,28 @@ STATES = [
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/thamasa-night-v1
     S("thamasa_night", gen="gen_thamasa_arrive", prev="crescent_landing",
       timeout=1800),
+
+    # boundary L -> boundary M (issue #127, "the Thamasa fire block"): the
+    # inn sleep, the fire, Strago's house-door talk into the join, the
+    # burning house (map 351: Fire Rod + Ice Rod chests, the wandering
+    # flames, the (21,22) ambush, FlameEater battle 79), the win tail, and
+    # Shadow's goodbye -- the `fire-out-v1` checkpoint.  checkpoint=, not
+    # prev=, the same vector_crash shape: this state cold-Continues the
+    # tracked thamasa-night-v1 SRAM checkpoint rather than a savestate link,
+    # so a clean run always starts from the real Continue screen.
+    # timeout=1800: a scripted town scene, a boss fight behind a 5-rung seed
+    # ladder, and two world crossings is well past run.sh's 600s default on
+    # a loaded machine (gen_kolts/gen_tunnelarmr precedent).  Re-cutting the
+    # SRAM is a deliberate by-hand operation:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/thamasa-night-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/fire-out-v1/fire-out.sram \
+    #     tools/tests/run.sh tools/tests/gen_thamasa_fire.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/fire-out-v1
+    # fire_out is STAGED, not landed: gen_thamasa_fire (on disk, WIP) cannot
+    # yet win the burning-house ambush -- the loss silently auto-Continues
+    # the checkpoint (#127's pass-three finding) -- so registering it here
+    # would block every full-chain run at a known-red edge.  Re-enable with
+    # the L->M completion:
+    # S("fire_out", gen="gen_thamasa_fire", checkpoint="thamasa-night-v1",
+    #   timeout=1800),
 ]
