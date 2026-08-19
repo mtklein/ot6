@@ -1475,7 +1475,12 @@ H.run({ maxFrames = 400000 }, {
   -- Potion is last, so a poorer purse upstream shorts it (via the
   -- purse-clamp acceptance in buyItem) rather than the Fenix Downs or the
   -- Shurikens.
-  buyItem(TONIC, 0, function() return 20 - invCount(TONIC) end, "TONIC to 20"),
+  -- 30, not 20 (2026-08-19): the Veldt transit arrived with tonic=0
+  -- potion=0 and lost five de-correlated rungs in a row -- two members, no
+  -- heal source, and the Mobliz shop is on the transit's far side.  The
+  -- extra ten Tonics (~500 GP) are funded by the marginal Potion below
+  -- dropping 11 -> 10 (~300 GP back), the list's own shorting order.
+  buyItem(TONIC, 0, function() return 30 - invCount(TONIC) end, "TONIC to 30"),
   buyItem(ANTIDOTE, 2, function() return 3 - invCount(ANTIDOTE) end,
     "ANTIDOTE to 3"),
   -- Fenix Downs are for reviving allies (battle 47's prolonged tail killed
@@ -1502,8 +1507,8 @@ H.run({ maxFrames = 400000 }, {
   -- the 1434 the Potion-heavy list left, and the scenario's later stops are
   -- funded a little better than before rather than worse.  11 is still above
   -- the medic line's floor asserted below.
-  buyItem(POTION, 1, function() return 11 - invCount(POTION) end,
-    "POTION to 11"),
+  buyItem(POTION, 1, function() return 10 - invCount(POTION) end,
+    "POTION to 10"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d skeans=%d",

@@ -351,6 +351,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
   local fought, wasBattle = 0, false
   local stuckN, battleFrames, segFrames = 0, 0, 0
   local segCalm, coasting = 0, false
+  local fleeN, refusedN = 0, 0      -- opts.flee: frames held / cant-run debounce
   local function makePlan(actor)
     -- `worldWalkFight()` episodes are constructed before H.run starts, so
     -- resolve this at execution time.  The field party byte is repurposed in
@@ -598,6 +599,32 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
           return
         end
         tick = tick + 1
+        -- opts.flee (2026-08-19, the Veldt transit): a two-member party with
+        -- an empty bag cannot FIGHT its way across -- five de-correlated
+        -- rungs wiped, and restocking upstream just fed the same burn.  A
+        -- player in that spot RUNS, and this gen's own boot-battle flee
+        -- proves a bare L+R hold works on Veldt formations.  Hold L+R with
+        -- a periodic B to shed any open command menu (an open menu stops
+        -- battle time under Wait, which stops the run counter); fall back
+        -- to the menu fight on a debounced can't-run bit or after the cap,
+        -- the lib newFlee's own shape.
+        if opts.flee then
+          refusedN = ((H.readByte(0x00b1) & 0x02) ~= 0) and refusedN + 1 or 0
+          fleeN = fleeN + 1
+          if refusedN < 60 and fleeN <= 1800 then
+            local pad = { l = true, r = true }
+            if tick % 16 < 3 then pad.b = true end
+            H.setPad(pad)
+            return
+          end
+          if fleeN == 1801 or refusedN == 60 then
+            H.log(string.format("[gau] walk[%s] flee %s at f%d -- " ..
+              "fighting this one out", what,
+              refusedN >= 60 and "REFUSED ($b1 can't-run)" or "capped",
+              H.frame))
+            fleeN = fleeN + 1     -- log once
+          end
+        end
         local ph = tick % 30
         if H.readByte(MENU) == 0 then
           plan, planActor, mstreak = nil, nil, 0
@@ -611,6 +638,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
         return
       end
       plan, planActor = nil, nil
+      fleeN, refusedN = 0, 0
       -- NOT in a battle and NOT on a live, aligned, lit world: normally
       -- a fade or a battle teardown, which passes on its own.  But a
       -- state a care stop's exit read as closed one frame early holds
@@ -1151,18 +1179,45 @@ local function transitCheckpoint()
 end
 local function transitAttempt(n)
   local ldReq
+  local reloadSteps = {
+    H.logStep(function()
+      return string.format("[gau] shore transit ATTEMPT %d -- reloading " ..
+        "(%s)", n, tostring(lost))
+    end),
+    H.call(function() ldReq = H.requestLoadState(transitBlob) end),
+    H.waitFrames(2),
+    H.call(function() H.checkReq(ldReq, "transit attempt " .. n) end),
+    H.waitFrames(60 + (n - 1) * 17),
+  }
+  -- De-correlate the rungs with WASTED STEPS, not waited frames (2026-08-19).
+  -- Five rungs once died at IDENTICAL relative frames (a1 f7554 ... a5
+  -- f37362, deltas exactly 7452): world encounter rolls are per-step and
+  -- the accumulator rides the savestate, so idle frames after a reload
+  -- change nothing and every rung replayed the same death march.  Each rung
+  -- now paces east-and-back (n-1) times on the shore pair (192,105)<->
+  -- (193,105) -- both tiles proven passable by attempt 1's own walked route
+  -- -- so every later roll lands on a different step index.  A fight during
+  -- the pacing is fine: it de-correlates harder.
+  --
+  -- The pacing MUST run after the `lost` reset below: worldWalkFight's
+  -- terminator treats a set `lost` as done, and the first draft put the
+  -- pacing inside the reload block, where attempt n-1's loss string was
+  -- still live -- every jitter step "satisfied after 0 frames" and the
+  -- rungs replayed identically anyway.
+  -- The 12000-frame budget matches the transit segments': the accumulator
+  -- is primed enough that the jitter's very first step can (and does) eat
+  -- the route's opening fight, and a 3000 budget timed out inside it.
+  local jitterSteps = {}
+  for j = 2, n do
+    jitterSteps[#jitterSteps + 1] = worldWalkFight(193, 105, 12000,
+      string.format("transit a%d jitter %d out", n, j), false, { flee = true })
+    jitterSteps[#jitterSteps + 1] = worldWalkFight(192, 105, 12000,
+      string.format("transit a%d jitter %d back", n, j), false, { flee = true })
+  end
   local steps = {
-    H.cond(function() return n > 1 end, {
-      H.logStep(function()
-        return string.format("[gau] shore transit ATTEMPT %d -- reloading " ..
-          "(%s)", n, tostring(lost))
-      end),
-      H.call(function() ldReq = H.requestLoadState(transitBlob) end),
-      H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "transit attempt " .. n) end),
-      H.waitFrames(60 + (n - 1) * 17),
-    }, {}),
+    H.cond(function() return n > 1 end, reloadSteps, {}),
     H.call(function() lost, wipeN = nil, 0 end),
+    H.cond(function() return n > 1 end, jitterSteps, {}),
   }
   -- The transit ends OFF the world (Mobliz's entrance tile loads map 157),
   -- so "still on the world" is the loop condition rather than a tile test.
@@ -1171,7 +1226,8 @@ local function transitAttempt(n)
       return lost == nil and H.worldMode()
     end, {
       worldWalkFight(220, 115, 12000,
-        string.format("transit a%d seg %d", n, i), true, { segment = true }),
+        string.format("transit a%d seg %d", n, i), true,
+        { segment = true, flee = true }),
       H.cond(function() return lost == nil and H.worldMode() end, {
         H.fieldCare({ tag = string.format("transit a%d care %d", n, i),
                       threshold = 0.9, maxFrames = 12000 }),
@@ -1376,6 +1432,17 @@ H.run({ maxFrames = 500000 }, {
   transitAttempt(1),
   transitAttempt(2),
   transitAttempt(3),
+  -- Five rungs, not three (2026-08-19, the battle-68 ruling re-applied).
+  -- The #122 timing shift re-rolled the Veldt: all three rungs lost, the
+  -- last wiped in seg 2 with tonic=0 potion=0 -- the bag drains upstream of
+  -- the transit checkpoint and the Mobliz shop is the transit's DESTINATION,
+  -- so a dry crossing rides entirely on encounter luck.  A player retries
+  -- the crossing from their save more than three times; the ladder is that
+  -- player.  Five rungs that all lose still fail the step, and the supply
+  -- shape (no heal source between the falls and Mobliz) is a real balance
+  -- observation for the M6 pass.
+  transitAttempt(4),
+  transitAttempt(5),
   H.call(function()
     if not transitDone then
       error("gau: the Veldt transit to Mobliz was lost -- " .. tostring(lost)
