@@ -339,7 +339,12 @@ STATES = [
     # assignment menu (P1=TERRA+EDGAR+CELES, P2=CYAN+SABIN, P3=LOCKE+GAU) ->
     # defense live -> the measured cliff descent -> just before the KEFKA
     # fight -> the scripted win.
-    S("narshe_battle", gen="gen_narshe_battle", prev="reunion_ready"),
+    # timeout=1800 (2026-08-19): the #122 timing shift lengthened the
+    # descent's fights and the run outgrew the 600s default -- killed at
+    # waypoint 16/18 with the machine idle (load 1.4), twice.  Real
+    # progress, not starvation; the discriminator is HANDOFF trap 9.
+    S("narshe_battle", gen="gen_narshe_battle", prev="reunion_ready",
+      timeout=1800),
     S("kefka_entry", gen="gen_narshe_battle", prev="narshe_battle"),
     # kefka_won is v0.4's FIRST link and the input-driven chain's head: the
     # win tail (esper scene, TERRA's flight, the Arvis regroup and its
