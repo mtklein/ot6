@@ -244,7 +244,12 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
+      -- 40000, not 20000 (2026-08-19): an unrunnable formation fought to a
+      -- win through 3 shields is a long fight, and the #122 alignment made
+      -- one long enough to eat the old budget mid-grind while WINNING
+      -- (monster HP falling, party standing).  The budget must fit at
+      -- least one such fight plus the walk.
+      { maxFrames = 40000, arrive = arrived, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -316,7 +321,7 @@ local function warpTo(sx, sy, dx, dy, dmap, what)
     H.logStep(function()
       return string.format("%s: from (%d,%d)", what, H.fieldX(), H.fieldY())
     end),
-    H.navTo(sx, sy, { maxFrames = 20000, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6, arrive = function()
+    H.navTo(sx, sy, { maxFrames = 40000, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6, arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
     H.release(),
