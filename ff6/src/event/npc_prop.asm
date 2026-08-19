@@ -15368,6 +15368,16 @@ NPCProp::_343:
                 set_npc_gfx CLYDE, LOCKE
                 end_npc
 
+        ; OT6 #127/#125: the Thamasa square save sparkle (appended, never
+        ; inserted -- events address NPCs by {map, index}; the trigger is in
+        ; EventTrigger::_343).  $0632 is the standing save-sparkle switch.
+        make_npc {33, 25}, $0632
+                set_npc_anim FOUR_FRAMES, SPECIAL
+                set_npc_speed NORMAL
+                set_npc_gfx SAVE_POINT, RAINBOW
+                set_npc_sprite_priority HIGH
+                end_npc
+
 ; ------------------------------------------------------------------------------
 
 NPCProp::_344:

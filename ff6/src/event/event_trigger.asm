@@ -1672,6 +1672,11 @@ EventTrigger::_342:
 EventTrigger::_343:
         make_event_trigger {35, 15}, _cbd89f
         make_event_trigger {25, 12}, _cbd8f9
+        ; OT6 #127/#125: a save point in Thamasa's square, the Octopath town
+        ; cadence and the burning house's retry boundary (thamasa-route.md
+        ; §2.4 placement 1; the budget is #125's grown block).  Standing
+        ; switch $0632 sparkle appended at the END of NPCProp::_343.
+        make_event_trigger {33, 25}, SavePoint
 
 EventTrigger::_344:
         make_event_trigger {54, 18}, _cc0977
