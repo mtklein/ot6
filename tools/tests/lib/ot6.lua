@@ -2155,7 +2155,33 @@ function M.newFightDriver(tag, opts)
 
   local function button(actor)
     local st = M.readByte(MSTATE)
+    if st ~= ST_TGT then tgtSpin = 0 end
     if plan == nil or planActor ~= actor then
+      if st == ST_TGT then
+        -- #111's missing backstop (measured 2026-08-19, sfigaro_escape's
+        -- wipe).  A confirm clears the plan optimistically and presses A;
+        -- when the A is REFUSED -- the target cursor's rest mask sat on the
+        -- corpse of monster slot 0 -- the state stays ST_TGT with no plan,
+        -- and this head used to return nil here every tick: no press, no
+        -- replan, the turn held open until the party wiped 8000 frames
+        -- later.  Instead: keep confirming, and after a few refused ticks
+        -- walk the cursor (the focus steer's own rotation) between
+        -- confirms until any live target lets the A land.
+        tgtSpin = tgtSpin + 1
+        if tgtSpin >= 8 then
+          if tgtSpin == 8 then
+            M.log(string.format("[%s] tgt confirm is being refused " ..
+              "(chars=%02X mons=%02X) -- walking the cursor to a live " ..
+              "target", tag or "fight",
+              M.readByte(TGTCHARS), M.readByte(TGTMONS)))
+          end
+          local dirs = { "left", "right", "down", "up" }
+          if (tgtSpin % 6) < 3 then
+            return { dirs[1 + ((tgtSpin // 6) % 4)] }
+          end
+        end
+        return { "a" }
+      end
       if st ~= ST_CMD then return nil end
       plan, planActor, tgtSpin = makePlan(actor), actor, 0
       M.log(string.format("[%s] actor=%d char=%d plan=%s",
@@ -2333,7 +2359,10 @@ function M.newFightDriver(tag, opts)
         watch.until_ = battleTick + 900
         healWatch = watch
       end
-      plan, planActor, tgtSpin = nil, nil, 0
+      -- A refused confirm (corpse under the target cursor) re-enters
+      -- button()'s plan-nil ST_TGT head next tick, which owns the #111
+      -- backstop; the optimistic clear here is what routes it there.
+      plan, planActor = nil, nil
       return { "a" }
     end
     if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC or st == ST_ESPER then
