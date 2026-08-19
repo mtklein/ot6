@@ -9,10 +9,11 @@
 -- (ot6_progression.asm:3-6, called from battle_main.asm:16251), so MP spent
 -- in a corridor comes back and a Tonic drunk in one does not.
 --
--- The fixture is zozo_clock_solved: somebody hurt who knows no spell at all,
--- CELES with Cure known and MP to spend, and a bag of Tonics.  One starting
--- state therefore drives the same visit four ways, and the difference
--- between the first two IS the consumable saving.
+-- The fixture is zozo_clock_solved: a caster who knows Cure and has MP to
+-- spend, a bag of Tonics, and (as of the healthy-fixture campaign below) a
+-- standing, undamaged party.  One starting state therefore drives the same
+-- visit four ways, and the difference between the first two IS the
+-- consumable saving.
 --
 -- NOTHING BELOW IS WRITTEN AS A LITERAL FROM THAT FIXTURE, and that is a
 -- correction rather than a style preference.  This test used to be
@@ -28,11 +29,17 @@
 -- no cure, the healer is whoever knows Cure, and the refusal target is
 -- whoever is already at full.
 --
--- The one thing that is still a fixture assumption is that SOMEBODY is
--- meaningfully hurt.  That is checked as a precondition and fails loudly if
--- a future regeneration lands this state with the party at full, which is
--- the right outcome: a heal-policy test on a party that needs no healing
--- passes without testing anything.
+-- The one thing that used to be a fixture assumption -- that SOMEBODY is
+-- meaningfully hurt -- stopped being one on 2026-08-18, when the
+-- healthy-fixture repair campaign (fieldCare stops at damage sites;
+-- tools/audit_party_hp.py) made every generated savestate ship standing and
+-- undamaged, zozo_clock_solved included.  There is no fixture left upstream
+-- that arrives hurt, by design, so this test now manufactures its own
+-- patient: hurtPatient() below writes a reduced HP straight into one
+-- Cure-less character's record after each reload.  That write is a
+-- sanctioned focused-test expedient (tools/state_write_waivers.txt), not a
+-- claim about play; the property under test -- the relationship between the
+-- bag and cast branches -- is unchanged.
 --
 -- What this pins down:
 --   1. M.calcMaxHpMp unpacks the boost code the way CalcMaxHPMP does.  A
@@ -74,6 +81,35 @@ local refuseTonics = nil      -- the bag's Tonic count before that refusal
 -- themselves, HEALER is a member who knows Cure, and FULL is somebody
 -- already at their maximum, which case 5 needs so the game refuses a Tonic.
 local PATIENT, HEALER, FULL = nil, nil, nil
+
+-- The healthy-fixture campaign (fieldCare now stops at damage sites;
+-- tools/audit_party_hp.py) means every generated savestate, zozo_clock_solved
+-- included, ships its party standing and undamaged.  That is the fixture
+-- getting better and this test's one remaining fixture assumption --
+-- "somebody is meaningfully hurt" -- going false.  Rather than chase a
+-- fixture upstream that still ships damage (none is left, by design), this
+-- test manufactures its own patient: a direct write to one character's HP
+-- word, the same $1600+37c record layout gen_*.lua and the battle tests
+-- already poke.  Sanctioned as a focused-test expedient
+-- (tools/state_write_waivers.txt); the property under test -- the
+-- relationship between the bag and cast branches -- is unchanged, only the
+-- fixture's "somebody hurt" precondition is now made true by hand instead
+-- of assumed.  WOUNDED is resolved once (the first character who knows no
+-- Cure) and rewritten after every reload of ZOZO, since the savestate
+-- itself reverts to full health each time.
+local WOUNDED = nil
+
+local function hurtPatient()
+  if not WOUNDED then
+    for _, c in ipairs(H.partyMembers()) do
+      if not H.knowsSpell(c, CURE) then WOUNDED = c; break end
+    end
+    H.assertEq(WOUNDED ~= nil, true,
+      "the fixture has somebody who knows no Cure to cast as patient")
+  end
+  H.writeWord(0x1600 + 37 * WOUNDED + 9,
+    math.floor(H.charMaxHp(WOUNDED) * 0.5))
+end
 
 local function resolveRoles()
   local worst = 1.0
@@ -151,6 +187,7 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
   H.call(function()
+    hurtPatient()
     resolveRoles()
     H.assertEq(H.knowsSpell(HEALER, CURE), true, "the healer knows Cure here")
     H.assertEq(H.knowsSpell(PATIENT, CURE), false, "the patient does not")
@@ -176,6 +213,7 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
   H.call(function()
+    hurtPatient()
     magicRun.bag, magicRun.mp = bag(), H.charMp(HEALER)
     trace, tracing = {}, true
   end),
@@ -214,6 +252,7 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
   H.call(function()
+    hurtPatient()
     magicRun.floorBag, magicRun.floorMp = bag(), H.charMp(HEALER)
   end),
   H.fieldCare({ tag = "zozo mp floor", threshold = 0.95, mpFloor = 999 }),

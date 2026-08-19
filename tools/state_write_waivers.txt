@@ -70,8 +70,10 @@ tools/tests/battle_slots.lua	.writeByte(	quarantine: reels free-run at frame rat
 tools/tests/battle_slots.lua	.writeWord(	quarantine: reels free-run at frame rate, so no input selects an icon on cue
 tools/tests/battle_steal.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeByte(
+tools/tests/battle_thief.lua	.writeWord(	quarantine: #122's RNG reshuffle makes the desert pair's chip damage lethal to a deferred party member over the file's one sustained (non-damaging) battle; the floor write never touches the BP ledger under test
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
+tools/tests/field_healpolicy.lua	.writeWord(	quarantine: the healthy-fixture campaign (#122 fallout) leaves no savestate that arrives hurt, so the test writes its own patient's HP
 tools/tests/gen_battle2.lua	.writeWord(
 tools/tests/lib/ot6.lua	.writeByte(
 tools/tests/lib/ot6.lua	.writeWord(

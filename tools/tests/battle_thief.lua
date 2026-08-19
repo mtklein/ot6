@@ -97,6 +97,33 @@ end
 local locke, ally
 local function bp(slot) return H.readByte(BP + ENT_C(slot)) end
 local function mp() return H.readWord(0x3C08 + locke*2) end
+local function hp(slot) return H.readWord(0x3BF4 + slot*2) end
+local function maxHp(slot) return H.readWord(0x3C1C + slot*2) end
+
+-- Desert chip damage vs. a two-person party (#122 fallout): the whole test
+-- keeps one continuous battle alive by construction -- Steal, Filch and
+-- Bestow are all non-damaging, so nothing here ever kills the two monsters,
+-- and the fight (and its chip damage) runs the full length of the file.
+-- Measured 2026-08-19: with the RNG chain reshuffled, the desert pair now
+-- hits hard enough to kill the deferred ally before phase 7 (the "waits her
+-- turn out and dies" hazard the header already names) AND to kill Locke
+-- himself mid-phase-7, where he is taking real hits every round with no
+-- Defend of his own (his rows are all Steal, on purpose -- that is the
+-- ledger under test).  Neither BP ledger nor any assertion below ever reads
+-- HP, so a floor write here costs the test nothing it is measuring: it
+-- can't give the ally a free bp (only a real turn does that, and this never
+-- lets her take one), and it can't change what Locke's own turns bank.
+-- Sanctioned expedient (tools/state_write_waivers.txt); checked every frame
+-- so no single hit gets the chance to land the killing blow between checks.
+local HP_FLOOR = 0.5
+local function keepAlive()
+  for _, slot in ipairs({ locke, ally }) do
+    if slot then
+      local h, m = hp(slot), maxHp(slot)
+      if m > 0 and h > 0 and h < m * HP_FLOOR then H.writeWord(0x3BF4 + slot*2, m) end
+    end
+  end
+end
 local function cmdRowOf(slot, cmd)
   for r = 0, 3 do
     if H.readByte(0x202E + slot*12 + r*3) == cmd then return r end
@@ -143,6 +170,7 @@ local target = nil                       -- character-target slot for Bestow
 local tc = H.targetCursor({ mask = TCURSOR,
                             dirs = { "down", "up", "left", "right" } })
 local function decide()
+  keepAlive()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
   end

@@ -216,6 +216,32 @@ local function pulse()
         if pct < wpct then worst, wpct = s, pct end
       end
     end
+    -- ST_ITEM and ST_TGT are read from the real menu, not decided by us, so
+    -- once the game is actually sitting in one of them the medic finishes
+    -- the heal it already opened, regardless of what wpct reads THIS frame.
+    -- Measured 2026-08-19 (#122 fallout): re-gating every frame on a live
+    -- wpct<55 check let a heal in flight get abandoned the moment the
+    -- target's percentage ticked back above 55 mid-navigation (a real
+    -- possibility once damage-per-hit changed) -- the outer branch would
+    -- then fall to the plain Defend cadence while the actual screen was
+    -- still the item list, so "right"/"a" landed on item-grid navigation
+    -- instead of the command list, and the submenu never closed: the pool
+    -- spend then sat forever at menu=01 mstate=$0a with nothing driving it.
+    if st == ST_ITEM then
+      local slow = ph % 30 < 5
+      local want = (wpct < 45) and bagIdxOf({ POTION }) or nil
+      want = want or bagIdxOf({ TONIC, POTION })
+      if want == nil then H.setPad(slow and { b = true } or {}) return end
+      local cur = H.readByte(0x8947 + a) + H.readByte(0x894F + a)
+      if cur < want then H.setPad(slow and { down = true } or {})
+      elseif cur > want then H.setPad(slow and { up = true } or {})
+      else H.setPad(slow and { a = true } or {}) end
+      return
+    elseif st == ST_TGT then
+      local btn = tc.steer(worst, ph)
+      H.setPad(btn and { [btn] = true } or {})
+      return
+    end
     if wpct < 55 then                   -- somebody needs the heal
       if st == ST_CMD then
         local want = nil
@@ -227,18 +253,6 @@ local function pulse()
         if cur == want then H.setPad(edge and { a = true } or {})
         elseif cur < want then H.setPad(edge and { down = true } or {})
         else H.setPad(edge and { up = true } or {}) end
-      elseif st == ST_ITEM then
-        local slow = ph % 30 < 5
-        local want = (wpct < 45) and bagIdxOf({ POTION }) or nil
-        want = want or bagIdxOf({ TONIC, POTION })
-        if want == nil then H.setPad(slow and { b = true } or {}) return end
-        local cur = H.readByte(0x8947 + a) + H.readByte(0x894F + a)
-        if cur < want then H.setPad(slow and { down = true } or {})
-        elseif cur > want then H.setPad(slow and { up = true } or {})
-        else H.setPad(slow and { a = true } or {}) end
-      elseif st == ST_TGT then
-        local btn = tc.steer(worst, ph)
-        H.setPad(btn and { [btn] = true } or {})
       elseif st == 0x01 then
         H.setPad({})
       else
