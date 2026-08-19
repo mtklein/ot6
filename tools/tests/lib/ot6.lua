@@ -2155,7 +2155,7 @@ function M.newFightDriver(tag, opts)
 
   local function button(actor)
     local st = M.readByte(MSTATE)
-    if st ~= ST_TGT then tgtSpin = 0 end
+    if st == ST_CMD then tgtSpin = 0 end
     if plan == nil or planActor ~= actor then
       if st == ST_TGT then
         -- #111's missing backstop (measured 2026-08-19, sfigaro_escape's
@@ -2164,21 +2164,31 @@ function M.newFightDriver(tag, opts)
         -- corpse of monster slot 0 -- the state stays ST_TGT with no plan,
         -- and this head used to return nil here every tick: no press, no
         -- replan, the turn held open until the party wiped 8000 frames
-        -- later.  Instead: keep confirming, and after a few refused ticks
-        -- walk the cursor (the focus steer's own rotation) between
-        -- confirms until any live target lets the A land.
+        -- later.
+        --
+        -- Two rules, both measured the hard way on n128_won's regen (the
+        -- first version of this backstop CAUSED that freeze):
+        --   * below the threshold this waits silently, exactly as the old
+        --     head did -- a landed confirm's tail passes through here for a
+        --     tick or two, and pressing A there perturbed healthy fights
+        --     (the n128 divergence began at the first such press);
+        --   * tgtSpin resets only at ST_CMD (a genuine menu restart), not
+        --     on any off-ST_TGT flicker -- n128's freeze never logged
+        --     because animation flickers reset the count below the
+        --     threshold every sample window.
+        -- Past the threshold: walk the cursor (the focus steer's own
+        -- rotation) between confirms until any live target lets the A land.
         tgtSpin = tgtSpin + 1
-        if tgtSpin >= 8 then
-          if tgtSpin == 8 then
-            M.log(string.format("[%s] tgt confirm is being refused " ..
-              "(chars=%02X mons=%02X) -- walking the cursor to a live " ..
-              "target", tag or "fight",
-              M.readByte(TGTCHARS), M.readByte(TGTMONS)))
-          end
-          local dirs = { "left", "right", "down", "up" }
-          if (tgtSpin % 6) < 3 then
-            return { dirs[1 + ((tgtSpin // 6) % 4)] }
-          end
+        if tgtSpin < 8 then return nil end
+        if tgtSpin == 8 then
+          M.log(string.format("[%s] tgt confirm is being refused " ..
+            "(chars=%02X mons=%02X) -- walking the cursor to a live " ..
+            "target", tag or "fight",
+            M.readByte(TGTCHARS), M.readByte(TGTMONS)))
+        end
+        local dirs = { "left", "right", "down", "up" }
+        if (tgtSpin % 6) < 3 then
+          return { dirs[1 + ((tgtSpin // 6) % 4)] }
         end
         return { "a" }
       end
