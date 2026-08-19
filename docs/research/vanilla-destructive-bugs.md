@@ -483,3 +483,119 @@ Each of these was read and the bound verified. None is a defect.
 - **The Floating Continent countdown surviving Game Over.** `GameOver`'s
   timer-skip guards (`ff6/src/event/event_main.asm:113076-113083`) test event
   bits `$02ab-$02ae` that are never written anywhere, so the timers always stop.
+
+---
+
+## The community corpus, triaged (2026-08-19)
+
+Sources: Master ZED's *FF3us/6j Glitches & Bugs guide* v2.6
+(masterzed.cavesofnarshe.com — 161 entries, read directly, the canonical
+exhaustive list) and the Worlds Collide randomizer's `Flags:Fixes` docs
+(wiki.ff6worldscollide.com — bundles named engine bugs under opt-in fix
+flags), against this project's own docs/code. C. V. Reynolds' compilation
+readme and the ff6hacking.com forum "all bugs" thread 403'd every fetch
+attempt; their names are used only where Master ZED or WC corroborate them.
+Terii Senshi's Algorithms FAQ and speedrun.com yielded no fetchable primary
+source this pass — claims resting on them alone say **not verified in
+sources** rather than repeating folklore. Scope: start through Thamasa;
+WoR-only content (Psycho Cyan) stays out of scope, already logged above.
+
+### Special attention
+
+**Evade/MBlock — bucket (a), never a fix candidate.** Master ZED confirms it
+plainly ("Evade is worthless... M.Block takes care of all evasion"); WC
+bundles it as an opt-in flag, itself evidence upstream treats it as a
+toggle, not an obvious defect. Every OT6 fight from Narshe through the
+Sealed Gate is tuned with M.Block as the sole evasion stat; "fixing" Evade
+now would silently retune every measured encounter in `bosses-wob.md` and
+`balance-metrics.md` with no number visibly changing. Owner ruling: closed.
+
+**Vanish + Doom/X-Zone/Demi — bucket (a), a feature under the house rule.**
+Master ZED: Clear status (Vanish/Fader/Inviz Edge) overrides both the
+instant-death immunity check and the Life/Life 2 dead-target check.
+`docs/design/magicite-tube-six.md` §6 already has the deepest read in the
+corpus — Phantom grants Vanish, Shoat grants Doom, landing together in the
+tube-six stretch — and recommends preserving it since it costs two esper
+slots, two turns, and 53 MP, a real price. Owner ruling confirms: bucket
+(a). §14.2's two open items stand unchanged: the exact hit-check path is
+unread (a grep for `Doom`/`Demi`/`CheckHit` in `ot6_break.asm`/`ot6_boost.asm`
+found no OT6 code near instant-death handling, consistent with untouched but
+not proof), and test row 10 is the conformance probe once both ship.
+
+**Counterattack/queue quirks — bucket (d), already handled, twice.** OT6
+found its own version rather than inheriting one: issue #91
+(`ot6_boost.asm:546-618`, `Ot6QueueFold`) is the direct hit on "we changed
+action-end BP flow." The boosted-spell price fold guarded against
+re-folding a counterattack by testing the global "counterattack executing"
+flag (`$b1.0`), but that flag doesn't say *whose* action is queueing — an
+ordinary action drained during someone else's counterattack took the same
+early-out and cast at the unfolded price. Fixed by comparing the queued
+pointer against the actor's own counterattack slot (`$32cd,x`) instead. One
+gap is left deliberately: a second counterattack queued before the first
+resolves would still fold, judged unreachable with vanilla AI density.
+Separately, issue #66 (`bosses-wob.md:34-39`, `Ot6MayAct`) rules that a
+Broken enemy loses its counters along with its turns — Octopath parity, not
+an inherited quirk. Master ZED's corpus flagged no vanilla counterattack/
+queue defect distinct from these two.
+
+**Item dupes — not verified in sources; the confirmed bug is loss, not
+duplication, and it's moot.** No FF6 item-*duplication* glitch turned up
+readable in this pass, so: not verified in sources. Master ZED does confirm
+the opposite — Capture/ThiefKnife + Offering/Dragon Horn steals from every
+enemy in one action but only *grants* the first item, still consuming every
+attempt. Moot for OT6: Locke's Steal is single-target at every boost tier
+(`kits.md:336-420`), so the multi-target precondition doesn't exist.
+`tools/audit_supplies.py`'s "honest bags" premise is unchallenged by
+anything in this corpus — the only confirmed defect destroys loot.
+
+**Battle soft-locks — one already fixed, one just found.** No new,
+sourceable formation/AI-corner hang turned up beyond this doc's existing
+"Confirmed in source" section. OT6 found and fixed one of its own: the Zozo
+z-loop shaft (map 225, x 29-40/y 31-61) can roll a random encounter mid
+z-level transition on a diagonal tile, and the pre-battle scroll never
+settles — a real hang in unmodified play (`ot6_break.asm:698-729`,
+`field/battle.asm:350`, shipped v0.11), not named in any source checked
+here, so likely an OT6-original find worth reporting upstream. **New
+tonight, not from the community corpus:** the burning-house ambush loss
+(#127) doesn't surface as a hang or a visible game-over at all — the
+engine's Game Over → Continue flow silently auto-Continues, so a lost fight
+can look identical to a won one to anything driving input rather than
+watching the screen. A hang is loud; this is quiet. Worth auditing every
+other scripted-loss point in the shipped range for the same blind spot
+before "the fights were played" is trusted fully.
+
+### Full triage
+
+| Bug (source) | Mechanism | Bucket | Note |
+|---|---|---|---|
+| Swordless Runic, 2 variants (Master ZED, Commands) | Runic fires weaponless when CPU-driven (Muddle/Charm/Colosseum), or if Ogre Nix breaks mid-Palidor-jump after Runic queued | (c) | Celes's Runic is OT6's BP showcase (`ot6_boost.asm:420-474`). Check whether weaponless casts can desync `OT6_RUNICTURNS` — untested |
+| Learn L.5 Doom by watching Joker Doom (Master ZED, Slot) | Lore-by-observation auto-teaches any Lore witnessed, incl. Setzer's relabeled L.5 Doom | (c) | Strago's kit is curated learn-many/equip-~5 (`kits.md`, `thamasa-route.md`); check the gate filters watched Lores before v0.13 |
+| Item loss via multi-target Steal (Master ZED) | Capture/ThiefKnife + Offering/Dragon Horn only grants the first stolen item | (b) | Moot — Steal is single-target at every tier (`kits.md:336-420`) |
+| Evade is worthless (Master ZED; WC `Flags:Fixes`) | M.Block alone governs physical evasion | (a) | Owner ruling: never fix |
+| Vanish overrides death-immunity + revive checks (Master ZED) | Clear status skips instant-death and Life/Life2 dead-checks | (a) | Owner ruling: preserve (`magicite-tube-six.md` §6/§14.2) |
+| Mantra divide-by-zero (Master ZED, Blitz) | Muddle-retarget to one enemy computes HP/0; SNES divider gives $ffff → 9999 | (a) | Balance oddity, same class as Vanish+Doom |
+| Rippler trades every status, not its listed set (Master ZED) | Every status byte Dark-Float swaps | (a) | Monster-only spell, unauthored |
+| Charm: second caster locks out the first (Master ZED) | Multiple Charmers leave earlier casts inert but tied up | (a) | Monster-side, unauthored |
+| Roulette random-targets only via menu commands (Master ZED) | Rage/Mimic/Colosseum Roulette acts single-target instead | (a) | Cosmetic; Strago's own cast unaffected |
+| Tapir shows "Miss" except on Sleep (Master ZED) | Cure lands silently; miss-check only clears for Sleep | (a) | Cosmetic text bug, Mog's kit |
+| Skean spells cause formation errors (Master ZED) | Caster may not return to formation | (a) | Cosmetic, monster/Ninja Rage path |
+| Status timers don't reset on manual removal (Master ZED) | Dispel clears the status but not its auto-expire timer | (a) | Confirmed clear of OT6 state — `OT6_RUNICTURNS`/Broken timer are private counters |
+| Barrier Ring etc. cast at full HP (Master ZED) | Rippler-traded Near-Fatal only checks status, not HP | (a) | Requires Rippler (monster-only); cosmetic |
+| Jump/Launcher, Jump/Super Ball disappearance (Master ZED) | Simultaneous airborne states desync visibility/targeting | (a) | No OT6 kit grants Jump through Thamasa |
+| Joker Doom forced-target chain (Master ZED; WC `Flags:Fixes`) | Slot's forced targeting + Mimic re-roll bypasses target safety | (a) | Needs Gogo's Mimic, out of range; noted for WoR pass |
+| Sketch (this project's own read is deeper than Master ZED's) | `CheckSketchHit` (`battle_main.asm:9065-9083`) can call the wrong effect on a miss | (d) | Owner ruling #123 preserves it; landed for battle 125 in `thamasa-route.md` §5, ~20-30% miss estimated |
+
+**Bucket counts:** (a) 13 · (b) 1 · (c) 2 · (d) 4 (counting #91 and #66 once
+each, from Special attention, not duplicated in the table).
+
+### Candidate follow-ups (not filed)
+
+- Probe whether a weaponless Celes casting Runic desyncs `OT6_RUNICTURNS`.
+- Check the curated Lore-gate before v0.13: does Joker Doom teach Strago an
+  off-list Lore?
+- Report the Zozo z-loop hang upstream — not previously documented anywhere
+  checked here.
+- Audit every scripted-loss point in the shipped route for the same
+  Game-Over-auto-Continues blind spot #127 found at the burning house.
+- Revisit the Joker Doom/Mimic chain once Gogo and the WoR range are in
+  scope.

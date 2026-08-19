@@ -189,6 +189,51 @@ Map 351 is event-only: no encounter enable, no exits except scripted ones,
 entry party forced **TERRA·LOCKE·STRAGO** (`:71874`). Its content is all
 NPC-triggered:
 
+**CORRECTION (2026-08-19, #127 fallout):** the map is not one contiguous
+floor. A live full-map tile-property dump (every `(x,y)` read once, no
+walking — `probe_thamasa_house_map.lua`) found 35 cardinally-disconnected
+tile islands; a plain flood fill over the dump confirms zero walkable path
+between most pairs of them. The landing pocket at (4,11) connects to
+everything else ONLY through `ff6/src/field/trigger/short_entrance.dat`'s
+map-351 block (offset `$167a`, 17 records — one forward + 8 forward/return
+pairs, `short_entrance.inc` `ITEM_SIZE=6`: `SrcX,SrcY,Map,Flags,DestX,DestY`),
+a same-map (`Map` byte decodes to 351 for every record) warp table that
+`event_trigger.asm`/`npc_prop.asm` say nothing about — `CheckShortEntrance`
+(`entrance.asm:272`) fires by matching the live position against `SrcPos`
+alone, no direction test, same as any other floor trigger. The full graph,
+landing to every objective (island numbers are the flood-fill's own
+labels, not in-game data):
+
+```
+island 0  (landing pocket, x=0-8 y=1-12) --(4,3)->(4,38)--> island 13
+                                           <-(4,39)/(5,39)<-(4,5)--
+island 13 (x=0-5 y=22-39)      --(2,24)->(26,36)--> island 11 (the (21,22)
+                                                     AMBUSH lives here)
+                                <-(26,37)<-(2,26)--
+island 11 (x=15-30 y=19-37)    --(26,21)->(21,9)--> island 1 (north corridor)
+                                <-(21,10)<-(26,23)--
+island 1  (x=17-32 y=1-10)     --(28,3)->(4,55)--> island 28 (FIRE ROD
+                                                    (4,52), dead-end spur)
+                                <-(4,56)<-(28,5)--
+island 1                       --(23,3)->(46,27)--> island 12 (east wing)
+                                <-(46,28)<-(23,5)--
+island 12 (x=39-53 y=19-28)    --(49,21)->(45,10)--> island 4 (ICE ROD
+                                                     (45,7), dead-end spur)
+                                <-(45,11)<-(49,23)--
+island 12                      --(43,21)->(21,54)--> island 26 (south hall)
+                                <-(21,55)<-(43,23)--
+island 26 (x=17-25 y=47-55)    --(21,49)->(46,54)--> island 24 (FLAMEEATER
+                                                     (46,53) -- no return
+                                                     pair recorded)
+```
+
+This replaces this section's original silence on inter-room connectivity
+(it only listed the trigger/NPC content of each room, not how a party
+actually walks between them) and the survey's-descendant `gen_thamasa_fire.lua`
+STATUS header's earlier (wrong) guess that the (4,3)→(4,38) jump was a
+scripted "floor gives way" cutscene — it is an ordinary tile warp, and it
+is one hop in a much larger, fully-mapped graph.
+
 - **Twelve wandering flame NPCs**, each `set_npc_movement RANDOM` with
   collision on (map init `_cbe5cb`, `map_init_event.asm:370`; NPC block
   `npc_prop.asm:15714-15861`), each firing battle 31 on contact-talk
