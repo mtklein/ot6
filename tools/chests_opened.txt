@@ -74,3 +74,8 @@
 231	map 75 South Figaro, Warp Stone (11,23)
 239	map 225 Zozo clock shelf, Tincture (104,9)
 240	map 225 Zozo clock shelf, Potion (105,9)
+246	map 343 Thamasa town, Echo Screen (13,8)
+247	map 343 Thamasa town, Green Cherry (35,12)
+248	map 343 Thamasa town, Soft (43,30)
+249	map 343 Thamasa town, Eyedrop (31,37)
+250	map 343 Thamasa town, Fenix Down (14,18)

@@ -648,6 +648,83 @@ M.contracts["crescent-landing-v1"] = {
   },
 }
 
+-- thamasa-night-v1: checkpoint L (docs/design/thamasa-route.md section 2.2),
+-- a world SRAM save just outside Thamasa on the same south long-entrance
+-- strip the town was entered through (long_entrance.dat map-343 block, src
+-- (19,48) len 6, measured landing world (249,128)).  Exercised by
+-- gen_thamasa_arrive: the
+-- Crescent Island walk to the Thamasa world trigger, the five town chests,
+-- Strago's house door, the talk, and the two naming screens.  NOT the
+-- Memento Ring: gen_thamasa_arrive's own header records the survey
+-- correction (map 349's "upstairs" is WoR Gungho/Ebot's Rock content
+-- sharing the map id, not reachable from the WoB house's ground floor).
+--
+-- $008D=1 (Strago engaged) is set at Strago's FIRST line, roughly 1600
+-- frames before either naming screen opens -- a measured correction to the
+-- checkpoint's own name (issue #127 comment, probe_thamasa_names.lua,
+-- committed 404f49a).  It does NOT mean the scene, the fire, or the join
+-- have happened: $008E (fire) and $0090 (FlameEater down) are asserted
+-- clear, and the roster is unchanged from K (Strago's `char_party` join is
+-- segment 3, past the burning house).  Pre-inn: $0087 is not part of this
+-- area's switch chronology yet (the inn night is M's boundary), so it is
+-- not asserted here.
+M.contracts["thamasa-night-v1"] = {
+  slot = 3,
+  ram = {
+    -- Measured 2026-08-19: the south exit lands the party back on the same
+    -- staging tile the town was approached from (249,128), not the
+    -- long_entrance.dat DestX/DestY (250,129) -- that record's dest is
+    -- read at the map edge, one tile short of where a held press actually
+    -- releases control on the world map.
+    { 0x1f60, 0xFF, 249, "world x (save-block cell $1f60): outside Thamasa" },
+    { 0x1f61, 0xFF, 128, "world y (save-block cell $1f61)" },
+    { 0x1f62, 0xFF, 83, "dead Blackjack x -- the wreck never moves" },
+    { 0x1f63, 0xFF, 238, "dead Blackjack y" },
+    { 0x11FA, 0x03, 0x00, "ON FOOT" },
+    { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  switches = {
+    { 0x008D, 1, "Strago engaged (:69854) -- NOT scene-complete, see header" },
+    { 0x008E, 0, "no fire yet (:70635)" },
+    { 0x0090, 0, "FlameEater not fought (:72129)" },
+    { 0x02E7, 0, "Strago not yet joined (:71796, segment 3)" },
+    { 0x02F7, 0, "Strago not yet available (:71797, segment 3)" },
+    { 0x007A, 1, "the airship is still dead -- v0.13 is on foot" },
+    { 0x0246, 0, "no active airship" },
+    { 0x02F3, 1, "SHADOW available -- unchanged since K (:69160)" },
+    { 0x02E3, 1, "SHADOW initialized (:69158)" },
+    { 0x02FB, 1, "GAU still available (unchanged since K)" },
+    { 0x009D, 0, "the v0.13 area tail is ahead (:77992)" },
+  },
+  party = {
+    size = 3,                     -- the #21 control: TERRA LOCKE SHADOW
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x03, "SHADOW" },
+    },
+  },
+  -- #123's checkpoint rule: an inventory spot-assert so a silent bag sweep
+  -- fails visibly rather than passing into the baseline.  Each item was
+  -- also asserted as an exact +1 delta at pickup time (chestAuto's
+  -- before/after count, the #21 count-assert pattern applied to gear);
+  -- this is the boundary-level presence check on top of that.
+  items = {
+    { 0xFB, 1, "Echo Screen -- town chest bit 246" },
+    { 0xF8, 1, "Green Cherry -- town chest bit 247" },
+    { 0xF4, 1, "Soft -- town chest bit 248" },
+    { 0xF3, 1, "Eyedrop -- town chest bit 249" },
+    { 0xF0, 1, "Fenix Down -- town chest bit 250" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)

@@ -1,0 +1,15 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "650fdd1aaa2df67380f969fa64c7487c8ebce3691f18636d281186b046734ec5",
+  "generator_sig": "bacd878685b14d8fe45343d58c352c48898997890ec877cf51c8f32f266c49cd gen_thamasa_arrive tools/tests/checkpoints/crescent-landing-v1/manifest.json tools/tests/checkpoints/crescent-landing-v1/crescent-landing.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/crescent-landing-v1/manifest.json",
+      "sha256": "143bf8c41ca0967e86c8a1d39357b79a4b7a681f2c0d48c3590bc7b39b5e10ea"
+    },
+    {
+      "path": "build/states/crescent_landing.stamp",
+      "sha256": "d990308f3c7a8db8462b26dd59d67f01c00dc79d1d71f2b570c9b7e9b027e274"
+    }
+  ]
+}

@@ -589,4 +589,21 @@ STATES = [
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/crescent-landing-v1
     S("crescent_landing", gen="gen_voyage", checkpoint="banquet-done-v1",
       timeout=1800),
+
+    # ---- v0.13: docs/design/thamasa-route.md section 1, segments 1-2 ------
+    # boundary K -> boundary L (issue #127, "the Thamasa wave"): the
+    # Crescent Island world walk to the Thamasa trigger, the town's five
+    # chests, Strago's house (the Memento Ring upstairs, then the talk and
+    # both naming screens), and the world save just outside town -- the
+    # `thamasa-night-v1` checkpoint.  timeout=1800: six chests, two
+    # doors/stairs, two naming screens and two world crossings is a whole
+    # story segment, past run.sh's 600s default on a loaded machine
+    # (gen_kolts/gen_voyage precedent).  Re-cutting the SRAM is a deliberate
+    # by-hand operation:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/crescent-landing-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/thamasa-night-v1/thamasa-night.sram \
+    #     tools/tests/run.sh tools/tests/gen_thamasa_arrive.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/thamasa-night-v1
+    S("thamasa_night", gen="gen_thamasa_arrive", prev="crescent_landing",
+      timeout=1800),
 ]
