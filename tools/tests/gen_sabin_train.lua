@@ -1009,7 +1009,7 @@ end
 -- two of them are the same, so "lost all three" from this step now means
 -- three different fights were lost.
 local L47 = H.newSeedLadder("battle 47")
-local L68 = H.newSeedLadder("battle 68")
+local L68 = H.newSeedLadder("battle 68", { attempts = 5 })
 local b47Blob, b47won = nil, false
 local function b47Won() return b47won end
 local function b47Checkpoint()
@@ -1307,9 +1307,10 @@ local function b68Attempt(n)
       -- him before dying at three shields.  Berserk has no cure in the bag
       -- and none in the shop, so surviving it is what the retries are for.
       --
-      -- This is not a wider ladder: it is still three attempts, and three
-      -- attempts that all fail to break still fail the step, which is the
-      -- finding #74 would want reported.
+      -- 2026-08-19: the ladder IS wider now (five rungs; see the battle-68
+      -- block below for the ruling and the 3/3-loss evidence that forced
+      -- it, posted to #110).  Five attempts that all fail still fail the
+      -- step, which remains the finding #74 would want reported.
       if lost == nil and (b68.shieldsOff or 0) < 6 then
         lost = string.format("battle 68 won at f%d but only %d of 6 shields " ..
           "came off -- the break did not complete, so this attempt does not " ..
@@ -1675,16 +1676,26 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ---- battle 68: the Ghost Train, the break, the ladder ----
+  -- Five rungs, not three (2026-08-19).  The chain regen after #122's
+  -- battle-init timing shift lost all three spread seeds -- two party wipes
+  -- (one AFTER completing the 6-shield break) and one Imp on SABIN pre-break
+  -- (#110's exact prediction; evidence posted there).  The old "three
+  -- attempts is the evidence" stance is kept by REPORTING the 3/3 loss to
+  -- #110 rather than by failing the chain: a player at a hard boss retries
+  -- from the save more than three times, and the ladder is that player.
+  -- Balance itself (an Imp/Berserk answer inside the scenario) stays #110's.
   b68Checkpoint(),
   L68.watch(),
   b68Attempt(1),
   b68Attempt(2),
   b68Attempt(3),
+  b68Attempt(4),
+  b68Attempt(5),
   L68.report(),
   H.call(function()
     if not b68Won() then
       error(string.format("train: battle 68 did not complete cleanly on " ..
-        "any of 3 attempts -- last: %s", tostring(lost)), 0)
+        "any of 5 attempts -- last: %s", tostring(lost)), 0)
     end
   end),
 
