@@ -1,4 +1,6 @@
--- @suite savestate=moogle_cleared slow
+-- probe_dancefreeze.lua -- #129: reproduce the dance-kill battle freeze
+-- and dump the engine wait-state mid-freeze.  NOT in the suite.
+-- Derived from battle_dancemp.lua at the failing alignment (no HP pin).
 -- battle_dancemp.lua -- issue #34: Dance costs MP, a flat amount paid at
 -- dance start, per docs/design/mp-economy.md's verb survey (Dance: "flat,
 -- paid at start", 4-10).
@@ -367,20 +369,17 @@ H.run({ maxFrames = 250000 }, {
   -- ======================================================================
   mogMenu("mog's command window (isolation arm)"),
   H.call(function()
-    -- Staging (2026-08-19, a labeled unit-style expedient): the ledger
-    -- under test needs the pack ALIVE for two more auto-dance turns, and
-    -- the #122 RNG reshuffle put a kill on Mog's very first free turn, so
-    -- the pack is pinned tall (3000 HP) to guarantee the two mid-dance
-    -- price samples exist.  (Historical note: that first-turn kill briefly
-    -- read as an engine freeze and opened #129 -- resolved NOT A BUG: the
-    -- victory message was waiting for a keypress this file's old driver
-    -- never sent; the phase-3 driver now mashes A on any menuless frame.)
-    for s = 0, 5 do
-      local mhp = H.readWord(0x3BFC + s * 2)
-      if mhp > 0 and mhp < 2000 then
-        H.writeWord(0x3BFC + s * 2, 3000)
-      end
-    end
+    -- #129 staging (2026-08-19, a labeled unit-style expedient): a dance
+    -- auto-turn that kills the LAST monster trips the battle-end freeze
+    -- #129 tracks (the fight provably never ends), and the #122 RNG
+    -- reshuffle put this file's kill exactly on Mog's first free turn.
+    -- The ledger under test needs the pack ALIVE for two more auto-turns
+    -- and nothing after needs the battle to end, so the pack is pinned
+    -- tall (3000 HP) -- no kill, no freeze, the queue fills, the tail
+    -- asserts run.  #129 carries its own deterministic repro recipe; a
+    -- +300 nudge was tried first and the kill still landed.
+    -- PROBE: no HP pin -- this file exists to LET the first-turn kill land
+    -- and then dump the frozen engine's wait-state.
     H.writeWord(0x3C08 + mogSlot * 2, DANCE_COST - 1)
     H.log("[isolation arm] MOG's pool := 7 -- below the flat price")
   end),
@@ -518,24 +517,88 @@ H.run({ maxFrames = 250000 }, {
       "the DANCE status locked in (whole-battle state bought)")
   end),
 
-  -- ---- 3. the locked-in steps are free ----------------------------------
-  H.driveUntil(function() return #costs >= 3 end, 30000, {
+  -- ---- 3. PROBE: let the kill land, catch the freeze, dump the engine ----
+  H.call(function()
+    -- exec-hit counters: does the engine still RUN these during the freeze?
+    probeHits = {}
+    -- exec callbacks take the SNES CPU address RAW (the seed ladder's own
+    -- convention); the first draft masked to file offsets and every counter
+    -- read zero even mid-fight.
+    probeTrace = {}
+    local watch = {
+      CheckBattleEnd  = H.sym("CheckBattleEnd"),
+      Ot6ActionEnd    = H.sym("Ot6ActionEnd"),
+      GfxCmd_0f       = H.sym("GfxCmd_0f"),
+      BtlGfx_04       = H.sym("BtlGfx_04"),
+      WinBattle       = H.sym("WinBattle"),
+      GfxCmd_02       = H.sym("GfxCmd_02"),
+      TerminateBattle = H.sym("TerminateBattle"),
+      EndAction       = H.sym("EndAction"),
+      HudFlush        = H.sym("Ot6BgHudFlush_ext"),
+      RestageGate     = H.sym("Ot6RestageGate_ext"),
+      UpdateMenuState = H.sym("UpdateMenuState"),
+      UpdateSprites   = H.sym("UpdateSprites"),
+      ClearSpriteData = H.sym("ClearSpriteData"),
+      UpdateSfx       = H.sym("UpdateSfx"),
+      -- #129 round 9: the message machinery's own internals, per the
+      -- issue's corrected evidence trail -- which of these still executes
+      -- during the freeze names the loop.
+      mess_wait        = H.sym("mess_wait"),
+      DrawDlgText      = H.sym("DrawDlgText@btlgfx_code"),
+      InitWideMsgWindow = H.sym("InitWideMsgWindow"),
+      GetAttackMsgPtr  = H.sym("GetAttackMsgPtr"),
+      c19917           = H.sym("_c19917"),
+      ShowMsg          = H.sym("ShowMsg"),
+      DlgTextCmd_07    = H.sym("DlgTextCmd_07"),
+      UpdateCtrlBattle = H.sym("UpdateCtrlBattle"),
+    }
+    for name, cpu in pairs(watch) do
+      probeHits[name] = 0
+      emu.addMemoryCallback(function()
+        probeHits[name] = probeHits[name] + 1
+        if #probeTrace < 60 then
+          probeTrace[#probeTrace + 1] =
+            string.format("f%d:%s", H.frame, name)
+        end
+      end, emu.callbackType.exec, cpu, cpu)
+    end
+    probe46w = {}
+    emu.addMemoryCallback(function()
+      local st = emu.getState()
+      if #probe46w < 40 then
+        probe46w[#probe46w + 1] = string.format("f%d:%02X%04X",
+          H.frame, st["cpu.k"], st["cpu.pc"])
+      else
+        table.remove(probe46w, 1)
+        probe46w[#probe46w + 1] = string.format("f%d:%02X%04X",
+          H.frame, st["cpu.k"], st["cpu.pc"])
+      end
+    end, emu.callbackType.write, 0x000046, 0x000046)
+    probe47 = 0
+    emu.addMemoryCallback(function()
+      probe47 = probe47 + 1
+      if probe47 % 65536 == 1 then
+        local st = emu.getState()
+        probePC = st["cpu.pc"]
+        probeSP = st["cpu.sp"]
+        probeK  = st["cpu.k"]
+      end
+    end, emu.callbackType.read, 0x000047, 0x000047)
+    H.log("[probe] exec watches armed (CPU addrs)")
+  end),
+  H.driveUntil(function()
+    -- freeze signature: both monsters read 0 HP while battleLoadStarted
+    local dead = true
+    for s = 0, 1 do
+      if H.readWord(0x3BFC + s * 2) ~= 0 then dead = false end
+    end
+    return H.battleLoadStarted() and dead
+  end, 30000, {
     H.call(function()
       ph = ph + 1
-      -- Mog auto-dances; bystanders Defend to keep the pack alive; dialogs
-      -- and victory pages get A.
-      --
-      -- #129 resolution (2026-08-19): mash A whenever NO menu is up, in
-      -- battle too, not only after teardown.  The victory message after a
-      -- dance auto-turn kill ("got <n> exp. point(s)", message $27) ends in
-      -- DlgTextCmd_07, a keypress wait; this driver's old fallback for
-      -- MENU==0-while-loaded was silence, so the engine sat politely
-      -- waiting for a button forever -- which read as an engine freeze and
-      -- opened #129.  Differentially proven: mashing A through the same
-      -- window terminates the battle normally in ~700 frames.
-      if not H.battleLoadStarted() or H.readByte(MENU) == 0 then
+      if not H.battleLoadStarted() then
         H.setPad(ph % 8 < 4 and { a = true } or {})
-      elseif H.readByte(ACTOR) ~= mogSlot then
+      elseif H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= mogSlot then
         local st = H.readByte(MSTATE)
         local step = ph % 40
         if st == ST_DEF then H.setPad(ph % 10 < 5 and { a = true } or {})
@@ -546,18 +609,83 @@ H.run({ maxFrames = 250000 }, {
       else H.setPad({}) end
     end),
     H.waitFrames(1),
-  }, "two more dance turns queue"),
+  }, "both monsters at 0 HP (the kill landed)"),
   H.call(function()
-    local c = {}
-    for _, v in ipairs(costs) do c[#c + 1] = tostring(v) end
-    H.log("cmd-$13 cost queue: {" .. table.concat(c, ",") .. "}")
-    H.assertEq(costs[2], 0, "mid-dance turn 1 queues at 0 MP")
-    H.assertEq(costs[3], 0, "mid-dance turn 2 queues at 0 MP")
-    H.assertEq(mpOf(mogSlot), mp0 - DANCE_COST,
-      "MP unmoved across the locked-in steps -- one payment per battle")
-    H.screenshot("dancemp_locked")
-    H.log("PASSED: the real MOG learned his dance by WINNING on this terrain, "
-      .. "paid the flat 8 once from his real pool, danced the rest for free; "
-      .. "the refusal below the price lives in the labeled isolation arm")
+    H.log("[probe] kill landed -- sampling the freeze")
+    for name, n in pairs(probeHits) do
+      H.log(string.format("[probe] pre-freeze exec hits %s=%d", name, n))
+      probeHits[name] = 0
+    end
+    probeTrace = {}   -- restart the sequence trace at the kill
+  end),
+  H.waitFrames(1200),
+  H.call(function()
+    -- 20 seconds later: what still executes, and what does state say?
+    for name, n in pairs(probeHits) do
+      H.log(string.format("[probe] FROZEN-window exec hits %s=%d (1200 frames)",
+        name, n))
+    end
+    for s = 0, 2 do
+      local e = 4 + s
+      H.log(string.format(
+        "[probe] mon s%d: hp=%d st1=%02X st4=%02X present($3AA8)=%02X",
+        s, H.readWord(0x3BFC + s * 2), H.readByte(0x3EE4 + e * 2),
+        H.readByte(0x3EF8 + e * 2), H.readByte(0x3AA8 + s * 2)))
+    end
+    H.log(string.format(
+      "[probe] alive: $3A74=%02X $3A75=%02X $3A76=%d $3A77=%d $3A79=%02X",
+      H.readByte(0x3A74), H.readByte(0x3A75), H.readByte(0x3A76),
+      H.readByte(0x3A77), H.readByte(0x3A79)))
+    H.log(string.format(
+      "[probe] pause flags: timeStopped($E9EF)=%02X menusShut($629A)=%02X " ..
+      "$00B1=%02X $2F4B=%02X MENU=%02X MSTATE=%02X ACTOR=%02X",
+      H.readByte(0x7EE9EF), H.readByte(0x7E629A), H.readByte(0x00B1),
+      H.readByte(0x2F4B), H.readByte(MENU), H.readByte(MSTATE),
+      H.readByte(ACTOR)))
+    -- #129 round 9: message-wait state ($7ee9f5 = "skip mess_wait's own
+    -- delay, DlgTextCmd_07 already waited"; $7e629e = InitMsgWindow's own
+    -- nesting counter) and the raw controller latches DlgTextCmd_07 polls
+    -- ($04 = last-swapped repeat-mode buttons, $0a = this frame's raw read,
+    -- both via UpdateCtrl / UpdateCtrlBattle).
+    H.log(string.format(
+      "[probe] msg-wait state: $7ee9f5=%02X $7e629e=%02X  ctrl: $04=%02X " ..
+      "$0a=%02X $6266=%02X $6268=%02X",
+      H.readByte(0x7EE9F5), H.readByte(0x7E629E), H.readByte(0x04),
+      H.readByte(0x0A), H.readByte(0x7E6266), H.readByte(0x7E6268)))
+    local w = {}
+    for a = 0x3A70, 0x3AA7 do w[#w + 1] = string.format("%02X", H.readByte(a)) end
+    H.log("[probe] $3A70-3AA7: " .. table.concat(w, " "))
+    -- where in the victory machinery are we parked?
+    H.log(string.format(
+      "[probe] gfx queue ptr $76=%04X  event ptr $8f=%02X%02X%02X  " ..
+      "animBusy($62A5)=%02X %02X %02X %02X  bgIdx($ECB8)=%02X",
+      H.readWord(0x76), H.readByte(0x91), H.readByte(0x90), H.readByte(0x8f),
+      H.readByte(0x7E62A5), H.readByte(0x7E62A6),
+      H.readByte(0x7E62A7), H.readByte(0x7E62A8), H.readByte(0x7EECB8)))
+    local q = {}
+    for a = 0x2D6E, 0x2D7D do q[#q + 1] = string.format("%02X", H.readByte(a)) end
+    H.log("[probe] script queue $2D6E+: " .. table.concat(q, " "))
+    H.log(string.format(
+      "[probe] end-gates: $3EE0=%02X $3A6E=%02X $3A95=%02X $3EBC=%02X " ..
+      "$2F49=%02X colosseum($3A97)=%02X",
+      H.readByte(0x3EE0), H.readByte(0x3A6E), H.readByte(0x3A95),
+      H.readByte(0x3EBC), H.readByte(0x2F49), H.readByte(0x3A97)))
+    H.log("[probe] hit sequence since kill: " ..
+      table.concat(probeTrace, " "))
+    H.log(string.format("[probe] NMI flags: $46=%02X $47=%02X",
+      H.readByte(0x46), H.readByte(0x47)))
+    H.log(string.format("[probe] $47 reads in window: %d (spin proof)",
+      probe47 or -1))
+    H.log(string.format("[probe] spin site: K=%02X PC=%04X SP=%04X",
+      probeK or 0xFF, probePC or 0, probeSP or 0))
+    H.log("[probe] last $46 writes (PC): " .. table.concat(probe46w, " "))
+    local st = {}
+    for e = 0, 3 do
+      st[#st + 1] = string.format("e%d:st1=%02X st4=%02X", e,
+        H.readByte(0x3EE4 + e * 2), H.readByte(0x3EF8 + e * 2))
+    end
+    H.log("[probe] party status: " .. table.concat(st, "  "))
+    H.screenshot("dancefreeze")
+    H.log("[probe] DONE -- this probe always exits 0; the dump above is the deliverable")
   end),
 })
