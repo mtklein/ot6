@@ -569,7 +569,7 @@ before "the fights were played" is trusted fully.
 | Bug (source) | Mechanism | Bucket | Note |
 |---|---|---|---|
 | Swordless Runic, 2 variants (Master ZED, Commands) | Runic fires weaponless when CPU-driven (Muddle/Charm/Colosseum), or if Ogre Nix breaks mid-Palidor-jump after Runic queued | (c) | Celes's Runic is OT6's BP showcase (`ot6_boost.asm:420-474`). Check whether weaponless casts can desync `OT6_RUNICTURNS` — untested |
-| Learn L.5 Doom by watching Joker Doom (Master ZED, Slot) | Lore-by-observation auto-teaches any Lore witnessed, incl. Setzer's relabeled L.5 Doom | (c) | Strago's kit is curated learn-many/equip-~5 (`kits.md`, `thamasa-route.md`); check the gate filters watched Lores before v0.13 |
+| Learn L.5 Doom by watching Joker Doom (Master ZED, Slot) | Lore-by-observation auto-teaches any Lore witnessed, incl. Setzer's relabeled L.5 Doom | (a) | KEPT by owner ruling (2026-08-19, "that's pretty funny, i like it") -- the scholar learns a forbidden technique from the gambler, and the curated 5-slot bank makes carrying it a real choice. One engineering check remains: a test that the Lore machinery handles the id cleanly (learn bit, loadout byte, battle list, page render) |
 | Item loss via multi-target Steal (Master ZED) | Capture/ThiefKnife + Offering/Dragon Horn only grants the first stolen item | (b) | Moot — Steal is single-target at every tier (`kits.md:336-420`) |
 | Evade is worthless (Master ZED; WC `Flags:Fixes`) | M.Block alone governs physical evasion | (a) | Owner ruling: never fix |
 | Vanish overrides death-immunity + revive checks (Master ZED) | Clear status skips instant-death and Life/Life2 dead-checks | (a) | Owner ruling: preserve (`magicite-tube-six.md` §6/§14.2) |
