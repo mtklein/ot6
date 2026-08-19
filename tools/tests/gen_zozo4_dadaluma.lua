@@ -1075,10 +1075,158 @@ end
 -- attempt that wipes or stalls reloads the pre-stair checkpoint; the
 -- (n-1)*29-frame stagger before the re-climb moves every subsequent battle
 -- seed ($021e advances while we wait), which is what varies the draw.
+--
+-- MEASURED 2026-08-19 (ROM #122's battle-init cycles, dadaluma_entry.GbIX2kXB):
+-- the frame stagger above did NOT vary the draw.  All three attempts entered
+-- the very first stair-room fight at IDENTICAL party HP (314,349,325,363,
+-- the pre-climb care stop's own top-up) against the same 392hp/shield-2
+-- monster, and the opening round dealt near-identical damage every time
+-- (attempt 1: 55,118,79,129; attempt 2: 55,123,83,140) -- the same near-wipe
+-- opening every attempt, which is why all three then died the same way over
+-- the following rounds.  This is gen_sabin_gau's lesson: encounter rolls are
+-- STEP-indexed and the accumulator rides the savestate, so idle frames after
+-- a reload change nothing.  Each attempt now also paces (52,30)<->(53,30)
+-- -- both proven passable by attempt 1's own walked route (the stairDir
+-- landing tile and the base of the stair column), and below the stair
+-- column's walker band (x=53, y=18..29 per the header) so pacing there stays
+-- clear of the conveyor bodies -- (n-1) times before climbing, so every
+-- subsequent roll along the ladder lands on a different step index.  A
+-- fight during the pacing is fine and is fought with the same tactical
+-- driver as the climb itself (this town's shields need the real fighter,
+-- not a blind mash -- see `encounters` above), and it must run AFTER the
+-- stairFail reset below: a stale wipe string from the prior attempt reads
+-- as "already done" to the pacing's own driveUntil otherwise.
 local stairSaveReq, stairFail, stairDone = nil, nil, false
-local function stairAttempt(n)
+local function stairJitter(n)
+  local pairs_ = n - 1
+  local hb, moves, lx, ly = 0, 0, nil, nil
+  local fought = encounters("stair jitter attempt " .. n,
+    function(msg) stairFail = msg end)
+  return H.cond(function() return pairs_ > 0 end, {
+    H.driveUntil(function() return moves >= pairs_ * 2 or stairFail ~= nil end,
+      20000, {
+      H.call(function()
+        hb = hb + 1
+        if fought() then return end
+        if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+        if not H.hasControl() then H.setPad({}); return end
+        if not H.tileAligned() then H.setPad({}); return end
+        local x, y = H.fieldX(), H.fieldY()
+        if lx ~= nil and (x ~= lx or y ~= ly) then moves = moves + 1 end
+        lx, ly = x, y
+        local dir = (moves % 2 == 0) and "right" or "left"
+        if H.canStep(x, y, dir) then
+          H.setPad({ [H.movePress(dir)] = true })
+        else
+          H.setPad({})
+        end
+      end),
+    }, "stair jitter, attempt " .. n),
+    H.call(function() H.setPad({}) end),
+  }, {})
+end
+-- One leg of the conveyor drive: walk until either the map flips (done),
+-- stairFail fires (a wipe or timeout elsewhere), or this leg's own budget
+-- runs out (a soft per-leg timeout -- stairFail is left nil so the caller
+-- tries another leg rather than reloading over a merely slow leg) or one
+-- battle has been fought and the party is settled again (stopAfterBattle,
+-- followPath/door's own pattern).  A caller strings legs together with a
+-- care stop between them; see stairAttempt below for why.
+local function stairLeg(n, leg, foughtFn, maxFrames)
   local hb = 0
+  local foughtOne = false
+  return H.driveUntil(function()
+    if map() == 221 or stairFail ~= nil then return true end
+    if foughtOne and settled() then return true end
+    return false
+  end, maxFrames, {
+    H.call(function()
+      hb = hb + 1
+      if hb % 600 == 0 then
+        H.log(string.format("[stair] f+%d at (%d,%d)", hb, H.fieldX(), H.fieldY()))
+      end
+      if foughtFn() then foughtOne = true; return end
+      if H.dialogWaiting() then
+        H.setPad(hb % 8 < 4 and { "a" } or {})
+        return
+      end
+      if not H.hasControl() then H.setPad({}); return end
+      if not H.tileAligned() then return end
+      local x, y = H.fieldX(), H.fieldY()
+      for _, mv in ipairs(stairDir(x, y)) do
+        if H.canStep(x, y, mv) then
+          H.setPad({ [H.movePress(mv)] = true })
+          return
+        end
+      end
+      H.setPad({})
+    end),
+  }, string.format("stair conveyor leg %s, attempt %d", tostring(leg), n))
+end
+-- MEASURED 2026-08-19 (dadaluma_entry.Dqyzu0wc, after adding stairJitter):
+-- the jitter DID de-correlate the draw (attempt 2's opening round now deals
+-- 366/113/128 where the un-jittered baseline dealt 369/118/129 -- a
+-- different roll), but every attempt still wiped, and not from an
+-- over-healing fight: attempt 3's fatal stretch logged ZERO heal/cure/revive
+-- actions across three straight battles (4 fight, 9 skill, 0 heal).  What
+-- actually happened, read off the raw $3BF4 party-HP words: this single
+-- continuous drive fights every stair-room encounter back to back with NO
+-- care stop between them (climbCare, the pattern `door()` already uses
+-- below, was never applied here) -- so attempt 2 won its first fight at
+-- 55/113/79/128, was immediately dropped into a second encounter at that
+-- same HP with nobody topped up, and died there; and attempt 3's roll had
+-- CELES (entity 1, the sole opts.healer) die in round 1 of the FIRST fight,
+-- which is worse than it sounds -- newFightDriver's makePlan gates ALL
+-- healing and reviving on `actor == opts.healer` (ot6.lua:1915-1916,
+-- deliberate: role-splitting a party avoids the heal-lock a shared healer
+-- causes), so once the one designated healer is down, nobody else may ever
+-- act to revive her for the rest of the fight, or the next one, or the one
+-- after that.  Three straight uncared fights against a party that can never
+-- recover a downed CELES is not a survivable draw regardless of tactics.
+-- The fix is HANDOFF's rule this file already states above `climbCare`:
+-- heal BETWEEN battles, not only inside them.  Unlike the in-battle healer
+-- restriction, M.fieldCare is not gated to one designated caster (it tries
+-- every living party member -- ot6_field.lua:2451), so a care stop after
+-- each stair-room battle both tops up survivors AND can revive a downed
+-- CELES with anyone's Fenix Down before the next encounter -- closing the
+-- heal-lock as a side effect of the same fix that closes the missing-care
+-- gap.  Legs mirror door()'s own per-leg followPath+climbCare shape.
+local STAIR_LEG_FRAMES = 12000
+local function stairAttempt(n)
   local fought
+  local legs = {}
+  for leg = 1, 5 do
+    legs[#legs + 1] = H.cond(function() return map() ~= 221 and stairFail == nil end, {
+      stairLeg(n, leg, function() return fought() end, STAIR_LEG_FRAMES),
+      climbCare(string.format("stair attempt %d leg %d", n, leg)),
+    }, {})
+  end
+  legs[#legs + 1] = H.cond(function() return map() ~= 221 and stairFail == nil end, {
+    stairLeg(n, "final", function() return fought() end, 24000),
+    H.call(function()
+      if map() ~= 221 and stairFail == nil then
+        stairFail = string.format("[stair] attempt %d TIMED OUT at (%d,%d)",
+          n, H.fieldX(), H.fieldY())
+      end
+    end),
+  }, {})
+  -- Marking the climb done belongs IN the legs array, not after it: Lua
+  -- truncates a `table.unpack(...)` that is not the LAST element of a table
+  -- constructor to its first return value alone.  A first draft put this
+  -- cond after `table.unpack(legs)` in the return below and it silently
+  -- dropped every leg past the first -- measured 2026-08-19
+  -- (dadaluma_entry.14y4UOg5): only "stair conveyor leg 1" ever ran, and
+  -- stairDone latched true right after leg 1's care stop even though the
+  -- party was still on map 225 at (52,30)/(54,30), which sent the U1 crossing
+  -- (which assumes map 221 at (30,43)) into a 24000-frame stall with nothing
+  -- in its per-tile table for that position.  This check now MUST also gate
+  -- on map() == 221, not merely stairFail == nil, or a leg that exits via
+  -- its OWN timeout-without-stairFail (impossible today since every leg
+  -- either reaches map 221, fights, or the final leg sets stairFail on
+  -- timeout -- but the gate is cheap insurance against the same class of bug).
+  legs[#legs + 1] = H.cond(function() return map() == 221 and stairFail == nil end, {
+    H.call(function() stairDone = true end),
+  }, {})
   return H.cond(function() return not stairDone end, {
     H.cond(function() return n > 1 end, {
       H.logStep(function()
@@ -1095,43 +1243,11 @@ local function stairAttempt(n)
     }, {}),
     H.call(function()
       stairFail = nil
-      hb = 0
       fought = encounters("stairFollow attempt " .. n,
         function(msg) stairFail = msg end)
     end),
-    H.driveUntil(function()
-      return map() == 221 or stairFail ~= nil
-    end, 26000, {
-      H.call(function()
-        hb = hb + 1
-        if hb >= 24000 then
-          stairFail = string.format("[stair] attempt %d TIMED OUT at (%d,%d)",
-            n, H.fieldX(), H.fieldY())
-          return
-        end
-        if hb % 600 == 0 then
-          H.log(string.format("[stair] f+%d at (%d,%d)", hb, H.fieldX(), H.fieldY()))
-        end
-        if fought() then return end
-        if H.dialogWaiting() then
-          H.setPad(hb % 8 < 4 and { "a" } or {})
-          return
-        end
-        if not H.hasControl() then H.setPad({}); return end
-        if not H.tileAligned() then return end
-        local x, y = H.fieldX(), H.fieldY()
-        for _, mv in ipairs(stairDir(x, y)) do
-          if H.canStep(x, y, mv) then
-            H.setPad({ [H.movePress(mv)] = true })
-            return
-          end
-        end
-        H.setPad({})
-      end),
-    }, "stair conveyor -> P12b, attempt " .. n),
-    H.cond(function() return stairFail == nil end, {
-      H.call(function() stairDone = true end),
-    }, {}),
+    stairJitter(n),
+    table.unpack(legs),
   }, {})
 end
 local function stairFollow()
