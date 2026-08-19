@@ -367,6 +367,21 @@ H.run({ maxFrames = 250000 }, {
   -- ======================================================================
   mogMenu("mog's command window (isolation arm)"),
   H.call(function()
+    -- #129 staging (2026-08-19, a labeled unit-style expedient): a dance
+    -- auto-turn that kills the LAST monster trips the battle-end freeze
+    -- #129 tracks (the fight provably never ends), and the #122 RNG
+    -- reshuffle put this file's kill exactly on Mog's first free turn.
+    -- The ledger under test needs the pack ALIVE for two more auto-turns
+    -- and nothing after needs the battle to end, so the pack is pinned
+    -- tall (3000 HP) -- no kill, no freeze, the queue fills, the tail
+    -- asserts run.  #129 carries its own deterministic repro recipe; a
+    -- +300 nudge was tried first and the kill still landed.
+    for s = 0, 5 do
+      local mhp = H.readWord(0x3BFC + s * 2)
+      if mhp > 0 and mhp < 2000 then
+        H.writeWord(0x3BFC + s * 2, 3000)
+      end
+    end
     H.writeWord(0x3C08 + mogSlot * 2, DANCE_COST - 1)
     H.log("[isolation arm] MOG's pool := 7 -- below the flat price")
   end),
