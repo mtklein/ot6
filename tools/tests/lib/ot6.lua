@@ -1914,6 +1914,26 @@ function M.newFightDriver(tag, opts)
     -- because a solo party has nobody to hand the job to.
     local mayHeal = opts.healer == nil
         or M.readByte(BCHID + actor * 2) == opts.healer
+    -- #128: a dead healer must not lock the party out of its own bag.  The
+    -- role assignment above is for the living: measured twice (the Zozo
+    -- stairs, the Thamasa fire), the designated healer died first and no
+    -- other actor would ever touch an item or a cure, so the party bled
+    -- out holding full supplies.  A player hands the Tonic to whoever is
+    -- alive.  When the healer is down -- or not in this fight at all --
+    -- whoever holds the row inherits the job; the revive loop below raises
+    -- the dead in entity order (the healer among them), and the role
+    -- returns to its owner on their next living turn.
+    if not mayHeal then
+      local healerAlive = false
+      for e = 0, 3 do
+        if M.readByte(BCHID + e * 2) == opts.healer
+           and M.readWord(0x3BF4 + e * 2) > 0 then
+          healerAlive = true
+          break
+        end
+      end
+      if not healerAlive then mayHeal = true end
+    end
     local row = (opts.items and mayHeal) and cmdRow(actor, CMD_ITEM) or nil
     -- opts.cure = false turns the cast line off and leaves healing to the
     -- bag, the way this driver worked before.  Anything else is the list of

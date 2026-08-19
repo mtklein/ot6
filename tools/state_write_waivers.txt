@@ -142,3 +142,6 @@ tools/tests/probe_v07_j_negative.lua	.writeByte(
 tools/tests/probe_vargas.lua	.writeByte(
 tools/tests/probe_vargas.lua	.writeWord(
 tools/tests/save_checksum.lua	emu.write	quarantine: the 1-in-65536 zero-checksum save (owner-named)
+tools/tests/battle_healerdown.lua	.writeByte(	quarantine: #128 regression staging -- the healer death (engine corpse shape hp=0+st1 $80) and a Fenix Down are poked because a real targeted kill couples to formation luck; the property under test is the driver policy, not the fight
+tools/tests/battle_healerdown.lua	.writeWord(	quarantine: #128 regression staging, same reason as its writeByte line
+tools/tests/probe_dancefreeze.lua	.writeWord(	quarantine: #129 instrument -- inherits battle_dancemp MP-pin staging in a probe that never produces fixtures
