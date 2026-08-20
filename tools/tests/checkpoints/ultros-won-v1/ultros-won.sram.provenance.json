@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "5f83e6c09e851fe92da56c07dc4d74984f6bb538ba328397fdb2ad771bba4250",
+  "generator_sig": "497790d102e190e693705db58e847452438c69b57fba4057dea71ea86c32e432 gen_ultros tools/tests/checkpoints/esper-mtn-save-v1/manifest.json tools/tests/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/esper-mtn-save-v1/manifest.json",
+      "sha256": "4f3278c7a1acdf72402107804a7265683325d881d69281caaa13070e566c5851"
+    }
+  ]
+}

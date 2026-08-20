@@ -861,6 +861,80 @@ M.contracts["esper-mtn-save-v1"] = {
   },
 }
 
+-- ultros-won-v1: checkpoint O (docs/design/thamasa-route.md section 2.2 and
+-- Segment 5 end; issue #127's "the statue room and Ultros III"), the SAME
+-- vanilla save point on the mountain exterior at map 375 (8,44), on its
+-- SECOND visit -- after the statue-lore scene and the Ultros III fight.
+-- Exercised by gen_ultros: cold-Continue the tracked esper-mtn-save-v1
+-- battery, prep OUTSIDE combat (Fire Rod onto TERRA for a fire-weakness,
+-- bludgeon-class -- unshielded -- physical Fight; full-heal), the short WEST
+-- door 375 (2,45)->371 (9,9) into the statue room, walk (15,20) for the lore
+-- scene ($0096/$0097), step (15,22) for Ultros III (battle 125, RELM joins
+-- two script lines before the battle command), win it on HP (NOT Sketch --
+-- #123: a missed Sketch is the corruption bug's entry condition, and the
+-- fight is ended deterministically on Ultros's 22000 HP instead), then walk
+-- back out 371 (10,9)->375 (3,45) to the save point and re-Save.
+--
+-- The window O lives in is narrow and is the whole reason this boundary
+-- exists here: $0095=1 (Ultros beaten, :73801) AND $0099=0 (the massacre
+-- chain has NOT started, :75156).  A save generated after stepping on 375
+-- (15,17) would be unreachable in principle (section 2.3's O note), so O must
+-- be cut between the Ultros win and the massacre trigger.  RELM is now in the
+-- party ($02E8/$02F8, :73700-73701); the statue lore is seen ($0096/$0097,
+-- :74018-74019); everything else carries from N.
+M.contracts["ultros-won-v1"] = {
+  slot = 3,
+  field = { map = 375, x = 8, y = 44 },     -- the same vanilla save point
+  switches = {
+    { 0x0632, 1, "the standing save-sparkle switch (the 375 (8,44) sparkle rides it)" },
+    { 0x008D, 1, "Strago engaged (unchanged since L)" },
+    { 0x0090, 1, "FlameEater beaten (carried from M, :72129)" },
+    { 0x0091, 1, "the morning-after resolved (carried from M, :73000)" },
+    { 0x0092, 1, "Shadow's goodbye played (carried from M, :73302)" },
+    { 0x0096, 1, "the statue lore IS seen now (:74018)" },
+    { 0x0097, 1, "the statue lore IS seen now (:74019)" },
+    { 0x0095, 1, "Ultros III IS beaten now (:73801)" },
+    { 0x0099, 0, "the massacre chain has NOT started (:75156) -- O's window" },
+    { 0x02E7, 1, "STRAGO joined (:71796)" },
+    { 0x02F7, 1, "STRAGO available (:71797)" },
+    { 0x02F3, 0, "SHADOW unavailable (left at the inn night, :70653)" },
+    { 0x02E8, 1, "RELM joined in the Ultros scene (:73700)" },
+    { 0x02F8, 1, "RELM available (:73701)" },
+    { 0x009D, 0, "the v0.13 area tail is ahead (:77992)" },
+  },
+  party = {
+    size = 4,                     -- STRAGO TERRA LOCKE RELM; SHADOW is gone
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x07, "STRAGO" },
+      { 0x08, "RELM" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  -- #123's checkpoint spot-assert (Sketch-bug canary): no chest is opened
+  -- this segment, so the bag is N's carried through, and a silent bank-$7e
+  -- sweep from a mis-driven Sketch would show up as a missing pickup here.
+  -- Prep crossed the weakness weapons (probe_ultros_equip's OT6 permissions):
+  -- the Fire Rod is now WORN by STRAGO ($07) in place of his Ice Rod, and the
+  -- bag's spare ThunderBlade is WORN by TERRA ($00).  Both it[4] checks find
+  -- the weapon on its wearer rather than in the $1869 bag, and doubling as
+  -- the equip-took proof.
+  items = {
+    { 0xF0, 1, "Fenix Down -- town chest bit 250 (carried from N)" },
+    { 0x35, 1, "Fire Rod -- map 351 chest bit 104 (worn by STRAGO in prep)", 0x07 },
+    { 0x0F, 1, "ThunderBlade -- bag spare (worn by TERRA in prep)", 0x00 },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)

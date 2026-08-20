@@ -654,4 +654,36 @@ STATES = [
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/esper-mtn-save-v1
     S("esper_mtn_save", gen="gen_esper_mtn", checkpoint="fire-out-v1",
       timeout=1800),
+
+    # boundary N -> boundary O (issue #127, "the statue room and Ultros III"):
+    # cold-Continue the tracked esper-mtn-save-v1 SRAM checkpoint (map 375
+    # (8,44)), prep OUTSIDE combat (Fire Rod onto TERRA for a fire-weakness,
+    # bludgeon-class -- unshielded -- physical Fight; full-heal), the short
+    # WEST door 375 (2,45)->371 (9,9) into the statue room, the (15,20) lore
+    # scene ($0096/$0097) and the (15,22) Ultros III fight (battle 125, RELM
+    # joins), then back out 371 (10,9)->375 (3,45) to the save point and the
+    # real Save UI -- the `ultros-won-v1` checkpoint.  checkpoint=, not prev=:
+    # this state cold-Continues the tracked esper-mtn-save-v1 battery rather
+    # than a savestate link, the gen_esper_mtn / gen_gate_cave_save shape.
+    #
+    # THE FIGHT IS ENDED ON HP, NEVER BY SKETCH (#123): Ultros III's scripted
+    # vanilla finish is a Sketch->Tentacle surrender, but a MISSED Sketch is
+    # the corruption bug's entry condition and can sweep the bank-$7e save
+    # block right before this batch checkpoint is captured.  The generator
+    # drives no Sketch at all; RELM only Fights.  Ultros's AI grows a
+    # tri-elemental counter form after 5 party MAGIC commands
+    # (ai_script.asm:6267-6355), so the whole offense is elemental WEAPONS
+    # (TERRA's Fire Rod / LOCKE's ThunderBlade = bolt) swung as physical
+    # Fights and healing is item-only -- zero MAGIC commands, the form never
+    # arms.  A 5-rung seed ladder (H.newSeedLadder) retries a loss from a
+    # savestate taken just after the lore scene.  timeout=1800: the 22000-HP
+    # fight behind a seed ladder plus two warp-maze crossings runs past
+    # run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
+    # deliberate by-hand operation:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/esper-mtn-save-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/ultros-won-v1/ultros-won.sram \
+    #     tools/tests/run.sh tools/tests/gen_ultros.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/ultros-won-v1
+    S("ultros_won", gen="gen_ultros", checkpoint="esper-mtn-save-v1",
+      timeout=1800),
 ]
