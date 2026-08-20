@@ -1807,6 +1807,16 @@ EventTrigger::_375:
         make_event_trigger {47, 53}, _cbee62
         make_event_trigger {39, 54}, _cbee71
         make_event_trigger {36, 53}, _cbee80
+        ; OT6 #125/#127: the mountain-top save point (placement 2,
+        ; save-points-vector.md / thamasa-route.md Segment 6).  (15,16) is the
+        ; tile one step NORTH of the massacre trigger (15,17) _cbf2b5 -- the
+        ; last controllable ground before the massacre's one-way chain
+        ; (esper reveal -> town 341 -> solo Leo vs Kefka, battle 124, whose
+        ; loss is a GAME OVER).  Its compartment (map-375 comp 2, entered at
+        ; (16,9) from map 372) is reached only by walking down onto (15,16),
+        ; so a save here is on the sole approach.  Appended, never inserted;
+        ; standing switch $0632 sparkle appended at the END of NPCProp::_375.
+        make_event_trigger {15, 16}, SavePoint
 
 EventTrigger::_376:
 

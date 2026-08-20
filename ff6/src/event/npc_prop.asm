@@ -16655,6 +16655,21 @@ NPCProp::_375:
                 set_npc_gfx RELM
                 end_npc
 
+        ; OT6 #125/#127: the mountain-top save sparkle (appended at the END,
+        ; never inserted -- events address NPCs by {map, index}, and the
+        ; esper-reveal vignette scripts on map 375 index the NPCs above; the
+        ; trigger is in EventTrigger::_375).  (15,16) is one tile north of the
+        ; massacre trigger (15,17), the last controllable ground before the
+        ; one-way massacre chain.  $0632 is the standing save-sparkle switch,
+        ; the same one the (8,44) esper-mountain sparkle rides.
+        make_npc {15, 16}, $0632
+                set_npc_no_react
+                set_npc_anim FOUR_FRAMES, SPECIAL
+                set_npc_speed NORMAL
+                set_npc_gfx SAVE_POINT, RAINBOW
+                set_npc_sprite_priority HIGH
+                end_npc
+
 ; ------------------------------------------------------------------------------
 
 NPCProp::_376:

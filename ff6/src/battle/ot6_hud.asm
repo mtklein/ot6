@@ -2267,6 +2267,35 @@ Ot6ShieldTbl:
                                 ;   have told them apart in any case:
                                 ;   15 names cover 42 species
         ; sealed gate / thamasa / the floating continent
+        .word   $0173
+        .byte   4, OT6_SLASH    ; kefka vs leo: the massacre's one real fight
+                                ;   (formation 388, KEFKA_VS_LEO, L1 HP5001,
+                                ;   fought by a solo General Leo on the WEDGE
+                                ;   actor -- thamasa-route.md Segment 6, issue
+                                ;   #124).  UN-AUTHORED this was a formula
+                                ;   floor: 2 + level/8 = 2 shields at L1, a
+                                ;   2-shield Kefka that trivialised the peak of
+                                ;   the WoB.  Authored to 4 so a solo guest at
+                                ;   arrival level wins with intent but can lose
+                                ;   careless -- battle 124 is the area's
+                                ;   designed risk point (its loss is a GAME
+                                ;   OVER: the battle tail calls _ca5ea9 =
+                                ;   `if_b_switch $40 return; call GameOver`,
+                                ;   event_main.asm:76471).  SLASH is Leo's
+                                ;   sword (the Crystal, char_prop.asm:336),
+                                ;   the only tool the player holds here, so the
+                                ;   fight teaches break one more time with it.
+                                ;   NO element add (issue #124 proposed "one
+                                ;   hidden element for Shock to find"): probed
+                                ;   at authoring, Leo's whole solo kit is
+                                ;   non-elemental -- Shock is magic $82,
+                                ;   element byte $00, and the Crystal is item
+                                ;   $14, element byte $00 -- so any element
+                                ;   weakness would be UNREACHABLE by the forced
+                                ;   party and would author a "?" the player can
+                                ;   never exploit (the break-reach discipline,
+                                ;   check_break_reach.py).  Slash is the whole,
+                                ;   honest key; see probe_leo.lua.
         .word   $012e
         .byte   7, OT6_SLASH|OT6_PIERCE ; ultros 3: the row, third verse
         .word   $0116
