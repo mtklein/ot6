@@ -623,11 +623,17 @@ STATES = [
     #     OT6_CAPTURE_SRM=tools/tests/checkpoints/fire-out-v1/fire-out.sram \
     #     tools/tests/run.sh tools/tests/gen_thamasa_fire.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/fire-out-v1
-    # fire_out is STAGED, not landed: gen_thamasa_fire (on disk, WIP) cannot
-    # yet win the burning-house ambush -- the loss silently auto-Continues
-    # the checkpoint (#127's pass-three finding) -- so registering it here
-    # would block every full-chain run at a known-red edge.  Re-enable with
-    # the L->M completion:
-    # S("fire_out", gen="gen_thamasa_fire", checkpoint="thamasa-night-v1",
-    #   timeout=1800),
+    # fire_out LANDED (issue #127, tenth pass): the burning-house ambush and
+    # FlameEater both win now that the party is actually prepped like a
+    # player would prep it -- gear, ice espers, BACK ROW (the owner's own
+    # first move, live -- it halves the opener's physical damage and is
+    # what actually keeps the party alive to land a hit), full HP/MP
+    # between every fight (not just before the two bosses), and the Ice Rod
+    # equipped on STRAGO once FlameEater's own Reflect+Safe (ai_script.asm
+    # AIScript::_278) makes further-magic a losing move -- Reflect never
+    # bounces a physical Fight, elemental or not.  Checkpoint M
+    # (fire-out-v1) captured and sealed from a clean run (verdict 0,
+    # generated-state verify passed).
+    S("fire_out", gen="gen_thamasa_fire", checkpoint="thamasa-night-v1",
+      timeout=1800),
 ]

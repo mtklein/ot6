@@ -725,6 +725,79 @@ M.contracts["thamasa-night-v1"] = {
   },
 }
 
+-- fire-out-v1: checkpoint M (docs/design/thamasa-route.md section 1,
+-- segments 2-4; issue #127's "the Thamasa fire block"), a world SRAM save
+-- outside Thamasa on the same south long-entrance strip as L (measured:
+-- world (249,128), same staging tile).  Exercised by gen_thamasa_fire: the
+-- inn sleep, the fire, Strago's house-door talk into his join, the burning
+-- house (map 351, Fire Rod + Ice Rod chests, the wandering flames, the
+-- ambush, FlameEater/battle 79 behind a 5-rung seed ladder), the win tail,
+-- and Shadow's goodbye (his gear returned to the bag, asserted as an
+-- inventory delta in the generator itself rather than a fixed item id
+-- here, because which slot he carried is measured live at boot).
+--
+-- $0090/$0091/$0092 are the three switches the task names: FlameEater
+-- beaten, the morning-after resolved, Shadow's goodbye played.  $008D
+-- stays 1 (unchanged since L); $008E (the fire) is deliberately NOT
+-- asserted either way -- town 343's burning retile is gated
+-- `$008E && !$0090` (thamasa-route.md hazard 4), so once $0090=1 the raw
+-- value of $008E no longer describes what the player sees, and asserting
+-- it would be pinning an implementation detail rather than a boundary fact.
+M.contracts["fire-out-v1"] = {
+  slot = 3,
+  ram = {
+    { 0x1f60, 0xFF, 249, "world x (save-block cell $1f60): outside Thamasa" },
+    { 0x1f61, 0xFF, 128, "world y (save-block cell $1f61)" },
+    { 0x1f62, 0xFF, 83, "dead Blackjack x -- the wreck never moves" },
+    { 0x1f63, 0xFF, 238, "dead Blackjack y" },
+    { 0x11FA, 0x03, 0x00, "ON FOOT" },
+    { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
+  },
+  switches = {
+    { 0x008D, 1, "Strago engaged (unchanged since L)" },
+    { 0x0090, 1, "FlameEater beaten (:72129)" },
+    { 0x0091, 1, "the morning-after resolved (:73000)" },
+    { 0x0092, 1, "Shadow's goodbye played (:73302)" },
+    { 0x02E7, 1, "STRAGO joined (:71796)" },
+    { 0x02F7, 1, "STRAGO available (:71797)" },
+    { 0x02F3, 0, "SHADOW unavailable (left at the inn night, :70653)" },
+    { 0x007A, 1, "the airship is still dead -- v0.13 is on foot" },
+    { 0x0246, 0, "no active airship" },
+    { 0x009D, 0, "the v0.13 area tail is ahead (:77992)" },
+  },
+  party = {
+    size = 3,                     -- TERRA LOCKE STRAGO; SHADOW is gone
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x07, "STRAGO" },
+    },
+  },
+  -- #123's checkpoint rule, extended to this boundary's own new pickups:
+  -- the two map-351 chests and the five town chests L already carried.
+  items = {
+    { 0xFB, 1, "Echo Screen -- town chest bit 246 (carried from L)" },
+    { 0xF8, 1, "Green Cherry -- town chest bit 247 (carried from L)" },
+    { 0xF4, 1, "Soft -- town chest bit 248 (carried from L)" },
+    { 0xF3, 1, "Eyedrop -- town chest bit 249 (carried from L)" },
+    { 0xF0, 1, "Fenix Down -- town chest bit 250 (carried from L)" },
+    { 0x35, 1, "Fire Rod -- map 351 chest bit 104" },
+    -- worn by STRAGO ($07), not sitting in the bag: docs/design/thamasa-
+    -- route.md's own line ("the Ice Rod is a FlameEater counter picked up
+    -- on the way in") is the route actually using the pickup, not just
+    -- carrying it -- STRAGO has no weapon of his own otherwise, and its
+    -- ice element is real physical damage output against FlameEater (see
+    -- flameEaterAttempt's header). it[4]=0x07 allows either.
+    { 0x36, 1, "Ice Rod -- map 351 chest bit 105", 0x07 },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
@@ -809,6 +882,17 @@ function M.contractDiffs(c)
         if M.readByte(0x1869 + i) == it[1] and M.readByte(0x1969 + i) > 0 then
           have = 1
           break
+        end
+      end
+      -- it[4], optional: a charId this item is also allowed to be WORN by
+      -- rather than sitting in the bag -- a pickup a route deliberately
+      -- equips (a rod on a fighter, say) is still "held", just not in the
+      -- $1869 array the plain scan above reads.  Checks the character's
+      -- six equip slots ($1600+37*charId+$1F..$24: w/sh/he/ar/r1/r2).
+      if have == 0 and it[4] then
+        local base = 0x1600 + 37 * it[4]
+        for slot = 0x1F, 0x24 do
+          if M.readByte(base + slot) == it[1] then have = 1; break end
         end
       end
       field(string.format("item $%02X (%s) %s inventory", it[1], it[3],

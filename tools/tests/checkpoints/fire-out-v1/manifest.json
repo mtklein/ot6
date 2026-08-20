@@ -1,0 +1,20 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "fire-out.sram",
+  "slot": 3,
+  "milestone": "fire-out",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "size": 32768,
+  "sha256": "a49d3880f7c9897fb2dc549fe0c498ae647b5b341ea65d545c57d8760ff7b014",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "a49d3880f7c9897fb2dc549fe0c498ae647b5b341ea65d545c57d8760ff7b014",
+    "generator_sig": "f42ed5bb93ef54c3d9845d37b669eb5b4658cbe7d1f8a094e143317be0300096 gen_thamasa_fire tools/tests/checkpoints/thamasa-night-v1/manifest.json tools/tests/checkpoints/thamasa-night-v1/thamasa-night.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/thamasa-night-v1/manifest.json",
+        "sha256": "f0fb2084328c6cd0157619d992ee8816cfbc7ebd84a0b7884c7a2f8879524bd5"
+      }
+    ]
+  }
+}

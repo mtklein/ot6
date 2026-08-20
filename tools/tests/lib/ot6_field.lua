@@ -1187,12 +1187,34 @@ function M.worldNavTo(txIn, tyIn, opts)
   local arrive = opts.arrive
   local spareSet = {}
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
+  -- opts.fleeSpecies: issue #127's Crescent Island grind again -- a set of
+  -- formation species words (M.formationHas's own convention, the same
+  -- $57C0 OT6_SPECIES table every spare list in the tree already keys on)
+  -- to FLEE specifically while otherwise fighting tactically. Baskervor
+  -- ($01D, no elemental weakness, HP750) turned out to be a bad grind
+  -- target -- either wiping the party outright or, per the coordinator's
+  -- read of the reward-scaler knobs, killing off enough characters mid-
+  -- fight that OT6's win-XP split gives the survivors little or nothing --
+  -- while Cephaler ($096, weak bolt, HP420) in the SAME formation pool
+  -- grinds cleanly. `flee` is already built below whenever `tactical` is
+  -- (i.e. for playBattles="tactical" too, not only "flee"), so this reuses
+  -- newFlee's own cap + can't-run/pincer-refusal fallback verbatim with no
+  -- new state writes (the #75 constraint every navigator here keeps).
+  local fleeSet = {}
+  for _, w in ipairs(opts.fleeSpecies or {}) do fleeSet[w] = true end
   local blocked, nblocked = {}, 0
   local plan, idx = nil, 1
   local pend = nil
   local aPhase = 0
   local battN = 0
-  local wipeCheck = wipeCanary("worldNavTo")
+  -- opts.wipeEndsRide: advanceStory's own convention (its header explains
+  -- wipeCanary's soft/hard split in full), extended here for issue #127's
+  -- Crescent Island grind: a caller doing real, RNG-risked world-map
+  -- grinding needs to reload and retry a wipe rather than have it hard-
+  -- error the whole generator run.  Off by default (every other caller of
+  -- worldNavTo in the tree still wants the loud failure).
+  local wipeSeen = false
+  local wipeCheck = wipeCanary("worldNavTo", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
       and M.newFightDriver("worldNavTo",
         { tactical = true, boost = true, items = true,
@@ -1205,7 +1227,9 @@ function M.worldNavTo(txIn, tyIn, opts)
   local function resolveT(v) return type(v) == "function" and v() or v end
   return M.driveUntil(function()
     local done
-    if arrive and arrive() then
+    if wipeSeen then
+      done = true
+    elseif arrive and arrive() then
       done = true
     else
       done = M.worldX() == resolveT(txIn) and M.worldY() == resolveT(tyIn)
@@ -1222,7 +1246,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.frame, M.worldX(), M.worldY(),
           plan and tostring(#plan) or "-", idx, nblocked))
       end
-      wipeCheck()
+      if wipeCheck() then wipeSeen = true; M.setPad({}); return end
       battN = M.battleLoadStarted() and battN + 1 or 0
       if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it (never a spared formation), then let the
@@ -1233,7 +1257,8 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
-        if opts.playBattles == "flee" then
+        if opts.playBattles == "flee"
+           or (flee and next(fleeSet) and M.formationHas(fleeSet)) then
           flee(battN)
           return
         end
@@ -3024,6 +3049,12 @@ end
 -- The list seek is menu_esperdetail's two-column idiom against the live
 -- $7e9d89 row->esper table; an esper the save does not own never appears
 -- there, so the seek times out instead of equipping the wrong row.
+-- `pos` may be a literal char-select row (the established idiom -- measured
+-- once and hardcoded, per gen_n128's own note) or a function returning one,
+-- resolved live at the point the row is actually needed -- the same
+-- lazy-resolution shape M.equipWeapon's own `pos` already supports, for a
+-- caller whose party order isn't pinned down until runtime (e.g. a
+-- character who just joined mid-route).
 function M.equipEsper(pos, esperIdx, opts)
   opts = opts or {}
   local tag = opts.tag or ("equip esper " .. esperIdx)
@@ -3032,6 +3063,9 @@ function M.equipEsper(pos, esperIdx, opts)
     0x05, 0x06, 0x0a, 0x1e, 0x4d
   local GENJULIST = 0x9d89
   local function st() return M.readByte(ZM) end
+  local function targetPos()
+    return type(pos) == "function" and pos() or pos
+  end
   local seek_ph = 0
   return M.seqStep({
     M.driveUntil(function() return st() == ST_MAIN end, 1200,
@@ -3046,7 +3080,7 @@ function M.equipEsper(pos, esperIdx, opts)
       tag .. ": character select", 5),
     M.waitFrames(10),
     M.driveUntil(function()
-      return st() == ST_CHAR and M.readByte(CUR) == pos
+      return st() == ST_CHAR and M.readByte(CUR) == targetPos()
     end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
       tag .. ": character cursor"),
     M.pressButtons({ "a" }, 2),

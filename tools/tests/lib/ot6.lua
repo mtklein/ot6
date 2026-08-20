@@ -2650,8 +2650,69 @@ function M.run(opts, steps)
   local root = seqStep(steps)
   local finished = false
 
+  -- #127's silent-auto-Continue canary.  Every game-over path routes
+  -- through the event GameOver SCRIPT ($CC/E568); when it runs, the
+  -- title screen follows, and any driver that mashes A auto-Continues the
+  -- last save -- after which the session has TIME-TRAVELED (roster and
+  -- switches revert) while every naive predicate reads healthy.  Measured
+  -- on the burning-house ambush: a lost fight read as a win for two full
+  -- agent passes.  So the default is LOUD: GameOver fails the run,
+  -- unless the route declares it survivable (opts.allowGameOver, or a
+  -- ladder setting M.gameOverFired = 0 after handling its reload).
+  --
+  -- READ watch, not exec (the first version's own blindness, measured the
+  -- hard way): GameOver in bank $CC is EVENT SCRIPT DATA -- the event
+  -- interpreter READS those bytes and never executes them as CPU code, so
+  -- an exec watch fires never and a lost ambush read as a win for one
+  -- more full pass.  The interpreter's fetch of the script's first byte
+  -- is the reliable signal.
+  --
+  -- SECOND BLIND SPOT, found pass five (issue #127's ambush ladder): even
+  -- the READ watch above stayed at 0 through five confirmed real losses
+  -- (win-verification -- map/roster ground truth, not this canary --
+  -- caught all five landing back on the reloaded thamasa-night-v1 SRAM).
+  -- GameOver at $CC/E568 is a NARRATIVE event script (`_ca5ea9`'s own
+  -- body: `if_b_switch $40, return; call GameOver` -- 8 call sites, all in
+  -- event_main.asm, all story-adjacent); a genuine party wipe inside a
+  -- live `battle` command is handled by the BATTLE MODULE directly and
+  -- apparently never runs that script at all.  TitleScreen
+  -- (cutscene_main.asm, $C2680C) is the actual title-screen module entry
+  -- every path back to the title screen must reach, GameOver-scripted or
+  -- not, so an EXEC watch there is the backstop: it fires on the real
+  -- title screen regardless of which internal path got there.  Both
+  -- watches feed the same M.gameOverFired counter so no caller needs to
+  -- know which one fired.
+  M.gameOverFired = 0
+  do
+    local ok, addr = pcall(M.sym, "GameOver")
+    if ok then
+      emu.addMemoryCallback(function()
+        M.gameOverFired = M.gameOverFired + 1
+      end, emu.callbackType.read, addr, addr)
+    end
+  end
+  do
+    local ok, addr = pcall(M.sym, "TitleScreen")
+    if ok then
+      emu.addMemoryCallback(function()
+        M.gameOverFired = M.gameOverFired + 1
+      end, emu.callbackType.exec, addr, addr)
+    end
+  end
+
   emu.addEventCallback(function()
     if finished then return end
+    if M.gameOverFired > 0 and not opts.allowGameOver then
+      finished = true
+      traceFlush()
+      M.log("FAIL: GAME OVER fired (event GameOver, $CC/E568) -- the run " ..
+        "lost and any further input auto-Continues the last save, which " ..
+        "reads as silent time travel.  A ladder that can survive this " ..
+        "must reload BEFORE the game-over lands, or clear " ..
+        "M.gameOverFired after handling it (see #127's ambush finding).")
+      emu.stop(3)
+      return
+    end
     M.frame = M.frame + 1
     if M.frame > budget then
       finished = true

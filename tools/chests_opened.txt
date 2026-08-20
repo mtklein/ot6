@@ -62,6 +62,8 @@
 92	map 263 factory, Tent (42,46)
 93	map 263 factory, Gold Armor (32,57)
 94	map 271 research facility, Break Blade (8,37)
+104	map 351 Thamasa burning house, Fire Rod (4,52)
+105	map 351 Thamasa burning house, Ice Rod (45,7)
 122	map 382 gate cave, Assassin (36,39)
 123	map 383 gate cave, Tempest (48,56)
 124	map 384 gate cave west, Ether (29,23)
