@@ -636,4 +636,22 @@ STATES = [
     # generated-state verify passed).
     S("fire_out", gen="gen_thamasa_fire", checkpoint="thamasa-night-v1",
       timeout=1800),
+
+    # boundary M -> boundary N (issue #127, "the Esper Mountain approach"):
+    # the world walk from M's (249,128) to the Esper Mountain world entrance
+    # (229,130) -> map 375 (55,31), the SW crossing of the exterior to the
+    # vanilla save point at 375 (8,44) (fighting group-90 fire-weak trash with
+    # TERRA's boosted Fire), and the real Save UI -- the `esper-mtn-save-v1`
+    # checkpoint.  checkpoint=, not prev=: this state cold-Continues the
+    # tracked fire-out-v1 SRAM checkpoint rather than a savestate link, the
+    # gen_thamasa_fire / gen_gate_cave_save shape.  timeout=1800: a world
+    # crossing plus a mountain crossing with real tactical fights is past
+    # run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
+    # deliberate by-hand operation:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram \
+    #     tools/tests/run.sh tools/tests/gen_esper_mtn.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/esper-mtn-save-v1
+    S("esper_mtn_save", gen="gen_esper_mtn", checkpoint="fire-out-v1",
+      timeout=1800),
 ]

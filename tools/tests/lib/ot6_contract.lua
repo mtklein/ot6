@@ -798,6 +798,69 @@ M.contracts["fire-out-v1"] = {
   },
 }
 
+-- esper-mtn-save-v1: checkpoint N (docs/design/thamasa-route.md section 2.2
+-- and Segment 5; issue #127's "the Esper Mountain approach"), the vanilla
+-- save point on the mountain exterior at map 375 (8,44), seven tiles east of
+-- the 371 west door (2,45).  A FIELD save-point boundary: a cold Continue of
+-- the captured battery puts the party on the save tile itself.  Exercised by
+-- gen_esper_mtn: the world walk from M's (249,128) to the mountain world
+-- entrance (229,130) -> 375 (55,31), then the SW crossing to the save point,
+-- fighting group-90 fire-weak trash with TERRA's boosted Fire.
+--
+-- The roster is unchanged from M (TERRA LOCKE STRAGO; SHADOW gone), and this
+-- boundary sits BEFORE the statues: $0097=0 (statue lore not seen), $0095=0
+-- (Ultros III not fought), $0099=0 (the massacre chain not started).  It is
+-- the last save reachable before the statue room, and a save generated after
+-- stepping on 375 (15,17) would be unreachable in principle (section 2.3's O
+-- note, applied one boundary earlier).  $0090/$0091/$0092 carry from M
+-- (FlameEater beaten, morning-after resolved, Shadow's goodbye played);
+-- $0632 is the standing save-sparkle switch the 375 (8,44) sparkle rides.
+M.contracts["esper-mtn-save-v1"] = {
+  slot = 3,
+  field = { map = 375, x = 8, y = 44 },     -- the vanilla mountain save point
+  switches = {
+    { 0x0632, 1, "the standing save-sparkle switch (the 375 (8,44) sparkle rides it)" },
+    { 0x008D, 1, "Strago engaged (unchanged since L)" },
+    { 0x0090, 1, "FlameEater beaten (carried from M, :72129)" },
+    { 0x0091, 1, "the morning-after resolved (carried from M, :73000)" },
+    { 0x0092, 1, "Shadow's goodbye played (carried from M, :73302)" },
+    { 0x0097, 0, "the statue lore is NOT seen yet (:74019) -- pre-statues" },
+    { 0x0095, 0, "Ultros III is NOT fought yet (:73801)" },
+    { 0x0099, 0, "the massacre chain has NOT started (:75156)" },
+    { 0x02E7, 1, "STRAGO joined (:71796)" },
+    { 0x02F7, 1, "STRAGO available (:71797)" },
+    { 0x02F3, 0, "SHADOW unavailable (left at the inn night, :70653)" },
+    { 0x02E8, 0, "RELM not joined yet (:73700, segment 5 statue room)" },
+    { 0x009D, 0, "the v0.13 area tail is ahead (:77992)" },
+  },
+  party = {
+    size = 3,                     -- TERRA LOCKE STRAGO; SHADOW is gone
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x07, "STRAGO" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  -- #123's checkpoint spot-assert: no chest is opened this segment (the
+  -- mountain chests all sit off the direct line to the save point), so the
+  -- bag is M's, carried through.  The Ice Rod is worn by STRAGO ($07), not in
+  -- the $1869 array (it[4]=0x07 allows either), the same as M.
+  items = {
+    { 0xF0, 1, "Fenix Down -- town chest bit 250 (carried from M)" },
+    { 0x35, 1, "Fire Rod -- map 351 chest bit 104 (carried from M)" },
+    { 0x36, 1, "Ice Rod -- map 351 chest bit 105 (carried from M)", 0x07 },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
