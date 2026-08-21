@@ -686,4 +686,27 @@ STATES = [
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/ultros-won-v1
     S("ultros_won", gen="gen_ultros", checkpoint="esper-mtn-save-v1",
       timeout=1800),
+
+    # boundary O -> boundary P (issue #127, "the massacre block"), the v0.13
+    # route TERMINAL: cold-Continue the tracked ultros-won-v1 SRAM checkpoint
+    # (map 375 (8,44)), climb the retiled Esper Mountain to the massacre trigger
+    # 375 (15,17) -- the save comp -> (11,51) $0097 shortcut -> the SE
+    # compartment -> 372 (51,17) -> 372 (40,19) -> the pocket (16,9), all navTo
+    # hops -- then ride the atomic massacre chain: solo Leo's battle 124 (a real
+    # loseable fight whose loss is a GAME OVER, behind a 5-rung seed ladder off a
+    # pre-fight savestate with a GameOver read-canary), the scripted theater
+    # battles 105/97, Leo's death, the party restore, the burial and the
+    # Blackjack's return, and the real world Save at the stop line world
+    # (249,128) -- the `thamasa-done-v1` checkpoint.  checkpoint=, not prev=:
+    # this state cold-Continues the tracked ultros-won-v1 battery rather than a
+    # savestate link, the gen_ultros / gen_esper_mtn shape.  timeout=1800: the
+    # warp-maze climb, a seed-laddered solo fight, and the long scripted tail run
+    # past run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
+    # deliberate by-hand operation:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/ultros-won-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/thamasa-done-v1/thamasa-done.sram \
+    #     tools/tests/run.sh tools/tests/gen_massacre.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/thamasa-done-v1
+    S("thamasa_done", gen="gen_massacre", checkpoint="ultros-won-v1",
+      timeout=1800),
 ]

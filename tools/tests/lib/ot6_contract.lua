@@ -935,6 +935,69 @@ M.contracts["ultros-won-v1"] = {
   },
 }
 
+-- thamasa-done-v1: checkpoint P (docs/design/thamasa-route.md section 2.2 and
+-- Segment 7 "The v0.8/v0.13 stop line"; issue #127's O->P), the v0.13 route
+-- TERMINAL.  Exercised by gen_massacre: cold-Continue the tracked ultros-won-v1
+-- battery (map 375 (8,44)), climb the retiled Esper Mountain to the massacre
+-- trigger 375 (15,17), ride the atomic massacre chain -- solo Leo's battle 124
+-- (a loss is a GAME OVER; a 5-rung seed ladder off a pre-fight savestate), the
+-- scripted theater battles 105/97, Leo's death and the party restore, the
+-- burial, the Blackjack's return and the roster re-normalize -- and world-Save
+-- at the stop line.  control returns on the WoB world map at (249,128), one
+-- tile from the repaired Blackjack (parked (249,127)).
+--
+-- P's window: $0099=$009B=$009C=$009D=1 (the whole massacre chain and the area
+-- tail ran) with the party restored to TERRA LOCKE STRAGO RELM (WEDGE/Leo out,
+-- $02F3=0 Shadow still unavailable).  A world save here is the batch checkpoint.
+M.contracts["thamasa-done-v1"] = {
+  slot = 3,
+  world = { x = 249, y = 128 },     -- the stop line, beside the Blackjack
+  switches = {
+    { 0x008D, 1, "Strago engaged (carried from O)" },
+    { 0x0090, 1, "FlameEater beaten (carried, :72129)" },
+    { 0x0091, 1, "the morning-after resolved (carried, :73000)" },
+    { 0x0092, 1, "Shadow's goodbye played (carried, :73302)" },
+    { 0x0096, 1, "the statue lore seen (carried, :74018)" },
+    { 0x0097, 1, "the statue lore seen (carried, :74019)" },
+    { 0x0095, 1, "Ultros III beaten (carried, :73801)" },
+    { 0x0099, 1, "the massacre chain started -- back in town (:75156)" },
+    { 0x018A, 1, "Kefka's Magitek entrance ran (:76337)" },
+    { 0x009B, 1, "Leo fell (:76598)" },
+    { 0x009C, 1, "the burial ran (:77313)" },
+    { 0x009D, 1, "the v0.13 area tail ran (:77992)" },
+    { 0x02E7, 1, "STRAGO joined (:71796)" },
+    { 0x02F7, 1, "STRAGO available (:71797)" },
+    { 0x02E8, 1, "RELM joined (:73700)" },
+    { 0x02F8, 1, "RELM available (:73701)" },
+    { 0x02F3, 0, "SHADOW unavailable (:70653; never restored, :77990)" },
+  },
+  party = {
+    size = 4,                     -- TERRA LOCKE STRAGO RELM; Leo (WEDGE) is gone
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x07, "STRAGO" },
+      { 0x08, "RELM" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  -- #123's checkpoint spot-assert (Sketch-bug canary): the bag carries from O
+  -- across the whole massacre chain (no chest on the route -- audit_chests
+  -- stays exact at 58), so a silent bank-$7e sweep from a mis-driven Sketch
+  -- anywhere upstream shows up as the Fenix Down pickup gone missing here.
+  items = {
+    { 0xF0, 1, "Fenix Down -- town chest bit 250 (carried from O)" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
