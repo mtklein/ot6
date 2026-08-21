@@ -54,9 +54,13 @@ small-frequent-releases pattern):
   real: the release playthrough opens every chest a player would see (51,
   measured by camera), so the whole route is tuned against how people
   actually play.
-- **v0.13 — Thamasa**: Strago and Relm join with the curated-kit machinery
-  (learn many, equip few), the burning house and FlameEater, Ultros ③, and
-  Kefka's massacre with Leo playable, ending at the repaired Blackjack.
+- **v0.13 — Thamasa** (shipped 2026-08-21): Strago and Relm join (Strago
+  with the curated Lore bank — learn many, equip five), the burning house and
+  FlameEater, the Esper Mountain and Ultros ③, and Kefka's massacre with Leo
+  playable (his authored break row: 4 shields, weak slashing), ending at the
+  repaired Blackjack. The burning-house ambush proved the tested-like-a-person
+  discipline: winnable at route level with a player's prep (back row, an
+  ice/water esper, heal-before-you-go), not with a naked party.
 - **v0.14 — The Floating Continent**: the IAF gauntlet, the Floating
   Continent, AtmaWeapon, and the escape into the World of Ruin landing. Tier 6
   is reached here.

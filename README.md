@@ -7,13 +7,13 @@ boost-point turn economy.
 
 ## Status
 
-v0.12 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.12)). The game is
-playable from the start through the whole Sealed Gate arc: Terra's return,
-the Narshe mission handoff, the Cave to the Sealed Gate, the Esper attack on
-Vector, the Imperial banquet, and the voyage to the Crescent Island landing.
-v0.12 is the first release of the end-of-World-of-Balance arc
-(v0.12–v0.14).
+v0.13 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.13)). The game is
+playable from the start through the whole Thamasa arc: everything the Sealed
+Gate release covered, then Thamasa town, Strago and Relm joining, the burning
+house and FlameEater, the Esper Mountain and Ultros, and Kefka's massacre
+with General Leo — ending beside the repaired Blackjack. v0.13 is the second
+release of the end-of-World-of-Balance arc (v0.12–v0.14).
 
 Break and boost are the two central systems. Enemies carry shields and hidden
 weaknesses, hitting a weakness chips a shield, and breaking drops defenses
@@ -25,9 +25,9 @@ magicite you carry. That adds to what the born mages can already do rather than
 replacing it. Blitz is a menu, Steal guarantees the rare at three boost pips,
 and level-ups fully restore HP and MP.
 
-Route work is on Thamasa next: Strago and Relm, the curated kits, the
-burning house, and the massacre (v0.13), then the Floating Continent
-(v0.14) finishes the arc to the end of the World of Balance.
+Route work is on the Floating Continent next: the IAF gauntlet, the
+Floating Continent, AtmaWeapon, and the escape into the World of Ruin
+landing (v0.14) finishes the arc to the end of the World of Balance.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and how far the game is
 playable, [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design,
