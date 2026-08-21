@@ -37,6 +37,17 @@ cleanup_suite() {
 }
 trap cleanup_suite EXIT INT TERM
 
+# Code-coverage mode (#130): with OT6_COVERAGE set in the environment, every
+# run.sh dumps a CDL touched-byte bitmap (lib/ot6.lua coverageFlush).  Give
+# each test its own artifact dir so the per-test coverage.cdl files do not
+# clobber one another under the shared build/states publish dir, then union
+# them with lib/coverage_report.py after the run.  Inert when unset, so the
+# correctness path is unchanged.  OT6_COVERAGE itself already inherits into
+# each run.sh through env(1); only the per-test artifact dir needs setting.
+COVDIR=""
+if [ -n "${OT6_COVERAGE:-}" ]; then COVDIR="$SROOT/coverage"; mkdir -p "$COVDIR"; fi
+cov_env_for() { [ -n "$COVDIR" ] && printf 'OT6_ARTIFACT_DIR=%s' "$COVDIR/$1"; }
+
 # Test-only rendezvous used by runner_isolation_selftest.sh.
 if [ "${1:-}" = "--isolation-probe" ]; then
   printf '%s\n' "$SROOT" > "${2:?probe output path required}"
@@ -250,7 +261,7 @@ if [ "$JOBS" -gt 1 ]; then
         # already read, so nothing downstream changes.
         mkdir "$CLAIMS/$t" 2>/dev/null || continue
         t0=$(python3 -c 'import time; print(time.time())')
-        env $(ram_env_for "$t") OT6_WORKER="$w" "$RUN" "$CDIR/$t.lua" "$LDIR/$t.log" >/dev/null 2>&1
+        env $(ram_env_for "$t") $(cov_env_for "$t") OT6_WORKER="$w" "$RUN" "$CDIR/$t.lua" "$LDIR/$t.log" >/dev/null 2>&1
         rc=$?
         # Preserve the familiar diagnostic path, but publish it atomically.
         tmp="$ROOT/build/states/suite_$t.log.tmp.$$"
@@ -273,7 +284,7 @@ if [ "$JOBS" -gt 1 ]; then
   done
 else
   for t in $TESTS; do
-    env $(ram_env_for "$t") "$RUN" "$ROOT/tools/tests/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
+    env $(ram_env_for "$t") $(cov_env_for "$t") "$RUN" "$ROOT/tools/tests/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
     verdict "$t" "$?" ""
   done
 fi
@@ -305,4 +316,16 @@ if [ "$fail" -eq 0 ]; then
 else
   echo "OT6 suite: RED -- $line"
 fi
+
+# Coverage report (#130).  Union the per-test bitmaps and print the OT6 blind
+# spots, before the EXIT trap removes $SROOT.  A report also lands under
+# build/states so it survives the run for inspection.  This never changes the
+# suite's pass/fail; a failed union is reported but does not flip $fail.
+if [ -n "$COVDIR" ]; then
+  echo
+  python3 "$ROOT/tools/tests/lib/coverage_report.py" \
+    "$ROOT/ff6/rom/ff6-en.map" "$COVDIR" \
+    | tee "$ROOT/build/states/coverage-report.txt" || true
+fi
+
 exit $fail

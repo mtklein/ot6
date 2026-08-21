@@ -93,6 +93,31 @@ silently, so `make test` costs what it always did and `make savestates-test`
 (generate the chain, then run the same suite) is the command that always
 runs everything that can be generated.
 
+### Code coverage (`make coverage`)
+
+`make coverage` answers "which OT6 routines does the test suite never
+touch?"  It generates the savestate chain (for reach), then runs the whole
+suite with `OT6_COVERAGE=1`.  Mesen keeps a Code/Data Log per emulator
+process — one flag byte per PRG-ROM byte, `0x01` once fetched as code and
+`0x02` once read as data — and `lib/ot6.lua`'s `coverageFlush` dumps the
+`0x03` (touched-either-way) bitmap for the two OT6 code segments
+(`ot6_code` `F00000-F02C5B` and `ot6_c1` `C1FFE8-C1FFF4`, from
+`ff6/rom/ff6-en.map`) at each run's teardown.  The CDL is per-process, so
+each test only marks the code its own boot reached; suite.sh gives each test
+its own artifact dir so the `coverage.cdl` bitmaps do not clobber, and
+`lib/coverage_report.py` unions them and buckets set bits into the map's
+`ot6_code` exports.  The report — a covered/total summary and the list of
+routines no script touched — prints at the end of the run and lands at
+`build/states/coverage-report.txt`.
+
+Data-read (`0x02`) counts as touched on purpose: several OT6 exports are
+tables (stat/icon/font blobs) that are read, never executed, and a code-only
+metric would report every one as a permanent blind spot.  The
+`COVERAGE_RANGES` list in `ot6.lua` and the `RANGES` list in
+`coverage_report.py` are the same two segments in the same order and must
+stay in lockstep; the report refuses a bitmap whose length disagrees.
+`OT6_COVERAGE` is inert unless set, so `make test` is unchanged.
+
 The **scenario stack** turns those three opening chains (Locke, Terra,
 Sabin) into one lineage.  The reunion needs all three completed in a single
 playthrough, but each input-driven chain sets only its own flag, so a

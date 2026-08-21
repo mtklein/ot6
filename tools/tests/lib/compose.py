@@ -1099,6 +1099,15 @@ def main() -> int:
     lib_alias = any(w.startswith("tools/tests/lib/") for w in waived_files)
 
     preamble = [MARKER + "\n"]
+    # Coverage flag (#130).  Mesen's Lua sandbox blocks os.getenv
+    # (AllowIoOsAccess=false), so a runtime toggle cannot be read from the
+    # environment inside a script; inject it as a global the way OT6_SYMS and
+    # OT6_STATES are.  Set only when OT6_COVERAGE is in this compose's
+    # environment (suite.sh's coverage mode / `make coverage`), so `make test`
+    # composes the same file it always did and lib/ot6.lua's coverageFlush
+    # stays a no-op.
+    if os.environ.get("OT6_COVERAGE"):
+        preamble.append("OT6_COVERAGE = true  -- lib/ot6.lua coverageFlush (#130)\n")
     if gated:
         preamble += write_gate_prologue()
     else:

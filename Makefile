@@ -7,7 +7,7 @@ VERSION := 0.13
 # A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date. That happened twice on 2026-07-18.
 .DELETE_ON_ERROR:
 
-.PHONY: all rom patch run test tested verify clean release release-test savestates savestates-test nomp-rom
+.PHONY: all rom patch run test tested verify clean release release-test savestates savestates-test coverage nomp-rom
 
 all: rom
 
@@ -426,6 +426,17 @@ checkpoint-negatives: rom
 savestates-test: savestates
 	python3 tools/tests/lib/compose.py --selftest
 	tools/tests/suite.sh
+
+# Code coverage (#130): run the full suite (savestate tests included, for the
+# widest reach) under Mesen's Code/Data Log and report which OT6 routines the
+# run never executed.  OT6_COVERAGE makes every run.sh dump a per-test
+# executed-code bitmap (lib/ot6.lua coverageFlush); suite.sh keeps the bitmaps
+# apart and unions them with lib/coverage_report.py at the end.  Read-only
+# analysis -- it does not stamp the ROM or gate a release, so it depends on
+# `savestates` for reach but not on a green `test`.  The report also lands at
+# build/states/coverage-report.txt.
+coverage: savestates
+	OT6_COVERAGE=1 tools/tests/suite.sh
 
 clean:
 	$(MAKE) -C ff6 clean

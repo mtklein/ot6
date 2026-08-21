@@ -2628,6 +2628,70 @@ local function traceFlush()
   end
   traceSet, traceCount = {}, 0
 end
+
+-- ---- CDL code coverage (#130) ----------------------------------------------
+-- When OT6_COVERAGE is set, dump the "touched" bitmap for the OT6 code ranges
+-- at run teardown.  Mesen keeps a Code/Data Log per emulator process:
+-- emu.getCdlData(prgRom) returns one CdlFlags byte per PRG-ROM offset, with
+-- 0x01 (Code) set once the byte has been fetched as an opcode and 0x02 (Data)
+-- set once it has been read as data.  We record 0x03 (either), so a data table
+-- exercised by the run counts as touched -- otherwise every OT6 data export
+-- (stat/icon/font tables, which are read, never executed) would read as a
+-- permanent blind spot.  The CDL is per-process and starts empty each boot, so
+-- each test contributes only what its own run reached; lib/coverage_report.py
+-- unions the per-test bitmaps across the suite and maps set bits back to
+-- routine names.  Read-only (one getCdlData read at teardown, nothing
+-- written), so the honesty rules are untouched.
+--
+-- The ranges track ff6/rom/ff6-en.map's ot6_code (F00000-F02C5B) and ot6_c1
+-- (C1FFE8-C1FFF4) segments, expressed as PRG-ROM offsets (CPU addr & 0x3FFFFF).
+-- coverage_report.py carries the same {base,len} pairs in the same order and
+-- unpacks the concatenated bitmap against them; the two lists must stay in
+-- lockstep.  emu.getCdlData returns a 0-indexed array (element [k] is PRG
+-- offset k; #cdl is 0x3FFFFF with a live [0]), so read cdl[offset] directly --
+-- measured: the highest code offset lands at 0x302ADC, exactly one below
+-- Ot6EsperStatTbl's data at F02ADD, which is the code/data boundary the map
+-- names and confirms the indexing.
+--
+-- The on/off switch is the global OT6_COVERAGE, not an env var: Mesen's Lua
+-- sandbox blocks os.getenv (AllowIoOsAccess=false), so lib/compose.py injects
+-- OT6_COVERAGE=true into the composed preamble when its own environment has
+-- OT6_COVERAGE set (suite.sh's coverage mode).  Undefined for a normal run, so
+-- the `not OT6_COVERAGE` guard makes this a no-op on the `make test` path.
+local COVERAGE_RANGES = { { 0x300000, 0x2C5C }, { 0x01FFE8, 0x0D } }
+local coverageDone = false
+local function coverageFlush()
+  if coverageDone or not OT6_COVERAGE then return end
+  coverageDone = true
+  local ok, cdl = pcall(function()
+    return emu.getCdlData(emu.memType.snesPrgRom)
+  end)
+  if not ok or type(cdl) ~= "table" then
+    M.log("coverage: getCdlData unavailable (" .. tostring(cdl) .. ")")
+    return
+  end
+  local total = 0
+  for _, r in ipairs(COVERAGE_RANGES) do total = total + r[2] end
+  local nbytes = math.floor((total + 7) / 8)
+  local bytes = {}
+  for i = 1, nbytes do bytes[i] = 0 end
+  local bit = 0
+  for _, r in ipairs(COVERAGE_RANGES) do
+    local base, len = r[1], r[2]
+    for off = 0, len - 1 do
+      local flag = cdl[base + off] or 0
+      if (flag & 0x03) ~= 0 then
+        local idx = math.floor(bit / 8) + 1
+        bytes[idx] = bytes[idx] | (1 << (bit % 8))
+      end
+      bit = bit + 1
+    end
+  end
+  local chars = {}
+  for i = 1, nbytes do chars[i] = string.char(bytes[i]) end
+  M.emitBlob("coverage.cdl", table.concat(chars))
+end
+
 local function traceTick()
   if not M.tileAligned() then return end
   local m = M.mapId() & 0x1ff
@@ -2705,6 +2769,7 @@ function M.run(opts, steps)
     if M.gameOverFired > 0 and not opts.allowGameOver then
       finished = true
       traceFlush()
+      coverageFlush()
       M.log("FAIL: GAME OVER fired (event GameOver, $CC/E568) -- the run " ..
         "lost and any further input auto-Continues the last save, which " ..
         "reads as silent time travel.  A ladder that can survive this " ..
@@ -2717,6 +2782,7 @@ function M.run(opts, steps)
     if M.frame > budget then
       finished = true
       traceFlush()
+      coverageFlush()
       M.log("FAIL: frame budget exceeded (" .. budget .. " frames)")
       emu.stop(2)
       return
@@ -2736,11 +2802,13 @@ function M.run(opts, steps)
     if not ok then
       finished = true
       traceFlush()
+      coverageFlush()
       M.log("FAIL: " .. tostring(r))
       emu.stop(1)
     elseif r == "done" then
       finished = true
       traceFlush()
+      coverageFlush()
       M.log("PASS (frame " .. M.frame .. ")")
       emu.stop(0)
     end
