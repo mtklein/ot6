@@ -320,6 +320,22 @@ local function liveBattle()
   return H.battleLoadStarted() and H.monstersPresent() > 0
 end
 
+-- Pin the live pack tall ($3BFC is battle current-HP, dancemp's staging) so the
+-- spend can actually reach the boundary.  #124's re-rolled RNG made EDGAR's
+-- tool target die under him mid-spend: with no live target the cast cannot
+-- confirm and the pool stalls in target-select (measured 2026-08-20: parked at
+-- 27 MP in ST_TGT for the whole 150000-frame budget), and every kill that DOES
+-- land levels EDGAR and refills his pool, undoing the walk down.  Keeping the
+-- pack alive gives every cast a target and stops the refills, so the pool
+-- drains straight into [4,7]; the bystander medic already in `pulse` keeps the
+-- party standing through the extra rounds.
+local function pinPackTall()
+  for s = 0, 5 do
+    local hp = H.readWord(0x3BFC + s * 2)
+    if hp > 0 and hp < 3000 then H.writeWord(0x3BFC + s * 2, 3000) end
+  end
+end
+
 -- the same open, but it gives up the moment the battle ends rather than
 -- burning its whole budget: the boundary arm below retries on a fresh fight
 local function openToolsWindowOrEnd(what)
@@ -477,7 +493,7 @@ H.run({ maxFrames = 300000 }, {
         -- something one fight can do.
         H.call(function() mode = "spend" end),
         H.driveUntil(function() return pool() <= 7 end, 150000,
-          { H.call(pulse), H.waitFrames(1) },
+          { H.call(function() pinPackTall(); pulse() end), H.waitFrames(1) },
           "the pool is spent into the boundary (attempt " .. n .. ")"),
         tryRead("the fight that spent it (attempt " .. n .. ")"),
         H.cond(function() return done end, {}, {

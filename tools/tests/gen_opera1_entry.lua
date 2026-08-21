@@ -155,8 +155,23 @@ H.run({ maxFrames = 250000 }, {
     H.log(string.format("[boot] map=%d (%d,%d)", map(), H.fieldX(), H.fieldY()))
   end),
 
-  -- 1. off the street to the world (approach {62,45}, step RIGHT onto x=63)
-  H.navTo(62, 45, { maxFrames = 12000, playBattles = true }),
+  -- 0. Heal before the road out.  zozo_done hands this generate a party at
+  -- 56-87% (CELES 194/349, LOCKE 229/353), and the Zozo street below draws
+  -- random battles.  #124's Leo-break ROM re-rolled the battle chain, and a
+  -- street encounter that the old blind-A-tap walk survived now wipes a
+  -- half-strength party (measured 2026-08-20: opera_entry lost the fight at
+  -- (60,46) and stalled the full budget into a Game Over).  A full party is a
+  -- lot harder to kill, and the fight is one to leave rather than win -- there
+  -- is no XP worth taking on the way out of town -- so the walk flees instead
+  -- of A-tapping (mirroring gen_mrf_chute's upper-floor crossing).  The care
+  -- stop is player-realistic prep; it is a no-op when the party is already up.
+  H.fieldCare({ tag = "care before leaving Zozo", threshold = 0.9 }),
+
+  -- 1. off the street to the world (approach {62,45}, step RIGHT onto x=63).
+  -- Flee the street encounters rather than blind-A-tapping them: this is the
+  -- road out, not a fight to win, and a fled encounter cannot lose the party
+  -- the way a blindly-fought one did after the RNG re-roll.
+  H.navTo(62, 45, { maxFrames = 12000, playBattles = "flee" }),
   (function() local hb=0
     return H.driveUntil(function() return H.worldMode() end, 4000, {
       H.call(function() hb=hb+1

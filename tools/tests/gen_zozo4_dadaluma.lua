@@ -234,16 +234,60 @@ end
 -- budget.  Both are consistent with the list not being populated yet; that
 -- is the hypothesis the margin is against, and it is unverified beyond the
 -- one observation.
+-- The field-menu screens ZMENUSTATE ($26) shows while a menu owns the screen
+-- (ot6_field.lua's CARE_SCREENS, replicated here because it is a lib local).
+-- When none of these is set the field menu is genuinely closed.
+local MENU_SCREENS = {
+  [0x05] = true, [0x06] = true, [0x08] = true, [0x0A] = true, [0x17] = true,
+  [0x18] = true, [0x19] = true, [0x1A] = true, [0x3B] = true, [0x3D] = true,
+  [0x64] = true, [0x70] = true,
+}
+-- careReady strengthens `settled` with "the field menu is actually closed".
+-- The 120-frame margin below was sized (2026-08-13) against a plain walk-end;
+-- it does NOT cover a fought-out battle VICTORY with a level-up.  #124's
+-- Leo-break ROM re-rolled the battle chain, and a P9a leg that used to flee
+-- now wins its fight and levels a member (measured 2026-08-20, dadaluma_entry
+-- leg 4: EDGAR 354->398).  Through that longer victory teardown ZMENUSTATE
+-- reads a menu screen while hasControl()/settled() briefly go true, so
+-- fieldCare "opened the menu in 0 frames" onto the transient and read an
+-- unpopulated on-screen character list -- "caster not on screen" for a caster
+-- in the party the whole time, then its item fallback stalled the full
+-- 24000-frame budget (the exact symptom the margin's own comment predicted).
+-- Gating on "no menu screen" is the discriminator the fixed margin lacked; a
+-- transient that never clears just skips the stop (soft), which the next leg's
+-- care answers, rather than hanging the generate.
+local function careReady()
+  return settled() and not MENU_SCREENS[H.readByte(0x26)]
+end
 local function climbCare(what)
   return H.cond(function() return true end, {
-    H.waitUntilSoft(settled, 1200, "climbCare " .. what),
-    H.cond(settled, {
-      H.waitFrames(120),
+    -- Wait for careReady to hold CONTINUOUSLY, not just be true once.  A won
+    -- leg's victory+level-up teardown flickers careReady true in the gaps
+    -- between its own screens, so a single-sample wait (plus even a 120-frame
+    -- margin) returned into one of those gaps and fieldCare then opened onto
+    -- the LEVEL UP! screen -- "menu open after 0 frames", an empty on-screen
+    -- character list, "caster not on screen", and a 24000-frame stall
+    -- (measured 2026-08-20, dadaluma_entry leg 4, EDGAR 354->398 on #124's
+    -- re-rolled chain).  Requiring 90 straight ready frames does not complete
+    -- until the whole teardown is gone; the internal soft cap keeps a
+    -- genuinely-stuck state (a scene beam / z-loop) a SKIP, not a hang.  The
+    -- pad is neutral throughout -- the teardown advances itself.
+    (function()
+      local calm, waited = 0, 0
+      return H.driveUntil(function()
+        waited = waited + 1
+        calm = careReady() and calm + 1 or 0
+        return calm >= 90 or waited >= 6000
+      end, 8000, { H.call(function() H.setPad({}) end) },
+        "climbCare settle " .. what)
+    end)(),
+    H.cond(careReady, {
       H.fieldCare({ tag = "care " .. what, threshold = 0.9 }),
     }, {
       H.logStep(function()
-        return string.format("[care %s] SKIPPED -- not settled at (%d,%d) " ..
-          "on map %d after 1200 frames", what, H.fieldX(), H.fieldY(), map())
+        return string.format("[care %s] SKIPPED -- not settled/menu-clear at " ..
+          "(%d,%d) on map %d ($26=%02X) after the settle budget", what,
+          H.fieldX(), H.fieldY(), map(), H.readByte(0x26))
       end),
     }),
   })

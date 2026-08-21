@@ -676,7 +676,17 @@ function M.navTo(txIn, tyIn, opts)
   local noPathN, pause = 0, 0          -- no-path retry state
   -- built for "tactical" and for "flee": the flee branch falls back to it
   -- once M.FLEE_CAP frames pass without the formation releasing the party
-  local wipeCheck = wipeCanary("navTo")
+  --
+  -- opts.wipeEndsRide: worldNavTo/advanceStory's own convention (see
+  -- wipeCanary's soft/hard split), extended to navTo for the Magitek Factory
+  -- upper-floor crossing (gen_mrf_chute): a #124-shifted RNG chain now rolls
+  -- an unrunnable pincer into that flee gauntlet, and a caller running the
+  -- crossing as a seed-ladder wipe-retry needs a wipe to END this ride so it
+  -- can reload and take a different battle-RNG phase, rather than hard-error
+  -- the whole generate.  Off by default -- every other navTo caller still
+  -- wants the loud failure.
+  local wipeSeen = false
+  local wipeCheck = wipeCanary("navTo", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
       and M.newFightDriver("navTo",
         { tactical = true, boost = true, items = true,
@@ -695,7 +705,9 @@ function M.navTo(txIn, tyIn, opts)
   end
   return M.driveUntil(function()
     local done
-    if arrive and arrive() then
+    if wipeSeen then
+      done = true
+    elseif arrive and arrive() then
       done = true
     else
       -- stopped on the goal tile, not passing through it (see ISSUE #22).
@@ -718,7 +730,7 @@ function M.navTo(txIn, tyIn, opts)
       -- RAM the field module also writes to, so require 3 consecutive
       -- frames before acting; a real battle or dialog persists for hundreds.
       -- Acting on a 1-frame ghost would tap A on the open field.
-      wipeCheck()
+      if wipeCheck() then wipeSeen = true; M.setPad({}); return end
       battN = M.battleLoadStarted() and battN + 1 or 0
       dlgN  = M.dialogWaiting() and dlgN + 1 or 0
       lostN = M.hasControl() and 0 or lostN + 1
@@ -2601,6 +2613,18 @@ function M.fieldCare(opts)
   local phase, served, want, pending, tries = 0, false, nil, nil, 0
   local refuseArmed = true
 
+  -- Per-plan stall watchdog.  A plan that neither lands nor is abandoned makes
+  -- no forward progress, and without a backstop the drive presses at it for the
+  -- whole 24000-frame budget (the dadaluma_entry leg-4 hang: a cast dropped for
+  -- "caster not on screen", then a Tonic fallback that never confirmed).
+  -- `stall` counts serveFrame calls since the last real progress -- a landing,
+  -- a fresh plan, or an abandon.  Crossing the limit force-abandons the current
+  -- plan (marking it failed so pick() moves on); when every plan is exhausted
+  -- pick() returns nil and the visit exits cleanly.  A legitimate heal lands in
+  -- a few hundred frames, well under this, so working care is never cut short.
+  local STALL_LIMIT = 1200
+  local stall = 0
+
   local function steer(cur, wantRow)
     if cur == wantRow then return { "a" } end
     return { [cur < wantRow and "down" or "up"] = true }
@@ -2611,10 +2635,12 @@ function M.fieldCare(opts)
     M.log(string.format("[%s] dropping plan (%s): %s", tag, why, planText(w)))
     failed[key(w)] = true
     want, pending = nil, nil
+    stall = 0
   end
 
   local function serveFrame()
     phase = (phase + 1) % 12
+    stall = stall + 1
     local st = M.readByte(CARE_ZM)
 
     -- Refusal.  zMosaic is not a flag the game clears: MosaicTask writes
@@ -2668,6 +2694,7 @@ function M.fieldCare(opts)
             M.charHp(pending.char), pending.mp, M.charMp(pending.caster)))
         end
         want, pending = nil, nil
+        stall = 0
       end
     end
 
@@ -2675,12 +2702,22 @@ function M.fieldCare(opts)
       want = pick()
       if want == nil then served = true; M.setPad({}); return end
       tries = tries + 1
+      stall = 0
       if tries > maxTries then
         M.log(string.format("[%s] giving up after %d attempts", tag, tries))
         served = true; M.setPad({}); return
       end
       if want.kind == "cast" then activeCaster = want.caster end
       M.log(string.format("[%s] plan: %s", tag, planText(want)))
+    end
+
+    -- Stall backstop: this plan has made no progress for STALL_LIMIT frames
+    -- (a target/caster window that never populated, a confirm that never
+    -- lands).  Abandon it so pick() can try another; the visit exits once
+    -- every plan is exhausted rather than burning the whole budget.
+    if stall > STALL_LIMIT then
+      abandon(want, string.format("stalled %d frames without progress", stall))
+      M.setPad({}); return
     end
 
     -- Route by state.  A screen that is not on the current plan's path gets
@@ -2708,13 +2745,12 @@ function M.fieldCare(opts)
         if M.readByte(0x1869 + M.readByte(CARE_SEL)) ~= want.item then
           held = { "b" }
         else
+          -- want.char is always a party member, so a nil slot is the target
+          -- window not yet populated (a teardown transient), not an
+          -- untargetable character.  Wait for it; the stall backstop guards a
+          -- window that never fills.
           local slot = slotOf(want.char)
-          if slot == nil then
-            M.log(string.format("[%s] char %d is not on the target window " ..
-              "(slots %d,%d,%d,%d)", tag, want.char, M.readByte(0x69),
-              M.readByte(0x6a), M.readByte(0x6b), M.readByte(0x6c)))
-            abandon(want, "not a target"); M.setPad({}); return
-          end
+          if slot == nil then M.setPad({}); return end
           local cur = M.readByte(CARE_CUR)
           if cur == slot then
             pending = { kind = "item", char = want.char, item = want.item,
@@ -2735,8 +2771,14 @@ function M.fieldCare(opts)
       if st == 0x05 then
         held = steer(M.readByte(CARE_CUR), 1)          -- Skills is row 1
       elseif st == 0x06 then
+        -- The caster is always a party member (pickCast only draws from
+        -- partyMembers), so a nil slot here is never "not in the party" -- it
+        -- is the on-screen list not yet populated, which is exactly what a
+        -- battle-victory teardown transient looks like when the menu opens onto
+        -- it.  Wait for it rather than permanently failing the plan; the stall
+        -- backstop covers a list that never fills.
         local slot = slotOf(want.caster)
-        if slot == nil then abandon(want, "caster not on screen"); M.setPad({}); return end
+        if slot == nil then M.setPad({}); return end
         held = steer(M.readByte(CARE_CUR), slot)
       elseif st == 0x0A then
         if menuCaster() ~= want.caster then
@@ -2775,8 +2817,12 @@ function M.fieldCare(opts)
         if menuCaster() ~= want.caster or menuSpell() ~= want.spell then
           held = { "b" }
         else
+          -- want.char is always a party member (pick draws from
+          -- partyMembers), so a nil slot is a not-yet-populated target window,
+          -- not an untargetable character.  Wait; the stall backstop guards a
+          -- window that never fills.
           local slot = slotOf(want.char)
-          if slot == nil then abandon(want, "not a target"); M.setPad({}); return end
+          if slot == nil then M.setPad({}); return end
           local cur = M.readByte(CARE_CUR)
           if cur == slot then
             pending = { kind = "cast", char = want.char, caster = want.caster,

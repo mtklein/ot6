@@ -71,6 +71,7 @@ tools/tests/battle_slots.lua	.writeWord(	quarantine: reels free-run at frame rat
 tools/tests/battle_steal.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeByte(
 tools/tests/battle_thief.lua	.writeWord(	quarantine: #122's RNG reshuffle makes the desert pair's chip damage lethal to a deferred party member over the file's one sustained (non-damaging) battle; the floor write never touches the BP ledger under test
+tools/tests/battle_toolsgrey.lua	.writeWord(	quarantine: #124's re-rolled battle RNG made the cave pack die under EDGAR mid-spend, stalling the boundary walk in target-select and refilling his pool on the level-up; the pin holds the pack's battle HP tall so every tool cast has a live target and no kill lands, and it never touches the MP pool or the tools-grey cell under test
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
 tools/tests/field_healpolicy.lua	.writeWord(	quarantine: the healthy-fixture campaign (#122 fallout) leaves no savestate that arrives hurt, so the test writes its own patient's HP

@@ -470,6 +470,19 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("right", function() return not H.worldMode() and map() == 382 end,
     900, "(169,194) -> CAVE TO THE SEALED GATE (382)"),
   H.waitUntil(landed(382, 10), 2400, "382 landing", 1),
+  -- Care between fights, down the cave.  #124's Leo-break ROM re-rolled the
+  -- battle chain, and the deep-cave flee gauntlet (382 -> 383 -> 385 -> 384,
+  -- every leg fleeing and none of it healing) now bleeds SABIN out over the
+  -- whole descent -- and this checkpoint's bag holds ZERO Fenix Downs and no
+  -- caster a Life spell, so a member who reaches 0 anywhere in here CANNOT be
+  -- revived by the pre-save care below (measured 2026-08-20: SABIN shipped
+  -- 0/407 status1=80, the run's own assertPartyStanding refused it).  A
+  -- player rests between fights rather than fleeing forty tiles on one health
+  -- bar; these stops are that rest, topping the party at each safe landing so
+  -- cumulative flee damage never reaches a death this segment cannot undo.
+  -- threshold 0.85 (not the save's 0.95): a light top-up that spares TERRA's
+  -- MP for the several stops down the descent.
+  H.fieldCare({ tag = "care entering the gate cave (382)", threshold = 0.85 }),
   -- #84: Assassin, visible on the walk down the cave mouth
   H.openChest{ stand = { 36, 40 }, face = "up", bit = 122, what = "Assassin",
                nav = { playBattles = "flee" } },
@@ -478,6 +491,7 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("down", function() return map() == 383 end, 900,
     "door (31,43) -> BASEMENT 1 (383)"),
   H.waitUntil(landed(383, 10), 2400, "383 landing", 1),
+  H.fieldCare({ tag = "care in BASEMENT 1 (383)", threshold = 0.85 }),
   -- #84: Tempest, visible from the corridor down to the timed floor
   H.openChest{ stand = { 48, 57 }, face = "up", bit = 123, what = "Tempest",
                nav = { playBattles = "flee" } },
@@ -544,6 +558,10 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.fieldY(), 8, "384 landing y")
     H.screenshot("step_gh_384")
   end),
+  -- BASEMENT 3 is the longest, encounter-heaviest leg (290 pre-lever tiles);
+  -- enter it topped up, and top up again mid-way (after the Ether) so the
+  -- south loop to the save door cannot bleed anyone out.
+  H.fieldCare({ tag = "care entering BASEMENT 3 (384)", threshold = 0.85 }),
 
   -- ---- 5. BASEMENT 3's south loop, the door switch, the save point --------
   -- #84: the Ether at (29,23), visible on the walk and opened from ABOVE
@@ -557,6 +575,8 @@ H.run({ maxFrames = 200000 }, {
   -- so they are that walk's pickups.
   H.openChest{ stand = { 29, 22 }, face = "down", bit = 124, what = "Ether",
                nav = { playBattles = "flee", maxFrames = 20000 } },
+  H.fieldCare({ tag = "care mid-BASEMENT 3, before the save-door loop",
+                threshold = 0.85 }),
   H.navTo(62, 11, { playBattles = "flee", maxFrames = 30000 }),
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x0173) == 1 end, 3000, {

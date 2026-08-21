@@ -387,6 +387,34 @@ local crossed = { ok = false }
 -- successful but brittle crossing.
 local MIN_CROSS_TIMER = 900
 local catwalkBlob = nil                -- captured on the catwalk, below
+
+-- Arrival with clock margin is not the only thing the ladder must hold out
+-- for: the rat fights are real fights, and an arrangement whose LAST fight
+-- kills a member (the reviver has no turn left before the goal tile ends the
+-- fight) or grinds the healer himself down banks a casualty into the entry
+-- point.  #124's Leo-break ROM re-rolled the fight chain, and the hold=0
+-- arrangement now lands LOCKE at 44/353 (near fatal) with a member at 0
+-- (measured 2026-08-20).  So the ladder's success gate below asks for the
+-- SAME contract the exit asserts -- everyone standing (M.standing's formula:
+-- alive, unpoisoned/unpetrified/unzombied, above max/8) -- and spends the next
+-- rat arrangement when an attempt arrives on time but hurt, exactly as it
+-- already does when an attempt arrives too late.
+local function allStanding()
+  for _, c in ipairs(H.partyMembers()) do
+    local hp, mx = H.charHp(c), H.charMaxHp(c)
+    if not (hp > 0 and (H.charStatus1(c) & 0xC6) == 0 and hp > (mx >> 3)) then
+      return false
+    end
+  end
+  return true
+end
+local function hurtLine()
+  local t = {}
+  for _, c in ipairs(H.partyMembers()) do
+    t[#t + 1] = string.format("c%d %d/%d", c, H.charHp(c), H.charMaxHp(c))
+  end
+  return table.concat(t, " ")
+end
 local function crossAttempt(n, hold)
   local loadReq
   return H.cond(function() return not crossed.ok end, {
@@ -415,6 +443,15 @@ local function crossAttempt(n, hold)
           n, H.readWord(0x1189)))
         crossed.ok = false
       end
+      -- On time but hurt is not good enough: a casualty banked here fails the
+      -- exit contract just as an over-clock arrival does, so it spends the
+      -- next arrangement too.  (See the allStanding note above.)
+      if crossed.ok and not allStanding() then
+        H.log(string.format("[rafters] attempt %d reached Ultros on the clock " ..
+          "but banked a hurt party (%s); reserving the next rat arrangement " ..
+          "for a cleaner entry", n, hurtLine()))
+        crossed.ok = false
+      end
       H.log(string.format("[rafters] attempt %d %s at (%d,%d), timer %d left, rats: %s",
         n, crossed.ok and "ARRIVED" or "did not arrive",
         H.fieldX(), H.fieldY(), H.readWord(0x1189), ratLine()))
@@ -422,7 +459,7 @@ local function crossAttempt(n, hold)
   })
 end
 
-H.run({ maxFrames = 250000 }, {
+H.run({ maxFrames = 420000 }, {
   H.loadState("build/states/opera_dance_done.mss.lua"),
   H.waitFrames(60),
   H.call(function()
@@ -563,13 +600,33 @@ H.run({ maxFrames = 250000 }, {
           #catwalkBlob))
       end),
     }) end)(),
+  -- Each hold is a different rat arrangement (see the note above); the ladder
+  -- stops at the first that arrives ON THE CLOCK and STANDING.  The re-rolled
+  -- fight chain (#124) made the first few holds cost a casualty, so the ladder
+  -- carries more arrangements to search now.  Holds stay under ~750 because a
+  -- longer stand eats the same chase clock the crossing then needs (MIN_CROSS
+  -- _TIMER gates the margin), so past that a hold fails on time, not on rats.
   crossAttempt(1, 0),
-  crossAttempt(2, 233),
-  crossAttempt(3, 601),
+  crossAttempt(2, 149),
+  crossAttempt(3, 293),
+  crossAttempt(4, 433),
+  crossAttempt(5, 577),
+  crossAttempt(6, 701),
   H.call(function()
     H.assertEq(crossed.ok, true,
-      "the rafters were crossed with safe clock margin within three attempts")
+      "the rafters were crossed on the clock and standing within six attempts")
   end),
+  -- Heal before banking the entry point.  The crossing ladder accepts the
+  -- first attempt that arrives on the clock and ALIVE, but #124's re-rolled
+  -- rat chain can leave a member as low as 44/353 -- right on
+  -- assertPartyStanding's near-fatal bar -- on that accepted attempt, and the
+  -- banked fixture is what battle_ultros2 boots, so a member dropped in at 44
+  -- hp is a casualty shipped, not a fight lost.  Opening the field menu STOPS
+  -- the chase timer (event_main.asm:29616-29617, the same stop the timer-room
+  -- assert below leans on), so this heal costs no clock; the facing press that
+  -- follows re-establishes EVENT_DIR after the menu closes, so the "facing
+  -- RIGHT" contract still holds.
+  H.fieldCare({ tag = "care at the Ultros entry point", threshold = 0.95 }),
   -- face Ultros by input: his NPC occupies {15,7}, so a short RIGHT press
   -- is a blocked step that turns the party in place
   H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(6),

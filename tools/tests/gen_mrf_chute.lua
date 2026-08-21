@@ -37,6 +37,23 @@
 -- both are `mod_bg_tiles BG1/BG2 {19,24}` door frames guarded by the
 -- once-per-tile latch $01B5, which is $1EB6 bit 5, cleared by player.asm
 -- :529-531 on every step and not a story switch (see gen_vector_sneak.lua).
+--
+-- ---------------------------------------------------------------------
+-- 2026-08-20 (#124/#125): the Leo-break-row ROM (9630f46) re-rolled the
+-- battle-init RNG chain-wide, and the crossing below now sometimes rolls an
+-- UNRUNNABLE pincer (four 615-hp Factory monsters, both sides occupied so
+-- $b1 bit 1 holds and no L+R roll ever fires) into the flee gauntlet -- a
+-- fight this L14-15 party cannot win, and a wipe the old single-pass
+-- crossing hard-failed on.  The crossing IS survivable from most game-time
+-- seeds (the same generate is green booting from a hand-captured mrf_entry),
+-- so this is the standard timing-shift/robustness class, not enemy tuning:
+-- the fix is a seed-ladder wipe-retry, the same shape gen_vargas /
+-- gen_narshe_battle use.  The party is FULL-HEALED before the crossing
+-- (fieldCare), that full-heal is baked into the reload checkpoint, each
+-- attempt takes a different battle-RNG phase (H.newSeedLadder), and a wipe
+-- reloads and retries rather than shipping a casualty (or a Game Over) into
+-- everything downstream.  navTo gained opts.wipeEndsRide for this (lib/
+-- ot6_field.lua), mirroring worldNavTo/advanceStory.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -161,7 +178,97 @@ local function census(tag, targets)
   end
 end
 
-H.run({ maxFrames = 60000 }, {
+-- The crossing, run as a seed-ladder wipe-retry (see the 2026-08-20 header
+-- note).  crossBlob is the pre-crossing checkpoint -- the FULL-HEALED party
+-- at the landing tile -- captured once after fieldCare; every attempt past
+-- the first reloads it, so the bag and HP never deplete across retries and
+-- each attempt is the honest "prepped player walks in" that the doctrine
+-- describes.  L.spread(n) takes a different battle-RNG phase per attempt, so
+-- the pincer roll differs; a wipe ends the ride (opts.wipeEndsRide) instead
+-- of hard-failing, and the ladder reloads and takes the next phase.
+local CROSS_ATTEMPTS = 6
+local L = H.newSeedLadder("mrf crossing", { attempts = CROSS_ATTEMPTS })
+local crossed, crossLost, crossBlob = false, nil, nil
+
+local function crossBody()
+  return H.cond(function() return crossLost == nil end, {
+    -- 1. across the upper floor to {19,22}, one tile above the door frames.
+    H.navTo(19, 22, { maxFrames = 50000, playBattles = "flee",
+      wipeEndsRide = true,
+      arrive = function() return H.fieldY() >= 40 end }),
+    H.call(function()
+      if H.partyWiped() then
+        crossLost = string.format("wiped crossing the upper floor near (%d,%d)",
+          H.fieldX(), H.fieldY())
+        H.log("[mrf crossing] LOST -- " .. crossLost)
+      end
+    end),
+    H.cond(function() return crossLost == nil end, {
+      H.navTo(19, 22, { maxFrames = 18000, playBattles = "flee",
+        wipeEndsRide = true }),                       -- doors
+      H.call(function()
+        if H.partyWiped() then
+          crossLost = "wiped at the door frames"
+          H.log("[mrf crossing] LOST -- " .. crossLost)
+        end
+      end),
+    }, {}),
+    H.cond(function() return crossLost == nil end, {
+      H.call(function()
+        H.assertEq(H.fieldX(), 19, "above the chute x")
+        H.assertEq(H.fieldY(), 22, "above the chute y")
+        H.log(string.format("[chute] poised at (%d,%d)", H.fieldX(), H.fieldY()))
+        H.screenshot("mrf_chute_entry")
+      end),
+      -- 2. three tapped DOWN steps: {19,23} and {19,24} animate the door open,
+      --    {19,25} is the chute and takes the party over.
+      tapInto("down", function() return H.fieldX() == 10 and H.fieldY() == 45 end,
+        16000, "DOWN through the door frames onto the chute -> (10,45)"),
+      H.call(function()
+        if H.fieldX() == 10 and H.fieldY() == 45 and not H.partyWiped() then
+          crossed = true
+          H.log(string.format("[mrf crossing] rode the chute to (10,45)"))
+        else
+          crossLost = string.format("chute ride ended at (%d,%d)%s",
+            H.fieldX(), H.fieldY(), H.partyWiped() and " (wiped)" or "")
+          H.log("[mrf crossing] LOST -- " .. crossLost)
+        end
+      end),
+    }, {}),
+  }, {})
+end
+
+local function crossAttempt(n)
+  local ldReq
+  return H.cond(function() return not crossed end, {
+    H.logStep(function()
+      return string.format("[mrf crossing] ATTEMPT %d of %d begins at f%d%s",
+        n, CROSS_ATTEMPTS, H.frame,
+        n > 1 and (" (prior loss: " .. tostring(crossLost) .. ")") or "")
+    end),
+    -- attempts past the first rewind to the full-healed pre-crossing
+    -- checkpoint; the spread below then takes a different battle-RNG phase.
+    H.cond(function() return n > 1 end, {
+      H.call(function() ldReq = H.requestLoadState(crossBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "mrf crossing attempt " .. n) end),
+      H.waitFrames(60),
+    }, {}),
+    H.call(function() crossLost = nil end),
+    L.spread(n),                          -- spread the battle RNG phase (#83)
+    crossBody(),
+  }, {})
+end
+
+-- allowGameOver: the crossing ladder deliberately loses attempts and reloads
+-- the full-healed crossBlob before taking the next battle-RNG phase, so a
+-- wipe's Game Over is expected, not a failed run.  Correctness is guarded by
+-- ground truth instead of the auto-Continue canary: every attempt rewinds to
+-- crossBlob (a known-good party, never a post-wipe state), `crossed` only
+-- flips on the real (10,45) landing, and assertPartyStanding is the exit
+-- contract.  A crossing that never wins fails loudly at the L.report/crossed
+-- check below.
+H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState("build/states/mrf_entry.mss.lua"),
   H.waitFrames(150),
   H.call(function()
@@ -179,25 +286,19 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("mrf_entry"))
   end),
 
-  -- 0. Care, before the crossing and again after it.
+  -- 0. Care, before the crossing.
   --
   -- The upper floor draws random battles (map 262, map_prop.dat +$05 bit 7
   -- set -- the flag CheckRandomBattle tests at field/battle.asm:332), the
-  -- crossing below is 38 tiles of it, and this step flees what it meets, so
-  -- nothing in it heals.  The party arrives here with EDGAR around 187/398,
-  -- which is a party walking into an encounter area at half strength, and
-  -- on 2026-08-13 that cost him: he took a fatal hit in a fled fight and
+  -- crossing below is 38 tiles of it, and it flees what it meets, so nothing
+  -- in it heals.  The party arrives here with EDGAR around 187/398, which is
+  -- a party walking into an encounter area at half strength, and on
+  -- 2026-08-13 that cost him: he took a fatal hit in a fled fight and
   -- mrf_chute, mrf_263, mrf_kefka and ifrit_entry all shipped him dead
-  -- (tools/audit_party_hp.py).  The generator had no care stop and no exit
-  -- contract, so it wrote the fixture and said nothing.
-  --
-  -- Two stops rather than one, and they do different jobs.  This one is the
-  -- preparation a player would do before crossing: a full EDGAR is a lot
-  -- harder to kill than a half one.  The one before the save is the repair,
-  -- because being careful is not the same as being lucky, and the fixture is
-  -- what everything downstream boots.  H.assertPartyStanding below is the
-  -- contract that makes both of them mean something: without it a care stop
-  -- that silently did nothing reports the same green as one that worked.
+  -- (tools/audit_party_hp.py).  This is the preparation a player would do
+  -- before crossing: a full EDGAR is a lot harder to kill than a half one,
+  -- and because it is captured into crossBlob below, every wipe-retry starts
+  -- from this same full party rather than depleting the bag across attempts.
   --
   -- Threshold 0.85 rather than a boss step's 0.95: what follows is trash
   -- encounters and a scripted ride, and gen_ifrit_magicite already runs its
@@ -206,26 +307,44 @@ H.run({ maxFrames = 60000 }, {
   H.fieldCare({ tag = "care before the upper-floor crossing",
                 threshold = 0.85 }),
 
-  -- 1. across the upper floor to {19,22}, one tile above the door frames.
-  H.navTo(19, 22, { maxFrames = 50000, playBattles = "flee",
-    arrive = function() return H.fieldY() >= 40 end }),
-  H.navTo(19, 22, { maxFrames = 18000, playBattles = "flee" }), -- doors
+  -- Capture the pre-crossing checkpoint: the full-healed party at the
+  -- landing, the retry ladder's rewind point.  Nothing is written to the
+  -- game; this is just this boot's own state.
+  (function()
+    local req
+    return H.cond(function() return true end, {
+      H.call(function() req = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(req, "pre-crossing checkpoint capture")
+        crossBlob = req.blob
+        H.log(string.format("pre-crossing checkpoint captured (%d bytes) at "
+          .. "(%d,%d) f%d", #crossBlob, H.fieldX(), H.fieldY(), H.frame))
+      end),
+    }, {})
+  end)(),
+
+  L.watch(),
+  crossAttempt(1),
+  crossAttempt(2),
+  crossAttempt(3),
+  crossAttempt(4),
+  crossAttempt(5),
+  crossAttempt(6),
+  -- Before the verdict, not after: the attempts are evidence only if they
+  -- were DIFFERENT fights (#83).
+  L.report(),
   H.call(function()
-    H.assertEq(H.fieldX(), 19, "above the chute x")
-    H.assertEq(H.fieldY(), 22, "above the chute y")
-    H.log(string.format("[chute] poised at (%d,%d)", H.fieldX(), H.fieldY()))
-    H.screenshot("mrf_chute_entry")
+    if not crossed then
+      error(string.format("the Magitek Factory upper-floor crossing was not "
+        .. "survived in %d seed-ladder attempts (last loss: %s).  If every "
+        .. "phase loses even from a full-healed party, that is a balance "
+        .. "finding about this pincer, not a route bug -- capture the numbers.",
+        CROSS_ATTEMPTS, tostring(crossLost)), 0)
+    end
   end),
 
-  -- 2. three tapped DOWN steps: {19,23} and {19,24} animate the door open,
-  --    {19,25} is the chute and takes the party over.
-  tapInto("down", function() return H.fieldX() == 10 and H.fieldY() == 45 end,
-    16000, "DOWN through the door frames onto the chute -> (10,45)"),
-
   H.waitFrames(60),
-  -- The repair half of the care stop: whatever the crossing cost, it is
-  -- fixed here rather than shipped.  See the block above section 1.
-  H.fieldCare({ tag = "care after the crossing", threshold = 0.85 }),
   H.call(function()
     H.assertEq(mapTitleHere(), "MAGITEK FACTORY", "still in the MAGITEK FACTORY")
     H.assertEq(map(), 262, "still on map 262 -- the chute is intra-map")
@@ -235,6 +354,13 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("[mrf_chute] f%d map=%d (%d,%d)",
       H.frame, map(), H.fieldX(), H.fieldY()))
     H.log(partyReport("mrf_chute"))
+  end),
+
+  -- The repair half of the care stop: whatever the winning crossing cost, it
+  -- is fixed here rather than shipped.  Being careful is not the same as
+  -- being lucky, and the fixture is what everything downstream boots.
+  H.fieldCare({ tag = "care after the crossing", threshold = 0.85 }),
+  H.call(function()
     -- The exit contract.  A failure here means the crossing cost more than
     -- the bag could answer, which is a finding about supplies rather than a
     -- reason to lower the bar; it is not a reason to ship the casualty into

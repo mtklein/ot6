@@ -99,14 +99,16 @@ end
 local slotOf = {}
 local mode = nil          -- { char=, cmd=, state=, hold=true } or { cast=id }
 local ph, hb, lane = 0, -600, nil
+local holdBlank = 0        -- frames a held costed window has shown a blank wallet
+local WALLET_SETTLE = 90   -- past arm 2's measured +30 reopen paint, with margin
 local BACK = { left = "right", right = "left", up = "down", down = "up" }
 local function pulse()
   ph = ph + 1
   if H.frame - hb >= 600 then
     hb = H.frame
-    H.log(string.format("[hb f%d] batt=%s menu=%02x actor=%d mstate=%02x",
+    H.log(string.format("[hb f%d] batt=%s menu=%02x actor=%d mstate=%02x wallet=%04x",
       H.frame, tostring(H.battleLoadStarted()), H.readByte(MENU),
-      H.readByte(ACTOR), H.readByte(MSTATE)))
+      H.readByte(ACTOR), H.readByte(MSTATE), walletWords()[1]))
   end
   local edge = ph % 10 < 5
   if not H.battleLoadStarted() then
@@ -157,7 +159,34 @@ local function pulse()
     return
   end
   local st = H.readByte(MSTATE)
-  if st == mode.state and mode.hold then H.setPad({}) return end
+  if st ~= mode.state then holdBlank = 0 end
+  if st == mode.state and mode.hold then
+    -- #124 reconciliation (measured 2026-08-21): the commit that added the
+    -- break-shield row re-rolled battle-init RNG chain-wide, and on the new
+    -- ATB order EDGAR's Tools window opens on the very frame the previous
+    -- held window's one-shot wallet blank fires.  The window is genuinely
+    -- his (screenshot: his Tools list, actor==slotOf[EDGAR], $30 up) but it
+    -- opened without a live wallet stage, so the header paints blank and a
+    -- bare `hold` idles on it for the full 30000-frame settle (EDGAR is slot
+    -- 0, so actor==0 also can't be told from a cleared pointer -- the reach
+    -- predicate can't screen this out on its own).  So a held costed window
+    -- whose M/P header never paints is treated as one that opened stale:
+    -- give a fresh open its measured +30-frame stage-then-flush margin, then
+    -- back out with B and let the ST_CMD arm below reopen it clean, which
+    -- re-runs Ot6WalletStage (arm 2's reopen note: blank at +10/+20, painted
+    -- at +30).  A window that stages normally (arms 1-2) paints well inside
+    -- WALLET_SETTLE and never reaches the B, so this is inert there.
+    local w = walletWords()
+    if (w[1] & 0xFF) == GLYPH_M and (w[2] & 0xFF) == GLYPH_P then
+      holdBlank = 0
+      H.setPad({})
+      return
+    end
+    holdBlank = holdBlank + 1
+    if holdBlank < WALLET_SETTLE then H.setPad({}) return end
+    H.setPad(ph % 10 < 5 and { b = true } or {})   -- reopen fresh to re-stage
+    return
+  end
   if st == ST_CMD then
     local wantCell = nil
     for i = 0, 3 do
