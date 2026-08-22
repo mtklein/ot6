@@ -574,8 +574,24 @@ player prunes the kit all game. Same model, different collection verbs:
   taught-only capstone lore (Grand Train candidate, WoR).
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
-  preserved ✦: it corrupts a save now and then, and that is canon);
+  preserved ✦: it corrupts a save now and then, and that is canon —
+  the full owner ruling is in `vanilla-destructive-bugs.md`);
   support/trickster kit TBD.
+  - **Boost-tiered Sketch (design canon, awaiting Relm's kit to build).**
+    Sketch is a *chance verb* like Steal and Dance, so boost buys certainty in
+    Sketch's own terms — a landed sketch of the chosen target — not a potency it
+    does not have (DESIGN.md canon rule; ROADMAP §"Design canon"). **0 BP is
+    vanilla to the byte**: the original `CheckSketchHit` level-ratio roll AND its
+    missed-cast bug, untouched. Each point tilts that roll toward success;
+    **3 BP = a guaranteed landed Sketch**, the same shape as Steal's guaranteed
+    rare and Dance's fully-choreographed trance. This routes *around* the vanilla
+    bug rather than touching it: a landed Sketch already cannot fire the
+    corruption (`thamasa-route.md` §5.2 — the bug lives only on the miss path),
+    so a 3-BP guarantee simply never reaches it. The guarantee is the chance-verb
+    canon applied, **not** a fix — no code on this path may target the bug's
+    mechanism, and no mechanic may depend on the bug or its absence (owner ruling
+    #123). Not yet coded; it lands when Relm's kit does, reusing the same
+    pending-BP read and `Ot6ActionEnd` charge Steal already uses.
 
 ## Open questions for the driver
 

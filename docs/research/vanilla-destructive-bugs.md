@@ -377,6 +377,12 @@ bug gets modernized. Named examples follow, so the boundary is on record:
 - **Leap removing Gau.** Not a defect, and vanilla already guards the
   degenerate case: `TargetEffect_54` refuses Leap when fewer than two party
   members remain (`ff6/src/battle/battle_main.asm:9614-9620`).
+- **Sketch's missed-cast corruption** — the one *destructive* bug preserved by
+  explicit exception rather than by being harmless. Unlike everything else in
+  this list it clears #13's bar, and would normally be fixed; owner ruling #123
+  keeps it untouched. The full ruling, its mechanism, and how the route lives
+  beside it are under [The community corpus → Special attention](#special-attention)
+  and `thamasa-route.md` §5.
 
 ---
 
@@ -564,6 +570,31 @@ watching the screen. A hang is loud; this is quiet. Worth auditing every
 other scripted-loss point in the shipped range for the same blind spot
 before "the fights were played" is trusted fully.
 
+**Sketch's missed-cast corruption — bucket (d), preserved untouched by owner
+ruling #123 (2026-08-16).** The mechanism is read in
+`thamasa-route.md` §5.2: `TargetEffect_55`
+(`battle_main.asm:9673-9700`) leaves `$b7 = $ff` on any non-success exit, and a
+failed `CheckSketchHit` roll (`battle_main.asm:9065-9083`, an attacker/target
+level ratio) is one such exit; the invalid `$b7` then drives `AnimType_2f`'s
+unguarded index, whose severity is data-dependent — a corrupt sprite, spawned
+inventory, or a bank-`$7e` sweep that can reach the save block. This clears #13's
+destructive bar, so it would normally be fixed. The owner ruling is that it is
+**not**: unboosted Sketch keeps its original roll *and* its original bug, exactly
+as vanilla 1.0 shipped it. Two constraints ride the ruling — **no mechanic may
+depend on the bug or its absence, and no code change may target its mechanism.**
+The owner's image is Roman ruins inside an Italian grocery store: you route the
+aisles around them and leave the stones alone. In practice the route reaches the
+Ultros ③ scripted finish (a landed Sketch of TENTACLE surrenders the fight,
+`thamasa-route.md` §0.3 / §5.1) by ordinary play; whether a player's *unboosted*
+Sketch still trips the corruption is their own archaeology, and the release notes
+say so (`thamasa-route.md` §5.3). The boost half of #123 — a guaranteed landed
+Sketch at 3 BP — lands with Relm's kit (`kits.md`) and stays consistent with this
+ruling: it routes *around* the ruin without touching a stone, because a landed
+Sketch already cannot fire the miss-path bug, so the guarantee never reaches it.
+It is the chance-verb canon applied, not a fix. This is the same class of
+decision as the Vanish+Doom and Joker-Doom preservations above, recorded here so
+the boundary is on the record next to the mechanism.
+
 ### Full triage
 
 | Bug (source) | Mechanism | Bucket | Note |
@@ -583,7 +614,7 @@ before "the fights were played" is trusted fully.
 | Barrier Ring etc. cast at full HP (Master ZED) | Rippler-traded Near-Fatal only checks status, not HP | (a) | Requires Rippler (monster-only); cosmetic |
 | Jump/Launcher, Jump/Super Ball disappearance (Master ZED) | Simultaneous airborne states desync visibility/targeting | (a) | No OT6 kit grants Jump through Thamasa |
 | Joker Doom forced-target chain (Master ZED; WC `Flags:Fixes`) | Slot's forced targeting + Mimic re-roll bypasses target safety | (a) | Needs Gogo's Mimic, out of range; noted for WoR pass |
-| Sketch (this project's own read is deeper than Master ZED's) | `CheckSketchHit` (`battle_main.asm:9065-9083`) can call the wrong effect on a miss | (d) | Owner ruling #123 preserves it; landed for battle 125 in `thamasa-route.md` §5, ~20-30% miss estimated |
+| Sketch (this project's own read is deeper than Master ZED's) | `CheckSketchHit` (`battle_main.asm:9065-9083`) can call the wrong effect on a miss | (d) | Owner ruling #123 preserves it untouched (see Special attention above for the full ruling); landed for battle 125 in `thamasa-route.md` §5, ~20-30% miss estimated |
 
 **Bucket counts:** (a) 13 · (b) 1 · (c) 2 · (d) 4 (counting #91 and #66 once
 each, from Special attention, not duplicated in the table).
