@@ -17,9 +17,16 @@ repaired; the whole WoB world map is reachable.
 ## Enabling tooling
 
 - ☑ Airship-driver: board → discovery → deck → party-select → IAF (`probe_iaf.lua`, #131).
-- ◐ **Airship autopilot** (`probe_grind.lua`): flies, closes to ~14 tiles;
-  needs brake-on-approach + landing to dock at towns / land in a grind region.
-  Position X=$33/$35, Y=$37/$39 (tile=fine>>12); heading $73; thrust A; rotate L/R.
+- ☑ **Airship flyable + landable** (`probe_grind.lua`) — cracked, owner-guided:
+  settle ~150f post-Lift-off; MOVE with **Y-strafe** (hold Y + dir = clean grid
+  movement, no momentum; release stops dead) — "like walking on a grid"; A+heading
+  for gross travel; **LAND with B** over OPEN interior land only (away from
+  mountains/water/forest/coast edges — bad tiles bounce, `$19`~6 then reverts;
+  the shadow marks the set-down tile). Proven end to end: crossed west and landed
+  the party on foot (at Sabin's house). Registers: X=$33/$35, Y=$37/$39, heading
+  $73, B=$05 bit7, LandAirship=$EE936E.
+  - ◐ Next: land in OPEN world terrain (not on a location entrance) to grind —
+    needs knowing where open plains are → decode the WoB tile landability / map.
 - ☐ Chocobo rental + overworld nav (for the Serpent Trench leg).
 - ☐ On-foot dungeon nav reused from the harness (navTo) for Narshe mines, the
   Serpent Trench, auction/shop menus.
