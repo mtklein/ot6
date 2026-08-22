@@ -84,8 +84,21 @@ class Data:
         return [int.from_bytes(self.rand[g * 8 + 2 * i: g * 8 + 2 * i + 2],
                                "little") for i in range(4)]
 
+    def resolve(self, word):
+        # A RandBattleGroup word's bit 15 ($8000) is a "+Rand(0..3)" flag,
+        # stripped and applied at battle_main.asm:8215-8224: the slot draws one
+        # of base..base+3 with equal odds.  Without it the raw word (e.g.
+        # $80b1) indexes battle_monsters.dat far out of range.  Formations are
+        # 9-bit (0..511).  Returns (list-of-formation-ids, is_rand).
+        base = word & 0x01FF
+        if word & 0x8000:
+            return [base + k for k in range(4)], True
+        return [base], False
+
     def bodies(self, f):
         rec = self.monsters[f * FORM_REC:(f + 1) * FORM_REC]
+        if len(rec) < FORM_REC:
+            return []       # formation index past the table (a stray flag bit)
         seen = {}
         for slot in range(6):
             if rec[1] & (1 << slot):
@@ -107,13 +120,16 @@ def report(data, m):
     g = data.group(m)
     any_pincer = False
     print("map %d: rolls random battles, group %d" % (m, g))
-    for i, f in enumerate(data.formations(g)):
-        p = data.pincer(f)
-        any_pincer = any_pincer or p
-        who = " ".join("%s($%03x)x%d" % (data.names[sp], sp, n)
-                       for sp, n in data.bodies(f))
-        print("  %7s formation $%03x %-14s %s"
-              % (ODDS[i], f, "PINCER POSSIBLE" if p else "fleeable", who))
+    for i, w in enumerate(data.formations(g)):
+        forms, is_rand = data.resolve(w)
+        for j, f in enumerate(forms):
+            p = data.pincer(f)
+            any_pincer = any_pincer or p
+            who = " ".join("%s($%03x)x%d" % (data.names[sp], sp, n)
+                           for sp, n in data.bodies(f))
+            odds = ODDS[i] + ("+r" if is_rand else "") if j == 0 else "  +rand"
+            print("  %8s formation $%03x %-14s %s"
+                  % (odds, f, "PINCER POSSIBLE" if p else "fleeable", who))
     if any_pincer:
         print("  -> a \"flee\" drive can stall M.FLEE_CAP on a pincer roll "
               "(Cmd_2a, $b1.1): budget a fight or pick \"tactical\"")
@@ -157,6 +173,16 @@ def selftest(root):
     for m in (108, 109, 110):
         check("Returner Hideout map %d encounter-free" % m,
               data.rolls(m), False)
+
+    # The Floating Continent (map 394) is the first map to use the $8000
+    # +Rand(0..3) formation flag; without resolve() its raw words index the
+    # formation table out of range (the crash this selftest now guards).
+    check("FC map 394 rolls", data.rolls(394), True)
+    fc_words = data.formations(data.group(394))
+    check("FC first slot is a +Rand spread 177..180",
+          data.resolve(fc_words[0]), ([177, 178, 179, 180], True))
+    fc_pool = sorted({f for w in fc_words for f in data.resolve(w)[0]})
+    check("FC pool is forms 177-188", fc_pool, list(range(177, 189)))
 
     print("audit_encounters selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
