@@ -157,6 +157,11 @@ see `gen_massacre.lua` on the same handler).
 | 8 | `:13557` | `battle 89, CLOUDS` (after `switch $01CC=0`, `call _cacfbd`) | 459 | **AirForce** `$113` + Laser Gun `$145` + MissileBay `$147` (Speck `$146` script-spawned; §7) |
 | → | `:13560` | `load_map 394,{4,8},DOWN` — **FC entry**; dlg $0851 "…the Statues are just ahead" `:13585` | | |
 
+**Live-confirmed:** `tools/tests/probe_iaf.lua` drives the whole entry headless
+(board → discovery → deck → "Find the FC" → the party-formation menu → the
+ambush) and reads `battle 126` in the emulator as **Sky Armor `$043` + Spit Fire
+`$0e3`**, matching formation 175's offline decode (#131).
+
 The `AIRSHIP_CENTER`/`AIRSHIP_WOB`/`CLOUDS` arguments are battle **backgrounds**
 (`event_cmd.inc:234`, `battle_bg.inc`), not part of the formation id.
 
@@ -324,11 +329,13 @@ The IAF trash (Sky Armor / Spit Fire, forms 175/176) carries no drawn gauge in
 
 Offline reads to confirm live once a headless drive reaches the FC:
 
-1. **Entry drive.** Board (249,127) → land → ride discovery (watch `$009E`
-   0→1) → deck-menu trim to 3 (watch `$01A2==1`) → "Find the FC" → `battle 126`.
-   No existing harness helper drives airship board/land or the deck party menu;
-   this is the survey's first probe to build (see `probe_iaf.lua`).
-2. **IAF formations** 175/176/477/459 species and the six-wave timer chain.
+1. ✅ **Entry drive — done.** `tools/tests/probe_iaf.lua` boards, rides the
+   discovery to the deck (`$009E`→1), works the helm menu and the FC
+   party-formation menu (grab reserve → place in the group 2×2 → START), and
+   lands in `battle 126` (#131). It also documents the full menu state machine.
+2. **IAF formations** — `battle 126` (175/176 = Sky Armor + Spit Fire)
+   ✅ live-confirmed by the probe; 477/477 (Ultros④) and 459 (AirForce) and the
+   six-wave timer chain still to confirm live (drive on past wave 1).
 3. **FC pool** 177–188 (the `+Rand` spread) and that 358 draws nothing.
 4. **Shadow rejoin** `$035E` path and that nothing upstream pre-sets it.
 5. **AtmaWeapon / Nerapa** — confirm the fights fire at their NPC tiles (394
