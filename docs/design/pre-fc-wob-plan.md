@@ -8,6 +8,26 @@
 >
 > Status legend: ☐ todo · ◐ in progress · ☑ done. Kept current as work lands.
 
+## ▶ RESUME HERE (handoff 2026-08-22, paused for a Fable session)
+
+**The airship is flyable + landable headless** — that was the hard blocker and
+it's solved (technique in `probe_grind.lua`'s header; registers + B/land
+mechanism documented). Everything for the pre-FC tour is now unblocked.
+
+**Immediate next step:** land the airship in **open world terrain** (not on a
+location entrance — the last run landed on Sabin's house, map 93, which loaded
+that field map instead of leaving the party on the walkable world map), then
+`worldNavTo` with `playBattles="tactical"` to walk-and-fight = the grind. The
+open question the owner will answer on resume: **where the open plains / a good
+grind spot are** (world coords or a direction+landmark from a known town), since
+that's map knowledge, not a mechanic. Fixtures: `build/states/iaf_deck.mss`
+(on the Blackjack deck, pre-Lift-off) and `build/states/wob_landed.mss` (a
+landed on-foot state) speed iteration.
+
+**Then** work the checklist below in order (grind → shop → Mog+Water Rondo via
+the Serpent Trench → obtain Golem/Zoneseek/Sraphim). Esper *tuning* (#6) and the
+esper *audit* (#7) are already done.
+
 ## The party's starting point (thamasa_done, the stop line)
 
 L15–17, ~10 under vanilla's FC expectation; two ThunderBlades (bolt — the IAF/FC
