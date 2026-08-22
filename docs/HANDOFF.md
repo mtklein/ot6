@@ -618,12 +618,22 @@ everything, and keep to one heavy run at a time per machine.
 - **A poison DOT tick chips a shield; Sap does not.** A tick is an ordinary
   poison hit with no attacker and chips exactly one axis. A broken monster
   takes no ticks at all.
-- **The `event_triggers` fixed block has room for 2 more triggers
-  game-wide** — 13 trailing `$FF` bytes in the block at `C40000`+`$1A10`, and
-  a trigger is 5 bytes. (`npc_prop` has 76 trailing bytes ≈ 8 more NPC
-  records, an upper bound, since an NPC record's last byte could legitimately
-  be `$FF`.) Any further save-point work needs segment relocation first
-  (`design/save-points-vector.md` §1).
+- **The `event_triggers` fixed block has room for ~16 more triggers
+  game-wide** (was 2 before #125). The block was grown `$1A10`→`$1A60`
+  (+16 trigger slots) and `npc_prop` `$50B0`→`$5140` (+16 NPC records) in the
+  #125 relocation — the segment shift `save-points-vector.md` §1 describes,
+  already performed. Measured in the shipped ROM (`build/ot6.sfc`, bounds from
+  `ff6/rom/ff6-en.map`): `event_triggers` = `C40000-C41A5F` (`$1A60`) with
+  **83 trailing `$FF` → 16 free trigger slots** (a trigger is 5 bytes);
+  `npc_prop` = `C41A60-C46B9F` (`$5140`) with 202 trailing `$FF` ≈ 22 more
+  NPC records, an upper bound (an NPC record's last byte could legitimately be
+  `$FF`). Anchors: `ff6/src/event/event_trigger.asm:22` (`fixed_block $1a60`),
+  `ff6/src/event/npc_prop.asm:188` (`fixed_block $5140`). Further save-point
+  work now has headroom, but if a block fills the mechanism is unchanged:
+  enlarge the `fixed_block` size constant and let the bank-C4 chain shift
+  (`design/save-points-vector.md` §1). The one hardcoded downstream consumer,
+  `tools/tests/battle_runic.lua`, already reads `MagicProp` via `H.sym`
+  (`battle_runic.lua:39`) so growth never stales it.
 - **The suite is self-registering**, discovered from each test's `-- @suite`
   marker; `tools/tests/suite.sh --list` reports what runs. Tests that load a
   deep story savestate join once `make savestates` has generated it.
