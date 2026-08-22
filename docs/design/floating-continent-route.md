@@ -157,6 +157,26 @@ see `gen_massacre.lua` on the same handler).
 | 8 | `:13557` | `battle 89, CLOUDS` (after `switch $01CC=0`, `call _cacfbd`) | 459 | **AirForce** `$113` + Laser Gun `$145` + MissileBay `$147` (Speck `$146` script-spawned; §7) |
 | → | `:13560` | `load_map 394,{4,8},DOWN` — **FC entry**; dlg $0851 "…the Statues are just ahead" `:13585` | | |
 
+**Break data (decoded from `Ot6ShieldTbl` / `monster_prop` / `Ot6ElemAddTbl`):**
+
+| enemy | L | shields | weak | class |
+|---|---|---|---|---|
+| Sky Armor `$043` | 24 | 5 | **bolt**\|wind | $02 |
+| Spit Fire `$0e3` | 25 | 5 | **bolt**\|wind | $01 |
+| Ultros④ `$168` | 26 | 7 | fire\|**bolt**\|poison (absorbs water) | $03 |
+| Chupon `$12f` | 26 | 4 | ice\|water (absorbs fire) | $04 |
+| AirForce `$113` | 25 | 8 | **bolt**\|water | $02 |
+
+**Bolt is the IAF key.** Sky Armor, Spit Fire, Ultros④, and AirForce are *all*
+bolt-weak — and so is AtmaWeapon (§7). A bolt-leaning party breaks every wave
+fast; that matters because (see below) the waves auto-chain with no field
+care-stop, so a slow break means attrition. **Winnability probe (#132,
+`probe_iaf_fight.lua`):** at the routed L15–17 with an untuned Terra/Setzer/Gau
+party, the party won wave 1 but **wiped by wave 2** — the timer-chained waves
+gave no heal window and only Terra carried bolt. The route needs a bolt-tuned
+three (and/or a pre-FC grind at Chimera+Cephaler, `level-curve.md`) so break
+ends each wave before damage stacks.
+
 **Live-confirmed:** `tools/tests/probe_iaf.lua` drives the whole entry headless
 (board → discovery → deck → "Find the FC" → the party-formation menu → the
 ambush) and reads `battle 126` in the emulator as **Sky Armor `$043` + Spit Fire
