@@ -179,10 +179,14 @@ the whole assault. It has no short/long entrances
 **Encounters.** Only 394 rolls (`map_prop +5 = $80`; `SubBattleGroup[394]=112`;
 `field/battle.asm:332-333`,`:394-411`). Group 112's four words are `$80B1/$80B4/
 $80B7/$80B9` = base forms 177/180/183/185 **each +Rand(0..3)** (the `$8000`
-flag, `battle_main.asm:8215-8224`) → effective pool **177–188**. Contents
-(verify-on-arrival): Behemoth `$020`, Apokryphos `$00c`, Misfit `$0a4`, Ninja
-`$003`, Wirey Drgn `$0d8`, Brainpan `$04a`, Dragon `$083` — the vanilla FC pool.
-Map 358 is encounter-free (`+5 = $00`).
+flag, `battle_main.asm:8215-8224`) → effective pool **177–188**. Contents:
+Behemoth `$020`, Apokryphos `$00c`, Misfit `$0a4`, Ninja `$003`, Wirey Drgn
+`$0d8`, Brainpan `$04a`, Dragon `$083` — the vanilla FC pool. Map 358 is
+encounter-free (`+5 = $00`). (Confirmed with `tools/audit_encounters.py 394`,
+which the FC's `+Rand` flag first exercised — the fix is `e855c36`.) **Several of
+these formations permit a pincer** (e.g. the Apokryphos/Misfit, Ninja, and
+Brainpan groups), so a walk across 394 wants a fight budget or a `"tactical"`
+playBattles mode, not a blind `"flee"` (HANDOFF, the flee bullet).
 
 **Shadow rejoin.** Talk to the Shadow NPC at 394 (10,16), visibility switch
 `$035E`, event `_cad9a7` (`npc_prop.asm:17437-17443`; script `:32586`):
