@@ -37,12 +37,19 @@ repaired; the whole WoB world map is reachable.
    to Nikeah. Missable in the WoR.
 5. ☐ **Optional espers — obtain:** Golem + Zoneseek (Jidoor Auction House),
    Sraphim (man in the woods near Tzen, 3000 GP in the WoB).
-6. ☐ **Optional espers — tune:** confirm each optional esper's OT6 kit (granted
-   spells, stat bump, divine) is designed and balanced, per the magicite design
-   (`magicite.md`, ROADMAP M5). This is the "consider every area" pass.
-7. ☐ **Full WoB esper audit** — per-`give_genju` WoB/WoR verification so we know
-   the complete pre-FC optional set (Golem/Zoneseek/Sraphim confirmed WoB;
-   most others WoR-gated).
+6. ☑ **Optional espers — tuned** (d5de87e): Golem/Zoneseek/Sraphim had sat
+   untuned (esper_stat 0,0,0,0, dead pre-folded CURE_2 grants) unlike the
+   story/field espers. Gave them the deliberate identity+kit+stat pass —
+   Sraphim "the Seraph" (durable reviver 0,0,+4,+2), Golem "the Bulwark"
+   (physical wall 0,-2,+5,0), Zoneseek "the Sap" (MP-warfare caster 0,0,+2,+3);
+   dropped the dead CURE_2 tiers. esper tests green.
+7. ☑ **Full WoB esper audit** — read owned-esper bitfield ($1A69) off the
+   checkpoint chain. **Owned at FC entry (12):** Ramuh, Ifrit, Shiva, Siren,
+   Shoat, Maduin, Bismark, Stray, Kirin, Carbunkl, Phantom, Unicorn (the routed
+   WoB story set). **WoB-optional, not yet owned (3):** Golem, Zoneseek (Jidoor
+   auction), Sraphim (Tzen 3000 GP) ← the obtain targets. **WoR-gated (12):**
+   Terrato, Palidor, Tritoch, Odin, Raiden, Bahamut, Alexandr, Crusader,
+   Ragnarok, Fenrir, Starlet, Phoenix.
 8. ☐ **Sweep for other WoB optional content** reachable by airship pre-FC
    (colosseum? Zozo/other shops? Gau rages?) — note anything worth tuning.
 
