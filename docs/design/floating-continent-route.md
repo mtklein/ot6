@@ -171,11 +171,14 @@ see `gen_massacre.lua` on the same handler).
 bolt-weak — and so is AtmaWeapon (§7). A bolt-leaning party breaks every wave
 fast; that matters because (see below) the waves auto-chain with no field
 care-stop, so a slow break means attrition. **Winnability probe (#132,
-`probe_iaf_fight.lua`):** at the routed L15–17 with an untuned Terra/Setzer/Gau
-party, the party won wave 1 but **wiped by wave 2** — the timer-chained waves
-gave no heal window and only Terra carried bolt. The route needs a bolt-tuned
-three (and/or a pre-FC grind at Chimera+Cephaler, `level-curve.md`) so break
-ends each wave before damage stacks.
+`probe_iaf_fight.lua`):** at the routed L15–17 the timer-chained waves give no
+heal window, so damage accrues to a wipe. An untuned Terra/Setzer/Gau party
+wiped by **wave 2**; a bolt-tuned mage three (Terra/Celes/Relm) lasted to
+**wave 3** but still wiped. So the level deficit — not just party choice — is
+the wall: **a pre-FC grind is needed** (Chimera+Cephaler, `level-curve.md`),
+with a bolt-leaning three to break each wave fast on top. (Caveat: the generic
+tactical driver may not force the bolt weakness; a bolt-forcing drive is a
+tuning avenue before concluding a given level is unwinnable.)
 
 **Live-confirmed:** `tools/tests/probe_iaf.lua` drives the whole entry headless
 (board → discovery → deck → "Find the FC" → the party-formation menu → the

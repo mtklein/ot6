@@ -19,6 +19,17 @@ local function hpLine()
 end
 local F = H.newFightDriver("IAF", { tactical = true, boost = true, bank = 3, items = true, healPercent = 50 })
 local seenBattles, lastActive, wipeHold = 0, false, 0
+-- target a bolt-tuned three: Terra $00, Celes $06, Relm $08 (all Thunder casters)
+local TARGETS = { 0x00, 0x06, 0x08 }
+local sweep = 0
+local function inGroup(c)  -- is char id c already placed in the group?
+  for i = 0, 3 do if rd(0x7e9d99 + i) == c then return true end end
+  return false
+end
+local function nextTarget()
+  for _, c in ipairs(TARGETS) do if not inGroup(c) then return c end end
+  return nil
+end
 H.run({ maxFrames = 40000 }, {
   H.loadState("build/states/iaf_deck.mss.lua"),
   H.waitFrames(4),
@@ -27,13 +38,20 @@ H.run({ maxFrames = 40000 }, {
   H.driveUntil(function() local s=H.readByte(0x26); return s>=0x2c and s<=0x2f end, 1200, {
     H.call(function() H.setPad(H.dialogWaiting() and (H.frame%16<4 and {"a"} or {}) or {}) end)
   }, "party-select"),
-  -- build a 3-char group
-  H.driveUntil(function() return grpCount()>=3 end, 3000, {
+  -- build the bolt-tuned three (Terra/Celes/Relm) by sweeping the reserve
+  H.driveUntil(function() return grpCount()>=3 end, 4000, {
     H.call(function()
+      if H.frame % 60 == 0 then H.log(string.format("  build f%d 26=%02X 4a=%02X idx=%02X char=%02X want=%s grp=%d",
+        H.frame, H.readByte(0x26), H.readByte(0x4a), idx(), charAt(idx()), tostring(nextTarget()), grpCount())) end
       local s=H.readByte(0x26)
       if s==0x2d then
-        if H.readByte(0x4a)~=0 then tap("up")
-        elseif charAt(idx())==0xFF then tap("right") else tap("a") end
+        if H.readByte(0x4a)~=0 then tap("up")           -- leave the group column
+        elseif charAt(idx())==nextTarget() then tap("a") -- grab the wanted char
+        else                                             -- sweep the reserve grid (both rows)
+          sweep = sweep + 1
+          local m = sweep % 12
+          if m == 5 then tap("down") elseif m == 11 then tap("up") else tap("right") end
+        end
       elseif s==0x2e then
         if H.readByte(0x4a)~=0x10 then tap("down")
         else local tgt=firstEmptyGroupSlot()
