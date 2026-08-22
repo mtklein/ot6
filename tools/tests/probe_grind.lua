@@ -52,9 +52,13 @@ for i, dir in ipairs(PATH) do
     end),
   }, {})
 end
+steps[#steps+1] = H.waitFrames(60)
 steps[#steps+1] = H.call(function()
-  H.log(string.format("RESULT onfoot=%s pos=(%d,%d)", tostring(onFoot()), tileX(), tileY()))
+  H.log(string.format("RESULT onfoot=%s map=%d field=(%d,%d) worldctrl=%s",
+    tostring(onFoot()), H.readWord(0x1f64) & 0x3ff, H.fieldX and H.fieldX() or -1,
+    H.fieldY and H.fieldY() or -1, tostring(H.worldHasControl and H.worldHasControl())))
   H.screenshot("cr_final")
 end)
+steps[#steps+1] = H.cond(function() return onFoot() end, { H.saveState("wob_landed.mss") }, {})
 steps[#steps+1] = H.logStep(function() return "done" end)
 H.run({ maxFrames = 16000 }, steps)
