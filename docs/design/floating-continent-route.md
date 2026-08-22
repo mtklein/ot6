@@ -201,8 +201,9 @@ point (70,29), elects to return, and has **not** yet beaten AtmaWeapon.
 Shadow is forced (rejoined just before); no pre-battle dialog (AtmaWeapon's
 speech is battle-side, `ai_script.asm:5169`). Post-win: `$035F=0` `:32686`,
 Shadow leaves in `_cad9fc` (`:32642`, dlg $0855, `char_party SHADOW,0` `:32649`,
-`$02F3=0` `:32677`). The exact (60,15) trigger tile is read from map 394's field
-event-tile table; the on-map coord is **verify-on-arrival**.
+`$02F3=0` `:32677`). The AtmaWeapon NPC is at map 394 **(60,15)**
+(`ff6/src/event/npc_prop.asm:17346-17347`); the (60,11) pre-fight trigger
+`_cadd1e` (`event_trigger.asm:1959`) plays CATASTROPHE and arranges the party.
 
 **Save points — both vanilla, zero budget cost.**
 - 394 (7,12): `make_event_trigger {7,12}, SavePoint` (`event_trigger.asm:1960`)
@@ -224,9 +225,11 @@ lands via `load_map 393,{67,16}` (`:34127`); Shadow's dlg $0870
 `play_song METAMORPHOSIS` `:34142`; **`switch $02BC=1`** (escape active) `:34143`;
 then two timers.
 
-**Nerapa — the escape's doorman.** `battle 81` (`:32693`) = **formation 451**,
-monster 280 `$0118` "Nerapa"; opens with Condemned on the whole party, run under
-the escape clock (§7, `bosses-wob.md` §22).
+**Nerapa — the escape's doorman.** The Nerapa NPC is on the escape-landing map
+393 at **(108,15)**, switch `$0361`, event `_cada48`
+(`ff6/src/event/npc_prop.asm:17324-17327`) → `battle 81` (`:32693`) =
+**formation 451**, monster 280 `$0118` "Nerapa"; opens with Condemned on the
+whole party, run under the escape clock (§7, `bosses-wob.md` §22).
 
 **The clocks.**
 
@@ -328,7 +331,8 @@ Offline reads to confirm live once a headless drive reaches the FC:
 2. **IAF formations** 175/176/477/459 species and the six-wave timer chain.
 3. **FC pool** 177–188 (the `+Rand` spread) and that 358 draws nothing.
 4. **Shadow rejoin** `$035E` path and that nothing upstream pre-sets it.
-5. **AtmaWeapon / Nerapa** on-map trigger tiles (394 (60,15) / the escape ledge)
-   — the one item left UNVERIFIED offline (map-394 event-tile table).
+5. **AtmaWeapon / Nerapa** — confirm the fights fire at their NPC tiles (394
+   (60,15) / 393 (108,15), both now cited from `npc_prop.asm`) and their forms
+   (450 / 451).
 6. **Escape timing** 21600/21300 frames and the 0:05 Shadow window, and that
    "Wait" holds while "Jump" clears `$02F3`/skips `$037D`.
