@@ -102,6 +102,29 @@ Notes and cautions:
   absolute numbers differ from vanilla but the *ranking* of spots holds (same
   monster data, uniform scale).
 
+## Gear at the FC entry (thamasa_done)
+
+The owner's warning was "behind in gear **and** levels"; the gear half, read
+from the same checkpoint:
+
+| char | weapon | armor | relic |
+|---|---|---|---|
+| TERRA | **ThunderBlade** (bolt) | Mithril Vest | — |
+| LOCKE | **ThunderBlade** (bolt) | Kung Fu Suit | — |
+| STRAGO | Fire Rod | Cotton Robe | — |
+| RELM | Chocobo Brush | Silk Robe | Memento Ring |
+
+Two things stand out:
+- **Two ThunderBlades** — the party already carries bolt weapons, and the whole
+  IAF (and AtmaWeapon) is bolt-weak (`floating-continent-route.md` §3). Front-row
+  Terra/Locke swings, or their Thunder, are a natural break answer; a bolt-leaning
+  three is available without new purchases.
+- **Empty relic slots on three of four**, mid-tier (Mithril/cloth) armor. Relics
+  are the clearest under-gear, and survivability relics are exactly what the IAF's
+  care-stop-less attrition punishes the lack of. The Blackjack reopens WoB shops
+  (Thamasa and others), so gear/relic shopping is part of FC prep alongside a
+  grind.
+
 ## How to regenerate
 
 ```py
