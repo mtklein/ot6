@@ -190,7 +190,11 @@ make_genju_prop {ULTIMA, 0}, {}, {}, {}, {}
 ;   no fold family, so they are already correct as-is.
 make_genju_prop {CURE, 0}, {REGEN, 0}, {ANTDOT, 0}, {SCAN, 0}, {}
 
-; 18: zoneseek
+; 18: zoneseek, "the Sap" (optional, Jidoor Auction House).  The MP-warfare
+;   stone: Rasp and Osmose are the game's MP attrition (drain to kill a caster,
+;   steal to fuel your own), Shell the magic wall behind them.  No fold family
+;   touches these three, so all three stand as-is.  An optional stone, tuned to
+;   the story tier it is bought alongside (the tube six).
 make_genju_prop {RASP, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
 
 ; 19: carbunkl, "the Facet" (v0.7, magicite-tube-six.md §7).  The mirror:
@@ -206,11 +210,22 @@ make_genju_prop {RFLECT, 0}, {SAFE, 0}, {}, {}, {}
 ;   unbuildable Ghostwalk passive made party-wide.
 make_genju_prop {VANISH, 0}, {DEMI, 0}, {}, {}, {}
 
-; 21: sraphim
-make_genju_prop {LIFE, 0}, {CURE_2, 0}, {CURE, 0}, {REGEN, 0}, {REMEDY, 0}
+; 21: sraphim, "the Seraph" (optional, the man in the woods near Tzen).  The
+;   revival stone -- one of the only three sources of Life in the game (Bismark
+;   row: "revival lives on Terra, Fenix Downs and Sraphim only").  LIFE folds to
+;   Life 2 under boost (Ot6FoldTbl), and CURE folds to Cure 2/Cure 3, so the
+;   vanilla pre-folded CURE_2 grant is dropped as a dead un-foldable tier (the
+;   Kirin/Unicorn reason); the foldable CURE covers every tier.  Regen/Remedy
+;   round out the durable-healer identity.
+make_genju_prop {LIFE, 0}, {CURE, 0}, {REGEN, 0}, {REMEDY, 0}, {}
 
-; 22: golem
-make_genju_prop {SAFE, 0}, {STOP, 0}, {CURE_2, 0}, {}, {}
+; 22: golem, "the Bulwark" (optional, Jidoor Auction House).  The defensive wall
+;   -- its summon still raises the Earth Wall that soaks physical hits for the
+;   party (battle_main $3a81, preserved).  The granted kit is that identity:
+;   Safe (the physical-defense buff) plus Stop (lock a threat down).  The
+;   pre-folded CURE_2 is dropped -- a dead un-foldable tier, and healing is
+;   Kirin/Sraphim's job, not the wall's.
+make_genju_prop {SAFE, 0}, {STOP, 0}, {}, {}, {}
 
 ; 23: unicorn -- "the Purity" (v0.7, magicite-tube-six.md §9).  The paladin:
 ;   smite + cleanse.  PEARL is BRANCH A of the cross-doc holy decision, DECIDED

@@ -648,7 +648,12 @@ Ot6EsperStatTbl:
         esper_stat    0,   0,  +2,  +4   ; 17 kirin, FIELD.  Mag.pwr is heal
                                          ;    potency; stamina because the healer
                                          ;    has to still be standing.
-        esper_stat    0,   0,   0,   0   ; 18 zoneseek
+        esper_stat    0,   0,  +2,  +3   ; 18 zoneseek, OPTIONAL, "the Sap".  A
+                                         ;    support caster stone: mag.pwr leads
+                                         ;    (its Rasp/Osmose/Shell are all
+                                         ;    magical), with stamina to outlast
+                                         ;    the MP war.  A tier under the story
+                                         ;    casters (Maduin/Kirin).
         esper_stat    0,  -2,  +6,  +2   ; 19 carbunkl, STORY, "the Facet".  The
                                          ;    wall stone's stat is the wall stat,
                                          ;    at the story tier's top.  -2 speed:
@@ -661,8 +666,19 @@ Ot6EsperStatTbl:
                                          ;    and the downside; the six tube
                                          ;    stones need six distinct reasons to
                                          ;    swap, not six distinct leads.
-        esper_stat    0,   0,   0,   0   ; 21 sraphim
-        esper_stat    0,   0,   0,   0   ; 22 golem
+        esper_stat    0,   0,  +4,  +2   ; 21 sraphim, OPTIONAL, "the Seraph".
+                                         ;    The durable reviver: stamina leads
+                                         ;    (the healer who has to still be
+                                         ;    standing to cast Life), mag.pwr
+                                         ;    second.  Mirrors Kirin's 0,0,+2,+4
+                                         ;    with the two swapped -- Kirin heals
+                                         ;    harder, Sraphim endures harder.
+        esper_stat    0,  -2,  +5,   0   ; 22 golem, OPTIONAL, "the Bulwark".
+                                         ;    The wall stone's stat is the wall
+                                         ;    stat: stamina, one under Carbunkl's
+                                         ;    story-top +6.  -2 speed, heavy as
+                                         ;    its own Earth Wall; no mag.pwr, it
+                                         ;    is not a caster.
         esper_stat    0,   0,  +5,  +2   ; 23 unicorn, STORY, and deliberately
                                          ;    the smallest story package with no
                                          ;    downside: the Pearl grant is where
