@@ -299,6 +299,17 @@ No new save-point authoring is needed here (contrast the massacre stretch, #124/
 
 ---
 
+**Segment-2 CROSSED (#132, 2026-08-24): `probe_fc_descent.lua` PASSES**
+— the full (4,8) → save-alcove crossing runs headless: trigger-frontier
+walking with chute twin-pairing, burst fallback over the bfs-blind
+stair reveals, between-round fieldCare, flee-first fights with
+**forced Bolt** (`magic={[7]={spell=2}}` — Ninja/Apokryphos/Brainpan/
+Dragon are all bolt-weak, so the no-run nukers die before their round-3
+nukes).  Chain: (19,12) (25,19) (40,12) (40,6)-chute (36,28)
+(67,39)-walk (40,24) (63,33) (59,39) (52,24) (82,30) (90,43) → 358.
+Fixture: `fc_alcove.mss` (the encounter-free save alcove).  Earlier
+measurements kept below for the tuning record.
+
 **Segment-2 measurements (#132, 2026-08-24, `probe_fc_descent.lua`):**
 the descent machinery works — the stair-reveal triggers chain, the
 scripted chutes ride ((40,6)↔(32,16) and the (67,39)-walk pair are

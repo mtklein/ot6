@@ -157,7 +157,7 @@ local function round(r)
       (function()
         local near = false
         return H.navTo(function() return tile[1] end, function() return tile[2] end,
-          { maxFrames = 20000, playBattles = "flee", avoid = AVOID,
+          { maxFrames = 20000, playBattles = "flee", magic = { [0x07] = { spell = 2 } }, avoid = AVOID,
             arrive = function()
               if H.fieldX() == tile[1] and H.fieldY() == tile[2] then
                 near = true
@@ -177,6 +177,7 @@ local function round(r)
     (function()
       local t, calm = 0, 0
       return H.driveUntil(function()
+        if not mapIs(394) then return true end
         if not H.hasControl() or H.dialogWaiting() then calm = 0; return false end
         calm = calm + 1
         return calm >= 40
