@@ -21,14 +21,21 @@ ThunderBlades).  The walkable+landable pocket is X 113–119 / Y 25–26 (tile
 prop `$0044`), nearest entrance 8 tiles away across mountains.  Verified
 live: the probe's paced encounter drew species `001F 0096 0096` and fled it.
 
-**Immediate next step:** the grind itself, from `wob_grind.mss`: worldNavTo
-pacing with `playBattles="tactical"` (consider `fleeSpecies={0x01f}` if
-L22 Chimera outguns the L15–17 party — that's also a balance datapoint) to
-~L21–22, then `probe_iaf_fight.lua` to verify the IAF becomes survivable.
+**The grind is DONE (2026-08-23):** `probe_grind_run.lua` chunks (5 fights
+per green run over the rolling `wob_grind_run.mss`, fieldCare between
+fights, hard fights fled at 9k battle frames) took the active party
+TERRA/LOCKE/STRAGO/RELM from L15–17 to **L21/L21/L22/L21** in 28 fights,
+zero wipes.  Final state: `build/states/wob_grind_done.mss` (party on foot
+at the pocket, healed, beside the parked Blackjack).  Balance read: form
+190 is a fair fight-everything grind at these levels — the only walls were
+driver artifacts (heal-treadmill on bad Aqua Rake streaks, both fixed in
+the chunk driver), not tuning problems.
 
-**Then** the checklist below in order (shop → Mog+Water Rondo via the Serpent
-Trench → obtain Golem/Zoneseek/Sraphim).  Esper *tuning* (#6) and the esper
-*audit* (#7) are already done.
+**Immediate next step:** re-board the parked Blackjack from
+`wob_grind_done.mss` and verify the IAF gauntlet is survivable post-grind
+(`probe_iaf_fight.lua`).  **Then** the checklist below in order (shop →
+Mog+Water Rondo via the Serpent Trench → obtain Golem/Zoneseek/Sraphim).
+Esper *tuning* (#6) and the esper *audit* (#7) are already done.
 
 ## The party's starting point (thamasa_done, the stop line)
 
@@ -55,9 +62,9 @@ repaired; the whole WoB world map is reachable.
 
 ## The wrap-up checklist
 
-1. ☐ **Grind** to close the level gap (target ~L21–22). Best WoB spot:
-   Chimera+Cephaler (~1572 XP), else Ralph/Wyvern. Verify the IAF becomes
-   survivable post-grind (`probe_iaf_fight.lua`).
+1. ◐ **Grind** to close the level gap — ☑ done to L21–22 at the Chimera
+   pocket (`probe_grind_run.lua`, `wob_grind_done.mss`); ☐ still to do:
+   verify the IAF becomes survivable post-grind (`probe_iaf_fight.lua`).
 2. ☐ **Shop** — relics (the clear under-gear) and armor at WoB towns.
 3. ☐ **Mog** — recruit in Narshe (WoB).
 4. ☐ **Water Rondo / Water Harmony** — take Mog down the Serpent Trench:
