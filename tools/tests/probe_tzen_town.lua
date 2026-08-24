@@ -1,4 +1,4 @@
--- probe_tzen.lua -- fly Jidoor -> Tzen: buy SRAPHIM (3000 GP) and what
+-- probe_tzen_town.lua -- bank the in-Tzen fixture + scan the seller ring
 -- relics the purse allows (#133 items 2 and 5).
 --
 -- Boots from wob_golem_done.mss (in Jidoor town, Golem+Zoneseek won).
@@ -175,50 +175,17 @@ H.run({ maxFrames = 50000 }, flatten({
     H.assertEq(mapIs(306), true, "this is WoB Tzen (map 306)")
     H.screenshot("tzen_arrival")
   end),
-  -- Sraphim: seller at (29,3), ride his choice at row 0 (Yes) until owned
-  approachTalk(29, 3, "sraphim",
-    function() return espers() > espersAtBoot end),
+  H.saveState("wob_tzen_town.mss"),
   H.call(function()
-    H.log(string.format("SRAPHIM bought: gil=%d espers=%d", gil(), espers()))
+    for dy = -3, 3 do
+      local row = {}
+      for dx = -4, 4 do
+        local x, y = 29 + dx, 3 + dy
+        local p = H.bfsPath(x, y)
+        row[#row+1] = string.format("%s(%d,%d)", p and "O" or ".", x, y)
+      end
+      H.log("  ring: " .. table.concat(row, " "))
+    end
   end),
-  -- relic room 312 via bump door (25,7); keeper shop 32 at (80,16)
-  H.navTo(25, 8, { maxFrames = 9000, playBattles = "flee" }),
-  H.driveUntil(function() return mapIs(312) end, 600,
-    { H.call(function() H.setPad({ up = true }) end) }, "into the relic room"),
-  H.waitFrames(50),
-  approachTalk(80, 16, "relics",
-    function() return H.readByte(0x26) == 0x25 end),
-  H.cond(function() return gil() >= 7000 end, {
-    H.buyItem(0xba, 1, function() return 1 end, "RunningShoes"),
-  }, {}),
-  (function()
-    local phase = 0
-    return H.driveUntil(function() return H.hasControl() end, 3000, {
-      H.call(function()
-        phase = (phase + 1) % 8
-        H.setPad(phase < 4 and { "b" } or {})
-      end),
-    }, "shop closed")
-  end)(),
-  H.call(function()
-    H.log(string.format("TZEN RESULT: gil=%d espers=%d shoes=%d",
-      gil(), espers(), H.invCountOf(0xba)))
-    H.screenshot("tzen_done")
-  end),
-  -- out of the relic room (no return door record: rooms exit by walking
-  -- off the south edge back to the parent map), then out of town via the
-  -- exit row y=31, and save ON THE WORLD beside the ship so the next leg
-  -- boots ready to board
-  H.navTo(81, 22, { maxFrames = 6000, playBattles = "flee",
-    arrive = function() return mapIs(306) end }),
-  H.driveUntil(function() return mapIs(306) end, 900,
-    { H.call(function() H.setPad({ down = true }) end) }, "back in Tzen"),
-  H.waitFrames(50),
-  H.navTo(23, 30, { maxFrames = 9000, playBattles = "flee",
-    arrive = function() return H.worldMode() end }),
-  H.driveUntil(function() return H.worldMode() end, 900,
-    { H.call(function() H.setPad({ down = true }) end) }, "out to the world"),
-  H.waitFrames(60),
-  H.saveState("wob_tzen_done.mss"),
   H.logStep(function() return "done" end),
 }))
