@@ -21,17 +21,166 @@ end
 local TRIGGERS = {
   {19,12},{25,19},{40,12},{40,6},{32,16},{44,11},{36,28},{67,39},
   {42,17},{40,24},{63,31},{48,22},{77,31},{52,24},{59,39},{82,30},
-  {63,28},{89,25},{70,23},{90,43},
+  {63,28},{89,25},{70,23},{70,29},{90,43},
 }
-local AVOID = { {70,29},{60,11} }
+local AVOID = { {60,11} }
 local visited = {}
 local burst = nil
 local stuckN = 0
 local preBurst = nil
 local function key(c) return c[1] .. "," .. c[2] end
+local function rd(a) return emu.read(a, emu.memType.snesMemory) end
+local function midx() return H.readByte(0x4b) + H.readByte(0x4a) + H.readByte(0x5a) end
+local function charAt(i) return rd(0x7e9d89 + i) end
+local function grpCount() local n=0; for i=0,3 do if rd(0x7e9d99+i)~=0xFF then n=n+1 end end; return n end
+local function firstEmptyGroupSlot() for _,i in ipairs({0x10,0x11,0x12,0x13}) do if charAt(i)==0xFF then return i end end end
+local function inGroup(c) for i=0,3 do if rd(0x7e9d99+i)==c then return true end end; return false end
+local function nextTarget() for _,c in ipairs({0x00,0x01,0x07}) do if not inGroup(c) then return c end end end
+local shadowIn = false
+local banked = false
+local function deckPhase(r)
+  -- the (70,29) "return?" Yes lands us on the Blackjack deck with
+  -- $035E set (Shadow posed).  Wheel right+A, steer dlg $0527 to row 0
+  -- ("Find the Floating Continent" -- with $00A0=1 this is the quick
+  -- re-arrival, no IAF), then talk Shadow into the party at (10,16).
+  local t2 = 0
+  local pcPhase, pcDir, pcLastIdx, pcLastBtn, pcProbe, pcProbeN = 0, {}, nil, nil, 0, 0
+  return H.cond(function() return mapIs(6) and not banked end, {
+    H.navTo(14, 6, { maxFrames = 4000,
+      arrive = function() return not H.hasControl() or H.dialogWaiting() end }),
+    H.driveUntil(function() return mapIs(394) end, 8000, {
+      H.call(function()
+        t2 = t2 + 1
+        -- "Find the FC" reruns the 3-char party select before the
+        -- $00A0 re-entry branch: drive it (probe_iaf_fight3's learned-
+        -- button builder, condensed)
+        local ms = H.readByte(0x26)
+        if not H.hasControl() and ms >= 0x2c and ms <= 0x2f then
+          pcPhase = (pcPhase + 1) % 9
+          local function tap(btn) H.setPad(pcPhase < 3 and { btn } or {}) end
+          if ms == 0x2d then
+            if grpCount() >= 3 then tap("start")
+            elseif H.readByte(0x4a) ~= 0 then tap("up")
+            else
+              local tgt = nil
+              for i = 0, 15 do
+                local c = charAt(i)
+                if (c==0x00 or c==0x01 or c==0x07) and not inGroup(c)
+                   and rd(0x7eac8d + i) < 0x80 then tgt = i; break end
+              end
+              local cur = midx()
+              if not tgt then tap("b")
+              elseif cur == tgt then tap("a")
+              else
+                local want = (cur < tgt) and "inc" or "dec"
+                if pcLastIdx ~= nil and cur ~= pcLastIdx and pcLastBtn then
+                  pcDir[(cur > pcLastIdx) and "inc" or "dec"] = pcLastBtn
+                end
+                local btn = pcDir[want]
+                if not btn then
+                  btn = ({"down","up","right","left"})[(pcProbe % 4) + 1]
+                  pcProbeN = pcProbeN + 1
+                  if pcProbeN % 14 == 0 then pcProbe = pcProbe + 1 end
+                end
+                pcLastIdx, pcLastBtn = cur, btn
+                tap(btn)
+              end
+            end
+          elseif ms == 0x2e then
+            if H.readByte(0x4a) ~= 0x10 then tap("down")
+            else
+              local tgt = firstEmptyGroupSlot()
+              if not tgt then tap("a")
+              else
+                local cc, cr = (midx() >> 1) & 1, midx() & 1
+                local tc, tr = (tgt >> 1) & 1, tgt & 1
+                if cc < tc then tap("right") elseif cc > tc then tap("left")
+                elseif cr < tr then tap("down") elseif cr > tr then tap("up")
+                else tap("a") end
+              end
+            end
+          else tap("b") end
+          return
+        end
+        if t2 % 900 == 0 then
+          H.log(string.format("  deck t=%d map=%d (%d,%d) ctrl=%s dlg=%s 56F=%02X d0=%04X world=%s",
+            t2, H.mapId() & 0x3ff, H.fieldX(), H.fieldY(),
+            tostring(H.hasControl()), tostring(H.dialogWaiting()),
+            H.readByte(0x056F), H.readWord(0x00d0), tostring(H.worldMode())))
+        end
+        if t2 == 4000 then H.screenshot("deck4000") end
+        local mx = H.readByte(0x056F)
+        if mx > 0 then
+          local sel = H.readByte(0x056E)
+          local ph = t2 % 24
+          if sel > 0 then H.setPad(ph < 3 and { up = true } or {})
+          else H.setPad((ph >= 12 and ph < 15) and { "a" } or {}) end
+          return
+        end
+        if H.dialogWaiting() then H.setPad(t2 % 16 < 4 and { "a" } or {}); return end
+        if not H.hasControl() then H.setPad({}); return end
+        -- the wheel gate needs RIGHT+A held ON (14,6); anywhere else,
+        -- walk there (blind holds are what wandered us into the ship)
+        if H.fieldX() == 14 and H.fieldY() == 6 then
+          H.setPad({ right = true, a = true })
+        else
+          local dx, dy = 14 - H.fieldX(), 6 - H.fieldY()
+          local d = math.abs(dx) >= math.abs(dy)
+            and (dx > 0 and "right" or "left")
+            or (dy > 0 and "down" or "up")
+          H.setPad({ [d] = true })
+        end
+      end),
+    }, "re-enter the FC r" .. r),
+    H.waitFrames(90),
+    -- Shadow stands at (10,16); (10,17) is not walkable -- approach
+    -- from whichever adjacent tile paths, face him, tap A (the Mog-take
+    -- pattern: face-taps can step, so re-aim each cycle)
+    (function()
+      local t3 = 0
+      local cands = { {10,17,"up"}, {9,16,"right"}, {11,16,"left"}, {10,15,"down"} }
+      local ci = 1
+      return H.driveUntil(function()
+        if (H.readByte(0x1850 + 3) & 0x07) ~= 0 then shadowIn = true end
+        return shadowIn
+      end, 12000, {
+        H.call(function()
+          t3 = t3 + 1
+          if H.dialogWaiting() then H.setPad(t3 % 24 < 3 and { "a" } or {}); return end
+          if H.battleLoadStarted() or H.battleActive() then H.setPad({}); return end
+          if not H.hasControl() then H.setPad({}); return end
+          local c = cands[ci]
+          local dx, dy = c[1] - H.fieldX(), c[2] - H.fieldY()
+          if dx == 0 and dy == 0 then
+            local ph = t3 % 40
+            if ph < 2 then H.setPad({ [c[3]] = true })
+            elseif ph >= 10 and ph < 14 then H.setPad({ "a" })
+            elseif ph == 39 then ci = ci % #cands + 1; H.setPad({})
+            else H.setPad({}) end
+          else
+            local d = math.abs(dx) >= math.abs(dy)
+              and (dx > 0 and "right" or "left")
+              or (dy > 0 and "down" or "up")
+            H.setPad({ [d] = true })
+            if t3 % 300 == 299 then ci = ci % #cands + 1 end
+          end
+        end),
+      }, "SHADOW joins r" .. r)
+    end)(),
+    H.call(function()
+      H.log(string.format("[fc r%d] SHADOW aboard: party byte=%02X", r,
+        H.readByte(0x1850 + 3)))
+      -- the descent re-walks from the landing: un-mark the path so the
+      -- chutes can be re-ridden (reveal triggers re-step as no-ops;
+      -- (70,29) is latched inert)
+      visited = {}
+      stuckN = 0
+    end),
+  }, {})
+end
 local function round(r)
   local tile = nil
-  return H.cond(function() return mapIs(394) end, flatten({
+  return H.cond(function() return mapIs(394) and not banked end, flatten({
     -- care between legs: the pool's Behemoths/Dragons are long fights
     -- and a wounded party entering the next one dies (measured r7)
     H.cond(function()
@@ -45,7 +194,11 @@ local function round(r)
       tile = nil
       local best, bd = nil, 1e9
       for _, c in ipairs(TRIGGERS) do
-        if not visited[key(c)] then
+        -- the 358 door is gated on Shadow: stepping (90,43) latches
+        -- $01B5, which also kills the (70,29) return prompt that poses
+        -- him -- AtmaWeapon forces Shadow, so he comes first
+        local gated = (key(c) == "90,43") and not shadowIn
+        if not visited[key(c)] and not gated then
           local p = H.bfsPath(c[1], c[2], nil, nil)
           if p then
             if #p < bd then bd, best = #p, c end
@@ -61,7 +214,8 @@ local function round(r)
         -- spot): burst-walk toward the nearest un-visited trigger
         local cands = {}
         for _, c in ipairs(TRIGGERS) do
-          if not visited[key(c)] then
+          local gated = (key(c) == "90,43") and not shadowIn
+          if not visited[key(c)] and not gated then
             local dx = c[1] - H.fieldX()
             local dy = c[2] - H.fieldY()
             cands[#cands+1] = { c, dx * dx + dy * dy }
@@ -117,7 +271,9 @@ local function round(r)
           -- early stop the moment any un-visited trigger becomes pathable
           if t2 % 64 == 0 and t2 > 0 then
             for _, c in ipairs(TRIGGERS) do
-              if not visited[key(c)] and H.bfsPath(c[1], c[2], nil, nil) then
+              local gated = (key(c) == "90,43") and not shadowIn
+              if not visited[key(c)] and not gated
+                 and H.bfsPath(c[1], c[2], nil, nil) then
                 return true
               end
             end
@@ -157,7 +313,7 @@ local function round(r)
       (function()
         local near = false
         return H.navTo(function() return tile[1] end, function() return tile[2] end,
-          { maxFrames = 20000, playBattles = "flee", magic = { [0x07] = { spell = 2 } }, avoid = AVOID,
+          { maxFrames = 20000, playBattles = "flee", magic = { [0x07] = { spell = 2, boost = false } }, avoid = AVOID,
             arrive = function()
               if H.fieldX() == tile[1] and H.fieldY() == tile[2] then
                 near = true
@@ -181,14 +337,24 @@ local function round(r)
         if not H.hasControl() or H.dialogWaiting() then calm = 0; return false end
         calm = calm + 1
         return calm >= 40
-      end, 4000, {
+      end, 15000, {
         H.call(function()
           t = t + 1
+          if t % 1200 == 0 then
+            H.log(string.format("  settle t=%d map=%d (%d,%d) ctrl=%s dlg=%s 56F=%02X 56E=%02X",
+              t, H.mapId() & 0x3ff, H.fieldX(), H.fieldY(),
+              tostring(H.hasControl()), tostring(H.dialogWaiting()),
+              H.readByte(0x056F), H.readByte(0x056E)))
+          end
+          if t == 6000 then H.screenshot("settle6000") end
           local mx = H.readByte(0x056F)
           if mx > 0 then
+            -- $056F is the choice COUNT; the last row is mx-1
+            local want = mx - 1
             local sel = H.readByte(0x056E)
             local ph = t % 24
-            if sel < mx then H.setPad(ph < 3 and { down = true } or {})
+            if sel < want then H.setPad(ph < 3 and { down = true } or {})
+            elseif sel > want then H.setPad(ph < 3 and { up = true } or {})
             else H.setPad((ph >= 12 and ph < 15) and { "a" } or {}) end
             return
           end
@@ -239,14 +405,22 @@ H.run({ maxFrames = 200000 }, flatten({
   end),
   (function()
     local out = {}
-    for r = 1, 30 do out[#out+1] = round(r) end
+    for r = 1, 40 do
+      out[#out+1] = deckPhase(r)
+      out[#out+1] = H.cond(function()
+        return shadowIn and not banked and mapIs(394)
+      end, {
+        H.waitFrames(60),
+        H.saveState("fc_shadow.mss"),
+        H.call(function() banked = true end),
+      }, {})
+      out[#out+1] = round(r)
+    end
     return out
   end)(),
   H.call(function()
-    H.assertEq(mapIs(358), true, "reached the save alcove (map 358)")
-    H.screenshot("fc_alcove")
+    H.assertEq(shadowIn, true, "SHADOW recruited and fc_shadow banked")
+    H.screenshot("fc_shadow")
   end),
-  H.navTo(8, 10, { maxFrames = 4000 }),
-  H.saveState("fc_alcove.mss"),
   H.logStep(function() return "done" end),
 }))
