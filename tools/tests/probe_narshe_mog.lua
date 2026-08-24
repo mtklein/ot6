@@ -119,10 +119,22 @@ local function stage(x, y, pred, tag, opts)
     }, tag),
   }
 end
-local function edge(x, y, dir, destMap, tag)
+local function edge(x, y, dir, destMap, tag, alts)
+  local tile = nil
   return {
-    H.navTo(x, y, { maxFrames = 9000, playBattles = "flee",
-      arrive = function() return mapIs(destMap) end }),
+    H.call(function()
+      for _, c in ipairs(alts or { {x, y} }) do
+        if H.bfsPath(c[1], c[2]) or (H.fieldX()==c[1] and H.fieldY()==c[2]) then
+          tile = c
+          H.log(string.format("[%s] edge approach (%d,%d)", tag, c[1], c[2]))
+          return
+        end
+      end
+      error(tag .. ": no reachable approach tile")
+    end),
+    H.navTo(function() return tile[1] end, function() return tile[2] end,
+      { maxFrames = 9000, playBattles = "flee",
+        arrive = function() return mapIs(destMap) end }),
     H.driveUntil(function() return mapIs(destMap) end, 900,
       { H.call(function() H.setPad({ [dir] = true }) end) }, tag),
     H.waitFrames(60),
@@ -139,41 +151,50 @@ local function flatten(t)
 end
 
 H.run({ maxFrames = 80000 }, flatten({
-  H.loadState("build/states/wob_tzen_done.mss.lua"),
+  H.loadState("build/states/wob_narshe_town.mss.lua"),
   H.waitFrames(8),
-  -- board and fly to Narshe
-  H.worldNavTo(function() return H.readByte(0x1f62) end,
-               function() return H.readByte(0x1f63) end,
-    { maxFrames = 8000, playBattles = "tactical",
-      arrive = function() return not H.worldMode() end }),
-  H.driveUntil(function() return rd(0x20) == 1 end, 1200,
-    { H.call(function() H.setPad(H.frame % 16 < 4 and { "a" } or {}) end) },
-    "aboard"),
-  H.waitFrames(150),
-  H.driveUntil(function() return landed end, 16000,
-    { H.call(flyFrame) }, "landed at the Narshe doorstep"),
-  H.waitFrames(60),
-  H.worldNavTo(84, 33, { maxFrames = 6000, playBattles = "tactical",
-    arrive = function() return not H.worldMode() end }),
-  H.driveUntil(function() return not H.worldMode() end, 900,
-    { H.call(function() H.setPad(H.frame % 16 < 4 and { "a" } or {}) end) },
-    "Narshe loads"),
-  H.waitFrames(90),
+  -- (banked in-town fixture; the flight leg lives in probe_narshe_town)
+  H.cond(function() return false end, {}, {}),
   H.call(function()
     H.assertEq(mapIs(20), true, "this is Narshe (map 20)")
     H.log(string.format("in Narshe at (%d,%d)", H.fieldX(), H.fieldY()))
   end),
   -- the chase
-  edge(52, 37, "up", 30, "into the treasure room"),
+  edge(52, 38, "up", 30, "into the treasure room"),
   stage(79, 17, function() return sw(0x239) == 1 end, "Lone Wolf intro [$0239]",
     { maxFrames = 4000 }),
   edge(79, 18, "down", 20, "back to town"),
   stage(49, 37, function() return sw(0x23A) == 1 end, "chase [$023A]"),
   stage(38, 20, function() return sw(0x23B) == 1 end, "chase [$023B]"),
-  edge(36, 2, "up", 21, "north to map 21"),
+  edge(36, 2, "up", 21, "north to map 21", {{36,2},{35,2},{37,2},{38,2},{34,2},{39,2},{36,3},{35,3}}),
   stage(31, 22, function() return sw(0x23C) == 1 end, "chase [$023C]"),
-  edge(35, 2, "up", 22, "north to map 22"),
-  edge(19, 2, "up", 23, "north to the cliff (map 23)"),
+  -- the 21->22 crossing row is (34..37,1); scan whole top rows for ANY
+  -- reachable approach (the fixed candidates all missed)
+  (function()
+    local tile = nil
+    return {
+      H.call(function()
+        for y = 2, 6 do
+          for x = 16, 44 do
+            if H.bfsPath(x, y) then
+              tile = { x, y }
+              H.log(string.format("[to-22] reachable top tile (%d,%d)", x, y))
+              return
+            end
+          end
+        end
+        error("to-22: nothing reachable in rows 2-6")
+      end),
+      H.navTo(function() return tile[1] end, function() return tile[2] end,
+        { maxFrames = 9000, playBattles = "flee",
+          arrive = function() return mapIs(22) end }),
+      H.driveUntil(function() return mapIs(22) end, 1200, {
+        H.call(function() H.setPad({ up = true }) end),
+      }, "north to map 22"),
+      H.waitFrames(60),
+    }
+  end)(),
+  edge(19, 2, "up", 23, "north to the cliff (map 23)", {{19,2},{18,2},{20,2},{21,2},{19,3},{18,3},{20,3},{21,3}}),
   stage(22, 20, function() return sw(0x23D) == 1 end, "the standoff [$023D]"),
   stage(8, 18, function() return sw(0x23F) == 1 end, "the ledge [$023F]"),
   -- take MOG (over the Gold Hairpin: the routed choice).  Stand EXACTLY

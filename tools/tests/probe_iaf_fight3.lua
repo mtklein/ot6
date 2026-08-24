@@ -39,7 +39,7 @@ local function nextTarget()
   return nil
 end
 H.run({ maxFrames = 60000 }, {
-  H.loadState("build/states/wob_tzen_done.mss.lua"),
+  H.loadState("build/states/wob_grind_run.mss.lua"),
   H.waitFrames(8),
   -- the bolt kit: Ramuh + Earrings x2 on Strago, RunningShoes on Terra,
   -- Sniper Sight on Locke (all field-menu drives, no state writes)

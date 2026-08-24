@@ -75,8 +75,11 @@ end
 H.run({ maxFrames = 80000 }, flatten({
   H.loadState("build/states/wob_chase23C.mss.lua"),
   H.waitFrames(8),
-  hop({{30,20},{31,20},{30,21},{31,21}}, "up", 43, "21 -> 43"),
-  hop({{113,45},{112,45},{113,44},{113,46},{112,44}}, "up", 41, "43 -> 41"),
+  -- back to town, then in through the (22,44) mines door: its 41 pocket
+  -- (20,9) is the best candidate link to the (107/117,12) top doors
+  hop({{24,52},{25,52},{26,52},{23,52},{27,52},{28,52},{24,51},{25,51}},
+      "down", 20, "21 -> town"),
+  hop({{22,45},{21,44},{23,44},{22,43},{22,44}}, "up", 41, "town -> 41 north"),
   -- The mines are a designed maze of one-way pockets threading 41<->43
   -- (and possibly 42).  Generic explorer: on each round, if the goal
   -- doors are reachable take them; else take the first unused door for
@@ -106,10 +109,12 @@ H.run({ maxFrames = 80000 }, flatten({
             [41] = { {57,11},{58,12},{56,11},{57,12},
                      {41,5},{42,5},{40,5},{43,5},
                      {57,21},{25,59},{18,51},{86,29} },
-            [43] = { {111,30},{110,30},{112,30},{111,31},
+            [43] = { {75,39},{74,39},{76,39},{75,40},{74,40},{76,40},
+                     {111,30},{110,30},{112,30},{111,31},
                      {73,61},{74,61},{72,61},{73,62},
                      {113,45},{113,44},{112,45},
-                     {108,60},{109,60},{107,60} },
+                     {108,60},{109,60},{107,60},
+                     {68,48},{69,48},{81,48},{82,48},{70,45},{80,45} },
             [42] = { {86,29},{86,30},{85,29},{87,29} },
           }
           for _, c in ipairs(DOORS[m] or {}) do
@@ -120,6 +125,13 @@ H.run({ maxFrames = 80000 }, flatten({
               H.log(string.format("[maze r%d] map %d door (%d,%d)", r, m, c[1], c[2]))
               return
             end
+          end
+          for yy = 0, 63, 3 do
+            local row = {}
+            for xx = 0, 126, 3 do
+              row[#row+1] = H.bfsPath(xx, yy) and "O" or "."
+            end
+            H.log("  chart y" .. yy .. " " .. table.concat(row))
           end
           error(string.format("maze r%d: map %d, nothing new from (%d,%d)",
             r, m, H.fieldX(), H.fieldY()))
@@ -139,7 +151,28 @@ H.run({ maxFrames = 80000 }, flatten({
                   return dT > 15 and dS > 15
                 end })
           end)(),
-          H.waitFrames(70),
+          H.waitFrames(30),
+          -- an L-row trigger tile sits one step past the approach: if the
+          -- arrival did not teleport us, push into it (up first -- every
+          -- decoded row here faces north -- then the other directions)
+          (function()
+            local m0, x0, y0 = nil, nil, nil
+            local pushes = { "up", "left", "right", "down" }
+            local pi, pt = 1, 0
+            return H.driveUntil(function()
+              if m0 == nil then m0, x0, y0 = H.mapId() & 0x1ff, H.fieldX(), H.fieldY() end
+              local moved = (H.mapId() & 0x1ff) ~= m0
+                or math.abs(H.fieldX() - x0) + math.abs(H.fieldY() - y0) > 10
+              return moved or pi > #pushes
+            end, 900, {
+              H.call(function()
+                pt = pt + 1
+                if pt % 50 == 0 then pi = pi + 1 end
+                H.setPad(pushes[pi] and { [pushes[pi]] = true } or {})
+              end),
+            }, "maze push r" .. r)
+          end)(),
+          H.waitFrames(50),
           H.call(function()
             H.log(string.format("[maze r%d] now map %d (%d,%d)", r,
               H.mapId() & 0x1ff, H.fieldX(), H.fieldY()))

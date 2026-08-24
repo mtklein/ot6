@@ -22,7 +22,7 @@
 -- stands) and logs WIPE.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local GOAL_LEVEL = 21
+local GOAL_LEVEL = 24
 local FIGHTS = 5
 
 local CHAR, REC = 0x1600, 37
