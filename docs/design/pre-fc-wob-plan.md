@@ -8,7 +8,29 @@
 >
 > Status legend: ☐ todo · ◐ in progress · ☑ done. Kept current as work lands.
 
-## ▶ RESUME HERE (updated 2026-08-23: landed at the grind spot)
+## ▶ STATUS (2026-08-24: the wrap-up is done as far as the game permits)
+
+Everything below is complete except two items **blocked by #134** (the
+Narshe cliff is unreachable, so WoB Mog — and Water Rondo, which needs
+him — wait on an owner call).  The headline results:
+
+- **Grind**: L15–17 → **L24/L24/L25** (two rounds, ~45 fights, zero
+  wipes) over the rolling-chunk driver; gil funded the whole shopping
+  and esper program along the way.
+- **IAF verdict (item 1's verify): balance signal for #132.**  At L24
+  with Ramuh-granted Bolt cast every round, Earrings ×2, RunningShoes
+  haste, and the pre-FC gear ceiling, attrition still wins in wave 7 of
+  8.  Full analysis in `floating-continent-route.md`.
+- **Espers**: Golem + Zoneseek won at the Jidoor auction (lot RNG
+  decoded; decline-unless-target bidding), Sraphim bought at Tzen
+  (hidden roof path).  All three in — the WoB-optional set is complete.
+- **Shopping**: Earrings ×2, Sniper Sight, RunningShoes; the armor
+  ceiling finding is in the sweep notes.
+- **Sweep**: done; findings under item 8.
+- Chain fixtures: `wob_grind_run.mss` (L24 party at the pocket, the
+  live head of the chain), plus per-leg banks named in the probes.
+
+## ▶ old resume note (2026-08-23: landed at the grind spot)
 
 **The party is landed at the decoded grind pocket** — `probe_land_grind.lua`
 flies the Blackjack closed-loop from `iaf_deck` to world tile **(116,25)**,
@@ -62,17 +84,21 @@ repaired; the whole WoB world map is reachable.
 
 ## The wrap-up checklist
 
-1. ◐ **Grind** to close the level gap — ☑ done to L21–22 at the Chimera
-   pocket (`probe_grind_run.lua`, `wob_grind_done.mss`); ☐ still to do:
-   verify the IAF becomes survivable post-grind (`probe_iaf_fight.lua`).
-2. ☐ **Shop** — relics (the clear under-gear) and armor at WoB towns.
-3. ☐ **Mog** — recruit in Narshe (WoB).
-4. ☐ **Water Rondo / Water Harmony** — take Mog down the Serpent Trench:
-   Nikeah → rent chocobo → east/south through Doma to Baren Falls → leap to the
-   Veldt → leap into the Serpent Trench (water battles teach the dance) → back
-   to Nikeah. Missable in the WoR.
-5. ☐ **Optional espers — obtain:** Golem + Zoneseek (Jidoor Auction House),
-   Sraphim (man in the woods near Tzen, 3000 GP in the WoB).
+1. ☑ **Grind** — L21–22 (2026-08-23), extended to L24/24/25 (-08-24);
+   the IAF verify ran (`probe_iaf_fight3.lua`) and produced its answer:
+   NOT survivable at any pre-FC level/kit — a #132 balance signal
+   (`floating-continent-route.md` has the verdict and the retune levers).
+2. ☑ **Shop** — Earrings ×2 + Sniper Sight (Jidoor), RunningShoes
+   (Tzen), all equipped for the verify.  Armor: the pre-FC ceiling is
+   Mithril/Gaia (see the sweep).
+3. ⛔ **Mog** — BLOCKED by #134 (the cliff is unreachable; chase drives
+   to $023C and every mines route dead-ends — fixtures banked for repro).
+4. ⛔ **Water Rondo** — BLOCKED by #134 (needs Mog aboard).  The leg is
+   otherwise ready: the Crescent dive's post-scenario arm is live
+   ($0041=1, "Jump?"), the mountain door is (214,148), and the deck
+   party-change (talk to any crew member) covers the swap.
+5. ☑ **Optional espers — obtained** (2026-08-24): Golem + Zoneseek at
+   the auction, Sraphim at Tzen.  The full pre-FC esper set is aboard.
 6. ☑ **Optional espers — tuned** (d5de87e): Golem/Zoneseek/Sraphim had sat
    untuned (esper_stat 0,0,0,0, dead pre-folded CURE_2 grants) unlike the
    story/field espers. Gave them the deliberate identity+kit+stat pass —
@@ -86,7 +112,7 @@ repaired; the whole WoB world map is reachable.
    auction), Sraphim (Tzen 3000 GP) ← the obtain targets. **WoR-gated (12):**
    Terrato, Palidor, Tritoch, Odin, Raiden, Bahamut, Alexandr, Crusader,
    Ragnarok, Fenrir, Starlet, Phoenix.
-8. ◐ **Sweep for other WoB optional content** reachable by airship pre-FC —
+8. ☑ **Sweep for other WoB optional content** reachable by airship pre-FC —
    findings so far (2026-08-24):
    - **Vector burns with the story** ($0079): its shops — the only WoB
      Thunder Rod and the whole Gold armor tier — are gone pre-FC.  The
