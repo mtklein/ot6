@@ -48,10 +48,13 @@ local wiped, goal = false, false
 local tactical = H.newFightDriver("grind_run",
   { tactical = true, boost = true, items = true, healPercent = 55 })
 local paceDir = "left"
-local battN, sawBattle, cycleDone, fleeing = 0, false, false, false
-local function resetCycle() battN, sawBattle, cycleDone, fleeing = 0, false, false, false end
+local battN, fightN, sawBattle, cycleDone, fleeing = 0, 0, false, false, false
+local function resetCycle()
+  battN, fightN, sawBattle, cycleDone, fleeing = 0, 0, false, false, false
+end
 local function frame()
   battN = H.battleLoadStarted() and battN + 1 or 0
+  if battN > 0 then fightN = fightN + 1 end  -- cumulative: battN flickers
   if battN == 0 then tactical.idle() end
   if battN >= 3 then
     sawBattle = true
@@ -74,11 +77,13 @@ local function frame()
     -- instead of erroring the chunk: every formation in this pool is
     -- runnable (no pincer bit), a fled fight just pays no XP, and an
     -- error would lose the whole chunk since artifacts only publish on
-    -- a PASS.
-    if battN > 9000 then
+    -- a PASS.  The cap counts fightN, not battN: battN flickers with the
+    -- battle signal (measured: a 21k-frame revive-treadmill fight never
+    -- tripped a consecutive-9000 battN cap).
+    if fightN > 9000 then
       if not fleeing then
         fleeing = true
-        H.log(string.format("fight too long (%d battle frames); fleeing it", battN))
+        H.log(string.format("fight too long (%d battle frames); fleeing it", fightN))
       end
       H.setPad({ l = true, r = true })
       return
@@ -119,6 +124,11 @@ local steps = {
   H.call(function()
     for _, c in ipairs(party()) do xp0[c.slot] = c.xp end
   end),
+  -- The rolling save can carry battle scars (a fled fight leaves corpses
+  -- and scraps -- measured: chunk 3 booted with two dead and 209/57 hp,
+  -- and its first Chimera became an unwinnable revive-treadmill).  Care
+  -- first, care after every fight: fieldCare is a no-op when healthy.
+  H.fieldCare({ tag = "care at chunk start", threshold = 0.85 }),
 }
 for i = 1, FIGHTS do
   steps[#steps + 1] = H.cond(function() return not (wiped or goal) end, {
@@ -132,12 +142,14 @@ for i = 1, FIGHTS do
         afterFight(i)
       end
     end),
-    H.cond(function() return not wiped end,
-      { H.saveState("wob_grind_run.mss") }, {}),
+    H.cond(function() return not wiped end, {
+      H.fieldCare({ tag = "care after fight " .. i, threshold = 0.85 }),
+      H.saveState("wob_grind_run.mss"),
+    }, {}),
   }, {})
 end
 steps[#steps + 1] = H.call(function()
   H.log(string.format("chunk done: wiped=%s goal=%s", tostring(wiped), tostring(goal)))
 end)
 steps[#steps + 1] = H.logStep(function() return "done" end)
-H.run({ maxFrames = 80000 }, steps)
+H.run({ maxFrames = 140000 }, steps)
