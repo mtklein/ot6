@@ -48,8 +48,8 @@ local wiped, goal = false, false
 local tactical = H.newFightDriver("grind_run",
   { tactical = true, boost = true, items = true, healPercent = 55 })
 local paceDir = "left"
-local battN, sawBattle, cycleDone = 0, false, false
-local function resetCycle() battN, sawBattle, cycleDone = 0, false, false end
+local battN, sawBattle, cycleDone, fleeing = 0, false, false, false
+local function resetCycle() battN, sawBattle, cycleDone, fleeing = 0, false, false, false end
 local function frame()
   battN = H.battleLoadStarted() and battN + 1 or 0
   if battN == 0 then tactical.idle() end
@@ -67,6 +67,21 @@ local function frame()
         if hp > 0 and hp < 10000 then alive = true end
       end
       if not alive then wiped = true; H.setPad({}); return end
+    end
+    -- A fight that runs this long is a heal-treadmill (a bad Aqua Rake
+    -- streak outpaces the driver's healing and damage stalls -- measured:
+    -- Chimera at 1369 hp after 13k frames, every turn a heal).  Flee it
+    -- instead of erroring the chunk: every formation in this pool is
+    -- runnable (no pincer bit), a fled fight just pays no XP, and an
+    -- error would lose the whole chunk since artifacts only publish on
+    -- a PASS.
+    if battN > 9000 then
+      if not fleeing then
+        fleeing = true
+        H.log(string.format("fight too long (%d battle frames); fleeing it", battN))
+      end
+      H.setPad({ l = true, r = true })
+      return
     end
     tactical.frame()
     return
@@ -108,7 +123,7 @@ local steps = {
 for i = 1, FIGHTS do
   steps[#steps + 1] = H.cond(function() return not (wiped or goal) end, {
     H.call(resetCycle),
-    H.driveUntil(function() return cycleDone or wiped end, 14000,
+    H.driveUntil(function() return cycleDone or wiped end, 22000,
       { H.call(frame) }, "grind fight " .. i),
     H.call(function()
       if wiped then
