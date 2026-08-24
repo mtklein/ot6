@@ -12,8 +12,13 @@
 --     A bad tile "bounces" ($19 spikes ~6 then reverts, still airborne);
 --     an open tile lands (map leaves airship mode, party on foot).
 --   * So landing = strafe the grid trying B at each stop until one takes.
---     $c2 bit1 is a hint but not authoritative; the real test is B landing vs
---     bouncing. The shadow marks exactly where it will set down.
+--     [Corrected by probe_land_grind (#133): $c2 bit1 IS authoritative --
+--     LandAirship refuses iff it is set, and the descent is unconditional
+--     once started.  The "bounce" this header used to describe was a
+--     detection artifact: $1f64 bit13 stays SET after a world-map landing
+--     (party on foot, $20 leaves 1), so onFoot() below reads airborne
+--     forever; it only cleared here because this run's landing hit a
+--     location entrance, which loads a field map.]
 -- Live state: X=$33/$35, Y=$37/$39 (tile=fine>>12); heading $73; $c2 terrain.
 --
 -- This probe demonstrates it end to end: cross west off the mountainous Thamasa

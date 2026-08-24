@@ -1,4 +1,4 @@
-# Pre-FC World-of-Balance wrap-up — the plan (#132)
+# Pre-FC World-of-Balance wrap-up — the plan (#133)
 
 > **Owner goal (2026-08-22):** thoroughly cover the WoB *before* the Floating
 > Continent. No rush to the FC. This is both the owner's own playthrough and a
@@ -8,25 +8,27 @@
 >
 > Status legend: ☐ todo · ◐ in progress · ☑ done. Kept current as work lands.
 
-## ▶ RESUME HERE (handoff 2026-08-22, paused for a Fable session)
+## ▶ RESUME HERE (updated 2026-08-23: landed at the grind spot)
 
-**The airship is flyable + landable headless** — that was the hard blocker and
-it's solved (technique in `probe_grind.lua`'s header; registers + B/land
-mechanism documented). Everything for the pre-FC tour is now unblocked.
+**The party is landed at the decoded grind pocket** — `probe_land_grind.lua`
+flies the Blackjack closed-loop from `iaf_deck` to world tile **(116,25)**,
+lands, and saves `build/states/wob_grind.mss` (party on foot beside the
+parked ship).  The grind spot question is answered from the ROM data, no map
+knowledge needed: `world_battle_group.dat` sector (X 96–127, Y 0–31) grass
+slot → group 22 = **Chimera+2×Cephaler (form 190, 1572 XP) at ~62.5%**, rest
+3×Cephaler; **no pincer-capable formation**; Cephaler is weak bolt (the two
+ThunderBlades).  The walkable+landable pocket is X 113–119 / Y 25–26 (tile
+prop `$0044`), nearest entrance 8 tiles away across mountains.  Verified
+live: the probe's paced encounter drew species `001F 0096 0096` and fled it.
 
-**Immediate next step:** land the airship in **open world terrain** (not on a
-location entrance — the last run landed on Sabin's house, map 93, which loaded
-that field map instead of leaving the party on the walkable world map), then
-`worldNavTo` with `playBattles="tactical"` to walk-and-fight = the grind. The
-open question the owner will answer on resume: **where the open plains / a good
-grind spot are** (world coords or a direction+landmark from a known town), since
-that's map knowledge, not a mechanic. Fixtures: `build/states/iaf_deck.mss`
-(on the Blackjack deck, pre-Lift-off) and `build/states/wob_landed.mss` (a
-landed on-foot state) speed iteration.
+**Immediate next step:** the grind itself, from `wob_grind.mss`: worldNavTo
+pacing with `playBattles="tactical"` (consider `fleeSpecies={0x01f}` if
+L22 Chimera outguns the L15–17 party — that's also a balance datapoint) to
+~L21–22, then `probe_iaf_fight.lua` to verify the IAF becomes survivable.
 
-**Then** work the checklist below in order (grind → shop → Mog+Water Rondo via
-the Serpent Trench → obtain Golem/Zoneseek/Sraphim). Esper *tuning* (#6) and the
-esper *audit* (#7) are already done.
+**Then** the checklist below in order (shop → Mog+Water Rondo via the Serpent
+Trench → obtain Golem/Zoneseek/Sraphim).  Esper *tuning* (#6) and the esper
+*audit* (#7) are already done.
 
 ## The party's starting point (thamasa_done, the stop line)
 
@@ -83,4 +85,5 @@ repaired; the whole WoB world map is reachable.
 ## Then (out of scope for this goal, tracked in #132)
 
 The FC arc itself — IAF → Floating Continent → AtmaWeapon → the humane escape →
-WoR landing — once the party is prepped.
+WoR landing — once the party is prepped.  This wrap-up is #133 (milestone
+v0.14) and blocks #132; commits for wrap-up work reference #133.
