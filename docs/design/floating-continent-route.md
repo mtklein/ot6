@@ -180,6 +180,18 @@ with a bolt-leaning three to break each wave fast on top. (Caveat: the generic
 tactical driver may not force the bolt weakness; a bolt-forcing drive is a
 tuning avenue before concluding a given level is unwinnable.)
 
+**Post-grind re-measure (#133, 2026-08-24, `probe_iaf_fight2.lua`):** at
+**L21/L21/L22** (Terra+Locke with the two ThunderBlades, Strago third),
+pre-shopping gear, the party reaches **wave 4** then wipes by attrition.
+The pip mechanics work — ThunderBlade Fights chip Sky Armor/Spit Fire
+5→4→3→break, measured live — but the cadence loses the race: ~1 pip per
+~1500 frames against ~150–230 dmg/char/round, and the third member (Fire
+Rod) contributes zero chips.  Open levers before a balance verdict:
+Diamond-tier armor + RunningShoes (haste) from the #133 shopping leg, a
+third bolt source (Thunder Rod, or esper-granted casting), and a
+bolt-forcing/boost-spending driver.  Re-verify after the shopping and
+esper legs land.
+
 **Live-confirmed:** `tools/tests/probe_iaf.lua` drives the whole entry headless
 (board → discovery → deck → "Find the FC" → the party-formation menu → the
 ambush) and reads `battle 126` in the emulator as **Sky Armor `$043` + Spit Fire
