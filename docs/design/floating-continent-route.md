@@ -192,6 +192,20 @@ third bolt source (Thunder Rod, or esper-granted casting), and a
 bolt-forcing/boost-spending driver.  Re-verify after the shopping and
 esper legs land.
 
+**Verdict (#133, 2026-08-24, `probe_iaf_fight3.lua`): balance signal.**
+Every pre-FC lever was applied and measured — **L24/L24/L25** (a second
+grind round), Ramuh equipped on Strago so the driver casts Bolt every
+round (the fold under boost included), Earrings ×2, RunningShoes haste,
+Sniper Sight, and the pre-FC gear ceiling (Vector's Gold tier burns with
+the story, so Mithril/Gaia is the max) — and the chain still ends by
+attrition in wave 7 of 8, with wave 7 itself a 21k-frame heal-treadmill.
+Three different party shapes and four level bands (L15–17, L21–22, L24–25)
+all lose the same way: the no-heal-window auto-chain outlasts any
+sustainable damage rate.  Per `level-curve.md`'s own rule ("unwinnable at
+these levels even with perfect break/prep *and* a reasonable grind is a
+balance signal — retune the shield row"), the IAF gauntlet needs a #132
+retune: fewer pips per wave, fewer waves, or a care window between waves.
+
 **Live-confirmed:** `tools/tests/probe_iaf.lua` drives the whole entry headless
 (board → discovery → deck → "Find the FC" → the party-formation menu → the
 ambush) and reads `battle 126` in the emulator as **Sky Armor `$043` + Spit Fire
