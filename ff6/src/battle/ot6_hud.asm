@@ -2302,6 +2302,27 @@ Ot6ShieldTbl:
         .byte   7, OT6_PIERCE   ; flameeater
         .word   $00de
         .byte   1, $00          ; balloon: vanilla ice/water pops them
+        ; the FC random pool (forms 177-188; floating-continent-route.md
+        ; S4): un-authored, the formula fallback handed these L26 randoms
+        ; up-to-5-pip gauges, so every walk fight ran boss-length while
+        ; the pool deals FC-tier damage (~300/char/round openers, party
+        ; nukes) -- measured wipes from full HP at L24 (#132 segment 2).
+        ; Deliberate rows: the elites carry 3, the rest 2; fights stay
+        ; dangerous but end inside the party's HP budget.
+        .word   $0020
+        .byte   3, OT6_SLASH|OT6_PIERCE ; behemoth: the pool's elite
+        .word   $0083
+        .byte   3, OT6_SLASH|OT6_PIERCE ; dragon: the other elite
+        .word   $000c
+        .byte   2, OT6_SLASH|OT6_PIERCE ; apokryphos
+        .word   $00a4
+        .byte   2, OT6_SLASH|OT6_PIERCE ; misfit
+        .word   $0003
+        .byte   2, OT6_SLASH|OT6_PIERCE ; ninja
+        .word   $00d8
+        .byte   2, OT6_SLASH|OT6_PIERCE ; wirey drgn
+        .word   $004a
+        .byte   2, OT6_SLASH|OT6_PIERCE ; brainpan
         .word   $0043
         .byte   2, OT6_SLASH|OT6_PIERCE ; sky armor: IAF wave trash.
                                 ;   Previously un-authored, so the formula

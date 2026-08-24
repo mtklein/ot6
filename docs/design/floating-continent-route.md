@@ -299,6 +299,34 @@ No new save-point authoring is needed here (contrast the massacre stretch, #124/
 
 ---
 
+**Segment-2 measurements (#132, 2026-08-24, `probe_fc_descent.lua`):**
+the descent machinery works — the stair-reveal triggers chain, the
+scripted chutes ride ((40,6)↔(32,16) and the (67,39)-walk pair are
+two-way twins; ride one down and its return twin must be skipped — the
+probe marks the landing-adjacent trigger visited), and the route flowed
+(4,8) → (36,28) → (42,19) before fights ended it.  The pool itself:
+
+- The FC randoms were **un-authored in Ot6ShieldTbl** — the formula gave
+  the L26 pool up-to-5-pip gauges.  Authored now: Behemoth/Dragon 3,
+  Apokryphos/Misfit/Ninja/WireyDrgn/Brainpan 2.
+- **Four of seven species are vanilla no-run** (monster_prop +19 bit 2:
+  Apokryphos, Misfit, WireyDrgn, Brainpan — verified against the
+  pristine ROM), so 7 of the 12 formations cannot be fled.
+- **Measured wipes from full HP at L24**: Ninja pairs throw ~300/char
+  AoE per round; a no-run formation nuked the full-HP party dead by
+  round 3 (fc-care healed to ~930s the round before).  Behemoth (6051
+  HP) wins by attrition when entered wounded.
+- **No pips chipped in the fatal fights** — the tactical driver casts;
+  only matching-class weapon hits chip.  A physical-first opener is the
+  drive-side lever to try before touching monster stats.
+- **The gear ceiling is vanilla-authentic**: no WoB shop sells Diamond
+  anywhere (the Diamond shops 57/61/66 are all `$00A4=1` WoR variants);
+  Albrook pre-FC is open (the (179,71) trigger is a first-visit scene,
+  not a lock) but its stock is not the answer.  Vanilla survives this
+  pool at ~L26-30; the routed L24 + break covenant is the gap — the
+  level-curve rule's balance-signal clause applies if the physical-first
+  driver still wipes.
+
 ## 5. The escape
 
 **Trigger.** After Kefka moves the statues (cutscene `:33900-34126`), the party

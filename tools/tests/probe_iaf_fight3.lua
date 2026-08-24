@@ -264,7 +264,23 @@ H.run({ maxFrames = 100000 }, flatten({
     H.screenshot("iaf2_result")
   end),
   H.cond(function() return (H.readWord(0x1f64) & 0x3ff) == 394 end, {
-    H.waitFrames(60),
+    -- settle FULLY before banking: a state saved mid-fade hangs Mesen
+    -- on restore (measured: the first fc_land.mss deadlocked the boot)
+    (function()
+      local t2, calm = 0, 0
+      return H.driveUntil(function()
+        if not H.hasControl() or H.dialogWaiting() then calm = 0; return false end
+        calm = calm + 1
+        return calm >= 240
+      end, 6000, {
+        H.call(function()
+          t2 = t2 + 1
+          if H.dialogWaiting() then H.setPad(t2 % 16 < 4 and { "a" } or {})
+          else H.setPad({}) end
+        end),
+      }, "FC arrival settles")
+    end)(),
+    H.hold({ "down" }), H.waitFrames(30), H.release(), H.waitFrames(60),
     H.saveState("fc_land.mss"),
   }, {}),
   H.logStep(function() return "done" end),
