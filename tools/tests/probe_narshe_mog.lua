@@ -181,12 +181,19 @@ H.run({ maxFrames = 80000 }, flatten({
   -- talking to Lone Wolf instead takes the Hairpin and DROPS Mog.
   H.navTo(9, 17, { maxFrames = 6000, playBattles = "flee" }),
   (function()
-    local phase = 0
+    -- ot6 dialog choices are a menu that a held direction steers (the
+    -- Tzen seller lesson: right+a confirmed "No" forever).  Face-press
+    -- up+a only until the dialog opens, then plain A edges.
+    local t, talked = 0, false
     return H.driveUntil(function() return mogIn() end, 9000, {
       H.call(function()
-        phase = (phase + 1) % 8
-        if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
-        H.setPad(phase < 4 and { up = true, a = true } or { up = true })
+        t = t + 1
+        if H.dialogWaiting() then talked = true end
+        if talked then
+          H.setPad(t % 24 < 3 and { "a" } or {})
+        else
+          H.setPad(t % 30 < 3 and { up = true, a = true } or { up = true })
+        end
       end),
     }, "MOG joins")
   end)(),

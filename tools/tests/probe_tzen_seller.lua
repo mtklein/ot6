@@ -52,17 +52,21 @@ H.run({ maxFrames = 40000 }, flatten({
     H.screenshot("seller_reach")
   end),
   (function()
-    local phase, lastD = 0, -1
-    return H.driveUntil(function() return espers() > e0 end, 4000, {
+    -- ot6 renders dialog choices as a menu while dialogWaiting reads
+    -- false, and a held direction steers that menu -- the facing-press
+    -- RIGHT was selecting "No" before every confirm (measured: dlg $0621
+    -- looped forever, gil never moved).  So: press right+a only until
+    -- the dialog first opens, then plain A edges ONLY.
+    local t, talked = 0, false
+    return H.driveUntil(function() return espers() > e0 end, 6000, {
       H.call(function()
-        phase = (phase + 1) % 8
-        if H.dialogWaiting() then
-          local d = H.readWord(0x00d0)
-          if d ~= lastD then lastD = d; H.log(string.format("  dlg $%04X", d)) end
-          H.setPad(phase < 4 and { "a" } or {})
-          return
+        t = t + 1
+        if H.dialogWaiting() then talked = true end
+        if talked then
+          H.setPad(t % 24 < 3 and { "a" } or {})
+        else
+          H.setPad(t % 30 < 3 and { right = true, a = true } or { right = true })
         end
-        H.setPad(phase < 4 and { right = true, a = true } or { right = true })
       end),
     }, "SRAPHIM bought")
   end)(),
