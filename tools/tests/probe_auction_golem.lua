@@ -31,6 +31,15 @@ local function won() return espers0 ~= nil and espers() > espers0 end
 
 local function bumpIn(i)
   return {
+    -- burn wRand ($1f6d) IN TOWN before re-entering: the auction room's
+    -- crowd stands still (a wait there burns nothing -- 28 deterministic
+    -- lots measured, then 20 more with an in-room jitter), but the town
+    -- streets have RANDOM-movement NPCs whose direction rolls advance
+    -- the field Rand.  The wait varies per lot to walk the RNG table.
+    H.call(function()
+      H.log(string.format("lot %d: wRand=%02X", i, H.readByte(0x1f6d)))
+    end),
+    H.waitFrames(40 + (i * 97) % 240),
     H.navTo(26, 28, { maxFrames = 9000, playBattles = "flee" }),
     H.driveUntil(function() return mapIs(200) end, 600,
       { H.call(function() H.setPad({ up = true }) end) },
@@ -107,14 +116,14 @@ local steps = {
     H.log(string.format("boot: gil=%d espers=%d", gil(), espers0))
   end),
 }
-for i = 1, 14 do
+for i = 1, 40 do
   steps[#steps + 1] = H.cond(function() return not won() end,
     flatten({ bumpIn(i), auctionRound(i) }), {})
 end
 steps[#steps + 1] = H.call(function()
   H.log(string.format("GOLEM RESULT: gil=%d espers %d -> %d (%s)",
-    gil(), espers0, espers(), won() and "GOLEM WON" or "not drawn in 14 lots"))
+    gil(), espers0, espers(), won() and "GOLEM WON" or "not drawn in 40 lots"))
 end)
 steps[#steps + 1] = H.cond(won, { H.saveState("wob_golem_done.mss") }, {})
 steps[#steps + 1] = H.logStep(function() return "done" end)
-H.run({ maxFrames = 160000 }, flatten(steps))
+H.run({ maxFrames = 200000 }, flatten(steps))
