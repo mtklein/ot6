@@ -27,8 +27,24 @@ end
 H.run({ maxFrames = 60000 }, flatten({
   H.loadState("build/states/wob_chase23C.mss.lua"),
   H.waitFrames(8),
-  -- branch A: the east arm
-  H.navTo(60, 48, { maxFrames = 12000, playBattles = "flee" }),
+  -- from the chase spot the only link south is the exit row; ride it to
+  -- town (38,2) deliberately, then re-enter 21 at (26,50) and TAKE THE
+  -- RIGHT: east along the south strip to the arm at (60,48)
+  H.navTo(27, 51, { maxFrames = 9000, playBattles = "flee",
+    arrive = function() return mapIs(20) end }),
+  H.driveUntil(function() return mapIs(20) end, 900,
+    { H.call(function() H.setPad({ down = true }) end) }, "down to town"),
+  H.waitFrames(60),
+  H.navTo(36, 2, { maxFrames = 9000, playBattles = "flee",
+    arrive = function() return mapIs(21) end }),
+  H.driveUntil(function() return mapIs(21) end, 900,
+    { H.call(function() H.setPad({ up = true }) end) }, "back into 21"),
+  H.waitFrames(60),
+  H.call(function()
+    H.log(string.format("re-entered 21 at (%d,%d)", H.fieldX(), H.fieldY()))
+  end),
+  H.navTo(60, 48, { maxFrames = 15000, playBattles = "flee",
+    avoid = { {23,52},{24,52},{25,52},{26,52},{27,52},{28,52} } }),
   H.call(function()
     H.log(string.format("east arm at (%d,%d)", H.fieldX(), H.fieldY()))
     H.screenshot("east_arm")

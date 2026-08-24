@@ -8,11 +8,18 @@
 >
 > Status legend: ☐ todo · ◐ in progress · ☑ done. Kept current as work lands.
 
-## ▶ STATUS (2026-08-24: the wrap-up is done as far as the game permits)
+## ▶ STATUS (2026-08-24: two items left — Mog, then Water Rondo)
 
-Everything below is complete except two items **blocked by #134** (the
-Narshe cliff is unreachable, so WoB Mog — and Water Rondo, which needs
-him — wait on an owner call).  The headline results:
+**#134 is CLOSED — the cliff path exists.**  The missing link was a
+press-A secret: map 20's trigger (15,57) is the cracked wall — stand on
+it facing up with A held ($01B0-$01B4 are the LIVE PAD, not story
+switches) and the mine mouth at (14,54) blasts open ($01F0=1,
+map-init-persistent).  Behind it: door (15,56) → mine 41-NW → exit door
+(21,9) → town (23,44) "outside again" → west door (10,37) → caves
+48 → 49 → … the walkthrough's northern-mine chain to the cliffs.
+`probe_west_route.lua` is driving this now (49 is a slow-climb map; the
+patient-climber pattern applies).  Mog take + Water Rondo probes are
+staged and ready behind it.  The headline results:
 
 - **Grind**: L15–17 → **L24/L24/L25** (two rounds, ~45 fights, zero
   wipes) over the rolling-chunk driver; gil funded the whole shopping
@@ -91,12 +98,30 @@ repaired; the whole WoB world map is reachable.
 2. ☑ **Shop** — Earrings ×2 + Sniper Sight (Jidoor), RunningShoes
    (Tzen), all equipped for the verify.  Armor: the pre-FC ceiling is
    Mithril/Gaia (see the sweep).
-3. ⛔ **Mog** — BLOCKED by #134 (the cliff is unreachable; chase drives
-   to $023C and every mines route dead-ends — fixtures banked for repro).
-4. ⛔ **Water Rondo** — BLOCKED by #134 (needs Mog aboard).  The leg is
-   otherwise ready: the Crescent dive's post-scenario arm is live
-   ($0041=1, "Jump?"), the mountain door is (214,148), and the deck
-   party-change (talk to any crew member) covers the swap.
+3. ☑ **Mog** (2026-08-24) — recruited headless, `wob_mog_done.mss`
+   banked.  The route (decoded from live tile props + entrance records,
+   `probe_dump41/21.lua`, driven by `probe_cliff43_east.lua`):
+   chase to $023C (map 21 (31,22)) → long entrance (30,20) → cliff 43
+   → climb the 108-column to y≈45, push EAST at y44-46 (bridge tiles
+   bfs can't model) → door (113,45) → mine 41 shaft (58,11) → internal
+   door (57,21)→(25,58) → west door (18,51) → 21 ledge (36,25), climbs
+   to (24,10) → 41's closed east corridor (108,12)→(117,12) → 21
+   top-right (32,10) → row (35,1) → 22 → 23.  The hostage ledge is a
+   STILLNESS puzzle: step on (8-10,18) ("Don't move or this one's
+   dust…!", $023E + a 240-unit timer), then stand still — moving onto
+   (8,19)/(10,19)/(9,20) cancels it — until "Kupo!!" resolves ($023F).
+   Then Mog hangs at (5,16): walk the hidden west ledge to (6,16), face
+   LEFT, A (`probe_mog_take.lua`; naming menu committed with START;
+   Lone Wolf at (9,15)/right side = the Gold-Hairpin lose-Mog branch,
+   never touched).  Mog waits in the airship ($02FA=1, not in party).
+   Checkpoint fixtures: `wob_kupo.mss` (resolved standoff),
+   `wob_mog_done.mss` (recruited).
+4. ◐ **Water Rondo** — `probe_water_rondo.lua` running: blind descent
+   off 23 (bfs mismodels the post-scene map) → board → deck
+   party-change (X in flight → deck 6 → interior 7, bench Relm, seat
+   Mog via the $26 swap UI) → wheel Lift-off → fly to Crescent
+   Mountain (door (214,148)) → dive (8,11) A-only → trench ride with
+   tactical fights → assert the dances byte ($1D4C) changed.
 5. ☑ **Optional espers — obtained** (2026-08-24): Golem + Zoneseek at
    the auction, Sraphim at Tzen.  The full pre-FC esper set is aboard.
 6. ☑ **Optional espers — tuned** (d5de87e): Golem/Zoneseek/Sraphim had sat
