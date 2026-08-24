@@ -2302,6 +2302,21 @@ Ot6ShieldTbl:
         .byte   7, OT6_PIERCE   ; flameeater
         .word   $00de
         .byte   1, $00          ; balloon: vanilla ice/water pops them
+        .word   $0043
+        .byte   2, OT6_SLASH|OT6_PIERCE ; sky armor: IAF wave trash.
+                                ;   Previously un-authored, so the formula
+                                ;   fallback gave it a boss-scale 5-gauge --
+                                ;   and the gauntlet chains SIX waves of
+                                ;   2x sky armor + spit fire (form 175) with
+                                ;   no care window, ~15 pips a wave.  The
+                                ;   #133 verdict (floating-continent-route.md
+                                ;   S3): attrition wins at every level band
+                                ;   and kit up to L24 + full bolt.  2 pips =
+                                ;   the balloon precedent: repeating trash
+                                ;   pops fast; the real gauges stay on
+                                ;   Ultros/Chupon/AirForce below.
+        .word   $00e3
+        .byte   2, OT6_SLASH|OT6_PIERCE ; spit fire: same wave, same reasoning
         .word   $0168
         .byte   7, OT6_SLASH|OT6_PIERCE ; ultros 4: one last time
         .word   $012f

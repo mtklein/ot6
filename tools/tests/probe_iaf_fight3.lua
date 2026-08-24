@@ -38,7 +38,16 @@ local function nextTarget()
   for _, c in ipairs(TARGETS) do if not inGroup(c) then return c end end
   return nil
 end
-H.run({ maxFrames = 60000 }, {
+local function flatten(t)
+  local out = {}
+  for _, v in ipairs(t) do
+    if type(v) == "table" and v.tick == nil and v[1] ~= nil then
+      for _, s in ipairs(v) do out[#out + 1] = s end
+    else out[#out + 1] = v end
+  end
+  return out
+end
+H.run({ maxFrames = 100000 }, flatten({
   H.loadState("build/states/wob_grind_run.mss.lua"),
   H.waitFrames(8),
   -- the bolt kit: Ramuh + Earrings x2 on Strago, RunningShoes on Terra,
@@ -142,33 +151,110 @@ H.run({ maxFrames = 60000 }, {
     local g={} for i=0,3 do local c=rd(0x7e9d99+i); if c~=0xFF then g[#g+1]=string.format("$%02x",c) end end
     H.log("party formed: " .. table.concat(g, " "))
   end),
-  H.driveUntil(function()
-    if H.gameOverFired and H.gameOverFired > 0 then return true end
-    if (H.readWord(0x1f64) & 0x3ff) == 394 then return true end
-    local alive = 0
-    for _, v in ipairs(H.partyHp and H.partyHp() or {}) do if v > 0 then alive = alive + 1 end end
-    if alive < 2 and not H.battleActive() then
-      wipeHold = (wipeHold or 0) + 1
-    else wipeHold = 0 end
-    return (wipeHold or 0) >= 300
-  end, 40000, {
-    H.call(function()
-      local active = H.battleActive()
-      if active and not lastActive then
-        seenBattles = seenBattles + 1
-        local f = H.formationWords and H.formationWords() or {}
-        H.log(string.format("  [battle %d] f%d species=%s hp=%s", seenBattles, H.frame,
-          table.concat({f[1] or "?", f[2] or "?", f[3] or "?"}, ","), hpLine()))
+  -- per-wave loop with BETWEEN-WAVE CARE: field timers pause while a
+  -- menu is open (the vanilla IAF design intends menu heals between
+  -- waves), so after each fight ends, heal via fieldCare before the
+  -- next wave lands.  12 rounds covers 6x126 + Ultros/Chupon + AirForce
+  -- with slack.
+  (function()
+    local function ended()
+      if H.gameOverFired and H.gameOverFired > 0 then return true end
+      if (H.readWord(0x1f64) & 0x3ff) == 394 then return true end
+      local alive = 0
+      for _, c in ipairs(H.partyMembers()) do
+        if H.charHp(c) > 0 then alive = alive + 1 end
       end
-      lastActive = active
-      local s = H.readByte(0x26)
-      if active or H.battleLoadStarted() then F.frame()
-      elseif s == 0x2d then tap("start")
-      elseif s == 0x2e or s == 0x2f then tap("b")
-      elseif H.dialogWaiting() then H.setPad(H.frame % 8 < 4 and { "a" } or {})
-      else H.setPad({}) end
-    end)
-  }, "IAF chain -> FC or GameOver"),
+      if alive < 2 and not H.battleActive() then
+        wipeHold = (wipeHold or 0) + 1
+      else wipeHold = 0 end
+      return (wipeHold or 0) >= 300
+    end
+    local out = {}
+    for w = 1, 12 do
+      out[#out+1] = H.cond(function() return not ended() end, {
+        -- one wave: wait for it, fight it
+        H.driveUntil(function()
+          return ended() or (seenBattles >= w and not H.battleActive()
+            and not H.battleLoadStarted())
+        end, 20000, {
+          H.call(function()
+            local active = H.battleActive()
+            if active and not lastActive then
+              seenBattles = seenBattles + 1
+              local f = H.formationWords and H.formationWords() or {}
+              H.log(string.format("  [battle %d] f%d species=%s hp=%s", seenBattles, H.frame,
+                table.concat({f[1] or "?", f[2] or "?", f[3] or "?"}, ","), hpLine()))
+            end
+            if not active and lastActive then lastActive = false; return end
+            lastActive = active
+            local s = H.readByte(0x26)
+            if active or H.battleLoadStarted() then F.frame()
+            elseif s == 0x2d then tap("start")
+            elseif s == 0x2e or s == 0x2f then tap("b")
+            elseif H.dialogWaiting() then H.setPad(H.frame % 8 < 4 and { "a" } or {})
+            else H.setPad({}) end
+          end)
+        }, "wave " .. w),
+        H.waitFrames(20),
+        -- the care window: menu-heal while the wave timer is paused
+        -- soft pre-open: the inter-wave windows are short (256-512
+        -- frame timers) and the wave-6 teaser blocks menus, so try the
+        -- menu for <=400 frames and yield to any landing battle; only
+        -- hand fieldCare a menu that is already open ($26==0x05).
+        (function()
+          local t2 = 0
+          return H.cond(function()
+            t2 = 0
+            return not ended() and seenBattles < 8
+              and not H.battleActive() and not H.battleLoadStarted()
+          end, {
+            H.driveUntil(function()
+              t2 = t2 + 1
+              return t2 >= 400 or H.readByte(0x26) == 0x05
+                or H.battleActive() or H.battleLoadStarted()
+            end, 800, {
+              H.call(function()
+                if H.battleLoadStarted() then H.setPad({}); return end
+                H.setPad(t2 % 12 < 4 and { "x" } or {})
+              end),
+            }, "menu pre-open " .. w),
+            H.release(),
+            H.cond(function() return H.readByte(0x26) == 0x05 end,
+              { H.fieldCare({ tag = "iaf-care " .. w, threshold = 0.85 }) }, {}),
+            -- fieldCare no-ops when healthy and leaves our pre-opened
+            -- menu up -- which freezes the FIELD_ONLY wave timers.
+            -- Always close it.
+            (function()
+              local t3 = 0
+              return H.driveUntil(function()
+                t3 = t3 + 1
+                return t3 >= 600 or H.readByte(0x26) ~= 0x05
+              end, 900, {
+                H.call(function() H.setPad(t3 % 12 < 4 and { "b" } or {}) end),
+              }, "menu close " .. w)
+            end)(),
+            H.release(),
+            H.waitFrames(20),
+          }, {})
+        end)(),
+        -- after the six waves (ambush + 5 = battle 7), Ultros is armed
+        -- by WALKING to the deck's right edge (map 10 triggers (22,5-7)
+        -- -> _ca5a16, gated on the teaser's $01F0); step off and back on
+        -- each round until it fires
+        H.cond(function()
+          return not ended() and seenBattles == 7 and not H.battleActive()
+            and not H.battleLoadStarted() and (H.mapId() & 0x3ff) == 10
+        end, {
+          H.navTo(20, 6, { maxFrames = 2000, arrive = function()
+            return H.battleLoadStarted() or H.battleActive() end }),
+          H.navTo(22, 6, { maxFrames = 2000, arrive = function()
+            return H.battleLoadStarted() or H.battleActive() end }),
+          H.waitFrames(60),
+        }, {}),
+      }, {})
+    end
+    return out
+  end)(),
   H.call(function()
     local won = (H.readWord(0x1f64) & 0x3ff) == 394
     local how = won and "SURVIVED to the FC"
@@ -177,5 +263,9 @@ H.run({ maxFrames = 60000 }, {
       how, seenBattles, H.readWord(0x1f64) & 0x3ff, hpLine(), H.gameOverFired or 0))
     H.screenshot("iaf2_result")
   end),
+  H.cond(function() return (H.readWord(0x1f64) & 0x3ff) == 394 end, {
+    H.waitFrames(60),
+    H.saveState("fc_land.mss"),
+  }, {}),
   H.logStep(function() return "done" end),
-})
+}))

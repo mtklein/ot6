@@ -206,6 +206,34 @@ these levels even with perfect break/prep *and* a reasonable grind is a
 balance signal — retune the shield row"), the IAF gauntlet needs a #132
 retune: fewer pips per wave, fewer waves, or a care window between waves.
 
+**RETUNED (#132, 2026-08-24): SURVIVED to the FC.**  Two changes, both
+levers the verdict named:
+1. **Fewer pips per wave** — Sky Armor `$043` and Spit Fire `$0e3` were
+   *un-authored* in `Ot6ShieldTbl`, so the formula fallback gave the
+   repeating wave trash boss-scale 5-gauges (form 175 = 15 pips a wave,
+   six waves).  Authored rows: **2 pips each** (the balloon precedent —
+   trash pops fast; the real gauges stay on Ultros 7 / Chupon 4 /
+   AirForce 8).
+2. **Care stops** — two `call _cacfbd` (the tent heal: revive + full
+   HP/MP, the same sub the chain already ran before AirForce) after
+   waves 3 and 6.  Each three-wave stretch is now tight-but-winnable
+   (~300 HP bleed/wave against a ~1000 pool) instead of an eight-fight
+   attrition ramp.
+
+Also measured while fixing the probe: **the field menu opens fine
+between waves** (the wave timers are FIELD_ONLY and pause in menus), so
+vanilla-style menu healing works too — the earlier "no care window"
+read was a probe-sequencing artifact.  Ultros④ is armed by *walking* to
+the deck's right edge (map 10 triggers (22,5-7) → `_ca5a16`, gated on
+the teaser's `$01F0`); after Ultros the script auto-chains into
+AirForce with its own tent call — no field window there.
+
+The full measured run (`probe_iaf_fight3.lua`, L24/24/25 bolt kit):
+6× `battle 126` each entered at/near full HP, Ultros④+Chupon won in
+~12k frames, AirForce in two rounds, **landing on map 394** with the
+party at 739/787/544 going in.  Fixture banked: `fc_land.mss` (the
+Floating Continent arrival, segment 2's boot state).
+
 **Live-confirmed:** `tools/tests/probe_iaf.lua` drives the whole entry headless
 (board → discovery → deck → "Find the FC" → the party-formation menu → the
 ambush) and reads `battle 126` in the emulator as **Sky Armor `$043` + Spit Fire

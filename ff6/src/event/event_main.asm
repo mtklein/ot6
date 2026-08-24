@@ -13466,6 +13466,7 @@ _ca59a0:
         stop_timer 0
         battle 126, AIRSHIP_CENTER
         call _ca5ea9
+        call _cacfbd     ; ot6 #132: mid-gauntlet care stop (tent heal; see floating-continent-route.md S3)
         fade_in
         start_timer 0, 320, _ca59b1, FIELD_ONLY
         return
@@ -13532,6 +13533,7 @@ _ca5a0b:
         stop_timer 0
         battle 126, AIRSHIP_CENTER
         call _ca5ea9
+        call _cacfbd     ; ot6 #132: care stop before Ultros (the AirForce one at _cacfbd's third call predates this)
         fade_in
         return
 _ca5a16:
