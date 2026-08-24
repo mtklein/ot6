@@ -86,8 +86,22 @@ repaired; the whole WoB world map is reachable.
    auction), Sraphim (Tzen 3000 GP) ← the obtain targets. **WoR-gated (12):**
    Terrato, Palidor, Tritoch, Odin, Raiden, Bahamut, Alexandr, Crusader,
    Ragnarok, Fenrir, Starlet, Phoenix.
-8. ☐ **Sweep for other WoB optional content** reachable by airship pre-FC
-   (colosseum? Zozo/other shops? Gau rages?) — note anything worth tuning.
+8. ◐ **Sweep for other WoB optional content** reachable by airship pre-FC —
+   findings so far (2026-08-24):
+   - **Vector burns with the story** ($0079): its shops — the only WoB
+     Thunder Rod and the whole Gold armor tier — are gone pre-FC.  The
+     pre-FC armor ceiling is Mithril/Gaia/bard tier; the IAF attrition
+     data (wave 7 of 8 at L21/22 with that tier) is the live consequence.
+     Tuning question for #132: is that ceiling intended?
+   - **Colosseum**: WoR-only, nothing pre-FC.  **Moogle-den carving /
+     Terrato**: verified to live in Umaro's WoR cave (map 283) — the
+     esper audit's WoR gating stands.
+   - **Gau rages**: the Veldt is airship-reachable pre-FC for leaps
+     (optional; Gau is L15 and benched in this route).
+   - The full WoB town roster is now decoded from the entrance data (45
+     doors + 9 event triggers; see the 2026-08-24 commits): the gated
+     doors (64,76)/(30,48)→map 55 [$010B/$010C] and (179,71)→map 117
+     [$0037] are story-locked in this state.
 
 ## Then (out of scope for this goal, tracked in #132)
 
