@@ -8,18 +8,21 @@
 >
 > Status legend: ☐ todo · ◐ in progress · ☑ done. Kept current as work lands.
 
-## ▶ STATUS (2026-08-24: two items left — Mog, then Water Rondo)
+## ▶ STATUS (2026-08-24: **THE WRAP-UP IS COMPLETE** — every item ☑)
 
-**#134 is CLOSED — the cliff path exists.**  The missing link was a
-press-A secret: map 20's trigger (15,57) is the cracked wall — stand on
-it facing up with A held ($01B0-$01B4 are the LIVE PAD, not story
-switches) and the mine mouth at (14,54) blasts open ($01F0=1,
-map-init-persistent).  Behind it: door (15,56) → mine 41-NW → exit door
-(21,9) → town (23,44) "outside again" → west door (10,37) → caves
-48 → 49 → … the walkthrough's northern-mine chain to the cliffs.
-`probe_west_route.lua` is driving this now (49 is a slow-climb map; the
-patient-climber pattern applies).  Mog take + Water Rondo probes are
-staged and ready behind it.  The headline results:
+All eight checklist items are done headless.  The last two to land:
+**Mog recruited** (the cliff route fully decoded from live tile props +
+entrance records; the hostage ledge is a stillness puzzle; he's taken
+off the west cliff edge at (6,16) facing left) and **Water Rondo
+learned** (dances $00→$20 on the Serpent Trench, with the deck
+party-change seating Mog first).  Chain of banked fixtures:
+`wob_kupo.mss` → `wob_mog_done.mss` → `wob_lounge.mss` →
+`wob_mog_party.mss` → `wob_rondo_done.mss` (party at Nikeah, Mog
+aboard with Water Rondo).  Two durable tooling lessons out of the
+final legs: bfs is unreliable right after event scenes (blind
+waypoint walks from offline tile-prop solves are the fix), and dialog
+choices are closed-loop steerable via $056E/$056F — never ride a
+choice blind again.  The headline results:
 
 - **Grind**: L15–17 → **L24/L24/L25** (two rounds, ~45 fights, zero
   wipes) over the rolling-chunk driver; gil funded the whole shopping
@@ -116,12 +119,23 @@ repaired; the whole WoB world map is reachable.
    never touched).  Mog waits in the airship ($02FA=1, not in party).
    Checkpoint fixtures: `wob_kupo.mss` (resolved standoff),
    `wob_mog_done.mss` (recruited).
-4. ◐ **Water Rondo** — `probe_water_rondo.lua` running: blind descent
-   off 23 (bfs mismodels the post-scene map) → board → deck
-   party-change (X in flight → deck 6 → interior 7, bench Relm, seat
-   Mog via the $26 swap UI) → wheel Lift-off → fly to Crescent
-   Mountain (door (214,148)) → dive (8,11) A-only → trench ride with
-   tactical fights → assert the dances byte ($1D4C) changed.
+4. ☑ **Water Rondo** (2026-08-24) — **dances $00 → $20**, learned on
+   the Serpent Trench ride; `wob_rondo_done.mss` banked (ends at
+   Nikeah, map 187).  The leg, all headless: cliff descent (blind
+   waypoint walks — bfs mismodels 21/22/23 after scenes; corners
+   offline-solved from tile-prop dumps) → reverse mine chain → town →
+   board → X-deck → interior lounge (map 7 (50,55)) → talk to a roster
+   char → "Change party members?" → the party-select swap UI decoded
+   the hard way (reserve = 8-wide 2-row grid, group = the classic 2x2,
+   swap-pair semantics, $26 only meaningful while control is gone) →
+   RELM benched, MOG seated → wheel (14,6) with the live-pad gate
+   (RIGHT+A held — $01B0=up calibrates the nibble) → Lift-off picked
+   via **closed-loop choice steering ($056E=row, $056F=max; steer,
+   verify, then A)** — the definitive fix for the held-direction
+   choice-menu trap → calibrated flight → Crescent → dive → trench
+   with tactical fights.  Probe chain: `probe_lounge_bank.lua` →
+   `probe_party_change.lua` → `probe_water_rondo.lua` (fixtures
+   `wob_lounge.mss`, `wob_mog_party.mss`, `wob_rondo_done.mss`).
 5. ☑ **Optional espers — obtained** (2026-08-24): Golem + Zoneseek at
    the auction, Sraphim at Tzen.  The full pre-FC esper set is aboard.
 6. ☑ **Optional espers — tuned** (d5de87e): Golem/Zoneseek/Sraphim had sat

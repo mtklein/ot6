@@ -43,7 +43,15 @@ local function bestDir(ex, ey)
   end
   return best
 end
+local flyT = 0
 local function flyFrame()
+  flyT = flyT + 1
+  if flyT % 900 == 0 then
+    H.log(string.format("  fly t=%d mode=%s tile=(%d,%d) $20=%02X world=%s calI=%d cand=%d",
+      flyT, mode, fineX() >> 12, fineY() >> 12, rd(0x20),
+      tostring(H.worldMode()), calI, candI))
+  end
+  if flyT == 6000 then H.screenshot("fly6000") end
   if mode == "calib" then
     local d = DIRS[calI]
     if calT == 0 then calX, calY = fineX(), fineY() end
@@ -52,7 +60,15 @@ local function flyFrame()
     if calT <= 45 then H.setPad({}); return end
     cal[d] = { x = (fineX() - calX) / 30, y = (fineY() - calY) / 30 }
     calI, calT = calI + 1, 0
-    if calI > #DIRS then mode = "travel" end
+    if calI > #DIRS then
+      -- the wheel lift-off animation can eat the whole first pass;
+      -- if nothing moved, calibrate again
+      local moved = false
+      for _, v in pairs(cal) do
+        if math.abs(v.x) + math.abs(v.y) > 16 then moved = true end
+      end
+      if moved then mode = "travel" else calI = 1 end
+    end
     return
   end
   if mode == "travel" then
@@ -111,288 +127,61 @@ local tactical = H.newFightDriver("rondo", { tactical = true, boost = true,
   items = true, healPercent = 55 })
 
 H.run({ maxFrames = 120000 }, flatten({
-  H.loadState("build/states/wob_mog_done.mss.lua"),
-  H.waitFrames(8),
+  H.loadState("build/states/wob_mog_party.mss.lua"),
+  H.waitFrames(30),
   H.call(function()
     d0 = dances()
-    H.log(string.format("boot: dances=%02X mog-party=%d $2FA=%d map=%d (%d,%d)",
-      d0, H.readByte(0x1850 + 10) & 0x07, sw(0x2FA),
-      H.mapId() & 0x3ff, H.fieldX(), H.fieldY()))
-    H.assertEq(sw(0x2FA) == 1, true, "MOG is recruited (cliff join done)")
-  end),
-  -- down the cliffs: 23 -> 22 -> 21 -> town -> world.  bfs mismodels
-  -- map 23 right after the join scene (the party reads as a 1-tile
-  -- island at (10,17)), so the first hop is a blind waypoint walk along
-  -- the known corridor, no pathfinder involved.
-  (function()
-    local wps = { {10,18},{12,18},{13,19},{13,20},{24,20},{25,21},{25,31},{25,33} }
-    local wi, t, wt = 1, 0, 0
-    return H.driveUntil(function() return mapIs(22) end, 12000, {
-      H.call(function()
-        t = t + 1
-        if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}); return end
-        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
-        local wp = wps[wi]
-        if not wp then H.setPad({ down = true }); return end
-        local dx, dy = wp[1] - H.fieldX(), wp[2] - H.fieldY()
-        wt = wt + 1
-        if (dx == 0 and dy == 0) or wt > 900 then
-          wi, wt = wi + 1, 0
-          H.setPad({})
-          return
-        end
-        local d = math.abs(dx) >= math.abs(dy)
-          and (dx > 0 and "right" or "left")
-          or (dy > 0 and "down" or "up")
-        H.setPad({ [d] = true })
-      end),
-    }, "blind descent 23 -> 22")
-  end)(),
-  H.waitFrames(60),
-  -- 22 -> 21 top-right.  A nudge first: the party's z is stale right
-  -- after a teleport and bfs reads the map as a tiny island until one
-  -- real step normalizes it.
-  (function()
-    local function nudge(dir, n)
-      return { H.hold({ dir }), H.waitFrames(n or 250), H.release(),
-               H.waitFrames(20) }
-    end
-    local function doorHop(x, y, avoid, destPred, dir, tag)
-      local t = 0
-      return {
-        H.navTo(x, y, { maxFrames = 12000, playBattles = "flee",
-          arrive = destPred, avoid = avoid }),
-        H.driveUntil(destPred, 2000, {
-          H.call(function()
-            t = t + 1
-            if H.dialogWaiting() then H.setPad(t % 8 < 4 and { "a" } or {})
-            else H.setPad({ [dir] = true }) end
-          end),
-        }, tag),
-        H.waitFrames(50),
-        H.call(function()
-          H.log(string.format("[%s] map %d (%d,%d)", tag, H.mapId() & 0x1ff,
-            H.fieldX(), H.fieldY()))
-        end),
-      }
-    end
-    -- the descent retraces the mine chain: 21's top-right component has
-    -- no walk link to town (tile-prop verified), so back through 41/43.
-    return flatten({
-      nudge("down"),
-      doorHop(16, 40, nil, function() return mapIs(21) end, "down", "22 -> 21 top"),
-      nudge("down"),
-      doorHop(31, 10, nil, function() return mapIs(41) end, "up",
-        "21 -> 41 corridor"),
-      nudge("left"),
-      doorHop(107, 12, { {117,12} }, function() return mapIs(21) end, "up",
-        "corridor -> 21 ledge side"),
-      nudge("down"),
-      doorHop(37, 25, { {24,10} }, function() return mapIs(41) end, "down",
-        "21 ledge -> 41 west"),
-      nudge("down"),
-      doorHop(25, 59, { {18,51} },
-        function() return mapIs(41) and H.fieldX() > 50 end, "down",
-        "41 west -> shaft"),
-      nudge("down"),
-      doorHop(57, 11, { {57,21} }, function() return mapIs(43) end, "up",
-        "shaft -> 43"),
-      -- 43: west off the ledge back to the entry column, then down it
-      H.hold({ "left" }), H.waitFrames(1200), H.release(), H.waitFrames(30),
-      nudge("down"),
-      doorHop(108, 59, nil, function() return mapIs(21) end, "down",
-        "43 -> 21 chase"),
-      nudge("down"),
-      doorHop(24, 52, nil, function() return mapIs(20) end, "down",
-        "21 -> town"),
-    })
-  end)(),
-  H.navTo(38, 61, { maxFrames = 12000, playBattles = "flee",
-    arrive = function() return H.worldMode() end }),
-  H.driveUntil(function() return H.worldMode() end, 900,
-    { H.call(function() H.setPad({ down = true }) end) }, "out to the world"),
-  H.waitFrames(60),
-  -- board and fly to Crescent Mountain
-  H.worldNavTo(function() return H.readByte(0x1f62) end,
-               function() return H.readByte(0x1f63) end,
-    { maxFrames = 8000, playBattles = "tactical",
-      arrive = function() return not H.worldMode() end }),
-  H.driveUntil(function() return rd(0x20) == 1 end, 1200,
-    { H.call(function() H.setPad(H.frame % 16 < 4 and { "a" } or {}) end) },
-    "aboard"),
-  H.waitFrames(150),
-  -- ============ deck party-change: bench Relm, seat MOG ============
-  -- X in flight opens the deck (map 6); door (20,6) -> interior (map 7,
-  -- (40,11)) where map-init _caf47c stands the reserve roster up.  Talk
-  -- to a roster NPC -> char line -> "Change party members?" (0 No/1 Yes,
-  -- so down-then-A) -> the swap UI ($26 in 2c..2f, probe_iaf's decode).
-  H.driveUntil(function() return not H.worldMode() and (H.mapId() & 0x1ff) == 6 end,
-    1500, { H.call(function() H.setPad(H.frame % 12 < 3 and { x = true } or {}) end) },
-    "deck via X"),
-  H.waitFrames(90),
-  H.navTo(20, 6, { maxFrames = 4000,
-    arrive = function() return mapIs(7) end }),
-  H.driveUntil(function() return mapIs(7) end, 900,
-    { H.call(function() H.setPad({ up = true }) end) }, "into the interior"),
-  H.waitFrames(60),
-  H.call(function()
-    H.log(string.format("interior at (%d,%d)", H.fieldX(), H.fieldY()))
-    H.screenshot("interior")
-  end),
-  (function()
-    local function menuState() local s = H.readByte(0x26); return s >= 0x2c and s <= 0x2f end
-    local function idx() return H.readByte(0x4b) + H.readByte(0x4a) + H.readByte(0x5a) end
-    local function charAt(i) return rd(0x7e9d89 + i) end
-    local function mogSeated() return (H.readByte(0x1850 + 10) & 0x07) ~= 0 end
-    local function firstEmptyGroupSlot()
-      for _, i in ipairs({ 0x10, 0x11, 0x12, 0x13 }) do
-        if charAt(i) == 0xFF then return i end
-      end
-      return nil
-    end
-    local function relmGroupSlot()
-      for _, i in ipairs({ 0x10, 0x11, 0x12, 0x13 }) do
-        if charAt(i) == 8 then return i end
-      end
-      return nil
-    end
-    local phase = 0
-    local function tap(btn) phase = (phase + 1) % 9
-      H.setPad(phase < 3 and { [btn] = true } or {}) end
-    local function tapB(btn) phase = (phase + 1) % 9
-      H.setPad(phase < 3 and { btn } or {}) end
-    local t, scanDir, scanT = 0, "right", 0
-    local held = nil                        -- who the cursor is carrying
-    -- the talk spots: near the interior spawn; face-press A around the
-    -- room, riding whatever answers
-    local spots = { {40,12,"down"},{39,11,"left"},{41,11,"right"},{40,11,"up"},
-                    {38,12,"left"},{42,12,"right"},{40,14,"down"},{37,11,"up"},
-                    {43,11,"up"},{40,16,"down"} }
-    local si = 1
-    local walker = nil
-    return H.driveUntil(function()
-      return mogSeated() and not menuState() and H.hasControl()
-        and not H.dialogWaiting()
-    end, 20000, {
-      H.call(function()
-        t = t + 1
-        if menuState() then
-          walker = nil
-          local s = H.readByte(0x26)
-          if s == 0x2d then                       -- browsing
-            if relmGroupSlot() then               -- 1: grab Relm
-              if H.readByte(0x4a) ~= 0x10 then tap("down")
-              else
-                local tgt = relmGroupSlot()
-                local cc, cr = (idx() >> 1) & 1, idx() & 1
-                local tc, tr = (tgt >> 1) & 1, tgt & 1
-                if cc < tc then tap("right") elseif cc > tc then tap("left")
-                elseif cr < tr then tap("down") elseif cr > tr then tap("up")
-                else held = "relm"; tapB("a") end
-              end
-            elseif firstEmptyGroupSlot() then     -- 3: grab Mog in reserve
-              if H.readByte(0x4a) ~= 0 then tap("up")
-              elseif charAt(idx()) ~= 0x0A then
-                scanT = scanT + 1
-                if scanT > 360 then scanDir = scanDir == "right" and "left" or "right"; scanT = 0 end
-                tap(scanDir)
-              else held = "mog"; tapB("a") end
-            else                                  -- 5: full group -> confirm
-              tapB("start")
-            end
-          elseif s == 0x2e then                   -- holding someone
-            if held == "relm" then                -- 2: drop her in reserve
-              if H.readByte(0x4a) ~= 0 then tap("up")
-              elseif charAt(idx()) ~= 0xFF then
-                scanT = scanT + 1
-                if scanT > 360 then scanDir = scanDir == "right" and "left" or "right"; scanT = 0 end
-                tap(scanDir)
-              else tapB("a") end
-            else                                  -- 4: place Mog in the group
-              if H.readByte(0x4a) ~= 0x10 then tap("down")
-              else
-                local tgt = firstEmptyGroupSlot()
-                if not tgt then tapB("b")
-                else
-                  local cc, cr = (idx() >> 1) & 1, idx() & 1
-                  local tc, tr = (tgt >> 1) & 1, tgt & 1
-                  if cc < tc then tap("right") elseif cc > tc then tap("left")
-                  elseif cr < tr then tap("down") elseif cr > tr then tap("up")
-                  else tapB("a") end
-                end
-              end
-            end
-          else tapB("b") end
-          return
-        end
-        if H.dialogWaiting() then
-          walker = nil
-          -- choice-bearing dialogs put the cursor on row 0 ("No"); one
-          -- down edge then A edges picks "Yes" (harmless on plain text)
-          local ph = t % 32
-          if ph < 3 then H.setPad({ down = true })
-          elseif ph >= 8 and ph < 11 then H.setPad({ "a" })
-          else H.setPad({}) end
-          return
-        end
-        if not H.hasControl() then H.setPad({}); return end
-        -- walking: face-press A at the next talk spot
-        if walker == nil then
-          local s = spots[si]
-          si = si % #spots + 1
-          walker = { x = s[1], y = s[2], dir = s[3], stage = 0, st = 0 }
-        end
-        local w = walker
-        w.st = w.st + 1
-        if w.stage == 0 then
-          local dx, dy = w.x - H.fieldX(), w.y - H.fieldY()
-          if dx == 0 and dy == 0 then w.stage = 1; w.st = 0
-          elseif w.st > 600 then walker = nil
-          else
-            local d = math.abs(dx) > math.abs(dy)
-              and (dx > 0 and "right" or "left")
-              or (dy > 0 and "down" or "up")
-            H.setPad({ [d] = true })
-          end
-        else
-          if w.st < 3 then H.setPad({ [w.dir] = true })
-          elseif w.st < 12 then H.setPad({})
-          elseif w.st < 16 then H.setPad({ "a" })
-          elseif w.st < 60 then H.setPad({})
-          else walker = nil end
-        end
-      end),
-    }, "MOG seated via the deck party-change")
-  end)(),
-  H.waitFrames(60),
-  H.call(function()
-    H.log(string.format("party bytes: mog=%02X relm=%02X",
-      H.readByte(0x1850 + 10), H.readByte(0x1850 + 8)))
-    H.screenshot("party_changed")
+    local mogParty = H.readByte(0x1850 + 10) & 0x07
+    H.log(string.format("boot: dances=%02X mog-party=%d map=%d (%d,%d)",
+      d0, mogParty, H.mapId() & 0x3ff, H.fieldX(), H.fieldY()))
+    H.assertEq(mogParty ~= 0, true, "MOG is in the active party")
   end),
   -- back to the deck and the wheel: Lift-off
+  H.navTo(50, 50, { maxFrames = 4000,
+    arrive = function() return H.fieldX() < 45 end }),
+  H.driveUntil(function() return H.fieldX() < 45 end, 900,
+    { H.call(function() H.setPad({ up = true }) end) }, "out of the lounge"),
+  H.waitFrames(40),
   H.navTo(40, 10, { maxFrames = 4000,
     arrive = function() return mapIs(6) end }),
   H.driveUntil(function() return mapIs(6) end, 900,
     { H.call(function() H.setPad({ up = true }) end) }, "back on deck"),
   H.waitFrames(60),
-  H.navTo(15, 8, { maxFrames = 2000,
+  -- the wheel is the (14,6) step-trigger with the live-pad gate
+  -- $01B3+$01B4 = RIGHT+A held (bit calibration from the cracked wall:
+  -- $01B0=up, so bit3=right): stand on it pressing right+A into the
+  -- wheel (the book NPC at (15,6) pins the step)
+  H.navTo(14, 6, { maxFrames = 2000,
     arrive = function() return H.dialogWaiting() end }),
   (function()
     local t = 0
-    return H.driveUntil(function() return rd(0x20) == 1 end, 3000, {
+    return H.driveUntil(function() return rd(0x20) == 1 end, 6000, {
       H.call(function()
         t = t + 1
+        -- CLOSED-LOOP choice steering: $056E = current selection,
+        -- $056F = max selection (0 = no choice active).  Steer to the
+        -- Lift-off row and only press A once the cursor verifiably
+        -- sits there.  dlg $0527 = FC/Lift-off/Not-yet (want row 1);
+        -- $052A = Lift-off/Not-yet (want row 0).
+        local mx = H.readByte(0x056F)
+        if mx > 0 then
+          local want = (H.readWord(0x00d0) == 0x0527) and 1 or 0
+          local sel = H.readByte(0x056E)
+          local ph = t % 24
+          if sel < want then H.setPad(ph < 3 and { down = true } or {})
+          elseif sel > want then H.setPad(ph < 3 and { up = true } or {})
+          else H.setPad((ph >= 12 and ph < 15) and { "a" } or {}) end
+          return
+        end
         if H.dialogWaiting() then
-          -- dlg $0527 (FC/Lift-off/Not yet): down once then A edges;
-          -- dlg $052A (Lift-off/Not yet): A edges pick row 0 = Lift-off
-          local three = H.readWord(0x00d0) == 0x0527
-          local ph = t % 32
-          if three and ph < 3 then H.setPad({ down = true })
-          elseif ph >= 8 and ph < 11 then H.setPad({ "a" })
-          else H.setPad({}) end
+          H.setPad(t % 16 < 4 and { "a" } or {})
+          return
+        end
+        if H.hasControl() then
+          -- approach: press right+A into the wheel (live-pad gate)
+          H.setPad({ right = true, a = true })
         else
-          H.setPad(t % 24 < 3 and { up = true, a = true } or { up = true })
+          H.setPad({})
         end
       end),
     }, "Lift-off")
