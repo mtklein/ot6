@@ -84,6 +84,7 @@ local function present(m) return H.readByte(0x3AA8 + m * 2) % 2 == 1 end
 local function dead(m) return H.readByte(0x3EE4 + ent(m)) & 0x80 ~= 0 end
 
 local cyanSlot, msPresent = nil, {}
+local b1HpBefore = nil
 local function bp() return H.readByte(0x3E9C + cyanSlot * 2) end
 local function pend() return H.readByte(0x3E9D + cyanSlot * 2) end
 local function latchSet() return (H.readByte(DIVINE_USED) & (1 << cyanSlot)) ~= 0 end
@@ -116,6 +117,7 @@ end
 -- ---- shared drive helpers ----------------------------------------------
 local function surveyBattle()
   cyanSlot, msPresent = nil, {}
+  b1HpBefore = nil
   for s = 0, 3 do
     if H.readByte(0x3ED8 + s * 2) == CYAN then cyanSlot = s end
   end
@@ -332,6 +334,7 @@ add({
     H.assertEq(latchSet(), false, "latch left clear for the fallback cast")
   end),
 })
+add({ H.call(function() b1HpBefore = mhp(msPresent[1]) end) })
 add(castRow2("battle 1"))
 add({
   resolveCast("battle 1: the unbroken action resolves"),
@@ -347,6 +350,13 @@ add({
     H.assertEq(dead(m), false, "the unbroken commander took no Death")
     H.assertEq(present(m), true, "and is still present")
     H.assertEq(latchSet(), false, "the divine latch stays CLEAR on a fallback")
+    -- #71 item 2: the positive witness.  Every assertion above is about
+    -- what the fallback did NOT do (no Death, no kill, no latch), so an
+    -- Ot6Oblivion unbroken arm rewritten to power 0 -- a wasted turn
+    -- plus the MP -- passed all four.  The Tempest hit must land:
+    H.assertEq(mhp(m) < b1HpBefore, true, string.format(
+      "the reduced fallback DEALT damage (hp %d -> %d) -- a power-0 or "
+      .. "bailing unbroken arm fails here", b1HpBefore, mhp(m)))
     watching = false
     H.screenshot("divine_oblivion_fallback")
   end),

@@ -195,6 +195,17 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(20),
 
   -- ------------------------------------------------ 1. detect build + table --
+  -- #71 item 8, acknowledged and accepted: this self-detection inverts
+  -- every expectation with the build -- turn OT6_MP_COSTS off in the
+  -- SHIPPED ROM and this file detects "off", asserts SwdTech is free,
+  -- and passes.  The guard that catches that regression is structural
+  -- and lives OUTSIDE this file: the Makefile's `test` recipe builds
+  -- the nomp baseline and byte-compares it against the shipped ROM
+  -- (Makefile "nomp-rom": the ON ROM must differ from the OFF
+  -- baseline, or the flag is dead code), and runs this same instrument
+  -- on the OFF build expecting the free arm.  A shipped ROM with the
+  -- flag silently off fails THAT compare, not this file -- by design,
+  -- since one self-detecting instrument on both builds is the A/B.
   H.call(function()
     local sig = { 0x5d, 0x04, 0x5e, 0x0a, 0x5f, 0x0d }   -- Pummel/AuraBolt/Suplex
     local base

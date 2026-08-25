@@ -37,9 +37,14 @@ H.run({ maxFrames = 20000 }, {
       if (H.readByte(0x3aa8 + slot*2) & 1) == 1
         and (H.readByte(0x3eec + slot*2) & 0xc2) == 0 then alive = true end
     end
-    if alive then
-      H.assertEq(H.fieldHudPresent(), true, "hud survives the attack round")
-    end
+    -- #71 item 7: `if alive then assert` with nothing requiring alive to
+    -- ever be true -- both lobos dying inside the blind 600-frame window
+    -- skipped the headline check silently.  The premise is now asserted:
+    -- this file stages a fight precisely so the HUD has somebody to draw.
+    H.assertEq(alive, true,
+      "a monster survived the attack round (premise: the headline HUD " ..
+      "check below must run, not be skipped by a double kill)")
+    H.assertEq(H.fieldHudPresent(), true, "hud survives the attack round")
     H.assertEq(H.isPipGlyph(H.pipWord()), true, "pips survive the attack round")
   end),
 })

@@ -2766,7 +2766,12 @@ gaugefull:
         bcc     _11ba       ; return if less than advance wait duration
 @11aa:  lda     #$ff
         sta     $322c,x     ; disable advance wait
-        jsr     _c24e77       ; add action to queue
+        jsl     Ot6BrokenTurnGate ; #85: was `jsr _c24e77`.  A broken
+                            ;   monster's ready turn is LOST: the gate
+                            ;   skips only the queue-add, leaving the
+                            ;   flags vanilla -- byte-equivalent to
+                            ;   add-then-null, the state the $3820 jump
+                            ;   removal already creates and handles.
         lda     #$20
 
 SetFlag0:

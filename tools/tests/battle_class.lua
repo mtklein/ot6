@@ -240,9 +240,11 @@ H.run({ maxFrames = 90000 }, {
     local r1, r2 = classRev()
     H.assertEq(r1, 0, "guard 1 opens with no class revealed")
     H.assertEq(r2, 0, "guard 2 opens with no class revealed")
-    local cb = codexBase()
-    H.assertEq(sram(cb), 0x4f, "active codex magic 'O'")
-    H.assertEq(sram(cb + 1), 0x38, "active codex magic '8'")
+    -- (#71 item 9: the codex-magic asserts that stood here were a
+    -- write-then-read tautology -- H.loadState writes 0x4f/0x38 into
+    -- every page header on each load and codexBase() always returns one
+    -- of those pages, so no ROM change could fail them.  Dropped;
+    -- battle_codex's slot-1 planted-header case is the real check.)
   end),
   report("seeded"),
 

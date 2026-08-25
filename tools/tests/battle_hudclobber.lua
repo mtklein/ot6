@@ -164,6 +164,15 @@ H.run({ maxFrames=24000 }, {
     H.assertEq(junkFrames, 0, string.format(
       "the HUD never rendered break/shield/icon glyphs from blanked tiles "
       .. "(junkFrames=%d, worst %d cells at f%d)", junkFrames, maxJunk, worstFrame))
+    -- #71 item 1: junkFrames == 0 proves only the HAZARD arm -- make the
+    -- veil permanent (or delete the under-enemy HUD) and it stays green.
+    -- The repaint half -- the thing this file is NAMED for -- needs the
+    -- battle_whelkwipe:242 control: the HUD is PRESENT and its glyphs are
+    -- intact once the fight settles.
+    H.assertEq(H.fieldHudPresent(), true,
+      "the HUD repainted once the tiles were whole -- a permanent veil or " ..
+      "a deleted under-enemy HUD fails here, not silently")
+    H.glyphCanary()
     H.screenshot("hudclobber_final")
   end),
 })

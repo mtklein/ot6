@@ -172,7 +172,7 @@ H.run({ maxFrames = 70000 }, {
     end
 
     -- 2. A fresh, never-chipped, not-in-codex enemy draws '?', not a glyph.
-    local checked = 0
+    local checked, sawQ = 0, false
     for slot = 0, 5 do
       if present(slot) then
         local relm = H.readByte(0x3e91 + slot * 2)
@@ -186,11 +186,22 @@ H.run({ maxFrames = 70000 }, {
           local g = wcell(slot, k)
           H.assertEq(g == 0xBF or g == 0xFF or g == 0x00, true,
             string.format("slot %d cell %d is '?'/blank, not a leaked glyph (got %02X)", slot, k, g))
+          if g == 0xBF then sawQ = true end
         end
         checked = checked + 1
       end
     end
     H.assertEq(checked > 0, true, "at least one fresh enemy on screen")
+    -- #71 item 6: the accept-set above ('?'/blank) is satisfied by an
+    -- UNPOPULATED shadow line -- under OT6_RAM_POWERON=AllOnes every cell
+    -- reads $FF and the file goes green with Ot6BgHudLine's weakness
+    -- write gutted.  The control: at least one populated row actually
+    -- drew the '?' glyph ($BF), which only the real writer produces --
+    -- the file's own premise (:49, 'the fresh enemy draws ?') asserted
+    -- instead of assumed.
+    H.assertEq(sawQ, true,
+      "control: some cell drew the real '?' glyph ($BF) -- the HUD line " ..
+      "writer ran; an unpopulated (all-$FF) shadow line fails here")
     H.screenshot("reveal_poweron_hidden")
   end),
 })

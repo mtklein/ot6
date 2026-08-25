@@ -44,8 +44,18 @@ H.run({ maxFrames = 45000 }, {
   H.waitFrames(240),
   H.call(function()
     for n, base in ipairs({ 0x316000, 0x316400, 0x316800 }) do
-      H.assertEq(sram(base), 0x4f, "slot "..n.." codex magic 'O'")
-      H.assertEq(sram(base+1), 0x38, "slot "..n.." codex magic '8'")
+      if n == 1 then
+        -- slot 1's magic was deliberately broken above (0x37 planted),
+        -- so these two CAN fail: the engine re-magicked the header.
+        -- Slots 2 and 3 were never planted, and H.loadState writes
+        -- 0x4f/0x38 into all four page headers on every load
+        -- (lib/ot6.lua:306-312), so asserting them was a
+        -- write-then-read tautology that no ROM change could fail
+        -- (#71 item 9) -- dropped for those slots.
+        H.assertEq(sram(base), 0x4f, "slot "..n.." codex magic 'O' " ..
+          "(re-magicked from the planted 0x37)")
+        H.assertEq(sram(base+1), 0x38, "slot "..n.." codex magic '8'")
+      end
       H.assertEq(sram(base+0x10) & 0x08, 0x08,
         "legacy knowledge migrated into slot "..n)
     end

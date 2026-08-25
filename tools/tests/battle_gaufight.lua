@@ -575,6 +575,23 @@ add({
       "and it resolved ONLY bludgeoning: with the bench deferred, nothing "
       .. "else was loading an attack class into the window")
 
+    -- #71 item 3: the agreement loop below degenerates to false == false
+    -- on a natural formation where nothing Gau hit happens to be
+    -- bludgeon-weak -- deleting the OT6_BLUDG arm from Ot6ClassChip would
+    -- then be a coin flip to notice.  Require the draw to have produced
+    -- at least one bludgeon-weak hit body, so the positive arm of the
+    -- agreement is always exercised (the encounter-selection loop above
+    -- already re-draws until the formation qualifies, so this is an
+    -- assertion about the file's own premise, not new steering).
+    local anyWeak = false
+    for _, m in ipairs(hit) do
+      if (H.readByte(CLSWEAK(8 + m * 2)) & OT6_BLUDG) ~= 0 then
+        anyWeak = true
+      end
+    end
+    H.assertEq(anyWeak, true,
+      "at least one hit body is bludgeon-weak -- the chip arm below has " ..
+      "a positive case to prove, not just absences to agree with")
     -- the ledger and the class must agree, both ways, on the body he hit
     for _, m in ipairs(hit) do
       local e = 8 + m * 2

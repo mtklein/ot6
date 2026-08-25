@@ -775,6 +775,12 @@ H.run({ maxFrames = 200000 }, {
     holdCeles = false             -- ...and let her onto the queue at last
     H.log(string.format("expiry walk begins: turns=%d stance=%s",
       turns(celes), tostring(stance(celes))))
+    -- #71 item 4: the walk's predicate is checked BEFORE its body, so if
+    -- turns were already 0 it would return instantly and droppedEarly
+    -- could never be observed -- the entering value was logged but never
+    -- asserted, and the three assertions below would all pass vacuously.
+    H.assertEq(turns(celes) > 0, true,
+      "the expiry walk starts with shielded turns still owed")
   end),
   turnWalk(function() return turns(celes) == 0 end,
     "Celes spends all three shielded turns", 40000),
