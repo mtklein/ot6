@@ -12250,19 +12250,11 @@ BattleEnd_04:
 ; ------------------------------------------------------------------------------
 
 ; shadow leaves the party
+; ot6 #132: body relocated below the short-branch corridor (this region
+; is byte-tight); the stub costs 3 bytes and the moved body gains the
+; FC gate.
 ShadowLeaves:
-@48a6:  trb     $1ede       ; available characters (remove shadow)
-        jsr     RemoveChar
-        longi
-        ldy     $3010,x
-        lda     #$ff
-        sta     $161e,y
-        shorti
-        lda     #$fe
-        jsr     ClearFlag0       ; clear $3aa0.0 (make target not present)
-        lda     #$02
-        tsb     $2f49       ; disable fanfare
-        ldx     #$0b        ; battle event $0b (shadow leaves party)
+        jmp     Ot6ShadowLeaves
 _48c4:  pla
         pla
         lda     #$23        ; command $23 (battle event)
@@ -16949,6 +16941,38 @@ MonsterSpecialAnim:
 ; ------------------------------------------------------------------------------
 
 .segment "battle_cmd_prop"
+
+; ------------------------------------------------------------------------------
+
+; [ shadow leaves the party -- relocated body (ot6 #132) ]
+;
+; No leave-rolls on the Floating Continent (map 394, read live from
+; $1F64 -- $02BD looked like the arc switch but clears at arrival).  A
+; 1/16 leave mid-FC clears $02F3 (ShadowLeaves' trb $1ede) and silently
+; forfeits the canon humane escape -- a broken promise, not an emergent
+; feature (docs/design/floating-continent-route.md S5).
+Ot6ShadowLeaves:
+        longa
+        lda     $1f64
+        and     #$03ff
+        cmp     #394
+        shorta0             ; sep leaves Z from the cmp intact
+        bne     :+
+        jsr     WinBattle
+        jmp     _488f
+:       trb     $1ede       ; available characters (remove shadow)
+        jsr     RemoveChar
+        longi
+        ldy     $3010,x
+        lda     #$ff
+        sta     $161e,y
+        shorti
+        lda     #$fe
+        jsr     ClearFlag0       ; clear $3aa0.0 (make target not present)
+        lda     #$02
+        tsb     $2f49       ; disable fanfare
+        ldx     #$0b        ; battle event $0b (shadow leaves party)
+        jmp     _48c4
 
 ; cf/fe00
         .include "battle_cmd_prop.asm"

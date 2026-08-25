@@ -310,6 +310,21 @@ nukes).  Chain: (19,12) (25,19) (40,12) (40,6)-chute (36,28)
 Fixture: `fc_alcove.mss` (the encounter-free save alcove).  Earlier
 measurements kept below for the tuning record.
 
+**Segment-2 COMPLETE with Shadow (#132, 2026-08-24):** the canonical
+crossing is two probes over three checkpoints: `probe_fc_descent`
+(fc_land → the (70,29) "return?" Yes — the choice answered closed-loop;
+$056F is the choice COUNT, last row = mx-1 — → deck → the wheel's
+re-run party select → the $00A0 quick re-arrival → Shadow talked in at
+(10,16) → **fc_shadow.mss**) and `probe_fc_alcove2` (fc_shadow → the
+direct-path descent, (70,29) AVOIDED — its Yes-with-Shadow branch is
+the scripted Shadow REMOVAL `_cad9fc`, and the (89,25) chute that
+reaches it is a post-Shadow trap — → **fc_alcove2.mss**, Shadow in
+party at the 358 save point).  Engine fix riding along: Shadow's 1/16
+post-battle leave-roll is gated OFF while the live map is 394
+(`Ot6ShadowLeaves`, battle_main relocated body) — a mid-FC leave clears
+$02F3 and silently forfeits the canon humane escape, which is a broken
+promise, not an emergent feature.
+
 **Segment-2 measurements (#132, 2026-08-24, `probe_fc_descent.lua`):**
 the descent machinery works — the stair-reveal triggers chain, the
 scripted chutes ride ((40,6)↔(32,16) and the (67,39)-walk pair are
