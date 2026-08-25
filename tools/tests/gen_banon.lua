@@ -549,7 +549,41 @@ H.run({ maxFrames = 320000 }, {
   end),
 
   -- #84: Green Cherry, visible on the walk (the escort ends at (22,21),
-  -- four tiles from it)
+  -- four tiles from it).  A hideout wanderer can be parked on or beside
+  -- the pot when we get here (seen on the v0.14 regeneration: bfs said
+  -- "no path" for the four-tile walk, and the A-press answered nothing
+  -- for 6000 frames -- CheckNPCs tries the standing NPC first, and a
+  -- script-controlled object with no event eats the press).  Wait for
+  -- the pot tile and the stand tile to clear before walking in.
+  -- The escort parks the party ON _caf745's trigger tile (22,21)
+  -- (event_trigger.asm:451), and the engine re-fires a stood-on
+  -- trigger every frame -- each fire hits the $01F2 latch and returns,
+  -- but the event pointer is hot ($E5 mid-chain) often enough that
+  -- CheckNPCs (player.asm:161) refuses talks and chests.  A guard that
+  -- waits for event-calm while STANDING there can never be satisfied
+  -- (measured: $E5 parked for 9000 frames).  So: step off the trigger
+  -- first, then wait for the event queue to go stably quiet -- that
+  -- also gives the escort's async tail and the (27,25) wanderer time
+  -- to finish/clear -- and only then open the pot.
+  H.navTo(22, 23, { maxFrames = 8000, playBattles = "tactical" }),
+  H.release(),
+  (function()
+    local t, calm = 0, 0
+    return H.driveUntil(function()
+      t = t + 1
+      if H.eventRunning() or not H.hasControl() then calm = 0
+      else calm = calm + 1 end
+      return calm >= 120
+    end, 9000, {
+      H.call(function()
+        if t % 1200 == 0 then
+          H.log(string.format("  [drain] t=%d $E5=%04X calm=%d",
+            t, H.readWord(0x00e5), calm))
+        end
+        H.setPad({})
+      end),
+    }, "the escort's event tail drains, off the trigger tile")
+  end)(),
   H.openChest{ stand = {26, 22}, face = "up", bit = 41, what = "Green Cherry",
                nav = { playBattles = "tactical" } },
 

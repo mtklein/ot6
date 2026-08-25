@@ -2309,7 +2309,19 @@ function M.openChest(o)
       M.call(function() M.setPad({ [o.face] = true }) end),
     }, tag .. ": faced " .. o.face),
     M.release(), M.waitFrames(4),
-    M.driveUntil(function() return M.dialogWaiting() end, 6000, {
+    -- The answer is the BIT, not the dialog.  CheckTreasure sets the
+    -- treasure bit and gives the item BEFORE it launches the
+    -- "Received!" dialog event (player.asm:4c06-4cac), and an A press
+    -- still held when that dialog opens confirms it the same frame it
+    -- appears -- this loop's own 4-on/8-off cadence can flash the
+    -- dialog through faster than any per-frame dialogWaiting() sample
+    -- can see it (measured on gen_banon's map-109 pot, v0.14: the pot
+    -- opened on the first tap, sfx and item and bit all landed, and
+    -- 6000 frames of "wait for the dialog" then timed out against a
+    -- chest that had already answered).  So accept either signal.
+    M.driveUntil(function()
+      return M.dialogWaiting() or M.chestOpen(o.bit)
+    end, 6000, {
       M.call(function()
         aPh = (aPh + 1) % 12
         M.setPad(aPh < 4 and { a = true } or {})
