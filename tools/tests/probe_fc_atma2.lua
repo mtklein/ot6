@@ -208,7 +208,10 @@ local function round(r)
         if not visited[key(c)] and not gated then
           local p = H.bfsPath(c[1], c[2], nil, nil)
           if p then
-            if #p < bd then bd, best = #p, c end
+            -- ORDERED route: first unvisited reachable wins (nearest-
+            -- first made (44,11) RNG-optional and the diversion missed)
+            best, bd = c, #p
+            break
           end
         end
       end
@@ -429,8 +432,8 @@ H.run({ maxFrames = 200000 }, flatten({
       -- reveal), climb to the plateau, ride CATASTROPHE, fight
       out[#out+1] = H.cond(function()
         return not atmaDone and mapIs(394)
-          and H.fieldX() >= 43 and H.fieldX() <= 46
-          and H.fieldY() >= 9 and H.fieldY() <= 12
+          and H.fieldX() >= 67 and H.fieldX() <= 73
+          and H.fieldY() >= 22 and H.fieldY() <= 29
       end, {
         -- the north route: up from the (44,11) region to the y4 z0
         -- corridor, east across the (57,4) bridge into the plateau's
@@ -438,7 +441,7 @@ H.run({ maxFrames = 200000 }, flatten({
         (function()
           local wps = { {44,9},{43,5},{45,4},{50,4},{54,4},{56,4},{58,4},
                         {60,5},{60,8},{60,11} }
-          local wi, t6, wt = 1, 0, 0
+          local wi, t6, wt, wlast, wstill = 1, 0, 0, nil, 0
           return H.driveUntil(function()
             t6 = t6 + 1
             return t6 >= 9000
@@ -462,9 +465,18 @@ H.run({ maxFrames = 200000 }, flatten({
                 H.setPad({})
                 return
               end
+              local pos = H.fieldX() * 256 + H.fieldY()
+              if pos ~= wlast then wlast = pos; wstill = 0 else wstill = (wstill or 0) + 1 end
               local d = math.abs(dx) >= math.abs(dy)
                 and (dx > 0 and "right" or "left")
                 or (dy > 0 and "down" or "up")
+              -- on a stall, rotate through the other held directions:
+              -- the tunnel ride's landing micro-state sometimes blocks
+              -- the primary axis (measured at (70,25))
+              if wstill > 240 then
+                local rot = { "down", "left", "up", "right" }
+                d = rot[(math.floor(wstill / 240) % 4) + 1]
+              end
               H.setPad({ [d] = true })
             end),
           }, "north bridge to the approach")
@@ -501,12 +513,15 @@ H.run({ maxFrames = 200000 }, flatten({
         -- plateau interior: live bfs is z-blind off the ladder; blind
         -- waypoint walk up the west arm to the approach at (60,12)
         (function()
-          local wps = { {62,24},{60,22},{58,20},{57,17},{58,14},{60,12} }
+          -- one continuous blind chain: the y29 corridor west, the
+          -- (63,28) ladder reveal + climb, then the spine to Atma
+          local wps = { {70,29},{64,29},{63,29},{63,28},{63,25},{63,24},
+                        {62,24},{62,23},{60,23},{60,16} }
           local wi, t8, wt = 1, 0, 0
           return H.driveUntil(function()
             t8 = t8 + 1
             return t8 >= 6000
-              or (H.fieldX() == 60 and H.fieldY() == 12)
+              or (H.fieldX() == 60 and H.fieldY() <= 17)
           end, 7000, {
             H.call(function()
               if H.dialogWaiting() then H.setPad(t8 % 16 < 4 and { "a" } or {}); return end
@@ -530,7 +545,7 @@ H.run({ maxFrames = 200000 }, flatten({
         H.release(),
         H.waitFrames(30),
         H.cond(function()
-          return H.fieldY() <= 16 and math.abs(H.fieldX() - 60) <= 3
+          return H.fieldY() <= 18 and math.abs(H.fieldX() - 60) <= 3
         end, {
           H.call(function() H.screenshot("atma_approach") end),
           (function()
@@ -542,7 +557,8 @@ H.run({ maxFrames = 200000 }, flatten({
                 t4 = t4 + 1
                 if H.dialogWaiting() then H.setPad(t4 % 16 < 4 and { "a" } or {}); return end
                 if not H.hasControl() then H.setPad({}); return end
-                H.setPad({ up = true })
+                -- Atma is a no_react NPC at (60,15): bump up + A edges
+                H.setPad(t4 % 24 < 3 and { up = true, a = true } or { up = true })
               end),
             }, "CATASTROPHE -> battle 80")
           end)(),
