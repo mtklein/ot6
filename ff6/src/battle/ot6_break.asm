@@ -955,6 +955,7 @@ merge:  pla                     ; bank the matched weaknesses as pending (#33):
                                            ;   agnostic (abs,y in both index
                                            ;   widths), like every other store
                                            ;   in this proc but the codex one
+        jsr     Ot6BreakPurge              ; #85: a break empties the queue
 done:   rtl
 .endproc
 
@@ -1060,7 +1061,56 @@ merge:  lda     OT6_SCR_BIT     ; bank the matched class as pending (#33):
         sta     OT6_BROKEN_TICKS,y         ; shields down: break
         lda     #$ff                       ; #48: flash pending (see Ot6BreakArm)
         sta     OT6_BRKTICK-8,y
+        jsr     Ot6BreakPurge              ; #85: a break empties the queue
 done:   rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #85: purge the just-broken monster's queued actions ]
+;
+; #66 gated a Broken monster's counterattack path and its command
+; dispatch, and one leak survived: a turn queued BEFORE the break still
+; reaches ExecAction, which runs the AI script before any gate is
+; consulted -- no command dispatches, but the script's own side effects
+; land (battle variables, a tag's kill_monsters/show_monsters).  An
+; earlier gate cannot fix it (ExecAction re-enters forever on an
+; unconsumed command list), so the queue entry itself is removed when
+; the break lands, which is vanilla's own idiom for a jumping character
+; (the $3820 walk at battle_main.asm:1812-1822, QuetzEffect's shape).
+; This runs once per break, here in bank $F0, not on the per-action
+; $C2 path whose margin #66 measured at under 18 cycles.
+;
+; y = the just-broken monster's entity offset.  a8; callers run i16
+; (Ot6Chip pins longi, Ot6HitJoin pins it for Ot6ClassChip), so the
+; vanilla i8 walk idiom is bracketed by php/plp with the index regs
+; saved inside the narrow width.  preserves a/x/y.
+
+.proc Ot6BreakPurge
+        .a8
+        pha
+        php
+        shorti
+        .i8
+        phy
+        phx
+        tya
+        tax                     ; x = the broken monster
+        ldy     $3a66           ; action queue start
+@scan:  cpy     $3a67           ; action queue end
+        bcs     @done
+        txa
+        cmp     $3820,y         ; an action this monster queued?
+        bne     @next
+        lda     #$ff
+        sta     $3820,y         ; removed: its script must not run
+@next:  iny
+        bra     @scan
+@done:  plx
+        ply
+        plp
+        pla
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------

@@ -1187,6 +1187,36 @@ end
 -- different entry (another direction, other timeouts, battle-clearing
 -- flag handling, a story scene that walks into its own fight) keeps writing
 -- its own drive.
+-- #72: the Wait-mode menu flush, promoted from four independent
+-- rediscoveries (battle_thief:388 measured the mechanism; battle_rage
+-- and battle_walletmp re-derived it).  In Wait mode a bystander's open
+-- command window FREEZES the battle clock, so a queued action never
+-- reaches the top of the queue and the test hangs -- surfacing as a
+-- timeout somewhere unrelated.  This drives until the menu byte reads
+-- closed, pulsing A with the shared list-cursor block ($895F..$896A)
+-- zeroed, so every bystander takes row 0 and can never fire a second
+-- real action.  The 24 existing hand-rolled copies are deliberately NOT
+-- retrofitted (their timing is proven; a silent sweep is #71's failure
+-- mode) -- new code uses this instead of rediscovering the hazard.
+--   H.flushMenus()                    -- plain flush
+--   H.flushMenus{ pin = fn }          -- fn runs every tick (fixture pins)
+--   H.flushMenus{ maxFrames = n }     -- cap (default 1800; timeout raises)
+function M.flushMenus(opts)
+  opts = opts or {}
+  local t = 0
+  return M.driveUntil(function()
+    return M.readByte(0x7BCA) == 0
+  end, opts.maxFrames or 1800, {
+    M.call(function()
+      t = t + 1
+      if opts.pin then opts.pin() end
+      if M.readByte(0x7BCA) == 0 then M.setPad({}); return end
+      for a = 0x895F, 0x896A do M.writeByte(a, 0) end
+      M.setPad(t % 8 < 4 and { a = true } or {})
+    end),
+  }, "flush menus (#72)")
+end
+
 function M.enterEncounter()
   return seqStep({
     M.driveUntil(function() return M.battleLoadStarted() end, 4000, {

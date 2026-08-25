@@ -501,7 +501,7 @@ H.run({ maxFrames = 250000 }, {
       .. "characters); %d of the monster ones had a broken timer running.  "
       .. "%d turns began with the timer up "
       .. "(%d ExecAction, %d ExecRetal), %d of them after running the "
-      .. "monster's AI script -- the residual leak, reported not asserted.  "
+      .. "monster's AI script -- #85's queue purge owes a zero here.  "
       .. "%d dispatches by a broken actor after the kill (the ending), "
       .. "%d not attributable to an entity.",
       won.startFrame, won.deathFrame, monsterCmds + #leaks, charCmds, #leaks,
@@ -518,5 +518,12 @@ H.run({ maxFrames = 250000 }, {
       "no monster dispatched a command while its broken timer was running "
       .. "(issue #66: Ot6Gate answers at queue time, and before Ot6MayAct "
       .. "nothing re-checked between the queue entry and the turn)")
+    -- #85: the residual -- a turn queued BEFORE the break beginning at all.
+    -- Ot6BreakPurge removes the broken monster's $3820 entries the moment
+    -- its last shield drops, so no turn of its survives to run its AI
+    -- script.  This was the reported-not-asserted count above.
+    H.assertEq(byKind.ExecMonsterAction or 0, 0,
+      "no broken monster's turn ran its AI script (issue #85: the break "
+      .. "purges the actor's queued actions, vanilla's own jump idiom)")
   end),
 })
