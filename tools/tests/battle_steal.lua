@@ -107,7 +107,12 @@ local function armWatches()
   emu.addMemoryCallback(function()
     if rec and rec.code >= 1 and not rec.done then
       local be = H.readByte(0xBE)
-      rec.draws[#rec.draws + 1] = { be = be, roll = rollOf(be) }
+      -- $EE holds the chance the engine just computed (level + 50 -
+      -- target level, ring-doubled) -- captured here so the model
+      -- asserts against the engine's OWN threshold instead of a
+      -- hardcoded 50 that is only right when the levels are equal
+      rec.draws[#rec.draws + 1] = { be = be, roll = rollOf(be),
+                                    chance = H.readByte(0xEE) }
     end
   end, emu.callbackType.exec, RANDA, RANDA)
   -- gate the grant on the steal message being open (code >= 1): the bank
@@ -424,9 +429,17 @@ H.run({ maxFrames = 150000 }, {
           H.log(string.format("bare attempt %d: roll=%d -> %s",
             tries, roll, hit and "landed" or "missed"))
           -- vanilla's own model, verified per attempt: this is the seeded
-          -- V_fail and V_common sweep reduced to a prediction check
-          H.assertEq(hit, roll < 50,
-            "outcome matches vanilla's model exactly (lands iff roll < 50)")
+          -- V_fail and V_common sweep reduced to a prediction check.
+          -- The threshold is the engine's own $EE (level + 50 - target
+          -- level), not a hardcoded 50: the v0.14 chain's regenerated
+          -- fixture moved Locke a level off the target, and a drawn
+          -- roll of exactly 50 landed against chance 51 -- the engine
+          -- compares `cmp $ee / bcs miss` (strict less-than) and the
+          -- old hardcoded model broke on the boundary draw.
+          local chance = rec.draws[1].chance
+          H.log(string.format("bare attempt %d: chance=%d", tries, chance))
+          H.assertEq(hit, roll < chance,
+            "outcome matches vanilla's model exactly (lands iff roll < chance)")
           if hit then
             landed = true
             H.assertEq(rec.grant, wantVal,
