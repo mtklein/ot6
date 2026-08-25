@@ -91,6 +91,8 @@ emu.addMemoryCallback(function() if armed and cur then cur.id = sl() end end,
   emu.callbackType.exec, 0xC10CA4, 0xC10CA4)
 
 local junkFrames, tileDirtyFrames, maxJunk, worstFrame = 0, 0, 0, -1
+local hudEverWhole = false     -- #71 item 1: some frame drew the HUD from
+                               -- intact tiles (the repaint witness)
 local worstFe, worstId, spillFrames = 0, 0, 0
 local function sample()
   local r = rec[#rec]
@@ -102,6 +104,7 @@ local function sample()
   end
   local j, td = scan()
   if td then tileDirtyFrames = tileDirtyFrames + 1 end
+  if not td and j == 0 and H.fieldHudPresent() then hudEverWhole = true end
   if j > 0 then
     junkFrames = junkFrames + 1
     if j > maxJunk then maxJunk, worstFrame = j, H.frame end
@@ -169,10 +172,14 @@ H.run({ maxFrames=24000 }, {
     -- The repaint half -- the thing this file is NAMED for -- needs the
     -- battle_whelkwipe:242 control: the HUD is PRESENT and its glyphs are
     -- intact once the fight settles.
-    H.assertEq(H.fieldHudPresent(), true,
-      "the HUD repainted once the tiles were whole -- a permanent veil or " ..
-      "a deleted under-enemy HUD fails here, not silently")
-    H.glyphCanary()
+    -- #71 item 1: sampled DURING the soak, not after it -- the battle can
+    -- be over by this line and a missing HUD then is the correct answer.
+    -- The witness: at least one clean-tile frame actually drew the HUD, so
+    -- a permanent veil or a deleted under-enemy HUD fails here instead of
+    -- staying green on the hazard arm alone.
+    H.assertEq(hudEverWhole, true,
+      "the HUD rendered from whole tiles at least once during the soak -- " ..
+      "a permanent veil or a deleted under-enemy HUD fails here")
     H.screenshot("hudclobber_final")
   end),
 })

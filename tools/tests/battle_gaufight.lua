@@ -518,6 +518,31 @@ add({
       shieldPre[m] = H.readByte(SHIELD(e))
     end
     classWrites = {}
+    -- #71 item 3, the positive-arm pin (labeled, this file's own
+    -- isolation-write idiom): battle B is a single natural draw with no
+    -- formation criterion, so nothing guarantees a bludgeon-weak body --
+    -- and without one the ledger agreement below is all absences
+    -- (false == false), which is the degeneration the issue names.  When
+    -- the draw lacks one, body 1's class-weak mask gains OT6_BLUDG here,
+    -- BEFORE the swing, so the chip arm always has a positive case; the
+    -- agreement loop reads the same (poked) mask, so both directions
+    -- stay consistent.  The poke never touches shields, HP or the class
+    -- window under test.
+    local anyB = false
+    for _, m in ipairs(msPresent) do
+      if (H.readByte(CLSWEAK(8 + m * 2)) & OT6_BLUDG) ~= 0 then anyB = true end
+    end
+    if not anyB then
+      -- pin EVERY present body: the swing's target is the cursor's own
+      -- pick, so pinning one body races the target select (measured:
+      -- body 1 pinned, body 2 hit, witness still false)
+      for _, m in ipairs(msPresent) do
+        local e = 8 + m * 2
+        H.writeByte(CLSWEAK(e), H.readByte(CLSWEAK(e)) | OT6_BLUDG)
+      end
+      H.log("[pre-fight] draw had no bludgeon-weak body: every present "
+        .. "body's mask pinned |= OT6_BLUDG (labeled positive-arm poke)")
+    end
     H.log(string.format("[pre-fight] bodies=%d gau slot %d fights from the "
       .. "real menu", #msPresent, gauSlot))
   end),
