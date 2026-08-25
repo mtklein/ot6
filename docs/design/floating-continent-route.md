@@ -353,6 +353,26 @@ probe marks the landing-adjacent trigger visited), and the route flowed
   level-curve rule's balance-signal clause applies if the physical-first
   driver still wipes.
 
+**Segment-3 approach decoded (#132, 2026-08-24), execution blocked on a
+walker bug.**  AtmaWeapon's plateau (x56-64, y3-25) is tile-hermetic —
+zero walkable neighbors, no chute lands inside it.  The ONLY entry is
+the reveal at **(63,28)** (`_cad907`, `$01FB`): a 3-tile ladder at
+(63,25-27) into the plateau's south-east tip.  The full chute graph
+(move-sum decoded): (40,24)↔(63,31), (42,17)↔(67,39), (48,22)↔(77,31),
+(70,23)↔(89,25) are two-way tunnels; (36,28)/(52,24)/(59,39)/(63,28)/
+(82,30) are pure reveals.  So the Atma route is: descent prefix → the
+(40,24) tunnel (lands (63,31)) → step (63,28) → climb → (60,12) →
+(60,11) CATASTROPHE → battle 80.  Execution blocker: an encounter
+resolved while the party stands on a revealed stair/diag tile leaves it
+**off-grid** — movement AND the menu refuse (CheckMenu's between-tiles
+guard), only a state load realigns — reproduced at (21,9) and (42,13).
+`probe_fc_atma.lua` carries reload-on-wedge retry, but the wedge
+re-arms on the same leg; the next pass should probe the post-battle
+fine-position restore on stair tiles directly.  Pool notes: the Ninja
+formations were thinned (180 pair→single, 188 trio drops one — the pair
+out-raced fight AND flee at routed prep), and fight-first with the
+2-3 pip rows + forced Bolt beats everything else in the pool.
+
 ## 5. The escape
 
 **Trigger.** After Kefka moves the statues (cutscene `:33900-34126`), the party
