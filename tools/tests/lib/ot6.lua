@@ -585,6 +585,15 @@ function M.weaponElement(item)
   return M.readRomByte(base + ITEM_ELEM)
 end
 
+-- Spell +$01, the element byte of magic_prop_en.dat's 14-byte record
+-- (measured: Fire $00 reads $01, Ice $01 reads $02, Bolt $02 reads $04).
+-- Boost folding moves a cast up its own family and families share one
+-- element, so the base spell's byte answers for every tier it can fold to.
+function M.spellElement(id)
+  if id == nil or id > 0xFF then return 0 end
+  return M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + id * 14 + 1)
+end
+
 -- Item +$14, the power byte (data-formats.md "Items").  For a consumable
 -- that is how much it heals: $E8 Tonic reads 50 and $E9 Potion reads 250 on
 -- this ROM.  It is the engine's input rather than its output, so a caller
@@ -2137,6 +2146,36 @@ function M.newFightDriver(tag, opts)
     -- what a caller wants when the point is the element rather than the
     -- damage and the BP is owed to somebody's break.
     local mg = opts.magic and opts.magic[id]
+    if mg and cmdRow(actor, CMD_MAGIC) then
+      -- #99: the absorb guard, at plan time, for the ability's element --
+      -- the same defect the weapon guard was built for, arriving by the
+      -- other door (the Cranes' Left Crane healed 250 off a lightning
+      -- Blitz).  A spell whose element a PRESENT species absorbs is a
+      -- heal for the enemy, so the plan is refused and the actor falls
+      -- through to the branches below (usually Fight) -- self-correcting
+      -- rather than run-failing, because unlike a worn weapon the driver
+      -- can simply choose differently this turn.  Folding never changes
+      -- a family's element, so the base spell's byte answers for every
+      -- tier the pending boost could fold to.
+      local elem = M.spellElement(mg.spell)
+      local absorbed = nil
+      if elem ~= 0 then
+        for _, s in ipairs(M.formationSpecies()) do
+          if M.monsterAbsorb(s.species) & elem ~= 0 then
+            absorbed = s
+            break
+          end
+        end
+      end
+      if absorbed then
+        M.log(string.format(
+          "[%s] cast $%02X refused: %s is ABSORBED by slot %d species " ..
+          "$%04X (#99) -- falling through to Fight",
+          tag or "fight", mg.spell, M.elemStr(elem), absorbed.slot,
+          absorbed.species))
+        mg = nil
+      end
+    end
     if mg and cmdRow(actor, CMD_MAGIC) then
       local cell, cost = spellCell(actor, mg.spell, true)
       if cell ~= nil then
