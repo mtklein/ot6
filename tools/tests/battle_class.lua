@@ -558,7 +558,9 @@ H.run({ maxFrames = 90000 }, {
   -- 8. flagged-skill phase: TekMissile (flags3 $20) must chip.  Restore
   -- the lab to pierce-weak, hand Terra her real menu back, and walk it:
   -- MagiTek -> down x3, right (her 2x4 grid's bottom-right cell) -> fire
-  -- at the default target.  The drive retries the lap until the skill
+  -- at the default target (#111: TekMissile is offensive, so the default
+  -- is the enemy-side pick, never the party).  The drive retries the lap
+  -- until the skill
   -- loader's $02 lands and a shield moves.
   H.call(function()
     H.writeByte(0x3EA8, 0x02); H.writeByte(0x3EAA, 0x02)  -- pierce-weak

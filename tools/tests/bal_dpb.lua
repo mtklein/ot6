@@ -10,6 +10,12 @@
 -- The battle_break fixture (opening guard fight, Magitek trio) is the lab.
 -- Fire Beam is the default magitek skill (cursor opens on it), so mashing A
 -- fires an unboosted or boosted Fire Beam at the default target every turn.
+-- (#111: the engine autotargets nothing; an OFFENSIVE confirm's default is
+-- the engine's enemy-side pick, the first targettable monster slot -- never
+-- the party.  For this balance sweep any monster in the live formation is a
+-- valid sample, so the unsteered confirm is safe by construction; the
+-- hazardous case that issue documents is item-shaped actions, whose default
+-- is the ACTOR.)
 --
 -- Per frame the driver pins the target guards into an exact state and pins
 -- the party's BP and pending, then records every discrete HP drop with the

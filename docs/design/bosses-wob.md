@@ -746,15 +746,22 @@ the Beat B note in `wob-route.md`.)
 - **Break story:** this is the first battle after Zozo gives you four
   espers, and a Ramuh bearer casting Bolt into the body is the first
   use of the sub-job system (magicite.md's storm-lancer).
-- **No revival on the ride (#97).** Six fights back to back with no field
-  access between them, and nothing that raises the dead anywhere in reach:
-  the bag holds no Fenix Down, no shop lies past the checkpoint, and no
-  owned esper grants Life anywhere in the WoB. So a death at any point on
-  the ride is permanent. The winning run is comfortable — the margin *is*
-  the safety net — but this is also the sub-job debut, so a first-time
-  player is being taught to equip espers in the one place a mistake cannot
-  be undone. A tuning call to make deliberately (seed a Fenix Down, or
-  accept it) rather than by omission.
+- **No revival on the ride (#97) — decided: accepted, with the route
+  note.** Six fights back to back with no field access between them, and
+  nothing that raises the dead *in the routed bag*: no Fenix Down, no shop
+  past the checkpoint, no owned esper granting Life in the WoB. A death on
+  the ride is permanent. The deliberate call (v0.15 burndown): the game
+  already offers the counter — Fenix Down ($F0) is stocked by 25 item
+  shops (`shop_prop.dat`), several of them on the road to Vector — so the
+  ride stays as designed and the preparation is the player's, the same
+  shape as the burning house. Route guidance: **stock Fenix Downs before
+  entering the Magitek Facility**; the routed chain's own bag arriving
+  empty is a route bookkeeping fact, not a game gap.
+- **The body regenerates (#97).** Measured on the winning run: body HP
+  rose mid-fight, 2473 → 2590 → 2591, with no heal cast in the log. The
+  mechanism and rate are UNVERIFIED (not chased to the AI script); it
+  belongs beside the blade regrowth above because it sets a floor on how
+  fast a party must chip to make progress at all.
 - **Jank:** regrowth timing stays vanilla; the minecart shooter
   around it stays byte-for-byte.
 

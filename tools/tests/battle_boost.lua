@@ -93,6 +93,8 @@ H.run({ maxFrames = 30000 }, {
             btn = "down"
           else btn = "a" end                -- the row-2 beam
         elseif st == 0x38 then btn = "a"    -- confirm the default target
+        -- (#111: offensive confirm; the default is the enemy-side pick,
+        -- never the party, and this fixture stages one monster)
         elseif st == 0x01 then H.setPad({}); return
         else btn = "b" end
         if (mf - 1) % 8 == 0 then

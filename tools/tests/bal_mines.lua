@@ -195,7 +195,9 @@ function POLICIES.fire()
   return fireCastPulse()
 end
 -- the deliberately poor play (Measurement #5): bank to 3, then spend a 3-BP
--- boosted Fight at the default target.  Fight is pierce, and every mines-pool
+-- boosted Fight at the default target (#111: an offensive confirm defaults
+-- to the engine's enemy-side pick, never the party -- safe here because any
+-- pool body is a valid sample).  Fight is pierce, and every mines-pool
 -- species is formula (no class weakness), so this boost always lands on a
 -- shielded-unweak target, which is the case where boost is wasted.  For
 -- this pool it coincides with boost3 (Fight matches nothing either way);
