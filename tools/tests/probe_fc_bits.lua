@@ -7,6 +7,9 @@ H.run({ maxFrames = 1000 }, {
       H.readByte(0x1EDE), H.readByte(0x1EDF), H.readByte(0x1EB4),
       H.readByte(0x1EB5), H.readByte(0x1850 + 3)))
     H.log(string.format("1ED7=%02X (bit5=%d)", H.readByte(0x1ED7), (H.readByte(0x1ED7) >> 5) & 1))
+    H.log(string.format("$035F(atma)=%d $035E(shadowpose)=%d $01B5=%d",
+      (H.readByte(0x1EEB) >> 7) & 1, (H.readByte(0x1EEB) >> 6) & 1,
+      (H.readByte(0x1EB6) >> 5) & 1))
   end),
   H.logStep(function() return "done" end),
 })

@@ -373,6 +373,46 @@ formations were thinned (180 pair→single, 188 trio drops one — the pair
 out-raced fight AND flee at routed prep), and fight-first with the
 2-3 pip rows + forced Bolt beats everything else in the pool.
 
+**Segment-3 COMPLETE (#132, 2026-08-24): AtmaWeapon is down, headless.**
+`probe_fc_atma4.lua` (fc_shadow → the full south route → the (63,28)
+reveal ladder → the spine) banks **fc_atma_door.mss** at (60,17), and
+`probe_fc_atma5.lua` boots it, starts battle 80 and wins — `$035F`
+clears, **fc_atma_down.mss** banked at (60,16).  Findings that made it
+work, in the order they were bought:
+
+- **The talk gesture.**  `CheckNPCs` (player.asm:142) fires an NPC's
+  event only on an A-press read while the scan runs — and in practice
+  held-direction bumping (up+A edges against the NPC for 20k frames)
+  NEVER fires it.  The reliable gesture is the vanilla-manual one, all
+  taps from a standstill: tap the facing direction (4f), release
+  (20f), tap A (4f), release; repeat.  First cycle fired.  z was never
+  the problem: the NPC's z ($0888) is derived from its own tile's
+  props at creation, and both (60,15) and (60,16) are plain z2.
+- **Chute slides poison fieldX/fieldY.**  `fieldX` reads the party
+  object's subtile position, and an obj_script slide carries the
+  object OVER wall tiles — so a walker that keeps steering mid-slide
+  reads positions like (40,8) that no walkable tile explains, and can
+  strand the object off-route.  The "x40 ladder" the north-approach
+  runs seemed to climb was the (40,6) chute's slide path.  Rule: after
+  any trigger that can slide, hold NOTHING until control settles
+  (ride()'s absorb), and treat mid-slide coordinates as artifacts.
+- **p2 exit bits, not p1, decide walkability.**  p1=$00 tiles are
+  ladders only when p2's low nibble has exit bits; the y4-5 corridor
+  x42-54 is p1=$00 **p2=$00** — pure sky decoration.  The offline
+  charts that treated p1=00 as "climbable" were fiction; stepAllowed
+  (ot6_field.lua:415) has been right all along.
+- **The map prop dump's stride-256 indexing is correct** (it matches
+  `M.maptile`); a stride-128 "fix" produces garbage.  Both lineages'
+  dumps agree — mod_bg_tiles never touched the Atma approach.
+- **The fight** (form 450, 23349 HP, 11-pip slash|pierce shield,
+  re-shields mid-fight): the tactical driver with boost+bank 3+items+
+  forced Bolt2 wins on the doorstep kit, barely — two KOs and the
+  survivors at 1/1/1.  A legit WoB final exam, arguably a hair hot;
+  revisit only if the release pass shows it losing outright.
+- **Post-win Shadow removal is vanilla flow**: `_cada30` runs
+  `if_case CHAR::SHADOW → _cad9fc`, party drops to 3.  The escape
+  sequence re-handles Shadow; do not "fix" this.
+
 ## 5. The escape
 
 **Trigger.** After Kefka moves the statues (cutscene `:33900-34126`), the party
