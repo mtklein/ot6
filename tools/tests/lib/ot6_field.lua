@@ -2436,6 +2436,13 @@ function M.buyItem(id, row, qtyFn, name)
   }, "buy " .. name)
 end
 
+-- KNOWN LIMIT (#89, measured at gen_tunnelarmr:1025): calling this on
+-- the WORLD MAP is broken -- after the menu visit, the world engine's DP
+-- cells ($E0/$E2) come back as garbage and the world never resumes (the
+-- module-WRAM-ownership trap, inside the world-exit path).  Every route
+-- cares on a field map before stepping onto the world, which is also
+-- what a player does.  If a route ever genuinely needs world-map care,
+-- fix the world-exit path first; do not call this there and hope.
 function M.fieldCare(opts)
   opts = opts or {}
   local tag = opts.tag or "care"
@@ -3602,22 +3609,26 @@ function M.clearGateSoldier(probeX, probeY, tag)
       M.talkToObj(26, tag .. ": the gate soldier (battle 11)"),
       M.rideOut(tag .. ": ride battle 11 out", 30000, 75),
       M.call(function()
-        -- a lost attempt runs the scenario reset (_ca85ba) and puts the
-        -- party back on (47,43); being anywhere else with the lane open is
-        -- a win.  ($0104 is not this signal; see the branch below.)
-        -- The same test does not work after the fight: a beaten
-        -- soldier keeps his coordinates, because the scene hides the object
-        -- without moving it, so obj 26 still reads {30,42} on a win.
-        -- Each question is asked where it is valid: his tile decides whether
-        -- to fight (stable at step start, when the object map may not be
-        -- populated), and reachability decides whether we won (stable
-        -- afterwards, when he is gone from the map even though his record
-        -- is not).  A loss puts the party back on (47,43).
-        won = not (M.fieldX() == 47 and M.fieldY() == 43)
-          and M.bfsPath(probeX, probeY) ~= nil
-        M.log(string.format("%s: attempt %d %s at (%d,%d) f%d, $0104=%d",
+        -- The battle's own verdict, read directly (#102).  Battle
+        -- switch $40 is the game-over flag: cleared at every battle
+        -- init (`lda #$91 / trb $3ebc`, battle_main.asm:6181), set by
+        -- LoseBattle (`tsb $3ebc`, :16044), and copied to the field
+        -- block at battle end ($3EB4+x -> $1DC9+x, :12413), so field
+        -- byte $1DD1 bit 0 = 1 means THIS battle was lost.  The event
+        -- command if_b_switch branches when the bit is CLEAR
+        -- (EventCmd_b7, field/event.asm:4056-4058), which is how
+        -- _ca5ea9's win check reads it too.
+        -- The old inference here -- "not on the reset tile AND
+        -- bfsPath(probe) ~= nil" -- scored two apparent wins as losses
+        -- (HeavyArmor at 0 HP, LOCKE alive on the win tile, and the
+        -- reachability probe answering "no path"); the position and
+        -- probe are now logged for the record but decide nothing.
+        won = (M.readByte(0x1DD1) & 1) == 0
+        M.log(string.format(
+          "%s: attempt %d %s ($1DD1.0=%d) at (%d,%d) f%d, probe=%s",
           tag, n, won and "WON" or "LOST (scenario reset)",
-          M.fieldX(), M.fieldY(), M.frame, swv(0x0104)))
+          M.readByte(0x1DD1) & 1, M.fieldX(), M.fieldY(), M.frame,
+          tostring(M.bfsPath(probeX, probeY) ~= nil)))
       end),
     })
   end
