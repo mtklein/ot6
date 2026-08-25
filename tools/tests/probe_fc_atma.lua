@@ -12,6 +12,26 @@ local seen, lastActive = false, false
 H.run({ maxFrames = 120000 }, {
   H.loadState("build/states/fc_shadow.mss.lua"),
   H.waitFrames(60),
+  -- encounter drain: the off-grid wedge needs a battle to resolve ON a
+  -- stair tile, so trigger the next encounter here on the flat landing
+  -- (pace in place, fight it), leaving the stair legs encounter-free
+  (function()
+    local t0, fought, active0 = 0, false, false
+    return H.driveUntil(function()
+      if H.battleActive() then active0 = true end
+      return (active0 and not H.battleActive() and not H.battleLoadStarted())
+        or t0 >= 12000
+    end, 15000, {
+      H.call(function()
+        t0 = t0 + 1
+        if H.battleActive() or H.battleLoadStarted() then F.frame(); return end
+        if H.dialogWaiting() then H.setPad(t0 % 16 < 4 and { "a" } or {}); return end
+        local ph = t0 % 200
+        H.setPad(ph < 90 and { right = true } or (ph >= 100 and ph < 190) and { left = true } or {})
+      end),
+    }, "danger drain")
+  end)(),
+  H.waitFrames(60),
   H.call(function()
     H.log(string.format("on 394 at (%d,%d)", H.fieldX(), H.fieldY()))
   end),
@@ -45,6 +65,23 @@ H.run({ maxFrames = 120000 }, {
         end),
         H.loadState("build/states/fc_shadow.mss.lua"),
         H.waitFrames(90 + (r % 7) * 17),
+        (function()
+          local t0, active0 = 0, false
+          return H.driveUntil(function()
+            if H.battleActive() then active0 = true end
+            return (active0 and not H.battleActive() and not H.battleLoadStarted())
+              or t0 >= 12000
+          end, 15000, {
+            H.call(function()
+              t0 = t0 + 1
+              if H.battleActive() or H.battleLoadStarted() then F.frame(); return end
+              if H.dialogWaiting() then H.setPad(t0 % 16 < 4 and { "a" } or {}); return end
+              local ph = t0 % 200
+              H.setPad(ph < 90 and { right = true } or (ph >= 100 and ph < 190) and { left = true } or {})
+            end),
+          }, "danger drain r" .. r)
+        end)(),
+        H.waitFrames(60),
       }, {})
       out[#out+1] = H.cond(function()
         return mapIs(394) and not (H.fieldX() == 60 and H.fieldY() == 12)
