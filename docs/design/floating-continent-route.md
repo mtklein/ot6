@@ -470,6 +470,25 @@ hands control (`pass_off SLOT_1`/`NPC_1`, `:12397-12398`) and `return`s
 Shadow's FC fate is already decided (`$037D`, §5). This is the end of the World
 of Balance and the arc's finish.
 
+**Segments 4+5 COMPLETE (#132, 2026-08-24): the escape and the landing
+run headless in one probe.**  `probe_fc_statues.lua` (fc_atma_down →
+heal on 394 → the (60,11) trigger → the statue scene → 393 (67,16))
+banks **fc_escape_start.mss** with both clocks already running.
+`probe_fc_escape.lua` runs the rest: east under the clock, the Nerapa
+rod dance (CELES's Fire Rod is fine for the route — species $0169
+absorbs ice, not fire — but Nerapa absorbs fire and is ice-weak, so
+the Ice Rod goes on at his doorstep and comes off after; the absorb
+guard from #81 caught both directions of this), Nerapa down in ~4100
+frames, then the ledge at (115,17), "Wait!!", and the idle until
+timer 2 fires at 0:05 — Shadow arrives, `$037D=1` — then the exit
+flow straight through the RUIN cutscene to **map 397, solo Celes,
+`$00A4=1`**, banked as **fc_wor_landing.mss**.  Total run ~40k frames
+from the escape start.  Two probe lessons: a navTo arrive-latch must
+be exact-tile only (an `or not hasControl()` clause ended the ledge
+approach on a random battle load, and the party idled off-ledge into
+the 6:00 expiry), and the wait phase self-heals by walking back to
+(115,17) whenever it finds itself elsewhere with control.
+
 ---
 
 ## 7. Bosses (cross-ref `bosses-wob.md` §19–22)
