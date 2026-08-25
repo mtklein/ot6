@@ -1953,7 +1953,14 @@ Ot6ShieldTbl:
         .word   $0106
         .byte   6, OT6_BLUDG    ; ghosttrain: suplex is correct now
         .word   $0155
-        .byte   5, OT6_SLASH|OT6_BLUDG  ; rizopas: the coverage rule's example
+        .byte   4, OT6_SLASH|OT6_BLUDG  ; rizopas: the coverage rule's example
+                                ;   (#139, v0.15: 5 -> 4.  The real-attempt
+                                ;   ledger at the routed curve read 1W/8L --
+                                ;   the party entered his phase healthy
+                                ;   (268/235 measured) and still wiped to the
+                                ;   surfacing pressure; one pip lands the
+                                ;   break a round earlier, the same dial as
+                                ;   every other retune)
         .word   $0154
         .byte   1, OT6_SLASH|OT6_BLUDG  ; piranha: the chum wave
         ; ---- the v0.6 break-coverage pass: class rows that close the

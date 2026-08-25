@@ -374,24 +374,60 @@ local function worldToMap(tx, ty, what, budget)
 end
 
 -- ------------------------------------------------------ the retry ladder --
+-- The walk from the boot fixture to the falls top, shared by the main
+-- flow and the retry ladder (#135): a retry reloads the BOOT fixture and
+-- replays this walk, because loadState of a generator-produced .mss is
+-- the mechanism every run of every generator proves, while the mid-run
+-- requestSaveState blob it replaces wedged on its second reload (the
+-- jump cinematic started and battle 18 never fired -- measured, the
+-- v0.14 cycle).  The reloaded state resets the arrival switches, so the
+-- scene replays cleanly, and the walk's own battles re-roll the RNG
+-- phase, which is what the old ladder's 17-frame stagger was for.
+-- the ot6_field idiom; this file had no seq of its own, and the missing
+-- helper cost a silent construction hang (the atma3 lesson: a nil call
+-- while the step list is being BUILT dies before frame 1 with no error
+-- visible under --testrunner)
+local function seq(steps) return H.cond(function() return true end, steps) end
+
+local function walkToFalls()
+  return seq({
+    worldToMap(185, 93, "falls cave (185,93)", 20000),
+    settle(166, "cave 166"),
+    H.navTo(7, 5, { maxFrames = 6000, playBattles = "flee" }),
+    ride("up", function() return mapIdx() == 155 end, "-> 155", 3000),
+    settle(155, "overlook 155"),
+    H.navTo(10, 5, { maxFrames = 6000, playBattles = "flee" }),
+    ride("up", function() return mapIdx() == 156 end, "-> 156", 3000),
+    settle(156, "falls top 156"),
+    ride("up", function()
+      return sw(0x3C) == 1 and H.hasControl() and H.tileAligned()
+    end, "arrival scene ($003C)", 15000),
+    H.call(function()
+      H.assertEq(sw(0x3C), 1, "$003C -- Baren Falls named")
+      H.assertEq(inParty(3), false, "SHADOW left at the overlook")
+      H.log(string.format("[falls] post-arrival at (%d,%d)", H.fieldX(),
+        H.fieldY()))
+    end),
+  })
+end
+
 -- One jump attempt: (attempt 2+) reload the pre-jump checkpoint with a
 -- stagger and the fighter escalated, walk onto the jump row, and ride the
 -- fall + battle 18 + the shore cinematic to map 159.  `lost`
 -- short-circuits the ride so the next attempt starts promptly.
-local jumpBlob, jumpWon = nil, false
+local jumpWon = false
 
 local function jumpAttempt(n)
-  local ldReq
   return H.cond(function() return not jumpWon end, {
     H.cond(function() return n > 1 end, {
       H.logStep(function()
-        return string.format("[falls] ATTEMPT %d -- reloading the jump " ..
-          "checkpoint after a loss (%s)", n, tostring(lost))
+        return string.format("[falls] ATTEMPT %d -- reloading the boot " ..
+          "fixture and re-walking to the falls after a loss (%s)", n,
+          tostring(lost))
       end),
-      H.call(function() ldReq = H.requestLoadState(jumpBlob) end),
-      H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
-      H.waitFrames(240 + (n - 1) * 17),
+      H.loadState(DOOR),
+      H.waitFrames(30 + (n - 1) * 17),
+      walkToFalls(),
     }, {}),
     H.call(function()
       lost, fightTier, wipeN = nil, n, 0
@@ -433,43 +469,12 @@ H.run({ maxFrames = 250000 }, {
     H.log(string.format("[falls] start world (%d,%d)", H.worldX(), H.worldY()))
   end),
 
-  -- world -> the falls cave 166 -> the overlook 155 -> the falls 156
-  worldToMap(185, 93, "falls cave (185,93)", 20000),
-  settle(166, "cave 166"),
-  H.navTo(7, 5, { maxFrames = 6000, playBattles = "flee" }),
-  ride("up", function() return mapIdx() == 155 end, "-> 155", 3000),
-  settle(155, "overlook 155"),
-  H.navTo(10, 5, { maxFrames = 6000, playBattles = "flee" }),
-  ride("up", function() return mapIdx() == 156 end, "-> 156", 3000),
-  settle(156, "falls top 156"),
-
-  -- up into the y=12 row: the arrival scene; SHADOW leaves
-  ride("up", function()
-    return sw(0x3C) == 1 and H.hasControl() and H.tileAligned()
-  end, "arrival scene ($003C)", 15000),
-  H.call(function()
-    H.assertEq(sw(0x3C), 1, "$003C -- Baren Falls named")
-    H.assertEq(inParty(3), false, "SHADOW left at the overlook")
-    H.log(string.format("[falls] post-arrival at (%d,%d)", H.fieldX(),
-      H.fieldY()))
-  end),
+  walkToFalls(),
 
   -- onto the jump row facing up; "Jump?" option 0; the fall; battle 18
   -- (real, with the rizopas watch); the shore cinematic + GAU's name menu
-  -- -- all behind the three-attempt ladder.
-  (function()
-    local ckReq
-    return H.cond(function() return true end, {
-      H.call(function() ckReq = H.requestSaveState() end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ckReq, "jump checkpoint")
-        jumpBlob = ckReq.blob
-        H.log(string.format("[falls] jump checkpoint captured (%d bytes) f%d",
-          #jumpBlob, H.frame))
-      end),
-    }, {})
-  end)(),
+  -- -- all behind the three-attempt ladder.  (#135: no checkpoint blob
+  -- anymore -- a retry reloads the boot fixture and replays walkToFalls.)
   jumpAttempt(1),
   jumpAttempt(2),
   jumpAttempt(3),
@@ -488,7 +493,9 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(rizo.seen, true, "RIZOPAS surfaced in slot 5 (the piranhas' "..
       "death script ran)")
     H.assertEq(rizo.species, RIZOPAS, "slot 5 was RIZOPAS ($0155)")
-    H.assertEq(rizo.shields, 5, "RIZOPAS seeds 5 shields (Ot6ShieldTbl)")
+    H.assertEq(rizo.shields, 4,
+      "RIZOPAS seeds 4 shields (Ot6ShieldTbl; #139 took the fifth pip -- "
+      .. "the 1W/8L real-attempt ledger at the routed curve)")
     H.assertEq(rizo.wkc, 0x05, "RIZOPAS class row SLASH|BLUDG ($05)")
     H.assertEq(inParty(5), true, "SABIN in the party")
     H.assertEq(inParty(2), true, "CYAN in the party")
