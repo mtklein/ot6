@@ -126,11 +126,19 @@ local fTick, fStreak = 0, 0
 local function makeFightPlan(actor)
   local hp, mx = pHPf(actor), pMaxHPf(actor)
   local itemRow = cmdRowOf(actor, CMD_ITEM)
-  -- heal under 60%, and reach for the Potion once 100+ HP is missing: the
-  -- pursuit measured 4 attackers out-damaging a 50-HP Tonic line
-  if mx > 0 and hp > 0 and hp * 10 < mx * 6 and itemRow then
+  -- Heal policy, two-phase (v0.14 gate: attempt 1 entered the Rizopas
+  -- phase at 33%/21% and his surfacing opener killed both -- an
+  -- on-curve party that would have SURVIVED it near full).  Before
+  -- Rizopas surfaces, stay topped: heal under 80%, Potion once 60+ is
+  -- missing -- the piranha bite rate (~25 HP/1000f measured) loses to
+  -- a 50-HP Tonic line with room to spare, so the tempo cost is
+  -- affordable.  Once Rizopas is up, drop back to the 60% line and
+  -- spend the turns on boosted Fights instead -- he dies to tempo.
+  local rizoUp = rizo.seen and monPresent(5)
+  local thresh = rizoUp and 6 or 8
+  if mx > 0 and hp > 0 and hp * 10 < mx * thresh and itemRow then
     local id = nil
-    if mx - hp >= 100 and battItemIdx(POTION) then id = POTION
+    if mx - hp >= 60 and battItemIdx(POTION) then id = POTION
     elseif battItemIdx(TONIC) then id = TONIC
     elseif battItemIdx(POTION) then id = POTION end
     if id then
@@ -383,7 +391,7 @@ local function jumpAttempt(n)
       H.call(function() ldReq = H.requestLoadState(jumpBlob) end),
       H.waitFrames(2),
       H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
-      H.waitFrames(60 + (n - 1) * 17),
+      H.waitFrames(240 + (n - 1) * 17),
     }, {}),
     H.call(function()
       lost, fightTier, wipeN = nil, n, 0
