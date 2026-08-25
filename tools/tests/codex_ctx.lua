@@ -337,8 +337,10 @@ local function battlePulse()
   else
     -- transitional states and battle messages (the reveal banner blocks
     -- the queue until dismissed; measured: st=$01 held for 30000 frames
-    -- with no press): tap A through them
-    btn = "a"
+    -- with no press).  #90: tap B, not A -- B dismisses banners and
+    -- messages just as well but can never confirm a just-opened command
+    -- window's row 0 (the battle_levelup race this file was listed for).
+    btn = "b"
   end
   H.setPad((hold and btn) and { [btn] = true } or {})
 end

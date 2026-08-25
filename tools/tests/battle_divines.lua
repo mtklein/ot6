@@ -234,7 +234,11 @@ local function resolveCast(what)
       if ph % 8 >= 4 then H.setPad({}); return end
       if H.readByte(MENU) ~= 0 and not inWindow() then
         local st = H.readByte(MSTATE)
-        H.setPad(st == ST_TGT and { a = true } or { a = true })
+        -- #90: was `st == ST_TGT and {a} or {a}` -- A in EVERY state,
+        -- the battle_levelup race.  A only where it means "confirm the
+        -- target"; nothing in transitional $01; B elsewhere.
+        H.setPad(st == ST_TGT and { a = true }
+                 or (st == 0x01 and {} or { b = true }))
       else
         H.setPad({})
       end

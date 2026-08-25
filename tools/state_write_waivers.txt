@@ -50,6 +50,7 @@ tools/tests/battle_clockwork.lua	.writeWord(
 tools/tests/battle_codex.lua	.writeByte(	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
 tools/tests/battle_codex.lua	.writeWord(	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
 tools/tests/battle_codex.lua	emu.write	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
+tools/tests/battle_counterfold.lua	.writeByte(
 tools/tests/battle_dancemp.lua	.writeWord(
 tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(

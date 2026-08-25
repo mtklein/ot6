@@ -143,8 +143,13 @@ local function fightPulse()
     btn = (cur == 0) and "a" or (cur < 4 and "up" or nil)   -- Fight is row 0
   elseif st == ST_TGT then
     btn = "a"                       -- default monster target
+  elseif st == 0x01 then
+    btn = nil   -- #90: NOTHING in transitional $01 -- an A held here is
+                -- still down when the command window goes live and
+                -- confirms row 0 (the battle_levelup race)
   else
-    btn = "a"                       -- messages / transitions
+    btn = "b"   -- #90: B in unrecognised states -- advances messages,
+                -- confirms nothing
   end
   H.setPad(btn and { [btn] = true } or {})
 end
