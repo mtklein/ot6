@@ -2327,12 +2327,24 @@ function M.openChest(o)
         M.setPad(aPh < 4 and { a = true } or {})
       end),
     }, tag .. ": the chest answered"),
-    M.driveUntil(function() return not M.dialogWaiting() end, 600, {
-      M.call(function()
-        aPh = (aPh + 1) % 8
-        M.setPad(aPh < 4 and { a = true } or {})
-      end),
-    }, tag .. ": dialog dismissed"),
+    -- The bit lands BEFORE the dialog event launches, so when the
+    -- bit ended the wait above, the Received! window may still be a
+    -- few frames out.  Linger at least 90 frames, dismissing whatever
+    -- appears -- returning with a dialog pending starves the next
+    -- step (measured: gen_sfigaro's care menu timed out against the
+    -- Tonic chest's late dialog).
+    (function()
+      local dt = 0
+      return M.driveUntil(function()
+        dt = dt + 1
+        return dt >= 90 and not M.dialogWaiting()
+      end, 600, {
+        M.call(function()
+          aPh = (aPh + 1) % 8
+          M.setPad(M.dialogWaiting() and aPh < 4 and { a = true } or {})
+        end),
+      }, tag .. ": dialog dismissed")
+    end)(),
     M.call(function()
       M.setPad({})
       M.assertEq(M.chestOpen(o.bit), true, tag .. ": treasure bit set")
