@@ -68,6 +68,13 @@ small-frequent-releases pattern):
 Each release still needs its share of the kits, espers, and the wide weakness
 pass — that spread is the point of the arc.
 
+**v0.15 — Baren Falls** (shipped 2026-08-26) is a small tuning release on the
+finished arc: Rizopas backs off one shield pip (#139, from the honest-attempt
+ledger's 1W/8L), and the test suite's falsifiability pass (#71) plus the
+honest-retry restructure (#135) land under the hood. It also served as a
+measured run of the release process itself, feeding the next arc's theme:
+making the harness play the game as fluently as a person with a controller.
+
 **On versions:** 0.9 is followed by 0.10, not 1.0; these are ordinary
 increments, not a countdown. 1.0 is a long way off: the end of the World of
 Balance is roughly the game's halfway point, and the World of Ruin is
