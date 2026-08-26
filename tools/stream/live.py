@@ -32,7 +32,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-PAGE = """<!doctype html><title>OT6 live</title>
+PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 live</title>
 <body style="margin:0;background:#111;color:#cdc;display:grid;place-items:center;min-height:100vh;font:14px ui-monospace,monospace">
 <div style="text-align:center;padding:12px">
 <img id=f src="latest.png" style="image-rendering:pixelated;display:block;margin:0 auto;width:min(768px,95vw)">
@@ -44,7 +44,7 @@ PAGE = """<!doctype html><title>OT6 live</title>
 const $=id=>document.getElementById(id); let seen=-1;
 setInterval(async()=>{ try{
   const r=await fetch('status.json?'+Date.now()); const j=await r.json();
-  $('frame').textContent='frame '+j.frame.toLocaleString();
+  $('frame').textContent=(j.exact?'frame ':'frame ~')+j.frame.toLocaleString();
   $('pad').textContent=j.pad==='-'?'':('['+j.pad+']');
   $('notes').textContent=j.notes.join('\\n');
   $('s').textContent=j.test+' · live · shot #'+j.shots+' ('+j.shot_tag+') · '+new Date().toLocaleTimeString();
@@ -57,6 +57,9 @@ B64 = re.compile(r"^\[b64:([^\]]+)\] (\S+)\s*$")
 PAD = re.compile(r"\[ot6pad\] (\d+) (\S+)")
 NOTE = re.compile(r"\[ot6note\] (\d+) (.*)")
 PLAIN = re.compile(r"^\[ot6\] (.*)")
+# frame hints inside ordinary notes ("story f31113", "frame=2614",
+# "at frame 6623") -- the counter's source when no [ot6pad] taps flow
+HINT = re.compile(r"(?:\bframe[= ]|[ (]f)(\d{3,})\b")
 
 
 def newest_workspace():
@@ -68,7 +71,7 @@ def newest_workspace():
 
 def follow(log_path, webroot, test, stop, hop=False):
     state = {"frame": 0, "pad": "-", "notes": [], "test": test,
-             "shots": 0, "shot_tag": "-"}
+             "shots": 0, "shot_tag": "-", "exact": False}
     blob_tag, blob = None, []
     pos = 0
     quiet = 0.0
@@ -109,6 +112,7 @@ def follow(log_path, webroot, test, stop, hop=False):
             m = PAD.search(line)
             if m:
                 state["frame"], state["pad"] = int(m.group(1)), m.group(2)
+                state["exact"] = True
                 continue
             m = NOTE.search(line)
             if m:
@@ -118,6 +122,12 @@ def follow(log_path, webroot, test, stop, hop=False):
             m = PLAIN.match(line)
             if m:
                 state["notes"] = (state["notes"] + [m.group(1)])[-8:]
+                if not state["exact"]:
+                    h = None
+                    for h in HINT.finditer(line):
+                        pass
+                    if h:
+                        state["frame"] = int(h.group(1))
         if changed:
             quiet = 0.0
             tmp = os.path.join(webroot, ".status.tmp")
@@ -136,6 +146,7 @@ def follow(log_path, webroot, test, stop, hop=False):
                         log_path, pos, quiet = nl, 0, 0.0
                         state["test"] = os.path.basename(ws).split(".")[0]
                         state["frame"], state["pad"] = 0, "-"
+                        state["exact"] = False
                         state["notes"] = [f"— hopped to {state['test']} —"]
                 except SystemExit:
                     pass
