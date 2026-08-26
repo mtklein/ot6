@@ -370,7 +370,10 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
 }
 
-STATE_REF = re.compile(r"build/states/([A-Za-z0-9_]+)\.mss")
+# any <name>.mss reference, path-qualified or bare -- compose.py resolves
+# both against build/states, so both are fixture dependencies; the filter
+# against the graph's state names keeps false positives out
+STATE_REF = re.compile(r"([A-Za-z0-9_]+)\.mss")
 suite_tests = []
 for f in glob("tools/tests/*.lua"):
     text = (ROOT / f).read_text(errors="replace")
