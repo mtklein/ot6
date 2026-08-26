@@ -9,3 +9,4 @@
 /tools/bin
 /tools/calypsi/
 __pycache__/
+/build.ninja

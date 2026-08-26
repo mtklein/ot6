@@ -26,7 +26,12 @@ def create_stencil(gfx_bytes, tile_size):
                 stencil_offset += 1
 
     elif len(gfx_bytes) == 256 * tile_size:
-        stencil_bytes = np.zeros(16, dtype='>i2')
+        # unsigned: the top-bit mask is $8000, which numpy >= 2 refuses to
+        # OR into a signed int16 (older numpy wrapped silently; the tracked
+        # .trm files were generated under that wrap and the emitted BYTES
+        # are identical either way -- big-endian u2 and i2 store the same
+        # bit pattern)
+        stencil_bytes = np.zeros(16, dtype='>u2')
         mask = 0x8000
         stencil_offset = 0
         for i in range(256):

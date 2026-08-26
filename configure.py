@@ -1,0 +1,559 @@
+#!/usr/bin/env python3
+"""configure.py -- emit ./build.ninja, the whole project as one ninja graph.
+
+Owner rules (2026-08-26) this file exists to satisfy:
+  * no make anywhere; ninja with properly tracked dependencies is the build;
+  * bare `ninja` builds and tests absolutely everything, fully qualifying a
+    release: the default target is the release zip, and that zip's transitive
+    inputs are every ROM, every generated savestate, every suite test's
+    result, every audit, every selftest, and the release preflights;
+  * no aliases and no convenience targets: any partial need is spelled as a
+    real output path (`ninja build/states/vargas_entry.mss.lua`,
+    `ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`);
+  * parallelism is ninja's own, unbounded; emulator-running commands are
+    prefixed with nice(1) so a full fan-out leaves the machine usable.
+
+Structure of the graph (all paths relative to the repo root; run `ninja`
+from the root):
+
+  ff6 assets     tracked-source encoders: text json -> .dat/.inc, mml ->
+                 song/sfx .asm, monster stencils, lzss compression, the SPC
+                 program.  These write the same tracked paths the old
+                 ff6/Makefile wrote (committed outputs; a clean build must
+                 reproduce them byte-for-byte -- see commit a8ac39d).
+  ff6 objects    ca65 with --create-dep; depfiles are rebased to root-relative
+                 paths (tools/build/rebase_depfile.py) because ca65 runs with
+                 cwd=ff6 and ninja resolves depfile paths against the root.
+  ROMs           ff6-en.sfc and the OT6_MP_COSTS=0 control ff6-en-nomp.sfc,
+                 each via tools/build/link_rom.sh (the double-link cutscene
+                 dance).  The two links share the cfg-hardcoded temp_lz
+                 scratch dir, so nomp is order-only after en.
+  build/ot6.sfc  a content latch of ff6-en.sfc: mtime bumps with unchanged
+                 bytes prune everything downstream (restat).
+  savestates     the story-chain graph, embedded from
+                 tools/tests/lib/savestate_ninja.py (the same data file,
+                 tools/tests/savestate_graph.py, drives it).
+  suite          one edge per `-- @suite` test.  There is no skip state and
+                 no tally: a test whose fixture is missing builds the
+                 fixture, and the release artifact depends on every test's
+                 .ok, so "everything ran" is graph structure, not a number
+                 to cross-check.
+  checks         the selftests and audits the old `make test` preamble ran,
+                 each with its real inputs, so an unchanged tree re-runs
+                 none of them.
+  release        preflights (branch, README version, real notes), the BPS
+                 patch, and the zip.  `default` is the zip.
+
+Regeneration: the `configure` edge below re-runs this script when it, the
+graph data, VERSION, or any globbed directory changes (the depfile lists
+every file AND directory this script read, so adding a test or a source
+file re-configures).
+"""
+
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "tools" / "tests" / "lib"))
+import savestate_ninja as sn  # noqa: E402
+
+VERSION = (ROOT / "VERSION").read_text().strip()
+BASE = "Final Fantasy III (USA).sfc"
+BASE_SHA1 = "4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7"
+
+read_deps = set()   # every file/dir this script consulted -> configure.d
+
+
+def glob(pattern, base="."):
+    basep = ROOT / base
+    hits = sorted(str(p.relative_to(ROOT)) for p in basep.glob(pattern)
+                  if p.is_file())
+    # record the dirs the glob walked, so an added/removed file (which bumps
+    # the dir mtime) re-runs configure
+    # (the parent dirs, not `base` itself: ff6/'s own mtime bumps every time
+    # a ROM link creates and removes temp_lz, which would re-run configure
+    # on every build for nothing)
+    for p in hits:
+        read_deps.add(str(Path(p).parent))
+    return hits
+
+
+def esc(path):
+    """ninja path escaping: spaces only (no $ or : in any path here)."""
+    return path.replace("$", "$$").replace(" ", "$ ")
+
+
+class Writer:
+    def __init__(self):
+        self.lines = []
+
+    def __call__(self, s=""):
+        self.lines.append(s)
+
+    def edge(self, outs, rule, ins=(), implicit=(), order=(), **vars):
+        outs = " ".join(esc(o) for o in outs)
+        parts = [f"build {outs}: {rule}"]
+        if ins:
+            parts.append(" " + " ".join(esc(i) for i in ins))
+        if implicit:
+            parts.append(" | " + " ".join(esc(i) for i in implicit))
+        if order:
+            parts.append(" || " + " ".join(esc(i) for i in order))
+        self("".join(parts))
+        for k, v in vars.items():
+            if v:
+                self(f"  {k} = {v}")
+
+
+w = Writer()
+
+# ---------------------------------------------------------------- header --
+w("# AUTOGENERATED by configure.py -- do not edit.  `ninja` regenerates it.")
+w("ninja_required_version = 1.3")
+w("builddir = build/ninja")
+w()
+w("rule sh")
+w("  command = $cmd")
+w("  description = $desc")
+w()
+w("# Content latch: re-runs on any mtime bump, rewrites only on a byte")
+w("# change; restat = 1 prunes everything downstream when it did not.")
+w("rule latch")
+w("  command = mkdir -p $$(dirname $out) && { cmp -s $in $out || cp $in $out; }")
+w("  description = latch $in")
+w("  restat = 1")
+w()
+w("# ca65 runs with cwd=ff6 (sources use ff6-relative include/incbin paths);")
+w("# the depfile it writes is therefore ff6-relative and gets rebased to the")
+w("# repo root before ninja parses it (deps = gcc).")
+w("rule ca65")
+w("  command = cd ff6 && ca65 $flags --create-dep $rawdep -l $lst $src -o $obj"
+  " && cd .. && python3 tools/build/rebase_depfile.py ff6 $depfile")
+w("  depfile = $depfile")
+w("  deps = gcc")
+w("  description = ca65 $obj")
+w()
+sn.emit_state_rules(w)
+w("# One suite test: compose, boot Mesen headless, publish the log, touch the")
+w("# ok.  $env carries the per-test environment (dirty-RAM pins, checkpoint")
+w("# batteries, coverage artifact dirs); the separating space lives here.")
+w("rule suitetest")
+w("  command = $env nice tools/build/run_suite_test.sh $test $out")
+w("  description = suite $test")
+w()
+
+# ---------------------------------------------------------------- latches --
+latch_edges = {}
+
+
+def latch_of(src):
+    dep = f"build/ninja/src/{src}"
+    latch_edges[dep] = src
+    return dep
+
+
+# ------------------------------------------------------------- ff6 assets --
+generated = []          # order-only gate for every object: encoders ran first
+codec = ["ff6/tools/encode_text.py"] + glob("tools/romtools/*.py", "ff6") \
+    + glob("tools/char_table/*.json", "ff6")
+
+text_edges = []
+dlg = {"ff6/src/text/dlg1_en.json", "ff6/src/text/dlg2_en.json"}
+for j in glob("src/text/*_en.json", "ff6") + ["ff6/src/text/mte_tbl_jp.json"]:
+    if j in dlg:
+        continue
+    import json as _json
+    spec = _json.loads((ROOT / j).read_text())
+    read_deps.add(j)
+    dat = j[:-len(".json")] + ".dat"
+    outs = [dat]
+    if "inc_path" in spec:
+        outs.append("ff6/" + spec["inc_path"])
+    w.edge(outs, "sh", [j], implicit=codec,
+           cmd=f"cd ff6 && python3 tools/encode_text.py {j[len('ff6/'):]}",
+           desc=f"encode_text {j}")
+    generated += outs
+# the dlg pair: split, encode both, recombine -- one edge, both dats out.
+# The json INPUTS arrive through content latches because split/combine
+# rewrite them in place (strings migrate across the two-file boundary and
+# back, byte-identically): the latch re-runs on the mtime bump, finds the
+# bytes unchanged, and restat prunes this edge instead of cycling it.
+w.edge(["ff6/src/text/dlg1_en.dat", "ff6/src/text/dlg2_en.dat",
+        "ff6/include/text/dlg1_en.inc", "ff6/include/text/dlg2_en.inc"],
+       "sh", [latch_of(j) for j in sorted(dlg)],
+       implicit=codec + ["ff6/tools/fix_dlg.py"],
+       cmd="cd ff6 && python3 tools/fix_dlg.py split en"
+           " && python3 tools/encode_text.py src/text/dlg1_en.json"
+           " && python3 tools/encode_text.py src/text/dlg2_en.json"
+           " && python3 tools/fix_dlg.py combine en"
+           # split AND combine rewrite the dlg json INPUTS in place (strings
+           # migrate across the two-file boundary and back), so without this
+           # the inputs are always newer than the outputs and the edge re-runs
+           # forever -- the old Makefile rule ended with the same touch.
+           " && touch src/text/dlg1_en.dat src/text/dlg2_en.dat"
+           " include/text/dlg1_en.inc include/text/dlg2_en.inc",
+       desc="encode dlg1/dlg2")
+generated += ["ff6/src/text/dlg1_en.dat", "ff6/src/text/dlg2_en.dat",
+              "ff6/include/text/dlg1_en.inc", "ff6/include/text/dlg2_en.inc"]
+
+w.edge(["ff6/src/menu/menu_text_en.inc.raw"], "sh",
+       ["ff6/src/menu/menu_text_en.inc"],
+       implicit=["ff6/tools/encode_menu_text.py"],
+       cmd="cd ff6 && python3 tools/encode_menu_text.py"
+           " src/menu/menu_text_en.inc",
+       desc="encode_menu_text en")
+generated += ["ff6/src/menu/menu_text_en.inc.raw"]
+
+for mml in glob("src/sound/song_script/*.mml", "ff6"):
+    asm = mml[:-len(".mml")] + ".asm"
+    w.edge([asm], "sh", [mml],
+           implicit=["ff6/tools/encode_mml.py",
+                     "ff6/tools/romtools/bytes_to_asm.py"],
+           cmd=f"cd ff6 && python3 tools/encode_mml.py {mml[len('ff6/'):]}",
+           desc=f"encode_mml {Path(mml).stem}")
+    generated.append(asm)
+for mml in glob("src/sound/sfx_script/*.mml", "ff6"):
+    asm = mml[:-len(".mml")] + ".asm"
+    w.edge([asm], "sh", [mml],
+           implicit=["ff6/tools/encode_sfx.py"],
+           cmd=f"cd ff6 && python3 tools/encode_sfx.py {mml[len('ff6/'):]}",
+           desc=f"encode_sfx {Path(mml).stem}")
+    generated.append(asm)
+
+for g in glob("src/gfx/monster_gfx/*.4bpp", "ff6") \
+        + glob("src/gfx/monster_gfx/*.3bpp", "ff6"):
+    stn = g[:-len(".4bpp")] + ".stn"
+    w.edge([g + ".trm", stn], "sh", [g],
+           implicit=["ff6/tools/monster_stencil.py"],
+           cmd=f"cd ff6 && python3 tools/monster_stencil.py {g[len('ff6/'):]}",
+           desc=f"stencil {Path(g).name}")
+    generated += [g + ".trm", stn]
+
+# lzss: the same two source classes the old Makefile derived from tracked
+# sources (sprintf-consumed directories and literal incbin paths)
+LZ_SPRINTF_DIRS = [
+    "src/field/map_tile_prop", "src/field/map_tileset",
+    "src/field/overlay_prop", "src/field/sub_tilemap",
+    "src/gfx/battle_bg_tiles", "src/gfx/battle_bg_gfx",
+    "src/gfx/map_gfx_bg3", "src/gfx/map_anim_gfx_bg3",
+]
+LZ_LITERAL = [
+    "src/gfx/airship1.4bpp", "src/gfx/airship2.4bpp",
+    "src/gfx/attack_mode7.4bpp", "src/gfx/attack_mode7.scr",
+    "src/gfx/credits.4bpp", "src/gfx/ending_font.2bpp",
+    "src/gfx/ending1.4bpp", "src/gfx/ending2.4bpp", "src/gfx/ending3.4bpp",
+    "src/gfx/ending4.4bpp", "src/gfx/ending5.4bpp",
+    "src/gfx/floating_cont.4bpp", "src/gfx/magitek_train.cgx",
+    "src/gfx/minimap_1.4bpp", "src/gfx/minimap_2.4bpp",
+    "src/gfx/ruin_cutscene.4bpp",
+    "src/gfx/status_en.4bpp", "src/gfx/status_jp.4bpp",
+    "src/gfx/title_opening_en.4bpp", "src/gfx/title_opening_jp.4bpp",
+    "src/gfx/vector_approach.4bpp", "src/gfx/vector_approach.scr",
+    "src/gfx/world_1_bg.4bpp", "src/gfx/world_2_bg.4bpp",
+    "src/gfx/world_3_bg.4bpp", "src/gfx/world_3.pal",
+    "src/gfx/world_anim_sprite.4bpp", "src/gfx/world_misc_sprite.4bpp",
+    "src/gfx/world_backdrop.4bpp", "src/gfx/world_backdrop.scr",
+    "src/gfx/world_choco_1.4bpp", "src/gfx/world_choco_2.4bpp",
+    "src/world/world_1_tilemap.dat", "src/world/world_2_tilemap.dat",
+    "src/world/world_3_tilemap.dat",
+]
+lz_srcs = []
+for d in LZ_SPRINTF_DIRS:
+    lz_srcs += [f for f in glob(f"{d}/*", "ff6") if not f.endswith(".lz")]
+lz_srcs += [f"ff6/{p}" for p in LZ_LITERAL if (ROOT / "ff6" / p).is_file()]
+for src in lz_srcs:
+    w.edge([src + ".lz"], "sh", [src],
+           implicit=["ff6/tools/ff6_lzss.py"],
+           cmd=f"cd ff6 && python3 tools/ff6_lzss.py {src[len('ff6/'):]}"
+               f" {src[len('ff6/'):]}.lz",
+           desc=f"lzss {Path(src).name}")
+    generated.append(src + ".lz")
+
+# the SPC program (assembled + linked separately, then .incbin'd by sound)
+w.edge(["ff6/obj/ff6-spc.o"], "ca65", ["ff6/src/sound/ff6-spc.asm"],
+       order=generated,
+       flags="-g -I include", rawdep="obj/ff6-spc.d",
+       depfile="ff6/obj/ff6-spc.d", lst="obj/ff6-spc.lst",
+       src="src/sound/ff6-spc.asm", obj="obj/ff6-spc.o")
+w.edge(["ff6/src/sound/ff6-spc.dat"], "sh",
+       ["ff6/cfg/ff6-spc.cfg", "ff6/obj/ff6-spc.o"],
+       cmd="cd ff6 && ld65 -o src/sound/ff6-spc.dat -C cfg/ff6-spc.cfg"
+           " obj/ff6-spc.o",
+       desc="link ff6-spc.dat")
+generated.append("ff6/src/sound/ff6-spc.dat")
+
+# ------------------------------------------------------------ ff6 objects --
+MODULES = ["field", "btlgfx", "battle", "menu", "sound", "cutscene",
+           "event", "world", "gfx", "text"]
+EN_FLAGS = "-g -I include -D LANG_EN=1 -D ROM_VERSION=0"
+inc_files = glob("include/*.inc", "ff6") + glob("include/*/*.inc", "ff6")
+
+
+def module_obj(mod, obj, flags):
+    srcs = glob(f"src/{mod}/*", "ff6") + glob(f"src/{mod}/*/*", "ff6")
+    srcs = [s for s in srcs if not s.endswith((".lz", ".trm", ".lst", ".d"))]
+    w.edge([f"ff6/obj/{obj}.o"], "ca65", [f"ff6/src/{mod}/{mod}_main.asm"],
+           implicit=srcs + inc_files, order=generated,
+           flags=flags, rawdep=f"obj/{obj}.d",
+           depfile=f"ff6/obj/{obj}.d", lst=f"obj/{obj}.lst",
+           src=f"src/{mod}/{mod}_main.asm", obj=f"obj/{obj}.o")
+    return f"ff6/obj/{obj}.o"
+
+
+objs_en = [module_obj(m, f"{m}_en", EN_FLAGS) for m in MODULES]
+# the OT6_MP_COSTS=0 control: the battle object alone, flag forced off
+obj_nomp = module_obj("battle", "battlenomp_en",
+                      EN_FLAGS + " -D OT6_MP_COSTS=0")
+objs_nomp = [obj_nomp if o.endswith("battle_en.o") else o for o in objs_en]
+
+# ---------------------------------------------------------------- ROMs -----
+def rom_edge(out, objs, order=()):
+    rel = [o[len("ff6/"):] for o in objs]
+    w.edge([out, out[:-len(".sfc")] + ".dbg", out[:-len(".sfc")] + ".map"],
+           "sh", ["ff6/cfg/ff6-en.cfg"] + objs,
+           implicit=["tools/build/link_rom.sh", "ff6/tools/encode_cutscene.py",
+                     "ff6/tools/fix_checksum.py"],
+           order=order,
+           cmd=f"tools/build/link_rom.sh cfg/ff6-en.cfg {out[len('ff6/'):]} "
+               + " ".join(rel),
+           desc=f"link {Path(out).name}")
+
+
+rom_edge("ff6/rom/ff6-en.sfc", objs_en)
+# order-only after en: both links write the cfg-hardcoded temp_lz scratch
+rom_edge("ff6/rom/ff6-en-nomp.sfc", objs_nomp, order=["ff6/rom/ff6-en.sfc"])
+
+# ------------------------------------------------------------- ot6 layer ---
+qual = []   # every .ok the release patch depends on
+
+w.edge(["build/checks/base_rom.ok"], "sh", [BASE],
+       cmd=f'echo "{BASE_SHA1}  {BASE}" | shasum -a 1 -c - >/dev/null'
+           f' && mkdir -p build/checks && touch build/checks/base_rom.ok',
+       desc="verify base ROM (FF3us 1.0)")
+qual.append("build/checks/base_rom.ok")
+
+# build/ot6.sfc is a content latch of the linked ROM: a relink that produces
+# identical bytes regenerates nothing downstream (the v0.15 revert measured
+# this saving a ~90-minute chain).
+w.edge(["build/ot6.sfc"], "latch", ["ff6/rom/ff6-en.sfc"])
+
+w.edge(["build/checks/nomp_distinct.ok"], "sh",
+       ["build/ot6.sfc", "ff6/rom/ff6-en-nomp.sfc"],
+       cmd="if cmp -s build/ot6.sfc ff6/rom/ff6-en-nomp.sfc; then "
+           "echo 'ERROR: OT6_MP_COSTS=0 baseline is byte-identical to the"
+           " shipped ROM -- flag is dead'; exit 1; fi"
+           " && mkdir -p build/checks && touch build/checks/nomp_distinct.ok",
+       desc="nomp baseline differs from shipped ROM")
+qual.append("build/checks/nomp_distinct.ok")
+
+# ------------------------------------------------------------ savestates ---
+states = sn.load(ROOT)
+read_deps.add(sn.GRAPH)
+errors = sn.validate(states, ROOT)
+if errors:
+    for e in errors:
+        print(f"savestate_graph: {e}", file=sys.stderr)
+    sys.exit(1)
+sn.emit_state_edges(w, states, ROOT, latch_of)
+state_names = {e["state"] for e in states}
+all_stamps = [f"build/states/{e['state']}.stamp" for e in states]
+all_sidecars = [f"build/states/{e['state']}.mss.lua" for e in states]
+
+# ------------------------------------------------------------------ suite --
+LIBS = list(sn.LIB_HALVES)
+HARNESS = ["tools/tests/run.sh", "tools/tests/lib/compose.py",
+           "tools/tests/lib/decode_b64.py", "tools/tests/lib/pin_test_saves.py",
+           "tools/tests/lib/sram_checkpoint.py", "tools/build/run_suite_test.sh"]
+
+# The old suite.sh ram_env_for table: tests that boot power-on under a dirty
+# deterministic RAM fill and/or cold-Continue a tracked checkpoint battery.
+TEST_ENV = {
+    "battle_reveal_poweron": "OT6_RAM_POWERON=AllOnes "
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+    "battle_slotsboot":
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+    "battle_slots":
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+}
+
+STATE_REF = re.compile(r"build/states/([A-Za-z0-9_]+)\.mss")
+suite_tests = []
+for f in glob("tools/tests/*.lua"):
+    text = (ROOT / f).read_text(errors="replace")
+    m = re.search(r"^-- @suite(.*)$", text, re.M)
+    if not m:
+        continue
+    t = Path(f).stem
+    suite_tests.append(t)
+    attrs = m.group(1)
+    fixtures = set()
+    fm = re.search(r"savestate=([A-Za-z0-9_]+)", attrs)
+    if fm:
+        fixtures.add(fm.group(1))
+    # fixtures the test source names directly (loadState paths)
+    fixtures |= {s for s in STATE_REF.findall(text) if s in state_names}
+    deps = [latch_of("build/ot6.sfc"), latch_of(f)]
+    deps += [latch_of(h) for h in LIBS] + HARNESS
+    for fx in sorted(fixtures):
+        deps += [f"build/states/{fx}.mss.lua", f"build/states/{fx}.mss",
+                 f"build/states/{fx}.stamp"]
+    env = TEST_ENV.get(t, "")
+    if "OT6_SRAM_CHECKPOINT=" in env:
+        key = env.split("OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/")[1].split()[0]
+        deps += [latch_of(a) for a in sn.checkpoint_inputs(ROOT, key)]
+    w.edge([f"build/results/suite/{t}.ok"], "suitetest", implicit=deps,
+           test=t, env=env)
+    qual.append(f"build/results/suite/{t}.ok")
+
+# the mpcost A/B: the OFF half (free -- the negative control) on the nomp ROM
+for t in ("battle_mpcost", "battle_stealmp"):
+    w.edge([f"build/results/nomp/{t}.ok"], "sh",
+           implicit=[latch_of(f"tools/tests/{t}.lua"), "ff6/rom/ff6-en-nomp.sfc",
+                     latch_of("build/ot6.sfc")]
+                    + [latch_of(h) for h in LIBS] + HARNESS,
+           cmd=f"mkdir -p build/results/nomp && "
+               f"OT6_ROM=$$PWD/ff6/rom/ff6-en-nomp.sfc OT6_WORKER=nomp_{t} "
+               f"nice tools/tests/run.sh tools/tests/{t}.lua"
+               f" build/states/nomp_{t}.log >/dev/null 2>&1"
+               f" && touch build/results/nomp/{t}.ok"
+               f" || {{ echo 'FAIL: nomp {t} -- build/states/nomp_{t}.log';"
+               f" grep -E 'FAIL|assertEq' build/states/nomp_{t}.log | tail -3;"
+               f" exit 1; }}",
+           desc=f"nomp A/B {t}")
+    qual.append(f"build/results/nomp/{t}.ok")
+
+# ------------------------------------------------------------------ checks --
+def check(name, cmd, deps, desc=None):
+    out = f"build/checks/{name}.ok"
+    w.edge([out], "sh", implicit=deps,
+           cmd=f"{cmd} && mkdir -p build/checks && touch {out}",
+           desc=desc or name)
+    qual.append(out)
+
+
+test_luas = glob("tools/tests/*.lua") + glob("tools/tests/lib/*.lua")
+check("compose_selftest", "python3 tools/tests/lib/compose.py --selftest",
+      ["tools/tests/lib/compose.py", "tools/tests/lib/decode_b64.py"]
+      + LIBS)
+check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
+      ["tools/tests/lib/sram_checkpoint.py"])
+check("verdict_selftest", "sh tools/tests/run.sh --verdict-selftest",
+      ["tools/tests/run.sh"])
+check("boss_rows", "python3 tools/check_boss_rows.py",
+      ["tools/check_boss_rows.py", "docs/design/bosses-wob.md",
+       "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm"])
+check("break_reach", "python3 tools/check_break_reach.py",
+      ["tools/check_break_reach.py"] + glob("src/battle/ot6_*.asm", "ff6"))
+check("encounters_selftest", "python3 tools/audit_encounters.py --selftest",
+      ["tools/audit_encounters.py"])
+check("chestvis_selftest", "python3 tools/chest_visibility.py --selftest",
+      ["tools/chest_visibility.py"])
+check("state_writes",
+      "python3 tools/check_state_writes.py --selftest"
+      " && python3 tools/check_state_writes.py",
+      ["tools/check_state_writes.py", "tools/state_write_waivers.txt"]
+      + test_luas)
+check("playthrough_honest",
+      "python3 tools/check_playthrough_honest.py --selftest"
+      " && python3 tools/check_playthrough_honest.py",
+      ["tools/check_playthrough_honest.py"] + test_luas)
+check("test_registration",
+      "python3 tools/check_test_registration.py --selftest"
+      " && python3 tools/check_test_registration.py",
+      ["tools/check_test_registration.py"] + test_luas)
+check("ninja_py_selftest", "python3 tools/tests/lib/savestate_ninja.py --selftest",
+      ["tools/tests/lib/savestate_ninja.py"])
+check("ninja_sh_selftest", "sh tools/tests/lib/savestate_ninja_selftest.sh",
+      ["tools/tests/lib/savestate_ninja_selftest.sh",
+       "tools/tests/lib/savestate_ninja.py"])
+check("stamp_selftest", "sh tools/tests/lib/savestate_stamp_selftest.sh",
+      ["tools/tests/lib/savestate_stamp_selftest.sh",
+       "tools/tests/lib/savestate_stamp.sh"])
+check("runner_isolation", "sh tools/tests/lib/runner_isolation_selftest.sh",
+      ["tools/tests/lib/runner_isolation_selftest.sh", "tools/tests/run.sh"])
+checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
+    + glob("tools/tests/checkpoints/*/*.sram")
+check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
+      ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
+       latch_of("build/ot6.sfc")] + LIBS + checkpoint_files)
+check("check_states", "python3 tools/tests/lib/compose.py --check-states",
+      ["tools/tests/lib/compose.py", sn.GRAPH] + all_stamps)
+
+# the four fixture audits: real inputs replace the old make-level stamp
+AUDIT_COMMON = all_stamps + checkpoint_files
+check("audit_equipment", "python3 tools/audit_equipment.py",
+      ["tools/audit_equipment.py"] + AUDIT_COMMON)
+check("audit_party_hp",
+      "python3 tools/audit_party_hp.py --selftest"
+      " && python3 tools/audit_party_hp.py",
+      ["tools/audit_party_hp.py"] + AUDIT_COMMON)
+check("audit_supplies",
+      "python3 tools/audit_supplies.py --selftest"
+      " && python3 tools/audit_supplies.py",
+      ["tools/audit_supplies.py"] + AUDIT_COMMON)
+check("audit_chests",
+      "python3 tools/audit_chests.py --selftest"
+      " && python3 tools/audit_chests.py",
+      ["tools/audit_chests.py", "tools/chests_opened.txt",
+       "ff6/src/field/trigger/treasure_prop.dat"] + AUDIT_COMMON)
+
+# ---------------------------------------------------------------- release --
+rel_dir = f"build/release/ot6-v{VERSION}"
+notes = f"docs/release-notes-v{VERSION}.md"
+
+check("release_branch",
+      f"git show-ref --verify --quiet refs/heads/release/v{VERSION}"
+      f" || {{ echo 'ERROR: no release/v{VERSION} branch -- cut it first:"
+      f" git branch release/v{VERSION}'; exit 1; }}",
+      ["VERSION"], desc=f"release/v{VERSION} branch exists")
+check("release_readme",
+      f"grep -q 'v{VERSION} is the current release' README.md"
+      f" || {{ echo 'ERROR: README.md does not say v{VERSION} is the"
+      f" current release'; exit 1; }}",
+      ["VERSION", "README.md"], desc=f"README names v{VERSION}")
+
+bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
+w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual,
+       cmd=f'mkdir -p "{rel_dir}" && tools/bin/flips --create --bps'
+           f' "{BASE}" build/ot6.sfc "{bps}"',
+       desc=f"bps patch v{VERSION}")
+w.edge([f"{rel_dir}/RELEASE_NOTES.md"], "sh", [notes, "VERSION"],
+       cmd=f'mkdir -p "{rel_dir}" && cp "{notes}" "{rel_dir}/RELEASE_NOTES.md"',
+       desc="release notes")
+w.edge([f"build/release/ot6-v{VERSION}.zip"], "sh",
+       [bps, f"{rel_dir}/RELEASE_NOTES.md"],
+       cmd=f'rm -f "build/release/ot6-v{VERSION}.zip" && cd build/release &&'
+           f' zip -q -j "ot6-v{VERSION}.zip" "ot6-v{VERSION}/{BASE[:-4]}.bps"'
+           f' "ot6-v{VERSION}/RELEASE_NOTES.md"',
+       desc=f"release zip v{VERSION}")
+
+# ------------------------------------------------------- latches + regen ---
+w()
+for dep, src in sorted(latch_edges.items()):
+    w.edge([dep], "latch", [src])
+w()
+w("rule configure")
+w("  command = python3 configure.py")
+w("  depfile = build/ninja/configure.d")
+w("  deps = gcc")
+w("  generator = 1")
+w("  restat = 1")
+w.edge(["build.ninja"], "configure",
+       ["configure.py", sn.GRAPH, "tools/tests/lib/savestate_ninja.py",
+        "VERSION"])
+w()
+w(f"default {esc(f'build/release/ot6-v{VERSION}.zip')}")
+w()
+
+# ------------------------------------------------------------------ write --
+text = "\n".join(w.lines)
+out = ROOT / "build.ninja"
+(ROOT / "build/ninja").mkdir(parents=True, exist_ok=True)
+dep_targets = " ".join(sorted(esc(d) for d in read_deps))
+(ROOT / "build/ninja/configure.d").write_text(f"build.ninja: {dep_targets}\n")
+if not (out.exists() and out.read_text() == text):
+    out.write_text(text)
+    n_tests = len(suite_tests)
+    print(f"wrote build.ninja ({len(states)} states, {n_tests} suite tests, "
+          f"{len(qual)} release qualifiers)")

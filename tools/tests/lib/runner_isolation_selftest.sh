@@ -1,8 +1,7 @@
 #!/bin/sh
-# Positive concurrency control for issue #14.  It overlaps two
-# run.sh calls carrying the same worker label, then two suite.sh calls, and
-# checks that each pair owns distinct live directories.  Probe modes stop
-# before Mesen/test discovery, so this is fast and deterministic.
+# Overlaps two run.sh calls carrying the same worker label and checks that
+# they own distinct live workspaces.  The probe mode stops before Mesen, so
+# this is fast and deterministic.
 set -u
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/ot6-runner-selftest.XXXXXXXX") || exit 1
@@ -34,14 +33,6 @@ OT6_WORKER=same OT6_ISOLATION_PROBE_OUT="$TMP/run.b" OT6_ISOLATION_PROBE_GO="$ga
   "$ROOT/tools/tests/run.sh" ignored.lua &
 p2=$!
 check_pair runner "$TMP/run.a" "$TMP/run.b" "$gate" || exit 1
-wait "$p1"; wait "$p2"
-
-gate="$TMP/suite.go"
-"$ROOT/tools/tests/suite.sh" --isolation-probe "$TMP/suite.a" "$gate" &
-p1=$!
-"$ROOT/tools/tests/suite.sh" --isolation-probe "$TMP/suite.b" "$gate" &
-p2=$!
-check_pair suite "$TMP/suite.a" "$TMP/suite.b" "$gate" || exit 1
 wait "$p1"; wait "$p2"
 
 echo "runner isolation selftest: ok"
