@@ -501,8 +501,12 @@ publish_file "$RUN_LOG" "$LOG"
 if [ -n "${OT6_RECORD:-}" ] && [ -s "$RECORD_AVI" ]; then
   mkdir -p "$ROOT/build/stream"
   python3 "$ROOT/tools/stream/compose.py" "$RUN_LOG" "$RECORD_AVI" \
-    "$ROOT/build/stream/$(basename "$SCRIPT" .lua).mp4" \
-    || echo "[ot6] compose.py failed; the raw tape is $RECORD_AVI (set OT6_KEEP_RUNS=1 to keep it)"
+    "$ROOT/build/stream/$(basename "$SCRIPT" .lua).mp4" || {
+    # Keep the workspace so the tape survives: losing the AVI means paying
+    # for the whole run again just to retry a render step.
+    OT6_KEEP_RUNS=1
+    echo "[ot6] compose.py failed; workspace kept, raw tape at $RECORD_AVI"
+  }
 fi
 # OT6_NO_PUBLISH=1 runs a generator for its verdict only, leaving build/states
 # untouched.  `make smoke` uses it to falsify a lib change in minutes without
