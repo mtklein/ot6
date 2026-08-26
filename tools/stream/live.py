@@ -27,6 +27,7 @@ import re
 import sys
 import threading
 import time
+from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -97,7 +98,7 @@ def follow(log_path, webroot, test, stop, hop=False):
                 f.seek(pos)
                 chunk = f.read()
                 pos = f.tell()
-        except FileNotFoundError:
+        except OSError:
             chunk = ""
         changed = bool(chunk)
         for line in chunk.splitlines():
@@ -180,7 +181,10 @@ def main():
     log = os.path.join(ws, "run.log")
     test = os.path.basename(ws).split(".")[0]
 
-    webroot = os.path.join(ws, "live")
+    # The webroot is stable, outside any run workspace: workspaces are
+    # deleted when their run succeeds, and a server rooted inside one dies
+    # with it.
+    webroot = os.path.join(ROOT, "build", "live")
     os.makedirs(webroot, exist_ok=True)
     with open(os.path.join(webroot, "index.html"), "w") as f:
         f.write(PAGE)
@@ -190,9 +194,9 @@ def main():
                      args=(log, webroot, test, stop, args.workspace is None),
                      daemon=True).start()
 
-    os.chdir(webroot)
     httpd = ThreadingHTTPServer(("127.0.0.1", args.port),
-                                SimpleHTTPRequestHandler)
+                                partial(SimpleHTTPRequestHandler,
+                                        directory=webroot))
     print(f"live: http://127.0.0.1:{args.port}/  (test {test}, log {log})")
     try:
         httpd.serve_forever()
