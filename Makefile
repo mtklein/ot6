@@ -57,13 +57,29 @@ patch: tested
 # release: build the ROM, run both checks, then emit the distribution patch.
 # `test` is intentionally the fast development check and lets the tests that
 # need generated savestates skip when those fixtures are absent.  A release
-# must also generate the complete advertised story chain and rerun the suite
-# with those tests live.
+# needs the complete advertised story chain live, so it generates the chain
+# FIRST and then requires `test`'s own suite run to have been complete: the
+# tally must show zero skipped tests and must be about the stamped ROM.
+# This used to be a second full suite run (savestates-test); with the chain
+# already generated, that run repeated the first one identically, and the
+# v0.15 gate measured the repeat at 5m42s of a 13m34s release.  The
+# guarantee it provided survives as a check that can fail -- a skipped test,
+# a red tally, or a tally about some other ROM each refuse the release --
+# rather than as duplicate work.
 release-test:
 	$(MAKE) savestates
 	$(MAKE) test
-	$(MAKE) savestates-test
-	@echo "release gate green — base + the complete savestate chain"
+	@tally=build/.suite-tally; \
+	 test -f $$tally || { echo "ERROR: no suite tally -- did suite.sh run?"; exit 1; }; \
+	 rom=`shasum -a 1 build/ot6.sfc | cut -d' ' -f1`; \
+	 grep -q "^rom=$$rom$$" $$tally || { \
+	   echo "ERROR: the suite tally is not about build/ot6.sfc:"; cat $$tally; exit 1; }; \
+	 grep -q "^green=1$$" $$tally || { \
+	   echo "ERROR: the suite tally is not green:"; cat $$tally; exit 1; }; \
+	 grep -q " skip=0$$" $$tally || { \
+	   echo "ERROR: the suite skipped tests -- the savestate chain is incomplete:"; \
+	   cat $$tally; exit 1; }; \
+	 echo "release gate green -- complete suite, zero skipped, on the stamped ROM"
 
 # The release patch is named for the ROM on purpose, which is the opposite of
 # the `patch` rule above and for the same reason.  Emulators that support
@@ -74,17 +90,26 @@ release-test:
 # to go wrong.  The version lives in the directory name instead, so two
 # releases can sit side by side.
 release: release-test tested
+	@# Preflight: the release rules that drifted silently for v0.13/v0.14
+	@# (found on the v0.15 ledger -- no release branch cut, README two
+	@# releases stale) are structural now, the same stance the `tested`
+	@# stamp takes: nothing here depends on remembering.  Notes are
+	@# required outright; the old fall-back-to-template branch shipped a
+	@# fill-in-the-blanks file if anyone forgot to write them.
+	@git show-ref --verify --quiet refs/heads/release/v$(VERSION) || { \
+		echo "ERROR: no release/v$(VERSION) branch -- cut it first:"; \
+		echo "       git branch release/v$(VERSION)"; exit 1; }
+	@grep -q "v$(VERSION) is the current release" README.md || { \
+		echo "ERROR: README.md does not say v$(VERSION) is the current release"; exit 1; }
+	@test -f "docs/release-notes-v$(VERSION).md" || { \
+		echo "ERROR: docs/release-notes-v$(VERSION).md does not exist --"; \
+		echo "       a release ships real notes (start from docs/release-notes-template.md)"; exit 1; }
 	@rm -rf "build/release/ot6-v$(VERSION)"
 	@mkdir -p "build/release/ot6-v$(VERSION)"
 	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc \
 		"build/release/ot6-v$(VERSION)/$(basename $(BASE)).bps"
-	@if [ -f "docs/release-notes-v$(VERSION).md" ]; then \
-		cp "docs/release-notes-v$(VERSION).md" \
-			"build/release/ot6-v$(VERSION)/RELEASE_NOTES.md"; \
-	else \
-		sed 's/X\.Y/$(VERSION)/g' docs/release-notes-template.md \
-			> "build/release/ot6-v$(VERSION)/RELEASE_NOTES.md"; \
-	fi
+	@cp "docs/release-notes-v$(VERSION).md" \
+		"build/release/ot6-v$(VERSION)/RELEASE_NOTES.md"
 	@ls -la "build/release/ot6-v$(VERSION)/"
 
 # One GUI instance only: battery saves flush on exit, so a second instance
@@ -156,8 +181,41 @@ nomp-rom: rom
 		exit 1; fi
 	@echo "OT6_MP_COSTS=0 baseline built and confirmed distinct from the shipped ON ROM"
 
+# One audited pass per tree (the v0.15 release ledger).  The four fixture
+# audits cost ~20s each at the 120-fixture chain (the "~1s" this file used
+# to claim predates the full chain), and the release gate was running each
+# of them three times over an unchanged build/states -- once in
+# `savestates`, again in `test`, again when the gate re-entered
+# `savestates`.  The stamp keys on the fixture provenance stamps, the audit
+# scripts themselves, the GROW-list, and the tracked checkpoint manifests,
+# so a regenerated state, an edited audit, or a new checkpoint all re-run
+# the audits; a matching stamp means these exact tools already audited
+# these exact fixtures and said yes.  The audits' own selftests are not
+# stamped -- they run every `make test`, so a broken checker still fails
+# fast.  Deliberately `cat`, not xargs: BSD xargs on empty input would hand
+# shasum an empty argv and hang it on stdin.
+AUDITS := tools/audit_equipment.py tools/audit_party_hp.py \
+          tools/audit_supplies.py tools/audit_chests.py
+AUDIT_STAMP := build/.audit-stamp
+define run_audits
+key=`{ shasum -a 1 $(AUDITS) tools/chests_opened.txt 2>/dev/null; \
+       ls build/states/*.stamp 2>/dev/null; \
+       cat build/states/*.stamp 2>/dev/null; \
+       cat tools/tests/checkpoints/*/manifest.json 2>/dev/null; \
+     } | shasum -a 1 | cut -d' ' -f1`; \
+if [ -f $(AUDIT_STAMP) ] && [ "`cat $(AUDIT_STAMP)`" = "$$key" ]; then \
+  echo "fixture audits: this exact tree already audited green ($$key)"; \
+else \
+  python3 tools/audit_equipment.py && \
+  python3 tools/audit_party_hp.py && \
+  python3 tools/audit_supplies.py && \
+  python3 tools/audit_chests.py && \
+  echo $$key > $(AUDIT_STAMP) || exit 1; \
+fi
+endef
+
 test: rom nomp-rom graph
-	ninja -f $(NINJA_FILE) $(NINJAFLAGS) $(SUITE_STATES)
+	OT6_TIMEOUT=$(OT6_SAVESTATES_TIMEOUT) nice ninja -f $(NINJA_FILE) $(NINJAFLAGS) $(SUITE_STATES)
 	python3 tools/tests/lib/compose.py --selftest
 	python3 tools/tests/lib/sram_checkpoint.py selftest
 	@# The harness's own PASS/FAIL parsing.  It had no selftest until
@@ -210,15 +268,19 @@ test: rom nomp-rom graph
 	@# status in the name and are exempt.
 	python3 tools/check_test_registration.py --selftest
 	python3 tools/check_test_registration.py
+	@# The four fixture audits, one stamped pass -- see run_audits above for
+	@# the stamp; their selftests stay unconditional (pure python,
+	@# milliseconds), because the stamp must never skip the check that the
+	@# checkers still check.
+	@#
 	@# Nobody fights bare-handed.  The game strips characters at story beats
 	@# and returns their gear to inventory; no generator step ever put it back, so LOCKE
 	@# was unarmed in 42 fixtures and CELES in 29, and solo LOCKE punching a
 	@# 495-hp HeavyArmor read as a balance wall for three runs.  Reads the
-	@# savestates directly -- no emulator, ~1s for the whole tree -- so the
-	@# check is cheap enough to be unconditional.  Silent on an empty
+	@# savestates directly, no emulator.  Silent on an empty
 	@# build/states, because `make test` must not require the generated
 	@# savestates.
-	python3 tools/audit_equipment.py
+	@#
 	@# Nobody ships a casualty.  Sixty-eight generators fight battles and
 	@# three of them checked that their party was still standing at the end,
 	@# so returner_hideout shipped with TERRA and LOCKE at zero HP and five
@@ -231,8 +293,7 @@ test: rom nomp-rom graph
 	@# the measured gap that put it there.  The selftest is what fails if the
 	@# classifier stops classifying, since a green run over generated
 	@# fixtures and a green run over a broken predicate look identical.
-	python3 tools/audit_party_hp.py --selftest
-	python3 tools/audit_party_hp.py
+	@#
 	@# The supply half of the party-hp audit (#98).  A bag that spent its
 	@# revives and was never refilled is invisible to the two audits above --
 	@# everyone in the empty-bag fixture is alive and armed -- and that gap let
@@ -240,12 +301,12 @@ test: rom nomp-rom graph
 	@# with no Fenix Down to answer it.  Flags the cliff: zero revives where the
 	@# fixture it was generated from carried some.  Same reader, same only-shrinks
 	@# waiver, silent on an empty build/states.
-	python3 tools/audit_supplies.py --selftest
-	python3 tools/audit_supplies.py
+	@#
 	@# What the route walks past.  A normal player opens almost every chest;
-	@# this route opens none of the 94 on the maps it reaches, and one of them
-	@# is the Thunder Rod a room before the TunnelArmr fight that was losing
-	@# all three attempts.  Reads the treasure table out of the ff6 sources and
+	@# this route once opened none of the 94 on the maps it reached, and one
+	@# of them was the Thunder Rod a room before the TunnelArmr fight that was
+	@# losing all three attempts (the v0.12 chest pass is what changed that).
+	@# Reads the treasure table out of the ff6 sources and
 	@# the opened-flags out of the savestates and the tracked SRAM checkpoints,
 	@# so it has real data even before `make savestates` has run.  The check is
 	@# tools/chests_opened.txt, a GROW-only list of the chests the route does
@@ -253,8 +314,10 @@ test: rom nomp-rom graph
 	@# defect is uniform and a defect list would be 94 identical lines.  The
 	@# selftest is what fails if the decoder stops decoding; the count of
 	@# chests found is deliberately not checked, only which ones are opened.
+	python3 tools/audit_party_hp.py --selftest
+	python3 tools/audit_supplies.py --selftest
 	python3 tools/audit_chests.py --selftest
-	python3 tools/audit_chests.py
+	@$(run_audits)
 	python3 tools/tests/lib/savestate_ninja.py --selftest
 	sh tools/tests/lib/savestate_ninja_selftest.sh
 	sh tools/tests/lib/savestate_stamp_selftest.sh
@@ -272,11 +335,11 @@ test: rom nomp-rom graph
 	@# sufficient regeneration command, instead of warning from inside a composed
 	@# file nobody reads until some downstream test goes red for it.
 	python3 tools/tests/lib/compose.py --check-states
-	@rm -f $(STAMP)
-	tools/tests/suite.sh
+	@rm -f $(STAMP) build/.suite-tally
+	nice tools/tests/suite.sh
 	@echo "-- mpcost A/B: the OFF half (free — the negative control) on the nomp baseline --"
-	OT6_ROM=$(CURDIR)/ff6/rom/ff6-en-nomp.sfc tools/tests/run.sh tools/tests/battle_mpcost.lua
-	OT6_ROM=$(CURDIR)/ff6/rom/ff6-en-nomp.sfc tools/tests/run.sh tools/tests/battle_stealmp.lua
+	OT6_ROM=$(CURDIR)/ff6/rom/ff6-en-nomp.sfc nice tools/tests/run.sh tools/tests/battle_mpcost.lua
+	OT6_ROM=$(CURDIR)/ff6/rom/ff6-en-nomp.sfc nice tools/tests/run.sh tools/tests/battle_stealmp.lua
 	@shasum -a 1 build/ot6.sfc | cut -d' ' -f1 > $(STAMP)
 	@echo "suite green — stamped `cat $(STAMP)`"
 
@@ -291,44 +354,32 @@ test: rom nomp-rom graph
 #
 # The play-order chain, the checkpoint keys, the per-state route notes and the
 # scenario-stacking notes all live with the data: tools/tests/savestate_graph.py.
-# SAVESTATES_JOBS bounds `make savestates`, and only that target, by default.
-# Every other ninja target here is cheap and stays on ninja's own default.
 #
-# Why bound it at all.  Each savestate generation is a Mesen process racing a
-# wall-clock cap (run.sh --timeout=600).  nice(1) does not slow the wall, and
-# every one of them is equally niced, so they starve each other: unbounded,
-# `savestates` fans out to cores+2 emulators, each gets well under a core, and
-# the longest steps cross 600s and are killed by the timeout.  `savestates` is
-# the one target that reliably provokes this, because it is the one that
-# parallelises hard on its own.
-# Whether the run comes out green then depends on how loaded the machine
-# happened to be.
-#
-# Why 4.  It is a measured number rather than a derived one: 109 states
-# generated in ~60 min with no timeout kills (2026-07-29, M4 Max, other
-# agents live).  Raise it
-# on an idle machine; NINJAFLAGS still overrides everything, and
-# `make savestates SAVESTATES_JOBS=8` overrides just this.
-SAVESTATES_JOBS ?= 4
+# Parallelism is ninja's own, unbounded, at nice priority (owner rule,
+# 2026-08-26: no hardcoded parallelism numbers).  This retires
+# SAVESTATES_JOBS ?= 4, which existed because each generation is a Mesen
+# process racing run.sh's wall-clock cap and equally-niced emulators starve
+# each other under it -- unbounded fan-out pushed the longest steps over the
+# old 600s cap.  The cap was solving two problems and is now split: catching
+# a genuinely hung generator is OT6_SAVESTATES_TIMEOUT's job (default 1800s,
+# scaled for full-fan-out contention -- the longest edge measured 631s
+# uncontended on the v0.15 ledger, and the cap only bounds hang detection,
+# never slows a green run), and keeping the machine usable is nice's.
+# NINJAFLAGS still passes anything through (e.g. -j2, -k 0).
+OT6_SAVESTATES_TIMEOUT ?= 1800
 savestates: rom graph
 	@# Check generation the same way `test` is checked: a generator that pokes
 	@# game state produces a fixture nobody played, and `make savestates` can be
 	@# run with `make test` skipped -- so the no-state-write check runs here too.
 	python3 tools/check_state_writes.py
-	ninja -f $(NINJA_FILE) $(if $(NINJAFLAGS),$(NINJAFLAGS),-j$(SAVESTATES_JOBS)) savestates
+	OT6_TIMEOUT=$(OT6_SAVESTATES_TIMEOUT) nice ninja -f $(NINJA_FILE) $(NINJAFLAGS) savestates
 	@# Audit what was just generated, here rather than only in the next `make
-	@# test`.  Both read the .mss files directly and cost about a second, and
-	@# the failure they catch -- a fixture shipping a bare-handed or a downed
-	@# party member -- is one every later step inherits silently.  Waiting an
-	@# hour to hear it from a separate target is how returner_hideout shipped
-	@# with two dead characters in it.
-	python3 tools/audit_equipment.py
-	python3 tools/audit_party_hp.py
-	python3 tools/audit_supplies.py
-	@# Same reason, one step out: a route change that was supposed to start
-	@# opening chests and did not is cheaper to hear about here than an hour
-	@# later from `make test`.
-	python3 tools/audit_chests.py
+	@# test`: the failure they catch -- a fixture shipping a bare-handed or a
+	@# downed party member, a route that stopped opening its chests -- is one
+	@# every later step inherits silently.  Waiting an hour to hear it from a
+	@# separate target is how returner_hideout shipped with two dead
+	@# characters in it.  Stamped: see run_audits.
+	@$(run_audits)
 	@echo "savestates up to date"
 
 # ---------------------------------------------------------------- smoke ----
@@ -422,10 +473,13 @@ checkpoint-negatives: rom
 # savestates` exists to keep out of `make test`.  suite.sh picks the test up
 # automatically once the fixture is on disk and reports it as skipped when it
 # is not, so this target is just "generate the chain, then run the same
-# suite".
+# suite".  A standalone convenience these days: the release gate stopped
+# calling it (v0.15 ledger -- with the chain generated first, `test`'s own
+# suite run already includes these tests, and the gate now CHECKS the tally
+# for zero skips instead of rerunning an identical suite).
 savestates-test: savestates
 	python3 tools/tests/lib/compose.py --selftest
-	tools/tests/suite.sh
+	nice tools/tests/suite.sh
 
 # Code coverage (#130): run the full suite (savestate tests included, for the
 # widest reach) under Mesen's Code/Data Log and report which OT6 routines the
@@ -436,7 +490,7 @@ savestates-test: savestates
 # `savestates` for reach but not on a green `test`.  The report also lands at
 # build/states/coverage-report.txt.
 coverage: savestates
-	OT6_COVERAGE=1 tools/tests/suite.sh
+	OT6_COVERAGE=1 nice tools/tests/suite.sh
 
 clean:
 	$(MAKE) -C ff6 clean

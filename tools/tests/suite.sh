@@ -14,12 +14,13 @@
 # The default is the machine's P-core count (perflevel0) rather than a fixed
 # number. Measured on an M4 Max (10 P-cores, 42-test suite): the LPT makespan
 # is CPU-bound until ~6 workers (113s at 4 -> 83s at 6) and flat past that,
-# where the limit is a single test, battle_class (~78s), which no fan-out can
-# split. So the P-core count auto-sizes to the CPU-bound region and self-caps
-# at the floor; over-provisioning workers is harmless (idle pull-queue slots),
-# and the old hardcoded 4 left P-cores idle on anything bigger than a 4-core
-# part. To push under the floor, shorten battle_class itself; adding workers
-# will not do it.
+# where the limit is the single longest test, which no fan-out can split
+# (battle_rage, 112s on the v0.15 gate's 94-test run). So the P-core count
+# auto-sizes to the CPU-bound region and self-caps at the floor;
+# over-provisioning workers is harmless (idle pull-queue slots), and the old
+# hardcoded 4 left P-cores idle on anything bigger than a 4-core part. To
+# push under the floor, shorten the longest test itself; adding workers will
+# not do it.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 RUN="$ROOT/tools/tests/run.sh"
@@ -242,9 +243,9 @@ if [ "$JOBS" -gt 1 ]; then
   # drift out of sync with TESTS. Every test still runs whether or not it is
   # marked slow (unmarked ones are appended below); a mis-marked duration
   # costs a little idle tail and never loses or double-runs a test. $SLOW is in
-  # sorted order, which still front-loads the two longest (battle_class,
-  # battle_divines) into the first wave, which is all LPT needs; exact order
-  # past that barely moves the makespan.
+  # sorted order, which still front-loads the longest runners into the first
+  # wave, which is all LPT needs; exact order past that barely moves the
+  # makespan.
   in_list() { case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
   ORDER=""
   for t in $SLOW; do in_list "$t" "$TESTS" && ORDER="$ORDER $t"; done
@@ -316,6 +317,22 @@ if [ "$fail" -eq 0 ]; then
 else
   echo "OT6 suite: RED -- $line"
 fi
+
+# The machine-readable tally, for callers that must CHECK a suite result
+# instead of rerunning the suite (the Makefile's release gate).  The ROM sha
+# binds the verdicts to the exact ROM they are about -- the same binding the
+# `tested` stamp uses -- so a tally from before a rebuild cannot vouch for
+# the ROM on disk now.  Written unconditionally, red or green: a red tally
+# that says red is evidence; a missing file is not.  (Under
+# suite_tally_selftest.sh $ROOT is the selftest's fake tree, so this lands in
+# its scratch build/, never the real one.)
+mkdir -p "$ROOT/build"
+{
+  printf 'rom=%s\n' "$(shasum -a 1 "$ROOT/build/ot6.sfc" 2>/dev/null | cut -d' ' -f1)"
+  printf 'discovered=%s ran=%s pass=%s fail=%s xfail=%s xpass=%s skip=%s\n' \
+    "$discovered" "$ran" "$n_pass" "$n_fail" "$n_xfail" "$n_xpass" "$n_skip"
+  printf 'green=%s\n' "$([ "$fail" -eq 0 ] && echo 1 || echo 0)"
+} > "$ROOT/build/.suite-tally"
 
 # Coverage report (#130).  Union the per-test bitmaps and print the OT6 blind
 # spots, before the EXIT trap removes $SROOT.  A report also lands under
