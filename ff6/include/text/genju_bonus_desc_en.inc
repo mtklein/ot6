@@ -31,13 +31,13 @@ GENJU_BONUS_DESC_INC = 1
         _14 := GenjuBonusDesc + $0153
         _15 := GenjuBonusDesc + $016f
         _16 := GenjuBonusDesc + $018b
-        _17 := GenjuBonusDesc + $01a7
-        _18 := GenjuBonusDesc + $01a7
-        _19 := GenjuBonusDesc + $01a7
-        _20 := GenjuBonusDesc + $01a7
-        _21 := GenjuBonusDesc + $01a7
-        _22 := GenjuBonusDesc + $01a7
-        _23 := GenjuBonusDesc + $01a7
+        _17 := GenjuBonusDesc + $0018
+        _18 := GenjuBonusDesc + $0018
+        _19 := GenjuBonusDesc + $0018
+        _20 := GenjuBonusDesc + $0018
+        _21 := GenjuBonusDesc + $0018
+        _22 := GenjuBonusDesc + $0018
+        _23 := GenjuBonusDesc + $0018
 
 ; ##############################################################################
 

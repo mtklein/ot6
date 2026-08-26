@@ -25,24 +25,24 @@ Header:
         .addr   AltChannel7
         .addr   AltChannel8
 
-Channel7:
-SongStart:
-SongEnd:
+AltChannel1:
+AltChannel2:
+AltChannel3:
+AltChannel4:
+AltChannel5:
+AltChannel6:
+AltChannel7:
+AltChannel8:
+Channel1:
 Channel2:
 Channel3:
-Channel5:
 Channel4:
-AltChannel5:
-AltChannel1:
-AltChannel3:
-AltChannel2:
+Channel5:
 Channel6:
-AltChannel8:
-AltChannel4:
-Channel1:
-AltChannel7:
+Channel7:
 Channel8:
-AltChannel6:
+SongEnd:
+SongStart:
 
 .endscope
 

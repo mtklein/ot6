@@ -25,12 +25,18 @@ part of this release's supported, balanced playtest range.
 
 ## What's changed
 
-**Nothing, on purpose — if you are playing v0.15, there is no reason to
-update.** The game in this patch is identical to v0.15, Rizopas at Baren
-Falls included. This release exercises our release machinery end to end
-from a completely clean build: every test fixture regenerated from
+**Nothing you can play, on purpose — if you are playing v0.15, there is no
+reason to update.** This release exercises our release machinery end to
+end from a completely clean build: every test fixture regenerated from
 scratch by replaying the game, every check re-run, and the whole process
 timed. Shipping the result is part of the exercise.
+
+The patch file itself is not byte-for-byte v0.15's, and that is the one
+real thing the exercise turned up: a from-scratch build re-encodes some
+text and music data that had been carried as the original game's ripped
+bytes, and our encoder packs them a little differently (the same words
+and the same songs, stored smaller). The full test suite passed on the
+rebuilt ROM, which is the evidence behind "plays identically."
 
 ## A warning about Sketch
 

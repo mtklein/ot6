@@ -43,8 +43,8 @@ _003f:
         .byte   $79,$95,$9a,$b6,$f6
         .addr   _003f
 
-Channel2:
 AltChannel2:
+Channel2:
         .byte   $c4,$32,$dc,$21,$c6,$32,$d4,$b6,$b6
 
 _00cf:
@@ -98,8 +98,8 @@ _021a:
         .byte   $3f,$31,$23,$f6
         .addr   _021a
 
-Channel5:
 AltChannel5:
+Channel5:
         .byte   $c4,$32,$dc,$23,$c6,$3c,$d5,$b6,$b6
 
 _02f9:
@@ -128,16 +128,16 @@ _03d6:
         .byte   $25,$d4,$66,$f6
         .addr   _03d6
 
-Channel7:
 AltChannel7:
+Channel7:
         .byte   $c4,$64,$dc,$20,$c6,$40,$d5
 
 _03f3:
         .byte   $d6,$05,$dc,$26,$82,$dc,$27,$04,$dc,$26,$85,$85,$dc,$27,$04,$f6
         .addr   _03f3
 
-Channel8:
 AltChannel8:
+Channel8:
         .byte   $c6,$40,$d5,$b6,$b6,$b6,$b6,$b6,$b6
 
 _040e:

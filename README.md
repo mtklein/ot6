@@ -8,8 +8,8 @@ boost-point turn economy.
 ## Status
 
 v0.16 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.16)); its patch is
-identical to v0.15's. The game is
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.16)); it plays
+identically to v0.15. The game is
 playable from the start through the end of the World of Balance: the whole
 Thamasa arc, the world tour aboard the repaired Blackjack, the IAF gauntlet,
 the Floating Continent and AtmaWeapon, and the escape — stopping where the

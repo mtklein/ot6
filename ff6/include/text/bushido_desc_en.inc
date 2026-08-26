@@ -20,8 +20,8 @@ BUSHIDO_DESC_INC = 1
         _3 := BushidoDesc + $0039
         _4 := BushidoDesc + $0049
         _5 := BushidoDesc + $0062
-        _6 := BushidoDesc + $007f
-        _7 := BushidoDesc + $008f
+        _6 := BushidoDesc + $0039
+        _7 := BushidoDesc + $007f
 
 ; ##############################################################################
 

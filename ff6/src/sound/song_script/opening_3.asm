@@ -25,9 +25,9 @@ Header:
         .addr   AltChannel7
         .addr   AltChannel8
 
-SongStart:
-Channel1:
 AltChannel1:
+Channel1:
+SongStart:
         .byte   $f0,$50,$f4,$d4,$f7,$00,$64,$f8,$00,$00,$f2,$32,$b6,$b6,$b6,$b7
         .byte   $b9,$c4,$46,$dc,$20,$c6,$40,$d4,$c9,$30,$12,$e3,$dd,$08,$e0,$06
         .byte   $d6,$05,$e4,$6b,$87,$e5,$e2,$01,$e4,$95,$d6,$06,$25,$e5,$d8,$8d
@@ -48,8 +48,8 @@ _00a2:
         .byte   $dd,$04,$e0,$06,$d6,$05,$1c,$a8,$0e,$a8,$00,$a8,$d8,$8c,$a8,$a8
         .byte   $a8,$eb
 
-Channel2:
 AltChannel2:
+Channel2:
         .byte   $dc,$21,$c6,$54,$d4,$dd,$04,$d6,$05,$c4,$14,$c5,$c0,$1e,$62,$c5
         .byte   $c0,$28,$a8,$c5,$c0,$32,$a8,$c5,$c0,$3c,$e0,$06,$a8,$e2,$01,$d6
         .byte   $06,$1c,$46,$1c,$46,$1c,$4a,$2e,$20,$04,$1d,$2b,$1c,$e3,$1c,$46
@@ -65,8 +65,8 @@ Channel3:
         .byte   $d8,$90,$82,$90,$20,$4a,$90,$d7,$01,$d8,$90,$82,$90,$20,$66,$90
         .byte   $7e,$62,$8c,$62,$a8,$38,$a8,$2a,$a8,$1c,$a8,$a8,$a8,$eb
 
-Channel4:
 AltChannel4:
+Channel4:
         .byte   $dc,$22,$c6,$2c,$d4,$d6,$05,$c4,$14,$c5,$c0,$1e,$e2,$01,$25,$bf
         .byte   $6b,$bf,$95,$bf,$25,$bf,$e3,$c5,$c0,$28,$e2,$01,$25,$bf,$6b,$bf
         .byte   $95,$bf,$25,$bf,$e3,$c5,$c0,$32,$e2,$01,$25,$bf,$6b,$bf,$95,$bf
@@ -86,8 +86,8 @@ AltChannel4:
         .byte   $b1,$d7,$0b,$35,$76,$7b,$d7,$0b,$30,$35,$7b,$d7,$00,$d8,$d8,$d8
         .byte   $65,$b1,$97,$d7,$27,$68,$6d,$97,$d7,$22,$27,$6d,$8c,$b6,$b6,$eb
 
-Channel5:
 AltChannel5:
+Channel5:
         .byte   $dc,$22,$c6,$22,$d4,$d6,$04,$c4,$14,$c5,$c0,$1e,$e2,$01,$95,$bf
         .byte   $d7,$25,$bf,$6b,$bf,$d8,$95,$bf,$e3,$c5,$c0,$28,$e2,$01,$95,$bf
         .byte   $d7,$25,$bf,$6b,$bf,$d8,$95,$bf,$e3,$c5,$c0,$32,$e2,$01,$95,$bf
@@ -109,8 +109,8 @@ AltChannel5:
         .byte   $18,$42,$70,$a9,$bd,$77,$31,$07,$1c,$a9,$ab,$bd,$e0,$09,$d8,$62
         .byte   $a8,$eb
 
-Channel6:
 AltChannel6:
+Channel6:
         .byte   $dc,$21,$c6,$68,$d4,$dd,$04,$c4,$14,$c5,$c0,$1e,$d6,$03,$62,$c5
         .byte   $c0,$28,$a8,$c5,$c0,$32,$a8,$c5,$c0,$3c,$e0,$06,$a8,$d7,$e2,$01
         .byte   $ba,$20,$66,$90,$7e,$ba,$20,$66,$90,$7e,$ba,$4a,$90,$d7,$20,$00
@@ -131,8 +131,8 @@ Channel7:
         .byte   $85,$ba,$85,$85,$bd,$c4,$14,$88,$c4,$1e,$88,$c4,$28,$88,$c4,$32
         .byte   $85,$85,$85,$87,$87,$82,$b7,$ba,$b6,$eb
 
-Channel8:
 AltChannel8:
+Channel8:
         .byte   $dc,$25,$c6,$4a,$d5,$b6,$b6,$d6,$06,$c4,$0a,$c5,$c0,$32,$6b,$bf
         .byte   $6b,$bf,$6b,$bf,$6c,$6c,$6c,$6b,$bf,$6c,$6c,$6c,$6b,$bf,$6b,$6b
         .byte   $c5,$c0,$64,$6b,$bf,$6b,$bf,$6b,$bf,$6c,$6c,$6c,$6b,$bf,$6c,$6c

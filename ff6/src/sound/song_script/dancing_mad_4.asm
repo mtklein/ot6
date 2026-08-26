@@ -45,8 +45,8 @@ Channel3:
         .byte   $05,$63,$c5,$c0,$5a,$a8,$c4,$64,$c6,$3c,$d7,$74,$71,$ac,$b6,$74
         .byte   $71,$ac,$eb
 
-Channel4:
 AltChannel4:
+Channel4:
         .byte   $dc,$20,$c6,$40,$d4,$c4,$3c,$c5,$c0,$46,$b6,$c5,$c0,$50,$d6,$05
         .byte   $1c,$c5,$c0,$5a,$a8,$c4,$64,$c6,$46,$d7,$4a,$47,$ac,$b6,$4a,$47
         .byte   $ac,$eb
@@ -57,14 +57,14 @@ Channel5:
         .byte   $50,$a8,$c5,$c0,$5a,$a8,$c4,$64,$c6,$50,$4a,$47,$ac,$b6,$4a,$47
         .byte   $ac,$eb
 
-Channel6:
 AltChannel6:
+Channel6:
         .byte   $dc,$20,$c6,$40,$d4,$c4,$3c,$c5,$c0,$46,$d6,$04,$38,$c5,$c0,$50
         .byte   $a8,$c5,$c0,$5a,$a8,$c4,$64,$c6,$5a,$d8,$4a,$47,$ac,$b6,$4a,$47
         .byte   $ac,$eb
 
-Channel7:
 AltChannel7:
+Channel7:
         .byte   $c4,$50,$dc,$21,$c6,$28,$d4,$dd,$0a,$b6,$b6,$b6,$d6,$05,$e4,$3c
         .byte   $2b,$ac,$b6,$e4,$3c,$2b,$ac,$eb
 

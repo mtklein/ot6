@@ -35,27 +35,27 @@ _003c:
         .byte   $a8,$f6
         .addr   _003c
 
-Channel2:
 AltChannel2:
+Channel2:
         .byte   $c4,$7f,$c6,$40,$d6,$01,$dc,$07,$dd,$07,$38
 
 _004b:
         .byte   $a8,$f6
         .addr   _004b
 
-SongEnd:
-AltChannel8:
-Channel5:
-AltChannel4:
-Channel7:
 AltChannel3:
-AltChannel6:
-Channel8:
-Channel6:
+AltChannel4:
 AltChannel5:
+AltChannel6:
 AltChannel7:
-Channel4:
+AltChannel8:
 Channel3:
+Channel4:
+Channel5:
+Channel6:
+Channel7:
+Channel8:
+SongEnd:
 
 .endscope
 

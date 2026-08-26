@@ -31,8 +31,8 @@ SongStart:
         .byte   $f0,$78,$f7,$00,$64,$f8,$00,$01,$f2,$64,$c6,$40,$c4,$46,$dc,$20
         .byte   $d6,$02,$dd,$00,$e0,$08,$00,$a8,$a8,$a8,$eb
 
-Channel2:
 AltChannel2:
+Channel2:
         .byte   $c6,$40,$c4,$32,$dc,$20,$d6,$03,$dd,$00,$e0,$08,$00,$a8,$a8,$a8
         .byte   $eb
 
@@ -46,15 +46,15 @@ Channel4:
         .byte   $c6,$40,$c4,$28,$d4,$db,$02,$cd,$92,$f0,$dc,$20,$d6,$03,$dd,$00
         .byte   $e0,$08,$00,$a8,$a8,$a8,$eb
 
-AltChannel7:
-Channel5:
-AltChannel6:
-SongEnd:
-Channel7:
-Channel6:
-AltChannel8:
-Channel8:
 AltChannel5:
+AltChannel6:
+AltChannel7:
+AltChannel8:
+Channel5:
+Channel6:
+Channel7:
+Channel8:
+SongEnd:
 
 .endscope
 

@@ -44,9 +44,15 @@ def bytes_to_asm(bytes, labels=None, symbols=None, line_width=16):
         slice_begin = offset
 
         # print labels
+        # sorted: the set iterates in string-hash order, which Python
+        # randomizes per process, so coincident labels (Channel1 /
+        # AltChannel1 / SongStart at one offset) came out in a different
+        # order on every clean build and dirtied all ~85 tracked song
+        # scripts with pure label churn.  Same bytes, same addresses --
+        # only the emission order is pinned here.
         if offset in label_offsets:
             asm_string += '\n'
-            for label_str in label_offsets[offset]:
+            for label_str in sorted(label_offsets[offset]):
                 asm_string += f'\n{label_str}:'
 
         # print symbol tokens

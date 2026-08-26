@@ -25,8 +25,8 @@ Header:
         .addr   AltChannel7
         .addr   AltChannel8
 
-SongStart:
 Channel1:
+SongStart:
         .byte   $f0,$4b,$f4,$ae,$f7,$00,$46,$f8,$00,$00,$f2,$32,$c4,$46,$dc,$21
         .byte   $c6,$2c,$d4,$c9,$30,$12,$ef,$d6,$05,$e4,$51,$55,$b3,$bf,$3f,$d8
         .byte   $e4,$a1,$69,$e5,$e4,$d7,$23,$07,$d8,$e5,$e4,$69,$3f,$31,$e5,$e4

@@ -25,9 +25,9 @@ Header:
         .addr   AltChannel7
         .addr   AltChannel8
 
+AltChannel1:
 Channel1:
 SongStart:
-AltChannel1:
         .byte   $f4,$b0,$f7,$00,$64,$f8,$00,$00,$f2,$32,$dc,$20,$c6,$40,$d5,$e0
         .byte   $15,$f0,$55
 
@@ -59,8 +59,8 @@ _00d3:
         .byte   $85,$b6,$f6
         .addr   _00d3
 
-Channel3:
 AltChannel3:
+Channel3:
         .byte   $c4,$3c,$dc,$20,$c6,$40,$d5,$e0,$15
 
 _0161:
@@ -68,9 +68,9 @@ _0161:
         .byte   $bf,$a3,$a3,$a3,$bf,$a3,$bf,$b6,$b6,$b6,$b6,$b6,$f6
         .addr   _0161
 
-_0180:
-Channel4:
 AltChannel4:
+Channel4:
+_0180:
         .byte   $e2,$01,$c4,$3c,$dc,$21,$c6,$1e,$d5,$b6,$d6,$04,$87,$bf,$87,$87
         .byte   $82,$a9,$d6,$05,$c4,$3c,$dc,$22,$c6,$28,$d5,$87,$87,$87,$87,$41
         .byte   $bf,$41,$41,$bd,$c4,$3c,$dc,$23,$c6,$32,$d5,$85,$3c,$e3,$b6,$b6
@@ -78,17 +78,17 @@ AltChannel4:
         .byte   $dc,$23,$c6,$32,$d5,$d6,$05,$b7,$bd,$85,$3c,$f6
         .addr   _0180
 
-Channel5:
 AltChannel5:
+Channel5:
 _01ce:
         .byte   $e2,$01,$b6,$c4,$3c,$dc,$25,$c6,$5a,$d5,$b7,$d6,$05,$85,$85,$82
         .byte   $c4,$3c,$dc,$24,$c6,$64,$d5,$d6,$06,$b7,$85,$b9,$e3,$b6,$b6,$c4
         .byte   $3c,$dc,$25,$c6,$50,$d5,$d6,$05,$82,$82,$82,$ba,$b6,$b6,$b6,$f6
         .addr   _01ce
 
-_0200:
-Channel6:
 AltChannel6:
+Channel6:
+_0200:
         .byte   $c4,$3c,$dc,$26,$c6,$46,$d5,$b6,$b6,$b6,$b6,$b6,$b6,$bd,$d6,$05
         .byte   $85,$bd,$85,$bd,$85,$bd,$85,$b6,$b6,$bd,$85,$bd,$85,$bd,$85,$bd
         .byte   $85,$c4,$64,$dc,$27,$c6,$5a,$d5,$d6,$04,$b7,$ba,$c5,$c0,$0a,$bb
@@ -105,9 +105,9 @@ _0240:
         .byte   $d8,$9e,$ba,$f6
         .addr   _0240
 
+AltChannel8:
 Channel8:
 _0266:
-AltChannel8:
         .byte   $c4,$78,$b6,$b6,$b6,$b6,$b6,$b6,$d6,$05,$e2,$01,$e2,$01,$dc,$28
         .byte   $c6,$40,$d5,$82,$dc,$29,$c6,$40,$d5,$82,$e3,$f5,$02
         .addr   _0288

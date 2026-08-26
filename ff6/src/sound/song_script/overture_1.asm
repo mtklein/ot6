@@ -25,9 +25,9 @@ Header:
         .addr   AltChannel7
         .addr   AltChannel8
 
-SongStart:
 AltChannel1:
 Channel1:
+SongStart:
         .byte   $f7,$00,$50,$f8,$00,$00,$f2,$32,$c4,$3c,$dc,$20,$c6,$28,$d4,$f0
         .byte   $55,$d6,$05,$9e,$a2,$a2,$a2,$f0,$4b,$a1,$f0,$41,$a1,$f0,$37,$a1
         .byte   $f0,$4b,$d7,$0f,$ab,$bd,$f0,$55,$20,$24,$24,$24,$f0,$4b,$23,$f0
@@ -50,8 +50,8 @@ Channel1:
         .byte   $d7,$a3,$b7,$ba,$bf,$25,$25,$25,$1d,$ae,$bd,$41,$41,$41,$39,$b1
         .byte   $f0,$4b,$af,$bd,$eb
 
-Channel2:
 AltChannel2:
+Channel2:
         .byte   $c4,$3c,$dc,$20,$c6,$32,$d4,$d6,$05,$58,$5c,$5c,$5c,$5b,$5b,$5b
         .byte   $63,$ab,$bd,$82,$86,$86,$86,$85,$85,$85,$d7,$0f,$ab,$bd,$d8,$82
         .byte   $5b,$6b,$87,$d7,$15,$d8,$85,$3f,$5d,$6b,$54,$66,$58,$39,$c4,$28
@@ -88,8 +88,8 @@ Channel3:
         .byte   $33,$bc,$2e,$d8,$62,$a8,$62,$a8,$d7,$09,$bf,$d7,$09,$b7,$ba,$bf
         .byte   $d8,$4f,$4f,$4f,$47,$ae,$bd,$6b,$6b,$6b,$63,$ae,$bd,$eb
 
-Channel4:
 AltChannel4:
+Channel4:
         .byte   $c4,$46,$dc,$22,$c6,$5a,$d4,$d6,$05,$9e,$a2,$a2,$a2,$a1,$a1,$a1
         .byte   $8d,$ab,$bd,$82,$86,$86,$86,$85,$85,$85,$63,$ab,$bd,$58,$20,$66
         .byte   $58,$9b,$ac,$82,$62,$b6,$b6,$b6,$b6,$54,$a8,$c4,$3c,$dc,$21,$c6
@@ -116,15 +116,15 @@ Channel6:
         .byte   $b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$c4,$28,$85
         .byte   $85,$b7,$ba,$87,$87,$87,$87,$b7,$ba,$87,$87,$87,$87,$b7,$ba,$eb
 
-Channel7:
 AltChannel7:
+Channel7:
         .byte   $c4,$50,$dc,$24,$c6,$28,$d4,$b7,$b9,$b7,$d6,$04,$7f,$a9,$ab,$a9
         .byte   $7f,$a8,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$7e,$a8,$b6,$b6,$b6,$b6,$b6
         .byte   $b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6
         .byte   $bd,$7f,$ac,$af,$ae,$87,$a9,$ac,$ae,$87,$a9,$ac,$eb
 
-Channel8:
 AltChannel8:
+Channel8:
         .byte   $c4,$78,$dc,$25,$c6,$40,$d4,$d6,$03,$9e,$a2,$a2,$a2,$a1,$a1,$a1
         .byte   $8c,$82,$86,$86,$86,$85,$85,$85,$62,$b6,$b6,$b6,$b6,$b6,$b6,$b6
         .byte   $c5,$90,$0a,$e2,$23,$60,$e3,$ba,$b6,$b6,$b6,$b6,$b6,$b6,$b6,$b6

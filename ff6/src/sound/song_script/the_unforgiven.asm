@@ -25,9 +25,9 @@ Header:
         .addr   AltChannel7
         .addr   AltChannel8
 
+AltChannel1:
 Channel1:
 SongStart:
-AltChannel1:
         .byte   $f0,$aa,$f4,$e4,$f7,$00,$46,$f8,$00,$00,$f2,$32,$c4,$3c,$dc,$20
         .byte   $c6,$32,$d4,$d6,$06,$90,$74,$66,$4a,$69,$4d,$31,$12,$4d,$12,$00
         .byte   $a8
@@ -49,8 +49,8 @@ _0047:
         .byte   $33,$41,$f6
         .addr   _0047
 
-Channel2:
 AltChannel2:
+Channel2:
         .byte   $c4,$3c,$dc,$20,$c6,$37,$d4,$d6,$05,$90,$74,$66,$4a,$69,$4d,$31
         .byte   $12,$4d,$12,$00,$a8
 
@@ -151,8 +151,8 @@ _0414:
         .byte   $f6
         .addr   _0414
 
-Channel5:
 AltChannel5:
+Channel5:
         .byte   $c4,$3c,$dc,$25,$c6,$46,$d5,$b6,$b6,$d6,$05,$c4,$0a,$c5,$c0,$1e
         .byte   $e2,$03,$85,$87,$87,$e3,$c5,$c0,$3c,$85,$87,$87,$85,$87,$87,$85
         .byte   $85,$87,$87,$87,$87

@@ -61,8 +61,8 @@ _00d2:
         .byte   $41,$5d,$6b,$e5,$e3,$e2,$07,$e4,$17,$33,$4f,$5d,$e5,$e3,$e3,$f6
         .addr   _00d2
 
-Channel4:
 AltChannel4:
+Channel4:
         .byte   $c4,$3c,$dc,$21,$c6,$32,$d4
 
 _011b:
@@ -103,8 +103,8 @@ _0207:
         .byte   $79,$bf,$e3,$e2,$01,$c4,$46,$79,$bf,$c4,$23,$79,$bf,$e3,$f6
         .addr   _0207
 
-Channel7:
 AltChannel7:
+Channel7:
         .byte   $dc,$22,$c6,$50,$d4
 
 _027d:
@@ -118,8 +118,8 @@ _027d:
         .addr   _027d
 
 AltChannel8:
-SongEnd:
 Channel8:
+SongEnd:
 
 .endscope
 

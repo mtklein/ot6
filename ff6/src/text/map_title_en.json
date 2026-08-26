@@ -3,8 +3,7 @@
   "inc_path": "include/text/map_title_en.inc",
   "char_tables": [
     "dialog_en",
-    "dialog_escape",
-    "dte"
+    "dialog_escape"
   ],
   "text": [
     "",
