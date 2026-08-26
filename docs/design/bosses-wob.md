@@ -65,7 +65,7 @@ then on; only his shield count grows.
 | 6 | Kefka ×2 | Imperial Camp (Sabin) | — (no gauge) |
 | 7 | Telstar | Imperial Camp (Sabin) | 4 (Dobermans 2) |
 | 8 | GhostTrain | Phantom Train (Sabin) | 6 |
-| 9 | Rizopas | Baren Falls (Sabin) | 5 (Piranhas 1) |
+| 9 | Rizopas | Baren Falls (Sabin) | 4 (Piranhas 1) |
 | 10 | Kefka | Narshe defense | 6 |
 | 11 | Dadaluma | Zozo | 6 (Iron Fists 2) |
 | 12 | Ultros ② | Opera house | 6 |
