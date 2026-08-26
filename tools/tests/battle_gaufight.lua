@@ -125,18 +125,29 @@ end
 -- resolve an unwanted battle: flee (L+R), falling back to winning it through
 -- the real menus if flight stalls (an unrunnable set-piece formation).
 local function resolveBattle(tag)
-  local n, F = 0, nil
+  -- The single-lineage Veldt pool carries every formation the playthrough
+  -- has seen, armor draws included, so the fallback fights with the full
+  -- kit (items, heals, revives, tactical skills) -- an unarmed tap-fighter
+  -- wiped here against an M-TekArmor draw.  $b1 bit 1 is the engine's own
+  -- can't-run verdict; 60 held frames of it hands the fight to the driver
+  -- instead of donating free rounds until a 1200-frame cap.
+  local n, refusedN, F = 0, 0, nil
   return H.repeatN(1, {
     H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
       H.call(function()
         n = n + 1
-        if n < 1200 then
+        refusedN = ((H.readByte(0x00B1) & 0x02) ~= 0) and refusedN + 1 or 0
+        if F == nil and n < 1200 and refusedN < 60 then
           H.setPad({ l = true, r = true })
         else
           if not F then
-            F = H.newFightDriver(tag .. "-win")
-            H.log(tag .. ": flee stalled (unrunnable roster draw) -- "
-              .. "winning it through the menus instead")
+            -- one healer (CYAN), or every actor heals and the fight
+            -- heal-locks; SABIN fights tactically, GAU's Veldt rows are
+            -- outside the driver's repertoire and X-defer
+            F = H.newFightDriver(tag .. "-win",
+              { items = true, tactical = true, healer = 2 })
+            H.log(tag .. ": flee refused/stalled -- winning it through "
+              .. "the menus instead (full kit)")
           end
           F.frame()
         end
@@ -226,7 +237,15 @@ for n = 1, 6 do
       n, #msPresent, total, H.vars.suitable and "FIGHT" or "resolve"))
   end)
   w[#w + 1] = H.cond(function() return not H.vars.suitable end,
-    { resolveBattle("battle A draw " .. n) }, {})
+    { resolveBattle("battle A draw " .. n),
+      -- recover OUTSIDE combat before the next draw, gen_sabin_gau's own
+      -- between-battles doctrine: top off and Fenix Down through the world
+      -- menu so the next fight starts whole instead of bleeding turns into
+      -- the bag mid-battle
+      H.cond(function() return H.worldMode() end, {
+        H.fieldCare({ tag = "between draws " .. n, threshold = 0.9,
+                      maxFrames = 12000 }),
+      }, {}) }, {})
   if n == 1 then add(w)
   else add({ H.cond(function() return not H.vars.suitable end, w, {}) }) end
 end
