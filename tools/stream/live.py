@@ -25,6 +25,8 @@ import json
 import os
 import re
 import sys
+import importlib.util
+import runpy
 import threading
 import time
 from functools import partial
@@ -39,6 +41,7 @@ PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 live</title>
 <div style="padding:8px 0;font-size:18px"><span id=frame>-</span> <span id=pad style="color:#8ac"></span></div>
 <div id=notes style="text-align:left;max-width:min(768px,95vw);margin:0 auto;color:#9a9;white-space:pre-wrap;word-break:break-all"></div>
 <div id=s style="color:#575;padding-top:6px">connecting…</div>
+<div style="padding-top:4px"><a href="progress.html" style="color:#8ac">route progress &rarr;</a></div>
 </div>
 <script>
 const $=id=>document.getElementById(id); let seen=-1;
@@ -53,6 +56,49 @@ setInterval(async()=>{ try{
 }catch(e){ $('s').textContent='waiting for run…'; } }, 300);
 </script>"""
 
+PROGRESS_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 route</title>
+<body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
+<div style="max-width:1000px;margin:0 auto;padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<b style="font-size:17px">the route</b>
+<span id=hdr style="color:#8a8"></span></div>
+<svg id=map viewBox="0 0 1000 offset" width="100%"></svg>
+<div id=cur style="color:#9ac;padding-top:4px"></div>
+<div style="color:#575;padding-top:6px"><a href="index.html" style="color:#8ac">&larr; live view</a></div>
+</div>
+<script>
+const COLS = 8, DX = 120, DY = 74, R0 = 6;
+async function tick(){ try{
+  const j = await (await fetch('progress.json?'+Date.now())).json();
+  const svg = document.getElementById('map');
+  const rows = Math.ceil(j.edges.length / COLS);
+  svg.setAttribute('viewBox', `0 0 1000 ${rows*DY+40}`);
+  let out = '', px=null, py=null;
+  j.edges.forEach((e,i)=>{
+    const r = Math.floor(i/COLS), c = i%COLS;
+    const x = 60 + (r%2 ? (COLS-1-c) : c)*DX, y = 30 + r*DY;
+    if(px!==null) out += `<path d="M${px} ${py} L${x} ${y}" stroke="#333" stroke-width="3" fill="none"/>`;
+    px=x; py=y;
+  });
+  px=null;
+  j.edges.forEach((e,i)=>{
+    const r = Math.floor(i/COLS), c = i%COLS;
+    const x = 60 + (r%2 ? (COLS-1-c) : c)*DX, y = 30 + r*DY;
+    const rad = R0 + Math.min(14, Math.sqrt(e.dur||30));
+    const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#3a423c';
+    const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
+    out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}">${pulse}</circle>`
+        + `<text x="${x}" y="${y+rad+12}" fill="${e.status==='pending'?'#565':'#aca'}" font-size="9" text-anchor="middle">${e.name}</text>`;
+  });
+  svg.innerHTML = out;
+  document.getElementById('hdr').textContent =
+    `${j.done}/${j.total} segments · ${j.elapsed_min} min elapsed · ~${j.eta_min} min of spine left`;
+  document.getElementById('cur').textContent =
+    j.running.length ? ('now playing: ' + j.running.join(', ')) : '';
+}catch(e){} }
+tick(); setInterval(tick, 2000);
+</script>"""
+
 B64 = re.compile(r"^\[b64:([^\]]+)\] (\S+)\s*$")
 SHOT = re.compile(r"^\[ot6shot\] (\d+) (\S+)\s*$")
 PAD = re.compile(r"\[ot6pad\] (\d+) (\S+)")
@@ -61,6 +107,98 @@ PLAIN = re.compile(r"^\[ot6\] (.*)")
 # frame hints inside ordinary notes ("story f31113", "frame=2614",
 # "at frame 6623") -- the counter's source when no [ot6pad] taps flow
 HINT = re.compile(r"(?:\bframe[= ]|[ (]f)(\d{3,})\b")
+
+
+def progress_thread(webroot, stop):
+    """Write progress.json every 2s: each graph edge's status (done when its
+    primary stamp postdates the newest build.ninja, running when a live
+    workspace bears its name, pending otherwise), plus a remaining-spine ETA
+    from the ninja log's measured durations."""
+    states = runpy.run_path(
+        os.path.join(ROOT, "tools/tests/savestate_graph.py"))["STATES"]
+    # freshness authority: compose.py's own stamp verification (sig over
+    # generator+libs+extras, artifact hash, ancestor chain).  A fresh stamp
+    # is what ninja will not re-run -- modulo a ROM-content change, which
+    # the graph's latch owns and a mid-gate page can ignore honestly.
+    spec = importlib.util.spec_from_file_location(
+        "compose", os.path.join(ROOT, "tools/tests/lib/compose.py"))
+    compose = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(compose)
+    from pathlib import Path
+    rootp = Path(ROOT)
+    t0 = time.time()
+    while not stop.is_set():
+        dur = {}
+        try:
+            with open(os.path.join(ROOT, "build/ninja/.ninja_log")) as f:
+                for line in f:
+                    q = line.rstrip("\n").split("\t")
+                    if len(q) >= 5 and q[3].startswith("build/states/") \
+                       and q[3].endswith(".mss"):
+                        dur[q[3][13:-4]] = (int(q[1]) - int(q[0])) / 1000
+        except OSError:
+            pass
+        running = set()
+        for ws in glob.glob(os.path.join(ROOT, "build/test-runs/*/run.log")):
+            try:
+                if time.time() - os.path.getmtime(ws) < 45:
+                    running.add(os.path.basename(os.path.dirname(ws))
+                                .split(".")[0])
+            except OSError:
+                pass
+        edges, done = [], 0
+        for e in states:
+            n = e["state"]
+            names = [n] + list(e.get("also") or [])
+            cost = max((dur.get(x, 0.0) for x in names), default=0.0)
+            # a live workspace outranks content freshness: artifacts from a
+            # superseded edge can pass the stamp check while their
+            # replacement run is mid-flight
+            st = "pending"
+            if running & set(names):
+                st = "running"
+            else:
+                try:
+                    if all(os.path.exists(
+                               os.path.join(ROOT, f"build/states/{x}.stamp"))
+                           and compose.stamp_check(x, rootp) is None
+                           for x in names):
+                        st = "done"
+                except Exception:
+                    pass
+            if st == "done":
+                done += 1
+            edges.append({"name": n, "dur": cost, "status": st})
+        # remaining spine: longest chain of not-done edges (file order is
+        # play order; prev links carry the real topology)
+        owner = {}
+        for e in states:
+            for x in [e["state"]] + list(e.get("also") or []):
+                owner[x] = e["state"]
+        fin = {}
+        idx = {e["state"]: d for e, d in zip(states, edges)}
+        def finish(e):
+            n = e["state"]
+            if n in fin:
+                return fin[n]
+            b = 0.0
+            for dep in (e.get("prev"), e.get("seed"), e.get("after")):
+                if dep:
+                    b = max(b, finish(next(x for x in states
+                                           if x["state"] == owner[dep])))
+            mine = 0.0 if idx[n]["status"] == "done" else (idx[n]["dur"] or 60)
+            fin[n] = b + mine
+            return fin[n]
+        eta = max((finish(e) for e in states), default=0.0)
+        out = {"edges": edges, "done": done, "total": len(edges),
+               "running": sorted(running & set(owner)),
+               "elapsed_min": int((time.time() - t0) / 60),
+               "eta_min": int(eta / 60)}
+        tmp = os.path.join(webroot, ".p.tmp")
+        with open(tmp, "w") as f:
+            json.dump(out, f)
+        os.replace(tmp, os.path.join(webroot, "progress.json"))
+        time.sleep(5)
 
 
 def newest_workspace():
@@ -188,10 +326,14 @@ def main():
     os.makedirs(webroot, exist_ok=True)
     with open(os.path.join(webroot, "index.html"), "w") as f:
         f.write(PAGE)
+    with open(os.path.join(webroot, "progress.html"), "w") as f:
+        f.write(PROGRESS_PAGE)
 
     stop = threading.Event()
     threading.Thread(target=follow,
                      args=(log, webroot, test, stop, args.workspace is None),
+                     daemon=True).start()
+    threading.Thread(target=progress_thread, args=(webroot, stop),
                      daemon=True).start()
 
     httpd = ThreadingHTTPServer(("127.0.0.1", args.port),
