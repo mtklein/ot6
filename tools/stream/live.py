@@ -66,11 +66,12 @@ def newest_workspace():
     return os.path.dirname(max(logs, key=os.path.getmtime))
 
 
-def follow(log_path, webroot, test, stop):
+def follow(log_path, webroot, test, stop, hop=False):
     state = {"frame": 0, "pad": "-", "notes": [], "test": test,
              "shots": 0, "shot_tag": "-"}
     blob_tag, blob = None, []
     pos = 0
+    quiet = 0.0
 
     def finish_blob():
         nonlocal blob_tag, blob
@@ -118,10 +119,26 @@ def follow(log_path, webroot, test, stop):
             if m:
                 state["notes"] = (state["notes"] + [m.group(1)])[-8:]
         if changed:
+            quiet = 0.0
             tmp = os.path.join(webroot, ".status.tmp")
             with open(tmp, "w") as f:
                 json.dump(state, f)
             os.replace(tmp, os.path.join(webroot, "status.json"))
+        else:
+            quiet += 0.25
+            # channel-hop: this run went quiet; if a newer run is live,
+            # follow it instead (started without a named workspace only)
+            if hop and quiet > 10.0:
+                try:
+                    ws = newest_workspace()
+                    nl = os.path.join(ws, "run.log")
+                    if nl != log_path:
+                        log_path, pos, quiet = nl, 0, 0.0
+                        state["test"] = os.path.basename(ws).split(".")[0]
+                        state["frame"], state["pad"] = 0, "-"
+                        state["notes"] = [f"— hopped to {state['test']} —"]
+                except SystemExit:
+                    pass
         time.sleep(0.25)
 
 
@@ -142,7 +159,8 @@ def main():
         f.write(PAGE)
 
     stop = threading.Event()
-    threading.Thread(target=follow, args=(log, webroot, test, stop),
+    threading.Thread(target=follow,
+                     args=(log, webroot, test, stop, args.workspace is None),
                      daemon=True).start()
 
     os.chdir(webroot)
