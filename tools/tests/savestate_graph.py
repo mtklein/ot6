@@ -239,8 +239,7 @@ STATES = [
     # waypoint 16/18 with the machine idle (load 1.4), twice.  Real
     # progress, not starvation; the discriminator is HANDOFF trap 9.
     S("narshe_battle", gen="gen_narshe_battle", prev="reunion_ready",
-      timeout=1800),
-    S("kefka_entry", gen="gen_narshe_battle", prev="narshe_battle"),
+      timeout=1800, also=["kefka_entry"]),
     # kefka_won is v0.4's FIRST link and the input-driven chain's head: the
     # win tail (esper scene, TERRA's flight, the Arvis regroup and its
     # party-select menu) generates the map-30 boot the Zozo arc consumes.
@@ -270,8 +269,8 @@ STATES = [
     # bandit conveyor, both jump rows, and the z-level loop onto the y=13
     # strip beside DADALUMA at (30,14).  Entry point = (30,13); the fight is
     # battle 69, won by writing the battle-clearing flag like Kefka/Vargas.
-    S("dadaluma_entry", gen="gen_zozo4_dadaluma", prev="zozo_arrival"),
-    S("dadaluma_won", gen="gen_zozo4_dadaluma", prev="dadaluma_entry"),
+    S("dadaluma_entry", gen="gen_zozo4_dadaluma", prev="zozo_arrival",
+      also=["dadaluma_won"]),
     # gen_zozo5_ramuh: the tower door (33,9) -> map 226 -> TERRA (talked
     # from the WEST) -> the pure-dialog RAMUH scene -> the four magicite ->
     # the leave cutscene -> $0054=1 at {57,45}, v0.4's stop line.
