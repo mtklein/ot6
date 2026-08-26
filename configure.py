@@ -374,6 +374,17 @@ TEST_ENV = {
 # both against build/states, so both are fixture dependencies; the filter
 # against the graph's state names keeps false positives out
 STATE_REF = re.compile(r"([A-Za-z0-9_]+)\.mss")
+
+
+def fixture_deps(lua_path):
+    text = (ROOT / lua_path).read_text(errors="replace")
+    deps = []
+    for fx in sorted({s for s in STATE_REF.findall(text) if s in state_names}):
+        deps += [f"build/states/{fx}.mss.lua", f"build/states/{fx}.mss",
+                 f"build/states/{fx}.stamp"]
+    return deps
+
+
 suite_tests = []
 for f in glob("tools/tests/*.lua"):
     text = (ROOT / f).read_text(errors="replace")
@@ -383,15 +394,12 @@ for f in glob("tools/tests/*.lua"):
     t = Path(f).stem
     suite_tests.append(t)
     attrs = m.group(1)
-    fixtures = set()
-    fm = re.search(r"savestate=([A-Za-z0-9_]+)", attrs)
-    if fm:
-        fixtures.add(fm.group(1))
-    # fixtures the test source names directly (loadState paths)
-    fixtures |= {s for s in STATE_REF.findall(text) if s in state_names}
     deps = [latch_of("build/ot6.sfc"), latch_of(f)]
     deps += [latch_of(h) for h in LIBS] + HARNESS
-    for fx in sorted(fixtures):
+    deps += fixture_deps(f)
+    fm = re.search(r"savestate=([A-Za-z0-9_]+)", attrs)
+    if fm and f"build/states/{fm.group(1)}.mss" not in deps:
+        fx = fm.group(1)
         deps += [f"build/states/{fx}.mss.lua", f"build/states/{fx}.mss",
                  f"build/states/{fx}.stamp"]
     env = TEST_ENV.get(t, "")
@@ -407,7 +415,8 @@ for t in ("battle_mpcost", "battle_stealmp"):
     w.edge([f"build/results/nomp/{t}.ok"], "sh",
            implicit=[latch_of(f"tools/tests/{t}.lua"), "ff6/rom/ff6-en-nomp.sfc",
                      latch_of("build/ot6.sfc")]
-                    + [latch_of(h) for h in LIBS] + HARNESS,
+                    + [latch_of(h) for h in LIBS] + HARNESS
+                    + fixture_deps(f"tools/tests/{t}.lua"),
            cmd=f"mkdir -p build/results/nomp && "
                f"OT6_ROM=$$PWD/ff6/rom/ff6-en-nomp.sfc OT6_WORKER=nomp_{t} "
                f"nice tools/tests/run.sh tools/tests/{t}.lua"
