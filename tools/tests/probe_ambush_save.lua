@@ -88,7 +88,6 @@
 -- self-heals with Tonic/Potion first. H.fieldCare does not work on map
 -- 351 (every plan it tries comes back refused), so care() on this map is
 -- a no-op and recovery happens through in-battle heals instead.
-
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SAVE_SELECT = 0x14
