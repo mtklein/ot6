@@ -57,7 +57,7 @@ LIB_HALVES = (
 NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 STACK_RE = re.compile(r"^[A-Za-z0-9]+_$")
 FIELDS = {"state", "gen", "prev", "checkpoint", "seed", "stack", "after",
-          "timeout"}
+          "timeout", "also"}
 
 
 def checkpoint_inputs(root, key):
@@ -129,7 +129,25 @@ def validate(states, root):
             err(e, f"stack prefix {stack!r} must end in '_'")
         if stack and not gen:
             err(e, "stack= requires gen=")
+        # also=: further artifacts the SAME generator run publishes.  One
+        # edge, one play-through, several states -- the replacement for the
+        # old one-edge-one-artifact splits that replayed a whole route once
+        # per artifact.
+        also = e.get("also")
+        if also is not None:
+            if not gen:
+                err(e, "also= requires gen=")
+            elif not (isinstance(also, list) and also
+                      and all(isinstance(a, str) and NAME_RE.match(a)
+                              for a in also)):
+                err(e, f"also {also!r} must be a nonempty list of names")
+            else:
+                for a in also:
+                    if a == s or a in seen or also.count(a) > 1:
+                        err(e, f"also name {a!r} duplicates a state")
         seen.add(s)
+        for a in (e.get("also") or []):
+            seen.add(a)
     return errors
 
 
@@ -154,10 +172,8 @@ def emit_state_rules(w):
     w("# value's leading whitespace, so the separating spaces live HERE in")
     w("# the template (an empty splice leaves a harmless double space).")
     w("rule generate")
-    w("  command = OT6_WORKER=$state OT6_EXPECT_ARTIFACT='$state.mss "
-      "$state.mss.lua' $env tools/tests/run.sh tools/tests/$gen.lua && "
-      "sh tools/tests/lib/savestate_stamp.sh write $state $gen $ancestor "
-      "$extras")
+    w("  command = OT6_WORKER=$state OT6_EXPECT_ARTIFACT='$expect' $env "
+      "tools/tests/run.sh tools/tests/$gen.lua && $stamps")
     w("  description = generate $state <- $gen")
     w("")
     w("# A stacked chain's boot is a finished chain's ending: a pure copy of")
@@ -181,7 +197,9 @@ def emit_state_edges(w, states, root, latch_of):
     latched exactly once)."""
     for e in states:
         s = e["state"]
-        outs = (f"build/states/{s}.mss.lua build/states/{s}.mss")
+        names = [s] + list(e.get("also") or [])
+        outs = " ".join(f"build/states/{n}.mss.lua build/states/{n}.mss"
+                        for n in names)
         if e.get("seed"):
             src = e["seed"]
             w(f"build {outs} build/states/{s}.stamp: seed "
@@ -224,15 +242,26 @@ def emit_state_edges(w, states, root, latch_of):
             env.append(f"OT6_TIMEOUT={e['timeout']}")
         if e.get("after"):
             order = f" || build/states/{e['after']}.mss.lua"
-        w(f"build {outs} build/states/{s}.stamp: generate{explicit} | "
+        stamp_outs = " ".join(f"build/states/{n}.stamp" for n in names)
+        expect = " ".join(f"{n}.mss {n}.mss.lua" for n in names)
+        # one stamp per artifact, ancestry chained through the shared run:
+        # the first binds the external ancestor, each later artifact binds
+        # its predecessor's stamp from the same play-through
+        stamp_cmds, anc = [], ancestor
+        for n in names:
+            cmd = f"sh tools/tests/lib/savestate_stamp.sh write {n} {gen} {anc}"
+            if extras:
+                cmd += f" {extras}"
+            stamp_cmds.append(cmd)
+            anc = f"build/states/{n}.stamp"
+        w(f"build {outs} {stamp_outs}: generate{explicit} | "
           f"{' '.join(deps)}{order}")
         w(f"  state = {s}")
         w(f"  gen = {gen}")
-        w(f"  ancestor = {ancestor}")
+        w(f"  expect = {expect}")
+        w(f"  stamps = {' && '.join(stamp_cmds)}")
         if env:
             w(f"  env = {' '.join(env)}")
-        if extras:
-            w(f"  extras = {extras}")
     w("")
 
 
@@ -362,7 +391,9 @@ def selftest():
                 s(state="b", gen="gen_ok", prev="a"),
                 s(state="c", gen="gen_ok", checkpoint="good-v1"),
                 s(state="d", seed="b"),
-                s(state="e", gen="gen_ok", prev="d", stack="t9_")]
+                s(state="e", gen="gen_ok", prev="d", stack="t9_"),
+                s(state="f", gen="gen_ok", prev="e", also=["g", "h"]),
+                s(state="i", gen="gen_ok", prev="h")]
         check("well-formed graph validates", validate(good, root) == [])
         bad = [
             ("duplicate state", [s(state="a", gen="gen_ok")] * 2),
@@ -388,6 +419,14 @@ def selftest():
             ("unknown field",
              [dict(s(state="a", gen="gen_ok"), checkpointt="oops")]),
             ("bad state name", [s(state="a/b", gen="gen_ok")]),
+            ("also without gen",
+             [s(state="a", gen="gen_ok"),
+              s(state="b", seed="a", also=["x"])]),
+            ("also duplicating a state",
+             [s(state="a", gen="gen_ok"),
+              s(state="b", gen="gen_ok", also=["a"])]),
+            ("also duplicating itself",
+             [s(state="a", gen="gen_ok", also=["x", "x"])]),
         ]
         for label, graph in bad:
             check(label, validate(graph, root) != [])
@@ -402,7 +441,7 @@ def selftest():
                   for line in text.splitlines() if ": generate" in line
                   for h in LIB_HALVES))
         check("checkpointed generate edge hashes manifest before payload",
-              "extras = tools/tests/checkpoints/good-v1/manifest.json "
+              "tools/tests/checkpoints/good-v1/manifest.json "
               "tools/tests/checkpoints/good-v1/a.sram" in text)
         check("checkpointed generate edge exports OT6_SRAM_CHECKPOINT",
               "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/good-v1" in text)
@@ -414,19 +453,34 @@ def selftest():
               "cp build/states/$src.stamp build/states/$state.stamp" in text)
         # provenance ancestors: what each edge tells savestate_stamp.sh to
         # hash into its `ancestor` line.
-        check("generate rule threads $ancestor to savestate_stamp.sh",
-              "savestate_stamp.sh write $state $gen $ancestor" in text)
-        check("root generate edge records no ancestor", "ancestor = -" in text)
+        check("generate rule runs the per-edge stamp chain",
+              "&& $stamps" in text)
+        check("root generate edge records no ancestor",
+              "write a gen_ok -" in text)
         check("chained generate edge binds its predecessor's stamp",
-              "ancestor = build/states/a.stamp" in text)
+              "write b gen_ok build/states/a.stamp" in text)
         check("chained generate edge consumes its predecessor's stamp",
               any("build/states/a.stamp" in line
                   for line in text.splitlines()
                   if line.startswith("build build/states/b.")))
         check("checkpointed generate edge binds the checkpoint manifest",
-              "ancestor = tools/tests/checkpoints/good-v1/manifest.json" in text)
+              "write c gen_ok tools/tests/checkpoints/good-v1/manifest.json"
+              in text)
         check("stacked generate edge binds the seed copy's stamp",
-              "ancestor = build/states/d.stamp" in text)
+              "write e gen_ok build/states/d.stamp" in text)
+        check("an also= run publishes every artifact from one edge",
+              "build/states/f.mss.lua build/states/f.mss "
+              "build/states/g.mss.lua build/states/g.mss "
+              "build/states/h.mss.lua build/states/h.mss" in text
+              and "expect = f.mss f.mss.lua g.mss g.mss.lua h.mss h.mss.lua"
+              in text)
+        check("also= artifacts chain their stamps through the shared run",
+              "write g gen_ok build/states/f.stamp" in text
+              and "write h gen_ok build/states/g.stamp" in text)
+        check("a later edge may boot an also= artifact",
+              any("build/states/h.mss" in line
+                  for line in text.splitlines()
+                  if line.startswith("build build/states/i.")))
     print("savestate_ninja selftest:", "ok" if ok else "FAILED")
     return 0 if ok else 1
 

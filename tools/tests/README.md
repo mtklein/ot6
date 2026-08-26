@@ -50,14 +50,16 @@ is verifiable transitively from files on disk. `GATE_CONTRACT`
 (`ot6-provenance/v1`, one constant in `savestate_stamp.sh`) is a fixed sig
 input: bumping it deliberately stales every stamp.
 
-The **scenario stack** turns the three opening chains (Locke, Terra, Sabin)
-into one lineage: `OT6_STACK=<prefix>` makes `compose.py` rewrite every
-`.mss` basename in the script (never in the lib), so the same generator
-boots a prefixed predecessor and emits prefixed artifacts. The graph seeds
-each stacked hub from the previous chain's ending (`seed=` entries) and
-stacks the `t2_`/`s2_`/`t3_` layers up to `reunion_ready`. Details:
-`savestate_graph.py`'s SCENARIO STACKING section and `compose.py`'s
-docstring.
+The scenario split is played on **one pinned lineage** — Locke, then Sabin,
+then Terra — the way a single player with one cartridge plays it: scenario
+choice is order, not branching.  Each scenario's generators run exactly once;
+Sabin's opener boots `locke_done`, Terra's boots `sabin_done`, and Terra's
+closer (`gen_terra_done`), booted with all three completions carried in,
+rides the reunion cutscene and generates `reunion_ready` directly.  A
+generator that emits several states along one run declares them with
+`also=[...]` in the graph: one edge, one play-through, all its artifacts
+(`compose.py`'s `OT6_STACK` prefix machinery survives for experiments that
+replay a route from a foreign boot, but the graph no longer uses it).
 
 ## run.sh
 

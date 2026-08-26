@@ -65,7 +65,9 @@
 -- are read off battle RAM on each fight's rising edge and logged, because a
 -- balance claim about this step has to rest on what the ROM seeds.
 local H = dofile("tools/tests/lib/ot6.lua")
-local HUB = "build/states/scenario_hub.mss.lua"
+-- the pinned lineage: TERRA plays last, so the hub dispatch boots
+-- SABIN's ending (back at the hub, $001E and $0044 set)
+local HUB = "build/states/sabin_done.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

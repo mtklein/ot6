@@ -17,14 +17,10 @@
 #       lettered in the boundary comments below) is exactly this: prev=
 #       becomes checkpoint=.
 #
-#   S("t2_rapids_start", gen="gen_rapids", prev="t2_scenario_hub", stack="t2_")
-#       a STACKED state: compose.py replays the generator's route logic
-#       against prefix_-named fixtures (OT6_STACK) -- see SCENARIO STACKING
-#       below.
-#
-#   S("t2_scenario_hub", seed="locke_done")
-#       a stack SEED: a pure copy of a finished chain's ending under the
-#       stacked chain's boot name.  No generator, no emulator.
+#   S("south_figaro", gen="gen_kolts", prev="figaro_cleared",
+#     also=["kolts_entry", "vargas_entry"])
+#       one generator run that publishes several states: one edge, one
+#       play-through, all the artifacts the script emits along the way.
 #
 #   S("whelk_entry", gen="gen_whelk_poweron", after="battle2_entry")
 #       generated from power-on (no savestate input) and ORDERED after
@@ -47,23 +43,19 @@
 
 
 def S(state, *, gen=None, prev=None, checkpoint=None, seed=None, stack=None,
-      after=None, timeout=None):
+      after=None, timeout=None, also=None):
     return {"state": state, "gen": gen, "prev": prev, "checkpoint": checkpoint,
-            "seed": seed, "stack": stack, "after": after, "timeout": timeout}
+            "seed": seed, "stack": stack, "after": after, "timeout": timeout,
+            "also": also}
 
 
 STATES = [
     # ---- the suite's own fixtures (formerly STATE1/2/3 in the Makefile) ----
     # `make test` needs these three; they ride the same graph and the same
     # staleness mechanism as everything downstream of them.
-    S("battle_entry", gen="gen_battle_state"),
-    # first_battle: gen_battle_state's second artifact (the in-battle state
-    # battle_levelup/battle_smoke boot). Under the one-edge-one-artifact
-    # publish rule (#30) the battle_entry edge no longer republishes it,
-    # so it needs its own edge or a ROM change strands it stale -- which is
-    # exactly how battle_levelup broke during the Slot landing (9229881's
-    # report). after= orders the two identical emulator runs, no data dep.
-    S("first_battle", gen="gen_battle_state", after="battle_entry"),
+    # first_battle is gen_battle_state's second artifact (the in-battle
+    # state battle_levelup/battle_smoke boot): one run, both states.
+    S("battle_entry", gen="gen_battle_state", also=["first_battle"]),
     S("battle2_entry", gen="gen_battle2", prev="battle_entry"),
     # whelk_entry: the dialog-opening boss fight battle_dlgmenu tests.
     # gen_whelk_poweron generates it from COLD POWER-ON -- plays the New Game
@@ -84,29 +76,22 @@ STATES = [
     S("arvis_wake", gen="gen_arvis", prev="whelk_entry"),
     S("narshe_streets", gen="gen_narshe_escape", prev="arvis_wake"),
     S("moogle_entry", gen="gen_mines_chase", prev="narshe_streets"),
-    S("moogle_cleared", gen="gen_moogle", prev="moogle_entry"),
-    # moogle_defense: gen_moogle's second artifact (mid-set-piece, MOG
-    # leading P2) -- the first_battle pattern (#41): one edge per artifact,
-    # or the fixture silently goes stale while its sibling regenerates.
-    # battle_dancemp consumes it (the only real MOG-with-Dance window the
-    # chain has; measured 2026-08-10, the set piece is where dances are
-    # learned, so no earlier fixture can host that test).
-    S("moogle_defense", gen="gen_moogle", after="moogle_cleared"),
+    # moogle_defense: gen_moogle's second artifact, mid-set-piece with MOG
+    # leading P2; battle_dancemp consumes it (the chain's only real
+    # MOG-with-Dance window).
+    S("moogle_cleared", gen="gen_moogle", prev="moogle_entry",
+      also=["moogle_defense"]),
     S("worldmap_narshe", gen="gen_worldmap", prev="moogle_cleared"),
     S("figaro_entry", gen="gen_figaro", prev="worldmap_narshe"),
-    S("figaro_intro", gen="gen_edgar", prev="figaro_entry"),
-    # same script, later states; each keys on its own file so a half-run
-    # re-runs
-    S("figaro_matron", gen="gen_edgar", prev="figaro_intro"),
-    S("figaro_cleared", gen="gen_edgar", prev="figaro_matron"),
+    S("figaro_intro", gen="gen_edgar", prev="figaro_entry",
+      also=["figaro_matron", "figaro_cleared"]),
     # gen_kolts: the chocobo dismount, the South Figaro cave, and the mountain
     # timeout=1800: gen_kolts gained the South Figaro stop (the paced grind
     # on the world map outside the gate, the other three shops and the inn)
     # on 2026-08-12 and now runs past 80000 emulated frames, which is over
     # run.sh's 600 s default on a loaded machine.
-    S("south_figaro", gen="gen_kolts", prev="figaro_cleared", timeout=1800),
-    S("kolts_entry", gen="gen_kolts", prev="south_figaro", timeout=1800),
-    S("vargas_entry", gen="gen_kolts", prev="kolts_entry", timeout=1800),
+    S("south_figaro", gen="gen_kolts", prev="figaro_cleared", timeout=1800,
+      also=["kolts_entry", "vargas_entry"]),
     # gen_kolts_pool: one crossing past kolts_entry onto map 100 shelf F.
     # That map (95) is transit only and carries no encounter group --
     # 437 paced tiles there drew nothing -- so balance runs that want the
@@ -141,41 +126,42 @@ STATES = [
     # start from scenario_hub the same way.
     S("locke_scenario", gen="gen_scenario_locke", prev="scenario_hub"),
 
-    # ---- the TERRA/BANON scenario: the shortest of the three, from the hub -
-    # gen_rapids: talk to Terra at the hub, resume the raft down the lower
-    # Lete (the FORCED battle 8 plus two if_rand fights), spill onto the
-    # world map.  Two states: rapids_start is the cheap entry point UPSTREAM
-    # of the forced fight; rapids_done is on foot on the WoB NE of Narshe.
-    S("rapids_start", gen="gen_rapids", prev="scenario_hub"),
-    S("rapids_done", gen="gen_rapids", prev="rapids_start"),
-    # gen_terra_narshe: the world walk into Narshe and the townsfolk's
-    # turn-away at the checkpoint (which shoves the party back south, $001F)
-    S("terra_narshe", gen="gen_terra_narshe", prev="rapids_done"),
-    # gen_terra_caves: open the secret wall Locke used (an EXAMINE facing up
-    # on (15,57)) and step into the mines -- the only fixture in this
-    # scenario's random-encounter pool
-    S("terra_caves", gen="gen_terra_caves", prev="terra_narshe"),
-    # gen_terra_clifftop: the length of the caves -- maps 41/20-pocket/48/49/
-    # 50 -- including map 49's 13-gate ordered block maze, out onto the
-    # clifftop
-    S("terra_clifftop", gen="gen_terra_clifftop", prev="terra_caves"),
-    # gen_terra_done: into Arvis's house, onto the meeting trigger _ccb3fa,
-    # and out the far side with $0021 set -- the scenario complete
-    S("terra_done", gen="gen_terra_done", prev="terra_clifftop"),
+    # ---- the pinned scenario order (owner, 2026-08-26): LOCKE -> SABIN
+    # -> TERRA, one lineage, nothing replayed.  One player, one
+    # cartridge: scenario choice is order, not branching.  TERRA goes
+    # last because gen_terra_done's ending is the reunion-aware one.
+    #
+    # ---- LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
+    # gen_sfigaro: the occupied town.  The gate soldier (battle 11), then the
+    # cafe's cider runner -- STOLEN from, not killed, because the merchant's
+    # clothes come off the steal's reaction script and nothing else -- then
+    # the old man's password and the rich man's secret passage.
+    S("sfigaro_town", gen="gen_sfigaro", prev="locke_scenario", timeout=1800,
+      also=["sfigaro_passage"]),
+    # gen_celes: the passage, the rich man's mansion (a warp maze, entered by
+    # a deep door), the basement, the Celes chains cutscene + naming menu,
+    # freeing her, and the sleeping soldier's clock key
+    S("celes_freed", gen="gen_celes", prev="sfigaro_passage"),
+    # gen_tunnelarmr: the clock's secret passage (the ONLY basement exit),
+    # the escape through maps 87/86 to town, the world, the Figaro cave
+    # walked in from the south, and TunnelArmr (battle 67, $0104) -- which
+    # ends the Locke scenario ($001E=1, back at the hub).  Three states.
+    S("sfigaro_escape", gen="gen_tunnelarmr", prev="celes_freed",
+      also=["tunnelarmr_entry", "locke_done"]),
 
     # ---- SABIN's scenario: the longest of the three v0.3 branches ----
     # gen_sabin_world: the hub dispatch, the overworld landing at (161,36),
     # SHADOW's house (map 115) and the walk to the Imperial Camp.  Two states
     # from one script so an experiment on the house replays 700 frames, not
     # the hub as well.
-    S("sabin_world", gen="gen_sabin_world", prev="scenario_hub"),
-    S("sabin_camp", gen="gen_sabin_world", prev="sabin_world"),
+    S("sabin_world", gen="gen_sabin_world", prev="locke_done",
+      also=["sabin_camp"]),
     # gen_sabin_camp: one step south of the camp gate hands the game to CYAN
     # on map 120 for ~9,000 frames (the Doma defence, name menu and all)
     # before SABIN gets it back.  cyan_defence is generated mid-run so an
     # experiment on the commander fight replays 800 frames instead of 6,000.
-    S("cyan_defence", gen="gen_sabin_camp", prev="sabin_camp"),
-    S("camp_intro", gen="gen_sabin_camp", prev="cyan_defence"),
+    S("cyan_defence", gen="gen_sabin_camp", prev="sabin_camp",
+      also=["camp_intro"]),
     # gen_sabin_kefka: the LEO scene, the poisoning, both KEFKA
     # script-battles, the pursuit, and the handoff back to CYAN on the Doma
     # grounds.
@@ -220,119 +206,28 @@ STATES = [
     # option-1 prompt -- $0044=1 and the hub.  SABIN's scenario closes here.
     S("sabin_done", gen="gen_sabin_trench", prev="gau_joined"),
 
-    # ---- tier 4: LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
-    # gen_sfigaro: the occupied town.  The gate soldier (battle 11), then the
-    # cafe's cider runner -- STOLEN from, not killed, because the merchant's
-    # clothes come off the steal's reaction script and nothing else -- then
-    # the old man's password and the rich man's secret passage.
-    S("sfigaro_town", gen="gen_sfigaro", prev="locke_scenario", timeout=1800),
-    S("sfigaro_passage", gen="gen_sfigaro", prev="sfigaro_town"),
-    # gen_celes: the passage, the rich man's mansion (a warp maze, entered by
-    # a deep door), the basement, the Celes chains cutscene + naming menu,
-    # freeing her, and the sleeping soldier's clock key
-    S("celes_freed", gen="gen_celes", prev="sfigaro_passage"),
-    # gen_tunnelarmr: the clock's secret passage (the ONLY basement exit),
-    # the escape through maps 87/86 to town, the world, the Figaro cave
-    # walked in from the south, and TunnelArmr (battle 67, $0104) -- which
-    # ends the Locke scenario ($001E=1, back at the hub).  Three states.
-    S("sfigaro_escape", gen="gen_tunnelarmr", prev="celes_freed"),
-    S("tunnelarmr_entry", gen="gen_tunnelarmr", prev="sfigaro_escape"),
-    S("locke_done", gen="gen_tunnelarmr", prev="tunnelarmr_entry"),
-
-    # ---- SCENARIO STACKING: the road to the reunion ------------------------
-    # The reunion _caadb9 (event_main.asm:26683) needs $0021 && $001E && $0044
-    # in ONE playthrough; each input-driven chain sets one.  compose.py's
-    # OT6_STACK prefix replays a whole chain's ROUTE LOGIC from a different
-    # boot: a stacked state composes the same generator with every .mss
-    # basename prefixed, so it boots the prefixed predecessor and generates
-    # prefixed artifacts -- the input-driven states are never touched.  The
-    # full stack is LOCKE (input-driven) -> SABIN (s2_) -> TERRA (t3_); the
-    # earlier two_done milestone (LOCKE + TERRA, t2_) proved the mechanism on
-    # Terra's chain:
-    #  * Terra's is the shortest chain, so that first stacking layer -- the
-    #    one that had to prove the mechanism -- replays the least;
-    #  * the THIRD chain's hub return fires the reunion instead of reaching
-    #    the hub (the if_all at :26654), so whichever chain goes last cannot
-    #    end on its own "back at the hub" check.  That final step belongs to
-    #    gen_narshe_battle.  Terra takes it -- gen_terra_done's all-three
-    #    fork is already reunion-aware -- so Sabin's chain goes second and
-    #    its clean hub-return ending seeds the Terra layer.
-    #
-    # A stacked chain's "scenario_hub" IS the previous chain's ending: the
-    # seed entries copy both halves (state + sidecar), and a regenerated
-    # source (ROM changed, or the chain below replayed) re-seeds and the
-    # stack above replays -- that is just the dependency edge now.
-    S("t2_scenario_hub", seed="locke_done"),
-    S("t2_rapids_start", gen="gen_rapids", prev="t2_scenario_hub",
-      stack="t2_"),
-    S("t2_rapids_done", gen="gen_rapids", prev="t2_rapids_start",
-      stack="t2_"),
-    S("t2_terra_narshe", gen="gen_terra_narshe", prev="t2_rapids_done",
-      stack="t2_"),
-    S("t2_terra_caves", gen="gen_terra_caves", prev="t2_terra_narshe",
-      stack="t2_"),
-    S("t2_terra_clifftop", gen="gen_terra_clifftop", prev="t2_terra_caves",
-      stack="t2_"),
-    S("t2_terra_done", gen="gen_terra_done", prev="t2_terra_clifftop",
-      stack="t2_"),
-    # the acceptance check: asserts BOTH flags on the stacked ending and
-    # re-saves it under the canonical name (gen_two_done.lua's header says
-    # why the assert lives outside the mechanically-prefixed chain).
-    S("two_done", gen="gen_two_done", prev="t2_terra_done"),
-
-    # ---- the FULL stack: SABIN second (s2_), TERRA last (t3_) --------------
-    # ORDER (from the reunion spike): whichever chain returns to the hub
-    # THIRD rides the reunion instead of reaching the hub, so the final step
-    # must be reunion-aware -- gen_terra_done is (its all-three fork generates
-    # t3_reunion_ready at the map-22 staging).  Sabin's chain replays SECOND
-    # on top of locke_done, ending at his hub return ($001E+$0044).
-    S("s2_scenario_hub", seed="locke_done"),
-    S("s2_sabin_world", gen="gen_sabin_world", prev="s2_scenario_hub",
-      stack="s2_"),
-    S("s2_sabin_camp", gen="gen_sabin_world", prev="s2_sabin_world",
-      stack="s2_"),
-    S("s2_cyan_defence", gen="gen_sabin_camp", prev="s2_sabin_camp",
-      stack="s2_"),
-    S("s2_camp_intro", gen="gen_sabin_camp", prev="s2_cyan_defence",
-      stack="s2_"),
-    S("s2_kefka_done", gen="gen_sabin_kefka", prev="s2_camp_intro",
-      stack="s2_"),
-    S("s2_camp_cleared", gen="gen_sabin_doma", prev="s2_kefka_done",
-      stack="s2_"),
-    S("s2_doma_defended", gen="gen_sabin_escape", prev="s2_camp_cleared",
-      stack="s2_"),
-    S("s2_camp_escaped", gen="gen_sabin_magitek", prev="s2_doma_defended",
-      stack="s2_"),
-    S("s2_forest_done", gen="gen_sabin_forest", prev="s2_camp_escaped",
-      stack="s2_"),
-    S("s2_train_done", gen="gen_sabin_train", prev="s2_forest_done",
-      stack="s2_"),
-    S("s2_falls_done", gen="gen_sabin_falls", prev="s2_train_done",
-      stack="s2_"),
-    S("s2_gau_joined", gen="gen_sabin_gau", prev="s2_falls_done",
-      stack="s2_"),
-    S("s2_sabin_done", gen="gen_sabin_trench", prev="s2_gau_joined",
-      stack="s2_"),
-    # TERRA/BANON's chain replays LAST, on top of two completions:
-    S("t3_scenario_hub", seed="s2_sabin_done"),
-    S("t3_rapids_start", gen="gen_rapids", prev="t3_scenario_hub",
-      stack="t3_"),
-    S("t3_rapids_done", gen="gen_rapids", prev="t3_rapids_start",
-      stack="t3_"),
-    S("t3_terra_narshe", gen="gen_terra_narshe", prev="t3_rapids_done",
-      stack="t3_"),
-    S("t3_terra_caves", gen="gen_terra_caves", prev="t3_terra_narshe",
-      stack="t3_"),
-    S("t3_terra_clifftop", gen="gen_terra_clifftop", prev="t3_terra_caves",
-      stack="t3_"),
-    # gen_terra_done on the all-three boot takes its REUNION FORK: rides
-    # _caadb9's cutscene to the map-22 staging and generates t3_reunion_ready.
-    S("t3_reunion_ready", gen="gen_terra_done", prev="t3_terra_clifftop",
-      stack="t3_"),
-    # the acceptance check (gen_two_done's shape, one layer up): assert ALL
-    # THREE flags + the reunion on the stacked ending and re-save it as the
-    # canonical reunion_ready -- the boot gen_narshe_battle consumes.
-    S("reunion_ready", gen="gen_reunion_ready", prev="t3_reunion_ready"),
+    # ---- the TERRA/BANON scenario: the shortest of the three, from the hub -
+    # gen_rapids: talk to Terra at the hub, resume the raft down the lower
+    # Lete (the FORCED battle 8 plus two if_rand fights), spill onto the
+    # world map.  Two states: rapids_start is the cheap entry point UPSTREAM
+    # of the forced fight; rapids_done is on foot on the WoB NE of Narshe.
+    S("rapids_start", gen="gen_rapids", prev="sabin_done",
+      also=["rapids_done"]),
+    # gen_terra_narshe: the world walk into Narshe and the townsfolk's
+    # turn-away at the checkpoint (which shoves the party back south, $001F)
+    S("terra_narshe", gen="gen_terra_narshe", prev="rapids_done"),
+    # gen_terra_caves: open the secret wall Locke used (an EXAMINE facing up
+    # on (15,57)) and step into the mines -- the only fixture in this
+    # scenario's random-encounter pool
+    S("terra_caves", gen="gen_terra_caves", prev="terra_narshe"),
+    # gen_terra_clifftop: the length of the caves -- maps 41/20-pocket/48/49/
+    # 50 -- including map 49's 13-gate ordered block maze, out onto the
+    # clifftop
+    S("terra_clifftop", gen="gen_terra_clifftop", prev="terra_caves"),
+    # gen_terra_done, booted with all three completions carried in, takes
+    # its reunion fork: rides _caadb9's cutscene to the map-22 staging and
+    # generates reunion_ready, the boot gen_narshe_battle consumes.
+    S("reunion_ready", gen="gen_terra_done", prev="terra_clifftop"),
 
     # ---- the Battle for Narshe ---------------------------------------------
     # gen_narshe_battle: reunion staging -> BANON -> the three-party

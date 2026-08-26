@@ -50,7 +50,9 @@
 -- start button is pressed").
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/scenario_hub.mss.lua"
+-- the pinned lineage: SABIN plays after LOCKE, so the hub dispatch
+-- boots LOCKE's ending (back at the hub, $001E set)
+local DOOR = "build/states/locke_done.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
