@@ -121,6 +121,28 @@ else
   python3 "$ROOT/tools/tests/lib/compose.py" "$SCRIPT" "$COMPOSED" || exit 2
 fi
 
+# OT6_RECORD=1: run the same composed script under tools/stream/mesen_record
+# instead of the testrunner, taping the whole run (video + emulated audio) to
+# an AVI, then render build/stream/<script>.mp4 with the input panel at run
+# end.  See tools/stream/README.md.  Everything in this block is record-only;
+# with OT6_RECORD unset no line of it runs and the testrunner path below is
+# untouched.
+if [ -n "${OT6_RECORD:-}" ]; then
+  # The lib's recording taps (lib/ot6.lua "recording sidecars") key off the
+  # OT6_RECORD global, defined by prepending one line to a record-only copy.
+  # The sandboxed script cannot read the environment, so the flag has to
+  # travel in the script text; the original composed file is left alone.
+  RECORD_LUA="$WDIR/composed_record.lua"
+  { printf 'OT6_RECORD = true\n'; cat "$COMPOSED"; } > "$RECORD_LUA"
+  # Compiled per invocation: the source is small (a ~2s build), and a stale
+  # cached binary against a swapped Mesen core is exactly the layout-drift
+  # case the tool's version guard exists to refuse loudly, not to dodge.
+  RECORD_BIN="$WDIR/mesen_record"
+  c++ -O2 -std=c++17 -o "$RECORD_BIN" "$ROOT/tools/stream/mesen_record.cpp" || {
+    echo "mesen_record failed to compile; refusing to record"; exit 2; }
+  RECORD_AVI="$WDIR/record.avi"
+fi
+
 # ------------------------------------------------------------ shared emulator
 # Every worker on this machine execs one read-only Mesen bundle, and nothing
 # ever writes inside it.  Workers are kept apart by giving each its own Mesen
@@ -320,10 +342,21 @@ retried=0
 while :; do
   attempt=$(( attempt + 1 ))
   t0=$(date +%s)
-  env CFFIXED_USER_HOME="$MESEN_HOME" \
-    "$SHARED_APP/Contents/MacOS/Mesen" --testrunner --timeout="$CAP" --enableStdout \
-    "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1
-  code=$?
+  if [ -n "${OT6_RECORD:-}" ]; then
+    # The record host applies the pin_test_saves.py pins itself through the
+    # core's config API (settings.json is a C#-side concept it never reads)
+    # and takes the saves dir explicitly, so isolation matches the
+    # testrunner path.  A retry overwrites the AVI from frame 0.
+    "$RECORD_BIN" "$SHARED_APP/Contents/MacOS/MesenCore.dylib" \
+      "$MESEN2" "$TEST_SAVES" "$ROM" "$RECORD_LUA" "$RECORD_AVI" "$CAP" \
+      > "$RUN_LOG" 2>&1
+    code=$?
+  else
+    env CFFIXED_USER_HOME="$MESEN_HOME" \
+      "$SHARED_APP/Contents/MacOS/Mesen" --testrunner --timeout="$CAP" --enableStdout \
+      "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1
+    code=$?
+  fi
   elapsed=$(( $(date +%s) - t0 ))
   verdict_spoken "$RUN_LOG" && break
   [ $(( elapsed + 5 )) -ge "$CAP" ] || break
@@ -461,6 +494,16 @@ $ancestors"
   fi
 fi
 publish_file "$RUN_LOG" "$LOG"
+# Render the watchable video from the tape + the log's [ot6pad]/[ot6note]
+# stream.  A FAILed run is composed too: watching what the run did is most
+# of the point when it did the wrong thing.  Compose failure never flips a
+# test verdict; the recording is an observer.
+if [ -n "${OT6_RECORD:-}" ] && [ -s "$RECORD_AVI" ]; then
+  mkdir -p "$ROOT/build/stream"
+  python3 "$ROOT/tools/stream/compose.py" "$RUN_LOG" "$RECORD_AVI" \
+    "$ROOT/build/stream/$(basename "$SCRIPT" .lua).mp4" \
+    || echo "[ot6] compose.py failed; the raw tape is $RECORD_AVI (set OT6_KEEP_RUNS=1 to keep it)"
+fi
 # OT6_NO_PUBLISH=1 runs a generator for its verdict only, leaving build/states
 # untouched.  `make smoke` uses it to falsify a lib change in minutes without
 # half-updating the chain: a state generated mid-smoke would be fresher than
