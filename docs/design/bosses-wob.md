@@ -421,7 +421,12 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
 
 ### 9. Rizopas, after the Piranha school — Baren Falls (Sabin + Cyan)
 
-**Shields:** 5 (Piranhas 1) · **Weak:** bolt + slashing, bludgeoning.
+**Shields:** 4 (Piranhas 1) · **Weak:** bolt + slashing, bludgeoning.
+(#139, v0.15: 5 → 4. The real-attempt ledger at the routed curve read
+1W/8L, with the party entering his phase healthy — 268/235 measured —
+and still wiping to the surfacing pressure; one pip lands the break a
+round earlier, and the first regeneration after the change won on
+attempt 1.)
 
 - **Telegraph:** the falls swell backward → **El Nino** hits the
   party.
