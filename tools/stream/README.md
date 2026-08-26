@@ -203,3 +203,19 @@ Deferred / known limits:
 - The host applies the harness's determinism pins but not the play
   profile's cosmetic settings (video filters, equalizer); those are
   output-side only.  `OT6_RAM_POWERON` is honored.
+
+## Watching live (tools/stream/live.py)
+
+The tape is a sequential ZMBV stream, so it decodes while it is still being
+written: `live.py` follows the newest recording workspace (`tail -f` piped
+through ffmpeg), serves one page showing the newest frame, the live frame
+counter and held pad from the `[ot6pad]` taps, and the driver's `[ot6note]`
+lines.
+
+    OT6_RECORD=1 tools/tests/run.sh tools/tests/<x>.lua &
+    python3 tools/stream/live.py        # http://127.0.0.1:8611/
+
+The image feed samples at 4 fps and tracks the emulator with negligible lag;
+the pad/frame readout lags by Mesen's stdout block buffering.  Known limit,
+inherited from the recorder: if the tape stops (frame-geometry change), the
+image freezes while the pad/note telemetry keeps flowing.
