@@ -215,14 +215,12 @@ for mml in glob("src/sound/sfx_script/*.mml", "ff6"):
            desc=f"encode_sfx {Path(mml).stem}")
     generated.append(asm)
 
-for g in glob("src/gfx/monster_gfx/*.4bpp", "ff6") \
-        + glob("src/gfx/monster_gfx/*.3bpp", "ff6"):
-    stn = g[:-len(".4bpp")] + ".stn"
-    w.edge([g + ".trm", stn], "sh", [g],
-           implicit=["ff6/tools/monster_stencil.py"],
-           cmd=f"cd ff6 && python3 tools/monster_stencil.py {g[len('ff6/'):]}",
-           desc=f"stencil {Path(g).name}")
-    generated += [g + ".trm", stn]
+# Monster .trm/.stn pairs are ripped ROM data, tracked and consumed as-is;
+# they are NOT regenerated here.  monster_stencil.py's zero-tile trim is not
+# display-equivalent to Square's own choices -- regenerating ghosttrain's
+# pair dropped a kept-but-empty tile and the Phantom Train fight froze with
+# the train's sprite never arriving.  Run the tool by hand only for a
+# monster graphic that was actually edited, and verify that fight in-game.
 
 # lzss: the same two source classes the old Makefile derived from tracked
 # sources (sprintf-consumed directories and literal incbin paths)
@@ -286,7 +284,7 @@ inc_files = glob("include/*.inc", "ff6") + glob("include/*/*.inc", "ff6")
 
 def module_obj(mod, obj, flags):
     srcs = glob(f"src/{mod}/*", "ff6") + glob(f"src/{mod}/*/*", "ff6")
-    srcs = [s for s in srcs if not s.endswith((".lz", ".trm", ".lst", ".d"))]
+    srcs = [s for s in srcs if not s.endswith((".lz", ".lst", ".d"))]
     w.edge([f"ff6/obj/{obj}.o"], "ca65", [f"ff6/src/{mod}/{mod}_main.asm"],
            implicit=srcs + inc_files, order=generated,
            flags=flags, rawdep=f"obj/{obj}.d",
