@@ -168,23 +168,6 @@ because this column must stay monotonic with the tech index. The boost window
 offers techs weakest→strongest and *the cursor row is the boost level*
 (below), so a 2× row costing more than the 3× row would read as a bug.
 
-**The tempered edge (#137, v0.15).** A tech's *intrinsic* cost is what its
-own AUTO-window slot charges — `clamp(T − max(0, ceiling−2) + 1, 1, 3)` —
-and pending boost past the intrinsic is **surplus**, which feeds
-`Ot6BoostDmg`'s doubler: surplus 1 → ×2, surplus 2 → ×4. AUTO play spends
-exactly the intrinsic and never has surplus, so the window plays exactly as
-before; surplus exists where the player *arranges* it with the loadout
-configurator — Dispatch placed on the 3× row is Dispatch ×4, the nuke the
-spend was always read as promising (owner report, 2026-08-25: "I put retort
-on 1 and dispatch on 2+3, retort was amazing, dispatch was sad" — the same
-tech on adjacent rows was the proof the extra point bought nothing). An
-Oblivion that declines an unbroken target and resolves as Tempest carries
-its surplus too, so the fallback stops being a dead turn. All of it reads
-from the resolved action at damage time — no new state, no latch race.
-In-battle demonstration of the doubler at a manual row is blocked on #141
-(the manual row-1+ commit wedge); the surplus-0 invariance is pinned by
-battle_temperededge alongside battle_bushido's no-double-dip assert.
-
 Dispatch is the cheapest row of any kit at 4 MP (the "free-to-learn is not
 free-to-use" floor), which is 6.9% of the pool Cyan
 joins with, against the 8–21% a vanilla spell costs at the level it is learned.
