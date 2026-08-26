@@ -219,14 +219,20 @@ def main():
     w, h, fps, frames = probe(tape)
     if frames == 0:
         sys.exit(f"compose.py: {tape} holds no frames")
-    if (w, h) == (256, 239):
+    if (w, h) == (256, 224):
+        # mesen_record applies the testrunner's 7-top/8-bottom overscan crop
+        # (see the Overscan note there), so the tape is already the game area
+        crop = ""
+    elif (w, h) == (256, 239):
+        # an uncropped tape (e.g. cut by a host without the overscan pin):
+        # the 224-line picture sits at rows 7..230, measured with cropdetect
         crop = "crop=256:224:0:7,"
     else:
         # A geometry this pipeline has not measured (a hi-res switch would
         # have stopped the recorder mid-run anyway; README "Verified vs
         # deferred").  Scale whatever arrived rather than refusing.
         print(f"compose.py: unexpected tape geometry {w}x{h} "
-              f"(expected 256x239); skipping the game-area crop",
+              f"(expected 256x224); skipping the game-area crop",
               file=sys.stderr)
         crop = ""
 

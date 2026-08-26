@@ -91,10 +91,35 @@ layout is silent corruption.
    `[ot6pad] <frame> <buttons>` on every pad change from `M.setPad`, and
    `[ot6note] <frame> <text>` from every `M.log`, over stdout into the run
    log like everything else.
-3. `compose.py` reads the tape + log and renders the MP4: game area cropped
-   (the tape's 256x239 frame carries the 224-line picture at rows 7..230,
-   measured with cropdetect), scaled 2x nearest to 512x448, panel drawn
-   underneath at 512x112, notes muxed as soft mov_text subtitles.
+3. `compose.py` reads the tape + log and renders the MP4: the 256x224 tape
+   scaled 2x nearest to 512x448, panel drawn underneath at 512x112, notes
+   muxed as soft mov_text subtitles.
+
+### The recorded run must be the testrunner's run
+
+The C# layer's SNES defaults differ from the core's own struct defaults in
+two places, and the testrunner applies the C# ones, so the host must too:
+
+- **Overscan 7 top / 8 bottom** (UI/Config/SnesConfig.cs:45 vs
+  SettingTypes.h:562).  Behavioral, not just cosmetic: the decoded frame
+  size feeds `emu.takeScreenshot()`, whose PNG byte count
+  `M.screenLooksAlive()` thresholds.  Also puts the tape at the 256x224
+  the repo's screenshots document.
+- **SpcClockSpeedAdjustment 40** (UI/Config/SnesConfig.cs:62 vs
+  SettingTypes.h:570).  The SPC clock derives from it (32000 + adjustment,
+  Core/SNES/Spc.cpp:54,126; the 40 maps to real hardware's 32040Hz).  At
+  32000Hz the CPU/SPC interleaving shifts within the frame, and
+  `gen_vector_entry`'s world walk diverged: PASS at frame 6202 against the
+  testrunner's 6029, reproducibly on both sides.  Found by diffing
+  per-frame WRAM hashes between the two hosts: bytes identical until the
+  game's own H/V-counter load samples at $0630-$0632 (ff6/notes/
+  ff3u.asm C0/0153-0172) read one scanline apart, then a world-map
+  encounter fled 174 frames slower.
+
+With both matched, the recorded `gen_vector_entry` passes at 6029 exactly
+and the probed WRAM dumps are byte-identical to the testrunner's.  If a
+Mesen upgrade ever shifts these defaults again, that is the first place to
+look when a recorded run stops matching its unrecorded twin.
 
 ### Frame alignment
 
@@ -155,10 +180,14 @@ Verified this pass:
   path, from power-on, frame-exact against the input log (see above).
 - Audio present with the audio pin untouched (RMS -24dB on the title theme;
   silence over the first boot seconds is the game's own).
-- run.sh record mode end to end on a suite test (`battle_boost`), FAIL-path
-  compose reasoning (compose runs on any verdict), zero-diff behavior with
-  `OT6_RECORD` unset (no `[ot6pad]`/`[ot6note]` lines, verdict selftest
-  green, smoke green).
+- run.sh record mode end to end on a suite test (`battle_boost`), the
+  FAIL path (a deliberately failing script still composed its 122-frame
+  video), and zero-diff behavior with `OT6_RECORD` unset (no
+  `[ot6pad]`/`[ot6note]` lines, verdict selftest green, smoke green).
+- `OT6_SRAM_CHECKPOINT` under record mode: `gen_vector_entry` from the
+  post-opera-v1 checkpoint passes recorded at the same frame (6029) as the
+  stock testrunner run, and `verify_panel.py` is green on the result.  This
+  run is also what caught the two config divergences above.
 
 Deferred / known limits:
 
@@ -172,9 +201,6 @@ Deferred / known limits:
   `Snes.ForceFixedResolution` exists but was deliberately not pinned: it
   changes screenshot sizes, and `M.screenLooksAlive()`'s thresholds read
   those, so pinning it could make a recorded run *behave* differently.
-- **OT6_SRAM_CHECKPOINT under record mode**: wired identically (the host
-  pins the same saves dir the checkpoint is materialized into) but not yet
-  exercised by a real checkpoint run.  Unverified.
 - **Suite-wide recording** (`suite.sh` fan-out with OT6_RECORD): untested;
   record one test at a time for now.
 - **The soft-subtitle track needs the player's cooperation** (QuickTime:

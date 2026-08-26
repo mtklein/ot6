@@ -311,6 +311,29 @@ int main(int argc, char** argv) {
     snes.RamPowerOnState = RamState::AllZeros;        // determinism pin
   }
   snes.DisableFrameSkipping = true;                   // determinism pin
+  // The C# layer's SNES default, which the testrunner therefore applies and
+  // the core's own default (0) does not: crop 7 top / 8 bottom overscan rows
+  // (UI/Config/SnesConfig.cs:45).  This is behavioral, not cosmetic: the
+  // decoded frame size feeds emu.takeScreenshot(), whose PNG byte count
+  // M.screenLooksAlive() thresholds, so a host running uncropped 256x239
+  // played a DIFFERENT run -- gen_vector_entry passed at frame 6202 against
+  // the testrunner's 6029 until this matched.  It also puts the tape at the
+  // same 256x224 geometry the repo's screenshots document.
+  snes.Overscan.Top = 7;
+  snes.Overscan.Bottom = 8;
+  // The other C#-default-vs-core-default divergence, and the one that
+  // actually moved a route: the C# layer defaults SpcClockSpeedAdjustment
+  // to 40 (UI/Config/SnesConfig.cs:62) where the core defaults it to 0
+  // (Core/Shared/SettingTypes.h:570), and the SPC clock is derived from it
+  // (_spcSampleRate = 32000 + adjustment, Core/SNES/Spc.cpp:54,126) -- the
+  // 40 maps to real hardware's measured 32040Hz.  At 32000Hz the CPU/SPC
+  // interleaving shifts within the frame (measured: byte-identical WRAM
+  // until the game's own H/V-counter load samples at $0630-$0632 read one
+  // scanline off, ff6/notes/ff3u.asm C0/0153-0172), and gen_vector_entry's
+  // world walk then diverged 173 frames from the testrunner's run.  With
+  // both this and the overscan matched, the recorded run IS the
+  // testrunner's run, frame for frame.
+  snes.SpcClockSpeedAdjustment = 40;
   SetSnesConfig(snes);
 
   DebugConfig dbg = {};
