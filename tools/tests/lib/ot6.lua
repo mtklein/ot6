@@ -68,6 +68,12 @@ function M.log(msg)
   -- the log while the terminal showed only "timeout after 120 frames
   -- waiting for main menu", which is the misleading half.
   msg = tostring(msg)
+  if OT6_RECORD then
+    -- The note stream for the recorded video's subtitles; see the
+    -- "recording sidecars" section below.  One line per call, newlines
+    -- folded, so compose.py's parse stays line-oriented.
+    print("[ot6note] " .. (M.frame or 0) .. " " .. msg:gsub("\n", " | "))
+  end
   for line in (msg .. "\n"):gmatch("([^\n]*)\n") do
     print("[ot6] " .. line)
   end
@@ -153,6 +159,35 @@ function M.disableInputInjection()
   end
 end
 
+-- --------------------------------------------------- recording sidecars --
+-- When run.sh runs a script under OT6_RECORD=1 it prepends `OT6_RECORD =
+-- true` to the composed copy, and these taps emit the input/notes record
+-- that tools/stream/compose.py turns into the button panel and subtitles of
+-- the watchable video (tools/stream/README.md).  Both ride stdout like every
+-- other channel out of the sandbox:
+--
+--   [ot6pad] <frame> <btn+btn|-->     emitted from setPad, only on change
+--   [ot6note] <frame> <text>          emitted from M.log, one line per call
+--
+-- Neither line carries the [ot6] prefix, so run.sh's terminal grep skips
+-- them and they exist only in the log file compose.py reads.  The frame
+-- stamp is M.frame, the startFrame count since the script loaded; the pad
+-- set here is latched by the ROM at the frame's inputPolled, so it can land
+-- one frame after the stamp.  When OT6_RECORD is unset (every suite and
+-- generator run) the cost is one nil check in setPad and one in M.log.
+local recPadLast = nil
+local function recordPad()
+  local held = {}
+  for _, b in ipairs(ALL_BTN) do
+    if curPad[b] then held[#held + 1] = b end
+  end
+  local s = (#held > 0) and table.concat(held, "+") or "--"
+  if s ~= recPadLast then
+    recPadLast = s
+    print("[ot6pad] " .. M.frame .. " " .. s)
+  end
+end
+
 -- Set the held-button set ({"a","down"} or {a=true,down=true}); every other
 -- button is released, since the script owns the pad and there is no human
 -- player.
@@ -165,6 +200,7 @@ function M.setPad(buttons)
       curPad[name] = true
     end
   end
+  if OT6_RECORD then recordPad() end
 end
 
 -- ----------------------------------------------------------------- memory --
