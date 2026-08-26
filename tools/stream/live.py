@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
-"""live.py -- watch a recording run while it happens.
+"""live.py -- watch a headless run while it happens.  No video anywhere:
+the harness's own stdout stream is the broadcast.
 
-    OT6_RECORD=1 tools/tests/run.sh tools/tests/<x>.lua &   # the run
-    python3 tools/stream/live.py                            # the broadcast
+    OT6_LIVE=1 tools/tests/run.sh tools/tests/<x>.lua &    # the run
+    python3 tools/stream/live.py                           # the viewer
 
-Follows the newest (or the named) recording workspace under
-build/test-runs/: the growing ZMBV tape is decoded by piping it through
-ffmpeg as it is written (tail -f | ffmpeg; the AVI has no index until exit,
-but the stream is sequential so none is needed), and the run log's
-[ot6pad]/[ot6note] taps supply the live frame counter, the held buttons,
-and the driver's notes.  Serves one page on --port (default 8611) showing
-the newest decoded frame, the frame/pad state, and the last notes.
+Follows the newest (or the named) run workspace under build/test-runs/ by
+tailing its growing run.log:
 
-The image feed lags the emulator by at most the ffmpeg pipe (measured
-negligible: ZMBV decodes faster than the emulator produces) plus the 4 fps
-sampling; the pad/frame readout lags by Mesen's stdout block buffering,
-which flushes in bursts.  This is a monitor, not a measurement: the
-frame-exact record is the composed MP4 after the run.
+  [b64:<tag>] <chunk>   screenshot blobs -- each completed .png blob becomes
+                        the newest frame (OT6_LIVE=1 emits one every ~32
+                        frames; without it you still get every milestone
+                        screenshot the script emits)
+  [ot6pad] <f> <pad>    the live frame counter and held buttons
+  [ot6note] <f> <text>  the driver's notes
+  [ot6] <text>          every other log line, shown as notes too
+
+Serves one page on --port (default 8611).  Latency is Mesen's stdout block
+buffering: bursts every second or so.
 """
 import argparse
+import base64
 import glob
 import json
 import os
 import re
-import subprocess
 import sys
 import threading
 import time
@@ -34,37 +35,58 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 PAGE = """<!doctype html><title>OT6 live</title>
 <body style="margin:0;background:#111;color:#cdc;display:grid;place-items:center;min-height:100vh;font:14px ui-monospace,monospace">
 <div style="text-align:center;padding:12px">
-<img id=f src="latest.jpg" style="image-rendering:pixelated;width:768px;max-width:95vw">
+<img id=f src="latest.png" style="image-rendering:pixelated;display:block;margin:0 auto;width:min(768px,95vw)">
 <div style="padding:8px 0;font-size:18px"><span id=frame>-</span> <span id=pad style="color:#8ac"></span></div>
-<div id=notes style="text-align:left;max-width:768px;margin:0 auto;color:#9a9;white-space:pre-wrap"></div>
+<div id=notes style="text-align:left;max-width:min(768px,95vw);margin:0 auto;color:#9a9;white-space:pre-wrap;word-break:break-all"></div>
 <div id=s style="color:#575;padding-top:6px">connecting…</div>
 </div>
 <script>
-const $=id=>document.getElementById(id); let n=0;
-setInterval(()=>{ const u='latest.jpg?'+(n++); const t=new Image();
-  t.onload=()=>{ $('f').src=u; }; t.src=u; }, 400);
+const $=id=>document.getElementById(id); let seen=-1;
 setInterval(async()=>{ try{
   const r=await fetch('status.json?'+Date.now()); const j=await r.json();
   $('frame').textContent='frame '+j.frame.toLocaleString();
   $('pad').textContent=j.pad==='-'?'':('['+j.pad+']');
   $('notes').textContent=j.notes.join('\\n');
-  $('s').textContent=j.test+' · live · '+new Date().toLocaleTimeString();
-}catch(e){ $('s').textContent='waiting for run…'; } }, 500);
+  $('s').textContent=j.test+' · live · shot #'+j.shots+' ('+j.shot_tag+') · '+new Date().toLocaleTimeString();
+  if(j.shots!==seen){ seen=j.shots; const t=new Image(); const u='latest.png?'+seen;
+    t.onload=()=>{ $('f').src=u; }; t.src=u; }
+}catch(e){ $('s').textContent='waiting for run…'; } }, 300);
 </script>"""
+
+B64 = re.compile(r"^\[b64:([^\]]+)\] (\S+)\s*$")
+PAD = re.compile(r"\[ot6pad\] (\d+) (\S+)")
+NOTE = re.compile(r"\[ot6note\] (\d+) (.*)")
+PLAIN = re.compile(r"^\[ot6\] (.*)")
 
 
 def newest_workspace():
-    tapes = glob.glob(os.path.join(ROOT, "build/test-runs/*/record.avi"))
-    if not tapes:
-        sys.exit("no recording workspace found (run with OT6_RECORD=1 first)")
-    return os.path.dirname(max(tapes, key=os.path.getmtime))
+    logs = glob.glob(os.path.join(ROOT, "build/test-runs/*/run.log"))
+    if not logs:
+        sys.exit("no run workspace found (is a run going?)")
+    return os.path.dirname(max(logs, key=os.path.getmtime))
 
 
-def follow_log(log_path, webroot, test, stop):
-    pad_re = re.compile(r"\[ot6pad\] (\d+) (\S+)")
-    note_re = re.compile(r"\[ot6note\] (\d+) (.*)")
-    state = {"frame": 0, "pad": "-", "notes": [], "test": test}
+def follow(log_path, webroot, test, stop):
+    state = {"frame": 0, "pad": "-", "notes": [], "test": test,
+             "shots": 0, "shot_tag": "-"}
+    blob_tag, blob = None, []
     pos = 0
+
+    def finish_blob():
+        nonlocal blob_tag, blob
+        if blob_tag and blob_tag.endswith(".png"):
+            try:
+                data = base64.b64decode("".join(blob))
+                tmp = os.path.join(webroot, ".f.tmp")
+                with open(tmp, "wb") as f:
+                    f.write(data)
+                os.replace(tmp, os.path.join(webroot, "latest.png"))
+                state["shots"] += 1
+                state["shot_tag"] = blob_tag
+            except Exception:
+                pass
+        blob_tag, blob = None, []
+
     while not stop.is_set():
         try:
             with open(log_path, errors="replace") as f:
@@ -73,19 +95,28 @@ def follow_log(log_path, webroot, test, stop):
                 pos = f.tell()
         except FileNotFoundError:
             chunk = ""
-        changed = False
+        changed = bool(chunk)
         for line in chunk.splitlines():
-            m = pad_re.search(line)
+            m = B64.match(line)
             if m:
-                state["frame"] = int(m.group(1))
-                state["pad"] = m.group(2)
-                changed = True
+                if m.group(1) != blob_tag:
+                    finish_blob()
+                    blob_tag = m.group(1)
+                blob.append(m.group(2))
                 continue
-            m = note_re.search(line)
+            finish_blob()
+            m = PAD.search(line)
+            if m:
+                state["frame"], state["pad"] = int(m.group(1)), m.group(2)
+                continue
+            m = NOTE.search(line)
             if m:
                 state["frame"] = max(state["frame"], int(m.group(1)))
                 state["notes"] = (state["notes"] + [m.group(2)])[-8:]
-                changed = True
+                continue
+            m = PLAIN.match(line)
+            if m:
+                state["notes"] = (state["notes"] + [m.group(1)])[-8:]
         if changed:
             tmp = os.path.join(webroot, ".status.tmp")
             with open(tmp, "w") as f:
@@ -97,12 +128,11 @@ def follow_log(log_path, webroot, test, stop):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("workspace", nargs="?", help="a build/test-runs/<ws> dir "
-                    "(default: the one with the newest record.avi)")
+                    "(default: the one with the newest run.log)")
     ap.add_argument("--port", type=int, default=8611)
     args = ap.parse_args()
 
     ws = os.path.abspath(args.workspace) if args.workspace else newest_workspace()
-    tape = os.path.join(ws, "record.avi")
     log = os.path.join(ws, "run.log")
     test = os.path.basename(ws).split(".")[0]
 
@@ -111,27 +141,20 @@ def main():
     with open(os.path.join(webroot, "index.html"), "w") as f:
         f.write(PAGE)
 
-    ff = subprocess.Popen(
-        f"tail -c +1 -f '{tape}' | "
-        f"ffmpeg -hide_banner -loglevel error -y -i - "
-        f"-vf fps=4 -update 1 -q:v 3 '{webroot}/latest.jpg'",
-        shell=True)
-
     stop = threading.Event()
-    threading.Thread(target=follow_log, args=(log, webroot, test, stop),
+    threading.Thread(target=follow, args=(log, webroot, test, stop),
                      daemon=True).start()
 
     os.chdir(webroot)
     httpd = ThreadingHTTPServer(("127.0.0.1", args.port),
                                 SimpleHTTPRequestHandler)
-    print(f"live: http://127.0.0.1:{args.port}/  (test {test}, tape {tape})")
+    print(f"live: http://127.0.0.1:{args.port}/  (test {test}, log {log})")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         stop.set()
-        ff.terminate()
 
 
 if __name__ == "__main__":
