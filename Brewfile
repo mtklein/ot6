@@ -7,7 +7,6 @@
 brew "cc65"   # ca65/ld65: assembles and links the whole game
 brew "sdl2"   # MesenCore.dylib's one non-system link; Mesen aborts without it
 brew "ninja"  # runs the generated savestate graph (build/build.ninja; #25)
-brew "ffmpeg" # renders recorded playthroughs (OT6_RECORD=1; tools/stream/)
 
 # Optional. The build itself needs only stock python3 (>=3.9); numpy is used
 # by the asset re-encoders (ff6/tools/brr.py, monster_stencil.py,

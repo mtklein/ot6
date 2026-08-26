@@ -8,10 +8,9 @@ the harness's own stdout stream is the broadcast.
 Follows the newest (or the named) run workspace under build/test-runs/ by
 tailing its growing run.log:
 
-  [b64:<tag>] <chunk>   screenshot blobs -- each completed .png blob becomes
-                        the newest frame (OT6_LIVE=1 emits one every ~32
-                        frames; without it you still get every milestone
-                        screenshot the script emits)
+  [ot6shot] <f> <b64>   the live screenshot stream (every 128 frames by
+                        default; on in every run.sh run unless OT6_LIVE=0)
+  [b64:<tag>] <chunk>   milestone screenshot blobs, shown as frames too
   [ot6pad] <f> <pad>    the live frame counter and held buttons
   [ot6note] <f> <text>  the driver's notes
   [ot6] <text>          every other log line, shown as notes too
@@ -54,6 +53,7 @@ setInterval(async()=>{ try{
 </script>"""
 
 B64 = re.compile(r"^\[b64:([^\]]+)\] (\S+)\s*$")
+SHOT = re.compile(r"^\[ot6shot\] (\d+) (\S+)\s*$")
 PAD = re.compile(r"\[ot6pad\] (\d+) (\S+)")
 NOTE = re.compile(r"\[ot6note\] (\d+) (.*)")
 PLAIN = re.compile(r"^\[ot6\] (.*)")
@@ -101,6 +101,22 @@ def follow(log_path, webroot, test, stop, hop=False):
             chunk = ""
         changed = bool(chunk)
         for line in chunk.splitlines():
+            m = SHOT.match(line)
+            if m:
+                finish_blob()
+                try:
+                    data = base64.b64decode(m.group(2))
+                    tmp = os.path.join(webroot, ".f.tmp")
+                    with open(tmp, "wb") as f:
+                        f.write(data)
+                    os.replace(tmp, os.path.join(webroot, "latest.png"))
+                    state["shots"] += 1
+                    state["shot_tag"] = "live"
+                    state["frame"] = int(m.group(1))
+                    state["exact"] = True
+                except Exception:
+                    pass
+                continue
             m = B64.match(line)
             if m:
                 if m.group(1) != blob_tag:

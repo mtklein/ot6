@@ -56,9 +56,8 @@ function M.log(msg)
   -- terminal output is `grep '^\[ot6\]' "$RUN_LOG"`, so an unprefixed
   -- continuation line reaches the log file and nothing else.
   msg = tostring(msg)
-  if OT6_RECORD then
-    -- The note stream for the recorded video's subtitles.  One line per
-    -- call, newlines folded, so compose.py's parse stays line-oriented.
+  if OT6_LIVE then
+    -- the live broadcast's note stream, one line per call, newlines folded
     print("[ot6note] " .. (M.frame or 0) .. " " .. msg:gsub("\n", " | "))
   end
   for line in (msg .. "\n"):gmatch("([^\n]*)\n") do
@@ -146,22 +145,28 @@ function M.disableInputInjection()
   end
 end
 
--- --------------------------------------------------- recording sidecars --
--- When run.sh runs a script under OT6_RECORD=1 it prepends `OT6_RECORD =
--- true` to the composed copy, and these taps emit the input/notes record
--- that tools/stream/compose.py turns into the button panel and subtitles of
--- the watchable video (tools/stream/README.md).  Both ride stdout like every
--- other channel out of the sandbox:
+-- ------------------------------------------------------ live broadcast --
+-- run.sh prepends `OT6_LIVE = <n>` to the composed copy (on by default;
+-- OT6_LIVE=0 in the environment disables, a number > 1 sets the screenshot
+-- interval in frames, default 128).  The taps ride stdout into the run log,
+-- which tools/stream/live.py follows while the run happens:
 --
+--   [ot6shot] <frame> <b64 png>       a screenshot every interval frames
 --   [ot6pad] <frame> <btn+btn|-->     emitted from setPad, only on change
 --   [ot6note] <frame> <text>          emitted from M.log, one line per call
 --
--- Neither line carries the [ot6] prefix, so run.sh's terminal grep skips
--- them and they exist only in the log file compose.py reads.  The frame
--- stamp is M.frame, the startFrame count since the script loaded; the pad
--- set here is latched by the ROM at the frame's inputPolled, so it can land
--- one frame after the stamp.  When OT6_RECORD is unset (every suite and
--- generator run) the cost is one nil check in setPad and one in M.log.
+-- None carry the [ot6] prefix, so run.sh's terminal grep skips them and
+-- they exist only in the log file.  The frame stamp is M.frame; the pad set
+-- here is latched by the ROM at the frame's inputPolled, so it can land one
+-- frame after the stamp.
+local LIVE_IVL = (type(OT6_LIVE) == "number" and OT6_LIVE > 1) and OT6_LIVE
+                 or 128
+function M.liveShot()
+  local png = emu.takeScreenshot()
+  if png and #png > 0 then
+    print("[ot6shot] " .. M.frame .. " " .. M.b64encode(png))
+  end
+end
 local recPadLast = nil
 local function recordPad()
   local held = {}
@@ -187,7 +192,7 @@ function M.setPad(buttons)
       curPad[name] = true
     end
   end
-  if OT6_RECORD then recordPad() end
+  if OT6_LIVE then recordPad() end
 end
 
 -- ----------------------------------------------------------------- memory --
@@ -2428,6 +2433,7 @@ function M.run(opts, steps)
       return
     end
     M.frame = M.frame + 1
+    if OT6_LIVE and (M.frame == 20 or M.frame % LIVE_IVL == 0) then M.liveShot() end
     if M.frame > budget then
       finished = true
       traceFlush()
