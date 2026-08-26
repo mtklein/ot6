@@ -955,7 +955,6 @@ merge:  pla                     ; bank the matched weaknesses as pending (#33):
                                            ;   agnostic (abs,y in both index
                                            ;   widths), like every other store
                                            ;   in this proc but the codex one
-        jsr     Ot6BreakPurge              ; #85: a break empties the queue
 done:   rtl
 .endproc
 
@@ -1061,7 +1060,6 @@ merge:  lda     OT6_SCR_BIT     ; bank the matched class as pending (#33):
         sta     OT6_BROKEN_TICKS,y         ; shields down: break
         lda     #$ff                       ; #48: flash pending (see Ot6BreakArm)
         sta     OT6_BRKTICK-8,y
-        jsr     Ot6BreakPurge              ; #85: a break empties the queue
 done:   rts
 .endproc
 
@@ -1086,87 +1084,7 @@ done:   rts
 ; vanilla i8 walk idiom is bracketed by php/plp with the index regs
 ; saved inside the narrow width.  preserves a/x/y.
 
-; [ #85's other half: a broken monster's READY turn is lost ]
-;
-; The purge below removes what was queued before the break; this gate
-; stops what comes ready after it.  gaugefull (battle_main.asm:2755)
-; queues an actor's action the moment the advance-wait counter fills,
-; and it fills from the battle-graphics frame waits, so a monster broken
-; mid-animation still had its next turn queued -- measured
-; (battle_brokendeath): one turn per run beginning with the timer at its
-; full 15, both queues already purged.  The gate replaces the queue-add
-; alone: everything else at the call site stays vanilla, which makes a
-; skipped add byte-equivalent to add-then-null -- the exact state the
-; $3820 jump-removal walk creates and the drain already handles (a $FF
-; entry is skipped, the actor's flags reset on its next real turn).
-; After recovery the next gauge fill queues normally.
-;
-; x = the ready actor's entity offset; A is scratch at the call site
-; (the queued value is x itself, _c24e77's own txa).  a8; index width
-; pinned i8 for the byte-sized queue index, like the purge below.
 
-.proc Ot6BrokenTurnGate
-        .a8
-        php
-        shorti
-        .i8
-        cpx     #$08
-        bcc     @queue          ; characters never break
-        lda     OT6_BROKEN_TICKS,x
-        bne     @skip           ; broken: the ready turn is lost
-@queue: txa                     ; _c24e77's body, verbatim
-        phx
-        ldx     $3a67
-        sta     $3820,x
-        plx
-        inc     $3a67
-@skip:  plp
-        rtl
-.endproc
-
-; ------------------------------------------------------------------------------
-
-.proc Ot6BreakPurge
-        .a8
-        pha
-        php
-        shorti
-        .i8
-        phy
-        phx
-        tya
-        tax                     ; x = the broken monster
-        ldy     $3a66           ; action queue start
-@scan:  cpy     $3a67           ; action queue end
-        bcs     @wait
-        txa
-        cmp     $3820,y         ; an action this monster queued?
-        bne     @next
-        lda     #$ff
-        sta     $3820,y         ; removed: its script must not run
-@next:  iny
-        bra     @scan
-        ; the advance-wait queue is the second door (measured: the first
-        ; purge walked $3820 alone and battle_brokendeath still saw one
-        ; turn begin with the timer at its full 15 -- the entry was
-        ; staged in $3720).  RemoveAllActions walks both for a death
-        ; (battle_main.asm:1602-1627); a break does too.
-@wait:  ldy     $3a64           ; advance wait queue start
-@scan2: cpy     $3a65           ; advance wait queue end
-        bcs     @done
-        txa
-        cmp     $3720,y
-        bne     @next2
-        lda     #$ff
-        sta     $3720,y
-@next2: iny
-        bra     @scan2
-@done:  plx
-        ply
-        plp
-        pla
-        rts
-.endproc
 
 ; ------------------------------------------------------------------------------
 

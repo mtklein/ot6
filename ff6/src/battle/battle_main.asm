@@ -2766,12 +2766,18 @@ gaugefull:
         bcc     _11ba       ; return if less than advance wait duration
 @11aa:  lda     #$ff
         sta     $322c,x     ; disable advance wait
-        jsl     Ot6BrokenTurnGate ; #85: was `jsr _c24e77`.  A broken
-                            ;   monster's ready turn is LOST: the gate
-                            ;   skips only the queue-add, leaving the
-                            ;   flags vanilla -- byte-equivalent to
-                            ;   add-then-null, the state the $3820 jump
-                            ;   removal already creates and handles.
+        jsr     _c24e77       ; add action to queue
+                            ; (#85 tried, in order, a broken-turn gate
+                            ;   here and a break-time queue purge in the
+                            ;   chips, and each deadlocked battle 57 on
+                            ;   some timeline: KEFKA's retreat script
+                            ;   rides his own turn, queued or fresh, so
+                            ;   a broken Kefka silenced either way is a
+                            ;   battle that never ends.  A broken
+                            ;   monster's script turn is load-bearing
+                            ;   for scripted fights -- #66 gated
+                            ;   DISPATCH and left the script running on
+                            ;   purpose, and that is the equilibrium.)
         lda     #$20
 
 SetFlag0:
