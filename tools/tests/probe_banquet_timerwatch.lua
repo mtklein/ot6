@@ -1,12 +1,8 @@
--- probe_banquet_timerwatch.lua -- measurement instrument behind
--- probe_banquet_timer: phase A found the live timer block ($1188-$119F)
--- reading flags=$07 count=0 after the real Save UI ran.  This variant
--- stages the same live timer, drives the same save, and hangs write
--- callbacks over the timer block (both the $7E bank address and the
--- bank-$00 mirror) logging every writer PC and value.  Not a suite test.
--- (Caveat per HANDOFF trap 1: block moves and DMA are invisible to Mesen
--- write callbacks, so a clobber that fires no callback has to be caught
--- by sampling; this probe also samples each menu frame.)
+-- probe_banquet_timerwatch.lua -- stages the live timer block ($1188-$119F),
+-- drives a save, and hangs write callbacks over the block (both the $7E
+-- bank address and the bank-$00 mirror), logging every writer PC and value.
+-- Block moves and DMA fire no write callback, so this also samples the
+-- block once per menu frame to catch a clobber that a callback would miss.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

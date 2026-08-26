@@ -5,21 +5,21 @@
 --                     frame after Mog's "Choose a scenario…kupo!".  This is the
 --                     entry point of the whole v0.3 arc, and the fixture the
 --                     three scenario chains branch from.
---
+
 -- The river loops.
 -- The second steering prompt's option 0 is an infinite loop, and it is
 -- vanilla behavior.  This is the most important fact in this file.
---
+
 --   _cb07f2:  dlg $016E  "Hey, which way?  0: (Up)   1: (Left)"
 --             choice _cb07fc, _cb0840          (event_main.asm:39152-39158)
---
+
 -- Option 0 (_cb07fc, :39159) rides a loop of the river and ends
 -- `if_switch $0176=0, _cb07f2` (:39197), which returns to the same prompt.
 -- Option 1 (_cb0840, :39199) is the only way downstream.  This is the famous
 -- unattended-grind spot of vanilla FF6 (memory cursor on, Banon healing,
 -- return to an overlevelled party).  It is intentional, CONTRIBUTING.md's
 -- "vanilla's bugs stay" covers it, and it is not to be fixed.
---
+
 -- But it is a trap for a fixture, and a nasty one: advanceStory's blanket
 -- A-press always takes option 0, so a naive drive down this river never
 -- terminates.  It burns its whole frame budget and dies with a timeout that
@@ -28,7 +28,7 @@
 -- explicitly, by steering the multiple-choice cursor to a named option and
 -- only then confirming, and each is logged so a future failure says which
 -- fork it was at.  The three, in the order they arrive:
---
+
 --   1. _cb059f  dlg $0167 "Hop aboard the raft?  0: Yes  1: No"      -> 0
 --                 choice _cb05f0, EventReturn            (:38836-38841)
 --   2. _cb0657  dlg $016A "Which way? 0:(Straight) 1:(Left) 2:(Right)" -> 0
@@ -39,7 +39,7 @@
 --   3. _cb07f2  dlg $016E "Hey, which way?  0:(Up)  1:(Left)"        -> 1
 --                 choice _cb07fc, _cb0840                (:39152-39158)
 --      ^^^ the loop.  Option 0 here is the reason this file steers.
---
+
 -- How the cursor works (src/field/text.asm:368-425, transcribed):
 --   $056F  number of options; >= 2 means a multiple choice is live, and the
 --          engine zeroes it the moment A confirms (:425)
@@ -50,7 +50,7 @@
 -- like every other input in this suite: a held DOWN moves the cursor one
 -- row and no further.  DOWN/RIGHT increment (and stop at $056F), UP/LEFT
 -- decrement (and stop at 0).
---
+
 -- Two ways to read $056F wrong, both of which cost a run here:
 --   * It is meaningless during a battle.  It is field dialog RAM and the
 --     battle module scribbles it; a first cut tested it unconditionally and
@@ -64,7 +64,7 @@
 --     nothing else yet).  So nothing is read or asserted until
 --     H.dialogWaiting() ($BA=1 and $D3=1, the engine waiting for a
 --     keypress), which is the only moment $056F is final.
---
+
 -- The ride itself.
 -- It is not a vehicle mode.  The brief that scoped this work expected a
 -- third engine mode beside field and world (`set_script_mode` / `vehicle`
@@ -78,19 +78,7 @@
 -- overworld, a branch this route does not take.  So the harness needed no
 -- new engine model: the ride is "answer the prompts, survive the battles,
 -- and walk the two handoffs below".
---
--- The ride is not continuous: it hands control back twice, and the way
--- onward is a trigger the party must walk onto facing DOWN.  This is the fact
--- that actually cost the most here.  Map 114 is where the raft puts in, and
--- EventTrigger::_114 (event_trigger.asm:464-468) is
---     {20,21} SavePoint   {6,13} SavePoint
---     {20,24} _cb051c     {6,15} _cb055c
--- Both continuations open with `if_switch $01B2=0, EventReturn` (:38746,
--- :38777).  A first pass read $01B2 as an inert engine flag, measured it 0,
--- and did nothing further, and the ride stopped with the party standing
--- controllable at map 114 (20,22) for 130,000 frames, which is exactly what
--- "the river hangs" looks like from the outside.
---
+
 -- $01B0-$01B7 are not story switches.  Switch id N lives at bit N&7 of
 -- $1E80+(N>>3), so $01B0..$01B7 alias the byte $1EB6, and $1EB6 is the
 -- field engine's own control-flags byte.  UpdateCtrlFlags (field/event.asm
@@ -106,7 +94,7 @@
 -- Hence the handoffs below are a plain held DOWN, which both walks the
 -- party onto the trigger and leaves it facing the right way, rather than a
 -- navTo, whose last step BFS is free to make sideways.
---
+
 -- The same reading retro-explains three things elsewhere in the story that
 -- had looked arbitrary: _caf79c picks Banon's approach animation off
 -- $01B0/$01B1/$01B2 (which way you walked up to him), _caf68a/_caf6f0/
@@ -115,28 +103,7 @@
 -- (press A facing down), not a step, which is why gen_banon never tripped it.
 -- And _cb059f's own `if_switch $01B5=1, EventReturn` / `switch $01B5=1` is
 -- just the standard once-per-tile latch, not a story flag.
---
--- The battles are forced rather than random encounters.  The ride calls _cb0498
--- (`battle 7, RIVER`) and _cb04a1 (`battle 8, RIVER`) outright, and
--- _cb0486/_cb048f are `if_rand` coin-flips into them (:38660-38678).  A
--- dozen or so fire on the way down.  Since issue #75 they are fought rather
--- than write-cleared: this generator writes no game state.  The fighter is
--- the ride's own edge-tapped A (A opens the acting character's command list,
--- A confirms its first entry, A takes the default target), which on this
--- raft gives the game's own designed sustain: TERRA, EDGAR and SABIN
--- Fight the default enemy while BANON's first command is Health, the free
--- party-wide heal his presence exists for (bosses-wob.md #4: "Health is a
--- free party heal; his death is a game over").  He tops the raft up every
--- round while the other three chew through the formation.
---
--- Banon's death is an immediate game over, which is why this file used to
--- battle-clear write.  The input-driven driver watches his battle HP every
--- frame and fails the run loudly the moment he stays down, with the fight's
--- full numbers on the record: a #74-style balance finding beats a timeout
--- 30,000 frames later at the game-over screen.  The route is deterministic
--- from the fixture, so a surviving run replays exactly and a losing one is
--- a fact about the tuning, not about luck.
---
+
 -- Ultros: `battle 103, RIVER` at _cb08db (:39301), won with real input, the
 -- first real Ultros in this chain's history.  He has an authored shield
 -- row: Ot6ShieldTbl carries $012c (MONSTER::ULTROS_RIVER) at 5 shields,
@@ -150,14 +117,14 @@
 -- so the whole trajectory is on the record.  A deeper breaking run (probe
 -- fire, bank BP, break on the fuse) belongs in a battle test built ON this
 -- state; the generator's job is a real, survivable win.
---
+
 -- After him the script needs no more input: Sabin is swept overboard,
 -- `switch $001A=1`, and `call _caad4c` (:39355 -> :26626) tears the party
 -- down to SCENARIO_MOG and loads map 9 at {8,6}.  With none of $0021/$001E/
 -- $0044 set this is the first visit, so it plays dlg $016F (the "what about
 -- SABIN…" recap) and falls into _caadb4 (:26677): wait_30f, then
 -- dlg $0B8C "Choose a scenario…kupo!", then `return`.
---
+
 -- Where the generate lands, and why not mid-dialog.  The state is taken on
 -- the first controllable frame after that last dialog is dismissed, i.e.
 -- the
@@ -217,10 +184,6 @@ local CHOICES = {
 }
 local ci, inChoice = 0, false
 
--- The ride driver: steer choices, fight battles with real input (issue #75:
--- zero state writes), tap dialogs, touch nothing else.  Reused for each
--- ladder attempt.
---
 -- The fighter.  This river outpaces a blind A-masher: run 1 of the
 -- input-driven test conversion lost BANON in fight #3 (the 3-monster roll)
 -- with the party never healed once, because tap-A confirms each actor's
@@ -240,7 +203,7 @@ local ci, inChoice = 0, false
 -- know about, an MP refusal) taps A two more pulses, backs out with B and
 -- rebuilds from wherever the cursor is -- progress over elegance -- and
 -- every episode is logged with its actor and buttons.
---
+
 -- Battle bookkeeping (all READS): on each fight's rising edge the
 -- formation is named and BANON's battle slot found ($3ED8+2s == 14 --
 -- char 14, the WEDGE/BANON symbol collision gen_banon documents); while
@@ -610,10 +573,6 @@ local function rideAttempt(n)
   }, {})
 end
 
--- 200000 was the battle-clear-write-era budget; an input-driven ride spends
--- real ATB rounds on a dozen forced fights plus ULTROS, the ladder may ride
--- the river up to three times, and each ceiling carries headroom for the
--- measured cost of actually playing it
 H.run({ maxFrames = 700000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),

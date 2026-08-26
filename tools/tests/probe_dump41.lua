@@ -1,6 +1,6 @@
--- probe_dump41.lua -- dump mine 41's live tile props (p1 at $7E7600,
--- p2/exit bits at $7E7700, via the BG1 tilemap) so the top-corridor gap
--- (x~66..107 at y~10-14) can be read instead of guessed (#133 Mog).
+-- probe_dump41.lua -- dumps mine 41's live tile props (p1 at $7E7600,
+-- p2/exit bits at $7E7700, via the BG1 tilemap) for the top-corridor gap
+-- (x~66..107 at y~10-14).
 local H = dofile("tools/tests/lib/ot6.lua")
 local function sw(bit) return (H.readByte(0x1E80 + (bit >> 3)) >> (bit & 7)) & 1 end
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end

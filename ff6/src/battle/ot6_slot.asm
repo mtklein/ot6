@@ -1,24 +1,16 @@
 ; ------------------------------------------------------------------------------
 ; Setzer: the boost-tiered slot reels (a chance verb buys certainty)
 ; ------------------------------------------------------------------------------
-; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
-; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler receives the identical
-; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
-; ff6-en.map are byte-identical across the split.
-; ------------------------------------------------------------------------------
 
 ; ==============================================================================
 ; Boost-tiered Slot (Setzer): the chance-verb canon applied to the reels
 ;
-; ROADMAP.md "Design canon" / kits.md "Boost-tiered Steal": on chance verbs
-; boost buys certainty in the verb's own terms. Slot's terms are the
-; reel rig, and vanilla's
-; rig is one byte: w7e6179, a single Rand() drawn at the first A press of a
-; spin (btlgfx_main.asm, UpdateMenuState_08 @7f16, OR'd with $3c when the
-; battle disables joker doom, $2f49.2). Every way the machine is rigged
-; follows from `rig AND SlotRateTbl[icon]` ($1f,$03,$01,$01,$00,$00 for icons
-; 0-5, btlgfx_main.asm SlotRateTbl @7ee1):
+; On chance verbs boost buys certainty in the verb's own terms. Slot's terms
+; are the reel rig, and vanilla's rig is one byte: w7e6179, a single Rand()
+; drawn at the first A press of a spin (btlgfx_main.asm, UpdateMenuState_08
+; @7f16, OR'd with $3c when the battle disables joker doom, $2f49.2). Every
+; way the machine is rigged follows from `rig AND SlotRateTbl[icon]`
+; ($1f,$03,$01,$01,$00,$00 for icons 0-5, btlgfx_main.asm SlotRateTbl @7ee1):
 ;   == 0 (blessed): the rig favours the player.  reel 2 drifts up to
 ;        w7e617d = 4 extra icons to match reel 1's icon (@8053), and a landed
 ;        pair drifts reel 3 the same way toward the triple (@808c);
@@ -43,10 +35,7 @@
 ;         3 spin until they match. The triple of whatever icon the player
 ;         stopped reel 1 on is guaranteed: the selection is reel 1's unrigged,
 ;         vanilla-timed stop, so the player's selection lands with no UI
-;         change. (Per-reel choice needs no new UI, because choosing the
-;         outcome is choosing reel 1's icon, since the result vocabulary is
-;         triples; the non-triple results, 7-7-BAR self-doom and lagomorph,
-;         are the machine's penalties, and certainty removes them.)
+;         change.
 ;
 ; The joker-doom battle gate outranks boost at every tier: where vanilla ORs
 ; the rig with $3c ($2f49.2 set), tier 2/3 force $3c instead of 0, and
@@ -58,20 +47,14 @@
 ; w7e7b92/93/94 are all clear, @7fec), and Ot6SlotCommit writes the latch
 ; back to OT6_BOOST_REVEALED at the commit press, so Ot6ActionEnd charges
 ; the tier the reels were spun with. Without the latch an L/R edge
-; during the multi-second spin changes the charge without changing the reels,
-; which is battle_lateboost's delivered-vs-charged mismatch reopened through
-; the reel window (Ot6Boost's $32cc/$2bae commit gates only close after the
-; queue write). There is no MP price on Slot in this change (mp-economy.md's
-; Slots pricing waits on the price-display surface).
+; during the multi-second spin changes the charge without changing the reels.
+; There is no MP price on Slot in this change.
 ;
 ; The latch lives in the $57ba spare byte of the init-exempt OT6 strip
-; ($57ba-$57bf, ot6_hud.asm's block comment; probe_57ba_strip's bank-F0-only
-; writer invariant holds, because these procs assemble into bank $f0). Stale
-; values are harmless: every read below happens inside a spin, and every
-; spin's first press rewrites the latch. TODO(ABI): fold into ot6_memory.inc
-; beside the other strip names when that file's owner takes it.
+; ($57ba-$57bf, ot6_hud.asm's block comment), because these procs assemble
+; into bank $f0. Stale values are harmless: every read below happens inside a
+; spin, and every spin's first press rewrites the latch.
 ; OT6_SLOTTIER lives in ot6_memory.inc with the rest of the $57xx strip.
-
 ; ------------------------------------------------------------------------------
 
 ; [ latch the spin's tier + tier the rig byte (first A press of a spin) ]

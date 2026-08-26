@@ -1,46 +1,40 @@
 #!/usr/bin/env python3
 """configure.py -- emit ./build.ninja, the whole project as one ninja graph.
 
-Owner rules (2026-08-26) this file exists to satisfy:
-  * no make anywhere; ninja with properly tracked dependencies is the build;
-  * bare `ninja` builds and tests absolutely everything, fully qualifying a
-    release: the default target is the release zip, and that zip's transitive
-    inputs are every ROM, every generated savestate, every suite test's
-    result, every audit, every selftest, and the release preflights;
-  * no aliases and no convenience targets: any partial need is spelled as a
-    real output path (`ninja build/states/vargas_entry.mss.lua`,
-    `ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`);
-  * parallelism is ninja's own, unbounded; emulator-running commands are
-    prefixed with nice(1) so a full fan-out leaves the machine usable.
+Bare `ninja` builds and tests everything: the default target is the release
+zip, whose transitive inputs are every ROM, every generated savestate, every
+suite test's result, every audit, every selftest, and the release
+preflights.  There are no aliases; any partial need is a real output path
+(`ninja build/states/vargas_entry.mss.lua`,
+`ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`).
+Parallelism is ninja's own, unbounded; emulator-running commands are
+prefixed with nice(1).
 
 Structure of the graph (all paths relative to the repo root; run `ninja`
 from the root):
 
   ff6 assets     tracked-source encoders: text json -> .dat/.inc, mml ->
                  song/sfx .asm, monster stencils, lzss compression, the SPC
-                 program.  These write the same tracked paths the old
-                 ff6/Makefile wrote (committed outputs; a clean build must
-                 reproduce them byte-for-byte -- see commit a8ac39d).
+                 program.  They write tracked paths (committed outputs; a
+                 clean build reproduces them byte-for-byte).
   ff6 objects    ca65 with --create-dep; depfiles are rebased to root-relative
                  paths (tools/build/rebase_depfile.py) because ca65 runs with
                  cwd=ff6 and ninja resolves depfile paths against the root.
   ROMs           ff6-en.sfc and the OT6_MP_COSTS=0 control ff6-en-nomp.sfc,
-                 each via tools/build/link_rom.sh (the double-link cutscene
-                 dance).  The two links share the cfg-hardcoded temp_lz
-                 scratch dir, so nomp is order-only after en.
+                 each via tools/build/link_rom.sh.  The two links share the
+                 cfg-hardcoded temp_lz scratch dir, so nomp is order-only
+                 after en.
   build/ot6.sfc  a content latch of ff6-en.sfc: mtime bumps with unchanged
                  bytes prune everything downstream (restat).
   savestates     the story-chain graph, embedded from
                  tools/tests/lib/savestate_ninja.py (the same data file,
                  tools/tests/savestate_graph.py, drives it).
-  suite          one edge per `-- @suite` test.  There is no skip state and
-                 no tally: a test whose fixture is missing builds the
-                 fixture, and the release artifact depends on every test's
-                 .ok, so "everything ran" is graph structure, not a number
-                 to cross-check.
-  checks         the selftests and audits the old `make test` preamble ran,
-                 each with its real inputs, so an unchanged tree re-runs
-                 none of them.
+  suite          one edge per `-- @suite` test.  A test whose fixture is
+                 missing builds the fixture, and the release artifact
+                 depends on every test's .ok, so "everything ran" is graph
+                 structure.
+  checks         the selftests and audits, each with its real inputs, so an
+                 unchanged tree re-runs none of them.
   release        preflights (branch, README version, real notes), the BPS
                  patch, and the zip.  `default` is the zip.
 
@@ -334,8 +328,7 @@ w.edge(["build/checks/base_rom.ok"], "sh", [BASE],
 qual.append("build/checks/base_rom.ok")
 
 # build/ot6.sfc is a content latch of the linked ROM: a relink that produces
-# identical bytes regenerates nothing downstream (the v0.15 revert measured
-# this saving a ~90-minute chain).
+# identical bytes regenerates nothing downstream.
 w.edge(["build/ot6.sfc"], "latch", ["ff6/rom/ff6-en.sfc"])
 
 w.edge(["build/checks/nomp_distinct.ok"], "sh",
@@ -366,8 +359,8 @@ HARNESS = ["tools/tests/run.sh", "tools/tests/lib/compose.py",
            "tools/tests/lib/decode_b64.py", "tools/tests/lib/pin_test_saves.py",
            "tools/tests/lib/sram_checkpoint.py", "tools/build/run_suite_test.sh"]
 
-# The old suite.sh ram_env_for table: tests that boot power-on under a dirty
-# deterministic RAM fill and/or cold-Continue a tracked checkpoint battery.
+# Tests that boot power-on under a dirty deterministic RAM fill and/or
+# cold-Continue a tracked checkpoint battery.
 TEST_ENV = {
     "battle_reveal_poweron": "OT6_RAM_POWERON=AllOnes "
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",

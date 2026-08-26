@@ -6,7 +6,7 @@
 --                 $001E and $0021 set.  No single input-driven chain reaches
 --                 this state.  It is the canonical boot for anything that
 --                 wants two scenarios done and Sabin's still to go.
---
+
 -- Why a separate generator rather than naming t2_terra_done "two_done": the
 -- stack rewrite is mechanical (every basename gets the prefix), so the stacked
 -- chain's own artifacts all carry t2_.  This file asserts the combined claim
@@ -16,7 +16,7 @@
 -- asserts would catch that its flags are wrong.  The generate itself is a
 -- re-save of the same controllable moment under the canonical name, at ~0
 -- replay cost.
---
+
 -- What the hub looks like here (all facts from the input-driven endpoints):
 --  * _caad4c reloaded map 9 with SCENARIO_MOG at (8,3) facing DOWN and
 --    played _caadb4's "Choose a scenario…kupo!", not the reunion: the

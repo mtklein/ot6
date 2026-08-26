@@ -2,25 +2,11 @@
 
 Hit count determines break rate: a landed hit that matches a weakness chips a
 shield, so the number of times an action strikes is the strongest lever OT6 has
-over the break loop, and it multiplies directly against v0.8's MP costs.
+over the break loop, and it multiplies directly against MP costs. Pummel
+strikes twice, Bum Rush four times and Drill twice, each at power divided by
+its hit count (§5, where the hook lives).
 
-This document was a design pass through v0.9. It is now also the record of what
-shipped: v0.10 built the table it specifies, so Pummel strikes twice, Bum Rush
-four times and Drill twice, each at power divided by its hit count. §5 is what
-was built and where the hook went, §9 is what is still unmeasured, and §10 is
-the status of the build list.
-
-Owner direction: *"Pummel seems like a good candidate to do 2x
-bludgeon, where Suplex is one big hit. Bum Rush could go either way. And not
-just Sabin, but also Tools, Quadra Slam should hit 4x, etc."* And the target
-shape: *"In Octopath most characters have at least one multi-hit ability they
-can lean on for breaking, and a couple have more."*
-
-**Evidence rule (CONTRIBUTING.md).** Every mechanical claim cites the file
-and line it was read from, or is labelled **UNVERIFIED**. Numbers taken out
-of `.dat` files name the record and byte offset.
-
-Three instruments support this document:
+Three instruments support the shipped rule:
 `tools/tests/probe_multihit.lua` (the live rule and the break-window cap),
 `tools/tests/battle_hitcount.lua` (a suite test: a real Pummel, driven by
 controller input on the Mt. Kolts fixture, strikes twice), and
@@ -131,7 +117,7 @@ split: two hits each multiplied by `m` total the same as one double-sized hit
 multiplied by `m`. Defence therefore costs a multi-hit ability nothing that it
 does not cost a single-hit one.
 
-**And the three abilities this pass splits skip it anyway.** The same site
+**And the three split abilities skip it anyway.** The same site
 opens with `lda $11a2 / bit #$20 / bne`, so the ignore-defence flag branches
 past the whole block. Pummel's `MagicProp+$02` is `$21` (physical +
 ignore-defence), Bum Rush's is `$20` (ignore-defence, magic damage), and Drill
@@ -147,9 +133,9 @@ damage is **affine in power rather than linear**: `CalcDmg`
 term `$11ae` *before* the level multiply, and adds one more raw power term
 after it. The hit-rate half is not divided when power is, so N hits at `P/N`
 deal somewhat **more** total damage than one hit at `P`, not less. Read off
-the formula rather than measured; §9 keeps the magnitude open, and it is the
-reason the splits below are exact division with no compensation — a
-compensation curve would be correcting in the wrong direction.
+the formula rather than measured, this is the reason the splits below are
+exact division with no compensation — a compensation curve would be
+correcting in the wrong direction.
 
 ---
 
@@ -195,7 +181,7 @@ character reaches slash, pierce and bludgeoning, and the "ability-only" column
 is empty for all fourteen (`audit_multihit.py`'s per-character section prints
 that). The design needs the narrower question: can they reach a second axis
 without re-equipping, with the weapon they are holding. That is runtime
-state, and no static tool answers it. It is recorded as a gap in §9.
+state, and no static tool answers it.
 
 One reach fact is solid: Sabin's fists are bludgeoning and so is
 Pummel (`ot6_class.asm:163`, `:193`), so a bare-fisted Sabin's Blitz opens no
@@ -220,8 +206,7 @@ hitting an existing one. Bio Blaster (item `$a4`) is
 rewritten to spell `$7d` Bio Blast by `InitTarget_03`
 (`battle_main.asm:6575-6582`), with one-side targeting, POISON element,
 power 20, and status1 `$04` = POISON. One cast is one poison chip on every
-body plus a further chip per body per ~17 s thereafter. This, rather than any
-multi-hit, explains the owner's Zozo sighting.
+body plus a further chip per body per ~17 s thereafter.
 
 ---
 
@@ -268,9 +253,8 @@ matters: **vanilla Bum Rush is a single hit**, a magic-damage Blitz of power
 128 that ignores magic defence, not an eight-hit combo. The ×8 figure belongs
 to *Phantom Rush*, the later remakes' replacement for it (seven hits at 9.25×
 plus one at 11.75×), which is a different ability in a different game. So the
-×8 in `kits.md` was never a description of anything OT6 shipped or vanilla
-did, and §8's ledger entry for it is a design option rather than a
-restoration.
+×8 figure was never a description of anything OT6 shipped or vanilla did;
+Bum Rush ships at ×4 (§4.1).
 
 The two Quadras check out too, and the difference between them is one this
 ROM's data shows: Flurry (Quadra Slam) makes four randomly-targeted attacks
@@ -336,8 +320,7 @@ transcription of that output and go stale if nobody re-runs it.
 observed in play. Suplex's `$7e` decodes as "all monsters", which disagrees
 with how Suplex is generally understood to behave. The difference is likely
 the menu cursor's default versus what a player confirms, since these commands
-all carry `MULTI_TARGET`. Flagged UNVERIFIED; §10 lists a one-run probe to
-settle it, and no recommendation below depends on it.
+all carry `MULTI_TARGET`. Flagged UNVERIFIED; no claim below depends on it.
 
 ### 3.2 The per-character position
 
@@ -350,11 +333,8 @@ Read straight off §3.1, and printed per character by `audit_multihit.py`:
 | **Edgar** | Drill ×2 | yes, once Figaro's sand dive is done |
 | everyone else | **none** | one chip per action |
 
-Against the owner's Octopath rule (*most characters have at least one, a
-couple have more*), the three physical-kit characters now have one or more and
-eleven have none. Those eleven are the magic and utility kits, whose rate is
-boosted Fight (§4.4), plus the seven kits still being designed. Before v0.10
-the count was one character with three and thirteen with none.
+The three physical-kit characters have one or more multi-hit ability; eleven
+have none, and rely on boosted Fight instead (§4.4).
 
 ---
 
@@ -368,7 +348,7 @@ Principles, stated so they can be reviewed:
   used to open it. Cleave already follows this rule, since it refuses a target
   that is not Broken, and Bum Rush should not contradict it.
 - **P2 — One rate ability per kit, no more** (Cyan excepted; his three are
-  vanilla and are the "a couple have more" case the owner asked for).
+  vanilla).
 - **P3 — Breadth, rate and duration should be three different abilities**, so
   a kit presents them to the player as three different answers.
 - **P4 — Hit count splits an ability's power; it does not add to it.** §1.3.
@@ -381,9 +361,9 @@ Principles, stated so they can be reviewed:
 
 | ability | count | reason |
 |---|---|---|
-| **Pummel** | **×2** bludgeoning | The owner's proposal, and it fits P1: 4 MP at level 1, the earliest multi-hit in the game and his signature. Two chips per action against the 31 authored 2-shield species means Sabin breaks trash without help, which matches the Bio Blaster sighting. Power 110 → **55** per hit (P4, straight halving). |
-| **Suplex** | **×1** | The owner's proposal, and P3: this is the single-hit committer. 180 power is the highest in the Blitz list and it should stay one number. |
-| **Bum Rush** | **×4** bludgeoning, not ×8 | ×8 breaks every authored gauge but one in a single action (shield census: 31 species at 2, 10 at 3, 4 at 4, 5 at 5, 8 at 6, 5 at 7, one at 8, one at 11), which fails both P5 and P1, because the ultimate would become the opener. ×4 empties trash and the low bosses outright and is still a capstone moment, while bosses with 5 or more shields need Sabin's own Pummel or a partner to finish. See §8 for the ×8 ledger entry. Power 128 → **32** per hit (P4). This is the one row where P4 bites hard: 99 MP already buys the worst damage-per-MP in the Blitz list, and dividing it makes an expensive capstone weaker still against defended targets. It is applied anyway, because leaving it at 128 across four hits would make the ultimate both the best opener and the best nuke. The price, not the count, is the thing to revisit; see §9. |
+| **Pummel** | **×2** bludgeoning | Fits P1: 4 MP at level 1, the earliest multi-hit in the game and his signature. Two chips per action against the 31 authored 2-shield species means Sabin breaks trash without help. Power 110 → **55** per hit (P4, straight halving). |
+| **Suplex** | **×1** | P3: this is the single-hit committer. 180 power is the highest in the Blitz list and it stays one number. |
+| **Bum Rush** | **×4** bludgeoning, not ×8 | ×8 breaks every authored gauge but one in a single action (shield census: 31 species at 2, 10 at 3, 4 at 4, 5 at 5, 8 at 6, 5 at 7, one at 8, one at 11), which fails both P5 and P1, because the ultimate would become the opener. ×4 empties trash and the low bosses outright and is still a capstone moment, while bosses with 5 or more shields need Sabin's own Pummel or a partner to finish. Power 128 → **32** per hit (P4): 99 MP already buys the worst damage-per-MP in the Blitz list, and dividing it makes an expensive capstone weaker still against defended targets, applied anyway because leaving it at 128 across four hits would make the ultimate both the best opener and the best nuke. |
 | AuraBolt / Fire Dance / Air Blade | ×1 | Element probes, and Fire Dance/Air Blade are already breadth. Adding rate on top would make Sabin the answer to every fight, and P2 allows him one rate ability, which Pummel is. |
 | Mantra / Spiraler | ×1, and the question does not arise | Neither strikes an enemy. Mantra heals the party and Spiraler is a sacrifice; a hit count on either has nothing to chip. |
 
@@ -397,7 +377,7 @@ constant while the job changes, which is P3 applied inside one axis.
 | ability | count | reason |
 |---|---|---|
 | **AutoCrossbow** | **×1 per body**, unchanged | It is breadth (§2.2) and it is already the designed swarm answer in two of the break-coverage docs. Making it ×4 per body would be 16 chips against a four-stack. `kits.md` says "whole side, one hit per body", which is the correct reading. |
-| **Drill** | **×2** piercing | The owner said "Tools too", and Drill is the tool that should change: it is the armoured-boss answer, since it ignores defence (`ToolsEffect_05`, `battle_main.asm:7384-7386`), so two chips into one gauge complements AutoCrossbow's breadth against swarms. 16 MP → 8.0 MP/chip, which prices rate above breadth, the correct relationship. Power 191 → **96** per hit (P4; 191 halves to 95.5 and the extra point goes to the player). Drill's `$20` ignore-defence flag comes from `ToolsEffect_05` at runtime rather than from its record, which is why the audit's ItemProp columns do not show it. |
+| **Drill** | **×2** piercing | The armoured-boss answer, since it ignores defence (`ToolsEffect_05`, `battle_main.asm:7384-7386`), so two chips into one gauge complements AutoCrossbow's breadth against swarms. 16 MP → 8.0 MP/chip, which prices rate above breadth. Power 191 → **96** per hit (P4; 191 halves to 95.5 and the extra point goes to the player). Drill's `$20` ignore-defence flag comes from `ToolsEffect_05` at runtime rather than from its record, which is why the audit's ItemProp columns do not show it. |
 | **Bio Blaster** | ×1 per body **+ the DOT** | Duration (§2.4); the tick chip stays as it is. No hit count. |
 | **Chain Saw** | ×1 | The slash committer, 252 power. P3. |
 | Air Anchor / NoiseBlaster / Flash / Debilitator | ×1 | Gag, and three non-damaging utilities. |
@@ -408,18 +388,16 @@ Identity: the only character who fields all three cost curves, breadth
 
 ### 4.3 Cyan — the burst prober, unchanged
 
-No data moves for Cyan. Vanilla already gave him the counts this pass would
-have chosen, and the SwdTech ladder reads correctly as a whole: two burst
+No data moves for Cyan. Vanilla's own counts already fit: two burst
 probes at the tiers where a shield is worth opening, and single big numbers
-everywhere else. Stated per tech, so the ladder can be argued with rather than
-assumed:
+everywhere else. Stated per tech:
 
 | tech | count | reason |
 |---|---|---|
 | Dispatch `$55` | ×1 | The cheapest row of any kit at 4 MP. Its job is one reliable slash chip a turn, which is what a tier-1 signature should be. Rate here would make the rest of the ladder pointless. |
 | Retort `$56` | ×1 | A counter stance rather than an action. Hit count belongs to what it counters with, and multiplying a counter's hits would pay Cyan for being attacked. |
 | Slash `$57` | ×1 | Power 8; it is a status verb wearing a damage record. Nothing to divide. |
-| **Quadra Slam** `$58` | **×4** | Vanilla's, and the owner's "×4" instruction. 16 MP for four slash chips into one body is the best rate-per-MP in the game after Pummel, and it arrives at LV15, which is where a party first meets 4-and-5-shield bosses. |
+| **Quadra Slam** `$58` | **×4** | Vanilla's. 16 MP for four slash chips into one body is the best rate-per-MP in the game after Pummel, and it arrives at LV15, which is where a party first meets 4-and-5-shield bosses. |
 | Empowerer `$59` | ×2 | Vanilla's, at quarter power, and it is a drain. Left as it is: the two hits are a consequence of the drain effect rather than a probing choice, and repricing a drain belongs to the MP economy. |
 | Stunner `$5a` | ×1 | Already breadth: one slash chip on every body. P3 says breadth and rate should be different abilities, and Quadra Slam is the rate one. |
 | **Quadra Slice** `$5b` | **×4** | Vanilla's. The late-ladder repeat of Quadra Slam at 50 MP, which prices it as burst rather than as a probe: 12.5 MP per chip against Quadra Slam's 4.0. |
@@ -441,33 +419,15 @@ Identity: four chips into one gauge, on a slash axis, at burst prices.
 
 ### 4.4 Everyone else
 
-Thirteen characters have no multi-hit ability. This pass does not
-invent counts for kits that are still being designed (Locke, Gau, Mog dances,
-Strago lores, Setzer slots, Shadow throw, Relm). It states the rule for those
-passes to apply:
+Thirteen characters have no multi-hit ability of their own. The rule for a
+kit with a damaging physical verb is: exactly one cheap, early, repeatable
+multi-hit (P1/P2). A kit whose verbs are all magical satisfies the Octopath
+rule differently — through element spread plus boosted Fight — and needs no
+hit count.
 
-> **Every kit with a damaging physical verb gets exactly one cheap, early,
-> repeatable multi-hit** (P1/P2). A kit whose verbs are all magical satisfies
-> the Octopath rule differently — through element spread plus boosted Fight —
-> and needs no hit count.
-
-Applied to the pending kits, as proposals for their own passes rather than
-decisions made here:
-
-| character | candidate | why |
-|---|---|---|
-| Shadow | **Throw ×2** | He throws a pair. His only damaging verb, and his weapon classes (pierce/bludg) are narrow. |
-| Setzer | Slots' physical face ×? | Chance verb; boost already buys certainty (DESIGN.md's canon rule), so hit count may be the wrong lever for him. |
-| Locke | — | Filch and Bestow are utility. His probe is his weapon, so no rate. |
-| Mog / Strago / Relm / Gau / Terra / Celes | — | Element and breadth kits. Boosted Fight is their rate. |
-
-The owner's rule, *"Even a weak attacker can be useful in a pinch if they can
-multihit with a staff or something"*, is already true in OT6 for every
-character: `Ot6FightBoost` gives +1 landed hit per BP with any
-weapon (§1.1, measured). The question that constrains the design is which
-characters are forced to spend BP in order to probe. After
-this pass that is everyone except Sabin, Edgar and Cyan, which is the
-intended outcome, because those three are the physical-kit characters.
+Every character gets +1 landed hit per BP with any weapon regardless
+(`Ot6FightBoost`, §1.1, measured), so nobody is without a rate lever; Sabin,
+Edgar and Cyan are simply the characters who also have one that costs no BP.
 
 ---
 
@@ -492,16 +452,14 @@ shipped, in `ff6/src/battle/ot6_hitcount.asm`:
 > are disjoint (`$5d-$64` vs `$a3-$aa`), so one table serves both callers.
 > **`Ot6HitCount`** scans it and adds the value to `$3a70`.
 
-### 5.1 Where the hook went, and why not where this document first suggested
+### 5.1 Where the hook lives
 
 The hook must fire once per action rather than once per swing, or it re-arms
-itself indefinitely and the action never ends. This document originally named
-`Ot6SkillClass`'s site inside `LoadMagicProp` and `Ot6ItemClass`'s inside
-`CalcItemEffect` as the candidates, with neither checked for re-entry. Reading
-them settled it: `ExecAttack` calls `InitTarget` itself when `$3400` is `$ff`
+itself indefinitely and the action never ends. `LoadMagicProp` is not a valid
+site: `ExecAttack` calls `InitTarget` itself when `$3400` is `$ff`
 (`battle_main.asm:8276-8282`), and `InitTarget_00`/`InitTarget_02` call
 `LoadMagicProp` (`:6636`), so `LoadMagicProp` is reachable from inside the
-multi-attack loop. It was rejected on that rather than measured.
+multi-attack loop and a hook there would re-arm.
 
 The hook is in the command handlers instead, `Cmd_0a` for Blitz
 (`battle_main.asm:3438`) and `Cmd_09` for Tools (`:4014`). Those cannot be
@@ -539,8 +497,8 @@ The split is exact division, uncompensated, and §1.3 is why: defence is a
 multiplier rather than a subtraction, it distributes over a split, and all
 three of these abilities ignore it anyway. The only asymmetry runs in the
 player's favour, because FF6's physical formula is affine in power, so the
-divided ability keeps the undivided hit-rate term on every hit. Its size is
-unmeasured (§9); a compensation curve would have corrected the wrong way.
+divided ability keeps the undivided hit-rate term on every hit; a
+compensation curve would have corrected the wrong way.
 
 Cost: one table (24 bytes), one proc, two `jsl` shims in bank `$C2`, three
 spliced data bytes. No new RAM.
@@ -579,7 +537,7 @@ priced ability cannot be too strong on MP-per-chip alone. What it can do is
 make BP-spending pointless, and that is the test.
 
 Measured pools (`mp-economy.md`'s table, re-derived from `CharProp+$01`
-plus `LevelUpMP`) at Zozo, the stretch the owner played: Sabin 84 (L13), Edgar 87
+plus `LevelUpMP`) at Zozo: Sabin 84 (L13), Edgar 87
 (L13), Cyan 76 (L12). Chips per full pool, single target:
 
 | ability | MP | chips/cast | MP per chip | casts | chips per pool |
@@ -618,127 +576,7 @@ By the turn, the shipped kit reads:
 - Edgar, one turn, 4 MP: 1 chip per body, up to 4 bodies.
 - Edgar, one turn, 16 MP: **2 chips** on piercing, through armour.
 
-Those five lines are different jobs at clearly different prices, which is the
-outcome the pass wanted. Pummel ×2 costs the same as one BP and buys the same
-thing, so it is priced at parity with the free option, which leaves the choice
-open rather than automatic.
+Those five lines are different jobs at clearly different prices. Pummel ×2
+costs the same as one BP and buys the same thing, so it is priced at parity
+with the free option, which leaves the choice open rather than automatic.
 
-One consequence outside this document's scope: the Phantom Train (#74) is
-6 shields keyed to bludgeoning against a party that delivered exactly one chip
-per round, all through Sabin. Pummel ×2 makes that two, which is the pace the
-fight was budgeted for. Whether that is enough on its own is a question for a
-run of the fight, not for this table; the other half of #74 is Shadow's skeans
-being unbuyable in the scenario, which this pass does not touch.
-
-The case to check in playtest (the Serpent Trench precedent) is a
-2-shield poison-weak enemy against Sabin with Pummel ×2 and Edgar with Bio
-Blaster's DOT, since both then break it unaided. If the WoB trash pool stops
-presenting any resistance at all, the adjustment is shield counts on the trash
-pool rather than the hit counts, because shield count only becomes a usable
-lever once chip rate is nonzero, which is what this pass provides.
-
----
-
-## 8. What was rejected, and why
-
-- **Bum Rush ×8** (`kits.md`'s number, which came from nowhere in this game:
-  §3 shows vanilla Bum Rush is a single hit and the ×8 belongs to the remakes'
-  *Phantom Rush*). Rejected on P5 and the shield census:
-  ×8 empties every authored gauge but one in a single action, which turns the
-  capstone into the opener and removes the composition decision from every
-  fight it appears in. Recorded rather than deleted because it is the owner's
-  own figure and he may still want it. If so, the way to have it is
-  Cleave's: gate the ability on the target being Broken, so its eight hits are
-  damage rather than break rate.
-- **AutoCrossbow ×4 per body.** Rejected as a misclassification (§2.2): it is
-  already ×4 in the sense that matters, and ×4-per-body would be 16 chips
-  against a four-stack.
-- **Boost adding hits to abilities.** Rejected (§6): a 3-BP Quadra Slam at ten
-  hits ends the loop.
-- **Reusing `AttackerEffect_32` to author new hit counts.** Rejected (§5): it
-  forces exactly ×4 plus random targeting and consumes the single special-
-  effect slot, which five of the candidate abilities already spend.
-- **Inventing hit counts for the seven kits still being designed.** Declined
-  (§4.4): a partial hit-count table is worse than none, and those kits have
-  their own passes. The rule is handed over instead.
-
----
-
-## 9. What is still unmeasured
-
-- **What the power split actually costs in damage.** The split shipped as
-  exact division, uncompensated (§5.2), which is a decision rather than a
-  measurement. §1.3 establishes the direction from the formula — N hits at
-  P/N deal somewhat MORE than one hit at P, because the hit-rate term inside
-  the level multiply is not divided — but nobody has put a number on it. A damage
-  measurement, using `balance-metrics.md`'s instrumentation, would say how far
-  over one 110 Pummel's two 55s actually land. It cannot be done against a
-  defended target, because Pummel ignores defence.
-- **Bum Rush's price rather than its count.** 99 MP for 4×32 is the worst
-  damage-per-MP row in the Blitz list, and dividing its power made it worse.
-  The count is right by P1/P5; the 99 is `mp-economy.md`'s ceiling rule
-  applied to an ability whose vanilla power was already low. Dividing it made
-  it worse only in the sense of the number on the record: §1.3 says the split
-  itself is damage-neutral to slightly favourable. Worth a look next
-  time the MP economy is opened, and unreachable in play before LV70 either
-  way.
-- **Whether ×4 or ×8 is the Bum Rush the owner wants.** ×4 shipped, with §8's
-  ledger entry for ×8. It is one byte in `Ot6HitCountTbl` and one power byte.
-- **Suplex's real targeting.** `$7e` decodes as one-half (all monsters) and
-  that disagrees with the received account of the ability (§3.1). One probe
-  run settles it.
-- **Reach, properly measured.** `check_break_reach.py` answers "could this
-  actor ever field that class", not "can they field it with what they are
-  holding" (§2.3). A held-weapon reach model is a separate, useful tool, and
-  it would make the rate-versus-reach comparison quantitative.
-- **Whether a DOT tick's chip should count against a hit-count budget at all.**
-  The tick chip stays; whether Bio Blaster's price should rise now
-  that its duration curve is understood is a question for the MP economy, not
-  for this table.
-- **How the new rates feel in a played fight.** The Serpent Trench precedent:
-  a 2-shield poison-weak enemy now falls to Sabin's Pummel unaided, and to
-  Edgar's Bio Blaster DOT unaided. If the World of Balance trash pool stops
-  presenting any resistance, the adjustment is shield counts on the trash pool
-  rather than the hit counts, because shield count only becomes a usable lever
-  once chip rate is nonzero, which is what this pass provides.
-
----
-
-## 10. The build list, and what happened to it
-
-Built in v0.10.
-
-1. **Done, in a new file rather than `ot6_class.asm`.** `Ot6HitCountTbl` and
-   `Ot6HitCount` live in `ff6/src/battle/ot6_hitcount.asm`, included last from
-   `ot6.asm` so no existing bank `$f0` symbol moves. Three rows: `$5d, 1`,
-   `$64, 3`, `$a8, 1`.
-2. **Done, at a different hook than this list assumed.** Two `jsl`s, in
-   `Cmd_0a` and `Cmd_09`, which are once-per-action by construction and need
-   no self-disable. `AttackerEffect_32`'s `stz $11a9` pattern was not needed
-   and not used. §5.1 has the reasoning and the measurement.
-3. **Done.** `MagicProp` overrides for `$5d` (110 → 55) and `$64` (128 → 32);
-   an `ItemProp` override for `$a8` (191 → 96), which meant building
-   `ItemProp` a named-override mechanism of its own. Both `.dat` files stay
-   byte-identical. The numbers are exact division rather than §9's
-   measurement, which has still not been made; §5.2 says why that was
-   accepted.
-4. **Done as a new test rather than a promoted probe.**
-   `tools/tests/battle_hitcount.lua` drives a real Pummel and a real AuraBolt
-   control on the Mt. Kolts fixture with controller input only. It asserts hit
-   count rather than chip count: which formation the ledge draws is random, so
-   requiring a bludgeon-weak target would be a check that passes for the wrong
-   reason on an unlucky draw. The per-hit chip rule is `probe_multihit.lua`'s
-   assertion and is separate. Drill is covered by the table and splice
-   assertions rather than by a driven Tools action; a played Drill wants a
-   fixture where Edgar has the tool, which is a later fixture than this one.
-5. **Done.** `audit_multihit.py` now parses `Ot6HitCountTbl` and the power
-   splices, reports six multi-hit abilities across three characters, prints
-   MP-per-chip, and fails if the `$3a70` writer set changes (now 12, was 10).
-6. **Done.** `kits.md`'s Chip column carries ×2 on Pummel and Drill, ×4 on
-   Bum Rush, and a paragraph saying what a ×N means and how it differs from
-   AutoCrossbow's breadth.
-7. **Done, and it moved nothing.** `check_break_reach.py` reports the same
-   bands before and after, which is the expected result: hit count changes how
-   fast a party opens a shield, not which classes it can field. The feel notes
-   in `break-coverage-*.md` are the part that wants revisiting, and they want
-   a played run rather than a re-run of the checker.

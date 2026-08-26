@@ -1,46 +1,36 @@
 -- @suite slow savestate=camp_escaped
--- battle_mpcost.lua -- v0.5 "every ability costs MP": the OT6_MP_COSTS A/B.
+-- battle_mpcost.lua -- every ability costs MP: the OT6_MP_COSTS A/B.
 --
--- One self-detecting instrument, run on both builds, which is the whole A/B the
--- task asks for.  v0.5 flipped the flag on by default, so the A/B's premise is
--- inverted: the shipped ROM charges, and the flag-off build is the control.
+-- One self-detecting instrument, run on both builds.  The shipped ROM
+-- charges by default, so the flag-off build is the control.
 --   * on the shipped, flag-on ROM (build/ot6.sfc, the suite's default) the
 --     cost table is present in bank F0 with kits.md's numbers, so the test
 --     asserts the charge and the insufficient-mp refusal.
 --   * on the flag-off baseline (ff6/rom/ff6-en-nomp.sfc, handed here via
 --     OT6_ROM) the cost table is absent, so the identical SwdTech tech is
 --     free.  This is the negative control.
---
+
 -- The mechanism under test: vanilla's GetMPCost prices only magic/lore/
 -- summon/x-magic; Blitz/SwdTech/Tools fall through it at 0, so the universal
 -- charge at CalcAttackEffect never fires for them.  Ot6AbilityCost (ot6.asm)
 -- swaps that 0 for the kit price keyed by the id in $3a7b.
 --
--- Issue #75 conversion.  The old apparatus installed a triple-CYAN party by
--- poke ($3ED8, SwdTech-only $202E, the SWDTECH weapon flag written, $2020
--- ceiling pinned), stopped and HP-pinned the guards, and pinned each
--- scenario's MP.  On camp_escaped Cyan is real (battle_bushidogrey's
--- measured kit: katana SWDTECH flag $3BA4 bit 1 reads $82; the real learned
--- window is Dispatch $55 at 4 MP boost 1 and Retort $56 at 10 MP boost 2), the
--- fights are real world encounters, and both scenarios' MP states are the
--- fight's own:
---
---   charge  the battle's first Cyan turn, before any enemy has acted,
---           casts a real Dispatch off the opening 1-bp bank against his
---           real 67-MP pool.  ON: debited to exactly mp0-4 (write watch plus
---           a direct read inside the clean window).  OFF: the pool does not
---           move.  In both cases the tech lands its hit.
---   refusal (ON only), a labeled isolation arm (owner calibration).
---           battle_bushidogrey measured that the input-driven routes to a
---           broke kit-caster are out of reach on this pool's economy: a
---           deferring party is ground down before any real poverty arrives
---           (the enemy MP drain first blamed was battle-teardown zeroes read
---           ungated), and a six-battle Dispatch walk never spends the
---           pool down, because the trash dies first.  So this arm keeps one
---           write, recorded here: MP := 1 (below Dispatch's 4) with the pip
---           rebanked by a real item turn; the retried Dispatch must
---           fizzle, dealing no damage, leaving the 1 MP untouched and never
---           negative.
+-- On camp_escaped, Cyan is real: katana SWDTECH flag $3BA4 bit 1 reads
+-- $82, with Dispatch $55 (4 MP, boost 1) and Retort $56 (10 MP, boost 2)
+-- learned. Both scenarios' MP states are the fight's own:
+--   charge  the battle's first Cyan turn casts a real Dispatch off the
+--           opening 1-bp bank against his real 67-MP pool. ON: debited to
+--           exactly mp0-4. OFF: the pool does not move. In both cases the
+--           tech lands its hit.
+--   refusal (ON only), a labeled isolation arm: an input-driven route to a
+--           broke kit-caster is out of reach on this pool's economy (a
+--           deferring party is ground down before real poverty arrives,
+--           and a Dispatch walk never spends the pool down because the
+--           trash dies first), so this arm keeps one write: MP := 1
+--           (below Dispatch's cost) with the pip rebanked by a real item
+--           turn; the retried Dispatch must fizzle, dealing no damage,
+--           leaving the 1 MP untouched and never negative.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
 
@@ -84,14 +74,11 @@ local function refindSlots()
   end
 end
 
--- battle_bushidogrey's drive, unchanged in shape
 local mf = 0
 local cyanMode = "defer"                 -- "defer" | "item" | "tech:<row>"
 local quietA = false                     -- suppress the menu-idle A-mash: it
                                          -- can land on a just-opened window
                                          -- and confirm a bystander's Fight
-                                         -- (measured: 104 stray damage inside
-                                         -- the refusal window)
 local function decide()
   if H.readByte(MENU) == 0 then
     if quietA then return {} end
@@ -194,18 +181,6 @@ local R = {}
 H.run({ maxFrames = 200000 }, {
   H.waitFrames(20),
 
-  -- ------------------------------------------------ 1. detect build + table --
-  -- #71 item 8, acknowledged and accepted: this self-detection inverts
-  -- every expectation with the build -- turn OT6_MP_COSTS off in the
-  -- SHIPPED ROM and this file detects "off", asserts SwdTech is free,
-  -- and passes.  The guard that catches that regression is structural
-  -- and lives OUTSIDE this file: the Makefile's `test` recipe builds
-  -- the nomp baseline and byte-compares it against the shipped ROM
-  -- (Makefile "nomp-rom": the ON ROM must differ from the OFF
-  -- baseline, or the flag is dead code), and runs this same instrument
-  -- on the OFF build expecting the free arm.  A shipped ROM with the
-  -- flag silently off fails THAT compare, not this file -- by design,
-  -- since one self-detecting instrument on both builds is the A/B.
   H.call(function()
     local sig = { 0x5d, 0x04, 0x5e, 0x0a, 0x5f, 0x0d }   -- Pummel/AuraBolt/Suplex
     local base
@@ -227,8 +202,8 @@ H.run({ maxFrames = 200000 }, {
       cost[H.readRomByte(a)] = H.readRomByte(a + 1)
       a = a + 2
     end
-    local want = {                        -- kits.md's authored numbers (#45)
-      [0x5d] = 4,  [0x64] = 99,           -- Blitz:   Pummel, Bum Rush (#57 anchor)
+    local want = {                        -- kits.md's authored numbers
+      [0x5d] = 4,  [0x64] = 99,           -- Blitz:   Pummel, Bum Rush
       [0x55] = 4,  [0x58] = 16, [0x5c] = 99, -- SwdTech: Dispatch, Quadra Slam, Cleave
       [0xaa] = 4,  [0xa8] = 16, [0xa6] = 18, -- Tools:  AutoCrossbow, Drill, Chain Saw
     }
@@ -253,10 +228,6 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(bp(), 1, "the opening 1-bp bank pays Dispatch's boost")
     R.mp0 = mp()
     R.g0 = monsterHpSum()
-    -- ON: the real pool must afford the priced tech.  OFF: the nomp
-    -- baseline's battle-MP init reads this ON-build save's pool as 0,
-    -- and a free Dispatch executing from 0 MP is the control
-    -- (battle_stealmp measured the same wallet shape on its OFF half).
     if mode == "on" then
       H.assertEq(R.mp0 >= DISPATCH_COST, true, "his real pool affords the tech")
     end
@@ -268,10 +239,6 @@ H.run({ maxFrames = 200000 }, {
       R.mp0, R.g0))
   end),
 
-  -- ------------------------------ 2. charge (ON) / free (OFF, the control) --
-  -- The battle's first Cyan turn, before any enemy action can touch the
-  -- pool (this species drains MP; the first drain was measured ~2200 frames
-  -- in, and the first tech resolves well before it).
   H.call(function() cyanMode = "tech:0" end),
   driveTo(function() return sawSpell(DISPATCH) end, 20000,
     "the real Dispatch reaches $3410"),

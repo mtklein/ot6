@@ -1,15 +1,9 @@
--- probe_opera_rafter2.lua -- Beat A rafter-chase recon, step 1 (Ultros
--- drop-in).  Boots opera_dance_done (238 {98,7} $0111=1, $0345=1).
--- Mechanism (measured from ff6/src/event, event_main.asm + npc_prop.asm +
--- event_trigger.asm):
---  * 238 {99,20}: envelope NPC (vis gate $0345=1) event _cabf31 -> dlg
---    $04C8/$04C9, sets $0345=0, $0058=1 (Ultros threatens; "tell the
---    Impresario").  no_react NPC: fires on contact/bump.
---  * the Impresario (_cab724) is on map 234 {15,46}.  With $0058=1 & $0110=0 he
---    runs _cab744 -> the 5-min cutscene -> $0110=1 $02BA=1 $02BC=1 +
---    start_timer 0,18000,_caba09 (expiry = Ultros wins).  Reached 238->237->234.
--- This probe: dump boot, object-scan 238, drive to {99,20}, touch the envelope,
--- confirm $0058=1; then log where control lands.  Recon only.
+-- probe_opera_rafter2.lua -- boots opera_dance_done (238 {98,7} $0111=1, $0345=1).
+-- 238 {99,20}: envelope NPC (vis gate $0345=1) sets $0345=0, $0058=1 (Ultros
+-- threatens; "tell the Impresario").  The Impresario (_cab724) is on map 234
+-- {15,46}: with $0058=1 & $0110=0 he starts a 5-min timer (18000 frames,
+-- expiry = Ultros wins) and sets $0110=1 $02BA=1 $02BC=1.
+-- This probe drives to {99,20}, touches the envelope, then logs where control lands.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -44,8 +38,7 @@ H.run({ maxFrames = 20000 }, {
     end
   end),
 
-  -- Step 1: reach {99,20} and touch the envelope.  March down toward it,
-  -- nudging x to 99, then bump down/A when adjacent.
+  -- march down toward {99,20}, nudging x to 99, then bump down/A when adjacent
   (function() local hb=0
     return H.driveUntil(function() return sw(0x0058)==1 or map()~=238 end, 8000, {
       H.call(function() hb=hb+1

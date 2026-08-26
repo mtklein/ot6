@@ -1,6 +1,6 @@
 -- probe_sprdata.lua -- what writes w7e80db (monster sprite data / obj palette
 -- number) during the entry-point guard fight, and what the formation
--- contains.  #48 scratch probe, not a suite test.
+-- contains.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 

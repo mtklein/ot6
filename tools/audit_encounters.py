@@ -1,18 +1,6 @@
 #!/usr/bin/env python3
-"""Answer the encounter question mechanically: can map N draw a random
-battle, from which formations, and can they be fled (#82).
-
-Every playBattles choice in a route used to be a judgment call, and getting
-it wrong is expensive in both directions: "flee" against a formation that
-cannot be fled stalls until M.FLEE_CAP expires, and a walking budget with no
-battle allowance reports a navigation timeout for something that is not one
-(HANDOFF, the flee bullet).  The #75 sweep answered ~60 call sites from the
-game's data with a throwaway script, validated it against the library's own
-recorded map-98 measurement, and threw the script away.  This is that script
-kept: the decode is transcribed from docs/waiver-burndown-plan.md ("How each
-site's spelling was decided"), and the selftest pins it to the measurements
-that validated it, so the answer stays mechanical instead of becoming a
-judgment call again.
+"""Report whether a field map can roll a random battle, from which
+formations, and whether they can be fled.
 
 The chain, with the loads that make each step true:
 
@@ -39,7 +27,7 @@ fight, or pick "tactical").
 
 Usage:  python3 tools/audit_encounters.py [--repo ROOT] [--selftest] MAP...
 Maps are decimal or 0x-hex.  Exit 0; the tool reports, it does not judge a
-route.  --selftest exits 1 if the decode drifts from the pinned measurements.
+route.  --selftest exits 1 if the decode drifts from the pinned values.
 """
 
 from __future__ import annotations
@@ -138,15 +126,8 @@ def report(data, m):
 
 
 # ---------------------------------------------------------------- selftest --
-# Pinned to the measurements that validated the throwaway original, so a
-# drift in any file's layout is a loud failure instead of a wrong answer:
-#   * map 98's pool is the library's recorded measurement, reproduced
-#     exactly (Trilium + Tusker + two Cirpius, formation $01c);
-#   * Zozo maps 221/225 carry the pincers waiver-burndown-plan.md §"How each
-#     site's spelling was decided" names ("several of those formations
-#     permit a pincer") -- 5 of the 8;
-#   * the Returner Hideout (108/109/110) is encounter-free, the HANDOFF
-#     fact about $0525 bit 7.
+# Pinned values, so a drift in any file's layout is a loud failure instead
+# of a wrong answer.
 
 def selftest(root):
     data = Data(root)

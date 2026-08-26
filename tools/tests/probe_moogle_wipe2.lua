@@ -1,13 +1,7 @@
 -- probe_moogle_wipe2.lua -- the wave-loss aftermath, played the way a
--- player who lost would: mash A at whatever is on screen (issue #75).
--- probe_moogle_wipe established that an idle party wipes in-battle and the
--- machine then sits with the event engine stuck (ev=true, marches jammed,
--- no GameOver exec, field HP never written back) for 24k+ frames, but that
--- probe only tapped A on field dialogs, and a battle-side prompt
--- (annihilated text, a battle message) would not register there.  This one
--- mashes A unconditionally from the moment the wipe lands and screenshots
--- every 3000 frames, so a "softlock" reading cannot be an artifact of too
--- little input.  Zero writes.
+-- player who lost would: mash A at whatever is on screen. Mashes A
+-- unconditionally from the moment the wipe lands and screenshots every
+-- 3000 frames. Zero writes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/moogle_defense.mss.lua"
 

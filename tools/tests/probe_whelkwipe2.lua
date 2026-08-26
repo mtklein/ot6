@@ -1,20 +1,15 @@
--- probe_whelkwipe2.lua -- round 2: scroll-table + map + font-truth
--- instrumentation of the whelk head hide/show transition.
+-- probe_whelkwipe2.lua -- scroll-table + map + font-truth instrumentation
+-- of the whelk head hide/show transition.  The BG3 scroll HDMA table lives
+-- at w7e4af5 (224 x [hofs.w vofs.w], channel #2 -> $2111/$2112).
 --
--- Round 1 (probe_whelkwipe) established: the BG3 field map and small-font
--- tile regions are bit-identical base-vs-ot6 through both transitions, yet
--- the ot6 image renders a sweeping strip of glyph garbage.  The remaining
--- suspects are the per-scanline BG3 scroll HDMA table (w7e4af5, 224 x
--- [hofs.w vofs.w], channel #2 -> $2111/$2112) and the tile-region state at
--- burst start (round 1's drive-phase shadow refresh absorbed pre-burst
--- writes without logging them).  This probe logs, per transition:
+-- Logs, per transition:
 --   * a full BG3 field-map dump ($5400-$57ff) at burst start
 --   * a whole-font compare against SmallFontGfx at burst start (which
 --     cells differ from the vanilla font; ot6's claimed cells will show
 --     as expected diffs, anything else is state)
 --   * per-frame RLE of the BG3 scroll table (logged on change)
 --   * per-frame $2f48 / $201e / $61ab and the anim thread state
--- plus screenshots every 5th frame (round 1 owns the dense visuals).
+-- plus screenshots every 5th frame.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TAG = "wo2"

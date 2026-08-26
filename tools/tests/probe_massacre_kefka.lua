@@ -2,8 +2,7 @@
 -- chain to solo Leo, stage below the Kefka NPC (24,18) at 341 (24,19), save a
 -- reusable savestate, then INSTRUMENT why A does not fire battle 124: scan the
 -- object table for the NPC at (24,18), dump its collision/z/activated bits and
--- the $051d gate, and try edge-A activation while watching.  Issue #127.
--- No @suite.
+-- the $051d gate, and try edge-A activation while watching.  No @suite.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end

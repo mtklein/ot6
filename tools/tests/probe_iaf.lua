@@ -1,7 +1,6 @@
--- probe_iaf.lua -- the #121/#131 airship-driver: drive the Thamasa stop line
--- all the way into the IAF's first battle (formation 126), headless, and
--- confirm the survey's offline formation decode live. See
--- docs/design/floating-continent-route.md §2/§3/§9.
+-- probe_iaf.lua -- the airship-driver: drive the Thamasa stop line all the
+-- way into the IAF's first battle (formation 126), headless, and confirm
+-- the survey's offline formation decode live.
 --
 -- THE ENTRY CHAIN (all driven and asserted below):
 --   1. BOARD: from the stop line (world (249,128), party of 4), nudge UP onto
@@ -44,7 +43,7 @@ local function tap(btn) phase = (phase + 1) % 9; H.setPad(phase < 3 and { btn } 
 H.run({ maxFrames = 14000 }, {
   H.loadState("build/states/thamasa_done.mss.lua"),
   H.driveUntil(function() return H.worldHasControl() end, 3000, {}, "world control"),
-  -- 0. stop-line preconditions (floating-continent-route.md §1)
+  -- 0. stop-line preconditions
   H.call(function()
     H.assertEq(H.worldX(), 249, "stop-line world X = 249")
     H.assertEq(H.worldY(), 128, "stop-line world Y = 128")

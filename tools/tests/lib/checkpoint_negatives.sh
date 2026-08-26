@@ -1,14 +1,8 @@
 #!/bin/sh
-# checkpoint_negatives.sh: the stale-checkpoint regression (#25), run by
-# `make checkpoint-negatives`.
+# checkpoint_negatives.sh: the stale-checkpoint regression.
 #
-# Issue #25's acceptance criterion: "A stale checkpoint fails loudly, naming
-# what differed -- with a regression proving it FAILS, not merely that it
-# passes when correct."  Every fixture bug this project has had is a check
-# that can only agree with itself, and a refusal check whose refusal has never
-# been observed has the same problem.  So this script drives both refusal
-# paths through the real path (tools/tests/run.sh with a real checkpoint
-# directory) and asserts on the refusal text itself:
+# Drives both refusal paths through the real path (tools/tests/run.sh with
+# a real checkpoint directory) and asserts on the refusal text itself:
 #
 #   1. tools/tests/checkpoints/negative-unknown-layout-v1: a byte-identical
 #      copy of post-opera-v1 whose manifest declares a persistent_layout

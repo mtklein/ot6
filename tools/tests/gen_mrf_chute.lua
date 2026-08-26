@@ -1,59 +1,14 @@
--- gen_mrf_chute.lua -- v0.6 step 4: mrf_entry (MAGITEK FACTORY map 262,
--- {28,8}) -> the conveyor chute at {19,25} -> the factory's lower half,
--- control back at {10,45}.  Generates mrf_chute.
+-- gen_mrf_chute.lua -- mrf_entry (MAGITEK FACTORY map 262, {28,8}) -> the
+-- conveyor chute at {19,25} -> the factory's lower half, control back at
+-- {10,45}.  Generates mrf_chute.mss.
 --
--- Map 262 is not one walkable region, because of scripted
--- transitions rather than a maze.  Measured live off the loaded tilemap
--- (probe_mrf262, booted on mrf_entry), from the landing tile {28,8}:
---
---   (19,23) door anim _cc7753      39 steps      (11,16) _cc7862   32 steps
---   (19,24) door anim _cc7735      40 steps      (11,17) _cc784a   33 steps
---   (19,25) the chute   _cc7771    41 steps      (11,21) _cc78a5   43 steps
---   (21,25) short chute _cc77ec    43 steps       (9,22) platform  44 steps
---   (11,45) _cc78d0    NO PATH     (10,54) _cc7682 NO PATH
---   (6,31)  _cc76a7    NO PATH     (21,27) _cc781b  NO PATH
---
--- So the recon's offline "only 130 tiles reachable" understated it: the
--- upper floor is a single connected region containing both chutes, both
--- door-animation pairs and the east end of the platform gap.  Its
--- conclusion still holds where it matters: everything below y~27 is
--- unreachable on foot and has to be entered through a script.
---
--- The chute.  event_trigger.asm's map-262 block puts _cc7771
--- (event_main.asm:94990) on {19,25}; unlike its neighbours {19,23}/{19,24}
--- (which are `if_switch $01B5=1, EventReturn`-latched door animations that
--- only run `mod_bg_tiles`), it is ungated and runs an obj_script that
--- carries SLOT_1 down and across:
---
---   {19,25} -> DOWN 5 -> {19,30} -> LEFT 4 -> {15,30} -> LEFT 1 -> {14,30}
---   -> DOWN_LEFT 3 -> {11,33} -> LEFT 1 -> {10,33} -> DOWN 8 -> {10,41}
---   -> DOWN 3 -> {10,44} -> jump_low DOWN 1 -> {10,45}
---
--- and ends `player_ctrl_on` at {10,45}, one tile west of the {11,45}
--- trigger _cc78d0 that the upper floor could not reach.  It is one-way:
--- the party is walked over non-walkable tiles with `layer 2`/`layer 3`.
---
--- Stepping onto {19,23} and {19,24} on the way in is harmless and expected:
--- both are `mod_bg_tiles BG1/BG2 {19,24}` door frames guarded by the
--- once-per-tile latch $01B5, which is $1EB6 bit 5, cleared by player.asm
--- :529-531 on every step and not a story switch (see gen_vector_sneak.lua).
---
--- ---------------------------------------------------------------------
--- 2026-08-20 (#124/#125): the Leo-break-row ROM (9630f46) re-rolled the
--- battle-init RNG chain-wide, and the crossing below now sometimes rolls an
--- UNRUNNABLE pincer (four 615-hp Factory monsters, both sides occupied so
--- $b1 bit 1 holds and no L+R roll ever fires) into the flee gauntlet -- a
--- fight this L14-15 party cannot win, and a wipe the old single-pass
--- crossing hard-failed on.  The crossing IS survivable from most game-time
--- seeds (the same generate is green booting from a hand-captured mrf_entry),
--- so this is the standard timing-shift/robustness class, not enemy tuning:
--- the fix is a seed-ladder wipe-retry, the same shape gen_vargas /
--- gen_narshe_battle use.  The party is FULL-HEALED before the crossing
--- (fieldCare), that full-heal is baked into the reload checkpoint, each
--- attempt takes a different battle-RNG phase (H.newSeedLadder), and a wipe
--- reloads and retries rather than shipping a casualty (or a Game Over) into
--- everything downstream.  navTo gained opts.wipeEndsRide for this (lib/
--- ot6_field.lua), mirroring worldNavTo/advanceStory.
+-- The upper floor is one connected region on foot, but everything below
+-- y~27 is unreachable except through the chute.  The {19,25} trigger is
+-- ungated and walks the party over non-walkable tiles to {10,45}, one
+-- tile west of the {11,45} trigger the upper floor could not reach.
+-- Stepping onto {19,23}/{19,24} on the way in is harmless: they are
+-- door-frame animations guarded by the once-per-tile latch $01B5.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -133,11 +88,9 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- Stop tapping once the party is on the target tile.  The
-        -- terminator needs 16 consecutive calm frames there, and a further
-        -- tap walks off it before the count completes: the first version of
-        -- this rode the chute correctly to (10,45), then tapped itself to
-        -- (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile: the
+        -- terminator needs 16 consecutive calm frames there, and a
+        -- further tap would walk off it before the count completes.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return
@@ -178,14 +131,6 @@ local function census(tag, targets)
   end
 end
 
--- The crossing, run as a seed-ladder wipe-retry (see the 2026-08-20 header
--- note).  crossBlob is the pre-crossing checkpoint -- the FULL-HEALED party
--- at the landing tile -- captured once after fieldCare; every attempt past
--- the first reloads it, so the bag and HP never deplete across retries and
--- each attempt is the honest "prepped player walks in" that the doctrine
--- describes.  L.spread(n) takes a different battle-RNG phase per attempt, so
--- the pincer roll differs; a wipe ends the ride (opts.wipeEndsRide) instead
--- of hard-failing, and the ladder reloads and takes the next phase.
 local CROSS_ATTEMPTS = 6
 local L = H.newSeedLadder("mrf crossing", { attempts = CROSS_ATTEMPTS })
 local crossed, crossLost, crossBlob = false, nil, nil
@@ -260,14 +205,12 @@ local function crossAttempt(n)
   }, {})
 end
 
--- allowGameOver: the crossing ladder deliberately loses attempts and reloads
--- the full-healed crossBlob before taking the next battle-RNG phase, so a
--- wipe's Game Over is expected, not a failed run.  Correctness is guarded by
--- ground truth instead of the auto-Continue canary: every attempt rewinds to
--- crossBlob (a known-good party, never a post-wipe state), `crossed` only
+-- allowGameOver: the crossing ladder deliberately loses attempts and
+-- reloads the full-healed crossBlob before taking the next battle-RNG
+-- phase, so a wipe's Game Over is expected.  Correctness is ground-truth
+-- guarded: every attempt rewinds to a known-good party, `crossed` only
 -- flips on the real (10,45) landing, and assertPartyStanding is the exit
--- contract.  A crossing that never wins fails loudly at the L.report/crossed
--- check below.
+-- contract.
 H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState("build/states/mrf_entry.mss.lua"),
   H.waitFrames(150),
@@ -287,23 +230,9 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   end),
 
   -- 0. Care, before the crossing.
-  --
-  -- The upper floor draws random battles (map 262, map_prop.dat +$05 bit 7
-  -- set -- the flag CheckRandomBattle tests at field/battle.asm:332), the
-  -- crossing below is 38 tiles of it, and it flees what it meets, so nothing
-  -- in it heals.  The party arrives here with EDGAR around 187/398, which is
-  -- a party walking into an encounter area at half strength, and on
-  -- 2026-08-13 that cost him: he took a fatal hit in a fled fight and
-  -- mrf_chute, mrf_263, mrf_kefka and ifrit_entry all shipped him dead
-  -- (tools/audit_party_hp.py).  This is the preparation a player would do
-  -- before crossing: a full EDGAR is a lot harder to kill than a half one,
-  -- and because it is captured into crossBlob below, every wipe-retry starts
-  -- from this same full party rather than depleting the bag across attempts.
-  --
+
   -- Threshold 0.85 rather than a boss step's 0.95: what follows is trash
-  -- encounters and a scripted ride, and gen_ifrit_magicite already runs its
-  -- own 0.95 stop before battle 70.  The bag holds three Fenix Downs, nine
-  -- Potions, five Tonics and an Elixir at this point.
+  -- encounters and a scripted ride.
   H.fieldCare({ tag = "care before the upper-floor crossing",
                 threshold = 0.85 }),
 
@@ -331,8 +260,6 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   crossAttempt(4),
   crossAttempt(5),
   crossAttempt(6),
-  -- Before the verdict, not after: the attempts are evidence only if they
-  -- were DIFFERENT fights (#83).
   L.report(),
   H.call(function()
     if not crossed then
@@ -356,15 +283,12 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     H.log(partyReport("mrf_chute"))
   end),
 
-  -- The repair half of the care stop: whatever the winning crossing cost, it
-  -- is fixed here rather than shipped.  Being careful is not the same as
-  -- being lucky, and the fixture is what everything downstream boots.
+  -- The repair half of the care stop: whatever the winning crossing cost
+  -- is fixed here rather than shipped downstream.
   H.fieldCare({ tag = "care after the crossing", threshold = 0.85 }),
   H.call(function()
-    -- The exit contract.  A failure here means the crossing cost more than
-    -- the bag could answer, which is a finding about supplies rather than a
-    -- reason to lower the bar; it is not a reason to ship the casualty into
-    -- every step below this one.
+    -- The exit contract: a failure here means the crossing cost more
+    -- than the bag could answer.
     H.assertPartyStanding("mrf_chute exit")
     H.screenshot("mrf_chute")
   end),

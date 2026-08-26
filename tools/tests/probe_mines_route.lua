@@ -1,14 +1,9 @@
--- probe_mines_route.lua -- thread the Narshe mines from the banked
--- $023C chase state to the cliff map 23, then take MOG (#133 item 3).
+-- probe_mines_route.lua -- threads the Narshe mines from the banked
+-- $023C chase state to the cliff map 23, then takes MOG.
 --
--- The (30,22) chase pocket on map 21 is enclosed; its only forward exits
--- (bfs-scanned) are the (30,20) row -> map 43 (108,59) and the way back
--- to town.  Decoded chain to the cliff:
---   21 (30,20)row -> 43 (108,59); 43 door (113,45) -> 41 (58,11);
+-- Route: 21 (30,20)row -> 43 (108,59); 43 door (113,45) -> 41 (58,11);
 --   41 doors (107,12)/(117,12) -> 21's TOP pocket (23,10)/(32,10);
 --   21 top row (34..37,1) -> 22 (19,39); 22 top row (18..21,1) -> 23.
--- Every hop scans candidates first and logs what is reachable, so a
--- wrong link fails loudly with the data to fix it.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function sw(bit) return (H.readByte(0x1E80 + (bit >> 3)) >> (bit & 7)) & 1 end
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
@@ -75,16 +70,13 @@ end
 H.run({ maxFrames = 80000 }, flatten({
   H.loadState("build/states/wob_chase23C.mss.lua"),
   H.waitFrames(8),
-  -- back to town, then in through the (22,44) mines door: its 41 pocket
-  -- (20,9) is the best candidate link to the (107/117,12) top doors
+  -- back to town, then in through the (22,44) mines door
   hop({{24,52},{25,52},{26,52},{23,52},{27,52},{28,52},{24,51},{25,51}},
       "down", 20, "21 -> town"),
   hop({{22,45},{21,44},{23,44},{22,43},{22,44}}, "up", 41, "town -> 41 north"),
-  -- The mines are a designed maze of one-way pockets threading 41<->43
-  -- (and possibly 42).  Generic explorer: on each round, if the goal
-  -- doors are reachable take them; else take the first unused door for
-  -- the CURRENT map from the decoded entrance records.  Teleports are
-  -- detected by the position jumping far from both start and target.
+  -- Generic maze explorer: each round, take a goal door if reachable, else
+  -- the first unused door for the current map. Teleports are detected by
+  -- the position jumping far from both start and target.
   (function()
     local used = {}
     local out = {}
@@ -153,8 +145,8 @@ H.run({ maxFrames = 80000 }, flatten({
           end)(),
           H.waitFrames(30),
           -- an L-row trigger tile sits one step past the approach: if the
-          -- arrival did not teleport us, push into it (up first -- every
-          -- decoded row here faces north -- then the other directions)
+          -- arrival did not teleport us, push into it (up first, then the
+          -- other directions)
           (function()
             local m0, x0, y0 = nil, nil, nil
             local pushes = { "up", "left", "right", "down" }

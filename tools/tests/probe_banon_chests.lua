@@ -1,10 +1,9 @@
--- probe_banon_chests.lua -- #84 diagnosis: the Green Cherry treasure on map
--- 109 at (26,21) (treasure bit 41) did not answer a stand-below face-up A
--- from (26,22) in gen_banon.  Replay the escort, dump walkability and the
--- $7E2000 logical-map bytes around the treasure tile, and attempt the open
--- from every reachable neighbour, logging the CheckTreasure gates
--- (player.asm:719-: the z gate reads $b8/$b2, the marker gate wants bit 7 of
--- the facing tile's $7E2000 byte).
+-- probe_banon_chests.lua -- replays the escort to the Green Cherry treasure
+-- on map 109 at (26,21) (treasure bit 41), dumps walkability and the
+-- $7E2000 logical-map bytes around the treasure tile, and attempts the
+-- open from every reachable neighbour, logging the CheckTreasure gates:
+-- the z gate reads $b8/$b2, the marker gate wants bit 7 of the facing
+-- tile's $7E2000 byte.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -68,7 +67,7 @@ H.run({ maxFrames = 40000 }, {
       H.log(string.format("[walk] y=%2d %s", y, table.concat(row)))
     end
     -- the logical-map bytes CheckTreasure indexes ($7E2000 + (y<<8|x)):
-    -- the facing tile's byte needs bit 7 or the routine returns at :755
+    -- the facing tile's byte needs bit 7
     for y = CY - 2, CY + 2 do
       local row = {}
       for x = CX - 2, CX + 2 do

@@ -1,10 +1,9 @@
 -- probe: can any point of gen_sabin_doma's walk reach the map-123 copy of
--- the bit-96 X-Potion at (33,34)?  Map 124 (the copy the route sees) never
--- returns control (the (28,36) landing tile IS the _cb1283 family trigger,
--- gen_sabin_doma.lua:403-405), so the only honest pickup would be the 123
--- copy.  This walks the generator's own entry (121 (28,12) -> 123 (51,30)),
--- dumps a wide canStep grid around (33,34), and asks bfsPath from the
--- arrival room and from the two rooms the crawl visits next.
+-- the bit-96 X-Potion at (33,34)? Map 124 (the copy the route sees) never
+-- returns control, so the only honest pickup would be the 123 copy. This
+-- walks the generator's own entry (121 (28,12) -> 123 (51,30)), dumps a
+-- wide canStep grid around (33,34), and asks bfsPath from the arrival room
+-- and from the two rooms the crawl visits next.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

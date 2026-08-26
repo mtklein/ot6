@@ -1,10 +1,9 @@
--- probe_zozo3_chests.lua -- #84 evidence probe: can gen_zozo3_clock's walked
--- region on map 225 (the clock room, stairs revealed) reach the chest pair
--- (104,9) Tincture / (105,9) Potion?  Those chests sit in the west room,
--- which gen_zozo4_dadaluma's measured island graph (its header, lines 6-15)
--- enters only through door 221(15,39); this probe asks the live tilemap the
--- same question from zozo_clock_solved, where the party stands at (98,60)
--- with the clock staircase already open ($01F0 set).  Reads only.
+-- probe_zozo3_chests.lua -- can the walked region on map 225 (the clock
+-- room, stairs revealed) reach the chest pair (104,9) Tincture / (105,9)
+-- Potion?  Those chests sit in the west room, entered only through door
+-- 221(15,39).  This asks the live tilemap from zozo_clock_solved, where
+-- the party stands at (98,60) with the clock staircase already open
+-- ($01F0 set).  Reads only.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id)

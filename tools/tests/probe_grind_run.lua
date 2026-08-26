@@ -1,12 +1,6 @@
--- probe_grind_run.lua -- one resumable CHUNK of the Chimera-pocket grind
--- (#133): up to 5 fights, state re-published after each.
---
--- The full grind (L15-17 -> L21-22) is ~19-24 fights at the measured 786
--- XP/char (probe_grind_fight; LevelUpExp puts L21 at 26360 cumulative XP
--- and L22 at 30232), which is too long for one testrunner invocation --
--- run.sh's wall-clock cap would either kill it or a late wipe would lose
--- everything, since artifacts only publish on a PASS.  So the grind runs as
--- chunks over a rolling fixture:
+-- probe_grind_run.lua -- one resumable CHUNK of the Chimera-pocket grind:
+-- up to 5 fights, state re-published after each.  The grind runs as chunks
+-- over a rolling fixture:
 --
 --   cp build/states/wob_grind.mss     build/states/wob_grind_run.mss      # seed
 --   cp build/states/wob_grind.mss.lua build/states/wob_grind_run.mss.lua
@@ -15,10 +9,9 @@
 -- Each invocation loads wob_grind_run.mss, fights up to 5 pocket encounters
 -- tactically (pacing X 114..118 on Y 25), logs the party after each, and
 -- re-publishes wob_grind_run.mss, so the chunk chain accumulates XP and at
--- most one fight is ever lost to a wipe or a kill.  The run stops early
--- (still green, still publishing) when every character who gained XP this
--- chunk is at least GOAL_LEVEL, and logs GOAL REACHED; rerun-until-you-see-it
--- is the loop.  A wipe ends the chunk without saving (the last good save
+-- most one fight is ever lost to a wipe or a kill.  The run stops early when
+-- every character who gained XP this chunk is at least GOAL_LEVEL, and logs
+-- GOAL REACHED.  A wipe ends the chunk without saving (the last good save
 -- stands) and logs WIPE.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -71,15 +64,11 @@ local function frame()
       end
       if not alive then wiped = true; H.setPad({}); return end
     end
-    -- A fight that runs this long is a heal-treadmill (a bad Aqua Rake
-    -- streak outpaces the driver's healing and damage stalls -- measured:
-    -- Chimera at 1369 hp after 13k frames, every turn a heal).  Flee it
-    -- instead of erroring the chunk: every formation in this pool is
-    -- runnable (no pincer bit), a fled fight just pays no XP, and an
-    -- error would lose the whole chunk since artifacts only publish on
-    -- a PASS.  The cap counts fightN, not battN: battN flickers with the
-    -- battle signal (measured: a 21k-frame revive-treadmill fight never
-    -- tripped a consecutive-9000 battN cap).
+    -- A fight that runs this long is a heal-treadmill; flee it instead of
+    -- erroring the chunk, since every formation in this pool is runnable
+    -- (no pincer bit) and a fled fight just pays no XP.  The cap counts
+    -- fightN (cumulative), not battN, which flickers with the battle
+    -- signal.
     if fightN > 9000 then
       if not fleeing then
         fleeing = true
@@ -125,9 +114,8 @@ local steps = {
     for _, c in ipairs(party()) do xp0[c.slot] = c.xp end
   end),
   -- The rolling save can carry battle scars (a fled fight leaves corpses
-  -- and scraps -- measured: chunk 3 booted with two dead and 209/57 hp,
-  -- and its first Chimera became an unwinnable revive-treadmill).  Care
-  -- first, care after every fight: fieldCare is a no-op when healthy.
+  -- and scraps).  Care first, care after every fight: fieldCare is a no-op
+  -- when healthy.
   H.fieldCare({ tag = "care at chunk start", threshold = 0.85 }),
 }
 for i = 1, FIGHTS do

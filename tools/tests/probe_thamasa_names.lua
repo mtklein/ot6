@@ -1,43 +1,11 @@
--- probe_thamasa_names.lua -- issue #127 hazard 5: the character-naming
--- screen idiom, driven for the first time by any generator.  No -- @suite
--- marker: this is a one-shot measurement, not a suite test.
+-- probe_thamasa_names.lua -- drives the character-naming screen idiom
+-- through Strago's house scene (two consecutive name_menu screens), from
+-- build/states/crescent_landing.mss to Thamasa map 343 and back.  Carries
+-- no @suite marker: one-shot measurement, not a suite test.
 --
--- From build/states/crescent_landing.mss (world (232,150), party
--- TERRA-LOCKE-SHADOW), walk onto world (250,128) -> Thamasa, map 343
--- (23,46) (event_trigger.asm:37 -> _cbd2ee, event_main.asm:69190).  Cross
--- town to Strago's house door 343 (29,13) -> 349 (37,24)
--- (docs/design/thamasa-route.md Segment 2), talk to Strago (NPCProp::_349
--- record 0, obj $10, event _cbd982, event_main.asm:69814) and ride the
--- long scene through two naming screens (name_menu STRAGO :69871,
--- name_menu RELM :70067) to its end (load_map 343 {29,15} DOWN,
--- event_main.asm:70405-70410).
---
--- The commit idiom is not guessed here: it is gen_edgar.lua's commitName,
--- already measured and shipped for name_menu EDGAR/SABIN and reused
--- verbatim by gen_voyage.lua's rideScene for name_menu SHADOW.  A naming
--- menu suspends the field module entirely ($59 ~= 0), so advanceStory's
--- own dialog-paging cannot reach into it; START commits the pre-filled
--- default name (name_change.asm exits on START unless the name is blank)
--- and has to be pressed on repeat because a single press during the menu's
--- own fade-in is lost.  This probe's only open question is whether that
--- idiom -- proven on three single name menus -- also clears two back to
--- back in the same scene with no field frame between them.
---
--- One measured correction to the task's own framing, worth stating up
--- front: $008D is NOT a "scene complete" flag.  Reading the scene
--- (event_main.asm:69837-69854), `switch $008D=1` fires right after the
--- FIRST dialog line ("Whatcha want with me?"), a good 30+ frames BEFORE
--- either naming screen opens.  It means "Strago has been engaged", not
--- "the introduction is over".  This probe logs the frame it flips
--- separately from the frame the whole scene (both names, all the
--- dialogue, the walk back outside) actually ends.
---
--- Watch-fors from the task brief, handled below:
---   * map 343's STARTUP_EVENT town-intro scene on first entry -- ridden
---     with advanceStory before any navigation is attempted.
---   * the two magic-vignette triggers at 343 (35,15)/(25,12)
---     (event_trigger.asm:1670-1672) -- avoided via navTo's opts.avoid.
---   * the inn's pre-Strago 1500gp charge -- irrelevant, never touched.
+-- $008D is not a "scene complete" flag: it flips to 1 right after the first
+-- dialog line, well before either naming screen opens; it means "Strago has
+-- been engaged".
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -56,11 +24,9 @@ local function calm(n, extra)
 end
 
 -- ------------------------------------------------------- naming screen --
--- gen_edgar.lua's commitName, unchanged: advance the story until a naming
--- menu is up, wait out its fade-in, screenshot+log it, then hold-repeat
--- START until the event engine has resumed AND the menu flag is back down
--- for 10 straight frames (debounced the same way navTo debounces battle/
--- dialog signals -- a 1-frame ghost of either flag is not trustworthy).
+-- advances the story until a naming menu is up, wait out its fade-in,
+-- screenshot+log it, then hold-repeat START until the event engine has
+-- resumed and the menu flag is back down for 10 straight frames.
 local d8DFlips = nil
 local sceneStartFrame = nil
 local function commitName(tag)
@@ -98,11 +64,8 @@ local function commitName(tag)
 end
 
 -- ------------------------------------------------------------- doors --
--- gen_edgar.lua's crossDoor, ported with an opts.avoid passthrough for the
--- two vignette tiles this town carries.  A door is a wall until CheckDoor
--- opens it (HANDOFF trap 6: navTo lands at rest, so the tile that takes the
--- party away must be crossed with a held press), so this is navTo-a-
--- neighbour, then hold into the door.
+-- A door is a wall until CheckDoor opens it, so navTo lands adjacent, then
+-- a held press crosses the door.
 local DIAGSTAGE = {
   { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
   { -1, 1, "upright" }, { -1, -1, "downright" },
@@ -200,8 +163,7 @@ local steps = {
   end),
 
   -- ---- 3. cross town to Strago's house door -----------------------------
-  -- avoid the two magic-vignette tiles (35,15)/(25,12); optional side
-  -- content this probe has no reason to trigger.
+  -- avoids the two magic-vignette tiles (35,15)/(25,12).
   crossDoor(29, 13, 349, 37, 24, "Strago house door 343(29,13)->349(37,24)",
     { avoid = { { 35, 15 }, { 25, 12 } } }),
 

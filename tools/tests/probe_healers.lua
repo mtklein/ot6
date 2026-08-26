@@ -1,8 +1,8 @@
 -- probe_healers.lua -- survey: at each of a few field fixtures, who is in the
 -- party, what HP/MP they have, and which cure spells they actually know.
 -- Reads only.  Answers "is there a healer here" from the learn array
--- ($1A6E + 54*actor + spell, field-care-menu.md section 5.3) rather than from
--- a level table or a design document.
+-- ($1A6E + 54*actor + spell) rather than from a level table or a design
+-- document.
 --
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_healers.lua
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -17,11 +17,7 @@ local SPELLS = { [0x2D] = "Cure", [0x2E] = "Cure2", [0x2F] = "Cure3",
 -- these have to be written out rather than built by concatenation.
 --
 -- Only fixtures that tools/tests/lib/savestate_ninja.py still names are
--- listed.  The originally surveyed set included vargas_doorstep,
--- kolts_doorstep and tunnelarmr_doorstep, which exist in a seeded
--- build/states from before those three were renamed to *_entry but are not
--- targets any more, so a survey naming them would stop working the moment
--- the chain is regenerated.
+-- listed.
 local STATES = {
   { "sfigaro_passage",    "build/states/sfigaro_passage.mss.lua" },
   { "returner_hideout",   "build/states/returner_hideout.mss.lua" },

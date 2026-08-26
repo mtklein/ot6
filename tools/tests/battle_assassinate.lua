@@ -3,8 +3,7 @@
 --
 --   tools/tests/run.sh tools/tests/battle_assassinate.lua
 --
--- Status: evidence scaffold, not in suite.sh (unchanged by the #75
--- conversion; promoting it is a separate decision).
+-- Status: evidence scaffold, not in suite.sh.
 --
 -- Ot6Assassinate (ot6_divine.asm:174) is hooked at the same seam Oblivion
 -- uses, just after ChooseTarget in CalcAttackEffect, and fires when
@@ -13,27 +12,19 @@
 -- (OT6_DIVINE_USED, $3ecb) is unspent.  It marks Death in the target's
 -- $3dd4 and spends the latch.
 --
--- Issue #75 conversion: a real Shadow, and the break is earned.  The old
--- scaffold installed CHAR::SHADOW into every slot of the entry-point
--- fixture, forged command rows, pinned guard HP to $F000, and wrote the
--- Broken and boss states directly.
--- It now boots camp_escaped, the input-driven post-Magitek savestate at
--- world (179,71), party SABIN + SHADOW + CYAN, with Shadow's own record
--- carrying Fight and his Imperial ($25, PIERCE per Ot6WeapClassTbl), and walks
--- into the real local pool (measured 2026-08-10: species $2f 243hp
--- PIERCE-weak x3, and $29+$18 SLASH-weak mixes, all 3 shields, none
--- death-protected).  Draws without at least two PIERCE-weak 200+hp bodies are
--- fled; on a suitable draw Shadow chips a real gauge to Broken
--- with his own weapon class while the bench answers its menus with real
--- Defends (slotsboot's idiom; they deal no damage, so every monster HP drop
--- is Shadow's).
+-- Boots camp_escaped, the input-driven post-Magitek savestate at world
+-- (179,71), party SABIN + SHADOW + CYAN, with Shadow's own record carrying
+-- Fight and his Imperial ($25, PIERCE per Ot6WeapClassTbl), and walks into
+-- the real local pool. Draws without at least two PIERCE-weak 200+hp bodies
+-- are fled; on a suitable draw Shadow chips a real gauge to Broken with his
+-- own weapon class while the bench answers its menus with real Defends
+-- (slotsboot's idiom; they deal no damage, so every monster HP drop is
+-- Shadow's).
 --
--- The observation is read-only and mechanism-exact: a pc-gated write watch on
--- the monster $3dd4 cells counts Death marks written from inside
+-- The observation is read-only and mechanism-exact: a pc-gated write watch
+-- on the monster $3dd4 cells counts Death marks written from inside
 -- Ot6Assassinate (the divine's own kill), and the $3ecb latch byte is
--- read.  That replaces the old check on whether the guard's wound bit set,
--- which a plain 4x-broken damage kill would also satisfy, since 243hp bodies
--- die to plain damage too.
+-- read.
 --
 --   1. Broken non-boss: Shadow chips a body to Broken, and his next landed
 --      attack on it divine-kills, giving exactly one in-proc Death mark on a
@@ -42,19 +33,12 @@
 --      and strikes further bodies, and monster HP keeps falling (the control
 --      showing he still acts and lands), yet the in-proc kill count
 --      stays 1 and the latch byte never changes again.
---
--- One labeled isolation arm (issue #75); one write site stays.
--- 3. the boss check.  No boss shares a battle with Shadow anywhere
---    in the generated tree (the camp pursuit is four troops; the Ghost Train
---    boss has no entry-point fixture; the local pool carries no $3aa1.2
---    species, measured), so the non-boss check's negative is an isolation
---    arm: a fresh battle, a body chipped Broken by real play, then the one
---    write, setting its $3aa1 bit 2, the bit a boss carries
---    (ScimitarEffect reads the same bit, battle_main.asm:9147), and
---    Shadow's next landed hit on it must fire no divine and spend no
---    latch.  It must never produce fixtures; it converts organically when
---    a chain step generates a boss-with-Shadow entry point.  This is the file's
---    only surviving write (.writeByte( waiver line).
+--   3. the boss check: no boss shares a battle with Shadow anywhere in the
+--      generated tree, so the non-boss check's negative is an isolation
+--      arm: a fresh battle, a body chipped Broken by real play, then one
+--      write sets its $3aa1 bit 2, the bit a boss carries (ScimitarEffect
+--      reads the same bit, battle_main.asm:9147), and Shadow's next landed
+--      hit on it must fire no divine and spend no latch.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
 
@@ -144,12 +128,11 @@ local function fightPulse()
   elseif st == ST_TGT then
     btn = "a"                       -- default monster target
   elseif st == 0x01 then
-    btn = nil   -- #90: NOTHING in transitional $01 -- an A held here is
-                -- still down when the command window goes live and
-                -- confirms row 0 (the battle_levelup race)
+    btn = nil   -- NOTHING in transitional $01: an A held here is still
+                -- down when the command window goes live and confirms row 0
   else
-    btn = "b"   -- #90: B in unrecognised states -- advances messages,
-                -- confirms nothing
+    btn = "b"   -- B in unrecognised states: advances messages, confirms
+                -- nothing
   end
   H.setPad(btn and { [btn] = true } or {})
 end
@@ -232,13 +215,9 @@ add({
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),
-  -- SHADOW to the back row, through the real Order screen (H.setRows).
-  -- Measured: his front-row Fight lands ~110 on a shielded 243-hp body, so
-  -- a 3-shield gauge (chips are -1 per landed weak-class hit) damage-kills
-  -- at shield 1 and nothing ever breaks.  The back row halves his physical
-  -- damage (~55): three chips leave the body alive at ~78 hp, Broken, and
-  -- the fourth hit is the divine's.  A player picking a smaller stick is
-  -- play, not staging.
+  -- SHADOW to the back row, through the real Order screen (H.setRows). The
+  -- back row halves his physical damage: three chips leave the body alive,
+  -- Broken, and the fourth hit is the divine's.
   H.setRows({ [SHADOW] = true }, { tag = "shadow back row" }),
 })
 
@@ -305,7 +284,7 @@ add({
   end),
 })
 
--- ============== battle 3: the labeled isolation arm (issue #75)
+-- ============== battle 3: the labeled isolation arm ========================
 -- The boss check, with the one injected bit; see the header.  A fresh
 -- battle (fresh latch), a body Broken by real chips, then $3aa1.2 is set on
 -- it and Shadow's next landed hit must decline: no in-proc Death mark and no

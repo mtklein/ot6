@@ -3,45 +3,32 @@
 -- $01EE fill, never a priority-set word, so an animation's bg3-16x16
 -- window cannot render them.
 --
--- The bug (the owner's v0.3 sighting, which survived all three prior hud
--- fixes: fly-in gate, dialogue font-clobber veil, 16x16 anim veil): "white
--- flash in combat ... at the START of the fight, before anyone has made any
--- attacks ... as the enemies are appearing ... too quick to get a
--- screenshot."  Reliable on the Lete River forced fight (event battle
--- group 8), on both die rolls: formation 35 (Pterodon x2) and formation 37
--- (Nautiloid+Exocite+Pterodon).
---
--- Mechanism (probe_lete_entrance, frame-exact on the fixed-main image):
--- this entrance slides the shown monsters in.  The hud anchors track the
--- slide, so every live line's cur address walks sideways across the field
--- map, and each step one-shot-blanks the abandoned cells.  The blank word
--- was $21FF, a priority-set char $1FF.  That is invisible in 8x8, being a
--- blank font cell, but the same slide holds $896F=$59 (bg3 16x16 plus
--- priority), and a 16x16 map cell renders char n plus n+1, n+$10 and n+$11,
--- so $1FF pulls tiles $200/$20F/$210, past the font page into animation
--- gfx, at top priority.  63-92 abandoned cells accumulate over the slide
--- (map dumps in the probe log) and render as a full-width band of white
--- junk over the entering monsters for the effect's last ~15 frames, about a
--- quarter second, and it goes away when the effect's own cleanup refills the
--- buffer.  The anim veil (battle_hudanim16's fix) covers only live cells;
--- abandoned cells were covered by nothing.
+-- The Lete River forced fight's entrance slides the shown monsters in.  The
+-- hud anchors track the slide, so every live line's cur address walks
+-- sideways across the field map, and each step one-shot-blanks the
+-- abandoned cells.  The blank word was $21FF, a priority-set char $1FF.
+-- That is invisible in 8x8, being a blank font cell, but the same slide
+-- holds $896F=$59 (bg3 16x16 plus priority), and a 16x16 map cell renders
+-- char n plus n+1, n+$10 and n+$11, so $1FF pulls tiles $200/$20F/$210,
+-- past the font page into animation gfx, at top priority.  The anim veil
+-- (battle_hudanim16's fix) covers only live cells; abandoned cells were
+-- covered by nothing.
 --
 -- The fix: the flush's one-shot blank writes $01EE, the word vanilla
 -- holds in every field cell it did not draw.  It is priority-clear and safe
 -- in both tile modes, so an abandoned cell is word-identical to one that was
 -- never touched.
 --
--- The test needs rapids_start.mss: ride into the forced fight with no menu
--- input, since the flash happens before any turn, track every cell
--- a hud line abandons, and assert on every mid-battle bg3-16x16 frame
--- that no abandoned cell holds a priority-set word ($21FF or any other).
--- Each must read exactly $01EE or have been reclaimed or rewritten by
--- vanilla.  It also carries the cur-cell invariant (no painted glyph at cur
--- while 16x16), which is battle_hudanim16's clause applied to the entrance.
--- Positive controls: the slide abandoned >= 20 cells inside the 16x16
--- window, >= 10 veiled entry frames, >= 20 16x16 frames sampled, the hud
--- paints after settle, glyphCanary.  Pre-fix: 63+ violations in the first
--- slide.  Post-fix: zero.
+-- rapids_start rides into the forced fight with no menu input, since the
+-- flash happens before any turn, tracks every cell a hud line abandons, and
+-- asserts on every mid-battle bg3-16x16 frame that no abandoned cell holds
+-- a priority-set word ($21FF or any other).  Each must read exactly $01EE
+-- or have been reclaimed or rewritten by vanilla.  It also carries the
+-- cur-cell invariant (no painted glyph at cur while 16x16), which is
+-- battle_hudanim16's clause applied to the entrance.  Positive controls:
+-- the slide abandoned >= 20 cells inside the 16x16 window, >= 10 veiled
+-- entry frames, >= 20 16x16 frames sampled, the hud paints after settle,
+-- glyphCanary.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/rapids_start.mss.lua"
 local VR  = emu.memType.snesVideoRam
@@ -51,7 +38,7 @@ local CH_MAX = 0x056F
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 
--- OT6-claimed glyph chars from rom (battle_flyin's technique)
+-- OT6-claimed glyph chars from rom
 local claimed = nil
 local function claimedCharSet()
   local function findSig(sig)
@@ -198,8 +185,6 @@ H.run({ maxFrames = 45000 }, {
       "[hudtrail] frames16=%d veiled16=%d veilFrames=%d abandonedIn16=%d "
       .. "trailViol=%d curViol=%d", frames16, veiled16, veilFrames,
       abandonedIn16, trailViol, curViol))
-    -- the invariant first, so a pre-fix image fails on the bug itself (805
-    -- violations measured on it) rather than on a positive control
     H.assertEq(trailViol, 0,
       "no abandoned cell held a priority-set word on a 16x16 frame ("
       .. trailViol .. " violations) -- the white entrance band")

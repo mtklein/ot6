@@ -194,7 +194,7 @@ ram_scope zSkillsTextColor
         ram_byte Lore
         ram_byte Rage
         ram_byte Dance
-        ram_byte Thief          ; issue #68: the 8th skills row.  This byte was
+        ram_byte Thief          ; the 8th skills row.  This byte was
                                 ; z80, which nothing in the tree referenced, so
                                 ; growing the scope moves no other address.
 end_ram_scope

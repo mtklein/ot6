@@ -1,11 +1,10 @@
--- probe_fc_statues.lua -- #132 segment 4 opener: from fc_atma_down
--- (60,16, AtmaWeapon just fell), heal up, walk the spine north onto
--- the (60,11) trigger (_cadd1e), absorb the statue cutscene, and land
--- on the escape map 393 at (67,16).  Banks fc_escape_start.mss right
--- after Shadow's "Get outta here" dialog -- the 6:00 master clock and
--- the 5:55 Shadow timer start at that dialog, and they run during
--- menus and battles (FIELD_VISIBLE|BANQUET|MENU_BATTLE_VISIBLE), so
--- all healing happens back on 394 before the trigger.
+-- probe_fc_statues.lua -- from fc_atma_down (60,16, AtmaWeapon just
+-- fell), heal up, walk the spine north onto the (60,11) trigger, absorb
+-- the statue cutscene, and land on the escape map 393 at (67,16).  Banks
+-- fc_escape_start.mss right after Shadow's "Get outta here" dialog --
+-- the 6:00 master clock and the 5:55 Shadow timer start at that dialog,
+-- and they run during menus and battles, so all healing happens back on
+-- 394 before the trigger.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x3ff) == m end
 local FA = H.newFightDriver("spine", { tactical = true, boost = true, bank = 3,

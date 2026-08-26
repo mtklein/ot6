@@ -2,44 +2,7 @@
 -- {60,37}, LOCKE+CELES+EDGAR+SABIN) -> Narshe streets -> the world -> the
 -- east Figaro castle -> the engine-room attendant -> the Kohlingen crossing
 -- -> generate figaro_submerged.mss (map 61 {6,34}, castle parked west).
---
--- Route checkpoints, all read from source rather than the survey.  The
--- survey's "underwater encounters battle 19/20/21" step does not exist on
--- this route; those battles belong to the Serpent Trench in Sabin's
--- scenario, _ca8ae3:
---  * map 30 door (55,35) -> map 20 {49,14} (short_entrance.dat _30)
---  * map 20's south edge y=62 x0..43 -> world {83,36} (long_entrance _20)
---  * world (64,76)/(65,76) = the east castle trigger _ca5eb5
---    (event_trigger.asm:31-32), gated $010B=1, which kefka_won's tail
---    sets (gen_kefka_won asserts it) -> load_map 55 {28,42}
---  * map 55 door (28,38) -> 59 {12,49}; 59 door (9,49) -> 61 {10,33}
---    (short_entrance.dat _55/_59); doors are walls until CheckDoor, so
---    every crossing is navTo-a-neighbour + one held press (gen_edgar's
---    measured rule)
---  * the attendant: OLD_MAN NPC at {6,33} on map 61 (npc_prop.asm:2845),
---    event _ca682f (event_main.asm:15831): $0048=1 (set by kefka_won) ->
---    "I'll take you beyond the mountains" -> $010B=1 -> dlg $03D4
---    "(Go to Kohlingen?)" choice 0 -> _ca685a: $010B=0, world-scripted
---    castle run {64,76} -> ~{30,48}, load_map 61 {6,34} SET_PARENT,
---    "Next stop, Kohlingen!", $010C=1 (event_main.asm:15577-15607)
---  * dialog choices land in $056E (EventCmd_b6, field/event.asm:4784);
---    index 0 is the default, so a plain A edge picks Kohlingen
---
--- Issue #75, playBattles: every navigator call below passes the option, so
--- none of them falls through to the library's monster-dead flag write.
--- Which spelling is decided per step by the map's own data.  A field map
--- rolls for a random battle only when map_prop.dat byte +5 has bit 7 set
--- (field/map.asm:143-158 loads the 33-byte record to $0520; the step
--- handler at field/battle.asm:333-347 returns early unless $0525 is
--- negative).  That bit is clear on maps 30, 20, 55, 59 and 61, so every
--- field step here is on a map that cannot draw an encounter and the option
--- is intent only; those pass "tactical", because the only battle that could
--- reach the option on such a map is an unscripted surprise, and fighting it
--- beats spending M.FLEE_CAP frames trying to run.  The one world segment
--- (Narshe's south gate to the east castle trigger) really can draw
--- encounters, and passes "flee": it is corridor travel, nothing on it is
--- worth the ATB rounds a win costs, and the flee path falls back to the
--- tactical driver by itself if a formation will not release the party.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -78,14 +41,7 @@ local function door(nx, ny, dir, m, what)
     H.driveUntil(function() return map() == m end, 900, {
       H.hold({ dir }), H.waitFrames(4),
     }, what .. ": through the door"),
-    -- ride any arrival scene out (the west castle greets with one:
-    -- measured, an event walks the party to (28,28) and parks a dialog)
     H.advanceStory(landed(m, 10), 2400, { playBattles = "tactical" }),
-    -- door loads finalize the decompressed prop table late: ~150 frames
-    -- after control and brightness the engine still walked (and modelled)
-    -- on the previous map's props (measured, probe_n20c on map 30->20: a
-    -- legal step refused at +40f, accepted at +80f; the census flipped
-    -- from all-walls to correct at ~+150f).  Settle long before any BFS.
     H.waitFrames(150),
   })
 end
@@ -142,11 +98,6 @@ H.run({ maxFrames = 90000 }, {
     H.log(string.format("[castle] map 55 at (%d,%d)", H.fieldX(), H.fieldY()))
   end),
 
-  -- 4. gate {28,42} -> door (28,38) -> 59 {12,49} -> the west engine-room
-  --    door (9,49) -> 61 {10,33}.  Measured on the scratch state: (9,49)
-  --    is a walk-in doorway (model-walkable, fires on step), unlike the
-  --    castle's held-press doors; and 61's east door (15,49) lands at
-  --    (28,32), which is walled off from the attendant's platform.
   door(28, 39, "up", 59, "into the keep"),
   H.saveState("_scratch_keep59.mss"),   -- cheap re-entry for route iteration
   H.navTo(9, 49, { arrive = function() return map() == 61 end,

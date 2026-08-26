@@ -1,7 +1,6 @@
 -- probe_kolts_chests.lua -- smoke the seven South Figaro street/yard chest
--- pickups (#84) from south_figaro.mss before gen_kolts pays for a full run.
--- Same stand/face pairs, same order, as the gen_kolts insertion, including
--- the through-the-house detour into the Fenix Down chest's fenced yard.
+-- pickups from south_figaro.mss, including the through-the-house detour
+-- into the Fenix Down chest's fenced yard.
 local H = dofile("tools/tests/lib/ot6.lua")
 local M75_AVOID = {
   { 8, 32 }, { 9, 32 }, { 10, 32 },
@@ -19,8 +18,8 @@ end
 local function settle(dstMap, what)
   return H.cond(function() return true end, {
     H.waitFrames(90),
-    -- no hasControl term: town NPC async scripts flicker it (the settleField
-    -- trap gen_kolts documents); navTo debounces control on its own
+    -- no hasControl term: town NPC async scripts flicker it; navTo
+    -- debounces control on its own
     H.waitUntil(function()
       return H.tileAligned() and map() == dstMap
     end, 2400, what, 20),

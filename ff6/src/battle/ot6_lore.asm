@@ -1,5 +1,5 @@
 ; ------------------------------------------------------------------------------
-; Strago: the lore loadout and its page (#122, the Ot6Rage* family at 5 slots)
+; Strago: the lore loadout and its page (the Ot6Rage* family at 5 slots)
 ;
 ; The Ochette model, third instance: observation learning stays unlimited
 ; (LearnLore and the $1d29-$1d2b bitfield are untouched) and the battle Lore
@@ -8,8 +8,7 @@
 ; cursor and DMA only, the same split both earlier configurators use.
 ;
 ; Storage: OT6_LORELOAD, five bytes at $7e1e27, next in the save-block scrap.
-; byte = lore id + 1 (ids 0..23); $00 = unset; all five zero = AUTO.  No
-; persistent_layout bump; the ruling is at OT6_LORELOAD in ot6_memory.inc.
+; byte = lore id + 1 (ids 0..23); $00 = unset; all five zero = AUTO.
 ;
 ; The battle read is one choke point, and it is smaller than Gau's: vanilla's
 ; lore-list walk in InitSpellList (battle_main.asm @556a) tests one bit per
@@ -159,18 +158,16 @@
 ;
 ;   MANUAL (any loadout byte nonzero): the bits of the stored, still-learned
 ;     ids, the player's own five.
-;   AUTO (all five bytes zero, the state every pre-existing save and tracked
-;     checkpoint is in): the first five known lores in id order.  AUTO
-;     truncates past five for the same reason Gau's does (kit-gau.md's
-;     "the full list must not be reachable through inaction") -- though at
-;     24 candidates the stakes are comfort, not usability.
+;   AUTO (all five bytes zero, the state every pre-existing save is in): the
+;     first five known lores in id order.  AUTO truncates past five so the
+;     full list is not reachable through inaction, though at 24 candidates
+;     the stakes are comfort, not usability.
 ;
-; Cost note (the kit-gau §8.0 rule): this runs in every battle's init.  The
-; AUTO arm is one pass over 24 bits through Ot6LoreLearned and the MANUAL arm
-; five Ot6LoreSlot resolutions; both are O(dozens) of bit tests, far below
-; the frame-coupled threshold that took three tests red for Gau.  No WRAM
-; data port is involved: the mask is three direct-page bytes, and vanilla's
-; walk still performs all its own downstream writes.
+; This runs in every battle's init.  The AUTO arm is one pass over 24 bits
+; through Ot6LoreLearned and the MANUAL arm five Ot6LoreSlot resolutions;
+; both are O(dozens) of bit tests.  No WRAM data port is involved: the mask
+; is three direct-page bytes, and vanilla's walk still performs all its own
+; downstream writes.
 ;
 ; entry: jsl from InitSpellList, D = 0, db = $7e.  Sets its own widths and
 ; restores the caller's (Ot6RageList's own discipline; InitSpellList's widths

@@ -1,109 +1,43 @@
 -- @suite savestate=arvis_wake
--- menu_lorepage.lua -- issue #122: the field Skills->Lore loadout page (Strago)
--- renders.  MenuState_80 and Ot6Lore* (ot6_lore.asm, ot6_lore_page.asm) is the
--- Bushido page's single-column-of-five shape, with a per-row MP price (the
--- lore's own vanilla MagicProp cost) where the Rage/Bushido pages state one
--- flat number, because unlike a possess-verb, every lore prices differently.
+-- menu_lorepage.lua -- the field Skills->Lore loadout page (Strago) renders.
+-- MenuState_80 and Ot6Lore* is the Bushido page's single-column-of-five
+-- shape, with a per-row MP price (the lore's own vanilla MagicProp cost)
+-- where the Rage/Bushido pages state one flat number, because unlike a
+-- possess-verb, every lore prices differently.
 --
--- The staging problem (and why this file writes state at all).  No savestate
--- in the fixture chain contains Strago: he joins in v0.13's unrouted stretch,
--- well past every state this tree can currently generate.  The owner's
--- ruling (menu_ragepage.lua's own precedent, issue #75's "instrumenting a
--- mechanism a person cannot produce on cue is not a claim about play") is
--- that a focused unit-style test may use write expedients to reach a page
--- that real play cannot reach yet.  So this test boots arvis_wake -- the
--- shallowest field savestate (Terra, alone, moments after the Whelk/esper
--- scene) -- and pokes Strago into the party by hand.
+-- No savestate in the fixture chain contains Strago, so this test boots
+-- arvis_wake (Terra, alone, moments after the Whelk/esper scene) and pokes
+-- Strago into the party by hand.  The record poke sources CharProp (the ROM
+-- template char_prop STRAGO,STRAGO copies from at his real join), so what
+-- lands in the save is the same "New Game defaults" a real join would
+-- install.  $1D29-$1D2B (the party-wide learned-lore bitfield) is already
+-- correct on this save and needs no poke: InitNewGame writes it
+-- unconditionally at New Game from the InitLore table (ids 3, 7, 20 in this
+-- build).
 --
--- What got poked, and why it is MORE than the party byte alone.  The plan
--- going in was "just flip $1850+7 the way $1850+0 already reads"; Strago's
--- own $1600+37*7 character record was assumed to already carry New Game
--- defaults, on the theory that InitNewGame's global lore/rage bitfield init
--- (field/init.asm, the same file) would have a sibling that populates every
--- character's record regardless of party membership. Measured false: probed
--- directly, arvis_wake's $1600+37*7 reads all zero/$FF (actor=$FF, all four
--- commands $00), because a character's record is populated by the char_prop
--- event command at the moment their own recruitment scene runs
--- (event_main.asm has `char_prop STRAGO, STRAGO` deep in the Thamasa
--- content), and arvis_wake is nowhere near there. What IS already correct,
--- and does not need a poke, is $1D29-$1D2B (the party-wide learned-lore
--- bitfield): InitNewGame writes it unconditionally at New Game
--- (field/init.asm:150-162, from the InitLore table, {$88,$00,$10} ->
--- ids 3, 7, 20 in this build), so the page has real content to show from
--- the very first render without any bitfield poke.
+-- The field-object settings byte ($0867+41*id) is the "master" copy while
+-- the game is live, rebuilt into $1850 by PushCharFlags on every menu open;
+-- this test pokes Strago's settings byte with Terra's and lets
+-- PushCharFlags derive $1850+7 automatically.  InitCharProp then rebuilds
+-- zCharID by scanning char ids 0..15 and keeping the LAST id matching a
+-- given (party, order) pair, so this replaces Terra with Strago in the one
+-- HUD slot rather than adding a second party member.
 --
--- So the record poke sources CharProp (field/char_prop.asm's CharProp table,
--- 22-byte records, the ROM template char_prop STRAGO,STRAGO copies from at
--- his real join) rather than fabricating stats: record 7 is read at runtime
--- and its command/stat bytes are copied into the save's $1600+37*7 layout
--- (field-ram.txt's own field offsets), so what lands in the save is the same
--- "New Game defaults" a real join would install, just installed early. This
--- is confirmed self-consistent rather than assumed: CharProp[7]'s second
--- command byte reads $0C, which is BATTLE_CMD::LORE (const.inc), so the
--- Skills list's Lore row gates white for the same reason a real Strago's
--- would.
+-- InitLore's three starting lores (ids 3, 7, 20) are fewer than the five
+-- loadout slots, so AUTO's window fills slots 0-2 and leaves 3-4 genuinely
+-- empty, and the "- EMPTY -" marker is reachable on the first open.
 --
--- Everything the PAGE itself reads ($1D29-$1D2B, OT6_LORELOAD, MagicProp,
--- AttackName) is either already correct on this save or is read fresh from
--- ROM at assertion time, so the render assertions below are not deriving
--- their expectation from the same poke that produced the fixture -- the
--- names and prices come from the ROM tables the drawing code itself reads,
--- exactly as menu_ragepage.lua and menu_thiefpage.lua do.
---
--- Party math, and the one dead end this test's first draft measured on the
--- way here.  field-ram.txt documents $1850+n as `verbbppp` (v=visible
--- e=enabled r=row bb=battle order ppp=party) and calls it the "master"
--- copy, so the first draft copied char 0's $1850 byte ($C1) straight to
--- $1850+7 before pressing X.  Measured false: OpenMenu (field/menu.asm)
--- calls PushCharFlags on entry, which REBUILDS $1850 from each character's
--- $0867+41*id "object settings" byte (obj.asm's PushCharFlags: new
--- $1850,y = ($0867,x & $e7) | (old $1850,y's battle-order bits)) -- so a
--- direct $1850 poke made before X is clobbered the instant the menu opens,
--- and InitCharProp (which builds zCharID) runs later in that same
--- open-menu sequence, so a poke made after detecting the menu is already
--- too late (zCharID is already built by then).  The real "master" copy
--- while the game is live is therefore $0867+41*id, not $1850 -- confirmed
--- by probing both addresses across the X-menu transition.  So this test
--- pokes Strago's field-object settings byte with Terra's (both come up
--- $C1: visible+enabled+order 0+party 1), and lets PushCharFlags derive
--- $1850+7 from it automatically, the same way it derives Terra's own.
--- InitCharProp (menu_init.asm) then rebuilds zCharID by scanning char ids
--- 0..15 in order and keeping the LAST id that matches a given (party,
--- order) pair, so this does not add a second party member: it replaces
--- Terra with Strago in the one HUD slot, which is exactly what a
--- single-character drive needs and keeps the poke to the minimum that
--- reaches the page.
---
--- Real content from the first render.  InitLore's three starting lores (ids
--- 3, 7, 20) are fewer than the five loadout slots, so AUTO's window fills
--- slots 0-2 and leaves 3-4 genuinely empty -- the shared "- EMPTY -" marker
--- (menu_ragepage.lua's Ot6RageEmptyTiles, reused verbatim by this page's own
--- @blank arm) is reachable on the very first open, with no isolation arm
--- needed the way the Rage page's InitRage floor (9 >= 8 slots) required one.
---
--- Geometry (ot6_lore_page.asm's own header table, and #43's cadence rule
--- shared by every field-menu configurator): this window shows only ODD
--- tilemap rows 1-15 whole; row 1 title, row 3 hint + Y=AUTO, rows 5/7/9/11/13
--- the five slots (name col 3, price "nn MP" col 16), row 15 LEARNED
--- (caption col 3, count col 11) sharing its row with the AUTO/MANUAL word
--- (col 16) -- unlike the Rage/Bushido pages, which give the mode its own
--- row, because this page's row budget is one slot tighter (5 slots + title +
--- hint + learned = 8 of the window's 8 odd rows, no row to spare).  The
--- cursor gutter (cursor_x = 8*col - 16) and the even-row/row>15 canary are
--- copied from menu_ragepage.lua's pattern, duplicated rather than shared per
--- that file's own note on lib/compose.py's fixed savestate-signature files.
+-- Geometry: this window shows only odd tilemap rows 1-15 whole; row 1
+-- title, row 3 hint + Y=AUTO, rows 5/7/9/11/13 the five slots (name col 3,
+-- price "nn MP" col 16), row 15 LEARNED (caption col 3, count col 11)
+-- sharing its row with the AUTO/MANUAL word (col 16).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/arvis_wake.mss.lua"
 
 local ZMENUSTATE, ZCURSOR = 0x26, 0x4b
 local ZCHARID = 0x69                    -- zCharID::Slot1..4 (menu_ram.inc)
--- zSkillsTextColor is a ram_scope (menu_ram.inc:189-200) with no exported
--- debug symbol per byte (H.sym errors on it -- probed directly).  Its order
--- is Genju,Magic,Bushido,Blitz,Lore,Rage,Dance,Thief; menu_ragepage.lua names
--- Rage (index 5) $7e and menu_thiefpage.lua names Thief (index 7) $80, both
--- consistent with one byte per index from a $79 base, so Lore (index 4) is
--- $7d.  Read, not written; if this address is wrong the gate assertion below
--- fails loudly with the actual byte rather than silently mis-testing.
+-- zSkillsTextColor's order is Genju,Magic,Bushido,Blitz,Lore,Rage,Dance,Thief,
+-- one byte per index from a $79 base, so Lore (index 4) is $7d.
 local LORE_ROW_COLOR = 0x7d
 local CHAR_STRAGO = 0x07                -- CHAR::STRAGO (const.inc)
 local ST_MAIN, ST_CHAR, ST_SKILLS, ST_LORELOAD = 0x05, 0x06, 0x0a, 0x80
@@ -116,9 +50,7 @@ local function st() return H.readByte(ZMENUSTATE) end
 local BG1A = 0x3849
 local function cell(x, y) return H.readByte(BG1A + x * 2 + y * 64) end
 
--- menu text codec (ff6/tools/char_table/text_en.json): 'A'=$80.. 'a'=$9a..
--- '0'=$b4.. ' '=$ff.  Identical table to menu_ragepage.lua/menu_thiefpage.lua
--- on purpose: this page's chrome strings need no character outside it.
+-- menu text codec: 'A'=$80.. 'a'=$9a.. '0'=$b4.. ' '=$ff.
 local T = { A=0x80, C=0x82, D=0x83, E=0x84, G=0x86, H=0x87, L=0x8b, M=0x8c,
             N=0x8d, O=0x8e, P=0x8f, R=0x91, S=0x92, T=0x93, U=0x94, W=0x96,
             Y=0x98, DASH=0xc4, SLASH=0xc0, EQ=0xd2, SP=0xff }
@@ -156,22 +88,20 @@ local function nameText(id)
 end
 
 -- MagicProp, the vanilla spell table Ot6LoreRowCost reads (spell id = lore
--- id + $8b; 14-byte records; +5 is the MP cost -- ot6_lore.asm's own
--- arithmetic, mirrored here rather than trusted).
+-- id + $8b; 14-byte records; +5 is the MP cost).
 local MAGICPROP = H.sym("MagicProp") & 0x3FFFFF
 local MAGICPROP_REC = 14
 local function loreCost(id) return H.readRomByte(MAGICPROP + (id + 0x8b) * MAGICPROP_REC + 5) end
 
 -- CharProp, the ROM "New Game defaults" template char_prop STRAGO,STRAGO
--- copies from at his real join (field/char_prop.asm).  22-byte records:
--- hp,mp,cmd1..4,str,agi,stam,magpwr,batpwr,def,magdef,evade,mblock,
--- weapon,shield,helmet,armor,relic1,relic2,run|level|fixed.
+-- copies from at his real join.  22-byte records: hp,mp,cmd1..4,str,agi,
+-- stam,magpwr,batpwr,def,magdef,evade,mblock,weapon,shield,helmet,armor,
+-- relic1,relic2,run|level|fixed.
 local CHARPROP = H.sym("CharProp") & 0x3FFFFF
 local CHARPROP_REC = 22
 local STRAGO_REC = CHARPROP + CHAR_STRAGO * CHARPROP_REC
 local BATTLE_CMD_LORE = 0x0c            -- const.inc BATTLE_CMD::LORE
 
--- ---- page geometry, mirroring ot6_lore_page.asm's own header table ----
 local TITLE_ROW, HINT_ROW, LEARNED_ROW = 1, 3, 15
 local LEFT_COL, COST_COL = 3, 16
 local COUNT_COL = 11                    -- just past "LEARNED " at 3..9
@@ -193,9 +123,8 @@ local function assertRowBlank(y, what)
   end
 end
 
--- The cursor gutter canary (#43 round 3), menu_ragepage.lua's shape, single
--- column: entry n's sprite reserves tilemap columns cx/8, cx/8+1 and slot n's
--- text must start at column cx/8+2 (vanilla: cursor_x = 8*col - 16).
+-- Entry n's sprite reserves tilemap columns cx/8, cx/8+1 and slot n's text
+-- must start at column cx/8+2 (vanilla: cursor_x = 8*col - 16).
 local CURSOR_POS = H.sym("Ot6LoreCursorPos") & 0x3FFFFF
 local function cursorEntry(n)
   return H.readRomByte(CURSOR_POS + n * 2), H.readRomByte(CURSOR_POS + n * 2 + 1)
@@ -249,9 +178,7 @@ local function assertFilledRow(slot, id)
 end
 
 -- An unset slot: "- EMPTY - " over the name field, and the price field
--- blanked to PAD ($ff) x5 rather than left as whatever the last redraw put
--- there (Ot6LoreBlankCost -- the overwrite property every one of these
--- pages relies on).
+-- blanked to PAD ($ff) x5.
 local function assertEmptyRow(slot)
   local y = slotRow(slot)
   H.assertEq(#EMPTY_TX, NAME_SIZE,
@@ -263,10 +190,8 @@ local function assertEmptyRow(slot)
   end
 end
 
--- The full chrome + geometry sweep.  win[1..5] = the id each slot shows, or
--- nil for empty; nKnown = the LEARNED count (the whole bitfield, not the
--- slots -- InitLore's floor is 3, below 5, so this is never masked by the
--- window the way the Rage page's 9-known/8-slot floor is on its first open).
+-- win[1..5] = the id each slot shows, or nil for empty; nKnown = the LEARNED
+-- count (the whole bitfield, not the slots).
 local function assertPage(win, nKnown, what)
   assertRun(LEFT_COL, TITLE_ROW, TITLE, what .. ": title LORE LOADOUT")
   assertRun(LEFT_COL, HINT_ROW, HINT, what .. ": L/R SWAPS control hint")
@@ -281,9 +206,7 @@ local function assertPage(win, nKnown, what)
     else assertEmptyRow(slot) end
   end
 
-  -- The even-row / past-row-15 canary (#43's cadence rule): this window
-  -- shows only odd rows 1-15 whole, and this page uses every one of them
-  -- (title, hint, five slots, learned+mode) with none to spare.
+  -- This window shows only odd rows 1-15 whole.
   for y = 0, 27 do
     if y % 2 == 0 or y > 15 then
       assertRowBlank(y, string.format(
@@ -350,8 +273,7 @@ local function assertPage(win, nKnown, what)
   for n = 0, NSLOTS - 1 do assertCursorGutter(n, what) end
 end
 
--- KNOWN: the save's own learned-lore ids, ascending -- derived at boot, not
--- assumed, per the same discipline menu_ragepage.lua's KNOWN uses.
+-- KNOWN: the save's own learned-lore ids, ascending.
 local KNOWN = {}
 
 H.run({ maxFrames = 40000 }, {
@@ -361,16 +283,6 @@ H.run({ maxFrames = 40000 }, {
   H.waitUntil(function() return H.worldHasControl() or H.hasControl() end,
     600, "control on the world map", 5),
 
-  -- ==================================================================== --
-  -- The pokes.  Every write here is one of the two kinds check_state_writes
-  -- wants declared: (1) the party-byte copy that stands Strago up as the
-  -- only reachable member of arvis_wake's one-person party, and (2) the
-  -- character-record fields CharProp's own ROM template supplies for him,
-  -- sourced from ROM rather than fabricated (see header).  Nothing here
-  -- touches $1D29-$1D2B (the lore bitfield) or OT6_LORELOAD (the loadout):
-  -- both are already what a real save carries, and the page's own render is
-  -- checked against them, not against anything this block wrote.
-  -- ==================================================================== --
   H.call(function()
     local leadChar, leadByte = nil, nil
     for c = 0, 15 do
@@ -380,15 +292,9 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(leadChar ~= nil, true, "arvis_wake's party is not empty")
     H.log(string.format("lead character = %d, $1850 byte = $%02X", leadChar, leadByte))
 
-    -- (1) field-object settings byte ($0867 + 41*id, obj.asm's PushCharFlags
-    -- stride): the real "master" copy while the field is live (see header).
-    -- Strago takes over the lead's (party, order) bits; $1850+7 is left for
-    -- PushCharFlags to derive when the X menu opens.
     local leadObj = H.readByte(0x0867 + 41 * leadChar)
     H.writeByte(0x0867 + 41 * CHAR_STRAGO, leadObj)
 
-    -- (2) character record: CharProp[STRAGO]'s own bytes, at their real
-    -- $1600+37*7 field offsets (field-ram.txt).
     local base = 0x1600 + 37 * CHAR_STRAGO
     H.writeByte(base + 0x00, CHAR_STRAGO)          -- actor
     local NAME = { 0x92, 0x93, 0x91, 0x80, 0x86, 0x8e } -- S T R A G O
@@ -406,8 +312,6 @@ H.run({ maxFrames = 40000 }, {
     for i = 0, 3 do
       H.writeByte(base + 0x1A + i, H.readRomByte(STRAGO_REC + 6 + i))   -- vigor..magpwr
     end
-    -- $161E (esper) is already $FF ("no esper") from InitNewGame's clear
-    -- pass; left untouched.
     for i = 0, 3 do
       H.writeByte(base + 0x1F + i, H.readRomByte(STRAGO_REC + 15 + i))  -- weapon..armor
     end
@@ -421,7 +325,6 @@ H.run({ maxFrames = 40000 }, {
       .. "own New Game template, not a hardcoded byte")
   end),
 
-  -- derive KNOWN from the save's own (unpoked) bitfield
   H.call(function()
     for id = 0, 23 do
       if (H.readByte(0x1d29 + (id >> 3)) >> (id & 7)) & 1 == 1 then
@@ -442,7 +345,6 @@ H.run({ maxFrames = 40000 }, {
     end
   end),
 
-  -- the player's path: X -> main menu -> Skills -> STRAGO -> the Lore row -> A.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
@@ -480,8 +382,6 @@ H.run({ maxFrames = 40000 }, {
       "Lore row enabled -- the poked record carries BATTLE_CMD::LORE")
   end),
 
-  -- cursor down to the Lore row, A opens the configurator through
-  -- SkillsOption_04, the edge no test had driven before.
   H.driveUntil(function()
     return st() == ST_SKILLS and H.readByte(ZCURSOR) == SKILLS_ROW_LORE
   end, 900, { H.pressButtons({ "down" }, 2), H.waitFrames(6) },
@@ -491,14 +391,10 @@ H.run({ maxFrames = 40000 }, {
     "lore configurator open via the player path", 5),
   H.waitFrames(90),                         -- draws + DMA settle
 
-  -- ---- the full page a real (if hand-installed) Strago opens: AUTO's
-  -- window = KNOWN[1..3], slots 3-4 genuinely empty ----
   H.call(function()
     local win = {}
     for s = 1, #KNOWN do win[s] = KNOWN[s] end
     assertPage(win, #KNOWN, "AUTO, opened untouched")
-    -- opening the page writes nothing: AUTO is computed per slot on the fly
-    -- (Ot6LoreShow), so an un-edited page leaves every loadout byte at zero.
     for i = 0, NSLOTS - 1 do
       H.assertEq(H.readByte(0x1e27 + i), 0,
         string.format("opening the page did not seed OT6_LORELOAD+%d", i))
@@ -513,14 +409,9 @@ H.run({ maxFrames = 40000 }, {
       .. "cursor gutter")
   end),
 
-  -- ---- one L/R cycle: goes MANUAL, the cursored slot's name moves on ----
   H.pressButtons({ "r" }, 3),
   H.waitFrames(40),
   H.call(function()
-    -- Ot6LoreSeed freezes the AUTO window (KNOWN[1..3] into slots 0-2,
-    -- slots 3-4 stay $00 -- the window ran out before reaching them), then
-    -- the cycle walks the cursored slot (0) from its current id to the next
-    -- learned one.
     H.assertEq(H.readByte(0x1e27 + 0), KNOWN[2] + 1,
       "R cycled slot 0 to the next learned lore (stored byte = id + 1)")
     for i = 2, #KNOWN do
@@ -541,7 +432,6 @@ H.run({ maxFrames = 40000 }, {
       .. "the mode indicator followed it from AUTO to MANUAL in the same frame")
   end),
 
-  -- ---- Y reverts, and the indicator comes back with it ----
   H.pressButtons({ "y" }, 3),
   H.waitFrames(40),
   H.call(function()

@@ -1,5 +1,5 @@
 -- probe_tzen.lua -- fly Jidoor -> Tzen: buy SRAPHIM (3000 GP) and what
--- relics the purse allows (#133 items 2 and 5).
+-- relics the purse allows.
 --
 -- Boots from wob_golem_done.mss (in Jidoor town, Golem+Zoneseek won).
 -- Tzen = map 306, world door (119,149); the doorstep row below is
@@ -97,8 +97,7 @@ local function approachTalk(nx, ny, name, doneFn)
   return {
     H.call(function()
       -- adjacency first (all four sides -- the Tzen seller's south tile
-      -- is blocked and the first attempt parked two tiles away), then the
-      -- across-the-counter tiles shops use
+      -- is blocked), then the across-the-counter tiles shops use
       local cands = {
         {nx,ny+1,"up"},{nx-1,ny,"right"},{nx+1,ny,"left"},{nx,ny-1,"down"},
         {nx,ny+2,"up"},{nx-1,ny+1,"up"},{nx+1,ny+1,"up"},

@@ -1,64 +1,7 @@
 -- @suite slow savestate=camp_escaped
--- battle_bushido.lua -- v0.5 Bushido submenu (issue #8): SwdTech is a
--- tools-shell submenu rather than the vanilla numeral gauge.
---
--- Vanilla SwdTech ran a free bar (btlgfx_main.asm UpdateMenuState_35/37); OT6
--- deletes that path (OpenCmdMenuTbl[7] -> _c1_bushido_open) and drives SwdTech
--- through the Tools window shell (menu state $30).  Each row is a boost level,
--- weakest at the top; #38's 1-BP floor makes row i = boost i+1, with no free
--- tier.
---
--- Issue #75 conversion.  The old apparatus installed a triple-CYAN party by
--- poke, wrote the katana flag, pinned $2020/bp/MP/HP/shields, stopped the
--- guards, and poked every cursor.  On camp_escaped Cyan is real (the
--- bushidogrey and mpcost kit: katana SWDTECH flag $3BA4 bit 1 reads $82; three
--- techs learned, with $2020's low byte reading his true ceiling of 2, under
--- the same garbage high byte issue #4 documents InitSkills leaving), and
--- the input-driven arms run against his real window {Dispatch $55 at 4, Retort
--- $56 at 10, Slash $57 at 13} with cursor rows walked rather than poked:
---
---   1. the numeral gauge is gone: opening SwdTech lands in $30, and a watch
---      shows $37 never appears on the way.
---   2. the real window: WIN[2] = {Dispatch, Retort, Slash} at rows 0, 1 and 2
---      with their authored costs, and the right column and row 3 $ff.
---   3. names: Dispatch, Retort and Slash draw (from BushidoName), and
---      "Quadra" -- the first word of Quadra Slam, the first tech he has not
---      learned -- is nowhere in the window.
---   4. a row beyond current BP cannot commit: at the natural opening bank
---      of 1, confirming row 1 (boost 2) is refused, the submenu stays, and
---      nothing is banked.
---   5. confirm resolves: row 0 at bank 1 banks boost 1, latches Dispatch,
---      reaches $3410, deals real damage under the no-multiplier cap, and
---      the boost is consumed with no regen that turn (1 -> 0).
---   6. #38's main case, on the bank arm 5 just spent: at 0 bp
---      even row 0 is refused, because there is no free Bushido, while the
---      rows still enumerate, shown rather than emptied.
---
---   How many techs he has is a fact about his level, not a constant.
---   BushidoLevelTbl is 1, 6, 12, 15, 24, 34, 44, 70
---   (ff6/src/field/event.asm:1235-1236), read by UpdateCyan at :1181-1199,
---   so the count changes as the route's levels change.  He arrives at
---   camp_escaped at level 13 today (the #84 chest wave's extra fights moved
---   him up from 12), which still sits between the third threshold (12) and
---   the fourth (15), so the window stays three rows: Dispatch, Retort and
---   Slash.  He used to arrive at 11 and the window was two rows.
---   If this file's ceiling assertion goes red again, check his level at the
---   savestate before suspecting the feature.
---
---   Labeled isolation arms (owner ruling 2026-08-10).  Cyan's real
---   learned set is short and stays short at these levels, so the
---   ceiling sweep, the moving-window
---   enumeration at N=1,2,4,5,6,8, including Oblivion (tech 7, id $5c,
---   the named tech-8 ceiling arm), keeps its $2020 pokes, recorded here,
---   with the real ceiling restored after.  The class-chip and reveal half of
---   the old confirm arm is also labeled: every SwdTech is authored slash
---   (Ot6SkillClassTbl, $01) and this pool's species author weak-class
---   $02, so no chip can fire here in normal play.  The arm stages the $01 bit
---   into every live monster's weak mask (every one, because the tech's
---   default target is the engine's pick; measured: staging one monster
---   read 3->3 while the hit landed elsewhere) and the real Dispatch then
---   chips and reveals through the engine's own path.  Convert both
---   organically as higher-level content lands.
+-- battle_bushido.lua -- the Bushido submenu: SwdTech is a tools-shell
+-- submenu rather than the vanilla numeral gauge.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
 
@@ -316,13 +259,6 @@ H.run({ maxFrames = 150000 }, {
       "CYAN and SHADOW really fight this")
     H.assertEq(H.readByte(0x3BA4 + cyan*2) & 0x02, 0x02,
       "his real katana carries the SWDTECH flag (read, not written)")
-    -- Name the cause before the effect: the ceiling below is derived from
-    -- his level, so a route that levels him differently should say so here
-    -- rather than read as a broken feature.  Character record 2 is CYAN;
-    -- +$08 is level ($1600 + c*37, tools/savestate_party.py's layout).
-    -- 13 follows the fixture: the #84 chest wave's extra fights level him
-    -- 12 -> 13, still short of BushidoLevelTbl's fourth threshold (15), so
-    -- the three-tech ceiling below is unchanged.
     H.assertEq(H.readByte(0x1600 + 2*37 + 8), 13,
       "CYAN arrives at camp_escaped at level 13 -- past BushidoLevelTbl's "
       .. "third threshold (event.asm:1235), which is what sets the ceiling below")
@@ -402,7 +338,6 @@ H.run({ maxFrames = 150000 }, {
     })
   end)(),
 
-  -- 6. #38's main case, on the bank arm 5 just spent ----------------------
   park("reopen at the 0 bank arm 5 earned"),
   H.call(function()
     H.assertEq(bp(), 0, "the ledger: the bank really reads 0")
@@ -417,17 +352,13 @@ H.run({ maxFrames = 150000 }, {
     H.screenshot("bushido_zero_refused")
   end),
 
-  -- ============ labeled isolation arms (see the header) ===================
+  -- ============ labeled isolation arms ====================================
   -- (a) the ceiling sweep and Oblivion: $2020 pokes, real ceiling restored.
   --     The submenu re-enumerates at every open, so each poke and reopen
   --     reads one window of the WIN table.
   (function()
     local steps = {}
-    -- Ceiling 1 (the two-row window) is swept here now that his real ceiling
-    -- is 2: it was the natural case while he arrived at level 11 and is
-    -- poke-only from level 12 on, so it moves into the sweep rather than
-    -- being dropped.  Ceiling 2 leaves the sweep because the arms above cover it
-    -- naturally.
+    -- Ceiling 2 leaves the sweep because the arms above cover it naturally.
     for _, ceil in ipairs({ 0, 1, 3, 4, 5, 7 }) do
       steps[#steps+1] = H.call(function()
         H.setPad({})
@@ -436,7 +367,7 @@ H.run({ maxFrames = 150000 }, {
       steps[#steps+1] = H.waitFrames(16)
       steps[#steps+1] = H.call(function()
         -- the isolation write (waived, labeled): the swept ceiling, in
-        -- InitSkills' own garbage-high-byte shape (#4)
+        -- InitSkills' own garbage-high-byte shape
         H.writeWord(KNOWN, 0xFF00 | ceil)
       end)
       steps[#steps+1] = park("reopen at swept ceiling " .. ceil)
@@ -457,7 +388,7 @@ H.run({ maxFrames = 150000 }, {
     end)
     return H.repeatN(1, steps)
   end)(),
-  -- (b) the class-chip and reveal half of the old confirm arm (labeled): the
+  -- (b) the class-chip and reveal half (labeled): the
   --     tech class is slash ($01, Ot6SkillClassTbl) and this pool authors
   --     $02, so the $01 bit is staged into every live monster's weak mask
   --     (the tech's default target is the engine's pick) and the real
@@ -478,8 +409,7 @@ H.run({ maxFrames = 150000 }, {
             rv0[m] = H.readByte(0x3E9D + (8 + m*2))
             if H.readWord(0x3BFC + m*2) > 0 then
               -- the isolation write (waived, labeled): add the slash bit to
-              -- the authored mask rather than replacing it; a $01 assignment
-              -- overwrote $02 in an earlier draft and suppressed the chip
+              -- the authored mask rather than replacing it
               local a = 0x3E9C + (8 + m*2)
               H.writeByte(a, H.readByte(a) | OT6_SLASH)
             end

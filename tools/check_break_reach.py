@@ -1,69 +1,20 @@
 #!/usr/bin/env python3
 """Encounter-and-party break-class reachability check.
 
-The break floor's regression tests prove nonzero table bytes.  No static check
-proved that the party who walks a section of a route can field a class that
-some body in every formation is weak to.  This linter checks that for the
-declared areas (docs/design/break-coverage-vector.md SS10.2 item 3):
+For each declared area (AREAS below): walks SubBattleGroup -> RandBattleGroup
+-> BattleMonsters for the area's encounter maps, plus its forced
+EventBattleGroup entries, and asserts every formation has a reachable chip on
+at least one axis -- a break-class key (Ot6ShieldTbl's class byte, else the
+generated floor) some party member can field, or an element some body is
+weak to (monster_prop.dat +25 OR'd with Ot6ElemAddTbl) some member can
+deliver.
 
-  * walk SubBattleGroup -> RandBattleGroup -> BattleMonsters for the area's
-    named encounter maps (field/battle.asm:392,:408; battle_main.asm:16610),
-  * plus the forced-battle list: EventBattleGroup entries reached by event
-    `battle` commands (field/event.asm EventBattle) and by the magitek train
-    ride script's $e0/$e1/$e2 items (world/train_script.asm TrainCmd_e0/e1/e2),
-    because the minecart writes $0011e0 directly and is invisible to any
-    event-script scan,
-  * take the declared party for each step and compute the weapon/ability
-    classes each member can field (item_prop_en.dat equip mask at +$01,
-    16-bit, bit N = actor N, per docs/research/data-formats.md; classes from
-    Ot6WeapClassTbl / Ot6SkillClassTbl in ot6_class.asm),
-  * and assert every formation has a reachable chip on at least one axis:
-    a break-class key (Ot6ShieldTbl row's class byte, else the generated
-    floor) that some member can field, OR an element some body is weak to
-    (monster_prop.dat +25 OR'd with Ot6ElemAddTbl's adds, the same merge
-    Ot6SeedShields performs) that some member can deliver.
-
-The element axis is #116's fix.  The checker used to credit class keys only,
-which read Zozo as NO REACHABLE BREAK CLASS: HadesGigas, Gabbldegak,
-Harvester and SlamDancer carry Ot6ShieldTbl rows with no class key on
-purpose -- "the answer is the tool rather than the A button" (ot6_hud.asm) --
-and all four are poison-weak, opened by Edgar's Bio Blaster (item $a4 ->
-attack $7d, element $08).  Measured 2026-08-12 with probe_zozo_tool.lua:
-AutoCrossbow moved not one of the eight shields, the Bio Blaster chipped all
-four bodies on the same frame.  The model was incomplete, not the data, and
-Zozo could not be declared without turning `make test` red on a fight the
-game has an answer to.  It is declared now.
-
-"Can deliver" mirrors "can field": weapon elements (item_prop +$0F) ride the
-same equip-mask-plus-swing-command rule, tool elements ride Tools ownership
-(tool item -> attack id - $27 -> magic_prop +$01), and kit-ability elements
-(AuraBolt's holy) ride SwdTech/Blitz ownership.  Spell elements are runtime
-state -- a spell list depends on the save -- so they are NOT credited; no
-declared area needs one, and an area that ever does should declare it as
-data the way parties are declared.  Element rows are authored against
-absorb/null (the ot6_break.asm authoring rule), and the checker masks both
-off defensively so a data drift cannot credit a chip that heals.
-
-"Can field" is game-wide equippability plus command ownership.  Both halves
-are read from the same place the game reads them, the four battle-command
-slots in ff6/src/field/char_prop.asm.  A weapon (and an empty hand) only
-probes anything if its holder owns a command that swings it, so the weapon
-mask and the bare-fist bludgeon are credited to FIGHT owners only; SwdTech,
-Blitz and Tools classes are credited to whoever the table gives those commands
-to, rather than to hardcoded names.  This was wrong until issue #47: GAU had
-no Fight in vanilla (RAGE/LEAP/MAGIC/ITEM), so "bare fists are a bludgeoning
-probe for anyone" credited him two classes he could not swing, and GOGO and
-UMARO were credited the same way.  Giving Gau Fight made the model correct for
-him; the two exceptions that remain are named in AUTO_SWINGERS and MIMIC_ONLY
-below.  This does not cover inventory: whether the item is in the bag is a
-runtime fixture assertion (break-coverage-vector.md SS10.3) rather than a
-static one.  Weapons carrying OT6_NULLBRK chip nothing (ot6_class.asm:14-17)
-and grant no class here.
-
-Areas are declared in AREAS below; add an area by adding an entry, nothing
-else changes.  The vector-factory area's map set and forced list are the
-survey's SS1.1/SS2 decode; the party is docs/design/bosses-wob.md SS13-16
-(LOCKE CELES SABIN EDGAR, three after the tube room takes Celes).
+"Can field" reads equippability and command ownership from item_prop_en.dat
+and ff6/src/field/char_prop.asm; SwdTech/Blitz/Tools classes go to whoever
+owns those commands.  "Can deliver" mirrors it for elements: weapon elements
+(item_prop +$0F), tool attack elements (Tools ownership), and kit-ability
+elements (SwdTech/Blitz ownership).  Spell elements are runtime state and are
+not credited.  Weapons carrying OT6_NULLBRK grant no class or element.
 
 Nothing here writes.  It is a read-only linter.  Exit status 0 = clean.
 It prints one block per formation with no reachable break class.
@@ -71,9 +22,7 @@ It prints one block per formation with no reachable break class.
 Usage:  python3 tools/check_break_reach.py [--repo ROOT] [-v]
                 [--area NAME] [--party A,B,C] [--drop-class CLS]
 
---party and --drop-class exist to demonstrate failure (a party that lacks
-classes, or "nobody can field bludgeon") and for what-if probes.  The check
-itself is the bare invocation.
+--party and --drop-class exist to demonstrate failure and for what-if probes.
 """
 
 from __future__ import annotations
@@ -99,10 +48,7 @@ def class_str(mask):
     return "|".join(n for n, b in CLASS_BIT.items() if mask & b)
 
 
-# element bits, vanilla's own order.  Anchored to measured records rather
-# than to a manual: tusker weak $01 is fire, sand ray weak $82 is ice|water,
-# Bio Blaster's attack element is $08 poison, AuraBolt's is $20 holy, and
-# the ThunderBlade's weapon element is $04 bolt (all verified at load).
+# element bits, vanilla's own order.
 ELEM_BIT = {"fire": 0x01, "ice": 0x02, "bolt": 0x04, "poison": 0x08,
             "wind": 0x10, "holy": 0x20, "earth": 0x40, "water": 0x80}
 
@@ -128,10 +74,10 @@ COMMAND_ABILITIES = {
     "BUSHIDO": tuple(range(0x55, 0x5D)),        # swdtech
     "BLITZ": tuple(range(0x5D, 0x65)),          # blitz
 }
-# The full id ranges, not only the classed subset the old tuple carried: a
-# lookup in skill_class filters the class side (an unclassed ability grants
-# no class), and the element side reads magic_prop for every id the command
-# resolves (AuraBolt $5e carries holy and no class row at all).
+# The full id ranges: a lookup in skill_class filters the class side (an
+# unclassed ability grants no class), and the element side reads magic_prop
+# for every id the command resolves (AuraBolt $5e carries holy and no class
+# row at all).
 
 # Tools are type-0 items resolved through the Tools command; their class bytes
 # live in Ot6WeapClassTbl at the item id (ot6_class.asm:149-158).
@@ -191,17 +137,9 @@ AREAS = {
             },
         ],
     },
-    # The Cave to the Sealed Gate (issue #31, v0.7).  Map set verified from
-    # data rather than from the recon: 382/383/384/385 are the only maps in
-    # the area with the enable bit set and an entrance or load_map reaching
-    # them (379/380/381/387/388 carry enable bits or groups but nothing
-    # targets them, the map-275 pattern).  The Imperial Base (377/378) has the
-    # enable bit clear, so it contributes no encounters.  Battles 121/122/123
-    # (the gate scene and the esper attack) decode to dummy-only formations
-    # ($17b L1 HP1) and their real contents live in battle-event scripts
-    # being probed by a separate agent, so they are deliberately not declared
-    # here; add them when the probe lands.  Battle 149 is the map-384 (66,11)
-    # trap-switch Ninja ambush (event_main.asm:45177) and is real.
+    # Maps 382-385 are the only Sealed Gate maps with the random-battle
+    # enable bit set and reachable; battle 149 is the map-384 (66,11)
+    # trap-switch Ninja ambush.
     "sealed-gate": {
         "doc": "docs/design/break-coverage-sealed-gate.md SS1-2, SS5",
         "min_formations": 13,   # 3 unique per map x4 maps + the Ninja
@@ -218,13 +156,10 @@ AREAS = {
             },
         ],
     },
-    # Zozo (#116).  Declarable only once the checker understood the element
-    # axis: HadesGigas, Gabbldegak, Harvester and SlamDancer carry authored
-    # no-class shield rows ("the answer is the tool rather than the A
-    # button", ot6_hud.asm) and are opened by their poison weakness through
-    # Edgar's Bio Blaster.  Party per the measured climb (HANDOFF, the Zozo
-    # crossing record).  Maps 221 and 225 are the encounter-bearing climb
-    # maps, groups 77 and 78.
+    # Maps 221 and 225 are Zozo's encounter-bearing climb maps (groups 77
+    # and 78).  HadesGigas, Gabbldegak, Harvester and SlamDancer carry
+    # authored no-class shield rows and are opened by poison weakness
+    # through Edgar's Bio Blaster.
     "zozo": {
         "doc": "ot6_hud.asm's Zozo block + HANDOFF 'Zozo is broken by an "
                "element, not by a class'",
@@ -305,11 +240,8 @@ class Data:
         self._check_element_anchors()
 
     def _check_element_anchors(self):
-        """The offsets the element axis rides, proven against records the
-        source cites rather than trusted: ot6_break.asm names Bio Blaster as
-        item $a4 -> attack $7d with element $08 and AuraBolt $5e as $20, and
-        the Cranes record names the ThunderBlade $0f as bolt.  A drift in any
-        layout fails here, loudly, before a verdict is computed from it."""
+        """Verify the offsets the element axis rides against known records
+        before computing a verdict from them."""
         checks = [
             (self.attack_elem(0xA4 - TOOL_ATK_DELTA), 0x08,
              "Bio Blaster attack element (magic_prop $7d +$01)"),

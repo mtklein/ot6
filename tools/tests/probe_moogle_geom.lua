@@ -1,15 +1,13 @@
--- probe_moogle_geom.lua -- the passability dump the Moogle-defense
--- input-driven attempt was missing (issue #75, marshal-investigation).
--- Boots moogle_defense.mss (defense live, party 1 at the (14,14) choke)
--- and, with zero writes and zero input, renders:
+-- probe_moogle_geom.lua -- dumps Moogle-defense passability. Boots
+-- moogle_defense.mss (defense live, party 1 at the (14,14) choke) and,
+-- with zero writes and zero input, renders:
 --   * every field object's tile position (parties, moogles, Marshal,
 --     guards, TERRA-down)
 --   * the arena's passability x 2..28, y 6..46: prop bytes p1/p2 plus
 --     the object-occupancy map, the same view stepAllowed() consults
 --   * a flood-fill of party 1's reachable set from the choke, using the
---     live object map, so it shows where party 1 can step aside now
---   * the same flood with the object map ignored, which is tile geometry
---     only and shows where anybody could stand once the blockers move
+--     live object map
+--   * the same flood with the object map ignored (tile geometry only)
 --   * BFS probes to candidate aside tiles and to the Marshal
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/moogle_defense.mss.lua"
@@ -101,8 +99,7 @@ H.run({ maxFrames = 3000 }, {
     H.log("LIVE reachable from party 1 (objects as-is): " .. #q .. " tiles")
 
     -- ---- geometry-only flood (object map ignored) ---------------------
-    -- stepAllowed minus its object-occupancy clause, transcribed here so
-    -- the lib keeps its engine-faithful rule.  z tracked like bfsPath.
+    -- stepAllowed minus its object-occupancy clause. z tracked like bfsPath.
     local DIRBIT = { up = 0x08, right = 0x01, down = 0x04, left = 0x02 }
     local function tileOpen(x, y, m, z)
       if m ~= "up" and m ~= "right" and m ~= "down" and m ~= "left" then

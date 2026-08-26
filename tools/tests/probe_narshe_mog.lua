@@ -1,7 +1,7 @@
--- probe_narshe_mog.lua -- fly to NARSHE and recruit MOG via the Lone
--- Wolf chase (#133 item 3).
+-- probe_narshe_mog.lua -- flies to NARSHE and recruits MOG via the Lone
+-- Wolf chase.
 --
--- Decoded route (event_trigger/npc_prop/entrance data, all step-on):
+-- Route (event_trigger/npc_prop/entrance data, all step-on):
 --   world (84,33) -> town 20 (38,61)
 --   door (52,37) -> treasure room 30 arriving ON the intro trigger
 --     (79,17): Lone Wolf appears [$0239]
@@ -11,8 +11,8 @@
 --   22 top edge (18..21,1) -> 23 (25,31)
 --   trigger (22,20) [$023D]; triggers (8..10,18) resolve the cliff
 --     standoff [$023F: Lone Wolf and MOG hang from the ledge]
---   MOG's npc at (9,16) (_ccd5df, needs $023F=1): talking to him takes
---     Mog over the Gold Hairpin -- the routed choice -- and he JOINS.
+--   MOG's npc at (9,16) (needs $023F=1): talking to him takes Mog over
+--     the Gold Hairpin, and he JOINS.
 -- Gates verified in the fixture: $0070=1 (chase open), $0239..$023F=0,
 -- WoB.  Boots from wob_tzen_done.mss (on the world beside the ship at
 -- Tzen); saves wob_mog_done.mss on the world outside Narshe.
@@ -24,7 +24,7 @@ local function sw(bit) return (H.readByte(0x1E80 + (bit >> 3)) >> (bit & 7)) & 1
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
 local function mogIn()
   -- $1850+char = party-assignment byte; nonzero low bits = in a party.
-  -- $02FA/$02EA are the roster switches _ccd5df sets when Mog is taken.
+  -- $02FA/$02EA are the roster switches set when Mog is taken.
   return (H.readByte(0x1850 + 10) & 0x07) ~= 0 or sw(0x2FA) == 1
 end
 
@@ -153,7 +153,6 @@ end
 H.run({ maxFrames = 80000 }, flatten({
   H.loadState("build/states/wob_narshe_town.mss.lua"),
   H.waitFrames(8),
-  -- (banked in-town fixture; the flight leg lives in probe_narshe_town)
   H.cond(function() return false end, {}, {}),
   H.call(function()
     H.assertEq(mapIs(20), true, "this is Narshe (map 20)")
@@ -197,14 +196,13 @@ H.run({ maxFrames = 80000 }, flatten({
   edge(19, 2, "up", 23, "north to the cliff (map 23)", {{19,2},{18,2},{20,2},{21,2},{19,3},{18,3},{20,3},{21,3}}),
   stage(22, 20, function() return sw(0x23D) == 1 end, "the standoff [$023D]"),
   stage(8, 18, function() return sw(0x23F) == 1 end, "the ledge [$023F]"),
-  -- take MOG (over the Gold Hairpin: the routed choice).  Stand EXACTLY
-  -- at (9,17) facing up: MOG hangs at (9,16), Lone Wolf at (9,15) -- and
-  -- talking to Lone Wolf instead takes the Hairpin and DROPS Mog.
+  -- take MOG.  Stand EXACTLY at (9,17) facing up: MOG hangs at (9,16),
+  -- Lone Wolf at (9,15); talking to Lone Wolf instead takes the Hairpin
+  -- and DROPS Mog.
   H.navTo(9, 17, { maxFrames = 6000, playBattles = "flee" }),
   (function()
-    -- ot6 dialog choices are a menu that a held direction steers (the
-    -- Tzen seller lesson: right+a confirmed "No" forever).  Face-press
-    -- up+a only until the dialog opens, then plain A edges.
+    -- ot6 dialog choices are a menu that a held direction steers.
+    -- Face-press up+a only until the dialog opens, then plain A edges.
     local t, talked = 0, false
     return H.driveUntil(function() return mogIn() end, 9000, {
       H.call(function()
@@ -222,8 +220,7 @@ H.run({ maxFrames = 80000 }, flatten({
     H.log("MOG RECRUITED")
     H.screenshot("mog_joined")
   end),
-  -- out of Narshe: cliff -> back down is a long walk; save right here on
-  -- the cliff instead -- the next leg can walk out itself
+  -- saves here on the cliff rather than after the long walk back down
   H.saveState("wob_mog_done.mss"),
   H.logStep(function() return "done" end),
 }))

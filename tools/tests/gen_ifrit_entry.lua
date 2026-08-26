@@ -1,29 +1,11 @@
--- gen_ifrit_entry.lua -- v0.6 step 7: mrf_kefka (map 263, {39,31},
--- $005F=1) -> the {36,44}/{37,44}/{38,44} chute -> map 264, the
--- Ifrit/Shiva alcove, control at {10,7}.  Generates ifrit_entry.
+-- gen_ifrit_entry.lua -- mrf_kefka (map 263, {39,31}, $005F=1) -> the
+-- {36,44}/{37,44}/{38,44} chute -> map 264, the Ifrit/Shiva alcove,
+-- control at {10,7}.  Generates ifrit_entry.mss.
 --
--- The Kefka scene leaves the party at {39,31} and opens the way south:
--- measured, the chute row went from NO PATH at the {40,30} ride exit to
--- 16-18 steps once $005F was set (census in gen_mrf_kefka's log).
---
--- _cc7581 (event_main.asm:94642) on {37,44}, together with its two
--- neighbours _cc7565/_cc7573, which step the party onto the same tile, falls
--- into _cc7588 (:94649):
---     DOWN 2 / LEFT 3 / DOWN_LEFT 3 / LEFT 1 / (sfx) DOWN 1
---     hide_obj / wait_90f / load_map 264, {14,0}, DOWN, STARTUP_EVENT
---     show_obj / fade_in / DOWN 3 / DOWN_LEFT 3 / jump_low DOWN_LEFT
---     player_ctrl_on
--- {14,0} + DOWN 3 = {14,3}, + DOWN_LEFT 3 = {11,6}, + DOWN_LEFT = {10,7}.
--- The recon read that landing as "approximately (10,7)"; this step asserts
--- it exactly.
---
--- What is there.  npc_prop.asm:12289/:12298 put Ifrit at {3,8} and
--- Shiva at {9,6} on map 264, both behind switch $0646 (1 at new game per
--- init_npc_switch.dat, cleared only at event_main.asm:95353, i.e. after
--- the magicite hand-off).  They stand on the two doors out of the alcove:
--- {3,5} -> map 270 (the save room) and {9,5} -> map 269 (the way onward).
--- So the alcove is sealed until the fight is done, and `$0273` (set by
--- _cc7937 at :95313) additionally locks _cc75f6, the way back up to 263.
+-- The chute's landing tile is (10,7) exactly.  Ifrit ({3,8}) and Shiva
+-- ({9,6}) block the alcove's two doors -- {3,5} to the save room (270)
+-- and {9,5} onward (269) -- until the fight is done; $0273 additionally
+-- locks the way back up to 263.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -103,11 +85,9 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- Stop tapping once the party is on the target tile.  The
-        -- terminator needs 16 consecutive calm frames there, and a further
-        -- tap walks off it before the count completes: the first version of
-        -- this rode the chute correctly to (10,45), then tapped itself to
-        -- (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile: the
+        -- terminator needs 16 consecutive calm frames there, and a
+        -- further tap would walk off it before the count completes.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return
@@ -148,7 +128,6 @@ local function census(tag, targets)
   end
 end
 
-
 H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/mrf_kefka.mss.lua"),
   H.waitFrames(150),
@@ -179,16 +158,6 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldY(), 7, "264 landing y")
     H.assertEq(sw(0x0646), 1, "$0646 still SET -- both espers are standing")
     H.assertEq(sw(0x0060), 0, "$0060 still CLEAR")
-    -- Correction to the route recon's esper-alcove decode, which says the
-    -- pair "sit on the two doors ... Ifrit (3,8) is under 264 (3,5)->270,
-    -- Shiva (9,6) is under 264 (9,5)->269".  Only the second matters here:
-    -- Shiva at {9,6} is the tile directly below the {9,5} door and does
-    -- block it, but Ifrit at {3,8} is three tiles below the {3,5}
-    -- save-room door and does not, so the save room is reachable before the
-    -- fight.  This is measured here rather than assumed, and asserted in the
-    -- direction that holds, because it is the positive
-    -- control for the fight step: if {9,5} were already walkable, a later
-    -- claim that the fight opened the way onward could not be checked.
     H.log(string.format("[doors] bfsPath (3,5) save room = %s ; (9,5) onward = %s",
       H.bfsPath(3, 5) and (#H.bfsPath(3, 5) .. " steps") or "NO PATH",
       H.bfsPath(9, 5) and (#H.bfsPath(9, 5) .. " steps") or "NO PATH"))
@@ -206,33 +175,8 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("mrf_264_landing")
   end),
 
-  -- Repair whatever the map-263 crossing cost before anything downstream
-  -- is measured or captured.  The crossing above runs playBattles="flee",
-  -- and a fled encounter is not a free one: the enemies keep swinging for
-  -- the whole hold.  Measured 2026-08-18 on the chest-wave regeneration:
-  -- a 263 encounter fired at (40,43), the flee held ~1200 frames to
-  -- disengage, SABIN left it at 0 HP, and with no care stop and no exit
-  -- contract this generator shipped him dead in ifrit_entry.mss --
-  -- audit_party_hp was the only thing that noticed.  Same two-part shape
-  -- as gen_mrf_chute's stops: fieldCare is the repair, and
-  -- H.assertPartyStanding at the exit below is the contract that keeps a
-  -- stop that silently did nothing from reporting the same green as one
-  -- that worked.  Threshold 0.85 for the same reason as mrf_chute's:
-  -- what remains here is trash encounters, and gen_ifrit_magicite runs
-  -- its own 0.95 stop before battle 70.
   H.fieldCare({ tag = "care after the 263 crossing", threshold = 0.85 }),
 
-  -- 1b. The boundary detour (issue #25).  This step is A->B's terminal, so
-  --     before parking on the fight's entry point it walks the {3,5} door
-  --     into the map-270 save room, stands on the save point, and asserts
-  --     the mrf-save-room-v1 boundary table, the same table
-  --     gen_mrf_save_room_checkpoint saves under and gen_ifrit_magicite's
-  --     checkpoint boot asserts as its entry contract.  The sram witnesses
-  --     are products of the boundary save itself, so the step asserts the
-  --     pre-save variant (lib/ot6_contract.lua, assertExitContractPreSave).
-  --     Standing on a save tile re-enters SavePoint every frame and
-  --     hasControl() flickers (the same hazard gen_esper_tubes measured on
-  --     {10,9}), so arrival is judged on position, $01BF and alignment.
   H.navTo(3, 6, { maxFrames = 12000, playBattles = "flee" }),
   tapInto("up", function() return map() == 270 end, 9000,
     "door 264 (3,5) -> map 270 (the save room)"),
@@ -265,9 +209,9 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(60),
 
   -- 2. park on the fight's entry point, {3,7}, directly above Ifrit's
-  --    {3,8}, facing DOWN.  One A-press from _cc7937 and `battle 70`, the
-  --    same shape as opera_entry.  A DOWN press here cannot step (his
-  --    object occupies {3,8}) so it only turns the party.
+  --    {3,8}, facing DOWN.  One A-press fires _cc7937 -> battle 70.  A
+  --    DOWN press here cannot step (his object occupies {3,8}) so it only
+  --    turns the party.
   H.navTo(3, 7, { maxFrames = 24000, playBattles = "flee" }),
   H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   (function() local calm = 0
@@ -296,10 +240,6 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.readByte(0x1A69) & 0x02, 0, "IFRIT not yet owned ($1A69 bit1)")
     H.assertEq(H.readByte(0x1A69) & 0x04, 0, "SHIVA not yet owned ($1A69 bit2)")
     H.assertEq(H.readByte(0x1A69) & 0x01, 0x01, "RAMUH owned from Zozo ($1A69 bit0)")
-    -- The casualty contract (see the care stop after the 263 crossing):
-    -- this fixture is what gen_ifrit_magicite and the magicite chain boot,
-    -- so a party member down or near fatal here is a loss shipped
-    -- downstream, not a state of the story getting somewhere.
     H.assertPartyStanding("ifrit_entry")
     H.log(string.format("[ifrit_entry] f%d map=%d (%d,%d) face=%d $1A69=%02X",
       H.frame, map(), H.fieldX(), H.fieldY(),
@@ -309,10 +249,8 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("ifrit_entry.mss"),
 
-  -- 3. Verify the banked state is one A-press from battle 70.
-  --    Runs after the state is generated, so the saved blob is unaffected.
-  --    Without this an entry point can be one press short of working and
-  --    nothing notices until the fight step fails far from the cause.
+  -- 3. Verify the banked state is one A-press from battle 70, after the
+  --    state is generated so the saved blob is unaffected.
   (function() local hb, aPh = 0, 0
     return H.driveUntil(function()
       return H.battleLoadStarted() and H.formationHas({ [0x0109] = true })

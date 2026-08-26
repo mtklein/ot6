@@ -1,49 +1,24 @@
 -- @suite savestate=worldmap_narshe
--- battle_levelup.lua -- v0.4 test: full HP and MP restore on level up.
+-- battle_levelup.lua -- full HP and MP restore on level up.
 --
--- The mechanic (docs/design/mp-economy.md "Full HP/MP restore on level up"):
--- when a character gains a level, current HP and MP refill to the new maxima.
--- OT6 implements it as a jsl at the tail of vanilla DoLevelUp
--- (battle_main.asm) into Ot6LevelUpHeal (ff6/src/battle/ot6.asm), which writes
--- the battle current-HP and MP cells ($3bf4,y and $3c08,y) rather than the
--- $1600 record, because the victory sequence copies those battle cells back
--- over the record (UpdateSRAM, battle_main.asm:12136-12141) right after
--- WinBattle returns.
---
--- Issue #75 conversion: the level is earned, and the record is its own
--- check.  The old file pinned XP one threshold over, planted a $3FFF record
--- sentinel, forced the win by writing the battle-clearing flag, and faked the
--- negative with a level-50 poke.  All of it is replaced by the fixture's own
--- arithmetic:
--- worldmap_narshe's TERRA stands 23 XP short of level 5 (measured 2026-08-10:
--- exp=377, threshold=400 via LevelUpExp, the near-boundary save the
--- burn-down plan hoped a recon would find), while LOCKE needs 342 more, so
--- one grass-area battle levels her and cannot level him.  Real world
--- encounters are walked into (battle_fold's grass-area loop), fought through
--- the real menus (newFightDriver, where Terra casts her real Fire so her MP is
--- visibly spent and everyone else Fights), and won by damage.
+-- When a character gains a level, current HP and MP refill to the new
+-- maxima.  OT6 implements it as a jsl at the tail of vanilla DoLevelUp into
+-- Ot6LevelUpHeal (ff6/src/battle/ot6.asm), which writes the battle
+-- current-HP and MP cells ($3bf4,y and $3c08,y) rather than the $1600
+-- record, because the victory sequence copies those battle cells back over
+-- the record (UpdateSRAM) right after WinBattle returns.
 --
 --   positive  the battle where a character's level rises: the $1600 record
 --             afterwards holds current HP == the new max and current MP ==
---             the new max.  Both are exact: DoLevelUp grows the maxima and
---             UpdateSRAM copies the battle cells, so without Ot6LevelUpHeal
---             the record's currents keep their pre-level values, which are
---             below the new max, and for MP certainly so, since Fire was cast
---             this battle.
---   UpdateSRAM control (the sentinel's replacement, cb8e605 baseline-latch):
---             the record's 3-byte XP cell is latched before each battle and
---             must move across a won battle.  A win that skipped the
---             reward path would leave it unchanged, and every assertion above
---             would be reading stale bytes.
---   negative  in the same battles, a character whose level did not rise keeps
---             spent state: current HP and MP never exceed the latched
---             pre-battle values, since non-levelers get no refill, and the arm
---             only counts as exercised when a non-leveler ended a battle
---             below max (HP: enemy hits land on whoever the AI picks; MP:
---             Terra's own casts in her post-level battles).
---
--- The loop fights until the positive fired and both negatives were seen
--- non-vacuously (budget: 6 battles; measured green in 2).
+--             the new max.
+--   UpdateSRAM control: the record's 3-byte XP cell is latched before each
+--             battle and must move across a won battle, or every assertion
+--             above would be reading stale bytes.
+--   negative  in the same battles, a character whose level did not rise
+--             keeps spent state: current HP and MP never exceed the latched
+--             pre-battle values, and the arm only counts as exercised when
+--             a non-leveler ended a battle below max.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
@@ -91,28 +66,6 @@ local function latch()
   end
 end
 
--- ---- the in-battle action driver: codex_ctx's measured pulse ----
--- TERRA casts her real Fire through the live magic menu, so MP is spent and
--- the refill has something visible to restore, and everyone else Fights;
--- 5-on/5-off held presses, with A through messages.  One addition: the cast is
--- planned only while her battle MP covers the list's own cost cell (entry+3
--- of the $2092 spell list, the price source at ot6_boost.asm:725), so a
--- drained pool falls back to Fight instead of buzzing the greyed row.
---
--- Two rules keep the cast from being a coin flip, both copied from
--- battle_bushidogrey's drive, which had already been through this:
---   * nothing is pressed in the transitional state $01, and unrecognised
---     states get B rather than A.  The A-mash this file used to run in every
---     unrecognised state lands on the command window the frame it goes live
---     and confirms row 0 (Fight) before the driver can walk the cursor down to
---     Magic; battle_mpcost.lua names the same hazard ("it can land on a
---     just-opened window and confirm a bystander's Fight").  Measured
---     2026-08-11 on this fixture: Terra planned Fire in all six battles and
---     reached the magic list in none of them, ST_CMD ($05) going straight to
---     ST_TGT ($38) two frames after the driver first saw it.
---   * the planned-vs-reached counts below are asserted, so a driver that
---     loses that race again fails saying so instead of quietly leaving the
---     MP negative control with nothing to observe.
 local MENU, ACTOR, MSTATE, CMDTBL = 0x7BCA, 0x62CA, 0x7BC2, 0x202E
 local ST_TRANS, ST_CMD, ST_MAGIC, ST_TGT = 0x01, 0x05, 0x0E, 0x38
 local FIRE = 0x00
@@ -252,9 +205,8 @@ add({
         "char " .. c .. " max MP carries no boost tier")
       if deficit == nil or d < deficit then nearest, deficit = c, d end
     end
-    -- the precondition the burn-down plan asked a recon to find for the
-    -- input-driven arm: somebody is near enough that a couple of grass battles
-    -- cross the line.
+    -- the precondition: somebody is near enough that a couple of grass
+    -- battles cross the line.
     H.assertEq(deficit <= 200, true, string.format(
       "char %d is within reach of a level (deficit %d) -- if this "
       .. "fires, the fixture regeneration moved the XP and the fixture choice "
@@ -263,8 +215,8 @@ add({
   end),
 })
 
--- one earned battle: walk the grass area (battle_fold's loop), fight through
--- the real menus, then judge every record against its pre-battle latch.
+-- one earned battle: walk the grass area, fight through the real menus,
+-- then judge every record against its pre-battle latch.
 -- Steps after the first two only run while the goal is unmet (H.cond), so a
 -- lucky early run costs two battles and an unlucky one has budget.
 local function battleLeg(n)
@@ -309,9 +261,9 @@ local function battleLeg(n)
           .. "hp %d->%d/%d mp %d->%d/%d", n, c, b.level, level(c), b.exp,
           exp(c), b.hp, curHp(c), maxHp(c) & 0x3FFF, b.mp, curMp(c),
           maxMp(c) & 0x3FFF))
-        -- the sentinel's replacement: a won battle must move the record's
-        -- XP cell.  If it did not, UpdateSRAM never ran and every claim
-        -- below would be reading stale bytes.
+        -- a won battle must move the record's XP cell.  If it did not,
+        -- UpdateSRAM never ran and every claim below would be reading
+        -- stale bytes.
         H.assertEq(exp(c) > b.exp, true, string.format(
           "char %d's record XP moved across the win (UpdateSRAM ran) -- "
           .. "the baseline-latch control", c))

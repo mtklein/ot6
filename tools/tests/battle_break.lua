@@ -3,32 +3,18 @@
 --
 --   tools/tests/run.sh tools/tests/battle_break.lua
 --
--- Issue #75 conversion.  This test used to build its own laboratory on the
--- entry-point Guard fight: the Guards were poked fire-weak, their HP was
--- written to 4000 so they survived chipping, and the three casters' level and
--- mag.pwr were pinned equal so the drop-ratio assert did not depend on whose
--- menu fired.  All four writes are gone, replaced by a species that already
--- has what the measurement needs.  The burn-down plan asked for one shared
--- element-weak, HP-heavy body for this test and battle_reveal; the answer is
--- the Whelk head, the game's first boss:
+-- Drives the Whelk head fight:
 --
 --   * fire-weak for real -- Ot6ElemAddTbl authors $0134 + fire
 --     (ff6/src/battle/ot6_break.asm:404-406, "the tutorial probe"), so the
 --     chip key is the one the game teaches rather than one this file writes;
 --   * a real gauge -- Ot6ShieldTbl gives $0134 four shields and OT6_PIERCE
---     (ff6/src/battle/ot6_hud.asm:1730-1731), so the seed assert now checks
---     an authored row instead of the level formula's 2;
+--     (ff6/src/battle/ot6_hud.asm:1730-1731);
 --   * 1600 HP (monster_prop.dat $0134 +8) against a party that chips it for
---     a few hundred a hit, which is the headroom the old HP write bought;
+--     a few hundred a hit;
 --   * and only Terra beams.  Vicks and Wedge spend their turns on Heal
 --     Force, so every recorded drop on the head comes from one caster with
---     one spell, which is what the pinned level/mag.pwr used to buy.  This
---     is stronger than the pin: the pin made three casters equal on paper,
---     while this makes the measurement single-source in fact.
---
--- The fight itself is driven the way battle_whelkwipe drives it (walk onto
--- the trigger, tap through the scripted intro, then a settle-gated menu
--- policy), so nothing here is new machinery.
+--     one spell.
 --
 -- Asserts, in order:
 --   1. the head seeds at 4 shields, fire-weak, class-weak PIERCE -- the
@@ -73,8 +59,7 @@ local function timer()    return H.readByte(TIMER + hs * 2) end
 local function revealed() return H.readByte(REVEAL + hs * 2) end
 local function headHp()   return H.readWord(MHP + hs * 2) end
 -- the head retracts into the shell on its own timer; while it is gone the
--- default target is the shell, and any shell hit draws the MegaVolt counter
--- (bosses-wob.md SS1).  Same liveness test whelkbal_run.lua:83-85 uses.
+-- default target is the shell, and any shell hit draws the MegaVolt counter.
 local function headAlive()
   return (H.readByte(ALIVE + hs * 2) & 1) == 1
      and (H.readByte(MSTAT + hs * 2) & 0xC2) == 0
@@ -109,8 +94,7 @@ local function sampleDrops()
 end
 
 -- ------------------------------------------------------------- driver --
--- Sequences run from the settled top command menu, on the MagiTek cursor
--- (whelkbal_run.lua:103-127 measured these):
+-- Sequences run from the settled top command menu, on the MagiTek cursor:
 --   beam at the default target    A A A
 --   Heal Force (2,0), both lists  A dn dn A A  (self-target by default)
 -- Only Terra beams.  Vicks and Wedge heal, and everyone heals while the head
@@ -169,7 +153,7 @@ H.run({ maxFrames = 60000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
 
-  -- walk onto the trigger tile; battle_whelkwipe.lua:177-190's field drive
+  -- walk onto the trigger tile
   H.driveUntil(function()
     return H.battleLoadStarted() and H.monstersPresent() > 0
   end, 2600, {
@@ -264,11 +248,7 @@ H.run({ maxFrames = 60000 }, {
   H.call(function()
     -- The headroom check, stated as its own assertion so that a future
     -- failure reads as "the fixture ran out of HP" rather than as a broken
-    -- gauge.  Measured on this fixture: chips of 190/206/184 then a breaking
-    -- 828, leaving 192 of the head's 1600.  Vanilla's 224..255/256 spread is
-    -- worth about +6% on each of those, so the margin is real but not large;
-    -- if a damage retune ever closes it, the answer is a different body
-    -- rather than an HP write.
+    -- gauge.
     H.assertEq(headHp() > 0, true,
       "the head survived its own break -- the 1600 HP is the headroom this "
       .. "measurement runs on")

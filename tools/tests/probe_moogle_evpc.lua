@@ -1,11 +1,9 @@
--- probe_moogle_evpc.lua -- traces the event PC through a wave-1 loss
--- (issue #74 diagnostic instrument).  Boots moogle_defense, idles into the
--- wipe, A-mashes through the Annihilated screen, and from the moment the
--- battle module drops out logs every per-frame change of the 24-bit event
--- PC {$e5,$e6,$e7} alongside brightness / pos, for 2500 frames.  Wait-type
--- event commands park the PC for many frames, so the parked addresses
--- identify which script bytes the loss path executes.  Zero
--- writes: pad input and reads only.
+-- probe_moogle_evpc.lua -- traces the event PC through a wave-1 loss.
+-- Boots moogle_defense, idles into the wipe, A-mashes through the
+-- Annihilated screen, and from the moment the battle module drops out
+-- logs every per-frame change of the 24-bit event PC {$e5,$e6,$e7}
+-- alongside brightness / pos, for 2500 frames. Zero writes: pad input
+-- and reads only.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/moogle_defense.mss.lua"
 

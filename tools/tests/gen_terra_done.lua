@@ -8,9 +8,9 @@
 --                   on two choices.  This is the same beat gen_scenario
 --                   generates scenario_hub at, so the two states are
 --                   directly comparable.
---
+
 -- Two hops.
---
+
 -- 1. The clifftop -> Arvis's house.  The party is on map 20 (27,8), the ledge
 --    the caves come out on, which is the same ledge Terra escaped onto in the
 --    intro (gen_mines_chase walks it west, narshe_streets sits on it).  Its
@@ -20,7 +20,7 @@
 --    map 30 (67,26) is the reciprocal door straight back to the ledge, two
 --    tiles north of the (67,28) the party lands on, so the hop to the meeting
 --    is planned clear of it.
---
+
 -- 2. Arvis's house -> _ccb3fa at (66,35), and the scenario ends.
 --    EventTrigger::_30 puts _ccb3fa on {66,35} (event_trigger.asm:163); it
 --    needs $00A4=0, $0019=1 and $0021=0 (event_main.asm:104805-104809), plays
@@ -30,31 +30,20 @@
 --    scenario-complete flag in the whole event bank (every other $0021 line
 --    is an if_any condition), so this trigger is the only way to finish the
 --    scenario.
---
+
 -- Where it lands.  _caad4c (:26626) reduces the party to SCENARIO_MOG and
 -- reloads map 9; with $0021 set and not all three scenario flags set (the
 -- `if_all` at :26654 to the reunion _caadb9 only opens on $0021 && $001E &&
 -- $0044) it takes the `if_any` at :26665 to _caadb4 and plays dlg $0B8C,
 -- "Choose a scenario… kupo!", skipping the first-visit recap $016F.  The
 -- state is generated on the first controllable frame after that.
---
+
 -- Stack-clean: this generator also runs under OT6_STACK (booted from a
 -- t2_terra_clifftop that descends from locke_done, $001E=1), so every claim
 -- about the other scenarios' flags is asserted as unchanged since boot rather
 -- than as zero.  The invariant is that this route never touches Locke's or
 -- Sabin's state, and it is the same assertion in both runs.
---
--- The all-three boot (the t3_ stack, once Sabin's chain lands): with
--- $001E and $0044 both carried in, _ccb3fa's `switch $0021=1 / call
--- _caad4c` opens the if_all at :26654 and the hub return is the reunion
--- (_caadb9 -> "The three have reached Narshe" -> _ccb4da, ~10,400 frames
--- of cutscene with no input, measured on the poked twin,
--- probe_narshe_spike).  On that boot this file takes its reunion fork below:
--- instead of the hub gate it rides the cutscene to the map-22 staging, with
--- the party at (20,9), $0045 set, on the first controllable frame, and
--- generates reunion_ready.mss, the state gen_narshe_battle boots.  The fork
--- is written from the measured spike ride; it has not yet had a live
--- all-three run, which needs Sabin's ending.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local CLIFF = "build/states/terra_clifftop.mss.lua"
 
@@ -142,17 +131,6 @@ H.run({ maxFrames = 60000 }, {
     where("booted")
   end),
 
-  -- ===================================================================== --
-  -- 1. Into Arvis's house.  (53,9) is itself the door tile: its neighbours
-  --    below are solid ledge, so there is no entry point to stop one short
-  --    on, and a first version aimed at (53,10) and BFS answered "no path".
-  --    So navTo walks onto (53,9) directly and terminates on the map change
-  --    it fires.
-  -- ===================================================================== --
-  -- issue #75: playBattles=true on every navigator and story ride.  This
-  -- step's maps draw no encounters, so nothing changes on the expected path,
-  -- but a battle that did fire would be fought by real input rather than
-  -- write-cleared.
   H.navTo(53, 9, { maxFrames = 20000, playBattles = true,
     arrive = function() return map() ~= 20 end }),
   H.release(),
@@ -179,12 +157,6 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() where("_ccb3fa running") end),
 
   H.cond(reunionBoot, {
-    -- ------------------------------------------------------------------ --
-    -- The reunion fork (all-three boot): _caad4c's if_all fires _caadb9 ->
-    -- _ccb4da, ~10,400 frames of dialog-tap cutscene ending on the map-22
-    -- staging (measured on the poked twin, probe_narshe_spike).  Generate
-    -- reunion_ready.mss at the first controllable frame.
-    -- ------------------------------------------------------------------ --
     H.advanceStory(function()
       return sw(0x0021) == 1 and settleStaging()
     end, 60000, { playBattles = true }),

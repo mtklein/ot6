@@ -1,15 +1,9 @@
--- probe_lounge_bank.lua (generated head of probe_water_rondo) -- take MOG down the Serpent Trench and learn
--- Water Rondo (#133 item 4).
---
--- Boots from wob_mog_done.mss (Mog just recruited on the Narshe cliff).
--- Route: walk the cliff chain back down (23 -> 22 -> 21 -> town), out to
--- the world, board the ship at the Narshe doorstep, fly to Crescent
--- Mountain (world door (214,148), approach column (214,149..152), land
--- on the west plain), enter 167 -> door (25,26) -> cave 168, step the
--- dive trigger (8,11) ("Jump? (Why not?)" -- the post-scenario $0041 arm,
--- A-only ride per the choice-menu lesson), then ride the trench: battles
--- fought tactically; Mog aboard learns the water-terrain dance when he
--- wins there.  Ends at Nikeah; saves wob_rondo_done.mss.
+-- probe_lounge_bank.lua -- from wob_mog_done.mss (Mog just recruited on
+-- the Narshe cliff), walk the cliff chain back down (23 -> 22 -> 21 ->
+-- town), out to the world, board the ship at the Narshe doorstep, fly to
+-- Crescent Mountain (world door (214,148), approach column
+-- (214,149..152), land on the west plain), then bench Relm and seat Mog
+-- in the deck party-change UI.  Saves wob_lounge.mss.
 --
 -- If the join left Mog OUT of the active party, the deck party-change
 -- would be needed first; the probe asserts his party byte early so that
@@ -278,7 +272,7 @@ H.run({ maxFrames = 120000 }, flatten({
   -- X in flight opens the deck (map 6); door (20,6) -> interior (map 7,
   -- (40,11)) where map-init _caf47c stands the reserve roster up.  Talk
   -- to a roster NPC -> char line -> "Change party members?" (0 No/1 Yes,
-  -- so down-then-A) -> the swap UI ($26 in 2c..2f, probe_iaf's decode).
+  -- so down-then-A) -> the swap UI ($26 in 2c..2f).
   H.driveUntil(function() return not H.worldMode() and (H.mapId() & 0x1ff) == 6 end,
     1500, { H.call(function() H.setPad(H.frame % 12 < 3 and { x = true } or {}) end) },
     "deck via X"),

@@ -1,68 +1,34 @@
 -- @suite savestate=minecart_entry slow
--- battle_esperstats_tube6.lua -- the six tube-room stones, in battle
--- (docs/design/magicite-tube-six.md, issue #31): Maduin, Shoat, Phantom,
--- Carbunkl, Bismark and Unicorn grant their designed spell lists live and
--- carry a while-worn stat mod, where before all six were vanilla placeholder
--- rows with an Ot6EsperStatTbl byte of $00.
+-- battle_esperstats_tube6.lua -- the six tube-room stones, in battle:
+-- Maduin, Shoat, Phantom, Carbunkl, Bismark and Unicorn grant their designed
+-- spell lists live and carry a while-worn stat mod.
 --
 -- Same instrument and same shape as battle_esperstats.lua: each scenario
 -- reloads the fixture, equips its stone through the real field menu on the
 -- party leader, rides the minecart into the first scripted fight, and reads
 -- the granted union out of the compacted master Magic list plus the four
--- battle-side effective stat copies.  That file is the shipped test for the
--- eight stones it already covers; this is the v0.7 append for the six the
--- tube room grants.
+-- battle-side effective stat copies.
 --
--- =============== the input-driven rebuild (#75) ===========================
--- The previous version poked char 0's equipped-esper byte $161e on
--- battle_entry, the Narshe intro, three chapters before these stones
--- exist, where the menu could never have equipped one.  The poke is gone,
--- and the fixture is now minecart_entry, the first state on the chain where
--- this file's scenario is real play: it sits one step after the tube-room
--- set piece that grants all six stones at once ($1A69 = EF 01 9A 00 here),
--- and one A-press at CID starts the minecart ride whose scripted first fight
--- (battle 41, ~1240 frames in) is the measuring ground.  The tube room's
--- own door back to map 273 is one-way (measured), so no random-encounter
--- map is reachable past the grant; the scripted fight is the battle a
--- player reaches, and it is deterministic and input-only.
+-- The fixture sits one step after the tube-room set piece that grants all
+-- six stones at once ($1A69 = EF 01 9A 00 here), and one A-press at CID
+-- starts the minecart ride whose scripted first fight (battle 41, ~1240
+-- frames in) is the measuring ground.
 --
--- The controls are stronger on this fixture, and one sign flipped.  The
--- party is LOCKE, SABIN and EDGAR: NaturalMagic teaches only TERRA and
--- CELES, and Celes was taken by the tube-room scene one step earlier.  So
--- the BASE union is asserted empty, and:
---   * "Maduin grants Fire" was corroboration on the old fixture, since Terra
---     knows Fire innately at Narshe; here it is proof, as his Ice
---     and Bolt already were.  The old file's `Fire IS innate here` positive
---     assert is therefore gone, replaced by Fire in the base absent-controls:
---     the note it kept true is no longer true, and that is intended.
---   * "Bismark does not grant Fire" was not assertable before and was
---     documented as omitted; it is assertable here and is now asserted
---     (genju_prop.asm:150-151, "FIRE/ICE/BOLT dropped: Maduin's job").
--- Nothing was weakened: every absent-control the old BASE could make, this
--- BASE makes too.
+-- The party is LOCKE, SABIN and EDGAR: NaturalMagic teaches only TERRA and
+-- CELES, and Celes was taken by the tube-room scene one step earlier, so the
+-- BASE union is empty.
 --
--- The union window stays rows 1..54 (this file's own approach, adopted
--- back into battle_esperstats.lua by #75): row 0 is the esper row, whose
--- id byte holds the esper index, and MADUIN is esper 6 while ICE_2 is
--- spell $06, which is the collision that motivated the window; rows 55..78
--- are lores stored id-$8b.  Row 0 is asserted directly to hold the
--- equipped esper's index, which is the positive control for the window.
+-- The union window is rows 1..54: row 0 is the esper row, whose id byte
+-- holds the esper index, and rows 55..78 are lores stored id-$8b.  Row 0 is
+-- asserted directly to hold the equipped esper's index.
 --
--- The measured character is whoever leads the party (EDGAR on this savestate),
--- found from live menu RAM rather than assumed; stat deltas are against the
--- BASE scenario for the same character.  Vigor is stored doubled ($3b2c,
--- "vigor * 2", battle_main.asm:3857), so Bismark's authored +5 reads +10
--- and the -2 and -3 downsides read -4 and -6.
+-- The measured character is whoever leads the party (EDGAR on this
+-- savestate), found from live menu RAM.  Stat deltas are against the BASE
+-- scenario for the same character.  Vigor is stored doubled ($3b2c), so
+-- Bismark's authored +5 reads +10 and the -2 and -3 downsides read -4 and -6.
 --
--- The three broken rows this file exists to catch are unchanged:
---   * Maduin carried FIRE_2/ICE_2/BOLT_2, three dead pre-folded tiers at
---     once; all three must be absent and the base tiers present.
---   * Bismark granted LIFE against kits.md's revival rule
---     ("Terra, Fenix Downs, and Sraphim, and nowhere else"), so Life is
---     asserted absent.
---   * Shoat granted BIO, the pre-folded cap of the poison family, also absent.
--- Run this file against a ROM built before the genju_prop change and the
--- absent-checks fail; that is what they are for.
+-- Maduin carries FIRE/ICE/BOLT base tiers (not the pre-folded _2 tiers).
+-- Bismark does not grant LIFE.  Shoat does not grant BIO.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/minecart_entry.mss.lua"
 
@@ -82,7 +48,7 @@ local CARBUNKL, PHANTOM, UNICORN = 0x13, 0x14, 0x17
 local LIST0  = 0x208e            -- compacted master Magic list, 4-byte records
 local STAM, MAGPWR, SPEED, VIGOR = 0x3b40, 0x3b41, 0x3b19, 0x3b2c
 
--- field menu plumbing (menu_ram.inc; the menu_esperdetail walk)
+-- field menu plumbing (menu_ram.inc)
 local ZMENUSTATE, ZCURSOR, ZSELINDEX, ZLISTTYPE = 0x26, 0x4b, 0x28, 0x2a
 local ZCHARID, Z99 = 0x69, 0x99
 local SKILLCOLOR = 0x79
@@ -136,7 +102,7 @@ end
 local R = {}                     -- R[tag] = { slot, stam, mag, spd, vig, union, row0 }
 local leader = nil
 
--- two-column esper list seek (menu_esperdetail's idiom)
+-- two-column esper list seek
 local function listSeek(idx, what)
   local ph = 0
   return H.driveUntil(function()
@@ -249,9 +215,6 @@ local function rideAndMeasure(tag)
         union = unionSet(),
         row0  = H.readByte(LIST0),
       }
-      -- Log the full granted set before any assertion fires.  A run against
-      -- a pre-change ROM must leave the evidence in the log, not only a
-      -- verdict.
       H.log(string.format("[%s] slot=%d stam=%d mag=%d spd=%d vig*2=%d row0=$%02x union#=%d",
         tag, t, R[tag].stam, R[tag].mag, R[tag].spd, R[tag].vig, R[tag].row0,
         setSize(R[tag].union)))
@@ -288,10 +251,6 @@ end
 local function checkBase()
   return H.call(function()
     local b = R.base
-    -- LOCKE, SABIN and EDGAR know no natural magic (NaturalMagic covers only
-    -- Terra and Celes, and the tube room took Celes), so the union is empty.
-    -- The old fixture's "Fire IS innate here" note does not apply here: on
-    -- this party Fire is a clean control like everything else.
     H.assertEq(setSize(b.union), 0,
       "[base] the spell union is EMPTY -- no innate mage in the party, "
       .. "so every grant below including Fire is proof")
@@ -310,14 +269,9 @@ local function checkBase()
   end)
 end
 
--- #62's shape: all four stats asserted every scenario; a key left out means
--- the stat is expected flat; a negative delta must be seen dropping.  vig
--- deltas are given doubled, as $3b2c stores them.
 local function checkEsper(tag, esper, deltas, grants, absents)
   return H.call(function()
     local b, r = R.base, R[tag]
-    -- Positive control: list record 0 is the esper row, whose id byte
-    -- is the esper index.  That is why the union starts at row 1.
     H.assertEq(r.row0, esper, "[" .. tag .. "] list record 0 holds the esper index")
     local now = { stam = r.stam, mag = r.mag, spd = r.spd, vig = r.vig }
     local was = { stam = b.stam, mag = b.mag, spd = b.spd, vig = b.vig }
@@ -347,11 +301,6 @@ local function add(list) for _, s in ipairs(list) do all[#all + 1] = s end end
 
 add(driveSteps("base", nil));  add({ checkBase() })
 
--- Maduin -- "the Trinity", the largest package, on #62's boss tier: +7 mag.pwr
--- (the encoding's ceiling and vanilla's own per-stat ceiling), +3 stamina, -3
--- vigor (-6 doubled) because Terra's inheritance is a mage's.  All three
--- grants are fold base tiers and all three are assertable on this fixture; the
--- three pre-folded tiers the vanilla row carried are the broken-row fix.
 add(driveSteps("maduin", MADUIN))
 add({ checkEsper("maduin", MADUIN, { mag = 7, stam = 3, vig = -6 },
   { { FIRE, "Fire (base tier -- PROOF here, no innate mage)" },
@@ -360,19 +309,11 @@ add({ checkEsper("maduin", MADUIN, { mag = 7, stam = 3, vig = -6 },
     { ICE2, "Ice2 (dead pre-folded tier -- BROKEN ROW FIX)" },
     { BOLT2, "Bolt2 (dead pre-folded tier -- BROKEN ROW FIX)" } }) })
 
--- Shoat -- "the Gorgon Eye", story tier: +6 speed, +2 stamina, -2 vigor
--- (-4 doubled), since the Eye is a stare rather than a strike.  Bio absent is
--- the broken-row fix.
 add(driveSteps("shoat", SHOAT))
 add({ checkEsper("shoat", SHOAT, { spd = 6, stam = 2, vig = -4 },
   { { BREAK, "Break" }, { DOOM, "Doom" } },
   { { BIO, "Bio (pre-folded poison cap -- BROKEN ROW FIX)" } }) })
 
--- Bismark -- "the Tide", story tier: +5 vigor (+10 doubled), +3 stamina, and
--- -2 speed, since the leviathan is mass.  Life absent is the kits.md
--- revival rule, asserted.  Fire/Ice/Bolt are all "Maduin's job"
--- (genju_prop.asm:150-151) and on this fixture all three are assertable;
--- the old file had to omit Fire because Terra knew it innately.
 add(driveSteps("bismark", BISMARK))
 add({ checkEsper("bismark", BISMARK, { vig = 10, stam = 3, spd = -2 },
   { { HASTE, "Haste (fold base)" }, { SLOW, "Slow (fold base)" } },
@@ -380,27 +321,17 @@ add({ checkEsper("bismark", BISMARK, { vig = 10, stam = 3, spd = -2 },
     { FIRE, "Fire (Maduin's job -- newly assertable on this party)" },
     { ICE, "Ice (Maduin's job)" }, { BOLT, "Bolt (Maduin's job)" } }) })
 
--- Carbunkl -- "the Facet", story tier: +6 stamina (the wall stone's stat),
--- +2 mag.pwr, -2 speed because a gem is inert.
 add(driveSteps("carbunkl", CARBUNKL))
 add({ checkEsper("carbunkl", CARBUNKL, { stam = 6, mag = 2, spd = -2 },
   { { RFLECT, "Rflect" }, { SAFE, "Safe" } },
   { { WARP, "Warp (field furniture)" }, { SHELL, "Shell (Shiva's)" },
     { HASTE, "Haste (moved to Bismark)" } }) })
 
--- Phantom -- "the Ghostwalk", story tier: +6 speed, +2 mag.pwr, -2 stamina.
--- It shares Shoat's +6 speed lead deliberately
--- and separates on the second stat and the downside (magicite-tube-six.md §3).
 add(driveSteps("phantom", PHANTOM))
 add({ checkEsper("phantom", PHANTOM, { spd = 6, mag = 2, stam = -2 },
   { { VANISH, "Vanish" }, { DEMI, "Demi" } },
   { { BSERK, "Bserk (removes player control -- the Ifrit reason)" } }) })
 
--- Unicorn -- "the Purity", story tier and deliberately its smallest package
--- with no downside: +5 stamina, +2 mag.pwr.  Pearl is branch A of the
--- cross-doc holy decision, decided by the dispatcher (magicite-tube-six.md
--- §9): if this row is ever reverted to branch B, this assertion is the
--- thing that has to be deliberately edited.
 add(driveSteps("unicorn", UNICORN))
 add({ checkEsper("unicorn", UNICORN, { stam = 5, mag = 2 },
   { { PEARL, "Pearl (branch A -- the paladin's smite)" }, { REMEDY, "Remedy" } },

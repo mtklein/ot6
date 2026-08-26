@@ -1,15 +1,10 @@
 -- probe_climb.lua -- the maze route: arrival -> building door (44,48) ->
 -- 225(12,43) diagonal-stair interior -> onward door -> a 221 rooftop.
--- Diagonal-flood the landing and report reachable jumps/Dadaluma/doors.
--- navTo is diagonal-aware (bfsPath uses the 8 MOVES); only the probe
--- floods were cardinal, which made the interiors look sealed.
+-- Diagonal-floods the landing and reports reachable jumps/Dadaluma/doors.
 --
--- Successor route notes: the Zozo door tables (from short_entrance.dat;
--- earlier probes used off-by-one guesses, which produced the dead
--- crossings).  Doors are two-way; a crossing is navTo-a-neighbour +
--- one held press onto the source tile.
+-- Zozo door tables (from short_entrance.dat), source -> dest:
 --
--- map 221 (rooftops) -> map 225 (interiors), source(221) -> dest(225):
+-- map 221 (rooftops) -> map 225 (interiors):
 --   (13,21)->225(124,55)  (23,17)->225(83,61)   (42,28)->225(98,61)CLOCK
 --   (43,24)->225(110,54)  (44,48)->225(12,43)   (44,41)->225(11,16)
 --   (49,38)->225(21,14)   (54,35)->225(66,56)   (38,57)->225(52,56)
@@ -18,45 +13,25 @@
 --   (35,15)->225(35,13)   (15,39)->225(118,26)  (12,36)->225(104,26)
 --   (49,31)->179          (33,9)->226(82,37) TOWER (Dadaluma-roof exit)
 --
--- map 225 (interiors) -> map 221 (rooftops), source(225) -> dest(221):
+-- map 225 (interiors) -> map 221 (rooftops):
 --   (12,44)->221(44,49)   (11,17)->221(44,42)*  (21,15)->221(49,39)
 --   (52,57)->221(38,58)   (47,47)->221(35,54)   (59,35)->221(34,51)
 --   (46,9)->221(30,43)**  (118,27)->221(15,40)  (104,27)->221(12,37)
 --   (83,62)->221(23,18)   (124,56)->221(13,22)  (98,62)->221(42,29)
 --   (110,55)->221(43,25)* (66,57)->221(54,36)   (11,62)->221(35,34)
 --   (30,62)->221(31,31)   (30,34)->221(30,22)** (35,14)->221(35,16)**
---   * measured dead 2-3 tile pockets (44,42) and (43,25).
+--   * dead 2-3 tile pockets (44,42) and (43,25).
 --   ** the Dadaluma-region exits (221 x30-35): the 225 interior holding
 --      (46,9)/(30,34)/(35,14) is the one to reach; it is not the (44,48)
---      building, which only reaches (12,44)/(21,15)/(11,17).  Which
---      rooftop enters it (via 221 (30,43)/(30,22)/(35,16)) is not yet
---      known; it is reached across the jump-39/33 rows and/or the crane.
+--      building, which only reaches (12,44)/(21,15)/(11,17).
 --
--- The door-crossing technique (measured working): navTo the door source
--- tile itself with { arrive = function() return map()==<dest> end }.
--- Stepping onto a 221<->225 door tile transitions immediately; these are
--- walk-on transitions rather than CheckDoor walls, so no held press is
--- needed, unlike castle doors.  navTo to a neighbour followed by a held
--- press does not work here and cost several runs.
+-- Doors are two-way, walk-on transitions (not CheckDoor walls): stepping
+-- onto a 221<->225 door tile transitions immediately, so navTo the door
+-- source tile with { arrive = function() return map()==<dest> end }.
 --
--- Confirmed hop chain so far (all measured, each a clean crossing):
---   arrival street (61,44)
---     -navTo(44,48)->            225 (12,44) interior  [159-tile diagonal]
---     -navTo(21,15) arrive 221-> 221 (49,39) rooftop   [26 tiles]
---       this roof's only onward door is (54,35)->225(66,56), the next
---       building; the jump rows and Dadaluma are still hops beyond it.
---   The (44,48) building's other exits are dead ((11,17)->pocket (44,42);
---   the (12,44) side is the entrance).  A successor continues from
---   221(49,39): cross (54,35)->225(66,56), flood, follow its onward doors,
---   and keep hopping toward a rooftop bearing 221(30,43)/(30,22)/(35,16).
--- Issue #75: playBattles = "tactical" keeps these walks out of the library's
--- monster-dead flag write, and here it is not a no-op: maps 221 and 225 do
--- draw random battles (map_prop.dat byte +5 bit 7 set), from the Zozo pools
--- group 78 (Gabbldegak, Harvester, HadesGigas) and group 77 (SlamDancer,
--- Harvester, Gabbldegak).  Fought rather than fled for the reason
--- gen_zozo3_clock records: several of those formations permit a pincer,
--- which raises run difficulty from 2 to 6 per monster, and gen_zozo5_ramuh
--- already clears this same pool on these same maps with blind A-taps.
+-- Maps 221 and 225 draw random battles from the Zozo pools group 78
+-- (Gabbldegak, Harvester, HadesGigas) and group 77 (SlamDancer, Harvester,
+-- Gabbldegak); playBattles = "tactical" fights rather than flees them.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

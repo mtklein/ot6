@@ -1,17 +1,12 @@
 -- shot_battle_items.lua -- screenshot evidence for weapon-class icons in the
 -- battle Item list.
 --
--- Issue #75 conversion.  This script used to poke one weapon per break class
--- into the magitek entry point's empty bag and shoot the forged list.  It now
--- boots vector_entry, which carries the class-richest real bag on the chain
--- (see shot_field_items.lua's header for the recon; PIERCE and SLASH are
--- everything any v0.6 save owns in normal play).  It walks one step south out
--- of Vector onto the world map (the fixture stands on the long entrance at
--- map 242 (32,61); measured: a held DOWN reaches the world in ~30 frames),
--- walks the random-battle area until a world encounter fires, and shoots the
--- Item list the battle menu builds from the save's own $1869 bag.
+-- Boots vector_entry, walks south out of Vector (map 242, the long entrance
+-- at (32,61)) onto the world map, paces the random-battle area until a
+-- world encounter fires, and shoots the Item list the battle menu builds
+-- from the save's own $1869 bag.
 --
--- The weapon rows in the measured bag order (battle list order = bag order):
+-- The weapon rows in bag order (battle list order = bag order):
 --   row  9 Dirk PIERCE, row 19 ThunderBlade SLASH, row 23 MithrilKnife
 --   PIERCE, row 26 Ashura SLASH, with tool, relic and consumable rows around
 --   them for the no-class face.
@@ -36,9 +31,8 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() H.setPad({}) end),
   H.waitFrames(30),
 
-  -- the random-battle area right outside the trigger: pace until the world's
-  -- own encounter roll wins (battle_gaufight's Veldt-grind pacing, no danger
-  -- poke)
+  -- the random-battle area right outside the trigger: pace until the
+  -- world's own encounter roll wins (no danger poke)
   (function()
     local flip = false
     return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {

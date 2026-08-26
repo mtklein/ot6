@@ -49,9 +49,7 @@ H.run({ maxFrames = 60000 }, {
     H.writeWord(0x3C00, 1)   -- guards at 1 hp: first beam ends it
     H.writeWord(0x3C02, 1)
   end),
-  -- win fight 1: mash A (beams) until no monsters alive, then mash through victory
-  -- pulse A only while a battle menu is open: phase-proof progression
-  -- (blind timed patterns desync against regenerated states' atb phase)
+  -- win fight 1: pulse A only while a battle menu is open ($7bca), mash through victory
   H.driveUntil(function()
     local dead = H.readWord(0x3C00) == 0 and H.readWord(0x3C02) == 0
     return dead or not H.battleLoadStarted()   -- or victory already tore down

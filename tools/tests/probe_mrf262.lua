@@ -1,13 +1,9 @@
 -- probe_mrf262.lua -- read-only navigation survey of the Magitek Factory
--- upper floor (map 262) from the mrf_entry fixture, so the next route step
--- is planned off the live tilemap rather than the offline model the route
--- recon could only build from the static incbin.
+-- upper floor (map 262) from the mrf_entry fixture.
 --
 -- Dumps: the party's landing state, the full BFS step list to each
 -- candidate waypoint, an ASCII passability render of the interesting
--- areas, and the object map ($7E2000 bit7 clear = occupied) so a NO-PATH
--- caused by an NPC standing in a corridor is distinguishable from one
--- caused by the tilemap.
+-- areas, and the object map ($7E2000 bit7 clear = occupied).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -77,7 +73,7 @@ H.run({ maxFrames = 4000 }, {
   end),
 
   -- watch the $0270/$0271 platform window for 600 frames: how long is it
-  -- open, and how often (recon probe 3)
+  -- open, and how often
   (function() local n, on0, on1, edges0, edges1, p0, p1 = 0, 0, 0, 0, 0, 0, 0
     return H.driveUntil(function() return n >= 600 end, 900, {
       H.call(function()

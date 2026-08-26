@@ -1,8 +1,8 @@
 -- @suite slow
 -- battle_class.lua -- M3 acceptance: weapon-class chip -> reveal -> break.
---
+
 --   tools/tests/run.sh tools/tests/battle_class.lua
---
+
 -- The entry-point guards are authored piercing-weak (Ot6ShieldTbl now carries
 -- a class byte), so the seed itself is under test before any pokes.  The
 -- magitek party has no Fight command, so this borrows battle_hits's
@@ -11,7 +11,7 @@
 -- read is the live $3ca8 hand item, so poking a hand mid-battle swaps the
 -- probe class without touching damage stats, and each phase re-arms the
 -- party with a different weapon and watches the shield counter:
---
+
 --   0. seed: shields 2/2, class-weak $02 (authored), revealed-class 0,
 --      slot codex magic re-signed 'O8' (fresh init after self-clean)
 --   1. slash phase (MithrilBlade $0a): swings land, nothing chips
@@ -29,12 +29,10 @@
 --   8. flagged-skill phase (TekMissile $8a, flags3 $20 "can't dodge"):
 --      terra is un-berserked, her real commands restored, and her menu
 --      driven to TekMissile.  A flags3-nonzero classed skill must chip a
---      pierce-weak guard, where the whole-byte $f2 gate blocked every
---      such chip; this is the regression test for the bit-0 narrowing.
---      The drive traverses terra's magitek list, so its rendered rows
---      also carry the v0.2 ability-list assert: TekMissile (elementless,
---      Ot6SkillClassTbl pierce) wears the pierce class icon after its
---      name, where elemental abilities wear their element icon
+--      pierce-weak guard.  The drive traverses terra's magitek list, so
+--      its rendered rows also carry the ability-list assert: TekMissile
+--      (elementless, Ot6SkillClassTbl pierce) wears the pierce class icon
+--      after its name, where elemental abilities wear their element icon
 --   9. tools-list phase (staged, since no fixture reaches a Tools user):
 --      three tool items are poked into the battle inventory ($2686
 --      stride 5: id / usage flags, bit $40 = the tools-window scan bit /
@@ -43,34 +41,17 @@
 --      Ot6ToolListIcon_ext: Chain Saw wears slash, Drill wears pierce
 --      (each replacing the name field's trailing blank), NoiseBlaster
 --      (classless, and a full-width 13-char name) keeps its last letter
---
+
 -- The under-enemy HUD is asserted around phases 0-2: an authored-pierce
 -- guard with no element weakness shows [shield]['?'] before any probe,
 -- and the '?' becomes the pierce class icon ($da, white like the '?')
 -- once the class is revealed, because the class slots use the same
 -- revealed-versus-'?' code the element slots use.
---
+
 -- Element weaknesses are zeroed on both guards at setup so the magitek
 -- holder's stale beams and poison DoT cannot move shields: every shield
 -- transition below is the class path or a bug.
---
--- Guesses pending a real run (marked GUESS below):
---   - GUESS(seed-2): guards still seed 2/2 with the extended 4-byte
---     records (battle_break asserts the same; if this fails the record
---     stride is wrong and everything after is noise)
---   - swing cadence (resolved): the no-chip phases no longer wait a fixed
---     1500-frame budget.  The berserk gauge is accelerated (bumpAtb pokes the
---     ATB fill constant $3ac8) and each no-chip phase now drives until it has
---     watched two probe-class Fights resolve ($57b8 write counter),
---     then asserts nothing chipped, so a slow cadence fails the driveUntil
---     rather than letting the negative pass without testing anything.
---     Measured cadence: ~700 frozen frames of gauge spin-up at each phase
---     entry ($3aa0.3 held), then swings land every few dozen frames.
---   - GUESS(dice): poking $3ca8 to dice ids swaps the class lookup but
---     not the init-time special-effect bytes, so dice phases swing like
---     normal weapons here; real equipped-dice behaviour (the dice damage
---     effect reaching the join hook) still needs a manual phase-2 check.
---
+
 -- Entity map (same fight as battle_break): guards in monster slots 2/3
 -- -> entities $0c/$0e. shields $3E44/$3E46 - timers $3E94/$3E96 -
 -- revealed classes $3EA9/$3EAB - class weak $3EA8/$3EAA - weak elems
@@ -240,11 +221,6 @@ H.run({ maxFrames = 90000 }, {
     local r1, r2 = classRev()
     H.assertEq(r1, 0, "guard 1 opens with no class revealed")
     H.assertEq(r2, 0, "guard 2 opens with no class revealed")
-    -- (#71 item 9: the codex-magic asserts that stood here were a
-    -- write-then-read tautology -- H.loadState writes 0x4f/0x38 into
-    -- every page header on each load and codexBase() always returns one
-    -- of those pages, so no ROM change could fail them.  Dropped;
-    -- battle_codex's slot-1 planted-header case is the real check.)
   end),
   report("seeded"),
 
@@ -302,13 +278,6 @@ H.run({ maxFrames = 90000 }, {
   armRightHands(0x0A),                     -- MithrilBlade: slashing
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  -- Drive until two slashing Fights have resolved, rather than waiting a fixed
-  -- padded budget: the negative "nothing chips" below is only meaningful if
-  -- swings of the probe class landed, so that is a hard precondition.  If two
-  -- do not resolve within the cap this driveUntil fails, where the old fixed
-  -- wait would have passed without testing anything.  (Measured swing cadence
-  -- with the accelerated gauge: ~700f cold-start spin-up, then swings land
-  -- quickly.)
   H.driveUntil(function() return (classWrites[0x01] or 0) >= 2 end,
     2000, driveStep, "two slashing swings to resolve"),
   watchClasses(false),
@@ -557,13 +526,6 @@ H.run({ maxFrames = 90000 }, {
       "mean heal while shielded is NOT attenuated (>= 0.8x the shieldless mean)")
   end),
 
-  -- 8. flagged-skill phase: TekMissile (flags3 $20) must chip.  Restore
-  -- the lab to pierce-weak, hand Terra her real menu back, and walk it:
-  -- MagiTek -> down x3, right (her 2x4 grid's bottom-right cell) -> fire
-  -- at the default target (#111: TekMissile is offensive, so the default
-  -- is the enemy-side pick, never the party).  The drive retries the lap
-  -- until the skill
-  -- loader's $02 lands and a shield moves.
   H.call(function()
     H.writeByte(0x3EA8, 0x02); H.writeByte(0x3EAA, 0x02)  -- pierce-weak
     H.writeByte(0x3BD8, 0); H.writeByte(0x3BDA, 0)        -- absorb off
@@ -652,7 +614,7 @@ H.run({ maxFrames = 90000 }, {
   -- window; with every slot Tools, whatever cell the cursor rests on
   -- opens the tools window (menu state $2e), whose rows render through
   -- ListTextCmd_0e and Ot6ToolListIcon_ext.
-  --
+
   -- The battle tools window is a two-column grid and only its first row
   -- is on-screen (verified live: a third tool lands in an unrendered
   -- second row).  So the two asserted tools sit in slots 0 and 1, Chain Saw
@@ -727,19 +689,6 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("class_tools")
   end),
 
-  -- Liveness, and it matters here. Every assertion in this phase reads
-  -- a tilemap the window already drew, which a frozen machine satisfies
-  -- just as well as a running one, and did: Ot6ToolListIcon_ext (ot6.asm)
-  -- spun the battle NMI forever on a tool row with no class, and this test
-  -- came back green straight through it. Measured by reverting that fix and
-  -- re-running: all 40 assertions above pass (both tools rows, both class
-  -- icons) with $98 not advancing at all. The fixture is why it never
-  -- showed: its only classless tool (NoiseBlaster) sits in the list's
-  -- unrendered second row while the two asserted tools ride the first, so
-  -- the lock lands after the last thing this test looks at. It surfaced in
-  -- battle_vargas instead, where the BioBlaster is list entry 0. $98 is the
-  -- battle NMI's own frame counter (btlgfx_main.asm:1783), so a stall now
-  -- fails here rather than passing on stale VRAM.
   H.call(function() H.vars.nmi0 = H.readByte(0x0098) end),
   H.waitFrames(30),
   H.call(function()

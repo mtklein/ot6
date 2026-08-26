@@ -1,20 +1,14 @@
 -- @suite
--- battle_absorbguard.lua -- the absorbed-weapon guard, issue #81.
+-- battle_absorbguard.lua -- the absorbed-weapon guard.
 --
 --   tools/tests/run.sh tools/tests/battle_absorbguard.lua
 --
 -- The guard lives in M.run's per-frame callback (lib/ot6.lua): once per
 -- battle it reads the formation's species and every party member's
 -- equipped weapon, and fails the run if a weapon's element is absorbed by
--- anything in the formation.  That is the Cranes bug, where Optimum's
--- power-greedy pick armed two characters with ThunderBlades against a
--- boss that absorbs bolt and every swing healed it.
+-- anything in the formation.
 --
--- The whole point of a guard is that it is silent when everything is
--- fine, so a guard that never runs and a guard that ran and passed report
--- the same green.  This file separates them, on the game's own tutorial
--- for absorb: the Whelk fight, whose shell $0100 absorbs bolt, which is
--- what the shell is famous for teaching.
+-- This file checks it on the Whelk fight, whose shell $0100 absorbs bolt:
 --
 --   1. the offsets, pinned against behaviour recorded elsewhere -- if
 --      monster_prop's absorb byte moves, or item_prop's element byte
@@ -24,9 +18,7 @@
 --      absorber;
 --   3. THE NEGATIVE CONTROL: the same M.absorbClashesFor the guard calls,
 --      given the live formation off $57c0 and one fabricated ThunderBlade,
---      must report the clash.  Nothing is written to the game; only the
---      weapon list handed to the function is invented, so the formation
---      read, both ROM reads and the mask arithmetic are the real ones;
+--      must report the clash;
 --   4. the guard actually ran on this battle (M.absorbGuardBattles) and
 --      found nothing, which is correct: the Magitek party holds no
 --      elemental weapon;
@@ -46,11 +38,7 @@ H.run({ maxFrames = 30000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
 
-  -- 1. the data offsets, before any of it is used.  Each of these is a
-  -- number some other file already recorded from behaviour: Ifrit is
-  -- healed by fire and Shiva by ice (bosses-wob.md:611-651), the Left
-  -- Crane absorbed the ThunderBlade swings (lib/ot6_field.lua's
-  -- M.equipWeapon block), and ThunderBlade is bolt at power 108.
+  -- 1. the data offsets, before any of it is used.
   H.call(function()
     H.assertEq(H.weaponElement(THUNDERBLADE), 0x04, "ThunderBlade $0F is bolt")
     H.assertEq(H.weaponElement(MITHRILKNIFE), 0x00,
@@ -61,7 +49,7 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(H.monsterAbsorb(SHELL), 0x04, "Whelk shell $0100 absorbs bolt")
   end),
 
-  -- walk onto the trigger tile; battle_break.lua:170-187's field drive
+  -- walk onto the trigger tile
   H.driveUntil(function()
     return H.battleLoadStarted() and H.monstersPresent() > 0
   end, 2600, {
@@ -96,10 +84,8 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(species[1].species, SHELL, "slot 0 is the shell $0100")
     H.assertEq(species[2].species, HEAD, "slot 1 is the head $0134")
 
-    -- 3. the negative control.  Live formation, fabricated weapon: the
-    -- shell absorbs bolt, so a ThunderBlade in anyone's hand is exactly
-    -- the Cranes disaster and the guard's own decision function has to
-    -- say so.  If this passes with zero hits the guard is vacuous.
+    -- 3. the negative control. Live formation, fabricated weapon: the
+    -- shell absorbs bolt, so a ThunderBlade in anyone's hand must clash.
     local bolt = H.absorbClashesFor(
       { { char = 0, hand = "R", item = THUNDERBLADE } }, species)
     H.assertEq(#bolt, 1, "a ThunderBlade into the live whelk formation "
@@ -122,9 +108,7 @@ H.run({ maxFrames = 30000 }, {
     }), 0, "an empty party clashes with nothing")
 
     -- 4. and the guard itself ran, on this battle, against the party's
-    -- real gear.  The Magitek party carries no elemental weapon, so zero
-    -- is the right answer -- but only the count above makes zero mean
-    -- "looked and found nothing" instead of "never looked".
+    -- real gear.
     local live = {}
     for _, w in ipairs(H.partyWeapons()) do
       live[#live + 1] = string.format("c%d/%s=$%02X(%s)", w.char, w.hand,

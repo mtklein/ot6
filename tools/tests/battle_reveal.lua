@@ -1,66 +1,27 @@
 -- @suite
--- battle_reveal.lua -- the reveal-gate regression test. Guards against the
--- GUI bug where every enemy weakness icon showed as revealed from battle start
--- instead of '?'.
+-- battle_reveal.lua -- the reveal-gate regression test: enemy weakness icons
+-- must show '?' until actually revealed, never leak from a dirty seed.
 --
--- Root cause: Ot6SeedShields OR's the persistent codex into the reveal masks
--- $3e89 (elements) and $3e9d (classes) but relied on the caller having zeroed
--- them. InitBattle's $3a20-$3ed3 clear does that for a normal battle, so the
--- AllZeros harness and any normal fight never saw the leak.  The Cmd_20
--- scene-change reload (multi-phase bosses and reinforcements, AI cmd $f2)
--- re-runs the seed with no such clear, and real uninitialized RAM would too.
--- The seed now zeroes the masks itself before the codex merge.
+-- Ot6SeedShields ORs the persistent codex into the reveal masks $3e89
+-- (elements) and $3e9d (classes); it must zero those masks itself before
+-- the merge, since a Cmd_20 scene-change reload re-runs the seed without
+-- InitBattle's own clear.
 --
--- Quarantined mechanism arm (issue #75); ONE state write survives, and it is
--- the seed-entry mask dirtier below.  Nothing a player can press produces a
--- dirty reveal mask at seed time: InitBattle clears $3A20-$3ED3 before every
--- normal battle, and only a Cmd_20 scene reload or uninitialized RAM hands the
--- seed garbage.  So a one-shot exec callback at Ot6SeedShields re-dirties every
--- monster reveal mask to $FF the instant the seed starts, after InitBattle's
--- clear, which is the same stale state a Cmd_20 reload hands over.  That is a
--- unit test of the seed's own defensiveness rather than a claim about play.
--- Per the policy on #75 it keeps its `emu.write` waiver, records that here,
--- and may never produce fixtures.  It converts to a real multi-phase fight if
--- and when someone measures a reachable formation that runs Cmd_20 (the
--- Number 128 train chain and the MRF fights are the candidates the burn-down
--- plan names).
+-- This test arms a one-shot memory callback that stamps every monster's
+-- reveal masks to $FF the instant Ot6SeedShields starts, reproducing the
+-- state a Cmd_20 reload or uninitialized RAM would hand the seed, then
+-- boots the Whelk head fight and asserts every mask reads hidden despite
+-- the garbage, and that a real fire chip reveals only the fire axis while
+-- the head's class-weak PIERCE axis stays hidden.
 --
--- Issue #75 conversion, the other half.  Phase 2 used to build the same
--- laboratory battle_break did: the entry-point Guards poked fire-weak, their
--- HP written to 4000, and the three casters' level and mag.pwr pinned equal.
--- All of that is gone.  This file now boots the same body battle_break does,
--- the Whelk head, for the same reasons: $0134 is authored fire-weak
--- (Ot6ElemAddTbl, ot6_break.asm:404-406) and class-weak PIERCE with four
--- shields (Ot6ShieldTbl, ot6_hud.asm:1730-1731), and carries 1600 HP, so one
--- real Fire Beam chips a real weakness on a body that survives it.
---
--- The move strengthens phase 1 as well.  On the Guards, every present species
--- was authored class-weak $02, so the "the seed OVERWRITES the $FF rather than
--- OR-ing it" assertion only ever saw a nonzero replacement, and the file said
--- so ("no formula species is reachable in this fixture").  This formation
--- carries both: the head at $02 and the Whelk shell ($0100, Ot6ShieldTbl row
--- `0, $00`, ot6_hud.asm:1728-1729) at $00, so the same $FF must come back as
--- $02 on one body and $00 on the other in the same seed.
---
--- What changed shape, and why, so nobody reads it as a loosened test.  The
--- old phase-2 control was "the chipped Guard's SECOND authored ELEMENT
--- weakness is still hidden", which needed a body with two element bits; the
--- head has exactly one.  Its second authored axis is the class axis, so the
--- control is now "a fire chip reveals the element axis and leaves the
--- authored PIERCE class axis hidden", asserted the same way as a pair: the
--- second axis is really there, and it is really still hidden.  That is the
--- same claim about the same failure (one hit disclosing more than it earned)
--- across the two masks the seed actually zeroes.  Two assertions also got
--- tighter rather than looser: the revealed-element byte is now checked for
--- equality with $01 instead of for the fire bit, which is what catches a
--- blanket $FF, and the HUD '?' count is unchanged.
---
--- Addresses, all +slot*2 off the monster slot the body lands in (found by
--- species scan, never hardcoded): revealed elements $3E91, revealed classes
--- $3EA5, broken timer $3E90, class-weak mask $3EA4, weak elements $3BE8,
--- shields $3E40, HP $3BFC, presence $3AA8, status-1 $3EEC, species $57C0.
--- HUD shadow line for slot s is H.shadowLine(s); the four weakness cells are
--- the low bytes at +6/+8/+10/+12 ('?' = $BF, fire = $EB).
+-- Fixture: whelk_entry. The head ($0134) is authored fire-weak with 4
+-- shields and class-weak PIERCE ($02); the shell ($0100) is class-weak
+-- $00.  Addresses, all +slot*2 off the monster slot the body lands in:
+-- revealed elements $3E91, revealed classes $3EA5, broken timer $3E90,
+-- class-weak mask $3EA4, weak elements $3BE8, shields $3E40, HP $3BFC,
+-- presence $3AA8, status-1 $3EEC, species $57C0.  HUD shadow line for
+-- slot s is H.shadowLine(s); the four weakness cells are the low bytes
+-- at +6/+8/+10/+12 ('?' = $BF, fire = $EB).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"
 
@@ -79,10 +40,7 @@ local function headAlive()
   return present(hs) and (H.readByte(MSTAT + hs * 2) & 0xC2) == 0
 end
 
--- One-shot: the instant the seed begins, re-dirty every monster reveal mask.
--- This is the state the Cmd_20 reload (and uninitialized RAM) hands the seed;
--- InitBattle's clear has already run, so a correct seed must re-hide these.
--- THE QUARANTINED WRITE (see header): the only one left in this file.
+-- One-shot: re-dirty every monster reveal mask the instant the seed begins.
 local SEED = H.sym("Ot6SeedShields")
 local seedRef
 local function armSeedDirtier()
@@ -101,11 +59,7 @@ local function armSeedDirtier()
 end
 
 -- ------------------------------------------------------------- driver --
--- battle_break's policy, and for the same reason: only Terra beams, so the
--- one chip this file needs is one character casting one spell, and no beam is
--- ever spent on the shell (whose MegaVolt counter is lethal).  Sequences from
--- the settled top command menu on the MagiTek cursor, measured in
--- whelkbal_run.lua:103-127.
+-- only Terra beams; no beam is ever spent on the shell (MegaVolt counter is lethal)
 local BEAM = { "a", "a", "a" }
 local HEAL = { "a", "down", "down", "a", "a" }
 local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
@@ -164,7 +118,7 @@ H.run({ maxFrames = 60000 }, {
       .. "(the quarantined write -- see header)", SEED))
   end),
 
-  -- walk onto the trigger tile; battle_whelkwipe.lua:177-190's field drive
+  -- walk onto the trigger tile
   H.driveUntil(function()
     return H.battleLoadStarted() and H.monstersPresent() > 0
   end, 2600, {
@@ -183,10 +137,8 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() H.setPad({}) end),
   H.waitUntil(function() return H.battleActive() end, 900, "whelk up", 30),
 
-  -- The scripted intro re-uploads the small font for its whole run and the
-  -- hud is veiled while it is up (battle_hudclobber), so the cell reads below
-  -- must wait for a font-whole, un-veiled hud.  The run is past the intro when
-  -- the first battle menu opens.
+  -- the scripted intro re-uploads the small font and veils the hud while it
+  -- runs; wait for a font-whole, un-veiled hud (first battle menu open)
   H.driveUntil(function()
     return H.readByte(MENU) ~= 0 and H.readByte(0x64d5) == 0
        and H.fieldHudPresent()
@@ -231,14 +183,11 @@ H.run({ maxFrames = 60000 }, {
           wcell(slot, 0), wcell(slot, 1), wcell(slot, 2), wcell(slot, 3)))
         H.assertEq(relm, 0, "slot "..slot.." revealed-elements hidden despite seed garbage")
         H.assertEq(rcls, 0, "slot "..slot.." revealed-classes hidden despite seed garbage")
-        -- broken timer ($3e88): the seed now clears it, so a monster handed
-        -- $FF at seed (as a Cmd_20 reload would) must not start broken.
+        -- broken timer ($3e88): the seed clears it, so a monster handed $FF
+        -- at seed must not start broken.
         H.assertEq(brk, 0, "slot "..slot.." broken timer cleared (not broken) despite seed garbage")
-        -- class-weak mask ($3e9c): the $FF must be replaced, not OR'd, by the
-        -- seed's authoritative value, or the hud draws class cells that are
-        -- not there.  This formation carries both sides of that: the head is
-        -- authored PIERCE $02 and the shell is authored $00, so one seed has
-        -- to land a nonzero over the $FF and a zero over the $FF.
+        -- class-weak mask ($3e9c): $FF must be replaced, not OR'd, by the
+        -- seed's authoritative value.
         H.assertEq(clsW ~= 0xFF, true, "slot "..slot.." class-weak mask replaced, not OR'd (got FF)")
         if sp == HEAD_SP then
           H.assertEq(clsW, 0x02, "head's authored class-weak overwritten to PIERCE $02")
@@ -292,12 +241,8 @@ H.run({ maxFrames = 60000 }, {
     for k = 0, 3 do if wcell(hs, k) == 0xEB then drewFire = true end end
     H.assertEq(drewFire, true, "chipped head's HUD row shows the fire glyph, not '?'")
 
-    -- And only that axis.  Everything above this line was satisfiable by a
-    -- ROM that discloses everything it knows on the first matched chip, which
-    -- is the same shape as the bug this file was written for.  The head's
-    -- second authored axis is its class weakness, so it is the control:
-    -- asserted as a pair, the axis is really there, and it is really still
-    -- hidden.
+    -- And only that axis: the head's second authored axis is its class
+    -- weakness, asserted as a pair (there, and still hidden).
     local clsW = H.readByte(CWEAK + hs * 2)
     H.assertEq(clsW, 0x02,
       "control: the head really has a SECOND authored axis to keep hidden -- "

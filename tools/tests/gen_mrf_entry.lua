@@ -1,23 +1,12 @@
 -- gen_mrf_entry.lua -- v0.6 step 3: vector_sneak (VECTOR map 242, {57,34})
 -- -> the column north to the factory door -> map 262, the MAGITEK FACTORY
 -- upper floor, at {28,8}.  Generates mrf_entry.
---
--- The door is map 242's long entrance, decoded from LongEntrance
--- ($EDF480/$EDF882): src {57,2}, horizontal, length 2 -> map 262 dest
--- {28,8}.  So x=57..59 on row y=2 all fire it.  From the sneak exit at
--- {57,34} the column is clear: the party is already north of the guard
--- lanes (y=39..41) and of the "You!? How'd you get in here?" trigger row
--- (56..58,39), which is why step 2 exists.
---
--- This step also runs the live navigation census the route recon asked
--- for as its probe 2.  Offline BFS over
--- the static tilemap said map 262 has only ~130 tiles reachable from the
--- door and that (4,22), (11,45), (12,60), (22,53) and (22,54) are all
--- NO-PATH, because the map is joined by scripted obj_script
--- transitions and because several of its triggers rewrite BG1 at runtime
--- with `mod_bg_tiles` (event_main.asm:94962-95060).  The census below is
--- measured against the live tilemap the engine loaded, so the next step
--- can be routed from a measurement rather than an offline estimate.
+
+-- The door is map 242's long entrance: src {57,2}, horizontal, length 2
+-- -> map 262 dest {28,8}.  So x=57..59 on row y=2 all fire it.  From the
+-- sneak exit at {57,34} the column is clear: the party is already north
+-- of the guard lanes (y=39..41) and the trigger row at (56..58,39).
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -158,9 +147,8 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("mrf_entry.mss"),
 
-  -- 3. The census (recon probe 2).  Run after the state is generated so the
-  --    banked state is unaffected by it.  The targets are every tile the
-  --    recon's offline pass called NO-PATH, plus the two doors onward.
+  -- 3. The census.  Run after the state is generated so the banked state
+  --    is unaffected by it.
   H.call(function()
     census("mrf_entry", {
       { 22, 53, "the scripted 263 transition trigger" },

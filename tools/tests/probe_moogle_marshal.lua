@@ -1,17 +1,9 @@
 -- probe_moogle_marshal.lua -- measures how close the input-driven Marshal
--- fight gets, and what input-driven options remain (issue #75,
--- marshal-investigation).
---
--- probe_moogle_stations (plain tap-A) and probe_moogle_boosted (naive
--- R/A/A) both cleared the six waves 2-2-2 and then lost battle 6 with P2
--- around 330-364/543.  This run replays the stations plan and then
--- instruments the Marshal fight: party HP and monster HP (battle HP
--- table slots 4..9) every 240 frames, so the loss (or win) is recorded
--- with its margin.  It also dumps the party's item inventory at
--- defense-live; if the players are carrying Tonics/Potions, menu healing
--- before the fight is an input-driven option this route has not used.  The
--- battle driver here presses R once per ~half-second and A three times, a
--- slower boost cadence than probe_moogle_boosted's.  Zero writes.
+-- fight gets. Replays the stations plan and then instruments the Marshal
+-- fight: party HP and monster HP (battle HP table slots 4..9) every 240
+-- frames. Also dumps the party's item inventory at defense-live. The
+-- battle driver presses R once per ~half-second and A three times.
+-- Zero writes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/moogle_defense.mss.lua"
 
@@ -102,9 +94,7 @@ local function pokeStep()
 end
 
 -- the instrumented Marshal driver: slow boost cadence plus HP telemetry.
--- Runs until the battle module is gone and stays gone for 240 frames (a
--- wipe zeroes the HP table early; the debounce keeps telemetry flowing
--- through the Annihilated screen so the ending is recorded).
+-- Runs until the battle module is gone and stays gone for 240 frames.
 local function marshalFight(maxFrames)
   local phase, calm, tel = 0, 0, 0
   return H.driveUntil(function()

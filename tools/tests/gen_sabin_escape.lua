@@ -4,14 +4,7 @@
 --   doma_defended.mss  map 119 at (14,30), SABIN + CYAN mounted on Magitek,
 --                      controllable.  This is the starting point of the
 --                      escape to the overworld
---
--- Scope note: this step stops at the moment the escape hands the player
--- control, not at the overworld.  The escape's walk from (14,30) to the
--- world exit is a fight/scripted-interlude/fight sequence whose interlude
--- holds the party in an obj-script a plain navTo never sees end (measured;
--- see the long comment at generation time below).  That walk is the next
--- step.
---
+
 -- The defence is three talks to CYAN, and the talk detector is the part that
 -- matters.  SABIN arrives at (8,29) on map 119 with CYAN (the warrior NPC,
 -- object carrying event _cb1483, npc_prop.asm:4712) fighting off Imperial
@@ -23,18 +16,15 @@
 -- After each fight CYAN walks to a new spot and the next wave's soldiers are
 -- placed beside him (:41255-41312).
 --
--- Why a plain talkToObj fails here, measured over a dozen probe runs.  The
--- whole courtyard floor (y 19..29) is covered with _cb13b9 triggers
--- (event_trigger.asm) that fire a soldier-jump animation as SABIN walks.
--- gen_banon's talkToObj declares "engaged" as soon as `eventRunning() or
--- dialogWaiting()` holds for six frames, which a floor trigger satisfies,
--- so it walks up to CYAN, clips a floor tile, treats that as the talk,
--- and moves on having fought nothing.  The fix is a talk whose success test
--- is the fight switch itself (or a battle loading) rather than "some event
--- ran": walk cleanly onto a tile adjacent to CYAN, then hold a tight
--- face-then-edge-A loop, with no re-planning and no bfs mid-poke, until the
--- wanted switch flips.  Measured: from (9,26) that loop reaches _cb152c
--- (event PC $CB154D) in ~150 frames; a re-planning driver did not.
+-- A plain talkToObj fails here: the whole courtyard floor (y 19..29) is
+-- covered with _cb13b9 triggers (event_trigger.asm) that fire a
+-- soldier-jump animation as SABIN walks, and those satisfy the usual
+-- "eventRunning() or dialogWaiting() for six frames" engaged test, so a
+-- plain talk clips a floor tile and moves on having fought nothing. The
+-- fix is a talk whose success test is the fight switch itself (or a
+-- battle loading): walk cleanly onto a tile adjacent to CYAN, then hold a
+-- tight face-then-edge-A loop, with no re-planning and no bfs mid-poke,
+-- until the wanted switch flips.
 --
 -- $01B5 is not a wave latch; it is a live control-flag bit, which is the
 -- hazard the survey flagged.  _cb13b9 writes `switch $01B5=1` and reads it
@@ -43,7 +33,7 @@
 -- byte UpdateCtrlFlags rewrites every frame (field/event.asm:5416).  Reading
 -- it as "the wave is blocked" is how a probe convinced itself the defence
 -- had deadlocked when it had not; the fights never consult it.
---
+
 -- The Magitek escape is one long automatic cutscene.  After CYAN joins
 -- there is exactly one player_ctrl_on in the whole escape, at its end
 -- (:42253), right before `load_map 0, {179,71}, LEFT` + `set_script_mode
@@ -57,42 +47,14 @@
 -- field map.  The Magitek "mode" here is likewise a sprite the escape
 -- cutscene drives rather than a separate engine mode; $087C stays
 -- event-controlled throughout and no MAGITEK-specific movement code runs.)
---
+
 -- The exit lands on the camp-entry trigger.  World (179,71) is the
 -- tile whose trigger _cb0bb7 (:39715) loaded the camp, but it now opens
 -- `if_switch $0037=1, WorldReturn`, and the escape has set $0037, so
 -- re-stepping it returns instead of re-entering.  The savestate is
 -- generated on the first settled world frame, before any walk, so the
 -- fixture is unambiguous.
---
--- Issue #75: the waves are fought rather than write-cleared, and this
--- generator makes no state writes.  Battles 13/13/14 (Imperial troops; SABIN solo for
--- waves 1-2, wave 3 is where CYAN joins) run the house menu-episode
--- machine: bank boost to 2, dump it on Fight (R..R A A on a settled menu,
--- one button per 30-frame pulse), edge-tapped A for every dialog and
--- victory page.  A loss (90 straight frames of every real party slot at
--- 0 HP) sets `lost` and the three-attempt retry ladder reloads the
--- boot-moment checkpoint, which is the script's equivalent of a player
--- reloading a save, with the fighter escalated (tier 2+ dumps at
--- 1 BP) and a 17-frame reload stagger; three losses fail the generation with
--- every attempt's numbers recorded.  SHADOW's leave roll does not
--- run here: battle switch $4B is story-set until the magitek escape's
--- exit clears it (event_main.asm:42251).
---
--- Issue #75, playBattles: the one navigator call below (talkTo's approach
--- walk) passes
--- playBattles = "tactical", so it does not fall through to the library's
--- monster-dead flag write.
--- It runs on map 119, the Doma courtyard, which has random encounters
--- disabled.
--- A field map rolls for a random battle only when byte +5 of its 33-byte
--- map_prop.dat record has bit 7 set: LoadMapProp copies the record to $0520
--- (ff6/src/field/map.asm:143-158), and the step handler returns before the roll
--- unless $0525 is negative (ff6/src/field/battle.asm:333-347).  So the option
--- is intent only here.  "tactical" rather than "flee" because the only battle
--- that could still reach it is an unscripted surprise -- a goal fight is taken
--- by opts.spare or opts.arrive first -- and fighting one beats spending
--- M.FLEE_CAP frames failing to run from it.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_cleared.mss.lua"
 
@@ -117,21 +79,6 @@ local function monCount()
   return n
 end
 
--- BATTLE DETECTION, SLOT-AGNOSTIC -- and this is the whole reason run 2 of
--- this file died.  lib/ot6.lua's battleLoadStarted() reads ONE word, party
--- battle-HP slot 0 at $3BF4, and calls it "a battle has begun loading".
--- That holds for every fixture the harness had before this arc, because
--- every one of them fought with a party whose slot 0 was occupied.  CYAN's
--- solo defence of Doma does not: measured across the whole fight,
---     $3BF4=0000  $3BF6=00FE  $3BF8=0000  $3BFA=0000
--- CYAN is in battle slot ONE.  So battleLoadStarted() stayed false for the
--- entire battle, every driver in the run treated it as "no battle", nobody
--- pressed anything, and CYAN stood there while his HP ticked
--- FE -> D4 -> 94 -> 5A and the fight was lost.  The loss is then silent by
--- design: `battle 46` is followed by `call _ca5ea9` (:61522-61523), and
--- _ca5ea9 is `if_b_switch $40, _ca5eb2 / call GameOver` -- so a lost battle
--- leaves the event PC parked at $CB9EBB forever with the field still drawn.
---
 -- So scan all four slots -- but VALIDATE THE WHOLE TABLE, not just "some
 -- slot looks like HP".  A first attempt that returned true on any single
 -- plausible word fired on map 123 while the CYAN name menu was open:
@@ -227,12 +174,6 @@ local CHOICES = {}   -- this step reaches no `choice` at all
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
--- ---------------------------------------------------------- the fighter --
--- The input-driven battle driver (issue #75; gen_sabin_camp's copy of
--- gen_scenario's menu-episode machine).  fightFrame() is the one entry
--- point every battle-seeing site calls each frame: it opens the per-fight
--- bookkeeping on a rising edge (a >10-frame gap in sightings), runs the
--- loss watch, and drives the menu machine (boost prefix + Fight).
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local BP = 0x3E9C
 local fightTier = 1
@@ -261,12 +202,6 @@ local MSTATE = 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM = 0x01
 local CMDTBL, CMDROW = 0x202E, 0x890F
--- the item-list cursor is TWO cells per actor -- scroll ($8947) plus
--- row-on-screen ($894F) -- and the engine's own get_item_poi
--- (btlgfx_main.asm:_c189be) sums them before the *5; reading the scroll
--- alone selected inventory index 4 while the display said 1 (measured,
--- probe_itemuse: the select/deselect toggle that wedged the first
--- input-driven courtyard generation)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local function itemIdxOf(a)
   return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
@@ -293,8 +228,6 @@ local fTick, fStreak = 0, 0
 local function makeFightPlan(actor)
   local hp, mx = pHPf(actor), pMaxHPf(actor)
   local itemRow = cmdRowOf(actor, CMD_ITEM)
-  -- heal under 60%, and reach for the Potion once 100+ HP is missing: the
-  -- pursuit measured 4 attackers out-damaging a 50-HP Tonic line
   if mx > 0 and hp > 0 and hp * 10 < mx * 6 and itemRow then
     local id = nil
     if mx - hp >= 100 and battItemIdx(POTION) then id = POTION
@@ -308,9 +241,6 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  -- dump banked boost EVERY turn: these are 1-2 member steps where a dead
-  -- enemy is the only mitigation, and the pursuit measured bank-to-2
-  -- losing the tempo war against four attackers
   local boost = bp >= 1 and math.min(bp, 3) or 0
   H.log(string.format("escape: cast f%d e%d boost=%d tier=%d [%s]",
     H.frame, actor, boost, fightTier, partyLine()))
@@ -321,8 +251,6 @@ local function fightButton()
   local actor = H.readByte(ACTOR)
   if fPlan == nil or fPlanActor ~= actor then
     if st ~= ST_CMD then
-      -- planless in a parked LIST state: back out to the command list
-      -- (the b68 engine measured a menu reopening straight into a list)
       if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
         return { "b" }
       end
@@ -487,9 +415,6 @@ local function rideUntil(pred, what, budget)
         inChoice = false
       end
 
-      -- battle: hand the frame to the input-driven fighter (issue #75) -- it
-      -- opens the bookkeeping, runs the loss watch, and drives the
-      -- boost-and-Fight episode machine (script battles just ride).
       if battN >= 3 then
         quiet = 0
         fightFrame(phase, what)
@@ -529,18 +454,6 @@ local function rideUntil(pred, what, budget)
   }, what)
 end
 
--- "THE STORY BEAT IS OVER", written so a flapping trigger tile still
--- counts.  The obvious predicate -- n CONSECUTIVE frames of full control --
--- cannot be satisfied anywhere on this map, because every one of these
--- scenes leaves the party standing ON the trigger tile that fired it and
--- CheckEventTriggers (field/event.asm:5740) has no once-per-tile latch: it
--- re-fires the script every single frame.  The scripts are inert by then
--- (_cb0f2e opens `if_switch $002B=1, EventReturn`, :40303) but each firing
--- still flips $087C to 4 for a frame or two, so hasControl() oscillates
--- forever.  Measured, run 1: the party sat on (36,22) for 12,000 frames
--- with the heartbeat reading ctl=true and the every-frame settle sample
--- reading ctl=false, and "10 consecutive" never happened once.
---
 -- So: require the map to be STATICALLY quiet for 4n frames -- right map,
 -- tile-aligned, fully faded in, no battle, no dialog -- and require real
 -- user control in at least n of them.  A cutscene fails the second half
@@ -672,8 +585,6 @@ local function talkForFight(cx, cy, wantSw, what, budget)
   return H.cond(function() return true end, steps)
 end
 
--- CYAN's live tile (object carrying _cb1483).  It is obj 18 on entry and
--- stays obj 18 across the waves (measured: it walks (4,23)->(10,26)).
 local function cyanX() return objX(18) end
 local function cyanY() return objY(18) end
 
@@ -764,27 +675,6 @@ H.run({ maxFrames = 250000 }, {
       H.frame, table.concat(battles, " ")))
   end),
 
-  -- 2. THE ESCAPE HANDS CONTROL TO THE PLAYER AT (14,30), and that is the
-  -- deliberate end of this step.  After CYAN joins, the mount sequence
-  -- auto-walks the party (obj_scripts, control off) up through the castle
-  -- and back down, then returns USER control -- measured, a pure hands-off
-  -- ride from here idles at exactly (14,30), $087C=02, ev=false,
-  -- indefinitely (probe_ride).  That is the Magitek escape's starting line.
-  --
-  -- WHY THE STEP STOPS HERE, stated so the next agent does not rediscover it.
-  -- The escape from (14,30) to the world exit (36,14) is NOT a plain walk:
-  -- it is fight / scripted-interlude / fight.  Walking onto (24,28) fires
-  -- `battle 15` (_cb1955, :42014); the fight is WON (the tail runs past
-  -- `call _ca5ea9` -- GameOver's gate -- and sets $01F4=1), but control does
-  -- NOT come back: the party sits on (24,28) with $087C=04 (event-
-  -- controlled) and eventRunning() true for as long as the run lasts
-  -- (measured 7,000+ frames, probe_esc).  So _cb1955's tail leaves the
-  -- party inside an obj-script interlude that a plain navTo (which only
-  -- hands off and waits when control is lost) never sees end.  Driving the
-  -- escape needs a fight/interlude/fight state machine, or the interlude's
-  -- own exit condition decoded, and that is scoped as the next step rather
-  -- than thrashed here.  doma_defended is the clean, reproducible entry point
-  -- it should build from.
   rideUntil(function()
     return map() == 119 and H.fieldX() == 14 and H.fieldY() == 30
        and H.hasControl() and H.tileAligned() and bright() >= 15

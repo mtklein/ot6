@@ -1,14 +1,8 @@
--- battle_counterfold.lua -- #93
+-- battle_counterfold.lua -- a counter's boosted-fold behavior, simulated
+-- since the in-play trigger (a raged GAU countering with a tier-family
+-- spell) cannot be produced on cue.
 -- @suite savestate=battle_entry
---
--- The counterattack arm of Ot6QueueFold, covered for the first time.  The guard refuses to fold an action that
--- IS the actor's pending counterattack (queue pointer == $32CD,x while
--- $b1.0 is up), because no ActionEnd ever charges what a counter queues
--- -- a counter's fold would be free magnitude.  #91 rewrote that guard
--- from "is a counter running anywhere" to "is THIS action the counter",
--- and both versions refuse in the case the arm exists for, so nothing in
--- the suite could tell a correct guard from a merely different one.
---
+
 -- The reachable in-play instance is a raged GAU whose species counters
 -- with a tier-family spell -- choreography nobody can produce on cue --
 -- so this is a focused unit-style test in the battle_steal mold: the
@@ -16,20 +10,7 @@
 -- CreateNormalAction's $32CC,x pointer into the counter slot $32CD,x and
 -- raises $b1.0, which is precisely the state CreateRetalAction leaves,
 -- battle_main.asm:13206-13211), and the same cast is made twice:
---
---   control  boost 1 pending, no simulation: TERRA's Fire folds one
---            tier and is charged the folded price (#64's rule), so the
---            debit is strictly more than Fire's own published price.
---            This is the fail-before: it proves the fold fires and the
---            discriminator discriminates.
---   arm      boost 1 pending, counter simulated: the guard must take
---            its @keep exit -- base Fire queued, base price charged.
---
--- A wrong guard (the pre-#91 global flag, or no guard at all) fails one
--- arm or the other: fold-during-counter charges the arm the folded
--- price; a guard keyed on "any counter running" would also have to
--- refuse the CONTROL if the flag were up -- the two arms bracket it.
---
+
 -- Isolation writes (waived, labeled): the pending-boost byte $3E9D,x
 -- (the precondition both arms need), the counter slot $32CD,x and flag
 -- $b1 (the simulation itself).  Reads and pad presses otherwise.
@@ -46,8 +27,6 @@ local function mp() return H.readWord(CURMP + terra * 2) end
 local function fireCell()
   local base = H.readWord(MLISTPTR + terra * 2)
   if base < 0x2000 or base > 0x2600 then return nil end
-  -- the list embeds $FF gaps between known cells (measured: TERRA's
-  -- battle_entry list is 2D _ _ 00 ...), so scan all 54 cells
   for cell = 0, 53 do
     local at = base + (cell + 1) * 4
     if H.readByte(at) == FIRE then return cell, H.readByte(at + 3) end
@@ -94,8 +73,6 @@ local function castFire(tag, sim)
       local st = H.readByte(MSTATE)
       if st == ST_TRANS then H.setPad({}); return end
       if a ~= terra then
-        -- a bystander's open command window freezes the Wait-mode clock
-        -- (#72's hazard): X passes the menu to the next ready actor
         H.setPad(st == ST_CMD and (mf % 8 < 4 and { x = true } or {})
                  or { b = true })
         return

@@ -1,6 +1,6 @@
 -- gen_post_opera_checkpoint.lua -- create the v1 battery checkpoint from
 -- blackjack.
---
+
 -- This does not synthesize vanilla save checksums.  It opens the ordinary
 -- field menu, enters vanilla's Save selector, chooses slot 3, and lets
 -- CopyGameDataToSRAM write the save.  run.sh captures Mesen's complete 32 KiB
@@ -79,24 +79,11 @@ H.run({ maxFrames = 5000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
-    -- the real CopyGameDataToSRAM entry captures the slot argument the
-    -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
-    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- The pad-driven save (save-drive rule, tools/tests/README.md;
-  -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
-  -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
-  -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
-  -- poke, and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -125,10 +112,6 @@ H.run({ maxFrames = 5000 }, {
     H.assertEq(emu.read(0x316801, emu.memType.snesMemory), 0x38,
       "slot 3 has OT6 codex magic 8")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are read, never seeded (issue #75): the
-    -- battery carries whatever the chain earned.  The phase-2 checkpoint
-    -- re-cuts measure these, and the entry contracts follow the
-    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))

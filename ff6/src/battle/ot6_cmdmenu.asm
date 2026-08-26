@@ -7,16 +7,8 @@
 ; $C1/$C3 shims. The Steal submenu is the same shape but lives with its kit,
 ; in ot6_thief.asm.
 ; ------------------------------------------------------------------------------
-; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
-; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler receives the identical
-; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
-; ff6-en.map are byte-identical across the split.
-; ------------------------------------------------------------------------------
 
-; ------------------------------------------------------------------------------
-
-; [ open the Blitz command as a menu (v0.3 blitz-as-menu, stage 1) ]
+; [ open the Blitz command as a menu ]
 
 ; vanilla Blitz had no window: _c1776b armed the 64-frame pad-edge buffer and
 ; UpdateMenuState_3d matched button codes. This module deletes that path and
@@ -86,10 +78,8 @@
         ; command window opened: UpdateMenuState_04 (btlgfx_main.asm:13343)
         ; reads f:$001d4e, and when bit6 is clear (Reset) stz-loops the whole
         ; 92-byte cursor block $890f..$896a to zero; when set (Memory) it skips
-        ; that loop, so last turn's positions survive.  The old code here zeroed
-        ; the triple unconditionally, overriding that decision and snapping
-        ; Blitz to the top row whatever the setting, which was the
-        ; owner-reported bug.  Blitz reuses the Tools triple under the same
+        ; that loop, so last turn's positions survive.  Blitz reuses the Tools
+        ; triple under the same
         ; per-slot index ($62ca), so doing nothing makes it obey the bit the
         ; same way Tools/Magic/Item do.  A remembered row indexes the packed
         ; $5d+i list directly (in-battle the learned set is fixed), so no
@@ -107,29 +97,6 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ #46, retired by #53: an ability's break class glyph, for a field-menu list ]
-;
-; This proc gave the field Skills->Blitz page a class glyph and nothing else,
-; for one reason: the element icons in Ot6ElemGlyphTbl lived only in the battle
-; small font (uploaded by Ot6LoadFontIcons_ext from LoadMenuGfx,
-; btlgfx_main.asm:8911), while the four class cells ($d9 sword / $da spear /
-; $dc staff / $df sparkle) ship in the vanilla font art itself, which is also
-; how item names in the field menu carry them as a leading character
-; (item_name_en.json's {sword}/{spear}/{staff}/{special}, small_symbols_en
-; .json:0xD9-0xDF).  So a field page asking for an element drew whatever
-; occupied that cell, and #46 did not ask.
-;
-; #53 uploads the eight element tiles into the menu font as well
-; (Ot6MenuIcons4bpp_ext / Ot6MenuIcons2bpp_ext, ot6_icons.asm), which removes
-; the only reason this existed.  The page calls Ot6SkillIconGlyph now, the
-; rtl wrapper over Ot6ElemGlyphFor, the same leaf the battle ability lists
-; use to decide their icon.  This body is removed rather than left unreferenced
-; on purpose: a second glyph leaf that disagreed with the first is the problem
-; #56 had to clean up after two MP-price drawers drifted apart, and
-; keeping a class-only copy around invites a third page to pick it up.
-
-; ------------------------------------------------------------------------------
-
 ; [ draw one Blitz menu row: the names, and (priced build) their MP cost ]
 ;
 ; DrawToolsListText (btlgfx, bank C1, the full build) jsl's here for a
@@ -137,8 +104,7 @@
 ; stores it used to do. Moving that swap into bank F0 gives the priced build
 ; room to also stamp an MP cost after each name without growing the full C1
 ; bank: the feature costs C1 a single 4-byte jsl (net -4 bytes there), and the
-; logic lives here. This is the first menu-bank module, and the visual half of
-; the mp-cost feature the hidden charge has been waiting on.
+; logic lives here.
 ;
 ; the line buffer w7e5755 already holds the copied Tools template plus the two
 ; row ids (the caller wrote Index,y -> +5 and Index+3,y -> +11 before the jsl);
@@ -217,11 +183,10 @@
 ; assembled, because the shared C1 object calls it in both builds, so the flag
 ; gating lives here in the battle object rather than in btlgfx.
 ;
-; Layout and fit finding (see build/states/shots/tools_cost_display.png): the
-; tools window is two columns of 13-wide item names (AutoCrossbow, NoiseBlaster,
-; ...), and those already fill the row edge to edge, so a Blitz-style cost after
-; each name overflows the 32-tile screen (verified: probe_tools_2col rendered
-; the bare names reaching the right border).  A true single column would fit a
+; Layout and fit finding: the tools window is two columns of 13-wide item
+; names (AutoCrossbow, NoiseBlaster, ...), and those already fill the row
+; edge to edge, so a Blitz-style cost after each name overflows the 32-tile
+; screen.  A true single column would fit a
 ; trailing cost but needs the tools window to scroll (it is a fixed 4x2 grid
 ; whose max-scroll is hardwired to zero), which means re-cutting the shared
 ; item/throw cursor + draw state machine, more work than a cost label warrants.
@@ -288,7 +253,7 @@
 ; ------------------------------------------------------------------------------
 
 ; [ draw one Dance menu row: a leading 2-digit price per name, greyed if
-;   the caster cannot afford it (#34: the #35 display pattern's second consumer) ]
+;   the caster cannot afford it ]
 ;
 ; DrawDanceListText (btlgfx, bank C1) jsl's here after copying the template
 ; and storing the two row ids, the same shape as Ot6ToolRowDecorate, on the
@@ -359,7 +324,7 @@
 ; [ add the Bushido "not enough BP" grey reason to a row's font ]
 ;
 ; In bushido mode (w7e6168 = 2) the submenu row is the boost level (Y/6 + 1
-; since #38's 1-BP floor, weakest at top). A row whose boost exceeds the
+; with the 1-BP floor, weakest at top). A row whose boost exceeds the
 ; caster's current bp (OT6_BP_CLASS,entity) is unreachable, because
 ; Ot6BushidoConfirm refuses to commit it, so grey it like an unaffordable
 ; spell, a second grey reason on top of Ot6AbilityGrey's MP one.  At 0 bp that
@@ -370,7 +335,7 @@
 ; reached from Ot6BlitzRowDecorate's OT6_MP_COSTS block, so it lives behind the
 ; same flag.
 ;
-; #55 adds a second consumer, thief mode (w7e6168 = 3), for the same kind of
+; Thief mode (w7e6168 = 3) is a second consumer, for the same kind of
 ; reason: Bestow cannot do anything at 0 BP, because there is no pip to hand
 ; over, and Ot6Bestow's first refusal is that same test, so the row greys and
 ; the player learns it before spending the turn rather than after.  This proc
@@ -388,7 +353,7 @@
         pha                     ; [S+1] park the MP grey
         lda     $6168
         cmp     #$03
-        beq     @thief          ; #55: the thief submenu's own BP reason
+        beq     @thief          ; the thief submenu's own BP reason
         cmp     #$02
         bne     @pass           ; not bushido: return the MP grey unchanged
         phx                     ; [S+2] save caller X (Ot6BlitzRowDecorate's)
@@ -409,7 +374,7 @@
         inx
         bra     @div
 @haver: txa                     ; A = i
-        inc     a               ; #38: boost r = i + 1; with the 1-BP floor a
+        inc     a               ; boost r = i + 1; with the 1-BP floor a
                                 ;   0-bp Cyan greys every row (see the header)
         cmp     $01,s           ; r vs bp; C set iff r >= bp
         beq     @afford         ; r == bp: exactly affordable
@@ -423,7 +388,7 @@
         pla                     ; drop bp
         plx                     ; restore caller X
         bra     @pass
-; #55: in thief mode only Bestow has a BP precondition, and it is "hold one".
+; In thief mode only Bestow has a BP precondition, and it is "hold one".
 @thief: lda     $4005,y         ; this row's id (column 1; Qty at +1, Flags +2)
         cmp     #OT6_THIEF_BESTOW
         bne     @pass           ; steal / filch / an empty cell: MP grey only
@@ -449,7 +414,7 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ open Cyan's SwdTech as a submenu (v0.5 bushido submenu, issue #8) ]
+; [ open Cyan's SwdTech as a submenu ]
 ;
 ; vanilla SwdTech ran a free numeral gauge (UpdateMenuState_35/37, now dead):
 ; a bar climbed one unit every 4 frames, the tech was bar>>5, and A latched
@@ -458,7 +423,7 @@
 ; OpenCmdMenuTbl[7] now hits a C1 stub that jsl's here then jmp's OpenToolsWindow.
 ;
 ; The rows are the boost window: row r (weakest at top) = boost r+1 = the tech
-; Ot6BushidoTier returns for that boost (#38: no 0x tier). Ot6BushidoWindow
+; Ot6BushidoTier returns for that boost (no 0x tier). Ot6BushidoWindow
 ; enumerates the <=3 techs into wItemList's left column (cells r*2, so row r
 ; reads at wItemList offset r*6, what _c18470 computes for column 0); the
 ; right column and any unused rows are $ff (empty), so the window renders a
@@ -505,11 +470,11 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ enumerate the moving-window techs into wItemList (issue #8) ]
+; [ enumerate the moving-window techs into wItemList ]
 ;
 ; writes attack id ($55 + tech[i]) for row i = 0..min(2,ceiling) into
 ; wItemList::Index at cell i*2 (the left column of row i), and $ff-fills every
-; other cell through the 8-cell (4x2) window. #38: row i is boost i+1, since the
+; other cell through the 8-cell (4x2) window. row i is boost i+1, since the
 ; 0x tier is retired, so the window is three rows deep and row 3 always stays
 ; $ff (blank, and the C1 confirm refuses it). tech[i] shares Ot6BushidoTech's
 ; base+boost math and Ot6BushidoOblivion's top-tier swap with single-select, so
@@ -535,13 +500,13 @@
         jsl     Ot6BushidoCeil      ; A = ceiling (0..7)
         cmp     #$03
         bcc     :+
-        lda     #$02                ; #38: cap the window at three rows (1x/2x/3x)
+        lda     #$02                ; cap the window at three rows (1x/2x/3x)
 :       pha                         ; maxrow -> $02,s (after the offset push)
         lda     #$00
         pha                         ; left-cell write offset -> $01,s
         ldy     #$0000              ; row i
 @row:   tya                         ; A = row i
-        inc     a                   ; #38: row i -> boost i+1 (no 0x tier)
+        inc     a                   ; row i -> boost i+1 (no 0x tier)
         jsl     Ot6BushidoTech      ; A = tech (preserves Y; clobbers X)
         jsl     Ot6BushidoOblivion  ; A = tech, top-tier swap (preserves Y)
         clc
@@ -599,7 +564,7 @@
         inx
         bra     @div
 @haver: txa                         ; A = i (i <= 2)
-        inc     a                   ; #38: boost r = i + 1 (the 1-BP floor)
+        inc     a                   ; boost r = i + 1 (the 1-BP floor)
         pha                         ; park r ($01,s)
         ; --- entity offset for OT6_BP_CLASS/OT6_BOOST_REVEALED ---
         lda     $62ca

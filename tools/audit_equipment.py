@@ -1,29 +1,11 @@
 #!/usr/bin/env python3
 """Report party members who are walking the story bare-handed.
 
-Why this exists.  The game strips characters and returns their gear to the
-inventory at story beats (`remove_equip` / EventCmd_8d, 58 sites in 15
-clusters across event_main.asm), and the chain of generated savestates has
-never once put it back on.  battle_brokendeath found this at the Vector
-infiltration in 2026-07 and drove Equip -> Optimum by hand to fix its own
-fixture.  Nobody checked whether it was a general problem; it is one.
-
-On 2026-08-09 the first end-to-end run of the input-driven chain stalled at
-`sfigaro_town`, where solo LOCKE lost the gate soldier three times running.
-It read like a balance wall, a level-13 machine with 495 hp against a
-level-8 thief, but the cause was different: LOCKE's whole equipment block
-read `FF FF FF FF FF` and his own Dirk was sitting in the bag.  He was
-punching it.  Armed, his swing went 8 -> 21.
-
-A wrong fixture reads like a balance finding, and this script is here to
-catch that case.  To keep it cheap, it reads the savestates directly, with
-no emulator: 110 fixtures in about a second, against a `make savestates`
-measured in hours.
-
-Reading the fixture is `savestate_party.py`, shared with the sibling check
-`audit_party_hp.py`; this file is only the equipment question.  What it
-needs from a record is +$1F weapon and +$20..+$23 the rest, where $FF means
-empty.
+The game strips characters and returns their gear to the inventory at story
+beats (`remove_equip` / EventCmd_8d), and a generated savestate can carry
+that forward uncorrected.  Reads the savestate directly, with no emulator,
+via `savestate_party.py` (shared with `audit_party_hp.py`); the record used
+is +$1F weapon and +$20..+$23 the rest, where $FF means empty.
 
 Usage:  python3 tools/audit_equipment.py [--dir build/states] [-v]
 Exit 0 clean, 1 if anybody in a party is holding nothing.
@@ -36,9 +18,7 @@ import glob
 import os
 import sys
 
-# Explicit rather than relying on sys.path[0], which PYTHONSAFEPATH and
-# `python3 -P` both switch off; `make test` invokes this as a plain script
-# but a one-line insert costs nothing and cannot surprise anyone later.
+# sys.path[0] is unreliable under PYTHONSAFEPATH / `python3 -P`.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from savestate_party import (EMPTY, NAMES, declared_states, load_waivers,
@@ -54,26 +34,12 @@ ITEM_TYPE_WEAPON = 0x01      # ItemProp +$00 & $07
 def equippable_weapons(repo: str) -> dict[int, int]:
     """How many weapon records each actor may hold, read from the ROM data.
 
-    UMARO and GAU are bare-handed in a dozen fixtures between them, and that
-    is correct, because the game will not let either of them hold anything.
-    That is derived here rather than hardcoded, using the game's own two
-    reads from `GetValidWeapons` (`ff6/src/menu/equip.asm:1594-1601`): a
-    record is a weapon when `ItemProp +$00 & $07 == $01`, and the equip mask
-    is the 16-bit field at +$01, bit N = actor N (HANDOFF, "canonical facts
-    you should not re-derive"; byte +$00 also always looks like a mask and
-    always claims Terra, which is the mistake that entry exists to prevent).
+    Mirrors the game's own `GetValidWeapons` reads (`ff6/src/menu/
+    equip.asm:1594-1601`): a record is a weapon when `ItemProp +$00 & $07 ==
+    $01`, and the equip mask is the 16-bit field at +$01, bit N = actor N.
     An actor who can hold one weapon or none cannot be re-equipped and must
-    not be reported as a finding, or the real findings get buried.
-
-    The type test replaced a `range(0x00, 0x60)` stand-in for "is this a
-    weapon" on 2026-08-13.  Records $5A..$68 are shields, so the stand-in
-    counted the Buckler, the Mithril Shld and the Aegis Shld as weapons for
-    GAU and put him at four, which kept him in the report.  He holds exactly
-    one weapon record in this ROM, $24 Imp Halberd, and no shop in the game
-    stocks it (no record in `ff6/src/menu/shop_prop.dat` lists it), so the
-    route cannot arm him and reporting him buries the real findings.  Record
-    $FF is skipped: it is the empty-slot sentinel, and its record is typed
-    as a weapon with a mask that claims actors 0-7.
+    not be reported as a finding.  Record $FF (the empty-slot sentinel) is
+    skipped: it is typed as a weapon with a mask that claims actors 0-7.
     """
     path = os.path.join(repo, ITEM_PROP)
     try:
@@ -109,9 +75,7 @@ def main() -> int:
         print(f"audit_equipment: no fixtures under {args.dir}")
         return 0
 
-    # Same reason as the party-hp audit: a .mss the graph no longer declares
-    # is a rename leftover, and a finding in one cannot be fixed by editing
-    # any generator.  savestate_party.declared_states has the case.
+    # A .mss the graph no longer declares is a rename leftover.
     files, orphans = split_orphans(files, declared_states(args.repo))
     if not files:
         print(f"audit_equipment: {len(orphans)} fixture(s) under {args.dir} "

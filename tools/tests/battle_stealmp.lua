@@ -1,15 +1,10 @@
 -- @suite slow savestate=figaro_cleared
--- battle_stealmp.lua -- v0.5 "every ability costs MP": Steal (cmd $05) joins the
--- cost gate. This is the same self-detecting A/B as battle_mpcost.lua, aimed at
--- the one costed verb that test does not drive, Locke's Steal.  It checks that
--- the flat-cost path added to Ot6AbilityCost (cmd $05 -> 4 MP, keyed on the
--- command rather than an id-table row) charges and refuses through the universal
--- code, and stays free on the OFF baseline.
---
--- Repriced by #52 (2026-07-29): 2 -> 4. The flat path now reads the Ot6StealCost
--- leaf (the Ot6DanceCost shape) instead of an inline immediate, so this test,
--- battle_costtable.lua and #55's future row decorator all price one number.
---
+-- battle_stealmp.lua -- "every ability costs MP": Steal (cmd $05) joins the
+-- cost gate.  A self-detecting A/B: it checks that the flat-cost path added
+-- to Ot6AbilityCost (cmd $05 -> 4 MP, keyed on the command rather than an
+-- id-table row) charges and refuses through the universal code, and stays
+-- free on the OFF baseline.
+
 --   * ON  (build/ot6.sfc, the suite default): a Steal is queued at cost 4
 --     (Ot6AbilityCost's flat path), deducts 4 MP when it executes, and a caster
 --     below 4 MP is refused: the universal insufficient-mp fizzle
@@ -19,20 +14,7 @@
 --     not assembled, so cmd $05 keeps vanilla's 0 and the identical Steal is
 --     free, deducting 0 MP. The refusal half has nothing to refuse and is
 --     skipped. This is the negative control.
---
--- Issue #75 conversion.  This uses battle_steal.lua's fixture move, drive and
--- observation rig, minus the RNG decode: on figaro_cleared LOCKE's real
--- Steal runs against real desert species, and the MP ledger is his real
--- pool.  The old writes (party and enemy installs, slot sentinels, HP pins,
--- stop bits, bp and pending hands, and the per-drive MP := 50 and := 1
--- writes) are all gone.  The affordable arm charges his real
--- 31-MP pool; the refusal arm earns its poverty: real steal attempts
--- drain 4 MP each until the pool reads below 4, then a fresh battle with fresh
--- species loot hosts the refused attempt.  The refused steal is 3-bp
--- guaranteed (the bank earned by zero-MP item turns), so no item granted on
--- a populated, would-always-succeed steal is an unambiguous refusal
--- signal, whereas a 0-bp attempt could have missed its roll.
---
+
 -- The cost is read at the source, unchanged: a write watch on the mp-cost
 -- queue ($3620,y, stored in CreateAction) filtered to command $05
 -- captures what Ot6AbilityCost returned, 4 on ON and 0 on OFF,
@@ -48,7 +30,7 @@ local ST_CMD, ST_THIEF, ST_ITEM, ST_TGT, ST_TRANS = 0x05, 0x30, 0x0A, 0x38, 0x01
 local CMD_STEAL, CMD_ITEM = 0x05, 0x01
 local NONE = 0xFF
 local TONIC, POTION = 0xE8, 0xE9
-local STEAL_COST = 4                     -- #52: Ot6StealCost's immediate
+local STEAL_COST = 4                     -- Ot6StealCost's immediate
 
 local mode                               -- "on" (charges) | "off" (free)
 local locke
@@ -87,8 +69,6 @@ end
 local rec = nil
 local function newRec() rec = { code = 0 } end
 local function armWatches()
-  -- steal message trail ($3401): gates the grant watch, exactly as
-  -- battle_steal measured (the bank turns' item id lands in $32F4 too)
   emu.addMemoryCallback(function(_, v)
     if not rec then return end
     if v >= 1 and v <= 3 then rec.code = math.max(rec.code, v)
@@ -111,15 +91,10 @@ local function armWatches()
   end, emu.callbackType.write, 0x7E32F4, 0x7E32F4 + 18)
 end
 
--- ------------------------------------------------------ the menu drive --
--- battle_steal.lua's measured driver: latched blink-proof target mask
--- (H.targetCursor, the library version of that code), with a slow item-window
--- cadence.
 local mf = 0
 local drive = { wantBp = 0, wantPend = 0, target = nil }
 local tc = H.targetCursor({ mask = 0x7B7E })
--- Where is the machine?  A drive that stalls here used to report only
--- "timeout after N frames"; the party's HP is what tells a stuck menu apart
+-- Where is the machine?  The party's HP is what tells a stuck menu apart
 -- from a party that has been ground down over a long unboosted drain.
 local hb = -600
 local function heartbeat()
@@ -277,10 +252,7 @@ H.run({ maxFrames = 150000 }, {
     -- byte scan is the only way to ask: OT6_SYMS is scraped from the ON build's
     -- ff6-en.dbg, so H.sym would hand back an address that means nothing in the
     -- nomp ROM this test also runs against.
-    --
-    -- The signature is keys only, with the costs wildcarded (see #45): the
-    -- keys ($5d..$64, the Blitz attack ids) are structural, since they are
-    -- FixPlayerAttack's +$5d run and cannot move without the verb moving.
+
     local keys = { 0x5d, 0x5e, 0x5f, 0x60, 0x61, 0x62, 0x63, 0x64 }
     local base
     for a = 0x300000, 0x30FFF0 do
@@ -312,9 +284,6 @@ H.run({ maxFrames = 150000 }, {
   H.call(function()
     armWatches()
     mp0 = mp()
-    -- ON: the real pool must afford the priced steal (measured 31).
-    -- OFF: vanilla gives spell-less LOCKE a 0-MP pool, and a free steal
-    -- executing from 0 MP is the control this half asserts.
     if mode == "on" then
       H.assertEq(mp0 >= STEAL_COST, true,
         "his real pool affords the priced steal")
@@ -333,8 +302,6 @@ H.run({ maxFrames = 150000 }, {
         "ON: Ot6AbilityCost priced cmd $05 at 4 (flat path)")
       H.assertEq(left, mp0 - STEAL_COST, "ON: the steal deducted exactly 4 MP")
     else
-      -- If this trips with a nonzero qcost, check the build probe above
-      -- before checking Steal.
       H.assertEq(rec.qcost, 0, "OFF: cmd $05 keeps vanilla's 0 (Ot6AbilityCost absent)")
       H.assertEq(left, mp0, "OFF: the steal is FREE -- vanilla behavior, the control")
     end
@@ -348,20 +315,8 @@ H.run({ maxFrames = 150000 }, {
   -- re-seeds real loot, and a 3-bp guaranteed steal, which cannot
   -- miss, is refused by the universal insufficient-mp fizzle: nothing
   -- taken, MP untouched.  The OFF build charges 0, so there is nothing to
-  -- refuse, and this half runs only under the flag, as in battle_mpcost.lua.
-  --
-  -- The drain is segmented, and it has to be.  Nobody but LOCKE acts during
-  -- it -- every other character defers, on purpose, because a party that
-  -- kills the pack wins the fight, and a won fight can hand out a level, and
-  -- OT6 restores MP in full on a level up (ot6_progression.asm:3-6), which
-  -- is the one thing that would undo the poverty this arm is earning.  So
-  -- the desert gets free rounds against a party that never fights back, and
-  -- eight steals is a long time to give it: measured 2026-08-13, one
-  -- continuous drain took the party 75/60/36 -> 63/48/0 -> 39/5/0 -> 11/0/0
-  -- and then wiped in the next encounter, which surfaced as a 30000-frame
-  -- timeout on the refused steal rather than as a wipe (HANDOFF: the fight
-  -- driver's log goes silent on a wipe).
-  --
+  -- refuse, and this half runs only under the flag.
+
   -- The segmented shape is the route's own answer to the same problem: a few
   -- steals, flee (a flee pays no experience, so the pool stays drained), a
   -- real field care stop, then back in.  Six rounds is enough for a 31-MP

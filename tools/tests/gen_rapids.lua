@@ -10,13 +10,13 @@
 --   rapids_done.mss   the World of Balance at (93,41), on foot and
 --                     controllable: the ride finished, the overland walk to
 --                     Narshe not started.  gen_terra_narshe rides from here.
---
+
 -- One event, three doors.  BANON {8,10}, TERRA {7,11} and EDGAR {9,11} on the
 -- hub map are three NPCs sharing one `set_npc_event _cb094e`
 -- (npc_prop.asm:489, :497, :505), so the split is three ways rather than
 -- five, and which of the three is talked to does not matter.  TERRA (obj 19)
 -- is the one used here, because the states are named for her.
---
+
 -- The upstream step's two hazards do not occur here.
 -- gen_scenario.lua's river needed a steering driver and two hand-walked
 -- handoffs.  This continuation needs neither, and the reason is worth
@@ -25,7 +25,7 @@
 -- `wait_obj`.  Read the whole event and what is left is four
 -- `obj_script SLOT_1, ASYNC { move … }` / `wait_obj SLOT_1` pairs with
 -- battles between them.  Specifically:
---
+
 --   * The vanilla grind loop is upstream.  It is _cb07f2's option 0
 --     (:39152-39197, `if_switch $0176=0, _cb07f2`), reached from the ride
 --     _cb0657 starts.  This event re-enters map 113 at (104,61), past it.
@@ -39,7 +39,7 @@
 --     (field/event.asm:5415-5432), and they are EventTrigger::_114's
 --     (event_trigger.asm:464-468).  This step never loads map 114.  It runs
 --     113 -> world, end of story.
---
+
 -- Control is on for the entire ride, so hasControl() is not a progress gate
 -- here and is never used as one below.  :39391 `call _cacb95`, and _cacb95
 -- ends `update_party / player_ctrl_on` (:31276-31283), runs before
@@ -47,7 +47,7 @@
 -- first frame on the raft while the object script owns SLOT_1's movement
 -- anyway.  Every gate in this script is map id + position + the world-mode
 -- word; the pad is neutral except for A into a battle or an open dialog.
---
+
 -- The step has one forced fight and up to two more on a coin flip.  The
 -- survey called `battle 8, RIVER` (:39412) "the scenario's only combat",
 -- which is true of the forced fights but not of the step:
@@ -56,30 +56,7 @@
 -- are both real, both on this step's critical path, and each fires about half
 -- the time.  So the driver names and logs every battle it meets, and the
 -- run's battle count is reported rather than assumed.
---
--- Issue #75: the fights are played rather than write-cleared, and this
--- generator makes no state writes.  The driver's edge-tapped A is the fighter
--- (A opens the acting character's command list, A confirms its first entry, A
--- takes the default target): TERRA and EDGAR Fight the default enemy while
--- BANON's first command is Health, the free party heal his presence provides.
--- Banon's death is an immediate game over, which is why the
--- battle-clear write was here at all.  The driver watches his battle HP
--- every frame (slot found via $3ED8+2s == 14 on each fight's rising edge)
--- and fails the run with the fight's numbers if he stays at 0, giving a
--- #74-style balance finding at the moment of loss instead of a
--- timeout at the game-over screen.  gen_scenario's river fights the same
--- way and carries the fuller rationale.
---
--- rapids_done is verified by reload.  A calm capture does not imply a calm
--- boot on the world map: gen_sabin_gau measured a
--- reproducible boot-into-battle from a capture whose live timeline sailed
--- on calm (2026-08-03, the input-driven-root pilot).  So the world-map
--- generation here is captured in memory, reloaded (becoming the consumer's
--- timeline), and only emitted once the reload sits calm at (93,41) for 300
--- frames; a boot battle is fled with real input (hold L+R, since WoB randoms
--- are runnable) and the post-battle world reload restores this tile
--- with the danger counter zeroed, where the next attempt recaptures.
---
+
 -- What `battle N` resolves to (field/event.asm EventBattle, :1910-1922): the
 -- group index is scaled by four (two formation words per group) and
 -- UpdateBattleGrpRng takes the second word 1/4 of the time.  So from
@@ -179,12 +156,6 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- ------------------------------------------------------------ the driver --
--- FIGHT every battle with real input (issue #75 -- see the header), tap every
--- dialog, refuse every choice, touch nothing else.  `fights` accumulates
--- one row per fight so the run can report what it actually met instead of
--- what the route expected.
---
 -- THE FIGHTER is gen_scenario's menu-episode machine (its header carries
 -- the full story): tap-A alone never heals, because BANON's first command
 -- is FIGHT and his Health is ROW 1 (char_prop.asm:321).  From a settled

@@ -1,9 +1,5 @@
--- probe_sfigshops.lua -- the development harness for South Figaro's other
--- three shops, the relic equips and the inn, built so each of them could be
--- driven and read before any of it went into gen_kolts (whose own run is
--- long enough that a mistake there costs minutes instead of seconds).
---
---   tools/tests/run.sh tools/tests/probe_sfigshops.lua
+-- probe_sfigshops.lua -- drives South Figaro's other three shops, the
+-- relic equips and the inn.
 --
 -- It boots build/states/south_figaro.mss -- map 75 (1,28), the town's west
 -- gate, TERRA + LOCKE + EDGAR -- and drives, in order:
@@ -23,10 +19,6 @@
 --     is talked to first and then walks off.  Region A reaches region B --
 --     the inn -- only through the same-map short entrance (48,3) ->
 --     (69,10).
---
--- Every coordinate above is from docs/research/south-figaro-shop-route.md
--- (§5 for the inn, §10 for the other three shops), which derived them
--- statically from the map data; this probe is what actually walked them.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -63,8 +55,8 @@ local function where(tag)
     map(), H.fieldX(), H.fieldY(), gil(), table.concat(out, " | ")))
 end
 
--- settle, the gen_kolts shape: a lit screen plus the caller's terms, held
--- for 20 consecutive frames, driven rather than waited
+-- settle: a lit screen plus the caller's terms, held for 20 consecutive
+-- frames, driven rather than waited
 local function settled(n, extra)
   local cnt = 0
   return function()
@@ -98,7 +90,7 @@ local function shopQty() return H.readByte(0x0028) end
 local function rowItem(r) return H.readByte(0x9d89 + r) end
 local function inState(v) return function() return mstate() == v end end
 
--- map 75's walk-onto transitions (research doc §6.1's consolidated list)
+-- map 75's walk-onto transitions to avoid
 local M75_AVOID = {
   { 8, 32 }, { 9, 32 }, { 10, 32 },        -- -> map 80
   { 18, 55 }, { 19, 55 }, { 20, 55 },      -- -> map 91
@@ -107,8 +99,7 @@ local M75_AVOID = {
 
 -- Walk to a $F7 bump door's doormat and hold UP through it.  CheckDoor
 -- opens the $05/$15 pair only for a party standing directly below it, so
--- the door tile can never be the goal of a navTo (gen_edgar's finding, and
--- the shape gen_kolts already uses for the item shop at (44,32)).
+-- the door tile can never be the goal of a navTo.
 local function enterDoor(mx, my, dstMap, what)
   return seq({
     H.logStep(function()
@@ -168,9 +159,9 @@ local function closeShop(onMap, what)
   })
 end
 
--- gen_kolts's buyTo, unchanged in shape: the row is verified to hold the
--- expected item before any money moves, the quantity is steered and read
--- back, and the purchase is confirmed by gil falling by quantity x price.
+-- buyTo: the row is verified to hold the expected item before any money
+-- moves, the quantity is steered and read back, and the purchase is
+-- confirmed by gil falling by quantity x price.
 local function buyTo(id, row, target, unit, name)
   local want, before = 0, 0
   return seq({
@@ -217,12 +208,8 @@ end
 
 -- ------------------------------------------------------------ the equips --
 -- Two menus, not one.  Equip (main row 2) reaches R-Hand / L-Hand / Head /
--- Body and NOTHING else: EquipSlotCursorProp is `{1, 4}`, four rows
--- (ff6/src/menu/equip.asm:76-77).  Relics have their own menu (main row 3)
--- with its own two-slot cursor (RelicSlotCursorProp `{1, 2}`, :200-201) and
--- its own state chain $59 -> $5a -> $5b.  A first draft drove relics
--- through the Equip menu and would have hunted a fifth slot that does not
--- exist.
+-- Body and NOTHING else.  Relics have their own menu (main row 3) with its
+-- own two-slot cursor and its own state chain $59 -> $5a -> $5b.
 local ZM, CUR = 0x26, 0x4b
 local ST_MAIN, ST_CHAR = 0x05, 0x06
 local ST_EQOPT, ST_EQSLOT, ST_EQITEM = 0x36, 0x55, 0x57
@@ -348,12 +335,11 @@ end
 
 -- ------------------------------------------------------------- the inn ---
 -- `dlg $0B89` is "80 GP per night! Well? 0: Yes 1: No" and `take_gil 80`
--- sets $01BE when the party cannot pay, in which case the script says
--- "……Not enough money." and does not rest -- so the gold is asserted before
--- the talk rather than the rest being assumed.  What it restores is
--- `and_status {MAGITEK, INTERCEPTOR}` + `max_hp` + `max_mp` on all four
--- slots (_cacfbd, event_main.asm:31862-31875): full HP, full MP, and every
--- other persistent status bit cleared, KO and poison included.
+-- sets $01BE when the party cannot pay, in which case the script does not
+-- rest -- so the gold is asserted before the talk rather than the rest
+-- being assumed.  The rest restores `and_status {MAGITEK, INTERCEPTOR}` +
+-- max_hp + max_mp on all four slots: full HP, full MP, and every other
+-- persistent status bit cleared, KO and poison included.
 local CH_SEL, CH_MAX = 0x056E, 0x056F
 local function innRest(what)
   local ph, ci, inChoice, calm = 0, 0, false, 0

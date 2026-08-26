@@ -1,21 +1,16 @@
 -- @suite savestate=first_battle
--- battle_healerdown.lua -- #128: a dead opts.healer must not lock the fight
+-- battle_healerdown.lua -- a dead opts.healer must not lock the fight
 -- driver out of all healing.
 --
--- The lock, measured twice before the fix (the Zozo stairs, the Thamasa
--- fire): newFightDriver's makePlan gated every item heal and revive on
--- `actor == opts.healer`, so the moment the designated healer died no other
--- actor would ever touch the bag, and the party bled out holding full
--- supplies.  The fix (ot6.lua, the mayHeal block): when no living entity
--- carries the healer's char id, whoever holds an Item row inherits the job.
+-- newFightDriver's makePlan gates every item heal and revive on
+-- `actor == opts.healer`.  The fix (ot6.lua, the mayHeal block): when no
+-- living entity carries the healer's char id, whoever holds an Item row
+-- inherits the job.
 --
--- This is a focused unit test and stages with sanctioned expedient writes
--- (owner ruling: expedients are fine for unit-style tests; the long
--- playthroughs stay honest):
+-- This is a focused unit test and stages with sanctioned expedient writes:
 --   * the healer's death is POKED (hp=0 + status1 $80, the same pair the
---     engine's own dead_sub/SetStatus1 leaves -- measured on real corpses:
---     hp=0 st1=80), because arranging a real targeted kill would couple this
---     test to formation AI luck;
+--     engine's own dead_sub/SetStatus1 leaves), because arranging a real
+--     targeted kill would couple this test to formation AI luck;
 --   * a Fenix Down is ensured in the battle inventory the same way.
 -- Both writes are this file's waiver lines.
 --

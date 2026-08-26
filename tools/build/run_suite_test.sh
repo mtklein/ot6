@@ -1,16 +1,9 @@
 #!/bin/sh
 # run_suite_test.sh <test> <ok-file> -- compose and run one suite test.
 #
-# The per-test edge body for the ninja graph: what one iteration of
-# suite.sh's worker loop used to do, minus the scheduling (ninja's job
-# server owns that now) and minus the tally (the release artifact depends
-# on every test's .ok, so "how many ran, how many skipped" is structural:
-# an absent result is an unbuilt target, not a number to cross-check).
-#
-# Per-test environment (the old ram_env_for table: OT6_RAM_POWERON,
-# OT6_SRAM_CHECKPOINT) arrives via the edge's `env =` splice, exported by
-# the shell before this script runs, so this file stays a mechanism with
-# no test-specific knowledge.
+# The per-test edge body for the ninja graph.  Per-test environment
+# (OT6_RAM_POWERON, OT6_SRAM_CHECKPOINT) arrives via the edge's `env =`
+# splice, exported by the shell before this script runs.
 #
 # On failure the log's FAIL lines are printed so ninja's failure output
 # names the assertion, not just the command; the full log path is stated

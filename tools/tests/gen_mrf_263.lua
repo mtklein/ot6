@@ -1,28 +1,9 @@
--- gen_mrf_263.lua -- v0.6 step 5: mrf_chute (MAGITEK FACTORY map 262,
--- {10,45}) -> the right conveyor at {11,45} -> {20,45} -> the scripted
--- transition at {22,53} -> map 263, the factory's lower floor.  Generates
--- mrf_263.
+-- gen_mrf_263.lua -- mrf_chute (MAGITEK FACTORY map 262, {10,45}) -> the
+-- right conveyor at {11,45} -> {20,45} -> the scripted transition at
+-- {22,53} -> map 263, the factory's lower floor.  Generates mrf_263.mss.
 --
--- Measured at (10,45) (census in gen_mrf_chute's log): 123 tiles reachable,
--- and of every waypoint the route needs only two are among them:
--- {11,45} (_cc78d0, 1 step) and {6,31} (_cc76a7, the lift back up, 18
--- steps).  {22,53}, {22,54}, {10,54}, {12,60}, {15,60}, {21,27}, {4,22}
--- and {9,22} are all NO PATH.  So the lower half of map 262 is a chain of
--- scripted rides, as the route recon's third traversal hazard
--- predicted, and this step rides the next link.
---
--- _cc78d0 (event_main.asm:95182), on {11,45}, is ungated, with no $01B5
--- latch and no facing gate, and runs
---     layer 2 / speed FAST / move RIGHT 8 / jump_low / move RIGHT 1 / layer 0
--- i.e. {11,45} -> {20,45}, then `player_ctrl_on`.
---
--- _cc7651 (event_main.asm:94789), on {22,53}, walks SLOT_1 DOWN_LEFT and
--- falls into _cc7666 (:94805), which walks it further and then
--- `load_map 263, {16,9}, DOWN, STARTUP_EVENT` before walking it again on
--- the new map: DOWN 6 -> {16,15}, RIGHT 3 -> {19,15}, DOWN_RIGHT 2 ->
--- {21,17}, jump_low DOWN_RIGHT -> {22,18}, `player_ctrl_on`.  So the
--- expected landing is map 263 at {22,18}; the assertion below is the first
--- live confirmation of that read.
+-- The {11,45} trigger is ungated and moves the party RIGHT to {20,45}.
+-- The {22,53} trigger loads map 263 and walks the party to {22,18}.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -102,11 +83,9 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- Stop tapping once the party is on the target tile.  The
-        -- terminator needs 16 consecutive calm frames there, and a further
-        -- tap walks off it before the count completes: the first version of
-        -- this rode the chute correctly to (10,45), then tapped itself to
-        -- (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile: the
+        -- terminator needs 16 consecutive calm frames there, and a
+        -- further tap would walk off it before the count completes.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return
@@ -147,7 +126,6 @@ local function census(tag, targets)
   end
 end
 
-
 H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/mrf_chute.mss.lua"),
   H.waitFrames(150),
@@ -166,17 +144,10 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("mrf_chute"))
   end),
 
-  -- #84: the boot component's two visible chests, opened BEFORE the one-way
-  -- conveyor (probe_mrf262_chests: both NO PATH from the far side).  The
-  -- Gold Shld is opened from above, facing down -- its only reachable stand.
   H.openChest{ stand = { 7, 45 }, face = "up", bit = 84,
                what = "X-Potion", nav = { playBattles = "flee" } },
-  -- Gold Shld bit 86 (14,53): NOT opened -- pending investigation.  Its
-  -- only reachable stand is (14,52) face down, the same shape sfigaro's
-  -- Eyedrop opens with, but 6000 frames of clean A-edges never raise a
-  -- dialog (the run's own timeout).  The screenshot shows the chest present;
-  -- something eats the interaction (an object gate?), and the wave's rule is
-  -- evidence before force.
+  -- Gold Shld bit 86 (14,53) is not opened here: interacting with it from
+  -- its only reachable stand, (14,52) facing down, never raises a dialog.
 
   -- 1. one right step onto {11,45} -> the conveyor -> {20,45}
   tapInto("right", function() return H.fieldX() == 20 and H.fieldY() == 45 end,
@@ -199,11 +170,6 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("mrf_conveyor")
   end),
 
-  -- #84: the far component's two visible chests, including the ThunderBlade
-  -- HANDOFF has always named as the route's walked-past weapon.  The
-  -- Tincture at (17,27) is NOT here: all four of its stands read NO PATH
-  -- from every foothold (upper floor, boot, post-conveyor) -- visible only
-  -- mid-ride, the Flame Sabre case -- recorded as a rule exception.
   H.openChest{ stand = { 25, 45 }, face = "up", bit = 87,
                what = "ThunderBlade", nav = { playBattles = "flee" } },
   H.openChest{ stand = { 24, 52 }, face = "right", bit = 85,

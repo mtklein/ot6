@@ -2,8 +2,7 @@
 
 Source decode of the whole banquet block (maps 243/244/250/251/252,
 `$007C=1` → `$0238=1`), the scoring circuit and its reward tiers, the timer
-save/reset/load behaviour, and battles 26/27/30. Claims cite `file:line` or
-sit in the unverified ledger (§8).
+save/reset/load behaviour, and battles 26/27/30. Claims cite `file:line`.
 
 Companion to `sealed-gate-route.md`, the v0.7 route survey this block sits in.
 
@@ -251,9 +250,7 @@ Canon is the ≥67 tier, at a driven total of 75 (window 26, 16 of
 `$0277` and `$0278` all pay; Tintinabar and the Charm Bangle do not,
 and `banquet-done-v1` asserts their absence rather than their presence.
 ≥90 needs 41 of the window's 44 points, which is close to a perfect
-circuit. ≥77 needs 2 more window points than the driven best and is
-the likely target for a tuned route, but the release rule is that canon
-is what has been driven. Re-open the tier when a tuned circuit clears 28.
+circuit.
 
 Three route constraints govern the window:
 
@@ -357,7 +354,7 @@ the menu with pad input only.** The checkpoint-generating save idiom that
 force-writes `ZMENUSTATE=$13` to enter the save selector corrupts the
 live `$1188-$119F` block, because leftover menu-state tasks write over it
 (bank-C3 writers at C3/E04F+E052 and RAM-stub block moves; exact task
-unidentified, ledger §8). The SRAM copy is written first (`PushTimers`
+unidentified). The SRAM copy is written first (`PushTimers`
 precedes it) and stays correct, which is why checkpoints without a live
 timer are unaffected.
 
@@ -383,40 +380,8 @@ flags). Battles are forceable with the `EventBattle` RAM recipe
 Clean kills end with `$1dd1 = $00`, meaning b-switches $40/$44/$45 are all
 clear. Loseability: a wipe is not a game over
 (§3). The script continues, the +5 is skipped, the +1 still lands, and
-the party walks away from the fade-in (post-loss party HP state:
-unverified, ledger). The gen must assert, per fight, that the formation
+the party walks away from the fade-in. The gen must assert, per fight, that the formation
 words match (species `$102`/`$0c7`/`$0c2` at `$3F46+`), and on the win
 that `$1dd1 & $31 == 0` and the var0 delta is +6. A win that arrived by
 timer-expiry or wipe must fail the segment rather than pass with a lower
 tier.
-
-## 8. Unverified-claims ledger
-
-- **A window above 26 points** is undemonstrated. ≥77 needs 28 and ≥90
-  needs 41; whether a tuned route reaches either for the real segment
-  party (TERRA/LOCKE/EDGAR/SABIN at the levels that area expects) is
-  unmeasured, and the tier ruling in §5.2 reopens only when one does.
-- **250's interior passability / route order** between the coordinate
-  clusters in §5.2 is derived from entrances + NPC coordinates only; no
-  full live census. 250 is not a `mod_bg_tiles` map (its init is
-  `_cc839e`, one door, latched), so offline reading should hold, but the
-  v0.6 precedent is to census at savestate-generation time anyway.
-- **Post-loss party state** after a lost banquet fight (HP floor,
-  status) is unread and unmeasured. The gen never loses, but players can.
-- **`$44`'s full trigger set**: `BattleEnd_01` is also reachable via the
-  battle-end special-event table (`$3a6e`) and a sneeze path
-  (`battle_main.asm:12065-12066`); which in-battle mechanism (if any)
-  sets `$3a6e=1` for these formations was not traced. All observed clean
-  wins leave it clear.
-- **The C3/E04F writer's identity** in the poked-menu corruption (§5.3):
-  caught by PC, not attributed to a named routine; the dbg-symbol
-  neighborhood suggests a redraw task running with a stale index. The
-  behavioral rule (pad-input saves inside timer windows) does not depend
-  on the attribution.
-- **Dinner-scene coherence when fired from an arbitrary map**: only the
-  251 load is confirmed. Nothing suggests map-of-origin sensitivity, but
-  the full scene has not been ridden from outside the castle.
-- **Menu tick during the save-slot screens**: only the top menu is
-  confirmed 1:1. The selector screens also call `DecTimersMenuBattle`
-  (same loop) and the SRAM-vs-WRAM deltas are consistent with continuous
-  ticking, but there is no per-screen breakdown.

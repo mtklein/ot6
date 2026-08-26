@@ -1,63 +1,9 @@
--- gen_massacre.lua -- v0.13 step O->P (issue #127, docs/design/thamasa-
--- route.md Segments 6-7), and the generator that cuts battery checkpoint P,
--- `thamasa-done-v1`: the v0.13 TERMINAL -- world (249,128), party
--- TERRA LOCKE STRAGO RELM, $009D=1, beside the repaired Blackjack.
---
--- The step: cold-Continue the tracked `ultros-won-v1` battery (boundary O,
--- map 375 (8,44), party STRAGO TERRA LOCKE RELM, $0095=1 $0099=0), assert its
--- contract, then drive the whole Thamasa massacre chain, an atomic set piece
--- with NO legal save inside once triggered:
---   1. PREP OUTSIDE COMBAT (owner doctrine): full-heal at the save region.
---      The party is benched at the massacre (Leo fights solo on the WEDGE
---      actor with his own Crystal), so row/equip prep is moot; the full-heal
---      is the meaningful prep and the between-fights care.
---   2. THE CLIMB to the massacre trigger (measured live, probe_massacre_climb
---      + the short_entrance decode).  375's exterior post-statues ($0097=1) is
---      a fragmented warp-maze; the massacre pocket (holding (15,17)/(15,16)) is
---      a walled-off compartment entered ONLY at (16,9) from cave 372 (40,19),
---      with no plain walk from the save.  The clean three-warp route (each leg
---      a single connected walkable comp navTo paths inside -- no z-drop ledge
---      is crossed, every leg bfs-reachable live):
---        save comp --(11,51) $0097 shortcut _cbee8f: retile + load_map 375
---          {39,51}--> the SE compartment that owns the 372 door
---        375 (45,41) --short_entrance--> 372 (51,17)
---        372 (40,19) --short_entrance--> 375 (16,9), the massacre pocket
---        navTo (15,17)                   the massacre trigger _cbf2b5
---      The (11,51) shortcut is an ordinary CheckEventTriggers step trigger (not
---      a SavePoint), so it fires on a plain navTo walk-through; each
---      short_entrance warp fires by stepping its SrcPos (no direction test).
---      So the whole climb is navTo hops, not held presses.
---   3. step (15,17): the massacre auto-chain fires (_cbf2b5) -- esper reveal,
---      Yura, agreement to meet Leo ($0099=1, :75156), auto-load town 341,
---      the Leo/Yura scene, Kefka's Magitek entrance ($018A=1, :76337), and the
---      ROSTER REWRITE: everyone out, solo Leo on the WEDGE actor
---      (char_prop WEDGE, LEO :76352), control at 341 (22,22) (:76367).  Ride
---      the cutscene with dialog-advance.
---   4. battle 124 (Leo SOLO vs Kefka): approach the Kefka NPC at 341 (24,18)
---      (_cbfff4, char_prop VICKS KEFKA_4, formation 388 KEFKA_VS_LEO $173 L1
---      HP5001) from below, clean edge-A (a held direction starves CheckNPCs).
---      His #124 authored row is LIVE: shields 4, class OT6_SLASH -- Leo's
---      Crystal is a slashing sword, so boosted Fights break the shields, then
---      Shock/Fight him down.  A LOSS is a GAME OVER (event_main.asm tail
---      call _ca5ea9 -> GameOver), so this is a seed ladder with the GameOver
---      read-canary the ground-truth loss signal: on a loss, reload the
---      pre-battle-124 savestate and re-fight on a spread seed.  HAZARD: the
---      town-edge exit rows (x=9 col; y=45-46; x=24-28 y=15-16) fire a
---      repeatable battle 75 (Guardian 50000 HP) in the Leo window
---      ($018A=1 && $009B=0) -- approach Kefka centrally, never an exit row.
---   5. the scripted tail (NO save, savestate-splits only): $009B=1, theater
---      battle 105 (dummy $17b), the esper flyover, reload 341, Kefka's drain,
---      theater battle 97 (KEFKA_VS_ESPER $17a, AI-scripted: espers cast, end),
---      Leo dies in-scene, party restored (WEDGE out -> TERRA LOCKE STRAGO
---      RELM), grave scene map 340 ($009C=1).  Segment 7: burial, the Blackjack
---      flies in, the Setzer/Cyan/Edgar/Sabin scene, roster re-normalized +
---      norm_lvl'd (except Shadow $02F3=0), $009D=1, control at world
---      (249,128), airship at (249,127).  Theater battles are scripted -- drive
---      A, they end themselves.
---   6. full-heal, real world Save UI slot 3 -> checkpoint P thamasa-done.
---
+-- gen_massacre.lua -- the generator that cuts battery checkpoint P,
+-- `thamasa-done-v1`: world (249,128), party TERRA LOCKE STRAGO RELM,
+-- $009D=1, beside the repaired Blackjack.
+
 -- No chests on the massacre route (audit_chests stays exact at 58).
---
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
@@ -76,8 +22,8 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 local function seq(steps) return H.cond(function() return true end, steps) end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
--- care: a full-heal stop that skips (logged) rather than hangs when the field
--- isn't settled (gen_ultros' shape).
+-- care: a full-heal stop that skips (logged) rather than hangs when the
+-- field isn't settled.
 local function care(what)
   return seq({
     H.waitUntilSoft(function()
@@ -99,24 +45,6 @@ local function care(what)
   })
 end
 
--- The climb from the save point 375 (8,44) to the massacre trigger (15,17).
--- The measured route (probe_massacre_climb, short_entrance decode, the three
--- $0097-gated mod_bg_tiles shortcuts _cbee8f/_cbeebe/_cbeeec): the massacre
--- pocket (map-375 flood comp holding (15,17)/(15,16)) is a walled-off
--- compartment entered ONLY at (16,9) from map 372 (40,19).  The clean
--- three-warp path, each leg a single connected walkable compartment that
--- navTo paths inside (NO z-drop ledge is crossed -- verified live, every leg
--- bfs-reachable), is:
---   save comp --(11,51) $0097 shortcut: retile + load_map 375 {39,51}-->
---     375 (39,51), the SE compartment that owns the 372 (45,41) door
---   375 (45,41)  --short_entrance-->  372 (51,17)
---   372 (40,19)  --short_entrance-->  375 (16,9), the massacre pocket
---   walk (16,9)..(15,17)              the massacre trigger _cbf2b5
--- The (11,51) shortcut fires on a plain navTo walk-through (an ordinary
--- CheckEventTriggers step trigger, not a SavePoint), teleporting the party to
--- (39,51); each short_entrance warp fires by stepping its SrcPos (no direction
--- test), so the whole climb is navTo hops, not held presses.
---
 -- hop: navTo a warp/shortcut SrcPos (arrive when `arriveFn` fires -- a map
 -- change, or a same-map teleport detected by position), settle, log.
 local function hop(sx, sy, arriveFn, what)
@@ -190,14 +118,6 @@ local function leoAttempt(n)
       lossReload(function() return leoBlob end, "battle 124"),
     }) or seq({}),
     L124.spread(n),
-    -- activation: face the Kefka NPC at (24,18) from (24,19) with a held UP
-    -- that cannot step (the NPC collides), release, then a per-frame edge-A
-    -- driver -- 4 frames A on, 12 off -- that both talks to the NPC and pages
-    -- the "LEO: Kefka!" dialog through to `battle 124` (_cbfff4).  A single
-    -- setPad-per-frame call, NOT hold/release nested in driveUntil: the nested
-    -- form starved the battle-load (measured 2026-08-21, probe_massacre_kefka
-    -- -- the event fires but never reaches the battle), the edge-A driver
-    -- reaches battle 124 in ~140 frames.
     H.hold({ "up" }), H.waitFrames(6), H.release(), H.waitFrames(8),
     (function() local ph = 0
       return H.driveUntil(function()
@@ -228,9 +148,6 @@ local function leoAttempt(n)
       H.log(string.format("[battle 124] phase1 done, attempt %d, f%d, "
         .. "gameOverFired=%d map=%d", n, H.frame, H.gameOverFired, map()))
     end),
-    -- VERDICT: win iff the GameOver canary never fired and we are still in
-    -- the massacre chain (map 341, WEDGE/Leo still the solo party).  A loss
-    -- runs the GameOver script (canary > 0).
     H.call(function()
       H.setPad({})
       if H.gameOverFired == 0 and partyOf(WEDGE) ~= 0 then
@@ -251,10 +168,6 @@ end
 
 -- --------------------------------------------------------------------------
 H.run({ maxFrames = 6000000, allowGameOver = true }, {
-  -- ---- the cold Continue and the ENTRY CONTRACT (issue #25) --------------
-  -- ultros-won-v1 is a FIELD save on the mountain save tile 375 (8,44); the
-  -- SavePoint trigger re-enters every frame, so hasControl() never settles
-  -- there (gen_ultros' own boot).  Gate on map/alignment/brightness only.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -277,8 +190,8 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
   end),
 
   -- ---- 1. PREP: full-heal at the save region ----------------------------
-  -- step LEFT off the save re-entry tile first (its trigger re-fires every
-  -- frame, so hasControl never settles on it -- gen_ultros' note).
+  -- step LEFT off the save re-entry tile first (its trigger re-fires
+  -- every frame, so hasControl never settles on it).
   (function() local ph = 0
     return H.driveUntil(function()
       return H.fieldX() <= 7 and H.tileAligned() and not H.dialogWaiting()
@@ -320,10 +233,6 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
     H.log(string.format("[ot6] in the pocket f%d (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
   end),
-  -- walk onto the massacre trigger (15,17); it fires the chain ($0099=1 /
-  -- town 341 load).  A plain navTo hop -- the pocket is one connected comp
-  -- and (15,17) is bfs-reachable (11 steps) from the (16,9) entry.  (15,16)
-  -- one tile N is the #125 SavePoint; a held walk-through does not fire it.
   H.navTo(15, 17, { maxFrames = 20000, playBattles = "flee",
     arrive = function()
       return sw(0x0099) == 1 or map() == 341 or H.battleLoadStarted()
@@ -437,9 +346,8 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
   end),
   H.saveState("thamasa_done.mss"),
 
-  -- world save: open the field menu with X, Save, slot 3 (gen_thamasa_arrive
-  -- flow).  On the world map $0059 is 0 with the menu closed and nonzero once
-  -- it is open.
+  -- world save: open the field menu with X, Save, slot 3.  On the world
+  -- map $0059 is 0 with the menu closed and nonzero once it is open.
   (function() local calm, ph = 0, 0
     return H.driveUntil(function()
       calm = (H.readByte(0x59) ~= 0) and calm + 1 or 0

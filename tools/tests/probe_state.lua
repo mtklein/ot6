@@ -1,11 +1,5 @@
--- probe_state.lua -- read the field party/inventory state and dump it, then
--- stop.  A standing inspector: boot any checkpoint (OT6_SRAM_CHECKPOINT=...)
--- or savestate under it and see gear/espers/levels/bag in ~15s, no route
--- replay.  Raw ids; decode names in the shell against ff6/notes/battle-lists.
---
---   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/thamasa-night-v1 \
---     OT6_TIMEOUT=300 tools/tests/run.sh tools/tests/probe_state.lua
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- probe_state.lua -- reads the field party/inventory state and dumps it as
+-- raw ids, then stops.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function rec(c)  return 0x1600 + 37 * c end

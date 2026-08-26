@@ -1,16 +1,14 @@
 ; ------------------------------------------------------------------------------
-; Split out of field_menu.asm, which is otherwise vanilla FF6 disassembly.
-; Included from field_menu.asm at the exact spot this text used to occupy, so
-; emission order is unchanged: ff6-en.sfc CRC32 0x2E9B5A7F and
-; ff6-en-nomp.sfc 0xE8978806 are both byte-identical across the extraction.
+; Included from field_menu.asm at the exact spot this text occupies, so
+; emission order is unchanged.
 ;
 ; Still bank $C3 ("menu_code"), still under ending_anim.asm's un-popped
-; .charmap (menu_text_en.inc:114-121, issue #39), and still inside
-; field_menu.asm's `.if LANG_EN`.  Do not assemble this file on its own.
+; .charmap (menu_text_en.inc:114-121), and still inside field_menu.asm's
+; `.if LANG_EN`.  Do not assemble this file on its own.
 ; ------------------------------------------------------------------------------
 
 ; ------------------------------------------------------------------------------
-; Gau's rage loadout page (issue #40): the MenuState_7b shim, at eight rows
+; Gau's rage loadout page: the MenuState_7b shim, at eight rows
 ;
 ; Every decision is bank-F0 (Ot6Rage* in ot6_rage.asm); this is tilemap, cursor
 ; and DMA only, as the Bushido page's shim is.  Two shape differences,
@@ -63,7 +61,7 @@ Ot6RageDrawC3:
         sta     zTextColor
         ldy     #near Ot6RageTitleText
         jsr     DrawPosText
-        ldy     #near Ot6RageHintText           ; #44: "L/R SWAPS" on row 3
+        ldy     #near Ot6RageHintText           ; "L/R SWAPS" on row 3
         jsr     DrawPosText
         ldy     #near Ot6RageLearnedText
         jsr     DrawPosText
@@ -77,14 +75,13 @@ Ot6RageDrawC3:
 ; Blank under nomp: the label rides the number, so a zero price prints
 ; nothing rather than a bare "EACH".
 ;
-; #56: the price field is five cells wide now, not four, and it starts at column
-; 16 rather than 17 so that "EACH" (a fixed pos_text at 22) keeps its gap at 21.
-; Growing rightwards instead would have rendered "10 MPEACH".  This page's price
-; is 8 today and can reach two digits without anyone editing this file: it is a
-; tail-call to Ot6DanceCost (ot6_boost.asm:600-619), which is Dance's own
-; number rather than a copy of it, and mp-economy.md's range for a flat
-; possess-verb price is 4-10.  The title row still fits: "RAGE LOADOUT" ends at
-; 14, so 15 is the gap, the price is 16-20, 21 is the gap, "EACH" is 22-25.
+; The price field is five cells wide and starts at column 16 so that "EACH"
+; (a fixed pos_text at 22) keeps its gap at 21; growing rightwards instead
+; would render "10 MPEACH".  It is a tail-call to Ot6DanceCost
+; (ot6_boost.asm:600-619), Dance's own number rather than a copy of it, so it
+; can reach two digits without anyone editing this file.  The title row still
+; fits: "RAGE LOADOUT" ends at 14, so 15 is the gap, the price is 16-20, 21
+; is the gap, "EACH" is 22-25.
 Ot6RagePrice:
         jsl     Ot6RageRowCost          ; F0: A = MP cost (0 under nomp)
         beq     @none                   ; (rtl preserves the lda's Z)
@@ -93,7 +90,7 @@ Ot6RagePrice:
         sta     $e6
         ldx     #$0010                  ; col 16: "nn MP" is 16..20
         pla
-        jsr     Ot6LoadoutDrawCost      ; the one field-menu price drawer (#56)
+        jsr     Ot6LoadoutDrawCost      ; the one field-menu price drawer
         ldy     #near Ot6RageEachText   ; ... and "EACH" at col 22
         jmp     DrawPosText
 @none:  rts
@@ -104,14 +101,12 @@ Ot6RagePrice:
 ; columns.  The EN field-menu window this page lives in does not show BG1
 ; ScreenA one tile row per eight scanlines: a tilemap row pair is displayed in
 ; twelve scanlines, the odd row getting eight of them and the even row four.
-; Measured with a glyph drawn in every row, poked straight into the shadow:
-; odd rows 1,3,5,..,15 render whole at screen y =
-; 116 + 6*(row-1); even rows show only their bottom three scanlines; nothing
-; past row 15 is inside the window at all.  Vanilla's own tables agree:
-; every EN cursor list for this window is
-; `cursor_pos {x, 116 + n*12}` (skills.asm:125-126, :249-250, :292-293), and
-; DrawRageName biases its row by one under `.if LANG_EN` (skills.asm:1571-1574)
-; for this reason.
+; Odd rows 1,3,5,..,15 render whole at screen y = 116 + 6*(row-1); even rows
+; show only their bottom three scanlines; nothing past row 15 is inside the
+; window at all.  Vanilla's own tables agree: every EN cursor list for this
+; window is `cursor_pos {x, 116 + n*12}` (skills.asm:125-126, :249-250,
+; :292-293), and DrawRageName biases its row by one under `.if LANG_EN`
+; (skills.asm:1571-1574) for this reason.
 ;
 ; So the window holds eight usable text rows, and the page needs ten (title,
 ; eight slots, LEARNED).  Two columns of four fits, and it is
@@ -119,32 +114,29 @@ Ot6RagePrice:
 ; `cursor_prop {0,0}, {2,8}`, skills.asm:281-299):
 ;
 ;   row  1   RAGE LOADOUT                    8 MP EACH
-;   row  3   L/R SWAPS       (#44: the control hint; row 3 was spare)
+;   row  3   L/R SWAPS       (the control hint; row 3 was spare)
 ;   row  5   slot 0 (col 3)  slot 1 (col 16)
 ;   row  7   slot 2          slot 3
 ;   row  9   slot 4          slot 5
 ;   row 11   slot 6          slot 7
 ;   row 15   LEARNED nnn
 ;
-; The cursor gutter (#43, third round).  Columns 3 and 16 are not free choices:
-; `cursor_pos {x,y}` is the top-left of a 16x16 sprite, so a cursor at x owns
-; tilemap columns x/8 and x/8+1, and the text it points at must start at
-; x/8 + 2, i.e. cursor_x = 8*col - 16.  That is vanilla's rule in every list it
-; draws in this window (magic cols 3/16 under 8/112, skills.asm:831,:836 vs
+; The cursor gutter.  Columns 3 and 16 are not free choices: `cursor_pos
+; {x,y}` is the top-left of a 16x16 sprite, so a cursor at x owns tilemap
+; columns x/8 and x/8+1, and the text it points at must start at x/8 + 2,
+; i.e. cursor_x = 8*col - 16.  That is vanilla's rule in every list it draws
+; in this window (magic cols 3/16 under 8/112, skills.asm:831,:836 vs
 ; :125-126; espers 3/17 under 8/120, :1733,:1737 vs :249-250; rage 5/19 under
-; 24/136, :1544,:1548 vs :292-293).  This page's right column was already
-; correct (col 16 under `cursor_pos {112,...}` is vanilla's magic pair), but
-; the left column shipped at col 2 under a cursor at x=8, so the sprite drew
-; over the first letter of every left-hand beast name.  Only the left column
-; moved; {3, 16} under {8, 112} is now magic's geometry.
+; 24/136, :1544,:1548 vs :292-293).  This page's right column matches (col 16
+; under `cursor_pos {112,...}` is vanilla's magic pair), and the left column
+; is {3} under a cursor at x=8, magic's own geometry.
 ;
-; The price is stated once, on the title row, rather than once per row, because
-; two ten-cell monster names plus two cursor columns plus two
-; four-cell "n MP" fields is 30 columns, and the window's own right border
-; lives in column 30 (measured: the border rule is at screen x = 245).  The
-; price is flat by design (kit-gau.md §5), so eight copies of the same
-; number would not fit, and one copy states the same rule.  Under nomp
-; the cost is 0 and the whole "8 MP EACH" group is skipped, label included.
+; The price is stated once, on the title row, rather than once per row,
+; because two ten-cell monster names plus two cursor columns plus two
+; four-cell "n MP" fields is 30 columns, and the window's own right border is
+; column 30.  The price is flat, so eight copies of the same number would not
+; fit, and one copy states the same rule.  Under nomp the cost is 0 and the
+; whole "8 MP EACH" group is skipped, label included.
 ;
 ; Slot order is the cursor framework's own index, $4b = cols*row + col
 ; (CalcShortListIndex), so slot even = left column, slot odd = right, and
@@ -169,7 +161,7 @@ Ot6RageDrawSlots:
 :       ldx     #$0003                  ; even slot -> left column (3: the
                                         ;   cursor at x=8 owns columns 1-2)
 :       phx                             ; Ot6RageShow kills X
-        ; --- the beast, or #44's empty marker ---
+        ; --- the beast, or the empty marker ---
         ; An unset slot draws "- EMPTY -" in BLUE, the page's chrome colour, so
         ; it cannot be mistaken for a beast (every MonsterName is Mixed Case in
         ; the DEFAULT colour).  The colour has to be chosen per row rather than
@@ -194,13 +186,13 @@ Ot6RageDrawSlots:
         inx
         cpx     #$0008                  ; OT6_RAGESLOTS (ot6_memory.inc)
         bcc     @lp
-        ; fallthrough to #49, as the SwdTech page's slot loop does
+        ; fallthrough, as the SwdTech page's slot loop does
 
-; ---- #49: AUTO / MANUAL, and the control that gets back to AUTO ----
-; Row 13, the one row this page never drew on (it uses 1/3/5/7/9/11/15), which
-; issue #49's survey costed at 27 free columns.  The mode sits at column 3 and
-; the control at column 16, the page's own two slot columns, so the pair lines
-; up under the grid rather than in the middle of the row.
+; ---- AUTO / MANUAL, and the control that gets back to AUTO ----
+; Row 13, the one row this page never drew on (it uses 1/3/5/7/9/11/15).  The
+; mode sits at column 3 and the control at column 16, the page's own two slot
+; columns, so the pair lines up under the grid rather than in the middle of
+; the row.
 ;
 ; Drawn from the tail of the slot redraw for the same reason the SwdTech page
 ; draws its block there: Ot6RageDrawSlots is the only proc a redraw runs
@@ -228,10 +220,7 @@ Ot6RageDrawMode:
 ; ---- draw one monster (rage) name.  in: $e5 = rage id ($ff = unset),
 ;      $e6 = row, X = col.  The Ot6DrawBushName shape over MonsterName. ----
 ;
-; #44: an unset slot used to be a run of $ff pads.  That overwrote the
-; whole name field, so a revert wiped what was there, but it was unreadable:
-; the owner's playtest read the blank rows as a bug rather than as "you have
-; not hunted eight species yet".  It now spells "- EMPTY -", which is accurate
+; An unset slot spells "- EMPTY -", which is accurate
 ; in both of the states that produce a blank row: an AUTO window shorter
 ; than eight, and a MANUAL slot whose byte is $00.  Ot6RageList skips these
 ; slots when it builds the battle menu, so an empty row here is an empty
@@ -262,12 +251,12 @@ Ot6DrawRageName:
 :       stz     hWMDATA
         jmp     DrawPosTextBuf
 
-Ot6RageEmptyTiles:      raw_text OT6_RAGE_EMPTY ; "- EMPTY - " + $00 (issue #39:
+Ot6RageEmptyTiles:      raw_text OT6_RAGE_EMPTY ; "- EMPTY - " + $00,
                         ; encoded via menu_text_en.inc; a bare literal here
-                        ; picks up ending_anim.asm's credits charmap)
+                        ; would pick up ending_anim.asm's credits charmap
 
 ; ---- draw the LEARNED count (three digits, col 11 of the caption row) ----
-; #44: the colour is set here rather than inherited.  Ot6RageDrawSlots picks
+; The colour is set here rather than inherited.  Ot6RageDrawSlots picks
 ; DEFAULT or BLUE per row (the empty marker is chrome), so otherwise whatever
 ; the last slot happened to be would decide the colour of the collection
 ; score.  The count is data, so it is always DEFAULT.
@@ -326,7 +315,7 @@ Ot6RageDrawCount:
 ; (skills.asm:125-126, :249-250, :292-293); rows 5/7/9/11 are n = 2/3/4/5.
 ; x = {8, 112} pairs with text columns {3, 16}, since cursor_x = 8*col - 16; see
 ; the cursor-gutter note on Ot6RageDrawSlots.  Do not move this table to fix an
-; overlap; move the text.  menu_ragepage.lua's cursor canary asserts the pair.
+; overlap; move the text.
 Ot6RageCursorProp:
         cursor_prop {0, 0}, {2, 4}, NO_XY_WRAP   ; OT6_RAGECOLS x OT6_RAGEROWS
 Ot6RageCursorPos:
@@ -341,7 +330,7 @@ Ot6RageCursorPos:
 
 Ot6RageTitleText:       pos_text OT6_RAGE_TITLE
 Ot6RageHintText:        pos_text OT6_RAGE_HINT
-Ot6RageModeHintText:    pos_text OT6_RAGE_MODE_HINT     ; #49: "Y=AUTO" at {16,13}
+Ot6RageModeHintText:    pos_text OT6_RAGE_MODE_HINT     ; "Y=AUTO" at {16,13}
 Ot6RageEachText:        pos_text OT6_RAGE_EACH
 Ot6RageLearnedText:     pos_text OT6_RAGE_LEARNED
 

@@ -4,21 +4,13 @@
 -- posture, and leave; a cutscene with no input needed), continue to the
 -- mine mouth at (26,8) -> map 50 (mines chase map) at (78,58), and generate
 -- mines_chase.mss at the first calm tile inside.  Then open the two map-50
--- chests visible from the walk (#84): the Fenix Down at (65,28) and the
+-- chests visible from the walk: the Fenix Down at (65,28) and the
 -- Sleeping Bag at (52,33), each from the tile below.  Then north through the
 -- mines, clearing random encounters and logging their species, to
 -- (55,12), one tile short of the trigger at (55,11) that starts the
--- bridge-collapse -> Kefka flashback -> Moogle-defense chain (a
--- three-party set-piece this harness does not enter).  Generate
+-- bridge-collapse -> Kefka flashback -> Moogle-defense chain. Generate
 -- moogle_entry.mss there, calm, trigger unfired.
---
--- Issue #75: every navigator step passes playBattles=true, so the map-50
--- random pool is fought (tap-A = Fight, confirm at default target) rather
--- than write-cleared.  That is bal_mines.lua's measured baseline policy:
--- 8/8 wins, 0 deaths, ~2 real turns / ~744 frames per battle for solo L5
--- Terra against the full pool (the mines balance measurement), so the cost
--- is roughly +1-2k frames per encounter drawn and the step budgets below
--- carry it.  This gen has no write idiom of its own.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STREETS = "build/states/narshe_streets.mss.lua"
 
@@ -101,11 +93,9 @@ H.run({ maxFrames = 50000 }, {
   end),
   H.saveState("mines_chase.mss"),
 
-  -- #84: Fenix Down, visible on the walk
   H.openChest{ stand = { 65, 29 }, face = "up", bit = 11,
                what = "Fenix Down", item = 0xF0,
                nav = { playBattles = true } },
-  -- #84: Sleeping Bag, visible on the walk
   H.openChest{ stand = { 52, 34 }, face = "up", bit = 12,
                what = "Sleeping Bag",
                nav = { playBattles = true } },

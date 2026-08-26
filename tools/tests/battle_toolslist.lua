@@ -1,52 +1,22 @@
 -- @suite savestate=kolts_cave
 -- battle_toolslist.lua -- menu-bank: the Tools window prices each tool.
---
--- v0.5 costs every ability MP; the menu-bank modules show the price beside the
--- name so the charge is visible.  Blitz did it first (battle_blitzlist)
--- in the tools-shell's two columns; this is the same feature on the real tools
--- window (Edgar, cmd $09), whose inventory is built by vanilla's
--- MakeToolsList rather than Ot6BlitzListOpen, so the injection point differs.
---
--- Layout finding, recorded the way the Blitz commit recorded its 2-column
--- result: the tools window is two columns of 13-wide item names, and those
--- names fill the row edge to edge (verified by rendering the bare window, where
--- AutoCrossbow and NoiseBlaster reach the right border).  A Blitz-style cost
--- after each name overflows the screen, and a single column, which would fit a
--- trailing cost, needs the fixed 4x2 tools grid to scroll, which means
--- re-cutting the shared item and throw cursor and draw state machine.  So
--- Ot6ToolRowDecorate (ot6.asm, bank F0) stamps the cost in the row's leading
--- space pair instead: the template's two leading spaces before name 1 and its
--- two-space column gap before name 2 are each exactly the two tiles ListText
--- cmd $02 draws a 2-digit number into.  Same 31-tile width, all 8 tools, no
--- re-layout, and the price reads immediately left of the name it belongs to.
--- DrawToolsListText jsl's the shim for real-tools rows (the not-blitz arm); the
--- cost gating lives in the battle object, so the shared C1 bank and the nomp
--- baseline are untouched.
---
--- Issue #75 conversion: the tools are owned and the fight is real.  This
--- file used to install CHAR::EDGAR into every slot of the magitek intro
--- party, hand-write eight tool records into the battle item buffer, pin HP
--- and MP, and rewrite the $202E command rows.  All of that is gone: it now
--- boots kolts_cave (party TERRA LOCKE EDGAR, with the real Edgar, whose record
--- carries Tools), paces the cave lane until a natural encounter fires
--- (battle_naturalmp's drive, same fixture), waits for EDGAR's own menu, and
--- opens his real Tools window.  The list is therefore vanilla MakeToolsList
--- over the real bag: the AutoCrossbow Edgar starts with plus the
--- BioBlaster and NoiseBlaster gen_edgar buys from the Figaro tool merchant.
--- The expected rows are derived from the battle inventory's own
--- $40-flagged records, so a future purchase adds a row without touching
--- this file.  Prices are read from Ot6AbilityCostTbl in the ROM (the table
--- Ot6CostFor charges from) rather than written down, so a retune moves both
--- sides.
---
+
+-- Every ability costs MP; the menu-bank modules show the price beside the
+-- name so the charge is visible.  This is the real tools window (Edgar,
+-- cmd $09), whose inventory is built by vanilla's MakeToolsList.
+-- Ot6ToolRowDecorate stamps the cost in the row's leading space pair: the
+-- template's two leading spaces before name 1 and its two-space column gap
+-- before name 2 are each exactly the two tiles ListText cmd $02 draws a
+-- 2-digit number into, so the price reads immediately left of the name it
+-- belongs to with no re-layout.
+
 -- What is asserted:
 --   1. the list packs the owned tools.  wItemList holds exactly the battle
 --      inventory's tool-flagged ids, in bag order, $ff-terminated, and the
---      three real ones are individually required (the Figaro buys are what
---      battle_vargas's proof 3 depends on, so losing one here fails).
+--      three real ones are individually required.
 --   2. names render.  "BioBlaster", "NoiseBlaster" and "AutoCrossbow" are
---      found in VRAM (findName over the drawn window); with three entries the
---      grid uses both columns (row-major: entries 0 and 2 left, 1 right).
+--      found in VRAM; with three entries the grid uses both columns
+--      (row-major: entries 0 and 2 left, 1 right).
 --   3. costs render, and are correct.  The two tiles just left of each name
 --      decode to that tool's Ot6AbilityCostTbl price, read from the ROM.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -64,8 +34,8 @@ local BATTINV  = 0x2686                 -- battle inventory, 5 bytes/entry
 -- rows.
 local BIOBLASTER, NOISEBLASTER, AUTOCROSSBOW = 0xA4, 0xA3, 0xAA
 
--- Ot6AbilityCostTbl: (key, cost) pairs, $ff-terminated (ot6_boost.asm), the
--- table Ot6CostFor scans for the charge and the row stamp.
+-- Ot6AbilityCostTbl: (key, cost) pairs, $ff-terminated, the table
+-- Ot6CostFor scans for the charge and the row stamp.
 local COSTTBL = H.sym("Ot6AbilityCostTbl") & 0x3FFFFF
 local function costOf(id)
   local x = 0
@@ -77,8 +47,8 @@ local function costOf(id)
   end
 end
 
--- FF6 battle-font glyphs: 'A'..'Z' = $80.., 'a'..'z' = $9a.. (the same mapping
--- battle_blitzlist pins down), digits '0'..'9' = $b4.., blank = $ff.
+-- FF6 battle-font glyphs: 'A'..'Z' = $80.., 'a'..'z' = $9a.., digits
+-- '0'..'9' = $b4.., blank = $ff.
 local function glyphs(s)
   local t = {}
   for i = 1, #s do
@@ -88,12 +58,9 @@ local function glyphs(s)
   end
   return t
 end
--- "Bio Blaster" carries a real space (item_name_en.json:175), and in the
--- item-name records it is the narrow-space glyph $fe (item_name_en.dat
--- record $a4: e5 81 a2 a8 FE 81 a5 ...), the same tile "W Wind" uses in
--- magic_name records, not the $ff blank.  Its expected run spells that
--- out; the other two names are contiguous.  (The pre-conversion file avoided
--- this by asserting only the spaceless synthetic tools it had installed.)
+-- "Bio Blaster" carries a real space, encoded as the narrow-space glyph
+-- $fe (the same tile "W Wind" uses), not the $ff blank.  Its expected run
+-- spells that out; the other two names are contiguous.
 local function seqJoin(a, mid, b)
   local t = {}
   for _, v in ipairs(a) do t[#t + 1] = v end
@@ -108,8 +75,7 @@ local NM = {
   [AUTOCROSSBOW] = { name = "AutoCrossbow", g = glyphs("AutoCrossbow") },
 }
 
--- word address of a rendered glyph run in VRAM, or nil (battle_blitzlist's
--- findName).
+-- word address of a rendered glyph run in VRAM, or nil.
 local function findName(seq)
   local vr = emu.memType.snesVideoRam
   for w = 0x6000, 0x7FF0 do
@@ -138,9 +104,9 @@ local function readCost(nameSeq)
 end
 
 -- wait for EDGAR's own menu, consuming other characters' turns with a real
--- Defend (right swaps Fight->Def, then A), which is battle_naturalmp's pattern
--- on this same fixture.  The monsters take their own turns in here; their
--- damage lands on party HP, which nothing in this test asserts on.
+-- Defend (right swaps Fight->Def, then A).  The monsters take their own
+-- turns in here; their damage lands on party HP, which nothing in this
+-- test asserts on.
 local slotOf = {}
 local function menuFor(charId, what)
   local ph = 0
@@ -151,8 +117,8 @@ local function menuFor(charId, what)
     H.call(function()
       ph = ph + 1
       if H.readByte(MENU) == 0 then
-        -- no menu up: page any battle dialog with A (the battle_vargas
-        -- hazard, where a monster dialog blocks the queue until dismissed)
+        -- no menu up: page any battle dialog with A (a monster dialog can
+        -- block the queue until dismissed)
         H.setPad(ph % 8 < 4 and { a = true } or {})
       elseif H.readByte(ACTOR) ~= slotOf[charId] then
         local step = ph % 40
@@ -176,9 +142,8 @@ H.run({ maxFrames = 60000 }, {
     "field control in cave 96"),
   H.call(function() H.assertEq(map(), 96, "kolts_cave on map 96") end),
 
-  -- pace the auto-detected lane until a natural encounter fires
-  -- (battle_naturalmp's drive: the danger counter accrues per step and rolls
-  -- the encounter itself)
+  -- pace the auto-detected lane until a natural encounter fires (the
+  -- danger counter accrues per step and rolls the encounter itself)
   (function()
     local battN, waited, lane = 0, 0, nil
     local BACK = { left = "right", right = "left", up = "down", down = "up" }

@@ -1,57 +1,17 @@
--- gen_kefka_won.lua -- v0.4's first link: boot kefka_entry, win battle 57
--- again with real input (issue #75: this file writes no emulated game state;
--- the fight is played with gen_narshe_battle's menu-episode fighter and a
--- three-attempt retry ladder off the booted entry point, the same win that
--- file demonstrated from the same state).  Then ride the whole
--- win tail (the esper cliff on map 23, TERRA's morph, the flight across
--- the world, the regroup in Arvis's house) through the party-select menu
--- to the first controllable frame, and generate kefka_won.mss on map 30 at
--- (60,37).
---
--- The win tail contains three different waits, none of them a field dialog
--- with missing flags (issue #3's original theory).  Each one is measured
--- (probe_esper_stall and this file's own bring-up, 2026-07-20):
---
---  1. battle 78 at $CCBEB7 (event_main.asm:106707): the event PC parks at
---     $CCBEBA, the resume address after the battle command, until the
---     battle returns.  Battle 78 = group $4E -> formation 448 both slots =
---     TRITOCH_MORPH ($0115) alone vs TERRA alone.  Its whole AI is
---     `battle_event $12 / end_battle` on its first main turn
---     (ai_script.asm:5077): the set-piece ends itself, but its battle-event
---     dialogs are battle text and never raise the field's $00BA/$00D3
---     (which explains "dialogs present but flags read 0").
---     battleLoadStarted() also cannot see this battle: it reads party
---     battle-HP slot 0, and TERRA alone leaves slot 0 at $FFFF.  So
---     advanceStory neither taps (no dialogWaiting, no battN) nor
---     write-clears, and holding off indefinitely was the original $CCBEBA
---     stall (632af69).  The set-piece is detected here by its formation word
---     instead ($57C0 slot 0 in the TRITOCH set, which reads $FFFF outside
---     the fight on this route, measured f600..f11600): hands off through the
---     load (A queued during a set-piece load stalls the turn engine, the
---     intro-Tritoch twin's measured failure; see advanceStory's spare
---     notes), then edge-tap the battle-event text.
---  2. The vehicle flight (map 0, ~900 frames) and every field dialog: the
---     dialogs do raise $00BA/$00D3 and park the event PC at $CA0001
---     (WaitDlg), so dialogWaiting-gated taps advance them.  Nothing else
---     needs input.
---  3. party_menu 1, RESET at _cacb9f (event_main.asm:31284, called from
---     _ccc1b5), the "who hunts TERRA" selection.  632af69's
---     tap-A-at-everything drive cleared waits 1 and 2, then stalled here:
---     blind A walks into the menu and parks on a character's Status page
---     (screenshotted), where A does not exit and Start does not commit, so
---     $0059 stays $81, $0602/$0048/$010B stay clear, and the run times out.
---     The menu needs gen_narshe_battle's state-fed driver: cursor cell =
---     $4b+$4a+$5a, cells verified in $7E9D89, Start commits.  LOCKE+CELES+
---     EDGAR+SABIN go in: the story-canonical search party and a full bench
---     for the Zozo arc this fixture boots.
---
+-- gen_kefka_won.lua -- boot kefka_entry, win battle 57 with real input (a
+-- three-attempt retry ladder off the booted entry point).  Then ride the
+-- whole win tail (the esper cliff on map 23, TERRA's morph, the flight
+-- across the world, the regroup in Arvis's house) through the party-select
+-- menu to the first controllable frame, and generate kefka_won.mss on map
+-- 30 at (60,37).
+
 -- After the menu: _ccc1b5 reloads map 30 at {60,37} facing DOWN, sets
 -- $0602/$010B/$0048, set_parent_map 0 {84,33}, player_ctrl_on, return
 -- (event_main.asm:107272,107193-107208).  That calm is where the state is
 -- generated.
 local H = dofile("tools/tests/lib/ot6.lua")
 
--- the esper-zap species set, same triple gen_arvis spares for the intro twin
+-- the esper-zap species set
 local TRITOCH = { [0x0114] = true, [0x0115] = true, [0x0144] = true }
 
 local function map() return H.mapId() & 0x1ff end
@@ -61,10 +21,10 @@ end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 
 -- ----------------------------------------------- the input-driven fighter --
--- gen_narshe_battle's menu-episode machine (gen_scenario's cadence), reduced
--- to what this file fights: KEFKA, with P1 = TERRA+EDGAR+CELES.  Boost banked
--- to 2 and dumped; EDGAR on Tools -> AutoCrossbow from tier 2, CELES on
--- Runic (eats the Ice 2 telegraph) from tier 3, everyone else on Fight.
+-- The menu-episode fighter: KEFKA, with P1 = TERRA+EDGAR+CELES.  Boost
+-- banked to 2 and dumped; EDGAR on Tools -> AutoCrossbow from tier 2,
+-- CELES on Runic (eats the Ice 2 telegraph) from tier 3, everyone else on
+-- Fight.
 local KEFKA = 0x014A
 local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
 local MENU, ACTOR = 0x7bca, 0x62ca
@@ -188,8 +148,8 @@ local function mkFighter(tier, tag)
 end
 
 -- ---------------------------------------------------------- menu driving --
--- gen_narshe_battle's state-fed party-menu driver, on the 1-party layout:
--- pool rows 8 wide (cells 0-15), party 0's four slots at cells $10-$13.
+-- State-fed party-menu driver, on the 1-party layout: pool rows 8 wide
+-- (cells 0-15), party 0's four slots at cells $10-$13.
 local function mst() return H.readByte(0x0026) end
 local function menuUp() return H.readByte(0x0059) ~= 0 end
 local function cell9d(c) return H.readByte(0x7E9D89 + c) end
@@ -275,11 +235,10 @@ local function landed(m, n)
 end
 
 -- ------------------------------------------------------ the KEFKA ladder --
--- gen_narshe_battle's input-driven attempt shape: activation by clean edge-A,
--- the fight played with real input, the verdict read off the scripted branch
--- (the win scene on the stage vs the {25,5} lose-path save point), and a loss
--- reloading the booted entry point with the fighter's tier escalated; this is
--- the script's equivalent of a player reloading a save.
+-- Activation by clean edge-A, the fight played with real input, the
+-- verdict read off the scripted branch (the win scene on the stage vs the
+-- {25,5} lose-path save point); a loss reloads the booted entry point
+-- with the fighter's tier escalated.
 local kefkaBlob, kefkaWon = nil, false
 local kefkaLost = nil
 local function kefkaBody(tier)
@@ -348,15 +307,14 @@ local function kefkaAttempt(n)
   }, {})
 end
 
--- Budget: the battle-clear-write era ran this file in ~90k frames; the
--- input-driven fight costs real ATB rounds and the ladder may replay it
--- three times.
+-- Budget: the input-driven fight costs real ATB rounds and the ladder
+-- may replay it three times.
 H.run({ maxFrames = 400000 }, {
   H.loadState("build/states/kefka_entry.mss.lua"),
   H.waitFrames(30),
 
-  -- the ladder's checkpoint is the booted entry point (gen_narshe_battle
-  -- generated it one clean edge-A from battle 57 and verified the activation)
+  -- the ladder's checkpoint is the booted entry point, one clean edge-A
+  -- from battle 57
   (function()
     local ckReq
     return H.cond(function() return true end, {
@@ -381,15 +339,6 @@ H.run({ maxFrames = 400000 }, {
     end
   end),
 
-  -- The win tail, wait by wait (see the header): dialog-gated taps for the
-  -- field dialogs, the zap recipe for battle 78, no input otherwise, and
-  -- stop at the party menu, which blind A must never reach.
-  -- The menu detector combines three conditions on purpose: $0059 alone
-  -- rises to $52 during battle 78's transition (measured f3499) and blips
-  -- $FF/$01 at the vehicle handoff (f7037), so menuUp() alone fires 7000
-  -- frames early.  The real party menu shows $59=$81 with menu mode $0200=4
-  -- and the pick state $26=$2d once interactive, and all three hold together
-  -- only there.
   (function()
     local aPh, zapN, battN, hb = 0, 0, 0, -600
     return H.driveUntil(function()
@@ -415,9 +364,6 @@ H.run({ maxFrames = 400000 }, {
           return
         end
         if battN >= 3 then
-          -- no other battle exists on this route; a stray would be fought
-          -- with real input by the same edge-tapped A (issue #75: no
-          -- battle-clear write)
           H.setPad(aPh < 4 and { "a" } or {})
           return
         end
@@ -469,8 +415,8 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(sw(0x0139), 1, "$0139 SET -- the battle-won latch")
     H.assertEq(sw(0x0612), 0, "$0612 clear -- KEFKA gone")
     H.assertEq(sw(0x061D), 0, "raiders retired")
-    -- the tail-completion latches: clear at 632af69's menu wedge, set only
-    -- once _ccc1b5's caller ran to its return (event_main.asm:107194-107208)
+    -- the tail-completion latches are set only once _ccc1b5's caller runs
+    -- to its return
     H.assertEq(sw(0x0602), 1, "$0602 SET -- the post-menu stretch ran")
     H.assertEq(sw(0x010B), 1, "$010B SET -- ditto")
     H.assertEq(sw(0x0048), 1, "$0048 SET -- ditto")
@@ -479,14 +425,6 @@ H.run({ maxFrames = 400000 }, {
     H.screenshot("kefka_won")
   end),
 
-  -- #84: Elixir, visible on the walk (the chest at (55,30), five tiles from
-  -- the reload spot).  Its twin Elixir at (105,14), bit 10, is in the Elder
-  -- room, which no controllable frame of this file can reach: the streets
-  -- from either Arvis door connect only to the south gate and mine 50, and
-  -- the one entrance chain onward (50 -> 49 -> 48 -> the west streets ->
-  -- the Elder door at 20 (18,22)) crosses map 49's tripwire maze
-  -- (EventTrigger::_49, twenty triggers over x=106-116 y=12-23), measured
-  -- pathless after the (112,13) trigger fires (probe_n30_chests).
   H.openChest{ stand = { 55, 31 }, face = "up", bit = 2, what = "Elixir",
                nav = { playBattles = "tactical" } },
   -- back to the reload spot, approached from the north so the saved facing

@@ -1,226 +1,20 @@
--- gen_banon.lua -- from returner_hideout.mss (map 108, the entry hall) through
--- the Returner Hideout to the moment the party casts off for Narshe.
--- Generates one state:
+-- gen_banon.lua -- from returner_hideout.mss (map 108, the entry hall)
+-- through the Returner Hideout to the moment the party casts off for
+-- Narshe.  Generates one state:
 --   banon_joined.mss  map 112 (7,43), TERRA + EDGAR + SABIN + BANON, $0018
---                     set: the raft is armed and the Lete River is one map
---                     away.  This is the fixture gen_lete starts from.
---
--- The hideout is a conversation graph rather than a dungeon.  There is no
--- combat and little walking; what gates progress is five NPCs talked to in a
--- partial order, each one setting a switch the next one reads.  Read out of
--- event_main.asm:
---
---   map 109 ( 9,25) greeter $0413 -> _caf68a (:36275)   the way in
---   map 110 (51,50) BANON   $041d -> _caf79c (:36439) -> _caf7dc (:36475)
---       the speech.  Sets $0011/$0012 and rebuilds the party: `party_chars
---       TERRA / char_party EDGAR,0 / char_party SABIN,0 / char_party LOCKE,0`
---       plus a delete_obj each, so TERRA is alone from here to the raft.  It
---       then `load_map 110, {21,48}` (the same map id, so a map change is
---       not an arrival signal here; $0011 is), and that load teleports the
---       party from Banon's chamber in the east of map 110 to the small room
---       in the west.  It despawns Banon ($041D=0) and spawns the three
---       friends: $041F EDGAR (52,48, east), $0420 LOCKE (27,48, west),
---       $0416 SABIN (map 109).
---   map 110 (27,48) LOCKE   $0420 -> _caf9cf (:36808)  sets $015A
---   map 109 (26,28) SABIN   $0416 -> _caf9af (:36788)  sets $015B
---   map 110 (52,48) EDGAR   $041f -> _caf9a9 (:36782)  sets $015C
---   map 109 ( 9,25) greeter again: with $0011 set _caf68a takes its first
---       branch, to _cafa67 (:36912), which is the lock: `if_any switch
---       $015A=0 / $015B=0 / $015C=0 -> _caf962`, and _caf962 is a one-line
---       brush-off ("We're a small organization now", :36737) that sets
---       nothing.  Talking to all three friends is required; skip any one
---       and the route stalls with no error.  Satisfied, it sets $0421=1,
---       which spawns Banon back on map 108 (npc_prop.asm:4325).
---   map 108 (14,49) BANON   $0421 -> _cafab8 (:36965)  the decision
---
--- Three things the tables do not say, all measured (probe_hideout):
---
--- 1. The greeter blocks the way.  Map 109's arrival vestibule reaches exactly
---    five tiles, (9,26) through (9,30), and the greeter stands on (9,25),
---    blocking the only way north.  This is the same shape as map 71's Figaro
---    guard, and the first version of this script planned straight past him
---    to a door and got "no path".  Talking to him runs the escort, which
---    walks the party to (22,21) and opens 147 tiles.
---
--- 2. Maps 109 and 110 are each partitioned, and the partition determines the
---    route.  Map 110's west room (bbox (20,46)-(29,54), 55 tiles) and its
---    east half (bbox (41,38)-(57,54), 114 tiles) do not connect to each
---    other; they connect through map 109.  So map 109's three doors to map
---    110 lead to three different destinations rather than three ways to one
---    place:
---        (11, 8) -> 110 (44,27)   east   (unreachable from the escort end
---                                         BEFORE the speech; 22 steps after
---                                         it, measured 2026-08-12)
---        (14,17) -> 110 (22,53)   west
---        (25,15) -> 110 (42,44)   east   <- the one Banon is behind
---    Banon, Edgar, the save point and the door to the river are all in the
---    east; Locke and the tile the speech parks the party on are in the west.
---    That is why this script crosses between them five times and why each
---    crossing names which half it is going to.
---
--- 3. Door C is a door tile, not a floor tile.  bfsPath says NO PATH to
---    (25,15) while reporting (25,16) directly under it 8 steps away.  This is
---    the gen_edgar finding: a door tile is a wall until CheckDoor
---    (player.asm:959) swaps the open-door tiles in, and it only does that
---    for a party pressing into it from directly below or above.  BFS cannot
---    plan through one.  So door C is crossed by staging on (25,16) and
---    holding UP, while doors B and (42,45), which are ordinary floor, are
---    crossed by a plain navTo.  Getting this wrong reads as "no path" and
---    looks like a partition bug, which is what cost the first pass.
---
--- THE DECISION PROMPT IS ANSWERED "NO" THREE TIMES, AND THAT IS WHAT THIS
--- STEP IS FOR (issue #106).  The prompt is
---       dlg $0131  "Will you become our last ray of hope?  0: Yes  1: No"
---       choice _cafac3, _cafc98                        (event_main.asm:36965)
--- and the two branches hand out different relics.  Read out of the scripts:
---
---   * Option 0, first time asked, gives TERRA a GAUNTLET.  _cafac3 (:36973)
---     tests $0017 (has the glove already been handed over) and then the
---     party's facing, and both facing variants -- _cafac3's own body and
---     _cafb31 (:37047) -- run `give_item GAUNTLET` (:37019, :37092).  That
---     is what this route used to take: measured on the pre-change fixture,
---     banon_joined's bag held one Gauntlet and no Genji Glove.
---   * Option 1, three times, gives TERRA a GENJI GLOVE.  Refusal 1 lands on
---     _cafcd8 (:37322), which sets $0014 and teleports the party to map 109
---     (9,29); refusal 2 lands on _cafd30 (:37373), which sets $0015 the same
---     way; refusal 3 lands on _cafd86 (:37426), which sets $0016, despawns
---     BANON from map 108 ($0421=0) and calls _cafdcb (:37461), the forced
---     departure.  That scene ends `remove_equip LOCKE / if_switch $0017=1,
---     _caffe8 / dlg $0137 / give_item GENJI_GLOVE` (:37816-37834) and then
---     joins the Yes path's own tail at `call _cafff0`.
---
--- The two are exclusive, so this is a trade rather than free content, and
--- the trade is worth taking.  A Genji Glove lets one character equip two
--- weapons (equip.asm:2834-2872, the CheckReequipRelics list it shares with
--- the Gauntlet and the Merit Award), and in OT6 a shield chip goes by weapon
--- CLASS, looked up per hand per swing (Ot6WeaponClass reads $3ca8,x with x
--- carrying the hand, ot6_break.asm:1593-1619), so two weapons on one
--- character is two break classes on one character.  Ot6FightBoost's own
--- comment (ot6_boost.asm:481-484) records the other half: an empty off-hand
--- whiffs, so a boosted Fight is +1 real hit per BP for a one-weapon
--- character and twice that for a glove pair.  The Gauntlet by contrast only
--- lets a two-handed weapon share a hand with a shield
--- (battle_main.asm:6894), and this ROM's route holds no two-handed weapon
--- for many hours; nothing in the tree has ever equipped the one it was
--- already being given.
---
--- The other copy of the glove the route knows about is a chest in the Sealed
--- Gate basement, many hours later.  This one is BEFORE the scenario split,
--- and the bag is shared across the split -- LOCKE's own Dirk goes into it by
--- `remove_equip LOCKE` here (:38565 on the Yes path, :37816 on this one) and
--- is still there at celes_freed, in the Locke scenario -- so the glove is
--- left in the bag rather than equipped on anyone at this point.  Whoever
--- needs it equips it in the scenario that needs it; gen_tunnelarmr is the
--- first taker.
---
--- Three refusals rather than one.  There is a cheaper way to the same glove
--- and this route does not take it yet.  _caf966 (:36741) hands it over on a
--- SINGLE refusal ($0014 set, $0013 and $0017 clear), from the guard at map
--- 110 (44,14) -- npc_prop.asm:4422, spawn switch $041E, which reads 1 at
--- returner_hideout -- who stands behind map 109's (11,8) door.  The map
--- notes above record that door unreachable, and that reading was taken
--- before the speech: measured 2026-08-12 one refusal in, (11,8) is 22 steps
--- away and (11,15) is 15.  The speech's `switch $0414=0` despawns the NPC
--- whose spawn tile is (11,15) and is the likely reason, though the before
--- and after were not measured against each other, so that mechanism is
--- unverified.  Three refusals is what this route walks because it needs no
--- new crossings and the script guarantees the outcome; the one-refusal
--- variant is a follow-up, and it buys only walking time, because taking the
--- glove sets $0017 and _cafac3's first line then routes a later Yes past
--- both `give_item GAUNTLET` sites.  The measurement is still logged below so
--- the follow-up starts from evidence rather than from this paragraph.
---
--- What answering NO costs elsewhere: nothing that is read.  $0013 is set
--- only by _cafba6 (:37140) on the Yes path and tested only by _caf966's own
--- guard (:36742), so it stays clear here and the exit assertion below says
--- so.  $0014/$0015/$0016 are tested nowhere but inside this scene.  Both
--- paths converge on _cafff0 (:37852), which is what puts EDGAR and SABIN
--- back in the party, drops LOCKE (he is off to South Figaro), loads map 112
--- at (7,42), calls _cafdb9 to make BANON a real party member, and leads to
--- $0018, the switch _cb059f requires before the raft will board anyone.
--- Banon is character 14 and the disassembly calls him WEDGE: const.inc:397
--- and :398 define WEDGE and BANON to the same 14 and the symbol picker took
--- the first, so `char_party WEDGE, 1` at :37457 is Banon joining, and
--- $185E rather than $1855 is the byte that records it.
---
--- Answering option 1 needs its own drive.  advanceStory taps A at any
--- waiting dialog and a blind A always confirms row 0, so the refusal driver
--- below reads the choice cell instead: $056F is the number of choices, live
--- only while the text engine is waiting for a keypress, and $056E is the
--- 0-based row, incremented by DOWN/RIGHT and clamped at $056F-1
--- (field/text.asm:368-408).  $056D debounces a held direction to one move,
--- which the 4-on/4-off tap phase already satisfies.
---
--- One trigger this route deliberately does not assert against.  Map 109's
--- (25,23) trigger is _cb002b (:37880), the scrap-of-paper gag, and it opens
--- a choice prompt this script does not handle.  It sits 5 steps from
--- the escort's endpoint and the walks to SABIN pass near it, so pinning
--- every plan off it would be brittle.  It cannot fire on a walk-past,
--- and the reason is worth recording because the same fact governs
--- the whole Lete River (see gen_scenario.lua's header): _cb002b opens
--- `if_any switch $01B4=0 / switch $01B2=0 -> EventReturn`, and $01B0-$01B7
--- are not story switches.  Switch N lives at bit N&7 of $1E80+(N>>3), so
--- those eight alias the byte $1EB6, the field engine's control-flags byte,
--- rewritten every frame by UpdateCtrlFlags (field/event.asm:5415-5432) with
--- bits 0-3 = the party's facing direction one-hot and bit4 = "A is held".
--- So the gag's real condition is "A pressed while facing DOWN": it is an
--- examine action rather than a step trigger, and walking over the tile does
--- nothing.  Rather than rely on that, the generator asserts that $016B, the
--- flag _cb002b sets as soon as it fires, is still clear, which catches the
--- trigger by outcome whichever tile the navigator chose.
--- Issue #75, zero-write: every navigator here runs with opts.playBattles.
--- The hideout draws no random encounters, and that is now stated as a fact
--- rather than as a description of the map layout: maps 108, 109, 110 and 112
--- all have bit 7 clear in map_prop byte $0525, and CheckBattleSub tests
--- that bit and returns before it will roll anything
--- (ff6/src/field/battle.asm:332-333).  playBattles mode makes the battle
--- branch a property of the code path rather than an assumption: if a battle
--- did fire, it would be fought with real input rather than write-cleared.
---
--- THE MODE IS "tactical", and the choice is deliberate rather than a default.
--- The spelling used to be `true`, which is the blind branch: no menus, no
--- items, no flee, edge-tapped A and nothing else.  That branch is the one
--- that walked BANON's escort into a wipe at terra_clifftop while its log said
--- "navTo timeout" (ot6_field.lua's own comment at the branch says so), and it
--- has no business on this segment even when it can never run.  Between the
--- two real modes:
---
---   * "flee" means standing still while the formation takes free rounds
---     (M.FLEE_CAP's block comment).  From the speech to the departure TERRA
---     is the entire party -- Banon's script does `party_chars TERRA` and
---     deletes the other three -- so every free round lands on one character,
---     and she is the one this segment has been arriving poisoned.
---   * BANON is in the party for the last stretch, and his death is not a
---     wipe you retry: BattleEnd_03 is "banon died" and it goes to LoseBattle,
---     which sets the game-over flag (battle_main.asm:12300-12307, :16039).
---     There is no attempt 2 to spend here.
---
--- So the contingency wants the driver that reads the command table, uses
--- Edgar's Tools and Sabin's Blitz, and heals at 55% off its own item line.
--- The usual argument against tactical -- that it costs more frames per
--- encounter than a run -- does not apply to a segment that cannot roll one.
---
--- HP AND POISON.  Two care stops, one on arrival and one before the save.
--- This generator used to have none, on the reasoning that a hideout with no
--- encounters cannot cost the party anything, and that is exactly wrong for a
--- status: poison drains max HP/32 per step with a floor of 1
--- (ff6/src/field/player.asm:593-613), and this route walks a few hundred
--- steps across five crossings.  banon_joined shipped TERRA at 1 of 136 with
--- status 04 because the bit arrived with her from returner_hideout and
--- nothing here looked at it.  The arrival stop is the one that matters --
--- clearing the bit before the walking rather than after it -- and the exit
--- stop is what makes H.assertPartyStanding at the bottom a contract the
--- generator can meet rather than one it can only report.
+--                     set (the raft is armed).
+
+-- Progress gates on talking to five NPCs in a partial order, each setting
+-- a switch the next one reads.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/returner_hideout.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end
--- field object i's live tile.  Object number = the map's NPC record index +
--- 16, spawned or not (verified against gen_edgar's map-55 numbers: record 3
--- {24,16} is its obj 19).  Live coordinates matter here: the greeter walks
--- from (9,25) to (25,17) during his own escort.
+-- field object i's live tile (object number = the map's NPC record index +
+-- 16).  The greeter's own escort moves him from (9,25) to (25,17).
 local function objX(i) return H.readWord(0x086a + 0x29 * i) >> 4 end
 local function objY(i) return H.readWord(0x086d + 0x29 * i) >> 4 end
 local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
@@ -234,13 +28,9 @@ local function where(tag)
     sw(0x0014), sw(0x0015), sw(0x0016), sw(0x0017)))
 end
 
--- HP, status 1 and the poison cure, at both ends of the walk.  Status is on
--- the line because it is the whole reason this generator grew a care stop:
--- an HP-only roster reported banon_joined's TERRA as healthy at every point
--- of the route except the last one, where poison had already ground her to
--- 1 of 136.  ANTIDOTE is $F2 (ff6/src/text/item_name_en.json entry 242).
+-- ANTIDOTE is $F2.
 local ANTIDOTE = 0xF2
--- The two relics the decision chooses between (same file, entries 208/209).
+-- the two relics the BANON decision chooses between
 local GAUNTLET, GENJI_GLOVE = 0xD0, 0xD1
 local function roster(tag)
   local out = {}
@@ -266,10 +56,9 @@ local function settled(n, extra)
   end
 end
 
--- see gen_returner.lua and gen_kolts.lua: settles drive (a lingering dialog
--- or an encounter stalls a passive wait indefinitely) and do not require
--- player control ($087C&$0F alternates between 2 and 4 under any async object
--- script).
+-- settleField drives past a lingering dialog or encounter without
+-- requiring player control ($087C&$0F alternates between 2 and 4 under any
+-- async object script).
 local function settleField(dstMap, maxF)
   return seq({
     H.waitFrames(90),
@@ -337,28 +126,14 @@ local function crossDoorHold(sx, sy, dir, dstMap, what)
   })
 end
 
--- Talk to object `obj`, tracked by its live tile.  Two measured facts from
--- gen_edgar and gen_kolts shape the drive: CheckNPCs (player.asm:142)
--- activates whatever the object map holds one tile in the party's facing
--- direction while A is held, and a two-frame turn press does not set the
--- facing byte at all.  So the direction is held until $087F reads back the
--- wanted value, and only then is A edge-tapped (4 on / 4 off; activation is
--- edge-driven like dialog advance).  The approach tile is the first neighbour
--- BFS can currently reach, re-resolved lazily so it is correct inside
--- route().
 local FACE = { up = 0, right = 1, down = 2, left = 3 }
 local NEIGHBOURS = {
   { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
 }
--- Half the hideout's NPCs move.  npc_prop.asm gives EDGAR ($041f) and the
--- guard at (44,14) ($041e) `set_npc_movement RANDOM`; LOCKE ($0420), SABIN
--- and BANON have no movement property and stand still.  A first version
--- latched the approach tile and the facing once and timed out on EDGAR:
--- staged at (52,46) for an Edgar who had already stepped off (52,47).  So
--- this uses gen_edgar's talkTo shape: the approach tile is re-resolved (at
--- most every 30 frames, since BFS is not free), the facing is computed from
--- the live delta every frame, and a soft round that loses him walks back
--- and tries again before the hard round raises.
+-- EDGAR ($041f) and the guard at (44,14) ($041e) move randomly
+-- (npc_prop.asm); LOCKE, SABIN and BANON stand still.  The approach tile is
+-- re-resolved at most every 30 frames and facing is computed from the live
+-- delta every frame.
 local function talkToObj(obj, what, maxF)
   local engaged = false
   local function objAt() return objX(obj), objY(obj) end
@@ -435,22 +210,12 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- Talk to BANON and answer his prompt with option 1, "No".  One driver
--- covers the whole exchange rather than a talk step and a separate answer
--- step, because the exchange is one closed loop with three states and the
--- loop is what makes it safe to re-enter: whatever the text engine is doing
--- this frame, the pad is decided from what is on screen.
---
+-- Talk to BANON and answer his prompt with option 1, "No".
 --   a choice list is up ($056F >= 2)     -> walk $056E onto row 1, then A
 --   an ordinary page is waiting          -> edge-A to page it
 --   anything else (animation, map load)  -> empty pad
---
--- Never a blind A while a list is up: that is what confirms row 0, which is
--- Yes.  The terminator is the switch the refusal branch sets rather than the
--- prompt closing, so an A that lands one frame early (or a prompt that
--- somehow reopens) is retried by the same loop instead of silently taking
--- the other branch.  `swId` is $0014, $0015 and $0016 for refusals 1, 2 and
--- 3 (event_main.asm:37325, :37376, :37429).
+-- A blind A while a list is up confirms row 0 (Yes).  `swId` is $0014,
+-- $0015 and $0016 for refusals 1, 2 and 3.
 local function refuseBanon(n, swId, swName)
   local what = string.format("BANON refusal %d (option 1 = No, -> %s)",
     n, swName)
@@ -492,9 +257,6 @@ local function rideTo(pred, what, maxF)
   })
 end
 
--- 200000 covered the single Yes.  Three refusals add two return trips across
--- the vestibule, two extra map loads of 108, and the forced departure scene,
--- which is longer than the Yes departure.
 H.run({ maxFrames = 320000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -506,12 +268,7 @@ H.run({ maxFrames = 320000 }, {
     roster("booted")
   end),
 
-  -- The arrival care stop, and it is deliberately the first thing that
-  -- happens.  Everything below this line is walking, and walking is what
-  -- costs a poisoned character their HP; clearing the bit after the five
-  -- crossings would restore the HP but not the hundreds of steps' worth
-  -- already spent.  It is a no-op that only logs when nobody needs anything,
-  -- so the cost on a clean predecessor is a few frames.
+  -- care stop: a no-op that only logs when nobody needs healing
   H.fieldCare({ tag = "care on arrival", threshold = 0.85 }),
 
   -- ===================================================================== --
@@ -533,13 +290,9 @@ H.run({ maxFrames = 320000 }, {
   H.call(function()
     H.assertEq(sw(0x01F0), 1, "$01F0 set -- the escort ran")
   end),
-  -- _caf745 does `player_ctrl_on` before it walks the greeter clear
-  -- (event_main.asm:36393-36402; the obj_script is async), so control comes
-  -- back while he is still moving and can still be standing in the
-  -- corridor.  A first version asserted the path open as soon as the ride
-  -- finished and failed on that; the probe saw it open only because its
-  -- flood spent 600 frames before looking.  Wait for the path to open rather
-  -- than for a frame count.
+  -- Control returns before the greeter finishes walking clear of the
+  -- corridor, so this waits for the path to open rather than for a frame
+  -- count.
   H.waitUntil(function() return H.bfsPath(25, 16) ~= nil end, 3000,
     "the greeter walks clear of door C's approach", 10),
   H.call(function()
@@ -548,23 +301,6 @@ H.run({ maxFrames = 320000 }, {
     H.screenshot("banon_escorted")
   end),
 
-  -- #84: Green Cherry, visible on the walk (the escort ends at (22,21),
-  -- four tiles from it).  A hideout wanderer can be parked on or beside
-  -- the pot when we get here (seen on the v0.14 regeneration: bfs said
-  -- "no path" for the four-tile walk, and the A-press answered nothing
-  -- for 6000 frames -- CheckNPCs tries the standing NPC first, and a
-  -- script-controlled object with no event eats the press).  Wait for
-  -- the pot tile and the stand tile to clear before walking in.
-  -- The escort parks the party ON _caf745's trigger tile (22,21)
-  -- (event_trigger.asm:451), and the engine re-fires a stood-on
-  -- trigger every frame -- each fire hits the $01F2 latch and returns,
-  -- but the event pointer is hot ($E5 mid-chain) often enough that
-  -- CheckNPCs (player.asm:161) refuses talks and chests.  A guard that
-  -- waits for event-calm while STANDING there can never be satisfied
-  -- (measured: $E5 parked for 9000 frames).  So: step off the trigger
-  -- first, then wait for the event queue to go stably quiet -- that
-  -- also gives the escort's async tail and the (27,25) wanderer time
-  -- to finish/clear -- and only then open the pot.
   H.navTo(22, 23, { maxFrames = 8000, playBattles = "tactical" }),
   H.release(),
   (function()
@@ -608,11 +344,6 @@ H.run({ maxFrames = 320000 }, {
     H.assertEq(sw(0x041F), 1, "$041F set -- EDGAR is an NPC (east)")
     H.assertEq(sw(0x0420), 1, "$0420 set -- LOCKE is an NPC (west)")
     H.assertEq(sw(0x0416), 1, "$0416 set -- SABIN is an NPC on map 109")
-    -- `load_map 110, {21,48}` is where the scene puts the party, but not
-    -- where the scene leaves it: the movement after the load walks
-    -- everyone into position and it settles a couple of tiles east (measured
-    -- (23,48)).  So the assert is that the party is in the west room, stated
-    -- the way the route depends on it: LOCKE has to be reachable from here.
     H.log(string.format("the speech left the party at (%d,%d); " ..
       "LOCKE obj 19 at (%d,%d)", H.fieldX(), H.fieldY(), objX(19), objY(19)))
     for _, c in ipairs({ { 27, 49 }, { 27, 47 }, { 26, 48 }, { 28, 48 } }) do
@@ -636,8 +367,6 @@ H.run({ maxFrames = 320000 }, {
   rideTo(function() return sw(0x015A) == 1 end, "locke done"),
   H.call(function() H.assertEq(sw(0x015A), 1, "$015A set (LOCKE)") end),
 
-  -- #84: Fenix Down, visible on the walk (the west room's chest, one tile
-  -- from LOCKE)
   H.openChest{ stand = {28, 50}, face = "up", bit = 42, what = "Fenix Down",
                item = 0xF0, nav = { playBattles = "tactical" } },
 
@@ -656,20 +385,13 @@ H.run({ maxFrames = 320000 }, {
     where("three of three")
   end),
 
-  -- #84: Potion, visible on the walk (the east half's chest, three tiles
-  -- from EDGAR; this is the last time the route stands in the east)
   H.openChest{ stand = {55, 49}, face = "up", bit = 48, what = "Potion",
                item = 0xE9, nav = { playBattles = "tactical" } },
 
   -- ===================================================================== --
-  -- Phase 4: the greeter unlocks Banon.  With all three set, _caf68a's
-  -- $0011 branch reaches _cafa67, which sets $0421 and puts Banon back on
-  -- map 108.  Missing any of the three would take _caf962 instead, which is
-  -- one line of dialog and sets no switch, and the route would stall with
-  -- nothing to show for it, so $0421 is the assert that matters.
-  -- Note that the greeter is back on his spawn tile (9,25): every map load
-  -- re-inits NPCs from npc_prop, so his escort walk to (25,17) is undone.
-  -- talkToObj tracks him live either way.
+  -- Phase 4: the greeter unlocks BANON, setting $0421.  Every map load
+  -- re-inits NPCs from npc_prop, so the greeter is back on his spawn tile
+  -- (9,25); talkToObj tracks him live either way.
   -- ===================================================================== --
   crossTo(42, 45, 109, "H5 map 110 EAST -> map 109 (for the greeter)"),
   talkToObj(16, "the greeter (unlock BANON)"),
@@ -678,16 +400,6 @@ H.run({ maxFrames = 320000 }, {
     H.assertEq(sw(0x0421), 1, "$0421 set -- BANON is waiting on map 108")
   end),
 
-  -- ===================================================================== --
-  -- Phase 5: the decision, refused three times for the Genji Glove (#106).
-  -- Refusals 1 and 2 each end with `load_map 109, {9,29}`, so the party is
-  -- put back in the vestibule it came from and walks the same short crossing
-  -- back to BANON.  The greeter is not in the way for either return trip:
-  -- _cafcd8 sets $0413=0 on the first refusal, which is asserted below.
-  -- Refusal 3 despawns BANON instead and runs the forced departure
-  -- (_cafdcb), which hands over the glove and lands the party on map 112
-  -- with BANON aboard and $0018 set.
-  -- ===================================================================== --
   crossTo(9, 30, 108, "H6 map 109 -> map 108 (to BANON)"),
   H.call(function()
     H.assertEq(objX(16), 14, "BANON obj 16 at x=14")
@@ -703,12 +415,6 @@ H.run({ maxFrames = 320000 }, {
     H.assertEq(sw(0x0413), 0, "$0413 clear -- _cafcd8 despawned the greeter")
     H.assertEq(H.invCountOf(GAUNTLET), 0,
       "the No branch handed over no Gauntlet")
-    -- Free measurement, not a route dependency (see the header): _caf966
-    -- would hand the glove over right now, from the guard at map 110
-    -- (44,14), if map 109's (11,8) door could be reached.  This file's map
-    -- notes recorded that door unreachable from the escort's end, and the
-    -- speech has since despawned the NPC at (11,15) ($0414=0).  Log which it
-    -- is so a later pass can take the one-refusal variant on evidence.
     H.log(string.format(
       "one-refusal variant: $0414=%d, (11,8) door %s, (11,15) %s, " ..
       "(11,9) %s -- the glove NPC is map 110 (44,14) behind it",
@@ -729,10 +435,8 @@ H.run({ maxFrames = 320000 }, {
   H.call(function()
     H.assertEq(sw(0x0421), 1, "$0421 still set -- BANON is still on map 108")
   end),
-  -- The third refusal does not hand control back on map 109: _cafd86 sets
-  -- $0016, clears $0421 and calls _cafdcb, which runs the whole forced
-  -- departure.  So this one is followed by the ride to map 112 rather than
-  -- by a settle.
+  -- The third refusal clears $0421 and runs the forced departure directly
+  -- to map 112, rather than returning control on map 109.
   refuseBanon(3, 0x0016, "$0016"),
   H.advanceStory(function()
     return map() == 112 and sw(0x0018) == 1 and H.hasControl()
@@ -741,16 +445,11 @@ H.run({ maxFrames = 320000 }, {
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 112, "on map 112 -- the passage to the Lete River")
-    -- The switches the answer changed.  $0013 is set only by _cafba6 on the
-    -- Yes path and read only by _caf966's own guard, so a route that never
-    -- says yes leaves it clear for good; this assertion used to require it
-    -- set and is inverted here because the route's answer changed, not
-    -- because it was failing.
+    -- $0013 is set only on the Yes path.
     H.assertEq(sw(0x0013), 0,
       "$0013 clear -- the YES branch never ran (_cafba6 not called)")
     H.assertEq(sw(0x0016), 1, "$0016 set -- the third refusal ran (_cafd86)")
     H.assertEq(sw(0x0017), 1, "$0017 set -- the relic was handed over")
-    -- The point of the whole detour.  give_item at :37834, once.
     H.assertEq(H.invCountOf(GENJI_GLOVE), 1,
       "a Genji Glove is in the bag (event_main.asm:37834)")
     H.assertEq(H.invCountOf(GAUNTLET), 0,
@@ -781,20 +480,12 @@ H.run({ maxFrames = 320000 }, {
     H.screenshot("banon_joined")
   end),
 
-  -- The exit care stop.  The departure scene has just put EDGAR, SABIN and
-  -- BANON back in the party, so this is the first moment all four records
-  -- are visible to a care stop, and anything the walk cost -- or any status
-  -- the three of them were carrying while the story had them out of the
-  -- party -- is repairable here and nowhere later.
+  -- exit care stop: the first moment all four party records are visible
   H.fieldCare({ tag = "care before the raft", threshold = 0.85 }),
   H.call(function()
     roster("banon_joined exit")
-    -- The exit contract: nobody dead, petrified, zombie, poisoned, or at or
-    -- below max HP / 8 (H.assertPartyStanding, the same conditions
-    -- tools/audit_party_hp.py applies tree-wide).  This generator had none,
-    -- which is why banon_joined shipped TERRA poisoned at 1 of 136 and the
-    -- audit was the thing that found it, two steps and a `make savestates`
-    -- later.  Failing here instead means the fixture is never written.
+    -- H.assertPartyStanding: nobody dead, petrified, zombie, poisoned, or
+    -- at/below max HP / 8.
     H.assertPartyStanding("banon_joined exit")
   end),
   H.saveState("banon_joined.mss"),

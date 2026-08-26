@@ -1,14 +1,12 @@
 -- probe_zozo_kit.lua -- do the six Zozo equips actually land?
 --
--- H.equipWeapon grew opts.slot so it could reach the helmet, armour and the
--- two relic rows, and the relic rows are a different menu with their own
--- states and their own cursor.  That is new menu driving, and the place it
--- would be discovered broken is three hours into a savestate chain.  This
--- runs it once, on its own, and reads the slots back.
+-- H.equipWeapon reaches the helmet, armour and the two relic rows via
+-- opts.slot; the relic rows are a different menu with their own states and
+-- cursor.  This runs it once, on its own, and reads the slots back.
 --
--- It boots zozo_arrival and does exactly what gen_zozo4 now does after its
--- care stop: CELES's LeatherArmor, Star Pendant and Peace Ring, SABIN's
--- Buckler, Star Pendant and Black Belt.
+-- Boots zozo_arrival and does what gen_zozo4 does after its care stop:
+-- CELES's LeatherArmor, Star Pendant and Peace Ring, SABIN's Buckler, Star
+-- Pendant and Black Belt.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

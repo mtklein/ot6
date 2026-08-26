@@ -4,7 +4,7 @@
 -- verbs boost guarantees.  Unboosted Steal is vanilla; each BP tilts the
 -- common/rare gamble; the full 3-BP spend makes it a guaranteed steal that
 -- takes the rare item if the enemy has one.
---
+
 -- The hooks under test (ot6.asm):
 --   Ot6StealBoostLevel replaces `lda $3b18,x` at the head of vanilla's
 --     success math (TargetEffect_52, battle_main.asm). 0 bp returns the raw
@@ -15,21 +15,7 @@
 --     vanilla roll; 1-3 bp are fallback-aware (never nothing on a boosted
 --     success) and bias to the rare slot, becoming certain at 3 bp.
 --   Ot6BoostDmg's $05 gate: steal never gets a damage multiplier.
---
--- Issue #75 conversion.  The old apparatus rebuilt the entire battle by
--- poke: LOCKE installed into all three magitek slots, Steal forged into
--- $202E, level 50 written to both sides, sentinel steal slots written into
--- $3308/$3309 for every entity, enemies HP-pinned and stopped, bp and pending
--- handed over, MP pinned, and the $BE RNG index seeded at RandA to chosen
--- bytes.  On figaro_cleared each of those is a fact instead: LOCKE
--- carries Steal (row 1, the #55 thief submenu), the desert pool's
--- formation seeds real species with real authored steal slots (measured:
--- species $5C rare=$F2=common, and two $5D with rare empty and common Tonic;
--- LoadMonsterProp loads them from MonsterItems, battle_main.asm:7505), and
--- levels are real on both sides (L6 against L6 gives vanilla chance
--- 6+50-6 = 50, a coin flip).  The bank is earned by real zero-MP item turns,
--- and pending by real R edges.
---
+
 -- The seed pins are replaced by a zero-write decode.  An exec
 -- callback at RandA reads $BE at the instant the success roll runs and
 -- computes the byte the engine is about to draw (r1 = RNGTbl[be+1],
@@ -39,17 +25,7 @@
 -- weaken the gamble claim without being noticed.  The 3-bp guarantee is
 -- checked directly as roll-free: zero RandA draws during its resolution,
 -- which is stronger than any adversarial seed, because there is no roll.
---
--- The sneak ring arm is a labeled isolation arm (owner ruling 2026-08-10,
--- waiver-burndown plan: mechanism decodes may keep memory-hack staging
--- where the fixture cannot produce the input on cue).  No fixture chain
--- owns a Sneak Ring; the game's own sources are a shop the chain never visits
--- and a steal from species $14, so owning the ring in normal play is future
--- work.  The arm sets and clears one relic bit ($3C45 bit 0) around two
--- unboosted attempts and uses the same roll decode: with the ring the model
--- becomes lands-iff-roll-below-100, and any observed roll >= 50 that lands is
--- a roll the bare arm missed on.  This is the file's only
--- remaining write surface (the .writeByte waiver survives for it alone).
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/figaro_cleared.mss.lua"
 
@@ -115,9 +91,6 @@ local function armWatches()
                                     chance = H.readByte(0xEE) }
     end
   end, emu.callbackType.exec, RANDA, RANDA)
-  -- gate the grant on the steal message being open (code >= 1): the bank
-  -- turns' item use also writes its item id into this region (measured:
-  -- a banking Tonic's $E8 landed in the re-loot record as a false grant)
   emu.addMemoryCallback(function(_, v)
     if rec and rec.code >= 1 and v ~= NONE and not rec.done then rec.grant = v end
   end, emu.callbackType.write, 0x7E32F4, 0x7E32F4 + 18)
@@ -128,11 +101,6 @@ end
 -- `wantPend` by real R edges, then steals at the monster slot `target`.
 local mf = 0
 local drive = { wantBp = 0, wantPend = 0, target = nil }
--- the target-cursor latch and steer code, moved into the library from this
--- file's original copy (H.targetCursor keeps the measured facts: the
--- blink-proof every-frame latch, the reset outside target select, measured
--- here when the re-loot arm stole from the wrong monster off a stale
--- latch, and the per-press-cycle {left,down,right,up} grid rotation)
 local tc = H.targetCursor({ mask = 0x7B7E })
 local function decide()
   if H.readByte(MENU) == 0 then
@@ -143,8 +111,8 @@ local function decide()
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
   if st == ST_TRANS then return {} end
-  -- the item window needs the slow 6-on/24-off cadence (battle_preview's
-  -- measurement); everything else takes 4-on/4-off
+  -- the item window needs the slow 6-on/24-off cadence; everything else
+  -- takes 4-on/4-off
   local slow = (act == locke and st == ST_ITEM)
   if slow then
     if (mf - 1) % 30 >= 6 then return {} end
@@ -231,11 +199,6 @@ local function classify()
   end
 end
 
--- enter a desert battle whose formation suits the arm: every
--- arm needs a both-populated species (rareT), and battle 3 additionally
--- needs a common-only species (fbT1) for the fallback arm.  Flee
--- anything else and re-patrol (measured: the pool draws at least two
--- formation types, 1x$5C+2x$5D mixed, and rare-holders-only).
 local needFb = false
 local function suitable()
   return rareT ~= nil and ((not needFb) or fbT1 ~= nil)
@@ -357,8 +320,8 @@ H.run({ maxFrames = 150000 }, {
   -- model this arm asserts.
   enterDesertBattle(2),
   H.call(function()
-    -- the isolation write (waived, labeled): no fixture owns a Sneak Ring;
-    -- see the file header.  One relic bit on, cleared again below.
+    -- the isolation write (waived, labeled): no fixture owns a Sneak Ring.
+    -- One relic bit on, cleared again below.
     H.writeByte(0x3C45 + locke*2, H.readByte(0x3C45 + locke*2) | 0x01)
     drive.target = rareT
   end),
@@ -403,14 +366,9 @@ H.run({ maxFrames = 150000 }, {
   end)(),
   -- arm 2: 0 bp is the vanilla roll, decoded rather than seeded: each attempt
   -- must draw the success roll, and its outcome must match vanilla's own
-  -- model (lands iff roll < 50, chance = L6+50-L6).  Attempts run until
-  -- one lands or the MP budget for two is spent.
-  -- arm 2: 0 bp is the vanilla roll, decoded rather than seeded: each attempt
-  -- must draw the success roll, and its outcome must match vanilla's own
-  -- model (lands iff roll < 50, chance = L6+50-L6).  The target is the
-  -- both-populated species so the slot pick cannot turn a landed roll
-  -- into nothing (see the ring arm's note).  Up to three attempts
-  -- (4 MP each against the remaining real pool).
+  -- model (lands iff roll < chance).  The target is the both-populated
+  -- species so the slot pick cannot turn a landed roll into nothing.  Up to
+  -- three attempts (4 MP each against the remaining real pool).
   (function()
     local tries, landed, wantVal = 0, false, nil
     return H.repeatN(1, {
@@ -428,14 +386,9 @@ H.run({ maxFrames = 150000 }, {
           local hit = rec.code == 3
           H.log(string.format("bare attempt %d: roll=%d -> %s",
             tries, roll, hit and "landed" or "missed"))
-          -- vanilla's own model, verified per attempt: this is the seeded
-          -- V_fail and V_common sweep reduced to a prediction check.
-          -- The threshold is the engine's own $EE (level + 50 - target
-          -- level), not a hardcoded 50: the v0.14 chain's regenerated
-          -- fixture moved Locke a level off the target, and a drawn
-          -- roll of exactly 50 landed against chance 51 -- the engine
-          -- compares `cmp $ee / bcs miss` (strict less-than) and the
-          -- old hardcoded model broke on the boundary draw.
+          -- vanilla's own model, verified per attempt: the threshold is the
+          -- engine's own $EE (level + 50 - target level), compared strict
+          -- less-than (`cmp $ee / bcs miss`).
           local chance = rec.draws[1].chance
           H.log(string.format("bare attempt %d: chance=%d", tries, chance))
           H.assertEq(hit, roll < chance,

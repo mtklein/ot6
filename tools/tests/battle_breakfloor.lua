@@ -3,19 +3,18 @@
 -- asserted in ROM.  (battle_breaktbl.lua pattern: pure ROM bytes, no
 -- savestate, exit 0 = pass.)
 --
--- Phase 2 of "break floor" (#6) wired OT6_FLOOR_CLASS into the @formula seed
--- fallback (ot6.asm): a monster with no authored Ot6ShieldTbl row now seeds
--- its class-weak mask $3e9c from OT6_FLOOR_CLASS[species] instead of clearing
--- it to zero, so every species is breakable by at least one weapon class.
--- This test checks that the generated table (gen_break_floor.py) lands in the
+-- OT6_FLOOR_CLASS is wired into the @formula seed fallback (ot6.asm): a
+-- monster with no authored Ot6ShieldTbl row seeds its class-weak mask
+-- $3e9c from OT6_FLOOR_CLASS[species] instead of clearing it to zero, so
+-- every species is breakable by at least one weapon class. This test
+-- checks that the generated table (gen_break_floor.py) lands in the
 -- assembled ROM with the classes the classifier chose.
 --
 -- OT6_FLOOR_CLASS is one class byte per species (0..383), directly indexed by
 -- species id (matching OT6_CODEX width); it lives in bank $F0 (segment
 -- ot6_code).  HiROM PRG file offset = SNES addr - 0xC00000, so bank $F0 ->
--- 0x300000+ (school.lua and battle_breaktbl.lua document the same mapping).
--- The test locates the table itself by its opening run of species classes, so
--- it survives future data shifts the way breaktbl locates its tables.
+-- 0x300000+. The test locates the table itself by its opening run of
+-- species classes, so it survives future data shifts.
 
 local PRG = emu.memType.snesPrgRom
 local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04

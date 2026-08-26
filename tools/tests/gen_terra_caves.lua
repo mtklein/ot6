@@ -5,7 +5,7 @@
 --                    frame inside.  This is the entry point for the run to
 --                    Arvis's house, and the only fixture in the chain that
 --                    stands in this scenario's random-encounter pool.
---
+
 -- The way on is an examine action, not a door.
 -- gen_terra_narshe leaves the party at (39,53) with the checkpoint sealed
 -- behind an event that shoves it back every time.  The 231-tile southern
@@ -27,7 +27,7 @@
 -- that looks like the scenario dead-ending outside Narshe.
 -- The scenario brief predicted this reading would be needed on the river; it
 -- is needed here instead, on the same $1EB6.
---
+
 -- Why the $0020 term matters.  _ccb133's first if_any routes on $0020: with
 -- it set the fall-through runs _ccb148 (a bare shake/sfx that re-opens
 -- the wall for the later Kefka approach, gated on $0076/$006B), and with it
@@ -37,7 +37,7 @@
 -- (:104450), and finally `switch $01F0=1 / switch $0020=1 / switch $0608=0`
 -- (:104447-104449).  terra_narshe asserts both clear, so the branch is known
 -- rather than assumed.
---
+
 -- The hole opens at (15,56), which is map 20's short entrance to map 41
 -- (7,33).  Map 41's own (7,34) leads straight back to map 20 (15,57),
 -- so the arrival tile is one step from the way back.  BFS models passability
@@ -99,21 +99,10 @@ H.run({ maxFrames = 60000 }, {
     where("booted")
   end),
 
-  -- ===================================================================== --
-  -- To the wall, then face up and press A.  Facing is set by a press into
-  -- (15,56), which is still solid rock at this point: a blocked press
-  -- turns the party without moving it, the same idiom gen_narshe_escape
-  -- uses to face Arvis.  Only then is A edge-pressed, and the phase ends
-  -- when the scene picks up rather than after a fixed number of tries.
-  -- ===================================================================== --
-  -- issue #75: playBattles=true on every navigator.  Map 20's streets draw
-  -- no encounters, so nothing changes on the expected path, but a battle
-  -- that did fire here would be fought by real input rather than
-  -- write-cleared.
   H.navTo(15, 57, { maxFrames = 12000, playBattles = true }),
   H.release(),
   H.call(function() where("at the wall") end),
-  --
+
   -- A must stay held after the trigger fires.  $01B4 is not a latch; it is
   -- bit 4 of $1EB6, rewritten from the live pad every frame, and _ccb154
   -- re-reads it in its own guard a couple of opcodes after _ccb133 jumped
@@ -151,17 +140,7 @@ H.run({ maxFrames = 60000 }, {
     }
   end)(), "press A facing UP on (15,57) -- _ccb133 -> _ccb154"),
   H.release(),
-  --
-  -- There is deliberately no settle on (15,57).  The party is standing on
-  -- _ccb133's trigger tile, and with $01F0 now set the trigger re-fires and
-  -- immediately EventReturns each time it is checked, so eventRunning()
-  -- and hasControl() alternate between samples indefinitely.  A settle
-  -- predicate wanting 20 consecutive calm frames here never gets 2:
-  -- measured as a 20,000-frame timeout with the party motionless,
-  -- `ctl=false ev=true` and `ctl=true ev=false` three frames apart.  The fix
-  -- is to stop standing on the trigger rather than to write a better
-  -- predicate, so the asserts below read switches (which are stable) and the
-  -- next thing this script does is walk off the tile.
+
   H.waitFrames(90),
   H.call(function()
     H.assertEq(sw(0x01F0), 1, "$01F0 set -- _ccb154 ran (:104447)")

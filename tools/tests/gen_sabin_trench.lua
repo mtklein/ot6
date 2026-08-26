@@ -6,7 +6,7 @@
 --                    (_caad4c, event_main.asm:26626: every character
 --                    char_party 0, SCENARIO_MOG in, the same shape
 --                    locke_done ends in).
---
+
 -- The route:
 --   world (214,149) -> step onto (214,148) -> map 167 (12,25), Crescent
 --   Mountain.  Walking UP crosses (12,22) -> _cbc228, the helmet scene.
@@ -14,22 +14,16 @@
 --   being clear (the train's ending cleared $0184).  GAU dives for the
 --   breathing helmet, and $0041=1 opens the trench.  Then (25,26) -> 168
 --   (8,9); the (8,11)/(9,11) row asks "Jump?" ($0041 gate), option 0,
---   and _cbc866's jump runs _ca8ae3, the dive.
---
---   The trench is a vehicle script on world map 2 (load_map 2 {117,120}
---   AIRSHIP + set_script_mode VEHICLE, :21163).  move_vehicle commands
---   drive the ride; the player has input only at the two show_arrows
---   windows, where $01B7 ($1EB6 bit 7) picks the branch: LEFT sets it
---   (mainline), RIGHT clears it (detour through the mid-cave 175).  There is
---   no neutral default, so LEFT is held through the whole ride.  Battles
---   19/20/21 fire mid-script with no _ca5ea9 tail, and since issue #75
---   they are ended by play with no writes: flee first (hold L+R; no win is
---   needed, since the vehicle script resumes via PopDP either way), and if a
---   formation refuses the run for ~900 frames, fall back to the blind
---   tap-A fighter (SABIN/CYAN/GAU all Fight from row 0; SHADOW is long
---   gone, and GAU has no leave roll, so a win costs nothing).  $ed climbs
---   monotonically per segment (logged as the progress signal).
---
+--   and _cbc866's jump runs _ca8ae3, the dive.  The dive is a scripted
+--   ride with LEFT/RIGHT choice windows, where $01B7 ($1EB6 bit 7) picks
+--   the branch: LEFT sets it (mainline), RIGHT clears it (detour through
+--   the mid-cave 175); LEFT is held through the whole ride. Battles
+--   19/20/21 fire mid-script with no win-gate tail, ended by play with no
+--   writes: flee first (hold L+R; no win is needed, since the vehicle
+--   script resumes via PopDP either way), and if a formation refuses the
+--   run for ~900 frames, fall back to the blind tap-A fighter (SABIN/CYAN/
+--   GAU all Fight from row 0).
+
 --   Arrival _ca8be3 (:21288): world walk-on, then Nikeah 187 (24,11).
 --   The ferry clerk is NPC (17,15); dlg $032A's option 1 ("Hop aboard?")
 --   is the arc's single option-1 prompt, and option 0 loops the dialog
@@ -78,7 +72,7 @@ local function settle(toMap, what, budget)
 end
 
 -- ride driver with choice steering and trench battle handling: flee
--- first, tap-A fight after ~900 stubborn frames (see the header)
+-- first, tap-A fight after ~900 stubborn frames
 -- Set when the ride-scoped wipe canary fires; every ride() pred also
 -- exits on it so a lost dive ends the attempt rather than the run.
 local rideLost = nil
@@ -151,7 +145,7 @@ local function ride(dir, pred, what, budget, choiceWant)
       -- cells.  Five driver variants failed this ride in five different
       -- ways (the record is in dc07c44) before probe_trench_arrows and
       -- the source settled the mechanism:
-      --
+
       --   * show_arrows is non-blocking (VehicleCmd_da,
       --     world/event.asm:589, sets $E8 bits 1|2 and returns); the
       --     script runs `show_arrows / wait N / lock_arrows /
@@ -166,7 +160,7 @@ local function ride(dir, pred, what, budget, choiceWant)
       --     branch above; $1EB6 bit 7 stayed set the entire way,
       --     and the one 618-frame $00ED pause ended on its own
       --     (a long scripted beat, not a wait for input).
-      --
+
       -- What broke the five gen runs: this function read
       -- H.dialogWaiting() and CH_MAX/CH_SEL mid-ride.  Those are field
       -- module cells (hazard 1: the value at a module-owned address is

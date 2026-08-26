@@ -1,9 +1,8 @@
 # Balance metrics — the measurement harness
 
-Scope: measurement, not tuning. Every number below marked *proposed*
-is a proposal for the driver; nothing here is locked.
+Scope: measurement, not tuning.
 
-M3's weakness spread and M6's per-monster shield table cannot be tuned
+The weakness spread and the per-monster shield table cannot be tuned
 by feel alone across three scenario parties, so measurement comes
 first. `tools/tests/metrics_battle.lua` plays a fight by policy and
 emits one greppable `[ot6] [metrics] key=value` line per stat. It uses
@@ -36,26 +35,9 @@ inputs Blitz. Every stat fans out per party slot (`char_actions`, `char_dmg`,
 `char_chips`, `char_breaks`, `char_boosts`, `char_bp_*`,
 `char_dmg_taken`) using the same `sN:value` CSV the monster lines use.
 
-## Proposed target ranges (for the driver)
+## Running it, across formations
 
-| Range | Proposed target |
-|---|---|
-| Trash TTK, unboosted | **3–5 player actions** |
-| Trash TTK, boost3 | **2–3 player actions** (implied multiplier ~1.5–2×) |
-| Trash breaks | ≥1 break available when probing a real weakness; first break by the 2nd–3rd player action |
-| Boss break windows | **~2 per fight**, telegraphed; break uptime ~20–30% of the fight |
-| Trash danger budget | ≤3 enemy actions unboosted; breaking well should shave ≥1 |
-| greedy vs boost3 | greedy should *lose* to boost3 on TTK, so that banking is a real decision rather than something to ignore |
-
-Rationale for the first two rows: vanilla Narshe trash dies in ~2–3
-attacks, and OT6 adds a probe tax (chips) on top. 3–5 unboosted keeps
-trash fights short while leaving room for boost to recover the tax and
-more, so that the unboosted fight is longer than vanilla's but a
-well-played fight is shorter.
-
-## Running it, now and across formations
-
-Now: two entry-point states exist (`battle_entry`, `battle2_entry`,
+Two entry-point states exist (`battle_entry`, `battle2_entry`,
 selected by the `STATE` knob), so the matrix is 2 formations × 3
 policies. One
 run is deterministic (rng phase is frame-driven); distributions come
@@ -63,14 +45,10 @@ from the `SETTLE_EXTRA` jitter knob: sweep 0..90 in ~10-frame steps
 for ~10 samples per cell. Aggregation is a grep: every stat is one
 `key=value` line in `build/states/last_run.log`.
 
-Once post-magitek states exist (M3+): generate one entry-point state per
-stretch with the `gen_battle2` pattern (win, walk to the next trigger,
-save), named `battleN_entry`, and run the same matrix. The rows to fill
-are the stretch table in `weapon-classes.md`, which makes the coverage
-rule ("the story's actual party chips every non-boss encounter")
-checkable: per stretch, every formation shows a reasonable TTK range
-and a nonzero break rate *with that stretch's party*. Boss states get
-their own range row (break windows, uptime) once a boss is reachable.
+The rows to fill are the stretch table in `weapon-classes.md`, which makes
+the coverage rule ("the story's actual party chips every non-boss
+encounter") checkable: per stretch, every formation shows a reasonable TTK
+range and a nonzero break rate *with that stretch's party*.
 
 Attribution: damage, chips and breaks are credited to the entity whose
 action is running, read from the battle loop's own action-queue

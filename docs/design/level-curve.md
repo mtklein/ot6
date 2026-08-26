@@ -1,11 +1,9 @@
 # The OT6 level curve — party levels by area
 
-> **Why this exists.** There was no consolidated "expected party levels by
-> area" reference (only scattered notes like `thamasa-route.md` §6.1). This is
-> the authoritative one, and it is *empirical*: the levels below are read
-> directly off the routed **checkpoint savestate chain** (`build/states/*.mss`),
-> not from a vanilla walkthrough — so they are the levels OT6's own route
-> actually reaches, which is what tuning must answer to.
+> This is the authoritative party-level reference, and it is *empirical*: the
+> levels below are read directly off the routed **checkpoint savestate chain**
+> (`build/states/*.mss`), not from a vanilla walkthrough — so they are the
+> levels OT6's own route actually reaches, which is what tuning must answer to.
 >
 > Regenerate with `tools/savestate_party.py`'s `read_party` over the checkpoints
 > (the snippet at the bottom). Requires `make savestates` to have built the
@@ -37,14 +35,10 @@ The routed party reaches the **Floating Continent at L15–17**. Rough vanilla
 FF6 expectation for the same content is **~L25–30** (AtmaWeapon is a ~L30 fight
 in vanilla). So OT6 arrives at the FC roughly **ten levels light**, and the gap
 is widest here — the WoB's hardest stretch against its lowest-relative party.
-(#132, and owner note 2026-08-22: "the Floating Continent is *hard* … behind in
-gear and levels.")
 
 The deficit is real, and there are two answers, not one — a player can lean on
-tactics, **or grind to close part of the gap** with the Blackjack (owner steer
-2026-08-22: "since you have the airship you might want to look up pre-FC
-grinding spots"). See "Pre-FC grinding" below. Two things carry the deficit even
-without grinding:
+tactics, **or grind to close part of the gap** with the Blackjack. See
+"Pre-FC grinding" below. Two things carry the deficit even without grinding:
 
 - **Break, not levels, is the damage.** OT6's fights are Octopath shield/break
   tactics; boss shield and weakness rows are authored *against the routed
@@ -57,7 +51,7 @@ without grinding:
   already shipped (`ROADMAP.md`: "winnable at route level with a player's
   prep").
 
-Practical consequences for the #132 route:
+Practical consequences of the route as it stands:
 - The IAF gauntlet is eight fights with **no save and a real Game Over on a
   loss** (the `_ca5ea9` handler). At L15–17 that is a survivability test, not a
   damage race — budget for HP attrition across the chain and lean on break to

@@ -1,37 +1,10 @@
 -- probe_thamasa_house_map.lua -- one-shot ground-truth dump of map 351's
--- (the Thamasa burning house) live tile-passability grid, issue #127.
+-- (the Thamasa burning house) live tile-passability grid: reads the live
+-- decompressed tile-property tables ($7E7600 prop1 / $7E7700 prop2) across
+-- the whole map in one pass, without the bfsPath node cap.
 --
--- gen_thamasa_fire.lua's own STATUS header flags that its post-(4,10)-
--- trigger walk was discovered live, tile-by-tile, and that a navTo toward
--- (1,0) lost control at (4,3) and resurfaced at (4,38) with NO intervening
--- tiles recorded in the [tiles] walk trace -- a real jump, not a walk (a
--- genuine walk would have logged dozens of tileAligned() samples in
--- between; the trace jumps straight from (4,3)-ish to (4,38)). A source
--- read of event_trigger.asm's map-351 block (only 3 triggers: (4,10),
--- (21,22), (46,53)) and npc_prop.asm's map-351 block (all 20 make_npc
--- records, coordinates and events all cross-checked) turned up NO scripted
--- mechanism anywhere near (4,3) that could explain a teleport -- no
--- load_map, no mod_bg_tiles, no NPC event. So either it's an engine-level
--- tile-property effect baked into the compressed BURNING_BUILDING tileset
--- (map_tile_prop/burning_building.dat.lz, opaque without a live read) or
--- source review missed something. Rather than guess further from static
--- source, this probe reads the LIVE decompressed tile-property tables
--- ($7E7600 prop1 / $7E7700 prop2, indexed through the BG1 tilemap byte at
--- each (x,y) -- exactly what H.canStep/H.bfsPath already read) across the
--- WHOLE map in one pass, with the party never moving from the (4,10)/
--- (4,11) landing pocket. This sidesteps bfsPath's 4096-node cap entirely
--- (no search, just a grid read) and gives real ground truth: is the north
--- pocket actually wall-sealed from the main floor in the STATIC data (which
--- would mean a real engine warp exists somewhere), or does a corridor
--- exist that a single long bfsPath query simply couldn't reach (the same
--- cap trap gen_tunnelarmr's header documents for map 75)?
---
--- No -- @suite marker: one-shot measurement, not a suite test (probe
--- convention, see probe_thamasa_names.lua's header). Boot/inn/fire/join
--- steps are gen_thamasa_fire.lua's, copied rather than shared (same
--- convention: no second real caller yet to justify a lib promotion).
---
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- No @suite marker: one-shot measurement, not a suite test. Boot/inn/fire/
+-- join steps are copied from gen_thamasa_fire.lua rather than shared.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TERRA, LOCKE, STRAGO = 0, 1, 7
@@ -152,14 +125,10 @@ local function chaseTalkLazy(idxFn, maxFrames, what, opts)
   }, what or "chaseTalkLazy")
 end
 
--- ---- the grid dump itself ------------------------------------------------
 -- prop1 bits: 0x01/0x02 z-level walkable, 0x04 bridge, 0x07==both -> counter
 -- (wall). prop2 low nibble: exit bits per direction (down/up/right/left,
--- DIRBIT order in ot6_field.lua). A tile is "open" here if prop1 isn't the
--- $F7-style wall/counter pattern AND prop2's exit nibble is nonzero (some
--- exit exists). This mirrors stepAllowed's own tests without needing the
--- party actually standing adjacent (no z-transition edge cases at this
--- coarse a grain -- good enough to map connectivity, not to execute steps).
+-- DIRBIT order in ot6_field.lua). A tile is "open" if prop1 isn't the
+-- wall/counter pattern and prop2's exit nibble is nonzero.
 local function dumpGrid()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
   H.log(string.format("[hmap] masks $86=%02X $87=%02X (map w=%d h=%d)",
@@ -179,8 +148,6 @@ local function dumpGrid()
   for y, row in ipairs(rows) do
     H.log(string.format("[hmap] y=%02d %s", y - 1, row))
   end
-  -- also dump raw prop1/prop2 for the columns/rows the earlier run actually
-  -- touched, as decimal, for exact stepAllowed cross-checking
   local function dumpPoint(x, y)
     local t = H.maptile(x, y)
     local p1 = H.readByte(0x7E7600 + t)
@@ -232,7 +199,7 @@ H.run({ maxFrames = 60000 }, {
   H.waitUntil(function() return map() == 343 and H.hasControl() end, 3000,
     "Thamasa map re-loaded", 5),
 
-  -- ---- the inn, the fire (talk-across-the-counter, the proven fix) -------
+  -- ---- the inn, the fire (talk-across-the-counter) -------
   crossDoor(12, 19, 346, 23, 23, "inn door"),
   H.navTo(24, 17, { maxFrames = 9000, playBattles = "tactical", healer = TERRA,
     bank = 3, items = true }),

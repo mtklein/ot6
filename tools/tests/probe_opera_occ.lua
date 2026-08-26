@@ -11,7 +11,6 @@ H.run({ maxFrames = 4000 }, {
   H.call(function()
     H.assertEq(map(),236,"boot 236")
     H.log(string.format("[pos] CELES (%d,%d) z=%d", H.fieldX(), H.fieldY(), H.readByte(0x00b2)&3))
-    -- occupancy grid
     local hdr="   y\\x"; for x=4,15 do hdr=hdr..string.format(" %2d",x) end
     H.log("[occ]"..hdr)
     for y=6,27 do
@@ -19,8 +18,7 @@ H.run({ maxFrames = 4000 }, {
       for x=4,15 do row=row..(occFree(x,y) and "  ." or "  #") end
       H.log("[occ] "..row)
     end
-    -- canStep tests for the climb transitions (live z from CELES tile, but
-    -- canStep uses party z; move party is at (5,21) so tests reflect that z)
+    -- canStep uses party z, not live z; party is at (5,21) so tests reflect that z
     local function t(x,y,mv) H.log(string.format("[step] canStep(%d,%d,%s)=%s p1cur=%02x p1dst=%02x occDst=%s",
       x,y,mv,tostring(H.canStep(x,y,mv)),p1(x,y),
       p1(x+({up={0,-1},down={0,1},left={-1,0},right={1,0}})[mv][1],

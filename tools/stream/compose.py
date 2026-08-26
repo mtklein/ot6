@@ -1,44 +1,16 @@
 #!/usr/bin/env python3
 """compose.py <run.log> <tape.avi> <out.mp4> -- render the watchable video.
 
-Takes the raw tape mesen_record cut (ZMBV video + PCM audio in one AVI) and
-the run log whose [ot6pad]/[ot6note] lines the lib's recording taps emitted
-(tools/tests/lib/ot6.lua, "recording sidecars"), and renders an MP4:
-
-  +--------------------------+
-  |  game video, 2x nearest  |   512x448 (256x224 game area; the tape's
-  |                          |   239-row frame carries the 224-line picture
-  +--------------------------+   at rows 7..230, measured with cropdetect)
-  |  panel: pad + frame ctr  |   512x112, drawn UNDER the game, never over
-  +--------------------------+
-
-The panel -- SNES pad readout lit per frame from the input log, plus a frame
-counter -- is drawn HERE, pixel by pixel, and piped to ffmpeg as a second
-rawvideo input stacked under the game with vstack.  Drawing it ourselves
-keeps the ffmpeg requirements to core-only filters (crop/scale/vstack): the
-Homebrew ffmpeg bottle ships without libass or freetype, so the subtitles
-and drawtext filters do not exist in it (checked 9.0.1_1: its configuration
-line has no --enable-libass/--enable-libfreetype).
-
-Notes ride as a soft mov_text subtitle track (a native ffmpeg encoder --
-no external lib), so they never draw over the game unless the viewer turns
-them on.
-
-Frame alignment: the tape's 0-based frame n holds the frame during which
-M.frame read n+1 (recording starts while the emulator is still paused, and
-M.frame increments at startFrame before the frame is decoded), so the
-counter prints n+1 and a pad event stamped M.frame F lights its buttons
-from tape frame F-1.  Verified end-to-end in tools/stream/README.md.
-
-Sidecars land next to the MP4: <name>.inputs.tsv and <name>.notes.srt.
-The caller treats a failure here as non-fatal (the recording is an
-observer, never a verdict).
+Stacks the game video (512x448, 2x nearest) over a drawn pad + frame-counter
+panel (512x112) via ffmpeg, with notes as a mov_text subtitle track. The
+tape's 0-based frame n holds the frame during which M.frame read n+1.
+Sidecars <name>.inputs.tsv and <name>.notes.srt land next to the output MP4.
 """
 import json, re, subprocess, sys
 from fractions import Fraction
 from pathlib import Path
 
-MFRAME_OF_TAPE0 = 1              # M.frame stamp of tape frame 0 (see above)
+MFRAME_OF_TAPE0 = 1              # M.frame stamp of tape frame 0
 
 GAME_W, GAME_H = 512, 448        # 256x224 doubled, nearest-neighbor
 PANEL_W, PANEL_H = 512, 112
@@ -48,8 +20,7 @@ IDLE = (0x4A, 0x4A, 0x58)        # a button nobody is holding
 HELD = (0xFF, 0xD7, 0x5A)        # a held button
 TEXT = (0xB0, 0xB0, 0xBE)        # labels and the frame counter
 
-# 8x8 glyphs, one byte per row, bit 7 = leftmost pixel.  Hand-drawn here so
-# the renderer needs no font machinery at all.
+# 8x8 glyphs, one byte per row, bit 7 = leftmost pixel.
 FONT = {
     "0": [0x3C,0x66,0x6E,0x76,0x66,0x66,0x3C,0x00],
     "1": [0x18,0x38,0x18,0x18,0x18,0x18,0x7E,0x00],
@@ -157,8 +128,7 @@ def parse_log(path):
         m = note_re.match(line)
         if m:
             notes.append((int(m.group(1)), m.group(2).strip()))
-    # several setPad calls can land on one frame; the last one is the pad
-    # the frame's input poll latched
+    # several setPad calls can land on one frame; the last one wins
     dedup = {}
     for f, s in pads:
         dedup[f] = s
@@ -220,17 +190,13 @@ def main():
     if frames == 0:
         sys.exit(f"compose.py: {tape} holds no frames")
     if (w, h) == (256, 224):
-        # mesen_record applies the testrunner's 7-top/8-bottom overscan crop
-        # (see the Overscan note there), so the tape is already the game area
+        # mesen_record already crops to the game area (7-top/8-bottom overscan)
         crop = ""
     elif (w, h) == (256, 239):
-        # an uncropped tape (e.g. cut by a host without the overscan pin):
-        # the 224-line picture sits at rows 7..230, measured with cropdetect
+        # an uncropped tape: the 224-line picture sits at rows 7..230
         crop = "crop=256:224:0:7,"
     else:
-        # A geometry this pipeline has not measured (a hi-res switch would
-        # have stopped the recorder mid-run anyway; README "Verified vs
-        # deferred").  Scale whatever arrived rather than refusing.
+        # an unmeasured geometry; scale without cropping
         print(f"compose.py: unexpected tape geometry {w}x{h} "
               f"(expected 256x224); skipping the game-area crop",
               file=sys.stderr)
@@ -252,14 +218,8 @@ def main():
            "-i", "pipe:0"]
     if have_notes:
         cmd += ["-i", str(notes_srt)]
-    # Both vstack inputs get the same explicit timebase (one tick = one
-    # frame period) and pts = frame index, so vstack's framesync pairs
-    # frame n with frame n, exactly.  Left to their own devices the tape's
-    # AVI timebase and the rawvideo pipe's timebase disagree in the last
-    # decimal, and framesync padded 11 duplicates into a 3024-frame test
-    # render (the panel was 3 frames out of step by n=1500); an fps-filter
-    # grid on both branches still dropped 3.  Index-as-pts leaves nothing
-    # to round.
+    # Both vstack inputs share an explicit timebase (pts = frame index), so
+    # vstack's framesync pairs frame n with frame n exactly.
     grid = f"settb={fps.denominator}/{fps.numerator},setpts=N"
     cmd += ["-filter_complex",
             f"[0:v]{crop}scale={GAME_W}:{GAME_H}:flags=neighbor,"
@@ -270,16 +230,12 @@ def main():
                 "-metadata:s:s:0", "language=eng"]
     cmd += ["-c:v", "libx264", "-crf", "18", "-preset", "veryfast",
             "-pix_fmt", "yuv420p",
-            # 1 output frame per tape frame.  The default fps mode rounded
-            # the 60.0988 SNES rate to CFR 60 and padded 11 duplicate frames
-            # into a 3024-frame test render, which walked the panel out of
-            # step with the game by 3 frames at n=1500.
+            # 1 output frame per tape frame (passthrough avoids CFR rounding)
             "-fps_mode", "passthrough",
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
-            # no -shortest: the tape's audio track runs ~3 frames shorter
-            # than its video (the recorder stops taking sound first), and
-            # -shortest was truncating those video frames off the end
+            # no -shortest: the tape's audio track runs slightly shorter
+            # than its video (the recorder stops taking sound first)
             str(out_mp4)]
 
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)

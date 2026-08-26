@@ -1,7 +1,7 @@
--- probe_opera_dance3.lua -- corrected flower dance.  NPC(12,19) is the
+-- probe_opera_dance3.lua -- flower dance.  NPC(12,19) is the
 -- flowers (_cabf27 -> $0057).  Balcony (8,9)=_cabe6d needs only
--- $0057 -> $0111.  Ignore Draco.  Touch flowers from (12,18) facing down,
--- then climb to (8,9).
+-- $0057 -> $0111.  Touches flowers from (12,18) facing down,
+-- then climbs to (8,9).
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end

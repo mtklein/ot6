@@ -5,12 +5,6 @@
 ; cannot be read at command-select time, so they hook CalcAttackEffect instead.
 ; The select-time half of Oblivion is Ot6BushidoOblivion, in ot6_bushido.asm.
 ; ------------------------------------------------------------------------------
-; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
-; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler receives the identical
-; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
-; ff6-en.map are byte-identical across the split.
-; ------------------------------------------------------------------------------
 
 ; ==============================================================================
 ; Divine abilities (kit slot 8): resolution-time gates + once-per-battle latch
@@ -21,31 +15,23 @@
 ; time (Ot6BushidoTier drops a spent Oblivion back to Tempest) and set when
 ; the divine lands. Every divine uses the boost economy the same way its kit
 ; does: BP is spent through Ot6ActionEnd like any boosted
-; action, and (per the counterattack audit, the $b1.0 convention this file keeps
-; in Ot6BoostDmg/Ot6FightBoost/Ot6QueueFold) a countered action never reaches
-; ActionEnd to charge, so the divines inherit that invariant through the
-; commands they ride. This region is kept separate from the HUD-flush
-; and sub-jobs regions.
+; action, and a countered action never reaches ActionEnd to charge, so the
+; divines inherit that invariant through the commands they ride.
 ; ------------------------------------------------------------------------------
 
 ; [ Oblivion (Cyan, Bushido tech 8): instant death iff the target is Broken ]
 ;
-; kits.md: "Oblivion (divine) | 3, target must be Broken". The tech is vanilla
-; swdtech 8, attack id $5c, which magic_prop already builds as a pure
-; instant-death strike: power 0, Status-1 $80 (Death), the $11a2.1
+; The tech is vanilla swdtech 8, attack id $5c, which magic_prop already builds
+; as a pure instant-death strike: power 0, Status-1 $80 (Death), the $11a2.1
 ; instant-death-spell flag, and $11a7.0 "auto-miss if the target is immune to
-; the status". What it lacked was the Broken gate, and the survey that shipped
-; Ot6BushidoTier left it out of the ladder because that gate cannot be read at
-; command-latch time: swdtech is in RetargetCmdTbl (battle_main.asm:12810), which
-; clears the target there; the target is then re-chosen at resolution.
+; the status". What it lacked was the Broken gate: that gate cannot be read at
+; command-latch time, since swdtech is in RetargetCmdTbl
+; (battle_main.asm:12810), which clears the target there; the target is then
+; re-chosen at resolution.
 ;
 ; The gate is read at the one seam where the target exists and
 ; the attack's properties are still editable: immediately after ChooseTarget in
 ; CalcAttackEffect (battle_main.asm:8185), which fills $b8/$b9 for this attack.
-; (An earlier draft hooked Cmd_07's first instruction and always read an empty
-; target, because the retarget had cleared it and InitCmdTarget had not yet
-; re-picked it, so every Oblivion folded; battle_divines' broken-kill drive
-; caught it.)
 ; Here x is still the attacker (CalcAttackEffect indexes $3c08,x etc. right
 ; below), $3a7d is the resolved attack id, and the loaded MagicProp bytes
 ; ($11a6 power, $11aa Status-1, $11a2/$11a7 flags) are the ones the per-target
@@ -55,25 +41,23 @@
 ;                           ($3dd4, what SetStatus1 writes at :2254, applied by
 ;                           UpdateStatus :11067 for every present entity inde-
 ;                           pendent of the hit roll).  This is a guaranteed
-;                           kill; the Break window is the guarantee, the same
-;                           ruling Assassinate takes. Set the once-per-battle
-;                           latch.
+;                           kill, the same ruling Assassinate takes. Set the
+;                           once-per-battle latch.
 ;   unbroken, OR a Broken
 ;   but death-immune boss -> the props are patched to a Tempest-like hit in
 ;                           place: power 70, Status-1 cleared (no Death), the
 ;                           instant-death-spell and auto-miss flags cleared. The
 ;                           per-target loop then lands a 70-power elementless
-;                           slash, the "reduced" fallback (kits.md names
-;                           fizzle-or-reduced). Keeping a real hit as the
-;                           fallback is why Oblivion could rejoin
+;                           slash, the reduced fallback. Keeping a real hit as
+;                           the fallback is why Oblivion could rejoin
 ;                           the BP3 tier without retiring Tempest, and the latch
 ;                           stays clear (the divine was not spent), so the menu
 ;                           keeps offering Oblivion until it lands.
 ;
-; The death-immune fold matters because a boss can be Broken too (bosses carry
-; shields, DESIGN.md): without it, Oblivion against a Broken boss would spend
-; the once-per-battle latch on a target Death cannot kill. Folding it to a
-; Tempest hit spends the turn on damage and leaves the divine unspent.
+; The death-immune fold matters because a boss can be Broken too: without it,
+; Oblivion against a Broken boss would spend the once-per-battle latch on a
+; target Death cannot kill. Folding it to a Tempest hit spends the turn on
+; damage and leaves the divine unspent.
 ;
 ; entry: jsl from CalcAttackEffect just after ChooseTarget. a16/i8, db=$7e;
 ; x = attacker entity offset, $b8/$b9 = target mask, $3a7d = attack id. preserves
@@ -145,28 +129,21 @@ done:   plp
 
 ; [ Assassinate (Shadow, divine): instant-kill a Broken non-boss ]
 ;
-; kits.md sketch: "Shadow -- Assassin (piercing, thrown): Throw signature; ...
-; divine Assassinate -- instant kill a Broken non-boss." The two gates the
-; sketch names are the Broken check (OT6_BROKEN_TICKS nonzero) and the non-boss
-; check ($3aa1 bit 2, the instant-death-protection bit a boss carries, the
-; same one ScimitarEffect reads at battle_main.asm:9147). Both are read at the
-; same seam Oblivion uses, after ChooseTarget in CalcAttackEffect where the
-; target exists, so the kill is the same guaranteed $3dd4 Death mark
-; (SetStatus1's byte, applied by UpdateStatus for every present entity regardless
-; of the hit roll) and the once-per-battle gate is the shared OT6_DIVINE_USED
-; bit. A Broken non-boss dies; a boss (Death cannot kill it) or an unbroken
-; target is left alone, and the ordinary attack stands as the no-op fallback.
+; The two gates are the Broken check (OT6_BROKEN_TICKS nonzero) and the
+; non-boss check ($3aa1 bit 2, the instant-death-protection bit a boss
+; carries, the same one ScimitarEffect reads at battle_main.asm:9147). Both
+; are read at the same seam Oblivion uses, after ChooseTarget in
+; CalcAttackEffect where the target exists, so the kill is the same guaranteed
+; $3dd4 Death mark (SetStatus1's byte, applied by UpdateStatus for every
+; present entity regardless of the hit roll) and the once-per-battle gate is
+; the shared OT6_DIVINE_USED bit. A Broken non-boss dies; a boss (Death cannot
+; kill it) or an unbroken target is left alone, and the ordinary attack stands
+; as the no-op fallback.
 ;
-; UNDERSPECIFIED, reported rather than invented: the sketch does not say how
-; Shadow invokes it (his Throw signature, a dedicated command, or a boost cost),
-; and his kit is not built. This milestone ships the part that is specified (the
-; two gates, the guaranteed kill, and the once-per-battle latch) gated on the
-; attacker being Shadow (char id $03, $3ed8 keyed by the entity offset since
-; offset = slot*2) with an unspent divine: any attack Shadow lands on a Broken
-; non-boss assassinates it, once per battle. Narrowing it to
-; Throw-only ($b5 == $08) or adding an arming cost is a one-line change to the
-; gate below once his kit and its invocation are designed. It is dormant until
-; then, because no Shadow is fielded, so the char-id gate never matches.
+; Gated on the attacker being Shadow (char id $03, $3ed8 keyed by the entity
+; offset since offset = slot*2) with an unspent divine: any attack Shadow
+; lands on a Broken non-boss assassinates it, once per battle. It is dormant
+; while no Shadow is fielded, so the char-id gate never matches.
 ;
 ; entry: jsl from CalcAttackEffect just after ChooseTarget (beside Ot6Oblivion).
 ; a16/i8, db=$7e; x = attacker entity offset, $b8/$b9 = target mask. preserves

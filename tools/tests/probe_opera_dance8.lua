@@ -84,7 +84,7 @@ local function waltz(maxF, doneFn)
   end) }, "waltz")
 end
 
--- rideOpen: gen_opera3's TEXT_ONLY-stall-safe finale rider (A/START on stall)
+-- rideOpen: TEXT_ONLY-stall-safe finale rider (A/START on stall)
 local function rideOpen(pred, maxFrames, what)
   local aPh,sPh,stallN,lx,ly = 0,0,0,-1,-1
   return H.driveUntil(function() local d=pred(); if d then H.setPad({}) end; return d end,

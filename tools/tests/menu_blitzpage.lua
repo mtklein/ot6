@@ -1,99 +1,28 @@
 -- @suite savestate=vargas_won
--- menu_blitzpage.lua -- issue #46: the field Skills->Blitz page describes the
--- ability rather than a retired input system.
+-- menu_blitzpage.lua -- the field Skills->Blitz page shows name, probe icon
+-- and MP price for each Blitz, asserted against the ROM's AttackName,
+-- Ot6SkillClassTbl/Ot6ClassGlyphTbl/Ot6ElemGlyphTbl and Ot6AbilityCostTbl.
 --
--- v0.4 turned Blitz into a menu (Ot6BlitzListOpen, ot6_kits.asm, in place of
--- _c1776b's 64-frame pad-edge buffer and UpdateMenuState_3d's button matcher).
--- The field page went on drawing vanilla's button combos, eight ten-tile runs
--- of arrow and shoulder glyphs out of BlitzInputTileTbl.  Measured on the
--- pre-change ROM: rows 1/5/9/13, columns
--- 4-13 and 18-27, cells $d4/$d5/$d6 (the up, right and down-left arrows) and
--- $91/$8b/$97/$98 (R/L/X/Y); for example row 9 read `RLRLXY` and row 13
--- `RLXY->->`.  Nothing on the page could be acted on, because the combos do
--- nothing now.
+-- The probe icon is the ability's element if it has one, else its break
+-- class, else blank; the named cell must also carry art in the menu font's
+-- own vram copy.
 --
--- The page shows name, break class and MP price instead, and this test asserts
--- all three against the same tables the rest of the game reads, so none of
--- them can drift apart:
+-- The EN field-menu window shows a tilemap row pair in twelve scanlines, odd
+-- row eight and even row four, and nothing past row 15 is inside it.  The
+-- page is one column of eight rows: 1/3/5/7/9/11/13/15.
 --
---   * the name comes out of the ROM's own AttackName records (the table
---     ListTextCmd_0f renders the battle Blitz list from), read here with
---     H.sym and readRomByte rather than hardcoded, so a text re-encode cannot
---     invalidate the expectation without being noticed;
---   * the probe icon is checked against the same three ROM tables
---     Ot6ElemGlyphFor walks: MagicProp's element byte, then Ot6SkillClassTbl
---     (the table the chip consults, ot6_break.asm:1266) into
---     Ot6ClassGlyphTbl.  Element first, class second, blank when neither.
+-- `cursor_pos {x,y}` is the top-left of a 16x16 sprite; an entry at x owns
+-- tilemap columns x/8 and x/8+1, so the row it points at starts at x/8+2,
+-- that is cursor_x = 8*col - 16.
 --
---     #53 is why this is three tables and not one.  Until it landed the column
---     was class-only, and this test asserted five of the eight rows blank,
---     which was correct for what the page could then draw and wrong about the
---     game: AuraBolt is holy, Fire Dance fire, Air Blade wind, and those three
---     carried a real elemental probe the page could not show, because the
---     element tiles were uploaded into the battle font only.  The expectation
---     changed here because the correct behaviour changed, not to make the test
---     pass: the three rows are now asserted to carry their element, and only
---     Mantra and Spiraler stay blank, having neither element nor class.
---     Measured before and after on purpose-built ROMs,
---     tools/tests/probe_fieldicons.lua.
+-- Fixture: vargas_won, a real Sabin on Mt. Kolts right after his own boss
+-- fight, found in zCharID and entered by walking the character cursor onto
+-- his slot.  The learned mask $1d28 is whatever the save holds.
 --
---     Each named cell is also checked to have art in the menu font's own vram
---     copy, which is the half a tilemap assertion cannot see: a page can name
---     $eb while $eb is sixteen zero bytes, which is the
---     state the field font was in before #53;
---   * the price is checked against Ot6AbilityCostTbl, the table Ot6CostFor
---     scans for the charge and for the battle row.  The numbers are read
---     rather than written down: a balance retune must not turn this test red,
---     but a page that stops agreeing with the cost table must.
---
--- Geometry, in the loadout pages' style (#43, and the reason this window has
--- caused four problems).  The EN field-menu window shows a tilemap row pair
--- in twelve scanlines, odd row eight and even row four, and nothing past row 15
--- is inside it (vanilla says the same from the other side,
--- since every EN cursor list here is `cursor_pos {x, 116 + n*12}`,
--- skills.asm:125-126).  The page is one column of eight now, on rows
--- 1/3/5/7/9/11/13/15, so the even-row, row>15 and border-column canary below
--- constrains all eight rows at once; there is no spare odd row left for a
--- mistake to hide in.
---
--- The cursor gutter (#43 round 3).  `cursor_pos {x,y}` is the top-left of a
--- 16x16 sprite, so an entry at x owns tilemap columns x/8 and x/8+1 and the row
--- it points at must start at x/8+2, that is cursor_x = 8*col - 16, which is
--- vanilla's rule in every list it draws in this window.  Vanilla's own blitz
--- page drew at column 4 under a cursor at x=8, leaving one column of dead air;
--- the names start at 3 now.  The canary reads both halves out of the ROM and
--- tilemap the menu itself uses, so neither can move alone.  It is duplicated
--- from menu_ragepage.lua rather than shared: the only lua the runner inlines is
--- lib/ot6{,_field,_contract}.lua, and those three files are the savestate
--- generation signature (lib/savestate_stamp.sh:82-85), so a helper added there
--- would mark every generated fixture drifted.
---
--- Fixture (issue #75 conversion): vargas_won, a real Sabin, on Mt. Kolts
--- right after his own boss fight, found in zCharID and entered by walking the
--- character cursor onto his slot (menu_blitzpage_sabin.lua's pattern).
--- The Blitz command is his record's own, and the learned mask $1d28 is
--- whatever the save holds, so the partial phase, with learned rows and locked
--- ones on the same render, is now the page a real mid-Kolts Sabin opens.
--- The mask is read and each row asserted against it, so a join-level change
--- moves which tiers are lit without touching this file.
---
--- Two labeled isolation arms (issue #75); one write site stays.
--- The other two learned-counts this page must render cannot be produced on
--- any real save:
---   * all eight, the state that shows the locked marker cannot leak onto
---     a learned row, and the only state that renders Bum Rush's two-digit
---     price, needs Sabin's eighth Blitz, which is level 70.  The owner's
---     learn-ceiling ruling (2026-08-10, docs/waiver-burndown-plan.md
---     systemic call 1) keeps this arm as a labeled
---     memory-hack isolation arm, to be converted organically when high-level
---     content becomes reachable in play.
---   * none, meaning eight locked rows and not one digit, is unreachable by
---     play in the other direction: Pummel is learned at level 1, so every real
---     Sabin's mask has bit 0 set from the moment he exists.  A renderer
---     state no controller can produce is a mechanism claim (systemic call
---     2), so it stays beside the all-eight arm rather than being deleted.
--- Both arms write the one byte $1d28 and nothing else; this file keeps its
--- .writeByte( waiver line for that site and may never produce fixtures.
+-- Two labeled isolation arms write $1d28 directly, to reach two states no
+-- real save can produce: all eight Blitzes learned (Sabin's eighth Blitz is
+-- level 70) and none learned (Pummel is learned at level 1, so every real
+-- Sabin's mask has bit 0 set from the moment he exists).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
 
@@ -143,21 +72,11 @@ local function nameText(id)             -- for the log only
   return s
 end
 
--- The probe icon (#53), derived here as Ot6ElemGlyphFor derives it in
--- the ROM: the ability's element if it has one, else its break class, else
--- blank.  Three tables, all read out of the ROM so a data edit cannot leave a
--- stale expectation behind:
---   * MagicProp record +1 is the element byte (battle_main.asm:7037, 14-byte
---     records).  First set bit indexes Ot6ElemGlyphTbl.
---   * Ot6SkillClassTbl: (id, class) pairs, $ff-terminated (ot6_class.asm:184).
---     The class byte is a bit mask and the first set bit indexes
---     Ot6ClassGlyphTbl, the same walk Ot6ToolListIcon_ext and the hud's
---     weakness strip do.  Bit 7 is null-break: it teaches nothing and shows
---     nothing.
--- Element before class is the design ("consult the class when the ability has
--- no element"), and asserting it in that order here is what stops the page
--- reverting to #46's class-only answer: three Blitzes have an element
--- and no class, so a class-only page draws a pad on all three.
+-- The probe icon, derived here as Ot6ElemGlyphFor derives it in the ROM:
+-- MagicProp record +1 is the element byte (14-byte records); its first set
+-- bit indexes Ot6ElemGlyphTbl.  Otherwise Ot6SkillClassTbl gives (id, class)
+-- pairs, $ff-terminated; the class byte is a bit mask whose first set bit
+-- indexes Ot6ClassGlyphTbl.  Bit 7 is null-break and shows nothing.
 local SKILLCLASS = H.sym("Ot6SkillClassTbl") & 0x3FFFFF
 local CLASSGLYPH = H.sym("Ot6ClassGlyphTbl") & 0x3FFFFF
 local ELEMGLYPH = H.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
@@ -183,10 +102,7 @@ local function iconGlyph(id)            -- -> glyph tile, or PAD for neither
     x = x + 2
   end
 end
--- and the icon must be a cell the menu font has art in.  Before
--- #53 the element tiles were uploaded for battle only, so a field page asking
--- for one drew a blank cell; this is the guard that the page and the font
--- agree, checked against vram rather than against the source art.
+-- The icon's cell must also have art in the menu font's own vram copy.
 local ELEM_CELLS = {}
 for i = 0, 7 do ELEM_CELLS[H.readRomByte(ELEMGLYPH + i)] = i end
 local function fontCellHasArt(cellCode)
@@ -213,7 +129,7 @@ end
 
 -- ---- page geometry, mirroring skills.asm's Ot6BlitzPageDraw ----
 local NAME_COL, ICON_COL, COST_COL = 3, 14, 16
-local function blitzRow(i) return 1 + i * 2 end   -- ODD rows 1/3/5/../15 (#43)
+local function blitzRow(i) return 1 + i * 2 end   -- odd rows 1/3/5/../15
 
 local function assertRun(x0, y, bytes, what)
   for i, b in ipairs(bytes) do
@@ -222,19 +138,17 @@ local function assertRun(x0, y, bytes, what)
   end
 end
 
--- A row the page never draws on must be untouched ($00 from
--- ClearBG1ScreenA).  #39's runaway draws filled BG1A with ROM code bytes, so
--- every one of these would fail on a garbled page.
+-- A row the page never draws on must be untouched ($00 from ClearBG1ScreenA).
 local function assertRowBlank(y, what)
   for x = 0, 31 do
     H.assertEq(cell(x, y), 0, string.format("%s: cell {%d,%d} blank", what, x, y))
   end
 end
 
--- The geometry canary (#43).  An even tilemap row is four scanlines in this
--- window and rows past 15 are outside it entirely, so nothing may land on
--- either.  Column 30 is the window's own right border.  Columns 0-2 are the
--- cursor's gutter on every row here, because every row is cursored.
+-- An even tilemap row is four scanlines in this window and rows past 15 are
+-- outside it entirely, so nothing may land on either.  Column 30 is the
+-- window's own right border.  Columns 0-2 are the cursor's gutter on every
+-- row here, because every row is cursored.
 local function assertGeometry(what)
   for y = 0, 27 do
     if y % 2 == 0 or y > 15 then
@@ -259,13 +173,9 @@ local function assertGeometry(what)
   end
 end
 
--- The cursor gutter canary (#43 round 3).  Both sides are read, not written:
--- the cursor table comes out of the ROM the menu itself indexes, and the text
--- out of the tilemap the menu itself drew.  `cursor_pos {x,y}` assembles to
--- `.byte x, y` (menu_ram.inc:582-584), two bytes per entry, in the framework's
--- index order ($4b = cols*row + col, and cols is 1 here, so $4b is the row).
--- y is 116 + n*12 and tilemap row = 2n+1, so the row an entry points at is
--- (y-116)/6 + 1.
+-- `cursor_pos {x,y}` assembles to `.byte x, y`, two bytes per entry ($4b =
+-- cols*row + col, cols is 1 here, so $4b is the row).  y is 116 + n*12 and
+-- tilemap row = 2n+1, so the row an entry points at is (y-116)/6 + 1.
 local CURSOR_POS = H.sym("Ot6BlitzCursorPos") & 0x3FFFFF
 local function assertCursorGutter(n, what)
   local cx = H.readRomByte(CURSOR_POS + n * 2)
@@ -281,9 +191,7 @@ local function assertCursorGutter(n, what)
       "%s: cursor entry %d sits at x=%d, so tilemap {%d,%d} is under the "
       .. "sprite and must be blank", what, n, cx, x, y))
   end
-  -- and the row it points at begins in the next column.  A locked row
-  -- draws its marker over the same ten cells, so this holds at any learned
-  -- count.
+  -- the row it points at begins in the next column.
   H.assertEq(cell(col + 2, y) ~= 0, true, string.format(
     "%s: cursor entry %d at x=%d reserves columns %d-%d, so row %d must start "
     .. "at column %d (vanilla: cursor_x = 8*col - 16)",
@@ -301,9 +209,7 @@ local function assertLearnedRow(i)
     "blitz %d (%s) draws the probe icon its own data gives it -- MagicProp's "
     .. "element byte first, Ot6SkillClassTbl's break class second -- at {%d,%d}",
     i, nameText(id), ICON_COL, y))
-  -- and the cell it named is one the field font has art in (#53).  An element
-  -- icon is only visible if the tile arrived: before #53 the page could name
-  -- $eb while the menu font's $eb was sixteen zero bytes.
+  -- and the cell it named is one the field font has art in.
   if want ~= PAD then
     H.assertEq(fontCellHasArt(want), true, string.format(
       "blitz %d (%s) names font cell $%02x, so the MENU font must carry art "
@@ -325,12 +231,8 @@ local function assertLearnedRow(i)
   assertRun(COST_COL + 2, y, MP_SUFFIX, string.format("blitz %d ' MP'", i))
 end
 
--- A tier the character has not reached.  It is not blank (vanilla drew ten
--- pads, which the owner's playtest of the Rage page read as a rendering fault)
--- and it is not "- EMPTY -" (that word belongs to a Rage slot holding nothing;
--- this tier exists and is merely unreached).  Ten cells, exactly a name field
--- wide, so a learn replaces it completely; the class and price fields blank
--- with it, or the page would price something the player cannot pick.
+-- A tier the character has not reached shows "- LOCKED -" across the ten
+-- name cells; the class and price fields are blank.
 local function assertLockedRow(i)
   local y = blitzRow(i)
   H.assertEq(#LOCKED, NAME_SIZE,
@@ -345,12 +247,8 @@ local function assertLockedRow(i)
   end
 end
 
--- ---- the retired input system, listed so it cannot come back ----
--- Vanilla's combo glyphs, from BlitzInputTileTbl by way of GetBlitzInputTiles.
--- Measured on the pre-change ROM: these are the codes
--- that filled columns 4-13 and 18-27 of rows 1/5/9/13.  If any of them
--- reappears anywhere on this page, the page is teaching the retired system
--- again.
+-- The vanilla combo glyphs, from BlitzInputTileTbl by way of
+-- GetBlitzInputTiles.  None of these may appear anywhere on this page.
 local COMBO_TILES = { [0xd4] = "up", [0xd5] = "right", [0xd6] = "down-left" }
 local function assertNoCombos(what)
   for y = 0, 27 do
@@ -364,8 +262,6 @@ local function assertNoCombos(what)
   end
 end
 
--- teach() survives only for the two labeled isolation arms at the tail (see
--- header); the input-driven phases read the mask and write nothing.
 local function teach(mask) H.writeByte(BLITZES, mask) end
 
 local learnedMask = nil                 -- $1d28 as read off the save
@@ -377,9 +273,6 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
 
-  -- The save's own state, read: the mask must have learned tiers and locked
-  -- ones, or the partial phase would only exercise one row kind.  A mid-Kolts
-  -- Sabin has both by construction (Pummel at L1, Bum Rush at L70).
   H.call(function()
     learnedMask = H.readByte(BLITZES)
     local n = 0
@@ -388,10 +281,6 @@ H.run({ maxFrames = 30000 }, {
       learnedMask, n))
     H.assertEq(n > 0 and n < 8, true,
       "the real mask mixes learned and locked rows -- both render paths run")
-    -- the shape of the price data this page has to render, asserted as a shape
-    -- rather than as numbers so a balance retune cannot turn the page red:
-    -- there is at least one one-digit price and at least one two-digit price,
-    -- so the right-alignment path below is genuinely exercised.
     local lo, hi = 0, 0
     for i = 0, 7 do
       local c = costOf(BLITZ_ATK0 + i)
@@ -403,11 +292,6 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(lo > 0 and hi > 0, true,
       "the Blitz ladder spans one- and two-digit prices, so this page's "
       .. "right-aligned two-digit field is doing real work")
-    -- #53's shape check, so the icon assertions above cannot all pass without
-    -- testing anything.  The ladder must contain at least one element row, one
-    -- class row and one blank row, or the column is only exercised on one of
-    -- its three answers.  Counted from the ROM, so a data retune moves the
-    -- numbers and not the property.
     local nElem, nClass, nBlank = 0, 0, 0
     for i = 0, 7 do
       local g = iconGlyph(BLITZ_ATK0 + i)
@@ -423,20 +307,9 @@ H.run({ maxFrames = 30000 }, {
       .. "below only ever test one of them")
   end),
 
-  -- the player's path: X -> main menu -> Skills -> lead character -> submenu
-  -- This uses driveUntil rather than one press because the X that opens the
-  -- field menu is the first step in these tests that needs a specific frame,
-  -- so it is where a fixture generated against a different ROM shows up, as
-  -- "timeout waiting for main menu", which reads like a menu bug and is not
-  -- one.  Retrying the press costs nothing when the pairing is fine and
-  -- removes the false report when it is not.  This is the shape
-  -- probe_fieldicons.lua and menu_blitzpage_sabin.lua already use.  The
-  -- assertion is unchanged: the main menu must still come up.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
-  -- Find Sabin rather than assume his row, and assert his record carries the
-  -- Blitz command; the pair of checks from menu_blitzpage_sabin.lua.
   H.call(function()
     local ids = {}
     for s = 0, 3 do
@@ -469,7 +342,6 @@ H.run({ maxFrames = 30000 }, {
       "Blitz row enabled -- SABIN's own record carries the command")
   end),
 
-  -- cursor to the Blitz row, A opens the page through SkillsOption_03
   H.driveUntil(function()
     return st() == ST_SKILLS and H.readByte(ZCURSOR) == SKILLS_ROW_BLITZ
   end, 900, { H.pressButtons({ "down" }, 2), H.waitFrames(6) },
@@ -500,11 +372,6 @@ H.run({ maxFrames = 30000 }, {
       .. "and of every cursor's gutter", nL, 8 - nL))
   end),
 
-  -- ---- the cursor moves, and picks the row's description ----
-  -- One column means $4b is the blitz index (CalcShortListIndex: $4b = cols*row
-  -- + col, cols = 1), which is what LoadBigText indexes $7e9d89 with to choose
-  -- a description.  Walk down two and check the index tracks, so the
-  -- description box below the list keeps pointing at the row the sprite is on.
   H.pressButtons({ "down" }, 2),
   H.waitFrames(20),
   H.pressButtons({ "down" }, 2),
@@ -522,16 +389,7 @@ H.run({ maxFrames = 30000 }, {
       .. "happens to be selected")
   end),
 
-  -- ======================================================================= --
-  -- Labeled isolation arm 1 (issue #75, the owner's learn-ceiling ruling).
-  -- All eight: no locked row anywhere, and a two-digit price on screen.
-  -- Every state above has locked rows in it, so on its own it cannot tell
-  -- "- LOCKED -" drawn for an unreached tier from "- LOCKED -" leaking over a
-  -- learned one.  It is also the only state that renders Bum Rush, the 99 MP
-  -- top of the ladder and the only row that fills the tens cell, and the
-  -- eighth Blitz is level 70, which the no-grind-tier ruling keeps out of the
-  -- fixture chain.  One byte is written: $1d28.  See the header.
-  -- ======================================================================= --
+  -- Isolation arm 1: all eight Blitzes learned, no locked row anywhere.
   H.pressButtons({ "b" }, 3),
   H.waitUntil(function() return st() == ST_SKILLS end, 300,
     "back out of the blitz page", 5),
@@ -561,14 +419,7 @@ H.run({ maxFrames = 30000 }, {
       .. "their prices, the '- LOCKED -' marker nowhere on the page")
   end),
 
-  -- ======================================================================= --
-  -- Labeled isolation arm 2 (issue #75, the renderer-mechanism rule).
-  -- None: eight locked rows and not one digit, the one state where nothing
-  -- on the page is data.  It is unreachable by play, because Pummel is learned
-  -- at level 1, so every real Sabin's mask has bit 0 set from the moment he
-  -- exists, and the empty ladder can only be shown to the renderer by hand.
-  -- Same one-byte write, same waiver site.  See the header.
-  -- ======================================================================= --
+  -- Isolation arm 2: none learned, eight locked rows and not one digit.
   H.pressButtons({ "b" }, 3),
   H.waitUntil(function() return st() == ST_SKILLS end, 300,
     "back out of the blitz page", 5),

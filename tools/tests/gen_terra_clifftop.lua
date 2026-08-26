@@ -6,14 +6,14 @@
 --   terra_clifftop.mss  map 20 (27,8), the ledge the caves come out on,
 --                       first controllable frame, one short walk from
 --                       Arvis's back door and the end of the scenario.
---
+
 -- Six crossings, none of which can be derived from the tables.
 -- Every pocket on this route is small and sealed, and H.bfsPath cannot show
 -- that: these maps are 128x64 ($86/$87 = $7F/$3F) and its 4096-node hang
 -- guard trips long before it has covered one of them.  An uncapped flood over
 -- the same passability rules (run as a reachability probe during
 -- development) mapped them instead.  What that found:
---
+
 --   map 41  (7,33)  82 tiles, two exits: (7,34) straight back to map 20
 --                   (15,57), and (21,9) -> map 20 (23,44).
 --   map 20  (23,44) 86 tiles, and not the town: a sealed pocket whose only
@@ -27,25 +27,14 @@
 --                   narshe_streets sits on and gen_mines_chase walks west
 --                   along: the scenario comes back up the way Terra
 --                   originally escaped.
---
+
 -- A decoding hazard worth recording, because it sent this route to the wrong
 -- house first: short_entrance.dat's DestX is seven bits on a 128-wide map.
 -- Masking it with $3F turns map 20 (53,9)'s destination from map 30 (67,28),
 -- Arvis's back corridor and the reciprocal of map 30 (67,26) -> map 20
 -- (53,8), into map 30 (3,28), a room on the far side of the map, and makes
 -- every 128-wide map's doors look like they do not pair up.
---
--- Map 49 is an ordered maze.
--- EventTrigger::_49 carries twenty triggers (event_trigger.asm:242-261) and
--- thirteen of them are gates.  Each opens
---     cmp_var 0, K  /  if_switch $01A0=1, <pass>  /  if_switch $01B5=1, ...
---     call _cce405  /  <spawn eight NPCs in a ring>          (:111113-:112838)
--- and _cce405 is `pass_off NPC_1..NPC_8` (:112839), eight solid objects,
--- all circling the eight cells around the gate tile in lockstep on 8-move
--- loops.  Step on a gate out of turn and the ring closes around the party
--- and does not open: measured as navTo using its 20 no-path retries at
--- (113,23) with a full ring and no moment at which a whole path exists.
---
+
 -- Both flag bytes in that guard are engine state rather than story switches,
 -- the same aliasing the scenario brief flagged for the river:
 --     $01A0-$01A7 alias $1EB4, where cmp_var leaves its result:
@@ -55,21 +44,7 @@
 --         once-per-tile event latch.
 -- Event variables themselves live at $1FC2 + 2n (EventCmd_e8, :4458-4464),
 -- so var 0 is the word at $1FC2 and every gate below asserts it.
---
--- Issue #75 (the input-driven test conversion): no state writes.  The
--- caves are this scenario's only random-encounter pool, and every encounter
--- is now fought by real input instead of write-cleared.  The same
--- edge-tapped A that used to page the victory text also serves as the
--- auto-fighter (A opens the active character's command list, A confirms its
--- first entry, A takes the default target), which for this party is TERRA
--- and EDGAR attacking while BANON's first command is his Health heal.  The
--- pool's Repo Men and Vaporites die to it and the heal keeps the party
--- topped up between waves.  That is the lib's own opts.playBattles policy,
--- applied to the two local drivers (mazeWalk/gateStep) that carry their own
--- battle branches, and opts.playBattles passed to every lib navigator.
--- Input-driven fights cost real ATB rounds, so the per-crossing budgets
--- grew against their battle-clear-write ancestors.
---
+
 -- The order is fixed and one-way; it is seeded by the trigger on (111,26),
 -- _ccd9c4 (:111026), which is the maze's own intro cutscene and ends
 -- `switch $01F0=1 / set_var 0, 0 / set_var 1, 0` (:111068-111070).  The
@@ -90,13 +65,6 @@ local DD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 },
              right = { 1, 0 }, upleft = { -1, -1 }, upright = { 1, -1 },
              downleft = { -1, 1 }, downright = { 1, 1 } }
 local function planAvoids(tx, ty, bad, what)
-  -- Poll before asserting: an NPC standing in a one-tile corridor blocks
-  -- the object map exactly while its scene runs (navTo's own noPathRetries
-  -- rationale, lib ot6_field.lua).  This pre-check used to sample ONCE, so
-  -- any timing shift landing the sample inside such a window failed the
-  -- whole route -- measured 2026-08-18, when #122's battle-init cycles
-  -- moved this generator's map-49 arrival into one.  Same cadence as navTo:
-  -- 45-frame polls, 20 tries' worth of budget, then the hard assert stands.
   return H.cond(function() return true end, {
     H.waitUntil(function() return H.bfsPath(tx, ty) ~= nil end,
                 900, what .. ": a path exists (45f poll)", 45),
@@ -117,18 +85,6 @@ local function planAvoids(tx, ty, bad, what)
   })
 end
 
--- The maze needs a hold-walker rather than navTo.  Measured on map 49: the
--- party moves one tile per ~15 held frames reliably, but H.tileAligned()
--- reads false for every one of those frames (the sub-pixel bytes $0869/$086C
--- only zero at rest), and navTo gates both its step launch and its landing
--- check on alignment, so it releases after one tile, waits for an alignment
--- that only comes once it has stopped, and on the next launch condemns the
--- edge as "blocked in reality" though a plain held UP walks the whole column.
--- So the maze is driven by holding the BFS plan's direction and watching the
--- tile coordinate advance, never releasing mid-run and never asking about
--- alignment.  BFS still does the pathfinding; only the executor changes.
--- Battle watcher (shared by every crossing and the maze driver): names each
--- encounter once on its third consecutive loading frame, the suite's debounce.
 local encounters = {}
 local function watch()
   local seen = 0
@@ -152,21 +108,6 @@ local seeBattles = watch()
 local PRESS = { up = "up", right = "right", down = "down", left = "left" }
 local STEP = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Why the maze cannot use navTo.  Measured on map 49: the party moves one
--- tile per ~15 held frames reliably, but H.tileAligned() reads false for
--- every one of those frames (the sub-pixel bytes $0869/$086C only zero at
--- rest), and navTo gates both its step launch and its landing check on
--- alignment, so it releases after one tile, waits for an alignment that
--- only comes once stopped, and on the next launch condemns the edge as
--- "blocked in reality" though a plain held UP walks the whole column.  Both
--- drivers below hold-walk instead.
---
--- mazeWalk releases on an event or dialog.  For the intro passage and the
--- exit: the intro cutscene (_ccd9c4, walked onto at (111,26)) shows dlg $01AC
--- (EDGAR/TERRA explaining the light, :111093) and moves the party with
--- obj_scripts, and a direction held into it stalls it.  So this one taps
--- dialogs, fights battles with real input by the same edge-tapped A (issue
--- #75; no battle-clear write), and otherwise releases and waits.
 local function mazeWalk(gx, gy, what, budget)
   local plan, idx, tx, ty, startMap = nil, 1, nil, nil, nil
   local aPh, battN, dlgN = 0, 0, 0
@@ -219,23 +160,6 @@ local function mazeWalk(gx, gy, what, budget)
   }, what)
 end
 
--- gateStep pushes through.  For stepping from one solved gate to the next.
--- When a gate passes, its pass path sets $01B5 (the once-per-tile latch)
--- and returns control, but the party is standing on the trigger tile, and as
--- soon as the first step off clears $01B5 the trigger re-fires, now with
--- var 0 already advanced past what it wants, and falls through to `call
--- _cce405`, the ring of eight solid NPCs (event_main.asm, e.g. _cce35f).
--- Release for one frame in that window and the ring closes and does not
--- open: measured as the party stuck on (116,23) with the event PC parked in
--- _cce35f for the whole budget.  A held direction walks off before
--- the re-fire resolves (a plain held UP was measured passing through gates 10
--- and 11 without stopping), so this driver never releases for an event.  It
--- keeps pressing toward the target, only pausing the press to tap a dialog or
--- fight a battle with real input (issue #75; the same edge-tapped A, no
--- battle-clear write).  It avoids overshoot by ending on the
--- frame the tile coordinate first reads the target (which, moving up or left,
--- is ~1px into the final step, enough to have triggered the
--- gate).
 local function gateStep(gx, gy, what, budget)
   local aPh, battN = 0, 0
   return H.driveUntil(function()
@@ -307,16 +231,6 @@ local function cross(tx, ty, dstMap, ax, ay, bad, what, budget)
   local settle = landed(dstMap)
   return seq({
     planAvoids(tx, ty, bad, what),
-    -- playBattles="tactical", not playBattles=true.  Plain `true` is the
-    -- blind edge-tapped A: it opens the command list, confirms whatever is
-    -- on row 0 and takes the default target, with no idea what a command
-    -- table or an item is.  This step escorts BANON, where any death is a
-    -- Game Over, and it walked the whole thing without once opening the
-    -- item menu.  Measured 2026-08-09: the party wiped and the navigator
-    -- then spent sixty thousand frames planning routes from field position
-    -- (44,1888), which is what a wipe looks like when nothing checks for
-    -- one.  The fix is the same one Mt. Kolts needed: real menus, real boost,
-    -- and the driver's own medic line.
     H.navTo(tx, ty, { maxFrames = budget or 60000, playBattles = "tactical",
       arrive = function()
         seeBattles()
@@ -339,7 +253,7 @@ end
 
 -- x, y, the var-0 value the gate demands, the value it leaves behind, and an
 -- optional waypoint to route through on the way there.
---
+
 -- Gate 2 is the only one that needs the waypoint, and it needs it because of
 -- a tie rather than a wall.  From gate 1 at (110,23) there are two seven-step
 -- routes to (106,20): west along y=23 to (106,23) and up the x=106 column, or

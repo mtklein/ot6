@@ -9,77 +9,69 @@ boost-point turn economy.
 
 v0.16 is the current release
 ([tag](https://github.com/mtklein/ot6/releases/tag/v0.16)); it plays
-identically to v0.15. The game is
-playable from the start through the end of the World of Balance: the whole
-Thamasa arc, the world tour aboard the repaired Blackjack, the IAF gauntlet,
-the Floating Continent and AtmaWeapon, and the escape — stopping where the
-game sets you down in the World of Ruin. v0.14 finished the
-end-of-World-of-Balance arc (v0.12–v0.14); v0.15 is a small tuning release
-on top of it (Rizopas at Baren Falls backs off one shield pip).
+identically to v0.15. The game is playable from the start through the end of
+the World of Balance: the whole Thamasa arc, the world tour aboard the
+repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
+and the escape — stopping where the game sets you down in the World of Ruin.
 
 Break and boost are the two central systems. Enemies carry shields and hidden
 weaknesses, hitting a weakness chips a shield, and breaking drops defenses
 hard. Boost banks turns and folds spell tiers (Fire → Fira → Firaga).
 Magicite work as sub-jobs: equip an esper and its spells join your Magic list,
-along with a stat bump, while you hold it — in battle and, as of v0.11, in the
-field menu too, so you can heal and cure status between fights with the
-magicite you carry. That adds to what the born mages can already do rather than
-replacing it. Blitz is a menu, Steal guarantees the rare at three boost pips,
-and level-ups fully restore HP and MP.
+along with a stat bump, while you hold it — in battle and in the field menu.
+Blitz is a menu, Steal guarantees the rare at three boost pips, and level-ups
+fully restore HP and MP.
 
-The World of Balance is the roughly-halfway point; the World of Ruin is
-unstarted. See the roadmap for what comes next.
+See [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design and
+[docs/TOOLING.md](docs/TOOLING.md) for tool installation.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and how far the game is
-playable, [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design,
-and [docs/HANDOFF.md](docs/HANDOFF.md) for facts that are expensive to
-rediscover.
-
-## Quick start
+## Building
 
 You supply your own ROM; it is not included. The build verifies it by SHA-1
-and refuses anything else:
-
-```
-Final Fantasy III (USA).sfc    sha1 4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7
-```
-
-Drop that file at the repo root, then:
+and refuses anything else: `Final Fantasy III (USA).sfc`, sha1
+`4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7`, at the repo root.
 
 ```sh
-make rom     # build build/ot6.sfc
-make test    # full headless correctness run (the whole suite + the mp-cost A/B)
-make savestates-test  # the same, plus the tests that need the deep story savestates
-                    #   (slow: generates that chain of savestates first)
-make run     # launch the built ROM in Mesen (GUI)
-make patch   # emit a distributable .bps
+brew bundle                 # cc65, sdl2, ninja, ffmpeg
+python3 -m pip install numpy
+python3 configure.py        # writes build.ninja
+ninja                       # builds and tests everything; the default
+                            # target is the qualified release zip
 ```
 
-`make test` runs the whole suite headlessly under Mesen's testrunner, with no
-window and no input from you. It takes a few minutes. Tests self-register with
-a `-- @suite` marker, so `tools/tests/suite.sh --list` shows what runs; see
-[tools/tests/README.md](tools/tests/README.md) for how the harness works and
-how to write a test.
+Mesen and Flips are not brew-installable; [docs/TOOLING.md](docs/TOOLING.md)
+has those steps.
 
-## Layout
+`ninja` runs the whole graph: both ROMs, every generated savestate (the
+story-chain fixtures are multi-minute scripted playthroughs; a cold build
+takes upward of an hour and a half), all 94 suite tests, the audits and
+selftests, and the release packaging. Anything narrower is a real output
+path:
 
+```sh
+ninja ff6/rom/ff6-en.sfc                    # just the ROM
+ninja build/results/suite/battle_break.ok   # one suite test (and what it needs)
+ninja build/states/vargas_entry.mss.lua     # one savestate (and its chain)
 ```
-ff6/        # full-game source (vendored everything8215/ff6 disassembly,
-            #   GPL-3.0) + OT6 modules under ff6/src/battle/ot6_* (bank F0)
-docs/       # design, roadmap, research notes
-tools/      # Mesen 2, flips, Lua battle-test harness (tools/tests/)
-build/      # built ROM + distributable .bps patch (git-ignored)
-```
 
-Nearly all OT6 code lives in feature-oriented modules emitted in order from
-`ff6/src/battle/ot6.asm` into expanded bank `$F0`; `ot6_memory.inc` is the
-central WRAM/SRAM ownership map. Vanilla banks carry only minimal `jsl` hook
-shims. [docs/TOOLING.md](docs/TOOLING.md) covers the
-toolchain and [docs/research/](docs/research/) holds the reverse-engineering
-notes.
+`tools/gui.sh` opens the built ROM in the Mesen GUI.
+`OT6_RECORD=1 tools/tests/run.sh tools/tests/<test>.lua` records a run as a
+watchable video with a pad-input panel; see
+[tools/stream/README.md](tools/stream/README.md).
 
-## Contributing
+## Where the code is
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Issues are tracked
-[here](https://github.com/mtklein/ot6/issues), including known defects with
-reproductions, which are a reasonable place to start.
+OT6 code lives in feature modules emitted from
+[ff6/src/battle/ot6.asm](ff6/src/battle/ot6.asm) into expanded bank `$F0`;
+[ot6_memory.inc](ff6/src/battle/ot6_memory.inc) owns the shared WRAM/SRAM
+map. `ff6/` is a vendored copy of the everything8215/ff6 disassembly
+(GPL-3.0). The headless play harness is
+[docs/playing-headless.md](docs/playing-headless.md);
+[tools/tests/README.md](tools/tests/README.md) covers the test harness.
+
+## A warning about Sketch
+
+Relm's Sketch carries Final Fantasy VI 1.0's most famous bug, deliberately
+left in place: when a Sketch misses, the game can rarely corrupt your
+inventory or save. Save before experimenting with Sketch; the world map
+saves anywhere.

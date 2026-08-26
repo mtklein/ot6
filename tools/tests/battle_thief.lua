@@ -1,46 +1,11 @@
 -- @suite slow savestate=figaro_cleared
--- battle_thief.lua -- #55, Locke's kit, first slice: the thief submenu behind
--- the Steal row, and the two merchant verbs in it.
---
--- Why a submenu behind Steal rather than a new command: Locke's four command
--- rows are FIGHT, STEAL, MAGIC, ITEM (char_prop.asm:157); InitCmd_03 removes
--- MAGIC at runtime for a spell-less Locke, the battle menu is still hard-wired
--- to four rows, so Steal becomes the kit ladder's first row: OpenCmdMenuTbl[$05]
--- opens the Tools-window shell with Steal, Filch and Bestow in it, and the row
--- rides the queued action's attack byte ($2bb0 -> $3a7b -> $b6).
---
--- Issue #75 conversion.  The old apparatus installed LOCKE into all three
--- magitek slots, forged all-Steal command lists, pinned MP, HP and the bank
--- every frame, stopped the enemies, wrote sentinel shield counts, and zeroed
--- the shared cursor block.  On figaro_cleared the whole cast is real: LOCKE
--- carries the real submenu, the desert species seed their own shields
--- (Ot6SeedShields gives each 2, and three monsters sum to 6, enough for both
--- Filch arms), and every bank number below is earned and counted, so the
--- whole test is one deterministic ledger:
---
---   open 1 bp -> [white Bestow @1] -> R+Steal spends it (0, regen skipped)
---   -> [grey Bestow @0] -> one Tonic turn (+1) -> [white again] -> Filch
---   (+2: pip+regen -> 3) -> Bestow to the never-acted ally (3-1=2; ally
---   1+1=2) -> three item turns (5 = the Ot6ActionEnd cap, asserted by a
---   FOURTH item turn that must bank nothing) -> Filch at cap (shield off,
---   banks nothing) -> ally banked to cap by her own item turns -> Bestow
---   to the capped ally (a genuine no-op costing Locke nothing).
---
--- Every original assertion survives:
---   1. the submenu opens: tools-shell state $30, thief mode w7e6168 == 3,
---      three rows packed in the left column with ids, costs and targeting,
---      and the rest $ff.
---   2. the prices are the charged prices: Steal 4 (Ot6StealCost, #52),
---      Filch 6, Bestow 5 (Ot6ThiefCostTbl).
---   3. the rows draw their names from AttackName pad slots $56-$58.
---   4. Bestow greys at 0 BP and only at 0 BP (Ot6BushidoRowGrey's thief
---      arm); Steal and Filch stay white either way.
---   5. Filch moves a shield into a boost point: shield sum -1, bank +2
---      (pip plus regen), and no damage.
---   6. Bestow moves a pip between actors: ally +1, and Locke is charged
---      through the pending byte with regen skipped, so it is never free.
---   7. the caps and the no-regen rule: Filch at 5 still chips and banks
---      nothing; Bestow to a capped ally is a no-op costing Locke nothing.
+-- battle_thief.lua -- Locke's kit: the thief submenu behind the Steal row,
+-- and the two merchant verbs in it.
+
+-- Locke's four command rows are FIGHT, STEAL, MAGIC, ITEM; Steal opens the
+-- Tools-window shell with Steal, Filch and Bestow in it, and the row rides
+-- the queued action's attack byte ($2bb0 -> $3a7b -> $b6).
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/figaro_cleared.mss.lua"
 
@@ -100,21 +65,6 @@ local function mp() return H.readWord(0x3C08 + locke*2) end
 local function hp(slot) return H.readWord(0x3BF4 + slot*2) end
 local function maxHp(slot) return H.readWord(0x3C1C + slot*2) end
 
--- Desert chip damage vs. a two-person party (#122 fallout): the whole test
--- keeps one continuous battle alive by construction -- Steal, Filch and
--- Bestow are all non-damaging, so nothing here ever kills the two monsters,
--- and the fight (and its chip damage) runs the full length of the file.
--- Measured 2026-08-19: with the RNG chain reshuffled, the desert pair now
--- hits hard enough to kill the deferred ally before phase 7 (the "waits her
--- turn out and dies" hazard the header already names) AND to kill Locke
--- himself mid-phase-7, where he is taking real hits every round with no
--- Defend of his own (his rows are all Steal, on purpose -- that is the
--- ledger under test).  Neither BP ledger nor any assertion below ever reads
--- HP, so a floor write here costs the test nothing it is measuring: it
--- can't give the ally a free bp (only a real turn does that, and this never
--- lets her take one), and it can't change what Locke's own turns bank.
--- Sanctioned expedient (tools/state_write_waivers.txt); checked every frame
--- so no single hit gets the chance to land the killing blow between checks.
 local HP_FLOOR = 0.5
 local function keepAlive()
   for _, slot in ipairs({ locke, ally }) do
@@ -155,7 +105,7 @@ local function row(i)
 end
 
 -- ------------------------------------------------------ the menu drive --
--- One driver, selected by mode.  Modes:
+-- One driver, selected by mode:
 --   "defer"      -- this slot X-defers (never acts)
 --   "item"       -- one item turn (Tonic/Potion, default target)
 --   "kit:<row>"  -- open the thief submenu, pick row, confirm target
@@ -164,9 +114,6 @@ end
 local mf = 0
 local modeOf = {}                        -- slot -> mode
 local target = nil                       -- character-target slot for Bestow
--- blink-proof latch and steer of the character-target mask (measured in
--- battle_steal and moved into the library as H.targetCursor; the character
--- column walks {down,up,left,right})
 local tc = H.targetCursor({ mask = TCURSOR,
                             dirs = { "down", "up", "left", "right" } })
 local function decide()
@@ -240,8 +187,7 @@ local function driveTo(pred, maxF, tag)
     H.call(function() H.setPad(decide()) end),
   }, tag)
 end
--- wait for LOCKE's window in "park" mode at the submenu.  (locke is nil
--- at step-construction time, so the steps must read it at run time.)
+-- wait for LOCKE's window in "park" mode at the submenu
 local function parkAtSubmenu(_, tag)
   return H.repeatN(1, {
     H.call(function() modeOf[locke] = "park" end),
@@ -346,8 +292,7 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- 5: Filch takes one shield off the target and puts one pip into Locke ----
-  -- Which monster the cursor lands on is the game's choice; the chip is a
-  -- sum over the enemy side, which also catches a double chip.
+  -- the chip check sums the enemy side, catching a double chip
   H.call(function()
     H.vars.shA = shieldSum()
     H.vars.hpA = monsterHpSum()
@@ -394,14 +339,6 @@ H.run({ maxFrames = 120000 }, {
     H.log("PASSED phase 4: Bestow moves a boost point from Locke to an ally")
   end),
 
-  -- 7: the caps.  Bank both actors to Ot6ActionEnd's cap of 5, interleaved,
-  -- using non-damaging Steal for Locke and item turns for the ally.  A
-  -- deferred ally who waits her turn out
-  -- for another 30k frames dies to the desert chip damage (measured: the
-  -- serial version timed out on her bank), while item turns heal.
-  -- Then a fourth Locke turn must bank nothing, which is the cap, asserted;
-  -- Filch at cap chips but banks nothing; and a Bestow to the capped
-  -- ally is a no-op.
   H.call(function() modeOf[locke] = "kit:0"; modeOf[ally] = "item" end),
   driveTo(function() return bp(locke) == 5 and bp(ally) == 5 end, 60000,
     "interleaved item turns walk both banks to the cap"),
@@ -410,9 +347,6 @@ H.run({ maxFrames = 120000 }, {
     local turns0
     return H.repeatN(1, {
       H.call(function() H.vars.mpCap = mp() end),
-      -- one MORE item turn: the bank must stay 5.  Locke's three Steal
-      -- banks above preserve enough of the fixture's real bag for this
-      -- positive control.
       H.call(function()
         modeOf[locke] = "item"
         local i = bagIdxOf({TONIC, POTION})

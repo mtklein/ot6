@@ -1,76 +1,54 @@
 -- @suite
--- battle_foldcost.lua -- issue #64's baseline, recomputed from this ROM.
--- (school.lua and battle_breaktbl pattern: pure ROM bytes, no savestate.)
+-- battle_foldcost.lua -- boost-folded spell pricing, computed from ROM bytes.
+-- (pure ROM bytes, no savestate.)
 --
 --   tools/tests/run.sh tools/tests/battle_foldcost.lua
 --
--- #64 made a boost-folded spell cost the tier's real MP instead of the base
--- spell's.  The live half of that, what the queue charges, is
--- battle_fold.lua's.  This is the arithmetic half, and it exists because in
--- #45 an unmeasured price scale drifted for three releases and was then found
--- by the owner playing rather than by a test.
---
 -- Every number below is read out of the shipped ROM: the family table is
 -- Ot6FoldTbl (ot6_boost.asm), the costs are MagicProp+5, the byte
--- Ot6SpellMP reads, the learn levels are NaturalMagic (field/event.asm:1245)
--- and the pools are CharProp+$01 plus the LevelUpMP running sum, which is what
--- InitMaxMP computes.  Nothing is copied in except the eight family names and
--- the two design constants.
+-- Ot6SpellMP reads, the learn levels are NaturalMagic (field/event.asm),
+-- and the pools are CharProp+$01 plus the LevelUpMP running sum, which is
+-- what InitMaxMP computes.
 --
 -- What it asserts:
 --
 --   1. the family table is the shipped one.  8 rows x [base, +1, +2], pinned
---      by spell id, so a retune of which tier a boost reaches is an explicit
---      edit here too.  The shallow families repeat their second entry on
---      purpose (Poison/Life/Slow/Haste have no third tier in vanilla), so a
---      3-BP spend is never dead; this is asserted rather than assumed.
+--      by spell id.  The shallow families repeat their second entry
+--      (Poison/Life/Slow/Haste have no third tier in vanilla), so a 3-BP
+--      spend is never dead.
 --
---   2. monotonic.  Within a family, cost(+2) >= cost(+1) >= cost(base).  This
---      is the anti-regression for #64 itself: the bug was that boost made a
---      spell cheaper per point of power, and any future table where a
---      higher tier undercuts a lower one re-opens it.
+--   2. monotonic.  Within a family, cost(+2) >= cost(+1) >= cost(base): a
+--      boost may not buy a discount.
 --
---   3. the 99 ceiling (#57).  No folded tier may cost more than 99, for the
---      same reason battle_costtable asserts it on the kit column: every OT6
---      price drawer renders two digits (ListText cmd $02,
---      btlgfx_main.asm:15045-73), so 100 prints as punctuation.  Measured
---      headroom today: the dearest folded tier is Life 2 at 60.
+--   3. the 99 ceiling.  No folded tier may cost more than 99: every OT6
+--      price drawer renders two digits (ListText cmd $02), so 100 prints as
+--      punctuation.
 --
---   4a. the fold still buys something.  This is the assertion that would have
---      caught #64 going too far.  Folding is source-agnostic, so a tier is
---      reachable as soon as the base spell is known and 2 BP are banked, which
---      is a character's second action of their first battle (open with 1 BP,
---      +1 a turn: DESIGN.md).  Charging the tier's real MP does not change
---      reachability, it changes affordability: the pool has to cover the
---      price.  So for every family whose base spell is learned naturally, the
---      level at which the folded tier first becomes payable must be strictly
---      below the level that tier is learned.  Otherwise real cost would make
---      the fold worthless, because you could only afford Fire 3 after Terra
---      had learned Fire 3 anyway, and #64 would be the wrong call.
+--   4a. the fold still buys something.  Folding is source-agnostic, so a
+--      tier is reachable as soon as the base spell is known and 2 BP are
+--      banked, which is a character's second action of their first battle.
+--      Charging the tier's real MP changes affordability, not reachability:
+--      the pool has to cover the price.  So for every family whose base
+--      spell is learned naturally, the level at which the folded tier first
+--      becomes payable must be strictly below the level that tier is
+--      learned.
 --
---   4b. and MP buys the power: every folded tier costs at least 2x
---      its base spell.  This is the complement of 4a, guarding the other
---      direction, since a table where the tiers crept back toward the base
---      price would pass 4a while restoring the discount #64 closed.  It is
---      stated as a ratio because pools cancel, so no choice of measurement
---      level can argue it away.
+--   4b. and MP buys the power: every folded tier costs at least 2x its base
+--      spell.  Stated as a ratio because pools cancel, so no choice of
+--      measurement level can argue it away.
 --
---   5. the same numbers are logged as %-of-pool at both levels, because
---      #64 asks for that comparison explicitly and a number nobody prints is
---      a number nobody checks.
+--   5. the same numbers are logged as %-of-pool at both levels.
 --
--- Why families whose base spell is not natural magic (Bolt, Poison, Slow) are
--- measured at a clamped level rather than skipped: they arrive by esper, which
--- is story-gated rather than level-gated, so there is no learn level to read.
--- #45 hit the same problem and set the same clamp, L6, the earliest level the
--- party is presented at (kolts_entry), on the grounds that a
--- pool the game never shows is not a price anyone pays.  Those rows take part
--- in 1-3 and are logged in 5; assertion 4 needs a real learn level and says so.
+-- Families whose base spell is not natural magic (Bolt, Poison, Slow) are
+-- measured at a clamped level rather than skipped: they arrive by esper,
+-- which is story-gated rather than level-gated, so there is no learn level
+-- to read.  The clamp is L6, the earliest level the party is presented at.
+-- Those rows take part in 1-3 and are logged in 5; assertion 4 needs a real
+-- learn level and skips them.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local CEILING = 99              -- #57: the display and design ceiling
-local CLAMP_LV = 6              -- #45's floor: the earliest level the party
-                                --   is presented at
+local CEILING = 99              -- the display and design ceiling
+local CLAMP_LV = 6              -- the earliest level the party is presented at
 local MAGIC_STRIDE, MAGIC_MP = 14, 5
 local CHARPROP_SIZE, CHARPROP_MP = 0x16, 0x01
 local CHAR_TERRA, CHAR_CELES = 0, 6
@@ -101,8 +79,7 @@ local function mpCost(id)
   return H.readRomByte(magicProp + id * MAGIC_STRIDE + MAGIC_MP)
 end
 
--- pool(charId, level) exactly as InitMaxMP builds it (battle_costtable's own
--- helper, kept identical so the two tests cannot disagree about a pool).
+-- pool(charId, level) exactly as InitMaxMP builds it.
 local function pool(id, level)
   local mp = H.readRomByte(charProp + id * CHARPROP_SIZE + CHARPROP_MP)
   for i = 0, level - 2 do mp = mp + H.readRomByte(levelUpMp + i) end
@@ -186,7 +163,6 @@ H.run({ maxFrames = 20000 }, {
     local dearest, dearestName = 0, nil
     for _, f in ipairs(FAMILIES) do
       local c0, c1, c2 = mpCost(f[2]), mpCost(f[3]), mpCost(f[4])
-      -- monotonic.  #64's point: a boost may not buy a discount.
       assert(c1 >= c0, string.format(
         "%s: %s costs %d but base %s costs %d -- a higher tier that undercuts "
         .. "a lower one re-opens exactly the discount #64 closed",
@@ -217,8 +193,8 @@ H.run({ maxFrames = 20000 }, {
       local baseId, baseName = f[2], f[1]
       local who, whoName, baseLv = natural(baseId)
       -- the level the fold is reachable from: the base spell's own arrival,
-      -- floored at #45's clamp.  BP is never the binding constraint, since
-      -- 2 BP is a character's second action of their first battle.
+      -- floored at the clamp level.  BP is never the binding constraint,
+      -- since 2 BP is available by a character's second action.
       local measureLv = math.max(baseLv or 0, CLAMP_LV)
       local measureWho = who or CHAR_TERRA
       local measureName = whoName or "Terra*"
@@ -240,8 +216,8 @@ H.run({ maxFrames = 20000 }, {
               pct(cost, pool(measureWho, tierLv))) or "-",
             pay or 99))
 
-          -- the assertion #64 turns on.  Only meaningful where the tier has a
-          -- real learn level to be earlier than.
+          -- only meaningful where the tier has a real learn level to be
+          -- earlier than.
           if tierLv and baseLv then
             checked = checked + 1
             assert(pay ~= nil and pay < tierLv, string.format(
@@ -251,13 +227,10 @@ H.run({ maxFrames = 20000 }, {
               .. "#64's repricing has to avoid, not cause",
               name, cost, pay or 99, measureName, tierLv))
           end
-          -- and MP buys the power.  The other side of #64: a
-          -- folded tier must cost at least twice its base, or the fold is
-          -- again a discount.  This is stated as a ratio rather than a
-          -- %-of-pool bracket, because pools cancel, so it holds at every
-          -- level and cannot be argued away by picking a measurement level.
-          -- Measured headroom: Life 2 is the tightest family in the shipped
-          -- table at exactly 2.0x, and Bio the loosest at 8.7x.
+          -- a folded tier must cost at least twice its base, stated as a
+          -- ratio rather than a %-of-pool bracket, because pools cancel, so
+          -- it holds at every level and cannot be argued away by picking a
+          -- measurement level.
           local baseCost = mpCost(baseId)
           assert(cost >= 2 * baseCost, string.format(
             "%s costs %d against base %s's %d -- only %.1fx.  A folded tier "

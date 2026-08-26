@@ -2,14 +2,9 @@
 # savestate_stamp_selftest.sh: check the provenance signature in isolation,
 # no emulator, on a mock tree (OT6_ROOT).
 #
-# The signature is compared on two sides: the ninja `generate` edge `write`s it,
-# and lib/compose.py re-derives it at embed time to catch a drifted
-# worktree-seeded fixture.  So what matters is that it reacts to content on
-# every axis a generated savestate depends on (generator, all three composed-in
-# lib halves, declared extras) and never to a bare mtime bump.  The
-# `needsgen` generate-or-skip decision this file also used to pin now belongs
-# to ninja; its axes are checked end-to-end against real ninja
-# in savestate_ninja_selftest.sh, which is this file's other half.
+# Checks that it reacts to content on every axis a generated savestate
+# depends on (generator, all three composed-in lib halves, declared extras)
+# and never to a bare mtime bump.
 set -u
 GATE="$(cd "$(dirname "$0")" && pwd)/savestate_stamp.sh"
 ok=1
@@ -81,16 +76,16 @@ sh "$GATE" sig gen_fake /etc/passwd >/dev/null 2>&1
 
 # 6. the GATE_CONTRACT version is a real input: the digest is not the bare
 #    hash of the concatenated files, so bumping the constant moves every
-#    signature (issue #75 step 5, the deliberate invalidate-everything knob).
+#    signature.
 bare=$(cat "$TMP/tools/tests/gen_fake.lua" "$TMP/tools/tests/lib/ot6.lua" \
            "$TMP/tools/tests/lib/ot6_field.lua" \
            "$TMP/tools/tests/lib/ot6_contract.lua" | shasum -a 256 | cut -c1-64)
 check "GATE_CONTRACT version participates in the sig" DIFF \
   "${base%% *}" "$bare"
 
-# 7. write records the signature and the provenance bindings (issue #75
-#    step 5): line 1 is byte-identical to `sig` (the side compose.py
-#    re-derives), line 2 binds the artifact, line 3 binds the ancestor.
+# 7. write records the signature and the provenance bindings: line 1 is
+#    byte-identical to `sig` (the side compose.py re-derives), line 2 binds
+#    the artifact, line 3 binds the ancestor.
 printf 'generated state bytes v1\n' > "$TMP/build/states/fake.mss"
 sh "$GATE" write fake gen_fake - "$extra"
 [ "$(head -n 1 "$TMP/build/states/fake.stamp")" = "$(sh "$GATE" sig gen_fake "$extra")" ] &&

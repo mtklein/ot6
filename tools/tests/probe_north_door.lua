@@ -1,7 +1,4 @@
--- probe_north_door.lua -- "follow Lone Wolf north into the Mines, take
--- a right": the town north door (26,8) -> map 50 (78,58) (#133).
--- Chart 50, walk right/east, push edges; goal = anything that leaves
--- toward the snow fields.
+-- probe_north_door.lua -- walks the town north door (26,8) into map 50 (78,58) and charts it.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
 H.run({ maxFrames = 40000 }, {

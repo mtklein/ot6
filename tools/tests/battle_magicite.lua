@@ -1,71 +1,20 @@
 -- @suite slow savestate=n024_entry
--- battle_magicite.lua -- the v0.6 Ifrit and Shiva magicite redesigns, the
--- halves battle_esperstats.lua does not reach: the ability prices their kits
--- are built on, and the summons.  Design: docs/design/magicite-ifrit-shiva.md
--- (issue #16).  battle_esperstats covers which spells and which stat; this file
--- covers what they cost and what the divine does.
---
--- Issue #75 conversion.  The old apparatus staged everything on the magitek
--- entry point: char 0's equipped-esper byte and field MP poked before the
--- drive-in, Terra's command list rewritten, allies stopped, guard HP and MP
--- pinned, the Slow-immunity words written both ways, saved-cursor pokes,
--- and $3f2e and $3204 poked for the latch A/B.  On n024_entry every input
--- is real:
---
---   * the stones are in the bag ($1A69 bits, give_genju receipts
---     from the alcove hand-off) and are equipped through the real field
---     menu: X -> Skills -> character -> Espers -> stone -> detail -> A
---     (MenuState_1e/4d, field_menu.asm:2504 and skills.asm:2641).  Ifrit
---     goes on Locke, and an equipped stone grants its kit (genju_prop.asm),
---     so his Magic row appears with Ifrit's spells; Shiva goes on Celes.
---   * the fight is Number 024 (battle 72), the fixture's own one-A-press
---     boss, and it is the species the design chose: its authored
---     allowed-status word blocks Slow (monster_prop +$16; live $3330
---     reads $FFE1, bit 2 clear, read as the experiment's control rather than
---     written), and its real 777-MP pool is the Facility-scale target the
---     Osmose reprice exists for.
---   * the 7-MP boundary is earned: Celes's real pool, the 76 of 106 the
---     fixture carries, is walked down by real casts of her own kit until it
---     reads 5..7, and the greys are then read off the live list.  Shells
---     (15) for the distance, then Cure (5) or Antdot (3) chosen from where
---     the pool actually is, which reaches every value in the window from any
---     pool of 8 or more.
---   * the party is cared for before the fight and everyone but Celes plays
---     medic during it.  Neither is decoration: the fixture ships her at 151
---     of 349, and Number 024 is level 24 against a party that never attacks
---     for the dozen turns these arms take.  Both halves of that were
---     measured as wipes, and a wipe here reports as a drive timeout.
---   * the once-per-battle latch: the summon is offered at battle start,
---     spent during the run, and the row greys at her next real window, from
---     the natural refresh with no $3204 pokes.  The re-offer half is a second
---     battle: the fixture reloads and battle 72 re-enters, and the fresh
---     battle's init offers the row again ($3f2e read clear), which is the
---     plan's "re-summon arms become second battles".
---
--- The one thing lost against the original is the Slow-lands half of the
--- immunity pair.  No Slow-permitting enemy is reachable from this fixture
--- (maps 264/269/271/273 are measured encounter-free by the chain's own steps),
--- and the design's allowing species, Number 128, the Cranes and the blades,
--- live in later set pieces.  The refused half (species-authored immunity
--- consulted on a landed divine) is asserted here; the landing half is
--- follow-up work on a deeper fixture.
+-- battle_magicite.lua -- the Ifrit and Shiva magicite kits, the halves
+-- battle_esperstats.lua does not reach: the ability prices their kits are
+-- built on, and the summons. battle_esperstats covers which spells and
+-- which stat; this file covers what they cost and what the divine does.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/n024_entry.mss.lua"
 
 -- spell ids (const.inc ATTACK enum)
 local FIRE, ICE, DRAIN, SHELL, OSMOSE, CURE = 0x00, 0x01, 0x04, 0x25, 0x29, 0x2D
--- There was a seventh name here, `SCAN = 0x32`.  $32 is ATTACK::ANTDOT
--- (const.inc:640); ATTACK::SCAN is $18 (const.inc:614).  It was never used by
--- any assertion, and issue #76 was filed off a development-time observation
--- taken through it.  Removed rather than corrected: Celes learns Scan at
--- level 18 (field/event.asm:1268) and is level 14 at this fixture's
--- checkpoint, so a correct SCAN constant would name a spell she cannot cast.
 local ANTDOT = 0x32                      -- the 3-MP row the boundary tail steps with
 local INFERNO, DDUST = 0x37, 0x38        -- summon attack ids (esper + $36)
 local IFRIT, SHIVA = 0x01, 0x02          -- esper indices (GenjuProp order)
 
 -- authored prices (magic_prop_en.dat +$05, spliced in battle_main.asm)
-local OSMOSE_MP = 8                      -- OT6 v0.6; vanilla was 1
+local OSMOSE_MP = 8                      -- vanilla was 1
 local FIRE_MP, ICE_MP, DRAIN_MP, SHELL_MP = 4, 5, 15, 15
 local INFERNO_MP, DDUST_MP = 26, 27
 -- authored Diamond Dust record ($38): power cut, Slow added
@@ -74,9 +23,6 @@ local INFERNO_POWER, INFERNO_STATUS3 = 51, 0x00   -- unchanged (the control)
 local MAGIC_PROP_REC = 14
 local STATUS3_SLOW = 0x04
 
--- field menu route (probe-measured on this fixture 2026-08-10: the menu
--- opens with the command cursor on Item, and $4b is not the command cursor
--- until a press has happened, so the route is one unchecked down then A)
 local ZMENUSTATE, ZCURSOR, GENJULIST = 0x26, 0x4b, 0x9d89
 local MST_MAIN, MST_CHAR, MST_SKILLS, MST_LIST, MST_DETAIL = 0x05, 0x06, 0x0a, 0x1e, 0x4d
 local function mst() return H.readByte(ZMENUSTATE) end
@@ -165,9 +111,7 @@ local function listSeek(idx, what)
   }, what)
 end
 
--- equip esper `idx` on the character at char-select position `pos`
--- (menu order measured: 0=EDGAR 1=SABIN 2=LOCKE 3=CELES), verify by
--- reading the roster record back
+-- pos is char-select menu order: 0=EDGAR 1=SABIN 2=LOCKE 3=CELES
 local function equipOn(pos, idx, roster, tag)
   local steps = {
     H.driveUntil(function() return mst() == MST_MAIN end, 1200, {
@@ -218,9 +162,7 @@ end
 -- ------------------------------------------------------ the battle drive --
 local spells, mpWrites = {}, {}
 local R = {}   -- results; declared BEFORE enterBoss so its $3410 callback
-               -- closes over this table (a later declaration left the
-               -- callback holding a nil global, and Mesen discards
-               -- callback errors; measured: hpMid was never captured)
+               -- closes over this table
 local function sawSpell(id)
   for _, v in ipairs(spells) do if v == id then return true end end
   return false
@@ -234,14 +176,10 @@ local celesMode = "defer"                -- "defer"|"summon"|"cast"|"park"
 local lockeMode = "medic"                -- "medic"|"summon"
 local partyCare = true                    -- false briefly for menu assertions
 local castRec = nil                      -- list record to cast in "cast"
--- the character-target latch and steer code (measured in battle_steal and
--- moved into the library as H.targetCursor)
 local tc = H.targetCursor({ mask = 0x7B7D,
                             dirs = { "down", "up", "left", "right" } })
--- Where is the machine?  A drive that stalls in this file used to report
--- only "timeout after N frames", and the two things that actually stop it --
--- the fight ending, and the party being ground down by a level-24 boss --
--- look identical from outside.
+-- Where is the machine?  The fight ending, and the party being ground down
+-- by a level-24 boss, look identical from outside.
 local hbF = -600
 local function heartbeat()
   if H.frame - hbF < 600 then return end
@@ -286,28 +224,7 @@ local function decide()
   if act ~= celes and not partyCare then
     btn = (st == ST_CMD) and "x" or "b"
   elseif act ~= celes then                      -- the medic line
-    -- Everyone who is not CELES is a medic, and it takes all of them.  The
-    -- arms below are long -- the boundary walk alone is a dozen of her
-    -- turns -- and Number 024 is level 24 hitting a party that never fights
-    -- back.  Measured 2026-08-13 with LOCKE as the sole healer and the
-    -- other two deferring: LOCKE died about 7000 frames into boot B and the
-    -- party wiped about 5000 frames later, which surfaced as a 60000-frame
-    -- timeout on the Shell walk.
-    --
-    -- Heal only when somebody is badly hurt; a healthy party defers, so the
-    -- arms still finish before the boss's focus fire adds up (measured:
-    -- boot A's always-item healer died before the Inferno arm).
-    --
-    -- The threshold and the empty-bag defer follow the fixture
-    -- (2026-08-18): n024_entry now arrives with 7 Tonics and NO Potions
-    -- (the #84 route's care stops spent them), and the old 70% threshold
-    -- burned all seven inside the opening ~3500 frames.  The medic then
-    -- looped forever on a dry bag -- open Item, find nothing, close, reopen
-    -- (measured: the state histogram sat at $05/$09/$0a/$01 while the
-    -- actor-0 window held the queue, which is the Inferno-arm timeout's
-    -- whole mechanism) -- so a medic with nothing to give now defers the
-    -- turn instead of opening the list, and the bar for spending one of
-    -- the seven is the old badly-hurt line.
+
     local hurt = false
     for s2 = 0, 3 do
       local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
@@ -475,13 +392,6 @@ H.run({ maxFrames = 150000 }, {
   end),
   equipOn(3, SHIVA, 6, "A/celes-shiva"),
   equipOn(2, IFRIT, 1, "A/locke-ifrit"),
-  -- A real care stop before the fight.  The fixture ships CELES at 151 of
-  -- 349 -- 43%, which clears the party-hp audit's max/8 bar and does not
-  -- clear a level-24 boss: measured 2026-08-13, she was dead within 2500
-  -- frames of the divines resolving and arm 5, which waits for her next
-  -- window, then spent its whole budget waiting for a window that was never
-  -- coming.  Item-only, because her MP pool is what several arms below
-  -- measure and fieldCare would otherwise spend it casting her own Cure.
   H.fieldCare({ tag = "before battle 72", threshold = 0.95, magic = false }),
   enterBoss("bootA"),
   H.call(function()
@@ -510,9 +420,6 @@ H.run({ maxFrames = 150000 }, {
       "[osmose] the real Facility-scale MP pool the reprice exists for")
     R.hp0, R.mp0 = bossHp(), mp(celes)
   end),
-  -- 4. both divines, driven through the real menus one after the other; the
-  -- boss's focus fire is real, so the arms run before the attrition builds up
-  -- (measured: an always-healing party died before a late Inferno arm).
   (function()
     local lm0
     return H.repeatN(1, {
@@ -578,20 +485,6 @@ H.run({ maxFrames = 150000 }, {
       "[latch] her Ice row stays live after the summon")
   end),
 
-  -- 6. Osmose, in boot A rather than boot B.  It reads the boss's real
-  -- 777-MP pool and CELES's own, and neither is a boot-B fact; what put it
-  -- there was the old drain that ran before it.  Boot B's own arm is a walk
-  -- a dozen turns long, and every turn is a round of a level-24 boss
-  -- against a party that never attacks, so moving one cast out of that
-  -- battle and into this shorter one is worth doing on its own.
-  -- There used to be a Shell walk here first, to make the refill dramatic
-  -- by starting it from a low pool.  It bought nothing the assertions
-  -- check -- they are the 8-MP debit, the boss's pool dropping, and the
-  -- caster ending net positive, and all three hold from 76 -- and it cost
-  -- three of her turns.  Every turn here is a round of a level-24 boss
-  -- against a party that never attacks, and the arms below need a dozen
-  -- more: measured 2026-08-13, the party wiped partway through the
-  -- boundary walk and the run reported it as a 60000-frame timeout.
   (function()
     local m0, g0
     return H.repeatN(1, {
@@ -678,23 +571,10 @@ H.run({ maxFrames = 150000 }, {
   -- 7. the 7-MP boundary, earned by real casts of her own kit: Shells (15)
   -- to bring the pool down in big steps, then a tail that steps onto the
   -- 5..7 window exactly.
-  --
-  -- The tail used to be Cure alone, on the argument that 106 = 1 (mod 5)
-  -- and both Shell and Cure preserve the residue, so the walk had to land
-  -- on 6.  That is arithmetic about an ideal walk rather than about this
-  -- one: measured 2026-08-13, the pool arrived at the tail reading 13 and
-  -- not 16, one cast in the Shell phase having cost 3 rather than 15, and a
-  -- Cure-only tail then stepped 13 -> 8 -> 3, straight past the window.
-  -- (Antdot, $32, is the 3-MP row; it is the id issue #76 was filed against
-  -- under the label Scan, which CELES cannot cast at this level at all.
-  -- Whichever cell the grid walk actually landed on, a tail that can only
-  -- subtract 5 cannot recover from an odd residue.)
-  --
+
   -- So the tail picks its spell from where the pool actually is: Cure (5)
   -- down to 10, then Antdot (3) from 8 or 9, which reaches every value in
-  -- 5..7 from any pool of 8 or more.  The window assertion below is
-  -- unchanged and still the thing being proved; this only stops the drive
-  -- from walking past it.
+  -- 5..7 from any pool of 8 or more.
   H.call(function()
     celesMode = "cast"; castRec = recOf(celes, SHELL)
   end),

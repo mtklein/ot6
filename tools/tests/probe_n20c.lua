@@ -1,11 +1,10 @@
 -- probe_n20c.lua -- model-vs-engine on post-battle map 20: dump the
 -- (49,14) neighborhood's prop bytes, then push raw held directions and see
 -- whether the engine moves where the model says wall.
--- Issue #75: playBattles = "tactical" keeps this walk out of the library's
--- monster-dead flag write.  It is intent only -- maps 30 and 20 (Arvis's house, the Narshe streets) draw no random battles (map_prop.dat byte +5
--- bit 7 clear, so the field step handler at ff6/src/field/battle.asm:333-347
--- returns before the roll) -- and "tactical" rather than "flee" because the
--- only battle that could reach the option there is an unscripted surprise.
+--
+-- playBattles = "tactical" is used because maps 30 and 20 (Arvis's house,
+-- the Narshe streets) draw no random battles; the only battle reachable
+-- here would be an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

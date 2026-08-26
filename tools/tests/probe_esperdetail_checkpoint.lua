@@ -1,25 +1,19 @@
--- probe_esperdetail_checkpoint.lua -- issue #27's verification instrument.
---
--- The same menu drive and cell-level assertions as menu_esperdetail.lua (the
--- suite test), booted instead from a cold Continue off the tracked post-Opera
--- battery checkpoint, which survives ROM changes (issue #9) where savestate
--- fixtures do not.  Run it in a tree whose fixtures are stale against a fresh
--- menu-bank build:
+-- probe_esperdetail_checkpoint.lua -- the same menu drive and cell-level
+-- assertions as menu_esperdetail.lua (the suite test), booted instead from
+-- a cold Continue off the tracked post-Opera battery checkpoint, which
+-- survives ROM changes where savestate fixtures do not:
 --
 --   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/post-opera-v1 \
 --     tools/tests/run.sh tools/tests/probe_esperdetail_checkpoint.lua
 --
--- The Continue sequence is gen_vector_entry.lua's.  The party is LOCKE
--- CELES SABIN EDGAR on the world map at (137,203); the field menu opens from
--- the world map the same way as from a field map.  The esper inventory is
--- pinned to IFRIT and TERRATO (no mod) as in the suite test.
+-- The party is LOCKE CELES SABIN EDGAR on the world map at (137,203); the
+-- field menu opens from the world map the same way as from a field map.
+-- The esper inventory is pinned to IFRIT and TERRATO (no mod).
 --
--- #62 rebuilt what this asserts: Ot6EsperStatTbl is now two bytes per esper in
--- vanilla's equipment layout (four signed nibbles), so the single
--- "While worn...<Stat> + N" line at row 27 became a caption on the title row
--- plus one term per nonzero delta packed down from row 17.  Ifrit's row is
--- +6 vigor / +4 stamina / -3 mag.pwr, three terms including a minus sign.  The
--- assertions here track menu_esperdetail.lua's cell for cell.
+-- Ot6EsperStatTbl is two bytes per esper in vanilla's equipment layout
+-- (four signed nibbles): a caption on the title row plus one term per
+-- nonzero delta packed down from row 17. Ifrit's row is +6 vigor /
+-- +4 stamina / -3 mag.pwr, three terms including a minus sign.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -42,7 +36,7 @@ local CH_W, CH_PLUS, CH_MINUS, CH_DOT, CH_PCT, CH_COLON =
 local BLANK = 0xff
 local function digit(n) return 0xb4 + n end      -- '0' = $b4 .. '9' = $bd
 
--- Stat name tiles, verbatim from menu_text_en.inc.raw:111-114 (7 tiles each).
+-- Stat name tiles (7 tiles each).
 local STAT = {
   VIGOR   = { 0x95, 0xa2, 0xa0, 0xa8, 0xab, 0xff, 0xff },
   SPEED   = { 0x92, 0xa9, 0x9e, 0x9e, 0x9d, 0xff, 0xff },
@@ -52,13 +46,11 @@ local STAT = {
 
 local function st() return H.readByte(ZMENUSTATE) end
 
--- Walk the esper list cursor onto the slot holding esper `idx`.  The list is
--- a two-column grid (GenjuCursorProp `cursor_prop {0,0},{2,8}`, skills.asm):
--- $4b is a linear slot index whose parity is the column, so down/up move by
--- 2 and a parity change needs a left/right press first.  Direction-aware
--- because the slot the list restores after a detail-page exit is not
--- reliably the slot it left from.  4-frames-on/4-off gives clean press
--- edges.
+-- Walk the esper list cursor onto the slot holding esper `idx`.  The list
+-- is a two-column grid: $4b is a linear slot index whose parity is the
+-- column, so down/up move by 2 and a parity change needs a left/right
+-- press first.  Direction-aware because the slot the list restores after a
+-- detail-page exit is not reliably the slot it left from.
 local function listSeek(idx, what)
   local ph = 0
   return H.driveUntil(function()
@@ -88,10 +80,8 @@ local function listSeek(idx, what)
   }, what)
 end
 
--- #62 took over cols 17-27 of the spell rows and cols 13-28 of the title row,
--- so the cells the old form of this check used there are replaced by a broader
--- check of the same class: neither the percent glyph nor the learn-rate
--- colon may appear anywhere in the window's rows.
+-- Neither the percent glyph nor the learn-rate colon may appear anywhere in
+-- the window's rows.
 local function assertDeadColumnsGone(tag)
   H.assertEq(cell(12, 17), BLANK, tag .. ": no rate colon after spell 1's name")
   for y = 15, 27, 2 do
@@ -153,7 +143,7 @@ local function assertOldLineGone(tag)
 end
 
 H.run({ maxFrames = 80000 }, {
-  -- gen_vector_entry.lua's cold Continue off the battery checkpoint.
+  -- cold Continue off the battery checkpoint.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),

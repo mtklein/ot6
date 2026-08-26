@@ -1,41 +1,22 @@
 # The MP economy
 
-Scope: game-wide rules, WoB-sized numbers. Nothing here is
-locked, and every number is a placeholder for playtest. That is
-stated once here instead of on every row. Terminology:
-the pool keeps its vanilla name MP, the name existing players
-already know; enemy break counters are "shields"; SP is
-not used.
+Scope: game-wide rules, WoB-sized numbers. Terminology: the pool keeps
+its vanilla name MP, the name existing players already know; enemy break
+counters are "shields"; SP is not used.
 
-## The target, stated by the owner
-
-The economy exists to make Fight a real option. Vanilla did not offer
-that.
-
-> *"In that game there really wasn't ever any reason for Cyan or Sabin to
-> just attack instead of using one of their abilities."*
-
-In FF6, for the ability characters, the ability always beats Fight, so
-there is no decision to make each turn. Octopath handles this with
-resources: a character banks resources by not spending them, and a plain
-attack is the action that banks. The target for every number in this
-document is therefore:
-
-Fight must sometimes be the right move, and Cyan and Sabin must still
-play as ability characters.
-
-Both halves constrain the numbers. An economy tight enough to ration
-SwdTech makes Cyan a worse Locke. An economy loose enough that Fight is
+The economy exists to make Fight a real option. In vanilla FF6, for the
+ability characters, the ability always beats Fight, so there is no
+decision to make each turn. Octopath handles this with resources: a
+character banks resources by not spending them, and a plain attack is
+the action that banks. OT6's target: Fight must sometimes be the right
+move, and Cyan and Sabin must still play as ability characters. Both
+halves constrain the numbers — an economy tight enough to ration SwdTech
+makes Cyan a worse Locke, and an economy loose enough that Fight is
 never correct keeps vanilla's lack of a choice and adds bookkeeping.
-
-The owner expects this to take a while. Finding a number that suits both
-Octopath and FF6 is a playtest loop rather than a derivation, so a pass
-that improves the shape and gets played is worth more than one that waits
-to be correct. Successive rescales are expected.
 
 ## The ceiling: 99
 
-The owner's rule for the top of every ladder is that each character's own
+The rule for the top of every ladder is that each character's own
 ultimate costs 99 MP. It agrees with the baseline below: 99 against a
 L70 pool of ~760 is 13%, inside the 8-20% range. It therefore caps the
 table rather than recalibrating it, and it makes ladders comparable
@@ -65,25 +46,10 @@ ones), which is wired into `SummonMagicListText` and fed from
 `$2091` (`btlgfx_main.asm:11368`). Vanilla's summon window can render it,
 and none of OT6's two-digit drawers sees it.
 
-There is also a non-arithmetic reason for the number. The
-owner: *"seeing things like 99, 999, and 9999 in Final Fantasy games
-feels right. Very classic feel."* A player who has already met 9999
-damage and a 99-item stack reads 99 MP as the maximum without being told.
-This follows the same preference as keeping the
-FF3-US names (CONTRIBUTING) and the Vargas tutorial (bosses-wob.md):
-match what the original felt like, even where a cleaner number
-exists.
-
-General rule: where OT6 needs a cap or a
-round maximum, prefer the series' own numbers (99, 999, 9999) over an
-arbitrary one. A design that wants 100 or 50 should say why the classic
-number is wrong rather than defaulting past it.
-
-Scope, from the owner: 99 applies where it makes sense, not universally.
-Where a character has an ultimate, that ultimate costs 99. Where
-the top verb is flat or free, as with Slot, Rage and Dance, the character
-does not participate in the rule. That is a stated non-answer rather than
-a gap to fill with an invented capstone.
+99 applies where it makes sense, not universally. Where a character has
+an ultimate, that ultimate costs 99. Where the top verb is flat or free,
+as with Slot, Rage and Dance, the character does not participate in the
+rule.
 
 **Who qualifies, from the ladders:**
 
@@ -96,10 +62,7 @@ a gap to fill with an invented capstone.
 
 Air Anchor is not the Tools capstone. kits.md states: "Air Anchor
 stays a findable *item* mid-kit gag, not the capstone." Tools therefore
-has no top row to price today. When Overclock is built, the Σ rule and
-the 99 ceiling will disagree, and that decision belongs to the change
-that builds Overclock, because either answer prices an ability that
-currently has no code.
+has no top row to price today.
 
 Locke is the other case worth naming. Steal is flat for now, but his
 kit (`kits.md`) already designs Master's Mark, which steals from all
@@ -116,18 +79,6 @@ character with the esper can learn while Bum Rush is one character's
 once-per-kit divine. Nothing needs changing, and the vanilla-MP-costs
 house rule stands with its one named exception (Osmose, below).
 
-## Unresolved numbers are not blockers
-
-Where two documents disagree about a value, such as Overclock priced as
-the sum of its tools (`kits.md`) versus the 99 ceiling above, the
-disagreement does not have to be resolved on paper. The owner's ruling:
-*"doesn't matter what we start with, playtesting will help make it clear."*
-
-Pick the defensible default, ship it where it can be played, note the
-alternative in a comment, and let the playthrough decide. Shipping the
-wrong number once costs less than blocking a build on a number nobody can
-evaluate without playing it.
-
 ## Principles
 
 - **FF6's MP pool is the resource.** Every character
@@ -137,8 +88,7 @@ evaluate without playing it.
 - **Three currencies.** HP measures danger, MP measures sustain, and BP
   pays for burst. The break interacts with all three: shielded resistance
   (DESIGN.md, with the HP multiplier retired to 1x) halves off-weakness
-  damage and so makes probing necessary, the
-  restore-on-break passive (below) makes breaks a source of MP, and
+  damage and so makes probing necessary, and
   boosting spends the BP bank into the ×2 window.
 - **The free floor.** Fight, Def., Item, and Row never cost
   MP, matching Octopath's floor. A character with an empty pool still
@@ -147,15 +97,15 @@ evaluate without playing it.
 - **Signatures are free to learn and still cost MP to use.** Pillar 1's
   "signature is free" (DESIGN.md) means free at join: no deed, no
   level gate, no JP. Signatures become the cheapest rows of
-  their kits (1–4 MP) rather than costing nothing. The driver's directive
-  is that verbs free in vanilla, Steal and Tools by name, stop
-  being free under Octopath rules. The owner's absolute: only the
-  Fight row is free, and every other verb costs MP as its character's kit
-  comes online. (Item is inventory-gated, not an MP verb.) The rule is
-  about the row, not about the word "Fight": on the Veldt Leap occupies
-  the Fight row (kits.md's row-sharing rule, `Ot6VeldtRow`), so on the
-  Veldt the free floor is Leap, and Leap is free. Steal is priced,
-  because it is a verb beside Fight rather than the Fight row itself.
+  their kits (1–4 MP) rather than costing nothing: verbs free in
+  vanilla, Steal and Tools by name, stop being free under Octopath rules.
+  Only the Fight row is free, and every other verb costs MP as its
+  character's kit comes online. (Item is inventory-gated, not an MP
+  verb.) The rule is about the row, not about the word "Fight": on the
+  Veldt Leap occupies the Fight row (kits.md's row-sharing rule,
+  `Ot6VeldtRow`), so on the Veldt the free floor is Leap, and Leap is
+  free. Steal is priced, because it is a verb beside Fight rather than
+  the Fight row itself.
 - **BP buys tempo and MP buys power.** One Fire 3 instead of three Fires
   saves two turns, which is what the boost buys, and the magnitude is
   paid for at the tier's own price. Measured out of `magic_prop_en.dat`:
@@ -230,12 +180,12 @@ MP in addition to their gates (broken target, the 5-BP bank,
 once per battle), so there are no free apex actions: the
 gate limits frequency and MP prices the cast.
 
-Vanilla-free player verbs, with proposed cost shapes:
+Vanilla-free player verbs, with their cost shapes:
 
 | Verb | Shape | MP | Rationale |
 |---|---|---|---|
 | Steal (Locke #1) | flat small | **4** | 12.9% of the 31 MP pool Locke joins with, and parity with every other kit's signature row (Pummel, Dispatch and AutoCrossbow are all 4); see "Steal's price is real and invisible" below |
-| New kit skills (Locke #2–7, Analyze, …) | scaled by tier | 3–20 | costed from the start via M4 kit tables, and never free in vanilla; Analyze stays cheap (2–3) so scouting stays frequent |
+| New kit skills (Locke #2–7, Analyze, …) | scaled by tier | 3–20 | costed from the start via the kit tables, and never free in vanilla; Analyze stays cheap (2–3) so scouting stays frequent |
 | Tools (Edgar) | scaled by tier | 3–20 | bought once with gil and reusable, so MP is the per-use cost: AutoCrossbow 3–4, Drill/Chain Saw 12–20, Debilitator 8–12, Overclock costs the sum of the two tools it fires |
 | Blitz (Sabin) | scaled by tier | 4–99 | Pummel 4, mid-kit 10–17, then 28/50, then Bum Rush at the 99 maximum |
 | SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–99 | he pays both currencies (below), and Cleave costs 99 |
@@ -243,14 +193,14 @@ Vanilla-free player verbs, with proposed cost shapes:
 | Rage (Gau) | flat, paid at start | 8 | one payment starts a whole-battle possession and every possessed turn after it is free, the same rule Dance takes; `Ot6RageCost` tail-calls `Ot6DanceCost` so the two cannot drift |
 | Leap (Gau) | free — exception | 0 | the free floor rather than an exemption: Leap shares Gau's FIGHT row on the Veldt (kits.md), so on the Veldt it is the Fight command |
 | Sketch (Relm) | flat small | 2–4 | pay to roll; the Sketch bug stays (house rule) and does not refund |
-| Control (Relm, kit TBD) | flat moderate | 8–12 | vanilla's strongest free verb, giving full command of a monster; priced when her kit lands |
+| Control (Relm, kit not yet built) | flat moderate | 8–12 | vanilla's strongest free verb, giving full command of a monster |
 | Slot (Setzer) | flat small | 1–3 | the reels are the main price; MP makes the number of spins finite |
 | Runic (Celes) | free — exception | 0 | an income verb: vanilla Runic already credits the absorbed spell's cost to her pool, kept, on top of +1 BP (kits.md) |
 | Throw (Shadow) | free — exception | 0 | the thrown item is consumed; a per-use price already exists |
 | Coin Toss, Hired Help (Setzer) | free — exception | 0 | GP-priced verbs stay GP-priced; Octopath's merchant skills also spend money rather than MP |
 | Mimic (Gogo) | free — exception | 0 | vanilla Mimic copies the action and not the price; the bonus-character jank is preserved |
 | Guest verbs: Health (Banon), Shock (Leo), magitek beams, Possess (Ghost) | free — exception | 0 | guests have no kit tables; their stretches are authored tutorial content (the Whelk line is balanced on free beams, balance-metrics.md), and Possess already costs the ghost |
-| Relic-morphed commands (Jump, GP Rain, X Magic, …) | inherit | — | assigned at M4 data entry in the same records as everything else |
+| Relic-morphed commands (Jump, GP Rain, X Magic, …) | inherit | — | assigned in the same records as everything else |
 
 ### Steal's price is real and invisible
 
@@ -299,7 +249,7 @@ later make all of it dead code. That is why the display is not built.
 Making Steal free is not an option either. Leap is free because it
 occupies the Fight row on the Veldt and the free floor has to survive
 the substitution. Steal is a verb beside Fight, so making it free would
-contradict the owner's absolute that only the Fight row is free.
+contradict the rule that only the Fight row is free.
 
 The price is therefore charged and not drawn, deliberately. The cost is
 kept in a leaf, `Ot6StealCost`
@@ -441,9 +391,6 @@ Two things the measurement adds that the numbers alone do not show:
   tables on each `make test` and refuses a column that has
   fallen outside 4–25%.
 
-Per the preamble, every number here is still a playtest
-placeholder and successive rescales are expected, not churn.
-
 ## Early pools, from the character data
 
 Base MP (ff6/src/field/char_prop.asm): Terra 16, Locke 7,
@@ -494,125 +441,48 @@ level, current HP and MP are set to the new maximums.
 - Attrition works differently. Tents, inns, and save points stop
   being the only income; they matter most inside long
   same-level stretches and least right after a level. HP
-  refills too, which reduces dungeon attrition. The danger
-  numbers were measured without a level-up in the window, so
-  the M6 pass should check this.
-- Flagged for playtest: whether free refills make tents and
-  Ethers dead stock early, and whether long boss-less
-  stretches drain pools faster than the next level arrives.
+  refills too, which reduces dungeon attrition.
 
-## MP-management passives
+MP-drain verbs stay, on Octopath's pattern, where they are balanced by
+dealing little or no damage themselves and appearing on only a few
+characters. Osmose (Shiva, at 8 MP, above) and Rasp (Ramuh) sit in the
+esper pool (magicite.md), and reaching one is a deliberate perk that
+lets a character manage their own resources. Enemies already have MP
+and spend it in vanilla, and the MP kill stays (bosses-wob.md); Rasp and
+Osmose gain value as attack and income against that pool.
 
-MP relief comes from the esper passive pool (magicite.md).
-Slot rules and learning stay as written there: up to 4 slots,
-learned by battles carried, with stat passives competing for the
-same slots. The core pair follows Octopath's support-skill
-shapes, and the names here are descriptive placeholders:
+The free floor holds: Tools are not consumables — gil buys them once
+and they are reusable, so MP is their per-use price — and
+Attack/Defend/Item stay free because a character with no legal action
+is a soft lock. The pool is MP as in vanilla, and break counters are
+shields; SP is retired.
 
-- **MP on victory**: winning a battle restores ~15–25% of max
-  MP. This is Octopath's victory-restore shape, and it keeps trash chains
-  self-sustaining without inn trips.
-- **MP on break**: the character who lands a break restores a
-  few MP. This is Octopath's restore-on-break shape. Probing spends MP
-  and breaking returns some of it, so sustain follows the loop's payoff.
+## How costs are applied
 
-Further candidates, one line each:
+Vanilla's `GetMPCost` (battle_main.asm) prices only magic/lore/summon/x-magic.
+Every other command, including Blitz, SwdTech, Tools and the free
+floor, falls through it returning 0, so the universal charge at
+`CalcAttackEffect` (the `$3a4c` subtract, and its
+insufficient-MP fizzle) never fires for them. `Ot6AbilityCost`
+(`ff6/src/battle/ot6_boost.asm:878`) is the single hook, right after that
+`GetMPCost`: for the costed verbs it swaps the 0 for the
+kit price. Both the charge and the insufficient-MP refusal are
+universal, acting on whatever `$3620`→`$3a4c` holds. The cost
+data is not the record's +$05 byte, because GetMPCost reads the
+character spell-list copy for magic and ignores it for the rest; it is a
+parallel bank-$F0 table `Ot6AbilityCostTbl`, keyed by the id
+already in `$3a7b` (attack id $5d–$64 Blitz, $55–$5c SwdTech;
+tool item id $a3–$aa Tools), in the same shape as the class and
+element tables. Numbers are kits.md's columns.
 
-- **Cost down**: active skills cost −25%, floor 1.
-- **Max MP up**: a +max-MP magnitude in the stat-passive
-  channel magicite.md already defines.
-- **Broken-field regen**: +1–2 MP per turn while any enemy is
-  broken, which supports spending more during the window.
-- **Chip rebate**: a weakness chip restores 1 MP. Quadra Slam's ×4
-  makes this strong, so it likely needs a per-action cap. AutoCrossbow
-  needs one too, for breadth against a wave rather than rate against
-  a boss: it is whole-side, one hit per body, and not multi-hit. See
-  `design/multi-hit.md`.
-- kits.md's *Afterglow* (first cast each battle free) is the
-  same family on the character-passive side.
-
-The WoB roster's passive column (magicite.md) is already full, so
-these either displace listed candidates or go on WoR espers. That is
-the driver's call at M5 data entry.
-
-Adjacent income, active rather than passive: MP-drain verbs
-stay, on Octopath's pattern, where they are balanced by dealing
-little or no damage themselves and appearing on
-only a few characters. Osmose (Shiva, at 8 MP, above) and Rasp (Ramuh)
-sit in the esper pool (magicite.md), and reaching one is a deliberate
-perk that lets a character manage their own resources. The M6
-pass still watches Osmose-cycling next to Facet + Rune Eater.
-
-## Open questions for the driver
-
-1. **Cost display.** Costed verbs need menus that show costs.
-   The magic menu already renders MP columns; the Tools, Blitz,
-   Dance, stable, and Slot menus do not. The menu list
-   machinery exists, since class icons and fold previews already
-   use it, so scope this ca65 work
-   with M4's curated-kit menus. Noted for later polish in the
-   M4/M5 era: the pool's on-screen label can read "SP" for a
-   character who does not yet know any magic, changing to "MP"
-   once the first spell lands (magicite or otherwise). That would be one
-   pool and one mechanic with only the label differing, which tracks the
-   character's growth into magic. Caveat: item and spell
-   descriptions say "MP" universally, so the mismatch for
-   SP-labeled characters should be checked at implementation.
-2. **Enemy-side MP.** Enemies already have MP and spend it in
-   vanilla, and the MP kill stays (bosses-wob.md). Proposal:
-   change nothing, with no shield/MP interaction and no enemy boost.
-   Rasp and Osmose gain value as attack and income
-   against that pool. Observe this rather than redesigning it.
-3. **Does the free floor hold?** Yes. Tools are not
-   consumables: gil buys them once and they are reusable, so MP is their
-   per-use price. Attack/Defend/Item stay free because a
-   character with no legal action is a soft lock, and because
-   Octopath's floor is the model. This is stated as a question
-   so the driver can veto it.
-4. **Refill items.** Tinctures and Ethers are vanilla-scarce.
-   With costed verbs they become an economy control, so stock
-   lists and prices join the M6 tuning surface.
-5. **Terminology.** The pool is MP as in vanilla, break counters are
-   shields, and SP is retired. Older docs
-   still write SP for shield points, including DESIGN.md's break
-   section; that is left for a later touch-up.
-
-## Where it lands
-
-- **M4 — costs and refill.** Vanilla's `GetMPCost`
-  (battle_main.asm) prices only magic/lore/summon/x-magic.
-  Every other command, including Blitz, SwdTech, Tools and the free
-  floor, falls through it returning 0, so the universal charge at
-  `CalcAttackEffect` (the `$3a4c` subtract, and its
-  insufficient-MP fizzle) never fires for them. `Ot6AbilityCost`
-  (`ff6/src/battle/ot6_boost.asm:878`) is the single hook, right after that
-  `GetMPCost`: for the costed verbs it swaps the 0 for the
-  kit price. Both the charge and the insufficient-MP refusal are
-  universal, acting on whatever `$3620`→`$3a4c` holds. The cost
-  data is not the record's +$05 byte, because GetMPCost reads the
-  character spell-list copy for magic and ignores it for the rest; it is a
-  parallel bank-$F0 table `Ot6AbilityCostTbl`, keyed by the id
-  already in `$3a7b` (attack id $5d–$64 Blitz, $55–$5c SwdTech;
-  tool item id $a3–$aa Tools), in the same shape as the class and
-  element tables. Numbers are kits.md's columns.
-  - The whole mechanic gates on the build-time flag
-    `OT6_MP_COSTS`, which defaults ON, so the shipped ROM
-    charges MP. An explicit
-    `-D OT6_MP_COSTS=0` reassembles the pre-feature
-    vanilla-OT6 baseline, with none of the machinery present, kept as the
-    differ-checked regression control (`make -C ff6 ff6-en-nomp`
-    → `ff6-en-nomp.sfc`). The A/B is checked both ways by
-    `tools/tests/battle_mpcost.lua` (self-detecting: charge+refusal
-    on the shipped ON ROM, free+absent on the `nomp` baseline).
-  - Costs and the level-up refill ship together, because costs alone
-    would be attrition without income.
-- **M5 — passives.** The core pair uses the esper passive
-  machinery, and max-MP-up uses the stat channel.
-- **M6 — numbers.** The harness (balance-metrics.md) gains MP
-  lines: per-fight mp_spent / mp_restored / pool fraction at
-  fight end; refill cadence as fights-between-level-ups on the
-  pacing route (the mines_pace rig); mp-zero incidence. First
-  proposed ranges, to be re-proposed after measurement: a trash
-  fight spends ~10–25% of an on-curve pool unboosted; mp-zero
-  never happens on-route at on-curve levels; a refill arrives
-  before ~70% depletion.
+The whole mechanic gates on the build-time flag
+`OT6_MP_COSTS`, which defaults ON, so the shipped ROM
+charges MP. An explicit
+`-D OT6_MP_COSTS=0` reassembles the pre-feature
+vanilla-OT6 baseline, with none of the machinery present, kept as the
+differ-checked regression control (`make -C ff6 ff6-en-nomp`
+→ `ff6-en-nomp.sfc`). The A/B is checked both ways by
+`tools/tests/battle_mpcost.lua` (self-detecting: charge+refusal
+on the shipped ON ROM, free+absent on the `nomp` baseline). Costs and
+the level-up refill ship together, since costs alone would be
+attrition without income.

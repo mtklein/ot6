@@ -1,15 +1,10 @@
 -- shot_mines.lua -- one screenshot of a live mines random-encounter fight at
--- the shipped constants, for eyeball verification (Measurement #5).
---   tools/tests/run.sh tools/tests/shot_mines.lua build/states/shot_mines.log
+-- the shipped constants, for eyeball verification.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/mines_chase.mss.lua"
 
--- knob offsets for the caption, read live from ROM. The bank-$F0 layout
--- drifts: these offsets were once $12 low ($300173/$30033C) and read $6A/$88,
--- which are instruction bytes rather than knob bytes, so a shot taken "at the
--- shipped constants" was captioned with two instruction bytes. They now
--- derive from ff6/rom/ff6-en.dbg at compose time (H.sym), so the caption
--- always shows the real knob and no guard is needed. `& 0x3FFFFF` = snesPrgRom
+-- knob offsets for the caption, read live from ROM, derived from
+-- ff6/rom/ff6-en.dbg at compose time (H.sym). `& 0x3FFFFF` = snesPrgRom
 -- file offset.
 local ROM_HPMUL  = H.sym("Ot6HpMulTbl") & 0x3FFFFF       -- band0 byte
 local ROM_SHIELD = H.sym("Ot6ShieldedMulW") & 0x3FFFFF   -- word, low byte

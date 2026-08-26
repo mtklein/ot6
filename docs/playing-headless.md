@@ -1,55 +1,36 @@
 # Playing the game headlessly
 
-The harness can load a real save, read where the party is, and walk it
-around, so routes toward specific encounters are coordinate-aware
-rather than blind timed button-holds, which desync on any map. This
-tooling is what lets automated tests reach arbitrary points in the
-game for balance measurement.
+The harness loads a real save, reads where the party is, and walks it
+around, so routes are coordinate-aware rather than blind timed
+button-holds. This is what lets automated tests reach arbitrary points in
+the game.
 
-## Save decoupling (manual play vs. repeatable testing)
+## Save decoupling
 
-Two sets of saves, kept in separate directories so a test run cannot
-corrupt manual play:
+Two sets of saves in separate directories, so a test run cannot corrupt
+manual play:
 
-- **Your manual-play save** lives in Mesen's normal profile
-  (`~/Library/Application Support/Mesen2/Saves/ot6.srm`). Tests never
-  read or write it directly.
-- **Repeatable-testing saves** live inside each invocation's unique
-  `build/test-runs/<run>/saves/` directory. Tests run the shared read-only
-  emulator against that invocation's private Mesen config home (selected
-  with `CFFIXED_USER_HOME`), and
-  `tools/tests/lib/pin_test_saves.py` writes that home's `settings.json`
-  with an explicit `SaveDataFolder` override every run, so the two
-  directories cannot share a file even if your Mesen settings later add
-  their own override. `OT6_WORKER=<id>` is only a diagnostic label; it is
-  not an isolation key.
+- **Manual-play save**: Mesen's normal profile
+  (`~/Library/Application Support/Mesen2/Saves/ot6.srm`). Tests never touch
+  it.
+- **Test saves**: each invocation's private `build/test-runs/<run>/saves/`,
+  selected via `CFFIXED_USER_HOME`; `tools/tests/lib/pin_test_saves.py`
+  writes that home's `settings.json` with an explicit `SaveDataFolder`
+  override every run. `OT6_WORKER` is a diagnostic label, not an isolation
+  key.
 
-`run.sh` also wipes `<saves>/*.srm` before every launch: the testrunner
-flushes battery on exit and reloads it next boot, so a stale srm couples
-one run to the next. Tests that need a save inject it explicitly (next
-section); the srm on disk is left-over data.
-
-Copy from your play save into the testing world on demand:
-
-    tools/tests/make_srm_sidecar.sh   # snapshot the live save -> sidecar
-
-This writes `build/states/playthrough_srm.mss.lua`, the front 8 KB of
-your battery save (the vanilla slots) as an embeddable base64 blob.
-It does **not** include the second SRAM bank containing OT6's three
-isolated codex pages and transient page. It's under gitignored `build/`,
-so save data is never committed.
+`run.sh` wipes `<saves>/*.srm` before every launch; tests that need a save
+inject it explicitly. `tools/tests/make_srm_sidecar.sh` snapshots the live
+play save to `build/states/playthrough_srm.mss.lua` (front 8 KB, the
+vanilla slots, as an embeddable base64 blob; the OT6 bank-31 pages are not
+included).
 
 ## Booting a save headless
 
-Headless tests boot SRAM zeroed by construction (the pre-launch srm
-wipe above), so the harness *injects* the save into SRAM at boot and
-drives the title's Continue. In-game saves are pure vanilla-layout data with no
-code dependency, so a sidecar made once keeps loading across ROM
-rebuilds. Savestates (`.mss`) do not: they snapshot RAM+CPU and break
-when code moves.
-
-    tools/tests/probe_srmboot.lua   # inject, Continue, land on the field
-    tools/tests/probe_slots.lua     # survey all three save slots
+Headless boots have SRAM zeroed by construction, so the harness injects the
+save into SRAM at boot and drives the title's Continue. In-game saves are
+pure vanilla-layout data, so a sidecar keeps loading across ROM rebuilds;
+savestates (`.mss`) snapshot RAM+CPU and break when code moves.
 
 The inject idiom (front 8 KB to cpu `$30:6000`):
 
@@ -60,296 +41,153 @@ The inject idiom (front 8 KB to cpu `$30:6000`):
 
 ## Versioned SRAM checkpoints
 
-Durable shortcuts deep into the game use a complete 32 KiB Mesen `.srm`, not
-the legacy 8 KiB sidecar. `tools/tests/checkpoints/post-opera-v1/` contains a small
-manifest and its hashed payload. `sram_checkpoint.py` rejects unknown schemas,
-unsafe payload names, wrong sizes, and hash mismatches before a run starts:
-
-    python3 tools/tests/lib/sram_checkpoint.py validate \
-      tools/tests/checkpoints/post-opera-v1
-
-`run.sh` installs a verified checkpoint by value into the invocation-private
-save folder when `OT6_SRAM_CHECKPOINT` is set. Mesen then takes its ordinary
-cold-load path; no Lua writes SRAM. `gen_vector_entry.lua` drives title
-Continue, validates slot 3's story/codex contract, and then walks the world
-map to the Vector event trigger.
-
-The tracked checkpoint was produced by `gen_post_opera_checkpoint.lua`: it loads
-the `blackjack` tactical fixture, settles the final arrival, crosses and exits
-ALBROOK to normalize the world-menu state (the comment there says "Vector";
-it is the map-323 exit one step east of the checkpoint tile), then uses the
-real in-game Save UI
-to save slot 3. `OT6_CAPTURE_SRM` captures Mesen's complete battery file only
-after emulator shutdown. Its payload and manifest are included in
-`vector_entry`'s content freshness stamp.
-
-To regenerate the payload deliberately:
-
-    OT6_CAPTURE_SRM=tools/tests/checkpoints/post-opera-v1/post-opera.sram \
-      tools/tests/run.sh tools/tests/gen_post_opera_checkpoint.lua
-
-Then update the manifest SHA-256 and validate it before committing. The
-generator plants a nonzero codex marker which must survive the real Save As
-copy and cold Continue, which shows that bank `$31` was preserved rather than
-reinitialized.
+Durable shortcuts deep into the game use a complete 32 KiB Mesen `.srm`:
+`tools/tests/checkpoints/<key>/` holds a manifest plus a hashed payload.
+`sram_checkpoint.py validate <dir>` rejects unknown schemas, unsafe payload
+names, wrong sizes, and hash mismatches. `run.sh` installs a verified
+checkpoint into the invocation-private save folder when
+`OT6_SRAM_CHECKPOINT` is set; Mesen takes its ordinary cold-load path and no
+Lua writes SRAM. To capture a new payload, `OT6_CAPTURE_SRM=<path>` copies
+Mesen's complete battery file after emulator shutdown; update the manifest
+SHA-256 and validate before committing.
 
 ## Field navigation
 
-Addresses (from the vendored disassembly, `src/field/player.asm` /
-`battle.asm` / `event.asm`):
+Addresses (from the vendored disassembly):
 
 | RAM | meaning |
 |---|---|
 | `$086A` / `$086D` | party pixel X / Y (word); **tile = `>> 4`** |
 | `$0869` / `$086C` | sub-pixel X / Y |
-| `$1FC0` / `$1FC1` | party tile X / Y — a lazily-updated *cache*, stale mid-walk |
+| `$1FC0` / `$1FC1` | party tile X / Y — a lazily-updated cache, stale mid-walk |
 | `$1F64` | map index (word) |
 | `$0743` | party facing (0=up 1=right 2=down 3=left) |
 | `$087C` low nibble | party movement type: **2 = user-controlled**, 4 = event-controlled |
-| `$1EB9` bit 7 | **user has no control** (cutscene/event) |
-| `$0084` / `$0059` | map loading / menu opening (`$0059` stays `1` for a whole event-opened menu, e.g. the naming screen) |
-| `$E5`-`$E7` | 24-bit event script PC; **idle = `$CA0000`**, real scripts run in banks `$CA`-`$CC` |
+| `$1EB9` bit 7 | user has no control (cutscene/event) |
+| `$0084` / `$0059` | map loading / menu opening (`$0059` stays `1` for a whole event-opened menu) |
+| `$E5`-`$E7` | 24-bit event script PC; idle = `$CA0000`, real scripts run in banks `$CA`-`$CC` |
 | `$BA` / `$D3` | both `1` = a dialog is open, waiting for a keypress |
 | `$B2` | party z-level (bit 0 upper, bit 1 lower) |
 
-Events can walk the party while `$1EB9`/`$0084`/`$0059` all read normal,
-so the control check tests the movement type and event PC too; that is
-`H.hasControl()`. Two event-PC details both matter:
+Events can walk the party while `$1EB9`/`$0084`/`$0059` all read normal, so
+`H.hasControl()` tests the movement type and event PC too. Two event-PC
+details:
 
-- On maps with ambient NPC activity (a stove flame, a wanderer) the event
-  PC at `$E5`-`$E7` reads `$80xxxx` for one frame at a time, every few
-  frames, forever (measured in Arvis's house: `$800000` one frame in
-  four). `H.eventRunning()` therefore requires the PC to be inside banks
-  `$CA`-`$CC`; treating any non-idle value as "event running" starves
-  every consecutive-calm-frames predicate.
-  The `$80` is not NPC object scripts: those use a separate interpreter
-  with its own pointer in `$2A`/`$2C` (`field/obj.asm:4516`), seeded from
-  event-script ROM, and no field-module write to `$E5`-`$E7` ever sets bank
-  `$80`. The likely explanation is that `$E5`-`$E7` are shared direct-page
-  scratch that 30+ files write, so a non-`$CA` bank means some other
-  subsystem left a pointer there. The true source of `$80` is UNVERIFIED.
-  The bank check is correct either way, so this can confuse a reader but is
-  not a bug.
-- A stood-on **event trigger re-fires every 4 frames**. Once its switch
-  makes it a no-op, the cycle is 3 frames of event (movement type 4) and
-  1 frame of control, forever. Routes must step off a trigger tile (a
-  raw held direction lands in the 1-frame windows) before waiting for
-  calm; no calm predicate can be satisfied while parked on one.
+- On maps with ambient NPC activity the event PC reads `$80xxxx` for one
+  frame at a time, every few frames, forever; `H.eventRunning()` therefore
+  requires the PC to be inside banks `$CA`-`$CC`.
+- A stood-on event trigger re-fires every 4 frames. Once its switch makes
+  it a no-op, the cycle is 3 frames of event and 1 of control, forever;
+  routes must step off a trigger tile before waiting for calm.
 
-Dialog advancing is **edge-triggered**: one held A yields exactly one
-page. Advancing multiple pages takes press-RELEASE-press (4 frames on /
-4 off works).
+Dialog advancing is edge-triggered: one held A yields exactly one page;
+multiple pages take press-release-press (4 on / 4 off).
 
-Harness API (`tools/tests/lib/ot6.lua` for the battle core and the shared
-field-state reads; `tools/tests/lib/ot6_field.lua` for the navigation
-stack -- compose inlines both, so scripts see one `H`):
+Harness API (`tools/tests/lib/ot6.lua` for the battle core and shared
+field reads; `tools/tests/lib/ot6_field.lua` for the navigation stack;
+compose inlines both, so scripts see one `H`):
 
 - `H.fieldX()`, `H.fieldY()`, `H.mapId()` — live position (pixel `>> 4`;
   never navigate on the `$1FC0` cache) / map.
 - `H.tileAligned()` — at rest exactly on a tile: `$0869`, `$086C` and the
-  low 4 bits of both pixel words all zero. Position samples are only
-  valid here — the tile coord flips ~1px into a step moving up/left but
-  only at completion moving down/right.
-- `H.hasControl()` — true only when the party can actually be walked
-  this frame (control bit clear, not loading, not in a menu, movement
-  type 2, event PC idle, no battle loading). Cheap RAM reads only.
-- `H.eventRunning()`, `H.dialogWaiting()` — the event-PC and dialog
-  checks from the table above.
-- `H.canStep(x, y, move)` — true passability for one step, from RAM (next
-  section). `move` is one of the eight: `up right down left` plus
-  `upright downright downleft upleft`.
+  low 4 bits of both pixel words all zero. Position samples are only valid
+  here.
+- `H.hasControl()` — true only when the party can be walked this frame.
+- `H.eventRunning()`, `H.dialogWaiting()` — the checks above.
+- `H.canStep(x, y, move)` — true passability for one step, from RAM.
+  `move` is one of `up right down left upright downright downleft upleft`.
 - `H.movePress(move)` — the button that executes a move (a diagonal is
   pressed `left` or `right`; the tile decides which diagonal).
-- `H.bfsPath(tx, ty [, blockedEdges])` — BFS over `canStep` edges from
-  the party's current tile (z-level tracked along each candidate path);
-  returns a list of move names or nil.
-- `H.navTo(tx, ty, opts)` — BFS-driven walker, below. Targets may be
-  numbers or thunks (resolved each tick, for runtime-known coords).
-- `H.clearBattle(maxFrames, spare)` — win the current fight headlessly:
-  set each present monster's dead-status bit (`$3AA8` bit 0 →
-  `$3EEC` bit 7) and edge-tap A through the victory text. Formations
-  whose species words appear in `spare` are never force-killed; clearing
-  the fight a route exists to reach is a script bug, so it errors.
+- `H.bfsPath(tx, ty [, blockedEdges])` — BFS over `canStep` edges,
+  z-level tracked along each candidate path; returns move names or nil.
+- `H.navTo(tx, ty, opts)` — BFS-driven verified-step walker. Targets may
+  be numbers or thunks.
+- `H.clearBattle(maxFrames, spare)` — win the current fight headlessly by
+  setting each present monster's dead-status bit and edge-tapping A through
+  the victory text; formations in `spare` are never force-killed.
 - `H.advanceStory(pred, maxFrames, opts)` — run through a non-interactive
-  story stretch (long automatic events, intermittent dialogs, scripted
-  battles) until `pred()`: battles are force-killed and edge-tapped,
-  dialogs edge-tapped, everything else gets a neutral pad. A formation
-  in `opts.spare` is a set-piece: never force-killed, hands off for its
-  first 300 frames (A during the load queues player actions that starve
-  the battle event that ends it), then edge-tapped (its battle dialogs
-  stall without A). This is how the esper-zap scene is crossed.
-- `H.navDump()` — one-line navigator state (debugging).
+  story stretch until `pred()`: battles force-killed, dialogs edge-tapped,
+  neutral pad otherwise. A formation in `opts.spare` is a set-piece:
+  hands-off for its first 300 frames, then edge-tapped.
+- `H.navDump()` — one-line navigator state.
 
 ### True passability (the engine's own rules, from RAM)
 
-The collision data is in RAM, so passability is computed rather than
-discovered by trial. From the vendored disassembly (`src/field/map.asm`,
-`player.asm`):
-
 | RAM | meaning |
 |---|---|
-| `$7F0000` | BG1 tilemap, `row*256 + col` (one tile-type byte per position); coordinates wrap at `$86`/`$87`, the map's own size masks, **not** at 256 (`player.asm:1387-1412`) |
+| `$7F0000` | BG1 tilemap, `row*256 + col`; coordinates wrap at the map's own size masks (`$86`/`$87`), not at 256 |
 | `$7E7600[tile]` | tile properties: bits 0/1 z-level, bit 2 bridge, `& 7 == 7` counter/wall, bits 6/7 diagonal movement |
 | `$7E7700[tile]` | directional exit bits: up `$08`, right `$01`, down `$04`, left `$02` |
-| `$7E2000[row*256+col]` | object map; bit 7 **set = free**, clear = an NPC/object stands there |
+| `$7E2000[row*256+col]` | object map; bit 7 set = free, clear = an NPC/object stands there |
 
-`UpdatePlayerMovement` (`player.asm:325`) reads the d-pad and takes one
-of **two** branches, and `H.canStep` ports both.
+`UpdatePlayerMovement` takes one of two branches, and `H.canStep` ports
+both.
 
-#### The cardinal branch (`player.asm:456` → `CheckPlayerMove`)
-
-A step from `cur` toward a direction is allowed iff **all** of:
+A cardinal step from `cur` toward a direction is allowed iff all of:
 
 1. `$7700(cur)` has the direction's exit bit;
 2. `$7600(dst) & 7 ≠ 7` (counter/wall);
 3. the bridge/z rules pass — with `c = $7600(cur)`, `d = $7600(dst)`,
-   `z = $B2`: on a bridge (`c & 4`), upper-z (`z & 1`) forbids
-   `d & 2`, lower-z forbids `d & 1`; off a bridge, `d & 3 == 3` is
-   always allowed, `c & 3 == 3` allows everything *except* a bridge
-   tile, and otherwise `((c&3) XOR 3) & (d&3)` must be zero;
-4. the destination's object-map bit 7 is set (no NPC there — the engine
-   also allows crossing *under* an occupied bridge tile; the port skips
-   that case, conservatively).
+   `z = $B2`: on a bridge (`c & 4`), upper-z forbids `d & 2`, lower-z
+   forbids `d & 1`; off a bridge, `d & 3 == 3` is always allowed,
+   `c & 3 == 3` allows everything except a bridge tile, and otherwise
+   `((c&3) XOR 3) & (d&3)` must be zero;
+4. the destination's object-map bit 7 is set.
 
-Stepping off a non-bridge tile sets the party z-level from that tile's
-z bits, so `bfsPath` carries a z-level along each candidate path rather
-than assuming the live `$B2` stays valid.
+Stepping off a non-bridge tile sets the party z-level from that tile's z
+bits, so `bfsPath` carries a z-level along each candidate path.
 
-#### The diagonal branch (`player.asm:379`)
-
-The engine tests the party's **own** tile before reading the d-pad
-(`player.asm:368-377`). If `$7600(cur) & $c0` is set — and it is not a
-bridge tile the party is standing on the lower z-level of — then a
-**left or right press moves the party diagonally**, one tile in each
-axis. Which diagonal is a property of the tile, not of the press:
+The diagonal branch: the engine tests the party's own tile before the
+d-pad. If `$7600(cur) & $c0` is set (and it is not a bridge tile the party
+stands on the lower z-level of), a left or right press moves diagonally,
+one tile in each axis; which diagonal is a property of the tile:
 
 | `$7600(cur)` bit | right press | left press |
 |---|---|---|
-| bit 7 `$80` (`\` tiles) | down-right (dir `$06`) | up-left (dir `$08`) |
-| bit 6 `$40` (`/` tiles) | up-right (dir `$05`) | down-left (dir `$07`) |
+| bit 7 `$80` (`\` tiles) | down-right | up-left |
+| bit 6 `$40` (`/` tiles) | up-right | down-left |
 
-Bit 7 wins when both are set. The destination test is all there is:
-`$7600(dst)` must carry the **same** diagonal bit and must not be
-exactly `$f7`. This branch consults nothing else: not the exit bits,
-not the counter rule, not the z-level rules, not the object map, and it
-never calls `CheckDoor`. `_c04f8d` (`player.asm:1286`) maps directions
-`$05`–`$08` to exactly those four neighbours, and `CalcObjMoveDir`
-(`obj.asm:5521`) drives both axes at the cardinal rate, so a diagonal
-step costs the same 16 frames as a straight one.
-
-Up and down presses are not handled by this branch at all
-(`player.asm:380`/`:405` test only the right/left bits) and fall through
-to the cardinal path — as does a left/right press whose diagonal
-destination is refused (`:396`, `:400`, `:417`, `:426` all jump into the
-cardinal code). So on a diagonal tile the diagonal is tried first,
-and the cardinal move of the same press happens only when the diagonal
-is refused. That is why `canStep(x, y, "right")` is false where the
-engine would turn a right press into a diagonal.
-
-Every staircase in Figaro Castle is built from these tiles, so a model
-that knows only the cardinal branch reads them as solid wall and splits
-map 55 into regions BFS cannot join.
-
-`probe_canstep.lua` validates both branches against real movement
-(predict, press, compare) — the cardinal one at the mines boot area
-including a blocked press, the diagonal one by sweeping all four presses
-across each tile of the matron's staircase in Figaro and asserting the
-sweep produced a real diagonal, a real cardinal fallback and a real
-refusal. It renders the model's view of the neighborhood as ASCII.
+Bit 7 wins when both are set. The destination must carry the same diagonal
+bit and must not be exactly `$f7`; this branch consults nothing else. Up
+and down presses fall through to the cardinal path, as does a refused
+diagonal. A diagonal step costs the same 16 frames as a straight one.
+`canStep(x, y, "right")` is false where the engine would turn a right press
+into a diagonal. `probe_canstep.lua` validates both branches against real
+movement.
 
 ### Executing a route: navTo
 
-A step is one tile per press (up=−Y, down=+Y, left=−X, right=+X), plus
-the four diagonals above; the engine reads *held* direction bits and
-processes a party action every 4 frames; a walk step is 16 frames
-(1px/frame) and always completes once started. A press turns *and* steps
-in the same action when the step is allowed; a blocked press just turns.
+A step is one tile per press; the engine reads held direction bits and
+processes a party action every 4 frames; a walk step is 16 frames and
+always completes once started. A press turns and steps in the same action
+when the step is allowed; a blocked press just turns.
 
-`H.navTo(tx, ty, opts)` BFS-plans on `canStep` and executes one
-verified step at a time. Each iteration (only when user-controlled and
-tile-aligned): hold the next direction until the tile coord changes,
-release, wait for tile-alignment, and check the landing against the
-plan. A press that never moves the party proves the model wrong for
-that edge (an NPC wandered in, a z quirk): the edge is blocklisted for
-this `navTo` (it persists across re-plans) and the route re-BFSes. Any
-other deviation, such as an event force-move or post-battle drift,
-re-plans from the live position. Along the way it:
-
-- clears random encounters with the force-kill idiom, edge-tapping A
-  through the victory text — but **never** a formation listed in
-  `opts.spare` (the goal fight: pad released, `opts.arrive` sees it);
-- edge-taps A through dialogs (`dialogWaiting`);
-- goes hands-off (neutral pad) for any other control loss and lets the
-  event play out;
-- debounces those three states over 3 consecutive frames first, because
-  the battle/dialog signal bytes live in RAM the field module also
-  writes to, and acting on a one-frame false reading would tap A on the
-  open field.
-
-`opts.arrive` is an extra terminator predicate checked every frame;
-`opts.maxFrames` (default 20000) errors on timeout. Termination:
-`arrive()`, or standing on the target tile user-controlled and
-tile-aligned.
-
-### The Whelk fixture
-
-`gen_whelk_poweron.lua` runs the whole stack deterministically from a
-cold power-on, with no injected save, so it works on a fresh clone. It plays
-the New Game intro and the Narshe gauntlet down to the mines (map 41),
-rides the security-door blast scene, then `navTo(42, 6)` and generates
-`whelk_entry.mss` one tile short of the trigger. The Whelk event
-trigger is the single tile **(42,5)**; stepping onto it tile-aligned
-while user-controlled fires the event, which force-walks the party down,
-shows dialogs `$0B6E` / `$0B6F` (edge-tapped through), and starts the
-Whelk battle. During the fight the formation species words at `$57C0`
-read `0x0100` and `0x0134` — match on those (`$57C0` is battle scratch:
-whatever `RamPowerOnState` filled it with before the first fight — zeros
-under the pinned test profile — and stale words after one, so condition any
-read on `battleLoadStarted()`). The whelk-done event switch is `$1EA6`
-bit `$20`; once set, the trigger is inert — the script asserts it clear
-at boot, then (positive control) takes the one deliberate step onto the
-trigger to prove the fight comes up. Artifacts are byte-identical every
-run (the harness pins power-on RAM and frame rendering; see Runtime
-limits).
-
-### Reaching a balance fixture
-
-The demo entry point is the mech-suit intro: a beam party with no clean
-weakness/break loop, which is unfit for balance numbers. The fastest path
-to a real balance fixture is a **fresh save-point save past the mech-suit
-intro**, into the scenario split, where parties have normal commands and
-enemies have weaknesses. Make it in the GUI, run
-`make_srm_sidecar.sh`, and `metrics_battle.lua` measures it with no
-extra setup.
+`H.navTo(tx, ty, opts)` BFS-plans on `canStep` and executes one verified
+step at a time: hold the direction until the tile coord changes, release,
+wait for alignment, check the landing against the plan. A press that never
+moves the party blocklists that edge for this `navTo` and re-plans; any
+other deviation re-plans from the live position. Along the way it clears
+random encounters with the force-kill idiom (never a formation in
+`opts.spare`), edge-taps dialogs, goes hands-off for other control loss,
+and debounces those states over 3 consecutive frames. `opts.arrive` is an
+extra terminator predicate; `opts.maxFrames` (default 20000) errors on
+timeout.
 
 ## Runtime limits
 
-Two wall-clock caps apply to every headless run, both configured by the
-harness:
+Two wall-clock caps apply to every headless run:
 
-- `run.sh` passes `--timeout=600`. Mesen's testrunner defaults to a
-  **100-second** wall-clock cap; past it the process exits −1 (shell
-  255) with truncated, block-buffered stdout.
+- `run.sh` passes `--timeout` (default 600 s, `OT6_TIMEOUT` overrides;
+  generation edges in the ninja graph run at 1800 s). Past it the process
+  exits −1 with truncated, block-buffered stdout.
 - `pin_test_saves.py` sets `Debug.ScriptWindow.ScriptTimeout = 30`
-  (seconds). This per-Lua-slice watchdog defaults to **1 s** and kills a
-  slow frame callback (a big BFS, for example) under `--testrunner` without
-  reporting anything. The error goes to the script log, which only the GUI
-  script window reads. `--enableStdout` mirrors the *emulator* log, not
-  that one. Script errors are invisible headless, and `print()` is the only
-  channel out, so a test that goes quiet has told you nothing.
+  (seconds), the per-Lua-slice watchdog. Script errors are invisible
+  headless — the error goes to a log only the GUI script window reads —
+  so `print()` is the only channel out, and a test that goes quiet has
+  told you nothing.
 
-`pin_test_saves.py` also pins the test profile for determinism —
-`Snes.RamPowerOnState = "AllZeros"` (FF6 reads RAM it has never written,
-and Mesen's SNES default is `Random`, so runs diverged — three `Random`
-boots give three different WRAM hashes, two `AllZeros` boots are
-byte-identical; the pin is what makes runs bit-stable),
-`Snes.DisableFrameSkipping = true` (frame-skip picks rendered frames by
-host timing, so screenshots and savestate framebuffers varied), and
-`Audio.EnableAudio = false` (inert headless; hygiene). Test profiles
-deliberately diverge from the play profile here: runs are bit-reproducible
-by construction.
-
-Frame budgets (`H.run`'s `maxFrames`) remain the per-script failsafe.
-The whelk power-on generator, for one, plays the entire New Game intro before
-it reaches the mines, which is tens of thousands of frames (its header has
-the phase-by-phase route).
+`pin_test_saves.py` pins the test profile for determinism:
+`Snes.RamPowerOnState = "AllZeros"` (FF6 reads RAM it has never written),
+`Snes.DisableFrameSkipping = true`, `Audio.EnableAudio = false`. Runs are
+bit-reproducible by construction. Frame budgets (`H.run`'s `maxFrames`)
+are the per-script failsafe.

@@ -789,7 +789,7 @@ In `$1A` left and right are normal column movement (`MoveListCursor`,
 
 ## 9. What has been observed running, and what has not
 
-The magic recipe in §8 was executed on 2026-08-11 by `M.fieldCare`'s cast
+The magic recipe in §8 was executed by `M.fieldCare`'s cast
 path and traced frame by frame (`tools/tests/field_healpolicy.lua`, case 3,
 at `zozo_arrival`). The observed `zMenuState` sequence for one Cure, with
 frame counts:
@@ -831,7 +831,7 @@ Still not determined from the source:
   Probe named in §4.
 - **Whether inventory slot 255 is unreachable.** Probe named in §2.2.
 
-The two `MagicProp` questions that used to sit here are answered. Read out
+`MagicProp` fields for the relevant spells, read out
 of `build/ot6.sfc` at `$C46AC0 & $3FFFFF` with a 14-byte stride:
 
 | spell | `+0` targeting | `$20` all-targets | `+3` | outside battle | MP | power |

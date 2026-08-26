@@ -103,7 +103,7 @@ def main(argv):
     union, files = load_union(paths)
     if not files:
         sys.exit("coverage_report: no coverage.cdl bitmaps found under the "
-                 "given path(s) -- run `make coverage` (or a suite with "
+                 "given path(s) -- run the suite with "
                  "OT6_COVERAGE=1 set) first")
 
     def bit(i):

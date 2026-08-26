@@ -1,45 +1,18 @@
--- probe_dismount.lua -- the measurement instrument for getting off the
--- chocobo.  figaro_cleared.mss leaves the party riding one (the submerge
--- scene's `vehicle ... CHOCOBO`), and InitChoco (world/init.asm:402) never
--- writes the on-foot tile registers $E0/$E2 (only InitWorld does, from
--- $1F60, init.asm:758-762), so H.worldX/worldY read 0 and worldNavTo
--- cannot plan a route until the party is on foot.  Everything on tier 2
--- past Figaro depends on undoing that, so it is measured before it is
--- used.
+-- probe_dismount.lua -- measures getting off the chocobo. figaro_cleared.mss
+-- leaves the party riding one, and InitChoco never writes the on-foot tile
+-- registers $E0/$E2 (only InitWorld does, from $1F60), so H.worldX/worldY
+-- read 0 and worldNavTo cannot plan a route until the party is on foot.
 --
--- The dismount, read out of the source and confirmed here frame by frame:
---   * riding, the world module runs MoveVehicle (world/move.asm:361), whose
---     input handler for $20 == 2 is GetChocoInput (world/ctrl.asm:451).  Its
---     last branch, ctrl.asm:562-563, is `lda $05 / bit #$0080 / jsr
---     LandAirship`; $05 is the held-button low byte (bit7 = B) and the
---     test is on the held state rather than an edge, so a multi-frame hold
---     works.
---   * LandAirship (world/init.asm:1823) forks on $20 at :1827 and takes the
---     chocobo branch @93d4 (:1868): it sets `$19 = 3` (the world's exit
---     trigger), sets $1E bit0 to lock input out, zeroes the rotation and
---     speed vars, and converts the vehicle's mode-7 position into a tile
---     pair and stores it at $1F60/$1F61
---     (:1878-1888: `lda $34 / lsr4 / and #$00ff / sta $1f60` then
---     `lda $38 / asl4 / and #$ff00 / clc / adc $1f60 / sta $1f60`).
---   * $19=3 alone does not exit: the world main loop wants bit2
---     (world_start.asm:224-235, `lda $19 / and #$04 / cmp #$04 / bne`).
---     Bit0 instead runs _ee1c56 (move.asm:695), the descent, which lowers
---     altitude $2D each frame and only releases the exit with
---     `$19 = ($19 & $FE) | $04` (:672-677) once the bird is on the ground.
---   * ExitVehicle (init.asm:1596) then plays DismountChocoAnim, and because
---     $19 ~= $FF takes the reload branch: `stz $11fa` (:1616, clearing the
---     vehicle byte) and `jmp ReloadMap` (:1620).  ReloadMap re-dispatches
---     on $11FA & 3 (:118-126), which is now 0, so this time it runs
---     InitWorld, and InitWorld reads $1F60 into $E0/$E2.
--- So hold B and wait out the descent; the party then stands on the tile
--- the bird was over, with the registers the navigator needs.
+-- Holding B triggers LandAirship, which sets $19=3 (the world's exit
+-- trigger), locks input via $1E bit0, and converts the vehicle's mode-7
+-- position into a tile pair stored at $1F60/$1F61. The descent then lowers
+-- altitude each frame and sets $19 bit2 once grounded, at which point
+-- ExitVehicle clears $11FA and reloads the map on foot, and InitWorld reads
+-- $1F60 into $E0/$E2.
 --
 -- The probe also plans (does not walk) the two tier-2 world steps from the
--- landing tile, so a route bug shows up here rather than 10000 frames into
--- gen_kolts: South Figaro's world entrance (86,111) and Mt. Kolts's
--- (102,100), both read out of the WoB's own short-entrance block (map 0 of
--- trigger/short_entrance.dat: (86,111)/(85,112)/(86,112)/(85,113) -> map 75
--- (1,28); (102,100) -> map 95 (14,35)).
+-- landing tile: South Figaro's world entrance (86,111) and Mt. Kolts's
+-- (102,100).
 local H = dofile("tools/tests/lib/ot6.lua")
 local CLEARED = "build/states/figaro_cleared.mss.lua"
 
@@ -73,11 +46,8 @@ H.run({ maxFrames = 12000 }, {
     H.screenshot("dismount_riding")
   end),
 
-  -- ===================================================================== --
-  -- Hold B and watch the state machine: $19 should go 0 -> 3 (LandAirship)
-  -- -> 6 (descent done, bit0 cleared / bit2 set) and then $11FA drop to 0
-  -- as ExitVehicle reloads the map on foot.
-  -- ===================================================================== --
+  -- Hold B and watch the state machine: $19 goes 0 -> 3 -> 6, and then
+  -- $11FA drops to 0 as ExitVehicle reloads the map on foot.
   H.hold({ "b" }),
   H.driveUntil(function() return H.readByte(0x0019) ~= 0 end, 120, {
     H.waitFrames(1),
@@ -92,12 +62,8 @@ H.run({ maxFrames = 12000 }, {
   H.release(),
   H.call(function() snap("vehicle byte cleared") end),
 
-  -- ===================================================================== --
-  -- Settle the way route()'s world step does: control, full brightness and
-  -- alignment, then the 30-frame margin.  (A world module can report
-  -- control on a black screen mid-cutscene; gen_edgar's header documents
-  -- the 5700-frame generation that cost.)
-  -- ===================================================================== --
+  -- Waits for control, full brightness, and alignment, then a margin: a
+  -- world module can report control on a black screen mid-cutscene.
   H.waitUntil(function()
     return H.worldHasControl() and H.worldAligned() and bright() >= 15
   end, 900, "on foot, controllable, lit", 5),
@@ -117,10 +83,8 @@ H.run({ maxFrames = 12000 }, {
     H.screenshot("dismount_onfoot")
   end),
 
-  -- ===================================================================== --
-  -- Plan both tier-2 steps from here.  Planning only: the claim being
-  -- checked is that a path exists.
-  -- ===================================================================== --
+  -- Plans (does not walk) both tier-2 steps: the claim checked is that a
+  -- path exists.
   H.call(function()
     for _, t in ipairs({ { 86, 111, "South Figaro (map 75)" },
                          { 102, 100, "Mt. Kolts (map 95)" } }) do
@@ -132,10 +96,8 @@ H.run({ maxFrames = 12000 }, {
     end
   end),
 
-  -- ===================================================================== --
   -- Positive control: one step, so the check covers the engine moving the
   -- party and not only the register values.
-  -- ===================================================================== --
   H.call(function()
     local p = H.worldBfs(86, 111)
     H.log("first planned step is " .. tostring(p and p[1]))

@@ -2,54 +2,6 @@
 //
 //   mesen_record <MesenCore.dylib> <home_dir> <saves_dir> <rom.sfc> \
 //                <script.lua> <out.avi> <timeout_seconds>
-//
-// Why this program exists.  Mesen 2.1.1's video recorder (ZMBV-in-AVI, with
-// the emulated audio interleaved as PCM) lives in the core and works with no
-// window: VideoRenderer::UpdateFrame calls ProcessAviRecording BEFORE the
-// `if(_renderer)` check (Core/Shared/Video/VideoRenderer.cpp:162-181), and
-// SoundMixer::PlayAudioBuffer feeds the recorder before the audio-device
-// branch, gated only on `isRecording` (Core/Shared/Audio/SoundMixer.cpp:132-140),
-// so neither a rendering device nor an audio device is needed.  What is
-// missing is any way to START it headless: recording is reachable only
-// through the InteropDLL exports AviRecord/AviStop
-// (InteropDLL/RecordApiWrapper.cpp:11-13), which only the C# GUI calls.  The
-// Lua surface has no record function (Core/Debugger/LuaApi.cpp:90-160), the
-// testrunner has no flag for it (UI/Utilities/TestRunner.cs:16-66,
-// UI/Utilities/CommandLineHelper.cs:59-99), and the sandbox's package.loadlib
-// is compiled out (no LUA_USE_DLOPEN anywhere in Mesen2's makefile; the
-// shipped MesenCore.dylib carries loadlib.c's "dynamic libraries not
-// enabled" fallback string).  DYLD injection into the shipped app is blocked
-// by its hardened-runtime signature (flags=0x10000(runtime), and no
-// com.apple.security.cs.allow-dyld-environment-variables entitlement).
-//
-// So this program IS the missing caller: it dlopens the same MesenCore.dylib
-// the shipped app uses and drives the same exported C API in the same order
-// as Mesen's own testrunner (UI/Utilities/TestRunner.cs:16-66 -- InitDll,
-// apply config, InitializeEmu with null handles, Pause, ConsoleMode flag,
-// LoadRom, LoadScript, MaximumSpeed flag, Resume, poll IsRunning), plus one
-// AviRecord call while still paused so frame 0 is on tape.  Passing null
-// window handles takes the exact branch the testrunner takes: no renderer,
-// no sound device, no key manager (InteropDLL/EmuApiWrapper.cpp:80-127).
-//
-// Config.  The real testrunner applies the C# ConfigManager's settings.json;
-// this host has no C# layer, so it applies the harness pins directly through
-// the same SetXxxConfig exports (InteropDLL/ConfigApiWrapper.cpp).  The
-// struct definitions below are copied verbatim (methods dropped -- they do
-// not affect layout) from Mesen 2.1.1's Core/Shared/SettingTypes.h at the
-// cited lines, and a GetMesenVersion() == 0x020101 guard refuses to run
-// against any other core, because a struct passed by value into a dylib
-// whose layout has drifted is silent corruption.  The pins mirror
-// tools/tests/lib/pin_test_saves.py: SnesController on port 0, RamPowerOnState
-// (OT6_RAM_POWERON, default AllZeros), DisableFrameSkipping, ScriptTimeout 30,
-// and the battery-save folder pinned to <saves_dir> -- run.sh passes its
-// invocation-private saves directory, so save isolation holds by construction.
-// Settings the play profile might carry beyond these pins (video filters,
-// equalizers) are output-side only; EmulationConfig defaults match the pins'
-// assumptions (RunAheadFrames = 0, SettingTypes.h:379-386).
-//
-// Exit code: the emu.stop() code, exactly like the real testrunner
-// (0 = steps completed, 1 = Lua error, 2 = frame budget); -1/255 if the ROM
-// or script never finished (timeout), mirroring TestRunner.cs:52-65.
 
 #include <cstdint>
 #include <cstdio>
@@ -62,7 +14,7 @@
 #include <dlfcn.h>
 
 // ---- structs copied from Mesen 2.1.1 Core/Shared/SettingTypes.h ----------
-// (verbatim fields; member functions omitted -- they carry no storage)
+// (verbatim fields; member functions omitted)
 
 // SettingTypes.h:5-15
 enum class EmulationFlags : uint32_t {
@@ -255,9 +207,8 @@ int main(int argc, char** argv) {
   const char* aviPath = argv[6];
   const int timeoutSec = atoi(argv[7]);
 
-  // Line-buffer stdout: Lua print() inside the core writes to this same
-  // stdout, and run.sh reads the log after a kill, so a full buffer must
-  // not hold a verdict hostage.
+  // Line-buffer stdout: Lua print() in the core writes to this same stdout,
+  // which run.sh reads after a kill.
   setvbuf(stdout, nullptr, _IOLBF, 0);
 
   void* dl = dlopen(corePath, RTLD_NOW | RTLD_LOCAL);
@@ -295,12 +246,10 @@ int main(int argc, char** argv) {
     return 2;
   }
 
-  // Same order as Mesen's own testrunner: UI/Utilities/TestRunner.cs:16-66.
   InitDll();
 
-  // The harness pins, applied through the same interop the C# UI uses.
   SnesConfig snes = {};
-  snes.Port1.Type = ControllerType::SnesController;   // pin_test_saves.py #120
+  snes.Port1.Type = ControllerType::SnesController;
   const char* ram = getenv("OT6_RAM_POWERON");
   if (ram && strcmp(ram, "Random") == 0) {
     snes.RamPowerOnState = RamState::Random;
@@ -311,39 +260,22 @@ int main(int argc, char** argv) {
     snes.RamPowerOnState = RamState::AllZeros;        // determinism pin
   }
   snes.DisableFrameSkipping = true;                   // determinism pin
-  // The C# layer's SNES default, which the testrunner therefore applies and
-  // the core's own default (0) does not: crop 7 top / 8 bottom overscan rows
-  // (UI/Config/SnesConfig.cs:45).  This is behavioral, not cosmetic: the
-  // decoded frame size feeds emu.takeScreenshot(), whose PNG byte count
-  // M.screenLooksAlive() thresholds, so a host running uncropped 256x239
-  // played a DIFFERENT run -- gen_vector_entry passed at frame 6202 against
-  // the testrunner's 6029 until this matched.  It also puts the tape at the
-  // same 256x224 geometry the repo's screenshots document.
+  // C#'s SNES default overscan crop (7 top, 8 bottom rows); the core's own
+  // default is 0. The decoded frame size feeds emu.takeScreenshot(), whose
+  // PNG byte count M.screenLooksAlive() thresholds.
   snes.Overscan.Top = 7;
   snes.Overscan.Bottom = 8;
-  // The other C#-default-vs-core-default divergence, and the one that
-  // actually moved a route: the C# layer defaults SpcClockSpeedAdjustment
-  // to 40 (UI/Config/SnesConfig.cs:62) where the core defaults it to 0
-  // (Core/Shared/SettingTypes.h:570), and the SPC clock is derived from it
-  // (_spcSampleRate = 32000 + adjustment, Core/SNES/Spc.cpp:54,126) -- the
-  // 40 maps to real hardware's measured 32040Hz.  At 32000Hz the CPU/SPC
-  // interleaving shifts within the frame (measured: byte-identical WRAM
-  // until the game's own H/V-counter load samples at $0630-$0632 read one
-  // scanline off, ff6/notes/ff3u.asm C0/0153-0172), and gen_vector_entry's
-  // world walk then diverged 173 frames from the testrunner's run.  With
-  // both this and the overscan matched, the recorded run IS the
-  // testrunner's run, frame for frame.
+  // C# defaults SpcClockSpeedAdjustment to 40 (core default is 0); the SPC
+  // sample rate is derived from it (32000 + adjustment).
   snes.SpcClockSpeedAdjustment = 40;
   SetSnesConfig(snes);
 
   DebugConfig dbg = {};
-  dbg.ScriptTimeout = 30;                             // pin_test_saves.py pin
+  dbg.ScriptTimeout = 30;
   SetDebugConfig(dbg);
 
-  // Battery saves pinned to the caller's directory (run.sh passes the
-  // workspace-private saves dir it wipes and materializes checkpoints into),
-  // so a record run cannot touch the play profile's .srm.  Same guarantee
-  // pin_test_saves.py gives testrunner runs via SaveDataFolder.
+  // Battery saves pinned to the caller's directory, so a record run cannot
+  // touch the play profile's .srm.
   PreferencesConfig prefs = {};
   prefs.SaveFolderOverride = savesDir;
   SetPreferences(prefs);
@@ -358,14 +290,12 @@ int main(int argc, char** argv) {
     return 2;
   }
 
-  // Start the tape while still paused, so the AVI's first frame is the
-  // machine's first frame and the frame counter panel can line up 1:1.
-  // An out path of "-" runs everything except the recording itself, which
-  // is what isolates the recorder's frame cost in a measurement.
+  // Starts the tape while still paused, so frame 0 is on tape. An out path
+  // of "-" skips recording.
   if (strcmp(aviPath, "-") != 0) {
     RecordAviOptions opts = {};
     opts.Codec = VideoCodec::ZMBV;
-    opts.CompressionLevel = 6;    // the GUI's default (VideoRecordConfig.cs:13)
+    opts.CompressionLevel = 6;    // GUI default
     opts.RecordSystemHud = false; // nothing may draw over the game frame
     opts.RecordInputHud = false;
     AviRecord(const_cast<char*>(aviPath), opts);
@@ -391,7 +321,7 @@ int main(int argc, char** argv) {
       return 2;
     }
     fclose(f);
-    // name/path/content, scriptId -1 = new script (DebugApiWrapper.cpp:186)
+    // name/path/content, scriptId -1 = new script
     LoadScript(const_cast<char*>(scriptPath), const_cast<char*>(""),
                content.data(), -1);
   }
@@ -399,7 +329,6 @@ int main(int argc, char** argv) {
   SetEmulationFlag(EmulationFlags::MaximumSpeed, true);
   Resume();
 
-  // TestRunner.cs:52-61, with its 100ms poll.
   int result = -1;
   auto start = std::chrono::steady_clock::now();
   while (std::chrono::duration_cast<std::chrono::seconds>(
@@ -411,9 +340,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  // Explicit stop first: it joins the writer thread and finalizes the AVI
-  // index (AviRecorder.cpp:73-85).  The destructor would too, but only on
-  // clean shutdown paths, and we are about to force one.
+  // AviStop joins the writer thread and finalizes the AVI index.
   AviStop();
   Stop();
   Release();

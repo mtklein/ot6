@@ -1,49 +1,18 @@
 -- ot6_field.lua -- the navigation half of the OT6 test library: the true
 -- passability model ported from the engine, BFS pathfinding, and the
 -- verified-step walkers (navTo / worldNavTo / advanceStory / route).
---
--- lib/ot6.lua is the battle core every test uses; this file is what a
--- route needs to walk the game world, and only the gen_* route
--- generators and field probes call it.  It is not a standalone module.
 -- lib/compose.py inlines lib/ot6.lua and then this file into every
--- composed script, so a battle test carries nav code it never calls, and
--- invokes this chunk with the core's module table as its argument (the
--- `local M = ...` below).  Test scripts keep their one-line contract
---
---   local H = dofile("tools/tests/lib/ot6.lua")
---
--- and see one merged H; nothing anywhere references this file's path at
--- runtime.  Everything here installs onto that shared table through the
--- core's public M.* API plus M.seqStep (exported for route()); the shared
--- field-state reads both halves stand on (fieldX/hasControl/formation...)
--- stay in the core because suite battle tests use them too.
---
--- Freshness: a generated route fixture is a function of both halves, so
--- lib/savestate_stamp.sh hashes generator ++ ot6.lua ++ ot6_field.lua
--- (that fixed order) into the signature it stamps beside the fixture.
+-- composed script, invoking this chunk with the core's module table as
+-- its argument (the `local M = ...` below).
 
 local M = ...
 assert(type(M) == "table",
   "ot6_field.lua is inlined by lib/compose.py after lib/ot6.lua and " ..
   "receives the core module table; it cannot be loaded on its own")
 
--- The nav-encounter fallback, formerly the kill-bit (#75, the honesty
--- program's chief cheat).  navTo/worldNavTo/advanceStory reach here when a
--- step draws a random encounter without declaring how to handle it
--- (opts.playBattles).  It used to mark every present monster dead ($3EEC bit
--- 7) and walk on -- a written game state, and the biggest single contaminant
--- in the fixture tree.
---
--- It is gone, and it was gone before it was removed: a serial `make savestates`
--- with this centralised from its seven identical copies and made to log on
--- first fire recorded ZERO fires across all 114 fixtures.  Every step that can
--- draw an encounter already declares playBattles="flee"/"tactical", so the
--- fallback is never reached in generation.  So there is no state to write and
--- nothing to convert: the write is deleted, and the caller's A-tap fallback
--- handles the (never-taken) path.  A step that ever does reach here without
--- declaring playBattles gets a loud warning and is fought by blind A-taps,
--- which shows up as a wipe or a timeout -- the honest signal to declare it,
--- not a silent rig.
+-- navTo/worldNavTo/advanceStory reach here when a step draws a random
+-- encounter without declaring how to handle it (opts.playBattles); it logs
+-- once and the battle is then fought by blind A-taps.
 M._killbitFired = false
 function M.killbit(_slot)
   if not M._killbitFired then
@@ -56,82 +25,16 @@ end
 
 -- How long playBattles="flee" holds L+R before it accepts that this
 -- formation is not going to release the party and fights the battle out
--- instead.  The run mechanic is a per-round roll against level/speed, so a
--- short tail is normal, but holding L+R means standing still while the
--- formation takes free rounds.  Measured 2026-08-09 with this cap at
--- 5400 (90 seconds): a Mt. Kolts cave-97 formation refused to release a
--- full-health party, the flee held for all 5400 frames, the party wiped
--- inside its own escape attempt, and the drive then tapped A through the
--- Game Over and into a brand-new game, reporting eleven maps of intro
--- before the step's budget expired.  1800 frames is 30 seconds, several
--- rounds, long enough for a run that is going to work and short enough
--- that the fallback still has a party to fight with.
--- Navigators accept opts.fleeCap to shorten the cap per route.  Measured
--- 2026-08-09 on the Figaro-cave escape step (LOCKE + CELES, 113+150 hp): a
--- pincer formation (Trilobiter + Primordites, party surrounded) cannot be
--- fled at all, which is FF6's own rule that there is no escape until one
--- side is cleared, so every held frame is free damage, and the full 1800
--- killed the party before the tactical fallback engaged.  A wipe inside
--- the cap also leaves no "flee: no release" line and no fallback log: the
--- battle ends, RandBattle's GameOver holds the event PC, and the step
--- reads as a parked navigator.  A small party on a map with dangerous
--- formations wants a cap of a few hundred frames (two or three failed run
--- rolls) rather than ninety seconds.
+-- instead; 1800 frames is 30 seconds.  Navigators accept opts.fleeCap to
+-- shorten the cap per route.
 M.FLEE_CAP = 1800
 
--- A party wipe must be reported as one.  Twice a wipe has been reported
--- as something else: at Mt. Kolts cave 97 the drive tapped A through the
--- Game Over into a brand-new game and reported eleven maps of intro, and
--- at terra_clifftop a navigator spent sixty thousand frames planning
--- routes from field position (44,1888), a coordinate that only exists
--- because the field module no longer owned that RAM, and failed as "navTo
--- timeout".  Neither log said the party had died.
---
--- The character table at $1600 is the right field check: it is save
--- state, not module-owned scratch, so it survives the battle module, the
--- menu module and the Game Over screen alike.  It is debounced over 300
--- frames because a module handoff can blank things for a moment and a
--- false wipe would be worse than the timeout it replaces.
---
--- $1600 keeps pre-battle HP while a battle runs: the battle module
--- works on its own table at $3BF4 and syncs back at teardown, and a
--- battle that ends in a wipe tears down into the Game Over, where the
--- sync the field check is waiting on never reports a death.  Two steps
--- found this independently and converged on the same battle-side
--- signature (gen_sabin_gau's staging walk, gen_sabin_trench's dive):
--- every party slot whose battle max HP looks plausible, meaning nonzero
--- and under 1000, where a WoB max is a few hundred and module-transition
--- garbage reads tens of thousands, showing zero HP.  M.partyWipedInBattle
--- is that signature lifted into the library; M.partyWiped consults it
--- first, so the navigators' canary names an in-battle wipe instead of
--- pressing buttons into the Game Over.
---
--- A related problem, documented where the shared check lives because the
--- copies are scattered through gens: the ad-hoc per-gen `inBattle()`
--- (read $3BF4 words, skip entries that are 0 or FFFF, first survivor
--- under 10000 decides) cannot see a dead party in battle, because
--- every slot reads 0, every slot is skipped, and the loop falls through
--- to "not in battle".  gen_sabin_trench's ride held LEFT at a Game Over
--- through three full 60000-frame budgets for that reason.
--- Any driver keying on that pattern needs this check beside it.
--- Corrected 2026-08-13: this could never fire, and had not once since it was
--- written.  It opened with M.battleLoadStarted(), which returns false unless
--- some slot has current HP above zero, and then required every sane slot to
--- read zero.  The two conditions contradict each other, so the function that
--- exists to notice a dead party required a live one.
---
--- Measured cost, twice in one day: gen_zozo4_dadaluma reported "timeout
--- driving toward followPath" when the party had been dead for eleven tiles
--- and the remaining 22000 frames were the Game Over event playing out, and
--- gen_sabin_trench held LEFT through three 60000-frame budgets at a Game
--- Over.  Each cost about an hour to attribute.
---
--- The right test is the max-HP table rather than the current-HP one.  A
--- battle's $3C1C reads sane maxima whether or not anybody is standing, so it
--- says "a battle is loaded"; $3BF4 then says who is alive.  Outside a battle
--- both read garbage and the maxima fail the range check, which is what keeps
--- this from firing on the field.  The signature is the one gen_zozo4 proved
--- in place before it was lifted here.
+-- True while a battle is loaded and every party slot with a plausible max HP
+-- ($3c1c, nonzero and under 1000) reads 0 current HP ($3bf4).  $1600 (the
+-- field's own character table, checked by M.partyWiped) never reports a
+-- death that occurs inside a battle: it is synced back from the battle
+-- module's own table only at teardown, and a wipe tears down straight into
+-- the Game Over.
 function M.partyWipedInBattle()
   local sane, alive = 0, 0
   for e = 0, 3 do
@@ -160,38 +63,9 @@ function M.partyWiped()
 end
 
 -- The canary returns true once a wipe has held for 300 frames.  It normally
--- also raises, because for a navigator a wipe is the end of the run and the
--- alternative is pressing buttons into the Game Over until a budget expires.
---
--- `soft` is for the one caller whose whole design is built around losing:
--- a retry ladder rides its own fight out and reloads on a loss, so for that
--- ride a wipe is the expected outcome of an attempt rather than a failed
--- run.  Raising there does not report anything the ladder was not about to
--- report itself; it just stops the ladder at its first rung, which is how
--- gen_vargas came to run one attempt while its header and its step list both
--- said four (measured 2026-08-11 on the v0.10 tip: attempt 1 wiped with
--- VARGAS at 11065/11600 and the run ended there, with no "attempt 2 begins"
--- line anywhere in the log).  A soft canary hands the verdict back to the
--- caller, which still has to decide -- and gen_vargas still fails the run if
--- every attempt loses.
---
--- How far this generalises, checked rather than assumed: gen_vargas is the
--- only one of the ten retry ladders in the tree that was in this position.
--- The ten are the list in the commit that moved them onto H.newSeedLadder --
--- battle_brokendeath, gen_esper_tubes, gen_ifrit_magicite, gen_n128,
--- gen_tunnelarmr, gen_sfigaro, gen_terra_returned_checkpoint, gen_vargas,
--- probe_cranes_water, and M.clearGateSoldier below.  Only three library calls
--- arm this canary (M.navTo, M.worldNavTo and M.advanceStory, its three call
--- sites in this file), and in the other nine every step between an attempt's
--- spread and its verdict is a raw M.driveUntil or M.waitUntil, which do not.
--- Two of them reach a navigator through M.talkToObj, but before the fight
--- rather than after it, and a retry reloads a live-party blob before that
--- step runs, so neither can meet a wiped party.  Three -- gen_sfigaro,
--- gen_n128 and probe_cranes_water -- carry comments saying they avoided
--- advanceStory here deliberately, gen_sfigaro's being "a hard timeout here
--- would abort the whole generate instead of letting the ladder reload and
--- retry".  gen_vargas is the one that reached for the shared ride instead,
--- which is why it is the one that lost its rungs.
+-- also raises, since a wipe is the end of the run.  `soft` hands the verdict
+-- back to the caller instead, for a retry ladder that reloads and retries on
+-- a loss rather than treating it as a failed run.
 local function wipeCanary(tag, soft)
   local n, said = 0, false
   return function()
@@ -212,50 +86,21 @@ local function wipeCanary(tag, soft)
   end
 end
 
--- The corridor flee policy, one driver per navigator call.  The three
--- navigators below used to carry three byte-for-byte copies of it.
---
--- L+R is the engine's own run mechanic.  At the cap the run has failed and
--- the party is only taking damage, so the battle is fought out instead.  The
--- fallback is the tactical driver rather than a blind A-tap, because a party
--- that has already spent the cap being hit needs its own item menu more than
--- it needs a first command row.
---
--- Before the cap there is a shorter answer, because some formations do not
--- roll for the run at all.  $b1 bit 1 is the engine's own can't-run flag:
--- UpdateMonsterGfxBuf clears bits 1-2 every pass and sets bit 1 back on for a
--- pincer ($201f == 2, both sides occupied) or a live $3a42, and bit 2 with it
--- for a harder-to-run monster (battle_main.asm:15630-15641, :15655-15661,
--- :15696-15699).  Cmd_2a checks that bit before anything else and answers
--- "Can't run away!!" (battle_main.asm:5729-5731), so while it is set the run
--- counters can climb past the difficulty forever and nobody leaves.  Holding
--- L+R into that is free damage with no roll behind it, so this reads the flag
--- and hands the fight to the tactical driver while the party still has its HP.
---
--- Measured on the Phantom Train's front strip (2026-08-11, this is the bug
--- that made train_done stop generating): three Bombs pincered the party at
--- 141 (105,8), $b1 read $22 -- bit 1 can't-run plus bit 5, which the pincer
--- sets by falling into the back attack's tail (battle_main.asm:7904-7913) --
--- and across the full 1800 the run counters went 7,9,3 then 20,21,12 against
--- a difficulty of 6 while nobody escaped.  The party entered that fight at
--- 231/197/254 and the fallback inherited it at 22/0/39.
---
--- The periodic line is the measurement that was missing while all of that was
--- happening: "no release after 1800 frames" says the run failed and nothing
--- about why, and "the roll kept losing" and "the engine was never asked to
--- roll" want different fixes.  Every cell in it is the engine's own run
--- machinery:
---   $2f45  characters-are-running, set only while L+R reads as held and
---          nothing is blocking it (btlgfx_main.asm:1609-1621)
+-- The corridor flee policy, one driver per navigator call.  L+R is the
+-- engine's own run mechanic; at the cap the battle is fought out by the
+-- tactical driver instead.  Before the cap, $b1 bit 1 is the engine's own
+-- can't-run flag (set for a pincer or a monster that blocks running); while
+-- it is held, holding L+R is free damage with no roll behind it, so the
+-- fight is handed to the tactical driver early instead.  The periodic log
+-- line reports the engine's own run machinery:
+--   $2f45  characters-are-running (set while L+R is held and unblocked)
 --   $3a3b  run difficulty: 2 per live monster, 6 for a harder-to-run one
---          (battle_main.asm:15642-15667)
 --   $3d70  per-character run counter, +rand(run factor)+1 per check; the
 --          character escapes once it reaches the difficulty
---          (battle_main.asm:15583-15590)
 --   $b1    bit 1 can't-run, bit 2 harder-to-run, bit 5 back attack/pincer
 --   $2f4b  bit 0 the formation's own "no running with L+R"
 --   $7EE9EF / $7E629A  battle time stopped / menus force-closed, either of
---          which suppresses $2f45 outright (btlgfx_main.asm:1611-1613)
+--          which suppresses $2f45 outright
 local CANT_RUN = 0x02           -- $b1 bit 1
 local REFUSAL_FRAMES = 60       -- consecutive frames of it before believing it
 
@@ -309,59 +154,34 @@ end
 -- routes are found by BFS rather than discovered by playing.
 
 -- ----------------------------------------------- true passability model --
--- Port of the engine's own step check.  UpdatePlayerMovement
--- (src/field/player.asm:325) reads the d-pad and takes one of two branches;
--- both are modelled here, because Figaro Castle is built out of the second.
+-- Port of the engine's own step check (UpdatePlayerMovement), which takes
+-- one of two branches.  Tile id at (x,y) is the BG1 tilemap byte at
+-- $7f0000[y*256+x]; its properties are p1 = $7e7600[id] (the party's own
+-- tile prop, kept in $b8) and p2 = $7e7700[id] (directional exits, $b9).
 --
--- Tile id at (x,y) = the BG1 tilemap byte $7f0000[y*256+x]; its properties
--- are p1 = $7e7600[id] (the prop byte the engine keeps for the party's own
--- tile in $b8) and p2 = $7e7700[id] (directional exits, in $b9).
+-- Cardinal branch: a step toward dir is allowed iff p2(cur) has the
+-- direction's exit bit, p1(dst)&7 ~= 7 (not a counter/wall tile), the
+-- bridge/z-level rules pass (party z-level is $b2's low bits, bit0 upper /
+-- bit1 lower), and no object occupies dst ($7e2000[dst] bit7 set means
+-- free).
 --
--- Cardinal branch (@4978, player.asm:456-507 -> CheckPlayerMove @4e16,
--- player.asm:1072).  A step from cur=(x,y) toward dir is allowed iff all of:
---   1. p2(cur) has the direction's exit bit (up=$08 right=$01 down=$04
---      left=$02 -- player.asm DirectionBitTbl:1210);
---   2. p1(dst)&7 ~= 7 (counter/wall tile);
---   3. the bridge/z-level rules pass (below, transcribed branch for
---      branch; party z-level = $b2 low bits, bit0 upper / bit1 lower);
---   4. no object occupies dst: $7e2000[dstY*256+dstX] bit7 set means free
---      (the engine allows crossing under an occupied bridge tile; we skip
---      that special case, which is conservative, and movement-verify
---      covers it).
---
--- Diagonal branch (@48d4, player.asm:379-453).  UpdatePlayerMovement tests
--- the party's own tile first (player.asm:368-377): if p1(cur) & $c0 is set,
--- and the tile is not a bridge tile the party is standing on the lower
--- z-level of, a left or right press moves the party diagonally instead, one
--- tile in each axis.  Which diagonal depends on the tile, not on the press:
---   p1 bit7 ($80), "\" tiles:  right -> down-right (dir $06, :403)
---                              left  -> up-left    (dir $08, :420)
---   p1 bit6 ($40), "/" tiles:  right -> up-right   (dir $05, :394)
---                              left  -> down-left  (dir $07, :429)
--- bit7 wins when both are set (:385 `bmi`, :410 `bpl`).  The only
--- destination tests are that p1(dst) must carry the same diagonal bit and
--- must not be exactly $f7 (:389-393, :399-402, :416-419, :424-428).  The
--- branch consults nothing else: not p2's exit bits, not the counter rule,
--- not the z-level rules, not the object map (it never touches $7e2000 and
--- never calls GetObjMapAdjacent), and it never calls CheckDoor.  The
--- movement direction it stores in $087e is 5..8, and _c04f8d (player.asm
--- :1286) maps those to the four diagonal neighbours; CalcObjMoveDir
--- (obj.asm:5521) then drives both axes at the cardinal rate, so a diagonal
--- step is one tile in x and one in y (ObjMoveRateH/V rows for dir 5..8).
--- Up and down presses are not handled by this branch at all (:380/:405 test
--- only $07 bit0/bit1) and fall through to the cardinal path, as does a
--- left/right press whose diagonal destination fails (:396, :400, :417, :426
--- all jump into @4978).  So on a diagonal tile the diagonal is tried first
--- and the cardinal move of the same press only happens when the diagonal is
--- refused, which is why stepAllowed says "no" to a cardinal left/right that
--- the engine would turn into a diagonal.
+-- Diagonal branch: on a tile with p1 bit6 or bit7 set (and not a bridge
+-- tile the party is on the lower z-level of), a left/right press moves the
+-- party diagonally instead of cardinally, one tile in each axis.  bit7
+-- ("\" tiles) sends right to down-right and left to up-left; bit6 ("/"
+-- tiles) sends right to up-right and left to down-left; bit7 wins if both
+-- are set.  The destination tile must carry the same diagonal bit and must
+-- not be exactly $f7; nothing else is checked (no exit bits, no z-level
+-- rule, no object map).  Up/down presses never take this branch, nor does
+-- a left/right press whose diagonal destination fails -- those fall
+-- through to the cardinal path.  So on a diagonal tile the diagonal is
+-- tried first, and stepAllowed says "no" to a cardinal left/right that the
+-- engine would turn into a diagonal instead.
 --
 -- The four cardinal names double as press names; the four diagonal names
 -- are moves the model plans and verifies but never presses directly.
--- DIRS/DIRIDX stay cardinal: they are the world map's move set too, and the
--- overworld module (ff6/src/world/) has no diagonal branch; its
--- GetPlayerInput tests one passability bit per cardinal direction
--- (move.asm @1ead..@1ff3).  Only the field walks diagonals.
+-- DIRS/DIRIDX stay cardinal: the world map has no diagonal branch, so only
+-- the field walks diagonals.
 local DIRS   = { "up", "right", "down", "left" }
 local DIRIDX = { up = 0, right = 1, down = 2, left = 3 }
 local DIRBIT = { up = 0x08, right = 0x01, down = 0x04, left = 0x02 }
@@ -379,14 +199,10 @@ local PRESS  = { up = "up", right = "right", down = "down", left = "left",
                  upright = "right", downright = "right",
                  downleft = "left", upleft = "left" }
 
--- BG1 tilemap byte for a tile.  The tilemap's row stride is 256 ($7f0000 +
--- row*256 + col: UpdateLocalTiles builds its row pointers as {lo=0,hi=row},
--- player.asm:1385-1399), but the coordinates wrap at the map's own size
--- masks $86/$87, not at 256 (`and $86` / `and $87`, player.asm:1387-1412).
--- Those come from InitScrollClip via ScrollClipTbl = $0f/$1f/$3f/$7f
--- (scroll.asm:298-320, table at :244), so they are never zero and no
--- guard is needed; Figaro's exterior map 55 is $3f/$3f, its interiors
--- $7f/$3f (map_prop.dat record 33*map + 23).
+-- BG1 tilemap byte for a tile.  The tilemap's row stride is 256
+-- ($7f0000 + row*256 + col), but the coordinates wrap at the map's own
+-- size masks $86/$87, not at 256; those masks are never zero, so no
+-- guard is needed.
 function M.maptile(x, y)
   local xm, ym = M.readByte(0x0086), M.readByte(0x0087)
   return M.readByte(0x7F0000 + (y & ym) * 256 + (x & xm))
@@ -472,12 +288,10 @@ end
 -- path (nodes are (x,y,z) triples).  `blockedEdges` (optional, keys from
 -- edgeKey) prunes edges the executor has proven wrong empirically.
 -- `avoid` (optional) is a set of tile keys ((y<<8)|x) BFS must never route
--- through, for tiles that are walkable but must not be stepped on.  The
--- motivating case is a one-way entrance row sitting inside an otherwise
--- ordinary region: map 250's (22..24,34) door into 243, which the I->J
--- circuit crossed by accident while walking somewhere else and could not
--- come back from (issue #31).  The target tile itself is exempt, so a
--- route can still aim at an avoided tile deliberately.
+-- through, for tiles that are walkable but must not be stepped on (a
+-- one-way entrance row inside an otherwise ordinary region).  The target
+-- tile itself is exempt, so a route can still aim at an avoided tile
+-- deliberately.
 -- Returns a list of MOVES names (four cardinals plus the four diagonals a
 -- press turns into on a diagonal tile), or nil (unreachable / >4096 nodes).
 function M.bfsPath(tx, ty, blockedEdges, avoid)
@@ -528,7 +342,7 @@ function M.navReset()
   NAV = { blocked = {}, nblocked = 0, plan = 0, idx = 0, hb = 0 }
 end
 M.navReset()
-function M.navDump()   -- debugging one-liner (kept from the old navigator)
+function M.navDump()   -- debugging one-liner
   return string.format("bfs plan=%d idx=%d blocked=%d",
     NAV.plan or 0, NAV.idx or 0, NAV.nblocked or 0)
 end
@@ -559,101 +373,33 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --   opts.spare     list of formation species words never to clear by a
 --                  flag write
 --   opts.playBattles  clear mid-route battles by real play instead of the
---                  flag write, which means no state writes on this
---                  navigator (issue #75).  Opt-in while unconverted
---                  generators still use the flag write; it costs real ATB
---                  rounds per encounter, so input-driven steps budget more
---                  frames.  Three spellings, with the same contract
+--                  flag write.  Three spellings, with the same contract
 --                  worldNavTo carries:
---                  true    auto-fight by edge-tapped A (the taps that page
---                          the victory text also fight:
---                          A opens the command list, A confirms its first
---                          entry, A takes the default target);
+--                  true    auto-fight by edge-tapped A (opens the command
+--                          list, confirms its first entry, default target);
 --                  "tactical"  read the live command table and use Edgar's
 --                          Tools, Sabin's Blitz, and Fight for everyone else,
---                          with the driver's own item medic line.  Which
---                          Tool is opts.tool (default H.AUTOCROSSBOW); an
---                          area whose shield rows carry no class key wants
---                          the element instead, which for Zozo is
---                          H.BIO_BLASTER.  See newFightDriver's note.
---                            It heals
---                          at opts.healPercent (default 55).  That default
---                          was 35, which was too late: measured on map 98
---                          (Trilium + Tusker + two Cirpius), a party healing
---                          only below a third spent five Fenix Downs on one
---                          step, where healing earlier would have spent
---                          Tonics at fifty gil instead of Fenix Downs at
---                          five hundred;
+--                          with the driver's own item medic line.  Tool is
+--                          opts.tool (default H.AUTOCROSSBOW); heals at
+--                          opts.healPercent (default 55);
 --                  "flee"  hold L+R, the engine's own run mechanic.  A
---                          fled battle does not count as a win, so win-only
---                          rolls (SHADOW's 1/16 post-battle leave,
---                          battle_main.asm:11976) never happen, which is
---                          why the Sabin chain runs.  A formation
---                          that has not released the party after
+--                          formation that has not released the party after
 --                          M.FLEE_CAP consecutive battle frames is fought
---                          out by edge-tapped A instead of hanging the step,
---                          because unrunnable formations exist and a run
---                          that cannot end would only be a timeout;
---                          callers pick fight vs flee per step and say why.
+--                          out by edge-tapped A instead of hanging the step.
 --   opts.calmFrames  consecutive settled frames on the goal tile the
---                  terminator requires (default 16; see ISSUE #22 below)
+--                  terminator requires (default 16)
 --   opts.noPathRetries  BFS-no-path retries, 45 idle frames apart, before
---                  erroring (default 20).  A no-path is often transient:
---                  an NPC standing in a one-tile corridor blocks the
---                  object map exactly while its scene runs (the Figaro
---                  gate guard, measured), and erroring instantly turned
---                  every such scene into a route failure.
+--                  erroring (default 20)
 --
--- ISSUE #22: why the press ends on "moving" and the terminator on "stopped".
--- Both rules used to key on the tile coord changing, and both were wrong for
--- rightward and downward steps.  Measured per frame on map 242 with
--- probe_step2 (party at {57,34}, 1 px/frame):
---
---   f01..f05  py=544  aligned, not moving yet (the press has not latched)
---   f06..f20  py=545..559          walking; tile coord still 34
---   f21       py=560  aligned, tile coord flips to 35: arrival
---   f22..f37  py=561..576          a second tile, which was not asked for
---
--- Moving up or left the coord flips about 1px in, so releasing on the change
--- was always early enough; moving down or right it flips only at completion,
--- which is the same frame the engine re-reads the pad for the next step, and
--- a setPad only reaches the ROM at the next input poll.  So the release
--- landed one poll late and the engine latched another step whenever the tile
--- beyond was passable.  Two consequences, both measured: every
--- rightward/downward step overshot by one tile, and the terminator ("on the
--- tile, controlled, tile-aligned") fired on the single aligned frame at f21,
--- reporting success from a tile the party then walked off.  End to end on
--- vector_sneak: navTo(57,35) returned at (57,35) and the party was at
--- (57,36) sixty frames later.  (The original report's case:
--- navTo(45,38) returned success with the party at (46,38).)
---
--- The fix is the one the v0.6 generators' local tapWalk already proved:
---   * release as soon as the party is moving, on the first frame
---     tileAligned() goes false.  That is direction-independent (it does not
---     care when pixel>>4 happens to flip), speed-independent (map 41 walks
---     ~1.33 px/frame with jitter, map 242 exactly 1), and it is the earliest
---     release that still proves the step committed.
---   * require the party to be stopped rather than aligned for one frame:
---     opts.calmFrames consecutive settled frames on the goal tile.  While
---     walking, tileAligned() is false for 15 of every 16 frames, so a run of
---     16 aligned frames on one tile cannot happen mid-step, which is why
---     tapWalk's terminator counts them.
---
--- "Stopped" is not spelled "hasControl() for 16 frames" because many goal
--- tiles take the party away the instant it lands: a step-on trigger, a map
--- edge, a scene.  gen_mines_chase is the clearest case: (38,8) on the Narshe
--- clifftop fires the guard scene and leaves the party standing on the
--- trigger, which then re-fires every four frames indefinitely, so
--- hasControl() never holds for more than a frame at a time (that
--- generator's own comment says so).  A control-gated run of 16 hangs there
--- until the frame budget.  So stillness is counted on alignment alone,
--- which is the direct measurement of "not walking" and needs no control
--- flag, and control is only used to decide how long a run has to be: with
--- control, calmFrames is arrival; without it, three times that, because
--- something took the party over while it stood on the goal and the flag
--- cannot corroborate the rest.  Battle and dialog frames are excluded from
--- the run, because clearing those is navTo's own job rather than something
--- to terminate in the middle of.
+-- A step is held only until the party starts moving (the first frame
+-- tileAligned() goes false), then released, rather than until the tile
+-- coordinate changes -- the coordinate flips only on the final frame of a
+-- rightward/downward step, one input poll too late, which would overshoot
+-- by a tile.  The terminator requires calmFrames consecutive aligned frames
+-- on the goal tile rather than hasControl(), since some goal tiles retrigger
+-- control loss immediately on arrival (a step-on trigger, a scene); without
+-- control the run required is three times calmFrames.  Battle and dialog
+-- frames are excluded from the run.
 function M.navTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
@@ -677,14 +423,8 @@ function M.navTo(txIn, tyIn, opts)
   -- built for "tactical" and for "flee": the flee branch falls back to it
   -- once M.FLEE_CAP frames pass without the formation releasing the party
   --
-  -- opts.wipeEndsRide: worldNavTo/advanceStory's own convention (see
-  -- wipeCanary's soft/hard split), extended to navTo for the Magitek Factory
-  -- upper-floor crossing (gen_mrf_chute): a #124-shifted RNG chain now rolls
-  -- an unrunnable pincer into that flee gauntlet, and a caller running the
-  -- crossing as a seed-ladder wipe-retry needs a wipe to END this ride so it
-  -- can reload and take a different battle-RNG phase, rather than hard-error
-  -- the whole generate.  Off by default -- every other navTo caller still
-  -- wants the loud failure.
+  -- opts.wipeEndsRide: a party wipe ends this ride instead of raising, for a
+  -- caller whose retry ladder reloads and retries.  Off by default.
   local wipeSeen = false
   local wipeCheck = wipeCanary("navTo", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
@@ -710,7 +450,7 @@ function M.navTo(txIn, tyIn, opts)
     elseif arrive and arrive() then
       done = true
     else
-      -- stopped on the goal tile, not passing through it (see ISSUE #22).
+      -- stopped on the goal tile, not passing through it.
       calm = (M.fieldX() == resolve(txIn) and M.fieldY() == resolve(tyIn)
           and M.tileAligned() and not M.battleLoadStarted()
           and not M.dialogWaiting()) and calm + 1 or 0
@@ -748,13 +488,7 @@ function M.navTo(txIn, tyIn, opts)
         end
         if tactical then tactical.frame(); return end
         -- playBattles=true reaches here: the battle is cleared by blind
-        -- A-taps, with no menu awareness, no items and no flee.  This
-        -- is the branch that walked BANON's escort into a wipe at
-        -- terra_clifftop while its log said "navTo timeout".  It stays
-        -- because unconverted steps still use it, but it logs a warning
-        -- whenever it runs: converted routes want playBattles="flee"
-        -- (corridor encounters) or playBattles="tactical" (fights that
-        -- matter).
+        -- A-taps, with no menu awareness, no items and no flee.
         if opts.playBattles == true and battN % 3600 == 3 then
           M.log('playBattles=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
             'no menus, no items, no flee.  If this step loses parties or ' ..
@@ -785,9 +519,8 @@ function M.navTo(txIn, tyIn, opts)
         return
       end
       -- 4. a step is in flight: hold only until the party is moving (the
-      --    first frame it is off tile-alignment), then release.  See the
-      --    ISSUE #22 block above for why "until the tile coord changes" is
-      --    one input poll too late for right/down.
+      --    first frame it is off tile-alignment), then release -- the tile
+      --    coord changing is one input poll too late for right/down.
       if pend and pend.holding then
         -- the coord test is kept as a backstop rather than the primary rule:
         -- it is the only signal left if a map ever moved a full 16px in one
@@ -889,36 +622,23 @@ end
 -- intermittent dialogs and scripted battles (the esper-scene class).  It is
 -- the companion to navTo for stretches with no walking and no plan; it
 -- keeps the story unstuck until pred() is truthy (checked every frame;
--- raises after maxFrames).  Frames are classified with navTo's 3-frame
--- debounce (the battle/dialog signal bytes live in RAM the field module
--- also writes to; acting on a one-frame ghost would tap A on the open
--- field):
+-- raises after maxFrames).
 --   battle  -> flag-clear everything present + edge-tap A through the text
 --              (with opts.playBattles, no flag write: the same edge-tapped A
---              auto-fights the encounter for real, with no state writes,
---              issue #75, at the price of real ATB rounds).
---              A formation matching opts.spare is a scripted set-piece: it
---              is never cleared by a flag write, is left alone for its
---              first 300 frames, and is edge-tapped after that.  Both
---              halves are needed (measured, esper zap): the set-piece ends
---              via a monster-turn battle event, and A pressed during the
---              load queues player actions that keep the turn engine busy
---              indefinitely, while once the event has taken over (its
---              opening battle dialog is up by ~250 frames), it stalls
---              without A to advance that text;
+--              auto-fights the encounter for real).  A formation matching
+--              opts.spare is a scripted set-piece: never cleared by a flag
+--              write, left alone for its first 300 frames, edge-tapped
+--              after that;
 --   dialog  -> edge-tap A;
---   anything else -> neutral pad.  Control lost means an event is walking
---              the party; control held means the story is between beats.
---              In both cases blind A is worse than waiting: on the open
---              field it talks to NPCs and re-fires triggers.
+--   anything else -> neutral pad.
 function M.advanceStory(pred, maxFrames, opts)
   opts = opts or {}
   local spareSet = {}
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
   local aPhase = 0
   local battN, dlgN = 0, 0
-  -- opts.wipeEndsRide: a wipe ends this ride instead of failing the run, for
-  -- a caller that reloads and tries again.  See wipeCanary's header.
+  -- opts.wipeEndsRide: a wipe ends this ride instead of raising, for a
+  -- caller that reloads and tries again.
   local wipeSeen = false
   local wipeCheck = wipeCanary("advanceStory", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
@@ -960,26 +680,14 @@ function M.advanceStory(pred, maxFrames, opts)
           M.setPad(battN > 300 and aPhase < 4 and { "a" } or {})
           return
         end
-        -- playBattles="flee" used to be accepted here and then ignored: every
-        -- other navigator had a flee branch and this one did not, so a settle
-        -- that rolled an encounter blind-tapped A through a whole fight while
-        -- its caller's header said the route runs from them.  Measured on
-        -- gen_kolts (2026-08-09): the mountain settles fought Cirpius packs
-        -- by tap-A, which is how the party reached VARGAS with TERRA dead and
-        -- EDGAR on 1 hp.  Same contract as navTo's, cap included.
+        -- same contract as navTo's, cap included.
         if opts.playBattles == "flee" then
           flee(battN)
           return
         end
         if tactical then tactical.frame(); return end
         -- playBattles=true reaches here: the battle is cleared by blind
-        -- A-taps, with no menu awareness, no items and no flee.  This
-        -- is the branch that walked BANON's escort into a wipe at
-        -- terra_clifftop while its log said "navTo timeout".  It stays
-        -- because unconverted steps still use it, but it logs a warning
-        -- whenever it runs: converted routes want playBattles="flee"
-        -- (corridor encounters) or playBattles="tactical" (fights that
-        -- matter).
+        -- A-taps, with no menu awareness, no items and no flee.
         if opts.playBattles == true and battN % 3600 == 3 then
           M.log('playBattles=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
             'no menus, no items, no flee.  If this step loses parties or ' ..
@@ -1007,18 +715,14 @@ end
 -- ------------------------------------------------------- world map nav --
 -- The overworld is a separate engine (ff6/src/world/) with its own
 -- position registers and a 1-bit passability rule; every field predicate
--- above is meaningless there.  The world module keeps DP=$0000
--- (world_start.asm has no phd/pld; its menu path reads $e0 plain), so
--- these are absolute zero-page addresses:
+-- above is meaningless there.  The world module keeps DP=$0000, so these
+-- are absolute zero-page addresses:
 --   $E0/$E2  tile x/y, the high bytes of the 16-bit position words at
---            $DF/$E1 (word = tile*256 + fraction; move.asm integrates
---            velocity into them at @1e56)
+--            $DF/$E1 (word = tile*256 + fraction)
 --   $DF/$E1  low bytes = sub-tile fraction; both zero <=> at rest.
 --            Moving down/right the tile byte flips at step completion;
---            moving up/left it borrows through on the first frame (both
---            measured, probe_world step traces), which is the same
---            direction skew as the field, so position samples gate on
---            worldAligned()
+--            moving up/left it borrows through on the first frame, so
+--            position samples gate on worldAligned()
 --   $E3/$E5  16-bit velocity; GetPlayerInput zeroes both every aligned
 --            frame, then sets +-$10 for a held passable direction
 --   $F6     facing 0=up 1=right 2=down 3=left
@@ -1027,21 +731,15 @@ end
 --   $E8     bit0 = menu opening, bit3 = once-per-tile event/battle
 --            latch, bit4 = reload-world (battle return, zone eater)
 --
--- Movement is latched to the step: MovePlayer gates its whole body,
--- input read included, on both fractions being zero (move.asm:834-841),
--- so a begun step always continues to the next tile boundary.  A 4-frame
--- tap was measured carrying the party a full tile with velocity held at
--- $10 for all 16 frames (probe_world).  The executor therefore
--- holds the planned direction whenever it is aligned; releases are
--- never needed mid-step.
+-- Movement is latched to the step: input is gated on both fractions being
+-- zero, so a begun step always continues to the next tile boundary; the
+-- executor holds the planned direction whenever it is aligned, and
+-- releases are never needed mid-step.
 
--- On the world map iff (word $1F64 & $3FF) < 3: the top-level dispatch
--- masks #$03ff (field/reset.asm:66).  Raw compares are wrong there,
--- because entrance/parent records carry flag bits in the high byte (measured
--- $2000 on the world after the Narshe exit; $0200|55 entering Figaro).
+-- On the world map iff (word $1F64 & $3FF) < 3.  Raw compares are wrong
+-- there, because entrance/parent records carry flag bits in the high byte.
 function M.worldMode() return (M.readWord(0x1f64) & 0x3FF) < 3 end
--- which world: 0=WoB 1=WoR 2=Serpent Trench (GetWorldTileProp masks the
--- low byte only, move.asm @21d7)
+-- which world: 0=WoB 1=WoR 2=Serpent Trench
 function M.worldId() return M.readWord(0x1f64) & 0xFF end
 
 function M.worldX() return M.readByte(0x00e0) end
@@ -1069,11 +767,8 @@ end
 
 -- A step onto (x,y) is legal on foot iff bit4 ($0010) of the destination
 -- tile's property word is clear.  The engine checks nothing else: no
--- exit bits, no z-levels, no object map (GetPlayerInput tests this
--- per direction, move.asm @1ead..@1ff3; verified live, where predictions
--- from this rule matched real movement at the Narshe spawn, probe_world).
--- Other bits, informational: $20 forest (legal, sets the hidden flag),
--- $40 random battles enabled here.
+-- exit bits, no z-levels, no object map.  Other bits, informational: $20
+-- forest (legal, sets the hidden flag), $40 random battles enabled here.
 function M.worldPassable(x, y)
   return (M.worldTileProp(x, y) & 0x0010) == 0
 end
@@ -1090,11 +785,7 @@ end
 -- wraps at 256 in both axes.  `blockedEdges` (keys from worldEdgeKey)
 -- prunes edges the executor has proven wrong, same contract as the
 -- field bfsPath.  The node cap is 60000 rather than the field's 4096,
--- because world segments run 60+ tiles (Narshe->Figaro BFS'd 63 steps,
--- probe_world3) and the search disc grows quadratically with them: the
--- I->J crash-site grind is ~117 steps and its disc exceeded the old 20000
--- cap, which returned nil and left worldGrind idling to its frame
--- budget (measured, probe_banquet_stage run 2, 2026-07-28).
+-- since world segments can run over 100 tiles.
 function M.worldBfs(tx, ty, blockedEdges)
   blockedEdges = blockedEdges or {}
   local sx, sy = M.worldX(), M.worldY()
@@ -1133,14 +824,10 @@ end
 -- true when the world engine will accept a step this frame: on the world
 -- map, no world event script ($E7 bit0, which the Figaro/Narshe gate
 -- events run through), not fading out to a field map ($19), and none of
--- $E8's takeover bits: bit0 menu opening, bit5 battle pending/running
--- (set as soon as the encounter roll wins, move.asm's `ora #$20`
--- before BattleZoom, well before battleLoadStarted's HP-table signal,
--- which is what let a battle transition look like a dead edge in
--- gen_figaro run 1), bit4 reload-world (the post-battle fade/init).
+-- $E8's takeover bits: bit0 menu opening, bit5 battle pending/running (set
+-- as soon as the encounter roll wins, well before battleLoadStarted's
+-- HP-table signal), bit4 reload-world (the post-battle fade/init).
 -- battleLoadStarted is still checked for the battle interior itself.
--- ($E9 reads $04 during normal control, measured, so it is
--- deliberately not gated on.)
 function M.worldHasControl()
   return M.worldMode()
      and M.readByte(0x0019) == 0
@@ -1150,68 +837,42 @@ function M.worldHasControl()
 end
 
 -- Walk to world tile (tx,ty): the field navTo's verified-step loop on
--- the world engine.  Differences, each measured (probe_world/3):
+-- the world engine.  Differences:
 --  * hold-through: input is read only at tile boundaries, so the walker
 --    holds the planned direction continuously; a landing is verified
 --    when the fractions return to zero, and only then is the next
 --    direction chosen (re-plan on any mismatch, blocklist an edge whose
 --    press provably never moved us)
---  * battles reload the world: move.asm:916-921 snapshots the tile into
---    $1F60/$1F61 before Battle_ext and world_start.asm:465-482 reruns
---    ReloadMap after.  Measured: flag-write clear, then ~95 frames of
---    fade/init, position and facing restored exactly, danger counter zeroed.
---    The walker clears non-spared battles inline (flag write + edge-A) and
---    stalls until the reload finishes (aligned + full brightness) before
---    planning again
+--  * battles reload the world: the walker clears non-spared battles
+--    inline (flag write + edge-A) and stalls until the reload finishes
+--    (aligned + full brightness) before planning again
 --  * no dialog branch: world triggers run world event scripts, not the
---    field dialog engine; $BA/$D3 are stale field RAM here
+--    field dialog engine
 --   opts.arrive    extra terminator (checked first, every frame)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     formation species words never to clear by a flag write
 --   opts.playBattles  end mid-walk battles by real play instead of the
---                  flag write, with no state writes on this navigator (issue
---                  #75), the same opt-in contract navTo/advanceStory carry.
---                  true    = auto-fight by edge-tapped A (A opens the acting
---                            character's command list, A confirms its first
---                            entry, A takes the default target; the same
---                            taps page the victory text);
+--                  flag write, the same opt-in contract navTo/advanceStory
+--                  carry.
+--                  true    = auto-fight by edge-tapped A;
 --                  "tactical" = read the live command table and use Edgar's
 --                            Tools (opts.tool, default H.AUTOCROSSBOW),
 --                            Sabin's Blitz, and Fight for everyone else;
---                  "flee"  = hold L+R, the engine's own run mechanic.  On a
---                            fixture chain this is often the right
---                            input-driven ending for world encounters,
---                            because it earns no win, so
---                            win-only rolls (SHADOW's 1/16 post-battle
---                            leave, battle_main.asm:11976) never happen.
---                            It times out on unrunnable
---                            formations, so callers pick fight vs flee per
---                            step and say why.  In both cases the
---                            post-battle world reload restores the
+--                  "flee"  = hold L+R, the engine's own run mechanic; times
+--                            out on unrunnable formations.  In both cases
+--                            the post-battle world reload restores the
 --                            pre-battle tile with the danger counter
---                            zeroed (move.asm:916-921 /
---                            world_start.asm:465-482), and the walker
---                            re-plans from it.  Input-driven endings cost
---                            real ATB rounds; budget frames accordingly.
+--                            zeroed, and the walker re-plans from it.
 function M.worldNavTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
   local arrive = opts.arrive
   local spareSet = {}
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
-  -- opts.fleeSpecies: issue #127's Crescent Island grind again -- a set of
-  -- formation species words (M.formationHas's own convention, the same
-  -- $57C0 OT6_SPECIES table every spare list in the tree already keys on)
-  -- to FLEE specifically while otherwise fighting tactically. Baskervor
-  -- ($01D, no elemental weakness, HP750) turned out to be a bad grind
-  -- target -- either wiping the party outright or, per the coordinator's
-  -- read of the reward-scaler knobs, killing off enough characters mid-
-  -- fight that OT6's win-XP split gives the survivors little or nothing --
-  -- while Cephaler ($096, weak bolt, HP420) in the SAME formation pool
-  -- grinds cleanly. `flee` is already built below whenever `tactical` is
-  -- (i.e. for playBattles="tactical" too, not only "flee"), so this reuses
-  -- newFlee's own cap + can't-run/pincer-refusal fallback verbatim with no
-  -- new state writes (the #75 constraint every navigator here keeps).
+  -- opts.fleeSpecies: a set of formation species words (M.formationHas's
+  -- own convention) to FLEE specifically while otherwise fighting
+  -- tactically.  Reuses newFlee's own cap + can't-run/pincer-refusal
+  -- fallback, built below whenever `tactical` is.
   local fleeSet = {}
   for _, w in ipairs(opts.fleeSpecies or {}) do fleeSet[w] = true end
   local blocked, nblocked = {}, 0
@@ -1219,12 +880,8 @@ function M.worldNavTo(txIn, tyIn, opts)
   local pend = nil
   local aPhase = 0
   local battN = 0
-  -- opts.wipeEndsRide: advanceStory's own convention (its header explains
-  -- wipeCanary's soft/hard split in full), extended here for issue #127's
-  -- Crescent Island grind: a caller doing real, RNG-risked world-map
-  -- grinding needs to reload and retry a wipe rather than have it hard-
-  -- error the whole generator run.  Off by default (every other caller of
-  -- worldNavTo in the tree still wants the loud failure).
+  -- opts.wipeEndsRide: a party wipe ends this ride instead of raising, for
+  -- a caller that reloads and retries.  Off by default.
   local wipeSeen = false
   local wipeCheck = wipeCanary("worldNavTo", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
@@ -1276,13 +933,7 @@ function M.worldNavTo(txIn, tyIn, opts)
         end
         if tactical then tactical.frame(); return end
         -- playBattles=true reaches here: the battle is cleared by blind
-        -- A-taps, with no menu awareness, no items and no flee.  This
-        -- is the branch that walked BANON's escort into a wipe at
-        -- terra_clifftop while its log said "navTo timeout".  It stays
-        -- because unconverted steps still use it, but it logs a warning
-        -- whenever it runs: converted routes want playBattles="flee"
-        -- (corridor encounters) or playBattles="tactical" (fights that
-        -- matter).
+        -- A-taps, with no menu awareness, no items and no flee.
         if opts.playBattles == true and battN % 3600 == 3 then
           M.log('playBattles=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
             'no menus, no items, no flee.  If this step loses parties or ' ..
@@ -1340,11 +991,10 @@ function M.worldNavTo(txIn, tyIn, opts)
         end
       end
       -- 6. (re)plan.  If the blocklist made the target unreachable,
-      -- forgive it once and re-search before giving up: world
-      -- corridors run one tile wide (measured at the desert pass), so
-      -- a single falsely-condemned edge there would otherwise be
-      -- unrecoverable, while an edge that is actually dead is re-condemned
-      -- on the next pass.
+      -- forgive it once and re-search before giving up: some world
+      -- corridors run one tile wide, so a single falsely-condemned edge
+      -- there would otherwise be unrecoverable, while an edge that is
+      -- actually dead is re-condemned on the next pass.
       if plan and idx > #plan then plan = nil end
       if not plan then
         plan = M.worldBfs(resolveT(txIn), resolveT(tyIn), blocked)
@@ -1375,35 +1025,21 @@ function M.worldNavTo(txIn, tyIn, opts)
 end
 
 -- --------------------------------------- timed-tilemap (phase) rooms --
--- Some rooms are two complementary tilemaps swapped on an event timer.
--- Basement 2 of the Sealed Gate cave (map 385) swaps every 158 frames
--- once armed, and the reachable set inside either phase is a dead end;
--- the crossing exists only across the swaps.  navTo cannot drive such a
--- room (every edge is legitimately dead half the time and would be
+-- Some rooms are two complementary tilemaps swapped on an event timer,
+-- and the reachable set inside either phase alone is a dead end; the
+-- crossing exists only across the swaps.  navTo cannot drive such a room
+-- (every edge is legitimately dead half the time and would be
 -- condemned), so this walker plans over the union graph instead.
 --
--- The mechanism, measured on map 385 (probe_v07_385win, 2026-07-28; the
--- room's scripts are event_main.asm:44634-44905):
---   * every swap callback rewrites the tilemap before it flips the phase
---     switches (`call _cb2b24` then `switch $01F5=0/$01F6=1`, and the
---     same shape in all four callbacks), so there is a ~13-frame window
---     (fsf 145..157 of the 158 cycle) where the next phase's floor is
---     physically in place while the switches, and the hurt triggers
---     keyed on them, still show the old phase;
---   * a held press into a tile the window just opened is taken by the
---     engine at fsf ~148; the party is mid-step when the switches flip,
---     and mid-step does not fire the stood-on tile's hurt trigger
---     (arrival on the far side runs the destination's trigger in the new
---     phase, where it EventReturns);
---   * hurt tiles are ordinary event-trigger tiles, and a stood-on
---     trigger tile re-enters its script every frame, so hasControl()
---     flickers there and every press here is unconditional (the
---     re-entry-trap escape idiom);
---   * random encounters restore state rather than running a LoadMap: the
---     phase switches and timers survive the battle round-trip (measured,
---     probe_v07_385door), but the dead cycle's half of the tilemap is
---     re-based by map-init, so after a battle the walker re-snapshots
---     and re-plans.
+-- Each swap callback rewrites the tilemap before flipping the phase
+-- switches, so there is a brief window where the next phase's floor is
+-- in place while its hurt triggers still read the old phase; a step taken
+-- during the window lands mid-step when the switches flip and so never
+-- fires the trigger.  Hurt tiles are ordinary event triggers that
+-- re-enter every frame, so every press there is unconditional.  Random
+-- encounters preserve the phase switches and timers across the battle
+-- round-trip but rebase the dead cycle's tilemap, so the walker
+-- re-snapshots and re-plans afterward.
 --
 -- M.phaseWalk(tx, ty, spec) returns a step that walks the party to
 -- (tx,ty) across the swaps.  spec (all fields required unless noted):
@@ -1411,7 +1047,7 @@ end
 --                edges on `b` are the clock (on 385 only the four timer
 --                callbacks touch $01F6, so its edges are the swap
 --                instants; pick the switch with that property)
---   period     = 158            -- measured frames between swaps
+--   period     = 158            -- frames between swaps
 --   region     = { w = 17, h = 16 }
 --   hurt       = { a = {{x,y},...},   -- tiles that hurt while switch a
 --                  b = {{x,y},...},   -- ... while switch b is on
@@ -1462,11 +1098,7 @@ function M.phaseWalk(tx, ty, spec)
   local battN, aPhase = 0, 0
 
   -- Encounters are fled with the shared corridor policy (the same driver
-  -- navTo's playBattles="flee" runs), and a wipe is named a wipe.  This
-  -- branch used to lean on the kill-bit cheat; #75 removed that, which
-  -- silently left any encounter here fought by blind A-taps -- measured
-  -- 2026-08-17 on gate_cave_save, where a Zombone draw during a crossing
-  -- ended in "no clock edge observed" instead of a fight report.
+  -- navTo's playBattles="flee" runs), and a wipe is named a wipe.
   local wipeCheck = wipeCanary("phaseWalk")
   local tactical = M.newFightDriver("phaseWalk",
     { tactical = true, boost = true, items = true,
@@ -1678,8 +1310,6 @@ end
 -- (BFS one step toward any neighbor of the object's live tile), face it,
 -- edge A+direction; plain dialogs advanced with edge-A; stops as soon as
 -- a choice list is up ($056F >= 2) so a blind A can never answer it.
--- Written for the Blackjack party-swap room's random-walking TERRA
--- (probe_v07_g2h, 2026-07-28); nothing in it is specific to her.
 --   objIdx: the NPC's object index ($10 + record order in npc_prop)
 --   opts.done (optional): custom terminator; the default is
 --     "a choice dialog is up and waiting"
@@ -1736,19 +1366,12 @@ function M.chaseTalk(objIdx, maxFrames, what, opts)
 end
 
 -- ------------------------------------------- levers and re-entry escapes --
--- Promoted from gen_vector_crash (2026-07-28, pre-approved in the I->J
--- dispatch) the moment a second step needed both: the banquet's dais is the
--- same face-UP+A trigger class as 384's levers, and its boot/exit tiles are
--- the same stood-on re-entry class as the SavePoint boot.
-
--- The measured lever idiom (probe_v07_384toggle): one 8-frame up+A tap
--- fires the event and the switch flips at the end of it (~70 frames);
--- holding up with A released never re-fires; a second A press on a toggle
--- tile flips it back.  So tap once, hold up, and wait for the flip.
--- Dialogs opened by the event are advanced with edge-A; a battle that
--- fires on the tile is cleared by a flag write (no lever on any route so
--- far draws one, but the branch is kept because unexpected battles have
--- turned up elsewhere).
+-- A lever tile: one 8-frame up+A tap fires the event and the switch flips
+-- at the end of it (~70 frames); holding up with A released never
+-- re-fires; a second A press on a toggle tile flips it back.  So tap
+-- once, hold up, and wait for the flip.  Dialogs opened by the event are
+-- advanced with edge-A; a battle that fires on the tile is cleared by a
+-- flag write.
 function M.tapLever(swId, maxFrames, what)
   local n = 0
   local function swv(id)
@@ -1804,85 +1427,31 @@ end
 
 -- --------------------------------------------------------- field care --
 -- M.fieldCare: open the field menu and revive, cure and heal the party with
--- real presses, then close it again.  No state writes (issue #75); every
--- point of HP this restores is restored by the game's own item code,
--- driven the way a player drives it.  The status pass is CARE_STATUS_CURES
+-- real presses, then close it again.  The status pass is CARE_STATUS_CURES
 -- below, and it is one bit today: poison, because poison is the only status
 -- that walking makes worse.
 --
--- The input-driven routes run from random encounters, and a run costs HP:
--- the party takes a round or two of hits every time the run roll fails.
--- Measured on gen_kolts (2026-08-09), the mountain crossing took
--- TERRA from 94 to 39 and then the map-98 approach took her to 1 and EDGAR
--- from 106 to 1, at which point four played-out VARGAS attempts in a row
--- wiped, while seven Potions and five Tonics sat unused in the bag the
--- whole way.  The route was not too hard; the item menu was never used.
+-- ZMENUSTATE = DP $26, and the shared list cursor is DP $4B.
+-- Item path: $05 main menu (Item row 0) -A-> $08 item list ($4B is the
+-- inventory slot) -A-> $19 slot picked up (A on a different slot swaps
+-- them, A on the same slot uses it) -A-> $70 target select ($4B is the
+-- menu slot 0..3, battle order, moved by up/down only) -A-> item applied,
+-- window stays on $70.  B from $08 lands on the item options window $17,
+-- then $04, then out.  Refusals start the mosaic task, which writes DP $B5
+-- for eight frames without clearing it; the driver watches that byte's
+-- high nibble and drops the plan rather than pressing into a refusal.
 --
--- The UI, measured by probe_fieldheal.lua / probe_fieldcells.lua against a
--- real vargas_entry and cross-read against src/menu (the full citation
--- trail is docs/research/field-care-menu.md):
+-- OT6 restores HP and MP in full on every level up, so MP spent walking a
+-- corridor is refunded by the next level while a Tonic drunk there is gone
+-- for good; casting is therefore tried before the bag.
 --
---   ZMENUSTATE = DP $26, and the shared list cursor is DP $4B.
---   $05 main menu, Item on row 0
---     -A-> $08 the item list itself; there is no options window in front
---          of it, and $4B here is the inventory slot (one column)
---     -A-> $19 "slot picked up".  A on a different slot swaps the two; A on
---          the same slot calls UseItem (field_menu.asm:2331-2336).
---          A first pass tapped A toward $08 and then pressed A again with a
---          moved cursor, which rearranged the bag instead of using
---          anything.
---     -A-> $70 target select: $4B is the menu slot 0..3 (battle order, not
---          party order), moved by up/down only; $69+slot holds that slot's
---          character id, which is how a character maps to a cursor row.
---     -A-> the item is applied and the window stays on $70, so serving a
---          second character with a different item has to back out ($77 ->
---          $08) rather than press on.
---   B from $08 lands on the item options window $17, then $04, then out.
---
---   Refusals are readable.  CheckCanUseItem (item.asm:2243-2330) allows only
---   a Fenix Down on a KO'd target and allows Tonic/Potion only on a living
---   character below full HP; an invalid pick starts the mosaic task, which
---   writes DP $B5 (zMosaic) for eight frames and then stops without clearing
---   it.  This driver watches the high nibble, which is the only part of that
---   cell that goes back to zero, and gives up on the plan instead of
---   pressing A at a window that will never accept it.  See serveFrame.
---
--- ---- casting instead of drinking ----
---
--- Owner, 2026-08-11: *"use tonics.  they're cheap, easy heals.  also early
--- game as we've modded it, healing with magic is pretty economical, given
--- the MP refresh on level up."*
---
--- OT6 restores HP and MP in full on every level up (Ot6LevelUpHeal,
--- ff6/src/battle/ot6_progression.asm:3-6, called from
--- battle_main.asm:16251).  So MP spent walking a corridor is refunded by
--- the next level, while a Tonic drunk in that corridor is gone for good and
--- the Phantom Train's shop is a hard gil budget.  Casting is therefore the
--- cheap move and the bag is the fallback, which is the order this driver
--- picks in.  Cure is 5 MP (MagicProp+5) against pools of 40 to 106 at the
--- fixtures measured, so with the default floor a caster covers six to
--- fifteen heals between level ups.
---
--- The magic path, same sources as above (field-care-menu.md section 5):
---
---   $05 main menu, Skills on row 1
---     -A-> $06 character select: $4B is the menu slot again, and A here
---          copies it into zSelIndex $28, which is how the drive reads back
---          WHO the skills screens are showing (field_menu.asm:644-649)
---     -A-> $0A skills options, Magic on row 1, enabled only when the
---          gate byte $7A reads $20 (field_menu.asm:1091-1104)
---     -A-> $1A the spell list.  $7E9D89+i is the spell id at list index i
---          and $7E9E09+i is its colour; $20 there is the game's own
---          "known, castable outside battle, and the MP is there"
---          (skills.asm:1093-1122), and it is the gate A itself applies
---          (field_menu.asm:2826-2831).  $4B = 2*row + column.
---     -A-> $3B target select, the same cursor as $70.  Left and Right here
---          jump to the all-targets state $3D, so only up and down are used
---          (field_menu.asm:2852-2874).
---     -A-> the spell lands and the window STAYS on $3B, so a second target
---          for the same caster and spell costs nothing but cursor moves.
---          That is why the driver holds a caster until they hit their MP
---          floor rather than spreading the casts around.
+-- Magic path: $05 (Skills row 1) -A-> $06 character select ($4B copies
+-- into zSelIndex $28) -A-> $0A skills options (Magic row 1, enabled only
+-- when gate byte $7A reads $20) -A-> $1A spell list ($4B = 2*row+column;
+-- a spell is castable when its colour byte at $7E9E09+i reads $20) -A->
+-- $3B target select (up/down only) -A-> spell lands, window stays on $3B,
+-- so the driver holds a caster until they hit their MP floor rather than
+-- spreading the casts around.
 --
 -- opts.threshold  heal a living member below this fraction of max HP
 --                 (default 0.55)
@@ -1900,14 +1469,7 @@ end
 -- opts.reserve    { [itemId] = n } -- keep n of that item unspent, so a step
 --                 can hold Potions back for the fight it is walking toward
 -- opts.maxFrames  budget for the whole visit (default 24000)
--- opts.maxTries   plans to attempt before giving up (default 48).  A magic
---                 visit runs more plans than an item one for the same
---                 party, because a Cure restores less than a Potion at
---                 these levels: measured at the battle-70 stop, one Cure
---                 from a level 14 CELES restored 197 HP against a Potion's
---                 246, and a Tonic is a flat 50.  It is still the shorter
---                 visit in frames, because the extra plans stay inside $3B
---                 while each item use pays a full fade round trip.
+-- opts.maxTries   plans to attempt before giving up (default 48)
 -- opts.tag        log prefix
 --
 -- It is a no-op, and does not even open the menu, when nobody needs
@@ -1918,30 +1480,16 @@ end
 -- different question on each: the world module has its own position and
 -- control registers and every field predicate is meaningless there.
 --
--- On the world map that answer is only trustworthy when it holds for a
--- while.  Measured on the overworld (gen_sabin_gau's staging walk,
--- 2026-08-09): the close drive's exit read one satisfying frame
--- mid-handoff, logging "back to the field satisfied after 58 frames",
--- while the main menu was still open behind it (ZMENUSTATE=05), because
--- the world control/alignment registers held stale-live values during the
--- menu module's teardown.  The caller's walk then parked against an open
--- menu for its whole budget at every care stop, until it gained its own
--- B-tap recovery.  So the world close is debounced: its condition must
--- hold 30 consecutive frames before the close is believed, which a
--- stale-live coincidence cannot survive.
---
--- The debounce is world-mode only, because only the world close was
--- broken.  On a field map hasControl() already reads false for the
--- entire menu lifetime and becomes true only once the field module is
--- back (measured: the pre-dive close sampled ctl=false
--- straight through the menu, then ctl=true stable), so the field exit
--- is correct on the first true frame and needs no wait.  Forcing 30
--- consecutive true frames there hangs it instead: every B tap the close
--- driver sends to shut the menu drops control for that frame, and
--- 4-of-12 tapping never leaves 30 clean frames in a row (measured:
--- 2400-frame timeout with ctl=true on every heartbeat).  careClose()
--- below carries that split; careBackOnMap() is the raw predicate it and
--- the setRows first stage build on.
+-- On the world map the world control/alignment registers can hold
+-- stale-live values during the menu module's teardown, so a single
+-- satisfying frame can be a coincidence mid-handoff; the world close is
+-- therefore debounced, requiring 30 consecutive frames before it is
+-- believed.  On a field map hasControl() reads false for the entire menu
+-- lifetime and becomes true only once the field module is back, so the
+-- first true frame is correct there and debouncing it would hang instead
+-- (every B tap the close driver sends drops control for that frame).
+-- careClose() below carries that split; careBackOnMap() is the raw
+-- predicate it and the setRows first stage build on.
 local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
 local CARE_SEL, CARE_MAGIC_SEL = 0x28, 0x99   -- zSelIndex, chosen list index
 local CARE_MAGIC_GATE = 0x7a                  -- zSkillsTextColor[1] = Magic
@@ -1949,60 +1497,19 @@ local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
 local CARE_ANTIDOTE, CARE_SOFT, CARE_REMEDY = 0xF2, 0xF4, 0xF5
 local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 
--- ---- clearing a status, when a fixture proves the route needs it ----
+-- ---- clearing a status ----
 --
--- Status 1 is `weicmpzd` (ff6/notes/field-ram.txt:900-907): $80 wound, $40
--- petrify, $20 imp, $10 clear, $08 magitek, $04 poison, $02 zombie, $01
--- dark.  Five of those bits have a bag item that clears them, and
--- CheckCanUseItem accepts each item only on a target actually carrying its
--- bit (item.asm:2243-2323): Soft on petrify, Green Cherry on imp, Antidote
--- on poison, Revivify on zombie, Eyedrop on dark, Remedy on any of
--- petrify/imp/poison/dark at once.  The antidote arm is :2318-2322, and it
--- is `and #$04 / beq invalid`, so an Antidote offered to a character who is
--- not poisoned is refused rather than wasted.
+-- Status byte 1: $80 wound, $40 petrify, $20 imp, $10 clear, $08 magitek,
+-- $04 poison, $02 zombie, $01 dark.  Soft clears petrify, Green Cherry
+-- imp, Antidote poison, Revivify zombie, Eyedrop dark, Remedy any of
+-- petrify/imp/poison/dark at once; each item is refused on a target not
+-- carrying its bit.  Poison is the only status that walking makes worse
+-- (it drains max HP/32 every step, floored at 1).
 --
--- Poison was the first row in this table, because it is the only status that
--- walking makes worse.  DoPoisonDmg drains max HP/32
--- from every poisoned character on every step and floors the result at 1
--- (`ff6/src/field/player.asm:593-613`), so a character who leaves a fight
--- poisoned arrives at the end of any walk of length at exactly 1 HP,
--- whatever they had when the fight ended.  That is what banon_joined and
--- lete_river were: TERRA at 1 of 136 after five crossings of a hideout that
--- cannot draw an encounter at all.  Every other curable bit is a combat
--- handicap that costs nothing to carry down a corridor.
---
--- Adding one is one row here, and the drive needs no other change -- the
--- item path already routes $05 -> $08 -> $19 -> $70 for any item id, and
--- the landing check below watches the status byte as well as the bag count,
--- which is the only signal a cure that restores no HP produces.  What is
--- missing for the other four is a fixture that carries the status, so a row
--- for them would be a path nothing in the tree has ever run.  Petrify earned
--- its row on 2026-08-13: a forced Phantom Train corridor fight left SHADOW
--- petrified, the boss was then broken and beaten cleanly, and train_done
--- correctly refused to ship a stone party member.  The South Figaro
--- provision stop now carries Soft for that journey, so fieldCare uses the
--- ordinary item when the bit is present and otherwise leaves it in the bag.
---
--- A row carries an ORDERED list of items rather than one, tried in order and
--- skipped when the bag has none of that one.  The Antidote is first because
--- it is the cheap single-purpose answer; the Remedy is the fallback, and its
--- arm does accept a poisoned target -- `and #$65` isolates petrify, imp,
--- poison and dark (ff6/src/menu/item.asm:2311-2315).  Without the fallback a
--- party holding Remedies and no Antidote carries the bit for the rest of the
--- route, and that is measured rather than hypothetical: CELES took poison in
--- the first fight of gen_zozo2_arrival's crossing on 2026-08-13 with two
--- Remedies and no Antidote in the bag, and all twelve care stops after it
--- spent a Cure undoing damage the bit immediately redid.
---
--- HOW FAR THIS HAS BEEN WATCHED.  The declining half is measured three
--- times: with the bit set and nothing in the bag that clears it,
--- pickStatusCure returns nil and the visit logs `status1 04 -> 04` beside
--- each Tonic it spends, at gen_kolts's stop before VARGAS and at both of
--- gen_returner's.  The succeeding half -- bit set, a cure in the bag, bit
--- cleared -- was unwatched until 2026-08-13, because poison is a rare draw:
--- it landed once in a full chain regeneration and then not at all in eleven
--- targeted re-runs of the two generators that fight the formations which
--- apply it.  The Zozo crossing is the run that finally carried it.
+-- Each row is an ORDERED list of items, tried in order and skipped when
+-- the bag has none of that one: the single-purpose item first, Remedy as
+-- the fallback, since without it a party holding Remedies and no Antidote
+-- would carry the bit for the rest of the route.
 local CARE_STATUS_CURES = {
   { bit = 0x40, items = { CARE_SOFT, CARE_REMEDY }, what = "petrify" },
   { bit = 0x04, items = { CARE_ANTIDOTE, CARE_REMEDY }, what = "poison" },
@@ -2012,10 +1519,9 @@ local MAGIC_LIST, MAGIC_COLOUR = 0x7E9D89, 0x7E9E09
 -- The menu screens the drive can be parked on.  Every other value of $26 is
 -- a fade ($00/$01/$02) or a one-frame init ($03/$04/$07/$09/$3A/$3C/$6F/$77)
 -- that resolves on its own, and pressing anything during one is how a drive
--- loses a button (field-care-menu.md section 6, trap 1).  Two things read
--- this: the router presses B on any screen that is not on the current
--- plan's path, and the close predicate treats "not on any of these" as the
--- menu no longer being up.
+-- loses a button.  Two things read this: the router presses B on any
+-- screen that is not on the current plan's path, and the close predicate
+-- treats "not on any of these" as the menu no longer being up.
 local CARE_SCREENS = {
   [0x05] = "main", [0x06] = "char select", [0x08] = "item list",
   [0x0A] = "skills", [0x17] = "item options", [0x18] = "rare items",
@@ -2064,28 +1570,9 @@ function M.charHp(c) return M.readWord(0x1600 + 37 * c + 9) end
 
 -- M.calcMaxHpMp: unpack one of the two `bbnnnnnn nnnnnnnn` words in a
 -- character record into the effective maximum the menu draws and every
--- can-I-use-this check compares against.  The top two bits are a boost code
--- and the rest is the base.
---
--- CalcMaxHPMP (menu_common.asm:2376-2413) is a four-entry jump table whose
--- arms fall through each other, so the percentages are not in table order:
---
---   MaxHPMP_00 (:2398) clr_a, then falls through all three shifts -> +0
---   MaxHPMP_03 (:2400) lsr, lsr, lsr, adc base                    -> +12.5%
---   MaxHPMP_01 (:2402) lsr, lsr, adc base                         -> +25%
---   MaxHPMP_02 (:2404) lsr, adc base                              -> +50%
---
--- so code 2 is the 50% boost and code 3 is the 12.5% one.  This function
--- had those two swapped, matching neither the source nor
--- research/field-care-menu.md section 4; it is latent rather than observed,
--- because every World of Balance roster dumped so far reads a bare base
--- with no boost bits set, so no fixture has ever taken the wrong branch.
--- M.calcMaxHpMp is exported separately from the two readers so the unpack
--- can be checked against literal words without a fixture that sets a boost
--- (probe_healpolicy.lua).
---
--- `cap` is ValidateMaxHP's 9999 or ValidateMaxMP's 999
--- (menu_common.asm:2424-2447).
+-- can-I-use-this check compares against.  The top two bits are a boost
+-- code (0 +0%, 1 +25%, 2 +50%, 3 +12.5%) and the rest is the base.
+-- `cap` is 9999 for max HP, 999 for max MP.
 function M.calcMaxHpMp(w, cap)
   local base, code = w & 0x3fff, w >> 14
   local add = ({ [0] = 0, [1] = base // 4, [2] = base // 2,
@@ -2116,8 +1603,8 @@ function M.charStatus1(c) return M.readByte(0x1600 + 37 * c + 20) end
 function M.charActor(c) return M.readByte(0x1600 + 37 * c) end
 
 -- Can this character cast the spell from the field Magic menu?  $FF in the
--- learned table is permanent knowledge; #96 also makes an equipped esper's
--- GenjuProp spell ids live while worn, matching the battle list.  Read both
+-- learned table is permanent knowledge; an equipped esper's GenjuProp
+-- spell ids are also live while worn, matching the battle list.  Read both
 -- sources exactly as the game does so fieldCare will spend that granted MP
 -- before drinking from the bag.  Unequipping removes the second source and
 -- never writes the first.
@@ -2135,14 +1622,11 @@ function M.knowsSpell(c, spell)
   return false
 end
 
--- MP cost of a spell, read from the ROM's own table.  The field menu prices
--- a spell at MagicProp+5 with no OT6 hook in the path (_c3510d,
--- skills.asm:1056-1060), then halves it for a Gold Hairpin ($11D7 bit $20)
--- or flattens it to 1 for an Economizer (bit $40), skills.asm:1078-1090.
--- Those two relics are not modelled here, so this over-states the price for
--- a character wearing one, which errs toward drinking a Tonic when a cast
--- would have been free.  The in-menu gate below ($7E9E09 == $20) is the
--- game's own answer and catches the difference where it matters.
+-- MP cost of a spell, read from the ROM's own table (MagicProp+5).  The
+-- field menu halves it for a Gold Hairpin or flattens it to 1 for an
+-- Economizer; those two relics are not modelled here, so this over-states
+-- the price for a character wearing one, which errs toward drinking a
+-- Tonic when a cast would have been free.
 function M.spellMpCost(spell)
   return M.readRomByte((M.sym("MagicProp") & 0x3fffff) + 14 * spell + 5)
 end
@@ -2156,64 +1640,23 @@ function M.partyMembers()
 end
 
 -- ------------------------------------------------- the exit contract ------
--- Why this is a shared helper rather than four hand-written loops.
---
--- returner_hideout shipped with TERRA at 0/136 and LOCKE at 0/168 and five
--- Fenix Downs unused in the bag.  Two steps later Banon's speech cut the
--- party down to TERRA alone, so a hideout with no encounters in it produced
--- a party wipe, and the wipe was investigated as a bug in the hideout.  A
--- generator that ships a casualty is not saving the story getting
--- somewhere; it is saving the route losing on the way, and every step that
--- boots from that fixture inherits the loss.
---
--- tools/audit_party_hp.py is the tree-wide net for this and it is the same
--- three conditions, deliberately: the net only catches a bad fixture after
--- a `make savestates` measured in hours, while this fails the generator at
--- the moment it was about to save.  If you change one, change the other, or
--- a generator will pass its own exit contract and fail the audit.
---
+-- A party member is "standing" (fit to ship in a saved fixture) when:
 --   dead:       HP 0, or wound in status 1
 --   petrified
---   or zombie:  the other two bits of $C2, which is the mask the game
---               itself applies when it asks whether a character can be
---               healed (CheckCanUseItem, item.asm:2249-2258) or picked for
---               Skills (CheckSkillValid, field_menu.asm:722-731).  A
---               petrified character is not dead and a Fenix Down will not
---               raise them either
---   near fatal: HP at or below max HP / 8, which is the game's own
---               arithmetic and not a number chosen here: `lda $3c1c,y`
---               (max HP), `lsr3`, `cmp $3bf4,y` (current HP), and near
---               fatal goes into the status-to-set when the carry says
---               max/8 >= current (battle_main.asm:11544-11549)
---   poisoned:   $04 in status 1, which is a casualty in slow motion rather
---               than a handicap.  DoPoisonDmg drains max HP/32 from
---               every poisoned character on every step and floors the result
---               at 1 (ff6/src/field/player.asm:593-613), so the walk itself
---               converts the bit into 1 HP and then holds it there.  A
---               fixture that ships poison is a fixture that will hand the
---               next generator a character the next encounter has already
---               claimed, whatever HP the record reads today.  Measured:
---               banon_joined and lete_river shipped TERRA at 1 of 136 with
---               status 04, and the near-fatal clause above is what caught
---               them -- at the end, after the grind, rather than at the
---               fight that applied the bit.
---
--- Near fatal rather than dead-only because a member at 15 of 231 is a
--- casualty the next random encounter has already collected.  Near fatal
--- rather than something stricter because a bar that fires on ordinary wear
--- gets waived away; audit_party_hp.py's header carries the measurement that
--- put the line there.
---
--- This is the FLOOR, not the readiness bar.  A generator walking into a
--- known fight should assert more than this and several do: gen_kolts and
--- gen_returner require half HP at their exits, and gen_kolts additionally
--- rations TERRA's MP to what VARGAS needs.  Passing this helper only means
--- the fixture is not a casualty report.
+--   or zombie:  the other two bits of $C2, the mask the game itself
+--               applies when it asks whether a character can be healed or
+--               picked for Skills
+--   near fatal: HP at or below max HP / 8, the game's own threshold for
+--               setting near-fatal status
+--   poisoned:   $04 in status 1; DoPoisonDmg drains max HP/32 every step,
+--               floored at 1, so a poisoned character arrives at any walk's
+--               end at 1 HP regardless of what the record reads now
+-- This is the FLOOR, not a readiness bar; some generators assert more
+-- (e.g. half HP at their exits).
 -- $C6, not $C2: the game's own can-be-healed mask is $C2 (wound, petrify,
--- zombie) and stays $C2 everywhere this file asks the game's own question,
--- because the menu serves a poisoned character perfectly well.  The exit
--- contract asks a different question -- is this fixture safe to hand down --
--- and poison fails that one.
+-- zombie), and stays $C2 everywhere this file asks the game's own
+-- question, because the menu serves a poisoned character perfectly well.
+-- The exit contract asks a different question and poison fails it.
 function M.standing(c)
   local hp, mx = M.charHp(c), M.charMaxHp(c)
   return hp > 0 and (M.charStatus1(c) & 0xC6) == 0 and hp > (mx >> 3)
@@ -2256,18 +1699,16 @@ function M.chestOpen(bit)
   return (M.readByte(0x1E40 + (bit >> 3)) & (1 << (bit & 7))) ~= 0
 end
 
--- M.openChest: open one treasure chest through the real field interaction,
--- the #84 chest rule's pickup idiom (owner: if a chest is visible on the
--- screen, a human walks over and opens it).  navTo the stand tile, face the
--- chest (a short held press against its solid tile turns without stepping),
--- edge-A until the "Received!" dialog answers (the same clean-edge rule
--- gen_zozo5's talk() measured: CheckNPCs starves under held directions),
+-- M.openChest: open one treasure chest through the real field interaction.
+-- navTo the stand tile, face the chest (a short held press against its
+-- solid tile turns without stepping), edge-A until the "Received!" dialog
+-- answers (held directions starve CheckNPCs, so edge presses only),
 -- dismiss it, and assert the game's own record -- the treasure bit.
 --
 -- Idempotent on the bit: duplicate map copies share one bit and different
--- contents (the audit's known trap), so a chest already opened -- including
--- its twin on a copy map -- is a logged no-op rather than a timeout against
--- a chest that will never answer.
+-- contents, so a chest already opened -- including its twin on a copy map
+-- -- is a logged no-op rather than a timeout against a chest that will
+-- never answer.
 --
 --   H.openChest{ stand = {65,29}, face = "up", bit = 11,
 --                what = "Fenix Down", item = 0xF0,     -- item: optional
@@ -2282,14 +1723,9 @@ function M.openChest(o)
   local nav = { maxFrames = 15000, playBattles = "tactical" }
   for k, v in pairs(o.nav or {}) do nav[k] = v end
   -- The turn is closed-loop: hold the direction until the facing byte
-  -- ($087F,y) reads back the wanted value, the rule gen_edgar's talkTo
-  -- measured (a short fixed press can fail to set the byte at all).  This
-  -- used to be a fixed 8-frame hold, and that shipped a measured failure:
-  -- gen_banon's map-109 pot at (26,21), approached rightward onto (26,22),
-  -- tapped A for 6000 frames with the turn never taken, while a probe on the
-  -- same tile that held UP until $087F read 0 opened it first try
-  -- (probe_banon_chests, 2026-08-17).  The facing tile is the chest, which
-  -- is solid, so the held direction can press but never step.
+  -- ($087F,y) reads back the wanted value (a short fixed press can fail to
+  -- set the byte at all).  The facing tile is the chest, which is solid,
+  -- so the held direction can press but never step.
   local FACE_VAL = { up = 0, right = 1, down = 2, left = 3 }
   return M.cond(function()
     if M.chestOpen(o.bit) then
@@ -2310,15 +1746,11 @@ function M.openChest(o)
     }, tag .. ": faced " .. o.face),
     M.release(), M.waitFrames(4),
     -- The answer is the BIT, not the dialog.  CheckTreasure sets the
-    -- treasure bit and gives the item BEFORE it launches the
-    -- "Received!" dialog event (player.asm:4c06-4cac), and an A press
-    -- still held when that dialog opens confirms it the same frame it
-    -- appears -- this loop's own 4-on/8-off cadence can flash the
-    -- dialog through faster than any per-frame dialogWaiting() sample
-    -- can see it (measured on gen_banon's map-109 pot, v0.14: the pot
-    -- opened on the first tap, sfx and item and bit all landed, and
-    -- 6000 frames of "wait for the dialog" then timed out against a
-    -- chest that had already answered).  So accept either signal.
+    -- treasure bit and gives the item BEFORE it launches the "Received!"
+    -- dialog event, and an A press still held when that dialog opens
+    -- confirms it the same frame it appears -- this loop's own 4-on/8-off
+    -- cadence can flash the dialog through faster than any per-frame
+    -- dialogWaiting() sample can see it.  So accept either signal.
     M.driveUntil(function()
       return M.dialogWaiting() or M.chestOpen(o.bit)
     end, 6000, {
@@ -2330,9 +1762,7 @@ function M.openChest(o)
     -- The bit lands BEFORE the dialog event launches, so when the
     -- bit ended the wait above, the Received! window may still be a
     -- few frames out.  Linger at least 90 frames, dismissing whatever
-    -- appears -- returning with a dialog pending starves the next
-    -- step (measured: gen_sfigaro's care menu timed out against the
-    -- Tonic chest's late dialog).
+    -- appears -- returning with a dialog pending starves the next step.
     (function()
       local dt = 0
       return M.driveUntil(function()
@@ -2361,27 +1791,20 @@ end
 
 -- M.buyItem: buy `qtyFn()` more of shop row `row`, closed-loop,
 -- with the shop already open at its options window (menu state $25).
--- Promoted from gen_sabin_train/gen_sabin_gau, where two identical
--- copies had each arrived at these rules:
 --
---  * The list cursor row is MoveCursor's own cell (DP $4E,
---    menu_common.asm:1318) and the quantity is zSelIndex (DP $28,
---    menu_ram.inc).  Both are read and steered, never press-counted,
---    because menu direction holds auto-repeat: a counted 4-frame hold
---    measurably bought 25 Tonics instead of 14 and parked the next lap
---    on the wrong row.  Widget deltas (shop.asm MenuState_27): right +1,
---    left -1, up +10, down -10, gil-clamped by the handler.
+--  * The list cursor row (DP $4E) and the quantity (zSelIndex, DP $28) are
+--    read and steered, never press-counted, because menu direction holds
+--    auto-repeat.  Widget deltas: right +1, left -1, up +10, down -10,
+--    gil-clamped by the handler.
 --  * The clamp reports how much gil is available: steering toward a
---    quantity the gil cannot cover pins qty at the affordable maximum,
---    and a loop that keeps pressing spends its whole budget against that
---    clamp (gen_sabin_gau's "TONIC to 99" on 209 gil failed with a
---    timeout at 20000).  After 240 frames with the quantity unmoving
---    against the clamp, the clamped qty is accepted and logged.  Order
---    the buys so the marginal item comes last and a small purse shorts
---    it rather than the essentials.
+--    quantity the gil cannot cover pins qty at the affordable maximum.
+--    After 240 frames with the quantity unmoving against the clamp, the
+--    clamped qty is accepted and logged.  Order the buys so the marginal
+--    item comes last and a small purse shorts it rather than the
+--    essentials.
 --  * Purchases are verified after the shop closes; mid-menu inventory
---    reads are measurably wrong (the field bag does not update until the
---    shop hands RAM back).
+--    reads are wrong (the field bag does not update until the shop hands
+--    RAM back).
 function M.buyItem(id, row, qtyFn, name)
   local phase = 0
   local seen27, bought = false, false
@@ -2436,13 +1859,10 @@ function M.buyItem(id, row, qtyFn, name)
   }, "buy " .. name)
 end
 
--- KNOWN LIMIT (#89, measured at gen_tunnelarmr:1025): calling this on
--- the WORLD MAP is broken -- after the menu visit, the world engine's DP
--- cells ($E0/$E2) come back as garbage and the world never resumes (the
--- module-WRAM-ownership trap, inside the world-exit path).  Every route
--- cares on a field map before stepping onto the world, which is also
--- what a player does.  If a route ever genuinely needs world-map care,
--- fix the world-exit path first; do not call this there and hope.
+-- KNOWN LIMIT: calling this on the WORLD MAP is broken -- after the menu
+-- visit, the world engine's DP cells ($E0/$E2) come back as garbage and
+-- the world never resumes.  Every route cares on a field map before
+-- stepping onto the world.
 function M.fieldCare(opts)
   opts = opts or {}
   local tag = opts.tag or "care"
@@ -2645,9 +2065,8 @@ function M.fieldCare(opts)
   local refuseArmed = true
 
   -- Per-plan stall watchdog.  A plan that neither lands nor is abandoned makes
-  -- no forward progress, and without a backstop the drive presses at it for the
-  -- whole 24000-frame budget (the dadaluma_entry leg-4 hang: a cast dropped for
-  -- "caster not on screen", then a Tonic fallback that never confirmed).
+  -- no forward progress, and without a backstop the drive presses at it for
+  -- the whole 24000-frame budget.
   -- `stall` counts serveFrame calls since the last real progress -- a landing,
   -- a fresh plan, or an abandon.  Crossing the limit force-abandons the current
   -- plan (marking it failed so pick() moves on); when every plan is exhausted
@@ -2753,10 +2172,8 @@ function M.fieldCare(opts)
 
     -- Route by state.  A screen that is not on the current plan's path gets
     -- a B, which unwinds to $05 from anywhere: B in $70 goes to $77 -> $08,
-    -- in $08 to $17, in $17 to $05, in $1A to $0A (ReloadSkillsMenu,
-    -- field_menu.asm:2855-2860) and in $0A straight to $05
-    -- (field_menu.asm:1000-1007).  That replaces the older explicit rewind
-    -- flag, which only knew how to get back to the item list.
+    -- in $08 to $17, in $17 to $05, in $1A to $0A, and in $0A straight to
+    -- $05.
     local held = nil
     if want.kind == "item" then
       if st == 0x05 then
@@ -2878,14 +2295,9 @@ function M.fieldCare(opts)
     M.setPad(phase < 4 and held or {})
   end
 
-  -- The roster line carries MP as well as HP now.  MP is what the policy
-  -- spends, so a before/after pair that prints only HP cannot show what a
-  -- visit cost or what casting saved.  It carries status 1 as well, for the
-  -- same reason: a poisoned character reads as a healthy one on an HP/MP
-  -- line right up until the walk grinds them to 1, so a stop that could not
-  -- clear a status has to say so in its own log rather than leave the next
-  -- generator's roster to imply it.  A zero status prints nothing, so the
-  -- ordinary line is unchanged.
+  -- The roster line carries MP as well as HP, since MP is what the policy
+  -- spends, and status 1, since a poisoned character otherwise reads as a
+  -- healthy one on an HP/MP line.  A zero status prints nothing.
   local function roster(what)
     local out = {}
     for _, c in ipairs(M.partyMembers()) do
@@ -2928,48 +2340,34 @@ function M.fieldCare(opts)
     M.waitFrames(30),
     M.logStep(function() return roster("done") end),
   }, {
-    -- A care stop that does nothing still logs.  The first run with
-    -- this driver skipped its most important stop without logging, and the
-    -- roster three lines later was the only evidence, so "no log" and
-    -- "nothing needed" must not look the same.
+    -- A care stop that does nothing still logs, so "no log" and "nothing
+    -- needed" do not look the same.
     M.logStep(function() return roster("nothing to do") end),
   })
 end
 
 -- ---------------------------------------------------------------- rows --
 -- M.setRows: put characters in the front or back row through the real Order
--- screen.  Reads and pad presses only (issue #75).
+-- screen.  Reads and pad presses only.
 --
--- Owner note, 2026-08-09: "a lot of ranged attackers can just sit in
--- the back row forever at no cost."  Before this, no fixture in this
--- chain had set a row: every input-driven route walked its whole party
--- into the front row and took full physical damage.
---
--- The exemption was checked in this ROM.  ExecCmd sets
--- $B3 = $FF at the top of every command (battle_main.asm:3131-3133), and
--- bit $20 there means "ignore attacker row", so no row penalty is the
--- default.  One routine clears it: the weapon-swing setup
--- _c2299f (battle_main.asm:7127-7133), and only when the main-hand weapon
--- lacks WEAPON_FLAG::BACK_ROW.  So a back-row character loses damage only
--- on a Fight; EDGAR's Tools, TERRA's Magic and SABIN's Blitz never
--- reach that code and cost nothing.  Damage taken is halved for physical
--- attacks either way.  LOCKE is the one who trades something: Steal deals
--- no damage, so Fight is all he has, and this route leaves him in front.
--- Full citation trail: docs/research/row-menu.md.
+-- ExecCmd sets $B3 = $FF at the top of every command, and bit $20 there
+-- means "ignore attacker row", so no row penalty is the default; only the
+-- weapon-swing setup clears it, and only when the main-hand weapon lacks
+-- WEAPON_FLAG::BACK_ROW.  So a back-row character loses damage only on a
+-- Fight; EDGAR's Tools, TERRA's Magic and SABIN's Blitz never reach that
+-- code and cost nothing.  Damage taken is halved for physical attacks
+-- either way.
 --
 -- The UI, including the two parts that are easy to get wrong:
 --   * the Order screen has no main-menu row.  It is reached by pressing
---     left on the main menu ($05), a handler beside the A handler that
---     never goes through SelectMainMenuOption (field_menu.asm:571-576,
---     :3491-3508); the menu scrolls sideways ($65) to reveal the word
---     "Order", which is drawn off the visible edge.
+--     left on the main menu ($05); the menu scrolls sideways ($65) to
+--     reveal the word "Order", drawn off the visible edge.
 --   * the toggle is A twice on the same slot.  MenuState_10 compares
 --     zSelIndex ($28) to the cursor ($4B); a second A on a different slot
---     reorders the party instead of flipping a row
---     (field_menu.asm:1845-1870).  So the cursor must not move between the
---     two presses, and this driver verifies $28 before the second press
---     and treats state $11 (the swap) as an error rather than something to
---     recover from.
+--     reorders the party instead of flipping a row.  So the cursor must
+--     not move between the two presses, and this driver verifies $28
+--     before the second press and treats state $11 (the swap) as an
+--     error rather than something to recover from.
 --   * the row bit is at $1850 + charIdx, bit $20, in the party/order byte
 --     rather than the $1600 stat block.  The menu's working copy is
 --     $75 + slot.
@@ -3118,20 +2516,13 @@ function M.setRows(spec, opts)
 end
 
 -- M.equipEsper: equip a specific magicite on the character at char-select
--- position `pos`, through the real Skills -> Espers -> detail -> A walk
--- (skills.asm MenuState_4d @5902 is the equip).  Reads and pad presses
--- only (issue #75).  Written for the Cranes re-test (2026-08-10): the
--- fight's designed key is BISMARK's Sea Song, the game's only water
--- attack, and no input-driven route had equipped an esper before.
--- The list seek is menu_esperdetail's two-column idiom against the live
+-- position `pos`, through the real Skills -> Espers -> detail -> A walk.
+-- Reads and pad presses only.  The list seek is against the live
 -- $7e9d89 row->esper table; an esper the save does not own never appears
 -- there, so the seek times out instead of equipping the wrong row.
--- `pos` may be a literal char-select row (the established idiom -- measured
--- once and hardcoded, per gen_n128's own note) or a function returning one,
--- resolved live at the point the row is actually needed -- the same
--- lazy-resolution shape M.equipWeapon's own `pos` already supports, for a
--- caller whose party order isn't pinned down until runtime (e.g. a
--- character who just joined mid-route).
+-- `pos` may be a literal char-select row or a function returning one,
+-- resolved live at the point the row is actually needed, for a caller
+-- whose party order isn't pinned down until runtime.
 function M.equipEsper(pos, esperIdx, opts)
   opts = opts or {}
   local tag = opts.tag or ("equip esper " .. esperIdx)
@@ -3221,35 +2612,22 @@ end
 -- the seek time out rather than equip something else.
 --
 -- opts.slot names the slot, 0..5 = R-Hand, L-Hand, Helmet, Armor, Relic 1,
--- Relic 2, and it defaults to 0, which is what every caller before the Zozo
--- readiness sweep wanted.  The slot list is one vertical column and the
--- cursor lands on row 0, so the seek is that many DOWN presses, read back
--- off the same cursor byte the character and item seeks use rather than
--- counted blind.  The name still says weapon because that is what it is
--- nearly always used for; the slot is the exception.
+-- Relic 2, and it defaults to 0.  The slot list is one vertical column and
+-- the cursor lands on row 0, so the seek is that many DOWN presses, read
+-- back off the same cursor byte the character and item seeks use rather
+-- than counted blind.  The name still says weapon because that is what it
+-- is nearly always used for; the slot is the exception.
 --
 -- One hazard the slot opens up: equipping a Genji Glove, Gauntlet or Merit
 -- Award into a relic row makes the game run Optimum on its own when the
--- Relic screen is backed out of (CheckReequipRelics tests exactly those
--- three, equip.asm:2843-2850).  Those three are the whole list, so any
+-- Relic screen is backed out of.  Those three are the whole list, so any
 -- other relic is safe here; a caller that wants one of them owes the
--- deliberate re-equips afterwards, as HANDOFF records.
+-- deliberate re-equips afterwards.
 --
--- The slot matters because a bare slot is not a cosmetic gap.  Measured
--- 2026-08-12 at zozo_arrival and again at zozo_clock_solved: CELES walks
--- into Zozo with no body armour and no relics and SABIN with no shield and
--- no relics, while a LeatherArmor, a Buckler, two Star Pendants, a Peace
--- Ring and a Black Belt sit in the bag -- six items for the six empty
--- slots.  CELES's defence is 34 where the rest of the party runs 44 to 55,
--- and she is the only healer.
---
--- The game's own Optimum is not enough, measured 2026-08-10 on the Cranes:
--- it picks by attack power and armed LOCKE and EDGAR with Thunder
--- Blades ($0F: slash class, lightning element), and the Left Crane
--- absorbs lightning, so every Fight healed the boss (+160/+198 pair
--- heals, +943 boosted) and advanced its Giga Volt charge counter.  An
--- element-aware weapon swap is ordinary fight preparation, and this
--- function is where an input-driven route makes it.
+-- The game's own Optimum picks by attack power alone, with no element
+-- awareness, so it can arm a character with a weapon whose element the
+-- target absorbs.  An element-aware weapon swap is ordinary fight
+-- preparation, and this function is where an input-driven route makes it.
 function M.equipWeapon(pos, itemId, opts)
   opts = opts or {}
   local slot = opts.slot or 0
@@ -3387,12 +2765,7 @@ function M.equipLoadout(charId, items, opts)
 end
 
 -- ------------------------------------------- South Figaro shared toolkit --
--- Promoted from gen_sfigaro.lua (2026-08-09, the sfigaro_escape dispatch):
--- gen_sfigaro and gen_tunnelarmr both walk occupied South Figaro, and the
--- gate-soldier helper below was already flagged in HANDOFF as "wants
--- promoting into the library rather than copying".  Everything in this
--- section keeps gen_sfigaro's measured behavior line for line; the header
--- comments are the original findings and travel with the code.
+-- gen_sfigaro and gen_tunnelarmr both walk occupied South Figaro.
 
 -- field object i's live tile (pixel coords >> 4, block stride $29), the
 -- same read chaseTalk does internally; public because NPC positions are
@@ -3415,9 +2788,9 @@ end
 -- predicate is the library's public way to wrap a list into one step
 local function seq(steps) return M.cond(function() return true end, steps) end
 
--- gen_banon's talkToObj, unchanged in shape: approach re-resolved from live
--- object coords (NPCs wander), facing computed from the live delta, soft
--- rounds before a hard one.  CheckNPCs activates whatever the object map
+-- Talk to a posted NPC: approach re-resolved from live object coords (NPCs
+-- wander), facing computed from the live delta, soft rounds before a hard
+-- one.  CheckNPCs activates whatever the object map
 -- holds one tile in the party's facing direction while A is held, and a
 -- two-frame turn press does not set the facing byte, so the direction is
 -- held until it reads back, and only then is A edge-tapped.
@@ -3486,46 +2859,26 @@ function M.talkToObj(obj, what, maxF)
   })
 end
 
--- Ride a scene out to a settled, controllable field, edge-tapping A on every
--- frame the party is not in control and fighting anything that comes up by
--- real input (issue #75; the HP pin and battle-clearing flag write this
--- branch used to carry are gone).  Battle frames drive gen_moogle's Marshal
--- cycle: R raises the
--- active character's pending boost (1 bp at battle start, Ot6InitBP; the R
--- does nothing on an empty bank), then three edge-tapped A's confirm
--- the boosted Fight and page victory text, so solo LOCKE alternates
--- boosted and plain Fights against battle 11's HeavyArmor.  A loss now has
--- real consequences (the _ca85ba scenario reset), so the callers wrap every
--- engagement in a phase-spread retry sequence rather than pinning HP.
+-- Ride a scene out to a settled, controllable field, edge-tapping A on
+-- every frame the party is not in control and fighting anything that comes
+-- up by real input.  Battle frames drive gen_moogle's Marshal cycle: R
+-- raises the active character's pending boost (Ot6InitBP; the R does
+-- nothing on an empty bank), then three edge-tapped A's confirm the
+-- boosted Fight and page victory text.
 --
--- advanceStory does not work here.  advanceStory taps A only while a battle
--- is up or M.dialogWaiting() is true, and holds the pad empty otherwise.
--- The tail of `battle 11` has a window state that satisfies neither:
--- measured at the third gate-soldier fight, $0059 = $52 (a menu module owns
--- the CPU) with $BA/$D3 both clear, so dialogWaiting() is false, the battle
--- flag is already down, and advanceStory sat with the pad empty for 20000
--- frames while the event PC stayed parked at $CA85B9.  Tapping A whenever
+-- advanceStory does not work here: it taps A only while a battle is up or
+-- M.dialogWaiting() is true, and holds the pad empty otherwise, but the
+-- tail of a scripted battle can leave a menu module owning the CPU with
+-- neither signal set, which advanceStory cannot see.  Tapping A whenever
 -- there is no control clears it, and it cannot misfire on the open field
--- because the tap is gated on not having control.
--- (This must never meet a choice prompt, because an A press always takes
--- option 0, so every prompt on a route is answered by a choice-steering
--- rider like gen_sfigaro's rideUntil rather than by this.)
--- The fight itself is no longer a fixed button pattern.  The first
--- input-driven version of this drove every battle with a fixed 32-frame
--- cycle (R to boost, then three edge-tapped A's), which pages victory text
--- but does not keep the party alive.  Measured 2026-08-09 on the
--- first end-to-end run that reached this edge: solo LOCKE, level 8 with
--- 168 hp, lost the gate soldier's HeavyArmor three attempts running, while
--- sixteen Tonics sat in the bag.  He used none of them, because
--- the pattern does not read menus.  M.newFightDriver does: it reads
--- the live command table, boosts, and runs its own item medic line.
--- healPercent is the fraction it tops up at, and it is no longer the whole
--- rule: M.healDecision decides whether a heal is worth the turn it costs,
--- and a solo character who cannot out-heal the damage swings instead of
--- drinking.  That matters here more than anywhere, because LOCKE alone is
--- the one party shape opts.healer cannot help.
--- (The field half of this routine is hand-rolled; see the note above on
--- why advanceStory cannot handle the tail of battle 11.)
+-- because the tap is gated on not having control.  (This must never meet
+-- a choice prompt, because an A press always takes option 0, so every
+-- prompt on a route is answered by a choice-steering rider instead.)
+--
+-- The fight itself reads the live command table (M.newFightDriver) rather
+-- than driving a fixed button pattern, so it can boost, use items, and
+-- decide per-turn whether a heal is worth the turn it costs
+-- (M.healDecision) instead of always drinking.
 function M.rideOut(what, budget, dstMap)
   local phase, calm = 0, 0
   local F = M.newFightDriver(what or "rideOut",
@@ -3561,30 +2914,23 @@ function M.rideOut(what, budget, dstMap)
   })
 end
 
--- The gate soldier comes back every time map 75 reloads.  `hide_obj NPC_11`
--- (_ca856a, event_main.asm:20313) sets a runtime bit rather than story
--- state: leaving town for an interior and coming back re-runs InitNPCs
--- (field/init.asm:469 only skips it when reloading the same map) and
--- re-creates every npc whose spawn switch still holds.  His is $030C and
--- nothing in the scenario clears it.  So (30,42), the only tile joining the
--- SE quarter to the rest of town, is blocked again on every return, and
--- gen_sfigaro's route crosses that boundary three times.  The soldier's
--- uniform does not help: `if_switch $0103=1` only swaps his fight for a
--- "Halt!" line (:20296); it does not move him.
--- The branch is gated on a symptom (a BFS probe to a tile on the far side)
--- rather than assumed, so if the respawn ever stops happening this reports
--- it instead of walking into a fight that is not there.
+-- The gate soldier comes back every time map 75 reloads: leaving town for
+-- an interior and coming back re-runs InitNPCs and re-creates every npc
+-- whose spawn switch still holds (his is $030C, and nothing in the
+-- scenario clears it).  So (30,42), the only tile joining the SE quarter
+-- to the rest of town, is blocked again on every return.  The branch is
+-- gated on a symptom (a BFS probe to a tile on the far side) rather than
+-- assumed, so if the respawn ever stops happening this reports it instead
+-- of walking into a fight that is not there.
 --
--- Every engagement is a retry sequence (issue #75).  With the HP pin
--- gone, a lost battle 11 runs _ca85ba, which revives LOCKE on (47,43) and
--- clears both disguise switches, so each fight captures a blob first, and a
--- loss reloads it and re-engages on a different battle RNG phase.  The seed
--- is the game-time frame counter at battle init (`lda $021e / asl2 / sta $be`,
--- battle_main.asm:6174-6176), so the ladder is spread on $021e itself and
--- reads back what each attempt drew (M.newSeedLadder, issue #83) rather than
--- trusting a frame offset to land somewhere new.  Success means the party is
--- not on the opening tile and the probe tile is reachable; three losses fail
--- generation.
+-- Every engagement is a retry sequence.  A lost battle 11 revives LOCKE on
+-- (47,43) and clears both disguise switches, so each fight captures a blob
+-- first, and a loss reloads it and re-engages on a different battle RNG
+-- phase.  The seed is the game-time frame counter at battle init, so the
+-- ladder is spread on that counter and reads back what each attempt drew
+-- rather than trusting a frame offset to land somewhere new.  Success
+-- means the party is not on the opening tile and the probe tile is
+-- reachable; three losses fail generation.
 --
 -- The ladder is per call, not per run: gen_sfigaro crosses this boundary
 -- three times and each crossing is its own three fights.
@@ -3603,26 +2949,15 @@ function M.clearGateSoldier(probeX, probeY, tag)
         M.call(function() M.checkReq(loadReq, tag .. ": pre-fight reload") end),
         M.waitFrames(90),
       }) or seq({}),
-      -- outside the n > 1 block, unlike the wait it replaces: attempt 1 needs
-      -- a phase of its own too, or it can land on attempt 2's seed (#83)
-      L.spread(n),                       -- spread the battle RNG phase (#83)
+      -- attempt 1 needs a phase of its own too, or it can land on attempt
+      -- 2's seed
+      L.spread(n),                       -- spread the battle RNG phase
       M.talkToObj(26, tag .. ": the gate soldier (battle 11)"),
       M.rideOut(tag .. ": ride battle 11 out", 30000, 75),
       M.call(function()
-        -- The battle's own verdict, read directly (#102).  Battle
-        -- switch $40 is the game-over flag: cleared at every battle
-        -- init (`lda #$91 / trb $3ebc`, battle_main.asm:6181), set by
-        -- LoseBattle (`tsb $3ebc`, :16044), and copied to the field
-        -- block at battle end ($3EB4+x -> $1DC9+x, :12413), so field
-        -- byte $1DD1 bit 0 = 1 means THIS battle was lost.  The event
-        -- command if_b_switch branches when the bit is CLEAR
-        -- (EventCmd_b7, field/event.asm:4056-4058), which is how
-        -- _ca5ea9's win check reads it too.
-        -- The old inference here -- "not on the reset tile AND
-        -- bfsPath(probe) ~= nil" -- scored two apparent wins as losses
-        -- (HeavyArmor at 0 HP, LOCKE alive on the win tile, and the
-        -- reachability probe answering "no path"); the position and
-        -- probe are now logged for the record but decide nothing.
+        -- The battle's own verdict, read directly.  Field byte $1DD1 bit 0
+        -- = 1 means THIS battle was lost; position and the reachability
+        -- probe are logged for the record but decide nothing.
         won = (M.readByte(0x1DD1) & 1) == 0
         M.log(string.format(
           "%s: attempt %d %s ($1DD1.0=%d) at (%d,%d) f%d, probe=%s",
@@ -3632,39 +2967,7 @@ function M.clearGateSoldier(probeX, probeY, tag)
       end),
     })
   end
-  -- The party cannot walk past him, and that is measured rather than
-  -- assumed.  South Figaro is a stealth chapter and the gate soldier
-  -- appeared to wander, since the old reachability probe answered "lane
-  -- open" often enough to flip this branch by accident, so waiting him out
-  -- looked possible.  Measured 2026-08-09: polling M.bfsPath(22,43) every
-  -- 60 frames for 7200 frames (two minutes of game time) never found a
-  -- path.  He does not step off the choke point.  The fight is mandatory,
-  -- which is why the balance finding below is a real one rather than a
-  -- routing failure.
-  --
-  -- An earlier version decided this branch on the story switch instead of
-  -- a BFS probe.  It used to ask whether (22,43) was reachable at that
-  -- instant, and the answer appeared to depend on where the gate soldier
-  -- was standing: if he stepped off the choke point the probe would say
-  -- "lane already open", the fight would be skipped, and the next navTo
-  -- would walk into him and fail with "no path" twenty retries later.
-  -- Measured 2026-08-09: inserting a single menu visit ahead of this cond
-  -- was enough to flip it.  $0104 was taken to be the switch the gate
-  -- scene sets, it does not wander, and the loss path below already reads
-  -- it.
-  -- That change was then reverted to the reachability probe.  It had been
-  -- switched to $0104 on the theory that the soldier wanders and the probe
-  -- is a coin flip.  Both halves of that were wrong: he does not wander
-  -- (polled every 60 frames for 7200 frames, the lane never opened once),
-  -- and $0104 is not the switch the gate sets, so keyed on it this
-  -- reported a loss on a fight LOCKE had won outright, with HeavyArmor at
-  -- 0 hp and the party standing clear of the reset tile.
-  -- The branch is now the soldier's own tile rather than a path query.
-  -- Three readings of this have been wrong.  $0104 is not the switch the
-  -- gate sets (it called a won fight a loss).  And the BFS probe, which
-  -- was right when this step opened with a walk, reads "open" every time
-  -- now that the step opens two menus first, so the party skips the fight,
-  -- walks to (31,42) and fails with "no path" twenty retries later.
+  -- He does not step off the choke point, so the fight is mandatory.
   --
   -- He blocks exactly one tile: npc 10 / obj 26 sits at {30,42},
   -- spawn switch $030C, and (30,42) is the only tile joining the starting
@@ -3677,14 +2980,10 @@ function M.clearGateSoldier(probeX, probeY, tag)
       return string.format("%s: the gate soldier is on his post (%d,%d) " ..
         "at f%d; fighting him", tag, M.objX(26), M.objY(26), M.frame)
     end),
-    -- Heal first.  He respawns on every map-75 reload, so gen_sfigaro's
-    -- route fights him three times, and LOCKE arrives at the third one
-    -- with whatever HP the first two left him.  Measured: B1 won, R1 won
-    -- on its second attempt, R2 lost all three, not because that fight is
-    -- different but because he entered it with low HP.  A player heals
-    -- between rounds with a soldier, and so does this.  A no-op when he is
-    -- already at full HP, and it never spends below the Potion floor the
-    -- later beats need.
+    -- Heal first.  He respawns on every map-75 reload, so a route can
+    -- fight him more than once, arriving at a later one with whatever HP
+    -- the earlier fights left.  A no-op when he is already at full HP, and
+    -- it never spends below the Potion floor the later beats need.
     M.fieldCare({ tag = "care before " .. tag, threshold = 0.95 }),
     (function()
       local req
@@ -3700,38 +2999,10 @@ function M.clearGateSoldier(probeX, probeY, tag)
     L.watch(),
     fightOnce(1), fightOnce(2), fightOnce(3),
     -- ...and they were three DIFFERENT fights: distinct battle RNG seeds,
-    -- read off the seeder itself (#83).  "Three losses fail generation" only
+    -- read off the seeder itself.  "Three losses fail generation" only
     -- means something if the three were not one fight replayed.
     L.report(),
     M.call(function()
-      -- This fight blocks the route today, and the assert below is the
-      -- report of that rather than a flaky step.  A note here used to say
-      -- it passed once LOCKE was armed, in the back row, healed between
-      -- rounds and breaking the armour; that is falsified and removed.
-      --
-      -- Measured 2026-08-12 by probe_battle11.lua, which hooks the battle
-      -- module's own end-of-battle decision: solo LOCKE, level 8, 168 hp,
-      -- armed through the real Equip -> Optimum walk and in the back row,
-      -- IS KILLED by the level-13 HeavyArmor's second action and the party
-      -- is wiped.  168 -> 111 on its first (the halved physical), his one
-      -- Fight takes it 495 -> 489 and one shield off three, then 111 -> 0.
-      -- CheckBattleEnd sees $3A74 = 0 and calls LoseBattle with battle
-      -- message $29 "annihilated" (battle_main.asm:12170, :12822-12830),
-      -- which sets $3EBC.0 -- battle switch $40 -- and the event's
-      -- `if_b_switch $40` then falls through to the scenario reset.  So the
-      -- loss branch below is reading a real, ordinary loss.
-      -- One ATB round is about 570 frames at this level, so he gets one
-      -- action per fight and three shield chips are four away.  Healing
-      -- cannot close it: 111 of 168 is 66%, above the driver's 60% line,
-      -- and no Tonic covers a 111-damage hit.  Its weaknesses are bolt and
-      -- water (monster_prop +25 = $84) and solo LOCKE can reach neither.
-        -- Bare-handed -- how the chain delivered him until a deliberate
-        -- equip landed -- it was eight damage a swing, and front row and back row
-      -- measured identically bare-handed, which is why the row setting went
-      -- unnoticed for three runs.
-      -- Do not widen the attempt sequence until it succeeds by chance; that
-      -- is the #74 mistake, and it would be a re-roll of a fight whose
-      -- outcome does not depend on the seed.
       M.assertEq(won, true,
         tag .. ": battle 11 won within 3 attempts (boosted Fights)")
       M.assertEq(M.bfsPath(probeX, probeY) ~= nil, true,

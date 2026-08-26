@@ -1,35 +1,19 @@
 -- @suite savestate=worldmap_narshe
--- (The marker was a bare `-- @suite` until v0.6.  This test loads
--- build/states/worldmap_narshe.mss.lua at :34, which only `make savestates`
--- generates, so a plain marker made it a hard `make test` failure, reported as
--- "compose failed: save_checksum", in every tree without the generated states,
--- that is, in every fresh worktree.  It passed in the main tree only because
--- that tree has the fixture.  codex_saveas.lua loads the same state and
--- declares the same requirement; this now matches it.  Found while landing
--- #11/#23.)
--- Regression for #18.  CheckSaveSlotChecksum returns the checksum itself as
--- its validity token and 0 for invalid, with no separate flag, and every
--- caller tests it with beq.  So an intact save whose 2558-byte sum happens to
--- land on $0000 is drawn as an empty slot, refuses to load, and is overwritten
--- with no confirmation prompt (field_menu.asm:1981-1988 branches on the zero
--- straight into `; slot is empty, save instantly`).
+-- CheckSaveSlotChecksum returns the checksum itself as its validity token
+-- and 0 for invalid, with no separate flag, and every caller tests it with
+-- beq.  So an intact save whose 2558-byte sum happens to land on $0000 is
+-- drawn as an empty slot, refuses to load, and is overwritten with no
+-- confirmation prompt.
 --
--- CalcSaveSlotChecksum now folds a $0000 result onto $ffff.  The stored word at
--- $1ffe sits outside the summed range ($1600..$1ffd, cpx #$09fe), so the fold
--- applies identically on write and on verify.
+-- CalcSaveSlotChecksum folds a $0000 result onto $ffff.  The stored word at
+-- $1ffe sits outside the summed range ($1600..$1ffd), so the fold applies
+-- identically on write and on verify.
 --
--- This drives the game's own save path, the codex_saveas way, rather than
--- reimplementing the sum: zero the summed range so it totals $0000, let
--- vanilla's own CopyGameDataToSRAM run, then read back what it stored.  The
--- resulting save is garbage; only the checksum is under test.  Saving is only
--- legal on the world map, so this runs from worldmap_narshe.
---
--- Quarantined mechanism test (issue #75); state writes are sanctioned.
--- Owner-named on the #75 policy list: the 1/65536 zero-checksum save.  A
--- real game state whose 2558-byte sum lands exactly on $0000 exists but
--- cannot be reached on cue by play; the zeroed range is the only way to
--- put the fold under test.  It keeps its waiver, and it must never produce
--- fixtures.
+-- This drives the game's own save path rather than reimplementing the sum:
+-- zero the summed range so it totals $0000, let vanilla's own
+-- CopyGameDataToSRAM run, then read back what it stored.  The resulting
+-- save is garbage; only the checksum is under test.  Saving is only legal
+-- on the world map, so this runs from worldmap_narshe.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE       = 0x0026
@@ -53,10 +37,10 @@ H.run({ maxFrames = 8000 }, {
   H.waitFrames(120),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
     300, "main menu", 5),
-  -- Reach save select by pad (save-drive rule, tools/tests/README): up wraps
-  -- the main-menu cursor from Items to Save, A runs SelectMainMenuOption_06's
-  -- real entry, down walks the slot cursor to slot 3.  The drives poll the
-  -- state and cursor by reading them, so no frame count is load-bearing.
+  -- up wraps the main-menu cursor from Items to Save, A runs
+  -- SelectMainMenuOption_06's real entry, down walks the slot cursor to
+  -- slot 3.  The drives poll the state and cursor by reading them, so no
+  -- frame count is load-bearing.
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == MAIN_MENU and H.readByte(0x4b) == 6
   end, 600, {

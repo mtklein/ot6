@@ -23,10 +23,9 @@ OT6_NULLBRK := $80              ; property, not a class: high damage that
 ; [ weapon item id -> class byte ]
 
 ; one byte per item id, directly indexed (no scan: Fight reads this per
-; swing). non-weapons are $00. classified per docs/design/weapon-classes.md
-; v2.1; WoR-only weapons are classified too, since the rules already cover them.
+; swing). non-weapons are $00. WoR-only weapons are classified too.
 ;
-; judgment calls (v2.1 leaves these to taste; driver review welcome):
+; judgment calls for ambiguous items:
 ;   - heal rod $33: no class. a healing rod teaches nothing, and leaving it
 ;     classless avoids the undead/heal-reversal ambiguity until it is needed.
 ;   - the returning-arc family (full moon, boomerang, rising sun, sniper,
@@ -35,8 +34,7 @@ OT6_NULLBRK := $80              ; property, not a class: high damage that
 ;     darts, hawk eye) are piercing per "thrown edges, darts".
 ;   - hawk eye $49: piercing (a thrown blade, not a returning arc).
 ;   - air anchor $a9: piercing (it fires a harpoon).
-;   - atma weapon $1c: plain slashing. it resembles the null-break case,
-;     but v2.1 only names fixed dice for null-break; driver call.
+;   - atma weapon $1c: plain slashing, not null-break.
 ;   - empty hand $ff: bludgeoning. fists are a real class ("claws are how
 ;     the monk buys into a second class"), so bare knuckles stay bludgeon
 ;     and umaro is classified correctly with no special case.
@@ -74,7 +72,7 @@ Ot6WeapClassTbl:
         .byte   OT6_SLASH       ; $19 scimitar
         .byte   OT6_SLASH       ; $1a illumina
         .byte   OT6_SLASH       ; $1b ragnarok
-        .byte   OT6_SLASH       ; $1c atma weapon (null-break? driver call)
+        .byte   OT6_SLASH       ; $1c atma weapon
         ; spears $1d-$24
         .byte   OT6_PIERCE      ; $1d mithril pike
         .byte   OT6_PIERCE      ; $1e trident
@@ -154,7 +152,7 @@ Ot6WeapClassTbl:
         .byte   OT6_SLASH       ; $a6 chain saw ("buys edgar slashing")
         .byte   $00             ; $a7 debilitator
         .byte   OT6_PIERCE      ; $a8 drill
-        .byte   OT6_PIERCE      ; $a9 air anchor (harpoon; judgment)
+        .byte   OT6_PIERCE      ; $a9 air anchor (harpoon)
         .byte   OT6_PIERCE      ; $aa autocrossbow
         ; skeans/edges $ab-$af resolve as their spells: no class here
         .res    $b0 - $ab, $00
@@ -170,7 +168,7 @@ Ot6WeapClassTbl:
 ; matter what is equipped ✦. this table is scanned once per attack load,
 ; and anything absent is classless: its element byte carries the probe
 ; (aurabolt is a holy chip, not a punch). WoB physical skills only;
-; slots attacks, dances, and rage specials stay unclassified in v1.
+; slots attacks, dances, and rage specials stay unclassified.
 ;
 ;   - swdtechs are all slashing: cyan is the slashing specialist, and
 ;     quadra slam/slice are the strongest slash chips in the game.

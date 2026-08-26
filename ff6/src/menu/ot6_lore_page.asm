@@ -1,11 +1,11 @@
 ; ------------------------------------------------------------------------------
 ; Included from field_menu.asm at its include site, inside `.if LANG_EN` and
-; under ending_anim.asm's un-popped .charmap (menu_text_en.inc:114-121, issue
-; #39).  Do not assemble this file on its own.
+; under ending_anim.asm's un-popped .charmap (menu_text_en.inc:114-121).
+; Do not assemble this file on its own.
 ; ------------------------------------------------------------------------------
 
 ; ------------------------------------------------------------------------------
-; Strago's lore loadout page (#122): the MenuState shim, at five rows
+; Strago's lore loadout page: the MenuState shim, at five rows
 ;
 ; Every decision is bank-F0 (Ot6Lore* in ot6_lore.asm); this is tilemap,
 ; cursor and DMA only.  The single-column-of-five shape is the Bushido page's,
@@ -128,7 +128,7 @@ Ot6LoreDrawSlots:
         beq     @nocost
         jsl     Ot6LoreRowCost          ; F0: A = the lore's vanilla MP cost
         ldx     #$0010                  ; col 16: "nn MP" is 16..20
-        jsr     Ot6LoadoutDrawCost      ; the one field-menu price drawer (#56)
+        jsr     Ot6LoadoutDrawCost      ; the one field-menu price drawer
         bra     @next
 @nocost:
         lda     $e6                     ; blank the 5-cell price field so a
@@ -237,8 +237,7 @@ Ot6LoreDrawCount:
 
 ; ---- cursor: one column of five, on vanilla's 12px cadence ----
 ; y = 116 + n*12 for rows 5/7/9/11/13 (n = 2..6); x = 8 pairs with text
-; column 3 (cursor_x = 8*col - 16).  menu_lorepage.lua's canary reads this
-; table out of the ROM.
+; column 3 (cursor_x = 8*col - 16).
 Ot6LoreCursorProp:
         cursor_prop {0, 0}, {1, 5}, NO_XY_WRAP   ; OT6_LORECOLS x OT6_LOREROWS
 Ot6LoreCursorPos:

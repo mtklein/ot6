@@ -2,43 +2,7 @@
 -- 61 {6,34}, castle parked west at ~world {30,48}) -> up and out of the
 -- castle -> the western WoB -> Zozo's world tiles {21..22,92} -> generate
 -- zozo_arrival.mss on map 221 at the street landing {61,44}.
---
--- Route checkpoints (from source, not the survey):
---  * 61 door (11,32) -> 59 {10,48}; 59 door (12,41) -> 55 {28,31}
---    (short_entrance.dat _61/_59)
---  * map 55's row y=43 is the world-exit long entrance (gen_kolts's rule:
---    keep it off every route except when leaving on purpose).  Here it is
---    the exit: navTo(28,42), hold down
---  * the world landing is measured by this run's log (parent record vs the
---    long-entrance dest {65,77} was statically ambiguous; the ride's
---    SET_PARENT points at the west parking ~{30,48})
---  * world {30,48}/{31,48} are the west castle trigger tiles (_ca5ec2,
---    gated $010C=1, which is set here).  Triggers fire on step, so the exit
---    placement is safe, and the Zozo step heads south-west away from them
---  * Zozo: world {21,92}/{22,92}/{22,93} -> map 221 {61,44}
---    (short_entrance.dat _0)
---
--- Issue #75, playBattles: every navigator call passes the option, so none
--- reaches the library's monster-dead flag write.  Maps 61, 59 and 55 have
--- random encounters disabled -- a field map only rolls when map_prop.dat
--- byte +5 bit 7 is set (field/map.asm:143-158 loads the record to $0520,
--- field/battle.asm:333-347 returns early unless $0525 is negative) -- so
--- those steps pass "tactical" as intent only, and fight rather than flee if
--- something unscripted ever does fire.
---
--- ------------------------------------------------------- the world walk --
--- The crossing to Zozo used to be one 177-step worldNavTo with
--- playBattles="flee", and that is what left the party too weak for the
--- town.  Zozo's own maps draw levels 15 and 16 -- map 221 is
--- sub_battle_group 78 (Gabbldegak 15, Harvester 16, HadesGigas 16) and map
--- 225 is group 77 (SlamDancer 15, Harvester 16) -- while the party arrived
--- at LOCKE 11, EDGAR 12, SABIN 12, CELES 11 and was wiped on the climb
--- ("all four battle-HP words have read 0 ... at (45,54) on map 221").
--- Grinding inside Zozo is circular, so the levels are earned on the way in,
--- which is also what the route is supposed to do: docs/design/wob-route.md
--- section 2, "the route plays casual" -- a normal player fights what they
--- meet and grinds a little for experience.
---
+
 -- The ground is the western World of Balance between the west Figaro castle
 -- and Zozo, and it is the right tier rather than a soft one.  Decoded from
 -- world_1_tilemap.dat + WorldTileProp ($EE9B14) through the chain
@@ -54,7 +18,7 @@
 -- (battle_main.asm:15790-15800), so 4 alive is about 229 each.  The same
 -- pair of knobs halves the per-step danger increment (Ot6DangerMulW =
 -- $0008), which puts a fight roughly every 37 steps.
---
+
 -- The pool is breakable by the party that walks it, which is why it is safe
 -- to fight rather than flee.  Iron Fist carries an authored row (2 shields,
 -- PIERCE|BLUDG, ot6_hud.asm Ot6ShieldTbl); Vulture and Mind Candy have no
@@ -62,7 +26,7 @@
 -- (OT6_FLOOR_CLASS, ot6_break_floor.inc, seeded at ot6_break.asm:96-108).
 -- EDGAR's MithrilBlade is the party's slash ($0a, ot6_class.asm:57),
 -- SABIN's fists and Pummel cover bludgeon, LOCKE and CELES cover pierce.
---
+
 -- Shape of the walk, and why it is segmented.  HANDOFF's rule is that a
 -- world walk which fights its encounters needs a care stop BETWEEN battles
 -- or it wipes, because in-battle healing is bounded by turns and a field
@@ -74,7 +38,7 @@
 -- touches a world entrance record or a world event trigger (checked against
 -- all 45 ShortEntrance records for world 0 and all 9 EventTrigger records
 -- for map 0), which matters because BFS knows about neither.
---
+
 -- Then the grind laps: (34,99) <-> (34,112), 13 steps each way on the x=34
 -- column, all group 10, no entrance and no trigger on it, and no map load
 -- (the danger counter is zeroed by every battle and every map load, so a
@@ -168,12 +132,6 @@ local function walk(x, y, what, opts)
     H.logStep(function()
       return string.format("%s -> world (%d,%d): %s", what, x, y, rosterLine())
     end),
-    -- CELES owns recovery while the other three keep attacking.  Without a
-    -- named medic, a measured group-10 fight reached its last enemy at 51
-    -- hp and every actor abandoned the kill to queue redundant Fenix Downs
-    -- on EDGAR; the party died with the threat one Pummel from finished.
-    -- This is the same explicit role assignment newFightDriver documents for
-    -- avoiding party heal-locks, and leaves CELES free to Cure from safety.
     H.worldNavTo(x, y, { maxFrames = 40000, playBattles = "tactical",
                          healPercent = 60, healer = CELES,
                          reserve = { [POTION] = 3 },
@@ -204,15 +162,7 @@ end
 -- The target is LOCKE's TOTAL experience, not a level, and it is his rather
 -- than the party's because experience is split evenly and he is the lowest
 -- of the four, so a target that satisfies him satisfies everyone.
---
--- 6432 is level 13 (8 * sum(LevelUpExp[2..L]), CalcLevelExpTotal,
--- ff6/src/menu/status.asm:581-609; LevelUpExp is field/event.asm:1329).  He
--- reached this point at 4428 on the chain of 2026-07-22, so the bill is
--- about 2000 experience, of which the crossing's own four or five fights pay
--- roughly half.  Two levels for LOCKE and CELES and one or two for EDGAR and
--- SABIN is "a level or two", the owner's words, rather than a grind to the
--- cap: it puts a party of 13s and 14s against a pool of 15s and 16s, where
--- the losing party was 11s and 12s.
+
 local EXP_TARGET = 6432
 local grindLaps = 0
 local function grindDone() return expOf(LOCKE) >= EXP_TARGET end
@@ -230,11 +180,6 @@ local function lap(n)
   }, {})
 end
 
--- The lap cap is a bound on a runaway, not a plan: the loop exits on the
--- target, and a lap it skips costs one predicate call.  36 is set against
--- the measured rate -- about 200 experience each a fight, a fight about
--- every 37 steps, 26 steps a lap -- so it covers roughly 2600 experience,
--- comfortably more than the largest gap seen at this point in the route.
 local function grind()
   local steps = {}
   for n = 1, 36 do steps[#steps + 1] = lap(n) end
@@ -255,24 +200,11 @@ local function door(nx, ny, dir, m, what)
     H.driveUntil(function() return map() == m end, 900, {
       H.hold({ dir }), H.waitFrames(4),
     }, what .. ": through the door"),
-    -- ride any arrival scene out (the west castle greets with one:
-    -- measured, an event walks the party to (28,28) and parks a dialog)
     H.advanceStory(landed(m, 10), 2400, { playBattles = "tactical" }),
-    -- door loads finalize the decompressed prop table late: ~150 frames
-    -- after control and brightness the engine still walked (and modelled)
-    -- on the previous map's props (measured, probe_n20c on map 30->20: a
-    -- legal step refused at +40f, accepted at +80f; the census flipped
-    -- from all-walls to correct at ~+150f).  Settle long before any BFS.
     H.waitFrames(150),
   })
 end
 
--- maxFrames: the fleeing version of this step ran inside 90000.  Measured
--- 2026-08-13, the fought crossing alone reaches the grind column at f25743
--- having fought four battles, and the grind is the larger half; a group-10
--- fight runs in the same range as the Zozo street's measured 6352 frames.
--- 600000 is the lap cap's worth of that with room, rather than a number
--- tuned to one run.
 H.run({ maxFrames = 600000 }, {
   H.loadState("build/states/figaro_submerged.mss.lua"),
   H.waitFrames(30),

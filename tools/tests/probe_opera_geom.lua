@@ -3,12 +3,6 @@
 -- for the flower-dance nav: every field object (vis/x/y/face/movetype), and
 -- the p1/p2 passability grid over the pocket+stairs+balcony region x[3..18]
 -- y[6..27].
--- Issue #75: playBattles = "tactical" keeps these walks out of the library's
--- monster-dead flag write.  It is intent only -- the opera maps 236 and 238
--- draw no random battles (map_prop.dat byte +5 bit 7 clear, so the field
--- step handler at ff6/src/field/battle.asm:333-347 returns before the roll)
--- -- and "tactical" rather than "flee" because the only battle that could
--- reach the option there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -51,7 +45,6 @@ local function dumpObjs(tag)
 end
 
 local function dumpGrid(x0,x1,y0,y1)
-  -- header
   local hdr="   y\\x"
   for x=x0,x1 do hdr=hdr..string.format(" %02d",x) end
   H.log("[p1grid]"..hdr)

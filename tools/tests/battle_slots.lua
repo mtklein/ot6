@@ -1,16 +1,14 @@
 -- @suite slow
--- battle_slots.lua -- boost-tiered Slot (Setzer), the chance-verb canon
--- (ROADMAP.md "Design canon", kits.md "Boost-tiered Steal") applied to the
--- reels: on chance verbs boost buys certainty in the verb's own terms.
--- Slot's terms are
--- vanilla's single rig byte (w7e6179, one Rand at the first A press) and the
--- drift and avoid code it drives:
+-- battle_slots.lua -- boost-tiered Slot (Setzer): on chance verbs boost
+-- buys certainty in the verb's own terms.  Slot's terms are vanilla's
+-- single rig byte (w7e6179, one Rand at the first A press) and the drift
+-- and avoid code it drives:
 --   blessed icon (rig & SlotRateTbl[icon] == 0): reels 2 and 3 drift up to
 --     w7e617d extra icons toward the pair or triple (vanilla budget 4);
 --   cursed icon: no help, and a landed pair gets w7e617c bit 7, so reel 3
 --     refuses to stop on the completing icon (the rigged miss).
---
--- The hooks under test (ot6_kits.asm; C1 shims in btlgfx_main.asm):
+
+-- The hooks under test:
 --   Ot6SlotRig    -- latches the spin's tier ($57ba) at the first press and
 --                    stores the rig byte: untouched at 0-1 bp, forced 0 (or
 --                    $3c under the $2f49.2 joker-doom battle gate) at 2-3 bp.
@@ -22,50 +20,38 @@
 --                    the commit press, so Ot6ActionEnd charges exactly the
 --                    tier the reels were spun with.
 --   Ot6BoostDmg's $0f gate: slot attacks never get the damage multiplier.
---
--- Issue #75 split.  battle_slotsboot (the input-driven model this file now
--- follows) covers tier 0 and tier 3 end to end on a natural checkpoint boot:
--- latch 0 and 3, rig forced benevolent at 3, the chosen triple, the 3-bp
--- charge, the regen, and the multiplier exemption watch, so this file's
--- old poked tier-3 arm is deleted as covered.  What remains here splits in
--- two:
+
+-- battle_slotsboot covers tier 0 and tier 3 end to end on a natural
+-- checkpoint boot.  This file covers the rest, in two parts:
 --
 --   The input-driven half (no writes): a second natural boot of the
---   terra-returned-v1 SRAM checkpoint (battle_slotsboot's cold-Continue,
---   disembark, walk and choose-the-draw pattern, unchanged), driving the two
---   tiers slotsboot leaves unchecked with real R presses on earned bp:
+--   terra-returned-v1 SRAM checkpoint, driving the two tiers slotsboot
+--   leaves unchecked with real R presses on earned bp:
 --     H1 (1 bp): latch = 1, the 1-bp charge with regen skipped, and the
 --        commit re-bank.  Tier 1 leaves the drawn rig alone, so no rig
---        value is asserted; asserting one would need the poke this file
---        just gave up, and the rig's tier-1 hands-off half lives in the
---        quarantine lab where the byte can be planted.
---     H2 (2 bp): latch = 2, the rig
---        forced benevolent ($00, or $3c under a real joker gate), read
---        rather than written, with reel-2 help blessed toward the icon reel 1
---        stopped on, vanilla's 4-icon budget stored by the $f0 hook,
---        and the 2-bp charge.  H2 is played in a SECOND drawn battle: a bank
---        does not cross a battle boundary (Ot6InitBP re-seeds 1), so earning
---        2 bp inside H1's fight made that fight four Slot resolutions long,
---        and no formation this checkpoint's pool deals survives four.  The
---        second fight opens at 1 bp, one plain spin banks the 2, and both
---        fights are two resolutions.  The re-seed is asserted rather than
---        assumed on the way in.
+--        value is asserted here; that half lives in the quarantine lab
+--        where the byte can be planted.
+--     H2 (2 bp): latch = 2, the rig forced benevolent ($00, or $3c under a
+--        real joker gate), read rather than written, with reel-2 help
+--        blessed toward the icon reel 1 stopped on, vanilla's 4-icon
+--        budget stored by the $f0 hook, and the 2-bp charge.  H2 is played
+--        in a SECOND drawn battle, since a bank does not cross a battle
+--        boundary (Ot6InitBP re-seeds 1): the second fight opens at 1 bp,
+--        one plain spin banks the 2, and both fights are two resolutions.
 --
---   Labeled quarantine lab (issue #75): the icon and rig-byte arms.
---   No player input selects a reel icon: the reels free-run at frame rate
---   and a press stops them wherever the frame parity fell, so a cursed
---   pair of 3s, the same triple at tier 0 and tier 3 (the exemption
---   A/B), and a 7-pair under the joker gate cannot be produced on cue by
---   any input-driven drive.  Those arms are mechanism unit tests (burn-down
---   plan systemic call 2) and stay below as one labeled block on the old
+--   Labeled quarantine lab: the icon and rig-byte arms.  No player input
+--   selects a reel icon: the reels free-run at frame rate and a press
+--   stops them wherever the frame parity fell, so a cursed pair of 3s, the
+--   same triple at tier 0 and tier 3 (the exemption A/B), and a 7-pair
+--   under the joker gate cannot be produced on cue by any input-driven
+--   drive.  Those arms stay below as one labeled block on the old
 --   entry-point install rig: rig bytes planted, reel positions parked,
---   stopped reels restarted to replay the driver's boundary walk, and monsters
---   staged so nothing dies mid-observation.  The block keeps this file's
---   waiver lines and may never produce fixtures.  Arms: T0 byte-vanilla and
---   the rigged miss; T1 the miss bought off (same drive, one pending byte
---   different); T2 the drift walk replayed on a fresh budget; T3b the
---   exemption A/B damage ratio on identical triples; T3j the joker gate
---   refusing a bought 7-pair at 3 bp.
+--   stopped reels restarted to replay the driver's boundary walk, and
+--   monsters staged so nothing dies mid-observation.  Arms: T0
+--   byte-vanilla and the rigged miss; T1 the miss bought off (same drive,
+--   one pending byte different); T2 the drift walk replayed on a fresh
+--   budget; T3b the exemption A/B damage ratio on identical triples; T3j
+--   the joker gate refusing a bought 7-pair at 3 bp.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -120,7 +106,7 @@ local function armWatches()
       driftW[#driftW + 1] = { k = s["cpu.k"], v = v }
     end)
   end, emu.callbackType.write, 0x7E617D, 0x7E617D)
-  -- the exemption watch (cheap guards first; see battle_slotsboot's copy)
+  -- the exemption watch (cheap guards first)
   local BOOSTDMG = H.sym("Ot6BoostDmg")
   emu.addMemoryCallback(function(_, v)
     if not (v > 0 and H.readByte(0xB5) == 0x0F) then return end
@@ -179,25 +165,14 @@ local function menuFor(charId, what)
           H.readByte(ACTOR), H.readByte(MSTATE), H.monstersPresent(),
           table.concat(hps, "/"), table.concat(st1, "/"),
           table.concat(st4, "/"), table.concat(atb, "/")))
-        -- One picture of a wait that has clearly stalled.  It is what
-        -- identified this arm's failure in a single run: the screen read
-        -- "Got 256 Exp. point(s)", so the battle had been won and no menu
-        -- was ever going to arrive.
+        -- One picture of a wait that has clearly stalled: the battle may
+        -- have been won already, with no menu ever going to arrive.
         if stallShot == nil and H.frame - started > 3000 then
           stallShot = true
           H.screenshot("slots_stall")
         end
       end
       if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= slotOf[charId] then
-        -- Defer rather than Defend.  A Defend is "right then A", and when the
-        -- right press does not take, the A confirms Fight instead: measured
-        -- 2026-08-13, the formation went from five live monsters to a
-        -- victory screen inside one 600-frame window while this arm was
-        -- waiting for SETZER, and the wait then sat on "Got 256 Exp.
-        -- point(s)" for its whole budget.  H2 needs a bank of 2 that only
-        -- exists inside this battle -- Ot6InitBP re-seeds 1 in the next one
-        -- -- so the party must not win the fight out from under it.  X hands
-        -- the turn on without acting.
         local step = ph % 24
         if step < 4 then H.setPad({ x = true }) else H.setPad({}) end
       else
@@ -416,8 +391,6 @@ add({
       return pend(actor) == 0 or not H.battleLoadStarted()
     end, 15000, {
       H.call(function()
-        -- battle messages (the result banner) block the queue until
-        -- dismissed, as codex_ctx measured; tap A through them
         H.setPad(H.readByte(MENU) == 0 and H.frame % 8 < 4
                  and { a = true } or {})
       end),
@@ -444,15 +417,6 @@ add({
   }, "bank1: unboosted spin regens 0 -> 1"),
 })
 
--- H2 is played in a SECOND battle, and that is forced rather than chosen.
--- The bank does not cross a battle boundary -- Ot6InitBP re-seeds 1 in
--- every fight -- so the old shape earned 2 bp inside H1's fight, which made
--- it four Slot resolutions long: H1, two bank spins, H2.  This pool has no
--- formation that survives four.  Measured 2026-08-13, the whole draw pool
--- from this checkpoint deals 745, 1160 or 1246 total max HP over six draws,
--- and the party clears that in three spins: the H2 wait sat for its full
--- 30000-frame budget on a screen reading "Got 256 Exp. point(s)".
---
 -- A fresh fight opens at 1 bp, so one plain spin banks the 2 that H2 needs
 -- and the fight is only two resolutions long, which the same formations do
 -- survive.  Nothing is given up: the boundary re-seed is asserted on the
@@ -551,11 +515,6 @@ add({
   end),
 })
 
--- ========================================================================
--- Labeled quarantine lab (issue #75); see the header.
--- Fault injection for the icon-specific code: rig bytes planted, reel
--- positions parked, and stopped reels restarted.  May never produce fixtures.
--- ========================================================================
 local function stageEnemies(hp)
   for _, m in ipairs(msPresent) do
     local e = ENT_M(m)

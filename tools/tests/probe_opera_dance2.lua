@@ -1,14 +1,14 @@
 -- probe_opera_dance2.lua -- boot aria_postfork; drive the flower dance
 -- adaptively: chase the nearest play-stage NPC (Draco), A-mash to advance
 -- _cabd35 ($01F0/1/2) and _cabf27 ($0057), then head to balcony (8,9)=_cabe6d
--- ($0111).  Heavy logging, so a failure still records the mechanic.
+-- ($0111).
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local STRIDE=0x29
 local function objX(i) return H.readWord(0x086a + i*STRIDE) >> 4 end
 local function objY(i) return H.readWord(0x086d + i*STRIDE) >> 4 end
-local PLAY={3,7,8,9,10,12}   -- play-stage NPC object indices (from objscan)
+local PLAY={3,7,8,9,10,12}   -- play-stage NPC object indices
 local DELTA={up={0,-1},down={0,1},left={-1,0},right={1,0},upright={1,-1},upleft={-1,-1},downright={1,1},downleft={-1,1}}
 local MOVES={"up","upright","upleft","right","left","downright","downleft","down"}
 local function dumpsw(tag)

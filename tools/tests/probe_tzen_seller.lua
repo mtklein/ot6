@@ -1,9 +1,9 @@
 -- probe_tzen_seller.lua -- finish the Tzen leg from the banked
--- wob_tzen_town fixture: SRAPHIM, RunningShoes, exit, save (#133).
+-- wob_tzen_town fixture: SRAPHIM, RunningShoes, exit, save.
 --
 -- The seller at (29,3) hides behind a tile the BFS model calls
--- unwalkable but the engine allows (measured: a held RIGHT from (27,3)
--- lands (28,3)).  So: navTo(27,3), push right onto the hidden tile,
+-- unwalkable but the engine allows: a held RIGHT from (27,3) lands (28,3).
+-- So: navTo(27,3), push right onto the hidden tile,
 -- talk RIGHT into (29,3), ride his 3000-GP choice at row 0 (Yes).
 -- Then the relic room 312 (bump (25,7)), shop 32 keeper at (80,16):
 -- RunningShoes x1.  Exit via room edge and the town's y=31 row; save
@@ -33,11 +33,9 @@ H.run({ maxFrames = 40000 }, flatten({
   H.loadState("build/states/wob_tzen_town.mss.lua"),
   H.waitFrames(8),
   H.call(function() e0 = espers(); H.log(string.format("boot gil=%d espers=%d", gil(), e0)) end),
-  -- the hidden step onto (28,3), then talk right into the seller.
-  -- Replicates probe_tzen_seller's measured hunt sequence exactly: the
+  -- the hidden step onto (28,3), then talk right into the seller: the
   -- approach through (28,5)/(29,5) leaves the party on the z-level from
-  -- which the (27,3)->right push is allowed (a direct navTo(27,3)
-  -- arrives on a z where 400 held frames never move).
+  -- which the (27,3)->right push is allowed.
   H.navTo(28, 5, { maxFrames = 9000, playBattles = "flee" }),
   H.hold({ "up" }), H.waitFrames(60), H.release(), H.waitFrames(8),
   H.navTo(29, 5, { maxFrames = 6000, playBattles = "flee" }),
@@ -52,11 +50,9 @@ H.run({ maxFrames = 40000 }, flatten({
     H.screenshot("seller_reach")
   end),
   (function()
-    -- ot6 renders dialog choices as a menu while dialogWaiting reads
-    -- false, and a held direction steers that menu -- the facing-press
-    -- RIGHT was selecting "No" before every confirm (measured: dlg $0621
-    -- looped forever, gil never moved).  So: press right+a only until
-    -- the dialog first opens, then plain A edges ONLY.
+    -- dialog choices render as a menu while dialogWaiting reads false, and
+    -- a held direction steers that menu, so: press right+a only until
+    -- the dialog first opens, then plain A edges only.
     local t, talked = 0, false
     return H.driveUntil(function() return espers() > e0 end, 6000, {
       H.call(function()

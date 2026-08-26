@@ -4,20 +4,12 @@
 ; Two tilts: the success roll and the rare/common pick. The Steal submenu and
 ; the Filch/Bestow rows that share the command are in ot6_thief.asm.
 ; ------------------------------------------------------------------------------
-; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
-; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler receives the identical
-; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
-; ff6-en.map are byte-identical across the split.
-; ------------------------------------------------------------------------------
-
-; ------------------------------------------------------------------------------
 
 ; [ boost tilts the steal success roll: the chance verb's certainty ]
 
-; DESIGN.md's canon rule: on damage verbs boost multiplies; on chance verbs
-; boost guarantees. Steal rolls dice, so each BP buys odds and the full spend
-; buys certainty, expressed in steal's own terms.
+; On damage verbs boost multiplies; on chance verbs boost guarantees. Steal
+; rolls dice, so each BP buys odds and the full spend buys certainty,
+; expressed in steal's own terms.
 ;
 ; This replaces the single `lda $3b18,x` (load attacker level) at the head of
 ; the vanilla success math (TargetEffect_52, battle_main.asm @39a?..@39d8):

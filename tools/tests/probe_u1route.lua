@@ -1,19 +1,11 @@
--- probe_u1route.lua -- measurement probe for gen_zozo4's U1 crane-roof
--- crossing (map 221, stair-exit landing (30,43) -> the J39 row at (29,39)).
--- The first table drive parked at (33,43) z=2 with canStep refusing
--- "upright" for a whole 24000-frame budget; the hypothesis is that (33,43)
--- is a mid-beam bridge-diag tile whose diagonal is z-suppressed at z=2, and
--- the real route enters the "/" beam at its $41 base via (31,44)/(32,44) --
--- the two baseline-trail tiles the first table wrote off as recovery
--- entries.  This probe reads the live prop bytes (the street is the same
--- map 221, so the decompressed tables are live from zozo_arrival) and walks
--- a single-z-tracked door-walled BFS from (30,43) at each z seed, printing
--- the move list.  Reads only.
+-- probe_u1route.lua -- measurement probe for the U1 crane-roof crossing
+-- (map 221, stair-exit landing (30,43) -> the J39 row at (29,39)).  Reads
+-- the live prop bytes and walks a single-z-tracked door-walled BFS from
+-- (30,43) at each z seed, printing the move list.  Reads only.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 
--- gen_zozo4_dadaluma's transcription of player.asm's step rules (its
--- door-walled step model), z-tracked
+-- player.asm's step rules: door-walled, z-tracked
 local DIRBIT = { up = 0x08, right = 0x01, down = 0x04, left = 0x02 }
 local DELTA  = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 },
                  left = { -1, 0 }, upright = { 1, -1 }, downright = { 1, 1 },

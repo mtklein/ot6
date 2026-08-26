@@ -1,33 +1,15 @@
 -- gen_mrf_save_room_checkpoint.lua -- generate SRAM checkpoint B,
--- `mrf-save-room-v1` (the A-F save-point boundary range is lettered in
--- tools/tests/savestate_graph.py): boot ifrit_entry (the nearest
--- generated predecessor, map 264 {3,7}), walk the {3,5} door into the
--- map-270 save room, walk onto the vanilla save point at {25,10}, and save
--- through the game's OWN Save UI into slot 3.  run.sh captures Mesen's
--- complete 32 KiB battery file after shutdown (OT6_CAPTURE_SRM), using the
--- same procedure and menu path as gen_post_opera_checkpoint.lua, with nothing
--- synthesised.
+-- `mrf-save-room-v1`: boot ifrit_entry (map 264 {3,7}), walk the {3,5}
+-- door into the map-270 save room, walk onto the vanilla save point at
+-- {25,10}, and save through the game's own Save UI into slot 3.  run.sh
+-- captures Mesen's complete 32 KiB battery file after shutdown.
 --
--- Getting here and saving is the save/reset/load evidence #15 wants for
--- this save point: the walk shows the room is reachable on the played route,
--- the SavePoint event shows the save-enable flow ran ($01BF), and the
--- post-save asserts show the slot-3 record and the codex page landed in
--- SRAM.  The cold-Continue half of the round trip is gen_ifrit_magicite's
--- checkpoint boot, which asserts this same table as its entry contract.
---
--- Two measured hazards this file's shape depends on:
---  * Standing on a save tile re-enters the SavePoint script every frame
---    ($01B5 gate -> early return), so hasControl() flickers indefinitely
---    there, the same hazard gen_esper_tubes measured on the BIG_SWITCH tile.
---    No settle predicate can hold on the tile; arrival is judged on position,
---    $01BF and tile alignment only, and the menu is opened through repeated
---    edge presses.
---  * The ULTROS2 row witnesses the boundary contract requires are seeded
---    (an issue-#75 waived poke, burn-down pending an input-driven chain that
---    reveals them by play) right before the save, as the
---    post-opera checkpoint does.  A cold Continue must then recover them
---    from the battery, which the ROM's own fresh-page formatting cannot
---    produce.
+-- Standing on a save tile re-enters the SavePoint script every frame
+-- ($01B5 gate -> early return), so hasControl() flickers indefinitely
+-- there.  No settle predicate can hold on the tile; arrival is judged on
+-- position, $01BF and tile alignment only, and the menu is opened
+-- through repeated edge presses.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26
@@ -46,7 +28,7 @@ local function settled()
 end
 
 -- Walk one direction, absorbing dialogs/battles.  calmPred defaults to
--- settled(); the save-tile approach passes a relaxed one (see the header).
+-- settled(); the save-tile approach passes a relaxed one.
 local function tapInto(dir, pred, maxFrames, what, calmPred)
   local phase, n, ph, calm = 0, 0, 0, 0
   calmPred = calmPred or settled
@@ -124,12 +106,6 @@ H.run({ maxFrames = 20000 }, {
     H.screenshot("checkpoint_b_save_tile")
   end),
 
-  -- Open the ordinary field menu.  $0059 alone blips nonzero on a save
-  -- tile (the SavePoint re-entry; gen_zozo5_ramuh measured the blip class),
-  -- so a real menu means 30 consecutive frames of it.  The menu-flags byte
-  -- $0201 must then carry the save-enable bit OpenMainMenu copied from
-  -- $01BF (field/menu.asm:229-235), which is the flow the menu's own Save
-  -- command gates on (menu/field_menu.asm:3641-3643).
   (function() local calm, ph = 0, 0
     return H.driveUntil(function()
       calm = (H.readByte(0x59) ~= 0) and calm + 1 or 0
@@ -148,24 +124,11 @@ H.run({ maxFrames = 20000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
-    -- the real CopyGameDataToSRAM entry captures the slot argument the
-    -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
-    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- The pad-driven save (save-drive rule, tools/tests/README.md;
-  -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
-  -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
-  -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
-  -- poke, and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -194,10 +157,6 @@ H.run({ maxFrames = 20000 }, {
     H.assertEq(emu.read(0x316801, emu.memType.snesMemory), 0x38,
       "slot 3 has OT6 codex magic 8")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are read, never seeded (issue #75): the
-    -- battery carries whatever the chain earned.  The phase-2 checkpoint
-    -- re-cuts measure these, and the entry contracts follow the
-    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))

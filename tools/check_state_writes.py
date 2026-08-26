@@ -1,60 +1,12 @@
 #!/usr/bin/env python3
-"""State writes in tools/tests are declared, not silent.  This is that registry.
+"""State writes in tools/tests are declared, not silent: a registry of
+sanctioned write-side API uses.
 
-The rule (owner directive, 2026-08, refined): focused unit-style tests and
-measurement instruments may use write expedients -- a poke that reaches a
-mechanism a human cannot produce on cue is a fine way to unit-test it -- but
-the long playthroughs run before a release, the savestate generators that walk
-the game from power-on through the story with controller input, must never
-write game state.  A generator that pokes HP, warps the party, or clamps a boss
-mints a fixture nobody played, and every state downstream inherits it.
-
-That second half -- the playthroughs play for real -- is enforced by
-check_playthrough_honest.py.  This linter enforces the discipline around the
-first: every write, even a sanctioned one, must be DECLARED in
-tools/state_write_waivers.txt, so a new poke is a reviewed line rather than a
-silent one, and prose that merely mentions a write API never trips it.
-
-This linter scans every tools/tests/**/*.lua (lib/ included), strips Lua
-comments and string literals first (the corpus mentions write APIs far more
-often than it calls them, and prose must not trip the check), and then
-flags the write-side surface:
-
-    emu.write / emu.writeWord / emu.write16 / emu.write32
-    emu.setState / emu.addCheat / emu.clearCheats
-    emu.rewind / emu.reset / emu.loadSavestate
-    .writeByte( / .writeWord(          (any receiver -- the ot6.lua wrappers)
-    H.write / M.write                  (helper-module write entry points)
-
-One line per finding: file:line: token.  Exit 0 clean, exit 1 dirty.
-
-THE REGISTRY.  tools/state_write_waivers.txt lists every (file, token) pair
-that writes state, each a sanctioned unit-test or instrument expedient:
-
-  * a hit whose (file, token) pair is not in the list fails the run, so a new
-    poke cannot land silently -- it is added as a reviewed line or not at all;
-  * a listed pair that no longer matches anything also fails the run, so a
-    stale line must be deleted and the registry stays honest about the corpus.
-
-Granularity is per (file, token) rather than per line: line numbers churn with
-every unrelated edit, while "this file writes through this API" is the durable
-fact.  This is a registry, not a burn-down -- it may grow when a new unit-style
-test earns an expedient, so long as the addition is deliberate.  It carries no
-obligation to reach zero; the honesty that matters, generators playing for
-real, is a separate and absolute check (check_playthrough_honest.py).
-
---regen-waivers rewrites the list from the current corpus, for when a cleanup
-removes writes; running it to cover a new write is visible in the diff of a
-checked-in file.
-
-Wired into `make test` (both the check and --selftest) and into `make
-savestates` (so savestate generation cannot run from a poking generator even
-when the suite was skipped).  It lives in the Makefile rather than suite.sh
-because suite discovery globs *.lua for a `-- @suite` marker and cannot see
-a .py file, the same reason check_boss_rows.py sits there.
-
-Nothing here writes game state; it is a read-only linter (only
---regen-waivers touches anything, and only the waiver file).
+Scans every tools/tests/**/*.lua for the write-side token surface below,
+after stripping Lua comments and string literals so prose does not trip it.
+Every hit must be declared in tools/state_write_waivers.txt as a (file,
+token) pair; an undeclared hit or a stale waiver entry fails the run.
+--regen-waivers rewrites the list from the current corpus.
 
 Usage:  python3 tools/check_state_writes.py [--repo ROOT] [-v]
                 [--regen-waivers] [--selftest]
@@ -72,11 +24,8 @@ WAIVER_FILE = os.path.join("tools", "state_write_waivers.txt")
 
 # ---------------------------------------------------------------- tokens --
 # The write-side surface.  Matching is longest-token-first so a site is
-# reported under its most specific name (emu.writeWord, not emu.write), and
-# tokens that end in an identifier character take a trailing boundary so
-# emu.reset does not claim emu.resetAccessCounters (a counter reset is not a
-# state write) and M.write does not claim M.writeByte(, since the
-# .writeByte( token owns that site instead.
+# reported under its most specific name; a trailing boundary keeps e.g.
+# emu.reset from matching emu.resetAccessCounters.
 
 TOKENS = [
     "emu.write",
@@ -93,11 +42,8 @@ TOKENS = [
     ".writeWord(",
     "H.write",
     "M.write",
-    # The runtime write gate's confined raw-emu handle (lib/compose.py
-    # injects it at compose time; no checked-in .lua may name it).  A test
-    # that reaches for it is reaching around the gate.  This token was
-    # forbidden from the start, so it can never appear in the burn-down
-    # list; the static check closes the runtime gate's one escape hatch.
+    # The runtime write gate's confined raw-emu handle, injected by
+    # lib/compose.py; no checked-in .lua may name it.
     "__OT6_EMU_RAW",
 ]
 
@@ -118,17 +64,14 @@ TOKEN_RE = re.compile("|".join(
 
 
 def canon_token(matched: str) -> str:
-    """Map a regex match back to its TOKENS entry (they are equal today;
-    this function keeps waiver keys stable if a pattern grows)."""
+    """Map a regex match back to its TOKENS entry."""
     return matched
 
 
 # ---------------------------------------------------------------- lexer ---
-# Blank out Lua comments and string literals, preserving every newline so
-# line numbers survive.  Handles:  -- line comments, --[[ ]] / --[=[ ]=]
-# long comments, '...' and "..." with backslash escapes, [[ ]] / [=[ ]=]
-# long strings.  An unterminated quote is closed at the newline (Lua itself
-# errors there) and an unterminated long bracket runs to EOF.
+# Blanks out Lua comments and string literals, preserving newlines so line
+# numbers survive: -- line/long comments, '...'/"..." strings, [[ ]] long
+# strings.
 
 _LONG_OPEN = re.compile(r"\[(=*)\[")
 
@@ -251,11 +194,8 @@ WAIVER_HEADER = """\
 
 
 def load_waivers(path: str):
-    """{(file, token): reason-or-None} from the waiver file.
-
-    A third field beginning `quarantine:` records the reason the expedient is
-    warranted; a missing third field just means no reason was written down (the
-    line is sanctioned either way).  Missing file = empty."""
+    """{(file, token): reason-or-None} from the waiver file.  A third field
+    beginning `quarantine:` records the reason; missing file = empty."""
     waivers = {}
     if not os.path.exists(path):
         return waivers
@@ -282,11 +222,7 @@ def load_waivers(path: str):
 
 
 def write_waivers(path: str, hits, existing=None) -> int:
-    """Rewrite the list from the corpus, preserving classifications.
-
-    A quarantine mark is a judgement someone made about a file; regenerating
-    after a cleanup wave must not silently discard it and turn a sanctioned
-    mechanism test back into apparent conversion work."""
+    """Rewrite the list from the corpus, preserving quarantine reasons."""
     existing = existing or {}
     pairs = sorted({(rel, tok) for rel, _line, tok in hits})
     with open(path, "w", encoding="utf-8") as f:
@@ -489,10 +425,8 @@ def main() -> int:
     waiver_path = os.path.join(args.repo, WAIVER_FILE)
     if args.regen_waivers:
         hits, nfiles = scan_tree(args.repo)
-        # Pass the existing list so a recorded reason survives the rewrite;
-        # without this, --regen silently dropped every third field (the
-        # docstring promised preservation write_waivers only does when handed
-        # what to preserve).
+        # Passing the existing list lets a recorded quarantine reason
+        # survive the rewrite.
         npairs = write_waivers(waiver_path, hits, load_waivers(waiver_path))
         print("state-write waivers regenerated: %d (file,token) pairs "
               "covering %d sites in %d scanned files -> %s"

@@ -3,39 +3,7 @@
 -- -> map 209 (the opera-plot room) -> parked at {117,20} facing UP, one
 -- A-press below the IMPRESARIO ({117,19}, _ca9337).  Generates
 -- opera_entry.mss.
---
--- Why here rather than the opera-house foyer (the survey's guess).  Measured:
--- the opera house is map 237 (world {45,154}, far to the south of Jidoor), and
--- its impresario ({60,48}, _caae15, the performance trigger) is hidden
--- behind switch $0340, showing only a "The Opera House's closed" sign
--- (_caadf1, $0341).  $0340 is set to 1 only by the opera-open cutscene, which
--- begins by talking to the IMPRESARIO on map 209 (_ca9337: "Maria!?" -> CELES's
--- resemblance -> the letter NPC appears, $0331=1 -> reading it -> the Setzer
--- intro/name-menu -> $0340=1).  Map 209 is reached from Jidoor's north door,
--- not the opera house.  The state one A-press from the performance sequence
--- is therefore here, at the map-209 impresario; the whole opera cutscene
--- chain follows from that one talk.
---
--- Route checkpoints (source + measured, probe_opera_route/jidoor_door):
---  * Zozo world-exit: vertical long-entrance column x=63, y=32..63 -> world
---    {23,92}.  navTo {62,45}, step RIGHT.
---  * world {~22,91} -> Jidoor approach {27,129}; step DOWN onto {27,130}
---    (short_entrance _0) -> map 198 {15,61}.  worldNavTo BFS'd it without
---    trouble.
---  * Jidoor: the {16,12}->209 door is a bump entrance: {16,12} is a $F7
---    wall flanked by $F7, triggered by walking UP into it from {16,13} (the
---    reachable approach, 51 steps from the entrance).  Landing map 209 {118,28}.
---  * map 209: the IMPRESARIO stands at {117,19} (faces LEFT).  navTo {117,20},
---    face UP.  The entry point verifies, after the state is generated, that
---    one A-press fires _ca9337, so the banked state cannot be one A-press
---    short of working.
---
--- Roster: LOCKE+CELES+SABIN+EDGAR, #21's canonical four (the leave menu
--- seats all four since gen_zozo5's issue-#21 fix).
---
--- Issue #75: no state writes.  World encounters are fled by the engine's
--- own run mechanic (held L+R) with an edge-A fight fallback; field strays
--- are fought; walks run under the playBattles nav modes.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -47,23 +15,6 @@ local function settled()
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
 end
 
--- Robust world walk to (tx,ty).  worldNavTo's verified-step blocklist breaks
--- on the Zozo->Jidoor route: the area around (34,103) is a dense
--- random-battle zone (world tile prop bit6 $40), and every encounter
--- snapshots and restores the party to the same tile, so worldNavTo reads the
--- press as having not moved the party, condemns all four edges and loops
--- indefinitely (measured, probe_opera_world.lua).  This grinds through
--- instead: re-plan a worldBfs each time the plan runs out, press the next
--- step.  No edge is ever condemned, so a battle-restored tile is retried
--- until a step lands.  Arrival is the requested controlled world tile;
--- importantly, battle transitions also clear worldMode(), so that flag alone
--- cannot distinguish entering a town from starting a random encounter.
---
--- Encounters are handled with real input (issue #75; no battle-clear
--- write): hold the engine's own L+R run mechanic through the complete battle
--- transition, which is what a player does to ordinary world encounters.  A
--- bounded escape makes a genuinely unrunnable formation fail explicitly
--- instead of silently switching to a second, more fragile combat policy.
 local function worldGrind(tx, ty, what)
   local plan, idx, step = nil, 1, nil
   local battN, battleFrames, hb = 0, 0, -600
@@ -155,16 +106,6 @@ H.run({ maxFrames = 250000 }, {
     H.log(string.format("[boot] map=%d (%d,%d)", map(), H.fieldX(), H.fieldY()))
   end),
 
-  -- 0. Heal before the road out.  zozo_done hands this generate a party at
-  -- 56-87% (CELES 194/349, LOCKE 229/353), and the Zozo street below draws
-  -- random battles.  #124's Leo-break ROM re-rolled the battle chain, and a
-  -- street encounter that the old blind-A-tap walk survived now wipes a
-  -- half-strength party (measured 2026-08-20: opera_entry lost the fight at
-  -- (60,46) and stalled the full budget into a Game Over).  A full party is a
-  -- lot harder to kill, and the fight is one to leave rather than win -- there
-  -- is no XP worth taking on the way out of town -- so the walk flees instead
-  -- of A-tapping (mirroring gen_mrf_chute's upper-floor crossing).  The care
-  -- stop is player-realistic prep; it is a no-op when the party is already up.
   H.fieldCare({ tag = "care before leaving Zozo", threshold = 0.9 }),
 
   -- 1. off the street to the world (approach {62,45}, step RIGHT onto x=63).
@@ -229,9 +170,6 @@ H.run({ maxFrames = 250000 }, {
       H.fieldX(), H.fieldY(), sw(0x0331), sw(0x0340)))
   end),
 
-  -- #84: Tincture, visible on the walk (map 209's one chest, bit 66 at
-  -- (125,11); probe_chest209 measured the stand tile: only (125,12) below
-  -- it is reachable, 14 steps from the park tile).
   H.openChest{ stand = { 125, 12 }, face = "up", bit = 66,
                what = "Tincture", item = 0xEB,
                nav = { playBattles = true } },

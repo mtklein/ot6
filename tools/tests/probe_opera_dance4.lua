@@ -1,6 +1,6 @@
--- probe_opera_dance4.lua -- final dance attempt and diagnosis.  Climb the x=12
--- column to Draco (12,14), talk up to advance _cabd35 ($01F0->1->2), tracking
--- every object so Draco's movement is visible.  Then flowers -> balcony.
+-- probe_opera_dance4.lua -- climbs the x=12 column to Draco (12,14), talks up
+-- to advance _cabd35 ($01F0->1->2), tracking every object so Draco's movement
+-- is visible.  Then flowers -> balcony.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end

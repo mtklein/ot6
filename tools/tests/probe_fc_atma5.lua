@@ -1,10 +1,9 @@
--- probe_fc_atma5.lua -- #132 segment 3, the AtmaWeapon fight itself.
--- Boots fc_atma_door.mss (party at (60,17), Atma's NPC at (60,15),
--- banked by probe_fc_atma4).  The talk only fires on the clean gesture
--- -- tap up to face, release, tap A while stationary -- never on held
--- direction + A (probe_fc_atma4 measured both).  The post-win event
--- _cada30 clears switch $035F ($1EE0 region, byte $1EEB bit 7), which
--- makes an end condition no random encounter can fake.
+-- probe_fc_atma5.lua -- the AtmaWeapon fight itself.  Boots
+-- fc_atma_door.mss (party at (60,17), Atma's NPC at (60,15)).  The talk
+-- only fires on the clean gesture -- tap up to face, release, tap A
+-- while stationary -- never on held direction + A.  The post-win event
+-- clears switch $035F ($1EE0 region, byte $1EEB bit 7), which makes an
+-- end condition no random encounter can fake.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x3ff) == m end
 local FA = H.newFightDriver("atma", { tactical = true, boost = true, bank = 3,

@@ -1,8 +1,7 @@
--- probe_dump21.lua -- dump cliff map 21's tile props (p1/$7E7600,
--- p2/$7E7700) and the NPC-block map ($7E2000, bit7 clear = blocked)
--- straight from the chase state, to settle how the top pocket
--- ((23,10)-(32,10), the doors into 41's closed east corridor) is entered
--- (#133 Mog).
+-- probe_dump21.lua -- dumps cliff map 21's tile props (p1/$7E7600,
+-- p2/$7E7700) and the NPC-block map ($7E2000, bit7 clear = blocked), for
+-- the top pocket ((23,10)-(32,10), the doors into 41's closed east
+-- corridor).
 local H = dofile("tools/tests/lib/ot6.lua")
 H.run({ maxFrames = 3000 }, {
   H.loadState("build/states/wob_chase23C.mss.lua"),

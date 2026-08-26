@@ -5,16 +5,7 @@
 -- world {45,154}) -> parked at {60,49} facing UP below the now-visible
 -- IMPRESARIO ({60,48}, _caae15).  Generates opera_open.mss, one A-press
 -- from the performance itself (the aria).
---
--- Measured (probe_opera_intro): the intro rides on a hasControl-gated stall
--- fallback that alternates A and START, which clears both the dialog pages and
--- the name_menu SETZER without special-casing either; it ends on map 209
--- {118,24} with control and $0340=1/$010E=1.  Travel checkpoints: 209's
--- {118,29} door -> Jidoor {16,14}; Jidoor's south edge (long-entrance
--- src{0,63} HORIZ len31) -> world {27,132}; world -> opera approach
--- {45,153} -> step DOWN.  Issue #75: no state writes; the exposed world leg
--- flees random encounters, and the remaining walks run under the
--- playBattles nav modes.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -29,18 +20,7 @@ end
 -- ride a cutscene: edge-A through dialog, START through a menu ($0059), and
 -- when parked flag-less with no field control, alternate A/START (clears the
 -- name_menu too).  Stall gated on hasControl (gen_zozo5's issue-#3 fix).
---
--- The menu test must come first.  Since 62ccab7 (#24) battleLoadStarted()
--- means "$7E3BF4 is not $FFFF", and the menu module zeroes that word:
--- measured on the Zozo leave cutscene, $7E3BF4 reads $FFFF for every field
--- frame and $0000 for every frame a menu is up.  The battle branch therefore
--- returns true throughout the Setzer name_menu, and if it were tested first
--- this driver would edge-A the name grid instead of committing it with
--- START (and, in the battle-clear-write era, would also write $7E3EEC..
--- while those bytes belonged to the menu; those writes are gone, but the
--- ordering still matters).  gen_zozo5_ramuh's leave cutscene is where this
--- was measured: blind A on a party_menu enters a character's Status page
--- and does not leave it.
+
 local function rideOpen(pred, maxFrames, what)
   local aPh,sPh,stallN,lx,ly = 0,0,0,-1,-1
   return H.driveUntil(function() local d=pred(); if d then H.setPad({}) end; return d end,

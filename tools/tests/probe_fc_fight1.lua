@@ -1,6 +1,6 @@
--- probe_fc_fight1.lua -- one instrumented FC pool fight (#132): why do
--- pips not chip?  Boots fc_land, walks until a battle, fights it with
--- the traced tactical driver, logs shields per action.
+-- probe_fc_fight1.lua -- one instrumented FC pool fight: why do pips not
+-- chip?  Boots fc_land, walks until a battle, fights it with the traced
+-- tactical driver, logs shields per action.
 local H = dofile("tools/tests/lib/ot6.lua")
 local F = H.newFightDriver("fc1", { tactical = true, boost = true,
   items = true, healPercent = 50, trace = true })

@@ -1,17 +1,10 @@
 -- @suite savestate=battle_entry
--- battle_lore.lua -- issue #122: Strago's 5-slot lore loadout, asserted at
--- the one choke point InitSpellList's lore walk reads (ot6_lore.asm,
--- battle_main.asm "ot6 #122").
---
--- Writes: the $1d29-2b learned-bitfield and $1e27-2b (OT6_LORELOAD) pokes
--- below are a sanctioned unit-test expedient (owner ruling) -- they set up
--- collection/loadout states (truncation past five, a stale-but-stored id) a
--- human cannot assemble on cue, and every arm reloads the fixture and lets
--- real battle init (InitSpellList) run untouched from there.
---
--- The Ochette model, third instance: LearnLore and the $1d29-$1d2b learned
--- bitfield are untouched (observation stays unlimited), and only the battle
--- Lore menu narrows.  The narrowing is a single choke point: Ot6LoreMask
+-- battle_lore.lua -- Strago's 5-slot lore loadout, asserted at the one
+-- choke point InitSpellList's lore walk reads (ot6_lore.asm).
+
+-- LearnLore and the $1d29-$1d2b learned bitfield are untouched (observation
+-- stays unlimited), and only the battle Lore menu narrows.  The narrowing
+-- is a single choke point: Ot6LoreMask
 -- writes an EFFECTIVE 3-byte mask to $ee/$ef/$f0, and InitSpellList's
 -- vanilla lore walk (`bit $ee,x`, was `bit $1d29,x`) reads that instead of
 -- the raw bitfield.  For each passing bit y (a lore id, 0..23): $3a87
@@ -20,32 +13,7 @@
 -- effective mask -- leaves both cells at whatever InitBattle's own $ff fill
 -- left them ($2000-$341f, battle_main.asm InitBattle @2402), which this file
 -- measures rather than assumes (arm 1 below).
---
--- MANUAL (any of the five OT6_LORELOAD bytes at $7e1e27-$1e2b nonzero): the
--- stored, still-learned ids (byte = lore id+1; validated against $1d29-2b,
--- so a stale/hand-edited slot is dropped, not offered -- arm 4).
--- AUTO (all five loadout bytes zero, the state every existing save is in):
--- the first five known lores in id order, truncating past five (arm 2), the
--- same "the wall must not be reachable through inaction" ruling kit-gau.md
--- made for Gau's rages.
---
--- What is asserted:
---   1. vanilla-equivalence: $1d29-2b pinned to the ROM's own InitLore New
---      Game values (read live via H.sym/H.readRomByte, not hardcoded), AUTO
---      loadout.  The New Game count is well under the 5-slot cap, so AUTO
---      passes every learned bit through untouched -- byte-for-byte what the
---      pre-#122 vanilla walk would have written.  This arm is also the
---      measurement: it reads back a known-clear cell to learn what value
---      InitSpellList's own clearing (the InitBattle $ff fill) leaves, and
---      every other arm's "not written" assertions check against that same
---      measured value rather than a guessed constant.
---   2. AUTO truncation: 8 lores learned (ids 0-7), AUTO loadout -> only the
---      first 5 (ids 0-4) are offered; ids 5-7, though learned, are not.
---   3. MANUAL: a 3-slot loadout {21,22,23}, all three learned -> exactly
---      those three ids offered, in the count, nothing else.
---   4. stale-byte validation: a loadout slot names a lore whose learned bit
---      is CLEAR -> that slot is skipped (dropped from the count and the
---      cells), while a co-resident valid slot still lands.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 

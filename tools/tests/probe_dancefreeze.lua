@@ -1,83 +1,53 @@
--- probe_dancefreeze.lua -- #129: reproduce the dance-kill battle freeze
--- and dump the engine wait-state mid-freeze.  NOT in the suite.
--- Derived from battle_dancemp.lua at the failing alignment (no HP pin).
--- battle_dancemp.lua -- issue #34: Dance costs MP, a flat amount paid at
--- dance start, per docs/design/mp-economy.md's verb survey (Dance: "flat,
--- paid at start", 4-10).
+-- probe_dancefreeze.lua -- reproduces the dance-kill battle freeze and
+-- dumps the engine wait-state mid-freeze. NOT in the suite.
 --
--- Ot6AbilityCost's cmd-$13 arm charges Ot6DanceCost (8 MP) when the
--- actor's DANCE status ($3ef8 bit 0) is still clear, which is the commit
--- moment, and 0 on every mid-dance turn (RandDanceAction re-queues cmd $13
--- through
--- the same CreateAction with the bit set).  The Dance menu shows the cost
--- through the #35 display pattern's second consumer: Ot6DanceRowDecorate
--- re-lays each column to [font][cost][name] (the Ot6ToolRowDecorate
--- transform) and greys an unaffordable row via Ot6AbilityGrey; the #35
--- wallet paints the actor's current MP on the window's top edge.
+-- Dance costs MP, a flat amount paid at dance start. Ot6AbilityCost's
+-- cmd-$13 arm charges Ot6DanceCost (8 MP) when the actor's DANCE status
+-- ($3ef8 bit 0) is still clear (the commit moment), and 0 on every
+-- mid-dance turn (RandDanceAction re-queues cmd $13 through the same
+-- CreateAction with the bit set). The Dance menu shows the cost via
+-- Ot6DanceRowDecorate, which re-lays each column to [font][cost][name] and
+-- greys an unaffordable row via Ot6AbilityGrey; the wallet paints the
+-- actor's current MP on the window's top edge.
 --
--- Issue #75 conversion: the real Mog, and the game's own dance-learning.
--- The old header said Mog was not reachable yet; that is no longer true,
--- because he leads P2 of the Narshe moogle defense (gen_moogle,
--- moogle_defense.mss, generated en route to moogle_cleared, hence the
--- savestate=moogle_cleared line above, whose run refreshes both).  So every
--- staging is gone: no CHAR::MOG installs, no command-row writes, no monster
--- stop, HP or death-proof pins, no $1d4c pin, no $267e rebuild.  In their
--- place, the game's own setup:
---   * the defense is deployed as gen_moogle deploys it (P3 east,
---     P2 west, P1 back to the choke), and the wave storm is fought with
---     plain tap-A, except P2's battles, which are this test's subject;
---   * P2's first wave battle is won with plain Fights, and the victory is
---     what teaches Mog his first dance: the battle-end path sets the
---     current background's dance in $1d4c ("mastered a new dance!",
---     battle_main.asm:15842), asserted as a delta, 0 before and the
---     BattleBGDance bit after.  Until then Mog has no Dance command at all
---     (InitCmd_02 removes it on a zero mask, battle_main.asm:14129), which
---     is also asserted, because it is the reason no earlier fixture could
---     host this file with real inputs;
---   * P2's second wave battle is the measurement: the known dance now
---     matches the battle background by construction, since it was learned on
---     this terrain, so Cmd_13's 50% bg-mismatch stumble never fires
---     and the multi-turn phases are deterministic.  That is the property the
---     old file bought with a pinned mask, obtained here from the game's own
---     rule.
+-- Mog leads P2 of the Narshe moogle defense (gen_moogle, moogle_defense.mss,
+-- generated en route to moogle_cleared). The defense is deployed as
+-- gen_moogle deploys it (P3 east, P2 west, P1 back to the choke), and the
+-- wave storm is fought with plain tap-A, except P2's battles. P2's first
+-- wave battle is won with plain Fights, and the victory teaches Mog his
+-- first dance: the battle-end path sets the current background's dance in
+-- $1d4c. Until then Mog has no Dance command at all (InitCmd_02 removes it
+-- on a zero mask). P2's second wave battle is the measurement: the known
+-- dance matches the battle background by construction, since it was
+-- learned on this terrain, so Cmd_13's 50% bg-mismatch stumble never fires
+-- and the multi-turn phases are deterministic.
 --
 -- Asserted (phases 1-3 in P2's second wave battle, with no writes):
---   1. menu: the learned dance's row renders [cost 8][name] with the #35
---      pattern, in white because it is affordable at Mog's real pool; the
---      wallet paints his real MP; and the name is DanceName's own record,
---      read from the ROM.
+--   1. menu: the learned dance's row renders [cost 8][name], in white
+--      because it is affordable at Mog's real pool; the wallet paints his
+--      real MP; and the name is DanceName's own record, read from the ROM.
 --   2. charge at start: the cost queue prices the commit at 8, MP drops
 --      exactly 8 from the real pool, and the dance status locks in.
 --   3. free steps: two further auto-queued dance turns price at 0 and MP
 --      stays put, so there is one payment per battle.
 --
--- One labeled isolation arm (issue #75): two writes stay.
+-- One labeled isolation arm: two writes stay.
 --   4. refusal: the below-price fizzle, where the row greys $25, the commit
 --      still queues at 8, and the universal insufficient-MP gate refuses, so
---      there is no dance status and MP is unmoved.  The input-driven case is
---      a Mog whose pool is under 8, which is reachable in open play by
---      dancing across fights but not inside this set piece: the defense gives
---      P2 exactly two wave battles, the first is spent learning the dance
---      (the game's own precondition), and once Mog is dancing his turns
---      auto-queue and his menu never reopens.  Per the burn-down plan's
---      observation-window ruling (systemic call 2), the arm runs before the
---      real dance in the same battle: Mog's pool is written to 7, the refusal
---      is measured, and the pool is restored to the value read at battle
---      start.  Both writes are this file's .writeWord( waiver, and it may
---      never produce fixtures.
+--      there is no dance status and MP is unmoved. A Mog whose pool is
+--      under 8 is not reachable inside this set piece once he is dancing
+--      (his turns auto-queue and his menu never reopens), so the arm runs
+--      before the real dance in the same battle: Mog's pool is written to
+--      7, the refusal is measured, and the pool is restored to the value
+--      read at battle start.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/moogle_defense.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_DANCE, ST_TGT = 0x05, 0x21, 0x38
 -- The bystanders' "right swaps Fight->Def, then A" turn consumption passes
--- through menu state $27, the def. confirmation (btlgfx_main.asm:19186:
--- right on Fight enters it, A there queues command $15).  Measured
--- 2026-08-18 on the re-made moogle_defense: the old catch-all "b on any
--- non-command state" canceled $27 before the A of the 40-frame cadence
--- could land, so a bystander whose Def the arm needed oscillated
--- $05 <-> $27 without ever consuming its turn, MOG's window never came
--- back, and the input-driven phases timed out.  $27 takes the A instead.
+-- through menu state $27, the def. confirmation: right on Fight enters it,
+-- A there queues command $15.
 local ST_DEF = 0x27
 local CMD_DANCE = 0x13
 local CMDTBL = 0x202E
@@ -249,12 +219,9 @@ local danceId, mp0 = nil, nil
 local costs = {}                        -- cost-queue stores while cmd $13 queues
 
 -- walk the dance cursor onto the known dance's cell.  The $267e list is
--- positional: entry i holds dance i or $ff (UpdateMenuState_21's confirm
--- reads $267e,x and buzzes on a $ff cell), so the one learned dance sits
+-- positional: entry i holds dance i or $ff, so the one learned dance sits
 -- at cell danceId (row danceId//2, col danceId%2 on the 2-column grid) and
--- not at cell 0.  Cursor vars: col $8937+slot, row $893b+slot (the state's own
--- w7e8937,y and w7e893b,y).  Measured: an A-mash at cell 0
--- buzzed indefinitely on the first run of this conversion.
+-- not at cell 0.  Cursor vars: col $8937+slot, row $893b+slot.
 local function danceCursorToKnown(what)
   -- danceId is discovered at runtime, so the target row/col are computed
   -- inside the callbacks, not at step-construction time.
@@ -360,26 +327,13 @@ H.run({ maxFrames = 250000 }, {
       "same terrain, same dance: the bg-mismatch stumble cannot fire")
   end),
 
-  -- ======================================================================
-  -- The labeled isolation arm (see header): the below-price refusal.
-  -- Mog's pool is written to 7, the refusal is measured through the
-  -- standard surfaces, and the pool is restored to the value read above.
-  -- This runs before the real dance because a dancing Mog's menu never
-  -- reopens (RandDanceAction auto-queues his turns).
-  -- ======================================================================
+  -- The labeled isolation arm: the below-price refusal. Mog's pool is
+  -- written to 7, the refusal is measured through the standard surfaces,
+  -- and the pool is restored to the value read above. This runs before the
+  -- real dance because a dancing Mog's menu never reopens (RandDanceAction
+  -- auto-queues his turns).
   mogMenu("mog's command window (isolation arm)"),
   H.call(function()
-    -- #129 staging (2026-08-19, a labeled unit-style expedient): a dance
-    -- auto-turn that kills the LAST monster trips the battle-end freeze
-    -- #129 tracks (the fight provably never ends), and the #122 RNG
-    -- reshuffle put this file's kill exactly on Mog's first free turn.
-    -- The ledger under test needs the pack ALIVE for two more auto-turns
-    -- and nothing after needs the battle to end, so the pack is pinned
-    -- tall (3000 HP) -- no kill, no freeze, the queue fills, the tail
-    -- asserts run.  #129 carries its own deterministic repro recipe; a
-    -- +300 nudge was tried first and the kill still landed.
-    -- PROBE: no HP pin -- this file exists to LET the first-turn kill land
-    -- and then dump the frozen engine's wait-state.
     H.writeWord(0x3C08 + mogSlot * 2, DANCE_COST - 1)
     H.log("[isolation arm] MOG's pool := 7 -- below the flat price")
   end),
@@ -398,8 +352,7 @@ H.run({ maxFrames = 250000 }, {
       "...and the cost greys with it (one font colors the pair)")
     H.screenshot("dancemp_grey")
   end),
-  -- the menu lets the commit through, since the block stays out of
-  -- C1 (see Ot6AbilityGrey's scope comment); the refusal is the universal
+  -- the menu lets the commit through; the refusal is the universal
   -- execution-time fizzle.
   danceCursorToKnown("cursor onto the learned dance's cell (isolation arm)"),
   H.driveUntil(function()
@@ -521,9 +474,7 @@ H.run({ maxFrames = 250000 }, {
   H.call(function()
     -- exec-hit counters: does the engine still RUN these during the freeze?
     probeHits = {}
-    -- exec callbacks take the SNES CPU address RAW (the seed ladder's own
-    -- convention); the first draft masked to file offsets and every counter
-    -- read zero even mid-fight.
+    -- exec callbacks take the SNES CPU address RAW.
     probeTrace = {}
     local watch = {
       CheckBattleEnd  = H.sym("CheckBattleEnd"),
@@ -540,9 +491,8 @@ H.run({ maxFrames = 250000 }, {
       UpdateSprites   = H.sym("UpdateSprites"),
       ClearSpriteData = H.sym("ClearSpriteData"),
       UpdateSfx       = H.sym("UpdateSfx"),
-      -- #129 round 9: the message machinery's own internals, per the
-      -- issue's corrected evidence trail -- which of these still executes
-      -- during the freeze names the loop.
+      -- the message machinery's own internals: which of these still
+      -- executes during the freeze names the loop.
       mess_wait        = H.sym("mess_wait"),
       DrawDlgText      = H.sym("DrawDlgText@btlgfx_code"),
       InitWideMsgWindow = H.sym("InitWideMsgWindow"),
@@ -642,9 +592,9 @@ H.run({ maxFrames = 250000 }, {
       H.readByte(0x7EE9EF), H.readByte(0x7E629A), H.readByte(0x00B1),
       H.readByte(0x2F4B), H.readByte(MENU), H.readByte(MSTATE),
       H.readByte(ACTOR)))
-    -- #129 round 9: message-wait state ($7ee9f5 = "skip mess_wait's own
-    -- delay, DlgTextCmd_07 already waited"; $7e629e = InitMsgWindow's own
-    -- nesting counter) and the raw controller latches DlgTextCmd_07 polls
+    -- message-wait state ($7ee9f5 = "skip mess_wait's own delay,
+    -- DlgTextCmd_07 already waited"; $7e629e = InitMsgWindow's own nesting
+    -- counter) and the raw controller latches DlgTextCmd_07 polls
     -- ($04 = last-swapped repeat-mode buttons, $0a = this frame's raw read,
     -- both via UpdateCtrl / UpdateCtrlBattle).
     H.log(string.format(

@@ -1,90 +1,29 @@
 -- @suite savestate=vargas_entry slow
--- battle_vargas.lua -- tier 2's boss test: Vargas's break gauge, the three
--- chips that are supposed to reach it, and the scripted finish.
---
---   tools/tests/run.sh tools/tests/battle_vargas.lua
---
--- Boots vargas_entry.mss (gen_kolts), presses A once into `_ca828f`
--- (npc_prop.asm:4006 -> event_main.asm:19818), rides the scene through
--- `char_party SABIN,0` (:19906) into `battle 66, MOUNTAINS_EXT` (:19909),
--- and asserts:
---
---   1. the gauge is authored rather than computed by the formula.  Vargas
---      ($0103) seeds 5/5 with
---      class-weak $04 = OT6_BLUDG, straight off Ot6ShieldTbl (ot6.asm:2969);
---      both Ipoohs ($014D) seed 2/2 slash-weak.  The formula value for a
---      monster this size would not be 5, so a dropped row fails here first.
---   2. the element add is live.  His weak byte reads $28 = poison|holy.
---      Vanilla gives poison only (monster_prop.dat +25 = $08), and the
---      holy bit is Ot6ElemAddTbl's row (ot6.asm:216), applied at seed time
---      by Ot6ElemAdd.  This assertion fails if that row is ever
---      dropped, mistyped, or applied to the wrong species.
+-- battle_vargas.lua -- Vargas's break gauge test.  Boots vargas_entry.mss,
+-- rides the scene into battle 66 (MOUNTAINS_EXT), and asserts:
+
+--   1. the gauge seed: Vargas ($0103) 5/5 shields, class-weak OT6_BLUDG
+--      ($04); both Ipoohs ($014D) 2/2, slash-weak.
+--   2. Vargas's weak byte is $28 = poison|holy (vanilla poison only, holy
+--      added by Ot6ElemAddTbl).
 --   3. poison chips, and only poison does.  Edgar's Tools -> BioBlaster
---      (item $a4; InitTarget_03 subtracts ThrowToolsOffsetTbl to reach
---      attack $7d, battle_main.asm:6495-6584; MagicProp+1 = $08 poison)
---      takes a shield and reveals poison in $3E89.  Its negative control
---      runs first and in the same fight: the party's weapon swings are
---      driven onto Vargas until his hp moves, and the gauge is asserted
---      untouched at that moment.  Same actor, same target, one turn apart,
---      with only the weapon changing.  This is the end of tier 2's discovery
---      sequence (the mines hint, the Figaro shop, the Narshe school), and it
---      is the last link in it that had never been watched work.
---   4. holy chips.  Sabin's AuraBolt (Blitz 1, skill $5e, element $20) takes
---      a shield and reveals holy in $3E89, which is the runtime half of the
---      proof main commit 5d00086 deferred to "the vargas-entry fixture".  Holy
---      is the only way that shield can move on that turn: it is checked
---      against the recorded skill id, and Sabin is alone on the field.
---   5. bludgeoning chips, twice.  Pummel (Blitz 0, skill $5d, OT6_BLUDG per
---      Ot6SkillClassTbl, ot6_class.asm:193) takes two shields, 3 -> 1, and
---      reveals class $04.  Two rather than one because Pummel is x2
---      (Ot6HitCountTbl, ot6_hitcount.asm) and each hit is its own
---      ExecAttack -> CalcTargetDmg pass, so each is its own chip: the gauge
---      takes two separate writes in the one action, which is asserted
---      beside the end value.
---   6. the fight ends to the script.  Vargas's reaction script
---      (ai_script.asm:4385-4388) answers `if_attack PUMMEL` with
---      `battle_event $09 / kill_monsters ALL, FADE_HORIZONTAL`, and that,
---      rather than HP or the gauge, is what wins.  Asserted by the battle
---      tearing down within a bounded window of the Pummel that caused it.
---
--- How the fight is driven (issue #75 conversion: real input, no writes).
--- This file used to pin party HP and MP every frame, clamp the Ipoohs to 1 hp,
--- clamp Vargas under his own phase-2 threshold, install command ids into
--- $202E and write the menu cursor triples directly.  All of that is gone;
--- the drive is now gen_vargas's closed-loop menu driver (the generator
--- that beats this same fight by real play to generate vargas_won): every press
--- is decided from readable menu state ($7BC2), cursors are walked with the
--- d-pad and verified by re-reading the cell, boost points are banked with
--- real R presses, Potions and Cures go to whoever is hurt through the real
--- item, magic and target windows, and Vargas crosses his own script's phase
--- gates (`battle_event $07` at hp <= 10880, `$08` at hp <= 10368,
--- ai_script.asm:4392-4404) on real damage.  Submenus freeze battle time
--- (wait-mode) and the command list does not, so menu navigation is safe
--- however long it takes.
---
--- The order the pokes used to force now follows from the engine's own
--- targeting rule: BioBlaster's targeting byte is $6a = ONE_SIDE|INIT_GROUP|
--- MULTI_TARGET|ENEMY without $01 MANUAL, so the target cursor cannot be
--- walked and key_target_2's INIT_GROUP branch (btlgfx_main.asm @7875) aims
--- at monster group A, the two Ipoohs, until no live monster is left in
--- it.  The negative control (proof 3a) already requires both Ipoohs dead
--- before the plain-hit sample, so by the time the BioBlaster fires it aims
--- at Vargas on the first cast.  That is also what retires the old MP
--- pin: the pin existed because eight 8-MP casts (the old Ipooh-gate walk)
--- outran Edgar's ~19-MP WoB pool, and one cast does not.  The pool is
--- asserted sufficient before the cast rather than being written.
---
--- Sabin's level is asserted rather than assumed.  AuraBolt is a level-6 Blitz;
--- if the join level ever drops under it, proof 4 is testing nothing, so the
--- level is a hard assert rather than a comment.
---
--- This test is also the regression guard for the tools-window hard lock
--- fixed in Ot6ToolListIcon_ext (ot6.asm): a `plx` between the class-table
--- load and its `beq` and `bmi` guards left them reading the restored X, so a
--- classless tool row (BioBlaster is one) fell into a bit-walk over a zero
--- byte and looped forever with the battle NMI dead.  Proof 3 cannot pass
--- without opening that window on that row, so a regression times out here
--- rather than shipping a freeze.
+--      (item $a4, attack $7d) takes a shield and reveals poison in $3E89.
+--      Its negative control runs first, in the same fight: the party's
+--      weapon swings are driven onto Vargas until his hp moves, and the
+--      gauge is asserted untouched at that moment.
+--   4. holy chips.  Sabin's AuraBolt (Blitz 1, skill $5e, element $20)
+--      takes a shield and reveals holy in $3E89.
+--   5. bludgeoning chips, twice.  Pummel (Blitz 0, skill $5d, OT6_BLUDG)
+--      takes two shields, 3 -> 1, and reveals class $04: Pummel hits twice
+--      (Ot6HitCountTbl), each hit its own gauge write.
+--   6. the fight ends to the script.  Vargas's reaction script answers
+--      `if_attack PUMMEL` with `battle_event $09 / kill_monsters ALL,
+--      FADE_HORIZONTAL`, asserted by the battle tearing down within a
+--      bounded window of the Pummel that caused it.
+
+-- BioBlaster's targeting byte is $6a = ONE_SIDE|INIT_GROUP|MULTI_TARGET|
+-- ENEMY without $01 MANUAL, so it aims at monster group A (the two Ipoohs)
+-- until no live monster is left in it, then at Vargas.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/vargas_entry.mss.lua"
 
@@ -93,13 +32,13 @@ local OT6_BLUDG, OT6_SLASH = 0x04, 0x01
 local HOLY, POISON = 0x20, 0x08
 local PUMMEL, AURABOLT = 0x5D, 0x5E
 local BIOBLASTER, BIO_ATK = 0xA4, 0x7D  -- item id -> the attack it resolves to
-local BIO_MP = 8                        -- v0.5 cost (Ot6AbilityCostTbl)
+local BIO_MP = 8                        -- BioBlaster's MP cost (Ot6AbilityCostTbl)
 local CMD_FIGHT, CMD_ITEM, CMD_MAGIC = 0x00, 0x01, 0x02
-local CMD_TOOLS = 0x09                  -- battle command id (gen_arvis CMDNAME)
-local CMD_BLITZ = 0x0A                  -- blitz command id (opens the menu now)
+local CMD_TOOLS = 0x09                  -- battle command id
+local CMD_BLITZ = 0x0A                  -- blitz command id
 local SABIN_E = 3                       -- entity index SABIN joins into
 local EDGAR_E = 0                       -- entity index EDGAR holds (asserted)
-local TERRA_E = 2                       -- entity index TERRA holds (gen_vargas)
+local TERRA_E = 2                       -- entity index TERRA holds
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD   = 0x05                   -- the command list, cursor live
 local ST_ITEM  = 0x0A                   -- the item list
@@ -177,10 +116,8 @@ local function hpLine()
   return s .. string.format(" V=%d", H.readWord(MHP(vSlot)))
 end
 
--- metrics_battle's liveness criterion (the hud builder's own): present bit
--- $3AA8 bit0 and no death or disappear bit in status-1 $3EEC.  A killed Ipooh
--- keeps its presence bit and takes $80 in status, so the presence bit alone
--- would report it alive indefinitely.
+-- Liveness: present bit $3AA8 bit0 and no death/disappear bit in status-1
+-- $3EEC (a killed Ipooh keeps its presence bit).
 local function monsterAlive(s)
   return (H.readByte(0x3AA8 + s * 2) & 0x01) == 1
      and (H.readByte(0x3EEC + s * 2) & 0xC2) == 0
@@ -203,10 +140,6 @@ local function snap(t)
     H.readByte(RVC(vSlot)), H.readByte(WKE(vSlot)), H.readByte(0x3410)))
 end
 
--- Tap A unless Sabin's own command window is up.  Vargas's script talks
--- ($12 "I tire of this!", $43, $0a) and a battle dialog blocks the whole
--- queue until it is dismissed; measured at 9000 frames of menu=00/mstate=00
--- with the fight otherwise alive and nothing pressing anything.
 local function tapUnlessSabin()
   aPh = (aPh + 1) % 8
   if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == SABIN_E then
@@ -217,22 +150,12 @@ local function tapUnlessSabin()
 end
 
 -- ------------------------------------------------- the per-menu driver --
--- gen_vargas's driver, with a mode the test script advances so each proof
--- fires exactly the action it is measuring:
---   control: trio banks boost points and Fights (Ipoohs die, then Vargas's
---            hp moves under plain weapon swings); Potions under 30%, Terra
---            Cures under 60%; SABIN untouched (he has no menu in phase 1).
---   bio:     EDGAR's next turn is Tools -> BioBlaster, everyone else as in
---            control; single-shot (bioFired).
---   grind:   as control, until Vargas's own script fires phase 2.
---   aurabolt/pummel: SABIN picks that Blitz from the real list;
---            single-shot (blitzFired) so a queued action can never be
---            doubled while the test waits on its reveal commit.
---   hold:    everyone hands off (between proofs).
--- One pulse per frame while a menu is up; M resets on every actor change
--- and whenever the menu closes; presses are 5-on/5-off edges; a watchdog
--- backs out with B and falls back to a plain Fight rather than wedging,
--- and counts a nudge, which proof 3 asserts did not happen on its watch.
+-- `mode` selects the action each actor's menu drives: control (Fight, with
+-- Potion under 30% / Cure under 60% emergency heals), bio (EDGAR casts
+-- BioBlaster once), grind (as control, until Vargas's phase-2 script
+-- fires), aurabolt/pummel (SABIN casts that Blitz once), and hold
+-- (everyone hands off).  One input pulse per frame while a menu is up; a
+-- watchdog backs out with B and falls back to Fight, counting a nudge.
 local mode = "control"
 local bioFired, blitzFired = false, false
 local pressKind, pressName = nil, nil    -- a proof action's confirm is in flight
@@ -243,12 +166,6 @@ local function resetM()
 end
 resetM()
 
--- the single-shot latch: a proof action counts as submitted when the menu
--- leaves the actor's hands after target-confirm presses, because the
--- commit closes the window in wait-mode while a B backout only steps to the
--- tools list.  (A fixed press count latched too early: measured, the
--- target window discards the presses that land while it is still opening,
--- so the first run wedged with the action never sent.)
 local function latchSubmit()
   if pressKind == "bio" then
     bioFired = true
@@ -425,9 +342,8 @@ local function pulse()
     end
     if M.plan.kind == "bio" or M.plan.kind == "blitz" then
       if M.via ~= "toolshell" then return (ph < 5) and { "b" } or {} end
-      -- edge-press A until the commit closes the window; latchSubmit()
-      -- (on menu close / actor change) makes the action single-shot so a
-      -- second copy can never queue while the test waits on its reveal
+      -- edge-press A until the window closes; latchSubmit() makes the
+      -- action single-shot
       M.tgtN = M.tgtN + 1
       if M.tgtN == 1 and M.plan.kind == "bio" then
         tgtMask = H.readByte(MONMASK)     -- what the engine aimed, recorded
@@ -524,12 +440,8 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(lv >= 6, true,
       "SABIN is level 6+ so AuraBolt is learned (got " .. lv .. ")")
 
-    -- Edgar, his Tools command, and the weapon proof 3 needs.  The
-    -- BioBlaster is verified in inventory rather than assumed from the Figaro
-    -- shop route: the battle inventory ($2686, 5 bytes/entry) is scanned for
-    -- item $a4, and its $40 tools flag is what MakeToolsList filters on, so a
-    -- shop route that stops selling it fails here with a clear message
-    -- instead of hanging in a menu that has no such row.
+    -- the battle inventory ($2686, 5 bytes/entry) is scanned for item $a4;
+    -- its $40 flag is what MakeToolsList filters on.
     H.assertEq(H.readByte(0x3ED8 + EDGAR_E * 2), 0x04,
       "EDGAR is battle entity " .. EDGAR_E)
     local hasTools = false
@@ -565,15 +477,7 @@ H.run({ maxFrames = 150000 }, {
   end),
 
   -- ===================================================================== --
-  -- 3a: the negative control for the poison chip.  The trio's own boosted
-  -- weapon swings kill both Ipoohs for real, because the engine's targeting
-  -- rule sends Fights at group A until it is empty, and then land on Vargas
-  -- until his hp moves.  Nobody in this party carries a poison, holy or
-  -- bludgeoning weapon (boost multiplies damage but does not change the
-  -- weapon's class), so the gauge must not have moved, which is the
-  -- assertion.  Without it, "the shield went down after Edgar acted" would
-  -- be equally explained by "anything that hits him takes a shield", and
-  -- proof 3 would show nothing.
+  -- 3a: negative control -- plain weapon Fights must not move the gauge.
   -- ===================================================================== --
   H.driveUntil(function()
     return ipoohsDown() and H.readWord(MHP(vSlot)) < vHp0
@@ -595,8 +499,6 @@ H.run({ maxFrames = 150000 }, {
   -- weapon: Tools -> BioBlaster, picked by walking the real cursors.
   -- ===================================================================== --
   H.call(function()
-    -- the real check that replaced the old MP pin: one cast must be
-    -- fundable from the pool the fixture really carries
     H.log(string.format("EDGAR's pool before the cast: %d MP", mp(EDGAR_E)))
     H.assertEq(mp(EDGAR_E) >= BIO_MP, true,
       "EDGAR's own MP funds one BioBlaster (the old pin's real need)")
@@ -607,11 +509,6 @@ H.run({ maxFrames = 150000 }, {
   end, 20000, {
     fightDriver(),
   }, "the BioBlaster reaches VARGAS's gauge"),
-  -- #33 moved the on-screen reveal to the DAMAGE frame: the chip banks the
-  -- poison bit as pending at damage CALC (the shield write above) and
-  -- Ot6RevealCommit moves it into OT6_REVEALED_ELEM when the damage numeral
-  -- displays, a few hundred frames later.  wait for the commit before
-  -- asserting it (battle_clockwork pins the commit timing itself).
   H.call(function() mode = "hold" end),
   H.driveUntil(function()
     return H.readByte(RVE(vSlot)) & POISON == POISON
@@ -641,10 +538,9 @@ H.run({ maxFrames = 150000 }, {
   end),
 
   -- ===================================================================== --
-  -- Into phase two: keep fighting until Vargas's own script crosses its
-  -- thresholds on real damage (`battle_event $07` at hp <= 10880, `$08` at
-  -- hp <= 10368) and blows the trio offstage.  The old MHP clamp is gone, so
-  -- only landed hits move his hp now.
+  -- Phase two: fight until VARGAS's script crosses its thresholds
+  -- (battle_event $07 at hp<=10880, $08 at hp<=10368) and blows the trio
+  -- offstage.
   -- ===================================================================== --
   H.call(function() mode = "grind" end),
   H.driveUntil(function()
@@ -674,8 +570,6 @@ H.run({ maxFrames = 150000 }, {
   H.driveUntil(function() return #shWrites > nBefore end, 15000, {
     fightDriver(),
   }, "AURABOLT reaches the gauge"),
-  -- #33 again: the chip banks holy as pending at damage CALC (the gauge
-  -- write above) and Ot6RevealPoll commits it on the damage-numeral frame
   H.call(function() mode = "hold" end),
   H.driveUntil(function()
     return H.readByte(RVE(vSlot)) & HOLY == HOLY
@@ -696,26 +590,19 @@ H.run({ maxFrames = 150000 }, {
   end),
 
   -- ===================================================================== --
-  -- 5 + 6: bludgeoning, and the finish.  Pummel (Blitz 0, resolved attack id
-  -- $5d) picked from the menu.  Vargas answers `if_attack PUMMEL` with
-  -- battle_event $09 + kill_monsters ALL, so this same selection is both the
-  -- class proof and the win path; the shield write and the teardown are
-  -- asserted separately.
+  -- 5 + 6: bludgeoning and the finish.  Pummel (Blitz 0, attack id $5d);
+  -- VARGAS answers `if_attack PUMMEL` with battle_event $09 + kill_monsters
+  -- ALL.
   -- ===================================================================== --
   H.call(function()
     nBefore = #shWrites
     blitzFired = false
     mode = "pummel"
   end),
-  -- Two writes, not one: Pummel is x2 (Ot6HitCountTbl,
-  -- ff6/src/battle/ot6_hitcount.asm), and an extra count is a whole extra
-  -- ExecAttack -> CalcTargetDmg pass, so it is a whole extra chip
-  -- opportunity against a bludgeoning-weak target.  Waiting for the first
-  -- write and reading the gauge would race the second.
+  -- Pummel hits twice (Ot6HitCountTbl x2), each hit its own gauge write.
   H.driveUntil(function() return #shWrites >= nBefore + 2 end, 15000, {
     fightDriver(),
   }, "PUMMEL's two hits both reach the gauge"),
-  -- #33: the class chip defers the same way the element chips do
   H.call(function() mode = "hold" end),
   H.driveUntil(function()
     return H.readByte(RVC(vSlot)) & OT6_BLUDG == OT6_BLUDG
@@ -724,9 +611,6 @@ H.run({ maxFrames = 150000 }, {
   }, "the bludgeoning reveal commits on its damage frame"),
   H.call(function()
     snap("after PUMMEL")
-    -- his real hp as the script kills him (the blitz shell auto-confirms
-    -- its fixed target, so the ST_TGT bookkeeping never sees the blitz;
-    -- measured: pummelVhp still held the bio-confirm value here)
     pummelVhp = H.readWord(MHP(vSlot))
     H.assertEq(H.readByte(0x3410), PUMMEL, "the resolved skill was Pummel ($5d)")
     H.assertEq(shields(), 1, "PUMMEL took TWO shields: 3 -> 1 (x2, one chip a hit)")

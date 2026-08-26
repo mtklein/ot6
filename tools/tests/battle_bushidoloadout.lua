@@ -1,7 +1,7 @@
 -- @suite
--- battle_bushidoloadout.lua -- issue #8 Layer B: the per-save, field-configurable
--- Bushido loadout, asserted on the battle side.
---
+-- battle_bushidoloadout.lua -- the per-save, field-configurable Bushido
+-- loadout, asserted on the battle side.
+
 -- Storage is a 16-bit little-endian word at $1e1d..$1e1e, unused space inside
 -- the checksummed working-save block.  The four boost slots pack into 12 bits,
 -- 3 bits each: slot0 = bits 0-2, slot1 = bits 3-5, slot2 = bits 6-8, slot3 =
@@ -10,30 +10,7 @@
 -- case) runs the vanilla moving window untouched; a nonzero word returns the
 -- stored tech for that boost, but only if it is still learned ($1cf7 bit set),
 -- otherwise it falls back to the auto window for that slot.
---
--- issue #38 refloored Bushido at 1 BP.  The stored format did not move: same
--- word, same four 3-bit fields, same AUTO sentinel, so every tracked SRAM
--- checkpoint (persistent_layout ot6-codex-o8-v1) still decodes.  Word slot 0
--- is now dead: menu row i and window row i both address word slot i+1, and no
--- code reads slot 0 back.  A loadout {-,7,0,3} therefore packs as
--- 7<<3 | 0<<6 | 3<<9 = $0638 and enumerates $5c,$55,$58 into rows 0/1/2, with
--- row 3 of the grid permanently $ff.  This test carries slot 0 as a written-
--- but-ignored field in order to check that it is ignored.
---
--- What is asserted:
---   1. AUTO (word 0) is byte-for-byte the Layer A window: ceiling 4 packs
---      {2,3,4} into wItemList, as battle_bushido asserts.
---   2. MANUAL enumerates the stored techs in the stored order: a loadout whose
---      slots 1/2/3 are {7,0,3} makes Ot6BushidoWindow pack $5c,$55,$58.
---   3. validation fallback: a stored-but-unlearned slot ($1cf7 bit clear) falls
---      back to the auto tech for that boost rather than offering an uncastable
---      tech.
---   4. confirm fires the stored slot: confirming row i banks boost i+1
---      ($3e9d=i+1) and latches the stored tech for word slot i+1 ($2bb0).
---   5. sentinel: the all-slot-0 word ($0000) is AUTO, not a manual {0,0,0,0};
---      the degenerate config is indistinguishable from auto by design.
---   6. slot 0 is ignored (#38): a word whose dead slot 0 holds a very
---      different tech still enumerates from slots 1..3 only.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 
@@ -57,8 +34,6 @@ local function inNumer() return H.readByte(MSTATE) == ST_BUSHIDO end
 local actor
 local ceiling = 4
 local learnedBits = 0xFF               -- $1cf7 mask (which techs are learned)
--- word slots 0..3.  slots[1] is the dead slot 0 (#38); slots[2..4] are the
--- 1x/2x/3x tiers the menu and the battle window read.
 local slots = { 0, 0, 0, 0 }
 local bpbank = 5
 local sawNumeral = false
@@ -189,8 +164,6 @@ H.run({ maxFrames = 40000 }, {
     H.log("MANUAL enumerates the STORED techs in the STORED order")
   end),
 
-  -- 2b. #38: the dead slot 0 is never read.  Same three live slots, but slot 0
-  -- now holds tech 5; if anything still decoded it, a row would move. --------
   closeSub(),
   H.call(function()
     ceiling, learnedBits = 7, 0xFF

@@ -1,9 +1,8 @@
 -- probe_moogle_rotation.lua -- plays the whole Moogle defense with real
--- input by squad rotation (issue #75, marshal-investigation).  Zero state
--- writes; input is walking, Y-switching, and tap-A fighting, which is what
--- a player has available.
+-- input by squad rotation. Zero state writes; input is walking,
+-- Y-switching, and tap-A fighting.
 --
--- The strategy under test (from the measured geometry and march scripts):
+-- The strategy:
 --   * every march funnels into the tail (15,17)->(15,16)->(14,16)->
 --     (14,15)->(14,14)->(14,13); a guard that completes it fires the
 --     game-over exec at (14,13), so the choke (14,14) must be manned
@@ -12,7 +11,7 @@
 --     so a 2-step aside plus a 2-step walk-in swaps the goalie between
 --     waves
 --   * party 1 (LOCKE+3) wins exactly two waves by tap-A and
---     wipes on its third (pilot 41fcf8f), so: P1 waves 1-2, P2 (MOG+3)
+--     wipes on its third, so: P1 waves 1-2, P2 (MOG+3)
 --     waves 3-4, P3 waves 5-6, then the healthiest party takes the
 --     Marshal (battle 6 = Marshal + 2 Lobos)
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -103,7 +102,7 @@ local function wave(n, mask)
   })
 end
 
--- the Marshal's post + activation (gen_moogle's pokeStep, input-driven)
+-- the Marshal's post + activation
 local MX, MY = 15, 40
 local aPhase = 0
 local function defenseWon()

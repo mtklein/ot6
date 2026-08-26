@@ -15,7 +15,7 @@
 inc_lang "text/char_title_%s.inc"
 .endif
 inc_lang "text/item_name_%s.inc"
-; issue #40: the rage loadout page blanks a slot row to MonsterName::ITEM_SIZE
+; the rage loadout page blanks a slot row to MonsterName::ITEM_SIZE
 ; tiles.  skills.asm includes this too (the .inc is .ifndef-guarded), but it is
 ; assembled after this file, so the scope has to be pulled in here as well.
 inc_lang "text/monster_name_%s.inc"
@@ -728,7 +728,7 @@ CheckSkillValid:
         bne     @1e9c
         inx
 .if LANG_EN
-        cpx     #$0008          ; issue #68: + the Thief row.  Without this an
+        cpx     #$0008          ; + the Thief row.  Without this an
                                 ;   early Locke (Steal, no Magic) could not
                                 ;   open his own Skills menu at all.
 .else
@@ -1124,7 +1124,7 @@ SkillsOptionTbl:
         .addr   SkillsOption_05
         .addr   SkillsOption_06
 .if LANG_EN
-        .addr   SkillsOption_07         ; issue #68: thief (the 8th row)
+        .addr   SkillsOption_07         ; thief (the 8th row)
 .endif
 
 ; ------------------------------------------------------------------------------
@@ -1180,7 +1180,7 @@ SkillsOption_02:
         sty     zBG2HScroll
         sty     zBG3HScroll
 .if LANG_EN
-        ; issue #8 Layer B: SwdTech opens the loadout configurator, not the
+        ; SwdTech opens the loadout configurator, not the
         ; vanilla browse list.  The configurator names the learned techs too
         ; (the pool), so the browse list's only job is subsumed.  All state
         ; logic is bank-F0; Ot6LoadoutInitC3 does the C3 framework draw.
@@ -1205,7 +1205,7 @@ SkillsOption_02:
 SkillsOption_03:
 @2105:  stz     $4a
 .if LANG_EN
-        ; issue #46: the page is one column of eight rows now (name, break class,
+        ; the page is one column of eight rows (name, break class,
         ; MP price), not vanilla's 2x4 grid of button-combo glyphs, so it wants
         ; its own cursor.  LoadAbilityCursor's {2,4} table is still Dance's
         ; (SkillsOption_06) and must not move with this page.
@@ -1301,7 +1301,7 @@ InitMagicMenu:
 SkillsOption_04:
 @216e:  stz     $4a
 .if LANG_EN
-        ; issue #122: Lore opens the 5-slot loadout configurator, not the
+        ; Lore opens the 5-slot loadout configurator, not the
         ; vanilla browse list; the SkillsOption_05 repoint, re-applied for
         ; Strago.  The browse's only job was naming what he knows; the
         ; configurator names it, prices it (the vanilla MagicProp MP each
@@ -1350,7 +1350,7 @@ SkillsOption_04:
 SkillsOption_05:
 @21a6:  stz     $4a
 .if LANG_EN
-        ; issue #40: Rage opens the 8-slot loadout configurator, not the
+        ; Rage opens the 8-slot loadout configurator, not the
         ; vanilla browse list; the SkillsOption_02 repoint, re-applied.  The
         ; browse list's only job was naming what Gau knows; the configurator
         ; names it too (and prices it, and lets him carry eight of it into the
@@ -1413,7 +1413,7 @@ SkillsOption_06:
 
 ; [ skills menu $07: thief (init) ]
 
-; issue #68: SkillsOption_03's shape with the thief page's pieces.  The page
+; SkillsOption_03's shape with the thief page's pieces.  The page
 ; state is $30, a vanilla-unused menu state slot (see MenuState_30_Thief and
 ; the note at MENU_STATE_THIEF, skills.asm).
 SkillsOption_07:
@@ -2647,7 +2647,7 @@ MenuState_33:
         trb     z45
         jsr     InitDMA1BG1ScreenA
 .if LANG_EN
-        jsr     UpdateBlitzCursor       ; #46: one column of eight, not Dance's 2x4
+        jsr     UpdateBlitzCursor       ; one column of eight, not Dance's 2x4
 .else
         jsr     UpdateAbilityCursor
 .endif
@@ -2661,7 +2661,7 @@ MenuState_33:
 .if LANG_EN
 ; ------------------------------------------------------------------------------
 
-; [ menu state $30: thief menu (issue #68) ]
+; [ menu state $30: thief menu ]
 
 ; MenuState_33's shape: cursor over the rows, B backs out to the skills list,
 ; A is a no-op -- an info page, exactly as the field Blitz page behaves.  The
@@ -2749,7 +2749,7 @@ ReloadSkillsMenu:
         jmp     _c35807
 
 ; ==============================================================================
-; The two OT6 configurator pages (issues #8 Layer B, #40)
+; The two OT6 configurator pages
 ;
 ; Everything else in this file is vanilla FF6 disassembly; these ~780 lines were
 ; the only OT6-authored region in it, and they are self-contained: the pages
@@ -2766,7 +2766,7 @@ ReloadSkillsMenu:
 .if LANG_EN
         .include "ot6_loadout_page.asm"      ; SwdTech: MenuState_7b
         .include "ot6_rage_page.asm"         ; Rage:    MenuState_7c
-        .include "ot6_lore_page.asm"         ; Lore:    MenuState_80 (#122)
+        .include "ot6_lore_page.asm"         ; Lore:    MenuState_80
 .endif   ; LANG_EN
 
 ; ------------------------------------------------------------------------------

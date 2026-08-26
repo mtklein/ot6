@@ -1,6 +1,5 @@
--- probe_moogle_switch.lua -- Y-party-switching mechanics and march timing at
--- defense-live (issue #75, marshal-investigation).  Input is button presses
--- only (Y taps, the mechanic a player uses); zero writes.
+-- probe_moogle_switch.lua -- Y-party-switching mechanics and march timing
+-- at defense-live. Input is button presses only (Y taps); zero writes.
 --   1. tap Y three times, logging the party-leader object offset $0803 and
 --      the leader position after each, to measure whether control cycles
 --      1 -> 2 -> 3 -> 1 immediately and without a menu;

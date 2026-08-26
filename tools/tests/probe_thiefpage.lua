@@ -1,7 +1,5 @@
--- probe_thiefpage.lua -- issue #68's watched validation: the field Skills page
--- with its 8th row (Thief) and the thief page behind it, screenshotted in every
--- state the change adds.  probe_skillspage.lua measured the 7-row page this
--- grew from; this is its after-picture.
+-- probe_thiefpage.lua -- the field Skills page's 8th row (Thief) and the
+-- thief page behind it, screenshotted in every state the change adds.
 --
 -- celes_freed: LOCKE (Steal, so the row draws white and the page opens) and
 -- CELES (no Steal, so the row draws gray and A on it refuses).  Four shots:

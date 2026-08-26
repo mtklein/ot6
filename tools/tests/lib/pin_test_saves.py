@@ -11,9 +11,7 @@ the source settings say now or grow to say later.
 <dst_settings> is the worker's own
 <home>/Library/Application Support/Mesen2/settings.json.  run.sh points
 Mesen at that home with CFFIXED_USER_HOME, so writing here isolates a worker
-without giving it a private copy of the emulator (see run.sh's
-"shared emulator" note).  It used to be a settings.json inside a per-worker
-app bundle, which is what made the copies necessary.
+without giving it a private copy of the emulator.
 """
 import json, os, sys
 
@@ -52,8 +50,7 @@ ram = os.environ.get("OT6_RAM_POWERON", "AllZeros")
 # VRAM/CGRAM/OAM and cartridge SRAM alike. EnableRandomPowerOnState does not
 # touch RAM; its one use on the SNES path is randomising PPU registers
 # (brightness, Mode7 matrices, BG mode, layer enables), so leaving it on for
-# Random also dirties the PPU. This once wrote "AllZeros" whenever
-# Random was asked for, so no headless run had ever exercised random RAM.
+# Random also dirties the PPU.
 snes["EnableRandomPowerOnState"] = (ram == "Random")
 snes["RamPowerOnState"] = ram
 # Frame-skip picks which frames render based on host timing, so
@@ -65,11 +62,10 @@ snes["DisableFrameSkipping"] = True
 # input" note in tools/tests/lib/ot6.lua).  Unlike the pins above, this one
 # cannot fall back to a Mesen default: a source profile that never connected a
 # controller -- a fresh install, a hand-written settings.json, CI -- leaves
-# port 0 empty, and then every button press does nothing.  The game sits at the
-# title and every checkpoint Continue and new-game drive fails deterministically,
-# presenting exactly like a stale checkpoint or a broken ROM (#120, cost hours
-# on 2026-08-15).  Force the type rather than setdefault it: the harness needs a
-# SnesController on port 0 whatever the play profile happened to connect.
+# port 0 empty, and then every button press does nothing, presenting exactly
+# like a stale checkpoint or a broken ROM.  Force the type rather than
+# setdefault it: the harness needs a SnesController on port 0 whatever the
+# play profile happened to connect.
 snes.setdefault("Port1", {})["Type"] = "SnesController"
 # Audio is inert under --testrunner (no device opened); pinned off anyway.
 cfg.setdefault("Audio", {})["EnableAudio"] = False

@@ -76,10 +76,9 @@ scenario split is the stress test:
 
 - **Elemental weaknesses**: vanilla's bits stay wherever they exist ✦;
   add only where a stretch has a hole.
-- **Weapon weaknesses** (the new byte, M3): assigned by body type, so
+- **Weapon weaknesses** (the new byte): assigned by body type, so
   a player can guess and then confirm by probing.
-- Shields ✦: trash 1–3, minibosses 4–6, bosses 6–12 with telegraphs;
-  per-monster table authored in M6 against this spread.
+- Shields ✦: trash 1–3, minibosses 4–6, bosses 6–12 with telegraphs.
 
 ## Weapons as chip carriers
 
@@ -94,7 +93,7 @@ actions chip per hit ✦ (Quadra Slam, boosted Fight).
 The chip check reads the *action's* class byte, never the wielder's:
 Trickshot is piercing on a dagger thief, AutoCrossbow is piercing
 from a spear machinist, Suplex is bludgeoning regardless of claws.
-(M3's per-skill class/element byte provides this for free.)
+(The per-skill class/element byte provides this for free.)
 
 ## Multiple weapon classes per character
 
@@ -102,16 +101,10 @@ Base rule: one class per character. Two data-driven exceptions, no
 new battle code:
 
 1. **Skills** (above) — a kit can reach outside its weapon class.
-2. **Magicite weapon permits** (M5): an equipped esper may grant one
+2. **Magicite weapon permits**: an equipped esper may grant one
    extra weapon-class permit. Kept spare ✦: a small knob rather than
    a system to balance around.
 
-## Open questions for the driver
-
-1. ¤-weak density: how many Special-weak enemies per stretch give a
-   Setzer/Relm party something to probe without making ¤ answer
-   everything? (First instinct: rare before the Opera, steady after.)
-2. The ¤ icon needs a font cell. Draw a sparkle/asterisk in the same
-   family as the element icons, or borrow a vanilla glyph?
-   (v1 borrows the vanilla sparkle at $df; a bespoke ¤ can replace
-   the art in place later, since every consumer keys on the code.)
+The ¤ icon borrows the vanilla sparkle glyph at $df; every consumer keys on
+the code, so a bespoke ¤ can replace the art in place without touching
+anything else.

@@ -1,14 +1,9 @@
 -- probe_vector_step.lua -- measurement instrument for gen_vector_sneak.
---
--- navTo on Vector (map 242) logged every rightward step landing two tiles
--- east of its plan ("(42,38)->right landed (44,38)"), and the party's x
--- stayed even for the whole walk, which would put the odd-x sneak ledge
--- {43,38} and the odd-x sympathizer {45,39} out of reach.  This dumps the
--- raw movement state per frame through a held right, so the mechanism is
--- measured rather than inferred: party pixel coords ($086a/$086d via the
--- $0803 leader offset), the engine's own tile position bytes $af/$b0 (what
--- CheckEvent / CheckEntrance / the trigger tables compare against), the
--- movement type $087c, facing $087f, and the z byte $b2.
+-- Dumps the raw movement state per frame through a held right: party pixel
+-- coords ($086a/$086d via the $0803 leader offset), the engine's own tile
+-- position bytes $af/$b0 (what CheckEvent / CheckEntrance / the trigger
+-- tables compare against), the movement type $087c, facing $087f, and the
+-- z byte $b2.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function po() return H.readWord(0x0803) end

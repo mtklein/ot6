@@ -3,8 +3,8 @@
 ; Do not edit by hand. Re-run the generator to regenerate.
 ;
 ; One class byte per species, directly indexed by species id (0..383),
-; matching OT6_CODEX width. Data only; not yet referenced by ot6.asm
-; (the @formula lookup wiring is Phase 2). Class bits mirror ot6_class.asm.
+; matching OT6_CODEX width. Data only; not yet referenced by ot6.asm.
+; Class bits mirror ot6_class.asm.
 ; ----------------------------------------------------------------------------
 
 OT6_FLOOR_CLASS:

@@ -1,14 +1,5 @@
--- probe_return_pocket.lua -- fly Tzen -> the Chimera pocket, land, and
--- relics the purse allows (#133 items 2 and 5).
---
--- Boots from wob_golem_done.mss (in Jidoor town, Golem+Zoneseek won).
--- Tzen = map 306, world door (119,149); the doorstep row below is
--- landable.  Inside: the Sraphim seller stands at (29,3) (_cc5ddd, WoB
--- arm: "For 3000 GP this glowing stone's yours", choice row 0 = Yes);
--- the relic room 312 is the bump door (25,7), keeper shop 32 at (80,16)
--- (Earrings/RunningShoes/Black Belt/Amulet).  RunningShoes x1 is bought
--- only if the purse still covers it after Golem+Sraphim; the gil top-up
--- for the rest is another grind chunk, not this probe's business.
+-- probe_return_pocket.lua -- flies from Tzen to the Chimera pocket, lands,
+-- and saves the fixture.  Boots from wob_golem_done.mss.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function rd(a) return emu.read(a, emu.memType.snesMemory) end
 local function fineX() return ((rd(0x35) << 16) | H.readWord(0x33)) end
@@ -96,9 +87,8 @@ local function approachTalk(nx, ny, name, doneFn)
   local phase = 0
   return {
     H.call(function()
-      -- adjacency first (all four sides -- the Tzen seller's south tile
-      -- is blocked and the first attempt parked two tiles away), then the
-      -- across-the-counter tiles shops use
+      -- try adjacency on all four sides first, then the across-the-counter
+      -- tiles shops use
       local cands = {
         {nx,ny+1,"up"},{nx-1,ny,"right"},{nx+1,ny,"left"},{nx,ny-1,"down"},
         {nx,ny+2,"up"},{nx-1,ny+1,"up"},{nx+1,ny+1,"up"},

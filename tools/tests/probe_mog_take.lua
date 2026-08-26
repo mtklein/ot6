@@ -1,14 +1,9 @@
--- probe_mog_take.lua -- the last step of #133 item 3: take MOG off the
--- cliff.  Boots wob_kupo.mss ($023F=1, party at (9,19) on map 23, Mog
--- hanging off the LEFT cliff edge, Lone Wolf up-right -- NEVER talk to
--- him, _ccd594 loses Mog for a Gold Hairpin).
+-- probe_mog_take.lua -- takes MOG off the cliff. Boots wob_kupo.mss
+-- ($023F=1, party at (9,19) on map 23, Mog hanging off the LEFT cliff
+-- edge, Lone Wolf up-right). Talking to Wolf swaps Mog for a Gold Hairpin.
 --
--- The record tiles (Mog (9,16), Wolf (9,15)) are stale after the tumble
--- scene moved the live objects, so this tries face-and-press-A from
--- each column tile in a Mog-first order: every LEFT-facing press first
--- (Mog hangs left), then down/up presses that cannot target the Wolf.
--- The take event (_ccd5df) sets $02FA immediately, so success is loud.
--- Saves wob_mog_done.mss.
+-- Presses face+A from each column tile, LEFT-facing first. $02FA is set
+-- when Mog is taken. Saves wob_mog_done.mss.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function sw(bit) return (H.readByte(0x1E80 + (bit >> 3)) >> (bit & 7)) & 1 end
 local function mogIn()
@@ -24,7 +19,7 @@ local function flatten(t)
   return out
 end
 -- face `dir` (short tap, below the step threshold), press A, ride any
--- dialog A-only, give the event time to run
+-- dialog A-only
 local function tryTake(x, y, dir, tag)
   return H.cond(function() return not mogIn() end, flatten({
     H.navTo(x, y, { maxFrames = 4000, playBattles = "flee" }),
@@ -59,10 +54,8 @@ H.run({ maxFrames = 60000 }, flatten({
       (H.readByte(0x1E80 + (0x640 >> 3)) >> (0x640 & 7)) & 1))
     H.screenshot("take_boot")
   end),
-  -- Mog hangs at ~(4-5,16) (live object; the tumble moved him off his
-  -- record tile) and a snowy ledge runs west from the column that bfs
-  -- can't model.  Burst left along each row, then press A toward him
-  -- from every tile actually reached.
+  -- Mog hangs at ~(4-5,16); the ledge west of the column can't be
+  -- bfs-pathed, so burst left along each row, then press A.
   (function()
     local out = {}
     for _, y in ipairs({ 16, 15, 17, 14 }) do
@@ -122,8 +115,7 @@ H.run({ maxFrames = 60000 }, flatten({
     end
   end),
   -- ride out the join scene: dialogs A-tapped, the naming menu
-  -- ($0059~=0, the gen_celes precedent) committed with START, until the
-  -- party has control again
+  -- ($0059~=0) committed with START, until the party has control again
   (function()
     local t, calm, named = 0, 0, false
     return H.driveUntil(function()

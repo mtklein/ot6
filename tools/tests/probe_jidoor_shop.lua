@@ -1,9 +1,8 @@
 -- probe_jidoor_shop.lua -- from the banked wob_jidoor_town fixture: buy
--- the caster relics and win Golem + Zoneseek at the Auction House
--- (#133 items 2 and 5).
+-- the caster relics and win Golem + Zoneseek at the Auction House.
 --
--- Doors in Jidoor are bump entrances (probe_jidoor_town's bfs scout):
--- the walkable approach is the tile below, pushing UP -- relic shop
+-- Doors in Jidoor are bump entrances: the walkable approach is the tile
+-- below, pushing UP -- relic shop
 -- (5,26)->room 202, Auction House (26,28)->room 200.  Exits are the
 -- mirrored step-through on the way out.
 --
@@ -48,8 +47,8 @@ local function flatten(t)
   return out
 end
 -- Find a reachable tile near the keeper at runtime (counters block the
--- adjacent tile -- measured: room 202's (54,17) has no path), walk there,
--- then press toward the keeper with A until the shop options open.
+-- adjacent tile -- room 202's (54,17) has no path), walk there, then
+-- press toward the keeper with A until the shop options open.
 local function approachTalk(nx, ny, name)
   local tile, dir = nil, "up"
   local phase = 0
@@ -102,7 +101,7 @@ local function auctionRound(i)
     }, "auction " .. i .. ": auctioneer talks"),
     -- ride the lot on default-row A; "done" needs 90 calm frames because
     -- the scene pass_offs/pass_ons the party and the control flag reads
-    -- live between beats (advanceStory's measured lesson)
+    -- live between beats
     H.driveUntil(function() return calm >= 90 end, 12000, {
       H.call(function()
         aPhase = (aPhase + 1) % 8

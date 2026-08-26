@@ -1,51 +1,37 @@
 -- @manual Whelk break-loop measurement instrument, run by hand
--- whelkbal_run.lua -- boss break-loop measurement on the Whelk fight
--- (M6 groundwork; the boss-row companion to bal_mines.lua).
+-- whelkbal_run.lua -- boss break-loop measurement on the Whelk fight.
 --
---   sed -i '' 's/^local POLICY .*/local POLICY = "<p>"/' tools/tests/whelkbal_run.lua
---   tools/tests/run.sh tools/tests/whelkbal_run.lua build/states/whelkbal_<p>.log
---
--- Protocol (bal_mines discipline, adapted to a scripted boss):
---  * every battle starts from an identical loadState(whelk_entry);
---    battles are independent (HP and RNG reset; loadState resets
---    the codex). The formation is scripted ($0100 shell plus $0134 head),
---    so there are no encounter seeds: battle k decorrelates by settle
---    jitter alone (k*11 field frames before the trigger step, and
---    240 + 7(k-1) in-battle settle frames before the driver arms).
---  * the fight is played to the end by POLICY (below), with no
---    HP pins and no writes of the battle-clearing flag. A wipe is a sample
---    rather than a failure.
---  * battle menus drop input during their open animation every turn,
---    so presses are gated on the menu flag holding 4 consecutive 30-frame
---    pulses (bal_mines' settle rule). When no menu is up, A is
---    edge-tapped every other pulse, which the opener battle dialog and the
---    shell's mid-fight "Gruuu……" dialogs need; on a running battle
---    a stray A has no effect.
---  * the whelk's shell hides and shows the head on a monster-timer cycle
---    (vanilla AI). While the head is hidden the default target is the
---    shell, and any shell hit draws a MegaVolt counter. The beams and
---    pierce policies spend hidden-phase turns on Heal Force;
---    naive keeps mashing A into the shell, like the player it
---    models.
+-- Protocol:
+--  * every battle starts from an identical loadState(whelk_entry); battles
+--    are independent (HP and RNG reset).  The formation is scripted, so
+--    battle k decorrelates by settle jitter alone.
+--  * the fight is played to the end by POLICY (below), with no HP pins and
+--    no writes of the battle-clearing flag.  A wipe is a sample rather
+--    than a failure.
+--  * battle menus drop input during their open animation every turn, so
+--    presses are gated on the menu flag holding 4 consecutive 30-frame
+--    pulses.  When no menu is up, A is edge-tapped every other pulse.
+--  * the whelk's shell hides and shows the head on a monster-timer cycle.
+--    While the head is hidden the default target is the shell, and any
+--    shell hit draws a MegaVolt counter.  The beams and pierce policies
+--    spend hidden-phase turns on Heal Force; naive keeps mashing A into
+--    the shell.
 --
 -- Per battle the log carries greppable lines:
 --   [ot6] [metrics] b=<k> <key>=<value>
 --
 -- Policies (POLICY knob):
---   beams   fire beam at the default target every turn (never tek);
---           Heal Force while the head hides.  This is the control that
---           ignores the pierce weakness.  With the head's fire-weak add,
---           beams chip too, so it is no longer a zero-chip control.
---   pierce  terra: TekMissile at the head until it breaks, beams into
---           the break window, TekMissile again as shields re-arm;
---           vicks/wedge: fire beams. Heal Force while the head hides.
---   tutorial the designed line the fire-weak add exists for: everyone
---           beams the head (3 fire chips), and terra spends her action
---           on TekMissile exactly when one shield remains, which is the
---           4th chip. beams into the break window; Heal Force while the
---           head hides.
---   naive   everyone confirms their first beam at the default target
---           (A-A-A), always. The mash-through player.
+--   beams    fire beam at the default target every turn (never tek); Heal
+--            Force while the head hides.
+--   pierce   terra: TekMissile at the head until it breaks, beams into
+--            the break window, TekMissile again as shields re-arm;
+--            vicks/wedge: fire beams. Heal Force while the head hides.
+--   tutorial everyone beams the head (3 fire chips), and terra spends her
+--            action on TekMissile exactly when one shield remains (the
+--            4th chip); beams into the break window; Heal Force while
+--            hidden.
+--   naive    everyone confirms their first beam at the default target
+--            (A-A-A), always.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
@@ -106,7 +92,7 @@ end
 --   heal force (2,0), both lists  A dn dn A A   (self-target by default;
 --     the soldiers' 4-cell list stages sparsely, as Fire|Bolt / Ice / Heal,
 --     so Heal Force is (2,0) for everyone; (1,1) is a blank cell the
---     cursor can walk onto and wedge, which was measured)
+--     cursor can walk onto and wedge)
 --   tekmissile  terra (3,1)       A dn dn dn rt A A
 local function seqFor(actor)
   local hidden = not headAlive()
@@ -242,11 +228,10 @@ local function sample()
       local v = H.readByte(q.base + qShadow[qi])
       if (v & 0x80) == 0 then
         -- each real action passes through two queues (advance-wait and
-        -- action; measured in this fight: raw player dequeues equal 2x the
-        -- exec-verified cast counters).  The player, enemy, head and shell
-        -- action lines emit real actions: every second dequeue of a bucket
-        -- credits one.  counter_actions stays a raw counter-queue
-        -- dequeue tally, for diagnostics.
+        -- action).  The player, enemy, head and shell action lines emit
+        -- real actions: every second dequeue of a bucket credits one.
+        -- counter_actions stays a raw counter-queue dequeue tally, for
+        -- diagnostics.
         if q.counter then S.counterActions = S.counterActions + 1 end
         if v < 8 then
           S.playerDequeues = S.playerDequeues + 1
@@ -323,7 +308,7 @@ local function sample()
   if aliveC == 0 then S.result = "wiped" return true end
   if not H.battleLoadStarted() then
     -- terra KO'd ends this scripted fight in a game over even with the
-    -- soldiers standing (measured: the teardown follows c0 -> 0 directly)
+    -- soldiers standing
     local tdead = false
     for _, c in ipairs(chars) do
       if c.slot == terra and c.hp == 0 then tdead = true end
@@ -463,11 +448,7 @@ local function stepToWhelk(k)
         -- the whelk's own load window looks like a stray fight for a few
         -- dozen frames; hands off until the non-whelk state holds.  A real
         -- random encounter, which should not happen on this one-step route,
-        -- is run from and the sample is voided.  This used to flag the
-        -- formation's monsters dead instead, which is the write issue #75
-        -- exists to remove; since the sample is discarded either way, all
-        -- this path has to do is give the party back to the field, and L+R
-        -- is the engine's own run mechanic (lib M.fleeBattle).
+        -- is run from and the sample is voided.
         strayN = strayN + 1
         if strayN >= 120 and H.monstersPresent() > 0 then
           voidReason = "stray_encounter"

@@ -7,88 +7,30 @@
 --                        the merchant's clothes with the old man's cider
 --   sfigaro_passage.mss  map 86 (7,51), inside the secret passage the
 --                        grandson's password opens
---
+
 -- Five things this script had to measure, each of which broke a first
 -- attempt.
---
--- 1. The disguises come from a steal, not from a win.  This shapes the whole
---    file.  Merchant $13A and Officer $175 each carry
---    a reaction script whose only branch is `if_cmd STEAL`
---    (battle/ai_script.asm AIScript::_314 / _373): it sets battle switch
---    (13,4) / (13,5), swaps the monster for the b.day suit and ends the
---    fight.  Those are b_switch $4C / $4D, and the event script reads
---    exactly them -- `if_b_switch $4C, _ca8617` (event_main.asm:20385),
---    `if_b_switch $4D, _ca7ecf` (:19340).  EventCmd_b7 jumps when the bit is
---    clear (field/event.asm:4053-4060), and the jump target is the branch
---    that skips `obj_gfx LOCKE, MERCHANT` / `switch $0104=1`.  So a fight
---    finished any other way leaves Locke in his own clothes: measured, the
---    harness's battle-clear-write idiom beat the officer and $0103
---    stayed 0.  In battle those flags live at $3EB4+n (the field copy
---    $1DC9+n is loaded in at battle start and written back at the end,
---    battle_main.asm:6088, :12182), so $4C is bit 4 of $3EBD live and of
---    $1DD2 afterwards.  Both are asserted below.
---
+
 -- 2. The merchant's clothes are required, not decoration.  Map 86's
 --    grandson, npc 4 at {6,10}, is the gate: `if_switch $0104=1, _ca7bf8`
 --    else "Only people dressed as merchants may pass through"
 --    (event_main.asm:18747-18752).  Nothing else on the route opens.
---
+
 -- 3. One fight covers both errands.  The cafe's cider runner (map 78
 --    npc 6 at {75,39}, spawn switch $0307, `_ca7d7d` -> `_ca7db8`) runs
 --    `battle 10` and then, win or steal, ends `switch $01D0=1` ("Took the
 --    old man's cider!", :19061).  Steal it and the same scene also hands
 --    over the clothes.  The item-shop merchant on map 85 gives the clothes
 --    alone, so the cafe is strictly the cheaper stop.
---
--- 4. The town is not one-way; the pathfinder's node cap makes it look that
---    way.  H.bfsPath gives up at 4096 dequeues, and map 75 is a 64x64 town
---    with z-levels, so a long query runs the queue dry and answers "no
---    path" for a tile that is walkable.  Measured, and the boundary is one
---    tile wide: from (22,43) the plan to (37,41) is 49 steps and
---    found; from (22,44), one tile further along that same plan, the same
---    query returns nil.  A first version read that as "the SE quarter is
---    behind a one-way z step" and rebuilt the route around a wall that does
---    not exist.  Every long step here is therefore walked as short hops
---    through named waypoints, which keeps each query well inside the cap.
---
+
 -- 5. A destination coordinate is not an arrival test.  `go` used to treat
 --    "standing on (dx,dy)" as arrival for every crossing; map 78's front
 --    room contains a walkable (22,44), the same tile the town door lands on,
 --    so the walk to the exit registered arrival twenty tiles early on the
 --    wrong map and the settle then waited 12000 frames for a map id that
 --    never came.  Only a same-map warp has no map change to watch.
---
--- Issue #75 (the input-driven test conversion): no state writes.  The two
--- fights on this route are played:
---   * battle 11 (the gate soldier's HeavyArmor, up to three times, because
---     he respawns on every map-75 reload) is won by solo LOCKE on boosted
---     Fights: R raises pending boost out of the 1 bp Ot6InitBP grants, and
---     A-A-A confirms the boosted Fight, which is gen_moogle's Marshal drive.
---     The old HP pin is gone, so a loss now happens (the _ca85ba scenario
---     reset: dumped on (47,43), disguises cleared) and is handled the
---     way a player handles it, with a phase-spread retry ladder around
---     every engagement (a blob captured before the talk, reloaded and then
---     held to its own phase of the game-time frame counter the battle seed
---     is made of: `lda $021e / asl2 / sta $be`, battle_main.asm:6174-6176.
---     H.newSeedLadder reads back what each attempt drew, #83).
---   * the cider runner's Merchant is stolen from by real menu input
---     through the #55 thief submenu, with the boost banked by real input:
---     LOCKE opens with 1 bp and regens +1 per unboosted action
---     (Ot6ActionEnd), and a steal attempt is itself an action, so the
---     driver steals unboosted while the bank grows (each attempt rolls
---     vanilla odds and may land), and from 3 bp on it presses
---     R-R-R first, which Ot6StealBoostLevel converts to a guaranteed
---     steal (kits.md's tier table).  Steal costs 4 MP (Ot6StealCost),
---     paid from LOCKE's own pool, and the driver logs bank and MP per
---     attempt so an empty pool is visible in the generation log rather than
---     being written over.
--- The stealDriver that poked STEAL into every command cell and forced
--- banked+pending boost to the cap, and the pinParty HP writes, are gone.
+
 local H = dofile("tools/tests/lib/ot6.lua")
--- The cider-steal ladder's spread and its collision check (issue #83): each
--- attempt is held until the game-time frame counter the battle seed is made
--- of reaches its own phase, and L.report() fails if two attempts drew one
--- seed, which would make this ladder one fight played twice.
 local L = H.newSeedLadder("cider steal")
 local DOOR = "build/states/locke_scenario.mss.lua"
 
@@ -150,10 +92,6 @@ end
 
 local aPhase = 0
 
--- rideOut, which rides a scene out to a settled, controllable field and
--- fights anything that comes up with real input, is H.rideOut now (promoted
--- to lib/ot6_field.lua with its measured history, 2026-08-09).
-
 -- One short step to a waypoint on the current map.  See note 4: long BFS
 -- queries on map 75 run the 4096-node cap dry and answer "no path" for
 -- tiles that are plainly walkable, so every cross-town walk is a chain of
@@ -182,15 +120,6 @@ local function go(sx, sy, dm, dx, dy, what)
     if dm ~= startMap then return map() ~= startMap end
     return H.fieldX() == dx and H.fieldY() == dy
   end
-  -- The staging tile is re-resolved rather than latched.  Town NPCs wander,
-  -- and the object map they occupy is an input to every passability query, so
-  -- the answer is only true for the instant it was asked.  Measured: the
-  -- cafe's annex warp (33,46) resolved as "walkable, stand on it" on one run
-  -- and, 36 frames earlier on the next, as "unreachable, stage at (33,47)",
-  -- and then navTo could not reach (33,47) either, because the npc had moved
-  -- again by the time it planned.  Latching the first answer turns a
-  -- transient into a route failure; re-asking every 90 frames lets the walk
-  -- recover.
   local pickAt = -1000
   local function stage()
     if pick == nil or (H.frame - pickAt >= 90 and not arrived()) then
@@ -229,15 +158,6 @@ local function go(sx, sy, dm, dx, dy, what)
         H.call(function()
           aPhase = (aPhase + 1) % 8
           if H.dialogWaiting() then H.setPad(aPhase < 4 and { "a" } or {}); return end
-          -- stage() re-picks on every call, so the H.cond above (which
-          -- admitted us because the pick had a hold direction) does not
-          -- guarantee the pick still has one now: a nav outcome can switch
-          -- this to the walk-straight-onto-the-entrance variant mid-drive,
-          -- and `{ [nil] = true }` is a "table index is nil" abort.  Observed
-          -- 2026-07-29: the pick flipped at f2072 after the nav library
-          -- gained its avoid-set, which changed which staging tile it
-          -- reached first.  A directionless pick means walk straight, so
-          -- hold nothing.
           local hold = stage()[3]
           H.setPad(hold and { [hold] = true } or {})
         end),
@@ -252,9 +172,6 @@ local function go(sx, sy, dm, dx, dy, what)
     end),
   })
 end
-
--- talkToObj, which approaches a posted NPC and activates it, is H.talkToObj
--- now (promoted to lib/ot6_field.lua, 2026-08-09).
 
 -- gen_scenario.lua's choice-steering idiom, unchanged in shape.  $056F is
 -- the option count and is only final once dialogWaiting() is true (it is
@@ -315,20 +232,6 @@ local function talkThrough(obj, what, choices, budget)
   })
 end
 
--- The gate soldier, with his respawn-on-reload mechanism, the retry ladder,
--- and the his-own-tile branch, and their measured history, is
--- H.clearGateSoldier now (promoted to lib/ot6_field.lua, 2026-08-09;
--- gen_tunnelarmr re-enters the same town and needed the same answer).
-
--- ------------------------------------------------------------- the steal --
--- The input-driven steal (issue #75).  Locke's command window is `FIGHT,
--- STEAL, MAGIC, ITEM` (char_prop.asm:157); MAGIC is removed at runtime for
--- a spell-less Locke (InitCmd_03), the rows stay four, and STEAL is one
--- down from the resting cursor.  Since #55 the Steal row opens the thief
--- submenu (tools shell, state $30) with Steal on row 0, so one attempt is
--- the edge sequence  down, A (submenu opens), A (row 0 = Steal), A (the
--- target cursor opens MANUAL|ONE_SIDE|ENEMY on the lone Merchant).
---
 -- The boost is banked with real input.  Steal is the shipped boost-tiered
 -- chance verb (Ot6StealBoostLevel): 0 bp rolls raw vanilla odds, and 3 bp
 -- clamps the level term so vanilla's own `bcs` guarantees the steal.  LOCKE
@@ -340,7 +243,7 @@ end
 -- attempts, 12 MP, against the pool the fixture logs.  The merchant's
 -- reaction script (`if_cmd STEAL`, AIScript::_314) sets b_switch $4C and
 -- ends the fight; the caller asserts $1DD2 bit 4.
---
+
 -- The menu machine is armr-style: presses start only after the menu flag
 -- holds 4 consecutive pulses, a new sequence is only built while the menu
 -- is the command window (state $05, because a stray A from any other state
@@ -386,9 +289,6 @@ local function stealDriver(what, maxF)
             H.readByte(B_SWITCH_LIVE)))
         end
         if mIdx <= #mSeq then
-          -- one button per 16-frame window: 6 held, 10 released, the
-          -- edge cadence the old driver's measured prog used (a held
-          -- d-pad does not move this cursor; a 6-frame edge does)
           H.setPad(mSub < 6 and { mSeq[mIdx] } or {})
           mSub = mSub + 1
           if mSub >= 16 then
@@ -402,10 +302,6 @@ local function stealDriver(what, maxF)
     }, what .. ": steal the clothes")
 end
 
--- ========================================================================= --
--- Budget note (issue #75): input-driven fights cost real ATB rounds, and the
--- retry ladders can replay them, so the frame cap covers the worst case of
--- three three-attempt ladders plus the steal's.
 H.run({ maxFrames = 350000 }, {
   H.loadState(DOOR),
   H.waitFrames(60),
@@ -415,25 +311,6 @@ H.run({ maxFrames = 350000 }, {
     H.assertEq(sw(0x0105), 1, "$0105 -- LOCKE's scenario is live")
     H.assertEq(sw(0x001E), 0, "$001E clear -- the scenario is not done")
   end),
-  -- LOCKE is alone here, which is when the back row is worth the trade.  He
-  -- fights a level-13 HeavyArmor with 495 hp on 168 of his own, and halving
-  -- the physical damage he takes buys the turns his Tonics need.  He gives
-  -- up half his Fight for it, and Steal deals no damage, so Fight is all he
-  -- has; this is the one stretch of the game where the trade is clearly
-  -- worth it.
-  -- LOCKE arrives with no equipment, which had not been noticed because it
-  -- had not been checked: measured 2026-08-09, $1600+37*1+$1F..$23 all read
-  -- $FF at this fixture (no weapon, no armor, no relics) with his own Dirk
-  -- in the bag.  He then punched the gate soldier's level-13, 495-hp
-  -- HeavyArmor for eight damage a swing and lost three attempts in a row,
-  -- which looks like a balance finding and is not one.  The story's own
-  -- remove_equip returns gear to inventory (EventCmd_8d) and the chain of
-  -- generated savestates never put it back on.  A player opens the Equip
-  -- menu before walking into an occupied town, and so does this script.
-  -- The choice is explicit: his own Dirk supplies the only weapon class
-  -- available here, and the Leather Hat and LeatherArmor are the only
-  -- defensive pieces in the bag.  Relics stay empty; the Gauntlet would
-  -- make the game invoke Optimum itself when the Relic menu closes.
   H.equipLoadout(1, {
     { 0, 0x00 }, -- Dirk
     { 2, 0x69 }, -- Leather Hat
@@ -447,30 +324,7 @@ H.run({ maxFrames = 350000 }, {
   -- punching.  The note that replaced it claimed the back row won the fight
   -- ("shields 3 -> 0 three times over, 495 hp -> 0, LOCKE never below 112")
   -- and that is falsified, so it is gone rather than left for contrast.
-  --
-  -- Measured 2026-08-12 end to end (probe_battle11.lua, and the same shape
-  -- on the six seeds this generator drew the day before): armed and in the
-  -- back row, solo LOCKE loses this fight, and nothing available here makes
-  -- him win it.  The soldier's first action takes him 168 -> 111, which is
-  -- the halved physical.  His own Fight takes the HeavyArmor 495 -> 489 and
-  -- one shield off three.  The soldier's second action takes him 111 -> 0:
-  -- over 111 damage in ONE hit ($3A70 = 0), and measured row-exempt -- it
-  -- comes through command $0C (`Cmd_0c` / `_actbluemagic0`,
-  -- battle_main.asm:3740) carrying $B3 = $FF, where both weapon swings
-  -- carried $B3 = $DF.  So the back row halves his Fight and the soldier's
-  -- physical and does nothing at all to the thing that kills him.  That is
-  -- the AI's turn-2 line `attack BATTLE, TEK_LASER, SPECIAL`
-  -- (ai_script.asm:342-357) rolling one of the two non-physicals, and the
-  -- macro emits $F0 -- one of three at random, so it comes up 2 turns in 3.
-  -- One ATB round is about 570 frames at this level, so he gets exactly one
-  -- action before that hit lands: three shield chips are four turns away
-  -- and he has one.  Healing does not reach it either -- 111 of 168 is 66%,
-  -- above the driver's 60% line, and no Tonic covers a 111-damage hit.  So
-  -- the back row stays, because it is what buys the one action, and it is
-  -- not a win condition.  What this fight needs is a weapon better than the
-  -- single Dirk in the bag, or fewer shields on a level-13 monster, or a
-  -- soldier that cannot open with a row-exempt one-shot: a balance decision
-  -- rather than a routing one.
+
   H.setRows({ [1] = true }, { tag = "locke solo rows" }),
   H.call(function()
     where("boot")
@@ -521,9 +375,6 @@ H.run({ maxFrames = 350000 }, {
           H.call(function() H.checkReq(loadReq, "cider: pre-talk reload") end),
           H.waitFrames(90),
         }) or seq({}),
-        -- Outside the n > 1 block, unlike the wait it replaces: attempt 1 has
-        -- to take a phase of its own too, or it sits wherever the route left
-        -- it and can land on attempt 2's seed (#83).
         L.spread(n),                     -- spread the battle RNG phase (#83)
         H.talkToObj(22, "the cider runner"),
         -- ride the two dialogs into the fight directly: advanceStory's
@@ -598,9 +449,6 @@ H.run({ maxFrames = 350000 }, {
       end)(),
       L.watch(),
       stealAttempt(1), stealAttempt(2), stealAttempt(3),
-      -- Before the verdict, not after: three attempts are evidence only if
-      -- they were three DIFFERENT fights, and if they were not, that is what
-      -- this run should report rather than "not stolen in 3" (#83).
       L.report(),
       H.call(function()
         H.assertEq(stolen, true,
@@ -696,32 +544,10 @@ H.run({ maxFrames = 350000 }, {
       H.maptile(4, 15), H.readByte(0x7E7600 + H.maptile(4, 15))))
   end),
 
-  -- #84: Tonic, visible on the walk.  Map 86's (15,10) chest sits in this
-  -- same house the grandson guards; the celes walk never enters this room
-  -- (its map-86 tiles are the passage and the rich man's house), so the
-  -- pickup lives here rather than in gen_celes.
   H.openChest{ stand = { 15, 11 }, face = "up", bit = 30, what = "Tonic",
                item = 0xE8,
                nav = { playBattles = true } },
 
-  -- Repair whatever BEAT 1's gate-soldier fights (B1, R1, R2 -- solo LOCKE,
-  -- fought up to three times because he respawns on every map-75 reload)
-  -- and the town/passage crossings since cost, before anything downstream is
-  -- measured or captured.  Every one of those crossings runs
-  -- playBattles = true, and a fought or fled encounter is not a free one.
-  -- Measured 2026-08-18 on the chest-wave regeneration: with no care stop
-  -- and no exit contract here, this generator shipped LOCKE at 16/249 (near
-  -- fatal) in sfigaro_passage.mss -- and because gen_celes performs ZERO
-  -- state writes of its own (its header says so; the route draws no
-  -- battles), that same 16/249 LOCKE rode straight through into
-  -- celes_freed.mss untouched. audit_party_hp was the only thing that
-  -- noticed either one. Same two-part shape as gen_ifrit_entry's
-  -- post-crossing repair: fieldCare is the repair (LOCKE is solo here with
-  -- no heal spell, so this reaches for the bag's Tonics/Potions -- see the
-  -- gate soldier's own "care before" stops upstream for what is in supply),
-  -- and H.assertPartyStanding at the exit is the contract that keeps a stop
-  -- that silently did nothing from reporting the same green as one that
-  -- worked.
   H.fieldCare({ tag = "care before the secret passage", threshold = 0.85 }),
 
   go(4, 15, 86, 7, 51, "E4 map 86 (4,15) -> (7,51) [the secret passage]"),

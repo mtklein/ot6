@@ -1,7 +1,6 @@
--- probe_cliff_seam.lua -- the last gap: map 21 (32,21) -> (36,2).  The
--- passability model has been wrong about slow climbs twice (Tzen roof,
--- the 43 alcove ladder); this drives the seam directly with long holds,
--- staying east of x=31 so the (30,20) row cannot teleport us to 43.
+-- probe_cliff_seam.lua -- the last gap: map 21 (32,21) -> (36,2).  Drives
+-- the seam directly with long holds, staying east of x=31 so the
+-- (30,20) row cannot teleport the party to 43.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
 local t, phase = 0, 1
@@ -10,8 +9,7 @@ local holds = { {up=true}, {up=true,right=true}, {right=true}, {up=true},
 H.run({ maxFrames = 30000 }, {
   H.loadState("build/states/wob_chase23C.mss.lua"),
   H.waitFrames(8),
-  -- come back from the chase spot to town side?  no: wob_chase23C IS on
-  -- 21 at (30,22); shift east to (32,21) first
+  -- wob_chase23C starts on map 21 at (30,22); shift east to (32,21) first
   H.navTo(32, 21, { maxFrames = 6000, playBattles = "flee" }),
   H.call(function()
     H.log(string.format("start seam at (%d,%d)", H.fieldX(), H.fieldY()))

@@ -1,7 +1,7 @@
--- probe_fc_wedge.lua -- anatomy of the chute-landing wedge (#132).
--- Boot fc_shadow, walk the proven route to (82,30), ride the (89,25)
--- tunnel, then dump the party's fine-position/object state and probe
--- each direction, logging what the engine does with each hold.
+-- probe_fc_wedge.lua -- anatomy of the chute-landing wedge.  Boot
+-- fc_shadow, walk the proven route to (82,30), ride the (89,25) tunnel,
+-- then dump the party's fine-position/object state and probe each
+-- direction, logging what the engine does with each hold.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x3ff) == m end
 local function snap(tag)
@@ -23,11 +23,8 @@ H.run({ maxFrames = 80000 }, {
   H.navTo(25, 19, { maxFrames = 9000, playBattles = "tactical",
     magic = { [0x07] = { spell = 2, boost = false } } }),
   H.call(function() snap("pre-ride baseline") end),
-  -- continue the proven route: (40,12), (44,11), (40,6)-chute, (36,28),
-  -- (67,39)-walk, (40,24)-tunnel... simplest: go straight for the
-  -- (89,25) tunnel region via (36,28)/(67,39)/(40,24) legs is long;
-  -- instead ride the FIRST chute (40,6) and snapshot around IT -- same
-  -- ride class, minutes sooner
+  -- ride the FIRST chute (40,6) and snapshot around it instead of going
+  -- all the way to (89,25) -- same ride class, minutes sooner
   H.navTo(40, 12, { maxFrames = 12000, playBattles = "tactical",
     magic = { [0x07] = { spell = 2, boost = false } } }),
   H.call(function() snap("pre (40,6) approach") end),

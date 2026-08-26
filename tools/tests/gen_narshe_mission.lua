@@ -1,46 +1,18 @@
--- gen_narshe_mission.lua -- v0.7 step F->G (issue #31), and the generator
--- that cuts battery checkpoint G, `narshe-mission-v1`.
---
+-- gen_narshe_mission.lua -- the generator that cuts battery checkpoint G,
+-- `narshe-mission-v1`.
+
 -- The step: cold-Continue the tracked `terra-returned-v1` battery (boundary
 -- F, the v0.6 stop line), assert its contract, board the parked Blackjack,
 -- fly to Narshe, walk the mission-meeting scene to `$0076=1`, walk back out
 -- to the world map, and save through the game's own Save UI at the Narshe
 -- exit spawn, world (84,34), which is boundary G.
---
--- What the recon got right, and what it could not know.  The route recon's
--- step-1 entry (docs/design/sealed-gate-route.md, since trimmed) called this
--- step "fly to Narshe, walk the mission meeting"; the corrections below are
--- this pass's own measurements and supersede it:
---  * The escort trigger row is (37-39,51) on map 20 and the meeting is on
---    map 30; `$0076=1` at event_main.asm:94170 is the handoff, measured.
---  * The recon says "fly to Narshe" but not how.  Measured this pass
---    (probe_v07_fly, probe_v07_f2g):
---      - a cold Continue of checkpoint F puts the party on foot standing on
---        the parked ship's tile (the F-checkpoint Continue behavior,
---        asserted below and by battle_slotsboot.lua);
---      - one A tap boards and lifts off in a single beat; there is no
---        separate "board" state to wait for.  The flight view zeroes
---        $E0/$E2 (the on-foot world position cells), so "airborne" is
---        `$E0==0 and $E2==0` and the ship tile is word($34)>>4, word($38)>>4;
---      - a bare d-pad in flight rotates the ship and never translates it;
---        Y+direction strafes.  That is gen_terra_returned_checkpoint's landing
---        idiom, and it is the only way to fly a planned course;
---      - B over a tile whose live prop byte $c2 has bit1 clear grounds the
---        ship; the party is then in the parked state again and one step in
---        any walkable direction puts them on foot.
---  * (83-85,34-36) beside the Narshe gate is landable, confirmed live at
---    (84,36), one tile south of the (84,33) short entrance's approach row.
---
+
 -- Checkpoint G is a world battery save, so it needs no authoring (the
 -- 2-trigger ROM budget stays untouched).  The save happens at the
 -- Narshe exit spawn because that tile is where a cold Continue of the
 -- checkpoint puts the party, and the step out of G starts there.
---
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
---   reads the marker line above and refuses, before the emulator boots and
---   naming both strings, any OT6_SRAM_CHECKPOINT whose manifest.json declares
---   a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26
@@ -97,11 +69,6 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
--- Strafe-fly the ship to hover tile (tx,ty).  Y is required: without it
--- the presses only turn the ship (measured, probe_v07_fly: 240 held frames
--- per direction moved word($34)/word($38) not at all while $29/$2E carried
--- angular velocity).  The terminator needs 90 consecutive frames on the
--- tile so a decaying strafe cannot carry the ship off the goal unnoticed.
 local function flyTo(tx, ty)
   local calm, hb = 0, -300
   return H.driveUntil(function()
@@ -125,7 +92,6 @@ local function flyTo(tx, ty)
 end
 
 H.run({ maxFrames = 40000 }, {
-  -- ---- the cold Continue and the entry contract (issue #25) -------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -144,9 +110,6 @@ H.run({ maxFrames = 40000 }, {
       .. string.format("  $1EDE=%02X $1EDF=%02X", H.readByte(0x1EDE),
         H.readByte(0x1EDF)))
     H.assertEntryContract("terra-returned-v1")
-    -- the F-checkpoint Continue behavior, measured: the party is restored on
-    -- foot on the parked ship's tile even though the save was taken
-    -- aboard.  This step's first move depends on it.
     H.assertEq(H.readByte(0x11FA) & 3, 0, "$11FA -- restored ON FOOT")
     H.assertEq(H.readByte(0x11F3), 0, "$11F3 -- not forced aboard")
     H.assertEq(H.worldX(), 24, "boot world x")
@@ -201,9 +164,6 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(H.readByte(0x11FA) & 3, 0, "on foot beside the ship")
   end),
   worldGrind(84, 34, "world walk -> the Narshe entry point (84,34)"),
-  -- (84,33) is the short entrance -> map 20 (38,61); a tile that takes the
-  -- party elsewhere is entered with a held press rather than with a walker
-  -- aimed at it (see #22 and gen_vector_entry).
   pressWalk("up", function() return not H.worldMode() and map() == 20 end,
     1200, "held UP onto (84,33) -> NARSHE (map 20)"),
   H.waitUntil(function()
@@ -217,32 +177,6 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(sw(0x0076), 0, "$0076 CLEAR -- the mission meeting is ahead")
   end),
 
-  -- ---- pick the party up off the floor -----------------------------------
-  -- This step takes no damage at all -- it fought nothing on any measured
-  -- run -- and it still used to ship EDGAR at 0/448 and SABIN at 0/457,
-  -- because it inherited them: terra-returned-v1, the checkpoint this
-  -- cold-Continues out of, handed both over dead, and nothing here ever
-  -- picked them up.  That is fixed upstream now, where it belonged --
-  -- terra-returned-v1's own care stop raises them on the Blackjack deck --
-  -- so this stop is no longer undoing somebody else's loss.  It stays,
-  -- because a step that walks into a scripted scene should not walk into it
-  -- hurt, and because the checkpoint it writes is a tracked battery.
-  --
-  -- Here rather than at the far end.  Map 20 at (38,61) is a plain field map
-  -- with real control, which is what a care stop wants; the exit is the
-  -- world map at the checkpoint-G tile, where gen_tunnelarmr measured its
-  -- own stop breaking ($E0/$E2 reading (175,0) garbage, the world engine
-  -- never resuming).  It is also before the mission meeting, which runs
-  -- with playBattles=true, so the party walks into that upright.
-  --
-  -- The bag arriving here is thin and stays thin: 4 Tonics, no Potions and
-  -- no Fenix Downs on the measured re-cut, because battle 71 one boundary
-  -- back spends both revives.  Nobody in this party (LOCKE, EDGAR, SABIN,
-  -- SETZER) knows a cure, and an esper's grant is battle-only (#96), so
-  -- this drinks whatever the threshold asks for -- one Tonic, on that run.
-  -- If it ever arrives with a corpse it will have nothing to raise them
-  -- with, and that is a supply finding for the segment above, not a reason
-  -- to lower the exit bar.
   H.fieldCare({ tag = "care on arrival in Narshe", threshold = 0.55 }),
 
   -- ---- the escort trigger row and the mission meeting --------------------
@@ -296,26 +230,9 @@ H.run({ maxFrames = 40000 }, {
     -- everything the boundary declares except the sram witnesses, which
     -- only the save itself can put into the battery
     H.assertExitContractPreSave("narshe-mission-v1")
-    -- The floor, asserted at the exit: dead, petrified, zombie, or at or
-    -- below max HP / 8 (H.assertPartyStanding, the same three conditions as
-    -- tools/audit_party_hp.py; change the two together).  It goes here
-    -- rather than only in the audit because this generator writes a tracked
-    -- checkpoint as well as a fixture, and the audit's net only closes after
-    -- a `make savestates` measured in hours while a bad checkpoint is a
-    -- committed binary that no regeneration ever cleans.  If this fires, the
-    -- care stop above ran out of bag: that is a supply finding to report,
-    -- not a reason to lower the bar.
     H.assertPartyStanding("narshe_mission exit")
     H.screenshot("step_fg_g_tile")
   end),
-  -- The step's savestate is generated here, before the menu rather than
-  -- after.  The world menu does not unwind on B (measured: 900 frames of
-  -- edge-pressed B left $0059 nonzero; gen_terra_returned_checkpoint recorded
-  -- the same for the grounded-airship world menu and never closed
-  -- it).  So the only playable frame this generator can capture is the one
-  -- before the save UI opens; the save itself is confirmed by the full exit
-  -- contract below, asserted with the menu open, and by the 32 KiB battery
-  -- run.sh captures on shutdown.
   H.saveState("narshe_mission.mss"),
 
   -- ---- the real Save UI, slot 3 ------------------------------------------
@@ -337,24 +254,11 @@ H.run({ maxFrames = 40000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
-    -- the real CopyGameDataToSRAM entry captures the slot argument the
-    -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
-    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- The pad-driven save (save-drive rule, tools/tests/README.md;
-  -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
-  -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
-  -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
-  -- poke, and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -379,18 +283,10 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
       "SRAM $307ff0 records slot 3")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are read, never seeded (issue #75): the
-    -- battery carries whatever the chain earned.  The phase-2 checkpoint
-    -- re-cuts measure these, and the entry contracts follow the
-    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
     H.log("real Save UI wrote the narshe-mission checkpoint to slot 3")
-    -- The full exit contract, sram included, at the boundary save moment.
-    -- Asserted with the menu still open: as at the checkpoint-F boundary,
-    -- every declared field reads from cells the menu leaves intact
-    -- ($1f60/$1f61 rather than $e0/$e2, the #29 module-overlay class).
     H.assertExitContract("narshe-mission-v1")
     H.screenshot("step_fg_saved")
   end),

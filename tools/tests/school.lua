@@ -1,25 +1,20 @@
 -- @suite
 -- School test: the Narshe Beginner's House teaches the OT6 rules rather
--- than the vanilla ones.  Exit code 0 = pass, 1 = fail.  (smoke.lua
--- pattern: pure ROM bytes.)
+-- than the vanilla ones.  Exit code 0 = pass, 1 = fail.
 --
--- Three sentinel dialogs from docs/design/narshe-school.md are asserted
--- in full: the greeter ($0257, "The war has new rules..."), the tier-2
--- seed ($0276, the deserter), and the Runic lesson ($026F), which stopped
--- being a kept-vanilla line once Runic began banking a BP, so a reverted
--- Ot6RunicBP and a reverted advisor each fail one test.
+-- Three sentinel dialogs are asserted in full: the greeter ($0257, "The war
+-- has new rules..."), the tier-2 seed ($0276, the deserter), and the Runic
+-- lesson ($026F), which stopped being a kept-vanilla line once Runic began
+-- banking a BP, so a reverted Ot6RunicBP and a reverted advisor each fail
+-- one test.
+--
 -- The test self-locates through the dialog pointer table, so it survives
 -- future re-encodes that shift offsets:
 --   DlgBankInc  cc/e600 -> PRG 0x0CE600  (first dialog id of bank 2)
 --   DlgPtrs     cc/e602 -> PRG 0x0CE602  (16-bit offsets, 2 bytes/id)
 --   Dlg1        cd/0000 -> PRG 0x0D0000  (ids < DlgBankInc; else bank
 --                                         byte increments -> 0x0E0000)
--- (HiROM: PRG file offset = SNES address - 0xC00000; text_main.asm has
--- the segment map.)  Expected bytes are the repo codec's encoding of the
--- json entries; regenerate after editing the text with:
---   cd ff6 && python3 -c "import sys,json; sys.path.insert(0,'tools'); \
---     import romtools as rt; d=json.load(open('src/text/dlg1_en.json')); \
---     print(rt.TextCodec(d).encode(d['text'][599]).hex())"
+-- HiROM: PRG file offset = SNES address - 0xC00000.
 
 local cases = {
   {

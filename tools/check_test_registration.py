@@ -1,36 +1,11 @@
 #!/usr/bin/env python3
-"""Every test-shaped file under tools/tests declares whether it runs (#78).
+"""Every test-shaped file under tools/tests declares whether it runs.
 
-Why this exists.  `whelkbal_tek.lua` carried no `-- @suite` marker, so
-`make test` never ran it (suite.sh discovers members by that marker,
-suite.sh:70).  It sat in the tree failing, silently, and when someone finally
-ran it by hand it handed back numbers from two reads that had been wrong for a
-while.  An instrument nobody runs rots into confident-looking garbage, which is
-this repo's stated worst failure mode.  Nothing caught it because nothing was
-looking: a file simply not appearing in the suite is invisible.
-
-The rule.  A `.lua` under tools/tests must either be a suite member
-(`-- @suite ...`) or say out loud that it is not (`-- @manual ...`).  A file
-that is neither fails this check, so a test that loses its `@suite` marker --
-or a new one that never got one -- can no longer hide.  `@manual` is not a
-loophole: it is a one-line statement that a human runs this by hand and it is
-deliberately outside the gate, which is exactly the decision that was never
-made for whelkbal.
-
-What is exempt, and why the exemption is safe.  Three prefixes carry their
-status in the name, by long convention:
-
-  * `gen_*`   -- savestate generators, run by the ninja graph
-                 (tools/tests/savestate_graph.py), not the suite.  Orphan
-                 generators are a different question the graph owns.
-  * `probe*`  -- throwaway diagnostics, run by hand while chasing one thing.
-  * `shot_*`  -- screenshot producers, run by hand.
-
-These are understood to be off the suite; requiring a marker on ~120 probes
-would be noise that trains people to add markers without thinking, which is
-how the next whelkbal gets waved through.  The check is aimed at the namespaces
-a reader would mistake for pass/fail suite tests (battle_, menu_, bal_,
-metrics_, ...), which is where the rot actually hid.
+A `.lua` under tools/tests must either be a suite member (`-- @suite ...`)
+or say out loud that it is not (`-- @manual ...`).  Three prefixes are
+exempt, carrying their status in the name by convention: `gen_*` (savestate
+generators, run by the ninja graph), `probe*` (throwaway diagnostics, run
+by hand), `shot_*` (screenshot producers, run by hand).
 
 Usage:  python3 tools/check_test_registration.py [--dir tools/tests] [--selftest]
 Exit 0 if every non-exempt file declares itself, 1 otherwise.
@@ -84,8 +59,6 @@ def selftest() -> int:
             ok = False
             print(f"  SELFTEST FAIL {what}: got {got!r} want {want!r}")
 
-    # The exemption is by name, and it is the load-bearing half: a bug that
-    # exempted everything would pass a tree full of undeclared tests.
     check("gen_ is exempt", is_exempt("gen_arvis.lua"), True)
     check("probe_ is exempt", is_exempt("probe_vargas.lua"), True)
     check("probe16 (no underscore) is exempt", is_exempt("probe16.lua"), True)
@@ -93,9 +66,7 @@ def selftest() -> int:
     check("a battle_ test is NOT exempt", is_exempt("battle_break.lua"), False)
     check("an instrument is NOT exempt", is_exempt("whelkbal_tek.lua"), False)
 
-    # The marker must be a real comment line, not a mention in prose, so the
-    # whelkbal failure mode (a file talking about @suite in its header without
-    # carrying the marker) still fails.
+    # The marker must be a real comment line, not a mention in prose.
     check("bare @suite line declares", declares_itself("-- @suite slow\ncode"),
           True)
     check("@manual line declares", declares_itself("-- @manual instrument\nx"),
@@ -128,7 +99,7 @@ def main() -> int:
             print(f"  {name}")
         print("\nEach must open with one of:\n"
               "  -- @suite [savestate=<fixture>] [slow]   (a pass/fail member "
-              "make test runs)\n"
+              "the suite runs)\n"
               "  -- @manual <why it is run by hand>       (a deliberate "
               "instrument, off the gate)\n"
               "A file with neither is invisible: it can fail on main and "

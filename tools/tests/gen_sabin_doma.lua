@@ -3,7 +3,7 @@
 -- one state:
 --   camp_cleared.mss  map 119 (DOMA CASTLE), SABIN alone, controllable,
 --                     with CYAN's defence of the gate already underway
---
+
 -- The walk is three maps, and one of them has a door back the way it came.
 -- From map 121 the
 -- route is (short_entrance.dat, map 121):
@@ -15,7 +15,7 @@
 -- party_chars SABIN` and `load_map 119, {8,25}, RIGHT` (:41001), then the
 -- arrival scene that introduces CYAN to SABIN, sets $0033 and ends in
 -- `player_ctrl_on` (:41067-41068).
---
+
 -- That door: map 123 (17,39) goes straight back to map 121, and it is
 -- one tile south of where this step arrives on map 123.  The field BFS knows
 -- tile passability and nothing about doorways, so any plan that clips that
@@ -23,7 +23,7 @@
 -- gen_sabin_world's worldLeg: it names the map the step is allowed to end on
 -- and fails on any other, instead of leaving a walker to idle out
 -- its budget on the wrong map.
---
+
 -- What is not required, checked rather than assumed.  Map 123 carries two
 -- more scene triggers, (4,34) _cba29f (:62120, the King) and (42,8)
 -- _cba395 (:62307, "Here, too..."), and neither gates the family scene:
@@ -53,21 +53,6 @@ local function monCount()
   return n
 end
 
--- BATTLE DETECTION, SLOT-AGNOSTIC -- and this is the whole reason run 2 of
--- this file died.  lib/ot6.lua's battleLoadStarted() reads ONE word, party
--- battle-HP slot 0 at $3BF4, and calls it "a battle has begun loading".
--- That holds for every fixture the harness had before this arc, because
--- every one of them fought with a party whose slot 0 was occupied.  CYAN's
--- solo defence of Doma does not: measured across the whole fight,
---     $3BF4=0000  $3BF6=00FE  $3BF8=0000  $3BFA=0000
--- CYAN is in battle slot ONE.  So battleLoadStarted() stayed false for the
--- entire battle, every driver in the run treated it as "no battle", nobody
--- pressed anything, and CYAN stood there while his HP ticked
--- FE -> D4 -> 94 -> 5A and the fight was lost.  The loss is then silent by
--- design: `battle 46` is followed by `call _ca5ea9` (:61522-61523), and
--- _ca5ea9 is `if_b_switch $40, _ca5eb2 / call GameOver` -- so a lost battle
--- leaves the event PC parked at $CB9EBB forever with the field still drawn.
---
 -- So scan all four slots -- but VALIDATE THE WHOLE TABLE, not just "some
 -- slot looks like HP".  A first attempt that returned true on any single
 -- plausible word fired on map 123 while the CYAN name menu was open:
@@ -237,12 +222,6 @@ local function rideUntil(pred, what, budget)
           H.setPad(battN > 300 and phase < 4 and { "a" } or {})
           return
         end
-        -- Issue #75: no route on this step has an encounter pool (the Doma
-        -- interiors are event maps), so a monster table here would be a
-        -- surprise -- and the accurate answer to a surprise is to PLAY it:
-        -- the edge-tapped A below is the lib's own blind auto-fighter (A
-        -- opens the command list, A confirms Fight, A takes the default
-        -- target).  The battle-clear write that used to sit here is gone.
         H.setPad(phase < 4 and { "a" } or {})
         return
       end
@@ -280,18 +259,6 @@ local function rideUntil(pred, what, budget)
   }, what)
 end
 
--- "THE STORY BEAT IS OVER", written so a flapping trigger tile still
--- counts.  The obvious predicate -- n CONSECUTIVE frames of full control --
--- cannot be satisfied anywhere on this map, because every one of these
--- scenes leaves the party standing ON the trigger tile that fired it and
--- CheckEventTriggers (field/event.asm:5740) has no once-per-tile latch: it
--- re-fires the script every single frame.  The scripts are inert by then
--- (_cb0f2e opens `if_switch $002B=1, EventReturn`, :40303) but each firing
--- still flips $087C to 4 for a frame or two, so hasControl() oscillates
--- forever.  Measured, run 1: the party sat on (36,22) for 12,000 frames
--- with the heartbeat reading ctl=true and the every-frame settle sample
--- reading ctl=false, and "10 consecutive" never happened once.
---
 -- So: require the map to be STATICALLY quiet for 4n frames -- right map,
 -- tile-aligned, fully faded in, no battle, no dialog -- and require real
 -- user control in at least n of them.  A cutscene fails the second half
@@ -377,32 +344,11 @@ local function crawl123(gx, gy, dest)
       H.navTo(function() return target[1] end, function() return target[2] end, {
         maxFrames = 9000,
         playBattles = true,
-        -- A DOOR FIRES THE MOMENT THE PARTY STEPS ON IT, WHISKING IT AWAY --
-        -- so navTo never rests on the door tile and its own terminator
-        -- (on the tile, with control) can never fire.  For an inner door
-        -- the map even STAYS 123, so `map ~= 123` misses it too and the
-        -- walker would path endlessly back toward a tile it no longer
-        -- occupies (the crawl thrash, measured).  The real signal is the
-        -- transition itself: CheckShortEntrance's DoEntrance does
-        -- `lda #1 / sta $84` before FadeOut (field/entrance.asm), and $0084
-        -- is 0 during ordinary control (hasControl() folds it in).  Latch a
-        -- rising $0084, and the hop ends when the door fires whether the
-        -- destination is another room or another map.
         arrive = function()
           if H.readByte(0x0084) ~= 0 then transiting = true end
           return transiting or map() ~= 123
         end,
       }),
-      -- Ride out whatever the hop landed in until control is back.  This is
-      -- a rideUntil, not a bare waitUntil, because the BFS is blind to
-      -- TRIGGER tiles and can route a hop straight across one: the path from
-      -- (5,25) to the family door clips (4,34), which fires the King scene
-      -- _cba29f (:62120) -- a full cutscene that reloads map 123 at (25,17)
-      -- and only then returns control (measured, run 3).  A waitUntil would
-      -- sit through its dialogs doing nothing; rideUntil taps them.  It ends
-      -- the instant we are off map 123 (the family door won, into the
-      -- _cb1283 cutscene that never gives control back on map 124), or once
-      -- control is genuinely back on 123 for the next pickDoor.
       rideUntil(function()
         return map() ~= 123
             or (H.hasControl() and H.tileAligned() and bright() >= 15)
@@ -449,9 +395,6 @@ H.run({ maxFrames = 60000 }, {
       H.frame, H.fieldX(), H.fieldY()))
   end),
 
-  -- 1. into the castle.  From CYAN's spawn on map 121 the only forward door
-  --    the field BFS can reach is (28,12) -> map 123 at (51,30); the
-  --    survey's (37,11) is walled off from this spawn (measured, probe_121).
   fieldLeg(28, 12, 121, 123, "121 -> 123 (the castle interior)", 15000),
   rideUntil(landedField(123, 10), "inside Doma Castle (map 123)", 8000),
   H.waitFrames(30),

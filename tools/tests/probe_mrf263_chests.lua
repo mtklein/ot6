@@ -1,25 +1,24 @@
--- probe_mrf263_chests.lua -- walkability recon for the #84 pickups on map
--- 263 assigned to gen_ifrit_entry: Gold Helmet (14,55) bit 89, Tent (42,46)
--- bit 92, Gold Armor (32,57) bit 93.  Loads the mrf_kefka fixture (the same
--- boot gen_ifrit_entry uses: map 263, {39,31}, $005F=1) and measures, for
--- each chest, which of its four stand tiles BFS can reach -- both freely and
--- with every known scripted tile on the map excluded -- plus a canStep grid
--- around each chest.  Read-only: no chest is opened, no state is saved.
+-- probe_mrf263_chests.lua -- walkability recon for map 263 pickups: Gold
+-- Helmet (14,55) bit 89, Tent (42,46) bit 92, Gold Armor (32,57) bit 93.
+-- Loads the mrf_kefka fixture (map 263, {39,31}, $005F=1) and measures,
+-- for each chest, which of its four stand tiles BFS can reach -- both
+-- freely and with every known scripted tile on the map excluded -- plus
+-- a canStep grid around each chest.  Read-only: no chest is opened, no
+-- state is saved.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Every tile on map 263 known to fire a script when stepped on (from
--- gen_mrf_263/gen_mrf_kefka/gen_ifrit_entry's decodes plus the map's one
--- event trigger, the SavePoint at {60,32}).
+-- Every tile on map 263 known to fire a script when stepped on, plus the
+-- map's one event trigger, the SavePoint at {60,32}.
 local SCRIPTED = {
   { 36, 44 }, { 37, 44 }, { 38, 44 },            -- the chute to 264
   { 24, 17 }, { 24, 18 },                        -- the ride east
   { 40, 32 }, { 41, 32 }, { 42, 32 },            -- the Kefka row (inert now)
-  { 42, 41 },                                    -- _cc78e0 lift
-  { 49, 48 },                                    -- _cc7905
+  { 42, 41 },                                    -- lift
+  { 49, 48 },
   { 12, 6 }, { 18, 5 },                          -- entrances back to 262
   { 60, 32 },                                    -- SavePoint
 }
@@ -92,14 +91,14 @@ local function survey(tag, withGrids)
 end
 
 H.run({ maxFrames = 9000 }, {
-  -- half 1: gen_ifrit_entry's boot -- post-Kefka, map 263 (39,31)
+  -- half 1: post-Kefka boot, map 263 (39,31)
   H.loadState("build/states/mrf_kefka.mss.lua"),
   H.waitFrames(150),
   H.waitUntil(function() return H.hasControl() end, 1000, "ctl A", 5),
   survey("kefka", true),
-  -- half 2: gen_mrf_kefka's boot -- pre-ride, map 263 (22,18), where
-  -- gen_mrf_263 saved.  If a chest is NO PATH from (39,31) but reachable
-  -- here, it belongs to a walk on the other side of the one-way ride.
+  -- half 2: pre-ride boot, map 263 (22,18).  If a chest is NO PATH from
+  -- (39,31) but reachable here, it belongs to a walk on the other side
+  -- of the one-way ride.
   H.loadState("build/states/mrf_263.mss.lua"),
   H.waitFrames(150),
   H.waitUntil(function() return H.hasControl() end, 1000, "ctl B", 5),

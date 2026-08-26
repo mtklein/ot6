@@ -1,19 +1,17 @@
--- probe_vc_chests.lua -- NOT a suite test.  Measure the four #84 chests on
--- map 384's east half from gen_vector_crash's own traverse (issue #84):
---   Genji Glove (47,11) bit 125 -- behind the (58,18) span switch ($01F9,
---     _cb2fe7, event_main.asm:45071; the event scripts a 6-tile descent),
+-- probe_vc_chests.lua -- NOT a suite test.  Measures the four chests on
+-- map 384's east half:
+--   Genji Glove (47,11) bit 125 -- behind the (58,18) span switch ($01F9;
+--     the event scripts a 6-tile descent),
 --   Elixir (88,23) bit 126 and Ether (71,30) bit 128 -- behind the (71,15)
 --     lever ($0174),
 --   Magicite (113,6) bit 127 -- behind the lever or the (104,17) toggle
 --     ($01F5); this probe answers which.
--- Boots the gate_cave_save fixture, walks the generator's own opening
--- (386 save room -> 384 (64,12)), then runs the candidate insertion order:
--- span -> Genji -> lever -> Ether -> Elixir -> toggle -> Magicite, with a
--- bfsPath report before each stage and a final reachability check on the
--- (121,22) teleport approach the real traverse needs next.  Chest stands
--- are picked adaptively (first bfs-reachable neighbor) and logged, so the
--- generator edit can hardcode the measured stand/face.
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- Boots the gate_cave_save fixture, walks the opening (386 save room -> 384
+-- (64,12)), then runs the candidate insertion order: span -> Genji ->
+-- lever -> Ether -> Elixir -> toggle -> Magicite, with a bfsPath report
+-- before each stage and a final reachability check on the (121,22)
+-- teleport approach.  Chest stands are picked adaptively (first
+-- bfs-reachable neighbor) and logged.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -122,8 +120,8 @@ add(
 -- ---- the (58,18) span switch and the Genji shelf --------------------------
 add(
   H.navTo(58, 18, { playBattles = "flee", maxFrames = 20000 }),
-  -- the retrying up+A loop the retired probe_v07_384west measured this
-  -- switch with (the event scripts a descent, so the sw read is the exit)
+  -- retrying up+A loop; the event scripts a descent, so the sw read is
+  -- the exit
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x01F9) == 1 end, 3000, {
       H.call(function()

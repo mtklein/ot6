@@ -1,53 +1,27 @@
 -- @suite savestate=gau_joined slow
 -- codex_ctx.lua -- a battle entered from the world map after a menu save
--- selects the saved game's codex page rather than the transient page
--- (issue #29).
+-- selects the saved game's codex page rather than the transient page.
 --
--- The guarantee this pins: Ot6CodexActive (ff6/src/battle/ot6_codex.asm)
--- picks the per-save codex page by reading $7e021f, and its three callers
--- all run in battle context (ot6_break.asm:86/:849/:949).  $021f is a menu
--- module variable, so issue #29 asked whether any other module overlays it
--- between the menu's lifecycle write and the battle's read.  The 2026-07-28
--- audit measured the full module matrix (field/world/battle/menu, fresh and
--- loaded, pre- and post-menu, pre- and post-save) and found the cell held
--- the lifecycle value at every consumer read in every player-shaped flow:
--- $021f has exactly four writers, all menu lifecycle moments
--- (menu_common.asm:250, field_menu.asm:2925/:2963, save.asm:50), the world
--- module's DP swap covers only $0000-$00FF (world/init.asm:1446-1516), and
--- the menu's own clock tick stops at $021e (menu_common.asm:3494-3522, .a8).
--- The overlay measured in issue #29 (value 5, then a 36/37 oscillation) was
--- reproduced only under codex_saveas's then-forced-ZMENUSTATE save drive
--- (since converted to pad input), whose corrupted exit path left menu tasks
--- running.  It does not occur in any real flow.
+-- Ot6CodexActive picks the per-save codex page by reading $7e021f; its
+-- three callers all run in battle context.
 --
--- The drive (issue #75 conversion: the discriminator used to be forged, with
--- fire written into all 384 slot-3 species and ice into all 384 transient
--- species, and the closing fight was ended by the monster-dead flag write.
--- Both pages' content is now produced by play, following cb8e605's
--- baseline-change approach, and the fight is fled):
+-- The drive:
 --   0. the boot state is the pre-save control, read rather than staged: the
 --      never-saved chain's fights populated the transient page (lifecycle
 --      0 writes go there) while all three save-slot pages read
 --      empty, asserted byte-for-byte.
 --   1. stand on the Veldt at (214,149) and save into empty slot 3 via the
---      real Save command, pad input only (save-drive rule).  SaveAs copies
---      the transient payload, so at this instant the two pages are equal.
+--      real Save command, pad input only.  SaveAs copies the transient
+--      payload, so at this instant the two pages are equal.
 --   2. fight until the Veldt's varied formations teach something through
---      the party's real weapon classes.  The chip path's persistent
---      store consults Ot6CodexActive mid-battle, so the page
---      diff is the write half of the guarantee: every changed byte must
---      land in the slot-3 page and none in the transient page (lifecycle
---      3 now).  After this battle the pages differ by exactly the earned
---      bytes: knowledge slot 3 holds and the transient page lacks, asserted
---      by SRAM read.
+--      the party's real weapon classes.  Every changed byte must land in
+--      the slot-3 page and none in the transient page (lifecycle 3 now).
+--      After this battle the pages differ by exactly the earned bytes.
 --   3. fight again and read the seed before any input: a present monster
 --      of a just-taught species must enter pre-revealed with the taught
 --      bits, which is the read half.  Only the slot-3 page carries those
---      bits, so if any module had overlaid $021f between the save and this
---      battle, Ot6CodexActive would fall back to the transient page and the
---      pre-reveal would be missing.  (Species not in the taught set defer
---      the check to the next encounter, with bounded retries, fled with the
---      real run mechanic.)
+--      bits.  (Species not in the taught set defer the check to the next
+--      encounter, with bounded retries, fled with the run mechanic.)
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/gau_joined.mss.lua"
 
@@ -93,34 +67,17 @@ end
 local taught, taughtN = {}, 0
 local slot3Before, tempBefore = nil, nil
 
--- the in-battle action driver (codex_saveas's, measured): everyone Fights;
--- 4-frame-held presses on a 5-on/5-off cadence.  On gau_joined that means
--- Cyan's blade plus Sabin and Gau's bludgeoning hands, against the Veldt's
--- varied species rather than one exhausted Narshe pool.
+-- the in-battle action driver: everyone Fights; 4-frame-held presses on a
+-- 5-on/5-off cadence.
 --
--- Teach steering (follows the fixture, 2026-08-18): the #84 chest wave's
--- longer route fought more species before this savestate, so the chain
--- arrives with 32 transient codex bytes instead of the handful it used to
--- carry, and every chip a plain all-Fight drive can produce against the
--- Veldt's replay cycle is already taught.  Measured on the re-made
--- gau_joined: 45 straight all-Fight battles taught 0 bytes.  The one
--- pairing still open is species $A8's bludgeon weakness ($04,
--- gen_break_floor's row), and the only bludgeon attack this party can
--- actually deliver is Sabin's Pummel (blitz $5D, class $04 in
--- Ot6SkillClassTbl): Cyan and Sabin both SWING slash $01 (Kotetsu $2b and
--- MetalKnuckle $53 rows of Ot6WeapClassTbl), and Gau's bare-hand bludgeon
--- never happens because his Veldt command row is Leap/Rage/-/Item
--- ($11,$10,$ff,$01 -- no Fight; the atkclass write watch saw only $01
--- swings across 16 battles).  So: when a live monster's weak mask still
--- has a bit some party member can newly reveal, that member delivers it
--- (Fight for a weapon-class match, the Pummel list walk for the blitz),
--- the other characters Defend, and Gau -- who has no Fight row to swap
--- into Def -- burns his turn on a Tonic; when nothing present is
--- teachable, everyone taps A and the filler battle ends fast.  All of it
--- is read from the battle's own seeded state (weak mask $3e9c+off,
--- revealed bits $3e9d+off -- the same bytes checkReadSeed pins), so
--- nothing here pins a species id and the steer retires itself the moment
--- the chip lands.
+-- Teach steering: when a live monster's weak mask still has a bit some
+-- party member can newly reveal, that member delivers it (Fight for a
+-- weapon-class match, the Pummel list walk for the blitz class), the other
+-- characters Defend, and Gau -- who has no Fight row to swap into Def --
+-- burns his turn on a Tonic; when nothing present is teachable, everyone
+-- taps A and the filler battle ends fast.  All of it is read from the
+-- battle's own seeded state (weak mask $3e9c+off, revealed bits
+-- $3e9d+off), so nothing here pins a species id.
 local ST_TOOLS, ST_ITEM = 0x30, 0x0A
 local CMD_FIGHT, CMD_ITEM, CMD_BLITZ = 0x00, 0x01, 0x0A
 local ITEMLIST, PUMMEL, PUMMEL_COST, TONIC = 0x4005, 0x5D, 4, 0xE8
@@ -170,10 +127,8 @@ local function teacherPresent()
   end
   return false
 end
--- Per-battle diagnostics.  A red here used to say only "taught 0 bytes";
--- the three lines these feed (the [dbg] seeded-state dump, the [steer]
--- role log, and the per-battle attack-class tally) are what located the
--- 2026-08-18 teach drought, and they name the next one from the log alone.
+-- Per-battle diagnostics: the [dbg] seeded-state dump, the [steer] role
+-- log, and the per-battle attack-class tally.
 local lastActor, mfM, actM = nil, 0, nil
 local dbgLogged = false                 -- one [dbg] line per battle
 local steerLogged = {}                  -- one [steer] line per actor per battle
@@ -181,9 +136,8 @@ local atkSeen = {}                      -- OT6_ATKCLASS writes, tallied per batt
 emu.addMemoryCallback(function(_, v)
   atkSeen[v] = (atkSeen[v] or 0) + 1
 end, emu.callbackType.write, 0x7e57b8, 0x7e57b8)
--- The driver retains its Terra/Fire branch because this file shares the
--- proven menu walker, but this fixture has no Terra: every live action here
--- takes the ordinary Fight branch.
+-- this fixture has no Terra: every live action here takes the ordinary
+-- Fight branch.
 local function battleReset()
   lastActor = nil
   dbgLogged = false
@@ -335,19 +289,18 @@ local function battlePulse()
   elseif st == ST_TGT then
     btn = "a"
   else
-    -- transitional states and battle messages (the reveal banner blocks
-    -- the queue until dismissed; measured: st=$01 held for 30000 frames
-    -- with no press).  #90: tap B, not A -- B dismisses banners and
+    -- transitional states and battle messages: the reveal banner blocks
+    -- the queue until dismissed.  Tap B, not A -- B dismisses banners and
     -- messages just as well but can never confirm a just-opened command
-    -- window's row 0 (the battle_levelup race this file was listed for).
+    -- window's row 0.
     btn = "b"
   end
   H.setPad((hold and btn) and { [btn] = true } or {})
 end
 
--- gen_sabin_gau's proven Veldt pacing: alternate left/right at tile
--- boundaries.  North from this fixture is a map entrance, so a generic
--- four-direction beat can legitimately leave the overworld.
+-- alternate left/right at tile boundaries.  North from this fixture is a
+-- map entrance, so a generic four-direction beat can legitimately leave
+-- the overworld.
 local veldtFlip = false
 local hbP = -600
 local function patrolPulse()
@@ -362,10 +315,9 @@ local function patrolPulse()
   if not H.worldHasControl() then H.setPad({}); return end
   if not H.worldAligned() then return end
   -- Stay on the Veldt: battle re-entry drifts the beat west a tile at a
-  -- time, and by (202,149) the encounters are the desert's (species $08
-  -- and $0E showed up in the read half's seed checks, 2026-08-18), which
-  -- dilutes the search for the taught species.  Herd the walk back into
-  -- a band around the parked tile before resuming the alternating beat.
+  -- time, and further west the encounters dilute the search for the taught
+  -- species.  Herd the walk back into a band around the parked tile before
+  -- resuming the alternating beat.
   local x = H.worldX()
   if x < 210 then H.setPad({ right = true }); return end
   if x > 220 then H.setPad({ left = true }); return end
@@ -380,8 +332,7 @@ local actions = {
   H.waitUntil(worldReady, 500, "world-map control", 5),
 
   -- 0. the pre-save control, read: lifecycle-0 fights taught the transient
-  -- page and only it.  (The forged all-species staging this replaces could
-  -- not fail; these reads can.)
+  -- page and only it.
   H.call(function()
     H.assertEq(H.readByte(0x021f), 0, "never-saved chain: lifecycle reads 0")
     H.assertEq(sram(TEMP), 0x4f, "transient codex magic 'O'")
@@ -402,15 +353,12 @@ local actions = {
       known))
   end),
 
-  -- Park on the fixture's plain Veldt tile.  It is not a town entrance, so
-  -- ReloadMap on menu close cannot pull the party off the overworld.
-  -- issue #75: this walk really can be interrupted -- the note above
-  -- records a desert fight popping ~300 frames out of the old Figaro park
-  -- -- and it used to be the library's flag write that ended it.  Fled
-  -- rather than fought, because a fought battle chips shields and a chip is
-  -- exactly what this test's discriminator is made of: an incidental win
-  -- here would teach the transient page before the save copies it, and
-  -- muddy the page diff step 2 asserts.  A fled battle teaches nothing.
+  -- Park on the fixture's plain Veldt tile: not a town entrance, so
+  -- ReloadMap on menu close cannot pull the party off the overworld.  Fled
+  -- rather than fought, because a fought battle chips shields and a chip
+  -- is exactly what this test's discriminator is made of: an incidental
+  -- win here would teach the transient page before the save copies it and
+  -- muddy the page diff step 2 asserts.
   H.worldNavTo(214, 149, { maxFrames = 15000, playBattles = "flee" }),
 
   -- 1. save into slot 3, pad input only (save-drive rule; the cursor is
@@ -451,8 +399,8 @@ local actions = {
   end),
 
   -- Close the menu.  worldReady() and worldHasControl() read menu-module
-  -- garbage while the menu owns the zero page (measured), so the positive
-  -- check that the world module is back is the exact parked tile.
+  -- garbage while the menu owns the zero page, so the positive check that
+  -- the world module is back is the exact parked tile.
   H.driveUntil(function()
     return H.worldMode() and H.worldAligned() and bright() >= 15
        and H.worldX() == 214 and H.worldY() == 149
@@ -464,10 +412,9 @@ local actions = {
   -- interrupts, and after each battle diff both pages.  The first battle that
   -- teaches must have written the slot-3 page and only it.  (Desert
   -- encounters teach nothing to this kit, the loop keeps walking.)
-  -- This is one single-call state machine: H.cond latches its branch on the
-  -- first tick inside a driveUntil body (measured: the branch chosen on frame
-  -- one replayed for the whole loop and the battle accounting never ran), so
-  -- the battle edge is detected inline instead.
+  -- This is one single-call state machine: the battle edge is detected
+  -- inline, since H.cond latches its branch on the first tick inside a
+  -- driveUntil body.
   (function()
     local fights, wasInBattle = 0, false
     local function account()
@@ -499,11 +446,9 @@ local actions = {
         table.concat(sp, " "), table.concat(ac, " ")))
       fightSpecies = {}
     end
-    -- The bail-out follows the fixture: the teachable pairing (species $A8,
-    -- see the teach-steering header) sits fourth in the re-made state's
-    -- eight-formation Veldt cycle, so one full cycle plus slack bounds the
-    -- search; 6 used to be enough when the shorter pre-#84 chain left the
-    -- first formation's species unchipped.
+    -- The bail-out follows the fixture: the teachable pairing sits fourth
+    -- in the Veldt's eight-formation cycle, so one full cycle plus slack
+    -- bounds the search.
     return H.driveUntil(function()
       return (taughtN > 0 or fights >= 16) and not H.battleLoadStarted()
     end, 60000, {
@@ -535,14 +480,10 @@ local actions = {
 
   -- 3. the read half: a fresh battle's seed pre-reveals the taught bits,
   -- knowledge only the slot-3 page carries.  Encounters without a taught
-  -- species are fled (1914283's idiom; no submenu is open at seed, so a
-  -- bare L+R hold releases) and retried, with a bound on the retries.
-  -- The Veldt advances through its formation table rather than immediately
-  -- repeating the fight that taught the discriminator.  Search it as a
+  -- species are fled (no submenu is open at seed, so a bare L+R hold
+  -- releases) and retried, with a bound on the retries.  Searched as a
   -- sequence of player-shaped episodes: seed-check one battle, resolve it,
-  -- then recover on the field before looking for the next.  Besides keeping
-  -- the party alive through unrunnable set pieces, the explicit field-care
-  -- boundary proves that ordinary menu use does not disturb lifecycle 3.
+  -- then recover on the field before looking for the next.
 }
 
 local readChecked, readTries = 0, 0
@@ -608,10 +549,9 @@ local function readTry(n)
     H.waitUntil(function() return H.monstersPresent() > 0 end, 1200,
       "read-half monsters populate " .. n, 5),
     -- wait for the alive bits the check reads, not a blind settle: the
-    -- $3aa8 bits land after monstersPresent() goes positive (measured:
-    -- the write half's first-frame state dump saw zero alive bits with
-    -- monsters already counted), and a check that runs before them sees
-    -- an empty battle and defers a species it was looking at
+    -- $3aa8 bits land after monstersPresent() goes positive, and a check
+    -- that runs before them sees an empty battle and defers a species it
+    -- was looking at
     H.waitUntil(function()
       for slot = 0, 5 do
         if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then return true end
@@ -631,11 +571,7 @@ local function readTry(n)
   }, {})
 end
 
--- The retry bound follows the fixture: the re-made chain's Veldt pool
--- draws the taught species (see the teach-steering header) about one
--- battle in seven, measured across the write half's cycles, and one run's
--- read half missed it in 20 straight draws, so 20 was a ~90% bound.
--- Forty puts a miss under one run in three hundred.
+-- The retry bound follows the fixture's draw rate for the taught species.
 for n = 1, 40 do actions[#actions + 1] = readTry(n) end
 actions[#actions + 1] = H.call(function()
   H.assertEq(readChecked > 0, true,

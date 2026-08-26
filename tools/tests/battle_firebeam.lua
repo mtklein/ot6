@@ -13,9 +13,8 @@
 --   $7E3C00/$7E3C02  guard HP words
 --   $7E3E95/$7E3E97  revealed masks
 --
--- This also covers the input experiment: driving the battle with buttons when
--- no savestate was loaded mid-battle (the entry-point load happens in the
--- field, long before battle init).
+-- The entry-point load happens in the field, before battle init; the
+-- battle itself is driven with buttons rather than a mid-battle savestate.
 --
 -- Exit codes: 0 = battle came up, input drove the menus, and the action
 -- visibly resolved; 1 = any stage failed (each stage is asserted).

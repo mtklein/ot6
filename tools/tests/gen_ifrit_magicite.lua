@@ -1,105 +1,22 @@
--- gen_ifrit_magicite.lua -- v0.6 step 8, the step OUT of boundary B (#25):
--- cold battery Continue from the tracked mrf-save-room-v1 checkpoint (the
--- map-270 save room, slot 3), the boundary's entry contract asserted
--- first, then down through the {3,5} door to the alcove ->
--- battle 70 -> the four-interaction esper hand-off -> both magicite in
--- the bag.  Generates magicite_ifrit_shiva.
+-- gen_ifrit_magicite.lua -- cold battery Continue from the mrf-save-room-v1
+-- checkpoint (map-270 save room, slot 3), down through the {3,5} door to
+-- the alcove, battle 70, the four-interaction esper hand-off, both
+-- magicite in the bag.  Generates magicite_ifrit_shiva.mss.
 --
--- Generated from a checkpoint (savestate_graph.py:
--- checkpoint="mrf-save-room-v1").  The step used to boot ifrit_entry.mss; it
--- now starts from power-on and lets Mesen load the checkpoint battery
--- run.sh materialized, so a ROM change re-runs this step from its own
--- checkpoint in parallel with every other step instead of behind the whole
--- serial trunk (docs/design/checkpoint-fixtures.md).  ifrit_entry stays
--- generated as A->B's terminal; the ~15-step walk from the save tile to the
--- fight is replayed here from the checkpoint instead.
+-- The hand-off is four separate NPC interactions, gates interlocking:
+--   IFRIT {3,8}   first talk: battle 70, then $0060=1 / $0273=1
+--   IFRIT         second talk: $0272=1; falls into the hand-off if $0274 set
+--   SHIVA {9,6}   talk (only after $0060=1): $0274=1; falls into the
+--                 hand-off if $0272 set
+--   hand-off      $0646=0 / $0647=1 / $0648=1 / $0273=0 -- swaps both esper
+--                 NPCs for MAGICITE NPCs on the same two tiles
+--   MAGICITE {3,8}/{9,6}   give_genju IFRIT/SHIVA, clearing $0647/$0648
 --
--- The hand-off is four separate NPC interactions rather than one scene, and the
--- gates interlock (event_main.asm:95260-95385):
---
---   _cc7937  IFRIT {3,8}, sw $0646   first talk: walks SLOT_1 five tiles
---            RIGHT (so the party is left at {8,7} when the fight opens),
---            `battle 70`, then dlg $055F and `switch $0060=1 / $0273=1`
---   _cc7986  IFRIT, second talk      `switch $0272=1`; if $0274 also set,
---                                    fall into _cc79a4
---   _cc7992  SHIVA {9,6}, sw $0646   `if_switch $0060=0, EventReturn`, so
---                                    she will not talk before the fight;
---                                    then `switch $0274=1`; if $0272 also
---                                    set, fall into _cc79a4
---   _cc79a4  the hand-off            `$0646=0 / $0647=1 / $0648=1 / $0273=0`,
---                                    which swaps both esper NPCs for
---                                    MAGICITE NPCs on the same two tiles
---   _cc79cd  MAGICITE {3,8}, sw $0647   give_genju IFRIT, `$0647=0`
---   _cc79dd  MAGICITE {9,6}, sw $0648   give_genju SHIVA, `$0648=0`
---
--- `give_genju` (EventCmd_86, field/event.asm:3238) sets bit (id-$36) of
--- $1A69, and GENJU::RAMUH=$36 / IFRIT=$37 / SHIVA=$38 (include/const.inc
--- :564-566), so the receipts are $1A69 bits 1 and 2 and they are what this
--- step asserts, rather than a switch that only records that a scene ran.
---
--- Correction to the route recon's battle-70 decode, which read it as
--- formation 439 containing "species $0109 Ifrit only", said
--- "Shiva $0108 is NOT in the formation ... she is not in any formation in
--- the game -- I swept all 576", and listed "does Shiva enter via the AI
--- script?" as probe 1.  Measured live at the entry point, the formation
--- species words $57C0 read
---
---     0109 0108 0109 0108 FFFF FFFF
---
--- at battle start: **Shiva is in the formation from the first frame.**  No
--- AI-script entrance is involved.  (gen_ifrit_entry.lua's post-generation
--- verification is where that is measured; it is re-asserted below.)
---
--- THE FIGHT IS PLAYED, NOT WRITE-CLEARED (issue #75).  The
--- battle-clear-write helper this file carried is gone (bosses-wob.md
--- section 13: Ifrit 6 shields weak ice + piercing, Shiva 6 weak fire +
--- slashing, vanilla's tag fight):
---
---   * THE PARTY RE-EQUIPS FIRST -- a named loadout through the real field
---     Equip menu.  The Vector infiltration's `remove_equip`
---     (event_main.asm:11979-11988) stripped everyone and returned the gear
---     TO INVENTORY, and no generator between there and here ever re-equipped,
---     so the checkpoint's party arrives with LOCKE and CELES bare-handed
---     (tools/audit_equipment.py names them).  A player opens the menu
---     before a boss; so does this step, pad input only.
---   * THE FIGHT IS THE LIBRARY FIGHTER'S -- H.newFightDriver, tactical +
---     boost bank + real Item heals and Fenix revival.  See the block over
---     ifritAttempt for why battle_brokendeath's Celes-Ice machine, which
---     the handoff called proven, is NOT reused: measured on today's
---     fixtures it wipes -- the tag keeps Ifrit off stage for most of the
---     fight and that machine has no heal plan.
---   * THE END IS THE SCRIPT'S OWN: Ifrit & Shiva do not end by dying --
---     killing Ifrit runs his `if_self_dead` block (the recognition scene,
---     ai_script.asm:4551-4562) and end_battle.  Neither _cc7937's tail nor
---     _cc79a4 reads a battle switch, so the win latches on control return
---     (recon probe 5) -- $0060/$0273 are asserted below.
---
--- THE RETRY LADDER (gen_tunnelarmr's): battle 70 is an event battle, so a
--- loss is GAME OVER, not a revive.  The entry point is captured as a blob
--- beside the walk, and each attempt reloads it and takes its own battle RNG
--- phase before the A press.  The seed is the game-time frame counter at
--- battle init (`lda $021e / asl2 / sta $be`, battle_main.asm:6174-6176), and
--- H.newSeedLadder both spreads on it and reads back what each attempt really
--- drew, so "three attempts" is checked rather than assumed (#83).  Three
--- attempts, then fail loudly.
--- The combat CONTRACT for this fight (break observed pre-kill, the
--- if_self_dead placement guard) stays in battle_brokendeath.lua, booted on
--- ifrit_entry.mss; this step only needs a real win banked.
---
--- Incidental traversal battles on the walk (there have never been any on
--- maps 270/264, but the branch exists) FLEE by the real L+R mechanic --
--- gen_ifrit_entry's idiom, zero writes.
+-- give_genju sets bit (id-$36) of $1A69; IFRIT=$37, SHIVA=$38, so the
+-- receipts are $1A69 bits 1 and 2.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
---   reads the marker line above and refuses -- BEFORE the emulator boots,
---   naming both strings -- any OT6_SRAM_CHECKPOINT whose manifest.json declares
---   a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
--- The retry ladder's spread and its collision check (issue #83): each
--- attempt is held until the game-time frame counter the battle seed is
--- made of reaches its own phase, and L.report() fails if two attempts
--- drew one seed, which would make this ladder one fight played twice.
 local L = H.newSeedLadder("battle 70")
 
 local function map() return H.mapId() & 0x1ff end
@@ -109,9 +26,8 @@ local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
 end
--- a bare step list cannot be spliced into a step list (Lua truncates a
--- non-final table.unpack to one value); H.cond with an always-true
--- predicate is the library's public way to wrap a list into ONE step
+-- H.cond with an always-true predicate wraps a list into a single step
+-- (a bare list can't be spliced into a step list)
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 local MAP_TITLE_PTRS, MAP_TITLE = 0x268400, 0x0EF100
@@ -157,9 +73,8 @@ local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 
 
 -- Tap `dir` whenever the party has control, hold off while a scene controls
 -- it, edge-A through dialogs.  Used to walk into a trigger whose scene then
--- takes over; the tap keeps the party from sliding past the tile.
--- A battle here (never yet seen on these two maps) is FLED with the real
--- L+R run mechanic -- gen_ifrit_entry's idiom, zero writes.
+-- takes over; the tap keeps the party from sliding past the tile.  A
+-- battle here is fled with the real L+R run mechanic.
 local function tapInto(dir, pred, maxFrames, what)
   local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
   return H.driveUntil(function()
@@ -185,11 +100,9 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- Stop tapping once the party is on the target tile.  The
-        -- terminator needs 16 consecutive calm frames there, and a further
-        -- tap walks off it before the count completes: the first version of
-        -- this rode the chute correctly to (10,45), then tapped itself to
-        -- (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile: the
+        -- terminator needs 16 consecutive calm frames there, and a
+        -- further tap would walk off it before the count completes.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return
@@ -230,12 +143,10 @@ local function census(tag, targets)
   end
 end
 
-
 -- Hold a direction into an NPC and edge-press A until `pred` latches.
--- The direction press is safe because every NPC this step talks to occupies
--- the destination tile, so the step is refused and only the facing takes
--- (the face-an-NPC idiom).  Hands off entirely while a scene owns control.
--- A battle mid-talk (never yet seen here) is FLED with the real L+R run.
+-- The direction press is safe because the NPC occupies the destination
+-- tile, so the step is refused and only the facing takes.  Hands off
+-- entirely while a scene owns control.
 local function talkTo(dir, pred, maxFrames, what)
   local ph, calm, hb = 0, 0, 0
   return H.driveUntil(function()
@@ -262,27 +173,6 @@ local function talkTo(dir, pred, maxFrames, what)
   }, what)
 end
 
--- -------------------- battle 70, played with real input (issue #75) ------
--- The drive is the LIBRARY's shared observed-menu fighter, H.newFightDriver
--- -- tactical (EDGAR fires AutoCrossbow, SABIN Pummels), boost BANKED to 3
--- and unloaded (the break economy: a boosted hit chips a shield), real Item
--- heals and Fenix Down revival -- the same configuration that beat VARGAS
--- on attempt 1 (gen_kolts, 2026-08-09).
---
--- WHY NOT battle_brokendeath's Celes-Ice machine, which the handoff called
--- proven: it was MEASURED here first and it LOSES on today's fixtures.
--- Run on the fresh ifrit_entry (generated 2026-08-09), battle_brokendeath
--- itself wipes -- party 0/0/0/0 at f6309 with Ifrit still at 3057 hp and
--- 5 of 6 shields.  Traced on this step's checkpoint party, the mechanism is
--- the tag: its Ice/AutoCrossbow policy is gated on Ifrit being ON STAGE,
--- and in every run measured Ifrit took the stage for ~2400 frames, tagged
--- out, and stayed hidden for the next ~7800 while Shiva soaked the specials
--- (she got broken and RE-SEEDED her shields, 0 -> 6, mid-fight).  Exactly
--- one Ice ever fired (CELES mp 106 -> 101), the party had no heal plan, and
--- it died of attrition every time.  The library fighter has the heal
--- plan; its boosted Fights chip WHOEVER is up (slashing chips Shiva --
--- measured, sh 6 -> 3 under plain Fights -- and AutoCrossbow's pierce
--- chips Ifrit).  The tag means the fight is long; the budget carries it.
 local IFRIT, SHIVA = 0x0109, 0x0108
 
 local function eoff(m) return 8 + m * 2 end
@@ -294,12 +184,10 @@ local function mspecies(m) return H.readWord(0x57C0 + m * 2) end
 
 local fightBlob, fightWon = nil, false
 
--- One attempt, flat (driveUntil bodies replay latched state, so every
--- attempt builds fresh closures).  Reloads the entry point blob (attempt 1
--- runs in place -- the live timeline IS the blob's timeline), offsets the
--- RNG phase, presses A into IFRIT, plays battle 70, and decides on $0060:
--- _cc7937's tail sets it within ~2000 frames of the teardown, while a loss
--- rides the Annihilated screen into GAME OVER and never sets it.
+-- One attempt, flat: driveUntil bodies replay latched state, so each
+-- attempt builds fresh closures.  Attempt 1 runs in place; later attempts
+-- reload the entry point blob and offset the RNG phase.  The outcome is
+-- decided on $0060: a win sets it, a loss never touches it.
 local function ifritAttempt(n)
   local loadReq
   local ISLOT, SSLOT = nil, nil
@@ -322,7 +210,7 @@ local function ifritAttempt(n)
           "reloaded at the (3,7) entry point")
       end),
     }) or seq({}),
-    L.spread(n),                        -- spread the battle RNG phase (#83)
+    L.spread(n),                        -- spread the battle RNG phase
     -- A into IFRIT -> _cc7937 -> battle 70.  Confirm the formation before
     -- fighting it: this is the fight the step exists to pass through, and a
     -- win over the WRONG battle would look identical in the log without
@@ -340,18 +228,15 @@ local function ifritAttempt(n)
       H.assertEq(H.formationHas({ [SHIVA] = true }), true,
         "battle 70 has SHIVA $0108 FROM THE FIRST FRAME -- the recon's "
         .. "'Shiva is in no formation in the game' is wrong")
-      -- the LIVE monsters sit in slots 0/1; $57C0 repeats both species at
-      -- 2/3 with dead entities behind them, so the LOWEST slot per species
-      -- wins (battle_brokendeath's ghost-slot lesson)
+      -- the live monsters sit in slots 0/1; $57C0 repeats both species at
+      -- 2/3 with dead entities behind them, so the lowest slot per
+      -- species wins
       for m = 5, 0, -1 do
         if mspecies(m) == IFRIT then ISLOT = m end
         if mspecies(m) == SHIVA then SSLOT = m end
       end
       H.assertEq(ISLOT ~= nil, true, "an IFRIT slot resolved")
       H.assertEq(SSLOT ~= nil, true, "a SHIVA slot resolved")
-      -- NO-STAGING CONTROLS (issue #75): both gauges seed FULL and both HP
-      -- words read their authored values -- numbers a rigged run could
-      -- never show (break-coverage-vector.md §2 "The bosses" / bosses-wob.md 13).
       H.assertEq(mshields(ISLOT), 6, "ifrit opens with his authored 6 shields")
       H.assertEq(mshields(SSLOT), 6, "shiva opens with her authored 6 shields")
       H.assertEq(mhp(ISLOT), 3300, "ifrit opens at his authored 3300 HP")
@@ -359,15 +244,14 @@ local function ifritAttempt(n)
       H.assertEq(mticks(ISLOT), 0, "ifrit is NOT pre-broken")
       H.screenshot("ifrit_battle")
     end),
-    -- hands OFF until Ifrit takes the stage (the fly-in; input during the
-    -- window-open animation wedges the battle menu -- battle_break's lesson)
+    -- hands off until Ifrit takes the stage (the fly-in; input during the
+    -- window-open animation wedges the battle menu)
     H.waitUntil(function() return onfield(ISLOT) == 1 end, 3600,
       "ifrit takes the stage", 10),
     H.waitFrames(90),
-    -- the input-driven fight: the library fighter, with gauge logging
-    -- around it.  Its own menu==0 branch pages battle text, the recognition
-    -- scene's dialogs and the victory teardown, so this one drive carries
-    -- the whole battle from fly-in to field.
+    -- the library fighter drives the fight; its menu==0 branch pages
+    -- battle text, the recognition scene's dialogs, and the victory
+    -- teardown, carrying the whole battle from fly-in to field.
     H.driveUntil(function() return not H.battleLoadStarted() end, 90000, {
       H.call(function()
         hb = hb + 1
@@ -434,31 +318,20 @@ local function ifritAttempt(n)
 end
 
 H.run({ maxFrames = 300000 }, {
-  -- COLD BATTERY BOOT (issue #25): title -> Continue -> the sole valid
-  -- slot (3) -> the map-270 save room, standing on the tile the checkpoint
-  -- was saved on.  Repeated edge presses tolerate title timing; the entry
-  -- contract below prevents a false landing.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
   H.waitFrames(300),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
-  -- SOFT landing wait: a wrong-boundary checkpoint lands somewhere else, and
-  -- the failure must be the entry contract NAMING the wrong map -- never a
-  -- timeout here (checkpoint-fixtures.md, "fails loudly, naming what differed").
+  -- Soft landing wait: a wrong-boundary checkpoint lands somewhere else,
+  -- and the failure must be the entry contract naming the wrong map
+  -- rather than a timeout here.
   H.waitUntilSoft(function()
     return map() == 270 and H.tileAligned() and bright() >= 15
   end, 3000, "landed_at_b"),
   H.waitFrames(60),
   H.call(function()
-    -- THE ENTRY CONTRACT (issue #25): everything this step requires of
-    -- boundary B -- the save tile, slot, switches, the #21 party count and
-    -- roster, and the bank-$31 codex witnesses -- declared as DATA in
-    -- lib/ot6_contract.lua under "mrf-save-room-v1", the same table the
-    -- step INTO B (gen_ifrit_entry) and the checkpoint generator
-    -- (gen_mrf_save_room_checkpoint) assert as their EXIT contract.  A stale
-    -- or wrong checkpoint fails HERE by naming what differed.
     H.assertEntryContract("mrf-save-room-v1")
     H.log(partyReport("mrf-save-room-v1 entry"))
   end),
@@ -478,42 +351,13 @@ H.run({ maxFrames = 300000 }, {
     H.log(partyReport("ifrit entry point (walked from checkpoint B)"))
   end),
 
-  -- 1. the player's prep: the checkpoint's party arrives with LOCKE and CELES
-  --    bare-handed (the Vector remove_equip, never re-equipped since) --
-  --    real field Equip -> Optimum per character, a no-op for anyone armed.
-  --    BEFORE the retry blob, so every attempt replays an armed party.
-  --
-  --    DO NOT "FIX" OPTIMUM'S ELEMENT-BLINDNESS HERE.  It was tried and it
-  --    loses the fight; the numbers are below so nobody pays for it twice.
-  --    Optimum picks by attack power and hands the bag's two ThunderBlades
-  --    ($0F, power 108, element bolt) to EDGAR and LOCKE, and both siblings
-  --    NULL bolt -- monster_prop.dat +$18 reads $FC for each of them
-  --    (bolt|poison|wind|holy|earth|water).  That looks exactly like the
-  --    Cranes bug that H.equipWeapon was written for, and it is not.
-  --
-  --    What the element costs here is only DAMAGE, and LOCKE's swing was
-  --    never the damage.  What his swing is, is SHIELD CHIP, and chip goes
-  --    by weapon CLASS, not element: ThunderBlade is a sword, so
-  --    Ot6WeapClassTbl (ff6/src/battle/ot6_class.asm:58-64) gives it
-  --    OT6_SLASH, and Shiva's break axis is slashing (bosses-wob.md 13).
-  --    Breaking Shiva is how this fight is won -- killing EITHER sibling
-  --    ends it, and the winning run broke her (sh 6 -> 0, tk 16) and took
-  --    her 1551 -> 0 while broken.
-  --
-  --    Measured: swapping LOCKE to the Guardian ($02) and EDGAR to the
-  --    MithrilKnife ($01) -- non-elemental, and the best non-elemental
-  --    weapons either can hold -- LOST all three attempts, because both are
-  --    DAGGERS and therefore OT6_PIERCE. It bought damage that was already
-  --    nulled and sold the slashing chip that breaks Shiva; she bottomed out
-  --    at 3 shields and never broke. There is no non-elemental slashing
-  --    weapon available for LOCKE: the bag's only one is the MithrilBlade
-  --    $0A and CELES is holding it. So the ThunderBlade genuinely is his
-  --    best weapon for this fight, and Optimum's power-greedy pick is right
-  --    here by accident. A deliberate equip has to weigh class against the
-  --    boss's break axis; element alone is the wrong axis (issue #81).
-  -- Name the loadout instead of delegating it to attack-power-only
-  -- Optimum.  ThunderBlade is deliberate in this one fight: bolt is nulled,
-  -- not absorbed, and its slashing class is the available answer to Shiva.
+  -- 1. the player's prep: the checkpoint's party arrives with LOCKE and
+  --    CELES bare-handed, so equip and top up before the retry blob.  The
+  --    loadout below hands LOCKE and EDGAR ThunderBlades despite both
+  --    siblings nulling bolt damage: shield chip goes by weapon class,
+  --    not element, ThunderBlade is OT6_SLASH, and Shiva's break axis is
+  --    slashing -- breaking her is how this fight is won.
+
   H.equipLoadout(1, {
     { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
   }, { tag = "LOCKE Ifrit/Shiva kit" }),
@@ -526,31 +370,15 @@ H.run({ maxFrames = 300000 }, {
   H.equipLoadout(6, {
     { 0, 0x0A }, { 2, 0x6A }, { 3, 0x84 },
   }, { tag = "CELES Ifrit/Shiva kit" }),
-  -- 1b. the rest of the player's prep: HEAL.  The checkpoint battery was cut
-  --    with EDGAR at 108/354 and SABIN at 113/363, both about 31%, and a cold
-  --    Continue restores exactly that -- FF6's save point saves without
-  --    healing, so the party walks in at the HP it was saved at.  Every
-  --    comparable step already tops up first (battle_brokendeath:296 before
-  --    THIS fight, gen_esper_tubes:331 before battle 72, gen_n128:469,
-  --    gen_banquet_done:570); this one was the only boss step with no
-  --    H.fieldCare at all, and that omission is what lost the ladder.
-  --    Measured on the unhealed run: the fight driver's healPercent=60 is
-  --    already unmet at the fight's first frame, so it opens in a heal
-  --    deadlock and never leaves it -- 87 of 100 actions across all three
-  --    attempts were item uses, LOCKE attacked exactly zero times, and
-  --    attempts 1 and 2 ended with IFRIT untouched at 3300 hp / 6 shields.
-  --    Threshold and tag match battle_brokendeath's call for this fight.
   H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
   H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
   H.call(function()
     H.assertEq(H.fieldX() == 3 and H.fieldY() == 7, true,
       "back at the entry point, armed")
     H.log(partyReport("ifrit entry point, armed"))
-    -- The prep above has to be checked, not assumed: a fieldCare that
-    -- silently no-ops and an equipment drive that silently no-ops both leave a
-    -- party that loses the fight for a reason the battle log does not name.
-    -- That is exactly how this step failed before -- it read as a balance
-    -- wall.  Require the numbers the prep is supposed to produce.
+    -- The prep above is checked, not assumed: a silent no-op here would
+    -- leave a party that loses the fight for a reason the battle log
+    -- doesn't name.
     for _, c in ipairs(H.partyMembers()) do
       local base = 0x1600 + 37 * c
       local hp, maxhp = H.readWord(base + 0x09), H.readWord(base + 0x0B)
@@ -581,9 +409,6 @@ H.run({ maxFrames = 300000 }, {
   ifritAttempt(1),
   ifritAttempt(2),
   ifritAttempt(3),
-  -- Before the verdict, not after: three attempts are evidence only if they
-  -- were three DIFFERENT fights, and if they were not, that is what this run
-  -- should report rather than "lost all three" (#83).
   L.report(),
   H.call(function()
     H.assertEq(fightWon, true,
@@ -591,7 +416,7 @@ H.run({ maxFrames = 300000 }, {
       .. "tactical + boost bank + real items)")
   end),
   -- ride the post-battle tail out to a settled field ($0060 already
-  -- latched; playBattles=true -- no battle can occur here, and none ever has)
+  -- latched; playBattles=true, though no battle can occur here)
   H.advanceStory(function() return sw(0x0060) == 1 and settled() end, 12000,
     { playBattles = true }),
   H.waitFrames(60),
@@ -649,9 +474,8 @@ H.run({ maxFrames = 300000 }, {
     H.screenshot("magicite_ifrit_shiva")
   end),
   H.saveState("magicite_ifrit_shiva.mss"),
-  -- RELOAD-VERIFIED (gen_sabin_gau's pattern, a trap this program has paid
-  -- for): capture-calm does NOT imply reload-calm, so reload the parked
-  -- moment and require the consumer's boot to find it quiet.
+  -- Reload-verified: capture-calm does not imply reload-calm, so reload
+  -- the parked moment and require the consumer's boot to find it quiet.
   (function()
     local saveReq, loadReq
     return seq({

@@ -1,5 +1,5 @@
 -- probe_water_rondo.lua -- take MOG down the Serpent Trench and learn
--- Water Rondo (#133 item 4).
+-- Water Rondo.
 --
 -- Boots from wob_mog_done.mss (Mog just recruited on the Narshe cliff).
 -- Route: walk the cliff chain back down (23 -> 22 -> 21 -> town), out to
@@ -148,9 +148,8 @@ H.run({ maxFrames = 120000 }, flatten({
     { H.call(function() H.setPad({ up = true }) end) }, "back on deck"),
   H.waitFrames(60),
   -- the wheel is the (14,6) step-trigger with the live-pad gate
-  -- $01B3+$01B4 = RIGHT+A held (bit calibration from the cracked wall:
-  -- $01B0=up, so bit3=right): stand on it pressing right+A into the
-  -- wheel (the book NPC at (15,6) pins the step)
+  -- $01B3+$01B4 = RIGHT+A held ($01B0=up, so bit3=right): stand on it
+  -- pressing right+A into the wheel (the book NPC at (15,6) pins the step)
   H.navTo(14, 6, { maxFrames = 2000,
     arrive = function() return H.dialogWaiting() end }),
   (function()

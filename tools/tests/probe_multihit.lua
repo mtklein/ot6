@@ -1,40 +1,24 @@
--- probe_multihit.lua -- #54 phase 1: measures whether shield chipping is
--- per hit or once per action.
+-- probe_multihit.lua -- measures whether shield chipping is per hit or
+-- once per action.
 --
---   tools/tests/run.sh tools/tests/probe_multihit.lua
+-- The engine's multi-hit mechanism is $3a70, "number of attacks
+-- remaining in this action (0 = 1 attack)"; ExecAttack loops while
+-- decrementing it. Quadra Slam/Slice set it to 3; a boosted Fight sets
+-- it to 1 + 2*BP. Both reach the same loop, so a boosted Fight stands
+-- in for a Quadra Slam.
 --
--- The multi-hit design rests on one rule that had not been measured: when
--- an action strikes N times, whether it chips N shields or one.  DESIGN.md
--- asserts per-hit without citing a measurement.
---
--- Why a boosted Fight is the instrument used.  The engine has one
--- multi-hit mechanism: `$3a70`, "number of attacks (0 = 1 attack)", and one
--- loop that consumes it:
---     @3288:  plx / dec $3a70 / bmi @3291 / pea ExecAttack-1
---   (battle_main.asm:8322-8328)
--- Quadra Slam and Quadra Slice reach that loop by setting $3a70 = 3
--- (AttackerEffect_32, battle_main.asm:10782-10784); a boosted Fight reaches
--- the same loop by setting $3a70 = 1 + 2*BP (Ot6FightBoost, ot6_boost.asm:
--- 240-248).  Whatever the loop does about chipping, it does for both, and
--- a boosted Fight can be driven in the opening guard fight, while a
--- Quadra Slam needs Cyan at level 15.  Measuring the loop measures the rule.
---
--- Setup: battle_class's, narrowed.  Guard A ($0c) gets six shields,
--- class-weak = the class of the weapon every party right hand is holding,
--- and zero element weaknesses, so neither a beam nor a poison DOT (see #60)
--- can move a shield.  Guard B ($0e) is left class-weak 0 and element-weak
--- 0, so nothing can chip it; it is the control for whether the counter is
--- counting hits rather than frames.  The party is berserked onto a
--- Fight-only command list (battle_hits's driver) with magitek cleared, and
+-- Setup: Guard A ($0c) gets six shields, class-weak to the party's
+-- weapon, and zero element weaknesses, so nothing but a class hit can
+-- chip it. Guard B ($0e) is weak to nothing, the control for whether
+-- the counter is counting hits rather than frames. The party is
+-- berserked onto a Fight-only command list with magitek cleared, and
 -- one subject is given 3 BP / 3 pending, so its next auto-Fight swings
 -- 1+2*3 = 7 times.
 --
--- Swings alternate hands and an empty hand swings nothing (ot6_boost.asm:
--- 220-224), so with one weapon equipped half of those 8 swings land.  The
--- number is not predicted: the probe records $3a70 at every chip and
--- groups shield writes by action, keyed on $3a70 counting down inside one
--- volley.  Not by frame: a volley spans three of them, and the frame key
--- undercounted this probe's own headline 4 -> 2 before it was fixed.
+-- Swings alternate hands and an empty hand swings nothing, so with one
+-- weapon equipped half of those swings land. Shield writes are grouped
+-- by action, keyed on $3a70 counting down inside one volley (not by
+-- frame: a volley spans multiple frames).
 --
 -- Phase 2 then runs the identical volley into a two-shield enemy, to
 -- measure what a volley's remaining hits do once its earlier hits have
@@ -164,11 +148,9 @@ local function report(tag)
     end
   end
   -- group shield writes by action rather than by frame.  $3a70 counts down
-  -- within one action's volley (dec at battle_main.asm:8324) and is set
-  -- afresh at the next action, so a write whose remaining-count is higher
-  -- than the previous write's begins a new action.  Frames are the wrong
-  -- key: the 8-swing volley spans three of them, and keying on frames
-  -- undercounted it 4 -> 2 in this probe's first version.
+  -- within one action's volley and is set afresh at the next action, so a
+  -- write whose remaining-count is higher than the previous write's begins
+  -- a new action.
   H.log("-- shield writes, grouped by ACTION")
   local actions, cur, prevN = {}, nil, nil
   for _, w in ipairs(shieldWrites) do
@@ -230,23 +212,15 @@ H.run({ maxFrames = 40000 }, {
 
   H.call(function()
     report("phase 1: six shields, room for the whole volley")
-    -- the control is judged here, at the end of the phase it belongs to;
-    -- phase 2 deliberately makes B chippable so the volley cannot miss the
-    -- experiment by picking the wrong berserk target.
+    -- the control is judged here, at the end of the phase it belongs to.
     controlHeld = (shieldB() == 6)
   end),
 
-  -- Phase 2: the same volley into a 2-shield enemy, to measure whether the
-  -- break stops the rest of the volley chipping and whether the volley
-  -- continues.  Ot6Chip / Ot6ClassChip both bail on
-  -- `lda OT6_BROKEN_TICKS,y / bne done` (ot6_break.asm:829-830, :927-929),
-  -- so the prediction is: two chips, then break, then the remaining hits
-  -- land damage and chip nothing.
+  -- Phase 2: the same volley into a 2-shield enemy, to measure whether a
+  -- break mid-volley stops the remaining hits from chipping.
   H.call(function()
     resetLog()
-    -- Both guards, because a berserk Fight picks its target at random and
-    -- the first run of this phase spent its whole volley on the guard that
-    -- could not chip, so it measured nothing while appearing to pass.
+    -- both guards, since a berserk Fight picks its target at random.
     for _, e in ipairs({ A, B }) do
       H.writeByte(0x3E9C + e, WCLASS)
       H.writeByte(0x3E38 + e, 2)
@@ -258,17 +232,11 @@ H.run({ maxFrames = 40000 }, {
     keepAlive()
     H.log("phase 2: both guards 2 shields and class-weak, subject re-boosted")
   end),
-  -- re-arm the boost every cycle until a 7-swing volley is seen:
-  -- Ot6ActionEnd consumes the pending charge and skips that turn's regen,
-  -- so a single poke only survives until the subject's next action, and a
-  -- fixed wait let phase 2 finish having measured nothing (observed).
-  -- Wait for a chip that landed with >= 3 attacks still queued, that is,
-  -- one inside a boosted volley.  Waiting on "a guard broke" is
-  -- not enough (two ordinary Fights broke one first, and the phase exited
-  -- having measured nothing), and waiting on "$3a70 was 7" is not enough
-  -- either (the volley can spend itself on a guard that cannot chip).
-  -- Guards are re-armed to two live shields whenever they are broken or
-  -- empty, so a 2-shield target is standing when the volley arrives.
+  -- re-arm the boost every cycle: Ot6ActionEnd consumes the pending charge
+  -- each turn, so a single poke only survives until the subject's next
+  -- action. Wait for a chip that landed with >= 3 attacks still queued,
+  -- i.e. one inside a boosted volley. Guards are re-armed to two live
+  -- shields whenever they are broken or empty.
   H.driveUntil(function()
     for _, w in ipairs(shieldWrites) do if w.n >= 3 then return true end end
     return false
@@ -294,11 +262,8 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(controlHeld, true,
       "phase 1's class-weak-to-nothing control never chipped")
 
-    -- Phase 2's finding, asserted so the probe cannot report it without
-    -- having seen it: the breaking volley entered the chip hook four times
-    -- on its target, and the last hits found it already at zero shields, so
-    -- a volley that breaks its target mid-way stops chipping while its
-    -- remaining hits keep landing (and collect Ot6BrokenDmg's x2 instead).
+    -- asserts phase 2's finding: a volley that breaks its target mid-way
+    -- stops chipping while its remaining hits keep landing.
     local run, target = {}, nil
     for _, c in ipairs(chips) do
       if c.n == 0x07 then

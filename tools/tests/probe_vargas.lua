@@ -144,13 +144,10 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- Into phase two.  Measured here and recorded because no source states
-  -- it: from the start of the fight entities 0/1/2 take turns and entity 3
-  -- (SABIN) gets no menu for 9000 frames.  His turns begin only after
-  -- Vargas's reaction script runs `battle_event $07` at hp <= 10880 and
-  -- `battle_event $08` at hp <= 10368 (ai_script.asm:4392-4404), the beat
-  -- that removes the other three.  Clamp his HP under the second gate and
-  -- let his script run.
+  -- Into phase two.  Entities 0/1/2 take turns and entity 3 (SABIN) gets
+  -- no menu until Vargas's reaction script runs `battle_event $07` at
+  -- hp <= 10880 and `battle_event $08` at hp <= 10368.  Clamp his HP under
+  -- the second gate and let his script run.
   -- ===================================================================== --
   H.driveUntil(function()
     return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == SABIN_E
@@ -174,14 +171,9 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- The battle-clear-write question.  The harness's standard way to end a
-  -- fight is to set $3EEC+off bit7 on every live monster (H.clearBattle).
-  -- Vargas's reaction script opens with `if_self_dead / boss_death`
-  -- (ai_script.asm :4382-4384) BEFORE the `if_attack PUMMEL` branch, so
-  -- what a kill bit does to a boss whose death is scripted was an open
-  -- question.  It is measured here once and the result is logged rather
-  -- than assumed.  battle_vargas.lua does not depend on it either way,
-  -- because the Pummel path is verified and is the intended one.
+  -- The battle-clear-write question.  Vargas's reaction script opens with
+  -- `if_self_dead / boss_death` before the `if_attack PUMMEL` branch, so
+  -- what a kill bit does to a boss whose death is scripted is measured here.
   -- ===================================================================== --
   H.call(function()
     for slot = 0, 5 do

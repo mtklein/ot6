@@ -1,43 +1,13 @@
 -- probe_battleitem.lua -- measures which item battle-menu row N uses.
--- Reads and pad presses only (issue #75).
---
--- Background.  newFightDriver picks a heal by scanning the battle
--- inventory ($2686, 5 bytes/entry) for the item id it wants, and then
--- steers the item window's cursor, documented as the sum of $8947
--- (scroll) and $894F (row), to that index.  Traced at battle 11 (solo
--- Locke), the whole sequence runs: command list -> Item, item window
--- ($0A), steer, A, target select ($38), confirm.  The Potion is still in
--- the bag afterwards and his HP did not move, so the navigation is right
--- and the index is wrong: the row the window confirms is not the $2686
--- index the driver counted to.
---
--- The other candidate ordering is the field inventory ($1869 ids / $1969
--- counts), which is a different list with different holes in it.  This
--- probe settles it by measurement rather than by reading menu code: park
--- the cursor on a known row, use it, and read which item's count went
--- down.
---
--- Answer, measured 2026-08-09: the mapping is correct.  Cursor sum 1
--- consumed $2686 index 1 ($E9, a Potion, 5 -> 4).  The driver's indexing
--- is not the bug, and the whole item path (command list -> Item -> row ->
--- target -> confirm -> the count going down) works on this party through
--- the same cells newFightDriver uses.
---
--- So whatever fails at battle 11 is specific to that fight.  The two
--- things it does not share with this one are worth the next probe: Locke
--- is solo there (this party is three), so his target mask has one bit in
--- it.  Read newFightDriver's ST_TGT branch with that in mind: if `chars`
--- reads 0 for a solo party, the steer loop compares 0 < 0, presses up
--- indefinitely and never confirms, and the turn expires.  That is a
--- hypothesis, not a measurement; it has not been observed.
---
---   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_battleitem.lua
+-- newFightDriver picks a heal by scanning the battle inventory ($2686, 5
+-- bytes/entry) for the item id it wants, then steers the item window's
+-- cursor (sum of $8947 scroll + $894F row) to that index.  This probe
+-- parks the cursor on a known row, uses it, and reads which item's count
+-- went down, to check that mapping against the field inventory ($1869
+-- ids / $1969 counts), a different list with different holes in it.
 local H = dofile("tools/tests/lib/ot6.lua")
--- vargas_entry, not first_battle: the opening battle carries an empty
--- bag ($2686 reads FF x0 straight across, measured), so there is nothing
--- to select and the target window never opens.  The Vargas entry point is
--- one A press from `battle 66`, and the party walks in with Tonics,
--- Potions and Fenix Downs, so there are entries to index into.
+-- vargas_entry: the opening battle's bag is empty, so there is nothing to
+-- select; vargas_entry's party carries Tonics, Potions and Fenix Downs.
 local STATE = "build/states/vargas_entry.mss.lua"
 
 local MSTATE, ACTOR = 0x7BC2, 0x62CA

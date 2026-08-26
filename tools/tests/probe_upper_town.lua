@@ -1,5 +1,5 @@
 -- probe_upper_town.lua -- reach Narshe's upper north through the
--- buildings (#133): map 30's rooms exit at town (53,8)/(49,14)/(18,24)/
+-- buildings: map 30's rooms exit at town (53,8)/(49,14)/(18,24)/
 -- (32,18); from the treasure room they may interconnect.  Enter at
 -- (52,38), chart 30, hop every reachable exit door, and from each town
 -- landing chart the neighborhood + try the north-mine door (26,9)->50.

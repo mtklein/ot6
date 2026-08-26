@@ -3,12 +3,6 @@
 --
 --   tools/tests/run.sh tools/tests/gen_battle_state.lua
 --
--- Route (FF3us 1.0 New Game):
---   power-on -> title logo (Start presses) -> opening credits + Magitek walk
---   (all automatic, ~4.5 min emulated) -> Narshe cliff dialogs (mash A)
---   -> player control at the town gate -> walk north (hold Up, mash A)
---   -> scripted guard battle trigger.
---
 -- Outputs (decoded from stdout by run.sh into build/states/):
 --   battle_entry.mss[.lua]     field state a few seconds before the trigger
 --   first_battle.mss[.lua]     in-battle state (only if the battle engine
@@ -23,8 +17,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local entry, entryPrev, saveReq = nil, nil, nil
 
 H.run({ maxFrames = 60000 }, {
-  -- 1. Title screen: press Start a few times while the logo is up.  (The
-  --    title also auto-advances into the intro, so the presses are redundant.)
+  -- 1. Title screen: press Start a few times while the logo is up.
   H.waitFrames(355),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.logStep("title handled; waiting out the opening (this takes a while)..."),
@@ -33,14 +26,13 @@ H.run({ maxFrames = 60000 }, {
   H.waitUntil(function() return H.frame >= 15500 end, 16000, "intro to finish"),
   H.call(function() H.screenshot("gen_cliff") end),
 
-  -- 3. Cliff dialogs + town gate: walk north, mash A, keep rolling
-  --    entry point savestates so we always have a just-before-battle state.
+  -- 3. Cliff dialogs + town gate: walk north, mash A, capture rolling
+  --    entry-point savestates.
   H.driveUntil(function() return H.battleLoadStarted() end, 15000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
     H.call(function()
-      -- rolling entry point capture via the exec-callback trampoline:
-      -- harvest last cycle's request, then issue a new one every ~150 frames
+      -- harvest last cycle's savestate request, then issue a new one every ~150 frames
       if saveReq and saveReq.done and saveReq.blob then
         entryPrev = entry
         entry = saveReq.blob
@@ -75,8 +67,7 @@ H.run({ maxFrames = 60000 }, {
     end),
     H.saveState("first_battle.mss"),
   }, {
-    -- battle load began but the engine never came up (screen stayed black):
-    -- this is the regression signature the harness checks for.
+    -- battle load began but the engine never came up (screen stayed black)
     H.call(function()
       error("battle load started but battle never became active " ..
         "(battle_entry.mss emitted; see shots/gen_battle_entry.png)", 0)

@@ -2,7 +2,7 @@
 # ------------------------------------------------------------------------------
 # gen_break_floor.py -- OT6 "break floor" species -> weapon-class classifier
 #
-# Phase 1 of the break-floor feature (issue #6). Un-authored ("formula")
+# Phase 1 of the break-floor feature. Un-authored ("formula")
 # monsters currently get NO breakable weapon-class weakness. This tool reads
 # the monster name list and assigns every species one *reachable* physical
 # class, emitting a build-time data table (OT6_FLOOR_CLASS) plus a
@@ -234,10 +234,10 @@ def emit_review(rows, out_path, authored):
     table first), so counting it here misstates the floor. Authored species
     are listed as AUTHORED in the full table and excluded everywhere else.
 
-    The review surface is three-way (issue #11's first acceptance criterion):
-    explicit / inferred / defaulted. Two-way triage (defaulted only) hid the
-    keyword misfires -- Rhinox (no weakness, absorbs the Vector band's key
-    element) matched 'rhino' and was invisible to review.
+    The review surface is three-way: explicit / inferred / defaulted.
+    Inferred is not the same as reviewed: a keyword substring can fire on
+    the wrong body (e.g. 'rhino' matching Rhinox, which has no weakness to
+    that element).
     """
     counts = {OT6_PIERCE: 0, OT6_SLASH: 0, OT6_BLUDG: 0}      # floor-live only
     origins = {"explicit": [], "inferred": [], "defaulted": []}

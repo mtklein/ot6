@@ -1,16 +1,9 @@
 -- @manual probe: the voyage's back half, booted from the night-window
--- scratch state the first gen_voyage run cut (albrook_night_scratch.mss:
--- control on the port map 332, $0084/$0085 set, night unslept).  Exists so
--- the inn leg and the ship legs can be iterated at ~4 minutes a try instead
--- of replaying the 8-minute front half; gen_voyage is the product, this is
--- the instrument.  Route and helpers are gen_voyage.lua's, verbatim.
+-- scratch state albrook_night_scratch.mss (control on the port map 332,
+-- $0084/$0085 set, night unslept).  Route and helpers are gen_voyage.lua's.
 --
--- The scratch is NOT a fixture and does not live in build/states (the
--- audits ask for undeclared files there to be deleted).  To run this probe,
--- put a copy there first: gen_voyage emits albrook_night_scratch.mss on
--- every run, so either copy it out of a retained gen_voyage workspace
--- (build/test-runs/crescent_landing.*/artifacts/) or run gen_voyage by hand
--- through tools/tests/run.sh, whose unfiltered publish includes it.
+-- The scratch is not a fixture and does not live in build/states; a copy
+-- must be placed there to run this probe.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/albrook_night_scratch.mss.lua"
 
@@ -29,11 +22,8 @@ local function partyCount()
   return n
 end
 
--- Verified-step world grinder (gen_banquet_done's, unchanged; consumes a
--- plan entry only when the party lands on it).  An encounter on the grind
--- is fled with the real L+R run, which is the design for world encounters
--- (issue #75); this terrain's packs fled clean across gen_banquet_done's
--- much longer I->J grind.
+-- Verified-step world grinder: consumes a plan entry only when the party
+-- lands on it.  An encounter on the grind is fled with the real L+R run.
 local function worldGrind(tx, ty, what)
   local plan, idx, ph, hb = nil, 1, 0, -600
   local step = nil
@@ -136,10 +126,9 @@ local function settle(maxFrames, what)
 end
 
 -- Passive scene rider: pages dialogs with A, commits a naming menu with
--- START ($59 ~= 0 is the menu-up flag; name_menu suspends the field module,
--- gen_edgar's commitName finding), and otherwise waits for `done`.  Used
--- for every scripted stretch between talks: the sails, the deck scenes,
--- and the landing tail.
+-- START ($59 ~= 0 is the menu-up flag; name_menu suspends the field
+-- module), and otherwise waits for `done`.  Used for every scripted
+-- stretch between talks: the sails, the deck scenes, and the landing tail.
 local function rideScene(done, maxFrames, what)
   local ph = 0
   return H.driveUntil(done, maxFrames, {
@@ -159,14 +148,12 @@ end
 
 -- Walk to a character/NPC object's open neighbour, edge-A to talk, then
 -- ride the scene it opens (dialog paging + naming-menu START) until `done`.
--- H.chaseTalk's chassis with the rideScene branches folded in; the voyage's
--- scenes carry no choices (read end to end, :68091-69190), so a choice
--- window parks the pad and the step times out loudly rather than picking
--- something silently.  When no adjacent tile is reachable the rider falls
--- back to counter talk (gen_kolts's item-shop idiom): stand two tiles away
--- in line, face the NPC, and tap A -- CheckNPCs reaches through the one
--- impassable counter tile (ff6/src/field/player.asm:188-200).  The Albrook
--- innkeeper is that class of NPC.
+-- The voyage's scenes carry no choices, so a choice window parks the pad
+-- and the step times out loudly rather than picking something silently.
+-- When no adjacent tile is reachable the rider falls back to counter talk:
+-- stand two tiles away in line, face the NPC, and tap A -- CheckNPCs
+-- reaches through the one impassable counter tile.  The Albrook innkeeper
+-- is that class of NPC.
 local FACE = { up = 0, right = 1, down = 2, left = 3 }
 local function talkRide(objIdx, done, maxFrames, what)
   local ph = 0

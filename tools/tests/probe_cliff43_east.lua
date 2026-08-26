@@ -1,10 +1,9 @@
--- probe_cliff43_east.lua -- angle A on the Mog route (#133): map 43's
--- entry column crosses y=45, and the door (113,45)->41 (58,11) sits just
--- east of it -- likely bridge tiles bfs can't model.  Climb 43's entry
--- column to y~45 and burst east; if that fails, cross to the (73,60)
--- side and burst up at the (73-75,39) top.  On entering 41, frontier-
--- climb east to the top doors (107,12)/(117,12) -> 21 top pocket -> 22
--- -> 23 -> Mog.  Saves wob_mog_done.mss.
+-- probe_cliff43_east.lua -- angle A on the Mog route: map 43's entry
+-- column crosses y=45, and the door (113,45)->41 (58,11) sits just east
+-- of it.  Climbs 43's entry column to y~45 and bursts east; if that
+-- fails, crosses to the (73,60) side and bursts up at the (73-75,39) top.
+-- On entering 41, frontier-climbs east to the top doors (107,12)/(117,12)
+-- -> 21 top pocket -> 22 -> 23 -> Mog.  Saves wob_mog_done.mss.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function sw(bit) return (H.readByte(0x1E80 + (bit >> 3)) >> (bit & 7)) & 1 end
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
@@ -267,7 +266,7 @@ H.run({ maxFrames = 180000 }, flatten({
     H.screenshot("post43")
     if mapIs(43) then error("still stuck on 43 after every burst") end
   end),
-  -- the decoded chain through the mine (tile-prop verified offline):
+  -- the decoded chain through the mine:
   --   41 shaft: (57,21) internal door -> (25,58) west interior
   --   (18,51) -> 21 ledge (36,25), which climbs to (24,10)
   --   (24,10) -> 41 east corridor (108,12), cross to (117,12)
@@ -360,8 +359,7 @@ H.run({ maxFrames = 180000 }, flatten({
       H.fieldX(), H.fieldY()))
     H.screenshot("kupo")
   end),
-  -- bank the resolved standoff so the take can iterate from here
-  -- (probe_mog_take.lua finishes the job)
+  -- bank the resolved standoff so later steps can iterate from here
   H.saveState("wob_kupo.mss"),
   H.logStep(function() return "done" end),
 }))

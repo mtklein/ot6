@@ -4,24 +4,12 @@
 -- save-point boundary F, lettered in tools/tests/savestate_graph.py; the
 -- Continue restores the party on foot at the grounded Blackjack's tile),
 -- walk the plain south of Zozo into a world encounter, and drive real Slot
--- spins with real button presses.  No pokes on either side (issue #75): BP
--- accumulates through Ot6ActionEnd's own regen (battle opens at 1, +1 per
--- unboosted turn), boost is spent with real R presses, and the reels are
--- stopped by real A presses.  Whatever icons they land on, the tier promises
--- are asserted as invariants of the mechanism's own cells.
---
--- Issue #75 conversion: headroom comes from target selection rather than
--- staging.  The monster-side stop, death-proof and HP-floor pins are gone; in
--- their place the encounter is chosen: unsuitable draws are fled (L+R, the
--- engine's own run mechanic, battle_steal's formation-variance idiom) until
--- the plain south of Zozo deals a formation with enough bodies and HP to
--- survive three Slot resolutions with the enemy side acting freely.  Unforced
--- spins mostly resolve Lagomorph (a party heal) and the boosted
--- spin's chosen triple is reel 1's real stop, so the fight's damage
--- budget is small; the check below is calibrated from the pool's measured
--- draws.  The bench still answers its menus with real Defends and the
--- party takes the enemy's real hits.
---
+-- spins with real button presses. No pokes on either side: BP accumulates
+-- through Ot6ActionEnd's own regen (battle opens at 1, +1 per unboosted
+-- turn), boost is spent with real R presses, and the reels are stopped by
+-- real A presses. Whatever icons they land on, the tier promises are
+-- asserted as invariants of the mechanism's own cells.
+
 -- The three spins:
 --   spin 1 (0 bp): nothing is pending, the turn regens +1 bp (1 -> 2), and
 --     the spin resolves whatever vanilla dealt.
@@ -33,13 +21,10 @@
 --     whose $2f49.2 forbids joker doom, the promise is documented to fold,
 --     because the battle gate outranks boost, and it is asserted per that
 --     rule instead.
---
+
 -- The Ot6BoostDmg exemption rides the whole run as a write-watch: the
 -- multiplier's $f0-bank OT6_SCR_BIT store must never happen under cmd $0f.
---
--- Boot drive is probe_mp_universal's, verbatim where possible (the checkpoint
--- cold Continue, the disembark guard, the encounter walk).
---
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -70,7 +55,7 @@ local function onFoot()
 end
 
 -- wait for a character's menu; consume any other character's menu with a
--- real Defend (right swaps Fight->Def, then A), probe_mp_universal's idiom
+-- real Defend (right swaps Fight->Def, then A)
 local function menuFor(charId, what)
   local ph = 0
   local function up()
@@ -165,7 +150,7 @@ H.run({ maxFrames = 400000 }, {
   H.waitFrames(60),
   H.call(function() H.assertEntryContract("terra-returned-v1") end),
 
-  -- disembark guard (normally exits at 0 frames; see probe_mp_universal)
+  -- disembark guard
   (function()
     local ph, ph2 = 0, 0
     return H.driveUntil(function()
@@ -181,11 +166,6 @@ H.run({ maxFrames = 400000 }, {
   H.release(),
   H.waitFrames(30),
 
-  -- walk the plain until a real encounter fires, and choose it: a draw
-  -- without the headroom to survive three Slot resolutions is fled (L+R)
-  -- and the walk resumes.  Check calibrated from the pool's measured draws
-  -- (2026-08-10: the first draw dealt 3 bodies / 1237 total max HP, well
-  -- over the >= 2 bodies / >= 600 HP floor).
   (function()
     local ph = 0
     local pattern = { "down", "down", "right", "right", "down", "down",

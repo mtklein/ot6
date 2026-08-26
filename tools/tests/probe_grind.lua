@@ -1,24 +1,15 @@
--- probe_grind.lua -- the airship is FLYABLE + LANDABLE, headless (#132).
+-- probe_grind.lua -- the airship is FLYABLE + LANDABLE, headless.
 --
--- The working technique (owner-guided), for driving the WoB airship:
+-- Driving the WoB airship:
 --   * After Lift-off, WAIT ~150 frames for the flight to settle before input.
 --   * MOVE with Y-STRAFE: hold Y + a dpad direction = clean grid movement
 --     (west/north/east/south, ~7 tiles / 60f), no momentum -- release to stop
---     dead on a tile. (Turning via left/right + A works but is momentum-y;
---     Y-strafe is "like walking on a grid".)  A + heading is faster for gross
---     travel across the map.
+--     dead on a tile.  A + heading is faster for gross travel across the map.
 --   * LAND with B (-> LandAirship): only over OPEN interior land with space
 --     around the shadow -- NOT near mountains, water, forest, or coast EDGES.
---     A bad tile "bounces" ($19 spikes ~6 then reverts, still airborne);
---     an open tile lands (map leaves airship mode, party on foot).
---   * So landing = strafe the grid trying B at each stop until one takes.
---     [Corrected by probe_land_grind (#133): $c2 bit1 IS authoritative --
---     LandAirship refuses iff it is set, and the descent is unconditional
---     once started.  The "bounce" this header used to describe was a
---     detection artifact: $1f64 bit13 stays SET after a world-map landing
---     (party on foot, $20 leaves 1), so onFoot() below reads airborne
---     forever; it only cleared here because this run's landing hit a
---     location entrance, which loads a field map.]
+--     $c2 bit1 gates LandAirship (refuses iff set); the descent is
+--     unconditional once started, on an open tile (map leaves airship mode,
+--     party on foot).
 -- Live state: X=$33/$35, Y=$37/$39 (tile=fine>>12); heading $73; $c2 terrain.
 --
 -- This probe demonstrates it end to end: cross west off the mountainous Thamasa

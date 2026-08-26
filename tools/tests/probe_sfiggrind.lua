@@ -3,39 +3,12 @@
 -- earns.  Built separately from probe_sfigshops.lua so a shop mistake does
 -- not cost the grind's minutes and vice versa.
 --
---   tools/tests/run.sh tools/tests/probe_sfiggrind.lua
---
--- Why here.  LOCKE's level is fixed from `banon_joined`, where he leaves the
--- party, so the only window in which it can still move is Mt Kolts through
--- the Returner Hideout -- and the earliest encounter-bearing ground in that
--- window is the world map outside South Figaro, where the town's inn and its
--- four shops are also standing.  docs/research/locke-scenario-supply.md §4
--- has the level arithmetic; this file is the part of it that was never
--- measured, which is what one lap actually draws.
---
--- The corridor, derived statically from world_1_tilemap.dat and
--- WorldTileProp and then walked here:
---
---   * The southern walkable region is 422 tiles (the same figure
---     gen_kolts's header records), 371 of them battle-bg 0 and 51 bg 3.
---     Sector (86,111) is `WorldBattleRate[26] = $00`, so every one of those
---     tiles draws at the normal rate; bg 0 selects `WorldBattleGroup[104] =
---     3` (GreaseMonk / Rhodox / Rhinotaur) and bg 3 selects group 4.
---   * The per-step danger increment is HALVED by OT6 (`Ot6DangerMulW =
---     $0008`, ot6_break.asm:693) and random-battle rewards are DOUBLED
---     (`Ot6RewardMulW = $0020`), so the world's vanilla $00C0 becomes $0060
---     and a fight is expected about every 37 steps.
---   * Leaving town by the x=0 column lands at world (84,112), and (85,112)
---     and (86,112) are two of South Figaro's own four entrance tiles.  A
---     plan straight east from the exit walks onto them and back into the
---     town: measured statically, the 23-step shortest path (84,112) ->
---     (100,105) has both of them on it.  So the first hop is NORTH to
---     (84,108), from which the corridor is clean.
---   * The lap is (100,105) <-> (87,105), 13 steps each way on row 105, and
---     no world entrance or event trigger lies on it.  The whole grind stays
---     on the world map, because the danger counter is zeroed by every
---     battle and by every map load, so a lap that ducks into town throws
---     away whatever it had accumulated.
+-- The southern walkable region draws battles at the normal rate; OT6 halves
+-- the per-step danger increment and doubles random-battle rewards, so a
+-- fight is expected about every 37 steps.  The danger counter is zeroed by
+-- every battle and by every map load, so the lap route, (100,105) <->
+-- (87,105) on row 105, avoids South Figaro's own entrance tiles to keep
+-- accumulated danger from being thrown away.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -54,12 +27,8 @@ local function levelOf(c) return H.readByte(0x1600 + 37 * c + 8) end
 
 -- LOCKE is char 1.  The target is his TOTAL experience when the grind ends,
 -- not a level, because the level he arrives at his own scenario with is set
--- by this number plus whatever Mt Kolts, VARGAS and the hideout add on top
--- (measured at +943 on the chain of 2026-08-12: 814 at south_figaro, 1757 at
--- banon_joined).  Level 10 is 2976 total (8 * sum(LevelUpExp[2..10]),
--- CalcLevelExpTotal, ff6/src/menu/status.asm:580-605), so 2033 here lands
--- him at level 10 for the gate soldier, two levels above the 8 he has had
--- for every measurement of that fight so far.
+-- by this number plus whatever Mt Kolts, VARGAS and the hideout add on top.
+-- 2033 lands him at level 10 for the gate soldier.
 local LOCKE, EXP_TARGET = 1, 2033
 
 local function rosterLine()
@@ -111,10 +80,9 @@ local function care(tag)
                        reserve = { [POTION] = 3 }, mpFloor = 0.5 })
 end
 
--- One lap: east to (100,105), back west to (87,105).  26 steps, so at the
--- measured expected 37 steps a fight, a little under one fight a lap.  The
--- whole thing is skipped once the target is met, which is what makes a fixed
--- list of laps a bounded grind rather than an open-ended one.
+-- one lap: east to (100,105), back west to (87,105); 26 steps at ~37
+-- steps/fight, a little under one fight a lap.  Skipped once the target is
+-- met, so a fixed list of laps is a bounded grind.
 local done = function() return expOf(LOCKE) >= EXP_TARGET end
 local laps = 0
 local function lap(n)

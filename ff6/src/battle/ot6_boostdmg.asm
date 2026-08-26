@@ -8,16 +8,6 @@
 ; odds (ot6_steal.asm), slot buys the rig (ot6_slot.asm), rage buys the coin
 ; (ot6_rage.asm).
 ; ------------------------------------------------------------------------------
-; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
-; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler receives the identical
-; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
-; ff6-en.map are byte-identical across the split.
-; ------------------------------------------------------------------------------
-
-; ------------------------------------------------------------------------------
-
-; [ boost the base damage of a boosted character action ]
 
 ; called at the tail of the physical and magic base-damage calcs.
 ; damage x2/x3/x4 for pending boost 1/2/3; the per-target 9999 cap
@@ -39,8 +29,7 @@
         lda     $b1             ; counterattacks never boost (the $b1.0
         lsr                     ;   flag ExecRetal raises): interceptor's
         bcs     done            ;   dog rides command $02 attack $fc/$fd
-                                ;   (battle_main.asm:12606).  no exemption
-                                ;   below would catch it, and the counter
+                                ;   (battle_main.asm:12606); the counter
                                 ;   path never reaches Ot6ActionEnd to
                                 ;   charge what it delivered
         lda     $b5             ; current command
@@ -49,42 +38,22 @@
         beq     done            ; $06 capture: same fight path
         cmp     #$07
         beq     done            ; $07 bushido: boost bought the tech tier,
-                                ;   so it must not also buy a multiplier.
-                                ;   the same no-double-dip the tier-family
-                                ;   scan below enforces for folded spells
+                                ;   so it must not also buy a multiplier
         cmp     #$10
-        beq     done            ; $10 rage: a chance verb (#40).  boost bought
-                                ;   the coin's certainty (Ot6RageCoin's tier
-                                ;   ladder), never a damage multiplier.  This
-                                ;   gate is required on the start turn:
-                                ;   Cmd_10 executes the first possessed action
-                                ;   in the same turn (its _c21554 tail) while
-                                ;   the pending boost is still live, so without
-                                ;   it a 3-BP Rage-start would buy the
-                                ;   guaranteed special and also x8 it, the
-                                ;   double-dip kits.md's "Boost-tiered Steal"
-                                ;   rules out.
+        beq     done            ; $10 rage: boost bought the coin's
+                                ;   certainty (Ot6RageCoin), never a damage
+                                ;   multiplier. Cmd_10 executes the first
+                                ;   possessed action in the same turn while
+                                ;   the pending boost is still live, so this
+                                ;   gate is required on the start turn too
         cmp     #$0f
-        beq     done            ; $0f slot: a chance verb.  boost bought the
-                                ;   reel's certainty (the Ot6SlotRig tier
-                                ;   ladder), never a damage multiplier. without
-                                ;   this gate a pending boost would also x2/x8
-                                ;   the slot attack it just chose, the
-                                ;   double-dip kits.md's "Boost-tiered Steal"
-                                ;   rules out
-                                ;   (certainty instead of multiplication),
-                                ;   and the bushido/$07 gate above rules out
-                                ;   for the tier ladder.
+        beq     done            ; $0f slot: boost bought the reel's
+                                ;   certainty (Ot6SlotRig), never a damage
+                                ;   multiplier
         cmp     #$05
-        beq     done            ; $05 steal: a chance verb, not a damage one.
-                                ;   boost buys the rare/guarantee downstream
-                                ;   (Ot6StealBoostLevel / Ot6StealSlot), never
-                                ;   a damage multiplier: "on chance verbs
-                                ;   boost guarantees" (DESIGN.md). steal deals
-                                ;   no damage today, so this gate is redundant
-                                ;   (CalcDmg reaches here regardless of power),
-                                ;   and it states the ruling in advance for
-                                ;   Mug's later damage+steal kit (kits.md).
+        beq     done            ; $05 steal: boost buys the rare/guarantee
+                                ;   downstream (Ot6StealBoostLevel /
+                                ;   Ot6StealSlot), never a damage multiplier
         lda     OT6_BOOST_REVEALED,x         ; pending boost level
         beq     done
         phx

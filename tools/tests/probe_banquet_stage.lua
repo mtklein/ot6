@@ -1,30 +1,23 @@
--- probe_banquet_stage.lua -- I->J step staging (issue #31): cold-Continue
--- the vector-crash-v1 battery, walk the world grind to Vector 253, enter
--- the castle, ride the escort, start the banquet at the dais, and generate
--- two development savestates:
+-- probe_banquet_stage.lua -- cold-Continues the vector-crash-v1 battery,
+-- walks the world grind to Vector 253, enters the castle, rides the
+-- escort, starts the banquet at the dais, and generates two development
+-- savestates:
 --
 --   banquet_predais.mss  -- standing beside the dais, window not started
 --   banquet_window.mss   -- control back after the Gestahl/Cid scene,
 --                           $007C=1, timer 0 live (the 14400 window)
 --
--- These are iteration fixtures for the circuit/Q&A probes, not
--- states in the generated chain; the step generator (gen_banquet_done)
--- replays this whole route itself.  Run:
+-- These are iteration fixtures for the circuit/Q&A probes, not states in
+-- the generated chain.
 --
---   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/vector-crash-v1 \
---   tools/tests/run.sh tools/tests/probe_banquet_stage.lua
+-- The boot tile world (83,238) is the wrecked Blackjack, so an A tap
+-- there re-enters the wreck interior.  The Continue drive below presses
+-- A only while not on the world map, and the grind presses directions
+-- only.
 --
--- Hazard (the H->I report's first-hazard note): the boot tile world
--- (83,238) is the wrecked Blackjack, so an A tap there re-enters the
--- wreck interior.  The Continue drive below presses A only while not on
--- the world map, and the grind presses directions only.
---
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- Issue #75: playBattles = "flee" keeps these walks out of the library's
--- monster-dead flag write, and matches gen_banquet_done, the generator these
--- probes prototype.  Moot either way: maps 243, 244, 250, 251, 252 and 253
--- all have random encounters disabled (map_prop.dat byte +5 bit 7 clear;
--- ff6/src/field/battle.asm:333-347 returns before the roll).
+-- playBattles = "flee" avoids the library's monster-dead flag write.
+-- Maps 243, 244, 250, 251, 252, and 253 have random encounters disabled
+-- (map_prop.dat byte +5 bit 7 clear).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -40,18 +33,9 @@ end
 local function timerCount() return H.readWord(0x1189) end
 local function var0() return H.readWord(0x1fc2) end
 
--- Verified-step world grinder.  The shared grind-and-replan idiom
--- (gen_vector_entry's) consumes one plan entry per aligned frame, and
--- the party sits aligned for several frames before each press latches.
--- On straight lines the wasted entries agree in direction and have no
--- effect, but every turn of a long path desyncs the plan and forces a
--- 60000-node replan.  Measured on this step's ~117-step grind (run 4,
--- 2026-07-28): ~139 frames/tile, a (73,221)<->(73,222) oscillation with
--- plan lengths jumping 86->93, and the emulator slowed to ~40fps by the
--- per-replan BFS.  This version consumes an entry only when the party
--- lands on that entry's destination tile (navTo's rule, applied to the
--- world map): one BFS per step plus one per battle return, 16
--- frames/tile.
+-- Verified-step world grinder: consumes a plan entry only when the party
+-- lands on that entry's destination tile, one BFS per step plus one per
+-- battle return.
 local function worldGrind(tx, ty, what)
   local plan, idx, ph, hb = nil, 1, 0, -600
   local step = nil
@@ -121,14 +105,11 @@ local function pressWalk(dir, pred, maxFrames, what)
 end
 
 -- The dais is a face-up+A trigger the party must be standing on.  The
--- gate is `$01B4=0 or $01B0=0 or $007C=1 -> EventReturn` (_cc8490,
--- event_main.asm:97243-97247), where $01B0 = facing up and $01B4 = A
--- held.  M.tapLever does not work here: it releases A after 8 frames and
--- then only holds up, so the gate keeps reading A clear (measured, stage
--- run 9: 9000 frames, no latch).  Facing up without walking off the tile
--- works because the Gestahl NPC stands at (54,15), the $062E object
--- (npc_prop map-250 record 5), and blocks the step the same way
--- gen_sabin_train's upA holds into a wall.  So stand on (54,16) and hold
+-- gate is `$01B4=0 or $01B0=0 or $007C=1 -> EventReturn` (_cc8490), where
+-- $01B0 = facing up and $01B4 = A held.  A held tap that releases A and
+-- holds only up leaves the gate reading A clear.  Facing up without
+-- walking off the tile works because the Gestahl NPC stands at (54,15),
+-- the $062E object, and blocks the step.  Stand on (54,16) and hold
 -- up+A, with a 2-frame A release every 8 so the edge re-arms.
 local function holdUpA(swId, maxFrames, what)
   local n = 0
@@ -160,11 +141,11 @@ end
 
 H.run({ maxFrames = 120000 }, {
   -- ---- cold Continue; no stray A once the crash site is up -----------------
-  -- worldMode() alone is not a sufficient gate here: $1F64 reads < 3 at the
-  -- title screen too (measured, this probe's first run).  The A presses are
-  -- gated on brightness (menus are lit; load fades are dark) and disarmed
-  -- once the world is up at (83,238), because the boot tile is the wreck
-  -- itself and one more A would walk back inside (measured).
+  -- worldMode() alone is not a sufficient gate here: $1F64 reads < 3 at
+  -- the title screen too.  The A presses are gated on brightness (menus
+  -- are lit; load fades are dark) and disarmed once the world is up at
+  -- (83,238), because the boot tile is the wreck itself and one more A
+  -- would walk back inside.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -245,17 +226,16 @@ H.run({ maxFrames = 120000 }, {
   H.call(function() H.screenshot("bq_stage_250_entry") end),
   H.saveState("banquet_250_entry.mss"),
 
-  -- ---- the measured route to the dais --------------------------------------
-  -- MEASURED (probe_banquet_interior, iterations 1-8): the 250 entry is a
-  -- 131-tile component (the entrance hall, the corridor, and the four
-  -- hall soldiers), and the dais is not in it.  The route to the dais
-  -- uses the corridor stairs:
+  -- ---- the route to the dais -------------------------------------------
+  -- The 250 entry is a 131-tile component (the entrance hall, the
+  -- corridor, and the four hall soldiers), and the dais is not in it.
+  -- The route to the dais uses the corridor stairs:
   --   * the {22,29} doorway is a door tile the BFS model reads as a wall;
-  --     a held up press crosses it (the {14,8} class);
+  --     a held up press crosses it;
   --   * (23,12) is the messenger trigger; even gated off ($007D=0) it
-  --     re-enters at every rest frame and wedges navTo (iteration 2).  A
-  --     held press skips walk-over triggers (measured), so the
-  --     messenger tile and the (23,9) stairs are crossed in one pressWalk;
+  --     re-enters at every rest frame and wedges navTo.  A held press
+  --     skips walk-over triggers, so the messenger tile and the (23,9)
+  --     stairs are crossed in one pressWalk;
   --   * (23,9) -> (54,34) (short entrance), and from (54,34) the dais is
   --     an ordinary 17-step navTo inside the throne tower.
   H.navTo(23, 30, { maxFrames = 6000, playBattles = "flee" }),
@@ -283,9 +263,9 @@ H.run({ maxFrames = 120000 }, {
   H.saveState("banquet_predais.mss"),
 
   -- ---- face-up+A on (54,16): the banquet starts -----------------------------
-  -- tapLever returns the moment $007C latches (:97418); the timer starts
-  -- one line later and the scene tail still runs.  The dais tile is a
-  -- stood-on trigger afterwards, so the ride-out is stepOff.
+  -- tapLever returns the moment $007C latches; the timer starts one line
+  -- later and the scene tail still runs.  The dais tile is a stood-on
+  -- trigger afterwards, so the ride-out is stepOff.
   holdUpA(0x007C, 9000, "dais face-UP+A -> _cc8490 -> $007C=1"),
   H.release(),
   H.stepOff({ "down", "left", "right" }, 20000,
@@ -296,10 +276,8 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(sw(0x007C), 1, "$007C SET -- the window is live")
     H.assertEq(H.readByte(0x1188) ~= 0, true, "timer 0 flags live ($1188)")
     H.assertEq(sw(0x0634), 1, "$0634 -- the window soldier population is up")
-    -- The castle opens here.  $0630=0 (event_main.asm:97415) deletes the
-    -- two "Gestahl waits inside" servants at (16,30) and (30,30).  Those
-    -- are the two tiles the pre-banquet flood found blocked
-    -- (probe_banquet_interior iterations 4-8), the object-map blocks that
+    -- The castle opens here.  $0630=0 deletes the two "Gestahl waits
+    -- inside" servants at (16,30) and (30,30), the object-map blocks that
     -- separated the west and east columns from the corridor.
     H.assertEq(sw(0x0630), 0, "$0630 CLEAR -- the corridor servants are gone")
     H.log(string.format(

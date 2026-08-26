@@ -1,45 +1,33 @@
--- probe_banquet_timer.lua -- banquet-timer destructive-bug probe, phase A
--- (issue #31; the route recon's first-named hazard).  Not a suite test.
+-- probe_banquet_timer.lua -- banquet-timer save/load probe, phase A.
+-- Not a suite test.
 --
--- Question measured: whether a save taken with the event timer live
--- round-trips.  A player inside the banquet's 4-minute window can walk
--- out of the castle (243 row y=31 -> 253 -> world, all ungated during
--- $007B=1) and world-save with the event timer live.
+-- Measures whether a save taken with the event timer live round-trips.
+-- A player inside the banquet's 4-minute window can walk out of the
+-- castle (243 row y=31 -> 253 -> world, all ungated during $007B=1) and
+-- world-save with the event timer live.
 --
--- Staging: the banquet is 5 ungenerated steps downstream of
--- terra-returned-v1, so this probe does not reach it.  It cold-Continues
--- the terra-returned checkpoint (world (24,121), on foot at the parked
--- Blackjack) and hand-writes the timer-0 block exactly as
--- `start_timer 0, N, _cc8a96, {FIELD_VISIBLE, BANQUET,
--- MENU_BATTLE_VISIBLE}` would (EventCmd_a0, field/event.asm:3736-3757:
--- flags $72 = f|r|m + bank bits 2, ptr $028A96 = _cc8a96), plus switch
--- $007C=1 and score var 0 = 17 ($1FC2).  That staging tests the save/load
--- mechanism for a live banquet timer.  It says nothing about banquet
--- reachability, the castle-exit walk, or the dinner scene's behavior with
--- this party; those are separate claims (the exit rows are source-cited
--- in banquet-decode.md; the scene is only ridden to its first latch in
--- phase B).
+-- Staging: the banquet is downstream of terra-returned-v1, so this probe
+-- does not reach it directly.  It cold-Continues the terra-returned
+-- checkpoint (world (24,121), on foot at the parked Blackjack) and
+-- hand-writes the timer-0 block as `start_timer 0, N, _cc8a96,
+-- {FIELD_VISIBLE, BANQUET, MENU_BATTLE_VISIBLE}` would (flags $72 =
+-- f|r|m + bank bits 2, ptr $028A96 = _cc8a96), plus switch $007C=1 and
+-- score var 0 = 17 ($1FC2).  That staging tests the save/load mechanism
+-- for a live banquet timer only; it says nothing about banquet
+-- reachability, the castle-exit walk, or the dinner scene's behavior
+-- with this party.
 --
 -- Phase A measures:
---   A1  the world module does not tick timer 0 (no DecTimers call in
---       ff6/src/world/; measured here rather than only grepped);
+--   A1  the world module does not tick timer 0;
 --   A2  the menu does tick it (menu_common.asm:3466);
---   A3  the real Save UI (the same drive as gen_post_opera_checkpoint)
---       writes the timer block into the slot-3 save: PushTimers
---       (menu/save.asm:108) copies $1188-$119F to $1FA8,
+--   A3  the real Save UI writes the timer block into the slot-3 save:
+--       PushTimers (menu/save.asm:108) copies $1188-$119F to $1FA8,
 --       CopyGameDataToSRAM copies $1600-$1FFF to SRAM.  Asserted by
 --       reading the slot-3 bytes back at $307400+$9A8 and comparing the
 --       flags and pointer byte for byte.
--- run.sh's OT6_CAPTURE_SRM then captures the battery for phase B
--- (probe_banquet_timer2.lua), which cold-boots it and watches the timer
--- resume, tick on a field map, and fire _cc8a96.
---
--- Run:
---   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1 \
---   OT6_CAPTURE_SRM=build/states/banquet_timer_live.srm \
---   tools/tests/run.sh tools/tests/probe_banquet_timer.lua
---
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- run.sh's OT6_CAPTURE_SRM captures the battery for phase B, which
+-- cold-boots it and watches the timer resume, tick on a field map, and
+-- fire _cc8a96.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26
@@ -65,8 +53,8 @@ local function sram(off) return emu.read(off, emu.memType.snesMemory) end
 local menuT0 = 0
 
 H.run({ maxFrames = 30000 }, {
-  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3), the boot
-  -- step probe_mp_universal measured: restores on foot at (24,121).
+  -- cold Continue: the checkpoint's $307ff0=3 preselects slot 3, which
+  -- restores on foot at (24,121).
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -122,9 +110,9 @@ H.run({ maxFrames = 30000 }, {
     H.screenshot("banquet_timer_menu")
   end),
 
-  -- A3: real Save UI to slot 3 (gen_post_opera_checkpoint's drive, verbatim
-  -- mechanics: zero the $307ff0 sentinel, enter the save selector the way
-  -- the menu's own Save command does, confirm, watch the sentinel return).
+  -- A3: real Save UI to slot 3: zero the $307ff0 sentinel, enter the save
+  -- selector the way the menu's own Save command does, confirm, watch
+  -- the sentinel return.
   H.call(function()
     emu.write(0x307ff0, 0x00, emu.memType.snesMemory)
     H.assertEq(sram(0x307ff0), 0, "slot marker zeroed")

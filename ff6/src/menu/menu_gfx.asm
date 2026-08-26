@@ -132,7 +132,7 @@ LoadFontGfx2bpp:
         cpx     #$1400
         bne     @6b2b
         shorta
-        jsl     Ot6MenuIcons2bpp_ext    ; ot6 #53: element icon tiles into the
+        jsl     Ot6MenuIcons2bpp_ext    ; ot6: element icon tiles into the
                                         ;   copy this loader just laid down
         rts
 
@@ -174,7 +174,7 @@ LoadFontGfx4bpp:
         cpx     #$1000
         bne     @6b8b
         shorta
-        jsl     Ot6MenuIcons4bpp_ext    ; ot6 #53: element icon tiles into BG1's
+        jsl     Ot6MenuIcons4bpp_ext    ; ot6: element icon tiles into BG1's
                                         ;   copy -- the one every ability page
                                         ;   draws from (GetBG1TilemapPtr)
         rts

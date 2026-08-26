@@ -1,12 +1,8 @@
 ; ------------------------------------------------------------------------------
-; OT6: multi-hit hit counts (#54)
+; OT6: multi-hit hit counts
 ;
 ; A landed hit that matches a weakness chips a shield, so the number of times
-; an action strikes is the break-rate dial.  That rule is measured rather than
-; assumed: one boosted Fight action swinging eight times chipped four shields
-; off one target, 6 -> 5 -> 4 -> 3 -> 2 -> 1, at $3a70 = 7, 5, 3, 1
-; (tools/tests/probe_multihit.lua phase 1; the odd counts are the landing hand,
-; ot6_boost.asm:220-224).  docs/design/multi-hit.md is the design pass.
+; an action strikes is the break-rate dial.
 ;
 ; The engine has exactly one multi-hit mechanism, $3a70 "number of attacks
 ; (0 = 1 attack)" (battle_main.asm:6428), consumed by one loop:
@@ -28,36 +24,24 @@
 ; random targeting.  A scanned (id, extra) table is the shape ot6 already uses
 ; for per-ability data (Ot6SkillClassTbl, Ot6AbilityCostTbl).
 ;
-; Why the hook sits in the command handlers rather than in LoadMagicProp.
-; multi-hit.md §5 named LoadMagicProp and CalcItemEffect as the candidates and
-; flagged both as unchecked for re-entry, which is the dangerous property: a
-; hook that runs again inside the multi-attack loop re-arms $3a70 and the
-; action never ends.  ExecAttack calls InitTarget itself when $3400 is $ff
-; (battle_main.asm:8276-8282), and InitTarget_00/_02 call LoadMagicProp
-; (:6636), so LoadMagicProp is reachable from inside the loop and was rejected
-; on that basis rather than measured.  Cmd_0a and Cmd_09 cannot be: the
-; multi-attack loop re-enters ExecAttack, never the command handler, and
-; ExecCmd clears $3a70 through InitGfxScript (:6417) before dispatching, so
-; each handler sees a fresh 0 exactly once per action.  That is the same site
-; and the same argument as Ot6FightBoost, which lives in FightAttack for the
-; same reason.  Measured on the built ROM by tools/tests/battle_hitcount.lua:
-; a real Pummel sets $3a70 to 1 once and lands two hits.
+; Why the hook sits in the command handlers rather than in LoadMagicProp.  A
+; hook that runs again inside the multi-attack loop would re-arm $3a70 and
+; the action would never end.  ExecAttack calls InitTarget itself when $3400
+; is $ff (battle_main.asm:8276-8282), and InitTarget_00/_02 call LoadMagicProp
+; (:6636), so LoadMagicProp is reachable from inside the loop.  Cmd_0a and
+; Cmd_09 are not: the multi-attack loop re-enters ExecAttack, never the
+; command handler, and ExecCmd clears $3a70 through InitGfxScript (:6417)
+; before dispatching, so each handler sees a fresh 0 exactly once per action.
+; That is the same site and the same argument as Ot6FightBoost, which lives
+; in FightAttack for the same reason.
 ;
 ; The Cmd_09 shim's sharpest hazard is not re-entry but the carry.  `sbc #$a2`
 ; there reads the carry the dispatcher left set, so a hook that clobbered it
 ; would misindex EVERY tool, not just Drill.  This proc's php/plp restores it.
-; No test targets that contract by name, but battle_toolsgrey.lua drives Edgar
-; down the affordability line by casting real Bio Blasters and AutoCrossbows
-; through Cmd_09 and checks each charge against the menu, so a wrong tool index
-; would fail it; it passes on this ROM.  M.newFightDriver's tactical plan fires
-; AutoCrossbow the same way (tools/tests/lib/ot6.lua:1172), so every savestate
-; generated with that driver exercises it too.
 ;
 ; SwdTech has no hook because no SwdTech count changes: Quadra Slam and Quadra
 ; Slice are already x4 through vanilla's effect $32, and Empowerer x2 through
-; $36.  Adding one later means adding a jsl to Cmd_07 (battle_main.asm:3977)
-; the same way, since $b6 there is likewise the ability id before it is
-; rebased.
+; $36.
 ; ------------------------------------------------------------------------------
 
 .segment "ot6_code"
@@ -67,24 +51,9 @@
 ; [ ability id -> extra attacks ]
 
 ; 2-byte records, $ff-terminated, scanned once per action.  Keyed by attack id
-; for Blitz and by tool item id for Tools, the keying Ot6SkillClassTbl and
-; Ot6AbilityCostTbl already use; the two ranges are disjoint ($5d-$64 vs
-; $a3-$aa) and each caller passes only its own, so one table serves both.
-; An absent id is one hit, which is vanilla.
-;
-; The reasons are in docs/design/multi-hit.md §4; the short form:
-;   - pummel: sabin's signature, 4 MP at level 1, the earliest and cheapest
-;     repeatable probe in the game.  bludgeoning, which is also his bare
-;     fists' class, so it is a second axis only with claws equipped.
-;   - bum rush: a capstone, so x4 rather than the x8 kits.md once proposed.
-;     x8 empties every authored shield count but one in a single action,
-;     which would make the ultimate the opener.  x4 empties trash and the
-;     low bosses and still leaves 5-shield bosses needing a second source.
-;   - drill: edgar's armour-piercing tool (it ignores defence,
-;     ToolsEffect_05, battle_main.asm:7384-7386), so rate into one gauge is
-;     the complement to AutoCrossbow's one-hit-per-body breadth.
-; AutoCrossbow is deliberately absent: it is breadth, not rate, and x4 per
-; body would be 16 chips against a four-stack.
+; for Blitz and by tool item id for Tools; the two ranges are disjoint
+; ($5d-$64 vs $a3-$aa) and each caller passes only its own, so one table
+; serves both.  An absent id is one hit, which is vanilla.
 
 Ot6HitCountTbl:
         .byte   $5d, 1          ; pummel    x2 bludgeoning

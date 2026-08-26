@@ -7,9 +7,9 @@
 --                         controllable frame.  This is the fixture gen_banon
 --                         starts from and the entry point for anything that
 --                         wants the hideout without replaying the mountain.
---
+
 -- The route, and the three places the tables alone would leave you stuck.
---
+
 -- 1. The way out of map 98 is the tile Vargas was standing on.  Map 98 holds
 --    exactly two entrance records (short_entrance.dat, ShortEntrance::_98):
 --    (10,10) -> map 103 (59,9), the summit the party came in by, and
@@ -21,7 +21,7 @@
 --    way; it is `switch $031C=0` at :20147 that despawns him.  So the exit is
 --    walkable only because the fight was won, and $031C is asserted clear
 --    below before the step is planned.
---
+
 -- 2. Map 100 lands the party one tile from the way back.  The arrival tile is
 --    (8,48), and (7,48), its immediate west neighbour, is the entrance
 --    straight back to map 98.  This is the same hazard shape gen_kolts
@@ -30,46 +30,14 @@
 --    tiles and the target (17,59) is well east of the spawn, so the shortest
 --    path is unlikely to touch (7,48), and planAvoids() below makes that a
 --    guarantee.
---
--- 3. The mountain's north door is a long entrance, and it is guarded later.
---    Map 101 is entered at (10,49) from map 100 (17,59) and left by its long
---    entrance (5,57), horizontal, length $12: row y=57, x=5..22 -> world
---    (98,93) (long_entrance.dat, LongEntrance::_101).  Its other long record,
---    (10,48) length 1, goes straight back to map 100 (17,58), and (10,48) is
---    the tile directly north of the spawn, so this map is bracketed by
---    exits the way map 100 is, and the walk south is asserted off it.
---    NPCProp::_101 also puts two imperial SOLDIERs on (10,49)/(11,50), both
---    spawn switch $031d, the second running _ca8473 ("Scum!  You're
---    Returners!", event_main.asm:20159/20166) which throws the party back out
---    to world (98,93).  One of them spawns on the arrival tile itself.  They
---    cannot fire on this pass: $031D is set by the
---    hideout, by _caf68a's walk-in at :36300 and Banon's speech _caf7dc at
---    :36712, both of which are still ahead.  It is asserted clear on
---    arrival, so if that ordering ever changes this fails with an error
---    instead of walking into a scene.
---
+
 -- 4. The hideout's world tile is (104,64), and it is a long walk north.
 --    World (104,64) -> map 108 (11,55) (ShortEntrance::_0); map 108's own way
 --    back is the long entrance (6,57) length $11 -> world (104,65).  From the
 --    mountain's north door at (98,93) that is a long stretch of overworld,
 --    and the world step is planned by worldBfs and asserted to exist before
 --    it is walked rather than discovered by holding a direction.
---
--- Issue #75: this generator makes no state writes.  Every field navigator
--- runs with opts.playBattles, so mid-route encounters on Mt. Kolts are fought
--- by the edge-tapped A auto-fighter rather than write-cleared, and the world
--- step never lets worldNavTo's own battle branch see a battle at all.
--- worldWalkFighting below stops the walk on the world engine's
--- battle-pending bit ($E8 bit5, set as soon as the encounter roll wins,
--- move.asm's `ora #$20`, frames before worldNavTo's 3-frame debounce
--- could act), fights the encounter with H.fightBattle, rides out the
--- post-battle world reload (position restored, danger counter zeroed;
--- move.asm:916-921 / world_start.asm:465-482), and resumes.  Fighting
--- rather than fleeing is deliberate: L+R can fail on unrunnable or
--- back-attack formations, and this post-Vargas four
--- (TERRA/LOCKE/EDGAR/SABIN) beats the northern plains' encounters in about a
--- round, so the fight always terminates and the walk stays deterministic
--- from the fixture.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local WON = "build/states/vargas_won.mss.lua"
 
@@ -114,15 +82,6 @@ local function settled(n, extra)
   end
 end
 
--- The settle drives rather than waits, for the reason gen_kolts measured on
--- map 96: this is encounter territory, and a battle rolled on the arrival
--- tile stalls a passive waitUntil indefinitely.  advanceStory (playBattles
--- mode, issue #75) fights whatever came up with the same edge-tapped A that
--- pages the victory text; on a quiet field it holds the pad empty.  It also
--- does not require player control, because $087C&$0F alternates between 2 and
--- 4 while any async object script is live, and it leaves the question of
--- whether a step is possible this frame to navTo, which debounces control
--- itself.
 local function settleField(dstMap, maxF)
   return seq({
     H.waitFrames(90),
@@ -166,17 +125,6 @@ local function crossTo(tx, ty, dstMap, what, maxF)
   })
 end
 
--- The care layer, which this route did not have.  Every fight on it is
--- fought for real (see the header), the walk is long, and nothing here ever
--- opened a menu, so the party arrived at the hideout in whatever state the
--- encounters left it.  Measured 2026-08-11 on the v0.10 integration tip, out
--- of wt/restage's own returner_hideout.mss: TERRA 0/136 and LOCKE 0/168 --
--- half the party dead -- with five Fenix Downs and fifteen Tonics sitting in
--- the bag.  That fixture was accepted, and the failure surfaced one edge
--- later in gen_banon, where Banon's speech cuts the party down to TERRA
--- alone (`party_chars TERRA`, event_main.asm:36475) and the wipe canary
--- correctly reported a party in which every member had 0 hp.
---
 -- H.fieldCare revives from the bag before it heals, so one call answers both,
 -- and it does not open the menu at all when nobody needs anything, which is
 -- why it can sit after every fight without costing a quiet route any frames.
@@ -184,16 +132,6 @@ local function care(tag)
   return H.fieldCare({ tag = "care " .. tag, threshold = 0.85 })
 end
 
--- Issue #75: the input-driven world walk (see the header on zero writes).
--- One round walks toward the hideout until either the entrance fires (the
--- party leaves the world map) or the encounter roll wins.  $E8 bit5 is set as
--- soon as the roll wins and is checked here as the navigator's arrive() on
--- every frame, so worldNavTo's own 3-frame-debounced battle-clear-write
--- branch cannot run.  The encounter is then fought with real input and the
--- post-battle world reload is ridden out before the next round re-plans.
--- Rounds are written out flat because navigator and driveUntil bodies latch
--- state and cannot be replayed (the same reason as gen_banon's talkTo
--- rounds).
 local function battlePending()
   return (H.readByte(0x00e8) & 0x20) ~= 0 or H.battleLoadStarted()
 end
@@ -239,8 +177,6 @@ end
 -- generalised from a row to a tile set: map 98's neighbours are point exits
 -- rather than rows.)
 local function planAvoids(tx, ty, bad, what)
-  -- Poll before asserting (the gen_terra_clifftop fix, 2026-08-18): a
-  -- transient NPC in a corridor fails a single-sample BFS pre-check.
   return H.cond(function() return true end, {
     H.waitUntil(function() return H.bfsPath(tx, ty) ~= nil end,
                 900, what .. ": a path exists (45f poll)", 45),
@@ -299,12 +235,6 @@ H.run({ maxFrames = 220000 }, {
     H.assertEq(H.fieldX(), 8, "landed at x=8 on shelf A")
     H.assertEq(H.fieldY(), 48, "landed at y=48 on shelf A")
   end),
-  -- #84: the Tent chest at (8,52), visible on the walk down shelf A.  The
-  -- shelf's only entrance is the (8,48) landing above (short_entrance.dat),
-  -- so this generator is the one that can open it honestly; gen_kolts_cave
-  -- never crosses Vargas's ledge and cannot reach it.  The stand tile is
-  -- planned off (7,48) first, the same entrance hazard the (17,59) plan
-  -- below avoids.
   planAvoids(8, 53, { { 7, 48 } }, "shelf A -> the Tent chest"),
   H.openChest{ stand = { 8, 53 }, face = "up", bit = 40, what = "Tent",
                nav = { playBattles = true } },
@@ -314,7 +244,6 @@ H.run({ maxFrames = 220000 }, {
   crossTo(17, 59, 101, "M2 shelf A -> map 101, the north gatehouse"),
 
   H.call(function()
-    -- the imperial pair belongs to a scene the hideout arms, not this pass
     H.assertEq(sw(0x031D), 0,
       "$031D clear -- no imperial soldiers on map 101 yet (_ca8473)")
     where("north gatehouse")
@@ -385,15 +314,7 @@ H.run({ maxFrames = 220000 }, {
           H.readWord(base + 13), H.readWord(base + 15)))
       end
     end
-    -- The exit contract, which this generator did not have and gen_kolts
-    -- has had since 2026-08-06 for the same reason.  A fixture with a dead
-    -- character in it is not a savestate of the story reaching the hideout;
-    -- it is a savestate of the route losing on the way, and every step that
-    -- boots from it inherits the loss.  gen_banon inherits it worst: the
-    -- speech reduces the party to TERRA alone, so a dead TERRA here is a
-    -- whole dead party there, and that is how this presented -- as a wipe
-    -- inside a hideout that has no encounters at all.
-    --
+
     -- Half HP is the same bar gen_kolts uses.  A failure here means the
     -- descent and the world walk cost more than the bag could answer, which
     -- is a finding about supplies and not a reason to lower the bar.

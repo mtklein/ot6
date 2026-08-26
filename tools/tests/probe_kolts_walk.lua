@@ -1,5 +1,5 @@
 -- probe_kolts_walk.lua -- walkability dumps around the seven South Figaro
--- chests (#84), from south_figaro.mss.  For each chest, print which
+-- chests, from south_figaro.mss.  For each chest, print which
 -- neighbouring tiles accept a step in from some direction, plus whether the
 -- party's BFS can actually reach each candidate stand tile.
 local H = dofile("tools/tests/lib/ot6.lua")

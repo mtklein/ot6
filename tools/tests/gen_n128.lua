@@ -1,124 +1,19 @@
--- gen_n128.lua -- v0.6 step 13, the step OUT of boundary D (#25): the
--- minecart platform (map 272, CID at {9,51}) -> A -> `cutscene TRAIN` ->
--- the minecart's six forced battles, NUMBER 128 among them -> the Kefka
--- explosion on map 240 -> control with $0069=1 -> parked ON the escape
--- map's save point {58,7} (boundary E).  Generates n128_won.
---
--- One boot, from a checkpoint (issue #25; the dual-boot probe retired by
--- #30): every caller, both the ninja graph's generation edge and `make smoke`
--- (via the Makefile's SMOKE_CHECKPOINT_* map), supplies OT6_SRAM_CHECKPOINT=
--- minecart-platform-v1, so run.sh materializes the checkpoint .srm and SRAM
--- carries slot 3, the codex magic and the seeded ULTROS2 witness.  Cold
--- Continue -> the 272 save tile {3,55} -> entry contract -> walk to CID.
--- This file used to probe four SRAM bytes at runtime and fall back to
--- booting minecart_entry.mss when they were absent (smoke's old
--- checkpointless invocation).  With the checkpoint map there is no
--- checkpointless caller left, and a boot chosen by inspecting SRAM
--- contents was another way for a step to test something other than
--- what its edge declared.
---
+-- gen_n128.lua -- the minecart platform (map 272, CID at {9,51}) -> A ->
+-- `cutscene TRAIN` -> the minecart's six forced battles, NUMBER 128 among
+-- them -> the Kefka explosion on map 240 -> control with $0069=1 ->
+-- parked ON the escape map's save point {58,7} (boundary E).  Generates
+-- n128_won.mss.
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
---   reads the marker line above and refuses, before the emulator boots and
---   naming both strings, any OT6_SRAM_CHECKPOINT whose manifest.json declares
---   a different persistent_layout.
---
--- Why this step is not an event walk.  The route recon flagged this as the
--- beat most likely to consume the generating pass, and the reason is that
--- `battle 73` appears nowhere in `event_main.asm`.  The ride is opcode `$ae`, `CUTSCENE::TRAIN`
--- (include/event_cmd.inc:707), issued at event_main.asm:96580; it runs in
--- the world module's train engine off a fixed 5-byte-per-item course
--- (world/train_script.asm:615-660), and the fights are issued by ASM
--- writing the event-battle id straight to $0011E0:
---     item 3  cmd $e0 -> TrainCmd_e0 (:829) -> event battle $29 = battle 41
---     item 9  cmd $e1 -> TrainCmd_e1 (:864) -> event battle $90 = battle 144
---     item 14 cmd $e0 -> battle 41
---     item 24 cmd $e1 -> battle 144
---     item 31 cmd $e1 -> battle 144
---     item 36 cmd $e2 -> TrainCmd_e2 (:899) -> event battle $49 = battle 73
---                        = NUMBER 128 $010b + Left Blade $0140 + RightBlade $013f
--- so nothing in the event disassembly names the boss and no entry point
--- fixture can be parked in front of it.  This step therefore records every
--- battle the ride produces: the driver below logs each formation on
--- its rising edge and the assertions afterwards are about that record,
--- requiring six fights seen and one of them $010b with both blades.  A ride
--- that fought nothing would fail rather than pass.
---
--- It also answers recon probe 4 (ride duration), which the recon could
--- only guess at because it never traced where the train counter $36 is
--- decremented: the frame count from `cutscene TRAIN` to control on map 240
--- is logged below.
---
--- ############################################################################
--- ## The block below is history.  It was resolved on 2026-07-27 (#21).      ##
--- ## Everything from "this generator does not generate" to "party: LOCKE    ##
--- ## alone" described a ride fought solo because the fixture chain walked   ##
--- ## out of Zozo with two characters.  Its own "what would unblock this"    ##
--- ## has happened: gen_zozo5_ramuh seats SABIN and EDGAR at the leave       ##
--- ## cutscene's party_menu, the whole chain and the tracked post-opera-v1   ##
--- ## checkpoint were regenerated from it, and minecart_entry now boots      ##
--- ## LOCKE + SABIN + EDGAR (measured: $1850 LOCKE=$51 EDGAR=$C1 SABIN=$49,  ##
--- ## CELES=$00 after the tube room).  The solo measurements below are kept  ##
--- ## verbatim as the record of the earlier failure; the assertions at the   ##
--- ## entry point now require three.                                         ##
--- ############################################################################
---
--- Run against minecart_entry it rides the cutscene correctly and fights
--- all six battles in the scripted order --
---
---   1  f1281  0006 2A2A ...           Mag Roader           (battle 41)
---   2  f2450  0006 0006 ...           Mag Roader x2        (battle 144)
---   3  f3474  0006 2A2A ...           Mag Roader           (battle 41)
---   4  f5170  0006 0006 ...           Mag Roader x2        (battle 144)
---   5  f6546  0006 0006 ...           Mag Roader x2        (battle 144)
---   6  f7514  010B 0140 292A 013F     NUMBER 128 + blades  (battle 73)
---
--- which confirms the recon's decode of train_script.asm's course.  LOCKE
--- then died in fight 6.  Measured (probe_train_tail.lua), his battle
--- HP $3BF4 at the start of each fight:
---
---   fight 1: 501   fight 4: 385   fight 5: 261   fight 6: 151   -> 0
---
--- i.e. he enters the ride at full HP and the five Mag Roader fights take
--- ~70 HP each even though every one of them is write-cleared within three
--- frames of `battleLoadStarted()`; the boss finishes what is left.  The
--- screenshot `shots/train_after6.png` is the sighting: Number 128, Left
--- Blade and RightBlade all standing, LOCKE alone on 151.
---
--- The cause was upstream, in v0.5, and was not a balance problem to fix
--- here.  The party was one character because the fixture chain walked out of
--- Zozo with two.  `event_main.asm:26287` is
---
---     char_party LOCKE, 1 / char_party CELES, 1
---     party_menu 1, NO_RESET, {LOCKE, CELES}
---
--- which is a four-slot party menu with Locke and Celes forced and the other
--- two slots free.  Measured at the post-Opera checkpoint, $1EDE=$76 /
--- $1EDF=$88, so CYAN, EDGAR, SABIN and GAU are all available to fill them;
--- but $1850 reads LOCKE=$C1, CELES=$49 and every other character $00, so
--- nobody was added.  After the tube room takes Celes (`char_party CELES,
--- 0`, :96154) that leaves ONE.  docs/design/bosses-wob.md §13-§16 ("Locke,
--- Celes + two") is describing the intended area; the fixture chain is what
--- is wrong.
---
--- What would unblock this.  The v0.5 step that answers that party_menu has
--- to pick two more characters, and everything from there down, including
--- the tracked 32 KiB checkpoint at tools/tests/checkpoints/post-opera-v1/,
--- which is generated from blackjack.mss by gen_post_opera_checkpoint.lua, has
--- to be regenerated.  That is a v0.5 change rather than a v0.6 one, so this
--- generator is left in the tree as the evidence rather than being made to
--- pass by weakening what it checks.
---
--- Party: LOCKE alone.  Step 11 measured $1850 after the tube room and found
--- one character with a nonzero party nibble, so every fight on this ride,
--- Number 128 included, is a solo fight.  Asserted at the entry point so the
--- balance work has a measurement to stand on rather than
--- docs/design/bosses-wob.md §15's "three".
+
+-- The ride issues its six battles from the world module's train engine,
+-- writing the event-battle id straight to $0011E0; nothing in the event
+-- disassembly names them, so no entry-point fixture can be parked in
+-- front of the boss.  This step instead records every battle the ride
+-- produces and asserts against that record: six fights seen, one of them
+-- $010B (NUMBER 128) with both blades.
+
 local H = dofile("tools/tests/lib/ot6.lua")
--- The retry ladder's spread and its collision check (issue #83): each
--- attempt is held until the game-time frame counter the battle seed is
--- made of reaches its own phase, and L.report() fails if two attempts
--- drew one seed, which would make this ladder one fight played twice.
 local L = H.newSeedLadder("minecart ride")
 
 local function map() return H.mapId() & 0x1ff end
@@ -170,10 +65,6 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- (a tapInto helper used to sit here, defined and never called, the same
--- unused battle toolkit every conversion in this wave has deleted; its only
--- battle handling was the battle-clear write)
-
 local function census(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
@@ -197,52 +88,9 @@ local function census(tag, targets)
   end
 end
 
-
 -- a bare step list cannot be spliced into a step list; H.cond with an
 -- always-true predicate is the library's public way to wrap one into a step
 local function seq(steps) return H.cond(function() return true end, steps) end
-
--- Ride the cutscene with real input (issue #75): every one of the six forced
--- battles is fought with the library fighter.  These are event battles
--- the train engine issues by writing $0011E0, the ride waits on each win,
--- and fleeing is not part of the design.  Each fight's formation words are
--- recorded on the rising edge, so the assertions afterwards are about what
--- was fought.  Outside battle the ride is fixed: edge-A pages
--- the text, and a held direction would only work against the engine.
---
--- The ride is wrapped in gen_tunnelarmr's phase-spread retry ladder: six
--- input-driven fights back to back with no field care between them can lose
--- a party on a bad roll, a loss is game over, and the
--- RNG seed is the frame phase at battle init.  A wipe is detected inside the
--- drive (the party's battle HP all zero, debounced) so the ladder can
--- reload instead of riding the Annihilated screen into a timeout.
--- Fight 6 steers every single-target confirm onto the body, and the reason
--- is measured rather than assumed: on the first input-driven attempt the
--- fighter's default targeting attacked the blades for 8500 frames.  Left
--- Blade read 515/sh1 and then 700/sh3 again, so the blades regenerate, while
--- the body sat untouched at 3276/sh7 and the party ran out of HP.  The body's
--- authored break axis is piercing (bosses-wob.md 15, as re-decoded by #23:
--- the bolt/water row was never written, so the physical class is the shipped
--- axis), which is EDGAR's AutoCrossbow.
---
--- That steering is `opts.focus` on the boss driver.  It used to be a local
--- override in rideDriver that rotated the target cursor with UP and DOWN,
--- and it never moved the cursor once (#92).  The reason is geometric:
--- SelectMonsterUp / SelectMonsterDown (btlgfx_main.asm:17492, :17525) walk to
--- the next monster by comparing sprite screen positions, and Number 128's
--- body and its two blades sit side by side, so neither has a vertical
--- neighbour to walk to.  Measured on attempt 1 of the 2026-08-11 run: seven
--- target-select episodes in fight 6, zero cursor movements, and four of the
--- seven ran the 40-frame give-up out and confirmed on whichever part was
--- already highlighted -- twice on the Left Blade.  ot6.lua's focus machine
--- leads with LEFT/RIGHT for exactly this reason (its note is the Cranes,
--- another side-by-side formation) and is the one copy of this that has been
--- measured working.  The mask it steers to is the monster slot bit:
--- MonsterMaskTbl is `$01,$02,$04,$08,$10,$20` (btlgfx_main.asm:18220) and
--- TargetSelectUp/Down index it by the selected monster, so bit N is slot N
--- and the body's $010B slot 0 is mask $01.  Slot 0 is asserted below when
--- fight 6 is recorded rather than assumed, because a static focus list
--- naming the wrong slot would go back to steering nowhere, silently.
 
 -- What the party is carrying and what it has left to spend, read at the
 -- start of every fight on the ride.  There is no field access between the
@@ -288,61 +136,26 @@ end
 local fights, rideStart = {}, nil
 local function rideDriver(pred, lostRef, maxFrames, what)
   local ph, hb, battN, wipeN = 0, 0, 0, 0
-  -- Policy, revised three times, every time after measured losses.
-  --
-  -- Round one (run N0mLGnDD, ladder failing at fights 6/4/6): healPercent 60
-  -- reacted too late to the Mag Roaders' whole-party bursts, and bank=3
-  -- wasted BP, because a chip is per hit, so three boost-1 swings out-chip
-  -- one boost-3 swing.  Round two (run R0crCD3T): healPercent 75 improved
-  -- the Roader attrition and then heal-locked the boss fight -- under the
-  -- boss and two blades someone is always below 75%%, so EDGAR spent every
-  -- turn on the bag and the body took one chip in 4900 frames -- and the
-  -- answer then was to split the thresholds, 75%% for the Roaders and 55%%
-  -- for the boss, so EDGAR's turns went back to the AutoCrossbow.
-  --
-  -- Round three (2026-08-12) reads both of those as the same problem with
-  -- the same real cause, which is that the party had no dedicated healer and
-  -- so any threshold high enough to keep it alive took the break's own turns
-  -- away.  Two measurements settle it.
-  --
-  -- What each turn is worth in fight 6, off this driver's 300-frame dumps:
-  -- EDGAR's boosted AutoCrossbow is 500-750 damage and up to three shields
-  -- in one action, LOCKE's ThunderBlade is ~200 and a shield, and SABIN's
-  -- Pummel is ~190 and no shield at all, because Pummel is bludgeoning
-  -- against a pierce-weak body and slash-weak blades.  So SABIN's turn is
-  -- the one to spend on healing and EDGAR's is the one never to spend.
-  --
-  -- What decides the fight is EDGAR's HP at the door.  Across the six
-  -- attempts of 2026-08-11 and 2026-08-12 the body's low-water mark tracks
-  -- nothing except that: he entered fight 6 at 189 and 147 hp on the two
-  -- attempts that left the body at 3092 and 3054 of 3276, and at 366 hp on
-  -- the one attempt that broke it outright (sh0, 1639 left).  On the 189-hp
-  -- attempt he died at battle frame ~400, before taking a single turn.
-  --
-  -- So: `healer` is SABIN on both drivers, which is what lets the threshold
-  -- be raised without costing the break anything, and the Roader threshold
-  -- goes to 95%% because the five Roader fights are the only chance to heal
-  -- that exists -- there is no field access between the six -- and SABIN's
-  -- turns there are worth even less than they are at the boss.  The bag is
-  -- no longer the healing: it is the reserve for when his MP runs out, which
-  -- is why the eight Tonics now reach fight 6 instead of being drunk by
-  -- fight 3.
+
+  -- healer is SABIN on both drivers: his Pummel is bludgeoning against a
+  -- pierce-weak body and slash-weak blades, so his turn is the one to
+  -- spend on healing.  EDGAR's boosted AutoCrossbow (500-750 damage, up
+  -- to three shields per action) is the one never to spend.  The Roader
+  -- threshold is 95% (the five Roader fights are the only chance to
+  -- heal, with no field access between the six); the boss threshold 85%.
   local SABIN, LOCKE, BOLT = 0x05, 0x01, 0x02
   local Ftrash = H.newFightDriver("n128 trash", { tactical = true,
     boost = true, bank = 1, items = true, healer = SABIN,
     healPercent = 95, cadence = 12 })
   -- Fight 6 steers every single-target confirm onto the body through the
-  -- library's own focus machine rather than a local one; see the block
-  -- above rideDriver for why the local one could not work.
-  --
-  -- LOCKE's Bolt is on this driver and not on the trash one.  Ramuh's grant
-  -- is being spent on the fight whose element row it was chosen for; the
-  -- Mag Roaders are not worth his MP, and a pool spent on them is a pool the
-  -- boss does not get.  boost=false because the point is the chip rather
-  -- than the damage: a boosted cast folds up a tier and is charged the
-  -- higher tier's MP (battle_subjob scenario C), and one landed hit chips
-  -- one axis whatever tier it was, so the cheap tier buys more chips out of
-  -- the same pool against a body carrying seven shields.
+  -- library's own focus machine.
+
+  -- LOCKE's Bolt is on this driver and not on the trash one: Ramuh's
+  -- grant is spent on the fight whose element row it was chosen for.
+  -- boost=false because the point is the chip rather than the damage: a
+  -- boosted cast is charged the higher tier's MP, and one landed hit
+  -- chips one axis whatever tier it was, so the cheap tier buys more
+  -- chips out of the same pool against a body carrying seven shields.
   local Fboss = H.newFightDriver("n128 boss", { tactical = true,
     boost = true, bank = 1, items = true, healer = SABIN,
     healPercent = 85, cadence = 12,
@@ -379,9 +192,6 @@ local function rideDriver(pred, lostRef, maxFrames, what)
           w[1], w[2], w[3], w[4], w[5], w[6]))
         supplyReport("fight " .. #fights .. " start")
         if #fights == 6 then
-          -- Fboss's focus list is static, so the slot it names is checked
-          -- here.  A wrong slot steers nowhere and reports nothing, which
-          -- is the failure #92 spent a run finding.
           H.assertEq(w[1], 0x010b,
             "fight 6 puts NUMBER 128 in monster slot 0, which is the slot "
             .. "Fboss's focus list steers to (mask $01)")
@@ -415,11 +225,6 @@ local function rideDriver(pred, lostRef, maxFrames, what)
         F.frame()
         return
       end
-      -- Out of battle: a wipe that outruns the in-battle debounce shows
-      -- up as the Game Over Continue landing back on the boot save
-      -- tile (272 {3,55}), measured on the first input-driven attempt,
-      -- where the A-taps paged the Game Over and the battery Continue
-      -- parked the party there with the ride's pred permanently false.
       if #fights > 0 and map() == 272
          and H.fieldX() == 3 and H.fieldY() == 55 and not lostRef.lost then
         lostRef.lost = true
@@ -460,7 +265,7 @@ local function rideAttempt(n)
           "reloaded beside CID")
       end),
     }) or seq({}),
-    L.spread(n),                        -- spread the battle RNG phase (#83)
+    L.spread(n),                        -- spread the battle RNG phase
     -- A into CID -> _cc8022 -> ... -> `cutscene TRAIN`
     (function() local ph = 0
       return H.driveUntil(function() return sw(0x02BC) == 1 end, 20000, {
@@ -513,10 +318,6 @@ H.run({ maxFrames = 400000 }, {
   end, 3000, "landed_at_d"),
   H.waitFrames(60),
   H.call(function()
-    -- The entry contract (issue #25): declared once in
-    -- lib/ot6_contract.lua under "minecart-platform-v1", the same
-    -- table gen_minecart_entry (the step into D) and the checkpoint
-    -- generator assert as their exit contract.
     H.assertEntryContract("minecart-platform-v1")
     H.log(partyReport("minecart-platform-v1 entry"))
   end),
@@ -530,15 +331,6 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0, "booted facing CID")
     H.assertEq(sw(0x02BC), 0, "$02BC CLEAR at boot")
     H.assertEq(sw(0x0069), 0, "$0069 CLEAR at boot")
-    -- Three characters, not one; see the history block at the top of this
-    -- file.  They are named as well as counted, because the count alone
-    -- would still pass if the chain swapped EDGAR for CYAN somewhere
-    -- upstream.  This is also the owner rule for Number 128, recorded on
-    -- #75: the boss is fought by LOCKE + EDGAR + SABIN, seated through the
-    -- real party menu at the Zozo leave cutscene (gen_zozo5_ramuh) and
-    -- carried here by the checkpoint.  No party menu exists at this step
-    -- (the ride follows from talking to CID), so the roster verification is
-    -- the only check available.
     local cur, n, who = H.readByte(0x1A6D), 0, {}
     for c = 0, 13 do
       local b = H.readByte(0x1850 + c)
@@ -551,14 +343,6 @@ H.run({ maxFrames = 400000 }, {
     H.log(partyReport("minecart_entry"))
   end),
 
-  -- 1. the player's prep, all through real menus, before the retry blob:
-  --    the July-cut checkpoint delivers the party bare-handed and possibly
-  --    hurt (which every checkpoint-booted step in this wave has
-  --    measured), and the ride is six fights with no field access between
-  --    them
-  -- Preserve the minecart checkpoint's measured kit by name.  The party's
-  -- damage in this ride comes from Tools, Blitz and magicite, so this is a
-  -- readiness contract, not an invitation for Optimum to reshuffle classes.
   H.equipLoadout(1, {
     { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
   }, { tag = "LOCKE minecart kit" }),
@@ -568,22 +352,7 @@ H.run({ maxFrames = 400000 }, {
   H.equipLoadout(5, {
     { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 },
   }, { tag = "SABIN minecart kit" }),
-  -- The magicite.  bosses-wob.md 15 calls this fight the sub-job system's
-  -- debut -- "a Ramuh bearer casting Bolt into the body is the first use" --
-  -- and the stones have been owned since Zozo and the tube room ($1A69 reads
-  -- EF 01 9A 00 here, which is the Zozo four, Ifrit and Shiva, and the tube
-  -- six).  Until now this step equipped none of them, so the party rode with
-  -- no Magic command at all: measured on the 2026-08-11 run, every command
-  -- list read Fight / kit / -- / Item, and 117, 104 and 108 MP went unspent
-  -- across all six fights while eight Tonics were drunk dry.  NaturalMagic
-  -- teaches only TERRA and CELES, and CELES left at the tube room, so an
-  -- equipped stone is this party's only route to any spell.
-  --
-  -- Who gets what.  The rule is that the healer's turn has to be the turn
-  -- with the least to lose, and on this formation that is SABIN's, measured
-  -- rather than assumed.  Damage per action in fight 6, read off the boss
-  -- driver's own 300-frame dumps on 2026-08-12:
-  --
+
   --   EDGAR AutoCrossbow   500-750, and 3 shields off the body in one action
   --   LOCKE ThunderBlade   ~200 and a shield (the blade is LIGHTNING, which
   --                        is the body's own element row, so his ordinary
@@ -591,48 +360,13 @@ H.run({ maxFrames = 400000 }, {
   --   SABIN Pummel         ~190 and no shield at all: Pummel is bludgeoning,
   --                        the body is pierce-weak and the blades are
   --                        slash-weak, so his kit chips nothing here
-  --
+
   -- So:
-  --
-  --   SABIN <- KIRIN ($11), granting Cure/Regen/Antdot.  He is the only one
-  --     whose turn costs the break nothing, and Kirin is the only cure the
-  --     party owns (genju_prop.asm: Sraphim, Starlet and Phoenix are the
-  --     other cure stones and none of the three is owned).  With no field
-  --     access between the six fights this is the only healing that can be
-  --     carried past the last shop.  Kirin's row is +4 mag.pwr / +2 stamina,
-  --     which is a healer's line.
-  --   LOCKE <- RAMUH ($00), granting Bolt/Rasp: the storm-lancer
-  --     bosses-wob.md 15 names as this fight's sub-job debut, cast into the
-  --     body's authored element row.  Measured at 184 damage and one shield
-  --     per cast against his Fight's ~200 and one shield, so it trades even
-  --     on the board and spends a pool that was otherwise sitting idle -- he
-  --     rode the whole 2026-08-11 run with 108 MP and no way to use it.
-  --   EDGAR <- SIREN ($03), +4 speed and +2 mag.pwr with nothing given up.
-  --     He is the fight's whole damage output and his turns are the ones
-  --     worth having more of, so he is bought speed rather than a spell.
-  --     Ruled out: PHANTOM ($14) is +6 speed but -2 stamina and SHOAT ($05)
-  --     is +6 speed but -2 vigor, and whether either downside costs him
-  --     anything is unmeasured; SIREN's row has no negative to argue about.
-  --
-  -- Ruled out for LOCKE: MADUIN ($06) grants Bolt as well and carries +7
-  -- mag.pwr against Ramuh's +2, so it would hit harder.  Ramuh is chosen
-  -- anyway because the design names Ramuh, and because a chip is per landed
-  -- hit rather than per point of damage (Ot6ClassChip / Ot6Chip run from
-  -- Ot6HitJoin on every landed hit, ot6_break.asm:913-965), so against a
-  -- 7-shield body the cast count matters more than the cast size.  If the
-  -- ride ever needs more damage than this, Maduin is the lever.
-  --
-  -- The positions are the character-select cursor rows, which are party
-  -- order, measured here: EDGAR order 0, SABIN order 1, LOCKE order 2.  They
-  -- are asserted below off what is actually worn rather than trusted.
+
   H.equipEsper(1, 0x11, { tag = "KIRIN -> SABIN (Cure)" }),
   H.equipEsper(2, 0x00, { tag = "RAMUH -> LOCKE (Bolt)" }),
   H.equipEsper(0, 0x03, { tag = "SIREN -> EDGAR (+4 speed)" }),
   H.call(function()
-    -- Read back what is worn, keyed by character, so a party order that
-    -- moved equips the wrong person loudly instead of quietly.  A silently
-    -- wrong equip is exactly the failure this fight has already had once
-    -- (#92's focus list steering to a slot nothing was in).
     local want = { [0x05] = 0x11, [0x01] = 0x00, [0x04] = 0x03 }
     local names = { [0x05] = "SABIN/KIRIN", [0x01] = "LOCKE/RAMUH",
                     [0x04] = "EDGAR/SIREN" }
@@ -642,21 +376,6 @@ H.run({ maxFrames = 400000 }, {
       H.assertEq(worn, esper, names[c] .. " is worn")
     end
   end),
-  -- Back row, all three.  This is free here and it was not free before the
-  -- stones went on.  $B3 is $FF for every command and only a weapon swing
-  -- clears it (HANDOFF's rows note), so Tools, Magic and Blitz are all
-  -- row-exempt: EDGAR fights this boss with AutoCrossbow, SABIN with Cure
-  -- and LOCKE with Bolt, and not one of those three loses a point of output
-  -- in the back row.  What it buys is the halving on the way in, and the
-  -- body's script while a blade is alive is `BATTLE, BATTLE, ICE` and
-  -- `BATTLE, SPECIAL, NET` (ai_script.asm:4725-4746), so most of what it
-  -- throws is physical.  Measured need: on the 2026-08-12 attempt that
-  -- arrived in perfect shape -- EDGAR 448/448, eight Tonics unspent, every
-  -- MP pool near full -- the party still lost, LOCKE dying at battle frame
-  -- 3000 and EDGAR at 6000 with the body on 2473 of 3276, and with no Fenix
-  -- Down and no Life anywhere in the party's reach a death in this fight is
-  -- permanent.  Front row was costing survival to buy output that the back
-  -- row does not take away.
   H.setRows({ [0x01] = true, [0x04] = true, [0x05] = true },
             { tag = "back row for the ride" }),
   H.fieldCare({ tag = "care before the ride", threshold = 0.95 }),
@@ -687,16 +406,8 @@ H.run({ maxFrames = 400000 }, {
   rideAttempt(1),
   rideAttempt(2),
   rideAttempt(3),
-  -- Before the verdict, not after: three attempts are evidence only if they
-  -- were three DIFFERENT rides, and if they were not, that is what this run
-  -- should report rather than "lost all three" (#83).
   L.report(),
   H.call(function()
-    -- Carry the boss fight's numbers into the verdict.  A ladder that loses
-    -- all three is reporting a finding rather than a flake (#83), and the
-    -- finding is only useful if the reader can see how close it came and
-    -- what the party had left.  Attempt rows are logged in full; the
-    -- assertion string carries the last one, which is what a red run shows.
     for i, r in ipairs(fight6) do
       H.log(string.format("[fight 6] attempt %d: party %d/%d/%d hp, "
         .. "%d tonic %d potion %d fenix, body $010B down to %d/3276 sh%d",
@@ -742,14 +453,10 @@ H.run({ maxFrames = 400000 }, {
     H.screenshot("n128_after_ride")
   end),
 
-  -- 3. park on boundary E: the escape map's save point {58,7}, revealed by
-  --    $06AE.  n128_won is the D->E terminal, so it is generated standing on
-  --    the boundary tile with the vector-escape-v1 table asserted (the
-  --    same table gen_vector_escape_checkpoint saves under).  Map 240 is an
-  --    encounter map (rate $0070); navTo write-clears any draw on the walk.
-  --    The last step is a held RIGHT from (57,7).  A save tile flickers
-  --    hasControl() (the SavePoint re-entry), so arrival is judged on
-  --    position, $01BF and alignment.
+  -- 3. park on boundary E: the escape map's save point {58,7}, revealed
+  --    by $06AE.  The last step is a held RIGHT from (57,7).  A save
+  --    tile flickers hasControl() (the SavePoint re-entry), so arrival
+  --    is judged on position, $01BF and alignment.
   H.navTo(57, 7, { maxFrames = 15000, playBattles = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
@@ -777,10 +484,10 @@ H.run({ maxFrames = 400000 }, {
     H.screenshot("n128_won")
   end),
   H.saveState("n128_won.mss"),
-  -- Reload-verified (gen_sabin_gau's pattern).  The party is parked on a
-  -- save tile, where hasControl() flickers (the SavePoint re-entry), so
-  -- the reload is judged the way the park itself was: position, latch and
-  -- alignment, not the control flag.
+  -- Reload-verified.  The party is parked on a save tile, where
+  -- hasControl() flickers (the SavePoint re-entry), so the reload is
+  -- judged the way the park itself was: position, latch and alignment,
+  -- not the control flag.
   (function()
     local saveReq, loadReq
     return seq({

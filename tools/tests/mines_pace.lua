@@ -1,28 +1,17 @@
 -- @manual measurement of mines encounter rate and reward parity, run by hand
--- mines_pace.lua -- Measurement #4: encounter-rate and reward parity on
--- the mines chase map (map 50). Companion to bal_mines.lua; same fixture
--- (mines_chase.mss: Terra L5 alone at the map entry), same two-tile
--- pacing route (78,58)<->(77,58), same seeded RNG discipline.
+-- mines_pace.lua -- encounter-rate and reward parity on the mines chase
+-- map (map 50).  Companion to bal_mines.lua; same fixture (mines_chase.mss:
+-- Terra L5 alone at the map entry), same two-tile pacing route
+-- (78,58)<->(77,58), same seeded RNG discipline.
 --
--- Two arms, selected by the ARM knob (one arm per run, as whelkbal selects
--- its policy):
+-- Two arms, selected by the ARM knob:
 --   vanilla  the three OT6 balance knobs are poked to identity in the
---            loaded ROM image before every sample (emu.write to
---            snesPrgRom; verified by readback and by the danger-counter
---            delta): Ot6HpMulTbl band0 = $10 (1x trash HP), Ot6DangerMulW
---            = $10 (1x per-step danger), Ot6RewardMulW = $10 (1x
---            rewards). With all three at identity the encounter
---            arithmetic, fight HP, and rewards match vanilla exactly
---            (the scale routines are exact at $10).
+--            loaded ROM image before every sample: Ot6HpMulTbl band0 =
+--            $10 (1x trash HP), Ot6DangerMulW = $10 (1x per-step danger),
+--            Ot6RewardMulW = $10 (1x rewards).
 --   ours     the shipped values ($10 = 1x HP, $08 = 0.5x danger, $20 =
---            2x rewards); the ROM bytes are re-poked to shipped values
---            in case a vanilla run preceded in this process.
---            An earlier measurement ran this arm when band0 shipped $20
---            (2x HP); the next one set it to $10 (ot6.asm:352),
---            so at the current ship point the
---            two arms differ in danger and reward only, and a re-run
---            measures the rate and reward half of the parity product, not
---            the fight-length half #4 also reported.
+--            2x rewards); the ROM bytes are re-poked to shipped values in
+--            case a vanilla run preceded in this process.
 --
 -- Per sample: loadState -> poke arm -> seed $1fa1/$1fa2 -> pace until a
 -- random encounter fires (steps counted) -> mash A (baseline policy) to
@@ -30,24 +19,15 @@
 -- exp $1611-13 delta, party gil $1860-62 delta, read after the AddExp and
 -- gil clamps). Greppable lines: [ot6] [pace] b=<k> <key>=<value>.
 --
--- ROM knob offsets are build-specific (bank F0 layout) and do drift: all
--- three below were once exactly $12 low ($300173/$300177/$300179) against
--- the build of 2026-07-18, the same drift bal_mines.lua and bal_dpb.lua
--- carried (fixed in 8e405a9, which handed this file off). $12 low is
--- inside Ot6HpScale's /16 tail, which ends where Ot6HpMulTbl begins:
--- they read $6A/$6A/$D2, the `ror` of a `lsr OT6_SCR_COLS / ror` pair
--- and the low operand byte of the next `lsr`. They now derive from
--- ff6/rom/ff6-en.dbg at compose time via H.sym (`& 0x3FFFFF` for the
--- snesPrgRom file offset; HiROM bank $F0 -> $30xxxx), so they cannot go
--- stale by hand and no drift guard is needed.
+-- ROM knob offsets derive from ff6/rom/ff6-en.dbg at compose time via
+-- H.sym (`& 0x3FFFFF` for the snesPrgRom file offset; HiROM bank $F0 ->
+-- $30xxxx).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 local ARM = "vanilla"
 local STATE = "build/states/mines_chase.mss.lua"
 local NSAMPLES = 8
--- All three derive from ff6/rom/ff6-en.dbg at compose time (H.sym), so a
--- bank-$F0 shift can no longer stale them and no drift guard is needed.
 -- `& 0x3FFFFF` maps the CPU address to the snesPrgRom file offset ($F0 ->
 -- $30xxxx).
 local ROM_HPMUL  = H.sym("Ot6HpMulTbl")   & 0x3FFFFF   -- band0 byte
@@ -56,9 +36,8 @@ local ROM_REWARD = H.sym("Ot6RewardMulW") & 0x3FFFFF   -- word
 local SHIP = { hp = 0x10, danger = 0x08, reward = 0x20 }
 local PACE_FRAMES = 9000
 local BATTLE_FRAMES = 9000
--- $1fa1 spread (encounter-step roll) x $1fa2 (formation slot, the
--- bal_mines mix: slot0 Vaporite x2 / slot1 Were-Rat x2 / slot2/3
--- RepoMan+Vaporite). Same seeds both arms: paired samples.
+-- $1fa1 spread (encounter-step roll) x $1fa2 (formation slot: slot0
+-- Vaporite x2 / slot1 Were-Rat x2 / slot2/3 RepoMan+Vaporite).
 local SEEDS = {
   { },                              -- natural state values
   { fa1 = 0x20, fa2 = 0x00 },
@@ -108,8 +87,6 @@ local function pokeArm()
   local hp, dg, rw
   if ARM == "vanilla" then hp, dg, rw = 0x10, 0x10, 0x10
   else hp, dg, rw = SHIP.hp, SHIP.danger, SHIP.reward end
-  -- The three offsets are H.sym-derived, so a poke can no longer land on a
-  -- stale byte; the drift guard that used to gate this write is gone.
   emu.write(ROM_HPMUL,  hp, emu.memType.snesPrgRom)
   emu.write(ROM_DANGER, dg, emu.memType.snesPrgRom)
   emu.write(ROM_REWARD, rw, emu.memType.snesPrgRom)
@@ -221,9 +198,6 @@ local function sampleBlock(k)
         mline("hero_name", decodeName(0x1602, 6))
       end
       exp0, gil0 = read24(EXP0), read24(GIL0)
-      -- cold danger counter: the fixture carries ~$05B0 accumulated by
-      -- the gen walk, and a warm counter near the roll threshold hides
-      -- the rate knob (measured: paired steps came out identical).
       -- Vanilla zeroes the counter at every battle trigger, so a cold
       -- start gives the steady-state inter-encounter interval.
       H.writeWord(DANGER, 0)

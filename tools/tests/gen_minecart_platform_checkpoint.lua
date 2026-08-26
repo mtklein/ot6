@@ -1,19 +1,9 @@
 -- gen_minecart_platform_checkpoint.lua -- generate SRAM checkpoint D,
--- `minecart-platform-v1` (the A-F save-point boundary range is lettered in
--- tools/tests/savestate_graph.py): boot minecart_entry
--- (the nearest generated predecessor, map 272 {9,52} facing CID), walk the
--- platform to the vanilla save point at {3,55}, and save through the
--- game's OWN Save UI into slot 3.  run.sh captures the 32 KiB battery on
--- shutdown.  The cold-Continue half of the round trip is gen_n128's
--- checkpoint boot, which asserts this same table as its entry contract.
---
--- The tile is approached from the east: (3,54) is a wall (measured; the
--- offline pocket claim in §4.2 is about map 273, not here), so the walk is
--- navTo (4,55) then one LEFT tap.  The approach stays clear of CID at
--- {9,51}: the first navTo step leaves his contact line without an A press.
--- See gen_mrf_save_room_checkpoint.lua for the two measured hazards
--- (save-tile control flicker; codex witness seeding) this file's shape
--- inherits.
+-- `minecart-platform-v1`: boot minecart_entry (map 272 {9,52} facing
+-- CID), walk the platform to the vanilla save point at {3,55}, and save
+-- through the game's own Save UI into slot 3.  run.sh captures the 32
+-- KiB battery on shutdown.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26
@@ -96,12 +86,6 @@ H.run({ maxFrames = 20000 }, {
     H.screenshot("checkpoint_d_save_tile")
   end),
 
-  -- Open the ordinary field menu.  $0059 alone blips nonzero on a save
-  -- tile (the SavePoint re-entry; gen_zozo5_ramuh measured the blip class),
-  -- so a real menu means 30 consecutive frames of it.  The menu-flags byte
-  -- $0201 must then carry the save-enable bit OpenMainMenu copied from
-  -- $01BF (field/menu.asm:229-235), which is the flow the menu's own Save
-  -- command gates on (menu/field_menu.asm:3641-3643).
   (function() local calm, ph = 0, 0
     return H.driveUntil(function()
       calm = (H.readByte(0x59) ~= 0) and calm + 1 or 0
@@ -120,24 +104,11 @@ H.run({ maxFrames = 20000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
-    -- the real CopyGameDataToSRAM entry captures the slot argument the
-    -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
-    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- The pad-driven save (save-drive rule, tools/tests/README.md;
-  -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
-  -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
-  -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
-  -- poke, and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -166,10 +137,6 @@ H.run({ maxFrames = 20000 }, {
     H.assertEq(emu.read(0x316801, emu.memType.snesMemory), 0x38,
       "slot 3 has OT6 codex magic 8")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are read, never seeded (issue #75): the
-    -- battery carries whatever the chain earned.  The phase-2 checkpoint
-    -- re-cuts measure these, and the entry contracts follow the
-    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
@@ -188,18 +155,7 @@ H.run({ maxFrames = 20000 }, {
   H.call(function()
     H.assertExitContract("minecart-platform-v1")
     -- The floor, asserted before the battery is kept: dead, petrified,
-    -- zombie, or at or below max HP / 8 (the same three conditions as
-    -- tools/audit_party_hp.py; change the two together).  The four
-    -- checkpoints the audit named got this line yesterday; this one is on
-    -- the same lineage and did not have it.  Note what it would NOT have
-    -- caught, since that is the failure this checkpoint actually shipped:
-    -- the battery it was carrying had a standing party and an empty bag --
-    -- 8 Tonics and no Fenix Downs, against the 16 Tonics, 10 Potions and 2
-    -- Fenix Downs at mrf-save-room-v1 -- because the two revives had been
-    -- spent upstream raising the characters n024-entry-save-v1 handed over
-    -- dead.  Nothing complained until terra-returned-v1's care stop, two
-    -- boundaries later, had nothing to raise EDGAR with.  Supplies are not
-    -- checked anywhere; that gap is known and it is not this line's job.
+    -- zombie, or at or below max HP / 8.  Supplies are not checked here.
     H.assertPartyStanding("minecart-platform-v1 exit")
     H.screenshot("checkpoint_d_saved")
   end),

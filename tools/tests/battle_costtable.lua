@@ -1,73 +1,38 @@
 -- @suite savestate=gau_joined
--- battle_costtable.lua -- issue #45.  The test for the MP rescale: the kit cost
--- columns are pinned, and they are checked against
--- the baseline the design says they sit on, recomputed from this ROM's own
--- tables rather than from numbers copied into a test.
---
--- Why this exists: mp-economy.md has always said kit skills price on "the
--- vanilla spell baseline", but nothing ever measured what that baseline is, so
--- the v0.4 and v0.5 columns drifted three to eight times under it without any
--- test noticing.  The owner found it while playing (v0.7, LV14: Cyan holding a
--- 96 MP pool against techs costing 1/2/3, so neither MP nor BP bound him and
--- Fight had no case).  A playtest is an expensive way to learn an arithmetic
--- fact.
+-- battle_costtable.lua -- the test for the MP rescale: the kit cost
+-- columns are pinned, and checked against the baseline recomputed from
+-- this ROM's own tables rather than from numbers copied into a test.
 --
 -- What it asserts, all derived from the ROM:
 --   1. Ot6AbilityCostTbl is exactly the shipped 24-row column, $ff-terminated.
---      This is a plain pin, so a rescale must be an explicit edit here too.
---   2. the baseline.  For every Blitz and SwdTech row, cost as a fraction of
---      the caster's real max MP at the level the row is reachable stays inside
---      4%..25%.  Pool = CharProp+$01 ("starting mp") plus the LevelUpMP running
---      sum, which is what InitMaxMP computes (field/event.asm:1405).
---      Levels are BlitzLevelTbl and BushidoLevelTbl (event.asm:1236-1240).
---      Vanilla natural magic measured the same way runs 7.5%..20.3%, which is
---      where the 4% and 25% brackets come from.  They are wide on both sides,
---      so this check catches a column that has fallen off the scale rather than
---      one that is tuned differently.
---   2b. the 99 anchor (issue #57).  Each ladder's ultimate, Bum Rush
---      and Cleave, the divine top tier of the only two priced ladders, costs
---      exactly 99, and no row anywhere costs more than 99.  That ceiling comes
---      from the display: every OT6 price drawer renders two digits (ListText
---      cmd $02, btlgfx_main.asm:15045-15073, divides by ten exactly once;
---      Ot6LoadoutDrawCost, field_menu.asm:3053, has one tens loop), so a
---      three-digit cost prints as punctuation rather than as a number.  Tools
---      does not participate, because Edgar's capstone is Overclock, which has
---      no row here, so this asserts the two rows that qualify and
---      the <= 99 bound on all 24.
---   3. payability.  Every row affords at least 4 uses from a full pool at the
---      level it becomes available, which is the property #45 asks for: top-tier
---      abilities stay payable at the level they arrive.
---   3b. Steal (issue #52).  This is the one costed verb with no table row:
---      Steal is flat, priced by the Ot6StealCost leaf, so its immediate is read
---      at the source and held to the same baseline, measured against the pool
---      Locke joins with (LV6, 31 MP) rather than the LV14 pool #52's headline
---      quoted.  Signature parity with the cheapest row of all three
---      ladder kits is checked too, because #55 makes Steal tier one of Locke's
---      ladder.
---   4. the magic MP column (issue #76).  The kit ladders were pinned here from
---      the day they were authored; the 54 spell prices, which are the numbers
---      the Magic list actually prints, were pinned nowhere.  MagicProp is
---      spliced in battle_main.asm and OT6 owns exactly one byte of that column
---      (Osmose, 1 -> 8), so the whole thing is pinned literally, the same way
---      step 1 pins Ot6AbilityCostTbl: a reprice has to be an explicit edit
---      here too.  Every magic charge is derived from this byte, and the whole
---      chain is a straight line: battle init seeds each spell-list row's cost
---      from MagicProp+5 through _c25723 (battle_main.asm:14466, :14588-14595,
---      stored at :14478-14481); ValidateSpellList (:14491) runs it through
---      CalcMPCost (:14580, :14608) for the caster's relics; GetMPCost reads
---      the row back at queue time (:13223); CreateAction banks it into $3620
---      (:13176); InitPlayerAction stages it into $3a4c (:425); and
---      CalcAttackEffect subtracts it from $3c08 (:8367-8371).  So a price the
---      menu prints and a charge the wallet takes cannot disagree unless one of
---      those steps is edited, and this pin plus battle_mpcost/battle_walletmp's
---      measured charges cover both ends.
---   5. the Serpent-Trench section, which the owner reported as "barely
---      made it, intense" and which was never balance-swept.  gau_joined is
---      that entry point, and gen_sabin_trench.lua boots from it, so the trio's
---      pools are read live out of the fixture and every ability each of them
---      has learned at that level is checked for uses-per-pool.  Gau's
---      Rage price is read too (Ot6DanceCost's immediate, which Ot6RageCost
---      tail-calls), so a change to the possess-verb price shows up here.
+--   2. the baseline. For every Blitz and SwdTech row, cost as a fraction of
+--      the caster's real max MP at the level the row is reachable stays
+--      inside 4%..25% (vanilla natural magic measured the same way runs
+--      7.5%..20.3%). Pool = CharProp+$01 ("starting mp") plus the
+--      LevelUpMP running sum (InitMaxMP); levels are BlitzLevelTbl and
+--      BushidoLevelTbl.
+--   2b. the 99 anchor. Each ladder's ultimate (Bum Rush and Cleave) costs
+--      exactly 99, and no row anywhere costs more than 99: every OT6 price
+--      drawer renders two digits, so a three-digit cost would print as
+--      punctuation.
+--   3. payability. Every row affords at least 4 uses from a full pool at
+--      the level it becomes available.
+--   3b. Steal. The one costed verb with no table row: Steal is flat,
+--      priced by the Ot6StealCost leaf, read at the source and held to the
+--      same baseline against the pool Locke joins with (LV6, 31 MP).
+--   4. the magic MP column. MagicProp is spliced in battle_main.asm and
+--      OT6 owns exactly one byte of that column (Osmose, 1 -> 8), pinned
+--      literally like step 1. The chain: battle init seeds each spell-list
+--      row's cost from MagicProp+5 through _c25723; ValidateSpellList runs
+--      it through CalcMPCost for the caster's relics; GetMPCost reads the
+--      row back at queue time; CreateAction banks it into $3620;
+--      InitPlayerAction stages it into $3a4c; CalcAttackEffect subtracts
+--      it from $3c08.
+--   5. the Serpent-Trench section. gau_joined is the entry point
+--      gen_sabin_trench.lua boots from, so the trio's pools are read live
+--      out of the fixture and every ability each has learned at that
+--      level is checked for uses-per-pool. Gau's Rage price is read too
+--      (Ot6DanceCost's immediate, which Ot6RageCost tail-calls).
 --
 -- Fixture-free by design apart from step 5: steps 1-4 need no savestate, so
 -- this test keeps working if the chain of generated savestates is stale.
@@ -97,14 +62,8 @@ local SWDTECH = {
   { 0x5b, 50, "Quadra Slice" },{ 0x5c, 99, "Cleave" },
 }
 
--- #57: the designated ultimates, by table key.  Bum Rush and Cleave only; see
--- the header for why Tools (Overclock, unbuilt, priced as a sum) and the
--- flat verbs (Steal, Slot, Rage, Dance) do not participate.
 local ANCHOR = 99
 local ULTIMATE = { [0x64] = "Bum Rush", [0x5c] = "Cleave" }
--- #52: Steal is a flat verb with no per-ability id, so it has no row in the
--- table above.  Its price is the Ot6StealCost leaf's immediate, the same shape
--- Ot6DanceCost has, read here so the one number the charge uses is pinned.
 local STEAL_COST = 4
 local LOCKE_JOIN_LV = 6             -- measured: worldmap_narshe has Locke LV6
 
@@ -115,12 +74,6 @@ local TOOLS = {                 -- unchanged by #45; pinned so that stays true
   { 0xa7, 10, "Debilitator" },  { 0xa9, 14, "Air Anchor" },
 }
 
--- #76: the 54 magic prices, MagicProp +$05 for attack ids $00-$35, in table
--- order.  These are the numbers the Magic list prints and the numbers the
--- wallet takes (the chain is in the header).  Names are FF3-US's, as printed.
--- Every entry is vanilla except Osmose, OT6's one override in this column
--- (1 -> 8, argued at battle_main.asm's MagicProp splice); MAGIC_OT6 below
--- names it so a reader can tell the authored byte from the inherited ones.
 local MAGIC_MP = {
   { 0x00,  4, "Fire" },   { 0x01,  5, "Ice" },    { 0x02,  6, "Bolt" },
   { 0x03,  3, "Poison" }, { 0x04, 15, "Drain" },  { 0x05, 20, "Fire 2" },
@@ -144,17 +97,6 @@ local MAGIC_MP = {
 local MAGIC_PROP_REC = 14
 local MAGIC_PROP_MP = 5
 local MAGIC_OT6 = { [0x29] = 1 }        -- id -> the vanilla byte OT6 replaced
--- Scan is called out by id because issue #76 reported it as publishing 3 and
--- charging 0.  The report is a misattribution: the measurement was taken with
--- battle_magicite's `SCAN` constant, which held $32 (ATTACK::ANTDOT,
--- const.inc:640) rather than $18 (ATTACK::SCAN, const.inc:614), and no
--- character in any fixture or checkpoint in this tree has Scan learned at all
--- -- Celes learns it at level 18 (field/event.asm:1268), she is 14 at the
--- checkpoint that fixture descends from, and the deepest saved state anywhere
--- in the tree has her at 15 (read out of $1A6E in all 110 savestates and all
--- 12 checkpoint SRAMs).  So nothing was measured charging 0 for Scan.  The
--- pin below is what the report should have produced either way: the published
--- price, in the ROM, where a future edit has to come and say so.
 local SCAN_ID, SCAN_MP = 0x18, 3
 
 -- ca65 symbol -> snesPrgRom file offset (banks $C0-$FF are HiROM).
@@ -196,7 +138,6 @@ H.run({ maxFrames = 20000 }, {
       "the column is $ff-terminated right after the last Tools row")
   end),
 
-  --------------------------------------------- 2b. the 99 anchor (#57) -----
   H.call(function()
     local base = romOfs(H.sym("Ot6AbilityCostTbl"))
     -- Walk the live table rather than the pinned literals above: the ceiling
@@ -240,9 +181,6 @@ H.run({ maxFrames = 20000 }, {
   H.call(function()
     levelUpMp = romOfs(H.sym("LevelUpMP"))
     charProp  = romOfs(H.sym("CharProp"))
-    -- cross-check the pool model against two numbers measured on real saves
-    -- (probe_mppools: Cyan LV11 = 67, Sabin LV15 = 104).  If this trips, the
-    -- model below is wrong and every percentage under it is meaningless.
     H.assertEq(pool(CHAR.Cyan, 11), 67, "pool model: Cyan LV11 max MP")
     H.assertEq(pool(CHAR.Sabin, 15), 104, "pool model: Sabin LV15 max MP")
 
@@ -252,11 +190,6 @@ H.run({ maxFrames = 20000 }, {
       { name = "SwdTech", id = CHAR.Cyan,  rows = SWDTECH,
         levels = learnLevels(H.sym("BushidoLevelTbl")) },
     }
-    -- Rows 1-2 are learned at levels 1 and 6, but neither character can be
-    -- in the party that early: both join around LV10-11 on the input-driven
-    -- chain (measured: gau_joined has Cyan 11 and Sabin 11).  Pricing them
-    -- against a LV1 pool would be arithmetic about a state the game cannot
-    -- reach, so the reachable level is clamped up to the earliest join level.
     local JOIN = 10
     for _, kit in ipairs(kits) do
       for i, r in ipairs(kit.rows) do
@@ -282,11 +215,6 @@ H.run({ maxFrames = 20000 }, {
     H.log("ruler + payability hold for all 16 kit rows")
   end),
 
-  ------------------------------------- 3b. Steal, the flat verb (#52) ------
-  -- Steal has no id-table row (FixPlayerAttack omits it from CmdWithAttackTbl,
-  -- so it never earns a per-ability id), so its price is a leaf immediate in
-  -- Ot6StealCost, the shape Ot6DanceCost has.  Read it at the source, the same
-  -- way the Rage price is read below, and hold it to the same baseline.
   H.call(function()
     local ofs = romOfs(H.sym("Ot6StealCost"))
     H.assertEq(H.readRomByte(ofs), 0xa9,
@@ -294,10 +222,6 @@ H.run({ maxFrames = 20000 }, {
     local steal = H.readRomByte(ofs + 1)
     H.assertEq(steal, STEAL_COST, "Steal costs " .. STEAL_COST .. " MP (#52)")
 
-    -- The baseline, at the level Steal arrives: Locke joins at Narshe holding
-    -- 31 MP (LV6, probe_mppools.lua off worldmap_narshe), not at the LV14 pool
-    -- #52's headline measured against.  No join clamp here: unlike Sabin's and
-    -- Cyan's row-1 abilities, this level is one the game presents.
     local p = pool(CHAR.Locke, LOCKE_JOIN_LV)
     H.assertEq(p, 31, "pool model: Locke LV" .. LOCKE_JOIN_LV .. " max MP")
     local pct = 100 * steal / p
@@ -313,9 +237,6 @@ H.run({ maxFrames = 20000 }, {
       "Steal affords only %d uses from Locke's full LV%d pool",
       math.floor(p / steal), LOCKE_JOIN_LV))
 
-    -- Signature parity.  Steal is Locke's signature and #55 makes it tier one
-    -- of a ladder that tops at Master's Mark; it must price like every other
-    -- kit's cheapest row, or "signature" stops naming a price range.
     local base = romOfs(H.sym("Ot6AbilityCostTbl"))
     for _, sig in ipairs({ { 0x5d, "Pummel" }, { 0x55, "Dispatch" },
                            { 0xaa, "AutoCrossbow" } }) do
@@ -334,7 +255,6 @@ H.run({ maxFrames = 20000 }, {
     H.log("Steal is at parity with Pummel / Dispatch / AutoCrossbow")
   end),
 
-  --------------------------------- 4. the magic MP column (#76) -----------
   H.call(function()
     local base = romOfs(H.sym("MagicProp"))
     local ot6, checked = 0, 0
@@ -359,8 +279,6 @@ H.run({ maxFrames = 20000 }, {
       "the record past the pinned range is Ramuh at 25 MP -- the stride and "
       .. "the base both land where they should")
 
-    -- #76's headline, named so a search for it lands here rather than on the
-    -- issue: Scan publishes 3, and the charge is that same byte.
     H.assertEq(H.readRomByte(base + SCAN_ID * MAGIC_PROP_REC + MAGIC_PROP_MP),
       SCAN_MP, string.format(
         "Scan ($%02x) publishes %d MP, and that is also what it charges: "
@@ -407,9 +325,6 @@ H.run({ maxFrames = 20000 }, {
       H.log(string.format("trench  %s LV%d pool %d: %d uses of %s (dearest)",
         m.who, lv, mp, uses, worstName))
     end
-    -- Gau rides the trench too; his verb is Rage, priced by Ot6DanceCost's
-    -- immediate (Ot6RageCost tail-calls it, since possess-verbs share one flat
-    -- price, ot6_boost.asm).  Untouched by #45, and pinned so that shows.
     local rage = H.readRomByte(romOfs(H.sym("Ot6DanceCost")) + 1)
     H.assertEq(rage, 8, "the possess-verb price (Dance/Rage) is unchanged at 8")
     local gb = REC + REC_SIZE * CHAR.Gau

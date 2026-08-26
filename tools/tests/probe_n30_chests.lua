@@ -1,20 +1,9 @@
--- probe_n30_chests.lua -- #84 measurements for the two map-30 Elixirs
--- assigned to gen_kefka_won (Narshe interiors; kefka_won boots {60,37}).
+-- probe_n30_chests.lua -- opens the map-30 Elixir chest reachable from
+-- kefka_won's boot {60,37} (Narshe interiors).
 --
--- Findings (2026-08-17, all measured from kefka_won.mss):
---  * Chest bit 2 at (55,30): stand (55,31) face up, reachable (BFS 11).
---    This probe opens it live below, the same calls gen_kefka_won now makes.
---  * Chest bit 10 at (105,14), the Elder room: NOT reachable from any
---    controllable frame of gen_kefka_won.  BFS from {60,37} reaches no
---    stand tile of it; map 30's rooms connect only through map 20, the
---    front-door street region reaches only the south gate, the corridor
---    region only mine 50, and the one entrance chain onward
---    (50 -> 49 -> 48 -> 20 west -> Elder door (18,22) -> 30 (110,25))
---    crosses map 49's tripwire maze (EventTrigger::_49, twenty triggers
---    over x=106-116 y=12-23): stepping on (112,13) fired _cce15d, stole
---    control, and left BFS pathless to the south door (0 edges
---    blocklisted, 20 navTo retries).  The chest was "seen" by the route
---    because the win-tail cutscene stands the party in the Elder room.
+-- Chest bit 2 at (55,30): stand (55,31) face up, reachable.
+-- Chest bit 10 at (105,14), the Elder room, is not reachable from any
+-- controllable frame of this boot, so it is not opened here.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

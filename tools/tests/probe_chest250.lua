@@ -1,12 +1,8 @@
--- probe_chest250.lua -- #84 scratch probe, not a fixture and not registered.
--- Boots banquet_done (world (120,188), everything paid, $0238 set), walks
--- back into Vector and the castle to map 250, crosses the {22,29} doorway
--- into the corridor, and measures walkability to the two bit-77/78 chests at
--- (24,48) Back Guard and (25,48) X-Potion: a canStep dump plus bfsPath
--- lengths to the candidate stand tiles.  This approximates the generator's
--- own post-messenger stretch (same switch set; the map re-init here runs
--- with $0238 already 1, which the post-messenger moment does not -- noted in
--- the report).
+-- probe_chest250.lua -- boots banquet_done (world (120,188), everything
+-- paid, $0238 set), walks back into Vector and the castle to map 250,
+-- crosses the {22,29} doorway into the corridor, and measures walkability
+-- to the two bit-77/78 chests at (24,48) Back Guard and (25,48) X-Potion:
+-- a canStep dump plus bfsPath lengths to the candidate stand tiles.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

@@ -4,16 +4,9 @@
 ; The eight-slot loadout (battle list build + field configurator state, the
 ; same split shape ot6_loadout.asm has for Cyan) and Ot6RageCoin, boost's tilt
 ; on the possession roll.
-; ------------------------------------------------------------------------------
-; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
-; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler receives the identical
-; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
-; ff6-en.map are byte-identical across the split.
-; ------------------------------------------------------------------------------
 
 ; ==============================================================================
-; Gau's rage loadout (issue #40, docs/design/kit-gau.md)
+; Gau's rage loadout
 ;
 ; The Ochette model: Veldt learning stays unlimited (LearnRage and the $1d2c
 ; bitfield are untouched, since the collection game is Gau's), and the battle
@@ -21,7 +14,7 @@
 ;
 ; Storage: OT6_RAGELOAD, eight bytes at $7e1e1f, in the same save-block scrap
 ; the Bushido word lives in.  byte = rage id + 1; $00 = unset; all eight zero
-; = AUTO.  No persistent_layout bump; see ot6_memory.inc for the ruling.
+; = AUTO.
 ;
 ; The battle read is one choke point: the flat list InitSkills builds at $257e.
 ; Everything downstream reads that list and narrows itself with no further
@@ -133,9 +126,7 @@
 ;
 ; Called from InitSkills (battle_main.asm) in place of the vanilla $1d2c walk,
 ; not beside it.  Either arm builds the list and returns carry set; the
-; vanilla walk below the call site is now unreachable from here and stays only
-; as the reference the AUTO arm is measured against (battle_rage.lua's
-; labelled equivalence arm).
+; vanilla walk below the call site is now unreachable from here.
 ;
 ;   MANUAL (any loadout byte nonzero): the stored, still-learned ids in slot
 ;     order, the player's own arrangement, at most eight.
@@ -143,15 +134,10 @@
 ;     tracked checkpoint is in): the first eight known rages in id order, via the
 ;     same Ot6RageNth window the field page draws.
 ;
-; The AUTO ruling, 2026-07-28 (dispatcher; kit-gau.md §2.2 against the original
-; §8.2).  §2.2 always defined AUTO as "the first eight known rages"; the first
-; build pass shipped §8.2's "all-zero hands back to the vanilla walk" instead,
-; which meant a player who never opened the configurator still met the vanilla
-; 200-entry list, the thing the owner asked to be rid of ("keep the
-; number of his rages within reasonable limits").  That list must not be
-; reachable through inaction, so AUTO truncates.  The collection is untouched:
-; $1d2c still holds every species hunted, and the field page still cycles the
-; whole bitfield.  Only the battle menu is eight long, always.
+; AUTO truncates past eight so the full vanilla list is never reachable
+; through inaction.  The collection is untouched: $1d2c still holds every
+; species hunted, and the field page still cycles the whole bitfield.  Only
+; the battle menu is eight long, always.
 ;
 ; Terminator: InitBattle $ff-fills $2000-$341f (battle_main.asm:6096-6102, a
 ; 16-bit double-store loop) before it calls InitSkills, so every cell past the
@@ -173,13 +159,9 @@
         ; hWMADDH = 0, and the rest of the game depends on that bank byte being
         ; 0, because dozens of later writers set only the low word
         ; (`ldx #$9e8b / stx hWMADDL` in LoadArrayItem, item.asm:1256;
-        ; Ot6LoadoutDrawCost; Ot6DrawRageName's blank arm; ...).  This proc
-        ; first used plain `sta $257e,y` stores and so never touched it.  That
-        ; was not the bug that took battle_dlgmenu/battle_magicite/visual_f2
-        ; red (see the AUTO arm below for the one that was; those tests did not
-        ; go green until that was fixed).  The port is kept because a hook
-        ; that replaces vanilla code should inherit vanilla's side effects,
-        ; not just its output.
+        ; Ot6LoadoutDrawCost; Ot6DrawRageName's blank arm; ...).  The port is
+        ; kept because a hook that replaces vanilla code should inherit
+        ; vanilla's side effects, not just its output.
         longa
         lda     #$257e          ; pointer to known rages
         sta     f:hWMADDL
@@ -198,16 +180,10 @@
         ;
         ; Not eight calls to Ot6RageNth.  Ot6RageNth walks ids 0..254 from
         ; scratch every time, so the obvious loop costs ~255 jsl'd bit tests
-        ; per slot, and for the most common party, the one with no
-        ; rages at all, it still walks the full 255 before returning "nothing".
-        ; That is on the order of twenty thousand cycles added to every
-        ; battle's InitSkills, for every party in the game, and battle init
-        ; is frame-coupled: the OT6 font re-lay is staged one slice per nmi and
-        ; admission-gated on the live v counter (ot6_hud.asm:644-673).  It took
-        ; battle_dlgmenu ("font region corrupt: 1836 bytes differ at vram
-        ; $B000+001"), battle_magicite and visual_f2 red: three tests with
-        ; nothing to do with Gau, all green on the pre-change ROM, all green
-        ; again with the single pass below.  The field page can afford
+        ; per slot, on the order of twenty thousand cycles added to every
+        ; battle's InitSkills.  Battle init is frame-coupled: the OT6 font
+        ; re-lay is staged one slice per nmi and admission-gated on the live
+        ; v counter (ot6_hud.asm:644-673).  The field page can afford
         ; Ot6RageNth (one call per drawn row, once per keypress); this cannot.
         ; A = scratch, B = the byte being shifted, X = byte index, Y = ids
         ; emitted, $01,s = bit position.
@@ -576,9 +552,8 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
 ; Two call sites, and the second one is why the ladder works on the start turn:
 ;   * FixPlayerAttack's cmd-$10 arm (battle_main.asm @4dec), where vanilla
 ;     rolls the start turn's attack, at action load, before Cmd_10 exists.
-;     Measured: without this site, roll 1 of a 1-BP trance saw tier 0 and rolls
-;     2..5 saw tier 1, so the turn the BP was spent on was the one turn it did
-;     not buy (battle_rage.lua's tier arms assert the fix).
+;     Without this site the tier would not apply until one turn after the BP
+;     was spent, the one turn it should have bought.
 ;   * Cmd_10 itself, for the auto-queued possessed turns, and as a redundant
 ;     latch if the load path is ever reached differently.
 ; Both are idempotent on the start turn: the pending byte is not consumed until
@@ -602,8 +577,8 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
 
 ; [ boost tilts Rage's coin: the chance verb's certainty, Dance-shaped ]
 ;
-; DESIGN.md's canon: on damage verbs boost multiplies, on chance verbs boost
-; guarantees, in the verb's own terms.  Rage's term is one coin per
+; On damage verbs boost multiplies, on chance verbs boost guarantees, in the
+; verb's own terms.  Rage's term is one coin per
 ; possessed turn: RandCarry + rol picks entry 0 (always plain Fight) or entry
 ; 1 (the beast's special; monster_rage.asm:3-5).  The beast was already chosen
 ; from the menu, so the gamble BP buys off is which half of it shows up, and it

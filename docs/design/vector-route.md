@@ -1,4 +1,4 @@
-# OT6 v0.6 — Vector / Magitek Research Facility reference
+# Vector / Magitek Research Facility reference
 
 ## 7. Switches `$01B0`-`$01B7` are not story bits
 
@@ -104,7 +104,7 @@ disassembly's rendering of an unconditional long jump, so read those as `goto X`
 | Cranes | `event_main.asm:46907` `_cb3ff1` → **`battle 71`** `:47070` → formation 440 = `$010d` + `$010e` |
 | Terra return chain | `event_main.asm:30250` `_cac3c7` → `:30361` `_cac4b0` → flashback → `:25241` `_caa4e0` |
 | **Terra available** | `event_main.asm:25542` `switch $02F0=1` (= `$1EDE` bit 0) |
-| v0.6 stop line | `event_main.asm:25669` `call _cacb95` (map 6, Blackjack cabin) |
+| stop line | `event_main.asm:25669` `call _cacb95` (map 6, Blackjack cabin) |
 | `$01B0`-`$01B7` decode | `notes/field-ram.txt:1072-1080`; `field/event.asm:5415-5433`, `:92`, `:5523`; `field/player.asm:529-531`; `include/const.inc:72-77` |
 | `$02F0`-`$02FD` decode | `notes/field-ram.txt:1114-1116`; `field/event.asm:4443-4448`; `event_main.asm:30939-31010` |
 | event-battle → formation | `field/battle.asm:506-517`; `field/event.asm:1907-1935`; `battle/battle_main.asm:16494-16505` |

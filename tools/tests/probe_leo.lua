@@ -1,49 +1,17 @@
--- probe_leo.lua -- PART A of issue #124 (design: Leo playable at the massacre).
--- NOT a suite member: a one-shot survey instrument for the massacre's Leo
--- fight (thamasa-route.md Segment 6 / §9 Q2,Q3,Q10).
+-- probe_leo.lua -- one-shot survey instrument for the massacre's Leo fight.
+-- NOT a suite member.
 --
--- It boots the nearest checkpoint before the massacre (ultros-won-v1, map 375
--- (8,44)) and records what the fight's surface is, from two sources:
---   * LIVE, here: the reachability of the massacre trigger 375 (15,17) from
---     the save point -- which turns out to be the crux (below).
---   * DERIVED, from the ROM/event data this probe cites, for the questions the
---     live fight would answer once it can be reached.
+-- Boots the nearest checkpoint before the massacre (ultros-won-v1, map 375
+-- (8,44)) and records what the fight's surface is: the reachability of the
+-- massacre trigger 375 (15,17) from the save point (live, via BFS), and
+-- Leo's kit/mechanics (derived from ROM/event data, logged below).
 --
--- THE CRUX (measured live, this probe + probe_massacre_map.lua): 375 (15,17)
--- is NOT a short walk from (8,44).  It sits in map-375 compartment 2, a pocket
--- reachable only by warping in at 375 (16,9) from map 372 -- i.e. a full
--- Esper-Mountain-exit traversal (371->373->372) from the save point, whose
--- only walkable exit is the west door (2,45)->371.  Building that traversal is
--- the massacre route generator's job (thamasa-route.md's O->P segment), out of
--- #124's scope, so this probe does NOT drive it; it BFS-confirms the wall
--- (no hard-fail) and records the survey from data.  When the route generator
--- lands a battle-124-entry savestate, the live arm reads here.
---
--- SURVEY ANSWERS (issue #124 items 2, and thamasa-route §9 Q2/Q3/Q10):
---   Q2 Leo's kit: char_prop.asm:332 (CHAR_PROP::LEO $0f, loaded by
---      `char_prop WEDGE, LEO`, event_main.asm:76352, onto party record
---      CHAR::WEDGE = 14).  Commands FIGHT / SHOCK / NONE / ITEM; weapon the
---      Crystal (item $14, a slashing sword, element $00); level_mod VERY_HIGH
---      (Leo arrives above the party's own level, computed at join, so the
---      exact number is save-relative -- the live arm reads it).
---   Q3 boost/HUD for a WEDGE-slot solo party: the break gauge and boost bank
---      are battle-SLOT state ($3E38+/$3E9C+ indexed by entity, not character
---      id), so they seed and bank for slot 0 regardless of which record rides
---      it; the live arm confirms R banks $3E9C+0 and the gauge draws.
---   Q10 what a LOSS does: a GAME OVER.  The battle-124 tail runs
---      `call _ca5ea9` (event_main.asm:76471), and _ca5ea9 is
---      `if_b_switch $40 return; call GameOver` (event_main.asm:14171-14175) --
---      one of the 8 GameOver call sites.  $40 is the won-battle switch, so a
---      loss falls through to GameOver ($CC/E568).  The O->P fixture must
---      therefore treat a battle-124 loss as a hard failure + seed-ladder
---      retry (the Ultros shape), never a scripted continue.
---   $173 shields, old vs new: UN-AUTHORED the HUD drew the formula floor
---      (2 + level/8 = 2 at L1); issue #124 authors Ot6ShieldTbl $173 = 4,
---      OT6_SLASH, so it now draws 4 (battle_leo.lua asserts the ROM row).
---      NO element add: Leo's whole solo kit is non-elemental (Shock = magic
---      $82 element $00; Crystal = item $14 element $00), so the proposed
---      "hidden element for Shock" would be unreachable -- slash is the whole,
---      honest key.
+-- 375 (15,17) is NOT a short walk from (8,44).  It sits in map-375
+-- compartment 2, a pocket reachable only by warping in at 375 (16,9) from
+-- map 372 -- a full Esper-Mountain-exit traversal (371->373->372) from the
+-- save point, whose only walkable exit is the west door (2,45)->371.  This
+-- probe does not drive that traversal; it BFS-confirms the wall and
+-- records the survey from data.
 --
 -- Run:
 --   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/ultros-won-v1 \
@@ -59,7 +27,7 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 local function frec(off) return 0x1600 + 37 * LEO_REC + off end
 
 H.run({ maxFrames = 300000, allowGameOver = true }, {
-  -- ---- cold Continue to the map-375 save tile (gen_ultros boot) ----------
+  -- ---- cold Continue to the map-375 save tile ----------------------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -95,7 +63,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   -- ---- record Leo's kit from the char_prop record the fight will load -----
   -- (the record is dressed only at the massacre, so at ultros-won-v1 slot 14
   -- holds no Leo yet; the kit is read from ROM/char_prop.asm and logged for
-  -- the survey, with the live-read offsets named for the future arm.)
+  -- the survey, with the live-read offsets named.)
   H.call(function()
     H.log("[probe_leo] Q2 Leo kit (char_prop.asm:332, onto CHAR::WEDGE=14 at "
       .. "the massacre): FIGHT/SHOCK/NONE/ITEM; weapon Crystal (item $14, "

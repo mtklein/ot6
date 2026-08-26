@@ -1,7 +1,7 @@
 -- gen_sabin_gau.lua -- step 10 of SABIN's scenario: GAU.  Generates:
 --   gau_joined.mss   world (214,147), Crescent Mountain's entry point, party
 --                    SABIN+CYAN+GAU.  The trench step starts from here.
---
+
 -- Every Crescent Mountain helmet-scene variant gates on $01AB (GAU in the
 -- party), so the trench cannot open without him.  The route: off the shore
 -- (159's y=14 edge row; its "map 0" long-entrance records return to the
@@ -10,20 +10,7 @@
 -- the item shop 164 via (26,21); keeper (29,48) talked across his counter
 -- from (29,50); shop 12 row 0 = DRIED MEAT, row 1 = TONIC), then the
 -- Veldt grind.
---
--- The appearance, measured at battle_main.asm:11940-11960: GAU shows up at
--- the end of a veldt battle, after every monster dies, with 3/8 odds
--- (Rand cmp #$a0), party < 4, and GAU not yet in the roster ($1EDF bit 3).
--- $2f49/$2f4a arm his character-ai on every veldt battle; $2f4e going
--- nonzero is the appearance itself.
---
--- The dried-meat feed, driven with real input (#75).
--- A controller-only probe found the engine's two-stage target model.  Gau's
--- appearance first exposes him through the one-shot $2F4E mask, before
--- UpdateDead has installed him in $3A42.  An item submitted in that state has
--- no valid recipient, but completing the action normalizes Gau into an
--- ordinary present enemy-character and opens a fresh party menu.
---
+
 -- The generator therefore selects Active battle mode through Config, arms
 -- Cyan's delayed Retort, and parks a Tonic target cursor while Retort kills
 -- the last monster.  When Gau appears, that already-selected Tonic is sent
@@ -32,26 +19,17 @@
 -- targets the now-normalized Gau the same way, and submits it.  AIScript::_370
 -- consumes the meat, sets battle switch 13, and recruits Gau in that same
 -- encounter.  Every gameplay change is controller input; all addresses here
--- are observations used to close the loop.
+-- are observations used to close the loop. Wins are earned by the house
+-- menu-episode machine (bank boost to 2, dump on Fight), with a self-heal
+-- branch under 40% HP. A wipe reloads a pre-grind checkpoint behind a
+-- three-attempt retry ladder (17-frame stagger).
 --
--- The grind is fought rather than write-cleared (#75): the appearance rolls
--- only at a win, so wins are earned by the house menu-episode machine (bank
--- boost to 2, dump on Fight), with a self-heal branch (Item -> TONIC,
--- default self target) under 40% HP.  The Tonics are bought in Mobliz
--- alongside the meat.  A wipe reloads a pre-grind checkpoint (three
--- attempts, 17-frame stagger).  SHADOW is gone before this step, so there is
--- no leave roll to manage.
---
--- The generate is verified by reload, because a calm capture does not imply
--- a calm boot.  Measured during the input-driven-root pilot
--- (2026-08-03): a capture taken at (214,149) with full world control ($E8
--- gate clear, aligned, and the entry point guard below satisfied in 0
--- frames) boots into a battle reproducibly.  Every reload read $E8=$28
--- (bit5, battle pending) within a frame and battle_gaufight's 'world
--- control' wait timed out at 4000 frames, while the live generation
--- timeline continued past the same capture point with no battle.  The test
--- that matters for a fixture is the consumer's: reload what was captured
--- and require the calm the fixture promises.
+-- The generated state is verified by reload, not just a calm capture: a
+-- capture taken with full world control satisfied can still boot into a
+-- pending battle on reload (a calm capture does not imply a calm boot), so
+-- generation replays the captured blob and requires the same calm the
+-- fixture promises to its consumers.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/falls_done.mss.lua"
 local ZMENUSTATE, MAIN_MENU, CONFIG_MENU = 0x26, 0x05, 0x0E
@@ -98,8 +76,6 @@ local CMD_FIGHT, CMD_ITEM, CMD_SWDTECH, CMD_BLITZ, CMD_RAGE, CMD_LEAP =
   0x00, 0x01, 0x07, 0x0A, 0x10, 0x11
 local RETORT, PUMMEL, SUPLEX = 0x56, 0x5D, 0x5F
 local CMDTBL, CMDROW, ITEMLIST = 0x202E, 0x890F, 0x4005
--- item cursor = scroll ($8947) + row-on-screen ($894F), get_item_poi's
--- own sum (measured, probe_itemuse)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local BLCOL, BLROW = 0x8963, 0x8967
 local RAGESCR, RAGECOL, RAGEROW = 0x892B, 0x892F, 0x8933
@@ -228,17 +204,7 @@ end
 -- not already in slot 0" (`invSlot(DRIED_MEAT) ~= 0`), so when the meat is
 -- already at the front the menu is never opened and the caller is left
 -- pressing buttons at the field.
---
--- Measured 2026-08-12, from the two workers of this same generator in one
--- `make savestates` run.  The `gau_joined` worker left the Mobliz shop with
--- gil=4203 tonics=99, printed no "main menu for inventory move" line at all
--- -- so the cond was false and the meat was already in slot 0 -- and
--- prepareFeed's next step, the Config cursor drive, then spent its whole
--- 800-frame budget and failed with "timeout after 800 frames driving toward
--- main-menu cursor on Config".  The `s2_gau_joined` worker reached the same
--- counter, printed the line, moved the meat from a later slot, and every
--- step of the identical Config drive satisfied in under 80 frames.
---
+
 -- Why the two lineages differ in where the meat lands is UNVERIFIED: the
 -- observable difference is that this one arrived at the counter with
 -- tonic=0 in the bag and s2 arrived with tonic=99, and an emptied stack
@@ -323,23 +289,13 @@ local function gauPresent()
 end
 local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
 
--- ------------------------------------- world walk that FIGHTS its randoms --
--- The stretch from the falls shore to Mobliz crosses a VELDT area whose
--- packs are UNRUNNABLE (measured, probe_gaustuck: L+R never ended the
--- (203,116) encounter across 37000 frames) and too stiff for blind tap-A
--- (a SABIN+CYAN party whose row-0 commands are submenus stalls the pack
--- at mon=5).  So transit uses the SAME closed-loop boost-Fight machine
--- the grind does: BFS-step toward (tx,ty), and on any battle steer each
--- actor to Fight (command row 0), dump banked boost, self-Tonic under 40%,
--- until the battle tears down.  No GAU on stage here, so no feed branch.
---
 -- The "unrunnable" measurement is one formation at one tile, not a rule
 -- about the Veldt: nothing in the run path reads the Veldt flag ($11E4 is
 -- read at battle_main.asm:14150, :14211 and :15779 only, none of them the
 -- run code), so whether a given pack can be fled is that formation's own
 -- data.  Do not widen it to "no Veldt battle can be fled" without a
 -- decode of the pool.
---
+
 -- Every caller that crosses open Veldt now passes opts.segment and runs
 -- behind a ladder with an H.fieldCare stop between battles.  Do not add a
 -- bare continuous one back: all three of them wiped a party that way.
@@ -370,14 +326,6 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       for e = 0, partyEntities - 1 do
         if pHP(e) > 0 and pMaxHP(e) > 0 then
           local frac = pHP(e) * 10 // pMaxHP(e)
-          -- Heal at real danger, not at scratches (2026-08-19).  The old
-          -- fed threshold (<70%) lost the fence quad by OVER-healing: with
-          -- four attackers chipping, someone is always under 70%, so the
-          -- item row won nearly every turn, a 50-HP Tonic per turn lost
-          -- the race against ~120/round incoming, and the party dealt
-          -- almost no damage for 10,800 frames before bleeding out --
-          -- with NINETY-NINE tonics in the bag.  Under 40% is where a
-          -- heal beats an attack turn in that arithmetic.
           local healBelow = 4
           if frac < worst and frac < healBelow then target, worst = e, frac end
         end
@@ -505,34 +453,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
        and H.worldHasControl() and H.worldAligned()
        and not H.battleLoadStarted() and (H.readByte(0x00E8) & 0x20) == 0
     calm = parked and calm + 1 or 0
-    -- opts.segment: hand control back after any ONE fought battle, once
-    -- the world is live again -- the caller interleaves H.fieldCare
-    -- between battles, healing on the FIELD where it costs no battle
-    -- turns (the sustain arithmetic below is why).  The tile clause is
-    -- for a walk that ENDS on a tile.  An arriveOffWorld walk ends by
-    -- leaving the world, and its goal tile is a town entrance that fires
-    -- when the tile is ENTERED, so a segment that exits while parked on
-    -- it strands the walk: measured 2026-08-12, transit segments 5
-    -- through 20 each satisfied in 0 frames standing on (220,115) while
-    -- Mobliz never loaded, and all three ladder attempts ran out of
-    -- segments with the party healthy.
-    --
-    -- The exit COASTS for 60 quiet frames rather than firing the instant
-    -- the condition first reads true.  Measured 2026-08-17 on
-    -- s2_gau_joined (route a1 fence north seg 1, deterministic across
-    -- four runs): the arrival step's encounter roll lands AFTER a
-    -- one-frame exit read -- $E8 read $00 at the handoff and $28 (bit5
-    -- battle pending, bit3 once-per-tile) within 15 frames, with no
-    -- input pressed in between, so the battle was already owed and fired
-    -- on its own.  An instant exit handed that battle to the fieldCare
-    -- stop behind it, whose menu opener pressed X into the battle for
-    -- its whole 1800-frame budget.  While coasting the driver presses
-    -- nothing (an earlier draft of parked-waiting jittered left/right,
-    -- and every one of those steps was a fresh encounter roll); if the
-    -- owed battle declares itself the quiet count resets, this walk's
-    -- own driver fights it, and the exit coasts again from the far side.
-    -- So the care stop only ever opens on a world that has stayed quiet
-    -- for a full second, 4x the measured 15-frame roll latency.
+
     if opts.segment and H.worldMode() and H.worldHasControl()
        and H.worldAligned() and not H.battleLoadStarted()
        and (fought >= 1
@@ -544,15 +465,6 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     else
       segCalm, coasting = 0, false
     end
-    -- SEGMENT TIMEOUT IS A LADDER LOSS, NOT A RUN ABORT.  A segment
-    -- runs behind the route/staging ladder, so a draw that will not
-    -- resolve inside the budget (the formation lottery handing the west
-    -- bend a five-monster pack that outlasts the frames -- observed
-    -- 2026-08-09 booting a stale-stamped chain) must set `lost` and let
-    -- driveUntil finish CLEANLY, so the ladder reloads on a staggered
-    -- timeline.  Without this the segment's own driveUntil raises at
-    -- budget and kills the whole generation run before attempt 2.
-    -- Non-segment callers keep the raising budget (they are not laddered).
     if opts.segment then
       segFrames = segFrames + 1
       if segFrames > (budget or 40000) - 400 and lost == nil then
@@ -568,13 +480,6 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       if H.battleLoadStarted() then
         battleFrames = (battleFrames or 0) + 1
         if battleFrames == 120 then
-          -- name the draw: the staging area is a formation LOTTERY (a
-          -- draw at f58124 killed 231+254 HP from FULL in one battle),
-          -- so every battle logs its formation species words -- the
-          -- killer gets identified from the log, not guessed at.  Read
-          -- 120 frames in: at load time $57C0 still holds the LAST
-          -- formation's bytes (measured: five distinct battles logged
-          -- identical words at frame zero).
           local sp = {}
           for s = 0, 5 do sp[#sp + 1] = string.format("%04X",
             H.readWord(0x57C0 + s * 2)) end
@@ -607,15 +512,6 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
           return
         end
         tick = tick + 1
-        -- opts.flee (2026-08-19, the Veldt transit): a two-member party with
-        -- an empty bag cannot FIGHT its way across -- five de-correlated
-        -- rungs wiped, and restocking upstream just fed the same burn.  A
-        -- player in that spot RUNS, and this gen's own boot-battle flee
-        -- proves a bare L+R hold works on Veldt formations.  Hold L+R with
-        -- a periodic B to shed any open command menu (an open menu stops
-        -- battle time under Wait, which stops the run counter); fall back
-        -- to the menu fight on a debounced can't-run bit or after the cap,
-        -- the lib newFlee's own shape.
         if opts.flee then
           refusedN = ((H.readByte(0x00b1) & 0x02) ~= 0) and refusedN + 1 or 0
           fleeN = fleeN + 1
@@ -647,36 +543,9 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       end
       plan, planActor = nil, nil
       fleeN, refusedN = 0, 0
-      -- NOT in a battle and NOT on a live, aligned, lit world: normally
-      -- a fade or a battle teardown, which passes on its own.  But a
-      -- state a care stop's exit read as closed one frame early holds
-      -- this FOREVER while a driver that presses nothing (or worse,
-      -- HOLDS its last pad through a bare return) waits out its whole
-      -- budget -- measured 2026-08-09, twice: 12000 frames parked in
-      -- module limbo after 'staging care 1', reading (175,0) 0/0 with
-      -- worldHasControl garbage-TRUE and worldAligned false, so the
-      -- first recovery draft (parked behind hasControl alone) never
-      -- fired.  Every not-live reading counts toward stuck now.  After
-      -- ten calm seconds it is not a transition: tap B (closes a menu
-      -- level; A would just re-enter the submenu B left, so B leads),
-      -- and only a long-stuck state earns an occasional A (a dialog).
       local live = H.worldHasControl() and H.worldAligned()
          and bright() >= 15
       if not live then
-        -- A WIPE AT BATTLE'S END NEVER MEETS THE IN-BATTLE CANARY: the
-        -- killing blow tears the battle down, battleLoadStarted goes
-        -- false, and the GAME OVER screen reads as module limbo with
-        -- all party HP zero under the party's REAL max HP (measured
-        -- f75413: [0/231 0/254 0/246] off-world).  The signature must
-        -- be the real maxes, not merely nonzero ones: a first draft
-        -- keyed on maxHP > 0 and a module transition reading
-        -- [0/63512 0/7692] promptly named a phantom wipe at f13143 and
-        -- killed a walk the party was winning.  A WoB max is a few
-        -- hundred; transition garbage reads tens of thousands.  Every
-        -- slot must look sane and dead, debounced 90 frames.  Name it
-        -- a LOSS so the ladder reloads, and never tap A here -- A at a
-        -- Game Over walks into a brand-new game (the M.FLEE_CAP
-        -- horror).
         local partyEntities = fed and 3 or 2
         local sane, alive = 0, 0
         for e = 0, partyEntities - 1 do
@@ -1157,16 +1026,6 @@ local function genAttempt(n)
   }, {})
 end
 
--- The shore -> Mobliz transit ladder.  Same shape as the staging walk
--- below and built for the same measured reason: the transit was the last
--- bare worldWalkFight in this file, one continuous drive with no care stop
--- and no ladder, and it wiped the party at f30934 carrying 30 Tonics and 9
--- Fenix Downs.  That is the heal-RATE deficit the staging walk's comment
--- already names -- in-battle healing is bounded by turns, a Tonic turn
--- restores 50 while the pack deals more than that per round to each of two
--- characters, and bag depth cannot fix a rate.  Field care between battles
--- can, because a menu on the world map costs no battle turns.
---
 -- Fighting the crossing earns nothing but gil: a Veldt battle's experience
 -- sum is skipped monster by monster while $11E4 bit 1 is set
 -- (battle_main.asm:15778-15781), which is why the party cannot level its
@@ -1197,16 +1056,7 @@ local function transitAttempt(n)
     H.call(function() H.checkReq(ldReq, "transit attempt " .. n) end),
     H.waitFrames(60 + (n - 1) * 17),
   }
-  -- De-correlate the rungs with WASTED STEPS, not waited frames (2026-08-19).
-  -- Five rungs once died at IDENTICAL relative frames (a1 f7554 ... a5
-  -- f37362, deltas exactly 7452): world encounter rolls are per-step and
-  -- the accumulator rides the savestate, so idle frames after a reload
-  -- change nothing and every rung replayed the same death march.  Each rung
-  -- now paces east-and-back (n-1) times on the shore pair (192,105)<->
-  -- (193,105) -- both tiles proven passable by attempt 1's own walked route
-  -- -- so every later roll lands on a different step index.  A fight during
-  -- the pacing is fine: it de-correlates harder.
-  --
+
   -- The pacing MUST run after the `lost` reset below: worldWalkFight's
   -- terminator treats a set `lost` as done, and the first draft put the
   -- pacing inside the reload block, where attempt n-1's loss string was
@@ -1297,9 +1147,6 @@ local function walkAttempt(n)
     end, {
       worldWalkFight(215, 119, 12000,
         string.format("staging a%d seg %d", n, i), nil,
-        -- flee (2026-08-19): pure locomotion, no collection value -- the
-        -- transit's own ruling.  Post-join walks fought here died to the
-        -- formation lottery whenever the alignment turned.
         { segment = true, flee = true }),
       H.cond(function() return lost == nil end, {
         H.fieldCare({ tag = string.format("staging a%d care %d", n, i),
@@ -1325,18 +1172,6 @@ local function walkAttempt(n)
   return H.cond(function() return not walkDone end, steps, {})
 end
 
--- The POST-JOIN route ladder: the same siege discipline, applied to the
--- fence S-curve from the join tile to Crescent Mountain's entry point.  The
--- 2026-08-09 run that first got GAU aboard lost his whole party to the
--- formation lottery at f75413 on this very stretch -- with GAU joined and
--- the pre-join walk green -- because these nine steps were still bare
--- worldWalkFights with no care stops, no ladder, and (before the
--- Game-Over canary) not even a name for the wipe.  Each waypoint keeps
--- its BFS disc small around the fence; each is now besieged one battle
--- at a time with field care between, and the whole route reloads on a
--- 17-frame stagger when a draw goes fatal.  Care threshold is 0.75 here
--- (not 0.9): a care visit costs ~700-900 frames including the recovery
--- from M.fieldCare's transient exit, and this route fights ~20 battles.
 local ROUTE = {
   { 216, 128, "fence north" },
   { 218, 140, "east bend" },
@@ -1374,26 +1209,7 @@ local function routeAttempt(n)
     H.call(function() H.checkReq(ldReq, "route attempt " .. n) end),
     H.waitFrames(60 + (n - 1) * 17),
   }
-  -- De-correlate the rungs with WASTED STEPS, not waited frames -- the
-  -- same 2026-08-19 lesson transitAttempt already carries above.  Three
-  -- real route attempts against this checkpoint drew the IDENTICAL
-  -- species word (0002 0002 0001 0001) and the IDENTICAL starting HP
-  -- snapshot every time: the world encounter roll is per-step and its
-  -- accumulator rides the reloaded savestate, so idle frames after a
-  -- reload change nothing and every rung replayed the same death march.
-  -- Pace a short lateral pair near the checkpoint tile, never along the
-  -- route (2026-08-19, third draft).  The first draft paced to (216,128)
-  -- -- the route's own first waypoint -- and re-walked the identical
-  -- vulnerable leg.  The second draft called (217,119) "safe, sector
-  -- 120"; that was WRONG: battle_gaufight.lua records a 2026-08-10 live
-  -- BFS proving the ENTIRE walkable component here (1239 tiles, three
-  -- sectors) reads $FF Veldt in world_battle_group -- there is no
-  -- non-Veldt tile to pace on, and no route around the lottery.  The
-  -- pacing's real job is only to shift the step index so rungs 2+ meet
-  -- different draws PAST the first; the first post-reload draw is fixed
-  -- by the savestate and must simply be won (see the heal-threshold note
-  -- in makePlan for how that fight was actually lost and fixed).
-  --
+
   -- The pacing MUST run after the `lost` reset below, for the same
   -- reason transitAttempt's does: worldWalkFight's terminator treats a
   -- set `lost` as done, and pacing inside the reload block would see
@@ -1420,9 +1236,6 @@ local function routeAttempt(n)
       end, {
         worldWalkFight(tx, ty, 12000,
           string.format("route a%d %s seg %d", n, name, i), nil,
-          -- flee (2026-08-19): the transit's ruling; this very stretch lost
-          -- a whole joined party to the formation lottery on 2026-08-09 and
-          -- again under the #122 alignment.  Locomotion flees.
           { segment = true, flee = true }),
         H.cond(function() return lost == nil end, {
           H.fieldCare({ tag = string.format("route a%d %s care %d",
@@ -1465,12 +1278,6 @@ H.run({ maxFrames = 500000 }, {
     return H.worldMode() end }),
   H.waitUntil(function() return H.worldMode() and H.worldHasControl() end,
     3000, "on the world", 5),
-  -- Top up before stepping onto the Veldt.  falls_done ships the party
-  -- hurt -- SABIN 173/289 and CYAN 238/319 on the fixture measured
-  -- 2026-08-12, straight out of battle 18 with no care stop behind it --
-  -- while 30 Tonics and 9 Fenix Downs sit in the bag.  A player who had
-  -- just gone over a waterfall would drink before walking into open
-  -- country, and the crossing is where that 197 HP decides a battle.
   H.fieldCare({ tag = "care before the Veldt crossing", threshold = 0.95,
                 maxFrames = 12000 }),
   H.waitUntil(function()
@@ -1480,15 +1287,6 @@ H.run({ maxFrames = 500000 }, {
   transitAttempt(1),
   transitAttempt(2),
   transitAttempt(3),
-  -- Five rungs, not three (2026-08-19, the battle-68 ruling re-applied).
-  -- The #122 timing shift re-rolled the Veldt: all three rungs lost, the
-  -- last wiped in seg 2 with tonic=0 potion=0 -- the bag drains upstream of
-  -- the transit checkpoint and the Mobliz shop is the transit's DESTINATION,
-  -- so a dry crossing rides entirely on encounter luck.  A player retries
-  -- the crossing from their save more than three times; the ladder is that
-  -- player.  Five rungs that all lose still fail the step, and the supply
-  -- shape (no heal source between the falls and Mobliz) is a real balance
-  -- observation for the M6 pass.
   transitAttempt(4),
   transitAttempt(5),
   H.call(function()
@@ -1539,8 +1337,6 @@ H.run({ maxFrames = 500000 }, {
   -- staging tile can remain field-menu hostile briefly after a random battle.
   prepareFeed(),
 
-  -- out of town; settle the world fully (a stray press during the init
-  -- transient walks back in -- measured), then clear of the entrance
   H.navTo(29, 53, { maxFrames = 4000, playBattles = "flee", arrive = function()
     return mapIdx() == 157 end }),
   settle(157, "town again"),
@@ -1567,27 +1363,7 @@ H.run({ maxFrames = 500000 }, {
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
   end, 3000, "world live again", 5),
-  -- THE STAGING WALK IS A SIEGE BEHIND A LADDER (2026-08-09, measured
-  -- four ways on the fresh input-driven chain).  The packs are unrunnable
-  -- (the probe_gaustuck measurement above) and pay NOTHING -- no gil,
-  -- no exp -- so every battle is pure attrition, and in-battle healing
-  -- is bounded by TURNS: a Tonic turn heals 50 while the pack deals
-  -- 50-100 per round to each of two L10/11 characters.  Fought as one
-  -- continuous drive the party wiped at f32927 with 3 Tonics and again
-  -- at f34619 with 40 -- bag depth cannot fix a heal RATE deficit.
-  -- Field healing can: between battles the menu costs no battle turns
-  -- (the gen_kolts lesson -- "nobody was playing the item menu").  So
-  -- the walk is segmented: one fought battle per episode, then an
-  -- H.fieldCare stop (a no-op once everyone is topped).
-  --
-  -- AND the whole walk sits behind the house 3-attempt ladder, because
-  -- one draw of the formation lottery kills 231+254 HP from FULL in a
-  -- single battle (measured at f58124, siege segment 11) -- and a
-  -- replay from the same fixture is DETERMINISTIC, so without a
-  -- staggered reload every future generation run walks into the same doom on
-  -- the same frame.  A 17-frame stagger is a different timeline and a
-  -- different draw: the same TAS discipline battles 47 and 68 and the
-  -- grind already use.
+
   walkCheckpoint(),
   walkAttempt(1),
   walkAttempt(2),
@@ -1642,10 +1418,6 @@ H.run({ maxFrames = 500000 }, {
   routeAttempt(1),
   routeAttempt(2),
   routeAttempt(3),
-  -- Five rungs (2026-08-19, the battle-68 ruling): the whole fence is
-  -- inside the Veldt sector and its lottery includes unrunnable draws a
-  -- fresh party can lose outright, so the ladder needs real depth once the
-  -- rolls actually vary (the safe-row jitter above provides that).
   routeAttempt(4),
   routeAttempt(5),
   H.call(function()

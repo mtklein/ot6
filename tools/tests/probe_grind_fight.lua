@@ -1,14 +1,8 @@
--- probe_grind_fight.lua -- one measured Chimera-pocket fight (#133).
+-- probe_grind_fight.lua -- one Chimera-pocket fight.
 --
 -- From wob_grind.mss (party on foot at world (116,25), the decoded grind
 -- pocket), pace until a random encounter fires and fight it with the
--- tactical driver, then report XP/level/HP deltas.  This is the datapoint
--- that decides how the grind driver gets built: if form 190's L22 Chimera
--- (HP 2237, no weakness) is survivable-but-slow for the L15-17 party, the
--- grind fights everything tactically; if it wipes or bleeds the party,
--- the grind wants fleeSpecies={0x01f} (fight the bolt-weak Cephalers,
--- run from Chimera) -- and that is also a balance datapoint for the
--- level curve (#127's Baskervor lesson).
+-- tactical driver, then report XP/level/HP deltas.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function rd(a) return emu.read(a, emu.memType.snesMemory) end
 

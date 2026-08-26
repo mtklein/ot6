@@ -1,9 +1,9 @@
--- probe_ladder_seed.lua -- read-only instrument (issue #83): does the
--- three-attempt retry ladder actually play three different fights?
+-- probe_ladder_seed.lua -- read-only instrument: does the three-attempt
+-- retry ladder actually play three different fights?
 --
 -- The claim under test, as the generators state it: "H.waitFrames((n-1)*37)
--- -- vary the battle RNG seed".  Nothing in the tree had ever read the seed
--- back, so this probe reads it.
+-- -- vary the battle RNG seed".  This probe reads the seed directly to
+-- check that claim.
 --
 -- Where the seed comes from, from source rather than folklore
 -- (ff6/src/battle/battle_main.asm:6174-6176, inside InitBattle at :6138):
@@ -148,10 +148,9 @@ H.run({ maxFrames = 20000 }, {
     })
   end)(),
 
-  -- Two runs of the standard three-attempt shape, copied verbatim from
-  -- gen_ifrit_magicite.lua:299-325 and battle_brokendeath.lua:248-263, and
-  -- differing only in `lead`: the number of frames between the blob capture
-  -- and attempt 1's entry drive.
+  -- Two runs of the standard three-attempt shape, differing only in
+  -- `lead`: the number of frames between the blob capture and attempt 1's
+  -- entry drive.
   --
   -- `lead` is the term the ladder never controlled.  Attempt 1 runs in place,
   -- so its phase is (blob phase + lead).  Attempts 2 and 3 reload the blob and

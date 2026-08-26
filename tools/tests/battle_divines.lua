@@ -1,13 +1,13 @@
 -- @suite slow
 -- battle_divines.lua -- the kit-8 divines whose gates are read at resolution.
---
+
 --   tools/tests/run.sh tools/tests/battle_divines.lua
---
+
 -- These finishers cannot be gated at command-select time (their command is in
 -- RetargetCmdTbl, so the target is cleared and re-chosen at resolution), so OT6
 -- gates them where the attack lands.  Each is once-per-battle via
 -- OT6_DIVINE_USED ($3ECB, per-character bit).
---
+
 -- OBLIVION (Cyan, Bushido tech 8, attack $5C).  Ot6Oblivion (hooked right
 -- after ChooseTarget in CalcAttackEffect) reads the target's broken timer:
 --   * Broken and killable   -> marks Death in the target's $3dd4 directly and
@@ -16,56 +16,32 @@
 --     place (power 70, Death cleared): the reduced fallback, with the latch
 --     left clear.
 --
--- Issue #75 conversion: everything reachable converts, and the ceiling stays.
--- The old file installed a triple-CYAN party on the magitek entry point, pinned
--- HP, MP, bp and pending, wrote Broken, boss and stop states onto guards, and
--- poked the latch and both cursors.  It now boots cyan_defence, the
--- input-driven Doma interlude savestate: a real solo Cyan (L11, katana, his
--- own record) on map 120, surrounded by the map's own battle-43 grinding
--- soldiers (2x species $001, 100 hp, 2 shields, weak $03, which his slash
--- chips) and the battle-46 commander (species $14E, 456 hp, 3 shields, weak
--- $01, also chippable).
--- Measured 2026-08-10, this file's recon:
---   * CYAN is battle slot 1, opens at 1 bp, real MP 67, real techs 2
---     ($1cf7=03; submenu rows enumerate $55/$56 and row 2 is EMPTY);
---   * his front-row Fight would kill a 100-hp soldier before its 2-shield
---     gauge breaks, so Cyan fights from the back row (H.setRows through the
---     real Order screen), the same weaker-weapon play battle_assassinate
---     uses;
---   * every bank is earned: battle opens at 1 bp, each unboosted Fight
---     regens +1 (Ot6ActionEnd), and picking submenu row 2 spends the banked
---     3, with no pend or bp pins anywhere;
---   * targets break by real chipping (each landed slash removes 1 shield).  The
---     commander hosts every resolution arm: his 456 hp survives the 3-chip
---     break (~50 per back-row slash, measured) where a 100-hp soldier dies
---     exactly on its breaking hit (measured: both soldiers hit 0 hp with
---     brk finally nonzero, ending the battle before any cast), and his
---     solo formation leaves the resolution-time retarget only one body;
---   * the engine's own latch edges are asserted where play can reach them:
---     the kill sets the latch (battle 2) and the next battle's fresh open
---     enumerates Oblivion again (battle 3); no poke produces those
---     two readings;
---   * kills are checked against the mechanism: a pc-gated write watch counts
---     Death marks written from inside Ot6Oblivion (battle_assassinate's
---     idiom), so a fallback that damage-kills cannot be mistaken for a divine.
+-- Boots cyan_defence: a real solo Cyan (L11, katana) on map 120, surrounded
+-- by the map's own battle-43 grinding soldiers (2x species $001, 100 hp, 2
+-- shields, weak $03, which his slash chips) and the battle-46 commander
+-- (species $14E, 456 hp, 3 shields, weak $01, also chippable). Cyan opens
+-- at 1 bp with real MP 67 and 2 real techs ($1cf7=03). His front-row Fight
+-- would kill a 100-hp soldier before its 2-shield gauge breaks, so he
+-- fights from the back row (H.setRows through the real Order screen).
+-- Bank is earned, not pinned: each unboosted Fight regens +1 bp, and
+-- picking submenu row 2 spends the banked 3. Targets break by real
+-- chipping: the commander's 456 hp survives the 3-chip break where a
+-- 100-hp soldier dies exactly on its breaking hit, so his solo formation
+-- leaves the resolution-time retarget only one body. Kills are checked
+-- against the mechanism with a pc-gated write watch counting Death marks
+-- written from inside Ot6Oblivion, so a fallback that damage-kills cannot
+-- be mistaken for a divine.
 --
--- Labeled isolation arm (issue #75, owner learn-ceiling ruling
--- 2026-08-10): the ceiling writes stay.
--- Oblivion is Bushido tech 8: L68 Cyan, 99 MP (#57).  The input-driven chain's
--- Cyan is L11 with 67 max MP, and the ruling keeps it that way, with no
--- leveled-fixture grind tier.  So every battle below stages the ceiling in
--- one labeled block: KNOWN ($2020) := 7 so the window can enumerate the
--- divine, and MP := 999 so the 99-MP cast is not refused.  The boss-gate
--- negative additionally sets the target's $3aa1 bit 2, the bit a boss
--- carries, because no generated battle fields a death-protected body beside
--- Cyan (the commander reads aa1=$01, measured).  And the latch-driven
--- enumeration (row 2 falls to Tempest $5b while the latch is set) keeps the
--- old latch pokes, inside battle 1's staging: the only setter in normal play
--- is the kill, the kill can only land on the commander, and killing the solo
--- commander ends the battle before the window could reopen, so the
--- set-side reading cannot be produced by play at this fixture.  These writes
--- may never produce fixtures; they convert organically as the project's
--- areas reach the levels where tech 8 is real play.
+-- Oblivion is Bushido tech 8, normally reached at L68 with 99 MP; the
+-- input-driven Cyan here is L11 with 67 max MP, so the ceiling is staged
+-- explicitly in each battle below: KNOWN ($2020) := 7 so the window can
+-- enumerate the divine, and MP := 999 so the 99-MP cast is not refused.
+-- The boss-gate negative additionally sets the target's $3aa1 bit 2 (the
+-- boss bit), since no generated battle fields a death-protected body
+-- beside Cyan. The latch-driven enumeration keeps its own latch pokes,
+-- since the only real setter in play is the kill, and killing the solo
+-- commander ends the battle before the window could reopen.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/cyan_defence.mss.lua"
 
@@ -236,9 +212,6 @@ local function resolveCast(what)
       if ph % 8 >= 4 then H.setPad({}); return end
       if H.readByte(MENU) ~= 0 and not inWindow() then
         local st = H.readByte(MSTATE)
-        -- #90: was `st == ST_TGT and {a} or {a}` -- A in EVERY state,
-        -- the battle_levelup race.  A only where it means "confirm the
-        -- target"; nothing in transitional $01; B elsewhere.
         H.setPad(st == ST_TGT and { a = true }
                  or (st == 0x01 and {} or { b = true }))
       else
@@ -350,10 +323,6 @@ add({
     H.assertEq(dead(m), false, "the unbroken commander took no Death")
     H.assertEq(present(m), true, "and is still present")
     H.assertEq(latchSet(), false, "the divine latch stays CLEAR on a fallback")
-    -- #71 item 2: the positive witness.  Every assertion above is about
-    -- what the fallback did NOT do (no Death, no kill, no latch), so an
-    -- Ot6Oblivion unbroken arm rewritten to power 0 -- a wasted turn
-    -- plus the MP -- passed all four.  The Tempest hit must land:
     H.assertEq(mhp(m) < b1HpBefore, true, string.format(
       "the reduced fallback DEALT damage (hp %d -> %d) -- a power-0 or "
       .. "bailing unbroken arm fails here", b1HpBefore, mhp(m)))

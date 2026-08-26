@@ -18,13 +18,6 @@
 --   0 = steps completed         1 = Lua error / failed assert / timeout
 --   2 = frame budget exceeded   (testrunner exit code = emu.stop code)
 --
--- Why step lists: the library builds scripts as explicit step lists driven
--- by a startFrame callback.  This was originally justified by "coroutines
--- crash Mesen".  Coroutines do not crash Mesen; the failure was the
--- testrunner's wall-clock cap (exit 255, stdout lost) misread as a crash,
--- and coroutines run clean.  The step style stays because the whole suite
--- is written in it.
---
 -- This file is the battle core: steps, input, memory, savestates, battle
 -- signals, canaries, and the shared field-state reads.
 -- The field/world navigation stack (passability model, BFS, navTo /
@@ -55,23 +48,17 @@ local seqStep -- forward declaration (defined in the step-runner section)
 
 -- ---------------------------------------------------------------- logging --
 function M.log(msg)
-  -- print goes to the testrunner's stdout.  emu.log() is deliberately not
-  -- used: it is invisible under --testrunner and calling it from callbacks
-  -- is a crash suspect (see the "Working notes" section of the README).
+  -- print goes to the testrunner's stdout.  emu.log() is not used: it is
+  -- invisible under --testrunner and calling it from callbacks is a crash
+  -- suspect.
   --
   -- Every line carries the prefix, including continuation lines.  run.sh's
-  -- terminal output is `grep '^\[ot6\]' "$RUN_LOG"` (run.sh:326), so an
-  -- unprefixed continuation line reaches the log file and nothing else.
-  -- The messages that have continuation lines are all failures explaining
-  -- themselves, so those are the lines the terminal most needs.  Measured
-  -- 2026-07-30: a timeout's "the fixture you booted is stale" detail sat in
-  -- the log while the terminal showed only "timeout after 120 frames
-  -- waiting for main menu", which is the misleading half.
+  -- terminal output is `grep '^\[ot6\]' "$RUN_LOG"`, so an unprefixed
+  -- continuation line reaches the log file and nothing else.
   msg = tostring(msg)
   if OT6_RECORD then
-    -- The note stream for the recorded video's subtitles; see the
-    -- "recording sidecars" section below.  One line per call, newlines
-    -- folded, so compose.py's parse stays line-oriented.
+    -- The note stream for the recorded video's subtitles.  One line per
+    -- call, newlines folded, so compose.py's parse stays line-oriented.
     print("[ot6note] " .. (M.frame or 0) .. " " .. msg:gsub("\n", " | "))
   end
   for line in (msg .. "\n"):gmatch("([^\n]*)\n") do
@@ -221,27 +208,15 @@ function M.readRomByte(addr) return emu.read(addr, emu.memType.snesPrgRom) end
 function M.readRomWord(addr) return emu.readWord(addr, emu.memType.snesPrgRom) end
 
 -- OT6 symbol address, derived from ff6/rom/ff6-en.dbg at compose time and
--- injected as the global OT6_SYMS (lib/compose.py, the same mechanism that
--- embeds savestate sidecars as OT6_STATES).  Returns the ca65 `val`: a 24-bit
--- SNES CPU address (e.g. RandA = 0xC24B98), which is what an exec/read
--- memory callback wants.  For a snesPrgRom file offset (readRomByte/Word),
--- mask & 0x3FFFFF: banks $C0-$FF are HiROM, so file = cpu & 0x3FFFFF ($C0:0000
--- -> $000000, $F0:0000 -> $300000).  Errors if the symbol is absent,
--- which means the ROM was not (re)built, the name is wrong, or the script was
--- run raw instead of through run.sh (which composes OT6_SYMS in).  Deriving
--- the address this way replaces hand-maintained address literals, which went
--- stale on every bank-$F0/$C2/$C0 shift.
+-- injected as the global OT6_SYMS (lib/compose.py).  Returns the ca65 `val`:
+-- a 24-bit SNES CPU address (e.g. RandA = 0xC24B98).  For a snesPrgRom file
+-- offset (readRomByte/Word), mask & 0x3FFFFF: banks $C0-$FF are HiROM, so
+-- file = cpu & 0x3FFFFF ($C0:0000 -> $000000, $F0:0000 -> $300000).
 --
--- Duplicated names: ca65 scopes names per module, so a name can be defined
--- in two of them (`ExecCmd` is both field code and the battle command
--- dispatcher; 3838 of this ROM's 98483 label names are non-unique).
--- compose.py does not guess: such a name is a compose-time error, and if it
--- reached here at all, which is only possible when every occurrence was
--- inside a comment, it raises below rather than returning either candidate.
--- Disambiguate by the ca65 segment that defines it:
--- H.sym("ExecCmd@battle_code").  Segment names come from cfg/ff6-en.cfg and
--- survive the bank shifts that move addresses, so a qualified name is no
--- more fragile than a bare one.
+-- A name can be defined in two modules (ca65 scopes per module); such a
+-- name is a compose-time error unless every occurrence was inside a
+-- comment, in which case it raises below.  Disambiguate by the ca65 segment
+-- that defines it: H.sym("ExecCmd@battle_code").
 function M.sym(name)
   if type(OT6_SYMS) == "table" and OT6_SYMS[name] then
     return OT6_SYMS[name]
@@ -272,12 +247,11 @@ end
 
 -- ------------------------------------------------------------- savestates --
 -- Mesen 2 requires emu.createSavestate()/emu.loadSavestate() to run inside
--- an exec memory callback for the main CPU ("This function must be called
--- inside an exec memory operation callback"), and not inside an event
--- callback.  So requests go through a one-shot trampoline: register an exec
--- callback over the full address space, do the work on its first fire (the
--- next instruction the CPU executes), and unregister from within the callback.
--- Results are harvested a frame or two later by the calling step.
+-- an exec memory callback for the main CPU, not inside an event callback.
+-- So requests go through a one-shot trampoline: register an exec callback
+-- over the full address space, do the work on its first fire, and
+-- unregister from within the callback.  Results are harvested a frame or
+-- two later by the calling step.
 --
 -- Persistence: sandboxed Lua cannot write files, so blobs round-trip through
 -- stdout: [b64:<name>] lines that run.sh decodes into
@@ -321,11 +295,9 @@ local function checkReq(req, what)
 end
 M.checkReq = checkReq
 
--- Resolve a savestate sidecar to its base64 payload.  compose.py embedded it
--- as OT6_STATES[basename], which is the only path.  There is no loadfile()
--- fallback because loadfile raises under the default sandbox setting
--- (Debug.ScriptWindow.AllowIoOsAccess=false), so a fallback could never fire
--- and would replace a clear error with a confusing one.
+-- Resolve a savestate sidecar to its base64 payload.  compose.py embeds it
+-- as OT6_STATES[basename], which is the only path; there is no loadfile()
+-- fallback because loadfile raises under the sandbox.
 function M.resolveStateB64(sidecarPath)
   local base = sidecarPath:match("[^/]+$")
   if type(OT6_STATES) == "table" and OT6_STATES[base] then
@@ -363,26 +335,13 @@ function M.loadState(sidecarPath)
     M.waitFrames(2),
     M.call(function()
       checkReq(req, "savestate load")
-      -- Savestate loads do not detach callbacks (nothing in Mesen's load
-      -- path clears them; battle_banner registers exec callbacks before its
-      -- load and records straight through).  This call is a no-op once
-      -- inputCbRef is set; it is kept so the input hook is live
-      -- on paths that load before ever arming it.
+      -- Savestate loads do not detach callbacks.  This call is a no-op once
+      -- inputCbRef is set; it is kept so the input hook is live on paths
+      -- that load before ever arming it.
       M.rearmInputInjection()
-      -- Battery SRAM rides the savestate (re-measured 2026-08-04: markers
-      -- planted in banks $30 and $31, changed live, both restored by
-      -- emu.loadSavestate; the earlier "savestates do NOT restore battery
-      -- sram" comment here was wrong).  Post-load SRAM, weakness codex
-      -- included, is therefore a function of the fixture's own bytes: no
-      -- wipe, no cross-segment leakage within a script, and no cross-run
-      -- channel either (run.sh deletes <saves>/*.srm before every boot).
-      -- This used to be the site of an emu.write loop that re-formatted all
-      -- four codex pages after every load, an issue-#75 state write that
-      -- also overwrote the codex the fixture was generated with.  Runs that
-      -- boot fresh instead of loading rely on the ROM's own lazy page
-      -- formatting (Ot6CodexEnsure / Ot6CodexNewGame / Ot6CodexLoaded,
-      -- ff6/src/battle/ot6_codex.asm): an unsigned page is zeroed and
-      -- signed 'O8' by the game the first time anything touches the codex.
+      -- Battery SRAM rides the savestate: emu.loadSavestate restores banks
+      -- $30/$31.  Post-load SRAM, weakness codex included, is therefore a
+      -- function of the fixture's own bytes.
     end),
   })
 end
@@ -404,31 +363,16 @@ end
 -- ----------------------------------------------------- FF6 battle signals --
 -- $7E3BF4: 4 x 16-bit party battle HP ($FFFF outside battle).
 --
--- $7E3F46 is NOT six 16-bit monster IDs, which is what this said until
--- 2026-08-12 and what the two readers below still assume.  LoadBattleProp
--- copies the 15-byte formation record verbatim to $3F44
--- (battle_main.asm:8243-8250, `lda f:BattleMonsters,x / sta $3f44,y` for
--- eight words), and that record is: +$00 mold/bg1 bits, +$01 monsters
--- present, +$02..$07 six 8-BIT monster ID low bytes, +$08..$0D six packed
--- xxxxyyyy positions, +$0E the six ID high bits.  So the IDs land at
--- $3F46..$3F4B one byte each, the positions at $3F4C..$3F51, and the MSB
--- mask at $3F52 (ff6/notes/battle-ram.txt:1117-1152; confirmed against
--- formation 43, whose Merchant reads $13A exactly as gen_sfigaro's header
--- says, and formation 504, whose all-$1FF empty record ot6_hud.asm:1796
--- documents).
+-- The formation record at $3F44: +$00 mold/bg1 bits, +$01 monsters present,
+-- +$02..$07 six 8-bit monster ID low bytes, +$08..$0D six packed xxxxyyyy
+-- positions, +$0E the six ID high bits.  IDs land at $3F46..$3F4B one byte
+-- each, positions at $3F4C..$3F51, MSB mask at $3F52.
 --
--- Reading it as words therefore mixed ID bytes together and read two position
--- bytes as a third and fourth "monster".  Measured on battle 11, formation 64,
--- one monster ($09F): the old word decode answered 4, and the gen_sfigaro
--- fight log printed "monhp=495/sh3,0/sh0 monsters=4" for a single soldier.
--- Nothing broke from it because both call sites only ask whether the count is
--- above zero, but a present-count guard that is wrong about how many are
--- present is the kind of thing that reads correct until it doesn't (#94).  So:
 -- monstersPresent() counts the present mask ($3F45 low six bits), and
--- monsterIds() decodes the six bytes plus their MSBs, so both are right
--- whichever site reads them.  For a monster's SPECIES (0..383) prefer
--- OT6_SPECIES ($57c0, M.formationSpecies): it is full-width and carries
--- off-stage loads too; these ID low bytes only tell present slots apart.
+-- monsterIds() decodes the six ID bytes plus their MSBs.  For a monster's
+-- SPECIES (0..383) prefer OT6_SPECIES ($57c0, M.formationSpecies): it is
+-- full-width and carries off-stage loads too; these ID low bytes only tell
+-- present slots apart.
 M.MONSTER_IDS = 0x3F46          -- +$02..$07: six 8-bit ID low bytes
 M.MONSTER_PRESENT = 0x3F45      -- +$01, low 6 bits: bit i set => slot i on stage
 M.MONSTER_ID_MSB = 0x3F52       -- +$0E, --abcdef: bit (5-slot) is slot's ID high bit
@@ -436,21 +380,16 @@ M.BATTLE_HP = 0x3BF4
 
 -- OT6 HUD tilemap shadow: 6 lines x stride 14 (+0 cur addr, +2 prev addr,
 -- +4 five tilemap words).  This must track OT6_SHADOW in
--- ff6/src/battle/ot6.asm.
--- It lived at $5762 until 2026-07-18, when that address turned out to be
--- inside vanilla's `ram_res w7e5755, 128`; three suite tests had the old
--- address copy-pasted in and started reading vanilla's buffer when it
--- moved.  Read it from here rather than inlining it, so the next move is
--- one edit.
+-- ff6/src/battle/ot6.asm.  Read it from here rather than inlining it
+-- elsewhere.
 M.SHADOW = 0xECF1
 M.SHADOW_STRIDE = 14
 function M.shadowLine(line) return M.SHADOW + line * M.SHADOW_STRIDE end
 
 -- Six entries, one per monster slot: the on-stage slots carry their decoded
--- ID (the low byte at $3F46+slot widened by that slot's MSB in $3F52), and the
--- empty slots read $FFFF.  Six bytes, not six words -- see the note above
--- (#94).  Kept six-wide because every caller indexes ids[1..6]; monstersPresent
--- counts the mask directly.
+-- ID (the low byte at $3F46+slot widened by that slot's MSB in $3F52), and
+-- the empty slots read $FFFF.  Kept six-wide because every caller indexes
+-- ids[1..6]; monstersPresent counts the mask directly.
 function M.monsterIds()
   local mask = M.readByte(M.MONSTER_PRESENT) & 0x3F
   local msb = M.readByte(M.MONSTER_ID_MSB)
@@ -466,9 +405,8 @@ function M.monsterIds()
   return ids
 end
 
--- How many monsters are on stage: popcount of the present mask's low six bits
--- ($3F45, battle-ram.txt:1119-1128).  Measured on the whelk ($3F45 = $03 ->
--- 2), where the old word decode answered 4.
+-- How many monsters are on stage: popcount of the present mask's low six
+-- bits ($3F45).
 function M.monstersPresent()
   local mask = M.readByte(M.MONSTER_PRESENT) & 0x3F
   local n = 0
@@ -487,38 +425,15 @@ end
 
 -- True once the battle module has begun loading.
 --
--- $7E3BF4 is the party battle-HP table only while the battle module owns that
--- RAM.  Every other module writes over those bytes, so no single slot and no
--- single sentinel can say whether a battle is up.  Measured shapes:
+-- $7E3BF4 is the party battle-HP table only while the battle module owns
+-- that RAM; other modules write over the same bytes.  So this checks the
+-- shape of the whole table rather than one slot: every word must be a
+-- plausible current HP (0 for an empty or dead slot, else 1..9999) and at
+-- least one character alive.  $FFFF/$FF00 anywhere means these bytes
+-- belong to another module.
 --
---   field                     FFFF FFFF FFFF FFFF
---   field menu (START)        FFFF FFFF FFFF FFFF
---   moogle defense, on-map    FF00 0020 FF00 0020   <- field write
---   party menu / world redraw 0000 0000 0000 0000   <- menu owns the bytes
---   live battle               003F 0044 003D 0000   <- empty slot 3 reads 0
---   live battle, slot 0 dead  0000 0044 003D 0000
---
--- So the test looks at the shape of the whole table rather than one slot:
--- every word must be a plausible current HP, 0 for an empty or dead slot and
--- otherwise 1..9999, and at least one character must be alive.  $FFFF and
--- $FF00 are not HP values, so one of them anywhere means these bytes belong
--- to another module.
---
--- Three earlier versions shipped, and each cost a regeneration of every
--- savestate in the chain.  Do not reinstate any of them:
---   * slot 0, rejecting 0: reported no battle as soon as the first character
---     died, so worldNavTo pressed directions into a live battle (#24).
---   * slot 0, $FFFF only: reported a battle for every frame a menu was up,
---     and ridePartyMenu's blind A presses landed on a Status page.
---   * any slot 1..9999: accepted the moogle write's 0020 and hung
---     gen_moogle for 30,000 frames on map 30.
--- The `< 10000` bound in the original is what rejects the $FF00 write, and it
--- is easy to mistake for a sanity check.
---
--- Known limit, accepted: a total party wipe is all zeros, which is also what
--- a menu leaves, so this reports false.  Separating those needs a check
--- outside this table, and a wiped party in a fixture is a failure anyway.
--- Regression: battle_loadgate.lua.
+-- Known limit: a total party wipe is all zeros, the same shape a menu
+-- leaves, so this reports false for a wipe.
 function M.battleLoadStarted()
   local anyLive = false
   for i = 0, 3 do
@@ -538,10 +453,9 @@ function M.screenLooksAlive()
   return ok and type(png) == "string" and #png > 4000
 end
 
--- True while a battle is fully up and rendering.  A crashed battle load,
--- which this harness has caught, leaves the screen black and fails this
--- check.  emu.getState() is deliberately not used here: polling it was
--- correlated with emulator crashes.
+-- True while a battle is fully up and rendering.  A crashed battle load
+-- leaves the screen black and fails this check.  emu.getState() is not
+-- used here: polling it is correlated with emulator crashes.
 function M.battleActive()
   return M.battleLoadStarted() and M.monstersPresent() > 0 and M.screenLooksAlive()
 end
@@ -549,53 +463,20 @@ end
 -- --------------------------------------------- absorbed-weapon guard --
 -- Fail the run when a character enters a fight holding a weapon whose
 -- element something in the formation ABSORBS, because then every swing
--- heals the enemy.
+-- heals the enemy.  Checks ABSORB only (not NULL): a null match is a
+-- judgement call against the boss's break axis, weighed by class rather
+-- than element, so it is left to a human rather than swapped
+-- automatically.
 --
--- Why this exists.  Measured 2026-08-10 on the airship Cranes:
--- the game's own Equip -> Optimum picks by attack power and knows nothing
--- about elements, and it armed LOCKE and EDGAR with ThunderBlades
--- (item $0F, element bolt).  Left Crane $010D
--- absorbs bolt, so every Fight healed the boss (+160/+198 a pair swing,
--- +943 boosted) and advanced its Giga Volt counter.  The fight was
--- reported as honestly unwinnable and nearly became a request for a
--- tuning change.  The record is at M.equipWeapon below.
---
--- Why ABSORB only, and why a check rather than a swap.  The obvious
--- generalisation -- prefer an element-clean weapon -- was written and
--- measured WORSE.  On battle 70 the same weapon on the same two
--- characters is merely NULLED (monster_prop.dat +$18 reads $FC for both
--- Ifrit $0109 and Shiva $0108), and the swing was never where the damage
--- came from: that fight is won by chipping shields, and a chip goes by
--- weapon CLASS rather than element.  ThunderBlade is a sword, so
--- ot6_class.asm:58-64 makes it OT6_SLASH, and slashing is Shiva's break
--- axis.  The element-aware equip swapped to daggers (OT6_PIERCE), sold
--- the chip that wins the fight, and lost all three attempts.  So null is
--- a human judgement about class against the boss's break axis; absorb is
--- the one case with no upside on either side of the trade.  A check that
--- fails is the right shape for it, because it tells someone to think
--- instead of choosing for them.
---
--- Where the numbers come from, each confirmed against behaviour that was
--- already recorded rather than taken on trust:
---   * monster_prop.dat, 32-byte records, +23 absorb (+24 null, +25 weak;
---     HANDOFF "canonical facts", tools/check_boss_rows.py:88-92).  Ifrit
---     $0109 reads absorb $01 fire and Shiva $0108 absorb $02 ice, which
---     is bosses-wob.md's "fire heals Ifrit"; Whelk $0100 reads absorb $04
---     bolt, which is the game's own tutorial; Crane $010D reads absorb
---     $04 bolt, which is the Cranes measurement above.
---   * item_prop_en.dat, 30-byte records, +$00 type (&$07 == 1 is a
---     weapon) and +$0F element (research/data-formats.md "Items").
---     ThunderBlade $0F reads element $04 bolt, power 108, matching the
---     Cranes record.
+-- monster_prop.dat: 32-byte records, +23 absorb, +24 null, +25 weak.
+-- item_prop_en.dat: 30-byte records, +$00 type (&$07 == 1 is a weapon),
+-- +$0F element.
 M.ELEM_NAMES = { "fire", "ice", "bolt", "poison", "wind", "holy", "earth",
                  "water" }
 
 -- Edgar's two damaging Tools, by item id, for callers of newFightDriver's
 -- opts.tool.  AutoCrossbow is pierce-class and hits every enemy; the Bio
--- Blaster is element $08 poison and hits every enemy (item $a4 -> attack
--- $7d, battle_main.asm:6577).  Which one a segment wants is a question
--- about the bodies it is going to meet, not a preference: see the note over
--- newFightDriver.
+-- Blaster is element $08 poison and hits every enemy.
 M.AUTOCROSSBOW = 0xAA
 M.BIO_BLASTER = 0xA4
 
@@ -621,8 +502,7 @@ function M.weaponElement(item)
   return M.readRomByte(base + ITEM_ELEM)
 end
 
--- Spell +$01, the element byte of magic_prop_en.dat's 14-byte record
--- (measured: Fire $00 reads $01, Ice $01 reads $02, Bolt $02 reads $04).
+-- Spell +$01, the element byte of magic_prop_en.dat's 14-byte record.
 -- Boost folding moves a cast up its own family and families share one
 -- element, so the base spell's byte answers for every tier it can fold to.
 function M.spellElement(id)
@@ -630,11 +510,10 @@ function M.spellElement(id)
   return M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + id * 14 + 1)
 end
 
--- Item +$14, the power byte (data-formats.md "Items").  For a consumable
--- that is how much it heals: $E8 Tonic reads 50 and $E9 Potion reads 250 on
--- this ROM.  It is the engine's input rather than its output, so a caller
--- that can watch a use land should prefer what it measures; newFightDriver
--- uses this as the prior and replaces it with the observed number.
+-- Item +$14, the power byte.  For a consumable that is how much it heals.
+-- It is the engine's input rather than its output, so a caller that can
+-- watch a use land should prefer what it measures; newFightDriver uses
+-- this as the prior and replaces it with the observed number.
 function M.itemPower(item)
   if item == nil or item > 0xFF then return 0 end
   return M.readRomByte((M.sym("ItemProp") & 0x3FFFFF)
@@ -654,56 +533,13 @@ end
 --   mp          true for a cast, which is paid in MP rather than out of the
 --               bag; see the party clause below for the one thing it changes
 --
--- Returns the reason to heal, or nil for "act instead".
---
--- A heal buys back restore/roundCost of a turn and spends a whole one.  When
--- the item restores at least what a round takes, that trade never runs out --
--- the candidate can be topped up for ever -- so the fraction rule governs and
--- this behaves the way the driver always did.
---
--- When the item restores less than a round takes, whether the trade is worth
--- making depends on whose turn is being spent, and there are two cases.
---
--- Alone, the healer is also the only attacker, and the arithmetic is settled:
--- with HP h, a round costing d and a heal giving g < d, a character who
--- spends k of his turns drinking lands h/d + k*(g/d - 1) attacks before he
--- dies, which falls as k rises.  Every drink costs him more attacking time
--- than it buys, at any threshold, so he does not drink; he swings.  That is
--- solo LOCKE against battle 11's soldier, where a Tonic restoring 50 against
--- 55 to 112 a round bought five drinks and one attack (issue #74).
---
--- In a party the same drink is worth making when somebody is about to die,
--- because what it buys back is that member's whole remaining turn stream and
--- what it costs is one turn out of several.  It is not worth making as a
--- routine top-up: an item that cannot keep up with the damage empties the bag
--- without changing where the fight is going.  So a party heals the endangered
--- and stops topping up.
---
--- `mp` is where a cast parts company with a drink, and only there.  That
--- last refusal is an argument about the BAG: a fixed supply, spent down on
--- top-ups that change nothing, and gone for the fights after this one.  MP is
--- not a fixed supply -- OT6 refunds it in full at every level up
--- (ot6_progression.asm:3-6) and it is only bounded per fight -- so a party's
--- caster tops up on the fraction rule with a cure that cannot keep up, where
--- it would have put the Tonic back in the bag.  Refusing there would undo the
--- thing the cast line was added for: the minecart ride spent all eight Tonics
--- on the Mag Roaders and reached the boss with nothing, while every member
--- carried 100+ MP unspent (#92).
---
--- The SOLO refusal is not about the bag and `mp` does not touch it.  There
--- the argument is about turns, and a cast spends a turn exactly as a drink
--- does; the k-attacks arithmetic above does not mention what was drunk.
---
--- Deliberately NOT required of a party heal: that it lift the target clear of
--- the worst round seen.  That was tried and it is too strict -- roundCost is a
--- worst case, not a typical round, and using it as a bar for "would this help"
--- left EDGAR at 63/398 for the whole of battle 72 with seven Potions in the
--- bag while the party won around him.  The bar is proved for the solo case and
--- assumed for the party case, so it is only applied where it is proved.
---
--- Lowering healPercent would also have made battle 11 pass, and would have
--- been the mistake #74 documents: a number that fits one fight and still
--- heals at the wrong moments in every other thin-bag fight.
+-- Returns the reason to heal, or nil for "act instead".  If the heal
+-- restores at least what a round costs, topping up below threshold or
+-- covering danger is always worth it.  Otherwise: alone, healing never
+-- outpaces the damage so the candidate acts instead; with allies present,
+-- healing an endangered ally is worth the turn, and an `mp` heal (a cast,
+-- not a bag item) also tops up below threshold since MP is not a fixed
+-- supply the way bag items are.
 function M.healDecision(o)
   local hp, maxhp = o.hp or 0, o.maxhp or 0
   local gain, cost = o.restore or 0, o.roundCost or 0
@@ -712,8 +548,8 @@ function M.healDecision(o)
   local endangered = hp <= cost         -- one round could finish them
   if gain >= cost then
     -- healing outruns the damage, so topping up can be repeated for ever.
-    -- Before the enemy has landed a round cost is 0 and this is the whole
-    -- rule, which is what leaves a fight's opening turn as it always was.
+    -- Before the enemy has landed a round, cost is 0 and this is the whole
+    -- rule.
     if pct < (o.threshold or 60) then return "top-up" end
     if endangered then return "in danger" end
     return nil
@@ -750,31 +586,18 @@ function M.partyWeapons()
   return out
 end
 
--- The formation's species, from OT6's own per-slot stash rather than from
--- vanilla's $3F46.  Two reasons: OT6_SPECIES ($57c0, six words) is
--- written per entity by Ot6SeedShields at monster-load time
--- (ff6/src/battle/ot6_break.asm:70-78), so it carries a monster that is
--- loaded but not on stage -- gen_ifrit_magicite.lua:340 asserts SHIVA
--- $0108 is there from the first frame of battle 70 -- and $3F46 is six
--- BYTES in vanilla's map (ff6/notes/battle-ram.txt:1123-1128), which is
--- not wide enough for a 0..383 species and is not what the word reads in
--- M.monsterIds() give.
+-- The formation's species, from OT6's own per-slot stash (OT6_SPECIES,
+-- $57c0, six words) rather than from vanilla's $3F46: OT6_SPECIES is
+-- full-width (0..383) and carries a monster that is loaded but not on
+-- stage, where $3F46 is only six bytes.
 --
--- Which slots are real comes from the formation's own occupied-slot mask.
--- battle-ram.txt:1119-1121 draws the pair as "+$3F44 mmmmbbbb bbpppppp",
--- mold / bg1-monsters / monsters-present, and the two bytes are in the
--- order printed: the low six bits of the SECOND byte, $3F45, are the slot
--- mask.  Measured on the whelk fight, whose formation is $0100 in slot 0
--- and $0134 in slot 1: $3F44 reads $80 (mold 8) and $3F45 reads $03.
--- Reading the pair as one little-endian word and masking its low six bits
--- gives 0, which is what the first draft of this did, and it made the
--- guard silently check nothing.
+-- Which slots are real comes from the formation's occupied-slot mask: the
+-- low six bits of $3F45.
 --
 -- OT6_SPECIES is not cleared between battles, so without the mask a short
 -- formation would be checked against the tail of the previous one.
--- Formation 504, the Imperial Camp Kefka fight, is legitimately empty
--- (bosses-wob.md:267-268), so a zero mask is "nothing to check" rather
--- than an error.
+-- Formation 504 is legitimately empty, so a zero mask is "nothing to
+-- check" rather than an error.
 M.FORMATION_MASK = 0x3F45
 function M.formationSpecies()
   local mask = M.readByte(M.FORMATION_MASK) & 0x3F
@@ -821,14 +644,8 @@ end
 
 -- Random encounters are excluded.  OT6_RANDBTL ($57bd) is a normalized
 -- 0/1 flag latched in Ot6InitBP from the field trigger's marker and then
--- cleared, so an event battle always reads 0 and a marker can never leak
--- past one battle (ff6/src/battle/ot6_boost.asm:14-29).  Both measured
--- disasters were scripted fights, where the party stands and swings; a
--- random encounter that happens to absorb is usually fled or over in a
--- round, and failing a multi-hour chain for one would bury the finding
--- this guard exists to surface.  A clash in a random encounter is logged
--- instead, which is how we would learn that the line is in the wrong
--- place.
+-- cleared, so an event battle always reads 0.  A clash in a random
+-- encounter is logged instead of failing the run.
 M.RANDBTL = 0x57BD
 
 -- How long after M.battleLoadStarted() turns true before the formation is
@@ -857,10 +674,7 @@ function M.absorbGuardTick()
   if guardSettle < GUARD_SETTLE then return nil end
 
   -- A species outside 0..383 means the slot mask and the species stash
-  -- are not both filled yet, which is also what junk looks like on a
-  -- playline that has not fought a battle (probe_57ba_strip measured $ff
-  -- riding the srm boot line, and M.battleLoadStarted reads a shape
-  -- rather than a flag).  Keep waiting rather than failing a run on a
+  -- are not both filled yet.  Keep waiting rather than failing a run on a
   -- transient; if it never resolves, fail, because a guard that cannot
   -- read its data must not report the same green as one that read it and
   -- found nothing.
@@ -940,15 +754,13 @@ M.seqStep = seqStep
 -- Wait n frames.
 -- ------------------------------------------------------------ ot6 canary --
 -- Every OT6 font cell in VRAM must match its ROM source data, byte for
--- byte.  Catches battle/effect art clobbering our claimed font cells (the
--- fight-2 bug class) without hardcoding sums: the expected bytes come from
--- the ROM itself, so glyph art edits never stale the canary.
+-- byte.  Catches battle/effect art clobbering our claimed font cells; the
+-- expected bytes come from the ROM itself, so glyph art edits never stale
+-- the canary.
 function M.glyphCanary()
   local vr, rom = emu.memType.snesVideoRam, emu.memType.snesPrgRom
   local function findSig(sig)
-    -- scan the whole OT6 slice of bank F0: v0.2 grew the code ahead of the
-    -- bg glyph table (Ot6BgGlyphData sits at ~$F0109A now), so the window
-    -- has to reach past the first 4K it used to fit inside.
+    -- scan the whole OT6 slice of bank F0
     for base = 0x300000, 0x303FF0 do
       local hit = true
       for i = 1, 16 do
@@ -1047,18 +859,14 @@ function M.pressButtons(buttons, frames)
 end
 
 -- ---------------------------------------------------------- timeout blame --
--- A wait that runs out says "timeout after 600 frames waiting for main menu",
--- which often omits the real cause.  The usual cause is that the savestate
--- was generated against a different ROM than the one running, so the first
--- step needing a specific frame, typically the field X press, lands on a
--- frame the fixture's timing no longer has.  Read literally, the message
--- points at the menu code, and at least one agent went looking for a product
--- bug there.
---
--- So every timeout appends what the run knows: which fixture it
--- booted, and whether composition already flagged that fixture as generated
--- from sources this tree no longer has (OT6_STALE, emitted by lib/compose.py).
--- This adds context and does not suppress the failure.
+-- A wait that runs out says "timeout after 600 frames waiting for main
+-- menu", which often omits the real cause: the savestate may have been
+-- generated against a different ROM than the one running, so the first
+-- step needing a specific frame lands on a frame the fixture's timing no
+-- longer has.  So every timeout appends what the run knows: which fixture
+-- it booted, and whether composition already flagged that fixture as
+-- generated from sources this tree no longer has (OT6_STALE, emitted by
+-- lib/compose.py).
 M.lastState = nil
 
 function M.timeoutContext()
@@ -1131,15 +939,9 @@ end
 M.vars = {}
 
 -- Branch: choose a step list by predicate at the moment it is reached.
--- "Reached" means each fresh pass.  Task #17 (found by the codex_ctx
--- conversion) was this step latching its first-tick branch forever:
--- it had no reset, so inside a driveUntil body, whose steps replay every
--- cycle via seqStep:reset(), the predicate was consulted once in
--- the step's lifetime and every later cycle replayed the stale
--- branch.  reset() now clears the choice so a replayed cond re-asks its
--- predicate, which is what every driveUntil body was already assuming.
--- Top-level steps and the H.cond(function() return won end, ...) form
--- tick once and are never reset, so their behavior is unchanged.
+-- "Reached" means each fresh pass: reset() clears the choice so a replayed
+-- cond (inside a driveUntil body) re-asks its predicate.  Top-level steps
+-- tick once and are never reset, so their behavior is unaffected.
 function M.cond(pred, thenSteps, elseSteps)
   local chosen = nil
   return {
@@ -1171,16 +973,12 @@ function M.repeatN(n, steps)
   }
 end
 
--- Run the body steps in a loop until pred() is truthy (checked between body
--- cycles and every frame via pollEvery=frames).  Raises after maxFrames.
--- Completion releases the pad: pred can fire mid-body-cycle, abandoning the
--- body wherever it stands, and a button it was holding at that instant must
--- not stay held into the steps that follow.  (A stuck d-pad auto-repeats
--- the battle-menu cursor and a stuck A confirms into target selection;
--- both affected battle_boost and battle_preview when input injection moved
--- to hardware-faithful next-poll timing.  navTo/advanceStory/clearBattle
--- already release in their preds, and this is the same contract for every
--- drive.)
+-- Run the body steps in a loop until pred() is truthy.  Raises after
+-- maxFrames.  Completion releases the pad: pred can fire mid-body-cycle,
+-- abandoning the body wherever it stands, and a button it was holding at
+-- that instant must not stay held into the steps that follow (a stuck
+-- d-pad auto-repeats the battle-menu cursor and a stuck A confirms into
+-- target selection).
 function M.driveUntil(pred, maxFrames, steps, what)
   what = what or "condition"
   local body = seqStep(steps)
@@ -1214,26 +1012,16 @@ end
 -- takes a screenshot per poll (screenLooksAlive), so the wait polls
 -- every 30 frames rather than every frame.
 --
--- Deliberately option-free: dozens of tests enter their first fight
--- through this exact sequence, and the constants are part of each
--- test's frame/RNG landing, since a different hold or wait changes which
--- frame the encounter fires on.  This helper gives that majority one
--- definition instead of a copy in each test (31 verbatim copies
--- when it was extracted, several already drifted); a test that needs a
--- different entry (another direction, other timeouts, battle-clearing
--- flag handling, a story scene that walks into its own fight) keeps writing
--- its own drive.
--- #72: the Wait-mode menu flush, promoted from four independent
--- rediscoveries (battle_thief:388 measured the mechanism; battle_rage
--- and battle_walletmp re-derived it).  In Wait mode a bystander's open
--- command window FREEZES the battle clock, so a queued action never
--- reaches the top of the queue and the test hangs -- surfacing as a
--- timeout somewhere unrelated.  This drives until the menu byte reads
--- closed, pulsing A with the shared list-cursor block ($895F..$896A)
--- zeroed, so every bystander takes row 0 and can never fire a second
--- real action.  The 24 existing hand-rolled copies are deliberately NOT
--- retrofitted (their timing is proven; a silent sweep is #71's failure
--- mode) -- new code uses this instead of rediscovering the hazard.
+-- Deliberately option-free: the constants are part of each test's
+-- frame/RNG landing, since a different hold or wait changes which frame
+-- the encounter fires on.  A test that needs a different entry keeps
+-- writing its own drive.
+--
+-- In Wait mode a bystander's open command window FREEZES the battle
+-- clock, so a queued action never reaches the top of the queue and the
+-- test hangs.  flushMenus drives until the menu byte reads closed,
+-- pulsing A with the shared list-cursor block ($895F..$896A) zeroed, so
+-- every bystander takes row 0 and can never fire a second real action.
 --   H.flushMenus()                    -- plain flush
 --   H.flushMenus{ pin = fn }          -- fn runs every tick (fixture pins)
 --   H.flushMenus{ maxFrames = n }     -- cap (default 1800; timeout raises)
@@ -1264,94 +1052,36 @@ function M.enterEncounter()
 end
 
 -- ----------------------------------------------------- battle rng seed --
--- The retry ladder's mechanism, measured (issue #83) rather than assumed.
---
 -- A battle's whole RNG stream hangs off one byte, seeded once at battle
--- init (ff6/src/battle/battle_main.asm:6174-6176, inside InitBattle
--- at :6138):
+-- init (InitBattle):
 --
 --     lda     $021e       ; low byte of game time (frames)
 --     asl2
 --     sta     $be         ; set random number seed
 --
--- $021e is wGameTimeFrames (ff6/src/menu/menu_ram.inc:343, the last byte of
--- the $021b hours/minutes/seconds/frames block).  IncGameTime
--- (ff6/src/menu/menu_common.asm:3522-3549) runs it 1..60 and wraps, and it is
--- ticked once per vblank from the field, world and battle NMIs
--- (field/reset.asm:286, world/interrupt.asm:33/320/584,
--- btlgfx/btlgfx_main.asm:1763) and from the menu (menu_common.asm:3496).  A
--- is 8-bit at the store, so the seed is (frames * 4) & $FF: 60 values, 4..240,
--- one per phase.  $be is then the index every battle Rand/RandA/RandCarry
--- walks through RNGTbl (battle_main.asm:12640-12666).
+-- $021e is wGameTimeFrames, ticked 1..60 and wrapped once per vblank by the
+-- field, world, battle and menu NMIs.  A is 8-bit at the store, so the seed
+-- is (frames * 4) & $FF: 60 values, one per phase.  $be then indexes
+-- RNGTbl (256 bytes), which every battle Rand/RandA/RandCarry walks.
 --
--- So the ladder's premise holds -- waiting frames before a fight does move
--- the seed -- but the constant it used did not follow from it.  Measured with
--- probe_ladder_seed.lua on battle_entry's first encounter:
+-- newSeedLadder spaces attempts by holding until $021e has advanced to
+-- each attempt's own target phase (as widely as 60 phases allow), rather
+-- than by a fixed frame count, and reads the seed each attempt actually
+-- drew off the store instruction, requiring it be distinct.  A ladder that
+-- plays one fight twice fails the run instead of passing silently.
 --
---   * attempts 2 and 3 reload the entry blob and then spend a fixed ~92
---     frames of trampoline and settle before their own (n-1)*37, so they land
---     37 apart reliably;
---   * attempt 1 runs in place, so its phase is whatever the generator's own
---     step layout leaves between the blob capture and the entry drive.  That
---     term is not measured anywhere.  Re-running one ladder with 36 frames of
---     lead in front of attempt 1 put attempts 1 and 2 on the same seed $9C
---     with attempt 3 at $4C -- #80's reported signature, one fight played
---     twice;
---   * the drive from the wait to InitBattle took 96..99 frames across six
---     attempts, so even a reliable 37 arrives at the seed as 40.  The stagger
---     is not preserved by construction.
+-- The hold counts $021e's own movement rather than waiting for it to equal
+-- the target value, because $021e is ticked at the end of the owning
+-- module's vblank handler, which can finish just inside a sampled frame or
+-- just past it -- so an equality wait can miss a target phase every time it
+-- is written and overwritten within the same sampled frame.  Summing
+-- movement instead lands on the target when it is visible and one or two
+-- phases past it otherwise, which the spacing below tolerates.
 --
--- newSeedLadder replaces the constant with the counter it is trying to move:
--- each attempt holds until $021e has advanced to its own target phase, spaced
--- as widely as 60 phases allow, and the seed each attempt actually drew is
--- read off the store instruction and required to be distinct.  A ladder that
--- plays one fight twice is the failure mode with no symptom, so it fails the
--- run.
---
--- WHY THE HOLD COUNTS MOVEMENT INSTEAD OF MATCHING THE TARGET VALUE.  It used
--- to wait for `$021e == target`, sampled once per emulated frame, and that
--- cannot see every phase.  $021e is ticked at the very END of the owning
--- module's vblank handler -- ff6/src/field/reset.asm:286 sits after every
--- palette, sprite, tilemap and dialog transfer FieldNMI performs -- and that
--- handler is long enough to finish either just inside the frame or just past
--- it.  Measured 2026-08-12 on sfigaro_town's battle 11, in the 181 frames the
--- old wait spent failing (map 75, party standing still after a lost attempt):
---
---   * IncGameTime ran 180 times in 180 frames, one per frame on average,
---     exactly as designed -- the counter was never stopped;
---   * the tick executed at scanline 247, then 257, then 1 of the following
---     frame, straddling scanline 0, which is where the harness samples
---     (M.run's startFrame callback);
---   * so frames held 2, 1, 0, 1 ticks on a stable four-frame beat, and the
---     once-per-frame sample stepped +2, +1, 0, +1;
---   * every phase congruent to 3 mod 4 therefore existed only between two
---     sample points.  Phase 7, the target, was written at scanline 1 of a
---     frame and overwritten at scanline 257 of the SAME frame, every cycle.
---     No wait of any length could have matched it.
---
--- The field NMI's own $45/$46 counters step in the same 0/+2 pattern, which
--- is what rules out a second caller ticking the clock instead.
---
--- So the hold accumulates the counter's own movement: it sums each frame's
--- delta and releases once the counter has moved as far as the target was
--- away.  That lands on the target when the sample can see it and one or two
--- phases past it when it cannot, which 20-phase spacing does not care about,
--- and it is report() -- the seed each attempt really drew -- that guarantees
--- the attempts were different fights.  A counter that is genuinely stopped
--- moves nothing, and that still fails the run rather than falling back to
--- "wait a bit and hope": a ladder that cannot spread must not be able to
--- quietly play one fight twice.
---
--- Why the spacing is as wide as it is, rather than merely nonzero.  RNGTbl is
--- 256 bytes (ff6/src/field/rng_tbl.dat, incbin'd at field/rng_tbl.asm:11) and
--- $be is an index into it, so two attempts are not independent streams: they
--- are the same table read from two starting points, 4 entries apart per phase.
--- Attempts one phase apart share every draw with a shift of four, and a fight
--- consuming a few hundred randoms walks the whole table several times over
--- either way.  Distinct seeds are what makes the attempts different fights;
--- distant seeds are what makes them differ early, before the party's state has
--- diverged enough to matter.  Three attempts 20 phases apart start 80 table
--- entries apart, which is the most the cycle allows.
+-- Spacing is as wide as the 60-phase cycle allows (not merely nonzero)
+-- because $be indexes into the shared 256-byte RNGTbl: attempts one phase
+-- apart share nearly all their draws, so distinct AND distant seeds are
+-- what make attempts diverge early into genuinely different fights.
 
 M.SEED_PHASE = 0x021E                   -- wGameTimeFrames
 M.SEED_PERIOD = 60                      -- IncGameTime's 1..60 cycle
@@ -1360,12 +1090,10 @@ M.SEED_PERIOD = 60                      -- IncGameTime's 1..60 cycle
 function M.seedPhase() return M.readByte(M.SEED_PHASE) end
 function M.seedOf(phase) return (phase * 4) & 0xFF end
 
--- Address of the `sta $be` store, found by its bytes rather than copied:
--- AD 1E 02 (lda abs $021e), 0A 0A (asl a, asl a), 85 BE (sta dp $be), scanned
--- forward from InitBattle.  battle_main moves whenever a hook shim changes
--- size, and a stale literal here would silently watch the wrong instruction
--- and report a green ladder forever.  Requiring exactly one match makes a
--- moved or rewritten seeder an error rather than a miss.
+-- Address of the `sta $be` store, found by its bytes rather than a fixed
+-- address: AD 1E 02 (lda abs $021e), 0A 0A (asl a, asl a), 85 BE (sta dp
+-- $be), scanned forward from InitBattle.  Requiring exactly one match makes
+-- a moved or rewritten seeder an error rather than a silent miss.
 local SEED_SIG = { 0xAD, 0x1E, 0x02, 0x0A, 0x0A, 0x85, 0xBE }
 local seedStoreAddr = nil
 function M.seedStoreAddr()
@@ -1399,26 +1127,21 @@ end
 --     L.report(),                 -- once, after the last
 --   })
 --
--- and inside attempt(n), where `H.waitFrames((n - 1) * 37)` used to sit:
+-- and inside attempt(n):
 --
 --     L.spread(n),
 --
--- spread(n) latches attempt 1's phase and then holds each later attempt until
--- $021e has advanced to base + 20*(n-1), which is the widest even spacing
--- three attempts fit into the 60-phase cycle.  The seed the fight actually
--- drew is captured at the store and checked by report(): distinct across
--- attempts, and present for every attempt that ran, so a watcher that never
--- fired fails rather than passing silently.
+-- spread(n) latches attempt 1's phase and then holds each later attempt
+-- until $021e has advanced to base + 20*(n-1), the widest even spacing
+-- three attempts fit into the 60-phase cycle.  The seed each attempt
+-- actually drew is captured at the store and checked by report(): distinct
+-- across attempts, and present for every attempt that ran.
 --
--- opts.attempts (default 3) only sets the spacing.  It is not a licence to
--- widen the ladder: three is the doctrine (#74), and a ladder that loses three
--- different fights is reporting a finding.
+-- opts.attempts (default 3) only sets the spacing; it is not a licence to
+-- widen the ladder.
 --
--- opts.phaseSource replaces the live read of $021e, and exists so
--- battle_seedladder can drive the hold with samplers a real route cannot be
--- made to produce on demand: one that aliases the way the field NMI's straddle
--- makes the real one alias (a quarter of the phases never visible), and one
--- that never moves at all.  A generator's ladder reads the counter.
+-- opts.phaseSource replaces the live read of $021e, for callers that need
+-- to drive the hold with a synthetic sampler instead of the counter.
 function M.newSeedLadder(tag, opts)
   opts = opts or {}
   local attempts = opts.attempts or 3
@@ -1456,11 +1179,9 @@ function M.newSeedLadder(tag, opts)
     end)
   end
 
-  -- The spread, derived from the counter the seed is made of.  Replaces
-  -- H.waitFrames((n - 1) * 37).  sopts.forcePhase pins the target outright and
-  -- exists for battle_seedladder's controls -- driving two attempts onto one
-  -- seed to watch report() fail, and naming a phase the sampler cannot see to
-  -- watch the hold release anyway.  A generator does not pass it.
+  -- The spread, derived from the counter the seed is made of.
+  -- sopts.forcePhase pins the target outright, for tests that want to force
+  -- a specific (or colliding) phase; a generator does not pass it.
   L.spread = function(n, sopts)
     sopts = sopts or {}
     local target = nil
@@ -1482,17 +1203,12 @@ function M.newSeedLadder(tag, opts)
           L.tag, n, now, target, M.seedOf(target), base, gap,
           forced and "  [forcePhase -- a control, not a route]" or ""))
       end),
-      -- Not M.waitUntil: `target` is only known once the step above has run,
-      -- and waitUntil bakes its description at construction time.  And not an
-      -- equality test on the sampled phase, which is unreachable for a quarter
-      -- of the phases whenever the owning module's vblank handler straddles
-      -- the emulator's frame boundary -- see the measurement in the header
-      -- above.  This sums the counter's own movement and releases once it has
-      -- moved as far as the target was away, so it lands on the target or one
-      -- or two phases past it.  The budget is three cycles; one is enough at
-      -- the one tick per frame every vblank handler gives, so running out
-      -- means the counter is stopped or crawling, which is a finding about
-      -- where the spread was placed rather than about the length of the wait.
+      -- Not M.waitUntil: `target` is only known once the step above has run.
+      -- Sums the counter's own movement rather than testing equality against
+      -- the sampled phase, and releases once it has moved as far as the
+      -- target was away (see the note above this function).  The budget is
+      -- three cycles of the 60-phase period; running out means the counter
+      -- is stopped or crawling.
       (function()
         local waited, moved, need, prev, still = 0, 0, nil, nil, 0
         return {
@@ -1557,11 +1273,8 @@ function M.newSeedLadder(tag, opts)
         elseif L.spreads[n] then silent[#silent + 1] = n end
       end
       -- An attempt that took a phase and then drew no seed is a battle the
-      -- watcher missed, not an attempt that skipped the fight: every ladder
-      -- here spreads immediately before an engagement it cannot avoid.  Say so
-      -- rather than comparing whatever is left, which is how a check quietly
-      -- stops covering the thing it names.  Checked before the empty case
-      -- below, because it is the more specific account of the same symptom.
+      -- watcher missed.  Checked before the empty case below, as the more
+      -- specific account of the same symptom.
       assert(#silent == 0, string.format(
         "%s: attempt(s) %s took a battle RNG phase and then drew no seed.  The "
         .. "watcher is on `sta $be` at battle init, so either that attempt "
@@ -1590,10 +1303,10 @@ function M.newSeedLadder(tag, opts)
       end
       M.log(string.format("[%s] %d attempt(s), %d distinct battle RNG seeds",
         L.tag, #ran, #ran))
-      -- Go inert.  The exec callback cannot be removed from outside one (Mesen
-      -- wants that on the CPU's own thread), and clearGateSoldier builds a
-      -- fresh ladder per engagement, so a finished ladder's watcher would
-      -- otherwise keep charging later battles to its last attempt.
+      -- Go inert.  The exec callback cannot be removed from outside one
+      -- (Mesen wants that on the CPU's own thread), so a finished ladder's
+      -- watcher would otherwise keep charging later battles to its last
+      -- attempt.
       cur = 0
     end)
   end
@@ -1602,25 +1315,18 @@ function M.newSeedLadder(tag, opts)
 end
 
 -- ------------------------------------------------------- field state --
--- Live reads of the field engine's party/story state.  These are shared, so
--- they live in the battle core: suite battle tests that boot on a field
--- map read them to step into their encounter (battle_flyin picks its
--- walking lane, battle_kefka asserts the fixture's tile), and the
--- navigation stack in lib/ot6_field.lua is built on top of them.
--- Addresses from the vendored disassembly: party object pixel coords
--- $086a/$086d via the $0803 leader offset (src/field/player.asm), map
--- index $1f64 (battle.asm), player-control gate $1eb9 bit7 + map-load
--- $84 + menu-opening $59 (player.asm UpdatePlayerMovement).
+-- Live reads of the field engine's party/story state.  These are shared,
+-- so they live in the battle core: battle tests that boot on a field map
+-- read them to step into their encounter, and the navigation stack in
+-- lib/ot6_field.lua is built on top of them.  Addresses from the vendored
+-- disassembly: party object pixel coords $086a/$086d via the $0803 leader
+-- offset, map index $1f64, player-control gate $1eb9 bit7 + map-load $84
+-- + menu-opening $59.
 
 -- The active party's object record: $0803 holds the byte offset of the
--- party leader's object block (`ldy $0803; lda $086a,y`, in player.asm,
--- reset.asm and elsewhere).  Character 0 (TERRA) owns object offset 0, and
--- TERRA led every fixture up to the Moogle defense, so absolute reads of
--- $086A/$087C were correct for months.  The defense then made
--- LOCKE (object offset $29) the leader, and the lib kept reading TERRA's
--- knocked-out object: position froze at her (14,12) while party 1 stood at
--- (14,14), and hasControl never went true (measured, gen_moogle run 2).
--- Every party-relative read must go through this offset.
+-- party leader's object block (`ldy $0803; lda $086a,y`).  The leader is
+-- not always character 0 (TERRA); every party-relative read must go
+-- through this offset rather than an absolute address.
 local function pobj() return M.readWord(0x0803) end
 
 -- Live tile position = party-object pixel coords >> 4 ($086a x / $086d y,
@@ -1645,11 +1351,9 @@ end
 -- points into the event-script segment (banks $CA-$CC) and is off its idle
 -- parking value $ca/0000.  The bank test matters: ambient NPC object
 -- scripts (a stove flame, a wandering townsperson) run through the same
--- interpreter out of their RAM queue, and the PC reads $80xxxx (WRAM mirror)
--- for one frame at a time, every few frames, indefinitely on such maps.
--- Those excursions do not mean an event is running, and counting them broke
--- every consecutive-calm-frames predicate (measured in Arvis's house:
--- $800000 one frame in four).
+-- interpreter out of their RAM queue, and the PC reads $80xxxx (WRAM
+-- mirror) for one frame at a time, every few frames, indefinitely on such
+-- maps.  Those excursions do not mean an event is running.
 function M.eventRunning()
   local bank = M.readByte(0x00e7)
   if bank < 0xCA or bank > 0xCC then return false end
@@ -1731,49 +1435,36 @@ function M.clearBattle(maxFrames, spare)
 end
 
 -- -------------------------------------------- input-driven battle endings --
--- Issue #75: a script may inject input and read memory, and may never write
--- emulated game state.  These two end a battle the way a player can, with
--- no writes, and are the opt-in replacements for clearBattle's flag write.
--- The flag-write path above stays while unconverted generators depend on
--- it; new scripts and converted steps use these.
+-- A script may inject input and read memory, and may never write emulated
+-- game state.  These two end a battle the way a player can, with no
+-- writes, and are the opt-in replacements for clearBattle's flag write.
 --
--- fightBattle: win by edge-tapped A (4 on / 4 off).  Repeated A presses are
--- a workable strategy on the steps this is for: A on the top command opens
--- the actor's command list, A confirms its first entry, A accepts the
--- default target, and the early-game magitek beams kill their targets in one
--- hit.  This predates the helper: gen_sabin_magitek wins battles 15/16/17 by
--- these taps because the flag write softlocks the win-bit check, and the
--- vanilla-faithful intro guards die to one beam each.  The same edge taps
--- page through battle dialogs, level-ups, and the victory text.  `spare`
--- keeps clearBattle's goal-formation contract: if the battle we are asked to
--- fight is the goal set-piece, that is a script bug and this fails with an
--- error.  Budget note: a played-out win costs real ATB rounds, so budget
--- thousands of frames where clearBattle needed hundreds.
+-- fightBattle: win by edge-tapped A (4 on / 4 off).  A on the top command
+-- opens the actor's command list, A confirms its first entry, A accepts
+-- the default target.  The same edge taps page through battle dialogs,
+-- level-ups, and the victory text.  `spare` keeps clearBattle's
+-- goal-formation contract.  Budget note: a played-out win costs real ATB
+-- rounds, so budget thousands of frames where clearBattle needed hundreds.
 
 -- ------------------------------------------------------- target cursor --
--- The battle target-select steering machine, consolidated from four
--- copies (battle_steal, battle_stealmp, battle_thief, battle_magicite,
--- the #75 mech family).  The measured facts it encodes:
+-- The battle target-select steering machine.  Facts it encodes:
 --   * the live cursor mask ($7B7E monster / $7B7D character) blinks,
 --     reading 0 on off-frames, so the mask is latched while target select
 --     ($7BC2 == $38) is up, and the latch/age/press state resets as soon
---     as target select is down.  A latch that survives between selections
---     confirms immediately on the previous action's cursor (battle_steal's
---     measured wrong-monster steal off a stale latch);
+--     as target select is down;
 --   * steering rotates the d-pad one direction per press cycle rather than
---     per frame; a per-frame rotation flips direction mid-hold and registers
---     nothing (battle_steal's measurement);
+--     per frame; a per-frame rotation flips direction mid-hold and
+--     registers nothing;
 --   * the cursor grid follows the formation's screen layout, so rotating
 --     through all four directions settles on any reachable slot: monster
---     grids walk {left,down,right,up} (battle_steal's measured 08 -left->
---     04 -down-> 01), character columns {down,up,left,right}.
--- Known limit (probe_tgtcursor, measured on mrf_entry's 2x2 group-80
--- formation): the two-press rotation cycles among three hover positions
--- and the ally column, and cannot reach a slot that needs a bare
--- up-then-right (left,left -> $08; up -> $04; right -> $01).  All four
--- masks are reachable by single presses with a dwell between them; a
--- caller whose formation needs that steers with its own press plan and
--- uses only the latch half of this machine.
+--     grids walk {left,down,right,up}, character columns
+--     {down,up,left,right}.
+-- Known limit: on a 2x2 formation the two-press rotation cycles among
+-- three hover positions and the ally column, and cannot reach a slot that
+-- needs a bare up-then-right.  All four masks are reachable by single
+-- presses with a dwell between them; a caller whose formation needs that
+-- steers with its own press plan and uses only the latch half of this
+-- machine.
 -- opts: mask = 0x7B7E (monster, default) or 0x7B7D (character); dirs = the
 -- rotation list; minAge = settled frames before confirming (default 4).
 -- Use: call observe() once per drive frame, in any menu state (it manages
@@ -1826,24 +1517,14 @@ end
 -- falling edge.  frame() sets the controller pad itself.
 --
 -- opts.tool names the Tool Edgar reaches for, defaulting to AutoCrossbow.
--- AutoCrossbow is the right default because it is the pierce-class Tool and
--- most of the route's shield rows carry a class key, but an area can be
--- authored the other way round and Zozo is: all four of its species carry an
--- Ot6ShieldTbl row with two shields and NO class byte, and the block comment
--- over those rows says what to do about it in as many words -- "the answer is
--- the tool rather than the A button" (ff6/src/battle/ot6_hud.asm:2084-2085).
--- The tool it means is the Bio Blaster, because all four are poison-weak in
--- vanilla (monster_prop.dat +25 = $08 for $052/$04e/$053/$0df) and the Bio
--- Blaster is item $a4 -> attack $7d, element $08, all enemies
--- (ff6/src/battle/ot6_break.asm:203-204, :279-281; battle_main.asm:6577).
--- With AutoCrossbow in that town nothing chips, ever, and the same table's
--- own measurement says what that costs: "mashing wipes 6/6 in this town"
--- (ot6_hud.asm:2078).
+-- AutoCrossbow is pierce-class, and most of the route's shield rows carry
+-- a class key; a formation without a class key (e.g. Zozo's four species,
+-- all poison-weak) instead wants the Bio Blaster.
 --
--- The tool has to BE in the bag: the Tools-menu steer looks the id up in the
--- live list and drops the plan when it is missing, which then re-plans on the
--- next frame and makes no progress.  A caller that names a tool should assert
--- H.invCountOf(id) > 0 first, the way the Zozo generators do.
+-- The tool has to BE in the bag: the Tools-menu steer looks the id up in
+-- the live list and drops the plan when it is missing, re-planning on the
+-- next frame with no progress.  A caller that names a tool should assert
+-- H.invCountOf(id) > 0 first.
 function M.newFightDriver(tag, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -1855,25 +1536,20 @@ function M.newFightDriver(tag, opts)
     0x05, 0x0A, 0x0E, 0x38, 0x30, 0x16
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
   local BLCOL, BLROW = 0x8963, 0x8967
-  -- the magic list's cursor triple (btlgfx_main UpdateMenuState_0e:
-  -- scroll+row is the absolute grid row, col the column; grid cell N sits at
-  -- row N//2, column N%2, the mapping battle_brokendeath measured and
-  -- gen_vargas's Cure drive uses)
+  -- the magic list's cursor triple: scroll+row is the absolute grid row,
+  -- col the column; grid cell N sits at row N//2, column N%2.
   local MSCROLL, MCOL, MROW = 0x8913, 0x8917, 0x891B
   -- $302C,entity is the engine's own pointer at that character's compacted
-  -- battle Magic list ($208E/$21CA/$2306/$2442; GetMPCost walks it,
-  -- battle_main.asm:13201-13210, and so does CheckMagicEnabled, :14692).
-  -- Record 0 is the esper row and record n+1 is grid cell n.
+  -- battle Magic list.  Record 0 is the esper row and record n+1 is grid
+  -- cell n.
   local MLISTPTR = 0x302C
   local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
   local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
   local AUTOCROSSBOW, PUMMEL = M.AUTOCROSSBOW, 0x5D
-  -- The cures, cheapest first.  Cheapest rather than biggest for the same
-  -- reason M.fieldCare picks that way: the loop simply casts again if the
-  -- target is still short, so overshoot is only wasted MP.  Under OT6 the
-  -- upper tiers are folds of the base spell rather than separate grants
-  -- (battle_esperstats: KIRIN grants Cure and NOT Cure 2), so in practice
-  -- only the first of these is ever found in the list.
+  -- The cures, cheapest first: the loop simply casts again if the target
+  -- is still short, so overshoot is only wasted MP.  Under OT6 the upper
+  -- tiers are folds of the base spell rather than separate grants, so in
+  -- practice only the first of these is ever found in the list.
   local CURES = { 0x2D, 0x2E, 0x2F }
   local F = {}
   local menuStreak, tick, battleTick = 0, 0, 0
@@ -1898,11 +1574,9 @@ function M.newFightDriver(tag, opts)
   end
 
   -- opts.reserve = { [itemId] = n }: never spend the last n.  The bag is
-  -- shared across scenarios: the Terra party used every Potion crossing Mt.
-  -- Kolts, and solo LOCKE then started his own scenario with two Tonics
-  -- and nothing else against a soldier who hits for 115.  A party that
-  -- spends the last Potion whenever the HP gap is large enough is not
-  -- playing the way a player does.
+  -- shared across scenarios, so a party that spends the last Potion
+  -- whenever the HP gap is large enough is not playing the way a player
+  -- does.
   local function battInvIdx(id)
     local floor = (opts.reserve or {})[id] or 0
     for i = 0, 251 do
@@ -1912,14 +1586,11 @@ function M.newFightDriver(tag, opts)
     return nil
   end
 
-  -- What one use of an item gives back.  The prior is M.itemPower, the +$14
-  -- power byte: 50 for a Tonic and 250 for a Potion, and a Tonic was measured
-  -- restoring about 50 in battle 11.  It is a prior and not the answer,
-  -- because power is an input to the engine's heal routine rather than its
-  -- output.  The first use that lands replaces it with the HP that actually
-  -- came back (F.frame's healWatch), so a retuned item, or one whose power
-  -- does not pass through straight, corrects itself within one heal instead
-  -- of steering the policy wrong for a whole fight.
+  -- What one use of an item gives back.  The prior is M.itemPower, the
+  -- +$14 power byte; it is a prior and not the answer, because power is an
+  -- input to the engine's heal routine rather than its output.  The first
+  -- use that lands replaces it with the HP that actually came back
+  -- (F.frame's healWatch).
   local function itemRestoreOf(item)
     return itemRestore[item] or M.itemPower(item)
   end
@@ -1929,24 +1600,19 @@ function M.newFightDriver(tag, opts)
   -- walk below steers to) and the MP cost, or nil if the actor cannot cast
   -- it right now.
   --
-  -- Read live, per actor, rather than taken from the caller, because in OT6
-  -- the list is runtime state twice over: it is compacted to the union of
-  -- what the party knows (InitSpellList), and Ot6UnionEspers /
-  -- Ot6EsperSpellKnown (ot6_progression.asm:144, :205) add each equipped
-  -- esper's spells to its holder alone.  So the same spell sits at different
-  -- cells for different loadouts, and a caller-supplied row number would
-  -- silently steer to whatever else the compaction put there.  The row
-  -- layout is +0 id, +1 flags (bit 7 = greyed), +2 targeting, +3 MP cost
-  -- (battle_preview.lua:59-66).  The price is read here rather than out of
+  -- Read live, per actor, rather than taken from the caller: the list is
+  -- compacted to the union of what the party knows plus each equipped
+  -- esper's spells, so the same spell sits at different cells for
+  -- different loadouts.  Row layout: +0 id, +1 flags (bit 7 = greyed), +2
+  -- targeting, +3 MP cost.  The price is read here rather than out of
   -- magic_prop_en.dat because the engine's copy is the one it charges.
   --
   -- `strict` picks how hard to refuse.  Deciding what to do (strict) asks
-  -- the game's own greyed bit as well, which is the authority on castability
-  -- (CheckMagicEnabled, battle_main.asm:14822-14840).  Steering a list that
-  -- is already open (not strict) asks only the live MP, because the greyed
-  -- bit is refreshed by UpdateEnabledMagic on the action boundary (:1369)
-  -- and a bit that has gone stale under an open window would drop a plan
-  -- that was fine, spending the healer's turn on a B press.
+  -- the game's own greyed bit as well, the authority on castability.
+  -- Steering a list that is already open (not strict) asks only the live
+  -- MP, because the greyed bit is refreshed on the action boundary and a
+  -- bit that has gone stale under an open window would drop a plan that
+  -- was fine, spending the healer's turn on a B press.
   local function spellCell(actor, id, strict)
     local base = M.readWord(MLISTPTR + actor * 2)
     if base < 0x2000 or base > 0x2600 then return nil end
@@ -1979,25 +1645,16 @@ function M.newFightDriver(tag, opts)
     end
     turnSnap[actor] = hpNow
     -- opts.healer = <battle chid>: only that character runs the item
-    -- healing line; everyone else attacks.  Measured need (2026-08-09, the
-    -- escape cave): with every actor healing, a party whose only damage is
-    -- LOCKE's Fight heal-locks, because one enemy round costs more HP than
-    -- the Tonic his turn restores, so he never attacks, the monster never
-    -- dies, and the bag drains to a wipe.  A player splits the jobs, with
-    -- the safe back-row member healing and the fighter fighting.  This is
-    -- role assignment, not the fix for that heal-lock -- the policy below is,
-    -- because a solo party has nobody to hand the job to.
+    -- healing line; everyone else attacks.  Without this, a party whose
+    -- only damage-dealer also heals can heal-lock: it never attacks, the
+    -- monster never dies, and the bag drains to a wipe.
     local mayHeal = opts.healer == nil
         or M.readByte(BCHID + actor * 2) == opts.healer
-    -- #128: a dead healer must not lock the party out of its own bag.  The
-    -- role assignment above is for the living: measured twice (the Zozo
-    -- stairs, the Thamasa fire), the designated healer died first and no
-    -- other actor would ever touch an item or a cure, so the party bled
-    -- out holding full supplies.  A player hands the Tonic to whoever is
-    -- alive.  When the healer is down -- or not in this fight at all --
-    -- whoever holds the row inherits the job; the revive loop below raises
-    -- the dead in entity order (the healer among them), and the role
-    -- returns to its owner on their next living turn.
+    -- A dead healer must not lock the party out of its own bag.  When the
+    -- healer is down -- or not in this fight at all -- whoever holds the
+    -- row inherits the job; the revive loop below raises the dead in
+    -- entity order (the healer among them), and the role returns to its
+    -- owner on their next living turn.
     if not mayHeal then
       local healerAlive = false
       for e = 0, 3 do
@@ -2011,22 +1668,16 @@ function M.newFightDriver(tag, opts)
     end
     local row = (opts.items and mayHeal) and cmdRow(actor, CMD_ITEM) or nil
     -- opts.cure = false turns the cast line off and leaves healing to the
-    -- bag, the way this driver worked before.  Anything else is the list of
-    -- cure spells to try, cheapest first, defaulting to CURES.
+    -- bag.  Anything else is the list of cure spells to try, cheapest
+    -- first, defaulting to CURES.
     --
-    -- Why casting comes first.  M.fieldCare learned the same preference on
-    -- the field side and the reason carries over: OT6 refunds MP in full at
-    -- every level up (ot6_progression.asm:3-6, called from
-    -- battle_main.asm:16251) and never refunds a Tonic.  In battle there is
-    -- a second reason, measured on this ride: a segment can run six fights
-    -- with no field access between them, so the bag is a fixed supply while
-    -- MP is only bounded per fight.  The five Mag Roader fights spent all
-    -- eight of the party's Tonics and left the boss to be fought with
-    -- nothing (#92).
+    -- Casting comes first: OT6 refunds MP in full at every level up and
+    -- never refunds a Tonic, and a segment can run several fights with no
+    -- field access between them, so the bag is a fixed supply while MP is
+    -- only bounded per fight.
     --
     -- The option is named `cure` rather than `magic` only because this
-    -- driver already spends `opts.magic` on the attack line below.  It is
-    -- fieldCare's opts.magic under another name.
+    -- driver already spends `opts.magic` on the attack line below.
     local cureRow = mayHeal and opts.cure ~= false
         and cmdRow(actor, CMD_MAGIC) or nil
     if row ~= nil or cureRow ~= nil then
@@ -2071,38 +1722,12 @@ function M.newFightDriver(tag, opts)
       end
       for _, c in ipairs(cands) do
         local cost = roundCost[c.e] or 0
-        -- The cast, offered first.
-        --
-        -- The policy weighs a heal against what a round takes, and a cast is
-        -- weighed by the same rule with one clause turned off: see
-        -- M.healDecision's `mp`.  In short, the part of the rule that refuses
-        -- a losing heal in a PARTY is an argument about the bag being a fixed
-        -- supply, and MP is not that; the part that refuses one ALONE is an
-        -- argument about spending turns, and a cast spends a turn exactly as
-        -- a drink does.
-        --
-        -- The rule needs a number for what the cure restores, and unlike an
-        -- item there is no honest prior for one.  An item's +$14 power byte
-        -- reads back as the HP it gives (Tonic 50, and 50 is what a Tonic was
-        -- measured restoring); a cure's magic_prop power is an input to a
-        -- formula that scales with the caster's magic power and level, so
-        -- reading it would be deciding the policy on a guess.  So the first
-        -- cast of a spell in a battle is how the number is obtained: it is
-        -- offered unconditionally, healWatch measures what it put back, and
-        -- every later cast that battle is weighed against the real figure.
-        -- One exploratory turn, paid in the resource this branch exists to
-        -- spend, and only ever on somebody already hurt enough to be a
-        -- candidate.
-        --
-        -- The measurement can miss, and then the spell simply stays
-        -- unmeasured and keeps being offered -- which is the behaviour the
-        -- cast line shipped with, so a miss costs nothing it did not already
-        -- cost.  Measured missing on battle 70: CELES's Cure was planned on
-        -- EDGAR at 183/354 and an ally's Potion landed on him first, so the
-        -- cast healed a full target and moved no HP.  It needs an ally to
-        -- happen at all, and with an ally present a cast is allowed anyway
-        -- (the party clause), so it cannot reach the solo refusal, which is
-        -- the one this number is load-bearing for.
+        -- The cast, offered first.  A cure's magic_prop power scales with
+        -- the caster's magic power and level, so unlike an item's +$14
+        -- power byte there is no honest prior for what it restores.  The
+        -- first cast of a spell in a battle is offered unconditionally so
+        -- healWatch can measure what it put back; every later cast that
+        -- battle is weighed against the real figure.
         if cureRow ~= nil then
           for _, spell in ipairs(type(opts.cure) == "table" and opts.cure
                                  or CURES) do
@@ -2159,34 +1784,26 @@ function M.newFightDriver(tag, opts)
     end
     local id = M.readByte(BCHID + actor * 2)
     -- The boost bank.  Spending one BP as soon as it is available plays
-    -- OT6's economy badly: Ot6ShieldedMulW halves damage while a
-    -- monster still has shields, and the damage ratios are broken:weak:
-    -- unweak = 4:2:1 (ot6_break.asm:1487-1497), so the intended play is to
-    -- boost until the shield breaks and then hit.  A boosted Fight removes
-    -- shields faster per hit; spending 1 BP at a time removes them slowly
-    -- and often never breaks them.  opts.bank means: act unboosted, which is
-    -- what regenerates BP (Ot6ActionEnd), until the bank reads at least this
-    -- value, then spend.  gen_sfigaro's steal drive already worked this way,
-    -- and it had not been applied to Fights.
+    -- OT6's economy badly: damage while a monster still has shields is
+    -- halved, with ratios broken:weak:unweak = 4:2:1, so the intended play
+    -- is to boost until the shield breaks and then hit.  opts.bank means:
+    -- act unboosted, which regenerates BP, until the bank reads at least
+    -- this value, then spend.
     local have = M.readByte(BP + actor * 2)
     local boost = 0
     if opts.boost then
       if opts.bank and have < opts.bank then boost = 0
       else boost = math.min(have, 3) end
     end
-    -- opts.summon = { [charId] = { mp = cost } }: the once-per-battle genju,
-    -- through the menu route battle_magicite measured (2026-07-27): from the
-    -- magic list scrolled to the top, UP runs CheckHasGenju and opens the
-    -- esper window ($7BC2 = $16), A commits, and A confirms the default
-    -- target.  The engine's latch is the gate: the caster's entity bit in
-    -- $3f2e, which once set makes UpdateEnabledMagic grey the row
-    -- (battle_magicite point 3), so the plan is offered only while that bit
-    -- is clear and the character can pay.  The Magic command row only exists
-    -- while the stone is worn (battle_subjob's grant), so an unequipped
-    -- caller falls through to the branches below the same way a mage out of
-    -- MP does.  Written for the Cranes re-test (2026-08-10): BISMARK's Sea
-    -- Song is the game's only water attack, and water is that fight's
-    -- intended weakness.
+    -- opts.summon = { [charId] = { mp = cost } }: the once-per-battle
+    -- genju.  From the magic list scrolled to the top, UP runs
+    -- CheckHasGenju and opens the esper window ($7BC2 = $16), A commits,
+    -- and A confirms the default target.  The engine's latch is the gate:
+    -- the caster's entity bit in $3f2e, which once set makes
+    -- UpdateEnabledMagic grey the row, so the plan is offered only while
+    -- that bit is clear and the character can pay.  The Magic command row
+    -- only exists while the stone is worn, so an unequipped caller falls
+    -- through to the branches below the same way a mage out of MP does.
     local sm = opts.summon and opts.summon[id]
     if sm and M.readWord(CURMP + actor * 2) >= (sm.mp or 50)
        and (M.readWord(0x3f2e) & M.readWord(0x3018 + actor * 2)) == 0
@@ -2199,12 +1816,10 @@ function M.newFightDriver(tag, opts)
     -- cell against the live cursor cells, and confirm on the enemy the focus
     -- list picks (or the default enemy target when there is no focus list).
     --
-    -- The caller names a spell id, not a grid row.  It used to name the row,
-    -- with the MP price as a second caller-supplied number, and both are
-    -- wrong to hand in: the compacted list's rows move with the party's
-    -- loadout, and OT6 prices a folded cast at the tier it folds to
-    -- (battle_subjob scenario C: a boosted Bolt executes as Bolt 3 and is
-    -- charged Bolt 3's 53 MP).  spellCell answers both from the engine.  A
+    -- The caller names a spell id, not a grid row: the compacted list's
+    -- rows move with the party's loadout, and OT6 prices a folded cast at
+    -- the tier it folds to, so a caller-supplied row and MP price would be
+    -- wrong to hand in.  spellCell answers both from the engine.  A
     -- character who cannot pay falls through to the branches below, so a
     -- mage out of MP Fights instead of wedging the menu.
     --
@@ -2213,16 +1828,12 @@ function M.newFightDriver(tag, opts)
     -- damage and the BP is owed to somebody's break.
     local mg = opts.magic and opts.magic[id]
     if mg and cmdRow(actor, CMD_MAGIC) then
-      -- #99: the absorb guard, at plan time, for the ability's element --
-      -- the same defect the weapon guard was built for, arriving by the
-      -- other door (the Cranes' Left Crane healed 250 off a lightning
-      -- Blitz).  A spell whose element a PRESENT species absorbs is a
-      -- heal for the enemy, so the plan is refused and the actor falls
-      -- through to the branches below (usually Fight) -- self-correcting
-      -- rather than run-failing, because unlike a worn weapon the driver
-      -- can simply choose differently this turn.  Folding never changes
-      -- a family's element, so the base spell's byte answers for every
-      -- tier the pending boost could fold to.
+      -- The absorb guard, at plan time, for the ability's element.  A
+      -- spell whose element a PRESENT species absorbs is a heal for the
+      -- enemy, so the plan is refused and the actor falls through to the
+      -- branches below (usually Fight).  Folding never changes a family's
+      -- element, so the base spell's byte answers for every tier the
+      -- pending boost could fold to.
       local elem = M.spellElement(mg.spell)
       local absorbed = nil
       if elem ~= 0 then
@@ -2254,14 +1865,10 @@ function M.newFightDriver(tag, opts)
       end
     end
     -- opts.tools = false disables the Tools line while keeping the rest of
-    -- the tactical kit.  Measured need (2026-08-10, the Cranes): AutoCrossbow
-    -- hits all targets, and each Crane counts every hit in an if_hit retal
-    -- var; past the threshold the victim casts on its sibling the element
-    -- that sibling absorbs (Bolt2/Fire2 across the deck; +329 hp observed on
-    -- the Left Crane, more than three of our boosted hits undone).  Against
-    -- a formation where a multi-target attack heals the enemy, Edgar's
-    -- single-target pierce Fight removes the same class-weak shields without
-    -- triggering the sibling heal.
+    -- the tactical kit.  Against a formation where a multi-target attack
+    -- (AutoCrossbow hits all targets) heals the enemy, Edgar's
+    -- single-target pierce Fight removes the same class-weak shields
+    -- without triggering that heal.
     if opts.tactical and opts.tools ~= false and id == 4
        and M.readWord(CURMP + actor * 2) >= 4
        and cmdRow(actor, CMD_TOOLS) then
@@ -2283,26 +1890,15 @@ function M.newFightDriver(tag, opts)
     if st == ST_CMD then tgtSpin = 0 end
     if plan == nil or planActor ~= actor then
       if st == ST_TGT then
-        -- #111's missing backstop (measured 2026-08-19, sfigaro_escape's
-        -- wipe).  A confirm clears the plan optimistically and presses A;
-        -- when the A is REFUSED -- the target cursor's rest mask sat on the
-        -- corpse of monster slot 0 -- the state stays ST_TGT with no plan,
-        -- and this head used to return nil here every tick: no press, no
-        -- replan, the turn held open until the party wiped 8000 frames
-        -- later.
-        --
-        -- Two rules, both measured the hard way on n128_won's regen (the
-        -- first version of this backstop CAUSED that freeze):
-        --   * below the threshold this waits silently, exactly as the old
-        --     head did -- a landed confirm's tail passes through here for a
-        --     tick or two, and pressing A there perturbed healthy fights
-        --     (the n128 divergence began at the first such press);
-        --   * tgtSpin resets only at ST_CMD (a genuine menu restart), not
-        --     on any off-ST_TGT flicker -- n128's freeze never logged
-        --     because animation flickers reset the count below the
-        --     threshold every sample window.
-        -- Past the threshold: walk the cursor (the focus steer's own
-        -- rotation) between confirms until any live target lets the A land.
+        -- Backstop for a refused confirm: a confirm clears the plan
+        -- optimistically and presses A, and when the A is REFUSED (e.g.
+        -- the target cursor's rest mask sits on a corpse) the state stays
+        -- ST_TGT with no plan.  Below the threshold this waits silently,
+        -- since a landed confirm's tail also passes through here for a
+        -- tick or two.  tgtSpin resets only at ST_CMD (a genuine menu
+        -- restart), not on any off-ST_TGT flicker.  Past the threshold:
+        -- walk the cursor (the focus steer's own rotation) between
+        -- confirms until any live target lets the A land.
         tgtSpin = tgtSpin + 1
         if tgtSpin < 8 then return nil end
         if tgtSpin == 8 then
@@ -2335,13 +1931,9 @@ function M.newFightDriver(tag, opts)
     end
     if st == ST_ITEM and plan.kind == "item" then
       -- Use the index resolved when the plan was made rather than a fresh
-      -- read.  Mid-menu inventory reads return wrong values (gen_sabin_train's
-      -- shop drive hit the same thing and verifies purchases only after the
-      -- window closes), and a wrong read here returns nil, drops the plan,
-      -- presses B, and re-plans, without end.  Measured at battle 11: solo
-      -- LOCKE logged "heal entity 0 (58/168) with $E9" twice in three
-      -- hundred frames with his HP never moving, and died holding four
-      -- Potions.
+      -- read: mid-menu inventory reads return wrong values, and a wrong
+      -- read here returns nil, drops the plan, presses B, and re-plans,
+      -- without end.
       local want = plan.idx or battInvIdx(plan.item)
       if want == nil then plan, planActor = nil, nil; return { "b" } end
       local cur = M.readByte(ITEMSCR + actor) + M.readByte(ITEMROW + actor)
@@ -2389,18 +1981,13 @@ function M.newFightDriver(tag, opts)
     end
     if st == ST_TGT then
       -- Both ally-targeted lines steer the same way: an item and a cure
-      -- differ only in which window chose them.  gen_vargas's hand-written
-      -- Cure drive already crossed sides and walked $7B7D exactly like its
-      -- Potion drive (gen_vargas.lua:281-300); this is that, shared.
+      -- differ only in which window chose them.
       if plan.kind == "item" or plan.kind == "heal" then
         local chars, mons = M.readByte(TGTCHARS), M.readByte(TGTMONS)
         if mons ~= 0 then return { "right" } end
-        -- Neither side is selected.  The old code fell into the
-        -- steer below with chars = 0, which sets cur = 0, compares
-        -- `0 < plan.target`, false for target 0, and presses UP
-        -- without end.  A solo party's only valid target is 0, so this
-        -- deadlock can only happen to a party of one, which is
-        -- the shape of battle 11.
+        -- Neither side is selected: falling into the steer below with
+        -- chars = 0 would set cur = 0 and, for target 0, spin forever
+        -- pressing UP.
         if chars == 0 then return { "right" } end
         local wantMask = 1 << plan.target
         if chars ~= wantMask then
@@ -2422,24 +2009,14 @@ function M.newFightDriver(tag, opts)
         end
       end
       -- opts.focus = { {slot=S, mask=M}, ... }: monster kill order, steered
-      -- against the live target mask ($7B7E) the way the item line
-      -- steers $7B7D.  Each entry names a monster slot (for the liveness
-      -- check against $3BFC) and the $7B7E mask bit that puts the cursor on
-      -- it.  These are two different orderings, measured different
-      -- (2026-08-10, the Cranes): the mask's bit 0 is the cursor's default
-      -- rest position and landed damage on slot 1 ($010E), so mask bits
-      -- follow the on-screen formation layout rather than monster-table
-      -- order.  The need comes from the same fight: each Crane counts hits in
-      -- an if_hit retal var, and past the threshold the victim casts on its
-      -- sibling the element that sibling absorbs.  With the unfocused
-      -- default (everyone on the Right), the Right Crane cast Bolt2 into the
-      -- Left all fight: the Left healed to full each time, and because Bolt2
-      -- is lightning the same casts walked the Left's Giga Volt charge to
-      -- level 3, whose damage wiped the party ($010D at 1800/1800 across
-      -- three attempts' close dumps).
-      -- Focus picks the first entry whose slot is still alive; single-
-      -- target plans steer to its mask (summons, items and cures keep their
-      -- own targeting), and the tgtSpin backstop still confirms rather than
+      -- against the live target mask ($7B7E) the way the item line steers
+      -- $7B7D.  Each entry names a monster slot (for the liveness check
+      -- against $3BFC) and the $7B7E mask bit that puts the cursor on it;
+      -- mask bits follow the on-screen formation layout rather than
+      -- monster-table order, so the two are not interchangeable.  Focus
+      -- picks the first entry whose slot is still alive; single-target
+      -- plans steer to its mask (summons, items and cures keep their own
+      -- targeting), and the tgtSpin backstop still confirms rather than
       -- holding the turn open.
       if opts.focus and plan.kind ~= "item" and plan.kind ~= "summon"
          and plan.kind ~= "heal" then
@@ -2455,10 +2032,9 @@ function M.newFightDriver(tag, opts)
             tgtSpin = tgtSpin + 1
             if tgtSpin < 24 then
               -- on the ally side (mons == 0), LEFT crosses to the enemy
-              -- side.  Among monsters the walk leads with LEFT/RIGHT,
-              -- measured on the Cranes (side-by-side formation): 24 ticks
-              -- of down/up never moved the rest mask, so the pair is a
-              -- horizontal walk
+              -- side.  Among monsters the walk leads with LEFT/RIGHT: a
+              -- side-by-side formation's rest mask does not move on
+              -- down/up.
               if mons == 0 then return { "left" } end
               local dirs = { "left", "right", "down", "up" }
               return { dirs[1 + ((tgtSpin // 6) % 4)] }
@@ -2495,7 +2071,7 @@ function M.newFightDriver(tag, opts)
         healWatch = watch
       end
       -- A refused confirm (corpse under the target cursor) re-enters
-      -- button()'s plan-nil ST_TGT head next tick, which owns the #111
+      -- button()'s plan-nil ST_TGT head next tick, which owns the
       -- backstop; the optimistic clear here is what routes it there.
       plan, planActor = nil, nil
       return { "a" }
@@ -2525,15 +2101,11 @@ function M.newFightDriver(tag, opts)
     -- moves.  HP falling first is the enemy acting between the confirm and
     -- the heal, so the baseline follows it down rather than reading the
     -- rebound as a bigger heal than it was.
-    -- A heal that fills the target to maximum is CLIPPED, and the HP it moved
-    -- is a lower bound rather than what the heal is worth.  Recording one
-    -- would tell the policy the heal is far weaker than it is, and the policy
-    -- would then decline it for the rest of the battle.  Measured on the
-    -- minecart ride, where the same Cure moved 42, 84, 178 and 184 hp
-    -- depending on how much room the target had: 42 would have retired the
-    -- ride's whole healing line.  So a clipped heal is not recorded; it stays
-    -- unmeasured, which falls back to the item's power byte or to offering
-    -- the cast, and the next use on somebody with room measures it properly.
+    -- A heal that fills the target to maximum is CLIPPED, and the HP it
+    -- moved is a lower bound rather than what the heal is worth, so a
+    -- clipped heal is not recorded; it stays unmeasured, which falls back
+    -- to the item's power byte or to offering the cast, and the next use
+    -- on somebody with room measures it properly.
     if healWatch then
       local hp = M.readWord(0x3BF4 + healWatch.target * 2)
       if hp > healWatch.hp and hp >= healWatch.maxhp then
@@ -2571,9 +2143,9 @@ function M.newFightDriver(tag, opts)
         if id ~= 0xFFFF and id ~= 0 then
           -- hp, and the shield count beside it: shields live at
           -- $3E38 + entity*2 and monsters are entities 4..9, so slot s is
-          -- $3E40 + s*2 (battle_break.lua:34).  Without the shield count the
-          -- log shows low damage without showing the cause, since shielded
-          -- damage is halved and a broken monster takes 4x.
+          -- $3E40 + s*2.  Without the shield count the log shows low
+          -- damage without showing the cause, since shielded damage is
+          -- halved and a broken monster takes 4x.
           mhp[#mhp + 1] = string.format("%d/sh%d",
             M.readWord(0x3BFC + s2 * 2), M.readByte(0x3E40 + s2 * 2))
         end
@@ -2628,17 +2200,12 @@ function M.newFightDriver(tag, opts)
         held and next(held) and table.concat(held, "+") or "."))
     end
     tick = tick + 1
-    -- One press per `cadence` frames, and the number affects outcomes.
-    -- At the historical 30 a single boosted Fight costs four
-    -- press cycles, three R presses and an A, which is two seconds of wall
-    -- clock to enter one command.  Measured 2026-08-09 on battle 11 (solo
-    -- LOCKE, level 8, versus a 495-hp HeavyArmor): he got about three
-    -- decisions per fight and lost three attempts in a row, while a player
-    -- pressing at an ordinary speed gets ten.  The loss came from the input
-    -- rate rather than the party.  6-on/6-off is still slower
-    -- than a human pressing buttons, and it stays clear of the menu's
-    -- auto-repeat threshold; callers that have a reason to be slow can ask
-    -- for it.
+    -- One press per `cadence` frames, and the number affects outcomes: too
+    -- slow a cadence costs decisions per fight, which can decide a close
+    -- fight on input rate rather than the party.  6-on/6-off is still
+    -- slower than a human pressing buttons, and it stays clear of the
+    -- menu's auto-repeat threshold; callers that have a reason to be slow
+    -- can ask for it.
     local ph = tick % (opts.cadence or 30)
     local actor = M.readByte(ACTOR) & 3
     if plan and planActor ~= actor then plan, planActor = nil, nil end
@@ -2704,18 +2271,14 @@ end
 -- The runner.  steps: list of step objects.  opts.maxFrames: global budget.
 local runnerStarted = false
 
--- ---- the tile trace (#84) --------------------------------------------------
+-- ---- the tile trace ---------------------------------------------------
 -- Records which tiles the party actually stood on, per map, and emits them
--- as [tiles] log lines at each map change and at run end.  Read-only: three
--- byte-reads a frame and a log line, nothing written, so the honesty rules
--- are untouched.  The consumer is the chest-visibility rule -- the owner's
--- "if a chest is visible on the screen, a human walks over and opens it" --
--- which wants the route's real walked path measured rather than reasoned;
--- tools/chest_visibility.py harvests these lines from a regen log and
--- intersects them with the chest table.  Samples only at tileAligned(),
--- which is also what keeps a mid-step direction-skewed coordinate (the
--- tileAligned comment above) out of the record; battle and menu frames
--- re-record the frozen field tile, which the dedupe absorbs.
+-- as [tiles] log lines at each map change and at run end.  Read-only:
+-- nothing written.  tools/chest_visibility.py harvests these lines from a
+-- regen log and intersects them with the chest table.  Samples only at
+-- tileAligned(), which keeps a mid-step direction-skewed coordinate out of
+-- the record; battle and menu frames re-record the frozen field tile,
+-- which the dedupe absorbs.
 local traceMap, traceSet, traceCount = nil, {}, 0
 local function traceFlush()
   if traceMap == nil or traceCount == 0 then return end
@@ -2734,35 +2297,28 @@ local function traceFlush()
   traceSet, traceCount = {}, 0
 end
 
--- ---- CDL code coverage (#130) ----------------------------------------------
--- When OT6_COVERAGE is set, dump the "touched" bitmap for the OT6 code ranges
--- at run teardown.  Mesen keeps a Code/Data Log per emulator process:
--- emu.getCdlData(prgRom) returns one CdlFlags byte per PRG-ROM offset, with
--- 0x01 (Code) set once the byte has been fetched as an opcode and 0x02 (Data)
--- set once it has been read as data.  We record 0x03 (either), so a data table
--- exercised by the run counts as touched -- otherwise every OT6 data export
--- (stat/icon/font tables, which are read, never executed) would read as a
--- permanent blind spot.  The CDL is per-process and starts empty each boot, so
--- each test contributes only what its own run reached; lib/coverage_report.py
--- unions the per-test bitmaps across the suite and maps set bits back to
--- routine names.  Read-only (one getCdlData read at teardown, nothing
--- written), so the honesty rules are untouched.
+-- ---- CDL code coverage --------------------------------------------------
+-- When OT6_COVERAGE is set, dump the "touched" bitmap for the OT6 code
+-- ranges at run teardown.  emu.getCdlData(prgRom) returns one CdlFlags
+-- byte per PRG-ROM offset, with 0x01 (Code) set once fetched as an opcode
+-- and 0x02 (Data) set once read as data; we record 0x03 (either), so a
+-- data table exercised by the run counts as touched.  The CDL is
+-- per-process and starts empty each boot; lib/coverage_report.py unions
+-- the per-test bitmaps and maps set bits back to routine names.
+-- Read-only: nothing written.
 --
--- The ranges track ff6/rom/ff6-en.map's ot6_code (F00000-F02C5B) and ot6_c1
--- (C1FFE8-C1FFF4) segments, expressed as PRG-ROM offsets (CPU addr & 0x3FFFFF).
--- coverage_report.py carries the same {base,len} pairs in the same order and
--- unpacks the concatenated bitmap against them; the two lists must stay in
--- lockstep.  emu.getCdlData returns a 0-indexed array (element [k] is PRG
--- offset k; #cdl is 0x3FFFFF with a live [0]), so read cdl[offset] directly --
--- measured: the highest code offset lands at 0x302ADC, exactly one below
--- Ot6EsperStatTbl's data at F02ADD, which is the code/data boundary the map
--- names and confirms the indexing.
+-- The ranges track ff6/rom/ff6-en.map's ot6_code and ot6_c1 segments,
+-- expressed as PRG-ROM offsets (CPU addr & 0x3FFFFF); coverage_report.py
+-- carries the same {base,len} pairs in the same order and unpacks the
+-- concatenated bitmap against them, so the two lists must stay in
+-- lockstep.  emu.getCdlData returns a 0-indexed array, so read
+-- cdl[offset] directly.
 --
--- The on/off switch is the global OT6_COVERAGE, not an env var: Mesen's Lua
--- sandbox blocks os.getenv (AllowIoOsAccess=false), so lib/compose.py injects
--- OT6_COVERAGE=true into the composed preamble when its own environment has
--- OT6_COVERAGE set (suite.sh's coverage mode).  Undefined for a normal run, so
--- the `not OT6_COVERAGE` guard makes this a no-op on the `make test` path.
+-- The on/off switch is the global OT6_COVERAGE, not an env var: Mesen's
+-- Lua sandbox blocks os.getenv, so lib/compose.py injects
+-- OT6_COVERAGE=true into the composed preamble when its own environment
+-- has OT6_COVERAGE set.  Undefined for a normal run, so the
+-- `not OT6_COVERAGE` guard makes this a no-op.
 local COVERAGE_RANGES = { { 0x300000, 0x2C5C }, { 0x01FFE8, 0x0D } }
 local coverageDone = false
 local function coverageFlush()
@@ -2819,38 +2375,26 @@ function M.run(opts, steps)
   local root = seqStep(steps)
   local finished = false
 
-  -- #127's silent-auto-Continue canary.  Every game-over path routes
-  -- through the event GameOver SCRIPT ($CC/E568); when it runs, the
-  -- title screen follows, and any driver that mashes A auto-Continues the
-  -- last save -- after which the session has TIME-TRAVELED (roster and
-  -- switches revert) while every naive predicate reads healthy.  Measured
-  -- on the burning-house ambush: a lost fight read as a win for two full
-  -- agent passes.  So the default is LOUD: GameOver fails the run,
-  -- unless the route declares it survivable (opts.allowGameOver, or a
-  -- ladder setting M.gameOverFired = 0 after handling its reload).
+  -- Silent-auto-Continue canary.  Every game-over path routes through the
+  -- event GameOver script ($CC/E568); when it runs, the title screen
+  -- follows, and any driver that mashes A auto-Continues the last save,
+  -- after which the session has TIME-TRAVELED (roster and switches
+  -- revert) while every naive predicate reads healthy.  So the default is
+  -- LOUD: GameOver fails the run, unless the route declares it survivable
+  -- (opts.allowGameOver, or a ladder setting M.gameOverFired = 0 after
+  -- handling its reload).
   --
-  -- READ watch, not exec (the first version's own blindness, measured the
-  -- hard way): GameOver in bank $CC is EVENT SCRIPT DATA -- the event
-  -- interpreter READS those bytes and never executes them as CPU code, so
-  -- an exec watch fires never and a lost ambush read as a win for one
-  -- more full pass.  The interpreter's fetch of the script's first byte
-  -- is the reliable signal.
+  -- READ watch, not exec: GameOver in bank $CC is EVENT SCRIPT DATA -- the
+  -- event interpreter READS those bytes and never executes them as CPU
+  -- code, so an exec watch there would never fire.
   --
-  -- SECOND BLIND SPOT, found pass five (issue #127's ambush ladder): even
-  -- the READ watch above stayed at 0 through five confirmed real losses
-  -- (win-verification -- map/roster ground truth, not this canary --
-  -- caught all five landing back on the reloaded thamasa-night-v1 SRAM).
-  -- GameOver at $CC/E568 is a NARRATIVE event script (`_ca5ea9`'s own
-  -- body: `if_b_switch $40, return; call GameOver` -- 8 call sites, all in
-  -- event_main.asm, all story-adjacent); a genuine party wipe inside a
-  -- live `battle` command is handled by the BATTLE MODULE directly and
-  -- apparently never runs that script at all.  TitleScreen
-  -- (cutscene_main.asm, $C2680C) is the actual title-screen module entry
-  -- every path back to the title screen must reach, GameOver-scripted or
-  -- not, so an EXEC watch there is the backstop: it fires on the real
-  -- title screen regardless of which internal path got there.  Both
-  -- watches feed the same M.gameOverFired counter so no caller needs to
-  -- know which one fired.
+  -- A genuine party wipe inside a live `battle` command is handled by the
+  -- BATTLE MODULE directly and never runs the GameOver script at all, so
+  -- the READ watch alone is not sufficient.  TitleScreen is the actual
+  -- title-screen module entry every path back to the title screen must
+  -- reach, GameOver-scripted or not, so an EXEC watch there is the
+  -- backstop.  Both watches feed the same M.gameOverFired counter so no
+  -- caller needs to know which one fired.
   M.gameOverFired = 0
   do
     local ok, addr = pcall(M.sym, "GameOver")
@@ -2893,11 +2437,9 @@ function M.run(opts, steps)
       return
     end
     -- The absorb guard rides here rather than inside the battle drivers
-    -- because a route need not use one: gen_ifrit_magicite plays battle 70
-    -- with its own tactical driver, and a guard hung off M.fightBattle
-    -- would not see that fight at all.  Every test in the tree goes
-    -- through this one callback.  The tile trace rides here for the same
-    -- reason: every walk in the tree passes this frame.
+    -- because a route need not use one of those drivers at all, and every
+    -- test in the tree goes through this one callback.  The tile trace
+    -- rides here for the same reason.
     local ok, r = pcall(function()
       traceTick()
       local bad = M.absorbGuardTick()

@@ -2,40 +2,25 @@
 -- battle_hudanim16: the under-enemy hud must never render while the
 -- battlefield BG3 is in 16x16 tile mode.
 --
--- The bug (the owner's residual v0.2 sighting, which survived both the fly-in
--- gate and the dialogue font-clobber veil): "junk showing up every once in
--- a while during battle, drawing over and around the enemies -- break
--- icons amongst other things that look like junk memory ... happening in
--- fights with no dialog too, just ordinary random battles."
---
--- Mechanism (probe_junk16, probe_bg3anim, probe_aurabolt).  Battle
--- animation inits flip the battlefield's $2105 shadow ($896F) to 16x16
--- BG3 tiles while an effect uses BG3 as its canvas or color-math mask
--- (InitAnimType btlgfx_main.asm:26304/:26348, circle families :47410/
--- :48362).  Vanilla clears the field map first and its $01EE fill is
--- priority-clear, so it is invisible under the battle bg, but OT6's hud
--- cells are priority-set, and a 16x16 map cell renders at doubled size and
--- position, pulling three neighbor tiles.  Any live hud line inside the
--- effect's scroll window becomes doubled break-icon blocks flanked by
--- neighbor junk.  A plain Cure in the map-96 Cirpius x3 pool (hud rows 5
--- and 8, both inside the idle (0,0) window) showed it for 42 straight
--- frames; Fire's $51 phase (priority flag dropped) and plain Fights ($19,
--- bg1-only) are invisible, which is why the sighting was intermittent.  No
--- dialogue, boss or fly-in is required.
+-- Battle animation inits flip the battlefield's $2105 shadow ($896F) to
+-- 16x16 BG3 tiles while an effect uses BG3 as its canvas or color-math mask.
+-- Vanilla clears the field map first and its $01EE fill is priority-clear,
+-- so it is invisible under the battle bg, but OT6's hud cells are
+-- priority-set, and a 16x16 map cell renders at doubled size and position,
+-- pulling three neighbor tiles.  Any live hud line inside the effect's
+-- scroll window becomes doubled break-icon blocks flanked by neighbor junk.
 --
 -- The fix (Ot6BgHudFlush_ext): while $896F bit $40 is up, the flush veils
 -- every live line with vanilla's $01EE fill, the same veil entry and exit
 -- effects and dialogue windows get, and repaints as soon as the mode
 -- comes back.
 --
--- The test needs kolts_cave.mss (battle_flyin's fixture; its natural pool is
--- the sighting's formation class): pace into the Cirpius fight, let the entry
--- finish, then run ~2 player turns with Terra casting (her spells carry the
--- 16x16-with-priority anims) under a per-frame watch:
+-- kolts_cave's natural pool is Cirpius x3: pace into the fight, let the
+-- entry finish, then run ~2 player turns with Terra casting (her spells
+-- carry the 16x16-with-priority anims) under a per-frame watch:
 --   * invariant: on every mid-fight frame with $896F bit6 set and BG3 on
 --     the battlefield main screen, no live hud line cell in vram holds a
---     painted OT6 glyph (attr $21 plus a claimed char).  Pre-fix this fails
---     in the first Cure window (424 flagged frames on the probe).
+--     painted OT6 glyph (attr $21 plus a claimed char).
 --   * positive controls: >= 24 such 16x16 frames sampled, at
 --     least one with a live veiled line ($01EE at cur, which shows the veil
 --     painted rather than the lines being disabled); the dialogue latch
@@ -52,7 +37,7 @@ local ST_SPELL, ST_TGT = 0x0e, 0x38
 
 local function map() return H.mapId() & 0x1ff end
 
--- OT6-claimed glyph chars, read from rom (battle_flyin's technique)
+-- OT6-claimed glyph chars, read from rom
 local claimed = nil
 local function claimedCharSet()
   local function findSig(sig)
@@ -147,7 +132,7 @@ H.run({ maxFrames = 40000 }, {
     "field control in cave 96"),
   H.call(function() H.assertEq(map(), 96, "kolts_cave on map 96") end),
 
-  -- pace the auto-detected lane until an encounter loads (battle_flyin's pacer)
+  -- pace the auto-detected lane until an encounter loads
   (function()
     local battN, waited, lane = 0, 0, nil
     local BACK = { left = "right", right = "left", up = "down", down = "up" }
@@ -160,9 +145,6 @@ H.run({ maxFrames = 40000 }, {
     end, 8600, {
       H.call(function()
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
-        -- issue #75: the $1f6e danger pin is gone; the pace rolls the
-        -- encounter on its own (deterministic from the fixture; see
-        -- battle_flyin's note at the same loop).
         local x, y = H.fieldX(), H.fieldY()
         if lane == nil then
           for _, d in ipairs({ "right", "left", "up", "down" }) do

@@ -1,5 +1,5 @@
 -- @suite savestate=vargas_won slow
--- battle_blitzgrey.lua -- v0.5 MP costs: the Blitz menu greys what Sabin can't
+-- battle_blitzgrey.lua -- MP costs: the Blitz menu greys what Sabin can't
 -- afford, exactly as vanilla Magic greys a spell whose MP cost exceeds current
 -- MP.
 --
@@ -17,18 +17,14 @@
 -- universal charge at CalcAttackEffect later subtracts from, so the menu greys
 -- exactly what the charge would refuse.
 --
--- Issue #75 conversion: the boundary is spent to rather than written.  This
--- file used to install an all-Sabin party into the magitek intro fight, write
--- the known-blitz mask, and pin current MP, first low (grey pass) and then high
--- (white pass), which only showed the grey follows a poked number.  It now
--- boots vargas_won (the real post-boss Sabin, learned set read off $1d28:
+-- Boots vargas_won (the real post-boss Sabin, learned set read off $1d28:
 -- Pummel 4 MP and AuraBolt 10 MP at his real level), fights real ledge
 -- encounters, and drives his pool across the affordability line using the
 -- blitzes themselves: AuraBolts while the pool is rich, one Pummel to
 -- finish, until current MP lands in [4,9], where AuraBolt is unaffordable and
--- Pummel is still affordable.  That is stronger than the pins: the charge and
--- the grey are shown to read the same cell, in both directions on the same
--- rows (rich pool: every row white; spent pool: the expensive row grey).
+-- Pummel is still affordable. The charge and the grey are shown to read the
+-- same cell, in both directions on the same rows (rich pool: every row
+-- white; spent pool: the expensive row grey).
 --
 -- What is asserted (attribute byte = the odd/high byte of each name tile's
 -- tilemap word, $21 white / $25 grey):
@@ -117,11 +113,9 @@ local function planCast(mp)
 end
 
 -- ------------------------------------------------------------------------
--- the per-frame driver (battle_toolsgrey's, retargeted at the Blitz shell):
--- "spend" casts planCast's blitz on Sabin's menu; "open" holds the list up.
--- Bystanders Defend; battle dialogs are paged with A (the battle_vargas
--- hazard, measured on this family's first run); off-battle the lane is
--- paced for the next natural encounter.
+-- the per-frame driver: "spend" casts planCast's blitz on Sabin's menu;
+-- "open" holds the list up. Bystanders Defend; battle dialogs are paged
+-- with A; off-battle the lane is paced for the next natural encounter.
 -- ------------------------------------------------------------------------
 local mode = "spend"
 local ph, lane, hb = 0, nil, -600
@@ -138,7 +132,7 @@ local function pulse()
   local edge = ph % 10 < 5
   if not H.battleLoadStarted() then
     -- field: pace the lane for the next encounter; page victory/EXP dialogs
-    -- with A until control returns (the battle_walletmp run-4 hazard)
+    -- with A until control returns
     if not (H.hasControl() and H.tileAligned()) then
       H.setPad(ph % 8 < 4 and { a = true } or {})
       return
@@ -153,8 +147,7 @@ local function pulse()
     H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
     return
   end
-  lane = nil          -- re-anchor at the next field return (the walletmp
-                      -- run-5 hazard, where a stale anchor walks off the map)
+  lane = nil          -- re-anchor at the next field return
   if H.readByte(MENU) == 0 then
     H.setPad(ph % 8 < 4 and { a = true } or {})     -- page battle dialogs
     return

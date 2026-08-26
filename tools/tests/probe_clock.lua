@@ -1,14 +1,10 @@
--- probe_clock.lua -- instrument the Zozo clock's three chained choice
--- dialogs: open it, then drive the hour cursor to 2 by watching $056E move
--- one step per d-pad edge ($056D latch), logging the menu bytes throughout.
--- Issue #75: playBattles = "tactical" keeps these walks out of the library's
--- monster-dead flag write, and here it is not a no-op: maps 221 and 225 do
--- draw random battles (map_prop.dat byte +5 bit 7 set), from the Zozo pools
+-- probe_clock.lua -- instruments the Zozo clock's three chained choice
+-- dialogs: opens it, then drives the hour cursor to 2 by watching $056E
+-- move one step per d-pad edge ($056D latch), logging the menu bytes
+-- throughout.  Maps 221 and 225 draw random battles from the Zozo pools
 -- group 78 (Gabbldegak, Harvester, HadesGigas) and group 77 (SlamDancer,
--- Harvester, Gabbldegak).  Fought rather than fled for the reason
--- gen_zozo3_clock records: several of those formations permit a pincer,
--- which raises run difficulty from 2 to 6 per monster, and gen_zozo5_ramuh
--- already clears this same pool on these same maps with blind A-taps.
+-- Harvester, Gabbldegak); playBattles = "tactical" fights rather than
+-- flees them.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

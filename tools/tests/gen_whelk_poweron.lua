@@ -7,44 +7,7 @@
 -- boots from build/states/playthrough_srm.mss.lua, a git-ignored fixture
 -- generated from a human save by make_srm_sidecar.sh, so a fresh checkout
 -- could not generate STATE3.
---
--- Route (all New-Game, all automatic input; trigger tiles from
--- event_trigger.asm, scene bodies from event_main.asm, both verified):
---   power-on -> title Start-presses -> ~15.5k frames of automatic intro
---     march (the "1000 years have passed..." narration + Magitek credits walk)
---   -> blind UP+A masher (gen_battle_state's proven step) lands the
---     game-starting keypress, rides the cliff dialogs, and walks into the
---     first scripted guard fight.  Frame 15500 is still mid-credits, and a
---     neutral pad loops the attract sequence indefinitely (both measured,
---     see Phase 2a)
---   -> map 19 (Narshe approach): scripted fights fire at the x=38 column
---     triggers {38,38} {38,26} {38,17} (event_trigger.asm map 19); blind
---     held-UP climbs y=38 -> 1 into map 39, and every fight on the way is
---     won with real input by edge-tapped A (issue #75: this generator makes
---     no state writes).  Tap-A works here rather than being a shortcut: A
---     opens the magitek command, A confirms the first beam, A takes the
---     default target, and the vanilla-faithful intro guards die to one beam
---     each.  Fleeing (L+R) is not used on this step because these are
---     event `battle` fights whose win the script chain expects.
---   -> map 39 (Narshe town): blind-UP stalls at (26,42) (measured), so BFS
---     to (31,23), one south of the mines-approach trigger line {30..32,22}
---     (_cc9db2).  En route the {30,37} trigger (_cc9d0d) springs the 4-guard
---     ambush `battle 4`; navTo clears it.  Then blind-UP: the regroup scene
---     (dialog $0010, WEDGE/VICKS walk UP into the mine door and hide,
---     switch $012B=1) plays out, and the door north of (31,22) loads
---     map 41 at (38,33) facing up (load_map 41, event_main.asm:101393).
---   -> map 41 (Narshe mines): the security door at {41,5}x{3,4} boots closed
---     (map-init draws wall tiles while switch $012C=0, _cc9ef2), so the
---     entry point (42,6) is unreachable by BFS until the door-blast scene at
---     trigger {42,9} (_cc9e23) runs: choreography + dialog $0011, the BG mod
---     opens the x=42 column, TERRA ends force-marched to (42,8), and
---     switch $012C=1 marks it done.  So: navTo(42,9) with arrive=blastDone,
---     then navTo(42,6), two tiles, never touching (42,5).
---   -> assert the entry point is calm and the whelk-done switch is clear,
---   generate
---     whelk_entry.mss, then (as a positive control) take the one deliberate
---     step onto the trigger and confirm the Whelk fight comes up.
---
+
 -- The Whelk trigger, with semantics taken from gen_whelk and the disassembly:
 --   * map 41 event trigger {42,5} -> _cc9f37 (event_trigger.asm map 41,
 --     event_main.asm:101417).  It force-walks the party down, shows dialogs
@@ -59,7 +22,7 @@
 --     auto-fight clears never blind-mash the goal fight.  $57C0 is battle scratch
 --     (garbage before the first fight, stale after), so gate every read on
 --     battleLoadStarted(); see gen_whelk.lua:16-26 and ot6.lua:670-681.
---
+
 -- Deterministic by construction, same as every harness run: AllZeros power-on
 -- RAM + no frame skip + a pre-launch srm wipe (docs/playing-headless.md
 -- "Runtime limits").  Because SRAM boots zeroed and empty, the title's Start
@@ -107,16 +70,6 @@ end, emu.eventType.startFrame)
 -- (docs/playing-headless.md; ot6.lua clearBattle/advanceStory use the same).
 local aPhase = 0
 
--- FIGHT the current battle in place, with real input: edge-tap A (4 on / 4
--- off).  This replaced the battle-clear-write clear (issue #75 -- a
--- generator may inject input and read memory, never write game state).  The
--- taps are the whole strategy: A opens the top command (magitek for this
--- party), A confirms the first beam, A accepts the default target, and the
--- intro guards die to one beam; the same edge taps page the pre-fight
--- dialogs and the victory text.  Cost: a real fight runs ~1-3 ATB rounds
--- (thousands of frames) where the battle-clear-write cleared in hundreds --
--- the drive budgets below carry the difference.  NEVER call it on the
--- whelk: callers gate on `whelk()` first and hand off instead.
 local function fightRandomStep()
   H.setPad(aPhase < 4 and { "a" } or {})
 end
@@ -129,14 +82,6 @@ end
 local bestY, stall, climbHb = 0xFFFF, 0, -600
 local battN, dlgN = 0, 0  -- 3-frame debounce (the navTo/advanceStory idiom)
 local climbMap = -1
--- STALL_LIMIT counts CONSECUTIVE tile-aligned, in-control frames with no
--- northward progress.  A moving party is only momentarily aligned at each tile
--- boundary (at a fresh, lower Y), so a healthy climb never accrues; a party
--- jammed against a wall (or stopped at a corridor turn blind-UP can't round)
--- is aligned every frame at a fixed Y and trips this in a few seconds.  240
--- frames (~4 s) is well past any legitimate pause.  Map 19's corridor is
--- measured UP-navigable; map 39's is not (that step is BFS'd) -- if the route
--- shifts, this errors AT the stuck tile with the map/coords to fix.
 local STALL_LIMIT = 240
 
 -- The blind-northward climb body, shared by phases 2b and 2d.  Each call
@@ -243,16 +188,13 @@ end
 -- $5755-$5764, magitek $5755-$5761 (`cpx #$000d`, madou_line_mess_set).  The
 -- shortest of the three still covers this window, so watching it detects a
 -- list of ANY command without repointing anybody's commands first.
---
+
 -- Keyed on the BUFFER, never on a drawer's instruction address.  This ROM's
 -- bank C1 sits 11 bytes below ff6/notes/ff3u.asm (DrawMagicListText is at
 -- C1/4DC0 per ff6/rom/ff6-en.map:539, not the notes' C1/4DB5), which is how
 -- probe_shadow_overlap ended up with an exec watch on an operand byte that
 -- could never fire.  Vanilla's RAM reservations do not move; its code does.
---
--- Measured quiet: this window takes ZERO writes while the battle sits
--- settled and zero at the command level, then 60 from bank C1 the moment a
--- list opens.  So a nonzero count is a list, not hud chatter.
+
 local listWrites = 0
 emu.addMemoryCallback(function()
   local ok, bank = pcall(function() return emu.getState()["cpu.k"] end)
@@ -260,27 +202,14 @@ emu.addMemoryCallback(function()
 end, emu.callbackType.write, 0x7E5755, 0x7E5761)
 
 -- WHY A SWEEP AND NOT A SEARCH, and why the settle above is arbitrary now.
---
+
 -- Battle init seeds the RNG index from the game-time frame counter --
 -- `lda $021e / asl2 / sta $be` (battle_main.asm:6174-6176) -- and $021E
 -- ticks once per frame, wrapping at 60 (time_calc, C3/13C8-C3/1410).  So the
 -- entry point's frame phase picks one of sixty battle seeds, InitGauge draws
 -- the starting ATB gauges off it (battle_main.asm:6230+), and that decides
 -- whose menu opens first.  That much the old comment here had right.
---
--- What it had wrong is that the generator can steer it.  It cannot: the
--- seed is set at BATTLE init, not at the entry point, so every consumer
--- adds its own walk length to the generator's phase before the roll
--- happens.  Measured, all three consumers on one identical fixture (sha
--- 84209ed55945):
---   probe_shadow_overlap  264 frames entry point -> fight
---   battle_whelkwipe      266
---   battle_dlgmenu        267
--- Three walks, three residues of $021E, three different seeds.  One knob
--- here cannot set three rolls, so "advance a frame and re-check" would only
--- move the coin flip around -- it would satisfy whichever consumer the
--- generator happened to imitate and re-roll the other two.
---
+
 -- The useful thing the generator CAN do is prove the fixture does not
 -- depend on the roll at all.  So: replay the entry point at four spread
 -- phases, and require of each that the Whelk fight comes up, a battle
@@ -306,18 +235,6 @@ local steps = {
   H.waitUntil(function() return H.frame >= 15500 end, 16000, "intro march to finish"),
   H.call(function() H.screenshot("poweron_cliff") end),
 
-  -- ===================================================================== --
-  -- Phase 2a: frame 15500 is still MID-CREDITS (measured: poweron_cliff.png
-  -- shows the "MAIN PROGRAMMER" snow walk, byte-identical to the passing
-  -- generator's gen_cliff.png), and a hands-off pad from here leaves the
-  -- game in the attract loop FOREVER (measured: the map/position signature
-  -- repeats with an ~11k-frame period -- the real game never starts).  The
-  -- blind UP-hold + A-press masher is what lands the game-starting keypress
-  -- and rides the cliff dialogs into the first scripted guard fight, so
-  -- reuse it VERBATIM from gen_battle_state.lua:38-53 (minus the
-  -- rolling-savestate machinery), with its exact proven terminator:
-  -- battleLoadStarted().
-  -- ===================================================================== --
   H.driveUntil(function() return H.battleLoadStarted() end, 15000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
@@ -326,13 +243,6 @@ local steps = {
     return string.format("first forced fight loading at frame %d", H.frame)
   end),
 
-  -- ===================================================================== --
-  -- Phase 2b: clear the map-19 gauntlet.  From the first fight on, the world
-  -- is the real game: the climb body WINS the x=38-column scripted
-  -- fights ({38,38} {38,26} {38,17}) by tap-A and holds
-  -- UP the cliff corridor (measured UP-navigable, y=38 -> 1) until the town
-  -- map loads.
-  -- ===================================================================== --
   H.driveUntil(function() return H.mapId() == 39 end, 30000,
     { climbStep() }, "reach Narshe town (map 39)"),
   H.logStep(function()
@@ -340,13 +250,6 @@ local steps = {
       H.fieldX(), H.fieldY(), H.frame)
   end),
 
-  -- The map is NOT final at the first frame control reads true on a freshly
-  -- loaded map: the fade-in is still running, the $7F0000 tilemap settles
-  -- during it, and held input is ignored for ~50 more frames (all measured --
-  -- an entry-instant BFS here saw a different, sealed geometry and found no
-  -- path; the identical BFS later found the 26-step street route).  So wait
-  -- for control, then full screen brightness, then a margin, before ANY
-  -- planning on this map.
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 900,
     "control in town", 4),
   H.waitUntil(function()
@@ -354,14 +257,6 @@ local steps = {
   end, 900, "town fade-in", 10),
   H.waitFrames(30),
 
-  -- ===================================================================== --
-  -- Phase 2c: cross town by BFS.  Blind-UP stalls at (26,42) (measured, run
-  -- 2), so navigate to (31,23) -- one tile SOUTH of the mines-approach
-  -- trigger line {30..32,22} (_cc9db2), so the scene fires on OUR deliberate
-  -- step in 2d, not mid-plan.  The {30,37} ambush (`battle 4`, _cc9d0d,
-  -- self-gating on $0131) springs en route if BFS crosses it; navTo clears
-  -- it like any fight.
-  -- ===================================================================== --
   H.navTo(31, 23, { maxFrames = 14000, playBattles = true }),
   H.logStep(function()
     return string.format("at the mines approach (31,23), frame %d", H.frame)
@@ -409,12 +304,6 @@ local steps = {
     arrive = function() return blastDone() or whelk() end,
     maxFrames = 16000, spare = SPARE, playBattles = true,
   }),
-  -- navTo can complete in the 1-frame window between landing on (42,9) and
-  -- the event engine starting the scene (measured: run 4 arrived in exactly
-  -- the walk time, then planned against the still-closed door and died with
-  -- "no path").  So ride the scene explicitly: advanceStory taps its dialog
-  -- ($0011), stays hands-off through the choreography, and returns the
-  -- moment switch $012C lands.  Instant no-op if the scene already ran.
   H.advanceStory(function() return blastDone() end, 4000,
     { spare = SPARE, playBattles = true }),
   H.logStep(function()
@@ -482,15 +371,6 @@ for _, k in ipairs(SWEEP) do
     H.waitFrames(2),
     H.call(function()
       H.checkReq(loadReq, tag .. ": entry point reload")
-      -- DOCUMENTED GAP (issue #75): this sweep used to zero the codex
-      -- signature bytes at $316000/1 to imitate H.loadState's consumer-side
-      -- wipe.  Those were the generator's last two state writes, so they are
-      -- gone: the replays now run on the input-driven run's OWN battery --
-      -- the codex holds whatever the gauntlet fights genuinely taught.
-      -- That is a fidelity difference from consumers (which still wipe at
-      -- load), but nothing the sweep asserts -- whelk fires, a menu opens,
-      -- a list draws -- reads the codex, so the roll-dependence detector it
-      -- exists to be is unchanged.
       listWrites = 0
     end),
     H.waitFrames(k),        -- the phase itself: k more ticks of $021E

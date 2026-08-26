@@ -1,11 +1,8 @@
--- probe_fc_atma4.lua -- #132 segment 3: the proven SOUTH route back to
--- (60,16), one tile below AtmaWeapon's NPC at (60,15), then diagnostics
--- and a doorstep state bank.  The first south run reached this tile but
--- up+A never fired the talk event, so before iterating on the talk this
--- probe records what the engine sees there: party z ($b2), the props at
--- (60,15)/(60,16), the NPC-block bits, and the $035F switch.  It PASSES
--- on reaching the doorstep -- the talk attempt at the end is
--- best-effort telemetry, not the goal.
+-- probe_fc_atma4.lua -- the south route back to (60,16), one tile below
+-- AtmaWeapon's NPC at (60,15), then diagnostics and a doorstep state
+-- bank: party z ($b2), the props at (60,15)/(60,16), the NPC-block bits,
+-- and the $035F switch.  It PASSES on reaching the doorstep -- the talk
+-- attempt at the end is best-effort telemetry, not the goal.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x3ff) == m end
 local MAG = { [0x07] = { spell = 2, boost = false } }

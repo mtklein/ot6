@@ -3,8 +3,8 @@
 --   R raises the active character's pending boost (cap 3, never past bp),
 --   L lowers it, the party-window pip cell tracks live, and the boosted
 --   action consumes the points (and skips that turn's +1 regen).
---   ...and the repaint request that press raises is spent or dropped rather
---   than left standing, which is issue #87 (see the first R press below).
+--   ...and the repaint request that press raises (OT6_RESTAGE) is spent or
+--   dropped rather than left standing (see the first R press below).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 local MSTATE, RESTAGE = 0x7BC2, 0x57D4   -- menu state; the gate's request byte
@@ -14,7 +14,7 @@ local function bp(slot) return H.readByte(0x3e9c + slot*2) end
 local actor
 local cellSeen, cellFrames = {}, 0
 local markSeen, parkFrames = {}, 0
-local restageTrace = {}                  -- #87: OT6_RESTAGE, sampled per frame
+local restageTrace = {}                  -- OT6_RESTAGE, sampled per frame
 
 -- sfx request counters: boost feedback must be audible. Each request is an
 -- inc (nonzero write) consumed by UpdateSfx's stz, so count nonzero writes.
@@ -43,26 +43,20 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.enterEncounter(),
   H.waitFrames(240),
-  -- issue #75: the actor used to be handed 3 bp, with two party HP words
-  -- pinned to 500.  The bank is earned now: every character opens with 1
-  -- bp (Ot6InitBP) and an unboosted action regens +1 (Ot6ActionEnd), so
-  -- the first slot whose menu opens takes two real actions and arrives at
-  -- this test's window holding 3.  The submit is driven by menu state
-  -- ($7BC2) rather than by a fixed button sequence, because a fixed
-  -- sequence was measured to land its downs in whatever window holds the
-  -- cursor.  Three measurements settled the choices here.  Heal Force
-  -- (list row 3, shared by all three riders' magitek lists) leaves A
-  -- refused, because the v0.8 wallet prices it out of the opening MP, so
-  -- the bank action is the row-2 beam, which is the pick a plain A-mash
-  -- was measured to land on.  The item window fails two ways: the intro
-  -- bag is empty, and Wait mode stops time while a list is open, so
-  -- holding A in state $0a freezes the fight.  And nobody else may act, so
-  -- any other ready character defers focus with X, vanilla's own
-  -- turn-cycling key.  Two beams into shielded guards cannot end the fight
-  -- (shielded damage is halved), and each is an ordinary unboosted action
-  -- worth +1 bp (Ot6ActionEnd), twice, on top of the 1 bp the actor opened
-  -- with (Ot6InitBP).  $01 is transitional, so the driver leaves the pad
-  -- alone; anything unknown gets B to back out.
+  -- every character opens with 1 bp (Ot6InitBP) and an unboosted action
+  -- regens +1 (Ot6ActionEnd), so the first slot whose menu opens takes two
+  -- real actions and arrives at this test's window holding 3.  The submit
+  -- is driven by menu state ($7BC2) rather than by a fixed button
+  -- sequence.  The bank action is the row-2 beam (Heal Force, row 3, is
+  -- priced out of the opening MP).  The item window fails two ways: the
+  -- intro bag is empty, and Wait mode stops time while a list is open, so
+  -- holding A in state $0a freezes the fight.  Any other ready character
+  -- defers focus with X, vanilla's own turn-cycling key.  Two beams into
+  -- shielded guards cannot end the fight (shielded damage is halved), and
+  -- each is an ordinary unboosted action worth +1 bp (Ot6ActionEnd), twice,
+  -- on top of the 1 bp the actor opened with (Ot6InitBP).  $01 is
+  -- transitional, so the driver leaves the pad alone; anything unknown
+  -- gets B to back out.
   (function()
     local mf, downs = 0, 0
     return H.driveUntil(function()
@@ -93,8 +87,8 @@ H.run({ maxFrames = 30000 }, {
             btn = "down"
           else btn = "a" end                -- the row-2 beam
         elseif st == 0x38 then btn = "a"    -- confirm the default target
-        -- (#111: offensive confirm; the default is the enemy-side pick,
-        -- never the party, and this fixture stages one monster)
+        -- (an offensive confirm defaults to the enemy-side pick, never the
+        -- party, and this fixture stages one monster)
         elseif st == 0x01 then H.setPad({}); return
         else btn = "b" end
         if (mf - 1) % 8 == 0 then
@@ -111,7 +105,7 @@ H.run({ maxFrames = 30000 }, {
       H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8)))
     sfxWatch()
   end),
-  -- The first R press, sampled per frame -- issue #87.
+  -- The first R press, sampled per frame.
   --
   -- Ot6Boost's @refold arm raises OT6_RESTAGE = $80 on every L/R edge,
   -- whatever window is up (ot6_hud.asm, `sta OT6_RESTAGE ; open lists
@@ -123,20 +117,11 @@ H.run({ maxFrames = 30000 }, {
   -- loop (btlgfx_main.asm:1749).  It early-outs in ~14 cycles while the byte
   -- is zero and takes ~40 while a request stands, and the battle loop's
   -- per-iteration budget is close enough to full that the difference costs a
-  -- missed vblank -- the same cliff battle_trueknight phase 4b watches, worth
-  -- 163 frames per battle there.  So a request that stands is not a cosmetic
-  -- problem: it makes the rest of the battle run about 10% slower.
+  -- missed vblank per battle-loop iteration for the rest of the menu.
   --
-  -- Before the fix the gate's @wait arm held a fresh request for as long as
-  -- the menu was open in any non-browse state, which is what the command
-  -- window is, so the byte read $80 for every frame of this window and every
-  -- frame after it until the player closed the menu.  The trace below is the
-  -- discriminator: a single reading cannot tell "spent" from "never raised",
-  -- because both are 0.  The values in between are the signal.
-  --
-  -- The press keeps the original 6-frame hold and 22 idle frames (28 frames
-  -- total, as `H.pressButtons({"r"}, 6)` plus `H.waitFrames(20)` was), so the
-  -- ledger and the timing the later phases ride on are unchanged.
+  -- The trace below is the discriminator: a single reading cannot tell
+  -- "spent" from "never raised", because both are 0.  The values in between
+  -- are the signal.
   H.call(function()
     restageTrace = {}
     H.assertEq(H.readByte(RESTAGE), 0,

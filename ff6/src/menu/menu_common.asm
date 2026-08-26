@@ -338,7 +338,7 @@ MenuStateTbl:
         .addr   MenuState_2e
         .addr   MenuState_2f
 .if LANG_EN
-        .addr   MenuState_30_Thief      ; issue #68: the field Thief page.
+        .addr   MenuState_30_Thief      ; the field Thief page.
                                         ;   $30 was vanilla-unused (menu_misc
                                         ;   .asm: "menu state $30-$32: unused",
                                         ;   and nothing stores $30 to
@@ -421,8 +421,8 @@ MenuStateTbl:
         .addr   MenuState_79
         .addr   MenuState_7a
 .if LANG_EN
-        .addr   MenuState_7b            ; issue #8 Layer B: Bushido loadout configurator
-        .addr   MenuState_7c            ; issue #40: Gau's rage loadout configurator
+        .addr   MenuState_7b            ; Bushido loadout configurator
+        .addr   MenuState_7c            ; Gau's rage loadout configurator
 .else
         .addr   0
         .addr   0
@@ -431,7 +431,7 @@ MenuStateTbl:
         .addr   MenuState_7e
         .addr   MenuState_7f
 .if LANG_EN
-        .addr   MenuState_80            ; issue #122: Strago's lore loadout configurator
+        .addr   MenuState_80            ; Strago's lore loadout configurator
 .else
         .addr   0
 .endif
@@ -2322,22 +2322,20 @@ DrawHPMP:
 
 ; carry set = has mp, carry cleared = no mp
 
-; ot6 (#35): under the MP economy every character spends MP from battle one
+; ot6: under the MP economy every character spends MP from battle one
 ; (Ot6MpUniversal made the battle pool universal; Ot6AbilityCost prices every
 ; verb), so the field menu shows every pool unconditionally; vanilla's
 ; esper/Gogo/knows-a-spell gate below hid Locke's and Edgar's MP through the
-; entire pre-Zozo stretch while Steal and Tools charged it (owner-verified at
-; the Moogle defense).  Same idiom as Ot6MpUniversal: gated on OT6_MP_COSTS,
-; which this menu module defaults ON exactly as battle_main.asm does (only
-; the battle object is ever rebuilt with the flag forced off; the shared
-; menu object always assembles flag-set).
+; entire pre-Zozo stretch while Steal and Tools charged it.  Same idiom as
+; Ot6MpUniversal: gated on OT6_MP_COSTS, which this menu module defaults ON
+; exactly as battle_main.asm does (only the battle object is ever rebuilt
+; with the flag forced off; the shared menu object always assembles
+; flag-set).
 ;
 ; Size-neutral on purpose: the 2-byte sec/rts head is repaid by dropping the
 ; now-unreachable @0d63 tail, so every later C3 address is UNCHANGED.  A
-; plain insert shifted the whole menu bank and broke booting the seeded
-; savestates `make savestates` generates (gen_zozo5_ramuh loaded dadaluma_won
-; onto map 192 instead of 221 -- measured, this wave), because a field state
-; can hold live C3 return addresses.  The dead body's branches retarget the
+; plain insert would shift the whole menu bank, which breaks any field state
+; holding a live C3 return address.  The dead body's branches retarget the
 ; head's own sec/rts; with the flag off the original tail assembles instead and
 ; the routine is byte-for-byte vanilla.
 .ifndef OT6_MP_COSTS

@@ -1,22 +1,20 @@
-# OT6 v0.14 — IAF / Floating Continent route survey
+# IAF / Floating Continent route
 
-> **Status 2026-08-22 (#121).** The third and final End-of-WoB stretch, the
-> one with no prior survey (`sealed-gate-route.md` and `thamasa-route.md`
-> cover the other two). It picks up at `thamasa-route.md` §0.1's stop line —
-> WoB world (249,128), party TERRA·LOCKE·STRAGO·RELM, `$009D=1`, beside the
-> repaired Blackjack — and ends where control returns in the World of Ruin.
->
-> Claims cite a `file:line` or are labelled **UNVERIFIED** (needs a live
-> read) or **verify-on-arrival** (an offline data decode, true unless the
-> data moved). Line numbers are into `ff6/src/event/event_main.asm` unless a
-> path is given. Formation contents are decoded offline from
-> `event_battle_group.dat` (4 bytes/group = two formation words) →
-> `battle_monsters.dat` (15-byte records: `+1` present mask, `+2..+7` low id,
-> `+14` per-slot bit-8); the decode is validated against known event battles
-> (`battle 124`→form 388 `$173` KEFKA_VS_LEO per `gen_massacre`, `battle 125`
-> →form 387 Ultros③ `$12e` per `thamasa-route.md`). Boss shield/weakness data
-> is not re-derived here — it lives in `bosses-wob.md` §19–22 and is
-> cross-referenced in §7.
+This is the route from the World of Balance stop line — WoB world (249,128),
+party TERRA·LOCKE·STRAGO·RELM, `$009D=1`, beside the repaired Blackjack —
+through the Imperial Air Force gauntlet and the Floating Continent assault,
+to where control returns in the World of Ruin.
+
+Claims cite a `file:line` or are labelled **UNVERIFIED** (needs a live
+read) or **verify-on-arrival** (an offline data decode, true unless the
+data moved). Line numbers are into `ff6/src/event/event_main.asm` unless a
+path is given. Formation contents are decoded offline from
+`event_battle_group.dat` (4 bytes/group = two formation words) →
+`battle_monsters.dat` (15-byte records: `+1` present mask, `+2..+7` low id,
+`+14` per-slot bit-8); the decode is validated against known event battles
+(`battle 124`→form 388 `$173` KEFKA_VS_LEO per `gen_massacre`). Boss
+shield/weakness data is not re-derived here — it lives in `bosses-wob.md`
+§19–22 and is cross-referenced in §7.
 
 ---
 
@@ -31,8 +29,7 @@
    is a **map-7 Blackjack-interior NPC** (`event/npc_prop.asm:294-300`), and it
    short-circuits at `$005D=1` (set once at `:43448`, never cleared) into the
    pre-repair "go scout around" leaves (dlg $051E/$051F/$0520). It never gates
-   stop-line liftoff. This resolves `thamasa-route.md` §0.1's open question:
-   **liftoff works immediately.**
+   stop-line liftoff: **liftoff works immediately.**
 
 2. **The IAF is armed by *landing* the airship, not by flying to a spot.**
    There is no world-coordinate trigger. `AirshipGround` (`:172-181`, dispatched
@@ -70,7 +67,7 @@
    Shadow rejoins by talking to an NPC at 394 (10,16). Two **vanilla** save
    points already exist (394 (7,12), 358 (8,10)) — see §4.
 
-6. **The escape waits for Shadow with a five-second margin — owner canon.**
+6. **The escape waits for Shadow with a five-second margin.**
    After the statues rise, a 6:00 master clock (`start_timer 0, 21600`,
    `:34144`) runs to a GameOver on expiry (`:34155`/`:34174`). Shadow arrives at
    **0:05 remaining** (`start_timer 2, 21300`, `:34145`; handler `_ca57b3`
@@ -91,28 +88,25 @@
    `pass_off`/`return` (`:12397`/`:12449`). Shadow's FC fate is already fixed by
    then. This is the arc's stop line and the end of the World of Balance. See §6.
 
-8. **Engineering headroom is better than `#121` assumed** (§8): the
-   `event_triggers` block was grown +16 in #125, so there are now ~16 free
-   trigger slots, not 2 — and the FC's two save points are **vanilla**, costing
-   zero slots. The telegraph pass still must be data-authored (no per-frame
-   cycle headroom).
+8. **Engineering headroom** (§8): ~16 free trigger slots exist, and the FC's
+   two save points are **vanilla**, costing zero slots. The telegraph pass
+   still must be data-authored (no per-frame cycle headroom).
 
 ---
 
 ## 1. The stop line and liftoff
 
-Entry state (from `thamasa-route.md` §0.1, re-confirmed): control on the WoB
-world map at **(249,128)**, party **TERRA·LOCKE·STRAGO·RELM**, roster
-re-normalized and available except Shadow (`$02F3=0`), `$009D=1`. The Blackjack
-is parked at (249,127) as a free vehicle (`airship_pos {249,127}`, `:78009`).
+Entry state: control on the WoB world map at **(249,128)**, party
+**TERRA·LOCKE·STRAGO·RELM**, roster re-normalized and available except Shadow
+(`$02F3=0`), `$009D=1`. The Blackjack is parked at (249,127) as a free vehicle
+(`airship_pos {249,127}`, `:78009`).
 
 Liftoff is the ordinary world board action (walk onto the airship tile). No
 event runs; the `_cb2007` refusal ladder (`:43089`) belongs to the map-7
 interior Setzer NPC and is dead post-repair (`$005D=1` since `:43448`). Switch
 state at the line: `$009D=1`, `$009E=0` (set only later at `:14057`), `$005D=1`,
 `$007D=1` (inferred — the Thamasa shops/inn gate on it at `:69474`+/`:69493`, so
-it holds on arrival; exact byte **UNVERIFIED**, and moot for liftoff), `$007A`
-untouched in the arc (matches §0.1).
+it holds on arrival; exact byte **UNVERIFIED**, and moot for liftoff).
 
 ---
 
@@ -130,9 +124,9 @@ The IAF is not reached by flying to a location. The sequence is:
 
 The two gating switches to watch live: **`$009E`** (0→1 = discovery ran) and
 **`$01A2`** (must be 1 = three aboard). The forced three-party is a **route
-decision**: one of TERRA/LOCKE/STRAGO/RELM is benched for the entire IAF+FC. Who
-to keep is a kit question for the FC break fights (AtmaWeapon wants two of
-fire/ice/bolt/slash/pierce; §7) and is left to the kit/route pass.
+decision**: one of TERRA/LOCKE/STRAGO/RELM is benched for the entire IAF+FC.
+Who to keep is a kit question for the FC break fights (AtmaWeapon wants two of
+fire/ice/bolt/slash/pierce; §7).
 
 ---
 
@@ -169,75 +163,31 @@ see `gen_massacre.lua` on the same handler).
 
 **Bolt is the IAF key.** Sky Armor, Spit Fire, Ultros④, and AirForce are *all*
 bolt-weak — and so is AtmaWeapon (§7). A bolt-leaning party breaks every wave
-fast; that matters because (see below) the waves auto-chain with no field
-care-stop, so a slow break means attrition. **Winnability probe (#132,
-`probe_iaf_fight.lua`):** at the routed L15–17 the timer-chained waves give no
-heal window, so damage accrues to a wipe. An untuned Terra/Setzer/Gau party
-wiped by **wave 2**; a bolt-tuned mage three (Terra/Celes/Relm) lasted to
-**wave 3** but still wiped. So the level deficit — not just party choice — is
-the wall: **a pre-FC grind is needed** (Chimera+Cephaler, `level-curve.md`),
-with a bolt-leaning three to break each wave fast on top. (Caveat: the generic
-tactical driver may not force the bolt weakness; a bolt-forcing drive is a
-tuning avenue before concluding a given level is unwinnable.)
+fast, which matters because the waves auto-chain with no field care-stop
+between most waves.
 
-**Post-grind re-measure (#133, 2026-08-24, `probe_iaf_fight2.lua`):** at
-**L21/L21/L22** (Terra+Locke with the two ThunderBlades, Strago third),
-pre-shopping gear, the party reaches **wave 4** then wipes by attrition.
-The pip mechanics work — ThunderBlade Fights chip Sky Armor/Spit Fire
-5→4→3→break, measured live — but the cadence loses the race: ~1 pip per
-~1500 frames against ~150–230 dmg/char/round, and the third member (Fire
-Rod) contributes zero chips.  Open levers before a balance verdict:
-Diamond-tier armor + RunningShoes (haste) from the #133 shopping leg, a
-third bolt source (Thunder Rod, or esper-granted casting), and a
-bolt-forcing/boost-spending driver.  Re-verify after the shopping and
-esper legs land.
+**Tuning.** Sky Armor `$043` and Spit Fire `$0e3` carry authored
+`Ot6ShieldTbl` rows of **2 pips each** (the formula fallback would give the
+repeating wave trash boss-scale 5-gauges; the real gauges stay on Ultros 7 /
+Chupon 4 / AirForce 8). Two care stops — `call _cacfbd` (the tent heal:
+revive + full HP/MP, the same sub the chain already ran before AirForce) —
+run after waves 3 and 6, so each three-wave stretch is tight-but-winnable
+(~300 HP bleed/wave against a ~1000 pool) rather than an eight-fight
+attrition ramp. The field menu also opens between waves (the wave timers are
+FIELD_ONLY and pause in menus), so ordinary menu healing works too. Ultros④
+is armed by *walking* to the deck's right edge (map 10 triggers (22,5-7) →
+`_ca5a16`, gated on the teaser's `$01F0`); after Ultros the script
+auto-chains into AirForce with its own tent call — no field window there.
 
-**Verdict (#133, 2026-08-24, `probe_iaf_fight3.lua`): balance signal.**
-Every pre-FC lever was applied and measured — **L24/L24/L25** (a second
-grind round), Ramuh equipped on Strago so the driver casts Bolt every
-round (the fold under boost included), Earrings ×2, RunningShoes haste,
-Sniper Sight, and the pre-FC gear ceiling (Vector's Gold tier burns with
-the story, so Mithril/Gaia is the max) — and the chain still ends by
-attrition in wave 7 of 8, with wave 7 itself a 21k-frame heal-treadmill.
-Three different party shapes and four level bands (L15–17, L21–22, L24–25)
-all lose the same way: the no-heal-window auto-chain outlasts any
-sustainable damage rate.  Per `level-curve.md`'s own rule ("unwinnable at
-these levels even with perfect break/prep *and* a reasonable grind is a
-balance signal — retune the shield row"), the IAF gauntlet needs a #132
-retune: fewer pips per wave, fewer waves, or a care window between waves.
+A measured run at L24/24/25 with a bolt-leaning kit clears all six
+`battle 126` waves at/near full HP each time, wins Ultros④+Chupon in ~12k
+frames and AirForce in two rounds, landing on map 394 with the party at
+739/787/544 HP going in.
 
-**RETUNED (#132, 2026-08-24): SURVIVED to the FC.**  Two changes, both
-levers the verdict named:
-1. **Fewer pips per wave** — Sky Armor `$043` and Spit Fire `$0e3` were
-   *un-authored* in `Ot6ShieldTbl`, so the formula fallback gave the
-   repeating wave trash boss-scale 5-gauges (form 175 = 15 pips a wave,
-   six waves).  Authored rows: **2 pips each** (the balloon precedent —
-   trash pops fast; the real gauges stay on Ultros 7 / Chupon 4 /
-   AirForce 8).
-2. **Care stops** — two `call _cacfbd` (the tent heal: revive + full
-   HP/MP, the same sub the chain already ran before AirForce) after
-   waves 3 and 6.  Each three-wave stretch is now tight-but-winnable
-   (~300 HP bleed/wave against a ~1000 pool) instead of an eight-fight
-   attrition ramp.
-
-Also measured while fixing the probe: **the field menu opens fine
-between waves** (the wave timers are FIELD_ONLY and pause in menus), so
-vanilla-style menu healing works too — the earlier "no care window"
-read was a probe-sequencing artifact.  Ultros④ is armed by *walking* to
-the deck's right edge (map 10 triggers (22,5-7) → `_ca5a16`, gated on
-the teaser's `$01F0`); after Ultros the script auto-chains into
-AirForce with its own tent call — no field window there.
-
-The full measured run (`probe_iaf_fight3.lua`, L24/24/25 bolt kit):
-6× `battle 126` each entered at/near full HP, Ultros④+Chupon won in
-~12k frames, AirForce in two rounds, **landing on map 394** with the
-party at 739/787/544 going in.  Fixture banked: `fc_land.mss` (the
-Floating Continent arrival, segment 2's boot state).
-
-**Live-confirmed:** `tools/tests/probe_iaf.lua` drives the whole entry headless
-(board → discovery → deck → "Find the FC" → the party-formation menu → the
-ambush) and reads `battle 126` in the emulator as **Sky Armor `$043` + Spit Fire
-`$0e3`**, matching formation 175's offline decode (#131).
+`tools/tests/probe_iaf.lua` drives the whole entry headless (board →
+discovery → deck → "Find the FC" → the party-formation menu → the ambush)
+and reads `battle 126` in the emulator as **Sky Armor `$043` + Spit Fire
+`$0e3`**, matching formation 175's offline decode.
 
 The `AIRSHIP_CENTER`/`AIRSHIP_WOB`/`CLOUDS` arguments are battle **backgrounds**
 (`event_cmd.inc:234`, `battle_bg.inc`), not part of the formation id.
@@ -294,124 +244,48 @@ Shadow leaves in `_cad9fc` (`:32642`, dlg $0855, `char_party SHADOW,0` `:32649`,
 - 358 (8,10): `make_event_trigger {8,10}, SavePoint` (`event_trigger.asm:1753`)
   + sparkle NPC (`npc_prop.asm:16188-16196`, `$0632`). The encounter-free alcove.
 
-No new save-point authoring is needed here (contrast the massacre stretch, #124/
-#125). Both are vanilla; see §8.
+No new save-point authoring is needed here; see §8.
 
 ---
 
-**Segment-2 CROSSED (#132, 2026-08-24): `probe_fc_descent.lua` PASSES**
-— the full (4,8) → save-alcove crossing runs headless: trigger-frontier
-walking with chute twin-pairing, burst fallback over the bfs-blind
-stair reveals, between-round fieldCare, flee-first fights with
-**forced Bolt** (`magic={[7]={spell=2}}` — Ninja/Apokryphos/Brainpan/
-Dragon are all bolt-weak, so the no-run nukers die before their round-3
-nukes).  Chain: (19,12) (25,19) (40,12) (40,6)-chute (36,28)
-(67,39)-walk (40,24) (63,33) (59,39) (52,24) (82,30) (90,43) → 358.
-Fixture: `fc_alcove.mss` (the encounter-free save alcove).  Earlier
-measurements kept below for the tuning record.
+**The crossing (map 394 to the save alcove 358).** The stair-reveal
+triggers chain and the scripted chutes ride two-way: (40,6)↔(32,16) and
+the (67,39)-walk pair are twins, so riding one down already visits its
+return twin. A validated crossing: (4,8) → (19,12) (25,19) (40,12)
+(40,6)-chute (36,28) (67,39)-walk (40,24) (63,33) (59,39) (52,24)
+(82,30) (90,43) → 358.
 
-**Segment-2 COMPLETE with Shadow (#132, 2026-08-24):** the canonical
-crossing is two probes over three checkpoints: `probe_fc_descent`
-(fc_land → the (70,29) "return?" Yes — the choice answered closed-loop;
-$056F is the choice COUNT, last row = mx-1 — → deck → the wheel's
-re-run party select → the $00A0 quick re-arrival → Shadow talked in at
-(10,16) → **fc_shadow.mss**) and `probe_fc_alcove2` (fc_shadow → the
-direct-path descent, (70,29) AVOIDED — its Yes-with-Shadow branch is
-the scripted Shadow REMOVAL `_cad9fc`, and the (89,25) chute that
-reaches it is a post-Shadow trap — → **fc_alcove2.mss**, Shadow in
-party at the 358 save point).  Engine fix riding along: Shadow's 1/16
+Shadow's rejoin sits ahead of the (70,29) "return?" choice: choosing to
+return with Shadow already talked in at (10,16) but not yet rejoined
+triggers the scripted Shadow **removal** (`_cad9fc`), and the (89,25)
+chute reaches that removal branch — so a route that wants Shadow at the
+save alcove must avoid (70,29) after the talk-in. Shadow's 1/16
 post-battle leave-roll is gated OFF while the live map is 394
-(`Ot6ShadowLeaves`, battle_main relocated body) — a mid-FC leave clears
-$02F3 and silently forfeits the canon humane escape, which is a broken
-promise, not an emergent feature.
+(`Ot6ShadowLeaves`), since a mid-FC leave would clear `$02F3` and
+forfeit the humane escape.
 
-**Segment-2 measurements (#132, 2026-08-24, `probe_fc_descent.lua`):**
-the descent machinery works — the stair-reveal triggers chain, the
-scripted chutes ride ((40,6)↔(32,16) and the (67,39)-walk pair are
-two-way twins; ride one down and its return twin must be skipped — the
-probe marks the landing-adjacent trigger visited), and the route flowed
-(4,8) → (36,28) → (42,19) before fights ended it.  The pool itself:
+The FC randoms carry authored `Ot6ShieldTbl` rows: Behemoth/Dragon 3
+pips, Apokryphos/Misfit/Ninja/WireyDrgn/Brainpan 2 pips. Four of the
+seven species are vanilla no-run (`monster_prop` +19 bit 2: Apokryphos,
+Misfit, WireyDrgn, Brainpan), so 7 of the 12 formations cannot be fled.
+Ninja pairs throw ~300/char AoE per round and can nuke a full-HP party
+by round 3; Behemoth (6051 HP) wins by attrition if entered wounded. No
+WoB shop sells Diamond-tier gear (the Diamond shops are `$00A4=1` WoR
+variants); vanilla survives this pool around L26-30.
 
-- The FC randoms were **un-authored in Ot6ShieldTbl** — the formula gave
-  the L26 pool up-to-5-pip gauges.  Authored now: Behemoth/Dragon 3,
-  Apokryphos/Misfit/Ninja/WireyDrgn/Brainpan 2.
-- **Four of seven species are vanilla no-run** (monster_prop +19 bit 2:
-  Apokryphos, Misfit, WireyDrgn, Brainpan — verified against the
-  pristine ROM), so 7 of the 12 formations cannot be fled.
-- **Measured wipes from full HP at L24**: Ninja pairs throw ~300/char
-  AoE per round; a no-run formation nuked the full-HP party dead by
-  round 3 (fc-care healed to ~930s the round before).  Behemoth (6051
-  HP) wins by attrition when entered wounded.
-- **No pips chipped in the fatal fights** — the tactical driver casts;
-  only matching-class weapon hits chip.  A physical-first opener is the
-  drive-side lever to try before touching monster stats.
-- **The gear ceiling is vanilla-authentic**: no WoB shop sells Diamond
-  anywhere (the Diamond shops 57/61/66 are all `$00A4=1` WoR variants);
-  Albrook pre-FC is open (the (179,71) trigger is a first-visit scene,
-  not a lock) but its stock is not the answer.  Vanilla survives this
-  pool at ~L26-30; the routed L24 + break covenant is the gap — the
-  level-curve rule's balance-signal clause applies if the physical-first
-  driver still wipes.
-
-**Segment-3 approach decoded (#132, 2026-08-24), execution blocked on a
-walker bug.**  AtmaWeapon's plateau (x56-64, y3-25) is tile-hermetic —
-zero walkable neighbors, no chute lands inside it.  The ONLY entry is
+**AtmaWeapon's approach.** The plateau (x56-64, y3-25) is tile-hermetic
+— zero walkable neighbors, no chute lands inside it. The only entry is
 the reveal at **(63,28)** (`_cad907`, `$01FB`): a 3-tile ladder at
-(63,25-27) into the plateau's south-east tip.  The full chute graph
-(move-sum decoded): (40,24)↔(63,31), (42,17)↔(67,39), (48,22)↔(77,31),
-(70,23)↔(89,25) are two-way tunnels; (36,28)/(52,24)/(59,39)/(63,28)/
-(82,30) are pure reveals.  So the Atma route is: descent prefix → the
-(40,24) tunnel (lands (63,31)) → step (63,28) → climb → (60,12) →
-(60,11) CATASTROPHE → battle 80.  Execution blocker: an encounter
-resolved while the party stands on a revealed stair/diag tile leaves it
-**off-grid** — movement AND the menu refuse (CheckMenu's between-tiles
-guard), only a state load realigns — reproduced at (21,9) and (42,13).
-`probe_fc_atma.lua` carries reload-on-wedge retry, but the wedge
-re-arms on the same leg; the next pass should probe the post-battle
-fine-position restore on stair tiles directly.  Pool notes: the Ninja
-formations were thinned (180 pair→single, 188 trio drops one — the pair
-out-raced fight AND flee at routed prep), and fight-first with the
-2-3 pip rows + forced Bolt beats everything else in the pool.
+(63,25-27) into the plateau's south-east tip. The chute graph:
+(40,24)↔(63,31), (42,17)↔(67,39), (48,22)↔(77,31), (70,23)↔(89,25) are
+two-way tunnels; (36,28)/(52,24)/(59,39)/(63,28)/(82,30) are pure
+reveals. The route: descent prefix → the (40,24) tunnel (lands (63,31))
+→ step (63,28) → climb → (60,12) → (60,11) CATASTROPHE → battle 80.
 
-**Segment-3 COMPLETE (#132, 2026-08-24): AtmaWeapon is down, headless.**
-`probe_fc_atma4.lua` (fc_shadow → the full south route → the (63,28)
-reveal ladder → the spine) banks **fc_atma_door.mss** at (60,17), and
-`probe_fc_atma5.lua` boots it, starts battle 80 and wins — `$035F`
-clears, **fc_atma_down.mss** banked at (60,16).  Findings that made it
-work, in the order they were bought:
-
-- **The talk gesture.**  `CheckNPCs` (player.asm:142) fires an NPC's
-  event only on an A-press read while the scan runs — and in practice
-  held-direction bumping (up+A edges against the NPC for 20k frames)
-  NEVER fires it.  The reliable gesture is the vanilla-manual one, all
-  taps from a standstill: tap the facing direction (4f), release
-  (20f), tap A (4f), release; repeat.  First cycle fired.  z was never
-  the problem: the NPC's z ($0888) is derived from its own tile's
-  props at creation, and both (60,15) and (60,16) are plain z2.
-- **Chute slides poison fieldX/fieldY.**  `fieldX` reads the party
-  object's subtile position, and an obj_script slide carries the
-  object OVER wall tiles — so a walker that keeps steering mid-slide
-  reads positions like (40,8) that no walkable tile explains, and can
-  strand the object off-route.  The "x40 ladder" the north-approach
-  runs seemed to climb was the (40,6) chute's slide path.  Rule: after
-  any trigger that can slide, hold NOTHING until control settles
-  (ride()'s absorb), and treat mid-slide coordinates as artifacts.
-- **p2 exit bits, not p1, decide walkability.**  p1=$00 tiles are
-  ladders only when p2's low nibble has exit bits; the y4-5 corridor
-  x42-54 is p1=$00 **p2=$00** — pure sky decoration.  The offline
-  charts that treated p1=00 as "climbable" were fiction; stepAllowed
-  (ot6_field.lua:415) has been right all along.
-- **The map prop dump's stride-256 indexing is correct** (it matches
-  `M.maptile`); a stride-128 "fix" produces garbage.  Both lineages'
-  dumps agree — mod_bg_tiles never touched the Atma approach.
-- **The fight** (form 450, 23349 HP, 11-pip slash|pierce shield,
-  re-shields mid-fight): the tactical driver with boost+bank 3+items+
-  forced Bolt2 wins on the doorstep kit, barely — two KOs and the
-  survivors at 1/1/1.  A legit WoB final exam, arguably a hair hot;
-  revisit only if the release pass shows it losing outright.
-- **Post-win Shadow removal is vanilla flow**: `_cada30` runs
-  `if_case CHAR::SHADOW → _cad9fc`, party drops to 3.  The escape
-  sequence re-handles Shadow; do not "fix" this.
+AtmaWeapon (form 450) has 23349 HP and an 11-pip slash|pierce shield
+that re-shields mid-fight. Post-win, `_cada30` runs
+`if_case CHAR::SHADOW → _cad9fc`, dropping the party to 3; the escape
+sequence re-handles Shadow from there.
 
 ## 5. The escape
 
@@ -444,7 +318,7 @@ whole party, run under the escape clock (§7, `bosses-wob.md` §22).
 Per-screen collapse segments during the run use `start_timer 1, 180/480,
 _cae4d4` (`:34268`+), distinct from the master clock.
 
-**The humane line (owner canon 2026-08-16).** Hold at the ledge and choose
+**The humane line.** Hold at the ledge and choose
 "Wait!!" until Shadow arrives at 0:05. The wait costs ~355 s of the 6:00 clock
 and is safe by exactly one **300-frame (5-second)** window; leaving early
 permanently forfeits Shadow. The route's canon is the wait.
@@ -470,24 +344,10 @@ hands control (`pass_off SLOT_1`/`NPC_1`, `:12397-12398`) and `return`s
 Shadow's FC fate is already decided (`$037D`, §5). This is the end of the World
 of Balance and the arc's finish.
 
-**Segments 4+5 COMPLETE (#132, 2026-08-24): the escape and the landing
-run headless in one probe.**  `probe_fc_statues.lua` (fc_atma_down →
-heal on 394 → the (60,11) trigger → the statue scene → 393 (67,16))
-banks **fc_escape_start.mss** with both clocks already running.
-`probe_fc_escape.lua` runs the rest: east under the clock, the Nerapa
-rod dance (CELES's Fire Rod is fine for the route — species $0169
-absorbs ice, not fire — but Nerapa absorbs fire and is ice-weak, so
-the Ice Rod goes on at his doorstep and comes off after; the absorb
-guard from #81 caught both directions of this), Nerapa down in ~4100
-frames, then the ledge at (115,17), "Wait!!", and the idle until
-timer 2 fires at 0:05 — Shadow arrives, `$037D=1` — then the exit
-flow straight through the RUIN cutscene to **map 397, solo Celes,
-`$00A4=1`**, banked as **fc_wor_landing.mss**.  Total run ~40k frames
-from the escape start.  Two probe lessons: a navTo arrive-latch must
-be exact-tile only (an `or not hasControl()` clause ended the ledge
-approach on a random battle load, and the party idled off-ledge into
-the 6:00 expiry), and the wait phase self-heals by walking back to
-(115,17) whenever it finds itself elsewhere with control.
+**Equipment note — Nerapa.** Elsewhere on this route Celes's Fire Rod is
+fine (the enemies there absorb ice, not fire), but Nerapa is the
+exception: it absorbs fire and is ice-weak, so an Ice Rod belongs on
+Celes for this fight only.
 
 ---
 
@@ -510,46 +370,22 @@ The IAF trash (Sky Armor / Spit Fire, forms 175/176) carries no drawn gauge in
 
 ## 8. Engineering constraints and route notes
 
-- **Trigger budget: ~16 free, and the FC needs none.** `#121` quoted "2 free
-  triggers game-wide"; that predates the #125 relocation, which grew
-  `event_triggers` `$1A10`→`$1A60` (+16) and `npc_prop` `$50B0`→`$5140` (+16).
-  Measured in the shipped ROM: 83 trailing `$FF` = **16 free trigger slots**,
-  202 trailing in npc_prop (`event_trigger.asm:22`, `npc_prop.asm:188`; HANDOFF
-  corrected 2026-08-22). And the FC's two save points are **vanilla** (§4), so
-  the stretch adds no triggers at all. If future work does need one, the
-  mechanism is unchanged: enlarge the `fixed_block` constant, let the bank-C4
-  chain shift (`save-points-vector.md` §1).
+- **Trigger budget: ~16 free, and the FC needs none.** Measured in the
+  shipped ROM: 83 trailing `$FF` = **16 free trigger slots**, 202 trailing in
+  npc_prop (`event_trigger.asm:22`, `npc_prop.asm:188`). The FC's two save
+  points are **vanilla** (§4), so the stretch adds no triggers at all. If
+  future work does need one, the mechanism is unchanged: enlarge the
+  `fixed_block` constant, let the bank-C4 chain shift (`save-points-vector.md`
+  §1).
 - **Telegraph must be data-authored.** The per-battle-frame HUD hook
-  `Ot6BgHud_ext` has essentially no cycle headroom (under ~80, possibly <20;
-  HANDOFF traps §2). The FC bosses' telegraphs (Flare Star, Launcher, Sneeze,
-  Condemned) must ride the existing break/shield tables, not new per-frame code.
+  `Ot6BgHud_ext` has essentially no cycle headroom (under ~80, possibly <20).
+  The FC bosses' telegraphs (Flare Star, Launcher, Sneeze, Condemned) must
+  ride the existing break/shield tables, not new per-frame code.
 - **The forced three-party (§2/§3) is the stretch's one roster decision.** The
   fourth of TERRA·LOCKE·STRAGO·RELM is benched for the whole IAF+FC. AtmaWeapon
   (11 shields, five-axis weakness) wants a lineup holding ≥2 of fire/ice/bolt/
-  slash/pierce; Nerapa absorbs fire (don't bring a fire-only chipper). The pick
-  is deferred to the kit/route pass.
+  slash/pierce; Nerapa absorbs fire (don't bring a fire-only chipper).
 - **A lost fight is a real Game Over** everywhere on this stretch (the IAF
   `_ca5ea9` handler, the escape-clock `GameOver`), unlike the massacre's
   savestate-split theater. The route needs a save before the FC (the 394 (7,12)
   point) and honest loss handling.
-
----
-
-## 9. Verify-on-arrival checklist (for the probe / kit pass)
-
-Offline reads to confirm live once a headless drive reaches the FC:
-
-1. ✅ **Entry drive — done.** `tools/tests/probe_iaf.lua` boards, rides the
-   discovery to the deck (`$009E`→1), works the helm menu and the FC
-   party-formation menu (grab reserve → place in the group 2×2 → START), and
-   lands in `battle 126` (#131). It also documents the full menu state machine.
-2. **IAF formations** — `battle 126` (175/176 = Sky Armor + Spit Fire)
-   ✅ live-confirmed by the probe; 477/477 (Ultros④) and 459 (AirForce) and the
-   six-wave timer chain still to confirm live (drive on past wave 1).
-3. **FC pool** 177–188 (the `+Rand` spread) and that 358 draws nothing.
-4. **Shadow rejoin** `$035E` path and that nothing upstream pre-sets it.
-5. **AtmaWeapon / Nerapa** — confirm the fights fire at their NPC tiles (394
-   (60,15) / 393 (108,15), both now cited from `npc_prop.asm`) and their forms
-   (450 / 451).
-6. **Escape timing** 21600/21300 frames and the 0:05 Shadow window, and that
-   "Wait" holds while "Jump" clears `$02F3`/skips `$037D`.

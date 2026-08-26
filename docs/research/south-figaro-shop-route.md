@@ -42,10 +42,9 @@ bytes for 256 items).
 Neither `ff6/src/menu/shop_prop.dat` nor `ff6/src/menu/item_prop_en.dat`
 has been touched by OT6, and neither ever will be: a byte changed inside a
 fixed-record blob is invisible in a diff.  OT6's one change to the shop table
-is spliced over the `.incbin` in `ff6/src/menu/shop.asm`, named and argued
-there — the Phantom Train ghost merchant (record 85) gained a Fire Skean in
-his empty eighth slot for issue #74.  The South Figaro stock and prices below
-are untouched.
+is spliced over the `.incbin` in `ff6/src/menu/shop.asm` — the Phantom Train
+ghost merchant (record 85) gained a Fire Skean in his empty eighth slot.  The
+South Figaro stock and prices below are untouched.
 
 ---
 

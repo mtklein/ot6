@@ -1,20 +1,7 @@
 -- @suite savestate=gau_joined slow
--- battle_gaufight.lua -- issue #47: Gau has a free action in both territories.
+-- battle_gaufight.lua -- Gau has a free action in both territories.
 --
--- The problem: vanilla gives Gau four command slots and no Fight among them:
--- RAGE / LEAP / MAGIC / ITEM (char_prop.asm, record 11).  The third row looks
--- empty in vanilla only because InitCmd_03 removes MAGIC from a character who
--- knows no spells (battle_main.asm), and off the Veldt InitCmd_01 removes LEAP
--- as well, so the menu a v0.7 player saw was RAGE / - / - / ITEM.  That
--- worked while Rage was free.  It does not work now that Rage
--- costs a flat 8 MP (#40): an out-of-MP Gau had no action to take,
--- and mp-economy.md's stated target, that Fight must sometimes be the right
--- move, requires that every character be able to decline to spend.
---
--- The fix: Gau now carries FIGHT / RAGE / MAGIC / ITEM, and Leap shares the
--- Fight row (owner reversal 2026-07-29: on the Veldt, Leap is the free
--- action, so Fight is the row that can share; Magic must never be
--- the row given up):
+-- Gau carries FIGHT / RAGE / MAGIC / ITEM, and Leap shares the Fight row:
 --
 --      on the Veldt:     LEAP  / RAGE / MAGIC / ITEM
 --      everywhere else:  FIGHT / RAGE / MAGIC / ITEM
@@ -23,48 +10,28 @@
 -- row loop; the row it writes is $11, which is in InitCmdIDTbl, so Leap's own
 -- vanilla availability test (InitCmd_01) runs on it without extra code.
 --
--- Issue #75 conversion: all the staging is gone, with no monster stop bits, no
--- HP floors, no bench-wounding, no berserk, row-blank or ATB-hurry lab, and no
--- rage cursor pokes.  Battle A is natural; the trance survives because the
--- draw is chosen: unsuitable formations are resolved, either fled or won
--- through the real menus when the Veldt roster deals an unrunnable set-piece
--- formation, which is a measured hazard, and the walk resumes.  The
--- bench is parked with X, vanilla's own turn-cycling key, which also makes
--- arm 4's claim precise: focus is cycled all trance long and must
--- never land on Gau.  Arm 2's Fight is picked from the real menu.
---
--- One labeled isolation arm (issue #75): one write site stays.
--- The off-Veldt verdict (arms 1d, 2 and 3) cannot be reached by geography from
--- any generated fixture: gau_joined's entire walkable component was enumerated
--- live (2026-08-10, BFS over worldPassable from (214,149)), giving 1239 tiles
--- spanning exactly three 32x32 sectors, and WorldBattleGroup reads $ff
--- (Veldt) for all three; the component is walled by Crescent Mountain and
--- the sea, and no other fixture fields Gau at all (sabin_done is the bare
--- scenario hub).  Walking off the Veldt is therefore not possible from the
--- input-driven tree today, and battle B keeps the burn-down plan's instrumented
--- bit as a labeled isolation arm: an exec callback on InitCmdList
--- clears $11e4 bit 1 at the moment the code under test reads it (the
--- callback counts its firings and asserts the bit was set, so it
+-- Battle A is natural, on the Veldt.  Battle B tests the off-Veldt verdict:
+-- gau_joined's entire walkable component is Veldt sectors (WorldBattleGroup
+-- reads $ff for all of it), so an off-Veldt battle cannot be reached by
+-- geography from this fixture.  Battle B uses a labeled isolation arm
+-- instead: an exec callback on InitCmdList clears $11e4 bit 1 at the moment
+-- the code under test reads it (asserting the bit was set first, so it
 -- cannot pass without testing anything), and the bit is restored as soon as
--- the lists are read.  It may never produce fixtures; it converts organically
--- when the chain crosses the Serpent Trench and generates a world-side Gau
--- fixture off the Veldt.  This is the file's only write site (.writeByte(
--- waiver).
+-- the lists are read.
 --
 -- Asserted:
 --   1a. the save record, unpoked: $00 $10 $02 $01, that is FIGHT / RAGE /
 --      MAGIC / ITEM, read from the character record at $1616+$3010[slot].
---      Fails pre-#47: the record reads $10 $11 $02 $01 and holds no $00.
 --   1b. the built list, on the Veldt (battle A, natural).  Row 0 is LEAP,
 --      the shared row, asserted as the rule: LEAP when $11e4 bit 1 is set,
 --      else FIGHT.  Row 1 RAGE, row 2 MAGIC's own vanilla verdict (removed,
 --      no spells), row 3 ITEM.
 --   1c. the negative control: SABIN and CYAN keep FIGHT in row 0 and carry
 --      LEAP nowhere, so the substitution is gated on CHAR::GAU.
---   1d. the built list, off the Veldt (battle B, the labeled arm's one
---      instrumented bit).  Row 0 is FIGHT, rows 1-3 are unchanged, and the
---      save record is re-read and byte-identical to 1a: the same data with a
---      different verdict, which is what a shared row means.
+--   1d. the built list, off the Veldt (battle B, the isolation arm).  Row 0
+--      is FIGHT, rows 1-3 are unchanged, and the save record is re-read and
+--      byte-identical to 1a: the same data with a different verdict, which
+--      is what a shared row means.
 --   2. Fight executes and carries a real weapon class (battle B, where row
 --      0 is Fight): picked through the live $7BC2 menu, with the target
 --      steered onto the monster side and the bench deferred with X, so every
@@ -129,8 +96,8 @@ local function tap(btn, gap)
   })
 end
 
--- gen_sabin_gau's own Veldt-grind pacing: alternate left/right at tile
--- boundaries until the world's own encounter roll wins.  No danger poke.
+-- alternate left/right at tile boundaries until the world's own encounter
+-- roll wins.
 local function walkIntoEncounter(what)
   local flip = false
   return {
@@ -155,10 +122,8 @@ local function walkIntoEncounter(what)
   }
 end
 
--- resolve an unwanted battle: flee (L+R), and when the Veldt roster deals
--- an unrunnable set-piece formation (measured 2026-08-10: the fled Guard
--- formation from Sabin's own scripted fights timed out a 9000-frame L+R
--- hold), fall back to winning it through the real menus.
+-- resolve an unwanted battle: flee (L+R), falling back to winning it through
+-- the real menus if flight stalls (an unrunnable set-piece formation).
 local function resolveBattle(tag)
   local n, F = 0, nil
   return H.repeatN(1, {
@@ -247,8 +212,7 @@ add({
 -- ============================================================== battle A ==
 -- Entirely natural, on the Veldt.  The draw is chosen for the trance: the
 -- ride needs the fight alive for at least 3 possessed turns, so a draw under
--- 500 total monster HP is resolved and re-walked (measured pool: 3x $02f = 729
--- and $038+$039 = 432 recur; trash draws run 107).  Nothing is poked in any
+-- 500 total monster HP is resolved and re-walked.  Nothing is poked in any
 -- draw; the selection is done by playing.
 add({ H.call(function() H.vars.suitable = false end) })
 for n = 1, 6 do
@@ -362,8 +326,7 @@ add({
   }, "the rage window opens from row 1"),
   -- Steer the rage window's cursor to entry 0 with the d-pad against the
   -- live cursor cells (scroll $892b, col $892f, row $8933, indexed by the
-  -- actor slot; _c18438, btlgfx_main.asm:20096-20111).  This replaces the
-  -- old three cursor pokes with the same triple, read instead of written.
+  -- actor slot; _c18438).
   H.driveUntil(function()
     return H.readByte(MSTATE) == ST_RAGE
        and H.readByte(0x892B + gauSlot) + H.readByte(0x8933 + gauSlot) == 0
@@ -398,18 +361,8 @@ add({
                                       -- count openings/actions from the trance on
   -- ride the trance: the bench is X-cycled, so if the four-row
   -- menu ever offered a possessed Gau a window, the cycling would land
-  -- focus on him and the counter below would catch it.
-  --
-  -- 700 iterations is about 6300 frames.  It was 150 (~1350), which is one
-  -- Gau turn short of the >= 3 the phase asserts: measured 2026-08-12 on
-  -- the first gau_joined the repaired Veldt crossing produced, the ride
-  -- ended with Cmd_10 re-entered twice and the phase failed on a count, not
-  -- on behaviour -- Gau was still possessed and had still been offered no
-  -- window.  How many turns fit in a fixed window is a property of the
-  -- battle's ATB and the formation, so a threshold that close to the wall
-  -- reports the fixture rather than the mechanism.  Neither assertion is
-  -- relaxed by this: the count still has to reach 3, and "focus never lands
-  -- on Gau" now has to hold across 2.7x as many frames.
+  -- focus on him and the counter below would catch it.  700 iterations is
+  -- about 6300 frames.
   H.repeatN(700, {
     H.call(function()
       if H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot then
@@ -442,10 +395,8 @@ add({
 })
 
 -- ============================================================== battle B ==
--- The labeled isolation arm (issue #75); see the header.  This is a fresh
--- load, with one bit instrumented at the moment the code under test
--- reads it, because the off-Veldt verdict is unreachable by geography from
--- the generated tree (the component enumeration in the header).
+-- The labeled isolation arm; see the header.  Fresh load, with one bit
+-- instrumented at the moment the code under test reads it.
 add({
   H.loadState(STATE),
   H.waitFrames(20),
@@ -518,24 +469,18 @@ add({
       shieldPre[m] = H.readByte(SHIELD(e))
     end
     classWrites = {}
-    -- #71 item 3, the positive-arm pin (labeled, this file's own
-    -- isolation-write idiom): battle B is a single natural draw with no
-    -- formation criterion, so nothing guarantees a bludgeon-weak body --
-    -- and without one the ledger agreement below is all absences
-    -- (false == false), which is the degeneration the issue names.  When
-    -- the draw lacks one, body 1's class-weak mask gains OT6_BLUDG here,
-    -- BEFORE the swing, so the chip arm always has a positive case; the
-    -- agreement loop reads the same (poked) mask, so both directions
-    -- stay consistent.  The poke never touches shields, HP or the class
-    -- window under test.
+    -- battle B is a single natural draw with no formation criterion, so
+    -- nothing guarantees a bludgeon-weak body.  When the draw lacks one,
+    -- every present body's class-weak mask gains OT6_BLUDG here, before the
+    -- swing, so the chip arm always has a positive case.  The poke never
+    -- touches shields, HP or the class window under test.
     local anyB = false
     for _, m in ipairs(msPresent) do
       if (H.readByte(CLSWEAK(8 + m * 2)) & OT6_BLUDG) ~= 0 then anyB = true end
     end
     if not anyB then
       -- pin EVERY present body: the swing's target is the cursor's own
-      -- pick, so pinning one body races the target select (measured:
-      -- body 1 pinned, body 2 hit, witness still false)
+      -- pick, so pinning one body races the target select.
       for _, m in ipairs(msPresent) do
         local e = 8 + m * 2
         H.writeByte(CLSWEAK(e), H.readByte(CLSWEAK(e)) | OT6_BLUDG)
@@ -548,8 +493,7 @@ add({
   end),
   -- Gau's Fight, picked from the real four-row menu: cursor to row 0, A,
   -- then the target cursor steered onto the monster side before confirming
-  -- (the old menu drive confirmed without checking and hit Gau himself,
-  -- measured; $7b7e is the monster-side target mask the cursor state exposes).
+  -- ($7b7e is the monster-side target mask the cursor state exposes).
   H.driveUntil(function()
     for _, m in ipairs(msPresent) do
       if H.readWord(MHP(m)) < hpPre[m] then return true end
@@ -600,14 +544,8 @@ add({
       "and it resolved ONLY bludgeoning: with the bench deferred, nothing "
       .. "else was loading an attack class into the window")
 
-    -- #71 item 3: the agreement loop below degenerates to false == false
-    -- on a natural formation where nothing Gau hit happens to be
-    -- bludgeon-weak -- deleting the OT6_BLUDG arm from Ot6ClassChip would
-    -- then be a coin flip to notice.  Require the draw to have produced
-    -- at least one bludgeon-weak hit body, so the positive arm of the
-    -- agreement is always exercised (the encounter-selection loop above
-    -- already re-draws until the formation qualifies, so this is an
-    -- assertion about the file's own premise, not new steering).
+    -- Require the draw to have produced at least one bludgeon-weak hit
+    -- body, so the positive arm of the agreement below is always exercised.
     local anyWeak = false
     for _, m in ipairs(hit) do
       if (H.readByte(CLSWEAK(8 + m * 2)) & OT6_BLUDG) ~= 0 then

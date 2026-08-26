@@ -1,39 +1,23 @@
 -- @manual balance instrument (damage-per-BP), run by hand for tuning
--- bal_dpb.lua -- damage-per-BP by target state (Measurement #5, the core
--- boost-pedagogy result). This is a controlled A/B lab rather than a live
--- auto-battler: the mines pool is too fragile to express boosts (trash dies in
--- 2 actions) and its formula species carry no class weakness, so the ordering
--- is measured here in a pinned laboratory instead.
+-- bal_dpb.lua -- measures damage-per-BP by target state (shielded-unweak,
+-- shielded-weak, broken) on the battle_break fixture (Magitek trio vs
+-- guards):
 --
 --   tools/tests/run.sh tools/tests/bal_dpb.lua build/states/bal_dpb.log
 --
--- The battle_break fixture (opening guard fight, Magitek trio) is the lab.
--- Fire Beam is the default magitek skill (cursor opens on it), so mashing A
--- fires an unboosted or boosted Fire Beam at the default target every turn.
--- (#111: the engine autotargets nothing; an OFFENSIVE confirm's default is
--- the engine's enemy-side pick, the first targettable monster slot -- never
--- the party.  For this balance sweep any monster in the live formation is a
--- valid sample, so the unsteered confirm is safe by construction; the
--- hazardous case that issue documents is item-shaped actions, whose default
--- is the ACTOR.)
---
--- Per frame the driver pins the target guards into an exact state and pins
--- the party's BP and pending, then records every discrete HP drop with the
--- (state, boost) label live at the moment the hit landed. Pinning holds the
--- state constant across many casts: shields never deplete (chips are re-
--- pinned), the broken timer never expires, and HP never runs out, which makes
--- the fight usable as a damage bench.
+-- Mashing A fires an unboosted or boosted Fire Beam at the default enemy
+-- target every turn. Per frame the driver pins the target guards into an
+-- exact state and pins the party's BP and pending, then records every
+-- discrete HP drop with the (state, boost) label live at the moment the hit
+-- landed. Pinning holds the state constant across many casts: shields never
+-- deplete (chips are re-pinned), the broken timer never expires, and HP
+-- never runs out, which makes the fight usable as a damage bench.
 --
 -- Three states x two boost levels = six phases; each collects N damage
--- samples. Fire Beam base is the same in every phase (casters pinned equal),
--- so the per-state multiplier is the only variable:
+-- samples. Fire Beam base is the same in every phase (casters pinned equal):
 --   shielded-unweak   base x 0.5           (Ot6ShieldedDmg, shields up)
 --   shielded-weak     base x2 x 0.5 = x1   (vanilla fire-weak, then shielded)
 --   broken            base x2              (Ot6BrokenDmg, shields down)
--- Boost raises Fire Beam's potency tier the same way in every state, so the
--- marginal damage a boost buys (boosted - unboosted) tracks the state
--- multiplier. The design goal is the ordering broken > shielded-weak >
--- shielded-unweak, measured as damage-per-BP.
 --
 -- The resistance byte is read live from ROM and logged, so this lab reports
 -- the ordering at whatever Ot6ShieldedMulW the ROM (or a poke) carries.
@@ -51,19 +35,14 @@ local MENU  = 0x7BCA
 local ACTOR = 0x62CA
 local PIN_HP = 0xF000               -- guards pinned here; a hit never kills
 
--- resistance and hp knobs, read live from ROM for the log.
--- Bank-$F0 offsets drift on any code or data edit: these were once $12 low
--- ($30033C/$300173) and read code bytes ($88/$6A) instead of knobs, so
--- this lab's header line reported a resistance it was not measuring at. They
--- now derive from ff6/rom/ff6-en.dbg at compose time (H.sym), so they cannot
--- go stale, and no re-derivation or drift guard is needed. `& 0x3FFFFF` turns
--- the CPU address into the snesPrgRom file offset (bank $F0 -> $30xxxx).
+-- resistance and hp knobs, read live from ROM for the log. Derived from
+-- ff6/rom/ff6-en.dbg at compose time (H.sym). `& 0x3FFFFF` turns the CPU
+-- address into the snesPrgRom file offset (bank $F0 -> $30xxxx).
 local ROM_SHIELD = H.sym("Ot6ShieldedMulW") & 0x3FFFFF   -- word, low byte
 local ROM_HPMUL  = H.sym("Ot6HpMulTbl") & 0x3FFFFF       -- band0 byte
 -- POKE_SHIELD: if set, write this into Ot6ShieldedMulW before the phases,
 -- so the ordering can be swept across resistance without a rebuild ($08=0.5x,
--- $0c=0.75x, $10=1x). nil = leave the shipped byte. HP band0 is irrelevant
--- here (guards are pinned), so it is not swept.
+-- $0c=0.75x, $10=1x). nil = leave the shipped byte.
 local POKE_SHIELD = nil
 
 -- ----------------------------------------------------------- phase plan --
@@ -173,9 +152,8 @@ local function report()
     order.broken / math.max(order.unweak, 0.01),
     order.weak / math.max(order.unweak, 0.01)))
   -- broken is 2x at every resistance (shields down); weak is 2*R and unweak is
-  -- R.  So broken >= weak always, and weak is ~2x unweak always. The bounds are
-  -- loose so the whole resistance sweep (0.5/0.75/1x) passes; the logged ratios
-  -- carry the detail, and at 1x weak ties broken and the ordering collapses.
+  -- R, so broken >= weak always and weak is ~2x unweak always. At 1x
+  -- resistance weak ties broken, so the bounds below are loose.
   H.assertEq(order.broken >= order.weak * 0.9, true, "broken buys at least as much per BP as shielded-weak")
   H.assertEq(order.weak >= order.unweak * 1.5, true, "shielded-weak clearly outbuys shielded-unweak")
   H.screenshot("bal_dpb")

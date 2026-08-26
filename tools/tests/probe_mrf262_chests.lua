@@ -1,6 +1,6 @@
--- probe_mrf262_chests.lua -- #84: stand-tile reachability for map 262's five
--- visible chests, from gen_mrf_263's two footholds: the mrf_chute boot
--- (10,45) and the post-conveyor landing (~(20,45), ridden via {11,45}).
+-- probe_mrf262_chests.lua -- stand-tile reachability for map 262's five
+-- visible chests, from two footholds: the mrf_chute boot (10,45) and the
+-- post-conveyor landing (~(20,45), ridden via {11,45}).
 local H = dofile("tools/tests/lib/ot6.lua")
 local CHESTS = {
   { "Tincture",     83, 17, 27 },
@@ -30,8 +30,7 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 1000, "ctl", 5),
   census("boot(10,45)"),
-  -- ride the {11,45} conveyor exactly as gen_mrf_263 does: one step right,
-  -- ungated scripted ride to {20,45}
+  -- ride the {11,45} conveyor: one step right, ungated scripted ride to {20,45}
   H.call(function() H.setPad({ right = true }) end),
   H.waitUntil(function()
     return H.fieldX() >= 20 and H.hasControl() and H.tileAligned()

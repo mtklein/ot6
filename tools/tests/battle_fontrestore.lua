@@ -3,25 +3,17 @@
 local goodFire, goodShield
 -- cells at vram $5800, and the vanilla small-font restore on close brings
 -- back only the vanilla glyphs, so our element icons and hud glyphs
--- vanish until the next battle (the Whelk-dialogue bug the user hit).
--- The fix: the dialogue-close path (_c143b9 -> Ot6FontRestoreMark_ext)
--- runs the vanilla small-font restore to completion, then sets
--- OT6_FONTDIRTY ($57b9; relocated from $57d5, which is byte 0 of
--- vanilla's banner name scratch, see battle_banner), and the battle NMI
--- re-lays our icons in vblank, one ~128-byte slice per frame (6 stages; a
--- single-shot re-lay was ~46 scanlines and tore the frame).  The
--- flag-after-restore ordering matters; battle_dlgmenu tests the real
--- dialogue flow.  This test drives the mechanism directly: corrupt the
--- icon cells in vram, raise the flag, and confirm the NMI restores them
--- and clears the flag.
+-- vanish until the next battle.  The fix: the dialogue-close path
+-- (_c143b9 -> Ot6FontRestoreMark_ext) runs the vanilla small-font restore
+-- to completion, then sets OT6_FONTDIRTY ($57b9), and the battle NMI
+-- re-lays our icons in vblank, one ~128-byte slice per frame (6 stages).
+-- This test drives the mechanism directly: corrupt the icon cells in
+-- vram, raise the flag, and confirm the NMI restores them and clears the
+-- flag.
 --
--- Quarantined mechanism test (issue #75); state writes are sanctioned.
--- Owner-named on the #75 policy list: deliberate VRAM corruption for the
--- font-restore path.  The input under test (our font cells overwritten in
--- vram) is produced in real play only by a battle dialogue's own upload,
--- which battle_dlgmenu drives for real; this test isolates the restore
--- code itself and needs the corruption on cue.  It keeps its waivers, and
--- it must never produce fixtures.
+-- State writes are sanctioned here: deliberate VRAM corruption stands in
+-- for a battle dialogue's own upload (which battle_dlgmenu drives for
+-- real), so this test can isolate the restore code directly.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 local vr = emu.memType.snesVideoRam
@@ -42,7 +34,7 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.enterEncounter(),
   H.waitFrames(240),
-  -- baseline: our icons are present (glyphCanary passes elsewhere); snapshot
+  -- baseline: snapshot our icons before corruption
   H.call(function()
     goodFire = cellBytes(0xeb)
     goodShield = cellBytes(0x65)

@@ -41,10 +41,9 @@ rebuilt ROM, which is the evidence behind "plays identically."
 ## A warning about Sketch
 
 Relm's Sketch still carries Final Fantasy VI 1.0's most famous bug,
-deliberately left in place (see the v0.13 notes for the full house-rule
-rationale). When a Sketch misses, the game can rarely corrupt your
-inventory or save. **Save before experimenting with Sketch.** The world
-map saves anywhere.
+deliberately left in place. When a Sketch misses, the game can rarely
+corrupt your inventory or save. **Save before experimenting with
+Sketch.** The world map saves anywhere.
 
 ## What we'd like to know
 

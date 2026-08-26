@@ -1,48 +1,11 @@
--- gen_thamasa_arrive.lua -- v0.13: docs/design/thamasa-route.md section 1,
--- segments 1-2 (issue #127, "the Thamasa wave").  From checkpoint K
--- (crescent-landing-v1, world (232,150), party TERRA-LOCKE-SHADOW) to
--- checkpoint L `thamasa-night`: world outside Thamasa, $008D=1 (Strago
--- engaged), pre-inn, party unchanged, world-saveable.
---
+-- gen_thamasa_arrive.lua -- from checkpoint K (crescent-landing-v1, world
+-- (232,150), party TERRA-LOCKE-SHADOW) to checkpoint L `thamasa-night`:
+-- world outside Thamasa, $008D=1 (Strago engaged), pre-inn, party
+-- unchanged, world-saveable.
+
 -- The route, with the mechanism each beat rides (event_main.asm citations
 -- from docs/design/thamasa-route.md section 1):
---
---  1. World walk (232,150) -> (250,128), the Thamasa world trigger
---     (event_trigger.asm:35 -> _cbd2ee, :69190) -> map 343 (23,46).
---     Crescent Island world trash is runnable (HANDOFF); flee, as
---     gen_voyage's own world walks do.
---  2. Town 343's first-entry STARTUP_EVENT scene, ridden with advanceStory.
---  3. The five town chests, visible on any walk across 343 pre-$0099
---     (treasure_prop.dat map-343 block, all read 2026-08-19): Echo Screen
---     (13,8) bit246, Green Cherry (35,12) bit247, Soft (43,30) bit248,
---     Eyedrop (31,37) bit249, Fenix Down (14,18) bit250.  The two magic-
---     vignette one-shots at (35,15)/(25,12) are avoided (optional, not
---     part of L, event_trigger.asm:1670-1672).
---  4. Strago's house door 343 (29,13) -> 349 (37,24).  NO upstairs, NO
---     Memento Ring here: see the SURVEY CORRECTION at segment 4 below --
---     docs/design/thamasa-route.md's "stair pair (39,10)<->(61,20);
---     Memento Ring at (56,16) upstairs" is WoR Gungho/Ebot's Rock content
---     that reuses map id 349, not a WoB Strago's-house feature.
---  5. Talk to Strago (obj $10, event_main.asm:69814) and ride the two
---     naming screens (name_menu STRAGO :69871, name_menu RELM :70067)
---     with gen_edgar's commitName idiom, exactly as
---     probe_thamasa_names.lua proved it (START pulsed 8-on/12-off until
---     the event resumes, 21 frames each screen).  MEASURED CORRECTION
---     (issue #127 comment, probe committed 404f49a): $008D fires at
---     Strago's FIRST line, ~1600 frames before either naming screen opens
---     -- it means "Strago engaged", not "scene complete".  The real
---     end-of-scene signal is control back on map 343 at (29,15) facing
---     DOWN (event_main.asm:70405-70410); L's contract pins $008D=1 but no
---     step here waits on it as a scene-end signal.
---  6. Out of town the same way the K->L survey measured the entrance
---     (world trigger (250,128), long_entrance.dat map-343 south strip
---     src (19,48) len 6, MEASURED landing world (249,128), the same
---     staging tile the town was approached from): walk to the south exit and
---     hold DOWN through it.  Care, the exit contract, and the real Save
---     UI at slot 3 close the segment -- checkpoint L, `thamasa-night-v1`,
---     the same batch-checkpoint machinery gen_voyage used for K
---     (tools/tests/checkpoints/, manifest, provenance, sram_checkpoint).
---
+
 -- Dual boot (the gen_voyage/gen_narshe_mission shape): the normal ninja
 -- graph edge is prev="crescent_landing" (H.loadState of the .mss, fast,
 -- no title screen); cutting the thamasa-night-v1 checkpoint is a separate
@@ -55,7 +18,7 @@
 --     OT6_CAPTURE_SRM=tools/tests/checkpoints/thamasa-night-v1/thamasa-night.sram \
 --     tools/tests/run.sh tools/tests/gen_thamasa_arrive.lua
 --     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/thamasa-night-v1
---
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
@@ -112,9 +75,6 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
--- gen_edgar's commitName, ported byte-identical by probe_thamasa_names
--- (issue #127 comment, probe 404f49a): START pulsed 8-on/12-off until the
--- event engine resumes AND the menu flag is down for 10 straight frames.
 local function commitName(tag)
   local running = 0
   return seq({
@@ -346,35 +306,12 @@ local steps = {
     H.screenshot("thamasa_town_entry")
   end),
 
-  -- ---- 3. the five town chests (the #84 chest rule) -----------------------
-  -- Order is a rough sweep from the entrance (23,46) toward the house door
-  -- (29,13); navTo BFS handles the actual walking regardless of order.
   chestAuto(31, 37, 249, "Eyedrop", 0xF3, { avoid = VIGNETTES }),
   chestAuto(43, 30, 248, "Soft", 0xF4, { avoid = VIGNETTES }),
   chestAuto(35, 12, 247, "Green Cherry", 0xF8, { avoid = VIGNETTES }),
   chestAuto(13, 8, 246, "Echo Screen", 0xFB, { avoid = VIGNETTES }),
   chestAuto(14, 18, 250, "Fenix Down", 0xF0, { avoid = VIGNETTES }),
 
-  -- ---- 4. Strago's house door ----------------------------------------------
-  -- SURVEY CORRECTION (measured 2026-08-19, probe_thamasa_house.lua,
-  -- discarded after use): docs/design/thamasa-route.md's "interior stair
-  -- pair (39,10)<->(61,20); Memento Ring chest at (56,16) upstairs" is a
-  -- misread.  Map 349 is reused: the same map id also hosts the WoR
-  -- Gungho/Ebot's Rock epilogue (event_main.asm ~54600-56400, dialog
-  -- $0B34-$0B62 -- "GUNGHO", "Hidon's appeared at Ebot's Rock again!",
-  -- "RELM: Only STRAGO could have been taken in by that performance!").
-  -- Every load_map into 349 at (39,10)/(60,21)/(61,20)/(38,11)/(63,12)/
-  -- (63,13)/(44,22)/(41,21) belongs to that WoR scene's choreography, whose
-  -- own mod_bg_tiles calls (e.g. `mod_bg_tiles BG1, {37,16}, {1,2}` right
-  -- next to the (39,10) load_map) open wall sections MID-CUTSCENE -- a
-  -- fourth mod_bg_tiles-retiled map the survey's hazard 4 did not count
-  -- (it only names town 343 and mountain 375).  A live bfsPath grid sweep
-  -- (x=25..65, y=5..30) from the WoB door-arrival tile (37,24) found the
-  -- reachable ground floor is bounded x:35-47, y:17-25 -- no stairs, no
-  -- upstairs, and (56,16) is 20+ tiles outside it on both axes.  So for
-  -- this WoB checkpoint the Memento Ring is not visible on the walked
-  -- route and the chest rule does not reach it; it stays unopened
-  -- (bit 227) until whatever segment builds the WoR Ebot's Rock scene.
   crossDoor(29, 13, 349, 37, 24, "Strago house door 343(29,13)->349(37,24)",
     { avoid = VIGNETTES }),
 
@@ -404,11 +341,6 @@ local steps = {
     H.screenshot("thamasa_scene_end")
   end),
 
-  -- ---- 6. out of town the way we came in, and the world save -------------
-  -- long_entrance.dat map-343 south strip: src (19,48) len 6, the mirror of
-  -- the (250,128)->343(23,46) entry.  MEASURED: lands at world (249,128),
-  -- the same staging tile the town was approached from (not the table's
-  -- literal DestX/DestY (250,129), which is read at the map edge itself).
   H.navTo(21, 47, { maxFrames = 20000, playBattles = "flee", avoid = VIGNETTES }),
   pressWalk("down", function() return H.worldMode() end, 900,
     "held DOWN onto the south strip -> world (249,128)"),

@@ -1,13 +1,12 @@
--- probe_fc_escape.lua -- #132 segment 4: the 6:00 escape, from
--- fc_escape_start.mss (393 (67,16), clocks already running: master
--- timer 0 at 21600, Shadow timer 2 at 21300 -- both run in menus and
--- battles, so no dawdling and no field menus).  Route: east to Nerapa
--- at (108,15) (talk gesture -> battle 81), then past (112,15) (sets
--- $01FE) to the ledge trigger (115,17) (_ca577e, sets $01FD), answer
--- "Wait!!" (the last choice row), and idle until timer 2 fires
--- _ca57b3: Shadow arrives, $037D=1 -- the owner-canon humane wait.
--- Then absorb the exit flow (airship flees, the RUIN cutscene) as far
--- as it goes and bank the result.
+-- probe_fc_escape.lua -- the 6:00 escape, from fc_escape_start.mss
+-- (393 (67,16), clocks already running: master timer 0 at 21600, Shadow
+-- timer 2 at 21300 -- both run in menus and battles, so no dawdling and
+-- no field menus).  Route: east to Nerapa at (108,15) (talk gesture ->
+-- battle 81), then past (112,15) (sets $01FE) to the ledge trigger
+-- (115,17) (sets $01FD), answer "Wait!!" (the last choice row), and idle
+-- until timer 2 fires: Shadow arrives, $037D=1.  Then absorb the exit
+-- flow (airship flees, the RUIN cutscene) as far as it goes and bank the
+-- result.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x3ff) == m end
 local MAG = { [0x07] = { spell = 2, boost = false } }
@@ -58,7 +57,7 @@ H.run({ maxFrames = 150000 }, {
     { H.equipWeapon(2, 0x36, { tag = "CELES IceRod" }) }, {}),
   H.release(),
   H.waitFrames(30),
-  -- Nerapa: face right, tap A from a standstill (the proven gesture)
+  -- Nerapa: face right, tap A from a standstill
   (function()
     local t = 0
     return H.driveUntil(function()
@@ -88,9 +87,7 @@ H.run({ maxFrames = 150000 }, {
   H.navTo(112, 15, { maxFrames = 8000, playBattles = "tactical",
     magic = MAG }),
   -- the ledge: step onto (115,17).  The arrive latch is EXACT-tile
-  -- only: adding "or not hasControl()" here once ended the navTo on a
-  -- random battle load at (112,16), and the party then idled off the
-  -- ledge until the master clock ran out.
+  -- only.
   (function()
     local near = false
     return H.navTo(115, 17, { maxFrames = 8000, playBattles = "tactical",
@@ -145,9 +142,8 @@ H.run({ maxFrames = 150000 }, {
     H.log("Shadow made the jump; absorbing the exit flow")
     H.screenshot("shadow_saved")
   end),
-  -- exit: _ca48d6 -> load_map 10 -> 376 -> 390 (airship flees) -> the
-  -- RUIN cutscene -> the WoR landing.  Soft cap; bank wherever it
-  -- settles and report.
+  -- exit: load_map 10 -> 376 -> 390 (airship flees) -> the RUIN cutscene
+  -- -> the WoR landing.  Soft cap; bank wherever it settles and report.
   absorb(function() return mapIs(397) end, 90000, "exit flow -> WoR"),
   (function()
     local t, calm = 0, 0

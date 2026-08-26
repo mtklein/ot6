@@ -81,5 +81,4 @@ Both segments are `fixed_block`s at hard addresses (`event_triggers` at
 `ff6/include/macros.inc:409-431`).
 
 Any such edit is a ROM change, so it invalidates every savestate in
-the generated chain (`checkpoint-fixtures.md`, "The problem"); batch checkpoints
-survive.
+the generated chain; batch checkpoints survive.

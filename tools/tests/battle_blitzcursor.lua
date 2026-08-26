@@ -1,5 +1,5 @@
 -- @suite savestate=vargas_won slow
--- battle_blitzcursor.lua -- v0.3 Blitz-as-menu: it obeys Config>Cursor.
+-- battle_blitzcursor.lua -- Blitz-as-menu: it obeys Config>Cursor.
 --
 -- Vanilla's battle command lists (Magic, Tools, Item, ...) remember where the
 -- cursor sat across a character's turns when Config>Cursor = Memory, and snap
@@ -13,36 +13,13 @@
 --
 -- Blitz reuses the Tools shell, so its cursor lives in the Tools triple
 -- ($895f scroll, $8963 col, $8967 row, indexed by the active slot $62ca),
--- which are the bytes UpdateMenuState_04 keeps or clears.  Ot6BlitzListOpen
--- (ot6.asm) used to zero that triple unconditionally on every open, which
--- overrode the shell's decision and made Blitz always reset, ignoring the
--- setting.  That was the owner's playtest bug; the fix deletes the reset and
--- lets the shell's gated clear stand.  This test drives the config bit both
--- ways and asserts on the cursor RAM rather than on a screenshot.
+-- which are the bytes UpdateMenuState_04 keeps or clears.
 --
--- Issue #75 conversion: every input is the game's own.  The old file poked
--- the config byte every frame, installed a synthetic four-Blitz Sabin,
--- normalized the cursor triple by writing it, and forced a fresh
--- command-window open by writing the menu-state index $7bc2.  All four
--- stagings are gone:
---   * the config bit is set in the real field Config menu (main menu ->
---     Config -> the Cursor row -> dpad; ChangeConfigOption_06, config.asm:
---     Right = tsb $40 = Memory, Left = trb = Reset), gated on reading
---     $1d4e back, and flipped between battles, because that is the only
---     place a player can flip it;
---   * SABIN is the real one (vargas_won), with his real two-blitz list, a
---     1x2 grid, so the moved coordinate is the column rather than the row;
---   * the normalize is a d-pad walk verified by re-reading the cell;
---   * the fresh open is Sabin's next turn: he commits a real Defend, the
---     bystanders take their turns, and his next command window runs
---     UpdateMenuState_04's gated clear as every turn does.
--- A measured consequence shaped the phases: battle RAM is reinitialized
--- per battle, so a new battle's cursor says nothing about the setting, and
--- each variant must show its behavior within one battle.  So: battle 1 under
+-- This test drives the config bit both ways in the real field Config menu
+-- and asserts on the cursor RAM: battle RAM is reinitialized per battle, so
+-- each variant shows its behavior within one battle -- battle 1 under
 -- Memory (moved column survives a fresh open), flee, flip to Reset in the
--- field, battle 2 under Reset (moved column snaps back).  The pair still
--- pins the bit sense: the old unconditional reset fails Memory, and an
--- inverted-sense fix fails one of the two.
+-- field, battle 2 under Reset (moved column snaps back).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
 
@@ -299,10 +276,9 @@ H.run({ maxFrames = 200000 }, {
   H.driveUntil(function() return not H.battleLoadStarted() end, 12000, {
     H.call(function()
       -- back out of any open list first: wait mode freezes battle time
-      -- while a list is up, so held L+R can never count down under one
-      -- (measured: run 2 held for 9000 frames beneath the reopened blitz
-      -- window).  The command window does not freeze time (battle_vargas's
-      -- header), so once the state is back at $05 the L+R hold runs.
+      -- while a list is up, so held L+R can never count down under one.
+      -- The command window does not freeze time, so once the state is
+      -- back at $05 the L+R hold runs.
       ph = ph + 1
       local st = H.readByte(MSTATE)
       if H.readByte(MENU) ~= 0 and st ~= ST_CMD and st ~= 0x01 then

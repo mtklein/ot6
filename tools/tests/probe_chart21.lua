@@ -1,6 +1,5 @@
--- probe_chart21.lua -- chart map 21's reachable set from the chase entry
--- (pre-trigger), every tile, to settle whether the cliff-side top rows
--- connect at all (#133).
+-- probe_chart21.lua -- charts map 21's reachable set from the chase entry
+-- (pre-trigger), every tile.
 local H = dofile("tools/tests/lib/ot6.lua")
 H.run({ maxFrames = 9000, }, {
   H.loadState("build/states/wob_chase21.mss.lua"),

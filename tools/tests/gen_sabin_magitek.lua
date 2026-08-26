@@ -4,26 +4,7 @@
 -- gauntlet out to the World of Balance.  Generates:
 --   camp_escaped.mss   world map (179,71), on foot toward the Phantom Forest,
 --                      $0037=1 (the escape is done).
---
--- The blocker an earlier attempt hit, and its fix, which is geometric rather
--- than a state machine.  The escape is a series of event triggers
--- (event_trigger.asm
--- :564-573): battle 15 at the x=24 column (24,28)-(24,31)+(23,32) (_cb1955),
--- battle 16 at (33,29)/(33,30) (_cb19af), battle 17 at (36,22) (_cb19e6), and
--- the world-exit finale on the y=14 row (35/36/37,14) (_cb1a23, :42119 ->
--- player_ctrl_on + load_map 0 {179,71} + set_script_mode WORLD, :42253-42255).
--- Between them the party walks with real user control ($087C nibble 2); the
--- escape is walked rather than ridden.  Three facts, all measured (probe_esc):
---
---  1. Each battle must be won by tap-A rather than write-cleared.  _cb1955's
---     tail (event_main.asm:42026) is `call _ca5ea9`, which is `if_b_switch
---     $40, ...; call GameOver` (:14171): a battle that exits without the win
---     bit $40, which is what write-clearing during load produces,
---     calls GameOver and leaves the event stalled with no message.  That
---     stall is the "$CB1955 forever" the earlier attempt measured.
---     Auto-battle (edge-tap A) lets the Magitek party win; the teardown then
---     sets $01F4=1 and control returns a few frames after fade-in.
---
+
 --  2. The trigger re-fires every aligned frame (CheckEventTriggers has no
 --     once-per-tile latch, field/event.asm:5740-5786; its guard fires
 --     whenever the party is tile-aligned AND $087C nibble==2 AND no event
@@ -33,7 +14,7 @@
 --     navTo reads that as control lost and drops its plan every cycle (lib
 --     line ~1042), so it repeats in place and never completes a step.  That
 --     is why a plain navTo could not leave (24,30).
---
+
 --  3. Leave a trigger by holding a walkable direction persistently.
 --     The corridor runs along y=28, not the start row y=30.  (24,30) has no
 --     right exit (a wall; canStep confirmed it), while (24,28) does.  Holding
@@ -41,7 +22,7 @@
 --     begins on each clean frame, un-aligns the party, and the re-fire (which
 --     needs alignment) stops, so the step completes and the party is off the
 --     trigger.  The fix is a hold that does not give up on control loss.
---
+
 -- So the drive is: navTo the clean segment up to each trigger's near side
 -- (navTo works reliably off the triggers), then holdCross the trigger itself
 -- (persistent hold of the corridor direction + tap-A the fight), landing on
@@ -122,12 +103,6 @@ end
 -- visible, rather than corrupting a teardown.  The segments are chosen off
 -- the triggers, where control is continuous and navTo is reliable.
 local IMP = 0x0042
--- playBattles = "tactical" (issue #75) keeps the flag write out of the
--- library path too.  It is intent only: map 119 has random encounters
--- disabled (map_prop.dat byte +5 bit 7 clear; the field step handler at
--- ff6/src/field/battle.asm:333-347 returns before the roll unless $0525 is
--- negative), and the escape fights are goal fights that opts.spare hands
--- back to the caller before the option is consulted.
 local function seg(tx, ty, what)
   return H.cond(function() return true end, {
     H.logStep(function()
@@ -193,26 +168,7 @@ H.run({ maxFrames = 120000 }, {
 
   -- ===================================================================== --
   -- Heal, before the finale takes the party out to the world map.
-  --
-  -- Three fights, no healing anywhere in the route, and a full bag:
-  -- camp_escaped shipped with SABIN at 15 of 231 hp and eight Potions and
-  -- five Tonics unspent (tools/audit_party_hp.py, 2026-08-11).  Fifteen hit
-  -- points is not a survivor, it is a casualty the walk to the Phantom
-  -- Forest has already collected, and every step that boots this fixture
-  -- inherits it.  Same shape as returner_hideout, which shipped two dead
-  -- and produced a party wipe in a room with no encounters at all.
-  --
-  -- The stop goes HERE, past battle 17 and before the finale, rather than
-  -- on the world map at the other end.  Map 119 at y<=21 is a plain field
-  -- map with real control: the escape's triggers re-fire only while the
-  -- party is aligned ON one (CheckEventTriggers has no once-per-tile latch,
-  -- field/event.asm:5740-5786) and battle 17's is at (36,22), a tile below
-  -- where this lands.  World-map care has one measured failure against it --
-  -- gen_tunnelarmr had its stop there and the world DP cells $E0/$E2 came
-  -- back reading (175,0) garbage with the world engine never resuming
-  -- (gen_tunnelarmr.lua:649-654) -- and there is no reason to spend that
-  -- risk when a field map sits one step earlier.
-  --
+
   -- This party is CYAN, SHADOW and SABIN, none of whom knows a cure spell,
   -- so fieldCare will drink rather than cast whatever the magic option says.
   -- It picks Tonic or Potion by the size of the hole, so SHADOW's small one

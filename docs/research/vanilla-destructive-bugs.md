@@ -1,16 +1,14 @@
-# Research: vanilla destructive-bug inventory (issue #13)
+# Research: vanilla destructive-bug inventory
 
-Issue [#13](https://github.com/mtklein/ot6/issues/13) narrows the "Vanilla's
-bugs stay" house rule: harmless quirks are preserved, but before a release's
-playable range reaches affected content we fix or explicitly accept vanilla
+Vanilla's harmless quirks are preserved. Before a release's playable range
+reaches affected content, this project fixes or explicitly accepts vanilla
 defects that can **crash, lock up, corrupt SRAM/save data, corrupt persistent
 game state, cause unavoidable soft locks or progression loss, or produce
 arbitrary memory effects with materially destructive outcomes**.
 
-This document is the inventory. It is deliberately short. Per #13, "do not turn
-this into a general folklore-driven bug-fix sweep."
+This document is the inventory of that triage, kept deliberately short.
 
-## Method, and why the list is short
+## Method
 
 There is a large body of FF6 bug lore, and much of it describes the
 **v1.1 (rev 1) US ROM**, the Japanese ROM, or fan retranslations rather than
@@ -26,7 +24,7 @@ Two rules were applied:
    `ff6/`, cited by file and line. Everything else is in
    [Reported, unverified](#reported-unverified) with a note on what would
    settle it.
-2. **Destructive** means it clears #13's bar; being a bug is not sufficient.
+2. **Destructive** means it clears the bar defined above; being a bug is not sufficient.
    Cosmetic defects, wrong tables that only change a shake pattern, dead code,
    and balance oddities stay.
 
@@ -114,8 +112,8 @@ bits.
 **Classification: confirmed no-termination loop, no vanilla path to it.** It is
 a hazard for **OT6 fixtures**: a savestate or generated fixture
 that warps a party onto a Veldt sector without the encounter history that
-populates the bitmap hangs the headless test runner with no error, which is
-the "quiet test" failure mode `CONTRIBUTING.md` warns about.
+populates the bitmap hangs the headless test runner with no error and no
+visible failure — a "quiet test" hang.
 
 ### 4. `SetControlCmd` builds a WRAM write address from an unguarded index
 
@@ -209,7 +207,7 @@ Tentacles scene, `ff6/src/event/event_main.asm:88180-88184` at Terra's
 flashback). The only other uses are in the DEBUG new-game block
 (`ff6/src/field/init.asm:313-316`, inside the `.if ::DEBUG` branch).
 
-**Classification: not a vanilla defect for #13's purposes. It is an authoring
+**Classification: not a vanilla defect by this doc's bar. It is an authoring
 hazard for OT6.** Any OT6 route change that reorders party composition around
 an `opt_equip` produces a hard lockup rather than a visible glitch. Worth a
 line in the route-authoring notes.
@@ -354,17 +352,16 @@ Both are reads, not writes, and neither faults. Listed so they are on record.
 
 ## Explicitly preserved (the other half of the policy)
 
-#13 says the policy must not create an expectation that every harmless vanilla
-bug gets modernized. Named examples follow, so the boundary is on record:
+Not every harmless vanilla bug gets modernized. Named examples follow, so the
+boundary is on record:
 
-- **Vanish + Doom/X-Zone/Demi on bosses.** A balance exploit. #13 lists "minor
-  balance oddities" as preserved.
-- **Useless / mis-wired stats.** `CONTRIBUTING.md` already names these.
+- **Vanish + Doom/X-Zone/Demi on bosses.** A balance exploit, preserved as a
+  minor balance oddity rather than fixed.
+- **Useless / mis-wired stats** are preserved as balance oddities, not fixed.
   Note: the common claim that Evade is never read is not what the code shows.
   `ff6/src/battle/battle_main.asm:6016` reads `$3b54` (evade) or
-  `$3b55` (mblock) depending on carry. Either way the behaviour is benign and
-  out of #13's scope; recorded here so the folklore version is not written
-  down as fact.
+  `$3b55` (mblock) depending on carry. Either way the behaviour is benign;
+  recorded here so the folklore version is not written down as fact.
 - **Row jank, animation quirks, the "Ragers" text-erase bug**
   (`ff6/notes/ff3u.asm:98592-98593`), the screen-shake wrong-table bug
   (`ff6/src/field/screen.asm:1134`, upstream-annotated
@@ -379,10 +376,9 @@ bug gets modernized. Named examples follow, so the boundary is on record:
   members remain (`ff6/src/battle/battle_main.asm:9614-9620`).
 - **Sketch's missed-cast corruption** — the one *destructive* bug preserved by
   explicit exception rather than by being harmless. Unlike everything else in
-  this list it clears #13's bar, and would normally be fixed; owner ruling #123
-  keeps it untouched. The full ruling, its mechanism, and how the route lives
-  beside it are under [The community corpus → Special attention](#special-attention)
-  and `thamasa-route.md` §5.
+  this list it clears the destructive bar, and would normally be fixed; owner
+  ruling keeps it untouched. The full ruling and its mechanism are under
+  [The community corpus → Special attention](#special-attention).
 
 ---
 
@@ -405,8 +401,8 @@ the record.
    previous game's loadout. The effect is bounded, because the battle-side
    read validates each stored tech and falls back to AUTO
    (`ff6/src/battle/ot6_kits.asm:69-74`). This is a configuration-hygiene
-   problem rather than a soft lock, but it is the class of thing #13's
-   "persistent game-state" clause covers, and it is OT6's own.
+   problem rather than a soft lock, but it is a "persistent game-state" issue
+   under this doc's bar, and it is OT6's own.
 
 2. **The codex commits to SRAM outside the save transaction.**
    `ff6/src/battle/ot6_break.asm:876` and `:984` write `f:OT6_CODEX` /
@@ -492,26 +488,25 @@ Each of these was read and the bound verified. None is a defect.
 
 ---
 
-## The community corpus, triaged (2026-08-19)
+## The community corpus, triaged
 
 Sources: Master ZED's *FF3us/6j Glitches & Bugs guide* v2.6
 (masterzed.cavesofnarshe.com — 161 entries, read directly, the canonical
 exhaustive list) and the Worlds Collide randomizer's `Flags:Fixes` docs
 (wiki.ff6worldscollide.com — bundles named engine bugs under opt-in fix
-flags), against this project's own docs/code. C. V. Reynolds' compilation
-readme and the ff6hacking.com forum "all bugs" thread 403'd every fetch
-attempt; their names are used only where Master ZED or WC corroborate them.
-Terii Senshi's Algorithms FAQ and speedrun.com yielded no fetchable primary
-source this pass — claims resting on them alone say **not verified in
-sources** rather than repeating folklore. Scope: start through Thamasa;
-WoR-only content (Psycho Cyan) stays out of scope, already logged above.
+flags), checked against this project's own docs/code. C. V. Reynolds'
+compilation, the ff6hacking.com forum "all bugs" thread, Terii Senshi's
+Algorithms FAQ, and speedrun.com yielded no fetchable primary source, so
+claims resting on them alone say **not verified in sources** rather than
+repeating folklore. Scope: start through Thamasa; WoR-only content (Psycho
+Cyan) stays out of scope, already logged above.
 
 ### Special attention
 
-**Evade/MBlock — bucket (a), never a fix candidate.** Master ZED confirms it
-plainly ("Evade is worthless... M.Block takes care of all evasion"); WC
-bundles it as an opt-in flag, itself evidence upstream treats it as a
-toggle, not an obvious defect. Every OT6 fight from Narshe through the
+**Evade/MBlock — bucket (a), never a fix candidate.** Master ZED confirms
+Evade is effectively unused and M.Block alone governs evasion; WC bundles it
+as an opt-in flag, itself evidence upstream treats it as a toggle, not an
+obvious defect. Every OT6 fight from Narshe through the
 Sealed Gate is tuned with M.Block as the sole evasion stat; "fixing" Evade
 now would silently retune every measured encounter in `bosses-wob.md` and
 `balance-metrics.md` with no number visibly changing. Owner ruling: closed.
@@ -529,20 +524,20 @@ found no OT6 code near instant-death handling, consistent with untouched but
 not proof), and test row 10 is the conformance probe once both ship.
 
 **Counterattack/queue quirks — bucket (d), already handled, twice.** OT6
-found its own version rather than inheriting one: issue #91
-(`ot6_boost.asm:546-618`, `Ot6QueueFold`) is the direct hit on "we changed
-action-end BP flow." The boosted-spell price fold guarded against
-re-folding a counterattack by testing the global "counterattack executing"
-flag (`$b1.0`), but that flag doesn't say *whose* action is queueing — an
-ordinary action drained during someone else's counterattack took the same
-early-out and cast at the unfolded price. Fixed by comparing the queued
-pointer against the actor's own counterattack slot (`$32cd,x`) instead. One
-gap is left deliberately: a second counterattack queued before the first
-resolves would still fold, judged unreachable with vanilla AI density.
-Separately, issue #66 (`bosses-wob.md:34-39`, `Ot6MayAct`) rules that a
-Broken enemy loses its counters along with its turns — Octopath parity, not
-an inherited quirk. Master ZED's corpus flagged no vanilla counterattack/
-queue defect distinct from these two.
+found its own version rather than inheriting one: `Ot6QueueFold`
+(`ot6_boost.asm:546-618`) is the direct hit on OT6's own action-end BP flow.
+The boosted-spell price fold guarded against re-folding a counterattack by
+testing the global "counterattack executing" flag (`$b1.0`), but that flag
+doesn't say *whose* action is queueing — an ordinary action drained during
+someone else's counterattack took the same early-out and cast at the
+unfolded price. Fixed by comparing the queued pointer against the actor's
+own counterattack slot (`$32cd,x`) instead. One gap is left deliberately: a
+second counterattack queued before the first resolves would still fold,
+judged unreachable with vanilla AI density. Separately, `Ot6MayAct`
+(`bosses-wob.md:34-39`) rules that a Broken enemy loses its counters along
+with its turns — Octopath parity, not an inherited quirk. Master ZED's
+corpus flagged no vanilla counterattack/queue defect distinct from these
+two.
 
 **Item dupes — not verified in sources; the confirmed bug is loss, not
 duplication, and it's moot.** No FF6 item-*duplication* glitch turned up
@@ -554,53 +549,50 @@ attempt. Moot for OT6: Locke's Steal is single-target at every boost tier
 `tools/audit_supplies.py`'s "honest bags" premise is unchallenged by
 anything in this corpus — the only confirmed defect destroys loot.
 
-**Battle soft-locks — one already fixed, one just found.** No new,
+**Battle soft-locks — one already fixed, one already accounted for.** No new,
 sourceable formation/AI-corner hang turned up beyond this doc's existing
 "Confirmed in source" section. OT6 found and fixed one of its own: the Zozo
 z-loop shaft (map 225, x 29-40/y 31-61) can roll a random encounter mid
 z-level transition on a diagonal tile, and the pre-battle scroll never
 settles — a real hang in unmodified play (`ot6_break.asm:698-729`,
 `field/battle.asm:350`, shipped v0.11), not named in any source checked
-here, so likely an OT6-original find worth reporting upstream. **New
-tonight, not from the community corpus:** the burning-house ambush loss
-(#127) doesn't surface as a hang or a visible game-over at all — the
-engine's Game Over → Continue flow silently auto-Continues, so a lost fight
-can look identical to a won one to anything driving input rather than
-watching the screen. A hang is loud; this is quiet. Worth auditing every
-other scripted-loss point in the shipped range for the same blind spot
-before "the fights were played" is trusted fully.
+here, so likely an OT6-original find worth reporting upstream. Separately,
+the burning-house ambush loss doesn't surface as a hang or a visible
+game-over at all — the engine's Game Over → Continue flow silently
+auto-Continues, so a lost fight can look identical to a won one to anything
+driving input rather than watching the screen. A hang is loud; this is
+quiet, and worth checking for at every other scripted-loss point in the
+shipped range before "the fights were played" is trusted fully.
 
 **Sketch's missed-cast corruption — bucket (d), preserved untouched by owner
-ruling #123 (2026-08-16).** The mechanism is read in
-`thamasa-route.md` §5.2: `TargetEffect_55`
-(`battle_main.asm:9673-9700`) leaves `$b7 = $ff` on any non-success exit, and a
-failed `CheckSketchHit` roll (`battle_main.asm:9065-9083`, an attacker/target
-level ratio) is one such exit; the invalid `$b7` then drives `AnimType_2f`'s
-unguarded index, whose severity is data-dependent — a corrupt sprite, spawned
-inventory, or a bank-`$7e` sweep that can reach the save block. This clears #13's
-destructive bar, so it would normally be fixed. The owner ruling is that it is
-**not**: unboosted Sketch keeps its original roll *and* its original bug, exactly
-as vanilla 1.0 shipped it. Two constraints ride the ruling — **no mechanic may
-depend on the bug or its absence, and no code change may target its mechanism.**
-The owner's image is Roman ruins inside an Italian grocery store: you route the
-aisles around them and leave the stones alone. In practice the route reaches the
-Ultros ③ scripted finish (a landed Sketch of TENTACLE surrenders the fight,
-`thamasa-route.md` §0.3 / §5.1) by ordinary play; whether a player's *unboosted*
-Sketch still trips the corruption is their own archaeology, and the release notes
-say so (`thamasa-route.md` §5.3). The boost half of #123 — a guaranteed landed
-Sketch at 3 BP — lands with Relm's kit (`kits.md`) and stays consistent with this
-ruling: it routes *around* the ruin without touching a stone, because a landed
-Sketch already cannot fire the miss-path bug, so the guarantee never reaches it.
-It is the chance-verb canon applied, not a fix. This is the same class of
-decision as the Vanish+Doom and Joker-Doom preservations above, recorded here so
-the boundary is on the record next to the mechanism.
+ruling.** `TargetEffect_55` (`battle_main.asm:9673-9700`) leaves `$b7 = $ff`
+on any non-success exit, and a failed `CheckSketchHit` roll
+(`battle_main.asm:9065-9083`, an attacker/target level ratio) is one such
+exit; the invalid `$b7` then drives `AnimType_2f`'s unguarded index, whose
+severity is data-dependent — a corrupt sprite, spawned inventory, or a
+bank-`$7e` sweep that can reach the save block. This clears the destructive
+bar, so it would normally be fixed. The owner ruling is that it is **not**:
+unboosted Sketch keeps its original roll *and* its original bug, exactly as
+vanilla 1.0 shipped it. Two constraints ride the ruling — **no mechanic may
+depend on the bug or its absence, and no code change may target its
+mechanism.** In practice the route reaches the Ultros ③ scripted finish (a
+landed Sketch of TENTACLE surrenders the fight) by ordinary play; whether a
+player's *unboosted* Sketch still trips the corruption is their own
+archaeology. The boost half of the ruling — a guaranteed landed Sketch at 3
+BP — lands with Relm's kit (`kits.md`) and stays consistent with this
+ruling: it routes around the bug without touching it, because a landed
+Sketch already cannot fire the miss-path bug, so the guarantee never
+reaches it. It is the chance-verb canon applied, not a fix. This is the
+same class of decision as the Vanish+Doom and Joker-Doom preservations
+above, recorded here so the boundary is on the record next to the
+mechanism.
 
 ### Full triage
 
 | Bug (source) | Mechanism | Bucket | Note |
 |---|---|---|---|
 | Swordless Runic, 2 variants (Master ZED, Commands) | Runic fires weaponless when CPU-driven (Muddle/Charm/Colosseum), or if Ogre Nix breaks mid-Palidor-jump after Runic queued | (c) | Celes's Runic is OT6's BP showcase (`ot6_boost.asm:420-474`). Check whether weaponless casts can desync `OT6_RUNICTURNS` — untested |
-| Learn L.5 Doom by watching Joker Doom (Master ZED, Slot) | Lore-by-observation auto-teaches any Lore witnessed, incl. Setzer's relabeled L.5 Doom | (a) | KEPT by owner ruling (2026-08-19, "that's pretty funny, i like it") -- the scholar learns a forbidden technique from the gambler, and the curated 5-slot bank makes carrying it a real choice. One engineering check remains: a test that the Lore machinery handles the id cleanly (learn bit, loadout byte, battle list, page render) |
+| Learn L.5 Doom by watching Joker Doom (Master ZED, Slot) | Lore-by-observation auto-teaches any Lore witnessed, incl. Setzer's relabeled L.5 Doom | (a) | KEPT by owner ruling — the scholar learns a forbidden technique from the gambler, and the curated 5-slot bank makes carrying it a real choice |
 | Item loss via multi-target Steal (Master ZED) | Capture/ThiefKnife + Offering/Dragon Horn only grants the first stolen item | (b) | Moot — Steal is single-target at every tier (`kits.md:336-420`) |
 | Evade is worthless (Master ZED; WC `Flags:Fixes`) | M.Block alone governs physical evasion | (a) | Owner ruling: never fix |
 | Vanish overrides death-immunity + revive checks (Master ZED) | Clear status skips instant-death and Life/Life2 dead-checks | (a) | Owner ruling: preserve (`magicite-tube-six.md` §6/§14.2) |
@@ -614,19 +606,8 @@ the boundary is on the record next to the mechanism.
 | Barrier Ring etc. cast at full HP (Master ZED) | Rippler-traded Near-Fatal only checks status, not HP | (a) | Requires Rippler (monster-only); cosmetic |
 | Jump/Launcher, Jump/Super Ball disappearance (Master ZED) | Simultaneous airborne states desync visibility/targeting | (a) | No OT6 kit grants Jump through Thamasa |
 | Joker Doom forced-target chain (Master ZED; WC `Flags:Fixes`) | Slot's forced targeting + Mimic re-roll bypasses target safety | (a) | Needs Gogo's Mimic, out of range; noted for WoR pass |
-| Sketch (this project's own read is deeper than Master ZED's) | `CheckSketchHit` (`battle_main.asm:9065-9083`) can call the wrong effect on a miss | (d) | Owner ruling #123 preserves it untouched (see Special attention above for the full ruling); landed for battle 125 in `thamasa-route.md` §5, ~20-30% miss estimated |
+| Sketch (this project's own read is deeper than Master ZED's) | `CheckSketchHit` (`battle_main.asm:9065-9083`) can call the wrong effect on a miss | (d) | Owner ruling preserves it untouched (see Special attention above for the full ruling); ~20-30% miss estimated |
 
-**Bucket counts:** (a) 13 · (b) 1 · (c) 2 · (d) 4 (counting #91 and #66 once
-each, from Special attention, not duplicated in the table).
-
-### Candidate follow-ups (not filed)
-
-- Probe whether a weaponless Celes casting Runic desyncs `OT6_RUNICTURNS`.
-- Check the curated Lore-gate before v0.13: does Joker Doom teach Strago an
-  off-list Lore?
-- Report the Zozo z-loop hang upstream — not previously documented anywhere
-  checked here.
-- Audit every scripted-loss point in the shipped route for the same
-  Game-Over-auto-Continues blind spot #127 found at the burning house.
-- Revisit the Joker Doom/Mimic chain once Gogo and the WoR range are in
-  scope.
+**Bucket counts:** (a) 13 · (b) 1 · (c) 2 · (d) 4 (counting the counterattack/
+queue and Broken-loses-counters entries once each, from Special attention,
+not duplicated in the table).

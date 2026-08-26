@@ -1,21 +1,14 @@
--- probe_moogle_stations.lua -- the Moogle defense played with real input
--- the way the set-piece was designed: pre-position all three squads at
--- separate interception stations before the marches arrive (issue #75,
--- marshal-investigation).  Zero writes; walking, Y-taps, and tap-A only.
+-- probe_moogle_stations.lua -- the Moogle defense played with real input:
+-- pre-position all three squads at separate interception stations before
+-- the marches arrive. Zero writes; walking, Y-taps, and tap-A only.
 --
--- Why stations rather than mid-defense goalie swaps (from
--- probe_moogle_rotation): waves 1-3 queue up nose-to-tail in the lane, so
--- the aside-walk after wave 2 crosses the tile wave 3's guard is entering,
--- the swap loses the race, and the walking party takes the collision.
--- Instead, the first ~2000 frames of the defense are quiet (wave 1 needs
--- ~2100 field-frames to arrive), and the march scripts split by arm:
+-- The first ~2000 frames of the defense are quiet (wave 1 needs ~2100
+-- field-frames to arrive), and the march scripts split by arm:
 --   east loop  (20,19..23):        NPC_4 and NPC_9    -> P3 parks (20,20)
 --   west loop  (10,19..23):        NPC_7 and NPC_8    -> P2 parks (10,21)
 --   middle column + tail (15,y):   NPC_5 and NPC_6    -> P1 keeps (14,14)
--- Collisions auto-engage the collided party (measured: parked inactive P1
--- fought and its own HP table showed in battle), so once parked, no
--- input choreography is needed during the wave phase; tap-A rides every
--- fight, two per squad.  The choke stays manned throughout because an
+-- Collisions auto-engage the collided party, so once parked, tap-A rides
+-- every fight. The choke stays manned throughout because an
 -- unintercepted march ends in the GameOver exec at (14,13).
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/moogle_defense.mss.lua"
@@ -119,10 +112,10 @@ H.run({ maxFrames = 140000 }, {
   -- ------------------------------------------------ deployment (quiet) --
   -- P1 vacates the choke so P2/P3 can leave the mound (its (13,13)/(15,13)
   -- parks have no other exit), then everyone walks to station and P1
-  -- returns to the choke.  ~35 steps total against a ~2000-frame window.
+  -- returns to the choke.
   -- P3 first: its east station is the earliest one a march reaches
   -- (NPC_4 passes (20,20) around field-frame ~1400; the west arm's first
-  -- guard needs ~1800; the choke ~2100 -- probe_moogle_switch timings)
+  -- guard needs ~1800; the choke ~2100)
   H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),
   ySwitchTo(3),
   H.navTo(20, 20, { maxFrames = 4000, playBattles = true }),

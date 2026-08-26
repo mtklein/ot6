@@ -1,16 +1,9 @@
 -- probe_esper_mtn_map.lua -- one-shot ground-truth dump of map 375's (the
--- Esper Mountain exterior) live tile-passability grid + reachability from the
--- (55,31) world-entrance landing, issue #127.
+-- Esper Mountain exterior) live tile-passability grid + reachability from
+-- the (55,31) world-entrance landing.
 --
--- gen_esper_mtn.lua's first crossing attempt failed navTo "no path
--- (55,31)->(45,33)": the landing pocket may be disconnected from the save
--- point (8,44) in the static tilemap, the same map-351 shape (islands joined
--- only by short_entrance warps + one-way slides).  This reads the LIVE
--- decompressed tile-property tables across the whole map (no walking, no BFS
--- cap) and BFS-probes the objectives so the generator's route can be built on
--- ground truth instead of a straight-line creep guess.
---
--- No @suite: one-shot measurement (probe_thamasa_house_map.lua's convention).
+-- Reads the LIVE decompressed tile-property tables across the whole map (no
+-- walking, no BFS cap) and BFS-probes the objectives.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -37,7 +30,7 @@ local function dumpGrid()
 end
 
 H.run({ maxFrames = 120000 }, {
-  -- ---- boot: cold Continue fire-out-v1 (gen_esper_mtn's boot) ------------
+  -- boot: cold Continue
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),

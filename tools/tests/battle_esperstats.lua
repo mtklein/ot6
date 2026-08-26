@@ -1,93 +1,53 @@
 -- @suite savestate=minecart_entry slow
--- battle_esperstats.lua -- M5 espers-as-sub-jobs, the while-equipped stat boost
--- (the owner's fork-4 pick) plus a per-esper kit confirmation for the four Zozo
--- espers and the two MRF stones.  Companion to battle_subjob.lua, which covered
--- the additive spell grant and its deletions; this covers the stat half.
+-- battle_esperstats.lua -- espers-as-sub-jobs: the while-equipped stat boost
+-- plus a per-esper kit confirmation for the four Zozo espers and the two MRF
+-- stones.
 --
 -- The stat mod: while an esper is worn, Ot6EsperStatMod (ot6.asm) adds that
 -- esper's Ot6EsperStatTbl entry to the character's $1100 stat buffer at the top
 -- of UpdateEquipBattle, so the copy into the battle-side effective stats
 -- ($3b40 stamina, $3b41 mag.pwr, $3b19 speed, $3b2c vigor*2) carries the bump,
 -- which are the values damage, hit and ATB read.  It is never written to the
--- persistent $161a-$161d record, so having no esper is the reverted state, and
--- the negative control (scenario BASE) also covers unequip-reverts.
+-- persistent $161a-$161d record, so having no esper is the reverted state.
 --
--- =============== the input-driven rebuild (#75) ===========================
--- The previous version of this file poked char 0's equipped-esper byte $161e
--- and ran on battle_entry, the Narshe intro, where Terra owns no esper
--- at all, so the menu could never have equipped one and the poke was the only
--- way in.  Issue #75's rule (inputs in, observations out, never write
--- emulated state) retired the poke, and with it the fixture: equipping
--- in normal play requires owning the stone, so this file now runs on
--- minecart_entry, the first fixture on the chain that owns all six
--- stones under test (the Zozo four from gen_zozo5_ramuh, and Ifrit and Shiva
--- from the MRF hand-off; $1A69 reads EF 01 9A 00 here) and offers a battle:
+-- Each scenario reloads the minecart_entry fixture (party owns all six
+-- stones under test; $1A69 reads EF 01 9A 00) and equips its stone through
+-- the real field menu: X -> Skills -> leader -> Espers -> two-column list
+-- seek -> detail page -> A on row 0 (skills.asm MenuState_4d @5902).  Success
+-- is read back from the character record.  The battle is the minecart ride's
+-- first scripted fight, reached by one A-press to CID (`cutscene TRAIN`),
+-- which throws battle 41 (Mag Roader) ~1240 frames in.
 --
---   * each scenario reloads the fixture and equips its stone through the
---     real field menu: X -> Skills -> leader -> Espers -> two-column list
---     seek -> detail page -> A on row 0, the page's own equip handler
---     (skills.asm MenuState_4d @5902 "equip esper").  The walk is
---     menu_esperdetail.lua's, plus the equip press that test never makes.
---     Success is read back from the character record before leaving.
---   * the battle is the minecart ride's first scripted fight: the fixture
---     parks the party one A-press from CID, whose event runs `cutscene
---     TRAIN`, and the ride's course throws battle 41 (Mag Roader) ~1240
---     frames in (gen_n128's decode of train_script.asm:615-660).  A
---     random-encounter walk is not available here, because the tube room's
---     door back to map 273 is one-way (measured: the {10,25} door tile is
---     unreachable from inside), and the scripted fight is also
---     deterministic, frame-cheap, and reached by pad input alone.
---
--- The fixture change strengthens every control.  The party here is LOCKE,
--- SABIN and EDGAR, and NaturalMagic (field/event.asm) teaches spells only to
--- TERRA and CELES, and Celes left the roster at the tube room, one step before
--- this fixture.  So the party innately knows nothing: the BASE union is
--- asserted empty, and every grant signature below, including
--- FIRE and CURE, which the old Narshe fixture could not use because Terra
--- knows both innately, is a clean absent-at-BASE control.  Ifrit's Fire
--- and Kirin's Cure were corroboration rather than proof in the old file's own
--- words; here they are proof.  Nothing was weakened: every signature the old
--- BASE could assert absent, this BASE can too.
+-- The party is LOCKE, SABIN and EDGAR.  NaturalMagic (field/event.asm)
+-- teaches spells only to TERRA and CELES, and Celes left the roster at the
+-- tube room, so the BASE union is empty and every grant signature below is a
+-- clean absent-at-BASE control.
 --
 -- The measured character is whoever leads the party (the character menu's
--- slot 0, EDGAR on this savestate), found from the live menu RAM and asserted
--- against the field party order rather than assumed.  Stat deltas are against
--- the BASE scenario for the same character, so the change of character from
--- Terra changes nothing about what the numbers show.  Vigor is stored doubled
--- ($3b2c, "vigor * 2", battle_main.asm:3857), so an authored +6 reads +12.
+-- slot 0, EDGAR on this savestate), found from live menu RAM.  Stat deltas
+-- are against the BASE scenario for the same character.  Vigor is stored
+-- doubled ($3b2c), so an authored +6 reads +12.
 --
--- The union window is rows 1..54 of the compacted master Magic list, which is
--- battle_esperstats_tube6.lua's window, adopted here in place of the old
--- 0..78 sweep: row 0 is the esper row (its id byte is the esper index, which
--- collided with spell ids, so Ifrit(1) read as Ice), and rows 55..78 are
--- lores stored id-$8b (which collided with low spell ids; that file's BASE
--- control failed on it once).  Row 0 is instead asserted directly:
--- it must hold the equipped esper's index, which is the positive control that
--- justifies the window.
+-- The union window is rows 1..54 of the compacted master Magic list: row 0
+-- is the esper row (its id byte is the esper index) and rows 55..78 are
+-- lores stored id-$8b.  Row 0 is asserted directly to hold the equipped
+-- esper's index.
 --
--- #62's assertion shape is kept: `deltas` carries all four stats, a key left
--- out means the stat is expected flat, and a negative delta must be seen
--- dropping, since a build whose sign nibble decoded as zero would otherwise
--- pass as flat.  None of the scenarios is near the 0/255 clamps on this
--- fixture (Edgar's base battle stats here: stam 34, mag 29, spd 30, vig*2
--- 78), so these numbers exercise the arithmetic rather than the clamps.
+-- `deltas` carries all four stats; a key left out means the stat is expected
+-- flat, and a negative delta must be seen dropping.
 --
 -- Scenarios (each an independent state reload; every esper scenario equips
 -- through the menu as a player would):
---   BASE  no esper: assert nobody has an esper equipped, record the leader's
---                   four stats and the union, and assert the union is empty.
+--   BASE  no esper equipped; leader's four stats and union recorded, union empty.
 --   RAMUH esper 0  stamina +4, mag.pwr +2; grants Bolt/Rasp.
 --   SIREN esper 3  speed +4, mag.pwr +2; grants Sleep/Mute/Slow(base).
 --   KIRIN esper 17 mag.pwr +4, stamina +2; grants Cure(base)/Regen/Antdot,
 --                  and NOT Cure2 (dead pre-folded tier).
 --   STRAY esper 8  mag.pwr +4, speed +2; grants Muddle/Imp/Float.
 --   IFRIT esper 1  vigor +6 (+12 doubled), stamina +4, mag.pwr -3; grants
---                  Fire(base)/Drain, and not Fire2.  The -3 is the two-sided
---                  mod magicite-ifrit-shiva.md's ledger recorded as
---                  unbuildable under the old one-stat encoding.
+--                  Fire(base)/Drain, and not Fire2.
 --   SHIVA esper 2  mag.pwr +6, speed +4, vigor -3 (-6 doubled); grants
---                  Ice(base)/Osmose/Shell, and not Ice2 and not Rasp
---                  (left to Ramuh).  Ifrit's mirror, as §5.2 asked.
+--                  Ice(base)/Osmose/Shell, and not Ice2 and not Rasp.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/minecart_entry.mss.lua"
 
@@ -106,7 +66,7 @@ local IFRIT, SHIVA = 0x01, 0x02
 local LIST0  = 0x208e            -- compacted master Magic list, 4-byte records
 local STAM, MAGPWR, SPEED, VIGOR = 0x3b40, 0x3b41, 0x3b19, 0x3b2c
 
--- field menu plumbing (menu_ram.inc; the menu_esperdetail walk)
+-- field menu plumbing (menu_ram.inc)
 local ZMENUSTATE, ZCURSOR, ZSELINDEX, ZLISTTYPE = 0x26, 0x4b, 0x28, 0x2a
 local ZCHARID, Z99 = 0x69, 0x99
 local SKILLCOLOR = 0x79          -- zSkillsTextColor[0] = the Espers row
@@ -161,7 +121,7 @@ end
 local R = {}                     -- R[tag] = { slot, stam, mag, spd, vig, union, row0 }
 local leader = nil               -- char id of the measured character
 
--- two-column esper list seek (menu_esperdetail's, unchanged in shape)
+-- two-column esper list seek
 local function listSeek(idx, what)
   local ph = 0
   return H.driveUntil(function()
@@ -238,7 +198,7 @@ local function equipSteps(tag, esper)
       H.assertEq(H.readByte(Z99), esper,
         "[" .. tag .. "] the detail page is the right stone's")
     end),
-    -- A on detail row 0 equips; read the record back rather than trust the press
+    -- A on detail row 0 equips; read the record back to confirm
     H.driveUntil(function()
       return H.readByte(rec(leader) + ESPER_OFF) == esper
     end, 600, { H.pressButtons({ "a" }, 3), H.waitFrames(12) },
@@ -315,10 +275,6 @@ end
 local function checkBase()
   return H.call(function()
     local b = R.base
-    -- LOCKE, SABIN and EDGAR have no natural magic (NaturalMagic teaches only
-    -- Terra and Celes, and Celes left at the tube room), so the base union
-    -- is empty, which is what makes every signature below proof, Fire and
-    -- Cure included.
     H.assertEq(setSize(b.union), 0,
       "[base] the spell union is EMPTY -- nobody in LOCKE/SABIN/EDGAR "
       .. "innately knows anything, so every grant below is proof")
@@ -335,9 +291,6 @@ local function checkBase()
   end)
 end
 
--- #62's shape: all four stats asserted every scenario; a key left out means
--- the stat is expected flat; a negative delta must be seen dropping.  vig
--- deltas are given doubled, as $3b2c stores them.
 local function checkEsper(tag, esper, deltas, grants, absents)
   return H.call(function()
     local b, r = R.base, R[tag]
@@ -387,11 +340,6 @@ add({ checkEsper("kirin", KIRIN, { mag = 4, stam = 2 },
 add(driveSteps("stray", STRAY))
 add({ checkEsper("stray", STRAY, { mag = 4, spd = 2 },
   { { MUDDLE, "Muddle" }, { IMP, "Imp" }, { FLOAT, "Float" } }) })
--- v0.6 boss stones, on #62's boss tier: upside +10 across three stats bought
--- with a -3.  Ifrit's +6 vigor reads as +12 because $3b2c is the doubled
--- copy, and his mag.pwr -3 is the two-sided mod the old encoding could not
--- express.  On this fixture both grants are proof; the old file had to call
--- Fire corroboration because Terra knew it innately.
 add(driveSteps("ifrit", IFRIT))
 add({ checkEsper("ifrit", IFRIT, { vig = 12, stam = 4, mag = -3 },
   { { FIRE, "Fire (base tier -- PROOF here)" }, { DRAIN, "Drain" } },

@@ -3,10 +3,7 @@
 -- {82,37}) -> up to TERRA at {81,17} -> the Ramuh scene -> the four
 -- magicite -> the gather room -> the leave-Zozo walk-down -> $0054=1 ->
 -- map 221 {57,45} -> generate zozo_done.mss, v0.4's chain tail.
---
--- Everything below was measured end to end (probe_ramuh/tower3/gather/leave)
--- rather than predicted.  Four things the earlier source-read missed:
---
+
 --  1. The tower porch rolls random encounters.  The (33,10)->(33,9) door
 --     step fired battle 19-class trash on the first run (event PC parked at
 --     $CA0029 = RandBattle).  Every player-controlled drive write-clears a
@@ -40,17 +37,12 @@
 --     CELES/LOCKE Jidoor dialog -> $0054=1 -> load_map 221 {57,45} RIGHT
 --     (:26449-:26452).  TERRA does not rejoin; she is retrieved but
 --     catatonic.
---
--- Issue #21: that menu is not a confirm menu.  It was driven with START
--- (commit whatever is there) on the reading that {LOCKE, CELES} made it a
--- forced-member confirmation.  It is not.  event_main.asm:26280-26287
--- reads
---
+
 --     char_party LOCKE, 1     char_party CYAN,  0
 --     char_party EDGAR, 0     char_party SABIN, 0
 --     char_party GAU,   0     char_party CELES, 1
 --     party_menu 1, NO_RESET, {LOCKE, CELES}
---
+
 -- which is four slots with LOCKE and CELES forced and two free, and CYAN,
 -- EDGAR, SABIN and GAU all in the pool the char_party 0 lines just put
 -- them in.  Answering it with START committed a party of two, and the whole
@@ -58,36 +50,7 @@
 -- room takes CELES).  Nothing counted the party, so it went unnoticed for a
 -- release and a half; gen_vector_entry now asserts the count at the
 -- post-Opera checkpoint so this cannot go unnoticed again.
---
--- Owner decision (#21, 2026-07-27): the canonical fixture party is LOCKE,
--- CELES, SABIN, EDGAR.  SABIN fills the free bludgeon slot that
--- docs/design/break-coverage-vector.md makes the Vector area's one deliberate
--- class: the Rhinox row (OT6_BLUDG, no weakness, absorbs bolt, 8.93% of
--- area draws) exists to ask for it, and bare fists plus Pummel/Suplex/Bum
--- Rush answer it with no shop trip.  EDGAR brings pierce and Tools.  This
--- is the baseline every downstream balance number is measured on; changing
--- it regenerates the chain and invalidates all of them.
---
--- Issue #75: this file writes no emulated game state.  The porch and tower
--- random encounters the old file write-cleared are fought, and every walk
--- runs under navTo's playBattles mode.  Budgets grew where a fight can now
--- interrupt.
---
--- Those walks used to spell that mode `true`, which is edge-tapped A: A
--- opens the command list, A confirms Fight, A takes whatever target the
--- cursor was already on.  That loses here, and the shield table says so
--- from a measured sweep -- "mashing wipes 6/6 in this town"
--- (ot6_hud.asm:2078).  The reason is that all four species map 221 draws
--- carry two shields and no class byte at all (:2086-2097), so a weapon
--- swing never chips one and every hit lands halved for the whole fight.
--- What does chip is the vanilla poison weakness all four carry
--- (monster_prop.dat +25 = $08) through EDGAR's Bio Blaster, item $a4 ->
--- attack $7d, element $08, all enemies (ot6_break.asm:203-204;
--- battle_main.asm:6577).  So these are "tactical" with tool =
--- H.BIO_BLASTER.  Map 226, the tower itself, draws nothing at all
--- (map_prop.dat byte +5 bit 7 clear), so this only ever bites on the
--- porch and the street.
---
+
 -- The menu driver is gen_kefka_won's state-fed one, but it looks the layout
 -- up live rather than hard-coding cells: NO_RESET opens with the forced two
 -- already seated, so which pool cell holds SABIN and which party slot is
@@ -119,30 +82,10 @@ local function landed(m, n)
   end
 end
 
--- Zozo rolls RANDOM ENCOUNTERS even on the tower porch (measured: the
--- first run of this generator froze at (33,10) with the event PC parked
--- at $CA0029 -- inside RandBattle, right after its rand_battle command --
--- while a battle-blind hold-up drive pressed into the transition for 900
--- frames).  Every drive here that runs under player control clears a
--- stray battle with the battle-clear-write idiom before doing its own work.
--- (the battle-clear-write helper that lived here is gone -- issue #75:
--- strays are fought by the drivers' own edge-tapped A)
-
 -- advanceStory + the TEXT_ONLY stall fallback.  pred as usual; when the
 -- scene holds the stage with no dialog flags and no party motion, edge-tap
 -- A to advance the flag-less page.
---
--- The stall detector deliberately does NOT gate on eventRunning() -- that
--- was the original bug (measured, probe_ramuh f7208..f13400).  The scene's
--- TEXT_ONLY pages ($0432/$044A-$044D) park the event PC in a WRAM-MIRROR
--- object-script address ($80xxxx) while they wait, and eventRunning() reads
--- $80xxxx as "not an event" -- so an eventRunning-gated counter resets every
--- one of those frames and never taps, hanging the whole scene (the generator
--- timed out at 40000 frames doing exactly this).  The safe guard is
--- hasControl(): the party is event-controlled the entire cutscene (movement
--- type 4, never 2), so hasControl() is false throughout and a stall-tap can
--- only feed the scene -- it can never talk to a field NPC.  The threshold is
--- 180 frames of a stable leader position with no dialog and no field control.
+
 local function rideScene(pred, maxFrames, what)
   local aPh, stallN, lx, ly, fallbacks = 0, 0, -1, -1, 0
   return H.driveUntil(function()
@@ -292,13 +235,7 @@ end
 -- CPU it reads $81 -- so "$0059 ~= 0" is the one cheap signal that says "a
 -- menu has the machine, keep your hands off".  It has to be consulted
 -- BEFORE H.battleLoadStarted(), because that predicate LIES INSIDE MENUS.
---
--- Measured here (probe on zozo_gather, the leave cutscene): the party
--- battle-HP word $7E3BF4 reads $FFFF for the whole field cutscene and flips
--- to $0000 the instant the menu module boots, then stays $0000 for every
--- frame the menu is up.  Since 62ccab7 (#24) battleLoadStarted() is "slot 0
--- is not $FFFF", so it answers TRUE for the entire duration of any menu.
---
+
 -- With the battle branch on top, that turned this driver into a blind
 -- A-hammer the moment the party menu appeared -- exactly the thing the
 -- comment at the bumpTake call site says must never reach this menu.  The
@@ -310,12 +247,12 @@ end
 -- and could never get past six, so it burned the 40000-frame budget.  It
 -- read like a hang (no control, no dialog, no event, $59 latched) but the
 -- game was fine: it was rendering a Status screen and waiting for B.
---
+
 -- (When this driver still battle-clear write strays, writing $7E3EEC..
 -- under a live menu was the other half of why the order matters -- those
 -- are menu bytes while the menu is up.  The taps-only driver keeps the same
 -- order.)
---
+
 -- The detector is composite for gen_kefka_won's reason: $0059 alone blips
 -- outside real menus.  $0200=4 is the menu mode and $26=$2d the interactive
 -- pick state; all three together only hold on the party menu itself.
@@ -366,14 +303,6 @@ local function talk(sx, sy, dir, what)
   })
 end
 
--- Walk INTO a collision-activated object from an approach tile: navTo the
--- approach tile (sx,sy), then alternate HOLDING the bump direction (the
--- event fires on the bump against the solid object) with an A edge (the
--- backup for react NPCs) until a dialog answers.  The three magicite stones
--- and the gather double activate on collision, and their collision tiles
--- sit ONE ROW below the NPC prop coords (measured, probe_gather): SIREN
--- (82,11)->(82,12), KIRIN (81,12)->(81,13), STRAY (83,12)->(83,13), all
--- reached from the single approach tile (82,13) -- up/left/right.
 local function bumpTake(sx, sy, dir, what)
   local ph = 0
   return H.cond(function() return true end, {
@@ -425,20 +354,6 @@ H.run({ maxFrames = 200000 }, {
   H.waitUntil(landed(226, 10), 1500, "tower up", 1),
   H.waitFrames(150),
 
-  -- 2. TERRA at {81,17}: stand at {80,17} and face EAST, not {81,18}
-  --    facing up.  Her tile (81,17) is z=UPPER ($0888=1, prop $01) but
-  --    (81,18) below her is a z=LOWER tile ($0A): CheckNPCs' z-match
-  --    (player.asm @477c) rejects a lower-z party reaching an upper-z NPC,
-  --    so the south approach never activates (measured, probe_tower3:
-  --    dlg=false from (81,18), dlg=true from the (80,17) both-z tile $0B).
-  -- The ride terminates on the scene's own COMPLETION SWITCH, not on
-  -- switch-AND-landed: rideScene releases the pad the instant its pred is
-  -- true, so gating on the bare switch stops the stall-tapper exactly at
-  -- scene end.  The earlier switch-AND-landed pred kept A hammering through
-  -- the wrap-up frames after $0053=1 and walked the party straight into
-  -- RAMUH's stone dialog, desyncing the explicit talk() steps below (the
-  -- 40000-frame timeout).  Control settles in a separate landed() wait --
-  -- measured clean on map 226 within ~300 frames of $0053 (probe_ramuh).
   talk(80, 17, "right", "TERRA answers"),
   rideScene(function() return sw(0x0053) == 1 end, 40000, "the RAMUH scene"),
   H.waitUntil(landed(226, 20), 3000, "control after the scene", 5),
@@ -460,11 +375,6 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(sw(0x031F), 0, "his stone gone")
   end),
 
-  -- 4. SIREN/KIRIN/STRAY.  Their collision tiles are (82,12)/(81,13)/
-  --    (83,13) -- one row below the NPC prop coords -- and form a barrier
-  --    across the chamber mouth, all reached from the single floor tile
-  --    (82,13): up into SIREN, left into KIRIN, right into STRAY (measured,
-  --    probe_gather2).  Each grant clears the stone's own vis switch.
   bumpTake(82, 13, "up", "SIREN's stone"),
   rideScene(function() return sw(0x0320) == 0 end, 9000, "SIREN taken"),
   H.waitUntil(landed(226, 15), 3000, "control after SIREN", 5),
@@ -479,21 +389,9 @@ H.run({ maxFrames = 200000 }, {
     H.screenshot("magicite_taken")
   end),
 
-  -- 5. the gather room: bump CYAN's double (collision tile {83,33}, from
-  --    {83,34}) to fire the leave cutscene _caa890.  That cutscene is NOT
-  --    pure dialog: it pins LOCKE (the tracked leader) in place while the
-  --    others walk, so rideScene's leader-stall heuristic misfires and
-  --    hammers A (measured: it wedges the scene).  So the walk-down gets its
-  --    own driver: dialogWaiting -> edge-A (the BOTTOM Jidoor dialogs), else
-  --    hands off -- and it STOPS at the party menu.  Blind A or blind START
-  --    must never reach that menu: START commits a party of two (#21) and A
-  --    parks on a character's Status page, where neither exits (measured on
-  --    the same menu class in gen_kefka_won).
   bumpTake(83, 34, "up", "Everyone here?"),
   ridePartyMenu(),
 
-  -- THE MENU (#21).  Seat SABIN and EDGAR in the two free slots, then START.
-  -- Every cell is read live and every move is verified; see the header.
   H.waitFrames(20),
   H.call(function()
     H.log("[party] " .. cellCensus())
@@ -529,9 +427,6 @@ H.run({ maxFrames = 200000 }, {
     end, 55000, {
       H.call(function()
         aPh = (aPh + 1) % 8
-        -- same order as ridePartyMenu, and for the same measured reason: a
-        -- menu makes battleLoadStarted() answer true, and this driver must
-        -- never press A (or write-clear menu RAM) inside one.
         if H.readByte(0x0059) ~= 0 then H.setPad({}); return end
         if H.battleLoadStarted() then
           H.setPad(aPh < 4 and { "a" } or {}); return   -- fought, not write-cleared
@@ -565,10 +460,6 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(sw(0x0320), 0, "SIREN's stone gone")
     H.assertEq(sw(0x0321), 0, "KIRIN's stone gone")
     H.assertEq(sw(0x0322), 0, "STRAY's stone gone")
-    -- THE PARTY (#21).  $1850+charId is verbbppp (ff6/notes/field-ram.txt
-    -- :928); the low three bits are the party the character belongs to, 0
-    -- for nobody's.  COUNT it -- the original defect was invisible precisely
-    -- because nothing did -- then name the four it should be.
     local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
     local n, who = 0, {}
     for c = 0, 15 do

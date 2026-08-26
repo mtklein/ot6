@@ -1,15 +1,9 @@
--- probe_v07_384toggle.lua -- instrument the (104,17) toggle (_cb33c9,
--- event_main.asm:45485) frame by frame (issue #31).  Not a suite test.
--- One clean edge: 8 frames of up+A, then up only.  Log $01F5, position,
--- control every 20 frames for 900 frames.  Then a second clean edge, same
--- watch.  This settles what iteration 3/4 could not: when the switch
--- flips, how long the event runs, and whether a lingering press re-fires.
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- Issue #75: playBattles = "flee" keeps this walk out of the library's
--- monster-dead flag write, and here it is not a no-op: this Magitek Research
--- Facility basement draws random battles (map_prop.dat byte +5 bit 7 set).
--- "flee" is the spelling every gen_mrf_* generator already uses on these
--- floors: the instrument is measuring a floor mechanism, not a fight.
+-- probe_v07_384toggle.lua -- instruments the (104,17) toggle frame by frame.
+-- Not a suite test.  One clean edge: 8 frames of up+A, then up only.  Logs
+-- $01F5, position, control every 20 frames for 900 frames.  Then a second
+-- clean edge, same watch.
+-- playBattles = "flee": this Magitek Research Facility basement draws
+-- random battles.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

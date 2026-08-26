@@ -7,29 +7,12 @@
 --                     of the scenario, kept as its own link because
 --                     everything past here goes through the secret wall and
 --                     the mines, which is the part worth iterating on.
---
+
 -- The world step is short: `load_map 0, {93,41}` drops the party north-east
 -- of Narshe and the town's world tile is (84,33) -> map 20 (38,61)
 -- (ShortEntrance::_0).  21 steps, planned by worldBfs and asserted to exist
 -- before it is walked.
---
--- The checkpoint seals the route completely.
--- Map 20's south strip and the rest of Narshe are joined by one three-tile
--- corridor, and the checkpoint sits on it.  This was measured: a flood
--- over the engine's own passability rules (transcribed from
--- field/player.asm, reachability probe run during development) reaches 834
--- tiles spanning y 0..63 from the arrival tile, and 231 tiles spanning
--- y 50..63 with just {37,50}/{38,50}/{39,50} sealed.  Those three tiles are
--- _ccb205/_ccb230/_ccb21d (event_trigger.asm:111-113) and they re-fire for
--- as long as the scenario is unfinished:
---     _ccb230  $0019=1, $001F=0  -> the long scene, ends `switch $001F=1`
---     _ccb205  once $001F=1      -> goto _ccb35c -> _ccb37f, the short one
---     _ccb37f  guard: $0019=1 AND $001F=1 AND $0021=0   (:104721-104726)
--- and _ccb37f ends by shoving SLOT_1 five tiles south (:104768).  So the
--- party cannot walk into Narshe at all during this scenario.  That is the
--- purpose of the scene, and it is why the way onward is the secret wall at
--- (15,57) that gen_terra_done handles rather than a different path north.
---
+
 -- The scene needs A presses as well as a direction.  _ccb230 opens with five
 -- dialogs ($01A0 at :104526 through $01A4 at :104607) and every one waits for
 -- a keypress.  A first version drove the step onto the checkpoint by holding
@@ -100,12 +83,6 @@ H.run({ maxFrames = 60000 }, {
       H.worldX(), H.worldY(), #p))
   end),
 
-  -- ===================================================================== --
-  -- The world step: (93,41) -> (84,33) -> map 20 (38,61).
-  -- ===================================================================== --
-  -- issue #75: playBattles=true, so an encounter in the WoB area is fought by
-  -- real input (TERRA/EDGAR attack, BANON's first command is his Health
-  -- heal) rather than write-cleared; the budget carries the ATB rounds.
   H.worldNavTo(84, 33, { maxFrames = 60000, playBattles = true,
     arrive = function() return not H.worldMode() end }),
   H.release(),

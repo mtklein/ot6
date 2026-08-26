@@ -93,10 +93,6 @@ wired when Overclock is built, which has not happened yet.
   whole side, and exactly one chip against a solo boss. Drill answers armored
   bosses. Chain Saw covers slashing, so Edgar alone spans two physical
   classes through tools.
-- Passive candidates: *Tinkerer* (tools ignore blind), *Royal
-  Discount* (shops half price), *Overcharge* (+1 AutoCrossbow hit
-  per 2 BP, which converts breadth into rate rather than acting as a
-  tuning knob).
 
 ### Sabin — Monk (bludgeoning: fists; claws buy slashing)
 
@@ -127,10 +123,6 @@ Cleave is of Cyan's pool; both are pinned there so the fractions match. Mantra
 is priced under Fire Dance because it is a utility option rather than a damage
 tier. The full per-row derivation, and the baseline it is measured against,
 are in mp-economy.md's "The baseline".
-
-- Passive candidates: *Iron Fist* (unarmed counts as a bludgeon
-  weapon), *Discipline* (+1 BP when striking a Broken enemy),
-  *Second Wind* (Mantra also grants 1 BP).
 
 ### Cyan — Samurai (slashing: katana)
 
@@ -211,8 +203,7 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   drain become unavailable once Cyan out-levels them, which costs him utility
   and not only damage.
   Ruling: no special-casing of utility in the auto-window. A player who wants
-  a utility tech pins it in a slot with the player-chosen **loadout**, and
-  playtest decides whether that is enough.
+  a utility tech pins it in a slot with the player-chosen **loadout**.
 - **No affordable floor.** The 1× slot is always the cheapest tech *in the
   window*, so it gets pricier as Cyan levels. This is accepted, because his
   MP pool grows on the same schedule.
@@ -284,11 +275,6 @@ weapon-classes.md's "Cyan is a slashing specialist". Retort's and Empowerer's
 
 Test: `tools/tests/battle_bushido.lua`.
 
-- Passive candidates: *Vengeance* (+1 BP whenever any enemy Breaks),
-  *Retort* (the vanilla counter as a passive, given the same name as
-  SwdTech #2 because it is the same effect), *Zanshin* (Retort chips 1
-  when it counters).
-
 ---
 
 ## The middle three
@@ -319,11 +305,7 @@ lives on Terra, Fenix Downs, and Sraphim, and nowhere else.
   fold preview renders it. Everyone else gets Ultima by equipping
   Ragnarok.
 - **Trance keeps the divine slot** as her esper-state apex, usable
-  only while an enemy is Broken, or costing the full 5-BP bank
-  (DESIGN.md's two candidates; playtest decides in M6).
-- Passive candidates: *Esperkin* (spells chip 2 on weakness),
-  *Mag-Armor* (magic taken −25%), *Afterglow* (first cast each
-  battle costs 0 MP).
+  only while an enemy is Broken.
 
 ### Locke — Thief (piercing: dagger)
 
@@ -344,9 +326,6 @@ probes, redistributes and corrodes, with some merchant work as well
 
 - Filch and Bestow move BP around: take from enemies, give to
   allies. Tactically he supplies tempo as well as loot.
-- Passive candidates: *Sticky Fingers* (failed steal keeps the
-  turn's BP gain), *First Strike* (battle opens +1 BP for Locke),
-  *Fence* (steals sell for more).
 
 **The thief submenu.** Steal is tier one of this list rather than
 a verb of its own, so the list sits behind the Steal row:
@@ -445,11 +424,7 @@ Rulings that fall out of the vanilla math (see `tools/tests/battle_steal.lua`):
 - **No damage, no multiplier.** Steal deals no damage, and the Ot6BoostDmg command
   gate ($05) keeps boost from adding any: a chance verb takes the
   guarantee, not the ×2/×4/×8 a damage verb takes. That keeps the two
-  axes separate, and it settles **Mug's** ruling in advance. Mug is *steal +
-  piercing damage*: when it ships, boost drives exactly one axis (the damage
-  multiply or the steal guarantee, TBD by playtest) and never both, so that the
-  canon rule stays consistent. The steal half rides its unboosted vanilla odds
-  unless boost is spent on it.
+  axes separate.
 
 ### Celes — Rune Knight (slashing: sword, ice lean)
 
@@ -507,17 +482,14 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
     the stance bit at `RunicEffect`:8671 without absorbing (vanilla's own
     `CheckStatus` gate), and the bit only comes back at her next turn. The
     duration is not shortened, but that spell is not absorbed. Left as vanilla.
-- Divine leaning ✦-ward: **RunicBlade**, a Runic stance that also
-  *reflects* what it absorbs (absorb the MP as BP, bounce the spell).
-  **It is a separate ability rather than what a boosted Runic becomes.**
-  Boost buys *duration* on reactive verbs; if row 8 were
-  "Runic at 3 BP" the canon would have an exception at its own top tier,
-  and the divine would be unreachable for anyone out of BP. RunicBlade
-  changes the *kind* of the reaction (reflect as well as absorb) and can
-  then take duration from boost like any other reactive verb.
-  Absolute Zero stays the listed alternate until playtest.
-- Passive candidates: *Rune Eater* (Runic feeds 2 BP), *Cold Blood*
-  (ice chips +1), *Aegis* (magic taken at 0 pending −20%).
+- **RunicBlade** is a Runic stance that also *reflects* what it absorbs
+  (absorb the MP as BP, bounce the spell). It is a separate ability
+  rather than what a boosted Runic becomes: boost buys *duration* on
+  reactive verbs, so if row 8 were "Runic at 3 BP" the canon would have
+  an exception at its own top tier, and the divine would be unreachable
+  for anyone out of BP. RunicBlade instead changes the *kind* of the
+  reaction (reflect as well as absorb) and takes duration from boost
+  like any other reactive verb.
 
 ---
 
@@ -535,26 +507,6 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
   learned by dancing on each terrain ✦; divine **Water Rondo**, kept
   WoB-missable, vanilla-style. This kit needs no further design work.
-  - **Boost-tiered Dance (design canon, awaiting Mog's kit to build).**
-    Dance is a *chance verb* like Steal, so boost buys certainty in the dance's
-    own terms (DESIGN.md canon rule). **Keep the possession**: Mog still
-    dances on his own once it starts, and that loss of control is the point of
-    the dance. Boost
-    spent at dance-start buys choreography: **1–2 BP removes the stumble** (the
-    ~1/16 wrong-terrain misfire) and shifts the four-move weights toward the
-    stronger moves; **3 BP = the dance's best move every turn for the whole
-    trance**, fully choreographed, with no roll. Same shape as Steal: 0 BP is
-    vanilla to the byte, each point narrows the gamble, and the full spend
-    removes it. Not yet coded; it lands when Mog's kit
-    does (WoB), reusing the same pending-BP read and Ot6ActionEnd charge Steal
-    already uses.
-
-**The chance-verb family.** Steal and Dance (above) are the first two.
-**Sketch (Relm), Slot (Setzer), and Rage (Gau)** follow the same rule when
-their kits arrive: each rolls dice, so each spends BP on certainty in its own
-terms (a chosen sketch, a fixed reel, a picked rage) rather than on a potency it
-does not have. One option is held in reserve: coupling steal odds to a *broken*
-enemy.
 
 ## Curated kits (the Ochette/Hikari pair)
 
@@ -565,39 +517,11 @@ player prunes the kit all game. Same model, different collection verbs:
 - **Strago — Scholar (bludgeoning: rod)**: Lores by observation ✦
   (Cyrus/Hikari). Aqua Rake free ✦; **Analyze** cheap and early ✦
   (full weakness reveal, the party's scouting tool). Learns every lore
-  he sees cast, **equips 5** (settled 2026-08-18 with the #122 build,
-  re-asked against Gau's 8 per kit-gau.md §11.1: Gau's rages ARE his
-  kit, so they get the kit-length list; Strago's lores are one verb
-  inside an 8-row kit that also carries Analyze and Aqua Rake, so his
-  curation slice is smaller). Machinery: `OT6_LORELOAD`, the third
-  loadout configurator (ot6_lore.asm / ot6_lore_page.asm). Divine: a
-  taught-only capstone lore (Grand Train candidate, WoR).
+  he sees cast, **equips 5**: his lores are one verb inside an 8-row
+  kit that also carries Analyze and Aqua Rake, so his curation slice is
+  smaller than Gau's kit-length list. Machinery: `OT6_LORELOAD`, the
+  third loadout configurator (ot6_lore.asm / ot6_lore_page.asm).
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦: it corrupts a save now and then, and that is canon —
-  the full owner ruling is in `vanilla-destructive-bugs.md`);
-  support/trickster kit TBD.
-  - **Boost-tiered Sketch (design canon, awaiting Relm's kit to build).**
-    Sketch is a *chance verb* like Steal and Dance, so boost buys certainty in
-    Sketch's own terms — a landed sketch of the chosen target — not a potency it
-    does not have (DESIGN.md canon rule; ROADMAP §"Design canon"). **0 BP is
-    vanilla to the byte**: the original `CheckSketchHit` level-ratio roll AND its
-    missed-cast bug, untouched. Each point tilts that roll toward success;
-    **3 BP = a guaranteed landed Sketch**, the same shape as Steal's guaranteed
-    rare and Dance's fully-choreographed trance. This routes *around* the vanilla
-    bug rather than touching it: a landed Sketch already cannot fire the
-    corruption (`thamasa-route.md` §5.2 — the bug lives only on the miss path),
-    so a 3-BP guarantee simply never reaches it. The guarantee is the chance-verb
-    canon applied, **not** a fix — no code on this path may target the bug's
-    mechanism, and no mechanic may depend on the bug or its absence (owner ruling
-    #123). Not yet coded; it lands when Relm's kit does, reusing the same
-    pending-BP read and `Ot6ActionEnd` charge Steal already uses.
-
-## Open questions for the driver
-
-1. Trance's gate: Broken-enemies-only, the full 5-BP bank, or
-   either? (It kept the divine slot now that Ultima rides Fire.)
-2. ~~Strago's curated slot count: 5, or 6?~~ **Settled: 5** (2026-08-18,
-   the #122 build; reasoning in the Curated kits entry above).
-3. Does Bestow (Locke) step on Hired Help (Setzer), or is
-   BP-vs-GP economy distinct enough?
+  the full owner ruling is in `vanilla-destructive-bugs.md`).

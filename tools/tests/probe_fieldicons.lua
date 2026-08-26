@@ -1,25 +1,24 @@
 -- probe_fieldicons.lua -- reference probe, not a suite test (no `-- @suite`).
 --
--- Issue #53's measurement: where the field menu's small font lives in vram,
--- whether the eight element icon cells are free there, and what a field page
--- draws in its icon column.  Run it on the shipped ROM and on a
--- pre-change ROM (OT6_ROM=...) to get both halves of the before/after.
+-- Measures where the field menu's small font lives in vram, whether the
+-- eight element icon cells are free there, and what a field page draws in
+-- its icon column.  Run it on the shipped ROM and on a pre-change ROM
+-- (OT6_ROM=...) to get both halves of the before/after.
 --
 -- What it measures
---   1. Font space.  The menu keeps two copies of the small font, neither of
---      them the battle font at word $5800: LoadFontGfx2bpp lays 256 2bpp
---      tiles at word $6000 and LoadFontGfx4bpp expands the same art into
---      4bpp tiles at word $5000 (menu_gfx.asm:120,:139; the char bases are
---      hBG12NBA = $65 / hBG34NBA = $66, menu_init_2.asm:433-435).  For each
---      of the eight cells Ot6ElemGlyphTbl claims, the probe prints the tile
---      as it stands in vram in both copies, and prints cell $d9 (the sword,
---      which ships in the vanilla art) as the positive control that the
---      addresses are right.
+--   1. Font space.  The menu keeps two copies of the small font, neither
+--      of them the battle font at word $5800: LoadFontGfx2bpp lays 256
+--      2bpp tiles at word $6000 and LoadFontGfx4bpp expands the same art
+--      into 4bpp tiles at word $5000 (char bases hBG12NBA = $65 /
+--      hBG34NBA = $66).  For each of the eight cells Ot6ElemGlyphTbl
+--      claims, the probe prints the tile as it stands in vram in both
+--      copies, and prints cell $d9 (the sword, which ships in the
+--      vanilla art) as the positive control that the addresses are right.
 --   2. Stray references.  Every cell of the BG1 A/B and BG3 A tilemap
---      shadows is scanned for the eight icon codes.  A vanilla surface that
---      spelled one of them would start drawing an element icon the moment
---      the tiles arrive, which is the risk the battle path had to avoid
---      ($ee is vanilla's battle-tilemap junk fill, hence poison at $64).
+--      shadows is scanned for the eight icon codes.  A vanilla surface
+--      that spelled one of them would start drawing an element icon the
+--      moment the tiles arrive ($ee is vanilla's battle-tilemap junk
+--      fill, hence poison at $64).
 --   3. The Blitz page's icon column, cell by cell, against the ROM tables.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/arvis_wake.mss.lua"

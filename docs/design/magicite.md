@@ -10,7 +10,7 @@ spell/stat model is canon.
 
 ## What one magicite carries
 
-Five slots, all data-table work (menu plumbing lands M5):
+Five slots, all data-table work:
 
 1. **Spells** — 2–3 *base-tier* spells (boost folds the tiers, so a
    Ramuh bearer with 2 BP already casts Bolt 3). They are available
@@ -88,7 +88,6 @@ together, in one scene; see `magicite-tube-six.md`.
 - Summon-as-divine cadence ✦: the summon does not replace the
   character's own divine for the battle. Both exist, and both are
   once-per-battle abilities used at the same point in a fight.
-  Playtest for redundancy in M6.
 
 ## Learning summary
 
@@ -96,21 +95,4 @@ Spells, permits, summons: while-equipped, never learned ✦.
 Passives, including the stat bump: learned by battles-carried
 (above). That is the one form of esper permanence, and it replaces
 vanilla's stat-bonus grind with collecting passives. Character
-passives (kits.md) and esper passives share the same slots; the M6
-pass checks for degenerate pairs (Facet + Rune Eater = 3 BP per
-Runic, probably fine because Runic still eats the turn).
-
-## Open questions for the driver
-
-1. Battle-count tuning: is ~15/~25 right, and should the count show
-   on the esper screen as a meter (recommended: yes, so the player
-   can see the progress)?
-2. Water has no base spell in vanilla's list (it's lore/esper
-   territory). Bismark either grants the only Water spell in the
-   game or a Slow/Haste utility pair instead. Which?
-3. Maduin's *Trinity* (first cast +1 tier free): too strong a
-   folding interaction, or the right flavor for "Terra's blood"?
-4. The stat ruling gives every esper *two* passives on one
-   learning meter, which was tuned for a single payoff. Should they
-   land together at the threshold, or staggered, with the stat bump
-   early (~10 battles) and the named passive at the full count?
+passives (kits.md) and esper passives share the same slots.

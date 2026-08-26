@@ -1,69 +1,19 @@
 -- @suite slow savestate=camp_escaped
--- battle_bushidogrey.lua -- v0.5 MP costs and BP gating: the SwdTech submenu
+-- battle_bushidogrey.lua -- MP costs and BP gating: the SwdTech submenu
 -- greys what Cyan cannot reach, for two reasons: not enough MP (as in Magic
 -- and Blitz), and not enough BP (the boost the row would spend).
---
--- Vanilla Magic greys a spell whose MP cost exceeds current MP; the tools-shell
--- verbs never inherited that.  Ot6AbilityGrey (ot6.asm, bank F0) ports it, and
--- the row decorator OR's the $00/$04 it returns into the name's font scope.
--- The Bushido submenu adds a second grey reason: each row is a boost
--- level (row r spends r+1 BP, #38's 1-BP floor), so a row whose boost exceeds
--- the caster's current bp ($3e9c) is unreachable too.  Ot6BushidoRowGrey OR's
--- the same $04, and Ot6BushidoConfirm refuses to commit it.
---
--- Issue #75 conversion.  The old apparatus installed CYAN into the magitek
--- party by poke (char id, Bushido-only $202E, the weapon SWDTECH flag
--- written, $2020 ceiling pinned to 4) and set bp and MP per pass.  On
--- camp_escaped Cyan is real: his katana carries the SWDTECH flag ($3BA4
--- bit 1 reads $82, never written), his real learned window is three rows,
--- Dispatch ($55, 4 MP, boost 1), Retort ($56, 10 MP, boost 2) and Slash
--- ($57, 13 MP, boost 3), following
--- menu_blitzpage: the window is whatever the save holds.  How many rows that
--- is comes from his level, through BushidoLevelTbl (event.asm:1235); he
--- arrives here at level 12 and the third threshold is 12.  Every value below
--- is a ledger of real actions:
---
+
 --   bp: opens at Ot6InitBP's 1; +1 per item turn; minus the row's boost per
 --       tech (every tech is a boosted action, so its turn regens nothing).
 --       It opens at 1 in EVERY battle, so a ledger that spans a battle
 --       boundary is not a ledger -- see pass 4.
 --   MP: his real 76, spent 4 a Dispatch and 10 a Retort.
---
+
 -- Battles are real world encounters off the fixture tile; when the ledger's
 -- casts end one (Dispatch kills; Retort is the counter stance and mostly
 -- does not), the drive paces to the next.  MP persists across battles, the
 -- bank does not.  SHADOW heals with real items.
---
--- What is asserted (attribute byte = the odd/high byte of each name tile's
--- tilemap word, $21 white / $25 grey):
---   1. BP grey at the natural bank: bp 1, so Retort (boost 2 > 1) and Slash
---      (boost 3 > 1) are grey while Dispatch (boost 1) is white.
---      grey - white == $04.
---   2. both clear: one real item turn banks bp 2, and Retort goes white, so
---      the grey tracks the bank rather than being unconditional.
---   3. the open window ACCEPTS A REPAINT REQUEST (#77).  Passes 1, 2, 4 and 5
---      each open a window onto a bank that has stopped moving and read what
---      the row decorator derived at open.  #77 is the other half: the rows
---      are staged once, at open, and before the fix nothing re-staged them,
---      so a bank that moved behind an open window was drawn stale until the
---      window was closed and reopened.  The fix makes Ot6RestageGate_ext
---      serve the kit window ($30) beside the magic list ($0e), and has every
---      BP writer ask it for a repaint.  This pass drives a request through
---      its real path -- an L/R press, which is Ot6Boost's own OT6_RESTAGE
---      raise (#64) -- and watches the byte: before the fix the gate ignored a
---      request while $30 was up, so it stood at $80 for the rest of the menu;
---      after, the gate spends it within a few frames and leaves the window up
---      with its rows still right.  See the pass for why the bank move itself
---      is not what is driven here.
---   4. zero BP greys everything (#38): one real Retort takes a bank of 2 to
---      0, all three rows grey, and the names are still drawn, greyed rather
---      than absent.  The read checks the bank the rows were STAGED with,
---      because a battle boundary re-seeds the bank to 1 behind a ledger that
---      only watches the number it drove to.
---   5. MP grey, a labeled isolation arm: the bank is rebuilt (bp >= 2,
---      isolating MP), one write puts the pool at 7, and Dispatch (4) is
---      white while Retort (10) is grey, this time for the other reason.
---      The pass says why the walk cannot be driven on this pool's economy.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
 
@@ -71,13 +21,13 @@ local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_ITEM, ST_TOOLS, ST_TGT, ST_TRANS = 0x05, 0x0A, 0x30, 0x38, 0x01
 local CMD_SWDTECH, CMD_ITEM = 0x07, 0x01
 local KROW = 0x8967                       -- kit list cursor row (read!)
-local RESTAGE = 0x57D4                    -- #77: the gate's request byte (read!)
+local RESTAGE = 0x57D4                    -- the gate's request byte (read!)
 local WHITE, GREY = 0x21, 0x25
 local TONIC, POTION = 0xE8, 0xE9
 local DISPATCH_MP, RETORT_MP = 4, 10
 
 local cyan, shadow
-local restageTrace = {}          -- #77: OT6_RESTAGE, sampled per frame
+local restageTrace = {}          -- OT6_RESTAGE, sampled per frame
 local function bp() return H.readByte(0x3E9C + cyan*2) end
 local function pend() return H.readByte(0x3E9D + cyan*2) end
 local function mp() return H.readWord(0x3C08 + cyan*2) end
@@ -243,12 +193,6 @@ local function driveTo(pred, maxF, tag)
     H.call(frame),
   }, tag)
 end
--- park at the submenu (battle must be up) and settle for a VRAM read.
--- Settle the ledger first: the window can open mid-resolution and the
--- decorator then correctly draws the pre-charge bank (measured: the pass-3
--- window drew at f8375 with the second Dispatch's charge still in flight,
--- and the kit window does not repaint on a bank change while open, a
--- follow-up noted in the report and distinct from #64's live magic re-price).
 local function parkRead(tag)
   return H.repeatN(1, {
     H.call(function() cyanMode = "defer" end),
@@ -326,27 +270,6 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(attrOf(NM.Dispatch), WHITE, "Dispatch stays white")
   end),
 
-  -- 3. the open window accepts a repaint request (#77) ----------------------
-  -- Why the request and not a bank move.  The thing #77 describes is a bank
-  -- that moves while the window is up, and on this fixture that situation is
-  -- not reachable from the pad.  Measured here, driving Cyan into the window
-  -- and holding it: his own charge cannot land under his own window, because
-  -- the ATB restart and Ot6ActionEnd's charge are the same instruction
-  -- stream (battle_main.asm:296-303), so his menu cannot reopen until after
-  -- the bank has already moved -- observed as menu=0 across the whole
-  -- commit-to-charge interval.  The moves that CAN land under an open window
-  -- are the reactive ones (a True Knight cover, a Runic absorb, an ally's
-  -- Bestow), and no fixture puts one of those on a kit-bearing character
-  -- without staging it by hand, which this file does not do.
-  --
-  -- So this pass drives the repaint mechanism instead of one of its causes,
-  -- through the one cause that IS reachable from the pad: an L/R press.
-  -- Ot6Boost raises OT6_RESTAGE on that edge (#64) whatever window is open,
-  -- and the gate is the single place a request is spent, so what is asserted
-  -- below is exactly the half of the fix a bank move would exercise.  The
-  -- before-state is what makes it a test: on the unfixed ROM the gate only
-  -- ever looked at menu state $0e, so a request raised over the kit window
-  -- was never spent and the byte stood at $80.
   H.call(function() cyanMode = "defer" end),
   parkRead("submenu for the repaint request"),
   H.call(function()
@@ -392,16 +315,12 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(sawFresh, true, "and the fresh request was visible in the trace")
     -- the discriminator.  1..3 is a staging cycle in progress, and only a
     -- gate that serves menu state $30 ever starts one over the kit window.
-    -- The unfixed gate looked at $0e alone, so its trace is $80 forever.
     H.assertEq(sawCycle, true,
       "the gate STARTED a staging cycle over the open kit window (flag 1-3) "
       .. "-- the unfixed gate served the magic list only and left it $80 (#77)")
     H.assertEq(left, 0, "and the cycle completed, handing the byte back")
     H.assertEq(H.readByte(MSTATE), ST_TOOLS,
       "the window is still up: a re-stage must not walk it shut")
-    -- and the re-staged rows still say what the bank says.  #36 was a
-    -- re-stage that handed $7ba5 back wrong and drew another list's rows, so
-    -- "it repainted" is not enough on its own.
     H.assertEq(aD, WHITE, "Dispatch is still white after the re-stage")
     H.assertEq(aR, WHITE, "Retort is still white after the re-stage (bp 2)")
   end),
@@ -412,14 +331,6 @@ H.run({ maxFrames = 150000 }, {
       .. "is unchanged by this pass")
   end),
 
-  -- 4. zero BP greys everything (#38) ---------------------------------------
-  -- The bank has to still be 0 at the moment the rows are STAGED, and the
-  -- obvious drive does not guarantee that.  Two Dispatches spend a bank of 2
-  -- to 0, but a Dispatch also kills this trash, and the next encounter's
-  -- Ot6InitBP hands every character a fresh 1: measured 2026-08-13, the read
-  -- landed on banks 1/1/1/1 and the decorator correctly drew Dispatch white
-  -- for a bank of 1.  The row decorator was never wrong; the ledger was.
-  --
   -- Retort is the lever.  It costs boost 2, so one cast takes a bank of 2
   -- straight to 0, and it is the counter stance rather than a hit, so it
   -- does not end the fight the way a Dispatch does.  The read then checks
@@ -502,21 +413,6 @@ H.run({ maxFrames = 150000 }, {
     })
   end)(),
 
-  -- 5. MP grey: a labeled isolation arm (owner calibration).
-  -- The input-driven walk was tried three ways and measured out of reach on
-  -- this pool's economy: a Retort walk's counters end the battle; a deferring
-  -- party is ground down (and battle-RAM teardown zeroes read as
-  -- enemy MP drains to any ungated read); and a six-battle Dispatch
-  -- ladder never lands the pool under 10, because this trash flees or dies
-  -- before enough real casts spend it.  A precise low pool on a
-  -- kit-bearing caster is an input this fixture cannot produce on cue,
-  -- and the grey is a renderer decode, so the arm keeps one write, recorded
-  -- here: MP := 7, inside the 4..9 window, with the bank at pass 2's
-  -- real 2 (rebanked by one real item turn off the fresh battle's
-  -- Ot6InitBP 1).  The trash also flees on its own schedule, so the arm
-  -- is a short fresh-battle sequence (enter, one item turn, write, park,
-  -- read) retried up to five times; the heal threshold drops for it so heal
-  -- turns do not consume the pre-flee window.
   H.call(function() shadowThreshold = 40 end),
   (function()
     local done = false

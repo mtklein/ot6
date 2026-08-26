@@ -1,48 +1,17 @@
 -- probe_trench_arrows.lua -- read-only instrument for the Serpent Trench
--- ride (issue #75 follow-on; the sabin_done blocker).  Zero state writes:
--- buttons and observation only.
+-- ride.  Zero state writes: buttons and observation only.
 --
--- Background.  Five gen_sabin_trench driver permutations failed the ride in
--- five ways (the record is in that file's ride() comment and commit
--- dc07c44), all reasoning about the show_arrows fork windows.  The source
--- shows the windows cannot be what freezes the ride:
+-- show_arrows sets $E8 bits 1|2; the fork sample (world/move.asm) is
+-- level-triggered on held pad cell $05 while the arrows are shown: right
+-- pressed clears $1EB6 bit 7, left pressed sets it.  No edge, no confirm.
 --
---   * show_arrows (VehicleCmd_da, world/event.asm:589) sets $E8
---     bits 1|2 and clears the flash counter; lock_arrows clears bit 2,
---     hide_arrows clears bit 1.  It is non-blocking: the script pattern is
---     `show_arrows / wait 26 / lock_arrows / hide_arrows / if_switch
---     $01B7`, a timed input sample (event_main.asm:21212).
---   * The sample itself (world/move.asm:403-425) is level-triggered on
---     the held pad cell $05 every frame the arrows are shown: right
---     pressed -> $1EB6 &= $7F, left pressed -> $1EB6 |= $80.  No edge,
---     no confirm, and it is skipped while $E7 bit0 or $1E bit0 says
---     player input is disabled.
---
---   So holding left is the correct fork input, and the measured freeze
---   (ride parked at $ed=0200 from f9143 to a 60000-frame budget, b=false
---   by the gen's inBattle()) is a different waiter, one that a blanket
---   A-tap resolved twice while sending the ride down the $01B7=0
---   detour.  This probe identifies that waiter.
---
--- What it does.  Boots gau_joined, walks the gen's own route to the dive
--- (helmet scene -> jump), then rides with the original policy (hold left,
--- flee battles, tap-A the ones that will not flee) while logging a
--- transition trace of every cell the mechanism touches:
---
---   $E8 (arrow show/lock bits + danger bits), $1EB6 (bit7 = the $01B7
---   fork switch), $05 (held-pad sample the arrows read), $E7/$1E (input
---   disable bits the sampler honors), $00ED (the ride's progress
---   signal), $1F64 (map), $0026 (field ZMENUSTATE), $7BCA/$7BC2 (battle
---   menu-open/menu-state), $3BF4 raw first words (what inBattle() sees),
---   and CH_SEL/CH_MAX ($056E/$056F).
---
--- When $00ED freezes >600 frames, it holds everything for 1200 more
--- frames of clean observation, then presses one A and logs which cells
--- transition in the next 120 frames; the waiter is whichever cell responds.
--- It repeats that (freeze -> observe -> one A) up to 8 times, then ends.
--- PASS means "the trace was captured", not that Nikeah was reached; the
--- exit assertion is only that the ride left the helmet room and produced
--- at least one trace line.
+-- Boots gau_joined, walks to the dive (helmet scene -> jump), then rides
+-- holding left, fleeing battles, tap-A otherwise, logging a transition
+-- trace of every watched cell ($E8, $1EB6, $05, $E7/$1E, $00ED, $1F64,
+-- $0026, $7BCA/$7BC2, $3BF4, CH_SEL/CH_MAX).  When $00ED freezes >600
+-- frames, it holds 1200 more frames, presses one A, and logs which cell
+-- responds; repeats up to 8 times.  PASS means the trace was captured, not
+-- that Nikeah was reached.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/gau_joined.mss.lua"
 
@@ -99,7 +68,7 @@ local function trace(why, s)
   H.log(string.format("[arrows] f%d %s: %s", H.frame, why, fmt(s)))
 end
 
--- --------------------------------- route to the dive (the gen's steps) --
+-- --------------------------------- route to the dive -----------------
 local function ride(dir, pred, what, budget)
   -- plain pre-dive driver: dialogs tap A, otherwise hold dir
   local phase = 0

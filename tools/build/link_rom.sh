@@ -5,11 +5,11 @@
 # path is hardcoded in cfg/ff6-*.cfg's bank_7e FILE=), so: link once to
 # materialize that segment, lzss-compress it, wrap the .lz in a one-line
 # .incbin module, assemble it, link again with that object appended, then
-# fix the SNES checksum.  Verbatim from the old ff6/Makefile ROM recipes.
+# fix the SNES checksum.
 #
 # temp_lz is shared scratch BECAUSE the cfg hardcodes it, so two ROM links
 # must never run concurrently; the ninja graph serializes them with an
-# order-only edge (make never hit this because it built targets serially).
+# order-only edge.
 #
 # Runs with cwd=ff6 (all cfg/source paths are ff6-relative).
 set -eu

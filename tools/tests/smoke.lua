@@ -3,12 +3,10 @@
 -- Exit code 0 = pass, 1 = fail.
 --
 -- The marker is Dirk's item-name byte 0. OT6 replaces every weapon's
--- item-name icon with its break-class icon (commit "the icon IS the
--- class"); Dirk is item 0 and wears the piercing icon {spear} = $DA
--- (vanilla FF3us has the dirk icon $D8 there). The address: the
--- item_name segment loads at $D2B300 (ff6/rom/ff6-en.map), HiROM
--- $D2B300 -> PRG file offset 0x12B300; ITEM_SIZE = 13 per entry
--- (include/text/item_name_en.inc) and Dirk is entry 0, so its bytes
+-- item-name icon with its break-class icon; Dirk is item 0 and wears the
+-- piercing icon {spear} = $DA (vanilla FF3us has the dirk icon $D8 there).
+-- The item_name segment loads at $D2B300, HiROM $D2B300 -> PRG file offset
+-- 0x12B300; ITEM_SIZE = 13 per entry and Dirk is entry 0, so its bytes
 -- start at the segment base. "Dirk" itself encodes as 83 A2 AB A4.
 local expected = { 0xDA, 0x83, 0xA2, 0xAB, 0xA4 }
 

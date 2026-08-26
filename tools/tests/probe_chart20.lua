@@ -1,4 +1,4 @@
--- probe_chart20.lua -- full chart of Narshe town (map 20) (#133).
+-- probe_chart20.lua -- full chart of Narshe town (map 20).
 local H = dofile("tools/tests/lib/ot6.lua")
 H.run({ maxFrames = 9000 }, {
   H.loadState("build/states/wob_narshe_town.mss.lua"),

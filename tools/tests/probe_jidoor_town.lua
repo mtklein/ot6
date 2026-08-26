@@ -1,11 +1,10 @@
 -- probe_jidoor_town.lua -- bank an in-Jidoor fixture and scout door
--- reachability (#133).  The flight leg is proven and slow (~1800 frames);
--- everything inside the town iterates from wob_jidoor_town.mss instead.
--- Also reports, via H.bfsPath from the arrival tile, which tiles around
--- the relic-shop door (5,25) and the Auction House door (26,27) are
--- pathable -- shop doors here are bump/step-through entrances (the north
--- door {16,12} is documented as one in gen_opera1_entry), so the walk
--- targets a pathable neighbor and pushes through.
+-- reachability.  The flight leg is slow (~1800 frames); everything inside
+-- the town iterates from wob_jidoor_town.mss instead.  Also reports, via
+-- H.bfsPath from the arrival tile, which tiles around the relic-shop door
+-- (5,25) and the Auction House door (26,27) are pathable -- shop doors
+-- here are bump/step-through entrances, so the walk targets a pathable
+-- neighbor and pushes through.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function rd(a) return emu.read(a, emu.memType.snesMemory) end
 local function fineX() return ((rd(0x35) << 16) | H.readWord(0x33)) end

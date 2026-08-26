@@ -1,10 +1,9 @@
--- probe_chest271.lua -- #84 scratch probe, not a fixture and not registered.
--- Boots magicite_ifrit_shiva (map 264), replays gen_n024_entry's first two
--- transitions (264 {9,5} -> 269 {44,53}, 269 {42,12} -> 271 {31,28}), then
--- measures walkability around the bit-94 Break Blade chest at (8,37) on the
--- encounter-bearing factory map 271: a canStep dump plus bfsPath lengths to
--- the candidate stand tiles from the (31,28) landing.  The factory has
--- one-way terrain in places, so this is run before editing the generator.
+-- probe_chest271.lua -- boots magicite_ifrit_shiva (map 264), replays
+-- gen_n024_entry's first two transitions (264 {9,5} -> 269 {44,53}, 269
+-- {42,12} -> 271 {31,28}), then measures walkability around the bit-94
+-- Break Blade chest at (8,37) on the encounter-bearing factory map 271: a
+-- canStep dump plus bfsPath lengths to the candidate stand tiles from the
+-- (31,28) landing.  The factory has one-way terrain in places.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

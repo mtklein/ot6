@@ -7,77 +7,10 @@
 -- conversations, and the landing on Crescent Island at world (232,150),
 -- party TERRA - LOCKE - SHADOW.  Ends with the world battery save through
 -- the real Save UI -- boundary K, `crescent-landing-v1`.
---
+
 -- The route, with the mechanism each beat rides (all cited from
 -- ff6/src/event/event_main.asm unless said otherwise):
---
---  1. World walk (120,188) -> (137,203), the tile one west of the Albrook
---     gate, then held RIGHT onto the (138,203) short entrance -> 323 (2,17)
---     (world-0 ShortEntrance records; gen_vector_entry used the same door
---     from the same tile).  Encounters on the walk are fled with the real
---     L+R run, the same design gen_banquet_done's I->J grind used on this
---     terrain, after a care stop at the boot tile.
---  2. Albrook 323: the port gate triggers at (43,26)/(45,26) are no-ops
---     with $007D=1 (`_cc62f2/_cc632d` first line each), and the (43,29)
---     long entrance (len 3, decoded from trigger/long_entrance.dat) drops
---     into the port, map 332 (22,2).  Maps 323/325/332 cannot draw a
---     random battle (map_prop.dat +5 bit 7 clear, audit_encounters.py), so
---     every navTo below spells playBattles="flee" as intent only.
---  3. The Gau question, measured rather than assumed.  The survey
---     (sealed-gate-route.md section 1 seg 7) says GAU follows and refuses to
---     board at 332 (10,10)/(11,10) with `$02FB=0`.  The trigger's own guard
---     says otherwise for THIS chain: `set_case PARTY_CHARS` (:67906) fills
---     case bits from the char objects' party fields (EventCmd_de,
---     ff6/src/field/event.asm:4308-4348), and the banquet tail forced the
---     party to TERRA+LOCKE with `char_party GAU, 0` (:99089), so case bit
---     $01AB reads 0 and the trigger returns before the scene (:67907-67910).
---     GAU's post-banquet presence is an NPC standing in Vector 253 at
---     (41,13) whose talk script is flavor + delete_obj, no join (_cc929f).
---     So this generator rests on (10,10) to give the trigger its chance,
---     logs the guard inputs, and the exit contract pins the derived answer:
---     $02FB stays 1.  If the game disagrees, the contract diff names it.
---  4. The pier scene: talk LEO at 332 (12,15) (NPC record 3 -> obj $13,
---     npc_prop.asm:14419) -> _cbcc84: Celes+Shadow intro.  On a chain that
---     never met Shadow ($000B=0) this includes `name_menu SHADOW` (:68222),
---     the one beat a dialog rider cannot A through: START commits the
---     default name (gen_edgar's commitName finding), so the talk rider
---     below presses START whenever a menu is up ($59 ~= 0).  The scene ends
---     with `$0084=1 $0085=1` (:68350-68351) and control back -- the night
---     window.
---  5. THE NIGHT-WINDOW MEASUREMENT (the survey's open question 7): leave
---     Albrook mid-window, out the west long entrance to world (137,203),
---     verify world control, read $0084/$0085/$0087 and the save-enable
---     flag $0201 bit7 (raw read, no menu), run a real H.fieldCare there
---     (the world-menu round trip gen_sabin_gau's overworld care proved),
---     then walk back in and finish the sequence.  The sequence completing
---     after the excursion IS the answer; a wedge fails a named step here.
---  6. The night: the inn door 323 (54,12) -> 325 (58,56) (ShortEntrance),
---     innkeeper at (56,51) (obj $10, npc_prop.asm:14199) -> _cc614a: with
---     $0085=1 && $0087=0 the stay is free ("General Leo told us about
---     you"), the Locke/Celes night scene plays, and control returns on 325
---     (55,39) with $0087=1 (:91497).  Out the (58,57) trigger -> 323
---     (54,14) (_cc60d2).
---  7. Back to the port; LEO again -> _cbce36 "Right...let's go", $0083=1
---     (:68379), the scripted sail (world ship script :68390-68402), the
---     deck scenes, and TERRA alone on the night deck ($0507, `party_chars
---     TERRA` :68488).
---  8. LEO at (8,13) (obj $21) -> _cbcefc: the Terra/Leo conversation, the
---     Shadow scene, Locke's seasickness, the second sail (:68963), and the
---     day deck with $0086=1 (:69018).  No dialog in the scene is a choice;
---     the rider only pages.
---  9. LEO at (12,14) (obj $22) -> _cbd1f3: the split briefing, $0089=1.
--- 10. LOCKE at (10,14) (obj $1D) -> _cbd209: "Let's go", SHADOW joins
---     (`create_obj SHADOW`, `char_party SHADOW, 1`, `$02F3=1`, `norm_lvl`,
---     max_hp/max_mp, :69154-69163), `set_b_switch $4B`, and the landing
---     sail ends at world (232,150) facing UP (:69180-69188), controllable.
---     The Thamasa trigger at (250,128) is 40+ encounter-active steps away
---     and is NOT approached; the stop line is the landing tile itself.
---
--- The Save-UI block at the end is gen_banquet_done's, unchanged in shape:
--- savestate first (the world menu does not unwind on B, measured twice),
--- reload-verify, then the pad-driven slot-3 save with the read-only
--- CopyGameDataToSRAM exec hook as the receipt.
---
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
@@ -98,11 +31,6 @@ local function partyCount()
   return n
 end
 
--- Verified-step world grinder (gen_banquet_done's, unchanged; consumes a
--- plan entry only when the party lands on it).  An encounter on the grind
--- is fled with the real L+R run, which is the design for world encounters
--- (issue #75); this terrain's packs fled clean across gen_banquet_done's
--- much longer I->J grind.
 local function worldGrind(tx, ty, what)
   local plan, idx, ph, hb = nil, 1, 0, -600
   local step = nil
@@ -297,7 +225,6 @@ end
 
 -- --------------------------------------------------------------------------
 local steps = {
-  -- ---- the cold Continue and the entry contract (issue #25) ---------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -425,16 +352,6 @@ local steps = {
   end, 3600, "world control outside Albrook mid-window", 5),
   H.waitFrames(60),
   H.call(function()
-    -- THE MEASUREMENT.  The window switches held across the town exit, and
-    -- the party is controllable on the world map.  Save availability is
-    -- structural rather than sampled: the world menu writes $0201 = $80
-    -- unconditionally when it opens (ff6/src/world/world_start.asm:423-424;
-    -- the world map saves anywhere), and the care stop below opens that
-    -- menu mid-window and closes it, which is the demonstration.  $0201
-    -- itself is a multi-owner menu parameter cell (shop number, character
-    -- number, menu flags -- trap 1), so it is NOT read raw here; the first
-    -- run of this generator did read it raw, got a stale $02, and mislabeled
-    -- it as the save-enable bit.
     H.log(string.format(
       "== NIGHT-WINDOW MEASUREMENT: on the world mid-window at (%d,%d): "
       .. "$0084=%d $0085=%d $0087=%d, world control held ==",
@@ -561,8 +478,6 @@ local steps = {
   H.call(function()
     H.assertExitContractPreSave("crescent-landing-v1")
   end),
-  -- The step's savestate is generated here, before the menu (the world menu
-  -- does not unwind on B, measured -- gen_narshe_mission)
   H.saveState("crescent_landing.mss"),
   -- Reload-verified (gen_sabin_gau's pattern): a calm capture does not
   -- imply a calm reload, so reload the parked moment and require the
@@ -610,8 +525,6 @@ local steps = {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- The input-driven save receipt (issue #75): a read-only exec hook on
-    -- the real CopyGameDataToSRAM entry captures the slot argument.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff

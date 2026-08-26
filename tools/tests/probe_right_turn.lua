@@ -1,7 +1,6 @@
--- probe_right_turn.lua -- the walkthrough's "take a right": from 21's
--- entrance, the EAST arm (x58-62) and the (37,25)->41(19,51) door are
--- the two never-probed branches (#133).  Try both, goal-checking for
--- the snow-field chain the whole way.
+-- probe_right_turn.lua -- from map 21's entrance, tries the EAST arm
+-- (x58-62) and the (37,25)->41(19,51) door, goal-checking for the
+-- snow-field chain the whole way.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
 local function sw(bit) return (H.readByte(0x1E80 + (bit >> 3)) >> (bit & 7)) & 1 end
@@ -28,8 +27,8 @@ H.run({ maxFrames = 60000 }, flatten({
   H.loadState("build/states/wob_chase23C.mss.lua"),
   H.waitFrames(8),
   -- from the chase spot the only link south is the exit row; ride it to
-  -- town (38,2) deliberately, then re-enter 21 at (26,50) and TAKE THE
-  -- RIGHT: east along the south strip to the arm at (60,48)
+  -- town (38,2), then re-enter 21 at (26,50) and go east along the south
+  -- strip to the arm at (60,48)
   H.navTo(27, 51, { maxFrames = 9000, playBattles = "flee",
     arrive = function() return mapIs(20) end }),
   H.driveUntil(function() return mapIs(20) end, 900,

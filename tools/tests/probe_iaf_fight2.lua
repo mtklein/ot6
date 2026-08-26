@@ -1,14 +1,10 @@
--- probe_iaf_fight2.lua -- is the IAF gauntlet survivable POST-grind (#133)?
+-- probe_iaf_fight2.lua -- is the IAF gauntlet survivable POST-grind?
 --
--- probe_iaf_fight asked the question at the routed L15-17 from iaf_deck;
--- this asks it from wob_grind_done.mss (the leveled party on foot beside
--- the Blackjack parked at the Chimera pocket): walk back onto the ship,
--- ride the deck flow to the party-select, and fight the chain with the
--- grinders holding the route: Terra $00 + Locke $01 (the two ThunderBlades,
--- the bolt plan) and Strago $07
--- at L21/L22/L21 (Celes stayed L15 on the bench, so the original
--- Terra/Celes/Relm three would test a party nobody routed).
--- Everything from the deck onward is probe_iaf_fight's proven drive.
+-- Asks the question from wob_grind_done.mss (the leveled party on foot
+-- beside the Blackjack parked at the Chimera pocket): walk back onto the
+-- ship, ride the deck flow to the party-select, and fight the chain with
+-- the grinders holding the route: Terra $00 + Locke $01 (the two
+-- ThunderBlades, the bolt plan) and Strago $07 at L21/L22/L21.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function rd(a) return emu.read(a, emu.memType.snesMemory) end
 local function idx() return H.readByte(0x4b) + H.readByte(0x4a) + H.readByte(0x5a) end
@@ -67,10 +63,9 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("aboard: map=%d field=(%d,%d)",
       H.mapId() & 0x3ff, H.fieldX(), H.fieldY()))
   end),
-  -- probe_iaf_fight's proven deck -> party-select -> IAF drive, except the
-  -- walk targets the helm STEP-TRIGGER tile itself, (14,6) (event_trigger
-  -- map 6: {14,6} -> _caf532): iaf_deck happened to park the party there,
-  -- this boarding lands at (16,6), and (15,8) fires nothing.
+  -- The walk targets the helm STEP-TRIGGER tile itself, (14,6)
+  -- (event_trigger map 6: {14,6} -> _caf532): this boarding lands at
+  -- (16,6), and (15,8) fires nothing.
   H.navTo(14, 6, { maxFrames = 2000, arrive = function() return H.dialogWaiting() end }),
   H.pressButtons({ "a" }, 4), H.waitFrames(20),
   H.driveUntil(function() local s=H.readByte(0x26); return s>=0x2c and s<=0x2f end, 1200, {
@@ -84,13 +79,12 @@ H.run({ maxFrames = 60000 }, {
         charAt(idx()), rd(0x7eac8d + idx()), tostring(nextTarget()), grpCount())) end
       local s=H.readByte(0x26)
       if s==0x2d then
-        if H.readByte(0x4a)~=0 then tap("up")   -- group exit (proven in probe_iaf)
+        if H.readByte(0x4a)~=0 then tap("up")   -- group exit
         else
           -- Closed-loop steering with LEARNED buttons: the reserve list is
           -- readable ($7e9d89+i, compacting as chars are placed), but which
-          -- dpad button moves the cursor which way is not worth guessing
-          -- (four assumed layouts measured wrong).  Try buttons in rotation,
-          -- watch idx, and remember what worked.
+          -- dpad button moves the cursor which way is not fixed.  Try
+          -- buttons in rotation, watch idx, and remember what worked.
           local t = nil
           for i = 0, 15 do
             local c = charAt(i)

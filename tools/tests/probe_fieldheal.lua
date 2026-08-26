@@ -1,26 +1,17 @@
--- probe_fieldheal.lua -- learn the field Item/Use/target UI by driving it and
--- watching, so the input-driven routes can heal the party between steps
--- with real presses (issue #75: inputs in, observations out; this probe
--- writes nothing).
+-- probe_fieldheal.lua -- learns the field Item/Use/target UI by driving it
+-- and watching, so the input-driven routes can heal the party between
+-- steps with real presses.  Reads only; writes nothing.
 --
--- It boots vargas_entry.mss, which the input-driven Mt. Kolts route
--- currently delivers with TERRA dead (0/94) and EDGAR on 1/145 and seven
--- Potions and five Tonics unspent, the state a player would open the menu
--- on.
+-- Boots vargas_entry.mss, which the input-driven Mt. Kolts route delivers
+-- with TERRA dead (0/94) and EDGAR on 1/145 and seven Potions and five
+-- Tonics unspent.
 --
--- What the first two passes established, and where they went wrong:
---   * ZMENUSTATE is DP $26, the shared cursor row is DP $4B.
---   * main menu is $05 with Item on row 0; one A lands on $08, which is the
---     item list itself; there is no options window in front of it.
---   * pass 1 tapped A repeatedly toward $08 and then pressed A again, which
---     entered $19 and would have swapped two items (gen_sabin_gau uses that
---     same state as move mode).  Pass 2 pressed one edge at a time and saw
---     $08 -> A -> $19 -> A -> $70, with EDGAR healed exactly +50 (a Tonic,
---     the row the cursor happened to be on), so one of $19/$70 is the
---     target cursor and the other was not identified by pass 2.
--- This pass isolates that: it parks on a known row (Potion), presses A once,
--- screenshots, presses A once more, screenshots, and prints the inventory
--- counts and the roster around every press.
+-- ZMENUSTATE is DP $26, the shared cursor row is DP $4B.  Main menu is
+-- $05 with Item on row 0; one A lands on $08, the item list.  The state
+-- chain is $08 -> A -> $19 -> A -> $70, with $70's A confirming the
+-- target.  This pass parks on a known row (Potion), presses A once,
+-- screenshots, presses A once more, screenshots, and prints the
+-- inventory counts and the roster around every press.
 --
 -- Not a suite test: no `-- @suite` marker.  Run it directly, keeping the
 -- artifacts so the windows can be inspected:

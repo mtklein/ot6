@@ -3,45 +3,7 @@
 --                    SHADOW left at the overlook, GAU named but not
 --                    joined (he takes nothing and runs; recruitment is the
 --                    next step's Veldt work).
---
--- The route (entrances decoded from trigger/*.dat; events read at the
--- cited lines):
---   world (178,93), train_done's landing, walk east to (185,93)
---     -> map 166 (9,13)                       [world short-entrance]
---   166 (7,4)  -> map 155 (11,11)             [long entrance, len 1]
---   155 (10,4) -> map 156 (15,20)             [short entrance; (10,5) is a
---                                              sound trigger, harmless]
---   156: walking UP crosses the y=12 row -> _cbbef1/_cbbfa5
---     (event_main.asm:66235/66317): "This must be Baren Falls", $003C=1,
---     and SHADOW leaves ("I have served my purpose…", char_party SHADOW,0,
---     $02F3=0), so the party is SABIN+CYAN from here.
---   156 y=10 row, facing up -> _cbc03f (:66422): "Jump?"; option 0
---     (_cbc058) rides the fall.  The $01B5 once-latch applies per standing
---     position, because player.asm:529 clears it every step, so there is no
---     stale-state hazard.
---   battle 18 fires mid-fall (:66479) and its tail is _ca5ea9's win-bit
---     check, so the fight has to be won, and since issue #75 it is won by
---     play, with no state writes in this generator.  SABIN + CYAN run the
---     house menu-episode machine (bank boost to 2, dump it on Fight; one
---     button per 30-frame pulse from a settled menu), the piranhas die to
---     boosted Fights, their death script surfaces RIZOPAS, and the same
---     Fights finish it on real HP.  A loss (90 straight frames of both
---     party slots at 0; battle 18's loss is a game over) sets `lost` and
---     a three-attempt retry ladder reloads a checkpoint taken before the
---     jump with a 17-frame stagger and the fighter escalated (tier 2+
---     dumps at 1 BP).  Random encounters elsewhere on the route are fled
---     (hold L+R / playBattles="flee"), so no win is needed and no writes
---     occur.
---     RIZOPAS ($0155) is hidden
---     in slot 5 behind two visible Piranhas and is surfaced by the
---     piranhas' own death script, so the watch below keys on the
---     surfacing (slot-5 present bit) rather than on battle-up formation words.
---     Its authored row (Ot6ShieldTbl: 5 shields, SLASH|BLUDG) is read the
---     frame it surfaces.
---   Then the shore: load 159 {15,0}, the wash-ashore cinematic, GAU's
---     intro (dlg $02E6), `name_menu GAU` (driven by the menu module's own
---     state: $0026/$0027 == $5F -> press START, gen_sabin_camp's idiom),
---     "And you are?", GAU runs off, $003F=1, control returns.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/train_done.mss.lua"
 
@@ -64,9 +26,6 @@ local function monPresent(i) return H.readByte(0x3aa8 + i * 2) % 2 == 1 end
 local rizo = { seen = false, species = 0, shields = 0, smax = 0, wkc = 0,
                mask0 = nil }
 
--- ---------------------------------------------------------- the fighter --
--- The input-driven battle driver (issue #75; the house menu-episode machine):
--- boost prefix + Fight from a settled menu, one button per 30-frame pulse.
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local BP = 0x3E9C
 local fightTier = 1
@@ -94,12 +53,6 @@ local MSTATE = 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM = 0x01
 local CMDTBL, CMDROW = 0x202E, 0x890F
--- the item-list cursor is TWO cells per actor -- scroll ($8947) plus
--- row-on-screen ($894F) -- and the engine's own get_item_poi
--- (btlgfx_main.asm:_c189be) sums them before the *5; reading the scroll
--- alone selected inventory index 4 while the display said 1 (measured,
--- probe_itemuse: the select/deselect toggle that wedged the first
--- input-driven courtyard generation)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local function itemIdxOf(a)
   return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
@@ -126,14 +79,6 @@ local fTick, fStreak = 0, 0
 local function makeFightPlan(actor)
   local hp, mx = pHPf(actor), pMaxHPf(actor)
   local itemRow = cmdRowOf(actor, CMD_ITEM)
-  -- Heal policy, two-phase (v0.14 gate: attempt 1 entered the Rizopas
-  -- phase at 33%/21% and his surfacing opener killed both -- an
-  -- on-curve party that would have SURVIVED it near full).  Before
-  -- Rizopas surfaces, stay topped: heal under 80%, Potion once 60+ is
-  -- missing -- the piranha bite rate (~25 HP/1000f measured) loses to
-  -- a 50-HP Tonic line with room to spare, so the tempo cost is
-  -- affordable.  Once Rizopas is up, drop back to the 60% line and
-  -- spend the turns on boosted Fights instead -- he dies to tempo.
   local rizoUp = rizo.seen and monPresent(5)
   local thresh = rizoUp and 6 or 8
   if mx > 0 and hp > 0 and hp * 10 < mx * thresh and itemRow then
@@ -149,9 +94,6 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  -- dump banked boost EVERY turn: these are 1-2 member steps where a dead
-  -- enemy is the only mitigation, and the pursuit measured bank-to-2
-  -- losing the tempo war against four attackers
   local boost = bp >= 1 and math.min(bp, 3) or 0
   H.log(string.format("[falls] cast f%d e%d boost=%d tier=%d [%s]",
     H.frame, actor, boost, fightTier, partyLine()))
@@ -162,8 +104,6 @@ local function fightButton()
   local actor = H.readByte(ACTOR)
   if fPlan == nil or fPlanActor ~= actor then
     if st ~= ST_CMD then
-      -- planless in a parked LIST state: back out to the command list
-      -- (the b68 engine measured a menu reopening straight into a list)
       if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
         return { "b" }
       end
@@ -373,20 +313,6 @@ local function worldToMap(tx, ty, what, budget)
     arrive = function() return not H.worldMode() end })
 end
 
--- ------------------------------------------------------ the retry ladder --
--- The walk from the boot fixture to the falls top, shared by the main
--- flow and the retry ladder (#135): a retry reloads the BOOT fixture and
--- replays this walk, because loadState of a generator-produced .mss is
--- the mechanism every run of every generator proves, while the mid-run
--- requestSaveState blob it replaces wedged on its second reload (the
--- jump cinematic started and battle 18 never fired -- measured, the
--- v0.14 cycle).  The reloaded state resets the arrival switches, so the
--- scene replays cleanly, and the walk's own battles re-roll the RNG
--- phase, which is what the old ladder's 17-frame stagger was for.
--- the ot6_field idiom; this file had no seq of its own, and the missing
--- helper cost a silent construction hang (the atma3 lesson: a nil call
--- while the step list is being BUILT dies before frame 1 with no error
--- visible under --testrunner)
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 local function walkToFalls()
@@ -471,10 +397,6 @@ H.run({ maxFrames = 250000 }, {
 
   walkToFalls(),
 
-  -- onto the jump row facing up; "Jump?" option 0; the fall; battle 18
-  -- (real, with the rizopas watch); the shore cinematic + GAU's name menu
-  -- -- all behind the three-attempt ladder.  (#135: no checkpoint blob
-  -- anymore -- a retry reloads the boot fixture and replays walkToFalls.)
   jumpAttempt(1),
   jumpAttempt(2),
   jumpAttempt(3),

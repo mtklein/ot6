@@ -3,7 +3,7 @@
 -- -> the clock at {98,59}, an A+facing-up tile interaction rather than an
 -- NPC, solved 6:10:50, which opens the hidden staircase; generate
 -- zozo_clock_solved.
---
+
 -- The clock, from source (event_main.asm _ca96bd:22895 + event_trigger
 -- _225 {98,59}):
 --  * the trigger runs every frame the party stands on {98,59}; its gate is
@@ -25,16 +25,7 @@
 --  * dialog choices track in $056E (EventCmd_b6); the driver below moves
 --    the cursor by value (edge-presses, re-reading $056E) so the clock's
 --    two-per-row layout needs no geometry knowledge.
---
--- Issue #75, playBattles: both walks pass playBattles = "tactical", so
--- neither reaches the library's monster-dead flag write.  Both maps really
--- do draw random battles -- map_prop.dat byte +5 bit 7 is set for 221 and
--- 225 (field/map.asm:143-158, field/battle.asm:333-347) -- and their pools
--- are the Zozo trash: group 78 on the street (Gabbldegak x4, Harvester +
--- Gabbldegaks, HadesGigas, HadesGigas + Harvester) and group 77 in the
--- buildings (SlamDancer, Harvester, and mixes of the two with Gabbldegaks),
--- read out of sub_battle_group.dat and rand_battle_group.dat.
---
+
 -- Both walks name EDGAR's tool, and it is the Bio Blaster rather than the
 -- default AutoCrossbow.  Every one of those eight formations is built out
 -- of four species that carry an Ot6ShieldTbl row of two shields with NO
@@ -88,26 +79,15 @@ local function landed(m, n)
   end
 end
 
--- A rolled encounter must be FOUGHT, not sat through.  The two hand-rolled
--- drives after the clock (stepping off the trigger tile, and the calm wait
--- before the save) used to carry no battle handling at all, and map 225
--- rolls random battles on every step.  Measured 2026-08-17 on the failing
--- post-wave run, replayed with the heartbeat instrumented: the step off the
--- clock tile chained one extra step onto (98,61) -- the arrival-instant
--- pad-latch hazard gen_zozo4's corridor documents -- that step rolled an
--- encounter (btl=true, evPC=$CA0029, inside RandBattle), and with nobody
--- fighting it the pack took the party from four standing to one across the
--- wait's whole budget (bhp 0000,0051,0073,0080 -> 0000,0051,0000,0000).
--- What read as "a held scene carrying the party" was a live, unfought
--- battle.  This is gen_zozo4's `encounters` rider, on the same options this
--- file's own navTo steps use; a wipe is a hard FAIL because these two
--- drives have no checkpoint to retry from.
 local function battleHpAllZero()
   for e = 0, 3 do
     if H.readWord(0x3BF4 + e * 2) ~= 0 then return false end
   end
   return true
 end
+-- A rolled encounter must be FOUGHT, not sat through: map 225 rolls random
+-- battles on every step, and an un-fought battle can grind the party down
+-- across a wait's whole budget. This is gen_zozo4's `encounters` rider.
 local function encounters(what)
   local F = H.newFightDriver(what, { tactical = true, boost = true,
     items = true, healPercent = 55, tool = H.BIO_BLASTER })
@@ -133,27 +113,6 @@ local function encounters(what)
   end
 end
 
--- Drive one clock choice dialog to `idx` and confirm, terminating when the
--- switch `doneId` latches rather than when the dialog closes: the three
--- menus are chained and $BA/$D3 dip both during each menu's text render and
--- in the gap between them, so a dialogWaiting terminator confirms with no
--- menu up (the first measured bug, probe_clock).
---
--- Each menu is a prompt page ("Please reset the minute.") that waits for A,
--- followed by the choice list.  $056F (choice count) reads 0 through the
--- prompt and only grows >=2 once the choices render (measured: the minute
--- prompt sat at $056F=0 / $D3=1 for 60+ frames until an A advanced it, then
--- $056F=5).  The hour menu looked different only because the clock-trigger
--- drive's repeated A+up presses had already advanced its prompt.  The
--- cursor $056E is a linear index, one step per d-pad edge (the $056D latch
--- blocks until release, text.asm:383).  So:
---   * prompt page ($D3=1, $056F<2): edge-A to advance to the choices;
---   * choices up ($056F>=2): edge the cursor to idx, then edge-A to confirm;
---   * anything else (text scrolling): wait.
--- idx 0 is safe under this order: only the minute's target is 0, and
--- confirming choice 0 is the correct pick there; hour(2) and second(4)
--- start below idx, so they step down before any confirm-A and cannot pick
--- the wrong entry.
 local function clockPick(idx, doneId, what)
   local ph = 0
   return H.driveUntil(function() return sw(doneId) == 1 end, 3000, {
@@ -186,15 +145,6 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(map(), 221, "booted on the Zozo street (map 221)")
   end),
 
-  -- Top the party up before walking a map that draws encounters.
-  -- zozo_arrival ships LOCKE at 69/249 -- 28%, which audit_party_hp passes
-  -- because its bar is max/8.  Measured 2026-08-12: the walk below drew a
-  -- Zozo street pack at (41,39) on its first screen and the tactical driver
-  -- spent the step's whole 30000-frame budget in it without winning, because
-  -- a party that starts a fight at 28% and takes ~116 HP a round never gets
-  -- clear of the heal threshold and never gets its turns back for attacking.
-  -- The fight was not lost -- nobody died -- so nothing reported a fight at
-  -- all; the run reported a navigation timeout.
   H.fieldCare({ tag = "care before the Zozo streets", threshold = 0.95 }),
 
   -- 1. street -> the clock room: door (42,28) -> 225 {98,61}
@@ -238,15 +188,13 @@ H.run({ maxFrames = 90000 }, {
   -- its early EventReturn, but the event PC still enters, so eventRunning
   -- flickers and hasControl never holds.  This is the same stood-on-trigger
   -- hazard gen_mines_chase documents; walk one tile south to leave it.
-  --
+
   -- The press is PULSED, never held: press down only while aligned on the
-  -- clock tile, clear it the instant the step is in flight.  The previous
-  -- H.hold here was still down at the arrival instant, and the engine
-  -- latches a second step before the drive can react (the corridor-chaining
-  -- hazard gen_zozo4 documents) -- so the party was CARRIED onto (98,61),
-  -- and the extra step rolled the random encounter the header of
-  -- `encounters` describes.  An earlier reading of that heartbeat called
-  -- the carry "something scripted"; it was our own held pad.
+  -- clock tile, clear it the instant the step is in flight.  A held press
+  -- still down at the arrival instant lets the engine latch a second step
+  -- before the drive can react (the corridor-chaining hazard gen_zozo4
+  -- documents), carrying the party onto (98,61) and rolling a random
+  -- encounter that `encounters` above must handle.
   (function()
     local hb = 0
     local fought = encounters("off the clock tile")
@@ -302,20 +250,6 @@ H.run({ maxFrames = 90000 }, {
   H.call(function() H.setPad({}) end),
   H.waitFrames(30),
 
-  -- Repair whatever the two random-encounter fights above cost before
-  -- capture.  `encounters` fights rather than flees (the header explains
-  -- why), and a fought fight is not a free one: measured 2026-08-18 on the
-  -- chest-wave regeneration, the step off the clock tile and the calm wait
-  -- after it between them left LOCKE and EDGAR at 0 hp (status1 80 --
-  -- WOUNDED) and CELES near-fatal, and with no care stop and no exit
-  -- contract this generator shipped two dead party members in
-  -- zozo_clock_solved -- audit_party_hp was the only thing that noticed.
-  -- Same two-part shape as gen_ifrit_entry's post-crossing repair: fieldCare
-  -- is the repair (Fenix Down revives the wounded first, CELES's Cure and
-  -- the bag's Tonics/Potions cover the rest -- both are in supply here, see
-  -- the "care before the Zozo streets" stop above), and H.assertPartyStanding
-  -- at the exit is the contract that keeps a stop that silently did nothing
-  -- from reporting the same green as one that worked.
   H.fieldCare({ tag = "care after the clock encounters", threshold = 0.85 }),
 
   H.call(function()

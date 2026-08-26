@@ -1,23 +1,16 @@
--- probe_v07_385.lua -- the basement 2 timed-floor instrument (issue #31,
--- step G->H).  Not a suite test.  Boots v07q_385_entry.mss (map 385 (1,2),
--- party TERRA LOCKE EDGAR SABIN) and measures, live:
---   * what the room's reachable set is in the unarmed state (map-init
---     _cb2b0f -> _cb2bc9, event_main.asm:44714 region);
+-- probe_v07_385.lua -- the basement 2 timed-floor instrument.  Not a suite
+-- test.  Boots v07q_385_entry.mss (map 385 (1,2), party TERRA LOCKE EDGAR
+-- SABIN) and measures, live:
+--   * what the room's reachable set is in the unarmed state;
 --   * which arming trigger the entry tile can reach ((3,2)/(10,2) arm
---     cycle A via _cb2aca/_cb2ae8 :44634/:44646; (11,3)/(13,11) arm cycle
---     B via _cb2c6e/_cb2c8c :44746/:44758);
+--     cycle A; (11,3)/(13,11) arm cycle B);
 --   * how the live tilemap differs between phase $01F5 and phase $01F6,
 --     and whether a path to the (13,13) exit exists in either;
 --   * whether a safe path exists that never steps on a hurt trigger
---     (_cb2dbb tiles hurt while $01F5, _cb2dd2 while $01F6, (15,10)
---     always; event_trigger.asm:1844-1885).
+--     (tiles hurt while $01F5, some while $01F6, (15,10) always).
 -- Everything is a dump; it never tries to cross.
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- Issue #75: playBattles = "flee" keeps this walk out of the library's
--- monster-dead flag write, and here it is not a no-op: this Magitek Research
--- Facility basement draws random battles (map_prop.dat byte +5 bit 7 set).
--- "flee" is the spelling every gen_mrf_* generator already uses on these
--- floors: the instrument is measuring a floor mechanism, not a fight.
+-- playBattles = "flee": this Magitek Research Facility basement draws
+-- random battles.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

@@ -18,9 +18,6 @@ data, and the file/offset that proves it.
 
 Nothing here writes.  It is a read-only linter.  Exit status 0 = clean.
 
-Wired into `make test` (Makefile's test target, alongside the compose.py and
-sram_checkpoint.py selftests) as of the issue #23 pass that emptied WAIVERS.
-
 Usage:  python3 tools/check_boss_rows.py [--repo ROOT] [-v]
 """
 
@@ -241,9 +238,7 @@ class Data:
 # doc side: species resolution
 #
 # Rows that carry an id inline (`$003A`, `($10D)`) resolve themselves.  The
-# rest are resolved from this table, keyed by (section key, row label).  A row
-# that resolves to nothing is reported as a failure rather than skipped, which
-# is why this table exists.
+# rest are resolved from this table, keyed by (section key, row label).
 
 RESOLVE = {
     # boss section -> {row label (lowercased, trimmed) -> species id}
@@ -299,23 +294,13 @@ ULTROS_ROW_CLASSES = CLASS_BIT["slash"] | CLASS_BIT["pierce"]
 
 # --------------------------------------------------------------------------
 # Acknowledged open decisions: (species, "ELEMENT"|"CLASS"|"SHIELDS") ->
-# reason.  A waived mismatch is still printed in full in its own section.  It
-# does not fail the run, so this script can join `make test` without being
-# permanently red.  Every entry names the doc block that discusses it; delete
-# the entry when the decision lands either way.
-#
-# Waiving is never done in bulk: it is per species and per axis, so an
-# unrelated drift on the same boss still fails.
+# reason.  A waived mismatch is still printed but does not fail the run.
+# Waiving is per species and per axis; an unrelated drift on the same boss
+# still fails.
 
 WAIVERS = {
-    # This table is empty.  Every row bosses-wob.md authors in prose is
-    # authored into Ot6ElemAddTbl, so nothing needs waiving.
-    #
-    # With no waivers left this script is a plain check, and it is registered in
-    # `make test` (the Makefile's test target, next to the compose/sram_checkpoint
-    # selftests) so doc-vs-data drift fails the suite from here.  Suite.sh's own
-    # discovery globs *.lua for a `-- @suite` marker and cannot see a .py file,
-    # which is why registration is a Makefile line rather than a marker.
+    # Empty: every row bosses-wob.md authors in prose is authored into
+    # Ot6ElemAddTbl.
 }
 
 

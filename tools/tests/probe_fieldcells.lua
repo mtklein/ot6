@@ -1,18 +1,15 @@
 -- probe_fieldcells.lua -- finds the cursor cells of the field Item windows
 -- by differencing memory across a single pad edge, rather than guessing
--- which direct-page byte holds the cursor.  Reads only; writes nothing
--- (issue #75).
+-- which direct-page byte holds the cursor.  Reads only; writes nothing.
 --
--- probe_fieldheal established the state chain off vargas_entry.mss:
---   $05 main menu (Item on row 0) -A-> $08 item list -A-> $19 -A-> $70,
--- and that an A in $70 consumed a Tonic (slot 0) and healed EDGAR +50, so
--- neither the item row nor the target row followed DP $4B, which stayed
--- 00 throughout.  gen_sabin_train's shop notes say MoveCursor's own
--- row cell is DP $4E; for these windows that is unverified.
+-- The state chain off vargas_entry.mss: $05 main menu (Item on row 0)
+-- -A-> $08 item list -A-> $19 -A-> $70.  Neither the item row nor the
+-- target row follows DP $4B, which stays 00 throughout.
 --
--- So snapshot direct page $00-$FF (plus the menu's $1D00-$1DFF scratch)
--- before and after one down press in each window, and print every byte that
--- moved.  The cell that counts 0,1,2 with the highlight is the cursor.
+-- Snapshots direct page $00-$FF (plus the menu's $1D00-$1DFF scratch)
+-- before and after one down press in each window, and prints every byte
+-- that moved.  The cell that counts 0,1,2 with the highlight is the
+-- cursor.
 --
 -- Run it directly:
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_fieldcells.lua

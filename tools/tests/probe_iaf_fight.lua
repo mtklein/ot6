@@ -1,5 +1,5 @@
--- probe_iaf_fight.lua -- INSTRUMENTATION (#132): is the IAF gauntlet survivable
--- at the routed levels (L15-17)? Drives from the deck fixture through the
+-- probe_iaf_fight.lua -- is the IAF gauntlet survivable at the routed
+-- levels (L15-17)? Drives from the deck fixture through the
 -- party-select, then FIGHTS the whole auto-chain (6x battle 126 -> Ultros4 ->
 -- AirForce) with the tactical driver until the FC loads (map 394 = survived) or
 -- a Game Over fires (loss). Reports each battle's formation and party HP.

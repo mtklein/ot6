@@ -1,9 +1,9 @@
 -- @suite savestate=kefka_entry
--- battle_kefka.lua -- the generated-savestate test for v0.3's stop-line boss:
--- the Battle for Narshe's KEFKA, fought for real from kefka_entry.mss
--- (party 1 = TERRA+EDGAR+CELES at (19,36), KEFKA one tile below;
--- gen_narshe_battle generates it, and suite.sh adds this test when the fixture
--- exists and reports `skip` when it does not, the battle_vargas pattern).
+-- battle_kefka.lua -- the generated-savestate test for the Battle for
+-- Narshe's KEFKA, fought for real from kefka_entry.mss (party 1 =
+-- TERRA+EDGAR+CELES at (19,36), KEFKA one tile below; gen_narshe_battle
+-- generates it, and suite.sh adds this test when the fixture exists and
+-- reports `skip` when it does not).
 --
 -- What it asserts:
 --   1. battle 57 seeds formation 505: KEFKA_NARSHE $014A alone, gauge
@@ -12,40 +12,25 @@
 --      formula.
 --   2. the element add is live.  His weak byte reads exactly $09 =
 --      fire|poison.  Vanilla KEFKA_NARSHE has no weakness, so the whole
---      byte comes from Ot6ElemAddTbl's row, and this assertion fails
---      if that row is dropped (battle_vargas checks poison|holy $28, one boss
---      later).
+--      byte comes from Ot6ElemAddTbl's row.
 --   3. class shields chip under real input.  The party's own weapon
 --      swings must remove two gauge points and reveal the class before
---      the fight ends.  Axis-by-axis coverage belongs to battle_class;
---      tying this story test to incidental party equipment and ATB order
---      made it brittle.
+--      the fight ends.
 --   4. the scripted win branch runs, on real damage.  The fight is played
 --      to its own end (if_b_switch $40 -> _ccbcb1): the party is not
 --      warped to the {25,5} lose-path save point and the win scene runs.
 --
--- Issue #75 conversion.  Three write idioms are gone:
---   * party HP := max and ATB := $1000 every frame, to keep the rotation
---     moving, replaced by gen_narshe_battle's input-driven fighter, the
---     code that beats this battle to generate the fixture: one
---     button per 30-frame pulse once the menu flag holds, a per-turn
---     sequence built live from the actor's id and banked BP (boost to
---     2-3 and dump; EDGAR's AutoCrossbow at tier 2+; CELES's Runic at
---     tier 3+, which absorbs KEFKA's Ice 2; Fight otherwise), and a
---     stall-recovery tail (A, A, B, rebuild).
---   * KEFKA MHP := 1 after two chips (the vargas clamp idiom).  The
---     fight now runs on real damage until his own script ends it.
---   * losses are handled the way the generator handles them: the
---     entry point is captured once at boot (a savestate blob in memory,
---     with no writes) and a lost attempt reloads it and escalates the
---     policy tier, for three attempts total.  That is the same ladder that
---     generated the fixture, so a fixture this test can boot is a fixture
---     this ladder can beat.
---
--- Fixture vintage note (2026-08-10): kefka_entry.mss is the July 30
--- generation, stamp-fresh against current sources, but generated before
--- the chain's own input-driven conversion reached this tier.  The
--- input-driven regeneration replaces the bytes, not this test.
+-- The fight is driven by gen_narshe_battle's input-driven fighter, the code
+-- that beats this battle to generate the fixture: one button per 30-frame
+-- pulse once the menu flag holds, a per-turn sequence built live from the
+-- actor's id and banked BP (boost to 2-3 and dump; EDGAR's AutoCrossbow at
+-- tier 2+; CELES's Runic at tier 3+, which absorbs KEFKA's Ice 2; Fight
+-- otherwise), and a stall-recovery tail (A, A, B, rebuild).  KEFKA runs on
+-- real damage until his own script ends the fight.  Losses are handled the
+-- way the generator handles them: the entry point is captured once at boot
+-- (a savestate blob in memory, with no writes) and a lost attempt reloads
+-- it and escalates the policy tier, for three attempts total.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/kefka_entry.mss.lua"
 
@@ -200,8 +185,6 @@ local function attempt(n)
         0, -1, false, 0, 0
       lostWhy = nil
     end),
-    -- activation: face down once, then a clean edge-A (a held direction
-    -- starves CheckNPCs; measured in probe_kefka_npc)
     H.hold({ "down" }), H.waitFrames(4), H.release(), H.waitFrames(8),
     H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
       H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
@@ -292,7 +275,6 @@ H.run({ maxFrames = 300000 }, {
   attempt(2),
   attempt(3),
 
-  -- the win verdict: chips happened, and the win branch ran
   H.call(function()
     H.assertEq(won, true,
       "KEFKA beaten within 3 attempts (real damage, real menus)")

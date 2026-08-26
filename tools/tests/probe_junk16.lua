@@ -1,10 +1,10 @@
--- probe_junk16.lua -- reproduction attempt for the owner's "junk over and
--- around the enemies" in a plain random battle (no dialogue, no boss, no
--- fly-in dependence): boot kolts_cave.mss (map 96, the Cirpius-x3 pool;
--- 93.75% of draws, hud lines measured at row 5-6 of the bg3 field map) and
--- fight it out with plain Fight commands.  probe_aurabolt measured that
--- ordinary attack animations (any with bg1 graphics, and every bg3-scripted
--- one) set $2105 = $59: battlefield BG3 in 16x16 tile mode for 15-70 frames
+-- probe_junk16.lua -- reproduction attempt for "junk over and around the
+-- enemies" in a plain random battle (no dialogue, no boss, no fly-in
+-- dependence): boot kolts_cave.mss (map 96, the Cirpius-x3 pool; 93.75% of
+-- draws, hud lines at row 5-6 of the bg3 field map) and fight it out with
+-- plain Fight commands.  Ordinary attack animations (any with bg1
+-- graphics, and every bg3-scripted one) set $2105 = $59: battlefield BG3
+-- in 16x16 tile mode for 15-70 frames
 -- while BG3 stays on the main screen and the under-enemy hud cells stay
 -- painted in the $5400 map with the priority attr bit set (attr $21).
 -- Vanilla's own junk fill ($01EE) is priority-clear and invisible behind

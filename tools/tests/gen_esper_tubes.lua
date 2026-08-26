@@ -1,90 +1,30 @@
--- gen_esper_tubes.lua -- v0.6 step 10, the step out of boundary C (#25):
--- cold battery Continue from the tracked n024-entry-save-v1 checkpoint
--- (the new #10 save point, map 273 {26,53}, slot 3), the boundary's entry
--- contract asserted first, two steps to the 024 entry point
--- -> battle 72 -> the {25,50} door -> map 274, the esper tube room ->
+-- gen_esper_tubes.lua -- cold battery Continue from the n024-entry-save-v1
+-- checkpoint (map 273 {26,53}, slot 3), two steps to the 024 entry point,
+-- battle 72, through the {25,50} door to map 274 (the esper tube room),
 -- parked at {10,10} facing UP, one UP-step-plus-A-hold from the Cid/Kefka
--- set piece.  Generates n024_won and esper_tubes_entry.
+-- set piece.  Generates n024_won.mss and esper_tubes_entry.mss.
 --
--- Generated from a checkpoint (savestate_graph.py:
--- checkpoint="n024-entry-save-v1" on both of this script's states, so one
--- script, one boot and two generated states; the second state cannot ride a
--- predecessor edge the boot never uses).  The step used to boot
--- n024_entry.mss; that state is still generated as B->C's terminal, and
--- the cold Continue replays its last two steps from the checkpoint instead
--- (the "C + 2 steps" hybrid; boundary C is lettered in
--- tools/tests/savestate_graph.py).
---
--- Battle 72 (_cc79ed, event_main.asm:95385) is `battle 72 / call _ca5ea9 /
--- hide_obj NPC_1 / sort_obj / switch $0649=0`, with no `if_b_switch` gate at
--- all, and $0649 going to 0 is the receipt (recon probe 5).  Measured
--- formation at the entry point: `010A FFFF FFFF FFFF FFFF FFFF`, Number 024
--- alone, as decoded.
---
--- The fight is played rather than write-cleared (issue #75).  NUMBER 024 is
--- the specimen guard (bosses-wob.md section 14): 7 shields, a rotating
--- elemental wall (WallChange), and the fixed chip classes are slashing and
--- piercing, which is the doc's own "handhold while the wall spins" and
--- what the library fighter uses: boosted Fights (slashing) and
--- EDGAR's AutoCrossbow (piercing).  The drive is H.newFightDriver
--- (tactical, boost bank, and real Item heals and revival, the configuration
--- that has beaten VARGAS, battle 70 and the brokendeath guard), after
--- the player's own prep (a named loadout and H.fieldCare), because the
--- July-cut checkpoint delivers the party hurt and LOCKE/CELES bare-handed
--- (the Vector remove_equip; measured on the sibling checkpoint-booted step,
--- and the equip audit names both).  gen_tunnelarmr's phase-spread retry
--- ladder wraps the engagement: battle 72 is an event battle, a loss is game
--- over, and the RNG seed is the game-time frame counter at battle init
--- (`lda $021e / asl2 / sta $be`, battle_main.asm:6174-6176), read back per
--- attempt so three attempts are checked to be three fights (#83).
---
--- The tube-room trigger is gated on facing and button state, and this is the
--- second place in v0.6 where that matters (the first was the Vector sneak
--- ledge; see gen_vector_sneak.lua for the $01B0-$01B7 decode).
---
---   ff6/src/event/event_trigger.asm:1216   make_event_trigger {10,9}, _cc7a60
---   ff6/src/event/event_main.asm:95456-95461
---       _cc7a60: if_any
---                        switch $01B0=0        ; NOT facing UP
---                        switch $01B4=0        ; A NOT held
---                        switch $0068=1        ; already done
---                        goto EventReturn
---
--- $01B0 and $01B4 are $1EB6 bits 0 and 4, "party is facing up" and "the
--- A button is down this frame", rewritten every event tick by
--- UpdateCtrlFlags (field/event.asm:5415-5433).  So the scene fires only
--- while the party stands on {10,9}, faces UP at the BIG_SWITCH NPC on
--- {10,8} (npc_prop.asm:12631) and holds A.  A navTo cannot do that: it
--- releases the pad between steps and never presses A on the open field
--- (ot6_field.lua:340-351).
+-- The tube-room trigger at {10,9} fires only while the party faces UP and
+-- holds A; navTo cannot do that (it releases the pad between steps and
+-- never holds A on the open field), so the entry point is banked one tile
+-- south at {10,10}, already facing UP.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
---   reads the marker line above and refuses, before the emulator boots and
---   naming both strings, any OT6_SRAM_CHECKPOINT whose manifest.json declares
---   a different persistent_layout.
---
--- The entry point is banked one tile south of the trigger, at {10,10} already
--- facing UP, rather than on {10,9} itself.  The reason was sampled in this
--- run and logged: standing on {10,9} with A released, hasControl() held
--- for only 68 of 90 frames and eventRunning() for 22.  _cc7a60 is
--- re-entered every frame the party stands there, takes its early
--- `goto EventReturn` because $01B4 is clear, and the event PC entering
--- bank $CA makes hasControl() flicker continuously.  No settle predicate
--- can hold on that tile.  gen_zozo3_clock hit the same problem on the clock
--- tile and solved it the same way.
+-- ^ run.sh reads this marker and refuses, before boot, any
+--   OT6_SRAM_CHECKPOINT whose manifest declares a different
+--   persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
--- The retry ladder's spread and its collision check (issue #83): each
--- attempt is held until the game-time frame counter the battle seed is
--- made of reaches its own phase, and L.report() fails if two attempts
--- drew one seed, which would make this ladder one fight played twice.
+-- The retry ladder's spread and its collision check: each attempt is held
+-- until the game-time frame counter the battle seed is made of reaches
+-- its own phase, and L.report() fails if two attempts drew one seed,
+-- which would make this ladder one fight played twice.
 local L = H.newSeedLadder("battle 72")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
--- a bare step list cannot be spliced into a step list; H.cond with an
--- always-true predicate is the library's public way to wrap one into a step
+-- H.cond with an always-true predicate wraps a list into a single step
+-- (a bare list can't be spliced into a step list)
 local function seq(steps) return H.cond(function() return true end, steps) end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
@@ -131,12 +71,8 @@ local function partyReport(tag)
 end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
--- (a tapInto helper used to sit here, defined and never called, the same
--- unused battle toolkit gen_tunnelarmr's and gen_n024_entry's conversions
--- deleted from their own files; its only battle handling was the
--- battle-clear write)
 
--- ------------------ battle 72, played with real input (issue #75) --------
+-- ------------------ battle 72, played with real input --------------------
 local N024 = 0x010A
 local function eoff(m) return 8 + m * 2 end
 local function mshields(m) return H.readByte(0x3E38 + eoff(m)) end
@@ -146,12 +82,10 @@ local function mspecies(m) return H.readWord(0x57C0 + m * 2) end
 
 local fightBlob, fightWon = nil, false
 
--- One attempt, flat (driveUntil bodies replay latched state, so every
--- attempt builds fresh closures).  Attempt 1 runs in place, because the live
--- timeline is the blob's timeline; later attempts reload the entry point blob
--- and shift the RNG phase.  The outcome is decided on $0649: _cc79ed's
--- tail clears it after a win, while a loss rides the Annihilated screen
--- into game over and never touches it.
+-- One attempt, flat: driveUntil bodies replay latched state, so each
+-- attempt builds fresh closures.  Attempt 1 runs in place; later attempts
+-- reload the entry point blob and shift the RNG phase.  The outcome is
+-- decided on $0649: a win clears it, a loss never touches it.
 local function n024Attempt(n)
   local loadReq
   local NSLOT = nil
@@ -174,7 +108,7 @@ local function n024Attempt(n)
           "reloaded at the (25,52) entry point")
       end),
     }) or seq({}),
-    L.spread(n),                        -- spread the battle RNG phase (#83)
+    L.spread(n),                        -- spread the battle RNG phase
     -- A into NUMBER 024 -> battle 72.  Confirm the formation before
     -- fighting it: without the assert, a win over the wrong battle would
     -- look identical in the log.
@@ -194,8 +128,8 @@ local function n024Attempt(n)
         if mspecies(m) == N024 then NSLOT = m end   -- lowest slot wins
       end
       H.assertEq(NSLOT ~= nil, true, "a NUMBER 024 slot resolved")
-      -- no-staging control: the gauge seeds full from the authored table
-      -- (bosses-wob.md 14: 7 shields) rather than being pre-cleared
+      -- no-staging control: the gauge seeds full (7 shields) rather than
+      -- being pre-cleared
       H.assertEq(mshields(NSLOT), 7,
         "NUMBER 024 opens with his authored 7 shields")
       H.assertEq(mticks(NSLOT), 0, "NUMBER 024 is NOT pre-broken")
@@ -204,10 +138,9 @@ local function n024Attempt(n)
       H.screenshot("n024_battle")
     end),
     H.waitFrames(90),
-    -- the input-driven fight: the library fighter, gauges logged around it.
-    -- Its menu==0 branch pages battle text and the victory teardown, so
-    -- this one drive carries the battle to the field (or through the
-    -- Annihilated screen, on a loss).
+    -- the library fighter drives the fight; its menu==0 branch pages
+    -- battle text and the victory teardown, carrying the battle to the
+    -- field (or through the Annihilated screen, on a loss).
     H.driveUntil(function() return not H.battleLoadStarted() end, 90000, {
       H.call(function()
         hb = hb + 1
@@ -290,29 +223,25 @@ end
 
 
 H.run({ maxFrames = 300000 }, {
-  -- Cold battery boot (issue #25): title -> Continue -> the sole valid
-  -- slot (3) -> the new 273 save point, standing on the tile the checkpoint
-  -- was saved on.
+  -- Cold battery boot: title -> Continue -> the sole valid slot (3) -> the
+  -- 273 save point, standing on the tile the checkpoint was saved on.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
   H.waitFrames(300),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
-  -- Soft landing wait: a wrong-boundary checkpoint lands somewhere else, and
-  -- the failure should be the entry contract naming the wrong map rather than
-  -- a timeout here (checkpoint-fixtures.md, "fails loudly, naming what
-  -- differed").
+  -- Soft landing wait: a wrong-boundary checkpoint lands somewhere else,
+  -- and the failure should be the entry contract naming the wrong map
+  -- rather than a timeout here.
   H.waitUntilSoft(function()
     return map() == 273 and H.tileAligned() and bright() >= 15
   end, 3000, "landed_at_c"),
   H.waitFrames(60),
   H.call(function()
-    -- The entry contract (issue #25): declared once in lib/ot6_contract.lua
-    -- under "n024-entry-save-v1", the same table the step into C
-    -- (gen_n024_entry) and the checkpoint generator (gen_n024_save_checkpoint)
-    -- assert as their exit contract.  A stale or wrong checkpoint fails here
-    -- by naming what differed.
+    -- The entry contract: declared once in lib/ot6_contract.lua under
+    -- "n024-entry-save-v1".  A stale or wrong checkpoint fails here by
+    -- naming what differed.
     H.assertEntryContract("n024-entry-save-v1")
     H.log(partyReport("n024-entry-save-v1 entry"))
   end),
@@ -327,15 +256,9 @@ H.run({ maxFrames = 300000 }, {
     H.log(partyReport("024 entry point (walked from checkpoint C)"))
   end),
 
-  -- 1. the player's prep, all through real menus: the July-cut checkpoint
-  --    delivers LOCKE and CELES bare-handed and the party can arrive hurt
-  --    (both measured on the sibling checkpoint-booted steps), so re-equip
-  --    (Equip -> Optimum, a no-op for anyone armed) and top HP up from
-  --    the bag before the retry blob, so every attempt replays a
-  --    prepared party
-  -- The checkpoint normally already carries this exact set from battle 70;
-  -- spelling it out here keeps this cold-booted leg self-contained without
-  -- giving Optimum permission to reshuffle weapon classes.
+  -- 1. the player's prep: the checkpoint can deliver LOCKE and CELES
+  --    bare-handed and the party hurt, so re-equip and top HP up before
+  --    the retry blob, so every attempt replays a prepared party.
   H.equipLoadout(1, {
     { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
   }, { tag = "LOCKE Number-024 kit" }),
@@ -374,9 +297,8 @@ H.run({ maxFrames = 300000 }, {
   n024Attempt(1),
   n024Attempt(2),
   n024Attempt(3),
-  -- Before the verdict, not after: three attempts are evidence only if they
-  -- were three DIFFERENT fights, and if they were not, that is what this run
-  -- should report rather than "lost all three" (#83).
+  -- Before the verdict, not after: three attempts are evidence only if
+  -- they were three different fights.
   L.report(),
   H.call(function()
     H.assertEq(fightWon, true,
@@ -399,9 +321,9 @@ H.run({ maxFrames = 300000 }, {
     H.screenshot("n024_won")
   end),
   H.saveState("n024_won.mss"),
-  -- Reload-verified (gen_sabin_gau's pattern, a failure this program has hit
-  -- before): a calm capture does not imply a calm reload, so reload the parked
-  -- moment and require the consumer's boot to find it quiet.
+  -- Reload-verified: a calm capture does not imply a calm reload, so
+  -- reload the parked moment and require the consumer's boot to find it
+  -- quiet.
   (function()
     local saveReq, loadReq
     return seq({
@@ -446,17 +368,11 @@ H.run({ maxFrames = 300000 }, {
   -- 3. up to {10,10}, one step below the trigger tile.
   H.navTo(10, 10, { maxFrames = 12000, playBattles = "flee" }),
 
-  -- 3a. Why the entry point is not on {10,9}.  A first version of this step
-  --     tried to park on the trigger tile and timed out: the terminator
-  --     needs consecutive settled frames and settled() never held there.
-  --     This is measured below rather than assumed: step up onto {10,9} with
-  --     no A held and sample control for 90 frames.  The expected result,
-  --     which is the same problem gen_zozo3_clock hit on the clock tile, is
-  --     that _cc7a60 is re-entered every frame the party stands on it, takes
-  --     its early `goto EventReturn` because $01B4 is clear, and the event PC
-  --     entering bank $CA is enough to make eventRunning(), and with it
-  --     hasControl(), flicker continuously.  Then step back off and generate
-  --     from {10,10}, one UP-step-plus-A-hold from the scene.
+  -- 3a. Why the entry point is not on {10,9}: sample control while
+  --     standing on the trigger tile for 90 frames.  _cc7a60 re-enters
+  --     every frame the party stands there and takes its early exit, so
+  --     hasControl() flickers continuously and no settle predicate can
+  --     hold.  Then step back off and generate from {10,10}.
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(40),
   (function() local n, ctl, ev = 0, 0, 0
     return H.driveUntil(function() return n >= 90 end, 300, {
@@ -473,15 +389,10 @@ H.run({ maxFrames = 300000 }, {
       end),
     }, "sample control while standing on {10,9}")
   end)(),
-  -- Step back off, then approach {10,10} from below so the last step is an
-  -- UP step and the party is already facing UP when it lands.  A separate
-  -- "press up to turn" does not work here: this engine turns and moves in the
-  -- same frame when the destination is walkable (measured,
-  -- probe_vector_step: facing and pixel position both changed on frame 6
-  -- of a held press), and {10,9} is walkable, so a facing press here walks
-  -- back onto the trigger tile.  Every earlier face-an-NPC press
-  -- in this chain was safe only because an NPC object occupied the
-  -- destination and the step was refused.
+  -- Approach {10,10} from below so the last step is an UP step and the
+  -- party is already facing UP when it lands: this engine turns and moves
+  -- in the same frame when the destination is walkable, so a separate
+  -- "press up to turn" would walk back onto the trigger tile.
   H.navTo(10, 11, { maxFrames = 6000, playBattles = "flee" }),   -- back off the trigger tile
   H.navTo(10, 10, { maxFrames = 6000, playBattles = "flee" }),   -- back onto the entry point, facing UP
   (function() local calm = 0
@@ -546,11 +457,9 @@ H.run({ maxFrames = 300000 }, {
     })
   end)(),
 
-  -- 4. Verify, after the state is generated, that an A-hold fires
-  --    _cc7a60.  This is the assertion a plain navTo could not
-  --    satisfy, and it is why the entry point is a tile plus a facing
-  --    rather than just a tile: a fixture that only stands here shows
-  --    nothing.
+  -- 4. Verify that an A-hold fires _cc7a60: the entry point is a tile
+  --    plus a facing rather than just a tile, and a fixture that only
+  --    stands here shows nothing.
   (function() local n = 0
     return H.driveUntil(function()
       return H.fieldY() == 9 and n > 120 and (not H.hasControl() or sw(0x0068) == 1)

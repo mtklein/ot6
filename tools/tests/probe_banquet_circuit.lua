@@ -1,28 +1,22 @@
--- probe_banquet_circuit.lua -- I->J step development (issue #31): the ≥90
--- window circuit, driven from the staged banquet_window savestate
--- (probe_banquet_stage.lua) so iteration does not replay the world grind.
+-- probe_banquet_circuit.lua -- drives the banquet window circuit, from the
+-- staged banquet_window savestate.
 --
--- The drive is banquet-decode.md §5.2's circuit: talk to all 24 scoring
--- soldiers (banquet-decode §3 census) and win the four fights clean,
--- inside the 14400-frame timer.  Every soldier is a chaseTalk against its
--- object index (0x10 + npc_prop record position, extracted 2026-07-28;
--- eleven of the 24 wander), terminated on the soldier's own latch switch
--- or on $013C.  $013C means the dinner fired and the window expired; in
--- that case the probe fails and reports the var0/timer measurement, which
--- is the number missing from the banquet-decode §8 feasibility table.
+-- The drive talks to all 24 scoring soldiers and wins the four fights
+-- clean, inside the 14400-frame timer.  Every soldier is a chaseTalk
+-- against its object index (0x10 + npc_prop record position; eleven of
+-- the 24 wander), terminated on the soldier's own latch switch or on
+-- $013C.  $013C means the dinner fired and the window expired; in that
+-- case the probe fails and reports the var0/timer measurement.
 --
--- Per-fight asserts (§5.4): formation species at $3F46, clean-win
--- b-switches $1dd1 & $31 == 0, var0 delta +6.
+-- Per-fight asserts: formation species at $3F46, clean-win b-switches
+-- $1dd1 & $31 == 0, var0 delta +6.
 --
 -- Ends: var0==44 checkpoint, ride the expiry to the dinner table, stop on
--- the toast choice ($056F>=2), generate banquet_dinner.mss for the Q&A probe.
+-- the toast choice ($056F>=2), generate banquet_dinner.mss.
 --
---   tools/tests/run.sh tools/tests/probe_banquet_circuit.lua
--- Issue #75: playBattles = "flee" keeps these walks out of the library's
--- monster-dead flag write, and matches gen_banquet_done, the generator these
--- probes prototype.  Moot either way: maps 243, 244, 250, 251, 252 and 253
--- all have random encounters disabled (map_prop.dat byte +5 bit 7 clear;
--- ff6/src/field/battle.asm:333-347 returns before the roll).
+-- playBattles = "flee" avoids the library's monster-dead flag write.
+-- Maps 243, 244, 250, 251, 252, and 253 have random encounters disabled
+-- (map_prop.dat byte +5 bit 7 clear).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

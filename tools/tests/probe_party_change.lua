@@ -1,16 +1,13 @@
 -- probe_party_change.lua -- from the airship lounge (wob_lounge.mss),
--- talk to a roster character, answer "Change party members?" Yes, and
--- swap RELM out for MOG in the $26 swap UI (#133 Water Rondo prep).
--- Heavily instrumented: the previous sweep sat 20k frames with no
--- dialog, so log control/menu/dialog state while sweeping.
+-- talks to a roster character, answers "Change party members?" Yes, and
+-- swaps RELM out for MOG in the $26 swap UI.
 -- Saves wob_mog_party.mss.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function rd(a) return emu.read(a, emu.memType.snesMemory) end
 local function sw(bit) return (H.readByte(0x1E80 + (bit >> 3)) >> (bit & 7)) & 1 end
--- $26 is only meaningful while the menu program runs -- on the field it
--- idles at a stale value (measured 0x2F in the lounge).  The menu owns
--- input, so require control to be gone, no dialog, and the state range,
--- debounced a few frames so scene transitions don't misfire it.
+-- $26 is only meaningful while the menu program runs; it idles at a stale
+-- value on the field.  Live detection requires control gone, no dialog,
+-- and the state range, debounced a few frames.
 local menuStreak = 0
 local function menuState()
   local s = H.readByte(0x26)
@@ -67,11 +64,10 @@ H.run({ maxFrames = 40000 }, {
         end
         if t == 3000 or t == 12000 then H.screenshot("sweep" .. t) end
         if menuState() then
-          -- the "Change party?" menu opens with the group RESET (all
-          -- $FF), so all four seats get filled: TERRA, LOCKE, STRAGO,
-          -- MOG.  Cursor layout is not assumed: an explorer taps a
-          -- direction and rotates whenever the cursor signature
-          -- (idx+$4a) stops changing.
+          -- the "Change party?" menu opens with the group reset (all $FF),
+          -- filling all four seats: TERRA, LOCKE, STRAGO, MOG.  Cursor
+          -- layout is not assumed: it taps a direction and rotates
+          -- whenever the cursor signature (idx+$4a) stops changing.
           local WANT = { 0x0A, 0x00, 0x01, 0x07 }   -- Mog first
           local function grpCount()
             local n = 0
@@ -97,16 +93,12 @@ H.run({ maxFrames = 40000 }, {
           if sig ~= ex.lastSig then ex.lastSig = sig; ex.still = 0
           else ex.still = ex.still + 1 end
           local exDirs = { "up", "left", "right", "down" }
-          -- deterministic steering per party.asm MenuState_2d/_c371b9:
-          -- both reserve and group are 2-wide row-major (right/left +-1,
-          -- down/up +-2); DOWN enters the group only from the reserve's
-          -- right column ($4e==1), UP leaves it from the group's left
-          -- column.  It is a swap-pair UI: A in 2d picks slot 1, A in
-          -- 2e on a second cell swaps them (A on the same occupied cell
-          -- opens Status -- never do that).
-          -- SEEN on screen: the reserve is one horizontal row, the
-          -- group one 4-wide row below it.  right/left = +-1 within a
-          -- row; down enters the group, up leaves it.
+          -- reserve and group are 2-wide row-major (right/left +-1, down/up
+          -- +-2); DOWN enters the group only from the reserve's right
+          -- column ($4e==1), UP leaves it from the group's left column.
+          -- It is a swap-pair UI: A in state 2d picks slot 1, A in state 2e
+          -- on a second cell swaps them (A on the same occupied cell opens
+          -- Status).
           local function navTo(target)
             if ex.still > 90 then          -- wedged: jiggle out
               ex.di = ex.di % #exDirs + 1
@@ -115,14 +107,13 @@ H.run({ maxFrames = 40000 }, {
               return
             end
             local cur, ga = idx(), H.readByte(0x4a)
-            -- measured geometry: the reserve is an 8-wide 2-row grid
-            -- (left dies at idx8's col 0, right dies at idx7's col 7),
-            -- rows swap with up/down (+-8); the 4-wide group row sits
-            -- below row 1
+            -- the reserve is an 8-wide 2-row grid (left dies at idx8's col
+            -- 0, right dies at idx7's col 7); rows swap with up/down (+-8);
+            -- the 4-wide group row sits below row 1
             if ga == 0x10 and target < 0x10 then tap("up"); return end
             if ga == 0 and target >= 0x10 then tap("down"); return end
             if ga == 0x10 then
-              -- the group is the classic 2x2: $10 TL, $11 BL, $12 TR,
+              -- the group is a 2x2: $10 TL, $11 BL, $12 TR,
               -- $13 BR -- left/right swap columns (+-2), up/down rows
               local cc, cr = (cur - 0x10) >> 1, (cur - 0x10) & 1
               local tc, tr = (target - 0x10) >> 1, (target - 0x10) & 1
@@ -170,9 +161,8 @@ H.run({ maxFrames = 40000 }, {
               end
             end
           elseif s == 0x2e then
-            -- holding.  If WE didn't grab (a stray A from the dialog
-            -- ride picked someone up -- observed holding Relm at menu
-            -- open), or the hold has dragged on, cancel with B.
+            -- holding: if we didn't grab it (a stray A picked someone up),
+            -- or the hold has dragged on, cancel with B.
             ex.holdT = (ex.holdT or 0) + 1
             if held == nil or ex.holdT > 900 then
               tapB("b")
@@ -195,10 +185,9 @@ H.run({ maxFrames = 40000 }, {
           return
         end
         if not H.hasControl() then H.setPad({}); return end
-        -- anchor near the room center (50,55); a face-tap can step, so
-        -- drifting is expected -- walk back whenever >3 tiles out.  The
-        -- roster NPCs wander; face-pressing all four ways from the
-        -- center reaches whoever wanders adjacent.
+        -- anchor near the room center (50,55), walking back whenever >3
+        -- tiles out.  The roster NPCs wander; face-pressing all four ways
+        -- from the center reaches whoever wanders adjacent.
         local dx, dy = 50 - H.fieldX(), 55 - H.fieldY()
         if math.abs(dx) + math.abs(dy) > 3 then
           local d = math.abs(dx) >= math.abs(dy)

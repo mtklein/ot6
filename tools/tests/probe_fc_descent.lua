@@ -1,12 +1,11 @@
--- probe_fc_descent.lua -- #132 segment 2: cross the Floating Continent
--- (map 394) from the IAF landing to the encounter-free save alcove
--- (358).  Boots fc_land.mss.  The descent is a chain of mod_bg_tiles
--- stair-reveal triggers, driven empirically: step the nearest reachable
--- un-visited trigger, let it reveal, re-scan.  AVOIDED: (70,29) (the
--- "return to the airship?" choice -- the Shadow-posing detour, a later
--- probe) and (60,11) (the AtmaWeapon approach).  Fights: tactical (the
--- 177-188 pool permits pincers; Behemoth/Dragon are real fights).
--- Saves fc_alcove.mss on 358.
+-- probe_fc_descent.lua -- crosses the Floating Continent (map 394) from
+-- the IAF landing to the encounter-free save alcove (358).  Boots
+-- fc_land.mss.  The descent is a chain of mod_bg_tiles stair-reveal
+-- triggers, driven empirically: step the nearest reachable un-visited
+-- trigger, let it reveal, re-scan.  AVOIDED: (60,11) (the AtmaWeapon
+-- approach).  Fights: tactical (the 177-188 pool permits pincers;
+-- Behemoth/Dragon are real fights).  Saves fc_shadow.mss on recruiting
+-- Shadow.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x3ff) == m end
 local function flatten(t)
@@ -52,8 +51,7 @@ local function deckPhase(r)
       H.call(function()
         t2 = t2 + 1
         -- "Find the FC" reruns the 3-char party select before the
-        -- $00A0 re-entry branch: drive it (probe_iaf_fight3's learned-
-        -- button builder, condensed)
+        -- $00A0 re-entry branch
         local ms = H.readByte(0x26)
         if not H.hasControl() and ms >= 0x2c and ms <= 0x2f then
           pcPhase = (pcPhase + 1) % 9
@@ -120,7 +118,7 @@ local function deckPhase(r)
         if H.dialogWaiting() then H.setPad(t2 % 16 < 4 and { "a" } or {}); return end
         if not H.hasControl() then H.setPad({}); return end
         -- the wheel gate needs RIGHT+A held ON (14,6); anywhere else,
-        -- walk there (blind holds are what wandered us into the ship)
+        -- walk there
         if H.fieldX() == 14 and H.fieldY() == 6 then
           H.setPad({ right = true, a = true })
         else
@@ -134,8 +132,8 @@ local function deckPhase(r)
     }, "re-enter the FC r" .. r),
     H.waitFrames(90),
     -- Shadow stands at (10,16); (10,17) is not walkable -- approach
-    -- from whichever adjacent tile paths, face him, tap A (the Mog-take
-    -- pattern: face-taps can step, so re-aim each cycle)
+    -- from whichever adjacent tile paths, face him, tap A (face-taps
+    -- can step, so re-aim each cycle)
     (function()
       local t3 = 0
       local cands = { {10,17,"up"}, {9,16,"right"}, {11,16,"left"}, {10,15,"down"} }
@@ -182,7 +180,7 @@ local function round(r)
   local tile = nil
   return H.cond(function() return mapIs(394) and not banked end, flatten({
     -- care between legs: the pool's Behemoths/Dragons are long fights
-    -- and a wounded party entering the next one dies (measured r7)
+    -- and a wounded party entering the next one dies
     H.cond(function()
       if not mapIs(394) then return false end
       for _, c in ipairs(H.partyMembers()) do
@@ -210,8 +208,8 @@ local function round(r)
         H.log(string.format("[fc r%d] trigger (%d,%d) dist=%d", r,
           best[1], best[2], bd))
       else
-        -- bfs-blind reveal (z-stairs, the session's recurring blind
-        -- spot): burst-walk toward the nearest un-visited trigger
+        -- bfs-blind reveal (z-stairs): burst-walk toward the nearest
+        -- un-visited trigger
         local cands = {}
         for _, c in ipairs(TRIGGERS) do
           local gated = (key(c) == "90,43") and not shadowIn

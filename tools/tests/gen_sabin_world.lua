@@ -5,7 +5,7 @@
 --                    controllable frame of the scenario
 --   sabin_camp.mss   map 117 (IMPERIAL CAMP) just inside the north gate,
 --                    SABIN + SHADOW, controllable
---
+
 -- Why two states, and why this step is its own file.  The Sabin arc is ~15
 -- maps and a single generator for it would be tens of thousands of frames
 -- long: every
@@ -13,6 +13,10 @@
 -- camp first.  So the arc is cut at the points where the game itself hands
 -- control back on a fresh map, and each cut is a link in the generated chain.
 --
+-- Every battle on this route is fled (hold L+R): no win, so the leave roll
+-- (which only fires on a win) never runs, and this generator makes no
+-- state writes.
+
 -- The route, read off the event script (ff6/src/event/event_main.asm):
 --   hub obj 17 SABIN  $032a -> _cb0a1c            (:39463)
 --     ... dlg $01B1, fade, `party_chars SABIN`,
@@ -33,7 +37,7 @@
 --   world (179,71) -> event trigger _cb0bb7 (event_trigger.asm:30, :39715)
 --     -> `load_map 117, {36,2}, DOWN` and the camp startup event _cb0bc4
 --        re-creates SABIN (+ SHADOW if $02F3) and walks the party DOWN 1.
---
+
 -- The name menu is neither a dialog nor a field menu.  `name_menu` is event
 -- command $98 (ff6/src/field/event.asm:3600), which stores #$01 to $0200 and
 -- calls OpenMenu; OpenMenu ends in `jsl OpenMenu_ext` (field/menu.asm:322),
@@ -44,30 +48,7 @@
 -- plain advanceStory() sits there holding a neutral pad until its budget
 -- runs out.  The menu is dismissed with START (name_change.asm:85, "jump if
 -- start button is pressed").
---
--- Measured, run 1 of this file, at the moment SHADOW's menu was up:
---     $0200=1  $0059=1  $0084=0  $0026=$5F  $0027=$5F  $00BA=0  $00D3=0
--- $0200 is event command $98's own marker ("#$01 = name change menu"), and
--- $0059 is the field's menu-open gate, the same byte hasControl() already
--- watches.  $0026/$0027 are the menu module's zMenuState/zNextMenuState
--- (menu/menu_ram.inc:112-113, direct-page $26 by the ram_byte running
--- offset), and $5F is exactly the state MenuState_5d parks in after its
--- fade ("lda #$5f / sta zNextMenuState", name_change.asm:60-61).  So the
--- detector is $0200 == 1 AND $0059 ~= 0: $0200 alone goes stale after the
--- menu closes, and $0059 alone is true of any menu.  CYAN (:61204) and GAU
--- (:66618) hit the same menu later in the arc.
---
--- Issue #75: no state writes.  This step's only battles are random
--- encounters on the two overworld walks (the hub, the house and the camp
--- have none), and every one of them is fled with a held L+R, the engine's own
--- run mechanic (worldNavTo's playBattles="flee", and the same hold in the step
--- driver's own battle branch).  Fleeing is chosen over fighting on
--- purpose: WoB overworld encounters are runnable, a fled battle earns no win,
--- and SHADOW's 1/16 post-battle leave roll (battle_main.asm:11976) runs
--- only at a win, so from the moment he joins mid-step this route never
--- rolls it.  The field walks pass playBattles=true as well; their maps
--- have no encounter pools, so the flag documents intent rather than changing
--- behavior.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/scenario_hub.mss.lua"
 
@@ -412,7 +393,7 @@ H.run({ maxFrames = 90000 }, {
   -- (165,36); the party lands at (164,35), one tile west
   -- of the door, so the table's DestPos is not the whole story and the
   -- route uses the measurement rather than the record.
-  --
+
   -- The waypoint at (161,36) is required.  It is the
   -- landing tile from step 1, so it is known passable, and it lies west of
   -- the door: from there every shortest path to the camp runs south-east,

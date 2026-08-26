@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
 """Read the party out of a Mesen savestate, with no emulator.
 
-Shared by tools/audit_equipment.py and tools/audit_party_hp.py.  It started
-inside audit_equipment.py; the second reader of the same table is what moved
-it here, because the part that is easy to get wrong is locating the character
-block, and two copies of that would drift.
-
 A .mss is a short header then zlib streams; the biggest one carries WRAM.
 The character table ($1600, 16 records of 37 bytes) is located by its own
-shape rather than by a hardcoded offset, which would break the first time
-Mesen changed its state layout.  Then, per record (offsets confirmed in
-`ff6/notes/field-ram.txt:885-923` and again in code, tabulated in
-`docs/research/field-care-menu.md` section 4):
+shape rather than a hardcoded offset. Per record:
 
     +$00 actor index      +$08 level          +$09 current HP (word)
     +$0B boost|max HP     +$0D current MP     +$0F boost|max MP
@@ -20,10 +12,6 @@ Mesen changed its state layout.  Then, per record (offsets confirmed in
 Party membership is $1850 + c, low three bits (the party number, 0 = not in
 one); bit $40 is the enabled flag and bits 3-4 the battle order.  The
 currently active party number is $1A6D.
-
-Reading the whole tree costs about a second, against a `make savestates`
-measured in hours, which is what makes the audits cheap enough to be
-unconditional in `make test`.
 """
 
 from __future__ import annotations
@@ -43,21 +31,18 @@ CUR_PARTY = 0x1A6D           # WRAM address of the active party number
 REC = 37                     # bytes per character record
 WEAPON = 0x1F                # offset of the equipped weapon within a record
 EMPTY = 0xFF
-# Where the shape-signature resolves to in every fixture that has one.  Used
-# only as a cross-checked fallback for the early fixtures that do not.
+# Fixed offset the shape-signature resolves to; used as a fallback when the
+# signature does not match.
 FALLBACK_CB = 0x1844
 
-# Status 1 is `weicmpzd` (field-ram.txt:901-909): wound, petrify, imp, clear,
-# magitek, poison, zombie, dark.
+# Status 1 is `weicmpzd`: wound, petrify, imp, clear, magitek, poison,
+# zombie, dark.
 ST1_WOUND = 0x80
 ST1_PETRIFY = 0x40
 ST1_POISON = 0x04
 ST1_ZOMBIE = 0x02
-# The mask the game itself applies when it asks whether a character can be
-# healed (CheckCanUseItem, `item.asm:2249-2258`) or picked for Skills
-# (CheckSkillValid, `field_menu.asm:722-731`).  Poison is deliberately not
-# in it: the menu serves a poisoned character quite happily, and that is a
-# different question from whether a fixture may ship one.
+# The mask the game applies for "can be healed" / "pickable for Skills";
+# poison is deliberately excluded.
 ST1_OUT = ST1_WOUND | ST1_PETRIFY | ST1_ZOMBIE
 
 NAMES = {0: "TERRA", 1: "LOCKE", 2: "CYAN", 3: "SHADOW", 4: "EDGAR",
@@ -68,30 +53,8 @@ NAMES = {0: "TERRA", 1: "LOCKE", 2: "CYAN", 3: "SHADOW", 4: "EDGAR",
 def declared_states(repo: str) -> set[str]:
     """The fixture names this tree's savestate graph still declares.
 
-    Both audits glob `build/states/*.mss`, and that directory outlives the
-    graph: renaming a state writes the new name and leaves the old .mss
-    sitting there, because nothing ever deletes one.  On 2026-08-12
-    build/states held 98 fixtures of which 19 were leftovers -- the whole
-    `*_doorstep` -> `*_entry` rename (1e54ef8), plus mines_chase ->
-    moogle_entry, narshe_escape_start -> narshe_streets, the dev_* scratch
-    states and _scratch_vargas_p2.
-
-    That is not tidiness.  One of those leftovers, kefka_doorstep, was a
-    pre-rename copy of kefka_entry taken before gen_narshe_battle got its
-    care stop (b31ca37), and it carried CELES dead at 0/217.  So the party-hp
-    audit named a casualty that no generator produces, that no regeneration
-    can clear, and that no edit to any generator can fix -- and it was worked
-    as a live route bug.  An orphan cannot be repaired, only deleted, so the
-    audits have to be able to tell one apart from a fixture.
-
-    `tools/tests/savestate_graph.py` is the single list `make savestates`
-    builds from, which makes it the answer to "is this file still a fixture".
-    Reading it is milliseconds and needs no build.ninja and no emulator,
-    which matters because `make test` runs both audits without either.
-
-    Returns an empty set if the graph cannot be read at all; callers treat
-    that as "cannot tell" and fall back to auditing every file, which is the
-    behaviour from before this existed.
+    Returns an empty set if the graph cannot be read; callers then fall
+    back to auditing every file.
     """
     path = os.path.join(repo, GRAPH)
     try:
@@ -104,12 +67,8 @@ def declared_states(repo: str) -> set[str]:
 
 
 def split_orphans(files: list[str], declared: set[str]):
-    """Partition globbed fixtures into (live, orphan stems).
-
-    With an unreadable graph (`declared` empty) everything is live and
-    nothing is an orphan, so a caller that cannot read the graph audits the
-    whole directory exactly as it used to.
-    """
+    """Partition globbed fixtures into (live, orphan stems); with an empty
+    `declared`, everything counts as live."""
     if not declared:
         return list(files), []
     live = [p for p in files if stem_of(p) in declared]
@@ -120,10 +79,8 @@ def split_orphans(files: list[str], declared: set[str]):
 def load_waivers(repo: str, path: str) -> dict[tuple[str, str], str]:
     """(fixture, character) pairs where the story is what put them there.
 
-    A burn-down list, like the state-write list: a line that matches nothing
-    is an error, so a fixture that gets fixed upstream cannot keep a stale
-    exemption.  Format is three tab-separated columns, fixture / CHARACTER /
-    reason; `#` comments and blank lines are ignored.
+    Format: three tab-separated columns, fixture / CHARACTER / reason;
+    `#` comments and blank lines are ignored.
     """
     out = {}
     try:
@@ -143,15 +100,7 @@ def load_waivers(repo: str, path: str) -> dict[tuple[str, str], str]:
 def calc_max(word: int, cap: int) -> int:
     """Unpack a `bbnnnnnn nnnnnnnn` max-HP/MP word the way the menu does.
 
-    CalcMaxHPMP (`menu_common.asm:2377-2400`) is a four-entry jump table whose
-    arms fall through each other, so the percentages are not in table order:
-    code 1 is +25%, code 2 is +50%, code 3 is +12.5%.  ValidateMaxHP clamps
-    to 9999 and ValidateMaxMP to 999 (`menu_common.asm:2424-2447`).
-
-    Every World of Balance record dumped so far reads a bare base with no
-    boost bits set (measured across all 98 fixtures in the tree, 2026-08-11),
-    so this is latent today; it is here so the first boosted fixture does not
-    silently report a max that the menu never draws.
+    Code 0 is +0%, code 1 +25%, code 2 +50%, code 3 +12.5%.
     """
     base, code = word & 0x3FFF, word >> 14
     add = (0, base // 4, base // 2, base // 8)[code]
@@ -177,38 +126,19 @@ def biggest_stream(path: str) -> bytes | None:
 
 
 def find_char_block(raw: bytes, allow_fallback: bool = True) -> int | None:
-    """Offset of $1600 inside the blob, located by the table's own shape.
-
-    Records 0..10 carry actor ids whose low nibble is the record index; the
-    high nibble is join state (a fixture mid-chain reads 00 01 12 13 04 15
-    ..., which is why an equality test on the whole byte finds nothing).
-
-    The run length varies: the earliest fixtures (power-on, the first
-    battle, Arvis's house) have not filled the whole table yet, so an
-    eleven-record signature finds nothing there.  Try the longest run first,
-    since it is the least ambiguous, and shorten it only until one candidate
-    survives.  Stop at six: below that the signature starts matching
-    ordinary counting data elsewhere in WRAM, and a wrong offset would
-    report wrong results, which is worse than reporting nothing.
-
-    `allow_fallback` is the fixed-offset guess below, and it is a fact about
-    Mesen's WRAM dump.  A 32 KiB SRAM checkpoint is long enough to reach that
-    offset and would take the guess without meaning it, so read_party_sram
-    passes False: a checkpoint either matches the signature or reports
-    nothing.  Every checkpoint in the tree matches it at length 11, the
-    least ambiguous the signature gets.
+    """Offset of $1600 inside the blob, located by the table's own shape:
+    records 0..10 carry actor ids whose low nibble is the record index,
+    matched with a run of 8 to 11 consecutive records. `allow_fallback`
+    (off for checkpoints) permits a fixed-offset guess when no run is found.
     """
     for n in range(11, 7, -1):
         hits = [b for b in range(0, len(raw) - REC * n)
                 if all((raw[b + REC * c] & 0x0F) == c for c in range(n))]
         if len(hits) == 1:
             return hits[0]
-    # Early fixtures have no such run: at power-on only TERRA exists and
-    # the rest of the table is $FF, so there is no sequence to match.  The
-    # dump is a fixed 348964 bytes with a fixed layout, so fall back to the
-    # offset the signature resolves to everywhere it does work, and check
-    # it here rather than trusting it: record 0 must be actor 0, and
-    # somebody must be in the party.
+    # Early fixtures have no matching run; fall back to the fixed offset and
+    # sanity-check it: record 0 must be actor 0, and somebody must be in
+    # the party.
     if allow_fallback and len(raw) > FALLBACK_CB + REC * 16 + 0x300:
         cb = FALLBACK_CB
         party = cb + (PARTY - CHAR_BLOCK)
@@ -218,15 +148,7 @@ def find_char_block(raw: bytes, allow_fallback: bool = True) -> int | None:
 
 
 def read_party(path: str):
-    """Everybody assigned to a party in one fixture, or (None, reason).
-
-    "Assigned to a party" is `$1850 + c` low three bits nonzero, which during
-    the three-scenario split is true of all three parties at once, not only
-    the one the player is steering.  That is deliberate in both audits: a
-    character the story will hand back to the player in ten minutes is
-    shipping in this fixture just as much as the one on screen.  `active`
-    says which of them the player is holding right now ($1A6D).
-    """
+    """Everybody assigned to a party in one fixture, or (None, reason)."""
     raw = biggest_stream(path)
     if raw is None:
         return None, "no zlib stream"
@@ -237,12 +159,7 @@ def read_party(path: str):
 
 
 def party_at(raw: bytes, cb: int) -> list[dict]:
-    """The party records, given the blob and where the table starts.
-
-    Split out of read_party when the checkpoint reader arrived: the two
-    differ only in how they get `raw` and `cb`, and the part worth having
-    exactly one copy of is the record layout.
-    """
+    """The party records, given the blob and where the table starts."""
     party_off = cb + (PARTY - CHAR_BLOCK)
     cur = raw[cb + (CUR_PARTY - CHAR_BLOCK)]
     out = []
@@ -273,25 +190,7 @@ def party_at(raw: bytes, cb: int) -> list[dict]:
 def read_party_sram(path: str):
     """Everybody in the party inside a tracked SRAM checkpoint.
 
-    The checkpoints under tools/tests/checkpoints/ are the OTHER thing a
-    generator can boot from: five states cold-Continue out of one instead of
-    resuming a predecessor's .mss, so a casualty in a checkpoint is inherited
-    by every state below it exactly the way a casualty in a fixture is.  The
-    fixture audit could not see them, because a checkpoint is a 32 KiB
-    battery image and not a savestate, and that blind spot is where four of
-    them were sitting: gate-cave-save-v1 with TERRA dead, and
-    n024-entry-save-v1, narshe-mission-v1 and terra-returned-v1 each with
-    EDGAR and SABIN dead.
-
-    The save slot mirrors the $1600 character table record-for-record, so the
-    same shape signature that locates it in a WRAM dump locates it here, and
-    the same record layout reads it.  Cross-checked against an independent
-    measurement: the table resolves at 0x1400 in every checkpoint in the
-    tree, and the four records it reads out of n024-entry-save-v1 (LOCKE
-    353/353 88/98, EDGAR 0/398 81/107, SABIN 0/407 78/104, CELES 349/349
-    106/106) are the same four the emulator logged from live WRAM after
-    booting it.
-
+    The save slot mirrors the $1600 character table record-for-record.
     Returns (records, None) or (None, reason).
     """
     try:
@@ -306,12 +205,7 @@ def read_party_sram(path: str):
 
 
 def checkpoint_payloads(repo: str) -> list[tuple[str, str]]:
-    """(checkpoint name, payload path) for every tracked SRAM checkpoint.
-
-    Read off each manifest.json rather than globbing *.sram, so a directory
-    whose manifest names a payload that is not there is skipped here and
-    fails in sram_checkpoint.load, which is the code that owns that error.
-    """
+    """(checkpoint name, payload path) for every tracked SRAM checkpoint."""
     out = []
     pattern = os.path.join(repo, CHECKPOINTS, "*", "manifest.json")
     for mf in sorted(glob.glob(pattern)):

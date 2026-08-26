@@ -1,11 +1,11 @@
 -- probe_massacre_climb.lua -- boot ultros-won-v1 and ASCEND from the save
--- point 375 (8,44) to the massacre trigger 375 (15,17) via the measured
+-- point 375 (8,44) to the massacre trigger 375 (15,17) via the
 -- $0097-shortcut + warp route:
 --   save comp10 --(11,51) $0097 shortcut: retile+teleport--> 375 (39,51) comp8
 --   comp8       --(45,41)--> 372 (51,17) comp22
 --   372 (40,19) --> 375 (16,9) comp2 (massacre pocket)
 --   walk (15,17) --> the massacre chain ($0099=1 / town 341)
--- Issue #127 O->P.  No @suite.
+-- No @suite.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end

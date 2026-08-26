@@ -1,20 +1,11 @@
--- probe_rows.lua -- drive the real Order screen and flip TERRA and EDGAR into
--- the back row, off a live fixture.  Reads and pad presses only (issue #75).
+-- probe_rows.lua -- drives the real Order screen and flips TERRA and EDGAR
+-- into the back row, off a live fixture.  Reads and pad presses only.
 --
--- The owner's note, 2026-08-09: "a lot of ranged attackers can just sit in
--- the back row forever at no cost."  In this ROM the gap is wider:
 -- ExecCmd sets $B3 = $FF for every command and only the weapon swing
 -- clears the "ignore attacker row" bit, so Tools, Magic, Blitz, SwdTech,
--- Throw and Steal are all row-exempt (battle_main.asm:3131-3133, :7127-7133;
--- docs/research/row-menu.md).  EDGAR fights with Tools and TERRA with Magic,
--- so the back row costs them nothing and halves the physical damage they
--- take.  LOCKE's only damage is Fight, so he stays in front.
---
--- This is the check the research asked for: log $26 and the row bit
--- across a toggle and compare it against the documented path.
---
--- Run it directly:
---   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_rows.lua
+-- Throw and Steal are all row-exempt.  EDGAR fights with Tools and TERRA
+-- with Magic, so the back row costs them nothing and halves the physical
+-- damage they take.  LOCKE's only damage is Fight, so he stays in front.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_entry.mss.lua"
 
@@ -47,7 +38,7 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(H.hasControl() and H.tileAligned(), true,
       "the menu is closed and the party has control back")
     -- the party membership is unchanged: a mis-aimed second A would have
-    -- reordered it instead of flipping a row (field_menu.asm:1859-1870)
+    -- reordered it instead of flipping a row
     H.assertEq((H.readByte(0x1850) & 0x07) ~= 0, true, "TERRA still in party")
     H.assertEq((H.readByte(0x1851) & 0x07) ~= 0, true, "LOCKE still in party")
     H.assertEq((H.readByte(0x1854) & 0x07) ~= 0, true, "EDGAR still in party")

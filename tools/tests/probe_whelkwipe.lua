@@ -1,19 +1,13 @@
 -- probe_whelkwipe.lua -- frame-by-frame capture of the whelk head's
 -- hide/show transition (monster entry/exit FADE_DOWN/FADE_UP wipes).
 --
--- The measurement instrument behind the whelk-wipe bug hunt: drive the
--- whelk fight passively (Heal Force every turn, whelkbal's settle
--- discipline), trip an exec callback on DoMonsterEntryExit (vanilla
--- C2/E668, byte-identical on base and ot6 images), then screenshot every
--- frame of the transition while diffing the battle-field BG3 tilemap
--- (vram words $5400-$57ff) and the small-font tile region (vram words
--- $5800-$5fff) against pre-transition shadows.  Two transitions are
--- captured: the first FADE_DOWN (head hides) and the following FADE_UP
--- (head returns).
---
--- Run against build/ot6.sfc as-is (TAG "wo"); for the base-ROM ground
--- truth sed TAG to "wb" and point the runner at
--- build/states/base_rom_for_comparison.sfc.
+-- Drives the whelk fight passively (Heal Force every turn), trips an exec
+-- callback on DoMonsterEntryExit (vanilla C2/E668, byte-identical on base
+-- and ot6 images), then screenshots every frame of the transition while
+-- diffing the battle-field BG3 tilemap (vram words $5400-$57ff) and the
+-- small-font tile region (vram words $5800-$5fff) against pre-transition
+-- shadows.  Two transitions are captured: the first FADE_DOWN (head hides)
+-- and the following FADE_UP (head returns).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TAG = "wo"
@@ -22,10 +16,10 @@ local BURST = 150                  -- frames captured per transition
 local SHOT_EVERY = 1               -- screenshot cadence inside a burst
 
 -- ------------------------------------------------------------ trip wire --
--- DoMonsterEntryExit entry point (vanilla bank-C2 code, verified
--- byte-identical in both images).  Fires once per entry/exit animation.
--- Registered after the savestate load (the ordering is historical; loads do
--- not detach memory callbacks, and nothing in Mesen's load path clears them).
+-- DoMonsterEntryExit entry point (vanilla bank-C2 code, byte-identical in
+-- both images).  Fires once per entry/exit animation.  Registered after
+-- the savestate load: loads do not detach memory callbacks, and nothing
+-- in Mesen's load path clears them.
 local TRIP_PC = 0xC2E668
 local trips = {}                   -- { {frame=, type=, mask=}, ... }
 local tripped = false
@@ -96,9 +90,9 @@ local function diffFont(label, cap)
 end
 
 -- ------------------------------------------------------- passive driver --
--- whelkbal's menu-episode machine, pinned to the Heal Force sequence
--- (self-target heal: never hits the head or shell, so the only
--- transitions are the shell's own timer cycle).
+-- menu-episode machine, pinned to the Heal Force sequence (self-target
+-- heal: never hits the head or shell, so the only transitions are the
+-- shell's own timer cycle).
 local MENU = 0x7bca
 local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
 local function policyPulse()
@@ -174,8 +168,8 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-  -- walk into the whelk trigger (battle_dlgmenu's entry point walk; the
-  -- route is one step, so any battle that comes up is the whelk)
+  -- walk into the whelk trigger: the route is one step, so any battle
+  -- that comes up is the whelk
   H.driveUntil(function()
     return H.battleLoadStarted() and H.monstersPresent() > 0
   end, 2600, {

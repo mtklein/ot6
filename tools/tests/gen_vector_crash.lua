@@ -1,59 +1,6 @@
--- gen_vector_crash.lua -- v0.7 step H->I (issue #31), and the generator
--- that cuts battery checkpoint I, `vector-crash-v1`.
---
--- The step: cold-Continue the tracked `gate-cave-save-v1` battery (boundary
--- H, map 386 (74,53), the area's only interior save point), assert its
--- contract, then:
---   1. leave the save room (386 (73,59) short entrance -> 384 (64,12));
---   2. the 384 west traverse (measured, probe_v07_384west/2/3/4/5 and
---      probe_v07_384toggle; these probes are the record, and the recon's own
---      seven-lever reading was wrong):
---      the minimal switch chain is two levers rather than seven:
---        * (71,15) face-UP+A (_cb3176, event_main.asm:45276): persistent
---          $0174, extends the x=76 column bridge; 266-tile south loop ->
---          587 tiles, the whole east half;
---        * (104,17) face-UP+A toggle (_cb33c9, :45485): session $01F5,
---          flips the 5x13 tower region; 587 -> 655 tiles, opening the
---          (120..121,17..23) descent.  One 8-frame up+A tap fires it and
---          the switch flips at the event's end (~70 frames); a second A
---          press on the tile toggles it back, so the drive taps once and
---          then waits rather than repeating A;
---      then the (121,23) -> (4,37) teleport (short-entrance record; the
---      pairs are one-way: (4,36)->(121,22) is the return) and the west
---      walk to the gate door row (9..11,27), a 3-tile long entrance,
---      len 2 H, so the entry point must sit off that row.
---      The (89,29)/(96,18)/(99,18) walk-overs and the (112,16)/(99,13)
---      toggles are not on this route: the walk-overs serve the treasure
---      alcove.  The (58,18) span switch used to be off-route too; #84 put
---      it back on, because its (46..41,11) west bridge is the Genji Glove
---      shelf (the traverse's chest detours are step 2's, below).
---   3. the sealed gate scene (map 391; entry (8,21) is the scene trigger,
---      _cb39ca, :45953): ridden with no input via advanceStory, battles 121
---      and 122 in opts.spare.  The $17b dummy cannot be lost and must
---      never be write-cleared, because its battle_event is the scene
---      (measured).  The tail sets $0079=1 and returns control at 384 (10,28);
---   4. out the post-gate shortcut ((5,43) -> _cb2a9f -> 382 (31,41),
---      exposed by the $0079 map-init retile), the cave mouth (25,38) ->
---      world (169,194), the pocket, (166,194) -> the base east door;
---   5. the base re-cross and the crash: walking into the west trigger row
---      fires _cb280f (:44289), which runs the ensemble scene, $0242=1, the
---      auto-teleport to the Blackjack, battle 123 (spared; battle_event
---      $15 stages the deck crew on-screen, so rosters are asserted
---      field-side only, never inside), $007A/$007B/$01BA=1 $0246=0, the
---      scripted crash flight, and control back on map 6 (16,6) with the
---      wreck's parent map set to world (83,239);
---   6. the airship-dead check at the wheel (facing-LEFT+A on (14,6) opens
---      nothing, because _caf532 EventReturns on $007A=1/$0176=0), then off the
---      wreck: deck door (20,6) -> map 7 (40,11), the interior stairs
---      (40,18)->(50,51) and (50,62)->(10,30), the hatch trigger (8,36)
---      (_caf4b1: with $007A=1/$009D=0 it exits ON FOOT to the parent
---      world map) -- landing ON the wreck's world tile (83,238), on foot
---      (measured, probe_v07_gatescene3; an A tap there re-enters the
---      wreck interior, so the generator never presses A on the world);
---   7. the world battery save on that tile -- boundary I,
---      `vector-crash-v1` (the route recon's own name for the boundary, at
---      the recon's own proposed tile (83,238)).
---
+-- gen_vector_crash.lua -- the generator that cuts battery checkpoint I,
+-- `vector-crash-v1`.
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
@@ -111,9 +58,6 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
--- tapLever / stepOff: the measured lever and re-entry-escape idioms this
--- generator introduced now live in lib/ot6_field.lua (M.tapLever and
--- M.stepOff, promoted 2026-07-28 when the I->J step needed both again).
 local tapLever, stepOff = H.tapLever, H.stepOff
 
 local function landed(m, n)
@@ -162,10 +106,7 @@ local function fill(c, pos, slot, id, tag)
   end, { H.equipWeapon(pos, id, { slot = slot, tag = tag }) }, {})
 end
 
--- #84: budget raised 240000 -> 260000 for the four chest detours (the
--- probe measured them at ~8500 frames including fled encounters)
 H.run({ maxFrames = 260000 }, {
-  -- ---- the cold Continue and the entry contract (issue #25) -------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -237,16 +178,6 @@ H.run({ maxFrames = 260000 }, {
     H.assertEq(H.fieldY(), 12, "384 re-entry y")
   end),
 
-  -- ---- 1c. the Genji shelf (#84) ------------------------------------------
-  -- #84: Genji Glove (47,11), visible on the walk.  It sits at the east end
-  -- of the (46..41,11) west bridge, which only the (58,18) span switch
-  -- ($01F9, _cb2fe7, event_main.asm:45071) opens; that switch's event
-  -- scripts a 6-tile descent (the party ends at (58,24)) and the switch
-  -- tile is unreachable afterwards, so this is a one-way detour taken
-  -- before the (71,15) lever, exactly the probe_vc_chests order (measured
-  -- 2026-08-17: pre-span, every stand around all four east chests is
-  -- NO PATH from the 290-tile doorway component; post-span the bridge
-  -- opens and (71,15) is still reachable from it).
   H.navTo(58, 18, { playBattles = "flee", maxFrames = 20000 }),
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x01F9) == 1 end, 3000, {
@@ -271,11 +202,6 @@ H.run({ maxFrames = 260000 }, {
   tapLever(0x0174, 900, "tap-once UP+A on (71,15) -> $0174 (the x=76 column)"),
   stepOff({ "down", "left", "right", "up" }, 2400,
     "step off the (71,15) re-entry trigger"),
-  -- #84: Ether (71,30) and Elixir (88,23), visible on the walk; both open
-  -- only after the (71,15) lever extends the x=76 column bridge (measured,
-  -- probe_vc_chests 2026-08-17: NO PATH to any stand before it, and the
-  -- east chest row opens from the side -- (88,24) stays NO PATH, (89,23)
-  -- is the Elixir's stand)
   H.openChest{ stand = { 71, 31 }, face = "up", bit = 128, what = "Ether",
                nav = { playBattles = "flee", maxFrames = 25000 } },
   H.openChest{ stand = { 89, 23 }, face = "left", bit = 126, what = "Elixir",
@@ -285,11 +211,6 @@ H.run({ maxFrames = 260000 }, {
   H.release(),
   stepOff({ "down", "left", "right" }, 2400,
     "step off the (104,17) toggle (a further A press would toggle it back)"),
-  -- #84: Magicite (113,6), visible on the walk; its only stand is (114,6),
-  -- inside the tower region the (104,17) toggle flips, so it opens here and
-  -- not a step earlier (measured, probe_vc_chests 2026-08-17: every
-  -- neighbor NO PATH pre-toggle, and the (121,22) descent stays reachable
-  -- from the stand afterwards)
   H.openChest{ stand = { 114, 6 }, face = "left", bit = 127, what = "Magicite",
                nav = { playBattles = "flee", maxFrames = 25000 } },
   H.navTo(121, 22, { playBattles = "flee", maxFrames = 20000 }),
@@ -429,12 +350,6 @@ H.run({ maxFrames = 260000 }, {
        and H.worldX() ~= 0
   end, 3600, "world at the crash site", 5),
   H.waitFrames(45),
-  -- Measured (probe_v07_gatescene3): the hatch drops the party on the
-  -- wreck's own world tile (83,238), the route recon's proposed
-  -- checkpoint-I tile, on foot, with $1F60/61 == $1F62/63 == (83,238).
-  -- An A tap here re-enters the wreck interior (it does not lift off, and
-  -- the gen never presses it); the wheel check above already showed the
-  -- airship will not fly.
   H.call(function()
     H.log(string.format("[crash site] world (%d,%d) ship cells $1F62/63 = "
       .. "(%d,%d) $11FA=%02X $11F3=%02X $1F60/61=(%d,%d)",
@@ -451,15 +366,12 @@ H.run({ maxFrames = 260000 }, {
   -- ---- 7. the world battery save at the crash site, boundary I ------------
   H.call(function()
     H.assertExitContractPreSave("vector-crash-v1")
-    -- #84: the checkpoint ships with the east traverse's four treasure bits
     H.assertEq(H.chestOpen(125), true, "Genji Glove bit 125 open (384 (47,11))")
     H.assertEq(H.chestOpen(126), true, "Elixir bit 126 open (384 (88,23))")
     H.assertEq(H.chestOpen(127), true, "Magicite bit 127 open (384 (113,6))")
     H.assertEq(H.chestOpen(128), true, "Ether bit 128 open (384 (71,30))")
     H.screenshot("step_hi_i_tile")
   end),
-  -- The step's savestate is generated here, before the menu, because the
-  -- world menu does not unwind on B (measured)
   H.saveState("vector_crash.mss"),
 
   -- ---- the real Save UI, slot 3 --------------------------------------------
@@ -481,24 +393,11 @@ H.run({ maxFrames = 260000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
-    -- the real CopyGameDataToSRAM entry captures the slot argument the
-    -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
-    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- The pad-driven save (save-drive rule, tools/tests/README.md;
-  -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
-  -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
-  -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
-  -- poke, and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -523,10 +422,6 @@ H.run({ maxFrames = 260000 }, {
     H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
       "SRAM $307ff0 records slot 3")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are read, never seeded (issue #75): the
-    -- battery carries whatever the chain earned.  The phase-2 checkpoint
-    -- re-cuts measure these, and the entry contracts follow the
-    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))

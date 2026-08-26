@@ -1,15 +1,12 @@
--- probe_esper_mtn_route.lua -- trace the warp route from the 375 landing to
--- the save-point region and dump caves 373 + statue room 371, issue #127.
+-- probe_esper_mtn_route.lua -- traces the warp route from the 375 landing
+-- to the save-point region and dumps caves 373 + statue room 371.
 --
--- The 375 exterior is a warp-maze (probe_esper_mtn_map): the save-point
--- region (comp 9, containing 375 (8,44)/(2,45)) connects ONLY to the statue
--- room 371.  The reachable route is comp2(landing) -> cave 373 -> comp17 ->
--- 371 -> comp9.  This probe walks it (fleeing), dumping 373 and 371 on
--- arrival so the generator's 371 crossing can be planned to avoid the statue
--- lore trigger (371 (15,20)) and Ultros (371 (15,22)) -- N must stay
--- pre-statue ($0097=0).
+-- The 375 exterior is a warp-maze: the save-point region (comp 9,
+-- containing 375 (8,44)/(2,45)) connects only to the statue room 371. The
+-- reachable route is comp2(landing) -> cave 373 -> comp17 -> 371 -> comp9.
+-- This probe walks it (fleeing), dumping 373 and 371 on arrival, avoiding
+-- the statue lore trigger (371 (15,20)) and Ultros (371 (15,22)).
 --
--- No @suite: one-shot measurement.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

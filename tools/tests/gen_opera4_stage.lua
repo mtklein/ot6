@@ -2,20 +2,7 @@
 -- 234 {16,46}) -> route A onto the stage (map 238) with the aria armed
 -- ($0056=1), parked at {99,20} one navTo from the aria trigger {97,7}.
 -- Generates opera_stage.mss.
---
--- Route A, measured (probe_opera_route/stage), from the decoded door topology
--- (short_entrance.dat, maps 234/237/238):
---  * The two theater stage doors {4,24}/{28,24} both dump into a backstage
---    region of 238 (x>=109) that is passability-disconnected from the stage.
---    The stage is reached through the opera-house interior instead:
---      234 {25,49} --> 237 {72,32}  (theater floor exit)
---      237 {82,32} --> 238 {100,22} (the stage door; walk right from {72,32})
---    237's IMPRESARIO sits at {60,48}, far from the {72,32}->{82,32} walk, so
---    the performance trigger _caae15 is never re-armed in passing.
---  * On 238, map-init _caf187 shows CELES at {99,19} (obj_event _caba44) while
---    $0055=1 & $0056=0.  Talking her ({99,21} facing UP, A) runs the pre-aria
---    dialog _caba44->_cabaa8, which sets $0056=1 and hands control back at
---    {99,20}.  The aria trigger _cabafd {97,7} then fires ($0056=1 & $0057=0).
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -24,8 +11,6 @@ local function settled()
   return H.hasControl() and H.tileAligned() and bright()>=15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
 end
--- navTo a walk-on door src, bump fallback, settle on the destination map.
--- Issue #75: no state writes; a stray battle is fought by the taps.
 local function toDoor(tx,ty,bumpDir,destMap,what)
   return H.cond(function() return true end, {
     H.navTo(tx, ty, { maxFrames=24000, playBattles=true, arrive=function() return map()==destMap end }),

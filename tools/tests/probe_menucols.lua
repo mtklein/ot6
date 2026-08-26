@@ -1,9 +1,6 @@
 -- probe_menucols.lua -- reference probe, not a suite test (no @suite marker).
 --
--- Establishes vanilla's own cursor/text relationship for the EN field-menu
--- window, measured on the shipped OT6 ROM (the Magic and Espers lists are
--- untouched by OT6, so they show vanilla's geometry in the frame buffer
--- the owner sees).  Dumps, per list: the first non-zero BG1A column of each
+-- Dumps, per EN field-menu list: the first non-zero BG1A column of each
 -- drawn row, plus a screenshot for pixel measurement of the cursor sprite.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/arvis_wake.mss.lua"
@@ -29,10 +26,7 @@ local function dumpCols(tag)
       H.log(string.format("%s: row %2d  first-col=%2d  last-col=%2d", tag, y, first, last))
     end
   end
-  -- $4f/$50 are the cursor's column and row indices within the list (the
-  -- pair skills.asm:100-105 saves into $023e,x), not pixels.  The sprite's
-  -- pixel position is not in WRAM at a fixed address; it is measured off the
-  -- screenshots instead, by diffing two frames whose cursor index differs.
+  -- $4f/$50 are the cursor's column and row indices within the list, not pixels.
   H.log(string.format("%s: cursor index col=%d row=%d  menu state=$%02x",
     tag, H.readByte(0x4f), H.readByte(0x50), st()))
 end
@@ -60,11 +54,8 @@ H.run({ maxFrames = 40000 }, {
   H.waitUntil(function() return st() == ST_SKILLS end, 300, "skills submenu", 5),
   H.waitFrames(20),
 
-  -- Magic is row 1 of the skills submenu (Espers, Magic, SwdTech, ...), and it
-  -- is where the submenu's cursor already sits on entry here.  Espers (row 0)
-  -- is not dumped: the observed submenu cursor is 1, and driving it to 0 needs
-  -- an owned-esper state this fixture does not have.  The esper columns in the
-  -- report come from the source (skills.asm:1733, :1737), not from this probe.
+  -- Magic is row 1 of the skills submenu (Espers, Magic, SwdTech, ...); the
+  -- submenu cursor starts there.
   H.call(function()
     H.log("skills cursor on entry = " .. H.readByte(ZCURSOR) .. " (expect 1, Magic)")
   end),

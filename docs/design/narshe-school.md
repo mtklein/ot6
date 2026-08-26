@@ -2,9 +2,7 @@
 
 The Narshe Beginner's House rewritten to teach break/boost instead of
 vanilla trivia. **Scope:** this change touches the school's tutorial
-rooms only, and no story scenes or dialog elsewhere. DESIGN.md's
-"story/dialog changes out of scope" clause (`DESIGN.md`, "Out of scope
-(for now)") is amended by this sanction only that far.
+rooms only, and no story scenes or dialog elsewhere.
 
 Diff discipline: where an advisor's vanilla lesson is still true in OT6,
 the vanilla text is kept byte for byte. Eight dialog ids change;
@@ -155,9 +153,6 @@ $0273/$0274 espers (vanilla esper mechanics are what's live today),
 $0275 SwdTech (charge gauge still live today), $0277–$027D color demo,
 $03A5/$03A6 chocobo (shared with stables).
 
-When the Bushido menu or magicite sub-jobs ship, $0275 / $0274 become
-false and will need rewriting as well.
-
 ## $026F names the Boost Point
 
 Runic absorbs the next spell for MP **and** +1 BP (Ot6RunicBP,
@@ -210,21 +205,3 @@ Morph page already uses, so no 5th-line auto-pause is introduced.
   {fire}-style escapes, but no vanilla string uses them and the M2
   icons live in battle-font cells $eb–$ef/$fb–$fd only. Unverified in
   the field font, so the copy uses words rather than icons.
-
-## Open items
-
-- **L/R during targeting:** vanilla multi-target (the old $0264) may
-  now collide with Ot6Boost, which watches L/R whenever `$7bca` says a
-  battle menu is open. Needs a live check. If multi-target still
-  works, it is now undocumented in the school, which is acceptable
-  because vanilla left it to discovery. If it half-works, file it as
-  an input-priority bug.
-- **The magicite ghost ($0274)** teaches vanilla espers, which is what
-  the ROM does today but contradicts the magicite-as-sub-jobs design.
-  Rewrite belongs to the milestone that implements sub-jobs.
-- **WoR door-opener shares $0257**: he now announces the new rules at
-  the door in the World of Ruin. Read and accepted, since he is the
-  school's own doorman and the line is world-state-neutral.
-- **Element icons in school text**, once the field font question above
-  is settled. Icons would teach the ability marks more directly than
-  words do.

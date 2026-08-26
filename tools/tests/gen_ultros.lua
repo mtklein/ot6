@@ -1,77 +1,26 @@
--- gen_ultros.lua -- v0.13 step N->O (issue #127, docs/design/thamasa-
--- route.md Segment 5 end), and the generator that cuts battery checkpoint O,
+-- gen_ultros.lua -- the generator that cuts battery checkpoint O,
 -- `ultros-won-v1`: back at the Esper Mountain save point 375 (8,44) with
 -- $0095=1 and RELM joined.
---
--- The step: cold-Continue the tracked `esper-mtn-save-v1` battery (boundary
--- N, map 375 (8,44), party TERRA LOCKE STRAGO, pre-statues), assert its
--- contract, then:
---   1. PREP OUTSIDE COMBAT (owner doctrine).  Walk off the save-point
---      trigger, cross the two weakness weapons onto their wearers (the bag's
---      spare ThunderBlade onto TERRA, the Fire Rod onto STRAGO -- see the
---      constant block for the OT6 equip-permission measurement), and
---      full-heal.  Row is left FRONT, deliberately: see THE FIGHT below.
---   2. the short WEST door 375 (2,45)->371 (9,9) into the statue room
---      (probe_ultros_route: the save-point region reaches 371 in seven tiles,
---      and 371 (9,9)->(15,20) is a clear 21-step walk down column 15).
---   3. in 371: walk onto (15,20), which fires the statue-lore scene (_cbf168,
---      sets $0096/$0097).  Take the seed-ladder entry-point savestate HERE
---      (lore seen, Ultros not yet fought), then step down onto (15,22), which
---      fires Ultros III (_cbefa5, gated $0097 && !$0095): the choreography,
---      RELM's creation+join two lines before the battle command, and battle
---      125.  Fight party STRAGO TERRA LOCKE RELM.
---   4. after the win ($0095=1, control back in 371): walk back out the return
---      door 371 (10,9)->375 (3,45) to the save point 375 (8,44), full-heal,
---      and re-Save through the real Save UI into slot 3; run.sh captures the
---      battery.
---
+
 -- THE FIGHT (Ultros III, battle 125, formation 387): Ultros L25 HP 22000,
 -- ABSORBS WATER, WEAK FIRE|BOLT, OT6 row-7 shields slash|pierce.  Two design
 -- constraints, both read from ai_script.asm:6267-6355 and both pointing the
 -- same way -- to an ALL-PHYSICAL, ELEMENTAL-WEAPON offense with item-only
 -- healing:
---
---   * #123 -- NO SKETCH.  Ultros's scripted vanilla finish is a successful
---     Sketch->Tentacle surrender (kill_monsters ALL), but a MISSED Sketch is
---     the corruption bug's entry condition and can sweep the bank-$7e save
---     block right before this batch checkpoint is captured
---     (docs/design/thamasa-route.md section 5).  This generator drives NO
---     Sketch; H.newFightDriver has no Sketch arm, and RELM's opts leave her
---     with only Fight.  The fight ends on HP -- 22000 is slow but
---     deterministic -- watched via $0095 (set only by the real win tail,
---     :73801) plus a roster sanity check, never by a Tentacle exit.
---   * THE TRI-ELEMENTAL COUNTER FORM.  Ultros's retal block counts party
---     MAGIC commands in battle_var 2, and at the FIFTH one sets switch 0,3:
---     "Ultros's form has changed! Beware his tri-elemental attack!"  From
---     then on, a FIRE hit is countered with Fire 3, ICE with Ice 3, LIGHTNING
---     with Bolt 3 -- i.e. every one of our weakness hits would draw a level-3
---     counter.  FIGHT commands never touch battle_var 2, so the form never
---     arms if the party issues zero MAGIC.  So: TERRA and LOCKE swing
---     ThunderBlades (bolt weakness; slash class, shielded by Ultros's row 7 --
---     broken by the boost bank), STRAGO swings the Fire Rod (fire weakness;
---     bludgeon class, which is NOT in the slash|pierce shield row, so it lands
---     unshielded), RELM plain-Fights, and all healing is item-only
---     (cure=false).  This also sidesteps the water-absorb trap (no Aqua Rake,
---     no water) for free.
---   Row is left FRONT: back row would halve our entire (physical) offense
---   while shielding us from almost nothing -- Ultros's real damage is magical
---   AoE (Magnitude8, Aqua Rake) and status (Stone, Lode Stone), none of which
---   the row touches.  This is the FlameEater pass's "lean on gear, adapt the
---   doctrine to the fight" ruling, applied one boss on.
---
+
 -- Under 15360 HP Ultros self-casts Haste+Safe (Safe halves physical damage
 -- taken), so the back half of the fight is slower; the seed ladder + a deep
 -- item bag (22 Tonics / 9 Potions / 15 Fenix Downs at N) carry it.  A missed-
 -- win attempt reloads the entry-point savestate and re-fights on a spread
 -- battle seed (H.newSeedLadder, gen_thamasa_fire's FlameEater pattern), with
 -- the GameOver read-canary (lib) the ground-truth loss signal.
---
+
 -- No chests: none sit on the walked route (the mountain chests are all off
 -- the direct save-point<->statue-room line), so chests_opened.txt is
 -- untouched and audit_chests stays exact.
---
+
 -- One generator does the step and cuts the checkpoint, gen_esper_mtn's shape.
---
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
@@ -83,13 +32,6 @@ local ULTROS2 = 0x012d
 local saveArg = nil
 
 local TERRA, LOCKE, STRAGO, RELM = 0, 1, 7, 8
--- Measured (probe_ultros_equip): in OT6 TERRA can wear the ThunderBlade but
--- NOT the Fire Rod; STRAGO can wear the Fire Rod but NOT the ThunderBlade.
--- So the two weakness weapons cross: the bag's spare ThunderBlade (bolt) goes
--- to TERRA, the bag's Fire Rod (fire) swaps onto STRAGO in place of his Ice
--- Rod.  With LOCKE's own ThunderBlade that is THREE weakness dealers (two
--- bolt, one fire), all physical -- no MAGIC command, so Ultros's tri-elemental
--- counter form (armed at 5 party MAGIC casts) never triggers.
 local FIRE_ROD, THUNDERBLADE = 0x35, 0x0F
 local CONFIRM_BATTLE_GONE = 90
 
@@ -304,11 +246,6 @@ end
 
 -- --------------------------------------------------------------------------
 H.run({ maxFrames = 5000000, allowGameOver = true }, {
-  -- ---- the cold Continue and the ENTRY CONTRACT (issue #25) --------------
-  -- esper-mtn-save-v1 is a FIELD save: a cold Continue stands the party on
-  -- the save tile 375 (8,44), whose SavePoint trigger re-enters every frame,
-  -- so hasControl() never settles there (gen_vector_crash's stood-on-trigger
-  -- boot).  Gate on map/alignment/brightness only.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),

@@ -1,13 +1,8 @@
--- probe_ambush_poststall2.lua -- issue #127, L->M: the post-ambush-WIN
--- field stall, take 2.  gen_thamasa_fire.lua's own live run (this pass)
--- confirmed the ambush is winnable for real (no GameOver fired, $050A
--- cleared cleanly) and captured build/states/ambush_won.mss right at that
--- moment (f21833).  This probe loads that state directly -- skipping the
--- ~22000-frame checkpoint boot/inn/fire/join/house-walk/fight setup -- and
--- installs WRITE watches (with the writing instruction's own PC) on every
--- register H.hasControl()/M.mapId() reads, to name the exact instruction
--- that corrupts them, per the STATUS header's own "instrumentation this
--- pass didn't build" gap.
+-- probe_ambush_poststall2.lua -- the post-ambush-win field stall.  Loads
+-- build/states/ambush_won.mss directly, skipping the checkpoint boot/inn/
+-- fire/join/house-walk/fight setup, and installs write watches (with the
+-- writing instruction's own PC) on every register H.hasControl()/
+-- M.mapId() reads, to name the exact instruction that corrupts them.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 H.loadState("build/states/ambush_won.mss.lua")
@@ -55,16 +50,6 @@ local steps = {
 }
 for i = 1, 3000 do
   steps[#steps + 1] = H.call(function()
-    -- EXPERIMENT: pin $0803 (the party leader's object-block offset) back
-    -- to 0 every frame once the game's own sort_obj_work recomputes it to
-    -- the anomalous $07B0 seen live (a write-watch on $7E0803 traced that
-    -- write to PC $C0:72A1/$C0:72A6, inside sort_obj_work's CheckOtherSlots
-    -- loop -- event_main.asm's field-bank $C0 sort_obj implementation,
-    -- roughly $C070B6-$C072D8).  $0803=0 is a value hasControl() DID read
-    -- as valid (movByte=$02) for a real ~20-frame window right after the
-    -- win, before this recompute clobbers it; testing whether re-pinning
-    -- it recovers a walkable state once brightness also catches up.
-    -- pin disabled this pass -- see the $1850/$07fb check below instead
     if H.frame % 20 == 0 then
       H.log(string.format(
         "[probe2 tick] f%d map1f64=$%04X 0803=$%04X 07fb=$%04X 1a6d=$%02X " ..

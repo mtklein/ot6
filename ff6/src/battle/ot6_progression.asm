@@ -1,14 +1,11 @@
 ; ------------------------------------------------------------------------------
 
-; [ v0.4: full HP/MP restore on level up ]
+; [ full HP/MP restore on level up ]
 ;
-; Octopath's rule, ported whole (docs/design/mp-economy.md "Full HP/MP restore
-; on level up"): a character who gains a level refills current HP and MP to the
-; new maxima. The owner framed it "HP/SP/MP"; this project retired SP (the pool
-; is MP, mp-economy.md preamble) and boost points are battle-scoped RAM that
-; resets every fight. The $1600 record carries only HP ($1609/$160b) and MP
-; ($160d/$160f), so the implementable meaning is HP + MP. No third pool exists
-; in the record to restore.
+; A character who gains a level refills current HP and MP to the new maxima.
+; Boost points are battle-scoped RAM that resets every fight, and the $1600
+; record carries only HP ($1609/$160b) and MP ($160d/$160f), so the
+; implementable meaning is HP + MP.
 ;
 ; Called by a jsl at the tail of vanilla DoLevelUp (battle_main.asm, right after
 ; it stores the raised max MP), so the max HP/MP this refills to are already the
@@ -22,8 +19,7 @@
 ; battle HP/MP ($3bf4/$3c08) back over the record's current HP/MP
 ; (battle_main.asm:12136-12141). A refill written to the record here would be
 ; overwritten a few instructions later; the battle cell is the authority
-; at this point, and UpdateSRAM carries it into save RAM. (Refilling the
-; record instead was the first version of this hook, and it was wrong.)
+; at this point, and UpdateSRAM carries it into save RAM.
 ;
 ; Multi-level: CheckLevelUp loops DoLevelUp once per level gained
 ; (battle_main.asm:15773-15780), so this runs once per level and each pass reads
@@ -34,7 +30,7 @@
 ; same invariant vanilla relies on when it reads $3ed8,y one instruction
 ; after `jsr CheckLevelUp` (battle_main.asm:15456). A character who takes no
 ; level never enters DoLevelUp, so their damaged battle HP/MP flow through
-; UpdateSRAM un-restored (the negative control battle_levelup.lua asserts).
+; UpdateSRAM un-restored.
 ;
 ; The refill target is the effective max, decoded through the boost tier the top
 ; two bits of $160b/$160f carry, mirroring CalcMaxHPMP (battle_main.asm:6673) and
@@ -108,7 +104,7 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ M5 espers-as-sub-jobs: an equipped esper grants its spells to the Magic list ]
+; [ espers-as-sub-jobs: an equipped esper grants its spells to the Magic list ]
 ;
 ; Replaces the learned-status read `lda ($f0),y` inside ValidateSpellList's
 ; AddToSpellList_02 (battle_main.asm), the read whose $ff result marks a spell
@@ -133,7 +129,7 @@
 ; The GenjuProp row is esper*11 (GetGenjuPropPtr, battle_main.asm:16155),
 ; computed inline because that helper lives in the battle bank and this proc does
 ; not: 11e = ((e*4 + e)*2 + e).  Only the five spell-id bytes (+1,+3,+5,+7,+9)
-; are scanned; the learn-rate bytes are all zero under M5 (genju_prop.asm) and
+; are scanned; the learn-rate bytes are all zero (genju_prop.asm) and
 ; irrelevant to the grant, which keys on the id alone.
 ;
 ; Contract: a8/i16, D=0, DBR = the caller's (jsl preserves it, so `($f0),y`
@@ -184,7 +180,7 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ #96: equipped esper grants its spells in the field Magic list too ]
+; [ equipped esper grants its spells in the field Magic list too ]
 ;
 ; Field-menu `_c350ae` used to return the selected actor's raw $1a6e learn
 ; byte.  That contradicted the battle-side grant above: a stone's spell was
@@ -260,7 +256,7 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ M5: seed the master spell-list union with equipped espers' granted spells ]
+; [ seed the master spell-list union with equipped espers' granted spells ]
 ;
 ; Called once from InitSpellList (battle_main.asm) right after its actor loop
 ; unions the party's innately-known spells into $3034, and before that union is
@@ -331,15 +327,15 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ M5 espers-as-sub-jobs: a while-equipped stat mod (the owner's fork-4 pick) ]
+; [ espers-as-sub-jobs: a while-equipped stat mod ]
 ;
 ; Vanilla applied an esper's GenjuProp bonus byte at level-up (DoLevelUp ->
 ; GenjuBonusTbl, battle_main.asm:15826/:15960), a permanent, accumulating write
 ; to the character stat record ($161a strength / $161b speed / $161c stamina /
-; $161d mag.pwr).  The M5 core removed that: every GenjuProp bonus byte is $ff, so
-; DoLevelUp bmi-skips it (:15827) and the record never grows.  The owner's call
-; (ROADMAP M5) is the while-equipped model instead: hold the esper and get the
-; bump; unequip and it is gone, never written to the persistent record.
+; $161d mag.pwr).  Every GenjuProp bonus byte is now $ff, so DoLevelUp
+; bmi-skips it (:15827) and the record never grows.  This uses a
+; while-equipped model instead: hold the esper and get the bump; unequip and
+; it is gone, never written to the persistent record.
 ;
 ; Where it applies: the battle-side stat copy, not $161a-$161d.  FF6 already has
 ; a while-equipped stat mechanism, namely equipment.  UpdateEquip (bank C1) folds
@@ -366,14 +362,13 @@
 ; That byte looked usable (its GENJU_BONUS enum already spells
 ; +Str/+Spd/+Stam/+MagPwr), but the core set every one to $ff so DoLevelUp skips
 ; it, and DoLevelUp reads that byte unconditionally (:15826).  Re-authoring it to
-; a positive value to mean "while-equipped mod" would re-arm the vanilla level-up
-; bump that was just removed, reviving the permanent record write and breaking
-; battle_subjob's deletion control (scenario D), unless DoLevelUp were also
-; edited to force the skip.  That is a change to shared code for no gain.  A
-; parallel bank-$f0 table keyed by esper index (the shape Ot6FoldTbl /
-; Ot6AbilityCostTbl already use) keeps the new mechanism in ot6.asm, leaves the
-; GenjuProp bytes at $ff, and keeps the two stat lifetimes (removed level-up and
-; new while-equipped) off one shared byte.
+; a positive value to mean "while-equipped mod" would re-arm the vanilla
+; level-up bump that was just removed, reviving the permanent record write,
+; unless DoLevelUp were also edited to force the skip.  A parallel bank-$f0
+; table keyed by esper index (the shape Ot6FoldTbl / Ot6AbilityCostTbl already
+; use) keeps the new mechanism in ot6.asm, leaves the GenjuProp bytes at $ff,
+; and keeps the two stat lifetimes (removed level-up and new while-equipped)
+; off one shared byte.
 ;
 ; Stat mods only; HP/MP percentages are deferred.  The GENJU_BONUS HP_x/MP_x are
 ; a percent of a max that would then shift on equip/unequip (max-HP moving
@@ -381,13 +376,9 @@
 ; stat mods only; the encoding below has no HP/MP nibble, so the deferral is
 ; structural rather than a runtime skip.
 ;
-; The encoding is vanilla's own equipment layout (#62, 2026-07-29).  It used to be
-; one byte per esper, [selector:4][magnitude:4], one unsigned stat with a maximum
-; of 15, which is why magicite-ifrit-shiva.md's ledger recorded two-sided and
-; multi-stat mods as unbuildable.  #62 asked for both, and the measurement pass
-; (docs/design/esper-stat-baseline.md) found that FF6 already has the object
-; needed: ItemProp+16/+17 is two bytes holding four signed 4-bit stat deltas, and
-; CalcEquipEffect (battle_main.asm:2521-2539) is its reference decoder:
+; The encoding is vanilla's own equipment layout: ItemProp+16/+17 is two bytes
+; holding four signed 4-bit stat deltas, and CalcEquipEffect
+; (battle_main.asm:2521-2539) is its reference decoder:
 ;
 ;       lda     f:ItemProp+16,x         ; a16: both bytes
 ;       ldy     #$0006
@@ -401,16 +392,9 @@
 ;
 ; So Ot6EsperStatTbl is two bytes per esper in that layout:
 ;       byte 0 = [speed:4][vigor:4]      byte 1 = [magpwr:4][stamina:4]
-; $0000 = no mod.  Adopted rather than invented because (a) the baseline in
-; esper-stat-baseline.md is already measured in these units, so a design number is
-; transcribed rather than converted; (b) an esper's stat package becomes the
-; same kind of object a piece of armour carries, which is what #62 asked for;
-; (c) the sign bit, and therefore the downside stat that was wanted and
-; previously refused for space, comes free.  The cost is a per-stat ceiling of 7
-; instead of 15; the baseline measured vanilla's own ceiling at 7 (nothing in
-; 256 item records exceeds it), and mp-economy.md's standing rule is to prefer
-; the series' own numbers where a cap is needed.  Use the `esper_stat` macro
-; below; do not hand-pack.
+; $0000 = no mod.  The per-stat ceiling is 7 (vanilla's own ceiling; nothing
+; in 256 item records exceeds it).  Use the `esper_stat` macro below; do not
+; hand-pack.
 ;
 ; Two deliberate differences from CalcEquipEffect, both because these deltas can
 ; be negative against a base this code does not control:
@@ -531,112 +515,23 @@ out:    longi                   ; i16 to match the phx width
 .endproc
 
 ; Ot6EsperStatTbl: two bytes per esper index (GenjuProp order) in vanilla's own
-; ItemProp+16/+17 nibble layout, read by Ot6EsperStatMod while that esper is worn.
-; Authored: the four Zozo espers (v0.4), Ifrit and Shiva from the Magitek Research
-; Facility (v0.6, docs/design/magicite-ifrit-shiva.md), and the six the tube room
-; pays out (v0.7, docs/design/magicite-tube-six.md §11).  The rest are $0000 (no
-; mod), a data-append like their spell lists (genju_prop.asm).
+; ItemProp+16/+17 nibble layout, read by Ot6EsperStatMod while that esper is
+; worn.  The rest are $0000 (no mod), a data-append like their spell lists
+; (genju_prop.asm).
 ;
-; The ladder, rebuilt from measurement (#62, docs/design/esper-stat-baseline.md).
-; The old tiers were single-stat magnitudes 2-5 chosen as "~10-16% of a base
-; stat".  The baseline pass measured what a gear upgrade is worth in
-; vanilla's own units and re-cut them.  WoB shop-purchasable stat-bearing gear
-; runs median net +3, q3 +6, ceiling +11 (Power Sash, 5000 gil, Thamasa); nine of
-; thirteen WoB helmet tiers carry no stat package at all, and a tier is a shape
-; change plus +1..+7 defense rather than a bigger sum.  So the tiers here separate
-; on the upside column and on the sharpness of the trade, not on the net:
-;
-;   FIELD  upside +6 across 2 stats, no downside, net +6
-;          for the Zozo four, found lying on a floor.  Comparator: Head Band /
-;          Tiger Mask, q3 of WoB gear, the helmet the player is wearing.
-;   STORY  upside +8 across 3 stats, downside -2, net +6
-;          for the tube six, handed over in a scene, not fought for.
-;   BOSS   upside +10 across 3 stats, downside -3, net +7
-;          for Ifrit and Shiva (fought for) and Maduin (the crown).  Comparator:
-;          Power Sash, the best stat package purchasable in the World of
-;          Balance.  This is the owner's "+10 across relevant stats", spent as
-;          the upside column and paid for with the downside.
-;
-; Downsides are not universal, and the rule is written so it can be checked: a
-; stone carries a negative only where its already-written identity names an
-; opposition.  The four Zozo field stones carry none, because they are the
-; player's first stones and they set the zero everything else is read against,
-; and Unicorn carries none because his power is in the Pearl grant
-; rather than the stat (magicite-tube-six.md §9).  Precedent for the shape:
-; in all 256 vanilla item records two carry a negative, and the one that
-; is not a curse is Iron Armor's speed -2 (record $87, +0x10 = $a0), heavy plate
-; slowing the wearer down.  One stat, small, on an item whose identity implied it.
-;
-; UNRESOLVED, shipping a defensible default (owner's ruling: an unresolved value
-; is not a blocker).  The net is flat at +6..+7 across all three
-; tiers; the alternative is separating the net too (FIELD +6 / STORY +7 / BOSS
-; +9).  Flat was chosen because the baseline measured vanilla's tiers as shape
-; changes rather than sum changes, and because a Zozo floor stone is worn for
-; twenty hours while a boss stone competes with eleven others.  Only a playthrough
-; settles it.  If it needs to move, move the downsides first (-3 -> -2, -2 -> 0):
-; that raises the net without touching the upside column the page shows.
-;
-; Vanilla doubles vigor into $3b2c (battle_main.asm:6786-6791), so every vigor
-; number here reads twice as large in battle: Ifrit's +6 is +12 effective, and
-; Shiva's -3 is -6.  That is why the two vigor-negative stones are both casters.
+; Vanilla doubles vigor into $3b2c (battle_main.asm:6786-6791), so every
+; table vigor value reads twice as large in battle.
 Ot6EsperStatTbl:
 ;                   vig  spd  stm  mag
-        esper_stat    0,   0,  +4,  +2   ;  0 ramuh, FIELD.  Stamina leads
-                                         ;    because it is canon (vanilla
-                                         ;    STAMINA_1) and the bolt+Rasp caster
-                                         ;    takes the magpwr token.
-        esper_stat   +6,   0,  +4,  -3   ;  1 ifrit, BOSS.  "The stone you hold
-                                         ;    for the body, not the book"
-                                         ;    (magicite-ifrit-shiva.md §4.1) is
-                                         ;    now expressed in the data.  This
-                                         ;    closes §12.1's named debt as
-                                         ;    written, +vigor / -mag.pwr, which
-                                         ;    the old one-selector-unsigned
-                                         ;    encoding could not express.  +6
-                                         ;    vigor is +12 in battle against a
-                                         ;    base of 31-47.
-        esper_stat   -3,  +4,   0,  +6   ;  2 shiva, BOSS, and Ifrit's mirror:
-                                         ;    the book, not the body.  §5.2 asked
-                                         ;    for this pair of opposed
-                                         ;    specialisations.  Speed rather than
-                                         ;    stamina for her second stat so the
-                                         ;    two are not the same shape twice:
-                                         ;    Ice / Osmose / Shell is a kit about
-                                         ;    acting first and acting often.
-        esper_stat    0,  +4,   0,  +2   ;  3 siren, FIELD (tempo/control caster)
-        esper_stat    0,   0,   0,   0   ;  4 terrato, the no-mod control.  Left
-                                         ;    at $0000 on purpose: menu_esperdetail
-                                         ;    and probe_esperdetail_checkpoint use this
-                                         ;    row to check the detail page stays
-                                         ;    correct for a stone with no mod, so
-                                         ;    authoring it would remove a control.
-        esper_stat   -2,  +6,  +2,   0   ;  5 shoat, STORY, "the Gorgon Eye".
-                                         ;    The executioner acts first, and
-                                         ;    Break/Doom scale off nothing, so
-                                         ;    speed is the only lead available.
-                                         ;    -2 vigor: the Gorgon Eye is a stare,
-                                         ;    not a strike.
-        esper_stat   -3,   0,  +3,  +7   ;  6 maduin, BOSS tier, the crown.  +7
-                                         ;    mag.pwr is the encoding's ceiling and
-                                         ;    vanilla's own per-stat ceiling
-                                         ;    (Enhancer, Magus Rod, Illumina all
-                                         ;    sit at +7).  v0.7 has no conventional
-                                         ;    boss, since the section ends on the
-                                         ;    banquet rather than a fight, and
-                                         ;    all three of his grants scale off
-                                         ;    mag.pwr, so the crown stat is the
-                                         ;    section's reward.  -3 vigor: Terra's
-                                         ;    inheritance is a mage's, not a
-                                         ;    fighter's.
-        esper_stat   +5,  -2,  +3,   0   ;  7 bismark, STORY, "the Tide".  The
-                                         ;    leviathan is mass: it hits, it
-                                         ;    endures, and it is slow.  -2 speed is
-                                         ;    the Iron Armor shape.
-                                         ;    Kept a tier under Ifrit, which is the
-                                         ;    same relation the old table had.
-        esper_stat    0,  +2,   0,  +4   ;  8 stray, FIELD.  Mag.pwr leads
-                                         ;    (vanilla MAGPWR_1); the trickster is
-                                         ;    quick with it.
+        esper_stat    0,   0,  +4,  +2   ;  0 ramuh
+        esper_stat   +6,   0,  +4,  -3   ;  1 ifrit
+        esper_stat   -3,  +4,   0,  +6   ;  2 shiva
+        esper_stat    0,  +4,   0,  +2   ;  3 siren
+        esper_stat    0,   0,   0,   0   ;  4 terrato (no-mod control; leave at $0000)
+        esper_stat   -2,  +6,  +2,   0   ;  5 shoat
+        esper_stat   -3,   0,  +3,  +7   ;  6 maduin
+        esper_stat   +5,  -2,  +3,   0   ;  7 bismark
+        esper_stat    0,  +2,   0,  +4   ;  8 stray
         esper_stat    0,   0,   0,   0   ;  9 palidor
         esper_stat    0,   0,   0,   0   ; 10 tritoch
         esper_stat    0,   0,   0,   0   ; 11 odin
@@ -645,46 +540,13 @@ Ot6EsperStatTbl:
         esper_stat    0,   0,   0,   0   ; 14 alexandr
         esper_stat    0,   0,   0,   0   ; 15 crusader
         esper_stat    0,   0,   0,   0   ; 16 ragnarok
-        esper_stat    0,   0,  +2,  +4   ; 17 kirin, FIELD.  Mag.pwr is heal
-                                         ;    potency; stamina because the healer
-                                         ;    has to still be standing.
-        esper_stat    0,   0,  +2,  +3   ; 18 zoneseek, OPTIONAL, "the Sap".  A
-                                         ;    support caster stone: mag.pwr leads
-                                         ;    (its Rasp/Osmose/Shell are all
-                                         ;    magical), with stamina to outlast
-                                         ;    the MP war.  A tier under the story
-                                         ;    casters (Maduin/Kirin).
-        esper_stat    0,  -2,  +6,  +2   ; 19 carbunkl, STORY, "the Facet".  The
-                                         ;    wall stone's stat is the wall stat,
-                                         ;    at the story tier's top.  -2 speed:
-                                         ;    a gem is inert.
-        esper_stat    0,  +6,  -2,  +2   ; 20 phantom, STORY, "the Ghostwalk".
-                                         ;    Fast and incorporeal: -2 stamina,
-                                         ;    because a ghost has no body.  Shares
-                                         ;    Shoat's +6 speed lead deliberately
-                                         ;    and separates on both the second stat
-                                         ;    and the downside; the six tube
-                                         ;    stones need six distinct reasons to
-                                         ;    swap, not six distinct leads.
-        esper_stat    0,   0,  +4,  +2   ; 21 sraphim, OPTIONAL, "the Seraph".
-                                         ;    The durable reviver: stamina leads
-                                         ;    (the healer who has to still be
-                                         ;    standing to cast Life), mag.pwr
-                                         ;    second.  Mirrors Kirin's 0,0,+2,+4
-                                         ;    with the two swapped -- Kirin heals
-                                         ;    harder, Sraphim endures harder.
-        esper_stat    0,  -2,  +5,   0   ; 22 golem, OPTIONAL, "the Bulwark".
-                                         ;    The wall stone's stat is the wall
-                                         ;    stat: stamina, one under Carbunkl's
-                                         ;    story-top +6.  -2 speed, heavy as
-                                         ;    its own Earth Wall; no mag.pwr, it
-                                         ;    is not a caster.
-        esper_stat    0,   0,  +5,  +2   ; 23 unicorn, STORY, and deliberately
-                                         ;    the smallest story package with no
-                                         ;    downside: the Pearl grant is where
-                                         ;    his power is (magicite-tube-six.md
-                                         ;    §9), and the protector does not ask
-                                         ;    for a sacrifice.
+        esper_stat    0,   0,  +2,  +4   ; 17 kirin
+        esper_stat    0,   0,  +2,  +3   ; 18 zoneseek
+        esper_stat    0,  -2,  +6,  +2   ; 19 carbunkl
+        esper_stat    0,  +6,  -2,  +2   ; 20 phantom
+        esper_stat    0,   0,  +4,  +2   ; 21 sraphim
+        esper_stat    0,  -2,  +5,   0   ; 22 golem
+        esper_stat    0,   0,  +5,  +2   ; 23 unicorn
         esper_stat    0,   0,   0,   0   ; 24 fenrir
         esper_stat    0,   0,   0,   0   ; 25 starlet
         esper_stat    0,   0,   0,   0   ; 26 phoenix

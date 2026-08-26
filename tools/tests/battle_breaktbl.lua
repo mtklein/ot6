@@ -1,24 +1,16 @@
 -- @suite
--- battle_breaktbl.lua -- the v0.6 break-coverage tables, asserted in ROM.
+-- battle_breaktbl.lua -- the break-coverage tables, asserted in ROM.
 -- (school.lua pattern: pure ROM bytes, no savestate, exit 0 = pass.)
 --
 -- Checks that the authored weaknesses that close the fixed-party break gaps
--- land in the assembled ROM. The audit found a class of enemies
--- that no forced party could break: formula species (no class weakness)
--- whose party could reach none of their vanilla or added elements. This is
--- the regression test for the fix: every gap enemy now carries the
--- weapon class its forced party can reach, templar gained the conducting
--- bolt half of the armor palette, and the leader and grunt poison adds are
--- gone.  Those adds were retired "one right tool" artifacts on enemies whose
--- forced parties carry no poison.
+-- land in the assembled ROM: every gap enemy carries the weapon class its
+-- forced party can reach.
 --
 -- Ot6ShieldTbl (word id, byte shields, byte class) and Ot6ElemAddTbl
 -- (word id, byte element, byte pad) both live in bank $F0 (segment
 -- ot6_code); HiROM PRG file offset = SNES addr - 0xC00000, so bank $F0 ->
--- 0x300000+ (school.lua documents the same mapping for the dialog banks).
--- The test locates both tables itself by their opening anchor records, so
--- it survives future row insertions and shifts the way school locates its
--- data through the dialog pointer table.
+-- 0x300000+. The test locates both tables itself by their opening anchor
+-- records, so it survives future row insertions and shifts.
 
 local H = dofile("tools/tests/lib/ot6.lua")   -- only for H.sym address lookups
 
@@ -107,10 +99,9 @@ local want = {
   [0x013a] = { 2, PIERCE,         "merchant" },
   [0x003a] = { 2, SLASH,          "anguiform (trench)" },
   [0x005e] = { 2, BLUDG,          "actaneon (trench)" },
-  -- issue #23: was PIERCE, authored to a Gau "fanged strike" that bludgeons.
-  -- The trench trio is Sabin + Cyan + Gau and none of them pierces: Gau's
+  -- the trench trio is Sabin + Cyan + Gau and none of them pierces: Gau's
   -- only legal weapon is the Imp Halberd $24 (no shop stocks it) and bare
-  -- hands read $ff -> OT6_BLUDG.  A PIERCE row here would be unreachable.
+  -- hands read $ff -> OT6_BLUDG.
   [0x0059] = { 2, BLUDG,          "aspik (trench) -- #23, was a dead PIERCE" },
 }
 for id, w in pairs(want) do
@@ -132,17 +123,14 @@ check(E[0x014f] == nil, "grunt $014F has NO element add (poison retired)")
 check(E[0x0042] ~= nil and E[0x0042][1] == POISON, "m-tekarmor $0042 keeps poison")
 check(E[0x009f] ~= nil and E[0x009f][1] == POISON, "heavyarmor $009F keeps poison")
 
--- regression: the rows both tables opened with, untouched by this pass
+-- the rows both tables opened with
 check(S[0x0000] ~= nil and S[0x0000][2] == PIERCE, "regression: guard $0000 pierce")
 check(S[0x0134] ~= nil and S[0x0134][2] == PIERCE, "regression: whelk head $0134 pierce")
 check(E[0x0134] ~= nil and E[0x0134][1] == FIRE, "regression: whelk head fire add")
 
--- ---------------------------------------------------------------- issue #23
--- The four boss element sets bosses-wob.md authored in prose and that were
--- never written into the data.  check_boss_rows.py carried them as waivers for
--- three releases; these assertions keep them from regressing to prose again.
--- Each is an exact mask: a missing row reads nil and a wrong row reads a
--- different byte, so both directions fail.
+-- ------------------------------------------------------------------------
+-- Four boss element sets. Each is an exact mask: a missing row reads nil
+-- and a wrong row reads a different byte, so both directions fail.
 local elemWant = {
   -- id       mask                 why this row exists
   { 0x0117, FIRE | ICE | BOLT, "atmaweapon: the WoB capstone had ELEVEN "
@@ -170,12 +158,10 @@ end
 check(E[0x0168] ~= nil and (E[0x0168][1] & WATER) == 0,
   "ultros 4 $0168 elem-add must NOT carry water -- $168 absorbs it")
 
--- The same rule as a general invariant rather than a spot-check.  The
--- GhostTrain rule: an element add must never intersect its species' absorb or
--- null byte, or the chip trigger lands where vanilla reverses the damage sign
--- (absorb) or zeroes it (null).  Walking the whole table covers every future
--- row too; the Crane pair in bosses-wob.md was already wrong in this
--- direction once.
+-- The same rule as a general invariant rather than a spot-check: an element
+-- add must never intersect its species' absorb or null byte, or the chip
+-- trigger lands where vanilla reverses the damage sign (absorb) or zeroes
+-- it (null). Walking the whole table covers every row.
 local addRows, badAdds = 0, 0
 do
   local o = elemBase
@@ -199,7 +185,6 @@ check(badAdds == 0, string.format(
   "GhostTrain rule: all %d Ot6ElemAddTbl rows are absorb-safe and null-safe",
   addRows))
 -- guard the guard: if the walk found nothing, the loop above checks nothing.
--- 24 rows as of the issue #23 pass (18 before it, plus the 6 boss rows above).
 check(addRows >= 24, string.format(
   "elem-add walk saw %d rows (expected >= 24; a mislocated base proves nothing)",
   addRows))
@@ -212,13 +197,10 @@ check(rb(MPROP + 0x0117 * MREC + OFF_WEAK) == 0x00,
   "monster_prop base sane: $117 AtmaWeapon vanilla weak is $00 (the whole "
   .. "point of its added row)")
 
--- ---------------------------------------------------------------- issue #74
--- A break key the player cannot buy is not a key.  bosses-wob.md §8 budgets
--- Shadow into the Phantom Train as the second chipper, throwing elemental
--- skeans, but the scenario sold him none, so the fight delivered one chip per
--- round through Sabin alone and the break never completed.  The fix is a slot
--- in the ghost merchant's stock (shop 85, spliced in ff6/src/menu/shop.asm);
--- this asserts the property that fix exists for, rather than the byte.
+-- ------------------------------------------------------------------------
+-- The ghost merchant (shop 85, spliced in ff6/src/menu/shop.asm) must stock
+-- Shadow a throw item whose element chips the Phantom Train, or the fight's
+-- only chipper is Sabin.
 --
 -- Derived end to end from ROM data, so a restock that keeps the property
 -- passes and one that loses it fails:
@@ -227,11 +209,9 @@ check(rb(MPROP + 0x0117 * MREC + OFF_WEAK) == 0x00,
 --   intersect GhostTrain's weakness (monster_prop +25, OR any Ot6ElemAddTbl
 --   row)?
 --
--- The Shurikens the merchant already sold are not a key and never were: item
--- $41 is OT6_PIERCE (ot6_class.asm:120), the shield row is OT6_BLUDG, and a
--- Shuriken throw has no element, so it is damage without a chip.  That is the
--- shape of the hole, and it is why "the merchant already sells something
--- throwable" was not enough.
+-- The Shurikens the merchant already sold are not a key: item $41 is
+-- OT6_PIERCE (ot6_class.asm:120), the shield row is OT6_BLUDG, and a
+-- Shuriken throw has no element, so it is damage without a chip.
 --
 -- ShopProp is `.incbin shop_prop.dat` spliced at shop.asm.  PRG offsets
 -- come from the dbg symbols (& 0x3FFFFF maps HiROM CPU -> file) so bank-C4

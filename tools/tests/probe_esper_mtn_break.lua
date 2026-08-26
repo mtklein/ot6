@@ -1,58 +1,33 @@
--- probe_esper_mtn_break.lua -- issue #127 P1: the Esper Mountain
--- sequence-break wedge risk (thamasa-route.md hazard 8, §7 item 8).
---
--- Claim under test: nothing readable gates the world entrance
--- 0 (229,130) -> 375 (55,31) on $008D (Strago talked), and the statue-lore
--- scene on map 371 (_cbf168, event_main.asm:73807) scripts a STRAGO object
--- with no presence check.  A pre-$008D party (TERRA/LOCKE/SHADOW, no Strago
--- in $1850) that reaches the statue trigger at 371 (15,20) may therefore
--- hang the game.  Vanilla might prevent entry by geometry instead
--- (UNVERIFIED).  This is a probe (no `-- @suite` marker, never joins the
--- suite): it drives pad input and reads memory only, per the input-driven
--- rule -- no HP/state/switch pokes.
+-- probe_esper_mtn_break.lua -- checks whether the world entrance
+-- 0 (229,130) -> 375 (55,31) is gated on $008D (Strago talked), and whether
+-- the map-371 statue-lore scene at (15,20) hangs with a pre-Strago party
+-- (TERRA/LOCKE/SHADOW, no Strago in $1850). NOT a suite test: it drives pad
+-- input and reads memory only -- no HP/state/switch pokes.
 --
 -- Boots build/states/crescent_landing.mss.lua: world (232,150), party
--- TERRA*LOCKE*SHADOW, $008D=0 (checkpoint K, thamasa-route.md's own v0.7
--- stop line).  That is exactly the pre-Strago party the hazard asks about,
--- already on Crescent Island a short walk from the mountain.
+-- TERRA*LOCKE*SHADOW, $008D=0.
 --
 -- Method:
---   1. (229,130) itself reads world-tile-prop IMPASSABLE ($0010 set) --
---      measured directly (a diagnostic worldPassable() sweep before this
---      probe was written): the whole mountain silhouette around it is
---      walled off except a one-tile gap at (229,131)/(226,*)/(232,*), i.e.
---      the entrance is authored on what looks like solid mountainside, the
---      same way Narshe's and Mt. Kolts's short-entrance tiles are (compare
---      world-map-nav.md's "Mt. Kolts world tile (102,100)").  So the walk
---      is worldNavTo to the one reachable approach tile, (229,131), then a
---      deliberate held UP into (229,130) -- exactly the case HANDOFF trap 6
---      describes ("a tile that takes the party away must be entered with a
---      held press rather than made the goal of navTo"), except here the
---      open question is *whether* it takes the party away at all: does
---      CheckEntrance (move.asm:1246-1303) match the tile before or instead
---      of the passability check blocking the step outright?  Both outcomes
---      are informative: a transition proves the entrance overrides the
---      wall for any party; a refused step (the party never leaves (229,131)
---      no matter how long UP is held) proves vanilla's geometry answer to
---      hazard 8 without ever reaching the statue room.
+--   1. (229,130) reads world-tile-prop IMPASSABLE; the whole mountain
+--      silhouette around it is walled off except a one-tile gap at
+--      (229,131)/(226,*)/(232,*). The walk is worldNavTo to the one
+--      reachable approach tile, (229,131), then a deliberate held UP into
+--      (229,130). A transition proves the entrance overrides the wall for
+--      any party; a refused step proves vanilla's geometry blocks it
+--      without ever reaching the statue room.
 --   2. If map 375 loads: walk the exterior to the west statue-room door
---      375 (2,45) -> 371 (9,9) (thamasa-route.md §1 segment 5's map graph;
---      the save point (8,44) is the documented waypoint, seven tiles from
---      the door).  Hold directly onto the door tile (never a navTo goal,
---      same overshoot trap) and confirm the map change.
---   3. Inside 371 (no encounters on this map, per the route doc's table):
---      navTo an approach tile west of the statue trigger, avoiding the two
---      live event tiles ((15,20) statue-lore, (15,22) Ultros 3) so the BFS
---      never crosses either by accident.  Hold onto (15,20) on purpose,
---      then ride whatever happens for up to 1800 frames (30s @ 60fps),
---      paging any dialog with A and touching nothing else, sampling
---      hasControl()/eventRunning()/dialogWaiting() and switches $008D,
---      $0096, $0097 on a steady cadence.
+--      375 (2,45) -> 371 (9,9), holding directly onto the door tile, and
+--      confirm the map change.
+--   3. Inside 371: navTo an approach tile west of the statue trigger,
+--      avoiding the two live event tiles ((15,20) statue-lore, (15,22)
+--      Ultros 3), hold onto (15,20) on purpose, then ride whatever happens
+--      for up to 1800 frames, paging any dialog with A and touching
+--      nothing else, sampling hasControl()/eventRunning()/dialogWaiting()
+--      and switches $008D, $0096, $0097 on a steady cadence.
 --   A drive that never reaches "control back, tile aligned, no dialog"
---   inside that budget raises a driveUntil timeout -- that IS the wedge
---   signature the hazard describes, not a script bug, so it is left
---   unhandled by design: the timeout text plus the last logged sample are
---   the verdict.  No pcall anywhere in this file is deliberate.
+--   inside that budget raises a driveUntil timeout -- that is the wedge
+--   signature, left unhandled by design: the timeout text plus the last
+--   logged sample are the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/crescent_landing.mss.lua"
 
@@ -74,7 +49,7 @@ end
 
 -- Hold a direction, fleeing any battle, until `pred` or maxFrames.  Used to
 -- walk onto a hand-off tile deliberately (door / trigger), never as a navTo
--- goal (HANDOFF trap 6).
+-- goal.
 local function pressInto(dir, pred, maxFrames, what)
   local ph = 0
   return H.driveUntil(pred, maxFrames, {
@@ -158,9 +133,8 @@ local steps = {
     H.screenshot("p127_start")
   end),
 
-  -- 1a. World-walk to the one passable tile touching the entrance,
-  -- (229,131) (measured; (229,130)/(229,129)/(228,130)/(230,130) are all
-  -- impassable terrain).
+  -- World-walk to the one passable tile touching the entrance, (229,131);
+  -- (229,130)/(229,129)/(228,130)/(230,130) are all impassable terrain.
   H.worldNavTo(229, 131, { maxFrames = 8000, playBattles = "flee" }),
   H.waitFrames(20),
   H.call(function()
@@ -170,10 +144,9 @@ local steps = {
     H.screenshot("p127_approach")
   end),
 
-  -- 1b. The deliberate step: hold UP into (229,130), the entrance tile
-  -- itself.  Stops the moment the map changes (entry succeeded) or after
-  -- 900 frames of holding UP with the party still on the world map (entry
-  -- refused by geometry -- the party cannot even leave the approach tile).
+  -- The deliberate step: hold UP into (229,130), the entrance tile itself.
+  -- Stops the moment the map changes (entry succeeded) or after 900 frames
+  -- of holding UP with the party still on the world map (entry refused).
   pressIntoSoft("up", function()
     return not H.worldMode()
   end, 900, "hold UP onto world (229,130) -- the entrance tile"),
@@ -199,9 +172,8 @@ local steps = {
       H.assertEq(map(), 375, "entered Esper Mountain exterior (map 375)")
     end),
 
-    -- 2. Exterior 375 -> the save point (8,44) -> the west door approach
-    -- (3,45) -> hold LEFT onto (2,45) -> 371 (9,9).  playBattles="flee" for
-    -- the map-90 trash (Slurm/Adamanchyt); 371 itself has no encounters.
+    -- Exterior 375 -> the save point (8,44) -> the west door approach
+    -- (3,45) -> hold LEFT onto (2,45) -> 371 (9,9). 371 has no encounters.
     H.navTo(8, 44, { maxFrames = 20000, playBattles = "flee" }),
     H.call(function()
       logState("at_save_point_375")
@@ -218,8 +190,8 @@ local steps = {
       H.screenshot("p127_in_371")
     end),
 
-    -- 3. Approach the statue trigger from the west, avoiding both live
-    -- event tiles in the BFS plan, then hold onto (15,20) on purpose.
+    -- Approach the statue trigger from the west, avoiding both live event
+    -- tiles in the BFS plan, then hold onto (15,20) on purpose.
     H.navTo(14, 20, {
       maxFrames = 4000,
       avoid = { { 15, 20 }, { 15, 22 } },
@@ -232,8 +204,7 @@ local steps = {
         sw(0x008D), sw(0x0096), sw(0x0097)))
     end),
 
-    -- The deliberate step: hold RIGHT long enough to cross one 16px tile
-    -- (measured elsewhere at 1-1.33 px/frame; 24 frames is a safe margin)
+    -- The deliberate step: hold RIGHT long enough to cross one 16px tile,
     -- landing on (15,20), the statue-lore trigger.
     H.hold({ "right" }),
     H.waitFrames(24),

@@ -5,51 +5,14 @@
 --                   trigger at (31,51) unfired.  This is the entry point
 --                   gen_scenario rides from, and the fixture to start from
 --                   when studying the river or the vanilla loop.
+
+-- Map 112 has two entrances: (7,42) -> map 110 and (8,60) -> map 113.
+-- BFS knows nothing about entrance triggers, so the plan south is checked
+-- against (7,42) before a step is taken.
 --
--- This script is deliberately short.  The ride itself is long, forced, and
--- full of battles, and it is the part worth iterating on; keeping the walk to
--- it in its own script means a failed experiment on the river costs ~400
--- frames of replay instead of the whole hideout.
---
--- Hazard: the tile the party stands next to.  Map 112 has two entrance
--- records (ShortEntrance::_112): (7,42) -> map 110 (50,52) and
--- (8,60) -> map 113 (30,50).  _cafff0 lands the party at (7,42) and walks it
--- `move DOWN, 1` (event_main.asm:37872-37879), so it comes to rest on (7,43)
--- with the way back to the hideout directly north of it, the same shape
--- gen_returner hit twice on Mt. Kolts.  BFS models passability and knows
--- nothing about entrance triggers, so the plan south is checked against
--- (7,42) before a step is taken.
---
--- Map 112 has no NPCs and no event triggers at all (NPCProp::_112 and
--- EventTrigger::_112 are both empty), so nothing else here can fire.
---
--- Issue #75, zero-write: both navigators run with opts.playBattles.  Maps
--- 112 and 113 roll no encounters, and that is a fact about the data rather
--- than an impression: both have bit 7 clear in map_prop byte $0525, and
--- CheckBattleSub tests that bit and returns before it will roll anything
--- (ff6/src/field/battle.asm:332-333).  playBattles mode makes the battle
--- branch a property of the code path rather than an assumption: a battle
--- here would be fought with real input, never write-cleared.
---
--- THE MODE IS "tactical", for the reason gen_banon's header gives at
--- length.  The spelling was `true`, the blind branch -- no menus, no items,
--- no flee -- which is the branch that wiped a party at terra_clifftop while
--- reporting a navigation timeout.  Between the two real modes, "flee" means
--- standing still while the formation takes free rounds, and BANON is in the
--- party here: BattleEnd_03 is "banon died" and it goes to LoseBattle, which
--- sets the game-over flag (battle_main.asm:12300-12307, :16039), so a death
--- on this map is not a wipe to retry but the end of the run.  The usual
--- argument for fleeing -- that a run is cheaper in frames than a fight --
--- buys nothing on a map that cannot roll an encounter.
---
--- A care stop before the save, for the reason gen_banon has two: the audit
--- named lete_river alongside banon_joined, TERRA at 1 of 136 with status 04,
--- and poison drains max HP/32 on every step
--- (ff6/src/field/player.asm:593-613).  Eighteen tiles is not where that
--- damage was done -- it arrives with the fixture -- but this is the last
--- stop before the river, which is long, forced and full of battles, and
--- H.assertPartyStanding below refuses to write a fixture that would start
--- it poisoned.
+-- playBattles="tactical": BANON is in the party, and his death here goes
+-- to LoseBattle (game over), not a retry, so battles are fought rather
+-- than fled or blind-cleared.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/banon_joined.mss.lua"
 
@@ -82,8 +45,6 @@ local DD = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 },
              right = { 1, 0 }, upleft = { -1, -1 }, upright = { 1, -1 },
              downleft = { -1, 1 }, downright = { 1, 1 } }
 local function planAvoids(tx, ty, bad, what)
-  -- Poll before asserting (the gen_terra_clifftop fix, 2026-08-18): a
-  -- transient NPC in a corridor fails a single-sample BFS pre-check.
   return H.cond(function() return true end, {
     H.waitUntil(function() return H.bfsPath(tx, ty) ~= nil end,
                 900, what .. ": a path exists (45f poll)", 45),
@@ -133,18 +94,14 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(H.tileAligned(), true, "tile-aligned")
     H.assertEq(H.battleLoadStarted(), false, "no battle")
-    -- the boarding trigger is (31,51), _cb059f (event_trigger.asm:462);
-    -- it has not fired, which is what makes this an entry point
+    -- the boarding trigger is (31,51); it has not fired, which is what
+    -- makes this an entry point
     H.assertEq(sw(0x01B5), 0,
       "$01B5 clear -- _cb059f's re-entry guard is unarmed, the raft is unboarded")
     H.assertEq(sw(0x0019), 0, "$0019 clear -- the ride has not started")
     for c = 0, 15 do
       if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
         local base = 0x1600 + 37 * c
-        -- status 1 is on this line now.  Without it the roster reported
-        -- lete_river's TERRA as a healthy character until poison had already
-        -- taken her to 1 of 136, and the fixture that could still have been
-        -- repaired was several generators upstream by then.
         H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d status1=%02X",
           c, H.readByte(base), H.readByte(base + 8),
           H.readWord(base + 9), H.readWord(base + 11), H.readByte(base + 20)))
@@ -159,11 +116,8 @@ H.run({ maxFrames = 40000 }, {
   -- battles.  Anything not repaired here is carried into it.
   H.fieldCare({ tag = "care before the river", threshold = 0.85 }),
   H.call(function()
-    -- The exit contract: nobody dead, petrified, zombie, poisoned, or at or
-    -- below max HP / 8 (H.assertPartyStanding, the same conditions
-    -- tools/audit_party_hp.py applies tree-wide).  This generator had none,
-    -- which is how lete_river shipped TERRA at 1 of 136 with status 04 into
-    -- the fixture gen_scenario rides the whole river from.
+    -- The exit contract: nobody dead, petrified, zombie, poisoned, or at
+    -- or below max HP / 8.
     H.assertPartyStanding("lete_river exit")
   end),
   H.saveState("lete_river.mss"),

@@ -1,19 +1,7 @@
 -- @suite
--- battle_clockwork.lua -- issue #33: the HUD's boost pips and weakness
--- reveals land on the mechanical frame, not near it.
---
--- The measured desync this guards against (probe_clockwork on the pre-change
--- ROM, battle_entry, boosted Quadra Slam):
---   - pips: the staged party-row cell showed bp-minus-pending at the menu
---     restage (~f605), ~900 frames before Ot6ActionEnd's charge (f1504).
---   - reveals: the class chip wrote the revealed byte at damage calc
---     (f704), ~300 frames before the first damage numeral (f1006), and
---     only on the slot the hit landed on.
--- Post-change (same probe): the pip cell holds the full bank ($79) all
--- through the flight and drops to the charged value 3 frames after the bp
--- write; the reveal commits on GfxCmd_0b's numeral frame and writes both
--- same-species guards in the same frame.
---
+-- battle_clockwork.lua -- the HUD's boost pips and weakness reveals land
+-- on the mechanical frame, not near it.
+
 -- Staged with battle_mpcost.lua's drive: all-Bushido CYAN,
 -- boost banked by the swdtech submenu row, guards stopped with HP and
 -- shields pinned, MP pinned once (guests carry 0 MP and the universal fizzle
@@ -22,7 +10,7 @@
 -- be inert, with no pending change and no ching or click, because the latch
 -- has already decided the charge and the sound would acknowledge input the
 -- reels ignore.
---
+
 -- The boosted verb here is Bushido ($59 Dragon, single target, so the
 -- same-species propagation is a real assertion rather than a multi-hit
 -- side effect).  Fight, Blitz and spell pip timing use the same
@@ -167,7 +155,6 @@ H.run({ maxFrames = 40000 }, {
     emu.addEventCallback(function() sample() end, emu.eventType.startFrame)
   end),
 
-  -- open the swdtech submenu, latch row 2 (= the pinned boost 3, #38's top tier)
   H.driveUntil(inWindow, 1500, {
     H.call(function() pinField(); H.setPad({ "a" }) end),
     H.waitFrames(2),
@@ -179,9 +166,6 @@ H.run({ maxFrames = 40000 }, {
     H.writeByte(0x895F + actor, 0)
     H.writeByte(0x8963 + actor, 0)
     H.writeByte(0x8967 + actor, 2)          -- row 2 = boost 3 -> Dragon
-                                            -- (#38: the 1-BP floor made the
-                                            --  window three rows, so boost 3
-                                            --  is the last row, not the 4th)
   end),
   H.waitFrames(2),
   H.driveUntil(function() return not inWindow() end, 900, {

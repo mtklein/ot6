@@ -1,44 +1,7 @@
--- gen_gate_cave_save.lua -- v0.7 step G->H (issue #31), and the generator
--- that cuts battery checkpoint H, `gate-cave-save-v1`.
---
--- The step: cold-Continue the tracked `narshe-mission-v1` battery (boundary
--- G, world (84,34), the Narshe exit spawn, ship parked at (84,36)),
--- assert its contract, then:
---   1. board the parked Blackjack (one A tap boards AND lifts off) and X
---      to the deck; the interior chain 6 (20,6) -> 7 (40,11) -> (40,18)
---      stairs -> the party-swap room;
---   2. seat TERRA and bench SETZER: chase-talk the wandering Terra NPC
---      (obj $16; H.chaseTalk re-plans every aligned frame and stops on
---      the $0528 choice), answer Yes (index 1; blind A answers No),
---      then drive `party_menu 1, NO_RESET, {LOCKE, CELES}`, which opens
---      with all four cells empty (measured; the {LOCKE, CELES} list
---      pre-fills nothing on this chain), to TERRA LOCKE EDGAR SABIN by
---      runtime cell lookup, and commit with START;
---   3. wheel LEFT+A (the $052A "(Lift-off)" choice; $0170 is set, so
---      the wheel asks now, and a bare hold would leave the choice open),
---      strafe-fly to the base pass, land (163,194), walk east into the
---      Imperial Base 377, where TERRA is a hard requirement (_cb25d6,
---      event_main.asm:44004-44016; a party without her is turned back), ride
---      the $0172 "No Imperial soldiers…" beat, leave the re-entry-trap
---      trigger row with unconditional holds, cross to the east door, the
---      world pocket, and the cave: 382 -> 383 -> 385;
---   4. the timed floor (map 385): arm cycle A at (3,2), phaseWalk the
---      union graph to (11,3) (arming cycle B), phaseWalk to (13,12), and
---      out the (13,13) door -- lib/ot6_field.lua's M.phaseWalk, the
---      rewrite-window mechanism measured by probe_v07_385win;
---   5. basement 3 (map 384): the south loop to the (62,11) face-UP+A
---      switch (_cb3062; its _cb303e patch is the save-room door,
---      persistent $0173), the (64,10) door, and map 386's vanilla save
---      point: tapInto (74,53), because a held press walks through the
---      SavePoint trigger without firing it (measured,
---      probe_v07_386tile) and only a tap-and-settle stops on the tile;
---   6. the ordinary Save UI into slot 3; run.sh captures the battery.
---
--- Checkpoint H is the route recon's gate-cave-save boundary: the only
--- interior save point in the whole v0.7 section (386 (74,53), off 384
--- (64,10)).  One generator does the step and cuts the checkpoint, following
--- gen_narshe_mission's shape.
---
+-- gen_gate_cave_save.lua -- cuts battery checkpoint `gate-cave-save-v1`
+-- at the only interior save point in the Sealed Gate cave section, map
+-- 386 (74,53), off 384 (64,10).
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
@@ -58,7 +21,7 @@ local function shipX() return H.readWord(0x34) >> 4 end
 local function shipY() return H.readWord(0x38) >> 4 end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
--- the map-385 phaseWalk spec (hurt lists: event_trigger.asm:1849-1884)
+-- the map-385 phaseWalk spec (hurt-tile lists)
 local function spec385(over)
   local s = {
     switches = { a = 0x01F5, b = 0x01F6 },
@@ -76,7 +39,7 @@ local function spec385(over)
   return s
 end
 
--- gen_vector_entry's grind-and-replan world walker
+-- grind-and-replan world walker
 local function worldGrind(tx, ty, what)
   local plan, idx, ph = nil, 1, 0
   return H.driveUntil(function()
@@ -115,8 +78,6 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
--- STRAFE-fly the ship to hover tile (tx,ty); Y is load-bearing (a bare
--- d-pad only rotates the ship -- measured, probe_v07_fly)
 local function flyTo(tx, ty)
   local calm, hb = 0, -300
   return H.driveUntil(function()
@@ -139,7 +100,7 @@ local function flyTo(tx, ty)
   }, string.format("strafe-fly to (%d,%d)", tx, ty))
 end
 
--- drive the current choice dialog to idx and confirm (the zozo3 idiom)
+-- drive the current choice dialog to idx and confirm
 local function choicePick(idxIn, donePred, maxFrames, what)
   local ph = 0
   return H.driveUntil(donePred, maxFrames, {
@@ -162,7 +123,7 @@ local function choicePick(idxIn, donePred, maxFrames, what)
   }, what)
 end
 
--- ------------------------- party menu driver (gen_kefka_won's, verbatim) --
+-- ------------------------- party menu driver --------------------------
 local function mst() return H.readByte(0x0026) end
 local function menuUp() return H.readByte(0x0059) ~= 0 end
 local function cell9d(c) return H.readByte(0x7E9D89 + c) end
@@ -223,42 +184,20 @@ local function cellOf(charId)
 end
 
 -- ------------------------------------------------------------ TERRA's kit --
--- TERRA rejoins the party in the swap room below holding nothing.  The
--- Battle for Narshe's tail strips her when she turns into an esper and flies
--- off (`remove_equip TERRA` beside `delete_obj TERRA`,
--- event_main.asm:106887), her gear went back to the bag, and the whole
--- search for her ran without her, so the seating below is the first moment
--- anyone could put a kit on her -- and until this stop nobody did, which
--- shipped her bare into the Imperial Base and the Sealed Gate cave.
---
--- Equipped by item, never through Optimum (wob-route.md section 2), and the
--- items are chosen for the area this step walks into:
---   $0E Blizzard -- power 108 against the MithrilBlade's 38, OT6_SLASH
---       (ot6_class.asm:63), element ice (ItemProp +$0F = $02).  Both axes
---       are the area's: break-coverage-sealed-gate.md section 5 measures
---       slash keying 65.63 % of draws and pierce 0.00 %, and LOCKE and
---       EDGAR arrive carrying pierce ($02 and $01), so she is the second
---       slash swinger next to SABIN.  Ice keys 40.63 % of draws and feeds
---       an absorber in 0.00 % of them, which is the check the Thunder
---       Blade/Crane disaster is remembered for.
---   $6A Hair Band, $84 LeatherArmor -- the spares in the bag.
--- Her shield row stays empty because the bag holds no spare shield: LOCKE,
--- EDGAR and SABIN are wearing the three it has.  The relic rows stay empty
--- for the same reason the rest of the party's are empty here, and because
--- the one spare that would tempt a filler is a Gauntlet, which makes the
--- game run its own Optimum when the Relic screen is backed out
--- (CheckReequipRelics, equip.asm:2843-2850).
+-- TERRA rejoins the party in the swap room holding nothing; this is the
+-- first moment she can be equipped.  $0E Blizzard (slash, ice) matches
+-- this area's weakness; $6A Hair Band and $84 LeatherArmor are the bag's
+-- spares.  Her shield and relic rows stay empty (no spares in the bag).
 local EMPTY = 0xFF
 local CH_TERRA = 0
 local function gear(c, off) return H.readByte(0x1600 + 37 * c + off) end
 local function ordOf(c) return (H.readByte(0x1850 + c) >> 3) & 0x03 end
 
--- Fill one empty gear slot from the bag.  Both guards matter, for
--- gen_tunnelarmr's fillSlot reasons: H.equipWeapon's list seek walks the
--- menu's pre-filtered rows, so an item the bag does not hold makes it time
--- out rather than fail cleanly, and a slot that already holds something
--- does not want overwriting.  Slot n's byte is +$1F+n (R-Hand, L-Hand,
--- Helmet, Armor, Relic 1, Relic 2; ff6/notes/field-ram.txt:905-923).
+-- Fill one empty gear slot from the bag.  Both guards matter:
+-- H.equipWeapon's list seek walks pre-filtered menu rows, so a missing
+-- item times out rather than failing cleanly, and an occupied slot must
+-- not be overwritten.  Slot n's byte is +$1F+n (R-Hand, L-Hand, Helmet,
+-- Armor, Relic 1, Relic 2).
 local function fill(c, pos, slot, id, tag)
   return H.cond(function()
     return gear(c, 0x1F + slot) == EMPTY and H.invCountOf(id) > 0
@@ -283,7 +222,6 @@ local function landed(m, n)
 end
 
 H.run({ maxFrames = 200000 }, {
-  -- ---- the cold Continue and the ENTRY CONTRACT (issue #25) -------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -299,11 +237,6 @@ H.run({ maxFrames = 200000 }, {
     H.assertEntryContract("narshe-mission-v1")
     H.assertEq(H.worldX(), 84, "boot world x (the Narshe exit spawn)")
     H.assertEq(H.worldY(), 34, "boot world y")
-    -- MEASURED (probe_v07_g_boot): on foot on the world, word($34)/($38)
-    -- track the PARTY, not the ship -- the ship's saved position is the
-    -- save-block pair $1F62/$1F63, and a cold Continue restores it there:
-    -- (84,36), where the F->G step parked it.  (On checkpoint F the two
-    -- coincided because that save was taken aboard.)
     H.assertEq(H.readByte(0x1F62), 84, "the Blackjack is parked at (84,.) -- $1F62")
     H.assertEq(H.readByte(0x1F63), 36, "the Blackjack is parked at (.,36) -- $1F63")
   end),
@@ -336,9 +269,6 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(20),
   (function()
     local steps = {}
-    -- measured (probe_v07_g2h run 2): the menu opens with ALL FOUR party
-    -- cells EMPTY and the pool availability-ordered -- look every cell up
-    -- at runtime, place all four
     local wanted = { { 0x00, "TERRA" }, { 0x01, "LOCKE" },
                      { 0x04, "EDGAR" }, { 0x05, "SABIN" } }
     for _, w in ipairs(wanted) do
@@ -381,10 +311,9 @@ H.run({ maxFrames = 200000 }, {
 
   -- ---- 2b. TERRA's kit, the moment she is seated -------------------------
   -- The char-select row is asserted rather than assumed: H.equipWeapon
-  -- seeks the cursor to a fixed row, and the row is the party's order field
-  -- ($1850 bits 3-4), so a party seated in a different order would dress
-  -- the wrong character.  The menu above just wrote that order, TERRA into
-  -- the first empty cell, so this also checks the seating did what it says.
+  -- seeks the cursor to a fixed row, the party's order field ($1850 bits
+  -- 3-4), so a party seated in a different order would dress the wrong
+  -- character.
   H.call(function()
     H.assertEq(ordOf(CH_TERRA), 0, "TERRA is char-select row 0")
     H.log(string.format("[kit] TERRA gear before: %02X %02X %02X %02X",
@@ -449,8 +378,6 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("right", function() return not H.worldMode() and map() == 377 end,
     900, "(165,194) -> IMPERIAL BASE (377)"),
   H.waitUntil(landed(377, 10), 2400, "base landing", 1),
-  -- the entrance trigger row is a RE-ENTRY TRAP; unconditional holds only
-  -- (the landing tile (6,17) is NOT itself a trigger -- measured)
   pressWalk("right", function() return sw(0x0172) == 1 end, 20000,
     "held RIGHT onto (7,17) -> the no-soldiers beat -> $0172"),
   H.waitFrames(60),
@@ -470,20 +397,7 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("right", function() return not H.worldMode() and map() == 382 end,
     900, "(169,194) -> CAVE TO THE SEALED GATE (382)"),
   H.waitUntil(landed(382, 10), 2400, "382 landing", 1),
-  -- Care between fights, down the cave.  #124's Leo-break ROM re-rolled the
-  -- battle chain, and the deep-cave flee gauntlet (382 -> 383 -> 385 -> 384,
-  -- every leg fleeing and none of it healing) now bleeds SABIN out over the
-  -- whole descent -- and this checkpoint's bag holds ZERO Fenix Downs and no
-  -- caster a Life spell, so a member who reaches 0 anywhere in here CANNOT be
-  -- revived by the pre-save care below (measured 2026-08-20: SABIN shipped
-  -- 0/407 status1=80, the run's own assertPartyStanding refused it).  A
-  -- player rests between fights rather than fleeing forty tiles on one health
-  -- bar; these stops are that rest, topping the party at each safe landing so
-  -- cumulative flee damage never reaches a death this segment cannot undo.
-  -- threshold 0.85 (not the save's 0.95): a light top-up that spares TERRA's
-  -- MP for the several stops down the descent.
   H.fieldCare({ tag = "care entering the gate cave (382)", threshold = 0.85 }),
-  -- #84: Assassin, visible on the walk down the cave mouth
   H.openChest{ stand = { 36, 40 }, face = "up", bit = 122, what = "Assassin",
                nav = { playBattles = "flee" } },
   H.navTo(31, 42, { playBattles = "flee", maxFrames = 15000,
@@ -492,7 +406,6 @@ H.run({ maxFrames = 200000 }, {
     "door (31,43) -> BASEMENT 1 (383)"),
   H.waitUntil(landed(383, 10), 2400, "383 landing", 1),
   H.fieldCare({ tag = "care in BASEMENT 1 (383)", threshold = 0.85 }),
-  -- #84: Tempest, visible from the corridor down to the timed floor
   H.openChest{ stand = { 48, 57 }, face = "up", bit = 123, what = "Tempest",
                nav = { playBattles = "flee" } },
   H.navTo(53, 57, { playBattles = "flee", maxFrames = 20000,
@@ -510,15 +423,6 @@ H.run({ maxFrames = 200000 }, {
     1800, "held RIGHT onto the cycle-A arming trigger (3,2)"),
   H.waitUntil(function() return sw(0x01F0) == 1 end, 900,
     "cycle A armed ($01F0)", 2),
-  -- #84: Coin Toss, visible from the entry row.  phaseWalk is the room's
-  -- only honest mover (navTo would condemn the swapped half), and
-  -- openChest's own navTo is a no-op on the tile it already stands on.
-  -- The chest's only usable neighbor is (3,7) (measured, probe_385_grids
-  -- 2026-08-17: (3,9) is walled in both phases and (2,8) is a sealed
-  -- pocket whose only open edge is through the chest tile), which is on the
-  -- cycle-B hurt list and walled in phase B, so the walker arrives in
-  -- phase A, the chest is opened fast (calmFrames=4), and the party steps
-  -- straight off east to (4,7), open and hurt-free in both phases.
   H.phaseWalk(3, 7, spec385({ maxFrames = 20000,
     what = "phaseWalk to the Coin Toss chest stand (3,7)" })),
   H.openChest{ stand = { 3, 7 }, face = "down", bit = 133, what = "Coin Toss",
@@ -538,9 +442,6 @@ H.run({ maxFrames = 200000 }, {
     what = "phaseWalk across row 2 to the cycle-B trigger (11,3)" })),
   H.waitUntil(function() return sw(0x01F1) == 1 end, 900,
     "cycle B armed ($01F1)", 2),
-  -- #84: X-Potion, visible from the cycle-B trigger row, opened from ABOVE:
-  -- (14,5) is walled in both phases and (14,3) is open and hurt-free in
-  -- both (measured, probe_385_grids 2026-08-17)
   H.phaseWalk(14, 3, spec385({ maxFrames = 20000,
     avoid = { { 3, 2 }, { 10, 2 } },
     what = "phaseWalk east to the X-Potion chest stand (14,3)" })),
@@ -563,16 +464,6 @@ H.run({ maxFrames = 200000 }, {
   -- south loop to the save door cannot bleed anyone out.
   H.fieldCare({ tag = "care entering BASEMENT 3 (384)", threshold = 0.85 }),
 
-  -- ---- 5. BASEMENT 3's south loop, the door switch, the save point --------
-  -- #84: the Ether at (29,23), visible on the walk and opened from ABOVE
-  -- ((29,24) is not walkable; measured, probe_gate_chests/probe_gate_bfs
-  -- 2026-08-17).  The map's other four chests are not this generator's:
-  -- the pre-lever walking component here is 290 tiles and M.bfsPath finds
-  -- NO PATH to any stand beside the Genji Glove (47,11), Ether (71,30),
-  -- Elixir (88,23) or Magicite (113,6) -- they sit in the east half behind
-  -- gen_vector_crash's (71,15) lever (persistent $0174) and (58,18) span
-  -- switch (the "(46..41,11) west bridge" of that file's traverse notes),
-  -- so they are that walk's pickups.
   H.openChest{ stand = { 29, 22 }, face = "down", bit = 124, what = "Ether",
                nav = { playBattles = "flee", maxFrames = 20000 } },
   H.fieldCare({ tag = "care mid-BASEMENT 3, before the save-door loop",
@@ -600,20 +491,10 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.fieldX(), 73, "386 arrival x (short entrance 384 (64,10))")
     H.assertEq(H.fieldY(), 58, "386 arrival y")
   end),
-  -- #84: Tent, visible from the save point
   H.openChest{ stand = { 77, 53 }, face = "up", bit = 68, what = "Tent",
                nav = { playBattles = "flee" } },
-  -- The chest detours above added real fled and fought-out encounters to
-  -- this step, and a bad draw lands here drained (measured 2026-08-17:
-  -- LOCKE at 21/353 after three fought-out formations), which
-  -- assertPartyStanding below rightly refuses to save.  Map 386 draws no
-  -- encounters, so the care stop lives here, right before the save.
   H.fieldCare({ tag = "care before the gate-cave save", threshold = 0.95 }),
   H.navTo(74, 54, { playBattles = "flee", maxFrames = 9000 }),
-  -- tapInto the save tile: a HELD press walks straight THROUGH (74,53)
-  -- without firing the SavePoint trigger (measured, probe_v07_386tile --
-  -- CheckEventTriggers wants an exactly-aligned rest the step chain never
-  -- gives it); tap 8 frames, release, settle
   (function()
     local phase, n, ph, calm = 0, 0, 0, 0
     local function calmPred()
@@ -658,18 +539,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(sw(0x01BF), 1, "$01BF SET -- the SavePoint script ran")
     H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch")
     H.assertExitContractPreSave("gate-cave-save-v1")
-    -- gate-cave-save-v1 used to carry TERRA dead at 0/345, and this
-    -- generator had no care stop and no exit contract on the party, so both
-    -- the fixture and the checkpoint went out that way.  Same three
-    -- conditions as tools/audit_party_hp.py; change the two together.
-    --
-    -- RUN, and it passed with no care stop until the #84 chest detours
-    -- added real encounters: the dead TERRA was an artifact of an older
-    -- route, and a clean pre-#84 run reached this tile at TERRA 306/306,
-    -- LOCKE 270/353, EDGAR 338/398 and SABIN 407/407.  On 2026-08-17 a
-    -- three-fought-out-draws run reached it with LOCKE at 21/353 and this
-    -- line refused it, which is what the fieldCare stop on 386 above is
-    -- for.  This line is what says so if the care stop ever stops working.
+
     H.assertPartyStanding("gate-cave-save-v1 exit")
     H.screenshot("step_gh_save_tile")
   end),
@@ -677,8 +547,8 @@ H.run({ maxFrames = 200000 }, {
   H.saveState("gate_cave_save.mss"),
 
   -- ---- 6. the real Save UI, slot 3 ---------------------------------------
-  -- $0059 alone BLIPS nonzero on a save tile (the SavePoint re-entry); a
-  -- real menu is 30 CONSECUTIVE frames of it (the gen_n024 pattern)
+  -- $0059 alone blips nonzero on a save tile (the SavePoint re-entry); a
+  -- real menu is 30 consecutive frames of it.
   (function() local calm, ph = 0, 0
     return H.driveUntil(function()
       calm = (H.readByte(0x59) ~= 0) and calm + 1 or 0
@@ -697,24 +567,11 @@ H.run({ maxFrames = 200000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
-    -- the real CopyGameDataToSRAM entry captures the slot argument the
-    -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
-    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- The pad-driven save (save-drive rule, tools/tests/README.md;
-  -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
-  -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
-  -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
-  -- poke, and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -739,10 +596,6 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
       "SRAM $307ff0 records slot 3")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are read, never seeded (issue #75): the
-    -- battery carries whatever the chain earned.  The phase-2 checkpoint
-    -- re-cuts measure these, and the entry contracts follow the
-    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))

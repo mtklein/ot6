@@ -18,7 +18,7 @@
 ; c4/0000
 EventTriggerPtrs:
         ; OT6: grown $1a10 -> $1a60 (+16 trigger slots); every downstream
-        ; C4 segment shifts and relinks (thamasa-route.md §6, issue #125).
+        ; C4 segment shifts and relinks.
         fixed_block $1a60
         ptr_tbl EventTrigger
         end_ptr EventTrigger
@@ -1672,9 +1672,8 @@ EventTrigger::_342:
 EventTrigger::_343:
         make_event_trigger {35, 15}, _cbd89f
         make_event_trigger {25, 12}, _cbd8f9
-        ; OT6 #127/#125: a save point in Thamasa's square, the Octopath town
-        ; cadence and the burning house's retry boundary (thamasa-route.md
-        ; §2.4 placement 1; the budget is #125's grown block).  Standing
+        ; OT6: a save point in Thamasa's square, the Octopath town
+        ; cadence and the burning house's retry boundary.  Standing
         ; switch $0632 sparkle appended at the END of NPCProp::_343.
         make_event_trigger {33, 25}, SavePoint
 
@@ -1807,8 +1806,7 @@ EventTrigger::_375:
         make_event_trigger {47, 53}, _cbee62
         make_event_trigger {39, 54}, _cbee71
         make_event_trigger {36, 53}, _cbee80
-        ; OT6 #125/#127: the mountain-top save point (placement 2,
-        ; save-points-vector.md / thamasa-route.md Segment 6).  (15,16) is the
+        ; OT6: the mountain-top save point.  (15,16) is the
         ; tile one step NORTH of the massacre trigger (15,17) _cbf2b5 -- the
         ; last controllable ground before the massacre's one-way chain
         ; (esper reveal -> town 341 -> solo Leo vs Kefka, battle 124, whose

@@ -2,31 +2,15 @@
 -- post-Opera battery checkpoint, validate its semantic contract, then walk
 -- the world to the VECTOR event trigger and generate the real v0.6 entry
 -- point.
---
+
 -- Unlike the tactical chain of generated savestates, this starts from
 -- power-on and lets Mesen load an ordinary .srm from its private save
 -- directory.  The checkpoint contains one valid game in slot 3.
---
--- What this replaces (issue #17).  The previous version of this generator
--- held RIGHT off the checkpoint tile until `(mapId & 0x1ff) == 323`, asserted
--- field (2,17), and generated `vector_arrival.mss` logging "entered Vector".
--- Map 323 is ALBROOK.  `ff6/src/field/map_prop.dat` is 33 bytes x 415
--- records and byte 0 is the map-title index (`LoadMapProp`,
--- `ff6/src/field/map.asm:143-157`, copies the record to $0520..$0540;
--- `ShowMapTitle`, `ff6/src/field/text.asm:112-119`, indexes MapTitlePtrs
--- with $0520).  Map 323 -> title 53 -> "ALBROOK"; maps 242 and 253 ->
--- title 49 -> "VECTOR".  The east step off the checkpoint lands in the
--- Albrook short-entrance record at world (138,203)/(139,203), which is why
--- the old assertions passed while the party stood in the wrong town, and why
--- nothing
--- downstream of it could have reached the Magitek Research Facility:
--- map 323's only exits are the four Albrook shops, maps 330/332, and the
--- long entrance back to the world.
---
+
 -- How Vector is entered.  Not by an entrance record: there
 -- is no entrance anywhere in the game whose destination is map 242 or 253.
 -- Vector is a world event trigger:
---
+
 --   ff6/src/event/event_trigger.asm:36-37
 --       make_event_trigger {120, 187}, _ca5ecf
 --       make_event_trigger {121, 187}, _ca5ecf
@@ -34,12 +18,12 @@
 --       _ca5ecf: set_script_mode WORLD
 --                if_switch $0079=1, _ca5edc          ; post-story Vector (253)
 --                load_map 242, {32,61}, UP, {Z_UPPER, SHOW_TITLE, ...}
---
+
 -- $0079 is set only at event_main.asm:46316/:97003/:99716, all after v0.6,
 -- so on this route the trigger loads map 242 at (32,61) facing UP.  The
 -- v0.6 opening is therefore an ordinary on-foot world walk rather than an
 -- airship sequence: no vehicle/airship_pos opcode is involved.
---
+
 -- Why worldGrind and not worldNavTo.  The 31-step walk from the checkpoint
 -- tile (137,203) to (122,187) runs entirely inside the random-battle area
 -- (world tile prop bit6 $40 on every tile of the path).  A battle snapshots
@@ -49,27 +33,8 @@
 -- whole area battle-enabled it condemns them all.  That is the failure that
 -- broke gen_opera1; the same grind-and-replan walker is used here (see
 -- gen_opera1_entry.lua:47-76).
---
--- The positive control.  Issue #17's acceptance criterion is that this
--- fixture must fail if the party is on the wrong map, rather than
--- pass because a hard-coded map id matched a constant that was chosen
--- wrong, which is how the Albrook bug went undetected.  So the
--- landing is checked through the game's own map-title machinery: read the
--- live title index the engine loaded into $0520, follow MapTitlePtrs
--- ($E68400) into MapTitle ($CEF100), decode it, and require the string
--- "VECTOR".  A wrong turn now reports the name of the town the party is
--- standing in.  mapTitleHere() is exercised on the Albrook gate first, the
--- same step the retired generator took, so the control cannot pass
--- by returning "" for everything.
---
+
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
---   reads the marker line above and refuses, before the emulator boots and
---   naming both strings, any OT6_SRAM_CHECKPOINT whose manifest.json declares
---   a different persistent_layout.  An SRAM schema change bumps the layout
---   string in new checkpoint manifests, and every step then refuses the old
---   checkpoints until it is deliberately migrated to declare the new string
---   (checkpoint-fixtures.md, "Costs, named").
 local H = dofile("tools/tests/lib/ot6.lua")
 local function sw(id)
   return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1
@@ -112,7 +77,7 @@ end
 -- CheckRandomBattle tests at field/battle.asm:332).  Two characters
 -- punching that arc is exactly the fixture bug tools/audit_equipment.py
 -- exists to catch.
---
+
 -- Equipped by item, never through Optimum (wob-route.md section 2).  What
 -- the checkpoint's bag holds, and who gets it:
 --   LOCKE  $02 Guardian (power 59, and LOCKE is the only actor whose equip
@@ -126,7 +91,7 @@ end
 -- Ifrit is pierce and Shiva is slash (wob-route.md section 1).  The bag has
 -- no slash weapon either of these two can hold, so there is no better
 -- split available here.
---
+
 -- The relic rows are left alone on purpose.  The bag's spare relics are a
 -- Gauntlet, a Peace Ring and a Black Belt, and equipping a Gauntlet makes
 -- the game run its own Optimum when the Relic screen is backed out
@@ -192,18 +157,6 @@ H.run({ maxFrames = 160000 }, {
   H.waitUntil(function()
     return (emu.getState()["ppu.screenBrightness"] or 0) >= 15
   end, 900, "cold Continue fade-in", 10),
-  -- The entry contract (issue #25).  Everything this step requires of the
-  -- post-Opera boundary (save slot, story switches, world tile, the #21
-  -- party count and roster, and the bank-$31 codex witnesses) is declared
-  -- as data in tools/tests/lib/ot6_contract.lua under "post-opera-v1", the
-  -- same table a predecessor step will later assert as its exit contract.
-  -- A stale or wrong checkpoint fails here by naming what differed, one
-  -- "CONTRACT DIFF" line per field (expected vs read), rather than timing out
-  -- somewhere downstream.  This subsumes the #21 party-count control that
-  -- used to live inline: the contract counts the $1850 assignments and
-  -- requires all four named members.  See the #21 note beside the
-  -- contract declaration for why the count rather than the roster log is the
-  -- check that catches a chain running two characters.
   H.call(function()
     -- The roster diagnostic stays a log line; the contract is the check.
     local t = {}
@@ -244,7 +197,7 @@ H.run({ maxFrames = 160000 }, {
   -- stands on, the party is already standing in it for the control probe
   -- above, and it is a town, which is where a player would open the menu
   -- anyway.  Everything after this is the world walk and then Vector.
-  --
+
   -- The char-select rows are asserted rather than assumed: H.equipWeapon
   -- seeks the cursor to a fixed row and the row is the party's order field
   -- ($1850 bits 3-4), so a reordered party would dress the wrong character.
@@ -310,16 +263,11 @@ H.run({ maxFrames = 160000 }, {
   end),
 
   -- Step 1: the world walk.  29 steps, every tile battle-enabled.
-  --
-  -- The walk stops three tiles east of the trigger rather than one.  It used
-  -- to aim at (122,187), the tile the trigger is stepped onto from, and that
-  -- put the walker's own overshoot right on top of (121,187).  Measured per
-  -- frame on the regenerated checkpoint:
-  --
+
   --   f3508 (122,188) aligned, 1-step plan UP pressed  -> f3510 (121,188)
   --   f3524 (121,188) aligned, 2-step plan pressed     -> f3526 (121,187)
   --   f3541 world control drops; the trigger has fired; map 242 loads
-  --
+
   -- Two effects combine there.  worldGrind holds a direction continuously
   -- and only chooses the next one on an aligned frame, but the world
   -- engine latches input at the tile boundary, so a direction issued on
@@ -331,14 +279,7 @@ H.run({ maxFrames = 160000 }, {
   -- its `not worldMode()` arm, and the wait for world control that follows
   -- cannot be satisfied, giving "timeout after 2400 frames waiting for at
   -- the Vector trigger approach".
-  --
-  -- This is the same finding 56901e9 recorded for navTo (#22), and it is why
-  -- the fix is not a smarter walker: enter a tile that takes the party
-  -- elsewhere with a held press rather than with a walker aimed next to it.
-  -- Row 187 is passable for x=116..130 (measured), so aiming at (124,187)
-  -- leaves the whole +-1 overshoot window on safe tiles and puts no shortest
-  -- path near x=121; the held-LEFT step below then covers the last
-  -- three tiles, which is what it already did for the last one.
+
   worldGrind(124, 187, "world walk -> the Vector trigger approach (124,187)"),
   H.waitUntil(function()
     return H.worldHasControl() and H.worldAligned()
@@ -368,10 +309,6 @@ H.run({ maxFrames = 160000 }, {
   H.waitFrames(120),
 
   H.call(function()
-    -- Positive control, part 2: the same live title read that returned
-    -- "ALBROOK" above must now return "VECTOR".  This is the assertion
-    -- issue #17 asks for: it names the town the party is standing in
-    -- rather than agreeing with a constant.
     H.assertEq(mapTitleHere(), "VECTOR",
       "the map the party is standing on calls itself VECTOR")
     H.assertEq(map(), 242, "Vector town is map 242")

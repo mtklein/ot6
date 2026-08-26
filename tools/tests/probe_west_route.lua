@@ -1,4 +1,4 @@
--- probe_west_route.lua -- the walkthrough route, literally (#133):
+-- probe_west_route.lua -- the walkthrough route, literally:
 -- cracked wall (15,57) -> mine 41-NW -> door (21,9) -> town (23,44)
 -- ["outside again"] -> WEST -> door (10,36) -> caves 48 -> 49 -> 50 ->
 -- onward, scanning and charting at every landing, goal-checking for the

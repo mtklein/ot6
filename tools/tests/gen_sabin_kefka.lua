@@ -3,7 +3,7 @@
 -- CYAN.  Generates one state:
 --   kefka_done.mss  map 121 (Doma Castle grounds), CYAN alone, controllable,
 --                   on the first frame after the camp
---
+
 -- The camp is a switch ladder, and the map enforces its order
 -- (ff6/src/event/event_main.asm):
 --   $002B  _cb0f2e :40303  trigger (36,22), the LEO scene
@@ -16,7 +16,7 @@
 --   $002F  _cb1193 :40734  third talk, `battle 56` again
 --   $0155  _cb1209 :40794  `battle 44`, the Kefka/poison cutscene, and
 --          `call _cba0ec` (:40877)
---
+
 -- The order is not optional, and the map pushes the party back.  Once $002C
 -- is set, two tile strips become one-way barriers:
 --   (35..37,14) _cb1104 :40656  pushes the party DOWN 1, so it cannot walk
@@ -26,7 +26,7 @@
 -- (17,31) are the tiles that fire the pursuit (_cb11cb/_cb11da, :40946
 -- /:40955), they sit past the x=18 strip, and the strip only opens after the
 -- third scene.  Walking west first would be pushed back east each time.
---
+
 -- Both KEFKA scenes are fights with no monsters in them.  `battle 56` is event
 -- battle GROUP 56 (EventBattle, field/event.asm:1910-1919, reads
 -- EventBattleGroup at group*4 as two formation words); group 56 is
@@ -38,22 +38,7 @@
 -- CHAR_AI::KEFKA_IMP_CAMP_1)  playing its lines out.  The driver treats
 -- "battle up, zero monsters present" as a set-piece: hands off for 300
 -- frames, then edge-tap A.
---
--- The pursuit is a real fight: group 44 = formation 410, present mask $0f,
--- two $002 and two $001, four ordinary Imperial troops.  Since
--- issue #75 it is fought rather than write-cleared, and this generator makes
--- no state writes.  SABIN + SHADOW run the house menu-episode machine (bank
--- boost to 2, dump it on Fight: R..R A A on a settled menu, one button
--- per 30-frame pulse); the same edge-tapped A pages dialogs and victory
--- text, and the two zero-monster KEFKA scenes keep their no-input branch
--- (nothing there needed a write).  A loss sets `lost` via the
--- 90-frame party-down watch and a three-attempt retry ladder reloads a
--- checkpoint taken just before the pursuit walk, with the fighter
--- escalated (tier 2+ dumps at 1 BP) and a 17-frame reload stagger.
--- SHADOW's 1/16 post-battle leave roll does not run here: battle switch
--- $4B ("won't leave") is story-set through the camp, and the escape's exit
--- is what clears it (event_main.asm:42251, gen_sabin_forest's header).
---
+
 -- Where this step ends, and why not at Doma.  _cba0ec (:61858) does not
 -- hand SABIN to map 119.  It takes CYAN back to Doma (`load_map 121,
 -- {23,12}`, :61870) and gives the player control of him again at
@@ -61,20 +46,7 @@
 -- walking (121 -> 123 -> 124, where trigger (28,36) fires the family scene
 -- _cb1283 at :40863), so it is the next step's problem and this one stops
 -- on the first controllable frame of map 121.
---
--- Issue #75, playBattles: the one navigator call below (talkTo's approach
--- walk) passes
--- playBattles = "tactical", so it does not fall through to the library's
--- monster-dead flag write.
--- It runs on maps 117 and 121, both with random encounters disabled.
--- A field map rolls for a random battle only when byte +5 of its 33-byte
--- map_prop.dat record has bit 7 set: LoadMapProp copies the record to $0520
--- (ff6/src/field/map.asm:143-158), and the step handler returns before the roll
--- unless $0525 is negative (ff6/src/field/battle.asm:333-347).  So the option
--- is intent only here.  "tactical" rather than "flee" because the only battle
--- that could still reach it is an unscripted surprise -- a goal fight is taken
--- by opts.spare or opts.arrive first -- and fighting one beats spending
--- M.FLEE_CAP frames failing to run from it.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_intro.mss.lua"
 
@@ -99,21 +71,6 @@ local function monCount()
   return n
 end
 
--- BATTLE DETECTION, SLOT-AGNOSTIC -- and this is the whole reason run 2 of
--- this file died.  lib/ot6.lua's battleLoadStarted() reads ONE word, party
--- battle-HP slot 0 at $3BF4, and calls it "a battle has begun loading".
--- That holds for every fixture the harness had before this arc, because
--- every one of them fought with a party whose slot 0 was occupied.  CYAN's
--- solo defence of Doma does not: measured across the whole fight,
---     $3BF4=0000  $3BF6=00FE  $3BF8=0000  $3BFA=0000
--- CYAN is in battle slot ONE.  So battleLoadStarted() stayed false for the
--- entire battle, every driver in the run treated it as "no battle", nobody
--- pressed anything, and CYAN stood there while his HP ticked
--- FE -> D4 -> 94 -> 5A and the fight was lost.  The loss is then silent by
--- design: `battle 46` is followed by `call _ca5ea9` (:61522-61523), and
--- _ca5ea9 is `if_b_switch $40, _ca5eb2 / call GameOver` -- so a lost battle
--- leaves the event PC parked at $CB9EBB forever with the field still drawn.
---
 -- So scan all four slots -- but VALIDATE THE WHOLE TABLE, not just "some
 -- slot looks like HP".  A first attempt that returned true on any single
 -- plausible word fired on map 123 while the CYAN name menu was open:
@@ -209,11 +166,6 @@ local CHOICES = {}   -- this step reaches no `choice` at all
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
--- ---------------------------------------------------------- the fighter --
--- The input-driven battle driver (issue #75; gen_sabin_camp's copy of
--- gen_scenario's menu-episode machine): from a settled battle menu, one
--- button per 30-frame pulse -- boost prefix, then A A = Fight on the
--- default target.  Outside a settled menu, edge-tap A.
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local BP = 0x3E9C
 local fightTier = 1
@@ -241,12 +193,6 @@ local MSTATE = 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM = 0x01
 local CMDTBL, CMDROW = 0x202E, 0x890F
--- the item-list cursor is TWO cells per actor -- scroll ($8947) plus
--- row-on-screen ($894F) -- and the engine's own get_item_poi
--- (btlgfx_main.asm:_c189be) sums them before the *5; reading the scroll
--- alone selected inventory index 4 while the display said 1 (measured,
--- probe_itemuse: the select/deselect toggle that wedged the first
--- input-driven courtyard generation)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local function itemIdxOf(a)
   return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
@@ -273,8 +219,6 @@ local fTick, fStreak = 0, 0
 local function makeFightPlan(actor)
   local hp, mx = pHPf(actor), pMaxHPf(actor)
   local itemRow = cmdRowOf(actor, CMD_ITEM)
-  -- heal under 60%, and reach for the Potion once 100+ HP is missing: the
-  -- pursuit measured 4 attackers out-damaging a 50-HP Tonic line
   if mx > 0 and hp > 0 and hp * 10 < mx * 6 and itemRow then
     local id = nil
     if mx - hp >= 100 and battItemIdx(POTION) then id = POTION
@@ -288,9 +232,6 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  -- dump banked boost EVERY turn: these are 1-2 member steps where a dead
-  -- enemy is the only mitigation, and the pursuit measured bank-to-2
-  -- losing the tempo war against four attackers
   local boost = bp >= 1 and math.min(bp, 3) or 0
   H.log(string.format("kefka: cast f%d e%d boost=%d tier=%d [%s]",
     H.frame, actor, boost, fightTier, partyLine()))
@@ -301,8 +242,6 @@ local function fightButton()
   local actor = H.readByte(ACTOR)
   if fPlan == nil or fPlanActor ~= actor then
     if st ~= ST_CMD then
-      -- planless in a parked LIST state: back out to the command list
-      -- (the b68 engine measured a menu reopening straight into a list)
       if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
         return { "b" }
       end
@@ -526,18 +465,6 @@ local function rideUntil(pred, what, budget)
   }, what)
 end
 
--- "THE STORY BEAT IS OVER", written so a flapping trigger tile still
--- counts.  The obvious predicate -- n CONSECUTIVE frames of full control --
--- cannot be satisfied anywhere on this map, because every one of these
--- scenes leaves the party standing ON the trigger tile that fired it and
--- CheckEventTriggers (field/event.asm:5740) has no once-per-tile latch: it
--- re-fires the script every single frame.  The scripts are inert by then
--- (_cb0f2e opens `if_switch $002B=1, EventReturn`, :40303) but each firing
--- still flips $087C to 4 for a frame or two, so hasControl() oscillates
--- forever.  Measured, run 1: the party sat on (36,22) for 12,000 frames
--- with the heartbeat reading ctl=true and the every-frame settle sample
--- reading ctl=false, and "10 consecutive" never happened once.
---
 -- So: require the map to be STATICALLY quiet for 4n frames -- right map,
 -- tile-aligned, fully faded in, no battle, no dialog -- and require real
 -- user control in at least n of them.  A cutscene fails the second half

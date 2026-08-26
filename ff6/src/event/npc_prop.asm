@@ -12484,11 +12484,10 @@ NPCProp::_273:
                 set_npc_gfx NUMBER_024, MOG_UMARO
                 end_npc
 
-        ; OT6 (#10): the pre-024 save sparkle.  APPENDED, never inserted:
+        ; OT6: the pre-024 save sparkle.  APPENDED, never inserted:
         ; event scripts address NPCs as {map, index in this block}, so a
         ; record added ahead of NUMBER_024 renumbers it and the post-battle
-        ; cleanup clears the sparkle instead -- generating n024_won caught
-        ; exactly that on 2026-07-27.
+        ; cleanup clears the sparkle instead.
         make_npc {26, 53}, $0632
                 set_npc_no_react
                 set_npc_anim FOUR_FRAMES, SPECIAL
@@ -15368,7 +15367,7 @@ NPCProp::_343:
                 set_npc_gfx CLYDE, LOCKE
                 end_npc
 
-        ; OT6 #127/#125: the Thamasa square save sparkle (appended, never
+        ; OT6: the Thamasa square save sparkle (appended, never
         ; inserted -- events address NPCs by {map, index}; the trigger is in
         ; EventTrigger::_343).  $0632 is the standing save-sparkle switch.
         make_npc {33, 25}, $0632
@@ -16655,7 +16654,7 @@ NPCProp::_375:
                 set_npc_gfx RELM
                 end_npc
 
-        ; OT6 #125/#127: the mountain-top save sparkle (appended at the END,
+        ; OT6: the mountain-top save sparkle (appended at the END,
         ; never inserted -- events address NPCs by {map, index}, and the
         ; esper-reveal vignette scripts on map 375 index the NPCs above; the
         ; trigger is in EventTrigger::_375).  (15,16) is one tile north of the

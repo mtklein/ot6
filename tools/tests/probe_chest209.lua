@@ -1,5 +1,5 @@
--- probe_chest209.lua -- #84 scratch probe, not a fixture and not registered.
--- Boots opera_entry (map 209, parked at (117,20)) and measures walkability
+-- probe_chest209.lua -- boots opera_entry (map 209, parked at (117,20))
+-- and measures walkability
 -- around the bit-66 Tincture chest at (125,11): a canStep dump of the
 -- neighbourhood plus bfsPath lengths to the candidate stand tiles.  Read-only
 -- on the game: no A presses, no state writes.

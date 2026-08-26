@@ -4,7 +4,7 @@
 -- moment.  This is the harness's first world-map state, so the script also
 -- records the transition: every mode, position and flag byte the world
 -- navigator will build on gets logged.
---
+
 -- The exit (all static, verified against the built ROM):
 --   * map 20's south edge is one long entrance: horizontal run y=62,
 --     x=0..43, destination map $1FF = "load parent map"
@@ -22,7 +22,7 @@
 --     word is predicted $2000.  The test for "on the world map" is masked,
 --     (word & $3FF) < 3 per the top-level dispatch (field/reset.asm:66),
 --     never a raw compare.  The live value is logged and asserted here.
---
+
 -- World-side RAM (world/move.asm MovePlayer, GetPlayerInput; the world
 -- module keeps DP=$0000, since world_start.asm has no phd/pld and its menu
 -- path reads $e0 plain, so these are absolute zero-page):
@@ -30,21 +30,7 @@
 --   tile*256+fraction; $DF/$E1 low bytes are the sub-tile fractions),
 --   $E3/$E5 velocity, $F6 facing, $E7 bit0 = world event running,
 --   $19 = fade/exit trigger, $E8 bit0 = menu opening.
---
--- Issue #75, playBattles: the one navigator call below passes
--- playBattles = "tactical", so it does not fall through to the library's
--- monster-dead flag write.
--- It runs on map 20, the Narshe streets, which has random encounters
--- disabled; the world walk that follows it is driven by hand, not by a
--- navigator.
--- A field map rolls for a random battle only when byte +5 of its 33-byte
--- map_prop.dat record has bit 7 set: LoadMapProp copies the record to $0520
--- (ff6/src/field/map.asm:143-158), and the step handler returns before the roll
--- unless $0525 is negative (ff6/src/field/battle.asm:333-347).  So the option
--- is intent only here.  "tactical" rather than "flee" because the only battle
--- that could still reach it is an unscripted surprise -- a goal fight is taken
--- by opts.spare or opts.arrive first -- and fighting one beats spending
--- M.FLEE_CAP frames failing to run from it.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local CLEARED = "build/states/moogle_cleared.mss.lua"
 

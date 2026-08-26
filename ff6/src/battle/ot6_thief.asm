@@ -1,89 +1,72 @@
 ; ------------------------------------------------------------------------------
-; Locke's kit (#55): the Steal submenu and the merchant pair
+; Locke's kit: the Steal submenu and the merchant pair
 ;
 ; Ot6ThiefListOpen/IsNew/Exec plus Filch and Bestow. The boost tilts on the
 ; plain Steal roll that this submenu's first row fires are in ot6_steal.asm;
 ; the row price comes from Ot6ThiefCost in ot6_loadout.asm.
 ; ------------------------------------------------------------------------------
-; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
-; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler receives the identical
-; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
-; ff6-en.map are byte-identical across the split.
-; ------------------------------------------------------------------------------
 
 ; ------------------------------------------------------------------------------
-; #55: Locke's kit, first slice: the thief submenu and the merchant pair
+; Locke's kit, first slice: the thief submenu and the merchant pair
 ; ------------------------------------------------------------------------------
 ;
 ; The command slot, and why this is a submenu behind Steal.
 ;
-; The dispatch for this work said Locke's slots were "Fight / Steal / -- / Item"
-; and that the blank was worth investigating.  It is not blank: char_prop.asm:157
-; records FIGHT, STEAL, MAGIC, ITEM, and the third row is MAGIC removed at
-; runtime by InitCmd_03 (battle_main.asm:14100-14108) for a character who knows
-; no spell and holds no esper: $f6 (ValidateSpellList's count) and $f7 (the
-; equipped esper) both zero take the `_5434: lda #$ff / sta $03,s` removal.  This
-; is what #47 found for Gau, on the same instruction, and the battle
-; menu is still hard-wired to four rows.  So Locke has no spare command slot,
-; and the moment he equips an esper the row he gets back is Magic, which
-; kits.md's row-sharing rule says is never the row to sacrifice.
+; Locke's command rows are FIGHT, STEAL, MAGIC, ITEM (char_prop.asm:157); the
+; third row is MAGIC removed at runtime by InitCmd_03
+; (battle_main.asm:14100-14108) for a character who knows no spell and holds
+; no esper: $f6 (ValidateSpellList's count) and $f7 (the equipped esper) both
+; zero take the `_5434: lda #$ff / sta $03,s` removal. So Locke has no spare
+; command slot, and the moment he equips an esper the row he gets back is
+; Magic.
 ;
-; Locke does not need a new command.  Steal is tier one of an eight-tier ladder
-; (Ot6StealCost's own header, the owner's 2026-07-29 ruling that Locke's 99 is
-; Master's Mark), so the ladder belongs behind the Steal row, the same way
-; SwdTech's eight tiers sit behind Cyan's.  OpenCmdMenuTbl[$05] now opens a
-; Tools-shell list whose first row is Steal itself.  Three consequences:
+; Locke does not need a new command. Steal is tier one of an eight-tier
+; ladder, so the ladder belongs behind the Steal row, the same way SwdTech's
+; eight tiers sit behind Cyan's. OpenCmdMenuTbl[$05] now opens a Tools-shell
+; list whose first row is Steal itself. Three consequences:
 ;   * no command slot is spent, no row is shared, and Magic survives.
-;   * Steal's price becomes visible.  Ot6StealCost has carried the note "NOTE
-;     WHAT THIS PRICE STILL CANNOT DO: it cannot be SEEN ... the day #55 gives
-;     Locke a submenu, its row decorator reads this" since #52.  That is now
-;     the case, and the drawn 4 and the charged 4 are the same leaf.
+;   * Steal's price is visible: the drawn cost and the charged cost are the
+;     same leaf (Ot6StealCost).
 ;   * the Thief Glove's Steal -> Capture relic rewrite (RelicCmdTbl1/2,
-;     battle_main.asm:14152-14157) still lands on command $06, which has its own
-;     OpenCmdMenuTbl slot and is untouched.  A gloved Locke gets vanilla Capture
-;     and no submenu, a limitation reported rather than hidden (Follow-ups).
+;     battle_main.asm:14152-14157) still lands on command $06, which has its
+;     own OpenCmdMenuTbl slot and is untouched. A gloved Locke gets vanilla
+;     Capture and no submenu.
 ;
-; The id decision: cmd $05's $3a7b is a free byte, so this uses a second keyed
-; table.
+; The id decision: cmd $05's $3a7b is a free byte, so this uses a second
+; keyed table rather than widening Ot6AbilityCostTbl (whose key ranges are
+; disjoint by construction): Steal's effect id $a4 collides with Bio
+; Blaster's tool key in $11a9, Cmd_05's execute-time special-effect selector
+; (battle_main.asm:3406), but Ot6CostFor reads $3a7b, the queued attack byte,
+; which never sees $a4.
 ;
-; The dispatch warned that Ot6AbilityCostTbl "has no Steal row and cannot have
-; one" because Steal's effect id $a4 collides with Bio Blaster's tool key.  That
-; warning is about a different cell and does not bind here: $a4 is written to
-; $11a9, Cmd_05's execute-time special-effect selector (battle_main.asm:3406),
-; and Ot6CostFor reads $3a7b, the queued attack byte, which it never sees.
-; And $3a7b is free under command $05:
-;   * FixPlayerAttack (battle_main.asm:12879-12960) has no cmd-$05 arm at all,
-;     so nothing rewrites it on the way to the queue;
-;   * init_buf_input leaves $2bb0,y = $ff (btlgfx_main.asm:18978), which is what
-;     a Steal has queued in it to this day;
-;   * the Tools-shell confirm already routes a chosen row's wItemList::Index
-;     through w7e7a85 into $2bb0,y (set_target_data, btlgfx_main.asm:17293) and
-;     from there to $3a7b (CalcCmdDelay, battle_main.asm:633-635).
-; So the rows get per-ability ids at no cost, in a range that is disjoint from
-; Ot6AbilityCostTbl by command gate rather than by arithmetic.  Rather than
-; widen that table (whose header promises its three key ranges are disjoint on
-; their own), cmd $05 gets its own: Ot6ThiefCostTbl, reached only from
-; Ot6AbilityCost's @steal arm.  Steal's own row still prices through
-; Ot6StealCost, so the "one authority" invariant #52 built is intact, and any
-; $3a7b this menu did not write ($ff from a Confused or AI-issued Steal, a
-; Gogo mimic, or a relic Capture) falls through to plain Steal.
+; $3a7b is free under command $05:
+;   * FixPlayerAttack (battle_main.asm:12879-12960) has no cmd-$05 arm at
+;     all, so nothing rewrites it on the way to the queue;
+;   * init_buf_input leaves $2bb0,y = $ff (btlgfx_main.asm:18978), what a
+;     Steal has queued in it;
+;   * the Tools-shell confirm routes a chosen row's wItemList::Index through
+;     w7e7a85 into $2bb0,y (set_target_data, btlgfx_main.asm:17293) and from
+;     there to $3a7b (CalcCmdDelay, battle_main.asm:633-635).
+; So the rows get per-ability ids at no cost. cmd $05 gets its own table,
+; Ot6ThiefCostTbl, reached only from Ot6AbilityCost's @steal arm. Steal's own
+; row still prices through Ot6StealCost, and any $3a7b this menu did not
+; write ($ff from a Confused or AI-issued Steal, a Gogo mimic, or a relic
+; Capture) falls through to plain Steal.
 ;
-; The row ids are AttackName pad slots.  ListTextCmd_0f renders any id >= $51
+; The row ids are AttackName pad slots. ListTextCmd_0f renders any id >= $51
 ; from AttackName[id-$51] (btlgfx_main.asm:15308-15330), and indices $05-$0b
-; (ids $56-$5c) are the empty pad after Joker Doom (verified in
-; src/text/attack_name_en.json; SwdTech draws from BushidoName, not from these,
-; which is why they are still empty).  Steal $56, Filch $57, Bestow $58, authored
-; into that json so they ride the encode pipeline like every other name.  Names
-; render with no btlgfx change, and so does the banner during the action.
+; (ids $56-$5c) are the empty pad after Joker Doom (SwdTech draws from
+; BushidoName, not from these, which is why they are still empty). Steal
+; $56, Filch $57, Bestow $58 are authored into src/text/attack_name_en.json
+; so they ride the encode pipeline like every other name. Names render with
+; no btlgfx change, and so does the banner during the action.
 OT6_THIEF_STEAL  = $56
 OT6_THIEF_FILCH  = $57
 OT6_THIEF_BESTOW = $58
 
 ; ------------------------------------------------------------------------------
 
-; [ #55: open Steal as a submenu, the twin of Ot6BlitzListOpen ]
-;
+; [ open Steal as a submenu, the twin of Ot6BlitzListOpen ]
 ; Three rows in the left column only (cells 0/6/12, the Ot6BushidoWindow shape),
 ; right column and rows past the third $ff so the window renders one clean
 ; column.  Per row: Index = the id above, Qty = the MP cost the decorator draws,
@@ -146,7 +129,7 @@ OT6_THIEF_BESTOW = $58
 
 ; ------------------------------------------------------------------------------
 
-; [ #55: is this pending Steal-command action Filch, or Bestow, or plain Steal? ]
+; [ is this pending Steal-command action Filch, or Bestow, or plain Steal? ]
 ;
 ; One discriminator for the charge, the menu and the execute dispatch, so they
 ; cannot disagree about which row fired.  in: A = the queued attack byte
@@ -168,12 +151,11 @@ OT6_THIEF_BESTOW = $58
 
 ; ------------------------------------------------------------------------------
 
-; [ #55: run the thief row this Steal action selected ]
+; [ run the thief row this Steal action selected ]
 ;
-; The whole execute-side dispatch, so Cmd_05's hook is five bytes (jsl + bcs) and
-; every decision stays in bank F0, per ot6.asm's standing rule ("Keep
-; vanilla-bank edits to minimal hook shims so bank $C2 stays under its fixed
-; segment offsets"), and it keeps the row-id constants out of the C2 source.
+; The whole execute-side dispatch, so Cmd_05's hook is five bytes (jsl + bcs)
+; and every decision stays in bank F0, keeping the row-id constants out of
+; the C2 source.
 ;
 ; Set $3412 = 0 (attack name type "normal") for the two new rows.  ExecAction
 ; $ff-fills $3410-$341f before dispatching CmdTbl (battle_main.asm:3132), so
@@ -220,49 +202,49 @@ OT6_THIEF_BESTOW = $58
 
 ; ------------------------------------------------------------------------------
 
-; [ #55: Filch, chip a shield off the target and keep it as a boost point ]
+; [ Filch, chip a shield off the target and keep it as a boost point ]
 ;
-; kits.md designs Filch as "steal 1 BP from the target".  That is not
-; implementable: an enemy has no BP bank to take from.  OT6_BP_CLASS ($3e9c) is
-; a split table (ot6.asm's own header: "$3e9c,X characters: boost points (0-5)
-; - monsters: class weaknesses"), and the monster half is seeded at battle init
-; with the species' authored class-weakness mask (Ot6SeedShields,
-; ot6_break.asm:36 for the authored row and :51 for the generated break floor).
-; Decrementing it would not take a boost point; it would corrupt the break
-; system's record of what that monster is weak to.  Both shipped reactive earns
-; already refuse the monster half for the same reason (Ot6RunicBP's and
-; Ot6CoverBP's `cmp #$08`).
+; "Steal 1 BP from the target" is not implementable: an enemy has no BP bank
+; to take from.  OT6_BP_CLASS ($3e9c) is a split table (ot6.asm's own header:
+; "$3e9c,X characters: boost points (0-5) - monsters: class weaknesses"), and
+; the monster half is seeded at battle init with the species' authored
+; class-weakness mask (Ot6SeedShields, ot6_break.asm:36 for the authored row
+; and :51 for the generated break floor).  Decrementing it would not take a
+; boost point; it would corrupt the break system's record of what that
+; monster is weak to.  Both shipped reactive earns already refuse the
+; monster half for the same reason (Ot6RunicBP's and Ot6CoverBP's `cmp
+; #$08`).
 ;
-; The other reading, a pure mint ("+1 BP to Locke, the enemy pays nothing"),
-; does not work either: Ot6ActionEnd pays every
-; character +1 BP at the end of any turn they did not boost through
-; (ot6_boost.asm:142-147), so an ability whose whole effect is +1 BP is worse
-; than Fight, which earns the same pip and also swings.
+; A pure mint ("+1 BP to Locke, the enemy pays nothing") does not work
+; either: Ot6ActionEnd pays every character +1 BP at the end of any turn
+; they did not boost through (ot6_boost.asm:142-147), so an ability whose
+; whole effect is +1 BP is worse than Fight, which earns the same pip and
+; also swings.
 ;
 ; So Filch takes the resource the enemy does have: one shield, which Locke
-; keeps as a boost point.  That is a transfer on an axis the enemy actually
-; holds, and per #54's framing it is a probe his dagger cannot reach:
-; Ot6ClassChip only chips when the attack's class matches the target's weakness
-; row, so Locke's piercing dagger does nothing against anything not weak to
-; piercing.  Filch ignores class and element: it removes a shield whatever the
-; row says, which makes it the party's only answer to an enemy whose weakness
-; is unknown or unmatched.  It is not a reveal: it takes the shield without
-; recording the row, so it complements Debilitator rather than replacing it.
+; keeps as a boost point.  Ot6ClassChip only chips when the attack's class
+; matches the target's weakness row, so Locke's piercing dagger does nothing
+; against anything not weak to piercing.  Filch ignores class and element:
+; it removes a shield whatever the row says, which makes it the party's only
+; answer to an enemy whose weakness is unknown or unmatched.  It is not a
+; reveal: it takes the shield without recording the row, so it complements
+; Debilitator rather than replacing it.
 ;
-; The BP is payment for the chip, not for pointing at an enemy: if no shield is
-; removed, no pip is banked.  Against an already-Broken or shieldless target
-; Filch is a no-op (the Ot6Assassinate fallback shape).  A landed Filch nets
-; Locke +2 BP on the turn, this pip plus Ot6ActionEnd's own unboosted regen,
-; which is the point of the ability and the only way in the game to gain two in
-; one turn.  The cap is Ot6ActionEnd's and untouched: a Filch at 5 BP still
-; takes the shield and banks nothing, as Runic's absorb does.
+; The BP is payment for the chip, not for pointing at an enemy: if no shield
+; is removed, no pip is banked.  Against an already-Broken or shieldless
+; target Filch is a no-op (the Ot6Assassinate fallback shape).  A landed
+; Filch nets Locke +2 BP on the turn, this pip plus Ot6ActionEnd's own
+; unboosted regen, the only way in the game to gain two in one turn.  The
+; cap is Ot6ActionEnd's and untouched: a Filch at 5 BP still takes the
+; shield and banks nothing, as Runic's absorb does.
 ;
 ; The break tail is Ot6Chip's, copied rather than called because Ot6Chip is
 ; tied to the elemental weak-branch contract ($11a1, the reveal, the codex
 ; write) and Filch reveals nothing: shields to zero sets OT6_BROKEN_TICKS and
-; arms the #48 flash as pending ($ff), which Ot6BreakArm lands on the damage
-; frame.  There is no damage numeral on a Filch, so Ot6ActionEnd's backstop is
-; the frame that shows it, the same path a 0-damage chip already relies on.
+; arms the break flash as pending ($ff), which Ot6BreakArm lands on the
+; damage frame.  There is no damage numeral on a Filch, so Ot6ActionEnd's
+; backstop is the frame that shows it, the same path a 0-damage chip already
+; relies on.
 ;
 ; entry: jsl from Cmd_05's dispatch, db=$7e, a8/i8 (command context).  x =
 ; attacker entity offset, $b9 = the monster half of the target mask.  clobbers
@@ -296,14 +278,14 @@ OT6_THIEF_BESTOW = $58
         lda     #OT6_BREAK_TICKS
         sta     OT6_BROKEN_TICKS,y         ; shields down: Break
         lda     #$ff
-        sta     OT6_BRKTICK-8,y            ; #48: arm the flash as pending
+        sta     OT6_BRKTICK-8,y            ; arm the flash as pending
 @bank:  ; --- the chip landed: Locke keeps it as a boost point ---
         lda     OT6_BP_CLASS,x
         cmp     #$05
         bcs     @out            ; the bank cap holds; a filch never wraps
         inc     a
         sta     OT6_BP_CLASS,x
-        jsr     Ot6BankMoved    ; #77: an open kit window's BP grey is read
+        jsr     Ot6BankMoved    ; an open kit window's BP grey is read
                                 ;   at open only
 @out:   ply
 done:   plp
@@ -312,10 +294,10 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
-; [ #55: Bestow, hand one boost point to an ally ]
+; [ Bestow, hand one boost point to an ally ]
 ;
-; kits.md verbatim: "give an ally 1 BP".  Both ends of this transfer are
-; character rows of OT6_BP_CLASS, so unlike Filch it matches the sketch.
+; Both ends of this transfer are character rows of OT6_BP_CLASS, so unlike
+; Filch it needs no substitute resource.
 ;
 ; Locke's half of the transfer is not debited here.  This proc arms
 ; OT6_BOOST_REVEALED (the pending-boost byte) to 1 and lets Ot6ActionEnd do the
@@ -334,8 +316,7 @@ done:   plp
 ; pays at least one either way and cannot be double-charged.  Boosting into
 ; Bestow buys nothing, because it is not a damage verb and Ot6BoostDmg's cmd-$05
 ; gate already refuses to multiply anything under this command, so that is
-; wasted BP in the same way boosting into Runic is.  It is noted as a follow-up
-; rather than fixed with a new refusal surface.
+; wasted BP in the same way boosting into Runic is.
 ;
 ; Three refusals, all no-ops rather than errors, because by the time this
 ; runs the turn is committed and there is no menu left to signal in:
@@ -379,7 +360,7 @@ done:   plp
         bcs     @out            ; the ally is capped: the point would be lost
         inc     a
         sta     OT6_BP_CLASS,y  ; the ally banks it
-        jsr     Ot6BankMoved    ; #77: the ALLY's bank moved, and the ally
+        jsr     Ot6BankMoved    ; the ALLY's bank moved, and the ally
                                 ;   is the one who may have a kit window open,
                                 ;   since Locke is mid-action
         lda     OT6_BOOST_REVEALED,x       ; Locke's half: let Ot6ActionEnd charge it

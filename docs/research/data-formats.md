@@ -110,8 +110,8 @@ Sub-jobs design maps 1:1 onto this record: 5 granted skills + equip bonus.
 
 ## Spells/abilities — $C46AC0 vanilla, 14 B × 256
 
-> OT6 note: the C4 fixed_blocks ahead of this table grew (+$E0 total,
-> issue #125), so in OT6 builds MagicProp sits at $C46BA0. Addresses in
+> OT6 note: the C4 fixed_blocks ahead of this table grew (+$E0 total),
+> so in OT6 builds MagicProp sits at $C46BA0. Addresses in
 > this doc are vanilla; read live ones from `ff6/rom/ff6-en.map` or
 > `H.sym("MagicProp")`.
 

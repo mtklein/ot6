@@ -1,7 +1,7 @@
--- probe_narshe_chase2.lua -- chase to $023B, enter 21, scan BEFORE the trigger
--- Wolf chase (#133 item 3).
+-- probe_narshe_chase2.lua -- chases to $023B, enters 21, scans BEFORE the
+-- trigger.
 --
--- Decoded route (event_trigger/npc_prop/entrance data, all step-on):
+-- Route (event_trigger/npc_prop/entrance data, all step-on):
 --   world (84,33) -> town 20 (38,61)
 --   door (52,37) -> treasure room 30 arriving ON the intro trigger
 --     (79,17): Lone Wolf appears [$0239]
@@ -11,8 +11,8 @@
 --   22 top edge (18..21,1) -> 23 (25,31)
 --   trigger (22,20) [$023D]; triggers (8..10,18) resolve the cliff
 --     standoff [$023F: Lone Wolf and MOG hang from the ledge]
---   MOG's npc at (9,16) (_ccd5df, needs $023F=1): talking to him takes
---     Mog over the Gold Hairpin -- the routed choice -- and he JOINS.
+--   MOG's npc at (9,16) (needs $023F=1): talking to him takes Mog over
+--     the Gold Hairpin, and he JOINS.
 -- Gates verified in the fixture: $0070=1 (chase open), $0239..$023F=0,
 -- WoB.  Boots from wob_tzen_done.mss (on the world beside the ship at
 -- Tzen); saves wob_mog_done.mss on the world outside Narshe.
@@ -24,7 +24,7 @@ local function sw(bit) return (H.readByte(0x1E80 + (bit >> 3)) >> (bit & 7)) & 1
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
 local function mogIn()
   -- $1850+char = party-assignment byte; nonzero low bits = in a party.
-  -- $02FA/$02EA are the roster switches _ccd5df sets when Mog is taken.
+  -- $02FA/$02EA are the roster switches set when Mog is taken.
   return (H.readByte(0x1850 + 10) & 0x07) ~= 0 or sw(0x2FA) == 1
 end
 
@@ -153,7 +153,6 @@ end
 H.run({ maxFrames = 80000 }, flatten({
   H.loadState("build/states/wob_narshe_town.mss.lua"),
   H.waitFrames(8),
-  -- (banked in-town fixture; the flight leg lives in probe_narshe_town)
   H.cond(function() return false end, {}, {}),
   H.call(function()
     H.assertEq(mapIs(20), true, "this is Narshe (map 20)")

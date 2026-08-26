@@ -58,13 +58,6 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.enterEncounter(),
   H.waitFrames(240),
-  -- issue #75: this call used to pin both guards' HP to 500 for "fight
-  -- longevity".  The pin was unnecessary: during the idle watch the party
-  -- takes no action (no input is pressed), so nothing can damage a guard,
-  -- and the attack round below is one beam into shielded guards, which
-  -- battle_boost measured cannot end the fight even twice over (shielded
-  -- damage is halved).  Enemy damage lands on party HP, which this test
-  -- never asserts on.
   H.call(function()
     baseline = cellset()
     H.log("idle cells: " .. baseline)
@@ -75,22 +68,6 @@ H.run({ maxFrames = 30000 }, {
   H.call(function()
     H.assertEq(changes, 0, "idle hud perfectly stable for 600 frames")
   end),
-  -- one attack round: BG3 is contested during the effect, then must
-  -- recover.  Issue #75: this used to berserk the whole party ($3EE5 |= $10,
-  -- forced menu-less auto-actions) and un-berserk after, which is a status
-  -- write both ways.  Now one beam is fired through the live menu, driven by
-  -- menu state ($7BC2), using battle_boost's measured driver unchanged: a
-  -- fixed button sequence lands its downs in whatever window holds the
-  -- cursor, so every press is chosen from the state byte.  The action is
-  -- the row-2 beam rather than the no-damage Heal Force the burn-down plan
-  -- suggested, because battle_boost measured that Heal Force does not work
-  -- on this fixture (the v0.8 wallet prices Heal Force out of the opening
-  -- MP, so A is refused).  A beam is the effect art that contests BG3,
-  -- which is what this phase samples, and one beam into a shielded guard
-  -- cannot end the fight.  Any other ready character defers focus with X
-  -- (vanilla's own turn-cycling key), so exactly one action fires; "lands"
-  -- means the actor's bp moved (Ot6ActionEnd's +1 regen on an unboosted
-  -- action).
   (function()
     local mf, downs = 0, 0
     return H.driveUntil(function()

@@ -1,10 +1,7 @@
--- probe_sfigaro_escape_stall.lua -- reproduction instrument, temporary.
--- gen_tunnelarmr's escape step parks at (41,43) with no control and no plan
--- for 20000 frames on the "map 87 (57,48) -> map 86 (49,31)" crossing.
--- Map 87 has no event triggers and no NPCs in the tables, so nothing
--- should be able to take control there.  This replays the route to the
--- park and dumps every control-gate cell hasControl() reads, the event PC,
--- the dialog/choice cells, and the whole object table, plus screenshots.
+-- probe_sfigaro_escape_stall.lua -- replays the map 87 (57,48) -> map 86
+-- (49,31) crossing and dumps every control-gate cell hasControl() reads,
+-- the event PC, the dialog/choice cells, and the whole object table, plus
+-- screenshots.  Map 87 has no event triggers and no NPCs in the tables.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/celes_freed.mss.lua"
 

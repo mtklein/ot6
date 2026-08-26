@@ -2,61 +2,24 @@
 """savestate_ninja.py -- emit the savestate graph
 (tools/tests/savestate_graph.py) as build/build.ninja.
 
-Replaces the Makefile's generate/generate_checkpoint/stackseed macros, the SAVESTATES
-lists, the ~104 hand-written rules, and the grep-generated dependency include
-(issue #25).  The old shape kept producing four failure modes; each is listed
-below with the mechanism here that prevents it:
-
- * A content stamp beside a touch: make decides staleness by mtime, so the
-   content check (savestate_stamp.sh needsgen) had to `touch` the target to
-   stop make re-deciding.  The two mechanisms could disagree, and did
-   (2026-07-27: a resumed run printed "rom content changed" then booted an
-   old-ROM savestate against the new ROM).  Here the decision and the
-   execution are one mechanism: every generated state declares its real
-   inputs, and the "is the content the same?" question is answered by
-   `restat` latch edges (below), inside ninja's own scheduler.
- * make never reconsiders: a target with no newer prerequisite is skipped
-   without its recipe running, so that generated include existed only to add
-   generator/lib prerequisites back on.  Ninja edges list every input
-   directly, emitted from the same data entry that defines the step, so
-   there is no second list to go stale.
- * A silent .PHONY no-op: GNU make does not apply implicit pattern rules to
-   .PHONY targets, so `smoke-%: rom` matched nothing and reported success in
-   0.036s.  Ninja has no implicit rules: every target is an explicit edge,
-   an unknown target is a hard error, and a dirty edge either runs its
-   command or fails.
- * The graph in three places: macros, rules and a generated include.  The
-   graph is now one data list, which this script translates.
-
-The content-staleness mechanism (`restat`): git checkouts and rebuilds bump
-mtimes without changing bytes, and generating a savestate costs minutes to
-hours, so mtime alone must never schedule one.  Every source input to a
-generated state (the ROM, the generator .lua, the three composed-in lib
-halves, checkpoint manifests and payloads) is therefore routed through a latch
-edge:
+Every source input to a generated state (the ROM, the generator .lua, the
+three composed-in lib halves, checkpoint manifests and payloads) is routed
+through a content latch edge:
 
     build build/ninja/src/<path>: latch <path>      (cmp -s || cp; restat=1)
 
-The latch re-runs on any mtime bump (cheap: one cmp), rewrites its output
-only when bytes differ, and `restat = 1` tells ninja to re-stat the output
-and prune everything downstream when it did not move.  A touched-but-equal
-file regenerates nothing; a changed ROM re-runs every transitive dependent,
-because a state's staleness is determined by its position in this graph.
-Generated states themselves are not latched: a regenerated .mss is new bytes,
-and everything booted from it must replay.
+The latch re-runs on any mtime bump, rewrites its output only when bytes
+differ, and `restat = 1` prunes everything downstream when it did not move.
+Generated states themselves are not latched: a regenerated .mss is new
+bytes, and everything booted from it must replay.
 
-What does not participate in staleness (same as the stamp check this
-replaces): the harness itself (run.sh, compose.py, decode_b64.py,
-pin_test_saves.py, sram_checkpoint.py) and ff6-en.dbg.  A harness edit has never
-invalidated a generated state, and widening the input set would regenerate
-every state on any tooling change.
+Not routed through the latch (so a harness edit never invalidates a
+generated state): run.sh, compose.py, decode_b64.py, pin_test_saves.py,
+sram_checkpoint.py, ff6-en.dbg.
 
-savestate_stamp.sh has a narrower job now: each state-generating edge
-still `write`s build/states/<state>.stamp after success, because
-lib/compose.py re-derives that signature at embed time to catch a fixture
-that reached a test without passing any freshness check (a worktree-seeded
-state that a local edit has since drifted from).  The stamp is provenance for
-that consume-time check, and it no longer schedules anything.
+Each state-generating edge `write`s build/states/<state>.stamp after
+success; lib/compose.py re-derives that signature at embed time to catch a
+fixture that reached a test without passing any freshness check.
 
 Usage:
     python3 tools/tests/lib/savestate_ninja.py             # (re)write build/build.ninja
@@ -64,12 +27,8 @@ Usage:
     python3 tools/tests/lib/savestate_ninja.py --selftest  # validation negatives
 
 The write is compare-and-conditionally-write, so an unchanged graph leaves
-build/build.ninja's mtime alone; build.ninja also regenerates itself via a
-`generator = 1` edge when this script or the graph data changes, so bare
-`ninja -f build/build.ninja` stays correct without the make wrapper.
-Emitted paths are relative to the repo root: run ninja from the root (the
-make wrappers do), or a state-generating edge's run.sh invocation will not
-resolve.
+build/build.ninja's mtime alone.  Emitted paths are relative to the repo
+root: run ninja from the root.
 """
 
 import argparse
@@ -88,8 +47,7 @@ ROM = "build/ot6.sfc"
 LATCH_DIR = "build/ninja/src"
 # The three lib halves compose.py inlines into every composed generator, in
 # inline order.  ot6_contract.lua is the invariant-contract half: an edit to
-# a contract must re-run every step that asserts it (issue #25), which the old
-# stamp signature never covered.
+# a contract must re-run every step that asserts it.
 LIB_HALVES = (
     "tools/tests/lib/ot6.lua",
     "tools/tests/lib/ot6_field.lua",
@@ -103,8 +61,7 @@ FIELDS = {"state", "gen", "prev", "checkpoint", "seed", "stack", "after",
 
 
 def checkpoint_inputs(root, key):
-    """Manifest first, then sorted payloads, the same order the Makefile's
-    checkpoint_inputs hashed, so no checkpointed state's signature changes."""
+    """Manifest first, then sorted payloads."""
     adir = f"tools/tests/checkpoints/{key}"
     payloads = sorted(p.name for p in (root / adir).glob("*.sram"))
     return [f"{adir}/manifest.json"] + [f"{adir}/{p}" for p in payloads]
@@ -151,8 +108,8 @@ def validate(states, root):
         if after and after not in seen:
             err(e, f"after {after!r} is not an earlier state")
         if checkpoint:
-            # Dirs named negative-* are deliberately-wrong fixtures for
-            # `make checkpoint-negatives`; no generated state may ever name one.
+            # Dirs named negative-* are deliberately-wrong fixtures; no
+            # generated state may ever name one.
             if checkpoint.startswith("negative"):
                 err(e, f"checkpoint {checkpoint!r} is a negative fixture")
             elif not (root / "tools/tests/checkpoints" / checkpoint /
@@ -160,13 +117,7 @@ def validate(states, root):
                 err(e, f"checkpoint {checkpoint!r} has no manifest.json")
             elif not checkpoint_inputs(root, checkpoint)[1:]:
                 err(e, f"checkpoint {checkpoint!r} has no *.sram payload")
-        # timeout=: run.sh's wall-clock cap for THIS edge only.  The default
-        # is 600 s and it is not enough for every generator: the South Figaro
-        # stop pushed gen_kolts past 80000 emulated frames, and the cap is
-        # wall clock, so `nice` does not protect it and a loaded machine
-        # turns a working generator into a timeout kill (trap 9).  Raising it
-        # per edge is better than raising the global default, which would
-        # also lengthen the time a genuinely hung run takes to report.
+        # timeout=: run.sh's wall-clock cap for THIS edge only (default 600 s).
         timeout = e.get("timeout")
         if timeout is not None and not (isinstance(timeout, int)
                                         and 60 <= timeout <= 7200):
@@ -244,19 +195,16 @@ def emit_state_edges(w, states, root, latch_of):
         deps += [latch_of(h) for h in LIB_HALVES]
         # Wall-clock default for generation edges: 1800 s rather than run.sh's
         # 600 s, because bare `ninja` fans every runnable generator out at
-        # once and equally-niced emulators stretch each other's wall clock --
-        # the longest edge measured 631 s UNCONTENDED (v0.15 ledger), which
-        # left the old default one scheduler hiccup from a spurious kill.
-        # The cap detects hangs; it never slows a green run.  A per-edge
-        # timeout= larger than this still wins below.
+        # once and equally-niced emulators stretch each other's wall clock.
+        # A per-edge timeout= larger than this still wins below.
         env = [] if e.get("timeout") else ["OT6_TIMEOUT=1800"]
         extras = ""
         explicit = ""
         order = ""
-        # The provenance ancestor (issue #75): what savestate_stamp.sh write
-        # hashes into the stamp's `ancestor` line.  Exactly one of prev= /
-        # checkpoint= can be set (validate() enforces it); a state with neither
-        # is a power-on root and records no ancestor.
+        # The provenance ancestor: what savestate_stamp.sh write hashes into
+        # the stamp's `ancestor` line.  Exactly one of prev= / checkpoint=
+        # can be set (validate() enforces it); a state with neither is a
+        # power-on root and records no ancestor.
         ancestor = "-"
         if e.get("prev"):
             p = e["prev"]
@@ -464,8 +412,8 @@ def selftest():
               "build/states/b.stamp" in text)
         check("seed copies the stamp with the state (#75)",
               "cp build/states/$src.stamp build/states/$state.stamp" in text)
-        # provenance ancestors (#75): what each edge tells savestate_stamp.sh
-        # to hash into its `ancestor` line.
+        # provenance ancestors: what each edge tells savestate_stamp.sh to
+        # hash into its `ancestor` line.
         check("generate rule threads $ancestor to savestate_stamp.sh",
               "savestate_stamp.sh write $state $gen $ancestor" in text)
         check("root generate edge records no ancestor", "ancestor = -" in text)

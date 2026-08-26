@@ -1,25 +1,7 @@
--- battle_pricecharged.lua -- #79
+-- battle_pricecharged.lua -- every spell's published menu price matches
+-- the MP actually charged when cast.
 -- @suite savestate=worldmap_narshe
---
--- The price the battle menu PUBLISHES for a spell is the price the cast
--- actually DEBITS.  battle_costtable pins
--- all 54 published prices against the design table; this closes the other
--- half -- publish vs charge -- which is the check #76 believed it had and
--- turned out not to (it was measuring a spell nobody had learned).
---
--- Method: boot worldmap_narshe (codex_saveas' proven base: encounters
--- land from it and TERRA casts from a real list), walk into a live
--- encounter, and sweep her battle magic list: for every enabled entry the
--- current MP can pay, steer to the cell, cast at the default target, and
--- assert the MP delta equals the byte the menu itself displays (the
--- +3 cost byte of the $302C list entry -- the same byte the menu draws).
--- The battle may end mid-sweep; two encounters are chained.  The premise
--- assertion is >= 2 distinct spells measured with zero discrepancies --
--- portable against loadout drift, strict about the property (all 54
--- published prices are battle_costtable's job; this file pins
--- publish == charge on the spells a real fixture can afford).
---
--- Reads and pad presses only (issue #75).
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -42,10 +24,8 @@ local function cmdRowOf(a, cmd)
   return nil
 end
 
--- the sweep record: measured[id] = { want = published, got = delta }
 local measured, discrepancies = {}, {}
 local function nextTarget(a)
-  -- the first enabled, affordable, not-yet-measured cell
   for cell = 0, 53 do
     local id, flags, cost = listEntry(a, cell)
     if id == nil then return nil end
@@ -110,9 +90,6 @@ local function sweepBattle(n)
       -- actor that has a Magic row at all
       if caster == nil and cmdRowOf(a, CMD_MAGIC) then caster = a end
       if a ~= caster then
-        -- a bystander's open command window freezes the Wait-mode clock
-        -- (#72's hazard): X passes the menu to the next ready actor; B
-        -- backs out of any list
         H.setPad(st == ST_CMD and (mf % 8 < 4 and { x = true } or {})
                  or { b = true })
         return
@@ -142,9 +119,9 @@ local function sweepBattle(n)
           end
         end
       elseif st == ST_TGT then
-        btn = "a"       -- #111: offensive/heal confirm, engine's default
+        btn = "a"       -- offensive/heal confirm, engine's default
       else
-        btn = "b"       -- #90: B in unrecognised states
+        btn = "b"       -- B in unrecognised states
       end
       H.setPad(btn and { [btn] = true } or {})
     end),
@@ -156,9 +133,7 @@ local steps = {
   H.waitFrames(60),
 }
 local function patrolIntoBattle(n)
-  -- codex_saveas' grass patrol: enterEncounter's field-style held-up walk
-  -- does nothing on the world engine, so walk the (82,56)<->(82,50) grass
-  -- lane until an encounter fires
+  -- walk the (82,56)<->(82,50) grass lane until an encounter fires
   local plan, idx, goal = nil, 1, { 82, 56 }
   return H.seqStep({
     H.driveUntil(function() return H.battleLoadStarted() end, 20000, {

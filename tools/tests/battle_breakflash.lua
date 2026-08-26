@@ -1,60 +1,10 @@
 -- @suite slow
--- battle_breakflash.lua -- issue #48: breaking an enemy is an audio-visual
--- event, it lands on the break frame, and it is local to the enemy broken.
---
+-- battle_breakflash.lua -- breaking an enemy is an audio-visual event, it
+-- lands on the break frame, and it is local to the enemy broken.
+
 -- Visual-only assertions have been unreliable in this tree, so every claim
 -- here is made against the mechanism and the screenshots are corroboration:
---
---   1. the frame.  The chip banks $FF in OT6_BRKTICK at damage calc, and the
---      flash arms on a damage-numeral frame ($632E moving), strictly later.
---      That is #33's clockwork rule; the timeline is logged either way.
---   2. locality.  The broken guard's sprite-data byte (w7e80db + slot*2,
---      btlgfx_ram.inc:720) has its obj-palette bits driven to 3, the
---      engine's own flash and death scratch slot, while its unbroken sibling
---      is never armed and never leaves the 0/1/2 vanilla assigned it
---      (btlgfx_main.asm:4917-4921).  No screen-wide effect can do that.
---   3. the palette.  Obj palette 3 (w7e7e00::_11 = $7E7F60) holds $7FFF,
---      white, while the broken monster points at it.
---   4. the sound, once.  Exactly one animation-sfx enable (w7ee9ec) carrying
---      OT6_BREAK_SFX ($BE) per break, panned to the broken monster's screen
---      x, however many hits the breaking action landed.
---   5. the hand-back.  Three 4-frame white pulses, then the sprite goes back
---      to its own palette bits, all inside OT6_BREAK_FLASH frames.
---   6. two at once.  Both guards armed for the same damage frame flash
---      together and share one cleave, which is the multi-break case a
---      single-target beam on a two-monster formation cannot stage naturally.
---   6b. no reveal to ride (#63).  A break landing on a hit that reveals
---      nothing new still flashes and still cleaves, asserted with both
---      revealed bytes byte-identical across the phase.  The arm hangs off
---      Ot6RevealCommit's tail, and #63 was filed on the theory that this made
---      it reveal-dependent; it does not, because Ot6RevealPoll calls that proc
---      on every damage-numeral edge whether anything is pending or not.  This
---      phase pins that behaviour rather than checking a regression; it passes
---      pre-fix too.
---   6c. the break that also kills (#63, the regression).  A breaking hit takes
---      elemental x2 and broken x2, so in real play the break usually is the
---      kill, and pinLab's HP pin made that case unreachable here, which is
---      how v0.8-rc1 shipped without answering it at all.  With the HP pin
---      lifted on the target: the white flash is correctly refused (the death
---      fade owns obj palette 3 and w7e80db) but the cleave still fires, on the
---      damage frame, panned to the monster, and is dispatched to the APU
---      before the death sound replaces it.  This fails on the pre-fix ROM.
---   7. NMI budget (#33's measurement).  Extra per-frame battle traffic once
---      pushed the engine's line transfers past vblank and froze every ATB
---      with menus wedged shut.  This effect adds no transfer at all (palette
---      3 and w7e80db ride DMAs btlgfx_main.asm:1512-1518 makes
---      unconditionally), so the fight must keep ticking across a live flash,
---      asserted directly with ATB gauges and a menu open.
---
--- A lab control that the results depend on: vanilla also drives this byte.  A
--- monster flashes palette 3 for 16 frames when it takes its turn
--- (btlgfx_main.asm:23384-23410, measured live on this formation:
--- probe_sprdata saw C1/9B5D write $06/$00 to slot 3 at f545/f549/f553/f557).
--- Left alone that would produce exactly the observation this test is looking
--- for, so the per-monster once-a-battle latch that gates it (w7e618b, one
--- byte per slot, :23374) is pinned nonzero for both guards.  Every palette-3
--- frame observed after that is OT6's.
---
+
 -- Otherwise this uses battle_break.lua's laboratory: walk into the
 -- entry-point guard fight, poke both guards fire-weak and tough, and spam Fire
 -- Beam.  Guards sit in monster slots 2 and 3, at slot offsets 4 and 6.
@@ -87,11 +37,6 @@ local function palBits(g) return H.readByte(SPRDATA + G[g]) & 0x0E end
 -- ---------------------------------------------------------------- watchers
 local sfx = {}                  -- one entry per queued animation sfx
 local ecWrites = {}             -- EVERY write to the enable byte, zeroes too:
-                                --   a zero means the engine consumed the queue,
-                                --   which is how a queued cleave is known to
-                                --   have been dispatched rather than overwritten
-                                --   by the next sound (#63; there is no audio to
-                                --   check)
 local hpWrites = {}             -- damage-CALC frames
 local pendF, armF, offF = {}, {}, {}
 local prevTick, eatenF = {}, {}          -- the frame a PENDING byte was consumed
@@ -204,13 +149,7 @@ local function breakSfx()
 end
 
 -- the lab pin, re-applied every drive tick.
---
--- #63: both of these pins hide a candidate cause of the flash never firing in
--- real play, which is how that bug shipped green.  The HP pin means a break
--- can never coincide with a kill, and a breaking hit collects elemental x2
--- and broken x2, so in real play it usually is the kill.  Phase 5 below is
--- run with the HP pin lifted on the target for that
--- reason; nothing else in this file may assume it applies.
+
 local function pinLab(skip)
   for g = 1, 2 do
     H.writeByte(MONFLASH + (G[g] >> 1), 1)     -- vanilla turn-flash: spent
@@ -326,8 +265,6 @@ H.run({ maxFrames = 60000 }, {
       .. "damage frame, not fired at the chip hundreds of frames earlier")
     local onNumeral = false
     for _, f in ipairs(numeralF) do
-      -- Ot6RevealPoll sees $632E move on its own main-loop tick; the arm is
-      -- that tick or a few after (#33 measured the same slack for reveals)
       if armF[b] - f >= -2 and armF[b] - f <= 12 then onNumeral = true end
     end
     H.assertEq(onNumeral, true,
@@ -466,18 +403,6 @@ H.run({ maxFrames = 60000 }, {
     H.call(function() pinLab() end), H.waitFrames(4),
   }, "a battle menu still opens after the flash window"),
 
-  -- ---------------- phase 4: a break that reveals nothing new -------------
-  -- Phase 1 breaks a 2-shield guard, so its reveal lands on chip one
-  -- and its break on chip two, but nothing here asserted that, and a
-  -- reader (and #63's filed hypothesis) could believe the effect
-  -- rode the reveal.  This phase pins it: the guard goes in with its fire
-  -- weakness already known, breaks, and the revealed bytes are asserted
-  -- byte-identical across the whole phase.  So the break moment cannot be
-  -- riding a reveal, because there is none to ride.
-  --
-  -- Fail-before: this phase passes on the pre-#63 ROM too.  It
-  -- pins a property that was already true rather than catching
-  -- the bug; phase 5 does that.
   H.call(function()
     resetWatch()
     local b = H.vars.tgt
@@ -529,19 +454,6 @@ H.run({ maxFrames = 60000 }, {
       string.format("and still cleaved exactly once (%d)", #hits))
   end),
 
-  -- ---------------- phase 5: the breaking blow that also kills ------------
-  -- This is the case the owner plays, and the case pinLab's HP pin made
-  -- unreachable.  A breaking hit takes vanilla's elemental x2 and then
-  -- Ot6BrokenDmg's x2, giving 4x base, so on ordinary bodies the break is the
-  -- kill.  v0.8-rc1 answered that with nothing: Ot6BreakStart's
-  -- hp-already-zero refusal skipped the flash and the cleave
-  -- (probe_breakplay measured hp=0000, status $80, and no $BE queued).  The
-  -- flash is still correctly refused, because the death animation loads
-  -- MonsterDeathPal into this palette slot and repoints w7e80db at it
-  -- (btlgfx_main.asm:22259-22266), but the cleave must fire.
-  --
-  -- Fail-before observed: on the pre-fix ROM this phase fails at the cleave
-  -- count with 0.
   H.call(function()
     resetWatch()
     local b, o = H.vars.tgt, H.vars.sib
@@ -552,10 +464,6 @@ H.run({ maxFrames = 60000 }, {
     -- shields on the sibling puts that out of reach of the tail frames.
     H.writeByte(SHIELD + G[o], 6)
     pinLab()
-    -- 450 hp: chip one (elemental x2 then shielded x0.5, about 1x base,
-    -- measured ~134 in battle_break) leaves it alive; the breaking chip (x2
-    -- and x2 unattenuated, ~536) kills it.  The sibling stays pinned so the
-    -- battle does not end under the assertions.
     H.writeWord(MONHP + G[b], 450)
     H.vars.tgtX = H.readByte(MONX + G[b])
     H.log(string.format("phase 5: guard %d hp -> 450, hp pin LIFTED on it "
@@ -609,8 +517,6 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(tick(b), 0,
       "and the pending byte is consumed rather than left to outlive the action")
 
-    -- but the break is still audible.  This is the assertion #48 could not
-    -- have made, and the one that fails on the shipped ROM.
     H.assertEq(#hits, 1,
       string.format("the break still CLEAVES when its blow also kills -- one "
         .. "$%02X queued (%d)", BREAK_SFX, #hits))
@@ -647,9 +553,6 @@ H.run({ maxFrames = 60000 }, {
       .. "dispatched")
     H.assertEq(consumed ~= nil, true,
       "UpdateSfx consumed the cleave and wrote it out to the APU ports")
-    -- what remains unverified, and is recorded rather than claimed: whether
-    -- $BE sounds like a break.  #48 chose it by grep and never listened to it,
-    -- and this test cannot either.  It is one constant, OT6_BREAK_SFX.
   end),
 
   H.logStep(function() return "battle_breakflash complete" end),

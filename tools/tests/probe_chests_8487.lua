@@ -1,4 +1,4 @@
--- probe: walkability around the six #84 chests on maps 84 and 87
+-- probe_chests_8487.lua -- walkability around the six chests on maps 84 and 87
 --   map 84: 500 gil (7,52) b26, 1500 gil (21,56) b27, 1000 gil (12,55) b28,
 --           empty (22,55) b29
 --   map 87: RegalCutlass (47,33) b34, Heavy Shld (48,33) b35

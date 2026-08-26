@@ -10,12 +10,7 @@
 -- the cliffs.  Generate narshe_streets.mss at the first calm tile outside.
 -- advanceStory cannot tap through the naming menu, because $0059 goes 1 while
 -- it opens, so the script splits there and presses START itself.
---
--- Issue #75: every navTo/advanceStory step passes playBattles=true, so if any
--- encounter ever fires on this stretch it is fought by tap-A rather than
--- write-cleared.  The wake-flow maps drew no encounters in any measured run,
--- so the flag is a guarantee rather than a behavior change.  This gen contains
--- no write idiom of its own.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local WAKE = "build/states/arvis_wake.mss.lua"
 

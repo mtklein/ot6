@@ -108,18 +108,14 @@ two places, and the testrunner applies the C# ones, so the host must too:
 - **SpcClockSpeedAdjustment 40** (UI/Config/SnesConfig.cs:62 vs
   SettingTypes.h:570).  The SPC clock derives from it (32000 + adjustment,
   Core/SNES/Spc.cpp:54,126; the 40 maps to real hardware's 32040Hz).  At
-  32000Hz the CPU/SPC interleaving shifts within the frame, and
-  `gen_vector_entry`'s world walk diverged: PASS at frame 6202 against the
-  testrunner's 6029, reproducibly on both sides.  Found by diffing
-  per-frame WRAM hashes between the two hosts: bytes identical until the
-  game's own H/V-counter load samples at $0630-$0632 (ff6/notes/
-  ff3u.asm C0/0153-0172) read one scanline apart, then a world-map
-  encounter fled 174 frames slower.
+  32000Hz the CPU/SPC interleaving shifts within the frame and long runs
+  diverge (the game's H/V-counter load at $0630-$0632 samples one scanline
+  apart, then encounter resolution drifts).
 
-With both matched, the recorded `gen_vector_entry` passes at 6029 exactly
-and the probed WRAM dumps are byte-identical to the testrunner's.  If a
-Mesen upgrade ever shifts these defaults again, that is the first place to
-look when a recorded run stops matching its unrecorded twin.
+With both matched, recorded and unrecorded runs pass at identical frames
+with byte-identical WRAM.  If a Mesen upgrade shifts these defaults again,
+this is the first place to look when a recorded run stops matching its
+unrecorded twin.
 
 ### Frame alignment
 
@@ -135,10 +131,9 @@ panel by a frame -- watchable in the demo where each A-press's dialog
 advance lands right at the lit frame.
 
 The two vstack branches are pinned to the same timebase with pts = frame
-index (`settb`/`setpts=N` in compose.py); without that, framesync padded 11
-duplicate frames into a 3024-frame render and the panel walked 3 frames out
-of step by n=1500.  `verify_panel.py` exists so that regression cannot come
-back silently.
+index (`settb`/`setpts=N` in compose.py); without that, framesync pads
+duplicate frames and the panel walks out of step.  `verify_panel.py` exists
+so that failure mode cannot come back silently.
 
 ## Verifying a render
 
@@ -154,9 +149,7 @@ middle of each, and checks all 12 button cells (held must be lit, idle must
 be dark) plus the frame-counter digits (rendered with compose.py's own font;
 at least 90% of expected pixels lit and at most 10% stray).  `--shift`
 deliberately reads the wrong frame and must fail; run it once after touching
-compose.py, because a checker that cannot fail is not a check.  Both
-directions were run on the demo: 0 failures at shift 0, 18 failures at
-shift 30.
+compose.py, because a checker that cannot fail is not a check.
 
 ## Measurements (battle_boost, 3023 frames, M4-class machine)
 

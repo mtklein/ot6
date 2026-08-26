@@ -1,28 +1,21 @@
 -- @suite savestate=vargas_won
--- battle_blitzlist.lua -- v0.3 Blitz-as-menu: the selector itself.
+-- battle_blitzlist.lua -- Blitz-as-menu: the selector itself.
 --
--- Vanilla Blitz had no window: UpdateMenuState_3d (btlgfx_main.asm, now
--- deleted) read button codes off a 64-frame rolling pad-edge buffer.  The
--- command now hands off to Ot6BlitzListOpen (ot6.asm), which fills wItemList
--- with the learned blitzes, each row keyed by its resolved attack id $5D+i
--- (Pummel $5d to Bum Rush $64), and reuses the Tools window shell (menu
--- state $30).  The row draw changes the Tools template's $0e item-name code to
--- $0f so ListTextCmd_0f renders each row from AttackName; the confirm shim
--- subtracts $5D back to the raw index cmd $0a stores, which is the byte
--- UpdateMenuState_3d used to write, so FixPlayerAttack (which validates i
--- against $1d28 and adds +$5d) and everything downstream are untouched.
+-- Ot6BlitzListOpen (ot6.asm) fills wItemList with the learned blitzes, each
+-- row keyed by its resolved attack id $5D+i (Pummel $5d to Bum Rush $64),
+-- and reuses the Tools window shell (menu state $30).  The row draw changes
+-- the Tools template's $0e item-name code to $0f so ListTextCmd_0f renders
+-- each row from AttackName; the confirm shim subtracts $5D back to the raw
+-- index cmd $0a stores, so FixPlayerAttack (which validates i against
+-- $1d28 and adds +$5d) and everything downstream are untouched.
 --
--- Issue #75 conversion: a real Sabin, his real learned set, and real cursors.
--- This file used to install CHAR::SABIN into every magitek-intro slot, write
--- the known-blitz mask $1d28 by hand, pin HP, and poke the saved-cursor
--- triple to select a row.  It now boots vargas_won (Sabin on Mt. Kolts
--- right after his own boss fight), paces the ledge until a natural
--- encounter fires, waits for SABIN's own menu, and opens his real Blitz
--- command.  The learned set is whatever the save holds, following
--- menu_blitzpage_sabin: $1d28 is read, the rows are derived from
--- it, and the not-drawn negative control is the save's own first unlearned
--- blitz.  The selection cursor is walked with the d-pad and verified by
--- re-reading the cell (the battle_vargas idiom) rather than written.
+-- Boots vargas_won (Sabin on Mt. Kolts right after his own boss fight),
+-- paces the ledge until a natural encounter fires, waits for SABIN's own
+-- menu, and opens his real Blitz command. The learned set is whatever the
+-- save holds: $1d28 is read, the rows are derived from it, and the
+-- not-drawn negative control is the save's own first unlearned blitz. The
+-- selection cursor is walked with the d-pad and verified by re-reading the
+-- cell rather than written.
 --
 -- What is asserted:
 --   1. learned-only rows and stamped costs.  wItemList packs exactly the
@@ -108,8 +101,8 @@ local function menuFor(charId, what)
     H.call(function()
       ph = ph + 1
       if H.readByte(MENU) == 0 then
-        -- no menu up: page any battle dialog with A (the battle_vargas
-        -- hazard, where a monster dialog blocks the queue until dismissed)
+        -- no menu up: page any battle dialog with A (a monster dialog
+        -- blocks the queue until dismissed)
         H.setPad(ph % 8 < 4 and { a = true } or {})
       elseif H.readByte(ACTOR) ~= slotOf[charId] then
         local step = ph % 40
@@ -272,7 +265,7 @@ H.run({ maxFrames = 90000 }, {
   -- 3. selection resolves -----------------------------------------------------
   -- The cursor is walked back onto Pummel's row 0 with the d-pad, because the
   -- mash above may have moved it, and verified by re-reading the saved-cursor
-  -- cells (issue #75: the pokes are gone).
+  -- cells.
   (function()
     local ph = 0
     return H.driveUntil(function()

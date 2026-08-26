@@ -1,20 +1,8 @@
 #!/usr/bin/env python3
 """What the party could be wearing and is not, read straight out of a saved game.
 
-Four separate multi-hour investigations in one week ended the same way: a
-fight was reported as too hard, and the party was walking into it badly
-prepared.  LOCKE bare-handed at South Figaro.  Everyone in the front row at
-Number 128 when nobody's damage came from a weapon swing.  A Star Pendant in
-the bag while the boss rolled Poison.  The party's only pierce weapon in the
-hand of the character who spends the fight casting.  Each was found by
-somebody hand-checking one party at one fight, and then the next person
-hand-checked a different party somewhere else.
-
-This prints that check for any saved game in about a second, with no
-emulator.  It reports rather than fails: an empty slot is often correct (the
-bag has nothing that fits, or the character is a guest), so a check that went
-red on every gap would be noise from the day it landed.  Read it when a fight
-looks too hard, before concluding anything about tuning.
+Reports rather than fails: an empty slot is often correct (the bag has
+nothing that fits, or the character is a guest).
 
     python3 tools/audit_readiness.py                     every declared state
     python3 tools/audit_readiness.py build/states/x.mss  one of them

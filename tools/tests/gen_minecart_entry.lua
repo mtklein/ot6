@@ -1,24 +1,12 @@
--- gen_minecart_entry.lua -- v0.6 step 12: esper_tubes (map 274 {10,12},
--- $0068=1, LOCKE alone) -> the lift trigger {20,13} -> map 266 -> Cid's
--- "I'm going to talk to the Emperor" scene -> map 272 {8,46} -> parked
--- beside CID, one A-press from the minecart.  Generates minecart_entry.
+-- gen_minecart_entry.lua -- esper_tubes (map 274 {10,12}, $0068=1, LOCKE
+-- alone) -> the lift trigger {20,13} -> map 266 -> Cid's "I'm going to
+-- talk to the Emperor" scene -> map 272 {8,46} -> parked beside CID, one
+-- A-press from the minecart.  Generates minecart_entry.mss.
 --
--- _cc7f43 (event_main.asm:96313) is gated only on `$0068=1`, which step 11
--- banked, so walking onto {20,13} is enough.  It rides the lift down
--- (`load_map 266, {7,0}`, :96341), plays Cid's decision (dlg $057E) and
--- ends `load_map 272, {8,46}, RIGHT` + `player_ctrl_on` (:96406-96457) --
--- the minecart platform, which carries a SAVE POINT on {3,55}
--- (event_trigger.asm:1211, npc_prop.asm:12434).
---
--- THE MINECART IS LAUNCHED BY TALKING TO CID, not by a trigger.  Map 272's
--- ONLY event trigger is the save point; the ride hangs off NPC_1, CID at
--- {9,51} behind switch $0644 with event _cc8022 (npc_prop.asm:12419 ->
--- event_main.asm:96463), whose tail is
---     switch $02BC=1 / cutscene TRAIN / call _ca5ea9 / ...
---     load_map 240, {64,13}
--- (:96579-96586).  This step banks the entry point in front of him and dumps
--- the live object map so the parking tile is measured rather than read off
--- an obj_script.
+-- The lift trigger is gated only on $0068=1.  It rides down, plays Cid's
+-- decision, and lands on the minecart platform (map 272), which carries a
+-- save point on {3,55}.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -68,7 +56,7 @@ local function partyReport(tag)
     H.readByte(0x1EDE), H.readByte(0x1EDF))
 end
 
--- Exact single-tile stepping (see gen_vector_sneak.lua for the measurement).
+-- Exact single-tile stepping.
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
 -- Tap `dir` whenever the party has control, hold off while a scene controls
@@ -99,11 +87,9 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- Stop tapping once the party is on the target tile.  The
-        -- terminator needs 16 consecutive calm frames there, and a further
-        -- tap walks off it before the count completes: the first version of
-        -- this rode the chute correctly to (10,45), then tapped itself to
-        -- (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile: the
+        -- terminator needs 16 consecutive calm frames there, and a
+        -- further tap would walk off it before the count completes.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return
@@ -144,7 +130,6 @@ local function census(tag, targets)
   end
 end
 
-
 local cid = nil
 local verifyReq, verifyLoad = nil, nil
 
@@ -173,15 +158,6 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("esper_tubes"))
   end),
 
-  -- 1. onto {20,13} -> the lift -> map 266 -> map 272.
-  --    The trigger is stepped onto with an explicit DOWN tap rather than a
-  --    navTo whose goal is the trigger tile: navTo terminates on the party
-  --    coming to rest, and a tile that loads a map is one it never rests
-  --    on.  (Before #22 this step had a second reason: a downward navTo
-  --    step overshot by a tile, so navTo "arrived" at {20,13} from {20,14}
-  --    and the map never changed, measured at 219 frames.  That part is
-  --    fixed in the library now; the entry-point-then-tap shape is how a
-  --    trigger tile is entered.)
   H.navTo(20, 12, { maxFrames = 15000, playBattles = "flee", arrive = function() return map() ~= 274 end }),
   tapInto("down", function() return map() ~= 274 end, 9000,
     "DOWN onto {20,13} -> the lift"),
@@ -206,16 +182,6 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("minecart_platform")
   end),
 
-  -- 1b. The boundary detour (issue #25).  This step is C->D's terminal, so
-  --     before parking beside CID it stands on the platform save point at
-  --     {3,55} and asserts the minecart-platform-v1 boundary table, the
-  --     same table gen_minecart_platform_checkpoint saves under and gen_n128's
-  --     checkpoint boot asserts as its entry contract.  The sram witnesses
-  --     are products of the boundary save, so the pre-save variant is
-  --     asserted (lib/ot6_contract.lua).  (3,54) is a wall (measured); the
-  --     tile is entered from the east.  Standing on a save tile re-enters
-  --     SavePoint every frame and hasControl() flickers, so arrival is
-  --     judged on position, $01BF and alignment.
   H.navTo(4, 55, { maxFrames = 9000, playBattles = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
@@ -241,10 +207,8 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 2. park beside CID.  His {9,51} is occupied by his own object, so the
-  --    entry point is whichever of its four neighbours the live object map
-  --    and tilemap leave open.  It is resolved here rather than read off an
-  --    obj_script, because _cc7f43's tail repositions him and the recon's
-  --    {9,46} is NO PATH from the landing.
+  --    entry point is whichever of its four neighbours the live object
+  --    map and tilemap leave open, resolved here rather than assumed.
   H.call(function()
     for _, c in ipairs({ { 9, 52, "up", 0 }, { 8, 51, "right", 1 },
                          { 10, 51, "left", 3 }, { 9, 50, "down", 2 } }) do
@@ -293,8 +257,8 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("minecart_entry")
   end),
   H.saveState("minecart_entry.mss"),
-  -- Reload-verified (gen_sabin_gau's pattern): a calm capture does not imply
-  -- a calm reload, so reload the parked moment and require it quiet.
+  -- Reload-verified: a calm capture does not imply a calm reload, so
+  -- reload the parked moment and require it quiet.
   H.call(function() verifyReq = H.requestSaveState() end),
   H.waitFrames(2),
   H.call(function()

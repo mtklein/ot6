@@ -1,34 +1,25 @@
 -- @suite slow savestate=vargas_won
--- battle_hitcount.lua -- #54: a real Pummel strikes twice, and only the
--- abilities in Ot6HitCountTbl strike more than once.
+-- battle_hitcount.lua -- a real Pummel strikes twice, and only the abilities
+-- in Ot6HitCountTbl strike more than once.
 --
--- Why hit count is the thing worth pinning.  In OT6 a landed hit that matches
--- a weakness chips a shield, so hit count is the break-rate dial.  That the
--- chip is per landed hit rather than once per action is measured separately
--- and asserted by tools/tests/probe_multihit.lua: one boosted Fight action
--- swinging eight times chipped four shields off one guard, 6 -> 5 -> 4 -> 3 ->
--- 2 -> 1, at $3a70 = 7, 5, 3, 1, with a class-weak-to-nothing control guard
--- that kept all six.  This file therefore pins the other half, the half #54
--- builds: how many times each ability strikes.
+-- In OT6 a landed hit that matches a weakness chips a shield, so hit count
+-- is the break-rate dial; the per-landed-hit chip rule is
+-- probe_multihit.lua's assertion.  This file pins how many times each
+-- ability strikes.
 --
--- What the ROM does now.  Ot6HitCountTbl (ff6/src/battle/ot6_hitcount.asm)
--- adds its value to $3a70, "number of attacks (0 = 1 attack)"
--- (battle_main.asm:6428), from a jsl in Cmd_0a (Blitz, battle_main.asm:3438)
--- and Cmd_09 (Tools, :4014).  The dangerous property of any such hook is
--- re-entry: the multi-attack loop at battle_main.asm:8390-8392 pushes
--- ExecAttack again for each remaining count, so a hook that runs inside the
--- loop re-arms $3a70 and the action never ends.  The command handlers cannot
--- be re-entered that way -- the loop returns to ExecAttack, never to Cmd_0a --
--- and ExecCmd clears $3a70 through InitGfxScript (:6428) before dispatching.
--- This test is the measurement of that argument rather than the argument
--- itself: it watches every write to $3a70 inside one real Pummel and requires
--- the hook's write to happen exactly once.
+-- Ot6HitCountTbl (ff6/src/battle/ot6_hitcount.asm) adds its value to $3a70,
+-- "number of attacks (0 = 1 attack)" (battle_main.asm:6428), from a jsl in
+-- Cmd_0a (Blitz) and Cmd_09 (Tools).  The multi-attack loop
+-- (battle_main.asm:8390-8392) pushes ExecAttack again for each remaining
+-- count without re-entering the command handlers, and ExecCmd clears $3a70
+-- through InitGfxScript before dispatching, so the hook's write happens
+-- exactly once per action.  This test watches every write to $3a70 inside
+-- one real Pummel and asserts that.
 --
--- Honest drive (#75): no state is written.  The fixture is vargas_won, Sabin
--- on the Mt. Kolts ledge just after his own boss fight, the same fixture and
--- the same lane-pacing and menu-walking idioms battle_blitzlist.lua uses.  A
--- natural encounter is paced into, Sabin's real Blitz command is opened, and
--- two of his real learned rows are picked with the d-pad and A.
+-- No state is written.  The fixture is vargas_won, Sabin on the Mt. Kolts
+-- ledge just after his own boss fight.  A natural encounter is paced into,
+-- Sabin's real Blitz command is opened, and two of his real learned rows
+-- are picked with the d-pad and A.
 --
 -- Asserted:
 --   1. AuraBolt, a Blitz with no row in the table, leaves $3a70 at 0: one
@@ -41,23 +32,17 @@
 --   3. The power split that pays for the extra hit is in the built ROM:
 --      MagicProp $5d = 55 (was 110) and $64 = 32 (was 128), with $5f Suplex
 --      at its vanilla 180 as the untouched control, and ItemProp $a8 Drill
---      = 96 (was 191) with $a6 Chain Saw at 252 as its control.  These are
---      the byte POSITIONS the splices in battle_main.asm and menu/item.asm
---      cannot assert for themselves.
---   4. Ot6HitCountTbl itself, read out of the ROM, is the three rows the
---      design documents and no others, so the table and multi-hit.md cannot
---      drift apart silently.
+--      = 96 (was 191) with $a6 Chain Saw at 252 as its control.
+--   4. Ot6HitCountTbl itself, read out of the ROM, is the three rows
+--      docs/design/multi-hit.md documents and no others.
 --
 -- The hit counts are exact rather than lucky.  Both blitzes carry $20 in
 -- MagicProp +$04 ($11a4, "can't dodge"), and CheckHit's `bit #$20` arm takes
--- the carry-clear exit with no roll, so neither can whiff and neither count
--- can come back one short on an unlucky run.
+-- the carry-clear exit with no roll, so neither can whiff.
 --
 -- Not asserted here: that the two hits chip two shields.  That needs a
--- bludgeon-weak target, and which formation the ledge draws is random, so
--- asserting it would be a check that passes for the wrong reason on the runs
--- where the draw is unlucky.  Chips seen are logged, not required; the
--- per-hit chip rule is probe_multihit's assertion.
+-- bludgeon-weak target, and which formation the ledge draws is random.
+-- Chips seen are logged, not required.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
 
@@ -77,8 +62,7 @@ local MAGIC_REC, ITEM_REC = 14, 30
 
 -- ------------------------------------------------------------- recording --
 -- One timeline, so an action's events can be cut out of it by order rather
--- than by frame: a two-hit volley spans several frames, and keying on frames
--- undercounted probe_multihit's own headline before it was fixed.
+-- than by frame: a two-hit volley spans several frames.
 local log, refs = {}, {}
 
 local function arm()
@@ -105,7 +89,7 @@ local function arm()
   -- It is recorded so that "did Sabin's blitz execute" can be answered WITHOUT
   -- consulting Ot6HitCount: on a ROM whose Cmd_0a shim is missing, waiting on
   -- the hook alone just times out, and a timeout reads like a broken drive
-  -- rather than a missing feature.  Measured, by building exactly that ROM.
+  -- rather than a missing feature.
   refs.spell = emu.addMemoryCallback(function(_, v)
     log[#log + 1] = { k = "spell", frame = H.frame, v = v }
   end, emu.callbackType.write, 0x7E3410, 0x7E3410)
@@ -171,11 +155,10 @@ local function firstFor(id) return actionsFor(id)[1] end
 -- The best Pummel seen so far.  "Best" is needed rather than "the first"
 -- because an ExecAttack pass whose target is already dead never reaches
 -- CalcTargetDmg, so a Pummel that kills the ledge trash outright shows one
--- Ot6HitJoin pass even though the engine ran the loop twice (measured: the
--- first run of this test hit exactly that, $3a70 writes [1 0] with one
--- join).  The two-hit case needs a target that survives the first hit, and
--- which formation the ledge draws is random, so the drive casts Pummel every
--- Sabin turn until one lands on a survivor.
+-- Ot6HitJoin pass even though the engine ran the loop twice.  The two-hit
+-- case needs a target that survives the first hit, and which formation the
+-- ledge draws is random, so the drive casts Pummel every Sabin turn until
+-- one lands on a survivor.
 local function bestFor(id)
   local best = nil
   for _, a in ipairs(actionsFor(id)) do
@@ -193,19 +176,16 @@ end
 
 
 -- ---------------------------------------------------------------- driving --
--- One per-frame driver for everything, in battle_blitzgrey.lua's shape: pace
--- the ledge for an encounter when there is no battle, page battle dialogs,
--- let bystanders Defend, and on Sabin's turn walk his real Blitz command and
--- cast whatever `want` currently is.  Every button is toggled on a phase edge,
--- because a held button is not a fresh press and the confirm and the target
--- confirm both need one.
+-- One per-frame driver for everything: pace the ledge for an encounter when
+-- there is no battle, page battle dialogs, let bystanders Defend, and on
+-- Sabin's turn walk his real Blitz command and cast whatever `want` currently
+-- is.  Every button is toggled on a phase edge, because a held button is not
+-- a fresh press and the confirm and the target confirm both need one.
 --
 -- The Blitz shell is TWO COLUMNS, so entry n sits at row n//2, column n%2.
 -- Walking to "row n, column 0" instead parks the cursor on entry 2n: for
--- AuraBolt that is an empty cell, A is refused, and the drive times out having
--- asserted, from wItemList, that the row it never reached held the right
--- ability.  Measured on this file's first run.  The entry is found by scanning
--- wItemList for the id rather than assumed.
+-- AuraBolt that is an empty cell and A is refused.  The entry is found by
+-- scanning wItemList for the id rather than assumed.
 local slotOf = {}
 local want = nil
 
@@ -400,8 +380,7 @@ H.run({ maxFrames = 120000 }, {
   -- makes only one Ot6HitJoin pass even though the engine ran the loop twice,
   -- so a single cast would measure the loop but not the second landed hit.
   -- Which formation the ledge draws is random, so this is a bounded ladder
-  -- rather than one attempt; if no target in the budget survives a 55-power
-  -- hit, the drive times out and that is the finding.
+  -- rather than one attempt.
   H.call(function() want = PUMMEL end),
   drive(function()
     local a = bestFor(PUMMEL)

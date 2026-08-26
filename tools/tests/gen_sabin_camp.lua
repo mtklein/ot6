@@ -2,21 +2,17 @@
 -- opening, which is not about SABIN at all.  Generates one state:
 --   camp_intro.mss  map 117 at (36,2), SABIN + SHADOW, controllable, with
 --                   $02E2 set so the gate cutscene cannot re-fire
---
--- The #84 chest rule adds one pickup on the way out: the Star Pendant at
--- (45,5), which sits behind the sealed-chest gag until the gag is played
--- (the step-3 comment below has the mechanism).
---
+
 -- Walking one tile south hands the game to CYAN, on another map, for ~9,000
 -- frames.  That is the whole content of this step, and it is not what the
 -- route map suggests.  Stepping from the camp gate onto (36,3) fires
 -- _cb0c2f (event_trigger.asm:33, event_main.asm:39785), which walks the
 -- party UP 1 / RIGHT 2 to (38,2) and calls the commander scene _cb0c87
 -- (:39826).  That scene does not end by returning control:
---
+
 --     fade_out / wait_fade / switch $01CC=1 / switch $04EE=1
 --     wait_1s / call _cb9aae                        (:40019-40027)
---
+
 -- and _cb9aae (:60795) is the Doma interlude:
 --     char_party CYAN, 1 / char_party SABIN, 0
 --     load_map 120, {33,42}, UP                     (:60802-60806)
@@ -25,7 +21,7 @@
 -- `name_menu CYAN` (:61204), comes back with `load_map 120, {33,49}`
 -- (:61245), parks SLOT_1 on (33,44) and the commander (NPC_1, obj 16) on
 -- (33,54) (:61246-61269), and only then reaches `player_ctrl_on` (:61482).
---
+
 -- What this cost, and why the file is shaped this way.  Run 1 of this step
 -- pointed navTo at the LEO scene's tile and let it walk.  navTo dropped its
 -- plan on the first frame ("control lost at (36,2)") and then sat for
@@ -37,7 +33,7 @@
 -- `name_menu CYAN`, which navTo has no branch for.  So:
 -- nothing on this step is walked with navTo except the two short stretches
 -- where the party genuinely has control, and everything else is ridden.
---
+
 -- Only the commander matters.  Map 120 stands up twelve soldiers (NPCProp
 -- ::_120, npc_prop.asm), eleven of which are `battle 43` grinding
 -- (_cb9ffb.._cba073, :61739-61802) that hides one NPC each and changes no
@@ -46,39 +42,7 @@
 -- interlude and calls _cb0bc4 (:61737), the camp's own startup event,
 -- which re-creates SABIN and SHADOW and reloads map 117 at (36,2).  So the
 -- interlude is exactly one fight long and the eleven others are skipped.
---
--- Issue #75: battle 46 is fought rather than write-cleared, and this
--- generator makes no state writes.  The fight is CYAN alone (battle slot one;
--- see the inBattle note) against event battle group 46 = formation 409 = one
--- $14E, and a loss cannot be recovered from in-timeline: `battle 46` is
--- followed by `call _ca5ea9` (:61522-61523), the GameOver gate, so a lost
--- fight leaves the event PC at $CB9EBB indefinitely.  The fighter is the house
--- menu-episode machine (gen_scenario's cadence: presses start only once the
--- battle-menu flag has held 4 straight pulses, then one button per 30-frame
--- pulse).  CYAN banks boost to 2 and dumps it on Fight: R raises pending
--- boost, and A A confirms the boosted Fight on the default target, the same
--- bank-and-dump policy the river fighters used.  A loss (CYAN at 0 HP
--- for 90 straight frames) does not error: it sets `lost`, and the retry
--- ladder reloads the cyan_defence-moment checkpoint, which is the script's
--- equivalent of a player reloading a save, then pokes the
--- commander again with the fighter escalated (attempt 2+ dumps at 1 BP,
--- which changes every input from the first turn and reshuffles the whole
--- interleaving).  Three attempts, then fail with every attempt's numbers
--- recorded.
---
--- Issue #75, playBattles: every navigator call below passes
--- playBattles = "tactical", so it does not fall through to the library's
--- monster-dead flag write.
--- Every step runs on map 117 (the Imperial Camp) or map 120 (Doma
--- Castle's interior), and both have random encounters disabled.
--- A field map rolls for a random battle only when byte +5 of its 33-byte
--- map_prop.dat record has bit 7 set: LoadMapProp copies the record to $0520
--- (ff6/src/field/map.asm:143-158), and the step handler returns before the roll
--- unless $0525 is negative (ff6/src/field/battle.asm:333-347).  So the option
--- is intent only here.  "tactical" rather than "flee" because the only battle
--- that could still reach it is an unscripted surprise -- a goal fight is taken
--- by opts.spare or opts.arrive first -- and fighting one beats spending
--- M.FLEE_CAP frames failing to run from it.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/sabin_camp.mss.lua"
 
@@ -103,21 +67,6 @@ local function monCount()
   return n
 end
 
--- BATTLE DETECTION, SLOT-AGNOSTIC -- and this is the whole reason run 2 of
--- this file died.  lib/ot6.lua's battleLoadStarted() reads ONE word, party
--- battle-HP slot 0 at $3BF4, and calls it "a battle has begun loading".
--- That holds for every fixture the harness had before this arc, because
--- every one of them fought with a party whose slot 0 was occupied.  CYAN's
--- solo defence of Doma does not: measured across the whole fight,
---     $3BF4=0000  $3BF6=00FE  $3BF8=0000  $3BFA=0000
--- CYAN is in battle slot ONE.  So battleLoadStarted() stayed false for the
--- entire battle, every driver in the run treated it as "no battle", nobody
--- pressed anything, and CYAN stood there while his HP ticked
--- FE -> D4 -> 94 -> 5A and the fight was lost.  The loss is then silent by
--- design: `battle 46` is followed by `call _ca5ea9` (:61522-61523), and
--- _ca5ea9 is `if_b_switch $40, _ca5eb2 / call GameOver` -- so a lost battle
--- leaves the event PC parked at $CB9EBB forever with the field still drawn.
---
 -- So scan all four slots -- but VALIDATE THE WHOLE TABLE, not just "some
 -- slot looks like HP".  A first attempt that returned true on any single
 -- plausible word fired on map 123 while the CYAN name menu was open:
@@ -205,25 +154,10 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- Map 117's only prompt is the sealed-chest gag _cb0dbe (:40058) on obj 29
--- at {45,5}, and the #84 chest pickup below now fires it ON PURPOSE: the
--- route answers option 0 (Kick it), the branch whose tail deletes the NPC
--- covering the treasure record (see the pickup's own comment).  One entry
--- per kick attempt, because a retry reloads a checkpoint from before the
--- prompt and replays it.  Map 120 still has no prompt at all, and any
--- prompt beyond these stays a hard failure rather than a blind A-press.
 local CHOICES = { { want = 0 }, { want = 0 } }
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
--- ---------------------------------------------------------- the fighter --
--- The input-driven battle driver (issue #75; gen_scenario's menu-episode
--- machine, reduced to the one policy this step needs): from a settled
--- battle menu
--- (flag $7BCA held 4 straight pulses), one button per 30-frame pulse --
--- boost prefix (R per banked point, dumped at the tier's threshold), then
--- A A = Fight on the default target.  Outside a settled menu, edge-tap A
--- (battle dialogs, victory text).  `tier` >= 2 dumps at 1 BP instead of 2.
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local BP = 0x3E9C                       -- banked boost points, +slot*2
 local fightTier = 1
@@ -251,12 +185,6 @@ local MSTATE = 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM = 0x01
 local CMDTBL, CMDROW = 0x202E, 0x890F
--- the item-list cursor is TWO cells per actor -- scroll ($8947) plus
--- row-on-screen ($894F) -- and the engine's own get_item_poi
--- (btlgfx_main.asm:_c189be) sums them before the *5; reading the scroll
--- alone selected inventory index 4 while the display said 1 (measured,
--- probe_itemuse: the select/deselect toggle that wedged the first
--- input-driven courtyard generation)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local function itemIdxOf(a)
   return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
@@ -283,8 +211,6 @@ local fTick, fStreak = 0, 0
 local function makeFightPlan(actor)
   local hp, mx = pHPf(actor), pMaxHPf(actor)
   local itemRow = cmdRowOf(actor, CMD_ITEM)
-  -- heal under 60%, and reach for the Potion once 100+ HP is missing: the
-  -- pursuit measured 4 attackers out-damaging a 50-HP Tonic line
   if mx > 0 and hp > 0 and hp * 10 < mx * 6 and itemRow then
     local id = nil
     if mx - hp >= 100 and battItemIdx(POTION) then id = POTION
@@ -298,9 +224,6 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  -- dump banked boost EVERY turn: these are 1-2 member steps where a dead
-  -- enemy is the only mitigation, and the pursuit measured bank-to-2
-  -- losing the tempo war against four attackers
   local boost = bp >= 1 and math.min(bp, 3) or 0
   H.log(string.format("camp: cast f%d e%d boost=%d tier=%d [%s]",
     H.frame, actor, boost, fightTier, partyLine()))
@@ -311,8 +234,6 @@ local function fightButton()
   local actor = H.readByte(ACTOR)
   if fPlan == nil or fPlanActor ~= actor then
     if st ~= ST_CMD then
-      -- planless in a parked LIST state: back out to the command list
-      -- (the b68 engine measured a menu reopening straight into a list)
       if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
         return { "b" }
       end
@@ -673,41 +594,10 @@ H.run({ maxFrames = 150000 }, {  -- the #84 chest pickup rides on the end
         tostring(lost)), 0)
     end
   end),
-  -- STEP OFF THE TRIGGER BEFORE GENERATING.  _cb0bc4 puts the party back on
-  -- (36,2) and walks it DOWN 1, so it comes to rest on (36,3) -- which is
-  -- _cb0c2f's own trigger tile.  CheckEventTriggers (field/event.asm:5740)
-  -- has no once-per-tile latch: it re-fires every frame the party stands
-  -- there, and although $02E2 now makes the script an immediate
-  -- EventReturn, each firing still flips $087C to 4 for a frame or two.
-  -- hasControl() therefore FLAPS -- measured, run 5: the 900-frame
-  -- heartbeat read ctl=true while landedField's every-frame sample read
-  -- ctl=false, and "10 consecutive settled frames" never once happened in
-  -- 6,000.  (36,5) is two tiles south, off every trigger on the map and on
-  -- the road the next step takes anyway.
   H.navTo(36, 5, { maxFrames = 4000, playBattles = "tactical" }),
   rideUntil(landedField(117, 10), "camp control settled off the trigger", 6000),
   H.waitFrames(30),
 
-  -- ==================================================================== --
-  -- 3. #84: the Star Pendant chest at (45,5), visible on this walk.  The
-  -- treasure record (bit 50) is covered by an NPC standing on the chest
-  -- tile: obj 29 (NPC_14 in npc_prop.asm ::_117, {45,5}, event bit $04EE),
-  -- stood up when the commander scene set $04EE=1 (:40027).  CheckNPCs runs
-  -- before CheckTreasure (field/player.asm:515-516), so while the NPC is
-  -- there an A-press gets the sealed-chest gag _cb0dbe (:40058) -- a
-  -- three-way prompt -- and the treasure can never answer.  Option 0
-  -- (Kick it, _cb0dcc) is taken: its tail is `switch $04EE=0 / delete_obj
-  -- NPC_14` (:40113-40115), which uncovers the record, and the kick
-  -- animation returns the party to the tile it interacted from (DOWN 2,
-  -- then jump_high UP 2), so the chest is opened from where the party
-  -- already stands.  (Option 1, Hit it, also deletes the NPC but ends on a
-  -- jump_low ledge drop below the chest.)  The branch fights battle 42
-  -- (group 42 = formation 62/46, two-three Dobermans) followed by the
-  -- _ca5ea9 GameOver gate (:40098-40099); it is fought for real by the
-  -- same rideUntil fighter as the commander, and a loss reloads a
-  -- checkpoint taken here at (36,5) -- one retry, second CHOICES entry --
-  -- rather than timing out at the parked event PC.
-  -- ==================================================================== --
   (function()
     local ckReq, chestBlob
     local function kickAttempt(n)
@@ -757,7 +647,6 @@ H.run({ maxFrames = 150000 }, {  -- the #84 chest pickup rides on the end
       end),
     })
   end)(),
-  -- #84: Star Pendant, visible on the walk
   H.openChest{ stand = { 45, 6 }, face = "up", bit = 50,
                what = "Star Pendant", item = 0xB1,
                nav = { playBattles = "tactical" } },

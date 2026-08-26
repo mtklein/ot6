@@ -3,29 +3,20 @@
 --
 --   tools/tests/run.sh tools/tests/battle_banner.lua
 --
--- The bug this pins down (single-frame asserts cannot see flicker, so the
--- invariant is checked on every frame of the sequence): vanilla builds its
--- attack/special/esper name-scratch string at $7E57D5 (ram_res w7e57d5,128;
--- GfxCmd_01/GfxCmd_11 and the swdtech and esper loaders all write byte 0
--- nonzero), and OT6_FONTDIRTY used to live on that byte.  Every named
--- banner then triggered the full ~46-scanline font re-lay in the
--- NMI tail, running ~30 scanlines past the end of vblank, which put VRAM
--- writes into active display and INIDISP/HDMA setup mid-frame, and the user
--- saw the screen flash and tear.  probe_banner measured end-of-flush at
--- scanline 292 (vblank ends at 262) on banner frames against 248 +/- 5 when
--- quiet.
---
--- The fix under test: OT6_FONTDIRTY relocated to $57B9 (write-watcher
--- verified spare byte), and the legit dialogue-close re-lay staged into six
--- ~128-byte slices, each gated on the live V counter.
+-- Single-frame asserts cannot see flicker, so the invariant is checked on
+-- every frame of the sequence. Vanilla builds its attack/special/esper
+-- name-scratch string at $7E57D5 (GfxCmd_01/GfxCmd_11 and the swdtech and
+-- esper loaders all write byte 0 nonzero). OT6_FONTDIRTY lives at $57B9,
+-- and the dialogue-close re-lay is staged into six ~128-byte slices, each
+-- gated on the live V counter.
 --
 -- Invariants, asserted across every frame from menu-open through the Fire
 -- Beam banner and resolution:
 --   1. the battle NMI's OT6 tail work and the following INIDISP write stay
 --      inside vblank (scanline 225..261) on every frame;
 --   2. a banner event happened in the window, seen as $57D5 changing from its
---      armed baseline.  This is the positive control that the vanilla writer
---      ran; issue #75 made it a read rather than a poke-then-poll;
+--      armed baseline. This is the positive control that the vanilla writer
+--      ran;
 --   3. OT6_FONTDIRTY ($57B9) stayed 0 throughout, so no re-lay was triggered;
 --   4. right after the banner the under-monster HUD cells are still
 --      painted in VRAM (shadow line vs tilemap word compare).
@@ -46,17 +37,9 @@ local armed = false
 local rec = {}                  -- per-frame {f, nmi, fs, fe, id, fd}
 local cur = nil
 local maxFd = 0
-local sawBanner = false         -- latched at NMI entry: the pre-relocation
-                                -- flush cleared $57D5 every NMI, so a
-                                -- main-thread poll can never see it
-local base57D5 = nil            -- $57D5 as the window opened (issue #75:
-                                -- this used to be poked to 0 so nonzero
-                                -- meant "banner"; the fixture arrives with
-                                -- $82 already there, so "banner happened"
-                                -- is now a change from the armed baseline.
-                                -- A new banner whose first char equals the
-                                -- stale one would fail the positive
-                                -- control rather than pass silently.)
+local sawBanner = false         -- latched at NMI entry
+local base57D5 = nil            -- $57D5 as the window opened: "banner
+                                -- happened" is a change from this baseline
 
 local function sl() return emu.getState()["ppu.scanline"] end
 
@@ -100,11 +83,8 @@ H.run({ maxFrames = 12000 }, {
     "battle to become active (screen rendering)", 30),
   H.waitFrames(240),
 
-  -- arm the instrument.  This used to zero vanilla's name-scratch byte so
-  -- that nonzero meant a banner happened; issue #75 made it a read: latch the
-  -- byte as it is (measured $82 from this fixture and drive; the poke was
-  -- load-bearing, and a clean-slate assert failed here) and detect the banner
-  -- as a change from that baseline in the NMI watcher.
+  -- arm the instrument: latch the name-scratch byte as it is, and detect
+  -- the banner as a change from that baseline in the NMI watcher.
   H.call(function()
     base57D5 = H.readByte(0x57D5)
     H.log(string.format("armed: $57D5 baseline %02X", base57D5))

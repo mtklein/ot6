@@ -11118,7 +11118,7 @@ DrawDanceListText:
         sta     w7e5755+5
         lda     $267f,y
         sta     w7e5755+11
-        jsl     Ot6DanceRowDecorate     ; ot6 #34: leading MP cost + grey per
+        jsl     Ot6DanceRowDecorate     ; ot6: leading MP cost + grey per
                                         ;   column (no-op layout in nomp)
         jsr     InitListTextTfr
         jsr     DrawListText
@@ -15307,7 +15307,7 @@ ListTextCmd_0f:
 .if LANG_EN
         cmp     #$51
         bcc     @65cc
-        tax                     ; ot6 (#8): park the id (X free here, reloaded at
+        tax                     ; ot6: park the id (X free here, reloaded at
                                 ;   @65bf), test bushido mode without touching A/Y
         lda     w7e6168
         cmp     #$02            ; bushido submenu? SwdTech names ($55-$5c) live in
@@ -18229,7 +18229,7 @@ _c1776b:
         jsl     Ot6BlitzListOpen
         jmp     OpenToolsWindow
 
-; ot6 (bushido submenu, #8): the SwdTech numeral gauge is replaced by a tools-
+; ot6 (bushido submenu): the SwdTech numeral gauge is replaced by a tools-
 ; shell submenu the same way Blitz was.  OpenCmdMenuTbl[7] hits this stub, which
 ; hands off to bank $f0 (fills wItemList with the moving-window techs + costs and
 ; raises bushido mode w7e6168=2), then reuses the Tools window shell to pick one.
@@ -18237,7 +18237,7 @@ _c1_bushido_open:
         jsl     Ot6BushidoListOpen
         jmp     OpenToolsWindow
 
-; ot6 (#55, locke's kit): Steal is the first row of a thief submenu, not a bare
+; ot6 (locke's kit): Steal is the first row of a thief submenu, not a bare
 ; command.  OpenCmdMenuTbl[5] hits this stub instead of the target-select state
 ; it used to; bank $f0 fills wItemList with Steal/Filch/Bestow (+ costs and each
 ; row's own targeting byte) and raises thief mode w7e6168=3, then the Tools
@@ -19031,7 +19031,7 @@ OpenCmdMenuTbl:
         .addr   OpenMagicWindow
         .addr   _c17795
         .addr   _c17795
-        .addr   _c1_thief_open          ; ot6 (#55): $05 steal -- was _c17795
+        .addr   _c1_thief_open          ; ot6: $05 steal -- was _c17795
                                         ;   (straight to target select); now
                                         ;   opens the thief submenu whose first
                                         ;   row IS Steal.  Locke has no spare
@@ -19039,7 +19039,7 @@ OpenCmdMenuTbl:
                                         ;   removed by InitCmd_03), so the ladder
                                         ;   lives behind the row he already has.
         .addr   _c17795
-        .addr   _c1_bushido_open        ; ot6 (#8): swdtech numeral gauge ->
+        .addr   _c1_bushido_open        ; ot6: swdtech numeral gauge ->
                                         ;   tools-shell submenu (was
                                         ;   UpdateMenuState_35, now dead)
         .addr   OpenThrowWindow
@@ -20667,7 +20667,7 @@ UpdateMenuState_30:
         bra     @8818
 @8809:  lda     w7e6168         ; ot6: blitz mode? queue it, no target select
         beq     :+
-        cmp     #$03            ; ot6 (#55): thief submenu? take the SAME arm a
+        cmp     #$03            ; ot6: thief submenu? take the SAME arm a
         beq     :+              ;   real tool takes -- the row id goes to
                                 ;   w7e7a85 and the row's own targeting byte to
                                 ;   w7e7a84, then target select, and
@@ -20676,7 +20676,7 @@ UpdateMenuState_30:
                                 ;   No new commit code: the whole point of
                                 ;   putting the ladder behind Steal is that this
                                 ;   path already carries a per-row id.
-        cmp     #$02            ; ot6 (#8): bushido submenu? row r = boost r,
+        cmp     #$02            ; ot6: bushido submenu? row r = boost r,
         bne     @blitzcommit    ;   latch the base+r tech in bank F0 (X = cell
         jsl     Ot6BushidoConfirm ;   offset from _c18470; may refuse & stay open)
         rts
@@ -49068,17 +49068,16 @@ ItemJumpThrowAnim:
 ; battle script" is the container every action animation, monster
 ; special, entry/exit effect and battle event runs under.  bracketing
 ; the container rather than tick provenance is a measured correction:
-; probe_animtick showed ~101 of 120 menu-idle frames tick through
-; WaitFrame (the battle menu is modal inside a gfx command), so "ticked
-; by WaitFrame" meant "most of an interactive battle" rather than
-; "animating".
+; ~101 of 120 menu-idle frames tick through WaitFrame (the battle menu
+; is modal inside a gfx command), so "ticked by WaitFrame" meant "most
+; of an interactive battle" rather than "animating".
 ;
-; discipline: no btlgfx_code size change (battle_banner and probe_banner
-; pin battle-NMI code addresses $C10BA7/$C10C17/$C10C1B/$C10CA4, and the
+; discipline: no btlgfx_code size change (battle-NMI code addresses
+; $C10BA7/$C10C17/$C10C1B/$C10CA4 are pinned, and the
 ; bank sits $23 bytes short of full), so the wrapper lives in the pinned
 ; ot6_c1 tail segment (ld65 raises an overlap error if btlgfx_code ever
 ; grows into it) and the flag writes happen in bank F0 (the $57ba-$57bf
-; strip keeps its bank-F0-only writer invariant, probe_57ba_strip).
+; strip keeps its bank-F0-only writer invariant).
 ; dispatch is `jmp (BtlGfxTbl,x)` from ExecBtlGfx_ext, so the wrapper
 ; owns the frame: jsl into the real BtlGfx_04 (its rtl lands back here),
 ; then clear the flag and rtl to ExecBtlGfx's caller.  BtlGfx_04 reads

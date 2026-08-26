@@ -1,38 +1,18 @@
--- probe_cursorgutter.lua -- the isolated instrument for issue #43's third
--- round.  Not a suite test (no @suite marker): it asserts one rule, on both
--- OT6 configurator pages, and nothing else.
+-- probe_cursorgutter.lua -- asserts the field menu cursor gutter rule on
+-- both OT6 configurator pages.
 --
--- The rule.  The field menu's cursor is a 16x16 sprite and `cursor_pos {x, y}`
--- is its top-left corner (menu_ram.inc:582-584; the macro is `.byte x, y`).
--- So an entry at x covers tilemap columns x/8 and x/8+1, and the row it
--- points at must begin at column x/8 + 2:
+-- The field menu's cursor is a 16x16 sprite and `cursor_pos {x, y}` is its
+-- top-left corner. An entry at x covers tilemap columns x/8 and x/8+1, and
+-- the row it points at must begin at column x/8 + 2:
 --
 --     cursor_x = 8 * text_col - 16
---
--- Vanilla follows it throughout this window: magic draws at cols 3/16
--- under cursors 8/112 (skills.asm:831, :836 vs :125-126), espers at 3/17 under
--- 8/120 (:1733, :1737 vs :249-250), rage at 5/19 under 24/136 (:1544, :1548 vs
--- :292-293), and the config menu's value column 14 under 96 (config.asm:50).
--- Measured on the shipped ROM too: probe_menucols.lua diffs two frames of the
--- untouched magic list and finds the sprite for `cursor_pos {8, 116}` occupying
--- screen x 8..23, y 116..131 exactly.
---
--- Why this is a separate file.  menu_swdtechpage.lua and menu_ragepage.lua
--- carry this canary too, but they also assert every cell of their pages, so on
--- a ROM with the old column layout they fail on a title glyph before the
--- cursor rule is evaluated.  This probe asserts nothing about which glyph is
--- where, only that the cursor does not sit on one, so it provides the
--- fail-before evidence for the fix: it fails on the pre-fix ROM and names the
--- covered cell, and passes on the fixed ROM, with no other assertion in the
--- way.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/arvis_wake.mss.lua"
 
 local ZMENUSTATE, ZCURSOR = 0x26, 0x4b
--- The lead's four battle-command bytes are $1616..$1619 ($0016..$0019 off the
--- character record; _c34d3d walks all four to colour the skills rows,
--- skills.asm:390-401).  Installing BUSHIDO in one and RAGE in another lights
--- BOTH configurator rows, so one menu trip reaches both pages.
+-- The lead's four battle-command bytes are $1616-$1619. Installing BUSHIDO
+-- in one and RAGE in another lights both configurator rows, so one menu
+-- trip reaches both pages.
 local CMD3, CMD4 = 0x1618, 0x1619
 local LEARNED, LOADOUT = 0x1cf7, 0x1e1d
 local RAGES, RAGELOAD = 0x1d2c, 0x1e1f
@@ -45,9 +25,8 @@ local BG1A = 0x3849
 local function cell(x, y) return H.readByte(BG1A + x * 2 + y * 64) end
 local function st() return H.readByte(ZMENUSTATE) end
 
--- The rule, applied to one cursor table entry.  Both sides are read from the
--- running game: the cursor from the ROM the menu indexes, the text from the
--- tilemap it drew.
+-- The rule applied to one cursor table entry: the cursor is read from the
+-- ROM, the text from the tilemap.
 local function gutter(base, n, page)
   local cx = H.readRomByte(base + n * 2)
   local cy = H.readRomByte(base + n * 2 + 1)
@@ -67,13 +46,8 @@ local function gutter(base, n, page)
     .. "column %d (cursor_x = 8*col - 16)", page, n, cx, col, col + 1, col + 2))
 end
 
--- NB: H.sym must be called with a string literal.  compose.py scans the
--- source for H.sym calls to decide which symbols to bake into OT6_SYMS, so a
--- variable argument resolves to nothing at runtime.  (This note used to spell
--- the call out with a placeholder name in it, which the scanner collected and
--- then warned about as a missing symbol on every compose of this file.
--- Naming a symbol that exists is harmless; naming one that does not produces
--- a warning.)
+-- H.sym must be called with a string literal: compose.py scans the source
+-- for H.sym calls to decide which symbols to bake into OT6_SYMS.
 local BUSH_CURSOR = H.sym("Ot6LoadoutCursorPos") & 0x3FFFFF
 local RAGE_CURSOR = H.sym("Ot6RageCursorPos") & 0x3FFFFF
 

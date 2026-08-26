@@ -1,16 +1,9 @@
 -- probe_lockekit.lua -- reports what solo LOCKE is holding and what his
--- stats are at the top of his scenario.  Reads only (issue #75).
---
--- Asked because the first full savestate run to reach sfigaro_town
--- measured him doing eight damage a swing to the gate soldier's HeavyArmor
--- (495 hp, level 13, weak to bolt|water, neither of which LOCKE can
--- reach).  Eight is low enough that "he is unarmed" and "the fight is tuned
--- past him" are both possible explanations, and they call for different
--- responses, so this probe measures the loadout first.
+-- stats are at the top of his scenario.  Reads only.
 --
 -- Character block is $1600 + 37*c: +8 level, +9/+11 hp, +13/+15 mp,
 -- +$0C..$0F the four battle powers, +$1F/$20 weapon/shield, +$21..$23 the
--- rest of the equipment (ff6/notes/field-ram.txt).
+-- rest of the equipment.
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_lockekit.lua
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/locke_scenario.mss.lua"

@@ -5,95 +5,40 @@
 --   sfigaro_escape.mss    on the world map, out of occupied South Figaro
 --   tunnelarmr_entry.mss  map 70, one tile short of the (47,38) trigger
 --
--- The clock is the escape, which corrects gen_celes's note 6.
--- All three of the basement's forward exits are dead-end pockets (map 84's
--- (8,57) landing does not reach its (57,54) door, map 88 is a save closet,
--- and map 89's (106,54) landing reaches only the way back), and the way up is
--- blocked by _ca8632's "This passage leads out" push at (29,9).  The only
--- way on is the clock: winding it (map 84 (18,49)) opens BG at (13,50)
--- (_caecf8, map 84's init _caecf2), and that is what makes (15,51) -> map 87
--- reachable.  Measured: (15,51) is walled off before the wind and 17 steps
--- away after it.  So the escape is 84 (clock) -> 87 -> 86 -> town -> world.
---
--- The clock's wind gate is the $01Bx control-flag alias (gen_celes's note),
--- and the interaction that satisfies it is to stand on the trigger tile
--- (18,49) facing up with A held.  CheckEventTriggers re-fires _ca7913 every frame
--- the party is aligned there (field/event.asm:5740), UpdateCtrlFlags (:5416)
--- sets $1EB6 bit0 (facing up) and bit4 (A) the frame before, and the "Wind
--- the clock?" prompt then appears (option 0 = Yes).  (18,48) above is a wall
--- so holding UP pins the facing without moving; A is edge-pressed so the
--- prompt is not confirmed on the same hold.  Standing below it, or holding
--- UP+A as one continuous press, both fail (measured).
+-- All three of the basement's forward exits are dead-end pockets, and the
+-- way up is blocked; the only way on is the clock (map 84 (18,49)):
+-- winding it opens BG at (13,50), making (15,51) -> map 87 reachable. The
+-- escape is 84 (clock) -> 87 -> 86 -> town -> world. The wind gate is
+-- satisfied by standing on the trigger tile (18,49) facing up with A
+-- held; (18,48) above is a wall so holding UP pins the facing without
+-- moving, and A is edge-pressed so the "Wind the clock?" prompt is not
+-- confirmed on the same hold.
 --
 -- The cave, with $001A=1 (set on the raft for every scenario), loads map 70,
 -- the TunnelArmr copy, from its lobby trigger _ca5ef7, where gen_kolts
 -- with $001A=0 got map 73.  The cave graph is gen_kolts's, walked the other
 -- way: world (75,103) -> map 72 -> ... -> map 71 -> [trigger] -> map 70.
+-- Map 87, the clock passage, has random encounters (Vector Pups), which no
+-- earlier step of the basement route does; every traversal step here runs
+-- playBattles="flee" (L+R) with the tactical fight driver as the
+-- M.FLEE_CAP fallback, since this escape route has no shop to restock at.
+-- The escape re-enters town at (48,36) and leaves by the x=56 column, both
+-- east of the gate soldier's (30,42) choke, so no interaction with him is
+-- needed.
 --
--- The tunnel has encounters (measured 2026-08-09, the sfigaro_escape park).
--- Map 87, the clock passage, has random encounters (Vector Pups),
--- which no earlier step of the basement route does (gen_celes measured its
--- own maps encounter-free, and this file inherited that assumption).  The
--- 2026-08-09 savestate run parked at (41,43) "with no plan" for 20000
--- frames, and the handoff called it the map-75 gate soldier; both halves
--- of that were wrong.  probe_sfigaro_escape_stall measured the park: it is
--- map 87 rather than 75, the event PC sits at $CA0029, inside EventScript's
--- RandBattle stub (ca/0018), i.e. an ordinary random encounter, and the
--- "missing plan" is navTo's playBattles=true battle branch, which answers a
--- battle with blind edge-A.  Blind A against a Vector Pup pair left LOCKE
--- at 0 hp with the fight still up after 2000+ frames; navigation never
--- got the field back.
---
--- The answer is to flee rather than fight; the tactical version was tried
--- first and measured (2026-08-09, one full run).  The driver won the first
--- tunnel encounter with real input (8000+ frames, two Tonic heals, a real
--- Fenix Down revival of CELES mid-fight) and the win emptied the bag.
--- The very next cave encounter opened with CELES on 1 hp, no Fenix Down
--- left to raise her, and LOCKE's medic line finding nothing to drink (the
--- log shows plan=fight at 6/194 hp, which is what an empty bag produces),
--- and the party wiped; RandBattle's GameOver then held the event PC
--- indefinitely, which the wipe canary missed because $1600 still carries
--- pre-battle HP (follow-up filed).  An escape route has no shop, so
--- supplies spent on ordinary encounters are unrecoverable, and this matches
--- gen_kolts's cave policy ("the cave steps run; the cave cost the party
--- ten hit points end to end").  So every traversal step here runs
--- playBattles="flee" (L+R, the engine's own mechanic, with the tactical
--- fight driver as the M.FLEE_CAP fallback) and safeWalk grew the same
--- branch.  The gate soldier needed
--- nothing here: the escape re-enters town at (48,36) and leaves by the
--- x=56 column, both east of his (30,42) choke (the re-entry H.call logs
--- his post and the exit reachability so a route change would say so).
---
--- Issue #75 (the input-driven test conversion): no state writes, and the
--- first input-driven TunnelArmr in the generated chain.  The fight is
--- played as designed: CELES re-raises Runic every turn, because the
--- boss's AI (AIScript::_260) is `attack BATTLE, BOLT, FIRE / wait / attack
--- POISON, SPECIAL, FIRE`, so most of its script rolls a runic-able spell,
--- and the stance absorbs it, refunds her MP and banks her a BP per absorb,
--- while LOCKE chips the 5 OT6_PIERCE shields with boosted Fights (R raises
--- his pending boost from the 1 bp every character opens with, A-A-A
--- confirms the boosted Fight; the same drive that beat the Marshal in
--- gen_moogle).  Break the shields and the damage window finishes the 1300
--- HP.  That only works if LOCKE's hands hold PIERCE weapons: see the equip
--- stop below, where he is given a Genji Glove and a pierce weapon in each
--- hand by name, because a shield chip goes by weapon class and nothing that
--- picks by attack power knows that.
--- A loss on an event battle is game over, so the fight uses a retry
--- ladder: the entry point blob is captured beside the entry-point generation,
--- and each attempt reloads it and takes its own battle RNG phase before
--- stepping onto the trigger.  The seed is the game-time frame counter at
--- battle init (`lda $021e / asl2 / sta $be`, battle_main.asm:6174-6176), and
--- H.newSeedLadder reads back what each attempt really drew, so "a different
--- fight" is checked rather than assumed (#83).  This file also carried
--- gen_sfigaro's battle toolkit
--- (rideOut's HP pin and battle-clear write, clearGateSoldier, and
--- stealDriver's command-table pokes) without calling any of it; that unused
--- code was deleted in the same pass.
+-- The fight is played as designed: CELES re-raises Runic every turn (the
+-- boss's AI mostly rolls a runic-able spell, so the stance absorbs it,
+-- refunds her MP, and banks her a BP per absorb), while LOCKE chips the 5
+-- OT6_PIERCE shields with boosted Fights. Breaking the shields and the
+-- damage window finishes the 1300 HP. This only works with pierce weapons
+-- in both of LOCKE's hands (a Genji Glove and a pierce weapon, given by
+-- name), because a shield chip goes by weapon class. A loss on this event
+-- battle is game over, so the fight uses a retry ladder: the entry-point
+-- blob is captured beside entry-point generation, and each attempt
+-- reloads it and takes its own battle RNG phase before stepping onto the
+-- trigger; H.newSeedLadder reads back what each attempt actually drew.
+
 local H = dofile("tools/tests/lib/ot6.lua")
--- The retry ladder's spread and its collision check (issue #83): each
--- attempt is held until the game-time frame counter the battle seed is
--- made of reaches its own phase, and L.report() fails if two attempts
--- drew one seed, which would make this ladder one fight played twice.
 local L = H.newSeedLadder("TunnelArmr")
 local DOOR = "build/states/celes_freed.mss.lua"
 
@@ -109,17 +54,6 @@ local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 -- predicate is the library's public way to wrap a list into a single step
 local function seq(steps) return H.cond(function() return true end, steps) end
 
--- The flee cap is short on this route, and the value is measured
--- (2026-08-09).  The Figaro cave rolls pincer formations (Trilobiter +
--- Primordites, party surrounded) which FF6 does not release until one side
--- is cleared, so a held L+R only gives the enemy free rounds, and the
--- library's default 1800-frame cap killed LOCKE + CELES (113+150 hp) before
--- the tactical fallback engaged.  420 frames is two or three failed run
--- rolls: a releasable formation lets go inside it, and a pincer flips to the
--- fight driver while the party still has the hp to win.  bank = 3 is set for
--- the fallback: boosted Fights break shields and a broken monster takes 4x
--- (Ot6ShieldedMulW), which cut the first input-driven tunnel fight from an
--- 8000-frame fight that emptied the bag to one the party can afford.
 local FLEE_CAP = 420
 
 local FACE = { up = 0, right = 1, down = 2, left = 3 }
@@ -203,15 +137,6 @@ local function go(sx, sy, dm, dx, dy, what)
     if dm ~= startMap then return map() ~= startMap end
     return H.fieldX() == dx and H.fieldY() == dy
   end
-  -- The staging tile is re-resolved rather than latched.  Town NPCs wander,
-  -- and the object map they occupy is an input to every passability query, so
-  -- the answer is only true for the instant it was asked.  Measured: the
-  -- cafe's annex warp (33,46) resolved as "walkable, stand on it" on one run
-  -- and, 36 frames earlier on the next, as "unreachable, stage at (33,47)",
-  -- and then navTo could not reach (33,47) either, because the npc had moved
-  -- again by the time it planned.  Latching the first answer turns a
-  -- transient into a route failure; re-asking every 90 frames lets the walk
-  -- recover.
   local pickAt = -1000
   local function stage()
     if pick == nil or (H.frame - pickAt >= 90 and not arrived()) then
@@ -244,11 +169,6 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      -- 40000, not 20000 (2026-08-19): an unrunnable formation fought to a
-      -- win through 3 shields is a long fight, and the #122 alignment made
-      -- one long enough to eat the old budget mid-grind while WINNING
-      -- (monster HP falling, party standing).  The budget must fit at
-      -- least one such fight plus the walk.
       { maxFrames = 40000, arrive = arrived, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
@@ -269,14 +189,6 @@ local function go(sx, sy, dm, dx, dy, what)
   })
 end
 
--- Wind the South Figaro clock: stand on (18,49) facing up, edge-tap A until
--- the "Wind the clock?" prompt confirms ($010D=1).  See the header.
--- Step-by-step BFS walk to (tx,ty), re-planning every frame and taking only
--- the first step, tapping A through dialogs.  Map 70 needs this rather than
--- navTo: navTo's verify/re-plan machinery bounces the party off the
--- (47,40)->map 71 mouth and the (50,31) "what IS that noise?" trigger into a
--- teleport to (8,3), while one BFS step at a time follows the same route to
--- (47,38) (measured: navTo -> (8,3), safeWalk -> (47,38)).
 local function safeWalk(tx, ty, what, budget)
   local ph = 0
   local DP = { up = "up", down = "down", left = "left", right = "right",
@@ -368,21 +280,6 @@ local function settleWorld(n)
   end
 end
 
--- ------------------------------------------------------------ the equips --
--- Two menus, not one, and this drive is gen_kolts's `menuEquip` copied here
--- rather than shared.  Sharing it means editing tools/tests/lib/ot6_field.lua,
--- which every generated state latches on by content, so a one-line library
--- edit regenerates all 114 of them.  ISSUE #107 OWNS THE PROMOTION: that
--- pass has to edit the library anyway, so moving menuEquip, posOf,
--- preferItem and fillSlot there belongs with it rather than costing a second
--- full regeneration here.  The states and rules are gen_kolts's, verified
--- there:
---   Equip is main menu row 2 and reaches R-Hand / L-Hand / Head / Body
---   (EquipSlotCursorProp is {1, 4}, equip.asm:76-77); Relic is main row 3
---   with a two-slot cursor (RelicSlotCursorProp {1, 2}, :200-201) and its
---   own state chain $59 -> $5a -> $5b.  Main menu rows are Item / Skills /
---   Equip / Relic / Status / Config / Save (SelectMainMenuOptionTbl,
---   field_menu.asm:3420-3427).
 local ZM, CUR = 0x26, 0x4b
 local ST_MAIN, ST_CHAR = 0x05, 0x06
 local ST_EQOPT, ST_EQSLOT, ST_EQITEM = 0x36, 0x55, 0x57
@@ -555,29 +452,6 @@ local function gearLine(tag)
     table.concat(out, " | "), table.concat(bag, " ")))
 end
 
--- ----------------------------------------------- the real TunnelArmr win --
--- Battle 67, formation 436: TunnelArmr $0104, 1300 HP behind 5 OT6_PIERCE
--- shields.  It is an event battle, so a loss is game over rather than a
--- revive.  The policy follows the fight's own design (issue #75; the
--- battle-clear write that used to end it is gone):
---   * CELES re-raises Runic every turn she gets ("down","a": Runic is one
---     row below the resting cursor, and the stance queues with no target
---     select).  The boss's script, `attack BATTLE, BOLT, FIRE / wait /
---     attack POISON, SPECIAL, FIRE` (AIScript::_260), rolls a runic-able
---     spell on most turns, and every absorb refunds her MP and banks her a
---     BP (Ot6RunicBP).  This is what vanilla teaches in this fight, with
---     OT6's economy added.
---   * LOCKE spends his turns on boosted Fights ("r","a","a","a"): R
---     raises pending boost out of the 1 bp every character opens with
---     (Ot6InitBP; +1 regen per unboosted turn), and the A's confirm Fight on
---     the default target.  R has no effect on an empty bank, so the same
---     sequence alternates boosted and plain hits, chips the pierce shields,
---     and the break window multiplies the finish.  This is the same drive
---     that beat the Marshal in gen_moogle.
--- The menu-episode machine is gen_arvis's: presses start only after the
--- menu flag holds 4 consecutive pulses, one button per ~31-frame pulse,
--- and an exhausted sequence backs out with B and rebuilds.
---
 -- The retry ladder.  The fight's RNG seed is the frame phase at battle
 -- init (`lda $021e / asl2 / sta $be`, gen_whelk_poweron's measurement), so a
 -- lost fight is retried by reloading the entry point blob captured beside the
@@ -737,53 +611,6 @@ H.run({ maxFrames = 300000 }, {
     where("boot (celes_freed)")
   end),
 
-  -- CELES arrives with no equipment, which is the defect class the equip
-  -- audit was built on: the capture scene stripped her (remove_equip
-  -- returns gear to inventory, EventCmd_8d), gen_celes frees her without an
-  -- equip stop, and nothing downstream armed her, so she fought TunnelArmr
-  -- and walked the whole chain to the reunion with nothing equipped
-  -- (tools/audit_equipment.py, 2026-08-09: celes_freed gear FF FF 6A FF FF,
-  -- relic only).  Runic needs no weapon, which is why the fight was winnable
-  -- at all, but a player opens Equip before walking into a boss tunnel, and
-  -- so does this script.  celes_freed keeps its waiver in
-  -- tools/equipment_waivers.txt because this stop is the next step.
-  --
-  -- EVERY SLOT IN THIS STOP IS DECIDED HERE, BY ITEM.  Nothing calls
-  -- Optimum (owner, 2026-08-12: it goes wrong too often; decide what
-  -- equipment is useful and equip that).  The record behind the ruling is
-  -- three multi-hour investigations -- the Cranes' ThunderBlades against a
-  -- bolt-absorbing boss, this fight, and battle 70 -- all of them a routine
-  -- that picks by attack power and knows nothing else.
-  --
-  -- What it did here.  The pair arrives owning exactly two weapons they can
-  -- hold beyond LOCKE's equipped Dirk: the MithrilBlade ($0A, power 38,
-  -- OT6_SLASH) and a spare MithrilKnife ($01, power 30, OT6_PIERCE).
-  -- TunnelArmr is `5, OT6_PIERCE`
-  -- (ff6/src/battle/ot6_hud.asm:1943), so the Dirk was the only thing in the
-  -- party that could chip it, and Optimum handed LOCKE the blade and CELES
-  -- the Dirk: measured 2026-08-12, `[celes kit] done: c1=0A c6=00`, the
-  -- pierce weapon in the hand of the character whose entire drive is Runic
-  -- and who never swings.  All three attempts lost with the shields at 5 of
-  -- 5 for almost the whole fight (seeds $88 / $D8 / $38, boss 1300 -> 783 at
-  -- best), because the 0.5x shielded attenuation (Ot6ShieldedMulW,
-  -- ot6_break.asm:1490) never lifted.
-  --
-  -- What happens now, and why it is better than the hand-equipped Dirk that
-  -- replaced Optimum first.  LOCKE wears the Genji Glove the Returner
-  -- Hideout hands over (#106; gen_banon refuses BANON three times for it),
-  -- which lets his left hand hold a weapon instead of a shield
-  -- (equip.asm:2834-2872).  OT6 looks a swing's break class up per hand
-  -- (Ot6WeaponClass reads $3ca8,x with the hand in x,
-  -- ot6_break.asm:1593-1619), so two weapons is two chipping hands, and
-  -- Ot6FightBoost swings both of them for every point of pending boost
-  -- (ot6_boost.asm:481-484).  Both hands are PIERCE -- the Dirk and the
-  -- MithrilKnife ($01, power 30) gen_kolts buys at South Figaro for exactly
-  -- this -- so his boosted Fight chips two shields where it used to chip
-  -- one, and the MithrilBlade goes to CELES so that nobody is bare.
-  --
-  -- Measured 2026-08-12, three configurations, all from celes_freed with the
-  -- party at full HP, each fighting its own battle RNG seed:
-  --
   --   Guardian 59 + MithrilKnife 30, what ships (seed $48): first boosted
   --     Fight took the shields 5 -> 1 and 331 HP off, the second took them
   --     to 0, boss dead on LOCKE's third turn.  Won attempt 1 with LOCKE
@@ -795,10 +622,10 @@ H.run({ maxFrames = 300000 }, {
   --     first boosted Fight took the shields 5 -> 3, three turns to break
   --     them, boss dead on LOCKE's sixth turn.  Won attempt 1 with LOCKE at
   --     20/249 and CELES DEAD.
-  --
+
   -- The two glove rows differ only in main-hand power and cost a turn; the
   -- third differs in chip rate and costs three turns and a character.
-  --
+
   -- The chip counts are the part that is not a seed artifact, and they match
   -- Ot6FightBoost's arithmetic exactly: at pending boost 1 a one-weapon
   -- character swings three times and the empty hand whiffs one of them, so
@@ -806,7 +633,7 @@ H.run({ maxFrames = 300000 }, {
   -- land, so four chips.  Twice the chipping is why the break window opens a
   -- turn and a half earlier, and arriving with a live CELES rather than a
   -- corpse is what that turn and a half buys.
-  --
+
   -- ONE THING STILL RUNS OPTIMUM AND IT IS NOT US.  Backing out of the
   -- Relic menu after equipping a Genji Glove, Gauntlet or Merit Award makes
   -- the game re-equip that character itself: CheckReequipRelics
@@ -831,9 +658,6 @@ H.run({ maxFrames = 300000 }, {
             or H.invCountOf(DIRK) >= 1, true,
       "LOCKE still owns his Dirk (equipped by #107 or carried in the bag)")
   end),
-  -- 1. The glove.  It is in the bag because gen_banon refuses BANON three
-  --    times for it (#106), while #107 deliberately carries LOCKE's Dirk
-  --    through the split in his main hand.
   equipRelic(posOf(CH_LOCKE), 0, GENJI_GLOVE, "locke genji glove"),
   H.call(function()
     H.assertEq(wearsRelic(CH_LOCKE, GENJI_GLOVE), true,
@@ -847,7 +671,7 @@ H.run({ maxFrames = 300000 }, {
   --    releases whatever was there and puts the main hand's pick back in
   --    reach.  Both lists are pierce-only in preference order, and each step
   --    is skipped when the hand already holds that item or a better one.
-  --
+
   --    The Guardian is the main hand's first choice: $02, power 59,
   --    OT6_PIERCE, and LOCKE is one of the few who can hold it.  It reaches
   --    this fixture as LOCKE's boosted steal off the South Figaro merchant
@@ -891,17 +715,6 @@ H.run({ maxFrames = 300000 }, {
       "CELES is holding a weapon -- audit_equipment refuses a bare fixture")
   end),
 
-  -- The rows are re-set for a two-character party.  gen_sfigaro put LOCKE in
-  -- the back row, which was right for solo battle 11 (survive long enough to
-  -- break one armour), and rows persist in $1850, so he arrived here still in
-  -- the back.  Measured on the cave formations (2026-08-09), a back-row LOCKE
-  -- removes this party's damage: 24 damage dealt across 6000 frames of one
-  -- fight while front-row CELES died twice.  The row rule
-  -- (research/row-menu.md) is that only a Fight pays the back-row penalty,
-  -- and LOCKE's Fight is all the damage this pair has, while CELES's job here
-  -- is Runic and the item medic line, both row-exempt, so the back row costs
-  -- her nothing and halves the physical damage that keeps dropping her.  So
-  -- LOCKE is in front and CELES is in back.
   H.setRows({ [1] = false, [6] = true }, { tag = "escape rows" }),
 
   -- ===================================================================== --
@@ -910,43 +723,19 @@ H.run({ maxFrames = 300000 }, {
   -- ===================================================================== --
   go(57, 13, 83, 35, 14, "celes room -> corridor"),
   go(45, 12, 84, 8, 57, "corridor (45,12) -> map 84 (8,57)"),
-  -- #84: the clock map's four chests, all visible on the walk to and from
-  -- the clock.  Stand tiles are measured, not guessed (probe_chests_8487,
-  -- 2026-08-17): the 500-gil chest is approached from ABOVE ((7,53) is
-  -- wall), and the 1500-gil/empty pair from below via the (20..22,56..57)
-  -- pocket ((21,55) and (22,54) are walls).  The gil chests carry no item,
-  -- so the treasure bit is the whole assert; the empty one is opened too,
-  -- because the rule is behavioral -- a human checks what is inside.
-  -- #84: 500 gil, visible on the walk
   H.openChest{ stand = { 7, 51 }, face = "down", bit = 26, what = "500 gil",
                nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
-  -- #84: 1000 gil, visible on the walk ((12,54) is the benign ticking-clock
-  -- dialog trigger _ca793e; navTo taps A through it before the pickup)
   H.openChest{ stand = { 12, 54 }, face = "down", bit = 28, what = "1000 gil",
                nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
-  -- #84: 1500 gil, visible on the walk
   H.openChest{ stand = { 21, 57 }, face = "up", bit = 27, what = "1500 gil",
                nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
-  -- #84: empty chest, visible on the walk
   H.openChest{ stand = { 22, 56 }, face = "up", bit = 29, what = "(empty)",
                nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   windClock(),
   go(15, 51, 87, 20, 33, "clock passage (15,51) -> map 87 (20,33)"),
-  -- #84: BASEMENT 1's shelf pair, visible from the corridor the crossing
-  -- walks (the chests sit in the y=33 wall row; the y=34 tiles under them
-  -- are the only reachable neighbours -- probe_chests_8487, 2026-08-17).
-  -- Item ids are not asserted: neither is in the recipe's verified table.
-  -- The shelf detour roughly doubles this map's encounter exposure, and the
-  -- first validation run measured what that costs: seven basement pincers
-  -- fought out back-to-back with no healing between them wiped LOCKE+CELES
-  -- on the exit crossing (run sfigaro_escape.oNR7Tl59, 2026-08-17).  So the
-  -- detour is bracketed with the town care idiom: full hp into the shelf
-  -- walk, full hp into the exit crossing.
   H.fieldCare({ tag = "care before the basement shelf", threshold = 0.95 }),
-  -- #84: RegalCutlass, visible on the walk
   H.openChest{ stand = { 47, 34 }, face = "up", bit = 34, what = "RegalCutlass",
                nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
-  -- #84: Heavy Shld, visible on the walk
   H.openChest{ stand = { 48, 34 }, face = "up", bit = 35, what = "Heavy Shld",
                nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   H.fieldCare({ tag = "care before the basement exit", threshold = 0.95 }),
@@ -963,15 +752,6 @@ H.run({ maxFrames = 300000 }, {
   go(52, 27, 75, 48, 36, "map 86 (52,27) -> town (map 75) (48,36)"),
   H.call(function()
     where("back in occupied town")
-    -- The gate soldier is not on this route, and this is the measurement
-    -- that shows it (the 2026-08-09 handoff attributed the escape park to
-    -- him; the park was a map-87 encounter, see the header).  He does respawn
-    -- on every map-75 load (spawn switch $030C, nothing clears it), but his
-    -- (30,42) choke point joins the SW starting pocket to the rest of town,
-    -- and this crossing runs (48,36) -> (56,34), all on the east side.  Log
-    -- his position and the exit reachability so a future route change that
-    -- does cross his lane shows up here instead of as a navTo timeout.
-    -- H.clearGateSoldier is in the library for that case.
     local post = "gone"
     for i = 16, 31 do
       if H.objX(i) == 30 and H.objY(i) == 42 then
@@ -982,10 +762,6 @@ H.run({ maxFrames = 300000 }, {
       post, sw(0x030C),
       H.bfsPath(56, 34) and "reachable" or "NOT reachable this instant"))
   end),
-  -- Heal before leaving town, on a plain field map where fieldCare is known
-  -- to work.  The tunnel crossing arrives here with hp spent, and the world
-  -- half of the route (where care measured broken, note above) then needs
-  -- none.
   H.fieldCare({ tag = "care before leaving town", threshold = 0.95 }),
   -- exit via the x=56 column -> world (87,112)
   H.navTo(56, 34, { maxFrames = 12000, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6,
@@ -1012,22 +788,6 @@ H.run({ maxFrames = 300000 }, {
     return string.format("sfigaro_escape generated at frame %d", H.frame)
   end),
 
-  -- ===================================================================== --
-  -- PHASE 3: the Figaro cave, entered from the south.  World (75,102) is a
-  -- world event trigger, not an entrance record (event_trigger.asm:38):
-  -- _ca5ee3 with $001A=1 loads map 69 (the TunnelArmr side), where $001A=0
-  -- would load map 72.  From map 69, (10,2)/(4,4) -> map 70, and (47,38) on
-  -- map 70 is the TunnelArmr trigger _ca89af.
-  -- ===================================================================== --
-  -- issue #75: playBattles="flee".  A world encounter in the area south of
-  -- the range is run from with the engine's own L+R (tactical driver past
-  -- FLEE_CAP), never write-cleared, and the budget covers the flee rounds.
-  -- (The care stop used to sit here, on the world map, and measured broken:
-  -- after fieldCare's menu visit the world DP cells $E0/$E2 read (175,0)
-  -- garbage and the world engine never resumed.  That is trap 1's module
-  -- WRAM ownership, inside fieldCare's world-exit path, which this route was
-  -- likely the first generation run to exercise.  Care happens on the field
-  -- before leaving town instead; follow-up filed for the library.)
   H.worldNavTo(75, 102, { maxFrames = 45000, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6,
     arrive = function() return not H.worldMode() end }),
   H.release(),
@@ -1045,22 +805,6 @@ H.run({ maxFrames = 300000 }, {
   --   (17,21) --walk--> (10,2)  --> map 70 (55,31)
   warpTo(14, 33, 55, 56, 69, "cave warp A (14,33) -> (55,56)"),
   warpTo(61, 57, 17, 21, 69, "cave warp B (61,57) -> (17,21)"),
-  -- The chests this route walks past, logged rather than opened, for the
-  -- skipped-chest inventory (issue #84).  Decoded from
-  -- ff6/src/field/trigger/treasure_prop.dat with the per-map start offsets
-  -- in ff6/include/field/treasure_prop.inc: map 69 holds an X-Potion at
-  -- (3,18) and a Tincture at (33,23), and map 70 holds one chest, the
-  -- Thunder Rod ($37) at (52,14).  The rod is the one that matters here.
-  -- It is a lightning source that needs nobody's weapon: its equip mask is
-  -- $9180 (item_prop_en.dat +$01), which is Strago, Relm and Gogo, so
-  -- neither LOCKE nor CELES can hold it, but ItemProp+18 is $C7 -- bit 7
-  -- set means "using this item casts spell $07", Bolt 2 (battle_main.asm
-  -- :6603, :6613-6617).  TunnelArmr is weak to bolt (monster_prop.dat
-  -- +$2099 = $84, bolt|water, widened to ice|bolt|water by Ot6ElemAdd), and
-  -- an elemental-weakness hit chips a shield on its own axis
-  -- (Ot6Chip, ot6_break.asm:841).  So the rod is a second break axis for
-  -- one use.  It is not needed for the win once LOCKE holds the Dirk, and
-  -- picking it up is left to the route pass that opens chests deliberately.
   H.call(function()
     H.log(string.format(
       "chests passed on map 69: (3,18) X-Potion %s; (33,23) Tincture %s",
@@ -1186,9 +930,6 @@ H.run({ maxFrames = 300000 }, {
   armrAttempt(1),
   armrAttempt(2),
   armrAttempt(3),
-  -- Before the verdict, not after: three attempts are evidence only if they
-  -- were three DIFFERENT fights, and if they were not, that is what this run
-  -- should report rather than "lost all three" (#83).
   L.report(),
   H.call(function()
     H.assertEq(armrWon, true,

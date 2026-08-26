@@ -1,54 +1,7 @@
 -- gen_opera5_dance.lua -- v0.5 Beat A step 5: opera_stage (map 238 {99,20},
 -- $0056=1) -> the aria forks {0,1,0} -> the flower dance on map 236 -> $0111=1.
 -- Generates opera_dance_done.mss on map 238 {98,7} after the aria is solved.
---
--- The flower dance (every claim measured; probe_opera_geom/occ/dance5-8):
---  * Map 236 is z-split.  p1 tile props: 09 = upper-z only, 02 = lower-z only,
---    03/0b = both-z bridge tiles.  Stepping off a 09 tile drops z->1, off a 02
---    tile z->2, and a 03/0b tile keeps z (player.asm zAfter).  The lib's
---    bfsPath seeds one z and simulates zAfter along the path, but the live
---    engine's z diverges across the 09<->02<->03<->0b joins, so bfsPath
---    returns NO PATH from the postfork basin (5,21) to the dance area, which
---    is the documented blocker.  The fix is gen_zozo4_dadaluma's
---    corridorFollow: a hand-coded per-tile direction table driven one
---    canStep-gated step at a time on the live z (which is always correct),
---    pulsing the pad so no press outlives its step.
---  * DRACO is obj#19 (=NPC_4=$13, event _cabd35) and starts on (12,19),
---    occupying it; that occupancy is what seals the basin from the upper
---    region.  (The scoping record's "flowers {12,19}"/"Draco {12,14}" had the
---    two swapped: (12,19) is Draco, (12,14) is open floor above.)
---  * The waltz: stand at (11,19) (basin edge, reachable) and touch Draco to the
---    right.  Each touch runs _cabd35/_cabd5c/_cabd6a: he leads a slow dance step
---    that hops him a few tiles around the basin (all uniform 09, so a greedy
---    canStep chase catches him) and sets $01F0->$01F1->$01F2.  A 4th touch runs
---    _cabd7a: Draco is hidden and the flowers (obj#16=NPC_1) spawn at (12,19).
---  * The flowers: touch obj#16 -> _cabf27 sets $0057=1 and moves NPC_1 away,
---    which frees (12,19) and opens the climb to the upper region.
---  * The balcony: climb (12,19)->(12,14) up the x=12 corridor, right to (14,14),
---    up the 0b column (14,13/12/11) to (14,10), left along y=10 to (11,10), up
---    to the y=9 strip, left to (8,9).  This detours right and up, away from
---    (8,9), which is why a manhattan-greedy chase oscillated.  Stepping onto
---    (8,9) fires _cabe6d (gated $0057=1): it stops the timer, then rides the
---    wedding-waltz finale (TEXT_ONLY verses -> load_map 233 rafters ->
---    load_map 238) and sets $0111=1 on 238 at (98,7).  rideOpen (gen_opera3's
---    stall-safe A/START rider) carries that untimed tail.
---  * The timer: start_timer 0, 2336, _cabd21 arms as control returns on 236
---    (~2287 grace).  climb+waltz+flowers+balcony to (8,9) measured ~1360
---    frames, then stop_timer, so there is a wide margin.
---
--- Issue #75, playBattles: the one navigator call below passes
--- playBattles = "tactical", so it does not fall through to the library's
--- monster-dead flag write.
--- It runs on map 238, the opera stage, which has random encounters
--- disabled.
--- A field map rolls for a random battle only when byte +5 of its 33-byte
--- map_prop.dat record has bit 7 set: LoadMapProp copies the record to $0520
--- (ff6/src/field/map.asm:143-158), and the step handler returns before the roll
--- unless $0525 is negative (ff6/src/field/battle.asm:333-347).  So the option
--- is intent only here.  "tactical" rather than "flee" because the only battle
--- that could still reach it is an unscripted surprise -- a goal fight is taken
--- by opts.spare or opts.arrive first -- and fighting one beats spending
--- M.FLEE_CAP frames failing to run from it.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -170,7 +123,6 @@ local function rideOpen(pred, maxFrames, what)
     end) }, what)
 end
 
--- ---- the two hand-coded stair corridors (measured tile props) --------------
 local CLIMB={}   -- postfork basin (5,21) -> (11,19), adjacent to Draco
 local function c(x,y,d) CLIMB[key(x,y)]=d end
 c(5,21,{"right"}); c(6,21,{"right"}); c(7,21,{"right"}); c(8,21,{"right"}); c(9,21,{"right"})

@@ -1,715 +1,94 @@
--- probe_ambush_save.lua -- PLAYTEST SETUP (not a suite test, not a generator).
--- grind, the FIGHT PLAN. Built a bespoke per-fight driver (Aqua Rake
--- lead, Filch/burst fallback, survivor-mode gate, revive window) to
--- replace the generic driver's proven "revive treadmill" failure mode.
--- VERDICT: still a #74-style balance finding, and now the clearest
--- version of it yet -- with a properly-executing tactical plan, 4 of 4
--- completed rungs are clean, consistent losses, and the plan's OWN
--- offense (Aqua Rake, the burst half of break-and-burst) never got to
--- fire even ONCE across any of them):
+-- probe_ambush_save.lua -- PLAYTEST PROBE (not a suite test, not a
+-- generator): grinds TERRA/LOCKE HP past 555 on Crescent Island trash, then
+-- rides gen_thamasa_fire.lua's own route (inn -> fire -> Strago joins ->
+-- map 351) through the (21,22) four-Balloon ambush and the (46,53)
+-- FlameEater fight to checkpoint M `fire-out`.
 --
--- 0. THE PLAN BUILT: newAmbushPlan (right above ambushAttempt), a
---    bespoke raw-button state-machine fighter -- modeled on
---    gen_narshe_battle.lua's per-fight fighter and battle_thief.lua's
---    decide() -- NOT H.newFightDriver, replacing it for this fight only.
---    STRAGO alive -> Aqua Rake (lore id 3, researched fresh this pass:
---    ST_LORE=$1B, cursor block $891F/$8923/$8927, row found via
---    $306A+id==id+$8B, the same table battle_lore.lua's own passing test
---    exercises) every turn -- multi-target water, hits all four Balloons,
---    and because the Exploder self-destruct deals CURRENT hp, a landed
---    Rake also defuses whatever a surviving Balloon's own explosion would
---    do. LOCKE alive, Strago down -> Filch (thief submenu row 1, strips
---    a shield class-blind, banks +2 BP) while any Balloon still carries
---    one, else an R-boosted Fight (4x on a broken target) on the default
---    cursor. Revives withheld entirely while 2+ Balloons live (the
---    measured treadmill); the gate opens at <=1 Balloon, reviving STRAGO
---    first. Self-heal below 40% HP always allowed (never spent on
---    corpses).
+-- Run with the checkpoint env var set (bare run.sh boots a fresh game and
+-- never reaches the ambush):
+--   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/thamasa-night-v1 \
+--   OT6_TIMEOUT=3600 tools/tests/run.sh tools/tests/probe_ambush_save.lua
 --
--- 1. A REAL STALL BUG, FOUND AND FIXED LIVE: the first full run stalled
---    the ENTIRE 1800000-frame phase-1 budget on LOCKE's own self-heal --
---    H.targetCursor's own documented limit ("the two-press rotation...
---    cannot reach a slot that needs a bare up-then-right", ot6.lua's own
---    header) most likely means the character-column rotation this fight's
---    2-down-of-3 shape needs isn't reachable by the shared 4-direction
---    rotation. Fixed with a stall-breaker (240 failed-confirm ticks, then
---    force A regardless of the latch) -- the same #111-backstop shape
---    already used elsewhere in this codebase. With it, every attempt now
---    resolves in ~5000-6000 frames instead of never.
+-- No @suite marker: one-shot probe, not a suite test.
 --
--- 2. RESULT, ALL 4 CLEAN RUNGS: TERRA and STRAGO are ALWAYS both fully
---    killed by the opener (missing = their own exact max HP, i.e. 550 and
---    488, every single attempt -- STRAGO never once got to cast Aqua
---    Rake) -- LOCKE is ALWAYS the sole survivor, at a genuinely NEW
---    number each time: missing 157, 433, 279, 279 out of his 558 max
---    across the four attempts (the FIRST direct measurement of the
---    opener's real per-target damage the task asked for -- it is neither
---    "555" nor uniform; it ranges 157-433 on the one character it doesn't
---    outright kill, no visible pattern to the four numbers this pass had
---    time to look for). Even so, LOCKE alone could not turn the fight:
---    tally across the 4 rungs is Filch x1, x0, x2, x2 -- and BOOSTED
---    BURST FIGHT x0, x0, x0, x0. The burst half of break-and-burst never
---    fired ONCE. Every one of LOCKE's turns not spent on the 1-2 Filches
---    he did land went to self-healing (the 40% floor triggering
---    repeatedly, sometimes on his very first turn -- attempt 2's 125/558
---    opening) -- the three still-full-HP Balloons' own ongoing damage
---    output overwhelms what his self-heal-only sustain can offset, so he
---    never reaches the "no shields left, go boosted Fight" branch at all.
---    This is a DIFFERENT treadmill than the generic driver's revive loop
---    (which the survivor-mode gate did successfully kill -- no revive-
---    while-2+-alive ever fired), but the SAME shape: one character cannot
---    out-sustain three L22 Balloons long enough to ever land a real
---    offensive turn, whether that turn would have been a revive or a
---    burst kill.
---
--- 3. RUNG 5: the SAME pre-filed, confirmed-deterministic creepNav no-path
---    bug from the sixth pass (identical addresses: "no path (26,36)->
---    (22,25)"), unrelated to the fight plan. Per the coordinator's own
---    instruction this stays filed; 4 clean rungs are the report.
---
--- 4. PER THE COORDINATOR'S OWN DECISION RULE ("if all rungs STILL lose
---    with break-and-burst executed, report per-rung numbers and stop"):
---    stopping here. The bespoke plan executed as designed (Filch landed,
---    the survivor-mode gate held, self-heal fired correctly) and still
---    lost every completed rung. Given a properly-driven Locke -- fighting
---    honestly, healing himself, never wasting a turn on a doomed revive
---    -- cannot survive long enough to land even one boosted burst against
---    three full-HP Balloons, and Strago (whose Aqua Rake is the plan's
---    entire engine) has a 0-for-4 survival record against the opener,
---    this reads as conclusive: the fix this fight needs is not in the
---    driver.
---
--- ---------------------------------------------------------------------
---
--- STATUS 2026-08-19 (issue #127, SEVENTH pass -- coordinator's diagnosis
--- of the plateau (Baskervor attrition, not thin XP -- OT6's 2x reward
--- scaler means real wins should climb fast) is plausible but the directed
--- fix, teaching the grind to flee Baskervor specifically, was tried live
--- and made things WORSE, not better; REVERTED. Superseded by the eighth
--- pass above, which is the current report -- kept for the record):
---
--- 0. THE FIX BUILT: M.worldNavTo gained opts.fleeSpecies (lib/ot6_field.
---    lua, a real, general-purpose, KEPT library feature -- a set of
---    formation species words to flee via the existing newFlee sub-driver
---    -- cap, can't-run/pincer-refusal fallback, no new state writes --
---    while fighting everything else tactically). Wired into the grind as
---    fleeSpecies = { Baskervor $01D }, fight Cephaler ($096) and anything
---    else.
---
--- 1. MEASURED RESULT: worse. The "flee:" diagnostic (newFlee's own 600-
---    frame heartbeat) fired dozens of times back to back with genuinely
---    different counter values each time -- not one stuck fight, real
---    fleeing on nearly every single encounter this tile rolled. Repeated
---    flees appear to have a real position-drift cost this codebase's
---    other flee callers (all short, bounded corridor walks) have never
---    exercised at this scale: the party ended up stuck at (232,146),
---    "no path with 4 blocked edges" in all four directions, FIGHTING
---    CHIMERA ($01F, the FOREST terrain group's own no-weakness HP2237
---    monster) -- a formation this grass-tile shuttle should never roll at
---    all. Chimera wiped the party repeatedly. The grind never reached
---    GOAL MET or CAP REACHED; it burned through all 220 scheduled legs
---    (many landing in the wipe branch, which never checks the fight-cap
---    condition) and fell through to "enter town" with the party nowhere
---    near its expected staging tile, failing there instead.
---
--- 2. REVERTED: GRIND_WALK is back to plain playBattles="tactical" (fight
---    everything), the SIXTH pass's configuration, which reliably
---    completes even though it plateaus at TERRA 550hp/LOCKE 558hp (both
---    L18). Root cause of the plateau itself -- whether it really is
---    Baskervor-attrition (wipes reloading away all progress) or something
---    else (an XP-share-for-survivors-only mechanic, since TERRA is the
---    one who dies almost every fight) -- was NOT conclusively settled
---    this pass: a leg-by-leg audit of the 60->85-fight stretch (run18's
---    own log) found only ONE explicit party-wide WIPE line in that whole
---    range, while the fight counter climbed steadily via real battle
---    starts -- which sits uneasily next to "mostly wiped fights" as the
---    full explanation, though it does not rule out individual-character
---    death-without-a-full-wipe as a contributing factor. Filed, not
---    chased further.
---
--- 3. NO NEW AMBUSH DATA THIS PASS. The sixth pass's 4 clean rungs (L18,
---    TERRA 550hp/LOCKE 558hp, full-kit driver, restocked bag) are
---    unaffected by this reverted experiment and remain the report: TERRA
---    dies on the pincer's opening frame in every attempt, LOCKE is the
---    reliable survivor, three Balloons sit untouched at 555hp for the
---    whole fight while the lone survivor cycles revive-items without
---    ever landing a real attack. Given two independent attempts to move
---    TERRA past the exact >555 threshold (a cap raise, then selective
---    fleeing) both failed to help -- one plateaued outright, the other
---    actively regressed -- this is where the report stops rather than
---    trying a third grinding mechanism.
---
--- opener looks level-INDEPENDENT, which the L16 data alone could not show):
---
--- 0. THE GRIND, BUILT AND WORKING (moved pre-inn per the coordinator's own
---    course-correction -- checkpoint L boots directly onto the world map
---    as TERRA-LOCKE-SHADOW, so grinding needs no town exit at all): out of
---    three real bugs found live, the one that mattered most was a
---    checkpoint that was captured ONCE before leg 1 and never refreshed,
---    so every wipe (measured: roughly 1 in 2-3 legs, even at three
---    members, against Baskervor's L22 HP750 no-weakness) reloaded all the
---    way back to the START, discarding every level gained since -- 137
---    legs (900000 frames) produced ZERO net progress before this was
---    caught. Fixed by re-checkpointing after every leg that didn't wipe.
---    Also built: the Thamasa item shop, decoded from source (short_
---    entrance.dat's map-343 block $15f0, shop_prop.dat record 35) rather
---    than guessed, with two real UI bugs fixed (a 2-tile counter-talk
---    staging fallback; edge-tapped not held B to close the shop -- shop.
---    asm's B-handler reads a fresh-press edge). M.worldNavTo gained
---    opts.wipeEndsRide (lib/ot6_field.lua), extending advanceStory's own
---    soft-wipe convention, so a grind wipe ends that leg instead of
---    hard-failing the run.
---
--- 1. THE GRIND'S OWN RESULT: TERRA plateaued. First cap (60 fights):
---    TERRA L14->L18 (+4) 550hp, LOCKE L15->L18 (+3) 558hp -- LOCKE clears
---    the >555 target, TERRA sits 5hp under it. Coordinator raised the cap
---    to 85 (correctly judging the stop-rule's "thin XP" trigger, <2
---    levels/60 fights, did not apply -- both characters gained 3-4
---    levels, healthy ground). Result at 85 fights: TERRA STILL exactly
---    550hp, LOCKE STILL exactly 558hp -- 25 more fights, ZERO further
---    progress for EITHER character. That is a plateau, not "close and
---    still climbing"; root cause not chased down this pass, but a
---    plausible mechanism is sitting in the data (see #3 below) -- a
---    character who is dead more often than alive at fight-end may be
---    earning little or none of that fight's XP, and TERRA is the one who
---    dies almost every single time (see #3).
---
--- 2. PER THE COORDINATOR'S OWN CALL, PROCEEDED TO THE AMBUSH ANYWAY (L18,
---    550/558hp, NOT the exact >555 goal, but the "if it still loses all 5
---    rungs, report the L18 numbers" framing): a healthy restock first
---    (30 tonic / 15 potion / 20 fenix down, gil never came close to
---    short -- 161155 left after buying). Then the SAME 5-rung ladder +
---    full-kit driver (items, cure, boosted Fight, healer=TERRA) from
---    pass five, now fighting from L18 instead of L16.
---
--- 3. RESULT: 4 OF 5 RUNGS ARE CLEAN, REAL, CONSISTENT LOSSES (reproduced
---    IDENTICALLY across two separate full runs -- same frames, same
---    partyhp, same monhp, down to the byte). Every attempt's very first
---    logged battle frame (f+1, before the tactical driver has thrown a
---    single input) already shows TERRA at 0 or near-0 hp -- every attempt,
---    no exceptions -- with LOCKE the sole reliable survivor (401,
---    282, 393, 393 hp across the four clean attempts) and STRAGO also
---    dead at f+1 in three of the four. Monster HP is the more striking
---    number: one Balloon already at 0/sh0 (a self-destruct, killing
---    whoever it caught) and the other THREE sit at a completely
---    unmoved 555/555/555 for the ENTIRE fight in every attempt watched in
---    detail (6300+ frames, zero damage landed) -- the lone survivor
---    spends the whole fight cycling revive-item turns on the fallen
---    rather than ever landing an attack, because the moment anyone is
---    healed up they die again to something (unclear what, given the
---    Balloons are demonstrably not attacking for 555+ damage every round
---    themselves -- worth the next pass's attention). THE LEVEL-INDEPENDENCE
---    IS THE HEADLINE FINDING: TERRA died to this SAME opener at L16 (pass
---    five, ~290-345hp) AND at L18 (this pass, 550hp) -- climbing 200+ max
---    HP changed nothing about whether she survives the opening round.
---    Either the real damage/effect is well above the "555, a Balloon's
---    own full HP" hypothesis the grind target was built on, or -- worth
---    flagging explicitly -- the opener may not be a plain damage roll at
---    all (an instant-KO-shaped effect would explain a kill rate that
---    doesn't move with HP the way ordinary damage should). Filed, not
---    chased further this pass: the task's own scope was "grind to the
---    measured target," not "re-derive the opener's mechanic."
---
--- 4. RUNG 5 IS BLOCKED BY A CONFIRMED-DETERMINISTIC NAVIGATION BUG, NOT A
---    COMBAT OUTCOME: attempt 5's own approach walk, creepNav(21, 23,
---    FLEE_WALK) from the post-reload position (26,36), fails with "no
---    path (26,36)->(22,25) [0 edges blocklisted, 20 retries]" --
---    reproduced IDENTICALLY in two separate full runs (same source tile,
---    same target tile, same "20 retries" exhaustion), so this is not a
---    one-off flake. One mitigation was tried and made things WORSE: a
---    smaller creep step (8, forcing a different intermediate waypoint)
---    broke attempt 1 too (previously clean) with a *different*
---    "no path (26,36)->(23,30)", which disproves the "one specific tile
---    transiently blocked by a wandering flame" theory this pass started
---    with -- reverted back to the default step. Root cause not found:
---    the leading candidate is some state that only exists after exactly
---    four requestLoadState reloads (attempts 2, 3, 4 each reload once;
---    attempt 5 is the fourth), since attempts 1-4 from the SAME nominal
---    starting tile never hit this. Filed for whoever next touches map
---    351's navigation or the reload trampoline; the 4 clean rungs already
---    on hand are sufficient, consistent evidence for the balance verdict
---    without a 5th.
---
--- 5. NOT REACHED THIS PASS: FlameEater, the win tail, Shadow's goodbye,
---    the world save, checkpoint M. The savestate_graph.py `fire_out` edge
---    stays commented out; no new chest bits were opened (the route still
---    reaches the ambush before either rod chest).
---
--- 1. THE PHASE-BOUNDARY BUG (pass four's actual failure, per the
---    coordinator): the fight-phase driveUntil's old exit condition,
---    `not H.battleLoadStarted() and not H.battleActive()`, trusted a
---    SINGLE frame's read of two flags both documented flaky mid-fight
---    (battleLoadStarted's own header: "a total party wipe is all zeros,
---    which is also what a menu leaves, so this reports false";
---    battleActive() adds a screenshot check a single big-effect frame can
---    also fail). One bad frame handed off from the tactical driver
---    (F.frame(): items, revives, cures, boosted Fight) to the win-tail's
---    BLIND A-mash (no F.frame() call at all) WHILE THE FIGHT WAS STILL
---    LIVE -- confirmed by the coordinator's screenshots: TERRA and STRAGO
---    die in the pincer, LOCKE solos unsupported, no items/revives spent,
---    until the party wipes for real and Game Over auto-Continues
---    thamasa-night-v1. Pass four's own "M.gameOverFired stayed 0" claim
---    was correct but MEANINGLESS: that canary was an EXEC watch on
---    $CC/E568, and GameOver there is event-SCRIPT DATA the interpreter
---    only ever READS, never executes as CPU code -- the watch could not
---    have fired regardless of outcome. FIXED this pass: ambushAttempt/
---    flameEaterAttempt's phase-1 loop now keeps calling F.frame() for as
---    long as the battle module MIGHT still own the screen, and only
---    concludes "the battle is over" after CONFIRM_BATTLE_GONE=90
---    CONSECUTIVE confirming frames -- one bad frame can no longer end a
---    live fight early.
---
--- 2. WITH THE FIX, THE FIGHT GENUINELY PLAYS OUT -- AND STILL LOSES, ALL
---    5 SEEDS, TWICE (10 total attempts across two full runs, frame-for-
---    frame identical in matching pairs -- this route is deterministic).
---    Per-rung battle-frame-+1 partyhp (TERRA/LOCKE/STRAGO/-, entity
---    order), i.e. the state before the tactical driver has thrown a
---    single input:
---      attempt 1: 0,290,216,0    (TERRA dead on the pincer's opening hit)
---      attempt 2: 0,345,334,0    (TERRA dead)
---      attempt 3: 345,397,0,0    (STRAGO dead; TERRA/LOCKE untouched)
---      attempt 4: 0,292,116,0    (TERRA dead)
---      attempt 5: 0,237,16,0     (TERRA dead)
---    -- 4 of 5 seeds kill TERRA outright on the pincer's opening round,
---    before any input is possible; the 5th kills STRAGO instead. Every
---    attempt's monhp trace shows the SAME shape: monsters=4, one Balloon
---    already at 0/sh0 (self-destructed taking the opening kill with it,
---    consistent with the OT6 Exploder-at-full-HP mechanic the task brief
---    named), the other 2-3 Balloons sitting at FULL 555/sh1 (unbroken)
---    for THOUSANDS of battle frames while the 1-2 survivors fight on --
---    attempt 2's three remaining Balloons never move off 555 for the
---    entire attempt; attempt 4's best case chips two more down to 0 over
---    ~5400 frames before its own solo survivor (TERRA, Cure-healed
---    43->240->119) also runs out; attempt 3 gets one Balloon to 305/555
---    before losing. Items and revives ARE being spent this pass (Cure
---    casts landing 197hp, Fenix Down uses logged in the raw trace) --
---    this is the honest-tactics result, not an under-driven one. No
---    attempt reached a state where H.gameOverFired, map()==351, and
---    partyOf(STRAGO)~=0 were simultaneously true (the new win-verification
---    gate), so ambWon never flips and the ladder correctly reports "all 5
---    seed-ladder attempts lost" and fails the run rather than misreading
---    a loss as a win.
---
--- 3. STILL UNRESOLVED, FLAGGED RATHER THAN CHASED FURTHER: what a lost
---    attempt's field state actually IS after the loss.  Two GameOver-
---    adjacent canaries were tried and NEITHER fired on any of the 10 lost
---    attempts (lib/ot6.lua, both uncommitted): a READ watch on the
---    GameOver event script ($CC/E568, the coordinator's fix for the first
---    pass's blind EXEC watch -- turns out `_ca5ea9`'s `call GameOver` is
---    an 8-site, story-only path, not what a genuine in-battle wipe takes),
---    and this pass's own addition, an EXEC watch on TitleScreen
---    (cutscene_main.asm, $C2680C, the real title-screen module entry any
---    path back to the title screen should reach). Both stayed at 0
---    through every loss. What IS observed post-loss: map()==0 and
---    pos=(14,3792) at the final win-verification check, but the raw
---    per-frame tile trace shows map id READINGS BOUNCING among small
---    values (0, 3, 5) with position stuck near (8,7) rather than settling
---    on thamasa-night-v1's actual saved state (world map 0, position
---    (249,128)) -- which does not cleanly match "a clean SRAM reload" any
---    more than it matches pass four's original "stuck engine" theory (its
---    own probeDump/probeEventDump calls, still in this file, are the
---    instruments for whoever picks this up: they show the field state
---    genuinely mid-event, bank $CB, $050A still 1, TERRA/LOCKE/STRAGO
---    still valid party members, only ~90-6000 frames before the garbage
---    reading sets in). This does not change the balance verdict in #2 --
---    win-verification's map/roster check independently confirms every
---    attempt as a loss regardless of which theory of the post-loss state
---    is right -- but it is a real, still-open harness/engine question for
---    the next pass, distinct from the fight-balance question this pass
---    answers.
---
--- 4. VERDICT PER THE TASK'S OWN DECISION RULE: after honest tactics (a
---    fight-engaged driver: boosted Fight, TERRA's unboosted Ice, items,
---    Cure/Fenix Down revives) across 5 varied seeds, the ambush cannot be
---    won at this party level (TERRA/LOCKE/STRAGO, L16-ish, STRAGO freshly
---    joined) against 4x L22 Balloons (HP555 each) in a pincer whose
---    opening round routinely kills one party member (usually TERRA)
---    before any input is possible. This is the #74-style balance finding
---    the task and the coordinator's own directive both anticipated as a
---    legitimate outcome: the survey's L16-vs-L22 gap, made concrete.
---    FlameEater and checkpoint M were NOT reached this pass; the
---    savestate_graph.py `fire_out` edge stays commented out.
---
--- Files touched this pass: tools/tests/lib/ot6.lua (the TitleScreen exec
--- backstop added to the existing GameOver read-watch canary, both
--- uncommitted), this file (ambushAttempt/flameEaterAttempt's phase-1
--- debounce + phase-2 win-verification rewrite; removed the prior pass's
--- deliberate data-gathering stop -- the always-false 400-frame trace plus
--- forced error() -- probe instruments themselves are kept).
---
--- ---------------------------------------------------------------------
---
--- STATUS 2026-08-19 (issue #127, FOURTH pass -- SUPERSEDED, see the FIFTH
--- pass block above: this pass's "WON on attempt 1" was a lost fight
--- silently auto-Continuing to the world save, caught by an EXEC watch on
--- GameOver that could never fire because $CC/E568 is event-script DATA,
--- never CPU-executed code. Kept for its own still-valid archaeology
--- (sort_obj_work/$0803/$07fb reading, the probe methodology) but its
--- headline claim is wrong -- the blocker was DEEPER than post-win
--- because there never was a win):
---
--- 1. THE GAME-OVER CANARY WORKS AND THE AMBUSH IS REAL. tools/tests/
---    lib/ot6.lua's new M.gameOverFired exec canary on event GameOver
---    ($CC/E568) plus this file's lossReload() (reload the pre-fight blob
---    and clear M.gameOverFired the instant a real loss is detected, before
---    any A-mash can reach a Continue prompt) landed clean. Two full live
---    runs from thamasa-night-v1 (OT6_SRAM_CHECKPOINT + OT6_TIMEOUT=2400)
---    both won the (21,22) ambush (battle 45) on ATTEMPT 1 OF 5, frame-for-
---    frame identical (battle ends f20732, $050A clears f21833,
---    M.gameOverFired stayed 0 THE WHOLE ATTEMPT -- watched live). Pass
---    three's "silently auto-Continued Game Over" theory is DISPROVEN as
---    the cause of what follows: this reproduces on a CONFIRMED clean win
---    with zero Game Over and zero button presses of ours in the window
---    that matters (H.dialogWaiting() reads false throughout).
---
--- 2. THE REAL BLOCKER: post-win field control never returns, confirmed to
---    be a genuine non-walkable state, not a slow fade or a stuck
---    predicate. Live evidence (not through a savestate reload -- see #3
---    for why that matters), watched every frame with zero input from us:
---      f21833 (battle teardown) $0803=$0000 movByte=$10 map1f64=$2000
---      f21835  $0084=$01 (blocks hasControl) movByte=$02 (valid!)
---      f21836  $0084=$00 -> H.hasControl()=TRUE, tileAligned=TRUE,
---              $07fb=$0000 (TERRA's own object pointer -- LEGITIMATE,
---              not the $07d9 "empty slot" sentinel), $1a6d=$01,
---              $1850/51/57 (TERRA/LOCKE/STRAGO membership)=$C1/$69/$00
---              -- TERRA and LOCKE correctly read "in party 1"; STRAGO
---              reads $00, "in no party", the one clearly-wrong byte in
---              the group. bright()=0 (screen still black).
---    THIS PASS'S DECISIVE TEST: held DOWN for 40 frames starting the
---    instant hasControl()+tileAligned() went true (f21836), bypassing the
---    brightness gate entirely to ask "is this window really walkable".
---    Position never moved (pos=(8,7) before AND after). This confirms,
---    with better instrumentation, pass three's own probe_ambush_stall.lua
---    finding ("hasControl() reading true here is not evidence of a
---    walkable party") -- and rules out "the old settle predicate was just
---    waiting on the wrong flag (brightness)" as the fix. map1f64 reads
---    $2000 (worldMode()-shaped: &0x3FF=0<3) the whole time; position
---    settles at world-mode-flavored (8,7)/(14,3792)-ish readings
---    afterward, and a subsequent navTo (P3 leg) times out at 20000 frames
---    making zero progress, confirming the party truly cannot walk from
---    here by any means this pass tried.
---
--- 3. LIKELY ROOT CAUSE, precisely located via a live $7E-address write-
---    watch with PC capture (new: tools/tests/probe_ambush_poststall2.lua,
---    loads the ambush_won.mss savestate this pass's live run captured
---    right at the win and re-drives from there in seconds instead of
---    ~20 real minutes -- keep this probe, it is the fast iteration loop
---    the next pass needs). CAVEAT FIRST: the reloaded-savestate probe's
---    OWN trace of the SAME captured moment reads DIFFERENTLY from the
---    live run ($07fb=$07d9 "empty", $1850/51/57 all $00, vs the live
---    run's $07fb=$0000 valid and $1850/51=$C1/$69 valid) -- a savestate
---    round-trip through emu.createSavestate()/loadSavestate() does not
---    perfectly preserve this transient state, so trust the LIVE numbers
---    in #2, not the probe's post-reload numbers, for what the game is
---    actually doing; the probe is still useful for locating WHICH CODE
---    touches these addresses, just not for the exact values at each frame.
---    ff6/src/field/obj.asm's sort_obj_work (CalcObjPtrs/GetTopCharPtr/
---    CheckSlot1-4/CheckOtherSlots, ~obj.asm:3769-3900, called from
---    ff6/src/field/event.asm:577/748 and reachable via the `sort_obj`
---    event command) is the routine that (re)builds the $0803-$0866
---    object-pointer list every time it runs, per its own header comment:
---    "the first object in the list (the player object at $0803) is
---    always the first character in the active party... if there are no
---    characters in the active party, the CAMERA object acts as the
---    player object." CheckSlot1 skips writing $0803 for a character slot
---    whose $07fb/7fd/7ff/0801 pointer already reads the empty sentinel
---    $07d9 -- i.e. IF something upstream (battle teardown, or a missing
---    re-assertion) leaves $07fb empty when sort_obj_work next runs, this
---    routine will legitimately fall through to the camera object, which
---    is consistent with the probe's own (reload-tainted, see above)
---    $07fb=$07d9/$0803=$07B0-lands-on-object-slot-48(the last slot,
---    camera) trace. The likely missing piece: `_cbe622` (the ambush event,
---    event_main.asm:71907-72029) never re-asserts `party_chars`/`sort_obj`
---    after `battle 45` + `call _ca5ea9`, unlike `_cbe5e4` (the working
---    (4,10) floor-trigger scene just before it), which explicitly does
---    `party_chars TERRA, LOCKE, STRAGO` + `sort_obj` right after its own
---    battle-adjacent work and is the one piece of this map's scripted
---    spine confirmed to "run clean and repeatedly" every pass. `_ca5ea9`
---    itself is trivial (event_main.asm:14171-14174: `if_b_switch $40,
---    return; call GameOver`) and is shared with Dadaluma/TunnelArmr/
---    FlameEater without incident, so the bug is not in the shared gate --
---    it is specific to what `_cbe622` does (or omits) around it, most
---    likely interacting with the event's own `create_obj NPC_4..7` /
---    `delete_obj NPC_4..7` pair (a shape none of this map's OTHER working
---    scripted beats use). NOT FIXED THIS PASS: this is an event/engine
---    ASM change (most likely adding a `party_chars`/`sort_obj` call to
---    `_cbe622` after its battle, mirroring `_cbe5e4`), which needs
---    assembler-level verification against vanilla behavior and is out of
---    a route-generator script's scope to apply unilaterally. Filed for
---    the orchestrator/owner; this file cannot reach FlameEater or capture
---    checkpoint M until it lands.
---
--- 4. Two harness-side ideas tried and MEASURED NOT TO WORK, so the next
---    pass does not re-try them: (a) writing $0803 back to 0 every frame
---    once the game overwrites it (tools/tests/probe_ambush_poststall2.lua
---    still carries the commented-out attempt) keeps $0803 valid but
---    movByte at that pinned offset still reads 0, not 2 -- the real
---    blocker is deeper than this one pointer; (b) dropping the
---    bright()>=15 requirement from the "settled" predicate and walking
---    the instant hasControl()+tileAligned() go true (#2's decisive test)
---    -- the window is real by every flag this harness can read, but the
---    party still does not move, so this is not a settle-predicate bug at
---    all.
---
--- Files touched this pass: tools/tests/lib/ot6.lua (M.gameOverFired
--- canary, uncommitted -- see its own comment), this file (lossReload(),
--- the win-tail driveUntil's H.gameOverFired watch, allowGameOver=true on
--- H.run, the walk-test/trace block above the P3 leg),
--- tools/tests/probe_ambush_poststall2.lua (new fast reload-based probe,
--- caveat in #3 above). Checkpoint M (`fire-out-v1`) was NOT captured;
--- the savestate_graph.py `fire_out` edge stays commented out; no new
--- chest bits were opened (the route reaches the ambush before either
--- rod chest, per the island graph in the next STATUS block down).
---
--- ---------------------------------------------------------------------
---
--- STATUS 2026-08-19 (issue #127 stall investigation, pass three): the
--- post-ambush "field-control stall" documented below (the [ambush dbg]
--- dump at f17665, movByte=$10, map1f64=$2000) is NOT a predicate misread.
--- It is a real, reproducible engine event: winning the (21,22) scripted
--- ambush (battle 45) on this event-only map is followed, ~130-380 real
--- frames later, by the game visibly leaving map 351 altogether and
--- landing back on the WORLD MAP, then Thamasa TOWN (343) at (23,46) --
--- the same tile this generator's own step 1 lands on -- WITH THE PARTY
--- ROSTER REVERTED to the pre-inn state (TERRA/LOCKE/SHADOW, Strago absent,
--- confirmed via a live field-menu screenshot: build/states/shots/
--- stall_probe3_after_menu_try.png shows TERRA/LOCKE/SHADOW, no Strago).
--- This looks exactly like the checkpoint being silently re-Continued, not
--- a stuck predicate.
---
--- Evidence (tools/tests/probe_ambush_stall.lua, run 3x refining the
--- method -- runs need `OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/
--- thamasa-night-v1 OT6_TIMEOUT=1800 tools/tests/run.sh ...`, NOT bare
--- run.sh, or it boots a fresh game and never reaches the ambush at all):
---   * take 1 used H.repeatN(60,{H.call(setPad)}) to "hold" a direction --
---     wrong: H.call never returns "frame", so seqStep drains all 60
---     iterations in one real frame (see ot6.lua's seqStep/M.call). No real
---     time passed, so that run's movement test was meaningless (though it
---     incidentally showed hasControl() flipping true ~10 real frames after
---     the dump). Fixed in takes 2-3 with H.hold(dir)+H.waitFrames(n), the
---     same idiom H.pressButtons already uses.
---   * take 2 (proper real-frame holds, but run only after a 400-frame
---     passive delay) found hasControl()=true from dump+~4f to dump+~130f
---     (movByte=$02, position holds steady at tile (8,7)), then a relapse
---     into movByte=$E9 / pxY=$ED00-ish garbage that outlasted the rest of
---     that run (260+ more frames, zero pixel displacement under 4x60
---     frames of held directional input) -- but the movement test landed
---     entirely in the BAD window by accident (the delay overshot the good
---     one), so it didn't test whether the party could actually walk while
---     hasControl() genuinely read true.
---   * take 3 fixed that: high-resolution (every real frame) logging plus a
---     movement test fired INSIDE the dump+4..130f good window. Verdict:
---     the party does NOT move. Four directions x 20 real frames each,
---     hasControl()=true and movByte=$02 (nominally "user-controlled")
---     before AND after every hold, yet pixel position (0x80,0x70, tile
---     (8,7)) never changes by even one pixel. hasControl() reading true
---     here is not evidence of a walkable party.
---   * Past dump+~130f (during the 4th direction hold, "right", though the
---     SAME transition happens on an equivalent zero-input passive wait at
---     the same offset -- it is time-triggered, not input-triggered):
---     $1f64 flips from $2000 to intermediate garbage then settles at
---     $0157 (343, Thamasa town); position settles at (0x170,0x2E0) = tile
---     (23,46); an event runs (eventRunning()=true) for ~35 frames partway
---     through (probably a map-load startup event); brightness ramps
---     0->15 TWICE (two fade cycles) before the state goes rock-stable for
---     the remaining 400+ observed frames: hasControl=true, tileAligned=
---     true, bright=15, movByte=$02, map=343, position (23,46).
---     build/states/shots/stall_probe3_after_inwindow_moves.png (taken
---     right as the transition starts) shows the WORLD MAP, not the house
---     -- a small island at night, party standing on it. worldMode()
---     ($1f64 & 0x3FF < 3) was ALREADY true at $2000 from the very first
---     dump, so the "good window" was likely already mid-transition the
---     whole time; the tile-(8,7)-looking reads were stale leftover field-
---     object bytes, not a genuine walkable field state.
---   * The field menu (X) DOES open successfully at every point tested
---     (ZMENUSTATE hits $05), including inside the "bad" window -- menu
---     access is gated separately from hasControl() and is not informative
---     about whether the party can walk.
---   * The settled end state's own field-menu screenshot
---     (stall_probe3_after_menu_try.png) shows party TERRA Lv14 / LOCKE
---     Lv15 / SHADOW Lv14 -- Shadow, not Strago. That is the checkpoint's
---     OWN pre-inn roster, not this run's actual party (which had joined
---     Strago and lost Shadow hours of real playtime earlier in the SAME
---     run). This is the strongest single piece of evidence: something
---     about winning battle 45 on this map's floor trigger reverts the
---     session to look like the SRAM checkpoint was just re-Continued,
---     not merely a stale-memory-read predicate bug.
---
--- Verdict per the task's own decision rule ("if movement does NOT work:
--- capture the evidence and stop -- report as a real engine interaction"):
--- movement does not work, and the failure is far larger than a stuck
--- predicate -- it looks like a full session/checkpoint revert triggered by
--- winning this specific scripted battle. Do NOT "fix" this by loosening
--- hasControl()/mapId() waits in houseWarp/ambushAttempt/settle: that would
--- let the generator drive forward on a WORLD/TOWN map believing it is
--- still on map 351, silently producing a corrupt or misleading checkpoint.
--- Filed for the orchestrator; not chased further this pass (root cause
--- needs either a real-hardware/vanilla comparison of event_trigger.asm's
--- (21,22) record and _cbe622/_ca5ea9's actual post-battle behavior, or
--- instrumentation this pass didn't build to catch the exact instruction
--- that touches $1f64/$086a/$086d/$1850 during the dump+130..380f window).
--- The route below (islands 1/28/4/12/26/24, FlameEater) was NOT re-walked
--- this pass as a result -- see the caller's final report.
---
--- ---------------------------------------------------------------------
---
--- STATUS 2026-08-19 (previous pass): the previous pass's mystery is SOLVED.
--- The "one-way relocation" at (4,3)->(4,38) is not a scripted event or an
--- engine tile-fall at all: it is an ordinary SAME-MAP short_entrance
--- record (src=(4,3) map=351 dest=(4,38), flags $01;
--- ff6/src/field/trigger/short_entrance.dat offset $167a, decoded by hand
--- against short_entrance.inc's ITEM_SIZE=6 layout). event_trigger.asm's
--- map-351 block (3 records: (4,10)/(21,22)/(46,53)) and npc_prop.asm's
--- (20 make_npc records, all decoded, coordinates below) between them
--- explain NOTHING south of the landing pocket, because the mechanism
--- neither of those tables can express (a same-map warp) lives in a THIRD
--- table this pass had not yet read. Map 351's short_entrance block runs
--- $167a..$16e0 (17 records = one landing-pocket exit plus 8 forward/return
--- pairs). Decoded and cross-checked against a live grid dump (a new probe,
--- tools/tests/probe_thamasa_house_map.lua, boots the checkpoint, rides the
--- same verified boot/inn/fire/join/  (4,10)-trigger sequence, then reads
--- the LIVE decompressed tile-property tables ($7E7600/$7E7700 through the
--- BG1 tilemap byte, i.e. exactly what H.canStep/H.bfsPath already read)
--- across the whole 64x64 map in one pass -- no walking, so no bfsPath
--- node-cap risk): the map is NOT one contiguous floor. It is 35 separate
--- cardinally-disconnected tile islands (a Python flood fill over the dump
--- confirms zero walkable path between any two of them), stitched together
--- ONLY by the 8 short_entrance pairs. This is why the old plan's
--- navTo(1,0) "explore the north room" reasoning was doomed regardless of
--- BFS cap size: there IS no walkable route from the landing pocket to
--- (4,52)/(21,22)/(45,7)/(46,53) at all, by design (the burning-house
--- "each room is its own pocket, doors do the connecting" structure, same
--- idea as the town's long/short entrances, just entirely internal to one
--- map ID). The full island graph, landing to every objective:
---   island 0  (landing pocket + "north room", the (4,10) trigger lands
---              here) --(4,3)->(4,38)--> island 13 (return via (4,39) or
---              (5,39)->(4,5))
---   island 13 --(2,24)->(26,36)--> island 11 (the (21,22) AMBUSH trigger
---              lives here; return via (26,37)->(2,26))
---   island 11 --(26,21)->(21,9)--> island 1 (the north corridor; return
---              via (21,10)->(26,23))
---   island 1  --(28,3)->(4,55)--> island 28 (FIRE ROD chest (4,52) is
---              here, a dead-end spur; return via (4,56)->(28,5))
---   island 1  --(23,3)->(46,27)--> island 12 (the east wing; return via
---              (46,28)->(23,5))
---   island 12 --(49,21)->(45,10)--> island 4 (ICE ROD chest (45,7) is
---              here, a dead-end spur; return via (45,11)->(49,23))
---   island 12 --(43,21)->(21,54)--> island 26 (the south hall; return via
---              (21,55)->(43,23))
---   island 26 --(21,49)->(46,54)--> island 24 (FLAMEEATER trigger (46,53)
---              is here; no return recorded -- one-way into the boss room,
---              consistent with the win tail's own load_map 349 exit)
--- houseWarp() below rides each of these exactly like crossDoor() rides a
--- town door, except the arrival test is a coordinate match rather than a
--- map-ID change (src map == dest map == 351 for all of them, so
--- crossDoor's own "map() ~= startMap" test would never fire here).
--- This solves the KO risk the previous pass flagged too: the "contact
--- battle at (4,38)" that cost TERRA and STRAGO both KO'd was not caused by
--- the relocation itself (there is no such coupling) -- it was an ordinary
--- wandering-flame contact fought blind by navTo's own tactical driver
--- while pathing toward a target it could never reach; walking each island
--- deliberately (with a care() stop at every warp) should not change the
--- flame encounter rate but keeps healing current between them, per the
--- task's "care between chained fights" rule and #128's healer-lock note.
--- Everything through Strago's join and the map-351 load at (4,11) remains
--- VERIFIED per the prior pass (build/test-runs/fire_out.*). The house
--- graph above is decoded from source + a live grid probe but the walk
--- through it, the FlameEater fight, and the win tail below are being run
--- for the first time this pass; see the caller's final report for the
--- live result.
---
--- gen_thamasa_fire.lua -- v0.13 step L->M (issue #127, "the Thamasa wave"):
--- docs/design/thamasa-route.md section 1, segment 2-4 (the Thamasa fire
--- block).  Cold-boots the tracked `thamasa-night-v1` SRAM checkpoint
--- (world outside Thamasa, $008D=1, party TERRA-LOCKE-SHADOW, pre-inn) the
--- way gen_vector_crash cold-boots `gate-cave-save-v1`: this state is a
--- checkpoint= graph entry, not a prev= savestate link, so every run starts
--- from the real Continue screen.  Generates checkpoint M `fire-out`: world
--- outside Thamasa, $0090=$0091=$0092=1, party TERRA-LOCKE-STRAGO,
+-- gen_thamasa_fire.lua -- v0.13 step L->M: cold-boots the tracked
+-- `thamasa-night-v1` SRAM checkpoint (world outside Thamasa, $008D=1,
+-- party TERRA-LOCKE-SHADOW, pre-inn) and generates checkpoint M `fire-out`:
+-- world outside Thamasa, $0090=$0091=$0092=1, party TERRA-LOCKE-STRAGO,
 -- $02F3=0 (SHADOW gone).
 --
--- The route (event_main.asm citations from docs/design/thamasa-route.md
--- section 1 segments 2-4, cross-checked live against the disassembly --
--- see the SURVEY CORRECTIONS below):
+-- The route:
+--  1. Grind Crescent Island trash (grass: Baskervor L22 HP750 no weakness,
+--     Cephaler L21 HP420 weak bolt) between world (232,150) and (249,128)
+--     until TERRA's and LOCKE's max HP both exceed 555 (a Balloon's own
+--     full HP, and its self-destruct's damage), fought tactically,
+--     re-checkpointing after every leg that doesn't wipe.
+--  2. Re-enter town: held RIGHT onto the (250,128) world trigger -> map
+--     343 (23,46).
+--  3. Thamasa item shop: town 343 door (26,37) -> map 347 (36,44); the
+--     shopkeeper sits behind a counter at (36,39), talked to from 2 tiles
+--     back. Shop 35 sells Tonic (row 0), Potion (row 1), Fenix Down
+--     (row 6) among its 8 rows. Stock Tonic to 30, Potion to 15, Fenix
+--     Down to 20.
+--  4. The inn: exterior door 343 (12,19) -> interior map 346 (23,23); the
+--     innkeeper at (24,15) sits behind a counter and is talked to from
+--     (24,17) facing up. Choosing Yes (default cursor) falls straight
+--     into the night/fire scene with no further choice screens.
+--  5. The night scene: SHADOW leaves the party, the fire starts, Shadow
+--     runs off after Interceptor and goes unavailable. Control returns on
+--     map 343 at (12,21), retiled burning.
+--  6. Talk to Strago at the house door (an NPC event, NPCProp::_343
+--     record 5, make_npc {39,24}). The scene ends with Strago joining
+--     and load_map 351 {4,11}, forced entry party TERRA-LOCKE-STRAGO.
+--  7. Map 351 (the burning house; every exit is scripted) is 35
+--     cardinally-disconnected tile islands, stitched together only by
+--     short_entrance warps that fire on tile entry with no direction
+--     test. The full island graph, landing to every objective:
+--       island 0  (landing pocket) --(4,3)->(4,38)--> island 13
+--       island 13 --(2,24)->(26,36)--> island 11 (the (21,22) ambush
+--         trigger)
+--       island 11 --(26,21)->(21,9)--> island 1 (the north corridor)
+--       island 1  --(28,3)->(4,55)--> island 28 (Fire Rod chest (4,52))
+--       island 1  --(23,3)->(46,27)--> island 12 (the east wing)
+--       island 12 --(49,21)->(45,10)--> island 4 (Ice Rod chest (45,7))
+--       island 12 --(43,21)->(21,54)--> island 26 (the south hall)
+--       island 26 --(21,49)->(46,54)--> island 24 (FlameEater trigger
+--         (46,53))
+--     houseWarp() below rides each of these like crossDoor() rides a town
+--     door, except the arrival test is a coordinate match rather than a
+--     map-ID change. Twelve wandering flame NPCs (random movement) fire
+--     battle 31 on contact; none are required. The (21,22) ambush is
+--     battle 45 (4x Balloon, weak ice|water; a self-destruct deals the
+--     Balloon's own current HP). FlameEater's fight is battle 79
+--     (formation 449, shields 7, pierce, weak ice, absorbs fire), also a
+--     floor trigger, which re-forces party order STRAGO,TERRA,LOCKE. Both
+--     post-battle gates are `call _ca5ea9` (the same win/lose gate
+--     Dadaluma and TunnelArmr use): a win sets $0090=1 (ambush: $050A)
+--     and a loss falls into vanilla GameOver.
+--  8. Win tail: the Relm/Interceptor rescue, Shadow's smoke-bomb exit,
+--     the night talk at Strago's house (load_map 349 {64,16}), ending
+--     $0091=1 $0098=1, control in the house, party TERRA-LOCKE-STRAGO.
+--  9. Leaving the house plays Shadow's goodbye on town 343 (29,15): his
+--     gear returns to inventory, $0092=1.
+--  10. Out of town (long_entrance.dat map-343 south strip) and the real
+--      Save UI at slot 3 -- checkpoint M, `fire-out-v1`.
 --
---  1. Re-enter town the same way K->L did: held RIGHT onto the (250,128)
---     world trigger -> map 343 (23,46).
---  2. The inn.  SURVEY CORRECTION: the survey names no coordinates for the
---     inn door or the innkeeper.  Decoded live from the disassembly rather
---     than guessed: short_entrance.dat's map-343 block has a record
---     src=(12,19) -> map 90+256=346 dest=(23,23) (the "+256" offset is
---     measured against the already-known Strago's-house record,
---     src=(29,13) -> map 93+256=349 dest=(37,24), which matches
---     thamasa-route.md exactly).  So the inn's exterior door is 343
---     (12,19) -> interior map 346 (23,23), and NPCProp::_346's first
---     record (obj $10, the "$10 + record order" rule gen_thamasa_arrive's
---     Strago talk already relies on) is the innkeeper at (24,15), event
---     _cbd73f: "1 GP per night. Why not relax for a spell? 0: Yes / 1: No"
---     (dlg $079D, since $008D=1 and $007D=1 by the time L is reached).
---     Choosing Yes (the default cursor position, so plain edge-A works)
---     runs _cbd7ac: take_gil 1, the innkeeper walks off-screen, and since
---     $008D=1 it falls straight into _cbdcc7 -- the whole night/fire scene
---     -- with NO further choice screens.  So this is one advanceStory-style
---     drive from the Yes confirm to control settling back on map 343.
---  3. The night scene (_cbdcc7, :70419): SHADOW leaves the party
---     (char_party SHADOW,0 :70456), the fire starts, $0190=1 $008E=1
---     (:70634-70635), Shadow runs off after Interceptor and goes
---     unavailable ($02F3=0 :70653).  Control returns on map 343 at
---     (12,21), retiled burning (mod_bg_tiles under $008E && !$0090).
---  4. Talk to Strago at the house door.  This is an NPC event, NOT the
---     (29,13) tile door: NPCProp::_343 record 5 (index 4, 0-based;
---     make_npc {39,24}, $0508, event _cbde30) -- so obj $10+4 = $14.
---     Discovered live (findNpc below) rather than trusted blind, because
---     map 343 carries far more than 16 make_npc records across its many
---     switch-gated variants and the "$10 + order" rule is unverified past
---     16 entries on this specific map.
---     The scene ends with Strago joining (char_party STRAGO,1 + $02E7=1
---     $02F7=1, :71790-71801) and load_map 351 {4,11} (:71852), forced
---     entry party TERRA-LOCKE-STRAGO (:71874).
---  5. Map 351, the burning house (event-only; every exit is scripted).
---     Two chests, visible on the walk (chest_visibility.py / the #84
---     rule): Fire Rod bit 104 (4,52), Ice Rod bit 105 (45,7) -- decoded
---     live from treasure_prop.dat (audit_chests.py's own table), not
---     guessed.  Twelve wandering flame NPCs (make_npc ... set_npc_movement
---     RANDOM, npc_prop.asm:15717-15860) fire battle 31 (formation 158/159,
---     Balloon x3/x6) on contact; a scripted four-Balloon ambush sits on
---     the (21,22) FLOOR TRIGGER (event_trigger.asm:1715, not an NPC).
---     FlameEater's fight is ALSO a floor trigger, (46,53)
---     (event_trigger.asm:1716, _cbe767) -- there is no FlameEater sprite
---     record in NPCProp::_351 at all, so the previous plan's assumption of
---     a contact-talk NPC there was wrong; it fires on tile entry like the
---     ambush.  The trigger's own script re-forces party order
---     STRAGO,TERRA,LOCKE (party_chars STRAGO,TERRA,LOCKE, :72101) right
---     before `battle 79` (:72124), and the post-battle gate is
---     `call _ca5ea9` -- the SAME win/lose gate Dadaluma and TunnelArmr use
---     (a real win sets $0090=1 at :72129 and despawns the trigger NPC; a
---     loss falls into vanilla GameOver), so the ladder below watches
---     $0090 rather than any battle-menu flag.
---  6. Win tail: the Relm/Interceptor rescue, Shadow's smoke-bomb exit, the
---     night talk at Strago's house (load_map 349 {64,16} :72613), ending
---     $0091=1 $0098=1 (:73000-73001), control in the house, party
---     TERRA-LOCKE-STRAGO.
---  7. Leaving the house through 349 (37,25) (event_trigger.asm:1708,
---     gated $0091 && !$0092) plays Shadow's goodbye on town 343 (29,15):
---     remove_equip SHADOW (:73018, his gear returns to inventory),
---     $0092=1 (:73302).  This MUST run before the town is left, per the
---     task brief -- it is the last chance this segment gets at it.
---  8. Out of town the way K->L measured it (long_entrance.dat map-343
---     south strip, src (19,48) len 6, landing world (249,128)) and the
---     real Save UI at slot 3 -- checkpoint M, `fire-out-v1`.
+-- Ice Rod is not driven as an in-battle item cast: FlameEater is fought
+-- with the lib driver's plain kit (boosted Fight from whoever holds it,
+-- TERRA's Cure).
 --
--- Ice Rod: not driven as an in-battle item cast this pass.  newFightDriver
--- has no generic "cast an item's attached spell" branch (only the named
--- Tonic/Potion/Fenix Down heal line and the Tools/Blitz skill lines), and
--- building a bespoke Item->target steer for one rod cast was cut for scope
--- -- the chest is opened and carried, but FlameEater is fought with the
--- lib driver's plain kit (boosted Fight from whoever holds it, TERRA's
--- Cure).  This is the "verify what the engine supports" question the task
--- flagged as open; it stays open.  Filed rather than guessed at.
---
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
---   declares a different persistent_layout.
+-- The ambush is fought with a bespoke driver (newAmbushPlan, below), not
+-- H.newFightDriver: STRAGO alive casts Aqua Rake (lore id 3) every turn
+-- (multi-target water, all four Balloons are weak to it, and it also
+-- lowers their current HP so a surviving Balloon's self-destruct does
+-- less); LOCKE alive with Strago down uses Filch while any Balloon still
+-- carries a shield, else a boosted Fight; anyone else uses plain boosted
+-- Fight. Revives are withheld while 2+ Balloons live; the gate opens at
+-- <=1 Balloon, reviving STRAGO first. Any acting character below 40% HP
+-- self-heals with Tonic/Potion first. H.fieldCare does not work on map
+-- 351 (every plan it tries comes back refused), so care() on this map is
+-- a no-op and recovery happens through in-battle heals instead.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SAVE_SELECT = 0x14
@@ -720,28 +99,18 @@ local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
 local ICE_SPELL = 0x01
 local saveArg = nil
 
--- ISSUE #127 PROBE INSTRUMENTATION (data-gathering only, not part of the
--- route): dump the exact byte obj.asm's sort_obj_work reads for
--- CheckSlot1-4/CheckOtherSlots -- $0867+41*id, bit $40 = enabled, low 3
--- bits = party number -- for TERRA/LOCKE/SHADOW/STRAGO, plus $1a6d (active
--- party number) and the four slot object pointers $07fb/07fd/07ff/0801 and
--- leader $0803, at three moments (a known-good point right after the fire
--- scene, immediately before battle 45/the ambush fires, and at the post-win
--- stall).  Also arms a write-watch (with PC) on all four $0867+41*id bytes,
--- armed before the house is entered, ring-buffered to the last 40 hits.
+-- Debug dump of the sort_obj_work party-membership byte ($0867+41*id, bit
+-- $40=enabled, low 3 bits=party number) for TERRA/LOCKE/SHADOW/STRAGO, plus
+-- $1a6d (active party number) and the object pointers $07fb/07fd/07ff/0801/
+-- 0803. Also a write-watch (with PC) on all four $0867+41*id bytes,
+-- ring-buffered to the last 40 hits.
 local PROBE_IDS = { { 0, "TERRA" }, { 1, "LOCKE" }, { 3, "SHADOW" }, { 7, "STRAGO" } }
--- ISSUE #127 PROBE, COORDINATOR'S FINAL DATA ROUND: frames to screenshot
--- across the 1101-frame win-tail teardown window (f20732->f21833) and the
--- post-stall corruption (f21958) -- frame numbers hardcoded from the prior
--- pass's confirmed frame-for-frame-identical repro from this checkpoint.
+-- Frames to screenshot across the win-tail teardown window.
 local SHOT_FRAMES_TAIL = {
   [20740] = true, [20900] = true, [21100] = true, [21300] = true,
   [21500] = true, [21700] = true, [21958] = true, [22100] = true,
 }
--- ISSUE #127 PROBE, THE WHITE-BOX TRACE: the event PC through the ejection
--- window (f21200-21900), logged on every change -- shared across the two
--- separate step blocks that tick frames in this range (the win-tail
--- A-mash loop and the post-stall driveUntil), via this file-scope upvalue.
+-- Event PC trace across f21200-21900, logged on every change.
 local peTrailLast = nil
 local _cbe622Sym = nil
 do
@@ -799,20 +168,14 @@ local function armProbeWatch()
   H.log("[probe127] write-watch armed on $0867+41*{0,1,3,7} (TERRA/LOCKE/SHADOW/STRAGO)")
 end
 
--- Owner's insight: control handed to the CAMERA object is normal MID-SCENE
--- semantics (sort_obj_work falls back to it whenever no character is in the
--- active party, which is also true while an event owns the stage), so the
--- stall may be the event engine still running rather than corrupted party
--- bytes. This dumps the raw event-engine state field-ram.txt documents
--- ($E1 waiting-flags, $E2 object-to-wait-for, $E3 pause counter, $E5-E7
--- event PC, $E8 event stack pointer, $EA event opcode, $DA/$DC current
--- object) plus whether the party/camera position sits on the (21,22)
--- ambush trigger tile -- _cbe622 (event_main.asm:71906) sets switch
--- $050A=1 unconditionally as its FIRST action with no if_b_switch guard
--- ahead of it, so $050A is a teardown-completion flag the SAME script
--- clears at its own end (:72009), not a one-shot latch a re-entry would be
--- blocked by; if tile entry is re-detected while parked on (21,22), this
--- floor trigger can refire.
+-- sort_obj_work falls back to the CAMERA object whenever no character is in
+-- the active party, which is also true while an event owns the stage. Dumps
+-- the raw event-engine state ($E1 waiting-flags, $E2 object-to-wait-for, $E3
+-- pause counter, $E5-E7 event PC, $E8 event stack pointer, $EA event opcode,
+-- $DA/$DC current object) plus whether the party/camera sits on the (21,22)
+-- ambush trigger tile. _cbe622 sets switch $050A=1 unconditionally as its
+-- first action and clears it at its own end, so re-entry while parked on
+-- (21,22) can refire the trigger.
 local function probeEventDump(tag)
   local sw050A = (H.readByte(0x1E80 + (0x050A >> 3)) >> (0x050A & 7)) & 1
   local e1 = H.readByte(0x00e1)
@@ -931,7 +294,7 @@ end
 
 -- Live NPC lookup: scan object slots 16..31 for whichever sits nearest
 -- (x,y), rather than trust the "$10 + record order" arithmetic past 16
--- make_npc records on one map (see the header's survey correction).
+-- make_npc records on one map.
 local function objAt(idx)
   local off = 0x29 * idx
   return H.readWord(0x086a + off) >> 4, H.readWord(0x086d + off) >> 4
@@ -1009,20 +372,12 @@ local function chaseTalkLazy(idxFn, maxFrames, what, opts)
   }, what or "chaseTalkLazy")
 end
 
--- MEASURED (2026-08-19): map 351 is big enough that H.bfsPath's 4096-node
--- cap (nodes are (x,y,z) triples; ot6_field.lua:503) goes dry on a single
--- long query -- the Fire Rod's stand ((4,52), ~40 tiles straight down the
--- entry shaft) came back "no path" even though the shaft is a plain
--- corridor, the same trap gen_tunnelarmr's header documents for map 75
--- ("long BFS queries... run the 4096-node cap dry and answer 'no path' for
--- tiles that are plainly walkable"; its fix there is a chain of short
--- hand-placed waypoints).  Map 351 has no waypoint table here, so instead
--- of hard-coding one, creepXY hands navTo a MOVING target: a function that
--- always names a point at most `step` tiles away in the straight-line
--- direction of the real destination, and the real destination once within
--- `step`.  navTo re-resolves tx()/ty() on every replan, so this is a
--- continuous short-hop pursuit that converges on the real target through
--- many small (cheap, cap-safe) BFS queries instead of one long one.
+-- Map 351 is big enough that H.bfsPath's 4096-node cap (nodes are (x,y,z)
+-- triples) can go dry on a single long query and report "no path" for a
+-- plainly walkable tile. creepXY hands navTo a MOVING target instead: a
+-- point at most `step` tiles away in the straight-line direction of the
+-- real destination, re-resolved on every replan, so many small cap-safe
+-- BFS queries converge on the target instead of one long one.
 local function creepXY(tx, ty, step)
   step = step or 14
   local function pt()
@@ -1040,25 +395,12 @@ local function creepNav(tx, ty, opts, step)
   return H.navTo(fx, fy, opts)
 end
 
--- a care stop that skips (logged) rather than hangs when the field isn't
--- settled -- zozo4's climbCare rule, needed on map 351's scripted stretches
--- MEASURED (2026-08-19): H.fieldCare is not usable AT ALL on map 351,
--- regardless of party state. First measured with TERRA and STRAGO both
--- KO'd: opening the field menu worked (the roster log printed fine), but
--- every plan the policy tried -- Fenix Down revives, a Tonic top-up on
--- LOCKE who was alive the whole time -- came back "REFUSED by the game",
--- and the drive that presses B to close the menu afterward timed out at
--- 2400 frames (hasControl() never returned). Retested with the WHOLE party
--- alive but hurt (102/345, 397/397, 217/434) in case this was a revival-
--- only edge case: SAME result -- a plain Cure cast and a plain Tonic use
--- were BOTH refused, and the menu-close hang happened again regardless.
--- So this is not about who is dead; H.fieldCare cannot act on this map at
--- all. Filed, not chased further (root cause is in shared library
--- territory, out of scope for this generator -- see the spawned follow-up
--- task). In-battle Fenix Down/Cure via newFightDriver's #128 mayHeal
--- fallback DOES work here (measured repeatedly, live) so care() on this
--- map is now a no-op: it settles and logs, never opens the menu, and all
--- recovery happens through the next contact battle instead.
+-- A care stop that skips (logged) rather than hangs when the field isn't
+-- settled. H.fieldCare is not usable on map 351 regardless of party state
+-- (every plan it tries comes back refused by the game, and the menu-close
+-- drive then hangs), so care() on this map is a no-op: it settles and logs,
+-- never opens the menu, and recovery happens through the next contact
+-- battle's in-battle heal/revive instead.
 local function onMap351() return map() == 351 end
 local function care(what)
   return seq({
@@ -1099,11 +441,9 @@ local CHEST_CAND = {
 local FACE_VAL = { up = 0, right = 1, down = 2, left = 3 }
 local function chestAuto(cx, cy, bit, what, item)
   local pick
-  -- NOTE (2026-08-19): the CHEST_CAND reachability probe below is only a
-  -- heuristic at range -- H.bfsPath's 4096-node cap can make a genuinely
-  -- reachable candidate read NONE from far away (see creepXY's header) --
-  -- so a bad pick here is not fatal; the walk itself creeps in short hops
-  -- regardless of which candidate was chosen.
+  -- The CHEST_CAND reachability probe is only a heuristic at range (the
+  -- BFS cap can make a reachable candidate read NONE from far away); a bad
+  -- pick is not fatal since the walk itself creeps in short hops regardless.
   local function stage()
     if not pick then
       for _, c in ipairs(CHEST_CAND) do
@@ -1164,39 +504,17 @@ local function chestAuto(cx, cy, bit, what, item)
 end
 
 -- ------------------------------------------------------ the item shop --
--- MEASURED live (this pass): a first grind attempt at these settings ran
--- the bag dry -- tonic=0 potion=0 fenix=0 by leg 8 -- and once items ran
--- out, the survivor(s) had only Cure's finite MP left, which was not
--- enough against Baskervor (L22 HP750, no weakness); the party wiped on
--- leg 10. The fix a real player would reach for is exactly this: stock up
--- before grinding. Thamasa's item shop, decoded from source rather than
--- guessed (ff6/src/field/trigger/short_entrance.dat's map-343 block,
--- offset $15f0, 7 records, decoded the same way the inn/Strago-door
--- records already in this file were): town 343 door (26,37) -> map 347
--- dest (36,44) (the "+256" high-map convention already established for
--- Strago's own door record); the shopkeeper NPC inside sits at (36,39)
--- (ff6/src/event/npc_prop.asm's NPCProp::_347, event _cbd730,
--- `shop_menu 35`). Shop 35's stock (ff6/src/menu/shop_prop.dat, 128
--- fixed 9-byte records -- shop.asm's own "shop type" + 8 item-id bytes
--- comment -- record 35 decoded byte-for-byte: 03 E8 E9 EB F5 FD F1 F0 F7):
--- row 0 = $E8 Tonic, row 1 = $E9 Potion, row 6 = $F0 Fenix Down (thamasa-
--- route.md's own prose summary, "Revivify, Remedy, Warp Stone", was not
--- exhaustive -- it named three of the eight rows, not all of them).
+-- Thamasa's item shop: town 343 door (26,37) -> map 347 dest (36,44); the
+-- shopkeeper NPC sits at (36,39), event _cbd730, `shop_menu 35`. Shop 35's
+-- 8-row stock: row 0 = $E8 Tonic, row 1 = $E9 Potion, row 6 = $F0 Fenix Down.
 local function gil()
   return H.readByte(0x1860) + H.readByte(0x1861) * 256 + H.readByte(0x1862) * 65536
 end
--- MEASURED (this pass, live, twice -- a settle wait before the first
--- pathfinding call did NOT change the result, ruling out the map-351-style
--- late-decompression timing gap): NONE of CHEST_CAND's four 1-tile-
--- adjacent candidates around the Thamasa shopkeeper (36,39) pass bfsPath
--- -- the fallback silently defaulted to the same unreachable (36,40) both
--- times. This is the innkeeper's own "talk-across-a-counter" shape
--- (player.asm's CheckNPCs extension, the Dadaluma-note case this file's
--- inn-door code already documents) -- a counter blocks the 1-tile
--- approach, and the real stand tile is 2 tiles back. SHOP_CAND tries
--- 1-tile candidates first (the common case elsewhere in this file) and
--- falls back to 2-tile candidates in the same four directions before
--- giving up to the same hardcoded default the old code had.
+-- None of CHEST_CAND's 1-tile-adjacent candidates reach the Thamasa
+-- shopkeeper (36,39) -- a counter blocks the 1-tile approach, so the real
+-- stand tile is 2 tiles back (the same "talk-across-a-counter" shape as the
+-- inn counter, below). SHOP_CAND tries 1-tile candidates first, then falls
+-- back to 2-tile candidates in the same four directions.
 local SHOP_CAND = {
   { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
   { 0, 2, "up" }, { 0, -2, "down" }, { -2, 0, "right" }, { 2, 0, "left" },
@@ -1237,16 +555,10 @@ local function shopTalk(nx, ny, what)
     end),
   })
 end
--- MEASURED (this pass, live): a continuously-HELD B timed out at 900
--- frames -- shop.asm's own B-handlers (MenuState_25/26/27) read z08+1's
--- JOY_B bit, which is an EDGE flag (a fresh press), not a level; the last
--- buyItem call leaves the shop at state $26 (the buy list, per
--- MenuState_26's own B-handler jumping back to $25, not straight to
--- closed), so closing needs TWO separate B edges (26->25, then 25->
--- closed) and a held button only ever supplies the first one. Edge-tapped
--- (on/off cycling), matching every OTHER button-press idiom already in
--- this file (H.pressButtons's own 4-on/4-off, the A-mash phase pattern),
--- fixes it.
+-- shop.asm's B-handlers (MenuState_25/26/27) read an EDGE flag, not a
+-- level; the last buyItem call leaves the shop at state $26 (the buy
+-- list), so closing needs TWO separate B edges (26->25, then 25->closed),
+-- which a held button cannot supply -- so B is edge-tapped here.
 local function shopClose(what)
   local ph = 0
   return seq({
@@ -1265,101 +577,40 @@ local function shopClose(what)
 end
 
 -- ------------------------------------------------------ the grinding leg --
--- Owner's ruling on the #74-style ambush balance finding (pass five): no
--- enemy stat gets touched ("this is not a bug-fix mod") -- the fight
--- stands, the PARTY grinds.
+-- No enemy stat gets touched -- the party grinds instead. Grinds Crescent
+-- Island trash (grass: Baskervor L22 HP750 no weakness, Cephaler L21
+-- HP420 weak bolt), fought with the same tactical driver the rest of this
+-- file uses, healed between legs with H.fieldCare (works on the world map,
+-- unlike map 351). Shadow fights along on plain Fight; only TERRA's and
+-- LOCKE's max HP count toward the goal, since Shadow is gone before the
+-- ambush regardless.
 --
--- PLACEMENT, owner's course-correction (pass six): originally staged
--- between the fire scene and Strago's join (TERRA+LOCKE only, Shadow
--- already gone), reusing P2's proof (tools/tests/probe_fire_exit.lua) that
--- a mid-fire south exit and world SRAM save are legal. Moved BEFORE the
--- inn instead: checkpoint L's own party is TERRA-LOCKE-SHADOW and the
--- checkpoint boots directly onto the world map at (249,128) with zero
--- preamble, so grinding here needs no town exit at all -- just fight
--- Crescent Island's own trash right after the boot-time fieldCare, then
--- carry on into town. Three live members (Shadow only leaves at the inn
--- night scene, story-order-wise still ahead of this point) is a safer
--- roster to grind on than the post-fire duo, though it is not risk-free
--- (see the wipe-tolerance note below, kept regardless).
+-- Target: grind until BOTH TERRA's and LOCKE's max HP exceed 555 -- the
+-- Balloon's own full HP, which is also its self-destruct's damage. OT6
+-- levels fully restore HP/MP, so a level-up is itself a heal.
 --
--- Crescent Island's own trash (thamasa-route.md section 1 segment 1's
--- terrain-group table: grass carries Baskervor L22 HP750 no-weakness and
--- Cephaler L21 HP420 weak bolt), fought with the SAME tactical driver
--- (H.worldNavTo's playBattles="tactical") the rest of this file trusts,
--- healed between legs with H.fieldCare (proven to work on the world map
--- at this file's own boot step). Shadow fights along on plain Fight (the
--- driver's own default for anyone who isn't Edgar/Sabin -- newFightDriver
--- only special-cases id==4/id==5 for Tools/Blitz), so his shurikens are
--- never spent on trash; only TERRA's and LOCKE's max HP count toward the
--- goal below, since Shadow is gone before the ambush regardless.
---
--- The adaptive target, per the brief: grind until BOTH TERRA's and
--- LOCKE's max HP exceed 555 -- the Balloon's own full HP, which is also
--- its self-destruct's damage (ot6_break.asm's Exploder-at-full-HP rule
--- the task brief names).  Surviving the pincer's opening hit is the
--- fight's whole gate (every seed-ladder rung's battle-frame-+1 partyhp
--- dump, pass five's own STATUS header, shows exactly one hit killing
--- whoever is unlucky); once both survivors can eat a 555-damage opener
--- and still be standing, the existing 5-rung ladder + full-kit driver
--- gets a real shot instead of a guaranteed opening-round KO.
---
--- OT6 levels fully restore HP/MP (a design fact per the brief) -- a
--- level-up IS a heal, so this does not need its own dedicated heal logic
--- beyond fieldCare between legs; the level-ups themselves keep both
--- characters topped up as they climb.
---
--- Real fights are counted with an InitBattle exec watch ($C22434, the
--- same address newSeedLadder's own battle-seed watch already anchors to
--- -- ff6/src/battle/battle_main.asm:6138), armed only for the grind
--- window (armed/disarmed around the loop below) so it never double-counts
--- the ambush/FlameEater/wandering-flame fights later in the route.
--- GRIND_LEG_CAP bounds the outer shuttle-leg loop generously (each leg
--- may roll zero encounters); the REAL governing cap is grindFights >= 60
--- (the brief's "hard cap of ~60 fights"), checked after every leg.  If
--- the cap lands without both max HPs over 555, this errors out with the
--- full numbers rather than raising the cap -- per the brief, a level gain
--- under +2 for either character at that point is itself the answer to
--- report (route-design data: where should this area's XP come from), not
--- a reason to grind longer.
--- Coordinator's judgment call (pass six, after the 60-fight cap landed
--- TERRA at 550/555hp -- 5 short -- with LOCKE already past target and
--- +3/+4 level gains proving the ground is not thin XP): raised to 85,
--- same stop condition, same per-leg re-checkpoint. Measured pace (60
--- fights/95 legs) puts 85 fights around ~135 legs; GRIND_LEG_CAP raised
--- to 220 for real headroom rather than cutting it close.
+-- Real fights are counted with an InitBattle exec watch, armed only for
+-- the grind window so it never double-counts the ambush/FlameEater/
+-- wandering-flame fights later in the route. GRIND_LEG_CAP bounds the
+-- outer shuttle-leg loop generously; the governing cap is grindFights >=
+-- GRIND_FIGHT_CAP, checked after every leg. If the cap lands without both
+-- max HPs over 555, this errors out with the full numbers rather than
+-- raising the cap.
 local GRIND_HP_TARGET = 555
--- PLAYTEST: 0 = the grind ends on its first check, so the state this
--- probe emits carries the party at ROUTE-NATURAL level (what a player
--- actually brings to this door), which is the thing under test.
+-- 0: the grind ends on its first check, so the state this probe emits
+-- carries the party at ROUTE-NATURAL level.
 local GRIND_FIGHT_CAP = 0
 local GRIND_LEG_CAP = 220
 local function charLevel(c) return H.readByte(0x1600 + 37 * c + 0x08) end
 local grindFights, grindWatchRef, grindDone = 0, nil, false
 local grindGoalMissed = false
 local grindStartLv = {}
--- MEASURED live (this pass): a full item bag still lost to Baskervor (L22
--- HP750, "no weakness" per thamasa-route.md -- neither TERRA's Ice nor a
--- boosted LOCKE Fight denudes it fast, and its own counters ground the
--- party down over 9300+ frames, one fight, regardless of healPercent or
--- dropping the useless Ice cast). Random world trash at this level carries
--- real wipe risk no amount of in-fight tuning removes -- a real player
--- grinding here risks the same thing and reloads. M.worldNavTo gained an
--- opts.wipeEndsRide passthrough this pass (lib/ot6_field.lua, extending
--- advanceStory's own existing soft-wipe convention) so a wipe here ends
--- that leg's ride instead of hard-failing the whole generator; grindBlob
--- is the entry-point checkpoint each wiped leg reloads before retrying.
+-- M.worldNavTo's opts.wipeEndsRide lets a wipe here end that leg's ride
+-- instead of hard-failing the whole run; grindBlob is the entry-point
+-- checkpoint each wiped leg reloads before retrying.
 local grindBlob, grindFightsAtCheckpoint = nil, 0
--- MEASURED (this pass, live): a first guess at an intermediate point
--- (245,135), picked by eyeballing a straight-line interpolation, failed
--- outright -- "worldNavTo: no path (249,128)->(245,135) [0 edges
--- blocklisted]", i.e. not a BFS timeout but a genuinely unreachable tile
--- (open water/impassable terrain, most likely). Fixed by reusing a
--- COORDINATE ALREADY PROVEN reachable rather than guessing a new one:
--- gen_thamasa_arrive.lua (the shipped K->L generator) drives
--- `H.worldNavTo(249, 128, ...)` directly from checkpoint K's own landing
--- at world (232,150) with no intermediate waypoints at all, so that whole
--- stretch is a live-confirmed walkable path. Reusing its endpoints as the
--- grind's own shuttle removes the guess entirely.
+-- GRIND_A/GRIND_B reuse gen_thamasa_arrive's own already-walkable
+-- checkpoint-K-landing/Thamasa-trigger endpoints as the grind shuttle.
 local GRIND_A = { 232, 150 }  -- checkpoint K's own landing tile
 local GRIND_B = { 249, 128 }  -- the Thamasa-trigger staging tile (this
                                -- file's own exit destination)
@@ -1382,62 +633,12 @@ local function disarmGrindWatch()
     grindWatchRef = nil
   end
 end
--- MEASURED (this pass, live): 8000 frames was not a walk budget, it was a
--- walk-AND-fight budget -- playBattles="tactical" (deliberate: the whole
--- point is to fight, not flee) means every encounter on the ~28-tile
--- (232,150)<->(249,128) leg gets fully played out, and a single tactical
--- fight elsewhere in this file already runs 3000-6000+ frames on its own
--- (the ambush ladder's own battle logs). One leg can easily hold 2-4 such
--- fights back to back. 60000 gives headroom for several full fights plus
--- the walk itself without needing to reason about exactly how many
--- encounters a given leg rolls.
--- MEASURED (this pass, live): a full item bag (30 tonic/15 potion/8 fenix
--- down) STILL wiped on the very first leg -- not from chained encounters,
--- from ONE Baskervor fight (thamasa-route.md's own "no weakness" row) that
--- ran 9300+ frames barely denting its 750 HP (750->701 the whole fight)
--- while LOCKE alone did the damage and TERRA cycled dead/revived until the
--- Fenix Downs and the fight both ran out. Two fixes: (1) drop the
--- ICE_SPELL magic line -- Baskervor has NO weakness and Cephaler is weak
--- to BOLT, so TERRA's Ice cast was spending her turns (and MP) on zero
--- elemental bonus against EITHER monster in this pool, unlike its use
--- later against the Balloon ambush where Ice is the real weakness; a
--- plain boosted Fight from her too is strictly better here. (2) raise
--- healPercent from 70 to 90 so the heal/item policy engages much earlier,
--- before the party is already this deep in a slow fight.
--- Coordinator's pass-seven diagnosis: the 60->85-fight plateau (TERRA and
--- LOCKE's stats byte-for-byte unchanged across 25 more fights) is
--- Baskervor attrition, not thin XP -- OT6's reward scaler runs at 2x
--- (Ot6RewardMulW), so real won fights should climb fast; 25 fights of
--- zero progress reads as mostly-lost/mostly-wiped fights against the one
--- tough draw in this pool.
---
--- TRIED AND REVERTED (this pass, live): opts.fleeSpecies = { BASKERVOR }
--- (M.worldNavTo gained the option, lib/ot6_field.lua, kept -- the library
--- feature itself is sound and general-purpose; only THIS application is
--- reverted). Measured result was WORSE than the plateau it was meant to
--- fix: fleeing fired on nearly every single encounter (the "flee:" log
--- line -- newFlee's own 600-frame heartbeat -- appeared dozens of times
--- back to back with different counter values, i.e. genuinely different
--- formations each time, not one stuck fight), and repeated flees appear
--- to have drifted the party's WORLD POSITION off the intended (232,150)<->
--- (249,128) grass-tile shuttle -- the log shows the party stuck at
--- (232,146) with "no path with 4 blocked edges" (all four directions dead)
--- and, worse, fighting CHIMERA (species $01F, the FOREST terrain group's
--- own "no weakness" HP2237 monster, thamasa-route.md's segment 1 table),
--- a monster this shuttle should never encounter on grass. Chimera wiped
--- the party repeatedly. The run never reached GOAL MET or CAP REACHED --
--- it burned through all 220 scheduled legs (apparently many landing in
--- the wipe branch, which does not check the fight-cap condition at all)
--- and fell through to "enter town" with the party NOT at the expected
--- staging position, failing there instead. Filed rather than chased
--- further: either Baskervor and Cephaler share mixed formations often
--- enough that "flee if Baskervor present" means "flee nearly everything"
--- on this tile, or repeated flees have a real (undocumented) position-
--- drift cost this codebase's other flee callers have not hit before
--- (they mostly flee CORRIDOR encounters over short, bounded walks, not a
--- long open-world shuttle with dozens of consecutive flees). Reverted to
--- plain tactical (fight everything) below, which reliably completes even
--- though it plateaus -- see the STATUS header for the full call.
+-- 60000 gives headroom for several full tactical fights plus the walk
+-- itself: a single tactical fight can run 3000-6000+ frames on its own,
+-- and one leg can hold 2-4 back to back. No magic line: Baskervor has no
+-- weakness and Cephaler is weak to bolt, not ice, so TERRA's Ice cast (used
+-- later against the Balloon ambush, where it IS the weakness) would be
+-- wasted here.
 local GRIND_WALK = { maxFrames = 60000, playBattles = "tactical",
   healer = TERRA, bank = 3, items = true, healPercent = 90,
   wipeEndsRide = true }
@@ -1485,16 +686,9 @@ local function grindLeg(n)
       end)(),
     }, {
     H.fieldCare({ tag = "grind care leg " .. n, threshold = 0.85 }),
-    -- CRITICAL FIX (this pass, live): grindBlob used to be captured ONCE,
-    -- before leg 1, and never refreshed -- so every wipe (roughly 1 in 2-3
-    -- legs against Baskervor, measured) reloaded all the way back to the
-    -- ORIGINAL pre-grind state, discarding every level gained since the
-    -- very start, not just that one leg's risk. 137 legs (~900000 frames)
-    -- burned the whole frame budget with TERRA/LOCKE's stats byte-for-byte
-    -- unchanged the entire time as a direct result. Re-checkpointing here,
-    -- after every leg that DIDN'T wipe (already healed, already safe),
-    -- means a wipe only costs its own leg -- this is the actual save-scum
-    -- shape a real grinding player uses, not a return-to-start restart.
+    -- Re-checkpointing here, after every leg that didn't wipe (already
+    -- healed, already safe), means a wipe only costs its own leg rather
+    -- than the whole grind.
     (function()
       local ckReq
       return seq({
@@ -1531,20 +725,9 @@ local function grindLeg(n)
           tHp, grindStartLv[LOCKE], lLv, lGain, lHp, GRIND_HP_TARGET))
         grindDone = true
         grindGoalMissed = true
-        -- Coordinator's call (pass six, round two): the FIRST cap raise
-        -- (60->85 fights) bought LOCKE the target and TERRA nothing at all
-        -- -- 550hp at fight 60 AND at fight 85, byte-for-byte, 25 fights of
-        -- zero progress for her specifically (a plateau, not "close and
-        -- still climbing" -- consistent with a character who is dead more
-        -- often than alive at fight-end earning little or no XP from those
-        -- rounds, though this pass did not chase that root cause down).
-        -- Given that, raising the cap AGAIN was judged unlikely to help
-        -- and not attempted; instead, per the coordinator's own framing
-        -- ("if it still loses all 5 rungs, THAT report goes to the owner
-        -- with the L18 numbers"), the route proceeds into town/shop/inn/
-        -- fire/ambush with whatever TERRA and LOCKE actually reached
-        -- (LOCKE clears the target; TERRA sits 5hp under it) rather than
-        -- erroring out short of ever reaching the ambush at all.
+        -- The route proceeds into town/shop/inn/fire/ambush with whatever
+        -- TERRA and LOCKE actually reached rather than erroring out short
+        -- of ever reaching the ambush at all.
         H.log(string.format(
           "[grind] proceeding to town/ambush WITHOUT the full goal met -- " ..
           "TERRA %dhp is %d short of >%d (LOCKE %dhp already clears it); " ..
@@ -1557,21 +740,16 @@ local function grindLeg(n)
 end
 
 -- ---------------------------------------------------------- P3: Strago's --
--- join-level probe (the survey's join-level question -- no norm_lvl at
--- join, per thamasa-route.md finding 3.  Logged, not asserted: whatever
--- char_prop's init-time averaging produces is measured here rather than
--- predicted).
--- NOTE: returns a step object (H.call(...)) -- call it as a list ENTRY,
--- never from inside another H.call's body (that only constructs a
--- throwaway step and logs nothing; measured the hard way, see the STATUS
--- note at the top of this file).  The one live call site inlines this
--- instead, for exactly that reason.
+-- join-level probe. Logged, not asserted: whatever char_prop's init-time
+-- averaging produces is measured here rather than predicted.
+-- Returns a step object (H.call(...)) -- call it as a list ENTRY, never
+-- from inside another H.call's body (that only constructs a throwaway
+-- step and logs nothing).
 local function logStragoJoin()
   return H.call(function()
-    -- ff6/notes/field-ram.txt:885-895: the 37-byte character record,
-    -- indexed by character id (same convention as $1850+charId): +$08
-    -- level, +$09 current HP, +$0B max HP (top 2 bits are the hp-boost
-    -- flag, masked off), +$0D current MP, +$0F max MP (same mask).
+    -- the 37-byte character record, indexed by character id: +$08 level,
+    -- +$09 current HP, +$0B max HP (top 2 bits are the hp-boost flag,
+    -- masked off), +$0D current MP, +$0F max MP (same mask)
     local lvl = H.readByte(0x1600 + 37 * STRAGO + 0x08)
     local hp = H.readWord(0x1600 + 37 * STRAGO + 0x09)
     local mhp = H.readWord(0x1600 + 37 * STRAGO + 0x0B) & 0x3FFF
@@ -1586,54 +764,24 @@ end
 -- --------------------------------------------------------- battle 31/45 --
 -- The wandering flames and the (21,22) ambush are ordinary contact/tile
 -- battles; navTo's playBattles="tactical" branch (H.newFightDriver
--- underneath) already fights anything that starts while it walks.  No
--- special handling needed beyond passing tactical opts through, and a care
--- stop after each leg per the task's "care between chained fights" note.
+-- underneath) already fights anything that starts while it walks. No
+-- special handling needed beyond passing tactical opts through, and a
+-- care stop after each leg.
 --
--- MEASURED (2026-08-19): the default healPercent=55 was NOT enough.  A live
--- run wiped the party approaching the (21,22) ambush -- creepNav(21,22,...)
--- chained 4-5 wandering-flame contact battles back to back inside ISLAND
--- 11 alone (three flames live there per npc_prop.asm, and the corridor from
--- P2's landing (26,36) to the ambush tile crosses all of them) with no
--- care() stop possible in between (they're random-movement contacts, not
--- plannable waypoints), so chip damage from each fight carried into the
--- next; by the time the scripted 4x-Balloon ambush (battle 45) started the
--- party was already down to ~65-90% and TERRA -- the designated healer --
--- was the FIRST to drop, which stops all further in-battle healing (the
--- exact risk the task brief named: "TERRA the healer DIED in the prior
--- session's one deep run"). Raising healPercent so newFightDriver tops
--- everyone up much earlier per-fight is the only lever available inside a
--- single navTo call (no post-battle-field-care hook exists).
+-- healPercent=85 so newFightDriver tops everyone up early, since chained
+-- wandering-flame contacts on the way to the ambush leave no room for a
+-- field-menu heal between fights (no post-battle-field-care hook exists,
+-- and H.fieldCare doesn't work on this map anyway). healer=TERRA (not nil):
+-- letting every actor reach for the bag via the mayHeal fallback makes
+-- healing look attractive every turn to everyone, not just the down actor,
+-- so nobody ever finishes the fight.
 --
--- FURTHER MEASURED (2026-08-19): even with healPercent=85 and mid-leg
--- waypoints (below), island 13 alone burned all 3 Fenix Downs and still
--- wiped -- H.fieldCare turned out to be non-functional on this map (see
--- care()'s own note), so once the bag ran dry there was no recovery left
--- at all. Tried healer=nil (letting every actor reach for the bag from
--- turn one, not just TERRA once she falls, per #128's mayHeal fallback)
--- expecting more resilience; it backfired live -- monhp sat at 555/555
--- UNCHANGED for 3300+ straight frames while the whole party did nothing
--- but heal/revive each other in a loop, because mayHeal now made healing
--- look attractive to everyone every turn instead of only the down actor's
--- own fallback case, so nobody ever finished the fight and the bag drained
--- for zero progress. Reverted to healer=TERRA (the #128 fallback alone,
--- not a blanket policy, is the correct amount of sharing) -- the real fix
--- for this segment is smaller waypoint chunks (below), not who is allowed
--- to open the bag.
--- MEASURED (2026-08-19): the fights themselves are slow, not just chained.
--- Live battle logs sat at "monhp=0/sh0,555/sh1,555/sh1,0/sh0" -- two
--- Balloons at full HP -- for 3000+ straight frames with the party fighting
--- the whole time, i.e. plain boosted Fight was landing near zero net
--- damage. The design doc's own finding (thamasa-route.md's Balloon row):
--- weak to ice|water, and OT6's shield-break ratio is 4:1 weak:unweak
--- (ot6_break.asm:1487-1497, cited in newFightDriver's own boost comment) --
--- an unweak physical hit while shields hold is doing a QUARTER the damage
--- an elemental hit would. opts.magic routes TERRA's turns to Ice (spell
--- $01, `boost=false` per newFightDriver's own note: "what a caller wants
--- when the point is the element rather than the damage") instead of
--- boosted Fight whenever she is not needed to heal; if she does not know
--- Ice yet at this join level the driver's own fallback (spellCell finds
--- nothing -> falls through to Tools/Fight) keeps this harmless to try.
+-- Balloons are weak to ice|water, and OT6's shield-break ratio is 4:1
+-- weak:unweak, so an unweak physical hit while shields hold does a
+-- quarter the damage an elemental hit would. opts.magic routes TERRA's
+-- turns to Ice (spell $01, `boost=false`, since the point is the element
+-- rather than the damage) instead of boosted Fight whenever she is not
+-- needed to heal.
 local WALK = { playBattles = "tactical", healer = TERRA, bank = 3,
                items = true, maxFrames = 20000, healPercent = 85,
                magic = { [TERRA] = { spell = ICE_SPELL, boost = false } } }
@@ -1643,51 +791,21 @@ local FLEE_WALK = { playBattles = "flee", healer = TERRA, bank = 3,
                      items = true, maxFrames = 20000, healPercent = 85,
                      magic = { [TERRA] = { spell = ICE_SPELL, boost = false } } }
 
--- Map 351's internal short_entrance warps (STATUS header): a short_entrance
--- fires purely by standing on its SrcPos tile (ff6/src/field/entrance.asm's
--- CheckShortEntrance compares the live position against SrcPos with no
--- direction test), exactly like the (4,10) floor trigger this file already
--- rides with a plain H.navTo/creepNav -- no crossDoor-style staged/held
--- diagonal approach is needed.
+-- A short_entrance fires purely by standing on its SrcPos tile (no
+-- direction test), exactly like the (4,10) floor trigger -- no
+-- crossDoor-style staged/held diagonal approach is needed. navTo's own
+-- completion test wants the party settled on the goal tile for a few
+-- frames, but a short_entrance relocates the party the instant it lands,
+-- so fieldX/Y jump to DestPos before that settle ever accumulates and
+-- navTo would keep re-planning from the wrong island; passing navTo's
+-- `arrive` opt ends the walk the moment fieldX/Y read the known DestPos
+-- instead.
 --
--- Two dead ends on the way to this shape, both MEASURED, worth keeping so a
--- third pass doesn't retry them:
--- (1) crossDoor-style staging (reasoning: src map == dest map == 351, so
---     crossDoor's own "map() ~= startMap" arrival test can't fire here) --
---     worked for P1, then failed on P2 with "no path (4,38)->(2,25)" even
---     though the SAME bfsPath call had just approved that candidate when
---     staging picked it.
--- (2) plain `creepNav(sx, sy, WALK)` with no `arrive` override -- this is
---     what actually explains (1)'s ghost failure too. navTo's own
---     completion test wants the party CALM (settled, tileAligned) ON the
---     goal tile for up to 48 frames (ot6_field.lua's calmWant*3 rule,
---     "the party has control OR has been on the goal tile long enough
---     regardless"); a short_entrance instead relocates the party the
---     INSTANT it lands tile-aligned on SrcPos, so fieldX/Y jump to DestPos
---     before calm ever accumulates. navTo's driveUntil never reports
---     "done", so it keeps re-planning -- now FROM the post-warp island,
---     TOWARD a source tile on an island that same warp is the only link
---     to, which of course has "no path". Live evidence: P1's own
---     creepNav(4,3,...) got the party to (4,38) (the warp fired -- visible
---     in the log as the FAIL's own "no path (4,38)->(4,24)" source
---     coordinate, (4,24) being creepXY's fresh waypoint FROM (4,38) TOWARD
---     the now-unreachable (4,3)) and then hard-failed retrying anyway.
--- The fix: pass navTo's own `arrive` opt (an OR'd alternate stop
--- condition, ot6_field.lua:698) so the walk-to-SrcPos step ends the moment
--- fieldX/Y read the KNOWN DestPos, sidestepping the calm/settle race
--- entirely rather than waiting on it.
---
--- `flee`: islands 13 and 11 (the stretch this file's own STATUS/WALK notes
--- above document wiping the party even with healPercent=85 and mid-leg
--- waypoints) hold six of the twelve wandering flames between them, and
--- none of the twelve are required content -- the doc's own words, "A
--- fought flame is hidden+deleted for the rest of the visit", describes an
--- optional contact, not a gate. holding L+R (playBattles="flee") past a
--- wandering flame instead of fighting it is available and unused content
--- on the safer legs, and here it directly avoids fights this route does
--- not need to survive. Defaults to "tactical" (unchanged behavior) so
--- callers on calmer islands, and the ambush/FlameEater trigger legs which
--- SHOULD fight what they hit, are unaffected.
+-- `flee`: islands 13 and 11 hold six of the twelve wandering flames, and
+-- none of the twelve are required content, so holding L+R past one
+-- instead of fighting it is available on the safer legs. Defaults to
+-- "tactical" so the ambush/FlameEater trigger legs, which should fight
+-- what they hit, are unaffected.
 local function houseWarp(sx, sy, dx, dy, what, playBattles)
   return seq({
     creepNav(sx, sy, { playBattles = playBattles or "tactical", healer = TERRA,
@@ -1714,31 +832,20 @@ local function battleHpAllZero()
   return true
 end
 
--- --------------------------------------------------- #127 GameOver guard --
--- M.run (tools/tests/lib/ot6.lua, this pass's lib addition) now arms an
--- exec canary on the event GameOver routine ($CC/E568,
--- ff6/src/event/event_main.asm's `.proc GameOver`) and FAILS THE WHOLE RUN
--- LOUDLY (H.gameOverFired > 0 -> emu.stop(3)) the frame after it fires,
--- unless opts.allowGameOver is set -- built exactly to catch the disaster
--- this file's own STATUS header documents: a lost ambush whose A-mashing
--- auto-Continued the SRAM checkpoint and silently reverted the whole
--- session (roster included) while every predicate here kept reading
--- healthy. This file's H.run() call passes allowGameOver=true (both
--- fights below are seed ladders BUILT to survive a loss), so the canary
--- alone no longer aborts the run -- but a real GameOver must still never
--- be allowed to reach a title-screen Continue prompt, which is what the
--- old "A-mash until the win switch clears" tail step did for up to 3200
--- frames on every loss, GameOver or not.
+-- ------------------------------------------------------- GameOver guard --
+-- M.run arms an exec canary on the event GameOver routine ($CC/E568) and
+-- fails the whole run (H.gameOverFired > 0 -> emu.stop(3)) the frame after
+-- it fires, unless opts.allowGameOver is set. This file's H.run() call
+-- passes allowGameOver=true (both fights below are seed ladders built to
+-- survive a loss), so the canary alone no longer aborts the run -- but a
+-- real GameOver must still never be allowed to reach a title-screen
+-- Continue prompt.
 --
--- Fix, in both ambushAttempt and flameEaterAttempt's tail step below:
--- the win-tail driveUntil's own predicate now also stops the instant
--- H.gameOverFired > 0 (M.driveUntil checks its predicate BEFORE running
--- its body each tick, so the exit lands before one more "a" press goes
--- out -- no mash reaches a Continue prompt), and lossReload() here
--- reloads the ladder's pre-fight blob and resets H.gameOverFired back to
--- 0 right after, so neither the next attempt's own frame-boundary state
--- nor a final failed-ladder error() ever trips on a stale nonzero counter
--- left over from THIS attempt's loss.
+-- In both ambushAttempt and flameEaterAttempt's tail step below, the
+-- win-tail driveUntil's own predicate also stops the instant
+-- H.gameOverFired > 0 (before one more "a" press goes out, so no mash
+-- reaches a Continue prompt), and lossReload() here reloads the ladder's
+-- pre-fight blob and resets H.gameOverFired back to 0 right after.
 local function lossReload(blobFn, tag)
   local req
   return seq({
@@ -1755,113 +862,56 @@ local function lossReload(blobFn, tag)
 end
 
 -- --------------------------------------------------------- the ambush --
--- MEASURED (2026-08-19): the (21,22) ambush (battle 45, 4x Balloon,
--- formation 158/159's bigger sibling per event_main.asm:71993) is NOT
--- survivable by preparation alone. Every live attempt -- full HP entering
--- the fight or not, flee-mode-preserved or worn down -- read partyhp with
--- TERRA and STRAGO ALREADY at 0 on the very first logged battle frame
--- (f+1, menu=82, before the tactical driver has thrown a single input):
--- a pincer opening apparently lands its first round before the player
--- gets a turn, and losing two of three members to it is not something
--- healPercent or a well-timed care() stop can prevent -- there is no
--- frame to act on. This is exactly the shape the FlameEater seed ladder
--- below already solves: a hard, RNG-sensitive fight, retried from a
--- checkpoint with a spread battle seed rather than assumed winnable in
--- one try. event_main.asm's own _cbe622 sets switch $050A=1 as its first
--- action and clears it only at the very end, after the post-battle
--- teardown (`hide_obj`/`delete_obj` the ambush NPCs, `fade_in`) -- the
--- SAME "only a real win reaches the tail" shape $0090 gives FlameEater --
--- so the ladder here watches $050A instead of a battle-menu flag, exactly
--- as FlameEater's own header explains for $0090.
+-- The (21,22) ambush (battle 45, 4x Balloon) is a hard, RNG-sensitive
+-- fight: a pincer opening lands its first round before the player gets a
+-- turn, so it is retried from a checkpoint with a spread battle seed like
+-- FlameEater's own ladder, rather than assumed winnable in one try.
+-- _cbe622 sets switch $050A=1 as its first action and clears it only at
+-- the very end, after the post-battle teardown -- the same "only a real
+-- win reaches the tail" shape $0090 gives FlameEater -- so the ladder here
+-- watches $050A instead of a battle-menu flag.
 local L45 = H.newSeedLadder("ambush (battle 45)", { attempts = 5 })
 local ambBlob, ambWon = nil, false
 
--- FRAME-BUDGET FOR "the battle module is really gone": pass five's own
--- correction (coordinator, live screenshots).  The OLD exit condition
--- `(not H.battleLoadStarted() and not H.battleActive())` trusted a SINGLE
--- frame's read of two flags that are both known-flaky mid-fight
--- (battleLoadStarted's own header: "a total party wipe is all zeros, which
--- is also what a menu leaves, so this reports false"; battleActive() adds
--- a screenshot check that a single big-effect frame -- an Exploder self-
--- destruct flash, say -- can also fail).  One bad frame handed control from
--- the tactical driver (F.frame(), which casts Cure/uses Fenix Downs/etc)
--- to the win-tail's blind A-mash WHILE THE FIGHT WAS STILL LIVE: TERRA and
--- STRAGO died in the pincer, LOCKE then soloed unsupported (no items, no
--- revives -- the win-tail never calls F.frame() at all) until the party
--- wiped for real, Game Over fired, and the blind A-mash walked itself onto
--- the vanilla Continue prompt, silently re-loading the thamasa-night-v1
--- SRAM. Every one of pass four's "post-ambush stall" readings (world-mode-
--- shaped $1f64, position (8,7)-ish, no Strago in the party) was that
--- reloaded save, not a stuck engine. CONFIRM_BATTLE_GONE is the debounce
--- fix: only trust "the battle is over" after this many CONSECUTIVE frames
--- of both flags reading false, so one bad frame can no longer end the
--- fight early.
+-- battleLoadStarted()/battleActive() are both known-flaky on a single
+-- frame mid-fight (a total wipe reads all zero like a menu does; a
+-- big-effect frame can fail the screenshot check), so trusting one frame's
+-- read risks handing control to the win-tail's A-mash while the fight is
+-- still live. CONFIRM_BATTLE_GONE only trusts "the battle is over" after
+-- this many CONSECUTIVE frames of both flags reading false.
 local CONFIRM_BATTLE_GONE = 90
 
 -- ==================================================== the ambush FIGHT PLAN
--- Owner's pass-eight ruling (amended to lead with Aqua Rake): the generic
--- H.newFightDriver ends every attempt the same way -- "the lone survivor
--- cycles revive-items without ever landing a real attack" (pass six's own
--- STATUS finding) -- a revive treadmill feeding fresh bodies to three live
--- Balloons every round, never actually damaging them. This is a BESPOKE
--- driver for this one fight, modeled on gen_narshe_battle.lua's raw per-
--- character button-sequence fighter and battle_thief.lua's state-machine
--- decide() (its exact CMDTBL/ST_THIEF/KCOL/KROW addresses for Filch, and
--- the Lore addresses researched fresh this pass -- see below), NOT
--- H.newFightDriver: the generic driver has no Lore arm at all (Strago's
--- cmd $0C never gets driven), and its unconditional item/cure loop is
--- exactly the treadmill bug this plan exists to fix.
+-- Bespoke driver for this one fight, modeled on gen_narshe_battle.lua's
+-- raw per-character button-sequence fighter and battle_thief.lua's
+-- state-machine decide() -- not H.newFightDriver, which has no Lore arm at
+-- all and whose unconditional item/cure loop produces a revive treadmill
+-- that never lands a real attack.
 --
 -- THE PLAN:
---   STRAGO alive -> Aqua Rake (lore id 3, $8e) every turn. Multi-target
---     water, hits all four Balloons: chips their shields (their own
---     weakness) AND lowers their current HP, which matters because the
---     Exploder self-destruct deals CURRENT hp (thamasa-route.md/the task
---     brief) -- so a landed Rake also defuses whatever a surviving
---     Balloon's own self-destruct would otherwise do. Multi-target, no
---     cursor steering: enters ST_TGT and confirms with a bare A.
---   LOCKE alive, Strago down -> break-and-burst fallback: Filch (thief
---     submenu row 1, strips one shield class-blind, banks Locke +2 BP)
---     while ANY live Balloon still carries a shield, else an R-boosted
---     Fight (a broken target takes 4x) on whatever the default enemy
---     cursor lands on.
---   anyone else (TERRA, if she is the one left standing) -> plain
---     boosted Fight. NOT built this pass: an Ice-cast line for her (the
---     original, pre-Aqua-Rake-amendment brief's fallback) -- Strago
---     surviving is the plan's whole premise (he opens for free the
---     instant he is alive at all), so this is filed as a known gap
---     rather than chased, same spirit as the Ice Rod cast this file's own
---     header already leaves undriven.
---   SURVIVOR MODE / REVIVE WINDOW (rule 1 & 3 of the brief, collapsed
---     into one gate): revives are WITHHELD entirely while 2+ Balloons are
---     still alive -- "every revived body dies before acting" is the
---     measured failure mode this exists to stop. The instant at most ONE
---     Balloon remains, the gate opens: revive STRAGO first (his Rake is
---     the plan's engine), then anyone else down, then resume offense.
---   SELF-HEAL: any acting, living character below 40% HP uses a Tonic/
---     Potion on THEMSELVES before anything else, survivor-mode or not
---     ("the fence lesson" -- rule 4). Never spent topping off a body that
---     is about to be revived instead; the revive-window gate already
---     keeps those two lines from colliding (a corpse cannot act, so it
---     is never the "acting character" self-heal fires for).
+--   STRAGO alive -> Aqua Rake (lore id 3) every turn: multi-target water,
+--     hits all four Balloons (their weakness), and lowers their current
+--     HP so a surviving Balloon's self-destruct (which deals current HP)
+--     does less. Multi-target, no cursor steering: enters ST_TGT and
+--     confirms with a bare A.
+--   LOCKE alive, Strago down -> Filch (strips one shield) while any live
+--     Balloon still carries a shield, else an R-boosted Fight (a broken
+--     target takes 4x) on the default enemy cursor.
+--   anyone else -> plain boosted Fight.
+--   Revives are withheld while 2+ Balloons are alive; the gate opens at
+--     <=1 Balloon: revive STRAGO first, then anyone else down.
+--   Any acting, living character below 40% HP uses a Tonic/Potion on
+--     themselves first; the revive-window gate keeps this from colliding
+--     with reviving a corpse (a corpse cannot act).
 --
--- RAM/menu addresses, all either already-proven-live in this file/library
--- (CMDTBL, ST_CMD/ST_TGT/ST_ITEM, the thief submenu) or researched fresh
--- this pass and cited: Lore's own steady-browse MSTATE ($1B, "lore
--- select" per btlgfx_main.asm's own UpdateMenuState_1b comment; $19 is
--- the transitional DMA-fill state on the way in), its single-column
--- cursor block ($891F/$8923/$8927, immediately following Magic's own
--- $8913/$8917/$891B block and Rage's own $892B one tier further -- all
--- three are one contiguous 12-byte-stride table), and the row-lookup via
--- $306A+loreId reading that lore's own attack id (loreId+$8B) iff it is
--- currently offered (battle_lore.lua's own already-passing test exercises
--- this exact table). Aqua Rake = lore id 3 ($8e - $8b), confirmed inside
--- Strago's own InitLore starting set {3,7,20} (ff6/src/field/init.asm) --
--- the AUTO five-lore rule offers all three known lores in ascending id
--- order when only three are known, so id 3 (the lowest) should land at
--- row 0, but the driver below does not hardcode that: it counts offered
--- ids below 3 live, the same shape the generic driver's own spellCell
--- uses for Magic.
+-- RAM/menu addresses: Lore's steady-browse MSTATE is $1B ($19 is the
+-- transitional DMA-fill state on the way in); its single-column cursor
+-- block sits at $891F/$8923/$8927, immediately following Magic's
+-- $8913/$8917/$891B block and Rage's $892B (one contiguous 12-byte-stride
+-- table); $306A+loreId reads that lore's own attack id (loreId+$8B) iff it
+-- is currently offered. Aqua Rake = lore id 3, inside Strago's InitLore
+-- starting set {3,7,20}; the driver counts offered ids below 3 live rather
+-- than hardcoding a row.
 local MENU_A, ACTOR_A, MSTATE_A = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL_A, CMDROW_A = 0x202E, 0x890F
 local BCHID_A, BCHP_A, BCMAXHP_A = 0x3ED8, 0x3BF4, 0x3C1C
@@ -1958,7 +1008,7 @@ local function newAmbushPlan(tag)
     local charId = H.readByte(BCHID_A + actor * 2)
     local hp, mx = H.readWord(BCHP_A + actor * 2), H.readWord(BCMAXHP_A + actor * 2)
     local balloonsAlive, stragoSlot, downSlots = partyCounts()
-    -- 1. self-heal, always allowed (the fence lesson)
+    -- 1. self-heal, always allowed
     if mx > 0 and hp > 0 and hp < mx * 0.40 then
       local idx = bagIdxOfA({ TONIC, POTION })
       if idx then return { kind = "item", ids = { TONIC, POTION }, target = actor } end
@@ -2002,20 +1052,11 @@ local function newAmbushPlan(tag)
         if cur > want then return "up" end
         return "a"
       elseif st == ST_TGT_A then
-        -- MEASURED (this pass, live): a self-heal on LOCKE (the sole
-        -- survivor, both allies down) stalled the WHOLE attempt for the
-        -- full 1800000-frame budget right here -- H.targetCursor's own
-        -- documented limit ("the two-press rotation cycles among three
-        -- hover positions... cannot reach a slot that needs a bare up-
-        -- then-right", ot6.lua's own header) most likely means the
-        -- character-column rotation this fight's 2-down-of-3 shape needs
-        -- isn't one the shared {down,up,left,right} rotation can reach.
-        -- Backstop, same shape as the library's own #111 fix elsewhere in
-        -- this codebase: past a real frame budget of failed confirms,
-        -- stop steering and just press A on whatever is highlighted --
-        -- with at most one living character in most of this fight's own
-        -- turns, "whatever is highlighted" IS the only valid choice
-        -- anyway.
+        -- H.targetCursor's two-press rotation cannot reach every slot
+        -- (documented in ot6.lua). Backstop: past a real frame budget of
+        -- failed confirms, stop steering and just press A on whatever is
+        -- highlighted -- with at most one living character in most of
+        -- this fight's own turns, that is the only valid choice anyway.
         plan.tgtSpin = (plan.tgtSpin or 0) + 1
         if plan.tgtSpin > 240 then return "a" end
         ambushCharTC.observe()
@@ -2141,14 +1182,10 @@ local function ambushAttempt(n)
   local F = newAmbushPlan("ambush-plan-" .. n)
   local notBattle, giveUp = 0, 0
   local loadReq
-  -- BUG FOUND LIVE (2026-08-19): H.cond(pred, thenSteps, elseSteps) hands
-  -- elseSteps to the shared lib's own seqStep(), which needs a PLAIN list
-  -- (#steps/steps[i]) -- passing seq({...}) here instead of the bare
-  -- {...} hands seqStep a COMPOUND step object (a {tick=,reset=} table
-  -- with no integer part), so #that is 0 and seqStep's tick() loop exits
-  -- immediately as "done" without ever running a single inner step. Fixed
-  -- here (bare {...}, matching every OTHER H.cond call in this file) and
-  -- in flameEaterAttempt.
+  -- H.cond(pred, thenSteps, elseSteps) hands elseSteps to the shared lib's
+  -- own seqStep(), which needs a PLAIN list (#steps/steps[i]) -- a
+  -- seq({...}) here would hand it a compound step object instead, whose
+  -- length reads 0, so it would exit immediately without running anything.
   return H.cond(function() return ambWon end, {}, {
     H.logStep(function()
       return string.format("ambush attempt %d at f%d", n, H.frame)
@@ -2162,24 +1199,9 @@ local function ambushAttempt(n)
     L45.spread(n),
     H.call(function() H.log(string.format(
       "[ambush] approaching (21,22), attempt %d", n)) end),
-    -- MEASURED (this pass, live, twice): attempt 5 of one run hit "no path
-    -- (26,36)->(22,25) [0 edges blocklisted, 20 retries]" from this same
-    -- reload point after attempts 1-4 reached the fight cleanly. Tried and
-    -- REJECTED: a smaller creep step (8, forcing a different intermediate
-    -- waypoint) -- this made it WORSE, failing on attempt 1 too with "no
-    -- path (26,36)->(23,30)", proving the theory wrong: it is not one
-    -- specific tile being transiently blocked by a live NPC, since a
-    -- DIFFERENT waypoint choice hit the SAME class of failure on a
-    -- PREVIOUSLY-clean attempt. Reverted to the default step (14, the
-    -- original, mostly-reliable behavior -- 4 of 5 attempts clean in the
-    -- run that surfaced this). Root cause not chased further this pass;
-    -- filed as an occasional (not systematic) pathing flake for whoever
-    -- picks up map 351 next, alongside this file's other creepXY/bfsPath
-    -- notes on this same map.
     creepNav(21, 23, FLEE_WALK),
-    -- probe instrument kept (issue #127): the party-membership/object-
-    -- pointer dump right before the trigger fires, for comparison against
-    -- the post-battle dump below.
+    -- Party-membership/object-pointer dump right before the trigger fires,
+    -- for comparison against the post-battle dump below.
     H.call(function() probeDump("PRE-BATTLE45 attempt-" .. n) end),
     pressWalk("up", function()
       return H.battleLoadStarted() or not H.hasControl()
@@ -2187,16 +1209,12 @@ local function ambushAttempt(n)
     H.waitUntil(function() return H.battleActive() end, 6000,
       "ambush battle up", 10),
     H.waitFrames(90),
-    -- PHASE 1 (pass five fix): drive the fight TACTICALLY (F.frame() --
-    -- items, revives, Terra's Ice, boosted Fight) for as long as the
-    -- battle module might still own the screen, and ONLY conclude the
-    -- battle is over after CONFIRM_BATTLE_GONE consecutive confirming
-    -- frames.  H.gameOverFired is checked first and exits immediately
-    -- with no debounce: it is now a READ watch on the event GameOver
-    -- SCRIPT bytes in bank $CC (lib/ot6.lua, uncommitted -- the coordinator's
-    -- fix for the earlier EXEC watch, which could never fire because
-    -- $CC/E568 is event-interpreter DATA, never CPU-executed code), so it
-    -- is ground truth for "this attempt just lost", not a heuristic.
+    -- PHASE 1: drive the fight (F.frame()) for as long as the battle module
+    -- might still own the screen, and only conclude the battle is over
+    -- after CONFIRM_BATTLE_GONE consecutive confirming frames.
+    -- H.gameOverFired is checked first and exits immediately with no
+    -- debounce: it is a READ watch on the event GameOver script bytes in
+    -- bank $CC, ground truth for "this attempt just lost".
     H.driveUntil(function()
       if H.gameOverFired > 0 then return true end
       if H.battleLoadStarted() or H.battleActive() then
@@ -2219,14 +1237,11 @@ local function ambushAttempt(n)
       probeDump("POST-BATTLE45 attempt-" .. n)
       probeEventDump("POST-BATTLE45 attempt-" .. n)
     end),
-    -- PHASE 2 (pass five fix): the win-tail.  $050A is UNSOUND as a win
-    -- signal (the coordinator's correction): thamasa-night-v1, the SRAM a
-    -- loss silently re-Continues to, has NEVER set $050A either, so it
-    -- reads 0 there too and cannot tell a win from a reload.  This phase
-    -- just settles (edge-A through anything waiting, same idiom
-    -- newFightDriver's own menu==0 case uses) and hands off to the win-
-    -- verification call below, which checks real ground truth instead of
-    -- any single field switch.
+    -- PHASE 2, the win-tail. $050A is unsound as a win signal: a loss
+    -- silently re-Continues to thamasa-night-v1, whose SRAM never sets
+    -- $050A either, so it reads 0 there too and cannot tell a win from a
+    -- reload. This phase just settles (edge-A through anything waiting)
+    -- and hands off to the win-verification call below.
     H.driveUntil(function()
       if H.gameOverFired > 0 then return true end
       giveUp = giveUp + 1
@@ -2240,11 +1255,10 @@ local function ambushAttempt(n)
         else H.setPad({}) end
       end),
     }, "ambush win-tail settle (or a real GameOver shows itself)"),
-    -- WIN VERIFICATION (coordinator's directive 3, pass five): a real win
-    -- needs ALL THREE -- H.gameOverFired stayed 0 the whole attempt, we
-    -- are STILL on map 351 (a reload lands on the world map/town, not
-    -- here), and STRAGO is still in the active party (thamasa-night-v1's
-    -- own roster is pre-Strago, so his presence alone rules out a reload).
+    -- WIN VERIFICATION: a real win needs all three -- H.gameOverFired
+    -- stayed 0 the whole attempt, still on map 351 (a reload lands on the
+    -- world map/town), and STRAGO still in the active party
+    -- (thamasa-night-v1's own roster is pre-Strago).
     H.call(function()
       H.setPad({})
       local realWin = H.gameOverFired == 0 and map() == 351
@@ -2280,10 +1294,9 @@ end
 -- Dadaluma/TunnelArmr use); a loss is vanilla GameOver.  L26 HP8400 vs a
 -- party around L16-19 is a long fight -- newFightDriver's own tactical
 -- kit (boosted Fight, TERRA's Cure, the item bag) fights it honestly, no
--- bespoke per-turn plan (the Aqua Rake/Ice Rod optimizations are filed,
--- not built -- see the header).  A seed ladder (H.newSeedLadder, 5 rungs
--- like gen_sabin_train's battle 68) retries a loss from a checkpoint taken
--- just before the trigger tile, with a care stop each attempt.
+-- bespoke per-turn plan. A seed ladder (H.newSeedLadder, 5 rungs) retries
+-- a loss from a checkpoint taken just before the trigger tile, with a
+-- care stop each attempt.
 local L79 = H.newSeedLadder("FlameEater (battle 79)", { attempts = 5 })
 local feBlob, feWon = nil, false
 
@@ -2292,9 +1305,6 @@ local function flameEaterAttempt(n)
     bank = 3, items = true, cure = true, healer = TERRA, healPercent = 60 })
   local notBattle, giveUp = 0, 0
   local loadReq
-  -- was `seq({...})` here -- ambushAttempt's header explains the bug this
-  -- hid (seqStep needs a plain list, not a pre-wrapped compound step); a
-  -- bare {...} is the fix, same as every other H.cond call in this file.
   return H.cond(function() return feWon end, {}, {
     H.logStep(function()
       return string.format("FlameEater attempt %d at f%d", n, H.frame)
@@ -2322,11 +1332,9 @@ local function flameEaterAttempt(n)
       H.log(string.format("[FlameEater] up, attempt %d: hp=%d", n,
         H.readWord(0x3bfc)))
     end),
-    -- PHASE 1 (pass five fix, same as ambushAttempt above -- see its own
-    -- comment for the measured bug this debounce fixes): drive
-    -- tactically until the battle module is confirmed gone for
-    -- CONFIRM_BATTLE_GONE consecutive frames, or H.gameOverFired reads
-    -- (the READ watch, ground truth) fires -- whichever first.
+    -- PHASE 1: drive tactically until the battle module is confirmed gone
+    -- for CONFIRM_BATTLE_GONE consecutive frames, or H.gameOverFired (the
+    -- READ watch, ground truth) fires -- whichever first.
     H.driveUntil(function()
       if H.gameOverFired > 0 then return true end
       if H.battleLoadStarted() or H.battleActive() then
@@ -2346,12 +1354,10 @@ local function flameEaterAttempt(n)
         "[FlameEater] phase 1 done (battle module gone or GameOver read), " ..
         "attempt %d, f%d, gameOverFired=%d", n, H.frame, H.gameOverFired))
     end),
-    -- PHASE 2 (pass five fix): the win-tail settle. $0090 alone is a
-    -- decent positive signal here (thamasa-night-v1 never sets it either,
-    -- so ==1 cannot be confused with the reloaded save the way the
-    -- ambush's $050A==0 could) but the win-verification call below still
-    -- cross-checks party/roster sanity rather than trusting one switch in
-    -- isolation, matching the ambush fix for consistency.
+    -- PHASE 2, the win-tail settle. $0090 alone is a decent positive
+    -- signal here (thamasa-night-v1 never sets it either), but the
+    -- win-verification call below still cross-checks party/roster sanity
+    -- rather than trusting one switch in isolation.
     H.driveUntil(function()
       if H.gameOverFired > 0 then return true end
       giveUp = giveUp + 1
@@ -2364,9 +1370,9 @@ local function flameEaterAttempt(n)
         else H.setPad({}) end
       end),
     }, "the win tail flips $0090 (or a real GameOver shows itself)"),
-    -- WIN VERIFICATION (coordinator's directive 3, pass five): gameOverFired
-    -- stayed 0, $0090 flipped, and the roster is still sane (STRAGO/TERRA
-    -- present -- a reload to thamasa-night-v1 would drop both).
+    -- WIN VERIFICATION: gameOverFired stayed 0, $0090 flipped, and the
+    -- roster is still sane (STRAGO/TERRA present -- a reload to
+    -- thamasa-night-v1 would drop both).
     H.call(function()
       H.setPad({})
       local realWin = H.gameOverFired == 0 and sw(0x0090) == 1
@@ -2431,35 +1437,19 @@ local steps = {
   -- ---- 2. care, then the grinding leg, then into town --------------------
   H.fieldCare({ tag = "care at the L tile", threshold = 0.9 }),
 
-  -- ---- 2.5. the grinding leg (owner's ruling, pass six; MOVED before the
-  -- inn per the owner's course-correction -- checkpoint L's own party is
-  -- TERRA-LOCKE-SHADOW, boots directly on the world map with zero
-  -- preamble, and Shadow only leaves at the inn night scene, so grinding
-  -- here fights the fire block's SAFEST possible roster (three live
-  -- members) instead of the post-fire duo the wipe-tolerance machinery
-  -- below was built for. That machinery (worldNavTo's opts.wipeEndsRide,
-  -- grindBlob's reload-on-wipe) stays armed regardless, as cheap
-  -- insurance -- three members is safer, not risk-free, and it cost
-  -- nothing to leave it on.
-  -- No enemy stat gets touched; the party grinds instead. Crescent Island
-  -- trash (thamasa-route.md section 1 segment 1's terrain-group table:
-  -- grass carries Baskervor L22 HP750 no-weakness and Cephaler L21 HP420
-  -- weak bolt), fought with the tactical driver until TERRA and LOCKE can
-  -- both survive a full-HP Balloon's self-destruct (Shadow's own HP is
-  -- irrelevant -- he is gone before the ambush; he fights along on plain
-  -- Fight, the driver's default for any character who isn't Edgar/Sabin,
-  -- so Throw/shurikens are never spent here). See grindLeg's own header
-  -- comment for the full design; GRIND_A/GRIND_B are the exact (232,150)/
-  -- (249,128) endpoints gen_thamasa_arrive (the shipped K->L generator)
-  -- already proved walkable end to end.
+  -- ---- 2.5. the grinding leg ----------------------------------------------
+  -- Runs before the inn: checkpoint L's own party is TERRA-LOCKE-SHADOW and
+  -- boots directly on the world map, and Shadow only leaves at the inn
+  -- night scene, so grinding here fights the fire block's safest roster
+  -- (three live members). See grindLeg's own header comment for the full
+  -- design.
   H.call(function()
     H.log(string.format(
       "[grind] pre-inn grind starting, party TERRA/LOCKE/SHADOW, f%d " ..
       "world=(%d,%d)", H.frame, H.worldX(), H.worldY()))
   end),
-  -- the grind's own entry-point checkpoint -- a wiped leg reloads THIS,
-  -- not the whole run (see grindLeg's own wipe branch and worldNavTo's new
-  -- opts.wipeEndsRide, lib/ot6_field.lua).
+  -- the grind's own entry-point checkpoint -- a wiped leg reloads this,
+  -- not the whole run.
   (function()
     local ckReq
     return seq({
@@ -2499,30 +1489,18 @@ local steps = {
       H.frame, map(), H.fieldX(), H.fieldY()))
   end),
 
-  -- ---- 2.6. stock up before the inn (owner's ruling, pass six; MOVED
-  -- pre-inn along with the grind -- both the shop and the new (33,25) save
-  -- point are available before the inn, and the grind's own tactical
-  -- driving eats the bag fast, so there is no reason to wait). Quantities
-  -- are generous asks, not requirements -- H.buyItem's own purse-clamp
-  -- acceptance takes whatever gil actually covers and logs it, same as
-  -- gen_sabin_train's shop.
+  -- ---- 2.6. stock up before the inn ---------------------------------------
+  -- Quantities are generous asks, not requirements -- H.buyItem's own
+  -- purse-clamp acceptance takes whatever gil actually covers and logs it.
   crossDoor(26, 37, 347, 36, 44, "item shop door 343(26,37)->347(36,44)"),
-  -- MEASURED (this pass, live): shopTalk's own staging picked (36,40) as
-  -- reachable right after the door load, then H.navTo's live walk failed
-  -- with "no path (36,44)->(36,40)" -- the same "door loads finalize the
-  -- decompressed prop table LATE" timing gap gen_zozo2/gen_zozo4 already
-  -- measured (this file's own map-351-entry comment cites it too). A
-  -- settle wait before the first pathfinding call is the fix there; same
-  -- fix here.
+  -- Door loads finalize the decompressed prop table late; a settle wait
+  -- before the first pathfinding call avoids a spurious "no path".
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
     "shop interior settled before pathfinding", 10),
   H.waitFrames(150),
   shopTalk(36, 39, "Thamasa item shop"),
   H.buyItem(TONIC, 0, function() return 30 - H.invCountOf(TONIC) end, "TONIC to 30"),
   H.buyItem(POTION, 1, function() return 15 - H.invCountOf(POTION) end, "POTION to 15"),
-  -- Coordinator's directive (pass six): "grab a healthy Fenix stock -- the
-  -- ambush plan leans on revives" -- raised from 8 to 20 (gil was in no
-  -- danger of running short: 64594 left over buying to 8 the first time).
   H.buyItem(FENIX_DOWN, 6, function() return 20 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 20"),
   H.call(function()
@@ -2532,10 +1510,8 @@ local steps = {
       gil(), H.frame))
   end),
   shopClose("Thamasa item shop"),
-  -- MEASURED (this pass, source decode): the return record is NOT the
-  -- forward one mirrored -- map 347's own short_entrance block ($1656,
-  -- decoded the same way) is src=(36,45) map=87(+256=343) dest=(26,39),
-  -- two tiles off the forward door's own (26,37)/(36,44) on both ends.
+  -- The return record is not the forward one mirrored: src=(36,45)
+  -- dest=(26,39), two tiles off the forward door's (26,37)/(36,44).
   crossDoor(36, 45, 343, 26, 39, "item shop door 347(36,45)->343(26,39), return"),
 
   -- ---- 3. the inn: door, innkeeper, the whole fire scene -----------------
@@ -2544,16 +1520,11 @@ local steps = {
     H.log(string.format("[ot6] inn interior f%d (%d,%d)", H.frame,
       H.fieldX(), H.fieldY()))
   end),
-  -- MEASURED (2026-08-19, this generator's own probe pass): the innkeeper
-  -- at (24,15) sits behind a counter tile at (24,16) that bfsPath refuses
-  -- as a stand (it is solid), while (24,17) -- two tiles south, the far
-  -- side of the counter -- IS reachable (bfsPath len 7 from the door
-  -- landing).  This is the Dadaluma note's "talk-across-a-counter"
-  -- mechanic (CheckNPCs' extension, player.asm @478e): stand one tile back
-  -- from the counter, face it, and the talk reaches through to the NPC
-  -- beyond.  chaseTalk's "walk directly adjacent" model does not fit a
-  -- counter NPC (it was built for wandering NPCs on open floor), so this is
-  -- a face+A stand rather than a chase.
+  -- The innkeeper at (24,15) sits behind a counter tile at (24,16) that
+  -- bfsPath refuses as a stand; (24,17), two tiles south, is reachable.
+  -- This is the "talk-across-a-counter" mechanic: stand one tile back from
+  -- the counter, face it, and the talk reaches through to the NPC beyond
+  -- -- a face+A stand rather than a chase.
   H.navTo(24, 17, { maxFrames = 9000, playBattles = "tactical", healer = TERRA,
     bank = 3, items = true }),
   H.driveUntil(function()
@@ -2572,8 +1543,8 @@ local steps = {
     }, "talk-across-the-counter -> innkeeper's 1 GP choice")
   end)(),
   -- one continuous scripted stretch from here: the Yes confirm (default
-  -- cursor), the innkeeper walking off, and (since $008D=1) straight into
-  -- the night/fire scene with no further choice screens (see header).
+  -- cursor), the innkeeper walking off, and straight into the night/fire
+  -- scene with no further choice screens.
   H.advanceStory(calm(30), 30000, { playBattles = "tactical" }),
   H.waitFrames(30),
   H.call(function()
@@ -2590,9 +1561,9 @@ local steps = {
       H.readByte(0x1850) & 7, H.readByte(0x1851) & 7))
     H.screenshot("thamasa_fire_started")
   end),
-  -- ISSUE #127 PROBE: known-good moment (right after the fire scene,
-  -- before the house is entered) -- baseline for the $0867+41*id dump, and
-  -- where the write-watch on those four bytes is armed (before the house).
+  -- Known-good moment (right after the fire scene, before the house is
+  -- entered): baseline for the $0867+41*id dump, and where the write-watch
+  -- on those four bytes is armed.
   H.call(function()
     probeDump("GOOD-post-fire")
     armProbeWatch()
@@ -2622,12 +1593,9 @@ local steps = {
     H.assertEq(partyOf(STRAGO) ~= 0, true, "STRAGO is in party 1")
     H.assertEq(partyOf(TERRA) ~= 0, true, "TERRA is in party 1")
     H.assertEq(partyOf(LOCKE) ~= 0, true, "LOCKE is in party 1")
-    -- P3 (issue #127): inlined rather than calling logStragoJoin() here --
-    -- that helper is itself an H.call step object, and invoking it from
-    -- inside ANOTHER H.call's body only constructs a throwaway step and
-    -- runs nothing (measured: no [P3] line ever appeared in a real run
-    -- that reached this point).  logStragoJoin is left in place as a
-    -- standalone step for a future caller; this inlines its body.
+    -- Inlined rather than calling logStragoJoin() here -- that helper is
+    -- itself an H.call step object, and invoking it from inside ANOTHER
+    -- H.call's body only constructs a throwaway step and runs nothing.
     do
       -- ff6/notes/field-ram.txt:885-895: the 37-byte character record,
       -- indexed by character id (same convention as $1850+charId): +$08
@@ -2648,15 +1616,11 @@ local steps = {
   end),
 
   -- ---- 5. the burning house: two chests, the ambush, FlameEater ----------
-  -- MEASURED (2026-08-19): the load_map lands the party in a 3-tile
-  -- landing pocket ((4,10)-(4,11)-(4,12); prop1=$F7, fully solid, on all
-  -- three other sides -- bfsPath confirmed the enclosure before this fix).
-  -- The way out is a FLOOR TRIGGER at (4,10) (event_trigger.asm:1714,
-  -- _cbe5e4), not an automatic startup event: stepping onto it (gated
-  -- `$0190==1`, true here) plays the short "avoid the flames... find
-  -- RELM!" scene, re-orders the party, walks LOCKE/STRAGO a few tiles
-  -- diagonally into the house proper, and clears $0190.  Ridden with
-  -- advanceStory like every other scripted stretch.
+  -- load_map lands the party in a 3-tile landing pocket, fully enclosed.
+  -- The way out is a floor trigger at (4,10), not an automatic startup
+  -- event: stepping onto it (gated `$0190==1`) plays the short "avoid the
+  -- flames... find RELM!" scene, re-orders the party, walks LOCKE/STRAGO a
+  -- few tiles diagonally into the house proper, and clears $0190.
   H.navTo(4, 10, WALK),
   H.advanceStory(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15
@@ -2669,59 +1633,30 @@ local steps = {
       H.frame, H.fieldX(), H.fieldY(), sw(0x0190), sw(0x008F)))
     H.assertEq(sw(0x0190), 0, "$0190 cleared by the (4,10) trigger")
   end),
-  -- door loads finalize the decompressed prop table LATE (gen_zozo2's
-  -- measured rule, reused by gen_zozo4's door()); settle before any
-  -- pathfinding reads it.
+  -- door loads finalize the decompressed prop table late; settle before
+  -- any pathfinding reads it.
   H.waitUntil(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15
   end, 2400, "map 351 settled before pathfinding", 10),
   H.waitFrames(150),
-  -- The house graph, decoded from ff6/src/field/trigger/short_entrance.dat
-  -- offset $167a (17 records, map 351 -> map 351) and cross-checked against
-  -- a live full-map tile-property dump (probe_thamasa_house_map.lua): 35
-  -- cardinally-disconnected tile islands stitched together ONLY by these
-  -- warps.  See the STATUS header for the full island graph.  Each hop
-  -- rides houseWarp() (crossDoor's same-map twin); a care() stop follows
-  -- every hop, per the task's "care between chained fights" rule -- the
-  -- wandering flames sit inside these islands (12 of them, all decoded
-  -- from npc_prop.asm), so a contact battle can start on any leg.
+  -- 35 cardinally-disconnected tile islands stitched together only by
+  -- short_entrance warps (see the file header for the full island graph).
+  -- Each hop rides houseWarp() (crossDoor's same-map twin); a care() stop
+  -- follows every hop, since the wandering flames sit inside these islands
+  -- and a contact battle can start on any leg.
   H.call(function() H.log("[ot6] island 0 -> 13: (4,3)->(4,38)") end),
   houseWarp(4, 3, 4, 38, "P1 (4,3)->(4,38): the floor warp into the main hall"),
   care("after P1"),
-  -- MEASURED (2026-08-19): this whole route is deterministic frame-for-
-  -- frame given identical code (P1 lands at (4,38) on the exact same frame,
-  -- 10534, across half a dozen otherwise-different attempts), which means
-  -- the wandering flames' contact timing and the pincer/ambush RNG draws
-  -- are ALSO pinned by real-time frame count, not luck -- a plain re-run
-  -- with no code change reproduces the same wipe every time. A battle
-  -- seed ladder (H.newSeedLadder, the FlameEater pattern below) is the
-  -- correct tool for this but needs a save/reload-on-loss loop, which
-  -- needs the wipe to be caught rather than hard-erroring the whole run
-  -- (M.run's own pcall stops the process on the first error() -- there is
-  -- no per-step retry); building that around H.navTo's built-in wipe
-  -- canary (a hard error by design, ot6_field.lua's wipeCanary) was out of
-  -- scope for this pass. This single extra wait is the cheap version of
-  -- the same idea: shifting every subsequent battle's frame phase by a
-  -- fixed offset changes which byte of the seed table each one draws
-  -- (spread()'s own docs: "Replaces H.waitFrames((n-1)*37)"), without
-  -- needing the full ladder machinery.
+  -- This route is deterministic frame-for-frame given identical code,
+  -- which pins the wandering flames' contact timing and the pincer/ambush
+  -- RNG draws to real-time frame count. This wait shifts every subsequent
+  -- battle's frame phase by a fixed offset, changing which byte of the
+  -- seed table each one draws.
   H.waitFrames(37),
 
-  -- MEASURED (2026-08-19): island 13 (three wandering flames,
-  -- (2,29)/(5,31)/(4,35)) and island 11 (three more,
-  -- (17,34)/(22,25)/(17,27)) chain-battled the party WIPED on multiple live
-  -- runs -- 4-5 contact fights back to back with no field-menu heal between
-  -- them (only newFightDriver's in-battle threshold heal, which can't act
-  -- once the healer is down, AND H.fieldCare turned out to be broken on
-  -- this map, see care()'s note) burned all 3 Fenix Downs and then had
-  -- nothing left when the LAST survivor also went down. Two things
-  -- together got a live run past this stretch: a mid-leg waypoint + care()
-  -- (halving the run of chained fights between real heals; (4,30) and
-  -- (24,29) are plain confirmed-walkable tiles from the grid dump, nothing
-  -- special about the coordinates) AND fleeing the wandering flames
-  -- (FLEE_WALK) on every leg through these two islands rather than fighting
-  -- every one -- none of the twelve flames are required content (see
-  -- houseWarp's own note on `flee`).
+  -- islands 13 and 11 hold six wandering flames between them; chain-
+  -- battling all of them wipes the party. A mid-leg waypoint + care() plus
+  -- fleeing them (FLEE_WALK) gets a run through wipe-free.
   creepNav(4, 30, FLEE_WALK),
   care("partway through the main hall (island 13)"),
 
@@ -2729,47 +1664,13 @@ local steps = {
   houseWarp(2, 24, 26, 36, "P2 (2,24)->(26,36): into the ambush hall", "flee"),
   care("after P2"),
 
-  -- MEASURED (2026-08-19): a (24,29) mid-leg waypoint was tried here too
-  -- (matching island 13's), but bfsPath came back "no path (26,36)-
-  -- >(24,29)" on a live run -- the offline flood fill that suggested it was
-  -- walkable used undirected reachability (any nonzero exit nibble), which
-  -- overlooks one-way exit-bit walls the live engine enforces; the earlier
-  -- P2 fix (see the STATUS header's dead-end #1) hit the same false-
-  -- positive-connectivity trap. Dropped rather than re-guessed: flee mode
-  -- already got P2 through island 13 wipe-free and much faster (16621 vs
-  -- 35999 frames on the same leg pre-flee), so island 11's own P2->ambush
-  -- stretch goes straight there without a waypoint that isn't real.
-  -- MEASURED (2026-08-19): with the (24,29) waypoint gone, this leg went
-  -- straight back to fighting every wandering flame between (26,36) and
-  -- (21,22) (WALK is tactical) and wiped again, right where the earlier
-  -- attempts did. FLEE_WALK here too: the flames along the way are still
-  -- optional, and the SCRIPTED ambush itself, once triggered by stepping
-  -- on (21,22), should be exactly the "unrunnable formation" flee mode's
-  -- own fallback describes -- when running fails for M.FLEE_CAP frames it
-  -- hands off to the SAME tactical driver WALK would have used, so in
-  -- theory the ambush still gets fought properly.  MEASURED live: it does
-  -- NOT work out that way for a formation flee refuses outright.  The log:
-  -- "flee: this formation refuses the run ($b1 bit 1 held 60 frames -- a
-  -- pincer, or a monster nobody runs from) after 62 frames; fighting it
-  -- out instead" -- and by the time the fallback took over, partyhp was
-  -- already 0,5,0,0 on the very FIRST logged battle frame.  A pincer
-  -- (party surrounded) apparently still lets the enemy act during the ~60
-  -- frames flee spends standing still trying to run, so attempting to flee
-  -- an unrunnable ambush is worse than not trying -- it eats a full round
-  -- of free damage before the tactical driver ever gets a turn. Fix:
-  -- FLEE_WALK only as far as (21,23), one tile short of the trigger (a
-  -- confirmed-walkable staging tile from the grid dump), so any wandering
-  -- flame on the way there is still skippable; then a single tactical
-  -- WALK hop onto (21,22) itself so the ambush is fought from turn one,
-  -- never attempted-and-refused.
-  -- MEASURED (2026-08-19): staging at (21,23) and stepping onto (21,22)
-  -- tactically (below) fixed the "flee refuses the ambush and eats a free
-  -- round" problem, but the ambush itself still wiped the party outright --
-  -- see ambushAttempt's own header for the evidence (TERRA and STRAGO both
-  -- read 0 hp on the battle's very first frame, before the driver ever
-  -- acted). No amount of pre-fight preparation moves that number; this is
-  -- the same "hard, luck-sensitive fight" shape FlameEater already has a
-  -- seed ladder for, so it gets one too, checkpointed here.
+  -- A pincer formation (like the scripted ambush) refuses to let the party
+  -- flee: the flee driver spends ~60 frames trying before falling back to
+  -- the tactical driver, and the enemy still acts during those frames, so
+  -- attempting to flee an unrunnable fight is worse than not trying. Fix:
+  -- FLEE_WALK only as far as (21,23), one tile short of the trigger, so
+  -- any wandering flame on the way is still skippable; then a single
+  -- tactical hop onto (21,22) itself so the ambush is fought from turn one.
   H.call(function() H.log("[ot6] checkpointing before the ambush trigger") end),
   (function()
     local ckReq
@@ -2808,32 +1709,6 @@ local steps = {
     end
   end),
   L45.report(),
-  -- SUPERSEDED 2026-08-19 (issue #127, pass five, coordinator's major
-  -- correction): the "post-ambush field-control stall" that passes three
-  -- and four spent most of their time on (world-mode-shaped $1f64, no
-  -- Strago in the party, position stuck around (8,7)) was NEVER a stuck
-  -- engine. It was the reloaded thamasa-night-v1 SRAM -- the ambush was
-  -- being LOST the whole time (a real GameOver, invisible to pass four's
-  -- own canary because that canary armed an EXEC watch on $CC/E568, and
-  -- GameOver there is event-interpreter DATA, never CPU-executed code, so
-  -- the watch could never fire), and the win-tail's blind A-mash walked
-  -- the resulting Game Over screen onto the vanilla Continue prompt.
-  -- ambushAttempt() above now (a) drives the fight tactically with a
-  -- debounced end-of-battle check instead of handing off to the blind
-  -- A-mash mid-fight, (b) watches a READ watch on those same bytes
-  -- (lib/ot6.lua, ground truth -- the event interpreter really does fetch
-  -- them to run the script), and (c) verifies a win against map/roster
-  -- ground truth instead of a switch that reads identically on the
-  -- reloaded save. A real win no longer needs a bespoke settle dance here:
-  -- ambushAttempt's own phase 2 already leaves the party settled on map
-  -- 351 with control back before ambWon is allowed to flip true. The
-  -- probe instruments this investigation built (probeDump/probeEventDump/
-  -- probePcTrail/armProbeWatch/PROBE_IDS/SHOT_FRAMES_TAIL, plus
-  -- ambushAttempt's own PRE/POST-BATTLE45 probeDump calls) are KEPT for
-  -- the next pass that needs them; only the deliberate stop below (an
-  -- always-false 400-frame trace + a forced error(), built to gather this
-  -- pass's screenshot evidence and never meant to reach FlameEater) is
-  -- removed.
   care("after the (21,22) ambush"),
 
   H.call(function() H.log("[ot6] island 11 -> 1: (26,21)->(21,9)") end),
@@ -2952,7 +1827,7 @@ local steps = {
     H.screenshot("thamasa_shadow_goodbye")
   end),
 
-  -- ---- 8. out of town the way K->L measured it, and the world save ------
+  -- ---- 8. out of town, and the world save --------------------------------
   care("before leaving town"),
   H.navTo(21, 47, { maxFrames = 20000, playBattles = "tactical", healer = TERRA,
     bank = 3, items = true }),
@@ -3074,20 +1949,10 @@ end
 for _, s in ipairs(steps) do push(s) end
 
 -- allowGameOver=true: both the ambush and FlameEater below are seed
--- ladders explicitly built to survive a real loss (see the #127 GameOver
--- guard note above lossReload()) -- without this the lib's own canary
--- would abort the whole run the frame after either fight's first loss,
--- before the ladder ever got a chance to reload and retry.
--- MEASURED (this pass, live): 900000 was not enough headroom for the grind
--- alone -- 137 legs (~900000 frames) burned the whole budget without ever
--- leveling up once, because of the stale-checkpoint bug grindLeg's own
--- comment now documents (every wipe was reloading the ORIGINAL pre-grind
--- state, discarding all progress since the very first leg, not just that
--- one). With that fixed (grindBlob now refreshes after every successful
--- leg), a wipe only costs its own leg's frames, but the wipe rate itself
--- is real (roughly 1 in 2-3 legs against Baskervor even at 3 members), so
--- reaching 60 real fights can still cost several times as many total
--- frames as a wipe-free grind would. 3000000 gives real headroom for
--- that plus the rest of the route (ambush ladder, FlameEater, the win
--- tail) behind it.
+-- ladders explicitly built to survive a real loss -- without this the
+-- lib's own canary would abort the whole run the frame after either
+-- fight's first loss, before the ladder ever got a chance to reload and
+-- retry. 3000000 gives headroom for the grind's own wipe-and-retry cost
+-- (roughly 1 in 2-3 legs against Baskervor even at 3 members) plus the
+-- rest of the route (ambush ladder, FlameEater, the win tail) behind it.
 H.run({ maxFrames = 3000000, allowGameOver = true }, flat)

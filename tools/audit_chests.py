@@ -1,119 +1,16 @@
 #!/usr/bin/env python3
 """Report the treasure the route walks past without opening.
 
-Why this exists.  Owner, 2026-08-12: "human players love to open chests to
-find out what's inside.  a typical run will open almost every chest you
-see."  The route does not open any.  Measured 2026-08-12 across all 98
-savestates in build/states and all 12 tracked SRAM checkpoints: every one of
-the 512 treasure bits at $1E40 is clear, from power-on to the deepest link
-in the chain.
-
-That is not tidiness.  A Thunder Rod sits in a chest on map 70, one room
-before the TunnelArmr fight that was losing all three attempts and blocking
-the v0.10 release check, and eight more chests sit on map 75 in South Figaro,
-including a Fenix Down and two Tonics.  A route that skips content reaches a
-fight the designers expected it to reach armed, loses, and reports a balance
-finding; this project has already spent days on three fights that turned out
-to be under-preparation rather than tuning.
-
-The two halves of the question come from different places.
-
-WHAT CHESTS EXIST, AND WHERE.  `ff6/src/field/trigger/treasure_prop.dat`,
-one 5-byte record per chest, blocked by map through the offsets in
-`ff6/include/field/treasure_prop.inc`.  Layout, all confirmed in the game's
-own reader `CheckTreasure` (`ff6/src/field/player.asm:719-810`):
-
-    +$00 x tile           (`player.asm:766`, compared against $2A)
-    +$01 y tile           (`player.asm:769`, compared against $2B)
-    +$02 switch, 16-bit   (`player.asm:780`, `TreasureProp::Switch`)
-    +$04 content          (`player.asm:778`, `TreasureProp::Content`)
-
-    ITEM_SIZE = 5 (`treasure_prop.inc:9`), and the scan loop steps by five
-    (`inx5`, `player.asm:773`).
-
-The switch word carries both the flag and the kind.  Bits 0-8 are the index
-into the treasure-bit array: `and #$01ff / lsr3` picks the byte and
-`and #$0007` picks the bit (`player.asm:782-789`).  The kind is the high
-nibble, tested in this order (`player.asm:797`, `:817`, `:830`, `:840`):
-$8000 gil (content x 100), $4000 item, $2000 monster-in-a-box (content is an
-event battle group), $1000 empty.  Ten records set NONE of the four; they
-fall through to the same empty branch, because the `and #$10 / beq` at
-`player.asm:840-842` branches to the instruction after it either way -- the
-vendored disassembly's own comment there is "this has no effect".  So they
-are empty chests and are counted as such.
-
-The unit the game tracks is the BIT, not the record: 25 bit indices are
-shared by two or three records, because the game keeps duplicate map copies
-(South Figaro before and after the occupation, the two South Figaro cave
-variants) and one flag has to close the chest in every copy.  Bit 19 is
-shared by maps 70, 73 and 90 and the three copies hold DIFFERENT items --
-Thunder Rod, Tincture, Hero Ring -- so opening it in one copy takes that
-copy's item and empties the chest in the others.  Everything below counts
-distinct bits and names every map a bit appears on.
-
-WHICH MAPS THE ROUTE VISITS, AND WHAT IT OPENS.  "What it opens" is exact:
-the treasure bits live at $1E40..$1E7F (`ff6/notes/field-ram.txt:1035`,
-written only by `player.asm:795` and cleared only by `event.asm:5549`), which
-is inside the $1600..$1FFF block the game copies into a save slot
-(`CopyGameDataToSRAM`, `ff6/src/menu/save.asm:154d`), so the same offset
-reads a .mss fixture and a tracked SRAM checkpoint.  `savestate_party.py`
-locates $1600 in both.
-
-"Which maps" is NOT exact, and the number below is a LOWER BOUND.  Two
-mechanical sources are unioned:
-
-  * every fixture's and checkpoint's own map id ($1F64).  Exact -- the party
-    was standing there -- but it only sees the maps the route STOPS on.
-  * every positive map equality in `tools/tests/gen_*.lua`
-    (`H.assertEq(map(), N)`, `map() == N` and the `H.mapId()` spellings).
-    In a green chain an assertion that ran and held is proof the route
-    reached that map.
-
-Neither sees a map crossed with no assertion and no fixture.  Map 72 is the
-known case: gen_kolts walks the whole of it, but its map id reaches the
-generator as the third argument of a file-local `crossTo(55, 32, 72, ...)`
-helper, which no general pattern can safely read.  Its two chests are
-therefore missing from the count.  The fix is not a cleverer grep -- it is a
-map-change log written by the harness during generation and published beside
-the savestate, which would make this half exact and self-maintaining; that
-costs one full `make savestates` and is filed as a follow-up rather than
-guessed at here.
-
-WHAT THE CHECK IS.  `tools/chests_opened.txt` is a grow-only list of the
-chests the route does open, one line per treasure bit, and the audit fails
-unless the measured set matches it exactly.  It is the inverse of the
-burn-down waiver lists in `audit_equipment.py` and `audit_party_hp.py`, and
-deliberately so: those list defects, and a defect list here would be 94
-identical lines saying "the route does not open chests", which is noise from
-the day it lands and stays noise for weeks.  A list of wins is empty today,
-costs nothing to read, and still fails in both directions -- a route that
-stops opening a chest it used to open, and a route that opens a new one
-without recording it.  A bare threshold was the other candidate and was
-rejected because it cannot say WHICH chest changed.
-
-The count of chests in scope is reported and deliberately not checked: it
-moves whenever a generator gains or loses a map assertion, which has nothing
-to do with treasure, and a check on it would fail for the wrong reason.
-
-Four things fail when the check does not run, because an audit that finds no
-opened chests and an audit that read nothing print the same green:
-
-  1. the treasure table must parse to a positive number of records with
-     consistent per-map bounds;
-  2. at least one fixture or checkpoint must be read;
-  3. every source read must show a non-empty EVENT-bit array at $1E80, the
-     224 bytes immediately after the treasure bits.  A reader that landed
-     on the wrong offset reports zero for both arrays; every state in this
-     chain is past the intro and carries story switches (the emptiest in the
-     tree has 284 bits set), so an all-zero event array means the read is
-     wrong, not that the game is clean;
-  4. no set treasure bit may fall outside the set of indices the table
-     actually uses.  The table uses 259 of the 512, so a stray bit above
-     that range is garbage rather than a chest.
-
-`--selftest` drives the decoder against a synthetic save blob with a known
-bit set, which is what fails if the reporting path is ever reduced to
-printing zero.
+Chest layout is `ff6/src/field/trigger/treasure_prop.dat`, a 5-byte record
+per chest blocked by map through `ff6/include/field/treasure_prop.inc`.
+Opened state is the 512-bit array at $1E40, part of the $1600..$1FFF block
+the game copies into a save slot, so the same offset reads a .mss fixture
+and a tracked SRAM checkpoint.  Route coverage is the union of each source's
+own map id and every map a `tools/tests/gen_*.lua` assertion names; this is
+a LOWER BOUND, since a map only crossed (no fixture, no assertion) is
+invisible to it.  `tools/chests_opened.txt` records the chests the route
+does open, one line per treasure bit, and the audit fails unless the
+measured set matches it exactly.
 
 Usage:  python3 tools/audit_chests.py [--dir build/states] [--selftest] [-v]
 Exit 0 clean, 1 if the opened set disagrees with the record or a control
@@ -184,12 +81,8 @@ class Chest:
 
 
 def item_name(names: list[str], item_id: int) -> str:
-    """The name the player sees, without the leading item-type glyph.
-
-    `item_name_en.json` prefixes every name with a `{...}` icon token; that
-    token is the icon column the menu draws, not part of the name, and it is
-    not a weapon category either (`docs/research/data-formats.md`).
-    """
+    """The name the player sees, without the leading `{...}` icon token
+    `item_name_en.json` prefixes every entry with."""
     if item_id >= len(names):
         return f"item ${item_id:02X}"
     return re.sub(r"^\{[^}]*\}", "", names[item_id]).strip()
@@ -273,10 +166,9 @@ def read_state(raw: bytes | None):
 
 # ----------------------------------------------------------- route coverage --
 
-# Positive map equalities.  Every one of these is an assertion or an arrival
-# predicate that HELD in a green chain, so each is proof the route reached
-# that map.  Negative forms (`~=`) are not matched, and comments are stripped
-# before matching so a map id named in prose does not count.
+# Positive map equalities only; negative forms (`~=`) are not matched, and
+# comments are stripped before matching so a map id named in prose does not
+# count.
 MAP_PATTERNS = [
     re.compile(r"H\.assertEq\(\s*map\(\)\s*,\s*(\d+)"),
     re.compile(r"H\.assertEq\(\s*H\.mapId\(\)\s*(?:&\s*0x1ff\s*)?,\s*(\d+)"),
@@ -330,28 +222,18 @@ def load_record(repo: str) -> tuple[dict[int, str], str | None]:
 # ---------------------------------------------------------------- selftest --
 
 def selftest(repo: str = ".") -> int:
-    """Drive the decoder over data whose answer is known independently.
-
-    Without this, a reader broken into always returning an empty set would
-    print the same "0 opened" as the tree genuinely prints today, and the
-    fixtures cannot tell the two apart because the real answer IS zero.
-    """
+    """Drive the decoder over data whose answer is known independently."""
     bad = []
     chests, err = load_chests(repo)
     if err:
         print(f"audit_chests selftest: {err}")
         return 1
 
-    # The table itself, against three facts established elsewhere in the tree.
     if len(chests) != 286:
         bad.append(f"expected 286 treasure records, decoded {len(chests)}")
     by_map = {}
     for c in chests:
         by_map.setdefault(c.map, []).append(c)
-    # docs/design/thamasa-route.md: five minor chests on map 343 only, and
-    # "Fire Rod (4,52) and Ice Rod (45,7)" on map 351 -- a coordinate pair
-    # that is not symmetric, so it fails if x and y are ever read the wrong
-    # way round (`player.asm:766`, `:769`).
     if len(by_map.get(343, [])) != 5:
         bad.append(f"map 343 should carry 5 chests, decoded "
                    f"{len(by_map.get(343, []))}")
@@ -359,61 +241,41 @@ def selftest(repo: str = ".") -> int:
     if rods != [(4, 52, "Fire Rod"), (45, 7, "Ice Rod")]:
         bad.append("map 351 should be Fire Rod at (4,52) and Ice Rod at "
                    f"(45,7), decoded {rods}")
-    # The lead that opened issue #84: an agent decoding the Mt Kolts tent got
-    # as far as item $F7 and flagged the record layout unverified.  The
-    # layout did need deriving, but that reading was right -- $F7 is a Tent
-    # and it is in the Mt Kolts blocks, on maps 96, 97 and 100.
     tents = sorted((c.map, c.what) for c in chests
                    if c.content == 0xF7 and c.kind == "item"
                    and 95 <= c.map <= 100)
     if tents != [(96, "Tent"), (97, "Tent"), (100, "Tent")]:
         bad.append("item $F7 should decode as a Tent in the Mt Kolts blocks "
                    f"on maps 96, 97 and 100; decoded {tents}")
-    # docs/design/bosses-wob.md:386: map 153, a monster-in-a-box whose
-    # content is event battle group 34.
     m153 = [c for c in by_map.get(153, []) if c.kind == "monster"]
     if len(m153) != 1 or m153[0].content != 34:
         bad.append("map 153's monster-in-a-box should be event battle "
                    f"group 34, decoded {[(c.kind, c.content) for c in m153]}")
-    # The motivating chest, named in the issue.
     m70 = by_map.get(70, [])
     if len(m70) != 1 or m70[0].what != "Thunder Rod":
         bad.append("map 70 should carry exactly the Thunder Rod, decoded "
                    f"{[c.what for c in m70]}")
-    # The bit index is nine bits wide, not eight, and only three records in
-    # the table prove it: an `and #$00ff` in place of the game's `and #$01ff`
-    # (player.asm:784) would alias map 89's chest onto bit 0 and still decode
-    # every other record correctly.
+    # The bit index is nine bits wide, not eight (player.asm:784).
     ninebit = sorted((c.bit, c.map) for c in chests if c.bit >= 0x100)
     if ninebit != [(256, 89), (257, 378), (258, 207)]:
         bad.append("the three nine-bit treasure indices should be 256 on map "
                    f"89, 257 on 378 and 258 on 207, decoded {ninebit}")
-    # The kind nibble, tallied.  Ten records set no kind bit at all and are
-    # empty chests by fallthrough (player.asm:840-842); pinning the tally is
-    # what fails if that reading is ever quietly changed.
+    # Ten records set no kind bit at all and are empty chests by fallthrough
+    # (player.asm:840-842).
     tally = {k: sum(1 for c in chests if c.kind == k)
              for k in ("item", "monster", "gil", "empty")}
     if tally != {"item": 258, "monster": 11, "gil": 7, "empty": 10}:
         bad.append(f"kind tally should be 258 item / 11 monster / 7 gil / "
                    f"10 empty, decoded {tally}")
-    # Gil records hold hundreds, not units: `lda $1a / sta hWRMPYA /
-    # lda #100 / sta hWRMPYB` (player.asm:800-803).  Map 30's is the biggest
-    # in the game and the one a reader would notice.
+    # Gil records hold hundreds, not units (player.asm:800-803).
     m30gil = [c.what for c in by_map.get(30, []) if c.kind == "gil"]
     if m30gil != ["5000 gil"]:
         bad.append("map 30's gil chest should read 5000 gil, decoded "
                    f"{m30gil}")
 
-    # The reader, against a synthetic blob.  A save slot is $0A00 bytes of
-    # $1600..$1FFF (save.asm:154d), so a blob of that length with $1600 at 0
-    # is exactly what read_state has to cope with; the character-table shape
-    # signature is what locates it, so records 0..10 carry actor ids whose
-    # low nibble is the record index.
-    #
-    # The three offsets below are written as LITERALS, not through off(), so
-    # that a wrong address constant fails here instead of agreeing with
-    # itself: $1E40 - $1600 = $840, $1E80 - $1600 = $880, $1F64 - $1600 =
-    # $964.
+    # A save slot is $0A00 bytes of $1600..$1FFF (save.asm:154d).  The three
+    # offsets below are literals: $1E40-$1600=$840, $1E80-$1600=$880,
+    # $1F64-$1600=$964.
     blob = bytearray(0x0A00)
     for c in range(11):
         blob[37 * c] = c
@@ -433,8 +295,6 @@ def selftest(repo: str = ".") -> int:
             bad.append(f"event-bit control read {live} bits, expected 8")
         if map_id != 75:
             bad.append(f"map id read {map_id}, expected 75")
-    # And the negative: an untouched slot must report nothing opened, or the
-    # positive above proves only that the reader answers yes to everything.
     blob[0x840 + (want >> 3)] = 0
     got = read_state(bytes(blob))
     if got is None or got[0]:

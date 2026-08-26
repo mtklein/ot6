@@ -6,51 +6,10 @@
 -- cannot be split legally -- a save inside the Esper-World flashback would
 -- save as the WEDGE-actor Maduin with the roster rewritten -- so the
 -- checkpoint gen IS the step.
---
--- The route, every step measured on the probe ladder (2026-07-27):
---  1. 240 (58,7) -> (54,40) -> held LEFT onto the reunion trigger column
---     x=52 (approached from the EAST along row 40; §4.4's (52,36..38)
---     candidates are NOT walkable live).
---  2. The Setzer reunion auto-plays onto the Blackjack deck (map 6),
---     battle 71 (Cranes, 010D+010E) FOUGHT AND WON WITH REAL INPUT
---     (2026-08-10, probe_cranes_water's playbook -- see the prep block
---     below; the original July generator write-cleared this fight, and the
---     interim record called it unwinnable off a Thunder-Blade loadout bug),
---     then the non-interactive flights to Zozo and into the flashback:
---     control as the WEDGE-actor MADUIN at 219 (34,10).
---  3. The flashback's interactive chain (unmapped until now):
---       a. pocket exit (36,15) -> 217 (23,21);
---       b. talk the (32,11) NPC -> choice -> carry MADONNA in ($006C);
---       c. talk MADONNA resting at 219 (46,42) -> $006E;
---       d. talk the (32,11) NPC again -> PORTED to the gate map 218,
---          landing ON the inert trigger tile (56,49), which flickers
---          control ($0117=0 early-return) -- escaped with an UNCONDITIONAL
---          held press, the {10,9} lesson again;
---       e. talk MADONNA at the gate (55,34) -> the long confession/Terra
---          scene -> $006F=1 -> the Gestahl raid (auto);
---       f. talk NPC_4 (the tempest plan) -> $0116;
---       g. talk the elder -> MADUIN collapses -> $0117;
---       h. pocket exit (41,56) -> 217 -> the gate door (32,6) -> the
---          trigger fires ($0117=1) -> $0118;
---       i. talk MADONNA -> the finale _caa4e0 -> espers stolen, TERRA
---          taken -> party restored, Zozo, $02F0=1 (TERRA AVAILABLE),
---          Setzer's tutorial -> control on map 6.
---  4. Takeoff: LEFT+A on the wheel trigger 6 (14,6) (_caf532, facing+A
---     gated) -> world VEHICLE mode.  Strafe SOUTH (Y+down) until the LIVE
---     tile prop under the ship clears the can't-land bit ($c2 & $02,
---     world/init.asm LandAirship), one B tap -> the ship grounds.  The
---     menu opens from the grounded ship with saving ENABLED ($0201 bit7
---     measured $80 -- resolving §4.5's mid-flight caveat: airborne it is
---     $00).
---  5. The ordinary Save UI into slot 3; run.sh captures the battery.
---
+
 -- See gen_mrf_save_room_checkpoint.lua for the codex-witness seeding and the
 -- $307ff0 sentinel this file reuses.
 local H = dofile("tools/tests/lib/ot6.lua")
--- The ride ladder's spread and its collision check (issue #83): each attempt
--- is held until the game-time frame counter the battle seed is made of
--- reaches its own phase, and L.report() fails if two attempts drew one seed,
--- which would make this ladder one Cranes fight played twice.
 local L = H.newSeedLadder("cranes ride")
 
 local ZMENUSTATE = 0x26
@@ -126,15 +85,6 @@ local function talkApproached(pred, maxFrames, what)
   }, what)
 end
 
--- The ride ladder (probe_cranes_water's measured shape).  Each attempt:
--- reload the pre-trigger blob (attempt 1 skips -- it IS that state), walk
--- onto the reunion trigger, and ride the scene with the fight driver;
--- battles go to the driver, non-battle frames edge-A on map 6 and go
--- NEUTRAL on 219 (the flashback's start tile sits by the Esper-world
--- save point -- blind A there re-opens the save query forever, the first
--- budget-burn run's 55k-frame lesson).  A wipe is detected off the LAST
--- in-battle monster HP samples -- never the teardown table, which reads
--- $FFFF everywhere and once turned a measured WIN into a "wipe".
 local summonChars, rideBlob, rideWon = {}, nil, false
 local function rideAttempt(n)
   local loadReq
@@ -208,12 +158,6 @@ local function rideAttempt(n)
   })
 end
 
--- 160000: the July budget (60000) was sized for 3-frame battle-clear-write
--- fights;  the input-driven ride is ~13k to the flashback
--- (probe_cranes_water: fight open f7452, both Cranes dead ~f15250,
--- flashback f19772 with ~5.5k of menu prep in front), the flashback chain +
--- takeoff + save measured ~55k more in July, and the ladder may burn two
--- wiped attempts (~15k each) before its win.
 H.run({ maxFrames = 160000 }, {
   H.loadState("build/states/n128_won.mss.lua"),
   H.waitFrames(150),
@@ -224,32 +168,7 @@ H.run({ maxFrames = 160000 }, {
   end),
 
   -- 1-2. FIGHT PREP, then the reunion trigger and the ride.
-  --
-  -- THE WALL, RESOLVED (2026-08-10, probe_cranes_water -- superseding the
-  -- "unwinnable in normal play as tuned" record that stood here; the full
-  -- wall history lives in that file's header and probe_cranes_wedge's):
-    -- the wall was a LOADOUT bug, not balance.  The game's own Optimum had
-    -- armed LOCKE and EDGAR with THUNDER BLADES ($0F: slash, LIGHTNING), and the
-  -- Left Crane ABSORBS lightning (monster_prop +23 = $04) -- every Fight
-  -- healed the boss and walked its Giga Volt counter (_269's if_element
-  -- LIGHTNING ladder).  The prior wipe timelines' "chip pace vs survival"
-  -- arithmetic was measured on a party feeding the boss.
-  --
-  -- The vanilla playbook, all through real menus, wins attempt 1 of the
-  -- standard ladder (probe_cranes_water PASS f19772; Left dead ~b+4400,
-  -- Right broken and dead ~b+7500):
-  --   * BISMARK->EDGAR (Sea Song, the designed water key: bosses-wob 16),
-  --     SHIVA->SABIN (Diamond Dust), CARBUNKL->LOCKE (party Rflect --
-  --     the Cranes' whole normal rotation is reflectable);
-  --   * DAGGERS for both swingers (OT6_PIERCE = the Cranes' class weak:
-  --     element-clean AND shield-chipping);
-  --   * back row for all three (Blitz/summons/items are row-exempt);
-  --   * driver: healer=SETZER (the 4th rider the reunion adds; the bag
-  --     is 15 Tonics and an all-medic line heal-locks), tools=false
-  --     (AutoCrossbow splash feeds both if_hit retal counters), bank 2,
-  --     focus on the Left Crane (mask $01 = slot 0, measured by the
-  --     probe's delta logger), cadence 12.
-  -- SETZER keeps whatever row/kit he joins with -- he cannot be prepped.
+
   H.equipEsper(0, 7, { tag = "BISMARK -> EDGAR" }),
   H.equipEsper(1, 2, { tag = "SHIVA -> SABIN" }),
   H.equipEsper(2, 19, { tag = "CARBUNKL -> LOCKE" }),
@@ -287,18 +206,8 @@ H.run({ maxFrames = 160000 }, {
     })
   end)(),
 
-  -- The ride, as a 3-attempt phase-spread ladder (the doctrine).  Some shift
-  -- between attempts has always been necessary: the first two July cut
-  -- attempts crashed the EMULATOR at the identical battle frame twice,
-  -- because same inputs = same deterministic trajectory.  The shift used to
-  -- be a 7-frame base plus 37 per attempt; it is now taken from the game-time
-  -- frame counter the battle seed is actually made of, and checked (#83).
   L.watch(),
   rideAttempt(1), rideAttempt(2), rideAttempt(3),
-  -- Before the verdict, not after: three attempts are evidence only if they
-  -- were three DIFFERENT rides -- distinct battle RNG seeds on the first
-  -- battle after each attempt's spread -- and if they were not, that is what
-  -- this run should report rather than "lost all three" (#83).
   L.report(),
   H.call(function()
     H.assertEq(rideWon, true,
@@ -394,33 +303,7 @@ H.run({ maxFrames = 160000 }, {
   end),
 
   -- 3j. pick the party up off the floor, before the save.
-  --
-  -- The Cranes are what costs the party, and it is not the ride's approach
-  -- that does it: the reunion scene hands the fight a party at FULL HP
-  -- (measured this run -- LOCKE arrives at n128_won on 209/397 and battle 71
-  -- opens at partyhp=448,457,397,312, so #92's minecart retune cannot reach
-  -- this fight either way).  Battle 71 then spends it.  Attempt 1 wiped;
-  -- attempt 2 won and came out EDGAR 0/448, SABIN 274/457, LOCKE 252/397,
-  -- SETZER 28/312, and nothing between there and the save gives any of it
-  -- back -- the whole flashback is played as the WEDGE-actor Maduin, with
-  -- the party off the field, and the finale restores the roster without
-  -- restoring HP.  That is how terra-returned-v1 came to be committed with
-  -- EDGAR at 0/448 and SABIN at 0/457.
-  --
-  -- Here rather than anywhere earlier, because this is the first frame since
-  -- the fight on which the party exists and the player has field control.
-  -- The deck (map 6) is an ordinary field map; the alternative is the
-  -- grounded world map four steps below, where gen_tunnelarmr measured a
-  -- care stop breaking outright.
-  --
-  -- The bag is 15 Tonics, 2 Fenix Downs and no Potions, and nobody here
-  -- (LOCKE, EDGAR, SABIN, SETZER) knows a cure -- an esper's grant is
-  -- battle-only (#96) -- so this drinks.  The default 0.55 threshold is
-  -- deliberate rather than a top-up: it buys the revive and lifts whoever
-  -- the fight left near fatal, and leaves the members in the 60% band alone,
-  -- so the Fenix Down the next segment might need is still there.  If this
-  -- ever runs the bag dry, that is a supply finding for the segment, not a
-  -- reason to lower the exit bar below.
+
   H.fieldCare({ tag = "care on the deck after the Cranes" }),
 
   -- 4. takeoff and grounding
@@ -456,7 +339,6 @@ H.run({ maxFrames = 160000 }, {
     H.screenshot("checkpoint_f_grounded")
   end),
 
-  -- 5. the Save UI (menu save is ENABLED from the grounded ship; measured)
   (function() local calm, ph = 0, 0
     return H.driveUntil(function()
       calm = (H.readByte(0x59) ~= 0) and calm + 1 or 0
@@ -475,24 +357,11 @@ H.run({ maxFrames = 160000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
-    -- the real CopyGameDataToSRAM entry captures the slot argument the
-    -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
-    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- The pad-driven save (save-drive rule, tools/tests/README.md;
-  -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
-  -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
-  -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
-  -- poke, and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -517,20 +386,11 @@ H.run({ maxFrames = 160000 }, {
     H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
       "SRAM $307ff0 records slot 3")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are read, never seeded (issue #75): the
-    -- battery carries whatever the chain earned.  The phase-2 checkpoint
-    -- re-cuts measure these, and the entry contracts follow the
-    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
     H.log("real Save UI wrote the terra-returned checkpoint to slot 3")
   end),
-  -- The exit contract is asserted WITH THE MENU OPEN, the post-opera
-  -- precedent: the grounded-airship world menu does not unwind on B the
-  -- way the field menus do (measured -- 900 frames of B left $59 set),
-  -- and every declared field reads from WRAM/SRAM cells the menu leaves
-  -- intact ($1f64, $e0/$e2, $1E80.., $1850, bank $31).
   H.waitFrames(45),
   H.call(function()
     H.assertExitContract("terra-returned-v1")

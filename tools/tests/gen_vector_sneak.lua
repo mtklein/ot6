@@ -3,7 +3,7 @@
 -- the facing-gated sneak ledge at {43,38} -> control back at {57,34}, north
 -- of both the gate guards and the "You!? How'd you get in here?" trigger row.
 -- Generates vector_sneak.
---
+
 -- Why navTo cannot reach the MAGITEK FACTORY door from the arrival tile.
 -- The door is map 242's long entrance at (57,2) len 2 -> map 262 (28,8).
 -- The corridor to it is three parallel lanes at y=39/40/41 and each lane is
@@ -18,9 +18,9 @@
 -- puts an ungated trigger on (56,39)/(57,39)/(58,39) -> _cc93dc (:99473) ->
 -- dlg $06B0 -> `battle 29` -> load_map 242 {34,58}, i.e. a forced fight and
 -- a teleport back to the south of the map.
---
+
 -- The intended way in, and the two things about it a walker cannot discover:
---
+
 --  1. The old man is a choice dialog.  npc_prop.asm:10770 puts the Returner
 --     sympathizer at {45,39} behind switch $063B with event _cc9627
 --     (event_main.asm:99897).  It ends `dlg $054E` ("All ready? 0: Yes
@@ -28,15 +28,15 @@
 --     and only its tail sets `switch $01F0=1` (:100017).  Branch 1 does
 --     nothing.  So the pick is driven by value off the cursor
 --     ($056E) and the choice count ($056F), the gen_zozo3_clock idiom.
---
+
 --  2. The ledge is facing-gated.  event_trigger.asm:1067 puts _cc96c9 on
 --     {43,38}; event_main.asm:100025-100029 opens with
---
+
 --         if_any
 --                 switch $01F0=0
 --                 switch $01B2=0
 --                 goto EventReturn
---
+
 --     and $01B2 is not a story switch.  Switch $01B0-$01B7 alias $1EB6,
 --     the engine's live facing/A/tile-latch byte, which UpdateCtrlFlags
 --     rewrites every event tick from the party facing byte $087F,y and the
@@ -47,7 +47,7 @@
 --     then does nothing.  The party must arrive by stepping DOWN
 --     from {43,37}, which is why this step navTos to {43,37} and then drives
 --     a held DOWN rather than navTo-ing the trigger tile.
---
+
 -- Where it ends.  _cc96c9's SLOT_1 obj_script walks the party over
 -- non-walkable rooftop tiles: {43,38} -> {42,38} -> {41,38} -> {41,35} ->
 -- {49,35} -> {49,34} -> {54,34} -> {54,35} -> {57,35} -> {57,34}, then
@@ -159,12 +159,6 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("vector_entry"))
   end),
 
-  -- 1. up to {45,38}, directly above the sympathizer at {45,39}.  This was
-  --    a navTo followed by a local tapWalk for the last tiles, because
-  --    the pre-#22 navTo could not come to rest on an odd x reached
-  --    rightward; the library lands exactly now, so one navTo does it.
-  --    A DOWN press on {45,38} cannot step (his object occupies {45,39})
-  --    so it only turns the party, the standard face-an-NPC idiom.
   H.navTo(45, 38, { maxFrames = 40000, playBattles = "tactical" }),
   H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()

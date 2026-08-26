@@ -1,21 +1,4 @@
 -- probe_narshe_town.lua -- bank the in-Narshe fixture + scan door tiles
--- Wolf chase (#133 item 3).
---
--- Decoded route (event_trigger/npc_prop/entrance data, all step-on):
---   world (84,33) -> town 20 (38,61)
---   door (52,37) -> treasure room 30 arriving ON the intro trigger
---     (79,17): Lone Wolf appears [$0239]
---   back out (79,18) -> 20 (52,39); trigger (49,37) [$023A]
---   trigger row (37..39,20) [$023B]; top edge (34..39,1) -> 21 (26,50)
---   trigger row (30..32,22) [$023C]; 21 top edge (34..37,1) -> 22 (19,39)
---   22 top edge (18..21,1) -> 23 (25,31)
---   trigger (22,20) [$023D]; triggers (8..10,18) resolve the cliff
---     standoff [$023F: Lone Wolf and MOG hang from the ledge]
---   MOG's npc at (9,16) (_ccd5df, needs $023F=1): talking to him takes
---     Mog over the Gold Hairpin -- the routed choice -- and he JOINS.
--- Gates verified in the fixture: $0070=1 (chase open), $0239..$023F=0,
--- WoB.  Boots from wob_tzen_done.mss (on the world beside the ship at
--- Tzen); saves wob_mog_done.mss on the world outside Narshe.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function rd(a) return emu.read(a, emu.memType.snesMemory) end
 local function fineX() return ((rd(0x35) << 16) | H.readWord(0x33)) end
@@ -24,7 +7,7 @@ local function sw(bit) return (H.readByte(0x1E80 + (bit >> 3)) >> (bit & 7)) & 1
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
 local function mogIn()
   -- $1850+char = party-assignment byte; nonzero low bits = in a party.
-  -- $02FA/$02EA are the roster switches _ccd5df sets when Mog is taken.
+  -- $02FA is the roster switch set when Mog is taken.
   return (H.readByte(0x1850 + 10) & 0x07) ~= 0 or sw(0x2FA) == 1
 end
 

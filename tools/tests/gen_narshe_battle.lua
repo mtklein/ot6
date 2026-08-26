@@ -2,7 +2,7 @@
 -- to KEFKA's fall: v0.3's final beat and its stop line.  Boots
 -- reunion_ready.mss, the map-22 staging the reunion cutscene ends on
 -- (party at (20,9), $0045 set), and generates three states:
---
+
 --   narshe_battle.mss   the defense live: parties assigned and parked at
 --                       {20,10}/{18,10}/{22,10}, twelve marches walking,
 --                       $0132=1, first controllable frame after "Go!!"
@@ -10,69 +10,7 @@
 --                       descent done.  This is battle_kefka's boot; a suite
 --                       test should be a savestate load plus a short fight
 --                       rather than a 5,400-frame descent.
---
--- (kefka_won.mss belongs to gen_kefka_won, one file downstream; see step 5.)
---
--- Issue #75: this file plays with real input.  The battle-clear write that
--- used to clear every descent collision and KEFKA himself is gone, and this
--- script writes no emulated game state.  What replaced it:
---  * descent collisions are fought: the menu-episode fighter below
---    (gen_scenario's cadence) spends each actor's turn, with boost banked to
---    2 and dumped, EDGAR on Tools -> AutoCrossbow from tier 2, CELES on
---    Runic from tier 3, and everyone else on Fight.  Collision battles
---    auto-engage the collided party (gen_moogle's measured rule), so the
---    same fighter serves whichever squad a march runs into; a win resets
---    that raider's whole march as the battle-clear write win did, and
---    battle time freezes all field clocks, so the descent's measured
---    field-frame race (~5400 to the entry point vs ~6100 for a march to
---    reach BANON) is unaffected by how long the fights take.
---  * KEFKA is fought with real input, the first input-driven Kefka in this
---    chain.  His authored profile (bosses-wob.md #10): 3000 HP, gauge
---    6/6, class row $03 = slash|pierce, weak byte $09 = poison|fire.
---    P1 = TERRA+EDGAR+CELES was picked for those axes (fire,
---    BioBlaster poison, and slash/Runic); the fighter's Fights chip the
---    class row, AutoCrossbow adds pierce volume, and Runic (tier 3)
---    handles the Ice 2 telegraph.  Whether he takes damage while
---    shielded is the break system's concern (shields attenuate and
---    the break doubles; battle_break.lua); the fighter only plays.
---  * Losses are handled the way a player handles them: a retry ladder
---    (gen_scenario's) reloads an in-run checkpoint, which is the script's
---    equivalent of reloading a save, and escalates the fighter's
---    tier, which reshuffles every subsequent ATB interleaving and roll.
---    Three descent attempts (a wipe mid-descent or a march reaching BANON
---    ends the attempt), three KEFKA attempts (battle 57's loss path warps
---    the party to the {25,5} save point, which is detected and not fatal).
---    A third loss fails the generation with every attempt's numbers
---    recorded, so a partial measured result is reported rather than a
---    fabricated pass (#74).
---
--- Every field mechanism here was measured first (probe_narshe_spike*,
--- probe_kefka_npc, probe_kefka_fight; spike lineage, commits
--- a74de44/3909646/a3cd55b/510ed0d):
---  * BANON {20,7} -> _ccc605 "Prepared?" -> A picks Yes; the map-5 info
---    scene's choice converges either way.
---  * party_menu 3, RESET: state machine $2d -A-> $2e -A-> swap; cursor
---    cell = $4b+$4a+$5a; pool rows 8 wide; party p = cells $10+4p+s
---    drawn as three 2x2 boxes; Start commits iff every party non-empty
---    (else $69 error splash, self-recovering).  The driver is state-fed
---    and verifies every landing in $7E9D89.
---  * The split: P1 = TERRA+EDGAR+CELES (fire, BioBlaster poison and
---    slash/Runic, three of the four axes Kefka's rows chip under),
---    P2 = CYAN+SABIN, P3 = LOCKE+GAU.  The commit is confirmed by $1850's
---    low 3 bits per character.
---  * The defense cannot be held passively (measured twice: an east-lane
---    march reaches BANON at ~f6100 of defense time past any standing
---    formation), and bfsPath cannot see the cliff route to Kefka
---    (the model's z-carry prunes a real two-tile ledge slide at
---    (18,11), probe_narshe_edge).  So the descent launches immediately and
---    walks raider o25's measured march reversed, 18 waypoints with an
---    axis-alternating held pusher.  Field-frame timing is preserved
---    under input-driven fighting because battles freeze all field clocks.
---  * KEFKA (NPC_1, no_react, no collision): activation needs a clean
---    edge-A, because any held direction starves CheckNPCs (player.asm:142).
---    battle 57 = formation 505 = KEFKA_NARSHE $014A alone.  The win
---    runs the scripted if_b_switch $40 branch; the loss branch parks
---    the party at the {25,5} save point.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local BOOT = "build/states/reunion_ready.mss.lua"
 
@@ -149,18 +87,15 @@ end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
 -- ----------------------------------------------- the input-driven fighter --
--- gen_scenario's menu-episode machine, generalized: presses start only once
--- the battle-menu flag has held 4 straight frames, then one button per
--- 30-frame pulse (6 held, 24 released, because battle menus ignore input
--- during their open animation every turn).  The per-turn sequence is built
--- from the acting character's live id and banked BP:
---     boost prefix        bank to 2, dump up to 3 (bosses-wob's "sit at
---                         2-3 BP" doctrine; battle_boost's mechanics)
---     EDGAR (4), tier 2+  down A A A   Tools -> AutoCrossbow, his kit's
---                                      whole-side opener (kits.md)
+-- Presses start only once the battle-menu flag has held 4 straight
+-- frames, then one button per 30-frame pulse (6 held, 24 released,
+-- because battle menus ignore input during their open animation every
+-- turn).  The per-turn sequence is built from the acting character's
+-- live id and banked BP:
+--     boost prefix        bank to 2, dump up to 3
+--     EDGAR (4), tier 2+  down A A A   Tools -> AutoCrossbow
 --     CELES (6), tier 3+  down A A     Runic, which absorbs KEFKA's Ice 2
---     SABIN (5), tier 3+  down A A A   Blitz -> Pummel (menu-picked,
---                                      battle_vargas's tools-shell list)
+--     SABIN (5), tier 3+  down A A A   Blitz -> Pummel
 --     everyone else       A A          Fight, default target
 -- A sequence that leaves the menu open (a target prompt the route did not
 -- know about, or an MP refusal) taps A for two more pulses, backs out with B
@@ -343,20 +278,6 @@ local WAY = {
   { 15, 27 }, { 16, 28 }, { 18, 28 }, { 18, 30 }, { 18, 33 },
   { 18, 34 }, { 19, 35 }, { 19, 36 },
 }
--- #122 added a few dozen cycles to every battle's init, which shifted the
--- descent's RNG alignment chain-wide.  The retained run this fixed against
--- (build/test-runs/narshe_battle.*) measured waypoints 13-16 -- (18,28)
--- through (18,34) -- as a raider (formation FFFF 001C 0065 ...) the same
--- march bumps into two to four times in a row with no rest between.  TERRA
--- (slot 0, 241 hp, the squishiest of the three and the only actor whose
--- scripted plan ever lands a hit on $001C -- EDGAR's AutoCrossbow and
--- CELES's Runic never touch it, see the header) does not reliably survive
--- that stretch, and once she is down nobody's plan can chip $001C at all:
--- $0065 dies to AutoCrossbow, $001C sits untouched at full HP, and the
--- fight cannot end (measured: battle #13 stalled at hp=355 sh=3 for the
--- full 88000-frame episode budget, all 3 attempts, identically).  A player
--- would rest before a gauntlet like that; WAY_CARE_AFTER is the same call,
--- landing right before it.
 local WAY_CARE_AFTER = 12
 local function descentBody(tier, wi0, wi1)
   local wi = wi0
@@ -501,10 +422,6 @@ local function kefkaBody(tier)
     end
     postN = postN + 1
     evN = (H.eventRunning() or H.dialogWaiting()) and evN + 1 or evN
-    -- Win verdict: the stage held by the win scene (_ccbcb1) for a
-    -- sustained stretch, with the lose-path warp given ample time to
-    -- have landed the party at {25,5} instead.  Both endings run events,
-    -- so the discriminator is the save-point position, not the event.
     if postN >= 600 and evN >= 60 then
       if F.lost then kefkaLost = F.lost end   -- wiped yet no warp: record it
       return true
@@ -578,10 +495,9 @@ local function kefkaAttempt(n)
   }, {})
 end
 
--- Budgets: the battle-clear-write era ran this file in ~120k frames;
--- input-driven fights spend real ATB rounds on every descent collision and
--- on KEFKA himself, and the ladders may replay the descent and the fight up
--- to three times each.
+-- Budgets: input-driven fights spend real ATB rounds on every descent
+-- collision and on KEFKA himself, and the ladders may replay the descent
+-- and the fight up to three times each.
 H.run({ maxFrames = 600000 }, {
   H.loadState(BOOT),
   H.waitFrames(30),
@@ -675,34 +591,22 @@ H.run({ maxFrames = 600000 }, {
       H.assertEq(sw(id), 1, string.format("raider $%04X marching", id))
     end
     -- All three parties, not just the one being steered: the split has
-    -- already happened, parties 2 and 3 are queued behind the same fight,
-    -- and from here on nothing can heal them without a Y switch this
-    -- generator never makes.  If this ever fires it is a finding about the
-    -- walk to BANON, which plays its battles; the fix would be a care stop
-    -- BEFORE the assignment, while one menu visit can still reach all
-    -- seven.
+    -- already happened, and from here on nothing can heal parties 2/3
+    -- without a Y switch this generator never makes.
     H.assertPartyStanding("narshe_battle")
     H.screenshot("narshe_battle")
   end),
 
-  -- The old power-only Optimum call at the reunion staging was a no-op: the
-  -- active character there is the scenario Moogle, while the seven heroes
-  -- are only an assignment pool.  After the split the actual combined
-  -- lineage has no spare Dirk or LeatherArmor anyway -- LOCKE still owns
-  -- those -- and CELES already carries the MithrilBlade deliberately handed
-  -- to her by the TunnelArmr route.  Preserve and name that intent rather
-  -- than inventing equipment the playthrough did not acquire.
+  -- The combined lineage has no spare Dirk or LeatherArmor for CELES --
+  -- LOCKE still owns those -- and she already carries the MithrilBlade
+  -- from the TunnelArmr route.
   H.call(function()
     H.assertEq(H.readByte(0x1600 + 37 * 6 + 0x1F), 0x0A,
       "CELES retains the TunnelArmr route's MithrilBlade for reunion")
   end),
-  -- This party's authored verbs are all row-exempt: TERRA's Magic, EDGAR's
-  -- Tools and CELES's Runic.  The descent is a physical gauntlet and the
-  -- combined lineage legitimately has no spare body armor for CELES, so the
-  -- back row is the player's available defensive preparation.  Tier 1 may
-  -- still spend early turns on Fight (and accept its damage penalty); from
-  -- tier 2 onward the route uses the three verbs this formation was built
-  -- around.
+  -- This party's authored verbs (TERRA's Magic, EDGAR's Tools, CELES's
+  -- Runic) are all row-exempt, so the back row is free defensive
+  -- preparation for the physical descent gauntlet.
   H.setRows({ [0] = true, [4] = true, [6] = true },
     { tag = "Narshe defense rows" }),
   H.saveState("narshe_battle.mss"),
@@ -737,23 +641,6 @@ H.run({ maxFrames = 600000 }, {
     end
   end),
 
-  -- Heal, before the entry point is captured.  The descent fights every
-  -- collision it walks into and nothing in it heals, so the fixture this
-  -- step generates shipped CELES dead at 0/217 with a Fenix Down still in
-  -- the bag (measured on the pre-rename kefka_doorstep artifact,
-  -- tools/audit_party_hp.py, 2026-08-11).  Everything downstream boots that:
-  -- the KEFKA ladder below, battle_kefka, gen_kefka_won.  A two-character
-  -- party walking into KEFKA reads as a hard boss rather than as a descent
-  -- that lost somebody, which is exactly the misreading this whole class of
-  -- bug produces.
-  --
-  -- Party 1 is TERRA, EDGAR and CELES, and TERRA and CELES both know Cure,
-  -- so this casts and only reaches for the bag to revive.  mpFloor 0.75
-  -- because KEFKA is the very next fight and both healers are in this
-  -- party: a caster drained in the corridor walks into the boss with no
-  -- Cure.  0.75 was measured to keep essentially all of the item saving
-  -- while leaving the caster ready.
-  --
   -- It cannot heal parties 2 and 3 -- the menu shows the active party and
   -- this generator never switches with Y -- but it does not need to: they
   -- never leave the staging tile.  The assertion below covers them anyway.
@@ -773,11 +660,8 @@ H.run({ maxFrames = 600000 }, {
           H.readWord(base + 13), H.readWord(base + 15)))
       end
     end
-    -- The exit contract.  The care stop above is the fix; this is what makes
-    -- the generator fail loudly instead of shipping a casualty into the
-    -- KEFKA fight and everything downstream of it.  A failure here means the
-    -- descent cost more than the bag could answer, which is a finding about
-    -- supplies and not a reason to lower the bar.
+    -- The exit contract: a failure here means the descent cost more than
+    -- the bag could answer.
     H.assertPartyStanding("kefka_entry")
     H.log(string.format("[entry point] f%d after %d fights (all attempts)",
       H.frame, fights))
@@ -814,12 +698,6 @@ H.run({ maxFrames = 600000 }, {
     end
   end),
 
-  -- ==================================================================== --
-  -- 5. Stop at the stop line.  The win above is v0.3's milestone;
-  --    everything after it (the esper scene, Arvis, the walk to control)
-  --    is v0.4's first link and stalls the walker (issue #3).  The tail
-  --    lives in gen_kefka_won.lua, deliberately outside SAVESTATES.
-  -- ==================================================================== --
   H.call(function()
     local atSave = H.fieldX() == 25 and H.fieldY() == 5
     H.assertEq(atSave, false,

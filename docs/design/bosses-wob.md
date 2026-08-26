@@ -1,10 +1,9 @@
-# WoB bosses, boss by boss — design dive v1 (2026-07-16)
+# WoB bosses, boss by boss
 
 Scope: every boss and miniboss from Whelk through the Floating
 Continent, in story order. Shield counts and weakness rows here are the
-M6 hand-authored table (replacing the demo's 2+level/8 formula for
-these fights). Nothing is locked except explicit ✦, and most ✦ below
-are jank preservations the house rule already demands.
+hand-authored table. ✦ marks vanilla behavior kept unchanged as a
+deliberate jank preservation.
 
 ## The boss contract
 
@@ -19,11 +18,9 @@ Stated once, assumed by every block:
 - **Bosses get no exemption from breaks.** Turn loss and ×2 apply to
   AtmaWeapon the same way they apply to a Lobo. Shields are the only
   value tuned per boss.
-- **Owner decision (2026-07-28, rc1 playtest): the Vargas triple-tutorial
-  stays verbatim, permanently.** Menu-Blitz made the in-battle input
-  tutorial mechanically unnecessary. It stays anyway, for its charm
-  ("i always found the original charming and you've kept it exactly,
-  even maybe more so"). No cleanup pass removes it.
+- **The Vargas triple-tutorial stays verbatim.** Menu-Blitz made the
+  in-battle input tutorial mechanically unnecessary, but it stays for
+  its charm. No cleanup pass removes it.
 
 - **Scripts run regardless of break state.** Vargas's Pummel finish,
   Chupon's Sneeze and the espers interrupting Ultros on the bridge
@@ -33,16 +30,16 @@ Stated once, assumed by every block:
   monster and no gauge; see 6.)
 - **Counters are disabled while Broken.** A Broken enemy loses its
   counters along with its turns, so Whelk's shell does not counter
-  during the window. This matches Octopath. Owner decision on issue
-  #66, shipping in v0.10: `Ot6MayAct` (`ot6_break.asm:1666`) asks the
-  same question at turn time that `Ot6Gate` asks at queue time, at
-  `battle_main.asm:274` and inside `CheckRetal` at `:12761`.
+  during the window. This matches Octopath. `Ot6MayAct`
+  (`ot6_break.asm:1666`) asks the same question at turn time that
+  `Ot6Gate` asks at queue time, at `battle_main.asm:274` and inside
+  `CheckRetal` at `:12761`.
 - **A nameplate with no shields is itself information.** Scripted
   set-pieces (Tritoch, Guardian, the Imperial Camp Kefka) draw no
   gauge at all, which tells the player the fight is scripted.
 
 Numbers below are shields only; boss HP falls under the global
-−25–35% cut and is tuned in M6. Elemental rows keep vanilla's bits
+−25–35% cut. Elemental rows keep vanilla's bits
 wherever they exist ✦ (weapon-classes.md); every *added* element or
 class is justified by the coverage rule: the party the story gives you
 must be able to chip. Before Zozo the proofs rely on kits.md's learn
@@ -73,7 +70,7 @@ then on; only his shield count grows.
 | 14 | Number 024 | Magitek factory | 7 |
 | 15 | Number 128 | minecart escape | 7 (blades 3 each) |
 | 16 | Left & Right Cranes | airship escape | 6 + 6 |
-| 17 | Ultros ③ | Esper Mountain (v0.8 — corrected 2026-07-28; battle 125's only call site is the Relm-joining scene, see thamasa-route.md §3.1) | 7 |
+| 17 | Ultros ③ | Esper Mountain (battle 125's only call site is the Relm-joining scene) | 7 |
 | 18 | FlameEater | Thamasa | 7 (Balloons 1) |
 | 19 | Ultros ④ + Chupon | FC approach | 7 + 4 |
 | 20 | AirForce | FC approach | 8 (pods 3/3, Speck 1) |
@@ -231,9 +228,7 @@ tested at the Narshe defense instead. Per-party notes below.
 **Shields:** 5 · **Weak:** bolt, water, ice + piercing. (Decoded, not
 recalled: `$104` weak = **bolt|water** — `monster_prop.dat` +25 reads
 `$84` — and +23/+24 are both `$00`, so it absorbs nothing and nulls
-nothing. An earlier draft printed the bolt bit and silently dropped
-the water one, against the "keep vanilla's bits ✦" rule at the top of
-this doc; same slip logged at Nerapa below.) Bolt *and* water are
+nothing.) Bolt *and* water are
 vanilla's machine bits and this party can produce neither — the only
 water in the WoB this early is a thrown Water Edge, Throw is Shadow's
 ✦ and he is two scenarios away, and Locke's list is verbs, not
@@ -294,16 +289,12 @@ new per-formation hook rather than a table row.
 That matches the intent: both scenes are scripted and should read as
 scripted. He takes a few hits and flees, twice, with the waiter line
 unchanged, and the empty HUD says so from the start, which is the same
-rule as Tritoch one scenario earlier. If a future pass wants a
-breakable Kefka here, that is new code and belongs in the roadmap, not
-in the shield table.
+rule as Tritoch one scenario earlier.
 
 **Telstar:** 4 shields · bolt, water + bludgeoning (Dobermans 2 · fire +
 piercing). (Decoded, not recalled: `$044` weak = **bolt|water** —
 `monster_prop.dat` +25 reads `$84`, the same byte TunnelArmor and the whole
-AirForce assembly carry — and `$01a` Doberman weak = **fire**. An earlier
-draft printed only the bolt bit here and left the Dobermans' element off
-entirely.)
+AirForce assembly carry — and `$01a` Doberman weak = **fire**.)
 - **Telegraph:** its antenna sparks and it radios for backup → a
   Doberman wave arrives next turn. Break to stop the call. This is the
   first break that prevents a summon; the same use returns at
@@ -316,8 +307,7 @@ entirely.)
 **Shields:** 6 · **Weak:** fire, bolt, holy + bludgeoning ·
 **absorbs poison.** (Decoded, not recalled: `$106` weak =
 **fire|bolt|holy** — `monster_prop.dat` +25 reads `$25` — and +23
-reads **`$08`, poison absorbed**; +24 is `$00`. An earlier draft
-dropped vanilla's bolt bit and never mentioned the absorb at all.)
+reads **`$08`, poison absorbed**; +24 is `$00`.)
 
 - **Telegraph:** the whistle sounds down the corridor → **Evil
   Toot**, a party-wide random status attack. Break the boiler before
@@ -327,106 +317,39 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   AuraBolt is holy chip at range, Pummel ×2 chips repeatedly, and
   Shadow's elemental skeans reach two of the three element bits rather
   than one: Fire Skean is fire (item `$ab` → spell `$51`) and Bolt
-  Edge is bolt (`$ad` → `$53`), both legal chips once vanilla's bolt
-  bit is restored to the row. Cyan cannot chip his own scenario's
+  Edge is bolt (`$ad` → `$53`). Cyan cannot chip his own scenario's
   boss, which is deliberate: the Phantom Train farewell is where
   **Cleave** unlocks (kits.md), and Cleave requires a Broken target,
   so the train is the first target it can be used on. Another
-  character has to break it for him.
-- **Where Shadow's key comes from (issue #74).** That break story was
-  unbuyable for four releases: no shop in the scenario sold a skean, so
-  Shadow chipped nothing unless the player had bought one in South Figaro
-  before the party split, and the fight delivered one chip per round
-  through Sabin alone. The ghost merchant in the train's car B (shop
-  record 85) now sells **Fire Skean** in the slot vanilla left empty; the
-  splice and the reasoning are in `ff6/src/menu/shop.asm`, and
-  `battle_breaktbl.lua` asserts that his stock still contains a throw item
-  whose element chips this row. Fire and not bolt because fire also opens
-  Specter, the monster-in-a-box below, and one key for two bodies beats two
-  keys for one each. At 500 GP against a purse that reaches this shop with
-  about 7,500 GP and a list that already spends about 5,700, the break is
-  something the player buys with the scenario's last money rather than
-  something the shop hands over.
-- **The break completes now, measured.** For four releases the train died
-  with shields still standing, which is what the report on #74 said and what
-  every measured line reproduced. The input-driven playthrough
-  (`gen_sabin_train.lua`) now takes all six off, and both v0.10 changes are
-  load-bearing. One winning ledger, verbatim: Aura Bolt 6→5 (holy), Fire
-  Skean 5→4 (fire), Pummel 4→2 (two hits, two chips), Fire Skean 2→1,
-  Pummel 1→0. Sabin spends 18 MP of his 56 on the whole break, because a
-  double-hitting Pummel is 2 MP a chip where Suplex is 13. The fight stays
-  close: the party carries about 680 HP against a party-wide spike of
-  roughly 150 each, so a three-attempt ladder still loses attempts, and the
-  Broken window (2159 frames, damage ×4) is where it is won.
-- **The gap between the last chip and the kill is not a fixed number, and
-  nothing asserts it.** It was 389 of 1900 HP when #74 was closed. On
-  2026-08-12 it measured 279 HP and 1213 frames on one run and 0 HP and 0
-  frames on another — the sixth chip and the kill landing together — with
-  no change to the fight, only to the party, which by then had two more
-  levels and a real shopping list upstream (`wob-route.md` §2). The gap is
-  the race between the chip pace and the party's own damage output, so it
-  closes as the party improves. What the playthrough asserts is that six
-  chips land; the gap is logged next to it and nothing goes red when it
-  moves. Owner ruling, 2026-08-12: "absolutely do not let you being good at
-  the game be a release blocker."
-- **Whether the break lands is mostly whether Sabin keeps his turns.**
-  Evil Toot's random statuses include **Berserk**, and a berserked Sabin is
-  out of the break entirely: he is never served a command menu again, so he
-  chips nothing and auto-Fights instead, which spends the fight's clock on
-  killing the train sooner. Measured 2026-08-12: Aura Bolt took the first
-  shield, Berserk (status 2 `$10`) landed about 1200 frames later, and the
-  train then took eleven unattributed ~70-damage hits from him and died
-  with three shields standing — #74's original shape, reproduced by a
-  status roll rather than by the design gap. **Imp** does the same thing
-  more bluntly, because Blitz cannot be selected at all. Neither has a cure
-  in this scenario: the ghost merchant sells Tonic, Potion, Antidote, Green
-  Cherry, Fenix Down, Sleeping Bag, Shuriken and the spliced Fire Skean,
-  and Green Cherry only answers Muddled. Across five measured attempts the
-  break landed on two, so the three-attempt ladder is carrying this step
-  rather than decorating it. Read that as the live constraint before
-  re-tuning anything here.
-- **Jank ✦: Suplex still works.** It is also mechanically consistent
-  now: Suplex is bludgeoning and the train is bludgeon-weak. The
-  undead flag stays as well, so one Fenix Down kills the train
-  instantly regardless of break state. By house rule, vanilla
-  shortcuts take precedence over the break system.
+  character has to break it for him. The ghost merchant in the
+  train's car B (shop record 85) sells **Fire Skean**, giving Shadow
+  a chip key in this scenario; fire rather than bolt because fire
+  also opens Specter, the monster-in-a-box below.
+- **Jank ✦: Suplex still works.** It is also mechanically consistent:
+  Suplex is bludgeoning and the train is bludgeon-weak. The undead
+  flag stays as well, so one Fenix Down kills the train instantly
+  regardless of break state. Vanilla shortcuts take precedence over
+  the break system.
 - **Jank ✦: poison heals the Phantom Train.** This is vanilla
-  behaviour and it stays, but it needs to be written down where an
-  author will find it. Edgar's Bio Blaster is poison: the Throw/Tools
-  table maps item `$a4` to spell `$7d` (battle_main.asm:6577) and that
-  spell's element byte is `$08`. The Narshe school's tier-2 seed once
-  presented that tool as the answer to armored enemies ("Every armor
-  fears one right tool", narshe-school.md); the v0.5 break pass
-  retired that framing and the seed's own rewrite has dropped it (see
-  "The imperial soldier line"), but the poison heal here is vanilla
-  and applies regardless. If Bio Blaster is used on this boss,
-  vanilla's absorb branch flips the damage sign and skips past the
-  weakness branch that contains the shield chip
-  (battle_main.asm:1850, chip at :1872), so the hit heals the train
-  and chips nothing. Nothing is broken today, because Edgar is on
-  Terra's segment and this party carries no poison, so the problem is
-  latent rather than live. Do not build a poison beat around the
-  Phantom Train, and re-read this before routing Edgar onto it.
+  behaviour and it stays. Edgar's Bio Blaster is poison: the
+  Throw/Tools table maps item `$a4` to spell `$7d`
+  (battle_main.asm:6577) and that spell's element byte is `$08`. If
+  Bio Blaster is used on this boss, vanilla's absorb branch flips the
+  damage sign and skips past the weakness branch that contains the
+  shield chip (battle_main.asm:1850, chip at :1872), so the hit heals
+  the train and chips nothing. Edgar is on Terra's segment and this
+  party carries no poison, so the problem is latent rather than live.
 - **Poison fails on this train twice, on the boss and on the chest.**
-  Decoded while authoring the armor line: `$0156` Specter, the
-  monster-in-a-box in this same scenario (map 153, treasure 114 →
-  event battle group 34 → formation 476), also **absorbs poison**
-  (+$2ad7 = `$08`), and is fire|holy weak in vanilla (+$2ad9 = `$21`).
-  The one element the v0.3 arc teaches is therefore the one element
-  that fails twice here. Specter gets **no authored row**: vanilla's
-  fire and holy are both usable keys here (Shadow's Fire Skean and
-  Sabin's AuraBolt, the same two the break story above uses), and
-  adding poison would put a chip trigger on an absorber, which is the
-  error caught in draft at Nerapa and the Cranes.
+  `$0156` Specter, the monster-in-a-box in this same scenario (map
+  153, treasure 114 → event battle group 34 → formation 476), also
+  absorbs poison (+$2ad7 = `$08`), and is fire|holy weak in vanilla
+  (+$2ad9 = `$21`). Specter gets **no authored row**: vanilla's fire
+  and holy are both usable keys here (Shadow's Fire Skean and Sabin's
+  AuraBolt, the same two the break story above uses).
 
 ### 9. Rizopas, after the Piranha school — Baren Falls (Sabin + Cyan)
 
 **Shields:** 4 (Piranhas 1) · **Weak:** bolt + slashing, bludgeoning.
-(#139, v0.15: 5 → 4. The real-attempt ledger at the routed curve read
-1W/8L, with the party entering his phase healthy — 268/235 measured —
-and still wiping to the surfacing pressure; one pip lands the break a
-round earlier, and the first regeneration after the change won on
-attempt 1.)
 
 - **Telegraph:** the falls swell backward → **El Nino** hits the
   party.
@@ -455,10 +378,9 @@ with no weakness of any kind, and `Ot6ElemAddTbl` carries `$09`
 absorbed or nulled. The 6 shields and the two classes were already in
 `Ot6ShieldTbl`. Kefka's own row is deliberately broad (poison|fire +
 piercing, slashing), so any squad you route to him can break him. His
-waves (Trooper, HeavyArmor, Rider) used to rely on the same poison the
-school taught, which only the Edgar squad could cast; the v0.5 pass
-gave them slash\|pierce class rows so every player-assigned squad has a
-key (see "The imperial soldier line" below).
+waves (Trooper, HeavyArmor, Rider) carry slash\|pierce class rows so
+every player-assigned squad has a key (see "The imperial soldier line"
+below).
 
 - **Telegraph:** he giggles and frost crawls the ground → **Ice 2**
   across the engaged squad.
@@ -473,25 +395,7 @@ key (see "The imperial soldier line" below).
 ## The imperial soldier line — every party gets a key
 
 These are not bosses. They are documented here because this is where
-the weakness data lives, and because the v0.5 break-coverage pass
-changed the design. (This section replaces the old "one right tool"
-writeup, which is kept in git history.)
-
-**The previous design.** The Narshe school's tier-2 seed said "their
-armored machines shrug off blade and fire alike… Every armor fears one
-right tool" (narshe-school.md), and the tool was Edgar's Bio Blaster
-(poison, `$08`). Four species were given a poison `Ot6ElemAddTbl` add
-so that the dialog would be accurate. That made poison the only key to
-the imperial line.
-
-**Why that did not work.** The fixed-party audit walked every forced
-section and found that the parties that fight this line do not include
-Edgar, and so have no poison. Cyan's solo Doma duel is slash-only,
-Sabin's whole scenario has no poison, Locke solo in occupied South
-Figaro is pierce-only, and the Narshe defense is a player-assigned
-3-way split where at most one squad holds Edgar. "One right tool =
-poison" therefore left the imperial line unbreakable by the exact party
-the game gives you.
+the weakness data lives.
 
 **The fix: a weapon class, chosen per the forced party.** Poison is no
 longer special; it is one Edgar-reachable key among several. Each
@@ -515,7 +419,7 @@ heavier / duel bodies). **Class chips ignore absorb/null**, so
 HeavyArmor's vanilla water-absorb and everyone's stray element bits
 never interfere with the break; the class is always a legal key.
 
-**The palette (owner's choice).** Armored soldiers are **pierce**, on
+**The palette.** Armored soldiers are **pierce**, on
 the reading that a blade finds the gaps in armor, with **bolt** where a
 party can cast it: the machines (M-TekArmor, HeavyArmor) are natively
 bolt-weak in vanilla, and Templar gains bolt (`$04`) here for Shadow's
@@ -523,48 +427,36 @@ Bolt Edge at the camp. The Cyan solo duel is **slash**, so it plays as
 a swordfight. Sabin's fights add **bludg**. The rows are varied rather
 than uniform: the key is whichever character is fighting the enemy.
 
-**Element table, after the pass.** M-TekArmor and HeavyArmor keep their
-poison adds, on top of vanilla bolt, because a party that fights them
-can cast poison (Shadow's bolt at the camp; Edgar at the Narshe waves).
-**Leader and Grunt lost their poison adds.** Those were the "one tool"
-artifacts, the two species with *no* vanilla weakness at all, and
-poison is unreachable in both of their forced fights (a solo duel; a
-Cyan+Sabin defense), so the add was dead data that also produced an
-unresolvable `?` on a fight the class row already answers. Templar's
-row was verified `$00/$00` at +$17/+$18 before authoring, as the rest
-of the table was.
+**Element table.** M-TekArmor and HeavyArmor keep their poison adds, on
+top of vanilla bolt, because a party that fights them can cast poison
+(Shadow's bolt at the camp; Edgar at the Narshe waves). Leader and
+Grunt carry no poison add: poison is unreachable in both of their
+forced fights (a solo duel; a Cyan+Sabin defense), and the class row
+already answers them. Templar's row is `$00`/`$00` at +$17/+$18 (no
+absorb, no null).
 
-**Trooper and Rider changed direction.** The old writeup left them
-element-only ("vanilla already agrees, no row needed") because they are
-poison-weak in vanilla. But the Narshe defense assigns squads by player
-choice, and a Cyan+Sabin or Locke+Gau squad reaches neither poison nor
-any vanilla element on these bodies. v0.5 therefore gives both a
-slash\|pierce class row: vanilla poison stays the Edgar squad's key,
-and the class is every other squad's. Formation 88
-(Trooper+HeavyArmor, `battle 23`, event_main.asm:108505) is now
-breakable by whatever a squad holds, not by Edgar alone.
+**Trooper and Rider.** Both carry a slash\|pierce class row: vanilla
+poison stays the Edgar squad's key, and the class is every other
+squad's. Formation 88 (Trooper+HeavyArmor, `battle 23`,
+event_main.asm:108505) is breakable by whatever a squad holds, not by
+Edgar alone.
 
-**M-TekArmor gets no new row.** It is already breakable by the party
-that fights it (Shadow's Bolt Edge, or the Magitek bolt beam at the
-camp), so it was never a gap; it carries the bolt half of the palette
-in vanilla.
+**M-TekArmor.** It is breakable by the party that fights it (Shadow's
+Bolt Edge, or the Magitek bolt beam at the camp); it carries the bolt
+half of the palette in vanilla.
 
-**The school seed now matches the data.** The tier-2 dialog ($0276) was
-rewritten under the school's own story/dialog sanction
-(narshe-school.md) to teach the new version: armor turns a careless
-blow aside, but every plate has a seam, and no two are the same, so
-bring the weapon that fits. Both of the old claims are gone. A precise
-blade *is* an answer (pierce/slash), and there are several tools rather
-than one. The class rows are the mechanic; `school.lua` now pins the
-new dialog bytes, so text and data fail separately if either drifts.
+**The school seed.** The tier-2 dialog ($0276) teaches: armor turns a
+careless blow aside, but every plate has a seam, and no two are the
+same, so bring the weapon that fits. A precise blade is an answer
+(pierce/slash), and there are several tools rather than one. The class
+rows are the mechanic; `school.lua` pins the dialog bytes, so text and
+data fail separately if either drifts.
 
 **The one place coverage overrode the theme.** The palette's default for
 armored soldiers is pierce+bolt, but the Doma courtyard defense party
 (Sabin bludg + Cyan slash) can field neither pierce nor bolt. Grunt and
 Cadet therefore take slash\|bludg rather than the default, using the
-owner's rule that Sabin's fights are bludgeon. This is recorded so a
-future author does not change them back to pierce and re-open the
-gap.
+rule that Sabin's fights are bludgeon.
 
 ## The Serpent Trench — three aquatics, three keys
 
@@ -590,30 +482,24 @@ Vanilla bits are kept (dead or level-locked for this party, live for a
 later party that carries the element); class chips ignore the
 water-absorb.
 
-## Break coverage — the free-roam floor (#6)
+## Break coverage — the free-roam floor
 
-- **The free-roam tail now has a floor.** `Ot6SeedShields`' `@formula`
-  fallback used to clear the class-weak mask (`$3e9c`), which left an
-  un-authored enemy breakable only by whatever element it happened to
-  carry, and unbreakable if it carried none. It now seeds a per-species
-  **floor class** instead: `sta $3e9c,y` reads `OT6_FLOOR_CLASS[species]`,
-  a build-time table generated by `ff6/tools/gen_break_floor.py` from the
-  monster names, so every un-authored body is breakable by some weapon
-  class. The palette follows the authored rows:
-  armored/mechanical/dragon/insect → **pierce**, brute/ooze/golem/monk →
-  **bludgeon**, and beasts/humanoids/casters → **slash** (the remainder).
-  Authored `Ot6ShieldTbl` rows still take precedence (the `@hit` path
-  overwrites the mask); the floor only fills the gap.
-  `battle_breakfloor` is the regression test, and it asserts that all 384
-  species carry a breakable class. The pacing effect of universal
-  breakability, which is more breaks, is a playtest and balance matter,
-  like the Kolts shield-count sweep.
-- **Tentacle_2 / Tentacle_3 (`$013D`/`$013E`) are out of WoB scope,
-  deliberately.** They belong to the World-of-Ruin Figaro engine room,
-  which is outside this document's World-of-Balance scope. The floor gives
-  them a class like any other species, but their fight is in the WoR, so
-  revisit their break design with the WoR pass rather than treating it as
-  a WoB gap.
+- **The free-roam tail has a floor.** `Ot6SeedShields`' `@formula`
+  fallback seeds a per-species **floor class**: `sta $3e9c,y` reads
+  `OT6_FLOOR_CLASS[species]`, a build-time table generated by
+  `ff6/tools/gen_break_floor.py` from the monster names, so every
+  un-authored body is breakable by some weapon class. The palette
+  follows the authored rows: armored/mechanical/dragon/insect →
+  **pierce**, brute/ooze/golem/monk → **bludgeon**, and
+  beasts/humanoids/casters → **slash** (the remainder). Authored
+  `Ot6ShieldTbl` rows still take precedence (the `@hit` path overwrites
+  the mask); the floor only fills the gap. `battle_breakfloor` is the
+  regression test, and it asserts that all 384 species carry a
+  breakable class.
+- **Tentacle_2 / Tentacle_3 (`$013D`/`$013E`) are out of WoB scope.**
+  They belong to the World-of-Ruin Figaro engine room, which is
+  outside this document's World-of-Balance scope. The floor gives them
+  a class like any other species, but their fight is in the WoR.
 
 ### 11. Dadaluma
 
@@ -663,28 +549,14 @@ Party: Locke, Celes + two.
 - This is vanilla's tag fight: they swap in and out. Each keeps its
   own gauge across swaps, and a swapped-out sibling's break timer
   keeps running; it is not frozen behind the `$3aa0.0` presence gate.
-- **A Broken sibling takes no turns; whether that pins it on stage is
-  still open.** Two gates now stand. `Ot6Gate` (`ot6_break.asm:1654`,
+- **A Broken sibling takes no turns.** `Ot6Gate` (`ot6_break.asm:1654`,
   consulted at `battle_main.asm:1421`) refuses to queue a broken
   monster's turn, and `Ot6MayAct` (`ot6_break.asm:1666`) refuses one
   that was queued before the break landed, at `battle_main.asm:274`
-  and `:12761`. Measured on battle 70 through real play in
-  `battle_brokendeath.lua`, one run each on the same fixture and the
-  same driver: 11 commands dispatched by a Broken Ifrit before the
-  second gate landed, 3 of them casts of Fire from his `if_hit`
-  retaliation block (`ai_script.asm:4613-4616`), and 0 after. Turns
-  beginning with the timer up fell from 21 to 1 over the same window.
-- The tag is the one thing this does not settle. It is the first
-  branch of Ifrit's main AI script (`if_battle_var_greater 3, 5 /
-  kill_monsters_wait MONSTER_1 / show_monsters MONSTER_2`,
-  `ff6/src/battle/ai_script.asm:4573-4577`), and `ExecAction` runs the
-  AI script (`battle_main.asm:238`) before it reaches the gate
-  (`:274`), so a turn queued before the break still runs the script
-  and lands its side effects; only the command dispatch is refused.
-  One such turn was measured in the run after the fix. Closing it
-  needs the queue entry purged at break time (`QuetzEffect`'s walk,
-  `battle_main.asm:1814-1822`). **UNVERIFIED:** nobody has watched a
-  Broken sibling complete a tag-out, before or after the fix.
+  and `:12761`. A turn queued before the break still runs its AI
+  script and lands side effects — `ExecAction` (`battle_main.asm:238`)
+  runs the script before it reaches the gate (`:274`) — so only the
+  command dispatch is refused.
 
 - **Telegraph:** Ifrit inhales and the air shimmers → **Fire 2**;
   Shiva does the same with **Ice 2**. Whichever one is on the field
@@ -720,12 +592,7 @@ wall spins.
 
 Party: **three**, on rails. Celes is separated partway through the
 Facility, so this fight and the Crane escape run one character short of
-the party that walked in. (Owner account; §16's "the factory four" is
-likewise one too many. This is flagged rather than rewritten, because
-the exact roster here is runtime state and is to be measured at the
-fixture, not read out of the event dump. An attempt to derive it from
-`event_main.asm` opcode adjacency produced a badly wrong answer; see
-the Beat B note in `wob-route.md`.)
+the party that walked in.
 
 | part | shields | weak |
 |---|---|---|
@@ -734,39 +601,25 @@ the Beat B note in `wob-route.md`.)
 
 - Blades regenerate a few turns after dying (vanilla ✦), and regrown
   blades return at full shields. Their weakness row stays revealed.
-- **Telegraph:** the whole-side sweep (Gale Cut — audit list) is a
-  *proposal*, and it is the other way round from the script this ROM
-  builds. In `AIScript::_267` (`ff6/src/battle/ai_script.asm:4725-4746`;
+- **Telegraph:** In `AIScript::_267` (`ff6/src/battle/ai_script.asm:4725-4746`;
   the label index is the monster id, 267 = `$010B`), Gale Cut sits behind
   `if_num_monsters 1`: the body Hastes itself and then runs Gale Cut,
   Atomic Ray, Blaster and Shock Wave **once both blades are dead**. While
   a blade is alive it runs `BATTLE, BATTLE, ICE` and `BATTLE, SPECIAL,
-  NET`. So killing the blades is what turns the sweep on, and a party
-  that leaves them standing keeps the body on its mild script.
-  "Breaking either blade cancels it" is a design intent to build, not
-  vanilla behaviour to inherit — the same shape of error §16 had to
-  correct about the Cranes' charge. Until it is built this is not the
-  fight where breaking a part is the answer, and a drive tuned as if it
-  were will make the fight harder rather than easier.
+  NET`. Killing the blades is what turns the sweep on, so a party that
+  leaves them standing keeps the body on its mild script.
 - **Break story:** this is the first battle after Zozo gives you four
   espers, and a Ramuh bearer casting Bolt into the body is the first
   use of the sub-job system (magicite.md's storm-lancer).
-- **No revival on the ride (#97) — decided: accepted, with the route
-  note.** Six fights back to back with no field access between them, and
-  nothing that raises the dead *in the routed bag*: no Fenix Down, no shop
-  past the checkpoint, no owned esper granting Life in the WoB. A death on
-  the ride is permanent. The deliberate call (v0.15 burndown): the game
-  already offers the counter — Fenix Down ($F0) is stocked by 25 item
-  shops (`shop_prop.dat`), several of them on the road to Vector — so the
-  ride stays as designed and the preparation is the player's, the same
-  shape as the burning house. Route guidance: **stock Fenix Downs before
-  entering the Magitek Facility**; the routed chain's own bag arriving
-  empty is a route bookkeeping fact, not a game gap.
-- **The body regenerates (#97).** Measured on the winning run: body HP
-  rose mid-fight, 2473 → 2590 → 2591, with no heal cast in the log. The
-  mechanism and rate are UNVERIFIED (not chased to the AI script); it
-  belongs beside the blade regrowth above because it sets a floor on how
-  fast a party must chip to make progress at all.
+- **No revival on the ride.** Six fights back to back with no field
+  access between them, and nothing that raises the dead in the routed
+  bag: no Fenix Down, no shop past the checkpoint, no owned esper
+  granting Life in the WoB. A death on the ride is permanent; Fenix
+  Down ($F0) is stocked by 25 item shops (`shop_prop.dat`), several of
+  them on the road to Vector, so the preparation is the player's.
+- **The body regenerates.** Body HP rises mid-fight with no heal cast
+  logged; the mechanism and rate are unconfirmed, but it sets a floor
+  on how fast a party must chip to make progress.
 - **Jank:** regrowth timing stays vanilla; the minecart shooter
   around it stays byte-for-byte.
 
@@ -779,11 +632,8 @@ Party: the factory four (Setzer is flying the airship).
 | Left Crane ($10D) | 6 | water + piercing |
 | Right Crane ($10E) | 6 | bolt, water + piercing |
 
-(Decoded from `monster_prop.dat` +25, not recalled: `$10D` weak =
-water, absorbs bolt; `$10E` weak = bolt|water, absorbs fire. An
-earlier draft here read the opposed fire/bolt pair as vanilla's
-weaknesses — that pair is in the ABSORB bytes, and neither Crane is
-fire-weak. Vanilla's shared weakness is water.)
+(Decoded from `monster_prop.dat` +25, not recalled: `$10D` weak = water, absorbs bolt.
+`$10E` weak = bolt|water, absorbs fire. Vanilla's shared weakness is water.)
 
 - **The Cranes' vanilla charge is element-driven rather than a
   fuse.** Read from `ai_script.asm`: both counters are in the COUNTER
@@ -792,10 +642,7 @@ fire-weak. Vanilla's shared weakness is water.)
   the element it absorbs, and the results are **Fire 3** and **Giga
   Volt**. There is a separate timer move (`if_battle_timer 60` →
   Magnitude8). This is not the one-ATB-cycle fuse the boss contract
-  defines above, and an earlier draft claiming OT6 "inherits it,
-  verbatim" was wrong. Giving the Cranes a telegraph that matches the
-  contract is work that has not been done. "Break cancels the charge"
-  is a design intent to build, not a vanilla behavior to inherit.
+  defines above.
 - **Break story:** this is the WoB's effective 12-shield fight: two
   live gauges with two fuses on independent clocks. Focus one Crane
   and the other's charge lands. Use the wrong element and you heal its
@@ -803,11 +650,6 @@ fire-weak. Vanilla's shared weakness is water.)
   here is **water**, the shared vanilla weakness, plus **bolt on the
   Right Crane only**; the espers the factory has just paid out are the
   wrong answer.
-  (An earlier draft of this line called "Ifrit's fire and Ramuh's
-  bolt" the factory's own boss keys. Both heal: `$10E` absorbs fire
-  and `$10D` absorbs bolt — `monster_prop.dat` +23, absorb, verified
-  against +25, weak. That contradicted the decode note 18 lines above
-  in this same section, which had it right.)
 - **Jank:** they climb the hull mid-battle, and the wrong-element
   heal stays as the 1994 original shipped it.
 
@@ -838,9 +680,7 @@ Balloons: 1 · ice, water.
 (Decoded, not recalled: in vanilla `$116` weak = **ice only** —
 `monster_prop.dat` +25 reads `$02` — with +24 `$6c` nulling
 bolt|poison|holy|earth and +23 `$01` **absorbing fire**. Water above is
-an OT6 add, not vanilla. `$0de` Balloon weak = `$82` = ice|water. An
-earlier draft merged the two rows and gave the FlameEater the Balloons'
-water bit *as vanilla*, which it never was.)
+an OT6 add, not vanilla. `$0de` Balloon weak = `$82` = ice|water.)
 
 - **Telegraph:** it absorbs the room's fire and turns white →
   **Fireball** across the party. Break during the fuse to cancel it.
@@ -905,11 +745,10 @@ Same three, straight from the deck.
 (Decoded, not recalled: all four parts share one vanilla byte —
 `monster_prop.dat` +25 = **`$84` = bolt|water** on `$113`, `$145`, `$147`
 and `$146` alike, with +23/+24 both `$00`, so the assembly absorbs and
-nulls nothing. An earlier draft dropped the water bit from three rows and
-gave the MissileBay **fire**, which it has never been weak to. The Speck's
-row is the one that differs: it is bolt|water-weak like the rest, but
-the authored answer is still one shield and any physical class, because
-the Speck's purpose is to absorb spells.)
+nulls nothing. The Speck's row is the one that differs: it is
+bolt|water-weak like the rest, but the authored answer is still one
+shield and any physical class, because the Speck's purpose is to
+absorb spells.)
 
 - **Telegraph:** the missile bay racks and locks → **Launcher**
   barrage. Breaking the *bay* cancels it; breaking the body does not.
@@ -954,10 +793,7 @@ Party: your three, during the continent's collapse.
 
 **Shields:** 5 · **Weak:** ice, bolt, holy + slashing, piercing.
 (Decoded, not recalled: `$118` weak = ice|bolt|holy and **absorbs
-fire**. An earlier draft listed fire as a weakness — authoring that
-would put a chip trigger on an absorber, where vanilla reverses the
-damage sign — and dropped vanilla's ice and bolt, against the
-"keep vanilla's bits ✦" rule at the top of this doc.)
+fire**.)
 
 - The fight opens *untelegraphed*, with **Condemned** on the whole
   party before your first input. That is vanilla's ambush, preserved.
@@ -981,28 +817,11 @@ damage sign — and dropped vanilla's ice and bolt, against the
 | Kefka ×2 (Imperial Camp) | no monster entity at all — formation 504 is empty and the fight runs on character AI `$04`; see 6 above |
 | Chupon's Sneeze, Vargas's finish | in their blocks above: scripts beat state |
 
-## Open questions for the driver
+## Poison-bit audit
 
-1. **Ifrit/Shiva pinning:** a Broken sibling cannot tag out (Stop
-   rules). Confirm this, or should a break force the swap instead and
-   hand the window to the sibling?
-2. **024's element row:** WallChange re-hides the element row
-   mid-fight. Keep that or not? (Classes stay revealed either way.)
-3. **Atma's added row:** fire/ice/bolt + slash/pierce is broad by
-   design, because the party is a free pick. Narrowing it risks a
-   lineup that cannot chip the fight at all.
-4. **Chupon:** keep the 4-shield gauge, or draw him shieldless like
-   Tritoch, given that Sneeze ends the fight regardless?
-5. **Part-break feeding:** should breaking a limb chip the body 1
-   (128, Cranes, AirForce)? v1 says no: parts pay in cancels, not in
-   chip.
-6. **Vanilla-script audit** (M6 data entry): TunnelArmor's quake =
-   Magnitude8; Number 128's sweep = Gale Cut; Crane left/right
-   element sides; Nerapa's full script; Telstar's reinforcement call;
-   Guardian's WoB location. The poison bits on
-   Marshal/Vargas/Kefka/Dadaluma are audited (decoded from
-   `monster_prop.dat` +25, not recalled — the file is byte-identical
-   to vanilla `$CF0000`):
+The poison bits on Marshal/Vargas/Kefka/Dadaluma are audited (decoded
+from `monster_prop.dat` +25, not recalled — the file is byte-identical
+to vanilla `$CF0000`):
 
    | species | id | weak byte | verdict |
    |---|---|---|---|
@@ -1011,14 +830,14 @@ damage sign — and dropped vanilla's ice and bolt, against the
    | Kefka (Narshe) | $014a | $00 — | **poison is an add** — authored (`Ot6ElemAddTbl`, `$09` with fire) |
    | Dadaluma | $0107 | $08 poison | vanilla agrees — no add |
 
-   ($14a is the **Narshe defense** Kefka and nothing else. A scan of
-   all 576 formation records puts him in exactly two, 489 (with the
-   Ice Dragon) and 505, and 505 is what group 57 / `battle 57` reaches
-   at event_main.asm:106362, the fight he "won't forget." The camp
-   scenes share no record with him because they carry no monster at
-   all; see 6 above. The $11a/$12a Kefka records are the level-83 and
-   level-71 endgame ones, which are out of WoB scope.
-   From the same pass: Ipooh $014d reads $01 fire, so the fire weak
-   above is vanilla and not an add, and the chip keys are confirmed in
-   the data, with AuraBolt ($5e) carrying $20 holy and BioBlaster's
-   attack ($7d) carrying $08 poison in the vanilla spell records.)
+($14a is the **Narshe defense** Kefka and nothing else. A scan of
+all 576 formation records puts him in exactly two, 489 (with the
+Ice Dragon) and 505, and 505 is what group 57 / `battle 57` reaches
+at event_main.asm:106362, the fight he "won't forget." The camp
+scenes share no record with him because they carry no monster at
+all. The $11a/$12a Kefka records are the level-83 and level-71
+endgame ones, which are out of WoB scope.
+From the same pass: Ipooh $014d reads $01 fire, so the fire weak
+above is vanilla and not an add, and the chip keys are confirmed in
+the data, with AuraBolt ($5e) carrying $20 holy and BioBlaster's
+attack ($7d) carrying $08 poison in the vanilla spell records.)

@@ -1,55 +1,25 @@
 -- @suite
--- battle_seedladder.lua -- the retry ladder plays three different fights, and
--- the check that says so is not vacuous.
+-- battle_seedladder.lua -- H.newSeedLadder must draw three distinct battle
+-- RNG seeds across a three-attempt retry ladder, and its report() must
+-- actually fail when that isn't true.
 --
--- Issue #83.  Nine generators carry a three-attempt retry ladder whose whole
--- claim to being evidence is that its attempts are three different fights: a
--- ladder that loses all three is reported as a finding about the encounter
--- rather than retried, which is what replaced the rigging #74 documents.  The
--- attempts were spread with `H.waitFrames((n - 1) * 37)` and a comment saying
--- that varied the battle RNG seed.  Nothing read the seed back.
+-- The battle RNG seed is (game-time frames * 4) & $FF, computed once per
+-- phase from $021e (wGameTimeFrames, ticked once per vblank from the field,
+-- world and battle NMIs) at InitBattle; $be indexes RNGTbl for every battle
+-- Rand.
 --
--- Where the seed comes from (ff6/src/battle/battle_main.asm:6174-6176, inside
--- InitBattle at :6138): `lda $021e / asl2 / sta $be`.  $021e is
--- wGameTimeFrames (ff6/src/menu/menu_ram.inc:343), which IncGameTime
--- (ff6/src/menu/menu_common.asm:3522-3549) runs 1..60 and wraps, ticked once
--- per vblank from the field, world and battle NMIs.  So the seed is
--- (frames * 4) & $FF, one value per phase, and $be indexes RNGTbl for every
--- battle Rand (battle_main.asm:12640-12666).
---
--- probe_ladder_seed.lua measured the shipped ladder against that.  The
--- premise held -- waiting does move the phase -- but the spread did not
--- follow from it.  Attempts 2 and 3 reload the entry blob and then spend a
--- fixed ~92 frames before their own offset, so they land 37 apart; attempt 1
--- runs in place at whatever phase the generator's step layout leaves it.  With
--- 36 frames of lead in front of attempt 1 and nothing else changed, attempts 1
--- and 2 both drew seed $9C and attempt 3 drew $4C: one fight played twice,
--- which is #80's reported signature.
---
--- H.newSeedLadder replaces the constant with the counter the seed is made of.
--- This test runs it over battle_entry's first encounter and checks both
--- halves of the claim:
---
+-- This test runs the ladder over battle_entry's first encounter and checks:
 --   1. positive -- three attempts through the reload-and-spread shape draw
 --      three distinct seeds, and L.report() passes;
 --   2. negative -- two attempts driven onto one phase draw one seed, and
---      L.report() raises.  Without this half, a report() that could never
---      fail would print the same green as one that checked something.  The
---      control is a real pair of attempts, not a poked table: identical route,
---      identical seed, which is exactly how the old ladder degenerated.
---
--- Cases 4 and 5 are about the hold rather than the check, and they are the
--- reason spread() counts the counter's movement instead of matching its value.
--- The harness samples $021e once per emulated frame; the counter's tick sits
--- at the end of a vblank handler long enough to straddle that boundary, so a
--- quarter of the phases are written and overwritten between two samples and
--- an equality test can never see them.  sfigaro_town's battle 11 hit it: 181
--- frames waiting for phase 7 while the counter ticked 180 times and passed
--- through 7 three times, reported as "$021e is not advancing here".  Case 4
--- drives the hold with that exact aliasing and requires it to release; case 5
--- drives it with a counter that genuinely never moves and requires it to fail,
--- because "cannot spread" must never quietly become "play the same fight
--- twice".
+--      L.report() raises;
+--   3. report() also fails on a ladder that recorded no seeding at all, and
+--      on an attempt that took a phase but never fought;
+--   4/5. the harness samples $021e once per emulated frame, but the real
+--      counter's tick straddles that boundary, so about a quarter of the
+--      phases are never what a sample returns. spread() must release when
+--      the target phase is one the sampler never shows (case 4), and must
+--      still fail when the counter genuinely never moves (case 5).
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
@@ -75,15 +45,9 @@ local function drive(mk, out, budget, what)
   })
 end
 
--- A sampler that aliases the way the real one does.  $021e is ticked at the
--- end of the owning module's vblank handler (ff6/src/field/reset.asm:286),
--- which is long enough to finish either just inside the emulated frame or
--- just past it, so the tick straddles the frame boundary the harness samples
--- on: measured 2026-08-12 on sfigaro_town's battle 11, frames held 2, 1, 0, 1
--- ticks on a four-frame beat and every phase congruent to 3 mod 4 lived and
--- died between two samples.  This reproduces that sequence exactly: the
--- counter still advances 60 phases per 60 frames, and a quarter of them are
--- never what a sample returns.
+-- A sampler that aliases the way the real one does: the counter still
+-- advances 60 phases per 60 frames, on a four-frame beat (2,1,0,1), and a
+-- quarter of them are never what a sample returns.
 local BEAT = { 2, 1, 0, 1 }
 local function sampleSeq(start, count)          -- the beat, as plain data
   local out, cur = {}, start
@@ -109,9 +73,8 @@ local function aliasedSampler(start)
   end
 end
 -- The first phase at least `away` ahead of `start` that the sampler never
--- returns.  `away` keeps the case honest: a blind phase one step ahead would
--- be reached by any implementation, so the target is put most of a cycle out
--- and the hold has to accumulate across both the repeats and the double steps.
+-- returns.  `away` keeps the case honest by putting the target most of a
+-- cycle out.
 local function neverSampled(start, away)
   local seen = {}
   for _, v in ipairs(sampleSeq(start, H.SEED_PERIOD * 4)) do seen[v] = true end
@@ -165,20 +128,17 @@ H.run({ maxFrames = 8000 }, {
   attempt(POS, 1), attempt(POS, 2), attempt(POS, 3),
   POS.report(),
   H.call(function()
-    -- The seeds are also required to be the ones the phases predict, so this
-    -- test fails if the seeder stops being (game-time frames * 4) rather than
-    -- quietly watching an instruction that no longer means what the header
-    -- says.  A distinctness check over garbage would still pass.
+    -- The seeds must also equal what the phases predict, not merely differ
+    -- from each other.
     for n = 1, 3 do
       local s = POS.seeds[n]
       H.assertEq(s ~= nil, true, "attempt " .. n .. " recorded a seeding")
       H.assertEq(s.seed, H.seedOf(s.phase),
         "attempt " .. n .. " seed is (game-time frames * 4) & $FF")
     end
-    -- ...and spread apart rather than merely unequal: the gap is 20 phases,
-    -- and the drive from the spread to InitBattle jittered by 3 frames when
-    -- measured, so anything under about 10 would mean the spread is not
-    -- surviving the walk into the fight.
+    -- ...and spread apart rather than merely unequal: the gap is 20 phases;
+    -- anything under about 10 means the spread did not survive the walk
+    -- into the fight.
     for a = 1, 3 do
       for b = a + 1, 3 do
         local d = (POS.seeds[a].phase - POS.seeds[b].phase) % H.SEED_PERIOD
@@ -237,14 +197,9 @@ H.run({ maxFrames = 8000 }, {
     })
   end)(),
 
-  -- 4. The spread must not need to SEE its target phase.  The harness samples
-  -- $021e once per emulated frame and the counter's tick straddles that
-  -- boundary, so a quarter of the phases are written and overwritten between
-  -- two samples.  sfigaro_town's battle 11 asked for phase 7, which was one of
-  -- them, and the old equality wait reported the counter as stopped after 181
-  -- frames of it ticking 180 times.  Same arithmetic here: the counter still
-  -- covers 60 phases per 60 frames and the target is a phase this sampler
-  -- never returns.
+  -- 4. The spread must not need to SEE its target phase: the harness samples
+  -- $021e once per emulated frame while the counter's tick straddles that
+  -- boundary, so a quarter of the phases are never what a sample returns.
   (function()
     local START = 1
     local blind = neverSampled(START, 30)

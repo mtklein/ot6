@@ -3,20 +3,14 @@
 -- drawing from blanked glyph tiles, which shows as junk over and around the
 -- enemies.
 --
--- The bug (owner sighting, v0.2+): "showing up every once in a while during
--- battle, drawing over and around the enemies, maybe comprising break icons
--- amongst other things that look like junk memory, but not exclusively."
--- Root cause: window_mess_open_init (_c142e4, btlgfx_main.asm:9264) opens a
--- battle dialog by ClearDlgGfxBuf-ing the whole small font and re-uploading it
--- to vram $5800 (SmallFontGfx, four TfrDlgTextGfx passes), which zeroes OT6's
+-- window_mess_open_init (_c142e4) opens a battle dialog by ClearDlgGfxBuf-ing
+-- the whole small font and re-uploading it to vram $5800, which zeroes OT6's
 -- borrowed HUD glyph tiles ($64-$79, $eb-$fd, all blank in the vanilla
 -- font).  Only the dialog close (_c143b9) re-flags the OT6 re-lay; the open
--- does not, and the window keeps re-uploading as it prints.  So from a dialog
--- opening until its close re-lay finishes, and for the whole fight when the
--- script never issues a close, the HUD map still points at those now-blank
--- tiles, and the shield/break/'?' cells render as junk.  Reproduced in the
--- Narshe Magitek-flashback fight (battle 115, Kefka's "Uwee, hee, hee!"): the
--- HUD drew from blanked tiles ~5000/9000 frames (probe_moogfont / _moogjunk).
+-- does not, and the window keeps re-uploading as it prints.  So from a
+-- dialog opening until its close re-lay finishes, and for the whole fight
+-- when the script never issues a close, the HUD map still points at those
+-- now-blank tiles, and the shield/break/'?' cells render as junk.
 --
 -- The fix (Ot6BgHudFlush_ext veil): while a dialog window is up (w7e64d5) or a
 -- font re-lay is in flight (OT6_FONTDIRTY), the flush writes vanilla's $01ee
@@ -26,19 +20,16 @@
 --
 -- The invariant, asserted every frame of a fight that opens a dialogue: no bg3
 -- field-map cell may hold an OT6 glyph char whose tile data is, that frame,
--- clobbered (that is, different from its bank-F0 source).  There is also a
--- positive control, so that a pass cannot hide a regression: the dialogue must
--- have clobbered the tiles (tileDirty frames > 0), otherwise the hazard was
--- never exercised.
+-- clobbered (that is, different from its bank-F0 source).  Positive control:
+-- the dialogue must have clobbered the tiles (tileDirty frames > 0),
+-- otherwise the hazard was never exercised.
 --
--- Needs moogle_entry.mss (make savestates), the battle_vargas
--- pattern.
 --   tools/tests/run.sh tools/tests/battle_hudclobber.lua   (needs moogle_entry.mss)
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/moogle_entry.mss.lua"
 local VR, ROM = emu.memType.snesVideoRam, emu.memType.snesPrgRom
 
--- OT6 glyph cells + their rom source (glyphCanary's signature scan)
+-- OT6 glyph cells + their rom source
 local allCells, claimed = {}, {}
 local function findRom()
   local function findSig(sig)
@@ -75,10 +66,9 @@ local function scan()
   return n, true
 end
 
--- scanline instrument (battle_banner's pinned C1 exec hooks): the dialogue's
--- font re-lay slices run on the same NMIs as the veiled line flush, so this
--- fight also exercises the flush-timing invariant, which is asserted below to
--- stay in vblank.
+-- scanline instrument: the dialogue's font re-lay slices run on the same
+-- NMIs as the veiled line flush, so this fight also exercises the
+-- flush-timing invariant, which is asserted below to stay in vblank.
 local armed = false
 local rec, cur = {}, nil
 local function sl() return emu.getState()["ppu.scanline"] end
@@ -91,8 +81,8 @@ emu.addMemoryCallback(function() if armed and cur then cur.id = sl() end end,
   emu.callbackType.exec, 0xC10CA4, 0xC10CA4)
 
 local junkFrames, tileDirtyFrames, maxJunk, worstFrame = 0, 0, 0, -1
-local hudEverWhole = false     -- #71 item 1: some frame drew the HUD from
-                               -- intact tiles (the repaint witness)
+local hudEverWhole = false     -- some frame drew the HUD from intact tiles
+                               -- (the repaint witness)
 local worstFe, worstId, spillFrames = 0, 0, 0
 local function sample()
   local r = rec[#rec]
@@ -151,9 +141,8 @@ H.run({ maxFrames=24000 }, {
       tileDirtyFrames, junkFrames, maxJunk))
     H.log(string.format("[hudclobber] NMI tail: worstFlushEnd=%d worstPostInidisp=%d spillFrames=%d (records=%d)",
       worstFe, worstId, spillFrames, #rec))
-    -- (a) the flush and INIDISP stay in vblank even with a re-lay slice on the
-    -- same NMI as the veiled line flush (a timing hazard that was disproven but
-    -- is still guarded)
+    -- the flush and INIDISP stay in vblank even with a re-lay slice on the
+    -- same NMI as the veiled line flush
     H.assertEq(#rec >= 500, true, "scanline instrument recorded the fight (got " .. #rec .. ")")
     H.assertEq(spillFrames, 0, string.format(
       "every NMI tail stayed in vblank [<=261] (worstFlushEnd=%d worstPostInidisp=%d)",
@@ -167,16 +156,6 @@ H.run({ maxFrames=24000 }, {
     H.assertEq(junkFrames, 0, string.format(
       "the HUD never rendered break/shield/icon glyphs from blanked tiles "
       .. "(junkFrames=%d, worst %d cells at f%d)", junkFrames, maxJunk, worstFrame))
-    -- #71 item 1: junkFrames == 0 proves only the HAZARD arm -- make the
-    -- veil permanent (or delete the under-enemy HUD) and it stays green.
-    -- The repaint half -- the thing this file is NAMED for -- needs the
-    -- battle_whelkwipe:242 control: the HUD is PRESENT and its glyphs are
-    -- intact once the fight settles.
-    -- #71 item 1: sampled DURING the soak, not after it -- the battle can
-    -- be over by this line and a missing HUD then is the correct answer.
-    -- The witness: at least one clean-tile frame actually drew the HUD, so
-    -- a permanent veil or a deleted under-enemy HUD fails here instead of
-    -- staying green on the hazard arm alone.
     H.assertEq(hudEverWhole, true,
       "the HUD rendered from whole tiles at least once during the soak -- " ..
       "a permanent veil or a deleted under-enemy HUD fails here")

@@ -1,34 +1,26 @@
 #!/usr/bin/env python3
-"""Which chests did the route SEE?  The owner's chest rule, made mechanical.
+"""Which chests did the route SEE, and are therefore expected to open.
 
-The rule (owner, 2026-08-16, #84): if a chest is visible on the screen, a
-human walks over and opens it.  The route emulates a human, so the set of
-chests the route should open is not an editorial list -- it is a measurement:
-take the tiles the party actually stood on (the [tiles] trace lines M.run
-emits, harvested from a regen log), widen each to what the screen actually
-shows, and intersect with the treasure table audit_chests.py already decodes.
+Takes the tiles the party actually stood on (the [tiles] trace lines M.run
+emits, harvested from a regen log), widens each to what the screen actually
+shows, and intersects with the treasure table audit_chests.py decodes.
 
-"What the screen shows" is the MEASURED camera, not a model
-(probe_chestcam.lua, 2026-08-16): with the party at pixel (px,py) the live
-BG1 scroll reads exactly (px-112, py-112), clamped at zero on each axis, and
-the view is 256x224 -- read off $5B/$5F with the party parked mid-route, so
-the number includes whatever the engine really does.  A chest tile is
-visible from a party tile iff the chest's 16px rect overlaps that view.  The
-one remaining approximation: the far-edge clamp (scroll <= map size - view)
-is not applied because map pixel sizes are not decoded here; that clamp only
-ever shows MORE map for a party hugging a right/bottom border, so the report
-can UNDER-count visibility there -- the safe direction -- and the
-nearest-approach distances flag anything close enough to care.
+The camera model: with the party at pixel (px,py) the BG1 scroll is
+(px-112, py-112), clamped at zero on each axis; the view is 256x224.  A
+chest tile is visible from a party tile iff the chest's 16px rect overlaps
+that view.  The far-edge clamp (scroll <= map size - view) is not applied,
+since map pixel sizes are not decoded here; that only ever shows MORE map
+for a party hugging a right/bottom border, so the report can UNDER-count
+visibility there, and the nearest-approach distances flag anything close.
 
 Usage:
   python3 tools/chest_visibility.py [--repo ROOT] LOG [LOG...]
   python3 tools/chest_visibility.py --selftest
 
-LOGs are any files carrying [tiles] lines -- a `make savestates` log covers
-the whole route.  Output: per map the route walked, every chest with its
-verdict (VISIBLE / not seen), kind, contents and nearest approach; then the
-summary the #84 route-editing wave works from.  Exit 0 always (a report, not
-a gate); --selftest exits 1 on parser/math drift.
+LOGs are any files carrying [tiles] lines -- a full savestate-regeneration
+log covers the whole route.  Output: per map the route walked, every chest with its
+verdict (VISIBLE / not seen), kind, contents and nearest approach.  Exit 0
+always (a report, not a gate); --selftest exits 1 on parser/math drift.
 """
 
 from __future__ import annotations
@@ -112,10 +104,8 @@ def selftest():
     os.unlink(path)
     check("harvest unions per map", w[242], {(56, 35), (57, 36), (10, 10)})
     check("harvest keeps maps apart", w[98], {(5, 5)})
-    # The live measurement itself (probe_chestcam, 2026-08-16): party tile
-    # (13,31) -> scroll (96,384) read off $5B/$5F, and the Flame Sabre chest
-    # (3,25) at px 48..63 x 400..415 sits left of the view.  If the formula
-    # constants drift, this is what says so.
+    # party tile (13,31) -> scroll (96,384); the Flame Sabre chest (3,25) at
+    # px 48..63 x 400..415 sits left of the view.
     check("the measured mid-chute frame excludes the Flame Sabre",
           visible_from(13, 31, 3, 25), False)
     # One tile changes it: from (10,32) the view starts at (48,400) and the
@@ -144,7 +134,7 @@ def main():
         return selftest()
     if not args.logs:
         print("chest_visibility: name at least one log carrying [tiles] "
-              "lines (a make savestates log covers the route)")
+              "lines (a savestate-generation log covers the route)")
         return 2
 
     walked = harvest(args.logs)

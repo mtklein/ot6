@@ -1,18 +1,14 @@
 -- probe_auction_golem.lua -- win GOLEM at the Jidoor auction, declining
--- every other lot (#133 item 5).
+-- every other lot.
 --
--- probe_jidoor_shop's always-bid ride won Zoneseek but paid 10-20k for
--- junk lots (80k across 7 rounds) and hit the gil floor before Golem
--- drew.  The lots are identified by the announce dialog: after the
--- auctioneer's generic $0AA7 "Here's our next item!", the lot's own dlg
--- follows -- $0AA9 is GOLEM (rides to take_gil 20000 + give_genju),
--- $0AA8?/$0A44 Cherub Down, $0AAA the 1/1200 airship, etc.  The current
--- dialog index is $d0 (field/text.asm:43), so the ride watches it:
--- choices default to DECLINE (row 1: down, then A) until the Golem
+-- Lots are identified by the announce dialog: after the auctioneer's
+-- generic $0AA7 "Here's our next item!", the lot's own dlg follows --
+-- $0AA9 is GOLEM.  The current dialog index is $d0, so the ride watches
+-- it: choices default to DECLINE (row 1: down, then A) until the Golem
 -- announce is seen, then bid (row 0: plain A).  A declined lot costs 0.
 --
 -- Boots from wob_jidoor_done.mss (in Jidoor town, gil 32,737, Zoneseek
--- won).  Stops when the owned-esper count grows or after 14 dry lots.
+-- won).  Runs up to 40 lots, stopping early once the esper count grows.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function gil() return H.readByte(0x1860) | (H.readByte(0x1861) << 8) | (H.readByte(0x1862) << 16) end
 local function espers()
@@ -31,11 +27,8 @@ local function won() return espers0 ~= nil and espers() > espers0 end
 
 local function bumpIn(i)
   return {
-    -- burn wRand ($1f6d) IN TOWN before re-entering: the auction room's
-    -- crowd stands still (a wait there burns nothing -- 28 deterministic
-    -- lots measured, then 20 more with an in-room jitter), but the town
-    -- streets have RANDOM-movement NPCs whose direction rolls advance
-    -- the field Rand.  The wait varies per lot to walk the RNG table.
+    -- Waits in town before re-entering: town NPCs' random movement
+    -- advances wRand ($1f6d); the auction room's crowd does not.
     H.call(function()
       H.log(string.format("lot %d: wRand=%02X", i, H.readByte(0x1f6d)))
     end),
@@ -73,7 +66,7 @@ local function auctionRound(i)
           if lot == nil or golemLot then
             H.setPad(aPhase < 4 and { "a" } or {})          -- ride/bid: row 0
           else
-            -- decline: push the cursor down, then confirm row 1
+            -- decline: cursor down, then confirm row 1
             if aPhase < 3 then H.setPad({ down = true })
             elseif aPhase < 6 then H.setPad({ a = true })
             else H.setPad({}) end

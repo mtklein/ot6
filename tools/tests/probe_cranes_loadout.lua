@@ -1,22 +1,13 @@
--- probe_cranes_loadout.lua -- read-only instrument (issue #75, the Cranes
--- vanilla-playbook re-test): reports what the n128_won party brings to the
--- reunion fight.
---
--- The wall record (gen_terra_returned_checkpoint header, probe_cranes_wedge)
--- says the fight's designed key, water (bosses-wob.md 16), is unobtainable
--- by this party.  The vanilla playbook disagrees: BISMARK ($1A69 bit 7,
--- the tube-room give_genju per gen_esper_tubes_done) carries Sea Song
--- ($3d: water, power 58, 50 MP, all enemies), the game's only water spell
--- (magicite-tube-six.md section 8).  Whether the key exists here reduces
--- to three readable facts, dumped below:
+-- probe_cranes_loadout.lua -- read-only: reports what the n128_won party
+-- brings to the reunion fight.  BISMARK ($1A69 bit 7) carries Sea Song
+-- ($3d: water, power 58, 50 MP, all enemies), the game's only water
+-- spell.  Dumps three facts:
 --   * esper ownership ($1A69/$1A6A): whether BISMARK is owned at this
 --     boundary;
 --   * per-character MP: whether anyone can pay the 50 MP Sea Song costs;
 --   * known spells ($1a6e + 54*actor): whether anyone knows Bolt (the
 --     Right Crane's second weakness) or any element that would feed an
---     absorb (Left absorbs bolt 0x04, Right absorbs fire 0x01;
---     monster_prop.dat +23, read 2026-08-10).
--- Not a suite test; no fixture output.
+--     absorb (Left absorbs bolt 0x04, Right absorbs fire 0x01).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local NAMES = { [0]="TERRA","LOCKE","CYAN","SHADOW","EDGAR","SABIN","CELES",

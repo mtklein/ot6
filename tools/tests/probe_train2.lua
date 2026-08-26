@@ -1,21 +1,14 @@
 -- probe_train2.lua -- mainline drive instrument: forest_done -> the detach.
--- Rides the route probe_train measured open: departure, car A west door,
--- strip (66,8)->(58,8) into car B ($017E=1), across B to (50,8), the strip
--- to car C's side door (41,8) facing up ($0180=1, $0509=1), the trap ghost
--- talk (_cbb265: $017C=1, battle 47, which must be fought because its tail
--- is _ca5ea9's win-bit check), the mob scene at 142 (41,9), the roof climb
--- at x=40 (_cbb3e6), the run west to (34,5) (_cbb4d5, SABIN's jump), the
--- mob catch at (11,8) ($0182), car 149, the interior ladder x=26, and the
--- roof lever (28,5) facing-up+A (_cbb645: $0183=1, cinematic -> 141
--- (117,8)).  Floods each new pocket so a blocked step is reported with its
--- tile.
--- Issue #75: playBattles = "flee" keeps these walks out of the library's
--- monster-dead flag write, and here it is not a no-op: the Phantom Train
--- maps 142, 145 and 149 all draw random battles (map_prop.dat byte +5
--- bit 7 set).  Fled rather than fought, matching gen_sabin_train's corridor
--- policy and for its measured reason: a fled battle is not a win, and
--- SHADOW's 1/16 post-battle walk-off (battle_main.asm:11976-11991) rolls
--- only at a win, so fleeing keeps the party this instrument is measuring.
+-- Rides departure, car A west door, strip (66,8)->(58,8) into car B
+-- ($017E=1), across B to (50,8), the strip to car C's side door (41,8)
+-- facing up ($0180=1, $0509=1), the trap ghost talk ($017C=1, battle 47),
+-- the mob scene at 142 (41,9), the roof climb at x=40, the run west to
+-- (34,5) (SABIN's jump), the mob catch at (11,8) ($0182), car 149, the
+-- interior ladder x=26, and the roof lever (28,5) facing-up+A ($0183=1,
+-- cinematic -> 141 (117,8)).  Floods each new pocket so a blocked step is
+-- reported with its tile.
+-- playBattles = "flee": maps 142, 145, 149 draw random battles, and a won
+-- (rather than fled) battle would roll SHADOW's 1/16 post-battle walk-off.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/forest_done.mss.lua"
 
@@ -87,11 +80,7 @@ local function flood(tag)
   end
 end
 
--- flap-tolerant hold; tap-A dialogs; battles are won by tap-A rather than by
--- the battle-clear write (the train's scripted fights all tail into
--- _ca5ea9's win-bit check, and a battle-clear write would GameOver), except
--- random trash when spareReal is false.  On the train every fight ends up
--- tap-A, which is cheap and safe everywhere.
+-- flap-tolerant hold; tap-A dialogs and battles alike.
 local function holdDrive(dir, pred, what, budget)
   local phase, hb = 0, -600
   return H.driveUntil(pred, budget or 15000, {
@@ -217,8 +206,6 @@ H.run({ maxFrames = 120000 }, {
   H.call(function() flood("car 149") end),
 
   -- the east vestibule climbs inside: (28,5) is directly reachable
-  -- (measured: 149's flood from (30,7) is x=27..31, y=5..10, so the ladder
-  -- column x=26 that the exterior implies is not the way; the lever tile is).
   H.navTo(28, 5, { maxFrames = 9000, playBattles = "flee" }),
   (function()
     local phase = 0

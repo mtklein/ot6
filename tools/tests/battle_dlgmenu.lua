@@ -1,27 +1,13 @@
 -- @suite slow
 -- battle_dlgmenu: battles that open with a scripted battle dialogue must
--- come back with intact, working menus.  Regression test for the whelk
--- garbled-menu bug (first bad: 0666392): Ot6MarkFontDirty_ext was hooked
--- between _c143b9's parameter setup and its jmp WaitTfrVRAM and clobbered
--- A, which is WaitTfrVRAM's source bank, so every dialogue-close "restore"
--- streamed $1000 bytes of bank-$01 open bus over the small font at vram
--- $5800 and all later menu and list text rendered as noise.  The map words
--- stayed correct; deep list picks read as rejected only because nobody
--- could see which rows were real.
+-- come back with intact, working menus: the small font at vram $5800 must
+-- render correctly and every menu and list pick must resolve.
 --   flow: whelk entry point -> step onto the trigger -> edge-tap the opening
 --   dialogues -> first menu entirely hands-off -> whole-font byte scan
 --   (every claimed OT6 cell == its bank-F0 data, every other byte ==
 --   SmallFontGfx) -> open the magitek list -> staged-row map-word asserts
 --   -> a deep row selects, targets, and executes ($3410 exec watch).
---
--- The menu owner does not matter, by design.  The battle-start ATB roll
--- decides whose menu opens first, and every assert here is written to hold
--- for any of them: everyone in this fight rides magitek armor, so the top
--- command opens a magitek list whoever holds it; the "Ice" probe and the
--- $83-$8a exec watch are beam-family checks common to all those lists; and
--- assertStagingSane accepts the element icons any of those lists stages.
--- This was not always true (see the block comment there), and the fixture
--- generator must not be tuned to steer the roll on this test's behalf.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"
 local WHELK = { [0x0134] = true }
@@ -38,8 +24,8 @@ local SMALLFONT_ROM = H.sym("SmallFontGfx") & 0x3FFFFF  -- headerless-image offs
 local function claimedCells()
   local rom = emu.memType.snesPrgRom
   local function findSig(sig)
-    -- v0.2 grew bank F0 ahead of the bg glyph table (~$F0109A now), so the
-    -- scan window reaches past the first 4K it used to fit inside.
+    -- the scan window reaches past the first 4K, since bank F0 extends
+    -- ahead of the bg glyph table (~$F0109A).
     for base = 0x300000, 0x303FF0 do
       local hit = true
       for i = 1, 16 do
@@ -101,7 +87,7 @@ end
 -- Whole-map scan of the staging rows.  Every word must be a cell that
 -- carries art: a small-font text tile ($80+), or one of the eight
 -- OT6 element icons.  Anything else means garbage got staged.
---
+
 -- The icon half is part of the rule, not an exception to it.  Ability list
 -- rows are drawn by Ot6ListIconCommon and Ot6AbilityPad_ext (ot6.asm), which
 -- append the ability's element glyph from Ot6ElemGlyphTbl, and that
@@ -110,17 +96,7 @@ end
 -- (ot6.asm:1158).  The other seven icons land at $eb $ec $ed
 -- $ef $fb $fc $fd, all >= $80, which is why a $80+-only rule
 -- looked correct.
---
--- Measured on this fixture (probe dump of $7c00-$7d3f with the magitek
--- list open): row $7c70 reads "Bio Blast" followed by word $3964, that is
--- tile $164 = font cell $64, palette 6, which is
--- Ot6ElemPalTbl's ".byte 6 << 2 ; poison: green".  That word is correct,
--- intended, player-visible art.  The old rule called it garbage, so
--- the test could only pass on the battle-start ATB rolls where somebody
--- other than Terra held the first menu, which made it depend on which ROM
--- bytes happened to be assembled, which CONTRIBUTING.md says a test
--- must never depend on.
---
+
 -- The allowed set is derived rather than listed here: claimedCells() finds
 -- the icon data in bank F0 by signature scan, and assertFontIntact() then
 -- byte-compares every claimed cell's vram against that rom data, so a
@@ -161,11 +137,6 @@ H.run({ maxFrames = 12000 }, {
       aPhase = (aPhase + 1) % 8
       if H.battleLoadStarted() then
         if whelk() then H.setPad({}); return end
-        -- an incidental encounter on the way to the trigger is fled rather
-        -- than ended by writing the battle-clearing flag (issue #75): L+R is
-        -- the engine's own run mechanic, the idiom every converted traversal
-        -- step uses.  If the formation refuses to release, the driveUntil
-        -- budget fails instead of a poke hiding the problem.
         H.setPad({ l = true, r = true })
         return
       end
@@ -181,8 +152,7 @@ H.run({ maxFrames = 12000 }, {
   H.call(function() H.setPad({}) end),
   H.waitUntil(function() return H.battleActive() end, 900, "whelk up", 30),
   H.waitFrames(240),
-  -- edge-tap A only until the first menu appears, then hands off: the
-  -- original bug garbled this screen with no further input
+  -- edge-tap A only until the first menu appears, then hands off
   H.driveUntil(function() return H.readByte(0x7bca) ~= 0 end, 4000, {
     H.call(function()
       local n = (H.vars.mn or 0) + 1
@@ -193,9 +163,6 @@ H.run({ maxFrames = 12000 }, {
   H.call(function() H.setPad({}) end),
   H.waitFrames(300),
   H.call(function()
-    -- name the menu owner: nothing asserts on it (see the header), but a
-    -- failure that is roll-dependent should say so in its own log instead
-    -- of making the next reader re-measure the ATB phase
     local actor = H.readByte(0x62ca)
     H.log(string.format("first menu: actor slot %d, char id $%02x", actor,
       H.readByte(0x3ed8 + actor * 2)))

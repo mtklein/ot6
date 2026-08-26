@@ -756,7 +756,7 @@ CalcSaveSlotChecksum:
         inx
         cpx     #$09fe
         bne     @19d8
-        ; OT6 (#18): $0000 is CheckSaveSlotChecksum's "invalid" answer.  That
+        ; $0000 is CheckSaveSlotChecksum's "invalid" answer.  That
         ; routine returns the checksum itself as its validity token and zero for
         ; invalid, with no separate flag, and every caller tests it with
         ; beq.  So a perfectly intact save whose 2558-byte sum happens to land
@@ -764,7 +764,7 @@ CalcSaveSlotChecksum:
         ; overwritten with no confirmation prompt: field_menu.asm:1981-1988
         ; branches on a zero straight into `; slot is empty, save instantly`.
         ; About 1 in 65,536 per save, independent per save, silent, and
-        ; unrecoverable.  Live since v0.1.
+        ; unrecoverable.
         ;
         ; Fold that one value onto $ffff so the sentinel stops colliding with a
         ; real sum.  The stored word at $1ffe sits OUTSIDE the summed range --

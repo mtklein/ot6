@@ -4,10 +4,9 @@
 ; inherits slot 1. The active page is 0 for transient or 1..3 for a saved
 ; game, read from wSaveSlotToLoad ($7e021f).
 ;
-; Why that read is safe from battle context (issue #29, audited 2026-07-28).
-; $021f is a menu-module variable, and Ot6CodexActive's callers all run in
-; battle (ot6_break.asm:155/:884/:992), so the guarantee rests on nothing else
-; ever writing the cell:
+; That read is safe from battle context: $021f is a menu-module variable, and
+; Ot6CodexActive's callers all run in battle (ot6_break.asm:155/:884/:992), so
+; the guarantee rests on nothing else ever writing the cell:
 ;   * it has exactly four writers, all lifecycle moments: New Game
 ;     (menu/menu_common.asm:250, menu/field_menu.asm:2756), validated load
 ;     confirm (menu/field_menu.asm:2794), and save (menu/save.asm:50, the
@@ -20,16 +19,6 @@
 ;   * the menu's own live clock stops one byte short: wGameTimeHours..
 ;     Frames are $021b-$021e, ticked 8-bit (IncGameTime, menu_common.asm:3522-3546
 ;     under .a8), so the tick never carries into $021f.
-; Measured per module (probe drives, 2026-07-28): the cell held the
-; lifecycle value at every consumer read across field/world/battle/menu,
-; fresh and slot-3-loaded, pre/post menu, pre/post save, including battles
-; entered from the world map right after an in-menu save.  The overlaid
-; values issue #29 reported (5; then 36/37 oscillation) reproduced only
-; under codex_saveas's forced-ZMENUSTATE save drive, whose corrupted menu
-; exit leaves menu tasks running, and in no player-reachable flow.
-; tools/tests/codex_ctx.lua pins the guarantee end to end: world save into
-; slot 3, menu close, encounter, and the battle's seed must surface the
-; slot-3 page's knowledge, not the transient page's.
 OT6_CODEX_V2     := $384f       ; 'O8': per-save elements + classes
 OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
 

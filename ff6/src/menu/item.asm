@@ -2595,7 +2595,7 @@ ItemBlankQtyText:               pos_text ITEM_BLANK_QTY
 .segment "item_prop"
 
 ; ------------------------------------------------------------------------------
-; OT6 v0.10: ItemProp is the vanilla blob plus one named byte override.
+; ItemProp is the vanilla blob plus one named byte override.
 ;
 ; Same splice discipline MagicProp uses (battle_main.asm, above the MagicProp
 ; label), and for the same reason: item_prop_en.dat is 256 fixed 30-byte
@@ -2608,16 +2608,16 @@ ItemBlankQtyText:               pos_text ITEM_BLANK_QTY
 ;   +$0e targeting  +$0f element  +$14 power  +$1b special effect
 ;
 ; ---- override 1: Drill ($a8) power, 191 -> 96 -------------------------------
-; docs/design/multi-hit.md §4.2 and principle P4, "hit count splits an
-; ability's power; it does not add to it".  Ot6HitCountTbl (ot6_hitcount.asm)
-; makes Drill strike twice, and each strike is a whole ExecAttack pass carrying
-; the record's full power, so without this cut a 16-MP Tool would deal double
-; damage as well as chipping twice.  191 / 2 is 95.5; 96 rounds the spare half
-; point to the player, and the difference is one point either way.
+; Hit count splits an ability's power; it does not add to it.
+; Ot6HitCountTbl (ot6_hitcount.asm) makes Drill strike twice, and each strike
+; is a whole ExecAttack pass carrying the record's full power, so without
+; this cut a 16-MP Tool would deal double damage as well as chipping twice.
+; 191 / 2 is 95.5; 96 rounds the spare half point to the player, and the
+; difference is one point either way.
 ;
-; The split is uncompensated, for the reasons multi-hit.md §1.3 reads out of
-; the damage path: defence is a multiplier rather than a subtraction, so it
-; distributes over a split, and Drill ignores it in any case.
+; The split is uncompensated: defence is a multiplier rather than a
+; subtraction, so it distributes over a split, and Drill ignores it in any
+; case.
 ;
 ; Drill is the Tool that gets rate because it ignores defence (ToolsEffect_05,
 ; battle_main.asm:7384-7386), which makes it the armoured-boss answer and the
@@ -2641,9 +2641,7 @@ ItemProp:
 
 ; Same length assert MagicProp carries, catching the dangerous half of a
 ; hand-spliced binary: a wrong .incbin COUNT shifts every record past the
-; splice and silently re-points the whole item table.  The byte POSITION is
-; pinned separately by tools/tests/battle_hitcount.lua, which reads records
-; $a8 and $a6 (Chain Saw, unchanged, the control) back out of the built ROM.
+; splice and silently re-points the whole item table.
 .assert * - ItemProp = ITEM_PROP_END, error, "ItemProp splice changed the table length"
 
 .popseg

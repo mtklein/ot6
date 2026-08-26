@@ -5,16 +5,9 @@
 ; only the tilemap/DMA/cursor shell and jsl's in here for every decision), and
 ; the two OT6_MP_COSTS-gated row-price leaves the menus draw with. The battle
 ; side that reads the word this file writes is ot6_bushido.asm.
-; ------------------------------------------------------------------------------
-; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
-; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler receives the identical
-; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
-; ff6-en.map are byte-identical across the split.
-; ------------------------------------------------------------------------------
 
 ; ==============================================================================
-; Bushido loadout configurator: OT6-owned bank-F0 logic (issue #8 Layer B)
+; Bushido loadout configurator: OT6-owned bank-F0 logic
 ;
 ; The field-menu configurator's state logic lives here in F0; the C3 menu-state
 ; handler (field_menu.asm) is a thin shim that jsl's these for every decision
@@ -52,7 +45,7 @@
 
 ; [ auto-window tech for a slot: base = max(0,ceil-2), tech = min(base+slot-1,ceil) ]
 ; The same math Ot6BushidoTech runs in AUTO mode, replicated menu-side off
-; $1cf7 so the seed baseline matches what battle would pick.  #38: the slot
+; $1cf7 so the seed baseline matches what battle would pick.  The slot
 ; index is the boost (1..3) and slot 0 is retired, so a 0 clamps to 1 the same
 ; way the battle leaf does; Ot6LoadoutSeedWord still walks 0..3 and relies on
 ; that clamp to mirror slot 1 into the unused slot 0 (see there).
@@ -60,14 +53,14 @@
 .proc Ot6LoadoutAutoTech
         .a8
         .i16
-        cmp     #$01                ; #38: 1-BP floor, clamp the retired slot 0
+        cmp     #$01                ; 1-BP floor, clamp the retired slot 0
         bcs     :+
         lda     #$01
 :       pha                         ; park slot ($01,s)
         jsl     Ot6LoadoutCeil      ; A = ceiling
         pha                         ; park ceiling ($01,s ; slot now $02,s)
         sec
-        sbc     #$02                ; ceiling - 2  (#38: three tiers, not four)
+        sbc     #$02                ; ceiling - 2  (three tiers, not four)
         bcs     :+
         lda     #$00                ; base floors at 0
 :       clc
@@ -133,7 +126,7 @@
         rtl
 .endproc
 
-; [ #49: is the SwdTech loadout AUTO?  the packed word is zero ]
+; [ is the SwdTech loadout AUTO?  the packed word is zero ]
 ; The twin of Ot6RageIsAuto below, and it decodes AUTO the same way every
 ; other reader of this word already does: Ot6LoadoutSlotTech branches @auto on
 ; a zero word (:1081-1083) and Ot6LoadoutCycleCore seeds on one (:1190-1193).
@@ -222,11 +215,11 @@
 ; So that after the first manual edit the un-touched slots keep the auto
 ; techs they were displaying, not zero.  Result is nonzero = MANUAL (unless the
 ; auto window is all tech 0, a ceiling-0 case that reads auto either way).
-; #38: the loop still walks slots 0..3 even though slot 0 is retired.  That is
-; deliberate, because the stored format must not move (persistent_layout
-; ot6-codex-o8-v1), and Ot6LoadoutAutoTech's clamp makes slot 0 a harmless
-; mirror of slot 1, which keeps the word nonzero (= MANUAL) in the same
-; cases it did before.  Nothing ever reads slot 0 back.
+; The loop still walks slots 0..3 even though slot 0 is retired.  That is
+; deliberate, because the stored format must not move, and
+; Ot6LoadoutAutoTech's clamp makes slot 0 a harmless mirror of slot 1, which
+; keeps the word nonzero (= MANUAL) in the same cases it did before.
+; Nothing ever reads slot 0 back.
 ; clobbers A,X,Y.
 .proc Ot6LoadoutSeedWord
         .a8
@@ -278,7 +271,7 @@
         bne     :+
         jsl     Ot6LoadoutSeedWord  ; first edit: store the auto window in the word
 :       lda     $4e                 ; cursored row (0..2)
-        inc     a                   ; #38: row i -> word slot i+1 (slot 0 retired)
+        inc     a                   ; row i -> word slot i+1 (slot 0 retired)
         jsl     Ot6LoadoutUnpack    ; A = the slot's current stored tech
         ldy     #$0008              ; try every residue once
 @hop:   clc
@@ -321,7 +314,7 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
         beq     @dn
         lda     $4e
         bne     :+
-        lda     #$03                ; wrap 0 -> 2 (pre-decrement).  #38: 3 rows
+        lda     #$03                ; wrap 0 -> 2 (pre-decrement, 3 rows)
 :       dec     a
         sta     $4e
         lda     #$01
@@ -331,7 +324,7 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
         beq     @sel
         lda     $4e
         inc     a
-        cmp     #$03                ; #38: three rows (1x/2x/3x), no 0x
+        cmp     #$03                ; three rows (1x/2x/3x), no 0x
         bcc     :+
         lda     #$00                ; wrap 2 -> 0
 :       sta     $4e
@@ -385,7 +378,7 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
 .endif
 .endproc
 
-; [ #55: price a thief submenu row: always defined, flag-gated body ]
+; [ price a thief submenu row: always defined, flag-gated body ]
 ; Ot6LoadoutCost's twin, for the second keyed table.  Ot6ThiefListOpen is
 ; assembled in both builds (the C1 stub jsl's it either way), but the cost
 ; leaves are OT6_MP_COSTS-only, so the list prices its rows through this shim:
@@ -393,12 +386,11 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
 ; keeps the byte-identical unpriced layout.
 ;
 ; The branch here is the same branch Ot6AbilityCost's @steal arm makes.  The
-; Steal row is not in Ot6ThiefCostTbl, because Ot6StealCost is its
-; one authority (#52), so a shim that only scanned the thief table would draw
-; Steal at 0 while the charge took 4.  Splitting on Ot6ThiefIsNew in both places
-; means the drawn price and the charged price come out of the same leaf for every
-; row, which is why #52 left Steal's price as a callable leaf
-; instead of an inline immediate.
+; Steal row is not in Ot6ThiefCostTbl, because Ot6StealCost is its one
+; authority, so a shim that only scanned the thief table would draw Steal at
+; 0 while the charge took 4.  Splitting on Ot6ThiefIsNew in both places means
+; the drawn price and the charged price come out of the same leaf for every
+; row.
 ; in: A = row id.  out: A = MP cost (0 under nomp).  preserves X and Y.  rtl.
 .proc Ot6ThiefCost
         .a8
@@ -407,7 +399,7 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
         jsl     Ot6ThiefIsNew       ; carry set = filch/bestow (A preserved)
         bcc     @steal
         jmp     Ot6ThiefCostFor     ; tail-call: same bank, its rtl returns for us
-@steal: jmp     Ot6StealCost        ; the Steal row: #52's one authority for the 4
+@steal: jmp     Ot6StealCost        ; the Steal row's one authority
 .else
         lda     #$00
         rtl

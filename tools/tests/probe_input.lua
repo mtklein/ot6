@@ -1,11 +1,9 @@
--- probe_input: verify the input layer stays alive over a long, realistic run.
--- The old $4218/$4219 read-hack stopped working after ~7000 frames with no
--- error, freezing the party mid-navigation. With emu.setInput(input, port)
--- inside an inputPolled event callback, held input reaches the ROM every
--- frame for the whole run. Boot into the mine and pace the party; random
--- encounters do fire, so clear them inline (the clearBattle idiom) and keep
--- going. Assert the party keeps accumulating tile transitions, including in
--- the run's second half, the window where the old hack stopped working.
+-- probe_input: verify the input layer stays alive over a long, realistic
+-- run.  With emu.setInput(input, port) inside an inputPolled event
+-- callback, held input reaches the ROM every frame for the whole run.
+-- Boot into the mine and pace the party; random encounters do fire, so
+-- clear them inline and keep going.  Assert the party keeps accumulating
+-- tile transitions, including in the run's second half.
 local H = dofile("tools/tests/lib/ot6.lua")
 local SRM = "build/states/playthrough_srm.mss.lua"
 

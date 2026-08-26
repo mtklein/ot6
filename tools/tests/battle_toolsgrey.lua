@@ -1,36 +1,15 @@
 -- @suite savestate=kolts_cave slow
--- battle_toolsgrey.lua -- v0.5 MP costs: the Tools window greys what Edgar
--- cannot afford, the counterpart to battle_blitzgrey on the real tools window.
---
--- Same mechanism as Blitz (see battle_blitzgrey's header): Ot6AbilityGrey
--- (ot6.asm) compares each row's MP cost to the active caster's current MP
--- ($3c08,slot*2) and returns magic's $04/$00, which Ot6ToolRowDecorate OR's into
--- the column's $21 font byte to give $25 grey.  The tools decorator also lays
--- each column out [font][cost][name] so the one font command colors the price
--- and the name together; the price display that landed just before had put the
--- cost tile ahead of the font, outside greying's reach.
---
--- Issue #75 conversion: the boundary is spent to rather than written.  This
--- file used to install an all-Edgar party into the magitek intro fight,
--- hand-write the tool records, and pin current MP to 8, which only showed the
--- grey follows a poked number.  It now boots kolts_cave (real TERRA, LOCKE and
--- EDGAR, real bag: AutoCrossbow 4, NoiseBlaster 6, Bio Blaster 8, with
--- Ot6AbilityCostTbl prices read from the ROM), fights real encounters, and
--- drives the pool to the affordability line using the tools themselves: Bio
--- Blaster casts while the pool is rich, one AutoCrossbow to finish, until
--- current MP lands in [4,7], where Bio Blaster (8) is unaffordable and
--- AutoCrossbow (4) is still affordable.
--- That is stronger than the pin: it shows the charge and the grey
--- agree, because the cell CalcAttackEffect debits is the cell the decorator
--- reads.  If a fight ends before the pool is down, the lane is paced to the
--- next natural encounter and the spend continues (MP writes back to the
--- field and loads again, battle_naturalmp's path).
---
+-- battle_toolsgrey.lua -- the Tools window greys what Edgar cannot afford.
+-- Ot6AbilityGrey compares each row's MP cost to the active caster's current
+-- MP ($3c08,slot*2) and returns magic's $04/$00, which Ot6ToolRowDecorate
+-- OR's into the column's $21 font byte to give $25 grey. The tools decorator
+-- lays each column out [font][cost][name] so the one font command colors
+-- the price and the name together.
+
 -- What is asserted (attribute = the odd byte of a name tile's tilemap word,
 -- $21 white / $25 grey):
 --   1. rich pool: every owned tool the pool can afford renders white at the
---      first open, and those are the same rows that later grey, so the grey
---      is affordability-driven rather than unconditional.
+--      first open, and those are the same rows that later grey.
 --   2. spent-to boundary: with MP spent into [4,7], Bio Blaster
 --      renders grey and AutoCrossbow white on one screen; NoiseBlaster
 --      follows its own line (white iff mp >= 6).
@@ -47,8 +26,6 @@ local WHITE, GREY = 0x21, 0x25
 local BIOBLASTER, NOISEBLASTER, AUTOCROSSBOW = 0xA4, 0xA3, 0xAA
 local TONIC, POTION = 0xE8, 0xE9
 
--- the medics' battle-bag scan and target steerer (battle_magicite's medic
--- line; see the bystander branch in pulse below)
 local function bagIdxOf(ids)
   for i = 0, 251 do
     local id = H.readByte(0x2686 + i * 5)
@@ -82,7 +59,7 @@ local function glyphs(s)
   return t
 end
 -- "Bio Blaster" spells its space as the narrow-space glyph $fe in item-name
--- records (battle_toolslist's finding); the other two are contiguous.
+-- records; the other two are contiguous.
 local function seqJoin(a, mid, b)
   local t = {}
   for _, v in ipairs(a) do t[#t + 1] = v end
@@ -117,8 +94,7 @@ end
 local function map() return H.mapId() & 0x1ff end
 
 local edgarSlot, edgarOfs = nil, nil
--- Edgar's live pool: the battle cell when a battle is up, else his field MP
--- (writeback keeps them one number; see battle_naturalmp phase 3).
+-- Edgar's live pool: the battle cell when a battle is up, else his field MP.
 local function pool()
   if H.battleLoadStarted() and edgarSlot then
     return H.readWord(0x3C08 + edgarSlot * 2)
@@ -158,10 +134,6 @@ local function pulse()
   end
   local edge = ph % 10 < 5              -- 5-on/5-off press edges
   if not H.battleLoadStarted() then
-    -- field: pace the lane for the next encounter; page victory/EXP dialogs
-    -- with A until control returns (the battle_walletmp run-4 hazard)
-    -- a map change off 96 is how the 2026-08-18 wipe surfaced (game over,
-    -- then the attract-mode intro maps); name it when it happens again
     if map() ~= lastMap then
       H.log(string.format("[mapchg f%d] map %d -> %d at (%d,%d) ctl=%s "
         .. "aligned=%s lane=%s", H.frame, lastMap or -1, map(),
@@ -184,28 +156,14 @@ local function pulse()
     H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
     return
   end
-  lane = nil          -- re-anchor at the next field return (the walletmp
-                      -- run-5 hazard, where a stale anchor walks off the map)
+  lane = nil          -- re-anchor at the next field return: a stale anchor
+                      -- can walk off the map
   if H.readByte(MENU) == 0 then
-    -- no menu up: page any battle dialog with A.  Measured on the first run
-    -- of this conversion, this is the battle_vargas hazard: a monster's dialog
-    -- blocked the whole queue for 20k+ frames of menu=00/mstate=00 with the
-    -- fight otherwise alive and this driver's hands off.
     H.setPad(ph % 8 < 4 and { a = true } or {})
     return
   end
   local a = H.readByte(ACTOR)
   if a ~= edgarSlot then
-    -- A bystander's window: heal a hurting party with real Item turns
-    -- first, then real Defend (right, then A), slow cadence.  The medic
-    -- half follows the re-made fixture (2026-08-18): kolts_cave now
-    -- arrives at 69/160, 130/194, 170/222 -- gen_kolts's #84 chest detours
-    -- walk more fights before the save -- and the defend-only version of
-    -- this branch was ground down mid-spend: the run ended in a game over
-    -- and the attract-mode intro march (the "paced off map 96 (now 19)"
-    -- red).  Heals keep the file's design intact: the driver's only attack
-    -- stays EDGAR's tools.  The plan is battle_magicite's medic line:
-    -- Potion for somebody badly hurt, Tonic for the rest, worst-HP target.
     local st = H.readByte(MSTATE)
     tc.observe()
     local worst, wpct = nil, 101
@@ -216,17 +174,6 @@ local function pulse()
         if pct < wpct then worst, wpct = s, pct end
       end
     end
-    -- ST_ITEM and ST_TGT are read from the real menu, not decided by us, so
-    -- once the game is actually sitting in one of them the medic finishes
-    -- the heal it already opened, regardless of what wpct reads THIS frame.
-    -- Measured 2026-08-19 (#122 fallout): re-gating every frame on a live
-    -- wpct<55 check let a heal in flight get abandoned the moment the
-    -- target's percentage ticked back above 55 mid-navigation (a real
-    -- possibility once damage-per-hit changed) -- the outer branch would
-    -- then fall to the plain Defend cadence while the actual screen was
-    -- still the item list, so "right"/"a" landed on item-grid navigation
-    -- instead of the command list, and the submenu never closed: the pool
-    -- spend then sat forever at menu=01 mstate=$0a with nothing driving it.
     if st == ST_ITEM then
       local slow = ph % 30 < 5
       local want = (wpct < 45) and bagIdxOf({ POTION }) or nil
@@ -320,15 +267,6 @@ local function liveBattle()
   return H.battleLoadStarted() and H.monstersPresent() > 0
 end
 
--- Pin the live pack tall ($3BFC is battle current-HP, dancemp's staging) so the
--- spend can actually reach the boundary.  #124's re-rolled RNG made EDGAR's
--- tool target die under him mid-spend: with no live target the cast cannot
--- confirm and the pool stalls in target-select (measured 2026-08-20: parked at
--- 27 MP in ST_TGT for the whole 150000-frame budget), and every kill that DOES
--- land levels EDGAR and refills his pool, undoing the walk down.  Keeping the
--- pack alive gives every cast a target and stops the refills, so the pool
--- drains straight into [4,7]; the bystander medic already in `pulse` keeps the
--- party standing through the extra rounds.
 local function pinPackTall()
   for s = 0, 5 do
     local hp = H.readWord(0x3BFC + s * 2)
@@ -408,33 +346,10 @@ H.run({ maxFrames = 300000 }, {
 
   -- 2. spend to the boundary with the tools themselves, and read the window
   --    WHILE the pool is still there ---------------------------------------
-  --
-  -- The spend and the read have to happen inside the same fight.  OT6 gives
-  -- back HP and MP in full on a level up (ot6_progression.asm:3-6, called
-  -- from battle_main.asm:16251), and a level up lands on the victory screen,
-  -- so a boundary reached on the last turn of a fight is gone before the
-  -- next window opens.  Measured 2026-08-13 on the failing run: the pool was
-  -- parked at 7, the fight ended, EDGAR levelled, and the window that the
-  -- assertion read was drawn on a refilled 68 -- correctly white, against an
-  -- assertion that had been told the pool was 7.  The old code asserted the
-  -- pool at one moment and read the window at another with a battle boundary
-  -- allowed in between.
-  --
-  -- There is no step that just waits for that fight to end, either.  This
-  -- driver's only attack is EDGAR's tools, and planCast stops casting once
-  -- the pool is parked, so with the boundary reached nobody left in the
-  -- party can kill anything: two versions that tried to "let the fight
-  -- finish" simply burned their budget with a submenu held open, which
-  -- freezes battle time on top of it.
-  --
-  -- So each attempt reads twice: once in the fight that reached the
-  -- boundary, and, if that fight has already ended (the cast that parks the
-  -- pool is often the one that kills the last monster), once at the start of
-  -- the next fight, where EDGAR has a full turn cycle and nothing has died.
-  -- MP persists across battles; the only thing that undoes the boundary is a
-  -- level up on the way out, and then the next attempt spends again.
-  --
-  -- Three attempts, the house limit.
+
+  -- each attempt reads twice: once in the fight that reached the boundary,
+  -- and, if that fight has already ended, once at the start of the next
+  -- fight. MP persists across battles.
   (function()
     local done = false
     local function inWindow() local m = pool() return m >= 4 and m <= 7 end
@@ -488,9 +403,7 @@ H.run({ maxFrames = 300000 }, {
     end
     local function attempt(n)
       return H.cond(function() return done end, {}, {
-        -- spend across as many fights as it takes: a cave fight is about one
-        -- EDGAR turn long and the pool starts at 51, so the walk down is not
-        -- something one fight can do.
+        -- spend across as many fights as it takes to reach the boundary
         H.call(function() mode = "spend" end),
         H.driveUntil(function() return pool() <= 7 end, 150000,
           { H.call(function() pinPackTall(); pulse() end), H.waitFrames(1) },

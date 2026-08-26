@@ -1,10 +1,5 @@
 -- probe_reveal_trace.lua -- live trace of what writes the revealed-weakness
--- bytes on the first battle, under Random RAM on HEAD, with a wiped codex.
--- Answers the coordinator's discriminator: whether a fresh Guard shows
--- revealed with no codex entry.  If it does, there is a garbage source to
--- trace to its writer.  If it shows '?', the reveal the user sees comes from
--- their populated codex, which is correct persistence, rather than from RAM.
---
+-- bytes on the first battle, under Random RAM, with a wiped codex.
 -- Boots from power-on (no state load, so Random RAM reaches battle
 -- init). Watches writes to the monster revealed-elems ($7E3E91-9B), revealed-
 -- classes ($7E3EA5-AF) and weak-elems ($7E3BE8-F2) ranges, logging each
@@ -53,9 +48,7 @@ end
 H.run({ maxFrames = 70000 }, {
   H.call(function()
     armSeedSnapshot()
-    -- Wipe the codex so no species has a learned weakness: the discriminator's
-    -- clean condition. Under power-on the seed re-checks the magic; a 0 magic
-    -- forces the wipe path (codex all 0), guaranteeing no merge source.
+    -- wipe the codex; under power-on a 0 magic forces the wipe path (codex all 0)
     emu.write(0x316000, 0, emu.memType.snesMemory)
     emu.write(0x316001, 0, emu.memType.snesMemory)
   end),

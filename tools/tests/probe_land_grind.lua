@@ -1,18 +1,14 @@
 -- probe_land_grind.lua -- fly the Blackjack to the Chimera grind pocket and
--- land there, closed-loop (#132).
+-- land there, closed-loop.
 --
--- probe_grind proved the technique (Y-strafe + B) with a blind snake search
--- that happened to set down on a location entrance (Sabin's house, map 93).
--- This probe replaces the search with a decoded destination: the WoB world
--- encounter data (world_battle_group.dat, sector col X96-127 / row Y0-31,
--- grass slot -> group 22) puts the Chimera+Cephaler pack (formation 190,
--- 1572 XP, ~62.5% of rolls; rest is 3x Cephaler; no pincer-capable
--- formation in the group) on the walkable-and-landable grass pocket at
--- world tiles X 113-119 / Y 25-26 (tile prop $0044: bit1 clear = airship
--- may land, bit4 clear = passable on foot, bit6 set = battles, high byte
--- 0 = grass bg).  Nearest location entrance is (114,17), eight tiles north
--- across mountains ($0053), so a landing here cannot repeat the map-93
--- surprise.
+-- The WoB world encounter data (world_battle_group.dat, sector col
+-- X96-127 / row Y0-31, grass slot -> group 22) puts the Chimera+Cephaler
+-- pack (formation 190, 1572 XP, ~62.5% of rolls; rest is 3x Cephaler; no
+-- pincer-capable formation in the group) on the walkable-and-landable
+-- grass pocket at world tiles X 113-119 / Y 25-26 (tile prop $0044: bit1
+-- clear = airship may land, bit4 clear = passable on foot, bit6 set =
+-- battles, high byte 0 = grass bg).  Nearest location entrance is
+-- (114,17), eight tiles north across mountains ($0053).
 --
 -- Flying is closed-loop on the airship position registers (X fine
 -- $33-$35, Y fine $37-$39, tile = fine>>12; LandAirship computes the
@@ -24,7 +20,7 @@
 -- post-liftoff heading is.
 --
 -- Phases:
---   A  board the deck, lift off, settle (probe_grind's proven opening);
+--   A  board the deck, lift off, settle;
 --   B  calibrate 4 strafe bursts, fly to tile (116,25), land with B
 --      (bounce -> sidestep to the next $0044 candidate and retry),
 --      save wob_grind.mss;
@@ -43,8 +39,8 @@ local function tileY() return (fineY() >> 12) & 0xFF end
 local CAND = { {116,25},{117,25},{115,25},{114,25},{118,25},{119,25},
                {116,26},{117,26},{115,26},{118,26},{113,25},{114,26} }
 
--- Execution truth for the dead-B mystery: count how often the input chain
--- actually runs.  Addresses are bank $EE (world program) label offsets:
+-- Execution truth: count how often the input chain actually runs.
+-- Addresses are bank $EE (world program) label offsets:
 -- MoveVehicle @1998, GetVehicleInput @6bec, the non-strafe B check @6d22,
 -- the common-tail B check @7045, LandAirship @936e.
 local hits = { mv = 0, gvi = 0, b1 = 0, b2 = 0, land = 0 }
@@ -121,11 +117,10 @@ local function flyFrame()
     H.setPad({ y = true, [d] = true })
     return
   end
-  -- probe_grind's proven land cadence, verbatim rhythm: a SHORT strafe burst,
-  -- release, then B.  A B pressed after a long continuous strafe hold is
-  -- ignored (measured: $19 stays 0, $c2 goes stale for ~200 frames -- the
-  -- input path is not polled), so the burst right before the press is part
-  -- of the technique, not decoration.
+  -- Land cadence: a SHORT strafe burst, release, then B.  A B pressed
+  -- after a long continuous strafe hold is ignored ($19 stays 0, $c2 goes
+  -- stale for ~200 frames -- the input path is not polled), so the burst
+  -- right before the press is part of the technique, not decoration.
   if mode == "rhythm" then
     rhyT = rhyT + 1
     if rhyT <= 10 then                  -- burst toward the candidate center
@@ -138,10 +133,8 @@ local function flyFrame()
     if rhyT <= 28 then H.setPad({ b = true }); return end
     H.setPad({})
     -- Landed = the world program is back with the party ON FOOT beside the
-    -- parked ship: vehicle type $20 leaves 1 (airship).  NOT $1f64 bit13 --
-    -- that bit stays set for a world-map landing ($1f64=2400, measured);
-    -- probe_grind's onFoot() only worked because its landing set down on a
-    -- location entrance, which loads a FIELD map and rewrites $1f64.
+    -- parked ship: vehicle type $20 leaves 1 (airship).  Not $1f64 bit13 --
+    -- that bit stays set for a world-map landing.
     if rd(0x20) ~= 1 and H.worldHasControl() then landed = true; return end
     local t = rhyT - 28
     if t % 60 == 0 and t <= 120 then
@@ -188,7 +181,7 @@ local function paceFrame()
 end
 
 local steps = {
-  -- Phase A: probe_grind's proven opening, verbatim
+  -- Phase A: board, lift off, settle
   H.loadState("build/states/iaf_deck.mss.lua"),
   H.waitFrames(4),
   H.navTo(15, 8, { maxFrames = 1500, arrive = function() return H.dialogWaiting() end }),
@@ -198,11 +191,10 @@ local steps = {
     H.log(string.format("airborne at tile (%d,%d), heading %d", tileX(), tileY(),
       H.readWord(0x73)))
   end),
-  -- Engage A-thrust once before any strafing: probe_grind's proven run always
-  -- flew under A power after liftoff and its B presses landed; without this
-  -- leg B never triggers LandAirship at all ($19 stays 0 through every try,
-  -- measured twice).  Heading is 0 post-liftoff, so a short thrust drifts
-  -- north a few tiles; the closed-loop travel corrects afterwards.
+  -- Engage A-thrust once before any strafing: without it, B never triggers
+  -- LandAirship at all ($19 stays 0 through every try).  Heading is 0
+  -- post-liftoff, so a short thrust drifts north a few tiles; the
+  -- closed-loop travel corrects afterwards.
   H.hold({ "a" }), H.waitFrames(120), H.release(), H.waitFrames(30),
   H.call(function()
     H.log(string.format("post-thrust at (%d,%d) spd=%04X", tileX(), tileY(),

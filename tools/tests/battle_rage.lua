@@ -1,83 +1,23 @@
 -- @suite
--- battle_rage.lua -- issue #40: Gau's 8-slot rage loadout, asserted at the one
--- choke point the design ruled on (docs/design/kit-gau.md §2.2, §8.3, §8.7).
---
--- The Ochette model keeps Veldt learning unlimited: LearnRage and the 32-byte
--- $1d2c-$1d4b bitfield are untouched, because the collection is the point of
--- Gau.  It narrows only the battle menu, to eight slots the player configures
--- in the field.  The narrowing happens in exactly one place: the flat list
--- InitSkills builds at $257e once per battle (battle_main.asm:14656+).
--- Everything downstream reads that list and narrows itself: the window draw
--- (DrawRageListText), the confirm (btlgfx_main.asm:20264-20266, which refuses
--- an $ff cell), the scroll cap, and RandRage's confused-rager pick
--- (battle_main.asm:987-999).  So this test asserts the list, byte for byte,
--- and nothing about window chrome: if the list is right the window cannot be
--- wrong.
---
--- Storage is eight bytes at $1e1f-$1e26, the next free space after the Bushido
--- loadout word inside the checksummed working-save block.  byte = rage id + 1;
--- $00 = unset; all eight zero = AUTO.  No persistent_layout bump: the sentinel
--- means every existing save and every tracked SRAM checkpoint (which hold
--- zeros there, measured) decodes as AUTO, the state they are genuinely in.
---
--- The AUTO ruling, 2026-07-28.  kit-gau.md contradicted itself: §2.2 defined
--- AUTO as "the first eight known rages in id order", §8.2 wrote "all-zero ->
--- return carry, use the vanilla walk", and the first build pass shipped §8.2.
--- That left the vanilla 200-entry wall reachable through inaction: a player who
--- never opens the configurator meets exactly the wall the owner asked to be
--- rid of.  The dispatcher reversed §8 onto §2.2: AUTO truncates to eight.
--- Arm 1 asserts the truncation.  Arm 1b is the separate, explicitly labelled
--- vanilla-walk equivalence measurement: with eight or fewer species learned
--- the AUTO list is still the vanilla walk byte for byte, which is the only
--- range over which "byte-for-byte vanilla under AUTO" survives the ruling.
--- It also measures what the underlying collection still contains ($1d2c
--- is read back and counted, so the arm shows the collection is untouched while
--- the battle menu is capped).
---
--- The $ff fill, verified (kit-gau.md flagged it unverified and asked for
--- one probe before the build relied on it).  InitSkills does not terminate the
--- rage region: unlike the dance list right above it, which explicitly writes
--- $ff for every unknown dance (battle_main.asm:14666-14671), the rage walk only
--- streams the ids it finds.  The terminator comes from InitBattle, whose
--- 16-bit double-store loop fills $2000-$341f with $ff (battle_main.asm:
--- 6096-6102) before it calls InitSkills (:6162), and InitSkills has exactly
--- that one caller.  Arm 1 measures it: past the last known rage the region is
--- $ff all the way to the dance list at $267e.
---
--- What is asserted:
---   1. AUTO truncation and the fill.  All eight bytes zero, eleven species
---      learned -> the first eight in id order and nothing else; and the region
---      past the count is $ff to $267d.
---   1b. Vanilla-walk equivalence (a measurement, not the ruling).  With six
---      species learned, inside the eight-wide window, the AUTO list is the
---      whole vanilla walk, byte for byte.  The collection behind it is counted
---      out of $1d2c in the same arm.
---   2. Manual.  Stored ids appear in slot order rather than id order, because
---      the player arranged them; the count is the number of filled slots, and
---      the cell after the last one is $ff.
---   3. Validation.  A stored id whose $1d2c bit is clear is dropped, not
---      offered: the list shrinks and the remaining slots keep their order.
---   4. Full eight.  All eight slots filled -> exactly eight ids then $ff,
---      the limit the owner asked for, measured.
---   5. The wall is unreachable.  With 40 species learned, AUTO shows the first
---      8 and a set loadout shows the player's 8.  The collection still holds 40,
---      counted from the bitfield in the same arm, so nothing was taken away
---      from the collection game; only the battle menu is capped.
---   6. The trance's price (the Dance model, #34's rule applied to the other
---      possess-verb).  Rage-start debits the flat 8; every possessed turn
---      after it debits 0; and a Gau who cannot pay the start does not get the
---      whole-battle state for free: the RAGE status never sets.
---   7. The tier latch.  The pending boost is copied into OT6_RAGETIER at
---      Cmd_10 and must outlive the action it was spent on: mid-trance turns
---      re-enter Cmd_10 with the pending byte already consumed, and a naive
---      re-latch would silently drop the whole possession to tier 0.
---
--- Gau is not recruitable at this fixture, so he is installed the way
--- battle_bushido installs Cyan: CHAR::GAU into $3ED8 and a Rage-only command
--- list at $202E.  The rage window is battle menu state $1e, and its cursor is
--- the same triple the tools window uses: scroll $892b,y / column $892f,y /
--- row $8933,y indexed by the actor slot, entry = (scroll + row) * 2 + column
--- (_c18438, btlgfx_main.asm:20096-20111).
+-- battle_rage.lua -- Gau's 8-slot rage loadout, asserted at the one choke point.
+
+-- Veldt learning is unlimited: LearnRage and the 32-byte $1d2c-$1d4b bitfield
+-- are untouched. Only the battle menu is narrowed, to eight slots the player
+-- configures in the field. The narrowing happens in one place: the flat list
+-- InitSkills builds at $257e once per battle. Everything downstream (window
+-- draw, confirm, scroll cap, RandRage's confused-rager pick) reads that list,
+-- so this test asserts the list, byte for byte.
+
+-- InitSkills does not terminate the rage region itself; the $ff fill comes
+-- from InitBattle, which fills $2000-$341f with $ff before calling
+-- InitSkills. Past the last known rage, the region is $ff all the way to the
+-- dance list at $267e.
+
+-- Gau is not recruitable at this fixture, so he is installed manually:
+-- CHAR::GAU into $3ED8 and a Rage-only command list at $202E. The rage
+-- window is battle menu state $1e; its cursor is scroll $892b,y / column
+-- $892f,y / row $8933,y indexed by the actor slot, entry = (scroll + row) * 2
+-- + column.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 
@@ -88,7 +28,7 @@ local LIST, COUNT = 0x257E, 0x3A9A   -- the flat battle list and its length
 local DANCELIST = 0x267E             -- the dance list starts here: our ceiling
 
 -- eleven species, ascending, spread over several bitfield bytes so the walk
--- has to cross byte boundaries the way a real Gau's does.
+-- crosses byte boundaries.
 local KNOWN = { 3, 7, 12, 20, 33, 41, 55, 68, 90, 111, 130 }
 
 local function teach(ids)
@@ -109,8 +49,7 @@ end
 
 local function cell(i) return H.readByte(LIST + i) end
 
--- what the collection still holds, read back out of the bitfield the battle
--- list no longer mirrors: the popcount of $1d2c-$1d4b, in id order.
+-- ids currently in the learned-rage bitfield, in id order.
 local function learnedIds()
   local ids = {}
   for id = 0, 254 do
@@ -140,9 +79,9 @@ local function assertList(want, tag)
 end
 
 -- One arm: reload the field fixture, install the save-side state, drop into a
--- battle, and read the list InitSkills just built.  A savestate reload per arm
--- is the only way to re-run InitSkills, because it runs exactly once, from
--- InitBattle.
+-- battle, and read the list InitSkills just built. InitSkills runs exactly
+-- once, from InitBattle, so a savestate reload per arm is the only way to
+-- re-run it.
 local function arm(tag, setup, check)
   return {
     H.loadState(STATE),
@@ -163,9 +102,6 @@ local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
 
 add({ H.waitFrames(20) })
 
--- 1. AUTO truncates to eight, and the $ff fill that terminates it -----------
--- The 2026-07-28 ruling: the wall must not be reachable through inaction.
--- Eleven species are learned; the battle menu offers the first eight.
 local AUTO8 = head(KNOWN, 8)
 add(arm("auto", function()
   teach(KNOWN)
@@ -175,10 +111,6 @@ end, function()
   H.assertEq(#learnedIds(), #KNOWN,
     "auto: and the COLLECTION is untouched -- $1d2c still holds all "
     .. #KNOWN .. " species")
-  -- the fill, measured: nothing between the terminator and the dance list is
-  -- anything but $ff.  This comes from InitBattle, not InitSkills; see the
-  -- header.  The whole range is swept rather than sampled, so one bad byte
-  -- anywhere still shows up.
   local bad = nil
   for i = #AUTO8, (DANCELIST - LIST) - 1 do
     if cell(i) ~= 0xFF then bad = i break end
@@ -190,12 +122,6 @@ end, function()
     .. "order; the region past them is $ff to $267d", #KNOWN, #AUTO8))
 end))
 
--- 1b. Vanilla-walk equivalence, the measurement the ruling did not delete ----
--- Inside the window (<= 8 learned) the AUTO list is still exactly what the
--- vanilla $1d2c walk would have written.  This arm is labelled a measurement
--- on purpose: it is not the ruling, it is the range over which kit-gau.md's
--- "a fresh Gau with <= 8 rages is byte-for-byte vanilla under AUTO" (§2.2)
--- still holds after the truncation.
 local SIX = { 3, 7, 12, 20, 33, 41 }
 add(arm("auto-vanilla-equiv", function()
   teach(SIX)
@@ -229,7 +155,6 @@ end, function()
     .. "surviving slots keep their order")
 end))
 
--- 4. Full eight: the owner's "choose from 8", measured ----------------------
 add(arm("eight", function()
   teach(KNOWN)
   loadout({ 130, 111, 90, 68, 55, 41, 33, 20 })
@@ -247,8 +172,6 @@ add(arm("wall", function()
   teach(many)
   loadout(nil)                                         -- AUTO: never configured
 end, function()
-  -- the ruling, at the size that motivated it: a player who never opened the
-  -- configurator gets eight, not forty.
   assertList(head(_G.__many, 8), "wall")
   H.assertEq(#learnedIds(), #_G.__many,
     "wall: and the album still holds all " .. #_G.__many .. " species")
@@ -289,16 +212,10 @@ local function mp(s)    return H.readWord(CURMP(s)) end
 local actor
 local startMp = 50
 local pinMp, pinPend = true, 0
--- forward declaration: trance() arms the tier/coin instrument for every arm,
--- so even the arms that only care about MP can assert how many possessed
--- turns actually happened (see the vacuous-claim note in kit-gau.md §9).
 local instrument, cmd10HitsReset
-local cmd10Hits = 0     -- Cmd_10 entries: declared HERE, above every closure
-                        --   that reads it (a later `local` would leave those
-                        --   closures reading a nil global instead; measured:
-                        --   "attempt to compare number with nil")
-local coinSummary       -- forward: the tier3 arm sits above its definition
-local coins = {}        -- one entry per possessed turn (see the tier section)
+local cmd10Hits = 0     -- Cmd_10 entries
+local coinSummary
+local coins = {}        -- one entry per possessed turn
 local pinBe = nil       -- the $be seed to force at each Ot6RageCoin entry
 local cmd0 = CMD_RAGE                -- the one command Gau is installed with
 
@@ -315,19 +232,10 @@ local function pinGau()
     H.writeWord(MAXMP(s), 99)
   end
   if actor then
-    -- pinPend is nil once the rage has been confirmed: Cmd_10 has not run yet
-    -- at that point, and re-pinning would overwrite the pending byte the
-    -- latch is about to read.
+    -- pinPend is nil once the rage has been confirmed, so re-pinning does not
+    -- overwrite the pending byte the latch is about to read.
     if pinPend then H.writeByte(0x3E9D + actor * 2, pinPend) end
     if pinMp then H.writeWord(CURMP(actor), startMp) end
-    -- Park the bench by wounding it rather than by stopping it; see
-    -- battle_slots.lua:114-118, where a stopped character's pending menu stays
-    -- open forever and starves the actor's next turn.  This fixture used the
-    -- stopped form and hit that: a battle with a list open is paused, so after
-    -- the rage-start action Cmd_10 re-entered zero more times (measured:
-    -- cmd10=1, menu=$01, mstate=$1e over 2700 frames).  Every "several
-    -- possessed turns" claim in the arms below was therefore vacuous until this
-    -- line changed.  A dead row raises no menu at all.
     for _, s in ipairs(PARTY) do
       if s ~= actor then
         H.writeByte(0x3EE4 + s * 2, H.readByte(0x3EE4 + s * 2) | 0x80)  -- wound
@@ -347,8 +255,8 @@ end
 local function pinAll() pinGau(); pinGuards() end
 
 -- One driving tick: re-pin the fixture and clear any other character's open
--- menu, because a battle with a list open is paused and these arms need the
--- ATB to keep running.  It never presses into the rage window itself.
+-- menu, since an open menu pauses the battle and these arms need the ATB to
+-- keep running. It never presses into the rage window itself.
 local function tick()
   pinAll()
   if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) ~= ST_RAGE then
@@ -429,9 +337,6 @@ add({
     _G.__tier0 = H.readByte(RAGETIER)
     H.assertEq(_G.__tier0, 0, "unboosted start latched tier 0")
   end),
-  -- ride the possession: several more possessed turns must cost nothing, and
-  -- the latch must not move.  300 ticks rather than 90: the turn count is
-  -- asserted below, and 90 was not enough for "several" to be true.
   ride(300),
   H.call(function()
     H.assertEq(raging(actor), true, "still possessed after riding the trance")
@@ -486,9 +391,8 @@ add({
       .. "Cmd_10 re-entries did not re-latch the consumed pending byte")
     H.assertEq(H.readByte(0x3E9D + actor * 2), 0,
       "the pending boost itself was consumed by the start action")
-    -- and the top of the ladder, on the same instrument the tier-1 and tier-2
-    -- arms use: tier 3 takes no roll at all (no `inc $be`) and forces entry 1
-    -- on every possessed turn, start turn included.
+    -- tier 3 takes no roll at all (no `inc $be`) and forces entry 1 on every
+    -- possessed turn, including the start turn.
     local c0, c1, draws = coinSummary()
     H.log(string.format("tier3: %d Fight / %d special over %d possessed turns "
       .. "[%s]", c0, c1, #coins, draws))
@@ -505,34 +409,16 @@ add({
 })
 
 -- ====================== 8. The tier ladder's odds ===========================
--- Ot6RageCoin's tier-1 and tier-2 arms had never executed: the latch was
--- asserted, the coin was not.  Both are one threshold compare against one
--- fresh RNG draw, so battle_slots.lua's approach applies directly: pin the
--- draw at the threshold from both sides and demand the opposite outcome:
---
 --   tier 1   the special unless draw < $40   -> $3f = Fight, $40 = special
 --   tier 2   the special unless draw < $10   -> $0f = Fight, $10 = special
---
--- The observable is the coin itself, not a proxy.  RandRage's tail is
--- `rol / tax / lda f:MonsterRage,x` (battle_main.asm:1008-1012), and X is
--- monsterId*2 + coin, so a read callback over the MonsterRage table reports
--- the coin exactly, per possessed turn, with no inference: entry 0 is always
--- plain Fight, entry 1 the monster's special (monster_rage.asm:3-5).
---
--- The draw is pinned the battle_steal way: an exec callback on Ot6RageCoin's
--- own entry writes $be, and the macro's `inc $be; ldx $be; lda f:RNGTbl,x`
--- then reads RNGTbl[$be+1].  RNGTbl is a permutation of 0..255 (asserted
--- below), so every boundary value is reachable exactly, with no need to settle
--- for a nearest available value.  The same callback pair also counts the draws
--- the proc takes ($be delta across it), which is how tier 0's claim to be
--- byte-vanilla and to draw nothing extra is measured rather than assumed.
---
--- The width contract.  Ot6RageCoin is entered from a site whose index width
--- is unknown, does `rep #$10` to park Y, and must hand the caller's width
--- back by hand (`plp` would also restore the stale carry it exists to
--- replace).  The call site is located by scanning RandRage for the `jsl`
--- to Ot6RageCoin, so the address is derived rather than hardcoded, and the
--- CPU state is compared either side of it.
+
+-- The coin is read straight off the MonsterRage table: X is monsterId*2 +
+-- coin, entry 0 is always plain Fight, entry 1 the monster's special.
+
+-- Ot6RageCoin is entered from a site whose index width is unknown, does
+-- `rep #$10` to park Y, and must hand the caller's width back by hand
+-- (`plp` would also restore the stale carry it exists to replace). The call
+-- site is located by scanning RandRage for the `jsl` to Ot6RageCoin.
 local RNGTBL   = H.sym("RNGTbl") & 0x3FFFFF
 local MONRAGE  = H.sym("MonsterRage")
 local COINPROC = H.sym("Ot6RageCoin")
@@ -544,8 +430,7 @@ local widthChecks = {}
 local instrumented = false
 
 -- Mesen exposes the CPU registers as flat "cpu.<field>" keys; the flag byte's
--- name is resolved once (and logged) rather than guessed, so a Mesen upgrade
--- that renames it fails loudly here instead of silently skipping the check.
+-- key name is resolved once (and logged) rather than hardcoded.
 local PS_KEY, Y_KEY
 local function resolveCpuKeys()
   local s = emu.getState()
@@ -607,10 +492,9 @@ instrument = function()
   H.log(string.format("RandRage=%06x  jsl site=%06x  Ot6RageCoin=%06x",
     RANDRAGE, site, COINPROC))
 
-  -- locate the proc's single `inc $be`, ot6_rand's rolling index bump.  An exec
-  -- callback there counts the draws the proc actually takes (tier 0 must take
-  -- none) and records the index the draw is about to read, which is how the
-  -- boundary pin is shown to have landed rather than assumed.
+  -- the proc's single `inc $be` is ot6_rand's rolling index bump; an exec
+  -- callback there counts draws taken (tier 0 takes none) and records the
+  -- index about to be read.
   local randSite = nil
   for i = 0, 160 do
     local a = (COINPROC & 0x3FFFFF) + i
@@ -637,8 +521,7 @@ instrument = function()
     beAtRand = H.readByte(0xBE)         -- pre-increment: the seed we pinned
   end, emu.callbackType.exec, randSite, randSite)
 
-  -- how many times the possessed turn re-enters Cmd_10 at all: the denominator
-  -- for "every roll", and what makes a multi-turn claim non-vacuous
+  -- counts Cmd_10 re-entries per possessed turn
   emu.addMemoryCallback(function() cmd10Hits = cmd10Hits + 1 end,
     emu.callbackType.exec, H.sym("Cmd_10"), H.sym("Cmd_10"))
 
@@ -677,8 +560,7 @@ coinSummary = function()
 end
 
 -- One tier arm: pin the pending BP and the draw, ride the trance, and demand
--- every possessed turn come up the same way.  Same drive, one pending byte and
--- one RNG byte different: the tier and the draw are the only variables.
+-- every possessed turn come up the same way.
 local function tierArm(tag, pend, draw, wantCoin, why)
   local seed = nil
   add(trance(tag, function()
@@ -727,16 +609,9 @@ local function tierArm(tag, pend, draw, wantCoin, why)
         "%s: every one of the %d rolls picked entry %d (%s)",
         tag, #coins, wantCoin, why))
       for _, e in ipairs(coins) do
-        -- including roll 1.  Vanilla rolls the start turn's attack at action
-        -- load (FixPlayerAttack's cmd-$10 arm), before Cmd_10 runs, so the
-        -- original single latch in Cmd_10 left exactly one turn untiered:
-        -- the turn the BP was spent on.  Measured before the fix:
-        -- roll 1 tier=0 draws=0, rolls 2..5 tier=1 draws=1.
         H.assertEq(e.tier, pend, tag .. ": every roll saw the latched tier "
           .. "-- the START turn included (it is rolled at action load)")
-        -- tiers 1 and 2 spend exactly one extra draw per turn, and it is the
-        -- draw pinned here: the index the roll read is the seed written above,
-        -- so the value compared against the threshold was $%02x.
+        -- tiers 1 and 2 spend exactly one extra draw per turn: the one pinned here
         H.assertEq(e.draws, 1, string.format(
           "%s: the tilted coin took exactly one extra RNG draw", tag))
         H.assertEq(e.seed, seed, string.format(
@@ -747,11 +622,6 @@ local function tierArm(tag, pend, draw, wantCoin, why)
   })
 end
 
--- Tier 0 is byte-vanilla, measured on the same instrument: the proc hands the
--- caller's own carry straight back and executes ot6_rand's `inc $be` zero
--- times, so an unboosted trance walks exactly the RNGTbl indices vanilla
--- walks.  That is the property the whole same-drive A/B rests on, and it is
--- the one arm that must not be pinned, because pinning would hide it.
 add(trance("t0-vanilla", function() startMp = 50; pinPend = 0 end, function()
   instrument()
   coins = {}
@@ -796,9 +666,9 @@ tierArm("t2-over",  2, 0x10, 1, "draw $10 >= $10, so the special wins")
 tierArm("t2-at-t1-boundary", 2, 0x3F, 1,
   "the very draw that MISSED at tier 1 now hits -- 3/4 -> 15/16")
 
--- The width restore, on a tier-1 trance (the arm that actually takes the
--- rep/sep path).  The caller's index-width bit and Y must come back unchanged
--- across the jsl; the carry is the one thing the proc is allowed to replace.
+-- The width restore, on a tier-1 trance. The caller's index-width bit and Y
+-- must come back unchanged across the jsl; the carry is the one thing the
+-- proc is allowed to replace.
 add({
   H.call(function()
     H.assertEq(#widthChecks > 0, true,
@@ -818,35 +688,6 @@ add({
   end),
 })
 
--- ========================= 9. Leap is free ==================================
--- Reversed 2026-07-29 (owner): "I don't recall showing a cost for Leap.  If
--- it's 2 MP, let's just make it free."  #40 had priced it at a flat 2 from
--- "only the basic Fight command is free" (mp-economy.md, as it then read)
--- plus that doc's probe-collect tier.  Two things retired that:
---
---   * The price was never displayed.  Leap is a top-level command row, not a
---     list entry, and the four-row battle command window draws names only.
---     command_window_data_set (btlgfx_main.asm:10099-10125) stores exactly
---     two things per row, the command byte and a GetTextColor colour, and
---     its template MenuText::_4 (:45137) is four fixed 8-byte records with no
---     numeric field.  GetTextColor (:10704-10707) is `and #$80` on the
---     DISABLED flag, so that window's only grey means "unavailable", not
---     "unaffordable".  Compare Ot6BlitzRowDecorate (ot6_kits.asm:563-585),
---     where a list row explicitly stamps a two-digit cost and greys through
---     Ot6AbilityGrey.  So the only way to meet Leap's 2 MP was a refusal
---     after the turn was spent, and that path (battle_main.asm:8354-8371 ->
---     _setattackmes, :8720) composes no number either.  A price the player
---     cannot see until it refuses is not a usable surface.
---   * Leap is now the Fight row on the Veldt (Ot6VeldtRow, battle_main.asm;
---     battle_gaufight.lua).  #47 exists to guarantee Gau a free action; a
---     priced Leap in the Fight row would have reopened that hole in the one
---     territory Gau lives in.
---
--- So Ot6AbilityCost has no cmd-$11 arm any more and Leap falls out of the
--- chain with vanilla's own cost, which is 0.  Steal keeps its flat 2: it is
--- a verb beside Fight, not the Fight row, and issue #52 owns its repricing.
--- Gau is installed with Leap alone so the battle menu's first row is the verb
--- under test.
 local COSTQ = 0x3620                 -- the queued-cost cell CreateAction writes
 local CMD_LEAP = 0x11
 local LEAP_COST = 0
@@ -862,30 +703,14 @@ add({
         leapCosts[#leapCosts + 1] = v
       end
     end, emu.callbackType.write, 0x7E0000 + COSTQ, 0x7E0000 + COSTQ + 0xFE)
-    -- the positive control for both arms below.  "the pool did not move" is
-    -- vacuous unless the charge site actually ran, and the charge site is
-    -- CalcAttackEffect: it is the one that reads the staged cost $3a4c,
-    -- subtracts it from $3c08,x and refuses when short (battle_main.asm:
-    -- 8354-8371).  Counting its entries is what makes the no-debit assertion
-    -- mean "it ran and took nothing" rather than "nothing happened".
+    -- positive control: CalcAttackEffect reads the staged cost and debits
+    -- the pool, refusing when short; counting its entries confirms it ran.
     emu.addMemoryCallback(function() caeHits = caeHits + 1 end,
       emu.callbackType.exec, H.sym("CalcAttackEffect"), H.sym("CalcAttackEffect"))
   end),
 })
 
 -- Sample the pool while the battle is alive, and stop when it is not.
---
--- This replaces a single read taken after the window, which is what the first
--- draft of these arms did, and it read $FFFF (measured).  $FFFF is not a
--- charge: the cost queue was measured at 0 in the same run, and with a 0 cost
--- CalcAttackEffect never reaches the subtract at all (`lda $3a4c / beq @32ec`,
--- battle_main.asm:8354-8355), so no debit of any size is arithmetically
--- possible.  It is post-battle state: the leap is refused here anyway
--- ($3a76 is "number of characters alive", battle_main.asm:4907, and
--- TargetEffect_54 needs >= 2 while this harness wounds the bench), and reading
--- battle RAM after the battle stops being active reads nothing meaningful.
--- So the measurement has to be taken inside the live window, and the minimum
--- over that window is the correct form of "the pool never moved".
 local function sampleWhileLive(n)
   return H.repeatN(n, {
     H.call(function()
@@ -904,9 +729,7 @@ local function poolFloor()
   return lo
 end
 
--- 9a. The price, at a full pool, so affordability is not in play.  Two
--- measurements: what CreateAction stages for command $11, and what the pool
--- does across the whole live window afterwards.
+-- 9a. The price, at a full pool, so affordability is not in play.
 add(trance("leap", function()
   startMp = 20
   cmd0 = CMD_LEAP
@@ -946,13 +769,6 @@ add({
   end),
 })
 
--- 9b. The free floor, at zero.  The arm this replaces asserted the opposite:
--- that a Gau under 2 MP was refused.  That refusal is what the owner retired,
--- and it is the point of the reversal: with Leap sharing the Fight row on the
--- Veldt (battle_gaufight.lua), a Gau at 0 MP standing on the Veldt would
--- otherwise have had Leap (2), Rage (8), Magic and Item and no free action at
--- all, in his own territory.  Zero rather than one: 0 MP is the state the hole
--- was about, and it is the strictly harder case.
 add(trance("leap-zero", function()
   startMp = 0
   cmd0 = CMD_LEAP

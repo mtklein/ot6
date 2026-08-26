@@ -1,12 +1,8 @@
--- gen_vargas.lua -- from vargas_entry.mss: fight Vargas with real input, ride
--- the reunion, and generate vargas_won.mss on the first controllable frame
--- after it.  This is the last tier-2 link in the generated chain, and the
--- first boss in the chain of generated savestates won by a played strategy
--- under issue #75's rule: inputs in, observations out, no writes to emulated
--- game state.  The old generator pinned party HP/MP every frame, clamped
--- Vargas to 10300 to force his phase-2 event, and poked the Blitz cursor
--- cells; all of that is gone.
---
+-- gen_vargas.lua -- from vargas_entry.mss: fight Vargas with real input,
+-- ride the reunion, and generate vargas_won.mss on the first controllable
+-- frame after it. Inputs in, observations out: no writes to emulated game
+-- state.
+
 -- The fight (bosses-wob.md section 3, which both human playtests rated well):
 -- Vargas (11600 hp, 5 shields, weak poison|holy + bludgeoning) plus two
 -- Ipoohs (360 hp, 2 shields, slash-weak).  Two phases; only the second
@@ -17,42 +13,7 @@
 -- `battle_event $09 / kill_monsters ALL` (:4385-4388), so he dies to the
 -- script rather than to hp, which is the intended design ("Jank: the Blitz
 -- gate stays").
---
--- The strategy, all closed-loop on readable menu state (every cell below
--- was located in btlgfx_main.asm and verified live by probe runs):
---   * the trio spends Boost Points on Fights: R presses raise pending
---     ($3E9D+slot, bank $3E9C+slot, cap 3) and a boosted Fight is what
---     killed both Ipoohs in about a round each, measured;
---   * Potions (bag carries 3; battle inventory $2686, 5 bytes/entry, qty
---     at +3) go to whoever is under 30% -- selected in the item window
---     (mstate $0A, row cursor $894F), aimed through the real target
---     cursor ($38: char mask $7B7D / monster mask $7B7E, walked with the
---     pad until the mask is the wanted ally);
---   * TERRA plays medic once the potions thin out: Magic (her cmd cell,
---     found in $202E and reached by the command cursor $890F+slot) ->
---     Cure.  Her battle spell list is packed at $2092+$0278 (4
---     bytes/entry: id, flags bit7=disabled, targeting, cost), Cure ($2D)
---     is entry 0, grid cell (idx//2, idx%2) via the magic cursor triple
---     $8913/$8917/$891B+slot -- aimed at the weakest hurt ally;
---   * SABIN, phase 2: Blitz (cmd $0A) opens the v0.3 tools-shell menu
---     (mstate $30), PUMMEL ($5D) is found by scanning wItemList ($4005)
---     and reached by walking the real cursor triple $895F/$8963/$8967 --
---     pad edges only, then A, then A on the target.  No cell is ever
---     written; every press is verified by re-reading the cursor.
--- Timing note the whole machine depends on: submenus (item/magic/tools/
--- target) freeze battle time (wait-mode) and the command list does not,
--- so menu navigation is safe however long it takes, and the fight's
--- risk is confined to the open field between menus.
---
--- Measured (probe_vargas_win2/win5 off the tier-2 fixture): the policy
--- wins in ~13000 battle frames.  Both Ipoohs die to boosted Fights by
--- ~f3300; three potions and two Cures carry the trio through Gale Cut;
--- Vargas crosses his own script's gates at real hp (11600 -> 10304); the
--- trio is blown offstage; Sabin's first menu picks Pummel from the real
--- blitz list and the script ends the fight.  Terra fell to a Gale Cut
--- burst in both winning runs; the fixture keeps that outcome if it happens,
--- and the roster dump below records what the party looked like.
---
+
 -- The retry ladder is the game's own defeat flow made explicit: the
 -- entry point is captured once at boot (a savestate blob in memory, with no
 -- writes); a party wipe tears the battle down into Game Over instead of
@@ -62,17 +23,11 @@
 -- A-press, shifting every RNG draw downstream.  Three attempts, then fail.
 -- The ride is passed wipeEndsRide because the shared wipe canary otherwise
 -- raises on the first loss and no ladder here ever reaches rung two.
---
+
 -- The generate is verified by reload (gen_sabin_gau's discipline): capture,
 -- reload the capture as the consumer timeline, give it 300 frames, and
 -- require the same calm map-98 field before accepting the blob.
 local H = dofile("tools/tests/lib/ot6.lua")
--- The VARGAS ladder's spread and its collision check (issue #83): each
--- attempt is held until the game-time frame counter the battle seed is
--- made of reaches its own phase, and L.report() fails if two attempts drew
--- one seed, which would make this ladder one fight replayed.  Three
--- attempts, 20 phases apart, which is the widest even spacing the 60-phase
--- cycle allows and the doctrine's count (#74).
 local L = H.newSeedLadder("battle 66")
 local DOOR = "build/states/vargas_entry.mss.lua"
 
@@ -208,9 +163,6 @@ local function pulse()
       end
       return (ph < 5) and { "a" } or {}
     end
-    -- move the command cursor; a direction that is measured not to move
-    -- rotates to the next, so the window's d-pad semantics are not
-    -- assumed
     local DIRS = { "down", "up", "left", "right" }
     if ph == 0 then
       if M.lastCur == cur then M.dirI = ((M.dirI or 0) % 4) + 1
@@ -261,16 +213,6 @@ local function pulse()
     local cr, cc = H.readByte(0x8967 + a), H.readByte(0x8963 + a)
     if cr ~= row then return (ph < 5) and { (cr < row) and "down" or "up" } or {} end
     if cc ~= col then return (ph < 5) and { (cc < col) and "right" or "left" } or {} end
-    -- The confirm on the PUMMEL row itself is where the choice is made, and
-    -- it is the only place that is true on every path.  Pummel does not
-    -- always route through the target window -- measured 2026-08-11, a
-    -- winning run where SABIN's turn at f26022 planned pummel, spent 4 MP
-    -- and took VARGAS from 10863 to 10743 with the script then ending the
-    -- fight, while ST_TGT was never entered -- so a flag set only there
-    -- reported pummeled=false on a fight the Pummel had just won.  That
-    -- reads as "the drive never reached the ability", which is the exact
-    -- wrong conclusion, and it was in the log of the failing run this
-    -- branch was sent to diagnose.
     if not sabinPummeled then
       sabinPummeled = true
       H.log(string.format("[vargas] PUMMEL chosen at f%d, V=%d", H.frame, vHp()))
@@ -336,9 +278,6 @@ local function fightAttempt(n)
       -- frames.  90 is the settle every other reload in the tree uses.
       H.waitFrames(90),
     }, {}),
-    -- Outside the n > 1 branch, unlike the wait it replaces: attempt 1 needs
-    -- a phase of its own too, or it sits wherever the route left it and can
-    -- land on another attempt's seed (#83).
     L.spread(n),                        -- spread the battle RNG phase (#83)
     H.call(function()
       resetM()
@@ -387,17 +326,6 @@ local function fightAttempt(n)
       H.log(string.format("[vargas] teardown at f%d (pummeled=%s)",
         H.frame, tostring(sabinPummeled)))
     end),
-    -- the verdict: a win rides _ca828f's tail to a settled map-98 field with
-    -- SABIN in the party; a wipe rides the defeat flow to Game Over, and
-    -- wipeEndsRide is what lets this attempt end there and the next one
-    -- start.  Without it the shared wipe canary raises on the first lost
-    -- attempt and the ladder never reaches its second rung: measured
-    -- 2026-08-11 on the v0.10 tip, attempt 1 wiped with VARGAS at 11065 of
-    -- 11600 and the run ended with no "attempt 2 begins" line in the log, so
-    -- this generator had a four-rung ladder that could only ever run one.
-    -- The soft giveUp bound below stays as the backstop for a lost attempt
-    -- that does not wipe (a stalled reunion, say); the wipe path just no
-    -- longer costs 28000 frames to notice.
     (function()
       local calmN, giveUp = 0, 0
       return H.advanceStory(function()
@@ -493,9 +421,6 @@ H.run({ maxFrames = 700000 }, {
   fightAttempt(1),
   fightAttempt(2),
   fightAttempt(3),
-  -- Before the verdict, not after: the attempts are evidence only if they
-  -- were DIFFERENT fights, and if they were not, that is what this run should
-  -- report rather than "lost all three" (#83).
   L.report(),
   H.call(function()
     H.assertEq(fightWon, true,

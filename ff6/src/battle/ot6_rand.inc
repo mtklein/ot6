@@ -1,10 +1,8 @@
 ; ------------------------------------------------------------------------------
 ; OT6 shared leaf: the battle RNG, inlined.
 ;
-; Lived in ot6_kits.asm until the kits split; moved here because it is used
-; from two different kits (Ot6StealSlot in ot6_steal.asm, Ot6RageCoin in
-; ot6_rage.asm) and a macro definition emits nothing, so the move changes no
-; address. ROM CRC32 was unchanged at 0x2E9B5A7F.
+; Used from two kits (Ot6StealSlot in ot6_steal.asm, Ot6RageCoin in
+; ot6_rage.asm).
 ; ------------------------------------------------------------------------------
 
 ; battle Rand, inlined: this bank ($f0) can't `jsr Rand` (that routine lives in

@@ -1,18 +1,15 @@
 -- probe_jidoor.lua -- fly the leveled party to JIDOOR, buy the caster
--- relics, and scout the Auction House (#133 items 2 and 5).
+-- relics, and scout the Auction House.
 --
--- Jidoor = map 198, world door (27,130) (gen_opera1_entry's measured
--- route; the first version of this probe flew to (120,187), which the
--- SHOW_TITLE banner revealed to be burned VECTOR -- its Gold-tier shops
--- are gone with the story).  The doorstep plain (24,129)-ish is landable
--- ($0044).  Inside: door (5,25) -> room 202, relic shop 23's keeper at
--- (54,16); door (26,27) -> room 200, the Auction House (auctioneer
--- _cb4e47 at (19,24), running when $006B=1 -- set on Setzer's join --
--- and $01F0=0).  Exit doors: 202 (54,23) -> 198 (5,27); 200 (18,26).
+-- Jidoor = map 198, world door (27,130).  The doorstep plain (24,129)-ish
+-- is landable ($0044).  Inside: door (5,25) -> room 202, relic shop 23's
+-- keeper at (54,16); door (26,27) -> room 200, the Auction House
+-- (auctioneer _cb4e47 at (19,24), running when $006B=1 -- set on Setzer's
+-- join -- and $01F0=0).  Exit doors: 202 (54,23) -> 198 (5,27); 200
+-- (18,26).
 --
 -- Buys (shop 23 rows): Earrings $c3 row 3 x2 (10000) for the bolt
--- casters, Sniper Sight $e3 row 5 x1 (3000).  Gil at boot 125,737; the
--- auction reserve stays fat because Golem+Zoneseek bidding is next.
+-- casters, Sniper Sight $e3 row 5 x1 (3000).
 local H = dofile("tools/tests/lib/ot6.lua")
 local function rd(a) return emu.read(a, emu.memType.snesMemory) end
 local function fineX() return ((rd(0x35) << 16) | H.readWord(0x33)) end

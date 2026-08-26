@@ -1,19 +1,16 @@
--- probe_gaufeed.lua -- measurement instrument for #75's input-driven Gau
--- feed.  It routes falls_done -> Mobliz -> Veldt through controller input,
--- switches Battle Mode to Active through Config, and wins the final monster
--- with Cyan's delayed Retort while a party member is parked in Item
--- targeting.
+-- probe_gaufeed.lua -- input-driven Gau feed.  It routes falls_done ->
+-- Mobliz -> Veldt through controller input, switches Battle Mode to Active
+-- through Config, and wins the final monster with Cyan's delayed Retort
+-- while a party member is parked in Item targeting.
 --
--- The measured engine wrinkle is two-stage targeting.  GauAppears first makes
--- Gau a one-shot $2f4e target, before UpdateDead has placed him in $3a42.  An
--- item submitted in that state has no valid target, but its completed action
+-- The engine wrinkle is two-stage targeting.  GauAppears first makes Gau a
+-- one-shot $2f4e target, before UpdateDead has placed him in $3a42.  An item
+-- submitted in that state has no valid target, but its completed action
 -- normalizes Gau into an ordinary present enemy-character and opens a fresh
 -- party menu.  The probe therefore parks a Tonic for the normalizing action,
 -- preserves Dried Meat, then selects and submits Dried Meat from the fresh
 -- menu.  AIScript::_370 consumes it, sets battle switch 13, and recruits Gau
--- in the same encounter.  All gameplay changes are controller input and RAM
--- is only read; the only state operations are savestate capture and reload,
--- the same accelerator every gen uses.
+-- in the same encounter.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/falls_done.mss.lua"
 local FAST_STAGE = false
@@ -53,7 +50,7 @@ local function gil()
        + (H.readByte(0x1862) << 16)
 end
 
--- battle-menu model (battle_vargas / gen_sabin_train's map; all reads)
+-- battle-menu model (all reads)
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM, CMD_SWDTECH, CMD_BLITZ = 0x01, 0x07, 0x0A
@@ -233,7 +230,7 @@ local function moveMeatToFront()
   }, {})
 end
 
--- closed-loop shop buy (verbatim from gen_sabin_gau, measured there)
+-- closed-loop shop buy
 local function buyItem(id, row, qtyFn, name)
   local phase = 0
   local seen27, bought = false, false
@@ -275,7 +272,7 @@ local function buyItem(id, row, qtyFn, name)
   }, "buy " .. name)
 end
 
--- world walk that fights its randoms (verbatim machinery from gen_sabin_gau)
+-- world walk that fights its randoms
 local lost = nil
 local function worldWalkFight(tx, ty, budget, what)
   local tick, dirFlip, hb = 0, false, -1800
@@ -597,9 +594,8 @@ local function grindToAppearance()
           return                              -- pred fires next check
         end
         if bankedActor ~= nil and H.readByte(MENU) ~= 0 then
-          -- The finishing action may land while a window transition is still
-          -- underway.  Gau is already targetable, but the live Item menu is
-          -- still ours to drive until battle event $1b closes it.
+          -- Gau is already targetable, but the live Item menu is still ours
+          -- to drive until battle event $1b closes it.
           local st = H.readByte(MSTATE)
           local pulse = tick % 8 < 2
           if st == ST_CMD then
@@ -678,13 +674,11 @@ local function grindToAppearance()
         local ph = tick % 30
         local nmon, mhp = liveMonsters()
         -- Gau's arrival runs ResetForVeldtGau, which removes every queued
-        -- party action.  It cannot create a new menu afterward because the
-        -- battle-end path has already frozen normal ATB processing.  Vanilla
-        -- therefore expects the player to have one command menu open while a
-        -- previously queued action lands the final blow.  Bank that state:
-        -- one live monster, this actor has a command menu, and another
-        -- living actor already has an action pending.  If the pending action
-        -- does not kill, release the bank and continue fighting.
+        -- party action and cannot create a new menu afterward, since ATB
+        -- processing is already frozen.  Bank one live monster, an actor
+        -- with an open command menu, and another actor's pending action;
+        -- release the bank once that pending action resolves without
+        -- killing.
         if bankedActor ~= nil then
           if nmon == 0 or gauOn() then
             H.setPad({})
@@ -780,11 +774,10 @@ local function grindToAppearance()
           H.setPad({})
           return
         end
-        -- Once Cyan has prepared the Dried-Meat path, do not let him spend
-        -- the finishing turn himself.  Hold his ready menu until Sabin's ATB
-        -- is full, then use the ordinary battle character-switch button.
-        -- Sabin commits the reserved Suplex; Cyan's still-ready menu returns
-        -- during its animation and becomes the bank below.
+        -- Hold Cyan's ready menu until Sabin's ATB is full, then
+        -- character-switch to Sabin, who commits the reserved Suplex;
+        -- Cyan's still-ready menu returns during its animation and becomes
+        -- the bank below.
         if H.readByte(MSTATE) == ST_CMD and nmon <= 2
            and H.readByte(ACTOR) == 1 and meatPrimed[1]
            and pHP(1) * 2 >= pMaxHP(1) then
@@ -1048,7 +1041,6 @@ H.run({ maxFrames = 700000 }, {
     }, {})
   end)(),
   }, {
-    -- Keep this literal so compose_test.py can embed the state.
     H.loadState("build/states/_scratch_gau_grind.mss.lua"),
     H.waitFrames(30),
     H.call(function()
@@ -1064,11 +1056,9 @@ H.run({ maxFrames = 700000 }, {
 
   moveMeatToFront(),
 
-  -- Active mode is selected through the ordinary Config UI.  In Wait mode,
-  -- opening Item/target selection freezes the queued attack that must deliver
-  -- the final blow; Active mode lets that real attack resolve while the
-  -- Tonic target cursor is banked; it normalizes Gau's special target state
-  -- before the real Dried-Meat submission.
+  -- Active mode lets the queued attack resolve while the Tonic target
+  -- cursor is banked (Wait mode would freeze it); this normalizes Gau's
+  -- special target state before the Dried-Meat submission.
   H.release(),
   H.waitFrames(30),
   H.pressButtons({ "x" }, 4),

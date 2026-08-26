@@ -11,19 +11,12 @@
 ; re-lays our icons over a fully-restored font (in vblank, where direct vram
 ; writes land). the re-lay is staged: OT6_FONTDIRTY counts
 ; stages remaining, and the nmi flush runs one ~128-byte slice per
-; frame. the whole 768-byte re-lay measured ~46 scanlines of PIO,
-; more than an entire vblank, so a single-shot re-lay tore the frame
-; (probe_banner measured end-of-flush at scanline 292 of 262).
+; frame, since the whole 768-byte re-lay as PIO would run ~46 scanlines,
+; more than an entire vblank.
 ;
-; both halves of the restore-then-flag ordering are the whelk
-; garbled-menu bug fix (battle_dlgmenu is the regression gate):
-;   * the first cut of this shim ran before the jmp WaitTfrVRAM and
-;     clobbered A with the flag value, so the "restore" streamed $1000
-;     bytes of bank-$01 open bus over the font and every battle menu
-;     after a scripted dialogue rendered as noise;
-;   * raising the flag before the restore let the nmi re-lay fire
-;     between restore chunks, and the later chunks overwrote the icons
-;     back to vanilla (the original icons-vanish symptom).
+; The restore must complete before the flag is raised: raising the flag
+; before the restore would let the nmi re-lay fire between restore chunks,
+; and the later chunks would overwrite the icons back to vanilla.
 
 .proc Ot6FontRestoreMark_ext
         jsl     WaitTfrVRAM_far ; registers pass through untouched
@@ -51,13 +44,9 @@
 ;
 ; the upload is split into three ~128-byte slices so the nmi flush can
 ; re-lay the font one slice per vblank after a battle dialogue (the
-; whole 384 bytes as PIO measured ~23 scanlines, more than a vblank).
+; whole 384 bytes as PIO would run ~23 scanlines, more than a vblank).
 ; this entry point runs all slices back to back: it is only called in
 ; forced blank (battle init), where there is no time budget.
-;
-; (was six slices: three more uploaded the over-character boost-mark OBJ
-;  tiles, retired because they sat in vanilla's damage-numeral vram;
-;  see the block comment where Ot6BoostMarksNmi_ext used to live.)
 
 .proc Ot6LoadFontIcons_ext
         .a8
@@ -137,15 +126,14 @@ OT6_QMARK := $bf                ; '?' glyph (unrevealed weakness slot)
 
 ; ------------------------------------------------------------------------------
 
-; [ #53: the same eight element tiles, in the field menu's font ]
+; [ the same eight element tiles, in the field menu's font ]
 
-; Until now these tiles existed only in the battle font.  Ot6LoadFontIcons_ext
-; above uploads them to vram word $5800 from LoadMenuGfx (btlgfx_main.asm:8911),
+; These tiles exist only in the battle font.  Ot6LoadFontIcons_ext above
+; uploads them to vram word $5800 from LoadMenuGfx (btlgfx_main.asm:8911),
 ; which is the battle graphics path and runs nowhere else, so a field page
-; asking for an element glyph drew whatever occupied that cell of the menu's own
-; font, and #46 could only give the Blitz page class glyphs, which ship in the
-; vanilla font art itself (the Ot6ClassGlyphTbl note below).  Five of the eight
-; Blitzes therefore showed nothing, three of them elemental probes.
+; asking for an element glyph would draw whatever occupied that cell of the
+; menu's own font.  Only class glyphs (which ship in the vanilla font art
+; itself, the Ot6ClassGlyphTbl note below) were available there before this.
 ;
 ; Where the menu's font is, and there are two copies, neither at $5800:
 ;   * LoadFontGfx2bpp (menu_gfx.asm:120) lays 256 2bpp tiles at word $6000,
@@ -186,54 +174,6 @@ OT6_QMARK := $bf                ; '?' glyph (unrevealed weakness slot)
 ; patches only the copy the loader it hangs off has just laid down.
 ;
 ; ------------------------------------------------------------------------------
-; Which field surfaces use them, and why the others do not.
-;
-; #53 asked for the Blitz page and then for every sibling to be checked rather
-; than left inconsistent; this window family has already cost four rounds of
-; fixes that way.  All of them were checked.  The Blitz page draws the icon
-; (Ot6BlitzPageDraw, skills.asm); the rest are rulings, each with the
-; measurement that produced it, so the next agent can re-read the number
-; instead of re-deriving the question:
-;
-;   SwdTech (Skills -> SwdTech, the loadout page, field_menu.asm).  No, and
-;   the issue's premise for it is false.  "Several SwdTech are elemental" is
-;   not true of this ROM: magic_prop_en.dat's element byte (record +1) is $00
-;   for all eight of $55-$5c, and Ot6SkillClassTbl gives all eight OT6_SLASH
-;   (ot6_class.asm:185-192).  An icon column there would print the
-;   same sword glyph on all eight rows, eight copies of one fact.
-;   It also has nowhere to print it: the three
-;   slot rows are the one page in this window whose columns are fully spent
-;   (the #56 budget note over Ot6LoadoutDrawSlots costs the row at 28 cells
-;   wanted against 27 available and pays for it by deleting a gap).  If a
-;   SwdTech ever gains an element, the pool grid has the free cells rather
-;   than the slot rows: 15 for the left column, 29 for the right.
-;
-;   Rage (Skills -> Rage, the loadout page).  No, and there is no
-;   authority to read.  A Rage row
-;   names a monster (MonsterName, 10 cells), and the actions it grants are
-;   that monster's own two attacks, so "the element of a Rage" is not one
-;   value, and nothing in the tree defines it.  An assertion here could not
-;   read the icon out of the ROM the way #53 requires, because there is no
-;   such row in any table.  (Geometry was not the blocker: columns 13-15 and
-;   26-29 are free on that page.)
-;
-;   Magic / Lore (Skills -> Magic, the vanilla two-column list).  Not done,
-;   and the only one of these that is a gap rather than a ruling:
-;   spells do carry elements, and the battle Magic list already shows them
-;   (Ot6AbilityPad_ext).  Three reasons it is filed and not done here: it is
-;   vanilla's shared row drawer (_c34fc4, skills.asm:867) with several
-;   callers, not an OT6 page; the field magic page has no render test to fail
-;   first against; and every MagicName record already opens with a school
-;   glyph ({black}/{white}/{effect}, magic_name_en.json), so a second icon per
-;   row is a design question about two glyphs rather than a mechanical copy of
-;   the Blitz page.  Room exists when it is answered: the row is a 7-cell name
-;   + blank + 2 digits at columns 3 and 16, leaving 13-15 and 26-29.
-;
-;   Esper detail (Skills -> Espers -> a stone).  Not done, same shape as
-;   Magic: the spells a stone grants have elements, the names are drawn at
-;   column 5, and #62 has just taken columns 17-27 for the while-worn stat
-;   block.  Filed with Magic: they are one decision, and both are cheap now
-;   that the tiles are in the font.
 
 ; ---- the 4bpp copy at word $5000 (BG1: every ability page) ----
 .proc Ot6MenuIcons4bpp_ext
@@ -330,25 +270,6 @@ Ot6MenuIconArt:
         plx
         rts
 
-; battle-only scratch (unused vanilla ram $3ecb-$3ed3, ours since m1)
-                                ; OT6_DIVINE_USED is the per-character
-                                ; once-per-battle divine latch
-                                ;   (----1234, the $3f2f "desperation used"
-                                ;   precedent): bit set = that character has
-                                ;   spent their kit-8 divine this battle. lives
-                                ;   in the retired row-glyph buffer byte (the
-                                ;   one byte of the $3ecb-$3ed3 scratch range
-                                ;   the OT6_SCR walkers never touch; they own
-                                ;   $3ecc-$3ed3 as words). InitBattle's
-                                ;   $3a20-$3ed3 clear zeroes it on every fresh
-                                ;   battle, and a Cmd_20 scene-change reload
-                                ;   (which skips that clear) deliberately keeps
-                                ;   it: a multi-phase boss is one battle, so a
-                                ;   divine spent in phase 1 stays spent. not
-                                ;   $3f2f itself: vanilla's low-HP fight trigger
-                                ;   still writes that byte (battle_main.asm:3432
-                                ;   tsb $3f2f), so a random desperation would
-                                ;   otherwise lock a divine out.
 ; ------------------------------------------------------------------------------
 
 ; [ write one menu character ]
@@ -556,16 +477,15 @@ Ot6ElemPalTbl:
         shorta0
         lda     f:Ot6WeapClassTbl,x
         plx
-        cmp     #$00            ; retest. plx sets n/z from the value it
-                                ; pulled, so the two guards below were reading
-                                ; the caller's restored x rather than the class
-                                ; byte. x is ListTextCmd_0e's ItemName cursor
-                                ; (id*13 + 13), nonzero and positive for every
-                                ; item, so both guards fell through on a
-                                ; classless tool and @bit spun on a zero
-                                ; OT6_SCR_BIT forever: a lock, measured
-                                ; at $F0:057D with the battle nmi's $98
-                                ; frozen. see battle_vargas.lua proof 3.
+        cmp     #$00            ; retest: plx sets n/z from the value it
+                                ; pulled, so without this the two guards below
+                                ; would read the caller's restored x rather
+                                ; than the class byte. x is ListTextCmd_0e's
+                                ; ItemName cursor (id*13 + 13), nonzero and
+                                ; positive for every item, so both guards
+                                ; would fall through on a classless tool and
+                                ; @bit would spin on a zero OT6_SCR_BIT
+                                ; forever.
         beq     @out            ; classless tool: nothing to teach
         bmi     @out            ; null-break: teaches nothing, shows nothing
         sta     OT6_SCR_BIT
@@ -682,28 +602,22 @@ Ot6ElemPalTbl:
 
 ; ------------------------------------------------------------------------------
 
-; [ #53: the same element-or-class glyph, callable from the menu bank ]
+; [ the same element-or-class glyph, callable from the menu bank ]
 
 ; The field pages need what Ot6ElemGlyphFor decides (element first,
 ; the ability's break class when it has none, blank when it has neither) and
-; they must not get a second opinion about it.  #46 could not call it and wrote
-; Ot6SkillClassGlyph (then in ot6_kits.asm, deleted in v0.9) instead for two reasons, both now gone: the
-; element glyphs did not exist in the field font (the upload above), and
-; Ot6ElemGlyphFor is an rts leaf.  This is the rtl wrapper; the class-only leaf
+; they must not get a second opinion about it.  Ot6ElemGlyphFor is an rts
+; leaf, so the field bank calls this rtl wrapper instead; the class-only leaf
 ; is retired, so there is one glyph authority for both halves of the game.
 ;
 ; Why it saves and restores a byte of RAM.  Ot6ElemGlyphFor reports its palette
 ; index by storing OT6_SCR_COLS ($3ed2), which is battle-only scratch, and in
-; the field menu
-; that address is inside wBG1Tiles::ScreenA ($7e3849 + $0800, menu_ram.inc:458):
-; $3ed2 is the attribute byte of row 26, column 4 of the tilemap shadow.  A
-; stray write there would not be visible on screen (row 26 is outside this
-; window and its char byte stays $00, the blank tile) and, being an attribute
-; byte, would not be visible to menu_blitzpage.lua's row canary either, which
-; reads char bytes only.  This project does not leave writes like that in
-; place, so the byte is saved and put back.  The menu needs no
-; palette index: a field icon draws in its row's text colour, as
-; #46's class glyphs did.
+; the field menu that address is inside wBG1Tiles::ScreenA ($7e3849 + $0800,
+; menu_ram.inc:458): $3ed2 is the attribute byte of row 26, column 4 of the
+; tilemap shadow.  A stray write there would not be visible on screen (row 26
+; is outside this window and its char byte stays $00, the blank tile), but
+; the byte is saved and restored anyway.  The menu needs no palette index: a
+; field icon draws in its row's text colour.
 ;
 ; db is forced to $7e so that store lands where the battle path puts it rather
 ; than in bank $00 open bus; menu-bank callers run with db = $00.

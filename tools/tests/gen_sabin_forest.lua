@@ -4,7 +4,7 @@
 --   forest_done.mss   map 145 (26,11), the Phantom Train interior, with the
 --                     party just boarded; the train step builds from
 --                     here.
---
+
 -- The route (verified from the entrance tables and event scripts, decoded by a
 -- read-only source pass; short-entrance record = [SrcX,SrcY,Map,Flags,DestX,
 -- DestY] in trigger/short_entrance.dat):
@@ -21,22 +21,12 @@
 --        (dlg $02A4, $0038), then W to (72,10) _cba8f1 boarding cutscene ->
 --        `load_map 145,{26,11}` (event_main.asm:62961), $017C cleared to 0.
 -- No scripted battles/choices/name-menus on the walk; only random
--- encounters and the boarding dialogs (tap-A).
---
--- Issue #75: every encounter is fled, which retires the SHADOW pin.
--- This generator makes no state writes.  The old file pinned $1DD2 bit $08
--- ("shadow won't leave") for the walk and restored the boot byte before
--- the save, because every write-cleared win rolled SHADOW's 1/16 walk-off
--- (battle_main.asm:11976-11991; the camp exit ran `clr_b_switch $4B` at
--- event_main.asm:42251, so the bit is story-clear for this whole step).
--- The input-driven replacement never wins a random battle: every encounter is
--- fled (hold L+R, the engine's own run mechanic; navTo/worldNavTo
--- playBattles="flee" plus the same hold in the local drivers).  The leave roll
--- runs only at a win, so this route rolls it zero times and SHADOW's presence
--- at generation time is deterministic with no pin and no timing dependence.
--- The cost is a few real flee rounds per encounter (the budgets grew), and an
--- unrunnable formation would time out with an error; the forest and overworld
--- pools here are all runnable.
+-- encounters and the boarding dialogs (tap-A). Every encounter is fled
+-- (hold L+R, the engine's own run mechanic), never won, so the leave roll
+-- (which only fires on a win) never runs and SHADOW's presence at
+-- generation time has no timing dependence. This generator makes no state
+-- writes.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_escaped.mss.lua"
 
@@ -137,11 +127,6 @@ H.run({ maxFrames = 120000 }, {
   H.call(function()
     H.assertEq(H.worldMode(), true, "start on the World of Balance")
     H.assertEq(sw(0x0037), 1, "$0037 set -- escape done")
-    -- No SHADOW pin (issue #75; see the header).  Battle switch $4B is
-    -- story-clear here, and this route never wins a random battle: every
-    -- encounter is fled and the 1/16 walk-off rolls only at a win, so
-    -- SHADOW's presence at generation time is deterministic without writing
-    -- a byte.
     H.log(string.format("[forest] start world (%d,%d) $1dd2&08=%d (story's own)",
       H.worldX(), H.worldY(), H.readByte(0x1dd2) & 0x08))
   end),
@@ -204,14 +189,6 @@ H.run({ maxFrames = 120000 }, {
   crossVia(11, 8, "up", 135, "134->135"),
   crossTo(23, 7, 140, "135->140"),
 
-  -- Board the train.  Map 140: walk UP from arrival (79,14) through the door
-  -- (79,13) _cba852 (opens the platform tiles, $01F0) and the discovery
-  -- cutscene (79,11) _cba864 (dlg $02A4, $0038); the west path to the
-  -- boarding tile opens only after $0038 (measured).  Then WEST to (72,11)
-  -- _cba8e7 (auto-steps up to (72,10) _cba8f1) which runs the boarding
-  -- cutscene (dlg $02AB/$02A5/$02A6/$02D2) and load_map 145 {26,11}.  navTo
-  -- reaches (72,11) via the discovery; a generous cutscene-tolerant settle
-  -- then rides the boarding dialogs onto map 145.
   H.call(function()
     H.log(string.format("[forest] on map 140 at (%d,%d) -- board the train",
       H.fieldX(), H.fieldY()))

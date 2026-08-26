@@ -1,14 +1,6 @@
 -- probe_moogle_wipe.lua -- what happens when a player loses a
--- wave battle in the Moogle defense (issue #75, marshal-investigation).
---
--- The pilot's revert (7e596bd) reported a corpse-jam softlock: wiped
--- party 1 blocking the corridor, guards jammed 38k frames.  The event
--- script disagrees: the loss path _ccaaba revives all four slots at
--- 1 HP, clears status, and teleports the party to (14,11), after which the
--- winning guard should finish its march to (14,13) and exec
--- _cccb82, the real GameOver.  One of those accounts is wrong; this
--- probe measures which.  Player inputs only: nothing during the
--- battle (the party idles and wipes), A-taps on dialogs after.  Zero
+-- wave battle in the Moogle defense. Player inputs only: nothing during
+-- the battle (the party idles and wipes), A-taps on dialogs after. Zero
 -- writes; the GameOver detector is an exec callback on the event
 -- routine's own address, read-only.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -54,8 +46,7 @@ H.run({ maxFrames = 45000 }, {
   H.call(function() snap("battle up") end),
   -- the player gives no input at all; the wave wipes the idle party.
   -- Terminator: the battle module gone (a total wipe zeroes the HP table,
-  -- which battleLoadStarted reads as no-battle) and the field back (map 51
-  -- position reads sane again), debounced.
+  -- which battleLoadStarted reads as no-battle) and the field back.
   H.driveUntil((function()
     local calm = 0
     return function()

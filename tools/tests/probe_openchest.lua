@@ -1,5 +1,5 @@
--- probe_openchest.lua -- smoke M.openChest (#84) on South Figaro's street
--- chests (map 75, flat town, no encounters) before the wave.
+-- probe_openchest.lua -- smoke tests M.openChest on South Figaro's street
+-- chests (map 75, flat town, no encounters).
 local H = dofile("tools/tests/lib/ot6.lua")
 H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/south_figaro.mss.lua"),

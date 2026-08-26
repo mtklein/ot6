@@ -1,7 +1,7 @@
 -- gen_opera7_blackjack.lua -- v0.5 terminal step: ultros2_entry -> defeat
 -- Ultros 2 -> ride the Setzer/coin-toss/Blackjack sequence -> generate
 -- blackjack.
---
+
 -- The terminal is the first stable, controllable world-map frame after the
 -- Blackjack lands outside Vector.  Source (_cac128 -> _cb2007 -> _cb2379)
 -- gives the durable story invariants:
@@ -10,23 +10,7 @@
 --   $005E=1  the Blackjack arrival sequence completed
 --   $0246=0  the active airship is the Blackjack (not the Falcon)
 -- The world load is map 0 at {140,203}; the parked airship is {137,202}.
---
--- Ultros 2 is fought with real input (issue #75: this file writes no
--- emulated game state).  Battle 104's authored row (Ot6ShieldTbl "ultros 2:
--- same row, one more shield": 6 shields, OT6_SLASH|OT6_PIERCE) matches what
--- LOCKE+CELES+SABIN+EDGAR carry: LOCKE's dagger and EDGAR's spear are
--- pierce, CELES's sword is slash, and EDGAR's Tools add pierce volume.
--- The menu-episode fighter (gen_scenario's cadence) banks boost to 2 and
--- dumps it every turn; tier 2 adds EDGAR's AutoCrossbow, tier 3 SABIN's
--- Pummel.  The verdict is the event script's own fork (event_main.asm
--- :29954): `if_b_switch $40, _cac128`.  The win clears $034B; the loss
--- path (_cabdba) restarts the whole opera and, on the third failure, is
--- game over.  A wipe is caught by the 90-frame watch, and the
--- three-attempt ladder reloads the booted entry point before the failure
--- path runs, with the tier escalated; this is the script's equivalent of a
--- player reloading a save.  A third loss fails the generation with
--- every attempt's numbers recorded (#74).  The break-mechanics
--- contract remains battle_ultros2.lua's, on the same entry point.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/ultros2_entry.mss.lua"
 
@@ -50,17 +34,7 @@ end
 -- chain ever put it back, so she rejoined for the Blackjack with all five
 -- equipment bytes at $FF and walked into Vector that way -- the class of
 -- fixture bug tools/audit_equipment.py exists to catch.
---
--- She gets back exactly what the opera took, by item, never through
--- Optimum (wob-route.md section 2).  Measured at opera_open, the step
--- before the strip, she wore `0A 5B 6A 84 B1`, and all five sit in the bag
--- here: MithrilBlade $0A, Heavy Shld $5B, Hair Band $6A, LeatherArmor $84,
--- Star Pendant $B1.  The weapon is the one that matters for what comes
--- next: $0A is OT6_SLASH (ot6_class.asm:59) and it is the only slash
--- weapon in this bag that she can hold -- LOCKE's Guardian and the spare
--- daggers are all pierce -- so it is what keeps the party's break coverage
--- on both classes through the Magitek Research Facility, where Ifrit is
--- pierce and Shiva is slash (wob-route.md section 1).
+
 local EMPTY = 0xFF
 local CH_CELES = 6
 local function gear(c, off) return H.readByte(0x1600 + 37 * c + off) end
@@ -78,9 +52,6 @@ local function fill(c, pos, slot, id, tag)
   end, { H.equipWeapon(pos, id, { slot = slot, tag = tag }) }, {})
 end
 
--- ----------------------------------------------- the input-driven fighter --
--- gen_narshe_battle's menu-episode machine for the Ultros 2 fight; party is
--- #21's canonical LOCKE+CELES+SABIN+EDGAR.
 local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
 local MENU, ACTOR = 0x7bca, 0x62ca
 local BP = 0x3e9c
@@ -364,21 +335,10 @@ H.run({ maxFrames = 400000 }, {
   H.release(),
   H.waitFrames(30),
 
-  -- ...and then wait for it again, because a fixed 30-frame pause lands in a
-  -- window where the world map makes the battle gate read wrong.  Measured
-  -- here on the Blackjack arrival, per frame for 600 frames after the ride:
-  --
   --   f19494..f19521   $7E3BF4 = $5554   worldHasControl() true
   --   f19521..f19596   $7E3BF4 = $0000   worldHasControl() FALSE  (75 frames)
   --   f19596..f20094   $7E3BF4 = $5554   worldHasControl() true
-  --
-  -- $7E3BF4 is the party battle-HP table only while the battle module owns
-  -- that RAM; the world module reuses the same bytes for map data, and it
-  -- zeroes them for 75 frames during the arrival redraw.  Since 62ccab7
-  -- (#24) M.battleLoadStarted() is "slot 0 is not $FFFF", so it reads $0000
-  -- as a live battle, and worldHasControl(), which is gated on it, goes
-  -- false.  The old predicate rejected 0 and never saw this.
-  --
+
   -- The ride's own terminator already requires 30 consecutive good frames, so
   -- it exits correctly; the blind waitFrames(30) then landed in
   -- the dead window and asserted there ("world map is controllable: got

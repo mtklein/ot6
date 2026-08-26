@@ -1,10 +1,7 @@
--- probe_world.lua -- the live-probe checklist from
--- docs/research/world-map-nav.md, run against worldmap_narshe.mss
--- (the party on foot on the WoB, fresh from the Narshe south gate).  This
--- is the measurement instrument behind the worldPos/worldCanStep/worldBfs
--- additions to lib/ot6.lua: every mechanism claim the doc's audit flagged
--- as inferred-not-read gets an empirical answer here, logged with frames
--- and RAM values, before any executor is built on it.
+-- probe_world.lua -- live-probe checklist run against worldmap_narshe.mss
+-- (the party on foot on the WoB, fresh from the Narshe south gate).
+-- Measures world position/passability/encounter mechanics with frames and
+-- RAM values, logged for grepping.
 --
 -- Answers produced (each tagged [probe] for grepping):
 --   1. $1F64 live value on the world + the working mode mask
@@ -89,9 +86,8 @@ H.run({ maxFrames = 45000 }, {
 
   -- ------------------------------------------------------------------ --
   -- 2. step mechanics: tap DOWN for exactly 4 frames, release, and trace
-  -- 40 frames.  If movement is latched (move.asm:834-841 gates input on
-  -- fraction==0), the step runs to the next boundary on its own; if the
-  -- old strand-theory were right, the party would freeze mid-tile.
+  -- 40 frames.  Movement is latched: input is gated on fraction==0, so
+  -- the step runs to the next boundary on its own.
   -- ------------------------------------------------------------------ --
   H.call(function()
     P("== step-latch trace: 4-frame DOWN tap ==")
@@ -132,12 +128,9 @@ H.run({ maxFrames = 45000 }, {
   -- 4. random encounter: pace over battle-enabled plains until one
   -- fires, win it, and measure the aftermath frame by frame.
   -- The up-step trace above parked the party on (84,33), the Narshe gate
-  -- strip, which has prop $0007 and battles disabled, and this probe's
-  -- first revision paced right/left along it for 12000 frames with no
-  -- encounter (that non-result is recorded in world-map-nav.md).  Step
-  -- back down to the enabled row first and pace down/up: the danger
-  -- word grows +$30 per landing there (probe_world2) and the roll wins
-  -- within a handful of cycles.
+  -- strip, which has prop $0007 and battles disabled.  Step back down to
+  -- the enabled row first and pace down/up: the danger word grows +$30
+  -- per landing there and the roll wins within a handful of cycles.
   -- ------------------------------------------------------------------ --
   H.call(function() P("== pacing for a random encounter ==") end),
   H.hold({ "down" }), H.waitFrames(20), H.release(), H.waitFrames(4),
@@ -163,28 +156,8 @@ H.run({ maxFrames = 45000 }, {
     H.hold({ "up" }), H.waitFrames(24), H.release(), H.waitFrames(4),
   }, "random encounter fires"),
 
-  -- Issue #75: this was H.clearBattle(9000), the last live caller of the
-  -- flag write anywhere in the tree.  H.fightBattle wins the same battle on
-  -- edge-tapped A instead, which keeps this measurement comparable with the
-  -- numbers already in docs/research/world-map-nav.md: the flag write also
-  -- ended the fight as a win (it marked the monsters dead and then tapped
-  -- through the victory text), so the reload path being measured is the same
-  -- one.  Blind A-taps rather than the menu-aware driver because this is the
-  -- ending gen_returner already measures on this terrain with this fixture's
-  -- party -- command row 0 is Fight for both TERRA and LOCKE -- and its
-  -- header records that the northern plains' encounters fall in about a
-  -- round.  The budget grows from 9000 to 20000 to match gen_returner's,
-  -- because a played-out win costs real ATB rounds where the write cost
-  -- none.
-  --
-  -- Measured before and after on worldmap_narshe, same ROM, same fixture:
-  -- the encounter fires at the same frame (304) either way, because the
-  -- pacing above it is unchanged and the roll is deterministic; the battle
-  -- takes 548 frames to end by the flag write and 756 to end by play; and
-  -- the two things this probe exists to measure are identical across the
-  -- pair -- "world reloaded" satisfied after 0 frames and the post-reload
-  -- step after 93.  So the conversion costs 208 frames and changes no
-  -- measurement.
+  -- H.fightBattle wins the battle on edge-tapped A -- command row 0 is
+  -- Fight for both TERRA and LOCKE on this fixture.
   H.fightBattle(20000),
   H.call(function()
     P("battle won at f%d; watching the reload", H.frame)

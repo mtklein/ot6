@@ -1,26 +1,17 @@
 -- @suite
--- battle_breakvector.lua -- the v0.6 Vector / Magitek Factory break section,
+-- battle_breakvector.lua -- the Vector / Magitek Factory break section,
 -- asserted against the encounter chain in ROM.
 -- (school.lua and battle_breaktbl.lua pattern: pure ROM bytes, no savestate.)
---
--- Issue #11 asks for authored, encounter-aware rows to replace the generated
--- floor one route section at a time, and its acceptance criteria state
--- that "tests cover encounter/party reachability, not only nonzero table
--- bytes".  So this test does not only read back the twelve bytes the pass
--- wrote.  It walks
---
+
 --   SubBattleGroup[map] -> RandBattleGroup[group*8] -> BattleMonsters[form*15]
---
--- out of the shipped ROM, plus the minecart's five forced formations, and
--- asserts properties of the section: that every body in it is authored rather
--- than falling through to the floor, that every formation is answerable by
--- some buildable party, that the one formation which demands a blunt weapon
--- is the one the design says it is, and that slash is no longer the
--- automatic answer.  Those are the claims that were false before the pass
--- and that a byte-equality check alone would not notice going false again.
---
--- Survey, arithmetic and per-formation reading: docs/design/break-coverage-vector.md.
---
+
+-- Walks the section's random formations plus the minecart's five forced
+-- formations, out of the shipped ROM, and asserts properties of the
+-- section: that every body in it is authored rather than falling through
+-- to the floor, that every formation is answerable by some buildable
+-- party, that the one formation which demands a blunt weapon is the one
+-- the design says it is, and that slash is not the automatic answer.
+
 -- ROM addressing.  HiROM PRG file offset = SNES addr - $C00000 (school.lua
 -- documents the same mapping).  From the link map:
 --   monster_prop    CF0000  -> $0F0000   (32-byte records; +23 absorb, +25 weak)
@@ -101,8 +92,8 @@ check(shieldRows >= 70, string.format(
 
 -- --------------------------------------------------------- the authored rows
 -- Exact shields and class: a missing row reads nil, a drifted one reads a
--- different byte, and both fail.  The reason for each is in ot6_hud.asm beside
--- the row and in break-coverage-vector.md §8.1.
+-- different byte, and both fail.  The reason for each is in ot6_hud.asm
+-- beside the row.
 local want = {
   { 0x00cb, 2, PIERCE | BLUDG, "garm (magitek quadruped, entrance)" },
   { 0x00c7, 2, PIERCE,         "commando (imperial line keeps pierce)" },
@@ -126,9 +117,9 @@ for _, w in ipairs(want) do
 end
 
 -- -------------------------------------------------- the encounter chain, live
--- Seven encounter-bearing maps (break-coverage-vector.md §1.1).  Map 275 carries
--- group 106 and the enable bit but no entrance record targets it, so it is
--- excluded; 270/272/274 carry a group with the enable bit clear.
+-- Seven encounter-bearing maps.  Map 275 carries group 106 and the enable
+-- bit but no entrance record targets it, so it is excluded; 270/272/274
+-- carry a group with the enable bit clear.
 local AREA_MAPS = { 262, 263, 264, 269, 271, 273, 240 }
 local WANT_GROUP = { [262] = 80, [263] = 81, [264] = 104, [269] = 105,
                      [271] = 106, [273] = 106, [240] = 108 }
@@ -146,9 +137,6 @@ local function formationSpecies(f)
   return out
 end
 
--- Every section map must still point at the group this pass was authored against.
--- If a map is ever repointed, every distribution claim below is stale and the
--- test says so rather than measuring a different dungeon.
 for _, m in ipairs(AREA_MAPS) do
   local g = rb(SUBGRP + m)
   check(g == WANT_GROUP[m], string.format(
@@ -196,10 +184,10 @@ do
 end
 
 -- ------------------------------------------------------------- party model
--- Fixed core Locke + Celes, two free picks from Edgar/Sabin/Cyan/Gau
--- (break-coverage-vector.md §6.1; Terra is not yet active and Setzer is flying the
--- getaway).  These are the classes each brings for free, from the joining kit
--- and abilities only, with no shop trip:
+-- Fixed core Locke + Celes, two free picks from Edgar/Sabin/Cyan/Gau (Terra
+-- is not yet active and Setzer is flying the getaway).  These are the
+-- classes each brings for free, from the joining kit and abilities only,
+-- with no shop trip:
 --   Locke  swords + daggers            slash|pierce
 --   Celes  swords + daggers            slash|pierce
 --   Edgar  spears + Tools, Chain Saw   slash|pierce
@@ -280,7 +268,6 @@ end
 --   * it is bludgeon-only on the class axis, and
 --   * no element substitutes, because Rhinox has no vanilla weakness at all
 --     and absorbs bolt, the element the rest of the facility teaches.
--- If someone softens Rhinox, this is the assertion that fails.
 do
   local keys = formationKeys(0x168)
   check(keys == BLUDG, string.format(
@@ -302,11 +289,6 @@ do
     .. "Edgar+Cyan, buys a Flail or Full Moon in any of four towns)", payable))
 end
 
--- --------------------------------- slash is no longer the automatic answer
--- The failure this pass exists to fix: under the generated floor, slash
--- answered 100% of the draws in group 106, the deepest third of the facility
--- (Gobbler by default, Rhinox by a `rhino` keyword on the wrong
--- body), and the dungeon hands the player four swords on the way in.
 do
   local slashW, bludgW, pierceW, total = 0, 0, 0, 0
   for _, e in ipairs(randForms) do
@@ -324,8 +306,6 @@ do
     100 * slashW, 100 * pierceW, 100 * bludgW))
   check(math.abs(total - 1.0) < 1e-6, string.format(
     "draw weights sum to 1.0 (got %.6f)", total))
-  -- The inversion the section was authored to produce.  Before the pass this read
-  -- slash 67.86%, bludgeon 14.29%.
   check(bludgW > slashW, string.format(
     "bludgeon (%.2f%%) outranks slash (%.2f%%) as an area key -- slash is no "
     .. "longer the automatic answer", 100 * bludgW, 100 * slashW))

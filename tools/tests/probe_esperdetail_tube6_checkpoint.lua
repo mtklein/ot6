@@ -1,33 +1,23 @@
--- probe_esperdetail_tube6_checkpoint.lua -- issue #31's verification instrument.
---
--- The same menu drive and the same cell-level assertions as
--- menu_esperdetail_tube6.lua (the suite test), booted instead from a cold
--- Continue off the tracked post-Opera battery checkpoint, which survives ROM
--- changes (issue #9) where savestate fixtures do not.  This build changes ROM
--- data in two banks (genju_prop, ot6_progression), which is the class
--- of change that can leave a generated .mss describing the previous ROM;
--- run this to check the page from a boot that cannot be stale:
+-- probe_esperdetail_tube6_checkpoint.lua -- the same menu drive and the
+-- same cell-level assertions as menu_esperdetail_tube6.lua (the suite
+-- test), booted instead from a cold Continue off the tracked post-Opera
+-- battery checkpoint, which survives ROM changes where savestate fixtures
+-- do not:
 --
 --   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/post-opera-v1 \
 --     tools/tests/run.sh tools/tests/probe_esperdetail_tube6_checkpoint.lua
 --
--- The Continue sequence is gen_vector_entry.lua's, copied from
--- probe_esperdetail_checkpoint.lua.  The party is LOCKE CELES SABIN EDGAR on the
--- world map at (137,203); the field menu opens from the world map the same
--- way as from a field map.  The esper inventory is pinned to MADUIN (+5
--- mag.pwr, the largest mod), TERRATO (Ot6EsperStatTbl $0000, still the
--- no-mod control after this pass) and UNICORN (the Pearl grant, branch A).
---
--- Name tiles and stat-line geometry: see menu_esperdetail_tube6.lua's header.
+-- The party is LOCKE CELES SABIN EDGAR on the world map at (137,203); the
+-- field menu opens from the world map the same way as from a field map.
+-- The esper inventory is pinned to MADUIN (+5 mag.pwr, the largest mod),
+-- TERRATO (Ot6EsperStatTbl $0000, the no-mod control) and UNICORN (the
+-- Pearl grant, branch A).
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
--- reads
---   the marker line above and refuses, before the emulator boots, any
---   OT6_SRAM_CHECKPOINT whose manifest.json declares a different persistent_layout.
---   Note: probe_esperdetail_checkpoint.lua, the #27 probe this file mirrors, has
---   no such marker and is therefore refused by run.sh today; see this build's
---   report Follow-ups.
+-- ^ the persistent-SRAM layout this step understands.  run.sh reads the
+--   marker line above and refuses, before the emulator boots, any
+--   OT6_SRAM_CHECKPOINT whose manifest.json declares a different
+--   persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26
@@ -48,7 +38,7 @@ local BLANK   = 0xff
 local CH_W     = 0x96
 local CH_DOT   = 0xc5
 local CH_PLUS  = 0xca
-local CH_MINUS = 0xc4                   -- #62: a delta can be negative
+local CH_MINUS = 0xc4                   -- a delta can be negative
 local function digit(n) return 0xb4 + n end
 
 local NAME = {
@@ -62,7 +52,7 @@ local NAME = {
   -- "W Wind": tile 2 is $fe, the narrow-space glyph, not the $ff blank.
   W_WIND = { 0xe9, 0x96, 0xfe, 0x96, 0xa2, 0xa7, 0x9d },
 }
--- All four now: #62's block can draw any of them, and Maduin's leads on VIGOR.
+-- The block can draw any of the four; Maduin's leads on VIGOR.
 local STAT = {
   VIGOR   = { 0x95, 0xa2, 0xa0, 0xa8, 0xab, 0xff, 0xff },
   SPEED   = { 0x92, 0xa9, 0x9e, 0x9e, 0x9d, 0xff, 0xff },
@@ -121,8 +111,9 @@ local function assertRowEmpty(tag, slot)
       string.format("%s: row %d empty at {%d,%d}", tag, slot + 1, x, y))
   end
 end
--- #62's stat block: caption on the title row, one term per nonzero delta packed
--- down from row 17 (name cols 17-23, spacer 24, sign 25, magnitude 26-27).
+-- The stat block: caption on the title row, one term per nonzero delta
+-- packed down from row 17 (name cols 17-23, spacer 24, sign 25, magnitude
+-- 26-27).
 local function assertCaption(tag, present)
   if present then
     H.assertEq(cell(13, 15), BLANK, tag .. ": caption pad blank at {13,15}")
@@ -198,7 +189,7 @@ local function backToList()
 end
 
 local all = {
-  -- gen_vector_entry.lua's cold Continue off the battery checkpoint.
+  -- cold Continue off the battery checkpoint.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),

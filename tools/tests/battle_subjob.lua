@@ -1,62 +1,8 @@
 -- @suite slow savestate=n024_entry
--- battle_subjob.lua -- M5 espers-as-sub-jobs, the fork-independent core: an
--- equipped esper grants its spells to the in-battle Magic list additively, the
--- grant never teaches permanently, and level-up esper stat bonuses are gone.
---
--- Issue #75 conversion.  The old fixture poked char 0's equipped-esper byte
--- ($161e) in the field, rewrote command lists, muddled the caster for
--- menu-less casts, pinned guards, and handed bp/pending/MP.  On
--- n024_entry the inputs are real: RAMUH is owned ($1A69 bit 0,
--- gifted at Zozo and asserted in the alcove savestate), and it is equipped on
--- CELES through the real field menu (battle_magicite.lua's measured route:
--- X -> Skills -> character -> Espers -> stone -> detail -> A).  Ramuh is
--- authored to base-tier Bolt ($02) and Rasp ($1a), and Celes innately knows
--- neither (scenario A reads her real no-esper list as the control), so any
--- Bolt or Rasp in her list comes from the grant.  The fold cast goes through
--- her live menu, with real R edges for the pending and a real cursor walk to
--- the granted Bolt, against the fixture's own boss, Number 024.
---
--- Two hooks make this work, and probe_subjob measured both as necessary: the
--- in-battle Magic list is compacted to the union of party-known spells, so a
--- borrowed spell nobody knows has no slot at all.  Ot6UnionEspers (ot6.asm)
--- seeds the union with equipped espers' spells, and Ot6EsperSpellKnown then
--- keeps each one only for its esper's holder.
---
--- Scenarios (independent loads; per CONTRIBUTING, every positive carries its
--- negative control):
---   A negative  no esper: Celes's list has neither Bolt nor Rasp, as in
---               vanilla.
---   B grant     Ramuh: Bolt and Rasp appear; the list is A's list plus exactly
---               {summon, Bolt, Rasp}, so it is additive with the innate list
---               untouched; Bolt is priced at vanilla MP with no double-charge;
---               and the summon slot is registered ($3344,entity).
---   C fold      the granted Bolt cast with 2 real BP executes as Bolt3 ($0b)
---               via the fold, and since #64 is charged Bolt3's own 53 MP,
---               which also shows the untaught tier is castable and is now a
---               purchase.  Her real 106-MP pool pays it; the bank is earned
---               (Ot6InitBP's 1 plus one real item turn), the pending is two
---               real R edges, and the cast is a real cursor walk.  The charge
---               is exactly 53: with the muddle apparatus gone there is no
---               trailing-cast noise, so the old >= bound becomes an equality.
---   D deletions win a level-up with Ramuh: no esper stat bonus (stamina and
---               mag.pwr both flat in the persistent record, where vanilla
---               Ramuh's STAMINA_1 would bump stamina) and no spell learned
---               (Bolt and Rasp stay unlearned).
---
---               Labeled isolation arm (owner ruling 2026-08-10; the
---               waiver-burndown plan names this arm).  No fixture
---               sits one real fight short of a level, the n024 maps are
---               measured encounter-free, and winning the boss by play is a
---               whole generator's job (gen_esper_tubes).  So this arm keeps
---               two memory-hack stagings, recorded here: the XP pin (one
---               threshold over, so the next win levels) and the library's
---               clearBattle win.  The assertions still read only
---               persistent-record facts the level-up wrote.  Convert
---               organically when a near-threshold fixture exists.
---
--- #62 strengthened D's stat half: Ramuh's while-worn row moves two stats
--- (+4 stamina, +2 mag.pwr) and neither may ever reach the $16xx record, so D
--- reads both cells, giving two independent views of the same rule.
+-- battle_subjob.lua -- an equipped esper grants its spells to the in-battle
+-- Magic list additively, the grant never teaches permanently, and level-up
+-- esper stat bonuses are gone.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/n024_entry.mss.lua"
 
@@ -64,7 +10,6 @@ local BOLT, BOLT3, RASP = 0x02, 0x0b, 0x1a
 local BOLT3_MP = 53
 local RAMUH = 0x00                       -- esper index (GenjuProp order)
 
--- CELES's roster record (roster 6; measured on this fixture)
 local CBASE = 0x1600 + 37 * 6
 local ESPERB = CBASE + 0x1e              -- equipped esper
 local STAMB  = CBASE + 0x1c
@@ -73,7 +18,6 @@ local LEVELB = CBASE + 0x08
 local XPB    = CBASE + 0x11
 local KNOWNB = 0x1a6e + 54 * 6           -- her learned table ($ff = learned)
 
--- field menu route (battle_magicite's measured constants)
 local ZMENUSTATE, ZCURSOR, GENJULIST = 0x26, 0x4b, 0x9d89
 local MST_MAIN, MST_CHAR, MST_SKILLS, MST_LIST, MST_DETAIL = 0x05, 0x06, 0x0a, 0x1e, 0x4d
 local function mst() return H.readByte(ZMENUSTATE) end
@@ -132,7 +76,7 @@ local function bagIdxOf(ids)
   return nil
 end
 
--- vanilla XP thresholds (battle_levelup): 8*sum(LevelUpExp[0..L-1]) to leave L
+-- vanilla XP thresholds: 8*sum(LevelUpExp[0..L-1]) to leave L
 local LEVELUP_EXP = { 4,8,14,24,34,48,62,79, 99,120,143,169,195,224,257,289 }
 local function neededXp(L)
   local s = 0
@@ -140,8 +84,6 @@ local function neededXp(L)
   return 8 * s
 end
 
--- ------------------------------------------------ real field esper equip --
--- battle_magicite.lua's measured drive, unchanged in shape
 local function listSeek(idx, what)
   local ph = 0
   return H.driveUntil(function()
@@ -181,7 +123,6 @@ local function equipRamuhOnCeles(tag)
       H.pressButtons({ "a" }, 3), H.waitFrames(16),
     }, tag .. ": char select"),
     H.waitFrames(10),
-    -- menu position 3 = CELES (0=EDGAR 1=SABIN 2=LOCKE, measured)
     H.pressButtons({ "down" }, 3), H.waitFrames(12),
     H.pressButtons({ "down" }, 3), H.waitFrames(12),
     H.pressButtons({ "down" }, 3), H.waitFrames(12),
@@ -295,9 +236,6 @@ local function decide()
         if cur == want then btn = "a"
         else btn = (cur < want) and "down" or "up" end
       elseif st == ST_ITEM then
-        -- The fixture now reaches this fight with 41/106 MP.  Its chest
-        -- Tincture is the player's real way to restore enough for the 53-MP
-        -- folded tier, and the same item turn earns the second BP.
         local want = mp(celes) < BOLT3_MP and bagIdxOf({ TINCTURE })
           or bagIdxOf({ TONIC, POTION })
         if want == nil then btn = "b"
@@ -401,9 +339,7 @@ H.run({ maxFrames = 150000 }, {
     H.log("[B] Ramuh celes list: " .. fmt(set))
     H.assertEq(has(set, BOLT), true, "Ramuh grants Bolt into the list")
     H.assertEq(has(set, RASP), true, "Ramuh grants Rasp into the list")
-    -- multiset diff base->Ramuh: additive means no innate entry was removed,
-    -- and the only additions are Bolt, Rasp, and the esper's summon slot
-    -- (id = esper index 0, which collides with Fire's 0, hence the counting).
+    -- the esper's summon slot id (esper index 0) collides with Fire's id 0
     local function counts(t)
       local c = {}; for _, v in ipairs(t) do c[v] = (c[v] or 0) + 1 end; return c
     end
@@ -420,13 +356,10 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(adds[1], 0x00, "one addition is Ramuh's summon slot (esper index 0)")
     H.assertEq(adds[2], BOLT, "one addition is Bolt")
     H.assertEq(adds[3], RASP, "one addition is Rasp")
-    -- no double-charge: the granted Bolt is priced at vanilla Bolt MP
     local cost = H.readByte(LISTS[celes] + recOf(celes, BOLT)*4 + 3)
     H.log("[B] granted Bolt list MP cost = " .. tostring(cost))
     H.assertEq(cost ~= nil and cost >= 3 and cost <= 8, true,
       "granted Bolt priced at vanilla MP (~6), not doubled or Bolt3's")
-    -- summon plumbing intact: ValidateSpellList registered Ramuh's summon
-    -- ($3344,entity) and the once-per-battle gate is clear at start
     H.assertEq(H.readByte(0x3344 + celes*2), RAMUH,
       "ValidateSpellList registered Ramuh's summon ($3344,entity)")
     H.assertEq(H.readWord(0x3f2e) & H.readWord(0x3018 + celes*2), 0,
@@ -435,12 +368,6 @@ H.run({ maxFrames = 150000 }, {
   -- C: bank the second bp with one real item turn, then two real R edges
   -- and a real cursor walk cast the granted Bolt as a fold
   H.call(function() celesMode = "item" end),
-  -- The predicate waits for BOTH facts the cast below needs.  Measured on
-  -- the re-made fixture (2026-08-18): the bank alone read 2 after 294
-  -- frames, before her item turn had resolved (the pool still read the 41
-  -- she arrives with) -- bp also arrives through the earn paths
-  -- (Ot6RunicBP/Ot6CoverBP beside Ot6ActionEnd's regen), so gating on bp
-  -- alone let the phase race past the Tincture.
   driveTo(function()
     return bp(celes) >= 2 and mp(celes) >= BOLT3_MP
   end, 20000,
@@ -467,19 +394,12 @@ H.run({ maxFrames = 150000 }, {
       "granted Bolt at 2 real BP executed as Bolt3 ($0b) via the fold")
     H.assertEq(seen[(R.mp0 - BOLT3_MP) & 0xff], true,
       "[C] the pool was debited to exactly mp0-53 (the write watch)")
-    -- #64, as an equality: no muddle noise remains, so the delta is
-    -- Bolt3's own price.  This also answers the untaught-tier question: an
-    -- esper-granted Bolt still reaches Bolt3, and pays Bolt3's price for it.
     H.assertEq(R.mp0 - mp1, BOLT3_MP,
       "the folded Bolt3 was charged Bolt3's own 53 MP -- an untaught tier "
       .. "is still reachable by folding, and is now a purchase (#64)")
     H.screenshot("subjob_fold")
   end),
 
-  ---------------------------------------------------------------- D: deletions --
-  -- Labeled isolation arm; see the header.  The equip is still real, and the
-  -- XP pin and the library's clearBattle win are the two memory-hack stagings
-  -- the owner ruling keeps for level-up mechanism decodes.
   H.loadState(STATE),
   H.waitFrames(60),
   equipRamuhOnCeles("D"),
@@ -493,13 +413,13 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(H.readByte(KNOWNB + RASP) ~= 0xff, true,
       "Rasp unlearned before win (control)")
     local v = neededXp(R.lvl0) + 4                -- one threshold over
-    H.writeByte(XPB,     v         & 0xff)        -- ISOLATION WRITE (waived)
+    H.writeByte(XPB,     v         & 0xff)
     H.writeByte(XPB + 1, (v >> 8)  & 0xff)
     H.writeByte(XPB + 2, (v >> 16) & 0xff)
     H.log(string.format("[D] L=%d stamina=%d mag.pwr=%d, xp pinned one level over",
       R.lvl0, R.stam0, R.magp0))
   end),
-  H.clearBattle(20000),                           -- ISOLATION WIN (lib waiver)
+  H.clearBattle(20000),
   H.waitFrames(40),
   H.call(function()
     local lvl1 = H.readByte(LEVELB)

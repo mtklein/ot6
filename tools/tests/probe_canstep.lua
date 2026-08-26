@@ -1,35 +1,24 @@
--- probe_canstep: validate the movement model (H.canStep) against the engine
--- itself before anything depends on it.  Two parts, because
--- UpdatePlayerMovement has two branches and the model ports both:
+-- probe_canstep.lua -- validates the movement model (H.canStep) against
+-- the engine.
 --
--- Part 1, cardinal (player.asm:456 -> CheckPlayerMove).  Boot the injected
--- save (Narshe mines, party at rest), render the model's view of the 15x15
--- neighborhood as ASCII (flood fill over canStep edges: party @, reachable
--- ., unreachable #), then for each cardinal direction: predict canStep,
--- press it (adaptive hold, releasing as soon as the tile coord changes),
--- and compare prediction against observed movement.  Two rounds of all
--- four directions; steps back after each move (best effort).  Random
--- encounters are cleared between samples and void a sample they interrupt.
+-- Part 1, cardinal.  Renders the model's view of the 15x15 neighborhood as
+-- ASCII (flood fill over canStep edges: party @, reachable ., unreachable
+-- #), then for each cardinal direction: predicts canStep, presses it
+-- (adaptive hold, releasing as soon as the tile coord changes), and
+-- compares prediction against observed movement.  Two rounds of all four
+-- directions; steps back after each move (best effort).  Random encounters
+-- are cleared between samples and void a sample they interrupt.
 --
--- Part 2, diagonal (player.asm:379).  On a tile whose prop byte has $c0
--- set, a left or right press moves the party diagonally; Figaro Castle's
--- staircases are built from those tiles, and before the model knew the
--- branch they read as solid wall (map 55 split into three regions BFS could
--- not join, and gen_edgar hand-held four staircases with pushUntil).  So
--- boot figaro_matron.mss, walk to the foot of the matron's staircase, and
--- at each of its tiles press all four directions, comparing the
--- displacement the model predicts against the displacement the engine
--- produces.  That covers the three cases the branch can produce (a
--- diagonal, the cardinal fallback when the diagonal destination is refused,
--- and no movement at all), and the run asserts at least one of each.
+-- Part 2, diagonal.  On a tile whose prop byte has $c0 set, a left or
+-- right press moves the party diagonally; Figaro Castle's staircases are
+-- built from those tiles.  Boots figaro_matron.mss, walks to the foot of
+-- the matron's staircase, and at each of its tiles presses all four
+-- directions, comparing the displacement the model predicts against the
+-- displacement the engine produces: a diagonal, the cardinal fallback when
+-- the diagonal destination is refused, or no movement at all.
 --
 -- PASS iff zero mismatches in either part, at least 6 of 8 part-1 samples
 -- landed, and part 2 saw a diagonal, a fallback and a refusal.
--- Issue #75: playBattles = "tactical" keeps this walk out of the library's
--- monster-dead flag write.  It is intent only -- the Figaro castle maps 55/57/59/60 draw no random battles (map_prop.dat byte +5
--- bit 7 clear, so the field step handler at ff6/src/field/battle.asm:333-347
--- returns before the roll) -- and "tactical" rather than "flee" because the
--- only battle that could reach the option there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 local SRM = "build/states/playthrough_srm.mss.lua"
 local MATRON = "build/states/figaro_matron.mss.lua"
@@ -61,9 +50,8 @@ local function append(list, steps)
   for _, s in ipairs(steps) do list[#list + 1] = s end
 end
 
--- wait for control at rest on a tile, clearing any encounter that fires
--- meanwhile (a plain waitUntil starves if the battle only begins loading
--- after a battle-check step already passed)
+-- waits for control at rest on a tile, clearing any encounter that fires
+-- meanwhile.
 local function settleStep(tag)
   local aPhase = 0
   return H.driveUntil(function()
@@ -122,7 +110,7 @@ local function testDir(btn, round)
 end
 
 local steps = {
-  -- boot preamble (the SRM-inject Continue dance, verbatim from gen_whelk)
+  -- boot preamble
   H.waitFrames(5),
   H.call(function()
     local data = H.b64decode(H.resolveStateB64(SRM))
@@ -215,19 +203,18 @@ local ALLMOVES = { "up", "right", "down", "left",
 
 local function prop(x, y) return H.readByte(0x7E7600 + H.maptile(x, y)) end
 
--- The matron's staircase, measured from figaro_matron.mss: (66,26) carries
--- prop $83 and (65,25)/(64,24) carry $8b; all have bit7 set, that is, "\"
--- tiles, so a left press climbs them up-left and a right press descends
--- down-right.  (67,26) is the plain $02 floor tile at the foot, included
--- so the sweep also samples a non-diagonal tile on the same map.
+-- The matron's staircase: (66,26) carries prop $83 and (65,25)/(64,24)
+-- carry $8b; all have bit7 set, that is, "\" tiles, so a left press climbs
+-- them up-left and a right press descends down-right.  (67,26) is the
+-- plain $02 floor tile at the foot, included so the sweep also samples a
+-- non-diagonal tile on the same map.
 local STAIR = { { 67, 26 }, { 66, 26 }, { 65, 25 }, { 64, 24 } }
 local dresults = { diag = 0, fallback = 0, refused = 0, mism = 0, n = 0 }
 
--- one predict-then-press trial: work out what the model says the press does
--- before touching anything (a press changes both the party position and the
--- object map, so a prediction computed afterwards measures a different
--- state; a first draft of this probe made that mistake and reported a false
--- mismatch), then hold the button and compare displacements.
+-- one predict-then-press trial: works out what the model says the press
+-- does before touching anything (a press changes both the party position
+-- and the object map, so a prediction computed afterwards would measure a
+-- different state), then holds the button and compares displacements.
 local function diagTrial(x, y, btn)
   local pred, px, py, held
   return H.cond(function() return true end, {
@@ -305,16 +292,11 @@ local dsteps = {
   end),
 
   -- Connectivity check: (67,27) is where the west-ring door D13 drops the
-  -- party, and from there the matron used to be unreachable; her room
-  -- "flooded to FOUR tiles" and gen_edgar needed three pushUntil hand-holds
-  -- to cross the staircase.  BFS must now find her with no hand-holds.
+  -- party.  BFS must find the matron from there with no hand-holds.
   H.navTo(67, 27, { maxFrames = 6000, playBattles = "tactical" }),
-  -- settle before reading the object map: the party's marker at $7e2000 is
-  -- written by CheckPlayerMove as the step begins (player.asm:1176-1189) and
-  -- the tile just vacated is only released a few frames later, so a BFS run
-  -- the instant navTo's predicate fires sees the party's own stale marker
-  -- one tile back and calls the whole return path blocked (measured: this
-  -- assertion failed with no wait and passes with one).
+  -- settles before reading the object map: the party's marker at $7e2000
+  -- lags the step by a few frames, so reading it immediately can see a
+  -- stale marker one tile back.
   H.waitFrames(30),
   H.call(function()
     local plan = H.bfsPath(59, 22)     -- the tile below the matron's NPC
@@ -332,7 +314,7 @@ local dsteps = {
 }
 
 -- sweep the staircase: at each tile, all four presses, restoring position
--- between trials with navTo, which the diagonal fix makes possible
+-- between trials with navTo
 for _, t in ipairs(STAIR) do
   dsteps[#dsteps + 1] = H.navTo(t[1], t[2], { maxFrames = 4000, playBattles = "tactical" })
   dsteps[#dsteps + 1] = H.logStep(string.format(

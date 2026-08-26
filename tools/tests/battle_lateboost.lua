@@ -1,43 +1,28 @@
 -- @suite savestate=worldmap_narshe
 -- battle_lateboost: where the boost window closes.
 --
--- v0.2 RC playtest: "you can boost after selecting the ability", "once
--- the list is gone you can still boost", "it looks cosmetic, didn't
--- notice any damage boost or BP being spent".  Measurement split that
--- report in two (probe_lateboost.lua), and only the second half was a
--- bug:
+-- During target select, boosting is legal and fully effective: DESIGN.md
+-- prices boost "when confirming an action", and Ot6QueueFold hangs off
+-- CreateAction, which runs after target select, so the tier folds, the
+-- points are charged, and tier damage lands.  After the target is
+-- confirmed, points must not be taken: CreateAction has already frozen
+-- the tier, but Ot6ActionEnd charges whatever pending reads when the
+-- action ends, so Ot6Boost gates on $32cc,y = $ff, the actor's
+-- pending-action command-list pointer ($ff = nothing queued).
 --
---   * during target select, boosting is legal and fully effective.
---     DESIGN.md prices boost "when confirming an action", and
---     Ot6QueueFold hangs off CreateAction (battle_main.asm:12978), which
---     runs after target select, so the tier folds, the points are
---     charged, and tier damage lands.
---
---   * after the target is confirmed, the points were taken for nothing.
---     CreateAction has already frozen the tier, but Ot6ActionEnd charges
---     whatever pending reads when the action ends.  Pre-fix: two more R
---     presses took pending up, the spell stayed the frozen tier, damage was
---     identical, and bp fell further than the tier delivered.
---
--- Ot6Boost now gates on $32cc,y = $ff, the actor's pending-action
--- command-list pointer ($ff = nothing queued; battle_main.asm:254).
 -- This test pins both halves: the accepted spend must still pay in full,
--- and the post-commit spend must move neither pending nor bp.  The
--- second is the negative control; without it the test would pass just
--- as well if boosting had been disabled outright.
+-- and the post-commit spend must move neither pending nor bp.  The second
+-- is the negative control; without it the test would pass just as well if
+-- boosting had been disabled outright.
 --
--- Issue #75 conversion.  On worldmap_narshe TERRA owns Magic with
--- Fire, so the writes are gone: no bp:=5 hand, no mp:=99, no 3000-HP
--- monster pins, no guard stops, no magitek clear, no Magic-row installs,
--- and no saved-cursor pokes: the list cursor walks
--- to Fire by real d-pad edges against the live $8913/$8917/$891B bytes.
--- The bank is earned (1 bp at open plus 1 regen from a real zero-MP Tonic
--- turn = 2), and that resizes the arithmetic: one R at the
--- target cursor is the accepted spend (pending 1 folds Fire -> Fire 2,
--- 20 MP against her real 29, the tier her wallet buys, per battle_fold),
--- and the post-commit refusal still tests something because bp 2 >
--- pending 1 leaves headroom, so a refused R can only be the commit gate
--- and not the bp cap.
+-- On worldmap_narshe TERRA owns Magic with Fire, cast through the real
+-- menu, cursor walking to Fire by real d-pad edges against the live
+-- $8913/$8917/$891B bytes.  The bank is earned (1 bp at open plus 1 regen
+-- from a real zero-MP Tonic turn = 2): one R at the target cursor is the
+-- accepted spend (pending 1 folds Fire -> Fire 2, 20 MP against her real
+-- 29, the tier her wallet buys), and the post-commit refusal still tests
+-- something because bp 2 > pending 1 leaves headroom, so a refused R can
+-- only be the commit gate and not the bp cap.
 --
 --   asserts: no pending on entering target select and $32cc still $ff;
 --   R at the target cursor raises pending (and chings); the committed
@@ -83,7 +68,7 @@ local pendAtTarget, bpAtTarget
 local ching, chingRef = 0, nil
 
 -- bank one real Tonic turn (Locke defers with X); 6-on/24-off, because the
--- item window refuses a faster edge train (battle_preview's measurement)
+-- item window refuses a faster edge train
 local mf = 0
 local function bankDecide()
   if H.readByte(MENU) == 0 then
@@ -155,8 +140,7 @@ H.run({ maxFrames = 60000 }, {
     H.call(function() H.setPad(bankDecide()) end),
   }, "second bp banked by a real Tonic turn"),
   -- her next window: walk to Magic, open the list, park the cursor on
-  -- Fire by real d-pad edges (the old magicCursor() poked $8913/$8917/
-  -- $891B; these are the same bytes, read back as ground truth instead)
+  -- Fire by real d-pad edges against $8913/$8917/$891B
   H.driveUntil(function()
     if H.readByte(MENU) == 0 or (H.readByte(ACTOR) & 3) ~= terra then
       return false
@@ -259,8 +243,6 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(folded, true,
       "the target-select spend DID fold the spell (Fire -> Fire 2)")
     -- charged for one point, which is what was delivered.
-    -- Pre-fix this would read one more, from the post-commit presses taken
-    -- for no tier.
     H.assertEq(bp(terra), bpAtTarget - 1,
       "charged exactly the 1 point the fold used, no post-commit theft")
     H.assertEq(pend(terra), 0, "pending cleared after the action")

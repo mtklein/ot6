@@ -1,9 +1,9 @@
--- probe_cliff_walk.lua -- blind-walk NORTH from the $023C chase state
--- toward map 21's crossing row (34..37,1) -> map 22 (#133).  The BFS
--- model calls the top pocket unreachable, but the Tzen seller proved the
--- engine allows steps the model refuses (z-level paths).  Greedy wiggle:
--- hold up; when y stalls, alternate up-left/up-right sweeps.  Success =
--- the map flips to 22 (the row teleports on step-on).
+-- probe_cliff_walk.lua -- blind-walks NORTH from the $023C chase state
+-- toward map 21's crossing row (34..37,1) -> map 22.  The BFS model calls
+-- the top pocket unreachable; the engine allows z-level steps the model
+-- refuses.  Greedy wiggle: holds up; when y stalls, alternates
+-- up-left/up-right sweeps.  Success = the map flips to 22 (the row
+-- teleports on step-on).
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
 local t, lastY, stall, sweep = 0, nil, 0, 0

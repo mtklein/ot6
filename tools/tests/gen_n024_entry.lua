@@ -2,33 +2,20 @@
 -- {9,7}) -> {9,5} -> map 269 {44,53} -> {42,12} -> map 271 "MAGITEK RES.
 -- FACILITY" {31,28} -> {3,27} -> map 273 {30,60} -> parked at {25,52}
 -- facing UP, one A-press below NUMBER 024.  Generates n024_entry.
---
--- Three ordinary short entrances, decoded from ShortEntrance
--- ($DFBB00/$DFBF02) and agreeing with the recon's map graph:
+
+-- Three ordinary short entrances:
 --     264 {9,5}   -> 269 {44,53}
 --     269 {42,12} -> 271 {31,28}
 --     271 {3,27}  -> 273 {30,60}
 -- Unlike maps 262/263, 269/271/273 are single walking regions; the census
 -- after each landing is logged below as the evidence.
---
--- NUMBER 024 is npc_prop.asm:12478, map 273 NPC_1 at {25,51}, behind
--- switch $0649 (1 at new game, cleared only at event_main.asm:95390), with
--- event _cc79ed (:95385):
---     battle 72 / call _ca5ea9 / hide_obj NPC_1 / sort_obj / switch $0649=0
--- It stands directly below the {25,50} short entrance to map 274 (the
--- esper tube room), so it blocks the only way on, the same shape as Shiva
--- on {9,6} last step and with the same positive control: the entry point
--- asserts {25,50} is NO-PATH now, so a later claim that the fight opened it
--- can be checked.
---
--- Issue #75 (the input-driven test conversion): no state writes.  The
--- battle-clear write helper is gone; any encounter on the walk is fled with
--- the real L+R run (playBattles="flee" on every navTo, and the same branch in
--- the two inline drives).  No route battle has fired on maps
--- 264/269/271/273 so far; the branch exists so that if one does, it is
--- played rather than rigged.  This pass also deleted two helpers this file
--- defined and never called (tapInto and a stub `door`), the same unused
--- toolkit pattern gen_tunnelarmr's conversion cleaned out of its own file.
+
+-- NUMBER 024 is map 273 NPC_1 at {25,51}, behind switch $0649, with event
+-- _cc79ed: battle 72, then switch $0649=0.  It stands directly below the
+-- {25,50} short entrance to map 274 (the esper tube room), so it blocks
+-- the only way on; the entry point asserts {25,50} is NO-PATH now, so a
+-- later claim that the fight opened it can be checked.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -103,7 +90,6 @@ local function census(tag, targets)
   end
 end
 
-
 H.run({ maxFrames = 90000 }, {
   H.loadState("build/states/magicite_ifrit_shiva.mss.lua"),
   H.waitFrames(150),
@@ -141,10 +127,6 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("mrf_facility")
   end),
 
-  -- #84: Break Blade, visible on the walk (map 271's one chest, bit 94 at
-  -- (8,37); probe_chest271 measured the stand tiles from the (31,28)
-  -- landing: (8,38) below it 33 steps, (9,37) beside it 31, and the (3,27)
-  -- exit stays reachable at 37).
   H.openChest{ stand = { 8, 38 }, face = "up", bit = 94,
                what = "Break Blade",
                nav = { playBattles = "flee" } },
@@ -165,15 +147,6 @@ H.run({ maxFrames = 90000 }, {
     })
   end),
 
-  -- The boundary detour (issue #25).  This step is B->C's terminal, so
-  -- before parking on the 024 entry point it stands on the new #10 save point
-  -- at {26,53} and asserts the n024-entry-save-v1 boundary table, the
-  -- same table gen_n024_save_checkpoint saves under and gen_esper_tubes'
-  -- checkpoint boot asserts as its entry contract.  The sram witnesses are
-  -- products of the boundary save, so the pre-save variant is asserted
-  -- (lib/ot6_contract.lua).  Standing on a save tile re-enters SavePoint
-  -- every frame and hasControl() flickers, so arrival is judged on
-  -- position + $01BF + alignment.  The approach never faces 024 with A.
   H.navTo(26, 52, { maxFrames = 9000, playBattles = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
@@ -195,9 +168,9 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sw(0x01BF), 1,
       "$01BF SET -- the NEW 273 save point runs the SavePoint script")
     H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch took")
-    -- the sparkle NPC is present at the authored tile: 273's NPCs are object
-    -- $10 (NUMBER 024) and the appended $11 (the sparkle; record order is
-    -- the object's identity, handoff hazard 2)
+    -- the sparkle NPC is present at the authored tile: 273's NPCs are
+    -- object $10 (NUMBER 024) and the appended $11 (the sparkle; record
+    -- order is the object's identity)
     local off = 0x29 * 0x11
     H.assertEq(H.readWord(0x086a + off) >> 4, 26, "sparkle object $11 x")
     H.assertEq(H.readWord(0x086d + off) >> 4, 53, "sparkle object $11 y")

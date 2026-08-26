@@ -1,7 +1,6 @@
-# Break coverage — Vector / Magitek Research Facility (survey + authored rows)
+# Break coverage — Vector / Magitek Research Facility
 
-Everything below is decoded from the vendored data under `ff6/`. Where a claim
-is an inference rather than something read out of the source, it is labelled.
+Everything below is decoded from the vendored data under `ff6/`.
 Party composition is stated in `docs/design/bosses-wob.md`; §6 cites it rather
 than re-deriving it.
 `tools/tests/battle_breakvector.lua` recomputes the key shares from the shipped
@@ -473,38 +472,6 @@ containing Locke plus one of Edgar, Cyan or Sabin.
 
 ---
 
-## 7. What the distribution should be
-
-Three facts set the shape.
-
-1. Slash is the default attack for most of the roster and pierce is nearly
-   free. Five of the six candidates swing slash, it is the default for Celes
-   and Cyan, and the facility's own chests hand out four more swords (Flame
-   Sabre, ThunderBlade, Blizzard, Break Blade). Pierce is Locke's default line
-   and Edgar's whole Tools menu. Authoring either onto common trash costs the
-   player nothing.
-2. Bludgeon is the deliberate class and it is reachable (§6.2) through either
-   a party pick or a shop trip.
-3. Vanilla already labelled six of the ten bodies as machines (§3.1), which
-   gives the player a rule to guess before probing.
-
-So bludgeon carries the area, pierce is the second key on the imperial bodies,
-slash comes off the machines entirely, and ¤ is not used in this beat.
-
-Slash still has work: three of the area's six set-pieces are already slash
-rows, namely Shiva 6·slash, RightBlade and Left Blade 3·slash each, and
-Number 024 slash|pierce. Cyan's Quadra Slam (four hits, and multi-hit actions
-chip per hit — `weapon-classes.md`, "Weapons as chip carriers") and Celes'
-sword both apply there. What they lose is chipping every random encounter with
-the default attack.
-
-The measurable target is three conditions, not an even four-way split: every
-encounter is chippable by some buildable party (`weapon-classes.md`'s coverage
-rule); no encounter is chippable only by a class no party can field; and slash
-is no longer the automatic answer on the common bodies.
-
----
-
 ## 8. The area's `Ot6ShieldTbl` rows
 
 Format matches the existing table (`ot6_hud.asm:1273`): `.word` species,
@@ -531,12 +498,6 @@ Format matches the existing table (`ot6_hud.asm:1273`): `.word` species,
 
 All twelve sit at 2, against a formula value of 4, because the formula's count
 lands the break on an already-dead body (`ot6_hud.asm:1489-1510`).
-
-Unmeasured. Validating them needs a Vector entry-point fixture and a
-`bal_party.lua` `boost3` run with `BAL_BUFF_SHIELDS` over 1/2/3 against groups
-80, 104, 105 and 106 with a four-character party, and against group 108 and
-the minecart formations with three. The three-character arm matters on its
-own: less damage per round means the same shield count breaks later.
 
 ### 8.3 Resulting distribution
 
@@ -611,115 +572,9 @@ No shop change is needed. Vector's shop 27 stocks no blunt weapon, but with
 a four-character party that costs nothing: Sabin and Gau bring bludgeon for
 free, and Locke and Celes can buy it in four towns before the walk.
 
----
-
-## 10. What this asks of the generator and the tests
-
-### 10.1 Substring matching cannot express these rows, and does not need to
-
-Not needed: every row above goes in `Ot6ShieldTbl`, which `Ot6SeedShields`
-scans before `@formula` (`ot6_break.asm:24-38`). Authored rows take precedence
-by construction, so the generator needs no change to accommodate them.
-
-Not able, in general. Name-substring classification cannot express per-species
-intent wherever two species share a name, and 15 names in the game cover 42
-species. This area supplies two cases:
-
-- Both minecart bodies are named "Mag Roader" (`$006`, `$0af`), and one
-  absorbs the element the other is weak to. A name-keyed rule must give them
-  the same class. That is what the design wants here, but only by coincidence:
-  the tool could not have chosen otherwise.
-- Both Cranes are named "Crane" (`$10d`, `$10e`), and they already carry
-  authored rows over different vanilla element profiles.
-
-The same holds for the four Ultros records (`$12c`/`$12d`/`$12e`/`$168`, which
-carry four different authored rows), the three Tritochs, the three Kefkas and
-the four Tentacles. If species-level control is ever wanted from the tool, the
-keying has to move from name to species id.
-
-### 10.2 Three generator/tooling changes this survey identifies
-
-1. Three-way review output: explicit / inferred / defaulted. Two categories are
-   not enough. `break_floor_review.txt` triages only DEFAULT rows as "the
-   taste-review surface" (`gen_break_floor.py:202-203`). Rhinox is not on that
-   list, because `rhino` matched, even though it has no weakness at all,
-   absorbs the area's key element, and is 68.75 % of the deep pool. Inferred
-   rows need review too.
-2. Mark authored species as AUTHORED and exclude them from the headline
-   counts. 62 of the 384 rows the review counts never reach `@formula`; the
-   floor-live numbers are 245/58/19 over 322 species (§4).
-3. An encounter-and-party reachability check. No existing test detects the
-   floor's failure here: the bytes are nonzero and every species has a class,
-   but nothing measures whether that class is the interesting one or whether
-   the party can field it. The check that would catch it: walk
-   `SubBattleGroup → RandBattleGroup → BattleMonsters` for a named map set
-   and the forced-battle lists (`EventBattleGroup`, plus the train script's
-   `$e0`/`$e1`/`$e2` items, since the minecart is invisible to any event-script
-   scan), take a declared party and their equippable class sets, and assert
-   every formation has at least one class key some member can bring. That is
-   the concrete form of "tests cover encounter/party reachability, not only
-   nonzero table bytes".
-
-### 10.3 Fixture assertions, on the `gen_kolts.lua:594` pattern
-
-Inventory is ids at `$1869 + i` and counts at `$1969 + i` (the helper at
-`gen_kolts.lua:588-593`). Equipped weapon is `$161f + char*37`.
-
-**At the Vector entry point**, before the on-foot world walk into town:
-
-- Assert a bludgeon key exists: Sabin or Gau in the active party (their fists
-  and Blitz need nothing), **or** `invCount(0x44) + invCount(0x46) ≥ 1`
-  (Flail / Morning Star — Celes) **or** `invCount(0x45) + invCount(0x47) +
-  invCount(0x48) + invCount(0x4b) + invCount(0x4c) ≥ 1` (the boomerang family —
-  Locke). Direct analogue of "BioBlaster still carried (the poison key)". This
-  is the assertion the Rhinox row depends on.
-- Assert Ramuh is owned and equippable, because three bludgeon-only rows use
-  bolt as their fallback probe.
-- Assert the active party is four with Locke and Celes among them, so the
-  fixture cannot drift off `bosses-wob.md` §13's roster.
-
-**At the Ifrit & Shiva entry point** (map 264, which is also the Flan pool):
-assert Flame Sabre `$0d` is carried or equipped. It is Shiva's element key and
-Flan's, and it is a chest two maps back.
-
-**At the minecart boarding point** (map 272's save point at (3,55),
-`event_trigger.asm:1211`, the last controllable state before the ride): assert
-the party is three, and assert Ifrit and Shiva magicite are owned: they
-are the five Mag Roader fights' elemental answers and the facility awards both
-upstream.
-
-**At the Crane entry point** (map 240, one step from (52,39)/(52,40)/(52,41)):
-assert the party is the three that boarded, since `bosses-wob.md` §16's roster
-is the thing most likely to drift.
-
----
-
-## 11. Open items
-
 `tools/tests/battle_breakvector.lua` is the regression test on the rows: it
 walks `SubBattleGroup → RandBattleGroup → BattleMonsters` out of the shipped
-ROM, asserts every body in the area is authored rather than floored, enumerates the
-six free four-parties and asserts every formation is answerable by one, pins
-formation `$168` (Rhinox ×2) as both bludgeon-only and element-less, and
+ROM, asserts every body in the area is authored rather than floored, enumerates
+the six free four-parties and asserts every formation is answerable by one,
+pins formation `$168` (Rhinox ×2) as both bludgeon-only and element-less, and
 recomputes the key shares to assert bludgeon outranks slash.
-
-Each of these is a separate piece of work:
-
-- The shield counts in §8.2 are UNMEASURED: a precedent-following 2
-  against a formula 4. They need their own sweep with a Vector entry-point
-  fixture and a separate three-character arm (§8.2, §10.3). It is the largest
-  unvalidated assumption in the area.
-- The §10.3 fixture assertions are not written, because no Vector
-  entry-point / minecart-boarding / Crane entry-point fixture has been
-  generated yet. The Rhinox row's
-  "a bludgeon key is in the party or the bag" assertion belongs there.
-- The §10.2 generator/tooling items are untouched: three-way
-  explicit/inferred/defaulted review output, marking authored species and
-  excluding them from the headline counts, and the generalised
-  encounter/party reachability check. `battle_breakvector.lua` implements the
-  third of those for this area only; generalising it is the remaining work.
-- Whether maps 265 / 267 / 268 actually roll their group-0 encounters (§1.1)
-  wants one runtime check.
-- The generated floor remains the documented provisional fallback for every
-  area except this one. Retro-authoring Narshe → Blackjack is deferred.
-- No human playtesting. The distribution is measured; how it plays is not.

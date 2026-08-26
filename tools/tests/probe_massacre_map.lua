@@ -1,7 +1,6 @@
 -- probe_massacre_map.lua -- one-shot: boot ultros-won-v1 and flood-fill map
 -- 375's live passability to find which compartment the massacre trigger
--- 375 (15,17) sits in, and which warp tiles reach it.  Issue #124/#127.
--- No @suite.
+-- 375 (15,17) sits in, and which warp tiles reach it.  No @suite.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
@@ -73,8 +72,8 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
         w[1], w[2], w[3], tostring(c), tostring(walkable(w[1], w[2]))))
     end
     -- comp-2 (the massacre pocket) local geometry around (15,17) and the
-    -- (16,9) entry: pick the #125 save tile (walkable, adjacent to (15,17),
-    -- not the trigger itself)
+    -- (16,9) entry: pick a save tile (walkable, adjacent to (15,17), not
+    -- the trigger itself)
     local mc = comp[key(15, 17)]
     H.log(string.format("[mm] massacre comp=%d; neighbourhood of (15,17):", mc))
     for y = 6, 22 do

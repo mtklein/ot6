@@ -1,4 +1,4 @@
-# OT6 v0.7 — Sealed Gate / Banquet route survey
+# Sealed Gate / Banquet route survey
 
 ## 1. The route, segment by segment
 
@@ -36,21 +36,12 @@ lines (the `$007D` branch cluster, `:90701-91940`). The port is **map 332**
   $4B`, and the party is placed on the world map at **(232,150)**, Crescent
   Island, controllable.
 
-The **v0.7 stop line** is: world (232,150), party TERRA · LOCKE · SHADOW,
+The **stop line** is: world (232,150), party TERRA · LOCKE · SHADOW,
 `$007D=1 $0083=1 $0086=1`, airship still unavailable (`$007A=1`), Gau
 unavailable (`$02FB=0`). The Thamasa world trigger (`_cbd2ee`, `:69190` → map
 343 (23,46)) is at **(250,128)**, a 40+ step walk from the stop line across
 encounter-active ground, so it is not usable as an entry point. Crescent
-Island's world trash is split by terrain across three encounter groups, not one
-(`thamasa-route.md` §1 segment 1).
-
----
-
-## 6. Open questions for the milestone
-
-7. **The Albrook night window**: is leaving town (to world-save) mid-sequence
-   safe, or does `$0084/$0085` state wedge? The answer decides whether the
-   segment to the stop line gets a mid-segment savestate.
+Island's world trash is split by terrain across three encounter groups, not one.
 
 ---
 

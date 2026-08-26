@@ -1,27 +1,12 @@
 -- @suite slow
 -- battle_dmgnum: OT6 must not write into vanilla's damage-numeral vram.
---
--- The v0.2 RC playtest bug: "the boost chevrons sometimes turn into
--- numbers".  OT6's over-character boost marks used three 16x16 sprites in
--- obj tiles 200/202/204 and 216-221, which is vram words $2c80-$2dd0, inside
--- the block ff6/notes/battle-ram.txt:2206 labels "$2C00 Damage
--- Numeral Graphics / $2CC0 Miss Graphics".  GfxCmd_0b picks a numeral's
--- destination from a rotating counter (btlgfx_main.asm:24697, tables at
--- :24795): phases 2 and 3 land on $2c80/$2d80 and $2cc0/$2dc0, covering
--- all twelve of OT6's tiles.  So half of all damage numbers stamped
--- digits over the chevrons, intermittently, keyed to a counter no player
--- can see.  probe_objarrow.lua measured 2141 of 3000 frames clobbered.
---
--- The marks are retired, because there is no free obj vram to move them to
--- (probe_objsentinel.lua and probe_objtail.lua), so the invariant this
--- test checks is: while a boost is pending and damage numbers are flying,
---   * oam entries 96-99 (the old mark entries) stay parked, and
+
+-- The invariant checked, while a boost is pending and damage numbers are
+-- flying:
+--   * oam entries 96-99 (the retired boost-mark entries) stay parked, and
 --   * no oam entry ever points at a tile in the numeral block 192-223
 --     wearing OT6's palette-3/priority-3 attribute.
--- Against the pre-fix ROM both fail: the drawer populated entry
--- 96+slot every frame a boost was pending, with tile $c8/$ca/$cc and
--- attr $36.
---
+
 -- Negative control, so this cannot pass because boost feedback is gone
 -- altogether: the party-window pip cell must still show the arrow cluster
 -- while the boost is pending.
@@ -98,17 +83,6 @@ H.run({ maxFrames = 40000 }, {
   H.enterEncounter(),
   H.waitFrames(240),
   H.call(function() watchNumerals() end),
-  -- issue #75: the actor used to be handed 3 bp, with the guards pinned to
-  -- 3000 HP and the party to 900.  The bank is earned now, the same way
-  -- battle_boost earns it on this same fixture (its driver is used
-  -- unchanged): every character opens with 1 bp (Ot6InitBP), an unboosted
-  -- action regens +1 (Ot6ActionEnd), so the first slot whose menu opens
-  -- takes two real row-2 beams and arrives holding 3.  The submit is
-  -- driven by menu state ($7BC2), because a fixed sequence lands its downs
-  -- in whatever window holds the cursor, and battle_boost's notes on what
-  -- does not work carry over: Heal Force is priced out of the opening MP so
-  -- A is refused, the item window fails on an empty bag and the Wait-mode
-  -- freeze, and any other ready character defers focus with X.
   (function()
     local mf, downs = 0, 0
     return H.driveUntil(function()
@@ -150,9 +124,6 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(H.readByte(0x3e9c + actor*2), 3,
       "3 bp banked by real turns (1 open + 2 regen)")
   end),
-  -- arm a boost: this is the state the retired drawer painted in.
-  -- Driven by state rather than by counting presses, because a press landing
-  -- in a just-opening window is dropped (measured in metrics_battle.lua).
   H.driveUntil(function()
     return H.readByte(0x3e9d + actor*2) >= 3
   end, 900, {
@@ -164,16 +135,6 @@ H.run({ maxFrames = 40000 }, {
   -- hold the boost up for a while, sampling, before spending it
   H.waitUntil(function() sample(); return frames >= 120 end, 300,
     "boost held and sampled", 1),
-  -- now let the battle run so damage numerals fly.  Issue #75 note: the
-  -- pinned version A-mashed through the window, spending and re-arming
-  -- boosts against 3000-HP guards.  Unpinned, our beams would end the
-  -- fight mid-window, so the party holds still instead: the boost stays
-  -- pending for the whole run, which is the state the retired drawer
-  -- painted in on every frame, and the numerals come from the guards'
-  -- attacks landing on the party.  Nobody on our side deals damage, so the
-  -- fight cannot end and no HP pin is needed on either side.  The
-  -- positive controls below are unchanged and keep this from passing
-  -- without testing anything: a quiet window with no numerals still fails.
   H.driveUntil(function()
     sample()
     return frames >= 2400

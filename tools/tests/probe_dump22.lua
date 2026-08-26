@@ -1,6 +1,5 @@
--- probe_dump22.lua -- blind-descend 23 -> 22 (20,2) from wob_mog_done,
--- then dump cliff 22's tile props + NPC-block map so the downward
--- crossing can be solved offline (#133 Water Rondo descent).
+-- probe_dump22.lua -- blind-descends 23 -> 22 (20,2) from wob_mog_done,
+-- then dumps cliff 22's tile props and NPC-block map.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
 H.run({ maxFrames = 20000 }, {

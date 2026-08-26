@@ -1,66 +1,20 @@
 -- probe_zozo_tool.lua -- does EDGAR's Tool decide the Zozo climb?
 --
--- The climb's random encounters were losing, and the reason on the record
--- was that Zozo's four species carry an Ot6ShieldTbl row with two shields
--- and no class byte at all (ff6/src/battle/ot6_hud.asm:2086-2097), so
--- nothing a weapon or an ability does ever takes a shield off.  The block
--- comment over those four rows says the answer is not a weapon: "the answer
--- is the tool rather than the A button" (:2084-2085), meaning the vanilla
--- poison weakness all four already carry (monster_prop.dat +25 = $08) and
--- EDGAR's Bio Blaster, item $a4 -> attack $7d, element $08, all enemies
--- (ot6_break.asm:203-204, :279-281; battle_main.asm:6577).  Until
--- opts.tool, newFightDriver could only ever reach for AutoCrossbow.
+-- Zozo's four species carry an Ot6ShieldTbl row with two shields and no
+-- class byte, so nothing a weapon or ability does ever takes a shield off
+-- except the poison weakness they carry plus EDGAR's Bio Blaster (element
+-- $08, all enemies).
 --
--- This measures that claim rather than repeating it.  One boot of
--- zozo_arrival, a care stop so HP is not the variable, a checkpoint, then
--- the SAME pacing walk twice with the SAME input -- the emulator is
--- deterministic, so both halves draw the same formation on the same frame
--- off the same battle seed -- and the only difference between them is which
--- Tool the driver names.  It reports, per half: the formation, the shield
--- counts frame by frame, monster HP, party HP, and how the fight ended.
+-- Boots zozo_clock_solved (map 225's group 77), a care stop so HP is not
+-- the variable, a checkpoint, then the SAME pacing walk twice with the SAME
+-- input -- the emulator is deterministic, so both halves draw the same
+-- formation on the same frame off the same battle seed -- and the only
+-- difference between them is which Tool the driver names.  It reports, per
+-- half: the formation, the shield counts frame by frame, monster HP, party
+-- HP, and how the fight ended.
 --
 -- It asserts nothing about which half wins.  A probe that demanded the
 -- answer it expected would agree with itself; the numbers are the output.
---
--- It boots zozo_clock_solved rather than zozo_arrival, so the pool is map
--- 225's group 77 -- SlamDancer 392 hp def 115, Harvester 428 hp def 105,
--- and mixes of the two with Gabbldegaks.  That is the pool that wiped the
--- climb, and it is the pool where the break can be worth its turns.
---
--- Measured first on zozo_arrival, map 221's group 78, at full HP, and the
--- numbers are here because they are the reason the map was changed rather
--- than because they settle anything.  The draw was formation 104, four
--- Gabbldegak at 350 hp and 2 shields each:
---
---   autocrossbow  WON in 3251 frames, shields 8 -> 8   party -186 hp
---   bioblaster    WON in 5276 frames, shields 8 -> 1   party -160 hp
---
--- So the shield claim held exactly: with AutoCrossbow not one of the eight
--- shields moved in the whole fight, and with the Bio Blaster all four
--- bodies went 2 -> 1 on the same frame (f+1746), which is the group chip
--- the table's comment describes.  But AutoCrossbow still won that fight
--- FASTER, because its power is 125 against the Bio Blaster's 20, and a
--- 350-hp body dies to halved damage before a break can pay for the turns
--- it costs.  The break earns its keep on the bodies that do not: HadesGigas
--- at 1200 hp and defence 125, Harvester at 428 and 105.
---
--- Which is what map 225 then showed, on formation 108 -- SlamDancer 392 hp
--- plus two Harvesters at 428, both halves drawing it at f1526 off the same
--- seed from a full-HP party:
---
---   autocrossbow  all six shields still up past f+10200, and by then the
---                 party had gone 249/245/280/289 -> 44/0/246/36 with two
---                 members killed and raised, while one Harvester healed
---                 itself from 266 back to 428/428.  At the shielded halving
---                 the party cannot out-damage that heal, so the fight is
---                 not close: it is a stalemate the party loses slowly, and
---                 it never finished inside the run's wall clock.  That is
---                 the fight that blocked dadaluma_entry.
---   bioblaster    all three bodies 2 -> 1 on one action at f+1721.
---
--- The bio half's own ending was not observed: the run was killed for the
--- machine's sake before it finished.  What is measured is the chip, not the
--- win.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -157,14 +111,8 @@ local function half(name, tool)
           H.log(string.format("[%s] f+%d party [%s] vs %s", name,
             H.frame - f0, partyLine(), monsterLine()))
         end
-        -- A fight that is neither won nor lost is a RESULT, and it has to
-        -- end itself or it eats the wall clock and the run reports nothing
-        -- at all.  Measured on map 225's two-Harvester draw: at the
-        -- shielded halving the party cannot out-damage a Harvester's own
-        -- heal, so the fight ran past f+10200 with all six shields still
-        -- up, two members killed and revived, and one Harvester back at
-        -- 428/428 from 266.  That is a stalemate the party loses slowly,
-        -- and it is worth naming rather than waiting out.
+        -- A fight that is neither won nor lost must end itself, or it eats
+        -- the wall clock and the run reports nothing at all.
         if (H.frame - f0) > FIGHT_CAP then
           finish("STALEMATE")
           H.setPad({})
@@ -197,12 +145,8 @@ local function half(name, tool)
         return
       end
       F.idle()
-      -- A walk that draws nothing must SAY so.  Without this the half is
-      -- silent from the checkpoint to the encounter, and "the pacer is not
-      -- stepping" and "the pacer is stepping and has not rolled yet" print
-      -- the same nothing.  $1f6e is the step-danger accumulator every step
-      -- adds the map's rate to (field/battle.asm:350-388), so it moving is
-      -- the proof that steps are happening.
+      -- $1f6e is the step-danger accumulator every step adds the map's
+      -- rate to; it moving is the proof that steps are happening.
       if hb % 300 == 0 then
         H.log(string.format("[%s] pacing f+%d at (%d,%d) danger=$%04X ctl=%s "
           .. "align=%s steps=%d", name, hb, H.fieldX(), H.fieldY(),
@@ -221,10 +165,9 @@ local function half(name, tool)
         if stall > 40 then dirI = dirI % #DIRS + 1; stall = 0 end
       end
       lastX, lastY = x, y
-      -- Held, not pulsed, and not canStep-gated: this is open street, the
-      -- point is to accumulate steps rather than to reach a tile, and a
-      -- direction the map refuses just leaves the position unchanged, which
-      -- the stall counter above turns into the next direction.
+      -- held, not pulsed, and not canStep-gated: a direction the map
+      -- refuses leaves the position unchanged, which the stall counter
+      -- above turns into the next direction
       H.setPad({ [DIRS[dirI]] = true })
     end),
   }, name)
@@ -254,10 +197,8 @@ H.run({ maxFrames = 200000 }, {
     })
   end)(),
 
-  -- The Bio Blaster half runs FIRST, deliberately.  Both halves replay the
-  -- same input off the same checkpoint, so the order does not change which
-  -- fight either of them draws, and a run that loses its second half to the
-  -- wall clock should lose the control rather than the measurement.
+  -- both halves replay the same input off the same checkpoint, so order
+  -- does not change which fight either draws
   half("bioblaster", H.BIO_BLASTER),
 
   (function()

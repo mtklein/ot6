@@ -1,8 +1,5 @@
 -- probe_v07_g_boot.lua -- what a cold Continue of narshe-mission-v1
--- restores.  Not a suite test.  Run with:
---   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1 \
---   tools/tests/run.sh tools/tests/probe_v07_g_boot.lua
--- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- restores.  Not a suite test.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

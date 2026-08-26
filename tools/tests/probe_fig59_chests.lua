@@ -1,14 +1,12 @@
--- probe_fig59_chests.lua -- #84: can gen_zozo2_arrival reach the map-59
--- chests at (43,12) Tonic bit 14 and (44,12) Antidote bit 15?
+-- probe_fig59_chests.lua -- can gen_zozo2_arrival reach the map-59 chests
+-- at (43,12) Tonic bit 14 and (44,12) Antidote bit 15?
 --
 -- The generator's only map-59 ground is the west stairwell corridor
--- (x 10..12, y 41..50, [tiles] trace in the 2026-08-17 route regen log).
--- The chests sit at y=12 near x=44, a region gen_figaro_intro walks
--- (44,16..19).  This probe loads figaro_submerged, walks the generator's
--- own first step into map 59, and asks BFS whether any stand tile beside
--- the chests is reachable from the corridor; it also dumps the local
--- walkability grid around the chests, which canStep can read from anywhere
--- on the loaded map.
+-- (x 10..12, y 41..50).  The chests sit at y=12 near x=44, a region
+-- gen_figaro_intro walks (44,16..19).  This probe loads figaro_submerged,
+-- walks the generator's own first step into map 59, and asks BFS whether
+-- any stand tile beside the chests is reachable from the corridor; it
+-- also dumps the local walkability grid around the chests.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

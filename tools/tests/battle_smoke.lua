@@ -1,17 +1,6 @@
 -- @manual quick first-battle smoke, run by hand during battle/break bring-up
 -- battle_smoke.lua -- load the captured first-battle savestate and assert
--- battle state is live.  Run with:
---
---   tools/tests/run.sh tools/tests/battle_smoke.lua
---
--- Requires build/states/first_battle.mss.lua, produced by gen_battle_state.lua
--- (run.sh's compose step embeds the sidecar payload into the script, since
--- runtime file loads raise under Mesen's default AllowIoOsAccess setting).
---
--- Also dumps the OT6 break-system RAM:
---   $7E3E40, $7E3E42, ... per-monster shield current (stride 2 from $7E3E38+8)
---
--- Exit codes: 0 = battle active with sane values, 1 = any assert failed.
+-- battle state is live.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/first_battle.mss.lua"
@@ -53,7 +42,6 @@ H.run({ maxFrames = 3600 }, {
     H.log("shield current bytes $7E3E40-$7E3E4B: " .. table.concat(sb, " "))
 
     -- at least one present monster must carry a seeded shield count
-    -- (the retired monster-window digit used to stand in for this)
     local seeded = false
     for i = 0, 5 do
       if H.readByte(0x3AA8 + i * 2) % 2 == 1

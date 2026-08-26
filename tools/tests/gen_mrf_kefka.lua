@@ -1,28 +1,11 @@
--- gen_mrf_kefka.lua -- v0.6 step 6: mrf_263 (map 263, {22,18}) -> the
--- {24,18} ride down to {40,30} -> the {40,32} trigger -> Kefka's
--- esper-drain scene -> $005F=1.  Generates mrf_kefka.
+-- gen_mrf_kefka.lua -- mrf_263 (map 263, {22,18}) -> the {24,18} ride
+-- down to {40,30} -> the {40,32} trigger -> Kefka's esper-drain scene ->
+-- $005F=1.  Generates mrf_kefka.mss.
 --
--- Measured at (22,18) (census in gen_mrf_263's log): 493 tiles reachable,
--- and of the waypoints this beat needs, only {24,17} (3 steps) and
--- {24,18} (2 steps) are among them.  {36,44}/{37,44}/{38,44} (the chute
--- to map 264) and {40,32}/{41,32}/{42,32} (the Kefka trigger row)
--- are all NO PATH from the landing.  Map 263 is two disconnected walking
--- regions joined by a ride, the third time this beat has had that
--- shape (the {19,25} chute, the {11,45} conveyor, and this one).
---
--- _cc75c9 (event_main.asm:94694), on {24,18}, is ungated and falls into
--- _cc75d0 (:94701): `layer 3 / move RIGHT 8 / move RIGHT 7`, then
--- `hide_obj SLOT_1`, a camera pan, and a hard `pos {40,26}` teleport,
--- then `move DOWN 3 / jump_low / move DOWN 1`, so it ends at {40,30}
--- with `player_ctrl_on`.  ({24,17}'s _cc75bb is the same ride entered one
--- tile north; it walks DOWN_RIGHT into the same code.)
---
--- The trigger row {40,32}/{41,32}/{42,32} (_cc7431/_cc73e1/_cc7409,
--- :94388/:94340/:94364) is guarded `if_switch $005F=1, EventReturn` and
--- each walks SLOT_1 a step or two UP_LEFT before falling into _cc7451
--- (:94409), the scene where Kefka drains the espers.  Its tail
--- (:94620-94622) is `switch $005F=1 / unlock_camera / player_ctrl_on`,
--- and $005F is what this step banks.
+-- {24,18}'s trigger is ungated and rides the party down to {40,30}.  The
+-- trigger row {40,32}/{41,32}/{42,32} is guarded `if_switch $005F=1,
+-- EventReturn` and falls into the scene where Kefka drains the espers,
+-- ending with $005F=1.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -102,11 +85,9 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- Stop tapping once the party is on the target tile.  The
-        -- terminator needs 16 consecutive calm frames there, and a further
-        -- tap walks off it before the count completes: the first version of
-        -- this rode the chute correctly to (10,45), then tapped itself to
-        -- (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile: the
+        -- terminator needs 16 consecutive calm frames there, and a
+        -- further tap would walk off it before the count completes.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return
@@ -147,7 +128,6 @@ local function census(tag, targets)
   end
 end
 
-
 H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/mrf_263.mss.lua"),
   H.waitFrames(150),
@@ -161,11 +141,6 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("mrf_263"))
   end),
 
-  -- #84: map 263's three visible chests, opened in the pre-ride window --
-  -- the only honest access.  probe_mrf263_chests measured the map as two
-  -- components joined only by the scripted {24,18} ride: from this boot all
-  -- three stands path clean of every scripted tile (44/69/62 steps), while
-  -- gen_ifrit_entry's post-Kefka component reaches none of them.
   H.openChest{ stand = { 15, 55 }, face = "left", bit = 89,
                what = "Gold Helmet", nav = { playBattles = "flee" } },
   H.openChest{ stand = { 33, 57 }, face = "left", bit = 93,

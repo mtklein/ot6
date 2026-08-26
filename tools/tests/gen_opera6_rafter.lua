@@ -1,30 +1,7 @@
 -- gen_opera6_rafter.lua -- v0.5 Beat A step 6: opera_dance_done (map 238
 -- {98,7}, $0111=1) -> the rafter chase -> generate ultros2_entry one
 -- interaction before battle 104 (Ultros②, $012d, 6 shields, slash|pierce).
---
--- Measured route: touch Ultros's letter, return through the active theater to
--- alert the Impresario, ride the briefing, talk to the stage master, operate
--- the far-right switch, enter the left framework, and cross map 235 to Ultros.
---
--- The rat gates are played rather than switched off (issue #75).  The five rat
--- NPCs ({8,11} {11,15} {18,14} {21,7} {13,12}, switches $034C-$0350,
--- npc_prop.asm _235) used to be switched off before map 235 instantiated; now
--- they wander live.  Each is a no_react collision NPC whose event is
--- `battle 25`: a win despawns it and clears its switch, and a loss restarts
--- the chase (_caba0b).  The catwalk crossing fights whichever rats collide,
--- with the fight tapped like any encounter, inside the same 5-minute timer
--- (start_timer 0, 18000, event_main.asm:28736, counter at $1189; it ticks
--- through battles, and running it out fades to _caba09, which drops the
--- weight and restarts the opera, so the route stays short and rats that do
--- not collide are left alone).  The crossing itself is crossRafters on a
--- three-attempt ladder rather than a navTo, because the catwalk is one tile
--- wide, a rat parked on it leaves the goal with no path at all, and how many
--- rat fights the rats force decides whether the crossing fits the clock;
--- crossRafters' header has the measurements.  Before the entry point
--- generate, the script waits until no live rat stands within 4 tiles of
--- (14,7), so the banked state cannot boot into a rat collision under
--- battle_ultros2's immediate A-taps.
---
+
 -- The facing is produced by input rather than poked: the old generator wrote
 -- the object facing byte and $0743 to point the party at Ultros; now the last
 -- action at the entry point is a short RIGHT press against his occupied tile
@@ -32,6 +9,13 @@
 -- facing is asserted from RAM afterwards.  This file writes no emulated game
 -- state.
 --
+-- The rat gates are played rather than switched off. The five rat NPCs
+-- ({8,11} {11,15} {18,14} {21,7} {13,12}, switches $034C-$0350) wander
+-- live; each is a no_react collision NPC whose event is `battle 25`, a
+-- win despawns it and clears its switch, and a loss restarts the chase.
+-- The catwalk crossing fights whichever rats collide, inside the same
+-- 5-minute timer the vanilla scene uses.
+
 -- Note: the WoB story encounter is `_cabf4b` -> battle 104.  Battle 134
 -- belongs to the WoR Opera House dragon/weight event (`$0387=1`); older route
 -- notes conflated the two.
@@ -54,9 +38,6 @@ local function dumpsw(tag)
     sw(0x0387), sw(0x01B0), sw(0x01B4), sw(0x00A4), sw(0x02BA)))
 end
 
--- rat bookkeeping: NPC_9..NPC_13 ride objects 24..28 (NPC_n = object
--- n+15, gen_moogle's measured map), gates $034C..$0350 in list order.
--- A rat is live while its gate switch is still set.
 local function ratLine()
   local t = {}
   for k = 0, 4 do
@@ -81,46 +62,10 @@ local function ratNear(x, y, r)
 end
 
 -- crossRafters: walk to (tx,ty) on map 235 with the five rats live.
---
--- Why this is not a navTo.  The rafters are one tile wide from end to end:
--- measured 2026-08-13 by dumping the tile properties of every tile on map
--- 235, the only route from the left framework to Ultros is the single chain
--- col 6 -> (7,12) -> col 8 -> row 16 -> col 11 -> row 18 -> col 13 -> row 15
--- -> col 19 -> row 12 -> col 11 -> row 7, with no second way round at any
--- point.  A live rat standing on any tile of it therefore disconnects the
--- goal, because the passability model refuses a tile an object occupies
--- (lib/ot6_field.lua:395), and navTo can only wait: its no-path branch idles
--- 45 frames and re-searches, 20 times, and then fails.  Measured on the run
--- that reported `navTo: no path (6,12)->(14,7)`: bfsPath answered nil for
--- more than 600 consecutive frames with rats sitting at (8,15) and (14,12),
--- two tiles of that chain, so the 900-frame allowance is the whole margin.
---
+
 -- What this does instead.  Same BFS, re-planned on every tile-aligned frame
 -- (the `corridor` shape above), and three things navTo does not do:
---
---   * it dodges, taking a step only onto a tile no live rat is standing
---     next to, because standing next to one buys a fight (below);
---   * when the goal is unreachable it waits, and backs off if a rat has come
---     within two tiles, because a wandering rat usually steps off the
---     corridor on its own -- median 75 frames over 81 measured blockages,
---     though the tail runs to 1250;
---   * and when waiting has not worked for `patience` frames it goes and
---     stands beside the nearest reachable live rat on purpose.  A rat is a
---     collision-activated object and `CheckCollosions` fires its event as
---     soon as a character stands on any of the four tiles around it
---     (ff6/src/field/obj.asm:4035-4055, reached from the per-object update
---     at :4361); the event is `battle 25`, and a win despawns the rat and
---     clears its gate.  So a corridor a rat will not leave is cleared by
---     fighting the rat, which is what the chase is built out of, and it
---     terminates: there are five rats and each is removed for good.
---
--- The fights are driven by the tactical fight driver rather than by blind
--- A-taps, which is what the crossing used to do through navTo's
--- `playBattles=true`.  That was measured on 2026-08-13 and it is not a
--- style point: three rat fights tapped blind ran about 3200 frames each,
--- more than half of the chase's whole 18000-frame timer, and they left
--- LOCKE dead at 0/353 in the banked entry point, which
--- `tools/audit_party_hp.py` fails.
+
 local RAT_GATE0, RAT_OBJ0 = 0x034C, 24
 -- the eight moves M.bfsPath can return, and what each does to (x,y)
 local DELTA8 = { up = {0,-1}, right = {1,0}, down = {0,1}, left = {-1,0},
@@ -152,14 +97,7 @@ local function crossRafters(tx, ty, maxF, patience, hold, res, what)
   -- which only a loss sets (HANDOFF records the chain; LoseBattle is
   -- battle_main.asm:16040-16042).  A run is not a loss, so a run would take
   -- the despawn branch.
-  --
-  -- Measured 2026-08-13, and the pack refuses it: $b1 read $06 -- bit 1
-  -- can't-run plus bit 2 harder-to-run -- for 3000 consecutive battle frames
-  -- with battle type 0, so not a pincer, while the per-character run
-  -- counters stalled at 5,2,2 against a difficulty of 6 and nobody left.
-  -- What is kept is newFlee's own refusal test (lib/ot6_field.lua:218-256;
-  -- it is local to that file, so it is open-coded here): hold L+R, and hand
-  -- the fight to the tactical driver once the flag has held 60 frames.
+
   local function battleFrame()
     if battN <= 3 then refusedN = 0 end
     refusedN = ((H.readByte(0x00b1) & 0x02) ~= 0) and refusedN + 1 or 0
@@ -225,15 +163,6 @@ local function crossRafters(tx, ty, maxF, patience, hold, res, what)
     if not H.hasControl() then H.setPad({}); return end
     if not H.tileAligned() then H.setPad({}); return end
     if held < hold then held = held + 1; H.setPad({}); return end
-    -- Dodging, which is the expensive part of this map.  A rat fires its
-    -- fight from its own update as soon as a character stands on one of the
-    -- four tiles around it (obj.asm:4035-4055), so a step that lands next to
-    -- a rat buys a fight, and the fights are what overruns the chase clock:
-    -- measured 2026-08-13, one rat fight runs about 2500 frames of an
-    -- 18000-frame timer, and four of them ran two of four trial crossings out
-    -- of time.  So the walk only takes a step onto a tile no live rat is
-    -- standing next to, and otherwise holds still, or backs off if a rat has
-    -- come within two tiles.  Waiting costs the clock far less than fighting.
     local function ratDist(x, y)
       local d = 99
       for k = 0, 4 do
@@ -305,9 +234,6 @@ local function crossRafters(tx, ty, maxF, patience, hold, res, what)
   end) }, what)
 end
 
--- rideScene: the gen_zozo5_ramuh stall-safe cutscene rider.  The stall counter
--- is gated on hasControl() rather than eventRunning(); see issue #3.  v0.5
--- cutscenes require this.
 local function rideScene(pred, maxFrames, what)
   local aPh, stallN, lx, ly = 0, 0, -1, -1
   return H.driveUntil(function() local d=pred(); if d then H.setPad({}) end; return d end,
@@ -388,17 +314,6 @@ local crossed = { ok = false }
 local MIN_CROSS_TIMER = 900
 local catwalkBlob = nil                -- captured on the catwalk, below
 
--- Arrival with clock margin is not the only thing the ladder must hold out
--- for: the rat fights are real fights, and an arrangement whose LAST fight
--- kills a member (the reviver has no turn left before the goal tile ends the
--- fight) or grinds the healer himself down banks a casualty into the entry
--- point.  #124's Leo-break ROM re-rolled the fight chain, and the hold=0
--- arrangement now lands LOCKE at 44/353 (near fatal) with a member at 0
--- (measured 2026-08-20).  So the ladder's success gate below asks for the
--- SAME contract the exit asserts -- everyone standing (M.standing's formula:
--- alive, unpoisoned/unpetrified/unzombied, above max/8) -- and spends the next
--- rat arrangement when an attempt arrives on time but hurt, exactly as it
--- already does when an attempt arrives too late.
 local function allStanding()
   for _, c in ipairs(H.partyMembers()) do
     local hp, mx = H.charHp(c), H.charMaxHp(c)
@@ -500,11 +415,6 @@ H.run({ maxFrames = 420000 }, {
   -- Checkpoint: a cheap replay point for the steps below.
   H.saveState("ultros_dropped.mss"),
 
-  -- Step 2 (measured): 238 stage door -> 237, then the audience-floor step
-  -- trigger at {72,30}.  Since $0057=1, _ca5f48 loads map 233 (the active-opera
-  -- variant of the theater), whose IMPRESARIO is still _cab724 at {15,46}.
-  -- Stand above him at {15,45} and talk; the long 5-minute briefing lands on
-  -- map 231 and sets $0110.
   toDoor(100,23,"down",237,"stage -> opera house"),
   H.navTo(72,30,{maxFrames=12000,playBattles=true,arrive=function() return map()==233 end}),
   H.waitUntil(function() return map()==233 and settled() end,3000,"active theater settled",5),
@@ -524,9 +434,6 @@ H.run({ maxFrames = 420000 }, {
   end),
   H.saveState("rafter_briefing.mss"),
 
-  -- Step 3: stage master, far-right switch, then the newly-opened far-left
-  -- framework.  The room landings and stairs are Z-split, so the short raw
-  -- presses below are measured joins around otherwise ordinary navTo steps.
   H.navTo(28,24,{maxFrames=6000,playBattles=true,arrive=function() return map()==232 end}),
   H.waitUntil(function() return map()==232 and settled() end,1000,"right room",3),
   H.driveUntil(function() return H.fieldY()==35 end,300,{H.hold({"up"})},"leave right landing"),
@@ -578,17 +485,6 @@ H.run({ maxFrames = 420000 }, {
     H.log(string.format("[rafters] on the catwalk at (%d,%d), timer %d frames left, rats: %s",
       H.fieldX(), H.fieldY(), H.readWord(0x1189), ratLine()))
   end),
-  -- The crossing, on a three-attempt ladder.  It is a ladder because the
-  -- crossing's cost is dominated by rat fights it cannot avoid or run from,
-  -- and how many of them the rats force is luck: measured 2026-08-13 across
-  -- four rat arrangements from this same tile, two crossings met two fights
-  -- and finished with 5487 and 3424 frames of the chase clock to spare, and
-  -- two met four and ran the clock out inside the last few tiles.  A fight
-  -- runs about 2500-3400 frames of an 18000-frame timer and the pack cannot
-  -- be run from (see battleFrame), so there is no version of this walk that
-  -- always fits.  Each attempt reloads this tile and stands still for a
-  -- different number of frames first, which leaves the five wandering rats
-  -- somewhere else, and the ladder stops at the first attempt that arrives.
   (function() local req
     return H.cond(function() return true end, {
       H.call(function() req = H.requestSaveState() end),
@@ -600,12 +496,6 @@ H.run({ maxFrames = 420000 }, {
           #catwalkBlob))
       end),
     }) end)(),
-  -- Each hold is a different rat arrangement (see the note above); the ladder
-  -- stops at the first that arrives ON THE CLOCK and STANDING.  The re-rolled
-  -- fight chain (#124) made the first few holds cost a casualty, so the ladder
-  -- carries more arrangements to search now.  Holds stay under ~750 because a
-  -- longer stand eats the same chase clock the crossing then needs (MIN_CROSS
-  -- _TIMER gates the margin), so past that a hold fails on time, not on rats.
   crossAttempt(1, 0),
   crossAttempt(2, 149),
   crossAttempt(3, 293),
@@ -616,16 +506,6 @@ H.run({ maxFrames = 420000 }, {
     H.assertEq(crossed.ok, true,
       "the rafters were crossed on the clock and standing within six attempts")
   end),
-  -- Heal before banking the entry point.  The crossing ladder accepts the
-  -- first attempt that arrives on the clock and ALIVE, but #124's re-rolled
-  -- rat chain can leave a member as low as 44/353 -- right on
-  -- assertPartyStanding's near-fatal bar -- on that accepted attempt, and the
-  -- banked fixture is what battle_ultros2 boots, so a member dropped in at 44
-  -- hp is a casualty shipped, not a fight lost.  Opening the field menu STOPS
-  -- the chase timer (event_main.asm:29616-29617, the same stop the timer-room
-  -- assert below leans on), so this heal costs no clock; the facing press that
-  -- follows re-establishes EVENT_DIR after the menu closes, so the "facing
-  -- RIGHT" contract still holds.
   H.fieldCare({ tag = "care at the Ultros entry point", threshold = 0.95 }),
   -- face Ultros by input: his NPC occupies {15,7}, so a short RIGHT press
   -- is a blocked step that turns the party in place
@@ -650,12 +530,6 @@ H.run({ maxFrames = 420000 }, {
     H.assertEq(map(),235,"Ultros entry point is on rafters map 235")
     H.assertEq(sw(0x02BC),1,"rafter timer is active at the entry point")
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 1, "facing RIGHT")
-    -- battle_ultros2 boots this state and taps A into _cabf4b, which is what
-    -- stops the timer (event_main.asm:29616-29617).  A few frames is all that
-    -- ride needs, but a state banked with the clock nearly out would drop the
-    -- weight mid-test, so the floor is asserted here rather than discovered
-    -- there.  Measured 2026-08-13 across three rat fields: 3095, 5986 and
-    -- 6410 frames left at this point.
     H.assertEq(H.readWord(0x1189) >= 600, true,
       string.format("the rafter timer has room left at the entry point (%d frames)",
         H.readWord(0x1189)))

@@ -1,42 +1,28 @@
 -- @suite savestate=celes_freed
--- menu_thiefpage.lua -- issue #68: the field Skills->Thief page, the acceptance
--- criterion #55 (Locke's battle thief submenu) shipped without.
+-- menu_thiefpage.lua -- the field Skills->Thief page.
 --
--- The skills list grew an 8th row, Thief, gated like every other row by the
--- character's own battle commands (_c34d78 gained BATTLE_CMD::STEAL, so the
--- row is white exactly for Steal owners), and A on it opens a field info page
--- in the Blitz page's shape: one column, name + MP price per row, B backs out,
--- A is a no-op.  Three rows, always -- there is no learned set: Steal, Filch
--- and Bestow exist from the moment Locke does (granted at join, kits.md).
+-- The skills list has an 8th row, Thief, gated like every other row by the
+-- character's own battle commands, and A on it opens a field info page in
+-- the Blitz page's shape: one column, name + MP price per row, B backs out,
+-- A is a no-op.  Three rows, always -- there is no learned set: Steal,
+-- Filch and Bestow exist from the moment Locke does.
 --
--- Everything is asserted against the tables the game itself reads, so the
--- page cannot drift from the battle submenu it mirrors:
+-- Names come from the ROM's own AttackName records: the thief row ids
+-- $56-$58 are AttackName pad slots (record = id - $51, so 5/6/7).  Prices
+-- come from the same two authorities the battle charge reads: Steal from
+-- Ot6StealCost's immediate, Filch/Bestow from Ot6ThiefCostTbl's (key, cost)
+-- records -- not Ot6AbilityCostTbl, which keys $55-$5c as SwdTech boost
+-- rows.  There is no probe-icon column: Ot6SkillClassTbl keys $56-$58 to
+-- SwdTech's slash class, so an icon here would teach the wrong thing.
 --
---   * names from the ROM's own AttackName records.  The thief row ids $56-$58
---     are AttackName pad slots (record = id - $51, so 5/6/7), the same records
---     ListTextCmd_0f renders the battle thief list from (btlgfx_main.asm).
---   * prices from the same two authorities the battle CHARGE reads
---     (Ot6ThiefCost's split, ot6_loadout.asm): Steal from Ot6StealCost's
---     immediate (read at the source, battle_costtable.lua's pattern, with an
---     opcode guard so a reshaped leaf fails loudly), Filch/Bestow from
---     Ot6ThiefCostTbl's (key, cost) records.  NOT Ot6AbilityCostTbl: that
---     table keys $55-$5c as SwdTech boost rows, which is why the page pricing
---     through generic Ot6LoadoutCost would have drawn SwdTech prices here.
---   * NO probe-icon column, asserted blank.  Ot6SkillClassTbl keys $56-$58 to
---     SwdTech's slash class (the id collision again), so an icon here would
---     teach the wrong thing; the battle thief list draws none either.
+-- Geometry is the Blitz page's: rows 1/3/5 (odd rows only, nothing past row
+-- 15), name at column 3 flush against the cursor at x=8
+-- (cursor_x = 8*col - 16), price right-aligned at column 16.
 --
--- Geometry is the Blitz page's (#43): rows 1/3/5 (odd rows only, nothing past
--- row 15), name at column 3 flush against the cursor at x=8 (cursor_x =
--- 8*col - 16), price right-aligned at column 16 through Ot6LoadoutDrawCost.
--- The cursor canary reads Ot6ThiefCursorPos out of the ROM and the text out
--- of the tilemap shadow, both sides live, as menu_blitzpage.lua does.
---
--- Fixture: celes_freed, the real just-freed-Celes save.  LOCKE carries Steal
--- (his own record; nothing is installed) so his row is white and the page
--- opens; CELES does not, so her row is gray and A on it refuses
--- (SelectSkillsOption's $20 gate).  Both paths run on one save with zero
--- memory writes.
+-- Fixture: celes_freed, the real just-freed-Celes save.  LOCKE carries
+-- Steal (his own record) so his row is white and the page opens; CELES does
+-- not, so her row is gray and A on it refuses.  Both paths run on one save
+-- with zero memory writes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/celes_freed.mss.lua"
 
@@ -55,8 +41,7 @@ local function st() return H.readByte(ZMENUSTATE) end
 local BG1A = 0x3849
 local function cell(x, y) return H.readByte(BG1A + x * 2 + y * 64) end
 
--- menu text codec (ff6/tools/char_table/text_en.json): 'A'=$80.. 'a'=$9a..
--- '0'=$b4.. ' '=$ff.  " MP" is menu_text_en.inc.raw's OT6_LOADOUT_MP_SUFFIX.
+-- menu text codec: 'A'=$80.. 'a'=$9a.. '0'=$b4.. ' '=$ff.
 local T = { M = 0x8c, P = 0x8f, SP = 0xff }
 local MP_SUFFIX = { T.SP, T.M, T.P }
 local ZERO_CHAR, DIGIT9 = 0xb4, 0xbd
@@ -83,10 +68,8 @@ local function nameText(id)             -- for the log only
   return s
 end
 
--- Prices, from the charge's own two authorities (Ot6ThiefCost's split).
--- Steal: Ot6StealCost is `lda #imm / rtl`; read the immediate at the source
--- with battle_costtable.lua's opcode guard.  Filch/Bestow: Ot6ThiefCostTbl,
--- (key, cost) pairs, $ff-terminated (ot6_boost.asm).
+-- Steal: Ot6StealCost is `lda #imm / rtl`; read the immediate at the
+-- source.  Filch/Bestow: Ot6ThiefCostTbl, (key, cost) pairs, $ff-terminated.
 local STEALCOST = H.sym("Ot6StealCost") & 0x3FFFFF
 local THIEFTBL = H.sym("Ot6ThiefCostTbl") & 0x3FFFFF
 local function costOf(id)
@@ -121,11 +104,10 @@ local function assertRowBlank(y, what)
   end
 end
 
--- The geometry canary (#43): even rows are four scanlines in this window and
--- rows past 15 are outside it, so nothing may land on either.  Column 30 is
--- the window's right border; columns 0-2 the cursor gutter on every row.
--- Rows 7..15 are odd and usable but this page has only three rows, so they
--- must stay blank too -- a fourth row appearing is a bug this catches.
+-- Even rows are four scanlines in this window and rows past 15 are outside
+-- it, so nothing may land on either.  Column 30 is the window's right
+-- border; columns 0-2 the cursor gutter on every row.  This page has only
+-- three rows, so rows 7..15 must also stay blank.
 local function assertGeometry(what)
   for y = 0, 27 do
     if y % 2 == 0 or y > 5 then
@@ -152,10 +134,7 @@ local function assertGeometry(what)
   end
 end
 
--- The cursor gutter canary (#43 round 3), menu_blitzpage.lua's, over
--- Ot6ThiefCursorPos's three entries.  Both sides are read live: the cursor
--- table out of the ROM the menu indexes, the text out of the tilemap shadow
--- the menu drew.  y = 116 + n*12 -> tilemap row (y-116)/6 + 1.
+-- y = 116 + n*12 -> tilemap row (y-116)/6 + 1.
 local CURSOR_POS = H.sym("Ot6ThiefCursorPos") & 0x3FFFFF
 local function assertCursorGutter(n, what)
   local cx = H.readRomByte(CURSOR_POS + n * 2)
@@ -205,13 +184,9 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
 
-  -- the player's path: X -> main menu -> Skills -> LOCKE -> the 8th row
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
-  -- Find both characters rather than assume their slots, and assert LOCKE's
-  -- own record carries Steal and CELES's does not: the gating below is the
-  -- character data's, nothing installed by this test.
   H.call(function()
     local ids = {}
     for s = 0, 3 do
@@ -254,9 +229,6 @@ H.run({ maxFrames = 30000 }, {
       "Thief row white for LOCKE -- his own record carries Steal")
   end),
 
-  -- cursor to the 8th row (the row itself is the fail-before: a 7-row build's
-  -- cursor prop {1,7} cannot reach index 7 and this times out), A opens the
-  -- page through SkillsOption_07
   H.driveUntil(function()
     return st() == ST_SKILLS and H.readByte(ZCURSOR) == SKILLS_ROW_THIEF
   end, 900, { H.pressButtons({ "down" }, 2), H.waitFrames(6) },
@@ -270,9 +242,6 @@ H.run({ maxFrames = 30000 }, {
     for i = 0, 2 do assertThiefRow(i) end
     assertGeometry("thief page")
     for n = 0, 2 do assertCursorGutter(n, "thief page") end
-    -- the description box holds the empty string, not another page's
-    -- leftovers: LoadThiefDesc stages $ff (LoadBigText's blank arm) every
-    -- frame, and $7e9ec9 is the buffer the big-text task renders from.
     H.assertEq(H.readByte(0x9ec9), 0xff,
       "description buffer holds the blank marker -- the thief rows have no "
       .. "desc asset and must not show another page's text")
@@ -283,7 +252,6 @@ H.run({ maxFrames = 30000 }, {
       .. "the gutter and border")
   end),
 
-  -- ---- the cursor moves over exactly three rows ----
   H.pressButtons({ "down" }, 2),
   H.waitFrames(20),
   H.pressButtons({ "down" }, 2),
@@ -295,7 +263,6 @@ H.run({ maxFrames = 30000 }, {
     for n = 0, 2 do assertCursorGutter(n, "cursor on row 2") end
   end),
 
-  -- ---- B backs out and the skills list is whole again ----
   H.pressButtons({ "b" }, 3),
   H.waitUntil(function() return st() == ST_SKILLS end, 300,
     "B returns to the skills list", 5),
@@ -306,8 +273,6 @@ H.run({ maxFrames = 30000 }, {
       .. "redraw (_c34d27/ReloadSkillsMenu) recomputed the colors")
   end),
 
-  -- ---- the control: CELES's gray row refuses ----
-  -- shoulder R steps to the next character's skills list (CheckShoulderBtns)
   H.driveUntil(function()
     return st() == ST_SKILLS and H.readByte(ZSELINDEX) == celesSlot
   end, 900, { H.pressButtons({ "r" }, 2), H.waitFrames(30) },

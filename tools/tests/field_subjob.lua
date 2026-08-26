@@ -1,16 +1,12 @@
 -- @suite savestate=n024_entry
--- field_subjob.lua -- issue #96: an equipped esper grants its spells in the
--- field Magic list, not only in battle.
+-- field_subjob.lua -- an equipped esper grants its spells in the field Magic
+-- list, not only in battle.
 --
 -- The n024_entry fixture owns KIRIN and has EDGAR at field-menu position 0.
 -- He does not innately know Cure.  Both arms use real menu input:
 --   A. without an esper, Cure is absent from Edgar's rendered field list;
 --   B. equip Kirin through Skills -> Espers, then Cure is present and
 --      castable, while Edgar's permanent learned byte remains untouched.
---
--- This covers both pieces that matter to a player and to H.fieldCare: the C3
--- menu calls Ot6FieldSpellKnown while drawing, and the Lua planner follows the
--- same GenjuProp grant instead of spending a Tonic beside a usable MP pool.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/n024_entry.mss.lua"
 

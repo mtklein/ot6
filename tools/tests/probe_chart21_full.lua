@@ -1,6 +1,5 @@
 -- probe_chart21_full.lua -- full-resolution (step 1) chart of map 21
--- from the post-$023C chase state (#133/#134): the step-2 chart could
--- hide a 1-tile stair.
+-- from the post-$023C chase state.
 local H = dofile("tools/tests/lib/ot6.lua")
 H.run({ maxFrames = 9000 }, {
   H.loadState("build/states/wob_chase23C.mss.lua"),

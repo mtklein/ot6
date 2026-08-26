@@ -1,66 +1,24 @@
 -- @suite savestate=vector_sneak
 -- field_navstep: navTo must land exactly on the tile it was asked for, and
--- must never report success from a tile the party has already left (#22).
+-- must never report success from a tile the party has already left.
 --
--- The defect this is the positive control for: pre-fix, navTo held a step's
--- direction until the tile coord (pixel>>4) changed and released there.
--- Moving up or left, that coord flips ~1px in, so the release was early
--- enough; moving right or down it flips only at completion, on the same frame
--- the engine re-reads the pad, and a setPad reaches the ROM only at the next
--- input poll.  So the release landed one poll late, the engine latched
--- a second step whenever the tile beyond was passable, and the terminator
--- ("on the tile, controlled, tile-aligned") fired on that single aligned
--- frame while the party was already walking off it.
---
--- Why this fixture: the overshoot needs a map that walks 1 px/frame.  The
--- base whelk_entry fixture (map 41) walks ~1.33 px/frame with jitter and
--- does not reproduce it, so a control written there would be the kind of
--- quiet test CONTRIBUTING.md warns about.  Map 242's Vector corridor does
--- reproduce it: measured with probe_step2, py 544 -> 560 over frames 6..21,
--- then straight on to 576.
---
--- Why one-tile segments: a multi-tile navTo hides the bug, because the
--- overshoot is re-planned around (a slide along the same move leaves the edge
--- proven good), and an even overshoot can land on the goal by chance.  It is
--- only visible when the last planned step is the one that reaches the goal.
---
--- Why the carry-tile assertions: the engine can only carry the party past
--- the goal if the tile beyond it is passable, so against a wall the bug is
--- invisible.  Each segment therefore asserts both the step it is about to take
--- and the overshoot tile it would land on, so a map or fixture change that
--- walls the corridor fails instead of measuring nothing.
---
--- Why a watch instead of a single assert: at the instant the broken
--- terminator fires the party is on the goal tile, and it leaves on the frames
--- after.  A check taken on the frame navTo returns therefore passes on the
--- unfixed library.  watchTile holds the assertion open for 48 frames, three
--- full tiles of walking, and fails the moment the party moves off.
---
--- Fail-before / pass-after, measured: on the pre-fix library the down segment
--- reported navTo success at (57,35) with the party at (57,36) sixty frames
--- later; watchTile catches it 16 frames in.
+-- Map 242's Vector corridor walks ~1 px/frame, which reproduces navTo's
+-- overshoot; the base whelk_entry fixture (map 41) walks faster and jitters,
+-- and does not.  Each segment is a single tile: a multi-tile navTo can hide
+-- an overshoot because the remaining path re-plans around it.  Each segment
+-- asserts both the step it is about to take and, for the two directions the
+-- engine latches (right, down), that the tile beyond the goal is passable,
+-- so the overshoot is observable rather than blocked by a wall.
+-- watchTile holds the arrival assertion open for 48 frames (three tiles of
+-- walking) rather than checking once on return, since an overshoot is only
+-- visible on the frames after navTo returns.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vector_sneak.mss.lua"
 
 -- Hold the arrival assertion open for n frames: the party must stay on
--- (tx,ty) the whole time.  A stray Vector encounter is not a navigation
--- failure, so it is fled by holding L+R, the engine's own run mechanic (the
--- 1914283 idiom; the battle-clearing flag poke this replaced is an issue-#75
--- write), and the count restarts once control is back.  A formation that
--- refuses to release fails the driveUntil budget rather than being poked out
--- of existence.  The subject here, navTo's release timing on map 242, is
--- unaffected by how an interrupting fight ends.
---
--- The segment's own navTo passes playBattles = "flee" for the same reason,
--- and this file is why the sweep exists: converting watchTile's flag poke
--- did not make the segment input-driven while the navTo beside it was still
--- bare, because the library would have ended a mid-walk battle by the same
--- write.  Both halves or it is not converted.  It happens to be moot on this
--- fixture -- map 242 draws no random battles at all (map_prop.dat byte +5
--- bit 7 clear; ff6/src/field/battle.asm:333-347 returns before the roll),
--- and the Vector fights nearby are gate-guard event triggers south of the
--- route -- but "moot" is a property of the map, not of the code, and the
--- code should not read as though it were relying on the library to clean up.
+-- (tx,ty) the whole time.  A stray Vector encounter is fled by holding L+R
+-- (the engine's own run mechanic), and the count restarts once control is
+-- back.
 local function watchTile(tx, ty, n, what)
   local seen = 0
   return H.driveUntil(function() return seen >= n end, n * 8 + 1200, {
@@ -121,10 +79,9 @@ H.run({ maxFrames = 30000 }, {
 
   -- down and right are the two the engine latches at the boundary; left and
   -- up are here so the fix cannot trade one direction for another.  The route
-  -- stays inside the three-wide column x=56..58 the sneak lands in, north of
-  -- the gate guards' forced-battle row.  (The column is one-way in places:
-  -- (57,35) cannot be left upward and (57,33) cannot be left downward, which
-  -- is why the up segment is taken from (57,36).)
+  -- stays inside the three-wide column x=56..58 the sneak lands in.
+  -- ((57,35) cannot be left upward and (57,33) cannot be left downward,
+  -- which is why the up segment is taken from (57,36).)
   segment(57, 34, "down", 57, 35, "one tile DOWN"),
   segment(57, 35, "down", 57, 36, "a second tile DOWN"),
   segment(57, 36, "up", 57, 35, "one tile UP"),

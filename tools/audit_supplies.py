@@ -1,43 +1,10 @@
 #!/usr/bin/env python3
-"""Report a fixture that lost its last revive crossing a boundary (#98).
+"""Report a fixture that lost its last revive crossing a boundary.
 
-Why this exists.  The party-HP audit sees a casualty at the fixture that ships
-one, and the equipment audit sees a bare character.  Neither sees the thing
-between them: a bag that spent its revives and was never refilled.  That gap
-let one defect travel three checkpoint boundaries unseen -- battle 70 shipped
-two corpses, the next segment spent both Fenix Downs raising them, the
-checkpoint below was cut carrying none, and a death at the Cranes two
-boundaries later had no answer, because no owned esper grants Life anywhere in
-the World of Balance.  Every hop looked fine on its own: everybody in the
-empty-bag checkpoint was alive and armed.
-
-What it checks, and why this shape.  Not "how many items", which is noise, and
-not "does every fixture carry a Fenix Down", which would fire on the whole
-early game (twenty fixtures reach a fight before a Fenix Down is even for sale,
-and the fights are survivable without one).  The signal is the *cliff*: a
-fixture that carries **zero** revives when the fixture it was generated from
-carried some.  That is a revive spent and not replaced, which is exactly the
-minecart-platform defect and nothing else -- an early fixture that never had a
-Fenix Down inherits zero from a predecessor that also had zero, so it is not a
-drop and does not fire.
-
-Revival in the WoB is a Fenix Down and only a Fenix Down: no shop sells Life,
-and no owned esper grants it (genju_prop.asm), so counting item $F0 is the
-whole question.  If that ever stops being true -- a Life-granting esper, an
-innate Life caster kept in the party -- this count has to learn about it, the
-same way the party-HP audit tracks the game's own can-be-healed mask.
-
-Like tools/audit_party_hp.py in every other respect: it reads the .mss files
-and the tracked SRAM checkpoints directly with no emulator (the whole tree in
-about a second), it locates the inventory off the same character-table anchor
-savestate_party.find_char_block resolves ($1869 ids / $1969 counts, a fixed
-offset past $1600), it runs unconditionally in `make test`, and it carries a
-shrink-only waiver list where an entry matching nothing fails as stale.
-
-The predecessor is the graph's own edge: `prev=` names another fixture, and
-`checkpoint=` names a tracked battery the fixture cold-Continues from.  A root
-fixture (power-on, no predecessor) has nothing to have dropped from and is not
-audited for a cliff.
+Flags a fixture with zero Fenix Downs whose predecessor (named by the graph's
+`prev=` or `checkpoint=` edge) carried some; a root fixture is not audited.
+Revival in the WoB is a Fenix Down only. Inventory is located off the
+character-table anchor ($1869 ids / $1969 counts, offset past $1600).
 
 Usage:  python3 tools/audit_supplies.py [--repo .] [--selftest] [-v]
 Exit 0 clean, 1 if a fixture dropped to no revives across a boundary, or if a
@@ -67,8 +34,7 @@ def revives_in(raw: bytes, cb: int) -> int:
     """Fenix Downs in the bag, given the blob and the $1600 anchor.
 
     The inventory is 256 (id, count) slots at a fixed offset past the
-    character table, the same anchor the party reader uses, so a blob the
-    party reader can read is one this can read.
+    character table.
     """
     total = 0
     for i in range(256):
@@ -77,9 +43,8 @@ def revives_in(raw: bytes, cb: int) -> int:
     return total
 
 
-# Cached: a fixture that is the predecessor of several others would otherwise
-# be decoded once per child, and find_char_block scans the whole blob, so the
-# audit ran ~2.5x the sibling audits.  Reading each file once brings it in line.
+# Cached: a fixture with multiple children would otherwise be decoded once
+# per child.
 @functools.lru_cache(maxsize=None)
 def revives_of_mss(path: str):
     """(count, None) for a generated fixture, or (None, reason)."""
@@ -97,10 +62,8 @@ def revives_of_sram(path: str):
     """(count, None) for a tracked SRAM checkpoint, or (None, reason)."""
     with open(path, "rb") as f:
         raw = f.read()
-    # allow_fallback=False: a 32 KiB battery is long enough to reach the
-    # fixed-offset guess and take it without meaning it, so a checkpoint
-    # must match the table signature or report nothing (savestate_party's
-    # own rule for the same reason).
+    # allow_fallback=False: a checkpoint must match the table signature or
+    # report nothing.
     cb = find_char_block(raw, allow_fallback=False)
     if cb is None:
         return None, "character table not located"
@@ -111,9 +74,7 @@ def load_graph(repo: str):
     """The declared states with their predecessor edges.
 
     Returns (states, checkpoints): states is name -> {"prev", "checkpoint"},
-    checkpoints is name -> payload path.  Imported the same way
-    savestate_party.declared_states reads the graph, so the two cannot
-    disagree about what a state is.
+    checkpoints is name -> payload path.
     """
     import importlib.util
     path = os.path.join(repo, "tools", "tests", "savestate_graph.py")
@@ -143,10 +104,6 @@ def load_waivers(repo: str, path: str) -> set:
 
 
 # --------------------------------------------------------------- selftest --
-# A green run over a healthy tree and a green run over a classify() that
-# stopped classifying look identical, so the logic is exercised here against
-# synthetic counts rather than only against whatever the fixtures happen to
-# hold today.
 
 def is_cliff(here: int, pred: int) -> bool:
     """A revive spent and not replaced: none here, some in the predecessor."""
@@ -171,10 +128,7 @@ def selftest(repo: str = ".") -> int:
     check("0 -> 2 is not (a refill)", is_cliff(2, 0), False)
     check("3 -> 3 is not", is_cliff(3, 3), False)
 
-    # The decode itself, against a checkpoint the tree ships and the emulator
-    # independently logged.  mrf-save-room-v1 carries two Fenix Downs; if the
-    # inventory anchor ever moves this is what says so instead of the reader
-    # quietly counting the wrong bytes as item $F0.
+    # Checked against mrf-save-room-v1, which carries two Fenix Downs.
     cps = dict(checkpoint_payloads(repo))
     if "mrf-save-room-v1" not in cps:
         ok = False
@@ -186,8 +140,7 @@ def selftest(repo: str = ".") -> int:
             print(f"  SELFTEST FAIL revives_of_sram(mrf-save-room-v1) "
                   f"should read 2 Fenix Downs, got {err or n}")
 
-    # The graph must load and carry the edges the cliff check walks; an empty
-    # graph would make every fixture a root and audit nothing.
+    # Sanity-check: the graph loads with edges.
     states, _ = load_graph(repo)
     if len(states) < 50 or states.get("arvis_wake", {}).get("prev") != "whelk_entry":
         ok = False

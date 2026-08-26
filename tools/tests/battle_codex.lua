@@ -4,15 +4,7 @@
 -- all three O8 slot pages even when slot 2 is loaded first, then teach slot 2
 -- after migration. Fight 2 runs as slot 1 and must see the migrated knowledge
 -- but not slot 2's new learning.
---
--- Quarantined mechanism test (issue #75); state writes are sanctioned.
--- Owner-named on the #75 policy list: legacy-format codex migration.  The
--- input under test is a cartridge from the O7 era, a layout no current
--- build can produce by play and can only inherit, so seeding it is the only
--- way the migration path can run at all.  (The post-migration teaching
--- half writes knowledge a real fight could learn; it converts if this
--- test ever splits.)  It keeps its waivers, and it must never produce
--- fixtures.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
@@ -45,13 +37,6 @@ H.run({ maxFrames = 45000 }, {
   H.call(function()
     for n, base in ipairs({ 0x316000, 0x316400, 0x316800 }) do
       if n == 1 then
-        -- slot 1's magic was deliberately broken above (0x37 planted),
-        -- so these two CAN fail: the engine re-magicked the header.
-        -- Slots 2 and 3 were never planted, and H.loadState writes
-        -- 0x4f/0x38 into all four page headers on every load
-        -- (lib/ot6.lua:306-312), so asserting them was a
-        -- write-then-read tautology that no ROM change could fail
-        -- (#71 item 9) -- dropped for those slots.
         H.assertEq(sram(base), 0x4f, "slot "..n.." codex magic 'O' " ..
           "(re-magicked from the planted 0x37)")
         H.assertEq(sram(base+1), 0x38, "slot "..n.." codex magic '8'")

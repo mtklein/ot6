@@ -1,10 +1,7 @@
 -- @manual Whelk TekMissile chip measurement instrument, run by hand
 -- whelkbal_tek.lua -- the tutorial's first mechanical win, driven live:
--- TekMissile (flags3 $20, skill class PIERCE) chips the Whelk head's authored
--- shields 4 -> 3. This is the hit the boss measurement caught dealing ~517
--- with no shield movement at all under the whole-byte $f2 gate.
---
---   tools/tests/run.sh tools/tests/whelkbal_tek.lua build/states/whelkbal_tek.log
+-- TekMissile (flags3 $20, skill class PIERCE) chips the Whelk head's
+-- authored shields 4 -> 3.
 --
 -- Drive: whelk entry point -> fight -> dismiss the opening dialog -> spend
 -- non-terra menus on Heal Force (self-target) -> when terra's menu comes up,
@@ -12,22 +9,11 @@
 -- Laps rotate a target nudge (none/down/up) so the missile finds the head
 -- whichever part the cursor defaults to.
 --
--- Issue #75 conversion, and a stale premise fixed with it.  This file used to
--- burn the non-terra menus on their row-1 beam, on the stated grounds that
--- "the head has no vanilla element weakness, so beams cannot move shields".
--- That has not been true since Ot6ElemAddTbl gave $0134 a fire weakness
--- (ot6_break.asm:404-406, "the tutorial probe"): a beam chips the head like
--- anything else, so the 4 -> 3 this file measures could have come from Vicks
--- or Wedge rather than from the TekMissile it is about.  Heal Force is
--- self-target and moves no gauge, so the missile is now the only thing in the
--- fight that can chip, and the attribution holds.
---
--- The two writes are gone with it.  The party-HP floor and the head's max-HP
--- re-pin existed to keep the fight alive across an open-ended beam exchange;
--- with two of the three characters healing and the drive stopping at the
--- first chip, neither is needed.  Both become assertions instead: the head
--- must still be alive at the end, and its element-reveal mask must still be
--- zero, which is the direct proof that no beam ever landed on it.
+-- The head has a fire weakness (Ot6ElemAddTbl), so a beam also chips it.
+-- Heal Force is self-target and moves no gauge, so the missile is the only
+-- thing in the fight that can chip, which keeps the attribution to
+-- TekMissile.  The head's alive/element-reveal state is asserted at the
+-- end as the proof that no beam ever landed on it.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"
@@ -45,11 +31,9 @@ local function headCRev() return H.readByte(0x3EA5 + hs * 2) end
 
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 
--- The codex is per save slot: Ot6CodexActive (ot6_codex.asm:38-59) picks the
--- page from wSaveSlotToLoad ($7e021f) -- 1/2/3 map to $000/$400/$800 and
--- anything else, which includes a New Game, uses the transient page
--- OT6_CODEX_TEMP = $0c00 (ot6_memory.inc:23-28).  This fixture is a New
--- Game, so the assertion below used to read page 1 and find nothing there.
+-- The codex is per save slot: the active page follows wSaveSlotToLoad
+-- ($7e021f) -- 1/2/3 map to $000/$400/$800 and anything else, which
+-- includes a New Game, uses the transient page OT6_CODEX_TEMP = $0c00.
 local CODEX_ROOT, CODEX_CLASS, CODEX_TEMP = 0x316000, 0x0190, 0x0c00
 local function codexPage()
   local slot = H.readByte(0x021f)
@@ -93,8 +77,7 @@ local function castStep(donePred, budget, what)
           lap = lap + 1
         else
           -- Heal Force is (2,0) in both magitek lists and self-targets by
-          -- default (whelkbal_run.lua:103-108); (1,1) is a blank cell the
-          -- cursor can wedge on, which was measured.
+          -- default; (1,1) is a blank cell the cursor can wedge on.
           mySeq = { "a", "down", "down", "a", "a" }
         end
         idx = 1
@@ -168,13 +151,10 @@ H.run({ maxFrames = 40000 }, {
     return hs ~= nil and headShields() < 4
   end, 25000, "tekmissile chips the whelk head"),
   H.call(function() H.setPad({}) end),
-  -- The shield write lands at damage-calc time; the reveal is committed later,
-  -- on the damage frame's first numeral (Ot6RevealCommit, called from
-  -- Ot6RevealPoll -- ot6_memory.inc:125-128), with Ot6ActionEnd as the
-  -- no-numeral backstop.  The 40-frame settle this used to take stopped short
-  -- of that, so the class-reveal assertion below read a mask the game had not
-  -- written yet.  Fixed settle, not a wait-until: a waitUntil on the bit would
-  -- make the assertion agree with itself.
+  -- The shield write lands at damage-calc time; the reveal is committed
+  -- later, on the damage frame's first numeral, with Ot6ActionEnd as the
+  -- no-numeral backstop.  Fixed settle, not a wait-until: a waitUntil on
+  -- the bit would make the assertion agree with itself.
   H.waitFrames(300),
 
   H.call(function()

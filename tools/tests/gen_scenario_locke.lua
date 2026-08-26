@@ -6,7 +6,7 @@
 --   locke_scenario.mss  map 75 (South Figaro) at (48,43), LOCKE alone,
 --                       controllable.  This is the entry point of the Locke
 --                       scenario.
---
+
 -- The hub is six NPCs on a small map (NPCProp::_9, npc_prop.asm:473-521).
 -- The party (SCENARIO_MOG, char 13, dropped in at (8,3) by _caad4c) walks
 -- to whichever one it wants:
@@ -21,7 +21,7 @@
 -- `battle 8, RIVER`, :39357-39371).  The split is therefore three ways rather
 -- than five, and the completion flags are $001E (Locke), $0044 (Sabin) and
 -- $0021 (Terra); with all three set the hub takes _caadb9 (:26683) instead.
---
+
 -- What each entry costs, read off the three events.  This determines how the
 -- chains get dispatched:
 --   LOCKE  _ca84ab  party_chars LOCKE / load_map 75 {48,43} / … /
@@ -34,27 +34,14 @@
 --                   vehicle sprite and `battle 8, RIVER`, ending
 --                   `load_map 0, {93,41}`.  That chain re-enters the river
 --                   driver this file's sibling gen_scenario.lua already has.
---
+
 -- The save point at (8,6) is on the way and is harmless here.  This is worth
 -- stating because it broke gen_scenario one link back: SavePoint
 -- (event_main.asm:100749) branches on $0133, and $0133 was set by the Lete
 -- River's landing.  It therefore takes its short path (sfx, flash,
 -- `player_ctrl_on`, return) rather than the one-time tutorial, whose "No"
 -- answer ends in a bare EventReturn and never returns control.
---
--- Issue #75, playBattles: every navigator call below passes
--- playBattles = "tactical", so it does not fall through to the library's
--- monster-dead flag write.
--- They run on map 9 (the scenario hub) and map 75 (South Figaro), both
--- with random encounters disabled.
--- A field map rolls for a random battle only when byte +5 of its 33-byte
--- map_prop.dat record has bit 7 set: LoadMapProp copies the record to $0520
--- (ff6/src/field/map.asm:143-158), and the step handler returns before the roll
--- unless $0525 is negative (ff6/src/field/battle.asm:333-347).  So the option
--- is intent only here.  "tactical" rather than "flee" because the only battle
--- that could still reach it is an unscripted surprise -- a goal fight is taken
--- by opts.spare or opts.arrive first -- and fighting one beats spending
--- M.FLEE_CAP frames failing to run from it.
+
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/scenario_hub.mss.lua"
 

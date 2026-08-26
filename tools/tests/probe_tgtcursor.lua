@@ -1,11 +1,6 @@
 -- probe_tgtcursor.lua -- read-only: enumerate the battle target cursor's
--- monster-side hover positions on a group-80 formation (mrf_entry).
---
--- battle_runic's sleep-shepherd needs to put a chosen monster under, and
--- two draft runs measured the blind rotation never settling on some
--- bodies.  Measured here: pressing one direction at a time from target
--- select, which masks $7B7E serves, and whether the set covers all four
--- monsters.  ($7B7D is logged too: the rotation wanders to the ally side.)
+-- monster-side hover positions on a group-80 formation (mrf_entry), pressing
+-- one direction at a time from target select and logging masks $7B7E/$7B7D.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/mrf_entry.mss.lua"
 
@@ -50,7 +45,6 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(60),
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end,
     1800, "field control", 5),
-  -- pace into the same encounter the recon drew
   H.call(function()
     H.vars.x0, H.vars.y0 = H.fieldX(), H.fieldY()
   end),

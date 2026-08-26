@@ -1,35 +1,9 @@
 -- @suite savestate=worldmap_narshe
--- battle_preview: the un-made choice shows its boost.  With BP
+-- battle_preview.lua -- the un-made choice shows its boost. With BP
 -- pending, opening Terra's magic list renders the folded tier in Fire's
--- row (Ot6PreviewList_ext folds the render-scoped id), and since #64 the
--- rest of the row matches: the price is the folded tier's,
--- and the row greys when she cannot pay it.
---
--- Why the row had to catch up with the name: the preview shipped in v0.1
--- folding only the render-scoped id, with cost and selectability left on the
--- base spell.  That was consistent while the fold also charged the base spell.
--- #64 made the fold cost the tier's real MP, and at that point a row
--- reading "Fire 3" beside Fire's 4 MP, and confirming however broke
--- Terra was, showed the player something false, the class of bug the last
--- three releases have been removing.  Ot6FoldPrices (ot6_boost.asm) moves
--- spell-list byte 3, the one cell the grey, the number, the confirm gate and
--- GetMPCost all read, so the four cannot disagree.
---
--- Issue #75 conversion.  On worldmap_narshe Terra owns Magic with
--- Fire, so every write is gone: no guard stops, no bp or pending pokes, no
--- 300-MP solvency pumps, no 20-MP poverty pokes.  Her real pool is the
--- test's whole price ladder: 29 MP pays Fire's 4 and Fire 2's 20 but can
--- never pay Fire 3's 51, so pending 2 is the grey phase without any staging,
--- and the grey marks the fold's price rather than poverty, since the same
--- wallet pays both cheaper tiers, asserted un-greyed either side of it.
--- The bank is earned: one real Tonic turn (zero MP, so the ladder's
--- arithmetic never moves) banks the second bp; pending only ever comes
--- from real R and L edges at her open list.  The one assertion that cannot
--- survive on real inputs is the old control that a poked pending had not
--- re-priced anything yet, because its subject was the poke.  Its replacement
--- is the pending-0 baseline read before any R edge: price 4, tier 1,
--- ungreyed.
---
+-- row (Ot6PreviewList_ext folds the render-scoped id): the price shown is
+-- the folded tier's, and the row greys when she cannot pay it.
+
 --   asserts: pending 0/1/2 render tier 1/2/3 with prices 4/20/51 live in
 --   the same open list; the unaffordable folded row is greyed and refuses
 --   the confirm (state stays in-list, $32cc stays $ff); both cheaper
@@ -44,8 +18,7 @@ local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_ITEM, ST_MAGIC, ST_TGT, ST_TRANS = 0x05, 0x0A, 0x0E, 0x38, 0x01
 local CMD_MAGIC, CMD_ITEM = 0x02, 0x01
 local FIRE, FIRE2 = 0x00, 0x05
-local FIRE_MP, FIRE2_MP, FIRE3_MP = 4, 20, 51   -- MagicProp+5;
-                                     -- battle_foldcost.lua pins the ladder
+local FIRE_MP, FIRE2_MP, FIRE3_MP = 4, 20, 51   -- MagicProp+5
 local TONIC = 0xE8
 local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
 
@@ -119,16 +92,7 @@ local terra, sawFold
 local spells = {}
 
 -- Drive L/R until the PENDING BOOST reaches `want`.
---
--- This is not keyed on fireTier() on purpose.  The list restages one row-pair
--- per frame (Ot6RestageGate_ext, ot6_hud.asm), so a VRAM read taken mid-cycle
--- can briefly report a neighbouring tier.  Measured: a `driveUntil fireTier()
--- == 2` loop reported itself satisfied after 4 frames without ever pressing
--- L, and every price assertion downstream then passed or failed for reasons
--- unrelated to the price.  The pending byte is the ground truth for whether an
--- L or R edge happened, which is what these phases are about; the rendered
--- tier is then asserted at each stop rather than waited on, which is a
--- stronger statement.
+
 local function boostTo(want, label)
   return H.driveUntil(function() return pend(terra) == want end, 3000, {
     H.call(function()
@@ -142,12 +106,6 @@ local function boostTo(want, label)
   }, label)
 end
 
--- the banking drive: Locke defers with X, and Terra takes one real Tonic
--- turn (zero MP, so the price ladder's arithmetic never moves), which with
--- the opening Ot6InitBP bp banks the 2 the pending phases need.
--- Cadence note: the item window refuses a 4-on/4-off edge train (measured:
--- 995 A presses at st=0a moved nothing), and newFightDriver's 6-held pace
--- works, so the bank drive presses 6-on/24-off.
 local mf = 0
 local function bankDecide()
   if H.readByte(MENU) == 0 then
@@ -167,7 +125,6 @@ local function bankDecide()
     if cur == want then btn = "a"
     else btn = (cur < want) and "down" or "up" end
   elseif st == ST_ITEM then
-    -- Tonic sits at bag index 0 (measured: E8 x5 heads the battle bag)
     local cur = H.readByte(0x8947 + terra) + H.readByte(0x894F + terra)
     if cur > 0 then btn = "up" else btn = "a" end
   elseif st == ST_TGT then
@@ -272,8 +229,7 @@ H.run({ maxFrames = 60000 }, {
   }, "her open list parked on Fire"),
   H.waitFrames(30),
   -- ------------------------------------------------ pending 0: the baseline --
-  -- the input-driven replacement for the old poked-pending control: before any
-  -- R edge the row must carry Fire's own name and price, ungreyed.
+  -- before any R edge the row must carry Fire's own name and price, ungreyed.
   H.call(function()
     H.assertEq(pend(terra), 0, "no pending before any R edge")
     H.log(string.format("baseline: tier %d, price %d MP", fireTier(),
@@ -284,20 +240,12 @@ H.run({ maxFrames = 60000 }, {
       "and an unboosted Fire is affordable, so it is not greyed")
     H.screenshot("preview_list")
   end),
-  -- ------------------------------- the list is open: real L/R edges re-fold --
-  -- Each stop asserts both halves of the row: the name the player reads and
-  -- the price the game will charge.  Before #64 only the first moved.
   boostTo(1, "R raises the pending to 1"),
   H.waitFrames(40),
   H.call(function()
     H.log(string.format("pending 1: Fire's row renders tier %d, prices %d MP",
       fireTier(), rowCost(terra, FIRE)))
     H.assertEq(fireTier(), 2, "one boost re-folds the NAME to Fire 2, live")
-    -- and the price, live in the same open list.  Ot6Boost sets OT6_RESTAGE
-    -- for the name and bit 7 of $3204 for the price; the main loop's
-    -- `asl $3204,x / bcc / jsr UpdateEnabledMagic` (battle_main.asm:1367-1369)
-    -- runs the walk.  What this assert establishes is that the recheck lands
-    -- with a list open, which is the live half of #64.
     H.assertEq(rowCost(terra, FIRE), FIRE2_MP,
       "...and PRICES it as Fire 2 -- 20 MP, not Fire's 4")
     H.assertEq(rowGreyed(terra, FIRE), false,
@@ -313,12 +261,6 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(pend(terra), 2, "still just a preview: boost not consumed")
     H.assertEq(rowCost(terra, FIRE), FIRE3_MP,
       "...priced as Fire 3 -- 51 MP")
-    -- #64's grey, on the real wallet: 29 MP pays base Fire and Fire 2 but
-    -- not Fire 3, so the grey is about the fold rather than about being broke.
-    -- bit 7 of list entry+1 is the bit GetTextColor turns into the $04 the
-    -- drawer ORs into the row's $21 white palette to make $25 grey
-    -- (btlgfx_main.asm:11271-11278, :10704) AND the bit the A-button
-    -- refuses on (:19659-19663).
     H.assertEq(rowGreyed(terra, FIRE), true,
       "the real pool cannot pay Fire 3's 51, so the boosted row is greyed")
     H.screenshot("preview_grey")

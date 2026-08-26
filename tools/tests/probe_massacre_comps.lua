@@ -1,7 +1,7 @@
 -- probe_massacre_comps.lua -- boot ultros-won-v1, flood 375 at O, and report
 -- the compartment id of every warp source/dest, shortcut source/dest, and
 -- slide source, to find how comp8/comp22 (the massacre-pocket approach) is
--- reached.  Issue #127.  No @suite.
+-- reached.  No @suite.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end

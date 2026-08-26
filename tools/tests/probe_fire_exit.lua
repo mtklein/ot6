@@ -1,18 +1,7 @@
--- probe_fire_exit.lua -- issue #127's P2 (fire-window exit): from a
--- savestate taken mid-fire (control back on town 343 at (12,21), just
--- after $008E=1 fires), walk out the town's south exit, take a real world
--- SRAM save, re-enter, and log $008E's state and whether town 343
--- re-tiles burning on the way back in.  No -- @suite marker: this is a
--- one-shot measurement for the survey's S2 question
--- (docs/design/thamasa-route.md section 2.1, "the fire window"), not a
--- suite test, and gen_thamasa_fire.lua does not depend on its answer --
--- the main generator always resolves the fire before leaving town, so this
--- is evidence for the doc, not a route requirement.
---
--- Boot and the inn/fire ride are gen_thamasa_fire.lua's, copied rather than
--- shared (probe convention -- see probe_thamasa_names.lua's header): a
--- probe is a one-shot measurement and this repo does not promote a helper
--- to the library until a second real caller needs it.
+-- probe_fire_exit.lua -- from a savestate taken mid-fire (control back on
+-- town 343 at (12,21), just after $008E=1 fires), walk out the town's south
+-- exit, take a real world SRAM save, re-enter, and log $008E's state and
+-- whether town 343 re-tiles burning on the way back in.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -134,7 +123,7 @@ local function chaseTalkLazy(idxFn, maxFrames, what, opts)
 end
 
 H.run({ maxFrames = 300000 }, {
-  -- ---- boot: cold Continue thamasa-night-v1 (gen_thamasa_fire's boot) ----
+  -- ---- boot: cold Continue thamasa-night-v1 ----
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -171,14 +160,10 @@ H.run({ maxFrames = 300000 }, {
 
   -- ---- the inn, the fire ---------------------------------------------------
   crossDoor(12, 19, 346, 23, 23, "inn door"),
-  -- gen_thamasa_fire.lua's MEASURED fix (2026-08-19): the innkeeper at
-  -- (24,15) sits behind a counter tile at (24,16) that bfsPath refuses as a
-  -- stand; (24,17) is the reachable far side, and the talk reaches through
-  -- the counter (the Dadaluma "talk-across-a-counter" mechanic). This probe
-  -- was copied from gen_thamasa_fire.lua BEFORE that fix landed and its
-  -- plain chaseTalk(0x10, ...) timed out live (0x10 never lines up with an
-  -- adjacent-tile chase against a counter NPC) -- ported the working
-  -- approach here rather than leaving the probe on the stale one.
+  -- The innkeeper at (24,15) sits behind a counter tile at (24,16) that
+  -- bfsPath refuses as a stand; (24,17) is the reachable far side, and the
+  -- talk reaches through the counter (the Dadaluma "talk-across-a-counter"
+  -- mechanic).
   H.navTo(24, 17, { maxFrames = 9000, playBattles = "tactical", healer = TERRA,
     bank = 3, items = true }),
   H.driveUntil(function()
@@ -239,7 +224,7 @@ H.run({ maxFrames = 300000 }, {
       H.worldX(), H.worldY(), H.frame, sw(0x008E)))
   end),
 
-  -- a real world SRAM save, the same slot-3 UI drive every checkpoint uses
+  -- a real world SRAM save, using slot 3
   (function()
     local ZMENUSTATE, SAVE_SELECT = 0x26, 0x14
     local saveArg = nil
@@ -286,17 +271,10 @@ H.run({ maxFrames = 300000 }, {
         H.log(string.format("[P2] mid-fire world save landed: slot=%d",
           emu.read(0x307ff0, emu.memType.snesMemory)))
       end),
-      -- MEASURED (2026-08-19): confirming the save does NOT close the menu
-      -- stack back to the field on its own -- a live run held a direction
-      -- for 2000 frames right after "save confirmed" (both LEFT and RIGHT
-      -- tried) and never moved, because H.worldHasControl() requires $00E8
-      -- bit0 (menu opening/open) clear, and that bit was still set: the
-      -- Save/Main menu was still open, just sitting past the confirm.
-      -- Every OTHER save-driven generator in this repo ends the run right
-      -- at the save confirm (the save state's snapshot doesn't care whether
-      -- the menu is still open), so there was no precedent to copy for
-      -- "close the menu and keep going" -- this probe is the first caller
-      -- that needs the field back. Cancel out with B until control returns.
+      -- Confirming the save does not close the menu stack back to the field
+      -- on its own: H.worldHasControl() requires $00E8 bit0 (menu
+      -- opening/open) clear, and it stays set until the menu is cancelled.
+      -- Cancel out with B until control returns.
       H.driveUntil(function() return H.worldHasControl() end, 1200, {
         H.call(function() H.setPad({ b = true }) end),
       }, "cancel out of the save menu -> world control"),
@@ -309,14 +287,9 @@ H.run({ maxFrames = 300000 }, {
           tostring(H.worldMode()), tostring(H.worldHasControl()),
           H.worldX(), H.worldY(), tostring(H.worldAligned()), H.frame))
       end),
-      -- MEASURED (2026-08-19): holding RIGHT immediately after the B-cancel
-      -- read world=(175,0) aligned=false and NEVER aligned over 2000 held
-      -- frames -- not the expected (249,128). (175,0) is nowhere near the
-      -- pre-save position; y=0 is the world's top edge. Passively WAITING
-      -- (no input) for worldAligned() before pressing anything, in case the
+      -- Wait passively for worldAligned() before pressing anything: the
       -- save/menu-close leaves a fractional-position or camera resync that
-      -- needs quiet frames rather than input, which holding a direction
-      -- might be preventing from ever completing.
+      -- needs quiet frames rather than input.
       H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end,
         1800, "world re-settles after menu close (passive)", 10),
       H.call(function()
@@ -328,12 +301,10 @@ H.run({ maxFrames = 300000 }, {
   end)(),
 
   -- ---- back into town: does 343 re-tile burning? --------------------------
-  -- MEASURED (2026-08-19): the south exit lands the party at world
-  -- (249,128) -- the SAME tile the thamasa-night-v1 checkpoint boot lands
-  -- at ("atSite" above) -- one tile short of the (250,128) trigger, so the
-  -- return leg needs the SAME held-RIGHT approach the original entry used,
-  -- not LEFT (which walks away from the trigger and never re-enters; a
-  -- live run timed out here at 2000 frames with LEFT before this fix).
+  -- The south exit lands the party at world (249,128), the same tile the
+  -- thamasa-night-v1 checkpoint boot lands at, one tile short of the
+  -- (250,128) trigger, so the return leg needs the same held-RIGHT approach
+  -- the original entry used.
   (function()
     local hb = 0
     return H.driveUntil(function() return not H.worldMode() end, 2000, {
@@ -358,12 +329,9 @@ H.run({ maxFrames = 300000 }, {
     H.log(string.format(
       "[P2] RESULT: re-entered town at f%d, (%d,%d), $008E=%d -- ",
       H.frame, H.fieldX(), H.fieldY(), sw(0x008E)))
-    -- Read the tile prop under the party's own feet and a few offsets as a
-    -- cheap live signal of which tileset is loaded (the burning retile is
-    -- mod_bg_tiles, which changes BG1/BG2 graphics rather than the prop
-    -- table read here, so this is corroborating evidence, not proof by
-    -- itself -- the screenshot is the primary evidence for "does it LOOK
-    -- burning").
+    -- The burning retile is mod_bg_tiles, which changes BG1/BG2 graphics
+    -- rather than the tile prop table read here; the screenshot is the
+    -- primary evidence for whether it looks burning.
     H.screenshot("p2_fire_reentry")
     H.log(string.format(
       "[P2] CONCLUSION: $008E reads %d on return.  Combined with "

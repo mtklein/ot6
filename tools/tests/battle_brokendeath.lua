@@ -1,19 +1,14 @@
 -- @suite savestate=ifrit_entry slow
 -- battle_brokendeath.lua -- the Broken turn gate: that it holds, and where it
 -- may sit.
---
--- Two properties, both measured in one run of battle 70.  Issue #66 is the
--- first: a Broken monster must not dispatch a command.  This file's original
--- subject is the second: the gate's placement inside CheckRetal, which is
--- load-bearing and was got wrong once.
---
+
 -- Ot6MayAct (ot6_break.asm) refuses a Broken monster's turn at execution
 -- time.  Its one call site is inside CheckRetal (battle_main.asm), and
 -- CheckRetal is not only the counterattack path: an AI script's
 -- `if_self_dead` block reaches it too, through the `bit $3a56`
 -- died-branch ($3a56 is "characters/monsters that have died",
 -- set at battle_main.asm:11859-11863).
---
+
 -- Ifrit and Shiva do not end by dying.  They end by a script in that block:
 -- three dlg lines around a restore_monsters, then end_battle (Shiva's at
 -- ai_script.asm:4546-4557, Ifrit's at :4595-4606), and a break's x2 makes dying
@@ -21,97 +16,26 @@
 -- placed at the top of CheckRetal, which assembles cleanly and reads
 -- tidily, strands the ending and soft-locks the boss.  This test kills a
 -- Broken boss in battle 70 and requires the fight to end anyway.
---
--- Status on this branch: the Broken turn gate is applied, and this test
--- is the guard on where it sits.
---
--- Fail-before observed, on a build with `jsl Ot6MayAct` at CheckRetal's top
--- (replacing `lda $3aa0,x / lsr`, the size-neutral and therefore tempting
--- placement): the kill landed with no post-kill AI-retal entries recorded,
--- and the fight ended early as an ordinary victory with the recognition
--- scene absent.  Pass-after observed with the gate below the died-branch:
--- post-kill ExecAIRetal entries for the dead monster.  Both builds were
--- run; neither result is inferred.
---
--- The first version of this test asserted only that the battle ended, and that
--- passed in both placements, since killing the only on-stage monster is an
--- ordinary victory. That is why the assertion below is about ExecAIRetal
--- and not about the battle ending.
---
--- It also asserts the kill happened while Broken; otherwise the
--- test degrades into checking that the boss dies, which passes with no gate at
--- all and says nothing about placement.
---
--- ====================== the input-driven rebuild (#75) ====================
--- The previous version of this file staged its scenario: it pinned every
--- party member to 900 HP, set Ifrit's shield count to 0 and his broken
--- timer to $10 by direct write, and clamped his HP to 12 so the next landed
--- hit killed him mid-break.  Issue #75's rule (inputs in, observations
--- out, never write emulated state) retired all of that.  This version
--- reaches the same observation through real play: the party confirms its
--- named battle-70 loadout through the real field Equip menu, and
--- the fight uses the library's shared observed-menu fighter.
---
--- The staging that is gone is itself asserted against: shields must read
--- 6/6 at battle start (seeded from level, not pre-cleared) and both HP
--- totals must read their authored 3300 and 3000, which a staged run could
--- not show.  The same properties are checked as before (the kill lands while
--- the victim's broken timer is running; if_self_dead runs after it; the party
--- is alive at the end), reached through the game's own mechanics.
---
--- Correction 2026-08-09, which replaced the whole drive.  The Aug-06
--- rebuild drove CELES -> Magic -> Ice and EDGAR -> Tools -> AutoCrossbow
--- while Ifrit was on stage, and its header reported a measured win (kill
--- at tick 4 of the first break, f8283).  On the 2026-08-09 ifrit_entry
--- regeneration that drive wipes, reproducibly: party 0/0/0/0 by ~f6300 with
--- Ifrit still at ~3057 hp and 5 of 6 shields.  Traced on the sibling
--- checkpoint-based step (gen_ifrit_magicite), the mechanism is the tag: the
--- specials were gated on Ifrit being on stage, and in every measured run
--- he took the stage for ~2400 frames, tagged out, and stayed hidden for
--- the next ~7800 while Shiva soaked everything.  She was broken and then
--- re-seeded her shields 0 -> 6 when the break window lapsed, exactly one
--- Ice ever fired (CELES mp 106 -> 101), and a driver with no heal plan
--- died of attrition, identically with and without its menu-idle A-taps
--- (both variants run).  The drive is now H.newFightDriver: tactical
--- (EDGAR AutoCrossbow, SABIN Pummel), boost banked to 3 and unloaded,
--- with real Item heals and Fenix revival.  That is the configuration that
--- won Vargas on attempt 1 and battle 70 itself in gen_ifrit_magicite, where
--- SHIVA was broken at f7158 (sh 6 -> 0, tk=16) and killed inside her own
--- break window at f8637 (tk=5), and her if_self_dead ran the recognition
--- scene.
---
+
+-- The assertion is on ExecAIRetal running (not merely on the battle
+-- ending, since killing the only on-stage monster is an ordinary victory
+-- either way), and on the kill landing while Broken (otherwise the test
+-- degrades to checking that the boss dies, which passes with no gate at
+-- all).  Shields read 6/6 at battle start (seeded from level, not
+-- pre-cleared) and both HP totals read their authored 3300 and 3000.
+
 -- The guarded property is monster-agnostic, so the assertions bind to
 -- whichever of the pair dies first: both siblings end the fight through
 -- the same if_self_dead ending, the break multiplier makes dying
 -- mid-break the ordinary path for either, and the gate placement mistake
--- strands either one equally.  The old Ifrit-only binding came from
--- the staged lab rather than from the property.
---
--- The retry ladder (gen_tunnelarmr's; measured necessary here 2026-08-09).
--- This fixture's party is a harder start than the checkpoint-based step's:
--- CELES arrives at 221/349 and the bag is the Vector chain's leavings, and the
--- first library-fighter run on it fought well (heals and all three Fenix
--- revives landed) and still wiped at phase 0.  The battle RNG seed is the
--- game-time frame counter at battle init (`lda $021e / asl2 / sta $be`,
--- battle_main.asm:6174-6176), so the test tops the party up through the real
--- field Item menu (H.fieldCare), captures the entry point as a blob, and
--- replays up to three attempts on distinct phases, checked (#83).  An attempt only counts as the observation when a boss died
--- with its broken timer running; anything else, a wipe or a kill that
--- landed after the window lapsed, reloads and re-rolls.  That is
--- TAS-style setup for the observation rather than assertion-weakening: the
--- claims about what must follow a mid-break kill are unchanged.
---
+-- strands either one equally.
+
 -- Monster slot note: the live monsters sit in battle slots 0 (Ifrit, on
 -- stage from the fly-in) and 1 (Shiva, hidden until the tag); the
 -- formation table $57c0 repeats both species at slots 2/3 with dead
 -- entities behind them, so the slot scan below prefers the lowest slot per
--- species.  The earlier any-matching-slot scan picked ghost slot 2 and
--- watched a corpse that never moved.
+-- species.
 local H = dofile("tools/tests/lib/ot6.lua")
--- The retry ladder's spread and its collision check (issue #83): each
--- attempt is held until the game-time frame counter the battle seed is
--- made of reaches its own phase, and L.report() fails if two attempts
--- drew one seed, which would make this ladder one fight played twice.
 local L = H.newSeedLadder("battle 70")
 
 local STATE = "build/states/ifrit_entry.mss.lua"
@@ -149,17 +73,7 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 -- monster after the kill.  Armed once; frame numbers only rise across the
 -- ladder's reloads, so entries from a lost attempt can never satisfy the
 -- winning attempt's `f >= deathFrame` filter.
---
--- The second detector is the one issue #66 is about: does a Broken monster
--- still take a turn?  Ot6Gate answers at queue time (battle_main.asm:1421) and
--- nothing between the queue entry and the turn used to re-check, so turns
--- arrived by two ungated paths, the $3820 action-queue drain (:150-159) and
--- the $3920 counterattack queue (:103-112).  Ot6MayAct closes the second at
--- execution time, inside CheckRetal (:12762).  The first stays open: the
--- ExecAction hook that would close it does not fit the action path's cycle
--- budget, which battle_trueknight phase 4b measures.  See the block comment
--- over Ot6MayAct for the five builds that settled that.
---
+
 -- What that is worth asserting on is the command dispatch, not the queue
 -- entry: Ot6MayAct lets the turn be consumed and thrown away, so bare
 -- ExecAction/ExecRetal entries with the timer up still happen and are not the
@@ -167,22 +81,7 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 -- unique alias; the bare name `ExecCmd` is defined twice in ff6-en.dbg and
 -- H.sym refuses it) and require zero dispatches by an entity whose broken
 -- timer is running.
---
--- The window is battle start to the kill, and that bound is the property
--- rather than a convenience.  The kill ends this fight: the dead monster's
--- `if_self_dead` block reaches CheckRetal above the Ot6MayAct check, through
--- the `bit $3a56` died-branch (battle_main.asm:12753-12757), and the
--- dispatches behind it are the recognition scene that the assertion four
--- steps up requires to run.  Counting them would be asserting the opposite of
--- that, and it would contradict the design's own rule that scripts run
--- regardless of break state (docs/design/bosses-wob.md:28-33).  So the claim
--- is about the fight, which is where the punish window lives and where the
--- owner saw the defect.  Post-kill dispatches are logged rather than
--- asserted; measured with the gate in, all four were Ifrit's `if_self_dead`
--- block in script order -- `dlg $1c` (Cmd_21, battle_main.asm:13492),
--- `restore_monsters` (Cmd_24, :13294), `dlg $1b`, `dlg $1d`
--- (ai_script.asm:4595-4606).
---
+
 -- Classifying them by reading $3a56 at the dispatch does not work, which cost
 -- a run to find out: ExecAIRetal clears the entity's died bit on entry
 -- (`trb $3a56`, battle_main.asm:12682) before it runs a line of script, and
@@ -190,7 +89,7 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 -- four commands drain one per ExecRetal call (:12662-12668 re-arms $3407 and
 -- the next BattleLoop iteration re-enters), so there is no single turn to
 -- scope the flag to.  A frame bound needs neither.
---
+
 -- Its positive control is the same hook's other tally: monsters must be seen
 -- dispatching commands while unbroken, inside the same window.  Without that,
 -- "no broken dispatches" and "the hook never fired" report the same green.
@@ -215,13 +114,6 @@ local function armRetalDetector()
                             kind = name }
     end, emu.callbackType.exec, s, s)
   end
-  -- Reported, not asserted: the residual leak issue #66 names.  ExecAction
-  -- runs the monster's AI script (`jsr ExecMonsterAction`,
-  -- battle_main.asm:238) before it reaches the gate at :274, so an
-  -- already-queued turn still runs the script and lands its side effects --
-  -- battle-var writes, and the kill_monsters/show_monsters pair that performs
-  -- the Ifrit/Shiva tag.  Only the ExecCmd dispatch is refused.  Closing it
-  -- needs the queue entry purged at break time and is a separate change.
   local ms = H.sym("ExecMonsterAction")
   emu.addMemoryCallback(function()
     local e = emu.getState()["cpu.x"] & 0xff
@@ -289,10 +181,7 @@ local function attempt(n)
       end
       H.assertEq(ISLOT ~= nil, true, "an IFRIT slot resolved")
       H.assertEq(SSLOT ~= nil, true, "a SHIVA slot resolved")
-      -- no-staging controls: the lab this file used to build is gone, and a
-      -- relapse would show here.  Both gauges seed full and both HP words
-      -- read their authored values (break-coverage-vector.md §2 "The bosses"
-      -- and bosses-wob.md 13).
+      -- both gauges seed full and both HP words read their authored values
       H.assertEq(shields(ISLOT), 6, "ifrit opens with his authored 6 shields")
       H.assertEq(shields(SSLOT), 6, "shiva opens with her authored 6 shields")
       H.assertEq(mhp(ISLOT), 3300, "ifrit opens at his authored 3300 HP (no clamp)")
@@ -303,8 +192,6 @@ local function attempt(n)
       armRetalDetector()
     end),
 
-    -- hands off until Ifrit takes the stage (the fly-in; input during the
-    -- window-open animation wedges the battle menu, as battle_break measured)
     H.waitUntil(function() return onfield(ISLOT) == 1 end, 3600,
       "ifrit takes the stage", 10),
     H.waitFrames(90),
@@ -408,10 +295,6 @@ H.run({ maxFrames = 250000 }, {
   attempt(1),
   attempt(2),
   attempt(3),
-  -- ...and they were three DIFFERENT fights: distinct battle RNG seeds, read
-  -- off the seeder itself (#83).  This test needs a mid-break kill to happen
-  -- at all, so a ladder that replayed one fight would look like a hard-to-hit
-  -- case rather than like a broken spread.
   L.report(),
 
   -- 4. The property under test: a mid-break kill happened, and the
@@ -453,9 +336,6 @@ H.run({ maxFrames = 250000 }, {
     H.screenshot("brokendeath_end")
   end),
 
-  -- 5. Issue #66: a Broken monster does not take the turn.  The window is the
-  -- winning attempt's battle up to the kill; frame numbers only rise across
-  -- the ladder's reloads, so a lost attempt's entries cannot enter it.
   H.call(function()
     -- Entities are $00..$12 in steps of 2.  ExecCmd's third caller, "execute
     -- immediate action" (battle_main.asm:5778-5797), is entered with A = a
@@ -518,16 +398,6 @@ H.run({ maxFrames = 250000 }, {
       "no monster dispatched a command while its broken timer was running "
       .. "(issue #66: Ot6Gate answers at queue time, and before Ot6MayAct "
       .. "nothing re-checked between the queue entry and the turn)")
-    -- #85, resolved by understanding rather than by code, learned the
-    -- hard way twice in one day.  A broken monster's script turn -- the
-    -- "residual leak" -- is LOAD-BEARING: a queue-time turn gate and a
-    -- break-time queue purge were each tried, and each deadlocked
-    -- battle 57 on some timeline, because KEFKA's retreat script rides
-    -- his own turn and a broken Kefka silenced either way is a battle
-    -- that never ends.  #66's equilibrium is the design: DISPATCH is
-    -- gated (asserted zero above), the AI script runs.  The count here
-    -- stays a report, bounded only against runaway (the measured rate
-    -- is ~1 per run).
     H.assertEq((byKind.ExecMonsterAction or 0) <= 3, true,
       "broken-timer script turns stay near the measured ~1/run rate "
       .. "(the channel is load-bearing for scripted fights -- battle 57; "

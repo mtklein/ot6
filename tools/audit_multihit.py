@@ -1,26 +1,9 @@
 #!/usr/bin/env python3
-"""Multi-hit audit: how many times each ability strikes (#54)
+"""Multi-hit audit: how many times each ability strikes.
 
-Phase 1 of docs/design/multi-hit.md.  Hit count sets break rate, because each
-landed hit that matches a weakness chips a shield, so the design pass needs
-the shipped numbers rather than the ones the kit docs assert.  This script
-reads them out.
-
-Hit counts are set by code, not by a data field.  The engine has one
-multi-hit register: `$3a70`, "number of attacks (0 = 1 attack)"
-(battle_main.asm:6428).  The attack loop is
-
-    @3288:  plx
-            dec  $3a70
-            bmi  @3291
-            pea  ExecAttack-1        ; battle_main.asm:8389-8392
-    @3291:  rts
-
-so every extra count is an extra ExecAttack -> CalcTargetDmg pass, and
-therefore an extra chip opportunity.  Grepping the tree for every write to
-$3a70 is therefore an exhaustive enumeration of single-target multi-hit, and
-there are only eight writers (this script re-checks that the set has not
-grown, so the audit cannot go stale unnoticed):
+The engine's multi-hit register is `$3a70`, "number of attacks (0 = 1
+attack)" (battle_main.asm:6428); each extra count is an extra ExecAttack
+pass.  There are eight writers, which this script re-verifies:
 
     battle_main.asm:3513   FightAttack        = 1 (two hands), = 7 (Offering)
     ot6_boost.asm:426      Ot6FightBoost     += 2 per pending BP
@@ -32,21 +15,17 @@ grown, so the audit cannot go stale unnoticed):
                                                      quadra slice)
     battle_main.asm:11053  AttackerEffect_36 += 1 (empowerer, at 1/4 power)
     ot6_hitcount.asm       Ot6HitCount       += Ot6HitCountTbl's value for
-                                                this ability id (#54)
+                                                this ability id
 
-Ot6HitCount is the one that is data-driven rather than hard-coded, so this
-script parses Ot6HitCountTbl and folds it into the hit counts below.  Its
-write is in long form (`adc f:$7e0000+$3a70`), which is why the scan accepts
-an address expression before the $3a70 rather than only the bare symbol.
+Ot6HitCount is data-driven; its write is in long form
+(`adc f:$7e0000+$3a70`), so the scan accepts an address expression before
+$3a70 rather than only the bare symbol.
 
-Targets are not hits.  An ability that strikes the whole enemy side lands one
-hit on each body: four chips spread over four monsters, and one against a
-boss.  That is a different lever from four hits on one target, so the audit
-keeps them in separate columns.  Breadth comes from the
-targeting byte's INIT field (const.inc:1298-1302): INIT_SINGLE ($00)
-collapses the mask to one random body (ChooseTarget's `bit #$0c` /
-RandBit, battle_main.asm:14980-14985), anything else keeps every target in
-the mask.
+Targets are not hits: an ability striking the whole enemy side lands one hit
+per body, kept in a separate column from repeat hits on one target.  The
+targeting byte's INIT field (const.inc:1298-1302) controls breadth:
+INIT_SINGLE ($00) collapses to one random body, anything else keeps every
+target in the mask.
 
 Sources
   MagicProp   ff6/src/battle/magic_prop_en.dat, 14 B/record, id-indexed:
@@ -59,8 +38,8 @@ Sources
   classes     Ot6SkillClassTbl / Ot6WeapClassTbl (ot6_class.asm), reused
               from tools/check_break_reach.py so there is one parser
 
-Read-only.  Exit 0 = the $3a70 writer set is what this header says; nonzero
-means the enumeration above is stale and the audit must be redone.
+Read-only.  Exit 0 = the $3a70 writer set matches this list; nonzero means
+it has changed.
 
 Usage:  python3 tools/audit_multihit.py [--repo ROOT]
 """
@@ -134,12 +113,8 @@ def target_desc(t):
 
 def parse_costs(root):
     """Ot6AbilityCostTbl (ot6_boost.asm): (key, cost) pairs, $ff-terminated.
-
-    Keyed by attack id for Blitz/SwdTech and by tool item id for Tools, the
-    same keying ot6_class.asm uses, so a tool and a blitz can share a
-    number without colliding here (the ranges are disjoint: $55-$64 vs
-    $a3-$aa).
-    """
+    Keyed by attack id for Blitz/SwdTech and by tool item id for Tools
+    (disjoint ranges: $55-$64 vs $a3-$aa)."""
     path = os.path.join(root, "ff6/src/battle/ot6_boost.asm")
     with open(path, encoding="utf-8") as f:
         src = f.read().splitlines()
@@ -162,13 +137,10 @@ def parse_costs(root):
 
 
 def parse_hit_counts(root):
-    """Ot6HitCountTbl (ot6_hitcount.asm): (id, extra attacks) pairs, $ff-ended.
-
-    Same keying as Ot6SkillClassTbl and Ot6AbilityCostTbl: attack id for
-    Blitz and SwdTech, tool item id for Tools, and the two ranges are
-    disjoint.  The value is EXTRA attacks, matching $3a70's "0 = 1 attack",
-    so hits = 1 + extra.
-    """
+    """Ot6HitCountTbl (ot6_hitcount.asm): (id, extra attacks) pairs,
+    $ff-ended.  Same keying as Ot6SkillClassTbl and Ot6AbilityCostTbl.  The
+    value is EXTRA attacks, matching $3a70's "0 = 1 attack", so
+    hits = 1 + extra."""
     path = os.path.join(root, "ff6/src/battle/ot6_hitcount.asm")
     with open(path, encoding="utf-8") as f:
         src = f.read().splitlines()
@@ -192,12 +164,9 @@ def parse_hit_counts(root):
     return out
 
 
-# Power bytes OT6 splices over the vanilla blobs.  The .dat files stay
-# byte-identical, so reading them alone would print the pre-split power for
-# every ability #54 gave a hit count to -- exactly the "design intent read as
-# shipped fact" mistake this audit exists to prevent.  Each entry names the
-# source constant, and parsing FAILS if it is gone, so removing a splice
-# without updating this list is a red audit rather than a silent wrong number.
+# Power bytes OT6 splices over the vanilla blobs; the .dat files stay
+# byte-identical.  Each entry names the source constant, and parsing FAILS
+# if it is gone.
 POWER_SPLICES = {
     0x5D: ("ff6/src/battle/battle_main.asm", "PUMMEL_POWER_OT6"),
     0x64: ("ff6/src/battle/battle_main.asm", "BUM_RUSH_POWER_OT6"),
@@ -260,8 +229,8 @@ def check_writers(root):
     print("== $3a70 writers (the exhaustive multi-hit enumeration) ==")
     for rel, ln, op, text in sorted(writes):
         print("  %-40s:%-6d %s" % (rel, ln, text))
-    # 3 sta/stz + 6 inc + 1 adc = the set the header documents; a change
-    # here means a new multi-hit source exists and the doc must be redone.
+    # 3 sta/stz + 6 inc + 1 adc is the expected set; a change here means a
+    # new multi-hit source exists.
     n_up = len([h for h in writes if h[2] in ("sta", "inc", "adc")])
     print("  -> %d upward writers (header documents 12: FightAttack sta, "
           "Ot6FightBoost adc+sta, 3x jump inc, weapon-spellcast inc, "
@@ -378,8 +347,7 @@ def main():
     # ---- 2b. the tools that resolve as spells ----------------------------
     # InitTarget_03 (battle_main.asm:6575-6580) rewrites five item ids into
     # magic ids before the record is loaded, so their real properties are in
-    # MagicProp rather than ItemProp.  That includes Bio Blaster, the ability
-    # #60 is about.
+    # MagicProp rather than ItemProp.
     print()
     print("== tools/throwables that resolve as a SPELL "
           "(ThrowToolsItemTbl, battle_main.asm:6659-6666) ==")
@@ -431,8 +399,7 @@ def main():
                 amask |= data.skill_class.get(sid, 0) & 0x0F
         # "multi-hit" is anything that strikes the same body more than once:
         # vanilla's quadra ($32) and empowerer ($36) effects, plus every
-        # Ot6HitCountTbl row.  Breadth is not rate and is deliberately not
-        # counted here (multi-hit.md §2.2), so AutoCrossbow never appears.
+        # Ot6HitCountTbl row.  Breadth is not counted here.
         if "TOOLS" in cmds:
             for it in reach.TOOLS_RANGE:
                 amask |= data.weap_class[it] & 0x0F

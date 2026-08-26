@@ -6,7 +6,7 @@
 --   reunion_ready.mss  map 22 (20,9), the Battle-for-Narshe staging, first
 --                      controllable frame after the reunion cutscene.  This
 --                      is the canonical boot for gen_narshe_battle.
---
+
 -- The stack under this state: locke_done (input-driven, $001E), then s2_ =
 -- SABIN's whole chain replayed on top of it ($0044), then t3_ = TERRA/BANON's
 -- chain replayed on top of that ($0021).  With all three set, _ccb3fa's hub

@@ -1,10 +1,9 @@
--- probe_bridge_under.lua -- cross the (23..28,52) row without the
--- teleport (#133).  CheckEntrances only fires on BRIDGE tiles when the
--- party is on the upper z-level (entrance.asm:36-41: $b8 bit2 + $b2==1)
--- -- the row is the wooden bridge over the town, and the walkthrough
--- crosses it.  Try each crossing column from the north side, logging z
--- and where we land; on a successful crossing (still on 21, y>52), take
--- the east arm and push north with long holds.
+-- probe_bridge_under.lua -- crosses the (23..28,52) row without the
+-- teleport.  CheckEntrances only fires on BRIDGE tiles when the party is
+-- on the upper z-level ($b8 bit2 + $b2==1); the row is the wooden bridge
+-- over the town.  Tries each crossing column from the north side, logging
+-- z and where the party lands; on a successful crossing (still on map 21,
+-- y>52), takes the east arm and pushes north with long holds.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
 local function z() return H.readByte(0xb2) & 3 end

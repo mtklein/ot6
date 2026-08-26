@@ -1,26 +1,12 @@
 #!/usr/bin/env python3
-"""The long playthroughs play for real: no story generator writes game state (#75).
+"""No story generator writes game state; it must play through with real input.
 
-The honesty program's owner rule: expedients are fine in focused unit-style
-tests, but the long playthroughs we run before a release -- the savestate
-generators that walk the game from power-on through the story with controller
-input -- must never do anything a person could not.  A generator that pins a
-character's HP, clamps a boss, or kill-bits its way past a fight has minted a
-fixture that was never actually reached, and every state that boots from it
-inherits the lie.
-
-This guard makes that a checked invariant rather than a thing someone verified
-once.  A generator (tools/tests/gen_*.lua) may not write emulated game state --
-no emu.write, no M.writeByte/writeWord, and no M.clearBattle (which writes the
-kill-bit through the library) -- unless it is explicitly named below as a
-STANDALONE UNIT FIXTURE: a gen_ file that mints a leaf off the story spine to
-exercise one mechanism, not a step in the playthrough anything boots from.  The
-allowlist is code, not a burn-down file, because adding to it is a policy
-decision that should be read in review: is this fixture really off the spine?
-
-Suite tests, probes and measurement instruments are out of scope -- their
-expedients are the sanctioned kind.  check_state_writes.py governs those; this
-one governs only the play.
+A generator (tools/tests/gen_*.lua) may not write emulated game state -- no
+emu.write, no M.writeByte/writeWord, and no M.clearBattle (which writes the
+kill-bit through the library) -- unless named in UNIT_FIXTURE_GENERATORS as
+a standalone unit fixture: a leaf off the story spine nothing boots from.
+Suite tests, probes and measurement instruments are out of scope; those are
+governed by check_state_writes.py.
 
 Usage:  python3 tools/check_playthrough_honest.py [--dir tools/tests] [--selftest]
 Exit 0 if every playthrough generator is write-free, 1 otherwise.
@@ -33,15 +19,12 @@ import glob
 import os
 import sys
 
-# A write reaches emulated game state through one of these.  M.clearBattle is
-# here because it writes $3EEC through the library rather than inline, so a
-# generator that called it would cheat without a literal .writeByte( of its own.
+# A write reaches emulated game state through one of these.  M.clearBattle
+# writes $3EEC through the library rather than inline.
 WRITE_TOKENS = (".writeByte(", ".writeWord(", "emu.write", "clearBattle")
 
-# Generators exempt because they mint a STANDALONE UNIT FIXTURE off the story
-# spine -- a leaf nothing boots from -- to check one mechanism, not a step in
-# the playthrough.  Each entry is a claim to verify in review: run
-# savestate_graph.py and confirm the state has no descendants on the spine.
+# Generators exempt because they mint a standalone unit fixture off the
+# story spine -- a leaf nothing boots from.
 UNIT_FIXTURE_GENERATORS = {
     "gen_battle2": "standalone sprite-anchor check: clamps the two guards to "
                    "1 HP to reach the mixed-formation render state fast. Its "
@@ -54,9 +37,7 @@ UNIT_FIXTURE_GENERATORS = {
 def strip_comment(line: str) -> str:
     """The code half of a Lua line: everything before a `--` line comment.
 
-    Without this, a generator that merely MENTIONS clearBattle in a comment
-    ("the clearBattle this used to call is gone", gen_arvis) would read as a
-    live cheat.  Block comments (--[[ ]]) are not used in the generators.
+    Block comments (--[[ ]]) are not used in the generators.
     """
     i = line.find("--")
     return line if i < 0 else line[:i]
@@ -105,9 +86,8 @@ def selftest() -> int:
     check("honest input is not a write",
           writes_token_in('H.navTo(25, 52, { playBattles = "flee" })'), False)
 
-    # The allowlist claim itself: gen_battle2 must still be a leaf off the
-    # spine, or the exemption is wrong.  This is what fails if the graph moves
-    # battle2_entry onto the playthrough.
+    # gen_battle2 must still be a leaf off the spine, or the exemption is
+    # wrong.
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                         "tests"))

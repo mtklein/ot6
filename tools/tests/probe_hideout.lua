@@ -1,26 +1,21 @@
 -- probe_hideout.lua -- what the party can reach inside the Returner
 -- Hideout, measured rather than read off the entrance table.
 --
--- gen_banon's first cut planned map 109 (9,29) -> (25,15) straight off
--- ShortEntrance::_109 and got "no path", the same way gen_kolts's first cut
--- planned Mt. Kolts off its table.  Two things are true here and neither is
--- in any table:
---   * the greeter NPC at map 109 (9,25) is a wall.  The arrival vestibule
---     reaches exactly one tile besides itself, (9,26), which is the tile
---     directly under him.  Talking to him runs the escort (_caf68a,
---     event_main.asm:36275) which walks the party to (22,21) and opens the
---     map, the same shape as map 71's Figaro guards.
---   * both 109 and 110 are partitioned, so "the map has a door to X" says
---     nothing about whether this end of it can get there.
--- So this floods the engine's own passability model from wherever the party
--- is standing, ~200 nodes per frame (gen_kolts warns that a whole flood in
--- one Lua slice trips Mesen's script watchdog with no message), and prints
--- the reachable set as a map.  '@' party, '.' reachable, ' ' not.
--- Issue #75: playBattles = "tactical" keeps this walk out of the library's
--- monster-dead flag write.  It is intent only -- the Returner Hideout maps 108/109/110 draw no random battles (map_prop.dat byte +5
--- bit 7 clear, so the field step handler at ff6/src/field/battle.asm:333-347
--- returns before the roll) -- and "tactical" rather than "flee" because the
--- only battle that could reach the option there is an unscripted surprise.
+-- The greeter NPC at map 109 (9,25) is a wall.  The arrival vestibule
+-- reaches exactly one tile besides itself, (9,26), the tile directly under
+-- him.  Talking to him runs the escort (_caf68a, event_main.asm:36275),
+-- which walks the party to (22,21) and opens the map.  Both 109 and 110 are
+-- partitioned, so a door to a map says nothing about whether this end of it
+-- can get there.
+--
+-- This floods the engine's own passability model from wherever the party is
+-- standing, ~200 nodes per frame (a whole flood in one Lua slice trips
+-- Mesen's script watchdog), and prints the reachable set as a map.  '@'
+-- party, '.' reachable, ' ' not.  playBattles = "tactical" is used because
+-- maps 108/109/110 draw no random battles (map_prop.dat byte +5 bit 7
+-- clear, so the field step handler at ff6/src/field/battle.asm:333-347
+-- returns before the roll); the only battle that could reach the option
+-- there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/returner_hideout.mss.lua"
 
@@ -225,7 +220,7 @@ H.run({ maxFrames = 60000 }, {
   -- Door C (25,15) is a door tile, a wall until CheckDoor swaps it open
   -- for a party pressing into it (player.asm:959), which is why bfsPath
   -- reports NO PATH to it while (25,16) directly under it is 8 steps away.
-  -- It is crossed gen_edgar-style: stage on the neighbour, then hold into it.
+  -- It is crossed by staging on the neighbour, then holding into it.
   H.navTo(25, 16, { maxFrames = 20000, playBattles = "tactical" }),
   H.release(),
   (function()

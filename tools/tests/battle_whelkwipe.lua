@@ -2,41 +2,24 @@
 -- battle_whelkwipe: the whelk head's retract cycle (monster entry/exit
 -- FADE_DOWN/FADE_UP wipes) must render from vanilla's tiles only.
 --
--- The v0.1 playtest bug: the entry/exit effect family sweeps the
--- battle-field BG3 region with a per-scanline scroll wave (hdma #2, fed
--- from the w7e4af5 table the effect animates), assuming the field map
--- holds nothing visible but the effect's own mask tiles; vanilla
--- blanks even its banner rows to the $01ee junk fill first.  OT6's
--- under-enemy hud lines ride that same map, so the wipe smeared
--- shield, '?' and icon glyphs across the screen.  The fix
--- (Ot6EntryExitVeil): while DoMonsterEntryExit runs, the nmi flush writes
--- the $01ee fill over each live hud line instead of its cells, leaving the
--- field map word-identical to vanilla's for the whole animation; the shadow
--- is untouched, so the first flush afterwards repaints the hud.
---
--- Flow: whelk entry point -> battle -> settle -> passive Heal Force drive
--- (self-target, so the only transitions are the shell's own timer cycle)
--- -> FADE_DOWN trip (exec callback on vanilla C2/E668) -> per-frame
--- cell-level assert through the whole animation (no OT6-claimed glyph
--- char in the field map; every live hud line reads $01ee) -> head-gone
--- hud check -> FADE_UP trip -> same asserts -> hud back plus glyphCanary.
--- Cell asserts only, no pixel compares, so the test is deterministic and
--- unaffected by savestate regeneration.
+-- While DoMonsterEntryExit runs, the nmi flush writes the $01ee fill over
+-- each live hud line instead of its cells, leaving the field map
+-- word-identical to vanilla's for the whole animation; the shadow is
+-- untouched, so the first flush afterward repaints the hud.  Loads
+-- whelk_entry.mss, drives a passive Heal Force fight, and asserts the
+-- field map cell-by-cell through both the FADE_DOWN and FADE_UP wipes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"
 
 local VR = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 
--- OT6-claimed font cells, read from the rom so art edits never stale
--- this test (battle_dlgmenu's signature-scan approach): 8 element icons,
--- 16 hud glyphs (the cell table precedes the glyph data), and $bf, the
--- '?' glyph our weakness slots borrow.  During an entry/exit animation
--- none of these may be referenced by any field-map word.
+-- OT6-claimed font cells, read from the rom: 8 element icons, 16 hud
+-- glyphs (the cell table precedes the glyph data), and $bf, the '?'
+-- glyph weakness slots borrow.  During an entry/exit animation none of
+-- these may be referenced by any field-map word.
 local function claimedCharSet()
   local function findSig(sig)
-    -- v0.2 grew bank F0 ahead of the bg glyph table (~$F0109A now), so the
-    -- scan window reaches past the first 4K it used to fit inside.
     for base = 0x300000, 0x303FF0 do
       local hit = true
       for i = 1, 16 do
@@ -93,12 +76,11 @@ local function assertWipeVanilla(what)
 end
 
 -- trip wire on DoMonsterEntryExit (vanilla C2/E668); registered after
--- the savestate load (the ordering is historical; loads do not detach
--- callbacks)
+-- the savestate load, since loads do not detach callbacks
 local trips = 0
 local tripped = false
 local function armTripWire()
-  local addr = H.sym("DoMonsterEntryExit")   -- was hardcoded 0xC2E668 (bank $C2)
+  local addr = H.sym("DoMonsterEntryExit")
   emu.addMemoryCallback(function()
     if tripped then return end
     tripped = true
@@ -106,7 +88,7 @@ local function armTripWire()
   end, emu.callbackType.exec, addr, addr)
 end
 
--- passive driver: Heal Force every turn (whelkbal's settle discipline)
+-- passive driver: Heal Force every turn
 local MENU = 0x7bca
 local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
 local function policyPulse()
@@ -144,7 +126,7 @@ local function pulseTick()
 end
 
 -- one transition: drive to the trip, then hold the invariant every
--- frame until the veil byte clears (the wrapper's own end marker)
+-- frame until the veil byte clears
 local function transition(k, what)
   local checked = 0
   return {
@@ -194,15 +176,10 @@ local steps = {
   }, "whelk event fires"),
   H.call(function() H.setPad({}) end),
   H.waitUntil(function() return H.battleActive() end, 900, "whelk up", 30),
-  -- The whelk's scripted battle intro dialogue re-uploads the small font for
-  -- its whole ~13s run (window_mess_open_init), clobbering OT6's glyph tiles.
-  -- The clobber fix (battle_hudclobber) veils the under-enemy hud while it is
-  -- up, so this settle, which used to land mid-intro and see the hud drawn
-  -- from blanked tiles (present but junk), now taps through the intro and
-  -- waits for a font-whole, un-veiled hud before the retract checks below.
-  -- The run is past the intro when the first battle menu opens (7bca): the
-  -- dialogue is closed by then, the font is restored by its close re-lay, and
-  -- the hud is un-veiled.
+  -- The whelk's scripted battle intro dialogue re-uploads the small font,
+  -- clobbering OT6's glyph tiles; the hud is veiled while it is up.  The
+  -- first battle menu opening (7bca) means the dialogue is closed, the font
+  -- is restored, and the hud is un-veiled.
   H.driveUntil(function()
     return H.readByte(0x7bca) ~= 0 and H.readByte(0x64d5) == 0 and H.fieldHudPresent()
   end, 4000, {
@@ -212,13 +189,6 @@ local steps = {
   H.waitFrames(120),
   H.call(function()
     claimed = claimedCharSet()
-    -- Name the roll.  Nothing here asserts on it, because the retract cycle
-    -- is the head's own timer and policyPulse is menu-agnostic, which is why
-    -- this test passed unchanged on a ROM where the roll handed the first menu
-    -- to three different characters.  If this ever does time out waiting for
-    -- a transition, the next reader should not have to re-measure the ATB
-    -- phase to find out who was holding the menu (battle_dlgmenu:196-202 logs
-    -- the same thing for the same reason).
     local actor = H.readByte(0x62ca) & 3
     H.log(string.format("menu owner at settle: slot %d, char id $%02x",
       actor, H.readByte(0x3ed8 + actor * 2)))

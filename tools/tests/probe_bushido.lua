@@ -1,22 +1,10 @@
--- probe_bushido.lua -- the measurement instrument behind battle_bushido.
---
---   tools/tests/run.sh tools/tests/probe_bushido.lua build/states/probe_bushido.log
---
--- Cyan is not recruitable until the v0.3 arc, so he is installed into the
--- opening guard fight: every party slot gets CHAR::CYAN ($3ED8), a
--- Bushido-only command list ($202E stride 12), the weapon SWDTECH flag
--- ($3BA4/$3BA5 bit 1; UpdateCmd_02 greys the command without it,
--- battle_main.asm:13690), and a pinned $2020 (techs known - 1).
---
--- What this probe measures, none of which the source alone settles:
---   1. whether the command list offers Bushido after the poke, and
---      whether one A press lands in menu state $37 (the swdtech window);
---   2. whether $7BCA (menu open, Ot6Boost's gate) is still nonzero inside
---      that window, that is, whether L/R still moves the boost there;
---   3. what w7e7b82 does over time now.  Vanilla ticked it every 4
---      frames; the conversion should leave it constant;
---   4. what a short A press in the window latches, and what attack id
---      reaches $3410 ("last spell used", InitTarget_02 battle_main.asm:6545).
+-- probe_bushido.lua -- installs Cyan, who is not otherwise recruitable in
+-- this build, into the opening guard fight: every party slot gets
+-- CHAR::CYAN ($3ED8), a Bushido-only command list ($202E stride 12), the
+-- weapon SWDTECH flag ($3BA4/$3BA5 bit 1), and a pinned $2020 (techs
+-- known - 1).  Reports whether the command list offers Bushido, whether
+-- the boost gate ($7BCA) still works inside the swdtech window (menu
+-- state $37), and what attack id resolves at $3410.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 

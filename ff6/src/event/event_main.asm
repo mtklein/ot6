@@ -13466,7 +13466,7 @@ _ca59a0:
         stop_timer 0
         battle 126, AIRSHIP_CENTER
         call _ca5ea9
-        call _cacfbd     ; ot6 #132: mid-gauntlet care stop (tent heal; see floating-continent-route.md S3)
+        call _cacfbd     ; ot6: mid-gauntlet care stop (tent heal)
         fade_in
         start_timer 0, 320, _ca59b1, FIELD_ONLY
         return
@@ -13533,7 +13533,7 @@ _ca5a0b:
         stop_timer 0
         battle 126, AIRSHIP_CENTER
         call _ca5ea9
-        call _cacfbd     ; ot6 #132: care stop before Ultros (the AirForce one at _cacfbd's third call predates this)
+        call _cacfbd     ; ot6: care stop before Ultros (the AirForce one at _cacfbd's third call predates this)
         fade_in
         return
 _ca5a16:
@@ -103309,7 +103309,7 @@ _ccaaba:
         obj_script SLOT_1
                 action 40
                 end
-        ; OT6 (#74): every wave's WIN branch fades the field back in after
+        ; OT6: every wave's WIN branch fades the field back in after
         ; the collision battle (_ccaaec and its five siblings, and the
         ; Marshal win at _ccadbf) -- but this shared LOSS subroutine never
         ; did, so after the player pressed through the Annihilated screen
