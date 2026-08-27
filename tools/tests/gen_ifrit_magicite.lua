@@ -193,8 +193,19 @@ local function ifritAttempt(n)
   local ISLOT, SSLOT = nil, nil
   local sawBreak, ideathFrame, ideathTicks, sdeathFrame = false, nil, nil, nil
   local hb, ph, giveUp = 0, 0, 0
-  local F = H.newFightDriver("b70", { tactical = true, boost = true, bank = 3,
-    items = true, healPercent = 60, cadence = 12 })
+  -- tactical=FALSE is load-bearing here (thamlab measured 37.5%->62.5%/
+  -- attempt).  Ifrit & Shiva are a tag-team -- only one sibling is on
+  -- stage, and killing EITHER ends the fight -- broken by weapon CLASS
+  -- (Shiva = 6 SLASH shields), not element.  The party wears four slash
+  -- weapons, so the win is to COMMIT all four to Shiva: bank BP, chip her
+  -- 6 shields, break, and burst the x2-broken window before the party-wide
+  -- AoE cascades.  tactical=true instead put Edgar on AutoCrossbow (pierce
+  -- -> the wrong sibling) and Sabin on Pummel (bludgeon -> chips nothing),
+  -- leaving only 2 slash choppers, so Shiva broke just 3/8.  Boost stays on
+  -- (on a Fight it buys extra swings = more chips + more broken hits).
+  -- healPercent 80 widens the survival window against the AoE.
+  local F = H.newFightDriver("b70", { tactical = false, boost = true, bank = 3,
+    items = true, healPercent = 80, cadence = 12 })
   return H.cond(function() return fightWon end, {}, {
     H.logStep(function()
       return string.format("battle 70 attempt %d at f%d", n, H.frame)
