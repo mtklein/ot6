@@ -556,10 +556,17 @@ local function rideAttempt(n)
     -- every battle, taps every dialog, and holds DOWN off both landings.
     (function()
       local landedPred = landed(9, 20)
+      -- Lead attempt 1 with tier 2 (Edgar's AutoCrossbow whole-side
+      -- opener), not tier 1's everyone-Fight: measured, attempt 1 lost on
+      -- a bad roll when BANON (fragile, the in-ride healer) was focus-fired
+      -- during a slow 3-monster fight, and attempt 2's tier-2 AoE cleared
+      -- it -- so reserving the AoE for the retry is what left attempt 1 on
+      -- the RNG edge.  tier still escalates to 3 (SABIN AuraBolt) if a
+      -- retry is needed.
       return rideUntil(function() return lost ~= nil or landedPred() end,
         string.format("the Lete River, attempt %d: board, both forks, the " ..
           "two landings, ULTROS, and the scenario hub", n),
-        200000, walkOffLandings, n)
+        200000, walkOffLandings, math.min(n + 1, 3))
     end)(),
     H.release(),
     H.waitFrames(30),
