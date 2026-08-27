@@ -381,10 +381,16 @@ local function shopTrip()
       for r = 0, 7 do rows[#rows + 1] = string.format("%02X", rowItem(r)) end
       H.log("[shop] stock: " .. table.concat(rows, " "))
     end),
-    buyTo(0xF0, 5, 5, 500, "FENIX DOWN to 5"),
+    -- Essentials (Antidote, Soft) FIRST, then revives, then the Tonic soak
+    -- LAST, so a short pre-grind purse shorts Tonics -- topped again at the
+    -- post-grind counter below and downstream -- not the cures a fragile
+    -- party needs.  Fenix -> 15, Tonic -> 99 are ceilings; buyTo purse-clamps
+    -- each.  (Pre-grind gil here is ~2.8k, so Fenix clamps near 5; the
+    -- ceiling matters when the purse is deeper.)
     buyTo(0xF2, 1, 3, 50, "ANTIDOTE to 3"),
     buyTo(0xF4, 2, 2, 200, "SOFT to 2"),
-    buyTo(0xE8, 0, 25, 50, "TONIC to 25"),
+    buyTo(0xF0, 5, 15, 500, "FENIX DOWN to 15"),
+    buyTo(0xE8, 0, 99, 50, "TONIC to 99"),   -- the rite of passage: a full bag of Tonics for field care
     tapUntil("b", inState(0x25), "shop: back to the options window"),
     tapUntil("b", function() return H.hasControl() and map() == 85 end,
       "shop: closed"),

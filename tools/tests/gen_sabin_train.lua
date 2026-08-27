@@ -1101,26 +1101,26 @@ H.run({ maxFrames = 400000 }, {
     H.log(string.format("[shop] open; gil=%d", gil()))
     H.screenshot("train_shop")
   end),
-  buyItem(TONIC, 0, function() return 30 - invCount(TONIC) end, "TONIC to 30"),
+  -- Owner's route-wide restock rule: essentials and revives FIRST, then the
+  -- Tonic soak LAST, so a short purse shorts Tonics (topped again at Mobliz
+  -- and downstream) rather than the throwing kit or the revives.  Tonic -> 99
+  -- ("a rite of passage to get 99 in the bag") and Fenix -> 15 are the
+  -- ceilings; H.buyItem purse-clamps each to what the merchant's gil allows.
   buyItem(ANTIDOTE, 2, function() return 3 - invCount(ANTIDOTE) end,
     "ANTIDOTE to 3"),
-  -- Fenix Downs are for reviving allies (battle 47's prolonged tail killed
-  -- SHADOW, measurably, and he entered the boss fight dead); the item target
-  -- steer never confirms on the monster side, so the undead-instant-kill
-  -- throw is not reachable
-  buyItem(FENIX_DOWN, 4, function() return 4 - invCount(FENIX_DOWN) end,
-    "FENIX DOWN to 4"),
   buyItem(SHURIKEN, 6, function() return 10 - invCount(SHURIKEN) end,
     "SHURIKEN to 10"),
   buyItem(FIRE_SKEAN, 7, function() return 2 - invCount(FIRE_SKEAN) end,
     "FIRE SKEAN to 2"),
-  -- Potions drop from 15 to 11 to pay for them: 4 Potions is 1200 GP against
-  -- the skeans' 1000, so the purse that leaves this shop is 1634 rather than
-  -- the 1434 the Potion-heavy list left, and the scenario's later stops are
-  -- funded a little better than before rather than worse.  11 is still above
-  -- the medic line's floor asserted below.
   buyItem(POTION, 1, function() return 10 - invCount(POTION) end,
     "POTION to 10"),
+  -- Fenix Downs are for reviving allies (battle 47's prolonged tail killed
+  -- SHADOW, measurably, and he entered the boss fight dead); the item target
+  -- steer never confirms on the monster side, so the undead-instant-kill
+  -- throw is not reachable
+  buyItem(FENIX_DOWN, 4, function() return 15 - invCount(FENIX_DOWN) end,
+    "FENIX DOWN to 15"),
+  buyItem(TONIC, 0, function() return 99 - invCount(TONIC) end, "TONIC to 99"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d skeans=%d",

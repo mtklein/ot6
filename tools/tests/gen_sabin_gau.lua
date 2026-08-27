@@ -1324,14 +1324,25 @@ H.run({ maxFrames = 500000 }, {
   tapUntil("a", function()
     return invSlot(DRIED_MEAT) ~= nil and mstateMenu() == 0x26
   end, "bought", 2400),
-  -- the grind's medicine: Tonics from row 1, bought the verified-loop way
+  -- the grind's medicine, bought the verified-loop way.  Mobliz's shop 12
+  -- also stocks Fenix Down at row 5 (shop_prop.dat): the route-wide revive
+  -- floor, bought BEFORE the Tonic soak so a short purse shorts Tonics, not
+  -- the revives.  Fenix -> 15, Tonic -> 99 are ceilings; H.buyItem
+  -- purse-clamps each to the merchant's gil.
+  H.call(function()
+    H.assertEq(H.readByte(0x9d89 + 5), FENIX_DOWN, "shop 12 row 5 is Fenix Down")
+  end),
+  buyItem(FENIX_DOWN, 5, function() return 15 - invCount(FENIX_DOWN) end,
+    "FENIX DOWN to 15"),
   buyItem(TONIC, 1, function() return 99 - invCount(TONIC) end, "TONIC to 99"),
   tapUntil("b", inState(0x25), "options again"),
   tapUntil("b", function() return H.hasControl() end, "shop closed", 2400),
   H.call(function()
     H.assertEq(invSlot(DRIED_MEAT) ~= nil, true, "Dried Meat in the bag")
-    H.log(string.format("[gau] leaving the shop: gil=%d tonics=%d",
-      gil(), invCount(TONIC)))
+    H.assertEq(invCount(FENIX_DOWN) >= 6, true,
+      "the party leaves Mobliz with Fenix Downs -- a death is answerable now")
+    H.log(string.format("[gau] leaving the shop: gil=%d tonics=%d fenix=%d",
+      gil(), invCount(TONIC), invCount(FENIX_DOWN)))
   end),
   -- Prepare the feed while Mobliz is reliably menu-capable.  The Veldt
   -- staging tile can remain field-menu hostile briefly after a random battle.

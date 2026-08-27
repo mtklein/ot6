@@ -1153,10 +1153,14 @@ local steps = {
     "shop interior settled before pathfinding", 10),
   H.waitFrames(150),
   shopTalk(36, 39, "Thamasa item shop"),
-  H.buyItem(TONIC, 0, function() return 30 - H.invCountOf(TONIC) end, "TONIC to 30"),
+  -- Essentials (Potion, Fenix) first, then the Tonic soak LAST so a short
+  -- purse shorts Tonics, not the revives.  Gil is deep here (~70k), so all
+  -- three reach their ceilings; the ordering is the route-wide restock rule
+  -- (owner: Tonic -> 99, "a rite of passage to get 99 in the bag").
   H.buyItem(POTION, 1, function() return 15 - H.invCountOf(POTION) end, "POTION to 15"),
   H.buyItem(FENIX_DOWN, 6, function() return 20 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 20"),
+  H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
   H.call(function()
     H.log(string.format(
       "[shop] Thamasa item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",

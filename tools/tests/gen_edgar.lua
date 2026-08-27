@@ -324,6 +324,61 @@ H.run({ maxFrames = 120000 }, {
   H.call(function() where("throne hall") end),
 
   -- ==================================================================== --
+  -- PHASE 2a: the ITEM shop restock (owner directive: the route re-shops).
+  -- The throne hall has TWO twin shop doors side by side: (32,21) -> tool
+  -- alcove (D4 below) and (22,21) -> item shop (10,18).  The item merchant
+  -- (obj 24) stands at map 59 (10,13) with a walkable tile directly below,
+  -- a plain adjacent talk -- his event _ca67a2 opens shop_menu 4
+  -- (TERRA+LOCKE fall past the EDGAR/SABIN refusal cases; $00A4=$0048=0
+  -- so it is shop 4, not 64/47).  Shop 4 row 0 is Tonic (50 GP), row 5
+  -- Fenix Down (500 GP); it sells no Potion.  This is the ONLY Tonic
+  -- vendor anywhere in figaro_cleared's chain from power-on, so the party
+  -- arrives Tonic-starved (figaro_entry carries 0) and the shipped fixture
+  -- was reddening the item-turn tests (battle_steal/thief/stealmp, which
+  -- bank BP off Tonic/Potion turns).  Restock Tonics to 30 here so care's
+  -- 0.9 top-off stays sustainable and the fixture ships stocked.  This is
+  -- the pre-Edgar window; once EDGAR joins the shop refuses.
+  crossDoor(22, 21, 59, 10, 18, "D4a throne hall -> ITEM shop"),
+  talkTo(24, "item merchant", 6000),
+  H.waitUntil(inState(0x25), 900, "item shop: options menu", 2),
+  H.call(function() H.screenshot("edgar_itemshop") end),
+  shopPress("a", inState(0x26), "item shop: buy list open"),
+  H.call(function()
+    local rows = {}
+    for r = 0, 7 do
+      rows[#rows + 1] = string.format("%d:$%02X@%d", r, rowItem(r),
+        H.readWord(0x9f09 + r * 2))
+    end
+    H.log("shop 4 stock: " .. table.concat(rows, " "))
+    H.assertEq(rowItem(0), 0xE8, "item shop row 0 is Tonic")
+    H.assertEq(rowItem(5), 0xF0, "item shop row 5 is Fenix Down")
+    H.log(string.format("[shop] item shop heading in: gil=%d tonic=%d "
+      .. "potion=%d fenix=%d", gil(), invCount(0xE8), invCount(0xE9),
+      invCount(0xF0)))
+  end),
+  -- Tonics are THE field-heal consumable (care heals with them, not by
+  -- casting).  Buy to 30 HERE -- proven to stock figaro_cleared for the
+  -- steal/thief tests -- and let the LATER, gil-richer shops push toward
+  -- the full 99 as the owner wants.  30 fresh Tonics = 1500 GP of ~5338
+  -- gil; buying more starves gen_kolts's own South Figaro Fenix/Soft
+  -- targets (measured: 60 here left South Figaro too poor to buy 2 Softs,
+  -- failing that assertion and blocking the whole downstream tree).
+  H.buyItem(0xE8, 0, function() return 30 - invCount(0xE8) end, "TONIC to 30"),
+  H.waitUntil(inState(0x26), 2400, "item shop: back at the buy list", 2),
+  shopPress("b", inState(0x25), "item shop: back to options"),
+  shopPress("b", function() return H.hasControl() and map() == 59 end,
+    "item shop: closed"),
+  H.call(function()
+    H.assertEq(invCount(0xE8) >= 25, true,
+      string.format("Tonics restocked at the Figaro item shop (have %d)",
+        invCount(0xE8)))
+    H.log(string.format("[shop] item shop done: gil=%d tonic=%d potion=%d "
+      .. "fenix=%d", gil(), invCount(0xE8), invCount(0xE9), invCount(0xF0)))
+    where("item shop done")
+  end),
+  crossDoor(10, 19, 59, 22, 23, "D4b ITEM shop -> throne hall"),
+
+  -- ==================================================================== --
   -- PHASE 2: the shop, in its only window (TERRA + LOCKE, pre-Edgar).
   -- ==================================================================== --
   crossDoor(32, 21, 59, 44, 18, "D4 throne hall -> shop alcove"),
