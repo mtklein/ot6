@@ -1413,36 +1413,39 @@ end
 -- words) is the goal-formation guard: if the battle we are asked to clear
 -- is the goal fight, that is a script bug, so this fails with an error
 -- instead of instantly killing the fight the route exists to reach.
+-- NOTE: the low-level battle primitives (clearBattle, fightBattle,
+-- fightBattleByMenu, fleeBattle) deliberately do NOT auto-care after the
+-- battle.  They are the shared measurement primitives -- mechanism tests
+-- (battle_naturalmp measures post-battle field MP to the point, etc.)
+-- resolve a battle through them and then read exact state, and a care
+-- stop that casts a cure would perturb the number under test.  The
+-- heal-after-every-battle directive lives in the NAVIGATORS (navTo,
+-- worldNavTo, advanceStory, phaseWalk), which model route traversal, and
+-- in explicit M.careStop calls a generator places where it wants one.
 function M.clearBattle(maxFrames, spare)
   local spareSet = {}
   for _, w in ipairs(spare or {}) do spareSet[w] = true end
   local aPhase = 0
-  return M.seqStep({
-    M.driveUntil(function()
-      return not M.battleLoadStarted()   -- implies battleActive() false too
-    end, maxFrames or 9000, {
-      M.call(function()
-        aPhase = (aPhase + 1) % 8
-        if M.battleLoadStarted() and M.monstersPresent() > 0 then
-          if next(spareSet) and M.formationHas(spareSet) then
-            error("clearBattle: refusing to kill a spared formation " ..
-              string.format("(%04X %04X %04X %04X %04X %04X)",
-                table.unpack(M.formationWords())), 0)
-          end
-          for slot = 0, 5 do
-            if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
-            end
+  return M.driveUntil(function()
+    return not M.battleLoadStarted()   -- implies battleActive() false too
+  end, maxFrames or 9000, {
+    M.call(function()
+      aPhase = (aPhase + 1) % 8
+      if M.battleLoadStarted() and M.monstersPresent() > 0 then
+        if next(spareSet) and M.formationHas(spareSet) then
+          error("clearBattle: refusing to kill a spared formation " ..
+            string.format("(%04X %04X %04X %04X %04X %04X)",
+              table.unpack(M.formationWords())), 0)
+        end
+        for slot = 0, 5 do
+          if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
+            M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
           end
         end
-        M.setPad(aPhase < 4 and { "a" } or {})
-      end),
-    }, "clear battle"),
-    -- heal-after-every-battle: recover outside combat before the script's
-    -- next beat (zero frames when nobody needs it; skipped under a live
-    -- event timer)
-    M.careStop("care after battle (clearBattle)"),
-  })
+      end
+      M.setPad(aPhase < 4 and { "a" } or {})
+    end),
+  }, "clear battle")
 end
 
 -- -------------------------------------------- input-driven battle endings --
@@ -1506,15 +1509,15 @@ function M.targetCursor(opts)
     if T.mask == (1 << target) and T.age >= minAge then return "a" end
     if (mf - 1) % 8 == 0 then T.press = T.press + 1 end
     -- press-0 must index dirs[1], not dirs[#dirs]: Lua floor division
-    -- takes (0-1)//2 to -1 and -1 % #dirs to #dirs-1, so the old
-    -- ((T.press - 1) // 2) emitted the LAST direction on the first
-    -- frames of every target-select.  Measured on the Thamasa ambush
-    -- (pincer formation, char-column dirs): the stray press exiled the
-    -- cursor into a monster group within 3 frames of the window opening,
-    -- and the timeout's blind A then fed Fenix Downs to a Balloon --
-    -- eight ~1740-frame whiff episodes on one seed.  Other callers were
-    -- shielded only by coincidence (their configs make the stray press
-    -- "up", or a no-op).
+    -- takes (0-1)//2 to -1 and -1 % #dirs to #dirs-1, so the bare
+    -- ((T.press-1)//2) emitted the LAST rotation direction on the first
+    -- frames of every target-select.  That stray press hangs
+    -- battle_toolsgrey in target-select and exiled the Thamasa ambush's
+    -- char-column revive into a monster group.  (Measured both ways: this
+    -- max() form passed the whole targetCursor-caller suite in the
+    -- 2026-08-27 census; reverting it to the bare form re-hung
+    -- battle_toolsgrey.  The steal/thief/stealmp failures that briefly
+    -- looked like this were bag depletion, unrelated.)
     return dirs[(math.max(T.press - 1, 0) // 2) % #dirs + 1]
   end
   return T
@@ -2461,22 +2464,19 @@ function M.fightBattle(maxFrames, spare)
   local spareSet = {}
   for _, w in ipairs(spare or {}) do spareSet[w] = true end
   local aPhase = 0
-  return M.seqStep({
-    M.driveUntil(function()
-      return not M.battleLoadStarted()
-    end, maxFrames or 20000, {
-      M.call(function()
-        aPhase = (aPhase + 1) % 8
-        if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
-          error("fightBattle: asked to auto-fight a spared formation " ..
-            string.format("(%04X %04X %04X %04X %04X %04X)",
-              table.unpack(M.formationWords())), 0)
-        end
-        M.setPad(aPhase < 4 and { "a" } or {})
-      end),
-    }, "fight battle (tap-A)"),
-    M.careStop("care after battle (fightBattle)"),
-  })
+  return M.driveUntil(function()
+    return not M.battleLoadStarted()
+  end, maxFrames or 20000, {
+    M.call(function()
+      aPhase = (aPhase + 1) % 8
+      if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
+        error("fightBattle: asked to auto-fight a spared formation " ..
+          string.format("(%04X %04X %04X %04X %04X %04X)",
+            table.unpack(M.formationWords())), 0)
+      end
+      M.setPad(aPhase < 4 and { "a" } or {})
+    end),
+  }, "fight battle (tap-A)")
 end
 
 -- The command-table-aware counterpart to fightBattle().  Prefer this for a
@@ -2485,21 +2485,18 @@ function M.fightBattleByMenu(maxFrames, spare)
   local spareSet = {}
   for _, w in ipairs(spare or {}) do spareSet[w] = true end
   local F = M.newFightDriver("fightBattleByMenu")
-  return M.seqStep({
-    M.driveUntil(function()
-      return not M.battleLoadStarted()
-    end, maxFrames or 30000, {
-      M.call(function()
-        if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
-          error("fightBattleByMenu: asked to auto-fight a spared formation " ..
-            string.format("(%04X %04X %04X %04X %04X %04X)",
-              table.unpack(M.formationWords())), 0)
-        end
-        F.frame()
-      end),
-    }, "fight battle through the Fight menu"),
-    M.careStop("care after battle (fightBattleByMenu)"),
-  })
+  return M.driveUntil(function()
+    return not M.battleLoadStarted()
+  end, maxFrames or 30000, {
+    M.call(function()
+      if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
+        error("fightBattleByMenu: asked to auto-fight a spared formation " ..
+          string.format("(%04X %04X %04X %04X %04X %04X)",
+            table.unpack(M.formationWords())), 0)
+      end
+      F.frame()
+    end),
+  }, "fight battle through the Fight menu")
 end
 
 -- fleeBattle: hold L+R, which is the engine's run mechanic (see the pad map
@@ -2508,14 +2505,11 @@ end
 -- and on every event battle whose win-bit the story checks, so callers pick
 -- fight or flee per step and record why.  No writes.
 function M.fleeBattle(maxFrames)
-  return M.seqStep({
-    M.driveUntil(function()
-      return not M.battleLoadStarted()
-    end, maxFrames or 9000, {
-      M.call(function() M.setPad({ l = true, r = true }) end),
-    }, "flee battle (hold L+R)"),
-    M.careStop("care after battle (fleeBattle)"),
-  })
+  return M.driveUntil(function()
+    return not M.battleLoadStarted()
+  end, maxFrames or 9000, {
+    M.call(function() M.setPad({ l = true, r = true }) end),
+  }, "flee battle (hold L+R)")
 end
 
 -- The runner.  steps: list of step objects.  opts.maxFrames: global budget.

@@ -2470,6 +2470,12 @@ end
 -- rather than trusting every call site to remember.
 function M.fieldCare(opts)
   opts = opts or {}
+  -- The reserve floor applies to EXPLICIT care too, not just the automatic
+  -- post-battle path: a bare fieldCare() with no reserve spent the last
+  -- Tonics to zero (measured: the pre-gate-cave care shipped an empty bag
+  -- and a member the party then could not revive).  A caller that truly
+  -- means to spend everything before a boss passes reserve = {}.
+  if opts.reserve == nil then opts.reserve = M.CARE_RESERVE end
   local K = careKernel(opts)
   local phase = 0
   return M.cond(function() return not M.eventTimerLive() end, {
@@ -2517,8 +2523,29 @@ end
 -- never be the thing that kills a generator in an odd room.  Call
 -- frame() every frame; done() reports completion (instantly true when
 -- nobody needs care).
+-- The default reserve for AUTOMATIC post-battle care (the navigator hooks
+-- and M.careStop, which build their care through here): never spend the
+-- last few healing consumables.  A human tops off after a fight but keeps
+-- a cushion; without a floor, care at a 0.9 threshold in a no-healer
+-- segment drank Tonics and Potions to ZERO, and every downstream fixture
+-- and item-dependent test inherited an empty bag (measured 2026-08-27:
+-- figaro_cleared shipped 0/0, reddening battle_steal/thief/stealmp).
+-- Revival is deliberately NOT reserved (a dead member outweighs a thin
+-- bag), so CARE_FENIX is absent here.  The floor is the between-shops
+-- safety net; the route's shop restocks (owner directive) are what keep
+-- the bag actually stocked for the 0.9 top-off.
+M.CARE_RESERVE = { [CARE_TONIC] = 4, [CARE_POTION] = 4 }
+
 function M.newCareDriver(opts)
   opts = opts or {}
+  if opts.reserve == nil then opts.reserve = M.CARE_RESERVE end
+  -- Owner directive: outside-battle care heals with TONICS (items), not by
+  -- casting -- Tonics are cheap and everywhere, and casting cures drained
+  -- MP over a grind badly enough to wipe (zozo_arrival, MP-starved with a
+  -- full Tonic bag).  Field healing therefore spends no MP; MP is reserved
+  -- for battle.  An explicit fieldCare that wants to cast passes
+  -- magic=true; here (the automatic post-battle path) it stays off.
+  if opts.magic == nil then opts.magic = false end
   local K = careKernel(opts)
   local mode, ph, n = "start", 0, 0
   local closed = careClose(function()
