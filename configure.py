@@ -347,7 +347,13 @@ if errors:
         print(f"savestate_graph: {e}", file=sys.stderr)
     sys.exit(1)
 sn.emit_state_edges(w, states, ROOT, latch_of)
-state_names = {e["state"] for e in states}
+# Every name a test can reference includes the `also=` siblings: a state
+# like figaro_cleared is emitted by gen_edgar's edge as an also-artifact,
+# and fixture_deps() filtering against primary names only silently dropped
+# it -- the nomp qualifier edges then raced their fixtures on a from-scratch
+# build (caught by the 2026-08-27 simulated release).
+state_names = {e["state"] for e in states} \
+            | {a for e in states if e["also"] for a in e["also"]}
 all_stamps = [f"build/states/{e['state']}.stamp" for e in states]
 all_sidecars = [f"build/states/{e['state']}.mss.lua" for e in states]
 

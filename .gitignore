@@ -10,3 +10,5 @@
 /tools/calypsi/
 __pycache__/
 /build.ninja
+# session/agent state (worktrees can hold ROM copies; never commit)
+/.claude/

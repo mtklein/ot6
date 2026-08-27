@@ -1,121 +1,76 @@
-
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- probe_thamlab_grind.lua -- Thamasa fire lab, HEALTHY-LEVEL fixture baker.
+--
+-- Hand-run instrument (probe_): probe_thamlab_bake.lua's route with one
+-- big insertion -- a world-map XP grind on Crescent Island before the inn
+-- fire -- so the two lab fixtures are banked at the route research's
+-- "healthy" levels (L22-24) instead of the routed L15-17.  The confirm
+-- step of the level-gap hypothesis chain: at healthy levels, does the
+-- FlameEater fight become comfortable rather than a seed lottery?
+--
+-- Flow (the bake's own step list, reordered around the grind):
+--   1. cold Continue the thamasa-night-v1 checkpoint -> world (249,128)
+--   2. into town, PREP (gear + SHIVA/MADUIN espers + rows), shop trip #1
+--      (supplies for the grind)
+--   3. back OUT to the world map; GRIND: pace two tiles, fight every
+--      random encounter with the lib fight driver's nuke repertoire
+--      (nuke={Ice2,Ice}, nukeLore={Aqua Rake}), care stop after every
+--      battle (M.newCareDriver, worldNavTo's own care contract), until
+--      TERRA and LOCKE both reach GRIND_MIN (default 22).  STRAGO's join
+--      level follows: char_prop at the fire join sets his level to the
+--      AVERAGE of the available characters (field/event.asm EventCmd_40 ->
+--      CalcAverageLevel; measured join at 16 == avg(15,17) on the routed
+--      bake), so leveling TERRA/LOCKE lifts him too.
+--   4. shop trip #2 (top the bag back up to the bake's own 30/15/20)
+--   5. the bake's route verbatim: inn -> fire -> STRAGO joins -> burning
+--      house -> pre-ambush top-off -> bank thamlab_ambush_healthy.mss ->
+--      ambush ladder (with the POSITIONAL lore-row fix measured in
+--      probe_thamlab_ambush_fix.lua: row == loreId, not the compacted
+--      model) -> corridors/rods -> bank thamlab_flame_healthy.mss.
+--
+-- Crescent Island world pool at sector 156 (X 224-255, Y 128-159), from
+-- world_battle_group.dat / rand_battle_group.dat / battle_monsters.dat /
+-- monster_prop.dat (+12 XP, +16 level):
+--   grass (bg0, group 24): Baskervor L22 465xp/750hp -- forms 160 (x1,
+--     31.25%), 191 (x2, 31.25%), 162 (Cephaler+Baskervor 679xp, 37.5%);
+--     NO pincers.  Expected ~690 xp/fight raw.
+--   forest (bg1, group 25): Chimera L22 1144xp/2237hp forms; richer but
+--     Chimera is a wipe risk at L15.
+--   desert (bg2, group 26): FossilFang/Bug, pincer-capable.
+-- OT6 pays random battles x2 xp/gil (Ot6RewardMulW $20/16) and runs the
+-- danger counter at 0.5x (Ot6DangerMulW $08/16).  XP splits over the 3
+-- live allies (TERRA/LOCKE/SHADOW).  L15->L22 is ~20.4k xp/char
+-- (LevelUpExp entries 16..22 x8), so expect ~45 grass fights; the log
+-- reports what the pool actually pays.
+--
+-- Run (LONG -- the grind alone is ~45 fights; owner has made time a
+-- non-factor):
+--   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/thamasa-night-v1 \
+--   OT6_TIMEOUT=7200 tools/tests/run.sh tools/tests/probe_thamlab_grind.lua \
+--   build/thamlab/grind_bake.log
+--
+-- Smoke form (sed): @GRINDMIN@ -> a low level, @SUF@ -> _smoke so the
+-- banked fixtures don't collide with the real ones.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local SAVE_SELECT = 0x14
-local ZMENUSTATE = 0x26
 local TERRA, LOCKE, STRAGO, SHADOW = 0, 1, 7, 3
 local FIRE_ROD, ICE_ROD = 0x35, 0x36
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
-local ICE_SPELL = 0x01
-local saveArg = nil
+local ICE_SPELL, ICE2_SPELL = 0x01, 0x06
+local AQUA_RAKE_LORE_ID = 3
 
--- Preps TERRA and LOCKE with a 4-piece loadout and an Ice-granting esper
--- each before the ambush; STRAGO gets an esper too.  No enemy stat changes.
+local GRIND_MIN = tonumber("@GRINDMIN@") or 22
+local SUF = ("@SUF@"):find("@") and "" or "@SUF@"
+
+-- Same PREP as the bake: 4-piece loadouts and Ice-granting espers.
 local TERRA_GEAR = { { 0, 0x0E }, { 1, 0x5C }, { 2, 0x6E }, { 3, 0x89 } }
   -- Blizzard(w) / Mithril Shld(sh) / Bandana(he) / Mithril Vest(ar)
 local LOCKE_GEAR = { { 0, 0x0F }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 } }
   -- ThunderBlade(w) / Buckler(sh) / Head Band(he) / Kung Fu Suit(ar)
--- Esper indices (genju_prop.asm's numbering): SHIVA=2 grants {ICE, OSMOSE,
--- SHELL}; MADUIN=6 grants {FIRE, ICE, BOLT} -- one to TERRA, one to LOCKE,
--- for the boosted multi-target Ice cast the fight plan leads with (Ot6FoldTbl
--- folds Ice -> Ice2 -> Ice3). BISMARK=7 grants {HASTE, SLOW, {}} (no castable
--- Water spell); given to STRAGO, whose own Aqua Rake is the water answer.
 local SHIVA_ESPER, MADUIN_ESPER, BISMARK_ESPER = 2, 6, 7
--- char-select row, resolved live via (partyByte>>3)&3, the same read
--- M.equipLoadout/M.equipWeapon use.
 local function charPos(charId)
   return function() return (H.readByte(0x1850 + charId) >> 3) & 0x03 end
-end
-
--- Probe instrumentation (not part of the route): dumps the byte obj.asm's
--- sort_obj_work reads for CheckSlot1-4/CheckOtherSlots -- $0867+41*id, bit
--- $40 = enabled, low 3 bits = party number -- for TERRA/LOCKE/SHADOW/STRAGO,
--- plus $1a6d (active party number) and the slot object pointers
--- $07fb/07fd/07ff/0801 and leader $0803.
-local PROBE_IDS = { { 0, "TERRA" }, { 1, "LOCKE" }, { 3, "SHADOW" }, { 7, "STRAGO" } }
--- Frames to screenshot across the win-tail teardown window.
-local SHOT_FRAMES_TAIL = {
-  [20740] = true, [20900] = true, [21100] = true, [21300] = true,
-  [21500] = true, [21700] = true, [21958] = true, [22100] = true,
-}
--- Traces the event PC through f21200-21900, logged on every change.
-local peTrailLast = nil
-local _cbe622Sym = nil
-do
-  local ok, v = pcall(H.sym, "_cbe622")
-  if ok then _cbe622Sym = v end
-end
-local function probePcTrail()
-  if H.frame < 21200 or H.frame > 21900 then return end
-  local bank, hi, lo = H.readByte(0x00e7), H.readByte(0x00e6), H.readByte(0x00e5)
-  local e8 = H.readWord(0x00e8)
-  local wm = H.worldMode()
-  local m1f64 = H.readWord(0x1f64)
-  local key = string.format("%02X:%02X%02X:%04X:%s:%04X", bank, hi, lo, e8,
-    tostring(wm), m1f64)
-  if key ~= peTrailLast then
-    peTrailLast = key
-    H.log(string.format(
-      "[probe127-pctrail] f%d eventPC=%02X:%02X%02X e8=$%04X worldMode=%s 1f64=$%04X",
-      H.frame, bank, hi, lo, e8, tostring(wm), m1f64))
-  end
-end
-local function probeDump(tag)
-  local parts = {}
-  for _, e in ipairs(PROBE_IDS) do
-    local id, name = e[1], e[2]
-    local b = H.readByte(0x0867 + 41 * id)
-    parts[#parts + 1] = string.format("%s=$%02X(en=%d,pty=%d)",
-      name, b, (b & 0x40) ~= 0 and 1 or 0, b & 0x07)
-  end
-  H.log(string.format(
-    "[probe127 %s] f%d 1a6d=$%02X 07fb=$%04X 07fd=$%04X 07ff=$%04X " ..
-    "0801=$%04X 0803=$%04X %s",
-    tag, H.frame, H.readByte(0x1a6d), H.readWord(0x07fb), H.readWord(0x07fd),
-    H.readWord(0x07ff), H.readWord(0x0801), H.readWord(0x0803),
-    table.concat(parts, " ")))
-end
-local probeHits = {}
-local function probePc()
-  local s = emu.getState()
-  return string.format("%02X:%04X", s["cpu.k"] or 0, s["cpu.pc"] or 0)
-end
-local function armProbeWatch()
-  for _, e in ipairs(PROBE_IDS) do
-    local id, name = e[1], e[2]
-    local addr = 0x7E0867 + 41 * id
-    emu.addMemoryCallback(function(a, v)
-      local line = string.format(
-        "[probe127 watch] f%d pc=%s %s($0867+41*%d) <- $%02X",
-        H.frame, probePc(), name, id, v)
-      probeHits[#probeHits + 1] = line
-      if #probeHits > 40 then table.remove(probeHits, 1) end
-      H.log(line)
-    end, emu.callbackType.write, addr, addr)
-  end
-  H.log("[probe127] write-watch armed on $0867+41*{0,1,3,7} (TERRA/LOCKE/SHADOW/STRAGO)")
-end
-
-local function probeEventDump(tag)
-  local sw050A = (H.readByte(0x1E80 + (0x050A >> 3)) >> (0x050A & 7)) & 1
-  local e1 = H.readByte(0x00e1)
-  H.log(string.format(
-    "[probe127-event %s] f%d ctl=%s algn=%s ev=%s dlg=%s " ..
-    "e1(wait o/f/s)=$%02X(o=%d,f=%d,s=%d) e2(objWait)=$%02X " ..
-    "e3(pauseCnt)=$%02X eventPC(bank:e6e5)=%02X:%02X%02X e8(evStackPtr)=$%04X " ..
-    "ea(opcode)=$%02X da(curObjOfs)=$%02X dc(curObj)=$%02X pos=(%d,%d) " ..
-    "onAmbushTile(21,22)=%s sw($050A)=%d",
-    tag, H.frame, tostring(H.hasControl()), tostring(H.tileAligned()),
-    tostring(H.eventRunning()), tostring(H.dialogWaiting()),
-    e1, (e1 >> 7) & 1, (e1 >> 6) & 1, (e1 >> 5) & 1,
-    H.readByte(0x00e2), H.readByte(0x00e3),
-    H.readByte(0x00e7), H.readByte(0x00e6), H.readByte(0x00e5),
-    H.readWord(0x00e8), H.readByte(0x00ea),
-    H.readByte(0x00da), H.readByte(0x00dc),
-    H.fieldX(), H.fieldY(),
-    tostring(H.fieldX() == 21 and H.fieldY() == 22), sw050A))
 end
 
 local function map() return H.mapId() & 0x1ff end
@@ -124,6 +79,17 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 local function seq(steps) return H.cond(function() return true end, steps) end
 
+-- 37-byte character record (ff6/notes/field-ram.txt:885+): +$08 level,
+-- +$11 experience (3 bytes)
+local function lvl(c) return H.readByte(0x1600 + 37 * c + 0x08) end
+local function xpOf(c)
+  local b = 0x1600 + 37 * c + 0x11
+  return H.readByte(b) + H.readByte(b + 1) * 256 + H.readByte(b + 2) * 65536
+end
+local function gil()
+  return H.readByte(0x1860) + H.readByte(0x1861) * 256 + H.readByte(0x1862) * 65536
+end
+
 local function calm(n, extra)
   local cnt = 0
   return function()
@@ -131,20 +97,6 @@ local function calm(n, extra)
     cnt = ok and cnt + 1 or 0
     return cnt >= n
   end
-end
-
--- edge-A through dialogs/scenes until settled (gen_thamasa_arrive's settle)
-local function settle(maxFrames, what)
-  local ph = 0
-  return H.driveUntil(function()
-    return H.hasControl() and H.tileAligned() and not H.dialogWaiting()
-       and not H.battleLoadStarted()
-  end, maxFrames, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      H.setPad(H.dialogWaiting() and (ph < 4 and { "a" } or {}) or {})
-    end),
-  }, what)
 end
 
 local function pressWalk(dir, pred, maxFrames, what)
@@ -161,7 +113,7 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
--- gen_thamasa_arrive's crossDoor, unchanged
+-- gen_thamasa_arrive's crossDoor, unchanged (via the bake)
 local DIAGSTAGE = {
   { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
   { -1, 1, "upright" }, { -1, -1, "downright" },
@@ -214,9 +166,7 @@ local function crossDoor(sx, sy, dm, dx, dy, what, opts)
   })
 end
 
--- Live NPC lookup: scan object slots 16..31 for whichever sits nearest
--- (x,y), rather than trust "$10 + record order" past 16 make_npc records
--- on one map.
+-- Live NPC lookup (the bake's findNpc/objAt/chaseTalkLazy, unchanged)
 local function objAt(idx)
   local off = 0x29 * idx
   return H.readWord(0x086a + off) >> 4, H.readWord(0x086d + off) >> 4
@@ -235,12 +185,6 @@ local function findNpc(x, y, fallback)
     x, y, best or 0, bestD or -1, fallback))
   return best or fallback
 end
-
--- chaseTalk needs a concrete object index at construction time (every step
--- in an H.run list is built before the emulator boots -- gen_tunnelarmr's
--- posOf note), but the door NPC's slot is only knowable live.  This is
--- M.chaseTalk's body (lib/ot6_field.lua) with the one line that reads
--- objIdx replaced by a call to idxFn() every frame instead.
 local function chaseTalkLazy(idxFn, maxFrames, what, opts)
   opts = opts or {}
   local ph, hb = 0, 0
@@ -332,8 +276,7 @@ local function care(what)
   })
 end
 
--- gen_thamasa_arrive's chestAuto: live-staged (bfsPath candidates), so no
--- hand-guessed stand tile is needed for either map-351 chest.
+-- the bake's chestAuto, unchanged
 local CHEST_CAND = {
   { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
 }
@@ -362,7 +305,8 @@ local function chestAuto(cx, cy, bit, what, item)
       function() local p = stage(); local _, fy = creepXY(p[1], p[2]); return fy() end,
       { maxFrames = 40000, playBattles = "tactical", healer = TERRA, bank = 3,
         items = true, healPercent = 85,
-        magic = { [TERRA] = { spell = ICE_SPELL, boost = false } } }),
+        magic = { [TERRA] = { spell = ICE_SPELL, boost = false },
+                [LOCKE] = { spell = ICE_SPELL, boost = false } } }),
     H.call(function() before = item and H.invCountOf(item) or nil end),
     H.driveUntil(function()
       return H.readByte(0x087f + H.readWord(0x0803)) == FACE_VAL[stage()[3]]
@@ -399,9 +343,9 @@ local function chestAuto(cx, cy, bit, what, item)
   })
 end
 
-local function gil()
-  return H.readByte(0x1860) + H.readByte(0x1861) * 256 + H.readByte(0x1862) * 65536
-end
+-- the bake's shop steps, wrapped so the trip can run twice (pre- and
+-- post-grind top-up; H.buyItem's qty functions are count-based, so the
+-- second trip only buys what the grind consumed)
 local SHOP_CAND = {
   { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
   { 0, 2, "up" }, { 0, -2, "down" }, { -2, 0, "right" }, { 2, 0, "left" },
@@ -458,40 +402,329 @@ local function shopClose(what)
     H.waitFrames(30),
   })
 end
-
-local function logStragoJoin()
-  return H.call(function()
-    -- ff6/notes/field-ram.txt:885-895: the 37-byte character record,
-    -- indexed by character id (same convention as $1850+charId): +$08
-    -- level, +$09 current HP, +$0B max HP (top 2 bits are the hp-boost
-    -- flag, masked off), +$0D current MP, +$0F max MP (same mask).
-    local lvl = H.readByte(0x1600 + 37 * STRAGO + 0x08)
-    local hp = H.readWord(0x1600 + 37 * STRAGO + 0x09)
-    local mhp = H.readWord(0x1600 + 37 * STRAGO + 0x0B) & 0x3FFF
-    local mp = H.readWord(0x1600 + 37 * STRAGO + 0x0D)
-    local mmp = H.readWord(0x1600 + 37 * STRAGO + 0x0F) & 0x3FFF
-    H.log(string.format(
-      "[P3] STRAGO join stats: level=%d hp=%d/%d mp=%d/%d (measured, no " ..
-      "norm_lvl expected at join)", lvl, hp, mhp, mp, mmp))
-  end)
+local function shopTrip(tag)
+  local what = "Thamasa item shop (" .. tag .. ")"
+  return seq({
+    crossDoor(26, 37, 347, 36, 44, "item shop door 343(26,37)->347(36,44) " .. tag),
+    H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
+      "shop interior settled before pathfinding"),
+    H.waitFrames(150),
+    shopTalk(36, 39, what),
+    H.buyItem(TONIC, 0, function() return 30 - H.invCountOf(TONIC) end, "TONIC to 30"),
+    H.buyItem(POTION, 1, function() return 15 - H.invCountOf(POTION) end, "POTION to 15"),
+    H.buyItem(FENIX_DOWN, 6, function() return 20 - H.invCountOf(FENIX_DOWN) end,
+      "FENIX DOWN to 20"),
+    H.call(function()
+      H.log(string.format(
+        "[shop] %s done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+        what, H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
+        gil(), H.frame))
+    end),
+    shopClose(what),
+    crossDoor(36, 45, 343, 26, 39, "item shop door 347(36,45)->343(26,39), return " .. tag),
+  })
 end
 
+-- --------------------------------------------------------------- GRIND --
+-- One self-contained per-frame kernel (worldNavTo's shape, simplified to
+-- a two-tile pace): walk home<->away on the world map outside Thamasa,
+-- fight every random encounter with the lib fight driver's nuke
+-- repertoire, run a care stop after every battle, and stop once TERRA and
+-- LOCKE both read >= GRIND_MIN and the party is settled back on the home
+-- tile.  All input-driven; no state writes.
+local grindStats = {
+  fights = 0, bframes = 0, careN = 0, legs = 0,
+  f0 = nil, xp0 = nil, gil0 = nil, bag0 = nil,
+}
+local function grindStep()
+  local F = H.newFightDriver("grind", {
+    tactical = true, boost = true, bank = 3, items = true, cure = true,
+    healer = TERRA, healPercent = 60,
+    nuke = { ICE2_SPELL, ICE_SPELL }, nukeLore = { AQUA_RAKE_LORE_ID },
+  })
+  local CAND = {
+    { name = "left",  dx = -1, dy = 0, opp = "right" },
+    { name = "down",  dx = 0,  dy = 1, opp = "up" },
+    { name = "up",    dx = 0,  dy = -1, opp = "down" },
+  }
+  local dirIdx = 1
+  local home, away = nil, nil
+  local pend = nil
+  local battN, sawBattle = 0, false
+  local careD = nil
+  local fightXp0, fightForm, fightF0 = 0, -1, 0
+  local lastHb = -100000
+  local wrapN, stallN, stallSig = 0, 0, ""
+  local function anyMonsterAlive()
+    for i = 0, 5 do
+      if H.readByte(0x3AA8 + i * 2) % 2 == 1
+         and H.readWord(0x3BFC + i * 2) > 0 then return true end
+    end
+    return false
+  end
+  local function grindDone()
+    return lvl(TERRA) >= GRIND_MIN and lvl(LOCKE) >= GRIND_MIN
+  end
+  local function kernel()
+    -- boot-frame bookkeeping
+    if not grindStats.f0 then
+      grindStats.f0 = H.frame
+      grindStats.xp0 = { xpOf(TERRA), xpOf(LOCKE), xpOf(SHADOW) }
+      grindStats.gil0 = gil()
+      grindStats.bag0 = { H.invCountOf(FENIX_DOWN), H.invCountOf(TONIC),
+                          H.invCountOf(POTION) }
+      H.log(string.format(
+        "[grind] START f%d world=(%d,%d) target=L%d levels T/L/Sh=%d/%d/%d "
+        .. "xp=%d/%d/%d gil=%d bag f/t/p=%d/%d/%d",
+        H.frame, H.worldX(), H.worldY(), GRIND_MIN,
+        lvl(TERRA), lvl(LOCKE), lvl(SHADOW),
+        xpOf(TERRA), xpOf(LOCKE), xpOf(SHADOW), gil(),
+        grindStats.bag0[1], grindStats.bag0[2], grindStats.bag0[3]))
+    end
+    -- heartbeat: levels + xp every ~3600 frames, whatever else is going on
+    if H.frame - lastHb >= 3600 then
+      lastHb = H.frame
+      H.log(string.format(
+        "[grind hb] f%d fights=%d bframes=%d levels T/L/Sh=%d/%d/%d "
+        .. "xp=%d/%d/%d hp T=%d/%d L=%d/%d mp=%d,%d danger=$%04X",
+        H.frame, grindStats.fights, grindStats.bframes,
+        lvl(TERRA), lvl(LOCKE), lvl(SHADOW),
+        xpOf(TERRA), xpOf(LOCKE), xpOf(SHADOW),
+        H.charHp(TERRA), H.charMaxHp(TERRA), H.charHp(LOCKE), H.charMaxHp(LOCKE),
+        H.charMp(TERRA), H.charMp(LOCKE), H.readWord(0x1F6E)))
+    end
+    -- 1. battle: the nuke driver owns the pad
+    battN = H.battleLoadStarted() and battN + 1 or 0
+    if battN > 0 then
+      if H.gameOverFired > 0 then
+        error(string.format(
+          "[grind] party WIPED in grind fight %d (GameOver read-fired) f%d",
+          grindStats.fights, H.frame), 0)
+      end
+      if battN == 3 then
+        sawBattle = true
+        pend = nil
+        grindStats.fights = grindStats.fights + 1
+        fightXp0 = xpOf(TERRA)
+        fightForm = H.readWord(0x11E0) & 0x3FF
+        fightF0 = H.frame
+        wrapN, stallN, stallSig = 0, 0, ""
+        H.log(string.format(
+          "[grind] fight %d START f%d formation=%d levels T/L/Sh=%d/%d/%d",
+          grindStats.fights, H.frame, fightForm,
+          lvl(TERRA), lvl(LOCKE), lvl(SHADOW)))
+      end
+      if battN >= 3 then
+        grindStats.bframes = grindStats.bframes + 1
+        -- VICTORY-DEADLOCK guard (measured, fight 37 of the first real
+        -- bake): the kill can land while an actor's spell window is still
+        -- open; in Wait mode the open window freezes the battle clock, and
+        -- newFightDriver only plans at ST_CMD, so battle f+100k+ sat at
+        -- state $0E with every monster at 0 hp.  When no monster is alive
+        -- and a battle menu window is still up, tap B to close it so the
+        -- battle can end.
+        if battN > 600 and not anyMonsterAlive()
+           and H.readByte(0x7BCA) ~= 0 then
+          wrapN = wrapN + 1
+          if wrapN == 1 then
+            H.log(string.format(
+              "[grind] fight %d: all monsters down with a battle window "
+              .. "open (state=$%02X actor=%d) -- tapping B to let the "
+              .. "battle end, f%d", grindStats.fights,
+              H.readByte(0x7BC2), H.readByte(0x62CA) & 3, H.frame))
+          end
+          H.setPad(wrapN % 8 < 4 and { b = true } or {})
+          return
+        end
+        -- generic no-progress watchdog: if nothing observable moves for
+        -- 2400 battle frames, alternate B/A bursts to shake the state
+        -- machine loose rather than hang the bake.
+        local sig = string.format("%d:%d:%d:%d:%d",
+          H.readByte(0x7BCA), H.readByte(0x7BC2), H.readByte(0x62CA) & 3,
+          (function() local s = 0
+             for i = 0, 5 do s = s + H.readWord(0x3BFC + i * 2) end
+             return s end)(),
+          (function() local s = 0
+             for e = 0, 3 do s = s + H.readWord(0x3BF4 + e * 2) end
+             return s end)())
+        if sig == stallSig then stallN = stallN + 1
+        else stallSig, stallN = sig, 0 end
+        if stallN > 2400 then
+          if stallN == 2401 then
+            H.log(string.format(
+              "[grind] fight %d STALLED 2400 battle frames with no state "
+              .. "change (sig=%s) -- B/A recovery bursts engaged, f%d",
+              grindStats.fights, sig, H.frame))
+          end
+          local burst = (stallN // 240) % 2
+          H.setPad(stallN % 8 < 4
+            and (burst == 0 and { b = true } or { a = true }) or {})
+          return
+        end
+        F.frame()
+      else
+        H.setPad({})
+      end
+      return
+    end
+    F.idle()
+    -- 2. a care stop in progress owns the pad, control or not: the open
+    -- menu drops worldHasControl, so this must run BEFORE the control
+    -- gate (worldNavTo runs its careD at the top of its kernel for the
+    -- same reason; the first smoke starved the care stop here and froze)
+    if careD then
+      if careD.done() then careD = nil
+      else careD.frame(); return end
+    end
+    -- 3. anything that is not plain walkable world control: no input
+    if not H.worldMode() or not H.worldHasControl() then H.setPad({}); return end
+    if not H.worldAligned() then return end       -- mid-step: keep the pad
+    if bright() < 15 then H.setPad({}); return end
+    -- 4. a battle just resolved and the reload settled: tally + care
+    if sawBattle then
+      sawBattle = false
+      H.log(string.format(
+        "[grind] fight %d DONE f%d (%d bframes) formation=%d "
+        .. "xp/char +%d -> T/L/Sh=%d/%d/%d levels=%d/%d/%d "
+        .. "hp T=%d/%d L=%d/%d Sh=%d/%d bag f/t/p=%d/%d/%d gil=%d",
+        grindStats.fights, H.frame, H.frame - fightF0, fightForm,
+        xpOf(TERRA) - fightXp0,
+        xpOf(TERRA), xpOf(LOCKE), xpOf(SHADOW),
+        lvl(TERRA), lvl(LOCKE), lvl(SHADOW),
+        H.charHp(TERRA), H.charMaxHp(TERRA), H.charHp(LOCKE),
+        H.charMaxHp(LOCKE), H.charHp(SHADOW), H.charMaxHp(SHADOW),
+        H.invCountOf(FENIX_DOWN), H.invCountOf(TONIC), H.invCountOf(POTION),
+        gil()))
+      if not H.eventTimerLive() then
+        careD = H.newCareDriver({ threshold = 0.9,
+          tag = "care after grind fight " .. grindStats.fights })
+        grindStats.careN = grindStats.careN + 1
+      end
+    end
+    if careD then
+      if careD.done() then careD = nil
+      else careD.frame(); return end
+    end
+    -- 4. position bookkeeping
+    local x, y = H.worldX(), H.worldY()
+    if not home then home = { x = x, y = y } end
+    if pend then
+      if x == pend.tx and y == pend.ty then
+        if not away and pend.fromHome then
+          away = { x = x, y = y }
+          H.log(string.format("[grind] pace pair: home=(%d,%d) away=(%d,%d) dir=%s",
+            home.x, home.y, away.x, away.y, CAND[dirIdx].name))
+        end
+        grindStats.legs = grindStats.legs + 1
+        pend = nil
+      elseif x == pend.x and y == pend.y then
+        pend.stall = pend.stall + 1
+        if pend.stall > 10 then
+          if not away and pend.fromHome then
+            dirIdx = dirIdx + 1
+            if dirIdx > #CAND then
+              error("[grind] no walkable pace neighbor at home ("
+                .. home.x .. "," .. home.y .. ")", 0)
+            end
+            H.log(string.format("[grind] %s blocked at home; trying %s",
+              pend.dir, CAND[dirIdx].name))
+          else
+            H.log(string.format("[grind] step (%d,%d)->%s refused; re-picking",
+              pend.x, pend.y, pend.dir))
+          end
+          pend = nil
+          H.setPad({})
+          return
+        end
+        H.setPad({ [pend.dir] = true })
+        return
+      else
+        H.log(string.format("[grind] step (%d,%d)->%s landed (%d,%d); re-picking",
+          pend.x, pend.y, pend.dir, x, y))
+        pend = nil
+      end
+    end
+    -- 5. done?  settle on the home tile and let the outer pred fire
+    if grindDone() then
+      if x == home.x and y == home.y then H.setPad({}); return end
+      -- walk back toward home, one axis at a time
+      local dir
+      if x < home.x then dir = "right" elseif x > home.x then dir = "left"
+      elseif y < home.y then dir = "down" else dir = "up" end
+      local d = ({ right = { 1, 0 }, left = { -1, 0 },
+                   down = { 0, 1 }, up = { 0, -1 } })[dir]
+      pend = { x = x, y = y, dir = dir, tx = (x + d[1]) & 0xFF,
+               ty = (y + d[2]) & 0xFF, stall = 0 }
+      H.setPad({ [dir] = true })
+      return
+    end
+    -- 6. launch the next pace step
+    local d = CAND[dirIdx]
+    if x == home.x and y == home.y then
+      pend = { x = x, y = y, dir = d.name, tx = (x + d.dx) & 0xFF,
+               ty = (y + d.dy) & 0xFF, stall = 0, fromHome = true }
+      H.setPad({ [d.name] = true })
+    elseif away and x == away.x and y == away.y then
+      pend = { x = x, y = y, dir = d.opp, tx = home.x, ty = home.y, stall = 0 }
+      H.setPad({ [d.opp] = true })
+    else
+      -- displaced (post-battle oddity): walk back toward home
+      local dir
+      if x < home.x then dir = "right" elseif x > home.x then dir = "left"
+      elseif y < home.y then dir = "down" else dir = "up" end
+      local dd = ({ right = { 1, 0 }, left = { -1, 0 },
+                    down = { 0, 1 }, up = { 0, -1 } })[dir]
+      pend = { x = x, y = y, dir = dir, tx = (x + dd[1]) & 0xFF,
+               ty = (y + dd[2]) & 0xFF, stall = 0 }
+      H.setPad({ [dir] = true })
+    end
+  end
+  return seq({
+    H.driveUntil(function()
+      return grindStats.f0 ~= nil
+         and lvl(TERRA) >= GRIND_MIN and lvl(LOCKE) >= GRIND_MIN
+         and careD == nil and not H.battleLoadStarted()
+         and H.worldMode() and H.worldHasControl() and H.worldAligned()
+         and home ~= nil and H.worldX() == home.x and H.worldY() == home.y
+    end, 3500000, { H.call(kernel) }, "grind to L" .. GRIND_MIN),
+    H.release(),
+    H.call(function()
+      local s = grindStats
+      H.log(string.format(
+        "[grind] COMPLETE f%d: %d fights, %d battle frames, %d care stops, "
+        .. "%d pace legs, %d total frames; levels T/L/Sh=%d/%d/%d; "
+        .. "xp gained T/L/Sh=%d/%d/%d (%.0f xp/char/fight over %d fights); "
+        .. "gil %d -> %d; bag f/t/p %d/%d/%d -> %d/%d/%d "
+        .. "(consumed %d/%d/%d)",
+        H.frame, s.fights, s.bframes, s.careN, s.legs, H.frame - s.f0,
+        lvl(TERRA), lvl(LOCKE), lvl(SHADOW),
+        xpOf(TERRA) - s.xp0[1], xpOf(LOCKE) - s.xp0[2], xpOf(SHADOW) - s.xp0[3],
+        s.fights > 0 and (xpOf(TERRA) - s.xp0[1]) / s.fights or 0, s.fights,
+        s.gil0, gil(),
+        s.bag0[1], s.bag0[2], s.bag0[3],
+        H.invCountOf(FENIX_DOWN), H.invCountOf(TONIC), H.invCountOf(POTION),
+        s.bag0[1] - H.invCountOf(FENIX_DOWN), s.bag0[2] - H.invCountOf(TONIC),
+        s.bag0[3] - H.invCountOf(POTION)))
+    end),
+  })
+end
+
+-- ------------------------------------------------------- walk profiles --
 local WALK = { playBattles = "tactical", healer = TERRA, bank = 3,
                items = true, maxFrames = 20000, healPercent = 85,
-               magic = { [TERRA] = { spell = ICE_SPELL, boost = false } } }
--- islands 13/11 only: flee wandering flames rather than fight every one
--- (see houseWarp's own note on the `flee` parameter, below).
+               magic = { [TERRA] = { spell = ICE_SPELL, boost = false },
+                [LOCKE] = { spell = ICE_SPELL, boost = false } } }
 local FLEE_WALK = { playBattles = "flee", healer = TERRA, bank = 3,
                      items = true, maxFrames = 20000, healPercent = 85,
-                     magic = { [TERRA] = { spell = ICE_SPELL, boost = false } } }
-local FLAMEEATER_WALK = { playBattles = "tactical", healer = TERRA, bank = 3,
-  items = true, maxFrames = 100000, healPercent = 60 }
+                     magic = { [TERRA] = { spell = ICE_SPELL, boost = false },
+                [LOCKE] = { spell = ICE_SPELL, boost = false } } }
 
 local function houseWarp(sx, sy, dx, dy, what, playBattles)
   return seq({
     creepNav(sx, sy, { playBattles = playBattles or "tactical", healer = TERRA,
       bank = 3, items = true, maxFrames = 20000, healPercent = 85,
-      magic = { [TERRA] = { spell = ICE_SPELL, boost = false } },
+      magic = { [TERRA] = { spell = ICE_SPELL, boost = false },
+                [LOCKE] = { spell = ICE_SPELL, boost = false } },
       arrive = function() return H.fieldX() == dx and H.fieldY() == dy end }),
     H.waitUntil(function()
       return H.hasControl() and H.tileAligned() and bright() >= 15
@@ -504,13 +737,6 @@ local function houseWarp(sx, sy, dx, dy, what, playBattles)
         H.fieldX(), H.fieldY(), H.frame))
     end),
   })
-end
-
-local function battleHpAllZero()
-  for e = 0, 3 do
-    if H.readWord(0x3BF4 + e * 2) ~= 0 then return false end
-  end
-  return true
 end
 
 local function lossReload(blobFn, tag)
@@ -528,9 +754,13 @@ local function lossReload(blobFn, tag)
   })
 end
 
+-- ------------------------------------------------ the ambush battle 45 --
+-- The bake's bespoke per-turn plan with ONE change: the POSITIONAL
+-- lore-row model (row == loreId), the fix probe_thamlab_ambush_fix.lua
+-- measured correct (the compacted model held the cursor on the wrong row
+-- and stalled).
 local L45 = H.newSeedLadder("ambush (battle 45)", { attempts = 5 })
 local ambBlob, ambWon = nil, false
-
 local CONFIRM_BATTLE_GONE = 90
 
 local MENU_A, ACTOR_A, MSTATE_A = 0x7BCA, 0x62CA, 0x7BC2
@@ -544,7 +774,6 @@ local LROW_A = 0x8927
 local TBL_306A_A = 0x306A
 local CMD_FIGHT_A, CMD_ITEM_A, CMD_STEAL_A, CMD_LORE_A = 0x00, 0x01, 0x05, 0x0C
 local ITEMSCR_A, ITEMROW_A, BATTINV_A = 0x8947, 0x894F, 0x2686
-local AQUA_RAKE_LORE_ID = 3
 local CMD_MAGIC_A, ST_MAGIC_A = 0x02, 0x0E
 local MLISTPTR_A = 0x302C
 local MSCROLL_A, MCOL_A, MROW_A = 0x8913, 0x8917, 0x891B
@@ -581,24 +810,16 @@ local function bagIdxOfA(ids)
   end
   return nil
 end
--- battle_lore.lua's own tested fact: $306A+id reads id+$8B iff that lore
--- id is currently offered by Ot6LoreMask's live walk; otherwise whatever
--- InitBattle's own clear left there. Comparing against the exact expected
--- value (rather than measuring a separate "fill" byte first) sidesteps
--- needing that extra live-measurement step.
 local function loreOfferedA(id) return H.readByte(TBL_306A_A + id) == id + 0x8B end
--- The battle lore window is POSITIONAL by lore id: one row per id, with
--- unlearned/unoffered ids rendering as empty rows (thamlab, measured:
--- learned {3,7,20} -> Aqua Rake (id 3) renders on row index 3; the old
--- compacted-count model computed row 0, and the driver A-tapped the empty
--- first row for ~61k frames -- the stall the owner watched twice).
+-- POSITIONAL lore-row model (the ambush-fix measurement): the battle lore
+-- window renders one row per lore id, empty rows included.
 local function loreRowForA(targetId) return targetId end
+local ambushCharTC = H.targetCursor({ mask = 0x7B7D, dirs = { "down", "up", "left", "right" } })
 
 local function newAmbushPlan(tag)
   local F = {}
   local phase, mf = 0, 0
   local turnActor, turnPlan = nil, nil
-  local stepIdx = 0
   local aqCasts, filchCasts, fightBursts, iceCasts = 0, 0, 0, 0
   local openerLogged = false
   local function partyCounts()
@@ -621,17 +842,9 @@ local function newAmbushPlan(tag)
     end
     return false
   end
-  -- built once per fresh ST_CMD (turnPlan == nil or a new actor's turn)
   local function decideTurn(actor)
     if not openerLogged then
       openerLogged = true
-      local hp, mx = H.readWord(BCHP_A + actor * 2), H.readWord(BCMAXHP_A + actor * 2)
-      H.log(string.format(
-        "[%s] opener check f%d: first actor to get a turn is slot %d " ..
-        "(char $%02X) at %d/%d hp -- the opener's own damage on whoever it " ..
-        "caught is whatever's MISSING from THEIR max, logged separately " ..
-        "per party member below", tag, H.frame, actor,
-        H.readByte(BCHID_A + actor * 2), hp, mx))
       for e = 0, 3 do
         if H.readWord(BCMAXHP_A + e * 2) > 0 then
           H.log(string.format(
@@ -645,12 +858,10 @@ local function newAmbushPlan(tag)
     local charId = H.readByte(BCHID_A + actor * 2)
     local hp, mx = H.readWord(BCHP_A + actor * 2), H.readWord(BCMAXHP_A + actor * 2)
     local balloonsAlive, stragoSlot, downSlots = partyCounts()
-    -- 1. self-heal, always allowed (the fence lesson)
     if mx > 0 and hp > 0 and hp < mx * 0.40 then
       local idx = bagIdxOfA({ TONIC, POTION })
       if idx then return { kind = "item", ids = { TONIC, POTION }, target = actor } end
     end
-    -- 2. revive window: at most one Balloon left, revive STRAGO first
     if balloonsAlive <= 1 and #downSlots > 0 then
       local idx = bagIdxOfA({ FENIX_DOWN })
       if idx then
@@ -661,14 +872,6 @@ local function newAmbushPlan(tag)
         return { kind = "item", ids = { FENIX_DOWN }, target = tgt }
       end
     end
-    -- 3. offense -- lead with AoE weakness magic: STRAGO's Aqua Rake is
-    -- free every turn regardless; TERRA and
-    -- LOCKE now both carry an Ice-granting esper (SHIVA/MADUIN), so they
-    -- lead with a boosted, multi-target Ice cast (Balloons are weak to
-    -- ice|water, thamasa-route.md) whenever they can pay for it, falling
-    -- back to the pre-PREP break-and-burst kit (Filch/boosted Fight) only
-    -- when the cast isn't available (esper unequipped, out of MP, or the
-    -- greyed bit refuses it).
     if charId == STRAGO then
       return { kind = "lore", loreId = AQUA_RAKE_LORE_ID }
     end
@@ -683,7 +886,6 @@ local function newAmbushPlan(tag)
     end
     return { kind = "fight", boost = true }
   end
-  -- per-frame button for the CURRENT plan/state
   local function buttonFor(actor, st)
     local plan = turnPlan
     if plan.kind == "item" then
@@ -702,26 +904,9 @@ local function newAmbushPlan(tag)
         return "a"
       elseif st == ST_TGT_A then
         plan.tgtSpin = (plan.tgtSpin or 0) + 1
-        -- closed-loop char-column steer (plan-local, so nothing carries
-        -- across episodes): up/down only -- left/right switch target
-        -- GROUPS in this pincer formation; single 2-frame taps with a
-        -- long dwell, because battle d-pad input is auto-repeat, not
-        -- edge, driven.  (thamlab, measured: the old blind rotation's
-        -- first press exiled the cursor into a monster group and the
-        -- 240-spin blind A fed Fenix Downs to a Balloon -- eight ~1740-
-        -- frame whiff episodes on one seed; this steer confirms in ~35
-        -- frames on both pincer and normal shapes.)
-        plan.fixMf = (plan.fixMf or -1) + 1
-        local want = 1 << plan.target
-        local d7d = H.readByte(0x7B7D)
-        if d7d ~= 0 then plan.fixSeen = d7d end   -- latch across the blink
-        local ace = H.readByte(0x7ACE)
-        if plan.tgtSpin > 600 then return "a" end -- safety net only
-        if plan.fixSeen == want then return "a" end
-        local ph = plan.fixMf % 16
-        if ph >= 2 then return nil end
-        if ace % 2 == 0 then return (ace == 0) and "right" or "left" end
-        return "down"
+        if plan.tgtSpin > 240 then return "a" end
+        ambushCharTC.observe()
+        return ambushCharTC.steer(plan.target, mf)
       end
       return "b"
     end
@@ -739,7 +924,7 @@ local function newAmbushPlan(tag)
         if cur > 1 then return "up" end
         return "a"
       elseif st == ST_TGT_A then
-        return "a"                       -- default enemy cursor, no steer
+        return "a"
       end
       return "b"
     end
@@ -763,11 +948,6 @@ local function newAmbushPlan(tag)
       return "b"
     end
     if plan.kind == "magic" then
-      -- Same boost-bank shape the fight fallback uses below (spend BP,
-      -- capped at 3, only once at least 2 is banked) -- OT6 folds a boosted
-      -- base cast to its next tier via Ot6FoldTbl (Ice -> Ice2 -> Ice3), so
-      -- this is how the plan gets the bigger AoE hit rather than the base
-      -- 4 MP tier every single cast.
       if st == ST_CMD_A then
         if not plan.boosted then
           local bp = H.readByte(BP_A + actor * 2)
@@ -785,9 +965,6 @@ local function newAmbushPlan(tag)
         if cur == want then return "a" end
         return cur < want and "down" or "up"
       elseif st == ST_MAGIC_A then
-        -- re-read the cell every tick (not just at plan time): the list is
-        -- rebuilt when the window opens, matching M.newFightDriver's own
-        -- button()'s "re-read, don't trust the plan-time cell" note.
         local cell = spellCellA(actor, plan.spell, false)
         if cell == nil then return "b" end
         local wr, wc = cell // 2, cell % 2
@@ -821,7 +998,7 @@ local function newAmbushPlan(tag)
       if cur == want then return "a" end
       return cur < want and "down" or "up"
     elseif st == ST_TGT_A then
-      return "a"                         -- default enemy cursor, no steer
+      return "a"
     end
     return "b"
   end
@@ -833,14 +1010,20 @@ local function newAmbushPlan(tag)
       return
     end
     mf = mf + 1
+    -- victory-deadlock guard (same as the grind kernel's): every monster
+    -- down but a battle window still open freezes the Wait-mode clock
+    local anyMon = false
+    for s = 0, 5 do
+      if monPresentA(s) and monHpA(s) > 0 then anyMon = true; break end
+    end
+    if mf > 600 and not anyMon then
+      H.setPad(phase < 4 and { b = true } or {})
+      return
+    end
     local actor = H.readByte(ACTOR_A) & 3
     local st = H.readByte(MSTATE_A)
     if st == 0x01 then H.setPad({}); return end   -- ST_TRANS
     if (turnPlan == nil or turnActor ~= actor) and st ~= ST_CMD_A then
-      -- a fresh actor turn hasn't reached the command list yet (a
-      -- transitional state); hold still rather than build a plan off a
-      -- read that might still be settling, matching H.newFightDriver's
-      -- own "only build a plan at ST_CMD" convention.
       H.setPad({})
       return
     end
@@ -851,13 +1034,25 @@ local function newAmbushPlan(tag)
         H.frame, actor, H.readByte(BCHID_A + actor * 2), turnPlan.kind,
         turnPlan.kind == "item" and (" tgt=" .. turnPlan.target) or ""))
     end
+    -- LORE-STALL watchdog kept as a safety net (should never fire with the
+    -- positional model; if it does, that's a headline finding)
+    if turnPlan.kind == "lore" and st == ST_LORE_A then
+      turnPlan.loreStall = (turnPlan.loreStall or 0) + 1
+      if turnPlan.loreStall == 600 then
+        H.log(string.format(
+          "[%s] LORE-STALL WITH POSITIONAL FIX f%d: actor=%d loreId=%d " ..
+          "cursor(8927+a)=%d want=%d offered=%s -- falling back to Fight",
+          tag, H.frame, actor, turnPlan.loreId,
+          H.readByte(LROW_A + actor), loreRowForA(turnPlan.loreId),
+          tostring(loreOfferedA(turnPlan.loreId))))
+        turnPlan = { kind = "fight", boost = true }
+      end
+    end
     local slow = (st == ST_ITEM_A)
     local period = slow and 30 or 8
     local on = slow and 6 or 4
     if mf % period >= on then H.setPad({}); return end
     local btn = buttonFor(actor, st)
-    -- count landed actions on the ST_TGT->confirm edge, logged once per
-    -- kind so the report has real cadence numbers
     if st == ST_TGT_A and btn == "a" then
       if turnPlan.kind == "lore" and not turnPlan.counted then
         turnPlan.counted = true; aqCasts = aqCasts + 1
@@ -902,7 +1097,6 @@ local function ambushAttempt(n)
     H.call(function() H.log(string.format(
       "[ambush] approaching (21,22), attempt %d", n)) end),
     creepNav(21, 23, FLEE_WALK),
-    H.call(function() probeDump("PRE-BATTLE45 attempt-" .. n) end),
     pressWalk("up", function()
       return H.battleLoadStarted() or not H.hasControl()
     end, 1800, "step onto (21,22) -> battle 45"),
@@ -928,8 +1122,6 @@ local function ambushAttempt(n)
       H.log(string.format(
         "[ambush] phase 1 done (battle module gone or GameOver read), " ..
         "attempt %d, f%d, gameOverFired=%d", n, H.frame, H.gameOverFired))
-      probeDump("POST-BATTLE45 attempt-" .. n)
-      probeEventDump("POST-BATTLE45 attempt-" .. n)
     end),
     H.driveUntil(function()
       if H.gameOverFired > 0 then return true end
@@ -971,115 +1163,6 @@ local function ambushAttempt(n)
   })
 end
 
--- ---------------------------------------------------------- FlameEater --
--- Battle 79, formation 449: shields 7, pierce class, weak ice, absorbs
--- fire, the authored OT6 water add.  Fired by stepping on the (46,53)
--- floor trigger (event_trigger.asm:1716), which re-forces party order
--- STRAGO,TERRA,LOCKE itself.  A win sets $0090=1 (the SAME _ca5ea9 gate
--- Dadaluma/TunnelArmr use); a loss is vanilla GameOver.  L26 HP8400 vs a
--- party around L16-19 is a long fight -- newFightDriver's own tactical
--- kit (boosted Fight, TERRA's Cure, the item bag) fights it honestly, no
--- bespoke per-turn plan.  A seed ladder (H.newSeedLadder, 5 rungs
--- like gen_sabin_train's battle 68) retries a loss from a checkpoint taken
--- just before the trigger tile, with a care stop each attempt.
-local L79 = H.newSeedLadder("FlameEater (battle 79)", { attempts = 5 })
-local feBlob, feWon = nil, false
-
-local function flameEaterAttempt(n)
-  -- The nuke repertoire is what wins this board (thamlab, 8-seed protocol
-  -- at the routed levels: libnuke 5/8 with its win set strictly
-  -- containing the plain driver's 3/8; at healthy levels 3 of its wins
-  -- are 0-death 0-item).  TERRA/LOCKE lead boosted Ice (the fold pays the
-  -- AoE tier), STRAGO Aqua Rake through the Lore menu.
-  local F = H.newFightDriver("FlameEater", { tactical = true, boost = true,
-    bank = 3, items = true, cure = true, healer = TERRA, healPercent = 60,
-    nuke = { 0x01 }, nukeLore = { 3 } })
-  local notBattle, giveUp = 0, 0
-  local loadReq
-  -- H.cond's branches take a plain step list, not a pre-wrapped seq({...}).
-  return H.cond(function() return feWon end, {}, {
-    H.logStep(function()
-      return string.format("FlameEater attempt %d at f%d", n, H.frame)
-    end),
-    n > 1 and seq({
-      H.call(function() loadReq = H.requestLoadState(feBlob) end),
-      H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "FlameEater entry-point reload") end),
-      H.waitFrames(90),
-      care("post-reload, attempt " .. n),
-    }) or seq({}),
-    L79.spread(n),
-    H.call(function() H.log(string.format(
-      "[FlameEater] approaching (46,53), attempt %d", n)) end),
-    creepNav(46, 52, FLAMEEATER_WALK),
-    pressWalk("down", function()
-      return sw(0x0090) == 1 or H.battleLoadStarted() or H.battleActive()
-    end, 8000, "walk onto (46,53) until battle 79 starts (or it's already won)"),
-    H.driveUntil(function()
-      if H.gameOverFired > 0 then return true end
-      if H.battleLoadStarted() or H.battleActive() then
-        notBattle = 0
-      else
-        notBattle = notBattle + 1
-      end
-      return notBattle >= CONFIRM_BATTLE_GONE
-    end, 1800000, {
-      H.call(function()
-        if H.gameOverFired > 0 then H.setPad({}); return end
-        F.frame()
-      end),
-    }, "FlameEater fight (attempt " .. n .. ")"),
-    H.call(function()
-      H.log(string.format(
-        "[FlameEater] phase 1 done (battle module gone or GameOver read), " ..
-        "attempt %d, f%d, gameOverFired=%d", n, H.frame, H.gameOverFired))
-    end),
-    H.driveUntil(function()
-      if H.gameOverFired > 0 then return true end
-      giveUp = giveUp + 1
-      return sw(0x0090) == 1 or giveUp >= 11800
-    end, 12000, {
-      H.call(function()
-        if H.gameOverFired > 0 then H.setPad({}); return end
-        local ph = (giveUp % 8)
-        if not H.hasControl() then H.setPad(ph < 4 and { "a" } or {})
-        else H.setPad({}) end
-      end),
-    }, "the win tail flips $0090 (or a real GameOver shows itself)"),
-    H.call(function()
-      H.setPad({})
-      local realWin = H.gameOverFired == 0 and sw(0x0090) == 1
-         and partyOf(STRAGO) ~= 0 and partyOf(TERRA) ~= 0
-      if H.gameOverFired > 0 then
-        H.log(string.format(
-          "FlameEater attempt %d LOST -- GameOver read-fired (event " ..
-          "GameOver, $CC/E568), f%d", n, H.frame))
-      elseif realWin then
-        feWon = true
-        H.log(string.format(
-          "FlameEater BEATEN on attempt %d, f%d, map=%d pos=(%d,%d)",
-          n, H.frame, map(), H.fieldX(), H.fieldY()))
-      else
-        H.log(string.format(
-          "FlameEater attempt %d LOST -- win verification failed " ..
-          "($0090=%d partyOf(STRAGO)=%d partyOf(TERRA)=%d " ..
-          "gameOverFired=%d, giveUp=%d), f%d",
-          n, sw(0x0090), partyOf(STRAGO), partyOf(TERRA), H.gameOverFired,
-          giveUp, H.frame))
-      end
-    end),
-    H.cond(function() return not feWon end, {
-      lossReload(function() return feBlob end, "FlameEater"),
-    }, {
-      -- heal-after-every-battle: the boss is no exception, and three of
-      -- the lab's protocol wins ended with someone under the standing
-      -- floor -- recover before the win tail so the banked state ships
-      -- whole (zero frames when the party comes out clean).
-      H.careStop("care after the FlameEater"),
-    }),
-  })
-end
-
 -- ------------------------------------------------------------------------
 local steps = {
   -- ---- 1. cold Continue the thamasa-night-v1 checkpoint -----------------
@@ -1107,13 +1190,16 @@ local steps = {
   H.waitFrames(30),
   H.call(function()
     H.log(string.format(
-      "[ot6] boot f%d world=(%d,%d) party0=%02X party1=%02X party3=%02X",
+      "[ot6] boot f%d world=(%d,%d) party0=%02X party1=%02X party3=%02X " ..
+      "levels T/L/Sh=%d/%d/%d xp=%d/%d/%d",
       H.frame, H.worldX(), H.worldY(), H.readByte(0x1850) & 7,
-      H.readByte(0x1851) & 7, H.readByte(0x1853) & 7))
+      H.readByte(0x1851) & 7, H.readByte(0x1853) & 7,
+      lvl(TERRA), lvl(LOCKE), lvl(SHADOW),
+      xpOf(TERRA), xpOf(LOCKE), xpOf(SHADOW)))
     H.assertEntryContract("thamasa-night-v1")
   end),
 
-  -- ---- 2. care, then PREP, then into town ---------------------------------
+  -- ---- 2. care, into town, PREP, shop trip #1 ---------------------------
   H.fieldCare({ tag = "care at the L tile", threshold = 0.9 }),
 
   H.driveUntil(function() return not H.worldMode() end, 2000, {
@@ -1148,25 +1234,43 @@ local steps = {
       H.charMaxHp(LOCKE)))
   end),
 
-  crossDoor(26, 37, 347, 36, 44, "item shop door 343(26,37)->347(36,44)"),
-  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
-    "shop interior settled before pathfinding", 10),
-  H.waitFrames(150),
-  shopTalk(36, 39, "Thamasa item shop"),
-  H.buyItem(TONIC, 0, function() return 30 - H.invCountOf(TONIC) end, "TONIC to 30"),
-  H.buyItem(POTION, 1, function() return 15 - H.invCountOf(POTION) end, "POTION to 15"),
-  H.buyItem(FENIX_DOWN, 6, function() return 20 - H.invCountOf(FENIX_DOWN) end,
-    "FENIX DOWN to 20"),
-  H.call(function()
-    H.log(string.format(
-      "[shop] Thamasa item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
-      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
-      gil(), H.frame))
-  end),
-  shopClose("Thamasa item shop"),
-  crossDoor(36, 45, 343, 26, 39, "item shop door 347(36,45)->343(26,39), return"),
+  shopTrip("pre-grind"),
 
-  -- ---- 3. the inn: door, innkeeper, the whole fire scene -----------------
+  -- ---- 3. back out to the world map and GRIND ---------------------------
+  H.call(function() H.log("[grind] leaving town for the Crescent Island grind") end),
+  H.navTo(21, 47, { maxFrames = 20000, playBattles = "tactical", healer = TERRA,
+    bank = 3, items = true, avoid = { { 35, 15 }, { 25, 12 } } }),
+  pressWalk("down", function() return H.worldMode() end, 900,
+    "held DOWN onto the south strip -> world (249,128)"),
+  H.waitUntil(function()
+    return H.worldMode() and H.worldHasControl() and H.worldAligned()
+       and bright() >= 15
+  end, 3600, "world control outside Thamasa (grind start)", 5),
+  H.waitFrames(60),
+
+  grindStep(),
+
+  H.fieldCare({ tag = "post-grind top-off", threshold = 1.0 }),
+
+  -- ---- 4. back into town; shop trip #2 (top-up) -------------------------
+  H.driveUntil(function() return not H.worldMode() end, 2000, {
+    H.call(function()
+      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+      H.setPad({ right = true })
+    end),
+  }, "held RIGHT onto (250,128) -> Thamasa 343 (post-grind)"),
+  H.release(),
+  H.waitUntil(function() return map() == 343 and H.hasControl() end, 3000,
+    "Thamasa map re-loaded (post-grind)", 5),
+  H.call(function()
+    H.log(string.format("[ot6] post-grind town re-entry f%d map=%d (%d,%d) " ..
+      "levels T/L/Sh=%d/%d/%d", H.frame, map(), H.fieldX(), H.fieldY(),
+      lvl(TERRA), lvl(LOCKE), lvl(SHADOW)))
+  end),
+
+  shopTrip("post-grind"),
+
+  -- ---- 5. the inn: door, innkeeper, the whole fire scene ----------------
   crossDoor(12, 19, 346, 23, 23, "inn door 343(12,19)->346(23,23)"),
   H.call(function()
     H.log(string.format("[ot6] inn interior f%d (%d,%d)", H.frame,
@@ -1189,9 +1293,6 @@ local steps = {
       end),
     }, "talk-across-the-counter -> innkeeper's 1 GP choice")
   end)(),
-  -- one continuous scripted stretch from here: the Yes confirm (default
-  -- cursor), the innkeeper walking off, and (since $008D=1) straight into
-  -- the night/fire scene with no further choice screens (see header).
   H.advanceStory(calm(30), 30000, { playBattles = "tactical" }),
   H.waitFrames(30),
   H.call(function()
@@ -1206,14 +1307,9 @@ local steps = {
       "[ot6] FIRE STARTED f%d map=%d (%d,%d) party[TERRA LOCKE]=%d %d",
       H.frame, map(), H.fieldX(), H.fieldY(),
       H.readByte(0x1850) & 7, H.readByte(0x1851) & 7))
-    H.screenshot("thamasa_fire_started")
-  end),
-  H.call(function()
-    probeDump("GOOD-post-fire")
-    armProbeWatch()
   end),
 
-  -- ---- 4. talk to Strago at the house door -> STRAGO joins -> map 351 ---
+  -- ---- 6. talk to Strago at the house door -> STRAGO joins -> map 351 ---
   (function()
     local idxCell = { v = 0x14 }
     return seq({
@@ -1238,22 +1334,25 @@ local steps = {
     H.assertEq(partyOf(TERRA) ~= 0, true, "TERRA is in party 1")
     H.assertEq(partyOf(LOCKE) ~= 0, true, "LOCKE is in party 1")
     do
-      -- ff6/notes/field-ram.txt:885-895: the 37-byte character record,
-      -- indexed by character id (same convention as $1850+charId): +$08
-      -- level, +$09 current HP, +$0B max HP (top 2 bits are the hp-boost
-      -- flag, masked off), +$0D current MP, +$0F max MP (same mask).
-      local lvl = H.readByte(0x1600 + 37 * STRAGO + 0x08)
+      local slvl = H.readByte(0x1600 + 37 * STRAGO + 0x08)
       local hp = H.readWord(0x1600 + 37 * STRAGO + 0x09)
       local mhp = H.readWord(0x1600 + 37 * STRAGO + 0x0B) & 0x3FFF
       local mp = H.readWord(0x1600 + 37 * STRAGO + 0x0D)
       local mmp = H.readWord(0x1600 + 37 * STRAGO + 0x0F) & 0x3FFF
       H.log(string.format(
-        "[P3] STRAGO join stats: level=%d hp=%d/%d mp=%d/%d (measured, no " ..
-        "norm_lvl expected at join)", lvl, hp, mhp, mp, mmp))
+        "[P3] STRAGO join stats: level=%d hp=%d/%d mp=%d/%d " ..
+        "(char_prop join level = avg of available chars, $1EDE=$%04X; " ..
+        "TERRA=%d LOCKE=%d after the grind)", slvl, hp, mhp, mp, mmp,
+        H.readWord(0x1EDE), lvl(TERRA), lvl(LOCKE)))
+      if slvl < GRIND_MIN then
+        H.log(string.format(
+          "[P3] WARNING: STRAGO joined at L%d, below the L%d healthy floor " ..
+          "-- the join-average model missed; report this",
+          slvl, GRIND_MIN))
+      end
     end
     H.log(string.format("[ot6] map 351 entry f%d (%d,%d)", H.frame,
       H.fieldX(), H.fieldY()))
-    H.screenshot("thamasa_house_entry")
   end),
 
   H.equipEsper(charPos(STRAGO), BISMARK_ESPER, { tag = "BISMARK -> STRAGO" }),
@@ -1289,9 +1388,11 @@ local steps = {
 
   H.call(function()
     H.log(string.format(
-      "[prep] pre-ambush top-off f%d: TERRA %d/%d LOCKE %d/%d STRAGO %d/%d",
+      "[prep] pre-ambush top-off f%d: TERRA %d/%d LOCKE %d/%d STRAGO %d/%d " ..
+      "levels=%d/%d/%d",
       H.frame, H.charHp(TERRA), H.charMaxHp(TERRA), H.charHp(LOCKE),
-      H.charMaxHp(LOCKE), H.charHp(STRAGO), H.charMaxHp(STRAGO)))
+      H.charMaxHp(LOCKE), H.charHp(STRAGO), H.charMaxHp(STRAGO),
+      lvl(TERRA), lvl(LOCKE), lvl(STRAGO)))
   end),
   H.fieldCare({ tag = "pre-ambush full top-off", threshold = 1.0 }),
   H.call(function()
@@ -1312,6 +1413,14 @@ local steps = {
       end),
     })
   end)(),
+  H.saveState("thamlab_ambush_healthy" .. SUF .. ".mss"),
+  H.logStep(function()
+    return string.format(
+      "[thamlab] banked thamlab_ambush_healthy%s.mss at f%d (%d,%d) map=%d " ..
+      "phase=%d levels T/L/S=%d/%d/%d",
+      SUF, H.frame, H.fieldX(), H.fieldY(), H.mapId() & 0x1ff,
+      H.readByte(0x021E), lvl(TERRA), lvl(LOCKE), lvl(STRAGO))
+  end),
   L45.watch(),
   ambushAttempt(1),
   ambushAttempt(2),
@@ -1355,199 +1464,25 @@ local steps = {
   houseWarp(43, 21, 21, 54, "P7 (43,21)->(21,54): into the south hall"),
   care("after P7"),
 
-  -- island 26 -> 24 is one-way in the decoded table (no return pair
-  -- recorded) -- consistent with it leading straight to FlameEater's room,
-  -- whose own win tail exits via load_map 349 rather than back through here
   H.call(function() H.log("[ot6] island 26 -> 24: (21,49)->(46,54), FlameEater's chamber") end),
   houseWarp(21, 49, 46, 54, "P8 (21,49)->(46,54): into FlameEater's chamber"),
   care("before the FlameEater trigger"),
 
-  -- checkpoint the entry point for the retry ladder, once
   H.call(function() H.log("[ot6] checkpointing before the FlameEater trigger") end),
-  (function()
-    local ckReq
-    return seq({
-      H.call(function() ckReq = H.requestSaveState() end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ckReq, "FlameEater entry-point checkpoint")
-        feBlob = ckReq.blob
-      end),
-    })
-  end)(),
-  L79.watch(),
-  flameEaterAttempt(1),
-  flameEaterAttempt(2),
-  flameEaterAttempt(3),
-  flameEaterAttempt(4),
-  flameEaterAttempt(5),
-  H.call(function()
-    if not feWon then
-      error("FlameEater: all 5 seed-ladder attempts lost", 0)
-    end
-  end),
-  L79.report(),
-
-  -- ---- 6. the win tail: rescue, the night talk at Strago's house --------
-  H.advanceStory(function()
-    return map() == 349 and H.hasControl() and sw(0x0091) == 1
-       and sw(0x0098) == 1
-  end, 60000, { playBattles = "tactical" }),
-  H.waitFrames(30),
-  H.call(function()
-    H.assertEq(map(), 349, "control in Strago's house after the win tail")
-    H.assertEq(sw(0x0091), 1, "$0091 -- FlameEater aftermath resolved")
-    H.assertEq(sw(0x0098), 1, "$0098 -- morning-after companion switch")
-    H.assertEq(sw(0x0090), 1, "$0090 still SET -- FlameEater beaten")
-    H.log(string.format("[ot6] win tail settled f%d (%d,%d)", H.frame,
-      H.fieldX(), H.fieldY()))
-    H.screenshot("thamasa_after_fight")
-  end),
-
-  -- ---- 7. leave the house -> Shadow's goodbye ----------------------------
-  -- SHADOW's gear, recorded before remove_equip fires, so the exit
-  -- contract's "gear back in the bag" claim is an inventory delta rather
-  -- than a guess at what he carries.
-  H.call(function()
-    H._shadowWeapon = H.readByte(0x1600 + 37 * SHADOW + 0x1F)
-    H._shadowWeaponBefore = H._shadowWeapon ~= 0xFF
-      and H.invCountOf(H._shadowWeapon) or nil
-    H.log(string.format("[ot6] SHADOW's weapon before remove_equip: $%02X (bag=%s)",
-      H._shadowWeapon, tostring(H._shadowWeaponBefore)))
-  end),
-  houseWarp(60, 21, 38, 11, "stairs (60,21)->(38,11): upstairs to downstairs, Strago's house"),
-  care("after the stairs down"),
-  H.navTo(37, 25, { maxFrames = 6000, playBattles = "tactical", healer = TERRA,
-    bank = 3, items = true, arrive = function() return map() ~= 349 end }),
-  pressWalk("down", function() return map() ~= 349 end, 1800,
-    "held DOWN through 349(37,25) -> Shadow's goodbye on 343(29,15)"),
-  H.advanceStory(function()
-    return map() == 343 and H.hasControl() and sw(0x0092) == 1
-  end, 20000, { playBattles = "tactical" }),
-  H.waitFrames(30),
-  H.call(function()
-    H.assertEq(map(), 343, "back on the town map after Shadow's goodbye")
-    H.assertEq(sw(0x0092), 1, "$0092 -- Shadow's goodbye played")
-    if H._shadowWeapon ~= 0xFF and H._shadowWeaponBefore ~= nil then
-      local now = H.invCountOf(H._shadowWeapon)
-      H.assertEq(now, H._shadowWeaponBefore + 1, string.format(
-        "SHADOW's weapon ($%02X) returned to the bag: %d -> %d",
-        H._shadowWeapon, H._shadowWeaponBefore, now))
-    else
-      H.log("[ot6] SHADOW carried no measurable weapon at boot -- " ..
-        "remove_equip's bag delta is NOT asserted, only logged")
-    end
-    H.log(string.format("[ot6] Shadow's goodbye done f%d (%d,%d)", H.frame,
-      H.fieldX(), H.fieldY()))
-    H.screenshot("thamasa_shadow_goodbye")
-  end),
-
-  care("before leaving town"),
-  H.navTo(21, 47, { maxFrames = 20000, playBattles = "tactical", healer = TERRA,
-    bank = 3, items = true }),
-  pressWalk("down", function() return H.worldMode() end, 900,
-    "held DOWN onto the south strip -> world (249,128)"),
-  H.waitUntil(function()
-    return H.worldMode() and H.worldHasControl() and H.worldAligned()
-       and bright() >= 15
-  end, 3600, "world control outside Thamasa", 5),
-  H.waitFrames(60),
-  H.call(function()
-    H.log(string.format("[ot6] outside Thamasa: world (%d,%d) f%d",
-      H.worldX(), H.worldY(), H.frame))
-    H.screenshot("thamasa_fireout_world")
-  end),
-  H.fieldCare({ tag = "care before the M save", threshold = 0.9 }),
-  H.call(function()
-    H.assertPartyStanding("fire_out exit")
-    H.assertEq(H.readByte(0x11FA) & 3, 0, "ON FOOT outside Thamasa")
-    H.assertEq(partyOf(TERRA) ~= 0, true, "TERRA in party 1 at the M boundary")
-    H.assertEq(partyOf(LOCKE) ~= 0, true, "LOCKE in party 1 at the M boundary")
-    H.assertEq(partyOf(STRAGO) ~= 0, true, "STRAGO in party 1 at the M boundary")
-    H.assertEq(partyOf(SHADOW), 0, "SHADOW not in the party at the M boundary")
-  end),
-
-  -- ---- 9. the world battery save -- checkpoint M -------------------------
-  H.call(function()
-    H.assertExitContractPreSave("fire-out-v1")
-  end),
-  H.saveState("fire_out.mss"),
-  (function()
-    local saveReq, loadReq
-    return H.cond(function() return true end, {
-      H.call(function() saveReq = H.requestSaveState() end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(saveReq, "generated-state verify: capture")
-        loadReq = H.requestLoadState(saveReq.blob)
-      end),
-      H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "generated-state verify: reload") end),
-      H.waitFrames(180),
-      H.call(function()
-        H.assertEq(H.worldMode(), true, "reload: on the world map")
-        H.assertEq(H.readByte(0x11FA) & 3, 0, "reload: still ON FOOT")
-        H.assertEq(H.worldHasControl() and H.worldAligned(), true,
-          "reload: controllable at rest")
-        H.assertEq(H.battleLoadStarted(), false, "reload: no battle pending")
-        H.log("generated-state verify: the reload stayed calm -- fire_out verified")
-      end),
-    })
-  end)(),
-  (function() local calmN, ph = 0, 0
-    return H.driveUntil(function()
-      calmN = (H.readByte(0x59) ~= 0) and calmN + 1 or 0
-      return calmN >= 30
-    end, 1800, {
-      H.call(function()
-        ph = (ph + 1) % 48
-        if H.readByte(0x59) ~= 0 then H.setPad({}); return end
-        H.setPad(ph < 6 and { "x" } or {})
-      end),
-    }, "world menu open outside Thamasa")
-  end)(),
-  H.waitFrames(30),
-  H.waitUntil(function() return H.readByte(ZMENUSTATE) == 0x05 end, 600,
-    "main menu state", 5),
-  H.call(function()
-    H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
-      "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    local entry = H.sym("CopyGameDataToSRAM")
-    emu.addMemoryCallback(function()
-      saveArg = emu.getState()["cpu.a"] & 0xff
-    end, emu.callbackType.exec, entry, entry)
-  end),
-  H.driveUntil(function()
-    return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
-  end, 600, {
-    H.pressButtons({ "up" }, 4), H.waitFrames(16),
-  }, "main-menu cursor on Save"),
-  H.pressButtons({ "a" }, 4),
-  H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
-    600, "save-slot selection", 5),
-  H.driveUntil(function()
-    return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 2
-  end, 600, {
-    H.pressButtons({ "down" }, 4), H.waitFrames(16),
-  }, "save cursor on slot 3"),
-  H.driveUntil(function()
-    return saveArg == 3
-       and emu.read(0x307ff0, emu.memType.snesMemory) == 3
-  end, 1800, {
-    H.pressButtons({ "a" }, 4), H.waitFrames(20),
-  }, "save confirmed -- CopyGameDataToSRAM ran for slot 3 (exec hook)"),
-  H.waitFrames(120),
-  H.call(function()
-    H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
-      "SRAM $307ff0 records slot 3")
-    H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    H.assertExitContract("fire-out-v1")
-    H.screenshot("thamasa_fireout_saved")
-  end),
+  H.saveState("thamlab_flame_healthy" .. SUF .. ".mss"),
   H.logStep(function()
-    return string.format("fire-out-v1 saved via the real Save UI at "
-      .. "frame %d -- FlameEater beaten, Shadow's gear back in the bag; "
-      .. "checkpoint M of v0.13", H.frame)
+    return string.format(
+      "[thamlab] banked thamlab_flame_healthy%s.mss at f%d (%d,%d) map=%d " ..
+      "phase=%d levels T/L/S=%d/%d/%d hp T=%d/%d L=%d/%d S=%d/%d " ..
+      "mp=%d,%d,%d bag f/t/p=%d/%d/%d -- both healthy fixtures on disk, " ..
+      "run truncated here (the FlameEater ladder is the lab's subject, " ..
+      "not its fixture)",
+      SUF, H.frame, H.fieldX(), H.fieldY(), H.mapId() & 0x1ff,
+      H.readByte(0x021E), lvl(TERRA), lvl(LOCKE), lvl(STRAGO),
+      H.charHp(TERRA), H.charMaxHp(TERRA), H.charHp(LOCKE), H.charMaxHp(LOCKE),
+      H.charHp(STRAGO), H.charMaxHp(STRAGO),
+      H.charMp(TERRA), H.charMp(LOCKE), H.charMp(STRAGO),
+      H.invCountOf(FENIX_DOWN), H.invCountOf(TONIC), H.invCountOf(POTION))
   end),
 }
 
@@ -1562,4 +1497,4 @@ local function push(t)
 end
 for _, s in ipairs(steps) do push(s) end
 
-H.run({ maxFrames = 3000000, allowGameOver = true }, flat)
+H.run({ maxFrames = 6000000, allowGameOver = true }, flat)

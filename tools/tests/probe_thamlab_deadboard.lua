@@ -3,6 +3,70 @@
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
+-- ------------------------------------------------------- deadboard probe --
+-- Diagnostic only (reads + logs; no pad writes, no frames consumed).  Every
+-- driveUntil in the run gets a prepended call step that, while
+-- battleLoadStarted() holds, dumps the engine's battle-end inputs every 300
+-- battle frames: the CheckBattleEnd gates (battle_main.asm @47ed: $3a95 hide
+-- gate, $3a74/$3a76 chars alive, $3a75/$3a77 monsters alive, $3ee0/$3a6e
+-- special events, $3ebc termination flag) plus, per monster slot s=0..5, the
+-- inputs of the alive recount (@4b08): present bit $3AA8+2s.0, monster mask
+-- vs $2F4D (untargetable) / $2F4F (targetable) / $2F2F (not dead) / $3A3A
+-- (died or escaped) / $3409 (revived), status1 $3EEC+2s (wound $80, petrify
+-- $40, zombie $02), hide status $3F01+2s (bit $20), cur/max HP
+-- $3BFC+2s / $3C24+2s, and the OT6 species word $57C0+2s.
+local dbBt = 0
+local function deadboardDump()
+  if not H.battleLoadStarted() then dbBt = 0; return end
+  dbBt = dbBt + 1
+  if dbBt ~= 1 and dbBt % 300 ~= 0 then return end
+  local b = function(a) return H.readByte(a) end
+  H.log(string.format(
+    "[deadboard] f%d bt%d present=%02X a74=%02X a75=%02X a76=%d a77=%d " ..
+    "a95=%02X a6e=%02X ee0=%02X ebc=%02X f2f4d=%02X f2f4f=%02X " ..
+    "f2f2f=%02X f3a3a=%02X f3409=%02X f3a39=%02X",
+    H.frame, dbBt, b(0x3F45), b(0x3A74), b(0x3A75), b(0x3A76), b(0x3A77),
+    b(0x3A95), b(0x3A6E), b(0x3EE0), b(0x3EBC), b(0x2F4D), b(0x2F4F),
+    b(0x2F2F), b(0x3A3A), b(0x3409), b(0x3A39)))
+  local rows = {}
+  for s = 0, 5 do
+    rows[#rows + 1] = string.format(
+      "s%d[pr=%02X st1=%02X hid=%02X hp=%d/%d sp=%d msk=%02X]",
+      s, b(0x3AA8 + s * 2), b(0x3EEC + s * 2), b(0x3F01 + s * 2),
+      H.readWord(0x3BFC + s * 2), H.readWord(0x3C24 + s * 2),
+      H.readWord(0x57C0 + s * 2), b(0x3021 + s * 2))
+  end
+  H.log("[deadboard] " .. table.concat(rows, " "))
+end
+-- PROPOSED FIX under verification (the lib change would live in
+-- M.navTo, ot6_field.lua): a navTo's maxFrames budget pays for WALKING
+-- only -- battle frames are the battle's own cost and are excluded from
+-- the walk budget.  Measured need: the P5 Fire Rod spur walk (f28654)
+-- drew three full Balloon fights (7500 + 7670 + 3700 frames of battle
+-- against 20000 total budget) and timed out ~110 frames after the last
+-- fight's killing blow had already landed.  A hard backstop (walk budget
+-- + 80000, battles included) still bounds a genuinely hung battle.
+do
+  local origDriveUntil = H.driveUntil
+  H.driveUntil = function(pred, maxFrames, steps, what)
+    local wrapped = { H.call(deadboardDump) }
+    if what == "navTo" then
+      local walkBudget, walked = maxFrames, 0
+      wrapped[#wrapped + 1] = H.call(function()
+        if not H.battleLoadStarted() then walked = walked + 1 end
+        if walked > walkBudget then
+          error("timeout after " .. walkBudget .. " walk frames (battle " ..
+            "frames excluded) driving toward navTo", 0)
+        end
+      end)
+      maxFrames = maxFrames + 80000
+    end
+    for _, s in ipairs(steps or {}) do wrapped[#wrapped + 1] = s end
+    return origDriveUntil(pred, maxFrames, wrapped, what)
+  end
+end
+-- ----------------------------------------------------- end deadboard probe --
+
 local SAVE_SELECT = 0x14
 local ZMENUSTATE = 0x26
 local TERRA, LOCKE, STRAGO, SHADOW = 0, 1, 7, 3

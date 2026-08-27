@@ -403,6 +403,15 @@ local function resolve(v) return type(v) == "function" and v() or v end
 function M.navTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
+  -- The walk budget pays for WALKING.  A mid-walk battle's frames are the
+  -- battle's own cost: measured (thamlab deadboard probe, the P5 Fire Rod
+  -- spur), one 20000-frame walk drew three full Balloon fights -- ~18900
+  -- battle frames -- and timed out ~110 frames AFTER the killing blow of
+  -- a fight it had already won.  Battle frames and between-battles care
+  -- frames no longer charge the walk budget; the driveUntil cap keeps a
+  -- hard backstop (walk budget + 80000, everything included) so a
+  -- genuinely hung battle still ends the ride.
+  local walked = 0
   local arrive = opts.arrive
   local calmWant = opts.calmFrames or 16
   local spareSet = {}
@@ -435,6 +444,11 @@ function M.navTo(txIn, tyIn, opts)
           healer = opts.healer, magic = opts.magic,
           tool = opts.tool }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
+  -- the heal-after-every-battle directive: once a mid-walk battle
+  -- resolves, run a between-battles care stop (M.newCareDriver, soft)
+  -- before walking on, so the next fight starts whole.  opts.care=false
+  -- opts out; a live event timer opts the scene out automatically.
+  local careD, sawBattle = nil, false
   local function drop(why)  -- discard the plan, logging why once, not per frame
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -444,6 +458,9 @@ function M.navTo(txIn, tyIn, opts)
     NAV.plan, NAV.idx = 0, 0
   end
   return M.driveUntil(function()
+    -- never complete mid-care: arrive() can be map-based and go true while
+    -- the care menu is still open (see advanceStory's identical guard)
+    if careD then return false end
     local done
     if wipeSeen then
       done = true
@@ -458,9 +475,17 @@ function M.navTo(txIn, tyIn, opts)
     end
     if done then M.setPad({}) end
     return done
-  end, maxFrames, {
+  end, maxFrames + 80000, {
     M.call(function()
       aPhase = (aPhase + 1) % 8
+      if not M.battleLoadStarted() and careD == nil then
+        walked = walked + 1
+        if walked > maxFrames then
+          error(string.format("navTo: timeout after %d walk frames " ..
+            "(battle and care frames excluded)%s", maxFrames,
+            M.timeoutContext()), 0)
+        end
+      end
       if M.frame - NAV.hb >= 600 then
         NAV.hb = M.frame
         M.log(string.format("nav f%d (%d,%d) %s", M.frame, M.fieldX(),
@@ -471,12 +496,18 @@ function M.navTo(txIn, tyIn, opts)
       -- frames before acting; a real battle or dialog persists for hundreds.
       -- Acting on a 1-frame ghost would tap A on the open field.
       if wipeCheck() then wipeSeen = true; M.setPad({}); return end
+      -- a between-battles care stop in progress owns the pad
+      if careD then
+        if careD.done() then careD = nil; drop("cared")
+        else careD.frame(); return end
+      end
       battN = M.battleLoadStarted() and battN + 1 or 0
       dlgN  = M.dialogWaiting() and dlgN + 1 or 0
       lostN = M.hasControl() and 0 or lostN + 1
       if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it, but never the goal formation
       if battN >= 3 then
+        sawBattle = true
         drop("battle")
         if next(spareSet) and M.formationHas(spareSet) then
           M.setPad({})                 -- goal fight: left alone for arrive()
@@ -517,6 +548,20 @@ function M.navTo(txIn, tyIn, opts)
         if lostN >= 3 then drop("control lost") end
         M.setPad({})
         return
+      end
+      -- 3b. a battle just resolved and the field is back: recover OUTSIDE
+      --     combat before walking on (the heal-after-every-battle
+      --     directive).  Costs nothing when nobody needs care.
+      if sawBattle then
+        sawBattle = false
+        if opts.care ~= false and not M.eventTimerLive() then
+          careD = M.newCareDriver({
+            threshold = opts.careThreshold or 0.9, reserve = opts.reserve,
+            tag = "care after battle (navTo)" })
+          careD.frame()
+          if not careD.done() then return end
+          careD = nil
+        end
       end
       -- 4. a step is in flight: hold only until the party is moving (the
       --    first frame it is off tile-alignment), then release -- the tile
@@ -649,9 +694,14 @@ function M.advanceStory(pred, maxFrames, opts)
           healer = opts.healer, magic = opts.magic,
           tool = opts.tool }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
+  -- heal-after-every-battle: see navTo's care block; same contract here
+  local careD, sawBattle = nil, false
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.driveUntil(function()
-    local done = wipeSeen or pred()
+    -- never complete mid-care: pred() can be map/switch-based and go true
+    -- while the care menu is still open, which would end the step with
+    -- the menu up and the next step pressing into it
+    local done = careD == nil and (wipeSeen or pred())
     if done then M.setPad({}) end
     return done
   end, maxFrames or 20000, {
@@ -667,10 +717,14 @@ function M.advanceStory(pred, maxFrames, opts)
           tostring(M.eventRunning())))
       end
       if wipeCheck() then wipeSeen = true; M.setPad({}); return end
+      if careD then
+        if careD.done() then careD = nil else careD.frame(); return end
+      end
       battN = M.battleLoadStarted() and battN + 1 or 0
       dlgN  = M.dialogWaiting() and dlgN + 1 or 0
       if tactical and battN == 0 then tactical.idle() end
       if battN >= 3 then
+        sawBattle = true
         if battN == 3 then             -- rising edge: name the fight once
           local w = M.formationWords()
           M.log(string.format("story: battle up (%04X %04X %04X %04X %04X %04X)",
@@ -706,6 +760,21 @@ function M.advanceStory(pred, maxFrames, opts)
       if dlgN >= 3 then
         M.setPad(aPhase < 4 and { "a" } or {})
         return
+      end
+      -- a battle resolved earlier in the ride and control is back:
+      -- recover OUTSIDE combat before riding on.  A ride whose scene
+      -- never returns control simply leaves the latch armed; the caller's
+      -- own care stop then owns it.
+      if sawBattle and M.hasControl() and M.tileAligned() then
+        sawBattle = false
+        if opts.care ~= false and not M.eventTimerLive() then
+          careD = M.newCareDriver({
+            threshold = opts.careThreshold or 0.9, reserve = opts.reserve,
+            tag = "care after battle (advanceStory)" })
+          careD.frame()
+          if not careD.done() then return end
+          careD = nil
+        end
       end
       M.setPad({})
     end),
@@ -892,9 +961,17 @@ function M.worldNavTo(txIn, tyIn, opts)
           healer = opts.healer, magic = opts.magic,
           tool = opts.tool }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
+  -- heal-after-every-battle: see navTo's care block; same contract here,
+  -- run once the post-battle world reload has fully settled
+  local careD, sawBattle = nil, false
+  -- walk-budget semantics shared with navTo: battle and care frames do
+  -- not charge maxFrames (see navTo's measured note); the driveUntil cap
+  -- is the hard backstop.
+  local walked = 0
   local hb = -600
   local function resolveT(v) return type(v) == "function" and v() or v end
   return M.driveUntil(function()
+    if careD then return false end
     local done
     if wipeSeen then
       done = true
@@ -906,9 +983,17 @@ function M.worldNavTo(txIn, tyIn, opts)
     end
     if done then M.setPad({}) end
     return done
-  end, maxFrames, {
+  end, maxFrames + 80000, {
     M.call(function()
       aPhase = (aPhase + 1) % 8
+      if not M.battleLoadStarted() and careD == nil then
+        walked = walked + 1
+        if walked > maxFrames then
+          error(string.format("worldNavTo: timeout after %d walk frames " ..
+            "(battle and care frames excluded)%s", maxFrames,
+            M.timeoutContext()), 0)
+        end
+      end
       if M.frame - hb >= 600 then
         hb = M.frame
         M.log(string.format("wnav f%d (%d,%d) plan=%s idx=%d blocked=%d",
@@ -916,11 +1001,17 @@ function M.worldNavTo(txIn, tyIn, opts)
           plan and tostring(#plan) or "-", idx, nblocked))
       end
       if wipeCheck() then wipeSeen = true; M.setPad({}); return end
+      -- a between-battles care stop in progress owns the pad
+      if careD then
+        if careD.done() then careD = nil; plan, pend = nil, nil
+        else careD.frame(); return end
+      end
       battN = M.battleLoadStarted() and battN + 1 or 0
       if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it (never a spared formation), then let the
       --    world reload run out before touching the plan again
       if battN >= 3 then
+        sawBattle = true
         plan, pend = nil, nil
         if next(spareSet) and M.formationHas(spareSet) then
           M.setPad({})
@@ -961,6 +1052,21 @@ function M.worldNavTo(txIn, tyIn, opts)
       if (emu.getState()["ppu.screenBrightness"] or 0) < 15 then
         M.setPad({})
         return
+      end
+      -- 4b. a battle just resolved and the reload has settled: recover
+      --     OUTSIDE combat before walking on (heal-after-every-battle).
+      --     The world menu is safe here -- careClose's world-mode
+      --     debounce owns the teardown.
+      if sawBattle then
+        sawBattle = false
+        if opts.care ~= false and not M.eventTimerLive() then
+          careD = M.newCareDriver({
+            threshold = opts.careThreshold or 0.9, reserve = opts.reserve,
+            tag = "care after battle (worldNavTo)" })
+          careD.frame()
+          if not careD.done() then return end
+          careD = nil
+        end
       end
       local x, y = M.worldX(), M.worldY()
       -- 5. verify the landing of the last step
@@ -1859,11 +1965,44 @@ function M.buyItem(id, row, qtyFn, name)
   }, "buy " .. name)
 end
 
--- KNOWN LIMIT: calling this on the WORLD MAP is broken -- after the menu
--- visit, the world engine's DP cells ($E0/$E2) come back as garbage and
--- the world never resumes.  Every route cares on a field map before
--- stepping onto the world.
-function M.fieldCare(opts)
+-- The event timers, $1188-$119F: four 6-byte records, flags at +0 and a
+-- 16-bit frame counter at +1 (event.asm EventCmd_a0/a1).  A nonzero
+-- counter means the block holds live data: the scene is time-limited
+-- (the opera rafter chase, the banquet window, the aria's armed stretch),
+-- menus tick the clock 1:1, and leftover menu-state writers corrupt the
+-- block (the banquet-decode.md save-drive rule).  Care and every other
+-- menu visit stays out while any counter is nonzero.
+function M.eventTimerLive()
+  for k = 0, 3 do
+    if M.readWord(0x1189 + 6 * k) ~= 0 then return true end
+  end
+  return false
+end
+
+-- careKernel: the planning and menu-routing heart shared by M.fieldCare
+-- (the step form) and M.newCareDriver (the per-frame form navigators run
+-- between battles).  Works on a field map or the overworld alike --
+-- careClose above carries the world/field close split, and gen_sabin_gau
+-- has cared on the overworld all along.  (An older KNOWN-LIMIT note here
+-- claimed world care was broken; careClose's world-mode debounce is what
+-- fixed it.)
+-- The kernel plans only for the ACTIVE party ($1A6D), not everyone
+-- enrolled: during a multi-squad scene (the Moogle defense fields eleven)
+-- M.partyMembers() returns every deployed squad, but the field menu shows
+-- only the controlled party's four -- a plan for anyone else can never
+-- find its menu slot, and each such plan burns its full 1200-frame stall
+-- budget before dropping (measured killing moogle_cleared's advanceStory
+-- inside its own budget the first day navigator care ran the early chain).
+local function careParty()
+  local active = M.readByte(0x1A6D) & 0x07
+  local out = {}
+  for _, c in ipairs(M.partyMembers()) do
+    if (M.readByte(0x1850 + c) & 0x07) == active then out[#out + 1] = c end
+  end
+  return out
+end
+
+local function careKernel(opts)
   opts = opts or {}
   local tag = opts.tag or "care"
   local thresh = opts.threshold or 0.55
@@ -1936,7 +2075,7 @@ function M.fieldCare(opts)
     end)
     local casters = {}
     if activeCaster ~= nil then casters[1] = activeCaster end
-    for _, c in ipairs(M.partyMembers()) do
+    for _, c in ipairs(careParty()) do
       if c ~= activeCaster then casters[#casters + 1] = c end
     end
     for _, c in ipairs(casters) do
@@ -1991,18 +2130,18 @@ function M.fieldCare(opts)
   -- worst-first rather than only the worst being tried, so one member nobody
   -- can help does not stop the rest from being served.
   local function pick()
-    for _, c in ipairs(M.partyMembers()) do
+    for _, c in ipairs(careParty()) do
       local w = { kind = "item", char = c, item = CARE_FENIX, why = "revive" }
       if M.charHp(c) == 0 and avail(CARE_FENIX) > 0 and not failed[key(w)] then
         return w
       end
     end
-    for _, c in ipairs(M.partyMembers()) do
+    for _, c in ipairs(careParty()) do
       local w = pickStatusCure(c)
       if w ~= nil then return w end
     end
     local hurt = {}
-    for _, c in ipairs(M.partyMembers()) do
+    for _, c in ipairs(careParty()) do
       local hp, mx = M.charHp(c), M.charMaxHp(c)
       -- A petrified or zombie member is refused by CheckCanUseItem
       -- (item.asm:2249-2258) and by the spell check (field_menu.asm:3076
@@ -2300,7 +2439,7 @@ function M.fieldCare(opts)
   -- healthy one on an HP/MP line.  A zero status prints nothing.
   local function roster(what)
     local out = {}
-    for _, c in ipairs(M.partyMembers()) do
+    for _, c in ipairs(careParty()) do
       local st = M.charStatus1(c)
       out[#out + 1] = string.format("c%d %d/%d hp %d/%d mp%s", c, M.charHp(c),
         M.charMaxHp(c), M.charMp(c), M.charMaxMp(c),
@@ -2314,35 +2453,150 @@ function M.fieldCare(opts)
       M.invCountOf(CARE_REMEDY))
   end
 
-  return M.cond(anyNeed, {
-    M.logStep(function() return roster("opening the menu") end),
-    M.driveUntil(function() return M.readByte(CARE_ZM) == 0x05 end, 1800, {
-      M.call(function()
-        phase = (phase + 1) % 12
-        M.setPad(phase < 4 and { "x" } or {})
-      end),
-    }, tag .. ": field menu open"),
-    M.release(),
-    M.waitFrames(10),
-    M.driveUntil(function() return served end, budget, {
-      M.call(serveFrame),
-    }, tag .. ": heal/revive through the field menu"),
-    M.release(),
-    M.driveUntil(careClose(function()
-      return not CARE_SCREENS[M.readByte(CARE_ZM)]
-    end), 2400, {
-      M.call(function()
-        phase = (phase + 1) % 12
-        M.setPad(phase < 4 and { "b" } or {})
-      end),
-    }, tag .. ": back to the field"),
-    M.release(),
-    M.waitFrames(30),
-    M.logStep(function() return roster("done") end),
+  return {
+    tag = tag, budget = budget,
+    anyNeed = anyNeed,
+    serveFrame = serveFrame,
+    served = function() return served end,
+    roster = roster,
+  }
+end
+
+-- M.fieldCare: the step form -- behaviorally what it has always been
+-- (open the menu, serve the plans, close, settle), built on careKernel.
+-- A live event timer skips the visit outright (see M.eventTimerLive):
+-- the three timed scenes are the one standing exemption to the
+-- heal-after-every-battle directive, and the guard enforces it centrally
+-- rather than trusting every call site to remember.
+function M.fieldCare(opts)
+  opts = opts or {}
+  local K = careKernel(opts)
+  local phase = 0
+  return M.cond(function() return not M.eventTimerLive() end, {
+    M.cond(K.anyNeed, {
+      M.logStep(function() return K.roster("opening the menu") end),
+      M.driveUntil(function() return M.readByte(CARE_ZM) == 0x05 end, 1800, {
+        M.call(function()
+          phase = (phase + 1) % 12
+          M.setPad(phase < 4 and { "x" } or {})
+        end),
+      }, K.tag .. ": field menu open"),
+      M.release(),
+      M.waitFrames(10),
+      M.driveUntil(K.served, K.budget, {
+        M.call(K.serveFrame),
+      }, K.tag .. ": heal/revive through the field menu"),
+      M.release(),
+      M.driveUntil(careClose(function()
+        return not CARE_SCREENS[M.readByte(CARE_ZM)]
+      end), 2400, {
+        M.call(function()
+          phase = (phase + 1) % 12
+          M.setPad(phase < 4 and { "b" } or {})
+        end),
+      }, K.tag .. ": back to the field"),
+      M.release(),
+      M.waitFrames(30),
+      M.logStep(function() return K.roster("done") end),
+    }, {
+      -- A care stop that does nothing still logs, so "no log" and "nothing
+      -- needed" do not look the same.
+      M.logStep(function() return K.roster("nothing to do") end),
+    }),
   }, {
-    -- A care stop that does nothing still logs, so "no log" and "nothing
-    -- needed" do not look the same.
-    M.logStep(function() return roster("nothing to do") end),
+    M.logStep(function()
+      return K.roster("an event timer is live: no menu care here")
+    end),
+  })
+end
+
+-- M.newCareDriver: fieldCare's whole visit as a per-frame driver, for a
+-- navigator to run between battles without leaving its own drive.  Soft
+-- wherever the step form raises: a menu that will not open or close
+-- inside its budget logs and gives up, because a mid-walk care stop must
+-- never be the thing that kills a generator in an odd room.  Call
+-- frame() every frame; done() reports completion (instantly true when
+-- nobody needs care).
+function M.newCareDriver(opts)
+  opts = opts or {}
+  local K = careKernel(opts)
+  local mode, ph, n = "start", 0, 0
+  local closed = careClose(function()
+    return not CARE_SCREENS[M.readByte(CARE_ZM)]
+  end)
+  local D = {}
+  function D.done() return mode == "done" end
+  function D.frame()
+    ph = (ph + 1) % 12
+    n = n + 1
+    if mode == "start" then
+      if not K.anyNeed() then
+        M.log(K.roster("nothing to do"))
+        mode = "done"; M.setPad({}); return
+      end
+      M.log(K.roster("opening the menu"))
+      mode, n = "open", 0
+    end
+    if mode == "open" then
+      if M.readByte(CARE_ZM) == 0x05 then mode, n = "gap", 0; M.setPad({}); return end
+      if n > 1800 then
+        M.log(string.format("[%s] the menu never opened; giving up on this care stop", K.tag))
+        mode = "done"; M.setPad({}); return
+      end
+      M.setPad(ph < 4 and { "x" } or {})
+      return
+    end
+    if mode == "gap" then                -- the step form's 10-frame settle
+      if n >= 10 then mode, n = "serve", 0 end
+      M.setPad({})
+      return
+    end
+    if mode == "serve" then
+      if K.served() or n > K.budget then mode, n = "close", 0; M.setPad({}); return end
+      K.serveFrame()
+      return
+    end
+    if mode == "close" then
+      if closed() then mode, n = "settle", 0; M.setPad({}); return end
+      if n > 2400 then
+        M.log(string.format("[%s] the menu never closed; pressing on regardless", K.tag))
+        mode = "settle"; n = 0; M.setPad({}); return
+      end
+      M.setPad(ph < 4 and { "b" } or {})
+      return
+    end
+    if mode == "settle" then             -- the step form's 30-frame settle
+      if n >= 30 then
+        M.log(K.roster("done"))
+        mode = "done"
+      end
+      M.setPad({})
+      return
+    end
+    M.setPad({})
+  end
+  return D
+end
+
+-- M.careStop: the between-battles care stop as one reusable step -- the
+-- driver above wrapped for a step list, timer-guarded and soft.  This is
+-- what the battle-resolving steps append, and what a script drops after
+-- its own hand-rolled battle handling.
+function M.careStop(tag, opts)
+  opts = opts or {}
+  opts.tag = opts.tag or tag or "care after battle"
+  if opts.threshold == nil then opts.threshold = 0.9 end
+  local D
+  return M.cond(function() return not M.eventTimerLive() end, {
+    M.call(function() D = M.newCareDriver(opts) end),
+    M.driveUntil(function() return D.done() end, 40000, {
+      M.call(function() D.frame() end),
+    }, opts.tag),
+  }, {
+    M.logStep(function()
+      return string.format("[%s] an event timer is live: no menu care here",
+        opts.tag)
+    end),
   })
 end
 
@@ -2911,6 +3165,9 @@ function M.rideOut(what, budget, dstMap)
     }, what),
     M.release(),
     M.waitFrames(30),
+    -- heal-after-every-battle: rideOut exists to ride scripted battles, so
+    -- its settle is the canonical place to recover before the next beat
+    M.careStop("care after battle (" .. (what or "rideOut") .. ")"),
   })
 end
 

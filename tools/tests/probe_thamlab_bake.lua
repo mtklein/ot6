@@ -1,5 +1,18 @@
-
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- probe_thamlab_bake.lua -- Thamasa fire lab, fixture baker.
+--
+-- Hand-run instrument (probe_): a faithful copy of gen_thamasa_fire.lua's
+-- own step list from the thamasa-night-v1 checkpoint boot through the
+-- pre-FlameEater checkpoint, with H.saveState calls inserted at the two
+-- points where the gen captures its own in-memory reload blobs:
+--   (a) right after the pre-ambush blob capture -> thamlab_ambush.mss
+--   (b) at the FlameEater entry-point blob capture -> thamlab_flame.mss
+-- Everything downstream of (b) (the FlameEater ladder, win tail, save UI)
+-- is dropped: experiments boot the fixtures instead of replaying the
+-- route.  Run under the same checkpoint boot as the gen:
+--   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/thamasa-night-v1 \
+--   OT6_TIMEOUT=1800 tools/tests/run.sh tools/tests/probe_thamlab_bake.lua \
+--   build/thamlab/bake.log
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -587,12 +600,14 @@ end
 -- value (rather than measuring a separate "fill" byte first) sidesteps
 -- needing that extra live-measurement step.
 local function loreOfferedA(id) return H.readByte(TBL_306A_A + id) == id + 0x8B end
--- The battle lore window is POSITIONAL by lore id: one row per id, with
--- unlearned/unoffered ids rendering as empty rows (thamlab, measured:
--- learned {3,7,20} -> Aqua Rake (id 3) renders on row index 3; the old
--- compacted-count model computed row 0, and the driver A-tapped the empty
--- first row for ~61k frames -- the stall the owner watched twice).
-local function loreRowForA(targetId) return targetId end
+local function loreRowForA(targetId)
+  local row = 0
+  for id = 0, targetId - 1 do
+    if loreOfferedA(id) then row = row + 1 end
+  end
+  return row
+end
+local ambushCharTC = H.targetCursor({ mask = 0x7B7D, dirs = { "down", "up", "left", "right" } })
 
 local function newAmbushPlan(tag)
   local F = {}
@@ -702,26 +717,9 @@ local function newAmbushPlan(tag)
         return "a"
       elseif st == ST_TGT_A then
         plan.tgtSpin = (plan.tgtSpin or 0) + 1
-        -- closed-loop char-column steer (plan-local, so nothing carries
-        -- across episodes): up/down only -- left/right switch target
-        -- GROUPS in this pincer formation; single 2-frame taps with a
-        -- long dwell, because battle d-pad input is auto-repeat, not
-        -- edge, driven.  (thamlab, measured: the old blind rotation's
-        -- first press exiled the cursor into a monster group and the
-        -- 240-spin blind A fed Fenix Downs to a Balloon -- eight ~1740-
-        -- frame whiff episodes on one seed; this steer confirms in ~35
-        -- frames on both pincer and normal shapes.)
-        plan.fixMf = (plan.fixMf or -1) + 1
-        local want = 1 << plan.target
-        local d7d = H.readByte(0x7B7D)
-        if d7d ~= 0 then plan.fixSeen = d7d end   -- latch across the blink
-        local ace = H.readByte(0x7ACE)
-        if plan.tgtSpin > 600 then return "a" end -- safety net only
-        if plan.fixSeen == want then return "a" end
-        local ph = plan.fixMf % 16
-        if ph >= 2 then return nil end
-        if ace % 2 == 0 then return (ace == 0) and "right" or "left" end
-        return "down"
+        if plan.tgtSpin > 240 then return "a" end
+        ambushCharTC.observe()
+        return ambushCharTC.steer(plan.target, mf)
       end
       return "b"
     end
@@ -850,6 +848,40 @@ local function newAmbushPlan(tag)
       H.log(string.format("[%s] f%d slot=%d char=$%02X plan=%s%s", tag,
         H.frame, actor, H.readByte(BCHID_A + actor * 2), turnPlan.kind,
         turnPlan.kind == "item" and (" tgt=" .. turnPlan.target) or ""))
+    end
+    -- LORE-STALL watchdog (thamlab addition, not in the gen): the gen's
+    -- lore-row steering has stalled here before (cursor held on a wrong
+    -- row, ~61k frames of refused confirms).  When a lore plan makes no
+    -- progress for 600 frames, dump the evidence ONCE -- the offered-
+    -- signature table $306A, lore count $3A87, the $1E27 loadout slots,
+    -- the learned-lore bits $1D29-2B, the live cursor row, and the model's
+    -- computed want row -- then abandon the lore plan for a plain Fight so
+    -- the bake/measurement terminates.
+    if turnPlan.kind == "lore" and st == ST_LORE_A then
+      turnPlan.loreStall = (turnPlan.loreStall or 0) + 1
+      if turnPlan.loreStall == 600 then
+        local t306a = {}
+        for i = 0, 23 do
+          t306a[#t306a + 1] = string.format("%02X", H.readByte(TBL_306A_A + i))
+        end
+        local t1e27 = {}
+        for i = 0, 4 do
+          t1e27[#t1e27 + 1] = string.format("%02X", H.readByte(0x1E27 + i))
+        end
+        H.log(string.format(
+          "[%s] LORE-STALL dump f%d: actor=%d loreId=%d 3A87(loreCnt)=$%02X " ..
+          "306A+0..23=[%s] 1E27+0..4=[%s] 1D29..2B=%02X %02X %02X " ..
+          "cursor(8927+a)=%d wantRow(compacted model)=%d offered(loreId)=%s",
+          tag, H.frame, actor, turnPlan.loreId, H.readByte(0x3A87),
+          table.concat(t306a, " "), table.concat(t1e27, " "),
+          H.readByte(0x1D29), H.readByte(0x1D2A), H.readByte(0x1D2B),
+          H.readByte(LROW_A + actor), loreRowForA(turnPlan.loreId),
+          tostring(loreOfferedA(turnPlan.loreId))))
+        H.log(string.format(
+          "[%s] LORE-STALL: abandoning the lore plan for a plain boosted " ..
+          "Fight so this run terminates", tag))
+        turnPlan = { kind = "fight", boost = true }
+      end
     end
     local slow = (st == ST_ITEM_A)
     local period = slow and 30 or 8
@@ -986,14 +1018,8 @@ local L79 = H.newSeedLadder("FlameEater (battle 79)", { attempts = 5 })
 local feBlob, feWon = nil, false
 
 local function flameEaterAttempt(n)
-  -- The nuke repertoire is what wins this board (thamlab, 8-seed protocol
-  -- at the routed levels: libnuke 5/8 with its win set strictly
-  -- containing the plain driver's 3/8; at healthy levels 3 of its wins
-  -- are 0-death 0-item).  TERRA/LOCKE lead boosted Ice (the fold pays the
-  -- AoE tier), STRAGO Aqua Rake through the Lore menu.
   local F = H.newFightDriver("FlameEater", { tactical = true, boost = true,
-    bank = 3, items = true, cure = true, healer = TERRA, healPercent = 60,
-    nuke = { 0x01 }, nukeLore = { 3 } })
+    bank = 3, items = true, cure = true, healer = TERRA, healPercent = 60 })
   local notBattle, giveUp = 0, 0
   local loadReq
   -- H.cond's branches take a plain step list, not a pre-wrapped seq({...}).
@@ -1070,13 +1096,7 @@ local function flameEaterAttempt(n)
     end),
     H.cond(function() return not feWon end, {
       lossReload(function() return feBlob end, "FlameEater"),
-    }, {
-      -- heal-after-every-battle: the boss is no exception, and three of
-      -- the lab's protocol wins ended with someone under the standing
-      -- floor -- recover before the win tail so the banked state ships
-      -- whole (zero frames when the party comes out clean).
-      H.careStop("care after the FlameEater"),
-    }),
+    }, {}),
   })
 end
 
@@ -1312,6 +1332,12 @@ local steps = {
       end),
     })
   end)(),
+  H.saveState("thamlab_ambush.mss"),
+  H.logStep(function()
+    return string.format(
+      "[thamlab] banked thamlab_ambush.mss at f%d (%d,%d) map=%d phase=%d",
+      H.frame, H.fieldX(), H.fieldY(), H.mapId() & 0x1ff, H.readByte(0x021E))
+  end),
   L45.watch(),
   ambushAttempt(1),
   ambushAttempt(2),
@@ -1375,179 +1401,13 @@ local steps = {
       end),
     })
   end)(),
-  L79.watch(),
-  flameEaterAttempt(1),
-  flameEaterAttempt(2),
-  flameEaterAttempt(3),
-  flameEaterAttempt(4),
-  flameEaterAttempt(5),
-  H.call(function()
-    if not feWon then
-      error("FlameEater: all 5 seed-ladder attempts lost", 0)
-    end
-  end),
-  L79.report(),
-
-  -- ---- 6. the win tail: rescue, the night talk at Strago's house --------
-  H.advanceStory(function()
-    return map() == 349 and H.hasControl() and sw(0x0091) == 1
-       and sw(0x0098) == 1
-  end, 60000, { playBattles = "tactical" }),
-  H.waitFrames(30),
-  H.call(function()
-    H.assertEq(map(), 349, "control in Strago's house after the win tail")
-    H.assertEq(sw(0x0091), 1, "$0091 -- FlameEater aftermath resolved")
-    H.assertEq(sw(0x0098), 1, "$0098 -- morning-after companion switch")
-    H.assertEq(sw(0x0090), 1, "$0090 still SET -- FlameEater beaten")
-    H.log(string.format("[ot6] win tail settled f%d (%d,%d)", H.frame,
-      H.fieldX(), H.fieldY()))
-    H.screenshot("thamasa_after_fight")
-  end),
-
-  -- ---- 7. leave the house -> Shadow's goodbye ----------------------------
-  -- SHADOW's gear, recorded before remove_equip fires, so the exit
-  -- contract's "gear back in the bag" claim is an inventory delta rather
-  -- than a guess at what he carries.
-  H.call(function()
-    H._shadowWeapon = H.readByte(0x1600 + 37 * SHADOW + 0x1F)
-    H._shadowWeaponBefore = H._shadowWeapon ~= 0xFF
-      and H.invCountOf(H._shadowWeapon) or nil
-    H.log(string.format("[ot6] SHADOW's weapon before remove_equip: $%02X (bag=%s)",
-      H._shadowWeapon, tostring(H._shadowWeaponBefore)))
-  end),
-  houseWarp(60, 21, 38, 11, "stairs (60,21)->(38,11): upstairs to downstairs, Strago's house"),
-  care("after the stairs down"),
-  H.navTo(37, 25, { maxFrames = 6000, playBattles = "tactical", healer = TERRA,
-    bank = 3, items = true, arrive = function() return map() ~= 349 end }),
-  pressWalk("down", function() return map() ~= 349 end, 1800,
-    "held DOWN through 349(37,25) -> Shadow's goodbye on 343(29,15)"),
-  H.advanceStory(function()
-    return map() == 343 and H.hasControl() and sw(0x0092) == 1
-  end, 20000, { playBattles = "tactical" }),
-  H.waitFrames(30),
-  H.call(function()
-    H.assertEq(map(), 343, "back on the town map after Shadow's goodbye")
-    H.assertEq(sw(0x0092), 1, "$0092 -- Shadow's goodbye played")
-    if H._shadowWeapon ~= 0xFF and H._shadowWeaponBefore ~= nil then
-      local now = H.invCountOf(H._shadowWeapon)
-      H.assertEq(now, H._shadowWeaponBefore + 1, string.format(
-        "SHADOW's weapon ($%02X) returned to the bag: %d -> %d",
-        H._shadowWeapon, H._shadowWeaponBefore, now))
-    else
-      H.log("[ot6] SHADOW carried no measurable weapon at boot -- " ..
-        "remove_equip's bag delta is NOT asserted, only logged")
-    end
-    H.log(string.format("[ot6] Shadow's goodbye done f%d (%d,%d)", H.frame,
-      H.fieldX(), H.fieldY()))
-    H.screenshot("thamasa_shadow_goodbye")
-  end),
-
-  care("before leaving town"),
-  H.navTo(21, 47, { maxFrames = 20000, playBattles = "tactical", healer = TERRA,
-    bank = 3, items = true }),
-  pressWalk("down", function() return H.worldMode() end, 900,
-    "held DOWN onto the south strip -> world (249,128)"),
-  H.waitUntil(function()
-    return H.worldMode() and H.worldHasControl() and H.worldAligned()
-       and bright() >= 15
-  end, 3600, "world control outside Thamasa", 5),
-  H.waitFrames(60),
-  H.call(function()
-    H.log(string.format("[ot6] outside Thamasa: world (%d,%d) f%d",
-      H.worldX(), H.worldY(), H.frame))
-    H.screenshot("thamasa_fireout_world")
-  end),
-  H.fieldCare({ tag = "care before the M save", threshold = 0.9 }),
-  H.call(function()
-    H.assertPartyStanding("fire_out exit")
-    H.assertEq(H.readByte(0x11FA) & 3, 0, "ON FOOT outside Thamasa")
-    H.assertEq(partyOf(TERRA) ~= 0, true, "TERRA in party 1 at the M boundary")
-    H.assertEq(partyOf(LOCKE) ~= 0, true, "LOCKE in party 1 at the M boundary")
-    H.assertEq(partyOf(STRAGO) ~= 0, true, "STRAGO in party 1 at the M boundary")
-    H.assertEq(partyOf(SHADOW), 0, "SHADOW not in the party at the M boundary")
-  end),
-
-  -- ---- 9. the world battery save -- checkpoint M -------------------------
-  H.call(function()
-    H.assertExitContractPreSave("fire-out-v1")
-  end),
-  H.saveState("fire_out.mss"),
-  (function()
-    local saveReq, loadReq
-    return H.cond(function() return true end, {
-      H.call(function() saveReq = H.requestSaveState() end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(saveReq, "generated-state verify: capture")
-        loadReq = H.requestLoadState(saveReq.blob)
-      end),
-      H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "generated-state verify: reload") end),
-      H.waitFrames(180),
-      H.call(function()
-        H.assertEq(H.worldMode(), true, "reload: on the world map")
-        H.assertEq(H.readByte(0x11FA) & 3, 0, "reload: still ON FOOT")
-        H.assertEq(H.worldHasControl() and H.worldAligned(), true,
-          "reload: controllable at rest")
-        H.assertEq(H.battleLoadStarted(), false, "reload: no battle pending")
-        H.log("generated-state verify: the reload stayed calm -- fire_out verified")
-      end),
-    })
-  end)(),
-  (function() local calmN, ph = 0, 0
-    return H.driveUntil(function()
-      calmN = (H.readByte(0x59) ~= 0) and calmN + 1 or 0
-      return calmN >= 30
-    end, 1800, {
-      H.call(function()
-        ph = (ph + 1) % 48
-        if H.readByte(0x59) ~= 0 then H.setPad({}); return end
-        H.setPad(ph < 6 and { "x" } or {})
-      end),
-    }, "world menu open outside Thamasa")
-  end)(),
-  H.waitFrames(30),
-  H.waitUntil(function() return H.readByte(ZMENUSTATE) == 0x05 end, 600,
-    "main menu state", 5),
-  H.call(function()
-    H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
-      "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    local entry = H.sym("CopyGameDataToSRAM")
-    emu.addMemoryCallback(function()
-      saveArg = emu.getState()["cpu.a"] & 0xff
-    end, emu.callbackType.exec, entry, entry)
-  end),
-  H.driveUntil(function()
-    return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
-  end, 600, {
-    H.pressButtons({ "up" }, 4), H.waitFrames(16),
-  }, "main-menu cursor on Save"),
-  H.pressButtons({ "a" }, 4),
-  H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
-    600, "save-slot selection", 5),
-  H.driveUntil(function()
-    return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 2
-  end, 600, {
-    H.pressButtons({ "down" }, 4), H.waitFrames(16),
-  }, "save cursor on slot 3"),
-  H.driveUntil(function()
-    return saveArg == 3
-       and emu.read(0x307ff0, emu.memType.snesMemory) == 3
-  end, 1800, {
-    H.pressButtons({ "a" }, 4), H.waitFrames(20),
-  }, "save confirmed -- CopyGameDataToSRAM ran for slot 3 (exec hook)"),
-  H.waitFrames(120),
-  H.call(function()
-    H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
-      "SRAM $307ff0 records slot 3")
-    H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    H.assertExitContract("fire-out-v1")
-    H.screenshot("thamasa_fireout_saved")
-  end),
+  H.saveState("thamlab_flame.mss"),
   H.logStep(function()
-    return string.format("fire-out-v1 saved via the real Save UI at "
-      .. "frame %d -- FlameEater beaten, Shadow's gear back in the bag; "
-      .. "checkpoint M of v0.13", H.frame)
+    return string.format(
+      "[thamlab] banked thamlab_flame.mss at f%d (%d,%d) map=%d phase=%d -- " ..
+      "both lab fixtures on disk, run truncated here (the gen's FlameEater " ..
+      "ladder and win tail are the lab's subject, not its fixture)",
+      H.frame, H.fieldX(), H.fieldY(), H.mapId() & 0x1ff, H.readByte(0x021E))
   end),
 }
 

@@ -1417,26 +1417,32 @@ function M.clearBattle(maxFrames, spare)
   local spareSet = {}
   for _, w in ipairs(spare or {}) do spareSet[w] = true end
   local aPhase = 0
-  return M.driveUntil(function()
-    return not M.battleLoadStarted()   -- implies battleActive() false too
-  end, maxFrames or 9000, {
-    M.call(function()
-      aPhase = (aPhase + 1) % 8
-      if M.battleLoadStarted() and M.monstersPresent() > 0 then
-        if next(spareSet) and M.formationHas(spareSet) then
-          error("clearBattle: refusing to kill a spared formation " ..
-            string.format("(%04X %04X %04X %04X %04X %04X)",
-              table.unpack(M.formationWords())), 0)
-        end
-        for slot = 0, 5 do
-          if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-            M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
+  return M.seqStep({
+    M.driveUntil(function()
+      return not M.battleLoadStarted()   -- implies battleActive() false too
+    end, maxFrames or 9000, {
+      M.call(function()
+        aPhase = (aPhase + 1) % 8
+        if M.battleLoadStarted() and M.monstersPresent() > 0 then
+          if next(spareSet) and M.formationHas(spareSet) then
+            error("clearBattle: refusing to kill a spared formation " ..
+              string.format("(%04X %04X %04X %04X %04X %04X)",
+                table.unpack(M.formationWords())), 0)
+          end
+          for slot = 0, 5 do
+            if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
+              M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
+            end
           end
         end
-      end
-      M.setPad(aPhase < 4 and { "a" } or {})
-    end),
-  }, "clear battle")
+        M.setPad(aPhase < 4 and { "a" } or {})
+      end),
+    }, "clear battle"),
+    -- heal-after-every-battle: recover outside combat before the script's
+    -- next beat (zero frames when nobody needs it; skipped under a live
+    -- event timer)
+    M.careStop("care after battle (clearBattle)"),
+  })
 end
 
 -- -------------------------------------------- input-driven battle endings --
@@ -1499,7 +1505,17 @@ function M.targetCursor(opts)
     if target == nil then return "a" end
     if T.mask == (1 << target) and T.age >= minAge then return "a" end
     if (mf - 1) % 8 == 0 then T.press = T.press + 1 end
-    return dirs[((T.press - 1) // 2) % #dirs + 1]
+    -- press-0 must index dirs[1], not dirs[#dirs]: Lua floor division
+    -- takes (0-1)//2 to -1 and -1 % #dirs to #dirs-1, so the old
+    -- ((T.press - 1) // 2) emitted the LAST direction on the first
+    -- frames of every target-select.  Measured on the Thamasa ambush
+    -- (pincer formation, char-column dirs): the stray press exiled the
+    -- cursor into a monster group within 3 frames of the window opening,
+    -- and the timeout's blind A then fed Fenix Downs to a Balloon --
+    -- eight ~1740-frame whiff episodes on one seed.  Other callers were
+    -- shielded only by coincidence (their configs make the stray press
+    -- "up", or a no-op).
+    return dirs[(math.max(T.press - 1, 0) // 2) % #dirs + 1]
   end
   return T
 end
@@ -1530,6 +1546,12 @@ end
 -- the live list and drops the plan when it is missing, re-planning on the
 -- next frame with no progress.  A caller that names a tool should assert
 -- H.invCountOf(id) > 0 first.
+--
+-- opts.nuke = { spellId, ... } and opts.nukeLore = { loreId, ... } give the
+-- whole party an attack-magic repertoire: after the heal policy passes on
+-- the turn, any actor casts the first entry it can pay for (lores gate on
+-- the Lore command and the live offered table) instead of falling through
+-- to Fight.  See the repertoire note in makePlan.
 function M.newFightDriver(tag, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -1539,6 +1561,13 @@ function M.newFightDriver(tag, opts)
     0x00, 0x01, 0x02, 0x09, 0x0A
   local ST_CMD, ST_ITEM, ST_MAGIC, ST_TGT, ST_TOOLS, ST_ESPER =
     0x05, 0x0A, 0x0E, 0x38, 0x30, 0x16
+  -- the Lore command and its window's two states (the transitional DMA
+  -- fill, then the list itself), and the window's cursor pair: absolute
+  -- row = scroll ($891f) + in-window row ($8927), the item window's shape
+  -- (UpdateMenuState_1b / _c183f7, btlgfx_main.asm)
+  local CMD_LORE, ST_LORE_OPEN, ST_LORE = 0x0C, 0x19, 0x1B
+  local LSCROLL, LROW = 0x891F, 0x8927
+  local MAXMP = 0x3C30
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
   local BLCOL, BLROW = 0x8963, 0x8967
   -- the magic list's cursor triple: scroll+row is the absolute grid row,
@@ -1568,6 +1597,9 @@ function M.newFightDriver(tag, opts)
   local castRestore = {}               -- spell -> HP a landed cast put back
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
+  local loreSpinN = 0                  -- frames spent on live lore plans
+                                       -- since the last landed lore cast
+  local loreDead = false               -- the stall guard fired this battle
 
   local function cmdRow(actor, cmd)
     for row = 0, 3 do
@@ -1631,6 +1663,88 @@ function M.newFightDriver(tag, opts)
       end
     end
     return nil
+  end
+
+  -- The absorb guard, shared by every attack-cast line: a spell whose
+  -- element a PRESENT species absorbs is a heal for the enemy, so the plan
+  -- is refused and the actor falls through (usually to Fight).  Folding
+  -- never changes a family's element, so the base ability's byte answers
+  -- for every tier a pending boost could fold to.
+  local function absorbSlot(abilityId)
+    local elem = M.spellElement(abilityId)
+    if elem == 0 then return nil end
+    for _, s in ipairs(M.formationSpecies()) do
+      if M.monsterAbsorb(s.species) & elem ~= 0 then return s end
+    end
+    return nil
+  end
+
+  -- battle_lore.lua's own tested fact: $306A+id reads id+$8B iff that lore
+  -- id passed Ot6LoreMask's live walk this battle; otherwise whatever
+  -- InitBattle's own clear left there.  id+$8B is also the lore's ability
+  -- id (vanilla lore abilities are $8B..$A2), which names it in the live
+  -- list below and answers for its element in the absorb guard.
+  local function loreOffered(id) return M.readByte(0x306A + id) == id + 0x8B end
+  -- Where a lore sits in this actor's live battle Lore list, and what the
+  -- engine has priced it at -- spellCell's exact shape, one segment along.
+  -- The window is NOT a compacted list: the burning-house campaign's first
+  -- driver modeled a lore's row as "how many lower ids are offered", held
+  -- the cursor on the wrong row, and A-tapped ~61k frames against the
+  -- confirm's silent greyed-entry refusal (2026-08-27, the owner watching
+  -- the reproduced stall: empty rows on screen with Aqua Rake a few rows
+  -- down; scratchpad thamasa_stall_run.log ~line 4756).  The row is read
+  -- from the engine instead: the lore window indexes the same per-actor
+  -- spell list spellCell walks -- record 0 the esper, 1..54 the magic
+  -- grid, 55..78 the lore segment the window draws in record order
+  -- (DrawLoreListText / _c183f7: entry = list base + $DC + row*4) -- so
+  -- the row is wherever the lore actually sits in that segment, whatever
+  -- the layout.  A lore's +0 byte is its LORE id, not its ability id:
+  -- InitSpellList strips the $8B ability base before the store
+  -- (battle_main.asm @5651, `sbc #$8b`).  Same +1 flags (bit 7 greyed) /
+  -- +3 MP record shape, same `strict` semantics as spellCell.
+  local function loreCell(actor, id, strict)
+    local base = M.readWord(MLISTPTR + actor * 2)
+    if base < 0x2000 or base > 0x2600 then return nil end
+    for row = 0, 23 do
+      local a = base + (55 + row) * 4
+      if M.readByte(a) == id then
+        local cost = M.readByte(a + 3)
+        if M.readWord(CURMP + actor * 2) < cost then return nil end
+        if strict and (M.readByte(a + 1) & 0x80) ~= 0 then return nil end
+        return row, cost
+      end
+    end
+    return nil
+  end
+  local LORE_STALL = 600               -- pursuit frames with no landed lore
+  local function loreDiagnose(actor, want)
+    loreDead = true
+    local sig, load, bits, seg = {}, {}, {}, {}
+    for id = 0, 23 do sig[#sig + 1] = string.format("%02X", M.readByte(0x306A + id)) end
+    for i = 0, 4 do load[#load + 1] = string.format("%02X", M.readByte(0x1E27 + i)) end
+    for i = 0, 2 do bits[#bits + 1] = string.format("%02X", M.readByte(0x1D29 + i)) end
+    local base = M.readWord(MLISTPTR + actor * 2)
+    for row = 0, 23 do
+      seg[#seg + 1] = string.format("%02X/%02X",
+        M.readByte(base + (55 + row) * 4), M.readByte(base + (55 + row) * 4 + 1))
+    end
+    M.log(string.format("[%s] LORE STALLED %d frames with no landed cast -- "
+      .. "dumping the lore state and falling through to Fight: count $3A87=%d "
+      .. "sig $306A+0..23=%s loadout $1E27+0..4=%s learned $1D29-2B=%s "
+      .. "cursor $891F+$8927(+%d)=%d+%d want-row=%s segment(id/flags)=%s",
+      tag or "fight", loreSpinN,
+      M.readByte(0x3A87), table.concat(sig, " "), table.concat(load, " "),
+      table.concat(bits, " "), actor, M.readByte(LSCROLL + actor),
+      M.readByte(LROW + actor), tostring(want), table.concat(seg, " ")))
+  end
+
+  -- The nuke MP floor: a nuke is refused when paying for it would leave
+  -- the caster under a quarter of max MP (opts.nukeFloor overrides, in
+  -- absolute MP).  The tail of the bar is owed to the cure line, which
+  -- runs first every turn but only spends when somebody is hurt; a
+  -- repertoire that drained to zero would take the healer's MP with it.
+  local function nukeFloor(actor)
+    return opts.nukeFloor or (M.readWord(MAXMP + actor * 2) // 4)
   end
 
   local function makePlan(actor)
@@ -1833,28 +1947,15 @@ function M.newFightDriver(tag, opts)
     -- damage and the BP is owed to somebody's break.
     local mg = opts.magic and opts.magic[id]
     if mg and cmdRow(actor, CMD_MAGIC) then
-      -- The absorb guard, at plan time, for the ability's element.  A
-      -- spell whose element a PRESENT species absorbs is a heal for the
-      -- enemy, so the plan is refused and the actor falls through to the
-      -- branches below (usually Fight).  Folding never changes a family's
-      -- element, so the base spell's byte answers for every tier the
-      -- pending boost could fold to.
-      local elem = M.spellElement(mg.spell)
-      local absorbed = nil
-      if elem ~= 0 then
-        for _, s in ipairs(M.formationSpecies()) do
-          if M.monsterAbsorb(s.species) & elem ~= 0 then
-            absorbed = s
-            break
-          end
-        end
-      end
+      -- The absorb guard, at plan time, for the ability's element (the
+      -- shared absorbSlot above).
+      local absorbed = absorbSlot(mg.spell)
       if absorbed then
         M.log(string.format(
           "[%s] cast $%02X refused: %s is ABSORBED by slot %d species " ..
           "$%04X (#99) -- falling through to Fight",
-          tag or "fight", mg.spell, M.elemStr(elem), absorbed.slot,
-          absorbed.species))
+          tag or "fight", mg.spell, M.elemStr(M.spellElement(mg.spell)),
+          absorbed.slot, absorbed.species))
         mg = nil
       end
     end
@@ -1867,6 +1968,70 @@ function M.newFightDriver(tag, opts)
         return { kind = "magic", spell = mg.spell,
                  row = cmdRow(actor, CMD_MAGIC),
                  boostLeft = mg.boost == false and 0 or boost }
+      end
+    end
+    -- opts.nuke = { spellId, ... } and opts.nukeLore = { loreId, ... }: the
+    -- party-wide attack repertoire, tried in order, first castable wins
+    -- (owner directive: a party without Edgar or Sabin should nuke, not
+    -- plain-Fight -- a boosted base cast folds to its next tier, the AoE
+    -- hit, and a lore is the itemless multi-target line).  Where opts.magic
+    -- names one cast for one character, these apply to ANY actor who can
+    -- pay: spells gate on spellCell (the live list, MP, and the greyed
+    -- bit), lores on the Lore command being in the actor's command table,
+    -- the $306A offered signature, and loreCell's own live-list row, and
+    -- both on the absorb guard and the nukeFloor MP reserve.  Lores come
+    -- first: only a Lore-command
+    -- character passes that gate, and for that character the lore is the
+    -- point.  Boost rides the same bank machinery as Fight (opts.boost /
+    -- opts.bank); a lore is never boosted, matching the ambush driver's
+    -- measured play (Aqua Rake multi-targets unboosted).
+    if opts.nukeLore and not loreDead and cmdRow(actor, CMD_LORE) then
+      if loreSpinN > LORE_STALL then
+        loreDiagnose(actor, loreCell(actor, opts.nukeLore[1], false))
+      else
+        for _, lid in ipairs(opts.nukeLore) do
+          if loreOffered(lid) then
+            local cell, cost = loreCell(actor, lid, true)
+            local mp = M.readWord(CURMP + actor * 2)
+            local absorbed = absorbSlot(0x8B + lid)
+            if absorbed then
+              M.log(string.format(
+                "[%s] lore $%02X refused: %s is ABSORBED by slot %d species "
+                .. "$%04X (#99) -- falling through",
+                tag or "fight", lid, M.elemStr(M.spellElement(0x8B + lid)),
+                absorbed.slot, absorbed.species))
+            elseif cell ~= nil and mp - cost >= nukeFloor(actor) then
+              M.log(string.format(
+                "[%s] actor=%d nuke lore $%02X, row %d, %d MP of %d",
+                tag or "fight", actor, lid, cell, cost, mp))
+              return { kind = "lore", lore = lid,
+                       row = cmdRow(actor, CMD_LORE) }
+            end
+          end
+        end
+      end
+    end
+    if opts.nuke and cmdRow(actor, CMD_MAGIC) then
+      for _, spell in ipairs(opts.nuke) do
+        local cell, cost = spellCell(actor, spell, true)
+        if cell ~= nil
+           and M.readWord(CURMP + actor * 2) - cost >= nukeFloor(actor) then
+          local absorbed = absorbSlot(spell)
+          if absorbed then
+            M.log(string.format(
+              "[%s] nuke $%02X refused: %s is ABSORBED by slot %d species "
+              .. "$%04X (#99) -- falling through",
+              tag or "fight", spell, M.elemStr(M.spellElement(spell)),
+              absorbed.slot, absorbed.species))
+          else
+            M.log(string.format(
+              "[%s] actor=%d nuke $%02X, cell %d, %d MP of %d",
+              tag or "fight", actor, spell, cell, cost,
+              M.readWord(CURMP + actor * 2)))
+            return { kind = "magic", spell = spell,
+                     row = cmdRow(actor, CMD_MAGIC), boostLeft = boost }
+          end
+        end
       end
     end
     -- opts.tools = false disables the Tools line while keeping the rest of
@@ -1893,6 +2058,15 @@ function M.newFightDriver(tag, opts)
   local function button(actor)
     local st = M.readByte(MSTATE)
     if st == ST_CMD then tgtSpin = 0 end
+    -- The lore stall guard, checked wherever a lore plan is live rather
+    -- than only at plan time: a pursuit wedged inside the window (the
+    -- wrong-row failure mode) never returns to makePlan on its own.
+    if plan ~= nil and planActor == actor and plan.kind == "lore"
+       and loreSpinN > LORE_STALL and not loreDead then
+      loreDiagnose(actor, loreCell(actor, plan.lore, false))
+      plan, planActor = nil, nil
+      return { "b" }
+    end
     if plan == nil or planActor ~= actor then
       if st == ST_TGT then
         -- Backstop for a refused confirm: a confirm clears the plan
@@ -1972,6 +2146,22 @@ function M.newFightDriver(tag, opts)
       if col > wc then return { "left" } end
       return { "a" }
     end
+    if st == ST_LORE_OPEN and plan.kind == "lore" then
+      return nil                       -- transitional DMA fill, just wait
+    end
+    if st == ST_LORE and plan.kind == "lore" then
+      -- The item-window steer shape: the absolute row is scroll + cursor,
+      -- and the wanted row is re-read from the live segment (not strict,
+      -- for spellCell's stale-greyed-bit reason) rather than trusted from
+      -- plan time.  A lore the engine no longer offers a row for drops
+      -- the plan instead of steering to whatever holds the old row.
+      local want = loreCell(actor, plan.lore, false)
+      if want == nil then plan, planActor = nil, nil; return { "b" } end
+      local cur = M.readByte(LSCROLL + actor) + M.readByte(LROW + actor)
+      if cur < want then return { "down" } end
+      if cur > want then return { "up" } end
+      return { "a" }
+    end
     if st == ST_TOOLS and plan.kind == "skill" then
       local want
       for i = 0, 7 do
@@ -2023,12 +2213,19 @@ function M.newFightDriver(tag, opts)
       -- plans steer to its mask (summons, items and cures keep their own
       -- targeting), and the tgtSpin backstop still confirms rather than
       -- holding the turn open.
+      -- A lore is multi-target: the focus rotation would spin against a
+      -- whole-side mask it can never match, so it confirms on the default.
       if opts.focus and plan.kind ~= "item" and plan.kind ~= "summon"
-         and plan.kind ~= "heal" then
+         and plan.kind ~= "heal" and plan.kind ~= "lore" then
         local want = nil
+        -- MONSTER_IDS is six 8-bit ID low bytes, one per slot; a word
+        -- read at a 2-byte stride walks off the table into the position
+        -- bytes and can pass dead slots and skip live ones (measured:
+        -- the thamlab deadboard misdiagnosis).  monsterIds() decodes the
+        -- present mask, the authority on which slots hold a monster.
+        local ids = M.monsterIds()
         for _, e in ipairs(opts.focus) do
-          local mid = M.readWord(M.MONSTER_IDS + e.slot * 2)
-          if mid ~= 0 and mid ~= 0xFFFF
+          if ids[e.slot + 1] ~= 0xFFFF
              and M.readWord(0x3BFC + e.slot * 2) > 0 then want = e.mask; break end
         end
         if want ~= nil then
@@ -2075,13 +2272,23 @@ function M.newFightDriver(tag, opts)
         watch.until_ = battleTick + 900
         healWatch = watch
       end
+      -- A confirmed lore is the progress the stall guard watches for.
+      if plan.kind == "lore" then
+        loreSpinN = 0
+        M.log(string.format("[%s] lore $%02X confirmed", tag or "fight",
+          plan.lore))
+      end
       -- A refused confirm (corpse under the target cursor) re-enters
       -- button()'s plan-nil ST_TGT head next tick, which owns the
       -- backstop; the optimistic clear here is what routes it there.
       plan, planActor = nil, nil
       return { "a" }
     end
-    if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC or st == ST_ESPER then
+    if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC or st == ST_ESPER
+       -- the lore states join the back-out set only when the repertoire is
+       -- in play: without opts.nukeLore nothing here ever opens that
+       -- window, and the default driver stays byte-identical.
+       or (opts.nukeLore and (st == ST_LORE or st == ST_LORE_OPEN)) then
       plan, planActor = nil, nil
       return { "b" }
     end
@@ -2098,10 +2305,31 @@ function M.newFightDriver(tag, opts)
     roundCost, turnSnap = {}, {}
     itemRestore, castRestore = {}, {}
     healWatch, healSaid = nil, nil
+    -- The stall guard's verdict belongs to the battle it watched: a retry
+    -- ladder's reload is a different fight, and a recurrence should dump
+    -- again there rather than inherit a dead lore line silently.
+    loreSpinN, loreDead = 0, false
   end
 
   function F.frame()
     battleTick = battleTick + 1
+    -- VICTORY-DEADLOCK guard (measured, Thamasa grind bake fight 37): the
+    -- killing blow can land while an actor's spell/item window is still
+    -- open; in Wait mode the open window freezes the battle clock, and
+    -- this driver only plans at the command state, so the battle sat at
+    -- state $0E for 100k+ frames with every monster at 0 HP.  When no
+    -- monster slot holds HP and a battle menu window is still up, tap B
+    -- to close it so the battle can end.
+    if battleTick > 600 and M.readByte(MENU) ~= 0 then
+      local alive = false
+      for s = 0, 5 do
+        if M.readWord(0x3BFC + s * 2) > 0 then alive = true; break end
+      end
+      if not alive then
+        M.setPad(battleTick % 8 < 4 and { b = true } or {})
+        return
+      end
+    end
     -- The landed value of a heal, watched from its confirmation until the HP
     -- moves.  HP falling first is the enemy acting between the confirm and
     -- the heal, so the baseline follows it down rather than reading the
@@ -2143,15 +2371,19 @@ function M.newFightDriver(tag, opts)
       -- damage the party did, which is what separates a harness bug from a
       -- balance finding.
       local mhp = {}
+      -- present-mask driven (see the focus note above: the old word-stride
+      -- read here printed a slotless garbage list -- "all zero, monsters=3"
+      -- -- that misdiagnosed a live board as dead).  The s%d: tag keeps
+      -- slot identity in the log so that can never happen silently again.
+      local mids = M.monsterIds()
       for s2 = 0, 5 do
-        local id = M.readWord(M.MONSTER_IDS + s2 * 2)
-        if id ~= 0xFFFF and id ~= 0 then
+        if mids[s2 + 1] ~= 0xFFFF then
           -- hp, and the shield count beside it: shields live at
           -- $3E38 + entity*2 and monsters are entities 4..9, so slot s is
           -- $3E40 + s*2.  Without the shield count the log shows low
           -- damage without showing the cause, since shielded damage is
           -- halved and a broken monster takes 4x.
-          mhp[#mhp + 1] = string.format("%d/sh%d",
+          mhp[#mhp + 1] = string.format("s%d:%d/sh%d", s2,
             M.readWord(0x3BFC + s2 * 2), M.readByte(0x3E40 + s2 * 2))
         end
       end
@@ -2214,6 +2446,10 @@ function M.newFightDriver(tag, opts)
     local ph = tick % (opts.cadence or 30)
     local actor = M.readByte(ACTOR) & 3
     if plan and planActor ~= actor then plan, planActor = nil, nil end
+    -- The stall guard's clock: frames spent on a LIVE lore plan, rather
+    -- than wall clock since the first offer, so another actor's slow turn
+    -- between two pursuits cannot fire it.
+    if plan and plan.kind == "lore" then loreSpinN = loreSpinN + 1 end
     if ph == 0 then held = button(actor) or {} end
     M.setPad(ph < 6 and held or {})
   end
@@ -2225,19 +2461,22 @@ function M.fightBattle(maxFrames, spare)
   local spareSet = {}
   for _, w in ipairs(spare or {}) do spareSet[w] = true end
   local aPhase = 0
-  return M.driveUntil(function()
-    return not M.battleLoadStarted()
-  end, maxFrames or 20000, {
-    M.call(function()
-      aPhase = (aPhase + 1) % 8
-      if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
-        error("fightBattle: asked to auto-fight a spared formation " ..
-          string.format("(%04X %04X %04X %04X %04X %04X)",
-            table.unpack(M.formationWords())), 0)
-      end
-      M.setPad(aPhase < 4 and { "a" } or {})
-    end),
-  }, "fight battle (tap-A)")
+  return M.seqStep({
+    M.driveUntil(function()
+      return not M.battleLoadStarted()
+    end, maxFrames or 20000, {
+      M.call(function()
+        aPhase = (aPhase + 1) % 8
+        if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
+          error("fightBattle: asked to auto-fight a spared formation " ..
+            string.format("(%04X %04X %04X %04X %04X %04X)",
+              table.unpack(M.formationWords())), 0)
+        end
+        M.setPad(aPhase < 4 and { "a" } or {})
+      end),
+    }, "fight battle (tap-A)"),
+    M.careStop("care after battle (fightBattle)"),
+  })
 end
 
 -- The command-table-aware counterpart to fightBattle().  Prefer this for a
@@ -2246,18 +2485,21 @@ function M.fightBattleByMenu(maxFrames, spare)
   local spareSet = {}
   for _, w in ipairs(spare or {}) do spareSet[w] = true end
   local F = M.newFightDriver("fightBattleByMenu")
-  return M.driveUntil(function()
-    return not M.battleLoadStarted()
-  end, maxFrames or 30000, {
-    M.call(function()
-      if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
-        error("fightBattleByMenu: asked to auto-fight a spared formation " ..
-          string.format("(%04X %04X %04X %04X %04X %04X)",
-            table.unpack(M.formationWords())), 0)
-      end
-      F.frame()
-    end),
-  }, "fight battle through the Fight menu")
+  return M.seqStep({
+    M.driveUntil(function()
+      return not M.battleLoadStarted()
+    end, maxFrames or 30000, {
+      M.call(function()
+        if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
+          error("fightBattleByMenu: asked to auto-fight a spared formation " ..
+            string.format("(%04X %04X %04X %04X %04X %04X)",
+              table.unpack(M.formationWords())), 0)
+        end
+        F.frame()
+      end),
+    }, "fight battle through the Fight menu"),
+    M.careStop("care after battle (fightBattleByMenu)"),
+  })
 end
 
 -- fleeBattle: hold L+R, which is the engine's run mechanic (see the pad map
@@ -2266,11 +2508,14 @@ end
 -- and on every event battle whose win-bit the story checks, so callers pick
 -- fight or flee per step and record why.  No writes.
 function M.fleeBattle(maxFrames)
-  return M.driveUntil(function()
-    return not M.battleLoadStarted()
-  end, maxFrames or 9000, {
-    M.call(function() M.setPad({ l = true, r = true }) end),
-  }, "flee battle (hold L+R)")
+  return M.seqStep({
+    M.driveUntil(function()
+      return not M.battleLoadStarted()
+    end, maxFrames or 9000, {
+      M.call(function() M.setPad({ l = true, r = true }) end),
+    }, "flee battle (hold L+R)"),
+    M.careStop("care after battle (fleeBattle)"),
+  })
 end
 
 -- The runner.  steps: list of step objects.  opts.maxFrames: global budget.
@@ -2400,35 +2645,64 @@ function M.run(opts, steps)
   -- reach, GameOver-scripted or not, so an EXEC watch there is the
   -- backstop.  Both watches feed the same M.gameOverFired counter so no
   -- caller needs to know which one fired.
+  -- The two references are spelled as direct sym calls inside a thunk
+  -- rather than passing M.sym to pcall with the name as a second
+  -- argument: compose.py's _SYM_REF scanner only collects the direct-call
+  -- literal form, so the comma spelling left OT6_SYMS without either
+  -- name, M.sym raised at runtime, the pcall swallowed it, and the
+  -- canary silently never armed in ANY composed run (measured 2026-08-27:
+  -- a FlameEater wipe auto-Continued the battery save and the run
+  -- time-traveled while gameOverFired read 0).
+  -- Neither watch counts until the run has actually been IN the game
+  -- once (a frame with control or a battle): a raw power-on boots through
+  -- the real title screen, so an ungated exec watch condemns the chain's
+  -- one from-power-on generator (gen_battle_state) within seconds of
+  -- reset -- measured the day the canary was first armed.  For every
+  -- state-booted run the latch closes on the first frame.  The counters
+  -- are split so the failure names which watch fired; M.gameOverFired
+  -- stays the public sum every existing caller reads and clears.
   M.gameOverFired = 0
+  local goReadFired, titleExecFired = 0, 0
+  local canaryInGame = false
   do
-    local ok, addr = pcall(M.sym, "GameOver")
+    local ok, addr = pcall(function() return M.sym("GameOver") end)
     if ok then
       emu.addMemoryCallback(function()
-        M.gameOverFired = M.gameOverFired + 1
+        if canaryInGame then
+          goReadFired = goReadFired + 1
+          M.gameOverFired = M.gameOverFired + 1
+        end
       end, emu.callbackType.read, addr, addr)
     end
   end
   do
-    local ok, addr = pcall(M.sym, "TitleScreen")
+    local ok, addr = pcall(function() return M.sym("TitleScreen") end)
     if ok then
       emu.addMemoryCallback(function()
-        M.gameOverFired = M.gameOverFired + 1
+        if canaryInGame then
+          titleExecFired = titleExecFired + 1
+          M.gameOverFired = M.gameOverFired + 1
+        end
       end, emu.callbackType.exec, addr, addr)
     end
   end
 
   emu.addEventCallback(function()
     if finished then return end
+    if not canaryInGame and (M.hasControl() or M.battleLoadStarted()) then
+      canaryInGame = true
+    end
     if M.gameOverFired > 0 and not opts.allowGameOver then
       finished = true
       traceFlush()
       coverageFlush()
-      M.log("FAIL: GAME OVER fired (event GameOver, $CC/E568) -- the run " ..
+      M.log(string.format("FAIL: GAME OVER fired (GameOver read x%d, " ..
+        "TitleScreen exec x%d) -- the run " ..
         "lost and any further input auto-Continues the last save, which " ..
         "reads as silent time travel.  A ladder that can survive this " ..
         "must reload BEFORE the game-over lands, or clear " ..
-        "M.gameOverFired after handling it (see #127's ambush finding).")
+        "M.gameOverFired after handling it (see #127's ambush finding).",
+        goReadFired, titleExecFired))
       emu.stop(3)
       return
     end

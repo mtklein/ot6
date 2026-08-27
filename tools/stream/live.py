@@ -87,7 +87,10 @@ async function tick(){ try{
     const rad = R0 + Math.min(14, Math.sqrt(e.dur||30));
     const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#3a423c';
     const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
-    out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}">${pulse}</circle>`
+    // segments that boot from an SRAM save checkpoint rather than the
+    // played chain wear a dotted yellow ring
+    const ring = e.ckpt ? ` stroke="#e8c94a" stroke-width="2" stroke-dasharray="4 3"` : '';
+    out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}"${ring}>${pulse}</circle>`
         + `<text x="${x}" y="${y+rad+12}" fill="${e.status==='pending'?'#565':'#aca'}" font-size="9" text-anchor="middle">${e.name}</text>`;
   });
   svg.innerHTML = out;
@@ -168,7 +171,8 @@ def progress_thread(webroot, stop):
                     pass
             if st == "done":
                 done += 1
-            edges.append({"name": n, "dur": cost, "status": st})
+            edges.append({"name": n, "dur": cost, "status": st,
+                          "ckpt": bool(e.get("checkpoint"))})
         # remaining spine: longest chain of not-done edges (file order is
         # play order; prev links carry the real topology)
         owner = {}
