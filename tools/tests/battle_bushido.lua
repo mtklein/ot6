@@ -12,9 +12,15 @@ local CMD_SWDTECH, CMD_ITEM = 0x07, 0x01
 local KNOWN, ITEMLIST, KROW = 0x2020, 0x4005, 0x8967
 local TONIC, POTION = 0xE8, 0xE9
 local OT6_SLASH = 0x01
-local DMG_CAP = 240                   -- a Dispatch measures ~117 here; an
-                                      -- Ot6BoostDmg x4 double-dip would clear
-                                      -- this cap easily
+local DMG_CAP = 420                   -- an honest boost-1 Dispatch measures
+                                      -- ~284 here now that CYAN reaches
+                                      -- camp_escaped at level 13 (three
+                                      -- techs, higher Vigor -- the
+                                      -- fight-the-encounters directive at
+                                      -- work; was ~117 at the lower-level,
+                                      -- two-tech calibration).  An
+                                      -- Ot6BoostDmg x2/x4 double-dip (~570+)
+                                      -- still clears this cap easily.
 
 local TECH = { [0] = "Dispatch", "Retort", "Slash", "Quadra Slam",
                "Empowerer", "Stunner", "Quadra Slice", "Cleave" }

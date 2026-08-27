@@ -301,6 +301,14 @@ H.run({ maxFrames = 200000 }, {
                     m0 = mp()
                     spells = {}
                     cyanMode = "tech:0"
+                    -- quiet the idle A-mash NOW, before the latch drive:
+                    -- with CYAN at level 13 the fixture's timing drifted so
+                    -- a bystander's Fight (a ~68 physical, not a ~280
+                    -- Dispatch) could be confirmed by the MENU==0 idle A
+                    -- and land inside the damage window, failing the
+                    -- fizzled-for-no-damage check.  CYAN's tech still drives
+                    -- (cyanMode routes it whenever his menu is open).
+                    quietA = true
                   end),
                   -- the fizzled tech has no grant to signal on, so drive on
                   -- the latch (pending banks 1 at the submenu confirm).
@@ -316,7 +324,7 @@ H.run({ maxFrames = 200000 }, {
                     return latched
                   end, 30000, "the broke Dispatch is latched (attempt "
                     .. attempt .. ")"),
-                  H.call(function() cyanMode = "defer"; quietA = true end),
+                  H.call(function() cyanMode = "defer" end),  -- quietA already on
                   H.waitFrames(400),
                   H.call(function() quietA = false end),
                   H.call(function()
