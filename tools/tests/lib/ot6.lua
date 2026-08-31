@@ -1843,7 +1843,12 @@ function M.newFightDriver(tag, opts)
       local cands = {}
       for e = 0, 3 do
         local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
-        if hp > 0 and maxhp > 0 then
+        -- hp < maxhp: a FULL character is never a patient.  Without it,
+        -- the one-round-of-death rule (hp <= roundCost) deadlocked a
+        -- Trapper fight for 85k frames: a measured roundCost equal to max
+        -- HP made every full-health character an eternal candidate, and
+        -- all four turns went to Tonics that restored nothing.
+        if hp > 0 and maxhp > 0 and hp < maxhp then
           local pct = hp * 100 // maxhp
           if pct < threshold or hp <= (roundCost[e] or 0) then
             cands[#cands + 1] = { e = e, pct = pct, hp = hp, maxhp = maxhp }
