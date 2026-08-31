@@ -172,8 +172,19 @@ H.run({ maxFrames = 160000 }, {
   H.equipEsper(0, 7, { tag = "BISMARK -> EDGAR" }),
   H.equipEsper(1, 2, { tag = "SHIVA -> SABIN" }),
   H.equipEsper(2, 19, { tag = "CARBUNKL -> LOCKE" }),
-  H.equipWeapon(0, 0x01, { tag = "EDGAR MithrilKnife" }),
-  H.equipWeapon(2, 0x02, { tag = "LOCKE Guardian" }),
+  -- Both swaps are best-effort: the fighting lineage's LOCKE already
+  -- WIELDS Guardian in his Genji offhand (it is on his hand, not in the
+  -- bag), and the bag's dagger spread differs from the fled lineage's.
+  H.cond(function() return H.invSlotOf(0x01) ~= nil end,
+    { H.equipWeapon(0, 0x01, { tag = "EDGAR MithrilKnife" }) },
+    { H.logStep("no bagged MithrilKnife; EDGAR keeps his weapon") }),
+  H.cond(function()
+    -- skip when Guardian is already in either of LOCKE's hands
+    local base = 0x1600 + 37 * 1
+    return H.readByte(base + 0x1F) ~= 0x02 and H.readByte(base + 0x20) ~= 0x02
+       and H.invSlotOf(0x02) ~= nil
+  end, { H.equipWeapon(2, 0x02, { tag = "LOCKE Guardian" }) },
+     { H.logStep("LOCKE already holds Guardian (or none bagged); keeping hands as they are") }),
   H.setRows({ [1] = true, [4] = true, [5] = true }, { tag = "back row" }),
   H.call(function()
     -- key the summon table off what is actually WORN, never assumed
