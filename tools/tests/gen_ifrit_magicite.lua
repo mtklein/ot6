@@ -193,6 +193,7 @@ local function ifritAttempt(n)
   local ISLOT, SSLOT = nil, nil
   local sawBreak, ideathFrame, ideathTicks, sdeathFrame = false, nil, nil, nil
   local hb, ph, giveUp = 0, 0, 0
+  local wiped, wipeReq = 0, nil
   -- tactical=FALSE is load-bearing here (thamlab measured 37.5%->62.5%/
   -- attempt).  Ifrit & Shiva are a tag-team -- only one sibling is on
   -- stage, and killing EITHER ends the fight -- broken by weapon CLASS
@@ -263,9 +264,21 @@ local function ifritAttempt(n)
     -- the library fighter drives the fight; its menu==0 branch pages
     -- battle text, the recognition scene's dialogs, and the victory
     -- teardown, carrying the whole battle from fly-in to field.
-    H.driveUntil(function() return not H.battleLoadStarted() end, 90000, {
+    H.driveUntil(function()
+      return not H.battleLoadStarted() or wiped >= 120
+    end, 90000, {
       H.call(function()
         hb = hb + 1
+        -- Wipe watch: all four at 0 HP is a lost fight.  Abort the
+        -- attempt and reload BEFORE the game-over lands (the canary's
+        -- sanctioned ladder pattern) -- the battle module's own game-over
+        -- flow follows the last death by whole seconds, so 120 frames of
+        -- confirmed all-dead wins the race comfortably.
+        local alive = false
+        for e = 0, 3 do
+          if H.readWord(0x3BF4 + e * 2) > 0 then alive = true break end
+        end
+        wiped = (not alive) and wiped + 1 or 0
         if hb % 600 == 0 then
           H.log(string.format(
             "f%d ifr hp=%d sh=%d tk=%d fld=%d | shv hp=%d sh=%d tk=%d | party %d/%d/%d/%d",
@@ -293,6 +306,23 @@ local function ifritAttempt(n)
         F.frame()
       end),
     }, "battle 70, played (tactical + boost bank + real items)"),
+    -- A wiped attempt reloads the entry blob HERE, before the game-over
+    -- screen can land, and clears the canary counter for the race window.
+    H.cond(function() return wiped >= 120 end, {
+      H.logStep(function()
+        return string.format("attempt %d WIPED -- reloading the entry "
+          .. "blob before game over lands", n)
+      end),
+      H.call(function() wipeReq = H.requestLoadState(fightBlob) end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(wipeReq, "wipe reload")
+        H.gameOverFired = 0
+        H.setPad({})
+        wiped = 0
+      end),
+      H.waitFrames(90),
+    }, {}),
     H.call(function() F.idle(); H.setPad({}) end),
     H.logStep(function()
       return string.format(
@@ -375,9 +405,19 @@ H.run({ maxFrames = 300000 }, {
   -- absent -> the character keeps what they have, with a log.  The break
   -- plan needs slash CLASS on all four, which every fallback preserves.
   (function()
+    -- LOCKE wears the Genji Glove from his scenario, so his left hand
+    -- holds a SECOND WEAPON, not a shield (owner doctrine: the pair
+    -- doubles a boosted Fight's chips -- the commit-to-Shiva plan twice
+    -- over).  Repeated entries for one slot are a preference ladder,
+    -- weakest first: each present item overwrites the last, so the
+    -- strongest one held wins, and single copies allocate themselves
+    -- (LOCKE equips before EDGAR, so EDGAR's ladder picks from what
+    -- remains).
     local KITS = {
-      { 1, "LOCKE",  { { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 } } },
-      { 4, "EDGAR",  { { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 } } },
+      { 1, "LOCKE",  { { 0, 0x0F }, { 1, 0x01 }, { 1, 0x2B }, { 1, 0x0B },
+                       { 2, 0x69 }, { 3, 0x84 } } },
+      { 4, "EDGAR",  { { 0, 0x2B }, { 0, 0x0B }, { 0, 0x0F },
+                       { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 } } },
       { 5, "SABIN",  { { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 } } },
       { 6, "CELES",  { { 0, 0x0A }, { 2, 0x6A }, { 3, 0x84 } } },
     }
