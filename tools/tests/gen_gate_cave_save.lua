@@ -320,7 +320,16 @@ H.run({ maxFrames = 200000 }, {
       gear(CH_TERRA, 0x1F), gear(CH_TERRA, 0x20), gear(CH_TERRA, 0x21),
       gear(CH_TERRA, 0x22)))
   end),
+  -- Strongest-first ladder: the EMPTY-slot guard makes the first present
+  -- weapon land and every later rung skip.  The fighting lineage's bag
+  -- may lack the Blizzard (a fled-route chest), but the Cranes fix freed
+  -- LOCKE's ThunderBlade, and every rung is mask-valid for TERRA.
   fill(CH_TERRA, 0, 0, 0x0E, "TERRA Blizzard"),
+  fill(CH_TERRA, 0, 0, 0x0F, "TERRA ThunderBlade"),
+  fill(CH_TERRA, 0, 0, 0x0B, "TERRA RegalCutlass"),
+  fill(CH_TERRA, 0, 0, 0x0A, "TERRA MithrilBlade"),
+  fill(CH_TERRA, 0, 0, 0x01, "TERRA MithrilKnife"),
+  fill(CH_TERRA, 0, 0, 0x00, "TERRA Dirk"),
   fill(CH_TERRA, 0, 2, 0x6A, "TERRA Hair Band"),
   fill(CH_TERRA, 0, 3, 0x84, "TERRA LeatherArmor"),
   H.waitUntil(landed(7, 10), 2400, "map 7 control back after the equip stop", 1),
