@@ -571,7 +571,7 @@ function M.navTo(txIn, tyIn, opts)
         sawBattle = false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
-            threshold = opts.careThreshold or 0.9, reserve = opts.reserve,
+            threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
             tag = "care after battle (navTo)" })
           careD.frame()
           if not careD.done() then return end
@@ -784,7 +784,7 @@ function M.advanceStory(pred, maxFrames, opts)
         sawBattle = false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
-            threshold = opts.careThreshold or 0.9, reserve = opts.reserve,
+            threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
             tag = "care after battle (advanceStory)" })
           careD.frame()
           if not careD.done() then return end
@@ -1076,7 +1076,7 @@ function M.worldNavTo(txIn, tyIn, opts)
         sawBattle = false
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
-            threshold = opts.careThreshold or 0.9, reserve = opts.reserve,
+            threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
             tag = "care after battle (worldNavTo)" })
           careD.frame()
           if not careD.done() then return end
@@ -2627,7 +2627,13 @@ end
 function M.careStop(tag, opts)
   opts = opts or {}
   opts.tag = opts.tag or tag or "care after battle"
-  if opts.threshold == nil then opts.threshold = 0.9 end
+  -- 0.65, not 0.9: the fighting lineage meets several times the battles the
+  -- flee route did, and topping to 90% after every one of them drank ~96
+  -- Tonics by the Imperial Camp (measured; the bag hit the reserve floor
+  -- with two scenarios still to go).  A person walks a little hurt and
+  -- tops up before dangers -- the gens' explicit pre-boss cares at
+  -- 0.9-0.95 are that, and they stay.
+  if opts.threshold == nil then opts.threshold = 0.65 end
   local D
   return M.cond(function() return not M.eventTimerLive() end, {
     M.call(function() D = M.newCareDriver(opts) end),

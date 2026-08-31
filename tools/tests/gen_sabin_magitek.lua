@@ -174,7 +174,13 @@ H.run({ maxFrames = 120000 }, {
   -- It picks Tonic or Potion by the size of the hole, so SHADOW's small one
   -- does not cost a Potion.  It is a no-op that never opens the menu on a
   -- run where the three fights happened to cost nothing.
-  H.fieldCare({ tag = "post-escape care", threshold = 0.9 }),
+  -- reserve = {}: this is a segment boundary with a shop two maps ahead
+  -- (the ghost merchant restocks Tonics on the train), and the fighting
+  -- lineage arrives here with the bag at the reserve floor.  A person
+  -- spends their last Tonics to put the party on its feet before walking
+  -- the world; holding the floor here shipped SHADOW at 12% and SABIN at
+  -- 5% and failed the exit contract (measured).
+  H.fieldCare({ tag = "post-escape care", threshold = 0.9, reserve = {} }),
 
   -- Finale: up the x=37 column into the y=14 row -> _cb1a23 dismount cutscene
   -- -> world (179,71).  holdCross UP rides it (tap-A the dialogs) onto the
