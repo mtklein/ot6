@@ -178,13 +178,22 @@ H.run({ maxFrames = 160000 }, {
   H.cond(function() return H.invSlotOf(0x01) ~= nil end,
     { H.equipWeapon(0, 0x01, { tag = "EDGAR MithrilKnife" }) },
     { H.logStep("no bagged MithrilKnife; EDGAR keeps his weapon") }),
-  H.cond(function()
-    -- skip when Guardian is already in either of LOCKE's hands
+  -- The Cranes ABSORB bolt ($10D) and fire ($10E): LOCKE's ThunderBlade
+  -- R-hand would heal the Left Crane every swing (issue #81's absorb
+  -- guard measured exactly that).  Both Cranes are pierce-weak, so the
+  -- R-hand takes a plain dagger (ladder, weakest first) and Guardian
+  -- stays in the offhand under his Genji Glove.
+  H.cond(function() return H.invSlotOf(0x00) ~= nil end,
+    { H.equipWeapon(2, 0x00, { tag = "LOCKE R-hand Dirk (no element)" }) }, {}),
+  H.cond(function() return H.invSlotOf(0x01) ~= nil end,
+    { H.equipWeapon(2, 0x01, { tag = "LOCKE R-hand MithrilKnife" }) }, {}),
+  H.cond(function() return H.invSlotOf(0x04) ~= nil end,
+    { H.equipWeapon(2, 0x04, { tag = "LOCKE R-hand ThiefKnife" }) }, {}),
+  H.call(function()
     local base = 0x1600 + 37 * 1
-    return H.readByte(base + 0x1F) ~= 0x02 and H.readByte(base + 0x20) ~= 0x02
-       and H.invSlotOf(0x02) ~= nil
-  end, { H.equipWeapon(2, 0x02, { tag = "LOCKE Guardian" }) },
-     { H.logStep("LOCKE already holds Guardian (or none bagged); keeping hands as they are") }),
+    H.assertEq(H.readByte(base + 0x1F) ~= 0x0F, true,
+      "LOCKE's R-hand is no longer the ThunderBlade (the Cranes absorb bolt)")
+  end),
   H.setRows({ [1] = true, [4] = true, [5] = true }, { tag = "back row" }),
   H.call(function()
     -- key the summon table off what is actually WORN, never assumed
