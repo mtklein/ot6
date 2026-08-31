@@ -343,15 +343,34 @@ H.run({ maxFrames = 400000 }, {
     H.log(partyReport("minecart_entry"))
   end),
 
-  H.equipLoadout(1, {
-    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-  }, { tag = "LOCKE minecart kit" }),
-  H.equipLoadout(4, {
-    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-  }, { tag = "EDGAR minecart kit" }),
-  H.equipLoadout(5, {
-    { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 },
-  }, { tag = "SABIN minecart kit" }),
+  -- Best-effort, mask-checked kits (the gen_ifrit_magicite pattern);
+  -- LOCKE's left hand is a second weapon under the Genji Glove -- the
+  -- body's row is pierce, so a dagger offhand chips it twice per
+  -- boosted Fight.
+  (function()
+    local KITS = {
+      { 1, "LOCKE",  { { 0, 0x0F }, { 1, 0x00 }, { 1, 0x01 }, { 1, 0x02 },
+                       { 2, 0x69 }, { 3, 0x84 } } },
+      { 4, "EDGAR",  { { 0, 0x0A }, { 0, 0x0B }, { 0, 0x0F },
+                       { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 } } },
+      { 5, "SABIN",  { { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 } } },
+    }
+    local steps = {}
+    for _, kit in ipairs(KITS) do
+      local char, name, pairs_ = kit[1], kit[2], kit[3]
+      for _, p in ipairs(pairs_) do
+        local slot, item = p[1], p[2]
+        local tag = string.format("%s minecart kit slot %d", name, slot)
+        steps[#steps + 1] = H.cond(
+          function() return H.invSlotOf(item) ~= nil end,
+          { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
+          { H.logStep(string.format(
+              "%s: $%02X not in this lineage's bag; keeping current gear",
+              tag, item)) })
+      end
+    end
+    return H.cond(function() return true end, steps)
+  end)(),
 
   --   EDGAR AutoCrossbow   500-750, and 3 shields off the body in one action
   --   LOCKE ThunderBlade   ~200 and a shield (the blade is LIGHTNING, which

@@ -259,18 +259,36 @@ H.run({ maxFrames = 300000 }, {
   -- 1. the player's prep: the checkpoint can deliver LOCKE and CELES
   --    bare-handed and the party hurt, so re-equip and top HP up before
   --    the retry blob, so every attempt replays a prepared party.
-  H.equipLoadout(1, {
-    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-  }, { tag = "LOCKE Number-024 kit" }),
-  H.equipLoadout(4, {
-    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-  }, { tag = "EDGAR Number-024 kit" }),
-  H.equipLoadout(5, {
-    { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 },
-  }, { tag = "SABIN Number-024 kit" }),
-  H.equipLoadout(6, {
-    { 0, 0x0A }, { 2, 0x6A }, { 3, 0x84 },
-  }, { tag = "CELES Number-024 kit" }),
+  -- Best-effort, mask-checked kits (the gen_ifrit_magicite pattern): each
+  -- slot equips if the bag holds the item, repeated slot entries are a
+  -- weakest-first preference ladder, and LOCKE's left hand is a SECOND
+  -- WEAPON under his Genji Glove -- 024's row is slash|pierce, and the
+  -- pair chips both axes twice per boosted Fight.
+  (function()
+    local KITS = {
+      { 1, "LOCKE",  { { 0, 0x0F }, { 1, 0x00 }, { 1, 0x01 }, { 1, 0x02 },
+                       { 2, 0x69 }, { 3, 0x84 } } },
+      { 4, "EDGAR",  { { 0, 0x0A }, { 0, 0x0B }, { 0, 0x0F },
+                       { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 } } },
+      { 5, "SABIN",  { { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 } } },
+      { 6, "CELES",  { { 0, 0x0A }, { 2, 0x6A }, { 3, 0x84 } } },
+    }
+    local steps = {}
+    for _, kit in ipairs(KITS) do
+      local char, name, pairs_ = kit[1], kit[2], kit[3]
+      for _, p in ipairs(pairs_) do
+        local slot, item = p[1], p[2]
+        local tag = string.format("%s Number-024 kit slot %d", name, slot)
+        steps[#steps + 1] = H.cond(
+          function() return H.invSlotOf(item) ~= nil end,
+          { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
+          { H.logStep(string.format(
+              "%s: $%02X not in this lineage's bag; keeping current gear",
+              tag, item)) })
+      end
+    end
+    return H.cond(function() return true end, steps)
+  end)(),
   H.fieldCare({ tag = "care before battle 72", threshold = 0.95 }),
   H.navTo(25, 52, { maxFrames = 6000, playBattles = "flee" }),
   H.call(function()
