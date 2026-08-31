@@ -274,22 +274,57 @@ H.run({ maxFrames = 480000 }, {
   -- best level reads 21, re-board, and resume the mission.  Legs are
   -- capped so a bad roll cannot eat the wave.
   flyTo(116, 27),
+  -- Land-search: one state machine snaking the pocket area (X 108..122,
+  -- Y 23..31), pressing B at each waypoint and waiting out the bounce.
+  -- The first ring of tries around (116,27) all refused, so the search
+  -- is wide; worldNavTo walks the rest once on foot.
   (function()
-    local ring = { {0,0},{-1,0},{1,0},{0,1},{-2,0},{2,0},{0,-1},{-1,1},{1,1} }
-    local steps = {}
-    for _, d in ipairs(ring) do
-      steps[#steps + 1] = H.cond(function() return not onFoot() end, {
-        flyTo(116 + d[1], 27 + d[2]),
-        H.pressButtons({ "b" }, 6), H.waitFrames(140),
-      }, {})
+    local wps = {}
+    for row = 0, 4 do
+      local y = 23 + row * 2
+      if row % 2 == 0 then
+        for x = 108, 122, 2 do wps[#wps + 1] = { x, y } end
+      else
+        for x = 122, 108, -2 do wps[#wps + 1] = { x, y } end
+      end
     end
-    steps[#steps + 1] = H.call(function()
-      H.assertEq(onFoot(), true, "landed near the Chimera pocket")
-      H.log(string.format("[grind] landed at world (%d,%d)",
-        H.worldX(), H.worldY()))
-    end)
-    return H.cond(function() return true end, steps)
+    local wi, mode, hold = 1, "move", 0
+    return H.driveUntil(function()
+      return onFoot() or wi > #wps
+    end, 90000, {
+      H.call(function()
+        if onFoot() then H.setPad({}); return end
+        local wp = wps[wi]
+        if mode == "move" then
+          local dx, dy = wp[1] - shipX(), wp[2] - shipY()
+          if dx == 0 and dy == 0 then
+            mode, hold = "land", 0
+            H.setPad({})
+            return
+          end
+          local pad = { y = true }
+          if dx > 0 then pad.right = true elseif dx < 0 then pad.left = true end
+          if dy > 0 then pad.down = true elseif dy < 0 then pad.up = true end
+          H.setPad(pad)
+          return
+        end
+        -- mode == "land": tap B, then wait out the descend-or-bounce
+        hold = hold + 1
+        if hold <= 6 then H.setPad({ b = true }); return end
+        H.setPad({})
+        if hold >= 260 then
+          H.log(string.format("[grind] (%d,%d): bounced", wp[1], wp[2]))
+          wi, mode = wi + 1, "move"
+        end
+      end),
+    }, "snake land-search over the Chimera pocket")
   end)(),
+  H.waitFrames(90),
+  H.call(function()
+    H.assertEq(onFoot(), true, "landed near the Chimera pocket")
+    H.log(string.format("[grind] landed at world (%d,%d)",
+      H.worldX(), H.worldY()))
+  end),
   (function()
     local steps = {}
     for leg = 1, 16 do
