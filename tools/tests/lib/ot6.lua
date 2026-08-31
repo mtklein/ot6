@@ -1581,6 +1581,13 @@ function M.newFightDriver(tag, opts)
   -- cell n.
   local MLISTPTR = 0x302C
   local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
+  -- multi-target latch: one R press on a MULTI_TARGET spell's target screen
+  -- sets this to 1 and widens the side mask to every valid ally/monster
+  -- (probe_targetall.lua measured it; btlgfx_main.asm @6e9a sets it)
+  local TGTALL = 0x7B7F
+  -- folded cure MP by tier (magic_prop_en.dat +$05: $2D/5, $2E/25, $2F/40);
+  -- the fold charges the folded tier's real cost (mp-economy.md)
+  local CURE_MP = { [0x2D] = 5, [0x2E] = 25, [0x2F] = 40 }
   local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
   local AUTOCROSSBOW, PUMMEL = M.AUTOCROSSBOW, 0x5D
   -- The cures, cheapest first: the loop simply casts again if the target
@@ -1842,6 +1849,33 @@ function M.newFightDriver(tag, opts)
           allies = allies + 1
         end
       end
+      -- Two or more hurt and a cure known: one boosted, party-wide cure
+      -- outheals any single-target turn (owner directive: use the STRONG
+      -- form of the effect once -- Cure2/Cure3 the whole party -- rather
+      -- than spending a turn per head).  Boost folds the tier (1 BP ->
+      -- Cure2, 2 BP -> Cure3) and one R press on the target screen latches
+      -- all allies (TGTALL -- probe_targetall.lua).  Unboosted party Cure
+      -- is NOT offered: vanilla halves a spread spell, so tier-0-all heals
+      -- less per head than the single cast, and the single line below
+      -- already owns that case.
+      if cureRow ~= nil and #cands >= 2 then
+        local spell = (type(opts.cure) == "table" and opts.cure or CURES)[1]
+        local cell = spellCell(actor, spell, true)
+        local bank = M.readByte(BP + actor * 2)
+        if cell ~= nil and bank >= 1 then
+          local deep = cands[1].pct < 35 or #cands >= 3
+          local boost = math.min(bank, deep and 2 or 1)
+          local mpc = CURE_MP[spell + boost] or 99
+          if M.readWord(CURMP + actor * 2) >= mpc then
+            M.log(string.format("[%s] actor=%d party cure: %d hurt "
+              .. "(worst %d%%), boost %d folds $%02X -> $%02X (%d MP), "
+              .. "all allies", tag or "fight", actor, #cands, cands[1].pct,
+              boost, spell, spell + boost, mpc))
+            return { kind = "heal", spell = spell, target = cands[1].e,
+                     row = cureRow, all = true, boostLeft = boost }
+          end
+        end
+      end
       for _, c in ipairs(cands) do
         local cost = roundCost[c.e] or 0
         -- The cast, offered first.  A cure's magic_prop power scales with
@@ -1878,11 +1912,12 @@ function M.newFightDriver(tag, opts)
             end
           end
         end
-        -- then the bag
+        -- then the bag.  In combat the bag heals with POTIONS: a turn must
+        -- buy a real heal (owner directive -- Tonics are the field
+        -- resource), so the Tonic is only ever the last item standing.
         local item = row ~= nil
-                 and ((c.maxhp - c.hp >= 80 and battInvIdx(POTION)) and POTION
-                   or battInvIdx(TONIC) and TONIC
-                   or battInvIdx(POTION) and POTION) or nil
+                 and (battInvIdx(POTION) and POTION
+                   or battInvIdx(TONIC) and TONIC) or nil
         if item then
           local gain = itemRestoreOf(item)
           local why = M.healDecision({ hp = c.hp, maxhp = c.maxhp,
@@ -2187,6 +2222,20 @@ function M.newFightDriver(tag, opts)
         -- chars = 0 would set cur = 0 and, for target 0, spin forever
         -- pressing UP.
         if chars == 0 then return { "right" } end
+        if plan.all then
+          -- one R press latches all-allies (TGTALL=1 -- probe_targetall);
+          -- confirm once the latch reads back.  If it never takes (a spell
+          -- without MULTI_TARGET), drop to the single-target steer.
+          if M.readByte(TGTALL) ~= 0 then return { "a" } end
+          tgtSpin = tgtSpin + 1
+          if tgtSpin >= 40 then
+            M.log(string.format("[%s] all-ally latch never took -- "
+              .. "single-target fallback", tag or "fight"))
+            plan.all, tgtSpin = nil, 0
+            return {}
+          end
+          return (tgtSpin % 4) < 2 and { "r" } or {}
+        end
         local wantMask = 1 << plan.target
         if chars ~= wantMask then
           local cur = 0
@@ -2265,7 +2314,10 @@ function M.newFightDriver(tag, opts)
       if plan.kind == "item" and plan.item ~= FENIX_DOWN
          and itemRestore[plan.item] == nil then
         watch = { into = itemRestore, id = plan.item, what = "item" }
-      elseif plan.kind == "heal" and castRestore[plan.spell] == nil then
+      elseif plan.kind == "heal" and not plan.all
+         and castRestore[plan.spell] == nil then
+        -- an all-ally cast is boosted and spread, so its per-head number
+        -- would poison the single-cast ledger; it goes unmeasured
         watch = { into = castRestore, id = plan.spell, what = "cure" }
       end
       if watch then
