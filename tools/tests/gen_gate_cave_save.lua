@@ -40,9 +40,11 @@ local function spec385(over)
 end
 
 -- grind-and-replan world walker
-local function worldGrind(tx, ty, what)
+local function worldGrind(txIn, tyIn, what)
   local plan, idx, ph = nil, 1, 0
+  local function rz(v) return type(v) == "function" and v() or v end
   return H.driveUntil(function()
+    local tx, ty = rz(txIn), rz(tyIn)
     return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
       and H.worldHasControl() and H.worldAligned())
   end, 30000, {
@@ -54,12 +56,25 @@ local function worldGrind(tx, ty, what)
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then plan = nil; H.setPad({}); return end
       if not H.worldAligned() then return end
-      if not plan or idx > #plan then plan = H.worldBfs(tx, ty); idx = 1 end
+      if not plan or idx > #plan then
+        plan = H.worldBfs(rz(txIn), rz(tyIn)); idx = 1
+      end
       if not plan then H.setPad({}); return end
       local dir = plan[idx]; idx = idx + 1
       H.setPad({ [dir] = true })
     end),
-  }, what or string.format("worldGrind (%d,%d)", tx, ty))
+  }, what or "worldGrind")
+end
+local function onFoot() return (H.readWord(0x1f64) & 0x2000) == 0 end
+local function maxLvl()
+  local m = 0
+  for c = 0, 15 do
+    if partyOf(c) ~= 0 then
+      local l = H.readByte(0x1600 + 37 * c + 8)
+      if l > m then m = l end
+    end
+  end
+  return m
 end
 
 -- unconditional held walk (dialogs/battles absorbed); for trigger tiles
@@ -221,7 +236,7 @@ local function landed(m, n)
   end
 end
 
-H.run({ maxFrames = 200000 }, {
+H.run({ maxFrames = 480000 }, {
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -248,13 +263,65 @@ H.run({ maxFrames = 200000 }, {
     return H.readByte(0xe0) == 0 and H.readByte(0xe2) == 0
   end, 900, "liftoff (the flight view zeroes $E0/$E2)", 5),
   H.waitFrames(240),
+
+  -- ---- 1b. the Chimera-pocket grind (level-curve.md's sanctioned spot) --
+  -- The cave ahead is an elemental check whose 4-stacks out-damage an
+  -- L18 party ~2:1 even with the right casts (measured, five attempts);
+  -- the level doc's own rule allows a reasonable grind, and this pocket
+  -- (form 190, Chimera+Cephaler, 1572 XP -- the same one the old pre-FC
+  -- grind used) also pre-pays the documented FC level gap.  Fly there,
+  -- land, ping-pong X 114..118 on Y 25 fighting tactically until the
+  -- best level reads 21, re-board, and resume the mission.  Legs are
+  -- capped so a bad roll cannot eat the wave.
+  flyTo(116, 27),
+  (function()
+    local ring = { {0,0},{-1,0},{1,0},{0,1},{-2,0},{2,0},{0,-1},{-1,1},{1,1} }
+    local steps = {}
+    for _, d in ipairs(ring) do
+      steps[#steps + 1] = H.cond(function() return not onFoot() end, {
+        flyTo(116 + d[1], 27 + d[2]),
+        H.pressButtons({ "b" }, 6), H.waitFrames(140),
+      }, {})
+    end
+    steps[#steps + 1] = H.call(function()
+      H.assertEq(onFoot(), true, "landed near the Chimera pocket")
+      H.log(string.format("[grind] landed at world (%d,%d)",
+        H.worldX(), H.worldY()))
+    end)
+    return H.cond(function() return true end, steps)
+  end)(),
+  (function()
+    local steps = {}
+    for leg = 1, 16 do
+      steps[#steps + 1] = H.cond(function() return maxLvl() < 21 end, {
+        H.worldNavTo(leg % 2 == 1 and 118 or 114, 25, {
+          maxFrames = 45000, playBattles = "tactical",
+          careThreshold = 0.7, healPercent = 45,
+          magic = { [0] = { spell = 2 } }, summon = { [0] = {} } }),
+      }, {})
+    end
+    return H.cond(function() return true end, steps)
+  end)(),
+  H.call(function()
+    H.log(string.format("[grind] done: best level %d", maxLvl()))
+  end),
+  -- re-board wherever the ship parked ($1F62/63 track it) and lift off
+  worldGrind(function() return H.readByte(0x1F62) end,
+             function() return H.readByte(0x1F63) end,
+             "back onto the parked ship"),
+  H.pressButtons({ "a" }, 8),
+  H.waitUntil(function()
+    return H.readByte(0xe0) == 0 and H.readByte(0xe2) == 0
+  end, 900, "second liftoff", 5),
+  H.waitFrames(240),
+
   H.pressButtons({ "x" }, 8),
   H.waitUntil(landed(6, 20), 1800, "the Blackjack deck (map 6)", 1),
   H.waitFrames(30),
   pressWalk("right", function() return map() == 7 end, 900,
     "held RIGHT along row 6 -> deck door (20,6) -> map 7"),
   H.waitUntil(landed(7, 10), 1200, "map 7 landing", 1),
-  H.navTo(40, 17, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 9000 }),
+  H.navTo(40, 17, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, summon = { [0] = {}, [5] = {} }, maxFrames = 9000 }),
   pressWalk("down", function()
     return H.fieldY() >= 45 and H.tileAligned()
   end, 900, "stairs (40,18) -> the swap room (50,51)"),
@@ -358,11 +425,11 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- 3. wheel, fly to the base pass, walk the base, into the cave ------
-  H.navTo(40, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 6000 }),
+  H.navTo(40, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, summon = { [0] = {}, [5] = {} }, maxFrames = 6000 }),
   pressWalk("up", function() return map() == 6 end, 900,
     "door (40,10) -> the deck"),
   H.waitUntil(landed(6, 10), 1200, "deck again", 1),
-  H.navTo(14, 6, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 6000, calmFrames = 8 }),
+  H.navTo(14, 6, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, summon = { [0] = {}, [5] = {} }, maxFrames = 6000, calmFrames = 8 }),
   -- $0170 is SET on this chain, so the wheel opens dlg $052A and only an
   -- EDGE of A opens it -- LEFT+A edges until the choice list is up
   (function() local ph = 0
@@ -408,7 +475,7 @@ H.run({ maxFrames = 200000 }, {
     return H.fieldX() >= 9 and H.tileAligned() and H.hasControl()
   end, 2400, "held RIGHT off the entrance trigger row"),
   H.waitFrames(45),
-  H.navTo(30, 12, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 20000,
+  H.navTo(30, 12, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, summon = { [0] = {}, [5] = {} }, maxFrames = 20000,
     arrive = function() return H.worldMode() end }),
   pressWalk("right", function() return H.worldMode() end, 900,
     "east door (31,12) -> world (167,194)"),
@@ -423,7 +490,7 @@ H.run({ maxFrames = 200000 }, {
   H.fieldCare({ tag = "care entering the gate cave (382)", threshold = 0.85 }),
   H.openChest{ stand = { 36, 40 }, face = "up", bit = 122, what = "Assassin",
                nav = { playBattles = "flee" } },
-  H.navTo(31, 42, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 15000,
+  H.navTo(31, 42, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, summon = { [0] = {}, [5] = {} }, maxFrames = 15000,
     arrive = function() return map() == 383 end }),
   pressWalk("down", function() return map() == 383 end, 900,
     "door (31,43) -> BASEMENT 1 (383)"),
@@ -431,7 +498,7 @@ H.run({ maxFrames = 200000 }, {
   H.fieldCare({ tag = "care in BASEMENT 1 (383)", threshold = 0.85 }),
   H.openChest{ stand = { 48, 57 }, face = "up", bit = 123, what = "Tempest",
                nav = { playBattles = "flee" } },
-  H.navTo(53, 57, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 20000,
+  H.navTo(53, 57, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, summon = { [0] = {}, [5] = {} }, maxFrames = 20000,
     arrive = function() return map() == 385 end }),
   pressWalk("down", function() return map() == 385 end, 900,
     "door (53,58) -> BASEMENT 2 (385), the timed floor"),
@@ -491,7 +558,7 @@ H.run({ maxFrames = 200000 }, {
                nav = { playBattles = "flee", maxFrames = 20000 } },
   H.fieldCare({ tag = "care mid-BASEMENT 3, before the save-door loop",
                 threshold = 0.85 }),
-  H.navTo(62, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 30000 }),
+  H.navTo(62, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, summon = { [0] = {}, [5] = {} }, maxFrames = 30000 }),
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x0173) == 1 end, 3000, {
       H.call(function()
@@ -505,7 +572,7 @@ H.run({ maxFrames = 200000 }, {
     }, "face-UP+A on (62,11) -> $0173 (the save-room door)")
   end)(),
   H.waitFrames(60),
-  H.navTo(64, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 9000 }),
+  H.navTo(64, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, summon = { [0] = {}, [5] = {} }, maxFrames = 9000 }),
   pressWalk("up", function() return map() == 386 end, 1200,
     "held UP onto the save-room door (64,10) -> map 386"),
   H.waitUntil(landed(386, 10), 2400, "386 landing", 1),
@@ -517,7 +584,7 @@ H.run({ maxFrames = 200000 }, {
   H.openChest{ stand = { 77, 53 }, face = "up", bit = 68, what = "Tent",
                nav = { playBattles = "flee" } },
   H.fieldCare({ tag = "care before the gate-cave save", threshold = 0.95 }),
-  H.navTo(74, 54, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 9000 }),
+  H.navTo(74, 54, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, summon = { [0] = {}, [5] = {} }, maxFrames = 9000 }),
   (function()
     local phase, n, ph, calm = 0, 0, 0, 0
     local function calmPred()

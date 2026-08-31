@@ -25,7 +25,7 @@ CK=tools/tests/checkpoints
 step() {
   gen=$1 prev=$2 dir=$3 payload=$4
   echo "=== $dir <- $prev (via $gen) ==="
-  OT6_SRAM_CHECKPOINT="$CK/$prev" \
+  OT6_TIMEOUT=3600 OT6_SRAM_CHECKPOINT="$CK/$prev" \
   OT6_CAPTURE_SRM="$CK/$dir/$payload" \
     tools/tests/run.sh "tools/tests/$gen.lua" "build/states/last_$gen.log" \
     || { echo "STEP FAILED: $gen (build/states/last_$gen.log)"; exit 1; }
