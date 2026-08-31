@@ -382,9 +382,15 @@ H.run({ maxFrames = 400000 }, {
 
   -- So:
 
-  H.equipEsper(1, 0x11, { tag = "KIRIN -> SABIN (Cure)" }),
-  H.equipEsper(2, 0x00, { tag = "RAMUH -> LOCKE (Bolt)" }),
-  H.equipEsper(0, 0x03, { tag = "SIREN -> EDGAR (+4 speed)" }),
+  -- Rows computed LIVE from $1850 ((byte>>3)&3): the fled lineage's
+  -- hard-coded rows put KIRIN on whoever happened to sit at row 1, and
+  -- this lineage's party order differs.
+  H.equipEsper(function() return (H.readByte(0x1855) >> 3) & 3 end, 0x11,
+    { tag = "KIRIN -> SABIN (Cure)" }),
+  H.equipEsper(function() return (H.readByte(0x1851) >> 3) & 3 end, 0x00,
+    { tag = "RAMUH -> LOCKE (Bolt)" }),
+  H.equipEsper(function() return (H.readByte(0x1854) >> 3) & 3 end, 0x03,
+    { tag = "SIREN -> EDGAR (+4 speed)" }),
   H.call(function()
     local want = { [0x05] = 0x11, [0x01] = 0x00, [0x04] = 0x03 }
     local names = { [0x05] = "SABIN/KIRIN", [0x01] = "LOCKE/RAMUH",
