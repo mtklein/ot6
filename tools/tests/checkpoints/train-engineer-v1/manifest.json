@@ -2,8 +2,19 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "train-engineer.sram",
   "size": 32768,
-  "sha256": "unsealed",
+  "sha256": "d1c23ed80056e996816369ea6f870029abe76910f8622aad3d3dc2484460317a",
   "slot": 3,
   "milestone": "train-engineer",
-  "persistent_layout": "ot6-codex-o8-v1"
+  "persistent_layout": "ot6-codex-o8-v1",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "d1c23ed80056e996816369ea6f870029abe76910f8622aad3d3dc2484460317a",
+    "generator_sig": "6a7b60ddde9a0b01da58df909d731ccd0b299c930e4615908e2ade925b5da09d gen_seed_train",
+    "ancestors": [
+      {
+        "path": "build/states/train_done.stamp",
+        "sha256": "3e665999641e70f6b834350ad17bbdbb86f89524683b268f36ccf2343458a543"
+      }
+    ]
+  }
 }
