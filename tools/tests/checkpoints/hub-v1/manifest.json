@@ -2,8 +2,19 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "hub.sram",
   "size": 32768,
-  "sha256": "unsealed",
+  "sha256": "a8e07a8c251638b4e1cd251a563f749e36adb32420f065b1dfb657b97a387746",
   "slot": 3,
   "milestone": "hub",
-  "persistent_layout": "ot6-codex-o8-v1"
+  "persistent_layout": "ot6-codex-o8-v1",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "a8e07a8c251638b4e1cd251a563f749e36adb32420f065b1dfb657b97a387746",
+    "generator_sig": "5b725436aa9a051087679d16291a2a2363eb4d0b7178fafed774756a30366e1e gen_seed_hub",
+    "ancestors": [
+      {
+        "path": "build/states/scenario_hub.stamp",
+        "sha256": "59c500d99e07d5d3e34ed6dd26052796a284dcec71ae03c0f9e345e2df347152"
+      }
+    ]
+  }
 }
