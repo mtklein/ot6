@@ -369,28 +369,34 @@ H.run({ maxFrames = 300000 }, {
   --    not element, ThunderBlade is OT6_SLASH, and Shiva's break axis is
   --    slashing -- breaking her is how this fight is won.
 
-  H.equipLoadout(1, {
-    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-  }, { tag = "LOCKE Ifrit/Shiva kit" }),
-  -- The fighting lineage's bag holds one ThunderBlade, and LOCKE just took
-  -- it.  EDGAR's sword is already slash-class -- the Shiva break plan needs
-  -- the class, not that particular blade -- so the swap is conditional.
-  H.cond(function() return H.invSlotOf(0x0F) ~= nil end, {
-    H.equipLoadout(4, {
-      { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-    }, { tag = "EDGAR Ifrit/Shiva kit" }),
-  }, {
-    H.logStep("no spare ThunderBlade; EDGAR keeps his own slash sword"),
-    H.equipLoadout(4, {
-      { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-    }, { tag = "EDGAR Ifrit/Shiva kit (no blade swap)" }),
-  }),
-  H.equipLoadout(5, {
-    { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 },
-  }, { tag = "SABIN Ifrit/Shiva kit" }),
-  H.equipLoadout(6, {
-    { 0, 0x0A }, { 2, 0x6A }, { 3, 0x84 },
-  }, { tag = "CELES Ifrit/Shiva kit" }),
+  -- The kit lists were authored against the fled lineage's exact bag; the
+  -- fighting lineage carries different spares (more chests fought to, other
+  -- shops afforded).  Each slot equips best-effort: present -> worn,
+  -- absent -> the character keeps what they have, with a log.  The break
+  -- plan needs slash CLASS on all four, which every fallback preserves.
+  (function()
+    local KITS = {
+      { 1, "LOCKE",  { { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 } } },
+      { 4, "EDGAR",  { { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 } } },
+      { 5, "SABIN",  { { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 } } },
+      { 6, "CELES",  { { 0, 0x0A }, { 2, 0x6A }, { 3, 0x84 } } },
+    }
+    local steps = {}
+    for _, kit in ipairs(KITS) do
+      local char, name, pairs_ = kit[1], kit[2], kit[3]
+      for _, p in ipairs(pairs_) do
+        local slot, item = p[1], p[2]
+        local tag = string.format("%s Ifrit/Shiva kit slot %d", name, slot)
+        steps[#steps + 1] = H.cond(
+          function() return H.invSlotOf(item) ~= nil end,
+          { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
+          { H.logStep(string.format(
+              "%s: $%02X not in this lineage's bag; keeping current gear",
+              tag, item)) })
+      end
+    end
+    return H.cond(function() return true end, steps)
+  end)(),
   H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
   H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
   H.call(function()
