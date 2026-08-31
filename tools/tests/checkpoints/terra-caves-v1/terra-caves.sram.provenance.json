@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "476e37ad5b116ce1454350654645763d2835d515bedccf0957bb33287eb2bcce",
+  "generator_sig": "8e42758a1f45a5914b779690520c23e29ea9fe7a5d318cdadab218b84ff9301c gen_seed_terracave",
+  "ancestors": [
+    {
+      "path": "build/states/terra_clifftop.stamp",
+      "sha256": "5ba461b1a10e0f116baf0b6c4322696e7485a2ec6efaf7e4bd4f44fe5ea4e99c"
+    }
+  ]
+}
