@@ -1569,6 +1569,13 @@ function M.newFightDriver(tag, opts)
   -- row = scroll ($891f) + in-window row ($8927), the item window's shape
   -- (UpdateMenuState_1b / _c183f7, btlgfx_main.asm)
   local CMD_LORE, ST_LORE_OPEN, ST_LORE = 0x0C, 0x19, 0x1B
+  -- SHADOW's Throw: cmd $08 -> $2B (OpenThrowWindow builds wItemList) ->
+  -- $2D (item select) -> ST_TGT (probe_throw.lua; btlgfx
+  -- UpdateMenuState_2b/2d).  The skeans and their element bits:
+  -- Fire Skean $AB=fire($01), Water Edge $AC=water($80), Bolt Edge
+  -- $AD=bolt($04) (bosses-wob.md's element byte convention).
+  local CMD_THROW, ST_THROW_OPEN, ST_THROW = 0x08, 0x2B, 0x2D
+  local SKEAN_ELEM = { [0xAB] = 0x01, [0xAC] = 0x80, [0xAD] = 0x04 }
   local LSCROLL, LROW = 0x891F, 0x8927
   local MAXMP = 0x3C30
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
@@ -2089,6 +2096,30 @@ function M.newFightDriver(tag, opts)
       return { kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
                row = cmdRow(actor, CMD_BLITZ), boostLeft = boost }
     end
+    -- SHADOW throws an elemental skean when a present monster's REVEALED
+    -- weakness matches it (owner: unknown menus are missed opportunities --
+    -- "Shadow's throw can be useful").  Revealed-only keeps it honest (a
+    -- person acts on what the fight has shown); the skeans are bought for
+    -- exactly this (Fire Skean $AB, Water Edge $AC, Bolt Edge $AD -> fire/
+    -- water/bolt), and boost multiplies a thrown skean like any damage
+    -- verb.  Flow measured by probe_throw.lua: cmd $08 -> $2B builds
+    -- wItemList -> $2D selects -> ST_TGT.
+    if opts.tactical and opts.throw ~= false and id == 3
+       and cmdRow(actor, CMD_THROW) then
+      for item, elem in pairs(SKEAN_ELEM) do
+        if battInvIdx(item) then
+          for s = 0, 5 do
+            if M.readWord(0x3BFC + s * 2) > 0
+               and (M.readByte(0x3E91 + s * 2) & elem) ~= 0 then
+              M.log(string.format("[%s] SHADOW throws $%02X at slot %d "
+                .. "(revealed elem mask %02X)", tag or "fight", item, s, elem))
+              return { kind = "throw", item = item,
+                       row = cmdRow(actor, CMD_THROW), boostLeft = boost }
+            end
+          end
+        end
+      end
+    end
     local fight = cmdRow(actor, CMD_FIGHT)
     if fight == nil then return { kind = "switch" } end
     return { kind = "fight", row = fight, boostLeft = boost }
@@ -2096,7 +2127,10 @@ function M.newFightDriver(tag, opts)
 
   local KNOWN_ST = { [ST_CMD] = true, [ST_TGT] = true, [ST_ITEM] = true,
                      [ST_MAGIC] = true, [ST_ESPER] = true, [ST_TOOLS] = true,
-                     [ST_LORE] = true, [ST_LORE_OPEN] = true, [0x01] = true }
+                     [ST_LORE] = true, [ST_LORE_OPEN] = true, [0x01] = true,
+                     -- the Throw family (probe_throw.lua; btlgfx
+                     -- UpdateMenuState_2b/2c/2d): open, close, item select
+                     [ST_THROW_OPEN] = true, [0x2C] = true, [ST_THROW] = true }
   local function button(actor)
     local st = M.readByte(MSTATE)
     if st == ST_CMD then tgtSpin = 0 end
@@ -2222,6 +2256,36 @@ function M.newFightDriver(tag, opts)
       if cur < want then return { "down" } end
       if cur > want then return { "up" } end
       return { "a" }
+    end
+    if st == ST_THROW_OPEN and plan.kind == "throw" then
+      return nil                       -- the window is building; wait
+    end
+    if st == ST_THROW and plan.kind == "throw" then
+      -- the throw list is the tools shell's shape: wItemList $4005,
+      -- 3-byte rows, id $FF terminates.  Steer the tools cursor cells
+      -- toward the wanted row; if it cannot be reached, drop the plan
+      -- and back out rather than throw whatever sits under the cursor
+      -- (a wrong confirm here throws a WEAPON).
+      local want
+      for i = 0, 15 do
+        local rid = M.readByte(ITEMLIST + i * 3)
+        if rid == plan.item then want = i; break end
+        if rid == 0xFF then break end
+      end
+      if want == nil then plan, planActor = nil, nil; return { "b" } end
+      local wc, wr = want % 2, want // 2
+      local cc, cr = M.readByte(BLCOL + actor), M.readByte(BLROW + actor)
+      if cc == wc and cr == wr then return { "a" } end
+      tgtSpin = tgtSpin + 1
+      if tgtSpin >= 40 then
+        M.log(string.format("[%s] throw steer gave up (row %d,%d vs want "
+          .. "%d,%d) -- backing out, not throwing blind", tag or "fight",
+          cr, cc, wr, wc))
+        plan, planActor, tgtSpin = nil, nil, 0
+        return { "b" }
+      end
+      if cc ~= wc then return { wc > cc and "right" or "left" } end
+      return { wr > cr and "down" or "up" }
     end
     if st == ST_TOOLS and plan.kind == "skill" then
       local want

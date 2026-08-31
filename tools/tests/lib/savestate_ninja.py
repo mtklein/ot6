@@ -172,8 +172,13 @@ def emit_state_rules(w):
     w("# value's leading whitespace, so the separating spaces live HERE in")
     w("# the template (an empty splice leaves a harmless double space).")
     w("rule generate")
+    # Per-state logs (build/states/$state.log), not the shared last_run.log:
+    # the audits (audit_fenix's boss-vs-random rows, the unknown-menu TODO
+    # queue, party-cure firings) read per-segment logs, and one overwritten
+    # file keeps only the last edge of a wave.
     w("  command = OT6_WORKER=$state OT6_EXPECT_ARTIFACT='$expect' $env "
-      "tools/tests/run.sh tools/tests/$gen.lua && $stamps")
+      "tools/tests/run.sh tools/tests/$gen.lua build/states/$state.log "
+      "&& $stamps")
     w("  description = generate $state <- $gen")
     w("")
     w("# A stacked chain's boot is a finished chain's ending: a pure copy of")
