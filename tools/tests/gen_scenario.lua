@@ -592,7 +592,14 @@ H.run({ maxFrames = 700000 }, {
       "$0176 clear -- the ride's continuations are armed (every segment of the " ..
       "river ends `if_switch $0176=0, <next>`)")
     H.assertEq((H.readByte(0x185e) & 0x07) ~= 0, true, "BANON in the party")
-    H.log(string.format("[booted] map=%d (%d,%d)", map(), H.fieldX(), H.fieldY()))
+    -- The fighting lineage saves at the Mt. Kolts summit save point, which
+    -- consumes the one-time save-point tutorial ($0133) BEFORE this ride.
+    -- The (6,13) landing prompt (CHOICES[4]) then never fires: SavePoint's
+    -- $0133 gate takes its short, ctrl-restoring path.  Expect 4 prompts
+    -- only when the tutorial is still pending at boot.
+    H.vars.tutorialPending = (sw(0x0133) == 0)
+    H.log(string.format("[booted] map=%d (%d,%d) tutorialPending=%s",
+      map(), H.fieldX(), H.fieldY(), tostring(H.vars.tutorialPending)))
   end),
 
   -- ===================================================================== --
@@ -634,8 +641,11 @@ H.run({ maxFrames = 700000 }, {
     end
   end),
   H.call(function()
-    H.assertEq(ci, 4,
-      "all four prompts answered: board, fork 1, fork 2, save-point tutorial")
+    H.assertEq(ci, H.vars.tutorialPending and 4 or 3,
+      H.vars.tutorialPending
+        and "all four prompts answered: board, fork 1, fork 2, save-point tutorial"
+        or "all three prompts answered: board, fork 1, fork 2 (the save-point "
+           .. "tutorial was consumed at the summit save; $0133 short path)")
     H.assertEq(sw(0x0019), 1, "$0019 set -- the ride ran (_cb0657)")
     H.assertEq(sw(0x04FC), 1, "$04FC set -- _cb04b7 ran (the first landing)")
     H.assertEq(sw(0x04FD), 1, "$04FD set -- _cb04e6 ran (the second landing)")
