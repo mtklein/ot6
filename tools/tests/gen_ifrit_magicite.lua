@@ -372,9 +372,19 @@ H.run({ maxFrames = 300000 }, {
   H.equipLoadout(1, {
     { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
   }, { tag = "LOCKE Ifrit/Shiva kit" }),
-  H.equipLoadout(4, {
-    { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-  }, { tag = "EDGAR Ifrit/Shiva kit" }),
+  -- The fighting lineage's bag holds one ThunderBlade, and LOCKE just took
+  -- it.  EDGAR's sword is already slash-class -- the Shiva break plan needs
+  -- the class, not that particular blade -- so the swap is conditional.
+  H.cond(function() return H.invSlotOf(0x0F) ~= nil end, {
+    H.equipLoadout(4, {
+      { 0, 0x0F }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+    }, { tag = "EDGAR Ifrit/Shiva kit" }),
+  }, {
+    H.logStep("no spare ThunderBlade; EDGAR keeps his own slash sword"),
+    H.equipLoadout(4, {
+      { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
+    }, { tag = "EDGAR Ifrit/Shiva kit (no blade swap)" }),
+  }),
   H.equipLoadout(5, {
     { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 },
   }, { tag = "SABIN Ifrit/Shiva kit" }),
