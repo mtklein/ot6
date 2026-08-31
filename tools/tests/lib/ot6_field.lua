@@ -400,6 +400,21 @@ local function resolve(v) return type(v) == "function" and v() or v end
 -- control loss immediately on arrival (a step-on trigger, a scene); without
 -- control the run required is three times calmFrames.  Battle and dialog
 -- frames are excluded from the run.
+-- Human players FIGHT.  The route beelined by fleeing every encounter
+-- (playBattles="flee"), which pays ZERO xp and left the party badly
+-- under-leveled -- the level gap the chart documents, and the root cause
+-- of the fights that "needed" in-combat healing to scrape through.  With
+-- this true (the default), a "flee" navigation FIGHTS the encounter
+-- tactically instead -- leveling the party the way a person playing would
+-- -- while the tactical driver the flee mode already builds wins it.  A
+-- genuinely unwinnable encounter (a scripted set-piece that must be run)
+-- opts back out with playBattles="mustflee".
+M.FIGHT_NOT_FLEE = true
+local function wantsFlee(mode)
+  if mode == "mustflee" then return true end
+  return mode == "flee" and not M.FIGHT_NOT_FLEE
+end
+
 function M.navTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
@@ -436,7 +451,7 @@ function M.navTo(txIn, tyIn, opts)
   -- caller whose retry ladder reloads and retries.  Off by default.
   local wipeSeen = false
   local wipeCheck = wipeCanary("navTo", opts.wipeEndsRide)
-  local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
+  local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee" or opts.playBattles == "mustflee")
       and M.newFightDriver("navTo",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
@@ -513,7 +528,7 @@ function M.navTo(txIn, tyIn, opts)
           M.setPad({})                 -- goal fight: left alone for arrive()
           return
         end
-        if opts.playBattles == "flee" then
+        if wantsFlee(opts.playBattles) then
           flee(battN)
           return
         end
@@ -686,7 +701,7 @@ function M.advanceStory(pred, maxFrames, opts)
   -- caller that reloads and tries again.
   local wipeSeen = false
   local wipeCheck = wipeCanary("advanceStory", opts.wipeEndsRide)
-  local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
+  local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee" or opts.playBattles == "mustflee")
       and M.newFightDriver("advanceStory",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
@@ -735,7 +750,7 @@ function M.advanceStory(pred, maxFrames, opts)
           return
         end
         -- same contract as navTo's, cap included.
-        if opts.playBattles == "flee" then
+        if wantsFlee(opts.playBattles) then
           flee(battN)
           return
         end
@@ -953,7 +968,7 @@ function M.worldNavTo(txIn, tyIn, opts)
   -- a caller that reloads and retries.  Off by default.
   local wipeSeen = false
   local wipeCheck = wipeCanary("worldNavTo", opts.wipeEndsRide)
-  local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
+  local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee" or opts.playBattles == "mustflee")
       and M.newFightDriver("worldNavTo",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
@@ -1017,7 +1032,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
-        if opts.playBattles == "flee"
+        if wantsFlee(opts.playBattles)
            or (flee and next(fleeSet) and M.formationHas(fleeSet)) then
           flee(battN)
           return
@@ -3294,5 +3309,100 @@ function M.clearGateSoldier(probeX, probeY, tag)
     end),
   }, {
     M.logStep(function() return tag .. ": the lane is already open" end),
+  })
+end
+
+-- ---------------------------------------------------------------- saveGame --
+-- Save the game through the real Save UI, as a step: open the menu (X),
+-- cursor to the Save row, pick a slot, confirm, verify with the
+-- CopyGameDataToSRAM exec hook plus SRAM $307ff0, and close back out.
+-- Works anywhere the game itself allows saving -- a save-point tile
+-- ($01BF set by the shared SavePoint script) or the world map -- and
+-- asserts $0201 bit7 (the menu's own save-enable) rather than guessing.
+--
+-- This exists so story generators can save at the save points they pass,
+-- the way a person plays.  Battery SRAM rides inside .mss savestates, so
+-- a later `gen_seed_*` cutter can boot the segment's state and let
+-- run.sh's OT6_CAPTURE_SRM lift the battery -- the seed is the save made
+-- here, with no replay and no navigation in the cutter.
+--
+-- opts: slot (1-3, default 3), tag, maxFrames (whole drive, default 4000).
+function M.saveGame(opts)
+  opts = opts or {}
+  local slot = opts.slot or 3
+  local tag = opts.tag or ("save slot " .. slot)
+  local ZMENUSTATE, SAVE_SELECT = 0x26, 0x14
+  local saveArg = nil
+  local function menuOpen() return M.readByte(0x59) ~= 0 end
+  return M.seqStep({
+    -- open the menu; on the world map $59 rides the same flow
+    (function() local calm, ph = 0, 0
+      return M.driveUntil(function()
+        calm = (menuOpen() and M.readByte(ZMENUSTATE) == 0x05) and calm + 1 or 0
+        return calm >= 20
+      end, opts.maxFrames or 4000, {
+        M.call(function()
+          ph = (ph + 1) % 48
+          -- the first save point a save ever meets runs the SavePoint
+          -- tutorial dialog ($0133); page it before pressing X, or the
+          -- press lands in a dialog and the menu never opens
+          if M.dialogWaiting() then
+            M.setPad(ph % 8 < 4 and { "a" } or {}); return
+          end
+          if menuOpen() then M.setPad({}); return end
+          M.setPad(ph < 6 and { "x" } or {})
+        end),
+      }, tag .. ": main menu open")
+    end)(),
+    M.waitFrames(20),
+    M.call(function()
+      M.assertEq((M.readByte(0x0201) & 0x80) ~= 0, true,
+        tag .. ": $0201 bit7 SET -- the game allows saving here")
+      local entry = M.sym("CopyGameDataToSRAM")
+      emu.addMemoryCallback(function()
+        saveArg = emu.getState()["cpu.a"] & 0xff
+      end, emu.callbackType.exec, entry, entry)
+    end),
+    M.driveUntil(function()
+      return M.readByte(ZMENUSTATE) == 0x05 and M.readByte(0x4b) == 6
+    end, 600, {
+      M.pressButtons({ "up" }, 4), M.waitFrames(16),
+    }, tag .. ": cursor on Save"),
+    M.pressButtons({ "a" }, 4),
+    M.waitUntil(function() return M.readByte(ZMENUSTATE) == SAVE_SELECT end,
+      600, tag .. ": save-slot selection", 5),
+    M.driveUntil(function()
+      return M.readByte(ZMENUSTATE) == SAVE_SELECT
+         and M.readByte(0x4b) == slot - 1
+    end, 600, {
+      M.pressButtons({ "down" }, 4), M.waitFrames(16),
+    }, tag .. ": cursor on the slot"),
+    M.driveUntil(function()
+      return saveArg == slot
+         and emu.read(0x307ff0, emu.memType.snesMemory) == slot
+    end, 1800, {
+      M.pressButtons({ "a" }, 4), M.waitFrames(20),
+    }, tag .. ": CopyGameDataToSRAM ran (exec hook + $307ff0)"),
+    M.waitFrames(90),
+    M.call(function()
+      M.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), slot,
+        tag .. ": SRAM $307ff0 records the slot")
+      M.assertEq(emu.read(0x316800 - 0xb00 * (3 - slot), emu.memType.snesMemory)
+        ~= nil, true, tag .. ": slot region readable")
+      M.log(string.format("[%s] real Save UI wrote slot %d", tag, slot))
+    end),
+    -- close the menu; field and world settle differently, so accept either
+    (function() local calm = 0
+      return M.driveUntil(function()
+        local closed = not menuOpen()
+        local settled = M.worldMode() and M.worldHasControl()
+            or (M.hasControl() and M.tileAligned())
+        calm = (closed and settled) and calm + 1 or 0
+        return calm >= 20
+      end, 1200, {
+        M.pressButtons({ "b" }, 4), M.waitFrames(20),
+      }, tag .. ": menu closed")
+    end)(),
+    M.waitFrames(30),
   })
 end
