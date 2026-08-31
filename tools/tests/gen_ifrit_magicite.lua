@@ -413,10 +413,14 @@ H.run({ maxFrames = 300000 }, {
     -- strongest one held wins, and single copies allocate themselves
     -- (LOCKE equips before EDGAR, so EDGAR's ladder picks from what
     -- remains).
+    -- Every id below is mask-checked against its wearer (item_prop +1
+    -- equip mask): Ashura is Cyan-only and RegalCutlass excludes LOCKE,
+    -- which is why his offhand ladder is daggers (Guardian, his own
+    -- scenario blade, is the strongest he can hold).
     local KITS = {
-      { 1, "LOCKE",  { { 0, 0x0F }, { 1, 0x01 }, { 1, 0x2B }, { 1, 0x0B },
+      { 1, "LOCKE",  { { 0, 0x0F }, { 1, 0x00 }, { 1, 0x01 }, { 1, 0x02 },
                        { 2, 0x69 }, { 3, 0x84 } } },
-      { 4, "EDGAR",  { { 0, 0x2B }, { 0, 0x0B }, { 0, 0x0F },
+      { 4, "EDGAR",  { { 0, 0x0A }, { 0, 0x0B }, { 0, 0x0F },
                        { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 } } },
       { 5, "SABIN",  { { 0, 0x53 }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 } } },
       { 6, "CELES",  { { 0, 0x0A }, { 2, 0x6A }, { 3, 0x84 } } },
