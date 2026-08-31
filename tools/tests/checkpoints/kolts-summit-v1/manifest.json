@@ -2,18 +2,18 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "kolts-summit.sram",
   "size": 32768,
-  "sha256": "f282070344dbb2ee3fd5f7901209b2a8aaee7e3180a0d10938599a941580e42f",
+  "sha256": "491bbf65f69b6f4c23241605c36fcc4b81a934da08093bb54b7f8d240914cedd",
   "slot": 3,
   "milestone": "kolts-summit",
   "persistent_layout": "ot6-codex-o8-v1",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "f282070344dbb2ee3fd5f7901209b2a8aaee7e3180a0d10938599a941580e42f",
-    "generator_sig": "553c22e96ed6c444621cbb4de84e76a30b5c750920ef24d7d9138c2caec4593b gen_seed_summit",
+    "payload_sha256": "491bbf65f69b6f4c23241605c36fcc4b81a934da08093bb54b7f8d240914cedd",
+    "generator_sig": "fa8413c1d04648464c0258f5dff0652bf5a494b08a15224a459902fa03695540 gen_seed_summit",
     "ancestors": [
       {
         "path": "build/states/vargas_entry.stamp",
-        "sha256": "65884bbc032a5e6a2222bcbf9da713f0c20076f2dbb3ae1a57abb72ac5ad5b42"
+        "sha256": "4e06983e96553bf73775104855112994bc452704098152d29b1d23144da44e93"
       }
     ]
   }

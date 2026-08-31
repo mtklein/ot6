@@ -9,11 +9,11 @@
   "provenance": {
     "format": "ot6-provenance/v1",
     "payload_sha256": "147084bb7d895fe2d7c3c3a963f81c381c783b0889d24b1141a9378e7ae6a559",
-    "generator_sig": "0087bea2d15de4e6a6173c403d0f8554392c78e1b4251ecbc830e44526fe0f38 gen_seed_worldnarshe",
+    "generator_sig": "8f9b52bced5e1ec0fd391a8d888c0bd529f95552541c5fe4fbdefdc7bb8e93a2 gen_seed_worldnarshe",
     "ancestors": [
       {
         "path": "build/states/worldmap_narshe.stamp",
-        "sha256": "985597074245021352764d419574b3867cc4eb2949313f0d16f3cfdb39b1aab1"
+        "sha256": "d5d7ca3f0a08a45b715cd2ef9c7edc36cf39bc0501aceece359e53f893e8a260"
       }
     ]
   }
