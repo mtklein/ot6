@@ -1599,6 +1599,7 @@ function M.newFightDriver(tag, opts)
   local menuStreak, tick, battleTick = 0, 0, 0
   local plan, planActor, held = nil, nil, {}
   local tgtSpin = 0                    -- frames spent undecided in ST_TGT
+  local unknownSt, unknownN = nil, 0   -- unknown-menu-state stall guard
   -- The two numbers the heal policy weighs against each other, both measured
   -- in the fight rather than assumed.  See the policy note in makePlan.
   local roundCost = {}                 -- entity -> worst HP lost per own turn
@@ -2093,9 +2094,31 @@ function M.newFightDriver(tag, opts)
     return { kind = "fight", row = fight, boostLeft = boost }
   end
 
+  local KNOWN_ST = { [ST_CMD] = true, [ST_TGT] = true, [ST_ITEM] = true,
+                     [ST_MAGIC] = true, [ST_ESPER] = true, [ST_TOOLS] = true,
+                     [ST_LORE] = true, [ST_LORE_OPEN] = true, [0x01] = true }
   local function button(actor)
     local st = M.readByte(MSTATE)
     if st == ST_CMD then tgtSpin = 0 end
+    -- Unknown-menu-state stall guard, on EVERY path (plan or no plan): the
+    -- Phantom Train wipe was SHADOW's Throw list ($24), a state this driver
+    -- does not know, holding its menu open while the ghosts chipped the
+    -- party down.  A person mashes B out of a menu they did not mean to
+    -- open: after ~90 frames stuck in one unknown state, drop any plan and
+    -- back out.  Transitional states pass through in far fewer frames.
+    if M.readByte(MENU) ~= 0 and not KNOWN_ST[st] then
+      if st == unknownSt then unknownN = unknownN + 1
+      else unknownSt, unknownN = st, 1 end
+      if unknownN > 90 then
+        M.log(string.format("[%s] unknown menu state $%02X held %d frames "
+          .. "-- backing out (B)", tag or "fight", st, unknownN))
+        unknownSt, unknownN = nil, 0
+        plan, planActor = nil, nil
+        return { "b" }
+      end
+    else
+      unknownSt, unknownN = nil, 0
+    end
     -- The lore stall guard, checked wherever a lore plan is live rather
     -- than only at plan time: a pursuit wedged inside the window (the
     -- wrong-row failure mode) never returns to makePlan on its own.
