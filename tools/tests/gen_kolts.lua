@@ -1161,6 +1161,17 @@ H.run({ maxFrames = 700000 }, {
   crossTo(35, 50, 100, "K6 bridge -> shelf B", "tactical"),
   crossTo(58, 45, 97, "K7 shelf B -> cave 97", "tactical"),
   crossTo(55, 10, 103, "K8 cave 97 -> the summit", "tactical"),
+  -- The summit save point (57,8) -- vanilla's pre-Vargas save, taken the
+  -- way a person takes it.  The battery save rides inside kolts-era .mss
+  -- states (vargas_entry included), so gen_seed_summit.lua lifts it as
+  -- the kolts-summit-v1 SRM seed with no replay.
+  H.navTo(57, 8, { maxFrames = 8000, playBattles = "tactical" }),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true,
+      "$01BF SET -- stood on the summit save point (57,8)")
+  end),
+  H.saveGame({ tag = "summit save" }),
   crossTo(60, 9, 98, "K9 summit -> VARGAS's ledge", "tactical"),
 
   H.call(function()

@@ -731,6 +731,23 @@ H.run({ maxFrames = 300000 }, {
                nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   H.openChest{ stand = { 22, 56 }, face = "up", bit = 29, what = "(empty)",
                nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+  -- The basement save point (53,57) -- vanilla's, passed like a person
+  -- passes it on the escape.  Tolerant: if the tile proves unreachable
+  -- from this side of the maze, log and move on rather than fail the
+  -- scenario; the lifter (gen_seed_basement.lua) asserts the save is
+  -- really aboard before cutting the seed.
+  H.cond(function() return H.bfsPath(53, 57) ~= nil end, {
+    H.navTo(53, 57, { maxFrames = 12000, playBattles = "flee",
+                      fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
+    H.waitFrames(30),
+    H.call(function()
+      H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true,
+        "$01BF SET -- the basement save point (53,57)")
+    end),
+    H.saveGame({ tag = "basement save" }),
+  }, {
+    H.logStep("basement save point (53,57) not reachable from here; skipped"),
+  }),
   windClock(),
   go(15, 51, 87, 20, 33, "clock passage (15,51) -> map 87 (20,33)"),
   H.fieldCare({ tag = "care before the basement shelf", threshold = 0.95 }),

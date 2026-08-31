@@ -1245,6 +1245,21 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(sw(0x185), 0, "$0185 -- valve 2 open")
     H.assertEq(sw(0x186), 1, "$0186 -- valve 3 shut")
   end),
+  -- The engineer-room save point (20,10) -- vanilla's, taken in passing
+  -- before the GhostTrain.  gen_seed_train.lua lifts the battery riding
+  -- train_done.mss as the train-engineer-v1 seed.  Tolerant: skip with a
+  -- log rather than fail the scenario if the tile proves unreachable.
+  H.cond(function() return H.bfsPath(20, 10) ~= nil end, {
+    nav(20, 10, { maxFrames = 5000 }),
+    H.waitFrames(30),
+    H.call(function()
+      H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true,
+        "$01BF SET -- the engineer save point (20,10)")
+    end),
+    H.saveGame({ tag = "engineer save" }),
+  }, {
+    H.logStep("engineer save point (20,10) not reachable; skipped"),
+  }),
   nav(8, 13, { maxFrames = 5000, arrive = function()
     return mapIdx() == 141 end }),
   settle(141, "outside again"),

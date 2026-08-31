@@ -375,6 +375,21 @@ H.run({ maxFrames = 250000 }, {
     H.log(string.format("[map 49 -> map 50] f%d (%d,%d) encounters=%d",
       H.frame, H.fieldX(), H.fieldY(), #encounters))
   end),
+  -- The map-50 cave save point (66,41) -- vanilla's, taken in passing on
+  -- the way up.  gen_seed_terracave.lua lifts the battery riding
+  -- terra_clifftop.mss as the terra-caves-v1 seed.  Tolerant: skip with
+  -- a log rather than fail the scenario if the tile proves unreachable.
+  H.cond(function() return H.bfsPath(66, 41) ~= nil end, {
+    H.navTo(66, 41, { maxFrames = 20000, playBattles = "tactical" }),
+    H.waitFrames(30),
+    H.call(function()
+      H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true,
+        "$01BF SET -- the map-50 save point (66,41)")
+    end),
+    H.saveGame({ tag = "terra cave save" }),
+  }, {
+    H.logStep("map-50 save point (66,41) not reachable from here; skipped"),
+  }),
   cross(79, 58, 20, 27,  8, { { 37, 24 }, { 49, 11 }, { 49, 21 } },
         "map 50 -> the clifftop", 60000),
 
