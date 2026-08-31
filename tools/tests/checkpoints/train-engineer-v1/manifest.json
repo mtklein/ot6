@@ -1,0 +1,9 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "train-engineer.sram",
+  "size": 32768,
+  "sha256": "unsealed",
+  "slot": 3,
+  "milestone": "train-engineer",
+  "persistent_layout": "ot6-codex-o8-v1"
+}

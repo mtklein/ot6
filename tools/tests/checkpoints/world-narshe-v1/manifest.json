@@ -1,0 +1,20 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "world-narshe.sram",
+  "size": 32768,
+  "sha256": "147084bb7d895fe2d7c3c3a963f81c381c783b0889d24b1141a9378e7ae6a559",
+  "slot": 3,
+  "milestone": "world-narshe",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "147084bb7d895fe2d7c3c3a963f81c381c783b0889d24b1141a9378e7ae6a559",
+    "generator_sig": "0087bea2d15de4e6a6173c403d0f8554392c78e1b4251ecbc830e44526fe0f38 gen_seed_worldnarshe",
+    "ancestors": [
+      {
+        "path": "build/states/worldmap_narshe.stamp",
+        "sha256": "985597074245021352764d419574b3867cc4eb2949313f0d16f3cfdb39b1aab1"
+      }
+    ]
+  }
+}
