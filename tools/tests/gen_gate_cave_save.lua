@@ -254,7 +254,7 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("right", function() return map() == 7 end, 900,
     "held RIGHT along row 6 -> deck door (20,6) -> map 7"),
   H.waitUntil(landed(7, 10), 1200, "map 7 landing", 1),
-  H.navTo(40, 17, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, maxFrames = 9000 }),
+  H.navTo(40, 17, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 9000 }),
   pressWalk("down", function()
     return H.fieldY() >= 45 and H.tileAligned()
   end, 900, "stairs (40,18) -> the swap room (50,51)"),
@@ -330,6 +330,20 @@ H.run({ maxFrames = 200000 }, {
   fill(CH_TERRA, 0, 0, 0x0A, "TERRA MithrilBlade"),
   fill(CH_TERRA, 0, 0, 0x01, "TERRA MithrilKnife"),
   fill(CH_TERRA, 0, 0, 0x00, "TERRA Dirk"),
+  -- The cave's pool is the coverage table's "spirits: bludgeon-immune,
+  -- arcane-elemental" -- four fights of unmoved sh4 proved no physical
+  -- class chips here, and the Ninjas ABSORB fire.  The keys the party
+  -- can field: RAMUH's Bolt on TERRA and SHIVA's Ice on SABIN (worn
+  -- since the terra-returned cut; re-equipped only if lost, because an
+  -- A on a worn stone REMOVES it).
+  H.cond(function() return gear(CH_TERRA, 0x1E) ~= 0x00 end, {
+    H.equipEsper(function() return ordOf(CH_TERRA) end, 0x00,
+      { tag = "RAMUH -> TERRA (Bolt for the spirits)" }),
+  }, {}),
+  H.cond(function() return gear(5, 0x1E) ~= 0x02 end, {
+    H.equipEsper(function() return ordOf(5) end, 0x02,
+      { tag = "SHIVA -> SABIN (Ice for the spirits)" }),
+  }, {}),
   fill(CH_TERRA, 0, 2, 0x6A, "TERRA Hair Band"),
   fill(CH_TERRA, 0, 3, 0x84, "TERRA LeatherArmor"),
   H.waitUntil(landed(7, 10), 2400, "map 7 control back after the equip stop", 1),
@@ -344,11 +358,11 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- 3. wheel, fly to the base pass, walk the base, into the cave ------
-  H.navTo(40, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, maxFrames = 6000 }),
+  H.navTo(40, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 6000 }),
   pressWalk("up", function() return map() == 6 end, 900,
     "door (40,10) -> the deck"),
   H.waitUntil(landed(6, 10), 1200, "deck again", 1),
-  H.navTo(14, 6, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, maxFrames = 6000, calmFrames = 8 }),
+  H.navTo(14, 6, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 6000, calmFrames = 8 }),
   -- $0170 is SET on this chain, so the wheel opens dlg $052A and only an
   -- EDGE of A opens it -- LEFT+A edges until the choice list is up
   (function() local ph = 0
@@ -394,7 +408,7 @@ H.run({ maxFrames = 200000 }, {
     return H.fieldX() >= 9 and H.tileAligned() and H.hasControl()
   end, 2400, "held RIGHT off the entrance trigger row"),
   H.waitFrames(45),
-  H.navTo(30, 12, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, maxFrames = 20000,
+  H.navTo(30, 12, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 20000,
     arrive = function() return H.worldMode() end }),
   pressWalk("right", function() return H.worldMode() end, 900,
     "east door (31,12) -> world (167,194)"),
@@ -409,7 +423,7 @@ H.run({ maxFrames = 200000 }, {
   H.fieldCare({ tag = "care entering the gate cave (382)", threshold = 0.85 }),
   H.openChest{ stand = { 36, 40 }, face = "up", bit = 122, what = "Assassin",
                nav = { playBattles = "flee" } },
-  H.navTo(31, 42, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, maxFrames = 15000,
+  H.navTo(31, 42, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 15000,
     arrive = function() return map() == 383 end }),
   pressWalk("down", function() return map() == 383 end, 900,
     "door (31,43) -> BASEMENT 1 (383)"),
@@ -417,7 +431,7 @@ H.run({ maxFrames = 200000 }, {
   H.fieldCare({ tag = "care in BASEMENT 1 (383)", threshold = 0.85 }),
   H.openChest{ stand = { 48, 57 }, face = "up", bit = 123, what = "Tempest",
                nav = { playBattles = "flee" } },
-  H.navTo(53, 57, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, maxFrames = 20000,
+  H.navTo(53, 57, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 20000,
     arrive = function() return map() == 385 end }),
   pressWalk("down", function() return map() == 385 end, 900,
     "door (53,58) -> BASEMENT 2 (385), the timed floor"),
@@ -477,7 +491,7 @@ H.run({ maxFrames = 200000 }, {
                nav = { playBattles = "flee", maxFrames = 20000 } },
   H.fieldCare({ tag = "care mid-BASEMENT 3, before the save-door loop",
                 threshold = 0.85 }),
-  H.navTo(62, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, maxFrames = 30000 }),
+  H.navTo(62, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 30000 }),
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x0173) == 1 end, 3000, {
       H.call(function()
@@ -491,7 +505,7 @@ H.run({ maxFrames = 200000 }, {
     }, "face-UP+A on (62,11) -> $0173 (the save-room door)")
   end)(),
   H.waitFrames(60),
-  H.navTo(64, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, maxFrames = 9000 }),
+  H.navTo(64, 11, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 9000 }),
   pressWalk("up", function() return map() == 386 end, 1200,
     "held UP onto the save-room door (64,10) -> map 386"),
   H.waitUntil(landed(386, 10), 2400, "386 landing", 1),
@@ -503,7 +517,7 @@ H.run({ maxFrames = 200000 }, {
   H.openChest{ stand = { 77, 53 }, face = "up", bit = 68, what = "Tent",
                nav = { playBattles = "flee" } },
   H.fieldCare({ tag = "care before the gate-cave save", threshold = 0.95 }),
-  H.navTo(74, 54, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, maxFrames = 9000 }),
+  H.navTo(74, 54, { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 2 }, [5] = { spell = 1 } }, maxFrames = 9000 }),
   (function()
     local phase, n, ph, calm = 0, 0, 0, 0
     local function calmPred()
