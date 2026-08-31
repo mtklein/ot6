@@ -9,12 +9,7 @@
   "provenance": {
     "format": "ot6-provenance/v1",
     "payload_sha256": "b3a26ccd054faeaf5d89440f45d3af1f34605730b059873cd853f2590cdd3773",
-    "generator_sig": "e29f0fa053a95171cd5f1c2eb3f5f3e7b8a8bc59428a151c8ab76fc875988c7a gen_seed_worldsfigaro",
-    "ancestors": [
-      {
-        "path": "build/states/south_figaro.stamp",
-        "sha256": "645795371c3b5d04f16777821811a1c4ac225327b31302305020e77d0bb9341e"
-      }
-    ]
+    "generator_sig": "40adbea5160ea1f161166bb0993984ee3299779e85d338066a25671c7be783da gen_seed_worldsfigaro",
+    "ancestors": []
   }
 }

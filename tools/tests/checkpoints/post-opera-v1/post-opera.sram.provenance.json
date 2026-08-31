@@ -2,10 +2,5 @@
   "format": "ot6-provenance/v1",
   "payload_sha256": "d8c8b2e52ac7492d17d8b6ab1b73251461894108b6f3a12035c0bf1da8bd3adb",
   "generator_sig": "3d6d913c8f0d516c471b9317cb666b06c0e174befa80f560b9e06af488d53991 gen_post_opera_checkpoint",
-  "ancestors": [
-    {
-      "path": "build/states/blackjack.stamp",
-      "sha256": "5b854ec0457ec565f7def7bafe75b17e9c07a547ce210b82e63137e2d431484b"
-    }
-  ]
+  "ancestors": []
 }

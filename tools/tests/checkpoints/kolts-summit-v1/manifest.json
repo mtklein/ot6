@@ -9,12 +9,7 @@
   "provenance": {
     "format": "ot6-provenance/v1",
     "payload_sha256": "491bbf65f69b6f4c23241605c36fcc4b81a934da08093bb54b7f8d240914cedd",
-    "generator_sig": "fa8413c1d04648464c0258f5dff0652bf5a494b08a15224a459902fa03695540 gen_seed_summit",
-    "ancestors": [
-      {
-        "path": "build/states/vargas_entry.stamp",
-        "sha256": "4e06983e96553bf73775104855112994bc452704098152d29b1d23144da44e93"
-      }
-    ]
+    "generator_sig": "769dbf8c7981ec6659d8fb7934da7dd06624406184a422fb2aee92209ae25b33 gen_seed_summit",
+    "ancestors": []
   }
 }

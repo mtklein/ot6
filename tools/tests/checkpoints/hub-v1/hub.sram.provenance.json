@@ -1,11 +1,6 @@
 {
   "format": "ot6-provenance/v1",
   "payload_sha256": "c0c4896ab3318504579c1a9c8761e6490d4f32a4acc7397cd51678366c212e53",
-  "generator_sig": "999c73601ba445355cc0bdbe3700b969316f84aad6c16b005084c6b8979a15d8 gen_seed_hub",
-  "ancestors": [
-    {
-      "path": "build/states/scenario_hub.stamp",
-      "sha256": "59f8d7f88628d62f99ee2d1ee4c628bc5983c33d62d514cba97c14890d3a2555"
-    }
-  ]
+  "generator_sig": "089c346b247f297b9d3e68edc85fcc0a92c9e306f96072e3dfabdd96f5b009f0 gen_seed_hub",
+  "ancestors": []
 }
