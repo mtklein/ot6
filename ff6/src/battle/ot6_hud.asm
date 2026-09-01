@@ -1835,6 +1835,35 @@ Ot6ShieldTbl:
                                 ;   display saturates but the count is true)
         .word   $0118
         .byte   5, OT6_SLASH|OT6_PIERCE ; nerapa: sprint fight, low gauge
+        ; ---- the sealed gate cave (maps 382-386) -----------------------
+        ; The fled lineage never fought here, so the area shipped on floor
+        ; rows the mission party cannot answer: measured (2026-09-01, 14
+        ; rounds of honest play), an L23 TERRA/LOCKE/EDGAR/SABIN dealt the
+        ; $082+$048 trio ~150 of its 4191 HP in five rounds.  Vanilla's
+        ; own element bits carry the area's language -- HOLY on four of
+        ; five species (AuraBolt is the master key the story party holds
+        ; from L6), fire on the behemoth but ABSORBED by the ninja (the
+        ; area's absorb lesson) -- and stay untouched.  These rows add the
+        ; class axis the coverage rule requires: every body chippable by
+        ; the forced party's own hands.
+        .word   $006E
+        .byte   2, OT6_PIERCE|OT6_SLASH ; ninja: an assassin in cloth --
+                                ;   a blade finds him.  ice|holy vanilla;
+                                ;   absorbs fire (the trap stays)
+        .word   $00E5
+        .byte   2, OT6_SLASH|OT6_BLUDG  ; spirit: swept apart or beaten
+                                ;   through.  holy vanilla
+        .word   $00B3
+        .byte   2, OT6_SLASH    ; the soft flier; ice vanilla
+        .word   $0048
+        .byte   3, OT6_PIERCE|OT6_BLUDG ; the shelled tank, in threes:
+                                ;   AutoCrossbow sweeps the stack, fists
+                                ;   crack the shell.  holy|water vanilla
+        .word   $0082
+        .byte   4, OT6_BLUDG|OT6_SLASH  ; the brute: miniboss-grade gauge;
+                                ;   fire|holy vanilla is the elemental
+                                ;   reward for reading past the ninja's
+                                ;   absorb
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

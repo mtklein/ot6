@@ -2106,7 +2106,7 @@ function M.newFightDriver(tag, opts)
     end
     if opts.tactical and id == 5 and M.readWord(CURMP + actor * 2) >= 4
        and cmdRow(actor, CMD_BLITZ) then
-      return { kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
+      return { kind = "skill", cmd = CMD_BLITZ, skill = opts.blitz or PUMMEL,
                row = cmdRow(actor, CMD_BLITZ), boostLeft = boost }
     end
     -- SHADOW throws an elemental skean when a present monster's REVEALED

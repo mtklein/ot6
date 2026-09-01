@@ -457,7 +457,7 @@ function M.navTo(txIn, tyIn, opts)
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic,
-          tool = opts.tool }) or nil
+          tool = opts.tool, blitz = opts.blitz }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   -- the heal-after-every-battle directive: once a mid-walk battle
   -- resolves, run a between-battles care stop (M.newCareDriver, soft)
@@ -707,7 +707,7 @@ function M.advanceStory(pred, maxFrames, opts)
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic,
-          tool = opts.tool }) or nil
+          tool = opts.tool, blitz = opts.blitz }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   -- heal-after-every-battle: see navTo's care block; same contract here
   local careD, sawBattle = nil, false
@@ -974,7 +974,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic,
-          tool = opts.tool }) or nil
+          tool = opts.tool, blitz = opts.blitz }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   -- heal-after-every-battle: see navTo's care block; same contract here,
   -- run once the post-battle world reload has fully settled
