@@ -440,10 +440,34 @@ H.run({ maxFrames = 480000 }, {
   -- Ralph/Wyvern XP zone.  Every level-up fully restores HP/MP (the OT6
   -- rule), so the loop part-sustains itself.  Capped legs; goal 21.
   (function()
-    local steps = {}
-    for leg = 1, 40 do
+    -- Ask the ENGINE for the pacing ground: census a candidate grid with
+    -- worldBfs from the pocket entrance, keep what is reachable, and ping
+    -- between the two farthest reachable points.  Offline tile-id guesses
+    -- failed twice; passability is the engine's own truth.
+    local ax, ay, bx, by
+    local steps = {
+      H.call(function()
+        local reach = {}
+        for y = 188, 200, 2 do
+          for x = 166, 184, 2 do
+            local p = H.worldBfs(x, y)
+            if p then reach[#reach + 1] = { x, y, #p } end
+          end
+        end
+        H.assertEq(#reach >= 2, true,
+          "the east pocket has at least two reachable pacing points")
+        table.sort(reach, function(u, v) return u[3] > v[3] end)
+        -- farthest from the entrance, and the entrance-est point
+        ax, ay = reach[1][1], reach[1][2]
+        bx, by = reach[#reach][1], reach[#reach][2]
+        H.log(string.format("[grind] pacing (%d,%d) <-> (%d,%d) "
+          .. "(census: %d reachable)", ax, ay, bx, by, #reach))
+      end),
+    }
+    for leg = 1, 80 do
       steps[#steps + 1] = H.cond(function() return maxLvl() < 21 end, {
-        H.worldNavTo(leg % 2 == 1 and 180 or 172, 191, {
+        H.worldNavTo(function() return leg % 2 == 1 and ax or bx end,
+                     function() return leg % 2 == 1 and ay or by end, {
           maxFrames = 45000, playBattles = "tactical",
           careThreshold = 0.7, healPercent = 45,
           magic = { [0] = { spell = 2 } }, summon = { [0] = {} } }),
