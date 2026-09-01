@@ -452,6 +452,18 @@ check("verdict_selftest", "sh tools/tests/run.sh --verdict-selftest",
 check("boss_rows", "python3 tools/check_boss_rows.py",
       ["tools/check_boss_rows.py", "docs/design/bosses-wob.md",
        "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm"])
+# THE RATCHET (owner, 2026-09-01): zero no-key formations anywhere, as a
+# hard build gate -- an encounter nobody can chip cannot ship, so a
+# claimed-tuned area deterministically cannot hide one.  The audit's
+# party-hands model may only tighten.
+check("break_coverage_ratchet", "python3 tools/audit_break_coverage.py",
+      ["tools/audit_break_coverage.py", "build/ot6.sfc",
+       "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break_floor.inc",
+       "ff6/src/field/sub_battle_group.dat",
+       "ff6/src/field/rand_battle_group.dat",
+       "ff6/src/field/world_battle_group.dat",
+       "ff6/src/battle/battle_monsters.dat",
+       "ff6/src/battle/monster_prop.dat"])
 check("break_reach", "python3 tools/check_break_reach.py",
       ["tools/check_break_reach.py"] + glob("src/battle/ot6_*.asm", "ff6"))
 check("encounters_selftest", "python3 tools/audit_encounters.py --selftest",

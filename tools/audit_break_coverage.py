@@ -15,6 +15,16 @@ flags:
 
 Pure data, no emulator.  The Sealed Gate shipped exactly this hole; this
 audit exists so the next one is found by grep, not by fourteen wipes.
+
+THE RATCHET (owner, 2026-09-01): this audit is a BUILD GATE and its
+invariant is absolute -- ZERO no-key formations anywhere in the game.
+The invariant was established the day every measured hole was authored
+(kolts, zozo, the sealed gate), and from then on it may only TIGHTEN:
+any change to monster data, formations, the floor generator, or the
+authored table that opens a hole anywhere fails the build
+deterministically.  The party-hands model (broad kit today; the
+per-era coverage table is the planned tightening) may only grow more
+precise, never looser.
 """
 import json, os, sys
 
@@ -93,11 +103,13 @@ def species_key(sid):
 def formation_species(f):
     rec = bm[f*15:(f+1)*15]
     out = []
+    if len(rec) < 15: return out   # a group slot past the formation table
     for s in range(6):
         if rec[1] & (1 << s):
             out.append(rec[2+s] | (((rec[14] >> s) & 1) << 8))
     return out
 
+NOKEY = [0]
 def pool_report(tag, forms):
     lines = []
     for f in sorted(set(forms)):
@@ -107,6 +119,7 @@ def pool_report(tag, forms):
         unauth = [mname(s) for s, (a, _) in zip(sps, keys) if not a]
         if not any(ch for _, ch in keys):
             lines.append(f'  NO-KEY  form {f}: ' + ', '.join(mname(s) for s in sps))
+            NOKEY[0] += 1
         elif unauth:
             lines.append(f'  floor   form {f}: unauthored ' + ', '.join(sorted(set(unauth))))
     return lines
@@ -132,3 +145,8 @@ for sec in range(256):
     if lines:
         print(f'world group {g:3d} (first sector {sec}):')
         for l in lines: print(l)
+
+if NOKEY[0]:
+    print(f'RATCHET: {NOKEY[0]} no-key formation(s) -- the build gate refuses')
+    sys.exit(1)
+print('ratchet holds: zero no-key formations game-wide')
