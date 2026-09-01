@@ -371,19 +371,30 @@ Ot6RewardMulW:
 
 ; [ suppress sub-map encounters that the vanilla field cannot start ]
 
-; Map 225's north bridge shaft is a z-loop ladder: its diagonal tiles change
-; the party between z 0/2/3 while a step is resolving.  If CheckBattleSub
-; rolls on that ladder, EventScript_RandBattle stops forever at $ca0029 while
-; waiting for the pre-battle scroll/object movement to settle; the battle
-; latch never comes up and player control never returns.
+; Two authored sites share one wedge: if CheckBattleSub rolls while the
+; party's z-state is mid-flux, EventScript_RandBattle stops forever at
+; $ca0029 waiting for the pre-battle scroll/object movement to settle;
+; the battle latch never comes up and player control never returns.
 ;
-; The rectangle below is the shaft's complete authored route (x 29..40,
-; y 31..61); other rooms in composite map 225 lie outside it and keep their
-; encounter pool.  CheckBattleSub has already proved the party is tile-aligned
-; and cleared its one-step $57 request before calling.  Return carry SET to
-; run the normal danger/encounter path, CLEAR to consume this step without
-; adding danger or advancing the battle RNG.  a8/i16; preserves a/x/y and
-; every status bit except the carry result.
+; Map 225's north bridge shaft is a z-loop ladder: its diagonal tiles
+; change the party between z 0/2/3 while a step is resolving.  The
+; rectangle is the shaft's complete authored route (x 29..40, y 31..61);
+; other rooms in composite map 225 lie outside it and keep their
+; encounter pool.
+;
+; Map 132's forest corridor crosses itself at (16,8): tile prop $04
+; (bridge) with z-1 and both-z neighbors ((16,9)=$01, (17,9)=$03 --
+; measured by probe_forest_stall.lua, 2026-09-01), the same z-flux, and
+; the same $ca0029 wedge when the fighting lineage's crossTo rolled an
+; encounter there (the battle half-runs, the field redraws, the event
+; and the battle table never release).  The rectangle covers the bridge
+; structure and its z-transition aprons (x 14..17, y 8..9).
+;
+; CheckBattleSub has already proved the party is tile-aligned and
+; cleared its one-step $57 request before calling.  Return carry SET to
+; run the normal danger/encounter path, CLEAR to consume this step
+; without adding danger or advancing the battle RNG.  a8/i16; preserves
+; a/x/y and every status bit except the carry result.
 
 .proc Ot6AllowSubBattle
         .a8
@@ -394,8 +405,11 @@ Ot6RewardMulW:
         phy
         lda     a:$0082
         cmp     #$00e1          ; field map 225, Zozo interiors
-        bne     Allow
-        ldy     a:$0803         ; active party object's property offset
+        beq     Zozo
+        cmp     #$0084          ; field map 132, Phantom Forest
+        beq     Forest
+        bra     Allow
+Zozo:   ldy     a:$0803         ; active party object's property offset
         lda     a:$086a,y       ; x in 1/16-tile units
         cmp     #$01d0          ; x < 29
         bcc     Allow
@@ -406,6 +420,19 @@ Ot6RewardMulW:
         bcc     Allow
         cmp     #$03e0          ; y > 61
         bcs     Allow
+        bra     Suppress
+Forest: ldy     a:$0803         ; active party object's property offset
+        lda     a:$086a,y       ; x in 1/16-tile units
+        cmp     #$00e0          ; x < 14
+        bcc     Allow
+        cmp     #$0120          ; x > 17
+        bcs     Allow
+        lda     a:$086d,y       ; y in 1/16-tile units
+        cmp     #$0080          ; y < 8
+        bcc     Allow
+        cmp     #$00a0          ; y > 9
+        bcs     Allow
+Suppress:
         ply
         pla
         plp
