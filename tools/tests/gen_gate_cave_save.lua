@@ -330,7 +330,8 @@ H.run({ maxFrames = 480000 }, {
         if hold <= 60 then H.setPad({}); return end
         if hold <= 68 then H.setPad({ b = true }); return end
         H.setPad({})
-        if H.worldX() ~= 0 or H.worldY() ~= 0 then return end  -- grounding
+        -- grounding is the drive's own exit (onFoot in the outer pred);
+        -- here we only time out the bounce
         if hold >= 420 then
           H.log(string.format("[grind] (%d,%d): bounced (c2=%02X)",
             wp[1], wp[2], H.readByte(0xc2)))
