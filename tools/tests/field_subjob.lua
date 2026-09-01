@@ -64,6 +64,22 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 1000, "field control A", 5),
   H.call(function()
+    -- The fighting lineage's n024_entry arrives with stones worn (a
+    -- played save should); the negative control needs Edgar bare, and
+    -- the WHOLE party freed -- pass B hands Kirin to Edgar through the
+    -- real menu, and the one-owner rule refuses a stone someone else
+    -- wears (LOCKE arrives wearing Kirin here).  The grant reads the
+    -- worn byte live, so clearing it IS the never-wore-it state.
+    -- Declared in state_write_waivers.txt.
+    for _, c in ipairs(H.partyMembers()) do
+      local base = 0x1600 + 37 * c
+      local worn = H.readByte(base + 0x1E)
+      if worn ~= 0xFF then
+        H.writeByte(base + 0x1E, 0xFF)
+        H.log(string.format("char %d wore stone $%02X -> bared for the control",
+          c, worn))
+      end
+    end
     H.assertEq(H.readByte(EBASE + 0x1E), 0xFF, "A: Edgar has no esper")
     H.assertEq(H.readByte(LEARNED) ~= 0xFF, true,
       "A: Edgar has not permanently learned Cure")
@@ -80,6 +96,21 @@ H.run({ maxFrames = 30000 }, {
   H.loadState(STATE),
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 1000, "field control B", 5),
+  H.call(function()
+    -- The reload restores the fixture's worn stones, so free them again:
+    -- LOCKE arrives wearing Kirin, and the one-owner rule greys a stone
+    -- someone else wears -- the menu drive below would complete its
+    -- steps while the refused equip leaves Edgar's record bare.
+    for _, c in ipairs(H.partyMembers()) do
+      local base = 0x1600 + 37 * c
+      local worn = H.readByte(base + 0x1E)
+      if worn ~= 0xFF then
+        H.writeByte(base + 0x1E, 0xFF)
+        H.log(string.format("char %d wore stone $%02X -> freed for pass B",
+          c, worn))
+      end
+    end
+  end),
   H.equipEsper(0, KIRIN, { tag = "B equip Kirin on Edgar" }),
   H.call(function()
     H.assertEq(H.readByte(EBASE + 0x1E), KIRIN,

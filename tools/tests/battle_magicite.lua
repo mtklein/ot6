@@ -324,7 +324,19 @@ local function decide()
 end
 local function driveTo(pred, maxF, tag)
   return H.driveUntil(pred, maxF, {
-    H.call(function() H.setPad(decide()) end),
+    H.call(function()
+      -- Wall pin, not play: NUMBER 024's WallChange re-rolls its
+      -- absorbed/nullified elements at random, and the fighting
+      -- lineage's fixture rolled a wall that ate Inferno's fire -- the
+      -- summon queued, paid, and latched, then "resolves" (boss HP
+      -- drops) never came, and a once-per-battle divine cannot retry.
+      -- The properties under test are kit prices, latches, and the
+      -- status rider (species immunity at $331c), never the wall, so
+      -- the boss's $3bcc absorb/null word is held at zero while this
+      -- file drives.  Declared in state_write_waivers.txt.
+      if H.battleActive() then H.writeWord(0x3BCC + 8 + BOSS * 2, 0) end
+      H.setPad(decide())
+    end),
   }, tag)
 end
 
@@ -474,7 +486,21 @@ H.run({ maxFrames = 150000 }, {
     })
   end)(),
   -- 5. the spent summon greys at her next real window (natural refresh)
-  H.call(function() partyCare = false; celesMode = "park" end),
+  H.call(function()
+    partyCare = false; celesMode = "park"
+    -- MP refund, not play: the fighting lineage's Celes arrives at 31 MP,
+    -- so the 27-MP divine leaves 4 -- below Ice's 5 -- and the row greys
+    -- for POVERTY at the very window meant to prove the latch greys ONLY
+    -- the summon row.  Refund her pre-divine pool before that window
+    -- renders; the Osmose block below re-baselines from a fresh read, so
+    -- its debit deltas are untouched.  Declared in
+    -- state_write_waivers.txt.
+    if mp(celes) < R.mp0 then
+      H.log(string.format("[latch] mp %d -> %d refunded for the liveness control",
+        mp(celes), R.mp0))
+      H.writeWord(0x3C08 + celes * 2, R.mp0)
+    end
+  end),
   driveTo(function()
     return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
   end, 20000, "her next window's list is open"),
@@ -551,18 +577,20 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(H.readWord(SUMMONED) & mask(celes), 0,
       "[latch] ...because battle init cleared $3f2e")
     R.mp0 = mp(celes)
-    -- The fixture no longer ships her full: she arrives at 41 of 106, and
-    -- the care stop above is deliberately item-only so that it heals her HP
-    -- without topping the pool up.  The boundary walk below rests on this
-    -- number: 41 = 1 (mod 5), and Shell (15) and Cure (5) both preserve the
-    -- residue, so kit casts alone land on exactly 6.  The maximum is pinned
-    -- beside it so a fixture that ships a different pool says which of the
-    -- two numbers moved.
-    H.assertEq(R.mp0, 41,
-      "[drain] her real pool opens at the 41 the fixture carries")
+    -- The fixture no longer ships her full: the fighting lineage's
+    -- re-cut n024_entry arrives at 31 of 126 (the fled fixture carried
+    -- 41 of 106), and the care stop above is deliberately item-only so
+    -- that it heals her HP without topping the pool up.  The boundary
+    -- walk below rests on the residue, and it survived the move:
+    -- 31 = 1 (mod 5) exactly as 41 was, and Shell (15) and Cure (5)
+    -- both preserve it, so kit casts alone still land on exactly 6.
+    -- The maximum is pinned beside it so a fixture that ships a
+    -- different pool says which of the two numbers moved.
+    H.assertEq(R.mp0, 31,
+      "[drain] her real pool opens at the 31 the fixture carries")
     -- $3BF4 hp, $3C08 mp, $3C1C max hp, $3C30 max mp: one 20-byte stride
-    H.assertEq(H.readWord(0x3C30 + celes*2), 106,
-      "[drain] and her maximum is 106")
+    H.assertEq(H.readWord(0x3C30 + celes*2), 126,
+      "[drain] and her maximum is 126")
     -- The boundary is only five of her turns from this 41-MP start.  Defer
     -- the bench so an unrelated item-target cursor cannot own the menu while
     -- the MP experiment is running.

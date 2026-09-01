@@ -63,6 +63,7 @@ tools/tests/battle_fontrestore.lua	emu.write	quarantine: deliberate VRAM corrupt
 tools/tests/battle_gaufight.lua	.writeByte(
 tools/tests/battle_loadgate.lua	.writeWord(	quarantine: unit test of the harness's own load-gate predicate, not of play
 tools/tests/battle_lore.lua	.writeByte(
+tools/tests/battle_magicite.lua	.writeWord(	quarantine: two lab conditions the fighting lineage's fixture cannot supply on cue -- NUMBER 024's random WallChange (a once-per-battle divine cannot retry a wall that eats its element; the pin holds $3bcc at zero) and Celes's 31-MP pool (the 27-MP divine leaves her too poor to afford the Ice row whose latch-scoped liveness is the property; the refund restores her pre-divine pool before that window renders); neither touches the prices, latches, debit deltas, or $331c immunity under test
 tools/tests/battle_mpcost.lua	.writeWord(
 tools/tests/battle_rage.lua	.writeByte(
 tools/tests/battle_rage.lua	.writeWord(
@@ -73,11 +74,13 @@ tools/tests/battle_slots.lua	.writeByte(	quarantine: reels free-run at frame rat
 tools/tests/battle_slots.lua	.writeWord(	quarantine: reels free-run at frame rate, so no input selects an icon on cue
 tools/tests/battle_steal.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeByte(
+tools/tests/battle_subjob.lua	.writeWord(	quarantine: pass C banks real BP over ~20k frames while three allies idle in battle 72, and the fighting lineage's fixture wipes before the fold measurement lands; the clamp tops ally HP each drive pulse and never touches the lists, MP, BP, or queue under test
 tools/tests/battle_thief.lua	.writeWord(	quarantine: #122's RNG reshuffle makes the desert pair's chip damage lethal to a deferred party member over the file's one sustained (non-damaging) battle; the floor write never touches the BP ledger under test
 tools/tests/battle_toolsgrey.lua	.writeWord(	quarantine: #124's re-rolled battle RNG made the cave pack die under EDGAR mid-spend, stalling the boundary walk in target-select and refilling his pool on the level-up; the pin holds the pack's battle HP tall so every tool cast has a live target and no kill lands, and it never touches the MP pool or the tools-grey cell under test
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
 tools/tests/field_healpolicy.lua	.writeWord(	quarantine: the healthy-fixture campaign (#122 fallout) leaves no savestate that arrives hurt, so the test writes its own patient's HP
+tools/tests/field_subjob.lua	.writeByte(
 tools/tests/gen_battle2.lua	.writeWord(
 tools/tests/lib/ot6.lua	.writeByte(
 tools/tests/lib/ot6.lua	.writeWord(
