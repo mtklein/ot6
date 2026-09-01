@@ -288,17 +288,31 @@ H.run({ maxFrames = 480000 }, {
         for x = 122, 108, -2 do wps[#wps + 1] = { x, y } end
       end
     end
-    local wi, mode, hold = 1, "move", 0
+    local wi, mode, hold, legN, hb = 1, "move", 0, 0, 0
     return H.driveUntil(function()
       return onFoot() or wi > #wps
     end, 90000, {
       H.call(function()
+        hb = hb + 1
+        if hb % 300 == 0 then
+          H.log(string.format("[grind hb] wi=%d mode=%s ship=(%d,%d) "
+            .. "c2=%02X onFoot=%s legN=%d", wi, mode, shipX(), shipY(),
+            H.readByte(0xc2), tostring(onFoot()), legN))
+        end
         if onFoot() then H.setPad({}); return end
         local wp = wps[wi]
         if mode == "move" then
+          legN = legN + 1
+          if legN > 1200 then
+            H.log(string.format("[grind] (%d,%d): unreachable by strafe; "
+              .. "skipping", wp[1], wp[2]))
+            wi, legN = wi + 1, 0
+            H.setPad({})
+            return
+          end
           local dx, dy = wp[1] - shipX(), wp[2] - shipY()
           if dx == 0 and dy == 0 then
-            mode, hold = "land", 0
+            mode, hold, legN = "land", 0, 0
             H.setPad({})
             return
           end
@@ -314,7 +328,7 @@ H.run({ maxFrames = 480000 }, {
         H.setPad({})
         if hold >= 260 then
           H.log(string.format("[grind] (%d,%d): bounced", wp[1], wp[2]))
-          wi, mode = wi + 1, "move"
+          wi, mode, legN = wi + 1, "move", 0
         end
       end),
     }, "snake land-search over the Chimera pocket")
