@@ -16,16 +16,45 @@ flags:
 Pure data, no emulator.  The Sealed Gate shipped exactly this hole; this
 audit exists so the next one is found by grep, not by fourteen wipes.
 
-THE RATCHET (owner, 2026-09-01): this audit is a BUILD GATE and its
-invariant is absolute -- ZERO no-key formations anywhere in the game.
-The invariant was established the day every measured hole was authored
-(kolts, zozo, the sealed gate), and from then on it may only TIGHTEN:
-any change to monster data, formations, the floor generator, or the
-authored table that opens a hole anywhere fails the build
-deterministically.  The party-hands model (broad kit today; the
-per-era coverage table is the planned tightening) may only grow more
-precise, never looser.
+THE RATCHET (owner, 2026-09-01), two tiers:
+
+1. THE FLOOR INVARIANT, game-wide and absolute: zero completely keyless
+   formations anywhere (the Cirpius/Rhinox condition can never ship
+   again).  This is what the build gate enforces today.  NOTE HONESTLY:
+   unclaimed content passes this tier VACUOUSLY -- the floor generator
+   hands every species some class and the broad-kit model accepts most
+   of them.  Passing tier 1 is NOT "tuned".
+
+2. THE TUNING CLAIM: the explicit map/sector sets below are the areas we
+   claim to have tuned by play.  The claim may ONLY GROW, and everything
+   battle-enabled outside it is reported UNCLAIMED/UNTUNED so vacuous
+   passes can never be mistaken for verified ones.  The planned
+   tightening applies the per-era party-hands table (weapon-classes.md's
+   coverage rule) strictly within the claim.
+
+The World of Ruin is entirely UNCLAIMED as of 2026-09-01.
 """
+
+# ---- THE TUNING CLAIM (may only grow) -----------------------------------
+# Field maps the fighting lineage has validated by play, area by area,
+# plus the WoB world sectors (world_battle_group.dat bytes 0-255; bytes
+# 256-511 are the WoR and are unclaimed).
+CLAIMED_FIELD = set(
+    [3, 4, 9, 20, 21, 30, 32, 33, 34, 35, 36, 37, 38, 39, 41, 42, 43,
+     48, 49, 50, 107]                       # narshe: mines, town, caves
+    + [53, 55, 57, 58, 59, 60, 61, 62, 63, 64, 68, 69, 70, 71, 72, 73,
+       75, 76, 77, 78, 80, 81, 83, 84, 85, 86, 87, 90, 91, 92]  # figaro/SF
+    + [95, 96, 97, 98, 100, 101, 102, 103]  # mt. kolts
+    + [108, 109, 110, 112, 113, 114]        # returners / lete / split
+    + [115, 120, 125, 126, 130, 132, 133, 134, 135, 140, 141, 142,
+       144, 145, 146, 149, 151, 152, 153]   # sabin scenario / train
+    + [221, 225]                            # zozo
+    + [240, 242, 253, 262, 263, 264, 269, 271, 273]  # vector / mrf
+    + [323, 332]                            # albrook
+    + [377, 382, 383, 384, 385, 386]        # base / sealed gate cave
+)
+CLAIMED_WORLD_SECTORS = set(range(256))     # the WoB overworld
+
 import json, os, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -125,28 +154,38 @@ def pool_report(tag, forms):
     return lines
 
 print('== field maps (battle-enabled) ==')
+unclaimed = []
 for m in range(len(props)//33):
     if not (props[m*33+5] & 0x80): continue
     g = sbg[m]
     forms = [rbg[g*8+i] | (rbg[g*8+i+1] << 8) for i in range(0, 8, 2)]
     lines = pool_report(f'map {m}', forms)
+    tag = '' if m in CLAIMED_FIELD else '  [UNCLAIMED/UNTUNED]'
+    if m not in CLAIMED_FIELD:
+        unclaimed.append(m)
     if lines:
-        print(f'map {m:3d} (group {g}):')
+        print(f'map {m:3d} (group {g}):{tag}')
         for l in lines: print(l)
 
-print('== world sectors (WoB) ==')
+print('== world sectors ==')
 seen = set()
-for sec in range(256):
+for sec in range(512):
+    claimed = sec in CLAIMED_WORLD_SECTORS
     g = wbg[sec]
     if g == 0xFF or g in seen: continue
     seen.add(g)
     forms = [rbg[g*8+i] | (rbg[g*8+i+1] << 8) for i in range(0, 8, 2)]
     lines = pool_report(f'sector {sec}', forms)
     if lines:
-        print(f'world group {g:3d} (first sector {sec}):')
+        tag = '' if claimed else '  [WoR: UNCLAIMED/UNTUNED]'
+        print(f'world group {g:3d} (first sector {sec}):{tag}')
         for l in lines: print(l)
+
+print(f'tuning claim: {len(CLAIMED_FIELD)} field maps + the WoB overworld; '
+      f'{len(unclaimed)} battle-enabled maps UNCLAIMED (WoR + not yet '
+      f'validated) -- the claim may only grow')
 
 if NOKEY[0]:
     print(f'RATCHET: {NOKEY[0]} no-key formation(s) -- the build gate refuses')
     sys.exit(1)
-print('ratchet holds: zero no-key formations game-wide')
+print('tier-1 floor invariant holds: zero completely keyless formations game-wide')
