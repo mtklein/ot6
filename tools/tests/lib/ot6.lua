@@ -1695,7 +1695,17 @@ function M.newFightDriver(tag, opts)
     local elem = M.spellElement(abilityId)
     if elem == 0 then return nil end
     for _, s in ipairs(M.formationSpecies()) do
-      if M.monsterAbsorb(s.species) & elem ~= 0 then return s end
+      -- Only a slot that is alive AND on the field can drink a cast: a
+      -- tag-team sibling waiting off-stage ($3AA8 presence bit clear) is
+      -- untargetable, and counting it vetoed the element for the whole
+      -- fight (Ifrit & Shiva: Shiva's ice absorb blocked the Ice casts
+      -- the fight's own design doc prescribes against Ifrit).  With the
+      -- filter, the guard doubles as the tag-fight strategy: the element
+      -- flows while its absorber is off-stage and yields to the sword
+      -- the moment she steps on.
+      if M.readWord(0x3BFC + s.slot * 2) > 0
+         and (M.readByte(0x3AA8 + s.slot * 2) & 1) == 1
+         and M.monsterAbsorb(s.species) & elem ~= 0 then return s end
     end
     return nil
   end

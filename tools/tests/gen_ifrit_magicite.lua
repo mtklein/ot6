@@ -205,8 +205,18 @@ local function ifritAttempt(n)
   -- leaving only 2 slash choppers, so Shiva broke just 3/8.  Boost stays on
   -- (on a Fight it buys extra swings = more chips + more broken hits).
   -- healPercent 80 widens the survival window against the AoE.
+  -- CELES casts Ice into Ifrit -- the fight's own design prescription
+  -- (bosses-wob.md par.13: "Celes can chip both siblings by herself, with
+  -- Ice into Ifrit and her sword into Shiva", and "a Broken sibling takes
+  -- no turns" -- the break SILENCES the AoE).  The absorb guard is the
+  -- stage selector: while Shiva (ice-absorb) is off-stage the cast flows
+  -- at Ifrit's ice weakness; the moment she steps on, the guard refuses
+  -- and Celes falls through to her slash sword, Shiva's own key.
+  -- boost=false: base-tier Ice is 5 MP -- eleven chips from her pool --
+  -- and the BP bank stays owed to the broken-window Fights.
   local F = H.newFightDriver("b70", { tactical = false, boost = true, bank = 3,
-    items = true, healPercent = 80, cadence = 12 })
+    items = true, healPercent = 80, cadence = 12,
+    magic = { [6] = { spell = 0x01, boost = false } } })
   return H.cond(function() return fightWon end, {}, {
     H.logStep(function()
       return string.format("battle 70 attempt %d at f%d", n, H.frame)
@@ -460,6 +470,9 @@ H.run({ maxFrames = 300000 }, {
       H.assertEq(H.readByte(base + 0x1F) ~= 0xFF, true,
         CHARS[c + 1] .. " enters battle 70 holding a weapon")
     end
+    -- the Ice line above is only real if she actually knows the spell
+    H.assertEq(H.readByte(0x1A6E + 6 * 54 + 0x01), 0xFF,
+      "CELES knows Ice -- the chip axis into Ifrit (bosses-wob.md par.13)")
   end),
   -- capture the entry point as the retry ladder's reload blob
   (function()
