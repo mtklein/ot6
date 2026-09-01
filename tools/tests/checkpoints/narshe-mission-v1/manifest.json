@@ -2,17 +2,17 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "narshe-mission.sram",
   "size": 32768,
-  "sha256": "5545b323e68cf0c4bbcbeeab08c1c68bccb1706437c5569424786b9242b11999",
+  "sha256": "410f3c859b71462ab943cae68202946ca3567fc7eecc60c101162b6f9cee24ac",
   "slot": 3,
   "milestone": "narshe-mission",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "5545b323e68cf0c4bbcbeeab08c1c68bccb1706437c5569424786b9242b11999",
-    "generator_sig": "ffb40ee5d1e539cf2198724322c6979f7b771fc279be12e7318f65d1876d7ca5 gen_narshe_mission tools/tests/checkpoints/terra-returned-v1/manifest.json tools/tests/checkpoints/terra-returned-v1/terra-returned.sram",
+    "payload_sha256": "410f3c859b71462ab943cae68202946ca3567fc7eecc60c101162b6f9cee24ac",
+    "generator_sig": "f9262134c8ab46c2b0277e6a9e150067e1b93e96bde4a36f46ed8af6ae8515d4 gen_narshe_mission tools/tests/checkpoints/terra-returned-v1/manifest.json tools/tests/checkpoints/terra-returned-v1/terra-returned.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/terra-returned-v1/manifest.json",
-        "sha256": "2a180e4035a225899c42195a862a508b3ec2ff16fcfe8bc8add26353fee445a0"
+        "sha256": "98e279462bf90311cb37300b0b0986cd1c37e4aac21c6882a488f19ae8d36ad3"
       }
     ]
   },

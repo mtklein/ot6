@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "588d930f01216f2210231ec4daefb62ca4e44ceb4b836fb98cca848f6b895ea8",
+  "generator_sig": "3a092526382ea022d68fbe1a07f58a0f8cb2953bcf2a95bc58393abf45d8da2e gen_massacre tools/tests/checkpoints/ultros-won-v1/manifest.json tools/tests/checkpoints/ultros-won-v1/ultros-won.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/ultros-won-v1/manifest.json",
+      "sha256": "8cf26b00f04e9810aba5507dfdd61862897699633ab92f21c35b8b99469c6c3c"
+    }
+  ]
+}

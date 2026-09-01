@@ -8,7 +8,7 @@
   "provenance": {
     "format": "ot6-provenance/v1",
     "payload_sha256": "d8c8b2e52ac7492d17d8b6ab1b73251461894108b6f3a12035c0bf1da8bd3adb",
-    "generator_sig": "add3b39a3864daf021ffd059214fb76f27ea254713ec92f957520ae2ac7b49ef gen_post_opera_checkpoint",
+    "generator_sig": "f2788b030dc8aa4f740dadcc614a8ad678913b10687313cff4545ab62e12b3eb gen_post_opera_checkpoint",
     "ancestors": []
   },
   "persistent_layout": "ot6-codex-o8-v1"

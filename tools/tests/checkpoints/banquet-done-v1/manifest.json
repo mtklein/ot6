@@ -6,15 +6,15 @@
   "milestone": "banquet-done",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "80a368767f817146d65be7cdfc06fcd847351a651070f1231cf0acad5cf6aeba",
-    "generator_sig": "5c1795a8e8007f91b89980844f03abd28b4c083f8ce4f027d62e91e4c6bbeeb1 gen_banquet_done tools/tests/checkpoints/vector-crash-v1/manifest.json tools/tests/checkpoints/vector-crash-v1/vector-crash.sram",
+    "payload_sha256": "8453b2b0995639103cc60dc9a35c2fceb92e423f0f9cf475b77aca36c02a2dcb",
+    "generator_sig": "e2c31b07845d67ee46763d7c4972fac31749df30e774e5338275633d5af883bf gen_banquet_done tools/tests/checkpoints/vector-crash-v1/manifest.json tools/tests/checkpoints/vector-crash-v1/vector-crash.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/vector-crash-v1/manifest.json",
-        "sha256": "dcf7e8dc35482f4d7d4127ee2ed354b317ffa6c77d4fda022becbc279defe82e"
+        "sha256": "5564e57e1c460b96095bf2a29e258cb0739069c989eb6d797cc664fce24df6db"
       }
     ]
   },
   "persistent_layout": "ot6-codex-o8-v1",
-  "sha256": "80a368767f817146d65be7cdfc06fcd847351a651070f1231cf0acad5cf6aeba"
+  "sha256": "8453b2b0995639103cc60dc9a35c2fceb92e423f0f9cf475b77aca36c02a2dcb"
 }
