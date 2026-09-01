@@ -106,7 +106,7 @@ H.run({ maxFrames = 250000 }, {
   H.call(function() H.log(string.format("[world] Jidoor exit at (%d,%d)", H.worldX(), H.worldY())) end),
 
   -- 4. world -> the opera-house approach {45,153}, step DOWN -> map 237
-  H.worldNavTo(45, 153, { maxFrames=60000, playBattles="flee", arrive=function() return not H.worldMode() end }),
+  H.worldNavTo(45, 153, { maxFrames=60000, playBattles="tactical", arrive=function() return not H.worldMode() end }),
   H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end, 2000, "opera approach", 5),
   (function() local hb=0
     return H.driveUntil(function() return not H.worldMode() and map()==237 end, 4000, {

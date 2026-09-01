@@ -98,7 +98,7 @@ local function rideAttempt(n)
       H.call(function() H.checkReq(loadReq, "pre-attempt reload") end),
       H.waitFrames(90),
     }) or H.waitFrames(1),
-    H.navTo(54, 40, { playBattles = "flee", maxFrames = 25000 }),
+    H.navTo(54, 40, { playBattles = "tactical", maxFrames = 25000 }),
     pressWalk("left", function() return map() == 6 end, 9000,
       "held LEFT onto the reunion trigger -> the Blackjack deck"),
     H.release(),
@@ -241,27 +241,27 @@ H.run({ maxFrames = 160000 }, {
   end),
 
   -- 3a/3b. out to the town, carry Madonna in
-  H.navTo(36, 14, { playBattles = "flee", maxFrames = 6000 }),
+  H.navTo(36, 14, { playBattles = "tactical", maxFrames = 6000 }),
   pressWalk("down", function() return map() == 217 end, 6000,
     "pocket exit (36,15) -> 217"),
   H.waitFrames(60),
-  H.navTo(32, 12, { playBattles = "flee", maxFrames = 12000 }),
+  H.navTo(32, 12, { playBattles = "tactical", maxFrames = 12000 }),
   pressTalk("up", function() return sw(0x006C) == 1 end, 20000,
     "talk (32,11) -> carry MADONNA in -> $006C"),
   H.waitFrames(90),
 
   -- 3c. Madonna resting -> $006E
-  H.navTo(46, 43, { playBattles = "flee", maxFrames = 9000 }),
+  H.navTo(46, 43, { playBattles = "tactical", maxFrames = 9000 }),
   pressTalk("up", function() return sw(0x006E) == 1 end, 25000,
     "talk MADONNA -> $006E"),
   H.waitFrames(90),
 
   -- 3d. to the gate (the corridor NPC ports us; the landing tile flickers)
-  H.navTo(36, 14, { playBattles = "flee", maxFrames = 6000 }),
+  H.navTo(36, 14, { playBattles = "tactical", maxFrames = 6000 }),
   pressWalk("down", function() return map() == 217 end, 6000,
     "pocket exit -> 217"),
   H.waitFrames(60),
-  H.navTo(32, 12, { playBattles = "flee", maxFrames = 12000 }),
+  H.navTo(32, 12, { playBattles = "tactical", maxFrames = 12000 }),
   pressTalk("up", function() return map() == 218 end, 15000,
     "talk (32,11) -> ported to the gate (218)"),
   H.waitFrames(90),
@@ -271,7 +271,7 @@ H.run({ maxFrames = 160000 }, {
   -- 3e. the confession -> $006F and the raid
   planApproach(0x1C),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { playBattles = "flee", maxFrames = 9000 }),
+    { playBattles = "tactical", maxFrames = 9000 }),
   talkApproached(function() return sw(0x006F) == 1 end, 40000,
     "talk MADONNA at the gate -> $006F"),
   H.advanceStory(function() return map() == 219 and settled() end, 30000, { playBattles = true }),
@@ -280,7 +280,7 @@ H.run({ maxFrames = 160000 }, {
   -- 3f. the tempest plan -> $0116
   planApproach(0x13),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { playBattles = "flee", maxFrames = 9000 }),
+    { playBattles = "tactical", maxFrames = 9000 }),
   talkApproached(function() return sw(0x0116) == 1 end, 12000,
     "talk NPC_4 -> $0116"),
   H.waitFrames(90),
@@ -288,17 +288,17 @@ H.run({ maxFrames = 160000 }, {
   -- 3g. the collapse -> $0117
   planApproach(0x12),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { playBattles = "flee", maxFrames = 9000 }),
+    { playBattles = "tactical", maxFrames = 9000 }),
   talkApproached(function() return sw(0x0117) == 1 end, 12000,
     "talk the elder -> $0117"),
   H.waitFrames(90),
 
   -- 3h. the chase to the gate -> $0118
-  H.navTo(41, 55, { playBattles = "flee", maxFrames = 9000 }),
+  H.navTo(41, 55, { playBattles = "tactical", maxFrames = 9000 }),
   pressWalk("down", function() return map() == 217 end, 6000,
     "pocket exit (41,56) -> 217"),
   H.waitFrames(60),
-  H.navTo(32, 7, { playBattles = "flee", maxFrames = 15000 }),
+  H.navTo(32, 7, { playBattles = "tactical", maxFrames = 15000 }),
   pressWalk("up", function() return map() == 218 or sw(0x0118) == 1 end, 9000,
     "onto (32,6) -> the gate trigger"),
   H.advanceStory(function() return sw(0x0118) == 1 end, 30000, { playBattles = true }),
@@ -307,7 +307,7 @@ H.run({ maxFrames = 160000 }, {
   -- 3i. the finale and the ride home
   planApproach(0x1C),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { playBattles = "flee", maxFrames = 9000 }),
+    { playBattles = "tactical", maxFrames = 9000 }),
   talkApproached(function() return not H.hasControl() or map() ~= 218 end, 12000,
     "talk MADONNA -> the finale _caa4e0"),
   H.advanceStory(function()
@@ -327,7 +327,7 @@ H.run({ maxFrames = 160000 }, {
   H.fieldCare({ tag = "care on the deck after the Cranes" }),
 
   -- 4. takeoff and grounding
-  H.navTo(14, 6, { playBattles = "flee", maxFrames = 6000, calmFrames = 8 }),
+  H.navTo(14, 6, { playBattles = "tactical", maxFrames = 6000, calmFrames = 8 }),
   (function() local ph = 0
     return H.driveUntil(function() return H.worldMode() end, 1200, {
       H.call(function()

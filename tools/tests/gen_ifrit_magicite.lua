@@ -391,7 +391,7 @@ H.run({ maxFrames = 300000 }, {
   tapInto("down", function() return map() == 264 end, 12000,
     "save room -> door -> map 264"),
   H.waitFrames(60),
-  H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(3, 7, { maxFrames = 9000, playBattles = "tactical" }),
   H.call(function()
     H.assertEq(map(), 264, "at the Ifrit/Shiva alcove")
     H.assertEq(H.fieldX(), 3, "Ifrit entry point x")
@@ -452,7 +452,7 @@ H.run({ maxFrames = 300000 }, {
     return H.cond(function() return true end, steps)
   end)(),
   H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
-  H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(3, 7, { maxFrames = 9000, playBattles = "tactical" }),
   H.call(function()
     H.assertEq(H.fieldX() == 3 and H.fieldY() == 7, true,
       "back at the entry point, armed")
@@ -514,13 +514,13 @@ H.run({ maxFrames = 300000 }, {
   end),
 
   -- 3. SHIVA at {9,6}: stand at {9,7} and face UP.  $0274.
-  H.navTo(9, 7, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(9, 7, { maxFrames = 9000, playBattles = "tactical" }),
   talkTo("up", function() return sw(0x0274) == 1 end, 12000,
     "talk SHIVA -> $0274"),
 
   -- 4. IFRIT again at {3,8}: $0272, which (with $0274 already set) falls
   --    straight into _cc79a4, the hand-off.
-  H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(3, 7, { maxFrames = 9000, playBattles = "tactical" }),
   talkTo("down", function() return sw(0x0647) == 1 and sw(0x0648) == 1 end,
     16000, "talk IFRIT -> $0272 -> the hand-off _cc79a4"),
   H.waitFrames(60),
@@ -537,7 +537,7 @@ H.run({ maxFrames = 300000 }, {
   -- 5. the two magicite pickups
   talkTo("down", function() return (H.readByte(0x1A69) & 0x02) ~= 0 end, 12000,
     "take the IFRIT magicite -> $1A69 bit1"),
-  H.navTo(9, 7, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(9, 7, { maxFrames = 9000, playBattles = "tactical" }),
   talkTo("up", function() return (H.readByte(0x1A69) & 0x04) ~= 0 end, 12000,
     "take the SHIVA magicite -> $1A69 bit2"),
   H.waitFrames(60),

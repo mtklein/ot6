@@ -299,7 +299,7 @@ end
 local function worldLeg(tx, ty, want, what, budget)
   return H.worldNavTo(tx, ty, {
     maxFrames = budget or 30000,
-    playBattles = "flee",
+    playBattles = "tactical",
     arrive = function()
       if H.worldMode() then return false end          -- let the coord check run
       if want and map() == want then return true end

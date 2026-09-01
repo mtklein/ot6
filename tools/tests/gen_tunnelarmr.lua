@@ -20,7 +20,7 @@
 -- way: world (75,103) -> map 72 -> ... -> map 71 -> [trigger] -> map 70.
 -- Map 87, the clock passage, has random encounters (Vector Pups), which no
 -- earlier step of the basement route does; every traversal step here runs
--- playBattles="flee" (L+R) with the tactical fight driver as the
+-- playBattles="tactical" (L+R) with the tactical fight driver as the
 -- M.FLEE_CAP fallback, since this escape route has no shop to restock at.
 -- The escape re-enters town at (48,36) and leaves by the x=56 column, both
 -- east of the gate soldier's (30,42) choke, so no interaction with him is
@@ -91,7 +91,7 @@ local function settled(n, extra)
     return cnt >= n
   end
 end
--- playBattles="flee", not playBattles=true: a settle that rolls an encounter
+-- playBattles="tactical", not playBattles=true: a settle that rolls an encounter
 -- (map 87 and the caves both can) runs from it, with the tactical driver as
 -- the FLEE_CAP fallback, instead of blind-tapping A through it.  The header
 -- has the measurements behind this.
@@ -102,7 +102,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
+    end), maxF or 12000, { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.waitFrames(30),
   })
 end
@@ -115,7 +115,7 @@ local aPhase = 0
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
+    H.navTo(tx, ty, { maxFrames = 12000, playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -169,7 +169,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 40000, arrive = arrived, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
+      { maxFrames = 40000, arrive = arrived, playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -196,7 +196,7 @@ local function safeWalk(tx, ty, what, budget)
   -- map 70 draws random encounters like the rest of the cave; without this
   -- branch a battle mid-walk left the drive holding an empty pad until the
   -- budget ran out (the same failure the header describes on map 87).  Same
-  -- flee-then-tactical-fallback shape as navTo's playBattles="flee" branch.
+  -- flee-then-tactical-fallback shape as navTo's playBattles="tactical" branch.
   local F = H.newFightDriver(what or "safeWalk",
     { tactical = true, boost = true, bank = 3, items = true, healPercent = 55,
       healer = 6 })
@@ -233,7 +233,7 @@ local function warpTo(sx, sy, dx, dy, dmap, what)
     H.logStep(function()
       return string.format("%s: from (%d,%d)", what, H.fieldX(), H.fieldY())
     end),
-    H.navTo(sx, sy, { maxFrames = 40000, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6, arrive = function()
+    H.navTo(sx, sy, { maxFrames = 40000, playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6, arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
     H.release(),
@@ -724,20 +724,20 @@ H.run({ maxFrames = 300000 }, {
   go(57, 13, 83, 35, 14, "celes room -> corridor"),
   go(45, 12, 84, 8, 57, "corridor (45,12) -> map 84 (8,57)"),
   H.openChest{ stand = { 7, 51 }, face = "down", bit = 26, what = "500 gil",
-               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+               nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   H.openChest{ stand = { 12, 54 }, face = "down", bit = 28, what = "1000 gil",
-               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+               nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   H.openChest{ stand = { 21, 57 }, face = "up", bit = 27, what = "1500 gil",
-               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+               nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   H.openChest{ stand = { 22, 56 }, face = "up", bit = 29, what = "(empty)",
-               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+               nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   -- The basement save point (53,57) -- vanilla's, passed like a person
   -- passes it on the escape.  Tolerant: if the tile proves unreachable
   -- from this side of the maze, log and move on rather than fail the
   -- scenario; the lifter (gen_seed_basement.lua) asserts the save is
   -- really aboard before cutting the seed.
   H.cond(function() return H.bfsPath(53, 57) ~= nil end, {
-    H.navTo(53, 57, { maxFrames = 12000, playBattles = "flee",
+    H.navTo(53, 57, { maxFrames = 12000, playBattles = "tactical",
                       fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.waitFrames(30),
     H.call(function()
@@ -752,9 +752,9 @@ H.run({ maxFrames = 300000 }, {
   go(15, 51, 87, 20, 33, "clock passage (15,51) -> map 87 (20,33)"),
   H.fieldCare({ tag = "care before the basement shelf", threshold = 0.95 }),
   H.openChest{ stand = { 47, 34 }, face = "up", bit = 34, what = "RegalCutlass",
-               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+               nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   H.openChest{ stand = { 48, 34 }, face = "up", bit = 35, what = "Heavy Shld",
-               nav = { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
+               nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   H.fieldCare({ tag = "care before the basement exit", threshold = 0.95 }),
   go(57, 48, 86, 49, 31, "map 87 (57,48) -> map 86 (49,31)"),
 
@@ -781,7 +781,7 @@ H.run({ maxFrames = 300000 }, {
   end),
   H.fieldCare({ tag = "care before leaving town", threshold = 0.95 }),
   -- exit via the x=56 column -> world (87,112)
-  H.navTo(56, 34, { maxFrames = 12000, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6,
+  H.navTo(56, 34, { maxFrames = 12000, playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6,
     arrive = function() return H.worldMode() end }),
   H.release(),
   (function()
@@ -790,7 +790,7 @@ H.run({ maxFrames = 300000 }, {
       local ok = H.worldMode() and H.worldHasControl() and H.worldAligned()
         and bright() >= 15
       cnt = ok and cnt + 1 or 0; return cnt >= 20
-    end, 12000, { playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 })
+    end, 12000, { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 })
   end)(),
   H.waitFrames(30),
   H.call(function()
@@ -805,7 +805,7 @@ H.run({ maxFrames = 300000 }, {
     return string.format("sfigaro_escape generated at frame %d", H.frame)
   end),
 
-  H.worldNavTo(75, 102, { maxFrames = 45000, playBattles = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6,
+  H.worldNavTo(75, 102, { maxFrames = 45000, playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6,
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField(69),

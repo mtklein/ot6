@@ -271,10 +271,38 @@ retried=0
 while :; do
   attempt=$(( attempt + 1 ))
   t0=$(date +%s)
+  # The emulator runs in the background under a load-error watchdog: a
+  # script that dies at LOAD (a nil table key at file scope, an undefined
+  # name -- gen_fc_escape's summon table keyed by an EDGAR it never
+  # declared, 2026-09-01) leaves Mesen running the game unscripted at 100%
+  # CPU until the wall-clock cap, with nothing in this log but the
+  # emulator's own [CPU] chatter; the script log that would name the error
+  # is not read headless.  Every live script prints an [ot6] line within
+  # its first seconds (the tiles record at frame 21 at the latest), so a
+  # log with no [ot6] line after OT6_LOAD_GRACE seconds is that death:
+  # kill it and say so as a FAIL, which is deterministic and never retried.
   env CFFIXED_USER_HOME="$MESEN_HOME" \
     "$SHARED_APP/Contents/MacOS/Mesen" --testrunner --timeout="$CAP" --enableStdout \
-    "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1
+    "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1 &
+  mesen_pid=$!
+  load_grace="${OT6_LOAD_GRACE:-120}"
+  load_dead=0
+  while kill -0 "$mesen_pid" 2>/dev/null; do
+    sleep 5
+    if [ "$load_dead" -eq 0 ] && [ $(( $(date +%s) - t0 )) -ge "$load_grace" ] \
+       && ! grep -q '^\[ot6' "$RUN_LOG" 2>/dev/null; then
+      load_dead=1
+      kill "$mesen_pid" 2>/dev/null
+      sleep 2
+      kill -9 "$mesen_pid" 2>/dev/null
+    fi
+  done
+  wait "$mesen_pid"
   code=$?
+  if [ "$load_dead" -eq 1 ]; then
+    printf '[ot6] FAIL: the script printed nothing in %ss -- a Lua LOAD error (a nil table key or an undefined name at file scope); the emulator ran the game unscripted and was killed.  Load the composed script with `luac -p` for syntax, then read its file-scope code: this is deterministic and is not retried.\n' \
+      "$load_grace" >> "$RUN_LOG"
+  fi
   elapsed=$(( $(date +%s) - t0 ))
   verdict_spoken "$RUN_LOG" && break
   [ $(( elapsed + 5 )) -ge "$CAP" ] || break

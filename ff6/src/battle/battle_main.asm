@@ -12234,9 +12234,10 @@ BattleEnd_04:
 ; ------------------------------------------------------------------------------
 
 ; shadow leaves the party
-; ot6: body relocated below the short-branch corridor (this region
-; is byte-tight); the stub costs 3 bytes and the moved body gains the
-; FC gate.
+; ot6: the roll's body is a no-op in bank $C2 (Ot6ShadowLeaves, below):
+; Shadow stays the whole game, only scripted departures remain, and the
+; body lives in $C2 because its jsr/jmp are bank-relative (mis-placing it
+; in bank $CF halted the CPU -- see Ot6ShadowLeaves' own comment).
 ShadowLeaves:
         jmp     Ot6ShadowLeaves
 _48c4:  pla
@@ -16916,39 +16917,33 @@ MonsterSpecialAnim:
 
 ; ------------------------------------------------------------------------------
 
-.segment "battle_cmd_prop"
-
 ; ------------------------------------------------------------------------------
 
 ; [ shadow leaves the party -- relocated body ]
 ;
-; No leave-rolls on the Floating Continent (map 394, read live from
-; $1F64 -- $02BD looked like the arc switch but clears at arrival).  A
-; 1/16 leave mid-FC clears $02F3 (ShadowLeaves' trb $1ede) and silently
-; forfeits the canon humane escape -- a broken promise, not an emergent
-; feature.
+; OT6: the vanilla 1/16 leave roll is a NO-OP -- Shadow stays for the whole
+; game (owner's call, 2026-09-01); only the scripted departures remain.
+; Vanilla removed him here (trb $1ede, RemoveChar, battle event $0b); OT6
+; first gated that off on the Floating Continent, where a mid-FC leave
+; clears $02F3 and forfeits the canon humane escape, then everywhere.
+;
+; This body lives in bank $C2 (segment battle_code), not in
+; battle_cmd_prop's bank $CF: ShadowLeaves reaches it with a bank-relative
+; `jmp`, and its `jsr WinBattle` / `jmp _488f` are bank-relative too.
+; Placed under battle_cmd_prop (until 2026-09-01), the stub jumped to
+; $C2:FE00 -- decompress code's data table -- and the CPU ran off into a
+; STP: every 1/16 leave roll that passed after a won battle with Shadow
+; aboard froze the game (measured, probe_shadow_leaves_wedge.lua: cpu.k=$C2
+; pc=$FEFA, cycle count frozen).  The "$ca0029 wedge" the encounter-
+; suppression rectangles were authored against was this halt seen from
+; the field.
+.segment "battle_code"
+
 Ot6ShadowLeaves:
-        longa
-        lda     $1f64
-        and     #$03ff
-        cmp     #394
-        shorta0             ; sep leaves Z from the cmp intact
-        bne     :+
         jsr     WinBattle
         jmp     _488f
-:       trb     $1ede       ; available characters (remove shadow)
-        jsr     RemoveChar
-        longi
-        ldy     $3010,x
-        lda     #$ff
-        sta     $161e,y
-        shorti
-        lda     #$fe
-        jsr     ClearFlag0       ; clear $3aa0.0 (make target not present)
-        lda     #$02
-        tsb     $2f49       ; disable fanfare
-        ldx     #$0b        ; battle event $0b (shadow leaves party)
-        jmp     _48c4
+
+.segment "battle_cmd_prop"
 
 ; cf/fe00
         .include "battle_cmd_prop.asm"

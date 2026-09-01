@@ -166,56 +166,10 @@ local function pressWalk(dir, pred, maxFrames, what)
 end
 
 -- gen_thamasa_arrive's crossDoor, unchanged
-local DIAGSTAGE = {
-  { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
-  { -1, 1, "upright" }, { -1, -1, "downright" },
-  { 1, -1, "downleft" }, { 1, 1, "upleft" },
-}
 local function crossDoor(sx, sy, dm, dx, dy, what, opts)
   opts = opts or {}
-  local pick, startMap
-  local function stage()
-    if not pick then
-      for _, c in ipairs(DIAGSTAGE) do
-        local cx, cy, move = sx + c[1], sy + c[2], c[3]
-        local press = H.movePress(move)
-        if H.bfsPath(cx, cy) and (press == move or H.canStep(cx, cy, move)) then
-          pick = { cx, cy, press }; break
-        end
-      end
-      pick = pick or { sx, sy + 1, "up" }
-      H.log(string.format("%s: staging (%d,%d), hold %s into (%d,%d)",
-        what, pick[1], pick[2], pick[3], sx, sy))
-    end
-    return pick
-  end
-  local settled = calm(20)
-  local aPhase = 0
-  return seq({
-    H.call(function() pick, startMap = nil, map() end),
-    H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 9000, playBattles = "tactical", healer = TERRA, bank = 3,
-        items = true, avoid = opts.avoid,
-        arrive = function() return map() ~= startMap end }),
-    H.driveUntil(function()
-      return map() ~= startMap or (H.fieldX() == dx and H.fieldY() == dy)
-    end, 1800, {
-      H.call(function()
-        aPhase = (aPhase + 1) % 8
-        if H.dialogWaiting() then H.setPad(aPhase < 4 and { "a" } or {}); return end
-        H.setPad({ [stage()[3]] = true })
-      end),
-    }, what),
-    H.release(),
-    H.waitUntil(settled, 1800, what .. ": far-side control"),
-    H.waitUntil(function() return bright() >= 15 end, 900, what .. ": fade-in", 10),
-    H.waitFrames(30),
-    H.call(function()
-      H.assertEq(map(), dm, what .. ": landed on the right map")
-      H.log(string.format("[ot6] %s: DONE (%d,%d) frame=%d", what,
-        H.fieldX(), H.fieldY(), H.frame))
-    end),
-  })
+  if opts.healer == nil then opts.healer = TERRA end
+  return H.crossDoor(sx, sy, dm, dx, dy, what, opts)   -- promoted to the lib
 end
 
 -- Live NPC lookup: scan object slots 16..31 for whichever sits nearest
@@ -298,6 +252,21 @@ local function chaseTalkLazy(idxFn, maxFrames, what, opts)
   }, what or "chaseTalkLazy")
 end
 
+-- Every warp tile the house's walks use (the source tiles of the houseWarp
+-- calls below).  A walk toward one warp must AVOID all the others: the
+-- pathfinder knows walkability, not warps, and the regen's fire_out
+-- routed the (21,9)->(28,3) walk through (23,3) -- the east wing's warp --
+-- teleporting the party mid-walk and stranding the step (run.IgBKYd89).
+local HOUSE_WARPS = {
+  {2,24}, {4,3}, {4,56}, {21,49}, {23,3}, {26,21}, {28,3}, {43,21}, {45,11}, {49,21}, {60,21},
+}
+local function otherWarps(sx, sy)
+  local out = {}
+  for _, w in ipairs(HOUSE_WARPS) do
+    if not (w[1] == sx and w[2] == sy) then out[#out + 1] = { w[1], w[2] } end
+  end
+  return out
+end
 local function creepXY(tx, ty, step)
   step = step or 14
   local function pt()
@@ -305,7 +274,17 @@ local function creepXY(tx, ty, step)
     local dx, dy = tx - px, ty - py
     local dist = math.abs(dx) + math.abs(dy)
     if dist <= step or dist == 0 then return tx, ty end
-    return px + math.floor(dx * step / dist), py + math.floor(dy * step / dist)
+    -- the straight-line waypoint can land on a wall or behind one (the
+    -- regen's fire_out died on "no path (43,22)->(36,14)", a waypoint,
+    -- when a different start tile moved the interpolation onto stone);
+    -- only a REACHABLE waypoint shortens the walk, otherwise creep to
+    -- the target itself and let the pathfinder route the whole way
+    local wx, wy = px + math.floor(dx * step / dist), py + math.floor(dy * step / dist)
+    for _, w in ipairs(HOUSE_WARPS or {}) do
+      if w[1] == wx and w[2] == wy and not (w[1] == tx and w[2] == ty) then return tx, ty end
+    end
+    if H.bfsPath(wx, wy) then return wx, wy end
+    return tx, ty
   end
   return function() return (pt()) end,
          function() local _, y = pt(); return y end
@@ -406,62 +385,10 @@ end
 local function gil()
   return H.readByte(0x1860) + H.readByte(0x1861) * 256 + H.readByte(0x1862) * 65536
 end
-local SHOP_CAND = {
-  { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
-  { 0, 2, "up" }, { 0, -2, "down" }, { -2, 0, "right" }, { 2, 0, "left" },
-}
 local function shopTalk(nx, ny, what)
-  local pick
-  local function stage()
-    if not pick then
-      for _, c in ipairs(SHOP_CAND) do
-        local sx, sy = nx + c[1], ny + c[2]
-        if H.bfsPath(sx, sy) then pick = { sx, sy, c[3] }; break end
-      end
-      pick = pick or { nx, ny + 1, "up" }
-      H.log(string.format("[shop] %s: staging (%d,%d) face %s",
-        what, pick[1], pick[2], pick[3]))
-    end
-    return pick
-  end
-  local aPh = 0
-  return seq({
-    H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 9000, playBattles = "tactical", healer = TERRA, bank = 3,
-        items = true }),
-    H.driveUntil(function()
-      return H.readByte(0x087f + H.readWord(0x0803)) == FACE_VAL[stage()[3]]
-    end, 300, {
-      H.call(function() H.setPad({ [stage()[3]] = true }) end),
-    }, what .. ": faced"),
-    H.release(), H.waitFrames(4),
-    H.driveUntil(function() return H.readByte(0x0026) == 0x25 end, 3000, {
-      H.call(function()
-        aPh = (aPh + 1) % 12
-        H.setPad(aPh < 4 and { a = true, [stage()[3]] = true } or {})
-      end),
-    }, what .. ": shop opens"),
-    H.call(function()
-      H.log(string.format("[shop] %s: open at f%d, gil=%d", what, H.frame, gil()))
-    end),
-  })
+  return H.shopTalk(nx, ny, what, { healer = TERRA })      -- promoted to the lib
 end
-local function shopClose(what)
-  local ph = 0
-  return seq({
-    H.driveUntil(function()
-      return H.hasControl() and H.readByte(0x0026) ~= 0x25
-         and H.readByte(0x0026) ~= 0x26 and H.readByte(0x0026) ~= 0x27
-    end, 1800, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        H.setPad(ph < 4 and { b = true } or {})
-      end),
-    }, what .. ": shop closed"),
-    H.release(),
-    H.waitFrames(30),
-  })
-end
+local function shopClose(what) return H.shopClose(what) end
 
 local function logStragoJoin()
   return H.call(function()
@@ -485,7 +412,7 @@ local WALK = { playBattles = "tactical", healer = TERRA, bank = 3,
                magic = { [TERRA] = { spell = ICE_SPELL, boost = false } } }
 -- islands 13/11 only: flee wandering flames rather than fight every one
 -- (see houseWarp's own note on the `flee` parameter, below).
-local FLEE_WALK = { playBattles = "flee", healer = TERRA, bank = 3,
+local FLEE_WALK = { playBattles = "tactical", healer = TERRA, bank = 3,
                      items = true, maxFrames = 20000, healPercent = 85,
                      magic = { [TERRA] = { spell = ICE_SPELL, boost = false } } }
 local FLAMEEATER_WALK = { playBattles = "tactical", healer = TERRA, bank = 3,
@@ -496,6 +423,7 @@ local function houseWarp(sx, sy, dx, dy, what, playBattles)
     creepNav(sx, sy, { playBattles = playBattles or "tactical", healer = TERRA,
       bank = 3, items = true, maxFrames = 20000, healPercent = 85,
       magic = { [TERRA] = { spell = ICE_SPELL, boost = false } },
+      avoid = otherWarps(sx, sy),
       arrive = function() return H.fieldX() == dx and H.fieldY() == dy end }),
     H.waitUntil(function()
       return H.hasControl() and H.tileAligned() and bright() >= 15

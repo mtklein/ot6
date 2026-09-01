@@ -63,7 +63,7 @@ tools/tests/battle_fontrestore.lua	emu.write	quarantine: deliberate VRAM corrupt
 tools/tests/battle_gaufight.lua	.writeByte(
 tools/tests/battle_loadgate.lua	.writeWord(	quarantine: unit test of the harness's own load-gate predicate, not of play
 tools/tests/battle_lore.lua	.writeByte(
-tools/tests/battle_magicite.lua	.writeWord(	quarantine: two lab conditions the fighting lineage's fixture cannot supply on cue -- NUMBER 024's random WallChange (a once-per-battle divine cannot retry a wall that eats its element; the pin holds $3bcc at zero) and Celes's 31-MP pool (the 27-MP divine leaves her too poor to afford the Ice row whose latch-scoped liveness is the property; the refund restores her pre-divine pool before that window renders); neither touches the prices, latches, debit deltas, or $331c immunity under test
+tools/tests/battle_magicite.lua	.writeWord(	quarantine: lab conditions the fighting lineage's fixture cannot supply on cue -- (1) the casters' FIELD MP pinned before each boot (boot A: Celes 126 and Locke his maximum, for the divine/latch windows; boot B: Celes 31 = 1 mod 5 for the boundary walk); the fighting lineage's fixture ships them drained (Celes 1 of 126, Locke 13) after the honest Ifrit/Shiva nuking one door earlier, and the experiments cannot rest on that; (2) NUMBER 024's random WallChange pinned at zero (a once-per-battle divine cannot retry a wall that eats its element); neither touches the prices, latches, debit deltas or the $331c immunity under test
 tools/tests/battle_mpcost.lua	.writeWord(
 tools/tests/battle_rage.lua	.writeByte(
 tools/tests/battle_rage.lua	.writeWord(

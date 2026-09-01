@@ -112,7 +112,7 @@ H.run({ maxFrames = 250000 }, {
   -- Flee the street encounters rather than blind-A-tapping them: this is the
   -- road out, not a fight to win, and a fled encounter cannot lose the party
   -- the way a blindly-fought one did after the RNG re-roll.
-  H.navTo(62, 45, { maxFrames = 12000, playBattles = "flee" }),
+  H.navTo(62, 45, { maxFrames = 12000, playBattles = "tactical" }),
   (function() local hb=0
     return H.driveUntil(function() return H.worldMode() end, 4000, {
       H.call(function() hb=hb+1

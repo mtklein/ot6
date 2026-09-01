@@ -128,7 +128,7 @@ local function crossDoor(sx, sy, dm, dx, dy, what, opts)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 9000, playBattles = "flee", avoid = opts.avoid,
+      { maxFrames = 9000, playBattles = "tactical", avoid = opts.avoid,
         arrive = function() return map() ~= startMap end }),
     H.driveUntil(function()
       return map() ~= startMap or (H.fieldX() == dx and H.fieldY() == dy)
@@ -181,7 +181,7 @@ local function chestAuto(cx, cy, bit, what, item, opts)
   return H.cond(function() return not H.chestOpen(bit) end, {
     H.call(function() pick = nil end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 15000, playBattles = "flee", avoid = opts.avoid }),
+      { maxFrames = 15000, playBattles = "tactical", avoid = opts.avoid }),
     H.call(function() before = item and H.invCountOf(item) or nil end),
     H.driveUntil(function()
       return H.readByte(0x087f + H.readWord(0x0803)) == FACE_VAL[stage()[3]]
@@ -278,7 +278,7 @@ local steps = {
   -- ---- 1. care, then the world walk to the Thamasa trigger ---------------
   H.waitFrames(60),
   H.fieldCare({ tag = "care at the K tile", threshold = 0.9 }),
-  H.worldNavTo(249, 128, { maxFrames = 6000, playBattles = "flee" }),
+  H.worldNavTo(249, 128, { maxFrames = 6000, playBattles = "tactical" }),
   H.call(function()
     H.log(string.format("[ot6] at (249,128) staging tile, f%d", H.frame))
   end),
@@ -341,7 +341,7 @@ local steps = {
     H.screenshot("thamasa_scene_end")
   end),
 
-  H.navTo(21, 47, { maxFrames = 20000, playBattles = "flee", avoid = VIGNETTES }),
+  H.navTo(21, 47, { maxFrames = 20000, playBattles = "tactical", avoid = VIGNETTES }),
   pressWalk("down", function() return H.worldMode() end, 900,
     "held DOWN onto the south strip -> world (249,128)"),
   H.waitUntil(function()

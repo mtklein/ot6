@@ -87,7 +87,7 @@ H.run({ maxFrames = 90000 }, {
   --    arrive bails if a stray step fires the trigger early; the next
   --    drive's map-55 pred is then already true and holds nothing (holding
   --    down at the gate would step onto y=43, the world-exit row).
-  H.worldNavTo(64, 75, { maxFrames = 30000, playBattles = "flee",
+  H.worldNavTo(64, 75, { maxFrames = 30000, playBattles = "tactical",
     arrive = function() return not H.worldMode() end }),
   H.driveUntil(function() return not H.worldMode() and map() == 55 end, 900, {
     H.hold({ "down" }), H.waitFrames(4),

@@ -82,7 +82,7 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- through the {3,5} door into the save room
-  H.navTo(3, 6, { playBattles = "flee", maxFrames = 6000 }),
+  H.navTo(3, 6, { playBattles = "tactical", maxFrames = 6000 }),
   tapInto("up", function() return map() == 270 end, 9000,
     "door 264 (3,5) -> map 270"),
   H.waitFrames(60),
@@ -93,7 +93,7 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- onto the save point
-  H.navTo(25, 11, { playBattles = "flee", maxFrames = 6000 }),
+  H.navTo(25, 11, { playBattles = "tactical", maxFrames = 6000 }),
   tapInto("up", onSaveTile(25, 10), 9000,
     "onto the save tile 270 (25,10)", tileCalm),
   H.waitFrames(45),

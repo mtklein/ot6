@@ -49,7 +49,7 @@ end
 -- change, or a same-map teleport detected by position), settle, log.
 local function hop(sx, sy, arriveFn, what)
   return seq({
-    H.navTo(sx, sy, { maxFrames = 40000, playBattles = "flee",
+    H.navTo(sx, sy, { maxFrames = 40000, playBattles = "tactical",
       arrive = arriveFn }),
     H.release(),
     H.waitUntil(function()
@@ -233,7 +233,7 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
     H.log(string.format("[ot6] in the pocket f%d (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
   end),
-  H.navTo(15, 17, { maxFrames = 20000, playBattles = "flee",
+  H.navTo(15, 17, { maxFrames = 20000, playBattles = "tactical",
     arrive = function()
       return sw(0x0099) == 1 or map() == 341 or H.battleLoadStarted()
     end }),
@@ -267,7 +267,7 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
   -- Stage at (24,19), one tile below Kefka, avoiding the exit-row triggers
   -- (x=9 col; y=45-46; x=24-28 y=15-16) that fire battle 75 in the Leo
   -- window.  navTo the approach tile, then capture the pre-battle-124 blob.
-  H.navTo(24, 19, { maxFrames = 15000, playBattles = "flee",
+  H.navTo(24, 19, { maxFrames = 15000, playBattles = "tactical",
     avoid = { { 9, 28 }, { 9, 29 }, { 9, 30 }, { 9, 31 }, { 9, 32 }, { 9, 33 },
               { 9, 34 }, { 24, 16 }, { 25, 16 }, { 27, 16 }, { 28, 15 },
               { 24, 15 }, { 25, 15 } } }),

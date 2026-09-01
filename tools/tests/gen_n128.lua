@@ -321,7 +321,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEntryContract("minecart-platform-v1")
     H.log(partyReport("minecart-platform-v1 entry"))
   end),
-  H.navTo(9, 52, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(9, 52, { maxFrames = 9000, playBattles = "tactical" }),
   -- face CID: his object occupies (9,51), so an UP press only turns
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
@@ -409,7 +409,7 @@ H.run({ maxFrames = 400000 }, {
   H.setRows({ [0x01] = true, [0x04] = true, [0x05] = true },
             { tag = "back row for the ride" }),
   H.fieldCare({ tag = "care before the ride", threshold = 0.95 }),
-  H.navTo(9, 52, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(9, 52, { maxFrames = 9000, playBattles = "tactical" }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
     H.assertEq(H.fieldX() == 9 and H.fieldY() == 52, true,
@@ -487,7 +487,7 @@ H.run({ maxFrames = 400000 }, {
   --    by $06AE.  The last step is a held RIGHT from (57,7).  A save
   --    tile flickers hasControl() (the SavePoint re-entry), so arrival
   --    is judged on position, $01BF and alignment.
-  H.navTo(57, 7, { maxFrames = 15000, playBattles = "flee" }),
+  H.navTo(57, 7, { maxFrames = 15000, playBattles = "tactical" }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 58 and H.fieldY() == 7 and sw(0x01BF) == 1

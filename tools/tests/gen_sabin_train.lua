@@ -142,7 +142,7 @@ end
 local ENCOUNTER_ALLOWANCE = 12000
 local function nav(x, y, o)
   o = o or {}
-  o.playBattles = "flee"
+  o.playBattles = "tactical"
   o.maxFrames = (o.maxFrames or 20000) + ENCOUNTER_ALLOWANCE
   return H.navTo(x, y, o)
 end
@@ -815,11 +815,9 @@ local function b47Attempt(n)
     end)(),
     H.waitFrames(30),
     H.call(function()
-      if lost == nil and not inParty(3) then
-        lost = string.format("SHADOW walked off after battle 47's win (the " ..
-          "1/16 roll) at f%d -- a shifted retry re-rolls it", H.frame)
-        H.log("[train] " .. lost)
-      end
+      -- the 1/16 leave roll is a no-op by design (Ot6ShadowLeaves): a
+      -- missing SHADOW after a win is a ROM regression, not a re-roll
+      H.assertEq(inParty(3), true, "SHADOW aboard after battle 47's win (the leave roll is a no-op by design)")
       if lost == nil then
         b47won = true
         H.log(string.format("[train] battle 47 attempt %d clean: won, " ..
@@ -1011,11 +1009,7 @@ local function b68Attempt(n)
           "(a wipe-teardown) at f%d [%s]", H.frame, partyLine())
         H.log("[b68] " .. lost)
       end
-      if lost == nil and not inParty(3) then
-        lost = string.format("SHADOW walked off after battle 68's win " ..
-          "(the 1/16 roll) at f%d -- a shifted retry re-rolls it", H.frame)
-        H.log("[train] " .. lost)
-      end
+      H.assertEq(inParty(3), true, "SHADOW aboard after battle 68's win (the leave roll is a no-op by design)")
       if lost == nil and (b68.shieldsOff or 0) < 6 then
         lost = string.format("battle 68 won at f%d but only %d of 6 shields " ..
           "came off -- the break did not complete, so this attempt does not " ..

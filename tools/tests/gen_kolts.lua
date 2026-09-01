@@ -138,7 +138,7 @@ local function settleWorld(what, maxF)
   return seq({
     H.advanceStory(settled(20, function()
       return H.worldHasControl() and H.worldAligned()
-    end), maxF or 12000, { playBattles = "flee" }),
+    end), maxF or 12000, { playBattles = "tactical" }),
     H.waitFrames(30),
   })
 end
@@ -170,7 +170,7 @@ local FACE = { up = 0, right = 1, down = 2, left = 3 }
 local function talkAt(sx, sy, dir, what, maxF)
   local aPh, started = 0, 0
   return seq({
-    H.navTo(sx, sy, { maxFrames = 20000, playBattles = "flee" }),
+    H.navTo(sx, sy, { maxFrames = 20000, playBattles = "tactical" }),
     H.release(),
     H.driveUntil(function()
       started = (H.eventRunning() or H.dialogWaiting()) and started + 1 or 0
@@ -200,7 +200,7 @@ local function warpTo(sx, sy, dx, dy, what, maxF)
       return string.format("warp %s: (%d,%d) -> (%d,%d) -> (%d,%d)",
         what, H.fieldX(), H.fieldY(), sx, sy, dx, dy)
     end),
-    H.navTo(sx, sy, { maxFrames = maxF or 20000, playBattles = "flee",
+    H.navTo(sx, sy, { maxFrames = maxF or 20000, playBattles = "tactical",
                       arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
@@ -338,7 +338,7 @@ local function shopTrip()
       return string.format("[shop] heading in: gil=%d tonic=%d potion=%d " ..
         "fenix=%d", gil(), invCount(0xE8), invCount(0xE9), invCount(0xF0))
     end),
-    H.navTo(44, 32, { maxFrames = 30000, playBattles = "flee", avoid = M75_AVOID }),
+    H.navTo(44, 32, { maxFrames = 30000, playBattles = "tactical", avoid = M75_AVOID }),
     H.release(), H.waitFrames(20),
     H.call(function()
       H.assertEq(H.fieldX(), 44, "on the shop's door mat, x=44")
@@ -355,7 +355,7 @@ local function shopTrip()
       H.assertEq(map(), 85, "inside the item shop, map 85")
       where("item shop")
     end),
-    H.navTo(106, 54, { maxFrames = 20000, playBattles = "flee" }),
+    H.navTo(106, 54, { maxFrames = 20000, playBattles = "tactical" }),
     H.release(), H.waitFrames(20),
     -- Counter talk: the merchant is at (106,52) with the counter tile
     -- (106,53) between him and the party, and CheckNPCs reaches through it
@@ -410,7 +410,7 @@ local function shopTrip()
         "the party leaves with two Softs -- Petrify recovery backs up the " ..
         "route, not merely the next encounter")
     end),
-    H.navTo(104, 57, { maxFrames = 20000, playBattles = "flee" }),
+    H.navTo(104, 57, { maxFrames = 20000, playBattles = "tactical" }),
     H.release(), H.waitFrames(20),
     leaveTo(75, { "down", "left", "right", "up" }, "out of the item shop"),
     settleField("back in town", 75),
@@ -461,7 +461,7 @@ end
 local function grindTrip()
   return seq({
     -- out of town by the x=0 column -> world (84,112)
-    H.navTo(1, 28, { maxFrames = 30000, playBattles = "flee",
+    H.navTo(1, 28, { maxFrames = 30000, playBattles = "tactical",
                      avoid = M75_AVOID }),
     H.release(), H.waitFrames(30),
     H.driveUntil(function() return H.worldMode() end, 900, {
@@ -514,7 +514,7 @@ local function enterDoor(mx, my, dstMap, what)
     H.logStep(function()
       return string.format("%s: doormat (%d,%d) -> map %d", what, mx, my, dstMap)
     end),
-    H.navTo(mx, my, { maxFrames = 30000, playBattles = "flee",
+    H.navTo(mx, my, { maxFrames = 30000, playBattles = "tactical",
                       avoid = M75_AVOID }),
     H.release(), H.waitFrames(20),
     H.call(function()
@@ -537,7 +537,7 @@ end
 -- through the door under it.
 local function leaveDoor(ax, ay, what)
   return seq({
-    H.navTo(ax, ay, { maxFrames = 20000, playBattles = "flee" }),
+    H.navTo(ax, ay, { maxFrames = 20000, playBattles = "tactical" }),
     H.release(), H.waitFrames(20),
     H.driveUntil(function() return map() == 75 end, 1800, {
       H.hold({ "down" }), H.waitFrames(8),
@@ -553,7 +553,7 @@ end
 -- below the merchant rather than adjacent to him.
 local function counterShop(sx, sy, what)
   return seq({
-    H.navTo(sx, sy, { maxFrames = 20000, playBattles = "flee" }),
+    H.navTo(sx, sy, { maxFrames = 20000, playBattles = "tactical" }),
     H.release(), H.waitFrames(20),
     H.driveUntil(inState(0x25), 6000, {
       H.call(function()
@@ -730,7 +730,7 @@ local function innRest(what)
     H.call(function()
       H.assertEq(gil() >= 80, true, what .. ": the party can pay the 80 GP")
     end),
-    H.navTo(81, 19, { maxFrames = 20000, playBattles = "flee" }),
+    H.navTo(81, 19, { maxFrames = 20000, playBattles = "tactical" }),
     H.release(), H.waitFrames(20),
     H.call(function()
       H.assertEq(H.fieldX(), 81, what .. ": on the innkeeper's talk spot x=81")
@@ -868,7 +868,7 @@ local function relicTrip()
       where("pendants on")
     end),
     -- region A -> region B, the inn wing
-    H.navTo(48, 3, { maxFrames = 20000, playBattles = "flee",
+    H.navTo(48, 3, { maxFrames = 20000, playBattles = "tactical",
       arrive = function() return H.fieldX() == 69 and H.fieldY() == 10 end }),
     H.release(),
     settleField("inn wing", 76),
@@ -888,7 +888,7 @@ local function relicTrip()
       H.screenshot("sfigaro_inn")
     end),
     -- back out: region B -> region A -> map 75
-    H.navTo(70, 11, { maxFrames = 20000, playBattles = "flee",
+    H.navTo(70, 11, { maxFrames = 20000, playBattles = "tactical",
       arrive = function() return H.fieldX() == 49 and H.fieldY() == 4 end }),
     H.release(),
     settleField("relic wing", 76),
@@ -940,7 +940,7 @@ H.run({ maxFrames = 700000 }, {
       "$001A clear -> the cave's map-73/72 copy (event_main.asm:14219)")
   end),
   settleWorld("desert"),
-  H.worldNavTo(73, 93, { maxFrames = 30000, playBattles = "flee",
+  H.worldNavTo(73, 93, { maxFrames = 30000, playBattles = "tactical",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField("cave mouth", 71),
@@ -964,7 +964,7 @@ H.run({ maxFrames = 700000 }, {
   H.advanceStory(function()
     return H.hasControl() and H.tileAligned() and sw(0x0312) == 0
        and map() == 71
-  end, 20000, { playBattles = "flee" }),
+  end, 20000, { playBattles = "tactical" }),
   H.call(function()
     H.assertEq(sw(0x0312), 0, "the guards are gone ($0312 cleared)")
     where("cave opened")
@@ -974,7 +974,7 @@ H.run({ maxFrames = 700000 }, {
   -- map 71's event trigger at (10,48)/(11,48) opens the cave (_ca5ef7); the
   -- lobby has no short entrance onward.
   H.navTo(11, 48, { maxFrames = 20000, arrive = mapChanged(),
-           playBattles = "flee" }),
+           playBattles = "tactical" }),
   H.release(),
   settleField("cave body"),
   H.call(function()
@@ -996,7 +996,7 @@ H.run({ maxFrames = 700000 }, {
     return string.format("cave exit: (%d,%d) -> (16,43) -> world (75,103)",
       H.fieldX(), H.fieldY())
   end),
-  H.navTo(16, 43, { maxFrames = 20000, playBattles = "flee",
+  H.navTo(16, 43, { maxFrames = 20000, playBattles = "tactical",
     arrive = function() return H.worldMode() end }),
   H.release(),
   settleWorld("south region"),
@@ -1017,7 +1017,7 @@ H.run({ maxFrames = 700000 }, {
   -- ((86,111)/(85,112)/(86,112)/(85,113) -> map 75 (1,28)); generate on
   -- arrival, then leave by the x=0 column the party is already beside.
   -- ===================================================================== --
-  H.worldNavTo(86, 111, { maxFrames = 30000, playBattles = "flee",
+  H.worldNavTo(86, 111, { maxFrames = 30000, playBattles = "tactical",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField("south figaro", 75),
@@ -1037,15 +1037,15 @@ H.run({ maxFrames = 700000 }, {
   end),
 
   H.openChest{ stand = {5, 31}, face = "right", bit = 24, what = "Tonic",
-               item = 0xE8, nav = { playBattles = "flee", avoid = M75_AVOID } },
+               item = 0xE8, nav = { playBattles = "tactical", avoid = M75_AVOID } },
   H.openChest{ stand = {13, 28}, face = "right", bit = 25,
                what = "Green Cherry",
-               nav = { playBattles = "flee", avoid = M75_AVOID } },
+               nav = { playBattles = "tactical", avoid = M75_AVOID } },
   H.openChest{ stand = {11, 24}, face = "up", bit = 231, what = "Warp Stone",
-               nav = { playBattles = "flee", avoid = M75_AVOID } },
+               nav = { playBattles = "tactical", avoid = M75_AVOID } },
 
   enterDoor(15, 20, 81, "chest yard house"),
-  H.navTo(16, 15, { maxFrames = 20000, playBattles = "flee",
+  H.navTo(16, 15, { maxFrames = 20000, playBattles = "tactical",
                     avoid = { { 4, 17 }, { 16, 16 } } }),
   H.release(), H.waitFrames(20),
   H.driveUntil(function() return map() == 75 end, 1800, {
@@ -1057,9 +1057,9 @@ H.run({ maxFrames = 700000 }, {
     H.assertEq(map(), 75, "in the chest yard, back on map 75")
   end),
   H.openChest{ stand = {22, 19}, face = "up", bit = 20, what = "Fenix Down",
-               item = 0xF0, nav = { playBattles = "flee" } },
+               item = 0xF0, nav = { playBattles = "tactical" } },
   enterDoor(23, 17, 81, "chest yard house, back through"),
-  H.navTo(4, 16, { maxFrames = 20000, playBattles = "flee",
+  H.navTo(4, 16, { maxFrames = 20000, playBattles = "tactical",
                    avoid = { { 16, 16 }, { 4, 17 } } }),
   H.release(), H.waitFrames(20),
   H.driveUntil(function() return map() == 75 end, 1800, {
@@ -1072,7 +1072,7 @@ H.run({ maxFrames = 700000 }, {
   end),
 
   H.openChest{ stand = {32, 17}, face = "up", bit = 21, what = "Tonic",
-               item = 0xE8, nav = { playBattles = "flee", avoid = M75_AVOID } },
+               item = 0xE8, nav = { playBattles = "tactical", avoid = M75_AVOID } },
 
   shopTrip(),
 
@@ -1096,9 +1096,9 @@ H.run({ maxFrames = 700000 }, {
   end),
 
   H.openChest{ stand = {15, 46}, face = "up", bit = 22, what = "Antidote",
-               item = 0xF2, nav = { playBattles = "flee", avoid = M75_AVOID } },
+               item = 0xF2, nav = { playBattles = "tactical", avoid = M75_AVOID } },
   H.openChest{ stand = {15, 46}, face = "down", bit = 23, what = "Eyedrop",
-               nav = { playBattles = "flee", avoid = M75_AVOID } },
+               nav = { playBattles = "tactical", avoid = M75_AVOID } },
 
   relicTrip(),
 
@@ -1107,7 +1107,7 @@ H.run({ maxFrames = 700000 }, {
   -- Out the way we came: x=0 is the vertical long entrance -> world
   -- (84,112).  One press, not a navTo, because the target tile is the
   -- trigger.
-  H.navTo(1, 28, { maxFrames = 20000, playBattles = "flee", avoid = M75_AVOID }),
+  H.navTo(1, 28, { maxFrames = 20000, playBattles = "tactical", avoid = M75_AVOID }),
   H.release(),
   H.waitFrames(30),
   H.driveUntil(function() return H.worldMode() end, 900, {
@@ -1122,7 +1122,7 @@ H.run({ maxFrames = 700000 }, {
   -- exit row y=37 is two tiles south of the spawn, so every step here is
   -- pre-checked against it.
   -- ===================================================================== --
-  H.worldNavTo(102, 100, { maxFrames = 40000, playBattles = "flee",
+  H.worldNavTo(102, 100, { maxFrames = 40000, playBattles = "tactical",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField("mt kolts", 95),

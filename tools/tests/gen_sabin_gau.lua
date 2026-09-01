@@ -1274,7 +1274,7 @@ H.run({ maxFrames = 500000 }, {
   end),
 
   -- off the shore, to Mobliz, buy the Dried Meat and the grind's Tonics
-  H.navTo(8, 14, { maxFrames = 6000, playBattles = "flee", arrive = function()
+  H.navTo(8, 14, { maxFrames = 6000, playBattles = "tactical", arrive = function()
     return H.worldMode() end }),
   H.waitUntil(function() return H.worldMode() and H.worldHasControl() end,
     3000, "on the world", 5),
@@ -1297,14 +1297,14 @@ H.run({ maxFrames = 500000 }, {
     lost, wipeN = nil, 0
   end),
   settle(157, "Mobliz"),
-  H.navTo(26, 22, { maxFrames = 10000, playBattles = "flee", arrive = function()
+  H.navTo(26, 22, { maxFrames = 10000, playBattles = "tactical", arrive = function()
     return mapIdx() == 164 end }),
   H.cond(function() return mapIdx() ~= 164 end, {
-    H.navTo(26, 21, { maxFrames = 3000, playBattles = "flee", arrive = function()
+    H.navTo(26, 21, { maxFrames = 3000, playBattles = "tactical", arrive = function()
       return mapIdx() == 164 end }),
   }, {}),
   settle(164, "item shop"),
-  H.navTo(29, 50, { maxFrames = 6000, playBattles = "flee" }),
+  H.navTo(29, 50, { maxFrames = 6000, playBattles = "tactical" }),
   (function()
     local phase = 0
     return H.driveUntil(function() return mstateMenu() == 0x25 end, 3000, {
@@ -1348,13 +1348,13 @@ H.run({ maxFrames = 500000 }, {
   -- staging tile can remain field-menu hostile briefly after a random battle.
   prepareFeed(),
 
-  H.navTo(29, 53, { maxFrames = 4000, playBattles = "flee", arrive = function()
+  H.navTo(29, 53, { maxFrames = 4000, playBattles = "tactical", arrive = function()
     return mapIdx() == 157 end }),
   settle(157, "town again"),
   -- (18,41) is Mobliz's south exit ROW, and a row you leave a town by is a
   -- tile you STEP THROUGH, never one you come to rest on.  navTo to the
   -- entry point and press SOUTH through the row.
-  H.navTo(18, 40, { maxFrames = 8000, playBattles = "flee", arrive = function()
+  H.navTo(18, 40, { maxFrames = 8000, playBattles = "tactical", arrive = function()
     return H.worldMode() end }),
   (function()
     local hb = -600

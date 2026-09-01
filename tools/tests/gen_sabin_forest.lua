@@ -21,11 +21,10 @@
 --        (dlg $02A4, $0038), then W to (72,10) _cba8f1 boarding cutscene ->
 --        `load_map 145,{26,11}` (event_main.asm:62961), $017C cleared to 0.
 -- No scripted battles/choices/name-menus on the walk; only random
--- encounters and the boarding dialogs (tap-A). Every encounter is fled
--- (hold L+R, the engine's own run mechanic), never won, so the leave roll
--- (which only fires on a win) never runs and SHADOW's presence at
--- generation time has no timing dependence. This generator makes no state
--- writes.
+-- encounters and the boarding dialogs (tap-A). The fighting lineage fights
+-- its encounters (the shared navigator, FIGHT_NOT_FLEE); SHADOW's presence
+-- has no timing dependence because OT6 makes the 1/16 leave roll a no-op
+-- (Ot6ShadowLeaves, battle_main.asm). This generator makes no state writes.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_escaped.mss.lua"
@@ -43,7 +42,7 @@ local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 local function worldToMap(tx, ty, what, budget)
   return H.worldNavTo(tx, ty, {
     maxFrames = budget or 25000,
-    playBattles = "flee",
+    playBattles = "tactical",
     arrive = function() return not H.worldMode() end,
   })
 end
@@ -61,7 +60,7 @@ local function crossVia(wx, wy, dir, toMap, what)
         "%s -> map %d from (%d,%d) f%d", what, wx, wy, dir, toMap,
         H.fieldX(), H.fieldY(), H.frame)
     end),
-    H.navTo(wx, wy, { maxFrames = 14000, playBattles = "flee",
+    H.navTo(wx, wy, { maxFrames = 14000, playBattles = "tactical",
       arrive = function()
       return mapIdx() == toMap or (H.fieldX() == wx and H.fieldY() == wy
          and H.hasControl() and H.tileAligned()) end }),
@@ -95,7 +94,7 @@ end
 
 -- walk to field edge tile (tx,ty) on the current map and cross; done when the
 -- map index becomes `toMap`.  navTo handles the walk, random encounters
--- (fled, playBattles="flee"), and any cutscene dialogs (tap-A); the
+-- (fled, playBattles="tactical"), and any cutscene dialogs (tap-A); the
 -- short-entrance fires on arrival, so control is never handed back on
 -- (tx,ty) itself.  Use this only where the path to (tx,ty) does not brush
 -- another exit; else use crossVia.
@@ -106,7 +105,7 @@ local function crossTo(tx, ty, toMap, what)
         "from map %d (%d,%d) f%d", what, tx, ty, toMap, mapIdx(),
         H.fieldX(), H.fieldY(), H.frame)
     end),
-    H.navTo(tx, ty, { maxFrames = 16000, playBattles = "flee",
+    H.navTo(tx, ty, { maxFrames = 16000, playBattles = "tactical",
       arrive = function() return mapIdx() == toMap end }),
     H.waitUntil(function()
       return mapIdx() == toMap and H.hasControl() and H.tileAligned()
@@ -193,7 +192,7 @@ H.run({ maxFrames = 120000 }, {
     H.log(string.format("[forest] on map 140 at (%d,%d) -- board the train",
       H.fieldX(), H.fieldY()))
   end),
-  H.navTo(72, 11, { maxFrames = 16000, playBattles = "flee",
+  H.navTo(72, 11, { maxFrames = 16000, playBattles = "tactical",
     arrive = function() return mapIdx() == 145 end }),
   (function()
     local phase, hb = 0, -600
@@ -230,9 +229,13 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(sw(0x0038), 1, "$0038 set -- train discovered")
     H.assertEq(inParty(5), true, "SABIN aboard")
     H.assertEq(inParty(2), true, "CYAN aboard")
-    H.assertEq(inParty(3), true,
-      "SHADOW aboard -- deterministically: every encounter was fled, so " ..
-      "his 1/16 leave roll never ran")
+    -- SHADOW aboard by DESIGN: OT6's Ot6ShadowLeaves makes the vanilla
+    -- 1/16 leave roll a no-op (owner's call, 2026-09-01: Shadow stays for
+    -- the whole game; only scripted departures remain), so the fighting
+    -- lineage's won battles here cannot lose him.  (Until that day a
+    -- passing roll HALTED the game -- a mis-banked jump -- so this line
+    -- had never seen a passed roll either way.)
+    H.assertEq(inParty(3), true, "SHADOW aboard -- the leave roll is a no-op by design (Ot6ShadowLeaves)")
     H.assertEq(sw(0x003A), 0, "$003A clear -- Ghost Train not yet beaten")
     H.log(string.format("[forest_done] f%d map=%d (%d,%d) $0038=%d $017C=%d",
       H.frame, mapIdx(), H.fieldX(), H.fieldY(), sw(0x0038), sw(0x017C)))

@@ -142,14 +142,14 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   H.openChest{ stand = { 15, 55 }, face = "left", bit = 89,
-               what = "Gold Helmet", nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
+               what = "Gold Helmet", nav = { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
   H.openChest{ stand = { 33, 57 }, face = "left", bit = 93,
-               what = "Gold Armor", nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
+               what = "Gold Armor", nav = { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
   H.openChest{ stand = { 43, 46 }, face = "left", bit = 92,
-               what = "Tent", nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
+               what = "Tent", nav = { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
 
   -- 1. two steps east onto {24,18} -> the ride -> {40,30}
-  H.navTo(23, 18, { maxFrames = 12000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
+  H.navTo(23, 18, { maxFrames = 12000, playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
   tapInto("right", function() return H.fieldX() == 40 and H.fieldY() == 30 end,
     12000, "RIGHT onto {24,18} -> the ride -> (40,30)"),
   H.waitFrames(30),

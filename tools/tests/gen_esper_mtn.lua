@@ -26,7 +26,7 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 -- (the map id changed), then settle on the far side.
 local function hop(sx, sy, fromMap, what, avoid)
   return seq({
-    H.navTo(sx, sy, { maxFrames = 40000, playBattles = "flee", avoid = avoid,
+    H.navTo(sx, sy, { maxFrames = 40000, playBattles = "tactical", avoid = avoid,
       arrive = function() return map() ~= fromMap end }),
     H.release(),
     H.waitUntil(function()
@@ -122,7 +122,7 @@ H.run({ maxFrames = 500000 }, {
 
   -- ---- 1. care, then the world walk to the mountain entrance -------------
   H.fieldCare({ tag = "care at the M tile", threshold = 1.0 }),
-  H.worldNavTo(229, 130, { maxFrames = 40000, playBattles = "flee",
+  H.worldNavTo(229, 130, { maxFrames = 40000, playBattles = "tactical",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   H.waitUntil(function() return map() == 375 and H.hasControl() end, 4000,
@@ -139,7 +139,7 @@ H.run({ maxFrames = 500000 }, {
   H.advanceStory(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15
        and not H.dialogWaiting() and not H.battleLoadStarted()
-  end, 8000, { playBattles = "flee" }),
+  end, 8000, { playBattles = "tactical" }),
   hop(60, 16, 375, "375(60,16) -> 373"),
   hop(25, 15, 373, "373(25,15) -> 375 comp17 (rides the (20,17) vignette)"),
   hop(53, 62, 375, "375(53,62) -> 371 statue room"),
@@ -154,7 +154,7 @@ H.run({ maxFrames = 500000 }, {
   end),
   -- stage one tile east of the save tile (the (2,45)..(8,44) corridor runs
   -- E-W; (9,44) is on it), leaving the tap onto (8,44) to tapToSave
-  H.navTo(9, 44, { maxFrames = 20000, playBattles = "flee",
+  H.navTo(9, 44, { maxFrames = 20000, playBattles = "tactical",
     avoid = { { 15, 17 }, { 12, 46 }, { 11, 51 }, { 17, 49 } } }),
   H.release(),
   H.call(function()

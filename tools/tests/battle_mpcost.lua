@@ -29,7 +29,12 @@
 --           trash dies first), so this arm keeps one write: MP := 1
 --           (below Dispatch's cost) with the pip rebanked by a real item
 --           turn; the retried Dispatch must fizzle, dealing no damage,
---           leaving the 1 MP untouched and never negative.
+--           leaving the 1 MP untouched and never negative.  A ladder over
+--           fresh battles: the fighting lineage's camp_escaped packs carry
+--           a Berserk special, and once it lands on CYAN ($3EE5,x bit 4)
+--           CheckPlayerAction (battle_main.asm:1470) auto-picks his turns
+--           and his window never opens again in that battle, so an
+--           attempt that loses his window is void and drains its battle.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
@@ -72,6 +77,46 @@ local function refindSlots()
     if id == 0x02 then cyan = slot end
     if id == 0x03 then shadow = slot end
   end
+end
+-- Can this character's next full gauge open a command window?  The mirror
+-- of CheckPlayerAction's status gate (battle_main.asm:1470): STATUS1
+-- $3EE4,x {ZOMBIE $02, PETRIFY $40, DEAD $80} and STATUS2 $3EE5,x {BERSERK
+-- $10, CONFUSE $20, SLEEP $80} (const.inc STATUS1/STATUS2) each send the
+-- turn to CancelAction instead of the menu.  Read, never written.
+local ST1_NOMENU, ST2_NOMENU = 0x02 | 0x40 | 0x80, 0x10 | 0x20 | 0x80
+local function canMenu(slot)
+  return (H.readByte(0x3EE4 + slot*2) & ST1_NOMENU) == 0
+     and (H.readByte(0x3EE5 + slot*2) & ST2_NOMENU) == 0
+end
+local function cyanCanMenu() return canMenu(cyan) end
+-- The pack's HP table fills a few frames AFTER battleLoadStarted() and the
+-- present mask come up (probe: live at f6670, monster HP at f6671-72), and
+-- the status bytes above are the previous battle's until then.  So "CYAN
+-- lost his window" is only read off a battle whose pack has HP.
+local function cyanLostMenu()
+  return monsterHpSum() > 0 and not cyanCanMenu()
+end
+-- A live ally whose turns the game picks for him (BERSERK or CONFUSE) can
+-- swing at the monsters with no pad input at all, so the no-damage half of
+-- the refusal cannot be isolated while one is on the field.
+local function allyAutoActing()
+  for slot = 0, 3 do
+    if hp(slot) > 0 and (H.readByte(0x3EE5 + slot*2) & 0x30) ~= 0 then
+      return slot
+    end
+  end
+  return nil
+end
+local function packStr()
+  local parts = {}
+  for _, id in ipairs(H.monsterIds()) do
+    if id ~= 0xFFFF then parts[#parts + 1] = string.format("%03x", id) end
+  end
+  return table.concat(parts, ",")
+end
+local function cyanStatusStr()
+  return string.format("st1=%02x st2=%02x", H.readByte(0x3EE4 + cyan*2),
+    H.readByte(0x3EE5 + cyan*2))
 end
 
 local mf = 0
@@ -267,8 +312,17 @@ H.run({ maxFrames = 200000 }, {
 
   -- ------------------------------------------------- 3. refusal (ON only) --
   -- The labeled isolation arm; see the header.  The pip is still rebanked by
-  -- a real item turn and the attempt is a real menu drive; only the
-  -- poverty itself is staged.
+  -- a real item turn (in a fresh battle it is Ot6InitBP's opening 1) and the
+  -- attempt is a real menu drive; only the poverty itself is staged.
+  --
+  -- An attempt is void, not failed, when CYAN loses his window to a status
+  -- (the Berserk special; see the header) or the battle ends under it.  The
+  -- latch drive has to see both itself: a berserked CYAN never pends, and a
+  -- battle his auto-Fights then win parks on the EXP screen, where
+  -- battleLoadStarted() still reads the HP table and the quieted idle A
+  -- never dismisses it -- the 30000-frame timeout, not a refusal.  A void
+  -- attempt drains its battle (idle A back on) so the next one walks to a
+  -- fresh encounter.
   H.cond(function() return mode == "on" end, {
     (function()
       local done = false
@@ -278,13 +332,18 @@ H.run({ maxFrames = 200000 }, {
           driveTo(function()
             return H.battleLoadStarted() and H.monstersPresent() > 0
           end, 30000, "refusal battle (attempt " .. attempt .. ")"),
-          H.call(function() refindSlots(); cyanMode = "item" end),
+          H.call(function()
+            refindSlots(); cyanMode = "item"
+            H.log(string.format(
+              "  [refusal arm %d] pack %s; cyan slot %d bp=%d mp=%d %s",
+              attempt, packStr(), cyan, bp(), mp(), cyanStatusStr()))
+          end),
           driveTo(function()
-            return not H.battleLoadStarted() or bp() >= 1
+            return not H.battleLoadStarted() or cyanLostMenu() or bp() >= 1
           end, 40000, "a real item turn rebanks the pip (attempt "
             .. attempt .. ")"),
           H.cond(function()
-            return H.battleLoadStarted() and bp() >= 1
+            return H.battleLoadStarted() and not cyanLostMenu() and bp() >= 1
           end, {
             H.call(function()
               -- the isolation write (waived, labeled): the broke pool
@@ -295,7 +354,7 @@ H.run({ maxFrames = 200000 }, {
                 and mp() < DISPATCH_COST
             end, {
               (function()
-                local m0, g1, latched = nil, nil, false
+                local m0, g1, latched, packSeen = nil, nil, false, false
                 return H.repeatN(1, {
                   H.call(function()
                     m0 = mp()
@@ -314,9 +373,20 @@ H.run({ maxFrames = 200000 }, {
                   -- the latch (pending banks 1 at the submenu confirm).
                   -- The damage baseline is captured at the latch, and the
                   -- pad goes quiet for the whole bounded window so nothing
-                  -- but the fizzle, or its absence, can touch the monsters
+                  -- but the fizzle, or its absence, can touch the monsters.
+                  -- The drive also ends, unlatched, when the latch can no
+                  -- longer come: CYAN lost his window to a status, or the
+                  -- pack is dead (the EXP screen, which the quiet A cannot
+                  -- dismiss and battleLoadStarted() cannot see past).  Dead
+                  -- means seen alive first: a fresh battle's pack reads 0 HP
+                  -- for its first frames (see cyanLostMenu).
                   driveTo(function()
                     if not H.battleLoadStarted() then return true end
+                    local packHp = monsterHpSum()
+                    if packHp > 0 then packSeen = true end
+                    if cyanLostMenu() or (packSeen and packHp == 0) then
+                      return true
+                    end
                     if pend() >= 1 and not latched then
                       latched = true
                       g1 = monsterHpSum()
@@ -328,8 +398,16 @@ H.run({ maxFrames = 200000 }, {
                   H.waitFrames(400),
                   H.call(function() quietA = false end),
                   H.call(function()
-                    if not H.battleLoadStarted() or not latched then return end
+                    if not H.battleLoadStarted() or not latched then
+                      H.log(string.format("  [refusal arm %d] void before the "
+                        .. "latch: live=%s menuable=%s monsters %d hp %s",
+                        attempt, tostring(H.battleLoadStarted()),
+                        tostring(cyanCanMenu()), monsterHpSum(),
+                        cyanStatusStr()))
+                      return
+                    end
                     local left = mp()
+                    local auto = allyAutoActing()
                     H.log(string.format(
                       "refused Dispatch: MP %d -> %d, damage since %d, $3410 %s",
                       m0, left, g1 - monsterHpSum(),
@@ -337,6 +415,17 @@ H.run({ maxFrames = 200000 }, {
                     H.assertEq(left, m0,
                       "ON: too little MP is REFUSED -- the 1 MP is untouched, "
                       .. "never negative")
+                    if auto ~= nil then
+                      -- the MP half held; the damage half cannot be read
+                      -- off a field where the game swings for an ally.
+                      -- A fresh battle measures it again.
+                      H.log(string.format("  [refusal arm %d] slot %d is "
+                        .. "auto-acting (st2=%02x) inside the damage window; "
+                        .. "the no-damage half is measured again in a fresh "
+                        .. "battle", attempt, auto,
+                        H.readByte(0x3EE5 + auto*2)))
+                      return
+                    end
                     H.assertEq(g1 - monsterHpSum() <= 0, true,
                       "ON: and the refused tech dealt no damage (fizzled)")
                     H.screenshot("mpcost_on_refused")
@@ -346,6 +435,24 @@ H.run({ maxFrames = 200000 }, {
               end)(),
             }, {}),
           }, {}),
+          -- a void attempt leaves whatever battle remains; drain it (idle A
+          -- back on, so an EXP screen is dismissed and a berserked CYAN's
+          -- own swings end a live one) so the next attempt starts from a
+          -- FRESH encounter
+          H.cond(function() return done end, {}, {
+            H.call(function()
+              H.log(string.format("  [refusal arm %d] void: live=%s "
+                .. "menuable=%s bp=%d mp=%d %s -- draining the battle",
+                attempt, tostring(H.battleLoadStarted()),
+                tostring(cyanCanMenu()), bp(), mp(), cyanStatusStr()))
+              cyanMode = "defer"
+              quietA = false
+            end),
+            driveTo(function() return not H.battleLoadStarted() end, 60000,
+              "the failed attempt's battle drains away (attempt "
+              .. attempt .. ")"),
+            H.waitFrames(240),
+          }),
         })
       end
       steps[#steps+1] = H.call(function()

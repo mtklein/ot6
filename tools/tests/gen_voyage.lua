@@ -279,7 +279,7 @@ local steps = {
   -- and a held press skips walk-over triggers anyway (gen_banquet_done's
   -- (23,12) finding); the (43,29) long entrance fires in motion like every
   -- entrance.  One held DOWN crosses both.
-  H.navTo(43, 25, { maxFrames = 20000, playBattles = "flee" }),
+  H.navTo(43, 25, { maxFrames = 20000, playBattles = "tactical" }),
   pressWalk("down", function() return map() == 332 end, 1200,
     "held DOWN through the gate onto (43,29) -> the port 332 (22,2)"),
   H.waitUntil(landed(332, 10), 2400, "the port", 1),
@@ -295,7 +295,7 @@ local steps = {
   -- without the scene on this chain (header note 3); the settle absorbs
   -- the refusal scene if the derivation is wrong, and the log plus the
   -- exit contract's $02FB row report which way it went.
-  H.navTo(10, 10, { maxFrames = 12000, calmFrames = 4, playBattles = "flee" }),
+  H.navTo(10, 10, { maxFrames = 12000, calmFrames = 4, playBattles = "tactical" }),
   H.call(function()
     H.log(string.format(
       "[gau] resting on (10,10): $02FB=%d $0637=%d $009D=%d $1850[GAU]=%02X",
@@ -330,20 +330,20 @@ local steps = {
   -- Out of the port: the (21,1)/(22,1) triggers load 323 (44,28)
   -- (_cbc87a).  navTo rests on the tile and the arrive predicate is the
   -- map change itself, the shape gen_banquet_done used for its world exit.
-  H.navTo(22, 1, { maxFrames = 12000, playBattles = "flee",
+  H.navTo(22, 1, { maxFrames = 12000, playBattles = "tactical",
     arrive = function() return map() == 323 end }),
   H.waitUntil(landed(323, 10), 2400, "back in Albrook at the gate", 1),
   H.call(function()
     H.assertEq(H.fieldX(), 44, "gate-side arrival x (44,28)")
     H.assertEq(H.fieldY(), 28, "gate-side arrival y")
   end),
-  H.navTo(43, 27, { maxFrames = 6000, playBattles = "flee" }),
+  H.navTo(43, 27, { maxFrames = 6000, playBattles = "tactical" }),
   pressWalk("up", function()
     return H.fieldY() <= 24 and H.tileAligned()
   end, 900, "held UP through the gate row into town"),
   H.release(),
   H.waitFrames(30),
-  H.navTo(1, 17, { maxFrames = 20000, playBattles = "flee" }),
+  H.navTo(1, 17, { maxFrames = 20000, playBattles = "tactical" }),
   pressWalk("left", function() return H.worldMode() end, 900,
     "held LEFT onto the x=0 column -> world (137,203), MID-WINDOW"),
   H.waitUntil(function()
@@ -379,7 +379,7 @@ local steps = {
   -- it is entered with a held press, never a navTo whose goal it is
   -- (gen_kolts's (44,30) finding; the first run of this generator aimed
   -- navTo at the door tile and BFS correctly said "no path").
-  H.navTo(54, 13, { maxFrames = 20000, playBattles = "flee" }),
+  H.navTo(54, 13, { maxFrames = 20000, playBattles = "tactical" }),
   H.driveUntil(function() return map() == 325 end, 1200, {
     H.hold({ "up" }), H.waitFrames(8),
   }, "bump the inn door (54,12) -> 325"),
@@ -398,7 +398,7 @@ local steps = {
     H.log(string.format("[voyage] morning at 325 (%d,%d)",
       H.fieldX(), H.fieldY()))
   end),
-  H.navTo(58, 57, { maxFrames = 12000, playBattles = "flee",
+  H.navTo(58, 57, { maxFrames = 12000, playBattles = "tactical",
     arrive = function() return map() == 323 end }),
   H.waitUntil(landed(323, 10), 2400, "out of the inn", 1),
   H.call(function()
@@ -407,7 +407,7 @@ local steps = {
   end),
 
   -- ---- 7. back to the pier; "Right...let's go"; sail 1 ----------------------
-  H.navTo(43, 25, { maxFrames = 20000, playBattles = "flee" }),
+  H.navTo(43, 25, { maxFrames = 20000, playBattles = "tactical" }),
   pressWalk("down", function() return map() == 332 end, 1200,
     "held DOWN through the gate -> the port again"),
   H.waitUntil(landed(332, 10), 2400, "the port, morning", 1),

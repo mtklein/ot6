@@ -138,7 +138,7 @@ local crossed, crossLost, crossBlob = false, nil, nil
 local function crossBody()
   return H.cond(function() return crossLost == nil end, {
     -- 1. across the upper floor to {19,22}, one tile above the door frames.
-    H.navTo(19, 22, { maxFrames = 50000, playBattles = "flee",
+    H.navTo(19, 22, { maxFrames = 50000, playBattles = "tactical",
       wipeEndsRide = true,
       arrive = function() return H.fieldY() >= 40 end }),
     H.call(function()
@@ -149,7 +149,7 @@ local function crossBody()
       end
     end),
     H.cond(function() return crossLost == nil end, {
-      H.navTo(19, 22, { maxFrames = 18000, playBattles = "flee",
+      H.navTo(19, 22, { maxFrames = 18000, playBattles = "tactical",
         wipeEndsRide = true }),                       -- doors
       H.call(function()
         if H.partyWiped() then

@@ -309,7 +309,7 @@ end
 -- is the arrival
 local function worldToMap(tx, ty, what, budget)
   return H.worldNavTo(tx, ty, { maxFrames = budget or 30000,
-    playBattles = "flee",
+    playBattles = "tactical",
     arrive = function() return not H.worldMode() end })
 end
 
@@ -319,10 +319,10 @@ local function walkToFalls()
   return seq({
     worldToMap(185, 93, "falls cave (185,93)", 20000),
     settle(166, "cave 166"),
-    H.navTo(7, 5, { maxFrames = 6000, playBattles = "flee" }),
+    H.navTo(7, 5, { maxFrames = 6000, playBattles = "tactical" }),
     ride("up", function() return mapIdx() == 155 end, "-> 155", 3000),
     settle(155, "overlook 155"),
-    H.navTo(10, 5, { maxFrames = 6000, playBattles = "flee" }),
+    H.navTo(10, 5, { maxFrames = 6000, playBattles = "tactical" }),
     ride("up", function() return mapIdx() == 156 end, "-> 156", 3000),
     settle(156, "falls top 156"),
     ride("up", function()
@@ -359,7 +359,7 @@ local function jumpAttempt(n)
       lost, fightTier, wipeN = nil, n, 0
       rizo.seen, rizo.mask0 = false, nil
     end),
-    H.navTo(13, 11, { maxFrames = 5000, playBattles = "flee" }),
+    H.navTo(13, 11, { maxFrames = 5000, playBattles = "tactical" }),
     (function()
       local frames = 0
       return ride("up", function()

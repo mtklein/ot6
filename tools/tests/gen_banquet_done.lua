@@ -321,7 +321,7 @@ local function circuitRunner()
             H.frame, timerCount(), chestTries)
           cur = H.openChest{ stand = stand[1], face = stand[2], bit = 81,
                              what = "Tincture", item = 0xEB,
-                             nav = { playBattles = "flee", maxFrames = 2500,
+                             nav = { playBattles = "tactical", maxFrames = 2500,
                                      noPathRetries = 3 } }
           return "frame"
         end
@@ -360,7 +360,7 @@ local function circuitRunner()
         cur = H.navTo(c[1], c[2], {
           maxFrames = 3000,
           noPathRetries = 3,
-          playBattles = "flee",
+          playBattles = "tactical",
           avoid = (map() == 250 and anyLeftOutside243()) and DOOR243 or nil,
           arrive = function()
             return map() ~= fromMap
@@ -503,11 +503,11 @@ local steps = {
   H.fieldCare({ tag = "care before the banquet", threshold = 0.95 }),
 
   -- ---- 2. the castle and the dais ------------------------------------------
-  H.navTo(28, 2, { maxFrames = 30000, playBattles = "flee" }),
+  H.navTo(28, 2, { maxFrames = 30000, playBattles = "tactical" }),
   pressWalk("up", function() return map() == 243 end, 900,
     "castle door 253 (28,1) -> 243 (15,29)"),
   H.waitUntil(landed(243, 10), 2400, "castle antechamber 243", 1),
-  H.navTo(8, 18, { maxFrames = 12000, calmFrames = 4, playBattles = "flee" }),
+  H.navTo(8, 18, { maxFrames = 12000, calmFrames = 4, playBattles = "tactical" }),
   H.stepOff({ "right", "down", "up" }, 6000,
     "escort: A through $06A6, step off (8,18)"),
   H.waitUntil(function() return sw(0x013A) == 1 end, 3000,
@@ -516,20 +516,20 @@ local steps = {
   H.call(function()
     H.assertEq(sw(0x062F), 1, "$062F -- the soldier population is up")
   end),
-  H.navTo(15, 9, { maxFrames = 12000, playBattles = "flee" }),
+  H.navTo(15, 9, { maxFrames = 12000, playBattles = "tactical" }),
   pressWalk("up", function() return map() == 250 end, 900,
     "door 243 (15,8) -> 250 (23,33)"),
   H.waitUntil(landed(250, 10), 2400, "250 first entry", 1),
   H.call(function()
     H.assertEq(sw(0x013B), 1, "$013B -- 250 map-init opened the {22,29} door")
   end),
-  H.navTo(23, 30, { maxFrames = 6000, playBattles = "flee" }),
+  H.navTo(23, 30, { maxFrames = 6000, playBattles = "tactical" }),
   pressWalk("up", function()
     return H.fieldY() <= 28 and H.tileAligned()
   end, 900, "held UP through the {22,29} doorway"),
   H.release(),
   H.waitFrames(30),
-  H.navTo(23, 13, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(23, 13, { maxFrames = 9000, playBattles = "tactical" }),
   pressWalk("up", function()
     return (H.fieldX() ~= 23 or H.fieldY() > 20) and H.tileAligned()
   end, 1200, "held UP past (23,12) onto the (23,9) stairs -> (54,34)"),
@@ -540,7 +540,7 @@ local steps = {
     H.assertEq(H.fieldX(), 54, "stairs landing x (short entrance 23,9)")
     H.assertEq(H.fieldY(), 34, "stairs landing y")
   end),
-  H.navTo(54, 16, { maxFrames = 20000, playBattles = "flee" }),
+  H.navTo(54, 16, { maxFrames = 20000, playBattles = "tactical" }),
   H.call(function()
     H.assertEq(sw(0x007C), 0, "$007C clear at the dais")
     H.screenshot("step_ij_dais")
@@ -565,7 +565,7 @@ local steps = {
 
   -- leave the throne tower (the (53,35) long entrance to the corridor),
   -- then run the talk-only greedy circuit until the timer kills it
-  H.navTo(53, 34, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(53, 34, { maxFrames = 9000, playBattles = "tactical" }),
   (function() local ph = 0
     return H.driveUntil(function() return H.fieldX() < 40 end, 1200, {
       H.call(function()
@@ -700,7 +700,7 @@ local steps = {
       .. "'win' pays nothing and must fail here)")
     H.assertEq(var0(), dinner.preBattle30 + 5, "challenge +5 (clean)")
   end),
-  H.navTo(80, 20, { maxFrames = 9000, calmFrames = 4, playBattles = "flee" }),
+  H.navTo(80, 20, { maxFrames = 9000, calmFrames = 4, playBattles = "tactical" }),
   H.waitUntil(function() return H.readByte(0x056f) >= 2 end, 1200,
     "'Shall we begin again?'", 5),
   H.call(function() dinner.preWish = var0() end),
@@ -746,13 +746,13 @@ local steps = {
     H.screenshot("step_ij_two")
   end),
 
-  H.navTo(80, 26, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(80, 26, { maxFrames = 9000, playBattles = "tactical" }),
   pressWalk("down", function() return map() == 250 end, 900,
     "251 door row -> 250 (53,11)"),
   H.waitFrames(30),
   H.stepOff({ "down", "left", "right" }, 2400,
     "off the (53,11) trigger tile"),
-  H.navTo(53, 34, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(53, 34, { maxFrames = 9000, playBattles = "tactical" }),
   (function() local ph = 0
     return H.driveUntil(function() return H.fieldX() < 40 end, 1200, {
       H.call(function()
@@ -764,7 +764,7 @@ local steps = {
   end)(),
   H.release(),
   H.waitFrames(30),
-  H.navTo(23, 12, { maxFrames = 20000, calmFrames = 4, playBattles = "flee" }),
+  H.navTo(23, 12, { maxFrames = 20000, calmFrames = 4, playBattles = "tactical" }),
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x0238) == 1 end, 9000, {
       H.call(function()
@@ -787,7 +787,7 @@ local steps = {
   H.stepOff({ "down", "left", "right" }, 2400,
     "off the messenger trigger tile"),
 
-  H.navTo(15, 22, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(15, 22, { maxFrames = 9000, playBattles = "tactical" }),
   pressWalk("up", function()
     return H.fieldY() >= 45 and H.tileAligned()
   end, 900, "held UP onto (15,21) -> the chest alcove (24,52)"),
@@ -795,26 +795,26 @@ local steps = {
   H.waitUntil(landed(250, 10), 2400, "the chest alcove", 1),
   H.openChest{ stand = { 24, 49 }, face = "up", bit = 77,
                what = "Back Guard",
-               nav = { playBattles = "flee" } },
+               nav = { playBattles = "tactical" } },
   H.openChest{ stand = { 25, 49 }, face = "up", bit = 78,
                what = "X-Potion",
-               nav = { playBattles = "flee" } },
-  H.navTo(24, 52, { maxFrames = 3000, playBattles = "flee" }),
+               nav = { playBattles = "tactical" } },
+  H.navTo(24, 52, { maxFrames = 3000, playBattles = "tactical" }),
   pressWalk("down", function()
     return H.fieldY() <= 30 and H.tileAligned()
   end, 900, "held DOWN onto (24,53) -> back to the corridor (15,23)"),
   H.release(),
   H.waitUntil(landed(250, 10), 2400, "back in the corridor", 1),
 
-  H.navTo(23, 33, { maxFrames = 20000, playBattles = "flee" }),
+  H.navTo(23, 33, { maxFrames = 20000, playBattles = "tactical" }),
   pressWalk("down", function() return map() == 243 end, 1200,
     "door 250 (22..24,34) -> 243 (15,10)"),
   H.waitUntil(landed(243, 10), 2400, "243 on the way out", 1),
-  H.navTo(15, 30, { maxFrames = 12000, playBattles = "flee" }),
+  H.navTo(15, 30, { maxFrames = 12000, playBattles = "tactical" }),
   pressWalk("down", function() return map() == 253 end, 1200,
     "south rows -> 253 (29,2)"),
   H.waitUntil(landed(253, 10), 2400, "Vector 253 on the way out", 1),
-  H.navTo(30, 62, { maxFrames = 30000, playBattles = "flee",
+  H.navTo(30, 62, { maxFrames = 30000, playBattles = "tactical",
     arrive = function() return H.worldMode() end }),
   pressWalk("down", function() return H.worldMode() end, 1200,
     "253 (30,63) world exit -> world (120,188)"),

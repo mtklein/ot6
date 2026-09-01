@@ -158,7 +158,7 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("esper_tubes"))
   end),
 
-  H.navTo(20, 12, { maxFrames = 15000, playBattles = "flee", arrive = function() return map() ~= 274 end }),
+  H.navTo(20, 12, { maxFrames = 15000, playBattles = "tactical", arrive = function() return map() ~= 274 end }),
   tapInto("down", function() return map() ~= 274 end, 9000,
     "DOWN onto {20,13} -> the lift"),
   H.waitUntil(function() return map() == 272 end, 20000, "map 272 (the minecart platform)", 5),
@@ -182,7 +182,7 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("minecart_platform")
   end),
 
-  H.navTo(4, 55, { maxFrames = 9000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
+  H.navTo(4, 55, { maxFrames = 9000, playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 3 and H.fieldY() == 55 and sw(0x01BF) == 1
@@ -222,7 +222,7 @@ H.run({ maxFrames = 60000 }, {
       cid[1], cid[2], cid[3]))
   end),
   H.navTo(function() return cid[1] end, function() return cid[2] end,
-    { maxFrames = 9000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),   -- beside CID
+    { maxFrames = 9000, playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),   -- beside CID
   (function() local calm = 0
     return H.driveUntil(function()
       local ok = H.fieldX() == cid[1] and H.fieldY() == cid[2] and settled()

@@ -247,7 +247,7 @@ H.run({ maxFrames = 300000 }, {
   end),
 
   -- the two steps back onto the 024 entry point (§5's "C + 2 steps")
-  H.navTo(25, 52, { maxFrames = 6000, playBattles = "flee" }),
+  H.navTo(25, 52, { maxFrames = 6000, playBattles = "tactical" }),
   H.call(function()
     H.assertEq(map(), 273, "on map 273")
     H.assertEq(H.fieldX(), 25, "024 entry point x")
@@ -290,7 +290,7 @@ H.run({ maxFrames = 300000 }, {
     return H.cond(function() return true end, steps)
   end)(),
   H.fieldCare({ tag = "care before battle 72", threshold = 0.95 }),
-  H.navTo(25, 52, { maxFrames = 6000, playBattles = "flee" }),
+  H.navTo(25, 52, { maxFrames = 6000, playBattles = "tactical" }),
   H.call(function()
     H.assertEq(H.fieldX() == 25 and H.fieldY() == 52, true,
       "back at the entry point, armed and topped up")
@@ -367,7 +367,7 @@ H.run({ maxFrames = 300000 }, {
   end)(),
 
   -- 2. {25,50} -> map 274 {10,25}
-  H.navTo(25, 50, { maxFrames = 9000, playBattles = "flee", arrive = function() return map() == 274 end }),
+  H.navTo(25, 50, { maxFrames = 9000, playBattles = "tactical", arrive = function() return map() == 274 end }),
   H.waitUntil(function() return map() == 274 and settled() end, 6000,
     "map 274 control", 5),
   H.waitFrames(60),
@@ -384,7 +384,7 @@ H.run({ maxFrames = 300000 }, {
   end),
 
   -- 3. up to {10,10}, one step below the trigger tile.
-  H.navTo(10, 10, { maxFrames = 12000, playBattles = "flee" }),
+  H.navTo(10, 10, { maxFrames = 12000, playBattles = "tactical" }),
 
   -- 3a. Why the entry point is not on {10,9}: sample control while
   --     standing on the trigger tile for 90 frames.  _cc7a60 re-enters
@@ -411,8 +411,8 @@ H.run({ maxFrames = 300000 }, {
   -- party is already facing UP when it lands: this engine turns and moves
   -- in the same frame when the destination is walkable, so a separate
   -- "press up to turn" would walk back onto the trigger tile.
-  H.navTo(10, 11, { maxFrames = 6000, playBattles = "flee" }),   -- back off the trigger tile
-  H.navTo(10, 10, { maxFrames = 6000, playBattles = "flee" }),   -- back onto the entry point, facing UP
+  H.navTo(10, 11, { maxFrames = 6000, playBattles = "tactical" }),   -- back off the trigger tile
+  H.navTo(10, 10, { maxFrames = 6000, playBattles = "tactical" }),   -- back onto the entry point, facing UP
   (function() local calm = 0
     return H.driveUntil(function()
       local ok = H.fieldX() == 10 and H.fieldY() == 10 and settled()

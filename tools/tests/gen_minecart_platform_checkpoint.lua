@@ -75,7 +75,7 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- across the platform onto the save point (from the east; (3,54) is wall)
-  H.navTo(4, 55, { playBattles = "flee", maxFrames = 9000 }),
+  H.navTo(4, 55, { playBattles = "tactical", maxFrames = 9000 }),
   tapInto("left", onSaveTile(3, 55), 9000,
     "onto the save tile 272 (3,55)", tileCalm),
   H.waitFrames(45),

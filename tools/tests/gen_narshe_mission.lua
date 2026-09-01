@@ -246,7 +246,7 @@ H.run({ maxFrames = 480000 }, {
   -- ---- the escort trigger row and the mission meeting --------------------
   -- The trigger row is (37-39,51) (event_trigger.asm:114-116); park two
   -- tiles below it and enter with a held press, then ride the scene.
-  H.navTo(38, 53, { playBattles = "flee", maxFrames = 12000 }),
+  H.navTo(38, 53, { playBattles = "tactical", maxFrames = 12000 }),
   pressWalk("up", function() return map() == 30 or not H.hasControl() end,
     2400, "held UP onto the escort trigger row (38,51)"),
   H.advanceStory(function() return map() == 30 and sw(0x0076) == 1 end, 60000, { playBattles = true }),
@@ -268,7 +268,7 @@ H.run({ maxFrames = 480000 }, {
   end),
 
   -- ---- out of Narshe to the world map ------------------------------------
-  H.navTo(110, 25, { playBattles = "flee", maxFrames = 12000,
+  H.navTo(110, 25, { playBattles = "tactical", maxFrames = 12000,
     arrive = function() return map() == 20 end }),
   pressWalk("down", function() return map() == 20 end, 1200,
     "door 30 (110,26) -> map 20 (18,24)"),
@@ -276,7 +276,7 @@ H.run({ maxFrames = 480000 }, {
     return map() == 20 and H.hasControl() and H.tileAligned() and bright() >= 15
   end, 1800, "map 20 control", 5),
   H.waitFrames(30),
-  H.navTo(18, 61, { playBattles = "flee", maxFrames = 20000,
+  H.navTo(18, 61, { playBattles = "tactical", maxFrames = 20000,
     arrive = function() return H.worldMode() end }),
   pressWalk("down", function() return H.worldMode() end, 1200,
     "the map-20 south-edge long entrance -> the world map"),

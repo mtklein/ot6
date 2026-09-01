@@ -18,7 +18,7 @@ function M.killbit(_slot)
   if not M._killbitFired then
     M.log("[killbit] a nav step drew a random encounter without opts.playBattles "
       .. "-- the kill-bit cheat is removed (#75), so it is fought by blind "
-      .. 'A-taps; declare playBattles="flee"/"tactical" on this step')
+      .. 'A-taps; declare playBattles="tactical" (or "mustflee") on this step')
     M._killbitFired = true
   end
 end
@@ -458,7 +458,8 @@ function M.navTo(txIn, tyIn, opts)
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic,
           summon = opts.summon, nuke = opts.nuke, nukeLore = opts.nukeLore,
-          tool = opts.tool, blitz = opts.blitz }) or nil
+          tool = opts.tool, blitz = opts.blitz,
+          cadence = opts.cadence }) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   -- the heal-after-every-battle directive: once a mid-walk battle
   -- resolves, run a between-battles care stop (M.newCareDriver, soft)
@@ -518,7 +519,30 @@ function M.navTo(txIn, tyIn, opts)
         else careD.frame(); return end
       end
       battN = M.battleLoadStarted() and battN + 1 or 0
+      -- forensics (once per battle): the tile the party stood on when the
+      -- battle came up, its props and its neighbours', and the event script
+      -- pointer -- the shape of the $ca0029 wedge (a battle starting while a
+      -- step is resolving on z-flux tiles) is a black screen with the battle
+      -- RAM populated, and these are what decide it (fire_out, run.IgBKYd89)
+      if battN == 1 then
+        local x, y = M.fieldX(), M.fieldY()
+        local function pp(dx, dy)
+          local t = M.maptile(x + dx, y + dy)
+          return string.format("%02X/%02X", M.readByte(0x7E7600 + t), M.readByte(0x7E7700 + t))
+        end
+        M.log(string.format("nav: battle up at (%d,%d) $b2=%02X tile=%s N=%s S=%s W=%s E=%s evpc=%02X%02X%02X $57=%02X",
+          x, y, M.readByte(0x00b2), pp(0, 0), pp(0, -1), pp(0, 1), pp(-1, 0), pp(1, 0),
+          M.readByte(0x00e7), M.readByte(0x00e6), M.readByte(0x00e5), M.readByte(0x0057)))
+      end
       dlgN  = M.dialogWaiting() and dlgN + 1 or 0
+      -- diagnostic (once per episode): a dialog with monsters on screen and
+      -- the battle detector DOWN is the shape of the regen's fire_out stall
+      -- (a Balloon touch-battle A-tapped as a dialog, never fought)
+      if dlgN == 3 and battN == 0 and M.monstersPresent() > 0 then
+        M.log(string.format("nav: dialog with %d monster(s) present and battleLoadStarted()=false: hp=%d,%d,%d,%d $ba=%02X $d3=%02X",
+          M.monstersPresent(), M.readWord(M.BATTLE_HP), M.readWord(M.BATTLE_HP + 2),
+          M.readWord(M.BATTLE_HP + 4), M.readWord(M.BATTLE_HP + 6), M.readByte(0x00ba), M.readByte(0x00d3)))
+      end
       lostN = M.hasControl() and 0 or lostN + 1
       if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it, but never the goal formation
@@ -539,7 +563,7 @@ function M.navTo(txIn, tyIn, opts)
         if opts.playBattles == true and battN % 3600 == 3 then
           M.log('playBattles=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
             'no menus, no items, no flee.  If this step loses parties or ' ..
-            'drags, convert it: playBattles="flee" or playBattles="tactical".')
+            'drags, convert it: playBattles="tactical" (or "mustflee" to run).')
         end
         if M.monstersPresent() > 0 and not opts.playBattles then
           for slot = 0, 5 do
@@ -762,7 +786,7 @@ function M.advanceStory(pred, maxFrames, opts)
         if opts.playBattles == true and battN % 3600 == 3 then
           M.log('playBattles=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
             'no menus, no items, no flee.  If this step loses parties or ' ..
-            'drags, convert it: playBattles="flee" or playBattles="tactical".')
+            'drags, convert it: playBattles="tactical" (or "mustflee" to run).')
         end
         if M.monstersPresent() > 0 and not opts.playBattles then
           for slot = 0, 5 do
@@ -1046,7 +1070,7 @@ function M.worldNavTo(txIn, tyIn, opts)
         if opts.playBattles == true and battN % 3600 == 3 then
           M.log('playBattles=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
             'no menus, no items, no flee.  If this step loses parties or ' ..
-            'drags, convert it: playBattles="flee" or playBattles="tactical".')
+            'drags, convert it: playBattles="tactical" (or "mustflee" to run).')
         end
         if M.monstersPresent() > 0 and not opts.playBattles then
           for slot = 0, 5 do
@@ -1634,9 +1658,15 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- the bag has none of that one: the single-purpose item first, Remedy as
 -- the fallback, since without it a party holding Remedies and no Antidote
 -- would carry the bit for the rest of the route.
+local CARE_EYEDROP = 0xF3
 local CARE_STATUS_CURES = {
   { bit = 0x40, items = { CARE_SOFT, CARE_REMEDY }, what = "petrify" },
   { bit = 0x04, items = { CARE_ANTIDOTE, CARE_REMEDY }, what = "poison" },
+  -- Dark (blind) persists out of battle and halves a fighter's hits; the
+  -- FC descent delivered LOCKE to the alcove blind with three Remedies in
+  -- the bag and nothing reaching for them
+  { bit = 0x01, items = { CARE_EYEDROP, CARE_REMEDY }, what = "dark" },
+  { bit = 0x20, items = { CARE_REMEDY }, what = "imp" },
 }
 local MAGIC_LIST, MAGIC_COLOUR = 0x7E9D89, 0x7E9E09
 
@@ -1940,7 +1970,13 @@ function M.buyItem(id, row, qtyFn, name)
       local st = M.readByte(0x0026)
       if want == nil then
         want = qtyFn()
-        if want < 1 then want = 1 end
+        if want < 1 then
+          -- already at (or over) the target: nothing to buy, and no menu
+          -- interaction -- the first cut clamped this to 1 and bought a
+          -- Fenix Down the bag did not need (30 on a target of 25)
+          M.log(string.format("[shop] %s: already there (%d wanted); skipping", name, want))
+          bought = true; M.setPad({}); return
+        end
         M.log(string.format("[shop] %s: buying %d", name, want))
       end
       if st == 0x27 then
@@ -2108,9 +2144,12 @@ local function careKernel(opts)
 
   -- Everything the bag can do for this target.
   local function pickItem(target)
-    local hole = M.charMaxHp(target) - M.charHp(target)
-    local order = hole >= 120
-      and { CARE_POTION, CARE_TONIC } or { CARE_TONIC, CARE_POTION }
+    -- Tonics first, whatever the hole: outside battle the menu pauses the
+    -- clock, so a big hole costs Tonics, not turns, and the Potions are
+    -- the combat heal (owner doctrine).  The first cut reached for a
+    -- Potion at holes >= 120 and the IAF's between-wave care spent seven
+    -- of the gauntlet's Potions with 99 Tonics untouched.
+    local order = { CARE_TONIC, CARE_POTION }
     for _, id in ipairs(order) do
       local w = { kind = "item", char = target, item = id, why = "heal" }
       if avail(id) > 0 and not failed[key(w)] then return w end
@@ -2651,6 +2690,244 @@ function M.careStop(tag, opts)
   })
 end
 
+-- ------------------------------------------------------- doors, shops --
+-- Promoted from gen_thamasa_fire.lua so the Floating Continent prep can shop
+-- at Thamasa with the same measured mechanics (one implementation, not two).
+local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+local function calmFor(n, extra)
+  local cnt = 0
+  return function()
+    local ok = M.hasControl() and M.tileAligned() and (not extra or extra())
+    cnt = ok and cnt + 1 or 0
+    return cnt >= n
+  end
+end
+local function mapLow() return M.mapId() & 0x1ff end
+local DIAGSTAGE = {
+  { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
+  { -1, 1, "upright" }, { -1, -1, "downright" },
+  { 1, -1, "downleft" }, { 1, 1, "upleft" },
+}
+local SHOP_CAND = {
+  { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
+  { 0, 2, "up" }, { 0, -2, "down" }, { -2, 0, "right" }, { 2, 0, "left" },
+}
+local FACE_VAL = { up = 0, right = 1, down = 2, left = 3 }
+
+-- M.crossDoor: walk through the door at (sx,sy) and land on map dm at
+-- (dx,dy).  Stages on a reachable neighbour, holds the direction into the
+-- door tile through the transition, then waits for far-side control and the
+-- fade-in.  opts.healer / opts.avoid pass to the walk.
+function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
+  opts = opts or {}
+  local pick, startMap
+  local function stage()
+    if not pick then
+      for _, c in ipairs(DIAGSTAGE) do
+        local cx, cy, move = sx + c[1], sy + c[2], c[3]
+        local press = M.movePress(move)
+        if M.bfsPath(cx, cy) and (press == move or M.canStep(cx, cy, move)) then
+          pick = { cx, cy, press }; break
+        end
+      end
+      pick = pick or { sx, sy + 1, "up" }
+      M.log(string.format("%s: staging (%d,%d), hold %s into (%d,%d)",
+        what, pick[1], pick[2], pick[3], sx, sy))
+    end
+    return pick
+  end
+  local settled = calmFor(20)
+  local aPhase = 0
+  return M.seqStep({
+    M.call(function() pick, startMap = nil, mapLow() end),
+    M.navTo(function() return stage()[1] end, function() return stage()[2] end,
+      { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
+        bank = 3, items = true, avoid = opts.avoid,
+        arrive = function() return mapLow() ~= startMap end }),
+    M.driveUntil(function()
+      return mapLow() ~= startMap or (M.fieldX() == dx and M.fieldY() == dy)
+    end, 1800, {
+      M.call(function()
+        aPhase = (aPhase + 1) % 8
+        if M.dialogWaiting() then M.setPad(aPhase < 4 and { "a" } or {}); return end
+        M.setPad({ [stage()[3]] = true })
+      end),
+    }, what),
+    M.release(),
+    M.waitUntil(settled, 1800, what .. ": far-side control"),
+    M.waitUntil(function() return bright() >= 15 end, 900, what .. ": fade-in", 10),
+    M.waitFrames(30),
+    M.call(function()
+      M.assertEq(mapLow(), dm, what .. ": landed on the right map")
+      M.log(string.format("[ot6] %s: DONE (%d,%d) frame=%d", what,
+        M.fieldX(), M.fieldY(), M.frame))
+    end),
+  })
+end
+
+local function gilNow()
+  return M.readByte(0x1860) + M.readByte(0x1861) * 256 + M.readByte(0x1862) * 65536
+end
+M.gil = gilNow
+
+-- M.shopTalk: stand beside the shopkeeper at (nx,ny), face them, and A until
+-- the shop's options window (menu state $25) is open -- M.buyItem's entry.
+function M.shopTalk(nx, ny, what, opts)
+  opts = opts or {}
+  local pick
+  local function stage()
+    if not pick then
+      for _, c in ipairs(SHOP_CAND) do
+        local sx, sy = nx + c[1], ny + c[2]
+        if M.bfsPath(sx, sy) then pick = { sx, sy, c[3] }; break end
+      end
+      pick = pick or { nx, ny + 1, "up" }
+      M.log(string.format("[shop] %s: staging (%d,%d) face %s",
+        what, pick[1], pick[2], pick[3]))
+    end
+    return pick
+  end
+  local aPh = 0
+  return M.seqStep({
+    M.navTo(function() return stage()[1] end, function() return stage()[2] end,
+      { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
+        bank = 3, items = true }),
+    M.driveUntil(function()
+      return M.readByte(0x087f + M.readWord(0x0803)) == FACE_VAL[stage()[3]]
+    end, 300, {
+      M.call(function() M.setPad({ [stage()[3]] = true }) end),
+    }, what .. ": faced"),
+    M.release(), M.waitFrames(4),
+    M.driveUntil(function() return M.readByte(0x0026) == 0x25 end, 3000, {
+      M.call(function()
+        aPh = (aPh + 1) % 12
+        M.setPad(aPh < 4 and { a = true, [stage()[3]] = true } or {})
+      end),
+    }, what .. ": shop opens"),
+    M.call(function()
+      M.log(string.format("[shop] %s: open at f%d, gil=%d", what, M.frame, gilNow()))
+    end),
+  })
+end
+
+-- M.shopClose: B out of the shop until field control returns.
+function M.shopClose(what)
+  local ph = 0
+  return M.seqStep({
+    M.driveUntil(function()
+      local st = M.readByte(0x0026)
+      return M.hasControl() and st ~= 0x25 and st ~= 0x26 and st ~= 0x27
+    end, 1800, {
+      M.call(function()
+        ph = (ph + 1) % 8
+        M.setPad(ph < 4 and { b = true } or {})
+      end),
+    }, what .. ": shop closed"),
+    M.release(),
+    M.waitFrames(30),
+  })
+end
+
+-- M.bagArrange: put the listed items at bag slots 0, 1, 2, ... through the
+-- real field Item menu, the way a person keeps the combat items on top so a
+-- battle heal is one press away, not forty-three (the IAF gauntlet found
+-- the Potion at row 43: 1300 frames of active-time menu per heal).
+--
+-- Mechanics, measured by the care kernel: in the list ($08) the cursor
+-- (DP $4B) is the absolute bag slot; A picks the slot up ($19); A on a
+-- DIFFERENT slot swaps the two and returns to $08 (A on the same slot would
+-- use the item, so this driver never presses it there).  Direction is held,
+-- not tapped: the field menu auto-repeats.  Reads and presses only; every
+-- swap is verified in the bag ($1869 + slot) before the next.
+function M.bagArrange(order, opts)
+  opts = opts or {}
+  local tag = opts.tag or "bag arrange"
+  local ZM, CUR = 0x26, 0x4b
+  local mode, n, ph, i = "start", 0, 0, 1
+  local job = nil                 -- { id, tgt, from } for the swap in flight
+  local swaps = 0
+  local function nextJob()
+    while i <= #order do
+      local id, tgt = order[i], i - 1
+      local s = M.invSlotOf(id)
+      if s == nil then
+        M.log(string.format("[%s] $%02X is not in the bag; skipping its slot", tag, id))
+        i = i + 1
+      elseif s == tgt then i = i + 1
+      else return { id = id, tgt = tgt, from = s } end
+    end
+    return nil
+  end
+  local function done() return mode == "done" end
+  local function frame()
+    ph = (ph + 1) % 12
+    n = n + 1
+    local st = M.readByte(ZM)
+    if mode == "start" then
+      job = nextJob()
+      if job == nil then
+        M.log(string.format("[%s] already in order", tag))
+        mode = "done"; M.setPad({}); return
+      end
+      mode, n = "open", 0
+    end
+    if mode == "open" then
+      if st == 0x05 then mode, n = "item", 0; M.setPad({}); return end
+      if n > 1800 then error(string.format("[%s] the menu never opened", tag), 0) end
+      M.setPad(ph < 4 and { "x" } or {}); return
+    end
+    if mode == "item" then                -- main menu row 0 is Item
+      if st == 0x08 then mode, n = "pick", 0; M.setPad({}); return end
+      if st == 0x05 then
+        local cur = M.readByte(CUR)
+        if cur == 0 then M.setPad(ph < 4 and { "a" } or {})
+        else M.setPad({ [cur > 0 and "up" or "down"] = true }) end
+        return
+      end
+      if n > 1800 then error(string.format("[%s] the Item list never opened (state $%02X)", tag, st), 0) end
+      M.setPad(ph < 4 and { "b" } or {}); return
+    end
+    if mode == "pick" then                -- $08: cursor to the item, A -> $19
+      if job == nil then job = nextJob() end
+      if job == nil then mode, n = "close", 0; M.setPad({}); return end
+      if st == 0x19 then mode, n = "drop", 0; M.setPad({}); return end
+      if st ~= 0x08 then M.setPad(ph < 4 and { "b" } or {}); return end
+      if n > 2400 then error(string.format("[%s] never picked up $%02X at slot %d", tag, job.id, job.from), 0) end
+      local cur = M.readByte(CUR)
+      if cur == job.from then M.setPad(ph < 4 and { "a" } or {})
+      else M.setPad({ [cur < job.from and "down" or "up"] = true }) end
+      return
+    end
+    if mode == "drop" then                -- $19: cursor to the target, A -> swap
+      if st == 0x08 then
+        local got = M.readByte(0x1869 + job.tgt)
+        M.assertEq(got, job.id, string.format("[%s] $%02X moved to slot %d (from %d)", tag, job.id, job.tgt, job.from))
+        swaps = swaps + 1
+        job = nil
+        mode, n = "pick", 0; M.setPad({}); return
+      end
+      if st ~= 0x19 then M.setPad({}); return end
+      if n > 2400 then error(string.format("[%s] never dropped $%02X at slot %d", tag, job.id, job.tgt), 0) end
+      local cur = M.readByte(CUR)
+      if cur == job.tgt then M.setPad(ph < 4 and { "a" } or {})
+      else M.setPad({ [cur < job.tgt and "down" or "up"] = true }) end
+      return
+    end
+    if mode == "close" then
+      if M.hasControl() and not CARE_SCREENS[st] then
+        local top = {}
+        for k = 0, math.max(#order, 1) - 1 do top[#top + 1] = string.format("$%02X", M.readByte(0x1869 + k)) end
+        M.log(string.format("[%s] done: %d swap(s); slots 0..%d = %s", tag, swaps, #order - 1, table.concat(top, " ")))
+        mode = "done"; M.setPad({}); return
+      end
+      if n > 2400 then error(string.format("[%s] the menu never closed", tag), 0) end
+      M.setPad(ph < 4 and { "b" } or {}); return
+    end
+    M.setPad({})
+  end
+  return M.driveUntil(done, opts.maxFrames or 24000, { M.call(frame) }, tag)
+end
+
 -- ---------------------------------------------------------------- rows --
 -- M.setRows: put characters in the front or back row through the real Order
 -- screen.  Reads and pad presses only.
@@ -2962,6 +3239,7 @@ function M.equipWeapon(pos, itemId, opts)
   local function targetPos()
     return type(pos) == "function" and pos() or pos
   end
+  local found, stuck, lastCur, ph = false, 0, nil, 0
   return M.seqStep({
     M.driveUntil(function() return st() == ST_MAIN end, 1200,
       { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
@@ -2998,15 +3276,46 @@ function M.equipWeapon(pos, itemId, opts)
     M.waitUntil(function() return st() == ST_ITEM end, 300,
       tag .. ": item list", 5),
     M.waitFrames(10),
+    -- The list holds only what this character can wear, so walk it until
+    -- the item is under the cursor OR the cursor has stopped moving (the
+    -- list's end): an item the character cannot equip never appears, and
+    -- the old steer timed out on exactly that (EDGAR offered a Shadow-only
+    -- blade at the FC landing, 1800 frames).  opts.result.found reports
+    -- which it was, for a caller whose ladder may hold such rungs.
+    M.call(function() found, stuck, lastCur, ph = false, 0, nil, 0 end),
     M.driveUntil(function()
-      return st() == ST_ITEM
-         and M.readByte(0x1869 + M.readByte(0x9d8a + M.readByte(CUR)))
-             == itemId
-    end, 1800, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
-      tag .. ": list cursor on the item"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_SLOT end, 300,
-      tag .. ": equipped, back on slots", 5),
+      if st() ~= ST_ITEM then return false end
+      if M.readByte(0x1869 + M.readByte(0x9d8a + M.readByte(CUR))) == itemId then
+        found = true; return true
+      end
+      return stuck >= 8
+    end, 1800, {
+      M.call(function()
+        -- one press per 12-frame cycle, and the cursor is sampled once per
+        -- cycle AFTER the press has had its frames to land: "stuck" counts
+        -- presses that moved nothing, never frames (the first cut sampled
+        -- every frame and called any list exhausted 8 frames in)
+        ph = (ph + 1) % 12
+        if ph == 8 then
+          local cur = M.readByte(CUR)
+          stuck = (cur == lastCur) and stuck + 1 or 0
+          lastCur = cur
+        end
+        M.setPad(ph < 2 and { "down" } or {})
+      end),
+    }, tag .. ": list cursor on the item (or the list's end)"),
+    M.release(),
+    M.cond(function() return found end, {
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_SLOT end, 300,
+        tag .. ": equipped, back on slots", 5),
+      M.call(function() if opts.result then opts.result.found = true end end),
+    }, {
+      M.call(function()
+        M.log(string.format("[%s] $%02X is not in this character's list (unequippable); the slot keeps what it had", tag, itemId))
+        if opts.result then opts.result.found = false end
+      end),
+    }),
     M.driveUntil(function() return M.hasControl() end, 1200,
       { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),
     M.waitFrames(20),
@@ -3043,8 +3352,15 @@ function M.equipLoadout(charId, items, opts)
         M.readByte(base + 0x23), M.readByte(base + 0x24)))
     end),
   }
+  -- opts.optional: a rung the character cannot wear (the Equip list never
+  -- offers it) is logged and left, not asserted -- a kit LADDER names
+  -- candidates, and which of them this character can wear is the game's
+  -- call, read from its own list.
+  local results = {}
   for _, spec in ipairs(items) do
     local slot, item = spec[1], spec[2]
+    local res = { found = nil }
+    results[#results + 1] = res
     steps[#steps + 1] = M.cond(function()
       if M.readByte(base + 0x1F + slot) == item then return false end
       M.assertEq(M.invCountOf(item) > 0, true, string.format(
@@ -3052,14 +3368,19 @@ function M.equipLoadout(charId, items, opts)
       return true
     end, {
       M.equipWeapon(function() return pos end, item,
-        { slot = slot, tag = string.format("%s slot %d item $%02X", tag, slot, item) }),
+        { slot = slot, tag = string.format("%s slot %d item $%02X", tag, slot, item),
+          result = res }),
     }, {})
   end
   steps[#steps + 1] = M.call(function()
-    for _, spec in ipairs(items) do
+    for i, spec in ipairs(items) do
       local slot, item = spec[1], spec[2]
-      M.assertEq(M.readByte(base + 0x1F + slot), item, string.format(
-        "%s: slot %d holds item $%02X", tag, slot, item))
+      if opts.optional and results[i].found == false then
+        M.log(string.format("[%s] slot %d: $%02X was not wearable; slot holds $%02X", tag, slot, item, M.readByte(base + 0x1F + slot)))
+      else
+        M.assertEq(M.readByte(base + 0x1F + slot), item, string.format(
+          "%s: slot %d holds item $%02X", tag, slot, item))
+      end
     end
     M.log(string.format("[%s] char=%d after=%02X %02X %02X %02X %02X %02X",
       tag, charId, M.readByte(base + 0x1F), M.readByte(base + 0x20),
@@ -3067,6 +3388,252 @@ function M.equipLoadout(charId, items, opts)
       M.readByte(base + 0x23), M.readByte(base + 0x24)))
   end)
   return M.seqStep(steps)
+end
+
+-- M.equipKit: dress SEVERAL slots of one character in one Equip session
+-- and one Relic session -- open the menu once, walk slot -> item -> back
+-- on slots for each entry, B out once -- rather than M.equipLoadout's full
+-- open/close per item.  Built for the IAF deck, where the only window a
+-- benched-then-selected character can be dressed in is the short field
+-- gap between two waves (the wave timers run while the menu is CLOSED and
+-- pause while it is open, so what costs is the number of round trips).
+--
+-- `items` is an ordered list of { slot, item } with slot 0..5 as
+-- equipLoadout's.  opts.ladder = true makes entries for the same slot
+-- CANDIDATES in order (list the strongest first): once a slot holds one
+-- of them, its later entries are skipped.  An item the character cannot
+-- wear never appears in the game's list; that is detected as the list's
+-- end (the per-press stuck counter, equipWeapon's) and logged, and the
+-- slot keeps what it had.  Reads and presses only.
+function M.equipKit(charId, items, opts)
+  opts = opts or {}
+  local tag = opts.tag or string.format("kit char %d", charId)
+  local base = 0x1600 + 37 * charId
+  local ZM, CUR, SLOTCUR = 0x26, 0x4b, 0x4e
+  local ST_MAIN, ST_CHAR = 0x05, 0x06
+  local function st() return M.readByte(ZM) end
+  local function slotByte(slot) return M.readByte(base + 0x1F + slot) end
+  local pos
+  local doneSlot = {}
+  local function session(relic, list)
+    if #list == 0 then return {} end
+    local MAINROW = relic and 3 or 2
+    local ST_OPT = relic and 0x59 or 0x36
+    local ST_SLOT = relic and 0x5a or 0x55
+    local ST_ITEM = relic and 0x5b or 0x57
+    local stag = tag .. (relic and " (relics)" or " (gear)")
+    local function anyToDo()
+      for _, it in ipairs(list) do
+        local slot, item = it[3], it[2]
+        if not doneSlot[slot] and slotByte(slot) ~= item and M.invCountOf(item) > 0 then return true end
+      end
+      return false
+    end
+    local steps = {
+      -- a session right after another menu (a care stop's close) must not
+      -- read the closing menu's $05 as its own: settle in the field first
+      -- (the escape's post-Atma kit saw "main menu" in 3 frames and then
+      -- steered a cursor that was not there)
+      M.waitUntil(function() return M.hasControl() and st() ~= ST_MAIN end, 600,
+        stag .. ": field settled before the menu", 5),
+      M.waitFrames(20),
+      M.driveUntil(function() return st() == ST_MAIN end, 1200,
+        { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, stag .. ": main menu"),
+      M.waitFrames(20),
+      M.driveUntil(function() return st() == ST_MAIN and M.readByte(CUR) == MAINROW end, 900,
+        { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, stag .. ": cursor on the menu row"),
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_CHAR end, 300, stag .. ": character select", 5),
+      M.waitFrames(10),
+      M.driveUntil(function() return st() == ST_CHAR and M.readByte(CUR) == pos end, 600,
+        { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, stag .. ": character cursor"),
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_OPT end, 600, stag .. ": equip options", 5),
+      M.waitFrames(10),
+      M.driveUntil(function() return st() == ST_OPT and M.readByte(CUR) == 0 end, 600,
+        { M.pressButtons({ "left" }, 2), M.waitFrames(10) }, stag .. ": cursor on the Equip option"),
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_SLOT end, 300, stag .. ": slot select", 5),
+      M.waitFrames(10),
+    }
+    for _, it in ipairs(list) do
+      local slotRow, item, slot = it[1], it[2], it[3]
+      local itag = string.format("%s slot %d item $%02X", stag, slot, item)
+      local found, stuck, lastCur, ph = false, 0, nil, 0
+      steps[#steps + 1] = M.cond(function()
+        if doneSlot[slot] then return false end
+        if slotByte(slot) == item then doneSlot[slot] = opts.ladder or nil; return false end
+        if M.invCountOf(item) < 1 then
+          M.log(string.format("[%s] $%02X is not in the bag; skipped", itag, item)); return false
+        end
+        return true
+      end, {
+        M.driveUntil(function() return st() == ST_SLOT and M.readByte(SLOTCUR) == slotRow end, 600,
+          { M.pressButtons({ "down" }, 2), M.waitFrames(10) }, itag .. ": slot cursor"),
+        M.pressButtons({ "a" }, 2),
+        M.waitUntil(function() return st() == ST_ITEM end, 300, itag .. ": item list", 5),
+        M.waitFrames(10),
+        M.call(function() found, stuck, lastCur, ph = false, 0, nil, 0 end),
+        M.driveUntil(function()
+          if st() ~= ST_ITEM then return false end
+          if M.readByte(0x1869 + M.readByte(0x9d8a + M.readByte(CUR))) == item then
+            found = true; return true
+          end
+          return stuck >= 8
+        end, 1800, {
+          M.call(function()
+            ph = (ph + 1) % 12
+            if ph == 8 then
+              local cur = M.readByte(CUR)
+              stuck = (cur == lastCur) and stuck + 1 or 0
+              lastCur = cur
+            end
+            M.setPad(ph < 2 and { "down" } or {})
+          end),
+        }, itag .. ": list cursor on the item (or the list's end)"),
+        M.release(),
+        M.cond(function() return found end, {
+          M.pressButtons({ "a" }, 2),
+          M.waitUntil(function() return st() == ST_SLOT end, 300, itag .. ": equipped, back on slots", 5),
+          M.call(function()
+            M.assertEq(slotByte(slot), item, itag .. ": the slot holds it")
+            if opts.ladder then doneSlot[slot] = true end
+            M.log(string.format("[%s] slot %d <- $%02X", stag, slot, item))
+          end),
+        }, {
+          M.call(function()
+            M.log(string.format("[%s] $%02X is not in this character's list (unequippable); slot %d keeps $%02X",
+              stag, item, slot, slotByte(slot)))
+          end),
+          M.driveUntil(function() return st() == ST_SLOT end, 300,
+            { M.pressButtons({ "b" }, 2), M.waitFrames(10) }, itag .. ": back to slots"),
+        }),
+        M.waitFrames(10),
+      }, {})
+    end
+    steps[#steps + 1] = M.driveUntil(function() return M.hasControl() end, 1200,
+      { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, stag .. ": back out")
+    steps[#steps + 1] = M.waitFrames(20)
+    -- the whole session is skipped when nothing in it is left to do
+    return { M.cond(anyToDo, steps, { M.logStep(function() return "[" .. stag .. "] nothing to do" end) }) }
+  end
+  local gear, relics = {}, {}
+  for _, spec in ipairs(items) do
+    local slot, item = spec[1], spec[2]
+    if slot >= 4 then relics[#relics + 1] = { slot - 4, item, slot }
+    else gear[#gear + 1] = { slot, item, slot } end
+  end
+  local function six()
+    return string.format("%02X %02X %02X %02X %02X %02X", slotByte(0), slotByte(1),
+      slotByte(2), slotByte(3), slotByte(4), slotByte(5))
+  end
+  local steps = {
+    M.call(function()
+      local partyByte = M.readByte(0x1850 + charId)
+      M.assertEq(partyByte & 0x07, M.readByte(0x1A6D) & 0x07, tag .. ": character is in the active party")
+      pos = (partyByte >> 3) & 0x03
+      doneSlot = {}
+      M.log(string.format("[%s] char=%d row=%d before=%s", tag, charId, pos, six()))
+    end),
+  }
+  for _, s in ipairs(session(false, gear)) do steps[#steps + 1] = s end
+  for _, s in ipairs(session(true, relics)) do steps[#steps + 1] = s end
+  steps[#steps + 1] = M.call(function()
+    M.log(string.format("[%s] char=%d after=%s", tag, charId, six()))
+  end)
+  return M.seqStep(steps)
+end
+
+-- ------------------------------------------------- the party select --
+-- M.newPartySelect(pick): a driver for the game's multi-party select
+-- screen (menu states $2D character grid / $2E group slots), forming ONE
+-- group of exactly the characters in `pick`.  Written for the Blackjack's
+-- IAF launch (probe_iaf_fight3 / probe_fc_alcove2) and used by both FC
+-- gens; the cursor's direction mapping is probed at run time because the
+-- grid's row/column order is not the party-record order.  Reads and
+-- presses only.  Call pulse() once per frame while a select screen is up.
+function M.newPartySelect(pick)
+  local ZM = 0x26
+  local function rd(a) return emu.read(a, emu.memType.snesMemory) end
+  local function midx() return M.readByte(0x4b) + M.readByte(0x4a) + M.readByte(0x5a) end
+  local function charAt(i) return rd(0x7e9d89 + i) end
+  local function firstEmptyGroupSlot()
+    for _, i in ipairs({ 0x10, 0x11, 0x12, 0x13 }) do
+      if charAt(i) == 0xFF then return i end
+    end
+  end
+  local function inGroup(c)
+    for i = 0, 3 do if rd(0x7e9d99 + i) == c then return true end end
+    return false
+  end
+  local P = { ph = 0, dir = {}, lastIdx = nil, lastBtn = nil, probe = 0, probeN = 0 }
+  function P.ready()
+    for i = 0, 0x13 do
+      local c = charAt(i)
+      if c ~= 0xFF and c > 0x0F then return false end
+    end
+    return true
+  end
+  function P.complete()
+    for _, c in ipairs(pick) do if not inGroup(c) then return false end end
+    return true
+  end
+  function P.group()
+    local g = {}
+    for i = 0, 3 do local c = rd(0x7e9d99 + i); if c ~= 0xFF then g[#g + 1] = string.format("$%02x", c) end end
+    return table.concat(g, " ")
+  end
+  function P.pulse()
+    local ms = M.readByte(ZM)
+    P.ph = (P.ph + 1) % 9
+    local function tap(btn) M.setPad(P.ph < 3 and { btn } or {}) end
+    if not P.ready() then M.setPad({}); return end
+    if ms == 0x2d then
+      if P.complete() then tap("start")
+      elseif M.readByte(0x4a) ~= 0 then tap("up")
+      else
+        local tgt = nil
+        for i = 0, 15 do
+          local c = charAt(i)
+          if c ~= 0xFF and not inGroup(c) and rd(0x7eac8d + i) < 0x80 then
+            for _, w in ipairs(pick) do if c == w then tgt = i end end
+            if tgt then break end
+          end
+        end
+        local cur = midx()
+        if not tgt then tap("b")
+        elseif cur == tgt then tap("a")
+        else
+          local want = (cur < tgt) and "inc" or "dec"
+          if P.lastIdx ~= nil and cur ~= P.lastIdx and P.lastBtn then
+            P.dir[(cur > P.lastIdx) and "inc" or "dec"] = P.lastBtn
+          end
+          local btn = P.dir[want]
+          if not btn then
+            btn = ({ "down", "up", "right", "left" })[(P.probe % 4) + 1]
+            P.probeN = P.probeN + 1
+            if P.probeN % 14 == 0 then P.probe = P.probe + 1 end
+          end
+          P.lastIdx, P.lastBtn = cur, btn
+          tap(btn)
+        end
+      end
+    elseif ms == 0x2e then
+      if M.readByte(0x4a) ~= 0x10 then tap("down")
+      else
+        local tgt = firstEmptyGroupSlot()
+        if not tgt then tap("a")
+        else
+          local cc, cr = (midx() >> 1) & 1, midx() & 1
+          local tc, tr = (tgt >> 1) & 1, tgt & 1
+          if cc < tc then tap("right") elseif cc > tc then tap("left")
+          elseif cr < tr then tap("down") elseif cr > tr then tap("up")
+          else tap("a") end
+        end
+      end
+    else tap("b") end
+  end
+  return P
 end
 
 -- ------------------------------------------- South Figaro shared toolkit --

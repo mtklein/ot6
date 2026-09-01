@@ -20,7 +20,7 @@ local function where(tag)
     tostring(H.hasControl()), tostring(H.tileAligned())))
 end
 
--- settle: advanceStory (playBattles="flee") so an arrival-tile encounter
+-- settle: advanceStory (playBattles="tactical") so an arrival-tile encounter
 -- is fled instead of stalling a passive wait to timeout.
 local function settleField(what, dstMap, maxF)
   local held = 0
@@ -30,7 +30,7 @@ local function settleField(what, dstMap, maxF)
       and (dstMap == nil or map() == dstMap)
     held = ok and held + 1 or 0
     return held >= 30
-  end, maxF or 12000, { playBattles = "flee" })
+  end, maxF or 12000, { playBattles = "tactical" })
 end
 
 local function mapChanged()
@@ -72,7 +72,7 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   H.navTo(19, 17, { maxFrames = 20000, arrive = mapChanged(),
-           playBattles = "flee" }),
+           playBattles = "tactical" }),
   H.release(),
   settleField("cave 96 P", 96),
   H.call(function()
@@ -81,89 +81,89 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- P -> shelf D
-  H.navTo(22, 21, { maxFrames = 20000, playBattles = "flee", avoid = A96,
+  H.navTo(22, 21, { maxFrames = 20000, playBattles = "tactical", avoid = A96,
            arrive = mapChanged() }),
   H.release(), settleField("shelf D", 100), at("shelf D", 100, 44, 24),
 
   -- D -> ledge E, a same-map warp ((56,7) -> (30,36)), so the arrive
   -- predicate keys on the x jump rather than a map change
-  H.navTo(56, 7, { maxFrames = 25000, playBattles = "flee", avoid = A100,
+  H.navTo(56, 7, { maxFrames = 25000, playBattles = "tactical", avoid = A100,
            arrive = function() return H.fieldX() <= 32 end }),
   H.release(), settleField("ledge E", 100), at("ledge E", 100, 30, 36),
   H.openChest{ stand = { 30, 34 }, face = "up", bit = 39,
                what = "Atlas Armlet",
-               nav = { playBattles = "flee", avoid = A100 } },
+               nav = { playBattles = "tactical", avoid = A100 } },
 
   -- E -> D (the same warp pair, back: (31,36) -> (57,7))
-  H.navTo(31, 36, { maxFrames = 15000, playBattles = "flee", avoid = A100,
+  H.navTo(31, 36, { maxFrames = 15000, playBattles = "tactical", avoid = A100,
            arrive = function() return H.fieldX() >= 50 end }),
   H.release(), settleField("D again", 100), at("D again", 100, 57, 7),
 
   -- D -> cave pocket S
-  H.navTo(50, 33, { maxFrames = 25000, playBattles = "flee", avoid = A100,
+  H.navTo(50, 33, { maxFrames = 25000, playBattles = "tactical", avoid = A100,
            arrive = mapChanged() }),
   H.release(), settleField("cave S", 96), at("cave S", 96, 28, 25),
   H.openChest{ stand = { 28, 26 }, face = "down", bit = 38, what = "Guardian",
-               nav = { playBattles = "flee", avoid = A96 } },
+               nav = { playBattles = "tactical", avoid = A96 } },
 
   -- S -> D
-  H.navTo(29, 25, { maxFrames = 15000, playBattles = "flee", avoid = A96,
+  H.navTo(29, 25, { maxFrames = 15000, playBattles = "tactical", avoid = A96,
            arrive = mapChanged() }),
   H.release(), settleField("D third", 100), at("D third", 100, 51, 33),
 
   -- D -> cave R.  R's arrival tile (14,12) is the second glimpse trigger,
   -- so the settle plays that scene out; no exact-tile assert because the
   -- scene can nudge the party.
-  H.navTo(34, 7, { maxFrames = 25000, playBattles = "flee", avoid = A100,
+  H.navTo(34, 7, { maxFrames = 25000, playBattles = "tactical", avoid = A100,
            arrive = mapChanged() }),
   H.release(), settleField("cave R", 96, 24000), at("cave R", 96),
 
   -- R -> the bridge (the long entrance at (12,8))
-  H.navTo(12, 8, { maxFrames = 20000, playBattles = "flee", avoid = A96,
+  H.navTo(12, 8, { maxFrames = 20000, playBattles = "tactical", avoid = A96,
            arrive = mapChanged() }),
   H.release(), settleField("bridge", 102), at("bridge", 102, 51, 46),
 
   -- bridge -> shelf C
-  H.navTo(43, 50, { maxFrames = 20000, playBattles = "flee", avoid = A102,
+  H.navTo(43, 50, { maxFrames = 20000, playBattles = "tactical", avoid = A102,
            arrive = mapChanged() }),
   H.release(), settleField("shelf C", 100), at("shelf C", 100, 6, 29),
 
   -- C -> cave pocket Q
-  H.navTo(9, 37, { maxFrames = 20000, playBattles = "flee", avoid = A100,
+  H.navTo(9, 37, { maxFrames = 20000, playBattles = "tactical", avoid = A100,
            arrive = mapChanged() }),
   H.release(), settleField("cave Q", 96), at("cave Q", 96, 25, 16),
   H.openChest{ stand = { 27, 15 }, face = "up", bit = 37, what = "Tent",
-               nav = { playBattles = "flee", avoid = A96 } },
+               nav = { playBattles = "tactical", avoid = A96 } },
 
   -- Q -> C
-  H.navTo(25, 15, { maxFrames = 15000, playBattles = "flee", avoid = A96,
+  H.navTo(25, 15, { maxFrames = 15000, playBattles = "tactical", avoid = A96,
            arrive = mapChanged() }),
   H.release(), settleField("C second", 100), at("C second", 100, 9, 36),
 
   -- C -> the bridge
-  H.navTo(7, 29, { maxFrames = 20000, playBattles = "flee", avoid = A100,
+  H.navTo(7, 29, { maxFrames = 20000, playBattles = "tactical", avoid = A100,
            arrive = mapChanged() }),
   H.release(), settleField("bridge second", 102),
   at("bridge second", 102, 43, 51),
 
   -- bridge -> R, up the (50,46) stair
-  H.navTo(50, 46, { maxFrames = 20000, playBattles = "flee", avoid = A102,
+  H.navTo(50, 46, { maxFrames = 20000, playBattles = "tactical", avoid = A102,
            arrive = mapChanged() }),
   H.release(), settleField("R second", 96), at("R second", 96, 11, 8),
 
   -- R -> D
-  H.navTo(15, 12, { maxFrames = 20000, playBattles = "flee", avoid = A96,
+  H.navTo(15, 12, { maxFrames = 20000, playBattles = "tactical", avoid = A96,
            arrive = mapChanged() }),
   H.release(), settleField("D fourth", 100), at("D fourth", 100, 35, 7),
 
   -- D -> P.  The return lands on (21,21), P's other arrival tile, and the
   -- existing off-trigger step below walks the last stretch to (18,22).
-  H.navTo(43, 24, { maxFrames = 25000, playBattles = "flee", avoid = A100,
+  H.navTo(43, 24, { maxFrames = 25000, playBattles = "tactical", avoid = A100,
            arrive = mapChanged() }),
   H.release(), settleField("P return", 96), at("P return", 96, 21, 21),
   -- ===================================================================== --
 
-  H.navTo(18, 22, { maxFrames = 8000, playBattles = "flee" }),
+  H.navTo(18, 22, { maxFrames = 8000, playBattles = "tactical" }),
   H.release(),
   settleField("cave 96 P, off-trigger", 96),
   H.call(function()

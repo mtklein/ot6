@@ -1605,6 +1605,7 @@ function M.newFightDriver(tag, opts)
   local F = {}
   local menuStreak, tick, battleTick = 0, 0, 0
   local plan, planActor, held = nil, nil, {}
+  local heldFast = false            -- the live steer asked for 3 presses/pulse
   local tgtSpin = 0                    -- frames spent undecided in ST_TGT
   local unknownSt, unknownN = nil, 0   -- unknown-menu-state stall guard
   local parkSt, parkN = nil, 0         -- parked-KNOWN-window watchdog
@@ -1629,6 +1630,7 @@ function M.newFightDriver(tag, opts)
   end
   local startSnap = nil                -- party HP when the battle opened
   local planPulses = 0                 -- pulses the live plan has consumed
+  local steerTrail = {}                -- the list steer's last samples (see the cap drop)
   local loreSpinN = 0                  -- frames spent on live lore plans
                                        -- since the last landed lore cast
   local loreDead = false               -- the stall guard fired this battle
@@ -2253,18 +2255,28 @@ function M.newFightDriver(tag, opts)
     -- sat 900+ frames in the item window at one cursor row while the
     -- fight burned down around it; no legitimate steer takes 300 frames.
     if M.readByte(MENU) ~= 0 and KNOWN_ST[st] and plan ~= nil then
-      -- A flat cap beneath the signature watch: a steer whose cursor keeps
+      -- A cap beneath the signature watch: a steer whose cursor keeps
       -- moving without ever landing (the dadaluma wipe scrolled for a
       -- Potion the bag no longer held, 600+ frames, twice) never repeats a
-      -- signature, so it needs a budget that ignores progress.  No steer
-      -- this driver issues needs 40 pulses.
+      -- signature, so it needs a budget that ignores progress.  The budget
+      -- scales with the row the steer is walking to: the first cut was a
+      -- flat 40 ("no steer needs 40 pulses"), and the IAF gauntlet found
+      -- the Potion at bag row 43 -- every heal was dropped at 40, re-planned
+      -- and dropped again while the party burned down (attempt 10, waves
+      -- 5-6).  A deep row costs a press per row; the slack on top is the
+      -- open/confirm overhead and the dadaluma no-such-row case.
       planPulses = planPulses + 1
-      if planPulses > 40 then
+      -- (the fast steer walks ~3 rows a pulse, so even the last bag row
+      -- needs well under the ceiling; the ceiling keeps a runaway bounded)
+      local budget = math.min(140, 40 + (plan.kind == "item" and plan.idx or 0))
+      if planPulses > budget then
         parkDropN = parkDropN + 1
         M.log(string.format("[%s] plan %s (item=%s idx=%s) consumed %d pulses "
           .. "in state $%02X without landing (drop #%d this battle) -- "
-          .. "dropping it and backing out", tag or "fight", plan.kind,
-          tostring(plan.item), tostring(plan.idx), planPulses, st, parkDropN))
+          .. "dropping it and backing out%s", tag or "fight", plan.kind,
+          tostring(plan.item), tostring(plan.idx), planPulses, st, parkDropN,
+          #steerTrail > 0 and ("; list steer trail (scroll,row/col>want row,col): " .. table.concat(steerTrail, " ")) or ""))
+        steerTrail = {}
         parkSt, parkN, planPulses = nil, 0, 0
         dropPlan()
         return { "b" }
@@ -2344,7 +2356,7 @@ function M.newFightDriver(tag, opts)
       end
       if st ~= ST_CMD then return nil end
       plan, planActor, tgtSpin = makePlan(actor), actor, 0
-      planPulses = 0
+      planPulses, steerTrail = 0, {}
       if plan.kind == "heal" or plan.kind == "item" then careActor = actor end
       M.log(string.format("[%s] actor=%d char=%d plan=%s",
         tag or "fight", actor, M.readByte(BCHID + actor * 2), plan.kind))
@@ -2368,8 +2380,19 @@ function M.newFightDriver(tag, opts)
       local want = plan.idx or battInvIdx(plan.item)
       if want == nil then plan, planActor = nil, nil; return { "b" } end
       local cur = M.readByte(ITEMSCR + actor) + M.readByte(ITEMROW + actor)
-      if cur < want then return { "down" } end
-      if cur > want then return { "up" } end
+      -- A far row is walked at three presses per pulse rather than one
+      -- (the frame loop's `fast`): one press per 30-frame pulse put the
+      -- IAF's row-43 Potion 1300 frames of active-time menu away, and two
+      -- of three died while the steer walked (attempts 10-11).  Within two
+      -- rows the steer taps once per pulse again, so an overshoot is at
+      -- most two rows and the next pulse corrects it.
+      local far = math.abs(want - cur) > 2
+      if far and not plan.fastLogged then
+        plan.fastLogged = true
+        M.log(string.format("[%s] item steer: row %d -> %d, walking fast (3 presses a pulse)", tag or "fight", cur, want))
+      end
+      if cur < want then return { "down", fast = far } end
+      if cur > want then return { "up", fast = far } end
       return { "a" }
     end
     if st == ST_MAGIC and plan.kind == "summon" then
@@ -2392,6 +2415,11 @@ function M.newFightDriver(tag, opts)
       local wr, wc = cell // 2, cell % 2
       local ar = M.readByte(MSCROLL + actor) + M.readByte(MROW + actor)
       local col = M.readByte(MCOL + actor)
+      -- the steer's trail, printed if the plan is dropped at the pulse cap:
+      -- a list steer that never lands is either oscillating (a press moving
+      -- two rows) or chasing a cell that moves (a list re-fold under it)
+      steerTrail[#steerTrail + 1] = string.format("%d,%d/%d>%d,%d", M.readByte(MSCROLL + actor), M.readByte(MROW + actor), col, wr, wc)
+      if #steerTrail > 12 then table.remove(steerTrail, 1) end
       if ar < wr then return { "down" } end
       if ar > wr then return { "up" } end
       if col < wc then return { "right" } end
@@ -2761,8 +2789,15 @@ function M.newFightDriver(tag, opts)
     -- than wall clock since the first offer, so another actor's slow turn
     -- between two pursuits cannot fire it.
     if plan and plan.kind == "lore" then loreSpinN = loreSpinN + 1 end
-    if ph == 0 then held = button(actor) or {} end
-    M.setPad(ph < 6 and held or {})
+    if ph == 0 then
+      held = button(actor) or {}
+      heldFast, held.fast = held.fast or false, nil
+    end
+    -- `fast`: three 5-on/5-off presses in the pulse instead of one 6-on;
+    -- each is a distinct press to the menu (a release between), so no
+    -- auto-repeat is involved and the count per pulse is exact.
+    if heldFast then M.setPad(ph % 10 < 5 and held or {})
+    else M.setPad(ph < 6 and held or {}) end
   end
 
   return F
@@ -2970,10 +3005,18 @@ function M.run(opts, steps)
     local ok, addr = pcall(function() return M.sym("GameOver") end)
     if ok then
       emu.addMemoryCallback(function()
-        if canaryInGame then
-          goReadFired = goReadFired + 1
-          M.gameOverFired = M.gameOverFired + 1
-        end
+        if not canaryInGame then return end
+        -- Only a read made by the event interpreter ENTERING the script
+        -- counts: its pc ($e5-$e7) sits on the script's first byte as it
+        -- fetches it.  A neighbouring script's tail, a lookahead, or a
+        -- table walk can touch this one byte too (the WoR opening at the
+        -- Solitary Island bedside read it three times with the title
+        -- screen never entered, 2026-09-01), and those are not a game
+        -- over.  TitleScreen's exec watch below stays the backstop.
+        local pc = M.readByte(0x00e5) | (M.readByte(0x00e6) << 8) | (M.readByte(0x00e7) << 16)
+        if pc ~= addr and pc ~= addr + 1 then return end
+        goReadFired = goReadFired + 1
+        M.gameOverFired = M.gameOverFired + 1
       end, emu.callbackType.read, addr, addr)
     end
   end

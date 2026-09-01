@@ -314,7 +314,7 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
   H.fieldCare({ tag = "prep full-heal at the save region", threshold = 1.0 }),
 
   -- ---- 2. the WEST door 375 (2,45) -> 371 (9,9) --------------------------
-  H.navTo(2, 45, { maxFrames = 20000, playBattles = "flee",
+  H.navTo(2, 45, { maxFrames = 20000, playBattles = "tactical",
     avoid = { { 15, 17 }, { 12, 46 }, { 11, 51 }, { 17, 49 } },
     arrive = function() return map() ~= 375 end }),
   H.release(),
@@ -332,7 +332,7 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
   -- ---- 3. the statue-lore scene (15,20), then Ultros III (15,22) ---------
   -- Stage above the lore trigger (column 15 is a clear walk down, per
   -- probe_ultros_route), then step down onto (15,20) to fire the lore scene.
-  H.navTo(15, 17, { maxFrames = 12000, playBattles = "flee",
+  H.navTo(15, 17, { maxFrames = 12000, playBattles = "tactical",
     arrive = function() return sw(0x0097) == 1 end }),
   H.release(),
   pressWalk("down", function() return sw(0x0097) == 1 end, 6000,
@@ -386,8 +386,8 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
   H.advanceStory(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15
        and not H.dialogWaiting() and not H.battleLoadStarted()
-  end, 8000, { playBattles = "flee" }),
-  H.navTo(10, 9, { maxFrames = 20000, playBattles = "flee",
+  end, 8000, { playBattles = "tactical" }),
+  H.navTo(10, 9, { maxFrames = 20000, playBattles = "tactical",
     avoid = { { 15, 20 }, { 15, 22 } },
     arrive = function() return map() ~= 371 end }),
   H.release(),
@@ -401,7 +401,7 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
     H.log(string.format("[ot6] back on 375 f%d (%d,%d) $0095=%d",
       H.frame, H.fieldX(), H.fieldY(), sw(0x0095)))
   end),
-  H.navTo(9, 44, { maxFrames = 20000, playBattles = "flee",
+  H.navTo(9, 44, { maxFrames = 20000, playBattles = "tactical",
     avoid = { { 15, 17 }, { 12, 46 }, { 11, 51 }, { 17, 49 } } }),
   H.release(),
 

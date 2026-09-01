@@ -18,7 +18,7 @@ local function where(tag)
 end
 
 -- Settle: control + alignment + the expected map, held for 30 frames.
--- advanceStory (playBattles="flee") drives it rather than a passive wait,
+-- advanceStory (playBattles="tactical") drives it rather than a passive wait,
 -- so an encounter that rolled on the arrival tile is fled instead of
 -- stalling the settle to its timeout.
 local function settleField(what, dstMap, maxF)
@@ -29,7 +29,7 @@ local function settleField(what, dstMap, maxF)
       and (dstMap == nil or map() == dstMap)
     held = ok and held + 1 or 0
     return held >= 30
-  end, maxF or 12000, { playBattles = "flee" })
+  end, maxF or 12000, { playBattles = "tactical" })
 end
 
 local function mapChanged()
@@ -84,7 +84,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(hit, false, "plan stays off map 95's world-exit row 37")
   end),
   H.navTo(11, 26, { maxFrames = 20000, arrive = mapChanged(),
-           playBattles = "flee" }),
+           playBattles = "tactical" }),
   H.release(),
   settleField("shelf F", 100),
   H.call(function()

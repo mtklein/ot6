@@ -92,7 +92,7 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- off the 024 contact line, then down onto the sparkle
-  H.navTo(26, 52, { playBattles = "flee", maxFrames = 6000 }),
+  H.navTo(26, 52, { playBattles = "tactical", maxFrames = 6000 }),
   tapInto("down", onSaveTile(26, 53), 9000,
     "onto the NEW save tile 273 (26,53)", tileCalm),
   H.waitFrames(45),

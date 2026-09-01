@@ -219,7 +219,7 @@ local function diveAttempt(n)
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
     H.call(function() rideLost, rideWipeN = nil, 0 end),
-    H.navTo(25, 18, { maxFrames = 12000, playBattles = "flee", arrive = function()
+    H.navTo(25, 18, { maxFrames = 12000, playBattles = "tactical", arrive = function()
       return sw(0x41) == 1 or (H.fieldX() == 25 and H.fieldY() == 18
          and H.hasControl() and H.tileAligned()) end }),
     ride("up", function()
@@ -269,7 +269,7 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- step into Crescent Mountain
-  H.worldNavTo(214, 148, { maxFrames = 4000, playBattles = "flee",
+  H.worldNavTo(214, 148, { maxFrames = 4000, playBattles = "tactical",
     arrive = function() return not H.worldMode() end }),
   settle(167, "Crescent 167"),
 
@@ -308,7 +308,7 @@ H.run({ maxFrames = 200000 }, {
         table.concat(rows[y], ",")))
     end
   end),
-  H.navTo(12, 23, { maxFrames = 8000, playBattles = "flee" }),
+  H.navTo(12, 23, { maxFrames = 8000, playBattles = "tactical" }),
   -- (12,22) runs a preliminary beat (GAU runs ahead and the party is
   -- re-parked at (12,17)); the $0041 helmet scene itself is _cbc5fb's
   -- tail, triggered at (25,17)
@@ -354,7 +354,7 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- the ferry clerk at (17,15): option 1 boards
-  H.navTo(17, 16, { maxFrames = 8000, playBattles = "flee" }),
+  H.navTo(17, 16, { maxFrames = 8000, playBattles = "tactical" }),
   (function()
     local phase = 0
     return H.driveUntil(function()

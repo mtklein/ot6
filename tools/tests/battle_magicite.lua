@@ -46,6 +46,32 @@ local function bossSt3() return H.readByte(0x3EF8 + 8 + BOSS*2) end
 
 local locke, celes
 local function mp(slot) return H.readWord(0x3C08 + slot*2) end
+
+-- The fighting lineage's n024_entry ships Celes MP-DRY: she arrives at
+-- 1 of 126, having nuked Ifrit with Ice through the reserve (a deep fight
+-- breaches it by design) and cured the party in the Ifrit/Shiva battle one
+-- door earlier, with no inn between that door and this one.  That is
+-- honest play, and it is not what this lab measures: every experiment
+-- below is built on a 31-MP pool (31 = 1 mod 5, so her kit's 15s and 5s
+-- step onto exactly 6, the 7-MP boundary).  So the lab pins her FIELD
+-- record to 31 before each boot -- a lab condition the fixture cannot
+-- supply on cue (waivered in state_write_waivers.txt), and one that
+-- touches nothing under test: the prices, latches, debit deltas and the
+-- $331c immunity all read the same whatever the pool opens at.
+local function recMp(charId) return 0x1600 + 37 * charId + 13 end   -- the +13 M.charMp reads
+local CELES_REC_MP = recMp(6)
+local POOL = 31                               -- boot B: 31 = 1 (mod 5), the boundary walk's residue
+local POOL_A = 126                            -- boot A: her maximum, so the 27-MP divine leaves
+                                              -- every kit row live and no live-RAM refund is needed
+local function pinPool(tag, pool, charId, who)
+  charId, who = charId or 6, who or "Celes"
+  local cur = H.readWord(recMp(charId))
+  if cur ~= pool then
+    H.log(string.format("[%s] the fixture ships %s at %d MP; pinning the field record to the lab's %d", tag, who, cur, pool))
+    H.writeWord(recMp(charId), pool)
+  end
+  H.assertEq(H.readWord(recMp(charId)), pool, string.format("[%s] %s opens the boot at the lab's %d MP", tag, who, pool))
+end
 local function hp(slot) return H.readWord(0x3BF4 + slot*2) end
 local function mask(slot) return H.readWord(0x3018 + slot*2) end
 local function cmdRowOf(slot, cmd)
@@ -402,6 +428,12 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(H.readByte(0x1A69) & 0x06, 0x06,
       "IFRIT and SHIVA really in the bag ($1A69 give_genju receipts)")
   end),
+  H.call(function()
+    pinPool("bootA", POOL_A)
+    -- LOCKE too: the same fixture ships him drained (13 MP; Inferno is 26),
+    -- so the Ifrit positive control needs his pool as much as Celes's
+    pinPool("bootA", H.charMaxMp(1), 1, "Locke")
+  end),
   equipOn(3, SHIVA, 6, "A/celes-shiva"),
   equipOn(2, IFRIT, 1, "A/locke-ifrit"),
   H.fieldCare({ tag = "before battle 72", threshold = 0.95, magic = false }),
@@ -454,6 +486,16 @@ H.run({ maxFrames = 150000 }, {
         -- write $37/$38.  Take the damage baseline only after Celes's latch,
         -- debit and HP change have jointly identified her real summon.
         R.hpMid = bossHp()
+        -- The debit is read here, at the queue, and remembered: boot A's
+        -- pool is her maximum, so the divine leaves 99 and every kit row
+        -- stays live without any refund.  (The engine re-derives a
+        -- character's enabled bits only at her action's END -- AfterAction2
+        -- consumes the $3204 request; CheckMagicEnabled is cost vs the pool
+        -- at that moment -- and again only on the L/R boost edge, which the
+        -- parked window never presses; a Defer was measured NOT to rebuild
+        -- them.  An earlier cut pinned 31 here and needed a live-RAM refund
+        -- ahead of that rebuild; the higher pin removes the write.)
+        R.ddustDebit = R.mp0 - mp(celes)
         lockeMode = "summon"
       end),
       driveTo(function()
@@ -475,7 +517,7 @@ H.run({ maxFrames = 150000 }, {
           "[ddust] the Slow rider was REFUSED where the species' authored "
           .. "immunity blocks it -- per-monster immunity is still consulted; "
           .. "[inferno] and Inferno carries no rider of its own")
-        H.assertEq(R.mp0 - mp(celes), DDUST_MP, "[ddust] the summon charged its 27 MP")
+        H.assertEq(R.ddustDebit, DDUST_MP, "[ddust] the summon charged its 27 MP (the debit verified at the queue)")
         H.assertEq(lm0 - mp(locke), INFERNO_MP, "[inferno] charged its 26 MP")
         H.assertEq(H.readWord(SUMMONED) & mask(celes) ~= 0, true,
           "[latch] the engine set Celes's once-per-battle bit in $3f2e")
@@ -488,22 +530,17 @@ H.run({ maxFrames = 150000 }, {
   -- 5. the spent summon greys at her next real window (natural refresh)
   H.call(function()
     partyCare = false; celesMode = "park"
-    -- MP refund, not play: the fighting lineage's Celes arrives at 31 MP,
-    -- so the 27-MP divine leaves 4 -- below Ice's 5 -- and the row greys
-    -- for POVERTY at the very window meant to prove the latch greys ONLY
-    -- the summon row.  Refund her pre-divine pool before that window
-    -- renders; the Osmose block below re-baselines from a fresh read, so
-    -- its debit deltas are untouched.  Declared in
-    -- state_write_waivers.txt.
-    if mp(celes) < R.mp0 then
-      H.log(string.format("[latch] mp %d -> %d refunded for the liveness control",
-        mp(celes), R.mp0))
-      H.writeWord(0x3C08 + celes * 2, R.mp0)
-    end
+    -- Boot A's pool is her maximum, so nothing here needs a refund: the
+    -- window below must show the summon row greyed by the LATCH alone,
+    -- with every kit row live by MP.
+    H.assertEq(mp(celes), R.mp0 - DDUST_MP, "[latch] her pool is the divine's debit and nothing else (no refund, nothing spent since)")
   end),
   driveTo(function()
     return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
   end, 20000, "her next window's list is open"),
+  -- The window's enabled bits were built at her action's end, at the
+  -- post-divine pool (99 of 126 here): the summon row greys by the latch,
+  -- the kit rows stay live by MP.
   H.call(function()
     H.setPad({})
     H.assertEq(esperCost(celes), DDUST_MP, "[latch] ...still priced at 27")
@@ -564,6 +601,7 @@ H.run({ maxFrames = 150000 }, {
   -- ============================ boot B: the re-offer and the boundary ==
   H.loadState(STATE),
   H.waitFrames(60),
+  H.call(function() pinPool("bootB", POOL) end),
   equipOn(3, SHIVA, 6, "B/celes-shiva"),
   H.fieldCare({ tag = "before battle 72 (boot B)", threshold = 0.95,
                 magic = false }),
@@ -577,17 +615,16 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(H.readWord(SUMMONED) & mask(celes), 0,
       "[latch] ...because battle init cleared $3f2e")
     R.mp0 = mp(celes)
-    -- The fixture no longer ships her full: the fighting lineage's
-    -- re-cut n024_entry arrives at 31 of 126 (the fled fixture carried
-    -- 41 of 106), and the care stop above is deliberately item-only so
-    -- that it heals her HP without topping the pool up.  The boundary
-    -- walk below rests on the residue, and it survived the move:
-    -- 31 = 1 (mod 5) exactly as 41 was, and Shell (15) and Cure (5)
-    -- both preserve it, so kit casts alone still land on exactly 6.
-    -- The maximum is pinned beside it so a fixture that ships a
-    -- different pool says which of the two numbers moved.
-    H.assertEq(R.mp0, 31,
-      "[drain] her real pool opens at the 31 the fixture carries")
+    -- Her pool is the lab's 31 (pinPool above; the fled fixture carried
+    -- 41 of 106, the first fighting re-cut 31 of 126, the current one 1 of
+    -- 126), and the care stop above is deliberately item-only so that it
+    -- heals her HP without touching the pool.  The boundary walk below
+    -- rests on the residue: 31 = 1 (mod 5) exactly as 41 was, and Shell
+    -- (15) and Cure (5) both preserve it, so kit casts alone land on
+    -- exactly 6.  The maximum is pinned beside it so a fixture that ships
+    -- a different maximum says so.
+    H.assertEq(R.mp0, POOL,
+      "[drain] her pool opens at the lab's pinned 31")
     -- $3BF4 hp, $3C08 mp, $3C1C max hp, $3C30 max mp: one 20-byte stride
     H.assertEq(H.readWord(0x3C30 + celes*2), 126,
       "[drain] and her maximum is 126")

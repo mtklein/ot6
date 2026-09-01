@@ -65,7 +65,7 @@ H.run({ maxFrames = 5000 }, {
     H.assertEq(H.fieldX(), 2, "Vector entrance x")
     H.assertEq(H.fieldY(), 17, "Vector entrance y")
   end),
-  H.navTo(1, 17, { playBattles = "flee", maxFrames = 600 }),
+  H.navTo(1, 17, { playBattles = "tactical", maxFrames = 600 }),
   H.driveUntil(function() return (H.mapId() & 0x1ff) == 0 end, 800, {
     H.hold({ "left" }),
   }, "leave Vector to its west entry point"),
