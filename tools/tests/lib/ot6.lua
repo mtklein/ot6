@@ -2870,14 +2870,6 @@ function M.run(opts, steps)
   -- are split so the failure names which watch fired; M.gameOverFired
   -- stays the public sum every existing caller reads and clears.
   M.gameOverFired = 0
-  -- A retry ladder that reloads on a wipe can still lose the race: an
-  -- EVENT battle's loss runs the GameOver script, whose read watch fires
-  -- within frames of the last death -- faster than any all-dead counter.
-  -- A ladder sets this flag around its attempts to keep the canary
-  -- COUNTING but not RAISING, watches M.gameOverFired itself as one more
-  -- reload trigger, clears both after handling, and clears the flag when
-  -- the ladder ends.  Everywhere else the canary stays loud.
-  M.allowGameOverWindow = false
   local goReadFired, titleExecFired = 0, 0
   local canaryInGame = false
   do
@@ -2908,8 +2900,7 @@ function M.run(opts, steps)
     if not canaryInGame and (M.hasControl() or M.battleLoadStarted()) then
       canaryInGame = true
     end
-    if M.gameOverFired > 0 and not opts.allowGameOver
-       and not M.allowGameOverWindow then
+    if M.gameOverFired > 0 and not opts.allowGameOver then
       finished = true
       traceFlush()
       coverageFlush()

@@ -265,12 +265,7 @@ local function ifritAttempt(n)
     -- battle text, the recognition scene's dialogs, and the victory
     -- teardown, carrying the whole battle from fly-in to field.
     H.driveUntil(function()
-      -- H.gameOverFired: an event-battle loss reads the GameOver script
-      -- within frames of the last death, beating any all-dead counter;
-      -- inside the ladder's allowGameOverWindow it is one more reload
-      -- trigger instead of a run-ender.
       return not H.battleLoadStarted() or wiped >= 120
-          or H.gameOverFired > 0
     end, 90000, {
       H.call(function()
         hb = hb + 1
@@ -313,11 +308,10 @@ local function ifritAttempt(n)
     }, "battle 70, played (tactical + boost bank + real items)"),
     -- A wiped attempt reloads the entry blob HERE, before the game-over
     -- screen can land, and clears the canary counter for the race window.
-    H.cond(function() return wiped >= 120 or H.gameOverFired > 0 end, {
+    H.cond(function() return wiped >= 120 end, {
       H.logStep(function()
-        return string.format("attempt %d WIPED (all-dead %d frames, "
-          .. "gameOverFired %d) -- reloading the entry blob", n,
-          wiped, H.gameOverFired)
+        return string.format("attempt %d WIPED -- reloading the entry "
+          .. "blob before game over lands", n)
       end),
       H.call(function() wipeReq = H.requestLoadState(fightBlob) end),
       H.waitFrames(2),
@@ -481,20 +475,13 @@ H.run({ maxFrames = 300000 }, {
     })
   end)(),
 
-  -- 2. battle 70, played with real input, on the phase-spread retry ladder.
-  -- The canary's raise is suspended (counting continues) for exactly the
-  -- ladder's span: each attempt watches H.gameOverFired as a reload
-  -- trigger, and the flag comes down before the outcome assert.
-  H.call(function() H.allowGameOverWindow = true end),
+  -- 2. battle 70, played with real input, on the phase-spread retry ladder
   L.watch(),
   ifritAttempt(1),
   ifritAttempt(2),
   ifritAttempt(3),
   L.report(),
   H.call(function()
-    H.allowGameOverWindow = false
-    H.assertEq(H.gameOverFired, 0,
-      "no unhandled game-over left standing after the ladder")
     H.assertEq(fightWon, true,
       "battle 70 won within 3 attempts (the library fighter: "
       .. "tactical + boost bank + real items)")
