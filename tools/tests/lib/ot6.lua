@@ -1618,6 +1618,17 @@ function M.newFightDriver(tag, opts)
   local healSaid = nil                 -- last refusal logged, to log it once
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
   local parkDropN = 0                  -- watchdog fires this battle (see below)
+  local careActor = nil                -- who took this round's one care turn
+  -- A plan dropped before it lands (park, pulse cap, a cell the steer
+  -- cannot find) must not have spent the round's care budget: the actor
+  -- backs out to a fresh window and plans again, so the budget it claimed
+  -- at creation is refunded here.
+  local function dropPlan()
+    if careActor ~= nil and careActor == planActor then careActor = nil end
+    plan, planActor = nil, nil
+  end
+  local startSnap = nil                -- party HP when the battle opened
+  local planPulses = 0                 -- pulses the live plan has consumed
   local loreSpinN = 0                  -- frames spent on live lore plans
                                        -- since the last landed lore cast
   local loreDead = false               -- the stall guard fired this battle
@@ -1793,6 +1804,16 @@ function M.newFightDriver(tag, opts)
         if lost > (roundCost[e] or 0) then roundCost[e] = lost end
       end
     end
+    -- Before this actor's second turn there is no per-turn sample, but the
+    -- HP lost since the battle opened is a floor on what a round costs:
+    -- the dadaluma wipe priced a Potion at 'a round costs 0 (top-up)' on
+    -- turn two while every ally had already lost ~250 to the opening move.
+    if startSnap ~= nil and not turnSnap[actor] then
+      for e = 0, 3 do
+        local lost = startSnap[e] - hpNow[e]
+        if lost > (roundCost[e] or 0) then roundCost[e] = lost end
+      end
+    end
     turnSnap[actor] = hpNow
     -- opts.healer = <battle chid>: only that character runs the item
     -- healing line; everyone else attacks.  Without this, a party whose
@@ -1848,7 +1869,24 @@ function M.newFightDriver(tag, opts)
         .. "are off for the rest of the fight; attacking instead",
         tag or "fight", parkDropN))
     end
-    if (row ~= nil or cureRow ~= nil) and totalMon > 200 and parkDropN < 3 then
+    -- One care action per round (owner directive: one healer inside, and
+    -- the strong form once).  The caring actor's next turn delimits the
+    -- round; until then everyone else attacks, because the fastest way to
+    -- stop the damage is to end the fight.  The dadaluma wipe spent all
+    -- four turns of every round on heals, revives and item parks against
+    -- a 392-HP monster that one attacking round would have killed, and it
+    -- never landed a single blow.  A caring actor who has since died
+    -- reopens the budget.
+    local careOpen = careActor == nil or careActor == actor
+                  or hpNow[careActor] == 0
+    if (row ~= nil or cureRow ~= nil) and totalMon > 200 and parkDropN < 3
+       and not careOpen then
+      local said = string.format("[%s] actor=%d: this round's care turn "
+        .. "went to actor %d -- attacking", tag or "fight", actor, careActor)
+      if said ~= healSaid then healSaid = said; M.log(said) end
+    end
+    if (row ~= nil or cureRow ~= nil) and totalMon > 200 and parkDropN < 3
+       and careOpen then
       -- Revival stays item-only.  Life ($33) is not on any route this
       -- library drives yet: no esper in the WoB grants it (genju_prop.asm)
       -- and only Terra and Celes learn it innately, so a cast branch here
@@ -2197,6 +2235,22 @@ function M.newFightDriver(tag, opts)
     -- sat 900+ frames in the item window at one cursor row while the
     -- fight burned down around it; no legitimate steer takes 300 frames.
     if M.readByte(MENU) ~= 0 and KNOWN_ST[st] and plan ~= nil then
+      -- A flat cap beneath the signature watch: a steer whose cursor keeps
+      -- moving without ever landing (the dadaluma wipe scrolled for a
+      -- Potion the bag no longer held, 600+ frames, twice) never repeats a
+      -- signature, so it needs a budget that ignores progress.  No steer
+      -- this driver issues needs 40 pulses.
+      planPulses = planPulses + 1
+      if planPulses > 40 then
+        parkDropN = parkDropN + 1
+        M.log(string.format("[%s] plan %s (item=%s idx=%s) consumed %d pulses "
+          .. "in state $%02X without landing (drop #%d this battle) -- "
+          .. "dropping it and backing out", tag or "fight", plan.kind,
+          tostring(plan.item), tostring(plan.idx), planPulses, st, parkDropN))
+        parkSt, parkN, planPulses = nil, 0, 0
+        dropPlan()
+        return { "b" }
+      end
       -- "Parked" means NOTHING is moving: the signature folds in every
       -- window's live cursor cells, so a steer legitimately scrolling a
       -- deep list resets the count each press.  Keying on state alone
@@ -2217,7 +2271,7 @@ function M.newFightDriver(tag, opts)
           parkN, st, plan.kind, tostring(plan.item), tostring(plan.idx),
           parkDropN))
         parkSt, parkN = nil, 0
-        plan, planActor = nil, nil
+        dropPlan()
         return { "b" }
       end
     else
@@ -2230,7 +2284,7 @@ function M.newFightDriver(tag, opts)
         M.log(string.format("[%s] unknown menu state $%02X held %d pulses "
           .. "-- backing out (B)", tag or "fight", st, unknownN))
         unknownSt, unknownN = nil, 0
-        plan, planActor = nil, nil
+        dropPlan()
         return { "b" }
       end
     else
@@ -2242,7 +2296,7 @@ function M.newFightDriver(tag, opts)
     if plan ~= nil and planActor == actor and plan.kind == "lore"
        and loreSpinN > LORE_STALL and not loreDead then
       loreDiagnose(actor, loreCell(actor, plan.lore, false))
-      plan, planActor = nil, nil
+      dropPlan()
       return { "b" }
     end
     if plan == nil or planActor ~= actor then
@@ -2272,6 +2326,8 @@ function M.newFightDriver(tag, opts)
       end
       if st ~= ST_CMD then return nil end
       plan, planActor, tgtSpin = makePlan(actor), actor, 0
+      planPulses = 0
+      if plan.kind == "heal" or plan.kind == "item" then careActor = actor end
       M.log(string.format("[%s] actor=%d char=%d plan=%s",
         tag or "fight", actor, M.readByte(BCHID + actor * 2), plan.kind))
       return nil
@@ -2506,7 +2562,7 @@ function M.newFightDriver(tag, opts)
       -- A refused confirm (corpse under the target cursor) re-enters
       -- button()'s plan-nil ST_TGT head next tick, which owns the
       -- backstop; the optimistic clear here is what routes it there.
-      plan, planActor = nil, nil
+      dropPlan()
       return { "a" }
     end
     if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC or st == ST_ESPER
@@ -2514,7 +2570,7 @@ function M.newFightDriver(tag, opts)
        -- in play: without opts.nukeLore nothing here ever opens that
        -- window, and the default driver stays byte-identical.
        or (opts.nukeLore and (st == ST_LORE or st == ST_LORE_OPEN)) then
-      plan, planActor = nil, nil
+      dropPlan()
       return { "b" }
     end
     return nil
@@ -2525,6 +2581,7 @@ function M.newFightDriver(tag, opts)
     plan, planActor, held = nil, nil, {}
     parkDropN = 0
     if healSaid == "parked-out" then healSaid = nil end
+    careActor, startSnap, planPulses = nil, nil, 0
     -- Everything the heal policy measured belongs to the battle that just
     -- ended.  A retry ladder replays the same fight from a reload, and
     -- carrying a round cost across the boundary would let one attempt's
@@ -2540,6 +2597,15 @@ function M.newFightDriver(tag, opts)
 
   function F.frame()
     battleTick = battleTick + 1
+    -- The party's HP as the battle opened, for the first-turn danger floor
+    -- in makePlan.  Taken a beat after the table goes live so every entity
+    -- is written (the f+1 log line already reads every entity); no monster
+    -- acts inside 4 frames.
+    if startSnap == nil and battleTick == 4 and M.battleLoadStarted() then
+      local snap = {}
+      for e = 0, 3 do snap[e] = M.readWord(0x3BF4 + e * 2) end
+      startSnap = snap
+    end
     -- VICTORY-DEADLOCK guard (measured, Thamasa grind bake fight 37): the
     -- killing blow can land while an actor's spell/item window is still
     -- open; in Wait mode the open window freezes the battle clock, and
