@@ -166,7 +166,11 @@ H.run({ maxFrames = 480000 }, {
                      function() return leg % 2 == 1 and ay or by end, {
           maxFrames = 45000, playBattles = "tactical",
           careThreshold = 0.7, healPercent = 45,
-          magic = { [0] = { spell = 2 } }, summon = { [0] = {} } }),
+          -- probe_locke_bolt: this party has NO learned spells (magic
+          -- opts would silently degrade to Fight), but three stones are
+          -- worn -- Locke Carbunkl, Edgar Bismark, Sabin Shiva -- so the
+          -- once-per-fight genju is the party's whole magic game.
+          summon = { [1] = {}, [4] = {}, [5] = {} } }),
       }, {})
     end
     return H.cond(function() return true end, steps)

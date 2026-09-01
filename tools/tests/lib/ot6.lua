@@ -1617,6 +1617,7 @@ function M.newFightDriver(tag, opts)
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
+  local parkDropN = 0                  -- watchdog fires this battle (see below)
   local loreSpinN = 0                  -- frames spent on live lore plans
                                        -- since the last landed lore cast
   local loreDead = false               -- the stall guard fired this battle
@@ -1826,7 +1827,18 @@ function M.newFightDriver(tag, opts)
     -- would have ended the danger instead.
     local totalMon = 0
     for s = 0, 5 do totalMon = totalMon + M.readWord(0x3BFC + s * 2) end
-    if (row ~= nil or cureRow ~= nil) and totalMon > 200 then
+    -- The park ratchet: three watchdog drops in one battle means the
+    -- steer cannot land its plans (a greyed confirm, a moved row), and
+    -- replanning the same care loops forever -- the plains grind hung
+    -- 37000 frames in a park->drop->replan cycle.  A person whose item
+    -- confirm keeps buzzing stops shopping and Fights; so does this.
+    if parkDropN >= 3 and healSaid ~= "parked-out" then
+      healSaid = "parked-out"
+      M.log(string.format("[%s] %d park-drops this battle -- care plans "
+        .. "are off for the rest of the fight; attacking instead",
+        tag or "fight", parkDropN))
+    end
+    if (row ~= nil or cureRow ~= nil) and totalMon > 200 and parkDropN < 3 then
       -- Revival stays item-only.  Life ($33) is not on any route this
       -- library drives yet: no esper in the WoB grants it (genju_prop.asm)
       -- and only Terra and Celes learn it innately, so a cast branch here
@@ -1988,14 +2000,21 @@ function M.newFightDriver(tag, opts)
       local mp = M.readWord(CURMP + actor * 2)
       local used = M.readWord(0x3f2e) & M.readWord(0x3018 + actor * 2)
       local row = cmdRow(actor, CMD_MAGIC)
-      if mp >= (sm.mp or 50) and used == 0 and row then
+      -- $3344 + actor*2 is the worn esper ($ff = none), the same cell
+      -- FixPlayerAttack substitutes on a summon.  Terra and Celes carry
+      -- the Magic row innately, so without this conjunct a stone-less
+      -- caster plans a summon whose esper window can never open and
+      -- parks in the magic list.
+      local stone = M.readByte(0x3344 + actor * 2)
+      if mp >= (sm.mp or 50) and used == 0 and row and stone ~= 0xFF then
         return { kind = "summon", row = row }
       elseif summonWhyN < 8 then
         -- the summon line has historically never fired: say why, per refusal
         summonWhyN = summonWhyN + 1
         M.log(string.format(
-          "[%s] summon refused for char %d: mp=%d (need %d) used=$%04x row=%s",
-          tag or "fight", id, mp, sm.mp or 50, used, tostring(row)))
+          "[%s] summon refused for char %d: mp=%d (need %d) used=$%04x "
+          .. "row=%s stone=$%02X",
+          tag or "fight", id, mp, sm.mp or 50, used, tostring(row), stone))
       end
     end
     -- opts.magic = { [charId] = { spell = id, boost = false } }: the
@@ -2171,9 +2190,12 @@ function M.newFightDriver(tag, opts)
       if st == parkSt then parkN = parkN + 1
       else parkSt, parkN = st, 0 end
       if parkN > 12 then          -- ~360 real frames: button() runs per cadence PULSE
+        parkDropN = parkDropN + 1
         M.log(string.format("[%s] parked %d pulses in known state $%02X "
+          .. "(plan %s item=%s idx=%s, drop #%d this battle) "
           .. "-- dropping the plan and backing out", tag or "fight",
-          parkN, st))
+          parkN, st, plan.kind, tostring(plan.item), tostring(plan.idx),
+          parkDropN))
         parkSt, parkN = nil, 0
         plan, planActor = nil, nil
         return { "b" }
@@ -2481,6 +2503,8 @@ function M.newFightDriver(tag, opts)
   function F.idle()
     menuStreak, tick, battleTick = 0, 0, 0
     plan, planActor, held = nil, nil, {}
+    parkDropN = 0
+    if healSaid == "parked-out" then healSaid = nil end
     -- Everything the heal policy measured belongs to the battle that just
     -- ended.  A retry ladder replays the same fight from a reload, and
     -- carrying a round cost across the boundary would let one attempt's
