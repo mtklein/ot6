@@ -2187,8 +2187,18 @@ function M.newFightDriver(tag, opts)
     -- sat 900+ frames in the item window at one cursor row while the
     -- fight burned down around it; no legitimate steer takes 300 frames.
     if M.readByte(MENU) ~= 0 and KNOWN_ST[st] and plan ~= nil then
-      if st == parkSt then parkN = parkN + 1
-      else parkSt, parkN = st, 0 end
+      -- "Parked" means NOTHING is moving: the signature folds in every
+      -- window's live cursor cells, so a steer legitimately scrolling a
+      -- deep list resets the count each press.  Keying on state alone
+      -- fired at exactly 13 pulses while the Potion steer was 21 rows
+      -- into a scroll to slot 25, cancelling real heals mid-flight.
+      local sig = string.format("%d:%d:%d:%d:%d:%d:%d:%d:%d:%d", st, actor,
+        M.readByte(CMDROW + actor), M.readByte(ITEMSCR + actor),
+        M.readByte(ITEMROW + actor), M.readByte(MSCROLL + actor),
+        M.readByte(MROW + actor), M.readByte(MCOL + actor),
+        M.readByte(LSCROLL + actor), M.readByte(LROW + actor))
+      if sig == parkSt then parkN = parkN + 1
+      else parkSt, parkN = sig, 0 end
       if parkN > 12 then          -- ~360 real frames: button() runs per cadence PULSE
         parkDropN = parkDropN + 1
         M.log(string.format("[%s] parked %d pulses in known state $%02X "

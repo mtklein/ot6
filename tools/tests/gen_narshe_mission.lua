@@ -170,7 +170,8 @@ H.run({ maxFrames = 480000 }, {
           -- opts would silently degrade to Fight), but three stones are
           -- worn -- Locke Carbunkl, Edgar Bismark, Sabin Shiva -- so the
           -- once-per-fight genju is the party's whole magic game.
-          summon = { [1] = {}, [4] = {}, [5] = {} } }),
+          summon = { [1] = { mp = 36 }, [4] = { mp = 50 },
+                     [5] = { mp = 27 } } }),
       }, {})
     end
     return H.cond(function() return true end, steps)
