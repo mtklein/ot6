@@ -167,6 +167,20 @@ H.run({ maxFrames = 160000 }, {
     H.assertEntryContract("post-opera-v1")
   end),
 
+  -- CELES wears RAMUH for the whole facility arc: bolt is the area's own
+  -- language (break-coverage-vector.md 6.3 -- seven of the ten random
+  -- species carry vanilla bolt), and the L15-16 party otherwise fields no
+  -- bolt at all.  A phase reroll proved the cost: the Pipsqueak
+  -- five-stack ground a boltless party down over 20k frames.  Guarded so
+  -- an already-worn stone is not toggled OFF (A on a worn esper removes
+  -- it).
+  H.cond(function()
+    return H.readByte(0x1600 + 37 * 6 + 0x1E) ~= 0x00
+  end, {
+    H.equipEsper(function() return (H.readByte(0x1856) >> 3) & 3 end, 0x00,
+      { tag = "RAMUH -> CELES (the facility's bolt)" }),
+  }, {}),
+
   -- Positive control, part 1: check that mapTitleHere() reads the
   -- engine's live title and is not returning "" for everything.  Step
   -- east into the Albrook gate the way the retired generator did,
