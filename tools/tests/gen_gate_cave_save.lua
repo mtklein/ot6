@@ -279,15 +279,15 @@ H.run({ maxFrames = 480000 }, {
   -- The first ring of tries around (116,27) all refused, so the search
   -- is wide; worldNavTo walks the rest once on foot.
   (function()
-    local wps = {}
-    for row = 0, 4 do
-      local y = 23 + row * 2
-      if row % 2 == 0 then
-        for x = 108, 122, 2 do wps[#wps + 1] = { x, y } end
-      else
-        for x = 122, 108, -2 do wps[#wps + 1] = { x, y } end
-      end
-    end
+    -- Candidates computed from world_1_tilemap.dat: tile $18 (the id the
+    -- Blackjack parks on at Narshe) clusters near the pocket.  The pacing
+    -- strip itself (115-117,25) is $18 but only three tiles wide against
+    -- forest -- the lander wants clearance -- so the tries start at the
+    -- (120,22..24) cluster and fall back to the southern clearings;
+    -- worldNavTo walks the rest.
+    local wps = { {120,23},{120,22},{121,23},{120,24},
+                  {116,25},{117,25},{115,25},
+                  {116,35},{117,35},{104,33},{103,33},{105,36},{113,36} }
     local wi, mode, hold, legN, hb = 1, "move", 0, 0, 0
     return H.driveUntil(function()
       return onFoot() or wi > #wps
