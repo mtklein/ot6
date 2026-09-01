@@ -762,13 +762,16 @@ M.contracts["ultros-won-v1"] = {
     { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
   },
   -- no chest is opened this segment, so the bag is N's carried through.
-  -- The Fire Rod is WORN by STRAGO ($07) in place of his Ice Rod, and the
-  -- bag's spare ThunderBlade is WORN by TERRA ($00); both it[4] checks find
-  -- the weapon on its wearer rather than in the $1869 bag.
+  -- The Fire Rod is WORN by STRAGO ($07) in place of his Ice Rod; both
+  -- it[4] checks find the weapon on its wearer rather than in the $1869
+  -- bag.  The fled lineage carried a spare ThunderBlade that TERRA took in
+  -- prep; the fighting lineage's ONE ThunderBlade has ridden LOCKE's Genji
+  -- main hand since the banquet kit, so the prep leaves TERRA's weapon
+  -- alone (gen_ultros conds on the bag) and the blade is found on LOCKE.
   items = {
     { 0xF0, 1, "Fenix Down -- town chest bit 250 (carried from N)" },
     { 0x35, 1, "Fire Rod -- map 351 chest bit 104 (worn by STRAGO in prep)", 0x07 },
-    { 0x0F, 1, "ThunderBlade -- bag spare (worn by TERRA in prep)", 0x00 },
+    { 0x0F, 1, "ThunderBlade -- worn by LOCKE (Genji main hand since the banquet)", 0x01 },
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
