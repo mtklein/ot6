@@ -8,5 +8,3 @@
 # story.
 #
 # format: <fixture name>   # why the drop is deliberate
-
-magicite_ifrit_shiva   # the Ifrit & Shiva magicite-demo fixture: its driver deliberately spends the two Fenix Downs on real revival (gen_ifrit_magicite, "Fenix Down revival -- the same configuration that beat VARGAS"), and it dead-ends at n024_entry (a leaf, nothing boots from it). The mainline route past here continues from the re-cut n024-entry-save-v1 checkpoint, which carries two Fenix Downs, so this spend leaks nothing downstream.
