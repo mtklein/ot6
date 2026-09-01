@@ -265,14 +265,16 @@ H.run({ maxFrames = 150000 }, {
       "CYAN and SHADOW really fight this")
     H.assertEq(H.readByte(0x3BA4 + cyan*2) & 0x02, 0x02,
       "his real katana carries the SWDTECH flag (read, not written)")
-    H.assertEq(H.readByte(0x1600 + 2*37 + 8), 13,
-      "CYAN arrives at camp_escaped at level 13 -- past BushidoLevelTbl's "
-      .. "third threshold (event.asm:1235), which is what sets the ceiling below")
+    H.assertEq(H.readByte(0x1600 + 2*37 + 8), 14,
+      "CYAN arrives at camp_escaped at level 14 -- the fighting lineage "
+      .. "runs one level ahead of the fled curve, still past "
+      .. "BushidoLevelTbl's third threshold (12) and below its fourth "
+      .. "(15), which is what sets the ceiling below")
     R.ceiling = H.readWord(KNOWN)
     H.assertEq(R.ceiling & 0xFF, 2,
-      "his REAL ceiling is 2 (three techs learned at level 13, "
-      .. "BushidoLevelTbl 1/6/12; the high byte carries "
-      .. "InitSkills' garbage, the #4 regression's true shape)")
+      "his REAL ceiling is 2 (three techs learned by level 14, "
+      .. "BushidoLevelTbl 1/6/12 with 15 still ahead; the high byte "
+      .. "carries InitSkills' garbage, the #4 regression's true shape)")
     H.assertEq(bp(), 1, "the natural opening bank (Ot6InitBP)")
     emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
       emu.callbackType.write, 0x7E3410, 0x7E3410)
