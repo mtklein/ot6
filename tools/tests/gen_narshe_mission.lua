@@ -23,6 +23,17 @@ local TEMP_ELEM = 0x316c10 + ULTROS2
 local TEMP_CLASS = 0x316d90 + ULTROS2
 
 local function map() return H.mapId() & 0x1ff end
+local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
+local function maxLvl()
+  local m = 0
+  for c = 0, 15 do
+    if partyOf(c) ~= 0 then
+      local l = H.readByte(0x1600 + 37 * c + 8)
+      if l > m then m = l end
+    end
+  end
+  return m
+end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function shipX() return H.readWord(0x34) >> 4 end
@@ -91,7 +102,7 @@ local function flyTo(tx, ty)
   }, string.format("strafe-fly to (%d,%d)", tx, ty))
 end
 
-H.run({ maxFrames = 40000 }, {
+H.run({ maxFrames = 480000 }, {
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -117,6 +128,54 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(shipX(), 24, "the Blackjack is parked under the party (x)")
     H.assertEq(shipY(), 121, "the Blackjack is parked under the party (y)")
   end),
+
+  -- ---- the sanctioned grind, on the Vector plains ------------------------
+  -- Six measured Sealed-Gate cave wipes with the complete kit say that
+  -- area is a leveling gate at L18, and BOTH its approach pockets are
+  -- door-to-door shelves with no pacing ground (censused) -- you arrive
+  -- leveled or you don't.  The last open ground before it is right here:
+  -- the plains under the parked Blackjack.  The engine censuses its own
+  -- pacing pair; level-ups full-restore (the OT6 rule) so the loop
+  -- part-sustains; capped legs; goal 21 (level-curve.md's
+  -- reasonable-grind rule, which also narrows the documented FC gap).
+  (function()
+    local ax, ay, bx, by
+    local steps = {
+      H.call(function()
+        local reach = {}
+        for y = 112, 130, 2 do
+          for x = 14, 40, 2 do
+            if not (x == 24 and y == 121) then
+              local p = H.worldBfs(x, y)
+              if p then reach[#reach + 1] = { x, y, #p } end
+            end
+          end
+        end
+        H.assertEq(#reach >= 2, true, "the plains census found pacing ground")
+        table.sort(reach, function(u, v) return u[3] > v[3] end)
+        ax, ay = reach[1][1], reach[1][2]
+        bx, by = reach[#reach][1], reach[#reach][2]
+        H.log(string.format("[grind] pacing (%d,%d) <-> (%d,%d) "
+          .. "(census: %d reachable; best level %d)", ax, ay, bx, by,
+          #reach, maxLvl()))
+      end),
+    }
+    for leg = 1, 80 do
+      steps[#steps + 1] = H.cond(function() return maxLvl() < 21 end, {
+        H.worldNavTo(function() return leg % 2 == 1 and ax or bx end,
+                     function() return leg % 2 == 1 and ay or by end, {
+          maxFrames = 45000, playBattles = "tactical",
+          careThreshold = 0.7, healPercent = 45,
+          magic = { [0] = { spell = 2 } }, summon = { [0] = {} } }),
+      }, {})
+    end
+    return H.cond(function() return true end, steps)
+  end)(),
+  H.call(function()
+    H.log(string.format("[grind] done: best level %d", maxLvl()))
+    H.assertEq(maxLvl() >= 20, true, "the plains grind reached at least L20")
+  end),
+  worldGrind(24, 121, "back onto the parked ship (24,121)"),
 
   -- ---- board + lift off (one A tap does both) ---------------------------
   H.pressButtons({ "a" }, 8),

@@ -432,54 +432,6 @@ H.run({ maxFrames = 480000 }, {
     return H.worldHasControl() and H.worldAligned() and bright() >= 15
        and H.worldX() ~= 0
   end, 2400, "world pocket", 5),
-  -- ---- the sanctioned grind, in the east pocket's grass field ---------
-  -- Six measured cave wipes with the full kit say the Sealed Gate is a
-  -- leveling gate at L18; level-curve.md's reasonable-grind rule applies.
-  -- The west doorstep is a two-tile shelf, but this side opens onto real
-  -- pacing ground (world_1_tilemap: open $22 field, X 169-182), in the
-  -- Ralph/Wyvern XP zone.  Every level-up fully restores HP/MP (the OT6
-  -- rule), so the loop part-sustains itself.  Capped legs; goal 21.
-  (function()
-    -- Ask the ENGINE for the pacing ground: census a candidate grid with
-    -- worldBfs from the pocket entrance, keep what is reachable, and ping
-    -- between the two farthest reachable points.  Offline tile-id guesses
-    -- failed twice; passability is the engine's own truth.
-    local ax, ay, bx, by
-    local steps = {
-      H.call(function()
-        local reach = {}
-        for y = 188, 200, 2 do
-          for x = 166, 184, 2 do
-            local p = H.worldBfs(x, y)
-            if p then reach[#reach + 1] = { x, y, #p } end
-          end
-        end
-        H.assertEq(#reach >= 2, true,
-          "the east pocket has at least two reachable pacing points")
-        table.sort(reach, function(u, v) return u[3] > v[3] end)
-        -- farthest from the entrance, and the entrance-est point
-        ax, ay = reach[1][1], reach[1][2]
-        bx, by = reach[#reach][1], reach[#reach][2]
-        H.log(string.format("[grind] pacing (%d,%d) <-> (%d,%d) "
-          .. "(census: %d reachable)", ax, ay, bx, by, #reach))
-      end),
-    }
-    for leg = 1, 80 do
-      steps[#steps + 1] = H.cond(function() return maxLvl() < 21 end, {
-        H.worldNavTo(function() return leg % 2 == 1 and ax or bx end,
-                     function() return leg % 2 == 1 and ay or by end, {
-          maxFrames = 45000, playBattles = "tactical",
-          careThreshold = 0.7, healPercent = 45,
-          magic = { [0] = { spell = 2 } }, summon = { [0] = {} } }),
-      }, {})
-    end
-    return H.cond(function() return true end, steps)
-  end)(),
-  H.call(function()
-    H.log(string.format("[grind] done: best level %d", maxLvl()))
-    H.assertEq(maxLvl() >= 20, true,
-      "the east-pocket grind reached at least L20")
-  end),
   worldGrind(168, 194, "pocket walk -> (168,194)"),
   pressWalk("right", function() return not H.worldMode() and map() == 382 end,
     900, "(169,194) -> CAVE TO THE SEALED GATE (382)"),
