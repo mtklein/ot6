@@ -1607,6 +1607,7 @@ function M.newFightDriver(tag, opts)
   local plan, planActor, held = nil, nil, {}
   local tgtSpin = 0                    -- frames spent undecided in ST_TGT
   local unknownSt, unknownN = nil, 0   -- unknown-menu-state stall guard
+  local parkSt, parkN = nil, 0         -- parked-KNOWN-window watchdog
   -- The two numbers the heal policy weighs against each other, both measured
   -- in the fight rather than assumed.  See the policy note in makePlan.
   local roundCost = {}                 -- entity -> worst HP lost per own turn
@@ -2152,6 +2153,25 @@ function M.newFightDriver(tag, opts)
     -- party down.  A person mashes B out of a menu they did not mean to
     -- open: after ~90 frames stuck in one unknown state, drop any plan and
     -- back out.  Transitional states pass through in far fewer frames.
+    -- Parked-window watchdog: a KNOWN window whose steer stops making
+    -- progress gets dropped like an unknown one.  The Sealed-Gate wipe
+    -- sat 900+ frames in the item window at one cursor row while the
+    -- fight burned down around it; no legitimate steer takes 300 frames.
+    if M.readByte(MENU) ~= 0 and st ~= ST_CMD and KNOWN_ST[st]
+       and plan ~= nil then
+      if st == parkSt then parkN = parkN + 1
+      else parkSt, parkN = st, 0 end
+      if parkN > 300 then
+        M.log(string.format("[%s] parked %d frames in known state $%02X "
+          .. "-- dropping the plan and backing out", tag or "fight",
+          parkN, st))
+        parkSt, parkN = nil, 0
+        plan, planActor = nil, nil
+        return { "b" }
+      end
+    else
+      parkSt, parkN = nil, 0
+    end
     if M.readByte(MENU) ~= 0 and not KNOWN_ST[st] then
       if st == unknownSt then unknownN = unknownN + 1
       else unknownSt, unknownN = st, 1 end
