@@ -1835,6 +1835,31 @@ Ot6ShieldTbl:
                                 ;   display saturates but the count is true)
         .word   $0118
         .byte   5, OT6_SLASH|OT6_PIERCE ; nerapa: sprint fight, low gauge
+        ; ---- audit_break_coverage.py's two break-dark areas ------------
+        ; (owner-approved 2026-09-01.)  Both were beatable on raw stats,
+        ; which is how the fled lineage shipped them dark: the break loop
+        ; simply did not exist there.  Vanilla bits stay -- the four Zozo
+        ; bodies are all poison-weak (Bio Blaster is a live key whenever
+        ; EDGAR is picked), and Cirpius carries no vanilla weakness at
+        ; all, so its class row is its only key (the Rhinox condition).
+        .word   $0086
+        .byte   2, OT6_PIERCE   ; cirpius: a dart takes the mt. kolts
+                                ;   flier.  94% of draws on maps 96/97
+                                ;   rolled x3 of it with no key
+        .word   $0053
+        .byte   2, OT6_BLUDG    ; hadesgigas: the 1200-HP golem the
+                                ;   vector doc remembered at 2 shields --
+                                ;   the row it described, finally real.
+                                ;   absorbs earth; poison vanilla
+        .word   $0052
+        .byte   2, OT6_SLASH|OT6_PIERCE ; slamdancer: a street thug,
+                                ;   cut or stuck.  poison vanilla
+        .word   $004E
+        .byte   2, OT6_SLASH|OT6_PIERCE ; harvester: ditto.  poison vanilla
+        .word   $00DF
+        .byte   2, OT6_PIERCE   ; gabbldegak: the x4 swarm --
+                                ;   AutoCrossbow sweeps it, the pipsqueak
+                                ;   pattern.  poison vanilla
         ; ---- the sealed gate cave (maps 382-386) -----------------------
         ; The fled lineage never fought here, so the area shipped on floor
         ; rows the mission party cannot answer: measured (2026-09-01, 14

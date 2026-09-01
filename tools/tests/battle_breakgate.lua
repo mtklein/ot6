@@ -8,6 +8,12 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local WANT = {                    -- species -> { shields, class mask }
+  -- audit_break_coverage.py's break-dark findings (kolts + zozo):
+  [0x086] = { 2, 0x02 },          -- cirpius: pierce
+  [0x053] = { 2, 0x04 },          -- hadesgigas: bludg
+  [0x052] = { 2, 0x01 | 0x02 },   -- slamdancer: slash|pierce
+  [0x04E] = { 2, 0x01 | 0x02 },   -- harvester: slash|pierce
+  [0x0DF] = { 2, 0x02 },          -- gabbldegak: pierce
   [0x06E] = { 2, 0x02 | 0x01 },   -- ninja: pierce|slash
   [0x0E5] = { 2, 0x01 | 0x04 },   -- spirit: slash|bludg
   [0x0B3] = { 2, 0x01 },          -- soft flier: slash
