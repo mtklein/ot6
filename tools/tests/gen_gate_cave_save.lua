@@ -322,12 +322,18 @@ H.run({ maxFrames = 480000 }, {
           H.setPad(pad)
           return
         end
-        -- mode == "land": tap B, then wait out the descend-or-bounce
+        -- mode == "land": the proven idiom (the base-pass landing below)
+        -- RELEASES the pad for a beat before B -- a B pressed straight out
+        -- of a strafe hold is ignored -- then holds B 8 frames and waits
+        -- on the grounded signal (worldX reads nonzero only on foot).
         hold = hold + 1
-        if hold <= 6 then H.setPad({ b = true }); return end
+        if hold <= 60 then H.setPad({}); return end
+        if hold <= 68 then H.setPad({ b = true }); return end
         H.setPad({})
-        if hold >= 260 then
-          H.log(string.format("[grind] (%d,%d): bounced", wp[1], wp[2]))
+        if H.worldX() ~= 0 or H.worldY() ~= 0 then return end  -- grounding
+        if hold >= 420 then
+          H.log(string.format("[grind] (%d,%d): bounced (c2=%02X)",
+            wp[1], wp[2], H.readByte(0xc2)))
           wi, mode, legN = wi + 1, "move", 0
         end
       end),
