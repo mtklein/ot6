@@ -414,6 +414,31 @@ H.run({ maxFrames = 480000 }, {
     }, "step off RIGHT to (164,194)")
   end)(),
   H.release(), H.waitFrames(30),
+  -- ---- the sanctioned grind, ON FOOT at the proven landing ------------
+  -- Six measured cave wipes with the full kit (summon-opened fights,
+  -- Bolt/Ice, 0.85 care, 45 heal) say the Sealed Gate is a leveling
+  -- gate at L18.  level-curve.md's reasonable-grind rule applies; the
+  -- pocket's lander fought us, so the grind walks the base-pass plains
+  -- instead -- every level-up fully restores HP/MP (the OT6 rule), so
+  -- the loop part-sustains itself.  Legs are capped; the goal is 21.
+  (function()
+    local steps = {}
+    for leg = 1, 40 do
+      steps[#steps + 1] = H.cond(function() return maxLvl() < 21 end, {
+        H.worldNavTo(leg % 2 == 1 and 170 or 164, 194, {
+          maxFrames = 45000, playBattles = "tactical",
+          careThreshold = 0.7, healPercent = 45,
+          magic = { [0] = { spell = 2 } }, summon = { [0] = {} } }),
+      }, {})
+    end
+    return H.cond(function() return true end, steps)
+  end)(),
+  H.call(function()
+    H.log(string.format("[grind] done: best level %d", maxLvl()))
+    H.assertEq(maxLvl() >= 20, true,
+      "the base-pass grind reached at least L20")
+  end),
+  worldGrind(164, 194, "back to the base doorstep (164,194)"),
   pressWalk("right", function() return not H.worldMode() and map() == 377 end,
     900, "(165,194) -> IMPERIAL BASE (377)"),
   H.waitUntil(landed(377, 10), 2400, "base landing", 1),
