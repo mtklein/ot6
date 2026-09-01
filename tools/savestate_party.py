@@ -61,7 +61,16 @@ def declared_states(repo: str) -> set[str]:
         spec = importlib.util.spec_from_file_location("savestate_graph", path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        return {s["state"] for s in mod.STATES}
+        # A graph row's `also` names are declared fixtures too (a
+        # generator's second and third artifacts: first_battle,
+        # figaro_cleared, kolts_entry, vargas_entry, ...).  Missing them
+        # here made the audits call real, consumed fixtures "no longer
+        # declared" and advise deleting them.
+        out = set()
+        for s in mod.STATES:
+            out.add(s["state"])
+            out.update(s.get("also") or ())
+        return out
     except Exception:
         return set()
 
@@ -135,6 +144,14 @@ def find_char_block(raw: bytes, allow_fallback: bool = True) -> int | None:
         hits = [b for b in range(0, len(raw) - REC * n)
                 if all((raw[b + REC * c] & 0x0F) == c for c in range(n))]
         if len(hits) == 1:
+            return hits[0]
+        # The table shadows itself one byte later: record byte +1 is the
+        # graphic id, and every mainline character's graphic equals their
+        # actor id, so once the story initializes the whole roster (Strago
+        # and Relm at Thamasa) the graphic column matches the same run
+        # shifted by one.  Two consecutive hits are the actor column and
+        # its graphic shadow; the lower one is the table.
+        if len(hits) == 2 and hits[1] == hits[0] + 1:
             return hits[0]
     # Early fixtures have no matching run; fall back to the fixed offset and
     # sanity-check it: record 0 must be actor 0, and somebody must be in
