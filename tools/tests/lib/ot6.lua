@@ -2161,8 +2161,8 @@ function M.newFightDriver(tag, opts)
        and plan ~= nil then
       if st == parkSt then parkN = parkN + 1
       else parkSt, parkN = st, 0 end
-      if parkN > 300 then
-        M.log(string.format("[%s] parked %d frames in known state $%02X "
+      if parkN > 12 then          -- ~360 real frames: button() runs per cadence PULSE
+        M.log(string.format("[%s] parked %d pulses in known state $%02X "
           .. "-- dropping the plan and backing out", tag or "fight",
           parkN, st))
         parkSt, parkN = nil, 0
@@ -2175,8 +2175,8 @@ function M.newFightDriver(tag, opts)
     if M.readByte(MENU) ~= 0 and not KNOWN_ST[st] then
       if st == unknownSt then unknownN = unknownN + 1
       else unknownSt, unknownN = st, 1 end
-      if unknownN > 90 then
-        M.log(string.format("[%s] unknown menu state $%02X held %d frames "
+      if unknownN > 8 then        -- pulses, not frames (the cadence)
+        M.log(string.format("[%s] unknown menu state $%02X held %d pulses "
           .. "-- backing out (B)", tag or "fight", st, unknownN))
         unknownSt, unknownN = nil, 0
         plan, planActor = nil, nil
