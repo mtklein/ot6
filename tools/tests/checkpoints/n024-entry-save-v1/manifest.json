@@ -2,17 +2,17 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "n024-entry-save.sram",
   "size": 32768,
-  "sha256": "3888ca52532f1c2024a4b16660b0dc596a517de065736389f6df160ffb7b786c",
+  "sha256": "69ea55fad1a96a8d8843aff317ec7eb94063e4a71e5470363efc07a383aa4a2b",
   "slot": 3,
   "milestone": "n024-entry-save",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "3888ca52532f1c2024a4b16660b0dc596a517de065736389f6df160ffb7b786c",
-    "generator_sig": "04865a99f7fcf7c8a143a266c144d3a951622c331726c4b8429e3291c6131a56 gen_n024_save_checkpoint",
+    "payload_sha256": "69ea55fad1a96a8d8843aff317ec7eb94063e4a71e5470363efc07a383aa4a2b",
+    "generator_sig": "44364f100deb514094f50c555e117e9ccb50f3e06fbc9abaa21475bb1491cdb7 gen_n024_save_checkpoint",
     "ancestors": [
       {
         "path": "build/states/n024_entry.stamp",
-        "sha256": "ea9f23ac8d0450884291c3de871577b14db7b2e932d50478304b625fbf81f799"
+        "sha256": "99862a2ccacedd756746ecfc6becc2038109ae61d7c8c9a724421e8b1d5a81bc"
       }
     ]
   },

@@ -2,17 +2,17 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "minecart-platform.sram",
   "size": 32768,
-  "sha256": "294d6087a88ffabe9723805b4f5a02662e61666f460942c5247ab2c7e093da19",
+  "sha256": "e62b03d995b19aa84a126bdd1a5cd36bcdf6c86b9d1c72c42236f95041974eec",
   "slot": 3,
   "milestone": "minecart-platform",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "294d6087a88ffabe9723805b4f5a02662e61666f460942c5247ab2c7e093da19",
-    "generator_sig": "5c435a826960ce6ce1650fc6b9d9dfa47753d064a5de76876fb147d5077fddd5 gen_minecart_platform_checkpoint",
+    "payload_sha256": "e62b03d995b19aa84a126bdd1a5cd36bcdf6c86b9d1c72c42236f95041974eec",
+    "generator_sig": "ce099f7ed9fe65e4291b18ed521054579757f8ff6d1e25ba2386a13c81de2421 gen_minecart_platform_checkpoint",
     "ancestors": [
       {
         "path": "build/states/minecart_entry.stamp",
-        "sha256": "55b555a2a1d76098b77c7345f90dc590bb6484fed2deaf19e5dd891734bbd162"
+        "sha256": "58290f016c0406b6df41ffa4fda4f4441b5dd9202b1c2f6c06e57e9a95cad7ae"
       }
     ]
   },
