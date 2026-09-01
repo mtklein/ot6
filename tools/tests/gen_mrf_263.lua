@@ -145,7 +145,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   H.openChest{ stand = { 7, 45 }, face = "up", bit = 84,
-               what = "X-Potion", nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } } },
+               what = "X-Potion", nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
   -- Gold Shld bit 86 (14,53) is not opened here: interacting with it from
   -- its only reachable stand, (14,52) facing down, never raises a dialog.
 
@@ -171,14 +171,14 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   H.openChest{ stand = { 25, 45 }, face = "up", bit = 87,
-               what = "ThunderBlade", nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } } },
+               what = "ThunderBlade", nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
   H.openChest{ stand = { 24, 52 }, face = "right", bit = 85,
-               what = "Remedy", item = 0xF5, nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } } },
+               what = "Remedy", item = 0xF5, nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
 
   -- 2. across to {22,52} and one tapped DOWN onto {22,53} -> map 263
   H.navTo(22, 52, { maxFrames = 40000, playBattles = "flee",
     arrive = function() return map() == 263 end }),
-  H.navTo(22, 52, { maxFrames = 18000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } }), -- transition
+  H.navTo(22, 52, { maxFrames = 18000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }), -- transition
   tapInto("down", function() return map() == 263 end, 12000,
     "DOWN onto {22,53} -> the scripted transition to map 263"),
   H.waitUntil(function() return map() == 263 and settled() end,

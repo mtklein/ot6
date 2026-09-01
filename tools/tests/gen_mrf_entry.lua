@@ -107,7 +107,7 @@ H.run({ maxFrames = 60000 }, {
   -- 1. north up the column to {57,3}, one tile short of the door row.
   H.navTo(57, 3, { maxFrames = 40000, playBattles = "flee",
     arrive = function() return map() == 262 end }),
-  H.navTo(57, 3, { maxFrames = 18000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } }), -- entry point
+  H.navTo(57, 3, { maxFrames = 18000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }), -- entry point
   H.call(function()
     H.assertEq(map(), 242, "still in VECTOR at the factory entry point")
     H.assertEq(H.fieldX(), 57, "factory entry point x")

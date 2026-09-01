@@ -129,7 +129,7 @@ H.run({ maxFrames = 90000 }, {
 
   H.openChest{ stand = { 8, 38 }, face = "up", bit = 94,
                what = "Break Blade",
-               nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } } },
+               nav = { playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } } },
 
   -- 271 {3,27} -> 273 {30,60}
   H.navTo(3, 27, { maxFrames = 25000, playBattles = "flee", arrive = function() return map() == 273 end }),
@@ -147,7 +147,7 @@ H.run({ maxFrames = 90000 }, {
     })
   end),
 
-  H.navTo(26, 52, { maxFrames = 9000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } }),
+  H.navTo(26, 52, { maxFrames = 9000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 26 and H.fieldY() == 53 and sw(0x01BF) == 1
@@ -179,7 +179,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- park at {25,52}, facing UP into NUMBER 024 on {25,51}
-  H.navTo(25, 52, { maxFrames = 15000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } }),
+  H.navTo(25, 52, { maxFrames = 15000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   (function() local calm = 0
     return H.driveUntil(function()

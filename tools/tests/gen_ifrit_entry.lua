@@ -177,11 +177,11 @@ H.run({ maxFrames = 60000 }, {
 
   H.fieldCare({ tag = "care after the 263 crossing", threshold = 0.85 }),
 
-  H.navTo(3, 6, { maxFrames = 12000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } }),
+  H.navTo(3, 6, { maxFrames = 12000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
   tapInto("up", function() return map() == 270 end, 9000,
     "door 264 (3,5) -> map 270 (the save room)"),
   H.waitFrames(60),
-  H.navTo(25, 11, { maxFrames = 12000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } }),
+  H.navTo(25, 11, { maxFrames = 12000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 25 and H.fieldY() == 10 and sw(0x01BF) == 1
@@ -212,7 +212,7 @@ H.run({ maxFrames = 60000 }, {
   --    {3,8}, facing DOWN.  One A-press fires _cc7937 -> battle 70.  A
   --    DOWN press here cannot step (his object occupies {3,8}) so it only
   --    turns the party.
-  H.navTo(3, 7, { maxFrames = 24000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } } }),
+  H.navTo(3, 7, { maxFrames = 24000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
   H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   (function() local calm = 0
     return H.driveUntil(function()
