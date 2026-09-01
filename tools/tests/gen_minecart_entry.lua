@@ -182,7 +182,7 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("minecart_platform")
   end),
 
-  H.navTo(4, 55, { maxFrames = 9000, playBattles = "flee" }),
+  H.navTo(4, 55, { maxFrames = 9000, playBattles = "flee", careThreshold = 0.85, healPercent = 45 }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 3 and H.fieldY() == 55 and sw(0x01BF) == 1
@@ -222,7 +222,7 @@ H.run({ maxFrames = 60000 }, {
       cid[1], cid[2], cid[3]))
   end),
   H.navTo(function() return cid[1] end, function() return cid[2] end,
-    { maxFrames = 9000, playBattles = "flee" }),   -- beside CID
+    { maxFrames = 9000, playBattles = "flee", careThreshold = 0.85, healPercent = 45 }),   -- beside CID
   (function() local calm = 0
     return H.driveUntil(function()
       local ok = H.fieldX() == cid[1] and H.fieldY() == cid[2] and settled()
