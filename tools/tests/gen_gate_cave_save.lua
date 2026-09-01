@@ -273,11 +273,9 @@ H.run({ maxFrames = 480000 }, {
   -- land, ping-pong X 114..118 on Y 25 fighting tactically until the
   -- best level reads 21, re-board, and resume the mission.  Legs are
   -- capped so a bad roll cannot eat the wave.
-  flyTo(116, 27),
-  -- Land-search: one state machine snaking the pocket area (X 108..122,
-  -- Y 23..31), pressing B at each waypoint and waiting out the bounce.
-  -- The first ring of tries around (116,27) all refused, so the search
-  -- is wide; worldNavTo walks the rest once on foot.
+  -- Land-search straight from the Narshe liftoff (west of every
+  -- candidate, so the whole approach stays eastward): press B at each
+  -- waypoint and wait out the bounce.
   (function()
     -- Candidates computed from world_1_tilemap.dat: tile $18 (the id the
     -- Blackjack parks on at Narshe) clusters near the pocket.  The pacing
@@ -285,9 +283,12 @@ H.run({ maxFrames = 480000 }, {
     -- forest -- the lander wants clearance -- so the tries start at the
     -- (120,22..24) cluster and fall back to the southern clearings;
     -- worldNavTo walks the rest.
-    local wps = { {120,23},{120,22},{121,23},{120,24},
-                  {116,25},{117,25},{115,25},
-                  {116,35},{117,35},{104,33},{103,33},{105,36},{113,36} }
+    -- Ordered so every hop is EAST, UP, or DOWN: westward Y-strafe does
+    -- not move this flight (measured twice -- the freeze at (120,24) and
+    -- the first ring's (116)->(115) timeout were both westward hops), and
+    -- the gen's own proven flights never go west either.
+    local wps = { {103,33},{104,33},{105,36},{113,36},{116,35},{117,35},
+                  {117,25},{120,22},{120,23},{120,24},{121,23} }
     local wi, mode, hold, legN, hb = 1, "move", 0, 0, 0
     return H.driveUntil(function()
       return onFoot() or wi > #wps
@@ -316,9 +317,12 @@ H.run({ maxFrames = 480000 }, {
             H.setPad({})
             return
           end
+          -- one axis at a time, horizontal first
           local pad = { y = true }
-          if dx > 0 then pad.right = true elseif dx < 0 then pad.left = true end
-          if dy > 0 then pad.down = true elseif dy < 0 then pad.up = true end
+          if dx > 0 then pad.right = true
+          elseif dx < 0 then pad.left = true
+          elseif dy > 0 then pad.down = true
+          else pad.up = true end
           H.setPad(pad)
           return
         end
