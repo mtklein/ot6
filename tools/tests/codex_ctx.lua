@@ -6,20 +6,25 @@
 -- three callers all run in battle context.
 --
 -- The drive:
---   0. the boot state is the pre-save control, read rather than staged: the
---      never-saved chain's fights populated the transient page (lifecycle
---      0 writes go there) while all three save-slot pages read
---      empty, asserted byte-for-byte.
---   1. stand on the Veldt at (214,149) and save into empty slot 3 via the
---      real Save command, pad input only.  SaveAs copies the transient
---      payload, so at this instant the two pages are equal.
+--   0. the boot state is the mid-lifecycle control, read rather than
+--      staged: the fighting lineage saves at every save point (the .srm
+--      seed program), so gau_joined arrives at lifecycle 3 with the
+--      slot-3 page populated by post-first-save fights, the transient
+--      page frozen at whatever the pre-first-save opening taught, and
+--      slots 1 and 2 byte-for-byte empty.  (The fled lineage's
+--      never-saved control -- lifecycle 0, transient active -- no
+--      longer exists in any chain fixture.)
+--   1. stand on the Veldt at (214,149) and save into EMPTY slot 1 via
+--      the real Save command, pad input only.  Ot6CodexSaveAs copies
+--      the ACTIVE page (slot 3's) to the destination, so at this
+--      instant slot 1 equals slot 3 and lifecycle reads 1.
 --   2. fight until the Veldt's varied formations teach something through
 --      the party's real weapon classes.  Every changed byte must land in
---      the slot-3 page and none in the transient page (lifecycle 3 now).
+--      the slot-1 page and none in the slot-3 or transient pages.
 --      After this battle the pages differ by exactly the earned bytes.
 --   3. fight again and read the seed before any input: a present monster
 --      of a just-taught species must enter pre-revealed with the taught
---      bits, which is the read half.  Only the slot-3 page carries those
+--      bits, which is the read half.  Only the slot-1 page carries those
 --      bits.  (Species not in the taught set defer the check to the next
 --      encounter, with bounded retries, fled with the run mechanic.)
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -28,7 +33,8 @@ local STATE = "build/states/gau_joined.mss.lua"
 local ZMENUSTATE = 0x26
 local MAIN_MENU = 0x05
 local SAVE_SELECT = 0x14
-local SLOT3, TEMP = 0x316800, 0x316C00  -- codex pages (root $316000 + $400*n)
+-- codex pages (root $316000 + $400*n)
+local SLOT1, SLOT2, SLOT3, TEMP = 0x316000, 0x316400, 0x316800, 0x316C00
 local PAGE_USED = 0x310                 -- magic + elem@$10 + class@$190
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -65,7 +71,7 @@ end
 -- taught[species] = { elem = bits, class = bits }: what step 2 earned,
 -- keyed for step 3's seed check
 local taught, taughtN = {}, 0
-local slot3Before, tempBefore = nil, nil
+local slot1Before, slot3Before, tempBefore = nil, nil, nil
 
 -- the in-battle action driver: everyone Fights; 4-frame-held presses on a
 -- 5-on/5-off cadence.
@@ -331,25 +337,27 @@ local actions = {
   H.waitFrames(10),
   H.waitUntil(worldReady, 500, "world-map control", 5),
 
-  -- 0. the pre-save control, read: lifecycle-0 fights taught the transient
-  -- page and only it.
+  -- 0. the mid-lifecycle control, read: the fighting lineage saves into
+  -- slot 3 at every save point, so its post-save fights taught the
+  -- slot-3 page and only it; slots 1 and 2 have never been saved.
   H.call(function()
-    H.assertEq(H.readByte(0x021f), 0, "never-saved chain: lifecycle reads 0")
-    H.assertEq(sram(TEMP), 0x4f, "transient codex magic 'O'")
-    H.assertEq(sram(TEMP + 1), 0x38, "transient codex magic '8'")
+    H.assertEq(H.readByte(0x021f), 3,
+      "the chain saves as it goes: lifecycle reads 3 (the .srm seed program)")
+    H.assertEq(sram(SLOT3), 0x4f, "slot-3 codex magic 'O'")
+    H.assertEq(sram(SLOT3 + 1), 0x38, "slot-3 codex magic '8'")
     local known = 0
     for off = 0x10, PAGE_USED - 1 do
-      if sram(TEMP + off) ~= 0 then known = known + 1 end
+      if sram(SLOT3 + off) ~= 0 then known = known + 1 end
     end
     H.assertEq(known > 0, true,
-      "control: the chain's lifecycle-0 fights populated the TRANSIENT page")
-    for _, base in ipairs({ 0x316000, 0x316400, SLOT3 }) do
+      "control: the chain's post-save fights populated the SLOT-3 page")
+    for _, base in ipairs({ SLOT1, SLOT2 }) do
       for off = 0, PAGE_USED - 1 do
         H.assertEq(sram(base + off), 0, string.format(
-          "...and never touched save-slot page $%06X (+%03X)", base, off))
+          "...and never touched unsaved slot page $%06X (+%03X)", base, off))
       end
     end
-    H.log(string.format("[ctx] boot control: %d transient byte(s), slots empty",
+    H.log(string.format("[ctx] boot control: %d slot-3 byte(s), slots 1/2 empty",
       known))
   end),
 
@@ -361,8 +369,9 @@ local actions = {
   -- muddy the page diff step 2 asserts.
   H.worldNavTo(214, 149, { maxFrames = 15000, playBattles = "flee" }),
 
-  -- 1. save into slot 3, pad input only (save-drive rule; the cursor is
-  -- read back, never written).
+  -- 1. save into EMPTY slot 1, pad input only (save-drive rule; the
+  -- cursor is read back, never written).  SaveAs copies the ACTIVE
+  -- page -- slot 3's -- so the two pages come out equal.
   H.pressButtons({ "x" }, 4),
   H.waitFrames(120),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
@@ -376,26 +385,28 @@ local actions = {
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
     600, "save-slot selection", 5),
   H.driveUntil(function()
-    return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 2
+    return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 0
   end, 600, {
-    H.pressButtons({ "down" }, 4), H.waitFrames(16),
-  }, "save cursor on slot 3"),
+    H.pressButtons({ "up" }, 4), H.waitFrames(16),
+  }, "save cursor on slot 1"),
   H.pressButtons({ "a" }, 4),
-  H.driveUntil(function() return sram(0x307ff0) == 3 end, 900, {
+  H.driveUntil(function() return sram(0x307ff0) == 1 end, 900, {
     H.pressButtons({ "a" }, 4), H.waitFrames(20),
-  }, "first save into slot 3"),
+  }, "first save into slot 1"),
   H.call(function()
-    H.assertEq(sram(0x307ff0), 3, "SRAM last-saved-slot marker is 3")
-    H.assertEq(sram(SLOT3), 0x4f, "slot 3 codex magic 'O'")
-    H.assertEq(sram(SLOT3 + 1), 0x38, "slot 3 codex magic '8'")
-    -- SaveAs copied the transient payload, so the pages are equal right now,
-    -- and any later divergence is a post-save codex write, attributable to a
-    -- page
+    H.assertEq(sram(0x307ff0), 1, "SRAM last-saved-slot marker is 1")
+    H.assertEq(H.readByte(0x021f), 1, "lifecycle follows the save to 1")
+    H.assertEq(sram(SLOT1), 0x4f, "slot 1 codex magic 'O'")
+    H.assertEq(sram(SLOT1 + 1), 0x38, "slot 1 codex magic '8'")
+    -- SaveAs copied the ACTIVE (slot 3) page, so the pages are equal
+    -- right now, and any later divergence is a post-save codex write,
+    -- attributable to a page
     for off = 0x10, PAGE_USED - 1 do
-      H.assertEq(sram(SLOT3 + off), sram(TEMP + off),
-        "SaveAs left the pages equal at " .. offName(off))
+      H.assertEq(sram(SLOT1 + off), sram(SLOT3 + off),
+        "SaveAs left slot 1 equal to slot 3 at " .. offName(off))
     end
-    slot3Before, tempBefore = snapPage(SLOT3), snapPage(TEMP)
+    slot1Before, slot3Before, tempBefore =
+      snapPage(SLOT1), snapPage(SLOT3), snapPage(TEMP)
   end),
 
   -- Close the menu.  worldReady() and worldHasControl() read menu-module
@@ -410,7 +421,7 @@ local actions = {
 
   -- 2. the write half: pace the Veldt, fight whatever
   -- interrupts, and after each battle diff both pages.  The first battle that
-  -- teaches must have written the slot-3 page and only it.  (Desert
+  -- teaches must have written the slot-1 page and only it.  (Desert
   -- encounters teach nothing to this kit, the loop keeps walking.)
   -- This is one single-call state machine: the battle edge is detected
   -- inline, since H.cond latches its branch on the first tick inside a
@@ -420,21 +431,24 @@ local actions = {
     local function account()
       fights = fights + 1
       for off = 0x10, PAGE_USED - 1 do
-        local s3, tp = sram(SLOT3 + off), sram(TEMP + off)
-        if s3 ~= slot3Before[off] then
+        local s1, s3, tp = sram(SLOT1 + off), sram(SLOT3 + off), sram(TEMP + off)
+        if s1 ~= slot1Before[off] then
           local sp = (off >= 0x190) and (off - 0x190) or (off - 0x10)
           local kind = (off >= 0x190) and "class" or "elem"
           taught[sp] = taught[sp] or { elem = 0, class = 0 }
-          taught[sp][kind] = taught[sp][kind] | (s3 ~ slot3Before[off])
+          taught[sp][kind] = taught[sp][kind] | (s1 ~ slot1Before[off])
           taughtN = taughtN + 1
-          H.log(string.format("[ctx] post-save teach -> SLOT 3: %s %02X -> %02X",
-            offName(off), slot3Before[off], s3))
+          H.log(string.format("[ctx] post-save teach -> SLOT 1: %s %02X -> %02X",
+            offName(off), slot1Before[off], s1))
         end
+        H.assertEq(s3, slot3Before[off],
+          "the post-save battle wrote NOTHING to the slot-3 page (" ..
+          offName(off) .. ")")
         H.assertEq(tp, tempBefore[off],
           "the post-save battle wrote NOTHING to the transient page (" ..
           offName(off) .. ")")
       end
-      slot3Before = snapPage(SLOT3)
+      slot1Before = snapPage(SLOT1)
       local sp = {}
       for k in pairs(fightSpecies) do sp[#sp + 1] = string.format("%04X", k) end
       local ac = {}
@@ -459,13 +473,15 @@ local actions = {
         wasInBattle = inBattle
         if inBattle then battlePulse() else patrolPulse() end
       end),
-    }, "a post-save battle teaches the slot-3 page")
+    }, "a post-save battle teaches the slot-1 page")
   end)(),
   H.call(function()
     H.assertEq(taughtN > 0, true,
-      "WRITE HALF: a post-save chip landed in the SLOT-3 codex page " ..
+      "WRITE HALF: a post-save chip landed in the SLOT-1 codex page " ..
       "(Ot6CodexActive honored the saved lifecycle mid-battle)")
-    -- the discriminator exists: bits slot 3 holds that the transient lacks
+    -- the discriminator exists: bits only slot 1 holds -- a bit slot 3
+    -- already knew was copied in by SaveAs and never counts as taught,
+    -- so every taught bit is provably absent from BOTH control pages
     for sp, t in pairs(taught) do
       if t.elem ~= 0 then
         H.assertEq(sram(TEMP + 0x10 + sp) & t.elem, 0, string.format(
@@ -479,7 +495,7 @@ local actions = {
   end),
 
   -- 3. the read half: a fresh battle's seed pre-reveals the taught bits,
-  -- knowledge only the slot-3 page carries.  Encounters without a taught
+  -- knowledge only the slot-1 page carries.  Encounters without a taught
   -- species are fled (no submenu is open at seed, so a bare L+R hold
   -- releases) and retried, with a bound on the retries.  Searched as a
   -- sequence of player-shaped episodes: seed-check one battle, resolve it,
@@ -510,7 +526,7 @@ local function checkReadSeed()
         if t.elem ~= 0 then
           H.assertEq(revE & t.elem, t.elem, string.format(
             "monster slot %d (species $%03X) entered PRE-REVEALED " ..
-            "with the post-save elem bits -- only the slot-3 page holds them",
+            "with the post-save elem bits -- only the slot-1 page holds them",
             slot, sp))
         end
         if t.class ~= 0 then
@@ -532,9 +548,23 @@ local function resolveReadBattle(n)
   return H.driveUntil(function() return not H.battleLoadStarted() end, 15000, {
     H.call(function()
       frames = frames + 1
+      -- Life support, not play: the read half only needs ONE battle whose
+      -- species is taught, and the Veldt serves the SAVE's recorded
+      -- history -- the fighting lineage's history feeds this trio far
+      -- harder packs than the fled control ever met (measured: a read
+      -- search wiped resolving an unmatched pack).  Party HP is not a
+      -- measured quantity here -- seed bits are -- so every living
+      -- ally's battle HP tops to max each pulse.  Declared in
+      -- state_write_waivers.txt.
+      for s = 0, 3 do
+        local max = H.readWord(0x3C1C + s * 2)
+        if max > 0 and H.readWord(0x3BF4 + s * 2) > 0 then
+          H.writeWord(0x3BF4 + s * 2, max)
+        end
+      end
       -- Ordinary runnable formations release quickly.  If this is one of the
-      -- Veldt's unrunnable set pieces, stop donating HP to a futile escape
-      -- after ten seconds and win it through the real battle menus instead.
+      -- Veldt's unrunnable set pieces, stop holding L+R after ten seconds
+      -- and win it through the real battle menus instead.
       if frames < 600 then H.setPad({ l = true, r = true })
       else battlePulse() end
     end),

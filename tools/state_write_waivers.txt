@@ -79,6 +79,7 @@ tools/tests/battle_thief.lua	.writeWord(	quarantine: #122's RNG reshuffle makes 
 tools/tests/battle_toolsgrey.lua	.writeWord(	quarantine: #124's re-rolled battle RNG made the cave pack die under EDGAR mid-spend, stalling the boundary walk in target-select and refilling his pool on the level-up; the pin holds the pack's battle HP tall so every tool cast has a live target and no kill lands, and it never touches the MP pool or the tools-grey cell under test
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
+tools/tests/codex_ctx.lua	.writeWord(	quarantine: the Veldt serves the SAVE's recorded history, and the fighting lineage's history feeds the gau_joined trio packs that wiped the read-half search; the clamp tops ally HP each resolve pulse and never touches the codex pages or seed bits under test
 tools/tests/field_healpolicy.lua	.writeWord(	quarantine: the healthy-fixture campaign (#122 fallout) leaves no savestate that arrives hurt, so the test writes its own patient's HP
 tools/tests/field_subjob.lua	.writeByte(
 tools/tests/gen_battle2.lua	.writeWord(
