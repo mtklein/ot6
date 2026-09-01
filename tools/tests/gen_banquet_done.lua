@@ -465,12 +465,41 @@ local steps = {
   H.waitUntil(landed(253, 10), 2400, "Vector 253 (post-attack)", 1),
   H.waitFrames(30),
 
-  H.equipLoadout(0, {
-    { 0, 0x0E }, { 2, 0x6A }, { 3, 0x84 },
-  }, { tag = "TERRA banquet kit" }),
-  H.equipLoadout(1, {
-    { 0, 0x02 }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-  }, { tag = "LOCKE banquet kit" }),
+  -- The kit lists were authored against the fled lineage's exact bag; the
+  -- fighting lineage carries different spares, and LOCKE arrives already
+  -- dual-wielding under the Genji Glove (owner doctrine: his left hand
+  -- holds a SECOND WEAPON, not a shield -- the { 1, $5A } Buckler this kit
+  -- used to force is the anti-pattern the wave-4 kits removed).  Each slot
+  -- equips best-effort: in the bag -> worn, absent -> the character keeps
+  -- what they have, with a log.  Repeated entries for one slot are a
+  -- preference ladder, weakest first.  Same pattern as
+  -- gen_ifrit_magicite's kit; inlined rather than shared because a lib
+  -- edit re-stales every generated state in the chain.
+  (function()
+    local KITS = {
+      -- TERRA has no Genji Glove, so her L-hand takes a shield if the bag
+      -- holds one (her row arrives with slot 1 empty on this lineage).
+      { 0, "TERRA", { { 0, 0x0E }, { 1, 0x5A }, { 1, 0x5C },
+                      { 2, 0x6A }, { 3, 0x84 } } },
+      { 1, "LOCKE", { { 0, 0x0F }, { 1, 0x00 }, { 1, 0x01 }, { 1, 0x02 },
+                      { 2, 0x69 }, { 3, 0x84 } } },
+    }
+    local steps = {}
+    for _, kit in ipairs(KITS) do
+      local char, name, pairs_ = kit[1], kit[2], kit[3]
+      for _, p in ipairs(pairs_) do
+        local slot, item = p[1], p[2]
+        local tag = string.format("%s banquet kit slot %d", name, slot)
+        steps[#steps + 1] = H.cond(
+          function() return H.invSlotOf(item) ~= nil end,
+          { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
+          { H.logStep(string.format(
+              "%s: $%02X not in this lineage's bag; keeping current gear",
+              tag, item)) })
+      end
+    end
+    return H.cond(function() return true end, steps)
+  end)(),
   H.fieldCare({ tag = "care before the banquet", threshold = 0.95 }),
 
   -- ---- 2. the castle and the dais ------------------------------------------

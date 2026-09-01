@@ -283,16 +283,34 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
     return H.hasControl() and H.tileAligned() and bright() >= 15
        and not H.dialogWaiting() and not H.battleLoadStarted()
   end, 3000, "settled off the save trigger", 5),
-  H.equipWeapon(charPos(TERRA), THUNDERBLADE,
-    { slot = 0, tag = "ThunderBlade -> TERRA" }),
-  H.equipWeapon(charPos(STRAGO), FIRE_ROD,
-    { slot = 0, tag = "Fire Rod -> STRAGO (swaps out his Ice Rod)" }),
-  H.call(function()
-    H.assertEq(H.readByte(0x1600 + 37 * TERRA + 0x1F), THUNDERBLADE,
-      "TERRA wields the ThunderBlade (bolt weakness)")
-    H.assertEq(H.readByte(0x1600 + 37 * STRAGO + 0x1F), FIRE_ROD,
-      "STRAGO wields the Fire Rod (fire weakness, unshielded bludgeon)")
-  end),
+  -- Both swaps are best-effort chip optimization, not win conditions: the
+  -- espers end this fight on the script's schedule regardless of break
+  -- state (bosses-wob.md par.17).  On the fighting lineage the bag's one
+  -- ThunderBlade rides LOCKE's Genji off-hand, and a person would not
+  -- strip a party member's hand to arm another; absent from the bag,
+  -- each wearer keeps their current weapon, with a log.
+  H.cond(function() return H.invSlotOf(THUNDERBLADE) ~= nil end, {
+    H.equipWeapon(charPos(TERRA), THUNDERBLADE,
+      { slot = 0, tag = "ThunderBlade -> TERRA" }),
+    H.call(function()
+      H.assertEq(H.readByte(0x1600 + 37 * TERRA + 0x1F), THUNDERBLADE,
+        "TERRA wields the ThunderBlade (bolt weakness)")
+    end),
+  }, {
+    H.logStep("ThunderBlade -> TERRA: not in this lineage's bag; " ..
+      "TERRA keeps her current weapon"),
+  }),
+  H.cond(function() return H.invSlotOf(FIRE_ROD) ~= nil end, {
+    H.equipWeapon(charPos(STRAGO), FIRE_ROD,
+      { slot = 0, tag = "Fire Rod -> STRAGO (swaps out his Ice Rod)" }),
+    H.call(function()
+      H.assertEq(H.readByte(0x1600 + 37 * STRAGO + 0x1F), FIRE_ROD,
+        "STRAGO wields the Fire Rod (fire weakness, unshielded bludgeon)")
+    end),
+  }, {
+    H.logStep("Fire Rod -> STRAGO: not in this lineage's bag; " ..
+      "STRAGO keeps his current weapon"),
+  }),
   H.fieldCare({ tag = "prep full-heal at the save region", threshold = 1.0 }),
 
   -- ---- 2. the WEST door 375 (2,45) -> 371 (9,9) --------------------------

@@ -15,8 +15,12 @@ local saveArg = nil
 -- each before the ambush; STRAGO gets an esper too.  No enemy stat changes.
 local TERRA_GEAR = { { 0, 0x0E }, { 1, 0x5C }, { 2, 0x6E }, { 3, 0x89 } }
   -- Blizzard(w) / Mithril Shld(sh) / Bandana(he) / Mithril Vest(ar)
-local LOCKE_GEAR = { { 0, 0x0F }, { 1, 0x5A }, { 2, 0x73 }, { 3, 0x86 } }
-  -- ThunderBlade(w) / Buckler(sh) / Head Band(he) / Kung Fu Suit(ar)
+local LOCKE_GEAR = { { 0, 0x0F }, { 1, 0x00 }, { 1, 0x01 }, { 1, 0x02 },
+                     { 2, 0x73 }, { 3, 0x86 } }
+  -- ThunderBlade(w) / offhand DAGGER ladder / Head Band(he) / Kung Fu
+  -- Suit(ar).  LOCKE wears the Genji Glove, so his left hand holds a
+  -- second weapon, never a shield -- the { 1, $5A } Buckler this list
+  -- used to force is the anti-pattern the wave-4 kits removed.
 -- Esper indices (genju_prop.asm's numbering): SHIVA=2 grants {ICE, OSMOSE,
 -- SHELL}; MADUIN=6 grants {FIRE, ICE, BOLT} -- one to TERRA, one to LOCKE,
 -- for the boosted multi-target Ice cast the fight plan leads with (Ot6FoldTbl
@@ -1136,8 +1140,30 @@ local steps = {
       "LOCKE %d/%dhp (pre-gear)", H.frame, map(), H.fieldX(), H.fieldY(),
       H.charHp(TERRA), H.charMaxHp(TERRA), H.charHp(LOCKE), H.charMaxHp(LOCKE)))
   end),
-  H.equipLoadout(TERRA, TERRA_GEAR, { tag = "TERRA loadout" }),
-  H.equipLoadout(LOCKE, LOCKE_GEAR, { tag = "LOCKE loadout" }),
+  -- Best-effort: each gear piece equips only if the bag holds it; a piece
+  -- this lineage never bought or already wears keeps the current slot,
+  -- with a log.  (Same inline pattern as gen_ifrit_magicite /
+  -- gen_banquet_done: a shared lib helper would re-stale every generated
+  -- state in the chain.)
+  (function()
+    local KITS = { { TERRA, "TERRA", TERRA_GEAR },
+                   { LOCKE, "LOCKE", LOCKE_GEAR } }
+    local steps = {}
+    for _, kit in ipairs(KITS) do
+      local char, name, pairs_ = kit[1], kit[2], kit[3]
+      for _, p in ipairs(pairs_) do
+        local slot, item = p[1], p[2]
+        local tag = string.format("%s loadout slot %d", name, slot)
+        steps[#steps + 1] = H.cond(
+          function() return H.invSlotOf(item) ~= nil end,
+          { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
+          { H.logStep(string.format(
+              "%s: $%02X not in this lineage's bag; keeping current gear",
+              tag, item)) })
+      end
+    end
+    return H.cond(function() return true end, steps)
+  end)(),
   H.equipEsper(charPos(TERRA), SHIVA_ESPER, { tag = "SHIVA -> TERRA (Ice)" }),
   H.equipEsper(charPos(LOCKE), MADUIN_ESPER, { tag = "MADUIN -> LOCKE (Ice)" }),
   H.setRows({ [TERRA] = true, [LOCKE] = true }, { tag = "TERRA/LOCKE back row" }),
