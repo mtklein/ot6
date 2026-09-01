@@ -144,7 +144,13 @@ H.run({ maxFrames = 60000 }, {
 
   -- 1. south to the chute row.  Any of {36,44}/{37,44}/{38,44} fires it,
   --    so navTo aims at the middle one and terminates on the map change.
+  -- map 263's whole pool (ProtoArmor/Garm/Commando/Pipsqueak) is bolt-weak
+  -- and defense-walled (def 100): Celes's Bolt + Ramuh is THE key here.
+  -- This leg shipped bare and Pipsqueak x5 wiped three straight phase
+  -- rolls -- physicals totalled ~20 damage across a 31000-frame fight.
   H.navTo(37, 44, { maxFrames = 40000, playBattles = "flee",
+    careThreshold = 0.85, healPercent = 45,
+    magic = { [6] = { spell = 2 } }, summon = { [6] = {} },
     arrive = function() return map() == 264 end }),
   H.waitUntil(function() return map() == 264 end, 12000,
     "the chute -> map 264", 5),

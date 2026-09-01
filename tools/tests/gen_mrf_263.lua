@@ -177,6 +177,8 @@ H.run({ maxFrames = 60000 }, {
 
   -- 2. across to {22,52} and one tapped DOWN onto {22,53} -> map 263
   H.navTo(22, 52, { maxFrames = 40000, playBattles = "flee",
+    careThreshold = 0.85, healPercent = 45,
+    magic = { [6] = { spell = 2 } }, summon = { [6] = {} },
     arrive = function() return map() == 263 end }),
   H.navTo(22, 52, { maxFrames = 18000, playBattles = "flee", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }), -- transition
   tapInto("down", function() return map() == 263 end, 12000,
