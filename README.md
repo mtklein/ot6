@@ -7,9 +7,10 @@ boost-point turn economy.
 
 ## Status
 
-v0.16 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.16)); it plays
-identically to v0.15. The game is playable from the start through the end of
+v0.17 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.17)); it fixes a
+Shadow-related freeze and keeps Shadow in the party for the whole game
+(details in the release notes). The game is playable from the start through the end of
 the World of Balance: the whole Thamasa arc, the world tour aboard the
 repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
 and the escape — stopping where the game sets you down in the World of Ruin.
