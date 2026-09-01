@@ -258,14 +258,27 @@ local function driveSteps(tag, esper)
       H.assertEq(leader ~= nil, true, "[" .. tag .. "] a party leader resolved")
     end),
   }
-  if esper == nil then
-    steps[#steps + 1] = H.call(function()
-      for _, c in ipairs(partyChars()) do
-        H.assertEq(H.readByte(rec(c) + ESPER_OFF), 0xff,
-          string.format("[%s] char %d wears no esper (control)", tag, c))
+  -- The fighting lineage's minecart party arrives wearing stones (a
+  -- played save should); this laboratory needs bare records on BOTH
+  -- passes, because the union measure spans the whole party.  The bump
+  -- and the granted list are computed live from the worn byte (README:
+  -- "while you hold it"), so clearing the byte IS the never-wore-it
+  -- state.  A menu unequip doesn't exist to drive, and adding one to the
+  -- lib would re-stale every generated fixture; the poke is the
+  -- sanctioned unit-style expedient, declared in state_write_waivers.txt.
+  steps[#steps + 1] = H.call(function()
+    for _, c in ipairs(partyChars()) do
+      local worn = H.readByte(rec(c) + ESPER_OFF)
+      if worn ~= 0xff then
+        H.writeByte(rec(c) + ESPER_OFF, 0xff)
+        H.log(string.format("[%s] char %d wore stone $%02X -> bared for the measure",
+          tag, c, worn))
       end
-    end)
-  else
+      H.assertEq(H.readByte(rec(c) + ESPER_OFF), 0xff,
+        string.format("[%s] char %d wears no esper (control)", tag, c))
+    end
+  end)
+  if esper ~= nil then
     for _, s in ipairs(equipSteps(tag, esper)) do steps[#steps + 1] = s end
   end
   for _, s in ipairs(rideAndMeasure(tag)) do steps[#steps + 1] = s end

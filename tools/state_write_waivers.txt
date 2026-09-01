@@ -56,6 +56,8 @@ tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(
 tools/tests/battle_dotchip.lua	.writeByte(
 tools/tests/battle_dotchip.lua	.writeWord(
+tools/tests/battle_esperstats.lua	.writeByte(
+tools/tests/battle_esperstats_tube6.lua	.writeByte(
 tools/tests/battle_fontrestore.lua	.writeByte(	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
 tools/tests/battle_fontrestore.lua	emu.write	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
 tools/tests/battle_gaufight.lua	.writeByte(
