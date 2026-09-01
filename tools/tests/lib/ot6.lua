@@ -1616,6 +1616,7 @@ function M.newFightDriver(tag, opts)
   local castRestore = {}               -- spell -> HP a landed cast put back
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
+  local summonWhyN = 0                 -- summon-refusal diagnostics, capped
   local loreSpinN = 0                  -- frames spent on live lore plans
                                        -- since the last landed lore cast
   local loreDead = false               -- the stall guard fired this battle
@@ -1983,10 +1984,19 @@ function M.newFightDriver(tag, opts)
     -- only exists while the stone is worn, so an unequipped caller falls
     -- through to the branches below the same way a mage out of MP does.
     local sm = opts.summon and opts.summon[id]
-    if sm and M.readWord(CURMP + actor * 2) >= (sm.mp or 50)
-       and (M.readWord(0x3f2e) & M.readWord(0x3018 + actor * 2)) == 0
-       and cmdRow(actor, CMD_MAGIC) then
-      return { kind = "summon", row = cmdRow(actor, CMD_MAGIC) }
+    if sm then
+      local mp = M.readWord(CURMP + actor * 2)
+      local used = M.readWord(0x3f2e) & M.readWord(0x3018 + actor * 2)
+      local row = cmdRow(actor, CMD_MAGIC)
+      if mp >= (sm.mp or 50) and used == 0 and row then
+        return { kind = "summon", row = row }
+      elseif summonWhyN < 8 then
+        -- the summon line has historically never fired: say why, per refusal
+        summonWhyN = summonWhyN + 1
+        M.log(string.format(
+          "[%s] summon refused for char %d: mp=%d (need %d) used=$%04x row=%s",
+          tag or "fight", id, mp, sm.mp or 50, used, tostring(row)))
+      end
     end
     -- opts.magic = { [charId] = { spell = id, boost = false } }: the
     -- attack-magic line, the same shape as the tactical skills.  Open the
