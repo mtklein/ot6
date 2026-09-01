@@ -1948,7 +1948,9 @@ function M.newFightDriver(tag, opts)
           local deep = cands[1].pct < 35 or #cands >= 3
           local boost = math.min(bank, deep and 2 or 1)
           local mpc = CURE_MP[spell + boost] or 99
-          if M.readWord(CURMP + actor * 2) >= mpc then
+          local floorMp = M.readWord(MAXMP + actor * 2) // 4
+          local pool = M.readWord(CURMP + actor * 2)
+          if pool >= mpc and (deep or pool - mpc >= floorMp) then
             M.log(string.format("[%s] actor=%d party cure: %d hurt "
               .. "(worst %d%%), boost %d folds $%02X -> $%02X (%d MP), "
               .. "all allies", tag or "fight", actor, #cands, cands[1].pct,
@@ -1970,6 +1972,22 @@ function M.newFightDriver(tag, opts)
           for _, spell in ipairs(type(opts.cure) == "table" and opts.cure
                                  or CURES) do
             local cell, mpCost = spellCell(actor, spell, true)
+            -- The cure-MP reserve: the care budget concentrates every
+            -- round's heal on the Cure-caster, and cast-before-bag then
+            -- drained CELES to 1 MP across the Magitek factory (the
+            -- regenerated n024_entry).  A person keeps a quarter of the
+            -- pool for the fight ahead and reaches for a Potion; only a
+            -- patient inside one round of death may spend past it.
+            local floorMp = M.readWord(MAXMP + actor * 2) // 4
+            if cell ~= nil and c.hp > cost
+               and M.readWord(CURMP + actor * 2) - (mpCost or 0) < floorMp then
+              local said = string.format("[%s] actor=%d keeps the cure-MP reserve "
+                .. "(%d of %d, floor %d): $%02X would breach it -- the bag instead",
+                tag or "fight", actor, M.readWord(CURMP + actor * 2),
+                M.readWord(MAXMP + actor * 2), floorMp, spell)
+              if said ~= healSaid then healSaid = said; M.log(said) end
+              cell = nil
+            end
             if cell ~= nil then
               local gain = castRestore[spell]
               local why = gain == nil and "not yet measured"

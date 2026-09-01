@@ -137,8 +137,13 @@ local function attempt(n)
   local deathSlot, deathFrame, deathTicks = nil, nil, nil
   local startFrame = nil           -- first frame of THIS attempt's battle
   local hb = 0
+  -- CELES chips IFRIT with Ice (the b70 design: ice + piercing is his row),
+  -- so the break lands before the kill.  Under the one-care-per-round
+  -- driver the party attacks harder, and without a chip key IFRIT died
+  -- through his shields unbroken -- the ladder then had no observation.
   local F = H.newFightDriver("brokendeath", { tactical = true, boost = true,
-    bank = 3, items = true, healPercent = 60, cadence = 12 })
+    bank = 3, items = true, healPercent = 60, cadence = 12,
+    magic = { [6] = { spell = 1, boost = false } } })
   local function mname(m)
     return m == ISLOT and "IFRIT" or m == SSLOT and "SHIVA" or ("slot " .. m)
   end
