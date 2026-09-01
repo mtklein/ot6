@@ -2157,8 +2157,7 @@ function M.newFightDriver(tag, opts)
     -- progress gets dropped like an unknown one.  The Sealed-Gate wipe
     -- sat 900+ frames in the item window at one cursor row while the
     -- fight burned down around it; no legitimate steer takes 300 frames.
-    if M.readByte(MENU) ~= 0 and st ~= ST_CMD and KNOWN_ST[st]
-       and plan ~= nil then
+    if M.readByte(MENU) ~= 0 and KNOWN_ST[st] and plan ~= nil then
       if st == parkSt then parkN = parkN + 1
       else parkSt, parkN = st, 0 end
       if parkN > 12 then          -- ~360 real frames: button() runs per cadence PULSE
