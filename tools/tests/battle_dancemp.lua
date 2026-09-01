@@ -211,11 +211,18 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(H.readByte(DANCES), 0,
       "a real WoB Mog has learned NO dance yet -- $1d4c is zero as saved, "
       .. "which is why the learn must be earned before anything can be measured")
+    -- The engine's MP-cost queue is the CIRCULAR buffer $3620-$371F
+    -- (battle_main.asm "add to mp cost queue"), appended by its own
+    -- counter -- a single-cell watch only worked while the fixture's
+    -- battle happened to land the dance's cost at that exact position
+    -- (the fled fixture parked it at $371E; the re-cut one does not).
+    -- Watch the whole queue and let the command gate pick the dance's
+    -- own stores.
     emu.addMemoryCallback(function(_, v)
       if v ~= 0xFF and H.readByte(0x3A7A) == CMD_DANCE then
         costs[#costs + 1] = v
       end
-    end, emu.callbackType.write, 0x7E371E, 0x7E371E)
+    end, emu.callbackType.write, 0x7E3620, 0x7E371F)
   end),
 
   -- deployment, gen_moogle's exact march order: P1 unboxes the mound, P3
