@@ -189,9 +189,20 @@ H.run({ maxFrames = 400000 }, {
       local mhp = 0
       for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
       H.vars.mhpTotal = mhp
-      H.vars.suitable = (#msPresent >= 2 and mhp >= 600)
-      H.log(string.format("draw: %d bodies, %d total max HP -> %s",
-        #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
+      -- Mind Candy ($8C) opens with SleepSting, and a sleeping spinner's
+      -- slot window is torn down mid-spin -- the A presses then land in
+      -- the next ready ally's command menu (measured on the re-cut F:
+      -- spin2's reel-2 presses fell into LOCKE's Fight menu and timed
+      -- out).  A menu-driving test needs a spinner who stays awake, so a
+      -- sleep-capable pack redraws like an unsurvivable one.
+      local sleepy = false
+      for _, s in ipairs(H.formationSpecies()) do
+        if s.species == 0x8C then sleepy = true end
+      end
+      H.vars.suitable = (#msPresent >= 2 and mhp >= 600 and not sleepy)
+      H.log(string.format("draw: %d bodies, %d total max HP%s -> %s",
+        #msPresent, mhp, sleepy and " (sleep-capable pack)" or "",
+        H.vars.suitable and "FIGHT" or "flee"))
     end)
     local attempt = function(n)
       return H.cond(function() return not H.vars.suitable end, {
