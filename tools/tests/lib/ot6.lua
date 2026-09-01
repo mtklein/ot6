@@ -1817,7 +1817,14 @@ function M.newFightDriver(tag, opts)
     -- driver already spends `opts.magic` on the attack line below.
     local cureRow = mayHeal and opts.cure ~= false
         and cmdRow(actor, CMD_MAGIC) or nil
-    if row ~= nil or cureRow ~= nil then
+    -- The finisher rule: with the fight one poke from over, healing is
+    -- the wrong verb no matter how hurt anyone is.  The Sealed-Gate wipe
+    -- died with the last Ninja at 61 HP while three straight turns went
+    -- to item menus and its parting move erased the party; any attack
+    -- would have ended the danger instead.
+    local totalMon = 0
+    for s = 0, 5 do totalMon = totalMon + M.readWord(0x3BFC + s * 2) end
+    if (row ~= nil or cureRow ~= nil) and totalMon > 200 then
       -- Revival stays item-only.  Life ($33) is not on any route this
       -- library drives yet: no esper in the WoB grants it (genju_prop.asm)
       -- and only Terra and Celes learn it innately, so a cast branch here
