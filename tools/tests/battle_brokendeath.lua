@@ -262,18 +262,36 @@ H.run({ maxFrames = 250000 }, {
   --    checkpoint lineage's two ThunderBlades; neither exists in this save,
   --    so that was a fixture fabrication disguised as menu input.  EDGAR's
   --    MithrilBlade supplies slash, while the daggers and Tools cover pierce.
-  H.equipLoadout(1, {
-    { 0, 0x02 }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-  }, { tag = "LOCKE battle-70 kit" }),
-  H.equipLoadout(4, {
-    { 0, 0x0A }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 },
-  }, { tag = "EDGAR battle-70 kit" }),
-  H.equipLoadout(5, {
-    { 0, 0x53 }, { 2, 0x69 }, { 3, 0x86 },
-  }, { tag = "SABIN battle-70 kit" }),
-  H.equipLoadout(6, {
-    { 0, 0x01 }, { 1, 0x5A }, { 2, 0x6A }, { 3, 0x84 },
-  }, { tag = "CELES battle-70 kit" }),
+  -- Best-effort, like the wave-4 kits: each slot conds on the bag
+  -- (present -> worn, absent -> keep current gear, logged).  LOCKE wears
+  -- the Genji Glove, so his left hand is a DAGGER ladder, never a shield
+  -- -- the { 1, $5A } this kit used to force stuffed a Buckler over his
+  -- dual-wield whenever the bag held one.  EDGAR and CELES have no
+  -- glove; their shields stay, skipping when the bag runs out.
+  (function()
+    local KITS = {
+      { 1, "LOCKE", { { 0, 0x0F }, { 1, 0x00 }, { 1, 0x01 }, { 1, 0x02 },
+                      { 2, 0x69 }, { 3, 0x84 } } },
+      { 4, "EDGAR", { { 0, 0x0A }, { 1, 0x5A }, { 2, 0x69 }, { 3, 0x84 } } },
+      { 5, "SABIN", { { 0, 0x53 }, { 2, 0x69 }, { 3, 0x86 } } },
+      { 6, "CELES", { { 0, 0x01 }, { 1, 0x5A }, { 2, 0x6A }, { 3, 0x84 } } },
+    }
+    local steps = {}
+    for _, kit in ipairs(KITS) do
+      local char, name, pairs_ = kit[1], kit[2], kit[3]
+      for _, p in ipairs(pairs_) do
+        local slot, item = p[1], p[2]
+        local tag = string.format("%s battle-70 kit slot %d", name, slot)
+        steps[#steps + 1] = H.cond(
+          function() return H.invSlotOf(item) ~= nil end,
+          { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
+          { H.logStep(string.format(
+              "%s: $%02X not in this lineage's bag; keeping current gear",
+              tag, item)) })
+      end
+    end
+    return H.cond(function() return true end, steps)
+  end)(),
   H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
 
   -- 2. capture the prepared entry point as the retry ladder's reload blob
