@@ -161,7 +161,7 @@ H.run({ maxFrames = 480000 }, {
       end),
     }
     for leg = 1, 80 do
-      steps[#steps + 1] = H.cond(function() return maxLvl() < 21 end, {
+      steps[#steps + 1] = H.cond(function() return maxLvl() < 23 end, {
         H.worldNavTo(function() return leg % 2 == 1 and ax or bx end,
                      function() return leg % 2 == 1 and ay or by end, {
           maxFrames = 45000, playBattles = "tactical",
@@ -173,7 +173,7 @@ H.run({ maxFrames = 480000 }, {
   end)(),
   H.call(function()
     H.log(string.format("[grind] done: best level %d", maxLvl()))
-    H.assertEq(maxLvl() >= 20, true, "the plains grind reached at least L20")
+    H.assertEq(maxLvl() >= 22, true, "the plains grind reached at least L22")
   end),
   worldGrind(24, 121, "back onto the parked ship (24,121)"),
 
