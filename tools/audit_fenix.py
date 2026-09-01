@@ -69,6 +69,10 @@ def scan(path):
         return
     worker = worker_of(path)
     for i, line in enumerate(lines):
+        # [ot6note] is the frame-stamped duplicate of the [ot6] stream in
+        # per-state logs; counting both doubles every use.
+        if line.startswith("[ot6note]"):
+            continue
         if not FENIX.search(line):
             continue
         # context: a window of preceding lines names the fight/driver
