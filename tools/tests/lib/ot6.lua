@@ -1609,6 +1609,7 @@ function M.newFightDriver(tag, opts)
   local tgtSpin = 0                    -- frames spent undecided in ST_TGT
   local unknownSt, unknownN = nil, 0   -- unknown-menu-state stall guard
   local parkSt, parkN = nil, 0         -- parked-KNOWN-window watchdog
+  local idleSt, idleN = nil, 0         -- plan-less open-window back-out
   -- The two numbers the heal policy weighs against each other, both measured
   -- in the fight rather than assumed.  See the policy note in makePlan.
   local roundCost = {}                 -- entity -> worst HP lost per own turn
@@ -1867,8 +1868,8 @@ function M.newFightDriver(tag, opts)
     -- confirm keeps buzzing stops shopping and Fights; so does this.
     if parkDropN >= 3 and healSaid ~= "parked-out" then
       healSaid = "parked-out"
-      M.log(string.format("[%s] %d park-drops this battle -- care plans "
-        .. "are off for the rest of the fight; attacking instead",
+      M.log(string.format("[%s] %d park-drops this battle -- care and "
+        .. "skill plans are off for the rest of the fight; Fighting instead",
         tag or "fight", parkDropN))
     end
     -- One care action per round (owner directive: one healer inside, and
@@ -2054,6 +2055,18 @@ function M.newFightDriver(tag, opts)
       if opts.bank and have < opts.bank then boost = 0
       else boost = math.min(have, 3) end
     end
+    -- The park ratchet covers the tactical lines as well as care: a
+    -- skill whose window keeps getting dropped and re-planned is the
+    -- same buzzing confirm, and measured with only the back-out in place
+    -- the Zozo Bio Blaster turn cycled park -> B -> re-plan six times
+    -- while the party burned down (probeB, 2026-09-04).  Three drops and
+    -- this actor Fights for the rest of the battle.
+    if parkDropN >= 3 then
+      local fight = cmdRow(actor, CMD_FIGHT)
+      if fight ~= nil then
+        return { kind = "fight", row = fight, boostLeft = boost }
+      end
+    end
     -- opts.summon = { [charId] = { mp = cost } }: the once-per-battle
     -- genju.  From the magic list scrolled to the top, UP runs
     -- CheckHasGenju and opens the esper window ($7BC2 = $16), A commits,
@@ -2195,9 +2208,14 @@ function M.newFightDriver(tag, opts)
     -- (AutoCrossbow hits all targets) heals the enemy, Edgar's
     -- single-target pierce Fight removes the same class-weak shields
     -- without triggering that heal.
+    -- The tool has to be in the bag (a Tool is an item; the Tools list is
+    -- MakeToolsList's walk of the battle inventory): a plan for a tool
+    -- that is not there opens the list, finds no row, backs out and plans
+    -- the same thing again, forever.  Without the tool Edgar Fights.
     if opts.tactical and opts.tools ~= false and id == 4
        and M.readWord(CURMP + actor * 2) >= 4
-       and cmdRow(actor, CMD_TOOLS) then
+       and cmdRow(actor, CMD_TOOLS)
+       and battInvIdx(opts.tool or AUTOCROSSBOW) then
       return { kind = "skill", cmd = CMD_TOOLS, skill = opts.tool or AUTOCROSSBOW,
                row = cmdRow(actor, CMD_TOOLS), boostLeft = boost }
     end
@@ -2241,6 +2259,12 @@ function M.newFightDriver(tag, opts)
                      -- the Throw family (probe_throw.lua; btlgfx
                      -- UpdateMenuState_2b/2c/2d): open, close, item select
                      [ST_THROW_OPEN] = true, [0x2C] = true, [ST_THROW] = true }
+  -- The selection windows a plan-less driver backs out of (see the
+  -- plan-nil head of button()): every list that waits on A or B.  The
+  -- transitional states ($19 lore fill, $2B/$2C throw open/close) are
+  -- left out; they pass on their own.
+  local IDLE_ST = { [ST_ITEM] = true, [ST_TOOLS] = true, [ST_MAGIC] = true,
+                    [ST_ESPER] = true, [ST_LORE] = true, [ST_THROW] = true }
   local function button(actor)
     local st = M.readByte(MSTATE)
     if st == ST_CMD then tgtSpin = 0 end
@@ -2286,11 +2310,18 @@ function M.newFightDriver(tag, opts)
       -- deep list resets the count each press.  Keying on state alone
       -- fired at exactly 13 pulses while the Potion steer was 21 rows
       -- into a scroll to slot 25, cancelling real heals mid-flight.
-      local sig = string.format("%d:%d:%d:%d:%d:%d:%d:%d:%d:%d", st, actor,
+      -- The target window's cursor cells are its two side masks and the
+      -- group latch: without them every target steer read as parked at
+      -- 13 pulses no matter how the cursor moved, so the steers' own
+      -- give-ups (24 and 40 pulses, which confirm on whoever is lit)
+      -- could never fire first (the Zozo Bio Blaster wipe, 2026-09-04).
+      local sig = string.format("%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
+        st, actor,
         M.readByte(CMDROW + actor), M.readByte(ITEMSCR + actor),
         M.readByte(ITEMROW + actor), M.readByte(MSCROLL + actor),
         M.readByte(MROW + actor), M.readByte(MCOL + actor),
-        M.readByte(LSCROLL + actor), M.readByte(LROW + actor))
+        M.readByte(LSCROLL + actor), M.readByte(LROW + actor),
+        M.readByte(TGTCHARS), M.readByte(TGTMONS), M.readByte(TGTALL))
       if sig == parkSt then parkN = parkN + 1
       else parkSt, parkN = sig, 0 end
       if parkN > 12 then          -- ~360 real frames: button() runs per cadence PULSE
@@ -2354,6 +2385,26 @@ function M.newFightDriver(tag, opts)
         end
         return { "a" }
       end
+      -- No plan, but a selection window is open: a dropped plan's B out
+      -- of target select lands in the window that opened it (btlgfx
+      -- UpdateMenuState_38 restores $7A83, the Tools list for a tool),
+      -- and this driver only plans at the command state.  Left alone
+      -- that window stayed open for 4400 frames while the Zozo street
+      -- wiped the party (2026-09-04).  A person backs out again; so
+      -- does this, after two pulses of the same window, since a landed
+      -- confirm's closing tail also passes through here for a tick.
+      if IDLE_ST[st] then
+        if st == idleSt then idleN = idleN + 1 else idleSt, idleN = st, 1 end
+        if idleN > 2 then
+          M.log(string.format("[%s] no plan and window $%02X still open "
+            .. "after %d pulses -- backing out to re-plan", tag or "fight",
+            st, idleN))
+          idleSt, idleN = nil, 0
+          return { "b" }
+        end
+        return nil
+      end
+      idleSt, idleN = nil, 0
       if st ~= ST_CMD then return nil end
       plan, planActor, tgtSpin = makePlan(actor), actor, 0
       planPulses, steerTrail = 0, {}
@@ -2554,7 +2605,14 @@ function M.newFightDriver(tag, opts)
         end
         if want ~= nil then
           local mons = M.readByte(TGTMONS)
-          if mons ~= want then
+          -- The focused monster has to be UNDER the cursor, not be the
+          -- whole of it: a group-targeting ability (Bio Blaster $7D,
+          -- targeting $6A = ENEMY|MULTI_TARGET|INIT_GROUP|ONE_SIDE, no
+          -- MANUAL) lights a whole monster group ($7B7E=$2C measured on
+          -- the Zozo street) and its left/right only swap groups, so
+          -- an exact match against one slot's bit could never happen
+          -- and the turn was parked away into a wipe (2026-09-04).
+          if mons & want == 0 then
             tgtSpin = tgtSpin + 1
             if tgtSpin < 24 then
               -- on the ally side (mons == 0), LEFT crosses to the enemy
@@ -2626,6 +2684,7 @@ function M.newFightDriver(tag, opts)
     menuStreak, tick, battleTick = 0, 0, 0
     plan, planActor, held = nil, nil, {}
     parkDropN = 0
+    parkSt, parkN, idleSt, idleN = nil, 0, nil, 0
     if healSaid == "parked-out" then healSaid = nil end
     careActor, startSnap, planPulses = nil, nil, 0
     -- Everything the heal policy measured belongs to the battle that just
