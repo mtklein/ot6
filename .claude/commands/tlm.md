@@ -107,7 +107,7 @@ For each finished branch:
    The default target is the qualified release zip; it is the definition
    of green. Never push a red main. Never `--force`, never rewrite pushed
    history, never `stash` an agent's work away.
-5. `git push origin main`, close the GitHub issues the merge resolves
+5. `git push origin main` immediately (the laptop is a single point of failure; push every landing, and push wt/* branches holding real work as soon as they exist), close the GitHub issues the merge resolves
    (`Closes #N` in the merge message or `gh issue close`), delete the
    `wt/*` branch and its worktree (`git worktree remove`).
 
