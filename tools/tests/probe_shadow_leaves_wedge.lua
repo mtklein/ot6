@@ -9,7 +9,11 @@
 --   * exec watches on the battle's end path (CheckBattleEnd, WinBattle,
 --     ShadowLeaves, Ot6ShadowLeaves, _48c4/_488f, TerminateBattle) and on
 --     $C2:FE00-$C2:FFFF, where a bank-relative `jmp Ot6ShadowLeaves`
---     (assembled 4C 00 FE at $C2:4911) lands instead of $CF:FE00;
+--     (assembled 4C 00 FE at $C2:4911) landed instead of $CF:FE00 while
+--     the body was linked into bank $CF (before 3fffb2a; it is in bank
+--     $C2's battle_code now, resolved by symbol below -- the suite's
+--     battle_shadowstays.lua is the standing proof that the roll passes
+--     cleanly on the fixed ROM);
 --   * per-frame RAM dumps around the roll and around the kill, and CPU PC
 --     samples once ShadowLeaves has fired.
 -- The pad is driven by the same navigators with the same options as the
@@ -158,7 +162,12 @@ hook("ShadowLeaves", 0xC24911, 8, function()
     "$3ebd=%02X $1ede=%02X $be=%02X map=%d",
     x, b(0x3ee4 + (x & 0x7f)), b(0x201f), b(0x3a76), b(0x3ebd), b(0x1ede), b(0xbe), mapIdx())
 end)
-hook("Ot6ShadowLeaves", 0xCFFE00, 8, function() return string.format("$1ede=%02X", b(0x1ede)) end)
+-- no fallback address: $CF:FE00 was the BUG's placement, not a stand-in for
+-- the symbol.  Since 3fffb2a the body lives in bank $C2 (battle_code), so
+-- the dbg symbol is required here and a stale guess can never masquerade
+-- as a hit.
+local otsl = hook("Ot6ShadowLeaves", nil, 8, function() return string.format("$1ede=%02X", b(0x1ede)) end)
+assert(otsl, "Ot6ShadowLeaves must resolve from ff6-en.dbg (rebuild the ROM; run via run.sh)")
 hook("_48c4", 0xC24914, 8)
 hook("_488f", 0xC248FA, 8)
 hook("TerminateBattle", 0xC200C5, 8)
@@ -310,9 +319,9 @@ H.run({ maxFrames = 120000 }, {
       battleDump("autopsy")
       cpuSample("autopsy")
       H.log(string.format("[verdict] ShadowLeaves ($C2:4911) ran at f%d; " ..
-        "Ot6ShadowLeaves ($CF:FE00) ran %d times; $C2:FE00.. landed %d times; " ..
+        "Ot6ShadowLeaves ($%06X) ran %d times; $C2:FE00.. landed %d times; " ..
         "_48c4 %d, _488f %d, WinBattle %d, TerminateBattle %d (whole replay)",
-        slFrame, n("Ot6ShadowLeaves"), landN, n("_48c4"), n("_488f"),
+        slFrame, otsl.addr, n("Ot6ShadowLeaves"), landN, n("_48c4"), n("_488f"),
         n("WinBattle"), n("TerminateBattle")))
     else
       H.log(string.format("[verdict] ShadowLeaves never ran on this replay " ..
