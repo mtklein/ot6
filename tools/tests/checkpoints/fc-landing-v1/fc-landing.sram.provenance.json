@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "e7c0ea7bdd2502627d2e249a2232d71ec858b58795bf91b0cbb60aa06ec2ad26",
+  "generator_sig": "d8ea63c9cf9f5c292e85e35944645f743eb08ffbd7988f6c613218a73666ed5d gen_fc_landing tools/tests/checkpoints/thamasa-done-v1/manifest.json tools/tests/checkpoints/thamasa-done-v1/thamasa-done.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/thamasa-done-v1/manifest.json",
+      "sha256": "4ee8e171e940871641dff5786ec85ab14a6d26a7fdfa1eec98d498e15e29d742"
+    }
+  ]
+}

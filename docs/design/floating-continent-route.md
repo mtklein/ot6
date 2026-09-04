@@ -110,6 +110,24 @@ it holds on arrival; exact byte **UNVERIFIED**, and moot for liftoff).
 
 ---
 
+## 1a. Prep at Thamasa before boarding (measured, probe_fc_prep.lua)
+
+The gauntlet is a heal race (round costs of 300–600 per character against
+~900–1100 HP at L23–26), so the combat heal must be a Potion and it must be
+one press away.  From the stop line, RIGHT enters post-massacre Thamasa —
+**map 340**, not the pre-massacre 343: the same tiles under another map
+index — at (23,46).  The item shop door is still (26,37) → 347 (36,44), the
+keeper at (36,39) (stage (36,41), face up); rows: Tonic 0, Potion 1, Fenix
+Down 6.  The prep buys POTION to 40, FENIX DOWN to 25 (a row already at or over
+its target is skipped -- the seed carries 29), TONIC to 99 (~10k gil of a
+210k purse), then `H.bagArrange` puts Potion, Fenix Down,
+Tonic, Antidote, Remedy at bag slots 0–4 through the field Item menu's real
+pick-up-and-swap (the seed shipped the Potion at row 43: a 43-row list walk
+per battle heal, and two of three died while it walked — attempts 10–11).
+Return door 347 (36,45) → 340 (26,39); DOWN off (23,46) lands on the world
+at exactly (249,128) with the Blackjack on (249,127), so the boarding walk
+below starts unchanged.  Whole prep ≈ 4,100 frames.
+
 ## 2. Boarding, landing, and the deck menu — the real entry
 
 The IAF is not reached by flying to a location. The sequence is:
@@ -194,6 +212,23 @@ The `AIRSHIP_CENTER`/`AIRSHIP_WOB`/`CLOUDS` arguments are battle **backgrounds**
 
 ---
 
+### 3a. Dressing the bench pick (measured, gen_fc_landing.lua)
+
+The deck party select can pull a benched character (EDGAR) into the three,
+and he arrives with every slot empty — the field Equip screen never showed
+him while benched, so the Thamasa prep cannot dress him.  On the story deck
+right after the select the main menu is **disabled** (X did nothing for
+1200 frames with no dialog up; the party stands on the helm tile), so the
+first place he can be dressed is the field gap after wave 1, where the menu
+opens (the wave timers are FIELD_ONLY: they run while the menu is closed and
+pause while it is open).  `H.equipKit` does one Equip session and one Relic
+session per character there — round trips are what the gap cannot afford —
+and the wearable rungs are read from his own list ($25 is Shadow-only, mask
+$8008, and never appears).  A Relic-screen back-out with the Genji Glove
+involved runs the game's own Optimum on exit (element-blind best-attack
+gear).  The first cut of the seed fought all 13 battles with EDGAR naked and
+still won; the re-cut dresses him after wave 1.
+
 ## 4. The Floating Continent (map 394 + save alcove 358)
 
 **One map.** 394 "THE FLOATING LAND" (`map_prop.dat` rec 394 title index 59) is
@@ -206,7 +241,7 @@ the whole assault. It has no short/long entrances
 - Entry: IAF → `load_map 394,{4,8},DOWN` (`:13560`).
 - 394 (90,43) → `load_map 358,{8,7}`, `$01B5=1` (`event_trigger.asm:1962`, `:32517`).
 - 358 (8,8) → `load_map 394,{90,42}` (`event_trigger.asm:1755`, `:32546`).
-- 394 (70,29) → `_ca5a6c` (`event_trigger.asm:1961`) "The airship's below! Do you wish to return?" → `load_map 6,{16,6}` (`:13612`); the "Yes" branch `_ca5a8a` (`:13627`) sets **`$035E=1`** (`:13633`) *while AtmaWeapon is alive* (`if $035F=0`, `:13632`) — this is what poses Shadow's NPC.
+- 394 (70,29) → `_ca5a6c` (`event_trigger.asm:1961`) "The airship's below! Do you wish to return?" — **dlg $0857 rows: 0 = (No), 1 = (Yes)**, and the event gates itself on `$01B5` (`if_switch $01B5=1, EventReturn` then `switch $01B5=1`), so the prompt fires ONCE ever; a gen must answer Yes the first time (the first descent cut answered row 0 and stayed on 394) → `load_map 6,{16,6}` (`:13612`); the "Yes" branch `_ca5a8a` (`:13627`) sets **`$035E=1`** (`:13633`) *while AtmaWeapon is alive* (`if $035F=0`, `:13632`) — this is what poses Shadow's NPC.
 
 **Encounters.** Only 394 rolls (`map_prop +5 = $80`; `SubBattleGroup[394]=112`;
 `field/battle.asm:332-333`,`:394-411`). Group 112's four words are `$80B1/$80B4/
@@ -220,13 +255,26 @@ these formations permit a pincer** (e.g. the Apokryphos/Misfit, Ninja, and
 Brainpan groups), so a walk across 394 wants a fight budget or a `"tactical"`
 playBattles mode, not a blind `"flee"` (HANDOFF, the flee bullet).
 
-**Shadow rejoin.** Talk to the Shadow NPC at 394 (10,16), visibility switch
-`$035E`, event `_cad9a7` (`npc_prop.asm:17437-17443`; script `:32586`):
-`norm_lvl SHADOW` `:32616`, `char_party SHADOW,1` `:32625`, `$02F3=1` `:32627`,
-clears the NPC `$035E=0` `:32633`, met-latch `$002A=1` `:32634`. `$035E` is set
-only at `:13633` (above), so Shadow appears after the party reaches the return
-point (70,29), elects to return, and has **not** yet beaten AtmaWeapon.
-**verify-on-arrival** that nothing upstream pre-sets `$035E`.
+**Rows.** The (67,39) walk's Behemoth one-shot a front-row TERRA at 792 HP
+(two Fenix Downs in one random, run.0FsoIlAX r6). TERRA (Magic) and EDGAR
+(Tools) never swing, so the back row costs them nothing and halves the
+physical damage they take; the deck kit sets TERRA/EDGAR back, LOCKE front.
+
+**Shadow rejoin — MEASURED (probe_fc_shadow.lua on the fc-landing-v1 seed).**
+At the landing, before any return trip, `$035E=1`, `$035F=1`, the object map
+marks (10,16) occupied, and a talk from (10,15) facing DOWN makes Shadow join
+(`$02F3=1`, party of four). The earlier reading — that `$035E` is set only by
+the (70,29) return's Yes branch (`:13635`, gated on `$035F=1`) so Shadow
+appears only after returning — was wrong in effect: the switch is already on
+when the party lands (its origin is not an explicit `switch $035E=1` in
+`event_main.asm`, which has only the `:13635` site; a default-on NPC switch
+fits). The talk: NPC at 394 (10,16), event `_cad9a7` (`npc_prop.asm:17437-
+17443`; script `:32586`): `norm_lvl SHADOW` `:32616`, `char_party SHADOW,1`
+`:32625`, `$02F3=1` `:32627`, clears the NPC `$035E=0` `:32633`, met-latch
+`$002A=1` `:32634`. Its walkable neighbours are (10,15) and (9,16) only —
+(10,17) and (11,16) are F7 walls (probe_fc_bfs.lua's map dump). So the
+descent is: talk at the landing, then the crossing; (70,29) is avoided
+outright, because with Shadow in, its Yes branch is his scripted removal.
 
 **AtmaWeapon.** NPC at 394 (60,15), switch `$035F`, event `_cada30` →
 `battle 80` (`:32681`) = **formation 450**, monster 279 `$0117` "AtmaWeapon".
@@ -248,7 +296,11 @@ No new save-point authoring is needed here; see §8.
 
 ---
 
-**The crossing (map 394 to the save alcove 358).** The stair-reveal
+**The crossing (map 394 to the save alcove 358).** The reveals do NOT
+persist across a map load (measured, probe_fc_exit.lua on the fc-alcove-v1
+seed: (89,25) reads F7 after the alcove exit until (82,30) is stepped again,
+whose event takes control for a moment and changes the tiles) — every leg
+re-steps its reveals hop by hop. The stair-reveal
 triggers chain and the scripted chutes ride two-way: (40,6)↔(32,16) and
 the (67,39)-walk pair are twins, so riding one down already visits its
 return twin. A validated crossing: (4,8) → (19,12) (25,19) (40,12)
@@ -259,10 +311,23 @@ Shadow's rejoin sits ahead of the (70,29) "return?" choice: choosing to
 return with Shadow already talked in at (10,16) but not yet rejoined
 triggers the scripted Shadow **removal** (`_cad9fc`), and the (89,25)
 chute reaches that removal branch — so a route that wants Shadow at the
-save alcove must avoid (70,29) after the talk-in. Shadow's 1/16
-post-battle leave-roll is gated OFF while the live map is 394
-(`Ot6ShadowLeaves`), since a mid-FC leave would clear `$02F3` and
-forfeit the humane escape.
+save alcove must avoid (70,29) after the talk-in. Shadow's vanilla 1/16
+post-battle leave roll is a NO-OP in OT6 everywhere (`Ot6ShadowLeaves`;
+owner's call 2026-09-01: Shadow stays for the whole game, only scripted
+departures remain), so no won battle here or on the escape map can clear
+`$02F3` and forfeit the humane escape. (Until 2026-09-01 that handler was
+mis-banked and every passing roll halted the CPU -- see battle_main.asm's
+Ot6ShadowLeaves comment.)
+
+**Pool elements (decoded at the correct offsets — monster_prop +25 weak,
++23 absorb, per `tools/check_boss_rows.py`; a first pass read the status
+bytes at +20/+22 and is retracted).** Dragon ($083, 7000 HP): weak **bolt**.
+Behemoth ($020, 5800 HP): weak ice. Ninja ($003): weak bolt+holy.
+Apokryphos weak bolt/holy/water, Brainpan weak fire/bolt/holy, Misfit weak
+fire/holy, WireyDrgn none. **Nothing in the pool absorbs bolt**, and bolt is a
+weakness for four of the seven species — Bolt is a good nuke here, and TERRA
+carries Ramuh (bolt). The descent's difficulty is the Dragon's 7000 HP and
+850 MP at the party's level, not element hostility; see the descent lab note.
 
 The FC randoms carry authored `Ot6ShieldTbl` rows: Behemoth/Dragon 3
 pips, Apokryphos/Misfit/Ninja/WireyDrgn/Brainpan 2 pips. Four of the
@@ -315,6 +380,25 @@ whole party, run under the escape clock (§7, `bosses-wob.md` §22).
 | Saved flag | `$037D` (read in WoR at `:12033`/`:12172` to spawn Shadow's actor) |
 | Exit | both paths → `_ca48d6` `:11337`: `$02BC=0`, `load_map 10` → **376** `:11374` → **390** `:11432` (airship flees) |
 
+**Measured (gen_fc_escape.lua, 2026-09-01).** At the party's first control on
+393 the master clock reads 21,569 frames (5:59) with flags $70 — it RUNS in
+menus and battles (the `p` bit is clear) — and Shadow's timer 21,269; so the
+whole walk, every encounter, Nerapa and the walk to the ledge must fit inside
+~5:50 for the party to be waiting there when Shadow's timer fires. Walking to
+Nerapa at the default fighting policy met four random encounters at ~3,000
+frames each and the clock expired before Nerapa was engaged; the game over is
+`_cae414`'s expiry. (An earlier reading of "16,752 left" was the timer's flags
+byte, not its count: the record is flags at +0, the frame count at +1.) The escape is the one
+stretch where the run mechanic is the honest play: the gen's 393 walks hold
+L+R (a refusal shows on `$b1` bit 1 within 60 frames and hands the fight to
+the tactical driver; the cap is 600 frames), fight physically, and bank no BP;
+Nerapa is fought with the Bolt nuke. (A 12-frame decision cadence was tried
+and rejected: it makes the magic-list steer oscillate, and Bolt plans were
+dropped 32 times in one unrunnable fight — that, not the walking, burned the
+clock on that attempt. The 30-frame cadence steers Bolt cleanly.) Terra swaps Blizzard (ice) for the spare
+MithrilBlade before 393: species $0169 in the pool absorbs ice, and the lib's
+absorbed-weapon guard fails the run at that encounter otherwise.
+
 Per-screen collapse segments during the run use `start_timer 1, 180/480,
 _cae4d4` (`:34268`+), distinct from the master clock.
 
@@ -343,6 +427,23 @@ hands control (`pass_off SLOT_1`/`NPC_1`, `:12397-12398`) and `return`s
 (`:12449`): the player holds **solo Celes on the Solitary Island (map 397)**.
 Shadow's FC fate is already decided (`$037D`, §5). This is the end of the World
 of Balance and the arc's finish.
+
+**Measured (gen_fc_escape.lua, 2026-09-01).** The opening's dialogs page for
+roughly 5,000 frames after the party reaches (100,38) (`$ba=01` with `$d3=00`
+between pages, event pc at the WaitDlg script), then control returns with solo
+Celes at (99,38), 964 HP, `$00A4=1`, `$037D=1`; the gen emits `wor_landing.mss`
+there. (A first attempt was failed by the harness's game-over canary: its
+one-byte READ watch on the GameOver script fired three times on a neighbouring
+fetch with the title screen never entered; the watch is now gated on the event
+interpreter's pc.)
+
+**The clock that starts at the stop line (read from `:12390-12449`).** Right
+before the `return` that hands control back, the opening sets `var 7 = 120`
+(Cid's health) and starts `timer 0, 64, _ca533f, FIELD_ONLY`, which decrements
+var 7 every 64 field frames — about 2:08 of field time until Cid dies unfed,
+which is the fork to the cliff scene. The escape gen's terminal (control at the
+bedside) therefore leaves a live clock in the seed it cuts; the first WoR gen
+must feed him (or accept the fork) before anything else.
 
 **Equipment note — Nerapa.** Elsewhere on this route Celes's Fire Rod is
 fine (the enemies there absorb ice, not fire), but Nerapa is the

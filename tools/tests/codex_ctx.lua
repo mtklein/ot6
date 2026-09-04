@@ -471,7 +471,25 @@ local actions = {
         if wasInBattle and not inBattle then account() end
         if inBattle and not wasInBattle then battleReset() end
         wasInBattle = inBattle
-        if inBattle then battlePulse() else patrolPulse() end
+        if inBattle then
+          -- Life support, not play (same expedient as resolveReadBattle,
+          -- and the same reason): the WRITE half searches the Veldt for
+          -- the teachable pairing with battlePulse, which steers the teach
+          -- but does not heal.  The fighting lineage's recorded history --
+          -- now including the battles Shadow stays for (Ot6ShadowLeaves is
+          -- a no-op) -- serves this trio harder packs than before, and an
+          -- unclamped teach search wipes before the pairing comes up.  HP
+          -- is not the measured quantity here (the codex seed bytes are),
+          -- so every living ally's battle HP tops to max each pulse.
+          -- Declared in state_write_waivers.txt.
+          for s = 0, 3 do
+            local max = H.readWord(0x3C1C + s * 2)
+            if max > 0 and H.readWord(0x3BF4 + s * 2) > 0 then
+              H.writeWord(0x3BF4 + s * 2, max)
+            end
+          end
+          battlePulse()
+        else patrolPulse() end
       end),
     }, "a post-save battle teaches the slot-1 page")
   end)(),
