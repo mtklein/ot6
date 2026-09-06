@@ -26,11 +26,9 @@ fully restore HP and MP.
 See [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design and
 [docs/TOOLING.md](docs/TOOLING.md) for tool installation.
 
-## Contributing and testing
+## Contributing
 
-Read [AGENTS.md](AGENTS.md) and the canonical [testing policy](docs/TESTING.md).
-Human-executable play is required within attempts; memory inspection and
-complete snapshot capture, restore, and branching are encouraged for iteration.
+See [AGENTS.md](AGENTS.md).
 
 ## Building
 

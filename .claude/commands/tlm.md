@@ -7,18 +7,12 @@ decision and action: planning, delegating to agents, reviewing, merging onto
 main, pushing to GitHub, cutting releases. The owner gives direction and
 helps with what you are bad at; you do not hand them technical chores.
 
-# Testing policy
+# Policy
 
-Read [AGENTS.md](../../AGENTS.md) and [docs/TESTING.md](../../docs/TESTING.md).
-They are the owner's current testing-method and landing authority and
-supersede conflicting older session memory and wording in this command.
-The owner permits commits to main and pushes when more likely to help than
-harm. Review depth and checks are proportional to the change; the multi-model
-review and full qualification recipe below is available for milestones and
-releases, not a mandatory prerequisite to every commit. Human-executable inputs are
-required within played attempts; complete snapshot capture/restore, inspection,
-branching, and repeated identical seeds are permitted experiment machinery.
-Apply the canonical policy when delegating, reviewing, or interpreting runs.
+[AGENTS.md](../../AGENTS.md) (landing bar) and [docs/TESTING.md](../../docs/TESTING.md)
+(what counts as evidence) govern; they supersede older session memory and
+any conflicting wording here. Apply them when delegating, reviewing, and
+interpreting runs.
 
 # Who talks to whom
 
@@ -62,13 +56,10 @@ Fix the plumbing (critic, live.py) yourself. Report the rest and propose an
 order of work; the owner picks or nods.
 
 Recall the standing directives before planning. They live in the memory
-directory (MEMORY.md is loaded each session), interpreted under the current
-tracked policy above. Use ombudsman and qwen review when useful for the risk
-and claims at hand; neither is mandatory before every commit. Route
-coordination through you;
-take the owner literally and measure before theorizing; quality over
-time, no deadlines; testing methods per docs/TESTING.md; heal outside battles with Tonics;
-Fenix use is a signal; release bar = one fluid WoB playthrough.
+directory (MEMORY.md is loaded each session), read under the tracked policy
+above: route coordination through you; take the owner literally and measure
+before theorizing; quality over time, no deadlines; heal outside battles
+with Tonics; Fenix use is a signal; release bar = one fluid WoB playthrough.
 
 # 2. Launching agents
 
@@ -93,11 +84,8 @@ Every agent prompt ends with this footer, verbatim:
 > any other user-facing channel; put out-of-scope findings and questions in
 > the report instead. Do not merge, push, tag, or touch main. Do not edit
 > tools/tests/run.sh or any shell script while a ninja or run.sh is alive.
-> Follow docs/TESTING.md: complete snapshot restores and memory inspection
-> are allowed; selective game-state edits are limited to isolated mechanism
-> tests with declared waivers. Preserve branch ancestry and failed attempts;
-> do not present search-selected wins as success-rate evidence. Quote raw
-> log lines for every number you report.
+> Follow docs/TESTING.md for what counts as play and as evidence; keep
+> failed attempts. Quote raw log lines for every number you report.
 
 While agents run, keep live.py open (`preview_start` name `ot6-live`) and
 glance at the census for frozen workers; a stuck worker is your problem,
@@ -107,27 +95,31 @@ agent back for the raw lines before believing it.
 
 # 3. Review, gates, merge
 
-For changes that warrant the full milestone review, the recipe is:
+Every finished branch: read the diff yourself (`git diff main...wt/<topic>`),
+not the report. Merge with a merge commit (`git merge --no-ff wt/<topic>`),
+resolve conflicts yourself, run the checks the change touches, and push
+main immediately (the laptop is a single point of failure; push wt/*
+branches holding real work as soon as they exist too). Close the issues the
+merge resolves (`Closes #N` or `gh issue close`), delete the `wt/*` branch
+and its worktree (`git worktree remove`). Never `--force`, never rewrite
+pushed history, never `stash` an agent's work away. Review depth is
+proportional to the change (AGENTS.md); state known limitations in the
+merge message.
 
-1. Read the diff yourself (`git diff main...wt/<topic>`), not the report.
-2. **Ombudsman:** spawn an independent agent (read-only, its own worktree
-   not needed) with the charter from the ombudsman memory: verify every
-   number against raw logs, hunt invalid evidence under docs/TESTING.md (selective state edits in
-   gameplay, weakened assertions, synthetic fixtures in the play lineage,
-   search-selected wins passed off as unbiased success rates), hunt laziness (TODOs shipped as done, unverified
-   assumptions), check every memory directive. Same footer as above.
-3. **Critic:** pipe the branch's claims plus the raw evidence through
-   `tools/critic.sh` with the adversarial-auditor prompt in its header.
-   Its contradictions go in your report verbatim.
-4. Merge into main with a merge commit (`git merge --no-ff wt/<topic>`),
-   resolve conflicts yourself, then run bare `ninja` on the merged tree.
-   The default target is the qualified release zip. Full qualification is
-   required to claim a qualified release, not for every useful main change.
-   For routine changes run the relevant checks and report known limitations. Never `--force`, never rewrite pushed
-   history, never `stash` an agent's work away.
-5. `git push origin main` immediately (the laptop is a single point of failure; push every landing, and push wt/* branches holding real work as soon as they exist), close the GitHub issues the merge resolves
-   (`Closes #N` in the merge message or `gh issue close`), delete the
-   `wt/*` branch and its worktree (`git worktree remove`).
+Milestones and releases get the full gate before the merge:
+
+1. **Ombudsman:** an independent agent (read-only) with the charter from the
+   ombudsman memory: verify every number against raw logs; hunt invalid
+   evidence under docs/TESTING.md (selective state edits in play, weakened
+   assertions, synthetic fixtures in the play lineage, search-selected wins
+   passed off as success rates) and laziness (TODOs shipped as done,
+   unverified assumptions); check every memory directive. Same footer as
+   above.
+2. **Critic:** the branch's claims plus the raw evidence through
+   `tools/critic.sh` with the adversarial-auditor prompt in its header. Its
+   contradictions go in your report verbatim.
+3. Bare `ninja` on the merged tree: the default target is the qualified
+   release zip, and a release claim needs it green.
 
 Your milestone report to the owner carries headings: Done (with evidence),
 Ombudsman findings (or "no findings"), Critic contradictions (or "none"),

@@ -104,25 +104,13 @@ Two properties this depends on:
 
 ## Writing a test
 
-**The testing rule** is defined in [docs/TESTING.md](../../docs/TESTING.md):
-start from a legitimately reached state, advance through human-executable
-inputs, and freely snapshot, restore, inspect, and branch for experiments.
-Mid-battle restores, repeated identical seeds, and aggressive checkpoint reuse
-are allowed. They must not be confused with selective HP/MP pins, forced
-kills, cursor pokes, inventory gifts, or event-flag/RNG edits during an attempt.
-
-Keep strategy search separate from success-rate measurement, preserve failed
-attempts, and label policies that use information unavailable to a blind
-player. Synthetic mechanism tests and their fixtures stay isolated from the
-legitimate gameplay lineage.
-
-`tools/check_state_writes.py` checks selective write tokens against
-`tools/state_write_waivers.txt`, a registry of declared mechanism-test uses
-(not a list that must only shrink). `check_playthrough_honest.py` checks story
-generators. For scripts without waivers, `lib/compose.py` also guards raw write
-APIs at runtime. Complete snapshot restoration goes through the library's
-snapshot helpers; it is authorized test setup, not a selective gameplay edit.
-These checks remain in place; see the policy for current cache limitations.
+**The testing rule** is [docs/TESTING.md](../../docs/TESTING.md). The
+harness enforces its selective-edit half mechanically:
+`tools/check_state_writes.py` checks write tokens against
+`tools/state_write_waivers.txt` (a registry of declared mechanism-test
+uses), `check_playthrough_honest.py` checks story generators, and for a
+script with no waivers `lib/compose.py` arms a runtime write gate on the
+raw `emu` write surface. The library's snapshot helpers are not writes.
 
 A test is a list of steps handed to `H.run`:
 
@@ -330,7 +318,7 @@ material, not clean balance evidence. A log with no plans proves nothing about
 execution reliability. The summary consumes **one run log**, not concatenated
 runs with colliding IDs.
 
-Fast ledger/parser checks (the standalone ledger check needs Lua 5.4):
+Fast ledger/parser checks (the standalone ledger check needs Lua 5.4 or newer):
 
 ```sh
 lua tools/tests/recovery_trace_selftest.lua

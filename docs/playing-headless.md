@@ -5,12 +5,8 @@ around, so routes are coordinate-aware rather than blind timed
 button-holds. This is what lets automated tests reach arbitrary points in
 the game.
 
-## Testing guideline
-
-Follow [docs/TESTING.md](TESTING.md): start from a legitimately reached state,
-advance through human-executable inputs, and freely inspect, snapshot,
-restore, and branch for experiments. Mid-battle checkpoints are encouraged
-for local iteration. Selective state edits and forced kills are not play.
+What counts as play, and what a snapshot may be used for, is
+[docs/TESTING.md](TESTING.md).
 
 ## Save decoupling
 
