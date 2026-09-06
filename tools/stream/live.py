@@ -661,6 +661,20 @@ def follow(log_path, webroot, test, stop, hop=False, live_ref=None):
                 state["frame"], state["pad"] = int(m.group(1)), m.group(2)
                 state["exact"] = True
                 continue
+            if line.startswith("[ot6action] "):
+                try:
+                    e = json.loads(line[len("[ot6action] "):])
+                    note = (f'action #{e["id"]} actor {e["actor"]}: '
+                            f'{e["kind"]} {e["event"]} +{e["elapsed_frames"]}f')
+                    if "reason" in e:
+                        note += " — " + e["reason"]
+                    if "hp_net" in e:
+                        note += " HP net [" + e["hp_net"] + "]"
+                    state["frame"] = max(state["frame"], e["frame"])
+                    state["notes"] = (state["notes"] + [note])[-8:]
+                except (ValueError, KeyError, TypeError):
+                    pass  # a partial/bad trace must not stop the live viewer
+                continue
             m = NOTE.search(line)
             if m:
                 state["frame"] = max(state["frame"], int(m.group(1)))

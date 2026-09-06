@@ -280,6 +280,7 @@ function M.requestSaveState()
 end
 
 function M.requestLoadState(blob)
+  M.finishRecoveryTrace("state_reload")
   local req = {}
   local ref
   ref = emu.addMemoryCallback(function()
@@ -1122,7 +1123,10 @@ function M.seedStoreAddr()
   return seedStoreAddr
 end
 
--- A retry ladder that cannot quietly play one fight twice.
+-- A varied-seed robustness helper, not a restriction on all testing.
+-- docs/TESTING.md explicitly permits identical-state/seed replay for A/B
+-- comparisons and local debugging. Use snapshot restoration directly for
+-- those experiments; this helper intentionally checks seed diversity.
 --
 --   local L = H.newSeedLadder("battle 70")
 --   H.run({...}, {
@@ -1449,9 +1453,10 @@ function M.clearBattle(maxFrames, spare)
 end
 
 -- -------------------------------------------- input-driven battle endings --
--- A script may inject input and read memory, and may never write emulated
--- game state.  These two end a battle the way a player can, with no
--- writes, and are the opt-in replacements for clearBattle's flag write.
+-- Gameplay advances through human-executable inputs, without selective state
+-- edits. Complete snapshot restore/branching and memory reads are permitted
+-- experiment machinery (docs/TESTING.md). These helpers end battles by play;
+-- clearBattle's flag writes belong only in isolated mechanism tests.
 --
 -- fightBattle: win by edge-tapped A (4 on / 4 off).  A on the top command
 -- opens the actor's command list, A confirms its first entry, A accepts
@@ -1555,6 +1560,167 @@ end
 -- the turn, any actor casts the first entry it can pay for (lores gate on
 -- the Lore command and the live offered table) instead of falling through
 -- to Fight.  See the repertoire note in makePlan.
+-- Recovery action evidence. Pure ledger first; CPU observers below only read.
+-- A confirm press is an attempt, never proof of submission or resolution.
+local actionTraceSerial = 0
+function M.newRecoveryTrace(tag, emit)
+  local T = { pending = {}, queued = {}, running = {} }
+  local function event(p, stage, frame, fields)
+    local e = { v = 1, id = p.id, tag = tag or "fight", actor = p.actor,
+      kind = p.kind, requested = p.requested, target = p.target,
+      all = p.all, boost = p.boost, event = stage, frame = frame,
+      elapsed_frames = frame - p.frame }
+    for k, v in pairs(fields or {}) do e[k] = v end
+    emit(e)
+  end
+  function T.drop(actor, frame, reason)
+    local p = T.pending[actor]
+    if not p then return end
+    event(p, p.stage == "plan" and "drop" or "unresolved", frame,
+      { reason = reason, last_stage = p.stage })
+    T.pending[actor] = nil
+  end
+  function T.plan(actor, plan, frame)
+    -- A fresh turn supersedes any incomplete evidence for that actor.
+    T.drop(actor, frame, "new_plan")
+    if plan.kind ~= "heal" and plan.kind ~= "item" then return end
+    actionTraceSerial = actionTraceSerial + 1
+    local p = { id = actionTraceSerial, actor = actor, kind = plan.kind,
+      requested = plan.spell or plan.item, target = plan.target,
+      all = plan.all or false, boost = plan.boostLeft or 0,
+      frame = frame, stage = "plan" }
+    T.pending[actor] = p
+    event(p, "plan", frame, { reason = plan.reason or "recovery" })
+  end
+  function T.confirm(actor, frame, chars, mons)
+    local p = T.pending[actor]
+    if p and p.stage == "plan" then
+      event(p, "confirm", frame, { chars = chars, mons = mons })
+    end
+  end
+  function T.submit(actor, frame, cmd, attack, targets)
+    local p = T.pending[actor]
+    if not p or p.stage ~= "plan" then return end
+    p.stage, p.submitted = "submit", frame
+    p.accepted_command = cmd
+    T.pending[actor] = nil
+    T.queued[actor] = T.queued[actor] or {}
+    table.insert(T.queued[actor], p)
+    event(p, "submit", frame, { command = cmd, attack = attack,
+      targets = targets, navigation_frames = frame - p.frame })
+  end
+  function T.start(actor, frame, cmd, attack, targets, hp, mp, bp)
+    local queue = T.queued[actor] or {}
+    local p = queue[1]
+    if not p or p.accepted_command ~= cmd then return end
+    table.remove(queue, 1)
+    T.running[actor] = p
+    p.stage, p.started = "start", frame
+    p.command, p.attack, p.targets = cmd, attack, targets
+    p.hp, p.mp, p.bp = hp, mp, bp
+    event(p, "start", frame, { command = cmd, attack = attack,
+      targets = targets, queue_frames = frame - p.submitted })
+  end
+  function T.resolve(actor, frame, hp, mp, bp)
+    local p = T.running[actor]
+    if not p then return end
+    local deltas = {}
+    for i = 1, 4 do deltas[i] = hp[i] - p.hp[i] end
+    -- Net HP across the command, not an attributed healing amount (Runic,
+    -- counters, misses and caps can change the outcome). Preserve raw facts.
+    event(p, "resolve", frame, { command = p.command, attack = p.attack,
+      targets = p.targets, hp_net = table.concat(deltas, ","),
+      mp_net = mp - p.mp, bp_net = bp - p.bp,
+      execution_frames = frame - p.started })
+    T.running[actor] = nil
+  end
+  function T.close(frame, reason)
+    for actor = 0, 3 do
+      T.drop(actor, frame, reason)
+      for _, p in ipairs(T.queued[actor] or {}) do
+        event(p, "unresolved", frame, { reason = reason, last_stage = p.stage })
+      end
+      local p = T.running[actor]
+      if p then event(p, "unresolved", frame,
+        { reason = reason, last_stage = p.stage }) end
+    end
+    T.queued, T.running = {}, {}
+  end
+  return T
+end
+
+local recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
+local function recoveryFlush()
+  local function json(v)
+    if type(v) ~= "string" then return tostring(v) end
+    return '"' .. v:gsub('[%z\1-\31\\"]', function(c)
+      return string.format('\\u%04x', c:byte())
+    end) .. '"'
+  end
+  for _, e in ipairs(recoveryEvents) do
+    local keys, fields = {}, {}
+    for k in pairs(e) do keys[#keys + 1] = k end
+    table.sort(keys)
+    for _, k in ipairs(keys) do fields[#fields + 1] = json(k) .. ':' .. json(e[k]) end
+    -- Print once, outside CPU callbacks. M.log duplicates notes in live streams.
+    print('[ot6action] ' .. '{' .. table.concat(fields, ',') .. '}')
+  end
+  recoveryEvents = {}
+end
+local function recoveryHP()
+  local hp = {}
+  for e = 0, 3 do hp[e + 1] = M.readWord(0x3BF4 + e * 2) end
+  return hp
+end
+local function recoveryActivate(trace)
+  if recoveryObserver ~= trace then
+    if recoveryObserver then recoveryObserver.close(M.frame, "driver_changed") end
+    recoveryObserver = trace
+  end
+  if recoveryHooks then return end
+  recoveryHooks = true
+  local function hook(addr, fn)
+    emu.addMemoryCallback(function()
+      if recoveryObserver then fn(recoveryObserver, emu.getState()) end
+    end, emu.callbackType.exec, addr, addr)
+  end
+  -- GetPlayerAction has consumed the user queue entry before calling this;
+  -- X is entity offset, Y is queue offset. Read the accepted raw command.
+  hook(M.sym("GetPlayerTargets"), function(t, cpu)
+    local x, y = cpu["cpu.x"] & 0xffff, cpu["cpu.y"] & 0xffff
+    if x < 8 and x % 2 == 0 then
+      t.submit(x // 2, M.frame, M.readByte(0x2BAF + y),
+        M.readByte(0x2BB0 + y), M.readWord(0x2BB1 + y))
+    end
+  end)
+  -- ExecAction calls ExecCmd with X restored to the acting entity. $b5/$b6
+  -- now contain the command/attack after queue-time spell folding.
+  hook(M.sym("ExecCmd@battle_code"), function(t, cpu)
+    local x = cpu["cpu.x"] & 0xffff
+    if x < 8 and x % 2 == 0 then
+      t.start(x // 2, M.frame, M.readByte(0xB5), M.readByte(0xB6),
+        M.readWord(0xB8), recoveryHP(), M.readWord(0x3C08 + x),
+        M.readByte(0x3E9C + x))
+    end
+  end)
+  -- Immediately after ExecCmd returns to the normal-action path, including
+  -- graphics/status processing. This is not a menu-close or an HP heuristic.
+  hook(M.sym("SaveForMimic"), function(t, cpu)
+    local x = cpu["cpu.x"] & 0xffff
+    if x < 8 and x % 2 == 0 then
+      t.resolve(x // 2, M.frame, recoveryHP(), M.readWord(0x3C08 + x),
+        M.readByte(0x3E9C + x))
+    end
+  end)
+end
+function M.finishRecoveryTrace(reason)
+  if recoveryObserver then
+    recoveryObserver.close(M.frame, reason or "run_ended")
+    recoveryObserver = nil
+  end
+  recoveryFlush()
+end
+
 function M.newFightDriver(tag, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -1603,6 +1769,8 @@ function M.newFightDriver(tag, opts)
   -- practice only the first of these is ever found in the list.
   local CURES = { 0x2D, 0x2E, 0x2F }
   local F = {}
+  local recovery = (opts.actionTrace or OT6_ACTION_TRACE) and
+    M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
   local menuStreak, tick, battleTick = 0, 0, 0
   local plan, planActor, held = nil, nil, {}
   local heldFast = false            -- the live steer asked for 3 presses/pulse
@@ -1624,7 +1792,16 @@ function M.newFightDriver(tag, opts)
   -- cannot find) must not have spent the round's care budget: the actor
   -- backs out to a fresh window and plans again, so the budget it claimed
   -- at creation is refunded here.
-  local function dropPlan()
+  local function traceDrop(reason)
+    if recovery and planActor then
+      local pending = recovery.pending[planActor]
+      if pending and pending.stage == "plan" then
+        recovery.drop(planActor, M.frame, reason)
+      end
+    end
+  end
+  local function dropPlan(reason)
+    if reason ~= "confirm_attempt" then traceDrop(reason or "back_out") end
     if careActor ~= nil and careActor == planActor then careActor = nil end
     plan, planActor = nil, nil
   end
@@ -1900,7 +2077,7 @@ function M.newFightDriver(tag, opts)
             M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down",
               tag or "fight", actor, e))
             return { kind = "item", item = FENIX_DOWN, target = e, row = row,
-                     idx = battInvIdx(FENIX_DOWN) }
+                     idx = battInvIdx(FENIX_DOWN), reason = "revive" }
           end
         end
       end
@@ -1958,7 +2135,7 @@ function M.newFightDriver(tag, opts)
               .. "all allies", tag or "fight", actor, #cands, cands[1].pct,
               boost, spell, spell + boost, mpc))
             return { kind = "heal", spell = spell, target = cands[1].e,
-                     row = cureRow, all = true, boostLeft = boost }
+                     row = cureRow, all = true, boostLeft = boost, reason = "party_hurt" }
           end
         end
       end
@@ -2004,7 +2181,7 @@ function M.newFightDriver(tag, opts)
                   c.maxhp, spell, cell, mpCost, M.readWord(CURMP + actor * 2),
                   gain and tostring(gain) or "?", cost, why))
                 return { kind = "heal", spell = spell, target = c.e,
-                         row = cureRow }
+                         row = cureRow, reason = why }
               end
               local said = string.format("[%s] actor=%d not curing entity %d "
                 .. "(%d/%d): $%02X restores %d and a round costs %d, so the "
@@ -2031,7 +2208,7 @@ function M.newFightDriver(tag, opts)
               "$%02X -- restores %d, a round costs %d (%s)", tag or "fight",
               actor, c.e, c.hp, c.maxhp, item, gain, cost, why))
             return { kind = "item", item = item, target = c.e, row = row,
-                     idx = battInvIdx(item) }
+                     idx = battInvIdx(item), reason = why }
           end
           local said = string.format("[%s] actor=%d not healing entity %d " ..
             "(%d/%d): $%02X restores %d and a round costs %d, so the turn "
@@ -2278,7 +2455,7 @@ function M.newFightDriver(tag, opts)
           #steerTrail > 0 and ("; list steer trail (scroll,row/col>want row,col): " .. table.concat(steerTrail, " ")) or ""))
         steerTrail = {}
         parkSt, parkN, planPulses = nil, 0, 0
-        dropPlan()
+        dropPlan("pulse_budget")
         return { "b" }
       end
       -- "Parked" means NOTHING is moving: the signature folds in every
@@ -2301,7 +2478,7 @@ function M.newFightDriver(tag, opts)
           parkN, st, plan.kind, tostring(plan.item), tostring(plan.idx),
           parkDropN))
         parkSt, parkN = nil, 0
-        dropPlan()
+        dropPlan("cursor_stalled")
         return { "b" }
       end
     else
@@ -2314,7 +2491,7 @@ function M.newFightDriver(tag, opts)
         M.log(string.format("[%s] unknown menu state $%02X held %d pulses "
           .. "-- backing out (B)", tag or "fight", st, unknownN))
         unknownSt, unknownN = nil, 0
-        dropPlan()
+        dropPlan("unknown_menu")
         return { "b" }
       end
     else
@@ -2356,6 +2533,7 @@ function M.newFightDriver(tag, opts)
       end
       if st ~= ST_CMD then return nil end
       plan, planActor, tgtSpin = makePlan(actor), actor, 0
+      if recovery then recovery.plan(actor, plan, M.frame) end
       planPulses, steerTrail = 0, {}
       if plan.kind == "heal" or plan.kind == "item" then careActor = actor end
       M.log(string.format("[%s] actor=%d char=%d plan=%s",
@@ -2378,7 +2556,7 @@ function M.newFightDriver(tag, opts)
       -- read here returns nil, drops the plan, presses B, and re-plans,
       -- without end.
       local want = plan.idx or battInvIdx(plan.item)
-      if want == nil then plan, planActor = nil, nil; return { "b" } end
+      if want == nil then traceDrop("item_unavailable"); plan, planActor = nil, nil; return { "b" } end
       local cur = M.readByte(ITEMSCR + actor) + M.readByte(ITEMROW + actor)
       -- A far row is walked at three presses per pulse rather than one
       -- (the frame loop's `fast`): one press per 30-frame pulse put the
@@ -2411,7 +2589,7 @@ function M.newFightDriver(tag, opts)
       -- engine has since greyed) drops the plan rather than steering to
       -- whatever now occupies the old row.
       local cell = spellCell(actor, plan.spell, false)
-      if cell == nil then plan, planActor = nil, nil; return { "b" } end
+      if cell == nil then traceDrop("spell_unavailable"); plan, planActor = nil, nil; return { "b" } end
       local wr, wc = cell // 2, cell % 2
       local ar = M.readByte(MSCROLL + actor) + M.readByte(MROW + actor)
       local col = M.readByte(MCOL + actor)
@@ -2498,7 +2676,10 @@ function M.newFightDriver(tag, opts)
           -- one R press latches all-allies (TGTALL=1 -- probe_targetall);
           -- confirm once the latch reads back.  If it never takes (a spell
           -- without MULTI_TARGET), drop to the single-target steer.
-          if M.readByte(TGTALL) ~= 0 then return { "a" } end
+          if M.readByte(TGTALL) ~= 0 then
+            if recovery then recovery.confirm(actor, M.frame, chars, mons) end
+            return { "a" }
+          end
           tgtSpin = tgtSpin + 1
           if tgtSpin >= 40 then
             M.log(string.format("[%s] all-ally latch never took -- "
@@ -2608,7 +2789,9 @@ function M.newFightDriver(tag, opts)
       -- A refused confirm (corpse under the target cursor) re-enters
       -- button()'s plan-nil ST_TGT head next tick, which owns the
       -- backstop; the optimistic clear here is what routes it there.
-      dropPlan()
+      if recovery then recovery.confirm(actor, M.frame,
+        M.readByte(TGTCHARS), M.readByte(TGTMONS)) end
+      dropPlan("confirm_attempt")
       return { "a" }
     end
     if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC or st == ST_ESPER
@@ -2623,6 +2806,11 @@ function M.newFightDriver(tag, opts)
   end
 
   function F.idle()
+    if recovery then
+      recovery.close(M.frame, "battle_ended")
+      if recoveryObserver == recovery then recoveryObserver = nil end
+      recoveryFlush()
+    end
     menuStreak, tick, battleTick = 0, 0, 0
     plan, planActor, held = nil, nil, {}
     parkDropN = 0
@@ -2642,6 +2830,7 @@ function M.newFightDriver(tag, opts)
   end
 
   function F.frame()
+    if recovery then recoveryActivate(recovery); recoveryFlush() end
     battleTick = battleTick + 1
     -- The party's HP as the battle opened, for the first-turn danger floor
     -- in makePlan.  Taken a beat after the table goes live so every entity
@@ -2784,7 +2973,7 @@ function M.newFightDriver(tag, opts)
     -- can ask for it.
     local ph = tick % (opts.cadence or 30)
     local actor = M.readByte(ACTOR) & 3
-    if plan and planActor ~= actor then plan, planActor = nil, nil end
+    if plan and planActor ~= actor then traceDrop("actor_changed"); plan, planActor = nil, nil end
     -- The stall guard's clock: frames spent on a LIVE lore plan, rather
     -- than wall clock since the first offer, so another actor's slow turn
     -- between two pursuits cannot fire it.
@@ -3041,6 +3230,7 @@ function M.run(opts, steps)
       finished = true
       traceFlush()
       coverageFlush()
+      M.finishRecoveryTrace("run_ended")
       M.log(string.format("FAIL: GAME OVER fired (GameOver read x%d, " ..
         "TitleScreen exec x%d) -- the run " ..
         "lost and any further input auto-Continues the last save, which " ..
@@ -3057,6 +3247,7 @@ function M.run(opts, steps)
       finished = true
       traceFlush()
       coverageFlush()
+      M.finishRecoveryTrace("run_ended")
       M.log("FAIL: frame budget exceeded (" .. budget .. " frames)")
       emu.stop(2)
       return
@@ -3075,12 +3266,14 @@ function M.run(opts, steps)
       finished = true
       traceFlush()
       coverageFlush()
+      M.finishRecoveryTrace("run_ended")
       M.log("FAIL: " .. tostring(r))
       emu.stop(1)
     elseif r == "done" then
       finished = true
       traceFlush()
       coverageFlush()
+      M.finishRecoveryTrace("run_ended")
       M.log("PASS (frame " .. M.frame .. ")")
       emu.stop(0)
     end

@@ -7,7 +7,9 @@
 # fine, because instrumenting a mechanism a person cannot produce on cue is not
 # a claim about play.  The honesty that matters -- the long playthroughs (the
 # savestate generators) playing for real -- is a separate and ABSOLUTE check,
-# check_playthrough_honest.py, which refuses a generator that writes at all.
+# check_playthrough_honest.py, which rejects selective gameplay edits.
+# Complete snapshot capture/restore is authorized through the library helpers;
+# see docs/TESTING.md, the current testing policy.
 #
 #   * a write whose (file, token) is not listed FAILS the run, so a new poke is
 #     a reviewed line rather than a silent one;

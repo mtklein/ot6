@@ -5,6 +5,13 @@ around, so routes are coordinate-aware rather than blind timed
 button-holds. This is what lets automated tests reach arbitrary points in
 the game.
 
+## Testing guideline
+
+Follow [docs/TESTING.md](TESTING.md): start from a legitimately reached state,
+advance through human-executable inputs, and freely inspect, snapshot,
+restore, and branch for experiments. Mid-battle checkpoints are encouraged
+for local iteration. Selective state edits and forced kills are not play.
+
 ## Save decoupling
 
 Two sets of saves in separate directories, so a test run cannot corrupt
@@ -27,17 +34,17 @@ included).
 
 ## Booting a save headless
 
-Headless boots have SRAM zeroed by construction, so the harness injects the
-save into SRAM at boot and drives the title's Continue. In-game saves are
-pure vanilla-layout data, so a sidecar keeps loading across ROM rebuilds;
-savestates (`.mss`) snapshot RAM+CPU and break when code moves.
+Use the versioned full-battery checkpoint path below to boot an existing
+save through the game's Continue menu. For repeated experiments on the same
+compatible build, use the harness's complete emulator snapshot helpers,
+including inside a battle or menu. A machine snapshot captures execution
+state and can become incompatible when ROM code moves; a battery save instead
+requires compatibility with its declared persistent layout.
 
-The inject idiom (front 8 KB to cpu `$30:6000`):
-
-    local data = H.b64decode(H.resolveStateB64(SRM))
-    for i = 1, #data do
-      emu.write(0x306000 + i - 1, string.byte(data, i), emu.memType.snesMemory)
-    end
+The old front-8-KiB SRAM injection recipe omitted OT6's extra save pages and
+is not the supported path for new gameplay fixtures. Complete snapshot
+restoration is authorized; selectively transplanting RAM into a running
+attempt is not. See the testing policy for the distinction.
 
 ## Versioned SRAM checkpoints
 
@@ -48,8 +55,9 @@ names, wrong sizes, and hash mismatches. `run.sh` installs a verified
 checkpoint into the invocation-private save folder when
 `OT6_SRAM_CHECKPOINT` is set; Mesen takes its ordinary cold-load path and no
 Lua writes SRAM. To capture a new payload, `OT6_CAPTURE_SRM=<path>` copies
-Mesen's complete battery file after emulator shutdown; update the manifest
-SHA-256 and validate before committing.
+Mesen's complete battery file after emulator shutdown and records provenance.
+Seal it with `python3 tools/tests/lib/sram_checkpoint.py seal <dir>` and
+validate before committing; preserve the capture provenance.
 
 ## Field navigation
 
@@ -102,13 +110,13 @@ compose inlines both, so scripts see one `H`):
   z-level tracked along each candidate path; returns move names or nil.
 - `H.navTo(tx, ty, opts)` — BFS-driven verified-step walker. Targets may
   be numbers or thunks.
-- `H.clearBattle(maxFrames, spare)` — win the current fight headlessly by
-  setting each present monster's dead-status bit and edge-tapping A through
-  the victory text; formations in `spare` are never force-killed.
-- `H.advanceStory(pred, maxFrames, opts)` — run through a non-interactive
-  story stretch until `pred()`: battles force-killed, dialogs edge-tapped,
-  neutral pad otherwise. A formation in `opts.spare` is a set-piece:
-  hands-off for its first 300 frames, then edge-tapped.
+- `H.clearBattle(maxFrames, spare)` — legacy synthetic mechanism helper that
+  writes monster death flags. Never use it to advance a legitimate gameplay
+  fixture or as balance evidence; complete snapshot reuse is the shortcut.
+- `H.advanceStory(pred, maxFrames, opts)` — advance a story stretch, including
+  dialogs and battles. Gameplay callers must explicitly select
+  `opts.playBattles="tactical"` (or another human-executable battle mode).
+  The legacy flag-writing path is not legitimate play.
 - `H.navDump()` — one-line navigator state.
 
 ### True passability (the engine's own rules, from RAM)
@@ -166,10 +174,10 @@ when the step is allowed; a blocked press just turns.
 step at a time: hold the direction until the tile coord changes, release,
 wait for alignment, check the landing against the plan. A press that never
 moves the party blocklists that edge for this `navTo` and re-plans; any
-other deviation re-plans from the live position. Along the way it clears
-random encounters with the force-kill idiom (never a formation in
-`opts.spare`), edge-taps dialogs, goes hands-off for other control loss,
-and debounces those states over 3 consecutive frames. `opts.arrive` is an
+other deviation re-plans from the live position. For gameplay routes pass
+`playBattles="tactical"` so encounters are fought through the real controls;
+never rely on a legacy force-kill path. It edge-taps dialogs, goes hands-off
+for other control loss, and debounces those states over 3 consecutive frames. `opts.arrive` is an
 extra terminator predicate; `opts.maxFrames` (default 20000) errors on
 timeout.
 
