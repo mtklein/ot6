@@ -599,6 +599,57 @@ function M.healDecision(o)
   return nil
 end
 
+-- What one action is expected to deal, for the press rule's "kill this
+-- turn" test (#165), from numbers a person reads off the screen: the
+-- per-hit damage this actor's last action landed (shielded-equivalent,
+-- the damage watch's figure), how many hits the action makes, how many of
+-- them chip, and how many shields stand.  The hits up to the break land
+-- shielded; every hit past it lands broken, x4 shielded (Ot6ShieldedDmg
+-- x0.5 then Ot6BrokenDmg x2).  A gauge already broken (need 0) puts every
+-- hit in the window.  Returns the expected damage and the hit split, or
+-- nil when the action cannot break (chips < need) or nothing has been
+-- measured (per nil / 0).  Plain arithmetic, so battle_healpolicy can put
+-- the Rizopas numbers through it without an emulator.
+--
+--   per     shielded-equivalent damage per landed hit, measured
+--   hits    hits the action makes (M.fightSwings' sum; a tool's count)
+--   chips   of those, how many chip (the chip model's count)
+--   need    shields left to break; 0 when already broken
+function M.killEstimate(o)
+  local per, hits, chips, need = o.per or 0, o.hits or 0, o.chips or 0, o.need or 0
+  if per <= 0 or hits <= 0 then return nil end
+  if chips < need then return nil end
+  -- hits until the last chip lands: with every hit chipping that is
+  -- `need`; with only some (a Genji off-hand on the wrong class) the
+  -- chipping hits are spread through the volley, so round up
+  local toBreak = need == 0 and 0 or math.ceil(need * hits / chips)
+  if toBreak > hits then return nil end
+  local broken = hits - toBreak
+  return per * toBreak + per * 4 * broken, toBreak, broken
+end
+
+-- Whether a raise is worth the Fenix Down (#165): the HP it gives back
+-- against the smallest hit the living enemy has landed this fight.  Fenix
+-- Down (item $F0: ItemProp +19 bit 7 "fraction of max HP", +20 power 2;
+-- CalcDmgRatio -> CalcRatio: max HP * power >> 4) raises to maxhp/8 --
+-- CYAN's 358 -> 44, measured.  A hit at least that big lands the member
+-- back at 0 before anyone can top them up: the item is spent for nothing.
+-- With no hit measured yet the raise stands (the driver's old behaviour).
+--
+--   maxhp        the fallen member's max HP
+--   power        the item's power byte (M.itemPower; 2 for Fenix Down)
+--   smallestHit  the living enemy's smallest observed hit, or nil
+--
+-- Returns the raise HP and true to raise / false for a certain re-kill.
+function M.raiseDecision(o)
+  local maxhp, power = o.maxhp or 0, o.power or 2
+  local raiseHp = (maxhp * power) >> 4
+  if raiseHp <= 0 then return raiseHp, false end
+  local hit = o.smallestHit
+  if hit ~= nil and hit >= raiseHp then return raiseHp, false end
+  return raiseHp, true
+end
+
 function M.monsterAbsorb(species)
   return M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF)
     + species * MON_REC + MON_ABSORB)
@@ -1817,6 +1868,13 @@ end
 -- another.  Read-only.
 local execActor = nil                 -- entity 0..3 whose command ExecCmd entered
 local execDone = {}                   -- { actor, frame } per SaveForMimic, oldest first
+-- and the monster half of the same two observers (#165): the slot 0..5
+-- (X = 8 + slot*2) whose command is executing, and the last one to
+-- return with its frame.  The fight driver's hit ledger credits party HP
+-- drops to this slot -- the number a person reads off the damage
+-- numeral over their own character.
+local execMon = nil                   -- slot whose command ExecCmd entered
+local execMonDone = nil               -- { slot, frame } of the last to return
 local execHooks = false
 local function execActivate()
   if execHooks then return end
@@ -1824,7 +1882,8 @@ local function execActivate()
   local a = M.sym("ExecCmd@battle_code")
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xffff
-    if x < 8 and x % 2 == 0 then execActor = x // 2 end
+    if x < 8 and x % 2 == 0 then execActor = x // 2
+    elseif x < 20 and x % 2 == 0 then execMon = x // 2 - 4 end
   end, emu.callbackType.exec, a, a)
   local b = M.sym("SaveForMimic")
   emu.addMemoryCallback(function()
@@ -1832,6 +1891,9 @@ local function execActivate()
     if x < 8 and x % 2 == 0 then
       execDone[#execDone + 1] = { actor = x // 2, frame = M.frame }
       if execActor == x // 2 then execActor = nil end
+    elseif x < 20 and x % 2 == 0 then
+      execMonDone = { slot = x // 2 - 4, frame = M.frame }
+      if execMon == x // 2 - 4 then execMon = nil end
     end
   end, emu.callbackType.exec, b, b)
 end
@@ -1899,6 +1961,14 @@ function M.newFightDriver(tag, opts)
   local turnSnap = {}                  -- actor -> party HP at its last turn
   local itemRestore = {}               -- item  -> HP a landed use put back
   local castRestore = {}               -- spell -> HP a landed cast put back
+  -- The two ledgers the #165 rules read, both measured in the fight:
+  -- what this actor's last action landed PER HIT (the kill-this-turn
+  -- estimate), and what each monster's actions have taken off each party
+  -- member (the raise rule's smallest hit).
+  local dmgHit = {}                    -- actor -> { kind, skill, per, n }
+  local hitLedger = {}                 -- slot -> { min, minE, on = { [e] = smallest } }
+  local partyHpLast = {}               -- entity -> HP last frame (hit ledger baseline)
+  local monHpLast = {}                 -- slot -> HP last frame (damage watch baseline)
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
@@ -2163,6 +2233,34 @@ function M.newFightDriver(tag, opts)
     end
     return soleTarget()
   end
+  local function livingMonsters()
+    local n = 0
+    for s = 0, 5 do
+      if M.readWord(MON_HP + s * 2) > 0
+         and (M.readByte(MON_PRESENT + s * 2) & 1) == 1 then n = n + 1 end
+    end
+    return n
+  end
+  -- The raise rule's question (#165), read off the hit ledger: over the
+  -- living monsters, the smallest hit each has landed on this member --
+  -- or, with none on them yet, on anybody -- and whether a Fenix Down's
+  -- maxhp/8 survives it (M.raiseDecision).  Returns ok, the raise HP, and
+  -- the hit with its slot and victim (nil when nothing is measured).
+  local function raiseOk(e)
+    local hit, hitSlot, hitOn = nil, nil, nil
+    for s = 0, 5 do
+      local L = hitLedger[s]
+      if L and M.readWord(MON_HP + s * 2) > 0
+         and (M.readByte(MON_PRESENT + s * 2) & 1) == 1 then
+        local v, on = L.on[e], e
+        if v == nil then v, on = L.min, L.minE end
+        if v ~= nil and (hit == nil or v < hit) then hit, hitSlot, hitOn = v, s, on end
+      end
+    end
+    local raiseHp, ok = M.raiseDecision({ maxhp = M.readWord(0x3C1C + e * 2),
+      power = M.itemPower(FENIX_DOWN), smallestHit = hit })
+    return ok, raiseHp, hit, hitSlot, hitOn
+  end
 
   -- What the party's attacks have been landing, measured the way a person
   -- reads the numerals: at a damage plan's confirm a watch joins the
@@ -2177,21 +2275,13 @@ function M.newFightDriver(tag, opts)
   -- rule that consumes
   -- it only ever asks "does the window cover the HP", where an error is
   -- one more heal turn, not a lost fight.
-  local dmgWatch = {}                  -- { actor, kind, seen, until_ }, confirm order
+  local dmgWatch = {}                  -- { actor, kind, skill, seen, norm, n, until_ }, confirm order
   local dmgSeen = {}                   -- entity -> shielded-equivalent HP its last action took
-  local monTotLast = nil
   local DMG_SETTLE = 45                -- frames after SaveForMimic before the figure is read
   local DMG_EXPIRE = 3600              -- a confirmed plan that never executed (hygiene)
   local function dmgWatchOf(e)
     for i, w in ipairs(dmgWatch) do if w.actor == e then return i, w end end
     return nil
-  end
-  local function targetBroken()
-    for s = 0, 5 do
-      if M.readWord(MON_HP + s * 2) > 0
-         and M.readByte(BRK_TICKS + s * 2) ~= 0 then return true end
-    end
-    return false
   end
 
   -- battle_lore.lua's own tested fact: $306A+id reads id+$8B iff that lore
@@ -2389,15 +2479,17 @@ function M.newFightDriver(tag, opts)
       local press, pressWhy = (function()
         if opts.press == false then return nil end
         -- A press is the heal-or-attack choice, so it is only asked when
-        -- there is a heal to skip: a downed member the bag can raise, or a
-        -- candidate the fraction / one-round-of-death rules below would
-        -- offer a heal to.  With nobody to care for, the attack lines
-        -- below (summon, nuke, tool, the boost bank) keep their own order.
+        -- there is a heal to skip: a downed member the bag can raise (and
+        -- the raise rule below would let stand), or a candidate the
+        -- fraction / one-round-of-death rules below would offer a heal
+        -- to.  With nobody to care for, the attack lines below (summon,
+        -- nuke, tool, the boost bank) keep their own order.
         local needsCare = false
         local threshold = opts.healPercent or 60
         for e = 0, 3 do
           local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
-          if maxhp > 0 and hp == 0 and row ~= nil and battInvIdx(FENIX_DOWN) then
+          if maxhp > 0 and hp == 0 and row ~= nil and battInvIdx(FENIX_DOWN)
+             and raiseOk(e) then
             needsCare = true
           elseif hp > 0 and maxhp > 0 and hp < maxhp
              and (hp * 100 // maxhp < threshold or hp <= (roundCost[e] or 0)) then
@@ -2407,12 +2499,16 @@ function M.newFightDriver(tag, opts)
         if not needsCare then return nil end
         local slot = pressTarget()
         if slot == nil then return nil end
+        -- Somebody inside one round of death: the lethal-next-round heal
+        -- rule keeps its priority over a press that merely opens the
+        -- window -- UNLESS the press ends the fight this turn (#165,
+        -- below): the kill removes the threat now, a heal only delays it.
+        local lethal = nil
         for e = 0, 3 do
           local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
           if hp > 0 and hp < maxhp and hp <= (roundCost[e] or 0) then
-            return nil, string.format("[%s] actor=%d no press: entity %d "
-              .. "(%d/%d) is inside one round of death (%d) -- caring first",
-              tag or "fight", actor, e, hp, maxhp, roundCost[e])
+            lethal = e
+            break
           end
         end
         local sh = M.readByte(SH_CUR + slot * 2)
@@ -2430,28 +2526,82 @@ function M.newFightDriver(tag, opts)
            and battInvIdx(tool) then
           offer({ kind = "skill", cmd = CMD_TOOLS, skill = tool,
                   row = cmdRow(actor, CMD_TOOLS), boostLeft = have,
-                  chips = toolChips(slot, tool),
+                  chips = toolChips(slot, tool), hits = TOOL_HITS[tool] or 1,
                   what = string.format("Tools $%02X", tool) })
         end
         if opts.tactical and id == 5 and (opts.blitz or PUMMEL) == PUMMEL
            and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_BLITZ) then
           offer({ kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
                   row = cmdRow(actor, CMD_BLITZ), boostLeft = have,
-                  chips = 2 * hitChips(slot, 0x04, 0), what = "Pummel" })
+                  chips = 2 * hitChips(slot, 0x04, 0), hits = 2, what = "Pummel" })
         end
         local fight = cmdRow(actor, CMD_FIGHT)
         if fight ~= nil then
+          local _, l = handsOf(actor)
+          local mainSw, offSw = M.fightSwings(l ~= nil, have)
           offer({ kind = "fight", row = fight, boostLeft = have,
-                  chips = fightChips(actor, slot, have),
+                  chips = fightChips(actor, slot, have), hits = mainSw + offSw,
                   what = string.format("Fight at %d BP", have) })
         end
         if best == nil then return nil end
         if best.chips < need then
+          if lethal ~= nil then
+            return nil, string.format("[%s] actor=%d no press: entity %d "
+              .. "(%d/%d) is inside one round of death (%d) and %s lands %d "
+              .. "chip(s) against %d shield(s) on slot %d -- caring first",
+              tag or "fight", actor, lethal, hpNow[lethal],
+              M.readWord(0x3C1C + lethal * 2), roundCost[lethal], best.what,
+              best.chips, need, slot)
+          end
           return nil, string.format("[%s] actor=%d no press: %s lands %d "
             .. "chip(s) against %d shield(s) on slot %d -- caring",
             tag or "fight", actor, best.what, best.chips, need, slot)
         end
         local hp = M.readWord(MON_HP + slot * 2)
+        -- The kill-this-turn estimate (#165): this actor's own action,
+        -- priced per hit from what its last action of the same kind
+        -- landed (dmgHit), the hits up to the last chip shielded and the
+        -- rest broken (M.killEstimate).  It ends the fight only when the
+        -- target is the last monster standing.
+        local dh = dmgHit[actor]
+        local est, toBreak, brokenN, estWhy = nil, 0, 0, nil
+        if dh == nil or dh.kind ~= best.kind
+           or (best.kind == "skill" and dh.skill ~= best.skill) then
+          estWhy = string.format("%s has no per-hit figure yet", best.what)
+        else
+          est, toBreak, brokenN = M.killEstimate({ per = dh.per, hits = best.hits,
+                                                    chips = best.chips, need = need })
+          if est == nil then
+            estWhy = string.format("%s cannot be priced (%d a hit, %d hit(s))",
+              best.what, dh.per, best.hits)
+          else
+            estWhy = string.format("%s is expected to deal %d (%d hit(s): %d "
+              .. "shielded then %d broken at %d a hit)", best.what, est,
+              best.hits, toBreak, brokenN, dh.per)
+          end
+        end
+        local last = livingMonsters() == 1
+        if est ~= nil and est >= hp and last then
+          best.reason = "press"
+          M.log(string.format("[%s] actor=%d PRESS: slot %d (%d HP, %s) is the "
+            .. "last monster and %s -- a kill this turn%s; attacking instead "
+            .. "of caring (ending the fight is the strongest heal)",
+            tag or "fight", actor, slot, hp,
+            broken and "BROKEN" or (sh .. " shield(s) up"), estWhy,
+            lethal ~= nil and string.format(", with entity %d (%d/%d) inside "
+              .. "one round of death (%d)", lethal, hpNow[lethal],
+              M.readWord(0x3C1C + lethal * 2), roundCost[lethal]) or ""))
+          return best
+        end
+        if lethal ~= nil then
+          return nil, string.format("[%s] actor=%d no press: entity %d "
+            .. "(%d/%d) is inside one round of death (%d) and %s would %s "
+            .. "slot %d but not kill it (%s%s) -- caring first",
+            tag or "fight", actor, lethal, hpNow[lethal],
+            M.readWord(0x3C1C + lethal * 2), roundCost[lethal], best.what,
+            broken and "hit broken" or ("chip " .. best.chips .. " of " .. need),
+            slot, estWhy, last and "" or "; not the last monster")
+        end
         local window, parts = 0, {}
         for e = 0, 3 do
           if hpNow[e] > 0 and dmgSeen[e] then
@@ -2486,14 +2636,35 @@ function M.newFightDriver(tag, opts)
       -- library drives yet: no esper in the WoB grants it (genju_prop.asm)
       -- and only Terra and Celes learn it innately, so a cast branch here
       -- would be a branch nothing has ever taken.
+      --
+      -- No raise into a certain re-kill (#165): the Fenix Down puts the
+      -- member at maxhp/8, and if the living enemy's smallest hit this
+      -- fight is at least that, the next action lands them back at 0
+      -- before anyone can top them up (Rizopas seed $64: four Fenix
+      -- Downs to 44 HP, four Battles of -44).  The kill line, or a heal on
+      -- the living, is preferred; the fallen are raised when the enemy is
+      -- dead (fieldCare) or when its hits stop being lethal to the raise.
       if row ~= nil then
         for e = 0, 3 do
           if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
              and battInvIdx(FENIX_DOWN) then
-            M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down",
-              tag or "fight", actor, e))
-            return { kind = "item", item = FENIX_DOWN, target = e, row = row,
-                     idx = battInvIdx(FENIX_DOWN), reason = "revive" }
+            local ok, raiseHp, hit, hitSlot, hitOn = raiseOk(e)
+            if ok then
+              M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down "
+                .. "(to %d HP of %d; the living enemy's smallest hit this fight: %s)",
+                tag or "fight", actor, e, raiseHp, M.readWord(0x3C1C + e * 2),
+                hit and string.format("%d, slot %d on entity %d", hit, hitSlot, hitOn)
+                  or "none measured"))
+              return { kind = "item", item = FENIX_DOWN, target = e, row = row,
+                       idx = battInvIdx(FENIX_DOWN), reason = "revive" }
+            end
+            local said = string.format("[%s] actor=%d no raise: Fenix Down would put "
+              .. "entity %d at %d HP (1/8 of %d) and slot %d's smallest hit this "
+              .. "fight is %d (on entity %d) -- a raise that cannot survive the next "
+              .. "action; killing first, caring for the living instead",
+              tag or "fight", actor, e, raiseHp, M.readWord(0x3C1C + e * 2),
+              hitSlot, hit, hitOn)
+            if said ~= healSaid then healSaid = said; M.log(said) end
           end
         end
       end
@@ -3264,7 +3435,8 @@ function M.newFightDriver(tag, opts)
             table.remove(dmgWatch, i)
           end
         end
-        dmgWatch[#dmgWatch + 1] = { actor = actor, kind = plan.kind, seen = 0,
+        dmgWatch[#dmgWatch + 1] = { actor = actor, kind = plan.kind,
+                                    skill = plan.skill, seen = 0, norm = 0, n = 0,
                                     until_ = battleTick + DMG_EXPIRE }
       end
       -- A confirmed lore is the progress the stall guard watches for.
@@ -3311,8 +3483,10 @@ function M.newFightDriver(tag, opts)
     roundCost, turnSnap = {}, {}
     itemRestore, castRestore = {}, {}
     healWatch, healSaid = nil, nil
-    dmgWatch, dmgSeen, monTotLast = {}, {}, nil
+    dmgWatch, dmgSeen, monHpLast = {}, {}, {}
+    dmgHit, hitLedger, partyHpLast = {}, {}, {}
     execActor, execDone = nil, {}
+    execMon, execMonDone = nil, nil
     -- The stall guard's verdict belongs to the battle it watched: a retry
     -- ladder's reload is a different fight, and a recurrence should dump
     -- again there rather than inherit a dead lore line silently.
@@ -3381,32 +3555,81 @@ function M.newFightDriver(tag, opts)
     -- the figure is normalized and kept per actor.  A rise (a monster
     -- healing itself, an absorbed hit) only moves the baseline.
     do
-      local tot = 0
-      for s = 0, 5 do tot = tot + M.readWord(MON_HP + s * 2) end
       local who = execActor
       if who == nil and execDone[#execDone] ~= nil then
         who = execDone[#execDone].actor
       end
-      if who ~= nil and monTotLast ~= nil and tot < monTotLast then
-        local _, w = dmgWatchOf(who)
-        if w then w.seen = w.seen + (monTotLast - tot) end
+      for s = 0, 5 do
+        local hp = M.readWord(MON_HP + s * 2)
+        local last = monHpLast[s]
+        if who ~= nil and last ~= nil and hp < last then
+          local _, w = dmgWatchOf(who)
+          if w then
+            local drop = last - hp
+            w.seen = w.seen + drop
+            -- normalized per hit by the state of THIS slot's gauge as
+            -- the hit landed: a volley that breaks mid-way lands its
+            -- rest broken (x4 shielded), and the per-hit figure (#165)
+            -- must not average the two
+            w.norm = w.norm
+              + ((M.readByte(BRK_TICKS + s * 2) ~= 0) and (drop // 4) or drop)
+            w.n = w.n + 1
+          end
+        end
+        monHpLast[s] = hp
       end
       while execDone[1] ~= nil and M.frame - execDone[1].frame > DMG_SETTLE do
         local done = table.remove(execDone, 1)
         local i, w = dmgWatchOf(done.actor)
         if w then
-          local d = targetBroken() and (w.seen // 4) or w.seen
-          dmgSeen[w.actor] = d
+          dmgSeen[w.actor] = w.norm
+          if w.n > 0 then
+            dmgHit[w.actor] = { kind = w.kind, skill = w.skill,
+                                per = w.norm // w.n, n = w.n }
+          end
           M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
-            .. "(%d shielded-equivalent; the press rule counts it)",
-            tag or "fight", w.actor, w.kind, w.seen, d))
+            .. "(%d shielded-equivalent over %d hit(s), %d a hit; the press "
+            .. "rule counts it)", tag or "fight", w.actor, w.kind, w.seen,
+            w.norm, w.n, w.n > 0 and w.norm // w.n or 0))
           table.remove(dmgWatch, i)
         end
       end
       for i = #dmgWatch, 1, -1 do
         if battleTick > dmgWatch[i].until_ then table.remove(dmgWatch, i) end
       end
-      monTotLast = tot
+    end
+    -- The hit ledger (#165): party HP falling while a monster's command
+    -- executes (execMon, or within DMG_SETTLE frames of one returning
+    -- with no party command running) is that monster's hit on that
+    -- member -- the numeral a person reads over their own character.  A
+    -- drop with no monster acting (a poison tick, a party member's own
+    -- reflected spell) is nobody's and not recorded.  A killing hit is
+    -- capped at the HP the victim had, which is the right reading for
+    -- the raise rule: a member raised to 44 and killed from 44 measured
+    -- the enemy at "44 or more".
+    do
+      local slot = execMon
+      if slot == nil and execMonDone ~= nil and execActor == nil
+         and M.frame - execMonDone.frame <= DMG_SETTLE then
+        slot = execMonDone.slot
+      end
+      for e = 0, 3 do
+        local hp = M.readWord(0x3BF4 + e * 2)
+        local last = partyHpLast[e]
+        if slot ~= nil and last ~= nil and last ~= 0xFFFF and hp < last then
+          local drop = last - hp
+          local L = hitLedger[slot] or { on = {} }
+          hitLedger[slot] = L
+          if L.on[e] == nil or drop < L.on[e] then L.on[e] = drop end
+          if L.min == nil or drop < L.min then
+            L.min, L.minE = drop, e
+            M.log(string.format("[%s] slot %d's smallest hit this fight so far: "
+              .. "%d, on entity %d (%d -> %d)", tag or "fight", slot, drop, e,
+              last, hp))
+          end
+        end
+        partyHpLast[e] = hp
+      end
     end
     local menu = M.readByte(MENU)
     if battleTick == 1 or battleTick % 300 == 0 then
