@@ -124,6 +124,38 @@ local function armSeedWatch()
   end, emu.callbackType.exec, addr, addr)
 end
 
+-- Per-action attribution, read off the engine the way the lib's recovery
+-- trace does (ot6.lua recoveryActivate): ExecCmd runs with X = the acting
+-- entity offset and $b5/$b6 the command/attack after queue-time folding;
+-- SaveForMimic runs right after the normal-action path returns.  Every
+-- entity is logged here, Nerapa (entity 4+) included, with Nerapa's HP and
+-- shields at both ends, so a hit-line pairs with the command that dealt it
+-- and a command that dealt nothing is visible as such.  Observers only.
+local actT = 0
+local function armActionWatch()
+  local function hook(addr, fn)
+    emu.addMemoryCallback(function() fn(emu.getState()) end, emu.callbackType.exec, addr, addr)
+  end
+  hook(H.sym("ExecCmd@battle_code"), function(cpu)
+    local x = cpu["cpu.x"] & 0xffff
+    if x < 12 and x % 2 == 0 then
+      H.log(string.format("[act] t=%d start e%d cmd=$%02X atk=$%02X tgt=$%04X nerapa=%d/sh%d hp=%d,%d,%d,%d bp=%d",
+        actT, x // 2, H.readByte(0xB5), H.readByte(0xB6), H.readWord(0xB8),
+        H.readWord(0x3BFC), H.readByte(0x3E40),
+        H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8), H.readWord(0x3BFA),
+        x < 8 and H.readByte(0x3E9C + x) or 0))
+    end
+  end)
+  hook(H.sym("SaveForMimic"), function(cpu)
+    local x = cpu["cpu.x"] & 0xffff
+    if x < 12 and x % 2 == 0 then
+      H.log(string.format("[act] t=%d end   e%d nerapa=%d/sh%d hp=%d,%d,%d,%d",
+        actT, x // 2, H.readWord(0x3BFC), H.readByte(0x3E40),
+        H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8), H.readWord(0x3BFA)))
+    end
+  end)
+end
+
 local function talk(face, cap, tag)
   local t = 0
   return H.driveUntil(function()
@@ -153,6 +185,7 @@ local hpLast, condLast, condSeen = {}, {}, {}
 local function fight()
   return H.driveUntil(function()
     t = t + 1
+    actT = t
     if (H.gameOverFired or 0) > 0 then lost, why = true, "gameover"; return true end
     if H.partyWipedInBattle() then wipedN = wipedN + 1 else wipedN = 0 end
     if wipedN >= 300 then lost, why = true, "wiped"; return true end
@@ -216,6 +249,7 @@ H.run({ maxFrames = 40000, allowGameOver = true }, {
     H.assertEq(H.fieldX() == 106 and H.fieldY() == 15, true, "standing at (106,15)")
     H.assertEq(nerapaUp(), true, "$0361 set -- Nerapa stands")
     armSeedWatch()
+    armActionWatch()
     fenix0, potion0, tonic0 = H.invCountOf(FENIX_DOWN), H.invCountOf(POTION), H.invCountOf(TONIC)
     H.log(string.format("[lab] set-off policy=%s idle=%d phase=%d master=%d bag f/p/t=%d/%d/%d at f%d",
       POLICY, IDLE, H.readByte(0x021E), master(), fenix0, potion0, tonic0, H.frame))
