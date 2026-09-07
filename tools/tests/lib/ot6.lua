@@ -1805,6 +1805,37 @@ function M.finishRecoveryTrace(reason)
   recoveryFlush()
 end
 
+-- Which party entity's normal command the engine is executing right now:
+-- set at ExecCmd (X = the acting entity's offset, battle_code) and moved
+-- to execDone at SaveForMimic, the same two exec observers the action
+-- trace reads, installed once and always on (the trace's are behind its
+-- flag).  The fight driver's damage watch credits monster HP drops to
+-- this entity.  Measured on the Nerapa lab (2026-09-07): the party's
+-- first commands sat queued 1200-1500 frames behind the boss's four
+-- Condemned casts, past a FIFO watch's 900-tick expiry, so CELES's Fight
+-- was credited to TERRA's summon on one seed and EDGAR's crossbow on
+-- another.  Read-only.
+local execActor = nil                 -- entity 0..3 whose command ExecCmd entered
+local execDone = {}                   -- { actor, frame } per SaveForMimic, oldest first
+local execHooks = false
+local function execActivate()
+  if execHooks then return end
+  execHooks = true
+  local a = M.sym("ExecCmd@battle_code")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xffff
+    if x < 8 and x % 2 == 0 then execActor = x // 2 end
+  end, emu.callbackType.exec, a, a)
+  local b = M.sym("SaveForMimic")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xffff
+    if x < 8 and x % 2 == 0 then
+      execDone[#execDone + 1] = { actor = x // 2, frame = M.frame }
+      if execActor == x // 2 then execActor = nil end
+    end
+  end, emu.callbackType.exec, b, b)
+end
+
 function M.newFightDriver(tag, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -2135,18 +2166,26 @@ function M.newFightDriver(tag, opts)
 
   -- What the party's attacks have been landing, measured the way a person
   -- reads the numerals: at a damage plan's confirm a watch joins the
-  -- queue; monster HP falling is credited, oldest watch first, until the
-  -- drop settles; the settled figure is normalized to shielded-equivalent
-  -- damage (Ot6ShieldedDmg x0.5 then Ot6BrokenDmg x2: broken is x4
-  -- shielded, weak or not, so a hit that lands on a broken target is /4).
-  -- FIFO attribution can misfile a counter's damage or two overlapping
-  -- actions; the press rule that consumes it only ever asks "does the
-  -- window cover the HP", where an error is one more heal turn, not a
-  -- lost fight.
-  local dmgWatch = {}                  -- FIFO of { actor, seen, landed, until_ }
+  -- list; monster HP falling while that actor's command executes (the
+  -- execActor observer above) is credited to the actor's oldest watch,
+  -- and a beat after the command returns the figure is settled and
+  -- normalized to shielded-equivalent damage (Ot6ShieldedDmg x0.5 then
+  -- Ot6BrokenDmg x2: broken is x4 shielded, weak or not, so a hit that
+  -- lands on a broken target is /4).  A command that moved nothing (a
+  -- reflected cast, a miss) settles at 0; a counter's damage outside
+  -- that beat, with no party command executing, is nobody's.  The press
+  -- rule that consumes
+  -- it only ever asks "does the window cover the HP", where an error is
+  -- one more heal turn, not a lost fight.
+  local dmgWatch = {}                  -- { actor, kind, seen, until_ }, confirm order
   local dmgSeen = {}                   -- entity -> shielded-equivalent HP its last action took
   local monTotLast = nil
-  local DMG_SETTLE = 45                -- ticks with no further drop = the action landed
+  local DMG_SETTLE = 45                -- frames after SaveForMimic before the figure is read
+  local DMG_EXPIRE = 3600              -- a confirmed plan that never executed (hygiene)
+  local function dmgWatchOf(e)
+    for i, w in ipairs(dmgWatch) do if w.actor == e then return i, w end end
+    return nil
+  end
   local function targetBroken()
     for s = 0, 5 do
       if M.readWord(MON_HP + s * 2) > 0
@@ -3216,8 +3255,17 @@ function M.newFightDriver(tag, opts)
       -- dmgWatch queue above; F.frame credits and settles it)
       if plan.kind == "fight" or plan.kind == "skill" or plan.kind == "magic"
          or plan.kind == "summon" or plan.kind == "throw" or plan.kind == "lore" then
+        -- an actor gets a fresh confirm only after its last command
+        -- resolved (settled below) or was refused at the cursor, so an
+        -- earlier watch of this actor's still holding nothing is the
+        -- refused one: it is superseded, not queued behind
+        for i = #dmgWatch, 1, -1 do
+          if dmgWatch[i].actor == actor and dmgWatch[i].seen == 0 then
+            table.remove(dmgWatch, i)
+          end
+        end
         dmgWatch[#dmgWatch + 1] = { actor = actor, kind = plan.kind, seen = 0,
-                                    until_ = battleTick + 900 }
+                                    until_ = battleTick + DMG_EXPIRE }
       end
       -- A confirmed lore is the progress the stall guard watches for.
       if plan.kind == "lore" then
@@ -3264,6 +3312,7 @@ function M.newFightDriver(tag, opts)
     itemRestore, castRestore = {}, {}
     healWatch, healSaid = nil, nil
     dmgWatch, dmgSeen, monTotLast = {}, {}, nil
+    execActor, execDone = nil, {}
     -- The stall guard's verdict belongs to the battle it watched: a retry
     -- ladder's reload is a different fight, and a recurrence should dump
     -- again there rather than inherit a dead lore line silently.
@@ -3272,6 +3321,7 @@ function M.newFightDriver(tag, opts)
 
   function F.frame()
     if recovery then recoveryActivate(recovery); recoveryFlush() end
+    execActivate()
     battleTick = battleTick + 1
     -- The party's HP as the battle opened, for the first-turn danger floor
     -- in makePlan.  Taken a beat after the table goes live so every entity
@@ -3326,26 +3376,35 @@ function M.newFightDriver(tag, opts)
       end
     end
     -- The damage watch (see dmgWatch): monster HP falling is credited to
-    -- the oldest confirmed damage plan; once the drop has settled the
-    -- figure is normalized and kept per actor.  A rise (a monster healing
-    -- itself, an absorbed hit) only moves the baseline.
+    -- the entity whose command is executing (execActor), or, for the
+    -- DMG_SETTLE frames after a command returned, to that command; then
+    -- the figure is normalized and kept per actor.  A rise (a monster
+    -- healing itself, an absorbed hit) only moves the baseline.
     do
       local tot = 0
       for s = 0, 5 do tot = tot + M.readWord(MON_HP + s * 2) end
-      local w = dmgWatch[1]
-      if w ~= nil and monTotLast ~= nil then
-        if tot < monTotLast then
-          w.seen, w.landed = w.seen + (monTotLast - tot), battleTick
-        elseif w.landed ~= nil and battleTick - w.landed > DMG_SETTLE then
+      local who = execActor
+      if who == nil and execDone[#execDone] ~= nil then
+        who = execDone[#execDone].actor
+      end
+      if who ~= nil and monTotLast ~= nil and tot < monTotLast then
+        local _, w = dmgWatchOf(who)
+        if w then w.seen = w.seen + (monTotLast - tot) end
+      end
+      while execDone[1] ~= nil and M.frame - execDone[1].frame > DMG_SETTLE do
+        local done = table.remove(execDone, 1)
+        local i, w = dmgWatchOf(done.actor)
+        if w then
           local d = targetBroken() and (w.seen // 4) or w.seen
           dmgSeen[w.actor] = d
           M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
             .. "(%d shielded-equivalent; the press rule counts it)",
             tag or "fight", w.actor, w.kind, w.seen, d))
-          table.remove(dmgWatch, 1)
-        elseif battleTick > w.until_ then
-          table.remove(dmgWatch, 1)
+          table.remove(dmgWatch, i)
         end
+      end
+      for i = #dmgWatch, 1, -1 do
+        if battleTick > dmgWatch[i].until_ then table.remove(dmgWatch, i) end
       end
       monTotLast = tot
     end
