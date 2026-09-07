@@ -162,9 +162,12 @@ def selftest(repo: str = ".") -> int:
     else:
         party, err = read_party_sram(payloads["n024-entry-save-v1"])
         # The four records the emulator independently logged out of live
-        # WRAM after booting this checkpoint.
-        want = {"LOCKE": (314, 314, 0x00), "EDGAR": (354, 354, 0x00),
-                "SABIN": (278, 363, 0x00), "CELES": (151, 349, 0x00)}
+        # WRAM after booting this checkpoint (the 2026-09-01 re-cut, 3872225;
+        # gen_esper_tubes' "[care before battle 72] opening the menu" line:
+        # c1 402/447, c4 435/502, c5 469/511, c6 422/443).  The pre-re-cut
+        # checkpoint read 314/314, 354/354, 278/363, 151/349.
+        want = {"LOCKE": (402, 447, 0x00), "EDGAR": (435, 502, 0x00),
+                "SABIN": (469, 511, 0x00), "CELES": (422, 443, 0x00)}
         got = {m["name"]: (m["hp"], m["maxhp"], m["status1"])
                for m in (party or [])}
         if err or got != want:
@@ -316,7 +319,7 @@ def main() -> int:
               f"regeneration touches it: every state that cold-Continues out\n"
               f"of one starts from these bytes and inherits the loss, and the "
               f"segment then spends its revives undoing it.  Measured at\n"
-              f"n024-entry-save-v1: it hands over EDGAR and SABIN dead, the "
+              f"the pre-2026-09-01 n024-entry-save-v1: it handed over EDGAR and SABIN dead, the "
               f"care stop before battle 72 spends both of the segment's two\n"
               f"Fenix Downs raising them, and when CELES dies in the fight "
               f"there is nothing left to raise her with -- no esper grants\n"
