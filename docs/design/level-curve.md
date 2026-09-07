@@ -53,7 +53,10 @@ Doma stretch run on what they find, and the band is measured from
 `tools/audit_supplies.py` (`-v` lists each fixture with its count, band and
 level); a shop stop is written as `POTION to N` beside its `TONIC to N` /
 `FENIX DOWN to N` lines, essentials and Potions before the Tonic soak so a
-short purse shorts Tonics.  The WoB Potion shops the route passes or could
+short purse shorts Tonics.  The band is what the bag should hold *arriving*
+at the next fight, so the last shop before a shopless boss stretch buys the
+band plus that stretch's measured spend (the train merchant: 21 for L14
+plus the 9 the GhostTrain fight spent = 30, so Baren Falls still holds 21).  The WoB Potion shops the route passes or could
 reach: Phantom Train 85, Mobliz 12, Nikeah 15, Narshe 3 (the Terra
 scenario's return), Kohlingen 19, Jidoor 22, Vector 24, Thamasa 36.
 

@@ -1142,9 +1142,14 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   -- one before Baren Falls (shop_prop.dat: Figaro's shop 4 and South
   -- Figaro's shop 8 sell none; nothing between here and Mobliz).  The
   -- supply curve (docs/design/level-curve.md) carries ~level x1.5 of them:
-  -- L14 here -> 21.  The old target of 10 left 8 at the falls jump (#167).
-  buyItem(POTION, 1, function() return 21 - invCount(POTION) end,
-    "POTION to 21"),
+  -- L14 here -> 21.  The old target of 10 left 8 at the falls jump (#167),
+  -- and a target of 21 left 12: the GhostTrain fight between this counter
+  -- and the falls spent 9 on its own (train_done.log, nine `[b68] heal ...
+  -- POTION` lines, potion=21 -> 12 at the post-train care).  The last shop
+  -- before a shopless boss stretch buys the band PLUS that stretch's
+  -- measured spend, so the falls jump still holds the band: 21 + 9 = 30.
+  buyItem(POTION, 1, function() return 30 - invCount(POTION) end,
+    "POTION to 30"),
   -- Fenix Downs are for reviving allies (battle 47's prolonged tail killed
   -- SHADOW, measurably, and he entered the boss fight dead); the item target
   -- steer never confirms on the monster side, so the undead-instant-kill
