@@ -50,6 +50,41 @@
 --   * fights do not replay exactly: the same hold from the same reload
 --     arrived with 5349 and 6585 (and 3190 then 2794 in the
 --     qualification).
+--
+-- Re-measured 2026-09-07 for issue #164 (the max/8 gate banked LOCKE one
+-- boss hit from KO): 12 crossings per policy from the same catwalk snapshot
+-- (timer 14852; holds {0,250,550,900,1300,1750} and {100,400,700,1100,
+-- 1500,2200}; tools/tests/rafterlab_batch_gen.sh with RAFTERLAB_DRIVER),
+-- every arrival saved and battle 104 played from it with
+-- gen_opera7_blackjack's own fighter (rafterlab_ultros_gen.sh; the table
+-- is rafterlab_arrivals.py over build/rafterlab/):
+--   * a crossing replayed from the same approach is exact: two policies
+--     that make the same fight decisions arrive in byte-identical
+--     snapshots, so the policies below are paired per seed;
+--   * Ultros 2 gets ONE action before he dies (35 fights, 35 wins, ~2800
+--     frames each): a weak single hit of 37..101, a 219..241 hit on SABIN,
+--     or, in 8 of 35, a two-target hit of 258..281 on LOCKE (two of the
+--     eight landed on a LOCKE below that and killed him: 109 and 196) and
+--     117..132 on EDGAR.  LOCKE's max is 397.  The shipped no-items policy
+--     arrived with him at or under 281 in 6 of 12 crossings (167..267) --
+--     one hit from KO -- and under the max/8 gate once (SABIN 40/457);
+--   * the gate is not the lever: max/4 rejects the same single arrival
+--     max/8 does and spends a whole re-crossing on it; neither sees LOCKE
+--     at 198;
+--   * boost-Fight in the rat fights is worse: no shorter (median 2265 vs
+--     2152 frames, 1884..2864 vs 1588..2560), LOCKE arriving at 33 and 109,
+--     and Ultros KO'd him in 2 of 12;
+--   * Potions in the rat fights (items=true: the driver drinks when a
+--     member is under healPercent or inside one measured round of death):
+--     at 33%, 3 Potion plans in 12 crossings, repairing the one sub-gate
+--     arrival for 680 clock frames and no reload; at 50%, 6 plans, LOCKE
+--     > 281 in 7 of 12; at 70%, 18 plans (a re-plan of the same heal logs
+--     twice, so Potions spent is at most that; at most 5 plans in one
+--     crossing, worst extra clock cost 1616 frames, lowest arrival timer
+--     2608 against the 900 floor; the arrival line now says how many
+--     Potions are left), LOCKE > 281 in 9 of 12 and nobody under 56%.  70% ships:
+--     the rat fights are the only care this timed scene allows (no menu),
+--     and the fight after them opens with that hit.
 
 -- The facing is produced by input rather than poked: the old generator wrote
 -- the object facing byte and $0743 to point the party at Ultros; now the last
@@ -172,7 +207,14 @@ end
 --   * fights: the driver gets every battle frame from load latch to the
 --     field's return -- its own menu==0 branch chews the victory boxes.
 --     boost=false, cadence=12: measured 232 frames/fight faster than the
---     boosted default, and safer (zero casualties in ~40 lab fights).
+--     boosted default, and safer (zero casualties in ~40 lab fights);
+--     items=true, healPercent=70: a Potion when a member is under 70% or
+--     inside one round of death, because the boss after these fights
+--     opens with a hit of up to 281 on LOCKE (#164, header).
+-- The rat fights' driver options, on one line: tools/tests/
+-- rafterlab_batch_gen.sh substitutes it (RAFTERLAB_DRIVER) to measure a
+-- candidate policy against the shipped one from the same catwalk snapshot.
+local RAT_DRIVER = { tactical = true, boost = false, cure = false, items = true, healPercent = 70, cadence = 12 }
 local function crossRafters(tx, ty, maxF, hold, res, what)
   local hb, battN, wipeN, notBattN = 0, 0, 0, 0
   local held, lost = 0, nil
@@ -187,9 +229,7 @@ local function crossRafters(tx, ty, maxF, hold, res, what)
   local moveSameN, wig, lastDir = 0, nil, "right"
   local curMv, curMvN = nil, 0
   local chaseK, chaseN = nil, 0
-  local fight = H.newFightDriver("rafters",
-    { tactical = true, boost = false, cure = false, items = false,
-      cadence = 12 })
+  local fight = H.newFightDriver("rafters", RAT_DRIVER)
   local function holdN()
     local h = type(hold) == "function" and hold() or hold
     return h or 0
@@ -584,12 +624,19 @@ end
 local crossed = { ok = false, fights = 0 }
 local MIN_CROSS_TIMER = 900
 local HOLDS = { 0, 250, 550, 900, 1300, 1750 }
+-- the all-standing gate: every member above max/ARRIVAL_HP_DIV at (14,7)
+local ARRIVAL_HP_DIV = 8
+-- lab only (rafterlab_batch_gen.sh RAFTERLAB_ARRIVALS=1): a prefix here
+-- saves every arrival at (14,7), banked or not, as <prefix>arrival_<n>.mss
+-- so the Ultros 2 fight can be measured from each.  nil in the lineage.
+local LAB_ARRIVAL_PREFIX = nil
 local catwalkBlob = nil                -- captured on the catwalk, below
 
 local function allStanding()
   for _, c in ipairs(H.partyMembers()) do
     local hp, mx = H.charHp(c), H.charMaxHp(c)
-    if not (hp > 0 and (H.charStatus1(c) & 0xC6) == 0 and hp > (mx >> 3)) then
+    if not (hp > 0 and (H.charStatus1(c) & 0xC6) == 0
+            and hp > mx // ARRIVAL_HP_DIV) then
       return false
     end
   end
@@ -629,6 +676,22 @@ local function crossAttempt(n, hold)
     }, {}),
     crossRafters(14, 7, 25000, hold, crossed,
       string.format("cross the rafters to Ultros (attempt %d)", n)),
+    -- face Ultros by input: his NPC occupies {15,7}, so a short RIGHT press
+    -- is a blocked step that turns the party in place.  Done on every
+    -- arrival, so each one is logged (and, in the lab, saved) one A press
+    -- from battle 104 -- the HP line is what the gate below judges.
+    H.cond(function() return crossed.ok end, {
+      H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(6),
+      H.call(function()
+        H.log(string.format("[rafters] attempt %d arrival hp at (%d,%d): %s, " ..
+          "timer %d left, %d fights, Potions left %d", n, H.fieldX(), H.fieldY(),
+          hurtLine(), H.readWord(0x1189), crossed.fights or 0, H.invCountOf(0xE9)))
+      end),
+    }, {}),
+    H.cond(function() return crossed.ok and LAB_ARRIVAL_PREFIX ~= nil end,
+      LAB_ARRIVAL_PREFIX
+        and { H.saveState(LAB_ARRIVAL_PREFIX .. "arrival_" .. n .. ".mss") }
+        or {}, {}),
     H.call(function()
       local margin = crossed.ok and H.readWord(0x1189) or 0
       local standing = allStanding()
@@ -673,10 +736,9 @@ H.run({ maxFrames = 420000, allowGameOver = true }, {
 
   -- The opera field menu exposes only LOCKE even though EDGAR and SABIN join
   -- its battles.  Kirin turns his otherwise idle MP into ~200-HP Cures.
-  -- The crossing driver itself fights cure-less for speed (measured safe:
-  -- zero casualties in ~40 lab fights, and the ladder re-rolls any hurt
-  -- arrival), so this wear is for the fights around the scene, not inside
-  -- it.
+  -- The crossing driver itself fights cast-less for speed and drinks
+  -- Potions instead (#164; RAT_DRIVER), so this wear is for the fights
+  -- around the scene, not inside it.
   H.equipEsper(0, 0x11, { tag = "KIRIN -> LOCKE for the rafters" }),
   H.call(function()
     H.log(string.format("[prep] esper wear: LOCKE=%02X EDGAR=%02X SABIN=%02X CELES=%02X",
@@ -770,11 +832,14 @@ H.run({ maxFrames = 420000, allowGameOver = true }, {
   -- attempt booted with a nil path and impotent presses -- the menu visit
   -- inside an event-timer scene corrupts the room state (the same $1188
   -- block hazard the save-drive rule documents; this scene's clock is
-  -- $1189).  Recovery here is the all-out driver keeping fights to one
-  -- round; the party crosses on whatever HP the approach left it.
+  -- $1189).  Recovery here is the driver's Potions inside the rat fights
+  -- (#164); the party crosses on whatever HP the approach left it, plus
+  -- those.
   H.call(function()
     H.log(string.format("[rafters] on the catwalk at (%d,%d), timer %d frames left, rats: %s",
       H.fieldX(), H.fieldY(), H.readWord(0x1189), ratLine()))
+    H.log(string.format("[rafters] bag on the catwalk: Potions=%d Tonics=%d Fenix=%d; party %s",
+      H.invCountOf(0xE9), H.invCountOf(0xE8), H.invCountOf(0xF0), hurtLine()))
   end),
   (function() local req
     return H.cond(function() return true end, {
@@ -801,9 +866,8 @@ H.run({ maxFrames = 420000, allowGameOver = true }, {
   -- scene, where a menu visit corrupts the room state (the $1189-block
   -- hazard this file documents above).  Every banked arrival is gated
   -- all-standing by the ladder, which is what the exit contract asserts.
-  -- face Ultros by input: his NPC occupies {15,7}, so a short RIGHT press
-  -- is a blocked step that turns the party in place
-  H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(6),
+  -- the banked attempt's RIGHT press (crossAttempt) turned the party to
+  -- face Ultros; nothing has moved since
   H.call(function()
     H.assertEq(H.fieldX()==14 and H.fieldY()==7, true,
       "still at (14,7) -- the blocked press did not step")

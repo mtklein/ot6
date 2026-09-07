@@ -126,7 +126,7 @@ local function mkFighter(tier, tag)
   function F.frame(battN)
     phase = (phase + 1) % 8
     if battN == 3 then
-      bt = { f0 = H.frame, wiped = 0 }
+      bt = { f0 = H.frame, wiped = 0, hp = {} }
       local w = H.formationWords()
       H.log(string.format("[%s] battle up f%d (%04X %04X %04X %04X %04X %04X)",
         tag, H.frame, w[1], w[2], w[3], w[4], w[5], w[6]))
@@ -136,6 +136,16 @@ local function mkFighter(tier, tag)
       if battN % 300 == 0 then
         H.log(string.format("[%s] f%d party [%s] vs %s",
           tag, H.frame, partyLine(), monsterLine()))
+      end
+      -- every HP drop, so the log carries each of Ultros's hits (#164:
+      -- the 300-frame party line only brackets them)
+      for e = 0, 3 do
+        local hp, was = H.readWord(BCHP + e * 2), bt.hp[e]
+        if was ~= nil and was > 0 and hp < was then
+          H.log(string.format("[%s] hit f%d slot=%d char=%d %d->%d (-%d)",
+            tag, H.frame, e, H.readByte(BCHID + e * 2), was, hp, was - hp))
+        end
+        bt.hp[e] = hp
       end
       -- the wipe verdict is F.watch's, taken before this gate (#163)
     end
