@@ -96,7 +96,7 @@ def parse(path):
 
 def rows(logdir, tag):
     out = OrderedDict()
-    for log in sorted(logdir.glob(f"{tag}_i*.log"), key=lambda p: int(re.search(r"_i(\d+)", p.name).group(1))):
+    for log in sorted(logdir.glob(f"{tag}_i*.log"), key=lambda p: [int(x) for x in re.findall(r"\d+", p.name[len(tag):])]):
         r, ev, surf = parse(log)
         if r is None:
             print(f"[no result] {log}")

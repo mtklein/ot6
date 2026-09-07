@@ -27,7 +27,7 @@ for log in sorted(logdir.glob("*.log")):
             continue
         kv = dict(p.split("=", 1) for p in m.group(1).split() if "=" in p)
         kv["_log"] = log.name
-        rows[kv.get("policy", "?")][int(kv.get("idle", -1))] = kv   # last wins
+        rows[kv.get("policy", "?")][(int(kv.get("idle", -1)), int(kv.get("prompt", 0)))] = kv   # last wins
 
 
 def fmean(xs):
@@ -65,7 +65,7 @@ for pol, byidle in sorted(rows.items()):
         if raw:
             for k in ks + reps:
                 rep = " (replicate seed)" if k in reps else ""
-                print(f"    idle={k['idle']:>2} seed={k['seed']} be_up={k['be_up']} {k['outcome']:<13} t={k['t']:>5} "
+                print(f"    idle={k['idle']:>2} prompt={k.get('prompt', '0'):>2} seed={k['seed']} be_up={k['be_up']} {k['outcome']:<13} t={k['t']:>5} "
                       f"boss={k['t_boss']:>5} fenix={k['fenix']} potion={k['potion']} tonic={k['tonic']} "
                       f"deaths={k['deaths']} raises={k['raises']} bp@surface={k['bp_at_surface']} "
                       f"shore={k['shore']} party={k.get('party', '?')}{rep}")

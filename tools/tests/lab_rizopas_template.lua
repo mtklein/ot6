@@ -71,6 +71,12 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 local POLICY = "@POLICY@"
 local IDLE = tonumber("@IDLE@") or 0
+-- PROMPT: frames to wait at the "Jump?" prompt before answering it.  IDLE
+-- alone is quantized by the walk (measured: idles 0 and 5, 20 and 25, 40
+-- and 45 each drew one seed), so the prompt delay is the fine knob -- the
+-- answer is pressed on an exact frame, one phase per frame.  0 keeps the
+-- generator's own cadence untouched (the campaign's control).
+local PROMPT = tonumber("@PROMPT@") or 0
 if POLICY:find("@") then POLICY = "control" end
 
 local SABIN, CYAN = 5, 2
@@ -393,6 +399,7 @@ local monHp, monSh = nil, nil
 local hpLast = {}
 local bpAtSurface = "?"
 local shoreAt = nil
+local promptSeen = nil
 
 -- the per-frame ledger, called on every ride frame
 local function ledger()
@@ -494,6 +501,18 @@ local function ride(dir, pred, what, budget, choiceWant)
 
       if H.readByte(CH_MAX) >= 2 and H.dialogWaiting() then
         local sel, want = H.readByte(CH_SEL), choiceWant or 0
+        if PROMPT > 0 and want == 0 then
+          -- the fine seed knob: wait PROMPT frames, then answer on an
+          -- exact frame (4 on / 4 off from the moment the delay expires)
+          if promptSeen == nil then
+            promptSeen = H.frame
+            H.log(string.format("[lab] Jump? prompt at f%d phase %d; answering in %d frames",
+              H.frame, H.readByte(0x021E), PROMPT))
+          end
+          local k = H.frame - promptSeen - PROMPT
+          if k < 0 then H.setPad({}) else H.setPad(k % 8 < 4 and { "a" } or {}) end
+          return
+        end
         if sel < want then H.setPad(phase < 4 and { "down" } or {})
         elseif sel > want then H.setPad(phase < 4 and { "up" } or {})
         else H.setPad(phase < 4 and { "a" } or {}) end
@@ -579,9 +598,9 @@ H.run({ maxFrames = 50000, allowGameOver = true }, {
       outcome = "unknown"
     end
     H.log(string.format(
-      "[result] policy=%s idle=%d seed=%s be_up=%s outcome=%s t=%s t_surface=%s t_boss=%s fenix=%d potion=%d tonic=%d "
+      "[result] policy=%s idle=%d prompt=%d seed=%s be_up=%s outcome=%s t=%s t_surface=%s t_boss=%s fenix=%d potion=%d tonic=%d "
       .. "deaths=%s raises=%d hits=%d rizo_hp=%s rizo_sh=%s bp_at_surface=%s shore=%s nseeds=%d party=[%s]",
-      POLICY, IDLE, seedDrawn and string.format("$%02X", seedDrawn) or "none",
+      POLICY, IDLE, PROMPT, seedDrawn and string.format("$%02X", seedDrawn) or "none",
       beUp and string.format("$%02X", beUp) or "none", outcome,
       battleDown and tostring(battleDown - battleUp) or tostring(t),
       tostring(surfaceT), (deadT and surfaceT) and tostring(deadT - surfaceT) or "none",
