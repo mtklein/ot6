@@ -193,15 +193,32 @@ end
 -- standing on the ledge, ~180 frames from the doorstep, when it does;
 -- a Nerapa kill at 0:00 is the escape lost).
 local FENIX_BUDGET, CLOCK_MARGIN = 3, 900
+-- The field bag ($1969) is synced back from the battle module only at
+-- teardown, so mid-fight the count comes from the battle inventory:
+-- $2686, 256 records of 5 bytes, +0 item index, +3 quantity
+-- (battle-ram.txt:456-475).  The first ninja run of the ladder read the
+-- field bag and declared its rung lost at the fight's end, thirteen
+-- Fenix Downs late.
+local function fenixNow()
+  if H.battleActive() or H.battleLoadStarted() then
+    for i = 0, 255 do
+      if H.readByte(0x2686 + i * 5) == 0xF0 then return H.readByte(0x2689 + i * 5) end
+    end
+    return 0
+  end
+  return H.invCountOf(0xF0)
+end
 local function nerapaAttempt(n)
   local F = H.newFightDriver("Nerapa", FIGHT_ESCAPE)
   local wipedN, lost, why, fenix0 = 0, false, nil, nil
   return H.cond(function() return nerapaWon end, {}, {
+    n > 1 and lossReload(function() return nerapaBlob end, "Nerapa") or seq({}),
+    -- the bag is sampled AFTER the reload (the reload restores it): the
+    -- second ninja run sampled it before and reported rung 2 at -11 spent
     H.logStep(function()
       fenix0 = H.invCountOf(0xF0)
       return string.format("[Nerapa] attempt %d at f%d, master clock %d, fenix=%d", n, H.frame, H.readWord(0x1189), fenix0)
     end),
-    n > 1 and lossReload(function() return nerapaBlob end, "Nerapa") or seq({}),
     L81.spread(n),
     talk("right", 4000, string.format("Nerapa engaged (attempt %d)", n)),
     (function()
@@ -214,8 +231,8 @@ local function nerapaAttempt(n)
         if H.partyWipedInBattle() then wipedN = wipedN + 1 else wipedN = 0 end
         if wipedN >= 300 then lost, why = true, "wiped"; return true end
         if t >= 30000 then lost, why = true, "30000-frame cap"; return true end
-        if fenix0 - H.invCountOf(0xF0) > FENIX_BUDGET then
-          lost, why = true, string.format("%d Fenix Downs spent (budget %d)", fenix0 - H.invCountOf(0xF0), FENIX_BUDGET)
+        if fenix0 - fenixNow() > FENIX_BUDGET then
+          lost, why = true, string.format("%d Fenix Downs spent (budget %d)", fenix0 - fenixNow(), FENIX_BUDGET)
           return true
         end
         if t % 300 == 0 then

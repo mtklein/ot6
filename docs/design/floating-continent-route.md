@@ -512,6 +512,8 @@ leave roll a no-op). Every run is `tools/tests/run.sh` with
 | Q → R `gen_fc_alcove` | `fc-alcove-v1_20260907-073713.log` | `PASS (frame 38559)` | 7 randoms on 394 (two Dragons at 7000 HP, a Behemoth pack, two Ninja trios, two Apokryphos/Misfit fours) | 0 | TERRA L25 · LOCKE L28 · SHADOW L25 · EDGAR L27 |
 | R → WoR `gen_fc_escape`, attempt 1 (mustflee walk) | `wor_landing_20260907-074008.log` | **FAIL** at Nerapa: `assertEq failed: Nerapa defeated: got true, want false` | AtmaWeapon won (24000 HP, 11 pips, re-shield at 4130 with 10; ~10,000 frames, 0 Fenix); 4 Naughty on 393; Nerapa LOST | 2, both on Nerapa | TERRA L26 · LOCKE L29 · SHADOW L25 · EDGAR L27 at `escape_start` |
 | R → WoR `gen_fc_escape`, attempt 2 (fight walk) | `wor_landing_20260907-075542.log` | **FAIL**, the same line | frame-identical to attempt 1 through the doorstep (3:51 at f49317): the 63-frame L+R hold fell inside battle load | 2, Nerapa | — |
+| lab V4 (from `escape_start`: dress CELES, then the escape) | `lab_escape_v4_20260907-081006.log` | `PASS (frame 22250)` | kit 1,349 clock frames; doorstep 3:40; Nerapa won, 2:05 left; Shadow saved at f22250 | 1, Nerapa | — |
+| R → WoR `gen_fc_escape`, attempt 4 (ninja; CELES kit + ladder, no loss rules yet) | `wor_landing_ninja1_20260907-0820_FAIL.log` | **FAIL** — rung 1 "won" Nerapa at `master clock 0`, the Game Over followed and the harness Continued the alcove save: `navTo: no path (8,10)->(112,15)` | kit 621 clock frames (21567→20946); doorstep 3:43; rung 1 `seeded $be=$A0`, Nerapa fell at f63522 with 0:00 | **15, all on Nerapa** (27 → 12; `fenix=14` in the WON line was read before the last raises landed) — the driver raised the same member over and over under Condemned | — |
 | R → WoR `gen_fc_escape`, attempt 3 (fight walk + Nerapa seed ladder) | `wor_landing_20260907-080405.log` | `PASS (frame 78180)` | ladder rung 1 (`seeded $be=$10 from $021e=4`) won at t≈12,500 — `WON on attempt 1 at f61888, master clock 1419` (0:23 left); Shadow saved (`$037D`); `landing: map=397 (99,38) party=1 hp=964 $00A4=1 $037D=1` | **7, all on Nerapa** (Condemned killed slots 0–1 at t≈9,000 and they were raised) — a lab candidate | CELES L24 solo at the bedside |
 
 Both battery payloads came out **byte-identical** to the 2026-09-01 cuts
@@ -557,6 +559,20 @@ clock 21,267). Four experiments from that one snapshot, all retained
   rate.
 - The ledge wait from 1:45 works: Shadow's `$037D` set at f22154 in both
   passing labs, with `t0=1557 t2=1257` on the last logged wait tick.
+- **CELES is the escape's fourth, and she arrives bare.** The statue scene
+  puts her in party 1 (`$1850+6` = `$79` at `escape_start`; SHADOW's byte
+  is `$00` — he has left) with every equipment slot `$FF` — she has been
+  benched bare since the Vector crash — and the 888-HP fourth slot in
+  every 393 battle log is her, swinging nothing. The field menu opens on
+  393 with the clock running through it. Lab V4 (from the same
+  `escape_start`): `H.equipKit` for CELES cost **1,349 frames of clock**
+  (21,537 → 20,188) for one Equip and one Relic session; the Break Blade
+  `$11` and relics `$B1`/`$B5` landed, her own list refused the bag's
+  shield/helm/armor (`$84`, `$5B`/`$5A`, `$6B`/`$69`, ~120–150 frames each
+  to find out), the walk still reached Nerapa at 3:40 (a different seed
+  ran shorter fights), and Nerapa fell with **one** Fenix Down and 2:05
+  left; Shadow saved at f22250. The gen now dresses her right after the
+  `escape_start` save, so the lab fixture stays "first control, bare".
 - Espers as worn (record byte +$1E in every fixture): TERRA `$02` SHIVA,
   LOCKE `$06`, SHADOW and EDGAR none. The deck's `SHIVA -> EDGAR` esper
   session logged "equipped, back on the list" and the byte never moved —
