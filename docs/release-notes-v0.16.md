@@ -32,12 +32,6 @@ If you were playing v0.15 with Shadow, this is the reason to update.
 Gate now have proper shields and weaknesses, and there is no longer any
 enemy anywhere in the game without at least one way to break it.
 
-## Patch bytes
-
-If you compare this patch to v0.15's, it differs in the changes above and
-in some text and music data that is now stored more compactly. The words
-and the songs are the same.
-
 ## A warning about Sketch
 
 Relm's Sketch still carries Final Fantasy VI 1.0's most famous bug,
