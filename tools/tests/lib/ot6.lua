@@ -788,6 +788,30 @@ function M.monsterNull(species)
     + species * MON_REC + MON_ABSORB + 1)
 end
 
+-- The cast guards' decision (#99, #156, #172), with the stage handed in
+-- so battle_healpolicy can put battle 70's bytes through it without an
+-- emulator.  elem is the ability's element mask (0 for none),
+-- reflectable its magic_prop reflect bit, and slots the monsters ON
+-- STAGE -- alive and present -- each { slot, species, absorb, null,
+-- reflect } read from the slot's live record (the fight driver's
+-- stageSlots).  Returns the offending slot and why: "absorb" (any element
+-- of the cast is drunk: a heal for the enemy), "reflect" (a reflectable
+-- cast at a Reflect bearer lands on the party), or "null" (every element
+-- of the cast is nulled: a wasted turn).  Absorb is judged across the
+-- whole stage first, since it is the costliest.  nil when the cast may go.
+function M.castVeto(elem, reflectable, slots)
+  if elem ~= 0 then
+    for _, s in ipairs(slots) do
+      if (s.absorb & elem) ~= 0 then return s, "absorb" end
+    end
+  end
+  for _, s in ipairs(slots) do
+    if reflectable and s.reflect then return s, "reflect" end
+    if elem ~= 0 and (s.null & elem) == elem then return s, "null" end
+  end
+  return nil
+end
+
 -- Spell +$03, attack flags 1 (battle-ram.txt $11A3); bit 1 is "ignore
 -- reflect".  Clear on every attack spell the driver casts (Fire/Ice/Bolt
 -- at every tier, Pearl, Flare: a Reflect-bearing target bounces them);
@@ -2222,86 +2246,92 @@ function M.newFightDriver(tag, opts)
     return nil
   end
 
-  -- The absorb guard, shared by every attack-cast line: a spell whose
-  -- element a PRESENT species absorbs is a heal for the enemy, so the plan
-  -- is refused and the actor falls through (usually to Fight).  Folding
-  -- never changes a family's element, so the base ability's byte answers
-  -- for every tier a pending boost could fold to.
-  local function absorbSlot(abilityId)
-    local elem = M.spellElement(abilityId)
-    if elem == 0 then return nil end
-    for _, s in ipairs(M.formationSpecies()) do
-      -- Only a slot that is alive AND on the field can drink a cast: a
-      -- tag-team sibling waiting off-stage ($3AA8 presence bit clear) is
-      -- untargetable, and counting it vetoed the element for the whole
-      -- fight (Ifrit & Shiva: Shiva's ice absorb blocked the Ice casts
-      -- the fight's own design doc prescribes against Ifrit).  With the
-      -- filter, the guard doubles as the tag-fight strategy: the element
-      -- flows while its absorber is off-stage and yields to the sword
-      -- the moment she steps on.
-      if M.readWord(0x3BFC + s.slot * 2) > 0
-         and (M.readByte(0x3AA8 + s.slot * 2) & 1) == 1
-         and M.monsterAbsorb(s.species) & elem ~= 0 then return s end
-    end
-    return nil
-  end
-
   -- OT6's per-monster state, slot-indexed: monsters are entities 4..9 at a
   -- 2-byte stride, so slot s sits 8 bytes past the ot6_memory.inc base.
   local MON_HP, MON_PRESENT = 0x3BFC, 0x3AA8
   local SH_CUR, BRK_TICKS = 0x3E40, 0x3E90         -- OT6_SHIELD_CUR/BROKEN_TICKS + 8
   local RV_ELEM, RV_CLASS = 0x3E91, 0x3EA5         -- OT6_REVEALED_ELEM/BOOST_REVEALED + 8
   local MON_ST3 = 0x3F00                           -- current status 3 ($3EF8) + 8
+  -- the live element record: $3bcc,x is the entity's absorbed (low byte)
+  -- and nullified (high byte) elements, seeded from MonsterProp +23/+24 by
+  -- LoadMonsterProp (battle_main.asm `lda f:MonsterProp+23,x / ora $3bcc,y`)
+  local MON_ELEM = 0x3BCC + 8
 
-  -- The Reflect guard, beside the absorb guard, for every attack-cast
-  -- line (#156).  A reflectable spell (magic_prop +3 bit 1 clear) cast at
-  -- a monster under Reflect -- status 3 bit 7 -- deals it nothing and
-  -- lands its full damage on a party member: measured on Nerapa, every
-  -- Bolt/Ice at every tier dealt 0 to Nerapa, and a 2-BP Bolt 3 killed
-  -- LOCKE for 1400.  Reading the status byte is what a person does by
-  -- looking: the engine draws the Reflect bubble around the monster
-  -- ($2E60, the reflect graphics buffer), so the byte is on screen and
-  -- blind-player-legitimate, the way the revealed-weakness bytes are.
-  -- A spell whose every element the species NULLS (monster_prop +24) is
-  -- the same wasted turn without the self-inflicted hit, so it is
-  -- refused here too.  Summons, lores, blitzes, tools, throws and Fights
-  -- all carry ignore-reflect or no spell record at all, and pass.
-  local function immuneSlot(abilityId)
-    local elem = M.spellElement(abilityId)
-    local refl = M.spellReflectable(abilityId)
-    for _, s in ipairs(M.formationSpecies()) do
-      if M.readWord(MON_HP + s.slot * 2) > 0
-         and (M.readByte(MON_PRESENT + s.slot * 2) & 1) == 1 then
-        if refl and (M.readByte(MON_ST3 + s.slot * 2) & 0x80) ~= 0 then
-          return s, "is under REFLECT"
-        end
-        if elem ~= 0 and (M.monsterNull(s.species) & elem) == elem then
-          return s, "NULLS " .. M.elemStr(elem)
-        end
+  -- What is on stage right now, slot by slot, with the LIVE record's
+  -- bytes: the slots whose presence bit ($3AA8) is set and whose HP is up,
+  -- each with its species word, its absorb/null bytes and its Reflect bit.
+  -- This is what the cast guards below judge (#172).
+  --
+  -- Two things this deliberately does NOT read.  The formation's
+  -- present mask ($3F45, M.formationSpecies): that byte is the
+  -- formation record's opening line-up, copied once at load and never
+  -- updated, so a monster the script materialises later is not in it --
+  -- battle 70 reads $01 while Shiva stands on stage in slot 1, and a
+  -- guard enumerating that mask never saw her (CELES's Ice "took 0 off
+  -- the monsters" three times a fight while she drank it).  And the ROM's
+  -- species record: the slot's own $3bcc bytes are the engine's truth
+  -- for whatever occupies it, seeded from the same record and robust to
+  -- a slot being reloaded.  Only a slot that is alive AND on the field
+  -- can drink a cast: a tag-team sibling waiting off-stage is
+  -- untargetable, and counting it vetoed the element for the whole fight
+  -- (Ifrit & Shiva: Shiva's ice absorb blocked the Ice casts the fight's
+  -- own design doc prescribes against Ifrit).  With the presence filter
+  -- the guard doubles as the tag-fight strategy: the element flows while
+  -- its absorber is off-stage and yields to the sword the moment she
+  -- steps on.
+  local function stageSlots()
+    local out = {}
+    for slot = 0, 5 do
+      if M.readWord(MON_HP + slot * 2) > 0
+         and (M.readByte(MON_PRESENT + slot * 2) & 1) == 1 then
+        out[#out + 1] = {
+          slot = slot, species = M.readWord(M.FORMATION + slot * 2),
+          absorb = M.readByte(MON_ELEM + slot * 2),
+          null = M.readByte(MON_ELEM + 1 + slot * 2),
+          reflect = (M.readByte(MON_ST3 + slot * 2) & 0x80) ~= 0 }
       end
     end
-    return nil
+    return out
   end
-  -- Both cast guards with their log line, for the magic, lore and nuke
-  -- lines.  True means the cast is off the table this turn.
+
+  -- The cast guards, shared by every attack-cast line (M.castVeto holds
+  -- the decision; this is its log line).  A spell whose element something
+  -- on stage ABSORBS is a heal for the enemy (#99); a reflectable spell
+  -- (magic_prop +3 bit 1 clear) cast at a monster under Reflect -- status
+  -- 3 bit 7 -- deals it nothing and lands its full damage on a party
+  -- member (#156: measured on Nerapa, every Bolt/Ice at every tier dealt
+  -- 0 to Nerapa, and a 2-BP Bolt 3 killed LOCKE for 1400); a spell whose
+  -- every element the target NULLS is the same wasted turn without the
+  -- self-inflicted hit.  Any of the three refuses the plan and the actor
+  -- falls through (usually to Fight).  Folding never changes a family's
+  -- element, so the base ability's element answers for every tier a
+  -- pending boost could fold to.  Reading the status byte is what a
+  -- person does by looking: the engine draws the Reflect bubble around
+  -- the monster ($2E60, the reflect graphics buffer), so the byte is on
+  -- screen and blind-player-legitimate, the way the revealed-weakness
+  -- bytes are; an absorbed or nulled element shows itself the first time
+  -- it lands.  Summons, lores, blitzes, tools, throws and Fights all
+  -- carry ignore-reflect or no spell record at all, and pass the Reflect
+  -- half.  True means the cast is off the table this turn.
   local function castVetoed(abilityId, what)
-    local absorbed = absorbSlot(abilityId)
-    if absorbed then
+    local elem = M.spellElement(abilityId)
+    local s, why = M.castVeto(elem, M.spellReflectable(abilityId), stageSlots())
+    if not s then return false end
+    if why == "absorb" then
       M.log(string.format(
         "[%s] %s $%02X refused: %s is ABSORBED by slot %d species $%04X "
-        .. "(#99) -- falling through", tag or "fight", what, abilityId,
-        M.elemStr(M.spellElement(abilityId)), absorbed.slot, absorbed.species))
-      return true
-    end
-    local s, why = immuneSlot(abilityId)
-    if s then
+        .. "(live absorb byte $%02X; #99, #172) -- falling through",
+        tag or "fight", what, abilityId, M.elemStr(elem), s.slot, s.species,
+        s.absorb))
+    else
       M.log(string.format(
         "[%s] %s $%02X refused: slot %d species $%04X %s (#156) -- falling "
         .. "through to an unreflectable line", tag or "fight", what,
-        abilityId, s.slot, s.species, why))
-      return true
+        abilityId, s.slot, s.species,
+        why == "reflect" and "is under REFLECT"
+          or ("NULLS " .. M.elemStr(elem) .. string.format(" (live null byte $%02X)", s.null))))
     end
-    return false
+    return true
   end
 
   -- ---- the chip model (#156) -------------------------------------------

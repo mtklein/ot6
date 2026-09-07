@@ -323,6 +323,51 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: wipe verdict (#166) checked")
   end),
 
+  -- 10. the cast guards' decision (#99, #156, #172) on battle 70's bytes:
+  -- Ifrit $0109 (absorb $01 fire, null $FC) and Shiva $0108 (absorb $02
+  -- ice, null $FC), MonsterProp +23/+24, read from this ROM; CELES's Ice
+  -- $01 is element $02 and reflectable.  The stage is whoever is present
+  -- and alive; the fight driver's stageSlots reads it from the live
+  -- records, and the mask the old guard enumerated ($3F45, the
+  -- formation's opening line-up) read $01 all fight, so Shiva in slot 1
+  -- was never on its list.
+  H.call(function()
+    local IFRIT, SHIVA = 0x0109, 0x0108
+    H.assertEq(H.monsterAbsorb(SHIVA), 0x02, "Shiva $0108 absorbs ice (MonsterProp +23)")
+    H.assertEq(H.monsterAbsorb(IFRIT), 0x01, "Ifrit $0109 absorbs fire")
+    H.assertEq(H.monsterNull(SHIVA), 0xFC, "Shiva nulls everything but fire/ice")
+    H.assertEq(H.spellElement(0x01), 0x02, "Ice $01 is element $02")
+    local function mon(slot, species, reflect)
+      return { slot = slot, species = species, absorb = H.monsterAbsorb(species),
+               null = H.monsterNull(species), reflect = reflect or false }
+    end
+    local ice, refl = H.spellElement(0x01), H.spellReflectable(0x01)
+    local s, why = H.castVeto(ice, refl, { mon(0, IFRIT) })
+    H.assertEq(s, nil, "Ifrit alone on stage: Ice flows (his weakness)")
+    s, why = H.castVeto(ice, refl, { mon(1, SHIVA) })
+    H.assertEq(s and s.slot, 1, "Shiva on stage in slot 1: Ice is refused")
+    H.assertEq(why, "absorb", "...because she ABSORBS it")
+    s, why = H.castVeto(ice, refl, { mon(0, IFRIT), mon(1, SHIVA) })
+    H.assertEq(why, "absorb", "both on stage: the absorber wins the veto")
+    s, why = H.castVeto(ice, refl, {})
+    H.assertEq(s, nil, "nobody on stage (the fly-in): nothing to refuse")
+    -- the live byte is what is judged, not the species: a slot whose record
+    -- says no absorb passes even under Shiva's species word
+    s, why = H.castVeto(ice, refl, { { slot = 1, species = SHIVA, absorb = 0, null = 0, reflect = false } })
+    H.assertEq(s, nil, "a live record with no absorb passes whatever the species word says")
+    -- the other two halves
+    local bolt = H.spellElement(0x02)
+    s, why = H.castVeto(bolt, H.spellReflectable(0x02), { mon(1, SHIVA) })
+    H.assertEq(why, "null", "Bolt into Shiva: every element nulled ($FC) -- refused")
+    s, why = H.castVeto(bolt, true, { mon(0, IFRIT, true) })
+    H.assertEq(why, "reflect", "a reflectable cast at a Reflect bearer -- refused")
+    s, why = H.castVeto(bolt, false, { mon(0, IFRIT, true) })
+    H.assertEq(why, "null", "an unreflectable Bolt at Ifrit under Reflect: still nulled ($FC)")
+    s, why = H.castVeto(0, false, { mon(0, IFRIT, true), mon(1, SHIVA) })
+    H.assertEq(s, nil, "an elementless, unreflectable line (a summon, a lore) passes")
+    H.log("battle_healpolicy: cast guards' decision (#172) checked")
+  end),
+
   -- 8. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(
