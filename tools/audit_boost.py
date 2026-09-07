@@ -57,9 +57,10 @@ WIPE = re.compile(
 # the labs' own ledgers: bp only (the driver's line, when the lab runs the
 # driver, is in the same log and carries the rest)
 LAB_DEATH = re.compile(r"\[death\] (?:t=|f)(?P<t>\d+) entity (?P<e>\d).*?\bbp=(?P<bp>\d+)")
-# a battle opening, to group deaths into fights: the driver's f+1 line or a
-# lab's battle-up line
-BATTLE_UP = re.compile(r"battle f\+1 |\[lab\] battle up|\[m269lab\] battle up|battle-up present mask")
+# a battle opening, to group deaths into fights: the driver's f+1 line, or a
+# lab's battle-up line when no driver ran
+DRIVER_UP = re.compile(r"\] battle f\+1 ")
+LAB_UP = re.compile(r"\[lab\] battle up|\[m269lab\] battle up|battle-up present mask")
 # a wipe the driver did not write itself (the gen fighter, a lab's own
 # verdict, the canary)
 LAB_WIPE = re.compile(r"PARTY WIPED|\[m269lab\] WIPED|canary: BATTLE WIPE|outcome=lost_wiped|outcome=lost_gameover")
@@ -99,11 +100,17 @@ def scan(path):
     worker = worker_of(path)
     fight = 0
     deaths = []            # this fight's death records
-    seen_driver = set()    # (tick, e) the driver already wrote, so a lab line is not a second death
+    seen_driver = set()    # entities the driver already wrote, so a lab line is not a second death
+    # Fights are counted by the driver's own "battle f+1" line when the log
+    # has one; a lab's battle-up line names the same fight (hundreds of
+    # CPU-spam lines apart) and is only used when no driver ran (the
+    # Rizopas control is gen_sabin_falls' own fighter).
+    has_driver = any(DRIVER_UP.search(l) for l in lines if not l.startswith("[ot6note]"))
+    up = DRIVER_UP if has_driver else LAB_UP
     for line in lines:
         if line.startswith("[ot6note]"):
             continue
-        if BATTLE_UP.search(line):
+        if up.search(line):
             fight += 1
             deaths, seen_driver = [], set()
             continue
@@ -193,6 +200,10 @@ def selftest():
         "[ot6] [navTo] [death] f+3000 entity 0 char 4 from 120/502 by slot 3 cmd $00 atk $EE bp=4 party_bp=4,3,0,0 -- died holding 4 BP",
         "[ot6] [navTo] [death] f+3100 entity 1 char 5 from 60/511 by slot 3 cmd $00 atk $EE bp=3 party_bp=0,3,0,0 -- died holding 3 BP",
         "[ot6] [navTo] [wipe] f+3101 party_bp=0,3,0,0 deaths=e2@f+512:447/447:bp1:one_action;e3@f+513:443/443:bp0:one_action;e0@f+3000:120/502:bp4;e1@f+3100:60/511:bp3 class=one-shot early + died with 4 BP banked",
+    ])
+    # a lab whose fighter is not the driver (the Rizopas control): the lab's
+    # own battle-up, death and wipe lines are all there is
+    lab = "\n".join([
         "[ot6] [lab] battle up at f100: $BE=$64",
         "[ot6] [death] t=5583 entity 1 rizo=553/sh1 bp=0 party_bp=1,0",
         "[ot6] [death] t=6500 entity 0 rizo=553/sh1 bp=1 party_bp=1,0",
@@ -202,7 +213,9 @@ def selftest():
         p = os.path.join(d, "states", "x.log")
         os.makedirs(os.path.dirname(p))
         open(p, "w").write(log + "\n")
-        ev = list(scan(p))
+        q = os.path.join(d, "states", "y.log")
+        open(q, "w").write(lab + "\n")
+        ev = list(scan(p)) + list(scan(q))
     deaths = [r for k, r in ev if k == "death"]
     wipes = [r for k, r in ev if k == "wipe"]
     assert len(deaths) == 6, deaths                    # the [ot6note] mirror is not a seventh
@@ -213,7 +226,7 @@ def selftest():
     assert wipes[0]["cls"] == "one-shot early + died with 4 BP banked", wipes[0]["cls"]
     assert classify(wipes[0]["deaths"]) == wipes[0]["cls"]   # the python reading agrees with the lua one
     assert wipes[1]["source"] == "lab" and wipes[1]["cls"] == "worn down (no one-shot, no pips banked)", wipes[1]
-    assert wipes[1]["fight"] == 2 and len(wipes[1]["deaths"]) == 2
+    assert wipes[1]["fight"] == 1 and len(wipes[1]["deaths"]) == 2
     # the thresholds: a one-shot late in the fight is not "early"; 2 BP is not banked
     late = [dict(tick=5000, **{"from": 447}, max=447, bp=2, one_action=True)]
     assert classify(late) == "worn down (no one-shot, no pips banked)", classify(late)
