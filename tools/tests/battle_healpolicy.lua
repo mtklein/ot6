@@ -31,7 +31,15 @@
 --      supply and MP is not, so a caster tops up where a drinker would not.
 --      Alone the refusal is about spending turns instead, and a cast spends
 --      one exactly as a drink does, so `mp` changes nothing there;
---   5. that every case ran.
+--   5. the swing model and the class/reflect bits the press rule (#156)
+--      counts before it skips a heal;
+--   6. the two #165 rules on the Rizopas seed $64 numbers: the kill-this-
+--      turn estimate (H.killEstimate: hits to the last chip shielded, the
+--      rest x4) that lets a press beat lethal-next-round care only when it
+--      ends the fight, and the raise decision (H.raiseDecision: Fenix
+--      Down's maxhp/8 against the enemy's smallest hit) that refuses a
+--      raise into a certain re-kill;
+--   7. that every case ran.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TONIC, POTION = 0xE8, 0xE9
@@ -159,6 +167,42 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.spellReflectable(0x5D), false, "Pummel $5D ignores Reflect")
     H.assertEq(H.spellReflectable(0x8E), false, "Aqua Rake $8E ignores Reflect")
     H.log("battle_healpolicy: swing model, class and reflect bits checked")
+  end),
+
+  -- 6. the two #165 rules, on the Rizopas seed $64 numbers (care_i50.log
+  -- of the lab: SABIN's Fight landed 74 a hit shielded; Rizopas at 553 HP
+  -- behind 1 shield; CYAN 358 max HP raised to 44 and killed by a -44
+  -- Battle four times).
+  H.call(function()
+    -- M.killEstimate: hits to the last chip land shielded, the rest x4
+    local est, toBreak, broken = H.killEstimate({ per = 74, hits = 3, chips = 3, need = 1 })
+    H.assertEq(est, 74 + 2 * 4 * 74, "SABIN's 1-BP Fight (3 swings, 74 a hit) into 1 shield: 74 shielded then two broken hits = 666")
+    H.assertEq(toBreak * 10 + broken, 12, "one swing to the break, two broken")
+    H.assertEq(est >= 553, true, "666 covers Rizopas's 553: a kill this turn")
+    est = H.killEstimate({ per = 49, hits = 3, chips = 3, need = 1 })
+    H.assertEq(est, 49 + 2 * 4 * 49, "the same volley at 49 a hit is 441")
+    H.assertEq(est >= 553, false, "441 is short of 553: break but not kill, so care first")
+    est = H.killEstimate({ per = 74, hits = 3, chips = 3, need = 0 })
+    H.assertEq(est, 3 * 4 * 74, "a broken gauge puts every hit in the window: 888")
+    est = H.killEstimate({ per = 74, hits = 1, chips = 1, need = 1 })
+    H.assertEq(est, 74, "0 BP: one swing, the break itself, nothing broken")
+    H.assertEq(H.killEstimate({ per = 74, hits = 3, chips = 1, need = 2 }), nil, "chips short of the shields: no estimate")
+    H.assertEq(H.killEstimate({ per = 0, hits = 3, chips = 3, need = 1 }), nil, "nothing measured yet: no estimate")
+    est, toBreak, broken = H.killEstimate({ per = 100, hits = 6, chips = 3, need = 2 })
+    H.assertEq(toBreak * 10 + broken, 42, "a Genji pair with one chipping hand: 2 chips of 3 spread over 6 swings is 4 to the break, 2 broken")
+    H.assertEq(est, 4 * 100 + 2 * 400, "priced accordingly: 1200")
+    -- M.raiseDecision: Fenix Down's maxhp/8 against the smallest hit
+    local raiseHp, ok = H.raiseDecision({ maxhp = 358, power = H.itemPower(0xF0), smallestHit = 44 })
+    H.assertEq(raiseHp, 44, "Fenix Down raises CYAN (358) to 44 (measured: [raise] t=6113 entity 1 to 44 hp)")
+    H.assertEq(ok, false, "a 44-HP raise into a 44 hit is a certain re-kill: refused")
+    raiseHp, ok = H.raiseDecision({ maxhp = 358, power = 2, smallestHit = 42 })
+    H.assertEq(ok, true, "a 42 hit leaves 2 HP: the raise stands")
+    raiseHp, ok = H.raiseDecision({ maxhp = 358, power = 2, smallestHit = nil })
+    H.assertEq(ok, true, "nothing measured yet: the raise stands (the old behaviour)")
+    raiseHp, ok = H.raiseDecision({ maxhp = 1400, power = 2, smallestHit = 318 })
+    H.assertEq(raiseHp * 10 + (ok and 1 or 0), 1750, "LOCKE (1400) raises to 175; Nerapa's 318 Battle re-kills it")
+    H.assertEq(H.itemPower(0xF0), 2, "Fenix Down $F0 power byte is 2 (ItemProp +20; CalcRatio >> 4 = 1/8)")
+    H.log("battle_healpolicy: kill estimate and raise decision checked")
   end),
 
   -- 4. the table was not skipped
