@@ -253,7 +253,9 @@ end
 local menuAt = nil
 local function menuRoundTrip()
   local ph, calm = 0, 0
-  return {
+  -- H.cond(always, steps) is the lib's step-group idiom: H.run wants one
+  -- step per slot, not a bare list
+  return H.cond(function() return true end, {
     H.driveUntil(function()
       if H.readByte(ZMENUSTATE) == 0x05 then menuAt = menuAt or H.frame; return true end
       return false
@@ -277,7 +279,7 @@ local function menuRoundTrip()
       end),
     }, "field menu closed, world control back"),
     H.release(),
-  }
+  })
 end
 
 local before = {}
