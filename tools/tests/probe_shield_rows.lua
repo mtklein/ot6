@@ -38,7 +38,7 @@ local SPECIES = { [0x0052] = "SlamDancer", [0x004E] = "Harvester",
                   [0x0053] = "HadesGigas", [0x00DF] = "Gabbldegak",
                   [0x0086] = "Cirpius", [0x007A] = "Tusker", [0x000B] = "Brawler" }
 local ATTACK = { [0x7D] = "BioBlaster", [0xA4] = "BioBlaster", [0x5D] = "Pummel",
-                 [0x2D] = "Cure", [0xFF] = "Fight", [0x82] = "AutoCrossbow",
+                 [0x2D] = "Cure", [0xFF] = "Fight", [0xAA] = "AutoCrossbow",
                  [0xEE] = "Battle", [0xEF] = "Special" }
 local CLASSNAME = { "SLASH", "PIERCE", "BLUDG", "SPECIAL" }
 local function classStr(mask)
@@ -70,10 +70,12 @@ local function partyLine()
   end
   return table.concat(p, ",")
 end
--- $1600 + 37*c: +$1B R-Hand, +$1C L-Hand (item ids; $FF = empty)
+-- $1600 + 37*c: +$1F R-Hand, +$20 L-Hand (item ids; $FF = empty).  (+$1A..
+-- +$1D are vigor/speed/stamina/magic; a first draft read those.)
 local function hands(c)
+  if c > 15 then return string.format("c%d:-", c) end
   local b = 0x1600 + 37 * c
-  return string.format("c%d:R=$%02X,L=$%02X", c, H.readByte(b + 0x1B), H.readByte(b + 0x1C))
+  return string.format("c%d:R=$%02X,L=$%02X", c, H.readByte(b + 0x1F), H.readByte(b + 0x20))
 end
 local function monsterLine()
   local m = {}
@@ -143,9 +145,17 @@ local function fightStep()
     if H.battleLoadStarted() then
       offN = 0
       if battle.started == nil then battle.started = H.frame end
-      local anyMon = false
-      for i = 0, 5 do if monPresent(i) then anyMon = true end end
-      if battle.form == nil and anyMon then
+      -- the seeded line waits for Ot6SeedShields to have run on every
+      -- present slot (max shields nonzero; a 0-shield species would wait
+      -- the 120-frame fallback), since slots fill over several frames
+      local anyMon, allSeeded = false, true
+      for i = 0, 5 do
+        if monPresent(i) then
+          anyMon = true
+          if monMaxShields(i) == 0 then allSeeded = false end
+        end
+      end
+      if battle.form == nil and anyMon and (allSeeded or H.frame - battle.started >= 120) then
         battle.form = true
         local hs = {}
         for s = 0, 3 do hs[#hs + 1] = hands(slotChar(s)) end
