@@ -463,8 +463,33 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   -- AtmaWeapon and the statue scene.
   H.saveState("escape_start.mss"),
 
+  -- ---- 3b. dress CELES under the clock ---------------------------------------
+  -- The statue scene hands CELES over as the escape's fourth with every
+  -- slot $FF (benched bare since the Vector crash), and she fights the
+  -- whole escape that way unless dressed here -- the field menu opens on
+  -- 393 and the clock runs through it.  Measured (lab V4, 2026-09-07):
+  -- one Equip session and one Relic session cost 1,349 frames of clock
+  -- (21,537 -> 20,188), the Break Blade $11 and relics $B1/$B5 landed, and
+  -- the shield/helm/armor rungs ($84, $5B/$5A, $6B/$69) were refused by
+  -- her own list at ~120-150 frames each, so they are not asked for.
+  H.call(function()
+    local base = 0x1600 + 37 * 6
+    H.log(string.format("[escape] CELES before the kit: %02X %02X %02X %02X %02X %02X master=%d",
+      H.readByte(base + 0x1F), H.readByte(base + 0x20), H.readByte(base + 0x21),
+      H.readByte(base + 0x22), H.readByte(base + 0x23), H.readByte(base + 0x24), H.readWord(0x1189)))
+  end),
+  H.equipKit(6, { { 0, 0x11 }, { 0, 0x0E }, { 0, 0x0A },
+                  { 4, 0xB1 }, { 5, 0xB5 } }, { tag = "CELES escape kit", ladder = true }),
+  H.call(function()
+    local base = 0x1600 + 37 * 6
+    H.log(string.format("[escape] CELES after the kit: %02X %02X %02X %02X %02X %02X master=%d",
+      H.readByte(base + 0x1F), H.readByte(base + 0x20), H.readByte(base + 0x21),
+      H.readByte(base + 0x22), H.readByte(base + 0x23), H.readByte(base + 0x24), H.readWord(0x1189)))
+    H.assertEq(H.readByte(base + 0x1F) ~= 0xFF, true, "CELES holds a weapon for the escape")
+  end),
+
   -- ---- 4. Nerapa, the ledge, the wait ---------------------------------------
-  clock("out of the statue scene"),
+  clock("out of the statue scene, CELES dressed"),
   H.navTo(106, 15, { maxFrames = 20000, playBattles = ESCAPE_WALK.playBattles,
     bank = ESCAPE_WALK.bank, healPercent = ESCAPE_WALK.healPercent, care = false }),
   clock("at Nerapa's doorstep"),

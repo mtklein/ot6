@@ -511,7 +511,8 @@ leave roll a no-op). Every run is `tools/tests/run.sh` with
 | P → Q `gen_fc_landing` | `fc-landing-v1_20260907-072734.log` | `PASS (frame 65085)` | 14 IAF battle-actives (6 waves, Ultros④+Chupon, AirForce; the counter double-counts a wave whose load blinks) | 2, both in one wave (`[IAF] actor=1/2 revive entity 0`) | TERRA L23 · LOCKE L27 · EDGAR L25 |
 | Q → R `gen_fc_alcove` | `fc-alcove-v1_20260907-073713.log` | `PASS (frame 38559)` | 7 randoms on 394 (two Dragons at 7000 HP, a Behemoth pack, two Ninja trios, two Apokryphos/Misfit fours) | 0 | TERRA L25 · LOCKE L28 · SHADOW L25 · EDGAR L27 |
 | R → WoR `gen_fc_escape`, attempt 1 (mustflee walk) | `wor_landing_20260907-074008.log` | **FAIL** at Nerapa: `assertEq failed: Nerapa defeated: got true, want false` | AtmaWeapon won (24000 HP, 11 pips, re-shield at 4130 with 10; ~10,000 frames, 0 Fenix); 4 Naughty on 393; Nerapa LOST | 2, both on Nerapa | TERRA L26 · LOCKE L29 · SHADOW L25 · EDGAR L27 at `escape_start` |
-| R → WoR `gen_fc_escape`, attempt 2 (fight walk) | see the commit that lands this row | (filled in below) | | | |
+| R → WoR `gen_fc_escape`, attempt 2 (fight walk) | `wor_landing_20260907-075542.log` | **FAIL**, the same line | frame-identical to attempt 1 through the doorstep (3:51 at f49317): the 63-frame L+R hold fell inside battle load | 2, Nerapa | — |
+| R → WoR `gen_fc_escape`, attempt 3 (fight walk + Nerapa seed ladder) | `wor_landing_20260907-080405.log` | `PASS (frame 78180)` | ladder rung 1 (`seeded $be=$10 from $021e=4`) won at t≈12,500 — `WON on attempt 1 at f61888, master clock 1419` (0:23 left); Shadow saved (`$037D`); `landing: map=397 (99,38) party=1 hp=964 $00A4=1 $037D=1` | **7, all on Nerapa** (Condemned killed slots 0–1 at t≈9,000 and they were raised) — a lab candidate | CELES L24 solo at the bedside |
 
 Both battery payloads came out **byte-identical** to the 2026-09-01 cuts
 (`fc-landing.sram` e7c0ea7b…, `fc-alcove.sram` 985d5a55…): the merged
