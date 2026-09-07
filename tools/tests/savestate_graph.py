@@ -603,4 +603,48 @@ STATES = [
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/thamasa-done-v1
     S("thamasa_done", gen="gen_massacre", checkpoint="ultros-won-v1",
       timeout=1800),
+
+    # boundary P -> boundary Q (the Floating Continent landing): cold-Continue
+    # the tracked thamasa-done-v1 SRAM (world (249,128)), do the Thamasa prep
+    # (Potions/Fenix/Tonics, the bag arranged), board the Blackjack, ride the
+    # FC-discovery scene, form TERRA LOCKE EDGAR at the deck's party select,
+    # fight the whole IAF gauntlet (six Sky Armor / Spit Fire waves, Ultros IV
+    # + Chupon, the Air Force -- every loss a real Game Over, no ladder), land
+    # on 394 and Save at the landing SavePoint 394 (7,12) -- the
+    # `fc-landing-v1` checkpoint.  checkpoint=, not prev=: the gen_massacre /
+    # gen_ultros shape.  timeout=3600: fourteen fought battles plus the deck
+    # scenes run past 1800 s on a loaded machine.  Re-cutting the SRAM is a
+    # deliberate by-hand operation:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/thamasa-done-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/fc-landing-v1/fc-landing.sram \
+    #     tools/tests/run.sh tools/tests/gen_fc_landing.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/fc-landing-v1
+    S("fc_landing", gen="gen_fc_landing", checkpoint="thamasa-done-v1",
+      timeout=3600),
+
+    # boundary Q -> boundary R (the continent's save alcove): cold-Continue
+    # fc-landing-v1 at 394 (7,12), talk SHADOW in at (10,16), cross the
+    # continent by the route doc's validated reveal/chute order to the (90,43)
+    # drop into the encounter-free alcove 358, and Save at 358 (8,10) -- the
+    # `fc-alcove-v1` checkpoint.  Every FC random is fought (7 of the 12
+    # formations cannot be fled).  Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fc-landing-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/fc-alcove-v1/fc-alcove.sram \
+    #     tools/tests/run.sh tools/tests/gen_fc_alcove.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/fc-alcove-v1
+    S("fc_alcove", gen="gen_fc_alcove", checkpoint="fc-landing-v1",
+      timeout=3600),
+
+    # boundary R -> the World of Ruin (the end of the World of Balance):
+    # cold-Continue fc-alcove-v1, climb back to AtmaWeapon's plateau, beat
+    # him, ride the statue scene onto the escape map 393, beat Nerapa under
+    # the 6:00 clock, wait for Shadow at the ledge, and ride the airship's
+    # flight into the RUIN cutscene down to solo Celes at the Solitary
+    # Island bedside (map 397).  No battery cut: nothing between the alcove
+    # and the landing is a save point, so this is a plain savestate link.
+    # escape_start: gen_fc_escape's second artifact, first control on the
+    # escape map 393 with the 6:00 master clock and Shadow's 5:55 clock
+    # running -- the escape-policy lab's fixture (one run, both states).
+    S("wor_landing", gen="gen_fc_escape", checkpoint="fc-alcove-v1",
+      also=["escape_start"], timeout=3600),
 ]

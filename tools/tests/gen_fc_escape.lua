@@ -359,6 +359,11 @@ H.run({ maxFrames = 400000 }, {
       H.readWord(0x1188), H.readWord(0x118C), H.fieldX(), H.fieldY()))
     H.screenshot("escape_start")
   end),
+  -- escape_start: the lab fixture for the 6:00 clock (declared with
+  -- also= in the graph): first control on 393 with both clocks running,
+  -- so an escape-policy experiment branches here instead of replaying
+  -- AtmaWeapon and the statue scene.
+  H.saveState("escape_start.mss"),
 
   -- ---- 4. Nerapa, the ledge, the wait ---------------------------------------
   clock("out of the statue scene"),
@@ -426,19 +431,17 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ---- 5. the exit flow and the landing ---------------------------------------
-  -- the landing: control never came back at the bedside on the first
-  -- clean run (ctrl=false for 14400+ frames at (99,38), no dialog up), so
-  -- the wait logs every control component while on 397 and keeps a
-  -- savestate of the first island frame for a probe
+  -- the landing: the opening's dialogs page for ~5,000 frames after the
+  -- party reaches (100,38) before control returns (measured; the route
+  -- doc s6), so the wait logs every control component while on 397
   (function()
-    local t, saved = 0, false
+    local t = 0
     return H.driveUntil(function()
       t = t + 1
       if (H.gameOverFired or 0) > 0 then error("the landing was LOST (game over)", 0) end
       return t >= 60000 or (mapIs(397) and H.hasControl() and not H.dialogWaiting())
     end, 60500, {
       H.call(function()
-        if mapIs(397) and not saved then saved = true; H.saveState("wor_probe.mss"); H.log("[escape] first island frame saved as wor_probe.mss") end
         if mapIs(397) and t % 1200 == 0 then
           local pobj = H.readWord(0x0803)
           H.log(string.format("[landing] t=%d (%d,%d) $1eb9=%02X $0084=%02X $0059=%02X pobj=%04X mvtype=%02X event=%s battle=%s dlg=%s ctrl=%s $ba=%02X $d3=%02X evpc=%02X%02X%02X",
