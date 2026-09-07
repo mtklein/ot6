@@ -61,12 +61,13 @@
 --   * a crossing replayed from the same approach is exact: two policies
 --     that make the same fight decisions arrive in byte-identical
 --     snapshots, so the policies below are paired per seed;
---   * Ultros 2 gets ONE action before he dies (30 fights, 30 wins, ~2800
---     frames each): a weak single hit of 38..101, a 219..241 hit on SABIN,
---     or, in 5 of 30, a two-target hit of 259..278 on LOCKE and 117..132
---     on EDGAR.  LOCKE's max is 397.  The shipped no-items policy arrived
---     with him at or under 278 in 6 of 12 crossings (167..267) -- one hit
---     from KO -- and under the max/8 gate once (SABIN 40/457);
+--   * Ultros 2 gets ONE action before he dies (35 fights, 35 wins, ~2800
+--     frames each): a weak single hit of 37..101, a 219..241 hit on SABIN,
+--     or, in 8 of 35, a two-target hit of 258..281 on LOCKE (two of the
+--     eight landed on a LOCKE below that and killed him: 109 and 196) and
+--     117..132 on EDGAR.  LOCKE's max is 397.  The shipped no-items policy
+--     arrived with him at or under 281 in 6 of 12 crossings (167..267) --
+--     one hit from KO -- and under the max/8 gate once (SABIN 40/457);
 --   * the gate is not the lever: max/4 rejects the same single arrival
 --     max/8 does and spends a whole re-crossing on it; neither sees LOCKE
 --     at 198;
@@ -77,11 +78,11 @@
 --     member is under healPercent or inside one measured round of death):
 --     at 33%, 3 Potion plans in 12 crossings, repairing the one sub-gate
 --     arrival for 680 clock frames and no reload; at 50%, 6 plans, LOCKE
---     > 278 in 7 of 12; at 70%, 18 plans (a re-plan of the same heal logs
+--     > 281 in 7 of 12; at 70%, 18 plans (a re-plan of the same heal logs
 --     twice, so Potions spent is at most that; at most 5 plans in one
 --     crossing, worst extra clock cost 1616 frames, lowest arrival timer
 --     2608 against the 900 floor; the arrival line now says how many
---     Potions are left), LOCKE > 278 in 9 of 12 and nobody under 56%.  70% ships:
+--     Potions are left), LOCKE > 281 in 9 of 12 and nobody under 56%.  70% ships:
 --     the rat fights are the only care this timed scene allows (no menu),
 --     and the fight after them opens with that hit.
 
@@ -209,7 +210,7 @@ end
 --     boosted default, and safer (zero casualties in ~40 lab fights);
 --     items=true, healPercent=70: a Potion when a member is under 70% or
 --     inside one round of death, because the boss after these fights
---     opens with a hit of up to 278 on LOCKE (#164, header).
+--     opens with a hit of up to 281 on LOCKE (#164, header).
 -- The rat fights' driver options, on one line: tools/tests/
 -- rafterlab_batch_gen.sh substitutes it (RAFTERLAB_DRIVER) to measure a
 -- candidate policy against the shipped one from the same catwalk snapshot.
