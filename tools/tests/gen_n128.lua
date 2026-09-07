@@ -161,10 +161,34 @@ local function rideDriver(pred, lostRef, maxFrames, what)
     healPercent = 85, cadence = 12,
     magic = { [LOCKE] = { spell = BOLT, boost = false } },
     focus = { { slot = 0, mask = 0x01 } } })
+  local wipedN = 0
   return H.driveUntil(function() return lostRef.lost or pred() end, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
       hb = hb + 1
+      -- #163: the loss watch runs before the battle gate, on EVERY frame.
+      -- A wipe zeroes every battle-HP word, which battleLoadStarted()
+      -- reads as "no battle", so the in-fight check below (inside battN
+      -- >= 3) never saw the one state it existed for and a lost ride
+      -- idled to its budget (gen_sabin_falls, #159, had the same shape).
+      -- The lib's wipe predicate held 120 straight frames (this file's
+      -- own debounce) is the loss; so is the run canary's count (it now
+      -- counts a 300-frame battle-side wipe as a game over and freezes
+      -- the pad -- allowGameOver on the run keeps the ladder alive for
+      -- the reload).
+      wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
+      if not lostRef.lost and (H.gameOverFired or 0) > 0 then
+        lostRef.lost = true
+        H.log(string.format("[ride] GAME OVER counted by the canary in " ..
+          "fight %d at f%d", #fights, H.frame))
+      end
+      if not lostRef.lost and wipedN >= 120 then
+        lostRef.lost = true
+        H.log(string.format("[ride] PARTY WIPED in fight %d at f%d " ..
+          "(the lib's wipe predicate, outside the battle gate)",
+          #fights, H.frame))
+      end
+      if lostRef.lost then Ftrash.idle(); Fboss.idle(); H.setPad({}); return end
       if hb % 600 == 0 then
         local mhp = {}
         if H.battleLoadStarted() then
@@ -257,7 +281,13 @@ local function rideAttempt(n)
         loadReq = H.requestLoadState(rideBlob)
       end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "ride entry point reload") end),
+      H.call(function()
+        H.checkReq(loadReq, "ride entry point reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(90),
       H.call(function()
         H.assertEq(map(), 272, "reloaded onto map 272")
@@ -302,7 +332,10 @@ local function rideAttempt(n)
   })
 end
 
-H.run({ maxFrames = 400000 }, {
+-- allowGameOver: the ride ladder deliberately survives a lost ride
+-- (#163); rideDriver reads H.gameOverFired as a loss and the next attempt
+-- reloads.
+H.run({ maxFrames = 400000, allowGameOver = true }, {
   -- checkpoint boot: cold Continue into the 272 save tile {3,55}, entry
   -- contract, then walk back beside CID and face him.
   H.waitFrames(350),

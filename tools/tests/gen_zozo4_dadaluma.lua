@@ -135,14 +135,21 @@ local function encounters(what, onWipe)
   local wiped = false
   return function()
     if wiped then H.setPad({}); return true end
-    if battleHpAllZero() and not H.hasControl() and H.eventRunning() then
+    -- #163: the run canary's own count is a wipe signal too -- it now
+    -- counts a 300-frame battle-side wipe (M.partyWipedInBattle) as a
+    -- game over and freezes the pad, and the run carries allowGameOver
+    -- for the ladders, so it is read here rather than ending the run.
+    local counted = (H.gameOverFired or 0) > 0
+    if counted or (battleHpAllZero() and not H.hasControl()
+                   and H.eventRunning()) then
       dead = dead + 1
-      if dead >= 300 then
-        local msg = string.format("%s: THE PARTY IS WIPED -- all four " ..
-          "battle-HP words have read 0 with the event running and no " ..
-          "control for 300 consecutive frames, at (%d,%d) on map %d.  " ..
-          "This is a lost fight, not a stuck walk.",
-          what, H.fieldX(), H.fieldY(), map())
+      if counted or dead >= 300 then
+        local msg = string.format("%s: THE PARTY IS WIPED -- %s, at " ..
+          "(%d,%d) on map %d.  This is a lost fight, not a stuck walk.",
+          what, counted and "the run canary counted a game over"
+            or ("all four battle-HP words have read 0 with the event " ..
+                "running and no control for 300 consecutive frames"),
+          H.fieldX(), H.fieldY(), map())
         if onWipe then
           wiped = true
           onWipe(msg)
@@ -253,6 +260,30 @@ local function mkFighter(tier, tag)
   local bt = nil
   local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
   local phase = 0
+  local wipeN = 0
+  -- #163: the loss watch, called on EVERY frame of the drive rather than
+  -- from F.frame, which the caller reaches only while battleLoadStarted()
+  -- holds -- and a wipe zeroes every battle-HP word, which that predicate
+  -- reads as "no battle", so the old in-fight check never saw the one
+  -- state it existed for (gen_sabin_falls, #159, had the same shape).
+  -- The lib's wipe predicate held 90 straight frames is the loss; so is
+  -- the run canary's count (it now counts a 300-frame battle-side wipe as
+  -- a game over and freezes the pad -- allowGameOver on the run keeps the
+  -- ladder alive for the reload).
+  function F.watch()
+    wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
+    if (H.gameOverFired or 0) > 0 and not F.lost then
+      F.lost = string.format("GAME OVER counted by the canary at f%d " ..
+        "(tier %d) -- party [%s]", H.frame, tier, partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+    end
+    if wipeN >= 90 and not F.lost then
+      F.lost = string.format("PARTY WIPED at f%d (started f%s, tier %d) " ..
+        "-- party [%s]", H.frame, bt and tostring(bt.f0) or "?", tier,
+        partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+    end
+  end
   function F.frame(battN)
     phase = (phase + 1) % 8
     if battN == 3 then
@@ -267,20 +298,7 @@ local function mkFighter(tier, tag)
         H.log(string.format("[%s] f%d party [%s] vs %s",
           tag, H.frame, partyLine(), monsterLine()))
       end
-      local wiped, any = true, false
-      for e = 0, 3 do
-        if H.readWord(BCMAXHP + e * 2) > 0 then
-          any = true
-          if H.readWord(BCHP + e * 2) > 0 then wiped = false end
-        end
-      end
-      bt.wiped = (any and wiped) and bt.wiped + 1 or 0
-      if bt.wiped >= 90 and not F.lost then
-        F.lost = string.format("PARTY WIPED at f%d (started f%d, %d frames " ..
-          "in, tier %d) -- party [%s] vs %s", H.frame, bt.f0,
-          H.frame - bt.f0, tier, partyLine(), monsterLine())
-        H.log("[" .. tag .. "] " .. F.lost)
-      end
+      -- the wipe verdict is F.watch's, taken before this gate (#163)
     end
     if bt == nil or H.readByte(MENU) == 0 then
       mStreak, mSeq = 0, nil
@@ -778,10 +796,13 @@ local function climbAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(climbBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "climb attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "climb attempt " .. n)
+        H.gameOverFired = 0             -- the lost attempt's count (#163)
+      end),
       H.waitFrames(60),
     }, {}),
-    H.call(function() climbFail = nil end),
+    H.call(function() climbFail = nil; H.gameOverFired = 0 end),
     burnStep(),
     jitterStep((n - 1) * 2),
     H.logStep(function()
@@ -1014,11 +1035,15 @@ local function stairAttempt(n)
         stairSaveReq.reload = r
       end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(stairSaveReq.reload, "stair attempt " .. n) end),
+      H.call(function()
+        H.checkReq(stairSaveReq.reload, "stair attempt " .. n)
+        H.gameOverFired = 0             -- the lost attempt's count (#163)
+      end),
       H.waitFrames(60 + (n - 1) * 29),
     }, {}),
     H.call(function()
       stairFail = nil
+      H.gameOverFired = 0
       fought = encounters("stairFollow attempt " .. n,
         function(msg) stairFail = msg end)
     end),
@@ -1146,7 +1171,11 @@ local function jumpRow(dir, pred, maxFrames, what)
   })
 end
 
-H.run({ maxFrames = 400000 }, {
+-- allowGameOver: the climb, stair and Dadaluma ladders deliberately
+-- survive a lost fight (#163); encounters()' onWipe sink and F.watch read
+-- H.gameOverFired as a loss and the next attempt reloads.  An unladdered
+-- encounters() still raises on it.
+H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   H.call(function()
@@ -1347,6 +1376,8 @@ H.run({ maxFrames = 400000 }, {
           and H.tileAligned() and bright() >= 15
       end, 40000, {
         H.call(function()
+          F.watch()                       -- every frame, outside the gate
+          if F.lost then H.setPad({}); return end
           battN = H.battleLoadStarted() and battN + 1 or 0
           if battN >= 3 then
             F.frame(battN)
@@ -1367,10 +1398,16 @@ H.run({ maxFrames = 400000 }, {
           end),
           H.call(function() ldReq = H.requestLoadState(dadaBlob) end),
           H.waitFrames(2),
-          H.call(function() H.checkReq(ldReq, "dadaluma attempt " .. n) end),
+          H.call(function()
+            H.checkReq(ldReq, "dadaluma attempt " .. n)
+            -- the restored snapshot restarts the experiment: the canary's
+            -- count (and its pad freeze, which the reload thaws) belong
+            -- to the lost attempt
+            H.gameOverFired = 0
+          end),
           H.waitFrames(60),
         }, {}),
-        H.call(function() dadaLost = nil end),
+        H.call(function() dadaLost = nil; H.gameOverFired = 0 end),
         H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(4),
         fightBody(n),
         H.call(function()

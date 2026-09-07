@@ -224,7 +224,13 @@ local function ifritAttempt(n)
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(fightBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "entry point reload") end),
+      H.call(function()
+        H.checkReq(loadReq, "entry point reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt (#163)
+        H.gameOverFired = 0
+      end),
       H.waitFrames(90),
       H.call(function()
         H.assertEq(map(), 264, "reloaded onto map 264")
@@ -274,21 +280,29 @@ local function ifritAttempt(n)
     -- the library fighter drives the fight; its menu==0 branch pages
     -- battle text, the recognition scene's dialogs, and the victory
     -- teardown, carrying the whole battle from fly-in to field.
+    -- #163: a wipe zeroes every battle-HP word, which battleLoadStarted()
+    -- reads as "no battle", so the old `not battleLoadStarted() or wiped
+    -- >= 120` ended this drive on the FIRST wiped frame with `wiped` at 1
+    -- and the reload branch below never ran; the decide loop then tapped
+    -- A into the Annihilated screen.  The drive now stays up while the
+    -- lib's wipe predicate holds and ends on its 120-frame count, or on
+    -- the run canary's count (it now counts a 300-frame battle-side wipe
+    -- as a game over and freezes the pad -- allowGameOver on the run
+    -- keeps the ladder alive for the reload).
     H.driveUntil(function()
-      return not H.battleLoadStarted() or wiped >= 120
+      if (H.gameOverFired or 0) > 0 then return true end
+      if wiped >= 120 then return true end
+      return not H.battleLoadStarted() and not H.partyWipedInBattle()
     end, 90000, {
       H.call(function()
         hb = hb + 1
-        -- Wipe watch: all four at 0 HP is a lost fight.  Abort the
-        -- attempt and reload BEFORE the game-over lands (the canary's
-        -- sanctioned ladder pattern) -- the battle module's own game-over
-        -- flow follows the last death by whole seconds, so 120 frames of
+        -- Wipe watch: the lib's predicate (every sane battle-HP word 0
+        -- with the battle table live) is a lost fight.  Abort the attempt
+        -- and reload BEFORE the game-over lands (the canary's sanctioned
+        -- ladder pattern) -- the battle module's own game-over flow
+        -- follows the last death by whole seconds, so 120 frames of
         -- confirmed all-dead wins the race comfortably.
-        local alive = false
-        for e = 0, 3 do
-          if H.readWord(0x3BF4 + e * 2) > 0 then alive = true break end
-        end
-        wiped = (not alive) and wiped + 1 or 0
+        wiped = H.partyWipedInBattle() and wiped + 1 or 0
         if hb % 600 == 0 then
           H.log(string.format(
             "f%d ifr hp=%d sh=%d tk=%d fld=%d | shv hp=%d sh=%d tk=%d | party %d/%d/%d/%d",
@@ -318,10 +332,11 @@ local function ifritAttempt(n)
     }, "battle 70, played (tactical + boost bank + real items)"),
     -- A wiped attempt reloads the entry blob HERE, before the game-over
     -- screen can land, and clears the canary counter for the race window.
-    H.cond(function() return wiped >= 120 end, {
+    H.cond(function() return wiped >= 120 or (H.gameOverFired or 0) > 0 end, {
       H.logStep(function()
-        return string.format("attempt %d WIPED -- reloading the entry "
-          .. "blob before game over lands", n)
+        return string.format("attempt %d WIPED (wiped=%d gameOverFired=%d) "
+          .. "-- reloading the entry blob before game over lands", n, wiped,
+          H.gameOverFired or 0)
       end),
       H.call(function() wipeReq = H.requestLoadState(fightBlob) end),
       H.waitFrames(2),
@@ -368,7 +383,9 @@ local function ifritAttempt(n)
   })
 end
 
-H.run({ maxFrames = 300000 }, {
+-- allowGameOver: the battle-70 ladder deliberately survives a lost fight
+-- (#163); the fight drive reads H.gameOverFired as a loss and reloads.
+H.run({ maxFrames = 300000, allowGameOver = true }, {
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),

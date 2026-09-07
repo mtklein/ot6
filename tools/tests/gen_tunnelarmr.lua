@@ -522,6 +522,7 @@ local function armrAttempt(n)
   local pulse = armrPulse()
   local aPh, giveUp = 0, 0
   local loadReq
+  local wipedN, lostEarly = 0, nil
   return H.cond(function() return armrWon end, {}, {
     H.logStep(function()
       return string.format("TunnelArmr attempt %d at f%d", n, H.frame)
@@ -529,7 +530,13 @@ local function armrAttempt(n)
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(armrBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "entry point reload") end),
+      H.call(function()
+        H.checkReq(loadReq, "entry point reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt (#163)
+        H.gameOverFired = 0
+      end),
       H.waitFrames(90),
       H.call(function()
         H.assertEq(map(), 70, "reloaded onto map 70")
@@ -564,34 +571,60 @@ local function armrAttempt(n)
       H.assertEq(H.readByte(0x3e40 + (s or 0) * 2), 5,
         "5 shields seeded, per Ot6ShieldTbl $0104")
     end),
-    H.driveUntil(function() return not H.battleLoadStarted() end, 60000, {
+    -- #163: a wipe zeroes every battle-HP word, which battleLoadStarted()
+    -- reads as "no battle", so `not battleLoadStarted()` alone ends this
+    -- drive on the first wiped frame and the decide loop below then taps
+    -- A into the Annihilated screen for up to 3000 frames.  The lib's
+    -- wipe predicate held 90 straight frames, or the run canary's count
+    -- (it now counts a 300-frame battle-side wipe as a game over and
+    -- freezes the pad -- allowGameOver on the run keeps the ladder alive
+    -- for the reload), names the loss here instead and skips the taps.
+    H.driveUntil(function()
+      wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
+      if (H.gameOverFired or 0) > 0 and not lostEarly then
+        lostEarly = string.format("GAME OVER counted by the canary at f%d",
+          H.frame)
+      elseif wipedN >= 90 and not lostEarly then
+        lostEarly = string.format("PARTY WIPED at f%d (the lib's wipe " ..
+          "predicate, 90 frames)", H.frame)
+      end
+      if lostEarly then return true end
+      return not H.battleLoadStarted() and not H.partyWipedInBattle()
+    end, 60000, {
       H.call(function() H.setPad(pulse()) end),
       H.waitFrames(6),
       H.call(function() H.setPad({}) end),
       H.waitFrames(24),
     }, "TunnelArmr fight (Runic + boosted Fights)"),
+    H.call(function() H.setPad({}) end),
     H.logStep(function()
-      return string.format("battle 67 torn down at f%d; deciding", H.frame)
+      return string.format("battle 67 torn down at f%d (%s); deciding",
+        H.frame, lostEarly or "no wipe seen")
     end),
     -- Decide won or lost.  Tap A while control is away (pages the win tail's
-    -- "Whew!" and, on a loss, the Annihilated screen); give the tail 3000
-    -- frames to flip $001E before calling the attempt lost.
-    H.driveUntil(function()
-      giveUp = giveUp + 1
-      return sw(0x001E) == 1 or giveUp >= 3000
-    end, 3200, {
-      H.call(function()
-        aPh = (aPh + 1) % 8
-        if not H.hasControl() then H.setPad(aPh < 4 and { "a" } or {})
-        else H.setPad({}) end
-      end),
-    }, "the win tail flips $001E (or the loss shows itself)"),
+    -- "Whew!"); give the tail 3000 frames to flip $001E before calling the
+    -- attempt lost.  Skipped when the fight was already lost above: the
+    -- A-taps there would press into the Annihilated screen.
+    H.cond(function() return lostEarly == nil end, {
+      H.driveUntil(function()
+        giveUp = giveUp + 1
+        return sw(0x001E) == 1 or giveUp >= 3000
+      end, 3200, {
+        H.call(function()
+          aPh = (aPh + 1) % 8
+          if not H.hasControl() then H.setPad(aPh < 4 and { "a" } or {})
+          else H.setPad({}) end
+        end),
+      }, "the win tail flips $001E (or the loss shows itself)"),
+    }, {}),
     H.call(function()
       H.setPad({})
-      if sw(0x001E) == 1 then
+      if lostEarly == nil and sw(0x001E) == 1 then
         armrWon = true
         H.log(string.format("TunnelArmr BEATEN on attempt %d, f%d",
           n, H.frame))
+      elseif lostEarly then
+        H.log(string.format("attempt %d LOST (%s), f%d", n, lostEarly, H.frame))
       else
         H.log(string.format("attempt %d LOST (no $001E after teardown), f%d",
           n, H.frame))
@@ -600,7 +633,10 @@ local function armrAttempt(n)
   })
 end
 
-H.run({ maxFrames = 300000 }, {
+-- allowGameOver: the TunnelArmr ladder deliberately survives a lost
+-- battle 67 (#163); the fight drive reads H.gameOverFired as a loss and
+-- the next attempt reloads.
+H.run({ maxFrames = 300000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(60),
   H.call(function()

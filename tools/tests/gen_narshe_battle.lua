@@ -156,6 +156,32 @@ local function mkFighter(tier, tag)
   local bt = nil
   local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
   local phase = 0
+  local wipeN = 0
+  -- #163: the loss watch, called on EVERY frame of the drive rather than
+  -- from F.frame, which the caller reaches only while battleLoadStarted()
+  -- holds -- and a wipe zeroes every battle-HP word, which that predicate
+  -- reads as "no battle", so the old in-fight check never saw the one
+  -- state it existed for (gen_sabin_falls, #159, had the same shape).
+  -- The lib's wipe predicate held 90 straight frames is the loss; so is
+  -- the run canary's count (it now counts a 300-frame battle-side wipe as
+  -- a game over and freezes the pad -- allowGameOver on the run keeps the
+  -- ladders alive for the reload).
+  function F.watch()
+    wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
+    if (H.gameOverFired or 0) > 0 and not F.lost then
+      F.lost = string.format("GAME OVER counted by the canary at f%d " ..
+        "(battle #%s, tier %d) -- party [%s]", H.frame,
+        bt and tostring(bt.n) or "?", tier, partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+    end
+    if wipeN >= 90 and not F.lost then
+      F.lost = string.format("PARTY WIPED in battle #%s at f%d (started " ..
+        "f%s, tier %d) -- party [%s]", bt and tostring(bt.n) or "?",
+        H.frame, bt and tostring(bt.f0) or "?", tier, partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+      H.screenshot(string.format("narshe_lost%d", bt and bt.n or 0))
+    end
+  end
   function F.frame(battN)
     phase = (phase + 1) % 8
     if battN == 3 then
@@ -178,24 +204,7 @@ local function mkFighter(tier, tag)
         H.log(string.format("[%s] #%d f%d party [%s] vs %s",
           tag, bt.n, H.frame, partyLine(), monsterLine()))
       end
-      -- wipe watch: every fielded entity at 0 HP, 90 straight frames
-      -- (past any mid-round revive the policy could produce)
-      local wiped, any = true, false
-      for e = 0, 3 do
-        if H.readWord(BCMAXHP + e * 2) > 0 then
-          any = true
-          if H.readWord(BCHP + e * 2) > 0 then wiped = false end
-        end
-      end
-      bt.wiped = (any and wiped) and bt.wiped + 1 or 0
-      if bt.wiped >= 90 and not F.lost then
-        F.lost = string.format("PARTY WIPED in battle #%d at f%d " ..
-          "(started f%d, %d frames in, tier %d) -- party [%s] vs %s",
-          bt.n, H.frame, bt.f0, H.frame - bt.f0, tier, partyLine(),
-          monsterLine())
-        H.log("[" .. tag .. "] " .. F.lost)
-        H.screenshot(string.format("narshe_lost%d", bt.n))
-      end
+      -- the wipe verdict is F.watch's, taken before this gate (#163)
     end
     -- act: outside a settled menu, edge-tap A (opening dialogs, the shell
     -- text, victory pages); inside one, run the episode machine
@@ -294,7 +303,7 @@ local function descentBody(tier, wi0, wi1)
       H.log("[descent] LOST -- " .. descLost)
       return true
     end
-    if F.lost and not H.battleLoadStarted() then
+    if F.lost then
       descLost = F.lost
       return true                       -- wiped; the ladder decides
     end
@@ -308,6 +317,8 @@ local function descentBody(tier, wi0, wi1)
     return wi > wi1 and H.hasControl() and H.tileAligned()
   end, 90000, {
     H.call(function()
+      F.watch()                           -- every frame, outside the gate
+      if F.lost then H.setPad({}); return end
       battN = H.battleLoadStarted() and battN + 1 or 0
       if H.frame - hb >= 600 then
         hb = H.frame
@@ -362,10 +373,16 @@ local function descentAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(descBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "descent attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "descent attempt " .. n)
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60),
     }, {}),
-    H.call(function() descLost = nil end),
+    H.call(function() descLost = nil; H.gameOverFired = 0 end),
     -- There is no value in a deliberately Fight-only opening trial here:
     -- EDGAR was selected for this party specifically because AutoCrossbow
     -- clears the four-enemy waves.  Attempt 1 uses that authored kit; later
@@ -406,11 +423,15 @@ local function kefkaBody(tier)
   local F = mkFighter(tier, "kefka")
   local battN, seedChecked, postN, evN = 0, false, 0, 0
   return H.driveUntil(function()
+    if F.lost then
+      kefkaLost = F.lost
+      return true                       -- reload beats riding the fail path
+    end
     -- the verdict is only readable once the battle module has gone (an
-    -- "Annihilated" screen zeroes the HP table, which
-    -- battleLoadStarted still reads as a battle; the taps below page
-    -- it).  Field coords are stale while the battle owns the RAM, so
-    -- nothing positional is read until then either.
+    -- "Annihilated" screen zeroes the HP table, which battleLoadStarted
+    -- reads as NO battle -- #163: that is why F.watch above, not this
+    -- gate, is what sees a wipe).  Field coords are stale while the
+    -- battle owns the RAM, so nothing positional is read until then.
     if battN > 0 or H.battleLoadStarted() then return false end
     if H.fieldX() == 25 and H.fieldY() == 5 then
       -- battle 57's scripted loss branch: the party parked at the {25,5}
@@ -429,6 +450,8 @@ local function kefkaBody(tier)
     return false
   end, 90000, {
     H.call(function()
+      F.watch()                           -- every frame, outside the gate
+      if F.lost then H.setPad({}); return end
       battN = H.battleLoadStarted() and battN + 1 or 0
       if battN >= 3 then
         postN, evN = 0, 0
@@ -470,10 +493,13 @@ local function kefkaAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(kefkaBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "kefka attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "kefka attempt " .. n)
+        H.gameOverFired = 0             -- the lost attempt's count
+      end),
       H.waitFrames(60),
     }, {}),
-    H.call(function() kefkaLost = nil end),
+    H.call(function() kefkaLost = nil; H.gameOverFired = 0 end),
     -- activation: face him once (a held DOWN that cannot step), release,
     -- then edge-A only, because a held direction starves CheckNPCs
     H.hold({ "down" }), H.waitFrames(4), H.release(), H.waitFrames(8),
@@ -498,7 +524,10 @@ end
 -- Budgets: input-driven fights spend real ATB rounds on every descent
 -- collision and on KEFKA himself, and the ladders may replay the descent
 -- and the fight up to three times each.
-H.run({ maxFrames = 600000 }, {
+-- allowGameOver: the descent and KEFKA ladders deliberately survive a
+-- lost fight (#163); F.watch reads H.gameOverFired as a loss and the
+-- next attempt reloads.
+H.run({ maxFrames = 600000, allowGameOver = true }, {
   H.loadState(BOOT),
   H.waitFrames(30),
   H.call(function()

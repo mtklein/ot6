@@ -201,6 +201,7 @@ end
 local function rideUntil(pred, what, budget, tier)
   tier = tier or 1
   local phase, battN, dlgN, hb = 0, 0, 0, -900
+  local wipeN = 0                -- consecutive wiped frames (#163)
   local bt = nil                 -- live fight: { row, banon, dead }
   local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
   local function partyLine()
@@ -233,6 +234,29 @@ local function rideUntil(pred, what, budget, tier)
           tostring(H.eventRunning()), bright(), H.readByte(CH_MAX),
           tostring(H.worldMode()), #fights))
       end
+
+      -- #163: the loss watch runs before the battle gate, on EVERY frame.
+      -- A wipe zeroes every battle-HP word, which battleLoadStarted()
+      -- reads as "no battle", so the in-fight check below (inside battN
+      -- >= 3) never saw the one state it existed for and a lost ride
+      -- idled to its budget (gen_sabin_falls, #159, had the same shape).
+      -- The lib's wipe predicate held 90 straight frames is the loss; so
+      -- is the run canary's count (it now counts a 300-frame battle-side
+      -- wipe as a game over and freezes the pad -- allowGameOver on the
+      -- run keeps the ladder alive for the reload).
+      wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
+      if (H.gameOverFired or 0) > 0 and lost == nil then
+        lost = string.format("GAME OVER counted by the canary in battle #%d " ..
+          "at f%d (tier %d) -- party [%s]", #fights, H.frame, tier, partyLine())
+        H.log("rapids: " .. lost)
+      end
+      if wipeN >= 90 and lost == nil then
+        lost = string.format("PARTY WIPED in battle #%d at f%d (tier %d) " ..
+          "-- party [%s]", #fights, H.frame, tier, partyLine())
+        H.log("rapids: " .. lost)
+        H.screenshot(string.format("rapids_lost%d", #fights))
+      end
+      if lost ~= nil then H.setPad({}); return end
 
       battN = H.battleLoadStarted() and battN + 1 or 0
       dlgN  = H.dialogWaiting() and dlgN + 1 or 0
@@ -440,10 +464,16 @@ local function ride2Attempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(rideBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.call(function()
+        H.checkReq(ldReq, "attempt " .. n .. ": reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60),
     }, {}),
-    H.call(function() lost = nil end),
+    H.call(function() lost = nil; H.gameOverFired = 0 end),
     (function()
       local worldPred = onWorld(20)
       return rideUntil(function() return lost ~= nil or worldPred() end,
@@ -526,7 +556,10 @@ local function genAttempt(n)
   }, {})
 end
 
-H.run({ maxFrames = 200000 }, {
+-- allowGameOver: the ride ladder deliberately survives a lost ride 2
+-- (#163); rideUntil reads H.gameOverFired as a loss and the next attempt
+-- reloads.
+H.run({ maxFrames = 200000, allowGameOver = true }, {
   H.loadState(HUB),
   H.waitFrames(30),
   H.call(function()

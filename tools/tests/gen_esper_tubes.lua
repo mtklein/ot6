@@ -91,6 +91,7 @@ local function n024Attempt(n)
   local NSLOT = nil
   local sawBreak, deathFrame, deathTicks = nil, nil, nil
   local hb, ph, giveUp = 0, 0, 0
+  local wipedN, lostEarly = 0, nil
   local F = H.newFightDriver("b72", { tactical = true, boost = true, bank = 3,
     items = true, healPercent = 60, cadence = 12 })
   return H.cond(function() return fightWon end, {}, {
@@ -100,7 +101,13 @@ local function n024Attempt(n)
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(fightBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "entry point reload") end),
+      H.call(function()
+        H.checkReq(loadReq, "entry point reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt (#163)
+        H.gameOverFired = 0
+      end),
       H.waitFrames(90),
       H.call(function()
         H.assertEq(map(), 273, "reloaded onto map 273")
@@ -141,7 +148,26 @@ local function n024Attempt(n)
     -- the library fighter drives the fight; its menu==0 branch pages
     -- battle text and the victory teardown, carrying the battle to the
     -- field (or through the Annihilated screen, on a loss).
-    H.driveUntil(function() return not H.battleLoadStarted() end, 90000, {
+    -- #163: a wipe zeroes every battle-HP word, which battleLoadStarted()
+    -- reads as "no battle", so `not battleLoadStarted()` alone ends this
+    -- drive on the first wiped frame and the decide loop below then taps
+    -- A into the Annihilated screen for up to 3000 frames.  The lib's
+    -- wipe predicate held 90 straight frames, or the run canary's count
+    -- (it now counts a 300-frame battle-side wipe as a game over and
+    -- freezes the pad -- allowGameOver on the run keeps the ladder alive
+    -- for the reload), names the loss here instead and skips the taps.
+    H.driveUntil(function()
+      wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
+      if (H.gameOverFired or 0) > 0 and not lostEarly then
+        lostEarly = string.format("GAME OVER counted by the canary at f%d",
+          H.frame)
+      elseif wipedN >= 90 and not lostEarly then
+        lostEarly = string.format("PARTY WIPED at f%d (the lib's wipe " ..
+          "predicate, 90 frames)", H.frame)
+      end
+      if lostEarly then return true end
+      return not H.battleLoadStarted() and not H.partyWipedInBattle()
+    end, 90000, {
       H.call(function()
         hb = hb + 1
         if hb % 600 == 0 then
@@ -167,29 +193,35 @@ local function n024Attempt(n)
     H.call(function() F.idle(); H.setPad({}) end),
     H.logStep(function()
       return string.format(
-        "battle 72 torn down at f%d (break %s; kill %s); deciding",
+        "battle 72 torn down at f%d (break %s; kill %s; %s); deciding",
         H.frame, sawBreak and ("f" .. sawBreak) or "not observed",
-        deathFrame and ("f" .. deathFrame .. " tk=" .. deathTicks) or "not seen")
+        deathFrame and ("f" .. deathFrame .. " tk=" .. deathTicks) or "not seen",
+        lostEarly or "no wipe seen")
     end),
-    -- won or lost?  Tap A while control is away (pages _ca5ea9's scene
-    -- and, on a loss, the Annihilated screen); give the tail 3000 frames
-    -- to clear $0649 before calling the attempt lost.
-    H.driveUntil(function()
-      giveUp = giveUp + 1
-      return sw(0x0649) == 0 or giveUp >= 3000
-    end, 3200, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        if not H.hasControl() then H.setPad(ph < 4 and { "a" } or {})
-        else H.setPad({}) end
-      end),
-    }, "the _cc79ed tail clears $0649 (or the loss shows itself)"),
+    -- won or lost?  Tap A while control is away (pages _ca5ea9's scene);
+    -- give the tail 3000 frames to clear $0649 before calling the attempt
+    -- lost.  Skipped when the fight was already lost above: the A-taps
+    -- there would press into the Annihilated screen.
+    H.cond(function() return lostEarly == nil end, {
+      H.driveUntil(function()
+        giveUp = giveUp + 1
+        return sw(0x0649) == 0 or giveUp >= 3000
+      end, 3200, {
+        H.call(function()
+          ph = (ph + 1) % 8
+          if not H.hasControl() then H.setPad(ph < 4 and { "a" } or {})
+          else H.setPad({}) end
+        end),
+      }, "the _cc79ed tail clears $0649 (or the loss shows itself)"),
+    }, {}),
     H.call(function()
       H.setPad({})
-      if sw(0x0649) == 0 then
+      if lostEarly == nil and sw(0x0649) == 0 then
         fightWon = true
         H.log(string.format("battle 72 WON on attempt %d, f%d "
           .. "(tactical + boost bank + items)", n, H.frame))
+      elseif lostEarly then
+        H.log(string.format("attempt %d LOST (%s), f%d", n, lostEarly, H.frame))
       else
         H.log(string.format("attempt %d LOST (no $0649 clear after teardown), f%d",
           n, H.frame))
@@ -222,7 +254,10 @@ local function census(tag, targets)
 end
 
 
-H.run({ maxFrames = 300000 }, {
+-- allowGameOver: the battle-72 ladder deliberately survives a lost fight
+-- (#163); the fight drive reads H.gameOverFired as a loss and the next
+-- attempt reloads.
+H.run({ maxFrames = 300000, allowGameOver = true }, {
   -- Cold battery boot: title -> Continue -> the sole valid slot (3) -> the
   -- 273 save point, standing on the tile the checkpoint was saved on.
   H.waitFrames(350),

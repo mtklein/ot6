@@ -270,6 +270,10 @@ local function fightAttempt(n)
       H.waitFrames(2),
       H.call(function()
         H.checkReq(loadReq, "attempt " .. n .. ": entry point reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt (#163)
+        H.gameOverFired = 0
       end),
       -- The wait this replaces was 30 + n * 37, so a reloaded attempt had at
       -- least 104 frames before it pressed anything.  Part of that number was
@@ -284,6 +288,7 @@ local function fightAttempt(n)
       sabinPummeled = false
       lastVargasHp = 0
       for k in pairs(healBusy) do healBusy[k] = nil end
+      H.gameOverFired = 0
     end),
     -- one interaction -> the scene -> battle 66
     H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
@@ -331,6 +336,10 @@ local function fightAttempt(n)
       return H.advanceStory(function()
         giveUp = giveUp + 1
         if giveUp > 28000 then return true end       -- soft timeout: no win
+        -- #163: the run canary's count is the loss too (it counts a
+        -- 300-frame battle-side wipe as a game over and freezes the pad;
+        -- allowGameOver on the run keeps the ladder alive for the reload)
+        if (H.gameOverFired or 0) > 0 then return true end
         local ok = (H.mapId() & 0x1ff) == 98 and H.hasControl()
           and H.tileAligned() and bright() >= 15
           and not H.battleLoadStarted()
@@ -398,7 +407,10 @@ local function genAttempt(n)
   }, {})
 end
 
-H.run({ maxFrames = 700000 }, {
+-- allowGameOver: the battle-66 ladder deliberately survives a lost fight
+-- (#163); the post-fight ride ends on the lib's wipe canary or on
+-- H.gameOverFired and the next attempt reloads.
+H.run({ maxFrames = 700000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   -- capture the entry point once: the retry ladder's rewind point.  The blob

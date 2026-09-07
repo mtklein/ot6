@@ -179,6 +179,7 @@ local BP = 0x3E9C
 local fightTier = 1
 local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
 local lost = nil
+local wipeN = 0                         -- consecutive wiped frames (#163)
 local bt = nil
 local lastFightF = -100
 local function partyLine()
@@ -350,21 +351,35 @@ local function fightFrame(phase, tag)
     H.setPad(H.frame - bt.f0 > 300 and phase < 4 and { "a" } or {})
     return
   end
-  local wiped = true
-  for e = 0, 3 do
-    if H.readWord(0x3c1c + e * 2) > 0 and H.readWord(0x3bf4 + e * 2) > 0 then
-      wiped = false
-    end
+  -- the loss watch ran this frame already (lossWatch, before the gate)
+  if lost then H.setPad({}); return end
+  fightPulse(phase)
+end
+-- the loss watch: the lib's wipe predicate (every sane battle-HP word 0
+-- with the battle table live) held 90 straight frames, or the run canary
+-- having counted a game over.  Sets `lost` for the ladder; never raises.
+-- #163: runs EVERY frame of a ride or a talk, not behind the inBattle()
+-- gate.  A wipe zeroes every battle-HP word, which inBattle() reads as
+-- "no battle", so the old placement (inside fightFrame, reached only
+-- while inBattle() held) hid the one state the watch existed for and a
+-- lost wave idled to the attempt deadline (gen_sabin_falls, #159, had the
+-- same shape).  The lib's canary now counts the same wipe as a game over
+-- at 300 frames and freezes the pad; allowGameOver on the run keeps it
+-- alive for the reload, and the counter is a loss here too.
+local function lossWatch(tag)
+  local wiped = H.partyWipedInBattle()
+  wipeN = wiped and wipeN + 1 or 0
+  if (H.gameOverFired or 0) > 0 and not lost then
+    lost = string.format("%s: GAME OVER counted by the canary at f%d (tier %d) [%s]",
+      tag, H.frame, fightTier, partyLine())
+    H.log("escape: LOST -- " .. lost)
   end
-  bt.dead = wiped and bt.dead + 1 or 0
-  if bt.dead >= 90 and not lost then
-    lost = string.format("%s: party down at f%d (fight up f%d, tier %d) [%s]",
-      tag, H.frame, bt.f0, fightTier, partyLine())
+  if wipeN >= 90 and not lost then
+    lost = string.format("%s: party down at f%d (fight up f%s, tier %d) [%s]",
+      tag, H.frame, bt and tostring(bt.f0) or "?", fightTier, partyLine())
     H.log("escape: LOST -- " .. lost)
     H.screenshot("escape_lost")
   end
-  if lost then H.setPad({}); return end
-  fightPulse(phase)
 end
 
 local function rideUntil(pred, what, budget)
@@ -389,6 +404,10 @@ local function rideUntil(pred, what, budget)
           H.readByte(0x00ba), H.readByte(0x00d3), H.readByte(0x0026),
           H.readByte(0x0027), H.readWord(0x3bf6), monCount()))
       end
+
+      -- #163: the loss watch runs before the battle gate, every frame
+      lossWatch(what)
+      if lost then H.setPad({}); return end
 
       battN = inBattle() and battN + 1 or 0
       dlgN  = H.dialogWaiting() and dlgN + 1 or 0
@@ -544,14 +563,18 @@ local function talkForFight(cx, cy, wantSw, what, budget)
       return H.driveUntil(function()
         n = n + 1
         if n > cap and lost == nil then
-          lost = string.format("%s: attempt deadline at %d frames -- " ..
-            "assumed wiped or wedged [%s]", what, cap, partyLine())
+          lost = string.format("%s: attempt deadline at %d frames with no " ..
+            "win and no wipe seen -- a genuine wedge, see #159/#163 [%s]",
+            what, cap, partyLine())
           H.log("escape: LOST -- " .. lost)
         end
         return lost ~= nil or sw(wantSw) == 1
       end, budget or 30000, {
       H.call(function()
         phase = (phase + 1) % 8
+        -- #163: the loss watch runs before any battle gate, every frame
+        lossWatch(what)
+        if lost then H.setPad({}); return end
         if not adjacentToCyan() then approachStep(phase); return end
         -- adjacent: face + dense A (see the cadence note below)
         if inBattle() then
@@ -604,10 +627,19 @@ local function wavesAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(wavesBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.call(function()
+        H.checkReq(ldReq, "attempt " .. n .. ": reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
-    H.call(function() lost, fightTier = nil, n end),
+    H.call(function()
+      lost, fightTier, wipeN = nil, n, 0
+      H.gameOverFired = 0
+    end),
     talkForFight(cyanX, cyanY, 0x0034,
       "wave 1 (battle 13, $0034), attempt " .. n, 30000),
     H.cond(function() return lost == nil end, {
@@ -629,7 +661,10 @@ local function wavesAttempt(n)
   }, {})
 end
 
-H.run({ maxFrames = 250000 }, {
+-- allowGameOver: the waves ladder below deliberately survives a lost
+-- fight (#163); lossWatch reads H.gameOverFired as a loss and the next
+-- attempt reloads.
+H.run({ maxFrames = 250000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
