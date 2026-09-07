@@ -14,13 +14,18 @@ PREFIX = '[ot6action] '
 
 
 def summarize(lines):
-    actions, errors = {}, []
+    actions, errors, deaths = {}, [], []
     for line_no, line in enumerate(lines, 1):
         # Only canonical lines; live [ot6note] mirrors must not double-count.
         if not line.startswith(PREFIX):
             continue
         try:
             e = json.loads(line[len(PREFIX):])
+            # A party death (#175) rides the same stream outside any plan's
+            # lifecycle; tools/audit_boost.py reads it, this summary counts it.
+            if e.get('v') == 1 and e.get('event') == 'death':
+                deaths.append(e)
+                continue
             if e['v'] != 1 or e['event'] not in {
                 'plan', 'confirm', 'submit', 'start', 'resolve', 'drop', 'unresolved'
             }:
@@ -70,7 +75,7 @@ def summarize(lines):
     resolved = [e for es in actions.values() for e in es if e['event'] == 'resolve']
     return dict(counts=dict(counts), drops=dict(drops), incomplete=incomplete,
                 navigation_frames=nav, dropped_plan_frames=wasted,
-                resolved=resolved, errors=errors)
+                resolved=resolved, errors=errors, deaths=deaths)
 
 
 def render(s):
@@ -93,6 +98,10 @@ def render(s):
         lines.append(f'  #{e["id"]} actor {e["actor"]}: requested {requested}, '
                      f'executed cmd=${e["command"]:02x} attack=${e["attack"]:02x} '
                      f'targets=${e["targets"]:04x}; party HP net [{e["hp_net"]}]')
+    for d in s.get('deaths', []):
+        lines.append(f'  death: entity {d.get("entity")} at frame {d.get("frame")} '
+                     f'from {d.get("from")}/{d.get("maxhp")} holding {d.get("bp")} BP '
+                     f'(party BP {d.get("party_bp")})')
     lines.append('HP deltas are net changes across execution, not attributed healing.')
     if not c.get('plan'):
         lines.append('No recovery plans found; this is not evidence of a clean run.')

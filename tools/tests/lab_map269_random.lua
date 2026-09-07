@@ -276,6 +276,16 @@ local function hookObservers()
         "[hit] f%d %s(s%d) cmd=%02X atk=%s tgt=%04X dmg=%d,%d,%d,%d raw=%d,%d,%d,%d kills=%d party=%s",
         H.frame, SPECIES[monSpecies(slot)] or "?", slot, p.cmd, atkName(atk), p.tgt,
         dmg[1], dmg[2], dmg[3], dmg[4], raw[1], raw[2], raw[3], raw[4], kills, table.concat(after, ","))
+      -- the pips each victim fell holding (#175): OT6_BP_CLASS $3e9c + e*2
+      for e = 1, 4 do
+        if p.hp[e] > 0 and after[e] == 0 then
+          events[#events + 1] = string.format(
+            "[death] f%d entity %d c%d from %d by %s(s%d) %s bp=%d party_bp=%d,%d,%d,%d",
+            H.frame, e - 1, slotChar(e - 1), p.hp[e], SPECIES[monSpecies(slot)] or "?", slot,
+            atkName(atk), H.readByte(0x3E9C + (e - 1) * 2),
+            H.readByte(0x3E9C), H.readByte(0x3E9E), H.readByte(0x3EA0), H.readByte(0x3EA2))
+        end
+      end
     else
       local slot = x // 2
       local md = {}

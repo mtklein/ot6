@@ -776,6 +776,35 @@ function M.raiseDecision(o)
     .. "is in reach, and the enemy acts before anyone can top up", raiseHp, hit)
 end
 
+-- How a wipe reads (#175), from its [death] records -- each { tick, from,
+-- maxhp, bp, oneAction }.  The owner's two shapes: "it's totally normal to
+-- sometimes be wiped with a one shot attack early in a battle -- that
+-- means you're just under level and need more HP.  But when a party is
+-- wiped with 3-4 pips each, it means we weren't trying our best."  So a
+-- wipe is "one-shot early" when some member was killed by one action
+-- from at least onePct of max HP inside the first `early` ticks, and
+-- "died with BP banked" when some member fell holding at least `banked`
+-- pips; both can hold, and neither is "no deaths recorded".  Returns the
+-- class string the [wipe] line and tools/audit_boost.py print.
+function M.wipeClass(deaths, o)
+  o = o or {}
+  local onePct, early, banked = o.onePct or 80, o.early or 1800, o.banked or 3
+  local oneShot, held = false, 0
+  for _, d in ipairs(deaths or {}) do
+    if d.oneAction and d.tick <= early and (d.maxhp or 0) > 0
+       and (d.from or 0) * 100 // d.maxhp >= onePct then
+      oneShot = true
+    end
+    if (d.bp or 0) >= banked then held = math.max(held, d.bp) end
+  end
+  if #(deaths or {}) == 0 then return "no deaths recorded" end
+  local parts = {}
+  if oneShot then parts[#parts + 1] = "one-shot early" end
+  if held > 0 then parts[#parts + 1] = string.format("died with %d BP banked", held) end
+  if #parts == 0 then return "worn down (no one-shot, no pips banked)" end
+  return table.concat(parts, " + ")
+end
+
 function M.monsterAbsorb(species)
   return M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF)
     + species * MON_REC + MON_ABSORB)
@@ -1920,6 +1949,15 @@ function M.newRecoveryTrace(tag, emit)
       execution_frames = frame - p.started })
     T.running[actor] = nil
   end
+  -- A party death (#175), outside the per-plan lifecycle: the member,
+  -- the HP the killing action found them at, the pips they held and the
+  -- party's, and the killer's slot/command/attack.  action_trace.py
+  -- skips it when folding plans; the boost audit reads it.
+  function T.death(frame, fields)
+    local e = { v = 1, tag = tag or "fight", event = "death", frame = frame }
+    for k, v in pairs(fields or {}) do e[k] = v end
+    emit(e)
+  end
   function T.close(frame, reason)
     for actor = 0, 3 do
       T.drop(actor, frame, reason)
@@ -2026,6 +2064,11 @@ local execDone = {}                   -- { actor, frame } per SaveForMimic, olde
 -- numeral over their own character.
 local execMon = nil                   -- slot whose command ExecCmd entered
 local execMonDone = nil               -- { slot, frame } of the last to return
+-- and WHAT that slot is doing: $b5/$b6 are the command and attack after
+-- queue-time folding, the bytes the labs' [act] lines print (ExecCmd runs
+-- with them set; battle_main.asm).  The hit ledger tells a level spell
+-- from a swing by them (#174) and the [death] line names the killer.
+local execMonCmd, execMonAtk = nil, nil
 local execHooks = false
 local function execActivate()
   if execHooks then return end
@@ -2034,7 +2077,10 @@ local function execActivate()
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xffff
     if x < 8 and x % 2 == 0 then execActor = x // 2
-    elseif x < 20 and x % 2 == 0 then execMon = x // 2 - 4 end
+    elseif x < 20 and x % 2 == 0 then
+      execMon = x // 2 - 4
+      execMonCmd, execMonAtk = M.readByte(0xB5), M.readByte(0xB6)
+    end
   end, emu.callbackType.exec, a, a)
   local b = M.sym("SaveForMimic")
   emu.addMemoryCallback(function()
@@ -2120,6 +2166,20 @@ function M.newFightDriver(tag, opts)
   local hitLedger = {}                 -- slot -> { min, minE, on = { [e] = smallest } }
   local partyHpLast = {}               -- entity -> HP last frame (hit ledger baseline)
   local monHpLast = {}                 -- slot -> HP last frame (damage watch baseline)
+  -- The monster action in progress, for the ledger and the death lines
+  -- (#175, #174): which slot, its command/attack bytes, each member's HP
+  -- as it began (so a kill can be read as "from 447/447 in one action"),
+  -- and how many it has killed from full so far.
+  local monAct = nil                   -- { slot, cmd, atk, tick, hp0 = {}, kills, fullKills }
+  -- Boost left on the table (#175): every party death logged once with
+  -- the member's banked BP, and one [wipe] line per battle.  A person
+  -- watching sees the pips over the dead portrait; this writes them down.
+  local deathSaid = {}                 -- entity -> true while it lies dead
+  local battleDeaths = {}              -- the [death] records this battle, for the [wipe] line
+  local wipeSaid = false
+  local ONE_SHOT_PCT = 80              -- killed from at least this much of max HP by one action
+  local EARLY_TICKS = 1800             -- ...inside this many battle ticks is "one-shot early"
+  local BANKED_BP = 3                  -- dying with this many pips is "died with BP banked"
   -- The raise-then-top-up pair (#168): a Fenix Down confirmed by one actor
   -- (raisePending, until the target's HP moves or RAISE_WAIT ticks pass)
   -- holds the next actor's plan at the command window so their Potion
@@ -3849,9 +3909,11 @@ function M.newFightDriver(tag, opts)
     healWatch, healSaid = nil, nil
     dmgWatch, dmgSeen, monHpLast = {}, {}, {}
     dmgHit, hitLedger, partyHpLast = {}, {}, {}
+    monAct, deathSaid, battleDeaths, wipeSaid = nil, {}, {}, false
     raisePending, topUpOwed, unmuddlePending = nil, {}, nil
     execActor, execDone = nil, {}
     execMon, execMonDone = nil, nil
+    execMonCmd, execMonAtk = nil, nil
     -- The stall guard's verdict belongs to the battle it watched: a retry
     -- ladder's reload is a different fight, and a recurrence should dump
     -- again there rather than inherit a dead lore line silently.
@@ -4018,6 +4080,15 @@ function M.newFightDriver(tag, opts)
          and M.frame - execMonDone.frame <= DMG_SETTLE then
         slot = execMonDone.slot
       end
+      -- one monAct per attributed action: it opens when a slot starts
+      -- executing and closes when the attribution window ends
+      if slot == nil then
+        monAct = nil
+      elseif monAct == nil or monAct.slot ~= slot then
+        monAct = { slot = slot, cmd = execMonCmd or 0, atk = execMonAtk or 0,
+                   tick = battleTick, hp0 = {}, kills = 0, fullKills = 0 }
+        for e = 0, 3 do monAct.hp0[e] = partyHpLast[e] or M.readWord(0x3BF4 + e * 2) end
+      end
       for e = 0, 3 do
         local hp = M.readWord(0x3BF4 + e * 2)
         local last = partyHpLast[e]
@@ -4033,7 +4104,66 @@ function M.newFightDriver(tag, opts)
               last, hp))
           end
         end
+        -- The [death] line (#175): a member's HP reaching 0 from above,
+        -- with the pips they were holding.  The killer is the action
+        -- being attributed (or nobody: a poison tick, a bounced spell).
+        local maxhp = M.readWord(0x3C1C + e * 2)
+        if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
+           and not deathSaid[e] then
+          deathSaid[e] = true
+          local from = last
+          if monAct ~= nil and monAct.hp0[e] ~= nil and monAct.hp0[e] ~= 0xFFFF then
+            from = monAct.hp0[e]
+          end
+          local bp = M.readByte(BP + e * 2)
+          local pbp = {}
+          for p = 0, 3 do pbp[#pbp + 1] = tostring(M.readByte(BP + p * 2)) end
+          local oneAction = monAct ~= nil and from * 100 // maxhp >= ONE_SHOT_PCT
+          if monAct ~= nil then
+            monAct.kills = monAct.kills + 1
+            if from >= maxhp then monAct.fullKills = monAct.fullKills + 1 end
+          end
+          local rec = { e = e, char = M.readByte(BCHID + e * 2), tick = battleTick,
+                        from = from, maxhp = maxhp, bp = bp,
+                        slot = monAct and monAct.slot, cmd = monAct and monAct.cmd,
+                        atk = monAct and monAct.atk, oneAction = oneAction }
+          battleDeaths[#battleDeaths + 1] = rec
+          M.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d "
+            .. "by %s%s bp=%d party_bp=%s%s", tag or "fight", battleTick, e,
+            rec.char, from, maxhp,
+            monAct and string.format("slot %d cmd $%02X atk $%02X", monAct.slot,
+              monAct.cmd, monAct.atk) or "nobody (no monster action attributed)",
+            oneAction and " (ONE ACTION from >= 80%)" or "", bp,
+            table.concat(pbp, ","),
+            bp >= BANKED_BP and string.format(" -- died holding %d BP", bp) or ""))
+          if recovery then
+            recovery.death(M.frame, { entity = e, char = rec.char, tick = battleTick,
+              from = from, maxhp = maxhp, bp = bp, party_bp = table.concat(pbp, ","),
+              slot = rec.slot, cmd = rec.cmd, atk = rec.atk, one_action = oneAction })
+          end
+        elseif hp > 0 and hp ~= 0xFFFF then
+          deathSaid[e] = nil
+        end
         partyHpLast[e] = hp
+      end
+      -- The [wipe] line (#175), once: the engine's own verdict (M.wipeVerdict
+      -- via partyWipedInBattle, #166) with the pips every member held, and
+      -- the classification the owner reads a wipe by -- a one-shot early
+      -- in the fight is a level problem; three or more pips banked at a
+      -- death is a driver problem ("we weren't trying our best").
+      if not wipeSaid and M.partyWipedInBattle and M.partyWipedInBattle() then
+        wipeSaid = true
+        local pbp, ds = {}, {}
+        for p = 0, 3 do pbp[#pbp + 1] = tostring(M.readByte(BP + p * 2)) end
+        for _, d in ipairs(battleDeaths) do
+          ds[#ds + 1] = string.format("e%d@f+%d:%d/%d:bp%d%s", d.e, d.tick, d.from,
+            d.maxhp, d.bp, d.oneAction and ":one_action" or "")
+        end
+        local cls = M.wipeClass(battleDeaths, { onePct = ONE_SHOT_PCT,
+          early = EARLY_TICKS, banked = BANKED_BP })
+        M.log(string.format("[%s] [wipe] f+%d party_bp=%s deaths=%s class=%s",
+          tag or "fight", battleTick, table.concat(pbp, ","),
+          #ds > 0 and table.concat(ds, ";") or "none", cls))
       end
     end
     local menu = M.readByte(MENU)
