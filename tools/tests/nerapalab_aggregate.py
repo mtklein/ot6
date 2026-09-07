@@ -29,12 +29,23 @@ for log in sorted(logdir.glob("*.log")):
         rows[kv.get("policy", "?")][int(kv.get("idle", -1))] = kv   # last wins
 
 if md:
-    print("| policy | seeds | won | won_late | lost | Fenix/win | mean t (won) | clock left (won) |")
+    print("| policy | distinct seeds | won | won_late | lost | Fenix/win | mean t (won) | clock left (won) |")
     print("|---|---|---|---|---|---|---|---|")
 else:
     print(f"{'policy':12} {'n':>2} {'won':>3} {'late':>4} {'lost':>4} {'fx/win':>6} {'t(won)':>7} {'clock(won)':>10}")
 for pol, byidle in sorted(rows.items()):
-    ks = [byidle[i] for i in sorted(byidle)]
+    # Two idles can draw the same seed (the talk engages ~61 or ~107 frames
+    # after the idle ends, so phases collide): a repeated seed is a replicate
+    # of the same fight, not a new sample.  Statistics are over DISTINCT
+    # seeds; replicates are listed and marked.
+    ks, seen, reps = [], set(), []
+    for i in sorted(byidle):
+        k = byidle[i]
+        if k["seed"] in seen:
+            reps.append(k)
+        else:
+            seen.add(k["seed"])
+            ks.append(k)
     won = [k for k in ks if k["outcome"] == "won"]
     late = [k for k in ks if k["outcome"] == "won_late"]
     lost = [k for k in ks if k["outcome"].startswith("lost")]
@@ -49,7 +60,8 @@ for pol, byidle in sorted(rows.items()):
     else:
         print(f"{pol:12} {len(ks):>2} {len(won):>3} {len(late):>4} {len(lost):>4} "
               f"{fx:>6.1f} {tw:>7.0f} {cw:>10.0f}")
-        for k in ks:
+        for k in ks + reps:
+            rep = " (replicate seed)" if k in reps else ""
             print(f"    idle={k['idle']:>2} seed={k['seed']} {k['outcome']:<12} t={k['t']:>5} "
                   f"clock={k['clock_left']:>5} fenix={k['fenix']} potion={k['potion']} "
-                  f"deaths={k['deaths']} raises={k['raises']}")
+                  f"deaths={k['deaths']} raises={k['raises']}{rep}")
