@@ -63,7 +63,7 @@ for log in logs:
                              arrived=arrived, standing=arrived and n not in hurtset,
                              catwalk=cw))
     # the PANIC floor the scratch copy was run with
-    m = re.search(r"gen_p(\d+)_", log)
+    m = re.search(r"gen[_-]p(\d+)_", log)
     if m:
         panic = int(m.group(1))
     for r in rows:
