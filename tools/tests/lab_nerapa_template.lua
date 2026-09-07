@@ -88,6 +88,26 @@ local POLICIES = {
               healPercent = 0, nuke = { BOLT, ICE },
               summon = { [TERRA] = { mp = 30 } },
               reserve = { [FENIX_DOWN] = 27 } },
+  -- ---- the Reflect-aware line (measured 2026-09-07: every traced run
+  -- opens with Nerapa's status 3 = $80 REFLECT and status 4 = $80 FLOAT --
+  -- monster_prop +29 bit 7, seeded through $3de8 at LoadRageProp
+  -- battle_main.asm:7764-7773 -- so Bolt/Ice bounce onto the party).  No
+  -- attack magic at all: boosted Fight (LOCKE's Genji pair, ThunderBlade
+  -- slash+bolt and the Assassin's pierce, chips twice a swing), the
+  -- crossbow, Shiva once (a summon is not reflected), the cure line and
+  -- the bag as the control.  What a person who reads "Reflect" does.
+  physical = { tactical = true, boost = true, bank = 0, items = true,
+               healPercent = 40, summon = { [TERRA] = { mp = 30 } } },
+  -- physical, banking to 2 BP so LOCKE's Fight is three swings (six chips)
+  physical_bank2 = { tactical = true, boost = true, bank = 2, items = true,
+                     healPercent = 40, summon = { [TERRA] = { mp = 30 } } },
+  -- physical, Condemned-aware: no care at all
+  physical_allin = { tactical = true, boost = true, bank = 0, items = false,
+                     cure = false, summon = { [TERRA] = { mp = 30 } } },
+  -- physical with the one-Fenix raise cap
+  physical_raise1 = { tactical = true, boost = true, bank = 0, items = true,
+                      healPercent = 40, summon = { [TERRA] = { mp = 30 } },
+                      reserve = { [FENIX_DOWN] = 26 } },
 }
 local opts = assert(POLICIES[POLICY], "unknown POLICY " .. POLICY)
 
