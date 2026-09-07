@@ -12,8 +12,11 @@ are the in-combat heal, carried at ~level x1.5 (minimum 10) from the first
 town on the route that sells them -- the Phantom Train's ghost merchant, so
 the band is measured from `train_done` on (a fixture whose `prev` chain
 reaches it, or one rooted at a checkpoint, all of which lie downstream).
-A fixture under the band is a WARNING (listed, exit code unaffected); the
-fix is a `POTION to N` line at the shop stop before it.
+It is a World of Balance band: it ends at the WoR landing (the graph row
+that generates `wor_landing`, its `also=` siblings included, and anything
+downstream of it), where the party, the shops and the level curve are all
+different.  A fixture under the band is a WARNING (listed, exit code
+unaffected); the fix is a `POTION to N` line at the shop stop before it.
 
 Usage:  python3 tools/audit_supplies.py [--repo .] [--selftest] [-v]
 Exit 0 clean, 1 if a fixture dropped to no revives across a boundary, or if a
@@ -44,6 +47,10 @@ INV_QTY = 0x1969 - 0x1600             # inventory counts, one byte each
 # Figaro's shop 8 stock none (shop_prop.dat), so the band applies from here.
 FIRST_POTION_SHOP = "train_done"
 POTION_BAND_MIN = 10
+# The band is a WoB band: the graph row that generates this state (with its
+# `also=` artifacts, escape_start today) and everything downstream of it is
+# the World of Ruin, out of band.
+WOR_LANDING = "wor_landing"
 
 
 def count_in(raw: bytes, cb: int, item: int) -> int:
@@ -126,7 +133,8 @@ def load_graph(repo: str):
     spec.loader.exec_module(mod)
     states = {}
     for s in mod.STATES:
-        edge = {"prev": s.get("prev"), "checkpoint": s.get("checkpoint")}
+        edge = {"prev": s.get("prev"), "checkpoint": s.get("checkpoint"),
+                "row": s["state"]}
         states[s["state"]] = edge
         for a in s.get("also") or ():
             states[a] = dict(edge)
@@ -150,6 +158,27 @@ def past_first_potion_shop(name: str, states: dict) -> bool:
             return True
         name = edge["prev"]
     return False
+
+
+def in_world_of_ruin(name: str, states: dict) -> bool:
+    """Whether the fixture lies at or past the WoR landing: it is generated
+    by WOR_LANDING's graph row (its `also=` siblings included) or its `prev`
+    chain passes through that row.  The WoB band does not apply there."""
+    seen = set()
+    while name and name not in seen:
+        seen.add(name)
+        edge = states.get(name)
+        if edge is None:
+            return False
+        if edge.get("row") == WOR_LANDING:
+            return True
+        name = edge["prev"]
+    return False
+
+
+def in_potion_band(name: str, states: dict) -> bool:
+    """The band applies from the first Potion shop to the WoR landing."""
+    return past_first_potion_shop(name, states) and not in_world_of_ruin(name, states)
 
 
 def load_waivers(repo: str, path: str) -> set:
@@ -232,6 +261,15 @@ def selftest(repo: str = ".") -> int:
               past_first_potion_shop("terra_narshe", states), True)
         check("and at a checkpoint-rooted fixture (narshe_mission)",
               past_first_potion_shop("narshe_mission", states), True)
+        # a WoB band: it ends at the WoR landing's row
+        check("the WoB band still covers the FC alcove (fc_alcove)",
+              in_potion_band("fc_alcove", states), True)
+        check("but not the WoR landing (wor_landing)",
+              in_potion_band("wor_landing", states), False)
+        check("nor its row-mate, the escape's first frame (escape_start)",
+              in_potion_band("escape_start", states), False)
+        check("a fixture before the train is not in the WoR either (forest_done)",
+              in_world_of_ruin("forest_done", states), False)
 
     print("audit_supplies selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
@@ -284,7 +322,7 @@ def main() -> int:
             continue
         here = bag["fenix"]
         scanned += 1
-        if past_first_potion_shop(name, states) and bag["level"] is not None:
+        if in_potion_band(name, states) and bag["level"] is not None:
             band = potion_band(bag["level"])
             if bag["potion"] < band:
                 short.append((name, bag["potion"], band, bag["level"]))
