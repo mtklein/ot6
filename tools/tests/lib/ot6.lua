@@ -461,6 +461,37 @@ function M.partyHp()
   return hp
 end
 
+-- The wipe verdict from one reading of the battle module's party table
+-- (#166).  rows are the four battle slots in order, { actor, present, hp,
+-- maxhp } each -- $3ed8+2e, $3aa0+2e bit 0, $3bf4+2e, $3c1c+2e -- and
+-- flags is $3ebc.  The addresses and the reasoning sit on
+-- M.partyWipedInBattle (ot6_field.lua), which reads them; this half is
+-- the decision on its own, so battle_healpolicy can put the Veldt's and
+-- the Narshe descent's measured bytes through it without an emulator.
+--
+-- A seat counts when its actor byte is not $ff AND its present bit is set:
+-- a formation's hidden character AI (GAU on the Veldt, actor 11 at full
+-- HP in seat 2 with the bit clear) is seated but not in the party, and the
+-- engine's own alive mask leaves it out the same way.  A counted seat
+-- whose actor byte is out of range or whose max HP is implausible says
+-- another module owns these bytes right now: not a battle, not a wipe.
+-- With at least one seat counted, LoseBattle's flag (bit 0) is the
+-- engine's own verdict, and every counted HP word at 0 is the same verdict
+-- read up to a couple of hundred frames earlier.
+function M.wipeVerdict(rows, flags)
+  local seated, alive = 0, 0
+  for _, r in ipairs(rows) do
+    if r.actor ~= 0xFF and r.present then
+      if r.actor > 15 or r.maxhp == 0 or r.maxhp >= 10000 then return false end
+      seated = seated + 1
+      if r.hp > 0 then alive = alive + 1 end
+    end
+  end
+  if seated == 0 then return false end
+  if (flags & 0x01) ~= 0 then return true end
+  return alive == 0
+end
+
 -- True once the battle module has begun loading.
 --
 -- $7E3BF4 is the party battle-HP table only while the battle module owns
@@ -4286,9 +4317,10 @@ function M.run(opts, steps)
   -- TitleScreen exec for the next 30,000 frames with the pad released.
   -- Only a press moves it on, and the press a driver makes there is the
   -- A that Continues the last save.  So the wipe predicate itself (every
-  -- sane battle-HP word 0 with the battle table live, M.partyWipedInBattle)
-  -- held for WIPE_FRAMES counts as a game over: bounded, and before any
-  -- driver can press through to the title.
+  -- SEATED battle slot at 0 HP, or LoseBattle's $3ebc bit 0, with the
+  -- battle table live -- M.partyWipedInBattle, #166) held for WIPE_FRAMES
+  -- counts as a game over: bounded, and before any driver can press
+  -- through to the title.
   M.gameOverFired = 0
   local goReadFired, titleExecFired, wipeFired = 0, 0, 0
   local WIPE_FRAMES = 300
@@ -4337,11 +4369,19 @@ function M.run(opts, steps)
       if wipeN == WIPE_FRAMES then
         wipeFired = wipeFired + 1
         M.gameOverFired = M.gameOverFired + 1
-        M.log(string.format("canary: BATTLE WIPE -- every battle-HP word " ..
-          "has read 0 for %d frames with the battle table live " ..
-          "($3ebc=%02X); the engine is sitting on the annihilated screen " ..
-          "waiting for a press.  Counted as a game over (f%d).",
-          WIPE_FRAMES, M.readByte(0x3ebc), M.frame))
+        local seats = {}
+        for e = 0, 3 do
+          local a = M.readByte(0x3ed8 + e * 2)
+          seats[#seats + 1] = a == 0xFF and "-" or string.format("a%d%s:%d/%d",
+            a, (M.readByte(0x3aa0 + e * 2) & 1) == 1 and "" or "(hidden)",
+            M.readWord(0x3bf4 + e * 2), M.readWord(0x3c1c + e * 2))
+        end
+        M.log(string.format("canary: BATTLE WIPE -- the battle table has " ..
+          "read wiped for %d frames (seats [%s], $3ebc=%02X: every present " ..
+          "seat at 0 HP or LoseBattle's bit 0 set); the engine is sitting " ..
+          "on the annihilated screen waiting for a press.  Counted as a " ..
+          "game over (f%d).", WIPE_FRAMES, table.concat(seats, " "),
+          M.readByte(0x3ebc), M.frame))
         M.freezePad("the party was wiped in battle")
       end
     else

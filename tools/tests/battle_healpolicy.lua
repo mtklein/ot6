@@ -47,7 +47,11 @@
 --      the Muddle rule (#170): Remedy's status-2 cure mask has no CONFUSE
 --      bit (vanilla, byte for byte), a muddled ally gets a plain hit, a
 --      muddled actor defers;
---   8. that every case ran.
+--   8. that every case ran;
+--   9. the wipe verdict (#166, H.wipeVerdict) on gau_joined's stale-seat
+--      bytes and the Narshe descent's seven-marked party: seats come from
+--      the engine's actor table, LoseBattle's $3ebc bit 0 is a verdict on
+--      its own, and bytes another module owns are never a wipe.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TONIC, POTION = 0xE8, 0xE9
@@ -267,6 +271,56 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0, [1] = 0, [2] = 0, [3] = 0 },
                               hp = full, maxhp = full }), nil, "nobody muddled: nothing to do")
     H.log("battle_healpolicy: refined raise gate, ATB read and Muddle rule checked")
+  end),
+
+  -- 9. the wipe verdict (#166) on the bytes the old scan misread.  rows are
+  -- the four battle seats { actor = $3ed8+2e, present = $3aa0+2e bit 0,
+  -- hp = $3bf4+2e, maxhp = $3c1c+2e }; flags is $3ebc.  The rows are
+  -- probe_wipe166's measured ones (2026-09-07).
+  H.call(function()
+    local function row(a, hp, mx, hidden)
+      return { actor = a, present = a ~= 0xFF and not hidden, hp = hp, maxhp = mx }
+    end
+    local EMPTY = row(0xFF, 0, 0)
+    -- A Veldt random from falls_done: "seats=[a5:0/363 a2:0/358 a11:394/394
+    -- -:0/0] $1850 marks 2 $3ebc=01 $3a74=00" -- seat 2 is GAU, the
+    -- formation's hidden character AI, present bit clear, full HP; the
+    -- #163 audit's gau_joined wipe read the same [0/363 0/358 394/394 0/0]
+    local veldt = { row(5, 0, 363), row(2, 0, 358), row(11, 394, 394, true), EMPTY }
+    H.assertEq(H.wipeVerdict(veldt, 0x00), true,
+      "the Veldt: SABIN and CYAN at 0 with hidden GAU at 394/394 in seat 2 is a wipe (the HP half)")
+    H.assertEq(H.wipeVerdict(veldt, 0x01), true, "...and with LoseBattle's flag up, still one")
+    H.assertEq(H.wipeVerdict({ row(5, 0, 363), row(2, 40, 358), row(11, 394, 394, true), EMPTY }, 0x00), false,
+      "...and CYAN at 40 is not")
+    H.assertEq(H.wipeVerdict({ row(5, 0, 363), row(2, 0, 358), row(11, 394, 394), EMPTY }, 0x00), false,
+      "a PRESENT third member at 394 is a survivor (the present bit is what separates him from GAU)")
+    -- KEFKA from kefka_entry: "seats=[a0:0/306 a4:0/354 a6:0/310 -:0/0]
+    -- $1850 marks 7 $3ebc=00 $3a74=02" -- the HP half, 212 frames before
+    -- the flag; the verdict never consults the head count
+    local narshe = { row(0, 0, 306), row(4, 0, 354), row(6, 0, 310), EMPTY }
+    H.assertEq(H.wipeVerdict(narshe, 0x00), true, "KEFKA: three seated at 0 is a wipe however many $1850 marks")
+    H.assertEq(H.wipeVerdict({ row(0, 1, 306), row(4, 0, 354), row(6, 0, 310), EMPTY }, 0x00), false,
+      "TERRA at 1 HP: not a wipe")
+    -- LoseBattle's own verdict: $3ebc bit 0 counts even with HP words up
+    -- (an all-petrified party), and bit 0 only (the FC's measured $0D has it)
+    H.assertEq(H.wipeVerdict({ row(0, 200, 400), row(4, 150, 380), EMPTY, EMPTY }, 0x01), true,
+      "LoseBattle's bit 0 with HP words still up (petrify/zombie) is a wipe")
+    H.assertEq(H.wipeVerdict({ row(0, 0, 400), row(4, 0, 380), EMPTY, EMPTY }, 0x0D), true,
+      "the FC wipe's $3ebc=$0D counts")
+    H.assertEq(H.wipeVerdict({ row(0, 200, 400), row(4, 150, 380), EMPTY, EMPTY }, 0x0C), false,
+      "$0C -- bits 2/3 without bit 0 -- is not the game-over flag")
+    -- the shape gate: bytes another module owns are never a wipe
+    H.assertEq(H.wipeVerdict({ EMPTY, EMPTY, EMPTY, EMPTY }, 0x01), false,
+      "no seat filled: nothing to judge, flag or not")
+    H.assertEq(H.wipeVerdict({ row(11, 394, 394, true), EMPTY, EMPTY, EMPTY }, 0x01), false,
+      "only a hidden seat: nothing to judge either")
+    H.assertEq(H.wipeVerdict({ row(0, 0, 17732), EMPTY, EMPTY, EMPTY }, 0x00), false,
+      "falls_done's boot words [54740/17732 ...]: a max over 9999 is not a battle table")
+    H.assertEq(H.wipeVerdict({ row(0, 0, 0), EMPTY, EMPTY, EMPTY }, 0x00), false,
+      "all-zero RAM (power-on): actor 0 with max 0 is not a seated character")
+    H.assertEq(H.wipeVerdict({ row(0x80, 0, 300), EMPTY, EMPTY, EMPTY }, 0x00), false,
+      "an actor byte out of 0..15 is not a battle table")
+    H.log("battle_healpolicy: wipe verdict (#166) checked")
   end),
 
   -- 8. the table was not skipped
