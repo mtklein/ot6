@@ -194,29 +194,182 @@ local function sawSpell(id)
   return false
 end
 
--- modes: Locke heals, using item turns aimed at the worst-hp living ally,
--- because a two-man fight against a L24 boss does not survive a deferring
--- bench; Celes runs the arms.
+-- modes: the bench (everyone but Celes) is the medic line, spending its
+-- turns on the party's condition from the bag, because a two-man fight
+-- against a L24 boss does not survive a deferring bench; Celes runs the
+-- arms.  The medic line is on for the whole fight, parks included: the
+-- one time it was switched off "briefly for menu assertions" (the two
+-- latch windows and boot B's walk) the regenerated n024_entry wiped the
+-- party under it -- see carePlan below.
 local mf = 0
 local celesMode = "defer"                -- "defer"|"summon"|"cast"|"park"
 local lockeMode = "medic"                -- "medic"|"summon"
-local partyCare = true                    -- false briefly for menu assertions
 local castRec = nil                      -- list record to cast in "cast"
 local tc = H.targetCursor({ mask = 0x7B7D,
                             dirs = { "down", "up", "left", "right" } })
+-- The medic line's priorities, measured on the regenerated n024_entry
+-- (2026-09-07, engine observer below): NUMBER 024's SPECIAL ($ef) is a
+-- Muddle -- it took Edgar with the boss's first action (status2 $20 at
+-- f1803) and Celes at f3174; muddled Edgar fired NoiseBlaster ($a3) at
+-- his own party (tgt=000f), and muddled Sabin's Fire Dance ($60) on the
+-- party is what killed Locke (502/466/212/443 -> 201/201/0/180).  No
+-- monster action killed anyone until the party was already at 56 HP.
+-- So: (1) a muddled living ally is cured first -- a Remedy while the bag
+-- has one, a plain hit on the ally after it (physical damage clears
+-- Muddle); (2) the dead are raised with Fenix Down; (3) the hurt are
+-- healed from the bag: X-Potion in extremis, Potion when badly hurt,
+-- Tonics for the rest (this bag carries 0 Potions and 65 Tonics); (4)
+-- nothing to do -> Defer, so the next window comes sooner.  Every item
+-- here is HP/status only: Celes's pool, the quantity under test, is
+-- never touched by the bench.
+local REMEDY, XPOTION, FENIX = 0xF5, 0xEA, 0xF0
+local CMD_FIGHT = 0x00
+local HEAL_PCT = 60
+local ST2_MUDDLE = 0x20                  -- $3ee5,e*2 bit 5
+local function st2(s) return H.readByte(0x3EE5 + s*2) end
+local function maxHp(s) return H.readWord(0x3C1C + s*2) end
+local function alive(s) return maxHp(s) > 0 and hp(s) > 0 end
+local function carePlan()
+  for s = 0, 3 do
+    if alive(s) and (st2(s) & ST2_MUDDLE) ~= 0 then
+      -- a plain hit on the ally.  Remedy ($F5) was measured NOT to clear
+      -- it on this ROM (two Remedies on muddled Edgar, status2 $20 held
+      -- through both: exec f3242/done f3623, exec f4596/done f4978); an
+      -- ally's Fight did, both times it was tried (f7178, f7367 in the
+      -- wipe run, $20 -> $00 at the return).
+      return { kind = "fight", target = s, why = "muddled: a hit clears it" }
+    end
+  end
+  for s = 0, 3 do
+    if maxHp(s) > 0 and hp(s) == 0 and bagIdxOf({ FENIX }) then
+      return { kind = "item", item = FENIX, target = s, why = "down" }
+    end
+  end
+  local worst, wpct = nil, 101
+  for s = 0, 3 do
+    if alive(s) then
+      local pct = hp(s) * 100 // maxHp(s)
+      if pct < wpct then worst, wpct = s, pct end
+    end
+  end
+  if worst and wpct < HEAL_PCT then
+    local item = (wpct < 25 and bagIdxOf({ XPOTION }) and XPOTION)
+              or (wpct < 45 and bagIdxOf({ POTION }) and POTION)
+              or (bagIdxOf({ TONIC }) and TONIC)
+              or (bagIdxOf({ POTION }) and POTION) or nil
+    if item then
+      return { kind = "item", item = item, target = worst,
+               why = string.format("at %d%%", wpct) }
+    end
+  end
+  return nil
+end
+local plans, planKey = {}, {}            -- per bench actor: the held plan, its log key
+local summonArmed = {}                   -- per summoner: this window came through the esper list
+-- Steering a Fight onto an ally: the Fight target screen opens on the
+-- monster column, where the party mask ($7b7d) can hold a stale value
+-- and the shared targetCursor confirms early (measured: the first
+-- "hit slot 0" of the 2026-09-07 rearrangement went to the boss,
+-- tgt=0100).  So: monster mask ($7b7e) non-zero -> RIGHT, onto the party
+-- column (the monsters stand on the left of the screen; a "left" here
+-- parked Sabin in the target screen for 20000 frames, attempt 5); then
+-- up/down along the party mask until it is the target's bit and has
+-- held four observations.
+local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
+local allyAge, allyMask = 0, nil
+local function steerAlly(target)
+  if H.readByte(TGTMONS) ~= 0 then allyAge, allyMask = 0, nil; return "right" end
+  local m = H.readByte(TGTCHARS)
+  if m == allyMask then allyAge = allyAge + 1 else allyMask, allyAge = m, 1 end
+  if m == (1 << target) then return allyAge >= 4 and "a" or nil end
+  if m == 0 then return nil end
+  return (m > (1 << target)) and "up" or "down"
+end
 -- Where is the machine?  The fight ending, and the party being ground down
 -- by a level-24 boss, look identical from outside.
 local hbF = -600
+-- entity e (0..3 party, 4..9 monsters): status1/status2 at $3ee4,e*2 and
+-- status3/status4 at $3ef8,e*2 -- the four bytes a status question reads
+local function stFour(e)
+  return string.format("%02x%02x.%02x%02x", H.readByte(0x3EE4 + e*2),
+    H.readByte(0x3EE5 + e*2), H.readByte(0x3EF8 + e*2), H.readByte(0x3EF9 + e*2))
+end
+local function partyLine()
+  local hps, sts = {}, {}
+  for s = 0, 3 do
+    hps[#hps+1] = tostring(H.readWord(0x3BF4 + s*2))
+    sts[#sts+1] = stFour(s)
+  end
+  return table.concat(hps, "/"), table.concat(sts, " ")
+end
 local function heartbeat()
   if H.frame - hbF < 600 then return end
   hbF = H.frame
-  local hps = {}
-  for s = 0, 3 do hps[#hps+1] = tostring(H.readWord(0x3BF4 + s*2)) end
+  local hps, sts = partyLine()
   H.log(string.format("[hb f%d] live=%s menu=%02x actor=%d mstate=%02x "
-    .. "mons=%d hp=%s celes=%s locke=%s", H.frame,
+    .. "mons=%d hp=%s st=%s boss=%d/%s celes=%s locke=%s", H.frame,
     tostring(H.battleLoadStarted()), H.readByte(MENU), H.readByte(ACTOR),
-    H.readByte(MSTATE), H.monstersPresent(), table.concat(hps, "/"),
-    celesMode, lockeMode))
+    H.readByte(MSTATE), H.monstersPresent(), hps, sts, bossHp(),
+    stFour(4 + BOSS), celesMode, lockeMode))
+end
+-- Engine observer, read-only: every command the engine dispatches, party
+-- or monster, at ExecCmd (X = entity offset; $b5/$b6 the command/attack
+-- after queue-time folding, $b8 the target word) and its return at
+-- SaveForMimic -- the same two observers the lib's action trace reads,
+-- which only follows newFightDriver plans and so sees nothing of this
+-- file's own decide().  Installed once; callbacks survive loadState.
+local execA = H.sym("ExecCmd@battle_code")
+local execB = H.sym("SaveForMimic")
+local observerOn = false
+local function installObserver()
+  if observerOn then return end
+  observerOn = true
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xffff
+    if x % 2 ~= 0 or x >= 20 then return end
+    local cmd, atk, tgt = H.readByte(0xB5), H.readByte(0xB6), H.readWord(0xB8)
+    local hps, sts = partyLine()
+    H.log(string.format("[exec f%d] %s%d cmd=%02x atk=%02x tgt=%04x | hp=%s st=%s boss=%d/%s",
+      H.frame, x < 8 and "party" or "mon", x < 8 and x // 2 or x // 2 - 4,
+      cmd, atk, tgt, hps, sts, bossHp(), stFour(4 + BOSS)))
+    -- Celes's own Osmose, as the engine dispatches it: the target word
+    -- (a muddled caster's spell is re-aimed here, not at the menu) and
+    -- the two pools on entry, for the [osmose] verdict below
+    if celes and x // 2 == celes and cmd == CMD_MAGIC and atk == OSMOSE then
+      R.osmoses = R.osmoses or {}
+      R.osmoses[#R.osmoses + 1] = { frame = H.frame, tgt = tgt,
+        bossMp0 = bossMp(), mp0 = mp(celes) }
+    end
+  end, emu.callbackType.exec, execA, execA)
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xffff
+    if x % 2 ~= 0 or x >= 20 then return end
+    local hps, sts = partyLine()
+    H.log(string.format("[done f%d] %s%d | hp=%s st=%s boss=%d/%s", H.frame,
+      x < 8 and "party" or "mon", x < 8 and x // 2 or x // 2 - 4, hps, sts,
+      bossHp(), stFour(4 + BOSS)))
+    if celes and x // 2 == celes and R.osmoses then
+      local o = R.osmoses[#R.osmoses]
+      if o and o.bossMp1 == nil then
+        o.bossMp1, o.mp1, o.doneFrame = bossMp(), mp(celes), H.frame
+        H.log(string.format("[osmose f%d] Celes's Osmose tgt=%04x: boss pool %d->%d, hers %d->%d",
+          H.frame, o.tgt, o.bossMp0, o.bossMp1, o.mp0, o.mp1))
+      end
+    end
+  end, emu.callbackType.exec, execB, execB)
+end
+-- the Osmose that proves the reprice: hers, dispatched at the boss
+-- (target word bit 8 = monster slot 0), and the boss's pool lower at its
+-- return than at its entry.  An Osmose re-aimed by Muddle, or the boss's
+-- own casts spending its pool (Ice cost it 777->772 in the wipe run,
+-- which is what satisfied a bare bossMp() < g0), do not count.
+local function osmoseLanded()
+  for _, o in ipairs(R.osmoses or {}) do
+    if (o.tgt & (0x0100 << BOSS)) ~= 0 and o.bossMp1 and o.bossMp1 < o.bossMp0 then
+      return o
+    end
+  end
+  return nil
 end
 local function decide()
   heartbeat()
@@ -228,12 +381,13 @@ local function decide()
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
   if st == ST_TRANS then return {} end
-  local slow = (st == ST_ITEM)
-  if slow then
-    if (mf - 1) % 30 >= 6 then return {} end
-  else
-    if (mf - 1) % 8 >= 4 then return {} end
-  end
+  -- One cadence for every window, the item list included.  The item list
+  -- used to walk at one press per 30 frames; this fixture's battle mode is
+  -- ACTIVE ($1D4D=$22), so that walk was live exposure -- a Tonic sits at
+  -- row 22 and the X-Potion at 29 -- and in the 2026-09-07 rearrangement
+  -- run Edgar's X-Potion for a 3-HP Locke was still walking when the
+  -- boss's second Magnitude8 (f12998) put three of the four down.
+  if (mf - 1) % 8 >= 4 then return {} end
   local btn
   if act == locke and lockeMode == "summon" then
     if st == ST_CMD then
@@ -242,24 +396,33 @@ local function decide()
       if cur == want then btn = "a"
       else btn = (cur < want) and "down" or "up" end
     elseif st == ST_MAGIC then btn = "up"       -- to the top, then the esper window
-    elseif st == ST_ESPER then btn = "a"
-    elseif st == ST_TGT then btn = "a"
+    elseif st == ST_ESPER then btn = "a"; summonArmed[locke] = true
+    elseif st == ST_TGT then
+      -- confirm only a target screen this branch opened from the esper
+      -- window: when the mode flipped medic -> summon with his Fight's
+      -- target screen already open, a bare "a" here confirmed that Fight
+      -- on the boss (party2 cmd=00 tgt=0100 at f2422, 2026-09-07)
+      btn = summonArmed[locke] and "a" or "b"
     else btn = "b" end
+    if st == ST_CMD then summonArmed[locke] = nil end
     return btn and { [btn] = true } or {}
   end
-  if act ~= celes and not partyCare then
-    btn = (st == ST_CMD) and "x" or "b"
-  elseif act ~= celes then                      -- the medic line
-
-    local hurt = false
-    for s2 = 0, 3 do
-      local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
-      if h > 0 and m > 0 and h * 100 // m < 45 then hurt = true end
-    end
-    local bagHasHeal = bagIdxOf({ TONIC, POTION }) ~= nil
-    if st == ST_CMD and not (hurt and bagHasHeal) then btn = "x"
-    elseif st == ST_CMD then
-      local want = cmdRowOf(act, CMD_ITEM)
+  if act ~= celes then                          -- the medic line
+    if st == ST_CMD then
+      -- plan at the command window and hold it through the item and
+      -- target windows, so a mid-menu HP change cannot thrash the cursor
+      local p = carePlan()
+      local key = p and string.format("%s/%s/%d", p.kind, tostring(p.item), p.target) or "-"
+      if key ~= planKey[act] then
+        planKey[act] = key
+        if p then
+          H.log(string.format("[medic f%d] actor=%d: %s slot %d (%s) -- hp=%d/%d/%d/%d",
+            H.frame, act, p.item and string.format("item $%02X on", p.item) or "hit",
+            p.target, p.why, hp(0), hp(1), hp(2), hp(3)))
+        end
+      end
+      plans[act] = p
+      local want = p and cmdRowOf(act, p.kind == "item" and CMD_ITEM or CMD_FIGHT)
       if want == nil then btn = "x"
       else
         local cur = H.readByte(CMDROW + act) & 3
@@ -267,18 +430,8 @@ local function decide()
         else btn = (cur < want) and "down" or "up" end
       end
     elseif st == ST_ITEM then
-      -- A Tonic's 50 does not cover a round from this boss, so somebody
-      -- badly hurt gets the Potion when one exists; Tonics carry the rest.
-      local worstPct = 101
-      for s2 = 0, 3 do
-        local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
-        if h > 0 and m > 0 then
-          local pct = h * 100 // m
-          if pct < worstPct then worstPct = pct end
-        end
-      end
-      local want = (worstPct < 45) and bagIdxOf({ POTION }) or nil
-      want = want or bagIdxOf({ TONIC, POTION })
+      local p = plans[act]
+      local want = p and p.item and bagIdxOf({ p.item })
       if want == nil then btn = "b"
       else
         local cur = H.readByte(0x8947 + act) + H.readByte(0x894F + act)
@@ -287,16 +440,11 @@ local function decide()
         else btn = "a" end
       end
     elseif st == ST_TGT then
-      -- steer the heal onto the worst-hp living character
-      local worst, wpct = nil, 101
-      for s = 0, 3 do
-        local h, m = hp(s), H.readWord(0x3C1C + s*2)
-        if h > 0 and m > 0 then
-          local pct = h * 100 // m
-          if pct < wpct then worst, wpct = s, pct end
-        end
-      end
-      btn = tc.steer(worst, mf)
+      -- steer onto the plan's slot (a corpse for Fenix Down, the muddled
+      -- ally for Remedy or the hit, the worst-hp ally for a heal)
+      local p = plans[act]
+      if p and p.kind == "fight" then btn = steerAlly(p.target)
+      else btn = tc.steer(p and p.target, mf) end
     else btn = "b" end
   elseif act == celes then
     if celesMode == "defer" then
@@ -312,9 +460,10 @@ local function decide()
         if H.readByte(MSCROLL + celes) + H.readByte(MROW + celes) > 0 then
           btn = "up"
         else btn = "up" end
-      elseif st == ST_ESPER then btn = "a"
-      elseif st == ST_TGT then btn = "a"
+      elseif st == ST_ESPER then btn = "a"; summonArmed[celes] = true
+      elseif st == ST_TGT then btn = summonArmed[celes] and "a" or "b"   -- as Locke's
       else btn = "b" end
+      if st == ST_CMD then summonArmed[celes] = nil end
     elseif celesMode == "cast" then
       if st == ST_CMD then
         local want = cmdRowOf(celes, CMD_MAGIC)
@@ -333,7 +482,22 @@ local function decide()
         elseif col > wc then btn = "left"
         else btn = "a" end
       elseif st == ST_ESPER then btn = "b"
-      elseif st == ST_TGT then btn = "a"   -- the spell's own default side
+      elseif st == ST_TGT then
+        -- the spell's own default side -- except a Cure, which the walk
+        -- spends anyway: same 5 MP, so it goes to the worst-hp living
+        -- ally (the tail's two Cures used to land on Celes herself at
+        -- full HP while the bench was being ground down by ~190-a-head
+        -- AoEs, 2026-09-07)
+        if castRec == recOf(celes, CURE) then
+          local worst, wpct = nil, 101
+          for s = 0, 3 do
+            if alive(s) then
+              local pct = hp(s) * 100 // maxHp(s)
+              if pct < wpct then worst, wpct = s, pct end
+            end
+          end
+          btn = tc.steer(worst, mf)
+        else btn = "a" end
       else btn = "b" end
     else                                   -- "park": open her list and hold
       if st == ST_CMD then
@@ -385,7 +549,8 @@ local function enterBoss(tag)
       end
       H.assertEq(locke ~= nil and celes ~= nil, true,
         tag .. ": LOCKE and CELES really fight this")
-      partyCare = true
+      plans, planKey, summonArmed = {}, {}, {}
+      R.osmoses = {}
       spells, mpWrites = {}, {}
       emu.addMemoryCallback(function(_, v)
         spells[#spells + 1] = v
@@ -405,6 +570,7 @@ end
 
 H.run({ maxFrames = 150000 }, {
   H.waitFrames(20),
+  H.call(installObserver),
 
   -- ------------------------------------------------- 0. the records, in ROM --
   H.call(function()
@@ -529,7 +695,7 @@ H.run({ maxFrames = 150000 }, {
   end)(),
   -- 5. the spent summon greys at her next real window (natural refresh)
   H.call(function()
-    partyCare = false; celesMode = "park"
+    celesMode = "park"
     -- Boot A's pool is her maximum, so nothing here needs a refund: the
     -- window below must show the summon row greyed by the LATCH alone,
     -- with every kit row live by MP.
@@ -562,7 +728,7 @@ H.run({ maxFrames = 150000 }, {
         for _, v in ipairs(mpWrites) do
           if (v & 0xff) == ((m0 - OSMOSE_MP) & 0xff) then debited = true end
         end
-        return debited and bossMp() < g0
+        return debited and bossMp() < g0 and osmoseLanded() ~= nil
       end, 20000, "Celes's Osmose is really charged and drains the boss"),
       H.call(function() celesMode = "defer" end),
       H.waitFrames(240),
@@ -571,6 +737,12 @@ H.run({ maxFrames = 150000 }, {
         for _, v in ipairs(mpWrites) do seen[v & 0xff] = true end
         H.log(string.format("[osmose] mp %d->%d, boss pool %d->%d",
           m0, mp(celes), g0, bossMp()))
+        local o = osmoseLanded()
+        H.assertEq(o ~= nil, true,
+          "[osmose] HER Osmose was dispatched at the boss (target word) and "
+          .. "the boss's pool was lower at its return than at its entry")
+        H.assertEq(o ~= nil and o.mp1 > o.mp0, true,
+          "[osmose] ...and her own pool rose across that same execution")
         H.assertEq(seen[(m0 - OSMOSE_MP) & 0xff], true,
           "[osmose] the caster's MP was debited to exactly mp0-8 (the charge)")
         H.assertEq(bossMp() < g0, true, "[osmose] the boss's real pool dropped")
@@ -584,7 +756,7 @@ H.run({ maxFrames = 150000 }, {
   -- Now that Osmose has restored her above 27 MP, the spent summon row's
   -- grey cannot be explained by price.  Re-open the same live list and bind
   -- the verdict uniquely to the once-per-battle latch.
-  H.call(function() partyCare = false; celesMode = "park" end),
+  H.call(function() celesMode = "park" end),
   driveTo(function()
     return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
   end, 20000, "her refilled post-summon list is open"),
@@ -628,10 +800,11 @@ H.run({ maxFrames = 150000 }, {
     -- $3BF4 hp, $3C08 mp, $3C1C max hp, $3C30 max mp: one 20-byte stride
     H.assertEq(H.readWord(0x3C30 + celes*2), 126,
       "[drain] and her maximum is 126")
-    -- The boundary is only five of her turns from this 41-MP start.  Defer
-    -- the bench so an unrelated item-target cursor cannot own the menu while
-    -- the MP experiment is running.
-    partyCare = false
+    -- The boundary is only a handful of her turns from this start.  The
+    -- bench stays on the medic line throughout: decide() branches on the
+    -- acting slot, so a bench item-target cursor only ever delays her
+    -- window, never steers it, and the fixture's boss muddles a
+    -- deferring bench into wiping the party (carePlan above).
   end),
   -- 7. the 7-MP boundary, earned by real casts of her own kit: Shells (15)
   -- to bring the pool down in big steps, then a tail that steps onto the
