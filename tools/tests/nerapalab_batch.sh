@@ -4,7 +4,8 @@
 #   tools/tests/nerapalab_batch.sh <policy> <idle> [idle ...]
 #
 #   policy  a POLICIES key in lab_nerapa_template.lua
-#           (control | breakfirst | allin | allin_bank2 | raise1 | noraise)
+#           (control | breakfirst | allin | allin_bank2 | raise1 | noraise |
+#            physical | physical_bank2 | physical_allin | physical_raise1)
 #   idle    frames to stand still at the doorstep before the talk (shifts
 #           $021e; only idle mod 60 matters -- $021e has period 60)
 #

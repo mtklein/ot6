@@ -26,7 +26,14 @@
 -- monster_prop.dat row $118 (32 bytes at +$2300): speed 48, attack 11,
 -- hit 100, evade 0, mblock 0, defense 105, m.def 150, m.pow 10, HP 2800,
 -- MP 280, level 26; absorb $01 FIRE; null $D8 (poison|wind|earth|water);
--- weak $26 = ICE|BOLT|HOLY.  Ot6ShieldTbl (ot6_hud.asm:1837): 5 shields,
+-- weak $26 = ICE|BOLT|HOLY.  Row bytes 28-31 = 00 81 00 20: the 16-bit
+-- "status 3 & 4" word $0081 LoadRageProp seeds into $3de8
+-- (battle_main.asm:7764-7773; bit 0 is the flying flag, folded into
+-- Float) sets status 3 bit 7 = REFLECT -- measured, every traced fight
+-- reads st=00,00,80,80 from Nerapa's first action: Bolt and Ice at every
+-- tier bounce onto the party ([hp] lines), a summon (magic_prop $38 byte
+-- 2 bit 7 "ignore reflect") and everything physical land.  Ot6ShieldTbl
+-- (ot6_hud.asm:1837): 5 shields,
 -- class-weak SLASH|PIERCE.  AI (ai_script.asm:5237-5266): on its first
 -- turn Condemned on all four slots (once: monster switch 0), then the loop
 -- Battle/Battle/Fire2 . Battle/Fireball/Fire3 . Battle/Battle/Fire2; a

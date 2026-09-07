@@ -789,24 +789,116 @@ roster.
 
 ### 22. Nerapa — the escape's doorman
 
-Party: your three, during the continent's collapse.
+Party: your three plus CELES, who arrives from the statue scene with
+every equipment slot empty (route doc §9), during the continent's
+collapse, under the 6:00 escape clock.
 
-**Shields:** 5 · **Weak:** ice, bolt, holy + slashing, piercing.
-(Decoded, not recalled: `$118` weak = ice|bolt|holy and **absorbs
-fire**.)
+**Shields:** 5 · **Weak:** ice, bolt, holy + slashing, piercing ·
+**Absorbs:** fire · **Opens with REFLECT and FLOAT.**
 
-- The fight opens *untelegraphed*, with **Condemned** on the whole
-  party before your first input. That is vanilla's ambush, preserved.
-  The Condemned countdown runs at the same time as the Floating
-  Continent's own escape timer.
-- **Telegraph:** it gathers the curse again → Condemned is reapplied,
-  undoing any cleanses (script details on the audit list). Break to
-  stop the countdown being reset.
-- **Break story:** 5 shields on purpose. After Atma's 11, the low
-  gauge sets the pacing: a short fight run under two timers,
-  Condemned and the escape clock. Break fast, kill faster, and run.
-  Shadow's wait-or-jump choice comes shortly afterwards and is
-  outside this document's scope.
+Decoded, not recalled (`monster_prop.dat` row `$118`, 32 bytes at
+`+$2300`, ROM `$CF2300`; `tools/tests/lab_nerapa_template.lua` header):
+speed 48, attack 11, hit 100, evade 0, m.block 0, defense 105, m.def 150,
+m.pow 10, **HP 2800**, MP 280, level 26; absorb `$01` fire; null `$D8`
+poison|wind|earth|water; weak `$26` ice|bolt|holy. `Ot6ShieldTbl`
+(`ot6_hud.asm:1837`): 5 shields, class-weak `SLASH|PIERCE`. Row bytes
+28-31 `00 81 00 20`: the 16-bit "status 3 & 4" word `$0081` that
+`LoadRageProp` seeds into `$3de8` (`battle_main.asm:7764-7773`; bit 0 is
+the flying flag, folded into Float) sets **status 3 bit 7 = Reflect**.
+Measured: every traced fight of the 2026-09-07 lab reads Nerapa's status
+bytes as `st=00,00,80,80` from its first action to its last.
+
+**AI** (`ai_script.asm:5237-5266`): on its first turn a dialogue and
+**Condemned on all four slots**, once (monster switch 0 — the script
+never reapplies it); then the loop *Battle/Battle/Fire 2 · Battle/Fire
+Ball/Fire 3 · Battle/Battle/Fire 2*. A **Fight** command against it is
+countered with a Battle and counted; the 7th Fight draws **Roulette**
+(`if_cmd FIGHT … add_battle_var 0,1`; `if_battle_var_greater 0,6 →
+ROULETTE`). Condemned's count (`StartCondemn`, `battle_main.asm:1531`)
+is 20 + max(0, 60 − (26 + rand(0..25))) = 29..54, one tick per ATB
+overflow of that character; at 1 it casts Doom (`:15296-15303`).
+Measured onsets: slot 0 at t≈650-750, then one slot every ~280 frames,
+counts 31-55; the first Doom lands at t≈5,400-7,000.
+
+**The fight as measured** (`lab_nerapa_template.lua`, doorstep fixture
+from `lab_nerapa_bake.lua`, TERRA L26 / LOCKE L29 / EDGAR L27 / CELES
+L23, doorstep at 3:50). Nerapa's opening costs the clock **~1,350
+frames** (dialogue 232, four Condemned casts of ~270) before any party
+action resolves. The engine writes an action's result one frame after
+its own `ExecCmd`; read that way, the ledgers say:
+
+- **Every Bolt and Ice, at every tier, dealt 0 to Nerapa and its full
+  damage to a party member** — Reflect. `breakfirst_i37.log`: LOCKE's
+  Bolt → `[hp] t=1553 entity 3 888 -> 570 (-318)`; CELES's Ice → `entity
+  3 570 -> 295 (-275)`; LOCKE's 2-BP Bolt 3 → `[hp] t=3298 entity 1 1400
+  -> 0 (-1400)`; TERRA's 3-BP Ice 3 → `entity 2 1216 -> 0 (-1216)`. The
+  driver's `nuke = { Bolt }` line — gen_fc_escape's and the route doc's
+  "LOCKE's Bolt nuke" — spent a turn and killed a friend each time it
+  fired.
+- What lands: **Shiva** (a summon is unreflectable: `magic_prop` `$38`
+  byte 2 `$80`, "ignore reflect", vs `$00` on Bolt `$02`) for 534-579 and
+  a chip; EDGAR's **AutoCrossbow** 258-272 and a chip, ×4 at 2 BP (1081);
+  and **Fight**: CELES's 1-BP Break Blade two swings of ~98, each a chip.
+- **Who dies:** CELES (888 HP, no shield/helm/armor) to the first Fire 3
+  or a Battle at t≈1,550-2,100 in almost every seed; the driver then
+  raises her and she dies again (`control_i7`: 5 raises, 8 deaths, a
+  "win" at 0:09). Nobody dies to Doom before t≈5,400.
+
+**Break story, corrected.** Reflect makes this a *physical* break, and
+the party has the tool: LOCKE's Genji pair (ThunderBlade, slash + bolt;
+Assassin, pierce). A base Fight is one swing per hand and each BP adds
+two swings, landed alternately (`multi-hit.md` §1), so LOCKE's **1-BP
+Fight is four class-weak hits = four chips**; with CELES's two, the gauge
+breaks inside the party's first round and the surplus swings land on a
+broken, weak target. `physical_i0.log`: `[act] t=1961 start e1 cmd=$00`,
+`[hit] t=1962 nerapa (-560) sh=0 (-3)`, `[hit] t=1963 nerapa (-2045)` —
+**dead at t≈1,963, before its first Fire**. Fight draws the counter and
+counts toward Roulette, but the fight is over by the second Fight. The
+telegraph line the earlier draft claimed ("it gathers the curse again")
+is not in the script; the Condemned cast is once.
+
+**Policy × seed** (`tools/tests/nerapalab_batch.sh`, aggregate by
+`nerapalab_aggregate.py`; seeds are what InitBattle drew, `$be`; a
+repeated seed is a replicate and is not counted twice; `won_late` = Nerapa
+fell with under 900 frames of clock, gen_fc_escape's margin — the escape
+is still lost). Every attempt is retained under `build/nerapalab/`.
+
+| policy | distinct seeds | won | won_late | lost | Fenix/win | mean t (won) | clock left (won) |
+|---|---|---|---|---|---|---|---|
+| allin | 8 | 1 | 0 | 7 | 0.0 | 6528 | 7307 |
+| breakfirst | 8 | 3 | 0 | 5 | 4.0 | 10587 | 3236 |
+| control | 8 | 4 | 1 | 3 | 0.8 | 5763 | 8050 |
+| physical | 8 | 8 | 0 | 0 | 0.0 | 2641 | 11176 |
+| physical_allin | 8 | 8 | 0 | 0 | 0.0 | 2641 | 11176 |
+| physical_bank2 | 8 | 8 | 0 | 0 | 0.0 | 2873 | 10944 |
+| physical_raise1 | 8 | 8 | 0 | 0 | 0.0 | 2641 | 11176 |
+
+Per seed (`won` frames / clock left; `L` lost, `late` a win under the
+margin; the `$A0` column is issue #149's seed):
+
+| seed | `$C0` | `$20` | `$40` | `$60` | `$80` | `$A0` | `$30` | `$70` |
+|---|---|---|---|---|---|---|---|---|
+| control | 6221/7574 1Fx | late 13253/582 5Fx | L wiped | L wiped 5Fx | 4477/9334 | L wiped 2Fx | 5121/8710 | 7233/6582 2Fx |
+| breakfirst (bank 2) | L wiped 5Fx | L wiped 3Fx | 11037/2790 4Fx | L wiped 2Fx | 12765/1046 6Fx | L wiped | 7958/5873 2Fx | L wiped 2Fx |
+| allin (no care) | L wiped | 6528/7307 | L wiped | L wiped | L wiped | L wiped | L wiped | L wiped |
+| physical | 2653/11142 | 2405/11430 | 2717/11110 | 2853/10966 | 3261/10550 | 2213/11590 | 2745/11086 | 2281/11534 |
+| physical_bank2 | 3005/10790 | 2165/11670 | 3109/10718 | 2782/11037 | 3165/10646 | 3021/10782 | 2833/10998 | 2905/10910 |
+| physical_allin | = physical | = physical | = physical | = physical | = physical | = physical | = physical | = physical |
+| physical_raise1 | = physical | = physical | = physical | = physical | = physical | = physical | = physical | = physical |
+
+The three physical variants with care options differ from `physical`
+only in options that never engage: the fight ends before anyone needs a
+heal or a raise, so their traces are frame-identical. Every physical win
+had no deaths. Idles 45 and 52 re-drew `$C0` and `$A0` and reproduced
+those fights (replicates, not counted).
+
+**Recommendation.** The escape driver must not cast attack magic at a
+reflecting target, and against Nerapa the winning verb is the one it
+already has for randoms: boosted Fight with LOCKE's pair, the crossbow,
+Shiva once. A person does the same after the first bounced Bolt. With
+that line the fight is 35-55 s of a 3:50 clock, no Fenix, no deaths, on
+every seed tried. Dressing CELES before the continent (she has no armor
+at all) is the second lever and is outside this lab.
 
 ## Scripted set-pieces (no gauge drawn)
 
