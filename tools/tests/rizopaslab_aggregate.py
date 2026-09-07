@@ -51,6 +51,36 @@ def fmean(xs):
     return f"{mean(xs):.0f}" if xs else "-"
 
 
+if "--matrix" in sys.argv:
+    # seed x policy: outcome, boss-phase frames (surface -> dead) on a
+    # win, items and deaths -- the Nerapa section's per-seed table
+    pols = sorted(rows)
+    seeds = []
+    for pol in pols:
+        for k in rows[pol].values():
+            if k["seed"] not in seeds:
+                seeds.append(k["seed"])
+    seeds.sort(key=lambda s: int(s[1:], 16))
+    print("| seed | " + " | ".join(pols) + " |")
+    print("|---|" + "---|" * len(pols))
+    for s in seeds:
+        cells = []
+        for pol in pols:
+            ks = [k for k in rows[pol].values() if k["seed"] == s]
+            if not ks:
+                cells.append("—")
+                continue
+            k = ks[0]
+            d = 0 if k["deaths"] == "none" else len(k["deaths"].split(";"))
+            items = "".join(f" {n}{lab}" for n, lab in ((int(k["fenix"]), "Fx"), (int(k["potion"]), "Po"), (int(k["tonic"]), "To")) if n)
+            if k["outcome"] == "won":
+                cells.append(f"{k['t_boss']}{items}{' ' + str(d) + 'd' if d else ''}")
+            else:
+                cells.append(f"**L** {k['outcome'][5:]}{items} {d}d")
+        print(f"| `{s}` | " + " | ".join(cells) + " |")
+    sys.exit(0)
+
+
 if md:
     print("| policy | distinct seeds | won | lost | Fenix/win | Potion/win | deaths (all) | mean t (won) | mean boss phase (won) |")
     print("|---|---|---|---|---|---|---|---|---|")
