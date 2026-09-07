@@ -498,8 +498,16 @@ checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
        latch_of("build/ot6.sfc")] + LIBS + checkpoint_files)
+# The verdict depends on the ROM (a stamp records the ROM it was captured
+# on), on the generators (their own sigs), and -- for the drift note, and
+# for any stamp still on the conservative pre-ROM-identity rule -- on the
+# lib halves, all through the same latches the generate and suite edges
+# use, so the check re-runs exactly when its answer can move.
 check("check_states", "python3 tools/tests/lib/compose.py --check-states",
-      ["tools/tests/lib/compose.py", sn.GRAPH] + all_stamps)
+      ["tools/tests/lib/compose.py", "tools/tests/lib/savestate_stamp.sh",
+       sn.GRAPH, latch_of("build/ot6.sfc")]
+      + [latch_of(f"tools/tests/{e['gen']}.lua") for e in states if e.get("gen")]
+      + [latch_of(h) for h in LIBS] + all_stamps)
 
 # the four fixture audits: real inputs replace the old make-level stamp
 AUDIT_COMMON = all_stamps + checkpoint_files

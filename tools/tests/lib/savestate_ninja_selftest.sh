@@ -162,13 +162,23 @@ check "gen_g edit re-runs BOTH siblings and their dependent" "g1 g2 h " "$ran"
 run
 check "and the family is quiescent again afterwards" "" "$ran"
 
-# 6. each composed-in lib half re-runs every step.
+# 6. a composed-in lib half is provenance, not a scheduling input: editing
+#    one regenerates nothing (docs/TESTING.md -- a logging, assertion or
+#    controller-policy change does not by itself invalidate a legitimately
+#    reached snapshot).  The stamps keep vouching for what they were made
+#    from: the old lib hashes stay recorded, and nothing rewrites them.
 for half in ot6.lua ot6_field.lua ot6_contract.lua; do
   sleep 1
+  before=$(cat "$TMP/build/states/b.stamp")
   edit "tools/tests/lib/$half" "$half EDITED $$"
   run
-  check "lib/$half edit re-runs every step" "a b c e g1 g2 h " "$ran"
+  check "lib/$half edit regenerates NOTHING" "" "$ran"
+  check "lib/$half edit leaves the stamp's recorded provenance alone" \
+    "$before" "$(cat "$TMP/build/states/b.stamp")"
 done
+grep -q "^lib tools/tests/lib/ot6.lua " "$TMP/build/states/b.stamp" &&
+  echo "  pass stamp records the lib halves it was generated with" ||
+  { echo "  FAIL stamp has no lib provenance lines"; ok=0; }
 
 # 7. checkpoint payload and manifest edits re-run only the step that uses it.
 sleep 1
@@ -208,14 +218,22 @@ want=$(cd "$TMP" && OT6_ROOT="$TMP" sh tools/tests/lib/savestate_stamp.sh sig ge
   echo "  pass generate-edge stamp matches sig" ||
   { echo "  FAIL stamp/sig disagree"; ok=0; }
 [ "$(sed -n 2p "$TMP/build/states/b.stamp")" = \
+  "rom $(shasum -a 256 "$TMP/build/ot6.sfc" | cut -c1-64)" ] &&
+  echo "  pass generate-edge stamp records the ROM it booted" ||
+  { echo "  FAIL rom line wrong or missing"; ok=0; }
+[ "$(sed -n 3p "$TMP/build/states/b.stamp")" = \
+  "generator $(cd "$TMP" && OT6_ROOT="$TMP" sh tools/tests/lib/savestate_stamp.sh gensig gen_b)" ] &&
+  echo "  pass generate-edge stamp records the generator's own sig" ||
+  { echo "  FAIL generator line wrong or missing"; ok=0; }
+[ "$(sed -n 7p "$TMP/build/states/b.stamp")" = \
   "artifact $(shasum -a 256 "$TMP/build/states/b.mss" | cut -c1-64)" ] &&
   echo "  pass generate-edge stamp binds its artifact (#75)" ||
   { echo "  FAIL artifact binding wrong or missing"; ok=0; }
-[ "$(sed -n 3p "$TMP/build/states/b.stamp")" = \
+[ "$(sed -n 8p "$TMP/build/states/b.stamp")" = \
   "ancestor build/states/a.stamp $(shasum -a 256 "$TMP/build/states/a.stamp" | cut -c1-64)" ] &&
   echo "  pass chained stamp binds its predecessor's stamp (#75)" ||
   { echo "  FAIL ancestor binding wrong or missing"; ok=0; }
-[ "$(wc -l < "$TMP/build/states/a.stamp" | tr -d ' ')" = 2 ] &&
+[ "$(wc -l < "$TMP/build/states/a.stamp" | tr -d ' ')" = 7 ] &&
   echo "  pass root stamp carries no ancestor line" ||
   { echo "  FAIL root stamp shape wrong"; ok=0; }
 grep -q '^ancestor tools/tests/checkpoints/toy-v1/manifest.json ' \
