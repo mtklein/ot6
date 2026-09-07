@@ -99,6 +99,30 @@ local function mkFighter(tier, tag)
   local bt = nil
   local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
   local phase = 0
+  local wipeN = 0
+  -- #163: the loss watch, called on EVERY frame of the drive rather than
+  -- from F.frame, which the caller reaches only while battleLoadStarted()
+  -- holds -- and a wipe zeroes every battle-HP word, which that predicate
+  -- reads as "no battle", so the old in-fight check never saw the one
+  -- state it existed for (gen_sabin_falls, #159, had the same shape).
+  -- The lib's wipe predicate held 90 straight frames is the loss; so is
+  -- the run canary's count (it now counts a 300-frame battle-side wipe as
+  -- a game over and freezes the pad -- allowGameOver on the run keeps the
+  -- ladder alive for the reload).
+  function F.watch()
+    wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
+    if (H.gameOverFired or 0) > 0 and not F.lost then
+      F.lost = string.format("GAME OVER counted by the canary at f%d " ..
+        "(tier %d) -- party [%s]", H.frame, tier, partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+    end
+    if wipeN >= 90 and not F.lost then
+      F.lost = string.format("PARTY WIPED at f%d (started f%s, tier %d) " ..
+        "-- party [%s]", H.frame, bt and tostring(bt.f0) or "?", tier,
+        partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+    end
+  end
   function F.frame(battN)
     phase = (phase + 1) % 8
     if battN == 3 then
@@ -113,20 +137,7 @@ local function mkFighter(tier, tag)
         H.log(string.format("[%s] f%d party [%s] vs %s",
           tag, H.frame, partyLine(), monsterLine()))
       end
-      local wiped, any = true, false
-      for e = 0, 3 do
-        if H.readWord(BCMAXHP + e * 2) > 0 then
-          any = true
-          if H.readWord(BCHP + e * 2) > 0 then wiped = false end
-        end
-      end
-      bt.wiped = (any and wiped) and bt.wiped + 1 or 0
-      if bt.wiped >= 90 and not F.lost then
-        F.lost = string.format("PARTY WIPED at f%d (started f%d, %d frames " ..
-          "in, tier %d) -- party [%s] vs %s", H.frame, bt.f0,
-          H.frame - bt.f0, tier, partyLine(), monsterLine())
-        H.log("[" .. tag .. "] " .. F.lost)
-      end
+      -- the wipe verdict is F.watch's, taken before this gate (#163)
     end
     if bt == nil or H.readByte(MENU) == 0 then
       mStreak, mSeq = 0, nil
@@ -199,6 +210,8 @@ local function fightBody(tier)
     return false
   end, 90000, {
     H.call(function()
+      F.watch()                           -- every frame, outside the gate
+      if F.lost then H.setPad({}); return end
       battN = H.battleLoadStarted() and battN + 1 or 0
       if battN >= 3 then
         postN = 0
@@ -225,10 +238,16 @@ local function attempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(u2Blob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "ultros2 attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "ultros2 attempt " .. n)
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60),
     }, {}),
-    H.call(function() u2Lost = nil end),
+    H.call(function() u2Lost = nil; H.gameOverFired = 0 end),
     -- the entry-point contract is one advance from the WoB story battle 104
     H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
       H.call(pulseAdvance),
@@ -249,7 +268,10 @@ end
 
 -- Budget: the battle-clear-write era ran in 90k frames; the input-driven
 -- fight costs real ATB rounds and the ladder may replay it three times.
-H.run({ maxFrames = 400000 }, {
+-- allowGameOver: the ladder deliberately survives a lost battle 104
+-- (#163); F.watch reads H.gameOverFired as a loss and the next attempt
+-- reloads.
+H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()

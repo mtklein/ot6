@@ -85,6 +85,30 @@ local BP = 0x3E9C
 local function pHP(e) return H.readWord(0x3BF4 + e * 2) end
 local function pMaxHP(e) return H.readWord(0x3C1C + e * 2) end
 local function pMP(e) return H.readWord(0x3C08 + e * 2) end
+-- #163: the wipe predicate, readable on EVERY frame rather than behind a
+-- battleLoadStarted() gate.  A wipe zeroes every battle-HP word, which
+-- that predicate reads as "no battle", so a gated watch misses the one
+-- state it exists for (gen_sabin_falls, #159).  Two readings, OR'd: the
+-- lib's M.partyWipedInBattle (the run canary's own), and this file's
+-- slot-count reading -- the first `n` battle entities all showing a
+-- plausible max (0 < max < 1000; module garbage reads tens of thousands)
+-- with 0 HP.  The second is kept because this step's live party is two
+-- (three once GAU is fed) and the unused slots retain stale nonzero HP
+-- words from an earlier fight (gau_joined.log: "[0/363 0/358 394/394
+-- 0/0]" at a real wipe), which the lib's all-sane-slots reading counts
+-- as a survivor.
+local function partyDown(n)
+  if H.partyWipedInBattle() then return true end
+  local sane, alive = 0, 0
+  for e = 0, n - 1 do
+    local mx = pMaxHP(e)
+    if mx > 0 and mx < 1000 then
+      sane = sane + 1
+      if pHP(e) > 0 then alive = alive + 1 end
+    end
+  end
+  return sane >= n and alive == 0
+end
 local function partyLine()
   local p = {}
   for e = 0, 3 do
@@ -477,6 +501,15 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     return lost ~= nil or (arriveOffWorld and not H.worldMode()) or calm >= 30
   end, budget or 40000, {
     H.call(function()
+      -- #163: the run canary's count is a loss on any frame (it now counts
+      -- a 300-frame battle-side wipe as a game over and freezes the pad;
+      -- allowGameOver on the run keeps the ladders alive for the reload)
+      if (H.gameOverFired or 0) > 0 and not lost then
+        lost = string.format("GAME OVER counted by the canary during %s " ..
+          "at f%d [%s]", what, H.frame, partyLine())
+        H.log("[gau] LOST -- " .. lost)
+      end
+      if lost then H.setPad({}); return end
       if H.battleLoadStarted() then
         battleFrames = (battleFrames or 0) + 1
         if battleFrames == 120 then
@@ -848,6 +881,24 @@ local function grindStep()
   end, 250000, {
     H.call(function()
       phase = (phase + 1) % 8
+      -- #163: the wipe watch runs before the battleLoadStarted() gate,
+      -- every frame (see partyDown): a two-character wipe with the unused
+      -- slots at 0 reads as "no battle" and the gated watch below never
+      -- ran, so the loss idled to the 245000-frame deadline.  The run
+      -- canary's count is a loss too.
+      wipeN = partyDown(2) and wipeN + 1 or 0
+      if (H.gameOverFired or 0) > 0 and not lost then
+        lost = string.format("GAME OVER counted by the canary in fight #%d " ..
+          "at f%d (tier %d) [%s]", grind.fights, H.frame, fightTier,
+          partyLine())
+        H.log("[gau] LOST -- " .. lost)
+      end
+      if wipeN >= 90 and not lost then
+        lost = string.format("wiped in fight #%d at f%d (tier %d) [%s]",
+          grind.fights, H.frame, fightTier, partyLine())
+        H.log("[gau] LOST -- " .. lost)
+      end
+      if lost then H.setPad({}); return end
       if H.frame - hb >= 1800 then
         hb = H.frame
         H.log(string.format(
@@ -883,20 +934,10 @@ local function grindStep()
           H.log(string.format("[gau] fight #%d up f%d (%04X %04X %04X %04X)",
             grind.fights, H.frame, w[1], w[2], w[3], w[4]))
         end
-        -- wipe watch (a random-encounter wipe is a Game Over)
-        -- This step's live party is exactly Sabin+Cyan.  Unused battle slots
-        -- retain stale nonzero HP words, so counting all four masks a real
-        -- two-character wipe and leaves the driver wandering through Game
-        -- Over memory.
-        local wiped = pHP(0) == 0 and pHP(1) == 0
-        wipeN = wiped and wipeN + 1 or 0
-        if wipeN >= 90 and not lost then
-          lost = string.format("wiped in fight #%d at f%d (tier %d) [%s]",
-            grind.fights, H.frame, fightTier, partyLine())
-          H.log("[gau] LOST -- " .. lost)
-          H.setPad({})
-          return
-        end
+        -- the wipe watch ran above, before this gate (#163); this step's
+        -- live party is exactly Sabin+Cyan and the unused battle slots
+        -- retain stale nonzero HP words, which is why partyDown(2) reads
+        -- the first two slots rather than all four
         tick = tick + 1
         local ph = tick % 30
         local activeActor = H.readByte(ACTOR)
@@ -943,11 +984,18 @@ local function grindAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(grindBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.call(function()
+        H.checkReq(ldReq, "attempt " .. n .. ": reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt (#163)
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
     H.call(function()
       lost, fightTier, wipeN, fed = nil, n, 0, false
+      H.gameOverFired = 0
     end),
     grindStep(),
     (function()
@@ -1053,7 +1101,10 @@ local function transitAttempt(n)
     end),
     H.call(function() ldReq = H.requestLoadState(transitBlob) end),
     H.waitFrames(2),
-    H.call(function() H.checkReq(ldReq, "transit attempt " .. n) end),
+    H.call(function()
+      H.checkReq(ldReq, "transit attempt " .. n)
+      H.gameOverFired = 0               -- the lost attempt's count (#163)
+    end),
     H.waitFrames(60 + (n - 1) * 17),
   }
 
@@ -1074,7 +1125,7 @@ local function transitAttempt(n)
   end
   local steps = {
     H.cond(function() return n > 1 end, reloadSteps, {}),
-    H.call(function() lost, wipeN = nil, 0 end),
+    H.call(function() lost, wipeN = nil, 0; H.gameOverFired = 0 end),
     H.cond(function() return n > 1 end, jitterSteps, {}),
   }
   -- The transit ends OFF the world (Mobliz's entrance tile loads map 157),
@@ -1135,10 +1186,13 @@ local function walkAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(walkBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "walk attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "walk attempt " .. n)
+        H.gameOverFired = 0             -- the lost attempt's count (#163)
+      end),
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
-    H.call(function() lost, wipeN = nil, 0 end),
+    H.call(function() lost, wipeN = nil, 0; H.gameOverFired = 0 end),
   }
   for i = 1, 30 do
     steps[#steps + 1] = H.cond(function()
@@ -1206,7 +1260,10 @@ local function routeAttempt(n)
     end),
     H.call(function() ldReq = H.requestLoadState(routeBlob) end),
     H.waitFrames(2),
-    H.call(function() H.checkReq(ldReq, "route attempt " .. n) end),
+    H.call(function()
+      H.checkReq(ldReq, "route attempt " .. n)
+      H.gameOverFired = 0               -- the lost attempt's count (#163)
+    end),
     H.waitFrames(60 + (n - 1) * 17),
   }
 
@@ -1223,7 +1280,7 @@ local function routeAttempt(n)
   end
   local steps = {
     H.cond(function() return n > 1 end, reloadSteps, {}),
-    H.call(function() lost, wipeN = nil, 0 end),
+    H.call(function() lost, wipeN = nil, 0; H.gameOverFired = 0 end),
     H.cond(function() return n > 1 end, jitterSteps, {}),
   }
   for w = 1, #ROUTE do
@@ -1264,7 +1321,10 @@ local function routeAttempt(n)
   return H.cond(function() return not routeDone end, steps, {})
 end
 
-H.run({ maxFrames = 500000 }, {
+-- allowGameOver: the transit, grind, staging-walk and route ladders
+-- deliberately survive a lost fight (#163); the walk and the grind read
+-- H.gameOverFired as a loss and the next attempt reloads.
+H.run({ maxFrames = 500000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()

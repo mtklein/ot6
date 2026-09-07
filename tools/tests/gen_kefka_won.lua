@@ -73,6 +73,30 @@ local function mkFighter(tier, tag)
   local bt = nil
   local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
   local phase = 0
+  local wipeN = 0
+  -- #163: the loss watch, called on EVERY frame of the drive rather than
+  -- from F.frame, which the caller reaches only while battleLoadStarted()
+  -- holds -- and a wipe zeroes every battle-HP word, which that predicate
+  -- reads as "no battle", so the old in-fight check never saw the one
+  -- state it existed for (gen_sabin_falls, #159, had the same shape).
+  -- The lib's wipe predicate held 90 straight frames is the loss; so is
+  -- the run canary's count (it now counts a 300-frame battle-side wipe as
+  -- a game over and freezes the pad -- allowGameOver on the run keeps the
+  -- ladder alive for the reload).
+  function F.watch()
+    wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
+    if (H.gameOverFired or 0) > 0 and not F.lost then
+      F.lost = string.format("GAME OVER counted by the canary at f%d " ..
+        "(tier %d) -- party [%s]", H.frame, tier, partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+    end
+    if wipeN >= 90 and not F.lost then
+      F.lost = string.format("PARTY WIPED at f%d (started f%s, tier %d) " ..
+        "-- party [%s]", H.frame, bt and tostring(bt.f0) or "?", tier,
+        partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+    end
+  end
   function F.frame(battN)
     phase = (phase + 1) % 8
     if battN == 3 then
@@ -87,20 +111,7 @@ local function mkFighter(tier, tag)
         H.log(string.format("[%s] f%d party [%s] vs %s",
           tag, H.frame, partyLine(), monsterLine()))
       end
-      local wiped, any = true, false
-      for e = 0, 3 do
-        if H.readWord(BCMAXHP + e * 2) > 0 then
-          any = true
-          if H.readWord(BCHP + e * 2) > 0 then wiped = false end
-        end
-      end
-      bt.wiped = (any and wiped) and bt.wiped + 1 or 0
-      if bt.wiped >= 90 and not F.lost then
-        F.lost = string.format("PARTY WIPED at f%d (started f%d, %d frames " ..
-          "in, tier %d) -- party [%s] vs %s", H.frame, bt.f0,
-          H.frame - bt.f0, tier, partyLine(), monsterLine())
-        H.log("[" .. tag .. "] " .. F.lost)
-      end
+      -- the wipe verdict is F.watch's, taken before this gate (#163)
     end
     if bt == nil or H.readByte(MENU) == 0 then
       mStreak, mSeq = 0, nil
@@ -245,6 +256,10 @@ local function kefkaBody(tier)
   local F = mkFighter(tier, "kefka")
   local battN, postN, evN = 0, 0, 0
   return H.driveUntil(function()
+    if F.lost then
+      kefkaLost = F.lost
+      return true                       -- reload beats riding the fail path
+    end
     if battN > 0 or H.battleLoadStarted() then return false end
     if H.fieldX() == 25 and H.fieldY() == 5 then
       kefkaLost = kefkaLost or F.lost or string.format(
@@ -261,6 +276,8 @@ local function kefkaBody(tier)
     return false
   end, 90000, {
     H.call(function()
+      F.watch()                           -- every frame, outside the gate
+      if F.lost then H.setPad({}); return end
       battN = H.battleLoadStarted() and battN + 1 or 0
       if battN >= 3 then
         postN, evN = 0, 0
@@ -286,10 +303,16 @@ local function kefkaAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(kefkaBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "kefka attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "kefka attempt " .. n)
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60),
     }, {}),
-    H.call(function() kefkaLost = nil end),
+    H.call(function() kefkaLost = nil; H.gameOverFired = 0 end),
     H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
       H.cond(function() return true end, {
         H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
@@ -309,7 +332,10 @@ end
 
 -- Budget: the input-driven fight costs real ATB rounds and the ladder
 -- may replay it three times.
-H.run({ maxFrames = 400000 }, {
+-- allowGameOver: the ladder deliberately survives a lost battle 57
+-- (#163); F.watch reads H.gameOverFired as a loss and the next attempt
+-- reloads.
+H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState("build/states/kefka_entry.mss.lua"),
   H.waitFrames(30),
 

@@ -302,7 +302,11 @@ local function stealDriver(what, maxF)
     }, what .. ": steal the clothes")
 end
 
-H.run({ maxFrames = 350000 }, {
+-- allowGameOver: the cider-steal ladder deliberately survives a lost
+-- battle 10 (#163); its aftermath ride reads H.gameOverFired as a loss
+-- and the next attempt reloads.  (The gate-soldier ladders are the lib's,
+-- H.clearGateSoldier: battle 11's loss is scripted, not a game over.)
+H.run({ maxFrames = 350000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(60),
   H.call(function()
@@ -365,6 +369,7 @@ H.run({ maxFrames = 350000 }, {
     local blob, stolen = nil, false
     local function stealAttempt(n)
       local loadReq
+      local wipedN, lostEarly = 0, nil
       return H.cond(function() return stolen end, {}, {
         H.logStep(function()
           return string.format("cider steal attempt %d at f%d", n, H.frame)
@@ -372,7 +377,13 @@ H.run({ maxFrames = 350000 }, {
         n > 1 and seq({
           H.call(function() loadReq = H.requestLoadState(blob) end),
           H.waitFrames(2),
-          H.call(function() H.checkReq(loadReq, "cider: pre-talk reload") end),
+          H.call(function()
+            H.checkReq(loadReq, "cider: pre-talk reload")
+            -- the restored snapshot restarts the experiment: the canary's
+            -- count (and its pad freeze, which the reload thaws) belong
+            -- to the lost attempt (#163)
+            H.gameOverFired = 0
+          end),
           H.waitFrames(90),
         }) or seq({}),
         L.spread(n),                     -- spread the battle RNG phase (#83)
@@ -407,9 +418,27 @@ H.run({ maxFrames = 350000 }, {
         -- timeout here would abort the whole generate instead of letting the
         -- ladder reload and retry, so this ride gives up after its budget
         -- and lets the $1DD2 check below decide.
+        -- #163: a lost battle 10 (LOCKE down) is a wipe, and a wipe zeroes
+        -- every battle-HP word, which battleLoadStarted() reads as "no
+        -- battle" -- so stealDriver ends on the first wiped frame and this
+        -- ride's A-taps would press into the Annihilated screen for the
+        -- rest of its 20000-frame budget.  The lib's wipe predicate held
+        -- 90 straight frames, or the run canary's count (it now counts a
+        -- 300-frame battle-side wipe as a game over and freezes the pad;
+        -- allowGameOver on the run keeps the ladder alive for the
+        -- reload), ends the ride as a named loss instead.
         (function()
           local ph, calm, waited = 0, 0, 0
           return H.driveUntil(function()
+            wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
+            if (H.gameOverFired or 0) > 0 and not lostEarly then
+              lostEarly = string.format("GAME OVER counted by the canary " ..
+                "at f%d", H.frame)
+            elseif wipedN >= 90 and not lostEarly then
+              lostEarly = string.format("PARTY WIPED at f%d (the lib's " ..
+                "wipe predicate, 90 frames)", H.frame)
+            end
+            if lostEarly then return true end
             local ok = H.hasControl() and H.tileAligned() and bright() >= 15
                    and not H.battleLoadStarted() and not H.dialogWaiting()
                    and map() == 78
@@ -419,7 +448,7 @@ H.run({ maxFrames = 350000 }, {
           end, 20500, {
             H.call(function()
               ph = (ph + 1) % 8
-              if H.hasControl() then H.setPad({}); return end
+              if lostEarly or H.hasControl() then H.setPad({}); return end
               H.setPad(ph < 4 and { "a" } or {})
             end),
           }, "ride the steal's aftermath out (soft)")
@@ -427,11 +456,12 @@ H.run({ maxFrames = 350000 }, {
         H.release(),
         H.waitFrames(30),
         H.call(function()
-          stolen = (H.readByte(0x1dd2) >> 4) & 1 == 1
+          stolen = lostEarly == nil and (H.readByte(0x1dd2) >> 4) & 1 == 1
             and map() == 78 and H.hasControl()
           H.log(string.format("cider attempt %d: $1DD2=%02X map=%d -> %s", n,
             H.readByte(0x1dd2), map(),
-            stolen and "STOLEN" or "no steal; retrying"))
+            stolen and "STOLEN" or (lostEarly and ("LOST: " .. lostEarly ..
+              "; retrying") or "no steal; retrying")))
         end),
       })
     end

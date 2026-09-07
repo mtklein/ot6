@@ -445,6 +445,16 @@ local function crossRafters(tx, ty, maxF, hold, res, what)
       H.setPad({}); return
     end
     wipeN = H.partyWiped() and wipeN + 1 or 0
+    -- #163: the run canary's count is the same loss (it counts a
+    -- 300-frame battle-side wipe as a game over and freezes the pad;
+    -- allowGameOver on the run keeps the ladder alive for the reload)
+    if (H.gameOverFired or 0) > 0 and not lost then
+      lost = "a lost rat fight (the run canary counted a game over)"
+      H.log(string.format("cross: GAME OVER counted by the canary at f%d -- " ..
+        "a lost rat fight restarts the chase, so this attempt is over.",
+        H.frame))
+      H.setPad({}); return
+    end
     if wipeN >= 300 and not lost then
       lost = "a lost rat fight"
       H.log("cross: THE PARTY IS WIPED for 300 consecutive frames -- a lost " ..
@@ -610,6 +620,10 @@ local function crossAttempt(n, hold)
       H.waitFrames(2),
       H.call(function()
         H.checkReq(loadReq, "attempt " .. n .. ": catwalk reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt (#163)
+        H.gameOverFired = 0
       end),
       H.waitFrames(90),                -- the settle every other reload uses
     }, {}),
@@ -641,7 +655,10 @@ local function crossAttempt(n, hold)
   })
 end
 
-H.run({ maxFrames = 420000 }, {
+-- allowGameOver: the crossing ladder deliberately survives a lost rat
+-- fight (#163); crossRafters reads H.gameOverFired as a loss and the
+-- next attempt reloads.
+H.run({ maxFrames = 420000, allowGameOver = true }, {
   H.loadState("build/states/opera_dance_done.mss.lua"),
   H.waitFrames(60),
   H.call(function()
