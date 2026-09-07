@@ -173,6 +173,10 @@ end
 --     field's return -- its own menu==0 branch chews the victory boxes.
 --     boost=false, cadence=12: measured 232 frames/fight faster than the
 --     boosted default, and safer (zero casualties in ~40 lab fights).
+-- The rat fights' driver options, on one line: tools/tests/
+-- rafterlab_batch_gen.sh substitutes it (RAFTERLAB_DRIVER) to measure a
+-- candidate policy against the shipped one from the same catwalk snapshot.
+local RAT_DRIVER = { tactical = true, boost = false, cure = false, items = false, cadence = 12 }
 local function crossRafters(tx, ty, maxF, hold, res, what)
   local hb, battN, wipeN, notBattN = 0, 0, 0, 0
   local held, lost = 0, nil
@@ -187,9 +191,7 @@ local function crossRafters(tx, ty, maxF, hold, res, what)
   local moveSameN, wig, lastDir = 0, nil, "right"
   local curMv, curMvN = nil, 0
   local chaseK, chaseN = nil, 0
-  local fight = H.newFightDriver("rafters",
-    { tactical = true, boost = false, cure = false, items = false,
-      cadence = 12 })
+  local fight = H.newFightDriver("rafters", RAT_DRIVER)
   local function holdN()
     local h = type(hold) == "function" and hold() or hold
     return h or 0
@@ -584,12 +586,19 @@ end
 local crossed = { ok = false, fights = 0 }
 local MIN_CROSS_TIMER = 900
 local HOLDS = { 0, 250, 550, 900, 1300, 1750 }
+-- the all-standing gate: every member above max/ARRIVAL_HP_DIV at (14,7)
+local ARRIVAL_HP_DIV = 8
+-- lab only (rafterlab_batch_gen.sh RAFTERLAB_ARRIVALS=1): a prefix here
+-- saves every arrival at (14,7), banked or not, as <prefix>arrival_<n>.mss
+-- so the Ultros 2 fight can be measured from each.  nil in the lineage.
+local LAB_ARRIVAL_PREFIX = nil
 local catwalkBlob = nil                -- captured on the catwalk, below
 
 local function allStanding()
   for _, c in ipairs(H.partyMembers()) do
     local hp, mx = H.charHp(c), H.charMaxHp(c)
-    if not (hp > 0 and (H.charStatus1(c) & 0xC6) == 0 and hp > (mx >> 3)) then
+    if not (hp > 0 and (H.charStatus1(c) & 0xC6) == 0
+            and hp > mx // ARRIVAL_HP_DIV) then
       return false
     end
   end
@@ -629,6 +638,22 @@ local function crossAttempt(n, hold)
     }, {}),
     crossRafters(14, 7, 25000, hold, crossed,
       string.format("cross the rafters to Ultros (attempt %d)", n)),
+    -- face Ultros by input: his NPC occupies {15,7}, so a short RIGHT press
+    -- is a blocked step that turns the party in place.  Done on every
+    -- arrival, so each one is logged (and, in the lab, saved) one A press
+    -- from battle 104 -- the HP line is what the gate below judges.
+    H.cond(function() return crossed.ok end, {
+      H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(6),
+      H.call(function()
+        H.log(string.format("[rafters] attempt %d arrival hp at (%d,%d): %s, " ..
+          "timer %d left, %d fights", n, H.fieldX(), H.fieldY(), hurtLine(),
+          H.readWord(0x1189), crossed.fights or 0))
+      end),
+    }, {}),
+    H.cond(function() return crossed.ok and LAB_ARRIVAL_PREFIX ~= nil end,
+      LAB_ARRIVAL_PREFIX
+        and { H.saveState(LAB_ARRIVAL_PREFIX .. "arrival_" .. n .. ".mss") }
+        or {}, {}),
     H.call(function()
       local margin = crossed.ok and H.readWord(0x1189) or 0
       local standing = allStanding()
@@ -775,6 +800,8 @@ H.run({ maxFrames = 420000, allowGameOver = true }, {
   H.call(function()
     H.log(string.format("[rafters] on the catwalk at (%d,%d), timer %d frames left, rats: %s",
       H.fieldX(), H.fieldY(), H.readWord(0x1189), ratLine()))
+    H.log(string.format("[rafters] bag on the catwalk: Potions=%d Tonics=%d Fenix=%d; party %s",
+      H.invCountOf(0xE9), H.invCountOf(0xE8), H.invCountOf(0xF0), hurtLine()))
   end),
   (function() local req
     return H.cond(function() return true end, {
@@ -801,9 +828,8 @@ H.run({ maxFrames = 420000, allowGameOver = true }, {
   -- scene, where a menu visit corrupts the room state (the $1189-block
   -- hazard this file documents above).  Every banked arrival is gated
   -- all-standing by the ladder, which is what the exit contract asserts.
-  -- face Ultros by input: his NPC occupies {15,7}, so a short RIGHT press
-  -- is a blocked step that turns the party in place
-  H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(6),
+  -- the banked attempt's RIGHT press (crossAttempt) turned the party to
+  -- face Ultros; nothing has moved since
   H.call(function()
     H.assertEq(H.fieldX()==14 and H.fieldY()==7, true,
       "still at (14,7) -- the blocked press did not step")
