@@ -591,6 +591,23 @@ clock 21,267). Four experiments from that one snapshot, all retained
   `H.equipEsper` does not verify the stone landed (the summon it was meant
   to enable is refused every fight: `summon refused for char 4 … stone=$FF`).
 
+**Nerapa, measured properly (lab, 2026-09-07; `bosses-wob.md` §22).**
+The "coin flip" above was the driver, not the seed. Nerapa opens with
+**Reflect** (`monster_prop` `$118` +29 bit 7; every traced fight reads its
+status bytes `st=00,00,80,80`), so "LOCKE's Bolt nuke" and every Ice the
+driver cast bounced onto the party for 275-1400 a cast and dealt Nerapa
+nothing — the only damage the control policy ever landed was Shiva once,
+the crossbow, and blade swings, and the turns after that went to raising
+the bare CELES. From one doorstep snapshot (`lab_nerapa_bake.lua`:
+`escape_start` → CELES's kit → the fought walk, doorstep at 3:50) over
+the same 8-seed spread, the current driver won 4 of 8 distinct seeds
+cleanly (1 more at 0:09 on 5 Fenix, 3 wipes); a no-magic policy (boosted Fight with
+LOCKE's Genji pair, the crossbow, Shiva) won **every** seed in
+2,200-3,300 frames with no deaths and no Fenix Downs, Nerapa dead before
+its first Fire. The per-attempt lines and the table are in §22 of the
+bosses doc; the driver requirement is a Reflect check before any attack
+cast (a read of status 3 bit 7 at `$3EF8 + 2·slot`).
+
 **Supplies.** Q leaves the alcove with `tonic=21 potion=33 fenix=27` after
 the descent's care stops (99 Tonics bought at Thamasa; the IAF waves' care
 spent 70 of them). There is no shop between Thamasa and the World of Ruin,
