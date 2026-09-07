@@ -423,11 +423,8 @@ local actions = {
   -- interrupts, and after each battle diff both pages.  The first battle that
   -- teaches must have written the slot-1 page and only it.  (Desert
   -- encounters teach nothing to this kit, the loop keeps walking.)
-  -- This is one single-call state machine: the battle edge is detected
-  -- inline, since H.cond latches its branch on the first tick inside a
-  -- driveUntil body.
   (function()
-    local fights, wasInBattle = 0, false
+    local fights = 0
     local function account()
       fights = fights + 1
       for off = 0x10, PAGE_USED - 1 do
@@ -460,38 +457,37 @@ local actions = {
         table.concat(sp, " "), table.concat(ac, " ")))
       fightSpecies = {}
     end
-    -- The bail-out follows the fixture: the teachable pairing sits fourth
-    -- in the Veldt's eight-formation cycle, so one full cycle plus slack
-    -- bounds the search.
-    return H.driveUntil(function()
-      return (taughtN > 0 or fights >= 16) and not H.battleLoadStarted()
-    end, 60000, {
-      H.call(function()
-        local inBattle = H.battleLoadStarted()
-        if wasInBattle and not inBattle then account() end
-        if inBattle and not wasInBattle then battleReset() end
-        wasInBattle = inBattle
-        if inBattle then
-          -- Life support, not play (same expedient as resolveReadBattle,
-          -- and the same reason): the WRITE half searches the Veldt for
-          -- the teachable pairing with battlePulse, which steers the teach
-          -- but does not heal.  The fighting lineage's recorded history --
-          -- now including the battles Shadow stays for (Ot6ShadowLeaves is
-          -- a no-op) -- serves this trio harder packs than before, and an
-          -- unclamped teach search wipes before the pairing comes up.  HP
-          -- is not the measured quantity here (the codex seed bytes are),
-          -- so every living ally's battle HP tops to max each pulse.
-          -- Declared in state_write_waivers.txt.
-          for s = 0, 3 do
-            local max = H.readWord(0x3C1C + s * 2)
-            if max > 0 and H.readWord(0x3BF4 + s * 2) > 0 then
-              H.writeWord(0x3BF4 + s * 2, max)
-            end
-          end
-          battlePulse()
-        else patrolPulse() end
-      end),
-    }, "a post-save battle teaches the slot-1 page")
+    -- One try per encounter: pace until a battle loads, fight it through
+    -- the real menus, diff the pages, and -- unless it taught -- heal
+    -- through the field menu (Tonics first) before pacing again.  The
+    -- Veldt serves the SAVE's recorded history, and the fighting lineage's
+    -- history (Shadow stays, so his battles are in it) serves this trio
+    -- packs that a party walking in half-dead does not survive: measured,
+    -- the un-healed search entered its seventh fight with SABIN at 64 HP
+    -- and wiped.  The bail-out follows the fixture: the teachable pairing
+    -- sits fourth in the Veldt's eight-formation cycle, so two full cycles
+    -- bound the search.
+    local function writeTry(n)
+      return H.cond(function() return taughtN == 0 end, {
+        H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
+          H.call(patrolPulse),
+        }, "find write-half encounter " .. n),
+        H.call(battleReset),
+        H.driveUntil(function() return not H.battleLoadStarted() end, 15000, {
+          H.call(battlePulse),
+        }, "fight write-half battle " .. n),
+        H.call(account),
+        H.cond(function() return taughtN == 0 end, {
+          H.waitUntil(function()
+            return H.worldMode() and H.worldHasControl() and H.worldAligned()
+          end, 2400, "world control after write-half battle " .. n, 5),
+          H.fieldCare({ tag = "codex write search " .. n, threshold = 0.95 }),
+        }, {}),
+      }, {})
+    end
+    local tries = {}
+    for n = 1, 16 do tries[#tries + 1] = writeTry(n) end
+    return H.cond(function() return true end, tries, {})
   end)(),
   H.call(function()
     H.assertEq(taughtN > 0, true,
