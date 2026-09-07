@@ -183,12 +183,23 @@ local function lossReload(blobFn, tag)
   })
 end
 
+-- A rung is LOST, and reloaded, on any of: the GameOver canary, a
+-- battle-side wipe, the 30,000-frame cap, more than FENIX_BUDGET Fenix
+-- Downs spent in the fight (a person whose party is being raised over
+-- and over under Condemned does not grind the bag down -- the ninja run
+-- of 2026-09-07 08:20 "won" a rung with thirteen and the clock at 0:00),
+-- or a win that leaves the master clock under CLOCK_MARGIN (Shadow's
+-- timer fires 300 frames before the master clock and the party must be
+-- standing on the ledge, ~180 frames from the doorstep, when it does;
+-- a Nerapa kill at 0:00 is the escape lost).
+local FENIX_BUDGET, CLOCK_MARGIN = 3, 900
 local function nerapaAttempt(n)
   local F = H.newFightDriver("Nerapa", FIGHT_ESCAPE)
-  local wipedN, lost = 0, false
+  local wipedN, lost, why, fenix0 = 0, false, nil, nil
   return H.cond(function() return nerapaWon end, {}, {
     H.logStep(function()
-      return string.format("[Nerapa] attempt %d at f%d, master clock %d", n, H.frame, H.readWord(0x1189))
+      fenix0 = H.invCountOf(0xF0)
+      return string.format("[Nerapa] attempt %d at f%d, master clock %d, fenix=%d", n, H.frame, H.readWord(0x1189), fenix0)
     end),
     n > 1 and lossReload(function() return nerapaBlob end, "Nerapa") or seq({}),
     L81.spread(n),
@@ -197,12 +208,16 @@ local function nerapaAttempt(n)
       local t = 0
       return H.driveUntil(function()
         t = t + 1
-        if (H.gameOverFired or 0) > 0 then lost = true; return true end
+        if (H.gameOverFired or 0) > 0 then lost, why = true, "game over"; return true end
         -- the loss the canary misses: a battle-side wipe (attempt 1 of
         -- 2026-09-07 sat 22,000 frames past its wipe with no GameOver read)
         if H.partyWipedInBattle() then wipedN = wipedN + 1 else wipedN = 0 end
-        if wipedN >= 300 then lost = true; return true end
-        if t >= 30000 then lost = true; return true end
+        if wipedN >= 300 then lost, why = true, "wiped"; return true end
+        if t >= 30000 then lost, why = true, "30000-frame cap"; return true end
+        if fenix0 - H.invCountOf(0xF0) > FENIX_BUDGET then
+          lost, why = true, string.format("%d Fenix Downs spent (budget %d)", fenix0 - H.invCountOf(0xF0), FENIX_BUDGET)
+          return true
+        end
         if t % 300 == 0 then
           local st = {}
           for slot = 0, 3 do
@@ -223,13 +238,17 @@ local function nerapaAttempt(n)
     end)(),
     H.call(function()
       H.setPad({})
+      local clock = H.readWord(0x1189)
+      if not lost and not nerapaUp() and clock < CLOCK_MARGIN then
+        lost, why = true, string.format("Nerapa fell with %d frames on the clock (margin %d)", clock, CLOCK_MARGIN)
+      end
       if not lost and not nerapaUp() then
         nerapaWon = true
-        H.log(string.format("[Nerapa] WON on attempt %d at f%d, master clock %d, fenix=%d",
-          n, H.frame, H.readWord(0x1189), H.invCountOf(0xF0)))
+        H.log(string.format("[Nerapa] WON on attempt %d at f%d, master clock %d, fenix=%d (%d spent)",
+          n, H.frame, clock, H.invCountOf(0xF0), fenix0 - H.invCountOf(0xF0)))
       else
-        H.log(string.format("[Nerapa] attempt %d LOST at f%d (gameOverFired=%d wiped=%s t-cap=%s)",
-          n, H.frame, H.gameOverFired or 0, tostring(wipedN >= 300), tostring(not (wipedN >= 300) and (H.gameOverFired or 0) == 0)))
+        H.log(string.format("[Nerapa] attempt %d LOST at f%d: %s (master clock %d, fenix spent %d)",
+          n, H.frame, why or "not won", clock, fenix0 - H.invCountOf(0xF0)))
       end
     end),
   })
