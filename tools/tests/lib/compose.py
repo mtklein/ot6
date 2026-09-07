@@ -127,99 +127,211 @@ def digest(b64: str) -> str:
     return hashlib.sha256(b64.encode()).hexdigest()[:12]
 
 
-def generator_sig(gen, root, extras=()):
-    """The sha256(generator ++ lib/ot6.lua ++ lib/ot6_field.lua), computed by
-    shelling out to savestate_stamp.sh's `sig` subcommand, the single
-    authority also used at generation time.  OT6_ROOT points it at the
-    composing tree."""
-    out = subprocess.run(
-        ["sh", str(SAVESTATE_STAMP), "sig", gen, *extras],
+def _stamp_tool(root, *args, check=True):
+    """Shell into savestate_stamp.sh, the single authority for every digest
+    a stamp carries, pointed at `root` via OT6_ROOT.  Returns stdout, or
+    None when check=False and the tool refused (e.g. romsig with no ROM)."""
+    r = subprocess.run(
+        ["sh", str(SAVESTATE_STAMP), *args],
         env={**os.environ, "OT6_ROOT": str(root)},
-        capture_output=True, text=True, check=True,
-    ).stdout
+        capture_output=True, text=True, check=check,
+    )
+    return r.stdout if r.returncode == 0 else None
+
+
+def generator_sig(gen, root, extras=()):
+    """The provenance sig, sha256(GATE_CONTRACT ++ generator ++ the three
+    lib halves ++ extras): savestate_stamp.sh's `sig`, the same digest the
+    `generate` edge wrote into the stamp's first line."""
+    out = _stamp_tool(root, "sig", gen, *extras)
     return out.split()[0]            # "<64-hex> <gen>" -> the digest half
 
 
-def stamp_check(name, root):
-    """Consume-time freshness and provenance check for a generated fixture.
-    The stamp carries three claims (savestate_stamp.sh's header defines the
-    format), each re-verified here:
+def generator_own_sig(gen, root, extras=()):
+    """The compatibility binding for the generator: sha256(GATE_CONTRACT ++
+    generator ++ extras), the lib halves left out (`gensig`)."""
+    return _stamp_tool(root, "gensig", gen, *extras).strip()
 
-      1. `<sig> <gen> [extras]`, the sources: recompute the sig via the
-         single authority and compare.
-      2. `artifact <sha256>`, the output: hash the .mss beside the stamp.
-         A stamp with no artifact line is reported unbound rather than
-         trusted.
-      3. `ancestor <path> <sha256>`, the chain: hash the named ancestor
-         stamp (or checkpoint manifest) as it sits on disk.
 
-    Returns None when there is nothing to check: no stamp at all, or a
-    generator that has since been removed.  Otherwise it returns the line
-    the composed file prints through the [ot6] channel, and that
-    `--check-states` fails on.
+def rom_identity(root):
+    """The sha256 of the ROM a run in this tree boots (`romsig`: OT6_ROM if
+    set, else build/ot6.sfc), and the path it named.  (None, path) when no
+    ROM is there to hash: the checker then reports UNVERIFIED rather than
+    guessing."""
+    path = os.environ.get("OT6_ROM") or "build/ot6.sfc"
+    out = _stamp_tool(root, "romsig", check=False)
+    return (out.strip() if out else None), path
+
+
+# Verdicts stamp_status() can return, in the order it decides them.
+FRESH, DRIFT, STALE, UNBOUND, UNVERIFIED = (
+    "fresh", "drift", "stale", "unbound", "unverified")
+
+
+def stamp_status(name, root):
+    """Consume-time compatibility and provenance check for a generated
+    fixture.  Returns (verdict, message): (None, None) when there is nothing
+    to check (no stamp, or a generator since removed); (FRESH, None) when
+    every binding verifies; (DRIFT, note) when the fixture still verifies
+    but was produced by older shared lib halves (informational -- see
+    docs/TESTING.md, "Provenance and compatibility"); otherwise a STALE /
+    UNBOUND / UNVERIFIED verdict with the line `--check-states` fails on.
+
+    savestate_stamp.sh's header defines the stamp format.  The bindings and
+    the rule each is held to:
+
+      compatibility (decides freshness):
+        `rom <sha256>`        the ROM the run booted.  Changed ROM
+                              code/layout can invalidate a machine
+                              snapshot, so a different ROM is STALE; no
+                              ROM on disk to compare is UNVERIFIED.
+        `generator <sha256>`  the generator's own sig (extras included,
+                              lib halves excluded).  The play that reached
+                              the state changed: STALE.
+        `artifact <sha256>`   the .mss beside the stamp: replaced bytes
+                              are UNBOUND.
+        `ancestor <path> <sha256>`  the stamp or checkpoint manifest this
+                              state grew from: a moved chain is STALE.
+      provenance (recorded, reported, never a stale verdict by itself):
+        `<sig> <gen> [extras]` the sig over gen+lib halves+extras, and
+        `lib <path> <sha256>`  each lib half's bytes at generation time.
+                              A logging, assertion or controller-policy
+                              edit shared by every generator does not make
+                              a legitimately reached snapshot illegitimate;
+                              it is reported as DRIFT.
+
+    Migration: a stamp written before the rom/generator lines existed has
+    neither.  Nothing is invented for it; it stays on the older conservative
+    rule -- the whole sig must match -- until the fixture is regenerated,
+    which writes the full format.
     """
     base = name[:-len(".mss.lua")] if name.endswith(".mss.lua") else name
     stamp = root / "build" / "states" / (base + ".stamp")
     if not stamp.exists():
-        return None
+        return None, None
     lines = stamp.read_text().splitlines()
     head = lines[0].split() if lines else []
     if len(head) < 2:
-        return None
+        return None, None
     recorded, gen, *extras = head
     gen_lua = root / "tools" / "tests" / (gen + ".lua")
     if not gen_lua.exists():
-        return None
-    cur = generator_sig(gen, root, extras)
-    if cur != recorded[:64]:
-        return (f"fixture {base} is STALE -- generated from {gen}+lib "
-                f"sha {recorded[:12]}, current script hashes {cur[:12]}; "
-                f"regenerate it: ninja build/states/{base}.mss.lua")
+        return None, None
+    regen = f"regenerate it: ninja build/states/{base}.mss.lua"
 
     fields = {}
+    libs = []
     for line in lines[1:]:
         parts = line.split()
-        if parts:
+        if not parts:
+            continue
+        if parts[0] == "lib" and len(parts) == 3:
+            libs.append((parts[1], parts[2]))
+        else:
             fields[parts[0]] = parts[1:]
+
+    cur = generator_sig(gen, root, extras)
+    rom = fields.get("rom")
+    own = fields.get("generator")
+    if not (rom and own):
+        # Pre-ROM-identity stamp: the conservative rule, exactly as before
+        # the rom/generator lines existed.
+        if cur != recorded[:64]:
+            return STALE, (
+                f"fixture {base} is STALE -- generated from {gen}+lib sha "
+                f"{recorded[:12]}, current script hashes {cur[:12]}; its "
+                f"stamp predates ROM-identity recording, so it is held to "
+                f"the conservative whole-sig rule until regenerated; {regen}")
+        drift = None
+    else:
+        have, rom_path = rom_identity(root)
+        if have is None:
+            return UNVERIFIED, (
+                f"fixture {base} is UNVERIFIED -- it was generated on ROM "
+                f"sha {rom[0][:12]} but this tree has no {rom_path} to "
+                f"compare against; build it (ninja build/ot6.sfc) and "
+                f"re-check")
+        if have != rom[0]:
+            return STALE, (
+                f"fixture {base} is STALE -- generated on ROM sha "
+                f"{rom[0][:12]}, but {rom_path} is sha {have[:12]}: a "
+                f"machine snapshot of a different ROM; {regen}")
+        cur_own = generator_own_sig(gen, root, extras)
+        if cur_own != own[0]:
+            return STALE, (
+                f"fixture {base} is STALE -- its generator {gen} changed "
+                f"(own sha {own[0][:12]} at generation, {cur_own[:12]} now"
+                f"{', extras included' if extras else ''}); {regen}")
+        drift = None
+        if cur != recorded[:64]:
+            moved = [p for p, h in libs
+                     if (root / p).exists()
+                     and hashlib.sha256((root / p).read_bytes()).hexdigest()
+                     != h]
+            what = (", ".join(p.split("/")[-1] for p in moved)
+                    if moved else "the shared lib halves")
+            drift = (f"fixture {base} has provenance drift -- generated "
+                     f"with {gen}+lib sha {recorded[:12]}, current sources "
+                     f"hash {cur[:12]}: lib/{what} moved since generation. "
+                     f"ROM and generator match, so it stays a valid "
+                     f"snapshot (docs/TESTING.md); regenerate only if the "
+                     f"lib change should be reflected in the fixture")
 
     art = fields.get("artifact")
     if not art:
-        return (f"fixture {base} is UNBOUND -- its stamp predates the "
-                f"provenance format (no artifact line) so nothing ties the "
-                f".mss bytes to the run that claims them; re-run "
-                f"regenerate: ninja build/states/{base}.mss.lua")
+        return UNBOUND, (
+            f"fixture {base} is UNBOUND -- its stamp predates the "
+            f"provenance format (no artifact line) so nothing ties the "
+            f".mss bytes to the run that claims them; re-run "
+            f"regenerate: ninja build/states/{base}.mss.lua")
     mss = root / "build" / "states" / (base + ".mss")
     if not mss.exists():
-        return (f"fixture {base} is UNBOUND -- its stamp exists but "
-                f"build/states/{base}.mss does not; regenerate: ninja "
-                f"to regenerate it (issue #75)")
+        return UNBOUND, (
+            f"fixture {base} is UNBOUND -- its stamp exists but "
+            f"build/states/{base}.mss does not; regenerate: ninja "
+            f"to regenerate it (issue #75)")
     actual = hashlib.sha256(mss.read_bytes()).hexdigest()
     if actual != art[0]:
-        return (f"fixture {base} is UNBOUND -- build/states/{base}.mss "
-                f"(sha {actual[:12]}) is not the artifact its stamp vouches "
-                f"for (sha {art[0][:12]}): the state was replaced without a "
-                f"generation run; regenerate: ninja build/states/{base}.mss.lua "
-                f"(issue #75)")
+        return UNBOUND, (
+            f"fixture {base} is UNBOUND -- build/states/{base}.mss "
+            f"(sha {actual[:12]}) is not the artifact its stamp vouches "
+            f"for (sha {art[0][:12]}): the state was replaced without a "
+            f"generation run; regenerate: ninja build/states/{base}.mss.lua "
+            f"(issue #75)")
 
     anc = fields.get("ancestor")
     if anc:
         if len(anc) < 2:
-            return (f"fixture {base} is UNBOUND -- its stamp's ancestor "
-                    f"line is malformed; regenerate: ninja build/states/{base}.mss.lua")
+            return UNBOUND, (
+                f"fixture {base} is UNBOUND -- its stamp's ancestor "
+                f"line is malformed; regenerate: ninja build/states/{base}.mss.lua")
         path, digest_ = anc[0], anc[1]
         anc_file = root / path
         if not anc_file.exists():
-            return (f"fixture {base} is UNBOUND -- its ancestor {path} is "
-                    f"gone, so the chain it was generated from cannot be "
-                    f"verified; regenerate: ninja build/states/{base}.mss.lua")
+            return UNBOUND, (
+                f"fixture {base} is UNBOUND -- its ancestor {path} is "
+                f"gone, so the chain it was generated from cannot be "
+                f"verified; regenerate: ninja build/states/{base}.mss.lua")
         anc_actual = hashlib.sha256(anc_file.read_bytes()).hexdigest()
         if anc_actual != digest_:
-            return (f"fixture {base} is STALE -- its ancestor {path} "
-                    f"(sha {anc_actual[:12]}) is not the one it was "
-                    f"generated from (sha {digest_[:12]}); the chain below "
-                    f"it moved; regenerate: ninja build/states/{base}.mss.lua "
-                    f"(issue #75)")
-    return None
+            return STALE, (
+                f"fixture {base} is STALE -- its ancestor {path} "
+                f"(sha {anc_actual[:12]}) is not the one it was "
+                f"generated from (sha {digest_[:12]}); the chain below "
+                f"it moved; regenerate: ninja build/states/{base}.mss.lua "
+                f"(issue #75)")
+    if drift:
+        return DRIFT, drift
+    return FRESH, None
+
+
+def stamp_check(name, root):
+    """The failing half of stamp_status(): the message for a STALE, UNBOUND
+    or UNVERIFIED fixture, None for a fresh one or one with only provenance
+    drift.  This is the line the composed file prints through the [ot6]
+    channel and that `--check-states` fails on."""
+    verdict, msg = stamp_status(name, root)
+    return msg if verdict in (STALE, UNBOUND, UNVERIFIED) else None
 
 
 def check_states(root):
@@ -248,45 +360,90 @@ def check_states(root):
               "tests that need a generated savestate will report SKIPPED, "
               "not fail")
         return 0
-    stale = []
+    stale, drift = [], []
+    legacy = 0                      # stamps with no rom/generator lines
     for s in stamps:
-        msg = stamp_check(s.stem, root)
-        if msg:
+        verdict, msg = stamp_status(s.stem, root)
+        if verdict in (STALE, UNBOUND, UNVERIFIED):
             stale.append((s.stem, msg))
+        elif verdict == DRIFT:
+            drift.append((s.stem, msg))
+        if not any(l.startswith("rom ") for l in s.read_text().splitlines()):
+            legacy += 1
+    tail = ""
+    if orphans:
+        tail += f"; {len(orphans)} obsolete build stamp(s) ignored"
+    if legacy:
+        tail += (f"; {legacy} stamp(s) predate ROM-identity recording and "
+                 f"are held to the conservative whole-sig rule until "
+                 f"regenerated")
     if not stale:
         print(f"fixtures: {len(stamps)}/{len(stamps)} fresh "
-              f"(sources, artifact and ancestor bindings all verify)" +
-              (f"; {len(orphans)} obsolete build stamp(s) ignored" if orphans
-               else ""))
+              f"(ROM, generator, artifact and ancestor bindings all verify)"
+              + tail)
+        if drift:
+            # Informational: the fixture is still a valid snapshot of this
+            # ROM reached by this generator; only the shared harness that
+            # produced it has moved since (docs/TESTING.md).
+            halves = {}
+            for _, msg in drift:
+                for h in (LIB.name, FIELD.name, CONTRACT.name):
+                    if h in msg:
+                        halves[h] = halves.get(h, 0) + 1
+            named = ", ".join(f"lib/{h} ({n})" for h, n in sorted(halves.items()))
+            print(f"provenance drift (informational, not stale): "
+                  f"{len(drift)} of {len(stamps)} were generated with older "
+                  f"shared lib halves -- {named or 'lib halves'} moved since. "
+                  f"ROM and generator match, so they remain valid snapshots; "
+                  f"regenerate only if the lib change should be reflected "
+                  f"in the fixtures.")
+            print(f"  {drift[0][1]}")
+            if len(drift) > 1:
+                print(f"  ... and {len(drift) - 1} more, same shape")
         return 0
-    print(f"fixtures: {len(stale)} of {len(stamps)} are STALE or UNBOUND -- "
-          f"generated from sources this tree no longer has, or carrying bytes "
-          f"their stamps do not vouch for.")
+    verdicts = {}
+    for _, msg in stale:
+        kind = msg.split(" is ", 1)[1].split(" ", 1)[0]
+        verdicts[kind] = verdicts.get(kind, 0) + 1
+    summary = ", ".join(f"{n} {k}" for k, n in sorted(verdicts.items()))
+    print(f"fixtures: {len(stale)} of {len(stamps)} do not verify "
+          f"({summary}) -- generated on another ROM or by a changed "
+          f"generator, carrying bytes their stamps do not vouch for, or "
+          f"unverifiable in this tree{tail}.")
 
-    # Name which shared input moved, when it is a shared input.  ninja keeps
-    # a byte-copy of every generation input under build/ninja/src (the
-    # `latch` edges; see savestate_ninja.py's header), so "what did the last
-    # run see?" is answerable without guessing.  Every generator inlines all
-    # three lib halves, so one edited half makes every generated state stale
-    # at once; that case looks like many separate problems but is one.
-    moved = [p for p in (LIB.name, FIELD.name, CONTRACT.name)
-             if (root / "build" / "ninja" / "src" / "tools" / "tests" / "lib"
-                 / p).exists()
-             and (root / "build" / "ninja" / "src" / "tools" / "tests" / "lib"
-                  / p).read_bytes() != (root / "tools" / "tests" / "lib"
-                                        / p).read_bytes()]
-    if moved:
-        print(f"CAUSE: {', '.join('lib/' + m for m in moved)} changed since "
-              f"the last generation run.  Every generator inlines all three "
-              f"lib halves, so one edited half stales every generated state "
-              f"at once -- that is what {len(stale)} of {len(stamps)} looks "
-              f"like, and it is not {len(stale)} separate problems.")
+    # Name the one cause when there is one.  Every fixture is a snapshot of
+    # the same ROM, so a ROM change stales all of them at once; that case
+    # looks like many separate problems but is one.
+    on_other_rom = sum(1 for _, m in stale if "a machine snapshot of a "
+                       "different ROM" in m)
+    if on_other_rom:
+        print(f"CAUSE: the ROM changed since the last generation run "
+              f"({on_other_rom} of {len(stamps)} were generated on a "
+              f"different ROM).  A machine snapshot belongs to the ROM it "
+              f"was captured on; that is one cause, not {on_other_rom} "
+              f"separate problems.")
+    unverified = sum(1 for _, m in stale if " is UNVERIFIED " in m)
+    if unverified:
+        print(f"CAUSE: this tree has no built ROM to compare against "
+              f"({unverified} of {len(stamps)} are UNVERIFIED, not known "
+              f"stale).  ninja build/ot6.sfc, then re-check.")
+    held = sum(1 for _, m in stale if "predates ROM-identity recording" in m)
+    if held:
+        print(f"CAUSE: {held} of {len(stamps)} carry pre-ROM-identity "
+              f"stamps, so a shared lib-half edit still stales them under "
+              f"the conservative whole-sig rule.  Regenerating writes the "
+              f"full stamp format, after which only the ROM, the "
+              f"generator, and the artifact/ancestor bindings decide.")
 
     show = 6
     for _, msg in stale[:show]:
         print(f"  {msg}")
     if len(stale) > show:
         print(f"  ... and {len(stale) - show} more, same shape")
+    if drift:
+        print(f"provenance drift (informational, not stale) on {len(drift)} "
+              f"fixture(s) besides: shared lib halves moved since "
+              f"generation; ROM and generator match.")
 
     # Name the smallest sufficient action: a stale fixture only matters for
     # the tests that embed it, and regenerating one step is minutes where
@@ -786,7 +943,10 @@ def selftest() -> int:
         (root / "tools" / "tests" / "gen_fake.lua").write_text("gen v1\n")
         for h in ("ot6.lua", "ot6_field.lua", "ot6_contract.lua"):
             (root / "tools" / "tests" / "lib" / h).write_text(h + " v1\n")
+        rom = root / "build" / "ot6.sfc"
+        rom.write_bytes(b"rom v1")
         env = {**os.environ, "OT6_ROOT": str(root)}
+        env.pop("OT6_ROM", None)        # the mock tree's own ROM, always
 
         def gate(*args):
             return subprocess.run(
@@ -801,6 +961,97 @@ def selftest() -> int:
         check("a fresh stamp verifies clean (both name forms)",
               (stamp_check("fake", root), stamp_check("fake.mss.lua", root)),
               (None, None))
+        check("...and its verdict is FRESH", stamp_status("fake", root),
+              (FRESH, None))
+
+        # -- compatibility versus provenance (docs/TESTING.md).  The same
+        #    fresh stamp, one input moved at a time.
+        # A ROM change: the snapshot belongs to the ROM it was captured on.
+        rom.write_bytes(b"rom v2")
+        v, m = stamp_status("fake", root)
+        check("a ROM content change is STALE", v, STALE)
+        has("...naming the recorded and current ROM identities", m,
+            "a machine snapshot of a different ROM")
+        rom.write_bytes(b"rom v1")
+        check("restoring the ROM bytes restores FRESH",
+              stamp_status("fake", root), (FRESH, None))
+        # No ROM at all: nothing to compare against, and nothing invented.
+        rom.unlink()
+        v, m = stamp_status("fake", root)
+        check("no built ROM is UNVERIFIED, not fresh and not stale",
+              v, UNVERIFIED)
+        has("...and says which file to build", m, "ninja build/ot6.sfc")
+        check("UNVERIFIED is a failing verdict for stamp_check",
+              stamp_check("fake", root) is not None, True)
+        rom.write_bytes(b"rom v1")
+        # A lib-only edit: provenance drift, still a valid snapshot.
+        lib_ot6 = root / "tools" / "tests" / "lib" / "ot6.lua"
+        lib_ot6.write_text("ot6.lua v1\n-- a comment\n")
+        v, m = stamp_status("fake", root)
+        check("a lib-half-only edit is DRIFT, not stale", v, DRIFT)
+        has("...naming the half that moved", m, "lib/ot6.lua moved")
+        check("...and stamp_check does not fail it",
+              stamp_check("fake", root), None)
+        (root / "tools" / "tests" / "lib" / "ot6_contract.lua").write_text(
+            "ot6_contract.lua v2\n")
+        has("two moved halves are both named", stamp_status("fake", root)[1],
+            "ot6.lua, ot6_contract.lua moved")
+        (root / "tools" / "tests" / "lib" / "ot6_contract.lua").write_text(
+            "ot6_contract.lua v1\n")
+        # A generator edit while the lib drift stands: the play changed.
+        gen_fake = root / "tools" / "tests" / "gen_fake.lua"
+        gen_fake.write_text("gen v2\n")
+        v, m = stamp_status("fake", root)
+        check("a generator edit is STALE even alongside lib drift", v, STALE)
+        has("...naming the generator", m, "its generator gen_fake changed")
+        gen_fake.write_text("gen v1\n")
+        check("restoring the generator leaves only the drift",
+              stamp_status("fake", root)[0], DRIFT)
+        lib_ot6.write_text("ot6.lua v1\n")
+        check("restoring the lib half restores FRESH",
+              stamp_status("fake", root), (FRESH, None))
+        # The ROM check comes first: a stale ROM is not reported as drift.
+        rom.write_bytes(b"rom v2")
+        lib_ot6.write_text("ot6.lua v1\n-- a comment\n")
+        check("ROM change outranks lib drift",
+              stamp_status("fake", root)[0], STALE)
+        rom.write_bytes(b"rom v1")
+        lib_ot6.write_text("ot6.lua v1\n")
+
+        # -- migration: a stamp from before the rom/generator lines existed
+        #    (sig, artifact, ancestor only) is held to the conservative
+        #    whole-sig rule until regenerated -- a lib edit stales it, and
+        #    nothing pretends to know its ROM.
+        legacy_lines = [l for l in (st / "fake.stamp").read_text().splitlines()
+                        if not l.startswith(("rom ", "generator ", "lib "))]
+        (st / "legacy.mss").write_bytes(b"generated bytes v1")
+        (st / "legacy.stamp").write_text("\n".join(legacy_lines) + "\n")
+        check("a pre-ROM-identity stamp with current sources is FRESH",
+              stamp_status("legacy", root), (FRESH, None))
+        lib_ot6.write_text("ot6.lua v1\n-- a comment\n")
+        v, m = stamp_status("legacy", root)
+        check("...but a lib-only edit STALES it (conservative rule)", v, STALE)
+        has("...and the message says why it is held to that rule", m,
+            "predates ROM-identity recording")
+        check("the new-format sibling is only DRIFT under the same edit",
+              stamp_status("fake", root)[0], DRIFT)
+        lib_ot6.write_text("ot6.lua v1\n")
+        rom.write_bytes(b"rom v2")
+        check("a pre-ROM-identity stamp cannot see a ROM change (no line "
+              "to compare; regeneration writes one)",
+              stamp_status("legacy", root), (FRESH, None))
+        rom.write_bytes(b"rom v1")
+        # A stamp with a rom line but no generator line is malformed for
+        # the new rule and falls back to the conservative one too.
+        half = [l for l in (st / "fake.stamp").read_text().splitlines()
+                if not l.startswith("generator ")]
+        (st / "legacy.stamp").write_text("\n".join(half) + "\n")
+        lib_ot6.write_text("ot6.lua v1\n-- a comment\n")
+        check("a rom line without a generator line is still conservative",
+              stamp_status("legacy", root)[0], STALE)
+        lib_ot6.write_text("ot6.lua v1\n")
+        (st / "legacy.stamp").unlink()
+        (st / "legacy.mss").unlink()
         # The hand-crafted fixture: same stamp, replaced bytes.
         (st / "fake.mss").write_bytes(b"HAND-CRAFTED bytes")
         has("a tampered .mss is UNBOUND, naming the artifact mismatch",
@@ -850,6 +1101,50 @@ def selftest() -> int:
         check("whole-tree freshness ignores stamps the graph no longer declares",
               (graph_rc, "3 obsolete build stamp(s) ignored" in report.getvalue()),
               (0, True))
+        has("whole-tree summary names the bindings it verified",
+            report.getvalue(), "ROM, generator, artifact and ancestor")
+        # Whole-tree verdicts: lib-only drift is exit 0 with a note; a ROM
+        # change is exit 1 with the one cause named.
+        lib_ot6.write_text("ot6.lua v1\n-- a comment\n")
+        report = io.StringIO()
+        with contextlib.redirect_stdout(report):
+            rc = check_states(root)
+        check("whole-tree: a lib-only edit exits 0", rc, 0)
+        has("...and reports it as informational drift", report.getvalue(),
+            "provenance drift (informational, not stale): 1 of 1")
+        has("...naming the half", report.getvalue(), "lib/ot6.lua (1) moved")
+        lib_ot6.write_text("ot6.lua v1\n")
+        rom.write_bytes(b"rom v2")
+        report = io.StringIO()
+        with contextlib.redirect_stdout(report):
+            rc = check_states(root)
+        check("whole-tree: a ROM change exits 1", rc, 1)
+        has("...counting the verdicts", report.getvalue(), "(1 STALE)")
+        has("...and naming the one cause", report.getvalue(),
+            "CAUSE: the ROM changed since the last generation run")
+        rom.write_bytes(b"rom v1")
+        (st / "legacy.mss").write_bytes(b"generated bytes v1")
+        (st / "legacy.stamp").write_text("\n".join(legacy_lines) + "\n")
+        (root / "tools" / "tests" / "savestate_graph.py").write_text(
+            'STATES = [{"state": "fake"}, {"state": "legacy"}]\n')
+        report = io.StringIO()
+        with contextlib.redirect_stdout(report):
+            rc = check_states(root)
+        check("whole-tree: a fresh tree with a legacy stamp exits 0", rc, 0)
+        has("...and counts the stamps still on the conservative rule",
+            report.getvalue(), "1 stamp(s) predate ROM-identity recording")
+        lib_ot6.write_text("ot6.lua v1\n-- a comment\n")
+        report = io.StringIO()
+        with contextlib.redirect_stdout(report):
+            rc = check_states(root)
+        check("whole-tree: a lib edit stales only the legacy stamp",
+              (rc, "1 of 2 do not verify (1 STALE)" in report.getvalue()),
+              (1, True))
+        has("...naming the migration as the cause", report.getvalue(),
+            "CAUSE: 1 of 2 carry pre-ROM-identity stamps")
+        has("...and the new-format one as drift besides", report.getvalue(),
+            "provenance drift (informational, not stale) on 1 fixture(s)")
+        lib_ot6.write_text("ot6.lua v1\n")
 
     print("selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
@@ -968,7 +1263,15 @@ def main() -> int:
         # lib/ot6.lua.
         flagged = {}
         for name in states:
-            stale = stamp_check(name, ROOT)
+            verdict, msg = stamp_status(name, ROOT)
+            if verdict == DRIFT:
+                # Provenance only: the fixture verifies against this ROM and
+                # its generator; the shared lib halves moved since it was
+                # made.  Recorded in the log, not a warning, not OT6_STALE.
+                preamble.append(f"-- NOTE: {msg}\n")
+                preamble.append(f'print("[ot6] provenance: {msg}")\n')
+                continue
+            stale = msg if verdict in (STALE, UNBOUND, UNVERIFIED) else None
             if stale:
                 flagged[name] = stale
                 preamble.append(f"-- WARNING (issue #2): {stale}\n")
