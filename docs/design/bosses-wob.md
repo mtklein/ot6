@@ -418,7 +418,89 @@ hp=0 (-552) sh=0 (-1) brk=16` — **dead in one action, 645 frames after
 surfacing**. Pummel (2 bludgeoning hits) chips less than a boosted Fight
 and costs Blitz MP; Dispatch is one slash and is not in the driver.
 
-RIZOPAS-LAB-TABLE
+**Policy × seed** (`tools/tests/rizopaslab_batch.sh`, aggregate by
+`rizopaslab_aggregate.py`, per-run digests by `rizopaslab_actions.py`;
+the fixture is `falls_prejump.mss` from `lab_rizopas_bake.lua`, the
+generator's own walk; seeds are what InitBattle drew, `$be` at the store;
+the seed knob is a stand on the jump row plus an exact-frame delay at
+"Jump?" — the walk quantizes a plain idle, so twelve idles drew nine
+seeds and the tenth, `$E4`, took the prompt knob). Every attempt is
+retained under `build/rizopaslab/`. The policies: **control** is
+gen_sabin_falls' own fighter, verbatim (boost whatever BP it holds on
+every Fight, self-heal under 60% with a Potion when 60+ HP is missing,
+else a Tonic, no revive); the rest are the lib fight driver — **care**
+(boosted Fight, Potions to whoever is under 40% or inside a round of
+death, Fenix Down for the fallen), **bank2** (chip unboosted until 2 BP,
+then spend; care as `care`), **allin** (boosted Fight, no items, no
+care), **bankboss** (Fight the school unboosted, bank to the cap, unload
+when Rizopas surfaces; care as `care`), **pummel** (SABIN's Pummel at
+boost, CYAN Fights; care as `care`). None reads hidden HP or future RNG;
+`bankboss` reads the same surfacing the screen shows.
+
+| policy | distinct seeds | won | lost | Fenix/win | Potion/win | deaths (all) | mean t (won) | mean boss phase (won) |
+|---|---|---|---|---|---|---|---|---|
+| control | 10 | 9 | 1 | 0.0 | 1.0 | 1 + the `$E4` wipe | 7460 | 1740 |
+| care | 10 | 9 | 1 | 0.0 | 0.0 | 5 | 6814 | 1109 |
+| bank2 | 10 | 5 | 5 | 0.0 | 0.0 | 9 | 7184 | 1580 |
+| allin | 10 | 10 | 0 | 0.0 | 0.0 | 1 | 6863 | 1185 |
+| **bankboss** | 10 | **10** | 0 | 0.0 | 0.1 | **0** | 6897 | **860** |
+| pummel | 10 | 10 | 0 | 0.0 | 0.0 | 0 | 7962 | 1414 |
+
+`t` is battle-up to teardown (the ~4,500-frame school included); the boss
+phase is surfacing to death. Per seed (boss-phase frames on a win; `L`
+lost; Fx/Po/To items spent by the engine's own Item commands; `d`
+deaths; the `$E4` column is #162's `$EE`):
+
+| seed | control | care | bank2 | allin | bankboss | pummel |
+|---|---|---|---|---|---|---|
+| `$14` | 1467 1Po | 1388 | **L** wiped 1Fx 2Po 27To 1d | 1388 | 953 | 1579 |
+| `$28` | 1508 1Po | 1233 | 1334 | 1233 | 961 | 1148 |
+| `$34` | 1346 1Po | 779 | **L** wiped 2Fx 3d | 779 | 636 | 1107 |
+| `$64` | 2351 2Po | **L** wiped 4Fx 2Po 1To 5d | **L** wiped 1Fx 2d | 1877 1d | 649 | 1663 |
+| `$74` | 3406 2Po 1d | 1284 | 1512 | 1284 | 648 | 1666 |
+| `$80` | 1590 | 1094 | 1834 | 1094 | 940 | 1491 |
+| `$B0` | 755 | 803 | **L** wiped 1Fx 1d | 803 | 649 | 1629 |
+| `$C4` | 1569 1Po | 1301 | 1988 | 1301 | 1696 1Po | 1151 |
+| `$D0` | 1669 1Po | 774 | **L** wiped 1Fx 2d | 774 | 645 | 1110 |
+| `$E4` | **L** wiped (both to El Nino at t=5561, 1,096 frames after surfacing) | 1321 | 1231 | 1321 | 824 | 1599 |
+
+Three more seeds the prompt knob drew for the control only, while
+hunting `$E4` and the gen path's `$18`: `$C0` won 1539 1Po, `$E0` won
+3224 2Po 1d, `$08` won 4768 2Po 5To — the last two are the
+qualification's shape (a member down, the other soloing on the bag).
+`$18` itself, the seed the generator's own path drew in this tree
+(`lab_rizopas_bake.lua`: `store seed=$18`), was not landed by any prompt
+tried (35, 36 and 37 drew `$14`, 38 and 39 `$28` — the knob steps over
+phase 6); the
+qualification lineage's actual seed is unrecorded (the gen never logged
+`$be`) and the walk has drifted since (CYAN reached the jump at 338/358
+then, 307/358 now), so "the qualification's seed" is not a reproducible
+target — the spread above brackets it with `$14` (one phase off) and
+the gen-path measurement stands in the bake log.
+
+`allin` and `care` are frame-identical on nine of ten seeds: the care
+options never engaged before Rizopas died. Where they did (`$64`), care
+lost and no-care won. The old fighter's Potion-a-win is spent on itself
+under 60%; its two long wins (`$74`, `$E0`) and its `$08` are a member
+dead to El Nino and a 3,000-5,000-frame solo on the bag's two Potions and
+then Tonics — the qualification's attempt 1, which ran out of Potions and
+wiped.
+
+**Recommendation.** What a person does here: fight the school with
+plain, unboosted Fights (a Piranha has 10 HP; a boosted swing on one is
+thrown away), arrive at Rizopas with the bank full, and unload — a 3-BP
+Fight from either member is seven slashing swings, the break lands in
+the first two and the rest land ×4, and Rizopas, broken, loses the turn
+that would have been El Nino. Ten seeds, ten wins, no deaths, no Fenix,
+one Potion, the boss dead a mean 860 frames after surfacing and 824 on
+the seed that wiped the old fighter. That is what `gen_sabin_falls.lua`
+now plays (the lib driver with `bank = 99`, flipped to 0 when slot 5
+surfaces). Pummel is the second-best verb (two bludgeoning chips a use,
+~100 a hit, ten clean wins) and is what a person who opens the Blitz menu
+gets; Dispatch is not in the driver (an unknown-menu TODO). The driver
+rules above are for lib/ot6.lua's owner; with them in place `care` is
+the same policy as `bankboss` with a safety net, and without them the
+safety net is the thing that wipes.
 
 **The driver finding (lib/ot6.lua, not edited here).** `care_i50.log`:
 after El Nino left SABIN at 82 and CYAN dead with Rizopas at **553 HP,

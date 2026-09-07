@@ -49,9 +49,10 @@ end
 -- and, the moment slot 5 surfaces -- a thing the player sees on screen --
 -- the bank flips to 0 and both unload: a 3-BP Fight is 7 slashing swings
 -- into a SLASH|BLUDG row, the break lands inside the first swing or two
--- and the surplus lands x4.  Lab, 9 distinct seeds: 9 wins, no deaths,
--- no Fenix, the boss dead a mean 864 frames after surfacing (the old
--- boost-every-turn fighter: 9 wins, one death, a Potion a win, 1,740).
+-- and the surplus lands x4.  Lab, 10 distinct seeds including #162's
+-- wipe seed: 10 wins, no deaths, no Fenix, one Potion, the boss dead a
+-- mean 860 frames after surfacing (the old boost-every-turn fighter on
+-- the same ten: 9 wins and the wipe, a death, a Potion a win, 1,740).
 -- Care is the driver's own: Potions before Tonics, Fenix for the fallen.
 local FALLS_OPTS = { tactical = false, boost = true, bank = 99, items = true,
                      healPercent = 40 }
