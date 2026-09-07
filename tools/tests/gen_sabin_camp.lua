@@ -163,6 +163,7 @@ local BP = 0x3E9C                       -- banked boost points, +slot*2
 local fightTier = 1
 local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
 local lost = nil                        -- set by the loss watch
+local wipeN = 0                         -- consecutive wiped frames (#163)
 local bt = nil                          -- live-fight bookkeeping
 local function partyLine()
   local p = {}
@@ -320,20 +321,29 @@ local function fightPulse(_)
   end
   H.setPad(ph < 6 and fBtn or {})
 end
--- the loss watch: every party slot with a real max HP sitting at 0 -- for
--- CYAN's solo defence that is just him -- held 90 straight frames (past any
--- mid-round revive).  Sets `lost` for the ladder; never raises mid-fight.
+-- the loss watch: the lib's wipe predicate (every sane battle-HP word 0
+-- with the battle table live) held 90 straight frames (past any mid-round
+-- revive), or the run canary having counted a game over.  Sets `lost` for
+-- the ladder; never raises mid-fight.
+-- #163: runs EVERY frame of a ride, not behind the inBattle() gate.  A
+-- wipe zeroes every battle-HP word, which inBattle() reads as "no
+-- battle", so the old gate (battN >= 3, then `if bt`) hid the one state
+-- the watch existed for and a lost battle 46 idled to the 29000-frame
+-- deadline (gen_sabin_falls, #159, had the same shape).  The lib's canary
+-- now counts the same wipe as a game over at 300 frames and freezes the
+-- pad; allowGameOver on the run keeps it alive for the reload, and the
+-- counter is a loss here too.
 local function lossWatch(tag)
-  local wiped = true
-  for e = 0, 3 do
-    if H.readWord(0x3c1c + e * 2) > 0 and H.readWord(0x3bf4 + e * 2) > 0 then
-      wiped = false
-    end
+  local wiped = H.partyWipedInBattle()
+  wipeN = wiped and wipeN + 1 or 0
+  if (H.gameOverFired or 0) > 0 and not lost then
+    lost = string.format("%s: GAME OVER counted by the canary at f%d (tier %d) [%s]",
+      tag, H.frame, fightTier, partyLine())
+    H.log("camp: LOST -- " .. lost)
   end
-  bt.dead = wiped and bt.dead + 1 or 0
-  if bt.dead >= 90 and not lost then
-    lost = string.format("%s: party down at f%d (fight up f%d, tier %d) [%s]",
-      tag, H.frame, bt.f0, fightTier, partyLine())
+  if wipeN >= 90 and not lost then
+    lost = string.format("%s: party down at f%d (fight up f%s, tier %d) [%s]",
+      tag, H.frame, bt and tostring(bt.f0) or "?", fightTier, partyLine())
     H.log("camp: LOST -- " .. lost)
     H.screenshot("camp_lost")
   end
@@ -361,6 +371,10 @@ local function rideUntil(pred, what, budget)
           H.readByte(0x00ba), H.readByte(0x00d3), H.readByte(0x0026),
           H.readByte(0x0027), H.readWord(0x3bf6), monCount()))
       end
+
+      -- #163: the loss watch runs before the battle gate, every frame
+      lossWatch(what)
+      if lost then H.setPad({}); return end
 
       battN = inBattle() and battN + 1 or 0
       dlgN  = H.dialogWaiting() and dlgN + 1 or 0
@@ -413,14 +427,11 @@ local function rideUntil(pred, what, budget)
           H.setPad(battN > 300 and phase < 4 and { "a" } or {})
           return
         end
-        -- a REAL fight: play it (boosted Fights) and watch for the loss
-        if bt then
-          if battN % 300 == 0 then
-            H.log(string.format("camp: fight f%d party [%s] vs $%04X hp=%d",
-              H.frame, partyLine(), monSpecies(0), monHp(0)))
-          end
-          lossWatch(what)
-          if lost then H.setPad({}); return end
+        -- a REAL fight: play it (boosted Fights); the loss watch above
+        -- already ran this frame
+        if bt and battN % 300 == 0 then
+          H.log(string.format("camp: fight f%d party [%s] vs $%04X hp=%d",
+            H.frame, partyLine(), monSpecies(0), monHp(0)))
         end
         fightPulse(phase)
         return
@@ -493,10 +504,19 @@ local function cmdAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(cmdBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.call(function()
+        H.checkReq(ldReq, "attempt " .. n .. ": reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60 + (n - 1) * 17),  -- the stagger shifts every later roll
     }, {}),
-    H.call(function() lost, fightTier = nil, n end),
+    H.call(function()
+      lost, fightTier, wipeN = nil, n, 0
+      H.gameOverFired = 0
+    end),
     talkToObj(16, "the Imperial commander (_cb9eb5, battle 46)", 20000),
     (function()
       local landedPred = function()
@@ -507,8 +527,9 @@ local function cmdAttempt(n)
       return rideUntil(function()
         frames = frames + 1
         if frames > 29000 and lost == nil then
-          lost = string.format("attempt %d deadline (29000 frames) -- " ..
-            "assumed wiped or wedged [%s]", n, partyLine())
+          lost = string.format("attempt %d deadline (29000 frames) with no " ..
+            "win and no wipe seen -- a genuine wedge, see #159/#163 [%s]",
+            n, partyLine())
           H.log("camp: LOST -- " .. lost)
         end
         return lost ~= nil or landedPred()
@@ -525,7 +546,10 @@ local function cmdAttempt(n)
   }, {})
 end
 
-H.run({ maxFrames = 150000 }, {  -- the #84 chest pickup rides on the end
+-- allowGameOver: the two retry ladders below (battle 46, battle 42)
+-- deliberately survive a lost fight (#163); rideUntil's loss watch reads
+-- H.gameOverFired as a loss and the next attempt reloads.
+H.run({ maxFrames = 150000, allowGameOver = true }, {  -- the #84 chest pickup rides on the end
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -602,7 +626,10 @@ H.run({ maxFrames = 150000 }, {  -- the #84 chest pickup rides on the end
     local ckReq, chestBlob
     local function kickAttempt(n)
       return H.cond(function() return sw(0x04EE) == 1 and lost == nil end, {
-        H.call(function() lost, fightTier = nil, n end),
+        H.call(function()
+          lost, fightTier, wipeN = nil, n, 0
+          H.gameOverFired = 0
+        end),
         talkToObj(29, "the sealed-chest gag (_cb0dbe, Kick it -> battle 42)",
           20000),
         rideUntil(function()
@@ -632,9 +659,12 @@ H.run({ maxFrames = 150000 }, {  -- the #84 chest pickup rides on the end
         end),
         H.call(function() ldReq = H.requestLoadState(chestBlob) end),
         H.waitFrames(2),
-        H.call(function() H.checkReq(ldReq, "chest attempt 2: reload") end),
+        H.call(function()
+          H.checkReq(ldReq, "chest attempt 2: reload")
+          H.gameOverFired = 0           -- the lost attempt's count
+        end),
         H.waitFrames(77),               -- the stagger shifts every later roll
-        H.call(function() lost = nil end),
+        H.call(function() lost, wipeN = nil, 0 end),
         kickAttempt(2),
       }, {}),
       H.call(function()

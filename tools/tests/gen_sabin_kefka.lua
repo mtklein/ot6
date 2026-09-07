@@ -171,6 +171,7 @@ local BP = 0x3E9C
 local fightTier = 1
 local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
 local lost = nil
+local wipeN = 0                         -- consecutive wiped frames (#163)
 local bt = nil
 local function partyLine()
   local p = {}
@@ -328,17 +329,28 @@ local function fightPulse(_)
   end
   H.setPad(ph < 6 and fBtn or {})
 end
+-- the loss watch: the lib's wipe predicate (every sane battle-HP word 0
+-- with the battle table live) held 90 straight frames, or the run canary
+-- having counted a game over.  Sets `lost` for the ladder; never raises.
+-- #163: runs EVERY frame of a ride, not behind the inBattle() gate.  A
+-- wipe zeroes every battle-HP word, which inBattle() reads as "no
+-- battle", so the old gate (battN >= 3, then `if bt`) hid the one state
+-- the watch existed for and a lost battle 44 idled to the attempt
+-- deadline (gen_sabin_falls, #159, had the same shape).  The lib's
+-- canary now counts the same wipe as a game over at 300 frames and
+-- freezes the pad; allowGameOver on the run keeps it alive for the
+-- reload, and the counter is a loss here too.
 local function lossWatch(tag)
-  local wiped = true
-  for e = 0, 3 do
-    if H.readWord(0x3c1c + e * 2) > 0 and H.readWord(0x3bf4 + e * 2) > 0 then
-      wiped = false
-    end
+  local wiped = H.partyWipedInBattle()
+  wipeN = wiped and wipeN + 1 or 0
+  if (H.gameOverFired or 0) > 0 and not lost then
+    lost = string.format("%s: GAME OVER counted by the canary at f%d (tier %d) [%s]",
+      tag, H.frame, fightTier, partyLine())
+    H.log("kefka: LOST -- " .. lost)
   end
-  bt.dead = wiped and bt.dead + 1 or 0
-  if bt.dead >= 90 and not lost then
-    lost = string.format("%s: party down at f%d (fight up f%d, tier %d) [%s]",
-      tag, H.frame, bt.f0, fightTier, partyLine())
+  if wipeN >= 90 and not lost then
+    lost = string.format("%s: party down at f%d (fight up f%s, tier %d) [%s]",
+      tag, H.frame, bt and tostring(bt.f0) or "?", fightTier, partyLine())
     H.log("kefka: LOST -- " .. lost)
     H.screenshot("kefka_lost")
   end
@@ -366,6 +378,10 @@ local function rideUntil(pred, what, budget)
           H.readByte(0x00ba), H.readByte(0x00d3), H.readByte(0x0026),
           H.readByte(0x0027), H.readWord(0x3bf6), monCount()))
       end
+
+      -- #163: the loss watch runs before the battle gate, every frame
+      lossWatch(what)
+      if lost then H.setPad({}); return end
 
       battN = inBattle() and battN + 1 or 0
       dlgN  = H.dialogWaiting() and dlgN + 1 or 0
@@ -418,14 +434,11 @@ local function rideUntil(pred, what, budget)
           H.setPad(battN > 300 and phase < 4 and { "a" } or {})
           return
         end
-        -- a REAL fight (the pursuit): play it and watch for the loss
-        if bt then
-          if battN % 300 == 0 then
-            H.log(string.format("kefka: fight f%d party [%s] mon=%d",
-              H.frame, partyLine(), monCount()))
-          end
-          lossWatch(what)
-          if lost then H.setPad({}); return end
+        -- a REAL fight (the pursuit): play it; the loss watch above
+        -- already ran this frame
+        if bt and battN % 300 == 0 then
+          H.log(string.format("kefka: fight f%d party [%s] mon=%d",
+            H.frame, partyLine(), monCount()))
         end
         fightPulse(phase)
         return
@@ -529,10 +542,19 @@ local function pursuitAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(pursuitBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.call(function()
+        H.checkReq(ldReq, "attempt " .. n .. ": reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
-    H.call(function() lost, fightTier = nil, n end),
+    H.call(function()
+      lost, fightTier, wipeN = nil, n, 0
+      H.gameOverFired = 0
+    end),
     -- the deadline lives INSIDE the pred so a lost fight retries instead
     -- of raising out of stepOnto (attempt 1 of the first input-driven run
     -- died exactly there: SABIN down, SHADOW grinding alone, timeout at
@@ -543,7 +565,8 @@ local function pursuitAttempt(n)
         frames = frames + 1
         if frames > 23000 and lost == nil then
           lost = string.format("pursuit attempt %d deadline (23000 " ..
-            "frames) -- assumed wiped or wedged [%s]", n, partyLine())
+            "frames) with no win and no wipe seen -- a genuine wedge, " ..
+            "see #159/#163 [%s]", n, partyLine())
           H.log("kefka: LOST -- " .. lost)
         end
         return lost ~= nil or sw(0x0155) == 1
@@ -556,8 +579,9 @@ local function pursuitAttempt(n)
       return rideUntil(function()
         frames = frames + 1
         if frames > 39000 and lost == nil then
-          lost = string.format("attempt %d deadline (39000 frames) -- " ..
-            "assumed wiped or wedged [%s]", n, partyLine())
+          lost = string.format("attempt %d deadline (39000 frames) with no " ..
+            "win and no wipe seen -- a genuine wedge, see #159/#163 [%s]",
+            n, partyLine())
           H.log("kefka: LOST -- " .. lost)
         end
         return lost ~= nil or landedPred()
@@ -574,7 +598,10 @@ local function pursuitAttempt(n)
   }, {})
 end
 
-H.run({ maxFrames = 150000 }, {
+-- allowGameOver: the pursuit ladder below deliberately survives a lost
+-- battle 44 (#163); lossWatch reads H.gameOverFired as a loss and the
+-- next attempt reloads.
+H.run({ maxFrames = 150000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()

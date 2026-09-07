@@ -94,26 +94,41 @@ local function ride(dir, pred, what, budget, choiceWant)
       -- one the gau walk uses: every party slot showing a plausible max
       -- (0 < max < 1000; module garbage reads tens of thousands)
       -- with zero HP, debounced 90 frames, ride map only.
-      if mapIdx() == 2 and not rideLost then
-        local sane, alive = 0, 0
-        for e = 0, 2 do
-          local mx = H.readWord(0x3c1c + e * 2)
-          if mx > 0 and mx < 1000 then
-            sane = sane + 1
-            if H.readWord(0x3bf4 + e * 2) > 0 then alive = alive + 1 end
+      -- #163: the field-map rides this driver also serves (the helmet
+      -- scene's talk, with its fought-out or fled encounters) were
+      -- covered by nothing but the deadline, so the lib's wipe predicate
+      -- (M.partyWipedInBattle, the run canary's own) is read on EVERY
+      -- frame alongside the ride-map signature, and the canary's count is
+      -- a loss too: it now counts a 300-frame battle-side wipe as a game
+      -- over and freezes the pad, and allowGameOver on the run keeps the
+      -- ladder alive for the reload.
+      if not rideLost then
+        local wiped = H.partyWipedInBattle()
+        if not wiped and mapIdx() == 2 then
+          local sane, alive = 0, 0
+          for e = 0, 2 do
+            local mx = H.readWord(0x3c1c + e * 2)
+            if mx > 0 and mx < 1000 then
+              sane = sane + 1
+              if H.readWord(0x3bf4 + e * 2) > 0 then alive = alive + 1 end
+            end
           end
+          wiped = sane >= 3 and alive == 0
         end
-        if sane >= 3 and alive == 0 then
-          rideWipeN = rideWipeN + 1
-          if rideWipeN >= 90 then
-            rideLost = string.format("wiped mid-ride at f%d during %s",
-              H.frame, what)
-            H.log("[trench] LOST -- " .. rideLost)
-            H.setPad({})
-            return
-          end
-        else
-          rideWipeN = 0
+        rideWipeN = wiped and rideWipeN + 1 or 0
+        if (H.gameOverFired or 0) > 0 then
+          rideLost = string.format("GAME OVER counted by the canary at f%d " ..
+            "during %s (map=%d)", H.frame, what, mapIdx())
+          H.log("[trench] LOST -- " .. rideLost)
+          H.setPad({})
+          return
+        end
+        if rideWipeN >= 90 then
+          rideLost = string.format("wiped mid-ride at f%d during %s (map=%d)",
+            H.frame, what, mapIdx())
+          H.log("[trench] LOST -- " .. rideLost)
+          H.setPad({})
+          return
         end
       end
       if H.frame - hb >= 900 then
@@ -215,10 +230,19 @@ local function diveAttempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(diveBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "dive attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "dive attempt " .. n)
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
-    H.call(function() rideLost, rideWipeN = nil, 0 end),
+    H.call(function()
+      rideLost, rideWipeN = nil, 0
+      H.gameOverFired = 0
+    end),
     H.navTo(25, 18, { maxFrames = 12000, playBattles = "tactical", arrive = function()
       return sw(0x41) == 1 or (H.fieldX() == 25 and H.fieldY() == 18
          and H.hasControl() and H.tileAligned()) end }),
@@ -259,7 +283,10 @@ local function diveAttempt(n)
   }, {})
 end
 
-H.run({ maxFrames = 200000 }, {
+-- allowGameOver: the dive ladder below deliberately survives a lost ride
+-- (#163); ride() reads H.gameOverFired as a loss and the next attempt
+-- reloads.
+H.run({ maxFrames = 200000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()

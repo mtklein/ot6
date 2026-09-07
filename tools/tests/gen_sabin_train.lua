@@ -310,12 +310,22 @@ local function fightPulse(_)
   if ph == 0 then fBtn = b47Button() end
   H.setPad(ph < 6 and fBtn or {})
 end
+-- #163: runs EVERY frame of a fight-mode drive and of the battle-68 loop,
+-- not behind the inBattle() gate.  A wipe zeroes every battle-HP word,
+-- which inBattle() and battleLoadStarted() both read as "no battle", so
+-- the old gate hid the one state the watch existed for and a lost battle
+-- 47 idled to its 29000-frame deadline (gen_sabin_falls, #159, had the
+-- same shape).  The lib's canary now counts the same wipe as a game over
+-- at 300 frames and freezes the pad; allowGameOver on the run keeps it
+-- alive for the reload, and the counter is a loss here too.
 local function wipeWatch(tag)
-  local wiped = true
-  for e = 0, 3 do
-    if pMaxHP(e) > 0 and pHP(e) > 0 then wiped = false end
-  end
+  local wiped = H.partyWipedInBattle()
   wipeN = wiped and wipeN + 1 or 0
+  if (H.gameOverFired or 0) > 0 and not lost then
+    lost = string.format("%s: GAME OVER counted by the canary at f%d (tier %d) [%s]",
+      tag, H.frame, fightTier, partyLine())
+    H.log("[train] LOST -- " .. lost)
+  end
   if wipeN >= 90 and not lost then
     lost = string.format("%s: PARTY WIPED at f%d (tier %d) [%s]",
       tag, H.frame, fightTier, partyLine())
@@ -340,10 +350,12 @@ local function holdDrive(dir, pred, what, budget, fightMode)
           tostring(H.hasControl()), tostring(H.dialogWaiting()),
           tostring(inBattle())))
       end
+      if fightMode == "fight" then
+        wipeWatch(what)                    -- every frame, outside the gate
+        if lost then H.setPad({}); return end
+      end
       if inBattle() or H.battleLoadStarted() then
         if fightMode == "fight" then
-          wipeWatch(what)
-          if lost then H.setPad({}); return end
           fightPulse(phase)
         else
           H.setPad({ l = true, r = true })   -- flee, with real input
@@ -781,13 +793,20 @@ local function b47Attempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(b47Blob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "b47 attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "b47 attempt " .. n)
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60),                 -- settle the reload before driving
     }, {}),
     L47.spread(n),                      -- spread the battle RNG phase (#83)
     H.call(function()
       lost, fightTier, wipeN = nil, n, 0
       b47Heals, fPlan, fPlanActor = 0, nil, nil
+      H.gameOverFired = 0
     end),
     nav(26, 9, { maxFrames = 3000 }),
     (function()
@@ -804,8 +823,9 @@ local function b47Attempt(n)
       return holdDrive("down", function()
         frames = frames + 1
         if frames > 29000 and lost == nil then
-          lost = string.format("b47 attempt %d deadline (29000 frames) -- " ..
-            "assumed wiped or wedged [%s]", n, partyLine())
+          lost = string.format("b47 attempt %d deadline (29000 frames) with " ..
+            "no win and no wipe seen -- a genuine wedge, see #159/#163 [%s]",
+            n, partyLine())
           H.log("[train] LOST -- " .. lost)
         end
         return lost ~= nil
@@ -861,12 +881,16 @@ local function b68Attempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(b68Blob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "b68 attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "b68 attempt " .. n)
+        H.gameOverFired = 0             -- the lost attempt's count
+      end),
       H.waitFrames(60),                 -- settle the reload before driving
     }, {}),
     L68.spread(n),                      -- spread the battle RNG phase (#83)
     H.call(function()
       lost, wipeN = nil, 0
+      H.gameOverFired = 0
       b68.casts, b68.chips = 0, {}
       b68.plan, b68.planActor = nil, nil
       b68.brokeAt, b68.killedAt, b68.brokeHP = nil, nil, nil
@@ -944,6 +968,10 @@ local function b68Attempt(n)
         return lost ~= nil or b68.tornDown >= 3
       end, 150000, {
         H.call(function()
+          -- #163: the wipe watch runs before the inBattle() gate, which
+          -- reads a wiped party's all-zero table as "torn down"
+          wipeWatch("b68")
+          if lost then H.setPad({}); return end
           if not inBattle() then
             b68.tornDown = b68.tornDown + 1
             H.setPad({})
@@ -951,7 +979,6 @@ local function b68Attempt(n)
           end
           b68.tornDown = 0
           b68Observe()
-          wipeWatch("b68")
           -- SABIN down pre-break: the chip engine is gone, and there is no
           -- Fenix Down on the pacifist line, so this attempt is over
           if pHP(sabinE) == 0 and H.readByte(SH(gSlot)) > 0 then
@@ -1049,7 +1076,10 @@ local function b68Attempt(n)
   }, {})
 end
 
-H.run({ maxFrames = 400000 }, {
+-- allowGameOver: the battle-47 and battle-68 ladders below deliberately
+-- survive a lost fight (#163); wipeWatch reads H.gameOverFired as a loss
+-- and the next attempt reloads.
+H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
