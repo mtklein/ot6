@@ -442,8 +442,12 @@ def check(name, cmd, deps, desc=None):
 
 
 test_luas = glob("tools/tests/*.lua") + glob("tools/tests/lib/*.lua")
+# Covers stamp_status and the legacy-stamp adoption (--adopt-stamps), both
+# of which shell into savestate_stamp.sh; the adoption half also probes the
+# installed ninja's build-log columns on a mock graph.
 check("compose_selftest", "python3 tools/tests/lib/compose.py --selftest",
-      ["tools/tests/lib/compose.py", "tools/tests/lib/decode_b64.py"]
+      ["tools/tests/lib/compose.py", "tools/tests/lib/decode_b64.py",
+       "tools/tests/lib/savestate_stamp.sh"]
       + LIBS)
 check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
       ["tools/tests/lib/sram_checkpoint.py"])

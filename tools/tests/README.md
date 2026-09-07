@@ -13,6 +13,7 @@ ninja build/states/vargas_entry.mss.lua               # generate one savestate (
 ninja                                                 # everything
 
 python3 tools/tests/lib/compose.py --check-states     # is this red test a stale fixture?
+python3 tools/tests/lib/compose.py --adopt-stamps     # upgrade legacy stamps the tree's records can prove
 ```
 
 Run `--check-states` when a fixture-related test fails unexpectedly. It
@@ -29,6 +30,24 @@ do not infer a product bug or an obligation to replay the whole route from
 staleness alone. A stamp written before ROM identity was recorded has no
 `rom` line and is held to the older conservative whole-sig rule (any lib
 edit stales it) until its fixture is regenerated; the report counts these.
+
+Run `--adopt-stamps` **before** the first lib edit after a regeneration run
+that left legacy stamps: it upgrades each one to the full format in place,
+but only when the tree's own records prove what the missing lines would
+say, and refuses (saying why, per fixture) otherwise. The proof is: the
+stamp's sig still equals the current sig over generator + lib halves (so the
+`generator` and `lib` lines are the current hashes); the `.mss` still
+matches its `artifact` line; and ninja's build log (`build/ninja/.ninja_log`)
+shows the ROM content latch `build/ninja/src/build/ot6.sfc` last ran before
+the state's generate edge started while its copy is byte-equal to
+`build/ot6.sfc` (the latch is rewritten only on a ROM content change, and
+every generate edge depends on it, so the state was generated on the current
+ROM). Nothing is invented: a stamp whose sig already moved, whose ROM latch
+ran after the generate, whose artifact moved, or which has no ninja record is
+left as it is. The original sig line is kept; children bound by `ancestor`
+to the parent's old bytes are rebound to its new bytes; every rewrite keeps
+the stamp's mtime so ninja sees no generation. Run it with no ninja alive in
+the tree, and re-run `--check-states` afterwards.
 
 ## The savestate graph
 

@@ -40,7 +40,11 @@
 # A stamp written before the rom/generator lines existed carries neither.
 # compose.py keeps such a stamp on the older, conservative whole-sig rule
 # until the fixture is regenerated; nothing here ever invents a ROM
-# identity for it.
+# identity for it.  `compose.py --adopt-stamps` appends the missing lines
+# to such a stamp only when the tree's own records prove them: the sig
+# still matches the current sources, the artifact verifies, and ninja's
+# build log shows the ROM content latch last ran before the generate edge
+# and its copy is the current ROM (see adopt_stamps in compose.py).
 set -u
 
 # The GATE_CONTRACT version, a fixed input to every signature (sig and
