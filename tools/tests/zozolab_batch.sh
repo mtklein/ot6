@@ -15,20 +15,22 @@
 # prints the [result] line per run.  The fixture is build/states/zozolab_pre.mss
 # (baked by build/zozolab/gen_bake.lua).
 #
-# Results and per-run logs land in build/zozolab/<policy>_s<seed>.log.
+# Results and per-run logs land in build/zozolab/<TAG>_s<seed>.log (TAG
+# defaults to the policy).
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 POLICY="${1:?usage: zozolab_batch.sh <policy> <seed> [seed ...]}"
 shift 1
 [ $# -gt 0 ] || { echo "no seeds given"; exit 2; }
 JOBS="${JOBS:-3}"
+TAG="${TAG:-$POLICY}"          # output name prefix (a re-pass keeps pass 1's logs)
 [ "$JOBS" -le 3 ] || JOBS=3
 OUT="$ROOT/build/zozolab"
 mkdir -p "$OUT"
 
 run_one() {
   seed=$1
-  name="${POLICY}_s${seed}"
+  name="${TAG}_s${seed}"
   lua="$OUT/$name.lua"
   sed -e "s/@POLICY@/$POLICY/" -e "s/@SEED@/$seed/" \
       "$ROOT/tools/tests/lab_zozo_street.lua" > "$lua"

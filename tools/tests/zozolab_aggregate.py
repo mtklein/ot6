@@ -41,7 +41,7 @@ def main(paths):
             continue
         r = parse(hits[-1])
         r["raw"] = hits[-1]
-        rows[r.get("policy", "?")].append(r)
+        rows[name.split("_s")[0]].append(r)      # group by the batch TAG
 
     for pol in sorted(rows):
         print("== %s (%d runs)" % (pol, len(rows[pol])))

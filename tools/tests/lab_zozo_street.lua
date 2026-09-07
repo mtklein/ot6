@@ -188,6 +188,21 @@ local function hookObservers()
       mhp = { monHp(0), monHp(1), monHp(2), monHp(3), monHp(4), monHp(5) },
       msh = { monShields(0), monShields(1), monShields(2), monShields(3), monShields(4), monShields(5) } }
   end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"), H.sym("ExecCmd@battle_code"))
+  -- _writedamage (battle_main.asm @62ef) walks $33d0 + entity*2 (14-bit
+  -- damage taken, $FFFF = none; battle-ram.txt:733) for every entity and
+  -- calls ApplyDmg, which clamps HP at 0.  At its entry the words still
+  -- hold the roll.  Attribute them to whichever monster action is pending.
+  emu.addMemoryCallback(function()
+    local mx = nil
+    for x = 8, 0x12, 2 do if pending[x] then mx = x end end
+    if not mx then return end
+    local raw = {}
+    for e = 1, 4 do
+      local w = H.readWord(0x33D0 + (e - 1) * 2)
+      raw[e] = (w == 0xFFFF) and 0x3FFF or (w & 0x3FFF)
+    end
+    pending[mx].raw = raw
+  end, emu.callbackType.exec, H.sym("_writedamage"), H.sym("_writedamage"))
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xFFFF
     local p = pending[x]
@@ -196,17 +211,21 @@ local function hookObservers()
     local after = partyHp()
     if x >= 8 then
       local slot = (x - 8) // 2
-      local dmg, kills = {}, 0
+      local dmg, kills, raw = {}, 0, {}
       for e = 1, 4 do
         dmg[e] = p.hp[e] - after[e]
+        -- the engine's own damage word, captured at _writedamage (below)
+        -- before ApplyDmg clamps it to HP: a kill's true roll, not the HP
+        -- it took.  0x3FFF here means no word was seen for that entity.
+        raw[e] = (p.raw and p.raw[e]) or 0x3FFF
         if p.hp[e] > 0 and after[e] == 0 then kills = kills + 1 end
         if dmg[e] > maxHit then maxHit, maxHitWho, maxHitAtk = dmg[e], slotChar(e - 1), p.atk end
       end
       monsterHits[#monsterHits + 1] = { atk = p.atk, kills = kills }
       events[#events + 1] = string.format(
-        "[hit] f%d %s(s%d) cmd=%02X atk=%s tgt=%04X dmg=%d,%d,%d,%d kills=%d party=%s",
+        "[hit] f%d %s(s%d) cmd=%02X atk=%s tgt=%04X dmg=%d,%d,%d,%d raw=%d,%d,%d,%d kills=%d party=%s",
         H.frame, SPECIES[monSpecies(slot)] or "?", slot, p.cmd, atkName(p.atk), p.tgt,
-        dmg[1], dmg[2], dmg[3], dmg[4], kills, table.concat(after, ","))
+        dmg[1], dmg[2], dmg[3], dmg[4], raw[1], raw[2], raw[3], raw[4], kills, table.concat(after, ","))
     else
       local slot = x // 2
       local md = {}
