@@ -143,6 +143,10 @@ local F = H.newFightDriver("Nerapa", opts)
 local res = { deaths = {}, raises = 0, cond = {}, hits = 0 }
 local t, lost, why, wipedN = 0, false, nil, 0
 local fenix0, potion0, tonic0
+-- sampled from the battle inventory every active frame: a wipe tears
+-- down into the Game Over without syncing the field bag, so a post-fight
+-- bag read says 0 spent on every loss (control i15, 2026-09-07)
+local fenixLive, potionLive, tonicLive
 local monHp, monSh = nil, nil
 local hpLast, condLast, condSeen = {}, {}, {}
 
@@ -155,6 +159,9 @@ local function fight()
     if master() == 0 then lost, why = true, "clock"; return true end
     if t >= CAP then lost, why = true, "cap"; return true end
     if H.battleActive() then
+      fenixLive = bagNow(FENIX_DOWN, fenixLive or fenix0)
+      potionLive = bagNow(POTION, potionLive or potion0)
+      tonicLive = bagNow(TONIC, tonicLive or tonic0)
       -- Nerapa: HP $3BFC (slot 0), shields $3E40 (ot6 hud); log every change
       local hp, sh = H.readWord(0x3BFC), H.readByte(0x3E40)
       if monHp ~= nil and (hp ~= monHp or sh ~= monSh) then
@@ -224,10 +231,10 @@ H.run({ maxFrames = 40000, allowGameOver = true }, {
     H.setPad({})
     if F.idle then F.idle() end
     local clockLeft = master()
-    -- bag read the moment the battle module is gone (a loss that reaches
-    -- the title would revert it); during a still-loaded battle, the
-    -- battle inventory
-    local fenix1, potion1, tonic1 = bagNow(FENIX_DOWN, fenix0), bagNow(POTION, potion0), bagNow(TONIC, tonic0)
+    -- the last live battle-inventory sample (see fenixLive); the field bag
+    -- is only trusted after a win's teardown, and even then the live
+    -- sample is what the fight itself spent
+    local fenix1, potion1, tonic1 = fenixLive or fenix0, potionLive or potion0, tonicLive or tonic0
     local outcome
     if not lost and not nerapaUp() then
       outcome = clockLeft >= CLOCK_MARGIN and "won" or "won_late"

@@ -38,7 +38,9 @@ for pol, byidle in sorted(rows.items()):
     won = [k for k in ks if k["outcome"] == "won"]
     late = [k for k in ks if k["outcome"] == "won_late"]
     lost = [k for k in ks if k["outcome"].startswith("lost")]
-    fx = mean(int(k["fenix"]) for k in won) if won else float("nan")
+    # Fenix per win = landed raises: one Fenix Down each (no policy casts Life),
+    # and the bag delta reads 0 on every loss (the wipe never syncs the field bag)
+    fx = mean(int(k["raises"]) for k in won) if won else float("nan")
     tw = mean(int(k["t"]) for k in won) if won else float("nan")
     cw = mean(int(k["clock_left"]) for k in won) if won else float("nan")
     if md:
