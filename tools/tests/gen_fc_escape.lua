@@ -27,20 +27,6 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
--- Q's contract, registered here until the lib's table takes it (see
--- gen_fc_alcove.lua); this gen consumes it as its entry contract.
-H.contracts["fc-alcove-v1"] = {
-  slot = 3,
-  field = { map = 358, x = 8, y = 10 },
-  switches = {},
-  party = {
-    size = 4,
-    members = { { 0x00, "TERRA" }, { 0x01, "LOCKE" }, { 0x03, "SHADOW" }, { 0x04, "EDGAR" } },
-  },
-  ram = { { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" } },
-  items = {},
-  sram = {},
-}
 
 local TERRA = 0x00
 local function map() return H.mapId() & 0x3ff end

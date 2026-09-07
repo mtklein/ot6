@@ -16,24 +16,6 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
-H.contracts["fc-landing-v1"] = {
-  slot = 3,
-  field = { map = 394, x = 7, y = 12 },   -- the landing SavePoint (the _394 trigger block)
-  switches = {},
-  party = {
-    size = 3,                             -- TERRA LOCKE EDGAR: the IAF three
-    members = {
-      { 0x00, "TERRA" },
-      { 0x01, "LOCKE" },
-      { 0x04, "EDGAR" },
-    },
-  },
-  ram = {
-    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
-  },
-  items = {},
-  sram = {},
-}
 
 local ZMENUSTATE = 0x26
 local POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY = 0xE9, 0xF0, 0xE8, 0xF2, 0xF5   -- item ids (the care kernel's)
