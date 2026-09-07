@@ -835,6 +835,83 @@ M.contracts["thamasa-done-v1"] = {
   },
 }
 
+-- fc-landing-v1: checkpoint Q, the Floating Continent landing.  The IAF
+-- gauntlet (six Sky Armor / Spit Fire waves, Ultros IV + Chupon, the Air
+-- Force) is behind the party; the Blackjack set them down on map 394 at
+-- (4,8) and they saved at the vanilla SavePoint 394 (7,12)
+-- (event_trigger.asm:1960).  The deck's party select forced a trio:
+-- TERRA LOCKE EDGAR (docs/design/floating-continent-route.md s2/s3a).
+--
+-- Q's window: $009E=1 (the FC-discovery cutscene ran, event_main.asm:14057),
+-- $00A0=1 (the IAF chain armed, :13446), $02F3=0 (SHADOW is still out of
+-- the roster -- his NPC stands at 394 (10,16) and gen_fc_alcove talks him
+-- in), $035F=1 (AtmaWeapon's NPC stands, cleared only by his defeat :32686).
+M.contracts["fc-landing-v1"] = {
+  slot = 3,
+  field = { map = 394, x = 7, y = 12 },   -- the landing SavePoint
+  switches = {
+    { 0x009D, 1, "the v0.13 area tail ran (carried from P)" },
+    { 0x009E, 1, "the FC-discovery cutscene ran (:14057)" },
+    { 0x00A0, 1, "the IAF chain armed (:13446)" },
+    { 0x02F3, 0, "SHADOW still unavailable (joins at 394 (10,16))" },
+    { 0x035F, 1, "AtmaWeapon stands at 394 (60,15)" },
+  },
+  party = {
+    size = 3,                     -- TERRA LOCKE EDGAR: the IAF three
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x04, "EDGAR" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  items = {},
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- fc-alcove-v1: checkpoint R, the continent's encounter-free save alcove.
+-- The descent across 394 is behind the party -- the stair reveals, the
+-- (40,6)/(67,39)/(40,24) chutes, the (82,30) reveal and the (90,43) drop
+-- into map 358 (event_trigger.asm:1962, which sets $01B5) -- and they saved
+-- at the alcove's vanilla SavePoint 358 (8,10) (event_trigger.asm:1753).
+-- SHADOW was talked in at the landing (394 (10,16), _cad9a7 :32586).
+--
+-- R's window: $01B5=1 (the (70,29) "return?" prompt is dead: its event
+-- self-gates on it), $02F3=1 (SHADOW available, :32627), $035F=1 (AtmaWeapon
+-- still stands: the escape is gen_fc_escape's).
+M.contracts["fc-alcove-v1"] = {
+  slot = 3,
+  field = { map = 358, x = 8, y = 10 },   -- the alcove's SavePoint tile
+  switches = {
+    { 0x009E, 1, "the FC-discovery cutscene ran (carried from Q)" },
+    { 0x01B5, 1, "the alcove entry latched (:32517) -- (70,29) is dead" },
+    { 0x02F3, 1, "SHADOW available again (:32627)" },
+    { 0x035F, 1, "AtmaWeapon still stands at 394 (60,15)" },
+  },
+  party = {
+    size = 4,                     -- TERRA LOCKE EDGAR SHADOW
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x03, "SHADOW" },
+      { 0x04, "EDGAR" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  items = {},
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
