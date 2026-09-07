@@ -199,13 +199,18 @@ local FENIX_BUDGET, CLOCK_MARGIN = 3, 900
 -- (battle-ram.txt:456-475).  The first ninja run of the ladder read the
 -- field bag and declared its rung lost at the fight's end, thirteen
 -- Fenix Downs late.
-local function fenixNow()
-  if H.battleActive() or H.battleLoadStarted() then
+-- Read only once the battle is ACTIVE, and hand back the rung's baseline
+-- when no $F0 record is found: during battle load the table is not yet
+-- populated, and the third ninja run scanned it two frames after seeding,
+-- read "no Fenix Downs" as 27 spent, and threw all five rungs away.
+local function fenixNow(baseline)
+  if H.battleActive() then
     for i = 0, 255 do
       if H.readByte(0x2686 + i * 5) == 0xF0 then return H.readByte(0x2689 + i * 5) end
     end
-    return 0
+    return baseline
   end
+  if H.battleLoadStarted() then return baseline end
   return H.invCountOf(0xF0)
 end
 local function nerapaAttempt(n)
@@ -231,8 +236,8 @@ local function nerapaAttempt(n)
         if H.partyWipedInBattle() then wipedN = wipedN + 1 else wipedN = 0 end
         if wipedN >= 300 then lost, why = true, "wiped"; return true end
         if t >= 30000 then lost, why = true, "30000-frame cap"; return true end
-        if fenix0 - fenixNow() > FENIX_BUDGET then
-          lost, why = true, string.format("%d Fenix Downs spent (budget %d)", fenix0 - fenixNow(), FENIX_BUDGET)
+        if fenix0 - fenixNow(fenix0) > FENIX_BUDGET then
+          lost, why = true, string.format("%d Fenix Downs spent (budget %d)", fenix0 - fenixNow(fenix0), FENIX_BUDGET)
           return true
         end
         if t % 300 == 0 then
