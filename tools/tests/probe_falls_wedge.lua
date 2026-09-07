@@ -12,7 +12,8 @@
 -- battle RNG seed is the game-time frame counter ($021E asl2 -> $BE,
 -- battle_main.asm InitBattle), so idle frames are real seed variation --
 -- and rides the jump with a VERBATIM copy of the generator's ride and
--- fighter, plus per-pulse dumps of every hasControl component at map 156
+-- fighter (as fixed for #159: the wipe watch outside the battle gate; the
+-- pre-fix copy is in this file's first revision), plus per-pulse dumps of every hasControl component at map 156
 -- (probe_forest_stall.lua's dumpControl, extended with the battle-side
 -- words), whether battle 18 starts, and the frames to control.
 --
@@ -207,14 +208,14 @@ local function fightPulse(_)
   end
   H.setPad(ph < 6 and fBtn or {})
 end
-local function wipeWatch(tag)
-  local wiped = true
-  for e = 0, 3 do
-    if H.readWord(0x3c1c + e * 2) > 0 and H.readWord(0x3bf4 + e * 2) > 0 then
-      wiped = false
-    end
-  end
+local function wipeWatch(tag)   -- #159 fix: every frame, lib predicate, canary counts
+  local wiped = H.partyWipedInBattle()
   wipeN = wiped and wipeN + 1 or 0
+  if (H.gameOverFired or 0) > 0 and not lost then
+    lost = string.format("%s: GAME OVER counted by the canary at f%d (tier %d) [%s]",
+      tag, H.frame, fightTier, partyLine())
+    H.log("[falls] LOST -- " .. lost)
+  end
   if wipeN >= 90 and not lost then
     lost = string.format("%s: PARTY WIPED at f%d (tier %d) [%s]",
       tag, H.frame, fightTier, partyLine())
@@ -240,6 +241,11 @@ local function ride(dir, pred, what, budget, fightMode, choiceWant, watch, dirMo
           tostring(inBattle()), H.readByte(CH_SEL), H.readByte(CH_MAX)))
       end
 
+      if fightMode == "real" then
+        wipeWatch(what)
+        if lost then H.setPad({}); return end
+      end
+
       if inBattle() or H.battleLoadStarted() then
         if fightMode == "real" then
           if not rizo.mask0 and H.battleLoadStarted() then
@@ -258,8 +264,6 @@ local function ride(dir, pred, what, budget, fightMode, choiceWant, watch, dirMo
               "[falls] slot 5 SURFACED: species=$%04X shields=%d/%d wkc=$%02X",
               rizo.species, rizo.shields, rizo.smax, rizo.wkc))
           end
-          wipeWatch(what)
-          if lost then H.setPad({}); return end
           fightPulse(phase)
         else
           H.setPad({ l = true, r = true })
@@ -485,8 +489,11 @@ local function attempt(k)
     end),
     ride("up", function()
       frames = frames + 1
+      -- the generator's own watch is checked first: with the #159 fix it
+      -- must catch the wipe itself (GEN-LOST); the probe's separate
+      -- detector (WIPED) is the pre-fix measurement
+      if lost ~= nil then R.genLost = frames; return true end
       if R.wipeAt ~= nil then return true end
-      if lost ~= nil then R.genLost = frames; return true end   -- the generator's own watch
       if mapIdx() == 159 and sw(0x3F) == 1 and H.hasControl()
          and H.tileAligned() and bright() >= 15 then
         R.ctlAt = frames

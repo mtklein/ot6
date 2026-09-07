@@ -190,14 +190,26 @@ local function fightPulse(_)
   end
   H.setPad(ph < 6 and fBtn or {})
 end
+-- #159: runs EVERY frame of a real ride, not behind the inBattle() gate.
+-- A wipe zeroes every battle-HP word, which inBattle() and
+-- battleLoadStarted() both read as "no battle", so the old gate hid the
+-- one state the watch existed for: the v0.16 qualification's attempt 1
+-- sat on the annihilated screen (event PC parked at $CBC0C1, the byte
+-- after `battle 18`; the battle module waits for a press that a
+-- no-control ride never gives) from f18833 to the 39000-frame deadline
+-- (probe_falls_wedge.lua: 2 wipes in 24 varied entries, seed $EE, both
+-- caught 90 frames after the last HP word hit 0).  The lib's canary now
+-- counts the same wipe as a game over at 300 frames and freezes the pad;
+-- allowGameOver below keeps the run alive for the reload, and the counter
+-- is a loss here too.
 local function wipeWatch(tag)
-  local wiped = true
-  for e = 0, 3 do
-    if H.readWord(0x3c1c + e * 2) > 0 and H.readWord(0x3bf4 + e * 2) > 0 then
-      wiped = false
-    end
-  end
+  local wiped = H.partyWipedInBattle()
   wipeN = wiped and wipeN + 1 or 0
+  if (H.gameOverFired or 0) > 0 and not lost then
+    lost = string.format("%s: GAME OVER counted by the canary at f%d (tier %d) [%s]",
+      tag, H.frame, fightTier, partyLine())
+    H.log("[falls] LOST -- " .. lost)
+  end
   if wipeN >= 90 and not lost then
     lost = string.format("%s: PARTY WIPED at f%d (tier %d) [%s]",
       tag, H.frame, fightTier, partyLine())
@@ -224,6 +236,11 @@ local function ride(dir, pred, what, budget, fightMode, choiceWant)
           tostring(inBattle()), H.readByte(CH_SEL), H.readByte(CH_MAX)))
       end
 
+      if fightMode == "real" then
+        wipeWatch(what)
+        if lost then H.setPad({}); return end
+      end
+
       if inBattle() or H.battleLoadStarted() then
         if fightMode == "real" then
           -- the rizopas watch: record the seed row THE FRAME IT SURFACES
@@ -243,8 +260,6 @@ local function ride(dir, pred, what, budget, fightMode, choiceWant)
               "[falls] slot 5 SURFACED: species=$%04X shields=%d/%d wkc=$%02X",
               rizo.species, rizo.shields, rizo.smax, rizo.wkc))
           end
-          wipeWatch(what)
-          if lost then H.setPad({}); return end
           fightPulse(phase)
         else
           H.setPad({ l = true, r = true })   -- flee, with real input
@@ -352,11 +367,15 @@ local function jumpAttempt(n)
           tostring(lost))
       end),
       H.loadState(DOOR),
+      -- the restored snapshot restarts the experiment: the canary's count
+      -- (and its pad freeze, which loadState thaws) belong to the lost one
+      H.call(function() H.gameOverFired = 0 end),
       H.waitFrames(30 + (n - 1) * 17),
       walkToFalls(),
     }, {}),
     H.call(function()
       lost, fightTier, wipeN = nil, n, 0
+      H.gameOverFired = 0
       rizo.seen, rizo.mask0 = false, nil
     end),
     H.navTo(13, 11, { maxFrames = 5000, playBattles = "tactical" }),
@@ -365,8 +384,9 @@ local function jumpAttempt(n)
       return ride("up", function()
         frames = frames + 1
         if frames > 39000 and lost == nil then
-          lost = string.format("attempt %d deadline (39000 frames) -- " ..
-            "assumed wiped or wedged [%s]", n, partyLine())
+          lost = string.format("attempt %d deadline (39000 frames) with " ..
+            "no win and no wipe seen -- a genuine wedge, see #159 [%s]", n,
+            partyLine())
           H.log("[falls] LOST -- " .. lost)
         end
         return lost ~= nil
@@ -386,7 +406,9 @@ local function jumpAttempt(n)
   }, {})
 end
 
-H.run({ maxFrames = 250000 }, {
+-- allowGameOver: the retry ladder above deliberately survives a lost
+-- battle 18 (#159); the ride reads H.gameOverFired as a loss and reloads.
+H.run({ maxFrames = 250000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
