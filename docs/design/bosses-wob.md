@@ -349,19 +349,190 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
 
 ### 9. Rizopas, after the Piranha school — Baren Falls (Sabin + Cyan)
 
-**Shields:** 4 (Piranhas 1) · **Weak:** bolt + slashing, bludgeoning.
+Party: SABIN and CYAN, jumping the falls from the top of map 156
+(SHADOW has left at the overlook); battle 18 from the jump event
+(`event_main.asm:66481`), which calls `_cacfbd` first — `max_hp` and
+`max_mp` on every slot — so the party enters at **full HP and MP**
+whatever the walk cost it.
 
-- **Telegraph:** the falls swell backward → **El Nino** hits the
-  party.
-- **Break story:** this fight is the clearest case for the coverage
-  rule. Bolt is vanilla's weakness here and neither character can cast
-  it, so the weapon classes carry the fight: Pummel and Dispatch/Slash
-  chip regardless, and Quadra Slam (if the scenario got Cyan to level
-  15) chips 4 at a time. When the party has no usable element, the
-  classes are what remains.
-- **Jank:** the Piranha wave stays a wave. They do small damage, die
-  quickly, and teach the player to use AoE. Gau and the dried meat
-  come one screen later.
+**Shields:** 4 (Piranhas 1) · **Weak:** bolt + slashing, bludgeoning ·
+**Absorbs:** water.
+
+Decoded, not recalled (`monster_prop.dat` row `$155`, 32 bytes at
+`+$2AA0`, ROM `$CF2AA0`; `tools/tests/lab_rizopas_template.lua` header):
+`28 0e 64 00 00 6e af 03 07 03 27 00 00 00 00 00 0d e0 00 cd e6 09 00 80
+00 04 ff 00 00 01 00 20` — speed 40, attack 14, hit 100, evade 0,
+m.block 0, defense 110, m.def 175, m.pow 3, **HP 775**, MP 39, level 13;
+absorb `$80` water; null `$00`; weak `$04` bolt. Byte 31 `$20` is the
+special attack (`LoadRageProp` → `$322d`; `battle_main.asm:8443-8480`):
+bits 6 and 7 clear, `$20 − $20 = +0` to the multiplier — a plain
+physical hit under its own animation. Bytes 28-31 `00 01 00 20`: the
+status 3&4 word `$0001` is the flying flag (Float). `Ot6ShieldTbl`
+(`ot6_hud.asm:1601`): 4 shields, class-weak `SLASH|BLUDG`; no
+`Ot6ElemAddTbl` row; `Ot6HpMulTbl` ships `$10` (1×), so 775 is the HP the
+fight sees. Piranha `$154`: HP 10, level 9, attack 13, weak bolt, 1 shield
+`SLASH|BLUDG`.
+
+**AI** (`ai_script.asm:7328-7337`), one entry of each triple at random:
+*Battle/Special/Mega Volt · Battle/Ice/Ice · wait · El Nino/Battle/Battle*,
+looping; `boss_death` on death. `magic_prop_en.dat`: **Mega Volt** `$B8`
+bolt, power 20, hit 150; **Ice** `$01` power 22; **El Nino** `$6F` water,
+**power 61**, targeting `$7E` (the whole party), hit byte 0 — unmissable.
+The Piranha script (`:7290-7326`) restores two or three of the school on
+every death until the battle timer passes 60, then the last death hides
+the school and surfaces MONSTER_6 from the water: **the wave is a
+fixed-length tax**, ~4,450-5,500 frames in every attempt logged
+(`t_surface` in the `[result]` lines), whatever the party does.
+
+**What the party carries** (`lab_rizopas_bake.lua`, read at the falls):
+CYAN L14, 358 HP, Ashura `$2B` (katana: slash), Heavy Shld, Leather Hat,
+LeatherArmor, no relics, SwdTech `$07` = Dispatch/Retort/Slash. SABIN
+L14, 363 HP, MetalKnuckle `$53` (claw: slash on Fight; Pummel and Suplex
+bludgeon regardless), Buckler, Leather Hat, Kung Fu Suit, Star Pendant
+and Jewel Ring, Blitz `$07` = Pummel/AuraBolt/Suplex. Bag: **Tonic 91,
+Potion 2, Fenix Down 15**. Both weapons match the row, so every Fight
+swing chips: a 1-BP Fight is 3 swings = 3 chips, 2 BP 5, 3 BP 7
+(`M.fightSwings`); BP caps at 5 and regenerates one per unboosted turn
+(`ot6_boost.asm:141`).
+
+**The burst, measured.** Rizopas's spells land on the whole party as
+often as on one (`[act] … atk=$B8 tgt=$0003` and `tgt=$0001` both occur),
+for 40-90 a head; it acts about twice per party round (its actions in
+`care_i0.log` at `t=5062` and `t=5300`, the party's at `5535` and `5691`).
+**El Nino is the killer: `[hp] t=5583 entity 0 284 -> 55 (-229)` and
+`entity 1 221 -> 0 (-221)` in one action (`control_i55.log`, seed
+`$74`); `t=5314 … 326 -> 82 (-244)`, `238 -> 0 (-238)` (`care_i50.log`,
+seed `$64`).** Two ordinary hits and then El Nino is ~360 HP to each of
+two 358/363-HP members: that is the 650-frame double kill of #162
+(the probe's `$EE` reading is store seed `$E4`; `$BE` at battle-up sits
+ten draws past InitBattle's store in every run here). Nothing about it
+is a telegraph the AI script honours; the doc's earlier "the falls swell
+backward" line is not in the script and is removed.
+
+**Break story, measured.** The row is honest and the party's Fight is
+the key: SABIN's and CYAN's swings both chip. A 1-BP Fight from either is
+3 chips; the second member's next swing breaks; the surplus swings of a
+2- or 3-BP Fight land broken. `bankboss_i25.log` (seed `$D0`): CYAN
+Fight at 5 BP → `[hit] t=5083 rizopas hp=552 (-146) sh=1 (-2)`, `t=5084
+hp=0 (-552) sh=0 (-1) brk=16` — **dead in one action, 645 frames after
+surfacing**. Pummel (2 bludgeoning hits) chips less than a boosted Fight
+and costs Blitz MP; Dispatch is one slash and is not in the driver.
+
+**Policy × seed** (`tools/tests/rizopaslab_batch.sh`, aggregate by
+`rizopaslab_aggregate.py`, per-run digests by `rizopaslab_actions.py`;
+the fixture is `falls_prejump.mss` from `lab_rizopas_bake.lua`, the
+generator's own walk; seeds are what InitBattle drew, `$be` at the store;
+the seed knob is a stand on the jump row plus an exact-frame delay at
+"Jump?" — the walk quantizes a plain idle, so twelve idles drew nine
+seeds and the tenth, `$E4`, took the prompt knob). Every attempt is
+retained under `build/rizopaslab/`. The policies: **control** is
+gen_sabin_falls' own fighter, verbatim (boost whatever BP it holds on
+every Fight, self-heal under 60% with a Potion when 60+ HP is missing,
+else a Tonic, no revive); the rest are the lib fight driver — **care**
+(boosted Fight, Potions to whoever is under 40% or inside a round of
+death, Fenix Down for the fallen), **bank2** (chip unboosted until 2 BP,
+then spend; care as `care`), **allin** (boosted Fight, no items, no
+care), **bankboss** (Fight the school unboosted, bank to the cap, unload
+when Rizopas surfaces; care as `care`), **pummel** (SABIN's Pummel at
+boost, CYAN Fights; care as `care`). None reads hidden HP or future RNG;
+`bankboss` reads the same surfacing the screen shows.
+
+| policy | distinct seeds | won | lost | Fenix/win | Potion/win | deaths (all) | mean t (won) | mean boss phase (won) |
+|---|---|---|---|---|---|---|---|---|
+| control | 10 | 9 | 1 | 0.0 | 1.0 | 1 + the `$E4` wipe | 7460 | 1740 |
+| care | 10 | 9 | 1 | 0.0 | 0.0 | 5 | 6814 | 1109 |
+| bank2 | 10 | 5 | 5 | 0.0 | 0.0 | 9 | 7184 | 1580 |
+| allin | 10 | 10 | 0 | 0.0 | 0.0 | 1 | 6863 | 1185 |
+| **bankboss** | 10 | **10** | 0 | 0.0 | 0.1 | **0** | 6897 | **860** |
+| pummel | 10 | 10 | 0 | 0.0 | 0.0 | 0 | 7962 | 1414 |
+
+`t` is battle-up to teardown (the ~4,500-frame school included); the boss
+phase is surfacing to death. Per seed (boss-phase frames on a win; `L`
+lost; Fx/Po/To items spent by the engine's own Item commands; `d`
+deaths; the `$E4` column is #162's `$EE`):
+
+| seed | control | care | bank2 | allin | bankboss | pummel |
+|---|---|---|---|---|---|---|
+| `$14` | 1467 1Po | 1388 | **L** wiped 1Fx 2Po 27To 1d | 1388 | 953 | 1579 |
+| `$28` | 1508 1Po | 1233 | 1334 | 1233 | 961 | 1148 |
+| `$34` | 1346 1Po | 779 | **L** wiped 2Fx 3d | 779 | 636 | 1107 |
+| `$64` | 2351 2Po | **L** wiped 4Fx 2Po 1To 5d | **L** wiped 1Fx 2d | 1877 1d | 649 | 1663 |
+| `$74` | 3406 2Po 1d | 1284 | 1512 | 1284 | 648 | 1666 |
+| `$80` | 1590 | 1094 | 1834 | 1094 | 940 | 1491 |
+| `$B0` | 755 | 803 | **L** wiped 1Fx 1d | 803 | 649 | 1629 |
+| `$C4` | 1569 1Po | 1301 | 1988 | 1301 | 1696 1Po | 1151 |
+| `$D0` | 1669 1Po | 774 | **L** wiped 1Fx 2d | 774 | 645 | 1110 |
+| `$E4` | **L** wiped (both to El Nino at t=5561, 1,096 frames after surfacing) | 1321 | 1231 | 1321 | 824 | 1599 |
+
+Three more seeds the prompt knob drew for the control only, while
+hunting `$E4` and the gen path's `$18`: `$C0` won 1539 1Po, `$E0` won
+3224 2Po 1d, `$08` won 4768 2Po 5To — the last two are the
+qualification's shape (a member down, the other soloing on the bag).
+`$18` itself, the seed the generator's own path drew in this tree
+(`lab_rizopas_bake.lua`: `store seed=$18`), was not landed by any prompt
+tried (35, 36 and 37 drew `$14`, 38 and 39 `$28` — the knob steps over
+phase 6); the
+qualification lineage's actual seed is unrecorded (the gen never logged
+`$be`) and the walk has drifted since (CYAN reached the jump at 338/358
+then, 307/358 now), so "the qualification's seed" is not a reproducible
+target — the spread above brackets it with `$14` (one phase off) and
+the gen-path measurement stands in the bake log.
+
+`allin` and `care` are frame-identical on nine of ten seeds: the care
+options never engaged before Rizopas died. Where they did (`$64`), care
+lost and no-care won. The old fighter's Potion-a-win is spent on itself
+under 60%; its two long wins (`$74`, `$E0`) and its `$08` are a member
+dead to El Nino and a 3,000-5,000-frame solo on the bag's two Potions and
+then Tonics — the qualification's attempt 1, which ran out of Potions and
+wiped.
+
+**Recommendation.** What a person does here: fight the school with
+plain, unboosted Fights (a Piranha has 10 HP; a boosted swing on one is
+thrown away), arrive at Rizopas with the bank full, and unload — a 3-BP
+Fight from either member is seven slashing swings, the break lands in
+the first two and the rest land ×4, and Rizopas, broken, loses the turn
+that would have been El Nino. Ten seeds, ten wins, no deaths, no Fenix,
+one Potion, the boss dead a mean 860 frames after surfacing and 824 on
+the seed that wiped the old fighter. That is what `gen_sabin_falls.lua`
+now plays (the lib driver with `bank = 99`, flipped to 0 when slot 5
+surfaces). Pummel is the second-best verb (two bludgeoning chips a use,
+~100 a hit, ten clean wins) and is what a person who opens the Blitz menu
+gets; Dispatch is not in the driver (an unknown-menu TODO). The driver
+rules above are for lib/ot6.lua's owner; with them in place `care` is
+the same policy as `bankboss` with a safety net, and without them the
+safety net is the thing that wipes.
+
+**The driver finding (lib/ot6.lua, not edited here).** `care_i50.log`:
+after El Nino left SABIN at 82 and CYAN dead with Rizopas at **553 HP,
+1 shield**, the driver spent the next eleven turns on care — `revive
+entity 1 with Fenix Down` four times, CYAN standing up at 44 HP and
+dying to the next Battle (`[hp] t=6500 entity 1 44 -> 0 (-44)`, again at
+`9561`, `10974`), two Potions and a Tonic between — and refused SABIN's
+attack every time with `no press: entity 0 (82/363) is inside one round
+of death (244) -- caring first`, though the care it then chose was not
+for entity 0 and a 1-BP Fight (3 chips on 1 shield, the surplus broken)
+was the fight's end. Four Fenix Downs and a wipe against a boss one
+action from dead; the control won the same seed by never reviving.
+`bank2_i30.log` (seed `$14`) is the same shape with the other veto: El
+Nino left the pair at 22/33 with Rizopas at **551 HP, 1 shield**; SABIN,
+holding 3 BP, was refused with `no press: Fight at 3 BP would chip 7 of
+1 slot 5 but the window's damage 288 (e0:72x4) is short of its 551 HP --
+caring` — the window prices one *action's* measured damage ×4, not the
+**seven swings** a 3-BP Fight throws, six of them on a broken target
+(`bankboss` measured 552-629 from one such Fight) — and the driver then
+spent both Potions on the same member (the second `+91` on a 272/363
+SABIN while CYAN stood at 33), and, the Potions gone, **27 Tonics** of
++50 against 40-90 hits over 15,000 frames to a wipe. The exact rules:
+**(a) the one-round-of-death veto on the press must not fire when the
+press's window covers the monster's HP** (the press *is* the care);
+**(b) the press window must count the pressing actor's swings, 1 + 2·BP,
+with the swings past the break at ×4**, not one prior action ×4; **(c) a
+raise is not care when the raised member's HP would be at or under the
+monster's smallest measured hit** (44 vs 41-45 here); **(d) a Tonic
+whose +50 is under the round's measured cost is not care either** —
+attack instead (owner: strong single heals, never a treadmill of weak
+ones). With 15 Fenix and 2 Potions in the bag, (c) and (d) are what
+stand between this party and the Fenix signal.
 
 ## The reunion — Narshe defense
 

@@ -26,10 +26,7 @@ local function monPresent(i) return H.readByte(0x3aa8 + i * 2) % 2 == 1 end
 local rizo = { seen = false, species = 0, shields = 0, smax = 0, wkc = 0,
                mask0 = nil }
 
-local MENU, ACTOR = 0x7BCA, 0x62CA
-local BP = 0x3E9C
 local fightTier = 1
-local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
 local lost = nil
 local wipeN = 0
 local function partyLine()
@@ -40,155 +37,39 @@ local function partyLine()
   end
   return table.concat(p, " ")
 end
--- CLOSED-LOOP (2nd pass): the seq machine assumed full-HP parties, and
--- the first input-driven generation of the chain proved fights now carry
--- damage forward between steps (SABIN entered the courtyard at 46/231).  So
--- the fighter reads the engine's own cursor state ($890F/$8947 + actor, the
--- $7BC2 menu state) and steers by pad: boost-and-Fight as before, plus a
--- SELF-HEAL branch under 50% HP funded from the real bag (Potion when >=150
--- HP is missing, else Tonic; battle inventory $2686 stride 5, count at +3
--- -- a zero-count row is never picked).  Item targets default to self, so
--- no target steering is needed here.
-local MSTATE = 0x7BC2
-local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
-local CMD_ITEM = 0x01
-local CMDTBL, CMDROW = 0x202E, 0x890F
-local ITEMSCR, ITEMROW = 0x8947, 0x894F
-local function itemIdxOf(a)
-  return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
-end
-local BATTINV = 0x2686
-local TONIC, POTION = 0xE8, 0xE9
-local function pHPf(e) return H.readWord(0x3BF4 + e * 2) end
-local function pMaxHPf(e) return H.readWord(0x3C1C + e * 2) end
-local function battItemIdx(id)
-  for i = 0, 251 do
-    if H.readByte(BATTINV + i * 5) == id
-       and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
-  end
-  return nil
-end
-local function cmdRowOf(actor, cmdId)
-  for i = 0, 3 do
-    if H.readByte(CMDTBL + actor * 12 + i * 3) == cmdId then return i end
-  end
-  return nil
-end
-local fPlan, fPlanActor, fBtn = nil, nil, nil
-local fTick, fStreak = 0, 0
-local function makeFightPlan(actor)
-  local hp, mx = pHPf(actor), pMaxHPf(actor)
-  local itemRow = cmdRowOf(actor, CMD_ITEM)
-  local rizoUp = rizo.seen and monPresent(5)
-  local thresh = rizoUp and 6 or 8
-  if mx > 0 and hp > 0 and hp * 10 < mx * thresh and itemRow then
-    local id = nil
-    if mx - hp >= 60 and battItemIdx(POTION) then id = POTION
-    elseif battItemIdx(TONIC) then id = TONIC
-    elseif battItemIdx(POTION) then id = POTION end
-    if id then
-      H.log(string.format("[falls] heal f%d e%d %s (hp %d/%d) [%s]",
-        H.frame, actor, id == TONIC and "TONIC" or "POTION", hp, mx,
-        partyLine()))
-      return { kind = "item", item = id, row = itemRow }
-    end
-  end
-  local bp = H.readByte(BP + actor * 2)
-  local boost = bp >= 1 and math.min(bp, 3) or 0
-  H.log(string.format("[falls] cast f%d e%d boost=%d tier=%d [%s]",
-    H.frame, actor, boost, fightTier, partyLine()))
-  return { kind = "fight", boostLeft = boost }
-end
-local function fightButton()
-  local st = H.readByte(MSTATE)
-  local actor = H.readByte(ACTOR)
-  if fPlan == nil or fPlanActor ~= actor then
-    if st ~= ST_CMD then
-      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
-        return { "b" }
-      end
-      return nil
-    end
-    fPlan, fPlanActor = makeFightPlan(actor), actor
-    return nil
-  end
-  local plan = fPlan
-  if st == ST_CMD then
-    if plan.kind == "fight" then
-      if plan.boostLeft > 0 then
-        plan.boostLeft = plan.boostLeft - 1
-        return { "r" }
-      end
-      local cur = H.readByte(CMDROW + actor) & 3
-      if cur ~= 0 then return { "up" } end
-      return { "a" }
-    end
-    local cur = H.readByte(CMDROW + actor) & 3
-    if cur == plan.row then return { "a" } end
-    if plan.rowStall and plan.rowStall > 2 then
-      plan.rowStall = 0
-      return { ({ [0]="up", [1]="left", [2]="right", [3]="down" })[plan.row] }
-    end
-    plan.rowStall = (plan.rowStall or 0) + 1
-    return { cur < plan.row and "down" or "up" }
-  end
-  if st == ST_ITEM and plan.kind == "item" then
-    local want = battItemIdx(plan.item)
-    if want == nil then return { "b" } end
-    local cur = itemIdxOf(actor)
-    if cur < want then return { "down" } end
-    if cur > want then return { "up" } end
-    return { "a" }
-  end
-  if st == ST_TGT then
-    fPlan, fPlanActor = nil, nil
-    return { "a" }          -- item: default self; Fight: default enemy
-  end
-  if st == ST_TOOLS then return { "b" } end
-  return nil
-end
-local fHeld, fHb = 0, -300
+-- THE FIGHT (3rd pass, the #162 lab -- docs/design/bosses-wob.md §9,
+-- tools/tests/lab_rizopas_template.lua): the lib's fight driver, steered
+-- the way the lab's `bankboss` policy plays and a person does.  Battle
+-- 18 is a fixed-length Piranha wave (~4,500 frames: the school restores
+-- itself until its timer passes 60, then Rizopas surfaces) and then a
+-- 775-HP, 4-shield boss whose El Nino takes ~230 from BOTH members in one
+-- action about 1,100 frames after it surfaces.  A Piranha has 10 HP and
+-- one shield, so a boosted swing on one is waste: the party Fights the
+-- school UNBOOSTED (bank 99: BP regenerates one a turn, to the cap of 5)
+-- and, the moment slot 5 surfaces -- a thing the player sees on screen --
+-- the bank flips to 0 and both unload: a 3-BP Fight is 7 slashing swings
+-- into a SLASH|BLUDG row, the break lands inside the first swing or two
+-- and the surplus lands x4.  Lab, 10 distinct seeds including #162's
+-- wipe seed: 10 wins, no deaths, no Fenix, one Potion, the boss dead a
+-- mean 860 frames after surfacing (the old boost-every-turn fighter on
+-- the same ten: 9 wins and the wipe, a death, a Potion a win, 1,740).
+-- Care is the driver's own: Potions before Tonics, Fenix for the fallen.
+local FALLS_OPTS = { tactical = false, boost = true, bank = 99, items = true,
+                     healPercent = 40 }
+local F = nil
 local function fightPulse(_)
-  if H.readByte(MENU) == 0 then
-    fPlan, fPlanActor, fStreak, fHeld = nil, nil, 0, 0
-    fTick = fTick + 1
-    H.setPad(fTick % 8 < 4 and { "a" } or {})
-    return
+  if rizo.seen and FALLS_OPTS.bank ~= 0 then
+    FALLS_OPTS.bank = 0
+    H.log(string.format("[falls] f%d Rizopas is up -- bank 99 -> 0, spend "
+      .. "everything [%s]", H.frame, partyLine()))
   end
-  fStreak = fStreak + 1
-  if fStreak < 4 then H.setPad({}); return end
-  fTick = fTick + 1
-  -- the fighter's own heartbeat: menu state, cursor cells, plan -- the
-  -- numbers a wedge diagnosis needs (300-frame cadence)
-  if H.frame - fHb >= 300 then
-    fHb = H.frame
-    local a = H.readByte(ACTOR)
-    H.log(string.format("[falls] fmenu f%d st=%02X actor=%d row=%d itm=%d " ..
-      "plan=%s held=%d [%s]", H.frame, H.readByte(MSTATE), a,
-      H.readByte(CMDROW + a) & 3, itemIdxOf(a),
-      fPlan and fPlan.kind or "-", fHeld, partyLine()))
-  end
-  -- stall recovery: a plan that cannot finish in 40 pulses is backed out
-  -- (B) and rebuilt from whatever the cursor shows -- progress over
-  -- elegance, the house idiom
-  local ph = fTick % 30
-  if ph == 0 then
-    if fPlan ~= nil then
-      fHeld = fHeld + 1
-      if fHeld > 40 then
-        H.log(string.format("[falls] plan stalled 40 pulses (st=%02X) -- " ..
-          "backing out", H.frame and H.readByte(MSTATE) or 0))
-        fPlan, fPlanActor, fHeld = nil, nil, 0
-        fBtn = { "b" }
-        H.setPad(fBtn)
-        return
-      end
-    else
-      fHeld = 0
-    end
-    fBtn = fightButton()
-  end
-  H.setPad(ph < 6 and fBtn or {})
+  F.frame()
+end
+-- one driver per attempt (its round-cost and item memories belong to the
+-- fight that spent them), with the bank re-armed for the school
+local function newFighter()
+  FALLS_OPTS.bank = 99
+  F = H.newFightDriver("falls", FALLS_OPTS)
 end
 -- #159: runs EVERY frame of a real ride, not behind the inBattle() gate.
 -- A wipe zeroes every battle-HP word, which inBattle() and
@@ -223,7 +104,7 @@ end
 -- the wipe watch -- the win bit is EARNED; default: flee, hold L+R),
 -- dialogs tap-A, else hold `dir` (or hands-off when dir is nil).
 local function ride(dir, pred, what, budget, fightMode, choiceWant)
-  local phase, hb, quiet = 0, -900, 0
+  local phase, hb, quiet, wasIn = 0, -900, 0, false
   return H.driveUntil(pred, budget or 30000, {
     H.call(function()
       phase = (phase + 1) % 8
@@ -260,11 +141,17 @@ local function ride(dir, pred, what, budget, fightMode, choiceWant)
               "[falls] slot 5 SURFACED: species=$%04X shields=%d/%d wkc=$%02X",
               rizo.species, rizo.shields, rizo.smax, rizo.wkc))
           end
+          wasIn = true
           fightPulse(phase)
         else
           H.setPad({ l = true, r = true })   -- flee, with real input
         end
         return
+      end
+      if wasIn then
+        -- the falling edge: the driver forgets the fight it just played
+        wasIn = false
+        if F then F.idle() end
       end
 
       -- choice prompts: steer to choiceWant then confirm
@@ -377,6 +264,7 @@ local function jumpAttempt(n)
       lost, fightTier, wipeN = nil, n, 0
       H.gameOverFired = 0
       rizo.seen, rizo.mask0 = false, nil
+      newFighter()
     end),
     H.navTo(13, 11, { maxFrames = 5000, playBattles = "tactical" }),
     (function()
