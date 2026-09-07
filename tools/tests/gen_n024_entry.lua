@@ -100,6 +100,20 @@ H.run({ maxFrames = 90000 }, {
     H.log(partyReport("magicite_ifrit_shiva"))
   end),
 
+  -- Care at the save before walking on.  magicite_ifrit_shiva is saved as
+  -- battle 70 leaves the party: SABIN dead (the no-raise rule held through
+  -- the win) and nobody healed since, and the first random on map 269 is
+  -- Trapper x3, whose L4 Flare one-shots the L16s (docs/design/
+  -- map269-random.md).  Measured there over 15 seeds: walking in cared
+  -- (SABIN up, HP topped) versus as-saved cut the fight from a mean 8050
+  -- frames to 3355, in-battle Fenix Downs from 27 to 0 and deaths from 16
+  -- to 8; the remaining deaths are the level-parity finding, not the kit.
+  -- Threshold 0.95 is gen_ifrit_magicite's own pre-battle-70 stop.  MP is
+  -- left alone: battle_magicite / battle_subjob assert on this fixture's
+  -- MP-dry CELES.
+  H.fieldCare({ tag = "care at the Ifrit & Shiva save", threshold = 0.95 }),
+  H.call(function() H.log(partyReport("after the save-room care")) end),
+
   -- 264 {9,5} -> 269 {44,53}
   H.navTo(9, 5, { maxFrames = 9000, playBattles = "tactical", arrive = function() return map() == 269 end }),
   H.waitUntil(function() return map() == 269 and settled() end, 6000,

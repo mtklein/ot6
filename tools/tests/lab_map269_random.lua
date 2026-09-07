@@ -285,10 +285,13 @@ local function hookObservers()
             p.msh[i + 1], monShields(i))
         end
       end
-      partyActs[#partyActs + 1] = { char = slotChar(slot), cmd = p.cmd, atk = p.atk }
+      -- a dead (or otherwise skipped) member's turn resolves the same way
+      -- as the monsters' Nothing: command $12, stale $b6, tgt=0000
+      local atk = (p.cmd == 0x12) and 0x1FE or p.atk
+      partyActs[#partyActs + 1] = { char = slotChar(slot), cmd = p.cmd, atk = atk }
       events[#events + 1] = string.format(
         "[act] f%d c%d(slot%d) cmd=%02X atk=%s tgt=%04X mon=%s party=%s",
-        H.frame, slotChar(slot), slot, p.cmd, atkName(p.atk), p.tgt,
+        H.frame, slotChar(slot), slot, p.cmd, atkName(atk), p.tgt,
         table.concat(md, " "), table.concat(after, ","))
     end
   end, emu.callbackType.exec, H.sym("SaveForMimic"), H.sym("SaveForMimic"))
