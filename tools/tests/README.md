@@ -339,6 +339,16 @@ Fight or a summon.
 - `unresolved`: a submitted/started action lacked a matching completion before
   battle end, driver replacement, state reload, or run end. An abruptly cut
   log is reported as incomplete by the summary instead.
+- `death`: a party member's HP reached 0 (#175), outside any plan's
+  lifecycle: the entity, the HP the killing action found them at, the pips
+  they held (`bp`) and the party's (`party_bp`), and the killer's slot,
+  command and attack bytes. The summary lists these; they carry no plan id.
+
+Whether or not the trace is on, the driver logs the same record as a
+`[death]` line and one `[wipe]` line per battle with the party's pips and a
+classification ("one-shot early" / "died with N BP banked");
+`tools/audit_boost.py` (also run by `audit_fenix.py`) tabulates them over
+run logs.
 
 Submission and completion are engine evidence, not inferred from a disappearing
 menu or rising HP. Accepted recovery commands remain queued independently of
