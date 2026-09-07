@@ -98,6 +98,9 @@ end
 -- (CheckReequipRelics, equip.asm:2843-2850), which is the thing this route
 -- is not allowed to do.
 local EMPTY = 0xFF
+local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
+local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local CH_LOCKE, CH_CELES = 1, 6
 local function gear(c, off) return H.readByte(0x1600 + 37 * c + off) end
 local function ordOf(c) return (H.readByte(0x1850 + c) >> 3) & 0x03 end
@@ -229,6 +232,73 @@ H.run({ maxFrames = 160000 }, {
       H.log(string.format("[kit] char %d gear after:  %02X %02X %02X %02X",
         c, gear(c, 0x1F), gear(c, 0x20), gear(c, 0x21), gear(c, 0x22)))
     end
+  end),
+
+  -- ---- the item shop, in Albrook (#176) -----------------------------------
+  -- The post-opera battery boots the party beside Albrook with 6 Potions
+  -- at L16 (the band is ~level x1.5, docs/design/level-curve.md), and the
+  -- Magitek Factory ahead is a shopless boss stretch: Vector has weapon and
+  -- armour counters only (npc_prop maps 246/248), and the seeded chain
+  -- walked into Ifrit & Shiva on 4 Potions and out on 0 (mrf-save-room-v1
+  -- potion=4; magicite_ifrit_shiva.log "[care after battle 70] ...
+  -- potion=0").  Albrook's item shop is shop 24 on map 328 (shopkeeper
+  -- (37,47); _cc60ba opens 24 while $00A4 is clear), rows POTION 0 / FENIX
+  -- DOWN 5, no Tonic; the door is (7,13) -> 328 (37,54), five tiles from
+  -- where the party stands, and the way back out is the (37,55) event
+  -- trigger.  POTION to 33: the band at the L18 the factory's end reaches
+  -- (27) plus the stretch's measured spend, 6 (mrf_entry 6 -> the save
+  -- room's 4 -> 0 across Ifrit & Shiva) -- a floor, since the bag ran dry
+  -- there.  FENIX DOWN to 16 (~level).
+  H.call(function()
+    H.vars.shopStart = H.frame
+    H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 24")
+    H.log(string.format("[shop] Albrook stop begins f%d: gil=%d tonic=%d potion=%d fenix=%d",
+      H.frame, H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.crossDoor(7, 13, 328, 37, 54, "item shop door 323(7,13)->328(37,54)"),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
+    "shop interior settled", 10),
+  H.waitFrames(60),
+  H.shopTalk(37, 47, "Albrook item shop"),
+  H.call(function()
+    -- event command $9b parks the shop number at $0201 (field/event.asm:3656);
+    -- the rows come from the ROM table, since the menu fills its $7E9D89 row
+    -- list only once the buy list is drawn.
+    H.assertEq(H.readByte(0x0201), 24, "the counter opened shop 24 ($0201)")
+    H.assertEq(shopRow(24, 0), POTION, "shop 24 row 0 is Potion")
+    H.assertEq(shopRow(24, 5), FENIX_DOWN, "shop 24 row 5 is Fenix Down")
+  end),
+  H.buyItem(POTION, 0, function() return 33 - H.invCountOf(POTION) end, "POTION to 33"),
+  H.buyItem(FENIX_DOWN, 5, function() return 16 - H.invCountOf(FENIX_DOWN) end,
+    "FENIX DOWN to 16"),
+  H.call(function()
+    H.log(string.format("[shop] Albrook item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
+  end),
+  H.shopClose("Albrook item shop"),
+  H.call(function()
+    H.assertEq(H.invCountOf(POTION) >= 33, true,
+      "the party leaves Albrook with 33 Potions -- the L18 band plus the factory's measured spend")
+    H.assertEq(H.invCountOf(FENIX_DOWN) >= 16, true, "Fenix Downs at 16 (~level)")
+    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
+      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  -- out: the (37,55) event trigger, one tile below the arrival tile
+  H.navTo(37, 54, { maxFrames = 6000, playBattles = "tactical" }),
+  (function() local hb = 0
+    return H.driveUntil(function() return map() == 323 end, 900, {
+      H.call(function() hb = hb + 1
+        if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+        H.setPad({ down = true })
+      end) }, "held DOWN onto the (37,55) trigger -> Albrook 323") end)(),
+  H.release(),
+  H.waitUntil(function()
+    return map() == 323 and H.hasControl() and H.tileAligned() and bright() >= 15
+  end, 2400, "back on Albrook's streets", 5),
+  H.waitFrames(30),
+  H.call(function()
+    H.log(string.format("[shop] Albrook stop cost %d frames (f%d -> f%d); back at (%d,%d)",
+      H.frame - H.vars.shopStart, H.vars.shopStart, H.frame, H.fieldX(), H.fieldY()))
   end),
 
   -- Back out.  Map 323's world exits are LONG entrances on its west and
