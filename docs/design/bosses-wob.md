@@ -430,12 +430,27 @@ attack every time with `no press: entity 0 (82/363) is inside one round
 of death (244) -- caring first`, though the care it then chose was not
 for entity 0 and a 1-BP Fight (3 chips on 1 shield, the surplus broken)
 was the fight's end. Four Fenix Downs and a wipe against a boss one
-action from dead; the control won the same seed by never reviving. The
-exact rule: **the one-round-of-death veto on the press must not fire
-when the press's window covers the monster's HP** (the press *is* the
-care), **and a raise is not care when the raised member's HP would be
-at or under the monster's smallest measured hit** (44 vs 41-45 here) —
-bank the Fenix and end the fight.
+action from dead; the control won the same seed by never reviving.
+`bank2_i30.log` (seed `$14`) is the same shape with the other veto: El
+Nino left the pair at 22/33 with Rizopas at **551 HP, 1 shield**; SABIN,
+holding 3 BP, was refused with `no press: Fight at 3 BP would chip 7 of
+1 slot 5 but the window's damage 288 (e0:72x4) is short of its 551 HP --
+caring` — the window prices one *action's* measured damage ×4, not the
+**seven swings** a 3-BP Fight throws, six of them on a broken target
+(`bankboss` measured 552-629 from one such Fight) — and the driver then
+spent both Potions on the same member (the second `+91` on a 272/363
+SABIN while CYAN stood at 33), and, the Potions gone, **27 Tonics** of
++50 against 40-90 hits over 15,000 frames to a wipe. The exact rules:
+**(a) the one-round-of-death veto on the press must not fire when the
+press's window covers the monster's HP** (the press *is* the care);
+**(b) the press window must count the pressing actor's swings, 1 + 2·BP,
+with the swings past the break at ×4**, not one prior action ×4; **(c) a
+raise is not care when the raised member's HP would be at or under the
+monster's smallest measured hit** (44 vs 41-45 here); **(d) a Tonic
+whose +50 is under the round's measured cost is not care either** —
+attack instead (owner: strong single heals, never a treadmill of weak
+ones). With 15 Fenix and 2 Potions in the bag, (c) and (d) are what
+stand between this party and the Fenix signal.
 
 ## The reunion — Narshe defense
 
