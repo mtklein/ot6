@@ -814,6 +814,44 @@ function M.hitFloorExempt(o)
   return false, string.format("cast $%02X is an ordinary spell: its damage recurs", atk)
 end
 
+-- The keyed line's boost (#174): boost-Fight through randoms is the
+-- default (half damage unbroken plus the swings a pip adds restores
+-- vanilla kill speed), but where a member holds a key the formation's
+-- shield row answers to -- a class the weapon or blitz matches, an
+-- element it carries, read off the HUD's revealed cells -- the keyed
+-- line goes first, and unboosted where it chips: pips spent into a
+-- standing gauge buy half-damage swings, and the break is what the turn
+-- is for.  So the boost is the SMALLEST that chips the gauge to zero
+-- this turn (0 when the unboosted line already does: SABIN's Pummel is
+-- two bludgeoning hits into Trapper's two shields; LOCKE's ThunderBlade
+-- needs one pip for the second bolt swing), never more than the bank
+-- allows, and all the bank allows when no boost within it reaches the
+-- break (the surplus swings then land broken, x4).  Measured on the
+-- map-269 trio: the keyed tactical line ends the fight in 3355 frames
+-- against boost-Fight's 8515, 4/15 double kills against 7/15.
+--
+--   need     shields standing on the target (0 = broken: not this rule's turn)
+--   chipsAt  chips the actor's best line lands at each boost 0..bank
+--   bank     the most the bank lets this actor spend now
+--
+-- Returns the boost to use and the reason, or nil when no key is held
+-- (nothing chips at 0 BP -- more swings of the same hands chip nothing)
+-- or the gauge is already broken.
+function M.keyBoost(o)
+  local need, chipsAt, bank = o.need or 0, o.chipsAt or {}, o.bank or 0
+  if need <= 0 then return nil, "the gauge is broken: the unload's turn, not the key's" end
+  if (chipsAt[0] or 0) <= 0 then return nil, "no key held: nothing chips at 0 BP" end
+  for b = 0, bank do
+    if (chipsAt[b] or 0) >= need then
+      return b, string.format("%d BP lands %d chip(s) on %d shield(s): the smallest "
+        .. "boost that breaks this turn", b, chipsAt[b], need)
+    end
+  end
+  return bank, string.format("no boost within the bank (%d) reaches %d shield(s); "
+    .. "%d BP lands %d chip(s), the most the bank allows", bank, need, bank,
+    chipsAt[bank] or 0)
+end
+
 -- Spend it before you die (#175): a member inside one round of death who
 -- holds banked BP, and whom no heal in hand lifts clear of that round,
 -- spends the pips now on their strongest line rather than take a heal
@@ -3539,6 +3577,41 @@ function M.newFightDriver(tag, opts)
             return { kind = "magic", spell = spell,
                      row = cmdRow(actor, CMD_MAGIC), boostLeft = boost }
           end
+        end
+      end
+    end
+    -- The keyed line (#174): where this actor holds a key the target's
+    -- shield row answers to, that line goes first -- ahead of the tool,
+    -- the blitz and the boosted Fight below, which stay the default where
+    -- no key is held -- at the smallest boost that breaks this turn
+    -- (M.keyBoost; opts.keyBoost = true spends the bank's boost on it
+    -- instead, the A/B lever).  The chips are the HUD's revealed cells,
+    -- so an unrevealed axis holds no key; a broken gauge is the unload's
+    -- turn and falls through to the lines below.  opts.keyed = false
+    -- turns the rule off.
+    if opts.keyed ~= false then
+      local slot = pressTarget()
+      if slot == nil then
+        for s = 0, 5 do if monAlive(s) then slot = s; break end end
+      end
+      local sh = slot ~= nil and M.readByte(SH_CUR + slot * 2) or 0
+      local broken = slot ~= nil and M.readByte(BRK_TICKS + slot * 2) ~= 0
+      if slot ~= nil and sh > 0 and not broken then
+        local chipsAt, lines = {}, {}
+        for b = 0, boost do
+          lines[b] = bestLine(actor, slot, b)
+          chipsAt[b] = lines[b] and lines[b].chips or 0
+        end
+        local useBp, why = M.keyBoost({ need = sh, chipsAt = chipsAt, bank = boost })
+        if useBp ~= nil then
+          if opts.keyBoost == true then useBp = boost end
+          local line = lines[useBp]
+          line.reason = "keyed"
+          M.log(string.format("[%s] actor=%d KEYED: %s lands %d chip(s) on slot %d's %d "
+            .. "shield(s) -- %s%s (#174)", tag or "fight", actor, line.what, line.chips,
+            slot, sh, opts.keyBoost == true and "the bank's boost (keyBoost)" or why,
+            useBp == 0 and "; unboosted, the pip banks" or ""))
+          return line
         end
       end
     end

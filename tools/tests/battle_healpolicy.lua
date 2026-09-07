@@ -438,6 +438,30 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: the raise gate's level-spell exemption (#174) checked")
   end),
 
+  -- 13. the keyed line's boost (#174, H.keyBoost) on the map-269 trio
+  -- (Trapper: 2 shields, BLUDG key) and Nerapa (5 shields, SLASH|PIERCE):
+  -- chips per boost are the chip model's for each member's hands.
+  H.call(function()
+    -- LOCKE's Genji pair on a Trapper: ThunderBlade (bolt) chips, Guardian
+    -- does not; swings alternate, so 0 BP = 1 chip, 1 BP = 2, 2 BP = 3
+    local b, why = H.keyBoost({ need = 2, chipsAt = { [0] = 1, [1] = 2, [2] = 3, [3] = 4 }, bank = 3 })
+    H.assertEq(b, 1, "LOCKE on a Trapper: one pip breaks this turn -- not the bank's three (" .. why .. ")")
+    -- SABIN's Pummel: two bludgeoning hits whatever the boost
+    b, why = H.keyBoost({ need = 2, chipsAt = { [0] = 2, [1] = 2, [2] = 2, [3] = 2 }, bank = 3 })
+    H.assertEq(b, 0, "SABIN's Pummel on a Trapper breaks unboosted: the pip banks (" .. why .. ")")
+    -- LOCKE on Nerapa: both hands chip, 2/4/6 chips at 0/1/2 BP
+    b, why = H.keyBoost({ need = 5, chipsAt = { [0] = 2, [1] = 4, [2] = 6, [3] = 8 }, bank = 3 })
+    H.assertEq(b, 2, "LOCKE on Nerapa: two pips reach five shields (" .. why .. ")")
+    b, why = H.keyBoost({ need = 5, chipsAt = { [0] = 2, [1] = 4 }, bank = 1 })
+    H.assertEq(b, 1, "...and with one pip in the bank, the one pip: the most the bank allows (" .. why .. ")")
+    -- no key: CELES's MithrilBlade (slash) on a Trapper chips nothing
+    b, why = H.keyBoost({ need = 2, chipsAt = { [0] = 0, [1] = 0, [2] = 0 }, bank = 2 })
+    H.assertEq(b, nil, "no key held: the boost-Fight default keeps the turn (" .. why .. ")")
+    b, why = H.keyBoost({ need = 0, chipsAt = { [0] = 2 }, bank = 2 })
+    H.assertEq(b, nil, "a broken gauge is the unload's turn, not the key's (" .. why .. ")")
+    H.log("battle_healpolicy: the keyed line's boost (#174) checked")
+  end),
+
   -- 8. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(

@@ -340,6 +340,16 @@ elseif POLICY == "boostfight" then
   preCare = true
   driverOpts.bank = 0
   driverOpts.tactical = false
+elseif POLICY == "caredkb" then
+  -- cared with the keyed line at the bank's boost (opts.keyBoost, #174):
+  -- the A/B against the default, which spends the smallest boost that
+  -- breaks this turn (0 where the unboosted keyed hit already does)
+  preCare = true
+  driverOpts.keyBoost = true
+elseif POLICY == "carednokey" then
+  -- cared with the keyed line off (opts.keyed = false): the pre-#174 order
+  preCare = true
+  driverOpts.keyed = false
 else
   error("unknown POLICY " .. POLICY, 0)
 end
