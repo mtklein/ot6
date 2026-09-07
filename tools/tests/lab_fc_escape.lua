@@ -16,6 +16,11 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local POLICY = "fight"
+-- the Nerapa policy under test (the lab's second axis): the heal
+-- threshold the driver heals at and whether TERRA casts Bolt every turn
+-- (her Magic row is innate; Nerapa is bolt-weak) instead of summoning
+-- Shiva once and then healing.
+local NERAPA = { healPercent = 40, terraBolt = false }
 
 local TERRA, EDGAR = 0x00, 0x04
 local function map() return H.mapId() & 0x3ff end
@@ -24,14 +29,19 @@ local function nerapaUp() return (H.readByte(0x1EEC) >> 1) & 1 == 1 end    -- $0
 local function shadowSaved() return (H.readByte(0x1EEF) >> 5) & 1 == 1 end -- $037D
 
 local FIGHT_ESCAPE = { tactical = true, boost = true, bank = 0, items = true,
-                       healPercent = 40, nuke = { 2 },
+                       healPercent = NERAPA.healPercent, nuke = { 2 },
+                       magic = NERAPA.terraBolt and { [TERRA] = { spell = 2 } } or nil,
                        summon = { [TERRA] = { mp = 30 }, [EDGAR] = { mp = 27 } } }
 local FE = H.newFightDriver("Nerapa", FIGHT_ESCAPE)
 local FW = H.newFightDriver("ledge", FIGHT_ESCAPE)
 local WALK
 if POLICY == "fight" then
-  WALK = { playBattles = "tactical", bank = 0, healPercent = 60, care = false,
-           nuke = { 2 }, summon = FIGHT_ESCAPE.summon }
+  -- no nuke/summon on the walk: with nuke={2} the navTo driver's Bolt plan
+  -- parked in menu state $05 ("consumed 41 pulses ... without landing",
+  -- ten drops) on the second Naughty and the party bled out over 12,000
+  -- frames without a single hit landing (lab V0/V1, 2026-09-07); the
+  -- physical line wins these 3000-HP / 5-pip fights in ~1,900 frames each
+  WALK = { playBattles = "tactical", bank = 0, healPercent = 60, care = false }
 else
   WALK = { playBattles = "mustflee", fleeCap = 600, bank = 0, healPercent = 60, care = false }
 end
@@ -68,6 +78,16 @@ local function absorb(pred, cap, tag, driver)
     return t >= cap or pred()
   end, cap + 500, {
     H.call(function()
+      if H.battleActive() and t % 300 == 0 then
+        -- status 2 ($3EE5+2*slot) bit 0 is Condemned; $3B05+2*slot its
+        -- displayed count (battle-ram.txt:922, :1099)
+        local st = {}
+        for slot = 0, 3 do
+          st[#st + 1] = string.format("%d:%s/%d", slot,
+            (H.readByte(0x3EE5 + slot * 2) & 1) == 1 and "C" or "-", H.readByte(0x3B05 + slot * 2))
+        end
+        H.log(string.format("[lab condemned] t=%d %s master=%d", t, table.concat(st, " "), H.readWord(0x1189)))
+      end
       if H.battleLoadStarted() or H.battleActive() then driver.frame(); return end
       local mx = H.readByte(0x056F)
       if mx > 0 then
@@ -103,7 +123,8 @@ H.run({ maxFrames = 120000 }, {
   H.waitFrames(30),
   H.call(function()
     H.assertEq(mapIs(393), true, "escape_start is on the escape map (393)")
-    H.log(string.format("[lab] POLICY=%s at (%d,%d)", POLICY, H.fieldX(), H.fieldY()))
+    H.log(string.format("[lab] POLICY=%s healPercent=%d terraBolt=%s at (%d,%d)", POLICY,
+      NERAPA.healPercent, tostring(NERAPA.terraBolt), H.fieldX(), H.fieldY()))
   end),
   clock("lab start"),
   H.navTo(106, 15, { maxFrames = 30000, playBattles = WALK.playBattles, fleeCap = WALK.fleeCap,

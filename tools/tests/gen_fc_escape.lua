@@ -48,25 +48,34 @@ local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
 local FA = H.newFightDriver("fc", FIGHT)
 -- AtmaWeapon under his own tag (the Fenix audit files it as the boss it is)
 local FAtma = H.newFightDriver("AtmaWeapon", FIGHT)
--- The escape runs under the 6:00 master clock (21600 frames; the run that
--- measured it had 16752 left at first control and met four randoms of
--- ~3000 frames each on the way to Nerapa -- the clock expired before he
--- was even engaged).  A person on that countdown RUNS from what the game
--- lets them run from and fights the rest flat out: the engine's own L+R
--- (a refusal is detected within 60 frames; the cap is short), no BP
--- banking, physical damage only on the walks (a 12-frame cadence was
--- tried and it breaks the magic-list steer -- Bolt plans oscillated and
--- were dropped 32 times in one unrunnable fight, which is what actually
--- burned the clock; the 30-frame cadence steers Bolt fine).  This is the
--- one place the run mechanic is the honest play; the no-flee directive
--- is about not skipping the leveling the story asks for.
+-- The escape runs under the 6:00 master clock (21600 frames; it RUNS in
+-- menus and battles, so no field care from here).  The 393 walks are
+-- FOUGHT (playBattles="tactical", no BP banking, physical damage only):
+-- measured 2026-09-07 from the escape_start snapshot, the map's pool is
+-- one formation, Naughty ($169, 3000 HP, 5 pips), it sets $b1's can't-run
+-- bit (bit 2) in every encounter met, and the physical line wins each in
+-- ~1,200-1,900 frames -- four of them cost 7,700-8,300 frames of clock
+-- and the party reached Nerapa's doorstep at 3:41-3:51.  (The earlier
+-- "mustflee" walk never ran anything: the flee helper's refusal detector
+-- reads $b1 bit 1 -- "harder to run", not bit 2 -- and declared refusal
+-- at frame 63 of every battle, then fought it with the same driver.)  No
+-- nuke/summon on the walks: with nuke={2} the navTo driver's Bolt plan
+-- parked in menu state $05 ("consumed 41 pulses ... without landing", ten
+-- drops) and the party bled out over 12,000 frames (lab V0/V1).
 -- Nerapa (2800 HP, 5 pips, weak ice|bolt|holy + slash|pierce, absorbs fire,
--- Condemned on the whole party at the open): a damage race of about two
--- rounds.  The party's divines are both his weaknesses -- TERRA's Ramuh
--- (bolt) and EDGAR's Shiva (ice); LOCKE's Ifrit is fire and the driver's
--- absorb guard keeps it holstered -- and the crossbow pierces.  The first
--- cuts arrived at three-quarters HP with no Potions and revived each
--- other under Condemned until the wipe.
+-- Condemned on the whole party at the open -- measured: all four carry it
+-- by t=3000 with ~30 s on the count, and it kills at t~7,000): a damage
+-- race of ~5,500 frames.  TERRA wears SHIVA ($02: ice, his weakness) and
+-- summons it once, LOCKE nukes Bolt, EDGAR's crossbow pierces, SHADOW
+-- fights; EDGAR wears no esper (the deck's SHIVA->EDGAR session reported
+-- "equipped" but the stone stayed on TERRA -- byte +$1E is $FF in every
+-- fixture).  On the current ROM this fight is a coin flip on its seed:
+-- the 2026-09-07 gen run (mustflee walk, doorstep at 3:51) lost it with
+-- two Fenix Downs and a wipe at t~7,800; the same policy from the same
+-- snapshot with the fight walk (doorstep at 3:41) won it at t~6,000 with
+-- 1:48 left (labs V2/V3 -- identical traces, so healPercent 20/40 and a
+-- TERRA Bolt line changed no decision; the lethal-next-round heal rule
+-- and the summon line dominate).
 -- opts.summon = { [charId] = { mp = cost } }: Shiva's Diamond Dust is 27
 -- MP (battle_magicite measures it); Ramuh's divine is listed at 30 as a
 -- conservative affordability check (TERRA carries 228).
@@ -77,7 +86,7 @@ local FE = H.newFightDriver("Nerapa", FIGHT_ESCAPE)
 -- the ledge wait's randoms: the same policy under another tag, so the
 -- Fenix audit files them as randoms, not as the boss
 local FW = H.newFightDriver("ledge", FIGHT_ESCAPE)
-local ESCAPE_WALK = { playBattles = "mustflee", fleeCap = 600, bank = 0,
+local ESCAPE_WALK = { playBattles = "tactical", bank = 0,
                       healPercent = 60, care = false }
 -- Timer data (field-ram.txt:684-692): 4 records of 6 bytes at $1188 --
 -- byte 0 flags "pfrm----" (p = pauses in menu and battle), +1 the frame
@@ -372,7 +381,7 @@ H.run({ maxFrames = 400000 }, {
 
   -- ---- 4. Nerapa, the ledge, the wait ---------------------------------------
   clock("out of the statue scene"),
-  H.navTo(106, 15, { maxFrames = 20000, playBattles = ESCAPE_WALK.playBattles, fleeCap = ESCAPE_WALK.fleeCap,
+  H.navTo(106, 15, { maxFrames = 20000, playBattles = ESCAPE_WALK.playBattles,
     bank = ESCAPE_WALK.bank, healPercent = ESCAPE_WALK.healPercent, care = false }),
   clock("at Nerapa's doorstep"),
   -- (no doorstep care: the field care refuses under a live event timer,
@@ -389,11 +398,11 @@ H.run({ maxFrames = 400000 }, {
     H.log(string.format("[escape] post-Nerapa: (%d,%d) t0=%d", H.fieldX(), H.fieldY(), H.readWord(0x1188)))
   end),
   clock("post-Nerapa"),
-  H.navTo(112, 15, { maxFrames = 8000, playBattles = ESCAPE_WALK.playBattles, fleeCap = ESCAPE_WALK.fleeCap,
+  H.navTo(112, 15, { maxFrames = 8000, playBattles = ESCAPE_WALK.playBattles,
     bank = ESCAPE_WALK.bank, care = false }),
   (function()
     local near = false
-    return H.navTo(115, 17, { maxFrames = 8000, playBattles = ESCAPE_WALK.playBattles, fleeCap = ESCAPE_WALK.fleeCap,
+    return H.navTo(115, 17, { maxFrames = 8000, playBattles = ESCAPE_WALK.playBattles,
       bank = ESCAPE_WALK.bank, care = false,
       arrive = function()
         if H.fieldX() == 115 and H.fieldY() == 17 then near = true end
