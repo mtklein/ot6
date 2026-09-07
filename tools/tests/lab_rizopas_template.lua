@@ -412,6 +412,26 @@ local function ledger()
   if battleUp == nil then return end
   t = H.frame - battleUp
   actT = t
+  -- Party HP is read whether or not battleActive() agrees a battle is on:
+  -- a full wipe zeroes every battle-HP word, which battleActive() reads
+  -- as "no battle" (gen_sabin_falls' #159 note), and gating on it lost
+  -- the killing blow's [hp] lines in control_i0p28 (seed $E4).
+  if battleDown == nil then
+    for e = 0, 1 do
+      local php = H.readWord(0x3BF4 + e * 2)
+      if php < 10000 and hpLast[e] ~= nil and php ~= hpLast[e] then
+        H.log(string.format("[hp] t=%d entity %d %d -> %d (%+d)", t, e, hpLast[e], php, php - hpLast[e]))
+        if hpLast[e] > 0 and php == 0 then
+          res.deaths[#res.deaths + 1] = string.format("e%d@%d", e, t)
+          H.log(string.format("[death] t=%d entity %d rizo=%s", t, e, rizo.seen and (H.readWord(RHP) .. "/sh" .. H.readByte(RSH)) or "not up"))
+        elseif hpLast[e] == 0 and php > 0 then
+          res.raises = res.raises + 1
+          H.log(string.format("[raise] t=%d entity %d to %d hp", t, e, php))
+        end
+      end
+      if php < 10000 then hpLast[e] = php end
+    end
+  end
   if not H.battleActive() then return end
   -- the bag sample walks 256 records; every 16th frame is plenty (an item
   -- use takes far longer than that to resolve) and keeps the emulator fast
@@ -448,20 +468,6 @@ local function ledger()
       deadT = t
       H.log(string.format("[lab] t=%d RIZOPAS DOWN (%d frames after surfacing) party=[%s]", t, t - surfaceT, partyLine()))
     end
-  end
-  for e = 0, 1 do
-    local php = H.readWord(0x3BF4 + e * 2)
-    if hpLast[e] ~= nil and php ~= hpLast[e] then
-      H.log(string.format("[hp] t=%d entity %d %d -> %d (%+d)", t, e, hpLast[e], php, php - hpLast[e]))
-      if hpLast[e] > 0 and php == 0 then
-        res.deaths[#res.deaths + 1] = string.format("e%d@%d", e, t)
-        H.log(string.format("[death] t=%d entity %d rizo=%s", t, e, rizo.seen and (H.readWord(RHP) .. "/sh" .. H.readByte(RSH)) or "not up"))
-      elseif hpLast[e] == 0 and php > 0 then
-        res.raises = res.raises + 1
-        H.log(string.format("[raise] t=%d entity %d to %d hp", t, e, php))
-      end
-    end
-    hpLast[e] = php
   end
 end
 
