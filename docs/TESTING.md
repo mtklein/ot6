@@ -73,13 +73,21 @@ battery save loaded through Continue can be a suitable cross-build entry point
 when its persistent layout remains compatible; test that compatibility rather
 than assuming it.
 
-The current Ninja graph and stamp checker conservatively invalidate fixtures
-when shared harness sources change. That describes today's implementation,
-not an additional owner restriction. Improve dependency/compatibility handling
-when needed; do not forge stamps, discard provenance, or silently disable
-checks. Use `H.requestSaveState`, `H.requestLoadState`, `H.saveState`, and
-`H.loadState` for coherent snapshots, and the versioned SRAM checkpoint path
-for battery saves. Prefer these existing supported paths during iteration.
+The Ninja graph and stamp checker implement that separation. Each generated
+fixture's stamp records the ROM it was captured on, its generator's own
+signature, its artifact and ancestor bindings (compatibility), and the
+signature and per-file hashes of the shared harness sources that produced it
+(provenance). A fixture is stale when the ROM or its generator changed or a
+binding fails; a change to the shared harness sources alone is reported as
+provenance drift and regenerates nothing. A stamp written before ROM identity
+was recorded stays on the older conservative whole-signature rule until its
+fixture is regenerated; no ROM identity is invented for it. This describes
+the implementation, not an additional owner restriction. Improve
+dependency/compatibility handling when needed; do not forge stamps, discard
+provenance, or silently disable checks. Use `H.requestSaveState`,
+`H.requestLoadState`, `H.saveState`, and `H.loadState` for coherent
+snapshots, and the versioned SRAM checkpoint path for battery saves. Prefer
+these existing supported paths during iteration.
 
 ## Synthetic mechanism tests
 
