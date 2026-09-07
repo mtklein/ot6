@@ -32,12 +32,6 @@ If you were playing v0.15 with Shadow, this is the reason to update.
 Gate now have proper shields and weaknesses, and there is no longer any
 enemy anywhere in the game without at least one way to break it.
 
-**Two things this release meant to do and did not.** Some enemies at Mt.
-Kolts and in Zozo were supposed to pick up weapon weaknesses; they play as
-they did in v0.15, and the fix is in the next release. One bridge in the
-Phantom Forest has fewer random encounters than it should; that also goes
-back to normal next release.
-
 ## Patch bytes
 
 If you compare this patch to v0.15's, it differs in the changes above and
