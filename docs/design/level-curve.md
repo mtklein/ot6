@@ -56,9 +56,35 @@ level); a shop stop is written as `POTION to N` beside its `TONIC to N` /
 short purse shorts Tonics.  The band is what the bag should hold *arriving*
 at the next fight, so the last shop before a shopless boss stretch buys the
 band plus that stretch's measured spend (the train merchant: 21 for L14
-plus the 9 the GhostTrain fight spent = 30, so Baren Falls still holds 21).  The WoB Potion shops the route passes or could
-reach: Phantom Train 85, Mobliz 12, Nikeah 15, Narshe 3 (the Terra
-scenario's return), Kohlingen 19, Jidoor 22, Vector 24, Thamasa 36.
+plus the 9 the GhostTrain fight spent = 30, so Baren Falls still holds 21).
+It is a World of Balance band: `audit_supplies` stops applying it at the
+WoR landing's graph row (`wor_landing` and its `escape_start` sibling),
+where the party, the shops and the level curve are all different.
+
+The WoB Potion shops on the route, decoded from `npc_prop.asm` (the
+counter NPC's event) and `shop_prop.dat` (the rows), with the stop each
+generator makes (#176):
+
+| shop | where | rows (Tonic / Potion / Fenix) | stop |
+|---|---|---|---|
+| 85 | Phantom Train car B, map 85 | 0 / 1 / 4 | `gen_sabin_train`: POTION to 30 (L14 band 21 + the train fight's 9) |
+| 12 | Mobliz, map 164 | 1 / 2 / 5 | `gen_sabin_gau`: POTION to 23 (L15) |
+| 15 | Nikeah, the counter at (24,39) on town map 169 | 0 / 1 / 5 | `gen_sabin_trench`: POTION to 27 (L18).  The last Potion shop before the reunion: the Terra scenario never walks a town with control (its Narshe arrival is the isolated clifftop ledge; Arvis's front door lies past the reunion trigger; the map-22 staging boxes the party -- `probe_narshe_preshop`), so this bag is what TERRA's L13 party (band 20) and the Battle for Narshe (L14, 21) carry. |
+| 3 | Narshe, map 26 off town map 20's (41,22) door | 0 / 1 / 4 | `gen_zozo1_submerge`: POTION to 24 (the L16 the stretch reaches at the Blackjack; Kohlingen 19 is crossed by castle and Jidoor 22 walked through without a stop) |
+| 24 | Albrook, map 328 off (7,13); no Tonic | - / 0 / 5 | `gen_vector_entry`: POTION to 33 (L18 band 27 + the factory's measured 6, a floor: the bag ran dry at Ifrit & Shiva).  Vector itself sells no Potions -- weapon 27 and armour 28 only (maps 246/248). |
+| 44 | Narshe again, once `$006B` (the factory escape) swaps shop 3 for 44; no Tonic | - / 0 / 2 | `gen_narshe_mission`: POTION to 60 (L25 band 38 + a field-care allowance: nothing sells Tonics from here to Thamasa, and the plains grind spends the bag's), FENIX DOWN to 23 |
+| 24 | Albrook again | - / 0 / 5 | `gen_voyage`: POTION to 38 (L25) |
+| 35 | Thamasa, map 347 off (26,37) | 0 / 1 / 6 | `gen_thamasa_fire`: POTION to 45 (L26 band 39 + the mountain/Ultros/massacre's measured 6); `gen_fc_landing`: POTION to 65 (the L29 band 44 at the escape + the FC's measured 21) |
+
+Shop 71 is Narshe's `$00A4` variant and never opens on this route.  The
+Locke scenario has no Potion source: South Figaro's shop 8 sells none and
+its `$00A4` alternate 63 (which does) opens only after the escape scene
+sets the flag, when the town is occupied and the route is in the
+basement.  From the Narshe mission through Albrook nothing sells Tonics
+(shops 44 and 24 both lack them), so on that leg the care kernel's field
+heals come out of the Potion stack too -- the seeded chain from the
+`terra-returned-v1` checkpoint walked the whole Sealed Gate, crash,
+banquet and voyage with `tonic=0 potion=0..3`.
 
 ## Zozo: the level gate nobody authored (#155)
 

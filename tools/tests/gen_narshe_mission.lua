@@ -24,6 +24,9 @@ local TEMP_CLASS = 0x316d90 + ULTROS2
 
 local function map() return H.mapId() & 0x1ff end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
+local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
+local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local function maxLvl()
   local m = 0
   for c = 0, 15 do
@@ -276,6 +279,63 @@ H.run({ maxFrames = 480000 }, {
     return map() == 20 and H.hasControl() and H.tileAligned() and bright() >= 15
   end, 1800, "map 20 control", 5),
   H.waitFrames(30),
+
+  -- ---- Narshe's item shop on the way out (#176) ---------------------------
+  -- The plains grind above spent the bag's Tonics (terra-returned-v1 carries
+  -- 73, the seeded narshe_mission fixture 0) and the party arrives here with
+  -- no Potions at L23 (band ~level x1.5 = 35, docs/design/level-curve.md).
+  -- Narshe's item shop is the last shop before the Sealed Gate: the door
+  -- (41,22) -> map 26 (44,13), shopkeeper (44,8); with $006B set (the
+  -- factory escape) _ccd28c opens shop 44 -- rows POTION 0 / FENIX DOWN 2,
+  -- and NO Tonic.  Nothing sells Tonics again until Thamasa (Albrook's 24
+  -- has none either), so on this leg the care kernel's field heals come out
+  -- of the Potion stack too.  POTION to 60: the band at the L25 the leg
+  -- reaches (38) plus an allowance for that field care; the leg's own spend
+  -- could not be measured -- the seeded chain walked it with an empty bag
+  -- (gate_cave_save potion=0, vector_crash 3) -- so the next re-cut of the
+  -- checkpoints downstream measures it and this target follows.  FENIX
+  -- DOWN to 23 (~level).  Gil is deep (~173k).
+  H.call(function()
+    H.vars.shopStart = H.frame
+    H.assertEq(sw(0x006B), 1, "$006B set -- the item shop opens as shop 44")
+    H.assertEq(sw(0x00A4), 0, "$00A4 clear -- not shop 71")
+    H.log(string.format("[shop] Narshe stop begins f%d: gil=%d tonic=%d potion=%d fenix=%d",
+      H.frame, H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.crossDoor(41, 22, 26, 44, 13, "item shop door 20(41,22)->26(44,13)"),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
+    "shop interior settled", 10),
+  H.waitFrames(60),
+  H.shopTalk(44, 8, "Narshe item shop"),
+  H.call(function()
+    -- event command $9b parks the shop number at $0201 (field/event.asm:3656);
+    -- the rows come from the ROM table, since the menu fills its $7E9D89 row
+    -- list only once the buy list is drawn.
+    H.assertEq(H.readByte(0x0201), 44, "the counter opened shop 44 ($0201)")
+    H.assertEq(shopRow(44, 0), POTION, "shop 44 row 0 is Potion")
+    H.assertEq(shopRow(44, 2), FENIX_DOWN, "shop 44 row 2 is Fenix Down")
+  end),
+  H.buyItem(POTION, 0, function() return 60 - H.invCountOf(POTION) end, "POTION to 60"),
+  H.buyItem(FENIX_DOWN, 2, function() return 23 - H.invCountOf(FENIX_DOWN) end,
+    "FENIX DOWN to 23"),
+  H.call(function()
+    H.log(string.format("[shop] Narshe item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
+  end),
+  H.shopClose("Narshe item shop"),
+  H.call(function()
+    H.assertEq(H.invCountOf(POTION) >= 60, true,
+      "the party leaves Narshe with 60 Potions -- the Sealed Gate leg's in-combat AND field heal")
+    H.assertEq(H.invCountOf(FENIX_DOWN) >= 23, true, "Fenix Downs at 23 (~level)")
+    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
+      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.crossDoor(44, 14, 20, 41, 24, "item shop door 26(44,14)->20(41,24), return"),
+  H.call(function()
+    H.log(string.format("[shop] Narshe stop cost %d frames (f%d -> f%d)",
+      H.frame - H.vars.shopStart, H.vars.shopStart, H.frame))
+  end),
+
   H.navTo(18, 61, { playBattles = "tactical", maxFrames = 20000,
     arrive = function() return H.worldMode() end }),
   pressWalk("down", function() return H.worldMode() end, 1200,

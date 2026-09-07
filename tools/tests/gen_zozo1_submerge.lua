@@ -11,6 +11,9 @@ local function sw(id)
   return (H.readByte(0x1E80 + math.floor(id / 8)) >> (id % 8)) & 1
 end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
+local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
+local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 
 -- calm-arrival pred (gen_kefka_won's): n consecutive controllable
 -- full-bright field frames on map m
@@ -67,6 +70,59 @@ H.run({ maxFrames = 90000 }, {
                     maxFrames = 12000, playBattles = "tactical" }),
   H.waitUntil(landed(20, 10), 1200, "landed on the streets", 1),
   H.waitFrames(150),
+
+  -- 1b. Narshe's item shop on the way out (#176): the door (41,22) is eight
+  --     tiles from Arvis's front door, shop 3 on map 26 (shopkeeper (44,8);
+  --     _ccd28c opens 3 while $006B/$00A4 are clear, both clear here), rows
+  --     TONIC 0 / POTION 1 / FENIX DOWN 4.  Every town tops up; this is the
+  --     last Potion shop the route enters before the post-opera checkpoint
+  --     (Kohlingen is crossed by castle, Jidoor is walked through without a
+  --     stop), so it buys the band at the level the stretch reaches: L16 at
+  --     the Blackjack -> 24 (docs/design/level-curve.md; the seeded Zozo and
+  --     opera logs spent no Potions: 8 -> 10 across kefka_won..blackjack).
+  H.call(function()
+    H.vars.shopStart = H.frame
+    H.assertEq(sw(0x006B), 0, "$006B clear -- the item shop opens as shop 3")
+    H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 3")
+    H.log(string.format("[shop] Narshe stop begins f%d: gil=%d tonic=%d potion=%d fenix=%d",
+      H.frame, H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.crossDoor(41, 22, 26, 44, 13, "item shop door 20(41,22)->26(44,13)"),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
+    "shop interior settled", 10),
+  H.waitFrames(60),
+  H.shopTalk(44, 8, "Narshe item shop"),
+  H.call(function()
+    -- event command $9b parks the shop number at $0201 (field/event.asm:3656);
+    -- the rows come from the ROM table, since the menu fills its $7E9D89 row
+    -- list only once the buy list is drawn.
+    H.assertEq(H.readByte(0x0201), 3, "the counter opened shop 3 ($0201)")
+    H.assertEq(shopRow(3, 0), TONIC, "shop 3 row 0 is Tonic")
+    H.assertEq(shopRow(3, 1), POTION, "shop 3 row 1 is Potion")
+    H.assertEq(shopRow(3, 4), FENIX_DOWN, "shop 3 row 4 is Fenix Down")
+  end),
+  H.buyItem(POTION, 1, function() return 24 - H.invCountOf(POTION) end, "POTION to 24"),
+  H.buyItem(FENIX_DOWN, 4, function() return 15 - H.invCountOf(FENIX_DOWN) end,
+    "FENIX DOWN to 15"),
+  H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
+  H.call(function()
+    H.log(string.format("[shop] Narshe item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
+  end),
+  H.shopClose("Narshe item shop"),
+  H.call(function()
+    H.assertEq(H.invCountOf(POTION) >= 24, true,
+      "the party leaves Narshe with the Potion band (24 at L16) -- the in-combat heal")
+    H.assertEq(H.invCountOf(FENIX_DOWN) >= 15, true, "Fenix Downs at 15 for the Zozo stretch")
+    H.assertEq(H.invCountOf(TONIC) >= 90, true, "Tonics topped up for the field care")
+    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
+      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.crossDoor(44, 14, 20, 41, 24, "item shop door 26(44,14)->20(41,24), return"),
+  H.call(function()
+    H.log(string.format("[shop] Narshe stop cost %d frames (f%d -> f%d)",
+      H.frame - H.vars.shopStart, H.vars.shopStart, H.frame))
+  end),
 
   -- 2. the south gate at (38,61) (gen_worldmap's verified tile), then one
   --    held step south onto the y=62 exit row -> world {83,36}
