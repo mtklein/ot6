@@ -40,7 +40,11 @@ if POLICY == "fight" then
   -- parked in menu state $05 ("consumed 41 pulses ... without landing",
   -- ten drops) on the second Naughty and the party bled out over 12,000
   -- frames without a single hit landing (lab V0/V1, 2026-09-07); the
-  -- physical line wins these 3000-HP / 5-pip fights in ~1,900 frames each
+  -- physical line wins these 3000-HP / 5-pip fights in ~1,900 frames each.
+  -- (The park was Naughty's Mute greying LOCKE's Magic row, which the
+  -- command cursor skips; fixed in the driver under #153 -- cmdRow now
+  -- treats a disabled row as absent -- so a nuke walk is drivable again,
+  -- but this lab keeps the policy it measured.)
   WALK = { playBattles = "tactical", bank = 0, healPercent = 60, care = false }
 else
   WALK = { playBattles = "mustflee", fleeCap = 600, bank = 0, healPercent = 60, care = false }

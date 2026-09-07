@@ -89,19 +89,45 @@ end
 -- The corridor flee policy, one driver per navigator call.  L+R is the
 -- engine's own run mechanic; at the cap the battle is fought out by the
 -- tactical driver instead.  Before the cap, $b1 bit 1 is the engine's own
--- can't-run flag (set for a pincer or a monster that blocks running); while
--- it is held, holding L+R is free damage with no roll behind it, so the
--- fight is handed to the tactical driver early instead.  The periodic log
--- line reports the engine's own run machinery:
+-- can't-run flag; while it is held, holding L+R is free damage with no
+-- roll behind it, so the fight is handed to the tactical driver early
+-- instead.  The periodic log line reports the engine's own run machinery:
 --   $2f45  characters-are-running (set while L+R is held and unblocked)
 --   $3a3b  run difficulty: 2 per live monster, 6 for a harder-to-run one
 --   $3d70  per-character run counter, +rand(run factor)+1 per check; the
 --          character escapes once it reaches the difficulty
---   $b1    bit 1 can't-run, bit 2 harder-to-run, bit 5 back attack/pincer
+--   $b1    bit 1 can't-run, bit 2 the smoke-bomb can't-run, bit 5 back
+--          attack/pincer, bit 0 the counterattack flag (flickers on)
 --   $2f4b  bit 0 the formation's own "no running with L+R"
 --   $7EE9EF / $7E629A  battle time stopped / menus force-closed, either of
 --          which suppresses $2f45 outright
+--
+-- Which $b1 bit (#150, read from battle_main.asm and then measured):
+-- bit 1 ($02) is the gate the ESCAPE COMMAND itself tests -- Cmd_2a
+-- `lda $b1 / bit #$02 / bne` queues battle message $09 "can't run
+-- away!!", and GlobalCounter_05 fires that command the moment L+R is
+-- seen while the bit is up.  It is set by UpdateMonsterGfxBuf for a
+-- pincer with monsters alive on both sides (`lda #$02 / tsb $b1`), for a
+-- present monster whose monster_prop +19 bit 3 says no running (`lda
+-- #$06 / tsb $b1`, so bit 2 comes up with it), and while enemy
+-- characters are alive ($3a42).  Bit 2 ($04) is read only by the smoke
+-- bomb (AttackerEffect_4b).  "Harder to run" is not a $b1 bit at all: it
+-- is monster_prop +19 bit 0, which adds 6 instead of 2 to $3a3b.  So the
+-- 15609 comment "clear can't run flag and harder to run flag" for #$06
+-- does not mean bit 1 is the soft one, and CANT_RUN stays $02.
+-- Measured (probe_flee_world.lua, camp_escaped, two world-map randoms):
+-- $b1 read 00, L+R was held from battle frame 3, $2f45 went 1, $3a38
+-- latched "a character just ran away" at frames 243 and 371, and both
+-- fights ended with the party gone and the monsters alive.  On the FC
+-- escape map 393 the one formation is Naughty ($169, +19 = $8D: bit 3
+-- no-run AND bit 0 harder-to-run), so $b1 reads $06 from frame 3 and the
+-- helper's refusal there was the engine's own answer, not a wrong bit;
+-- Vargas ($3c88 = $DD) refuses the same way (probe_flee_boss.lua).
+-- The formation flag $2f4b bit 0 is a refusal as well: btlgfx escape_set
+-- never raises $2f45 while it is up, so holding L+R there is the cap's
+-- worth of free damage (asm-derived; no fixture on the route carries it).
 local CANT_RUN = 0x02           -- $b1 bit 1
+local NO_LR_RUN = 0x01          -- $2f4b bit 0
 local REFUSAL_FRAMES = 60       -- consecutive frames of it before believing it
 
 local function newFlee(opts, tactical)
@@ -111,7 +137,9 @@ local function newFlee(opts, tactical)
   -- that reaches here, so that value is the new-battle edge.
   return function(battN)
     if battN <= 3 then refusedN, said = 0, false end
-    refusedN = ((M.readByte(0x00b1) & CANT_RUN) ~= 0) and refusedN + 1 or 0
+    local refused = (M.readByte(0x00b1) & CANT_RUN) ~= 0
+                 or (M.readByte(0x2f4b) & NO_LR_RUN) ~= 0
+    refusedN = refused and refusedN + 1 or 0
     if battN % 600 == 3 then
       M.log(string.format(
         "flee: held %d of %d frames -- running=%d difficulty=%d " ..
@@ -124,10 +152,12 @@ local function newFlee(opts, tactical)
     if refusedN >= REFUSAL_FRAMES then
       if not said then
         said = true
-        M.log(string.format("flee: this formation refuses the run ($b1 bit 1 " ..
-          "held %d frames -- a pincer, or a monster nobody runs from) after " ..
+        M.log(string.format("flee: this formation refuses the run ($b1=%02X " ..
+          "$2f4b=%02X held %d frames -- $b1 bit 1 is the escape command's " ..
+          "own can't-run gate: a pincer, enemy characters, or a monster " ..
+          "nobody runs from; $2f4b bit 0 the formation's no-L+R flag) after " ..
           "%d frames; fighting it out instead of standing still for the cap",
-          refusedN, battN))
+          M.readByte(0x00b1), M.readByte(0x2f4b), refusedN, battN))
       end
       tactical.frame()
       return
@@ -1589,9 +1619,13 @@ end
 -- for eight frames without clearing it; the driver watches that byte's
 -- high nibble and drops the plan rather than pressing into a refusal.
 --
--- OT6 restores HP and MP in full on every level up, so MP spent walking a
--- corridor is refunded by the next level while a Tonic drunk there is gone
--- for good; casting is therefore tried before the bag.
+-- Owner directive (#152): outside battle the party heals from the BAG --
+-- Tonics first, then Potions -- and a cure is cast only when the bag has
+-- nothing left to offer (every healing item at its reserve floor, or
+-- refused for that target).  MP is the fight's resource; a Tonic is what a
+-- person drinks between fights.  (An earlier order cast first, reasoning
+-- that OT6's level-up refund makes MP the cheaper resource; measured, it
+-- cast Cure three times with 84 Tonics in the bag.)
 --
 -- Magic path: $05 (Skills row 1) -A-> $06 character select ($4B copies
 -- into zSelIndex $28) -A-> $0A skills options (Magic row 1, enabled only
@@ -1603,11 +1637,12 @@ end
 --
 -- opts.threshold  heal a living member below this fraction of max HP
 --                 (default 0.55)
--- opts.magic      cast a cure spell when someone can, and reach for the bag
---                 only when nobody can, the MP is short, or the target is
---                 KO'd and needs a Fenix Down (default true).  Set false on
---                 a step that wants its MP kept for the fight it is walking
---                 toward.
+-- opts.magic      allow a cure to be CAST as the fallback when the bag has
+--                 nothing for a target (default true).  The bag is always
+--                 tried first; set false on a step that must keep every
+--                 point of MP for the fight it is walking toward, and the
+--                 target simply goes unhealed once the bag is empty.
+--                 Revival is always a Fenix Down.
 -- opts.mpFloor    MP a caster keeps back: a fraction of their maximum below
 --                 1, an absolute number at or above it (default 0.25).  A
 --                 caster drained to zero in a corridor walks into the next
@@ -2210,8 +2245,15 @@ local function careKernel(opts)
     end
     table.sort(hurt, function(a, b) return a.r < b.r end)
     for _, h in ipairs(hurt) do
-      local w = useMagic and pickCast(h.c) or nil
-      if w == nil then w = pickItem(h.c) end
+      -- Bag first (owner directive, #152: outside battle the party heals
+      -- with Tonics, not by casting; Potions are the combat heal and MP is
+      -- the fight's).  A cure is cast only when the bag has nothing to
+      -- offer -- every healing item at its reserve floor or refused for
+      -- this target -- and the caller has not switched casting off.
+      -- Measured before this order: gen_esper_tubes' "care before battle
+      -- 72" cast $2D three times with 84 Tonics in the bag.
+      local w = pickItem(h.c)
+      if w == nil and useMagic then w = pickCast(h.c) end
       if w ~= nil then return w end
     end
     return nil
@@ -2599,9 +2641,11 @@ function M.newCareDriver(opts)
   -- Owner directive: outside-battle care heals with TONICS (items), not by
   -- casting -- Tonics are cheap and everywhere, and casting cures drained
   -- MP over a grind badly enough to wipe (zozo_arrival, MP-starved with a
-  -- full Tonic bag).  Field healing therefore spends no MP; MP is reserved
-  -- for battle.  An explicit fieldCare that wants to cast passes
-  -- magic=true; here (the automatic post-battle path) it stays off.
+  -- full Tonic bag).  careKernel now tries the bag first on every path
+  -- (#152); the automatic post-battle path additionally never casts, so a
+  -- grind that empties the bag walks on rather than spending the fight's
+  -- MP.  An explicit fieldCare keeps the cast fallback unless it passes
+  -- magic=false.
   if opts.magic == nil then opts.magic = false end
   local K = careKernel(opts)
   local mode, ph, n = "start", 0, 0
@@ -3105,6 +3149,23 @@ end
 -- `pos` may be a literal char-select row or a function returning one,
 -- resolved live at the point the row is actually needed, for a caller
 -- whose party order isn't pinned down until runtime.
+--
+-- The one-owner rule (#151).  The esper detail's A is refused when ANY
+-- character wears the stone: _c35574 (skills.asm) scans all sixteen
+-- $161E bytes and paints the row grey ($28), and MenuState_4d's A on a
+-- grey row plays the invalid sound and shows the "already equipped"
+-- message instead of writing the byte.  The first cut waited only for
+-- the list to come back and reported "equipped" either way -- measured
+-- on fc_landing: "SHIVA -> EDGAR: equipped, back on the list satisfied
+-- after 30 frames" while EDGAR's +$1E stayed $FF and TERRA's stayed $02,
+-- and every later fight logged "summon refused for char 4 ... stone=$FF".
+-- So the stone is freed from its owner FIRST, in the owner's own list:
+-- A on an empty row (a $7e9d89 entry of $FF) is the game's unequip
+-- (MenuState_1e @2908 writes $FF to +$1E), and that is verified before
+-- the target's walk begins.  After the target's walk the worn byte is
+-- read back and a mismatch raises, naming what the byte says.  An owner
+-- outside the active party cannot be reached through this menu, so that
+-- raises too rather than walking a session that cannot succeed.
 function M.equipEsper(pos, esperIdx, opts)
   opts = opts or {}
   local tag = opts.tag or ("equip esper " .. esperIdx)
@@ -3116,45 +3177,72 @@ function M.equipEsper(pos, esperIdx, opts)
   local function targetPos()
     return type(pos) == "function" and pos() or pos
   end
-  local seek_ph = 0
-  return M.seqStep({
-    M.driveUntil(function() return st() == ST_MAIN end, 1200,
-      { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
-    M.waitFrames(20),
-    M.driveUntil(function()
-      return st() == ST_MAIN and M.readByte(CUR) == 1
-    end, 900, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
-      tag .. ": cursor on Skills"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_CHAR end, 300,
-      tag .. ": character select", 5),
-    M.waitFrames(10),
-    M.driveUntil(function()
-      return st() == ST_CHAR and M.readByte(CUR) == targetPos()
-    end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
-      tag .. ": character cursor"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_SKILLS end, 300,
-      tag .. ": skills submenu", 5),
-    M.waitFrames(10),
-    M.driveUntil(function()
-      return st() == ST_SKILLS and M.readByte(CUR) == 0
-    end, 600, { M.pressButtons({ "up" }, 2), M.waitFrames(6) },
-      tag .. ": cursor to Espers"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_LIST end, 300,
-      tag .. ": esper list", 5),
-    M.waitFrames(10),
-    M.driveUntil(function()
-      return st() == ST_LIST
-         and M.readByte(GENJULIST + M.readByte(CUR)) == esperIdx
+  local function worn(c) return M.readByte(0x1600 + 37 * c + 0x1E) end
+  local function activeParty() return M.readByte(0x1A6D) & 0x07 end
+  local function inActiveParty(c)
+    local pb = M.readByte(0x1850 + c)
+    return (pb & 0x07) ~= 0 and (pb & 0x07) == activeParty()
+  end
+  local function posOf(c) return (M.readByte(0x1850 + c) >> 3) & 0x03 end
+  local function charAt(p)
+    for c = 0, 15 do
+      if inActiveParty(c) and posOf(c) == p then return c end
+    end
+    return nil
+  end
+  local function ownerOf(idx)
+    for c = 0, 15 do
+      if worn(c) == idx then return c end
+    end
+    return nil
+  end
+
+  -- the walk from the field to one character's esper list
+  local function listWalk(what, posFn)
+    return {
+      M.driveUntil(function() return st() == ST_MAIN end, 1200,
+        { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, what .. ": main menu"),
+      M.waitFrames(20),
+      M.driveUntil(function()
+        return st() == ST_MAIN and M.readByte(CUR) == 1
+      end, 900, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+        what .. ": cursor on Skills"),
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_CHAR end, 300,
+        what .. ": character select", 5),
+      M.waitFrames(10),
+      M.driveUntil(function()
+        return st() == ST_CHAR and M.readByte(CUR) == posFn()
+      end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+        what .. ": character cursor"),
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_SKILLS end, 300,
+        what .. ": skills submenu", 5),
+      M.waitFrames(10),
+      M.driveUntil(function()
+        return st() == ST_SKILLS and M.readByte(CUR) == 0
+      end, 600, { M.pressButtons({ "up" }, 2), M.waitFrames(6) },
+        what .. ": cursor to Espers"),
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_LIST end, 300,
+        what .. ": esper list", 5),
+      M.waitFrames(10),
+    }
+  end
+
+  -- put the list cursor on the first row whose $7e9d89 entry is `value`
+  -- (two columns: left/right move one row, up/down two)
+  local function seekRow(what, value)
+    local seek_ph = 0
+    return M.driveUntil(function()
+      return st() == ST_LIST and M.readByte(GENJULIST + M.readByte(CUR)) == value
     end, 3000, {
       M.call(function()
         seek_ph = (seek_ph + 1) % 8
         if seek_ph >= 4 then M.setPad({}); return end
         local target
         for r = 0, 26 do
-          if M.readByte(GENJULIST + r) == esperIdx then target = r; break end
+          if M.readByte(GENJULIST + r) == value then target = r; break end
         end
         if not target then M.setPad({}); return end
         local row = M.readByte(CUR)
@@ -3170,17 +3258,89 @@ function M.equipEsper(pos, esperIdx, opts)
         end
       end),
       M.waitFrames(1),
-    }, tag .. ": list cursor on the stone"),
-    M.waitFrames(20),
-    M.driveUntil(function() return st() == ST_DETAIL end, 600,
-      { M.pressButtons({ "a" }, 3), M.waitFrames(12) }, tag .. ": detail"),
-    M.waitFrames(20),
-    M.pressButtons({ "a" }, 3),          -- MenuState_4d @5902: equip esper
-    M.waitUntil(function() return st() == ST_LIST end, 300,
-      tag .. ": equipped, back on the list", 5),
-    M.driveUntil(function() return M.hasControl() end, 1200,
-      { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),
-    M.waitFrames(20),
+    }, what)
+  end
+
+  local function backOut(what)
+    return {
+      M.driveUntil(function() return M.hasControl() end, 1200,
+        { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, what .. ": back out"),
+      M.waitFrames(20),
+    }
+  end
+
+  local owner, target = nil, nil
+  local freeSteps = {
+    M.logStep(function()
+      return string.format("[%s] stone $%02X is worn by char %d (pos %d); " ..
+        "freeing it there first (one-owner rule)", tag, esperIdx, owner, posOf(owner))
+    end),
+  }
+  for _, s in ipairs(listWalk(tag .. " (free)", function() return posOf(owner) end)) do
+    freeSteps[#freeSteps + 1] = s
+  end
+  freeSteps[#freeSteps + 1] = seekRow(tag .. " (free): list cursor on an empty row", 0xFF)
+  freeSteps[#freeSteps + 1] = M.waitFrames(20)
+  freeSteps[#freeSteps + 1] = M.pressButtons({ "a" }, 3)   -- MenuState_1e @2908: unequip
+  freeSteps[#freeSteps + 1] = M.waitFrames(20)
+  freeSteps[#freeSteps + 1] = M.call(function()
+    if worn(owner) ~= 0xFF then
+      error(string.format("%s: freeing stone $%02X from char %d FAILED -- " ..
+        "+$1E still reads $%02X after A on an empty row", tag, esperIdx,
+        owner, worn(owner)), 0)
+    end
+    M.log(string.format("[%s] char %d freed: +$1E reads $FF", tag, owner))
+  end)
+  for _, s in ipairs(backOut(tag .. " (free)")) do freeSteps[#freeSteps + 1] = s end
+
+  local equipSteps = {}
+  for _, s in ipairs(listWalk(tag, targetPos)) do equipSteps[#equipSteps + 1] = s end
+  equipSteps[#equipSteps + 1] = seekRow(tag .. ": list cursor on the stone", esperIdx)
+  equipSteps[#equipSteps + 1] = M.waitFrames(20)
+  equipSteps[#equipSteps + 1] = M.driveUntil(function() return st() == ST_DETAIL end, 600,
+    { M.pressButtons({ "a" }, 3), M.waitFrames(12) }, tag .. ": detail")
+  equipSteps[#equipSteps + 1] = M.waitFrames(20)
+  equipSteps[#equipSteps + 1] = M.pressButtons({ "a" }, 3)   -- MenuState_4d @5902: equip esper
+  equipSteps[#equipSteps + 1] = M.waitUntil(function() return st() == ST_LIST end, 300,
+    tag .. ": back on the list", 5)
+  equipSteps[#equipSteps + 1] = M.waitFrames(10)
+  equipSteps[#equipSteps + 1] = M.call(function()
+    local got = worn(target)
+    if got ~= esperIdx then
+      local who = ownerOf(esperIdx)
+      error(string.format("%s: char %d (pos %d) does NOT wear stone $%02X after " ..
+        "the walk -- +$1E reads $%02X; the stone is %s.  The detail's A is " ..
+        "refused for a stone anyone wears (skills.asm _c35574), and reports " ..
+        "nothing else.", tag, target, targetPos(), esperIdx, got,
+        who and ("worn by char " .. who) or "worn by nobody"), 0)
+    end
+    M.log(string.format("[%s] verified: char %d (pos %d) wears $%02X (+$1E)",
+      tag, target, targetPos(), got))
+  end)
+  for _, s in ipairs(backOut(tag)) do equipSteps[#equipSteps + 1] = s end
+
+  return M.seqStep({
+    M.call(function()
+      target = charAt(targetPos())
+      if target == nil then
+        error(string.format("%s: no active-party character at char-select " ..
+          "position %d", tag, targetPos()), 0)
+      end
+      owner = ownerOf(esperIdx)
+      if owner ~= nil and owner ~= target and not inActiveParty(owner) then
+        error(string.format("%s: stone $%02X is worn by char %d, who is not " ..
+          "in the active party; this menu cannot free it", tag, esperIdx, owner), 0)
+      end
+    end),
+    M.cond(function() return owner ~= nil and owner == target end, {
+      M.logStep(function()
+        return string.format("[%s] char %d (pos %d) already wears $%02X; nothing to do",
+          tag, target, targetPos(), esperIdx)
+      end),
+    }, {
+      M.cond(function() return owner ~= nil and owner ~= target end, freeSteps, {}),
+      M.seqStep(equipSteps),
+    }),
   })
 end
 

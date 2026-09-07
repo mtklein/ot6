@@ -1,13 +1,13 @@
 -- @suite savestate=zozo_clock_solved
--- field_healpolicy.lua -- H.fieldCare's healing policy: cast a cure spell
--- when somebody can, drink from the bag when nobody can.  Reads and pad
--- presses only.
+-- field_healpolicy.lua -- H.fieldCare's healing policy: drink from the bag
+-- first (owner directive, #152: outside battle the party heals with
+-- Tonics), and cast a cure only when the bag has nothing to offer.  Reads
+-- and pad presses only.
 
 -- The fixture is zozo_clock_solved: a caster who knows Cure and has MP to
 -- spend, a bag of Tonics, and (as of the healthy-fixture campaign below) a
 -- standing, undamaged party.  One starting state therefore drives the same
--- visit four ways, and the difference between the first two IS the
--- consumable saving.
+-- visit four ways.
 
 -- What this pins down:
 --   1. M.calcMaxHpMp unpacks the boost code the way CalcMaxHPMP does.  A
@@ -16,16 +16,21 @@
 --      arms that were wrong.
 --   2. opts.magic=false: the patient is healed out of the bag.  Consumables
 --      go down and nobody's MP moves.
---   3. The default policy: the patient is healed by the caster casting Cure.
---      Her MP goes down, the bag is untouched, and the patient ends at least
---      as healthy as the item run left him.
---   4. opts.mpFloor past her whole pool: she declines and the bag pays.
---      That is the branch a step takes when it wants its MP for the fight
---      it is walking toward.
---   5. A refusal driven by hand, to measure what the game leaves in zMosaic
+--   3. The default policy with a stocked bag: the same -- the bag pays and
+--      the caster's MP does not move, even though she could cast.  Before
+--      #152 this case asserted the opposite (cast first, bag untouched),
+--      and the route's care stops cast Cure with 84 Tonics in the bag.
+--   4. The bag reserved away (opts.reserve at the bag's own counts, so
+--      nothing is spendable): the fallback -- she casts Cure, the bag is
+--      untouched, and the patient ends at least as healthy as the bag run
+--      left him.
+--   5. The bag reserved away AND opts.mpFloor past her whole pool: nothing
+--      can be done for the patient, and the visit says so without opening
+--      the menu or hanging.
+--   6. A refusal driven by hand, to measure what the game leaves in zMosaic
 --      afterwards.  The answer decides how any driver may test for a
 --      refusal, and the test M.fieldCare used was wrong.
---   6. Case 3 also logs the whole visit's ZMENUSTATE trace.
+--   7. Case 3 also logs the whole visit's ZMENUSTATE trace.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZOZO = "build/states/zozo_clock_solved.mss.lua"
@@ -152,7 +157,9 @@ H.run({ maxFrames = 200000 }, {
       "the menu is closed and the party has control back")
   end),
 
-  -- 3. the cast branch: same fixture, default policy
+  -- 3. the default policy with a stocked bag: the bag pays, the caster's MP
+  -- does not move (#152 -- the owner's outside-battle rule: Tonics, not
+  -- casting).
   H.loadState(ZOZO),
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
@@ -161,52 +168,81 @@ H.run({ maxFrames = 200000 }, {
     magicRun.bag, magicRun.mp = bag(), H.charMp(HEALER)
     trace, tracing = {}, true
   end),
-  H.fieldCare({ tag = "zozo cast", threshold = 0.95 }),
+  H.fieldCare({ tag = "zozo default", threshold = 0.95 }),
   H.call(function()
     tracing = false
     magicRun.spent = magicRun.bag - bag()
     magicRun.hp = H.charHp(PATIENT)
     H.log("ZMENUSTATE trace: " .. traceText())
-    H.log(string.format("cast branch: %d consumables spent, healer mp %d -> " ..
+    H.log(string.format("default branch: %d consumables spent, healer mp %d -> " ..
       "%d, patient %d/%d", magicRun.spent, magicRun.mp, H.charMp(HEALER),
       magicRun.hp, H.charMaxHp(PATIENT)))
-    H.assertEq(H.charMp(HEALER) < magicRun.mp, true,
-      "the healer paid for the heal out of her own MP")
-    H.assertEq(magicRun.spent, 0,
-      "and the bag was not opened at all")
-    H.assertEq(magicRun.hp >= itemRun.hp, true, string.format(
-      "casting left the patient at least as healthy as drinking did " ..
-      "(%d vs %d)", magicRun.hp, itemRun.hp))
+    H.assertEq(magicRun.spent > 0, true,
+      "with a stocked bag the default policy drinks (Tonics before casting)")
+    H.assertEq(H.charMp(HEALER), magicRun.mp,
+      "and the healer's MP is untouched even though she could cast")
     H.assertEq(magicRun.hp >= H.charMaxHp(PATIENT) * 0.95, true,
       string.format("the patient is back above the threshold (%d/%d)",
         magicRun.hp, H.charMaxHp(PATIENT)))
     H.assertEq(H.hasControl() and H.tileAligned(), true,
       "the menu is closed and the party has control back")
-    H.log(string.format(
-      "SAVING at this stop: %d consumables, paid for with %d MP",
-      itemRun.spent - magicRun.spent, magicRun.mp - H.charMp(HEALER)))
   end),
 
-  -- 4. the MP floor.  Same fixture and the same caster as case 3, with the
-  -- floor raised past her whole pool: she can still cast as far as the game
-  -- is concerned, and the policy declines and opens the bag instead.  This
-  -- is the branch a step takes when it wants its MP kept for the fight it
-  -- is walking toward.
+  -- 4. the cast fallback: the bag reserved away (opts.reserve at the bag's
+  -- own counts, so nothing in it is spendable) and the default policy: she
+  -- casts Cure out of her own MP, the bag is untouched, and the patient ends
+  -- at least as healthy as the bag run left him.
+  H.loadState(ZOZO),
+  H.waitFrames(30),
+  H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
+  H.call(function()
+    hurtPatient()
+    magicRun.castBag, magicRun.castMp = bag(), H.charMp(HEALER)
+  end),
+  H.fieldCare({ tag = "zozo bag reserved", threshold = 0.95,
+    reserve = { [0xE8] = 99, [0xE9] = 99 } }),
+  H.call(function()
+    local hp = H.charHp(PATIENT)
+    H.log(string.format("cast fallback: %d consumables spent, healer mp %d -> " ..
+      "%d, patient %d/%d", magicRun.castBag - bag(), magicRun.castMp,
+      H.charMp(HEALER), hp, H.charMaxHp(PATIENT)))
+    H.assertEq(H.charMp(HEALER) < magicRun.castMp, true,
+      "with the bag reserved away the healer casts, paying out of her own MP")
+    H.assertEq(magicRun.castBag - bag(), 0,
+      "and the bag was not opened at all")
+    H.assertEq(hp >= itemRun.hp, true, string.format(
+      "casting left the patient at least as healthy as drinking did " ..
+      "(%d vs %d)", hp, itemRun.hp))
+    H.assertEq(hp >= H.charMaxHp(PATIENT) * 0.95, true,
+      string.format("the patient is back above the threshold (%d/%d)",
+        hp, H.charMaxHp(PATIENT)))
+    H.assertEq(H.hasControl() and H.tileAligned(), true,
+      "the menu is closed and the party has control back")
+  end),
+
+  -- 5. nothing to offer: the bag reserved away AND the MP floor raised past
+  -- her whole pool.  She can still cast as far as the game is concerned, but
+  -- the policy declines, and with no bag to fall back on the patient goes
+  -- unhealed -- the visit reports that without opening the menu.
   H.loadState(ZOZO),
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
   H.call(function()
     hurtPatient()
     magicRun.floorBag, magicRun.floorMp = bag(), H.charMp(HEALER)
+    magicRun.floorHp = H.charHp(PATIENT)
   end),
-  H.fieldCare({ tag = "zozo mp floor", threshold = 0.95, mpFloor = 999 }),
+  H.fieldCare({ tag = "zozo nothing to offer", threshold = 0.95, mpFloor = 999,
+    reserve = { [0xE8] = 99, [0xE9] = 99 } }),
   H.call(function()
     H.assertEq(H.charMp(HEALER), magicRun.floorMp,
       "the floor kept every point of the healer's MP")
-    H.assertEq(magicRun.floorBag - bag() > 0, true,
-      "so the bag paid instead")
-    H.assertEq(H.charHp(PATIENT) >= H.charMaxHp(PATIENT) * 0.95, true,
-      "and the patient is topped up either way")
+    H.assertEq(magicRun.floorBag - bag(), 0,
+      "and the reserve kept every consumable")
+    H.assertEq(H.charHp(PATIENT), magicRun.floorHp,
+      "so the patient is exactly as hurt as before")
+    H.assertEq(H.hasControl() and H.tileAligned(), true,
+      "and the party still has control (no menu left open, no hang)")
   end),
 
   -- CheckCanUseItem refuses a Tonic on a character already at full HP, and

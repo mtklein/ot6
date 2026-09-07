@@ -52,16 +52,19 @@ local FAtma = H.newFightDriver("AtmaWeapon", FIGHT)
 -- menus and battles, so no field care from here).  The 393 walks are
 -- FOUGHT (playBattles="tactical", no BP banking, physical damage only):
 -- measured 2026-09-07 from the escape_start snapshot, the map's pool is
--- one formation, Naughty ($169, 3000 HP, 5 pips), it sets $b1's can't-run
--- bit (bit 2) in every encounter met, and the physical line wins each in
--- ~1,200-1,900 frames -- four of them cost 7,700-8,300 frames of clock
--- and the party reached Nerapa's doorstep at 3:41-3:51.  (The earlier
--- "mustflee" walk never ran anything: the flee helper's refusal detector
--- reads $b1 bit 1 -- "harder to run", not bit 2 -- and declared refusal
--- at frame 63 of every battle, then fought it with the same driver.)  No
--- nuke/summon on the walks: with nuke={2} the navTo driver's Bolt plan
--- parked in menu state $05 ("consumed 41 pulses ... without landing", ten
--- drops) and the party bled out over 12,000 frames (lab V0/V1).
+-- one formation, Naughty ($169, 3000 HP, 5 pips), whose monster_prop +19
+-- bit 3 is the no-run flag: $b1 reads $06 from frame 3 of every encounter
+-- met, and the physical line wins each in ~1,200-1,900 frames -- four of
+-- them cost 7,700-8,300 frames of clock and the party reached Nerapa's
+-- doorstep at 3:41-3:51.  (The earlier "mustflee" walk could not run
+-- here and said so: $b1 bit 1 is the escape command's own can't-run
+-- gate, which is the bit the flee helper reads -- #150, measured on
+-- camp_escaped where the same helper released the party from two
+-- randoms.)  No nuke/summon on the walks: with nuke={2} the navTo
+-- driver's Bolt plan parked in menu state $05 ("consumed 41 pulses ...
+-- without landing", ten drops) and the party bled out over 12,000 frames
+-- (lab V0/V1) -- Naughty's Mute greys LOCKE's Magic row and the command
+-- cursor skips it; the driver now plans around a disabled row (#153).
 -- Nerapa (2800 HP, 5 pips, weak ice|bolt|holy + slash|pierce, absorbs fire,
 -- Condemned on the whole party at the open -- measured: all four carry it
 -- by t=3000 with ~30 s on the count, and it kills at t~7,000): a damage
