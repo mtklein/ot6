@@ -51,11 +51,14 @@ echo "worktree ready: ROM copied, Mesen/flips linked"
 echo "seeded from ${SEED:-$MAIN} ($SEED_BRANCH) into $HERE_BRANCH"
 
 # State the seed's freshness with the same code the runtime check uses.
+# A fresh worktree has no built ROM yet, so stamps that record a ROM
+# identity read as UNVERIFIED (not stale) until `ninja build/ot6.sfc`.
 if [ -d "$HERE/build/states" ]; then
   echo
   python3 "$HERE/tools/tests/lib/compose.py" --check-states || {
     echo
-    echo "The seed is stale AS SEEDED. Re-confirm any time with:"
+    echo "The seed did not verify AS SEEDED (see above: STALE means regenerate,"
+    echo "UNVERIFIED means build the ROM first). Re-confirm any time with:"
     echo "    python3 tools/tests/lib/compose.py --check-states"
   }
 fi

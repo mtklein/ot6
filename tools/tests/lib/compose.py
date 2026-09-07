@@ -420,8 +420,9 @@ def check_states(root):
         print(f"CAUSE: the ROM changed since the last generation run "
               f"({on_other_rom} of {len(stamps)} were generated on a "
               f"different ROM).  A machine snapshot belongs to the ROM it "
-              f"was captured on; that is one cause, not {on_other_rom} "
-              f"separate problems.")
+              f"was captured on; that is one cause"
+              + (f", not {on_other_rom} separate problems."
+                 if on_other_rom > 1 else "."))
     unverified = sum(1 for _, m in stale if " is UNVERIFIED " in m)
     if unverified:
         print(f"CAUSE: this tree has no built ROM to compare against "
