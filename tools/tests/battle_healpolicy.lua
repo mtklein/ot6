@@ -39,7 +39,15 @@
 --      ends the fight, and the raise decision (H.raiseDecision: Fenix
 --      Down's maxhp/8 against the enemy's smallest hit) that refuses a
 --      raise into a certain re-kill;
---   7. that every case ran.
+--   7. the refined raise gate (#168) on the battle-70 and map-269 numbers:
+--      a raise the smallest hit re-kills stands when a kill is in reach
+--      (the last monster inside the party's window) or when an ally's
+--      gauge fills before the lethal monster's and their top-up lifts the
+--      raise clear of the hit; the ATB read (H.atbEta) behind that; and
+--      the Muddle rule (#170): Remedy's status-2 cure mask has no CONFUSE
+--      bit (vanilla, byte for byte), a muddled ally gets a plain hit, a
+--      muddled actor defers;
+--   8. that every case ran.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TONIC, POTION = 0xE8, 0xE9
@@ -205,7 +213,63 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: kill estimate and raise decision checked")
   end),
 
-  -- 4. the table was not skipped
+  -- 7. the refined raise gate (#168) and the Muddle rule (#170).  The
+  -- numbers are battle 70's (magicite_ifrit_shiva, 2026-09-07: SABIN 511
+  -- max HP, Fenix Down to 63, Ifrit's smallest hit 68 -- the gate held
+  -- through eight turns of a won fight) and map 269's (#171: LOCKE 447 max
+  -- HP one-shot at full HP by a 447 hit).
+  H.call(function()
+    local raiseHp, ok, why = H.raiseDecision({ maxhp = 511, power = 2, smallestHit = 68 })
+    H.assertEq(raiseHp, 63, "Fenix Down raises SABIN (511) to 63")
+    H.assertEq(ok, false, "with nothing else known, a 63-HP raise into a 68 hit is still refused")
+    H.assertEq(type(why), "string", "...and the decision names its reason: " .. tostring(why))
+    raiseHp, ok, why = H.raiseDecision({ maxhp = 511, power = 2, smallestHit = 68, killInReach = true })
+    H.assertEq(ok, true, "the last monster inside the party's window: the raise is free (" .. why .. ")")
+    raiseHp, ok, why = H.raiseDecision({ maxhp = 511, power = 2, smallestHit = 68,
+                                         topUpFirst = true, topUp = 250 })
+    H.assertEq(ok, true, "an ally's gauge fills before Ifrit's: 63 + 250 = 313 survives the 68 (" .. why .. ")")
+    raiseHp, ok, why = H.raiseDecision({ maxhp = 511, power = 2, smallestHit = 68,
+                                         topUpFirst = false, topUp = 250 })
+    H.assertEq(ok, false, "Ifrit's gauge fills first: nobody can top up in time -- refused (" .. why .. ")")
+    raiseHp, ok, why = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = 447,
+                                         topUpFirst = true, topUp = 250 })
+    H.assertEq(raiseHp * 10 + (ok and 1 or 0), 550,
+      "map 269: LOCKE (447) to 55, and 55 + 250 = 305 is still one-shot by the 447 -- refused even with the top-up first (" .. why .. ")")
+    raiseHp, ok, why = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = 447,
+                                         killInReach = true })
+    H.assertEq(ok, true, "...unless the kill is in reach, when the raise costs nothing")
+    raiseHp, ok = H.raiseDecision({ maxhp = 358, power = 2, smallestHit = 44 })
+    H.assertEq(ok, false, "Rizopas seed $64 unchanged: 44 into 44, nothing else known, refused")
+    -- the ATB read behind topUpFirst: $3218,x is the 16-bit gauge the
+    -- engine adds $3ac8,x to every tick and reads as full when its high
+    -- byte is 0 (battle_main.asm `lda $3219,x / beq` "branch if atb
+    -- gauge is full"; the overflow `stz $3219,x`)
+    H.assertEq(H.atbEta(0x8000, 0x0100), 128, "half full at 256 a tick: 128 ticks to full")
+    H.assertEq(H.atbEta(0xFF00, 0x0100), 1, "one tick short")
+    H.assertEq(H.atbEta(0x0010, 0x0100), 0, "high byte 0 is a full gauge (the engine's own test)")
+    H.assertEq(H.atbEta(0x8000, 0), nil, "a stopped gauge never fills")
+    -- Muddle.  Remedy $F5's record is vanilla's byte for byte; its
+    -- status-2 cure mask is SILENCE|SAP, no CONFUSE (bit 5), which is why
+    -- battle_magicite measured two Remedies leave muddled Edgar muddled.
+    H.assertEq(H.itemStatus2(0xF5), 0x48, "Remedy $F5 status-2 cure mask is $48 = SILENCE|SAP (ItemProp +22)")
+    H.assertEq(H.itemStatus2(0xF5) & H.ST2_MUDDLE, 0, "...so a Remedy never cured Muddle: vanilla, not authored")
+    H.assertEq(H.itemStatus1(0xF0), 0x80, "Fenix Down $F0 status-1 cure mask is DEAD (the same record shape)")
+    local full = { [0] = 1, [1] = 1, [2] = 1, [3] = 1 }
+    H.assertEq(H.muddleRule({ actor = 0, status2 = { [0] = 0, [1] = 0x20, [2] = 0, [3] = 0 },
+                              hp = full, maxhp = full }), 1,
+      "a muddled living ally: the actor Fights entity 1 to clear it")
+    H.assertEq(H.muddleRule({ actor = 0, status2 = { [0] = 0x20, [1] = 0x20, [2] = 0, [3] = 0 },
+                              hp = full, maxhp = full }), "defer",
+      "a muddled actor never plans: its inputs are the game's own targeting")
+    H.assertEq(H.muddleRule({ actor = 0, status2 = { [0] = 0, [1] = 0x20, [2] = 0, [3] = 0 },
+                              hp = { [0] = 1, [1] = 0, [2] = 1, [3] = 1 }, maxhp = full }), nil,
+      "a dead muddled ally is the raise rule's business, not a hit")
+    H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0, [1] = 0, [2] = 0, [3] = 0 },
+                              hp = full, maxhp = full }), nil, "nobody muddled: nothing to do")
+    H.log("battle_healpolicy: refined raise gate, ATB read and Muddle rule checked")
+  end),
+
+  -- 8. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(
       "all %d policy cases ran (a skipped table is the same green as a "
