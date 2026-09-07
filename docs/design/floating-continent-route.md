@@ -388,14 +388,16 @@ whole walk, every encounter, Nerapa and the walk to the ledge must fit inside
 Nerapa at the default fighting policy met four random encounters at ~3,000
 frames each and the clock expired before Nerapa was engaged; the game over is
 `_cae414`'s expiry. (An earlier reading of "16,752 left" was the timer's flags
-byte, not its count: the record is flags at +0, the frame count at +1.) The escape is the one
-stretch where the run mechanic is the honest play: the gen's 393 walks hold
-L+R (a refusal shows on `$b1` bit 1 within 60 frames and hands the fight to
-the tactical driver; the cap is 600 frames), fight physically, and bank no BP;
-Nerapa is fought with the Bolt nuke. (A 12-frame decision cadence was tried
-and rejected: it makes the magic-list steer oscillate, and Bolt plans were
-dropped 32 times in one unrunnable fight — that, not the walking, burned the
-clock on that attempt. The 30-frame cadence steers Bolt cleanly.) Terra swaps Blizzard (ice) for the spare
+byte, not its count: the record is flags at +0, the frame count at +1.) The
+393 walks are **fought** (`playBattles="tactical"`, physical damage only,
+no BP bank): the map's one formation sets the can't-run bit, and the
+earlier "mustflee" walk never released anything — see §9 for the
+measurement and for why a Bolt nuke on the walk stalls the driver. Nerapa
+is fought with LOCKE's Bolt nuke and TERRA's Shiva. (A 12-frame decision
+cadence was tried and rejected: it makes the magic-list steer oscillate,
+and Bolt plans were dropped 32 times in one unrunnable fight — that, not
+the walking, burned the clock on that attempt. The 30-frame cadence
+steers Bolt cleanly in the Nerapa driver.) Terra swaps Blizzard (ice) for the spare
 MithrilBlade before 393: species $0169 in the pool absorbs ice, and the lib's
 absorbed-weapon guard fails the run at that encounter otherwise.
 
@@ -490,3 +492,77 @@ The IAF trash (Sky Armor / Spit Fire, forms 175/176) carries no drawn gauge in
   `_ca5ea9` handler, the escape-clock `GameOver`), unlike the massacre's
   savestate-split theater. The route needs a save before the FC (the 394 (7,12)
   point) and honest loss handling.
+
+---
+
+## 9. Measured on the current ROM (2026-09-07)
+
+The three segments were re-cut in one sitting on ROM `build/ot6.sfc`
+sha256 `783ac067…` (byte-identical to the main tree's 2026-09-01 19:01
+latch), with `main` merged into the parked branch (the post-v0.17 fight
+driver: the cure-MP reserve, brokendeath chips before the kill; Shadow's
+leave roll a no-op). Every run is `tools/tests/run.sh` with
+`OT6_SRAM_CHECKPOINT` on the tracked battery, pad presses and reads only
+(`check_playthrough_honest.py` passes); logs are under
+`build/states/cuts/`.
+
+| segment | run | verdict | battles | Fenix | levels going out |
+|---|---|---|---|---|---|
+| P → Q `gen_fc_landing` | `fc-landing-v1_20260907-072734.log` | `PASS (frame 65085)` | 14 IAF battle-actives (6 waves, Ultros④+Chupon, AirForce; the counter double-counts a wave whose load blinks) | 2, both in one wave (`[IAF] actor=1/2 revive entity 0`) | TERRA L23 · LOCKE L27 · EDGAR L25 |
+| Q → R `gen_fc_alcove` | `fc-alcove-v1_20260907-073713.log` | `PASS (frame 38559)` | 7 randoms on 394 (two Dragons at 7000 HP, a Behemoth pack, two Ninja trios, two Apokryphos/Misfit fours) | 0 | TERRA L25 · LOCKE L28 · SHADOW L25 · EDGAR L27 |
+| R → WoR `gen_fc_escape`, attempt 1 (mustflee walk) | `wor_landing_20260907-074008.log` | **FAIL** at Nerapa: `assertEq failed: Nerapa defeated: got true, want false` | AtmaWeapon won (24000 HP, 11 pips, re-shield at 4130 with 10; ~10,000 frames, 0 Fenix); 4 Naughty on 393; Nerapa LOST | 2, both on Nerapa | TERRA L26 · LOCKE L29 · SHADOW L25 · EDGAR L27 at `escape_start` |
+| R → WoR `gen_fc_escape`, attempt 2 (fight walk) | see the commit that lands this row | (filled in below) | | | |
+
+Both battery payloads came out **byte-identical** to the 2026-09-01 cuts
+(`fc-landing.sram` e7c0ea7b…, `fc-alcove.sram` 985d5a55…): the merged
+driver changed no decision on those two segments. Their manifests now
+carry the generator signature of the committed sources.
+
+**The escape, measured from `escape_start`** (gen_fc_escape's second
+artifact: first control on 393, master clock 21,567 frames = 5:59, Shadow's
+clock 21,267). Four experiments from that one snapshot, all retained
+(`lab_escape_v0..v3_*.log`):
+
+- The 393 pool is one formation, **Naughty `$169` ×1, 3000 HP, 5 pips**
+  (`audit_encounters.py 393`: group 123, no pincer). In battle `$b1` reads
+  `$06` — bit 2 *can't run* and bit 1 *harder to run* both set
+  (`battle_main.asm:15609`) — so nothing on this map is run from in this
+  ROM. The old "mustflee" walk never ran anyway: the lib's flee helper
+  tests `$b1` bit 1 (`CANT_RUN = 0x02`, `ot6_field.lua:104`), not bit 2,
+  and declared "this formation refuses the run" at frame 63 of every
+  battle, then fought it with the same driver. The walks now declare the
+  fight they were doing (`playBattles="tactical"`).
+- Each Naughty falls to the physical line (Fight / AutoCrossbow, no BP
+  bank) in ~1,200–1,900 frames; four of them cost the clock 7,700–8,300
+  frames and the party reached Nerapa's doorstep at **3:41** (13,262; fight
+  walk) / **3:51** (13,866; attempt 1's walk).
+- A Bolt nuke on the walk is fatal to the *driver*, not the party: with
+  `nuke={2}` the navTo driver's magic plan parked in menu state `$05`
+  ("consumed 41 pulses in state $05 without landing", ten drops) on the
+  second Naughty and the party bled out over 12,000 frames without a hit
+  landing (V0 and V1, both wiped at (86,10)).
+- **Nerapa is a coin flip on its seed at these levels.** Condemned is on
+  all four by t=3000 (`$3EE5` bit 0 set, counts 32/31/29/25) and reaches
+  zero around t≈7,000. The gen's attempt 1 (doorstep 3:51) lost: Nerapa at
+  1263 HP / 2 pips by t=5100, then every actor healing or reviving
+  (Potion 276 against round costs of 668–998) until the count ran out —
+  wipe at t≈7,800, two Fenix Downs. From the same snapshot with the fight
+  walk (doorstep 3:41, a different seed) the identical driver won at
+  t≈6,000 with **1:48** left and no Fenix (V2); V3 (heal threshold 20 and a
+  TERRA Bolt line) produced a frame-identical trace, so neither lever
+  changed a decision — the driver's lethal-next-round heal rule and the
+  once-per-fight summon dominate. One win and one loss on the current ROM
+  is what is known; the passing gen run is a search-selected win, not a
+  rate.
+- The ledge wait from 1:45 works: Shadow's `$037D` set at f22154 in both
+  passing labs, with `t0=1557 t2=1257` on the last logged wait tick.
+- Espers as worn (record byte +$1E in every fixture): TERRA `$02` SHIVA,
+  LOCKE `$06`, SHADOW and EDGAR none. The deck's `SHIVA -> EDGAR` esper
+  session logged "equipped, back on the list" and the byte never moved —
+  `H.equipEsper` does not verify the stone landed (the summon it was meant
+  to enable is refused every fight: `summon refused for char 4 … stone=$FF`).
+
+**Supplies.** Q leaves the alcove with `tonic=21 potion=33 fenix=27` after
+the descent's care stops (99 Tonics bought at Thamasa; the IAF waves' care
+spent 70 of them). There is no shop between Thamasa and the World of Ruin,
+and the first WoR gen inherits the 2:08 Cid clock (§6) before any town.

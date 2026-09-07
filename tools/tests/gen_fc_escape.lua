@@ -151,7 +151,91 @@ local function talk(face, cap, tag)
   }, tag)
 end
 
-H.run({ maxFrames = 400000 }, {
+-- ---- the Nerapa seed ladder ---------------------------------------------
+-- Nerapa is a real loseable fight under two clocks (Condemned on the whole
+-- party at the open, the 6:00 escape clock), and on the current ROM the
+-- same policy wins or loses it on the battle seed alone (the 2026-09-07
+-- attempts: lost at t~7,800 with two Fenix Downs from one doorstep
+-- arrival, won at t~6,000 with none from another).  So it rides the
+-- gen_massacre / gen_ultros shape: a savestate at the doorstep, a
+-- 5-rung seed ladder (H.newSeedLadder spreads the battle seed's phase
+-- across the rungs and fails on a repeated seed), each loss reloaded
+-- from that snapshot -- the whole machine, clocks included, so every
+-- attempt opens with the same time left -- and the ladder's report
+-- names the seed of every attempt.  A won rung is a search-selected
+-- win: the attempt table is the record, not a rate.
+local L81 = H.newSeedLadder("Nerapa (battle 81)", { attempts = 5 })
+local nerapaBlob, nerapaWon = nil, false
+local function seq(steps) return H.cond(function() return true end, steps) end
+
+local function lossReload(blobFn, tag)
+  local req
+  return seq({
+    H.call(function() req = H.requestLoadState(blobFn()) end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(req, tag .. ": loss-reload")
+      H.gameOverFired = 0
+      H.log(string.format("[%s] loss-reload done, GameOver cleared, f%d",
+        tag, H.frame))
+    end),
+    H.waitFrames(90),
+  })
+end
+
+local function nerapaAttempt(n)
+  local F = H.newFightDriver("Nerapa", FIGHT_ESCAPE)
+  local wipedN, lost = 0, false
+  return H.cond(function() return nerapaWon end, {}, {
+    H.logStep(function()
+      return string.format("[Nerapa] attempt %d at f%d, master clock %d", n, H.frame, H.readWord(0x1189))
+    end),
+    n > 1 and lossReload(function() return nerapaBlob end, "Nerapa") or seq({}),
+    L81.spread(n),
+    talk("right", 4000, string.format("Nerapa engaged (attempt %d)", n)),
+    (function()
+      local t = 0
+      return H.driveUntil(function()
+        t = t + 1
+        if (H.gameOverFired or 0) > 0 then lost = true; return true end
+        -- the loss the canary misses: a battle-side wipe (attempt 1 of
+        -- 2026-09-07 sat 22,000 frames past its wipe with no GameOver read)
+        if H.partyWipedInBattle() then wipedN = wipedN + 1 else wipedN = 0 end
+        if wipedN >= 300 then lost = true; return true end
+        if t >= 30000 then lost = true; return true end
+        if t % 300 == 0 then
+          local st = {}
+          for slot = 0, 3 do
+            st[#st + 1] = string.format("%d:%s/%d", slot,
+              (H.readByte(0x3EE5 + slot * 2) & 1) == 1 and "C" or "-", H.readByte(0x3B05 + slot * 2))
+          end
+          H.log(string.format("[Nerapa] attempt %d t=%d condemned %s master=%d", n, t,
+            table.concat(st, " "), H.readWord(0x1189)))
+        end
+        return not nerapaUp() and not H.battleActive() and not H.battleLoadStarted()
+      end, 30500, {
+        H.call(function()
+          if lost then H.setPad({}); return end
+          if H.battleLoadStarted() or H.battleActive() then F.frame(); return end
+          if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}) else H.setPad({}) end
+        end),
+      }, string.format("Nerapa falls ($0361 clears), attempt %d", n))
+    end)(),
+    H.call(function()
+      H.setPad({})
+      if not lost and not nerapaUp() then
+        nerapaWon = true
+        H.log(string.format("[Nerapa] WON on attempt %d at f%d, master clock %d, fenix=%d",
+          n, H.frame, H.readWord(0x1189), H.invCountOf(0xF0)))
+      else
+        H.log(string.format("[Nerapa] attempt %d LOST at f%d (gameOverFired=%d wiped=%s t-cap=%s)",
+          n, H.frame, H.gameOverFired or 0, tostring(wipedN >= 300), tostring(not (wipedN >= 300) and (H.gameOverFired or 0) == 0)))
+      end
+    end),
+  })
+end
+
+H.run({ maxFrames = 600000, allowGameOver = true }, {
   -- ---- 0. cold Continue of Q -----------------------------------------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -389,11 +473,33 @@ H.run({ maxFrames = 400000 }, {
   -- in battle)
   H.release(),
   H.waitFrames(30),
-  talk("right", 4000, "Nerapa engaged"),
-  absorb(function()
-    return not nerapaUp() and not H.battleActive() and not H.battleLoadStarted()
-  end, 30000, "Nerapa falls ($0361 clears)", nil, FE),
+  (function()
+    local ckReq
+    return seq({
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "pre-Nerapa checkpoint")
+        nerapaBlob = ckReq.blob
+        H.log(string.format("[Nerapa] doorstep savestate captured at f%d, master clock %d", H.frame, H.readWord(0x1189)))
+      end),
+    })
+  end)(),
+  L81.watch(),
+  nerapaAttempt(1),
+  nerapaAttempt(2),
+  nerapaAttempt(3),
+  nerapaAttempt(4),
+  nerapaAttempt(5),
+  -- the ladder's own audit runs as a step (report() is a step: it asserts
+  -- that every attempt drew a distinct battle seed, so five losses are five
+  -- different fights and not one fight five times) before the verdict
+  L81.report(),
   H.call(function()
+    if not nerapaWon then
+      error("all 5 Nerapa seed-ladder attempts lost; the per-attempt lines above "
+        .. "are the balance finding (a lab candidate for the owner)", 0)
+    end
     H.assertEq(nerapaUp(), false, "Nerapa defeated")
     H.log(string.format("[escape] post-Nerapa: (%d,%d) t0=%d", H.fieldX(), H.fieldY(), H.readWord(0x1188)))
   end),
