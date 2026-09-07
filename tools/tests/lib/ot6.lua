@@ -527,6 +527,9 @@ function M.elemStr(mask)
 end
 
 local ITEM_REC, ITEM_TYPE, ITEM_ELEM, ITEM_POWER = 30, 0x00, 0x0F, 0x14
+-- a consumable's status cure masks: +21 status 1 (Fenix Down $F0 carries
+-- DEAD $80 there), +22 status 2 (Remedy $F5 carries $48)
+local ITEM_ST1, ITEM_ST2 = 0x15, 0x16
 local MON_REC, MON_ABSORB = 32, 23
 
 -- Item +$0F, but only for records the game itself calls a weapon: +$00's
@@ -556,6 +559,48 @@ function M.itemPower(item)
   if item == nil or item > 0xFF then return 0 end
   return M.readRomByte((M.sym("ItemProp") & 0x3FFFFF)
     + item * ITEM_REC + ITEM_POWER)
+end
+
+-- An item's status cure masks (ItemProp +21 / +22, the record shape
+-- Fenix Down's DEAD $80 sits in).  Remedy $F5 reads $48 = SILENCE|SAP in
+-- status 2, byte-identical to vanilla's record, so a Remedy never cured
+-- Muddle (STATUS2 bit 5) -- battle_magicite measured two Remedies leave
+-- muddled Edgar muddled (2026-09-07), and that is vanilla, not authored.
+-- A plain physical hit clears it: CalcMaxDmg strips sleep and muddle from
+-- a physically damaged target (battle_main.asm @0c45, `and $3ee5,y`),
+-- which is what the fight driver's Muddle rule below does.
+function M.itemStatus1(item)
+  if item == nil or item > 0xFF then return 0 end
+  return M.readRomByte((M.sym("ItemProp") & 0x3FFFFF) + item * ITEM_REC + ITEM_ST1)
+end
+function M.itemStatus2(item)
+  if item == nil or item > 0xFF then return 0 end
+  return M.readRomByte((M.sym("ItemProp") & 0x3FFFFF) + item * ITEM_REC + ITEM_ST2)
+end
+M.ST2_MUDDLE = 0x20                   -- STATUS2::CONFUSE, $3ee5 + entity*2
+
+-- The Muddle rule (#170), as arithmetic on the four status bytes a person
+-- reads off the muddle animation: a muddled actor never plans (the game
+-- picks its command and target -- RandCharAction -- so a confirm here is
+-- an AoE aimed wherever the engine re-aims it, and NUMBER 024's opening
+-- Muddle turned Edgar's NoiseBlaster and Sabin's Fire Dance on their own
+-- party), and a muddled LIVING ally gets a plain Fight before anything
+-- else, because the hit is the cure.  Returns "defer" for the actor, the
+-- ally's entity to hit, or nil.
+--
+--   actor    the deciding entity 0..3
+--   status2  entity -> $3ee5 byte
+--   hp       entity -> HP;  maxhp  entity -> max HP (0 for an empty slot)
+function M.muddleRule(o)
+  local st, hp, maxhp = o.status2 or {}, o.hp or {}, o.maxhp or {}
+  if ((st[o.actor] or 0) & M.ST2_MUDDLE) ~= 0 then return "defer" end
+  for e = 0, 3 do
+    if e ~= o.actor and ((st[e] or 0) & M.ST2_MUDDLE) ~= 0
+       and (hp[e] or 0) > 0 and (maxhp[e] or 1) > 0 then
+      return e
+    end
+  end
+  return nil
 end
 
 -- Ticks until an ATB gauge fills, from the two words the engine keeps per
@@ -1766,8 +1811,9 @@ function M.newRecoveryTrace(tag, emit)
     T.drop(actor, frame, "new_plan")
     -- Every plan that becomes a command is traced (the first version
     -- traced only heal/item; the Nerapa lab needed the attack lines in the
-    -- same ledger, #156).  A switch is a menu move, not a command.
-    if plan.kind == "switch" then return end
+    -- same ledger, #156).  A switch, or a muddled actor's defer (#170),
+    -- is a menu move, not a command.
+    if plan.kind == "switch" or plan.kind == "defer" then return end
     actionTraceSerial = actionTraceSerial + 1
     local p = { id = actionTraceSerial, actor = actor, kind = plan.kind,
       requested = plan.spell or plan.item or plan.skill or plan.lore or 0,
@@ -2027,9 +2073,15 @@ function M.newFightDriver(tag, opts)
   local raisePending = nil             -- { e, by, tick }
   local topUpOwed = {}                 -- entity -> battleTick the raise landed
   local RAISE_WAIT = 240               -- ticks a pending raise holds a plan
+  -- and the Muddle rule's own pending hit (#170): one ally's Fight on the
+  -- muddled member is in the air, so the next actor plans normally rather
+  -- than land a second hit on a member the first one already cleared
+  -- (measured from n024_entry: LOCKE's hit at f1143 on a SABIN CELES had
+  -- cleared at f886).
+  local unmuddlePending = nil          -- { e, by, tick }
   -- the ATB words per entity (X = entity*2): the 16-bit gauge and the
-  -- constant added to it each tick (M.atbEta)
-  local ATB, ATB_CONST = 0x3218, 0x3AC8
+  -- constant added to it each tick (M.atbEta), and STATUS2 ($3ee5)
+  local ATB, ATB_CONST, ST2 = 0x3218, 0x3AC8, 0x3EE5
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
@@ -2530,6 +2582,46 @@ function M.newFightDriver(tag, opts)
       end
     end
     turnSnap[actor] = hpNow
+    -- The Muddle rule (#170, M.muddleRule), before every other line: a
+    -- muddled actor defers (X) rather than confirm a command the engine
+    -- will re-aim -- measured from n024_entry, muddled SABIN's own
+    -- Fights, Suplex and Fire Dance all landed on the party and wiped it
+    -- -- and a muddled living ally gets a plain unboosted Fight, which
+    -- clears the status (CalcMaxDmg strips it from a physically damaged
+    -- target; a Remedy does not carry the bit, M.itemStatus2).
+    do
+      local s2, mx = {}, {}
+      for e = 0, 3 do
+        s2[e] = M.readByte(ST2 + e * 2)
+        mx[e] = M.readWord(0x3C1C + e * 2)
+      end
+      local r = M.muddleRule({ actor = actor, status2 = s2, hp = hpNow, maxhp = mx })
+      if r == "defer" then
+        local said = string.format("[%s] actor=%d is MUDDLED (STATUS2 $%02X) -- "
+          .. "not planning: its command would be re-aimed by the engine; "
+          .. "deferring the window (X)", tag or "fight", actor, s2[actor])
+        if said ~= healSaid then healSaid = said; M.log(said) end
+        return { kind = "defer" }
+      end
+      if r ~= nil and r ~= "defer" and unmuddlePending and unmuddlePending.e == r
+         and battleTick - unmuddlePending.tick <= RAISE_WAIT then
+        local said = string.format("[%s] actor=%d: entity %d is MUDDLED but actor %d's "
+          .. "hit on it (confirmed at tick %d) is still in the air -- planning "
+          .. "normally rather than land a second one", tag or "fight", actor, r,
+          unmuddlePending.by, unmuddlePending.tick)
+        if said ~= healSaid then healSaid = said; M.log(said) end
+        r = nil
+      end
+      local fight = r ~= nil and cmdRow(actor, CMD_FIGHT) or nil
+      if fight ~= nil then
+        healSaid = nil
+        M.log(string.format("[%s] actor=%d: entity %d (%d/%d) is MUDDLED (STATUS2 "
+          .. "$%02X) -- a plain unboosted Fight on the ally clears it; before "
+          .. "any other plan", tag or "fight", actor, r, hpNow[r], mx[r], s2[r]))
+        return { kind = "fight", row = fight, boostLeft = 0, target = r,
+                 ally = true, reason = "unmuddle" }
+      end
+    end
     -- opts.healer = <battle chid>: only that character runs the item
     -- healing line; everyone else attacks.  Without this, a party whose
     -- only damage-dealer also heals can heal-lock: it never attacks, the
@@ -3356,7 +3448,9 @@ function M.newFightDriver(tag, opts)
       return nil
     end
     if st == ST_CMD then
-      if plan.kind == "switch" then return { "x" } end
+      -- "switch" (no Fight row) and "defer" (a muddled actor, #170) both
+      -- hand the window on with X; the plan stays until the actor changes
+      if plan.kind == "switch" or plan.kind == "defer" then return { "x" } end
       if plan.boostLeft and plan.boostLeft > 0 then
         plan.boostLeft = plan.boostLeft - 1
         return { "r" }
@@ -3489,9 +3583,12 @@ function M.newFightDriver(tag, opts)
       return { "a" }
     end
     if st == ST_TGT then
-      -- Both ally-targeted lines steer the same way: an item and a cure
-      -- differ only in which window chose them.
-      if plan.kind == "item" or plan.kind == "heal" then
+      -- Every ally-targeted line steers the same way: an item and a cure
+      -- differ only in which window chose them, and the Muddle rule's
+      -- Fight on an ally (plan.ally, #170) crosses to the party column
+      -- with the same RIGHT (battle_magicite measured the monsters on the
+      -- left and a LEFT parking the cursor) and walks the same mask.
+      if plan.kind == "item" or plan.kind == "heal" or plan.ally then
         local chars, mons = M.readByte(TGTCHARS), M.readByte(TGTMONS)
         if mons ~= 0 then return { "right" } end
         -- Neither side is selected: falling into the steer below with
@@ -3547,7 +3644,7 @@ function M.newFightDriver(tag, opts)
       -- A lore is multi-target: the focus rotation would spin against a
       -- whole-side mask it can never match, so it confirms on the default.
       if opts.focus and plan.kind ~= "item" and plan.kind ~= "summon"
-         and plan.kind ~= "heal" and plan.kind ~= "lore" then
+         and plan.kind ~= "heal" and plan.kind ~= "lore" and not plan.ally then
         local want = nil
         -- MONSTER_IDS is six 8-bit ID low bytes, one per slot; a word
         -- read at a 2-byte stride walks off the table into the position
@@ -3616,7 +3713,9 @@ function M.newFightDriver(tag, opts)
       -- The raise-then-top-up pair (#168): a confirmed Fenix Down is
       -- pending until the target's HP moves (F.frame); a confirmed heal
       -- on a raised member pays the top-up owed.
-      if plan.kind == "item" and plan.item == FENIX_DOWN then
+      if plan.ally then
+        unmuddlePending = { e = plan.target, by = actor, tick = battleTick }
+      elseif plan.kind == "item" and plan.item == FENIX_DOWN then
         raisePending = { e = plan.target, by = actor, tick = battleTick }
       elseif (plan.kind == "item" or plan.kind == "heal") and plan.target
          and topUpOwed[plan.target] then
@@ -3626,9 +3725,10 @@ function M.newFightDriver(tag, opts)
         topUpOwed[plan.target] = nil
       end
       -- and what a damage plan lands, for the press rule's window (the
-      -- dmgWatch queue above; F.frame credits and settles it)
-      if plan.kind == "fight" or plan.kind == "skill" or plan.kind == "magic"
-         or plan.kind == "summon" or plan.kind == "throw" or plan.kind == "lore" then
+      -- dmgWatch queue above; F.frame credits and settles it).  A Fight
+      -- on a muddled ally (#170) moves no monster HP and is not one.
+      if not plan.ally and (plan.kind == "fight" or plan.kind == "skill" or plan.kind == "magic"
+         or plan.kind == "summon" or plan.kind == "throw" or plan.kind == "lore") then
         -- an actor gets a fresh confirm only after its last command
         -- resolved (settled below) or was refused at the cursor, so an
         -- earlier watch of this actor's still holding nothing is the
@@ -3688,7 +3788,7 @@ function M.newFightDriver(tag, opts)
     healWatch, healSaid = nil, nil
     dmgWatch, dmgSeen, monHpLast = {}, {}, {}
     dmgHit, hitLedger, partyHpLast = {}, {}, {}
-    raisePending, topUpOwed = nil, {}
+    raisePending, topUpOwed, unmuddlePending = nil, {}, nil
     execActor, execDone = nil, {}
     execMon, execMonDone = nil, nil
     -- The stall guard's verdict belongs to the battle it watched: a retry
@@ -3819,6 +3919,20 @@ function M.newFightDriver(tag, opts)
           .. "(%d ticks) -- forgetting it", tag or "fight", raisePending.by,
           raisePending.e, battleTick - raisePending.tick))
         raisePending = nil
+      end
+    end
+    -- the Muddle rule's pending hit (#170) is done when the bit clears
+    -- (or the member falls), or forgotten after its window
+    if unmuddlePending then
+      local e = unmuddlePending.e
+      if (M.readByte(ST2 + e * 2) & M.ST2_MUDDLE) == 0
+         or M.readWord(0x3BF4 + e * 2) == 0
+         or battleTick - unmuddlePending.tick > RAISE_WAIT + 600 then
+        M.log(string.format("[%s] entity %d's Muddle %s (actor %d's hit confirmed at "
+          .. "tick %d, now tick %d, STATUS2 $%02X)", tag or "fight", e,
+          (M.readByte(ST2 + e * 2) & M.ST2_MUDDLE) == 0 and "is CLEARED" or "hit is forgotten",
+          unmuddlePending.by, unmuddlePending.tick, battleTick, M.readByte(ST2 + e * 2)))
+        unmuddlePending = nil
       end
     end
     for e, _ in pairs(topUpOwed) do
