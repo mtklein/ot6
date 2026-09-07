@@ -27,7 +27,17 @@ OUT="$ROOT/build/rafterlab"
 mkdir -p "$OUT"
 SRC="$ROOT/tools/tests/gen_opera7_blackjack.lua"
 LUA="$OUT/ultros_$TAG.lua"
-[ -f "$ROOT/build/states/$STATE.mss.lua" ] || { echo "no sidecar build/states/$STATE.mss.lua"; exit 2; }
+# A lab crossing run ends in its designed FAIL (nothing banks at floor
+# 99999), and run.sh publishes nothing from a failed run, so the arrivals sit
+# in the retained workspace.  compose.py resolves loadState references
+# against build/states only: copy the pair in from the workspace (the .mss
+# and its sidecar, unchanged; provenance is the batch log beside it).
+if [ ! -f "$ROOT/build/states/$STATE.mss.lua" ]; then
+  src=$(ls "$ROOT"/build/test-runs/rafterlab-gen-*/artifacts/"$STATE.mss.lua" 2>/dev/null | head -1)
+  [ -n "$src" ] || { echo "no sidecar build/states/$STATE.mss.lua, and no retained lab workspace holds one"; exit 2; }
+  cp "${src%.lua}" "$src" "$ROOT/build/states/" || exit 2
+  echo "[lab] $TAG: staged $STATE from $(dirname "$src") into build/states/"
+fi
 
 DOOR_ANCHOR='local DOOR = "build/states/ultros2_entry.mss.lua"'
 n=$(grep -cF "$DOOR_ANCHOR" "$SRC")

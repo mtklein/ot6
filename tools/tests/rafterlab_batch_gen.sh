@@ -85,8 +85,12 @@ grep -q 'saveState("ultros2_entry.mss")' "$LUA" && { echo "saveState rename fail
 
 echo "[lab] $TAG: panic=$PANIC holds={ $HOLDS } driver=${DRIVER:-<shipped>} arrivals=$ARRIVALS -> $OUT/gen_$TAG.log"
 OT6_LIVE=0 OT6_TIMEOUT="${OT6_TIMEOUT:-2400}" OT6_WORKER="rafterlab-gen-$TAG" \
-  "$ROOT/tools/tests/run.sh" "$LUA" "$OUT/gen_$TAG.log" > /dev/null 2>&1
+  "$ROOT/tools/tests/run.sh" "$LUA" "$OUT/gen_$TAG.log" > "$OUT/gen_$TAG.stdout" 2>&1
 rc=$?
+# the designed FAIL means run.sh publishes no artifacts: the arrival saves
+# (RAFTERLAB_ARRIVALS=1) stay in the retained workspace it names here, and
+# rafterlab_ultros_gen.sh stages them from there
+grep -h '^failed run retained: ' "$OUT/gen_$TAG.stdout" | sed 's/^/[lab] /'
 grep -h '^\[ot6\] \[rafters\] \(on the catwalk\|bag on the catwalk\|attempt [0-9]* \(ARRIVED\|did not\|arrival hp\)\)' "$OUT/gen_$TAG.log"
 grep -h '^\[ot6\] \(PASS (frame\|FAIL:\)' "$OUT/gen_$TAG.log" || echo "[lab] $TAG: no verdict (rc=$rc)"
 echo "[lab] $TAG: a FAIL on the ladder assert is the expected end of a lab run (nothing is banked at floor 99999)"
