@@ -19,15 +19,32 @@ raw = "--raw" in sys.argv
 logdir = Path(args[0] if args else "build/rizopaslab")
 pat = re.compile(r"\[result\] (.*)")
 
+# Items are counted from the engine's own record -- the [act] line ExecCmd
+# writes for a party Item command (cmd=$01, atk = the item id) -- not from
+# the battle-inventory delta the [result] line carries: an emptied row
+# vanishes from the battle inventory, so the bag sample freezes at the
+# last nonzero count (control_i55: two Potion actions, "potion=1").
+ITEM_ACT = re.compile(r"\[act\] t=\d+ start e[0-3] cmd=\$01 atk=\$([0-9A-F]{2})")
+ITEM = {"E8": "tonic", "E9": "potion", "F0": "fenix"}
+
 rows = defaultdict(dict)
 for log in sorted(logdir.glob("*.log")):
+    used = {"tonic": 0, "potion": 0, "fenix": 0}
+    kv = None
     for line in log.read_text(errors="replace").splitlines():
-        m = pat.search(line)
-        if not m:
+        a = ITEM_ACT.search(line)
+        if a and a.group(1) in ITEM:
+            used[ITEM[a.group(1)]] += 1
             continue
-        kv = dict(p.split("=", 1) for p in m.group(1).split() if "=" in p)
-        kv["_log"] = log.name
-        rows[kv.get("policy", "?")][(int(kv.get("idle", -1)), int(kv.get("prompt", 0)))] = kv   # last wins
+        m = pat.search(line)
+        if m:
+            kv = dict(p.split("=", 1) for p in m.group(1).split() if "=" in p)
+    if kv is None:
+        continue
+    kv["_log"] = log.name
+    for k, v in used.items():
+        kv[k] = str(v)
+    rows[kv.get("policy", "?")][(int(kv.get("idle", -1)), int(kv.get("prompt", 0)))] = kv   # last wins
 
 
 def fmean(xs):
