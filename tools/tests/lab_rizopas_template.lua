@@ -406,9 +406,13 @@ local function ledger()
   t = H.frame - battleUp
   actT = t
   if not H.battleActive() then return end
-  fenixLive = bagNow(FENIX_DOWN, fenixLive or fenix0)
-  potionLive = bagNow(POTION, potionLive or potion0)
-  tonicLive = bagNow(TONIC, tonicLive or tonic0)
+  -- the bag sample walks 256 records; every 16th frame is plenty (an item
+  -- use takes far longer than that to resolve) and keeps the emulator fast
+  if t % 16 == 0 then
+    fenixLive = bagNow(FENIX_DOWN, fenixLive or fenix0)
+    potionLive = bagNow(POTION, potionLive or potion0)
+    tonicLive = bagNow(TONIC, tonicLive or tonic0)
+  end
   if not rizo.seen and monPresent(5) then
     rizo.seen = true
     rizo.species = H.readWord(0x57C0 + 10)
@@ -528,8 +532,12 @@ H.run({ maxFrames = 50000, allowGameOver = true }, {
     armSeedWatch()
     armActionWatch()
     fenix0, potion0, tonic0 = H.invCountOf(FENIX_DOWN), H.invCountOf(POTION), H.invCountOf(TONIC)
-    H.log(string.format("[lab] set-off policy=%s idle=%d phase=%d bag f/p/t=%d/%d/%d party=[%s] at f%d",
-      POLICY, IDLE, H.readByte(0x021E), fenix0, potion0, tonic0, partyLine(), H.frame))
+    -- field HP off the character records ($1600 + 37*c + 9/11), the bake's
+    -- own read, so the fixture's entry HP is on every run's log
+    H.log(string.format("[lab] set-off policy=%s idle=%d phase=%d bag f/p/t=%d/%d/%d field hp SABIN=%d/%d CYAN=%d/%d at f%d",
+      POLICY, IDLE, H.readByte(0x021E), fenix0, potion0, tonic0,
+      H.readWord(0x1600 + 37 * SABIN + 9), H.readWord(0x1600 + 37 * SABIN + 11),
+      H.readWord(0x1600 + 37 * CYAN + 9), H.readWord(0x1600 + 37 * CYAN + 11), H.frame))
   end),
   H.navTo(13, 11, { maxFrames = 5000, playBattles = "tactical" }),
   -- the seed knob: stand still IDLE frames on the jump row ($021e ticks
