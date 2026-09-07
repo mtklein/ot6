@@ -134,6 +134,33 @@ H.run({ maxFrames = 3000 }, {
       c.hp, c.maxhp, c.threshold))
   end),
 
+  -- 5. the swing half: what the press rule (#156) counts before it skips a
+  -- heal.  The swing model is plain arithmetic (Ot6FightBoost: two swings
+  -- per BP, alternating hands when both hold a weapon); the class and
+  -- reflect bits are read out of this ROM's tables.
+  H.call(function()
+    local function swings(two, boost) return table.pack(H.fightSwings(two, boost)) end
+    local s = swings(false, 0)
+    H.assertEq(s[1] * 10 + s[2], 10, "one weapon, 0 BP: 1 swing")
+    s = swings(false, 2)
+    H.assertEq(s[1] * 10 + s[2], 50, "one weapon, 2 BP: 1 + 4 swings")
+    s = swings(true, 0)
+    H.assertEq(s[1] * 10 + s[2], 11, "Genji pair, 0 BP: one swing a hand")
+    s = swings(true, 2)
+    H.assertEq(s[1] * 10 + s[2], 33, "Genji pair, 2 BP: 3 + 3 swings (six chips on a two-class gauge)")
+    H.assertEq(H.weaponClass(0x0F), 0x01, "ThunderBlade $0F is slashing")
+    H.assertEq(H.weaponClass(0x05), 0x02, "Assassin $05 is piercing")
+    H.assertEq(H.weaponClass(H.AUTOCROSSBOW), 0x02, "AutoCrossbow $AA is piercing")
+    H.assertEq(H.weaponClass(0xFF), 0x04, "an empty hand is a bludgeoning fist")
+    H.assertEq(H.spellReflectable(0x02), true, "Bolt $02 bounces off Reflect")
+    H.assertEq(H.spellReflectable(0x0B), true, "Bolt 3 $0B (the 2-BP fold) bounces too")
+    H.assertEq(H.spellReflectable(0x2D), true, "Cure $2D is reflectable (cast at allies, never at the monster)")
+    H.assertEq(H.spellReflectable(0x38), false, "Shiva's summon attack $38 ignores Reflect")
+    H.assertEq(H.spellReflectable(0x5D), false, "Pummel $5D ignores Reflect")
+    H.assertEq(H.spellReflectable(0x8E), false, "Aqua Rake $8E ignores Reflect")
+    H.log("battle_healpolicy: swing model, class and reflect bits checked")
+  end),
+
   -- 4. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(

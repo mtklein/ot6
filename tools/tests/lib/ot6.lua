@@ -603,6 +603,54 @@ function M.monsterAbsorb(species)
   return M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF)
     + species * MON_REC + MON_ABSORB)
 end
+-- monster_prop +24, the elements the species NULLS: a cast of one of them
+-- lands for 0.  The spell guards read it (a wasted turn); the weapon guard
+-- above deliberately does not (see its header).
+function M.monsterNull(species)
+  return M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF)
+    + species * MON_REC + MON_ABSORB + 1)
+end
+
+-- Spell +$03, attack flags 1 (battle-ram.txt $11A3); bit 1 is "ignore
+-- reflect".  Clear on every attack spell the driver casts (Fire/Ice/Bolt
+-- at every tier, Pearl, Flare: a Reflect-bearing target bounces them);
+-- set on every esper, lore, blitz and tool.  Families share the byte, so
+-- the base spell answers for every tier a boost folds it to.
+function M.spellReflectable(id)
+  if id == nil or id > 0xFF then return false end
+  return (M.readRomByte((M.sym("MagicProp") & 0x3FFFFF) + id * 14 + 3)
+          & 0x02) == 0
+end
+
+-- Item +$00 says weapon (type 1, record in use) -- weaponElement's own
+-- test, exposed for the hand model below.
+function M.isWeapon(item)
+  if item == nil or item > 0xFF then return false end
+  local t = M.readRomByte((M.sym("ItemProp") & 0x3FFFFF)
+    + item * ITEM_REC + ITEM_TYPE)
+  return (t & 0x80) == 0 and (t & 0x07) == 1
+end
+
+-- The class a Fight or Tools hit carries: Ot6WeapClassTbl[item]
+-- (ot6_class.asm, one byte per item id, tools included; an empty hand
+-- $FF is a bludgeoning fist).  Bit 7 is the null-break property, a hit
+-- that chips nothing, so it reads as no class here.
+function M.weaponClass(item)
+  if item == nil or item > 0xFF then return 0 end
+  local c = M.readRomByte((M.sym("Ot6WeapClassTbl") & 0x3FFFFF) + item)
+  if (c & 0x80) ~= 0 then return 0 end
+  return c & 0x0F
+end
+
+-- Swings a boosted Fight makes, (main hand, off hand): one per armed hand,
+-- plus two per BP (Ot6FightBoost adds 2*BP to $3a70, ot6_boost.asm), and
+-- with a weapon in each hand (a Genji Glove pair) the swings alternate
+-- hands, so each hand gets half.  Plain arithmetic, kept out of the
+-- driver so a test can check it without an emulator.
+function M.fightSwings(twoWeapons, boost)
+  if twoWeapons then return 1 + boost, 1 + boost end
+  return 1 + 2 * boost, 0
+end
 
 -- Both hands of every party member, as { char = c, hand = "R"|"L",
 -- item = id }.  The left hand is usually a shield and weaponElement()
@@ -1615,10 +1663,14 @@ function M.newRecoveryTrace(tag, emit)
   function T.plan(actor, plan, frame)
     -- A fresh turn supersedes any incomplete evidence for that actor.
     T.drop(actor, frame, "new_plan")
-    if plan.kind ~= "heal" and plan.kind ~= "item" then return end
+    -- Every plan that becomes a command is traced (the first version
+    -- traced only heal/item; the Nerapa lab needed the attack lines in the
+    -- same ledger, #156).  A switch is a menu move, not a command.
+    if plan.kind == "switch" then return end
     actionTraceSerial = actionTraceSerial + 1
     local p = { id = actionTraceSerial, actor = actor, kind = plan.kind,
-      requested = plan.spell or plan.item, target = plan.target,
+      requested = plan.spell or plan.item or plan.skill or plan.lore or 0,
+      target = plan.target,
       all = plan.all or false, boost = plan.boostLeft or 0,
       frame = frame, stage = "plan" }
     T.pending[actor] = p
@@ -1949,6 +2001,160 @@ function M.newFightDriver(tag, opts)
     return nil
   end
 
+  -- OT6's per-monster state, slot-indexed: monsters are entities 4..9 at a
+  -- 2-byte stride, so slot s sits 8 bytes past the ot6_memory.inc base.
+  local MON_HP, MON_PRESENT = 0x3BFC, 0x3AA8
+  local SH_CUR, BRK_TICKS = 0x3E40, 0x3E90         -- OT6_SHIELD_CUR/BROKEN_TICKS + 8
+  local RV_ELEM, RV_CLASS = 0x3E91, 0x3EA5         -- OT6_REVEALED_ELEM/BOOST_REVEALED + 8
+  local MON_ST3 = 0x3F00                           -- current status 3 ($3EF8) + 8
+
+  -- The Reflect guard, beside the absorb guard, for every attack-cast
+  -- line (#156).  A reflectable spell (magic_prop +3 bit 1 clear) cast at
+  -- a monster under Reflect -- status 3 bit 7 -- deals it nothing and
+  -- lands its full damage on a party member: measured on Nerapa, every
+  -- Bolt/Ice at every tier dealt 0 to Nerapa, and a 2-BP Bolt 3 killed
+  -- LOCKE for 1400.  Reading the status byte is what a person does by
+  -- looking: the engine draws the Reflect bubble around the monster
+  -- ($2E60, the reflect graphics buffer), so the byte is on screen and
+  -- blind-player-legitimate, the way the revealed-weakness bytes are.
+  -- A spell whose every element the species NULLS (monster_prop +24) is
+  -- the same wasted turn without the self-inflicted hit, so it is
+  -- refused here too.  Summons, lores, blitzes, tools, throws and Fights
+  -- all carry ignore-reflect or no spell record at all, and pass.
+  local function immuneSlot(abilityId)
+    local elem = M.spellElement(abilityId)
+    local refl = M.spellReflectable(abilityId)
+    for _, s in ipairs(M.formationSpecies()) do
+      if M.readWord(MON_HP + s.slot * 2) > 0
+         and (M.readByte(MON_PRESENT + s.slot * 2) & 1) == 1 then
+        if refl and (M.readByte(MON_ST3 + s.slot * 2) & 0x80) ~= 0 then
+          return s, "is under REFLECT"
+        end
+        if elem ~= 0 and (M.monsterNull(s.species) & elem) == elem then
+          return s, "NULLS " .. M.elemStr(elem)
+        end
+      end
+    end
+    return nil
+  end
+  -- Both cast guards with their log line, for the magic, lore and nuke
+  -- lines.  True means the cast is off the table this turn.
+  local function castVetoed(abilityId, what)
+    local absorbed = absorbSlot(abilityId)
+    if absorbed then
+      M.log(string.format(
+        "[%s] %s $%02X refused: %s is ABSORBED by slot %d species $%04X "
+        .. "(#99) -- falling through", tag or "fight", what, abilityId,
+        M.elemStr(M.spellElement(abilityId)), absorbed.slot, absorbed.species))
+      return true
+    end
+    local s, why = immuneSlot(abilityId)
+    if s then
+      M.log(string.format(
+        "[%s] %s $%02X refused: slot %d species $%04X %s (#156) -- falling "
+        .. "through to an unreflectable line", tag or "fight", what,
+        abilityId, s.slot, s.species, why))
+      return true
+    end
+    return false
+  end
+
+  -- ---- the chip model (#156) -------------------------------------------
+  -- What a person counts off the HUD before pressing: the target's shield
+  -- pips, and the weakness icons the fight has REVEALED (RV_CLASS /
+  -- RV_ELEM, the bytes the HUD draws; the codex pre-reveals what earlier
+  -- fights taught).  An unrevealed axis is a '?' and counts for nothing
+  -- here, the same rule SHADOW's throw plays by.  Each landed hit chips
+  -- one shield per matched axis (Ot6ClassChip, Ot6Chip; ot6_break.asm);
+  -- a hit that matches both is counted once, so the model only ever
+  -- under-promises.
+  local function hitChips(slot, class, elem)
+    if class ~= 0 and (M.readByte(RV_CLASS + slot * 2) & class) ~= 0 then
+      return 1
+    end
+    if elem ~= 0 and (M.readByte(RV_ELEM + slot * 2) & elem) ~= 0 then
+      return 1
+    end
+    return 0
+  end
+  -- The actor's hands ($1600 + 37*char + $1F/$20, the record partyWeapons
+  -- reads): main hand, and the off hand only when it holds a weapon (a
+  -- Genji Glove pair); a shield swings nothing.  An empty main hand is a
+  -- fist, which Ot6WeapClassTbl classes as bludgeoning.
+  local function handsOf(actor)
+    local c = M.readByte(BCHID + actor * 2)
+    local r = M.readByte(0x1600 + 37 * c + 0x1F)
+    local l = M.readByte(0x1600 + 37 * c + 0x20)
+    if not M.isWeapon(r) and M.isWeapon(l) then return l, nil end
+    return r, (M.isWeapon(l) and l or nil)
+  end
+  -- Chips a Fight at `boost` lands on `slot`: swings per hand times that
+  -- hand's chips per hit.  LOCKE's Genji pair of ThunderBlade (slash,
+  -- bolt) and Assassin (pierce) at 2 BP is 3 + 3 swings, six chips on a
+  -- slash|pierce-weak gauge -- Nerapa's five, in one action.
+  local function fightChips(actor, slot, boost)
+    local r, l = handsOf(actor)
+    local mainSw, offSw = M.fightSwings(l ~= nil, boost)
+    local n = mainSw * hitChips(slot, M.weaponClass(r), M.weaponElement(r))
+    if l then
+      n = n + offSw * hitChips(slot, M.weaponClass(l), M.weaponElement(l))
+    end
+    return n
+  end
+  -- A tool is one hit (Ot6HitCountTbl: the Drill x2); boost multiplies
+  -- its damage, not its swings (Ot6FightBoost lives in FightAttack).
+  local TOOL_HITS = { [0xA8] = 2 }
+  local function toolChips(slot, tool)
+    return (TOOL_HITS[tool] or 1) * hitChips(slot, M.weaponClass(tool), 0)
+  end
+  -- The one monster an untargeted attack lands on: the focus list's first
+  -- living entry, else the only living monster on the field.  With
+  -- several and no focus the engine's default cursor decides, and the
+  -- model does not guess.
+  local function soleTarget()
+    local only = nil
+    for s = 0, 5 do
+      if M.readWord(MON_HP + s * 2) > 0
+         and (M.readByte(MON_PRESENT + s * 2) & 1) == 1 then
+        if only ~= nil then return nil end
+        only = s
+      end
+    end
+    return only
+  end
+  local function pressTarget()
+    if opts.focus then
+      local ids = M.monsterIds()
+      for _, e in ipairs(opts.focus) do
+        if ids[e.slot + 1] ~= 0xFFFF
+           and M.readWord(MON_HP + e.slot * 2) > 0 then return e.slot end
+      end
+    end
+    return soleTarget()
+  end
+
+  -- What the party's attacks have been landing, measured the way a person
+  -- reads the numerals: at a damage plan's confirm a watch joins the
+  -- queue; monster HP falling is credited, oldest watch first, until the
+  -- drop settles; the settled figure is normalized to shielded-equivalent
+  -- damage (Ot6ShieldedDmg x0.5 then Ot6BrokenDmg x2: broken is x4
+  -- shielded, weak or not, so a hit that lands on a broken target is /4).
+  -- FIFO attribution can misfile a counter's damage or two overlapping
+  -- actions; the press rule that consumes it only ever asks "does the
+  -- window cover the HP", where an error is one more heal turn, not a
+  -- lost fight.
+  local dmgWatch = {}                  -- FIFO of { actor, seen, landed, until_ }
+  local dmgSeen = {}                   -- entity -> shielded-equivalent HP its last action took
+  local monTotLast = nil
+  local DMG_SETTLE = 45                -- ticks with no further drop = the action landed
+  local function targetBroken()
+    for s = 0, 5 do
+      if M.readWord(MON_HP + s * 2) > 0
+         and M.readByte(BRK_TICKS + s * 2) ~= 0 then return true end
+    end
+    return false
+  end
+
   -- battle_lore.lua's own tested fact: $306A+id reads id+$8B iff that lore
   -- id passed Ot6LoreMask's live walk this battle; otherwise whatever
   -- InitBattle's own clear left there.  id+$8B is also the lore's ability
@@ -2113,8 +2319,113 @@ function M.newFightDriver(tag, opts)
         .. "went to actor %d -- attacking", tag or "fight", actor, careActor)
       if said ~= healSaid then healSaid = said; M.log(said) end
     end
+    -- The boost bank, read here because the press rule spends it.  Spending
+    -- one BP as soon as it is available plays OT6's economy badly: damage
+    -- while a monster still has shields is halved, with ratios
+    -- broken:weak:unweak = 4:2:1, so the intended play is to boost until
+    -- the shield breaks and then hit.  opts.bank means: act unboosted,
+    -- which regenerates BP, until the bank reads at least this value,
+    -- then spend.
+    local have = M.readByte(BP + actor * 2)
+    local boost = 0
+    if opts.boost then
+      if opts.bank and have < opts.bank then boost = 0
+      else boost = math.min(have, 3) end
+    end
     if (row ~= nil or cureRow ~= nil) and totalMon > 200 and parkDropN < 3
        and careOpen then
+      -- The press rule (#156), the finisher rule's sibling: when this
+      -- actor's best unreflectable action chips the target's remaining
+      -- shields to zero this turn AND the party's measured damage in the
+      -- broken window covers the HP left, the fight is one break from
+      -- over and the actor attacks rather than heals -- unless somebody is
+      -- inside one round of death, when the lethal-next-round heal rule
+      -- still comes first.  The cure-MP reserve is untouched; a press
+      -- spends BP, not MP.  The chips come from the revealed weaknesses
+      -- and the pips (the HUD); the HP left is read the way the finisher
+      -- rule reads totalMon.  Measured on Nerapa: with the party at
+      -- Potion-and-Fenix turns against a 3-pip, 1653-HP gauge, every care
+      -- turn bought less than a round cost while LOCKE's six-chip Fight
+      -- would have opened the window.
+      local press, pressWhy = (function()
+        if opts.press == false then return nil end
+        local slot = pressTarget()
+        if slot == nil then return nil end
+        for e = 0, 3 do
+          local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
+          if hp > 0 and hp < maxhp and hp <= (roundCost[e] or 0) then
+            return nil, string.format("[%s] actor=%d no press: entity %d "
+              .. "(%d/%d) is inside one round of death (%d) -- caring first",
+              tag or "fight", actor, e, hp, maxhp, roundCost[e])
+          end
+        end
+        local sh = M.readByte(SH_CUR + slot * 2)
+        local broken = M.readByte(BRK_TICKS + slot * 2) ~= 0
+        local need = broken and 0 or sh
+        -- the strongest unreflectable line by chips, at full boost (the
+        -- swings past the break land x4): the tool first so a tie keeps
+        -- the driver's own order, then the blitz, then the Fight
+        local id = M.readByte(BCHID + actor * 2)
+        local best = nil
+        local function offer(p) if best == nil or p.chips > best.chips then best = p end end
+        local tool = opts.tool or AUTOCROSSBOW
+        if opts.tactical and opts.tools ~= false and id == 4
+           and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_TOOLS)
+           and battInvIdx(tool) then
+          offer({ kind = "skill", cmd = CMD_TOOLS, skill = tool,
+                  row = cmdRow(actor, CMD_TOOLS), boostLeft = have,
+                  chips = toolChips(slot, tool),
+                  what = string.format("Tools $%02X", tool) })
+        end
+        if opts.tactical and id == 5 and (opts.blitz or PUMMEL) == PUMMEL
+           and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_BLITZ) then
+          offer({ kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
+                  row = cmdRow(actor, CMD_BLITZ), boostLeft = have,
+                  chips = 2 * hitChips(slot, 0x04, 0), what = "Pummel" })
+        end
+        local fight = cmdRow(actor, CMD_FIGHT)
+        if fight ~= nil then
+          offer({ kind = "fight", row = fight, boostLeft = have,
+                  chips = fightChips(actor, slot, have),
+                  what = string.format("Fight at %d BP", have) })
+        end
+        if best == nil then return nil end
+        if best.chips < need then
+          return nil, string.format("[%s] actor=%d no press: %s lands %d "
+            .. "chip(s) against %d shield(s) on slot %d -- caring",
+            tag or "fight", actor, best.what, best.chips, need, slot)
+        end
+        local hp = M.readWord(MON_HP + slot * 2)
+        local window, parts = 0, {}
+        for e = 0, 3 do
+          if hpNow[e] > 0 and dmgSeen[e] then
+            -- the breaker's own swings land shielded until the last chip;
+            -- everyone else's turn in the window is x4 shielded
+            local mult = (e == actor and not broken) and 1 or 4
+            window = window + dmgSeen[e] * mult
+            parts[#parts + 1] = string.format("e%d:%dx%d", e, dmgSeen[e], mult)
+          end
+        end
+        if window < hp then
+          return nil, string.format("[%s] actor=%d no press: %s would %s "
+            .. "slot %d but the window's damage %d (%s) is short of its %d HP "
+            .. "-- caring", tag or "fight", actor, best.what,
+            broken and "hit broken" or ("chip " .. best.chips .. " of " .. need),
+            slot, window, table.concat(parts, " "), hp)
+        end
+        best.reason = "press"
+        M.log(string.format("[%s] actor=%d PRESS: slot %d %s, %s lands %d "
+          .. "chip(s); the window's damage %d (%s) covers its %d HP -- "
+          .. "attacking instead of caring", tag or "fight", actor, slot,
+          broken and "is BROKEN" or (sh .. " shield(s) up"), best.what,
+          best.chips, window, table.concat(parts, " "), hp))
+        return best
+      end)()
+      if press then
+        healSaid = nil
+        return press
+      end
+      if pressWhy and pressWhy ~= healSaid then healSaid = pressWhy; M.log(pressWhy) end
       -- Revival stays item-only.  Life ($33) is not on any route this
       -- library drives yet: no esper in the WoB grants it (genju_prop.asm)
       -- and only Terra and Celes learn it innately, so a cast branch here
@@ -2268,18 +2579,7 @@ function M.newFightDriver(tag, opts)
       end
     end
     local id = M.readByte(BCHID + actor * 2)
-    -- The boost bank.  Spending one BP as soon as it is available plays
-    -- OT6's economy badly: damage while a monster still has shields is
-    -- halved, with ratios broken:weak:unweak = 4:2:1, so the intended play
-    -- is to boost until the shield breaks and then hit.  opts.bank means:
-    -- act unboosted, which regenerates BP, until the bank reads at least
-    -- this value, then spend.
-    local have = M.readByte(BP + actor * 2)
-    local boost = 0
-    if opts.boost then
-      if opts.bank and have < opts.bank then boost = 0
-      else boost = math.min(have, 3) end
-    end
+    -- (the boost bank `have`/`boost` was read above the care block)
     -- The park ratchet covers the tactical lines as well as care: a
     -- skill whose window keeps getting dropped and re-planned is the
     -- same buzzing confirm, and measured with only the back-out in place
@@ -2341,17 +2641,9 @@ function M.newFightDriver(tag, opts)
     -- damage and the BP is owed to somebody's break.
     local mg = opts.magic and opts.magic[id]
     if mg and cmdRow(actor, CMD_MAGIC) then
-      -- The absorb guard, at plan time, for the ability's element (the
-      -- shared absorbSlot above).
-      local absorbed = absorbSlot(mg.spell)
-      if absorbed then
-        M.log(string.format(
-          "[%s] cast $%02X refused: %s is ABSORBED by slot %d species " ..
-          "$%04X (#99) -- falling through to Fight",
-          tag or "fight", mg.spell, M.elemStr(M.spellElement(mg.spell)),
-          absorbed.slot, absorbed.species))
-        mg = nil
-      end
+      -- The absorb and Reflect guards, at plan time, for the ability's
+      -- element and reflectability (castVetoed above).
+      if castVetoed(mg.spell, "cast") then mg = nil end
     end
     if mg and cmdRow(actor, CMD_MAGIC) then
       local cell, cost = spellCell(actor, mg.spell, true)
@@ -2387,13 +2679,8 @@ function M.newFightDriver(tag, opts)
           if loreOffered(lid) then
             local cell, cost = loreCell(actor, lid, true)
             local mp = M.readWord(CURMP + actor * 2)
-            local absorbed = absorbSlot(0x8B + lid)
-            if absorbed then
-              M.log(string.format(
-                "[%s] lore $%02X refused: %s is ABSORBED by slot %d species "
-                .. "$%04X (#99) -- falling through",
-                tag or "fight", lid, M.elemStr(M.spellElement(0x8B + lid)),
-                absorbed.slot, absorbed.species))
+            if castVetoed(0x8B + lid, "lore") then
+              -- refused and logged; the next lore, then the lines below
             elseif cell ~= nil and mp - cost >= nukeFloor(actor) then
               M.log(string.format(
                 "[%s] actor=%d nuke lore $%02X, row %d, %d MP of %d",
@@ -2410,14 +2697,7 @@ function M.newFightDriver(tag, opts)
         local cell, cost = spellCell(actor, spell, true)
         if cell ~= nil
            and M.readWord(CURMP + actor * 2) - cost >= nukeFloor(actor) then
-          local absorbed = absorbSlot(spell)
-          if absorbed then
-            M.log(string.format(
-              "[%s] nuke $%02X refused: %s is ABSORBED by slot %d species "
-              .. "$%04X (#99) -- falling through",
-              tag or "fight", spell, M.elemStr(M.spellElement(spell)),
-              absorbed.slot, absorbed.species))
-          else
+          if not castVetoed(spell, "nuke") then
             M.log(string.format(
               "[%s] actor=%d nuke $%02X, cell %d, %d MP of %d",
               tag or "fight", actor, spell, cell, cost,
@@ -2441,7 +2721,25 @@ function M.newFightDriver(tag, opts)
        and M.readWord(CURMP + actor * 2) >= 4
        and cmdRow(actor, CMD_TOOLS)
        and battInvIdx(opts.tool or AUTOCROSSBOW) then
-      return { kind = "skill", cmd = CMD_TOOLS, skill = opts.tool or AUTOCROSSBOW,
+      -- The chip model picks between the tool and the sword (#156): against
+      -- a lone monster whose revealed classes EDGAR's blade matches, a
+      -- boosted Fight's 1 + 2*BP swings chip more than the tool's one hit
+      -- (five to one at 2 BP), and chips are the point of the turn.  A
+      -- formation of several keeps the tool, which hits them all; a tie
+      -- keeps it too.
+      local tool = opts.tool or AUTOCROSSBOW
+      local slot = soleTarget()
+      local fight = cmdRow(actor, CMD_FIGHT)
+      if slot ~= nil and fight ~= nil then
+        local fc, tc = fightChips(actor, slot, boost), toolChips(slot, tool)
+        if fc > tc then
+          M.log(string.format("[%s] actor=%d Fight at %d BP chips %d against "
+            .. "slot %d, Tools $%02X %d -- Fighting (#156)", tag or "fight",
+            actor, boost, fc, slot, tool, tc))
+          return { kind = "fight", row = fight, boostLeft = boost }
+        end
+      end
+      return { kind = "skill", cmd = CMD_TOOLS, skill = tool,
                row = cmdRow(actor, CMD_TOOLS), boostLeft = boost }
     end
     if opts.tactical and id == 5 and M.readWord(CURMP + actor * 2) >= 4
@@ -2897,6 +3195,13 @@ function M.newFightDriver(tag, opts)
         watch.until_ = battleTick + 900
         healWatch = watch
       end
+      -- and what a damage plan lands, for the press rule's window (the
+      -- dmgWatch queue above; F.frame credits and settles it)
+      if plan.kind == "fight" or plan.kind == "skill" or plan.kind == "magic"
+         or plan.kind == "summon" or plan.kind == "throw" or plan.kind == "lore" then
+        dmgWatch[#dmgWatch + 1] = { actor = actor, kind = plan.kind, seen = 0,
+                                    until_ = battleTick + 900 }
+      end
       -- A confirmed lore is the progress the stall guard watches for.
       if plan.kind == "lore" then
         loreSpinN = 0
@@ -2941,6 +3246,7 @@ function M.newFightDriver(tag, opts)
     roundCost, turnSnap = {}, {}
     itemRestore, castRestore = {}, {}
     healWatch, healSaid = nil, nil
+    dmgWatch, dmgSeen, monTotLast = {}, {}, nil
     -- The stall guard's verdict belongs to the battle it watched: a retry
     -- ladder's reload is a different fight, and a recurrence should dump
     -- again there rather than inherit a dead lore line silently.
@@ -3001,6 +3307,30 @@ function M.newFightDriver(tag, opts)
       elseif battleTick > healWatch.until_ then
         healWatch = nil
       end
+    end
+    -- The damage watch (see dmgWatch): monster HP falling is credited to
+    -- the oldest confirmed damage plan; once the drop has settled the
+    -- figure is normalized and kept per actor.  A rise (a monster healing
+    -- itself, an absorbed hit) only moves the baseline.
+    do
+      local tot = 0
+      for s = 0, 5 do tot = tot + M.readWord(MON_HP + s * 2) end
+      local w = dmgWatch[1]
+      if w ~= nil and monTotLast ~= nil then
+        if tot < monTotLast then
+          w.seen, w.landed = w.seen + (monTotLast - tot), battleTick
+        elseif w.landed ~= nil and battleTick - w.landed > DMG_SETTLE then
+          local d = targetBroken() and (w.seen // 4) or w.seen
+          dmgSeen[w.actor] = d
+          M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
+            .. "(%d shielded-equivalent; the press rule counts it)",
+            tag or "fight", w.actor, w.kind, w.seen, d))
+          table.remove(dmgWatch, 1)
+        elseif battleTick > w.until_ then
+          table.remove(dmgWatch, 1)
+        end
+      end
+      monTotLast = tot
     end
     local menu = M.readByte(MENU)
     if battleTick == 1 or battleTick % 300 == 0 then
