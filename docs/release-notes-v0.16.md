@@ -38,9 +38,12 @@ and break like the rest of the game. A build gate now refuses to ship any
 encounter that has no break key at all.
 
 **Fewer stray encounters** on the Phantom Forest's corridor bridge, where a
-crossing was measured stalling mid-battle. The freeze fix above may be the
-real cause of that stall; the suppression stays in this build and will be
-re-examined once the bridge has been crossed with encounters live.
+crossing was once measured stalling mid-battle. That suppression still ships
+in this build. It has since been re-examined with the freeze above fixed: on
+a follow-up build with the suppression removed, the bridge was crossed forty
+times with every encounter fought, 120 won battles with Shadow aboard, four
+of them rolling Shadow's leave, and nothing stalled. The suppression comes
+out in the next release.
 
 ## Patch bytes
 
