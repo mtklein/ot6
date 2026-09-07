@@ -180,11 +180,40 @@ local function recordPad()
   end
 end
 
+-- The post-game-over pad freeze (#153).  A game over must end the
+-- attempt: whatever a driver presses after one is a press into the
+-- annihilated screen, the fade, or the title's Continue -- and one A there
+-- loads the last save while every predicate reads healthy again.  So from
+-- the moment the canary counts a game over until the script restores a
+-- snapshot (M.requestLoadState, the ladders' recovery path), setPad holds
+-- the pad neutral.  A run without allowGameOver has already stopped by
+-- then; a ladder that reloads and clears M.gameOverFired never notices.
+M.padFrozen = false
+local padFrozenSaid = false
+function M.freezePad(why)
+  if M.padFrozen then return end
+  M.padFrozen = true
+  padFrozenSaid = false
+  M.log(string.format("pad frozen (f%d): %s -- no further presses until a " ..
+    "snapshot is restored, so nothing here can Continue a save", M.frame, why))
+end
+function M.thawPad()
+  M.padFrozen = false
+end
+
 -- Set the held-button set ({"a","down"} or {a=true,down=true}); every other
 -- button is released, since the script owns the pad and there is no human
 -- player.
 function M.setPad(buttons)
   for _, b in ipairs(ALL_BTN) do curPad[b] = false end
+  if M.padFrozen then
+    if buttons ~= nil and next(buttons) ~= nil and not padFrozenSaid then
+      padFrozenSaid = true
+      M.log(string.format("pad frozen: a press was dropped at f%d (the run " ..
+        "is past a game over; restore a snapshot to press again)", M.frame))
+    end
+    buttons = nil
+  end
   for k, v in pairs(buttons or {}) do
     local name = (type(k) == "number") and v or (v and k or nil)
     if name then
@@ -281,6 +310,9 @@ end
 
 function M.requestLoadState(blob)
   M.finishRecoveryTrace("state_reload")
+  -- a restored snapshot restarts the experiment: the post-game-over pad
+  -- freeze (see M.freezePad) ends here, with the game over it answered
+  M.thawPad()
   local req = {}
   local ref
   ref = emu.addMemoryCallback(function()
@@ -1813,9 +1845,25 @@ function M.newFightDriver(tag, opts)
                                        -- since the last landed lore cast
   local loreDead = false               -- the stall guard fired this battle
 
+  -- A command row the cursor can actually land on.  Each $202E row is
+  -- three bytes -- id, flags, targeting -- and flags bit 7 is the engine's
+  -- own "disabled" mark (UpdateCmdList, battle_main.asm: `ror $0001,x`
+  -- writes each updater's carry there; btlgfx check_command reads it and
+  -- the command cursor SKIPS such a row).  A row that reads as present
+  -- but disabled is therefore unreachable: the steer's down/up hops over
+  -- it, cur oscillates 1 <-> 3 and the plan parks in ST_CMD until the
+  -- pulse cap drops it (#153: LOCKE, Muted by a Naughty on the FC escape,
+  -- Magic row flags $80, "consumed 41 pulses in state $05 without
+  -- landing" ten times over while the party bled out).  So a disabled
+  -- row is reported as absent, and the plan falls through to a line the
+  -- cursor can reach, the way a person reads a greyed command.
+  local function cmdDisabled(actor, row)
+    return (M.readByte(CMDTBL + actor * 12 + row * 3 + 1) & 0x80) ~= 0
+  end
   local function cmdRow(actor, cmd)
     for row = 0, 3 do
-      if M.readByte(CMDTBL + actor * 12 + row * 3) == cmd then
+      if M.readByte(CMDTBL + actor * 12 + row * 3) == cmd
+         and not cmdDisabled(actor, row) then
         return row
       end
     end
@@ -2597,6 +2645,17 @@ function M.newFightDriver(tag, opts)
         plan.boostLeft = plan.boostLeft - 1
         return { "r" }
       end
+      -- The row can go grey between the plan and the press (a status that
+      -- lands while the window is open: Mute greys Magic); the cursor
+      -- would then hop over it forever.  Re-plan instead of chasing it.
+      if plan.row ~= nil and cmdDisabled(actor, plan.row) then
+        M.log(string.format("[%s] plan %s: command row %d is DISABLED "
+          .. "(flags $%02X) -- the cursor cannot land there; re-planning",
+          tag or "fight", plan.kind, plan.row,
+          M.readByte(CMDTBL + actor * 12 + plan.row * 3 + 1)))
+        dropPlan("command_disabled")
+        return nil
+      end
       local cur = M.readByte(CMDROW + actor) & 3
       if cur == plan.row then return { "a" } end
       return { cur < plan.row and "down" or "up" }
@@ -3246,8 +3305,21 @@ function M.run(opts, steps)
   -- state-booted run the latch closes on the first frame.  The counters
   -- are split so the failure names which watch fired; M.gameOverFired
   -- stays the public sum every existing caller reads and clears.
+  -- Third watch, the battle-side wipe (#153): an annihilated party never
+  -- reaches either of the above on its own.  LoseBattle sets $3ebc bit 0
+  -- and the battle module then SITS on the annihilated screen waiting for
+  -- a press -- measured with probe_wipe_canary.lua on the FC (394): every
+  -- battle-HP word 0 from t=11945, $3ebc=$0D, no GameOver read and no
+  -- TitleScreen exec for the next 30,000 frames with the pad released.
+  -- Only a press moves it on, and the press a driver makes there is the
+  -- A that Continues the last save.  So the wipe predicate itself (every
+  -- sane battle-HP word 0 with the battle table live, M.partyWipedInBattle)
+  -- held for WIPE_FRAMES counts as a game over: bounded, and before any
+  -- driver can press through to the title.
   M.gameOverFired = 0
-  local goReadFired, titleExecFired = 0, 0
+  local goReadFired, titleExecFired, wipeFired = 0, 0, 0
+  local WIPE_FRAMES = 300
+  local wipeN = 0
   local canaryInGame = false
   do
     local ok, addr = pcall(function() return M.sym("GameOver") end)
@@ -3265,6 +3337,7 @@ function M.run(opts, steps)
         if pc ~= addr and pc ~= addr + 1 then return end
         goReadFired = goReadFired + 1
         M.gameOverFired = M.gameOverFired + 1
+        M.freezePad("the GameOver event script was entered")
       end, emu.callbackType.read, addr, addr)
     end
   end
@@ -3275,6 +3348,7 @@ function M.run(opts, steps)
         if canaryInGame then
           titleExecFired = titleExecFired + 1
           M.gameOverFired = M.gameOverFired + 1
+          M.freezePad("TitleScreen was entered")
         end
       end, emu.callbackType.exec, addr, addr)
     end
@@ -3285,18 +3359,33 @@ function M.run(opts, steps)
     if not canaryInGame and (M.hasControl() or M.battleLoadStarted()) then
       canaryInGame = true
     end
+    if canaryInGame and M.partyWipedInBattle and M.partyWipedInBattle() then
+      wipeN = wipeN + 1
+      if wipeN == WIPE_FRAMES then
+        wipeFired = wipeFired + 1
+        M.gameOverFired = M.gameOverFired + 1
+        M.log(string.format("canary: BATTLE WIPE -- every battle-HP word " ..
+          "has read 0 for %d frames with the battle table live " ..
+          "($3ebc=%02X); the engine is sitting on the annihilated screen " ..
+          "waiting for a press.  Counted as a game over (f%d).",
+          WIPE_FRAMES, M.readByte(0x3ebc), M.frame))
+        M.freezePad("the party was wiped in battle")
+      end
+    else
+      wipeN = 0
+    end
     if M.gameOverFired > 0 and not opts.allowGameOver then
       finished = true
       traceFlush()
       coverageFlush()
       M.finishRecoveryTrace("run_ended")
       M.log(string.format("FAIL: GAME OVER fired (GameOver read x%d, " ..
-        "TitleScreen exec x%d) -- the run " ..
+        "TitleScreen exec x%d, battle wipe x%d) -- the run " ..
         "lost and any further input auto-Continues the last save, which " ..
         "reads as silent time travel.  A ladder that can survive this " ..
         "must reload BEFORE the game-over lands, or clear " ..
         "M.gameOverFired after handling it (see #127's ambush finding).",
-        goReadFired, titleExecFired))
+        goReadFired, titleExecFired, wipeFired))
       emu.stop(3)
       return
     end
