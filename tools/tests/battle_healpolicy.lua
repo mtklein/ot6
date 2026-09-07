@@ -407,6 +407,37 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: spend rule and wipe class (#175) checked")
   end),
 
+  -- 12. the raise gate's floor (#174, H.hitFloorExempt) on the map-269
+  -- bytes: Trapper's L4 Flare is cmd $0C atk $95 (measured: "[death]
+  -- f+2135 entity 2 char 1 from 447/447 by slot 2 cmd $0C atk $95"), and
+  -- Rizopas's Battle cmd $00 atk $EE, El Nino cmd $02 atk $6F, Mega Volt
+  -- cmd $0C atk $B8 (the lab's [act] lines).
+  H.call(function()
+    local ex, why = H.hitFloorExempt({ cmd = 0x0C, atk = 0x95, fullKills = 2 })
+    H.assertEq(ex, true, "L4 Flare by Lore, two killed from full: not a floor (" .. why .. ")")
+    ex, why = H.hitFloorExempt({ cmd = 0x0C, atk = 0x95, fullKills = 1 })
+    H.assertEq(ex, true, "L4 Flare killing one: still a level spell, not a floor (" .. why .. ")")
+    ex, why = H.hitFloorExempt({ cmd = 0x02, atk = 0x94, fullKills = 0 })
+    H.assertEq(ex, true, "L5 Doom cast by the Magic command: a level spell (" .. why .. ")")
+    ex, why = H.hitFloorExempt({ cmd = 0x00, atk = 0xEE, fullKills = 0 })
+    H.assertEq(ex, false, "Rizopas's Battle: the floor (" .. why .. ")")
+    ex, why = H.hitFloorExempt({ cmd = 0x02, atk = 0x6F, fullKills = 1 })
+    H.assertEq(ex, false, "El Nino taking one member: an ordinary spell, its damage recurs (" .. why .. ")")
+    ex, why = H.hitFloorExempt({ cmd = 0x02, atk = 0x6F, fullKills = 2 })
+    H.assertEq(ex, true, "...but a cast that kills two from full in one action reads as a level spell whatever its id (" .. why .. ")")
+    ex, why = H.hitFloorExempt({ cmd = 0x0C, atk = 0xB8, fullKills = 0 })
+    H.assertEq(ex, false, "Mega Volt by the Lore command: ordinary, a floor (" .. why .. ")")
+    ex, why = H.hitFloorExempt({ cmd = 0x00, atk = 0xEE, fullKills = 2 })
+    H.assertEq(ex, false, "a swing is never exempt, whatever it killed (" .. why .. ")")
+    H.assertEq(H.LEVEL_SPELLS[0x98], "L? Pearl", "the level-spell set is const.inc's: $94 $95 $96 $98")
+    H.assertEq(H.LEVEL_SPELLS[0x97], nil, "...and $97 (Reflect???) is not one")
+    -- what the gate then sees: with the Flare's 447 kept aside, the ledger
+    -- has no hit and the raise stands
+    local raiseHp, ok, why2 = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = nil })
+    H.assertEq(raiseHp * 10 + (ok and 1 or 0), 551, "LOCKE (447) to 55 with no floor measured: the raise stands (" .. why2 .. ")")
+    H.log("battle_healpolicy: the raise gate's level-spell exemption (#174) checked")
+  end),
+
   -- 8. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(

@@ -776,6 +776,44 @@ function M.raiseDecision(o)
     .. "is in reach, and the enemy acts before anyone can top up", raiseHp, hit)
 end
 
+-- Is a monster action's damage a per-turn floor for the raise gate
+-- (#174)?  The gate (M.raiseDecision) refuses a Fenix Down when the
+-- living enemy's smallest hit re-kills the raise; a LEVEL SPELL is not
+-- that hit.  Trapper's L4 Flare killed full-HP LOCKE and CELES in one
+-- Lore action, and the gate read the 447 as "what this enemy does every
+-- turn" and held for the rest of the fight while the two who held the
+-- keys stayed down (map269-random.md: control 8050 frames, cared 3355).
+-- A level spell lands on a level-multiple, once per caster turn, a third
+-- of its turns; the raised member survives the next Battle.  So an
+-- action is exempt from the floor when it is a cast (the Magic or Lore
+-- command, $02 / $0C -- Battle and the special are $00) AND it is either
+-- one of vanilla's level spells (const.inc: L5 Doom $94, L4 Flare $95,
+-- L3 Muddle $96, L? Pearl $98) or it killed two or more members from
+-- full HP in the one action -- the shape a person recognises on screen
+-- whatever the spell was called.  Everything else -- a Battle, El Nino
+-- taking one member, a Fire 3 -- stays the floor it was.
+--
+--   cmd        the monster's command byte ($b5 at ExecCmd)
+--   atk        its attack byte ($b6), the ability id after folding
+--   fullKills  members this action killed from full HP
+--
+-- Returns true and the reason when the action is NOT a floor.
+M.LEVEL_SPELLS = { [0x94] = "L5 Doom", [0x95] = "L4 Flare", [0x96] = "L3 Muddle",
+                   [0x98] = "L? Pearl" }
+function M.hitFloorExempt(o)
+  local cmd, atk, fullKills = o.cmd or 0, o.atk or 0, o.fullKills or 0
+  if cmd ~= 0x02 and cmd ~= 0x0C then return false, "a swing, not a cast" end
+  if M.LEVEL_SPELLS[atk] then
+    return true, string.format("%s ($%02X) is a level spell: it recurs only on the "
+      .. "caster's turn, on a level-multiple", M.LEVEL_SPELLS[atk], atk)
+  end
+  if fullKills >= 2 then
+    return true, string.format("cast $%02X killed %d members from full HP in one "
+      .. "action: a level-spell shape, not a per-turn hit", atk, fullKills)
+  end
+  return false, string.format("cast $%02X is an ordinary spell: its damage recurs", atk)
+end
+
 -- Spend it before you die (#175): a member inside one round of death who
 -- holds banked BP, and whom no heal in hand lifts clear of that round,
 -- spends the pips now on their strongest line rather than take a heal
@@ -2577,14 +2615,54 @@ function M.newFightDriver(tag, opts)
   -- takes no turns (Ot6Gate skips them) and is not due to act.  Returns
   -- ok, the raise HP, the hit with its slot and victim (nil when nothing
   -- is measured), and the reason with every number in it.
+  -- A closed monster action's drops go into the hit ledger here (#165,
+  -- #174).  A level spell's, or a cast's that killed two from full, are
+  -- kept aside as L.spell -- on the record, in the raise line, but not
+  -- the smallest hit the gate measures against.
+  local function commitMonAct(act)
+    if #act.drops == 0 then return end
+    local L = hitLedger[act.slot] or { on = {} }
+    hitLedger[act.slot] = L
+    local exempt, why = M.hitFloorExempt({ cmd = act.cmd, atk = act.atk,
+                                           fullKills = act.fullKills })
+    if exempt then
+      local parts = {}
+      for _, d in ipairs(act.drops) do
+        parts[#parts + 1] = string.format("e%d:%d->%d", d.e, d.last, d.hp)
+        L.spell = L.spell or { n = 0 }
+        L.spell.n = L.spell.n + 1
+        if L.spell.min == nil or d.drop < L.spell.min then L.spell.min = d.drop end
+        L.spell.atk = act.atk
+      end
+      M.log(string.format("[%s] slot %d's cmd $%02X atk $%02X took %s -- NOT a floor "
+        .. "for the raise gate: %s (#174)", tag or "fight", act.slot, act.cmd, act.atk,
+        table.concat(parts, " "), why))
+      return
+    end
+    for _, d in ipairs(act.drops) do
+      if L.on[d.e] == nil or d.drop < L.on[d.e] then L.on[d.e] = d.drop end
+      if L.min == nil or d.drop < L.min then
+        L.min, L.minE = d.drop, d.e
+        M.log(string.format("[%s] slot %d's smallest hit this fight so far: "
+          .. "%d, on entity %d (%d -> %d)", tag or "fight", act.slot, d.drop, d.e,
+          d.last, d.hp))
+      end
+    end
+  end
+
   local function raiseOk(e, actor)
     local maxhp = M.readWord(0x3C1C + e * 2)
     local raiseHp = (maxhp * M.itemPower(FENIX_DOWN)) >> 4
     local hit, hitSlot, hitOn = nil, nil, nil
     local lethalEta, lethalSlot, lethalPct = nil, nil, nil
     local brokenLethal = nil
+    local spells = {}
     for s = 0, 5 do
       local L = hitLedger[s]
+      if L and L.spell and monAlive(s) then
+        spells[#spells + 1] = string.format("slot %d's $%02X (smallest %d, %d hit(s))",
+          s, L.spell.atk, L.spell.min, L.spell.n)
+      end
       if L and monAlive(s) then
         local v, on = L.on[e], e
         if v == nil then v, on = L.min, L.minE end
@@ -2647,6 +2725,10 @@ function M.newFightDriver(tag, opts)
         detail = detail .. string.format("; gauges: nobody else standing to top up "
           .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
       end
+    end
+    if #spells > 0 then
+      detail = detail .. string.format("; level-spell hits not counted as the floor "
+        .. "(#174): %s", table.concat(spells, ", "))
     end
     local _, ok, why = M.raiseDecision(o)
     return ok, raiseHp, hit, hitSlot, hitOn, why .. detail
@@ -2933,7 +3015,7 @@ function M.newFightDriver(tag, opts)
     -- SABIN at 82/363 under a 244 round spent eleven turns on care while
     -- one 1-BP Fight ended the fight.
     local function spendPlan(where)
-      if opts.spend == false then return nil end
+      if opts.spend == false or livingMonsters() == 0 then return nil end
       local hp, maxhp = hpNow[actor], M.readWord(0x3C1C + actor * 2)
       local cost = roundCost[actor] or 0
       if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return nil end
@@ -4221,28 +4303,25 @@ function M.newFightDriver(tag, opts)
         slot = execMonDone.slot
       end
       -- one monAct per attributed action: it opens when a slot starts
-      -- executing and closes when the attribution window ends
-      if slot == nil then
+      -- executing and closes when the attribution window ends.  Its
+      -- drops are held until it closes and committed to the ledger
+      -- together, because whether they are a floor at all is a fact
+      -- about the whole action (M.hitFloorExempt, #174: a level spell's
+      -- double kill is not what this enemy does every turn).
+      if slot == nil or monAct == nil or monAct.slot ~= slot then
+        if monAct ~= nil then commitMonAct(monAct) end
         monAct = nil
-      elseif monAct == nil or monAct.slot ~= slot then
+      end
+      if slot ~= nil and monAct == nil then
         monAct = { slot = slot, cmd = execMonCmd or 0, atk = execMonAtk or 0,
-                   tick = battleTick, hp0 = {}, kills = 0, fullKills = 0 }
+                   tick = battleTick, hp0 = {}, kills = 0, fullKills = 0, drops = {} }
         for e = 0, 3 do monAct.hp0[e] = partyHpLast[e] or M.readWord(0x3BF4 + e * 2) end
       end
       for e = 0, 3 do
         local hp = M.readWord(0x3BF4 + e * 2)
         local last = partyHpLast[e]
         if slot ~= nil and last ~= nil and last ~= 0xFFFF and hp < last then
-          local drop = last - hp
-          local L = hitLedger[slot] or { on = {} }
-          hitLedger[slot] = L
-          if L.on[e] == nil or drop < L.on[e] then L.on[e] = drop end
-          if L.min == nil or drop < L.min then
-            L.min, L.minE = drop, e
-            M.log(string.format("[%s] slot %d's smallest hit this fight so far: "
-              .. "%d, on entity %d (%d -> %d)", tag or "fight", slot, drop, e,
-              last, hp))
-          end
+          monAct.drops[#monAct.drops + 1] = { e = e, drop = last - hp, last = last, hp = hp }
         end
         -- The [death] line (#175): a member's HP reaching 0 from above,
         -- with the pips they were holding.  The killer is the action
