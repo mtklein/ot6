@@ -349,19 +349,93 @@ reads **`$08`, poison absorbed**; +24 is `$00`.)
 
 ### 9. Rizopas, after the Piranha school — Baren Falls (Sabin + Cyan)
 
-**Shields:** 4 (Piranhas 1) · **Weak:** bolt + slashing, bludgeoning.
+Party: SABIN and CYAN, jumping the falls from the top of map 156
+(SHADOW has left at the overlook); battle 18 from the jump event
+(`event_main.asm:66481`), which calls `_cacfbd` first — `max_hp` and
+`max_mp` on every slot — so the party enters at **full HP and MP**
+whatever the walk cost it.
 
-- **Telegraph:** the falls swell backward → **El Nino** hits the
-  party.
-- **Break story:** this fight is the clearest case for the coverage
-  rule. Bolt is vanilla's weakness here and neither character can cast
-  it, so the weapon classes carry the fight: Pummel and Dispatch/Slash
-  chip regardless, and Quadra Slam (if the scenario got Cyan to level
-  15) chips 4 at a time. When the party has no usable element, the
-  classes are what remains.
-- **Jank:** the Piranha wave stays a wave. They do small damage, die
-  quickly, and teach the player to use AoE. Gau and the dried meat
-  come one screen later.
+**Shields:** 4 (Piranhas 1) · **Weak:** bolt + slashing, bludgeoning ·
+**Absorbs:** water.
+
+Decoded, not recalled (`monster_prop.dat` row `$155`, 32 bytes at
+`+$2AA0`, ROM `$CF2AA0`; `tools/tests/lab_rizopas_template.lua` header):
+`28 0e 64 00 00 6e af 03 07 03 27 00 00 00 00 00 0d e0 00 cd e6 09 00 80
+00 04 ff 00 00 01 00 20` — speed 40, attack 14, hit 100, evade 0,
+m.block 0, defense 110, m.def 175, m.pow 3, **HP 775**, MP 39, level 13;
+absorb `$80` water; null `$00`; weak `$04` bolt. Byte 31 `$20` is the
+special attack (`LoadRageProp` → `$322d`; `battle_main.asm:8443-8480`):
+bits 6 and 7 clear, `$20 − $20 = +0` to the multiplier — a plain
+physical hit under its own animation. Bytes 28-31 `00 01 00 20`: the
+status 3&4 word `$0001` is the flying flag (Float). `Ot6ShieldTbl`
+(`ot6_hud.asm:1601`): 4 shields, class-weak `SLASH|BLUDG`; no
+`Ot6ElemAddTbl` row; `Ot6HpMulTbl` ships `$10` (1×), so 775 is the HP the
+fight sees. Piranha `$154`: HP 10, level 9, attack 13, weak bolt, 1 shield
+`SLASH|BLUDG`.
+
+**AI** (`ai_script.asm:7328-7337`), one entry of each triple at random:
+*Battle/Special/Mega Volt · Battle/Ice/Ice · wait · El Nino/Battle/Battle*,
+looping; `boss_death` on death. `magic_prop_en.dat`: **Mega Volt** `$B8`
+bolt, power 20, hit 150; **Ice** `$01` power 22; **El Nino** `$6F` water,
+**power 61**, targeting `$7E` (the whole party), hit byte 0 — unmissable.
+The Piranha script (`:7290-7326`) restores two or three of the school on
+every death until the battle timer passes 60, then the last death hides
+the school and surfaces MONSTER_6 from the water: **the wave is a
+fixed-length tax**, ~4,450-5,500 frames in every attempt logged
+(`t_surface` in the `[result]` lines), whatever the party does.
+
+**What the party carries** (`lab_rizopas_bake.lua`, read at the falls):
+CYAN L14, 358 HP, Ashura `$2B` (katana: slash), Heavy Shld, Leather Hat,
+LeatherArmor, no relics, SwdTech `$07` = Dispatch/Retort/Slash. SABIN
+L14, 363 HP, MetalKnuckle `$53` (claw: slash on Fight; Pummel and Suplex
+bludgeon regardless), Buckler, Leather Hat, Kung Fu Suit, Star Pendant
+and Jewel Ring, Blitz `$07` = Pummel/AuraBolt/Suplex. Bag: **Tonic 91,
+Potion 2, Fenix Down 15**. Both weapons match the row, so every Fight
+swing chips: a 1-BP Fight is 3 swings = 3 chips, 2 BP 5, 3 BP 7
+(`M.fightSwings`); BP caps at 5 and regenerates one per unboosted turn
+(`ot6_boost.asm:141`).
+
+**The burst, measured.** Rizopas's spells land on the whole party as
+often as on one (`[act] … atk=$B8 tgt=$0003` and `tgt=$0001` both occur),
+for 40-90 a head; it acts about twice per party round (its actions in
+`care_i0.log` at `t=5062` and `t=5300`, the party's at `5535` and `5691`).
+**El Nino is the killer: `[hp] t=5583 entity 0 284 -> 55 (-229)` and
+`entity 1 221 -> 0 (-221)` in one action (`control_i55.log`, seed
+`$74`); `t=5314 … 326 -> 82 (-244)`, `238 -> 0 (-238)` (`care_i50.log`,
+seed `$64`).** Two ordinary hits and then El Nino is ~360 HP to each of
+two 358/363-HP members: that is the 650-frame double kill of #162
+(the probe's `$EE` reading is store seed `$E4`; `$BE` at battle-up sits
+ten draws past InitBattle's store in every run here). Nothing about it
+is a telegraph the AI script honours; the doc's earlier "the falls swell
+backward" line is not in the script and is removed.
+
+**Break story, measured.** The row is honest and the party's Fight is
+the key: SABIN's and CYAN's swings both chip. A 1-BP Fight from either is
+3 chips; the second member's next swing breaks; the surplus swings of a
+2- or 3-BP Fight land broken. `bankboss_i25.log` (seed `$D0`): CYAN
+Fight at 5 BP → `[hit] t=5083 rizopas hp=552 (-146) sh=1 (-2)`, `t=5084
+hp=0 (-552) sh=0 (-1) brk=16` — **dead in one action, 645 frames after
+surfacing**. Pummel (2 bludgeoning hits) chips less than a boosted Fight
+and costs Blitz MP; Dispatch is one slash and is not in the driver.
+
+RIZOPAS-LAB-TABLE
+
+**The driver finding (lib/ot6.lua, not edited here).** `care_i50.log`:
+after El Nino left SABIN at 82 and CYAN dead with Rizopas at **553 HP,
+1 shield**, the driver spent the next eleven turns on care — `revive
+entity 1 with Fenix Down` four times, CYAN standing up at 44 HP and
+dying to the next Battle (`[hp] t=6500 entity 1 44 -> 0 (-44)`, again at
+`9561`, `10974`), two Potions and a Tonic between — and refused SABIN's
+attack every time with `no press: entity 0 (82/363) is inside one round
+of death (244) -- caring first`, though the care it then chose was not
+for entity 0 and a 1-BP Fight (3 chips on 1 shield, the surplus broken)
+was the fight's end. Four Fenix Downs and a wipe against a boss one
+action from dead; the control won the same seed by never reviving. The
+exact rule: **the one-round-of-death veto on the press must not fire
+when the press's window covers the monster's HP** (the press *is* the
+care), **and a raise is not care when the raised member's HP would be
+at or under the monster's smallest measured hit** (44 vs 41-45 here) —
+bank the Fenix and end the fight.
 
 ## The reunion — Narshe defense
 
