@@ -31,11 +31,13 @@ departures still remove him.
 
 If you were playing v0.15 with Shadow, this is the reason to update.
 
-**Break coverage filled in.** A few areas had encounters with no authored
-shields or weaknesses, falling back to a generic formula. Mt. Kolts, Zozo,
-and the Sealed Gate cave now carry real break data, so those enemies shield
-and break like the rest of the game. A build gate now refuses to ship any
-encounter that has no break key at all.
+**Break coverage.** The Sealed Gate cave's enemies now carry authored
+shields and weaknesses instead of the generated fallback, so they shield
+and break like the rest of the game, and a build gate now refuses to ship
+any encounter that has no break key at all. Mt. Kolts and Zozo play as
+they did in v0.15: the weapon-class keys written for them this cycle turned
+out not to take effect (a duplicate-row bug found during testing), and the
+fix lands in the next release.
 
 **Fewer stray encounters** on the Phantom Forest's corridor bridge, where a
 crossing was once measured stalling mid-battle. That suppression still ships
