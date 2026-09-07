@@ -3149,6 +3149,23 @@ end
 -- `pos` may be a literal char-select row or a function returning one,
 -- resolved live at the point the row is actually needed, for a caller
 -- whose party order isn't pinned down until runtime.
+--
+-- The one-owner rule (#151).  The esper detail's A is refused when ANY
+-- character wears the stone: _c35574 (skills.asm) scans all sixteen
+-- $161E bytes and paints the row grey ($28), and MenuState_4d's A on a
+-- grey row plays the invalid sound and shows the "already equipped"
+-- message instead of writing the byte.  The first cut waited only for
+-- the list to come back and reported "equipped" either way -- measured
+-- on fc_landing: "SHIVA -> EDGAR: equipped, back on the list satisfied
+-- after 30 frames" while EDGAR's +$1E stayed $FF and TERRA's stayed $02,
+-- and every later fight logged "summon refused for char 4 ... stone=$FF".
+-- So the stone is freed from its owner FIRST, in the owner's own list:
+-- A on an empty row (a $7e9d89 entry of $FF) is the game's unequip
+-- (MenuState_1e @2908 writes $FF to +$1E), and that is verified before
+-- the target's walk begins.  After the target's walk the worn byte is
+-- read back and a mismatch raises, naming what the byte says.  An owner
+-- outside the active party cannot be reached through this menu, so that
+-- raises too rather than walking a session that cannot succeed.
 function M.equipEsper(pos, esperIdx, opts)
   opts = opts or {}
   local tag = opts.tag or ("equip esper " .. esperIdx)
@@ -3160,45 +3177,72 @@ function M.equipEsper(pos, esperIdx, opts)
   local function targetPos()
     return type(pos) == "function" and pos() or pos
   end
-  local seek_ph = 0
-  return M.seqStep({
-    M.driveUntil(function() return st() == ST_MAIN end, 1200,
-      { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
-    M.waitFrames(20),
-    M.driveUntil(function()
-      return st() == ST_MAIN and M.readByte(CUR) == 1
-    end, 900, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
-      tag .. ": cursor on Skills"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_CHAR end, 300,
-      tag .. ": character select", 5),
-    M.waitFrames(10),
-    M.driveUntil(function()
-      return st() == ST_CHAR and M.readByte(CUR) == targetPos()
-    end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
-      tag .. ": character cursor"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_SKILLS end, 300,
-      tag .. ": skills submenu", 5),
-    M.waitFrames(10),
-    M.driveUntil(function()
-      return st() == ST_SKILLS and M.readByte(CUR) == 0
-    end, 600, { M.pressButtons({ "up" }, 2), M.waitFrames(6) },
-      tag .. ": cursor to Espers"),
-    M.pressButtons({ "a" }, 2),
-    M.waitUntil(function() return st() == ST_LIST end, 300,
-      tag .. ": esper list", 5),
-    M.waitFrames(10),
-    M.driveUntil(function()
-      return st() == ST_LIST
-         and M.readByte(GENJULIST + M.readByte(CUR)) == esperIdx
+  local function worn(c) return M.readByte(0x1600 + 37 * c + 0x1E) end
+  local function activeParty() return M.readByte(0x1A6D) & 0x07 end
+  local function inActiveParty(c)
+    local pb = M.readByte(0x1850 + c)
+    return (pb & 0x07) ~= 0 and (pb & 0x07) == activeParty()
+  end
+  local function posOf(c) return (M.readByte(0x1850 + c) >> 3) & 0x03 end
+  local function charAt(p)
+    for c = 0, 15 do
+      if inActiveParty(c) and posOf(c) == p then return c end
+    end
+    return nil
+  end
+  local function ownerOf(idx)
+    for c = 0, 15 do
+      if worn(c) == idx then return c end
+    end
+    return nil
+  end
+
+  -- the walk from the field to one character's esper list
+  local function listWalk(what, posFn)
+    return {
+      M.driveUntil(function() return st() == ST_MAIN end, 1200,
+        { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, what .. ": main menu"),
+      M.waitFrames(20),
+      M.driveUntil(function()
+        return st() == ST_MAIN and M.readByte(CUR) == 1
+      end, 900, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+        what .. ": cursor on Skills"),
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_CHAR end, 300,
+        what .. ": character select", 5),
+      M.waitFrames(10),
+      M.driveUntil(function()
+        return st() == ST_CHAR and M.readByte(CUR) == posFn()
+      end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+        what .. ": character cursor"),
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_SKILLS end, 300,
+        what .. ": skills submenu", 5),
+      M.waitFrames(10),
+      M.driveUntil(function()
+        return st() == ST_SKILLS and M.readByte(CUR) == 0
+      end, 600, { M.pressButtons({ "up" }, 2), M.waitFrames(6) },
+        what .. ": cursor to Espers"),
+      M.pressButtons({ "a" }, 2),
+      M.waitUntil(function() return st() == ST_LIST end, 300,
+        what .. ": esper list", 5),
+      M.waitFrames(10),
+    }
+  end
+
+  -- put the list cursor on the first row whose $7e9d89 entry is `value`
+  -- (two columns: left/right move one row, up/down two)
+  local function seekRow(what, value)
+    local seek_ph = 0
+    return M.driveUntil(function()
+      return st() == ST_LIST and M.readByte(GENJULIST + M.readByte(CUR)) == value
     end, 3000, {
       M.call(function()
         seek_ph = (seek_ph + 1) % 8
         if seek_ph >= 4 then M.setPad({}); return end
         local target
         for r = 0, 26 do
-          if M.readByte(GENJULIST + r) == esperIdx then target = r; break end
+          if M.readByte(GENJULIST + r) == value then target = r; break end
         end
         if not target then M.setPad({}); return end
         local row = M.readByte(CUR)
@@ -3214,17 +3258,89 @@ function M.equipEsper(pos, esperIdx, opts)
         end
       end),
       M.waitFrames(1),
-    }, tag .. ": list cursor on the stone"),
-    M.waitFrames(20),
-    M.driveUntil(function() return st() == ST_DETAIL end, 600,
-      { M.pressButtons({ "a" }, 3), M.waitFrames(12) }, tag .. ": detail"),
-    M.waitFrames(20),
-    M.pressButtons({ "a" }, 3),          -- MenuState_4d @5902: equip esper
-    M.waitUntil(function() return st() == ST_LIST end, 300,
-      tag .. ": equipped, back on the list", 5),
-    M.driveUntil(function() return M.hasControl() end, 1200,
-      { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),
-    M.waitFrames(20),
+    }, what)
+  end
+
+  local function backOut(what)
+    return {
+      M.driveUntil(function() return M.hasControl() end, 1200,
+        { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, what .. ": back out"),
+      M.waitFrames(20),
+    }
+  end
+
+  local owner, target = nil, nil
+  local freeSteps = {
+    M.logStep(function()
+      return string.format("[%s] stone $%02X is worn by char %d (pos %d); " ..
+        "freeing it there first (one-owner rule)", tag, esperIdx, owner, posOf(owner))
+    end),
+  }
+  for _, s in ipairs(listWalk(tag .. " (free)", function() return posOf(owner) end)) do
+    freeSteps[#freeSteps + 1] = s
+  end
+  freeSteps[#freeSteps + 1] = seekRow(tag .. " (free): list cursor on an empty row", 0xFF)
+  freeSteps[#freeSteps + 1] = M.waitFrames(20)
+  freeSteps[#freeSteps + 1] = M.pressButtons({ "a" }, 3)   -- MenuState_1e @2908: unequip
+  freeSteps[#freeSteps + 1] = M.waitFrames(20)
+  freeSteps[#freeSteps + 1] = M.call(function()
+    if worn(owner) ~= 0xFF then
+      error(string.format("%s: freeing stone $%02X from char %d FAILED -- " ..
+        "+$1E still reads $%02X after A on an empty row", tag, esperIdx,
+        owner, worn(owner)), 0)
+    end
+    M.log(string.format("[%s] char %d freed: +$1E reads $FF", tag, owner))
+  end)
+  for _, s in ipairs(backOut(tag .. " (free)")) do freeSteps[#freeSteps + 1] = s end
+
+  local equipSteps = {}
+  for _, s in ipairs(listWalk(tag, targetPos)) do equipSteps[#equipSteps + 1] = s end
+  equipSteps[#equipSteps + 1] = seekRow(tag .. ": list cursor on the stone", esperIdx)
+  equipSteps[#equipSteps + 1] = M.waitFrames(20)
+  equipSteps[#equipSteps + 1] = M.driveUntil(function() return st() == ST_DETAIL end, 600,
+    { M.pressButtons({ "a" }, 3), M.waitFrames(12) }, tag .. ": detail")
+  equipSteps[#equipSteps + 1] = M.waitFrames(20)
+  equipSteps[#equipSteps + 1] = M.pressButtons({ "a" }, 3)   -- MenuState_4d @5902: equip esper
+  equipSteps[#equipSteps + 1] = M.waitUntil(function() return st() == ST_LIST end, 300,
+    tag .. ": back on the list", 5)
+  equipSteps[#equipSteps + 1] = M.waitFrames(10)
+  equipSteps[#equipSteps + 1] = M.call(function()
+    local got = worn(target)
+    if got ~= esperIdx then
+      local who = ownerOf(esperIdx)
+      error(string.format("%s: char %d (pos %d) does NOT wear stone $%02X after " ..
+        "the walk -- +$1E reads $%02X; the stone is %s.  The detail's A is " ..
+        "refused for a stone anyone wears (skills.asm _c35574), and reports " ..
+        "nothing else.", tag, target, targetPos(), esperIdx, got,
+        who and ("worn by char " .. who) or "worn by nobody"), 0)
+    end
+    M.log(string.format("[%s] verified: char %d (pos %d) wears $%02X (+$1E)",
+      tag, target, targetPos(), got))
+  end)
+  for _, s in ipairs(backOut(tag)) do equipSteps[#equipSteps + 1] = s end
+
+  return M.seqStep({
+    M.call(function()
+      target = charAt(targetPos())
+      if target == nil then
+        error(string.format("%s: no active-party character at char-select " ..
+          "position %d", tag, targetPos()), 0)
+      end
+      owner = ownerOf(esperIdx)
+      if owner ~= nil and owner ~= target and not inActiveParty(owner) then
+        error(string.format("%s: stone $%02X is worn by char %d, who is not " ..
+          "in the active party; this menu cannot free it", tag, esperIdx, owner), 0)
+      end
+    end),
+    M.cond(function() return owner ~= nil and owner == target end, {
+      M.logStep(function()
+        return string.format("[%s] char %d (pos %d) already wears $%02X; nothing to do",
+          tag, target, targetPos(), esperIdx)
+      end),
+    }, {
+      M.cond(function() return owner ~= nil and owner ~= target end, freeSteps, {}),
+      M.seqStep(equipSteps),
+    }),
   })
 end
 
