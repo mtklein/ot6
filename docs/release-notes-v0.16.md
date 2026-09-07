@@ -38,12 +38,3 @@ Relm's Sketch still carries Final Fantasy VI 1.0's most famous bug,
 deliberately left in place. When a Sketch misses, the game can rarely corrupt
 your inventory or save. **Save before experimenting with Sketch.** The world
 map saves anywhere.
-
-## What we'd like to know
-
-- Whether Shadow behaves himself now that he stays: through the Phantom
-  Forest and the Ghost Train, when he rejoins later, and in any long stretch
-  of fighting with him in the party.
-- How breaking feels in the cave behind the Sealed Gate.
-- Anything that reads as a difficulty wall or a soft-lock. The fish at Baren
-  Falls is the fight we most want to hear about.
