@@ -368,6 +368,45 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: cast guards' decision (#172) checked")
   end),
 
+  -- 11. the spend rule (#175, H.spendDecision) on the Rizopas care_i50
+  -- numbers (SABIN 82/363 under a 244 round, CYAN dead, Potion +91
+  -- measured, the driver spent eleven turns on care) and the wipe
+  -- classification (H.wipeClass) the [wipe] line and audit_boost print.
+  H.call(function()
+    local v, why = H.spendDecision({ hp = 82, maxhp = 363, roundCost = 244, bp = 1,
+      heals = { { what = "item $E9", restore = 91 } } })
+    H.assertEq(v, "spend", "SABIN 82/363 under a 244 round with 1 BP: the Potion's 82 + 91 = 173 does not survive -- spend (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 82, maxhp = 363, roundCost = 244, bp = 0,
+      heals = { { what = "item $E9", restore = 91 } } })
+    H.assertEq(v, nil, "...with no pips there is nothing to spend (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 82, maxhp = 363, roundCost = 244, bp = 2,
+      heals = { { what = "item $E9", restore = 250 } } })
+    H.assertEq(v, nil, "a full Potion saves: 82 + 250 = 332 survives the 244 -- heal, keep the pips (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 82, maxhp = 363, roundCost = 244, bp = 2,
+      heals = { { what = "cure $2D", restore = nil }, { what = "item $E9", restore = 91 } } })
+    H.assertEq(v, nil, "an unmeasured cure may be the saving one: measure it first (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 300, maxhp = 363, roundCost = 244, bp = 3, heals = {} })
+    H.assertEq(v, nil, "300 HP is outside the 244 round: not dying, the bank's business (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 363, maxhp = 363, roundCost = 0, bp = 3, heals = {} })
+    H.assertEq(v, nil, "no round measured yet: nothing says next round is lethal (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 447, maxhp = 447, roundCost = 447, bp = 3, heals = {} })
+    H.assertEq(v, "spend", "map 269: LOCKE at full 447 under a 447 one-shot with 3 BP and nothing to heal with -- spend (" .. why .. ")")
+    -- the wipe class
+    local d = function(tick, from, maxhp, bp, one)
+      return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }
+    end
+    H.assertEq(H.wipeClass({ d(512, 447, 447, 1, true), d(513, 443, 443, 0, true) }),
+      "one-shot early", "two L4 Flare one-shots at f+512: a level problem")
+    H.assertEq(H.wipeClass({ d(5600, 284, 363, 3, false), d(5600, 221, 358, 4, false) }),
+      "died with 4 BP banked", "El Nino at t=5600 with 3 and 4 pips held: a driver problem")
+    H.assertEq(H.wipeClass({ d(512, 447, 447, 1, true), d(5600, 221, 358, 4, false) }),
+      "one-shot early + died with 4 BP banked", "both shapes in one wipe are both reported")
+    H.assertEq(H.wipeClass({ d(5600, 447, 447, 2, true) }),
+      "worn down (no one-shot, no pips banked)", "a one-shot late in the fight is not 'early'; 2 BP is under the bar")
+    H.assertEq(H.wipeClass({}), "no deaths recorded", "no records: says so")
+    H.log("battle_healpolicy: spend rule and wipe class (#175) checked")
+  end),
+
   -- 8. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(

@@ -776,6 +776,49 @@ function M.raiseDecision(o)
     .. "is in reach, and the enemy acts before anyone can top up", raiseHp, hit)
 end
 
+-- Spend it before you die (#175): a member inside one round of death who
+-- holds banked BP, and whom no heal in hand lifts clear of that round,
+-- spends the pips now on their strongest line rather than take a heal
+-- that only delays -- "a dead party with a bunch of unused boost pips
+-- means we've not used the abilities of the characters to their fullest
+-- extent."  Plain arithmetic so battle_healpolicy can put the Rizopas
+-- and Nerapa numbers through it.
+--
+--   hp, maxhp   the member's HP
+--   roundCost   what one enemy round takes off them, measured (0 = none yet)
+--   bp          the pips they hold
+--   heals       the heals on offer to them, each { what, restore } with
+--               restore nil for a cast not yet measured this battle
+--
+-- Returns "spend" with the reason, or nil with why not: not inside a
+-- round of death, no pips, or a heal that saves (hp + restore > cost);
+-- an unmeasured cast is let through to be measured -- the driver's own
+-- rule for a first cast -- since it may be the saving one.  The
+-- kill-press keeps its priority above this (the caller asks it first).
+function M.spendDecision(o)
+  local hp, cost, bp = o.hp or 0, o.roundCost or 0, o.bp or 0
+  if hp <= 0 or cost <= 0 or hp > cost then
+    return nil, string.format("%d HP is not inside one round of death (%d)", hp, cost)
+  end
+  if bp < 1 then return nil, "no BP banked" end
+  for _, h in ipairs(o.heals or {}) do
+    if h.restore == nil then
+      return nil, string.format("%s is not yet measured; it may save (measure it)", h.what)
+    end
+    if hp + h.restore > cost then
+      return nil, string.format("%s saves: %d + %d = %d survives the %d round",
+        h.what, hp, h.restore, hp + h.restore, cost)
+    end
+  end
+  local tried = {}
+  for _, h in ipairs(o.heals or {}) do
+    tried[#tried + 1] = string.format("%s +%d = %d", h.what, h.restore, hp + h.restore)
+  end
+  return "spend", string.format("%d/%d is inside one round of death (%d) holding %d BP, "
+    .. "and no heal saves it (%s)", hp, o.maxhp or 0, cost, bp,
+    #tried > 0 and table.concat(tried, ", ") or "nothing to heal with")
+end
+
 -- How a wipe reads (#175), from its [death] records -- each { tick, from,
 -- maxhp, bp, oneAction }.  The owner's two shapes: "it's totally normal to
 -- sometimes be wiped with a one shot attack early in a battle -- that
@@ -2844,6 +2887,117 @@ function M.newFightDriver(tag, opts)
       if opts.bank and have < opts.bank then boost = 0
       else boost = math.min(have, 3) end
     end
+    -- This actor's strongest unreflectable line against `slot` by the
+    -- chip model, at `bp` boost: the tool first so a tie keeps the
+    -- driver's own order, then the blitz, then the Fight.  Shared by the
+    -- press rule (#156, #165) and the spend rule (#175) below.
+    local function bestLine(actor, slot, bp)
+      local id = M.readByte(BCHID + actor * 2)
+      local best = nil
+      local function offer(p) if best == nil or p.chips > best.chips then best = p end end
+      local tool = opts.tool or AUTOCROSSBOW
+      if opts.tactical and opts.tools ~= false and id == 4
+         and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_TOOLS)
+         and battInvIdx(tool) then
+        offer({ kind = "skill", cmd = CMD_TOOLS, skill = tool,
+                row = cmdRow(actor, CMD_TOOLS), boostLeft = bp,
+                chips = toolChips(slot, tool), hits = TOOL_HITS[tool] or 1,
+                what = string.format("Tools $%02X", tool) })
+      end
+      if opts.tactical and id == 5 and (opts.blitz or PUMMEL) == PUMMEL
+         and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_BLITZ) then
+        offer({ kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
+                row = cmdRow(actor, CMD_BLITZ), boostLeft = bp,
+                chips = 2 * hitChips(slot, 0x04, 0), hits = 2, what = "Pummel" })
+      end
+      local fight = cmdRow(actor, CMD_FIGHT)
+      if fight ~= nil then
+        local _, l = handsOf(actor)
+        local mainSw, offSw = M.fightSwings(l ~= nil, bp)
+        offer({ kind = "fight", row = fight, boostLeft = bp,
+                chips = fightChips(actor, slot, bp), hits = mainSw + offSw,
+                what = string.format("Fight at %d BP", bp) })
+      end
+      return best
+    end
+    -- The spend rule (#175): this actor inside one round of death, holding
+    -- BP, with no heal in hand that lifts them clear of the round, spends
+    -- every pip now on their strongest line instead of a heal that only
+    -- delays (M.spendDecision).  Asked after the press rule (a kill this
+    -- turn is better still) and before the raise and the heals, and again
+    -- ahead of the attack lines when the care block is closed to this
+    -- actor, so a bank policy cannot hold the pips either.  The line is
+    -- the chip model's (bestLine); with nothing to chip, the once-a-battle
+    -- summon is the strongest unreflectable, unabsorbed line and goes
+    -- first when it is available.  Measured on Rizopas care_i50 (#162):
+    -- SABIN at 82/363 under a 244 round spent eleven turns on care while
+    -- one 1-BP Fight ended the fight.
+    local function spendPlan(where)
+      if opts.spend == false then return nil end
+      local hp, maxhp = hpNow[actor], M.readWord(0x3C1C + actor * 2)
+      local cost = roundCost[actor] or 0
+      if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return nil end
+      -- the heals this actor could give themself right now, priced the
+      -- way the care lines below price them
+      local heals = {}
+      if cureRow ~= nil then
+        for _, spell in ipairs(type(opts.cure) == "table" and opts.cure or CURES) do
+          if spellCell(actor, spell, true) then
+            heals[#heals + 1] = { what = string.format("cure $%02X", spell),
+                                  restore = castRestore[spell] }
+          end
+        end
+      end
+      if row ~= nil then
+        local item = (battInvIdx(POTION) and POTION) or (battInvIdx(TONIC) and TONIC)
+        if item then
+          heals[#heals + 1] = { what = string.format("item $%02X", item),
+                                restore = itemRestoreOf(item) }
+        end
+      end
+      local verdict, why = M.spendDecision({ hp = hp, maxhp = maxhp, roundCost = cost,
+                                             bp = have, heals = heals })
+      if verdict ~= "spend" then
+        local said = string.format("[%s] actor=%d no spend (%s): %s", tag or "fight",
+          actor, where, why)
+        if said ~= healSaid then healSaid = said; M.log(said) end
+        return nil
+      end
+      local slot = pressTarget()
+      if slot == nil then
+        for s = 0, 5 do if monAlive(s) then slot = s; break end end
+      end
+      local best = slot ~= nil and bestLine(actor, slot, have) or nil
+      -- the summon: unreflectable and unabsorbed by construction (the
+      -- summon line's own gates), and the strongest thing a caster with
+      -- nothing to chip can do with the turn
+      local id = M.readByte(BCHID + actor * 2)
+      local sm = opts.summon and opts.summon[id]
+      if sm and (best == nil or best.chips == 0) then
+        local mrow = cmdRow(actor, CMD_MAGIC)
+        local used = M.readWord(0x3f2e) & M.readWord(0x3018 + actor * 2)
+        local stone = M.readByte(0x3344 + actor * 2)
+        if M.readWord(CURMP + actor * 2) >= (sm.mp or 50) and used == 0 and mrow
+           and stone ~= 0xFF then
+          healSaid = nil
+          M.log(string.format("[%s] actor=%d SPEND (%s): %s -- the summon (esper $%02X) "
+            .. "rather than die holding boost (#175)", tag or "fight", actor, where, why, stone))
+          return { kind = "summon", row = mrow, reason = "spend" }
+        end
+      end
+      if best == nil then
+        local fight = cmdRow(actor, CMD_FIGHT)
+        if fight == nil then return nil end
+        best = { kind = "fight", row = fight, boostLeft = have, chips = 0,
+                 what = string.format("Fight at %d BP", have) }
+      end
+      best.reason = "spend"
+      healSaid = nil
+      M.log(string.format("[%s] actor=%d SPEND (%s): %s -- %s (%d chip(s) on slot %s) "
+        .. "rather than die holding boost (#175)", tag or "fight", actor, where, why,
+        best.what, best.chips or 0, tostring(slot)))
+      return best
+    end
     if (row ~= nil or cureRow ~= nil) and totalMon > 200 and parkDropN < 3
        and careOpen then
       -- The press rule (#156), the finisher rule's sibling: when this
@@ -2900,32 +3054,7 @@ function M.newFightDriver(tag, opts)
         -- the strongest unreflectable line by chips, at full boost (the
         -- swings past the break land x4): the tool first so a tie keeps
         -- the driver's own order, then the blitz, then the Fight
-        local id = M.readByte(BCHID + actor * 2)
-        local best = nil
-        local function offer(p) if best == nil or p.chips > best.chips then best = p end end
-        local tool = opts.tool or AUTOCROSSBOW
-        if opts.tactical and opts.tools ~= false and id == 4
-           and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_TOOLS)
-           and battInvIdx(tool) then
-          offer({ kind = "skill", cmd = CMD_TOOLS, skill = tool,
-                  row = cmdRow(actor, CMD_TOOLS), boostLeft = have,
-                  chips = toolChips(slot, tool), hits = TOOL_HITS[tool] or 1,
-                  what = string.format("Tools $%02X", tool) })
-        end
-        if opts.tactical and id == 5 and (opts.blitz or PUMMEL) == PUMMEL
-           and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_BLITZ) then
-          offer({ kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
-                  row = cmdRow(actor, CMD_BLITZ), boostLeft = have,
-                  chips = 2 * hitChips(slot, 0x04, 0), hits = 2, what = "Pummel" })
-        end
-        local fight = cmdRow(actor, CMD_FIGHT)
-        if fight ~= nil then
-          local _, l = handsOf(actor)
-          local mainSw, offSw = M.fightSwings(l ~= nil, have)
-          offer({ kind = "fight", row = fight, boostLeft = have,
-                  chips = fightChips(actor, slot, have), hits = mainSw + offSw,
-                  what = string.format("Fight at %d BP", have) })
-        end
+        local best = bestLine(actor, slot, have)
         if best == nil then return nil end
         if best.chips < need then
           if lethal ~= nil then
@@ -3015,6 +3144,10 @@ function M.newFightDriver(tag, opts)
         return press
       end
       if pressWhy and pressWhy ~= healSaid then healSaid = pressWhy; M.log(pressWhy) end
+      -- no kill this turn: a dying actor with pips spends them before any
+      -- raise or heal that only delays (#175)
+      local spend = spendPlan("care")
+      if spend then return spend end
       -- Revival stays item-only.  Life ($33) is not on any route this
       -- library drives yet: no esper in the WoB grants it (genju_prop.asm)
       -- and only Terra and Celes learn it innately, so a cast branch here
@@ -3192,6 +3325,13 @@ function M.newFightDriver(tag, opts)
     end
     local id = M.readByte(BCHID + actor * 2)
     -- (the boost bank `have`/`boost` was read above the care block)
+    -- The spend rule again (#175), for an actor the care block did not
+    -- take (the round's care turn is another's, or there is nothing to
+    -- care with): dying with pips banked overrides the bank.
+    do
+      local spend = spendPlan("attack")
+      if spend then return spend end
+    end
     -- The park ratchet covers the tactical lines as well as care: a
     -- skill whose window keeps getting dropped and re-planned is the
     -- same buzzing confirm, and measured with only the back-out in place
