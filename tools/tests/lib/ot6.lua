@@ -558,6 +558,19 @@ function M.itemPower(item)
     + item * ITEM_REC + ITEM_POWER)
 end
 
+-- Ticks until an ATB gauge fills, from the two words the engine keeps per
+-- entity: $3218,x is the 16-bit gauge it adds the constant $3ac8,x to on
+-- every ATB tick (battle_main.asm _c211bb), read as FULL when its high
+-- byte is 0 (`lda $3219,x / beq` "branch if atb gauge is full"; the
+-- overflow does `stz $3219,x`; an empty gauge is set to $01).  The raise
+-- rule compares these across entities, so the unit is the tick and the
+-- absolute value is never needed.  nil for a gauge that cannot fill.
+function M.atbEta(gauge, const)
+  if ((gauge or 0) >> 8) == 0 then return 0 end
+  if const == nil or const <= 0 then return nil end
+  return math.ceil((0x10000 - gauge) / const)
+end
+
 -- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
 -- kept out here as arithmetic on plain numbers so battle_healpolicy can put
 -- the measured cases through it without an emulated fight.
@@ -628,26 +641,63 @@ function M.killEstimate(o)
   return per * toBreak + per * 4 * broken, toBreak, broken
 end
 
--- Whether a raise is worth the Fenix Down (#165): the HP it gives back
--- against the smallest hit the living enemy has landed this fight.  Fenix
--- Down (item $F0: ItemProp +19 bit 7 "fraction of max HP", +20 power 2;
--- CalcDmgRatio -> CalcRatio: max HP * power >> 4) raises to maxhp/8 --
--- CYAN's 358 -> 44, measured.  A hit at least that big lands the member
--- back at 0 before anyone can top them up: the item is spent for nothing.
--- With no hit measured yet the raise stands (the driver's old behaviour).
+-- Whether a raise is worth the Fenix Down (#165, refined by #168): the HP
+-- it gives back against the smallest hit the living enemy has landed this
+-- fight.  Fenix Down (item $F0: ItemProp +19 bit 7 "fraction of max HP",
+-- +20 power 2; CalcDmgRatio -> CalcRatio: max HP * power >> 4) raises to
+-- maxhp/8 -- CYAN's 358 -> 44, measured.  A hit at least that big lands
+-- the member back at 0 before anyone can top them up: the item is spent
+-- for nothing.  With no hit measured yet the raise stands.
+--
+-- The first cut refused on the hit alone, and against any enemy whose
+-- smallest hit exceeds maxhp/8 -- most bosses at these levels -- it never
+-- opened: battle 70 shipped SABIN dead through eight turns of a won fight
+-- (63-HP raise, 68 hit).  So the re-kill is only a refusal when BOTH
+-- outs are closed:
+--   (a) nobody can top the raise up first: `topUpFirst` is whether another
+--       party member's gauge fills before the lethal monster's (the ATB
+--       read, M.atbEta), and `topUp` what their Potion gives; a raise
+--       followed by that Potion is care, and the pair has to lift the
+--       member clear of the hit (map 269: 55 + 250 = 305 under a 447
+--       one-shot is still no raise, #171);
+--   (b) no kill is in reach: `killInReach` is the last monster's HP
+--       inside the party's measured window (the #156/#165 estimate); a
+--       late raise in a fight being won costs nothing and means nobody
+--       walks out dead.
 --
 --   maxhp        the fallen member's max HP
 --   power        the item's power byte (M.itemPower; 2 for Fenix Down)
 --   smallestHit  the living enemy's smallest observed hit, or nil
+--   killInReach  (b) above, boolean
+--   topUpFirst   (a) above, boolean;  topUp  the HP that top-up gives
 --
--- Returns the raise HP and true to raise / false for a certain re-kill.
+-- Returns the raise HP, true to raise / false to refuse, and the reason.
 function M.raiseDecision(o)
   local maxhp, power = o.maxhp or 0, o.power or 2
   local raiseHp = (maxhp * power) >> 4
-  if raiseHp <= 0 then return raiseHp, false end
+  if raiseHp <= 0 then return raiseHp, false, "nothing to raise to" end
   local hit = o.smallestHit
-  if hit ~= nil and hit >= raiseHp then return raiseHp, false end
-  return raiseHp, true
+  if hit == nil then return raiseHp, true, "no enemy hit measured yet" end
+  if hit < raiseHp then
+    return raiseHp, true, string.format("%d HP survives the smallest hit, %d", raiseHp, hit)
+  end
+  if o.killInReach then
+    return raiseHp, true, string.format("%d HP would not survive the %d hit, but a "
+      .. "kill is in reach: the raise is free", raiseHp, hit)
+  end
+  local topUp = o.topUp or 0
+  if o.topUpFirst and raiseHp + topUp > hit then
+    return raiseHp, true, string.format("%d HP alone would not survive the %d hit, "
+      .. "but an ally tops up first: %d + %d = %d does", raiseHp, hit, raiseHp,
+      topUp, raiseHp + topUp)
+  end
+  if o.topUpFirst then
+    return raiseHp, false, string.format("%d HP, and even an ally's top-up first "
+      .. "(%d + %d = %d) does not survive the %d hit", raiseHp, raiseHp, topUp,
+      raiseHp + topUp, hit)
+  end
+  return raiseHp, false, string.format("%d HP does not survive the %d hit, no kill "
+    .. "is in reach, and the enemy acts before anyone can top up", raiseHp, hit)
 end
 
 function M.monsterAbsorb(species)
@@ -1969,6 +2019,17 @@ function M.newFightDriver(tag, opts)
   local hitLedger = {}                 -- slot -> { min, minE, on = { [e] = smallest } }
   local partyHpLast = {}               -- entity -> HP last frame (hit ledger baseline)
   local monHpLast = {}                 -- slot -> HP last frame (damage watch baseline)
+  -- The raise-then-top-up pair (#168): a Fenix Down confirmed by one actor
+  -- (raisePending, until the target's HP moves or RAISE_WAIT ticks pass)
+  -- holds the next actor's plan at the command window so their Potion
+  -- finds a living target; once it lands, the raised member is owed a
+  -- top-up (topUpOwed) that the one-care-per-round budget lets through.
+  local raisePending = nil             -- { e, by, tick }
+  local topUpOwed = {}                 -- entity -> battleTick the raise landed
+  local RAISE_WAIT = 240               -- ticks a pending raise holds a plan
+  -- the ATB words per entity (X = entity*2): the 16-bit gauge and the
+  -- constant added to it each tick (M.atbEta)
+  local ATB, ATB_CONST = 0x3218, 0x3AC8
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
@@ -2241,27 +2302,6 @@ function M.newFightDriver(tag, opts)
     end
     return n
   end
-  -- The raise rule's question (#165), read off the hit ledger: over the
-  -- living monsters, the smallest hit each has landed on this member --
-  -- or, with none on them yet, on anybody -- and whether a Fenix Down's
-  -- maxhp/8 survives it (M.raiseDecision).  Returns ok, the raise HP, and
-  -- the hit with its slot and victim (nil when nothing is measured).
-  local function raiseOk(e)
-    local hit, hitSlot, hitOn = nil, nil, nil
-    for s = 0, 5 do
-      local L = hitLedger[s]
-      if L and M.readWord(MON_HP + s * 2) > 0
-         and (M.readByte(MON_PRESENT + s * 2) & 1) == 1 then
-        local v, on = L.on[e], e
-        if v == nil then v, on = L.min, L.minE end
-        if v ~= nil and (hit == nil or v < hit) then hit, hitSlot, hitOn = v, s, on end
-      end
-    end
-    local raiseHp, ok = M.raiseDecision({ maxhp = M.readWord(0x3C1C + e * 2),
-      power = M.itemPower(FENIX_DOWN), smallestHit = hit })
-    return ok, raiseHp, hit, hitSlot, hitOn
-  end
-
   -- What the party's attacks have been landing, measured the way a person
   -- reads the numerals: at a damage plan's confirm a watch joins the
   -- list; monster HP falling while that actor's command executes (the
@@ -2282,6 +2322,118 @@ function M.newFightDriver(tag, opts)
   local function dmgWatchOf(e)
     for i, w in ipairs(dmgWatch) do if w.actor == e then return i, w end end
     return nil
+  end
+  local function monAlive(s)
+    return M.readWord(MON_HP + s * 2) > 0
+       and (M.readByte(MON_PRESENT + s * 2) & 1) == 1
+  end
+  -- ticks until entity X's gauge fills (X = e*2 for the party, 8 + s*2
+  -- for a monster slot), and its high byte for the log (0 = full)
+  local function etaOf(x)
+    local g = M.readWord(ATB + x)
+    return M.atbEta(g, M.readWord(ATB_CONST + x)), g >> 8
+  end
+  -- The party's measured window on one slot, the press rule's sum with
+  -- the deciding actor left out (they are spending the turn elsewhere):
+  -- each living member's last action in shielded-equivalent HP, x4 when
+  -- the target is broken.
+  local function partyWindow(actor, slot)
+    local broken = M.readByte(BRK_TICKS + slot * 2) ~= 0
+    local window, parts = 0, {}
+    for e2 = 0, 3 do
+      if e2 ~= actor and M.readWord(0x3BF4 + e2 * 2) > 0
+         and M.readWord(0x3C1C + e2 * 2) > 0 and dmgSeen[e2] then
+        local mult = broken and 4 or 1
+        window = window + dmgSeen[e2] * mult
+        parts[#parts + 1] = string.format("e%d:%dx%d", e2, dmgSeen[e2], mult)
+      end
+    end
+    return window, table.concat(parts, " "), broken
+  end
+  -- The raise rule's question (#165, #168), read off the hit ledger and
+  -- the gauges: over the living monsters, the smallest hit each has
+  -- landed on this member -- or, with none on them yet, on anybody --
+  -- and whether a Fenix Down's maxhp/8 survives it (M.raiseDecision),
+  -- with the two outs the refinement added measured here: (b) the last
+  -- monster inside the party's window (partyWindow), and (a) another
+  -- member's gauge filling before the earliest-acting lethal slot's,
+  -- with the bag's Potion (else Tonic) as the top-up.  A broken slot
+  -- takes no turns (Ot6Gate skips them) and is not due to act.  Returns
+  -- ok, the raise HP, the hit with its slot and victim (nil when nothing
+  -- is measured), and the reason with every number in it.
+  local function raiseOk(e, actor)
+    local maxhp = M.readWord(0x3C1C + e * 2)
+    local raiseHp = (maxhp * M.itemPower(FENIX_DOWN)) >> 4
+    local hit, hitSlot, hitOn = nil, nil, nil
+    local lethalEta, lethalSlot, lethalPct = nil, nil, nil
+    local brokenLethal = nil
+    for s = 0, 5 do
+      local L = hitLedger[s]
+      if L and monAlive(s) then
+        local v, on = L.on[e], e
+        if v == nil then v, on = L.min, L.minE end
+        if v ~= nil then
+          if hit == nil or v < hit then hit, hitSlot, hitOn = v, s, on end
+          if v >= raiseHp then
+            if M.readByte(BRK_TICKS + s * 2) ~= 0 then
+              brokenLethal = s
+            else
+              local eta, pct = etaOf(8 + s * 2)
+              if eta ~= nil and (lethalEta == nil or eta < lethalEta) then
+                lethalEta, lethalSlot, lethalPct = eta, s, pct
+              end
+            end
+          end
+        end
+      end
+    end
+    local o = { maxhp = maxhp, power = M.itemPower(FENIX_DOWN), smallestHit = hit }
+    local detail = ""
+    if hit ~= nil and hit >= raiseHp then
+      -- (b) a kill in reach: the last monster against the party's window
+      local slot = soleTarget()
+      if slot ~= nil then
+        local mhp = M.readWord(MON_HP + slot * 2)
+        local window, parts, broken = partyWindow(actor, slot)
+        o.killInReach = window >= mhp
+        detail = string.format("; kill: the last monster slot %d has %d HP%s "
+          .. "against the party's window %d (%s)", slot, mhp,
+          broken and ", BROKEN" or "", window, parts ~= "" and parts or "nothing measured")
+      else
+        detail = "; kill: not the last monster"
+      end
+      -- (a) a top-up first: the other members' gauges against the lethal slot's
+      local topUp = (battInvIdx(POTION) and itemRestoreOf(POTION))
+                 or (battInvIdx(TONIC) and itemRestoreOf(TONIC)) or 0
+      local first, firstEta, firstPct = nil, nil, nil
+      for p = 0, 3 do
+        if p ~= actor and p ~= e and M.readWord(0x3BF4 + p * 2) > 0
+           and M.readWord(0x3C1C + p * 2) > 0 then
+          local eta, pct = etaOf(p * 2)
+          if eta ~= nil and (first == nil or eta < firstEta) then
+            first, firstEta, firstPct = p, eta, pct
+          end
+        end
+      end
+      o.topUp = topUp
+      if lethalEta == nil then
+        o.topUpFirst = true
+        detail = detail .. string.format("; gauges: no lethal slot is due to act%s",
+          brokenLethal and string.format(" (slot %d is BROKEN and skips its turns)",
+            brokenLethal) or "")
+      elseif first ~= nil then
+        o.topUpFirst = firstEta < lethalEta
+        detail = detail .. string.format("; gauges: entity %d's is %d/256 (%d ticks "
+          .. "to full) against slot %d's %d/256 (%d ticks), top-up +%d", first,
+          firstPct, firstEta, lethalSlot, lethalPct, lethalEta, topUp)
+      else
+        o.topUpFirst = false
+        detail = detail .. string.format("; gauges: nobody else standing to top up "
+          .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
+      end
+    end
+    local _, ok, why = M.raiseDecision(o)
+    return ok, raiseHp, hit, hitSlot, hitOn, why .. detail
   end
 
   -- battle_lore.lua's own tested fact: $306A+id reads id+$8B iff that lore
@@ -2442,6 +2594,24 @@ function M.newFightDriver(tag, opts)
     -- reopens the budget.
     local careOpen = careActor == nil or careActor == actor
                   or hpNow[careActor] == 0
+    -- A raise followed by another actor's Potion in the same window is
+    -- care, not two care turns (#168): a member the raise just put at
+    -- maxhp/8 (topUpOwed) reopens the budget for their top-up.
+    if not careOpen then
+      for e = 0, 3 do
+        local maxhp = M.readWord(0x3C1C + e * 2)
+        if topUpOwed[e] and hpNow[e] > 0 and maxhp > 0
+           and hpNow[e] * 100 // maxhp < (opts.healPercent or 60) then
+          careOpen = true
+          local said = string.format("[%s] actor=%d: entity %d was raised to %d/%d "
+            .. "at tick %d and is owed its top-up -- the round's care budget "
+            .. "(actor %d's) reopens for it", tag or "fight", actor, e, hpNow[e],
+            maxhp, topUpOwed[e], careActor)
+          if said ~= healSaid then healSaid = said; M.log(said) end
+          break
+        end
+      end
+    end
     if (row ~= nil or cureRow ~= nil) and totalMon > 200 and parkDropN < 3
        and not careOpen then
       local said = string.format("[%s] actor=%d: this round's care turn "
@@ -2489,7 +2659,7 @@ function M.newFightDriver(tag, opts)
         for e = 0, 3 do
           local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
           if maxhp > 0 and hp == 0 and row ~= nil and battInvIdx(FENIX_DOWN)
-             and raiseOk(e) then
+             and raiseOk(e, actor) then
             needsCare = true
           elseif hp > 0 and maxhp > 0 and hp < maxhp
              and (hp * 100 // maxhp < threshold or hp <= (roundCost[e] or 0)) then
@@ -2637,33 +2807,35 @@ function M.newFightDriver(tag, opts)
       -- and only Terra and Celes learn it innately, so a cast branch here
       -- would be a branch nothing has ever taken.
       --
-      -- No raise into a certain re-kill (#165): the Fenix Down puts the
-      -- member at maxhp/8, and if the living enemy's smallest hit this
-      -- fight is at least that, the next action lands them back at 0
-      -- before anyone can top them up (Rizopas seed $64: four Fenix
-      -- Downs to 44 HP, four Battles of -44).  The kill line, or a heal on
-      -- the living, is preferred; the fallen are raised when the enemy is
-      -- dead (fieldCare) or when its hits stop being lethal to the raise.
+      -- No raise into a certain re-kill (#165, refined #168): the Fenix
+      -- Down puts the member at maxhp/8, and if the living enemy's
+      -- smallest hit this fight is at least that, the next action lands
+      -- them back at 0 (Rizopas seed $64: four Fenix Downs to 44 HP, four
+      -- Battles of -44) -- UNLESS an ally's gauge fills first and their
+      -- Potion lifts the raise clear of the hit, or the kill is in reach
+      -- (raiseOk measures both; M.raiseDecision decides).  Otherwise the
+      -- kill line, or a heal on the living, is preferred and the fallen
+      -- are raised when the enemy is dead (fieldCare).
       if row ~= nil then
         for e = 0, 3 do
           if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
              and battInvIdx(FENIX_DOWN) then
-            local ok, raiseHp, hit, hitSlot, hitOn = raiseOk(e)
+            local ok, raiseHp, hit, hitSlot, hitOn, why = raiseOk(e, actor)
+            local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
+              or "none measured"
             if ok then
-              M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down "
-                .. "(to %d HP of %d; the living enemy's smallest hit this fight: %s)",
-                tag or "fight", actor, e, raiseHp, M.readWord(0x3C1C + e * 2),
-                hit and string.format("%d, slot %d on entity %d", hit, hitSlot, hitOn)
-                  or "none measured"))
+              M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down: "
+                .. "raise to %d HP (1/8 of %d), the living enemy's smallest hit %s "
+                .. "-- %s", tag or "fight", actor, e, raiseHp,
+                M.readWord(0x3C1C + e * 2), hitStr, why))
               return { kind = "item", item = FENIX_DOWN, target = e, row = row,
                        idx = battInvIdx(FENIX_DOWN), reason = "revive" }
             end
             local said = string.format("[%s] actor=%d no raise: Fenix Down would put "
-              .. "entity %d at %d HP (1/8 of %d) and slot %d's smallest hit this "
-              .. "fight is %d (on entity %d) -- a raise that cannot survive the next "
-              .. "action; killing first, caring for the living instead",
+              .. "entity %d at %d HP (1/8 of %d), the living enemy's smallest hit %s "
+              .. "-- %s; killing first, caring for the living instead",
               tag or "fight", actor, e, raiseHp, M.readWord(0x3C1C + e * 2),
-              hitSlot, hit, hitOn)
+              hitStr, why)
             if said ~= healSaid then healSaid = said; M.log(said) end
           end
         end
@@ -3156,6 +3328,25 @@ function M.newFightDriver(tag, opts)
       end
       idleSt, idleN = nil, 0
       if st ~= ST_CMD then return nil end
+      -- Another actor's Fenix Down is in the air (#168): hold this window
+      -- until it lands, so the plan made here sees the raised member
+      -- alive and can top them up -- a Potion's target cursor cannot land
+      -- on a corpse, and a plan made a beat too early attacks instead.  A
+      -- person waits for the animation the same way.  Bounded: a raise
+      -- the engine refused or a slow queue releases the hold at
+      -- RAISE_WAIT ticks.
+      if raisePending and raisePending.by ~= actor
+         and M.readWord(0x3BF4 + raisePending.e * 2) == 0
+         and battleTick - raisePending.tick <= RAISE_WAIT then
+        if not raisePending.heldSaid then
+          raisePending.heldSaid = true
+          M.log(string.format("[%s] actor=%d holds its command window: actor %d's "
+            .. "Fenix Down on entity %d (confirmed at tick %d) has not landed yet; "
+            .. "planning once it does (or after %d ticks)", tag or "fight", actor,
+            raisePending.by, raisePending.e, raisePending.tick, RAISE_WAIT))
+        end
+        return nil
+      end
       plan, planActor, tgtSpin = makePlan(actor), actor, 0
       if recovery then recovery.plan(actor, plan, M.frame) end
       planPulses, steerTrail = 0, {}
@@ -3422,6 +3613,18 @@ function M.newFightDriver(tag, opts)
         watch.until_ = battleTick + 900
         healWatch = watch
       end
+      -- The raise-then-top-up pair (#168): a confirmed Fenix Down is
+      -- pending until the target's HP moves (F.frame); a confirmed heal
+      -- on a raised member pays the top-up owed.
+      if plan.kind == "item" and plan.item == FENIX_DOWN then
+        raisePending = { e = plan.target, by = actor, tick = battleTick }
+      elseif (plan.kind == "item" or plan.kind == "heal") and plan.target
+         and topUpOwed[plan.target] then
+        M.log(string.format("[%s] actor=%d's %s on entity %d is the top-up its raise "
+          .. "was owed (raised at tick %d)", tag or "fight", actor, plan.kind,
+          plan.target, topUpOwed[plan.target]))
+        topUpOwed[plan.target] = nil
+      end
       -- and what a damage plan lands, for the press rule's window (the
       -- dmgWatch queue above; F.frame credits and settles it)
       if plan.kind == "fight" or plan.kind == "skill" or plan.kind == "magic"
@@ -3485,6 +3688,7 @@ function M.newFightDriver(tag, opts)
     healWatch, healSaid = nil, nil
     dmgWatch, dmgSeen, monHpLast = {}, {}, {}
     dmgHit, hitLedger, partyHpLast = {}, {}, {}
+    raisePending, topUpOwed = nil, {}
     execActor, execDone = nil, {}
     execMon, execMonDone = nil, nil
     -- The stall guard's verdict belongs to the battle it watched: a retry
@@ -3596,6 +3800,32 @@ function M.newFightDriver(tag, opts)
       end
       for i = #dmgWatch, 1, -1 do
         if battleTick > dmgWatch[i].until_ then table.remove(dmgWatch, i) end
+      end
+    end
+    -- The raise-then-top-up pair (#168): a pending Fenix Down has landed
+    -- when its target's HP moves off 0; the member is then owed a top-up
+    -- until it arrives, they climb clear on their own, or they fall again.
+    if raisePending then
+      local hp = M.readWord(0x3BF4 + raisePending.e * 2)
+      if hp > 0 and hp ~= 0xFFFF then
+        topUpOwed[raisePending.e] = battleTick
+        M.log(string.format("[%s] actor %d's Fenix Down landed: entity %d is at %d/%d "
+          .. "at tick %d -- a top-up is owed (the care budget opens for it)",
+          tag or "fight", raisePending.by, raisePending.e, hp,
+          M.readWord(0x3C1C + raisePending.e * 2), battleTick))
+        raisePending = nil
+      elseif battleTick - raisePending.tick > RAISE_WAIT + 600 then
+        M.log(string.format("[%s] actor %d's Fenix Down on entity %d never landed "
+          .. "(%d ticks) -- forgetting it", tag or "fight", raisePending.by,
+          raisePending.e, battleTick - raisePending.tick))
+        raisePending = nil
+      end
+    end
+    for e, _ in pairs(topUpOwed) do
+      local hp, maxhp = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+      if hp == 0 or hp == 0xFFFF or maxhp == 0
+         or hp * 100 // maxhp >= (opts.healPercent or 60) then
+        topUpOwed[e] = nil
       end
     end
     -- The hit ledger (#165): party HP falling while a monster's command
