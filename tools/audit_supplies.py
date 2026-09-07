@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
-"""Report a fixture that lost its last revive crossing a boundary.
+"""Report a fixture that lost its last revive crossing a boundary, and warn
+where the bag is under the Potion band.
 
 Flags a fixture with zero Fenix Downs whose predecessor (named by the graph's
 `prev=` or `checkpoint=` edge) carried some; a root fixture is not audited.
 Revival in the WoB is a Fenix Down only. Inventory is located off the
 character-table anchor ($1869 ids / $1969 counts, offset past $1600).
+
+The Potion band (docs/design/level-curve.md, "The supply curve"): Potions
+are the in-combat heal, carried at ~level x1.5 (minimum 10) from the first
+town on the route that sells them -- the Phantom Train's ghost merchant, so
+the band is measured from `train_done` on (a fixture whose `prev` chain
+reaches it, or one rooted at a checkpoint, all of which lie downstream).
+A fixture under the band is a WARNING (listed, exit code unaffected); the
+fix is a `POTION to N` line at the shop stop before it.
 
 Usage:  python3 tools/audit_supplies.py [--repo .] [--selftest] [-v]
 Exit 0 clean, 1 if a fixture dropped to no revives across a boundary, or if a
@@ -21,40 +30,72 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from savestate_party import (biggest_stream, checkpoint_payloads,
-                             declared_states, find_char_block)
+                             declared_states, find_char_block, party_at)
 
 WAIVERS = "tools/supply_waivers.txt"
 
 FENIX_DOWN = 0xF0                      # the WoB's only revival, item id $F0
+POTION = 0xE9                          # the in-combat heal, item id $E9
 INV_IDS = 0x1869 - 0x1600             # inventory ids, offset past the char table
 INV_QTY = 0x1969 - 0x1600             # inventory counts, one byte each
 
+# The first fixture past a shop that sells Potions on the routed lineage:
+# the Phantom Train's ghost merchant (shop 85).  Figaro's shop 4 and South
+# Figaro's shop 8 stock none (shop_prop.dat), so the band applies from here.
+FIRST_POTION_SHOP = "train_done"
+POTION_BAND_MIN = 10
 
-def revives_in(raw: bytes, cb: int) -> int:
-    """Fenix Downs in the bag, given the blob and the $1600 anchor.
+
+def count_in(raw: bytes, cb: int, item: int) -> int:
+    """How many of `item` the bag holds, given the blob and the $1600 anchor.
 
     The inventory is 256 (id, count) slots at a fixed offset past the
     character table.
     """
     total = 0
     for i in range(256):
-        if raw[cb + INV_IDS + i] == FENIX_DOWN:
+        if raw[cb + INV_IDS + i] == item:
             total += raw[cb + INV_QTY + i]
     return total
+
+
+def revives_in(raw: bytes, cb: int) -> int:
+    """Fenix Downs in the bag."""
+    return count_in(raw, cb, FENIX_DOWN)
+
+
+def potion_band(level: int) -> int:
+    """Potions the bag should carry at this party level: ~level x1.5,
+    rounded up, never under POTION_BAND_MIN."""
+    return max(POTION_BAND_MIN, -(-3 * level // 2))
+
+
+def party_level(raw: bytes, cb: int):
+    """The active party's highest level, or None if none is flagged active."""
+    levels = [m["level"] for m in party_at(raw, cb) if m.get("active")]
+    return max(levels) if levels else None
 
 
 # Cached: a fixture with multiple children would otherwise be decoded once
 # per child.
 @functools.lru_cache(maxsize=None)
-def revives_of_mss(path: str):
-    """(count, None) for a generated fixture, or (None, reason)."""
+def bag_of_mss(path: str):
+    """({"fenix", "potion", "level"}, None) for a generated fixture, or
+    (None, reason)."""
     raw = biggest_stream(path)
     if raw is None:
         return None, "no zlib stream"
     cb = find_char_block(raw)
     if cb is None:
         return None, "character table not located"
-    return revives_in(raw, cb), None
+    return {"fenix": revives_in(raw, cb), "potion": count_in(raw, cb, POTION),
+            "level": party_level(raw, cb)}, None
+
+
+def revives_of_mss(path: str):
+    """(count, None) for a generated fixture, or (None, reason)."""
+    bag, err = bag_of_mss(path)
+    return (None, err) if err else (bag["fenix"], None)
 
 
 @functools.lru_cache(maxsize=None)
@@ -74,17 +115,41 @@ def load_graph(repo: str):
     """The declared states with their predecessor edges.
 
     Returns (states, checkpoints): states is name -> {"prev", "checkpoint"},
-    checkpoints is name -> payload path.
+    checkpoints is name -> payload path.  A row's `also=` artifacts come
+    from the same boot as its primary state, so they carry the row's edge
+    too (rapids_done is as far past the train as rapids_start is).
     """
     import importlib.util
     path = os.path.join(repo, "tools", "tests", "savestate_graph.py")
     spec = importlib.util.spec_from_file_location("savestate_graph", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    states = {s["state"]: {"prev": s.get("prev"), "checkpoint": s.get("checkpoint")}
-              for s in mod.STATES}
+    states = {}
+    for s in mod.STATES:
+        edge = {"prev": s.get("prev"), "checkpoint": s.get("checkpoint")}
+        states[s["state"]] = edge
+        for a in s.get("also") or ():
+            states[a] = dict(edge)
     checkpoints = dict(checkpoint_payloads(repo))
     return states, checkpoints
+
+
+def past_first_potion_shop(name: str, states: dict) -> bool:
+    """Whether the band applies: the fixture's `prev` chain reaches
+    FIRST_POTION_SHOP, or ends at a checkpoint (every tracked checkpoint is
+    cut downstream of the train).  A root with neither is before the shop."""
+    seen = set()
+    while name and name not in seen:
+        if name == FIRST_POTION_SHOP:
+            return True
+        seen.add(name)
+        edge = states.get(name)
+        if edge is None:
+            return False
+        if edge["checkpoint"] and not edge["prev"]:
+            return True
+        name = edge["prev"]
+    return False
 
 
 def load_waivers(repo: str, path: str) -> set:
@@ -128,6 +193,12 @@ def selftest(repo: str = ".") -> int:
     check("0 -> 2 is not (a refill)", is_cliff(2, 0), False)
     check("3 -> 3 is not", is_cliff(3, 3), False)
 
+    # the Potion band: ~level x1.5 rounded up, floor 10
+    check("band at L4 is the floor", potion_band(4), 10)
+    check("band at L14 (the train merchant)", potion_band(14), 21)
+    check("band at L15 (Mobliz) rounds up", potion_band(15), 23)
+    check("band at L27 (the FC entry)", potion_band(27), 41)
+
     # Checked against mrf-save-room-v1, which carries two Fenix Downs.
     cps = dict(checkpoint_payloads(repo))
     if "mrf-save-room-v1" not in cps:
@@ -150,6 +221,17 @@ def selftest(repo: str = ".") -> int:
         ok = False
         print(f"  SELFTEST FAIL load_graph should read the edges "
               f"(arvis_wake prev=whelk_entry), got {len(states)} states")
+    else:
+        check("the band does not apply before the train (forest_done)",
+              past_first_potion_shop("forest_done", states), False)
+        check("nor in the Locke scenario (celes_freed)",
+              past_first_potion_shop("celes_freed", states), False)
+        check("it applies at the train merchant's exit (train_done)",
+              past_first_potion_shop("train_done", states), True)
+        check("and downstream through the Terra scenario (terra_narshe)",
+              past_first_potion_shop("terra_narshe", states), True)
+        check("and at a checkpoint-rooted fixture (narshe_mission)",
+              past_first_potion_shop("narshe_mission", states), True)
 
     print("audit_supplies selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
@@ -191,16 +273,21 @@ def main() -> int:
             return n, f"checkpoint {cp}", err
         return None, "root", "no predecessor"
 
-    scanned, skipped, cliffs = 0, [], []
+    scanned, skipped, cliffs, short = 0, [], [], []
     for name in sorted(declared):
         path = os.path.join(args.dir, name + ".mss")
         if not os.path.exists(path):
             continue                     # unseeded tree: nothing to read
-        here, err = revives_of_state(name)
+        bag, err = bag_of_mss(path)
         if err:
             skipped.append((name, err))
             continue
+        here = bag["fenix"]
         scanned += 1
+        if past_first_potion_shop(name, states) and bag["level"] is not None:
+            band = potion_band(bag["level"])
+            if bag["potion"] < band:
+                short.append((name, bag["potion"], band, bag["level"]))
         edge = states.get(name, {"prev": None, "checkpoint": None})
         pred, label, perr = predecessor_revives(edge)
         if perr:
@@ -232,6 +319,19 @@ def main() -> int:
     for name, pred, label in cliffs:
         print(f"  REVIVE CLIFF  {name}: 0 Fenix Downs, but {label} carried "
               f"{pred}. A revive was spent and never replaced.")
+
+    if short:
+        print(f"  WARNING: {len(short)} fixture(s) under the Potion band "
+              f"(~level x1.5, min {POTION_BAND_MIN}; the in-combat heal, "
+              f"docs/design/level-curve.md) -- top up with a POTION to N "
+              f"line at the shop stop before each"
+              + ("" if args.verbose else "; -v lists them") + ":")
+        if args.verbose:
+            for name, have, band, level in short:
+                print(f"    POTION SHORT  {name:26s} potion={have:3d} "
+                      f"< band {band} (L{level})")
+        else:
+            print("    " + " ".join(n for n, _, _, _ in short))
 
     stale = sorted(waivers - used)
     if stale:

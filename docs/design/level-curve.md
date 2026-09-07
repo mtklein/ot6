@@ -29,6 +29,34 @@
 | Esper Mtn / Ultros③ | TERRA 15 · LOCKE 16 · STRAGO 17 | L15–17 |
 | **FC entry (thamasa_done)** | **TERRA 15 · LOCKE 16 · STRAGO 17 · RELM 15** | **L15–17** |
 
+## The supply curve (what the bag carries at each level)
+
+The care split is a directive: **outside battle heal with Tonics** (the
+field care between fights; a menu turn is free), **in battle heal with
+Potions** (turns are scarce, and a Tonic's +50 is under the measured
+round cost from the Sabin scenario on), and a **Fenix Down** is the WoB's
+only answer to a death.  The stock the route carries, topped up at every
+town that sells the item, scales with the active party's highest level:
+
+| item | band | first shop on the route |
+|---|---|---|
+| Tonic | ~level x5, cap 99 | Figaro Castle (shop 4, `gen_edgar`) |
+| Fenix Down | ~level, ~15-20 | South Figaro (shop 8, `gen_kolts`) |
+| **Potion** | **~level x1.5, minimum 10** | the Phantom Train's ghost merchant (shop 85, `gen_sabin_train`; L14 -> 21) |
+
+The Potion band starts at the first town that sells them.  On this route
+that is the Phantom Train (`shop_prop.dat`: Figaro's shop 4 and South
+Figaro's shop 8 stock no Potion; the eight or so the bag holds before the
+train are chests and drops), so the Locke scenario and the Imperial camp /
+Doma stretch run on what they find, and the band is measured from
+`train_done` on.  Below the band at a fixture is a warning from
+`tools/audit_supplies.py` (`-v` lists each fixture with its count, band and
+level); a shop stop is written as `POTION to N` beside its `TONIC to N` /
+`FENIX DOWN to N` lines, essentials and Potions before the Tonic soak so a
+short purse shorts Tonics.  The WoB Potion shops the route passes or could
+reach: Phantom Train 85, Mobliz 12, Nikeah 15, Narshe 3 (the Terra
+scenario's return), Kohlingen 19, Jidoor 22, Vector 24, Thamasa 36.
+
 ## Zozo: the level gate nobody authored (#155)
 
 The routed Zozo party (L14-15 above) meets map 225's solo SlamDancer

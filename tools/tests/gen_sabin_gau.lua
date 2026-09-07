@@ -8,7 +8,8 @@
 -- parent slot, which this chain last pushed at Doma, so the landing is
 -- (240,16) rather than the record's coords), Mobliz (world (220,115) -> map 157;
 -- the item shop 164 via (26,21); keeper (29,48) talked across his counter
--- from (29,50); shop 12 row 0 = DRIED MEAT, row 1 = TONIC), then the
+-- from (29,50); shop 12 row 0 = DRIED MEAT, row 1 = TONIC, row 2 = POTION,
+-- row 5 = FENIX DOWN), then the
 -- Veldt grind.
 
 -- The generator therefore selects Active battle mode through Config, arms
@@ -1390,8 +1391,16 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
   -- the revives.  Fenix -> 15, Tonic -> 99 are ceilings; H.buyItem
   -- purse-clamps each to the merchant's gil.
   H.call(function()
+    H.assertEq(H.readByte(0x9d89 + 2), POTION, "shop 12 row 2 is Potion")
     H.assertEq(H.readByte(0x9d89 + 5), FENIX_DOWN, "shop 12 row 5 is Fenix Down")
   end),
+  -- Potions are the in-combat heal, topped up at every town that sells them
+  -- (docs/design/level-curve.md: ~level x1.5; L15 here -> 23).  Mobliz is
+  -- the first shop after the falls and the last before the Veldt grind and
+  -- Crescent Mountain, and the train merchant's stock is what the falls
+  -- fight spent (#167).
+  buyItem(POTION, 2, function() return 23 - invCount(POTION) end,
+    "POTION to 23"),
   buyItem(FENIX_DOWN, 5, function() return 15 - invCount(FENIX_DOWN) end,
     "FENIX DOWN to 15"),
   buyItem(TONIC, 1, function() return 99 - invCount(TONIC) end, "TONIC to 99"),
@@ -1401,8 +1410,10 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
     H.assertEq(invSlot(DRIED_MEAT) ~= nil, true, "Dried Meat in the bag")
     H.assertEq(invCount(FENIX_DOWN) >= 6, true,
       "the party leaves Mobliz with Fenix Downs -- a death is answerable now")
-    H.log(string.format("[gau] leaving the shop: gil=%d tonics=%d fenix=%d",
-      gil(), invCount(TONIC), invCount(FENIX_DOWN)))
+    H.assertEq(invCount(POTION) >= 10, true,
+      "the party leaves Mobliz with Potions -- the in-combat heal (the band's floor)")
+    H.log(string.format("[gau] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
+      gil(), invCount(TONIC), invCount(POTION), invCount(FENIX_DOWN)))
   end),
   -- Prepare the feed while Mobliz is reliably menu-capable.  The Veldt
   -- staging tile can remain field-menu hostile briefly after a random battle.
