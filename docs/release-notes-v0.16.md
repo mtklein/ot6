@@ -37,10 +37,18 @@ and the Sealed Gate cave now carry real break data, so those enemies shield
 and break like the rest of the game. A build gate now refuses to ship any
 encounter that has no break key at all.
 
-**Fewer stray encounters** on the Phantom Forest's corridor bridge, where a
-crossing was measured stalling mid-battle. The freeze fix above may be the
-real cause of that stall; the suppression stays in this build and will be
-re-examined once the bridge has been crossed with encounters live.
+**The Phantom Forest's corridor bridge has its encounters back.** An
+earlier build had measured one crossing stalling after a battle on the
+bridge and, not yet knowing about the Shadow freeze, stopped encounters
+from starting on the bridge structure. With the freeze fixed, the bridge
+was crossed on this build with encounters live: 40 attempts from the
+forest entrance, 120 random battles fought and won with Shadow in the
+party, 50 of them rolled on the bridge tile or its landings, 4 of the 120
+passing Shadow's leave roll, and every one handed the party back 44
+frames after the battle ended. No stall. The suppression is gone; the
+forest's encounter pool is whole again. (Zozo's bridge shaft keeps its
+own suppression: its hang is a different mechanism, measured before a
+battle starts, with no Shadow in the party.)
 
 ## Patch bytes
 
