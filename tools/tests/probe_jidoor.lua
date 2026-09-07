@@ -1,165 +1,190 @@
--- probe_jidoor.lua -- fly the leveled party to JIDOOR, buy the caster
--- relics, and scout the Auction House.
---
--- Jidoor = map 198, world door (27,130).  The doorstep plain (24,129)-ish
--- is landable ($0044).  Inside: door (5,25) -> room 202, relic shop 23's
--- keeper at (54,16); door (26,27) -> room 200, the Auction House
--- (auctioneer _cb4e47 at (19,24), running when $006B=1 -- set on Setzer's
--- join -- and $01F0=0).  Exit doors: 202 (54,23) -> 198 (5,27); 200
--- (18,26).
---
--- Buys (shop 23 rows): Earrings $c3 row 3 x2 (10000) for the bolt
--- casters, Sniper Sight $e3 row 5 x1 (3000).
+-- @manual
+-- probe_jidoor.lua -- DIAGNOSTIC probe for the Narshe-mission grind's supply
+-- fix: from a plains-grind snapshot (leg 2 of lab_narshe_grind_snap), walk
+-- to the Jidoor approach (27,129), enter Jidoor (map 198), enter the item
+-- shop (198 (27,41) -> map 201, keeper NPC at (34,15), shop 22), buy a few
+-- Potions and Tents, walk back out to the world map, and use a Tent from
+-- the world menu.  Every coordinate here is measured, not assumed; the log
+-- is the evidence for the generator change.
 local H = dofile("tools/tests/lib/ot6.lua")
-local function rd(a) return emu.read(a, emu.memType.snesMemory) end
-local function fineX() return ((rd(0x35) << 16) | H.readWord(0x33)) end
-local function fineY() return ((rd(0x39) << 16) | H.readWord(0x37)) end
-local function tileX() return (fineX() >> 12) & 0xFF end
-local function tileY() return (fineY() >> 12) & 0xFF end
-local function gil() return H.readByte(0x1860) | (H.readByte(0x1861) << 8) | (H.readByte(0x1862) << 16) end
 
-local CAND = { {24,129},{23,129},{25,128},{24,128},{22,130},{30,129},{31,129} }
-local DIRS = { "up", "down", "left", "right" }
-local cal = {}
-local mode = "calib"
-local calI, calT, calX, calY = 1, 0, 0, 0
-local rhyT, candI, landed = 0, 1, false
-local function target()
-  local c = CAND[candI]
-  return c[1] * 4096 + 2048, c[2] * 4096 + 2048
+local function map() return H.mapId() & 0x1ff end
+local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+local TONIC, POTION, FENIX, TENT = 0xE8, 0xE9, 0xF0, 0xF7
+local function gil()
+  return H.readByte(0x1860) | (H.readByte(0x1861) << 8) | (H.readByte(0x1862) << 16)
 end
-local function bestDir(ex, ey)
-  local best, bestDot = nil, 0
-  for _, d in ipairs(DIRS) do
-    local v = cal[d]
-    if v then
-      local dot = v.x * ex + v.y * ey
-      if dot > bestDot then best, bestDot = d, dot end
-    end
+local function roster(tag)
+  local t = {}
+  for _, c in ipairs(H.partyMembers()) do
+    t[#t + 1] = string.format("c%d %d/%d hp %d/%d mp", c, H.charHp(c),
+      H.charMaxHp(c), H.charMp(c), H.charMaxMp(c))
   end
-  return best
+  H.log(string.format("[%s] %s | tonic=%d potion=%d fenix=%d tent=%d gil=%d",
+    tag, table.concat(t, "  "), H.invCountOf(TONIC), H.invCountOf(POTION),
+    H.invCountOf(FENIX), H.invCountOf(TENT), gil()))
 end
-local function flyFrame()
-  if mode == "calib" then
-    local d = DIRS[calI]
-    if calT == 0 then calX, calY = fineX(), fineY() end
-    calT = calT + 1
-    if calT <= 30 then H.setPad({ y = true, [d] = true }); return end
-    if calT <= 45 then H.setPad({}); return end
-    cal[d] = { x = (fineX() - calX) / 30, y = (fineY() - calY) / 30 }
-    calI, calT = calI + 1, 0
-    if calI > #DIRS then mode = "travel" end
-    return
-  end
-  if mode == "travel" then
-    local wx, wy = target()
-    local ex, ey = wx - fineX(), wy - fineY()
-    if math.abs(ex) < 4096 and math.abs(ey) < 4096 then
-      mode, rhyT = "rhythm", 0
+
+local function worldGrind(tx, ty, what)
+  local plan, idx = nil, 1
+  return H.driveUntil(function()
+    return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
+      and H.worldHasControl() and H.worldAligned())
+  end, 30000, {
+    H.call(function()
+      if H.battleLoadStarted() then
+        plan = nil; H.setPad({ l = true, r = true }); return
+      end
+      if not H.worldMode() then H.setPad({}); return end
+      if not H.worldHasControl() then plan = nil; H.setPad({}); return end
+      if not H.worldAligned() then return end
+      if not plan or idx > #plan then plan = H.worldBfs(tx, ty); idx = 1 end
+      if not plan then H.setPad({}); return end
+      local dir = plan[idx]; idx = idx + 1
+      H.setPad({ [dir] = true })
+    end),
+  }, what or string.format("worldGrind (%d,%d)", tx, ty))
+end
+
+local function pressWalk(dir, pred, maxFrames, what)
+  local ph = 0
+  return H.driveUntil(pred, maxFrames, {
+    H.call(function()
+      ph = (ph + 1) % 8
+      if H.battleLoadStarted() then
+        H.setPad({ l = true, r = true }); return
+      end
+      if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
+      H.setPad({ [dir] = true })
+    end),
+  }, what)
+end
+
+-- Use a Tent from the world menu: X -> main ($05, Item is row 0) -> item
+-- list ($08, DP $4B is the bag slot) -> A picks the slot up ($19) -> A on
+-- the same slot uses it; the item menu answers a Tent with return code $02,
+-- terminates after its fade, and the world module runs the tent event
+-- (world_start.asm @02db: VehicleEvent_01), which restores the party.
+local function useTent(tag)
+  local ph, calm, before, tentAt = 0, 0, nil, nil
+  return H.driveUntil(function()
+    if before == nil then return false end
+    local used = H.invCountOf(TENT) < before
+    local back = H.worldMode() and H.readByte(0x59) == 0 and H.worldHasControl()
+      and H.worldAligned() and bright() >= 15
+    calm = (used and back) and calm + 1 or 0
+    return calm >= 20
+  end, 4000, {
+    H.call(function()
+      ph = (ph + 1) % 8
+      if before == nil then
+        before = H.invCountOf(TENT)
+        H.log(string.format("[%s] tents in the bag: %d; opening the world menu at f%d",
+          tag, before, H.frame))
+      end
+      if H.invCountOf(TENT) < before then
+        if tentAt == nil then
+          tentAt = H.frame
+          H.log(string.format("[%s] Tent consumed at f%d (menu state %02X)",
+            tag, H.frame, H.readByte(0x26)))
+        end
+        H.setPad({}); return
+      end
+      if H.readByte(0x59) == 0 then H.setPad(ph < 4 and { "x" } or {}); return end
+      local st, cur = H.readByte(0x26), H.readByte(0x4b)
+      if st == 0x05 then
+        H.setPad(cur == 0 and (ph < 4 and { "a" } or {}) or { up = true }); return
+      end
+      local slot = H.invSlotOf(TENT)
+      if st == 0x08 then
+        if slot == nil then H.setPad({}); return end
+        if cur == slot then H.setPad(ph < 4 and { "a" } or {})
+        else H.setPad({ [cur < slot and "down" or "up"] = true }) end
+        return
+      end
+      if st == 0x19 then
+        H.setPad((slot and cur == slot) and (ph < 4 and { "a" } or {}) or (ph < 4 and { "b" } or {}))
+        return
+      end
       H.setPad({})
-      return
-    end
-    local d = bestDir(ex, ey)
-    if not d then error("strafe calibration produced no usable direction") end
-    H.setPad({ y = true, [d] = true })
-    return
-  end
-  if mode == "rhythm" then
-    rhyT = rhyT + 1
-    if rhyT <= 10 then
-      local wx, wy = target()
-      local d = bestDir(wx - fineX(), wy - fineY())
-      H.setPad(d and { y = true, [d] = true } or {})
-      return
-    end
-    if rhyT <= 22 then H.setPad({}); return end
-    if rhyT <= 28 then H.setPad({ b = true }); return end
-    H.setPad({})
-    if rd(0x20) ~= 1 and H.worldHasControl() then landed = true; return end
-    if rhyT - 28 >= 480 then
-      H.log(string.format("land at (%d,%d) bounced (c2=%02X); next candidate",
-        tileX(), tileY(), rd(0xc2)))
-      candI = candI + 1
-      if candI > #CAND then error("every landing candidate bounced") end
-      mode = "travel"
-    end
-    return
-  end
+    end),
+  }, tag)
 end
 
-local function talkShop(name)
-  local phase = 0
-  return H.driveUntil(function() return H.readByte(0x26) == 0x25 end, 3000, {
-    H.call(function()
-      phase = (phase + 1) % 8
-      if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
-      H.setPad(phase < 4 and { "up", "a" } or { "up" })
-    end),
-  }, name .. ": shop options open")
-end
-local function closeShop(name)
-  local phase = 0
-  return H.driveUntil(function() return H.hasControl() end, 3000, {
-    H.call(function()
-      phase = (phase + 1) % 8
-      H.setPad(phase < 4 and { "b" } or {})
-    end),
-  }, name .. ": shop closed")
-end
-
-H.run({ maxFrames = 40000 }, {
-  H.loadState("build/states/wob_grind_done.mss.lua"),
-  H.waitFrames(8),
-  H.call(function() H.log(string.format("boot: gil=%d", gil())) end),
-  H.worldNavTo(function() return H.readByte(0x1f62) end,
-               function() return H.readByte(0x1f63) end,
-    { maxFrames = 8000, playBattles = "tactical",
-      arrive = function() return not H.worldMode() end }),
-  H.driveUntil(function() return rd(0x20) == 1 end, 1200,
-    { H.call(function() H.setPad(H.frame % 16 < 4 and { "a" } or {}) end) },
-    "aboard (vehicle mode)"),
-  H.waitFrames(150),
-  H.driveUntil(function() return landed end, 16000,
-    { H.call(flyFrame) }, "landed at the Jidoor doorstep"),
-  H.waitFrames(60),
-  H.call(function() H.log(string.format("landed world=(%d,%d)", H.worldX(), H.worldY())) end),
-  H.worldNavTo(27, 130, { maxFrames = 6000, playBattles = "tactical",
-    arrive = function() return not H.worldMode() end }),
-  H.driveUntil(function() return not H.worldMode() end, 900,
-    { H.call(function() H.setPad(H.frame % 16 < 4 and { "a" } or {}) end) },
-    "town map loads"),
-  H.waitFrames(90),
+H.run({ maxFrames = 150000 }, {
+  H.loadState("build/states/narshe_grind_leg02.mss.lua"),
+  H.waitFrames(30),
   H.call(function()
-    H.log(string.format("in town: map=%d field=(%d,%d)", H.mapId() & 0x3ff,
-      H.fieldX(), H.fieldY()))
-    H.screenshot("jidoor_arrival")
-    H.assertEq(H.mapId() & 0x1ff, 198, "this is Jidoor (map 198)")
+    H.log(string.format("[probe] booted at world (%d,%d) f%d", H.worldX(), H.worldY(), H.frame))
+    roster("start")
   end),
-  -- relic shop 23: door (5,25) -> room 202, keeper (54,16)
-  H.navTo(5, 25, { maxFrames = 12000, playBattles = "flee",
-    arrive = function() return (H.mapId() & 0x1ff) == 202 end }),
-  H.waitFrames(60),
-  H.navTo(54, 17, { maxFrames = 6000 }),
-  talkShop("relics"),
-  H.buyItem(0xc3, 3, function() return 2 end, "Earrings x2"),
-  H.buyItem(0xe3, 5, function() return 1 end, "Sniper Sight"),
-  closeShop("relics"),
+  worldGrind(27, 129, "world walk -> the Jidoor approach (27,129)"),
   H.call(function()
-    H.log(string.format("relics bought: gil=%d earrings=%d sniper=%d",
-      gil(), H.invCountOf(0xc3), H.invCountOf(0xe3)))
+    H.log(string.format("[probe] at (%d,%d); stepping DOWN into Jidoor", H.worldX(), H.worldY()))
   end),
-  -- back to town, then the Auction House door (26,27) -> room 200
-  H.navTo(54, 23, { maxFrames = 6000, playBattles = "flee",
-    arrive = function() return (H.mapId() & 0x1ff) == 198 end }),
-  H.waitFrames(60),
-  H.navTo(26, 27, { maxFrames = 12000, playBattles = "flee",
-    arrive = function() return (H.mapId() & 0x1ff) == 200 end }),
+  pressWalk("down", function() return not H.worldMode() and map() == 198 end,
+    1200, "held DOWN into Jidoor (map 198)"),
+  H.waitUntil(function()
+    return map() == 198 and H.hasControl() and H.tileAligned() and bright() >= 15
+  end, 1800, "Jidoor control", 5),
+  H.waitFrames(30),
+  H.call(function()
+    H.log(string.format("[probe] Jidoor map %d at (%d,%d)", map(), H.fieldX(), H.fieldY()))
+    H.screenshot("probe_jidoor_arrive")
+  end),
+  H.navTo(27, 42, { playBattles = "tactical", maxFrames = 12000,
+    arrive = function() return map() == 201 end }),
+  pressWalk("up", function() return map() == 201 end, 1200,
+    "held UP into the item shop door 198 (27,41) -> map 201"),
+  H.waitUntil(function()
+    return map() == 201 and H.hasControl() and H.tileAligned() and bright() >= 15
+  end, 1800, "item shop interior control", 5),
   H.waitFrames(60),
   H.call(function()
-    H.log(string.format("auction house: map=%d field=(%d,%d) gil=%d",
-      H.mapId() & 0x3ff, H.fieldX(), H.fieldY(), gil()))
-    H.screenshot("auction_house")
+    H.log(string.format("[probe] shop interior map %d at (%d,%d)", map(), H.fieldX(), H.fieldY()))
+    H.screenshot("probe_jidoor_shop")
+    roster("before buying")
   end),
-  H.saveState("wob_jidoor.mss"),
-  H.logStep(function() return "done" end),
+  H.shopTalk(34, 15, "Jidoor item shop"),
+  H.buyItem(POTION, 0, function() return 5 - H.invCountOf(POTION) end, "POTION to 5 (probe)"),
+  H.buyItem(FENIX, 5, function() return 15 - H.invCountOf(FENIX) end, "FENIX DOWN to 15 (probe)"),
+  H.buyItem(TENT, 7, function() return 6 - H.invCountOf(TENT) end, "TENT to 6 (probe)"),
+  H.call(function() roster("after buying (shop still open)") end),
+  H.shopClose("Jidoor item shop"),
+  H.call(function() roster("after the shop closed") end),
+  H.navTo(34, 20, { playBattles = "tactical", maxFrames = 6000,
+    arrive = function() return map() == 198 end }),
+  pressWalk("down", function() return map() == 198 end, 1200,
+    "held DOWN out of the shop 201 (34,21) -> map 198"),
+  H.waitUntil(function()
+    return map() == 198 and H.hasControl() and H.tileAligned() and bright() >= 15
+  end, 1800, "Jidoor control again", 5),
+  H.waitFrames(30),
+  H.call(function()
+    H.log(string.format("[probe] back on map %d at (%d,%d)", map(), H.fieldX(), H.fieldY()))
+  end),
+  H.navTo(15, 62, { playBattles = "tactical", maxFrames = 20000,
+    arrive = function() return H.worldMode() end }),
+  pressWalk("down", function() return H.worldMode() end, 1200,
+    "held DOWN off Jidoor's south edge -> the world"),
+  H.waitUntil(function()
+    return H.worldHasControl() and H.worldAligned() and bright() >= 15
+  end, 2400, "world control", 5),
+  H.waitFrames(30),
+  H.call(function()
+    H.log(string.format("[probe] back on the world at (%d,%d) f%d", H.worldX(), H.worldY(), H.frame))
+    roster("before the Tent")
+  end),
+  useTent("tent on the world map"),
+  H.call(function()
+    roster("after the Tent")
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c), H.charMaxHp(c), string.format("char %d at full HP after the Tent", c))
+    end
+    H.screenshot("probe_jidoor_tent")
+  end),
+  H.logStep(function()
+    return string.format("probe_jidoor: shop + Tent measured; world (%d,%d) f%d",
+      H.worldX(), H.worldY(), H.frame)
+  end),
 })
