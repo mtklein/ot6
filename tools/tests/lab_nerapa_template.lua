@@ -139,12 +139,23 @@ local function armActionWatch()
   hook(H.sym("ExecCmd@battle_code"), function(cpu)
     local x = cpu["cpu.x"] & 0xffff
     if x < 12 and x % 2 == 0 then
-      H.log(string.format("[act] t=%d start e%d cmd=$%02X atk=$%02X tgt=$%04X nerapa=%d/sh%d hp=%d,%d,%d,%d bp=%d",
+      -- Nerapa's live statuses (entity 4: $3EE4/$3EE5 status 1/2, $3EF8/
+      -- $3EF9 status 3/4, +8), status 3 bit 7 = Reflect
+      H.log(string.format("[act] t=%d start e%d cmd=$%02X atk=$%02X tgt=$%04X nerapa=%d/sh%d st=%02X,%02X,%02X,%02X hp=%d,%d,%d,%d bp=%d",
         actT, x // 2, H.readByte(0xB5), H.readByte(0xB6), H.readWord(0xB8),
         H.readWord(0x3BFC), H.readByte(0x3E40),
+        H.readByte(0x3EE4 + 8), H.readByte(0x3EE5 + 8), H.readByte(0x3EF8 + 8), H.readByte(0x3EF9 + 8),
         H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8), H.readWord(0x3BFA),
         x < 8 and H.readByte(0x3E9C + x) or 0))
     end
+  end)
+  -- counterattacks run through ExecRetal (battle_main.asm:12650, X = the
+  -- retaliating entity, $b1.0 raised), a path ExecCmd's hook does not see
+  hook(H.sym("ExecRetal"), function(cpu)
+    local x = cpu["cpu.x"] & 0xffff
+    H.log(string.format("[retal] t=%d e%d counters (cmd list ptr $%02X) nerapa=%d/sh%d hp=%d,%d,%d,%d",
+      actT, x // 2, H.readByte(0x32CD + x), H.readWord(0x3BFC), H.readByte(0x3E40),
+      H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8), H.readWord(0x3BFA)))
   end)
   hook(H.sym("SaveForMimic"), function(cpu)
     local x = cpu["cpu.x"] & 0xffff
@@ -215,6 +226,12 @@ local function fight()
           condSeen[e] = true
           res.cond[e] = { t = t, n = cnt }
           H.log(string.format("[condemned] t=%d entity %d count %d", t, e, cnt))
+        end
+        if hpLast[e] ~= nil and php ~= hpLast[e] then
+          -- every HP write, timed: the engine writes an action's damage a
+          -- few frames after SaveForMimic, so this is what pairs a loss
+          -- with the [act]/[retal] line that caused it
+          H.log(string.format("[hp] t=%d entity %d %d -> %d (%+d)", t, e, hpLast[e], php, php - hpLast[e]))
         end
         if hpLast[e] ~= nil then
           if hpLast[e] > 0 and php == 0 then
