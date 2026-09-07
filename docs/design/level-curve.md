@@ -42,6 +42,24 @@ gear and Runic do not move it; L17-18 would.  It is vanilla data
 party three levels under vanilla's Zozo tier.  Details, the per-attempt
 table and the retune options: [zozo-street.md](zozo-street.md).
 
+## Map 269: the L16 parity trap (#171)
+
+The first random after the Ifrit & Shiva save (map 269, formation $076,
+Trapper x3, 37.5% of that map's rolls) casts **L4 Flare** on its second
+turn a third of the time: power 66, ignore-defence, no split, every
+level-multiple-of-4 target.  The routed party is LOCKE L16 / CELES L16 /
+EDGAR L17 / SABIN L17, so exactly the two L16s take a **745..848** roll
+(measured off `_writedamage`, 15 seeds x 5 policies) against 447 / 443
+max HP; the L17s cannot be touched by any of the trio's three level
+spells.  Rows and boost do not move it; the party's kill speed does
+(LOCKE's ThunderBlade and SABIN's Pummel are the bolt and bludgeon keys).
+The as-shipped leg walked in with SABIN dead from battle 70 and drew the
+double kill in 9/15 fights; cared (the fix now in `gen_n024_entry`) draws
+it in 4/15.  L17 for the pair would be immune -- 1055 / 1119 XP, three or
+four Trapper trios at 352 each -- and L20 is exposed again (4 and 5).
+Vanilla data, vanilla's own L20 party eats it too.  Details, the
+per-attempt table and the levers: [map269-random.md](map269-random.md).
+
 ## The Floating Continent gap
 
 The routed party reaches the **Floating Continent at L15–17**. Rough vanilla
