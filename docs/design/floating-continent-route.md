@@ -531,22 +531,31 @@ clock 21,267). Four experiments from that one snapshot, all retained
 
 - The 393 pool is one formation, **Naughty `$169` ×1, 3000 HP, 5 pips**
   (`audit_encounters.py 393`: group 123, no pincer). In battle `$b1` reads
-  `$06` — bit 2 *can't run* and bit 1 *harder to run* both set
-  (`battle_main.asm:15609`) — so nothing on this map is run from in this
-  ROM. The old "mustflee" walk never ran anyway: the lib's flee helper
-  tests `$b1` bit 1 (`CANT_RUN = 0x02`, `ot6_field.lua:104`), not bit 2,
-  and declared "this formation refuses the run" at frame 63 of every
-  battle, then fought it with the same driver. The walks now declare the
-  fight they were doing (`playBattles="tactical"`).
+  `$06` from frame 3: Naughty's `monster_prop` +19 is `$8D`, whose bit 3
+  is the no-run flag (`UpdateMonsterGfxBuf` sets `$06` for it) and whose
+  bit 0 is harder-to-run (+6 difficulty) — so nothing on this map is run
+  from in this ROM. The flee helper's refusal there was the engine's own
+  answer: `$b1` bit 1 (`CANT_RUN = 0x02`) is the gate the escape command
+  itself tests (`Cmd_2a`: "can't run away!!"); bit 2 is only the smoke
+  bomb's, and "harder to run" is not a `$b1` bit at all (#150, measured
+  on camp_escaped: with `$b1=00` the helper's L+R released the party from
+  two randoms). The walks declare the fight they were doing
+  (`playBattles="tactical"`).
 - Each Naughty falls to the physical line (Fight / AutoCrossbow, no BP
   bank) in ~1,200–1,900 frames; four of them cost the clock 7,700–8,300
   frames and the party reached Nerapa's doorstep at **3:41** (13,262; fight
   walk) / **3:51** (13,866; attempt 1's walk).
-- A Bolt nuke on the walk is fatal to the *driver*, not the party: with
+- A Bolt nuke on the walk was fatal to the *driver*, not the party: with
   `nuke={2}` the navTo driver's magic plan parked in menu state `$05`
   ("consumed 41 pulses in state $05 without landing", ten drops) on the
   second Naughty and the party bled out over 12,000 frames without a hit
-  landing (V0 and V1, both wiped at (86,10)).
+  landing (V0 and V1, both wiped at (86,10)). Cause (#153, reproduced
+  from fc_alcove with `probe_nuke_park.lua`): Naughty Mutes LOCKE
+  (status 2 `$08`), the engine marks his Magic row disabled (`$202F`
+  bit 7) and the command cursor skips it, so the steer's down/up hopped
+  1 ↔ 3 around row 2 forever. `cmdRow` now reports a disabled row as
+  absent and a plan whose row greys mid-menu is dropped; the same walk
+  re-run plans Fight for the muted turn and wins the fight.
 - **Nerapa is a coin flip on its seed at these levels.** Condemned is on
   all four by t=3000 (`$3EE5` bit 0 set, counts 32/31/29/25) and reaches
   zero around t≈7,000. The gen's attempt 1 (doorstep 3:51) lost: Nerapa at

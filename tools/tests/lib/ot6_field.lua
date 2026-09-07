@@ -89,19 +89,45 @@ end
 -- The corridor flee policy, one driver per navigator call.  L+R is the
 -- engine's own run mechanic; at the cap the battle is fought out by the
 -- tactical driver instead.  Before the cap, $b1 bit 1 is the engine's own
--- can't-run flag (set for a pincer or a monster that blocks running); while
--- it is held, holding L+R is free damage with no roll behind it, so the
--- fight is handed to the tactical driver early instead.  The periodic log
--- line reports the engine's own run machinery:
+-- can't-run flag; while it is held, holding L+R is free damage with no
+-- roll behind it, so the fight is handed to the tactical driver early
+-- instead.  The periodic log line reports the engine's own run machinery:
 --   $2f45  characters-are-running (set while L+R is held and unblocked)
 --   $3a3b  run difficulty: 2 per live monster, 6 for a harder-to-run one
 --   $3d70  per-character run counter, +rand(run factor)+1 per check; the
 --          character escapes once it reaches the difficulty
---   $b1    bit 1 can't-run, bit 2 harder-to-run, bit 5 back attack/pincer
+--   $b1    bit 1 can't-run, bit 2 the smoke-bomb can't-run, bit 5 back
+--          attack/pincer, bit 0 the counterattack flag (flickers on)
 --   $2f4b  bit 0 the formation's own "no running with L+R"
 --   $7EE9EF / $7E629A  battle time stopped / menus force-closed, either of
 --          which suppresses $2f45 outright
+--
+-- Which $b1 bit (#150, read from battle_main.asm and then measured):
+-- bit 1 ($02) is the gate the ESCAPE COMMAND itself tests -- Cmd_2a
+-- `lda $b1 / bit #$02 / bne` queues battle message $09 "can't run
+-- away!!", and GlobalCounter_05 fires that command the moment L+R is
+-- seen while the bit is up.  It is set by UpdateMonsterGfxBuf for a
+-- pincer with monsters alive on both sides (`lda #$02 / tsb $b1`), for a
+-- present monster whose monster_prop +19 bit 3 says no running (`lda
+-- #$06 / tsb $b1`, so bit 2 comes up with it), and while enemy
+-- characters are alive ($3a42).  Bit 2 ($04) is read only by the smoke
+-- bomb (AttackerEffect_4b).  "Harder to run" is not a $b1 bit at all: it
+-- is monster_prop +19 bit 0, which adds 6 instead of 2 to $3a3b.  So the
+-- 15609 comment "clear can't run flag and harder to run flag" for #$06
+-- does not mean bit 1 is the soft one, and CANT_RUN stays $02.
+-- Measured (probe_flee_world.lua, camp_escaped, two world-map randoms):
+-- $b1 read 00, L+R was held from battle frame 3, $2f45 went 1, $3a38
+-- latched "a character just ran away" at frames 243 and 371, and both
+-- fights ended with the party gone and the monsters alive.  On the FC
+-- escape map 393 the one formation is Naughty ($169, +19 = $8D: bit 3
+-- no-run AND bit 0 harder-to-run), so $b1 reads $06 from frame 3 and the
+-- helper's refusal there was the engine's own answer, not a wrong bit;
+-- Vargas ($3c88 = $DD) refuses the same way (probe_flee_boss.lua).
+-- The formation flag $2f4b bit 0 is a refusal as well: btlgfx escape_set
+-- never raises $2f45 while it is up, so holding L+R there is the cap's
+-- worth of free damage (asm-derived; no fixture on the route carries it).
 local CANT_RUN = 0x02           -- $b1 bit 1
+local NO_LR_RUN = 0x01          -- $2f4b bit 0
 local REFUSAL_FRAMES = 60       -- consecutive frames of it before believing it
 
 local function newFlee(opts, tactical)
@@ -111,7 +137,9 @@ local function newFlee(opts, tactical)
   -- that reaches here, so that value is the new-battle edge.
   return function(battN)
     if battN <= 3 then refusedN, said = 0, false end
-    refusedN = ((M.readByte(0x00b1) & CANT_RUN) ~= 0) and refusedN + 1 or 0
+    local refused = (M.readByte(0x00b1) & CANT_RUN) ~= 0
+                 or (M.readByte(0x2f4b) & NO_LR_RUN) ~= 0
+    refusedN = refused and refusedN + 1 or 0
     if battN % 600 == 3 then
       M.log(string.format(
         "flee: held %d of %d frames -- running=%d difficulty=%d " ..
@@ -124,10 +152,12 @@ local function newFlee(opts, tactical)
     if refusedN >= REFUSAL_FRAMES then
       if not said then
         said = true
-        M.log(string.format("flee: this formation refuses the run ($b1 bit 1 " ..
-          "held %d frames -- a pincer, or a monster nobody runs from) after " ..
+        M.log(string.format("flee: this formation refuses the run ($b1=%02X " ..
+          "$2f4b=%02X held %d frames -- $b1 bit 1 is the escape command's " ..
+          "own can't-run gate: a pincer, enemy characters, or a monster " ..
+          "nobody runs from; $2f4b bit 0 the formation's no-L+R flag) after " ..
           "%d frames; fighting it out instead of standing still for the cap",
-          refusedN, battN))
+          M.readByte(0x00b1), M.readByte(0x2f4b), refusedN, battN))
       end
       tactical.frame()
       return
