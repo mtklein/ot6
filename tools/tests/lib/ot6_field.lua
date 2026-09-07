@@ -1589,9 +1589,13 @@ end
 -- for eight frames without clearing it; the driver watches that byte's
 -- high nibble and drops the plan rather than pressing into a refusal.
 --
--- OT6 restores HP and MP in full on every level up, so MP spent walking a
--- corridor is refunded by the next level while a Tonic drunk there is gone
--- for good; casting is therefore tried before the bag.
+-- Owner directive (#152): outside battle the party heals from the BAG --
+-- Tonics first, then Potions -- and a cure is cast only when the bag has
+-- nothing left to offer (every healing item at its reserve floor, or
+-- refused for that target).  MP is the fight's resource; a Tonic is what a
+-- person drinks between fights.  (An earlier order cast first, reasoning
+-- that OT6's level-up refund makes MP the cheaper resource; measured, it
+-- cast Cure three times with 84 Tonics in the bag.)
 --
 -- Magic path: $05 (Skills row 1) -A-> $06 character select ($4B copies
 -- into zSelIndex $28) -A-> $0A skills options (Magic row 1, enabled only
@@ -1603,11 +1607,12 @@ end
 --
 -- opts.threshold  heal a living member below this fraction of max HP
 --                 (default 0.55)
--- opts.magic      cast a cure spell when someone can, and reach for the bag
---                 only when nobody can, the MP is short, or the target is
---                 KO'd and needs a Fenix Down (default true).  Set false on
---                 a step that wants its MP kept for the fight it is walking
---                 toward.
+-- opts.magic      allow a cure to be CAST as the fallback when the bag has
+--                 nothing for a target (default true).  The bag is always
+--                 tried first; set false on a step that must keep every
+--                 point of MP for the fight it is walking toward, and the
+--                 target simply goes unhealed once the bag is empty.
+--                 Revival is always a Fenix Down.
 -- opts.mpFloor    MP a caster keeps back: a fraction of their maximum below
 --                 1, an absolute number at or above it (default 0.25).  A
 --                 caster drained to zero in a corridor walks into the next
@@ -2210,8 +2215,15 @@ local function careKernel(opts)
     end
     table.sort(hurt, function(a, b) return a.r < b.r end)
     for _, h in ipairs(hurt) do
-      local w = useMagic and pickCast(h.c) or nil
-      if w == nil then w = pickItem(h.c) end
+      -- Bag first (owner directive, #152: outside battle the party heals
+      -- with Tonics, not by casting; Potions are the combat heal and MP is
+      -- the fight's).  A cure is cast only when the bag has nothing to
+      -- offer -- every healing item at its reserve floor or refused for
+      -- this target -- and the caller has not switched casting off.
+      -- Measured before this order: gen_esper_tubes' "care before battle
+      -- 72" cast $2D three times with 84 Tonics in the bag.
+      local w = pickItem(h.c)
+      if w == nil and useMagic then w = pickCast(h.c) end
       if w ~= nil then return w end
     end
     return nil
@@ -2599,9 +2611,11 @@ function M.newCareDriver(opts)
   -- Owner directive: outside-battle care heals with TONICS (items), not by
   -- casting -- Tonics are cheap and everywhere, and casting cures drained
   -- MP over a grind badly enough to wipe (zozo_arrival, MP-starved with a
-  -- full Tonic bag).  Field healing therefore spends no MP; MP is reserved
-  -- for battle.  An explicit fieldCare that wants to cast passes
-  -- magic=true; here (the automatic post-battle path) it stays off.
+  -- full Tonic bag).  careKernel now tries the bag first on every path
+  -- (#152); the automatic post-battle path additionally never casts, so a
+  -- grind that empties the bag walks on rather than spending the fight's
+  -- MP.  An explicit fieldCare keeps the cast fallback unless it passes
+  -- magic=false.
   if opts.magic == nil then opts.magic = false end
   local K = careKernel(opts)
   local mode, ph, n = "start", 0, 0
