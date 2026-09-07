@@ -2349,6 +2349,23 @@ function M.newFightDriver(tag, opts)
       -- would have opened the window.
       local press, pressWhy = (function()
         if opts.press == false then return nil end
+        -- A press is the heal-or-attack choice, so it is only asked when
+        -- there is a heal to skip: a downed member the bag can raise, or a
+        -- candidate the fraction / one-round-of-death rules below would
+        -- offer a heal to.  With nobody to care for, the attack lines
+        -- below (summon, nuke, tool, the boost bank) keep their own order.
+        local needsCare = false
+        local threshold = opts.healPercent or 60
+        for e = 0, 3 do
+          local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
+          if maxhp > 0 and hp == 0 and row ~= nil and battInvIdx(FENIX_DOWN) then
+            needsCare = true
+          elseif hp > 0 and maxhp > 0 and hp < maxhp
+             and (hp * 100 // maxhp < threshold or hp <= (roundCost[e] or 0)) then
+            needsCare = true
+          end
+        end
+        if not needsCare then return nil end
         local slot = pressTarget()
         if slot == nil then return nil end
         for e = 0, 3 do
