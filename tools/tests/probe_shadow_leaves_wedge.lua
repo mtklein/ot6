@@ -166,7 +166,9 @@ end)
 -- the symbol.  Since 3fffb2a the body lives in bank $C2 (battle_code), so
 -- the dbg symbol is required here and a stale guess can never masquerade
 -- as a hit.
-local otsl = hook("Ot6ShadowLeaves", nil, 8, function() return string.format("$1ede=%02X", b(0x1ede)) end)
+-- the literal H.sym("...") below is what compose.py scans for; hook()'s own
+-- pcall(H.sym, name) then finds the injected value too.
+local otsl = hook("Ot6ShadowLeaves", H.sym("Ot6ShadowLeaves"), 8, function() return string.format("$1ede=%02X", b(0x1ede)) end)
 assert(otsl, "Ot6ShadowLeaves must resolve from ff6-en.dbg (rebuild the ROM; run via run.sh)")
 hook("_48c4", 0xC24914, 8)
 hook("_488f", 0xC248FA, 8)
