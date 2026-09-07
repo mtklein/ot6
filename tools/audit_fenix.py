@@ -38,10 +38,11 @@ BATTLE = re.compile(r"battle (\d+)|formation|spared")
 # bespoke set-piece / boss driver tags (extend as the route grows)
 BOSS_HINT = re.compile(
     r"b70|FlameEater|ambush|Ultros|Kefka|Vargas|Whelk|Dadaluma|TunnelArmr|"
-    r"Ifrit|Shiva|Number|Cranes|Atma|pursuit|boss|magitek", re.I)
+    r"Ifrit|Shiva|Number|Cranes|Atma|pursuit|boss|magitek|"
+    r"\[IAF\]|Nerapa", re.I)
 RANDOM_HINT = re.compile(
     r"navTo|worldNavTo|advanceStory|rideOut|care after|care before|"
-    r"the ride|climb|cross", re.I)
+    r"the ride|climb|cross|ledge", re.I)
 
 
 def worker_of(path):

@@ -46,6 +46,8 @@ local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
                 healPercent = 60, magic = { [TERRA] = { spell = 2 }, [LOCKE] = { spell = 2 } },
                 nuke = { 2 } }
 local FA = H.newFightDriver("fc", FIGHT)
+-- AtmaWeapon under his own tag (the Fenix audit files it as the boss it is)
+local FAtma = H.newFightDriver("AtmaWeapon", FIGHT)
 -- The escape runs under the 6:00 master clock (21600 frames; the run that
 -- measured it had 16752 left at first control and met four randoms of
 -- ~3000 frames each on the way to Nerapa -- the clock expired before he
@@ -71,7 +73,10 @@ local FA = H.newFightDriver("fc", FIGHT)
 local FIGHT_ESCAPE = { tactical = true, boost = true, bank = 0, items = true,
                        healPercent = 40, nuke = { 2 },
                        summon = { [TERRA] = { mp = 30 }, [EDGAR] = { mp = 27 } } }
-local FE = H.newFightDriver("escape", FIGHT_ESCAPE)
+local FE = H.newFightDriver("Nerapa", FIGHT_ESCAPE)
+-- the ledge wait's randoms: the same policy under another tag, so the
+-- Fenix audit files them as randoms, not as the boss
+local FW = H.newFightDriver("ledge", FIGHT_ESCAPE)
 local ESCAPE_WALK = { playBattles = "mustflee", fleeCap = 600, bank = 0,
                       healPercent = 60, care = false }
 -- Timer data (field-ram.txt:684-692): 4 records of 6 bytes at $1188 --
@@ -283,7 +288,7 @@ H.run({ maxFrames = 400000 }, {
   end)(),
   absorb(function()
     return not atmaUp() and not H.battleActive() and not H.battleLoadStarted()
-  end, 60000, "AtmaWeapon falls ($035F clears)"),
+  end, 60000, "AtmaWeapon falls ($035F clears)", nil, FAtma),
   H.call(function()
     H.assertEq(atmaUp(), false, "$035F cleared -- AtmaWeapon defeated")
     H.log(string.format("[escape] post-Atma at (%d,%d)", H.fieldX(), H.fieldY()))
@@ -404,7 +409,7 @@ H.run({ maxFrames = 400000 }, {
             map(), H.fieldX(), H.fieldY(), tostring(H.dialogWaiting()),
             H.readWord(0x1188), H.readWord(0x118C)))
         end
-        if H.battleLoadStarted() or H.battleActive() then FE.frame(); return end
+        if H.battleLoadStarted() or H.battleActive() then FW.frame(); return end
         local mx = H.readByte(0x056F)
         if mx > 0 then
           local want, sel, ph = mx - 1, H.readByte(0x056E), t % 24
