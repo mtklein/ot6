@@ -81,7 +81,12 @@ signature and per-file hashes of the shared harness sources that produced it
 binding fails; a change to the shared harness sources alone is reported as
 provenance drift and regenerates nothing. A stamp written before ROM identity
 was recorded stays on the older conservative whole-signature rule until its
-fixture is regenerated; no ROM identity is invented for it. This describes
+fixture is regenerated, or until `compose.py --adopt-stamps` proves the
+missing lines from the tree's own records (the current sources still hash to
+the recorded signature, the artifact verifies, and ninja's build log shows
+the ROM content latch last ran before the generate edge with its copy equal
+to the current ROM) and appends them; no ROM identity is invented for it,
+and a fixture the records cannot prove is refused. This describes
 the implementation, not an additional owner restriction. Improve
 dependency/compatibility handling when needed; do not forge stamps, discard
 provenance, or silently disable checks. Use `H.requestSaveState`,

@@ -52,16 +52,27 @@ WAIVERS = ROOT / "tools" / "state_write_waivers.txt"
 
 
 def declared_states(root):
-    """Fixture names in this tree's current savestate graph.  An unreadable
-    or absent graph returns the empty-set fallback."""
+    """Fixture names in this tree's current savestate graph, the also=
+    siblings a generator run publishes included.  An unreadable or absent
+    graph returns the empty-set fallback."""
+    return set(_graph_order(root))
+
+
+def _graph_order(root):
+    """Fixture names in play order, also= siblings right after their state;
+    [] when the graph is unreadable or absent."""
     path = Path(root) / "tools" / "tests" / "savestate_graph.py"
     try:
         spec = importlib.util.spec_from_file_location("savestate_graph", path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        return {s["state"] for s in mod.STATES}
+        out = []
+        for e in mod.STATES:
+            out.append(e["state"])
+            out += list(e.get("also") or [])
+        return out
     except Exception:
-        return set()
+        return []
 
 
 def load_write_waivers(path):
@@ -127,13 +138,14 @@ def digest(b64: str) -> str:
     return hashlib.sha256(b64.encode()).hexdigest()[:12]
 
 
-def _stamp_tool(root, *args, check=True):
+def _stamp_tool(root, *args, check=True, env=None):
     """Shell into savestate_stamp.sh, the single authority for every digest
     a stamp carries, pointed at `root` via OT6_ROOT.  Returns stdout, or
-    None when check=False and the tool refused (e.g. romsig with no ROM)."""
+    None when check=False and the tool refused (e.g. romsig with no ROM).
+    `env` adds to (or overrides) the inherited environment."""
     r = subprocess.run(
         ["sh", str(SAVESTATE_STAMP), *args],
-        env={**os.environ, "OT6_ROOT": str(root)},
+        env={**os.environ, "OT6_ROOT": str(root), **(env or {})},
         capture_output=True, text=True, check=check,
     )
     return r.stdout if r.returncode == 0 else None
@@ -203,7 +215,9 @@ def stamp_status(name, root):
     Migration: a stamp written before the rom/generator lines existed has
     neither.  Nothing is invented for it; it stays on the older conservative
     rule -- the whole sig must match -- until the fixture is regenerated,
-    which writes the full format.
+    which writes the full format, or until `compose.py --adopt-stamps`
+    (adopt_stamps below) proves from the tree's own records what the
+    missing lines would say and appends them.
     """
     base = name[:-len(".mss.lua")] if name.endswith(".mss.lua") else name
     stamp = root / "build" / "states" / (base + ".stamp")
@@ -376,7 +390,7 @@ def check_states(root):
     if legacy:
         tail += (f"; {legacy} stamp(s) predate ROM-identity recording and "
                  f"are held to the conservative whole-sig rule until "
-                 f"regenerated")
+                 f"regenerated or adopted (compose.py --adopt-stamps)")
     if not stale:
         print(f"fixtures: {len(stamps)}/{len(stamps)} fresh "
               f"(ROM, generator, artifact and ancestor bindings all verify)"
@@ -434,7 +448,11 @@ def check_states(root):
               f"stamps, so a shared lib-half edit still stales them under "
               f"the conservative whole-sig rule.  Regenerating writes the "
               f"full stamp format, after which only the ROM, the "
-              f"generator, and the artifact/ancestor bindings decide.")
+              f"generator, and the artifact/ancestor bindings decide.  "
+              f"Before the next lib edit, `compose.py --adopt-stamps` "
+              f"upgrades a legacy stamp in place when the tree's own "
+              f"records prove the missing lines (it refuses these, whose "
+              f"sig has already moved).")
 
     show = 6
     for _, msg in stale[:show]:
@@ -454,6 +472,294 @@ def check_states(root):
           "nice -n 10 ninja -f build/build.ninja <state>\nor the whole chain: "
           " nice ninja")
     return 1
+
+
+# ------------------------------------------------- legacy stamp adoption --
+# `compose.py --adopt-stamps`: upgrade a pre-ROM-identity stamp (sig,
+# artifact and ancestor lines only) to the full format, but ONLY when the
+# tree's own records prove what the missing lines would say.  Nothing is
+# invented; a fixture whose records do not prove it is refused and told why.
+#
+# The proof, per fixture (adoption_proof):
+#   1. The recorded sig equals the CURRENT sig over gen + lib halves +
+#      extras (savestate_stamp.sh `sig`).  Then the generator's own sig and
+#      the lib-half hashes at generation time are the current ones, and can
+#      be written as `generator` and `lib` lines.
+#   2. The ROM at generation time equals the current ROM.  Every generate
+#      edge depends on the ROM through its content latch
+#      build/ninja/src/build/ot6.sfc (configure.py / savestate_ninja.py:
+#      `cmp -s || cp`, restat = 1), so when ninja started the edge the
+#      latch copy was byte-equal to build/ot6.sfc, the ROM run.sh boots.
+#      The latch copy is rewritten only when the ROM's content changes, and
+#      only by the latch edge.  ninja's build log (build/ninja/.ninja_log;
+#      builddir = build/ninja) records each edge run as
+#      `start_ms end_ms mtime_ns output hash`: start/end are relative to
+#      that ninja invocation, but the third column is absolute -- for a
+#      plain edge it is the edge's start time (ninja >= 1.11 records
+#      command_start_time_ there; verified on 1.13.2 / log v7 by the
+#      selftest below), and for a restat edge it is the output's new mtime
+#      when the command rewrote it, else the command's start time.  Either
+#      way the copy's last rewrite is no later than the latch's most recent
+#      record.  So: latch record < generate start, AND the copy's bytes are
+#      the current ROM's, proves the state was generated on the current
+#      ROM.  If the latch's most recent record is not before the generate
+#      started, the records cannot tell whether the copy was rewritten
+#      since, and the fixture is refused.  The stamp's own mtime must fall
+#      inside the recorded edge's window, so a stamp written by a hand run
+#      after that edge cannot borrow the edge's record.
+#   3. The artifact line still verifies (the .mss bytes match).
+#
+# The new lines are inserted in the order `write` produces, the original
+# sig line untouched, so stamp_status() sees a full-format stamp.  Two
+# consequences are handled here rather than left to the reader:
+#   - every child binds `ancestor <path> <sha256 of the parent's stamp
+#     bytes>`; appending lines to the parent moves that hash, so each child
+#     whose ancestor line named the parent's OLD bytes is rebound to the
+#     new bytes (that is the same fact restated, not a new binding), and so
+#     on down the chain;
+#   - the stamp is a ninja input of every child's generate edge, so each
+#     rewrite keeps the file's mtime (ninja schedules by mtime; adoption is
+#     not a generation and must not look like one).
+
+NINJA_LOG = "build/ninja/.ninja_log"          # builddir = build/ninja
+NINJA_LOG_VERSIONS = ("v7",)                  # what the selftest verified
+ROM_LATCH = "build/ninja/src/build/ot6.sfc"   # latch_of(ROM) in configure.py
+LIB_HALVES = ("tools/tests/lib/ot6.lua", "tools/tests/lib/ot6_field.lua",
+              "tools/tests/lib/ot6_contract.lua")
+
+
+def ninja_log_records(root):
+    """The most recent record per output in this tree's ninja build log:
+    ({output: (start_ms, end_ms, mtime_ns)}, None), or (None, why) when the
+    log is missing or of a version whose columns this code has not been
+    verified against."""
+    log = root / NINJA_LOG
+    if not log.exists():
+        return None, f"no ninja build log at {NINJA_LOG}"
+    lines = log.read_text().splitlines()
+    if not lines or not lines[0].startswith("# ninja log "):
+        return None, f"{NINJA_LOG} has no ninja log header"
+    version = lines[0].split()[-1]
+    if version not in NINJA_LOG_VERSIONS:
+        return None, (f"{NINJA_LOG} is ninja log {version}; the adoption's "
+                      f"reading of its columns is verified for "
+                      f"{', '.join(NINJA_LOG_VERSIONS)} only")
+    records = {}
+    for line in lines[1:]:
+        parts = line.split("\t")
+        if len(parts) < 4:
+            continue
+        try:
+            records[parts[3]] = (int(parts[0]), int(parts[1]), int(parts[2]))
+        except ValueError:
+            continue
+    return records, None
+
+
+def _when(ns):
+    import datetime
+    return datetime.datetime.fromtimestamp(ns / 1e9).strftime(
+        "%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+
+def _sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _rewrite_keeping_mtime(path, text):
+    """Replace a stamp's bytes and put its mtime back: ninja schedules the
+    children of this stamp by that mtime, and adoption is not a generation."""
+    st = path.stat()
+    path.write_text(text)
+    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
+
+
+def adoption_proof(base, root, records, rom_now, latch_sha):
+    """Decide one fixture.  Returns ("full", None) for a stamp that already
+    has the compatibility lines, ("refused", why) when the records do not
+    prove the missing lines, or ("adopt", (new_text, evidence)) with the
+    full-format text to write and a one-line account of the evidence.
+    `records` is ninja_log_records()'s table (or None with rom_now/latch_sha
+    unused); `rom_now` the sha of build/ot6.sfc (None when absent);
+    `latch_sha` the sha of the ROM latch copy (None when absent)."""
+    stamp = root / "build" / "states" / (base + ".stamp")
+    regen = f"regenerate it: ninja build/states/{base}.mss.lua"
+    lines = stamp.read_text().splitlines()
+    head = lines[0].split() if lines else []
+    if len(head) < 2:
+        return "refused", "its stamp has no sig line to reason from"
+    recorded, gen, *extras = head
+    fields = {}
+    for line in lines[1:]:
+        parts = line.split()
+        if parts:
+            fields.setdefault(parts[0], []).append(parts[1:])
+    if "rom" in fields and "generator" in fields:
+        return "full", None
+    unexpected = sorted(set(fields) - {"artifact", "ancestor"})
+    if unexpected:
+        return "refused", (
+            f"its stamp carries {', '.join(unexpected)} line(s) but not the "
+            f"full rom+generator pair: neither the legacy nor the full "
+            f"format; {regen}")
+    if len(fields.get("artifact", [])) != 1 or len(fields.get("ancestor", [])) > 1:
+        return "refused", f"its stamp's artifact/ancestor lines are malformed; {regen}"
+    gen_lua = root / "tools" / "tests" / (gen + ".lua")
+    if not gen_lua.exists():
+        return "refused", f"its generator tools/tests/{gen}.lua is gone"
+
+    # 1. the sig: the current sources ARE the generation-time sources.
+    cur = generator_sig(gen, root, extras)
+    if cur != recorded[:64]:
+        return "refused", (
+            f"its sig moved: generated from {gen}+lib halves"
+            f"{'+extras' if extras else ''} sha {recorded[:12]}, the current "
+            f"sources hash {cur[:12]}; the generator and lib lines cannot be "
+            f"derived from sources that changed; {regen}")
+
+    # 3. the artifact (cheap, and pointless to reason about the ROM for a
+    #    fixture whose bytes are not the ones the stamp vouches for).
+    art = fields["artifact"][0][0]
+    mss = root / "build" / "states" / (base + ".mss")
+    if not mss.exists():
+        return "refused", f"build/states/{base}.mss does not exist; {regen}"
+    actual = _sha(mss)
+    if actual != art:
+        return "refused", (
+            f"its artifact moved: build/states/{base}.mss is sha "
+            f"{actual[:12]}, the stamp vouches for {art[:12]}; {regen}")
+
+    # 2. the ROM, from ninja's records.
+    if rom_now is None:
+        return "refused", ("this tree has no build/ot6.sfc to compare the ROM "
+                           "latch copy against; ninja build/ot6.sfc and re-run")
+    if latch_sha is None:
+        return "refused", (f"no ROM latch copy at {ROM_LATCH}: ninja has not "
+                           f"latched the ROM in this tree")
+    if latch_sha != rom_now:
+        return "refused", (
+            f"the ROM latch copy {ROM_LATCH} (sha {latch_sha[:12]}) is not "
+            f"the current ROM (sha {rom_now[:12]}): the ROM changed since "
+            f"ninja last latched it, so a state generated on the latched "
+            f"ROM is a snapshot of a different ROM; {regen}")
+    if records is None:
+        return "refused", "no usable ninja build log (see above)"
+    gen_rec = records.get(f"build/states/{base}.stamp")
+    if gen_rec is None:
+        return "refused", (
+            f"{NINJA_LOG} has no record of a generate edge producing "
+            f"build/states/{base}.stamp (generated outside ninja, or the "
+            f"log was not seeded with the states); {regen}")
+    latch_rec = records.get(ROM_LATCH)
+    if latch_rec is None:
+        return "refused", f"{NINJA_LOG} has no record of the ROM latch {ROM_LATCH}"
+    g_start, g_end, g_at = gen_rec
+    g_dur_ns = (g_end - g_start) * 1_000_000
+    written = stamp.stat().st_mtime_ns
+    # The stamp is the edge's last output: written after the edge started
+    # and before it ended (one second of slack for the clock granularity of
+    # a copied tree).
+    if not (g_at <= written <= g_at + g_dur_ns + 1_000_000_000):
+        return "refused", (
+            f"its stamp was written at {_when(written)}, outside the "
+            f"recorded generate edge's window [{_when(g_at)}, "
+            f"{_when(g_at + g_dur_ns)}]: the stamp on disk is not the one "
+            f"that edge wrote (a hand run, or a copy that did not keep "
+            f"mtimes); {regen}")
+    l_at = latch_rec[2]
+    if not l_at < g_at:
+        return "refused", (
+            f"the ROM latch {ROM_LATCH} last ran at {_when(l_at)} (its most "
+            f"recent record in {NINJA_LOG}), not before this state's "
+            f"generate edge started at {_when(g_at)}; whether it rewrote "
+            f"the ROM copy after generation cannot be told from the "
+            f"records; {regen}")
+
+    own = generator_own_sig(gen, root, extras)
+    new = [lines[0], f"rom {rom_now}", f"generator {own}"]
+    new += [f"lib {h} {_sha(root / h)}" for h in LIB_HALVES]
+    new += [l for l in lines[1:] if l.strip()]
+    evidence = (f"rom {rom_now[:12]} (ninja: generate started "
+                f"{_when(g_at)}, ROM latch last ran {_when(l_at)}, "
+                f"{(g_at - l_at) / 1e9:.3f} s earlier, and its copy is the "
+                f"current ROM), generator {own[:12]}, lib halves recorded; "
+                f"sig {recorded[:12]} unchanged, artifact verifies")
+    return "adopt", ("\n".join(new) + "\n", evidence)
+
+
+def adopt_stamps(root):
+    """`compose.py --adopt-stamps`: the adoption step over every declared
+    fixture, in graph order (parents before children, so a child's ancestor
+    rebinding lands before the child's own adoption).  Prints one line per
+    fixture and a summary.  Exit 0 when nothing was refused, 1 otherwise."""
+    states = root / "build" / "states"
+    all_stamps = sorted(states.glob("*.stamp"))
+    declared = declared_states(str(root))
+    if declared:
+        order = _graph_order(root)
+        stamps = [states / f"{n}.stamp" for n in order
+                  if (states / f"{n}.stamp").exists()]
+        stamps += [s for s in all_stamps if s.stem in declared and s not in stamps]
+    else:
+        stamps = all_stamps
+    if not stamps:
+        print("no generated fixtures in this tree; nothing to adopt")
+        return 0
+    records, why = ninja_log_records(root)
+    if why:
+        print(f"adopt: {why}")
+    rom_now = _stamp_tool(root, "romsig", check=False,
+                          env={"OT6_ROM": str(root / "build" / "ot6.sfc")})
+    rom_now = rom_now.strip() if rom_now else None
+    latch = root / ROM_LATCH
+    latch_sha = _sha(latch) if latch.exists() else None
+
+    adopted, refused, full, rebound = [], [], 0, 0
+
+    def rebind(path_rel, old, new):
+        """Every stamp whose ancestor line names path_rel with the OLD
+        bytes' hash is bound to the same file's NEW bytes, and its own
+        children after it."""
+        nonlocal rebound
+        for s in all_stamps:
+            text = s.read_text()
+            lines = text.splitlines()
+            hit = [i for i, l in enumerate(lines)
+                   if l.split() == ["ancestor", path_rel, old]]
+            if not hit:
+                continue
+            before = hashlib.sha256(text.encode()).hexdigest()
+            for i in hit:
+                lines[i] = f"ancestor {path_rel} {new}"
+            _rewrite_keeping_mtime(s, "\n".join(lines) + "\n")
+            rebound += 1
+            print(f"  rebound {s.stem}: ancestor {path_rel} {old[:12]} -> "
+                  f"{new[:12]} (the parent's stamp gained its adopted lines)")
+            rebind(f"build/states/{s.name}", before, _sha(s))
+
+    for s in stamps:
+        verdict, detail = adoption_proof(s.stem, root, records, rom_now, latch_sha)
+        if verdict == "full":
+            full += 1
+            continue
+        if verdict == "refused":
+            refused.append((s.stem, detail))
+            print(f"adopt {s.stem}: REFUSED -- {detail}")
+            continue
+        text, evidence = detail
+        old = _sha(s)
+        _rewrite_keeping_mtime(s, text)
+        adopted.append(s.stem)
+        print(f"adopt {s.stem}: ADOPTED -- {evidence}")
+        rebind(f"build/states/{s.name}", old, _sha(s))
+
+    legacy = len(adopted) + len(refused)
+    print(f"adopted {len(adopted)} of {legacy} legacy stamp(s); "
+          f"{len(refused)} refused; {full} already in the full format; "
+          f"{rebound} ancestor line(s) rebound to adopted parents")
+    if adopted:
+        print("re-check with: python3 tools/tests/lib/compose.py --check-states")
+    return 1 if refused else 0
 
 
 class CrossTree(Exception):
@@ -1147,6 +1453,240 @@ def selftest() -> int:
             "provenance drift (informational, not stale) on 1 fixture(s)")
         lib_ot6.write_text("ot6.lua v1\n")
 
+    # -- adoption of legacy stamps (adopt_stamps): what the columns of
+    #    ninja's build log mean, against the real ninja on a mock graph.
+    #    adoption_proof reads the third column as an edge's absolute start
+    #    time (plain edge) and as the copy's rewrite time or the command's
+    #    start (restat latch); a ninja that records something else must
+    #    fail here, not silently mis-adopt.
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "build").mkdir()
+        (root / "rom.bin").write_bytes(b"rom v1")
+        (root / "build.ninja").write_text(
+            "builddir = build/ninja\n"
+            "rule latch\n"
+            "  command = mkdir -p $$(dirname $out) && "
+            "{ cmp -s $in $out || cp $in $out; }\n"
+            "  restat = 1\n"
+            "rule gen\n"
+            "  command = sleep 0.2 && cat $in > $out && sleep 0.05\n"
+            "build build/ninja/src/rom.bin: latch rom.bin\n"
+            "build build/out.txt: gen build/ninja/src/rom.bin\n")
+
+        def ninja():
+            return subprocess.run(["ninja"], cwd=root, capture_output=True,
+                                  text=True).returncode
+
+        copy, out = root / "build/ninja/src/rom.bin", root / "build/out.txt"
+        check("real ninja builds the probe graph", ninja(), 0)
+        recs, why = ninja_log_records(root)
+        check("the installed ninja writes a log version adoption reads",
+              why, None)
+        if recs:
+            check("plain edge: the log's mtime column is the edge's START "
+                  "(before its output was written)",
+                  recs["build/out.txt"][2] < out.stat().st_mtime_ns, True)
+            check("...and not before the latch it depends on",
+                  recs["build/ninja/src/rom.bin"][2] < recs["build/out.txt"][2],
+                  True)
+            check("latch rewrite: the column is the copy's new mtime",
+                  recs["build/ninja/src/rom.bin"][2], copy.stat().st_mtime_ns)
+            first = recs["build/ninja/src/rom.bin"][2]
+            os.utime(root / "rom.bin", ns=(first + 10**9, first + 10**9))
+            check("real ninja re-runs the latch on an mtime bump", ninja(), 0)
+            recs, _ = ninja_log_records(root)
+            check("latch cleaned: the column advanced (a later run)",
+                  recs["build/ninja/src/rom.bin"][2] > first, True)
+            check("...while the copy's mtime did not (no rewrite)",
+                  copy.stat().st_mtime_ns, first)
+            check("...and the pruned gen kept its record",
+                  recs["build/out.txt"][2] < out.stat().st_mtime_ns, True)
+
+    # -- adoption on a mock tree with a hand-written log in that format.
+    #    T is an arbitrary epoch; the log's start/end columns are
+    #    invocation-relative and only the third column decides.
+    T = 1_788_000_000_000_000_000
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "tools" / "tests" / "lib").mkdir(parents=True)
+        st = root / "build" / "states"
+        st.mkdir(parents=True)
+        (root / "tools" / "tests" / "gen_fake.lua").write_text("gen v1\n")
+        for h in ("ot6.lua", "ot6_field.lua", "ot6_contract.lua"):
+            (root / "tools" / "tests" / "lib" / h).write_text(h + " v1\n")
+        (root / "tools" / "tests" / "savestate_graph.py").write_text(
+            'STATES = [{"state": "fake"}, {"state": "child"}]\n')
+        rom = root / "build" / "ot6.sfc"
+        rom.write_bytes(b"rom v1")
+        latch = root / ROM_LATCH
+        latch.parent.mkdir(parents=True)
+        latch.write_bytes(b"rom v1")
+        env = {**os.environ, "OT6_ROOT": str(root)}
+        env.pop("OT6_ROM", None)
+
+        def gate(*args):
+            return subprocess.run(
+                ["sh", str(SAVESTATE_STAMP), *args], env=env,
+                capture_output=True, text=True, check=True).stdout
+
+        LATCH_AT, FAKE_AT, CHILD_AT = T, T + 5 * 10**9, T + 65 * 10**9
+        FAKE_DUR, CHILD_DUR = 60_000, 90_000       # ms
+
+        def write_log(latch_at=LATCH_AT, fake_at=FAKE_AT, child_at=CHILD_AT):
+            rows = [(13, 25, latch_at, ROM_LATCH)]
+            for n, at, dur in (("fake", fake_at, FAKE_DUR),
+                               ("child", child_at, CHILD_DUR)):
+                for ext in (".mss.lua", ".mss", ".stamp"):
+                    rows.append((100, 100 + dur, at, f"build/states/{n}{ext}"))
+            (root / NINJA_LOG).write_text(
+                "# ninja log v7\n" + "".join(
+                    f"{s}\t{e}\t{m}\t{o}\tdeadbeef\n" for s, e, m, o in rows))
+
+        def strip(name):
+            """A legacy stamp: the full one minus the lines that did not
+            exist yet.  Keeps the mtime, as a copied tree would."""
+            p = st / f"{name}.stamp"
+            keep = [l for l in p.read_text().splitlines()
+                    if not l.startswith(("rom ", "generator ", "lib "))]
+            _rewrite_keeping_mtime(p, "\n".join(keep) + "\n")
+
+        def stamp_at(name, at):
+            os.utime(st / f"{name}.stamp", ns=(at, at))
+
+        def adopt():
+            report = io.StringIO()
+            with contextlib.redirect_stdout(report):
+                rc = adopt_stamps(root)
+            return rc, report.getvalue()
+
+        def chain():
+            """A legacy chain as the qualification run leaves one: parent
+            and child stamps in the full format first (the texts adoption
+            must reproduce), then stripped, the child bound to the
+            stripped parent's bytes, stamps dated inside their edges."""
+            (st / "fake.mss").write_bytes(b"fake bytes")
+            (st / "child.mss").write_bytes(b"child bytes")
+            gate("write", "fake", "gen_fake", "-")
+            gate("write", "child", "gen_fake", "build/states/fake.stamp")
+            full = {n: (st / f"{n}.stamp").read_text() for n in ("fake", "child")}
+            strip("fake")
+            gate("write", "child", "gen_fake", "build/states/fake.stamp")
+            strip("child")
+            stamp_at("fake", FAKE_AT + 50 * 10**9)
+            stamp_at("child", CHILD_AT + 80 * 10**9)
+            write_log()
+            return full
+
+        full = chain()
+        check("the legacy chain is FRESH under the conservative rule",
+              (stamp_status("fake", root), stamp_status("child", root)),
+              ((FRESH, None), (FRESH, None)))
+        kept = {n: (st / f"{n}.stamp").stat().st_mtime_ns for n in ("fake", "child")}
+        rc, rep = adopt()
+        check("adopt: a proven chain is adopted, root first", rc, 0)
+        has("...saying what the records showed", rep,
+            "adopt fake: ADOPTED -- rom ")
+        has("...with the latch's timing relative to the generate", rep,
+            "ROM latch last ran 2")
+        check("...the adopted root is byte-identical to what `write` "
+              "produced at generation", (st / "fake.stamp").read_text(),
+              full["fake"])
+        has("...and the child was rebound to the parent's adopted bytes",
+            rep, "rebound child: ancestor build/states/fake.stamp")
+        check("...the adopted child is byte-identical to write's too",
+              (st / "child.stamp").read_text(), full["child"])
+        check("...both verdicts are FRESH under the full-format rule",
+              (stamp_status("fake", root), stamp_status("child", root)),
+              ((FRESH, None), (FRESH, None)))
+        check("...and no mtime moved (ninja must not see a generation)",
+              {n: (st / f"{n}.stamp").stat().st_mtime_ns for n in kept}, kept)
+        has("...summary counts", rep, "adopted 2 of 2 legacy stamp(s); 0 refused")
+        lib_ot6 = root / "tools" / "tests" / "lib" / "ot6.lua"
+        lib_ot6.write_text("ot6.lua v1\n-- a comment\n")
+        check("the point: a lib edit after adoption is DRIFT, not STALE",
+              (stamp_status("fake", root)[0], stamp_status("child", root)[0]),
+              (DRIFT, DRIFT))
+        lib_ot6.write_text("ot6.lua v1\n")
+        rc, rep = adopt()
+        check("adopting twice is a no-op", (rc, "adopted 0 of 0" in rep,
+                                            (st / "fake.stamp").read_text(),
+                                            (st / "child.stamp").read_text()),
+              (0, True, full["fake"], full["child"]))
+        has("...that counts the full-format stamps", rep,
+            "2 already in the full format")
+
+        # Refusals, each on a fresh legacy chain.
+        chain()
+        lib_ot6.write_text("ot6.lua v1\n-- a comment\n")
+        rc, rep = adopt()
+        check("refused: the sig moved (a lib edit since generation)",
+              (rc, "adopt fake: REFUSED -- its sig moved" in rep,
+               "adopt child: REFUSED -- its sig moved" in rep), (1, True, True))
+        check("...and nothing was written",
+              (st / "fake.stamp").read_text().count("rom "), 0)
+        lib_ot6.write_text("ot6.lua v1\n")
+        chain()
+        write_log(latch_at=FAKE_AT + 10 * 10**9)     # after fake, before child
+        rc, rep = adopt()
+        has("refused: the ROM latch's record is newer than the generate",
+            rep, "adopt fake: REFUSED -- the ROM latch build/ninja/src/build/"
+                 "ot6.sfc last ran at ")
+        has("...naming the order", rep, "not before this state's generate edge started")
+        has("...while the child, generated after that latch run, is adopted",
+            rep, "adopt child: ADOPTED")
+        check("...per-fixture: root legacy, child full",
+              ("rom " in (st / "fake.stamp").read_text(),
+               "rom " in (st / "child.stamp").read_text()), (False, True))
+        chain()
+        write_log(latch_at=FAKE_AT)                  # equal: not before
+        rc, rep = adopt()
+        has("refused: a latch record equal to the generate start is not "
+            "'before'", rep, "adopt fake: REFUSED -- the ROM latch")
+        chain()
+        (st / "fake.mss").write_bytes(b"HAND-CRAFTED")
+        rc, rep = adopt()
+        has("refused: the artifact moved", rep,
+            "adopt fake: REFUSED -- its artifact moved")
+        has("...and the child bound to the untouched parent still adopts",
+            rep, "adopt child: ADOPTED")
+        chain()
+        stamp_at("fake", FAKE_AT + 200 * 10**9)      # after the edge ended
+        rc, rep = adopt()
+        has("refused: the stamp was written outside the recorded edge's "
+            "window", rep, "adopt fake: REFUSED -- its stamp was written at ")
+        chain()
+        latch.write_bytes(b"rom v2")
+        rc, rep = adopt()
+        has("refused: the latch copy is not the current ROM", rep,
+            "adopt fake: REFUSED -- the ROM latch copy")
+        latch.write_bytes(b"rom v1")
+        chain()
+        (root / NINJA_LOG).unlink()
+        rc, rep = adopt()
+        has("refused: no ninja log", rep, "no ninja build log at build/ninja/.ninja_log")
+        chain()
+        (root / NINJA_LOG).write_text("# ninja log v5\n")
+        rc, rep = adopt()
+        has("refused: an unverified log version", rep,
+            "is ninja log v5; the adoption's reading of its columns is verified")
+        chain()
+        text = (root / NINJA_LOG).read_text()
+        (root / NINJA_LOG).write_text(
+            "".join(l + "\n" for l in text.splitlines() if "fake" not in l))
+        rc, rep = adopt()
+        has("refused: no generate record for the state", rep,
+            "no record of a generate edge producing build/states/fake.stamp")
+        chain()
+        rom.unlink()
+        rc, rep = adopt()
+        has("refused: no built ROM to compare against", rep,
+            "this tree has no build/ot6.sfc")
+        rom.write_bytes(b"rom v1")
+        chain()
+        rc, rep = adopt()
+        check("the same chain adopts once the records are back", rc, 0)
+
     print("selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
 
@@ -1159,6 +1699,10 @@ def main() -> int:
     # any time a red test might not be caused by your change.
     if len(sys.argv) == 2 and sys.argv[1] == "--check-states":
         return check_states(ROOT)
+    # --adopt-stamps: upgrade pre-ROM-identity stamps to the full format
+    # where the tree's own records prove the missing lines (adopt_stamps).
+    if len(sys.argv) == 2 and sys.argv[1] == "--adopt-stamps":
+        return adopt_stamps(ROOT)
     # --sha <sidecar>: the same fingerprint the provenance lines carry, so a
     # hash seen in a run log can be checked against a state on disk.
     if len(sys.argv) == 3 and sys.argv[1] == "--sha":
