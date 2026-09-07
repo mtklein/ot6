@@ -372,6 +372,10 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
     "battle_slots":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+    # grinds honest world-map fights until the 1/16 Shadow-leave roll passes:
+    # an 80-win cap at ~4000 frames a win is ~320k frames, ~1600 s at the
+    # ~200 frames/s a loaded machine emulates; the 600 s default cap is far short
+    "battle_shadowstays": "OT6_TIMEOUT=3600",
 }
 
 # any <name>.mss reference, path-qualified or bare -- compose.py resolves
