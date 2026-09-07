@@ -247,10 +247,13 @@ end
 
 -- The field menu, opened and closed on real presses after the roll battle:
 -- X until ZMENUSTATE reads $05 (the main menu), B until it reads no menu
--- screen and the world module has held control for 30 consecutive frames
--- (the same debounce the lib's care close uses on the world map, where the
--- registers can read stale-live mid-handoff).
-local menuAt = nil
+-- screen and the world has been settled() -- control, aligned, and faded
+-- back in to full brightness -- for 30 consecutive frames (the lib's care
+-- close debounces the world registers the same way because they can read
+-- stale-live mid-handoff; the brightness term is what the navigator waits
+-- for before stepping, and measured: control returns ~17 frames after B
+-- while the fade-in from the menu is still short of 15).
+local menuAt, menuClosedAt = nil, nil
 local function menuRoundTrip()
   local ph, calm = 0, 0
   -- H.cond(always, steps) is the lib's step-group idiom: H.run wants one
@@ -268,10 +271,10 @@ local function menuRoundTrip()
     H.release(),
     H.waitFrames(10),
     H.driveUntil(function()
-      local ok = H.worldHasControl() and H.worldAligned()
-             and not MENU_SCREENS[H.readByte(ZMENUSTATE)]
+      local ok = settled() and not MENU_SCREENS[H.readByte(ZMENUSTATE)]
       calm = ok and calm + 1 or 0
-      return calm >= 30
+      if calm >= 30 then menuClosedAt = menuClosedAt or H.frame; return true end
+      return false
     end, 2400, {
       H.call(function()
         ph = (ph + 1) % 12
@@ -371,8 +374,9 @@ H.run({ maxFrames = 600000 }, {
   H.call(function()
     H.assertEq(menuAt ~= nil, true, "the field menu opened (ZMENUSTATE $05) after the roll battle")
     H.assertEq(settled(), true, "the world is back under control after the menu closed")
-    H.log(string.format("[shadowstays] (a) f%d field menu opened at f%d and closed; "
-      .. "ZMENUSTATE=%02X", H.frame, menuAt, H.readByte(ZMENUSTATE)))
+    H.log(string.format("[shadowstays] (a) f%d field menu opened at f%d, closed and "
+      .. "the world settled at f%d; ZMENUSTATE=%02X bright=%d", H.frame, menuAt,
+      menuClosedAt, H.readByte(ZMENUSTATE), bright()))
   end),
 
   -- the directive after the last fight too: Tonic care through the field
