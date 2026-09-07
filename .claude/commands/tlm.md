@@ -132,7 +132,10 @@ owner asks. Steps, in order, none skipped:
 
 1. `git branch release/vX.Y main` (the build checks the branch exists).
 2. Bump `VERSION` to `X.Y`; write `docs/release-notes-vX.Y.md` in the
-   shape of the previous one (title "OT6 vX.Y -- <Name>", how to play,
+   shape of the previous one, **for players**: what changed in play
+   terms only. No map numbers, addresses, harness names, suppressions,
+   labs or test suites; if a player would not notice it, it is not a
+   note. The evidence lives in commits and issues, not in the notes (title "OT6 vX.Y -- <Name>", how to play,
    what changed in player terms decoded from the git log since the last
    tag); update README's "vX.Y is the current release" line and tag link.
 3. Commit as `release: vX.Y -- <Name> (version bump + release notes)` on
