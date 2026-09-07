@@ -50,6 +50,40 @@
 --   * fights do not replay exactly: the same hold from the same reload
 --     arrived with 5349 and 6585 (and 3190 then 2794 in the
 --     qualification).
+--
+-- Re-measured 2026-09-07 for issue #164 (the max/8 gate banked LOCKE one
+-- boss hit from KO): 12 crossings per policy from the same catwalk snapshot
+-- (timer 14852; holds {0,250,550,900,1300,1750} and {100,400,700,1100,
+-- 1500,2200}; tools/tests/rafterlab_batch_gen.sh with RAFTERLAB_DRIVER),
+-- every arrival saved and battle 104 played from it with
+-- gen_opera7_blackjack's own fighter (rafterlab_ultros_gen.sh; the table
+-- is rafterlab_arrivals.py over build/rafterlab/):
+--   * a crossing replayed from the same approach is exact: two policies
+--     that make the same fight decisions arrive in byte-identical
+--     snapshots, so the policies below are paired per seed;
+--   * Ultros 2 gets ONE action before he dies (30 fights, 30 wins, ~2800
+--     frames each): a weak single hit of 38..101, a 219..241 hit on SABIN,
+--     or, in 5 of 30, a two-target hit of 259..278 on LOCKE and 117..132
+--     on EDGAR.  LOCKE's max is 397.  The shipped no-items policy arrived
+--     with him at or under 278 in 6 of 12 crossings (167..267) -- one hit
+--     from KO -- and under the max/8 gate once (SABIN 40/457);
+--   * the gate is not the lever: max/4 rejects the same single arrival
+--     max/8 does and spends a whole re-crossing on it; neither sees LOCKE
+--     at 198;
+--   * boost-Fight in the rat fights is worse: no shorter (median 2265 vs
+--     2152 frames, 1884..2864 vs 1588..2560), LOCKE arriving at 33 and 109,
+--     and Ultros KO'd him in 2 of 12;
+--   * Potions in the rat fights (items=true: the driver drinks when a
+--     member is under healPercent or inside one measured round of death):
+--     at 33%, 3 Potion plans in 12 crossings, repairing the one sub-gate
+--     arrival for 680 clock frames and no reload; at 50%, 6 plans, LOCKE
+--     > 278 in 7 of 12; at 70%, 18 plans (a re-plan of the same heal logs
+--     twice, so Potions spent is at most that; at most 5 plans in one
+--     crossing, worst extra clock cost 1616 frames, lowest arrival timer
+--     2608 against the 900 floor; the arrival line now says how many
+--     Potions are left), LOCKE > 278 in 9 of 12 and nobody under 56%.  70% ships:
+--     the rat fights are the only care this timed scene allows (no menu),
+--     and the fight after them opens with that hit.
 
 -- The facing is produced by input rather than poked: the old generator wrote
 -- the object facing byte and $0743 to point the party at Ultros; now the last
@@ -172,11 +206,14 @@ end
 --   * fights: the driver gets every battle frame from load latch to the
 --     field's return -- its own menu==0 branch chews the victory boxes.
 --     boost=false, cadence=12: measured 232 frames/fight faster than the
---     boosted default, and safer (zero casualties in ~40 lab fights).
+--     boosted default, and safer (zero casualties in ~40 lab fights);
+--     items=true, healPercent=70: a Potion when a member is under 70% or
+--     inside one round of death, because the boss after these fights
+--     opens with a hit of up to 278 on LOCKE (#164, header).
 -- The rat fights' driver options, on one line: tools/tests/
 -- rafterlab_batch_gen.sh substitutes it (RAFTERLAB_DRIVER) to measure a
 -- candidate policy against the shipped one from the same catwalk snapshot.
-local RAT_DRIVER = { tactical = true, boost = false, cure = false, items = false, cadence = 12 }
+local RAT_DRIVER = { tactical = true, boost = false, cure = false, items = true, healPercent = 70, cadence = 12 }
 local function crossRafters(tx, ty, maxF, hold, res, what)
   local hb, battN, wipeN, notBattN = 0, 0, 0, 0
   local held, lost = 0, nil
@@ -646,8 +683,8 @@ local function crossAttempt(n, hold)
       H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(6),
       H.call(function()
         H.log(string.format("[rafters] attempt %d arrival hp at (%d,%d): %s, " ..
-          "timer %d left, %d fights", n, H.fieldX(), H.fieldY(), hurtLine(),
-          H.readWord(0x1189), crossed.fights or 0))
+          "timer %d left, %d fights, Potions left %d", n, H.fieldX(), H.fieldY(),
+          hurtLine(), H.readWord(0x1189), crossed.fights or 0, H.invCountOf(0xE9)))
       end),
     }, {}),
     H.cond(function() return crossed.ok and LAB_ARRIVAL_PREFIX ~= nil end,
@@ -698,10 +735,9 @@ H.run({ maxFrames = 420000, allowGameOver = true }, {
 
   -- The opera field menu exposes only LOCKE even though EDGAR and SABIN join
   -- its battles.  Kirin turns his otherwise idle MP into ~200-HP Cures.
-  -- The crossing driver itself fights cure-less for speed (measured safe:
-  -- zero casualties in ~40 lab fights, and the ladder re-rolls any hurt
-  -- arrival), so this wear is for the fights around the scene, not inside
-  -- it.
+  -- The crossing driver itself fights cast-less for speed and drinks
+  -- Potions instead (#164; RAT_DRIVER), so this wear is for the fights
+  -- around the scene, not inside it.
   H.equipEsper(0, 0x11, { tag = "KIRIN -> LOCKE for the rafters" }),
   H.call(function()
     H.log(string.format("[prep] esper wear: LOCKE=%02X EDGAR=%02X SABIN=%02X CELES=%02X",
@@ -795,8 +831,9 @@ H.run({ maxFrames = 420000, allowGameOver = true }, {
   -- attempt booted with a nil path and impotent presses -- the menu visit
   -- inside an event-timer scene corrupts the room state (the same $1188
   -- block hazard the save-drive rule documents; this scene's clock is
-  -- $1189).  Recovery here is the all-out driver keeping fights to one
-  -- round; the party crosses on whatever HP the approach left it.
+  -- $1189).  Recovery here is the driver's Potions inside the rat fights
+  -- (#164); the party crosses on whatever HP the approach left it, plus
+  -- those.
   H.call(function()
     H.log(string.format("[rafters] on the catwalk at (%d,%d), timer %d frames left, rats: %s",
       H.fieldX(), H.fieldY(), H.readWord(0x1189), ratLine()))

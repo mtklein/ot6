@@ -46,12 +46,40 @@ u_lost = re.compile(r"\[ultros2\] (PARTY WIPED|GAME OVER)")
 u_verdict = re.compile(r"^\[ot6\] (PASS \(frame|FAIL:)")
 
 
+def arrival_mss(tag, n):
+    """The saved arrival snapshot: build/states/ if staged, else the retained
+    lab workspace it was emitted into."""
+    p = f"build/states/rafterlab_{tag}_arrival_{n}.mss"
+    if os.path.exists(p):
+        return p
+    ws = glob.glob(f"build/test-runs/rafterlab-gen-{tag}.*/artifacts/"
+                   f"rafterlab_{tag}_arrival_{n}.mss")
+    return ws[0] if ws else None
+
+
+def same_bytes(a, b):
+    if not a or not b or not os.path.exists(a) or not os.path.exists(b):
+        return False
+    return open(a, "rb").read() == open(b, "rb").read()
+
+
 def ultros_for(tag, n):
     path = f"build/rafterlab/ultros_{tag}_a{n}.log"
+    twin = None
     if not os.path.exists(path):
-        return None
+        # A policy that made no different decision on this crossing arrives
+        # in a byte-identical snapshot: the baseline twin's Ultros run IS its
+        # Ultros run (same machine state, same fight), so reuse it, flagged.
+        m = re.match(r"^(.*)_(b\d+)$", tag)
+        if m and not tag.startswith("base_"):
+            base = f"base_{m.group(2)}"
+            if same_bytes(arrival_mss(tag, n), arrival_mss(base, n)):
+                path = f"build/rafterlab/ultros_{base}_a{n}.log"
+                twin = base
+        if not os.path.exists(path):
+            return None
     u = dict(path=path, hits=[], done=None, won=False, lost=False, verdict="none",
-             attempts=0)
+             attempts=0, twin=twin)
     for line in open(path, errors="replace"):
         if not line.startswith("[ot6] "):
             continue
@@ -148,7 +176,8 @@ for r in rows:
         hits = ",".join(f"s{s}-{d}" for s, _, d in u["hits"]) or "no hits"
         us = (f"{'WON' if u['won'] else 'LOST' if u['lost'] else '?'} "
               f"{u['verdict']} hits={hits}"
-              + (f" after=[{u['done'][1]}] {u['done'][0]}f" if u["done"] else ""))
+              + (f" after=[{u['done'][1]}] {u['done'][0]}f" if u["done"] else "")
+              + (f" (= {u['twin']} twin, identical snapshot)" if u.get("twin") else ""))
     print(f"{r['tag']:14} {r['attempt']:>3} {r['hold']:>5} {r['timer']:>6} {r['nfights']:>6} "
           f"{','.join(str(f) for f in r['fights']):>22} {r['potions']:>3} {hp:>28} {fracs:>5}  {us}")
 

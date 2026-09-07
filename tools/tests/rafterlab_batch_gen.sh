@@ -28,10 +28,11 @@
 # c4 H/M c5 H/M, ...").  Fold them with rafterlab_aggregate_gen.py.
 #
 # Optional environment (both leave the lineage's generator untouched):
-#   RAFTERLAB_DRIVER='{ tactical = true, boost = false, cure = false, items = true, healPercent = 33, cadence = 12 }'
+#   RAFTERLAB_DRIVER='{ tactical = true, boost = false, cure = false, items = false, cadence = 12 }'
 #       replaces the generator's one-line RAT_DRIVER table (the rat fights'
 #       newFightDriver options), so a candidate fight policy is measured with
-#       the same crossing code from the same catwalk snapshot;
+#       the same crossing code from the same catwalk snapshot (the example is
+#       the pre-#164 no-items policy; the shipped line is the anchor below);
 #   RAFTERLAB_ARRIVALS=1
 #       sets LAB_ARRIVAL_PREFIX so every arrival at (14,7) -- banked or not,
 #       facing Ultros -- is saved as build/states/rafterlab_<tag>_arrival_<n>.mss
@@ -50,7 +51,7 @@ mkdir -p "$OUT"
 SRC="$ROOT/tools/tests/gen_opera6_rafter.lua"
 LUA="$OUT/gen_$TAG.lua"
 
-DRIVER_ANCHOR='local RAT_DRIVER = { tactical = true, boost = false, cure = false, items = false, cadence = 12 }'
+DRIVER_ANCHOR='local RAT_DRIVER = { tactical = true, boost = false, cure = false, items = true, healPercent = 70, cadence = 12 }'
 PREFIX_ANCHOR='local LAB_ARRIVAL_PREFIX = nil'
 # Every anchor must match exactly once, or the copy measures something else.
 for pat in 'local RADIUS, STUCKCAP, PANIC, GATEK = 1, 600, 6000, 4' \
@@ -70,7 +71,7 @@ sed -e "s/^\( *\)local RADIUS, STUCKCAP, PANIC, GATEK = 1, 600, 6000, 4\$/\1loca
     -e "s/H\.saveState(\"\([a-z0-9_]*\)\.mss\")/H.saveState(\"rafterlab_${TAG}_\1.mss\")/g" \
     "$SRC" > "$LUA"
 if [ -n "$DRIVER" ]; then
-  sed -i.bak -e "s/^local RAT_DRIVER = { tactical = true, boost = false, cure = false, items = false, cadence = 12 }\$/local RAT_DRIVER = $DRIVER/" "$LUA"
+  sed -i.bak -e "s/^local RAT_DRIVER = { tactical = true, boost = false, cure = false, items = true, healPercent = 70, cadence = 12 }\$/local RAT_DRIVER = $DRIVER/" "$LUA"
   grep -qF "local RAT_DRIVER = $DRIVER" "$LUA" || { echo "RAT_DRIVER substitution failed"; exit 2; }
 fi
 if [ "$ARRIVALS" = 1 ]; then
