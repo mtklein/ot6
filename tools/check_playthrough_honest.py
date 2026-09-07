@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""No story generator writes game state; it must play through with real input.
+"""Story generators advance through real input; no selective game-state edits.
+
+Complete snapshot capture, restoration, branching, and memory inspection are
+permitted experiment machinery (docs/TESTING.md). This check does not prohibit
+library snapshot helpers or require continuous replay from the game's start.
 
 A generator (tools/tests/gen_*.lua) may not write emulated game state -- no
 emu.write, no M.writeByte/writeWord, and no M.clearBattle (which writes the

@@ -423,11 +423,8 @@ local actions = {
   -- interrupts, and after each battle diff both pages.  The first battle that
   -- teaches must have written the slot-1 page and only it.  (Desert
   -- encounters teach nothing to this kit, the loop keeps walking.)
-  -- This is one single-call state machine: the battle edge is detected
-  -- inline, since H.cond latches its branch on the first tick inside a
-  -- driveUntil body.
   (function()
-    local fights, wasInBattle = 0, false
+    local fights = 0
     local function account()
       fights = fights + 1
       for off = 0x10, PAGE_USED - 1 do
@@ -460,20 +457,37 @@ local actions = {
         table.concat(sp, " "), table.concat(ac, " ")))
       fightSpecies = {}
     end
-    -- The bail-out follows the fixture: the teachable pairing sits fourth
-    -- in the Veldt's eight-formation cycle, so one full cycle plus slack
-    -- bounds the search.
-    return H.driveUntil(function()
-      return (taughtN > 0 or fights >= 16) and not H.battleLoadStarted()
-    end, 60000, {
-      H.call(function()
-        local inBattle = H.battleLoadStarted()
-        if wasInBattle and not inBattle then account() end
-        if inBattle and not wasInBattle then battleReset() end
-        wasInBattle = inBattle
-        if inBattle then battlePulse() else patrolPulse() end
-      end),
-    }, "a post-save battle teaches the slot-1 page")
+    -- One try per encounter: pace until a battle loads, fight it through
+    -- the real menus, diff the pages, and -- unless it taught -- heal
+    -- through the field menu (Tonics first) before pacing again.  The
+    -- Veldt serves the SAVE's recorded history, and the fighting lineage's
+    -- history (Shadow stays, so his battles are in it) serves this trio
+    -- packs that a party walking in half-dead does not survive: measured,
+    -- the un-healed search entered its seventh fight with SABIN at 64 HP
+    -- and wiped.  The bail-out follows the fixture: the teachable pairing
+    -- sits fourth in the Veldt's eight-formation cycle, so two full cycles
+    -- bound the search.
+    local function writeTry(n)
+      return H.cond(function() return taughtN == 0 end, {
+        H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
+          H.call(patrolPulse),
+        }, "find write-half encounter " .. n),
+        H.call(battleReset),
+        H.driveUntil(function() return not H.battleLoadStarted() end, 15000, {
+          H.call(battlePulse),
+        }, "fight write-half battle " .. n),
+        H.call(account),
+        H.cond(function() return taughtN == 0 end, {
+          H.waitUntil(function()
+            return H.worldMode() and H.worldHasControl() and H.worldAligned()
+          end, 2400, "world control after write-half battle " .. n, 5),
+          H.fieldCare({ tag = "codex write search " .. n, threshold = 0.95 }),
+        }, {}),
+      }, {})
+    end
+    local tries = {}
+    for n = 1, 16 do tries[#tries + 1] = writeTry(n) end
+    return H.cond(function() return true end, tries, {})
   end)(),
   H.call(function()
     H.assertEq(taughtN > 0, true,
