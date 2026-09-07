@@ -67,12 +67,18 @@ local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 -- ------------------------------------------------------------ the hooks --
 -- Every name is resolved by symbol from ff6-en.dbg (H.sym raises on a
 -- missing or ambiguous one): a relinked ROM moves the addresses, never the
--- meaning.
-local SYM = {}
-for _, n in ipairs({ "ShadowLeaves", "Ot6ShadowLeaves", "WinBattle", "_488f",
-                     "UpdateSRAM", "TerminateBattle", "Rand@battle_code" }) do
-  SYM[n] = H.sym(n)
-end
+-- meaning.  Each call takes a string LITERAL on purpose: compose.py finds
+-- the names by scanning for `H.sym("...")` and injects only those, so a
+-- name passed through a variable is "not in ff6-en.dbg" at load time.
+local SYM = {
+  ShadowLeaves = H.sym("ShadowLeaves"),
+  Ot6ShadowLeaves = H.sym("Ot6ShadowLeaves"),
+  WinBattle = H.sym("WinBattle"),
+  _488f = H.sym("_488f"),
+  UpdateSRAM = H.sym("UpdateSRAM"),
+  TerminateBattle = H.sym("TerminateBattle"),
+  ["Rand@battle_code"] = H.sym("Rand@battle_code"),
+}
 H.assertEq(SYM.Ot6ShadowLeaves >> 16, 0xC2,
   "Ot6ShadowLeaves is linked into bank $C2 (the fix: a bank-relative jmp "
   .. "can reach it)")
