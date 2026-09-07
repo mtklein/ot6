@@ -529,6 +529,14 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     H.log(partyReport("ifrit_won"))
     H.screenshot("ifrit_won")
   end),
+  -- Owner directive (#169): field care after EVERY battle.  The b70
+  -- driver's raise gate can rightly refuse an in-fight Fenix Down (63 HP
+  -- against a 68 smallest hit), so the win can hand control back with a
+  -- member down; the 2026-09-07 regeneration shipped SABIN dead (hp 0,
+  -- st1 80) and gen_n024_entry walked short-handed into a one-shot random.
+  -- The lib default drinks Tonics first, casts only when the bag is empty,
+  -- and raises with Fenix Downs.
+  H.fieldCare({ tag = "care after battle 70", threshold = 0.95 }),
 
   -- 3. SHIVA at {9,6}: stand at {9,7} and face UP.  $0274.
   H.navTo(9, 7, { maxFrames = 9000, playBattles = "tactical" }),
@@ -559,6 +567,11 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     "take the SHIVA magicite -> $1A69 bit2"),
   H.waitFrames(60),
 
+  -- A no-op when the post-battle care above still holds (it does not even
+  -- open the menu); pays only if a random on the way to the pickups moved
+  -- someone below the threshold, so the pre-save assertion below is a
+  -- check on the checkpoint rather than on the encounter table.
+  H.fieldCare({ tag = "care before the magicite_ifrit_shiva save", threshold = 0.95 }),
   H.call(function()
     H.assertEq(map(), 264, "still on map 264")
     H.assertEq(H.readByte(0x1A69) & 0x01, 0x01, "RAMUH still owned ($1A69 bit0)")
@@ -572,6 +585,19 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     H.log(string.format("[magicite_ifrit_shiva] f%d map=%d (%d,%d) $1A69=%02X",
       H.frame, map(), H.fieldX(), H.fieldY(), H.readByte(0x1A69)))
     H.log(partyReport("magicite_ifrit_shiva"))
+    -- The checkpoint is checked, not assumed: it boots gen_n024_entry and
+    -- every descendant, so everyone must be alive, on their feet, and at
+    -- or above the care threshold when it is written (#169).
+    H.assertPartyStanding("magicite_ifrit_shiva pre-save")
+    for _, c in ipairs(H.partyMembers()) do
+      local hp, maxhp, st1 = H.charHp(c), H.charMaxHp(c), H.charStatus1(c)
+      H.assertEq(hp > 0 and (st1 & 0x80) == 0, true, string.format(
+        "%s is alive at the magicite_ifrit_shiva save (%d/%d, status1 %02X)",
+        CHARS[c + 1], hp, maxhp, st1))
+      H.assertEq(hp * 100 >= maxhp * 95, true, string.format(
+        "%s saves at or above the care threshold (%d/%d, want >= 95%%)",
+        CHARS[c + 1], hp, maxhp))
+    end
     H.screenshot("magicite_ifrit_shiva")
   end),
   H.saveState("magicite_ifrit_shiva.mss"),
