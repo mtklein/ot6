@@ -23,12 +23,33 @@
 --   * rat wander is a pure function of the chase clock, blind to party
 --     input, and a savestate reload replays it exactly -- so the retry
 --     ladder below samples arrangements with LARGE set-off holds (small
---     staggers collapse into identical runs) and can deterministically
---     REPLAY its best attempt;
+--     staggers collapse into identical runs);
 --   * measured strategy expectation over 8 arrangement fixtures
 --     (failures as 0): old held-pad fight-through and halo-avoidance
 --     both 0 (never arrived); verified-step fight-through 4163; the
 --     dodge policy used below 6938 with 100% arrival, ~3.0 fights.
+--
+-- Re-measured 2026-09-07 on the v0.16 lineage (issue #160: the
+-- qualification crossed seven times chasing a 6000-frame bar).  35
+-- crossings of this policy from the qualification's own catwalk snapshot
+-- -- its 7, plus 28 through tools/tests/rafterlab_batch_gen.sh over holds
+-- 0..3000 and the PANIC floor at 6000 and at 3000 (build/rafterlab/) --
+-- every one arrived standing, and:
+--   * the 181 rat fights cost 1648..3296 clock frames each (median 2284)
+--     and the walk itself ~900, so the fight count decides the margin:
+--     3 fights arrived with 3377..6585 left (6 of 35), 4 fights with
+--     1760..5183 (15 of 35), 5 fights with 546..3190 (14 of 35).  6000
+--     was cleared twice, both times by one hold-700 arrangement re-run;
+--   * the PANIC floor is not a lever: 6000 -> 3000 saved a fight in 2 of
+--     12 paired arrangements, changed nothing in 5 (no push fired) and
+--     cost 68..520 frames in 5; the 900 floor passed 11 of 12 either way;
+--   * a hold past ~400 frames buys no new first fight: rat 0 walks into
+--     the standing party at (6,12) with 14460 on the clock in every such
+--     attempt, for the longest fight of the crossing, and the rest of the
+--     hold is then spent standing after it;
+--   * fights do not replay exactly: the same hold from the same reload
+--     arrived with 5349 and 6585 (and 3190 then 2794 in the
+--     qualification).
 
 -- The facing is produced by input rather than poked: the old generator wrote
 -- the object facing byte and $0743 to point the party at Ultros; now the last
@@ -126,9 +147,8 @@ end
 -- that reloads and tries again.  `hold` (number or thunk) is that ladder's
 -- arrangement seed: aligned frames to stand still before setting off.
 --
--- The policy is the lab's measured champion ("dodge-h",
--- probe_rafterlab_dodge.lua; E[margin] 6938 over 8 arrangements, 100%
--- arrival, ~3 fights):
+-- The policy is the lab's "dodge-h" (probe_rafterlab_dodge.lua); what it
+-- yields on the current lineage is measured in the header above:
 --   * pulsed walking: every press is released on the first unaligned
 --     frame (a begun 16px step completes on its own); a press held
 --     through a step chains past junctions whose BOTH neighbors are
@@ -530,26 +550,29 @@ local function toDoor(tx,ty,bumpDir,destMap,what)
 end
 
 -- The crossing's retry ladder.  Attempt 1 runs from where the walk already
--- stands; later attempts reload the catwalk tile and stand still a
--- DIFFERENT, LARGE number of frames before setting off.  Rat wander is a
--- pure function of the chase clock (measured: blind to party input), so a
--- reload replays the same rat schedule exactly and the hold shifts only
--- the party's phase within it -- small staggers collapse into identical
--- attempts (the old 0/30/60/90/120/150 ladder produced six bit-identical
--- runs), while these large irregular holds land in genuinely different
--- collision patterns.  The same determinism is what makes the final
--- REPLAY step sound: re-running the best recorded hold reproduces its
--- outcome bit-for-bit.
+-- stands and is BANKED whenever it arrives standing with MIN_CROSS_TIMER
+-- still on the clock.  Margin past that floor buys nothing: the Ultros
+-- interaction's first opcode is `stop_timer 0` (ff6/src/event/
+-- event_main.asm, `_cabf4b`), so neither his choreography nor battle 104
+-- touches the chase clock, and what the clock has to cover after arrival
+-- is the facing press, the rat-free wait (19 frames in every measured
+-- run) and the >= 600 frames the exit contract asserts.  A person
+-- crosses once; the v0.16 qualification crossed seven times chasing a
+-- 6000 bar this lineage clears about one time in twenty (issue #160).
+--
+-- The later rungs are the fallback for a crossing that FAILED -- the
+-- clock ran out, a rat fight was lost, the party arrived hurt or under
+-- the floor.  Each reloads the catwalk tile and stands still a different,
+-- large number of frames before setting off.  Rat wander is a pure
+-- function of the chase clock (measured: blind to party input), so a
+-- reload replays the same rat schedule and the hold shifts only the
+-- party's phase within it; note that the reload's 92-frame settle is
+-- itself a hold attempt 1 never had, so a reloaded hold 0 is not
+-- attempt 1 again.  The fights are not replayed exactly (the same hold
+-- re-run from the same reload has arrived with 5349 and with 6585), so
+-- there is no "replay the best rung" step: a re-run is a fresh sample.
 local crossed = { ok = false, fights = 0 }
-local attempts = {}                    -- per attempt: hold, margin, standing
-local replayHold = nil                 -- set when the replay step picks one
--- Arrival alone is not enough: the generated entry point still needs time to
--- turn toward Ultros and let a nearby rat wander clear before it is safe to
--- bank.  MIN is that floor; TARGET is the margin worth stopping the ladder
--- for (measured E[margin] of this policy is ~6900, and ~3/4 of arrangements
--- clear 6000, so the ladder usually accepts its first attempt).
 local MIN_CROSS_TIMER = 900
-local TARGET_CROSS_TIMER = 6000
 local HOLDS = { 0, 250, 550, 900, 1300, 1750 }
 local catwalkBlob = nil                -- captured on the catwalk, below
 
@@ -569,17 +592,14 @@ local function hurtLine()
   end
   return table.concat(t, " ")
 end
--- One rung.  `hold` is a number, or a thunk for the replay rung (the value
--- is only known at run time).  `minAccept` is the margin this rung banks
--- at: TARGET for the sampling rungs, MIN for the replay rung.
-local function crossAttempt(n, hold, minAccept)
+-- One rung.  Banks the first standing arrival with MIN_CROSS_TIMER left.
+local function crossAttempt(n, hold)
   local loadReq
   return H.cond(function() return not crossed.ok end, {
     H.call(function()
       crossed.fights = 0
-      local h = type(hold) == "function" and hold() or hold
       H.log(string.format("[rafters] crossing attempt %d: hold %d, banking a " ..
-        "standing arrival with margin >= %d", n, h or -1, minAccept))
+        "standing arrival with margin >= %d", n, hold, MIN_CROSS_TIMER))
     end),
     -- attempts past the first rewind to the tile the walk stepped onto.  The
     -- rewind is gen_vargas's: capture once with H.requestSaveState and reload
@@ -598,13 +618,10 @@ local function crossAttempt(n, hold, minAccept)
     H.call(function()
       local margin = crossed.ok and H.readWord(0x1189) or 0
       local standing = allStanding()
-      local h = type(hold) == "function" and hold() or hold
-      attempts[#attempts + 1] = { hold = h, margin = margin,
-                                  standing = standing }
-      if crossed.ok and margin < minAccept then
+      if crossed.ok and margin < MIN_CROSS_TIMER then
         H.log(string.format("[rafters] attempt %d reached Ultros with %d " ..
-          "frames left, under this rung's %d bar; recorded, trying the next " ..
-          "arrangement", n, margin, minAccept))
+          "frames left, under the %d floor; recorded, trying the next " ..
+          "arrangement", n, margin, MIN_CROSS_TIMER))
         crossed.ok = false
       end
       -- On time but hurt is not good enough: a casualty banked here fails the
@@ -753,33 +770,12 @@ H.run({ maxFrames = 420000 }, {
           #catwalkBlob))
       end),
     }) end)(),
-  crossAttempt(1, HOLDS[1], TARGET_CROSS_TIMER),
-  crossAttempt(2, HOLDS[2], TARGET_CROSS_TIMER),
-  crossAttempt(3, HOLDS[3], TARGET_CROSS_TIMER),
-  crossAttempt(4, HOLDS[4], TARGET_CROSS_TIMER),
-  crossAttempt(5, HOLDS[5], TARGET_CROSS_TIMER),
-  crossAttempt(6, HOLDS[6], TARGET_CROSS_TIMER),
-  -- No sampling rung cleared TARGET: replay the best recorded arrangement.
-  -- Reloads replay the rat schedule exactly, so re-running the best hold
-  -- reproduces its crossing bit-for-bit; this rung banks at the MIN floor.
-  H.cond(function() return not crossed.ok end, {
-    H.call(function()
-      local best
-      for _, a in ipairs(attempts) do
-        if a.standing and a.margin >= MIN_CROSS_TIMER
-           and (not best or a.margin > best.margin) then
-          best = a
-        end
-      end
-      H.assertEq(best ~= nil, true,
-        "some sampled arrangement banked a standing arrival worth replaying")
-      replayHold = best.hold
-      H.log(string.format("[rafters] no rung cleared %d; replaying the best " ..
-        "recorded arrangement (hold %d, margin %d)",
-        TARGET_CROSS_TIMER, best.hold, best.margin))
-    end),
-    crossAttempt(7, function() return replayHold end, MIN_CROSS_TIMER),
-  }, {}),
+  crossAttempt(1, HOLDS[1]),
+  crossAttempt(2, HOLDS[2]),
+  crossAttempt(3, HOLDS[3]),
+  crossAttempt(4, HOLDS[4]),
+  crossAttempt(5, HOLDS[5]),
+  crossAttempt(6, HOLDS[6]),
   H.call(function()
     H.assertEq(crossed.ok, true,
       "the rafters were crossed on the clock and standing within the ladder")
@@ -798,11 +794,18 @@ H.run({ maxFrames = 420000 }, {
       "facing RIGHT at Ultros (EVENT_DIR 1), earned by the blocked press")
   end),
   -- the banked state must not boot into a rat collision: wait until no
-  -- live rat stands within 4 tiles of the entry point (they wander off; the
-  -- timer has headroom for this wait, and the log shows the positions)
+  -- live rat stands within 4 tiles of the entry point (they wander off, and
+  -- the log shows the positions).  The wait is bounded by the clock, not
+  -- only by frames: it gives up at 700 left so the >= 600 assert below
+  -- still holds on a floor-margin arrival, and says so.
   (function() local calm=0
     return H.driveUntil(function()
       calm = (settled() and not ratNear(14,7,4)) and calm+1 or 0
+      if calm < 20 and H.readWord(0x1189) <= 700 then
+        H.log(string.format("[rafters] giving up the rat-free wait at %d " ..
+          "frames left, rats: %s", H.readWord(0x1189), ratLine()))
+        return true
+      end
       return calm >= 20
     end, 9000, { H.call(function()
       if H.battleLoadStarted() then H.setPad(H.frame%8<4 and {"a"} or {}); return end
