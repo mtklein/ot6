@@ -20,40 +20,29 @@ patcher (Flips, beat) and open the result instead.
 
 ## What's changed
 
-**Shadow no longer freezes the game, and no longer leaves the party.**
-Vanilla Final Fantasy VI rolls a 1-in-16 chance after each won battle that
-Shadow, fighting as a guest, walks off. In OT6 that roll was jumping into the
-wrong bank of code and halting the console — a hard freeze, with the last
-frame stuck on screen, that shipped in v0.14 and v0.15. Anyone who fought
-alongside Shadow in those builds could hit it. The roll now runs correctly, and by design it
-is a no-op: **Shadow stays for the whole game.** Only the story's own scripted
-departures still remove him.
+**Shadow no longer freezes the game, and he no longer leaves the party.**
+In v0.14 and v0.15, winning a battle with Shadow as a guest could lock the
+game up with the last frame stuck on screen. That is fixed. And Shadow now
+stays with you for the whole game instead of wandering off after a fight;
+only the story itself can take him away.
 
 If you were playing v0.15 with Shadow, this is the reason to update.
 
-**Break coverage.** The Sealed Gate cave's enemies now carry authored
-shields and weaknesses instead of the generated fallback, so they shield
-and break like the rest of the game, and a build gate now refuses to ship
-any encounter that has no break key at all. Mt. Kolts and Zozo play as
-they did in v0.15: the weapon-class keys written for them this cycle turned
-out not to take effect (a duplicate-row bug found during testing), and the
-fix lands in the next release.
+**Every enemy can be broken.** The enemies in the cave behind the Sealed
+Gate now have proper shields and weaknesses, and there is no longer any
+enemy anywhere in the game without at least one way to break it.
 
-**Fewer stray encounters** on the Phantom Forest's corridor bridge, where a
-crossing was once measured stalling mid-battle. That suppression still ships
-in this build. It has since been re-examined with the freeze above fixed: on
-a follow-up build with the suppression removed, the bridge was crossed forty
-times with every encounter fought, 120 won battles with Shadow aboard, four
-of them rolling Shadow's leave, and nothing stalled. The suppression comes
-out in the next release.
+**Two things this release meant to do and did not.** Some enemies at Mt.
+Kolts and in Zozo were supposed to pick up weapon weaknesses; they play as
+they did in v0.15, and the fix is in the next release. One bridge in the
+Phantom Forest has fewer random encounters than it should; that also goes
+back to normal next release.
 
 ## Patch bytes
 
-This patch differs from v0.15's in the changes listed above and in one
-more way: a clean-room rebuild re-encoded some text and music data that
-had been carried as the original game's ripped bytes (the same words and
-the same songs, stored smaller). The full test suite passed on the built
-ROM, which is the evidence that nothing else changed.
+If you compare this patch to v0.15's, it differs in the changes above and
+in some text and music data that is now stored more compactly. The words
+and the songs are the same.
 
 ## A warning about Sketch
 
@@ -64,10 +53,9 @@ map saves anywhere.
 
 ## What we'd like to know
 
-- Whether Shadow behaves correctly now that he stays — across the Sabin
-  scenario (the Phantom Forest and the Ghost Train), his later rejoin, and any
-  battle where vanilla would have rolled him away.
-- Break behavior in the newly-covered areas: Mt. Kolts, Zozo, and the Sealed
-  Gate cave.
-- Anything that reads as a difficulty cliff or a soft-lock; v0.15's standing
-  question — Rizopas at 4 pips on a blind run — still applies.
+- Whether Shadow behaves himself now that he stays: through the Phantom
+  Forest and the Ghost Train, when he rejoins later, and in any long stretch
+  of fighting with him in the party.
+- How breaking feels in the cave behind the Sealed Gate.
+- Anything that reads as a difficulty wall or a soft-lock. The fish at Baren
+  Falls is the fight we most want to hear about.
