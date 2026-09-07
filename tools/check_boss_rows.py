@@ -181,12 +181,19 @@ class Data:
                             % (tok, HUD_ASM, i + 1)
                         )
                     cls |= CLASS_BIT[tok]
-                out[pending] = {
-                    "shields": shields,
-                    "class": cls,
-                    "line": i + 1,
-                    "comment": (line.split(";", 1)[1].strip() if ";" in line else ""),
-                }
+                # FIRST row wins, like Ot6SeedShields (ot6_break.asm scans
+                # from the top and stops at the first species match).  A
+                # second row for a species is dead code; #157 shipped five
+                # of them while this parser reported the dead rows as live.
+                # tools/check_shield_rows.py gates duplicates at build time;
+                # this parser just must not read them the wrong way round.
+                if pending not in out:
+                    out[pending] = {
+                        "shields": shields,
+                        "class": cls,
+                        "line": i + 1,
+                        "comment": (line.split(";", 1)[1].strip() if ";" in line else ""),
+                    }
                 pending = None
         return out
 

@@ -17,11 +17,14 @@
 --
 --   $052 SlamDancer  L15  HP 392  MP 120  speed 35  atk 13  def 115
 --                    mdef 145  mpow 10   weak POISON ($08)  absorb none
---                    shields 2, NO class key (Ot6ShieldTbl, ot6_hud.asm
---                    :1671, the first-match row; the second $0052 row at
---                    :1854 with SLASH|PIERCE is dead code -- Ot6SeedShields
---                    scans from the top and stops at the first hit,
---                    ot6_break.asm:74-83)
+--                    shields 2, NO class key on the ROM this lab measured
+--                    (v0.16: Ot6ShieldTbl ot6_hud.asm:1671, the first-match
+--                    row; the second $0052 row at :1854 with SLASH|PIERCE
+--                    was dead code -- Ot6SeedShields scans from the top
+--                    and stops at the first hit, ot6_break.asm:74-83).
+--                    #157 removed the keyless row, so a rerun of this lab
+--                    seeds 2 shields, SLASH|PIERCE: LOCKE's daggers and
+--                    the MithrilBlades chip it now; see probe_shield_rows
 --                    Every stat is byte-identical to the vanilla ROM record.
 --   AI (ai_script.asm:925 "slamdancer"):
 --       if_one_monster_type            <- true in $069 (and $06b/$06c no)

@@ -97,6 +97,10 @@ def find_shield_tbl():
     while True:
         sp = rom[a] | (rom[a+1] << 8)
         if sp == 0xFFFF: break
+        # first row wins, like Ot6SeedShields; a second row for a species
+        # is dead code and the build gate (tools/check_shield_rows.py)
+        # refuses it, so this audit refuses it too rather than pick a side
+        assert sp not in tbl, f'Ot6ShieldTbl lists species ${sp:04X} twice (rom+${a:06X}); first row wins in the engine'
         tbl[sp] = (rom[a+2], rom[a+3])
         a += 4
     return tbl

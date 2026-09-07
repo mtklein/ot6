@@ -28,7 +28,7 @@ SlamDancer + Gabbldegak x3 6.25%).
 |---|---|---|
 | SlamDancer $052 | L15, HP 392, MP 120, speed 35, atk 13, def 115, mdef 145, **mpow 10** | `monster_prop.dat` +$0A40; byte-identical to the vanilla ROM record |
 | weakness | poison ($08) only; no absorb/null | `monster_prop.dat` +25 |
-| shields | **2, no class key** | `Ot6ShieldTbl`, `ot6_hud.asm:1671` (first match wins, `ot6_break.asm:74-83`) |
+| shields | **2, no class key** at the time of the lab (v0.16) | `Ot6ShieldTbl`, `ot6_hud.asm:1671` (first match wins, `ot6_break.asm:74-83`). Fixed for #157: that shields-only row is gone and the species now seeds its keyed row (2, SLASH\|PIERCE); the lab's numbers below were measured on the keyless ROM |
 | AI | `if_one_monster_type` -> `attack FIRE_2, ICE_2, BOLT_2`; else two Battle lines | `ai_script.asm:925` |
 | Fire 2 / Ice 2 / Bolt 2 | power 60 / 62 / 61, magic, targeting $61 | `magic_prop_en.dat` |
 
@@ -198,12 +198,15 @@ keep flagging it.
 
 ## Out of scope, noticed on the way
 
-- `Ot6ShieldTbl` carries the four Zozo species **twice**
+- `Ot6ShieldTbl` carried the four Zozo species **twice**
   (`ot6_hud.asm:1671-1678` with no class, `:1849-1860` with
   SLASH|PIERCE / BLUDG / PIERCE).  `Ot6SeedShields` takes the first match,
-  so the second block is dead; `tools/check_boss_rows.py`'s parser keeps
-  the *last* row per species, so it reads the dead block.  Either delete
-  the second block or, if class keys were intended, delete the first.
+  so the second block was dead; `tools/check_boss_rows.py`'s parser kept
+  the *last* row per species, so it read the dead block.  Fixed as #157:
+  the first block is deleted, the parser reads first-wins, and
+  `tools/check_shield_rows.py` fails the build on a duplicate species.
+  `tools/tests/probe_shield_rows.lua` measures the seeded class byte and
+  the per-hit chips from `zozo_arrival`.
 - Runic opens a target window in this ROM (`state $38` after the confirm),
   so `newFightDriver` will need a target step if it ever gains a Runic
   line (the lab's steer is in `lab_zozo_street.lua`).

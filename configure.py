@@ -472,6 +472,15 @@ check("break_coverage_ratchet", "python3 tools/audit_break_coverage.py",
        "ff6/src/field/world_battle_group.dat",
        "ff6/src/battle/battle_monsters.dat",
        "ff6/src/battle/monster_prop.dat"])
+# One row per species (#157): Ot6SeedShields takes the FIRST match, so a
+# second Ot6ShieldTbl/Ot6ElemAddTbl row for a species is dead code that
+# reads as authored.  Source and the shipped ROM table must agree row for
+# row.
+check("shield_rows",
+      "python3 tools/check_shield_rows.py --selftest"
+      " && python3 tools/check_shield_rows.py",
+      ["tools/check_shield_rows.py", "build/ot6.sfc",
+       "ff6/src/battle/ot6_hud.asm", "ff6/src/battle/ot6_break.asm"])
 check("break_reach", "python3 tools/check_break_reach.py",
       ["tools/check_break_reach.py"] + glob("src/battle/ot6_*.asm", "ff6"))
 check("encounters_selftest", "python3 tools/audit_encounters.py --selftest",

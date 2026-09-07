@@ -1567,11 +1567,13 @@ Ot6ShieldTbl:
                                 ;   because terra/locke/edgar's other
                                 ;   weapons are all pierce (ot6_class.asm:
                                 ;   48,49,59) except edgar's mithril blade
-        .word   $0086
-        .byte   2, $00          ; cirpius: shields only; weakness is the
-                                ;   poison row in Ot6ElemAddTbl
+        ; (cirpius $0086 lived here as a shields-only row through v0.16;
+        ; its row is now the keyed one in the break-dark block below --
+        ; Ot6SeedShields takes the FIRST match, so a species may appear
+        ; in this table once.  tools/check_shield_rows.py gates that.)
         .word   $007a
-        .byte   2, $00          ; tusker: shields only, same reason.
+        .byte   2, $00          ; tusker: shields only; weakness is the
+                                ;   poison row in Ot6ElemAddTbl.
                                 ; an Ot6ShieldTbl row also exempts its
                                 ; species from Ot6HpScale (inert today,
                                 ; every band ships $10 = 1x); where a
@@ -1663,20 +1665,17 @@ Ot6ShieldTbl:
         .word   $0059
         .byte   2, OT6_BLUDG    ; aspik: crushed by a monk's fists
         ; zozo / opera / the factory
-        ; ---- zozo town: four poison-trash rows, shields only. the
-        ; search-for-terra party (Locke+Celes+Edgar+Sabin) has no native
-        ; fire; poison via Edgar's bio blaster is the town's break key.
-        ; every town thug is already poison-weak in vanilla, so these are
-        ; shield-count-only rows.
-        .word   $0052
-        .byte   2, $00          ; slamdancer
-        .word   $004e
-        .byte   2, $00          ; harvester
-        .word   $0053
-        .byte   2, $00          ; hadesgigas: the town wall, 1200 hp
-        .word   $00df
-        .byte   2, $00          ; gabbldegak: comes 4 at a time, bio's
-                                ;   group target chips the whole pack at once
+        ; ---- zozo town: the four street thugs (slamdancer $0052,
+        ; harvester $004e, hadesgigas $0053, gabbldegak $00df) had four
+        ; shields-only rows HERE through v0.16: the search-for-terra party
+        ; (Locke+Celes+Edgar+Sabin) has no native fire; every town thug is
+        ; already poison-weak in vanilla, so poison via Edgar's bio blaster
+        ; was the town's break key (bio's group target chips the whole
+        ; gabbldegak pack at once).  Those rows shadowed the keyed rows in
+        ; the break-dark block below (first match wins, ot6_break.asm
+        ; Ot6SeedShields), which is why the class keys never seeded
+        ; (issue #157).  The rows now live there, once: Bio Blaster
+        ; remains the key it always was; the class keys add to it.
         .word   $0107
         .byte   6, OT6_PIERCE|OT6_BLUDG ; dadaluma: break the crouch
         .word   $006c
@@ -1841,7 +1840,11 @@ Ot6ShieldTbl:
         ; simply did not exist there.  Vanilla bits stay -- the four Zozo
         ; bodies are all poison-weak (Bio Blaster is a live key whenever
         ; EDGAR is picked), and Cirpius carries no vanilla weakness at
-        ; all, so its class row is its only key (the Rhinox condition).
+        ; all (Ot6ElemAddTbl gives it poison), so its class row is its
+        ; only weapon key (the Rhinox condition).  These five are the ONLY
+        ; rows for their species: the shields-only rows that used to sit
+        ; above them (kolts, zozo) were removed for #157, because the
+        ; seeder takes the first match and never reached these.
         .word   $0086
         .byte   2, OT6_PIERCE   ; cirpius: a dart takes the mt. kolts
                                 ;   flier.  94% of draws on maps 96/97
