@@ -29,6 +29,19 @@
 | Esper Mtn / Ultros③ | TERRA 15 · LOCKE 16 · STRAGO 17 | L15–17 |
 | **FC entry (thamasa_done)** | **TERRA 15 · LOCKE 16 · STRAGO 17 · RELM 15** | **L15–17** |
 
+## Zozo: the level gate nobody authored (#155)
+
+The routed Zozo party (L14-15 above) meets map 225's solo SlamDancer
+(formation $069, 31% of that map's rolls), whose `if_one_monster_type`
+branch casts Fire 2 / Ice 2 / Bolt 2 every turn.  Measured in
+`tools/tests/lab_zozo_street.lua` (15 seeds x 5 policies, raw damage
+word): the single-target roll is **464..492**, above every member's max
+HP (353/349/398/407); the all-target split lands 207..263 each.  Rows,
+gear and Runic do not move it; L17-18 would.  It is vanilla data
+(`monster_prop.dat` $052 is byte-identical to the vanilla ROM) meeting a
+party three levels under vanilla's Zozo tier.  Details, the per-attempt
+table and the retune options: [zozo-street.md](zozo-street.md).
+
 ## The Floating Continent gap
 
 The routed party reaches the **Floating Continent at L15–17**. Rough vanilla

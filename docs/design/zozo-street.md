@@ -96,6 +96,23 @@ all-target damage per member: 207..263 (LOCKE 233..263, CELES 207..239, EDGAR 22
 single-target: every one a kill at any HP the party can have here (380 EDGAR, 339 LOCKE, 349 CELES, 380 SABIN -- the clamp)
 ```
 
+The roll behind the clamp, read off the engine's own damage word at
+`_writedamage` (before `ApplyDmg`; `build/zozolab/control3_s*.log`, a
+re-pass of seeds 0/8/28/40/44 that reproduced pass 1 result-for-result,
+as did a full 15-seed re-pass, `control2`):
+
+```
+[hit] f626  Bolt2 tgt=0002 dmg=0,349,0,0   raw=-,472,-,-     (CELES 349/349)
+[hit] f648  Bolt2 tgt=0004 dmg=0,0,380,0   raw=-,-,484,-     (EDGAR 380/398)
+[hit] f1521 Fire2 tgt=0008 dmg=0,0,0,380   raw=-,-,-,484     (SABIN 380/407)
+[hit] f697  Bolt2 tgt=0002 dmg=0,349,0,0   raw=-,464,-,-
+[hit] f1991 Ice2  tgt=0001 dmg=339,0,0,0   raw=492,-,-,-     (LOCKE 339/353)
+[hit] f842  Fire2 tgt=000F dmg=259,226,242,223 raw=259,226,242,223   (all-target: the split halves it)
+```
+
+**Single-target tier-2: 464..492 measured (n=5), against maximum HP of
+353 / 349 / 398 / 407.**
+
 What the numbers say:
 
 1. **Rows are irrelevant.** `allback` and `allfront` drew the same casts
@@ -106,10 +123,11 @@ What the numbers say:
    (`acts_before_first` is 0 in 6 of 13 control fights).  "Kill it before
    it acts" is a seed lottery: 2/15 for control, 5/15 for `breakfirst`.
 3. **A single-target cast is a death, full stop.** All-target casts split
-   to ~207..263 per member; the single-target roll is roughly twice that,
-   above every member's maximum HP (353/349/398/407).  No gear in the bag
-   changes that (the unused pieces are a RegalCutlass, hats, a Buckler,
-   Jewel Rings), and healing cannot pre-empt it.
+   to ~207..263 per member; the single-target roll is 464..492, above
+   every member's maximum HP (353/349/398/407) by 60-140.  No gear in the
+   bag changes that (the unused pieces are a RegalCutlass, hats, a
+   Buckler, Jewel Rings; magic defence scales the roll by (255-mdef)/256,
+   so even +30 mdef leaves it above 400), and healing cannot pre-empt it.
 4. **Runic is not a shield here.** The command is queued at selection but
    executes behind the other queued actions (s16: selected ~f+200,
    executed f+1228; the Fire 2 landed at f+605), and the stance is gone
@@ -127,7 +145,24 @@ What the numbers say:
 generator per policy (artifacts redirected to `build/zozolab/street/`, the
 tree's `dadaluma_entry` untouched):
 
-STREET_TABLE
+| policy | street | frames to Dadaluma's door | street battles | Fenix Downs | `audit_fenix.py` |
+|---|---|---|---|---|---|
+| control | reached | 55,321 | 9 | 3 (2 revives at care stops, both SABIN to a solo SlamDancer's cast; 1 in battle) | flags 2 RANDOM |
+| allback | reached | 50,408 | 9 | 0 | clean |
+| allfront | **wiped** on street battle 1 (Gabbldegak x4, `roundcost=314,310,204,263`) | - | 1 | 0 | clean (no fight to flag) |
+| breakfirst | reached | 48,605 | 9 | 0 | clean |
+| runic | reached | 50,405 | 9 | 1 (in battle, a solo SlamDancer) | flags 1 RANDOM |
+
+(`build/zozolab/street_<policy>.log`; the per-battle table is
+`build/zozolab/streetstats.py`.)  One run per policy is a sample, not a
+rate: the street draws its own formations (`$1fa2` advances per battle,
+so each run's sequence diverges from the first fight on), and every run
+that reached the door met a solo SlamDancer at least once.  What the
+sample does show is the sign of the row lever on the *physical*
+formations: front-row-everyone dies to the Gabbldegak swarm, back-row-
+everyone takes the least damage across the street (0 Fenix); and that
+the SlamDancer's cast is the street's only Fenix source in every run
+that spent one.
 
 ## Finding and recommendation
 
@@ -135,16 +170,18 @@ This is a **balance finding**, not a gear, row or driver problem.  The
 solo SlamDancer's tier-2 line is vanilla data (every stat byte matches the
 vanilla ROM) meeting a party the level curve places at L14-15 (vanilla
 reaches Zozo around L20: `level-curve.md`).  At mpow 10 / L15 the
-single-target roll exceeds every member's max HP; the party would need
-roughly **L17-18** (EDGAR 502 HP at L17, ~560 at L18 on the chain's own
-curve) for the low roll to be survivable, i.e. the row is hot by about
-three levels, or ~25-35% in damage.
+single-target roll (464..492) exceeds every member's max HP; on the
+chain's own HP curve (EDGAR 398 at L15, 448 at L16, 502 at L17; LOCKE
+353/397/447/501) the party needs **L17 for the max roll to leave a few
+HP, L18 for a margin**, i.e. the row is hot by about three levels, or
+~25-35% in damage (a topped 407-HP SABIN is 60-85 short of the roll).
 
 Options, cheapest first (the owner's call; none is applied here):
 
 - **Retune the solo branch**: `attack FIRE, ICE, BOLT` (tier 1, power
   21/22/20) in the `if_one_monster_type` block keeps the elemental read
-  and lands ~150-180 single / ~80 all — a hit, not a KO — at these levels.
+  and, scaling the measured 464..492 by 21/60, lands ~165-175 single /
+  ~85 all — a hit, not a KO — at these levels.
   The other three Zozo bodies (Harvester, HadesGigas, Gabbldegak) swing
   physicals and are not in this finding.
 - **Or lower mpow** on $052 (10 -> 6 puts the single roll near 300) if
