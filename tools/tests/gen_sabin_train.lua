@@ -1136,8 +1136,20 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     "SHURIKEN to 10"),
   buyItem(FIRE_SKEAN, 7, function() return 2 - invCount(FIRE_SKEAN) end,
     "FIRE SKEAN to 2"),
-  buyItem(POTION, 1, function() return 10 - invCount(POTION) end,
-    "POTION to 10"),
+  -- Potions are the IN-COMBAT heal (a Tonic's +50 is under the measured
+  -- round cost here; the field care between fights is what Tonics are
+  -- for), and this merchant is the route's FIRST Potion shop and the last
+  -- one before Baren Falls (shop_prop.dat: Figaro's shop 4 and South
+  -- Figaro's shop 8 sell none; nothing between here and Mobliz).  The
+  -- supply curve (docs/design/level-curve.md) carries ~level x1.5 of them:
+  -- L14 here -> 21.  The old target of 10 left 8 at the falls jump (#167),
+  -- and a target of 21 left 12: the GhostTrain fight between this counter
+  -- and the falls spent 9 on its own (train_done.log, nine `[b68] heal ...
+  -- POTION` lines, potion=21 -> 12 at the post-train care).  The last shop
+  -- before a shopless boss stretch buys the band PLUS that stretch's
+  -- measured spend, so the falls jump still holds the band: 21 + 9 = 30.
+  buyItem(POTION, 1, function() return 30 - invCount(POTION) end,
+    "POTION to 30"),
   -- Fenix Downs are for reviving allies (battle 47's prolonged tail killed
   -- SHADOW, measurably, and he entered the boss fight dead); the item target
   -- steer never confirms on the monster side, so the undead-instant-kill
@@ -1151,8 +1163,8 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
       gil(), invCount(TONIC), invCount(POTION), invCount(FIRE_SKEAN)))
     H.assertEq(invCount(TONIC) >= 12, true,
       "at least 12 Tonics for the medic line (bought)")
-    H.assertEq(invCount(POTION) >= 8, true,
-      "at least 8 Potions for the medic line (bought)")
+    H.assertEq(invCount(POTION) >= 10, true,
+      "at least 10 Potions for the medic line (bought; the Potion band's floor)")
     H.assertEq(invCount(FIRE_SKEAN) >= 2, true,
       "two Fire Skeans for SHADOW's chip (bought, #74)")
   end),
