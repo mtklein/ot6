@@ -47,7 +47,11 @@
 --      the Muddle rule (#170): Remedy's status-2 cure mask has no CONFUSE
 --      bit (vanilla, byte for byte), a muddled ally gets a plain hit, a
 --      muddled actor defers;
---   8. that every case ran.
+--   8. that every case ran;
+--   9. the wipe verdict (#166, H.wipeVerdict) on gau_joined's stale-seat
+--      bytes and the Narshe descent's seven-marked party: seats come from
+--      the engine's actor table, LoseBattle's $3ebc bit 0 is a verdict on
+--      its own, and bytes another module owns are never a wipe.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TONIC, POTION = 0xE8, 0xE9
@@ -267,6 +271,101 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0, [1] = 0, [2] = 0, [3] = 0 },
                               hp = full, maxhp = full }), nil, "nobody muddled: nothing to do")
     H.log("battle_healpolicy: refined raise gate, ATB read and Muddle rule checked")
+  end),
+
+  -- 9. the wipe verdict (#166) on the bytes the old scan misread.  rows are
+  -- the four battle seats { actor = $3ed8+2e, present = $3aa0+2e bit 0,
+  -- hp = $3bf4+2e, maxhp = $3c1c+2e }; flags is $3ebc.  The rows are
+  -- probe_wipe166's measured ones (2026-09-07).
+  H.call(function()
+    local function row(a, hp, mx, hidden)
+      return { actor = a, present = a ~= 0xFF and not hidden, hp = hp, maxhp = mx }
+    end
+    local EMPTY = row(0xFF, 0, 0)
+    -- A Veldt random from falls_done: "seats=[a5:0/363 a2:0/358 a11:394/394
+    -- -:0/0] $1850 marks 2 $3ebc=01 $3a74=00" -- seat 2 is GAU, the
+    -- formation's hidden character AI, present bit clear, full HP; the
+    -- #163 audit's gau_joined wipe read the same [0/363 0/358 394/394 0/0]
+    local veldt = { row(5, 0, 363), row(2, 0, 358), row(11, 394, 394, true), EMPTY }
+    H.assertEq(H.wipeVerdict(veldt, 0x00), true,
+      "the Veldt: SABIN and CYAN at 0 with hidden GAU at 394/394 in seat 2 is a wipe (the HP half)")
+    H.assertEq(H.wipeVerdict(veldt, 0x01), true, "...and with LoseBattle's flag up, still one")
+    H.assertEq(H.wipeVerdict({ row(5, 0, 363), row(2, 40, 358), row(11, 394, 394, true), EMPTY }, 0x00), false,
+      "...and CYAN at 40 is not")
+    H.assertEq(H.wipeVerdict({ row(5, 0, 363), row(2, 0, 358), row(11, 394, 394), EMPTY }, 0x00), false,
+      "a PRESENT third member at 394 is a survivor (the present bit is what separates him from GAU)")
+    -- KEFKA from kefka_entry: "seats=[a0:0/306 a4:0/354 a6:0/310 -:0/0]
+    -- $1850 marks 7 $3ebc=00 $3a74=02" -- the HP half, 212 frames before
+    -- the flag; the verdict never consults the head count
+    local narshe = { row(0, 0, 306), row(4, 0, 354), row(6, 0, 310), EMPTY }
+    H.assertEq(H.wipeVerdict(narshe, 0x00), true, "KEFKA: three seated at 0 is a wipe however many $1850 marks")
+    H.assertEq(H.wipeVerdict({ row(0, 1, 306), row(4, 0, 354), row(6, 0, 310), EMPTY }, 0x00), false,
+      "TERRA at 1 HP: not a wipe")
+    -- LoseBattle's own verdict: $3ebc bit 0 counts even with HP words up
+    -- (an all-petrified party), and bit 0 only (the FC's measured $0D has it)
+    H.assertEq(H.wipeVerdict({ row(0, 200, 400), row(4, 150, 380), EMPTY, EMPTY }, 0x01), true,
+      "LoseBattle's bit 0 with HP words still up (petrify/zombie) is a wipe")
+    H.assertEq(H.wipeVerdict({ row(0, 0, 400), row(4, 0, 380), EMPTY, EMPTY }, 0x0D), true,
+      "the FC wipe's $3ebc=$0D counts")
+    H.assertEq(H.wipeVerdict({ row(0, 200, 400), row(4, 150, 380), EMPTY, EMPTY }, 0x0C), false,
+      "$0C -- bits 2/3 without bit 0 -- is not the game-over flag")
+    -- the shape gate: bytes another module owns are never a wipe
+    H.assertEq(H.wipeVerdict({ EMPTY, EMPTY, EMPTY, EMPTY }, 0x01), false,
+      "no seat filled: nothing to judge, flag or not")
+    H.assertEq(H.wipeVerdict({ row(11, 394, 394, true), EMPTY, EMPTY, EMPTY }, 0x01), false,
+      "only a hidden seat: nothing to judge either")
+    H.assertEq(H.wipeVerdict({ row(0, 0, 17732), EMPTY, EMPTY, EMPTY }, 0x00), false,
+      "falls_done's boot words [54740/17732 ...]: a max over 9999 is not a battle table")
+    H.assertEq(H.wipeVerdict({ row(0, 0, 0), EMPTY, EMPTY, EMPTY }, 0x00), false,
+      "all-zero RAM (power-on): actor 0 with max 0 is not a seated character")
+    H.assertEq(H.wipeVerdict({ row(0x80, 0, 300), EMPTY, EMPTY, EMPTY }, 0x00), false,
+      "an actor byte out of 0..15 is not a battle table")
+    H.log("battle_healpolicy: wipe verdict (#166) checked")
+  end),
+
+  -- 10. the cast guards' decision (#99, #156, #172) on battle 70's bytes:
+  -- Ifrit $0109 (absorb $01 fire, null $FC) and Shiva $0108 (absorb $02
+  -- ice, null $FC), MonsterProp +23/+24, read from this ROM; CELES's Ice
+  -- $01 is element $02 and reflectable.  The stage is whoever is present
+  -- and alive; the fight driver's stageSlots reads it from the live
+  -- records, and the mask the old guard enumerated ($3F45, the
+  -- formation's opening line-up) read $01 all fight, so Shiva in slot 1
+  -- was never on its list.
+  H.call(function()
+    local IFRIT, SHIVA = 0x0109, 0x0108
+    H.assertEq(H.monsterAbsorb(SHIVA), 0x02, "Shiva $0108 absorbs ice (MonsterProp +23)")
+    H.assertEq(H.monsterAbsorb(IFRIT), 0x01, "Ifrit $0109 absorbs fire")
+    H.assertEq(H.monsterNull(SHIVA), 0xFC, "Shiva nulls everything but fire/ice")
+    H.assertEq(H.spellElement(0x01), 0x02, "Ice $01 is element $02")
+    local function mon(slot, species, reflect)
+      return { slot = slot, species = species, absorb = H.monsterAbsorb(species),
+               null = H.monsterNull(species), reflect = reflect or false }
+    end
+    local ice, refl = H.spellElement(0x01), H.spellReflectable(0x01)
+    local s, why = H.castVeto(ice, refl, { mon(0, IFRIT) })
+    H.assertEq(s, nil, "Ifrit alone on stage: Ice flows (his weakness)")
+    s, why = H.castVeto(ice, refl, { mon(1, SHIVA) })
+    H.assertEq(s and s.slot, 1, "Shiva on stage in slot 1: Ice is refused")
+    H.assertEq(why, "absorb", "...because she ABSORBS it")
+    s, why = H.castVeto(ice, refl, { mon(0, IFRIT), mon(1, SHIVA) })
+    H.assertEq(why, "absorb", "both on stage: the absorber wins the veto")
+    s, why = H.castVeto(ice, refl, {})
+    H.assertEq(s, nil, "nobody on stage (the fly-in): nothing to refuse")
+    -- the live byte is what is judged, not the species: a slot whose record
+    -- says no absorb passes even under Shiva's species word
+    s, why = H.castVeto(ice, refl, { { slot = 1, species = SHIVA, absorb = 0, null = 0, reflect = false } })
+    H.assertEq(s, nil, "a live record with no absorb passes whatever the species word says")
+    -- the other two halves
+    local bolt = H.spellElement(0x02)
+    s, why = H.castVeto(bolt, H.spellReflectable(0x02), { mon(1, SHIVA) })
+    H.assertEq(why, "null", "Bolt into Shiva: every element nulled ($FC) -- refused")
+    s, why = H.castVeto(bolt, true, { mon(0, IFRIT, true) })
+    H.assertEq(why, "reflect", "a reflectable cast at a Reflect bearer -- refused")
+    s, why = H.castVeto(bolt, false, { mon(0, IFRIT, true) })
+    H.assertEq(why, "null", "an unreflectable Bolt at Ifrit under Reflect: still nulled ($FC)")
+    s, why = H.castVeto(0, false, { mon(0, IFRIT, true), mon(1, SHIVA) })
+    H.assertEq(s, nil, "an elementless, unreflectable line (a summon, a lore) passes")
+    H.log("battle_healpolicy: cast guards' decision (#172) checked")
   end),
 
   -- 8. the table was not skipped

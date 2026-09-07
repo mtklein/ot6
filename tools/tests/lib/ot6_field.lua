@@ -29,27 +29,46 @@ end
 -- shorten the cap per route.
 M.FLEE_CAP = 1800
 
--- True while a battle is loaded and every party slot with a plausible max HP
--- ($3c1c, nonzero and under 1000) reads 0 current HP ($3bf4).  $1600 (the
--- field's own character table, checked by M.partyWiped) never reports a
--- death that occurs inside a battle: it is synced back from the battle
--- module's own table only at teardown, and a wipe tears down straight into
--- the Game Over.
+-- True while the battle module's party table is live and it reads as a
+-- lost fight (#166).  $1600 (the field's own character table, checked by
+-- M.partyWiped) never reports a death that occurs inside a battle: it is
+-- synced back from the battle module's own table only at teardown, and a
+-- wipe tears down straight into the Game Over.
+--
+-- Which of the four battle slots seat a party member is the engine's own
+-- reading: the actor table, $3ed8 + 2*slot (InitParty writes the actor
+-- number there and $ff for an empty seat; the leave paths write $ff back),
+-- AND the seat's "target present" bit, $3aa0 + 2*slot bit 0, which
+-- InitParty sets only for an actor who is IN the party -- never a head
+-- count of $1850.  The old scan counted every slot with a plausible max HP
+-- and compared against $1850's count.  Measured (probe_wipe166.lua,
+-- 2026-09-07): a Veldt random from falls_done seats SABIN and CYAN in 0/1
+-- and, in seat 2, actor 11 -- GAU, the formation's hidden character AI,
+-- 394/394 HP, present bit clear, absent from the engine's alive mask
+-- ($3a74=$03) -- so the real two-character wipe read [0/363 0/358 394/394
+-- 0/0] (gau_joined's, the #163 audit) with the 394 counted as a survivor;
+-- and the Narshe descent marks seven members in $1850 for a battle that
+-- seats three, which the `want <= 4` clause turned into "never wiped".
+--
+-- Two readings of the same fact, either one is the verdict (M.wipeVerdict):
+-- the present seats' HP words all 0, and LoseBattle's own flag, $3ebc bit 0
+-- ("game over after battle ends", battle_main.asm LoseBattle; cleared by
+-- InitBattle's `lda #$91 / trb $3ebc`), which CheckBattleEnd sets the
+-- moment its alive mask $3a74 reads 0 -- up to a couple of hundred frames
+-- after the last HP word does (UpdateDead runs at action resolution;
+-- measured +212 on KEFKA), and also for a party that is all petrified or
+-- zombied, which no HP scan can see.  The table's shape (actor bytes $ff or
+-- 0..15, a plausible max HP behind every present seat) is what says the
+-- battle module owns these bytes; other modules write over them.
 function M.partyWipedInBattle()
-  local sane, alive = 0, 0
+  local rows = {}
   for e = 0, 3 do
-    local mx = M.readWord(0x3c1c + e * 2)
-    if mx > 0 and mx < 10000 then
-      sane = sane + 1
-      if M.readWord(0x3bf4 + e * 2) > 0 then alive = alive + 1 end
-    end
+    rows[e + 1] = { actor = M.readByte(0x3ed8 + e * 2),
+                    present = (M.readByte(0x3aa0 + e * 2) & 1) == 1,
+                    hp = M.readWord(0x3bf4 + e * 2),
+                    maxhp = M.readWord(0x3c1c + e * 2) }
   end
-  if sane == 0 then return false end
-  local want = 0
-  for c = 0, 15 do
-    if (M.readByte(0x1850 + c) & 0x07) ~= 0 then want = want + 1 end
-  end
-  return want >= 1 and want <= 4 and sane >= math.min(want, 4) and alive == 0
+  return M.wipeVerdict(rows, M.readByte(0x3ebc))
 end
 
 function M.partyWiped()
