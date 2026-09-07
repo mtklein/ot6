@@ -2,9 +2,9 @@
 """savestate_ninja.py -- emit the savestate graph
 (tools/tests/savestate_graph.py) as build/build.ninja.
 
-Every source input to a generated state (the ROM, the generator .lua, the
-three composed-in lib halves, checkpoint manifests and payloads) is routed
-through a content latch edge:
+Every compatibility input to a generated state (the ROM, the generator
+.lua, checkpoint manifests and payloads) is routed through a content latch
+edge:
 
     build build/ninja/src/<path>: latch <path>      (cmp -s || cp; restat=1)
 
@@ -13,13 +13,22 @@ differ, and `restat = 1` prunes everything downstream when it did not move.
 Generated states themselves are not latched: a regenerated .mss is new
 bytes, and everything booted from it must replay.
 
-Not routed through the latch (so a harness edit never invalidates a
-generated state): run.sh, compose.py, decode_b64.py, pin_test_saves.py,
-sram_checkpoint.py, ff6-en.dbg.
+Not a dependency of a generate edge (so a harness edit never invalidates a
+generated state): the three composed-in lib halves (ot6.lua, ot6_field.lua,
+ot6_contract.lua), run.sh, compose.py, decode_b64.py, pin_test_saves.py,
+sram_checkpoint.py, ff6-en.dbg.  docs/TESTING.md: a change to logging,
+assertions, or controller policy does not by itself make a legitimately
+reached snapshot illegitimate; changed ROM code/layout can.  The lib halves
+are still latched inputs of every suite test, audit and selftest edge
+(configure.py), so a lib edit re-runs what asserts, not what was played.
 
 Each state-generating edge `write`s build/states/<state>.stamp after
-success; lib/compose.py re-derives that signature at embed time to catch a
-fixture that reached a test without passing any freshness check.
+success (savestate_stamp.sh: ROM identity, the generator's own sig, the
+provenance sig over gen+lib halves, artifact and ancestor bindings);
+lib/compose.py re-derives those at embed time to catch a fixture that
+reached a test without passing any freshness check, and reports a moved lib
+half as provenance drift rather than staleness -- the same rule this graph
+schedules by.
 
 Usage:
     python3 tools/tests/lib/savestate_ninja.py             # (re)write build/build.ninja
@@ -46,8 +55,10 @@ OUT = "build/build.ninja"
 ROM = "build/ot6.sfc"
 LATCH_DIR = "build/ninja/src"
 # The three lib halves compose.py inlines into every composed generator, in
-# inline order.  ot6_contract.lua is the invariant-contract half: an edit to
-# a contract must re-run every step that asserts it.
+# inline order.  They are provenance (the stamp records their hashes), not
+# scheduling inputs of a generate edge: a lib edit re-runs the suite tests,
+# audits and selftests that assert on fixtures (configure.py latches them
+# there), never the play that produced a fixture.
 LIB_HALVES = (
     "tools/tests/lib/ot6.lua",
     "tools/tests/lib/ot6_field.lua",
@@ -214,8 +225,10 @@ def emit_state_edges(w, states, root, latch_of):
             w(f"  src = {src}")
             continue
         gen = e["gen"]
+        # Compatibility inputs only: the ROM and this state's own generator
+        # (plus its checkpoint inputs below).  The lib halves are deliberately
+        # absent -- see the module header.
         deps = [latch_of(ROM), latch_of(f"tools/tests/{gen}.lua")]
-        deps += [latch_of(h) for h in LIB_HALVES]
         # Wall-clock default for generation edges: 1800 s rather than run.sh's
         # 600 s, because bare `ninja` fans every runnable generator out at
         # once and equally-niced emulators stretch each other's wall clock.
@@ -272,8 +285,8 @@ def emit_state_edges(w, states, root, latch_of):
 
 def latched_sources(states, root):
     """Every source path the state edges route through a latch, in first-use
-    order: the ROM, the lib halves, each generator, each checkpoint input."""
-    out = [ROM] + list(LIB_HALVES)
+    order: the ROM, each generator, each checkpoint input."""
+    out = [ROM]
     for e in states:
         if e.get("gen"):
             g = f"tools/tests/{e['gen']}.lua"
@@ -441,10 +454,16 @@ def selftest():
         check("latch rule is restat", "rule latch" in text and
               text.split("rule latch")[1].split("rule ")[0].count(
                   "restat = 1") == 1)
-        check("every generate edge depends on all three lib halves",
-              all(f"{LATCH_DIR}/{h}" in line
-                  for line in text.splitlines() if ": generate" in line
-                  for h in LIB_HALVES))
+        gen_lines = [l for l in text.splitlines() if ": generate" in l]
+        check("every generate edge depends on the ROM and its own generator",
+              gen_lines and all(f"{LATCH_DIR}/{ROM}" in line
+                                and f"{LATCH_DIR}/tools/tests/gen_ok.lua" in line
+                                for line in gen_lines))
+        check("no generate edge depends on a lib half (docs/TESTING.md)",
+              not any(f"{LATCH_DIR}/{h}" in line
+                      for line in gen_lines for h in LIB_HALVES))
+        check("no lib half is latched by the standalone graph at all",
+              not any(h in text for h in LIB_HALVES))
         check("checkpointed generate edge hashes manifest before payload",
               "tools/tests/checkpoints/good-v1/manifest.json "
               "tools/tests/checkpoints/good-v1/a.sram" in text)

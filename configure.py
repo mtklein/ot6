@@ -446,8 +446,12 @@ def check(name, cmd, deps, desc=None):
 
 
 test_luas = glob("tools/tests/*.lua") + glob("tools/tests/lib/*.lua")
+# Covers stamp_status and the legacy-stamp adoption (--adopt-stamps), both
+# of which shell into savestate_stamp.sh; the adoption half also probes the
+# installed ninja's build-log columns on a mock graph.
 check("compose_selftest", "python3 tools/tests/lib/compose.py --selftest",
-      ["tools/tests/lib/compose.py", "tools/tests/lib/decode_b64.py"]
+      ["tools/tests/lib/compose.py", "tools/tests/lib/decode_b64.py",
+       "tools/tests/lib/savestate_stamp.sh"]
       + LIBS)
 check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
       ["tools/tests/lib/sram_checkpoint.py"])
@@ -502,8 +506,16 @@ checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
        latch_of("build/ot6.sfc")] + LIBS + checkpoint_files)
+# The verdict depends on the ROM (a stamp records the ROM it was captured
+# on), on the generators (their own sigs), and -- for the drift note, and
+# for any stamp still on the conservative pre-ROM-identity rule -- on the
+# lib halves, all through the same latches the generate and suite edges
+# use, so the check re-runs exactly when its answer can move.
 check("check_states", "python3 tools/tests/lib/compose.py --check-states",
-      ["tools/tests/lib/compose.py", sn.GRAPH] + all_stamps)
+      ["tools/tests/lib/compose.py", "tools/tests/lib/savestate_stamp.sh",
+       sn.GRAPH, latch_of("build/ot6.sfc")]
+      + [latch_of(f"tools/tests/{e['gen']}.lua") for e in states if e.get("gen")]
+      + [latch_of(h) for h in LIBS] + all_stamps)
 
 # the four fixture audits: real inputs replace the old make-level stamp
 AUDIT_COMMON = all_stamps + checkpoint_files

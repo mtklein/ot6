@@ -35,6 +35,50 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Runs happen in every git worktree of this repo (agents and the release
+# qualification each get their own), not only under ROOT.  The census, the
+# progress view and the newest-workspace picker all look through the same
+# list, refreshed every 30s, so the owner sees what is actually running.
+_TREES = {"ts": 0.0, "roots": [ROOT]}
+
+
+def worktree_roots():
+    now = time.time()
+    if now - _TREES["ts"] > 30:
+        roots = [ROOT]
+        try:
+            import subprocess
+            out = subprocess.run(["git", "-C", ROOT, "worktree", "list",
+                                  "--porcelain"], capture_output=True,
+                                 text=True, timeout=5).stdout
+            for line in out.splitlines():
+                if line.startswith("worktree "):
+                    r = line[len("worktree "):].strip()
+                    if r and r not in roots and os.path.isdir(r):
+                        roots.append(r)
+        except Exception:
+            pass
+        _TREES["roots"], _TREES["ts"] = roots, now
+    return _TREES["roots"]
+
+
+def run_logs():
+    """Every build/test-runs/<ws>/run.log across the worktrees."""
+    logs = []
+    for r in worktree_roots():
+        logs += glob.glob(os.path.join(r, "build/test-runs/*/run.log"))
+    return logs
+
+
+def tree_tag(log):
+    """A short label for the worktree a run log lives in ("" for ROOT)."""
+    best = ""
+    for r in worktree_roots():
+        if log.startswith(r + os.sep) and len(r) > len(best):
+            best = r      # the longest match: agent trees live under ROOT
+    return "" if best in ("", ROOT) else os.path.basename(best)
+
+
 # The default landing: a control-room census of EVERY active run worker,
 # one tile per live workspace, growing/shrinking as workers start and finish.
 # Data comes from grid.json (grid_thread); each tile's screenshot is a cached
@@ -422,7 +466,7 @@ def grid_thread(webroot, stop, live_ref=None):
         live_test = (live_ref or {}).get("test")
         now = time.time()
         workers, active = [], set()
-        for log in glob.glob(os.path.join(ROOT, "build/test-runs/*/run.log")):
+        for log in run_logs():
             try:
                 if now - os.path.getmtime(log) > active_sec:
                     continue
@@ -430,8 +474,9 @@ def grid_thread(webroot, stop, live_ref=None):
                 data = _tail_bytes(log, tail_n)
             except OSError:
                 continue
-            wid = _safe_id(dirname)
-            name = dirname.split(".")[0]
+            tag = tree_tag(log)
+            wid = _safe_id((tag + "_" if tag else "") + dirname)
+            name = dirname.split(".")[0] + (f" @{tag}" if tag else "")
             frame, png, h, stuck = scan_worker(data, s_stuck, f_stuck)
             active.add(wid)
             if png is not None and h is not None and written.get(wid) != h:
@@ -448,7 +493,7 @@ def grid_thread(webroot, stop, live_ref=None):
                 "id": wid, "name": name, "frame": frame,
                 "shot": (f"grid/{wid}.png?{have}") if have else None,
                 "stuck": bool(stuck),
-                "live": bool(live_test and name == live_test)})
+                "live": bool(live_test and dirname.split(".")[0] == live_test)})
         # prune tiles/PNGs for workers that finished
         for wid in list(written):
             if wid not in active:
@@ -500,7 +545,7 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
     except OSError:
         pass
     running = set()
-    for ws in glob.glob(os.path.join(ROOT, "build/test-runs/*/run.log")):
+    for ws in run_logs():
         try:
             if time.time() - os.path.getmtime(ws) < 45:
                 running.add(os.path.basename(os.path.dirname(ws)).split(".")[0])
@@ -594,7 +639,7 @@ def progress_thread(webroot, stop, live_ref=None):
 
 
 def newest_workspace():
-    logs = glob.glob(os.path.join(ROOT, "build/test-runs/*/run.log"))
+    logs = run_logs()
     if not logs:
         sys.exit("no run workspace found (is a run going?)")
     return os.path.dirname(max(logs, key=os.path.getmtime))
