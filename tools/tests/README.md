@@ -318,7 +318,10 @@ The run log carries one canonical `[ot6action] {JSON}` line per event; the
 existing live viewer displays these as short action notes. Each recovery plan
 has a run-unique ID and records its actor **battle slot** (0–3), requested
 spell/item ID, target slot, intended boost, all-target intent, and reason.
-Only the driver's `heal` and `item` plans are traced in this first version.
+Every plan the driver turns into a command is traced (`heal`, `item`,
+`fight`, `magic`, `skill`, `summon`, `throw`, `lore`; the first version traced
+only `heal`/`item`); `requested` is the spell/item/skill/lore id, 0 for a
+Fight or a summon.
 
 - `plan`: the policy chose recovery.
 - `confirm`: the controller intends a target-confirm press. Repeated attempts
