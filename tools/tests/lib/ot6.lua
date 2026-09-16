@@ -4626,12 +4626,20 @@ local function watchTick()
   -- (measured 2026-09-16 on the Zozo street: three trips, every one with
   -- monster HP summing to 0 under an open command list)
   if inBattle and monsterHpSum() == 0 then W.lastUnanswerable = M.frame end
-  -- and on the field, a running event with no dialog up is the same
-  -- thing: a cutscene is playing and the pad is inert by design (measured
-  -- 2026-09-16 on gen_vargas: the Kolts intro, A tapped 151 of 300
-  -- frames at an unchanging tile while the scene played)
-  if not inBattle and M.eventRunning() and not M.dialogWaiting() then
-    W.lastInert = M.frame
+  -- On the field and the world map only a press the game COULD answer
+  -- counts: a held direction while the party has control (a walk), or
+  -- any press with a dialog or a menu up.  A tapped A through a scripted
+  -- walk or a cutscene is what a person does while the game is busy, and
+  -- the game legitimately does not answer it yet (measured 2026-09-16 on
+  -- gen_vargas: the Kolts intro, A tapped 151 of 300 frames at an
+  -- unchanging tile while the scene played; and on gen_arvis's Narshe
+  -- cutscenes).  Anything else marks the sample inert.
+  if not inBattle then
+    local dirHeld = curPad.up or curPad.down or curPad.left or curPad.right
+    local walking = dirHeld and ((M.worldMode and M.worldMode())
+      and M.worldHasControl() or M.hasControl())
+    local windowUp = M.dialogWaiting() or M.readByte(0x0059) ~= 0
+    if not (walking or windowUp) then W.lastInert = M.frame end
   end
   if not W.seenProg[prog] then W.lastNewProg = M.frame end
   W.seenProg[prog] = M.frame
@@ -4674,9 +4682,16 @@ local function watchTick()
   --    command list $05, re-plan, $38 ...) is not moving anything, and a
   --    consecutive-identity test would never see it.
   --  * On the FIELD or the world map the verdict is IDENTITY: the same
-  --    control cells at every sample of the window.  A walk that
-  --    re-plans around a wandering NPC revisits the same three tiles for
-  --    seconds (trip 3, the Zozo street), and that is the route working.
+  --    control cells at every sample of the window, every sample an
+  --    answerable press (above), AND the screen itself unchanged for the
+  --    window -- a screen that is still changing is a game still busy,
+  --    whatever the cells say.  A walk that re-plans around a wandering
+  --    NPC revisits the same three tiles for seconds (trip 3, the Zozo
+  --    street), and that is the route working.  The screen rule is
+  --    field-only on purpose: a battle's screen animates whether or not
+  --    a press is answered (ATB, idle sprites, the damage numbers of the
+  --    #185 hang itself), so there the menu cells are the screen's
+  --    answer.
   local pressed = pressFramesIn(WATCH.noEffectFrames)
   local N = WATCH.noEffectFrames
   local stuck
@@ -4684,6 +4699,7 @@ local function watchTick()
     stuck = (M.frame - W.lastUnanswerable) >= N and qc >= N
   else
     stuck = (M.frame - W.lastDiffCtl) >= N and (M.frame - W.lastInert) >= N
+      and qs >= N
   end
   if stuck and pressed >= WATCH.pressFraction * N then
     W.trips = W.trips + 1
@@ -5106,8 +5122,7 @@ function M.run(opts, steps)
     RUN.ldWait = 0
   end
 
-  rawAddEventCallback(function()
-    if finished then return end
+  local function frame()
     M.totalFrames = M.totalFrames + 1
 
     -- ---- a replay in flight: no steps, no canary, no watchdog ---------
@@ -5273,6 +5288,29 @@ function M.run(opts, steps)
       M.log(string.format("PASS (frame %d) attempts=%d/%d", M.frame,
         RUN.attempt, RUN.attempts))
       emu.stop(0)
+    end
+  end
+
+  -- The runner itself must never die without a verdict.  A Lua error in
+  -- the reload path, the canary, the sampler or the verdict code is
+  -- invisible headless (the script log is not read; docs/TESTING.md's
+  -- "no verdict" signature), so the whole frame body runs under pcall and
+  -- an error there is a FAIL line naming the runner, exit 1.
+  rawAddEventCallback(function()
+    if finished then return end
+    local ok, err = pcall(frame)
+    if not ok and not finished then
+      finished = true
+      pcall(traceFlush)
+      pcall(coverageFlush)
+      pcall(watchReport)
+      pcall(M.finishRecoveryTrace, "run_ended")
+      M.log(string.format("FAIL: segment runner internal error (attempt "
+        .. "%d/%d, phase %s, f%d): %s\n  [retry] this is a harness bug, not "
+        .. "a route or seed finding; nothing was retried.",
+        RUN.attempt, RUN.attempts, tostring(RUN.phase), M.frame,
+        tostring(err)))
+      emu.stop(1)
     end
   end, emu.eventType.startFrame)
 end
