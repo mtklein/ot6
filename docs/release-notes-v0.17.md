@@ -22,22 +22,18 @@ patcher (Flips, beat) and open the result instead.
 
 **The Mt. Kolts and Zozo enemies can be broken the way they were meant
 to be.** The Cirpius on Mt. Kolts and Zozo's SlamDancers, Harvesters,
-HadesGigases and Gabbldegaks used to carry shields with no weapon key that
-would chip them, so the only way through was raw damage. They now break
-to the keys they were designed for: pierce for the Cirpius and the
+HadesGigases and Gabbldegaks used to carry shields that no weapon could
+chip; only poison (Edgar's Bio Blaster) got through them. They now also
+break to the weapon keys they were designed for: pierce for the Cirpius and the
 Gabbldegak, slash or pierce for the SlamDancer and the Harvester, and a
 good bludgeoning (Sabin's Pummel) for the HadesGigas. Poison still works
-on all of them as before. If Zozo felt like a wall in v0.16,
-this is why, and it isn't any more.
+on all of them as before.
 
-**Random encounters return to the Phantom Forest bridge.** An earlier
-release quietly switched off encounters on the bridge in the forest after
-the Phantom Train, working around a freeze that has since been fixed.
-The bridge rolls its encounters again, as the game intended.
-
-Everything else about this release is under the hood: OT6's own
-playthrough of the World of Balance now completes end to end on this
-version, which is what qualified it.
+**Random encounters return to the Phantom Forest bridge.** v0.16 switched
+off encounters on the bridge in the forest after the Phantom Train to work
+around a freeze, and said it would put them back once the freeze was
+fixed. It is, and the bridge rolls its encounters again, as the game
+intended.
 
 ## A warning about Sketch
 
