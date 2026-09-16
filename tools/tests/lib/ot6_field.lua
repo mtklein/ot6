@@ -523,7 +523,7 @@ function M.navTo(txIn, tyIn, opts)
     plan, pend = nil, nil
     NAV.plan, NAV.idx = 0, 0
   end
-  return M.driveUntil(function()
+  return M.withReset(M.driveUntil(function()
     -- never complete mid-care: arrive() can be map-based and go true while
     -- the care menu is still open (see advanceStory's identical guard)
     if careD then return false end
@@ -749,7 +749,17 @@ function M.navTo(txIn, tyIn, opts)
                held = 0, holding = true }
       M.setPad({ [PRESS[dir]] = true })   -- a diagonal is pressed left/right
     end),
-  }, "navTo")
+  }, "navTo"), function()
+    -- back to as-built (#196): a repeated navTo re-plans from where it
+    -- stands with its whole walk budget, forgets a wipe or a care stop
+    -- the last pass ended on, and starts the blocklist over as a fresh
+    -- call would (M.navReset above).  The fight driver is kept: its
+    -- per-battle state is its own, cleared through idle() between fights.
+    M.navReset()
+    walked, plan, idx, pend, aPhase, calm = 0, nil, 1, nil, 0, 0
+    battN, dlgN, lostN, noPathN, pause = 0, 0, 0, 0, 0
+    wipeSeen, careD, sawBattle = false, nil, false
+  end)
 end
 
 -- Ride out a non-interactive story stretch: long automatic events with
@@ -787,7 +797,7 @@ function M.advanceStory(pred, maxFrames, opts)
   -- heal-after-every-battle: see navTo's care block; same contract here
   local careD, sawBattle = nil, false
   local hb = -600                      -- heartbeat: log immediately, then every 600
-  return M.driveUntil(function()
+  return M.withReset(M.driveUntil(function()
     -- never complete mid-care: pred() can be map/switch-based and go true
     -- while the care menu is still open, which would end the step with
     -- the menu up and the next step pressing into it
@@ -868,7 +878,12 @@ function M.advanceStory(pred, maxFrames, opts)
       end
       M.setPad({})
     end),
-  }, "advanceStory")
+  }, "advanceStory"), function()
+    -- as-built (#196): a wipe or a care stop the last pass ended on must
+    -- not end the next pass on its first frame
+    aPhase, battN, dlgN, hb = 0, 0, 0, -600
+    wipeSeen, careD, sawBattle = false, nil, false
+  end)
 end
 
 -- ------------------------------------------------------- world map nav --
@@ -1061,7 +1076,7 @@ function M.worldNavTo(txIn, tyIn, opts)
   local walked = 0
   local hb = -600
   local function resolveT(v) return type(v) == "function" and v() or v end
-  return M.driveUntil(function()
+  return M.withReset(M.driveUntil(function()
     if careD then return false end
     local done
     if wipeSeen then
@@ -1218,7 +1233,12 @@ function M.worldNavTo(txIn, tyIn, opts)
                tx = (x + d[1]) & 0xFF, ty = (y + d[2]) & 0xFF, stall = 0 }
       M.setPad({ [dir] = true })
     end),
-  }, "worldNavTo")
+  }, "worldNavTo"), function()
+    -- as-built (#196): see navTo's reset; the blocklist here is per call
+    blocked, nblocked, plan, idx, pend = {}, 0, nil, 1, nil
+    aPhase, battN, walked, hb = 0, 0, 0, -600
+    wipeSeen, careD, sawBattle = false, nil, false
+  end)
 end
 
 -- --------------------------------------- timed-tilemap (phase) rooms --
@@ -1409,7 +1429,7 @@ function M.phaseWalk(tx, ty, spec)
     idx = 1
   end
 
-  return M.driveUntil(function()
+  return M.withReset(M.driveUntil(function()
     return not M.battleLoadStarted()
        and M.fieldX() == tx and M.fieldY() == ty and M.tileAligned()
   end, spec.maxFrames or 30000, {
@@ -1531,7 +1551,13 @@ function M.phaseWalk(tx, ty, spec)
       end
       M.setPad({ [item.dir] = true })
     end),
-  }, spec.what or string.format("phaseWalk (%d,%d)", tx, ty))
+  }, spec.what or string.format("phaseWalk (%d,%d)", tx, ty)), function()
+    -- as-built (#196): observe the clock afresh and re-plan; a repeated
+    -- walk must not trust the last pass's grids, flip instant or HP mark
+    lastB, lastFlip, grids, plan, idx = nil, nil, {}, nil, 1
+    begunSeg, hp0, obsStart, hb = -1, nil, nil, -300
+    battN, aPhase, sawBattle, careD = 0, 0, false, nil
+  end)
 end
 
 -- --------------------------------------------------- NPC chase-talk --
@@ -1554,6 +1580,8 @@ function M.chaseTalk(objIdx, maxFrames, what, opts)
     local off = 0x29 * idx
     return M.readWord(0x086a + off) >> 4, M.readWord(0x086d + off) >> 4
   end
+  -- the only closure state is the A cadence phase, so the driveUntil's own
+  -- reset (its frame count) is all a repeat needs (#196)
   return M.driveUntil(done, maxFrames or 9000, {
     M.call(function()
       ph = (ph + 1) % 8
@@ -1606,7 +1634,7 @@ function M.tapLever(swId, maxFrames, what)
   local function swv(id)
     return (M.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1
   end
-  return M.driveUntil(function() return swv(swId) == 1 end, maxFrames, {
+  return M.withReset(M.driveUntil(function() return swv(swId) == 1 end, maxFrames, {
     M.call(function()
       n = n + 1
       if M.battleLoadStarted() then
@@ -1620,7 +1648,9 @@ function M.tapLever(swId, maxFrames, what)
       if M.dialogWaiting() then M.setPad(n % 8 < 4 and { "a" } or {}); return end
       M.setPad(n <= 8 and { up = true, a = true } or { up = true })
     end),
-  }, what)
+  }, what), function()
+    n = 0      -- the one A tap lives in frames 1..8 of the drive (#196)
+  end)
 end
 
 -- Escape a stood-on re-entry trigger tile (the re-entry-trap class: the
@@ -1629,7 +1659,7 @@ end
 -- party tile changes and settles 10 aligned quiet frames.
 function M.stepOff(dirs, maxFrames, what)
   local x0, y0, moved, calm, n = nil, nil, false, 0, 0
-  return M.driveUntil(function()
+  return M.withReset(M.driveUntil(function()
     if not x0 then return false end
     if M.fieldX() ~= x0 or M.fieldY() ~= y0 then moved = true end
     calm = (moved and M.tileAligned() and not M.dialogWaiting()
@@ -1651,7 +1681,11 @@ function M.stepOff(dirs, maxFrames, what)
       n = n + 1
       M.setPad({ [dirs[((n // 40) % #dirs) + 1]] = true })
     end),
-  }, what)
+  }, what), function()
+    -- the origin is re-read where the next pass stands (#196): the last
+    -- pass's "moved" would otherwise end this one on its first frame
+    x0, y0, moved, calm, n = nil, nil, false, 0, 0
+  end)
 end
 
 -- --------------------------------------------------------- field care --
@@ -2005,7 +2039,7 @@ function M.openChest(o)
     -- appears -- returning with a dialog pending starves the next step.
     (function()
       local dt = 0
-      return M.driveUntil(function()
+      return M.withReset(M.driveUntil(function()
         dt = dt + 1
         return dt >= 90 and not M.dialogWaiting()
       end, 600, {
@@ -2013,7 +2047,7 @@ function M.openChest(o)
           aPh = (aPh + 1) % 8
           M.setPad(M.dialogWaiting() and aPh < 4 and { a = true } or {})
         end),
-      }, tag .. ": dialog dismissed")
+      }, tag .. ": dialog dismissed"), function() dt = 0 end)   -- the linger is per pass (#196)
     end)(),
     M.call(function()
       M.setPad({})
@@ -2122,7 +2156,7 @@ function M.buyItem(id, row, qtyFn, name)
   local want = nil
   local lastQty, stall = nil, 0
   local shop, typeName, gil0, drawnOk = nil, nil, nil, false
-  return M.driveUntil(function() return bought end, 20000, {
+  return M.withReset(M.driveUntil(function() return bought end, 20000, {
     M.call(function()
       phase = (phase + 1) % 8
       local st = M.readByte(0x0026)
@@ -2212,7 +2246,13 @@ function M.buyItem(id, row, qtyFn, name)
         M.setPad({})
       end
     end),
-  }, "buy " .. name)
+  }, "buy " .. name), function()
+    -- as-built (#196): the row, the quantity and the "bought" latch are
+    -- resolved again for the shop the NEXT pass finds open
+    phase, seen27, bought, want = 0, false, false, nil
+    lastQty, stall = nil, 0
+    shop, typeName, gil0, drawnOk = nil, nil, nil, false
+  end)
 end
 
 -- The event timers, $1188-$119F: four 6-byte records, flags at +0 and a
@@ -3051,13 +3091,17 @@ end
 -- Promoted from gen_thamasa_fire.lua so the Floating Continent prep can shop
 -- at Thamasa with the same measured mechanics (one implementation, not two).
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+-- Returns the predicate and a function that restarts its count, for a
+-- step that is repeated (#196): the count is only advanced while the
+-- predicate is polled, so it would otherwise carry the last pass's
+-- settled run into the next.
 local function calmFor(n, extra)
   local cnt = 0
   return function()
     local ok = M.hasControl() and M.tileAligned() and (not extra or extra())
     cnt = ok and cnt + 1 or 0
     return cnt >= n
-  end
+  end, function() cnt = 0 end
 end
 local function mapLow() return M.mapId() & 0x1ff end
 local DIAGSTAGE = {
@@ -3093,10 +3137,12 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
     end
     return pick
   end
-  local settled = calmFor(20)
+  local settled, settledAgain = calmFor(20)
   local aPhase = 0
   return M.seqStep({
-    M.call(function() pick, startMap = nil, mapLow() end),
+    -- the first step is the reset (#196): the stage, the start map and
+    -- the far-side settle count are all re-read where this pass stands
+    M.call(function() pick, startMap = nil, mapLow(); settledAgain() end),
     M.navTo(function() return stage()[1] end, function() return stage()[2] end,
       { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
         bank = 3, items = true, avoid = opts.avoid,
@@ -3146,6 +3192,8 @@ function M.shopTalk(nx, ny, what, opts)
   end
   local aPh = 0
   return M.seqStep({
+    -- the staging tile is picked afresh per pass (#196)
+    M.call(function() pick = nil end),
     M.navTo(function() return stage()[1] end, function() return stage()[2] end,
       { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
         bank = 3, items = true }),
@@ -3282,7 +3330,11 @@ function M.bagArrange(order, opts)
     end
     M.setPad({})
   end
-  return M.driveUntil(done, opts.maxFrames or 24000, { M.call(frame) }, tag)
+  return M.withReset(
+    M.driveUntil(done, opts.maxFrames or 24000, { M.call(frame) }, tag),
+    function()   -- as-built (#196): the job list and "done" are per pass
+      mode, n, ph, i, job, swaps = "start", 0, 0, 1, nil, 0
+    end)
 end
 
 -- ---------------------------------------------------------------- rows --
@@ -3397,7 +3449,7 @@ function M.setRows(spec, opts)
     M.setPad(phase < 4 and held or {})
   end
 
-  return M.cond(anyNeed, {
+  return M.withReset(M.cond(anyNeed, {
     M.logStep(function()
       return string.format("[%s] opening the Order screen: %s", tag, rowLine())
     end),
@@ -3451,7 +3503,11 @@ function M.setRows(spec, opts)
     M.logStep(function()
       return string.format("[%s] already set: %s", tag, rowLine())
     end),
-  })
+  }), function()
+    -- as-built (#196): "done" and the skip list would otherwise let a
+    -- repeated pass open the Order screen and flip nothing
+    skip, phase, done, want, before, tries = {}, 0, false, nil, nil, 0
+  end)
 end
 
 -- M.equipEsper: equip a specific magicite on the character at char-select
@@ -4172,7 +4228,7 @@ function M.talkToObj(obj, what, maxF)
   end
   local function pokeStep(round, budget, hard)
     local started, waited, aPh = 0, 0, 0
-    return M.driveUntil(function()
+    return M.withReset(M.driveUntil(function()
       started = (M.eventRunning() or M.dialogWaiting()) and started + 1 or 0
       if started >= 6 then engaged = true; return true end
       waited = waited + 1
@@ -4192,12 +4248,17 @@ function M.talkToObj(obj, what, maxF)
         end
         M.setPad(aPh < 4 and { "a" } or {})
       end),
-    }, string.format("%s: activation round %d", what, round))
+    }, string.format("%s: activation round %d", what, round)), function()
+      -- a soft round's own budget is per pass (#196): the last pass's
+      -- spent `waited` would end this one on its first frame, unengaged
+      started, waited, aPh = 0, 0, 0
+    end)
   end
   return seq({
     M.call(function() engaged, apFrame, apPick = false, -1000, nil end),
     walkStep(), pokeStep(1, 600, false),
-    -- flat, not repeatN: it cannot replay navTo/driveUntil bodies
+    -- two distinct rounds (a soft one, then a hard one), so written flat;
+    -- since #196 a repeatN could replay these bodies, but they differ
     M.cond(function() return not engaged end,
       { walkStep(), pokeStep(2, 900, true) }, {}),
     M.release(),
@@ -4328,7 +4389,7 @@ function M.rideOut(what, budget, dstMap)
     { tactical = true, boost = true, bank = 3, items = true,
       healPercent = 60, cadence = 12 })
   return seq({
-    M.driveUntil(function()
+    M.withReset(M.driveUntil(function()
       local ok = M.hasControl() and M.tileAligned()
              and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
              and not M.battleLoadStarted() and not M.dialogWaiting()
@@ -4346,7 +4407,7 @@ function M.rideOut(what, budget, dstMap)
         if M.hasControl() then M.setPad({}); return end
         M.setPad(phase < 4 and { "a" } or {})
       end),
-    }, what),
+    }, what), function() calm = 0 end),   -- 20 settled frames of THIS pass (#196)
     M.release(),
     M.waitFrames(30),
     -- heal-after-every-battle: rideOut exists to ride scripted battles, so
@@ -4474,7 +4535,7 @@ function M.saveGame(opts)
   local slot = opts.slot or 3
   local tag = opts.tag or ("save slot " .. slot)
   local ZMENUSTATE, SAVE_SELECT = 0x26, 0x14
-  local saveArg = nil
+  local saveArg, hooked = nil, false
   local function menuOpen() return M.readByte(0x59) ~= 0 end
   return M.seqStep({
     -- open the menu; on the world map $59 rides the same flow
@@ -4500,10 +4561,17 @@ function M.saveGame(opts)
     M.call(function()
       M.assertEq((M.readByte(0x0201) & 0x80) ~= 0, true,
         tag .. ": $0201 bit7 SET -- the game allows saving here")
-      local entry = M.sym("CopyGameDataToSRAM")
-      emu.addMemoryCallback(function()
-        saveArg = emu.getState()["cpu.a"] & 0xff
-      end, emu.callbackType.exec, entry, entry)
+      -- the hook's answer is per pass (#196): a repeated save must see
+      -- CopyGameDataToSRAM run AGAIN, not the last pass's slot; the hook
+      -- itself is installed once
+      saveArg = nil
+      if not hooked then
+        hooked = true
+        local entry = M.sym("CopyGameDataToSRAM")
+        emu.addMemoryCallback(function()
+          saveArg = emu.getState()["cpu.a"] & 0xff
+        end, emu.callbackType.exec, entry, entry)
+      end
     end),
     M.driveUntil(function()
       return M.readByte(ZMENUSTATE) == 0x05 and M.readByte(0x4b) == 6
