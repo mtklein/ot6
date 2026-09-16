@@ -57,9 +57,36 @@ level); a shop stop is written as `POTION to N` beside its `TONIC to N` /
 short purse shorts Tonics.  The band is what the bag should hold *arriving*
 at the next fight, so the last shop before a shopless boss stretch buys the
 band plus that stretch's measured spend (the train merchant: 21 for L14
-plus the 9 the GhostTrain fight spent = 30, so Baren Falls still holds 21).  The WoB Potion shops the route passes or could
-reach: Phantom Train 85, Mobliz 12, Nikeah 15, Narshe 3 (the Terra
-scenario's return), Kohlingen 19, Jidoor 22, Vector 24, Thamasa 36.
+plus the 9 the GhostTrain fight spent = 30, so Baren Falls still holds 21).
+It is a World of Balance band: `audit_supplies` stops applying it at the
+WoR landing's graph row (`wor_landing` and its `escape_start` sibling),
+where the party, the shops and the level curve are all different.
+
+The WoB Potion shops on the route, decoded from `npc_prop.asm` (the
+counter NPC's event) and `shop_prop.dat` (the rows), with the stop each
+generator makes (#176):
+
+| shop | where | rows (Tonic / Potion / Fenix) | stop |
+|---|---|---|---|
+| 85 | Phantom Train car B, map 85 | 0 / 1 / 4 | `gen_sabin_train`: POTION to 30 (L14 band 21 + the train fight's 9) |
+| 12 | Mobliz, map 164 | 1 / 2 / 5 | `gen_sabin_gau`: POTION to 23 (L15) |
+| 15 | Nikeah, the counter at (24,39) on town map 169 | 0 / 1 / 5 | `gen_sabin_trench`: POTION to 27 (L18).  The last Potion shop before the reunion: the Terra scenario never walks a town with control (its Narshe arrival is the isolated clifftop ledge; Arvis's front door lies past the reunion trigger; the map-22 staging boxes the party -- `probe_narshe_preshop`), so this bag is what TERRA's L13 party (band 20) and the Battle for Narshe (L14, 21) carry. |
+| 3 | Narshe, map 26 off town map 20's (41,22) door | 0 / 1 / 4 | `gen_zozo1_submerge`: TONIC to 99, FENIX DOWN to 15, no Potion line (Nikeah's 27 arrives intact, over the L14 band).  The last Tonic counter before the post-opera checkpoint. |
+| 22 | Jidoor, map 201 off town map 198's (27,41) door; no Tonic | - / 0 / 5 | `gen_zozo2_arrival` after the L18 grind: POTION to 39 (the #158 target of 30 + 9 for field care: 49 Tonics measured from Jidoor to the opera's end), FENIX DOWN to 20.  `gen_narshe_mission`'s plains grind restocks here too: POTION to 35 per leg, to 60 on departure. |
+| 24 | Albrook, map 328 off (7,13); no Tonic | - / 0 / 5 | `gen_vector_entry`: POTION to 35 (L18 band 27 + the factory's measured 6, a floor: the bag ran dry at Ifrit & Shiva, + 2 for the factory's 9 Tonics of field care).  Vector itself sells no Potions -- weapon 27 and armour 28 only (maps 246/248). |
+| 44 | Narshe again, once `$006B` (the factory escape) swaps shop 3 for 44; no Tonic | - / 0 / 2 | none: `gen_narshe_mission` shops at Jidoor instead (row 22 above) |
+| 24 | Albrook again | - / 0 / 5 | `gen_voyage`: POTION to 38 (L25; no field-care extra: the legs to Thamasa's Tonic counter spent none) |
+| 35 | Thamasa, map 347 off (26,37) | 0 / 1 / 6 | `gen_thamasa_fire`: POTION to 15 and `gen_fc_landing`: POTION to 40, both under band.  The measured targets (45: L26 band 39 + the mountain's 6; 65: the L29 band 44 + the FC's 21) are held for #179: the extra purchase moved the RNG so fire_out lost its path and fc_landing an IAF fight. |
+
+Shop 71 is Narshe's `$00A4` variant and never opens on this route.  The
+Locke scenario has no Potion source: South Figaro's shop 8 sells none and
+its `$00A4` alternate 63 (which does) opens only after the escape scene
+sets the flag, when the town is occupied and the route is in the
+basement.  From the Narshe mission through Albrook nothing sells Tonics
+(shops 44 and 24 both lack them), so on that leg the care kernel's field
+heals come out of the Potion stack too -- the seeded chain from the
+`terra-returned-v1` checkpoint walked the whole Sealed Gate, crash,
+banquet and voyage with `tonic=0 potion=0..3`.
 
 ## Zozo: the level gate nobody authored (#155, levelled for #158)
 
@@ -85,8 +112,8 @@ largest roll seen; L18 is the target.
 | fixture | LOCKE | EDGAR | SABIN | CELES | Tonic / Potion / Fenix |
 |---|---|---|---|---|---|
 | grind start, world (34,99) | L13 314 | L14 354 | L15 407 | L13 310 | 75 / 21 / 14 |
-| zozo_arrival | L18 558 | L18 559 | L19 629 | L18 554 | 52 / 30 / 20 |
-| zozo_done | L18 558 | L19 620 | L19 629 | L18 554 | 14 / 31 / 18 |
+| zozo_arrival | L18 558 | L18 559 | L19 629 | L18 554 | 43 / 39 / 21 (#176 stops: was 52 / 30 / 20) |
+| zozo_done | L18 558 | L19 620 | L19 629 | L18 554 | 16 / 40 / 21 (was 14 / 31 / 18) |
 
 The grind was 57 laps (43 fights, frames 14897 -> 162667 of the
 generator), no Fenix Down and no death in it.  The first try at the
@@ -104,6 +131,19 @@ Every single-target cast left its target standing (82..136 HP).  The
 street itself (`gen_zozo3_clock` 1 fight, `gen_zozo4_dadaluma` 8 fights
 including one solo SlamDancer's all-target Fire 2) spent no Fenix Down in
 a random; Dadaluma killed EDGAR and CELES (2 Fenix at the care after him).
+
+With the #176 Potion stops in front of it (Nikeah, Narshe, Jidoor: the
+bag above), the chain from `dadaluma_entry` to `blackjack` regenerated
+under the segment runner (#178) with one counted retry: `dadaluma_entry`
+attempt 1 drew the J39-row fight as a back attack, where the fight
+driver's LEFT target steer cannot cross to the monster side (#185,
+`probe_j39_backattack`), and the no-effect watchdog cut it at frame
+23808 instead of the 9000-frame step budget; attempt 2, the seed moved 20
+frames at the boot point, climbed clean (16 fights played, no Fenix Down,
+`care after Dadaluma: nothing to do`) and passed at frame 46149.  Every
+later segment (`zozo_done` through `blackjack`) passed on its first
+attempt; the Fenix count stays 21 from `zozo_arrival` to `blackjack`.
+The back-attack steer itself is still open (#185).
 
 ## Map 269: the L16 parity trap (#171)
 

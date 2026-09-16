@@ -25,6 +25,9 @@ local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
+local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
+local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local function partyCount()
   local n = 0
   for c = 0, 15 do if partyOf(c) ~= 0 then n = n + 1 end end
@@ -272,6 +275,69 @@ local steps = {
     H.assertEq(H.fieldY(), 17, "Albrook arrival y")
     H.assertEq(sw(0x007D), 1, "$007D -- the port stands open")
     H.screenshot("voyage_albrook")
+  end),
+
+  -- ---- 1b. Albrook's item shop (#176) -----------------------------------------
+  -- Every town tops up, and this one is the first Potion shop since the
+  -- Narshe mission (Vector has weapon and armour counters only -- npc_prop
+  -- maps 246/248 -- and the gate cave and the crash sell nothing): shop 24
+  -- on map 328 (shopkeeper (37,47); _cc60ba opens 24 while $00A4 is clear,
+  -- which it is), rows POTION 0 / FENIX DOWN 5, no Tonic.  The door is
+  -- (7,13) -> 328 (37,54), five tiles from the arrival tile; the way back
+  -- is the map's event trigger at (37,55) (EventTrigger::_328).  POTION to
+  -- 38: the band (~level x1.5, docs/design/level-curve.md) at the L25 the
+  -- party holds through Thamasa; the Crescent Island walk to the next shop
+  -- (Thamasa 35, gen_thamasa_fire) spent no Potions on the seeded chain
+  -- (crescent_landing potion=3 -> thamasa_night 3).  No field-care extra
+  -- (owner, #176: at a Tonic-less shop the Potion target also covers the
+  -- Tonic shortfall, sized by the measured field-care spend after the
+  -- stop): the bag holds no Tonics here (the band at L25 is 99), but the
+  -- legs from here to Thamasa's Tonic counter measured no field-care spend
+  -- at all -- no Potion left the bag between banquet-done-v1 (3) and
+  -- thamasa_night (3) -- so the shortfall is Thamasa's to fill.
+  H.call(function()
+    H.vars.shopStart = H.frame
+    H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 24")
+    H.log(string.format("[shop] Albrook stop begins f%d: gil=%d tonic=%d potion=%d fenix=%d",
+      H.frame, H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.crossDoor(7, 13, 328, 37, 54, "item shop door 323(7,13)->328(37,54)"),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
+    "shop interior settled", 10),
+  H.waitFrames(60),
+  H.shopTalk(37, 47, "Albrook item shop"),
+  H.call(function()
+    -- event command $9b parks the shop number at $0201 (field/event.asm:3656);
+    -- the rows come from the ROM table, since the menu fills its $7E9D89 row
+    -- list only once the buy list is drawn.
+    H.assertEq(H.readByte(0x0201), 24, "the counter opened shop 24 ($0201)")
+    H.assertEq(shopRow(24, 0), POTION, "shop 24 row 0 is Potion")
+    H.assertEq(shopRow(24, 5), FENIX_DOWN, "shop 24 row 5 is Fenix Down")
+  end),
+  H.buyItem(POTION, 0, function() return 38 - H.invCountOf(POTION) end, "POTION to 38"),
+  H.buyItem(FENIX_DOWN, 5, function() return 25 - H.invCountOf(FENIX_DOWN) end,
+    "FENIX DOWN to 25"),
+  H.call(function()
+    H.log(string.format("[shop] Albrook item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
+  end),
+  H.shopClose("Albrook item shop"),
+  H.call(function()
+    H.assertEq(H.invCountOf(POTION) >= 38, true,
+      "the party leaves Albrook with the Potion band (38 at L25) -- the in-combat heal")
+    H.assertEq(H.invCountOf(FENIX_DOWN) >= 25, true, "Fenix Downs at 25")
+    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
+      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  -- out: the (37,55) event trigger, one tile below the arrival tile
+  H.navTo(37, 54, { maxFrames = 6000, playBattles = "tactical" }),
+  pressWalk("down", function() return map() == 323 end, 900,
+    "held DOWN onto the (37,55) trigger -> Albrook 323"),
+  H.waitUntil(landed(323, 10), 2400, "back on Albrook's streets", 1),
+  H.waitFrames(30),
+  H.call(function()
+    H.log(string.format("[shop] Albrook stop cost %d frames (f%d -> f%d); back at (%d,%d)",
+      H.frame - H.vars.shopStart, H.vars.shopStart, H.frame, H.fieldX(), H.fieldY()))
   end),
 
   -- ---- 2. through the port gate ---------------------------------------------

@@ -39,6 +39,9 @@ local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 en
 local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 local function monPresent(i) return H.readByte(0x3aa8 + i * 2) % 2 == 1 end
 local CH_SEL, CH_MAX = 0x056E, 0x056F
+local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
+local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local function inBattle()
   for i = 0, 3 do
     local hp = H.readWord(0x3bf4 + i * 2)
@@ -380,6 +383,95 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
     H.assertEq(mapIdx(), 187, "landed in Nikeah")
     H.log(string.format("[trench] Nikeah at (%d,%d)", H.fieldX(), H.fieldY()))
     H.screenshot("trench_nikeah")
+  end),
+
+  -- ---- Nikeah's item shop (#176) -------------------------------------------
+  -- The last Potion shop before the reunion: the Terra scenario never walks
+  -- a town with control (its Narshe arrival is the isolated clifftop ledge,
+  -- Arvis's front door lies past the reunion trigger, and the map-22
+  -- staging boxes the party -- probe_narshe_preshop), so what SABIN's party
+  -- buys here is the bag TERRA's party and the Battle for Narshe carry.
+  -- Shop 15, the counter NPC at (24,39) on Nikeah's town map 169 (_ca8f4a
+  -- opens 15 while $00A4 is clear, which it is), rows TONIC 0 / POTION 1 /
+  -- FENIX DOWN 5; the dock map 187 joins the town by its north edge
+  -- (16..17,1) -> 169 (14,61), back by 169 (13..14,63) -> 187 (17,2).
+  -- POTION to 27: the band (~level x1.5, docs/design/level-curve.md) at
+  -- the L18 this party holds; the seeded chain spent no Potions from here
+  -- to the post-opera checkpoint (potion=8 at sabin_done, reunion_ready,
+  -- kefka_entry; 10 at blackjack), so 27 holds the band for TERRA's L13
+  -- party (20) and the L14 descent (21) too.
+  H.call(function()
+    H.vars.shopStart = H.frame
+    H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 15")
+    H.log(string.format("[shop] Nikeah stop begins f%d: gil=%d tonic=%d potion=%d fenix=%d",
+      H.frame, H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.navTo(16, 2, { maxFrames = 8000, playBattles = "tactical" }),
+  (function() local ph = 0
+    return H.driveUntil(function() return mapIdx() == 169 end, 900, {
+      H.call(function() ph = ph + 1
+        if H.dialogWaiting() then H.setPad(ph % 8 < 4 and { "a" } or {}); return end
+        H.setPad({ up = true })
+      end) }, "held UP off the dock's north edge -> Nikeah town 169") end)(),
+  H.release(),
+  settle(169, "Nikeah town", 3000),
+  H.saveState("_scratch_nikeah169.mss"),   -- cheap re-entry for route iteration
+  -- The passability model reads nothing useful for a while after the map
+  -- load (probe_nikeah_town: bfs finds no path at all at +20 and at +150
+  -- frames, and a 44-step path to the counter's talk tile at +300/+400),
+  -- and shopTalk caches its staging pick on the first census, so let the
+  -- town settle before pathfinding.  A fixed settle is not enough: the
+  -- town's walkers cross the one street to the counter, so the talk tile
+  -- (24,41) reads reachable or not by the frame (probe_nikeah_town2 off
+  -- this generator's library-fighter dive: bfs 32 at +0, none at +100, 44
+  -- at +200, none at +400, then 32..44 to +1000), and the 400-frame settle
+  -- landed on a blocked frame -- shopTalk cached the (24,40) counter-tile
+  -- fallback and navTo read no path 20 times (potion-route sabin_done
+  -- attempt 1).  Wait, as a person would, for the street to clear.
+  H.waitFrames(150),
+  H.waitUntil(function() return H.bfsPath(24, 41) ~= nil end, 1800,
+    "a walkable street to the Nikeah counter's talk tile (24,41)", 1),
+  -- The keeper stands behind a counter ((24,40) is a counter tile); the
+  -- talk is from two tiles away in line, shopTalk's (24,41) candidate.
+  H.shopTalk(24, 39, "Nikeah item shop"),
+  H.call(function()
+    -- event command $9b parks the shop number at $0201 (field/event.asm:3656);
+    -- the rows come from the ROM table, since the menu fills its $7E9D89 row
+    -- list only once the buy list is drawn.
+    H.assertEq(H.readByte(0x0201), 15, "the counter opened shop 15 ($0201)")
+    H.assertEq(shopRow(15, 0), TONIC, "shop 15 row 0 is Tonic")
+    H.assertEq(shopRow(15, 1), POTION, "shop 15 row 1 is Potion")
+    H.assertEq(shopRow(15, 5), FENIX_DOWN, "shop 15 row 5 is Fenix Down")
+  end),
+  H.buyItem(POTION, 1, function() return 27 - H.invCountOf(POTION) end, "POTION to 27"),
+  H.buyItem(FENIX_DOWN, 5, function() return 15 - H.invCountOf(FENIX_DOWN) end,
+    "FENIX DOWN to 15"),
+  H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
+  H.call(function()
+    H.log(string.format("[shop] Nikeah item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
+  end),
+  H.shopClose("Nikeah item shop"),
+  H.call(function()
+    H.assertEq(H.invCountOf(POTION) >= 27, true,
+      "the party leaves Nikeah with the Potion band (27 at L18) -- the in-combat heal, carried to the reunion")
+    H.assertEq(H.invCountOf(FENIX_DOWN) >= 15, true, "Fenix Downs at 15")
+    H.assertEq(H.invCountOf(TONIC) >= 90, true, "Tonics topped up for the field care")
+    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
+      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+  end),
+  H.navTo(13, 62, { maxFrames = 8000, playBattles = "tactical" }),
+  (function() local ph = 0
+    return H.driveUntil(function() return mapIdx() == 187 end, 900, {
+      H.call(function() ph = ph + 1
+        if H.dialogWaiting() then H.setPad(ph % 8 < 4 and { "a" } or {}); return end
+        H.setPad({ down = true })
+      end) }, "held DOWN off the town's south edge -> the dock 187") end)(),
+  H.release(),
+  settle(187, "Nikeah dock again", 3000),
+  H.call(function()
+    H.log(string.format("[shop] Nikeah stop cost %d frames (f%d -> f%d)",
+      H.frame - H.vars.shopStart, H.vars.shopStart, H.frame))
   end),
 
   -- the ferry clerk at (17,15): option 1 boards
