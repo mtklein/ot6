@@ -263,9 +263,12 @@ local function fight()
         if hpLast[e] ~= nil then
           if hpLast[e] > 0 and php == 0 then
             local cause = (condLast[e] ~= nil and condLast[e] > 0 and condLast[e] <= 2) and "doom" or "dmg"
-            res.deaths[#res.deaths + 1] = string.format("e%d@%d:%s", e, t, cause)
-            H.log(string.format("[death] t=%d entity %d (%s; last condemned count %s) master=%d",
-              t, e, cause, tostring(condLast[e]), master()))
+            -- the pips the member fell holding (#175): OT6_BP_CLASS $3e9c + e*2
+            local bp = H.readByte(0x3E9C + e * 2)
+            res.deaths[#res.deaths + 1] = string.format("e%d@%d:%s:bp%d", e, t, cause, bp)
+            H.log(string.format("[death] t=%d entity %d (%s; last condemned count %s) master=%d bp=%d party_bp=%d,%d,%d,%d",
+              t, e, cause, tostring(condLast[e]), master(), bp,
+              H.readByte(0x3E9C), H.readByte(0x3E9E), H.readByte(0x3EA0), H.readByte(0x3EA2)))
           elseif hpLast[e] == 0 and php > 0 then
             res.raises = res.raises + 1
             H.log(string.format("[raise] t=%d entity %d to %d hp", t, e, php))

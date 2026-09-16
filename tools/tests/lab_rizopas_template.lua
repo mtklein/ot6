@@ -422,8 +422,12 @@ local function ledger()
       if php < 10000 and hpLast[e] ~= nil and php ~= hpLast[e] then
         H.log(string.format("[hp] t=%d entity %d %d -> %d (%+d)", t, e, hpLast[e], php, php - hpLast[e]))
         if hpLast[e] > 0 and php == 0 then
-          res.deaths[#res.deaths + 1] = string.format("e%d@%d", e, t)
-          H.log(string.format("[death] t=%d entity %d rizo=%s", t, e, rizo.seen and (H.readWord(RHP) .. "/sh" .. H.readByte(RSH)) or "not up"))
+          -- the pips the member fell holding (#175): OT6_BP_CLASS $3e9c + e*2
+          local bp = H.readByte(BP + e * 2)
+          res.deaths[#res.deaths + 1] = string.format("e%d@%d:bp%d", e, t, bp)
+          H.log(string.format("[death] t=%d entity %d rizo=%s bp=%d party_bp=%d,%d", t, e,
+            rizo.seen and (H.readWord(RHP) .. "/sh" .. H.readByte(RSH)) or "not up",
+            bp, H.readByte(BP), H.readByte(BP + 2)))
         elseif hpLast[e] == 0 and php > 0 then
           res.raises = res.raises + 1
           H.log(string.format("[raise] t=%d entity %d to %d hp", t, e, php))

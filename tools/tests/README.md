@@ -332,8 +332,8 @@ runs every script through the **segment runner** at the bottom of
   `gen_*` scripts, observation-only elsewhere; `opts.watchdog` and
   `OT6_WATCHDOG=1/0` override. `H.recoveryCount(tag, key)` is the
   recovery cap for a driver that drops its plan and backs out: past 3
-  drops of the same plan in one battle it fails fast the same way (not yet
-  wired into the fight driver; see the note at its definition).
+  drops of the same plan in one battle it fails fast the same way (the
+  fight driver calls it at both of its plan-drop sites).
 - **Seed sweep.** `python3 tools/tests/seed_sweep.py <state> --seeds K
   [--jobs N]` regenerates one state K times with K different boot seeds
   (`OT6_SEED_SHIFT`, spread over the 60-frame seed period), retries off,
@@ -405,6 +405,27 @@ Fight or a summon.
 - `unresolved`: a submitted/started action lacked a matching completion before
   battle end, driver replacement, state reload, or run end. An abruptly cut
   log is reported as incomplete by the summary instead.
+- `death`: a party member's HP reached 0 (#175), outside any plan's
+  lifecycle: the entity, the HP the killing action found them at, the pips
+  they held (`bp`) and the party's (`party_bp`), and the killer's slot,
+  command and attack bytes. The summary lists these; they carry no plan id.
+
+Whether or not the trace is on, the driver logs the same record as a
+`[death]` line and one `[wipe]` line per battle with the party's pips and a
+classification ("one-shot early" / "died with N BP banked");
+`tools/audit_boost.py` (also run by `audit_fenix.py`) tabulates them over
+run logs.
+
+The driver also logs one `[layout]` line per battle once the command window
+is up: the type of battle the engine set (`$201F`: normal / back attack /
+pincer / side attack) and the target group (`$7ACE`), with the directions
+the target cursor crosses by -- every steer press is derived from that
+reading (`H.battleLayout`), not from a fixed side.  A steer press that
+moves none of the target window's cells twice is not pressed again, and
+when no derived direction moves the cursor the driver raises `FIGHT
+DRIVER STUCK: ...` (with a `fightdriver_stuck` screenshot); a plan dropped
+and re-planned in the same menu state is counted by `H.recoveryCount` and
+fails fast past three, instead of re-planning until the party dies.
 
 Submission and completion are engine evidence, not inferred from a disappearing
 menu or rising HP. Accepted recovery commands remain queued independently of

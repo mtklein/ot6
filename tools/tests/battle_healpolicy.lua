@@ -368,6 +368,112 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: cast guards' decision (#172) checked")
   end),
 
+  -- 11. the spend rule (#175, H.spendDecision) on the Rizopas care_i50
+  -- numbers (SABIN 82/363 under a 244 round, CYAN dead, Potion +91
+  -- measured, the driver spent eleven turns on care) and the wipe
+  -- classification (H.wipeClass) the [wipe] line and audit_boost print.
+  H.call(function()
+    local v, why = H.spendDecision({ hp = 82, maxhp = 363, roundCost = 244, bp = 1,
+      heals = { { what = "item $E9", restore = 91 } } })
+    H.assertEq(v, "spend", "SABIN 82/363 under a 244 round with 1 BP: the Potion's 82 + 91 = 173 does not survive -- spend (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 82, maxhp = 363, roundCost = 244, bp = 0,
+      heals = { { what = "item $E9", restore = 91 } } })
+    H.assertEq(v, nil, "...with no pips there is nothing to spend (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 82, maxhp = 363, roundCost = 244, bp = 2,
+      heals = { { what = "item $E9", restore = 250 } } })
+    H.assertEq(v, nil, "a full Potion saves: 82 + 250 = 332 survives the 244 -- heal, keep the pips (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 82, maxhp = 363, roundCost = 244, bp = 2,
+      heals = { { what = "cure $2D", restore = nil }, { what = "item $E9", restore = 91 } } })
+    H.assertEq(v, nil, "an unmeasured cure may be the saving one: measure it first (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 300, maxhp = 363, roundCost = 244, bp = 3, heals = {} })
+    H.assertEq(v, nil, "300 HP is outside the 244 round: not dying, the bank's business (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 363, maxhp = 363, roundCost = 0, bp = 3, heals = {} })
+    H.assertEq(v, nil, "no round measured yet: nothing says next round is lethal (" .. why .. ")")
+    v, why = H.spendDecision({ hp = 447, maxhp = 447, roundCost = 447, bp = 3, heals = {} })
+    H.assertEq(v, "spend", "map 269: LOCKE at full 447 under a 447 one-shot with 3 BP and nothing to heal with -- spend (" .. why .. ")")
+    -- the wipe class
+    local d = function(tick, from, maxhp, bp, one)
+      return { tick = tick, from = from, maxhp = maxhp, bp = bp, oneAction = one }
+    end
+    H.assertEq(H.wipeClass({ d(512, 447, 447, 1, true), d(513, 443, 443, 0, true) }),
+      "one-shot early", "two L4 Flare one-shots at f+512: a level problem")
+    H.assertEq(H.wipeClass({ d(5600, 284, 363, 3, false), d(5600, 221, 358, 4, false) }),
+      "died with 4 BP banked", "El Nino at t=5600 with 3 and 4 pips held: a driver problem")
+    H.assertEq(H.wipeClass({ d(512, 447, 447, 1, true), d(5600, 221, 358, 4, false) }),
+      "one-shot early + died with 4 BP banked", "both shapes in one wipe are both reported")
+    H.assertEq(H.wipeClass({ d(5600, 447, 447, 2, true) }),
+      "worn down (no one-shot, no pips banked)", "a one-shot late in the fight is not 'early'; 2 BP is under the bar")
+    H.assertEq(H.wipeClass({}), "no deaths recorded", "no records: says so")
+    H.log("battle_healpolicy: spend rule and wipe class (#175) checked")
+  end),
+
+  -- 12. the raise gate's floor: every measured hit, a level spell's
+  -- included.  The #174 exemption was measured out (map269-random.md,
+  -- 2026-09-16: 20 Fenix Downs against main's 12, no frames gained) and
+  -- main's gate stands: LOCKE (447) raised to 55 under a measured 447
+  -- (Trapper's L4 Flare) or 55 (its recurrence) is refused.
+  H.call(function()
+    local rHp, rOk = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = 447 })
+    H.assertEq(rHp * 10 + (rOk and 1 or 0), 550, "LOCKE to 55 under a measured 447 one-shot: no raise")
+    rHp, rOk = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = 55 })
+    H.assertEq(rHp * 10 + (rOk and 1 or 0), 550, "LOCKE to 55 under a measured 55 recurrence: no raise")
+    H.assertEq(H.hitFloorExempt, nil, "no level-spell exemption in the lib (#174, measured out)")
+    H.log("battle_healpolicy: the raise gate's floor (#165) checked")
+  end),
+
+  -- 12b. the battle's layout (#176, H.battleLayout): which way the target
+  -- cursor crosses, by battle type ($201F) and target group ($7ACE).  The
+  -- directions are btlgfx's own jump tables (btlgfx_main.asm "move
+  -- character target left/right jump table (1 per battle type)"): in a
+  -- normal battle LEFT crosses to the monsters and RIGHT is an rts; in a
+  -- back attack it is the other way round -- the J39-row hang.
+  H.call(function()
+    local L = H.battleLayout({ type = 0, group = 1 })
+    H.assertEq(L.name .. ":" .. L.toMonsters[1] .. ":" .. L.toChars[1],
+      "normal:left:right", "a normal battle: LEFT to the monsters, RIGHT back")
+    H.assertEq(#L.toMonsters, 1, "...and only that one direction crosses")
+    L = H.battleLayout({ type = 1, group = 1 })
+    H.assertEq(L.name .. ":" .. L.toMonsters[1] .. ":" .. L.toChars[1],
+      "back attack:right:left", "a back attack: RIGHT to the monsters (#176)")
+    H.assertEq(#L.toMonsters, 1, "...and LEFT is not offered: it is an rts")
+    L = H.battleLayout({ type = 2, group = 1 })
+    H.assertEq(L.name .. ":" .. table.concat(L.toMonsters, ","),
+      "pincer:left,right", "a pincer: monsters on both sides, either crosses")
+    L = H.battleLayout({ type = 3, group = 1 })
+    H.assertEq(L.name .. ":" .. L.toMonsters[1], "side attack:right",
+      "a side attack with the cursor on the left party group ($7ACE=1): RIGHT")
+    L = H.battleLayout({ type = 3, group = 3 })
+    H.assertEq(L.toMonsters[1], "left",
+      "...and on the rightmost group ($7ACE=3): LEFT (RIGHT returns there)")
+    L = H.battleLayout({ type = 7, group = 0 })
+    H.assertEq(L.name, "unknown", "an unread battle type says so rather than guessing quietly")
+    H.log("battle_healpolicy: the battle layout's crossing directions (#176) checked")
+  end),
+
+  -- 13. the keyed line's boost (#174, H.keyBoost) on the map-269 trio
+  -- (Trapper: 2 shields, BLUDG key) and Nerapa (5 shields, SLASH|PIERCE):
+  -- chips per boost are the chip model's for each member's hands.
+  H.call(function()
+    -- LOCKE's Genji pair on a Trapper: ThunderBlade (bolt) chips, Guardian
+    -- does not; swings alternate, so 0 BP = 1 chip, 1 BP = 2, 2 BP = 3
+    local b, why = H.keyBoost({ need = 2, chipsAt = { [0] = 1, [1] = 2, [2] = 3, [3] = 4 }, bank = 3 })
+    H.assertEq(b, 1, "LOCKE on a Trapper: one pip breaks this turn -- not the bank's three (" .. why .. ")")
+    -- SABIN's Pummel: two bludgeoning hits whatever the boost
+    b, why = H.keyBoost({ need = 2, chipsAt = { [0] = 2, [1] = 2, [2] = 2, [3] = 2 }, bank = 3 })
+    H.assertEq(b, 0, "SABIN's Pummel on a Trapper breaks unboosted: the pip banks (" .. why .. ")")
+    -- LOCKE on Nerapa: both hands chip, 2/4/6 chips at 0/1/2 BP
+    b, why = H.keyBoost({ need = 5, chipsAt = { [0] = 2, [1] = 4, [2] = 6, [3] = 8 }, bank = 3 })
+    H.assertEq(b, 2, "LOCKE on Nerapa: two pips reach five shields (" .. why .. ")")
+    b, why = H.keyBoost({ need = 5, chipsAt = { [0] = 2, [1] = 4 }, bank = 1 })
+    H.assertEq(b, 1, "...and with one pip in the bank, the one pip: the most the bank allows (" .. why .. ")")
+    -- no key: CELES's MithrilBlade (slash) on a Trapper chips nothing
+    b, why = H.keyBoost({ need = 2, chipsAt = { [0] = 0, [1] = 0, [2] = 0 }, bank = 2 })
+    H.assertEq(b, nil, "no key held: the boost-Fight default keeps the turn (" .. why .. ")")
+    b, why = H.keyBoost({ need = 0, chipsAt = { [0] = 2 }, bank = 2 })
+    H.assertEq(b, nil, "a broken gauge is the unload's turn, not the key's (" .. why .. ")")
+    H.log("battle_healpolicy: the keyed line's boost (#174) checked")
+  end),
+
   -- 8. the table was not skipped
   H.call(function()
     H.assertEq(ran, #CASES, string.format(

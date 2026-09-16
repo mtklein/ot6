@@ -372,6 +372,72 @@ LOCKE's HP at any level below the mid-20s.  The levers, cheapest first
   is also Strago's Lore, so a power change reaches the player's copy;
   the AI swap does not.
 
+## 2026-09-16: the driver rules measured on this lab (wt/driver-boost)
+
+Fixture rebaked on the v0.17 ROM (`7924d5a46173`); every number is from a
+retained log under `build/m269lab/<driver>_<policy>_s<seed>.log`, 15 seeds
+per cell, main's `ot6.lua` composed into the same lab template as the A
+side.  Two things changed underneath the 2026-09-07 tables:
+
+- **`control` is now the same fight as `cared`.**  main's regenerated
+  `magicite_ifrit_shiva` already ships SABIN alive and topped
+  (`[m269lab bake at the save] ... SABIN L17 511/511 hp`), so the "as
+  shipped" leg no longer walks in with a dead member; `control`, `cared`,
+  `caredkb` and `carednokey` are frame-identical on all 15 seeds
+  (`mean frames=3290, 8 deaths, 8 care Fenix, 4 double-kill fights`, both
+  drivers).  The 2026-09-07 `control` row (8050 frames, 27 Fenix) is the
+  pre-#171-care fixture and stays above as history.
+- **The #174 keyed line changes nothing here**: the tactical driver already
+  led with Pummel / ThunderBlade (`actor=1 KEYED: Pummel lands 2 chip(s) on
+  slot 2's 2 shield(s) -- 0 BP ... unboosted, the pip banks`), so `caredkb`
+  and `carednokey` equal `cared` seed for seed.
+
+**`boostfight`, the A/B that decided #174(a)** (fenix = in battle + at
+the care stop; every run won, no wipes):
+
+| driver | mean frames | Fenix B+C | double-kill fights | note |
+|---|---|---|---|---|
+| main (`1d1e9b12`) | 8126 | 10+2 | 6/15 | the gate as shipped |
+| branch as pushed (exemption, `a7e12f45`) | 7942 | **27+0** | 6/15 | every later Flare re-killing the 55-HP raise was exempt too: `[death] f+4360 entity 3 char 6 from 55/443 by slot 2 cmd $0C atk $95` then `actor=3 revive entity 2` (s48); two actors raised the same corpse (`[act] f4322 c4 cmd=01 atk=$F0 tgt=0008`, `f4734 c1 ... tgt=0008`) |
+| exemption once per attack + one Fenix per corpse + open-action read (`bddd90a1`) | 8127 | 14+6 | 6/15 | better, not main |
+| **main's gate + one Fenix per corpse + open-action read (final)** | **7341** | 11+3 | 6/15 | 14 of 15 seeds equal main's Fenix; s12 drew a third Flare (`flares=3` vs main's 2) and main's own #168 top-up rule spent 2 more (`revive entity 2 ... 55 HP alone would not survive the 55 hit, but an ally tops up first`) |
+
+The exemption was measured out: a 55-HP raise never survives the next
+Flare either, so raising at all costs two Fenix per Flare and gains no
+frames.  main's gate stands; what the branch keeps is the one-Fenix-per-
+corpse rule (`raiseQueued`: `actor=1 no raise on entity 2: actor 0's Fenix
+Down on them is confirmed (tick 7754) and has not landed`) and the raise
+gate's provisional read of the monster action still in flight.
+
+Final per seed, `boostfight` (`f`=frames, fenix=pre/battle/care):
+
+```
+seed  main                              final
+s0    f13756 fenix 0/2/0 flares=1       f13427 0/2/0 flares=1
+s4    f 5032 0/0/0                      f 4152 0/0/0
+s8    f 4884 0/0/0                      f 4739 0/0/0
+s12   f11256 0/2/0 flares=2             f 9559 0/3/1 flares=3
+s16   f 4212 0/0/0                      f 3916 0/0/0
+s20   f 5296 0/0/0                      f 4024 0/0/0
+s24   f13883 0/0/2 flares=5             f13883 0/0/2 flares=5
+s28   f 5672 0/0/0 flares=1             f 4232 0/0/0
+s32   f 6364 0/0/0                      f 6220 0/0/0
+s36   f14160 0/2/0 flares=4             f 8919 0/2/0 flares=1
+s40   f 4100 0/0/0                      f 4100 0/0/0
+s44   f 3264 0/0/0                      f 3264 0/0/0
+s48   f13412 0/2/0 flares=1             f13412 0/2/0 flares=1
+s52   f13103 0/2/0 flares=5             f12767 0/2/0 flares=4
+s56   f 3508 0/0/0                      f 3508 0/0/0
+```
+
+`breakfirst` on the final driver: `mean frames=3444, Fenix 2+6, 4/15
+double-kill fights` (2026-09-07: 3462, 4/15).  The boost audit over every
+batch: no death held 3 or more pips (`Boost audit: 34 party death(s), 0
+holding >= 3 BP, 0 wipe(s) across 45 logs`); the spend rule fired where a
+member stood inside a Flare of death with a pip (`actor=3 SPEND (care):
+55/443 is inside one round of death (443) holding 1 BP, and no heal saves
+it (item $E8 +50 = 105) -- Fight at 1 BP`).
+
 ## Out of scope, noticed on the way
 
 - `magicite_ifrit_shiva` is saved with **SABIN dead and CELES at 6 MP**

@@ -119,18 +119,24 @@ def main():
     if not flagged:
         print("Fenix audit: no threshold violations in the scanned logs "
               f"({len(paths)} logs).")
-        return
-    print(f"Fenix audit: {len(flagged)} flagged segment/kind(s) "
-          f"(>2 Fenix in a boss, or any in a random) across {len(paths)} "
-          "logs.\n")
-    print(f"{'segment':28} {'fenix':>5}  {'kind':7} why")
-    for worker, n, cls in sorted(flagged, key=lambda x: -x[1]):
-        why = ("boss burned >2 -- underleveled or needs a strategy lab"
-               if cls == "BOSS"
-               else "Fenix in randoms -- underleveled or lab these encounters"
-               if cls == "RANDOM"
-               else "review: classify boss vs random")
-        print(f"{worker:28} {n:>5}  {cls:7} {why}")
+    else:
+        print(f"Fenix audit: {len(flagged)} flagged segment/kind(s) "
+              f"(>2 Fenix in a boss, or any in a random) across {len(paths)} "
+              "logs.\n")
+        print(f"{'segment':28} {'fenix':>5}  {'kind':7} why")
+        for worker, n, cls in sorted(flagged, key=lambda x: -x[1]):
+            why = ("boss burned >2 -- underleveled or needs a strategy lab"
+                   if cls == "BOSS"
+                   else "Fenix in randoms -- underleveled or lab these encounters"
+                   if cls == "RANDOM"
+                   else "review: classify boss vs random")
+            print(f"{worker:28} {n:>5}  {cls:7} {why}")
+    # The sibling audit (#175): boost left on the table at every death and
+    # the classification of every wipe, over the same logs.  Wherever the
+    # Fenix audit runs, this runs beside it.
+    import audit_boost
+    print()
+    audit_boost.report(paths)
 
 
 if __name__ == "__main__":
