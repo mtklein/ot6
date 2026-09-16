@@ -17,7 +17,8 @@ end
 
 local function worldGrind(tx, ty, what)
   local plan, idx, step = nil, 1, nil
-  local battN, battleFrames, hb = 0, 0, -600
+  local battleFrames, hb = 0, -600
+  local W = H.newWalkFighter(what or string.format("worldGrind (%d,%d)", tx, ty))
   local DW = { up = { 0, -1 }, down = { 0, 1 },
                left = { -1, 0 }, right = { 1, 0 } }
   local sawBattle = false
@@ -26,32 +27,19 @@ local function worldGrind(tx, ty, what)
       and H.worldHasControl() and H.worldAligned()
   end, 90000, {
     H.call(function()
-      battN = H.battleLoadStarted() and battN + 1 or 0
-      if battN > 0 then
-        plan, step, sawBattle = nil, nil, true
-        if battN == 3 then
-          local w = H.formationWords()
-          H.log(string.format("[grind] battle up f%d (%04X %04X %04X %04X " ..
-            "%04X %04X) -- fleeing with L+R", H.frame,
-            w[1], w[2], w[3], w[4], w[5], w[6]))
-        end
-        battleFrames = battleFrames + 1
-        if battleFrames > 2400 then
-          error("world encounter did not yield to 2400 frames of L+R", 0)
-        end
-        H.setPad({ l = true, r = true })
-        return
-      end
+      -- #183: a battle is fought (and the party healed after it) by the
+      -- walk fighter, which owns every frame of the fight and the reload.
+      if W.frame() then plan, step, sawBattle = nil, nil, true; return end
       if not H.worldMode() then
         if sawBattle then battleFrames = battleFrames + 1 end
         if battleFrames > 2400 then
           error("world encounter did not return to the map after 2400 frames", 0)
         end
         plan, step = nil, nil
-        H.setPad({ l = true, r = true }); return
+        H.setPad({}); return
       end
       if sawBattle then
-        H.log(string.format("[grind] fled; world resumed at (%d,%d)",
+        H.log(string.format("[grind] fought; world resumed at (%d,%d)",
           H.worldX(), H.worldY()))
         sawBattle, battleFrames = false, 0
       end
