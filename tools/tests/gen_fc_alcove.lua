@@ -45,25 +45,63 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 -- raw-nuking Bolt unboosted, wiped; this one won -- but one win is not
 -- reliability).  See the descent lab.
 --
--- TERRA's Bolt line.  The v0.17 requalification (2026-09-07 17:45,
+-- TERRA's Vanish line.  The v0.17 requalification (2026-09-07 17:45,
 -- build/v017-requal1.log) wiped this segment against a LONE Ninja ($003,
 -- 1650 HP, 2 pips slash|pierce, weak bolt|holy) at 394 (57,48): SHADOW's
 -- opening Fight took 87 and the Ninja answered with its retaliation
 -- (ai_script.asm AIScript::_3: `if_cmd FIGHT / set_target SELF / attack
--- SPECIAL`, its Special is "Inviz" = Image), after which every physical
+-- SPECIAL`, its Special is "Inviz"), after which every physical
 -- action the party owned -- 42 Fights and 17 AutoCrossbows over 39,000
 -- frames -- resolved "took 0 off the monsters (0 hit(s))" while the Ninja
 -- hit for 220-839 a round.  This config carried NO magic line, so the
--- driver had nothing an Image target cannot dodge, and the party bled out
--- through 36 Potions, 11 Tonics and a Fenix Down (f60848).  TERRA is the
--- back-row Magic member whose Fight never swings for anything (the rows
--- note below), so her attack turns go to Bolt: a spell lands through
--- Image, four of the seven descent species are bolt-weak and none absorbs
--- it.  LOCKE keeps his blades (one boosted Fight took 5800 off a Behemoth
--- in the same run); EDGAR keeps the crossbow.
-local BOLT = 0x02
+-- driver had nothing a Vanished target cannot dodge, and the party bled out
+-- through 36 Potions, 11 Tonics and a Fenix Down (f60848).
+--
+-- The first fix (19a6de87) gave TERRA a Bolt line and was inert: at this
+-- checkpoint NOBODY knows Bolt.  The learned table ($1A6E + 54*char,
+-- $FF = learned) read off the regenerated alcove state shows TERRA (L25,
+-- 228 MP, SHIVA worn) with $00 Fire, $04 Drain and $05 Fire 2 and no
+-- $02; LOCKE, SHADOW and EDGAR know nothing in $00-$17.  spellCell finds
+-- no cell and says nothing, so all 13 of her planned turns in that run
+-- read "plan=fight" (build/attempts/fc_alcove-attempt1.log).  Her Fight
+-- is not idle either -- it took 704, 808 and 1312 off broken targets in
+-- the same run -- so a blanket cast line would trade real damage for MP.
+--
+-- "Inviz" is Vanish, not Image: STATUS1::INVISIBLE (bit 4 of $3ee4 +
+-- entity*2, const.inc), under which every physical misses and a spell
+-- lands.  A first cut of this gate read STATUS2::IMAGE and never fired
+-- while two lab seeds wiped to the same all-zero Ninja fight
+-- (worktree build/attempts/lab-try2-imagegate/, seeds p12 and p52), so the gate reads both and
+-- says which it saw.
+--
+-- So the line is what a person does on seeing the Ninja fade out: while a
+-- live monster is Vanished (or Imaged), TERRA casts Fire 2 (20 MP; the
+-- plan-time absorb guard still refuses it on a fire absorber); otherwise
+-- the lookup is empty and she Fights as before.
+local FIRE2, ST1_INVISIBLE, ST2_IMAGE = 0x05, 0x10, 0x04
+local dodgeSaid = nil
+local function dodgerUp()
+  for s = 0, 5 do
+    if H.readWord(0x3BFC + s * 2) > 0 then
+      local e = 4 + s
+      if (H.readByte(0x3EE4 + e * 2) & ST1_INVISIBLE) ~= 0 then return s, "Vanish" end
+      if (H.readByte(0x3EE5 + e * 2) & ST2_IMAGE) ~= 0 then return s, "Image" end
+    end
+  end
+  return nil
+end
+local MAGIC = setmetatable({}, { __index = function(_, id)
+  if id ~= TERRA then return nil end
+  local s, what = dodgerUp()
+  if s == nil then dodgeSaid = nil; return nil end
+  if dodgeSaid ~= s then
+    dodgeSaid = s
+    H.log(string.format("[fc] slot %d wears %s (f%d): TERRA's attack turns go to Fire 2", s, what, H.frame))
+  end
+  return { spell = FIRE2 }
+end })
 local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
-                healPercent = 50, magic = { [TERRA] = { spell = BOLT } } }
+                healPercent = 50, magic = MAGIC }
 
 -- ---- descent (probe_fc_descent -> probe_fc_alcove2) ----------------------
 -- The route doc's VALIDATED crossing, in order (floating-continent-route.md
