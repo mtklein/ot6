@@ -284,7 +284,7 @@ H.run({ maxFrames = 600000 }, flatten({
                       { 3, 0x8F }, { 3, 0x84 },
                       { 4, 0xB3 }, { 5, 0xB1 } }, { tag = "EDGAR deck kit", ladder = true }),
   -- Relics: TERRA takes $B7 (Barrier Ring) + $B1 (Star Pendant), LOCKE $B1 beside
-  -- the Genji Glove he already wears (slot 4 stays: owner directive, the
+  -- the Genji Glove he already wears (slot 4 stays: owner guideline, the
   -- glove pairs the boost-Fight chips).  A Relic-screen back-out with the
   -- Genji Glove involved makes the game run its own Optimum (the lib's
   -- hazard note; measured in probe_equip_kit.lua, where swapping the

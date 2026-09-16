@@ -529,7 +529,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     H.log(partyReport("ifrit_won"))
     H.screenshot("ifrit_won")
   end),
-  -- Owner directive (#169): field care after EVERY battle.  The b70
+  -- Owner guideline (#169): field care after EVERY battle.  The b70
   -- driver's raise gate can rightly refuse an in-fight Fenix Down (63 HP
   -- against a 68 smallest hit), so the win can hand control back with a
   -- member down; the 2026-09-07 regeneration shipped SABIN dead (hp 0,

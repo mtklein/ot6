@@ -1638,7 +1638,7 @@ end
 -- for eight frames without clearing it; the driver watches that byte's
 -- high nibble and drops the plan rather than pressing into a refusal.
 --
--- Owner directive (#152): outside battle the party heals from the BAG --
+-- Owner guideline (#152): outside battle the party heals from the BAG --
 -- Tonics first, then Potions -- and a cure is cast only when the bag has
 -- nothing left to offer (every healing item at its reserve floor, or
 -- refused for that target).  MP is the fight's resource; a Tonic is what a
@@ -2264,7 +2264,7 @@ local function careKernel(opts)
     end
     table.sort(hurt, function(a, b) return a.r < b.r end)
     for _, h in ipairs(hurt) do
-      -- Bag first (owner directive, #152: outside battle the party heals
+      -- Bag first (owner guideline, #152: outside battle the party heals
       -- with Tonics, not by casting; Potions are the combat heal and MP is
       -- the fight's).  A cure is cast only when the bag has nothing to
       -- offer -- every healing item at its reserve floor or refused for
@@ -2650,14 +2650,14 @@ end
 -- figaro_cleared shipped 0/0, reddening battle_steal/thief/stealmp).
 -- Revival is deliberately NOT reserved (a dead member outweighs a thin
 -- bag), so CARE_FENIX is absent here.  The floor is the between-shops
--- safety net; the route's shop restocks (owner directive) are what keep
+-- safety net; the route's shop restocks (owner guideline) are what keep
 -- the bag actually stocked for the 0.9 top-off.
 M.CARE_RESERVE = { [CARE_TONIC] = 4, [CARE_POTION] = 4 }
 
 function M.newCareDriver(opts)
   opts = opts or {}
   if opts.reserve == nil then opts.reserve = M.CARE_RESERVE end
-  -- Owner directive: outside-battle care heals with TONICS (items), not by
+  -- Owner guideline: outside-battle care heals with TONICS (items), not by
   -- casting -- Tonics are cheap and everywhere, and casting cures drained
   -- MP over a grind badly enough to wipe (zozo_arrival, MP-starved with a
   -- full Tonic bag).  careKernel now tries the bag first on every path

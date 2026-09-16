@@ -3042,7 +3042,7 @@ function M.newFightDriver(tag, opts)
         .. "skill plans are off for the rest of the fight; Fighting instead",
         tag or "fight", parkDropN))
     end
-    -- One care action per round (owner directive: one healer inside, and
+    -- One care action per round (owner guideline: one healer inside, and
     -- the strong form once).  The caring actor's next turn delimits the
     -- round; until then everyone else attacks, because the fastest way to
     -- stop the damage is to end the fight.  The dadaluma wipe spent all
@@ -3424,7 +3424,7 @@ function M.newFightDriver(tag, opts)
         end
       end
       -- Two or more hurt and a cure known: one boosted, party-wide cure
-      -- outheals any single-target turn (owner directive: use the STRONG
+      -- outheals any single-target turn (owner guideline: use the STRONG
       -- form of the effect once -- Cure2/Cure3 the whole party -- rather
       -- than spending a turn per head).  Boost folds the tier (1 BP ->
       -- Cure2, 2 BP -> Cure3) and one R press on the target screen latches
@@ -3505,7 +3505,7 @@ function M.newFightDriver(tag, opts)
           end
         end
         -- then the bag.  In combat the bag heals with POTIONS: a turn must
-        -- buy a real heal (owner directive -- Tonics are the field
+        -- buy a real heal (owner guideline -- Tonics are the field
         -- resource), so the Tonic is only ever the last item standing.
         local item = row ~= nil
                  and (battInvIdx(POTION) and POTION
@@ -3618,7 +3618,7 @@ function M.newFightDriver(tag, opts)
     end
     -- opts.nuke = { spellId, ... } and opts.nukeLore = { loreId, ... }: the
     -- party-wide attack repertoire, tried in order, first castable wins
-    -- (owner directive: a party without Edgar or Sabin should nuke, not
+    -- (owner guideline: a party without Edgar or Sabin should nuke, not
     -- plain-Fight -- a boosted base cast folds to its next tier, the AoE
     -- hit, and a lore is the itemless multi-target line).  Where opts.magic
     -- names one cast for one character, these apply to ANY actor who can

@@ -324,7 +324,7 @@ H.run({ maxFrames = 120000 }, {
   H.call(function() where("throne hall") end),
 
   -- ==================================================================== --
-  -- PHASE 2a: the ITEM shop restock (owner directive: the route re-shops).
+  -- PHASE 2a: the ITEM shop restock (owner guideline: the route re-shops).
   -- The throne hall has TWO twin shop doors side by side: (32,21) -> tool
   -- alcove (D4 below) and (22,21) -> item shop (10,18).  The item merchant
   -- (obj 24) stands at map 59 (10,13) with a walkable tile directly below,
