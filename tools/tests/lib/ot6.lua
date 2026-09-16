@@ -2412,6 +2412,40 @@ local function execActivate()
   end, emu.callbackType.exec, b, b)
 end
 
+-- The unknown-menu guard's ledger (#188), one per run and bucketed by the
+-- $7BC2 state, so the driver's KNOWN_ST table is a measurement rather
+-- than a guess: `seen` counts every pulse a fight driver's button()
+-- sampled at a menu state it does not know, `drops` every time the guard
+-- fired (dropPlan("unknown_menu") and a B out).  Every driver in the run
+-- adds to the same ledger; watchReport prints it beside the verdict as
+-- the `[watch] unknown-menu` line, and the driver logs each state's
+-- first sighting in a battle with the actor, the command row and a
+-- screenshot (the `[unknown-menu]` lines).  Per the standing rule, every
+-- state that shows up here is a verb the driver has yet to learn.
+M.unknownMenu = { seen = {}, drops = {}, order = {} }
+local function unknownMenuNote(kind, st)
+  local T = M.unknownMenu
+  if T.seen[st] == nil and T.drops[st] == nil then T.order[#T.order + 1] = st end
+  T[kind][st] = (T[kind][st] or 0) + 1
+end
+function M.unknownMenuReport()
+  local T = M.unknownMenu
+  if #T.order == 0 then
+    return "unknown-menu drops by $7BC2 state: none (no unknown state sampled)"
+  end
+  table.sort(T.order)
+  local drops, seen, nd, ns = {}, {}, 0, 0
+  for _, st in ipairs(T.order) do
+    drops[#drops + 1] = string.format("$%02X=%d", st, T.drops[st] or 0)
+    seen[#seen + 1] = string.format("$%02X=%d", st, T.seen[st] or 0)
+    nd, ns = nd + (T.drops[st] or 0), ns + (T.seen[st] or 0)
+  end
+  return string.format("unknown-menu drops by $7BC2 state: %s (%d drop(s)); "
+    .. "pulses sampled there: %s (%d); the [unknown-menu] lines name each "
+    .. "state's first sighting per battle", table.concat(drops, " "), nd,
+    table.concat(seen, " "), ns)
+end
+
 function M.newFightDriver(tag, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -2479,6 +2513,7 @@ function M.newFightDriver(tag, opts)
   local heldFast = false            -- the live steer asked for 3 presses/pulse
   local tgtSpin = 0                    -- frames spent undecided in ST_TGT
   local unknownSt, unknownN = nil, 0   -- unknown-menu-state stall guard
+  local unknownSeen = {}               -- st -> true once logged this battle (#188)
   local parkSt, parkN = nil, 0         -- parked-KNOWN-window watchdog
   local idleSt, idleN = nil, 0         -- plan-less open-window back-out
   -- The two numbers the heal policy weighs against each other, both measured
@@ -4082,10 +4117,30 @@ function M.newFightDriver(tag, opts)
     if M.readByte(MENU) ~= 0 and not KNOWN_ST[st] then
       if st == unknownSt then unknownN = unknownN + 1
       else unknownSt, unknownN = st, 1 end
+      -- The ledger (#188): every pulse sampled here is counted by state,
+      -- and the first sighting of each state in a battle is written down
+      -- with who held the window, where the command cursor sat and what
+      -- the screen showed, so the KNOWN_ST table grows from evidence.
+      unknownMenuNote("seen", st)
+      if not unknownSeen[st] then
+        unknownSeen[st] = true
+        local shot = string.format("unknown_menu_%02X_f%d", st, M.frame)
+        pcall(M.screenshot, shot)
+        local cmds = {}
+        for row = 0, 3 do
+          cmds[#cmds + 1] = string.format("%02X", M.readByte(CMDTBL + actor * 12 + row * 3))
+        end
+        M.log(string.format("[%s] [unknown-menu] state $%02X first seen this "
+          .. "battle at f%d: actor=%d char=%d cmd row=%d cmds=%s plan=%s "
+          .. "screenshot=%s.png", tag or "fight", st, M.frame, actor,
+          M.readByte(BCHID + actor * 2), M.readByte(CMDROW + actor) & 3,
+          table.concat(cmds, ","), plan and plan.kind or "-", shot))
+      end
       if unknownN > 8 then        -- pulses, not frames (the cadence)
         M.log(string.format("[%s] unknown menu state $%02X held %d pulses "
           .. "-- backing out (B)", tag or "fight", st, unknownN))
         unknownSt, unknownN = nil, 0
+        unknownMenuNote("drops", st)
         dropPlan("unknown_menu")
         return { "b" }
       end
@@ -4522,6 +4577,7 @@ function M.newFightDriver(tag, opts)
     parkDropN = 0
     layout, layoutUnreadSaid, steerLast, steerDead = nil, false, nil, {}
     parkSt, parkN, idleSt, idleN = nil, 0, nil, 0
+    unknownSt, unknownN, unknownSeen = nil, 0, {}
     if healSaid == "parked-out" then healSaid = nil end
     careActor, startSnap, planPulses = nil, nil, 0
     -- Everything the heal policy measured belongs to the battle that just
@@ -5586,6 +5642,9 @@ local function watchReport()
     W.samplesTaken, W.pressFrames, W.trips, W.maxQuietCtl, W.maxQuietProg,
     W.maxQuietScreen, WATCH.noEffectFrames,
     math.floor(WATCH.pressFraction * 100), WATCH.quietFrames))
+  -- the fight drivers' unknown-menu ledger (#188), so the count sits
+  -- beside the verdict of every run rather than in a table nobody measured
+  M.log("[watch] " .. M.unknownMenuReport())
 end
 
 -- The recovery cap (#185's other half).  A driver that drops its plan and
