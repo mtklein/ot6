@@ -112,8 +112,8 @@ largest roll seen; L18 is the target.
 | fixture | LOCKE | EDGAR | SABIN | CELES | Tonic / Potion / Fenix |
 |---|---|---|---|---|---|
 | grind start, world (34,99) | L13 314 | L14 354 | L15 407 | L13 310 | 75 / 21 / 14 |
-| zozo_arrival | L18 558 | L18 559 | L19 629 | L18 554 | 52 / 30 / 20 |
-| zozo_done | L18 558 | L19 620 | L19 629 | L18 554 | 14 / 31 / 18 |
+| zozo_arrival | L18 558 | L18 559 | L19 629 | L18 554 | 43 / 39 / 21 (#176 stops: was 52 / 30 / 20) |
+| zozo_done | L18 558 | L19 620 | L19 629 | L18 554 | 16 / 40 / 21 (was 14 / 31 / 18) |
 
 The grind was 57 laps (43 fights, frames 14897 -> 162667 of the
 generator), no Fenix Down and no death in it.  The first try at the
@@ -131,6 +131,19 @@ Every single-target cast left its target standing (82..136 HP).  The
 street itself (`gen_zozo3_clock` 1 fight, `gen_zozo4_dadaluma` 8 fights
 including one solo SlamDancer's all-target Fire 2) spent no Fenix Down in
 a random; Dadaluma killed EDGAR and CELES (2 Fenix at the care after him).
+
+With the #176 Potion stops in front of it (Nikeah, Narshe, Jidoor: the
+bag above), the chain from `dadaluma_entry` to `blackjack` regenerated
+under the segment runner (#178) with one counted retry: `dadaluma_entry`
+attempt 1 drew the J39-row fight as a back attack, where the fight
+driver's LEFT target steer cannot cross to the monster side (#185,
+`probe_j39_backattack`), and the no-effect watchdog cut it at frame
+23808 instead of the 9000-frame step budget; attempt 2, the seed moved 20
+frames at the boot point, climbed clean (16 fights played, no Fenix Down,
+`care after Dadaluma: nothing to do`) and passed at frame 46149.  Every
+later segment (`zozo_done` through `blackjack`) passed on its first
+attempt; the Fenix count stays 21 from `zozo_arrival` to `blackjack`.
+The back-attack steer itself is still open (#185).
 
 ## Map 269: the L16 parity trap (#171)
 
