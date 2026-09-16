@@ -444,6 +444,35 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: the raise gate's level-spell exemption (#174) checked")
   end),
 
+  -- 12b. the battle's layout (#176, H.battleLayout): which way the target
+  -- cursor crosses, by battle type ($201F) and target group ($7ACE).  The
+  -- directions are btlgfx's own jump tables (btlgfx_main.asm "move
+  -- character target left/right jump table (1 per battle type)"): in a
+  -- normal battle LEFT crosses to the monsters and RIGHT is an rts; in a
+  -- back attack it is the other way round -- the J39-row hang.
+  H.call(function()
+    local L = H.battleLayout({ type = 0, group = 1 })
+    H.assertEq(L.name .. ":" .. L.toMonsters[1] .. ":" .. L.toChars[1],
+      "normal:left:right", "a normal battle: LEFT to the monsters, RIGHT back")
+    H.assertEq(#L.toMonsters, 1, "...and only that one direction crosses")
+    L = H.battleLayout({ type = 1, group = 1 })
+    H.assertEq(L.name .. ":" .. L.toMonsters[1] .. ":" .. L.toChars[1],
+      "back attack:right:left", "a back attack: RIGHT to the monsters (#176)")
+    H.assertEq(#L.toMonsters, 1, "...and LEFT is not offered: it is an rts")
+    L = H.battleLayout({ type = 2, group = 1 })
+    H.assertEq(L.name .. ":" .. table.concat(L.toMonsters, ","),
+      "pincer:left,right", "a pincer: monsters on both sides, either crosses")
+    L = H.battleLayout({ type = 3, group = 1 })
+    H.assertEq(L.name .. ":" .. L.toMonsters[1], "side attack:right",
+      "a side attack with the cursor on the left party group ($7ACE=1): RIGHT")
+    L = H.battleLayout({ type = 3, group = 3 })
+    H.assertEq(L.toMonsters[1], "left",
+      "...and on the rightmost group ($7ACE=3): LEFT (RIGHT returns there)")
+    L = H.battleLayout({ type = 7, group = 0 })
+    H.assertEq(L.name, "unknown", "an unread battle type says so rather than guessing quietly")
+    H.log("battle_healpolicy: the battle layout's crossing directions (#176) checked")
+  end),
+
   -- 13. the keyed line's boost (#174, H.keyBoost) on the map-269 trio
   -- (Trapper: 2 shields, BLUDG key) and Nerapa (5 shields, SLASH|PIERCE):
   -- chips per boost are the chip model's for each member's hands.

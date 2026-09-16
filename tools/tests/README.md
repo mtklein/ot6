@@ -350,6 +350,17 @@ classification ("one-shot early" / "died with N BP banked");
 `tools/audit_boost.py` (also run by `audit_fenix.py`) tabulates them over
 run logs.
 
+The driver also logs one `[layout]` line per battle once the command window
+is up: the type of battle the engine set (`$201F`: normal / back attack /
+pincer / side attack) and the target group (`$7ACE`), with the directions
+the target cursor crosses by -- every steer press is derived from that
+reading (`H.battleLayout`), not from a fixed side.  A steer press that
+moves none of the target window's cells twice is not pressed again, and
+when no derived direction moves the cursor, or one menu state has parked
+and dropped three plans in a battle, the driver raises `FIGHT DRIVER
+STUCK: ...` (with a `fightdriver_stuck` screenshot) instead of re-planning
+until the party dies.
+
 Submission and completion are engine evidence, not inferred from a disappearing
 menu or rising HP. Accepted recovery commands remain queued independently of
 new speculative plans for the same actor. Matching is by actor and command,

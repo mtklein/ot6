@@ -936,6 +936,65 @@ function M.wipeClass(deaths, o)
   return table.concat(parts, " + ")
 end
 
+-- Which way the target cursor crosses, read off the battle rather than
+-- assumed.  $201F is the type of battle the engine set at InitBattle
+-- (battle-ram.txt:423, battle_main.asm:7820: 0 normal, 1 back, 2 pincer,
+-- 3 side) and $7ACE is the target group the cursor sits in.  btlgfx's own
+-- jump tables are one entry per type (btlgfx_main.asm, "move character
+-- target left/right jump table (1 per battle type)"):
+--
+--   normal  chars: LEFT crosses (_c174bf), RIGHT is an rts -- nothing
+--           mons:  RIGHT crosses back (_c175a3)
+--   back    chars: RIGHT crosses (_c17439), LEFT is an rts -- nothing
+--           mons:  LEFT crosses back (_c17669)
+--   pincer  chars: both cross, to the left group (_c174bf) or the right
+--           (_c17439); monsters stand on both sides
+--   side    chars: LEFT unless the cursor is already the left character
+--           group ($7ACE = 1, _c174ea returns), RIGHT unless it is the
+--           rightmost ($7ACE = 3, _c17463 returns)
+--
+-- A back attack was what the J39-row fight drew on the dadaluma_entry
+-- attempt (#176): the steer pressed LEFT from the party side, LEFT is
+-- the rts, and the party idled in target select until the clock ran out.
+--
+-- Returns the layout: its type and name, the group read, and the
+-- directions that cross toward the monsters and back to the party, best
+-- first.  `o` overrides the reads for tests.
+M.BATTLE_TYPES = { [0] = "normal", [1] = "back attack", [2] = "pincer",
+                   [3] = "side attack" }
+function M.battleLayout(o)
+  o = o or {}
+  local t = o.type or M.readByte(0x201F)
+  local group = o.group or M.readByte(0x7ACE)
+  local L = { type = t, group = group, name = M.BATTLE_TYPES[t] or "unknown" }
+  if t == 0 then
+    L.toMonsters, L.toChars = { "left" }, { "right" }
+    L.where = "the monsters stand left of the party"
+  elseif t == 1 then
+    L.toMonsters, L.toChars = { "right" }, { "left" }
+    L.where = "the monsters stand RIGHT of the party (back attack)"
+  elseif t == 2 then
+    L.toMonsters, L.toChars = { "left", "right" }, { "right", "left" }
+    L.where = "the monsters stand on both sides (pincer)"
+  elseif t == 3 then
+    if group == 1 then
+      L.toMonsters, L.toChars = { "right" }, { "left" }
+    elseif group == 3 then
+      L.toMonsters, L.toChars = { "left" }, { "right" }
+    else
+      L.toMonsters, L.toChars = { "right", "left" }, { "left", "right" }
+    end
+    L.where = "the party is split around the monsters (side attack)"
+  else
+    -- a type this table does not know: say so and offer both, rather than
+    -- press one of them as if it were read
+    L.toMonsters, L.toChars = { "left", "right" }, { "right", "left" }
+    L.where = string.format("UNKNOWN battle type $%02X -- the crossing "
+      .. "direction is not read, only guessed", t)
+  end
+  return L
+end
+
 function M.monsterAbsorb(species)
   return M.readRomByte((M.sym("MonsterProp") & 0x3FFFFF)
     + species * MON_REC + MON_ABSORB)
@@ -2259,6 +2318,20 @@ function M.newFightDriver(tag, opts)
   -- cell n.
   local MLISTPTR = 0x302C
   local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
+  -- The battle's layout, read not assumed (M.battleLayout, #176): which
+  -- type of battle the engine set and therefore which way the target
+  -- cursor crosses between the party and the monsters.  Read once per
+  -- battle and logged; a side attack's group can move, so the crossing
+  -- direction is re-read each time it is needed.
+  local layout = nil
+  -- Every steer press and whether it moved anything: a direction that
+  -- twice changed no cell in the target window is not a direction here
+  -- (in a back attack LEFT is an rts), and the driver says so rather than
+  -- pressing it until the fight is lost.
+  local steerLast = nil                -- { dir, sig, kind }
+  local steerDead = {}                 -- dir -> presses with no effect
+  local parkDropByState = {}           -- menu state -> plans dropped there
+  local PARK_DROP_CAP = 3              -- ...before the driver fails fast
   -- multi-target latch: one R press on a MULTI_TARGET spell's target screen
   -- sets this to 1 and widens the side mask to every valid ally/monster
   -- (probe_targetall.lua measured it; btlgfx_main.asm @6e9a sets it)
@@ -3745,8 +3818,94 @@ function M.newFightDriver(tag, opts)
   -- left out; they pass on their own.
   local IDLE_ST = { [ST_ITEM] = true, [ST_TOOLS] = true, [ST_MAGIC] = true,
                     [ST_ESPER] = true, [ST_LORE] = true, [ST_THROW] = true }
+  -- The layout, read once per battle and said out loud (#176): a person
+  -- sees at a glance which side the monsters are on, and every direction
+  -- the target steer presses below is derived from this reading rather
+  -- than from a fixed idea of where they stand.
+  local layoutUnreadSaid = false
+  local function layoutOf()
+    if layout == nil then
+      local L = M.battleLayout()
+      if L.type > 3 then
+        -- InitBattle has not written $201F yet (it reads $FF while the
+        -- battle loads: measured at battle f+1, menu=82 state=88).  Not a
+        -- reading; nothing is cached and the next call reads again.
+        if not layoutUnreadSaid then
+          layoutUnreadSaid = true
+          M.log(string.format("[%s] [layout] not readable yet ($201F=%02X): the "
+            .. "battle is still loading; reading again once the menu is up",
+            tag or "fight", L.type))
+        end
+        return L
+      end
+      layout = L
+      M.log(string.format("[%s] [layout] battle type $%02X (%s): %s; from the "
+        .. "party side the cursor crosses with %s, and back with %s "
+        .. "($201F=%02X $7ACE=%02X)", tag or "fight", layout.type, layout.name,
+        layout.where, table.concat(layout.toMonsters, "/"),
+        table.concat(layout.toChars, "/"), layout.type, layout.group))
+    end
+    -- a side attack's crossing depends on the group the cursor sits in,
+    -- which moves during the fight: re-read that part every time
+    if layout.type == 3 then
+      local live = M.battleLayout()
+      layout.group, layout.toMonsters, layout.toChars =
+        live.group, live.toMonsters, live.toChars
+    end
+    return layout
+  end
+  -- Fail fast (#176): an input that does nothing, or a plan dropped in
+  -- the same window over and over, is a driver defect, and the run says
+  -- so with the state in hand instead of idling until the party dies.
+  local function failFast(what)
+    local said = string.format("[%s] FIGHT DRIVER STUCK: %s", tag or "fight", what)
+    M.log(said)
+    pcall(function() M.screenshot("fightdriver_stuck") end)
+    error(said, 0)
+  end
+  -- What the target window shows: both side masks, the all-latch and the
+  -- target group.  A steer press that leaves every one of them unchanged
+  -- moved nothing.
+  local function tgtSig()
+    return string.format("%02X:%02X:%02X:%02X", M.readByte(TGTCHARS),
+      M.readByte(TGTMONS), M.readByte(TGTALL), M.readByte(0x7ACE))
+  end
+  local function steerWatch()
+    if steerLast == nil then return end
+    local sig = tgtSig()
+    if steerLast.sig ~= sig then steerDead, steerLast = {}, nil; return end
+    local n = (steerDead[steerLast.dir] or 0) + 1
+    steerDead[steerLast.dir] = n
+    -- said for a crossing press (the layout's claim was wrong or unread);
+    -- a row walk reaching the end of the row is ordinary and only skips
+    if n == 2 and steerLast.kind == "cross" then
+      M.log(string.format("[%s] %s pressed twice in target select with no "
+        .. "effect (window %s, layout %s): that direction does nothing here",
+        tag or "fight", steerLast.dir, sig, layout and layout.name or "unread"))
+    end
+    steerLast = nil
+  end
+  local function steer(dir, kind)
+    steerLast = { dir = dir, sig = tgtSig(), kind = kind or "walk" }
+    return { dir }
+  end
+  -- Cross the cursor toward the monsters ("monsters") or back to the
+  -- party ("chars"), by the layout's reading, skipping a direction this
+  -- window has already shown to do nothing.
+  local function cross(toward)
+    local L = layoutOf()
+    local dirs = toward == "monsters" and L.toMonsters or L.toChars
+    for _, d in ipairs(dirs) do
+      if (steerDead[d] or 0) < 2 then return steer(d, "cross") end
+    end
+    failFast(string.format("crossing to the %s in a %s: %s did nothing twice "
+      .. "each in target select (state $%02X, window %s)", toward, L.name,
+      table.concat(dirs, " and "), M.readByte(MSTATE), tgtSig()))
+  end
+
   local function button(actor)
     local st = M.readByte(MSTATE)
+    if st == ST_TGT then steerWatch() else steerDead, steerLast = {}, nil end
     if st == ST_CMD then tgtSpin = 0 end
     -- Unknown-menu-state stall guard, on EVERY path (plan or no plan): the
     -- Phantom Train wipe was SHADOW's Throw list ($24), a state this driver
@@ -3806,12 +3965,25 @@ function M.newFightDriver(tag, opts)
       else parkSt, parkN = sig, 0 end
       if parkN > 12 then          -- ~360 real frames: button() runs per cadence PULSE
         parkDropN = parkDropN + 1
+        local inSt = (parkDropByState[st] or 0) + 1
+        parkDropByState[st] = inSt
         M.log(string.format("[%s] parked %d pulses in known state $%02X "
-          .. "(plan %s item=%s idx=%s, drop #%d this battle) "
-          .. "-- dropping the plan and backing out", tag or "fight",
+          .. "(plan %s item=%s idx=%s, drop #%d this battle, #%d in this "
+          .. "state) -- dropping the plan and backing out", tag or "fight",
           parkN, st, plan.kind, tostring(plan.item), tostring(plan.idx),
-          parkDropN))
+          parkDropN, inSt))
         parkSt, parkN = nil, 0
+        -- Re-planning into the same window that just parked is how a stuck
+        -- steer became a lost fight (#176: the J39 back attack dropped the
+        -- plan every 13 pulses until the clock ran out).  Three drops in
+        -- one state is not bad luck; the driver stops and says so.
+        if inSt >= PARK_DROP_CAP then
+          failFast(string.format("state $%02X has parked and dropped %d plans "
+            .. "this battle (last: %s item=%s idx=%s; target window %s, layout "
+            .. "%s) -- re-planning is not getting out of it", st, inSt,
+            plan.kind, tostring(plan.item), tostring(plan.idx), tgtSig(),
+            layoutOf().name))
+        end
         dropPlan("cursor_stalled")
         return { "b" }
       end
@@ -4056,11 +4228,11 @@ function M.newFightDriver(tag, opts)
       -- left and a LEFT parking the cursor) and walks the same mask.
       if plan.kind == "item" or plan.kind == "heal" or plan.ally then
         local chars, mons = M.readByte(TGTCHARS), M.readByte(TGTMONS)
-        if mons ~= 0 then return { "right" } end
+        if mons ~= 0 then return cross("chars") end
         -- Neither side is selected: falling into the steer below with
         -- chars = 0 would set cur = 0 and, for target 0, spin forever
         -- pressing UP.
-        if chars == 0 then return { "right" } end
+        if chars == 0 then return cross("chars") end
         if plan.all then
           -- one R press latches all-allies (TGTALL=1 -- probe_targetall);
           -- confirm once the latch reads back.  If it never takes (a spell
@@ -4090,7 +4262,13 @@ function M.newFightDriver(tag, opts)
           -- until the fight is lost.
           tgtSpin = tgtSpin + 1
           if tgtSpin < 40 then
-            return { cur < plan.target and "down" or "up" }
+            local d = cur < plan.target and "down" or "up"
+            -- ...and a direction that moved nothing twice is not pressed
+            -- a third time; the give-up below confirms instead (#176)
+            if (steerDead[d] or 0) < 2 then return steer(d) end
+            M.log(string.format("[%s] %s does nothing in this party-side "
+              .. "window (chars=%02X want=%02X)", tag or "fight", d, chars,
+              wantMask))
           end
           M.log(string.format("[%s] target steer gave up (chars=%02X " ..
             "want=%02X) -- confirming on whoever is highlighted",
@@ -4134,13 +4312,23 @@ function M.newFightDriver(tag, opts)
           if mons & want == 0 then
             tgtSpin = tgtSpin + 1
             if tgtSpin < 24 then
-              -- on the ally side (mons == 0), LEFT crosses to the enemy
-              -- side.  Among monsters the walk leads with LEFT/RIGHT: a
-              -- side-by-side formation's rest mask does not move on
-              -- down/up.
-              if mons == 0 then return { "left" } end
+              -- On the ally side (mons == 0) the cursor has to cross, and
+              -- which way that is depends on the battle's layout, not on
+              -- a fixed side (#176: a back attack crosses with RIGHT --
+              -- LEFT is an rts there, and the J39-row fight idled in
+              -- target select pressing it).  Among monsters the walk
+              -- leads with LEFT/RIGHT: a side-by-side formation's rest
+              -- mask does not move on down/up.  A direction this window
+              -- has shown to do nothing is skipped.
+              if mons == 0 then return cross("monsters") end
               local dirs = { "left", "right", "down", "up" }
-              return { dirs[1 + ((tgtSpin // 6) % 4)] }
+              for i = 0, 3 do
+                local d = dirs[1 + ((tgtSpin // 6 + i) % 4)]
+                if (steerDead[d] or 0) < 2 then return steer(d) end
+              end
+              failFast(string.format("walking the monster row in a %s: every "
+                .. "direction did nothing twice (state $%02X, window %s, "
+                .. "want=%02X)", layoutOf().name, st, tgtSig(), want))
             end
             M.log(string.format("[%s] focus steer gave up (mons=%02X " ..
               "want=%02X) -- confirming on whoever is highlighted",
@@ -4243,6 +4431,8 @@ function M.newFightDriver(tag, opts)
     menuStreak, tick, battleTick = 0, 0, 0
     plan, planActor, held = nil, nil, {}
     parkDropN = 0
+    parkDropByState = {}
+    layout, layoutUnreadSaid, steerLast, steerDead = nil, false, nil, {}
     parkSt, parkN, idleSt, idleN = nil, 0, nil, 0
     if healSaid == "parked-out" then healSaid = nil end
     careActor, startSnap, planPulses = nil, nil, 0
@@ -4571,6 +4761,9 @@ function M.newFightDriver(tag, opts)
 
     menuStreak = menuStreak + 1
     if menuStreak < 4 then M.setPad({}); return end
+    -- the layout is read once the command window is up (InitBattle has
+    -- run by then) and said at that moment, before any steer needs it
+    if layout == nil then layoutOf() end
     local traceActor = M.readByte(ACTOR) & 3
     if opts.trace and M.readByte(MSTATE) == ST_ITEM then
       -- the item window, in full: the cursor sum the driver steers ($8947
