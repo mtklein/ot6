@@ -71,11 +71,12 @@ generator makes (#176):
 | 85 | Phantom Train car B, map 85 | 0 / 1 / 4 | `gen_sabin_train`: POTION to 30 (L14 band 21 + the train fight's 9) |
 | 12 | Mobliz, map 164 | 1 / 2 / 5 | `gen_sabin_gau`: POTION to 23 (L15) |
 | 15 | Nikeah, the counter at (24,39) on town map 169 | 0 / 1 / 5 | `gen_sabin_trench`: POTION to 27 (L18).  The last Potion shop before the reunion: the Terra scenario never walks a town with control (its Narshe arrival is the isolated clifftop ledge; Arvis's front door lies past the reunion trigger; the map-22 staging boxes the party -- `probe_narshe_preshop`), so this bag is what TERRA's L13 party (band 20) and the Battle for Narshe (L14, 21) carry. |
-| 3 | Narshe, map 26 off town map 20's (41,22) door | 0 / 1 / 4 | `gen_zozo1_submerge`: POTION to 24 (the L16 the stretch reaches at the Blackjack; Kohlingen 19 is crossed by castle and Jidoor 22 walked through without a stop) |
-| 24 | Albrook, map 328 off (7,13); no Tonic | - / 0 / 5 | `gen_vector_entry`: POTION to 33 (L18 band 27 + the factory's measured 6, a floor: the bag ran dry at Ifrit & Shiva).  Vector itself sells no Potions -- weapon 27 and armour 28 only (maps 246/248). |
-| 44 | Narshe again, once `$006B` (the factory escape) swaps shop 3 for 44; no Tonic | - / 0 / 2 | `gen_narshe_mission`: POTION to 60 (L25 band 38 + a field-care allowance: nothing sells Tonics from here to Thamasa, and the plains grind spends the bag's), FENIX DOWN to 23 |
-| 24 | Albrook again | - / 0 / 5 | `gen_voyage`: POTION to 38 (L25) |
-| 35 | Thamasa, map 347 off (26,37) | 0 / 1 / 6 | `gen_thamasa_fire`: POTION to 45 (L26 band 39 + the mountain/Ultros/massacre's measured 6); `gen_fc_landing`: POTION to 65 (the L29 band 44 at the escape + the FC's measured 21) |
+| 3 | Narshe, map 26 off town map 20's (41,22) door | 0 / 1 / 4 | `gen_zozo1_submerge`: TONIC to 99, FENIX DOWN to 15, no Potion line (Nikeah's 27 arrives intact, over the L14 band).  The last Tonic counter before the post-opera checkpoint. |
+| 22 | Jidoor, map 201 off town map 198's (27,41) door; no Tonic | - / 0 / 5 | `gen_zozo2_arrival` after the L18 grind: POTION to 39 (the #158 target of 30 + 9 for field care: 49 Tonics measured from Jidoor to the opera's end), FENIX DOWN to 20.  `gen_narshe_mission`'s plains grind restocks here too: POTION to 35 per leg, to 60 on departure. |
+| 24 | Albrook, map 328 off (7,13); no Tonic | - / 0 / 5 | `gen_vector_entry`: POTION to 35 (L18 band 27 + the factory's measured 6, a floor: the bag ran dry at Ifrit & Shiva, + 2 for the factory's 9 Tonics of field care).  Vector itself sells no Potions -- weapon 27 and armour 28 only (maps 246/248). |
+| 44 | Narshe again, once `$006B` (the factory escape) swaps shop 3 for 44; no Tonic | - / 0 / 2 | none: `gen_narshe_mission` shops at Jidoor instead (row 22 above) |
+| 24 | Albrook again | - / 0 / 5 | `gen_voyage`: POTION to 38 (L25; no field-care extra: the legs to Thamasa's Tonic counter spent none) |
+| 35 | Thamasa, map 347 off (26,37) | 0 / 1 / 6 | `gen_thamasa_fire`: POTION to 15 and `gen_fc_landing`: POTION to 40, both under band.  The measured targets (45: L26 band 39 + the mountain's 6; 65: the L29 band 44 + the FC's 21) are held for #179: the extra purchase moved the RNG so fire_out lost its path and fc_landing an IAF fight. |
 
 Shop 71 is Narshe's `$00A4` variant and never opens on this route.  The
 Locke scenario has no Potion source: South Figaro's shop 8 sells none and
