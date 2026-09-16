@@ -20,7 +20,9 @@
 -- the game is not answering.  A PASS here, or a FAIL of another class, is
 -- the finding to report.  (The game's opening fight, first_battle.mss,
 -- was tried first and turned out to be runnable -- $2F4B=00, the party out
--- by f701 -- so it is the positive case, not this one.)
+-- by f701 -- so it is the positive case, not this one.)  The suite
+-- counterpart is watchdog_cantrun.lua (#200): the same walk and hold on
+-- attempt 1, and attempt 2 asserting that attempt 1 fell to the trip.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local STATE = "build/states/whelk_entry.mss.lua"

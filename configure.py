@@ -522,6 +522,13 @@ checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
        latch_of("build/ot6.sfc")] + LIBS + checkpoint_files)
+# the segment runner's negative control (#178, #200): a contract failure
+# fails on attempt 1 of 3 with no replay -- a red run a suite cannot expect
+check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
+      ["tools/tests/lib/retry_negative.sh", "tools/tests/run.sh",
+       "tools/tests/lib/compose.py",
+       latch_of("tools/tests/probe_retry_negative.lua"),
+       latch_of("build/ot6.sfc")] + [latch_of(h) for h in LIBS])
 # The verdict depends on the ROM (a stamp records the ROM it was captured
 # on), on the generators (their own sigs), and -- for the drift note, and
 # for any stamp still on the conservative pre-ROM-identity rule -- on the
