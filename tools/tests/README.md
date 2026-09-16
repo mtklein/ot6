@@ -320,7 +320,13 @@ runs every script through the **segment runner** at the bottom of
   and the held pad, and keeps a ring of 24. `no-effect`: the pad has been
   down 25% of the last 192 frames (~3 s) at an open control and no control
   cell has read anything new (#185's LEFT into a back-attack target cursor
-  trips here in seconds instead of after the 9000-frame budget).
+  trips here in seconds instead of after the 9000-frame budget). A held
+  L+R in a battle is the run mechanic, answered in the escape cells
+  (`$2F45`, the run counters `$3D70,x`, `$3A38`/`$3A39`) rather than the
+  menu: it counts as answered while those cells moved within the last 600
+  frames (measured 128-160 apart per character), and as a real no-effect
+  only when the formation cannot be run from (`$B1` bit 1, `$2F4B` bit 0)
+  or the cells have gone still. The escape cells are progress cells too.
   `no-progress`: neither a progress cell nor the screen has shown anything
   new for 1800 frames (~30 s). Both fail fast with a screenshot named in
   the FAIL line and the ring dumped to the log, and both are seed-dependent
