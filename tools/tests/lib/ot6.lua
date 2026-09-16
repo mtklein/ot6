@@ -796,6 +796,14 @@ end
 --   cmd        the monster's command byte ($b5 at ExecCmd)
 --   atk        its attack byte ($b6), the ability id after folding
 --   fullKills  members this action killed from full HP
+--   recurred   this battle, an earlier cast of the same attack already
+--              killed someone and was kept aside
+--
+-- The exemption is for the first kill only.  Once the spell has killed
+-- again, the recurrence is measured, not supposed: the map-269 A/B
+-- (boostfight, 15 seeds, main's driver against this one) spent 27 Fenix
+-- Downs in battle against main's 10 because each raised pair stood at 55
+-- HP until the next Flare took them again, while the fight dragged on.
 --
 -- Returns true and the reason when the action is NOT a floor.
 M.LEVEL_SPELLS = { [0x94] = "L5 Doom", [0x95] = "L4 Flare", [0x96] = "L3 Muddle",
@@ -803,6 +811,10 @@ M.LEVEL_SPELLS = { [0x94] = "L5 Doom", [0x95] = "L4 Flare", [0x96] = "L3 Muddle"
 function M.hitFloorExempt(o)
   local cmd, atk, fullKills = o.cmd or 0, o.atk or 0, o.fullKills or 0
   if cmd ~= 0x02 and cmd ~= 0x0C then return false, "a swing, not a cast" end
+  if o.recurred then
+    return false, string.format("cast $%02X has killed before this battle: it recurs, "
+      .. "so it is the floor now", atk)
+  end
   if M.LEVEL_SPELLS[atk] then
     return true, string.format("%s ($%02X) is a level spell: it recurs only on the "
       .. "caster's turn, on a level-multiple", M.LEVEL_SPELLS[atk], atk)
@@ -2283,6 +2295,7 @@ function M.newFightDriver(tag, opts)
   -- member (the raise rule's smallest hit).
   local dmgHit = {}                    -- actor -> { kind, skill, per, n }
   local hitLedger = {}                 -- slot -> { min, minE, on = { [e] = smallest } }
+  local spellKilled = {}               -- atk -> true once an exempt cast has killed (#174)
   local partyHpLast = {}               -- entity -> HP last frame (hit ledger baseline)
   local monHpLast = {}                 -- slot -> HP last frame (damage watch baseline)
   -- The monster action in progress, for the ledger and the death lines
@@ -2307,6 +2320,13 @@ function M.newFightDriver(tag, opts)
   local raisePending = nil             -- { e, by, tick }
   local topUpOwed = {}                 -- entity -> battleTick the raise landed
   local RAISE_WAIT = 240               -- ticks a pending raise holds a plan
+  -- Every confirmed Fenix Down not yet landed, by target (raisePending
+  -- holds only the latest, and its window hold lapses at RAISE_WAIT while
+  -- the item can still sit in the queue behind the enemy's animations).
+  -- A second actor's raise on the same corpse is a wasted Fenix: measured
+  -- on map 269, two Fenix Downs confirmed on one member 240+ ticks apart
+  -- both executed (branch_boostfight_s48: f4322 and f4734, tgt $0008).
+  local raiseQueued = {}               -- e -> { by, tick }
   -- and the Muddle rule's own pending hit (#170): one ally's Fight on the
   -- muddled member is in the air, so the next actor plans normally rather
   -- than land a second hit on a member the first one already cleared
@@ -2662,7 +2682,9 @@ function M.newFightDriver(tag, opts)
     local L = hitLedger[act.slot] or { on = {} }
     hitLedger[act.slot] = L
     local exempt, why = M.hitFloorExempt({ cmd = act.cmd, atk = act.atk,
-                                           fullKills = act.fullKills })
+                                           fullKills = act.fullKills,
+                                           recurred = spellKilled[act.atk] })
+    if exempt and act.kills > 0 then spellKilled[act.atk] = true end
     if exempt then
       local parts = {}
       for _, d in ipairs(act.drops) do
@@ -2695,8 +2717,30 @@ function M.newFightDriver(tag, opts)
     local lethalEta, lethalSlot, lethalPct = nil, nil, nil
     local brokenLethal = nil
     local spells = {}
+    -- The action still open (its drops are committed when it closes) is
+    -- read provisionally: a raise planned inside that window otherwise
+    -- sees "no enemy hit measured yet" for a hit that just landed.
+    -- Measured on map 269 (fix1_boostfight_s36): the recurring Flare took
+    -- the pair from 405/424 at f+9681, two raises were planned at f+9993
+    -- against an empty ledger, and the floor was only committed after.
+    local openL = nil
+    if monAct ~= nil and #monAct.drops > 0 then
+      local exempt = M.hitFloorExempt({ cmd = monAct.cmd, atk = monAct.atk,
+                                        fullKills = monAct.fullKills,
+                                        recurred = spellKilled[monAct.atk] })
+      if not exempt then
+        local base = hitLedger[monAct.slot] or { on = {} }
+        openL = { on = {}, min = base.min, minE = base.minE, spell = base.spell }
+        for k, v in pairs(base.on) do openL.on[k] = v end
+        for _, d in ipairs(monAct.drops) do
+          if openL.on[d.e] == nil or d.drop < openL.on[d.e] then openL.on[d.e] = d.drop end
+          if openL.min == nil or d.drop < openL.min then openL.min, openL.minE = d.drop, d.e end
+        end
+      end
+    end
     for s = 0, 5 do
       local L = hitLedger[s]
+      if openL ~= nil and s == monAct.slot then L = openL end
       if L and L.spell and monAlive(s) then
         spells[#spells + 1] = string.format("slot %d's $%02X (smallest %d, %d hit(s))",
           s, L.spell.atk, L.spell.min, L.spell.n)
@@ -3284,7 +3328,13 @@ function M.newFightDriver(tag, opts)
       -- are raised when the enemy is dead (fieldCare).
       if row ~= nil then
         for e = 0, 3 do
-          if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
+          local queued = raiseQueued[e]
+          if queued and queued.by ~= actor then
+            local said = string.format("[%s] actor=%d no raise on entity %d: actor %d's "
+              .. "Fenix Down on them is confirmed (tick %d) and has not landed", tag or "fight",
+              actor, e, queued.by, queued.tick)
+            if said ~= healSaid then healSaid = said; M.log(said) end
+          elseif M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
              and battInvIdx(FENIX_DOWN) then
             local ok, raiseHp, hit, hitSlot, hitOn, why = raiseOk(e, actor)
             local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
@@ -4133,6 +4183,7 @@ function M.newFightDriver(tag, opts)
         unmuddlePending = { e = plan.target, by = actor, tick = battleTick }
       elseif plan.kind == "item" and plan.item == FENIX_DOWN then
         raisePending = { e = plan.target, by = actor, tick = battleTick }
+        raiseQueued[plan.target] = { by = actor, tick = battleTick }
       elseif (plan.kind == "item" or plan.kind == "heal") and plan.target
          and topUpOwed[plan.target] then
         M.log(string.format("[%s] actor=%d's %s on entity %d is the top-up its raise "
@@ -4203,9 +4254,10 @@ function M.newFightDriver(tag, opts)
     itemRestore, castRestore = {}, {}
     healWatch, healSaid = nil, nil
     dmgWatch, dmgSeen, monHpLast = {}, {}, {}
-    dmgHit, hitLedger, partyHpLast = {}, {}, {}
+    dmgHit, hitLedger, partyHpLast, spellKilled = {}, {}, {}, {}
     monAct, deathSaid, battleDeaths, wipeSaid = nil, {}, {}, false
     raisePending, topUpOwed, unmuddlePending = nil, {}, nil
+    raiseQueued = {}
     execActor, execDone = nil, {}
     execMon, execMonDone = nil, nil
     execMonCmd, execMonAtk = nil, nil
@@ -4323,6 +4375,12 @@ function M.newFightDriver(tag, opts)
     -- The raise-then-top-up pair (#168): a pending Fenix Down has landed
     -- when its target's HP moves off 0; the member is then owed a top-up
     -- until it arrives, they climb clear on their own, or they fall again.
+    for e, q in pairs(raiseQueued) do
+      local hp = M.readWord(0x3BF4 + e * 2)
+      if (hp > 0 and hp ~= 0xFFFF) or battleTick - q.tick > RAISE_WAIT + 600 then
+        raiseQueued[e] = nil
+      end
+    end
     if raisePending then
       local hp = M.readWord(0x3BF4 + raisePending.e * 2)
       if hp > 0 and hp ~= 0xFFFF then

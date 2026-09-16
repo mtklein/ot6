@@ -429,6 +429,12 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(ex, false, "Mega Volt by the Lore command: ordinary, a floor (" .. why .. ")")
     ex, why = H.hitFloorExempt({ cmd = 0x00, atk = 0xEE, fullKills = 2 })
     H.assertEq(ex, false, "a swing is never exempt, whatever it killed (" .. why .. ")")
+    -- the exemption is the first kill's only: the second Flare that takes
+    -- the raised pair from 55 is the floor (map-269 boostfight A/B, #174)
+    ex, why = H.hitFloorExempt({ cmd = 0x0C, atk = 0x95, fullKills = 0, recurred = true })
+    H.assertEq(ex, false, "L4 Flare that has killed before this battle: the floor now (" .. why .. ")")
+    local rHp, rOk = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = 55 })
+    H.assertEq(rHp * 10 + (rOk and 1 or 0), 550, "LOCKE to 55 under a measured 55 recurrence: no raise")
     H.assertEq(H.LEVEL_SPELLS[0x98], "L? Pearl", "the level-spell set is const.inc's: $94 $95 $96 $98")
     H.assertEq(H.LEVEL_SPELLS[0x97], nil, "...and $97 (Reflect???) is not one")
     -- what the gate then sees: with the Flare's 447 kept aside, the ledger
