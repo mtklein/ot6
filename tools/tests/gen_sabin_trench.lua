@@ -19,10 +19,8 @@
 --   the branch: LEFT sets it (mainline), RIGHT clears it (detour through
 --   the mid-cave 175); LEFT is held through the whole ride. Battles
 --   19/20/21 fire mid-script with no win-gate tail, ended by play with no
---   writes: flee first (hold L+R; no win is needed, since the vehicle
---   script resumes via PopDP either way), and if a formation refuses the
---   run for ~900 frames, fall back to the blind tap-A fighter (SABIN/CYAN/
---   GAU all Fight from row 0).
+--   writes: fought with the library fighter (the vehicle script resumes
+--   via PopDP after the battle).
 
 --   Arrival _ca8be3 (:21288): world walk-on, then Nikeah 187 (24,11).
 --   The ferry clerk is NPC (17,15); dlg $032A's option 1 ("Hop aboard?")
@@ -74,8 +72,8 @@ local function settle(toMap, what, budget)
   }, {})
 end
 
--- ride driver with choice steering and trench battle handling: flee
--- first, tap-A fight after ~900 stubborn frames
+-- ride driver with choice steering and trench battle handling: the
+-- library fighter plays every battle
 -- Set when the ride-scoped wipe canary fires; every ride() pred also
 -- exits on it so a lost dive ends the attempt rather than the run.
 local rideLost = nil
@@ -83,6 +81,8 @@ local rideWipeN = 0
 
 local function ride(dir, pred, what, budget, choiceWant)
   local phase, hb, battN = 0, -900, 0
+  local F = H.newFightDriver("trench " .. what, { tactical = true,
+    boost = true, bank = 3, items = true, healPercent = 60, cadence = 12 })
   return H.driveUntil(function()
     return rideLost ~= nil or pred()
   end, budget or 30000, {
@@ -146,18 +146,20 @@ local function ride(dir, pred, what, budget, choiceWant)
           sw(0x44)))
       end
       if inBattle() or H.battleLoadStarted() then
-        battN = battN + 1
-        if battN < 900 and H.monstersPresent() > 0 then
-          H.setPad({ l = true, r = true })   -- flee, with real input
-        else
-          if battN == 900 then
-            H.log(string.format("[trench:%s] formation would not run for " ..
-              "900 frames -- fighting it (tap-A)", what))
-          end
-          H.setPad(phase < 4 and { "a" } or {})
+        -- Fought with the library fighter (#158's upstream regen): on the
+        -- v0.17 ROM the flee-then-tap-A handler wiped all three staggered
+        -- dives (build/attempts/sabin_done-attempt1-taplA.log: "formation
+        -- would not run for 900 frames -- fighting it (tap-A)" then
+        -- "LOST -- wiped mid-ride"), and a person fights these.
+        if battN == 0 then
+          H.log(string.format("[trench:%s] battle up f%d -- fighting it",
+            what, H.frame))
         end
+        battN = battN + 1
+        F.frame()
         return
       end
+      if battN > 0 then F.idle() end
       battN = 0
       -- On the ride map, hold the direction and read no field-owned
       -- cells.  Five driver variants failed this ride in five different
