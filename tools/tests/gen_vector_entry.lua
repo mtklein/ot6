@@ -244,7 +244,7 @@ H.run({ maxFrames = 160000 }, {
   -- (37,47); _cc60ba opens 24 while $00A4 is clear), rows POTION 0 / FENIX
   -- DOWN 5, no Tonic; the door is (7,13) -> 328 (37,54), five tiles from
   -- where the party stands, and the way back out is the (37,55) event
-  -- trigger.  POTION to 33: the band at the L18 the factory's end reaches
+  -- trigger.  POTION to 35: the band at the L18 the factory's end reaches
   -- (27) plus the stretch's measured spend, 6 (mrf_entry 6 -> the save
   -- room's 4 -> 0 across Ifrit & Shiva) -- a floor, since the bag ran dry
   -- there.  Plus 2 for field care (owner, #176: where the shop sells no

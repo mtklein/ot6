@@ -118,9 +118,12 @@ one press away.  From the stop line, RIGHT enters post-massacre Thamasa —
 **map 340**, not the pre-massacre 343: the same tiles under another map
 index — at (23,46).  The item shop door is still (26,37) → 347 (36,44), the
 keeper at (36,39) (stage (36,41), face up); rows: Tonic 0, Potion 1, Fenix
-Down 6.  The prep buys POTION to 40, FENIX DOWN to 25 (a row already at or over
-its target is skipped -- the seed carries 29), TONIC to 99 (~10k gil of a
-210k purse), then `H.bagArrange` puts Potion, Fenix Down,
+Down 6.  The prep buys POTION to 65 (the L29 band plus the FC's measured
+spend, docs/design/level-curve.md's shop table, #176; it was 40 until the
+segment runner made the RNG shift survivable, #179), FENIX DOWN to 25 (a row
+already at or over its target is skipped -- the seed carries 28), TONIC to
+99 (9,050 gil of a 203k purse: `gil=203205` at the counter, `gil=194155`
+after), then `H.bagArrange` puts Potion, Fenix Down,
 Tonic, Antidote, Remedy at bag slots 0–4 through the field Item menu's real
 pick-up-and-swap (the seed shipped the Potion at row 43: a 43-row list walk
 per battle heal, and two of three died while it walked — attempts 10–11).

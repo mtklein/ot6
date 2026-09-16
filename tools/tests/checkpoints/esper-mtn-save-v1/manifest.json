@@ -5,15 +5,15 @@
   "milestone": "esper-mtn-save",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "acb42884e9c3510f984d73c1cb772b7564d91fecdf4b9281e2ca3e1133f33bfa",
+  "sha256": "e8adee788a4b6284059652993b4889f7f1800327e0c167b4a65e41fb0851ccd0",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "acb42884e9c3510f984d73c1cb772b7564d91fecdf4b9281e2ca3e1133f33bfa",
-    "generator_sig": "b7cb22ee2fce4d62c8f673e3b9ea9de944d5c32b0ecd821b5d253a31a71b715e gen_esper_mtn tools/tests/checkpoints/fire-out-v1/manifest.json tools/tests/checkpoints/fire-out-v1/fire-out.sram",
+    "payload_sha256": "e8adee788a4b6284059652993b4889f7f1800327e0c167b4a65e41fb0851ccd0",
+    "generator_sig": "762d7c6873268bff717fa26ef951ffd0c91b942f3533a56113cbe1d4ee7eaf83 gen_esper_mtn tools/tests/checkpoints/fire-out-v1/manifest.json tools/tests/checkpoints/fire-out-v1/fire-out.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/fire-out-v1/manifest.json",
-        "sha256": "cf85839aac9eb6f2ee7d1957844326b002bf05bc02403e0a037e4c165fd4b502"
+        "sha256": "d590689484da8e0bd37c5540804560fd38f82bec20e9aa9bbfbb9b8043054219"
       }
     ]
   }
