@@ -195,6 +195,15 @@ Step constructors:
   Buttons: `a b x y l r start select up down left right`.
 - `H.call(fn)`, `H.logStep(msgOrFn)`, `H.repeatN(n, steps)`,
   `H.driveUntil(pred, maxFrames, steps, what)`, `H.cond(pred, then, else)`.
+  Steps close over their state and carry a `reset()` that puts them back
+  as built; `repeatN` resets its body after every pass, `driveUntil` after
+  every body cycle, and `seqStep`/`cond` forward a reset to their children
+  (#196). The library's state (a fold's pass count, a drive's frame count,
+  a navigator's plan and walk budget, a shop drive's "bought" latch) is
+  the library's to clear; a test's own counters are the test's, cleared in
+  the body's first `H.call`. A constructor with closure state of its own
+  names it through `H.withReset(step, fn)`. `step_reset.lua` pins the
+  shapes that once ran once and passed instantly on every later pass.
 - `H.attemptFailures()` — the run's earlier attempts' failures, oldest
   first (`{ attempt, class, msg, frame }`), empty on attempt 1.
 

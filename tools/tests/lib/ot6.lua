@@ -1221,6 +1221,18 @@ end
 -- A step is a table { tick = function(self) return "frame"|"done" end }.
 -- "frame" = consumed this frame, call again next frame; "done" = advance.
 -- Steps are built fresh per run; constructors below close over their state.
+--
+-- The reset protocol (#196).  A step may also carry
+-- reset = function(self), which puts it back to the state it was built in.
+-- repeatN calls its body's reset after every pass, driveUntil after every
+-- body cycle, and seqStep forwards a reset to every child that has one --
+-- so a step without a reset runs once, and every later pass finds it
+-- already "done" (measured: battle_steal's three attempts scored one
+-- steal three times; tools/tests/step_reset.lua pins the shapes).  Every
+-- constructor here with closure state has one; a constructor elsewhere
+-- (a navigator, a shop drive) names its own state through M.withReset.
+-- What a TEST's own closures hold is the test's to clear, in the body's
+-- first H.call.
 
 M.frame = 0
 
@@ -1444,8 +1456,13 @@ M.vars = {}
 
 -- Branch: choose a step list by predicate at the moment it is reached.
 -- "Reached" means each fresh pass: reset() clears the choice so a replayed
--- cond (inside a driveUntil body) re-asks its predicate.  Top-level steps
--- tick once and are never reset, so their behavior is unaffected.
+-- cond (inside a driveUntil body) re-asks its predicate, and resets the
+-- branch it had taken, so that branch's steps start over too (#196: the
+-- branch's seqStep was rebuilt over the SAME child objects, which kept
+-- their state -- a driveUntil under a cond under a repeatN ran on its
+-- earlier passes' frame count).  Top-level steps tick once and are never
+-- reset, so their behavior is unaffected.  The library's own list fold,
+-- cond(function() return true end, steps), rides on this.
 function M.cond(pred, thenSteps, elseSteps)
   local chosen = nil
   return {
@@ -1456,12 +1473,16 @@ function M.cond(pred, thenSteps, elseSteps)
       return chosen:tick()
     end,
     reset = function()
+      if chosen then chosen:reset() end
       chosen = nil
     end,
   }
 end
 
--- Repeat a step list n times.
+-- Repeat a step list n times.  Its own reset clears the pass count and
+-- resets the body, so a repeatN(1, ...) fold nested in a replayed body
+-- (a driveUntil's, or an outer repeatN's) runs on every pass rather than
+-- reporting itself done after its first (#196).
 function M.repeatN(n, steps)
   local body, done = seqStep(steps), 0
   return {
@@ -1474,6 +1495,10 @@ function M.repeatN(n, steps)
       end
       return "done"
     end,
+    reset = function()
+      done = 0
+      body:reset()
+    end,
   }
 end
 
@@ -1483,6 +1508,12 @@ end
 -- that instant must not stay held into the steps that follow (a stuck
 -- d-pad auto-repeats the battle-menu cursor and a stuck A confirms into
 -- target selection).
+--
+-- Its reset clears the frame count -- so a drive repeated by repeatN gets
+-- its whole cap on every pass, not what the earlier passes left of it --
+-- and resets the body, which pred may have abandoned mid-cycle (#196:
+-- measured, a pass that began inside the body's waitFrames never ran the
+-- body's first step again).
 function M.driveUntil(pred, maxFrames, steps, what)
   what = what or "condition"
   local body = seqStep(steps)
@@ -1503,7 +1534,25 @@ function M.driveUntil(pred, maxFrames, steps, what)
       if r == "done" then body:reset() end
       return "frame"
     end,
+    reset = function()
+      waited = 0
+      body:reset()
+    end,
   }
+end
+
+-- Chain a reset onto a step.  A constructor whose closures hold state its
+-- children cannot clear (a navigator's plan and walk budget, a shop
+-- drive's "bought" latch, an order screen's "done") names that state
+-- here, and the step's existing reset (the driveUntil's, the cond's)
+-- still runs first.  fn takes no arguments; it closes over the state.
+function M.withReset(step, fn)
+  local inner = step.reset
+  step.reset = function(self)
+    if inner then inner(self) end
+    fn()
+  end
+  return step
 end
 
 -- Step: the standard first-battle entry from a `*_entry` fixture.  The
