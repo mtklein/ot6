@@ -1294,13 +1294,16 @@ function M.phaseWalk(tx, ty, spec)
   local hb = -300
   local battN, aPhase = 0, 0
 
-  -- Encounters are fled with the shared corridor policy (the same driver
-  -- navTo's playBattles="flee" runs), and a wipe is named a wipe.
+  -- Encounters are fought by the library fighter (#183: they were fled
+  -- with L+R, which the no-effect watchdog now names a stall -- the
+  -- gate-cave regen spent two of three attempts on it), the party is
+  -- healed outside battle once it stands on a safe tile, and a wipe is
+  -- named a wipe.
   local wipeCheck = wipeCanary("phaseWalk")
   local tactical = M.newFightDriver("phaseWalk",
     { tactical = true, boost = true, items = true,
       healPercent = spec.healPercent or 55 })
-  local flee = newFlee(spec, tactical)
+  local sawBattle, careD = false, nil
 
   local function curPhase() return swv(swB) == 1 and "b" or "a" end
   local function otherOf(p) return p == "a" and "b" or "a" end
@@ -1413,16 +1416,27 @@ function M.phaseWalk(tx, ty, spec)
     M.call(function()
       aPhase = (aPhase + 1) % 8
       wipeCheck()
+      -- a between-battles care stop in progress owns the pad
+      if careD then
+        if careD.done() then
+          careD = nil
+          -- the menu stopped the field module: observe the clock afresh
+          grids, lastFlip, lastB, hp0, obsStart = {}, nil, nil, nil, nil
+        else
+          careD.frame(); return
+        end
+      end
       battN = M.battleLoadStarted() and battN + 1 or 0
       if tactical and battN == 0 then tactical.idle() end
       if battN >= 3 then
         if plan or lastFlip then
-          M.log(string.format("[phaseWalk] encounter at f%d -- flee, "
+          M.log(string.format("[phaseWalk] encounter at f%d -- fighting it, "
             .. "then re-observe", M.frame))
         end
         plan, grids, lastFlip, lastB = nil, {}, nil, nil
         begunSeg, hp0, obsStart = -1, nil, nil
-        flee(battN)
+        sawBattle = true
+        tactical.frame()
         return
       end
       if battN > 0 then M.setPad({}); return end
@@ -1451,6 +1465,24 @@ function M.phaseWalk(tx, ty, spec)
           end
         end
         M.setPad({})
+        -- a battle just ended and the party stands on a safe tile: recover
+        -- OUTSIDE combat before re-observing (heal-after-every-battle).
+        -- The menu stops the field module, so the tile clock does not run
+        -- under it; the clock is observed afresh once the stop is done.
+        if sawBattle then
+          if not (M.hasControl() and M.tileAligned()) then return end
+          sawBattle = false
+          if spec.care ~= false and not M.eventTimerLive() then
+            careD = M.newCareDriver({
+              threshold = spec.careThreshold or 0.65, reserve = spec.reserve,
+              tag = "care after battle (phaseWalk)" })
+            careD.frame()
+            if not careD.done() then return end
+            careD = nil
+            grids, lastFlip, lastB, hp0, obsStart = {}, nil, nil, nil, nil
+            return
+          end
+        end
         if lastFlip and fsf() >= 25 and fsf() <= PERIOD - 38 then
           local p = curPhase()
           if not grids[p] then capture(p) end
