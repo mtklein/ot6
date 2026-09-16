@@ -182,6 +182,39 @@ local function menuFor(charId, what)
   }, what)
 end
 
+-- Bank boost pips with real R presses, by feedback.  Ot6Boost latches a
+-- press ($57d2) only on frames it runs, and it does not run while an
+-- enemy's hit animation plays over the command window: on this ROM the
+-- second of two fixed-cadence presses fell on such a frame and banked
+-- nothing (measured 2026-09: "two real R presses bank pending 2: got 1").
+-- A person keeps pressing until the pip shows; so does this.  Taps only
+-- while Setzer's window is up, stops the moment the count reads `want`,
+-- says how many taps it took, and fails on its own if a dozen taps do
+-- not get there.  The caller's assertion on the count stays.
+local function bankPending(want, what)
+  local taps = 0
+  return H.repeatN(1, {
+    H.driveUntil(function() return pend(actor) >= want end, 1500, {
+      H.call(function()
+        if taps >= 12 then
+          error(string.format("%s: R tapped %d times and pending still reads "
+            .. "%d (want %d) -- the press is not being latched at all",
+            what, taps, pend(actor), want), 0)
+        end
+        H.assertEq(H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == slotOf[SETZER],
+          true, what .. ": setzer's command window is up for the R tap")
+        taps = taps + 1
+      end),
+      H.pressButtons({ "r" }, 6), H.waitFrames(20),
+    }, what .. ": R taps bank pending " .. want),
+    H.call(function()
+      H.log(string.format("%s: pending %d after %d R tap(s)%s", what,
+        pend(actor), taps, taps > want and string.format(
+          " (%d landed on frames Ot6Boost did not run)", taps - want) or ""))
+    end),
+  })
+end
+
 local function openSlotWindow(what)
   local row = nil
   return H.repeatN(1, {
@@ -361,7 +394,7 @@ add({
   H.call(function()
     H.assertEq(bp(actor), 1, "battle opens at 1 bp (Ot6InitBP)")
   end),
-  H.pressButtons({ "r" }, 6), H.waitFrames(20),
+  bankPending(1, "H1"),
   H.call(function()
     H.assertEq(pend(actor), 1, "one real R press banks pending 1")
   end),
@@ -451,7 +484,7 @@ add({
 
   -- ---------------------------------------------- H2: the tier-2 spin
   menuFor(SETZER, "setzer menu (H2)"),
-  H.repeatN(2, { H.pressButtons({ "r" }, 6), H.waitFrames(20) }),
+  bankPending(2, "H2"),
   H.call(function()
     H.assertEq(pend(actor), 2, "two real R presses bank pending 2")
     driftW = {}

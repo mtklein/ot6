@@ -1969,59 +1969,188 @@ end
 --     reading 0 on off-frames, so the mask is latched while target select
 --     ($7BC2 == $38) is up, and the latch/age/press state resets as soon
 --     as target select is down;
---   * steering rotates the d-pad one direction per press cycle rather than
---     per frame; a per-frame rotation flips direction mid-hold and
---     registers nothing;
---   * the cursor grid follows the formation's screen layout, so rotating
---     through all four directions settles on any reachable slot: monster
---     grids walk {left,down,right,up}, character columns
---     {down,up,left,right}.
--- Known limit: on a 2x2 formation the two-press rotation cycles among
--- three hover positions and the ally column, and cannot reach a slot that
--- needs a bare up-then-right.  All four masks are reachable by single
--- presses with a dwell between them; a caller whose formation needs that
--- steers with its own press plan and uses only the latch half of this
--- machine.
+--   * a d-pad tap moves the cursor once; steering taps one direction per
+--     16-frame press cycle (the caller's 4-on/4-off edge in the first
+--     half, hands off in the second) and reads the cells back before the
+--     next tap, so every tap's effect is observed, not assumed;
+--   * the cursor grid follows the formation's screen layout, which the
+--     script does not know in advance.  It learns it: each tap records
+--     "from this window state, this direction lands here" (or "moves
+--     nothing"), and the next tap is the first step of the shortest known
+--     walk to the wanted slot, else an untried direction from where the
+--     cursor stands, else a walk toward the nearest state with one.  A
+--     2x2 needing up-then-right, a 3-wide row, or a side attack all come
+--     out of the same rule.  (The "two presses per direction" rotation
+--     this replaced cycled among three cells of a 2x2 for 30000 frames
+--     while the party died -- battle_steal, 2026-09.)
+--   * crossing to the other side is just another state.  From there the
+--     battle layout's crossing direction (M.battleLayout) is tried first,
+--     then the reverse of the press that crossed, so the party column is
+--     not explored cell by cell before coming back.
+-- Bail (fail fast, #176): when every direction from every state this
+-- window can reach has been tried and the wanted slot never lit, or the
+-- press budget (opts.maxPresses, default 40) is spent, steer raises with
+-- the learned map in the message.  Spinning in target select until the
+-- drive budget ran out is what this replaced; a caller whose target can
+-- legitimately be anything passes nil and takes the default.
 -- opts: mask = 0x7B7E (monster, default) or 0x7B7D (character); dirs = the
--- rotation list; minAge = settled frames before confirming (default 4).
+-- exploration order (default {left,down,right,up}; character-column
+-- callers pass {down,up,left,right}); minAge = settled frames before
+-- confirming (default 4); maxPresses = the bail budget (default 40).
 -- Use: call observe() once per drive frame, in any menu state (it manages
 -- its own reset); inside ST_TGT call steer(targetSlot, mf), which returns a
 -- button name: "a" once the latched mask has settled on 1<<targetSlot for
 -- minAge frames (or immediately when targetSlot is nil, which takes the
--- default), otherwise the next rotation direction.  mf is the caller's
--- drive-frame counter, the same one that paces its press cadence.
+-- default), a direction to tap, or nil while the last tap settles.  mf is
+-- the caller's drive-frame counter, the same one that paces its press
+-- cadence.  T.mask/T.age/T.press stay readable for a caller's own logs.
 function M.targetCursor(opts)
   opts = opts or {}
   local mask = opts.mask or 0x7B7E
+  local other = (mask == 0x7B7E) and 0x7B7D or 0x7B7E
   local dirs = opts.dirs or { "left", "down", "right", "up" }
   local minAge = opts.minAge or 4
-  local T = { mask = nil, age = 0, press = 0 }
+  local maxPresses = opts.maxPresses or 40
+  local REVERSE = { left = "right", right = "left", up = "down", down = "up" }
+  local T = { mask = nil, age = 0, press = 0, side = nil, dir = nil }
+  -- the learned map: edges[state][dir] = the state that tap landed on
+  -- (the same state for a tap that moved nothing)
+  local edges, pending, lastCycle = {}, nil, nil
+  -- A state is which side the cursor is on and what it lights there:
+  -- "own" states carry the mask the caller steers (T.mask), "X" states
+  -- the far side's, kept so a crossing is seen as a move and walked back.
+  local function stateOf()
+    if T.mask == nil then return nil end
+    return (T.side == "own" and "" or "X") .. string.format("%02X", T.mask)
+  end
+  local function reset()
+    T.mask, T.age, T.press, T.side, T.dir = nil, 0, 0, nil, nil
+    edges, pending, lastCycle = {}, nil, nil
+  end
   function T.observe()
     if M.readByte(0x7BC2) == 0x38 then
-      local m = M.readByte(mask)
-      if m ~= 0 then
-        if m == T.mask then T.age = T.age + 1
-        else T.mask, T.age = m, 1 end
+      local m, o = M.readByte(mask), M.readByte(other)
+      local side = (m ~= 0 and "own") or (o ~= 0 and "other") or nil
+      local v = (side == "own" and m) or (side == "other" and o) or nil
+      if v ~= nil then
+        if v == T.mask and side == T.side then T.age = T.age + 1
+        else T.mask, T.side, T.age = v, side, 1 end
       end
     else
-      T.mask, T.age, T.press = nil, 0, 0
+      reset()
     end
+  end
+  -- breadth-first over the learned map from `from`: the first direction
+  -- of the shortest known walk to a state satisfying `goal`, or nil
+  local function firstStepTo(from, goal)
+    local prev, queue, head = { [from] = false }, { from }, 1
+    while head <= #queue do
+      local s = queue[head]; head = head + 1
+      if s ~= from and goal(s) then
+        local step = s
+        while prev[step].from ~= from do step = prev[step].from end
+        return prev[step].dir
+      end
+      for _, d in ipairs(dirs) do
+        local to = edges[s] and edges[s][d]
+        if to ~= nil and to ~= s and prev[to] == nil then
+          prev[to] = { from = s, dir = d }
+          queue[#queue + 1] = to
+        end
+      end
+    end
+    return nil
+  end
+  -- The exploration order from a state.  On the caller's side the
+  -- layout's crossing direction goes last, so the grid is walked before
+  -- the far side is visited at all; on the far side the layout's way
+  -- back goes first, then the reverse of the press that crossed.
+  local function untried(s)
+    local L = M.battleLayout()
+    local away = (mask == 0x7B7E) and L.toChars or L.toMonsters
+    local back = (mask == 0x7B7E) and L.toMonsters or L.toChars
+    local seen, order = {}, {}
+    local function add(d)
+      if d and not seen[d] then seen[d] = true; order[#order + 1] = d end
+    end
+    if s:sub(1, 1) == "X" then
+      for _, d in ipairs(back) do add(d) end
+      for _, es in pairs(edges) do
+        for d, to in pairs(es) do if to == s then add(REVERSE[d]) end end
+      end
+      for _, d in ipairs(dirs) do add(d) end
+    else
+      local crossing = {}
+      for _, d in ipairs(away) do crossing[d] = true end
+      for _, d in ipairs(dirs) do if not crossing[d] then add(d) end end
+      for _, d in ipairs(dirs) do add(d) end
+    end
+    for _, d in ipairs(order) do
+      if not (edges[s] and edges[s][d] ~= nil) then return d end
+    end
+    return nil
+  end
+  local function mapText()
+    local out = {}
+    for s, es in pairs(edges) do
+      local parts = {}
+      for _, d in ipairs(dirs) do
+        if es[d] ~= nil then
+          parts[#parts + 1] = d .. ">" .. (es[d] == s and "-" or es[d])
+        end
+      end
+      out[#out + 1] = s .. "{" .. table.concat(parts, " ") .. "}"
+    end
+    table.sort(out)
+    return table.concat(out, " ")
+  end
+  local function bail(why, target)
+    local msg = string.format("target cursor: %s -- slot %d (mask %02X) never "
+      .. "lit in this target select; %d taps; learned map: %s", why, target,
+      1 << target, T.press, mapText())
+    M.log(msg)
+    pcall(function() M.screenshot("targetcursor_bail") end)
+    error(msg, 0)
   end
   function T.steer(target, mf)
     if target == nil then return "a" end
-    if T.mask == (1 << target) and T.age >= minAge then return "a" end
-    if (mf - 1) % 8 == 0 then T.press = T.press + 1 end
-    -- press-0 must index dirs[1], not dirs[#dirs]: Lua floor division
-    -- takes (0-1)//2 to -1 and -1 % #dirs to #dirs-1, so the bare
-    -- ((T.press-1)//2) emitted the LAST rotation direction on the first
-    -- frames of every target-select.  That stray press hangs
-    -- battle_toolsgrey in target-select and exiled the Thamasa ambush's
-    -- char-column revive into a monster group.  (Measured both ways: this
-    -- max() form passed the whole targetCursor-caller suite in the
-    -- 2026-08-27 census; reverting it to the bare form re-hung
-    -- battle_toolsgrey.  The steal/thief/stealmp failures that briefly
-    -- looked like this were bag depletion, unrelated.)
-    return dirs[(math.max(T.press - 1, 0) // 2) % #dirs + 1]
+    if T.side == "own" and T.mask == (1 << target) and T.age >= minAge then
+      return "a"
+    end
+    local cycle = (mf - 1) // 16
+    local phase = (mf - 1) % 16
+    -- second half of the cycle: hands off while the tap settles
+    if phase >= 8 then return nil end
+    if cycle ~= lastCycle then
+      -- the first tap waits for a settled reading: a window that has not
+      -- lit yet, or is still on its opening frames, gets no stray press
+      if lastCycle == nil and T.age < minAge then return nil end
+      lastCycle = cycle
+      local here = stateOf()
+      if here == nil then return nil end        -- the window has not lit yet
+      if pending ~= nil then
+        edges[pending.from] = edges[pending.from] or {}
+        edges[pending.from][pending.dir] = here
+        pending = nil
+      end
+      local wantState = string.format("%02X", 1 << target)
+      local d = firstStepTo(here, function(s) return s == wantState end)
+      if d == nil then d = untried(here) end
+      if d == nil then
+        d = firstStepTo(here, function(s) return untried(s) ~= nil end)
+      end
+      if d == nil then
+        bail("every direction from every reachable state has been tried",
+          target)
+      end
+      if T.press >= maxPresses then
+        bail(string.format("%d taps without landing", T.press), target)
+      end
+      T.press = T.press + 1
+      pending = { from = here, dir = d }
+      T.dir = d
+    end
+    return T.dir
   end
   return T
 end

@@ -292,6 +292,18 @@ H.run({ maxFrames = 200000 }, {
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000,
     "back on the field after the flee", 5),
   H.waitFrames(30),
+  -- Care between the battles, the way the route does after every fight:
+  -- battle 1's first hit poisoned SABIN, and a poisoned character walks
+  -- the field down to 1 HP (max/32 a step) and dies to the first hit of
+  -- battle 2 before his Tools window ever opens (measured 2026-09: left
+  -- at 283 HP, the reset variant timed out with the list never up).  An
+  -- Antidote and Tonics from the bag, through the real field menu; the
+  -- roster line says what it found and what it spent.
+  H.fieldCare({ tag = "between battles", threshold = 0.9 }),
+  H.call(function()
+    H.log(string.format("SABIN after care: hp %d/%d status1=%02x",
+      H.charHp(SABIN), H.charMaxHp(SABIN), H.charStatus1(SABIN)))
+  end),
   setConfigCursor(false, "mid-test config flip"),
 
   -- ---- battle 2, under Reset ---------------------------------------------

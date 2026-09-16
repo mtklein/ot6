@@ -369,15 +369,21 @@ H.run({ maxFrames = 150000 }, {
   -- model (lands iff roll < chance).  The target is the both-populated
   -- species so the slot pick cannot turn a landed roll into nothing.  Up to
   -- three attempts (4 MP each against the remaining real pool).
+  -- Three explicit attempts, each behind its own cond, rather than one
+  -- driveUntil replaying a body: H.repeatN keeps no reset, so oneSteal (a
+  -- repeatN) inside a replayed body is done after its first pass, and the
+  -- old form scored attempt 1's record three times over without a second
+  -- steal ever being pressed (measured 2026-09-16: one "[bare 0-bp attempt]"
+  -- line, mp 21 -> 17 once, "draws={87}" evaluated as attempts 1, 2 and 3).
   (function()
     local tries, landed, wantVal = 0, false, nil
-    return H.repeatN(1, {
-      H.driveUntil(function() return landed or tries >= 3 end, 90000, {
+    local function attempt(n)
+      return H.cond(function() return not landed end, {
         H.call(function()
           drive.target = rareT
           wantVal = stealRare(rareT)
         end),
-        oneSteal("bare 0-bp attempt", 0, 0),
+        oneSteal("bare 0-bp attempt " .. n, 0, 0),
         H.call(function()
           tries = tries + 1
           H.assertEq(#rec.draws >= 1, true,
@@ -399,7 +405,10 @@ H.run({ maxFrames = 150000 }, {
               "the landed 0-bp steal took the species' authored item")
           end
         end),
-      }, "bare vanilla attempts"),
+      }, {})
+    end
+    return H.repeatN(1, {
+      attempt(1), attempt(2), attempt(3),
       H.call(function()
         H.log(string.format("bare arm done: %d attempt(s), landed=%s, mp=%d",
           tries, tostring(landed), mp()))
