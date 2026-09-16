@@ -420,8 +420,17 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
   -- load (probe_nikeah_town: bfs finds no path at all at +20 and at +150
   -- frames, and a 44-step path to the counter's talk tile at +300/+400),
   -- and shopTalk caches its staging pick on the first census, so let the
-  -- town settle before pathfinding.
-  H.waitFrames(400),
+  -- town settle before pathfinding.  A fixed settle is not enough: the
+  -- town's walkers cross the one street to the counter, so the talk tile
+  -- (24,41) reads reachable or not by the frame (probe_nikeah_town2 off
+  -- this generator's library-fighter dive: bfs 32 at +0, none at +100, 44
+  -- at +200, none at +400, then 32..44 to +1000), and the 400-frame settle
+  -- landed on a blocked frame -- shopTalk cached the (24,40) counter-tile
+  -- fallback and navTo read no path 20 times (potion-route sabin_done
+  -- attempt 1).  Wait, as a person would, for the street to clear.
+  H.waitFrames(150),
+  H.waitUntil(function() return H.bfsPath(24, 41) ~= nil end, 1800,
+    "a walkable street to the Nikeah counter's talk tile (24,41)", 1),
   -- The keeper stands behind a counter ((24,40) is a counter tile); the
   -- talk is from two tiles away in line, shopTalk's (24,41) candidate.
   H.shopTalk(24, 39, "Nikeah item shop"),

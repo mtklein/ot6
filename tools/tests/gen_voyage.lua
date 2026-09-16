@@ -288,7 +288,13 @@ local steps = {
   -- 38: the band (~level x1.5, docs/design/level-curve.md) at the L25 the
   -- party holds through Thamasa; the Crescent Island walk to the next shop
   -- (Thamasa 35, gen_thamasa_fire) spent no Potions on the seeded chain
-  -- (crescent_landing potion=3 -> thamasa_night 3).
+  -- (crescent_landing potion=3 -> thamasa_night 3).  No field-care extra
+  -- (owner, #176: at a Tonic-less shop the Potion target also covers the
+  -- Tonic shortfall, sized by the measured field-care spend after the
+  -- stop): the bag holds no Tonics here (the band at L25 is 99), but the
+  -- legs from here to Thamasa's Tonic counter measured no field-care spend
+  -- at all -- no Potion left the bag between banquet-done-v1 (3) and
+  -- thamasa_night (3) -- so the shortfall is Thamasa's to fill.
   H.call(function()
     H.vars.shopStart = H.frame
     H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 24")

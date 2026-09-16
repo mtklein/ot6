@@ -248,7 +248,12 @@ H.run({ maxFrames = 160000 }, {
   -- trigger.  POTION to 33: the band at the L18 the factory's end reaches
   -- (27) plus the stretch's measured spend, 6 (mrf_entry 6 -> the save
   -- room's 4 -> 0 across Ifrit & Shiva) -- a floor, since the bag ran dry
-  -- there.  FENIX DOWN to 16 (~level).
+  -- there.  Plus 2 for field care (owner, #176: where the shop sells no
+  -- Tonic, the Potion target also covers the Tonic shortfall, sized by the
+  -- measured field-care spend): the Tonic band at L18 is 90, the seeded
+  -- chain carried 89 in and walked the factory down to 80 (vector_entry
+  -- tonic=89 -> ifrit_entry 80), 9 Tonics = 450 HP = 2 Potions at 300.
+  -- FENIX DOWN to 16 (~level).
   H.call(function()
     H.vars.shopStart = H.frame
     H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 24")
@@ -268,7 +273,7 @@ H.run({ maxFrames = 160000 }, {
     H.assertEq(shopRow(24, 0), POTION, "shop 24 row 0 is Potion")
     H.assertEq(shopRow(24, 5), FENIX_DOWN, "shop 24 row 5 is Fenix Down")
   end),
-  H.buyItem(POTION, 0, function() return 33 - H.invCountOf(POTION) end, "POTION to 33"),
+  H.buyItem(POTION, 0, function() return 35 - H.invCountOf(POTION) end, "POTION to 35"),
   H.buyItem(FENIX_DOWN, 5, function() return 16 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 16"),
   H.call(function()
@@ -277,8 +282,8 @@ H.run({ maxFrames = 160000 }, {
   end),
   H.shopClose("Albrook item shop"),
   H.call(function()
-    H.assertEq(H.invCountOf(POTION) >= 33, true,
-      "the party leaves Albrook with 33 Potions -- the L18 band plus the factory's measured spend")
+    H.assertEq(H.invCountOf(POTION) >= 35, true,
+      "the party leaves Albrook with 35 Potions -- the L18 band plus the factory's measured spend and field care")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 16, true, "Fenix Downs at 16 (~level)")
     H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
       H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))

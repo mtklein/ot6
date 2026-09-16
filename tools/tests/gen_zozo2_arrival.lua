@@ -291,6 +291,15 @@ H.run({ maxFrames = 1200000 }, {
   --     (34,20), keeper (34,15) running _cb4460 = shop 22 while $00A4 is
   --     clear (event_main.asm); shop 22 rows: Potion 0, Fenix Down 5, and no
   --     Tonic.  Out by the south edge, as gen_opera2_open leaves.
+  --     POTION to 39 (#176): the L18 band 27 (+3 of margin, the #158 target
+  --     of 30) plus 9 for field care -- owner: at a Tonic-less shop the
+  --     Potion target also covers the Tonic shortfall, sized by the measured
+  --     field-care spend after the stop.  Nothing sells Tonics from here to
+  --     the post-opera checkpoint, and the #158 chain spent 40 Tonics from
+  --     Jidoor to the end of Zozo (zozo_arrival attempt 3 "[left Jidoor]
+  --     ... tonic=54"; zozo_done "[care before leaving Zozo] ... tonic=14")
+  --     plus 9 across the opera (the seeded zozo_done 42 -> blackjack 33):
+  --     49 Tonics x 50 HP = 2450 HP = 9 Potions at 300.
   walk(27, 129, "Jidoor approach",
        { arrive = function() return not H.worldMode() end }),
   H.driveUntil(function() return not H.worldMode() and map() == 198 end, 4000, {
@@ -307,14 +316,14 @@ H.run({ maxFrames = 1200000 }, {
   H.call(function()
     H.assertEq(H.readByte(0x0201), 22, "the counter opened shop 22 ($0201)")
   end),
-  H.buyItem(POTION, 0, function() return 30 - invCount(POTION) end,
-    "POTION to 30"),
+  H.buyItem(POTION, 0, function() return 39 - invCount(POTION) end,
+    "POTION to 39"),
   H.buyItem(FENIX, 5, function() return 20 - invCount(FENIX) end,
     "FENIX DOWN to 20"),
   H.shopClose("Jidoor item shop"),
   H.call(function()
     H.log(string.format("[shop] Jidoor done: %s", rosterLine()))
-    H.assertEq(invCount(POTION) >= 30, true, "Potions at 30 leaving Jidoor")
+    H.assertEq(invCount(POTION) >= 39, true, "Potions at 39 leaving Jidoor -- the L18 band plus field care")
     H.assertEq(invCount(FENIX) >= 20, true, "Fenix Downs at 20 leaving Jidoor")
   end),
   H.crossDoor(34, 21, 198, 27, 43, "Jidoor item shop -> street"),

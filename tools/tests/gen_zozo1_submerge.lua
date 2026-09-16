@@ -74,12 +74,15 @@ H.run({ maxFrames = 90000 }, {
   -- 1b. Narshe's item shop on the way out (#176): the door (41,22) is eight
   --     tiles from Arvis's front door, shop 3 on map 26 (shopkeeper (44,8);
   --     _ccd28c opens 3 while $006B/$00A4 are clear, both clear here), rows
-  --     TONIC 0 / POTION 1 / FENIX DOWN 4.  Every town tops up; this is the
-  --     last Potion shop the route enters before the post-opera checkpoint
-  --     (Kohlingen is crossed by castle, Jidoor is walked through without a
-  --     stop), so it buys the band at the level the stretch reaches: L16 at
-  --     the Blackjack -> 24 (docs/design/level-curve.md; the seeded Zozo and
-  --     opera logs spent no Potions: 8 -> 10 across kefka_won..blackjack).
+  --     TONIC 0 / POTION 1 / FENIX DOWN 4.  Every town tops up, and this is
+  --     the last TONIC counter before the post-opera checkpoint: Jidoor's
+  --     shop 22 (gen_zozo2_arrival's stop after the L18 grind) sells none,
+  --     and the #158 chain walked the grind and the Zozo climb from 82 Tonics
+  --     to 14 (zozo_arrival attempt 3 "[west landing] ... tonic=82";
+  --     zozo_done "[care before leaving Zozo] ... tonic=14").  No Potion
+  --     line: Nikeah's stop (gen_sabin_trench) now carries 27 to here
+  --     (kefka_won potion=27, over the L14 band of 21) and Jidoor buys the
+  --     L18 band after the grind, so a POTION line here buys nothing.
   H.call(function()
     H.vars.shopStart = H.frame
     H.assertEq(sw(0x006B), 0, "$006B clear -- the item shop opens as shop 3")
@@ -101,7 +104,6 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(shopRow(3, 1), POTION, "shop 3 row 1 is Potion")
     H.assertEq(shopRow(3, 4), FENIX_DOWN, "shop 3 row 4 is Fenix Down")
   end),
-  H.buyItem(POTION, 1, function() return 24 - H.invCountOf(POTION) end, "POTION to 24"),
   H.buyItem(FENIX_DOWN, 4, function() return 15 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 15"),
   H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
@@ -111,8 +113,6 @@ H.run({ maxFrames = 90000 }, {
   end),
   H.shopClose("Narshe item shop"),
   H.call(function()
-    H.assertEq(H.invCountOf(POTION) >= 24, true,
-      "the party leaves Narshe with the Potion band (24 at L16) -- the in-combat heal")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 15, true, "Fenix Downs at 15 for the Zozo stretch")
     H.assertEq(H.invCountOf(TONIC) >= 90, true, "Tonics topped up for the field care")
     H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
