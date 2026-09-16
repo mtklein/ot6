@@ -319,12 +319,24 @@ end
 --   build/states/<name>.lua      (sidecar: `return "<base64>"`)
 -- and lib/compose.py embeds referenced sidecars back in as OT6_STATES.
 
+-- How many trampolines are registered and not yet fired.  Two pending at
+-- once collide: both register over the full address space, the first
+-- fires, removes itself and returns, and Mesen then invokes the second
+-- with its "inside an exec callback" state already cleared, so its
+-- createSavestate/loadSavestate is refused ("This function must be called
+-- inside an exec memory operation callback" -- measured 2026-09-16 when
+-- the segment runner's boot snapshot landed on the same frame as a
+-- generator's fixture load).  The runner waits for zero before it asks.
+M.pendingStateReqs = 0
+
 function M.requestSaveState()
   local req = {}
   local ref
+  M.pendingStateReqs = M.pendingStateReqs + 1
   ref = rawAddMemoryCallback(function()
     if req.fired then return end
     req.fired = true
+    M.pendingStateReqs = M.pendingStateReqs - 1
     local ok, err = pcall(function() req.blob = emu.createSavestate() end)
     req.ok = ok and type(req.blob) == "string" and #req.blob > 0
     req.error = err
@@ -341,9 +353,11 @@ function M.requestLoadState(blob)
   M.thawPad()
   local req = {}
   local ref
+  M.pendingStateReqs = M.pendingStateReqs + 1
   ref = rawAddMemoryCallback(function()
     if req.fired then return end
     req.fired = true
+    M.pendingStateReqs = M.pendingStateReqs - 1
     local ok, err = pcall(function() emu.loadSavestate(blob) end)
     req.ok = ok
     req.error = err
@@ -4420,6 +4434,13 @@ M.WATCH = WATCH
 
 local RUN                   -- the current attempt; filled in below
 
+-- Where the seed variation goes when a body marks no boot point of its own
+-- (M.bootMark, below).  Late enough that a cold Continue has landed and
+-- asserted its entry contract first (measured f1035..f1456 across the
+-- checkpoint-booted generators' logs), so only a body with neither a
+-- fixture nor a contract ever reaches it.
+local BOOT_FALLBACK = 2400
+
 -- ---------------------------------------------------------- observation --
 -- Everything here is read-only: frame-buffer reads, RAM reads, and the pad
 -- the script itself is holding.
@@ -4435,6 +4456,7 @@ local function screenHash()
 end
 
 local function monsterHpSum()
+  if not M.battleLoadStarted() then return 0 end
   local ids, s = M.monsterIds(), 0
   for i = 1, 6 do
     if ids[i] ~= 0xFFFF then s = s + M.readWord(0x3BFC + (i - 1) * 2) end
@@ -4562,8 +4584,11 @@ local function failEvidence(kind)
   return string.format("%s/shots/%s.png", dir, tag)
 end
 
-local function prune(tbl, keepFrom)
+local function prune(tbl, keepFrom)            -- signature -> frame seen
   for k, f in pairs(tbl) do if f < keepFrom then tbl[k] = nil end end
+end
+local function pruneKeys(tbl, keepFrom)        -- frame -> pad held
+  for f in pairs(tbl) do if f < keepFrom then tbl[f] = nil end end
 end
 
 -- One observation, plus the two verdicts.  Returns an error message -- the
@@ -4600,7 +4625,7 @@ local function watchTick()
   prune(W.seenCtl, keepFrom)
   prune(W.seenProg, keepFrom)
   prune(W.seenScreen, keepFrom)
-  prune(W.pressAt, keepFrom)
+  pruneKeys(W.pressAt, keepFrom)
 
   W.samples[#W.samples + 1] =
     { frame = M.frame, pad = held, screen = screen, ctl = ctl, prog = prog }
@@ -4617,8 +4642,15 @@ local function watchTick()
   -- and not before this attempt has a window's worth of samples
   if M.frame < WATCH.noEffectFrames + WATCH.sampleEvery then return nil end
 
+  -- In a battle with NO menu open there is nothing for a press to move:
+  -- the drivers edge-tap A through the fly-in, the enemy's turns and the
+  -- victory text, and that tapping is waiting, not pressing into a wall
+  -- (measured 2026-09-16: the first version tripped on the first fight's
+  -- opening animation, 96 A-frames in 192 with $7BCA=0).  #185's press
+  -- was into an OPEN menu ($7BCA=1, state $38), which this keeps.
   local pressed = pressFramesIn(WATCH.noEffectFrames)
-  if qc >= WATCH.noEffectFrames
+  local answerable = ctl:sub(1, 4) ~= "B:00"
+  if answerable and qc >= WATCH.noEffectFrames
      and pressed >= WATCH.pressFraction * WATCH.noEffectFrames then
     W.trips = W.trips + 1
     local shot = failEvidence("noeffect")
@@ -4699,8 +4731,13 @@ local function classify(msg)
   if msg:find("recovery cap:", 1, true) then return "recovery_cap" end
   if msg:find("no path", 1, true) then return "nopath" end
   if msg:find("timeout after", 1, true) then return "timeout" end
-  if msg:find("PARTY IS WIPED", 1, true) or msg:find("PARTY WIPED", 1, true)
-     or msg:find("GAME OVER", 1, true) then return "wipe" end
+  -- Only the lib's own wipe texts: the canary's verdict and the
+  -- unladdered encounter canary.  A generator's ladder reports its last
+  -- loss inside its own exhaustion message ("not won in 3 attempts --
+  -- last loss: PARTY WIPED at f..."), and that is a ladder that already
+  -- retried, whose verdict is the balance finding: `other`, no re-roll.
+  if msg:find("THE PARTY IS WIPED", 1, true)
+     or msg:find("^GAME OVER fired") then return "wipe" end
   return "other"
 end
 M.classifyFailure = classify
@@ -4995,8 +5032,9 @@ function M.run(opts, steps)
       tally[#tally + 1] = string.format("%d:%s", f.attempt, f.class)
     end
     if #tally > 0 then
-      M.log(string.format("[retry] attempts=%d/%d exhausted; failed "
-        .. "attempts: %s", RUN.attempt, RUN.attempts,
+      M.log(string.format("[retry] attempts=%d/%d%s; failed attempts: %s",
+        RUN.attempt, RUN.attempts,
+        RUN.attempt >= RUN.attempts and " exhausted" or " stopped",
         table.concat(tally, " ")))
     end
     M.log(string.format("FAIL: %s%s", tostring(msg),
@@ -5012,9 +5050,10 @@ function M.run(opts, steps)
   -- takes (3 for a game over, 1 for a raised error, 2 for the budget).
   local function failed(class, msg, code)
     attemptLine(class, msg)
+    local haveS0 = RUN.s0blob and #RUN.s0blob > 0
     if not RETRYABLE[class] or RUN.attempt >= RUN.attempts
-       or not M.__body or not RUN.s0blob then
-      if RETRYABLE[class] and not RUN.s0blob then
+       or not M.__body or not haveS0 then
+      if RETRYABLE[class] and not haveS0 then
         M.log("[retry] no boot snapshot was captured for this run, so this "
           .. "seed-dependent failure cannot be replayed")
       end
@@ -5060,8 +5099,8 @@ function M.run(opts, steps)
           return
         end
         M.log(string.format("[retry] attempt %d/%d starting: body replayed "
-          .. "from source, %d frames idled at the boot point for the seed",
-          RUN.attempt, RUN.attempts, RUN.shift))
+          .. "from source; it will idle %d frames at its boot point to "
+          .. "move the seed", RUN.attempt, RUN.attempts, RUN.shift))
         RUN.phase = "run"
       elseif RUN.ldWait > 600 then
         stopWith(1, "other", "retry: the savestate load trampoline never "
@@ -5110,13 +5149,8 @@ function M.run(opts, steps)
     M.frame = M.frame + 1
     if OT6_LIVE and (M.frame == 20 or M.frame % LIVE_IVL == 0) then M.liveShot() end
 
-    -- The boot snapshot for the replay, taken on this attempt's first
-    -- frame and harvested a couple of frames later.  No step is delayed
-    -- for it: the trampoline fires inside the frame's own emulation, so a
-    -- first-try run lands frame for frame where it always did.
-    if RUN.attempt == 1 and M.frame == 1 and M.__body and RUN.attempts > 1 then
-      RUN.s0 = M.requestSaveState()
-    end
+    -- The boot snapshot for the replay: harvested here, a couple of
+    -- frames after it was asked for (below, after the tick).
     if RUN.s0 and RUN.s0.done and not RUN.s0blob then
       if RUN.s0.ok then
         RUN.s0blob = RUN.s0.blob
@@ -5126,6 +5160,7 @@ function M.run(opts, steps)
       else
         M.log("[retry] boot snapshot FAILED to capture ("
           .. tostring(RUN.s0.error) .. "); this run cannot retry")
+        RUN.s0blob = ""              -- asked and answered: do not ask again
       end
       RUN.s0 = nil
     end
@@ -5134,6 +5169,16 @@ function M.run(opts, steps)
       failed("budget", "frame budget exceeded (" .. RUN.budget
         .. " frames in attempt " .. RUN.attempt .. ")", 2)
       return
+    end
+
+    -- A body with no fixture load and no entry contract (the two
+    -- from-power-on generators, and the harness's own selftests) never
+    -- calls M.bootMark, so the seed variation would have nowhere to go.
+    -- Mark the run's own opening instead: idling there is the same
+    -- legitimate thing -- a player who has not started pressing yet.
+    if not RUN.bootMarked and M.frame == BOOT_FALLBACK then
+      M.bootMark(string.format("no fixture load or entry contract in the "
+        .. "first %d frames: the run's own opening", BOOT_FALLBACK))
     end
 
     -- The seed variation: idle frames at the boot point, pad neutral, the
@@ -5164,6 +5209,19 @@ function M.run(opts, steps)
       if bad then error(bad, 0) end
       return RUN.root:tick()
     end)
+    -- The boot snapshot for the replay, asked for on the first frame of
+    -- attempt 1 on which no other savestate trampoline is pending (a
+    -- fixture-booted body loads its fixture on frame 1, so this lands a
+    -- few frames later, on the loaded fixture; a checkpoint-booted body
+    -- gets frame 1, the power-on with its battery).  Either is the state
+    -- the replayed body's first step will find, which is all the replay
+    -- needs.  No step is delayed for it: the trampoline fires inside the
+    -- frame's own emulation, so a first-try run lands frame for frame
+    -- where it always did.
+    if ok and RUN.attempt == 1 and RUN.attempts > 1 and M.__body
+       and not RUN.s0 and not RUN.s0blob and M.pendingStateReqs == 0 then
+      RUN.s0 = M.requestSaveState()
+    end
     if not ok then
       failed(classify(r), tostring(r), 1)
     elseif r == "done" then
