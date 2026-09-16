@@ -26,6 +26,7 @@ local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local function partyCount()
@@ -325,6 +326,10 @@ local steps = {
       H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
   end),
   H.shopClose("Albrook item shop"),
+  -- #197: the combat items back on top of the bag after every purchase
+  -- (the fight driver found the Potion at row 43 downstream of a stop
+  -- that did not re-arrange)
+  H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Albrook item shop)" }),
   H.call(function()
     H.assertEq(H.invCountOf(POTION) >= 38, true,
       "the party leaves Albrook with the Potion band (38 at L25) -- the in-combat heal")

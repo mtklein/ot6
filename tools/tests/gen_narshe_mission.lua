@@ -27,10 +27,12 @@
 -- a person with an item shop next door plays it: it shops at Jidoor before
 -- the first leg and again whenever the Tents run out or the Potion/Fenix
 -- band is broken (docs/design/level-curve.md's supply curve), and it pitches
--- a Tent on the world map whenever a member is under half HP after a leg's
--- care stop -- a full party restore for 1200 gil, the save-point rest the
--- world map allows (item.asm @84f8: Tent needs $0201 bit7, which the world
--- map sets).  Coordinates and menu flow measured by tools/tests/probe_jidoor.lua:
+-- a Tent on the world map when the leg gate says the party is worn (needTent
+-- below: every summoner dry, or a member the care stop could not top up) --
+-- a full party restore for 1200 gil, the save-point rest the world map
+-- allows (item.asm @84f8: Tent needs $0201 bit7, which the world map sets).
+-- Every purchase stop ends with the combat items arranged back on top of
+-- the bag (#197).  Coordinates and menu flow measured by tools/tests/probe_jidoor.lua:
 -- world (27,129) + DOWN -> map 198 (15,61); shop door 198 (27,41) -> map 201
 -- (34,20), keeper at (34,15) (npc_prop NPCProp::_201, event _cb4460 = shop
 -- 22); back out 201 (34,21) -> 198 (27,43); south edge (15,62)+DOWN -> the
@@ -139,6 +141,7 @@ end
 
 -- ---- the grind's supply line (see the header) --------------------------
 local TONIC, POTION, FENIX, TENT = 0xE8, 0xE9, 0xF0, 0xF7
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
 -- the band the bag arrives at each fight with: Potions ~level x1.5 for the
 -- L18-23 this grind spans (27-35), Fenix ~level (20), Tents for the rest
 -- stops (10 -- the two measured grinds would each have used ~4-6)
@@ -168,7 +171,51 @@ local function lowestHp()
   end
   return low
 end
-local function needTent() return H.invCountOf(TENT) > 0 and lowestHp() < 0.5 end
+-- the care threshold the legs heal to (worldNavTo's careThreshold below)
+local CARE = 0.7
+-- probe_locke_bolt: this party has NO learned spells (magic opts would
+-- silently degrade to Fight), but three stones are worn -- Locke Carbunkl,
+-- Edgar Bismark, Sabin Shiva -- so the once-per-fight genju is the party's
+-- whole magic game.  Keyed by character; the leg options hand the same
+-- table to the fight driver.
+local SUMMON = { [1] = { mp = 36 }, [4] = { mp = 50 }, [5] = { mp = 27 } }
+-- the living stone-wearers, and how many of them can still pay their genju
+local function summoners()
+  local n, can = 0, 0
+  for _, c in ipairs(H.partyMembers()) do
+    local s = SUMMON[c]
+    if s and H.charHp(c) > 0 then
+      n = n + 1
+      if H.charMp(c) >= s.mp then can = can + 1 end
+    end
+  end
+  return n, can
+end
+-- When a person pitches one of the Tents in the bag (#199; measured on the
+-- v0.17 grind, build/attempts/narshe-mission-shops/v017_gates.txt: 73 leg
+-- gates).  Not on HP alone: the care stop after every battle heals to CARE
+-- with Tonics, so no gate saw a member under 0.7, let alone the old 0.5
+-- gate (0 of 73), and ten Tents rode the whole grind unused.  On MP: care
+-- does not restore it, a level-up restores one member at a time, and the
+-- genju is this party's whole magic game -- at 23 of the 73 gates no
+-- summoner could pay for one (c1 16/128 vs 36, c4 34/138 vs 50, c5 7/135
+-- vs 27 at the first such gate) and at 72 at least one could not.  So a
+-- leg gate rests when the magic game is gone (every summoner dry) or when
+-- the care stop left someone under its threshold (the bag at the Tonic
+-- floor); the departure gate, before the Sealed Gate leg, rests when any
+-- summoner is dry (the v0.17 party boarded at c1 3/183 and c4 4/182 MP
+-- with tent=10).
+local function needTent(anyDry)
+  if H.invCountOf(TENT) == 0 then return false end
+  if lowestHp() < CARE then return true end
+  local n, can = summoners()
+  return n > 0 and ((anyDry and can < n) or can == 0)
+end
+local function gateLine(tag, anyDry)
+  local n, can = summoners()
+  return bagLine(string.format("%s: lowest hp %.2f, %d/%d summoners can pay -> %s",
+    tag, lowestHp(), can, n, needTent(anyDry) and "tent" or "walk"))
+end
 local function needRestock()
   return H.invCountOf(TENT) == 0 or H.invCountOf(POTION) < 10
       or H.invCountOf(FENIX) < 8
@@ -247,8 +294,7 @@ local function jidoorRestock(tag, band)
   return {
     H.logStep(function() return bagLine(what .. ": leaving the plains for Jidoor") end),
     H.worldNavTo(27, 129, { maxFrames = 45000, playBattles = "tactical",
-      careThreshold = 0.7, healPercent = 45,
-      summon = { [1] = { mp = 36 }, [4] = { mp = 50 }, [5] = { mp = 27 } } }),
+      careThreshold = CARE, healPercent = 45, summon = SUMMON }),
     pressWalk("down", function() return not H.worldMode() and map() == 198 end,
       1200, what .. ": held DOWN into Jidoor (map 198)"),
     H.waitUntil(fieldSettled(198), 1800, what .. ": Jidoor control", 5),
@@ -277,6 +323,15 @@ local function jidoorRestock(tag, band)
       "TENT to " .. band.tent),
     H.shopClose("Jidoor item shop"),
     H.logStep(function() return bagLine(what .. ": bought") end),
+    -- #197: the combat items back on top of the bag (without this the
+    -- Potion rode at row 43 into the gate cave and the fight driver walked
+    -- 43 rows to it every heal)
+    H.bagArrange({ POTION, FENIX, TONIC, ANTIDOTE, REMEDY },
+      { tag = "bag: combat items on top (" .. tag .. ")" }),
+    H.call(function()
+      H.assertEq(H.readByte(0x1869), POTION, what .. ": slot 0 is Potion")
+      H.assertEq(H.readByte(0x186A), FENIX, what .. ": slot 1 is Fenix Down")
+    end),
     H.navTo(34, 20, { playBattles = "tactical", maxFrames = 6000,
       arrive = function() return map() == 198 end }),
     pressWalk("down", function() return map() == 198 end, 1200,
@@ -359,17 +414,12 @@ H.run({ maxFrames = 600000 }, {
     }
     local legOpts = {
       maxFrames = 45000, playBattles = "tactical",
-      careThreshold = 0.7, healPercent = 45,
-      -- probe_locke_bolt: this party has NO learned spells (magic
-      -- opts would silently degrade to Fight), but three stones are
-      -- worn -- Locke Carbunkl, Edgar Bismark, Sabin Shiva -- so the
-      -- once-per-fight genju is the party's whole magic game.
-      summon = { [1] = { mp = 36 }, [4] = { mp = 50 },
-                 [5] = { mp = 27 } } }
+      careThreshold = CARE, healPercent = 45, summon = SUMMON }
     for leg = 1, 80 do
       steps[#steps + 1] = H.cond(function() return maxLvl() < 23 end, {
-        -- rest first (a member under half HP after the last leg's care),
-        -- then shop if the bag is under its band, then walk the leg
+        -- rest first (the gate above needTent), then shop if the bag is
+        -- under its band, then walk the leg
+        H.logStep(function() return gateLine(string.format("leg %d gate", leg)) end),
         H.cond(needTent, { useTent(string.format("leg %d: tent", leg)) }, {}),
         H.cond(needRestock, jidoorRestock(string.format("leg %d", leg), GRIND_BAND), {}),
         H.worldNavTo(function() return leg % 2 == 1 and ax or bx end,
@@ -390,9 +440,11 @@ H.run({ maxFrames = 600000 }, {
   end, jidoorRestock("departure", DEPART_BAND), {}),
   -- back to the ship on foot, fighting what the walk meets like the legs do
   H.worldNavTo(24, 121, { maxFrames = 45000, playBattles = "tactical",
-    careThreshold = 0.7, healPercent = 45,
-    summon = { [1] = { mp = 36 }, [4] = { mp = 50 }, [5] = { mp = 27 } } }),
-  H.cond(needTent, { useTent("after the grind: tent") }, {}),
+    careThreshold = CARE, healPercent = 45, summon = SUMMON }),
+  -- the departure rest: any summoner dry before the Sealed Gate leg
+  H.logStep(function() return gateLine("departure gate", true) end),
+  H.cond(function() return needTent(true) end,
+    { useTent("after the grind: tent") }, {}),
   worldGrind(24, 121, "back onto the parked ship (24,121)"),
   H.call(function()
     H.log(bagLine("leaving the plains"))

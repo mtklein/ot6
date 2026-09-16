@@ -368,6 +368,10 @@ H.run({ maxFrames = 120000 }, {
   shopPress("b", inState(0x25), "item shop: back to options"),
   shopPress("b", function() return H.hasControl() and map() == 59 end,
     "item shop: closed"),
+  -- #197: the combat items back on top of the bag after every purchase
+  -- (the fight driver found the Potion at row 43 downstream of a stop
+  -- that did not re-arrange)
+  H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (Figaro item shop)" }),
   H.call(function()
     H.assertEq(invCount(0xE8) >= 25, true,
       string.format("Tonics restocked at the Figaro item shop (have %d)",
@@ -401,6 +405,7 @@ H.run({ maxFrames = 120000 }, {
   buyItem(0xA3, 2, 1, 500),               -- NoiseBlaster
   shopPress("b", inState(0x25), "back to options"),
   shopPress("b", function() return H.hasControl() end, "shop closed"),
+  H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (Figaro tool shop)" }),
   H.call(function()
     H.assertEq(invCount(0xA4), 1, "BioBlaster bought")
     H.assertEq(invCount(0xA3), 1, "NoiseBlaster bought")

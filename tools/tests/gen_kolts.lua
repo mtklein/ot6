@@ -395,6 +395,10 @@ local function shopTrip()
     tapUntil("b", function() return H.hasControl() and map() == 85 end,
       "shop: closed"),
     H.release(), H.waitFrames(30),
+    -- #197: the combat items back on top of the bag after every purchase
+    -- (the fight driver found the Potion at row 43 downstream of a stop
+    -- that did not re-arrange)
+    H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (South Figaro item shop)" }),
     H.call(function()
       H.log(string.format(
         "[shop] done: gil=%d tonic=%d potion=%d fenix=%d antidote=%d",
@@ -789,12 +793,14 @@ local function gearTrip()
     buyTo(MITHRILBLADE, 2, 1, 450, "MITHRILBLADE to 1"),
     buyTo(MITHRILKNIFE, 1, 1, 300, "MITHRILKNIFE to 1"),
     closeShop(77, "shop 5"),
+    H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (shop 5 (weapon))" }),
     leaveDoor(103, 16, "shop 5"),
     enterDoor(35, 19, 77, "armor shop"),
     counterShop(114, 12, "shop 6 (armor)"),
     buyTo(HEAVYSHLD, 1, 2, 400, "HEAVY SHLD to 2"),
     buyTo(PLUMEDHAT, 3, 2, 250, "PLUMED HAT to 2 -- one per scenario order, the Heavy Shld precedent: the Locke lineage wears one onto a head before the split hands the bag to SABIN's train"),
     closeShop(77, "shop 6"),
+    H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (shop 6 (armor))" }),
     leaveDoor(114, 16, "shop 6"),
     H.call(function()
       H.assertEq(invCount(MITHRILBLADE) >= 1, true,
@@ -844,6 +850,7 @@ local function relicTrip()
     buyTo(STARPENDANT, 2, 3, 500, "STAR PENDANT to 3"),
     buyTo(JEWELRING, 3, 3, 1000, "JEWEL RING to 3"),
     closeShop(76, "shop 7"),
+    H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (shop 7 (relic))" }),
     H.call(function()
       H.assertEq(invCount(STARPENDANT), 3, "three Star Pendants in the bag")
       H.assertEq(invCount(JEWELRING), 3, "three Jewel Rings in the bag")
@@ -1088,6 +1095,7 @@ H.run({ maxFrames = 700000 }, {
   buyTo(0xF0, 5, 7, 500, "FENIX DOWN to 7"),
   buyTo(0xE8, 0, 30, 50, "TONIC to 30"),
   closeShop(85, "shop 8"),
+  H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (South Figaro item shop, second visit)" }),
   leaveDoor(104, 57, "the item shop"),
   H.call(function()
     H.assertEq(invCount(0xF0) >= 6, true,
