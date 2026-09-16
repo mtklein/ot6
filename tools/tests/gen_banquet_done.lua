@@ -29,16 +29,14 @@ local function worldGrind(tx, ty, what)
   local step = nil
   local DW = { up = { 0, -1 }, down = { 0, 1 },
                left = { -1, 0 }, right = { 1, 0 } }
+  local W = H.newWalkFighter(what or string.format("worldGrind (%d,%d)", tx, ty))
   return H.driveUntil(function()
     return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
       and H.worldHasControl() and H.worldAligned())
   end, 60000, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        plan = nil; step = nil
-        H.setPad({ l = true, r = true }); return
-      end
+      if W.frame() then plan = nil; step = nil; return end
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then
         plan = nil; step = nil; H.setPad({}); return
@@ -78,15 +76,14 @@ local function worldGrind(tx, ty, what)
   }, what or string.format("worldGrind (%d,%d)", tx, ty))
 end
 
--- held walk: dialogs are absorbed with A, a battle is fled with L+R.
+-- held walk: dialogs are absorbed with A, a battle is fought (#183).
 local function pressWalk(dir, pred, maxFrames, what)
   local ph = 0
+  local W = H.newWalkFighter("pressWalk: " .. what)
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); return
-      end
+      if W.frame() then return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
     end),

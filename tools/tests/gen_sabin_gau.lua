@@ -332,7 +332,6 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
   local fought, wasBattle = 0, false
   local stuckN, battleFrames, segFrames = 0, 0, 0
   local segCalm, coasting = 0, false
-  local fleeN, refusedN = 0, 0      -- opts.flee: frames held / cant-run debounce
   local function makePlan(actor)
     -- `worldWalkFight()` episodes are constructed before H.run starts, so
     -- resolve this at execution time.  The field party byte is repurposed in
@@ -546,23 +545,9 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
           return
         end
         tick = tick + 1
-        if opts.flee then
-          refusedN = ((H.readByte(0x00b1) & 0x02) ~= 0) and refusedN + 1 or 0
-          fleeN = fleeN + 1
-          if refusedN < 60 and fleeN <= 1800 then
-            local pad = { l = true, r = true }
-            if tick % 16 < 3 then pad.b = true end
-            H.setPad(pad)
-            return
-          end
-          if fleeN == 1801 or refusedN == 60 then
-            H.log(string.format("[gau] walk[%s] flee %s at f%d -- " ..
-              "fighting this one out", what,
-              refusedN >= 60 and "REFUSED ($b1 can't-run)" or "capped",
-              H.frame))
-            fleeN = fleeN + 1     -- log once
-          end
-        end
+        -- #183: opts.flee (L+R first, fight only when refused or capped)
+        -- is gone; every encounter on the transit and the Veldt is fought
+        -- by the fighter below.
         local ph = tick % 30
         if H.readByte(MENU) == 0 then
           plan, planActor, mstreak = nil, nil, 0
@@ -576,7 +561,6 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
         return
       end
       plan, planActor = nil, nil
-      fleeN, refusedN = 0, 0
       local live = H.worldHasControl() and H.worldAligned()
          and bright() >= 15
       if not live then
@@ -1054,20 +1038,18 @@ local function genAttempt(n)
     }, {
       H.logStep(function()
         return string.format("%s: reload NOT calm ($E8=%02X bls=%s at " ..
-          "%d,%d) -- flee, re-park, recapture", tag, H.readByte(0x00e8),
+          "%d,%d) -- fight, re-park, recapture", tag, H.readByte(0x00e8),
           tostring(H.battleLoadStarted()), H.worldX(), H.worldY())
       end),
-      H.driveUntil(function()
-        return H.worldMode() and H.worldHasControl() and H.worldAligned()
-      end, 20000, {
-        H.call(function()
-          if H.battleLoadStarted() then
-            H.setPad({ l = true, r = true })   -- flee, with real input
-          else
+      (function() local W = H.newWalkFighter(tag .. ": boot battle")
+        return H.driveUntil(function()
+          return H.worldMode() and H.worldHasControl() and H.worldAligned()
+        end, 20000, {
+          H.call(function()
+            if W.frame() then return end   -- fought, not fled (#183)
             H.setPad({})
-          end
-        end),
-      }, tag .. ": flee the boot battle, ride out the world reload"),
+          end),
+        }, tag .. ": fight the boot battle, ride out the world reload") end)(),
       H.call(function() H.setPad({}) end),
       H.worldNavTo(214, 149, { maxFrames = 8000, playBattles = true }),
       H.waitFrames(30),
@@ -1509,19 +1491,18 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
     end
   end),
   -- The landing step itself can WIN the encounter roll ($E8 bit5 the
-  -- instant it wins); require REAL control before generating, fleeing any
-  -- landing-roll battle -- the post-battle reload restores this tile.
-  H.driveUntil(function()
-    return H.worldMode() and H.worldHasControl() and H.worldAligned()
-  end, 20000, {
-    H.call(function()
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true })   -- flee, with real input
-      else
+  -- instant it wins); require REAL control before generating, fighting
+  -- any landing-roll battle (#183) -- the post-battle reload restores
+  -- this tile.
+  (function() local W = H.newWalkFighter("landing-roll battle at the entry point")
+    return H.driveUntil(function()
+      return H.worldMode() and H.worldHasControl() and H.worldAligned()
+    end, 20000, {
+      H.call(function()
+        if W.frame() then return end
         H.setPad({})
-      end
-    end),
-  }, "calm, controllable entry point (flee any landing-roll battle)"),
+      end),
+    }, "calm, controllable entry point (fight any landing-roll battle)") end)(),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.worldMode(), true, "on the world")

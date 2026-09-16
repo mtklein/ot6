@@ -60,15 +60,16 @@ local function settle(maxFrames, what)
 end
 
 -- held walk onto a disappearing tile (HANDOFF trap 6: navTo lands at rest,
--- so the tile that takes the party away is entered with a held press)
+-- so the tile that takes the party away is entered with a held press).
+-- Its one use walks Thamasa (map 343), which rolls no encounters
+-- (tools/audit_encounters.py 343), so no L+R (#183): an unexpected
+-- battle stalls visibly instead of being fled.
 local function pressWalk(dir, pred, maxFrames, what)
   local ph = 0
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); return
-      end
+      if H.battleLoadStarted() then H.setPad({}); return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
     end),
@@ -282,12 +283,13 @@ local steps = {
   H.call(function()
     H.log(string.format("[ot6] at (249,128) staging tile, f%d", H.frame))
   end),
-  H.driveUntil(function() return not H.worldMode() end, 2000, {
-    H.call(function()
-      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
-      H.setPad({ right = true })
-    end),
-  }, "held RIGHT onto (250,128) -> Thamasa 343 (23,46)"),
+  (function() local W = H.newWalkFighter("held RIGHT onto (250,128)")
+    return H.driveUntil(function() return not H.worldMode() end, 2000, {
+      H.call(function()
+        if W.frame() then return end
+        H.setPad({ right = true })
+      end),
+    }, "held RIGHT onto (250,128) -> Thamasa 343 (23,46)") end)(),
   H.release(),
   H.waitUntil(function() return map() == 343 and H.hasControl() end, 3000,
     "Thamasa map loaded", 5),

@@ -521,7 +521,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   --    tile flickers hasControl() (the SavePoint re-entry), so arrival
   --    is judged on position, $01BF and alignment.
   H.navTo(57, 7, { maxFrames = 15000, playBattles = "tactical" }),
-  (function() local calm = 0
+  (function() local calm, W = 0, H.newWalkFighter("onto the save tile 240 (58,7)")
     return H.driveUntil(function()
       calm = (H.fieldX() == 58 and H.fieldY() == 7 and sw(0x01BF) == 1
               and H.tileAligned() and not H.dialogWaiting()
@@ -529,7 +529,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
       return calm >= 8
     end, 9000, {
       H.call(function()
-        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+        if W.frame() then return end
         if H.dialogWaiting() then H.setPad({ "a" }); return end
         if H.fieldX() == 58 and H.fieldY() == 7 then H.setPad({}); return end
         H.setPad({ right = true })

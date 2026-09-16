@@ -73,8 +73,9 @@ local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 
 
 -- Tap `dir` whenever the party has control, hold off while a scene controls
 -- it, edge-A through dialogs.  Used to walk into a trigger whose scene then
--- takes over; the tap keeps the party from sliding past the tile.  A
--- battle here is fled with the real L+R run mechanic.
+-- takes over; the tap keeps the party from sliding past the tile.  Its
+-- one use walks the save room, map 270, which rolls no encounters
+-- (tools/audit_encounters.py 270), so no L+R (#183).
 local function tapInto(dir, pred, maxFrames, what)
   local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
   return H.driveUntil(function()
@@ -93,7 +94,8 @@ local function tapInto(dir, pred, maxFrames, what)
           H.readByte(0x087f + H.readWord(0x0803))))
       end
       if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); phase = 0; return
+        -- #183: no L+R here.  map 270 rolls no encounters (tools/audit_encounters.py 270).
+        H.setPad({}); phase = 0; return
       end
       if H.dialogWaiting() then
         H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
@@ -162,7 +164,9 @@ local function talkTo(dir, pred, maxFrames, what)
           tostring(H.dialogWaiting()), tostring(H.battleLoadStarted())))
       end
       if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); return
+        -- #183: no L+R here.  The press faces an occupied NPC tile, so no
+        -- step completes and no encounter rolls.
+        H.setPad({}); return
       end
       if H.dialogWaiting() then
         H.setPad(ph < 4 and { "a" } or {}); return

@@ -41,7 +41,8 @@ local function tapInto(dir, pred, maxFrames, what, calmPred)
     H.call(function()
       ph = (ph + 1) % 8
       if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); phase = 0; return
+        -- #183: no L+R here.  map 9 rolls no encounters (tools/audit_encounters.py 9).
+        H.setPad({}); phase = 0; return
       end
       if H.dialogWaiting() then
         H.setPad(ph < 4 and { "a" } or {}); phase = 0; return

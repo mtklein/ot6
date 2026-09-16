@@ -530,20 +530,18 @@ local function genAttempt(n)
     }, {
       H.logStep(function()
         return string.format("%s: reload NOT calm ($E8=%02X bls=%s at " ..
-          "%d,%d) -- flee, re-settle, recapture", tag, H.readByte(0x00e8),
+          "%d,%d) -- fight, re-settle, recapture", tag, H.readByte(0x00e8),
           tostring(H.battleLoadStarted()), H.worldX(), H.worldY())
       end),
-      H.driveUntil(function()
-        return H.worldMode() and H.worldHasControl() and H.worldAligned()
-      end, 20000, {
-        H.call(function()
-          if H.battleLoadStarted() then
-            H.setPad({ l = true, r = true })   -- flee, with real input
-          else
+      (function() local W = H.newWalkFighter(tag .. ": boot battle")
+        return H.driveUntil(function()
+          return H.worldMode() and H.worldHasControl() and H.worldAligned()
+        end, 20000, {
+          H.call(function()
+            if W.frame() then return end   -- fought, not fled (#183)
             H.setPad({})
-          end
-        end),
-      }, tag .. ": flee the boot battle, ride out the world reload"),
+          end),
+        }, tag .. ": fight the boot battle, ride out the world reload") end)(),
       H.release(),
       H.waitFrames(30),
       H.call(function()

@@ -195,8 +195,9 @@ local function safeWalk(tx, ty, what, budget)
     upleft = "left", upright = "right", downleft = "left", downright = "right" }
   -- map 70 draws random encounters like the rest of the cave; without this
   -- branch a battle mid-walk left the drive holding an empty pad until the
-  -- budget ran out (the same failure the header describes on map 87).  Same
-  -- flee-then-tactical-fallback shape as navTo's playBattles="tactical" branch.
+  -- budget ran out (the same failure the header describes on map 87).  The
+  -- fighter plays every one from its first frame (#183: the L+R-first
+  -- FLEE_CAP window is gone).
   local F = H.newFightDriver(what or "safeWalk",
     { tactical = true, boost = true, bank = 3, items = true, healPercent = 55,
       healer = 6 })
@@ -209,8 +210,7 @@ local function safeWalk(tx, ty, what, budget)
         ph = (ph + 1) % 8
         if H.battleLoadStarted() then
           battN = battN + 1
-          if battN <= FLEE_CAP then H.setPad({ l = true, r = true })
-          else F.frame() end
+          F.frame()
           return
         end
         battN = 0

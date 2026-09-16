@@ -31,7 +31,7 @@ H.run({ maxFrames = 20000 }, {
   -- a load ever comes up without them, step off and back on to re-fire the
   -- SavePoint script rather than saving through a stale flag.
   H.cond(function() return sw(0x01BF) == 1 end, {}, {
-    (function() local calm = 0
+    (function() local calm, W = 0, H.newWalkFighter("re-fire the SavePoint on 240 (58,7)")
       return H.driveUntil(function()
         calm = (H.fieldX() == 58 and H.fieldY() == 7 and sw(0x01BF) == 1
                 and H.tileAligned() and not H.dialogWaiting()
@@ -39,7 +39,7 @@ H.run({ maxFrames = 20000 }, {
         return calm >= 8
       end, 6000, {
         H.call(function()
-          if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+          if W.frame() then return end
           if H.dialogWaiting() then H.setPad({ "a" }); return end
           if H.fieldX() == 58 and H.fieldY() == 7 then
             H.setPad({ left = true })      -- step off...

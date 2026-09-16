@@ -151,14 +151,17 @@ local function settle(maxFrames, what)
   }, what)
 end
 
+-- Every pressWalk here runs on Thamasa's maps 343/349/351, which roll no
+-- encounters (tools/audit_encounters.py 343 349 351); the two scripted
+-- fights it walks into (battles 45 and 79) end the walk on their first
+-- frame and are played by the ladders below.  So no L+R (#183): an
+-- unexpected battle stalls the walk visibly instead of being fled.
 local function pressWalk(dir, pred, maxFrames, what)
   local ph = 0
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); return
-      end
+      if H.battleLoadStarted() then H.setPad({}); return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
     end),
@@ -1048,12 +1051,13 @@ local steps = {
   -- ---- 2. care, then PREP, then into town ---------------------------------
   H.fieldCare({ tag = "care at the L tile", threshold = 0.9 }),
 
-  H.driveUntil(function() return not H.worldMode() end, 2000, {
-    H.call(function()
-      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
-      H.setPad({ right = true })
-    end),
-  }, "held RIGHT onto (250,128) -> Thamasa 343 (23,46)"),
+  (function() local W = H.newWalkFighter("held RIGHT onto (250,128)")
+    return H.driveUntil(function() return not H.worldMode() end, 2000, {
+      H.call(function()
+        if W.frame() then return end
+        H.setPad({ right = true })
+      end),
+    }, "held RIGHT onto (250,128) -> Thamasa 343 (23,46)") end)(),
   H.release(),
   H.waitUntil(function() return map() == 343 and H.hasControl() end, 3000,
     "Thamasa map re-loaded", 5),

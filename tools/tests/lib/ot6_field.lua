@@ -1294,13 +1294,16 @@ function M.phaseWalk(tx, ty, spec)
   local hb = -300
   local battN, aPhase = 0, 0
 
-  -- Encounters are fled with the shared corridor policy (the same driver
-  -- navTo's playBattles="flee" runs), and a wipe is named a wipe.
+  -- Encounters are fought by the library fighter (#183: they were fled
+  -- with L+R, which the no-effect watchdog now names a stall -- the
+  -- gate-cave regen spent two of three attempts on it), the party is
+  -- healed outside battle once it stands on a safe tile, and a wipe is
+  -- named a wipe.
   local wipeCheck = wipeCanary("phaseWalk")
   local tactical = M.newFightDriver("phaseWalk",
     { tactical = true, boost = true, items = true,
       healPercent = spec.healPercent or 55 })
-  local flee = newFlee(spec, tactical)
+  local sawBattle, careD = false, nil
 
   local function curPhase() return swv(swB) == 1 and "b" or "a" end
   local function otherOf(p) return p == "a" and "b" or "a" end
@@ -1413,16 +1416,27 @@ function M.phaseWalk(tx, ty, spec)
     M.call(function()
       aPhase = (aPhase + 1) % 8
       wipeCheck()
+      -- a between-battles care stop in progress owns the pad
+      if careD then
+        if careD.done() then
+          careD = nil
+          -- the menu stopped the field module: observe the clock afresh
+          grids, lastFlip, lastB, hp0, obsStart = {}, nil, nil, nil, nil
+        else
+          careD.frame(); return
+        end
+      end
       battN = M.battleLoadStarted() and battN + 1 or 0
       if tactical and battN == 0 then tactical.idle() end
       if battN >= 3 then
         if plan or lastFlip then
-          M.log(string.format("[phaseWalk] encounter at f%d -- flee, "
+          M.log(string.format("[phaseWalk] encounter at f%d -- fighting it, "
             .. "then re-observe", M.frame))
         end
         plan, grids, lastFlip, lastB = nil, {}, nil, nil
         begunSeg, hp0, obsStart = -1, nil, nil
-        flee(battN)
+        sawBattle = true
+        tactical.frame()
         return
       end
       if battN > 0 then M.setPad({}); return end
@@ -1451,6 +1465,24 @@ function M.phaseWalk(tx, ty, spec)
           end
         end
         M.setPad({})
+        -- a battle just ended and the party stands on a safe tile: recover
+        -- OUTSIDE combat before re-observing (heal-after-every-battle).
+        -- The menu stops the field module, so the tile clock does not run
+        -- under it; the clock is observed afresh once the stop is done.
+        if sawBattle then
+          if not (M.hasControl() and M.tileAligned()) then return end
+          sawBattle = false
+          if spec.care ~= false and not M.eventTimerLive() then
+            careD = M.newCareDriver({
+              threshold = spec.careThreshold or 0.65, reserve = spec.reserve,
+              tag = "care after battle (phaseWalk)" })
+            careD.frame()
+            if not careD.done() then return end
+            careD = nil
+            grids, lastFlip, lastB, hp0, obsStart = {}, nil, nil, nil, nil
+            return
+          end
+        end
         if lastFlip and fsf() >= 25 and fsf() <= PERIOD - 38 then
           local p = curPhase()
           if not grids[p] then capture(p) end
@@ -3908,6 +3940,99 @@ function M.talkToObj(obj, what, maxF)
       { walkStep(), pokeStep(2, 900, true) }, {}),
     M.release(),
   })
+end
+
+-- M.newWalkFighter (#183): fight-and-care for a generator's own walker.
+-- A bespoke driveUntil walker (a held press onto a trigger tile, a
+-- grind-and-replan world walk, a tap into a save tile) used to hold L+R
+-- when a battle opened under it, which runs from the fight: no XP, and on
+-- a pincer roll no escape at all (tools/audit_encounters.py).  The route
+-- fights what it meets, so a walker asks this first on every frame:
+--
+--   local W = H.newWalkFighter("pressWalk " .. what)
+--   H.call(function()
+--     if W.frame() then plan = nil; return end   -- a battle, or its care, owned the frame
+--     ...the walker's own pad...
+--   end)
+--
+-- W.frame() sets the pad itself and returns true on every frame it owns:
+-- while a battle is up (M.newFightDriver plays it: boost-Fight by default,
+-- items, the heal policy), through the post-battle reload, and through the
+-- care stop that heals OUTSIDE battle with Tonics/Potions once the field
+-- or world is controllable again (M.newCareDriver: the heal-after-every-
+-- battle directive; skipped under a live event timer, and given up after
+-- 600 uncontrolled frames so a scripted stretch that never hands control
+-- back still walks on).  A dialog during the reload is left to the walker,
+-- whose own A-tap branch pages it.  A walker whose predicate fires mid-
+-- care simply ends; driveUntil releases the pad.
+--
+-- opts: healPercent (45), careThreshold (0.7), care = false skips the
+-- stop; healer/magic/summon/nuke/nukeLore/tool/blitz/bank/reserve pass to
+-- the fight driver as worldNavTo passes them.  W.fought() counts battles.
+function M.newWalkFighter(tag, opts)
+  opts = opts or {}
+  local F = M.newFightDriver(tag, {
+    tactical = true, boost = true, items = true,
+    healPercent = opts.healPercent or 45,
+    bank = opts.bank, reserve = opts.reserve, healer = opts.healer,
+    magic = opts.magic, summon = opts.summon, nuke = opts.nuke,
+    nukeLore = opts.nukeLore, tool = opts.tool, blitz = opts.blitz })
+  local battN, fought, careD, settleN = 0, 0, nil, nil
+  local function settled()
+    if (emu.getState()["ppu.screenBrightness"] or 0) < 15 then return false end
+    if M.worldMode() then return M.worldHasControl() and M.worldAligned() end
+    return M.hasControl() and M.tileAligned() and not M.dialogWaiting()
+  end
+  local W = {}
+  function W.fought() return fought end
+  function W.frame()
+    if careD then
+      careD.frame()
+      if careD.done() then careD = nil end
+      return true
+    end
+    if M.battleLoadStarted() then
+      battN = battN + 1
+      if battN == 3 then
+        local w = M.formationWords()
+        M.log(string.format("[%s] battle up f%d (%04X %04X %04X %04X %04X %04X) -- fighting it",
+          tag, M.frame, w[1], w[2], w[3], w[4], w[5], w[6]))
+      end
+      F.frame()
+      return true
+    end
+    if battN > 0 then
+      F.idle()
+      battN, fought, settleN = 0, fought + 1, 0
+      M.log(string.format("[%s] battle over f%d -- %d fought on this walk",
+        tag, M.frame, fought))
+    end
+    if settleN then
+      settleN = settleN + 1
+      if not settled() then
+        if M.dialogWaiting() then return false end
+        if settleN > 600 then
+          M.log(string.format("[%s] no control 600 frames after the battle; " ..
+            "no care stop here", tag))
+          settleN = nil
+          return false
+        end
+        M.setPad({})
+        return true
+      end
+      settleN = nil
+      if opts.care ~= false and not M.eventTimerLive() then
+        careD = M.newCareDriver({
+          threshold = opts.careThreshold or 0.7, reserve = opts.reserve,
+          tag = "care after battle (" .. tag .. ")" })
+        careD.frame()
+        if careD.done() then careD = nil; return false end
+        return true
+      end
+    end
+    return false
+  end
+  return W
 end
 
 -- Ride a scene out to a settled, controllable field, edge-tapping A on
