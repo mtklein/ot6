@@ -192,7 +192,12 @@ local function lap(n)
     walk(34, 112, "grind lap " .. n .. " south"),
     walk(34, 99, "grind lap " .. n .. " north"),
     H.call(function() grindLaps = n; where("grind lap " .. n) end),
-    care("grind lap " .. n),
+    -- 0.6, not the crossing's 0.9: no Tonic shop is reachable from here
+    -- (Jidoor's shop 22 sells none), and the first grind at 0.9 drank the
+    -- bag from 75 to 0 by lap 52 (46 of the 84 Tonics at the lap stop,
+    -- build/attempts/zozo_arrival-attempt1.log) while every level-up
+    -- refills HP anyway.  The post-battle care (0.65) still runs.
+    care("grind lap " .. n, 0.6),
   }, {})
 end
 
