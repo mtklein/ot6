@@ -51,8 +51,8 @@ end
 -- a back-exit walks the party out the wrong door (navTo's BFS does not know
 -- which floor tiles are entrances).  crossVia avoids that: navTo to an
 -- interior waypoint reached without touching any exit, then hold `dir` one
--- step onto the real exit.  Battles (fled; see the header) and cutscene
--- dialogs (tap-A) are handled throughout; done when the map becomes `toMap`.
+-- step onto the real exit.  Battles (fought, #183) and cutscene dialogs
+-- (tap-A) are handled throughout; done when the map becomes `toMap`.
 local function crossVia(wx, wy, dir, toMap, what)
   return H.cond(function() return true end, {
     H.logStep(function()
@@ -65,14 +65,11 @@ local function crossVia(wx, wy, dir, toMap, what)
       return mapIdx() == toMap or (H.fieldX() == wx and H.fieldY() == wy
          and H.hasControl() and H.tileAligned()) end }),
     (function()
-      local phase = 0
+      local phase, W = 0, H.newWalkFighter("crossVia " .. what)
       return H.driveUntil(function() return mapIdx() == toMap end, 6000, {
         H.call(function()
           phase = (phase + 1) % 8
-          if H.battleLoadStarted() then
-            H.setPad({ l = true, r = true })   -- flee, with real input
-            return
-          end
+          if W.frame() then return end
           if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
           if not H.hasControl() then H.setPad({}); return end
           H.setPad({ [dir] = true })   -- step onto the exit
@@ -158,17 +155,14 @@ H.run({ maxFrames = 120000 }, {
         H.fieldX(), H.fieldY(), H.frame)
     end),
     (function()
-      local phase = 0
+      local phase, W = 0, H.newWalkFighter("map 133 recovery spring")
       return H.driveUntil(function()
         return sw(0x0192) == 1 and mapIdx() == 133 and H.hasControl()
            and H.tileAligned()
       end, 8000, {
         H.call(function()
           phase = (phase + 1) % 8
-          if H.battleLoadStarted() then
-            H.setPad({ l = true, r = true })   -- flee, with real input
-            return
-          end
+          if W.frame() then return end
           if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
           if H.eventRunning() or not H.hasControl() then H.setPad({}); return end
           H.setPad({ up = true })   -- step onto the spring (3,12)
@@ -210,7 +204,9 @@ H.run({ maxFrames = 120000 }, {
             tostring(H.eventRunning()), sw(0x0038)))
         end
         if H.battleLoadStarted() then
-          H.setPad({ l = true, r = true })   -- flee, with real input
+          -- #183: no L+R here.  The boarding walk is on map 140, which rolls
+          -- no encounters (tools/audit_encounters.py 140): no battle can open.
+          H.setPad({})
           return
         end
         if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
