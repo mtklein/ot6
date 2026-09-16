@@ -678,6 +678,60 @@ function M.muddleRule(o)
   return nil
 end
 
+-- The turn-denying statuses (#187), read off the same four bytes the
+-- Muddle rule reads.  Stop (STATUS3 bit 4, $3ef8): Ot6Gate holds the
+-- gauge (battle_main.asm @08d5 `jsl Ot6Gate / bne` "return if target has
+-- stop status or is broken"), so no window opens until $3af1's counter
+-- runs out.  Sleep and Berserk (STATUS2 bits 7 and 4, $3ee5): the gauge
+-- fills, but the ATB-full check @0941 (`peaflg STATUS12, {DEAD, PETRIFY,
+-- ZOMBIE, SLEEP, CONFUSE, BERSERK} ... bcc CancelAction`) cancels the
+-- menu and hands the turn to the engine -- a sleeper does nothing, a
+-- berserker Fights whom RandCharAction picks.  Imp (STATUS1 bit 5, $3ee4)
+-- is NOT one of them: an imp keeps its window with every command but
+-- Fight, Item and Magic's Imp spell greyed (BattleCmdProp's IMP flag;
+-- @1029 zeroes its battle power), so it is a cure question rather than a
+-- planning one.  Measured 2026-09-16 (probe_statuses.lua, the world walk
+-- off camp_escaped): Berserk landed on SHADOW as his window opened
+-- ($7BCA=01 $7BC2=01 actor=1), the driver planned a Fight for him, and
+-- the engine took the window away inside the pulse (the plan died as
+-- actor_changed); his gauge then read $0097 with $3AA0=$29 for ~1400
+-- frames while the engine's own Fights went out under his name.  The
+-- driver treats these as arithmetic on the bytes: a denied actor is
+-- never planned for, never pressed at, and never counted on to act.
+M.ST1_IMP, M.ST2_BERSERK, M.ST2_SLEEP, M.ST3_STOP = 0x20, 0x10, 0x80, 0x10
+--   s1, s2, s3   the entity's STATUS1/2/3 bytes
+-- Returns the name of the status that denies the turn, or nil.
+function M.turnDenied(o)
+  if ((o.s3 or 0) & M.ST3_STOP) ~= 0 then return "Stop" end
+  if ((o.s2 or 0) & M.ST2_SLEEP) ~= 0 then return "Sleep" end
+  if ((o.s2 or 0) & M.ST2_BERSERK) ~= 0 then return "Berserk" end
+  return nil
+end
+-- The cure in the bag for one status bit, from the ROM's own item
+-- records (M.itemStatus1/2) rather than a table of beliefs: the first of
+-- `items` that `has` says the bag holds and whose record carries the
+-- bit.  The default order is Green Cherry ($F8: STATUS1 $20, Imp only)
+-- then Remedy ($F5: STATUS1 $65 = Petrify|Imp|Poison|Blind, STATUS2 $48 =
+-- Sap|Mute) -- the single-purpose item first, the field care's order.
+-- Nothing in that pair carries Berserk's STATUS2 $10 (ROM read 2026-09-16,
+-- build/ot6.sfc ItemProp), so Berserk's cure is "none in the bag" until
+-- the ROM says otherwise; Sleep clears under any physical hit (CalcMaxDmg
+-- @0c45 strips sleep and muddle) and Stop only with its counter.
+--
+--   byte   1 or 2, which status byte the bit lives in
+--   bit    the status bit
+--   has    function(item) -> true when the bag holds one to spend
+--   items  the candidates in order (optional)
+M.GREEN_CHERRY, M.REMEDY = 0xF8, 0xF5
+function M.statusCure(o)
+  for _, item in ipairs(o.items or { M.GREEN_CHERRY, M.REMEDY }) do
+    local rec
+    if o.byte == 2 then rec = M.itemStatus2(item) else rec = M.itemStatus1(item) end
+    if (rec & o.bit) ~= 0 and o.has(item) then return item end
+  end
+  return nil
+end
+
 -- Ticks until an ATB gauge fills, from the two words the engine keeps per
 -- entity: $3218,x is the 16-bit gauge it adds the constant $3ac8,x to on
 -- every ATB tick (battle_main.asm _c211bb), read as FULL when its high
@@ -960,7 +1014,17 @@ function M.battleLayout(o)
   o = o or {}
   local t = o.type or M.readByte(0x201F)
   local group = o.group or M.readByte(0x7ACE)
-  local L = { type = t, group = group, name = M.BATTLE_TYPES[t] or "unknown" }
+  -- The preemptive strike (#186): battle_main.asm @2eb5..@2ec0 `jsr Rand /
+  -- cmp $ee / bcs / lda #$40 / tsb $b0` on a 1/8 roll (doubled by the Gale
+  -- Hairpin, suppressed by $2F4B bit 2), which opens the party's gauges
+  -- full and the monsters' empty
+  -- -- a free round.  Read live with the type; a test passing `type`
+  -- supplies it (default false) rather than reading the emulator.
+  local pre
+  if o.type ~= nil then pre = o.preemptive or false
+  else pre = (M.readByte(0x00B0) & 0x40) ~= 0 end
+  local L = { type = t, group = group, name = M.BATTLE_TYPES[t] or "unknown",
+              preemptive = pre }
   if t == 0 then
     L.toMonsters, L.toChars = { "left" }, { "right" }
     L.where = "the monsters stand left of the party"
@@ -2631,6 +2695,12 @@ function M.newFightDriver(tag, opts)
   -- on map 269, two Fenix Downs confirmed on one member 240+ ticks apart
   -- both executed (branch_boostfight_s48: f4322 and f4734, tgt $0008).
   local raiseQueued = {}               -- e -> { by, tick }
+  -- and every confirmed status cure not yet landed, by target (#187):
+  -- measured on mrf_263 (probe_statuses, 2026-09-16), actor 3's Green
+  -- Cherry on entity 1 was confirmed, actor 0 planned a second on the
+  -- same entity 480 frames later while the first sat in the queue, and
+  -- both were spent (4 -> 2 in the bag) on one Imp.
+  local cureQueued = {}                -- e -> { by, tick, item }
   -- and the Muddle rule's own pending hit (#170): one ally's Fight on the
   -- muddled member is in the air, so the next actor plans normally rather
   -- than land a second hit on a member the first one already cleared
@@ -2640,6 +2710,12 @@ function M.newFightDriver(tag, opts)
   -- the ATB words per entity (X = entity*2): the 16-bit gauge and the
   -- constant added to it each tick (M.atbEta), and STATUS2 ($3ee5)
   local ATB, ATB_CONST, ST2 = 0x3218, 0x3AC8, 0x3EE5
+  -- and STATUS1 ($3ee4) / STATUS3 ($3ef8) for the turn-denying statuses
+  -- and Imp (#187, M.turnDenied / M.statusCure)
+  local ST1, ST3 = 0x3EE4, 0x3EF8
+  local statusSaid = {}                -- "e:name" -> true once said this battle
+  local cureSaid = nil                 -- the last cure refusal logged, once
+  local freeRoundSaid = false          -- the preemptive free-round line, once
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
@@ -2949,6 +3025,39 @@ function M.newFightDriver(tag, opts)
     local g = M.readWord(ATB + x)
     return M.atbEta(g, M.readWord(ATB_CONST + x)), g >> 8
   end
+  -- The four status bytes' verdict on a party entity (#187): the name of
+  -- the status denying its turn, or nil; and whether it is an imp.
+  local function statusOf(e)
+    return M.readByte(ST1 + e * 2), M.readByte(ST2 + e * 2), M.readByte(ST3 + e * 2)
+  end
+  local function denied(e)
+    local s1, s2, s3 = statusOf(e)
+    return M.turnDenied({ s1 = s1, s2 = s2, s3 = s3 })
+  end
+  local function isImp(e)
+    return (M.readByte(ST1 + e * 2) & M.ST1_IMP) ~= 0
+  end
+  local function bagCount(id)
+    local n = 0
+    for i = 0, 251 do
+      if M.readByte(BATTINV + i * 5) == id then n = n + M.readByte(BATTINV + i * 5 + 3) end
+    end
+    return n
+  end
+  -- The cure the bag holds for entity e's Imp (Green Cherry, then Remedy)
+  -- or Berserk (nothing in this ROM), through M.statusCure and the
+  -- reserve-aware battInvIdx.
+  local function cureFor(e)
+    if isImp(e) then
+      return M.statusCure({ byte = 1, bit = M.ST1_IMP,
+        has = function(item) return battInvIdx(item) ~= nil end }), "Imp"
+    end
+    if (M.readByte(ST2 + e * 2) & M.ST2_BERSERK) ~= 0 then
+      return M.statusCure({ byte = 2, bit = M.ST2_BERSERK, items = { M.REMEDY },
+        has = function(item) return battInvIdx(item) ~= nil end }), "Berserk"
+    end
+    return nil, nil
+  end
   -- The party's measured window on one slot, the press rule's sum with
   -- the deciding actor left out (they are spending the turn elsewhere):
   -- each living member's last action in shielded-equivalent HP, x4 when
@@ -3061,8 +3170,10 @@ function M.newFightDriver(tag, opts)
                  or (battInvIdx(TONIC) and itemRestoreOf(TONIC)) or 0
       local first, firstEta, firstPct = nil, nil, nil
       for p = 0, 3 do
+        -- a Stopped, asleep or berserk member's gauge is not a turn the
+        -- party can plan on (#187): it is left out of the top-up race
         if p ~= actor and p ~= e and M.readWord(0x3BF4 + p * 2) > 0
-           and M.readWord(0x3C1C + p * 2) > 0 then
+           and M.readWord(0x3C1C + p * 2) > 0 and denied(p) == nil then
           local eta, pct = etaOf(p * 2)
           if eta ~= nil and (first == nil or eta < firstEta) then
             first, firstEta, firstPct = p, eta, pct
@@ -3224,6 +3335,57 @@ function M.newFightDriver(tag, opts)
                  ally = true, reason = "unmuddle" }
       end
     end
+    -- The status cure line (#187), after the Muddle rule and before any
+    -- heal: an imp's Fight lands for 0 and its Magic keeps only Imp, so
+    -- a turn that cures it is worth more than the turn it spends -- the
+    -- imp's own first (its attack is worthless anyway, and an imp keeps
+    -- its Item row: BattleCmdProp $01 carries the IMP flag), then a
+    -- living ally's.  The item comes from the ROM's records through
+    -- M.statusCure (Green Cherry, then Remedy); with nothing in the bag
+    -- that carries the bit the refusal is said once and the actor plans
+    -- on.  Berserk goes through the same gate and, in this ROM, always
+    -- lands on "none in the bag" (Remedy's STATUS2 byte is $48).  A cure
+    -- is care: it takes the round's care turn when the budget is open,
+    -- and the imp's self-cure goes regardless, since the alternative is
+    -- a zero.
+    if parkDropN < 3 and cmdRow(actor, CMD_ITEM) ~= nil and opts.items ~= false then
+      local order = { actor }
+      for e = 0, 3 do if e ~= actor then order[#order + 1] = e end end
+      for _, e in ipairs(order) do
+        if hpNow[e] > 0 and M.readWord(0x3C1C + e * 2) > 0 then
+          local item, what = cureFor(e)
+          local queued = cureQueued[e]
+          if what ~= nil and queued ~= nil then
+            local said = string.format("[%s] actor=%d no cure on entity %d: actor %d's "
+              .. "$%02X on them is confirmed (tick %d) and has not landed",
+              tag or "fight", actor, e, queued.by, queued.item, queued.tick)
+            if said ~= cureSaid then cureSaid = said; M.log(said) end
+          elseif what ~= nil then
+            local open = e == actor or careActor == nil or careActor == actor
+                      or hpNow[careActor] == 0 or denied(careActor) ~= nil
+            if item ~= nil and open then
+              M.log(string.format("[%s] actor=%d cure entity %d's %s with $%02X "
+                .. "(%d in the bag): %s", tag or "fight", actor, e, what, item,
+                bagCount(item), e == actor and "its own turn is worth nothing as "
+                .. "it stands" or "an ally's turn is worth nothing as it stands"))
+              return { kind = "item", item = item, target = e,
+                       row = cmdRow(actor, CMD_ITEM), idx = battInvIdx(item),
+                       reason = "cure " .. what }
+            end
+            local said = item == nil
+              and string.format("[%s] actor=%d: entity %d is %s and nothing in "
+                .. "the bag carries the bit (Green Cherry %d, Remedy %d) -- no "
+                .. "cure to plan; planning on", tag or "fight", actor, e,
+                what == "Imp" and "an IMP" or "BERSERK", bagCount(M.GREEN_CHERRY),
+                bagCount(M.REMEDY))
+              or string.format("[%s] actor=%d: entity %d's %s cure ($%02X) waits for "
+                .. "the round's care turn (actor %d's)", tag or "fight", actor, e,
+                what, item, careActor)
+            if said ~= cureSaid then cureSaid = said; M.log(said) end
+          end
+        end
+      end
+    end
     -- opts.healer = <battle chid>: only that character runs the item
     -- healing line; everyone else attacks.  Without this, a party whose
     -- only damage-dealer also heals can heal-lock: it never attacks, the
@@ -3286,8 +3448,11 @@ function M.newFightDriver(tag, opts)
     -- a 392-HP monster that one attacking round would have killed, and it
     -- never landed a single blow.  A caring actor who has since died
     -- reopens the budget.
+    -- A caring actor who has since been Stopped, put to sleep or
+    -- berserked (#187) has no next turn to delimit the round with, so the
+    -- budget reopens for them too, the way it does for a dead one.
     local careOpen = careActor == nil or careActor == actor
-                  or hpNow[careActor] == 0
+                  or hpNow[careActor] == 0 or denied(careActor) ~= nil
     -- A raise followed by another actor's Potion in the same window is
     -- care, not two care turns (#168): a member the raise just put at
     -- maxhp/8 (topUpOwed) reopens the budget for their top-up.
@@ -3638,8 +3803,32 @@ function M.newFightDriver(tag, opts)
       -- The first offer the policy says yes to gets the turn.
       local threshold = opts.healPercent or 60
       local cands = {}
+      -- The free round (#186): under a preemptive strike the party's
+      -- gauges opened full and the monsters' empty, so until the first
+      -- monster action closes nobody can be hit back, and a round cost
+      -- of 0 is the free round's arithmetic rather than "the enemy is
+      -- harmless".  The raises above stand (a Fenix Down nobody can
+      -- answer is the best one there is); a top-up on somebody standing
+      -- is deferred one turn for an attack that shortens the fight,
+      -- since the heal costs the same turn after the free round and the
+      -- damage the enemy will do is unmeasured either way.  A lever, not
+      -- a law: opts.freeRound = "care" keeps the top-ups.
+      -- "no monster has acted" is the exec observer's word (no monster
+      -- command has entered ExecCmd or returned), not the hit ledger's: a
+      -- first action that misses would leave the ledger empty
+      local freeRound = layout ~= nil and layout.preemptive
+                    and execMon == nil and execMonDone == nil
+                    and opts.freeRound ~= "care"
+      if freeRound and not freeRoundSaid then
+        freeRoundSaid = true
+        M.log(string.format("[%s] actor=%d: the preemptive strike's free round -- "
+          .. "no monster has acted yet, so top-ups wait one turn for an attack "
+          .. "(raises still go; opts.freeRound=\"care\" keeps the top-ups)",
+          tag or "fight", actor))
+      end
       for e = 0, 3 do
         local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
+        if freeRound then hp = 0 end
         -- hp < maxhp: a FULL character is never a patient.  Without it,
         -- the one-round-of-death rule (hp <= roundCost) deadlocked a
         -- Trapper fight for 85k frames: a measured roundCost equal to max
@@ -4047,9 +4236,11 @@ function M.newFightDriver(tag, opts)
       layout = L
       M.log(string.format("[%s] [layout] battle type $%02X (%s): %s; from the "
         .. "party side the cursor crosses with %s, and back with %s "
-        .. "($201F=%02X $7ACE=%02X)", tag or "fight", layout.type, layout.name,
+        .. "($201F=%02X $7ACE=%02X)%s", tag or "fight", layout.type, layout.name,
         layout.where, table.concat(layout.toMonsters, "/"),
-        table.concat(layout.toChars, "/"), layout.type, layout.group))
+        table.concat(layout.toChars, "/"), layout.type, layout.group,
+        layout.preemptive and " preemptive ($b0 bit 6: the party's gauges "
+          .. "opened full, the monsters' empty -- a free round)" or ""))
     end
     -- a side attack's crossing depends on the group the cursor sits in,
     -- which moves during the fight: re-read that part every time
@@ -4238,6 +4429,30 @@ function M.newFightDriver(tag, opts)
         st, M.frame, actor, M.readByte(BCHID + actor * 2),
         M.readByte(CMDROW + actor) & 3, plan and plan.kind or "-", sideWindowN))
       return { "b" }
+    end
+    -- A denied actor's window (#187): Stop, Sleep or Berserk on the
+    -- entity whose window this is.  The engine is about to take the
+    -- window away (measured: Berserk landing at $7BC2=01 -> the window
+    -- gone within the pulse) or never meant to open one, so nothing here
+    -- is a stall: the park, idle and target-spin counters are stood
+    -- down, a plan for this actor is dropped without a recovery count,
+    -- and no button is pressed at the command window.  A selection list
+    -- or the target screen left open under it is closed with B, because
+    -- in Wait mode an open list holds the battle clock and the status
+    -- would never run out.
+    do
+      local den = M.readByte(MENU) ~= 0 and denied(actor) or nil
+      if den ~= nil then
+        parkSt, parkN, idleSt, idleN, tgtSpin = nil, 0, nil, 0, 0
+        if plan ~= nil and planActor == actor then
+          M.log(string.format("[%s] actor=%d is under %s with its window at "
+            .. "state $%02X -- the engine takes this turn; dropping plan %s "
+            .. "without a recovery count", tag or "fight", actor, den, st, plan.kind))
+          dropPlan("denied_" .. den)
+        end
+        if IDLE_ST[st] or st == ST_TGT then return { "b" } end
+        return nil
+      end
     end
     -- The lore stall guard, checked wherever a lore plan is live rather
     -- than only at plan time: a pursuit wedged inside the window (the
@@ -4611,6 +4826,11 @@ function M.newFightDriver(tag, opts)
       elseif plan.kind == "item" and plan.item == FENIX_DOWN then
         raisePending = { e = plan.target, by = actor, tick = battleTick }
         raiseQueued[plan.target] = { by = actor, tick = battleTick }
+      elseif plan.kind == "item" and plan.target
+         and type(plan.reason) == "string" and plan.reason:sub(1, 5) == "cure " then
+        -- a confirmed status cure (#187): nobody plans another on this
+        -- entity until the bit clears (F.frame) or the window lapses
+        cureQueued[plan.target] = { by = actor, tick = battleTick, item = plan.item }
       elseif (plan.kind == "item" or plan.kind == "heal") and plan.target
          and topUpOwed[plan.target] then
         M.log(string.format("[%s] actor=%d's %s on entity %d is the top-up its raise "
@@ -4686,7 +4906,8 @@ function M.newFightDriver(tag, opts)
     dmgHit, hitLedger, partyHpLast = {}, {}, {}
     monAct, deathSaid, battleDeaths, wipeSaid = nil, {}, {}, false
     raisePending, topUpOwed, unmuddlePending = nil, {}, nil
-    raiseQueued = {}
+    raiseQueued, cureQueued = {}, {}
+    statusSaid, cureSaid, freeRoundSaid = {}, nil, false
     execActor, execDone = nil, {}
     execMon, execMonDone = nil, nil
     execMonCmd, execMonAtk = nil, nil
@@ -4708,6 +4929,67 @@ function M.newFightDriver(tag, opts)
       local snap = {}
       for e = 0, 3 do snap[e] = M.readWord(0x3BF4 + e * 2) end
       startSnap = snap
+    end
+    -- The [status] line (#187), once per battle per entity per status:
+    -- what landed, what the engine does with it, and what the bag holds
+    -- for it -- said the frame it lands, so the driver's next lines read
+    -- against it; and once when it clears.
+    if battleTick > 4 then
+      for e = 0, 3 do
+        if M.readWord(0x3C1C + e * 2) > 0 then
+          local s1, s2, s3 = statusOf(e)
+          local names = {}
+          local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3 })
+          if den then names[#names + 1] = den end
+          if (s1 & M.ST1_IMP) ~= 0 then names[#names + 1] = "Imp" end
+          local on = {}
+          for _, name in ipairs(names) do
+            on[name] = true
+            local key = e .. ":" .. name
+            if not statusSaid[key] then
+              statusSaid[key] = "on"
+              local what
+              if name == "Stop" then
+                what = "the engine holds its gauge (Ot6Gate; $3AF1 counts $12 ticks "
+                  .. "down) and opens no window for it; planning around it"
+              elseif name == "Sleep" then
+                what = "the ATB-full check cancels its menu (battle_main @0941); a "
+                  .. "physical hit on it clears the bit (@0c45), else the counter "
+                  .. "runs out; planning around it"
+              elseif name == "Berserk" then
+                local item = cureFor(e)
+                what = "the engine Fights for it (RandCharAction); planning around it; cure: "
+                  .. (item and string.format("$%02X x%d", item, bagCount(item))
+                      or string.format("none in the bag (Remedy x%d carries no Berserk bit)",
+                        bagCount(M.REMEDY)))
+              else
+                local item = cureFor(e)
+                what = "its Fight lands for 0 (battle power zeroed @1029) and its Magic "
+                  .. "keeps only Imp; every row but Fight/Item/Magic greyed; cure: "
+                  .. (item and string.format("$%02X x%d (planned next turn)", item,
+                        bagCount(item))
+                      or string.format("none in the bag (Green Cherry %d, Remedy %d)",
+                        bagCount(M.GREEN_CHERRY), bagCount(M.REMEDY)))
+              end
+              M.log(string.format("[%s] [status] f+%d entity %d char %d %s (STATUS1/2/3 "
+                .. "$%02X/$%02X/$%02X, atb=%04X menu=%02X st=%02X actor=%d): %s",
+                tag or "fight", battleTick, e, M.readByte(BCHID + e * 2),
+                name == "Imp" and "is an IMP" or ("is under " .. name:upper()),
+                s1, s2, s3, M.readWord(ATB + e * 2), M.readByte(MENU),
+                M.readByte(MSTATE), M.readByte(ACTOR) & 3, what))
+            end
+          end
+          for _, name in ipairs({ "Stop", "Sleep", "Berserk", "Imp" }) do
+            local key = e .. ":" .. name
+            if statusSaid[key] == "on" and not on[name] then
+              statusSaid[key] = "off"
+              M.log(string.format("[%s] [status] f+%d entity %d's %s is CLEARED "
+                .. "(STATUS1/2/3 $%02X/$%02X/$%02X)", tag or "fight", battleTick, e,
+                name, s1, s2, s3))
+            end
+          end
+        end
+      end
     end
     -- VICTORY-DEADLOCK guard (measured, Thamasa grind bake fight 37): the
     -- killing blow can land while an actor's spell/item window is still
@@ -4808,6 +5090,16 @@ function M.newFightDriver(tag, opts)
       local hp = M.readWord(0x3BF4 + e * 2)
       if (hp > 0 and hp ~= 0xFFFF) or battleTick - q.tick > RAISE_WAIT + 600 then
         raiseQueued[e] = nil
+      end
+    end
+    -- a queued status cure has landed when the bit it carries is gone
+    -- (the [status] CLEARED line says so), or is forgotten after its window
+    for e, q in pairs(cureQueued) do
+      local s1, s2 = M.readByte(ST1 + e * 2), M.readByte(ST2 + e * 2)
+      local still = (M.itemStatus1(q.item) & s1) ~= 0 or (M.itemStatus2(q.item) & s2) ~= 0
+      if not still or M.readWord(0x3BF4 + e * 2) == 0
+         or battleTick - q.tick > RAISE_WAIT + 600 then
+        cureQueued[e] = nil
       end
     end
     if raisePending then

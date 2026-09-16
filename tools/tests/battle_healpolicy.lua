@@ -450,6 +450,36 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: the battle layout's crossing directions (#176) checked")
   end),
 
+  -- 12c. the turn-denying statuses (#187, H.turnDenied) and the preemptive
+  -- strike (#186, H.battleLayout's `preemptive`), as arithmetic on the
+  -- bytes: Stop is STATUS3 $10, Sleep STATUS2 $80, Berserk STATUS2 $10;
+  -- Imp (STATUS1 $20) keeps its window and is not a denial.  The cure
+  -- lookup (H.statusCure) reads the ROM's item records: Green Cherry
+  -- $F8 STATUS1 $20, Remedy $F5 STATUS1 $65 / STATUS2 $48, so Imp has a
+  -- cure and Berserk has none (ROM read 2026-09-16).
+  H.call(function()
+    H.assertEq(H.turnDenied({ s1 = 0, s2 = 0, s3 = 0x10 }), "Stop", "STATUS3 bit 4 is Stop")
+    H.assertEq(H.turnDenied({ s1 = 0, s2 = 0x80, s3 = 0 }), "Sleep", "STATUS2 bit 7 is Sleep")
+    H.assertEq(H.turnDenied({ s1 = 0, s2 = 0x10, s3 = 0 }), "Berserk", "STATUS2 bit 4 is Berserk")
+    H.assertEq(H.turnDenied({ s1 = 0x20, s2 = 0, s3 = 0 }), nil, "Imp alone denies no turn")
+    H.assertEq(H.turnDenied({ s1 = 0, s2 = 0x20, s3 = 0 }), nil, "Muddle is the Muddle rule's, not a denial")
+    H.assertEq(H.turnDenied({ s1 = 0, s2 = 0x90, s3 = 0x10 }), "Stop", "Stop is named first when several stand")
+    local bag = { [0xF8] = true }
+    H.assertEq(H.statusCure({ byte = 1, bit = 0x20, has = function(i) return bag[i] end }), 0xF8,
+      "an Imp with a Green Cherry in the bag: the Green Cherry")
+    bag = { [0xF5] = true }
+    H.assertEq(H.statusCure({ byte = 1, bit = 0x20, has = function(i) return bag[i] end }), 0xF5,
+      "...with only Remedies: the Remedy (its record carries Imp)")
+    H.assertEq(H.statusCure({ byte = 2, bit = 0x10, items = { 0xF5 },
+      has = function(i) return bag[i] end }), nil,
+      "Berserk with Remedies in the bag: nothing (Remedy's STATUS2 byte is $48)")
+    H.assertEq(H.battleLayout({ type = 0, group = 1, preemptive = true }).preemptive, true,
+      "a preemptive strike rides the layout")
+    H.assertEq(H.battleLayout({ type = 0, group = 1 }).preemptive, false,
+      "...and defaults off for a supplied type")
+    H.log("battle_healpolicy: the turn-denying statuses (#187) and the preemptive flag (#186) checked")
+  end),
+
   -- 13. the keyed line's boost (#174, H.keyBoost) on the map-269 trio
   -- (Trapper: 2 shields, BLUDG key) and Nerapa (5 shields, SLASH|PIERCE):
   -- chips per boost are the chip model's for each member's hands.
