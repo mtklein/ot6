@@ -3068,7 +3068,15 @@ function M.bagArrange(order, opts)
     end
     M.setPad({})
   end
-  return M.driveUntil(done, opts.maxFrames or 24000, { M.call(frame) }, tag)
+  return M.seqStep({
+    M.driveUntil(done, opts.maxFrames or 24000, { M.call(frame) }, tag),
+    -- settle the way shopClose does: the field drops a press for a few
+    -- frames after the menu closes (gen_sabin_gau's inventory move tapped
+    -- X 30 frames after this step and waited 600 for a menu that never
+    -- opened, 3/3 seeds)
+    M.release(),
+    M.waitFrames(30),
+  })
 end
 
 -- ---------------------------------------------------------------- rows --
