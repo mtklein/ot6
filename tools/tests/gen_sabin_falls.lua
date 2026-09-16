@@ -101,7 +101,8 @@ end
 
 -- ride/walk driver: choices steered by CH_SEL, name menu by menu state,
 -- battles per fightMode ("real": the boost-and-Fight episode machine plus
--- the wipe watch -- the win bit is EARNED; default: flee, hold L+R),
+-- the wipe watch -- the win bit is EARNED; default: none can open, see
+-- the branch),
 -- dialogs tap-A, else hold `dir` (or hands-off when dir is nil).
 local function ride(dir, pred, what, budget, fightMode, choiceWant)
   local phase, hb, quiet, wasIn = 0, -900, 0, false
@@ -144,7 +145,10 @@ local function ride(dir, pred, what, budget, fightMode, choiceWant)
           wasIn = true
           fightPulse(phase)
         else
-          H.setPad({ l = true, r = true })   -- flee, with real input
+          -- #183: no L+R here.  The default rides walk maps 166/155/156,
+          -- which roll no encounters (tools/audit_encounters.py 166 155
+          -- 156); the jump's battle 18 rides in "real" mode above.
+          H.setPad({})
         end
         return
       end

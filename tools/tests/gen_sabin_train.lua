@@ -21,7 +21,8 @@
 -- (38,9) facing up; valves (7,7)/(9,7) toggle $0184/$0186 (SHUT/OPEN/SHUT
 -- is the smokestack's guard); (32,7) facing-up+A triggers battle 68.
 --
--- No emulator state writes: random/ungated battles are fled; battle 47
+-- No emulator state writes: random/ungated battles are fought by the
+-- library fighter (H.newWalkFighter, #183); battle 47
 -- (the trap ghost) and battle 68 (the Ghost Train) are played with real
 -- input, each behind a checkpoint retry ladder. SABIN's first two turns
 -- against the Ghost Train are AuraBolt (chips a shield, reveals HOLY) and
@@ -334,12 +335,13 @@ local function wipeWatch(tag)
   end
 end
 
--- holdDrive: hold `dir` toward pred; dialogs tap-A; battles are either fled
--- (the default, because corridor encounters earn no win and no SHADOW roll)
--- or fought ("fight": the boost machine plus wipe watch, for the win-gated
--- battle 47).
+-- holdDrive: hold `dir` toward pred; dialogs tap-A; battles are fought --
+-- corridor encounters by the library fighter (#183: they used to be fled,
+-- which earned no XP), the win-gated battle 47 by the bespoke boost
+-- machine plus wipe watch ("fight").
 local function holdDrive(dir, pred, what, budget, fightMode)
   local phase, hb = 0, -600
+  local W = fightMode ~= "fight" and H.newWalkFighter("holdDrive " .. what) or nil
   return H.driveUntil(pred, budget or 15000, {
     H.call(function()
       phase = (phase + 1) % 8
@@ -354,12 +356,10 @@ local function holdDrive(dir, pred, what, budget, fightMode)
         wipeWatch(what)                    -- every frame, outside the gate
         if lost then H.setPad({}); return end
       end
-      if inBattle() or H.battleLoadStarted() then
-        if fightMode == "fight" then
-          fightPulse(phase)
-        else
-          H.setPad({ l = true, r = true })   -- flee, with real input
-        end
+      if W then
+        if W.frame() then return end
+      elseif inBattle() or H.battleLoadStarted() then
+        fightPulse(phase)
         return
       end
       if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
@@ -411,14 +411,11 @@ local function mstateMenu() return H.readByte(0x0026) end
 -- open the merchant's shop: chase obj 29, poke, steer the $02D0 choice to
 -- 0 (and any other choice to 1), until the menu module reads shop-options
 local function openShop()
-  local phase = 0
+  local phase, W = 0, H.newWalkFighter("openShop")
   return H.driveUntil(function() return mstateMenu() == 0x25 end, 20000, {
     H.call(function()
       phase = (phase + 1) % 8
-      if inBattle() or H.battleLoadStarted() then
-        H.setPad({ l = true, r = true })
-        return
-      end
+      if W.frame() then return end
       -- a choice is open: pick by dialog id (see the hazard note)
       if H.dialogWaiting() and H.readByte(CH_MAX) >= 2 then
         local want = dlgId() == 0x02D0 and 0 or 1
