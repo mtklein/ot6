@@ -4711,10 +4711,12 @@ end
 -- run says so now rather than after forty of them.
 --
 -- NOT wired into the fight driver on this branch: the call site is this
--- file's "parked %d pulses in known state" drop inside newFightDriver,
--- which wt/driver-boost owns.  One line there --
---   M.recoveryCount(tag, string.format("%s/%02X", tostring(plan), state))
--- -- turns drop #4 into a counted, retried fast failure with a screenshot.
+-- file's `parkN > 12` "parked %d pulses in known state" drop inside
+-- newFightDriver (wt/driver-boost owns that code).  One line there, just
+-- before dropPlan("cursor_stalled") --
+--   M.recoveryCount(tag, string.format("%s/%02X", plan.kind, st))
+-- -- turns drop #4 of the same plan in the same menu state into a
+-- counted, retried fast failure with a screenshot (#185 reached #40).
 function M.recoveryCount(tag, key, cap)
   local k = tostring(tag) .. "|" .. tostring(key)
   local n = (W.recovery[k] or 0) + 1
