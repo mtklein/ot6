@@ -3910,6 +3910,99 @@ function M.talkToObj(obj, what, maxF)
   })
 end
 
+-- M.newWalkFighter (#183): fight-and-care for a generator's own walker.
+-- A bespoke driveUntil walker (a held press onto a trigger tile, a
+-- grind-and-replan world walk, a tap into a save tile) used to hold L+R
+-- when a battle opened under it, which runs from the fight: no XP, and on
+-- a pincer roll no escape at all (tools/audit_encounters.py).  The route
+-- fights what it meets, so a walker asks this first on every frame:
+--
+--   local W = H.newWalkFighter("pressWalk " .. what)
+--   H.call(function()
+--     if W.frame() then plan = nil; return end   -- a battle, or its care, owned the frame
+--     ...the walker's own pad...
+--   end)
+--
+-- W.frame() sets the pad itself and returns true on every frame it owns:
+-- while a battle is up (M.newFightDriver plays it: boost-Fight by default,
+-- items, the heal policy), through the post-battle reload, and through the
+-- care stop that heals OUTSIDE battle with Tonics/Potions once the field
+-- or world is controllable again (M.newCareDriver: the heal-after-every-
+-- battle directive; skipped under a live event timer, and given up after
+-- 600 uncontrolled frames so a scripted stretch that never hands control
+-- back still walks on).  A dialog during the reload is left to the walker,
+-- whose own A-tap branch pages it.  A walker whose predicate fires mid-
+-- care simply ends; driveUntil releases the pad.
+--
+-- opts: healPercent (45), careThreshold (0.7), care = false skips the
+-- stop; healer/magic/summon/nuke/nukeLore/tool/blitz/bank/reserve pass to
+-- the fight driver as worldNavTo passes them.  W.fought() counts battles.
+function M.newWalkFighter(tag, opts)
+  opts = opts or {}
+  local F = M.newFightDriver(tag, {
+    tactical = true, boost = true, items = true,
+    healPercent = opts.healPercent or 45,
+    bank = opts.bank, reserve = opts.reserve, healer = opts.healer,
+    magic = opts.magic, summon = opts.summon, nuke = opts.nuke,
+    nukeLore = opts.nukeLore, tool = opts.tool, blitz = opts.blitz })
+  local battN, fought, careD, settleN = 0, 0, nil, nil
+  local function settled()
+    if (emu.getState()["ppu.screenBrightness"] or 0) < 15 then return false end
+    if M.worldMode() then return M.worldHasControl() and M.worldAligned() end
+    return M.hasControl() and M.tileAligned() and not M.dialogWaiting()
+  end
+  local W = {}
+  function W.fought() return fought end
+  function W.frame()
+    if careD then
+      careD.frame()
+      if careD.done() then careD = nil end
+      return true
+    end
+    if M.battleLoadStarted() then
+      battN = battN + 1
+      if battN == 3 then
+        local w = M.formationWords()
+        M.log(string.format("[%s] battle up f%d (%04X %04X %04X %04X %04X %04X) -- fighting it",
+          tag, M.frame, w[1], w[2], w[3], w[4], w[5], w[6]))
+      end
+      F.frame()
+      return true
+    end
+    if battN > 0 then
+      F.idle()
+      battN, fought, settleN = 0, fought + 1, 0
+      M.log(string.format("[%s] battle over f%d -- %d fought on this walk",
+        tag, M.frame, fought))
+    end
+    if settleN then
+      settleN = settleN + 1
+      if not settled() then
+        if M.dialogWaiting() then return false end
+        if settleN > 600 then
+          M.log(string.format("[%s] no control 600 frames after the battle; " ..
+            "no care stop here", tag))
+          settleN = nil
+          return false
+        end
+        M.setPad({})
+        return true
+      end
+      settleN = nil
+      if opts.care ~= false and not M.eventTimerLive() then
+        careD = M.newCareDriver({
+          threshold = opts.careThreshold or 0.7, reserve = opts.reserve,
+          tag = "care after battle (" .. tag .. ")" })
+        careD.frame()
+        if careD.done() then careD = nil; return false end
+        return true
+      end
+    end
+    return false
+  end
+  return W
+end
+
 -- Ride a scene out to a settled, controllable field, edge-tapping A on
 -- every frame the party is not in control and fighting anything that comes
 -- up by real input.  Battle frames drive gen_moogle's Marshal cycle: R
