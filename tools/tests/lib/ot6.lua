@@ -4421,7 +4421,7 @@ do
 
 local WATCH = {
   sampleEvery     = 16,     -- frames between observations
-  noEffectFrames  = 192,    -- ~3.2s of game time pressing into no answer
+  noEffectFrames  = 300,    -- 5s of game time pressing into no answer
   pressFraction   = 0.25,   -- ... with the pad down at least this often
   quietFrames     = 1800,   -- ~30s with neither the screen nor a progress
                             --     cell showing anything new
@@ -4513,6 +4513,7 @@ local function watchReset()
   W.samples = {}
   W.seenCtl, W.seenProg, W.seenScreen, W.pressAt = {}, {}, {}, {}
   W.lastNewCtl, W.lastNewProg, W.lastNewScreen = 0, 0, 0
+  W.prevCtl, W.lastDiffCtl, W.lastUnanswerable = nil, 0, 0
   W.maxQuietCtl, W.maxQuietProg, W.maxQuietScreen = 0, 0, 0
   W.samplesTaken, W.pressFrames = 0, 0
   W.suppressUntil, W.trips = 0, 0
@@ -4615,6 +4616,10 @@ local function watchTick()
 
   if not W.seenCtl[ctl] then W.lastNewCtl = M.frame end
   W.seenCtl[ctl] = M.frame
+  if ctl ~= W.prevCtl then W.lastDiffCtl = M.frame end
+  W.prevCtl = ctl
+  local inBattle = ctl:sub(1, 2) == "B:"
+  if inBattle and ctl:sub(1, 4) == "B:00" then W.lastUnanswerable = M.frame end
   if not W.seenProg[prog] then W.lastNewProg = M.frame end
   W.seenProg[prog] = M.frame
   if screen then
@@ -4642,16 +4647,32 @@ local function watchTick()
   -- and not before this attempt has a window's worth of samples
   if M.frame < WATCH.noEffectFrames + WATCH.sampleEvery then return nil end
 
-  -- In a battle with NO menu open there is nothing for a press to move:
-  -- the drivers edge-tap A through the fly-in, the enemy's turns and the
-  -- victory text, and that tapping is waiting, not pressing into a wall
-  -- (measured 2026-09-16: the first version tripped on the first fight's
-  -- opening animation, 96 A-frames in 192 with $7BCA=0).  #185's press
-  -- was into an OPEN menu ($7BCA=1, state $38), which this keeps.
+  -- Two shapes of "no effect", measured on gen_zozo4_dadaluma's climb
+  -- (2026-09-16, the three false trips of the first version):
+  --
+  --  * In a BATTLE the press must land on an open menu for the whole
+  --    window -- with no menu open ($7BCA=0) the drivers edge-tap A
+  --    through the fly-in, the enemy's turns and the victory text, and
+  --    that is waiting, not pressing into a wall (trip 1: 96 A-frames in
+  --    192 at the first fight's opening; trip 2: a window that was
+  --    menu-closed for 23 of its 24 samples).  With the menu open, the
+  --    verdict is NOVELTY over the window: a driver that cycles between
+  --    two states it has already been in (#185: target select $38, drop,
+  --    command list $05, re-plan, $38 ...) is not moving anything, and a
+  --    consecutive-identity test would never see it.
+  --  * On the FIELD or the world map the verdict is IDENTITY: the same
+  --    control cells at every sample of the window.  A walk that
+  --    re-plans around a wandering NPC revisits the same three tiles for
+  --    seconds (trip 3, the Zozo street), and that is the route working.
   local pressed = pressFramesIn(WATCH.noEffectFrames)
-  local answerable = ctl:sub(1, 4) ~= "B:00"
-  if answerable and qc >= WATCH.noEffectFrames
-     and pressed >= WATCH.pressFraction * WATCH.noEffectFrames then
+  local N = WATCH.noEffectFrames
+  local stuck
+  if inBattle then
+    stuck = (M.frame - W.lastUnanswerable) >= N and qc >= N
+  else
+    stuck = (M.frame - W.lastDiffCtl) >= N
+  end
+  if stuck and pressed >= WATCH.pressFraction * N then
     W.trips = W.trips + 1
     local shot = failEvidence("noeffect")
     return string.format("no-effect: %s for %d frames at %s -- the pad has "
