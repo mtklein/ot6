@@ -4939,8 +4939,10 @@ end
 --      WATCH.sampleEvery frames and keeps a ring of them.  Pressing at a
 --      screen that answers nothing (the #185 back attack: LEFT into a
 --      target cursor that only RIGHT moves, 9000 frames of it) fails fast
---      as `no-effect`; a run that goes visually and mechanically still
---      fails fast as `no-progress`.  Fast, because a 9000-frame step budget
+--      as `no-effect` (a held L+R in a battle is the run mechanic and is
+--      judged on the escape cells instead, see escapeSig); a run that
+--      goes visually and mechanically still fails fast as `no-progress`.
+--      Fast, because a 9000-frame step budget
 --      is a poor first line of defence: it burns eight minutes to say what
 --      three seconds of samples already said.  The budgets stay as the
 --      backstop.
@@ -5009,6 +5011,9 @@ local WATCH = {
   quietFrames     = 1800,   -- ~30s with neither the screen nor a progress
                             --     cell showing anything new
   memoryFrames    = 900,    -- how long a sampled signature counts as "seen"
+  escapeQuiet     = 600,    -- a held L+R is an escape in progress while the
+                            --     run counters moved this recently (measured
+                            --     128-160 frames apart per character, below)
   ringSize        = 24,
   recoveryCap     = 3,      -- drops of the same plan in one battle
   screenStride    = 7,      -- frame-buffer sampling stride for the hash
@@ -5053,6 +5058,40 @@ local function invSum()
   return s
 end
 
+-- The ESCAPE cells: what a held L+R moves.  CheckRunAway
+-- (battle_main.asm, "try to run away") runs on every character's ATB tick
+-- while $2F45 -- the engine's own "L+R is down" latch, set by the graphics
+-- half when it reads the pad -- is set: it adds random($3D71,x)+1 to that
+-- character's run counter $3D70,x, and when the counter reaches the run
+-- difficulty $3A3B it sets the character's bit in $3A38 (just escaped),
+-- which becomes $3A39 (left the battle) when the run action resolves.
+-- Measured 2026-09-16 (probe_escape_cells.lua, the crescent_landing world
+-- random that tripped the first version of this rule, TERRA/LOCKE vs two
+-- Behemoth-class monsters, $3A3B=4): with L+R held from the first battle
+-- frame $2F45 went 0->1 at +133 frames, the counters moved at +245, +373,
+-- +389, +533, +661 (128-160 frames apart per character), $3A38 set at
+-- +373 and +533, and the party was out at +837 -- 544 frames after the
+-- command window opened.  The same snapshot with the pad released: none
+-- of these cells moved.  The ATB gauges sit full under the open window in
+-- both branches, so they say nothing.
+local function escapeSig()
+  return string.format("%02X.%02X.%02X.%02X%02X%02X%02X",
+    M.readByte(0x2F45), M.readByte(0x3A38), M.readByte(0x3A39),
+    M.readByte(0x3D70), M.readByte(0x3D72),
+    M.readByte(0x3D74), M.readByte(0x3D76))
+end
+
+-- The formation refuses to run: $B1 bit 1 (set for a pincer, or by a
+-- monster whose "can't run" flag is set -- UpdateMonsterGfxBuf) or the
+-- formation's own "L+R has no effect" bit, $2F4B bit 0 (event battles).
+-- Checked BEFORE the escape cells: the run counters tick in such a
+-- formation too (measured 2026-09-16 on the Whelk fight, $B1=07 $2F4B=0C,
+-- counters 03,01,03 -> 06,03,05 under a held L+R; probe_noeffect_cantrun),
+-- it is the run command itself that refuses ("can't run away!!", Cmd_2a).
+local function cantRun()
+  return (M.readByte(0x00B1) & 0x02) ~= 0 or (M.readByte(0x2F4B) & 0x01) ~= 0
+end
+
 -- The CONTROL cells: what an input is supposed to move.  Party HP is
 -- deliberately NOT here -- monsters chewing through the party while the
 -- script presses an inert direction is exactly the #185 hang, and counting
@@ -5088,7 +5127,9 @@ local function progSig(ctl)
     local h = M.readWord(0x3BF4 + e * 2)
     if h < 10000 then php = php + h end
   end
-  return string.format("%s|m%d|p%d|i%d", ctl, monsterHpSum(), php, invSum())
+  local esc = (ctl:sub(1, 2) == "B:") and ("|e" .. escapeSig()) or ""
+  return string.format("%s|m%d|p%d|i%d%s", ctl, monsterHpSum(), php, invSum(),
+    esc)
 end
 
 local W = {}
@@ -5101,6 +5142,7 @@ local function watchReset()
   W.samplesTaken, W.pressFrames = 0, 0
   W.suppressUntil, W.trips = 0, 0
   W.battleEpoch, W.inBattle, W.recovery = 0, false, {}
+  W.prevEsc, W.lastEscMove, W.escSaid, W.cantRunSaid = nil, 0, false, false
 end
 watchReset()
 W.enabled = false
@@ -5187,6 +5229,7 @@ local function watchTick()
   local battle = M.battleLoadStarted()
   if battle and not W.inBattle then
     W.battleEpoch, W.recovery = W.battleEpoch + 1, {}
+    W.prevEsc, W.lastEscMove, W.escSaid, W.cantRunSaid = nil, M.frame, false, false
   end
   W.inBattle = battle
   if M.frame % WATCH.sampleEvery ~= 0 then return nil end
@@ -5209,6 +5252,42 @@ local function watchTick()
   -- (measured 2026-09-16 on the Zozo street: three trips, every one with
   -- monster HP summing to 0 under an open command list)
   if inBattle and monsterHpSum() == 0 then W.lastUnanswerable = M.frame end
+  -- A held L+R in a battle is the run mechanic, and the engine answers it
+  -- in the escape cells (escapeSig above), not in the menu cells: the
+  -- command window stays open and unmoving for the whole count.  So while
+  -- L+R is held and the formation can be run from, the press is answered
+  -- as long as the escape cells have moved within WATCH.escapeQuiet; it
+  -- is a real no-effect only when the formation refuses to run (the
+  -- can't-run bits) or those cells have gone still.  Measured 2026-09-16
+  -- on crescent_landing's first world random: three false trips of the
+  -- first version, every one 300 frames of "l+r" under an open window
+  -- with the run counters ticking (probe_escape_cells.lua).
+  local escapeLive = false
+  if inBattle then
+    local esc = escapeSig()
+    if esc ~= W.prevEsc then W.lastEscMove = M.frame end
+    W.prevEsc = esc
+    if curPad.l and curPad.r then
+      if cantRun() then
+        if not W.cantRunSaid then
+          W.cantRunSaid = true
+          M.log(string.format("[watch] L+R held at f%d but this formation "
+            .. "cannot be run from ($B1=%02X $2F4B=%02X): the press counts "
+            .. "as unanswered", M.frame, M.readByte(0x00B1),
+            M.readByte(0x2F4B)))
+        end
+      else
+        escapeLive = (M.frame - W.lastEscMove) < WATCH.escapeQuiet
+        if escapeLive and not W.escSaid and M.readByte(0x2F45) ~= 0 then
+          W.escSaid = true
+          M.log(string.format("[watch] escape in progress at f%d: L+R held, "
+            .. "$2F45 set, run difficulty $%02X, counters %s -- the run "
+            .. "count answers the press, not the menu", M.frame,
+            M.readByte(0x3A3B), esc))
+        end
+      end
+    end
+  end
   -- On the field and the world map only a press the game COULD answer
   -- counts: a held direction while the party has control (a walk), or
   -- any press with a dialog or a menu up.  A tapped A through a scripted
@@ -5279,7 +5358,7 @@ local function watchTick()
   local N = WATCH.noEffectFrames
   local stuck
   if inBattle then
-    stuck = (M.frame - W.lastUnanswerable) >= N and qc >= N
+    stuck = (M.frame - W.lastUnanswerable) >= N and qc >= N and not escapeLive
   else
     stuck = (M.frame - W.lastDiffCtl) >= N and (M.frame - W.lastInert) >= N
       and qs >= N
@@ -5287,13 +5366,23 @@ local function watchTick()
   if stuck and pressed >= WATCH.pressFraction * N then
     W.trips = W.trips + 1
     local shot = failEvidence("noeffect")
+    local escNote = ""
+    if inBattle and curPad.l and curPad.r then
+      escNote = cantRun()
+        and string.format("  L+R is held but this formation cannot be run "
+          .. "from ($B1=%02X $2F4B=%02X).", M.readByte(0x00B1),
+          M.readByte(0x2F4B))
+        or string.format("  L+R is held and the formation can be run from, "
+          .. "but the escape cells (%s) have not moved for %d frames.",
+          escapeSig(), M.frame - W.lastEscMove)
+    end
     return string.format("no-effect: %s for %d frames at %s -- the pad has "
       .. "been down %d of the last %d frames and no control cell has read "
       .. "anything new in that time (the screen last changed %d frames "
-      .. "ago).  This is a press the game is not answering, not a slow "
+      .. "ago).%s  This is a press the game is not answering, not a slow "
       .. "step.  Screenshot %s; ring above.",
       pressedIn(WATCH.noEffectFrames), qc, ctl, pressed,
-      WATCH.noEffectFrames, qs, shot)
+      WATCH.noEffectFrames, qs, escNote, shot)
   end
 
   if qp >= WATCH.quietFrames and qs >= WATCH.quietFrames then
