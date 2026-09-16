@@ -109,6 +109,14 @@ function M.emitBlob(tag, data)
   for i = 1, #enc, 4000 do
     print("[b64:" .. tag .. "] " .. enc:sub(i, i + 3999))
   end
+  -- The end marker (lib/decode_b64.py): one tag can carry several
+  -- emissions in one log -- a ladder screenshotting each attempt, and now
+  -- a retried segment re-emitting every artifact on its replay.  The
+  -- decoder used to split them on base64 padding alone, which cannot see
+  -- a boundary when the payload's length is a multiple of three; that
+  -- concatenates two emissions into one corrupt file.  This line says
+  -- where each one ends.
+  print("[b64end:" .. tag .. "] " .. #data)
   M.log("emitted blob '" .. tag .. "' (" .. #data .. " bytes)")
 end
 
@@ -224,6 +232,24 @@ function M.setPad(buttons)
   if OT6_LIVE then recordPad() end
 end
 
+-- ------------------------------------------------ callback registration --
+-- The retry runner at the bottom of this file replays a segment's body
+-- after a seed-dependent failure.  Mesen only lets a callback be removed
+-- from inside a CPU callback, so the previous attempt's callbacks cannot
+-- be unregistered; they are made INERT instead, by an attempt-epoch guard
+-- that M.segmentBody wraps around emu.addMemoryCallback /
+-- emu.addEventCallback before the body ever runs.
+--
+-- Two kinds of registration must survive a replay and so are made through
+-- the raw handles captured here, before that shim exists: the one-shot
+-- savestate trampolines (an inert load trampoline would strand the run
+-- mid-reload) and the run canary (an inert canary is a silent
+-- auto-Continue).  Everything else -- the ladders' seed watchers, the
+-- recovery/exec observers, a generator's own logging watches -- is
+-- re-registered by the replayed body and wants the old copy inert.
+local rawAddMemoryCallback = emu.addMemoryCallback
+local rawAddEventCallback = emu.addEventCallback
+
 -- ----------------------------------------------------------------- memory --
 -- WRAM helpers accept either a $7E-prefixed SNES address (0x7E0000..0x7FFFFF)
 -- or a plain offset into the 128 KiB of work RAM (0x0000..0x1FFFF).
@@ -293,12 +319,24 @@ end
 --   build/states/<name>.lua      (sidecar: `return "<base64>"`)
 -- and lib/compose.py embeds referenced sidecars back in as OT6_STATES.
 
+-- How many trampolines are registered and not yet fired.  Two pending at
+-- once collide: both register over the full address space, the first
+-- fires, removes itself and returns, and Mesen then invokes the second
+-- with its "inside an exec callback" state already cleared, so its
+-- createSavestate/loadSavestate is refused ("This function must be called
+-- inside an exec memory operation callback" -- measured 2026-09-16 when
+-- the segment runner's boot snapshot landed on the same frame as a
+-- generator's fixture load).  The runner waits for zero before it asks.
+M.pendingStateReqs = 0
+
 function M.requestSaveState()
   local req = {}
   local ref
-  ref = emu.addMemoryCallback(function()
+  M.pendingStateReqs = M.pendingStateReqs + 1
+  ref = rawAddMemoryCallback(function()
     if req.fired then return end
     req.fired = true
+    M.pendingStateReqs = M.pendingStateReqs - 1
     local ok, err = pcall(function() req.blob = emu.createSavestate() end)
     req.ok = ok and type(req.blob) == "string" and #req.blob > 0
     req.error = err
@@ -315,9 +353,11 @@ function M.requestLoadState(blob)
   M.thawPad()
   local req = {}
   local ref
-  ref = emu.addMemoryCallback(function()
+  M.pendingStateReqs = M.pendingStateReqs + 1
+  ref = rawAddMemoryCallback(function()
     if req.fired then return end
     req.fired = true
+    M.pendingStateReqs = M.pendingStateReqs - 1
     local ok, err = pcall(function() emu.loadSavestate(blob) end)
     req.ok = ok
     req.error = err
@@ -380,6 +420,10 @@ function M.loadState(sidecarPath)
       -- Battery SRAM rides the savestate: emu.loadSavestate restores banks
       -- $30/$31.  Post-load SRAM, weakness codex included, is therefore a
       -- function of the fixture's own bytes.
+      -- The first fixture a run loads is its BOOT POINT: the segment
+      -- runner's replay starts the body again from here, and this is
+      -- where an attempt's seed variation is idled in (M.bootMark).
+      M.bootMark("fixture " .. tostring(M.lastState))
     end),
   })
 end
@@ -1332,6 +1376,10 @@ function M.waitFrames(n)
   return {
     tick = function()
       if c < n then
+        -- A long wait is a step that MEANS to sit still; tell the
+        -- no-progress watchdog so it does not read a declared pause as a
+        -- hang (the segment runner, bottom of this file).
+        if c == 0 and n >= 240 then M.watchQuiet(n + 120) end
         c = c + 1
         return "frame"
       end
@@ -4869,8 +4917,6 @@ function M.fleeBattle(maxFrames)
   }, "flee battle (hold L+R)")
 end
 
--- The runner.  steps: list of step objects.  opts.maxFrames: global budget.
-local runnerStarted = false
 
 -- ---- the tile trace ---------------------------------------------------
 -- Records which tiles the party actually stood on, per map, and emits them
@@ -4968,12 +5014,611 @@ local function traceTick()
   end
 end
 
+-- ============================================ the segment runner (#178) ====
+-- Runs are bit-reproducible, so any additive route change -- buying ten more
+-- Potions, one more grind lap -- reshuffles every later encounter, NPC walk
+-- and back-attack roll.  A segment that passed on its one seed then turns
+-- that edit into a red build (#179, #185).  Owner, 2026-09-16: "we must not
+-- allow shifting randomness to become a blocker.  Robustness please."
+--
+-- So every segment gets three things here, none of which are the route's
+-- business:
+--
+--   1. WATCHDOGS.  The run samples what it is looking at (a hash of the
+--      frame buffer, the control cells, the progress cells, the pad) every
+--      WATCH.sampleEvery frames and keeps a ring of them.  Pressing at a
+--      screen that answers nothing (the #185 back attack: LEFT into a
+--      target cursor that only RIGHT moves, 9000 frames of it) fails fast
+--      as `no-effect`; a run that goes visually and mechanically still
+--      fails fast as `no-progress`.  Fast, because a 9000-frame step budget
+--      is a poor first line of defence: it burns eight minutes to say what
+--      three seconds of samples already said.  The budgets stay as the
+--      backstop.
+--
+--   2. RETRY FROM THE BOOT POINT.  A failure whose class is SEED-DEPENDENT
+--      (a wipe, a navTo/worldNavTo "no path", a step timeout, a watchdog
+--      trip, a recovery-cap trip) restores the snapshot taken at the run's
+--      first frame, re-executes the generator's body from source -- fresh
+--      closures, fresh per-run tables, fresh step objects -- and replays it
+--      with the seed legitimately varied by idle frames at the boot point.
+--      Up to opts.retries attempts (3 by default for a gen_* segment, 1 for
+--      everything else).  A CONTRACT failure (assertEq, a checkpoint
+--      contract, a Lua error) is a bug and fails at once: a retry must
+--      never launder one.
+--
+--   3. THE COUNT.  Every attempt logs one greppable `[retry] attempt n/N`
+--      line with its class, frame, seed phase and raw message (and, for a
+--      wipe, the formation and every member's HP/BP), the verdict carries
+--      `attempts=n/N`, and tools/audit_retries.py lists every log with
+--      attempts > 1 so each class becomes an issue rather than a shrug.
+--
+-- HOW THE REPLAY IS CLEAN.  The step machine cannot be rewound: a step
+-- object holds its own counters, driveUntil has no reset at all, and the
+-- generator's own upvalues (blobs, ladder tallies, "did we already buy it"
+-- flags) are the state that really matters.  So nothing is rewound.
+-- lib/compose.py wraps everything after the `local H = dofile(...)` line in
+-- `H.segmentBody(function() ... end)`, and an attempt is that function run
+-- again: every local in the generator is constructed from scratch, H.run is
+-- called again (it installs the new step list instead of re-arming the
+-- runner), and the lib's own per-run state is reset by resetLibState below.
+-- The previous attempt's emu callbacks go inert through the epoch shim.
+--
+-- WHY THE SNAPSHOT IS THE RUN'S FIRST FRAME rather than the post-load boot
+-- state: the replayed body starts at ITS FIRST STEP, which is the fixture
+-- load (or the cold Continue of a checkpoint).  Restoring a post-load boot
+-- snapshot and then replaying a body that begins by loading that same
+-- fixture reaches the same machine state either way, so the snapshot is
+-- taken where the body starts, and the boot point is where the SEED
+-- VARIATION goes in: M.bootMark (called by M.loadState when the fixture
+-- load settles, and by assertEntryContract after a cold Continue) idles the
+-- pad for this attempt's shift before the body walks on.  Frame budgets,
+-- M.frame and the canary are per attempt; M.totalFrames counts the
+-- emulator's own.
+--
+-- A GENERATOR WITH ITS OWN LADDER (gen_fc_alcove, gen_fc_escape,
+-- gen_zozo4_dadaluma and the #163 ladders) is not double-retried: it runs
+-- with allowGameOver, so its wipes never reach the canary, and when its
+-- ladder is exhausted it raises its own message ("battle 69 not won in 3
+-- attempts"), which classifies as `other` and fails at once.  What the
+-- default catches for those files is the part their ladder never covered:
+-- the climb to the fight (#185 is exactly that).  A segment that wants out
+-- entirely passes opts.retries = 1.
+--
+-- MODULE-LEVEL STATE A GENERATOR CANNOT RESET: none in the tree today (the
+-- body's own chunk is re-executed, so its file-scope locals are rebuilt).
+-- A generator that parks state where the re-execution cannot reach it --
+-- inside the lib, or in a global -- clears it from a hook registered with
+-- H.onReplay(fn); every hook runs after the reload, before the body is
+-- re-executed, and hooks do not carry over into the next attempt.
+do
+
+local WATCH = {
+  sampleEvery     = 16,     -- frames between observations
+  noEffectFrames  = 300,    -- 5s of game time pressing into no answer
+  pressFraction   = 0.25,   -- ... with the pad down at least this often
+  quietFrames     = 1800,   -- ~30s with neither the screen nor a progress
+                            --     cell showing anything new
+  memoryFrames    = 900,    -- how long a sampled signature counts as "seen"
+  ringSize        = 24,
+  recoveryCap     = 3,      -- drops of the same plan in one battle
+  screenStride    = 7,      -- frame-buffer sampling stride for the hash
+}
+M.WATCH = WATCH
+
+local RUN                   -- the current attempt; filled in below
+
+-- Where the seed variation goes when a body marks no boot point of its own
+-- (M.bootMark, below).  Late enough that a cold Continue has landed and
+-- asserted its entry contract first (measured f1035..f1456 across the
+-- checkpoint-booted generators' logs), so only a body with neither a
+-- fixture nor a contract ever reaches it.
+local BOOT_FALLBACK = 2400
+
+-- ---------------------------------------------------------- observation --
+-- Everything here is read-only: frame-buffer reads, RAM reads, and the pad
+-- the script itself is holding.
+
+local function screenHash()
+  local ok, buf = pcall(emu.getScreenBuffer)
+  if not ok or type(buf) ~= "table" then return nil end
+  local h, n = 2166136261, #buf
+  for i = 1, n, WATCH.screenStride do
+    h = ((h ~ (buf[i] & 0xFFFFFF)) * 16777619) & 0xFFFFFFFF
+  end
+  return h
+end
+
+local function monsterHpSum()
+  if not M.battleLoadStarted() then return 0 end
+  local ids, s = M.monsterIds(), 0
+  for i = 1, 6 do
+    if ids[i] ~= 0xFFFF then s = s + M.readWord(0x3BFC + (i - 1) * 2) end
+  end
+  return s
+end
+
+local function invSum()
+  local s = 0
+  for i = 0, 255 do s = s + M.readByte(0x1969 + i) end
+  return s
+end
+
+-- The CONTROL cells: what an input is supposed to move.  Party HP is
+-- deliberately NOT here -- monsters chewing through the party while the
+-- script presses an inert direction is exactly the #185 hang, and counting
+-- that as movement is how it ran for 9000 frames.
+local function ctlSig()
+  if M.battleLoadStarted() then
+    return string.format("B:%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X",
+      M.readByte(0x7BCA),          -- menu byte
+      M.readByte(0x7BC2),          -- menu state ($38 = target select)
+      M.readByte(0x62CA) & 3,      -- whose menu
+      M.readByte(0x7B7D),          -- target mask: party side
+      M.readByte(0x7B7E),          -- target mask: monster side
+      M.readByte(0x7B7F),          -- all-target flag
+      M.readByte(0x890F),          -- command row cursor
+      M.readByte(0x891F))          -- list scroll
+  end
+  if M.worldMode and M.worldMode() then
+    return string.format("W:%d.%d.%d.%d.%d", M.worldX(), M.worldY(),
+      M.readByte(0x0059), M.dialogWaiting() and 1 or 0,
+      M.readByte(0x004b))
+  end
+  return string.format("F:%d.%d.%d.%d.%d.%d.%02X.%02X",
+    M.mapId() & 0x1ff, M.fieldX(), M.fieldY(),
+    M.readByte(0x0059), M.dialogWaiting() and 1 or 0,
+    M.eventRunning() and 1 or 0, M.readByte(0x004b), M.readByte(0x1eb9))
+end
+
+-- The PROGRESS cells: ctl plus everything a segment can be making headway
+-- on without moving a control cell -- damage out, damage in, shopping.
+local function progSig(ctl)
+  local php = 0
+  for e = 0, 3 do
+    local h = M.readWord(0x3BF4 + e * 2)
+    if h < 10000 then php = php + h end
+  end
+  return string.format("%s|m%d|p%d|i%d", ctl, monsterHpSum(), php, invSum())
+end
+
+local W = {}
+local function watchReset()
+  W.samples = {}
+  W.seenCtl, W.seenProg, W.seenScreen, W.pressAt = {}, {}, {}, {}
+  W.lastNewCtl, W.lastNewProg, W.lastNewScreen = 0, 0, 0
+  W.prevCtl, W.lastDiffCtl, W.lastUnanswerable, W.lastInert = nil, 0, 0, 0
+  W.maxQuietCtl, W.maxQuietProg, W.maxQuietScreen = 0, 0, 0
+  W.samplesTaken, W.pressFrames = 0, 0
+  W.suppressUntil, W.trips = 0, 0
+  W.battleEpoch, W.inBattle, W.recovery = 0, false, {}
+end
+watchReset()
+W.enabled = false
+
+-- A step that is SUPPOSED to sit still says so, and the watchdogs stand
+-- down for that long: M.waitFrames does it for a long wait, and a
+-- generator or driver can do it explicitly around a cutscene.
+function M.watchQuiet(frames, why)
+  local untilFrame = M.frame + (frames or 0)
+  if untilFrame > W.suppressUntil then
+    W.suppressUntil = untilFrame
+    if why then
+      M.log(string.format("[watch] standing down for %d frames: %s",
+        frames, why))
+    end
+  end
+end
+
+local function padString()
+  local held = {}
+  for _, b in ipairs(ALL_BTN) do if curPad[b] then held[#held + 1] = b end end
+  return (#held > 0) and table.concat(held, "+") or "--"
+end
+
+local function ringDump(tag)
+  M.log(string.format("[watch] ring at the %s trip, oldest first "
+    .. "(pad = held buttons, screen = frame-buffer hash, ctl/prog = the "
+    .. "state signatures):", tag))
+  for _, s in ipairs(W.samples) do
+    M.log(string.format("[watch]   f%-7d pad=%-16s screen=%s ctl=%s prog=%s",
+      s.frame, s.pad, s.screen and string.format("%08X", s.screen) or "-",
+      s.ctl, s.prog))
+  end
+end
+
+-- Every distinct press the window saw, so the FAIL line names the input
+-- that was getting no answer rather than just this frame's pad.
+local function pressedIn(frames)
+  local seen, out = {}, {}
+  for f, p in pairs(W.pressAt) do
+    if f >= M.frame - frames and p ~= "--" and not seen[p] then
+      seen[p] = true
+      out[#out + 1] = p
+    end
+  end
+  table.sort(out)
+  return (#out > 0) and table.concat(out, ",") or "--"
+end
+
+local function pressFramesIn(frames)
+  local n = 0
+  for f in pairs(W.pressAt) do if f >= M.frame - frames then n = n + 1 end end
+  return n
+end
+
+-- The evidence a fast failure leaves: the screen it failed at, and the
+-- ring.  The tag names a file run.sh decodes into the run workspace (and
+-- publishes to build/states/shots on a pass, retries included).
+local function failEvidence(kind)
+  local tag = string.format("watchdog_%s_a%d_f%d", kind, RUN.attempt, M.frame)
+  M.screenshot(tag)
+  ringDump(kind)
+  local dir = (type(OT6_ART_DIR) == "string" and OT6_ART_DIR ~= "")
+    and OT6_ART_DIR or "<the retained run workspace>/artifacts"
+  return string.format("%s/shots/%s.png", dir, tag)
+end
+
+local function prune(tbl, keepFrom)            -- signature -> frame seen
+  for k, f in pairs(tbl) do if f < keepFrom then tbl[k] = nil end end
+end
+local function pruneKeys(tbl, keepFrom)        -- frame -> pad held
+  for f in pairs(tbl) do if f < keepFrom then tbl[f] = nil end end
+end
+
+-- One observation, plus the two verdicts.  Returns an error message -- the
+-- runner routes it through the same failure path as a raised step error, so
+-- a watchdog trip is retried exactly like the wipe it precedes -- or nil.
+local function watchTick()
+  local held = padString()
+  if held ~= "--" then
+    W.pressFrames = W.pressFrames + 1
+    W.pressAt[M.frame] = held
+  end
+  local battle = M.battleLoadStarted()
+  if battle and not W.inBattle then
+    W.battleEpoch, W.recovery = W.battleEpoch + 1, {}
+  end
+  W.inBattle = battle
+  if M.frame % WATCH.sampleEvery ~= 0 then return nil end
+
+  local ok, ctl = pcall(ctlSig)
+  if not ok or type(ctl) ~= "string" then return nil end
+  local okp, prog = pcall(progSig, ctl)
+  if not okp then return nil end
+  local screen = screenHash()
+
+  if not W.seenCtl[ctl] then W.lastNewCtl = M.frame end
+  W.seenCtl[ctl] = M.frame
+  if ctl ~= W.prevCtl then W.lastDiffCtl = M.frame end
+  W.prevCtl = ctl
+  local inBattle = ctl:sub(1, 2) == "B:"
+  if inBattle and ctl:sub(1, 4) == "B:00" then W.lastUnanswerable = M.frame end
+  -- A menu still open after the last monster died is the engine winding
+  -- the fight down (death animation, the victory fade) under a window it
+  -- will close itself; the driver's B presses there are inert by design
+  -- (measured 2026-09-16 on the Zozo street: three trips, every one with
+  -- monster HP summing to 0 under an open command list)
+  if inBattle and monsterHpSum() == 0 then W.lastUnanswerable = M.frame end
+  -- On the field and the world map only a press the game COULD answer
+  -- counts: a held direction while the party has control (a walk), or
+  -- any press with a dialog or a menu up.  A tapped A through a scripted
+  -- walk or a cutscene is what a person does while the game is busy, and
+  -- the game legitimately does not answer it yet (measured 2026-09-16 on
+  -- gen_vargas: the Kolts intro, A tapped 151 of 300 frames at an
+  -- unchanging tile while the scene played; and on gen_arvis's Narshe
+  -- cutscenes).  Anything else marks the sample inert.
+  if not inBattle then
+    local dirHeld = curPad.up or curPad.down or curPad.left or curPad.right
+    local walking = dirHeld and ((M.worldMode and M.worldMode())
+      and M.worldHasControl() or M.hasControl())
+    local windowUp = M.dialogWaiting() or M.readByte(0x0059) ~= 0
+    if not (walking or windowUp) then W.lastInert = M.frame end
+  end
+  if not W.seenProg[prog] then W.lastNewProg = M.frame end
+  W.seenProg[prog] = M.frame
+  if screen then
+    if not W.seenScreen[screen] then W.lastNewScreen = M.frame end
+    W.seenScreen[screen] = M.frame
+  end
+  local keepFrom = M.frame - WATCH.memoryFrames
+  prune(W.seenCtl, keepFrom)
+  prune(W.seenProg, keepFrom)
+  prune(W.seenScreen, keepFrom)
+  pruneKeys(W.pressAt, keepFrom)
+
+  W.samples[#W.samples + 1] =
+    { frame = M.frame, pad = held, screen = screen, ctl = ctl, prog = prog }
+  if #W.samples > WATCH.ringSize then table.remove(W.samples, 1) end
+  W.samplesTaken = W.samplesTaken + 1
+
+  local qc, qp, qs = M.frame - W.lastNewCtl, M.frame - W.lastNewProg,
+                     M.frame - W.lastNewScreen
+  if qc > W.maxQuietCtl then W.maxQuietCtl = qc end
+  if qp > W.maxQuietProg then W.maxQuietProg = qp end
+  if qs > W.maxQuietScreen then W.maxQuietScreen = qs end
+
+  if not W.enabled or M.frame < W.suppressUntil then return nil end
+  -- and not before this attempt has a window's worth of samples
+  if M.frame < WATCH.noEffectFrames + WATCH.sampleEvery then return nil end
+
+  -- Two shapes of "no effect", measured on gen_zozo4_dadaluma's climb
+  -- (2026-09-16, the three false trips of the first version):
+  --
+  --  * In a BATTLE the press must land on an open menu for the whole
+  --    window -- with no menu open ($7BCA=0) the drivers edge-tap A
+  --    through the fly-in, the enemy's turns and the victory text, and
+  --    that is waiting, not pressing into a wall (trip 1: 96 A-frames in
+  --    192 at the first fight's opening; trip 2: a window that was
+  --    menu-closed for 23 of its 24 samples).  With the menu open, the
+  --    verdict is NOVELTY over the window: a driver that cycles between
+  --    two states it has already been in (#185: target select $38, drop,
+  --    command list $05, re-plan, $38 ...) is not moving anything, and a
+  --    consecutive-identity test would never see it.
+  --  * On the FIELD or the world map the verdict is IDENTITY: the same
+  --    control cells at every sample of the window, every sample an
+  --    answerable press (above), AND the screen itself unchanged for the
+  --    window -- a screen that is still changing is a game still busy,
+  --    whatever the cells say.  A walk that re-plans around a wandering
+  --    NPC revisits the same three tiles for seconds (trip 3, the Zozo
+  --    street), and that is the route working.  The screen rule is
+  --    field-only on purpose: a battle's screen animates whether or not
+  --    a press is answered (ATB, idle sprites, the damage numbers of the
+  --    #185 hang itself), so there the menu cells are the screen's
+  --    answer.
+  local pressed = pressFramesIn(WATCH.noEffectFrames)
+  local N = WATCH.noEffectFrames
+  local stuck
+  if inBattle then
+    stuck = (M.frame - W.lastUnanswerable) >= N and qc >= N
+  else
+    stuck = (M.frame - W.lastDiffCtl) >= N and (M.frame - W.lastInert) >= N
+      and qs >= N
+  end
+  if stuck and pressed >= WATCH.pressFraction * N then
+    W.trips = W.trips + 1
+    local shot = failEvidence("noeffect")
+    return string.format("no-effect: %s for %d frames at %s -- the pad has "
+      .. "been down %d of the last %d frames and no control cell has read "
+      .. "anything new in that time (the screen last changed %d frames "
+      .. "ago).  This is a press the game is not answering, not a slow "
+      .. "step.  Screenshot %s; ring above.",
+      pressedIn(WATCH.noEffectFrames), qc, ctl, pressed,
+      WATCH.noEffectFrames, qs, shot)
+  end
+
+  if qp >= WATCH.quietFrames and qs >= WATCH.quietFrames then
+    W.trips = W.trips + 1
+    local shot = failEvidence("noprogress")
+    return string.format("no-progress: nothing has moved for %d frames at "
+      .. "%s -- no map, position, menu, dialog, monster HP, party HP or "
+      .. "inventory change, and no new frame on screen either.  A step that "
+      .. "means to sit this still declares it with H.watchQuiet(n).  "
+      .. "Screenshot %s; ring above.", math.min(qp, qs), prog, shot)
+  end
+  return nil
+end
+
+local function watchReport()
+  M.log(string.format("[watch] %d samples, pad down %d frames, %d trip(s); "
+    .. "max quiet: ctl=%d prog=%d screen=%d frames (thresholds: no-effect "
+    .. "%d with the pad down %d%% of it, no-progress %d on prog AND screen)",
+    W.samplesTaken, W.pressFrames, W.trips, W.maxQuietCtl, W.maxQuietProg,
+    W.maxQuietScreen, WATCH.noEffectFrames,
+    math.floor(WATCH.pressFraction * 100), WATCH.quietFrames))
+end
+
+-- The recovery cap (#185's other half).  A driver that drops its plan and
+-- backs out calls this once per drop; past WATCH.recoveryCap drops of the
+-- same plan in the same battle it is not recovering, it is cycling, and the
+-- run says so now rather than after forty of them.
+--
+-- NOT wired into the fight driver on this branch: the call site is this
+-- file's `parkN > 12` "parked %d pulses in known state" drop inside
+-- newFightDriver (wt/driver-boost owns that code).  One line there, just
+-- before dropPlan("cursor_stalled") --
+--   M.recoveryCount(tag, string.format("%s/%02X", plan.kind, st))
+-- -- turns drop #4 of the same plan in the same menu state into a
+-- counted, retried fast failure with a screenshot (#185 reached #40).
+function M.recoveryCount(tag, key, cap)
+  local k = tostring(tag) .. "|" .. tostring(key)
+  local n = (W.recovery[k] or 0) + 1
+  W.recovery[k] = n
+  cap = cap or WATCH.recoveryCap
+  if n > cap then
+    local shot = failEvidence("recovery")
+    error(string.format("recovery cap: %s dropped and re-planned %s %d "
+      .. "times in one battle (cap %d).  That is a cycle, not a recovery: "
+      .. "the state it keeps returning to is not answering the plan.  "
+      .. "Screenshot %s; ring above.", tostring(tag), tostring(key), n, cap,
+      shot), 0)
+  end
+  return n
+end
+
+-- ------------------------------------------------------- failure classes --
+-- Seed-dependent: the same route on another seed can pass, so it is
+-- retried.  Everything else is a bug and fails at once.
+local RETRYABLE = {
+  wipe = true, nopath = true, timeout = true,
+  noeffect = true, noprogress = true, recovery_cap = true,
+}
+
+local function classify(msg)
+  msg = tostring(msg)
+  -- Contract first: an assert that happens to mention a path or a timeout
+  -- is still an assert.
+  if msg:find("assertEq failed", 1, true)
+     or msg:find("CONTRACT DIFF", 1, true)
+     or msg:find("entry contract", 1, true)
+     or msg:find("exit contract", 1, true) then return "assert" end
+  if msg:find("no-effect:", 1, true) then return "noeffect" end
+  if msg:find("no-progress:", 1, true) then return "noprogress" end
+  if msg:find("recovery cap:", 1, true) then return "recovery_cap" end
+  if msg:find("no path", 1, true) then return "nopath" end
+  if msg:find("timeout after", 1, true) then return "timeout" end
+  -- Only the lib's own wipe texts: the canary's verdict and the
+  -- unladdered encounter canary.  A generator's ladder reports its last
+  -- loss inside its own exhaustion message ("not won in 3 attempts --
+  -- last loss: PARTY WIPED at f..."), and that is a ladder that already
+  -- retried, whose verdict is the balance finding: `other`, no re-roll.
+  if msg:find("THE PARTY IS WIPED", 1, true)
+     or msg:find("^GAME OVER fired") then return "wipe" end
+  return "other"
+end
+M.classifyFailure = classify
+
+-- ----------------------------------------------------------- the attempt --
+RUN = {
+  attempt = 1, attempts = 1, phase = "run", root = nil, opts = {},
+  budget = 60000, shift = 0, gap = 20, idle = 0, idlePad = nil,
+  bootMarked = false, s0 = nil, s0blob = nil, ld = nil, ldWait = 0,
+  failures = {}, lastBattle = nil, epoch = 1, installing = false,
+}
+M.totalFrames = 0
+
+local replayHooks = {}
+function M.onReplay(fn) replayHooks[#replayHooks + 1] = fn end
+
+-- The epoch shim: every callback a body registers is wrapped so the
+-- previous attempt's copies stop firing (Mesen will not let them be
+-- removed from outside a CPU callback).  Installed once, before the first
+-- attempt runs.  Removal still works: the shim hands back Mesen's own ref.
+local shimmed = false
+local function installShim()
+  if shimmed then return end
+  shimmed = true
+  emu.addMemoryCallback = function(fn, ...)
+    local mine = RUN.epoch
+    return rawAddMemoryCallback(function(...)
+      if mine ~= RUN.epoch then return end
+      return fn(...)
+    end, ...)
+  end
+  emu.addEventCallback = function(fn, ...)
+    local mine = RUN.epoch
+    return rawAddEventCallback(function(...)
+      if mine ~= RUN.epoch then return end
+      return fn(...)
+    end, ...)
+  end
+end
+
+-- compose.py wraps everything after the `local H = dofile(...)` line in a
+-- call to this, so the runner can replay the body.  A script composed
+-- before this existed (or composed by hand) simply never calls it: the
+-- runner then reports that retries are unavailable rather than pretending.
+function M.segmentBody(fn)
+  M.__body = fn
+  installShim()
+  fn()
+end
+
+-- Called by M.loadState once the fixture is in, and by assertEntryContract
+-- once a cold Continue has landed: the point the replay is equivalent
+-- from, and where this attempt's seed variation goes in.
+function M.bootMark(what)
+  if RUN.bootMarked then return end
+  RUN.bootMarked = true
+  M.log(string.format("[retry] boot point: %s at f%d (attempt %d/%d, "
+    .. "$021e=%d, seed shift %d idle frames)", tostring(what), M.frame,
+    RUN.attempt, RUN.attempts, M.seedPhase(), RUN.shift))
+  if RUN.shift > 0 then
+    RUN.idle = RUN.shift
+    RUN.idlePad = {}
+    for _, b in ipairs(ALL_BTN) do RUN.idlePad[b] = curPad[b] end
+  end
+end
+
+-- What the fight was, for the attempt line.  Sampled while a battle is up,
+-- so it is still readable after the teardown a wipe runs into.
+local function sampleBattle()
+  local seats = {}
+  for e = 0, 3 do
+    local a = M.readByte(0x3ed8 + e * 2)
+    seats[#seats + 1] = (a == 0xFF) and "-" or
+      string.format("a%d:%d/%d bp%d", a, M.readWord(0x3bf4 + e * 2),
+        M.readWord(0x3c1c + e * 2), M.readByte(0x3e9c + e * 2))
+  end
+  local w = M.formationWords()
+  RUN.lastBattle = {
+    frame = M.frame,
+    formation = string.format("%04X %04X %04X %04X %04X %04X",
+      w[1], w[2], w[3], w[4], w[5], w[6]),
+    seats = table.concat(seats, " "),
+  }
+end
+
+local function resetLibState()
+  RUN.epoch = RUN.epoch + 1          -- the old attempt's callbacks go inert
+  M.frame = 0
+  M.gameOverFired = 0
+  M.thawPad()
+  M.setPad(nil)
+  M.vars = {}
+  M.lastState = nil
+  M.absorbGuardBattles, M.absorbGuardClashes = 0, 0
+  guardArmed, guardSettle = true, 0
+  traceMap, traceSet, traceCount = nil, {}, 0
+  recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
+  execActor, execDone, execMon, execMonDone = nil, {}, nil, nil
+  execHooks = false
+  M._killbitFired = false
+  watchReset()
+  RUN.bootMarked, RUN.idle, RUN.idlePad = false, 0, nil
+  RUN.lastBattle = nil
+  local hooks = replayHooks
+  replayHooks = {}
+  for _, fn in ipairs(hooks) do pcall(fn) end
+end
+
+-- --------------------------------------------------------------- M.run ----
+-- The runner.  steps: list of step objects.  opts.maxFrames: per-attempt
+-- budget.  opts.retries: attempts allowed (default 3 for a gen_* segment,
+-- 1 otherwise; OT6_RETRIES from the environment overrides both, which is
+-- how tools/tests/seed_sweep.py turns retries off).  opts.watchdog:
+-- true/false to force the fast-failure watchdogs on or off (default: on
+-- for a segment, observation-only elsewhere).
+local runnerStarted = false
+
 function M.run(opts, steps)
+  opts = opts or {}
+  -- Attempt 2+: the body has just been re-executed and this is its new
+  -- step list.  Install it; the callbacks below stay as they were.
+  if RUN.installing then
+    RUN.root = seqStep(steps)
+    RUN.opts = opts
+    RUN.budget = opts.maxFrames or 60000
+    return
+  end
   assert(not runnerStarted, "ot6.run() called twice")
   runnerStarted = true
-  opts = opts or {}
-  local budget = opts.maxFrames or 60000
-  local root = seqStep(steps)
+
+  local isSegment = type(OT6_SCRIPT) == "string"
+    and OT6_SCRIPT:match("^gen_") ~= nil
+  local attempts = opts.retries or (isSegment and 3 or 1)
+  if type(OT6_RETRIES) == "number" then attempts = OT6_RETRIES end
+  if attempts < 1 then attempts = 1 end
+  if not M.__body and attempts > 1 then
+    M.log("[retry] retries UNAVAILABLE: this script was not composed with "
+      .. "a segment body (lib/compose.py wraps one), so there is nothing to "
+      .. "replay; running single-attempt")
+    attempts = 1
+  end
+  RUN.attempts = attempts
+  RUN.gap = opts.seedGap or (M.SEED_PERIOD // math.max(attempts, 1))
+  RUN.opts = opts
+  RUN.budget = opts.maxFrames or 60000
+  RUN.root = seqStep(steps)
+  RUN.shift = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
+  if opts.watchdog ~= nil then W.enabled = opts.watchdog
+  elseif type(OT6_WATCHDOG) == "number" then W.enabled = OT6_WATCHDOG ~= 0
+  else W.enabled = isSegment end
+  M.log(string.format("[retry] segment runner: %s, up to %d attempt(s), "
+    .. "seed shift %d, watchdogs %s (no-effect %d frames, no-progress %d)",
+    tostring(OT6_SCRIPT or "?"), attempts, RUN.shift,
+    W.enabled and "ON" or "observing only", WATCH.noEffectFrames,
+    WATCH.quietFrames))
+
   local finished = false
 
   -- Silent-auto-Continue canary.  Every game-over path routes through the
@@ -4981,9 +5626,9 @@ function M.run(opts, steps)
   -- follows, and any driver that mashes A auto-Continues the last save,
   -- after which the session has TIME-TRAVELED (roster and switches
   -- revert) while every naive predicate reads healthy.  So the default is
-  -- LOUD: GameOver fails the run, unless the route declares it survivable
-  -- (opts.allowGameOver, or a ladder setting M.gameOverFired = 0 after
-  -- handling its reload).
+  -- LOUD: GameOver ends the attempt, unless the route declares it
+  -- survivable (opts.allowGameOver, or a ladder setting M.gameOverFired =
+  -- 0 after handling its reload).
   --
   -- READ watch, not exec: GameOver in bank $CC is EVENT SCRIPT DATA -- the
   -- event interpreter READS those bytes and never executes them as CPU
@@ -5024,6 +5669,11 @@ function M.run(opts, steps)
   -- battle table live -- M.partyWipedInBattle, #166) held for WIPE_FRAMES
   -- counts as a game over: bounded, and before any driver can press
   -- through to the title.
+  --
+  -- These three watches are registered ONCE, through the raw handles, so
+  -- that a replayed attempt inherits a live canary rather than a set of
+  -- inert ones (see "callback registration" at the top of this file); the
+  -- counters below are reset per attempt instead.
   M.gameOverFired = 0
   local goReadFired, titleExecFired, wipeFired = 0, 0, 0
   local WIPE_FRAMES = 300
@@ -5032,7 +5682,7 @@ function M.run(opts, steps)
   do
     local ok, addr = pcall(function() return M.sym("GameOver") end)
     if ok then
-      emu.addMemoryCallback(function()
+      rawAddMemoryCallback(function()
         if not canaryInGame then return end
         -- Only a read made by the event interpreter ENTERING the script
         -- counts: its pc ($e5-$e7) sits on the script's first byte as it
@@ -5052,7 +5702,7 @@ function M.run(opts, steps)
   do
     local ok, addr = pcall(function() return M.sym("TitleScreen") end)
     if ok then
-      emu.addMemoryCallback(function()
+      rawAddMemoryCallback(function()
         if canaryInGame then
           titleExecFired = titleExecFired + 1
           M.gameOverFired = M.gameOverFired + 1
@@ -5062,11 +5712,131 @@ function M.run(opts, steps)
     end
   end
 
-  emu.addEventCallback(function()
-    if finished then return end
+  -- ---- the failure path, shared by every way an attempt can end --------
+  local function attemptLine(class, msg)
+    local shot = nil
+    if class == "wipe" or class == "nopath" or class == "timeout" then
+      -- the watchdog classes already took their own screenshot
+      local tag = string.format("attempt%d_%s_f%d", RUN.attempt, class,
+        M.frame)
+      M.screenshot(tag)
+      local dir = (type(OT6_ART_DIR) == "string" and OT6_ART_DIR ~= "")
+        and OT6_ART_DIR or "<the retained run workspace>/artifacts"
+      shot = string.format("%s/shots/%s.png", dir, tag)
+    end
+    M.log(string.format("[retry] attempt %d/%d FAILED class=%s frame=%d "
+      .. "totalframes=%d shift=%d phase=%d%s: %s",
+      RUN.attempt, RUN.attempts, class, M.frame, M.totalFrames, RUN.shift,
+      M.seedPhase(), shot and (" screenshot=" .. shot) or "", tostring(msg)))
+    if class == "wipe" then
+      local b = RUN.lastBattle
+      if b then
+        M.log(string.format("[retry] attempt %d/%d wipe context: the last "
+          .. "battle up (f%d) was formation %s; seats at that reading %s "
+          .. "(actor:hp/maxhp bp)", RUN.attempt, RUN.attempts, b.frame,
+          b.formation, b.seats))
+      else
+        M.log(string.format("[retry] attempt %d/%d wipe context: no battle "
+          .. "was sampled in this attempt (the loss was not in a fight this "
+          .. "runner saw)", RUN.attempt, RUN.attempts))
+      end
+    end
+    RUN.failures[#RUN.failures + 1] =
+      { attempt = RUN.attempt, class = class, msg = tostring(msg),
+        frame = M.frame }
+  end
+
+  local function stopWith(code, class, msg)
+    finished = true
+    traceFlush()
+    coverageFlush()
+    watchReport()
+    M.finishRecoveryTrace("run_ended")
+    local tally = {}
+    for _, f in ipairs(RUN.failures) do
+      tally[#tally + 1] = string.format("%d:%s", f.attempt, f.class)
+    end
+    if #tally > 0 then
+      M.log(string.format("[retry] attempts=%d/%d%s; failed attempts: %s",
+        RUN.attempt, RUN.attempts,
+        RUN.attempt >= RUN.attempts and " exhausted" or " stopped",
+        table.concat(tally, " ")))
+    end
+    M.log(string.format("FAIL: %s%s", tostring(msg),
+      (class == "assert" or class == "other" or class == "budget")
+        and string.format("\n  [retry] class=%s is NOT seed-dependent, so "
+          .. "this failed on attempt %d of %d without a retry: fix it, do "
+          .. "not re-roll it.", class, RUN.attempt, RUN.attempts)
+        or ""))
+    emu.stop(code)
+  end
+
+  -- Schedule a replay, or stop.  `code` is the exit code a final failure
+  -- takes (3 for a game over, 1 for a raised error, 2 for the budget).
+  local function failed(class, msg, code)
+    attemptLine(class, msg)
+    local haveS0 = RUN.s0blob and #RUN.s0blob > 0
+    if not RETRYABLE[class] or RUN.attempt >= RUN.attempts
+       or not M.__body or not haveS0 then
+      if RETRYABLE[class] and not haveS0 then
+        M.log("[retry] no boot snapshot was captured for this run, so this "
+          .. "seed-dependent failure cannot be replayed")
+      end
+      stopWith(code, class, msg)
+      return
+    end
+    M.log(string.format("[retry] attempt %d/%d: restoring the boot snapshot "
+      .. "(%d bytes) and replaying the body with a fresh seed",
+      RUN.attempt + 1, RUN.attempts, #RUN.s0blob))
+    M.thawPad()
+    M.setPad(nil)
+    RUN.phase = "reloading"
+    RUN.ld = M.requestLoadState(RUN.s0blob)
+    RUN.ldWait = 0
+  end
+
+  local function frame()
+    M.totalFrames = M.totalFrames + 1
+
+    -- ---- a replay in flight: no steps, no canary, no watchdog ---------
+    if RUN.phase == "reloading" then
+      RUN.ldWait = RUN.ldWait + 1
+      if RUN.ld and RUN.ld.done then
+        if not RUN.ld.ok then
+          stopWith(1, "other", "retry: the boot snapshot would not load: "
+            .. tostring(RUN.ld.error))
+          return
+        end
+        RUN.attempt = RUN.attempt + 1
+        RUN.shift = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
+          + RUN.gap * (RUN.attempt - 1)
+        resetLibState()
+        M.rearmInputInjection()
+        canaryInGame = false
+        goReadFired, titleExecFired, wipeFired, wipeN = 0, 0, 0, 0
+        RUN.installing = true
+        local ok, err = pcall(M.__body)
+        RUN.installing = false
+        if not ok then
+          stopWith(1, "other", "retry: replaying the segment body raised: "
+            .. tostring(err))
+          return
+        end
+        M.log(string.format("[retry] attempt %d/%d starting: body replayed "
+          .. "from source; it will idle %d frames at its boot point to "
+          .. "move the seed", RUN.attempt, RUN.attempts, RUN.shift))
+        RUN.phase = "run"
+      elseif RUN.ldWait > 600 then
+        stopWith(1, "other", "retry: the savestate load trampoline never "
+          .. "fired in 600 frames")
+      end
+      return
+    end
+
     if not canaryInGame and (M.hasControl() or M.battleLoadStarted()) then
       canaryInGame = true
     end
+    if M.battleLoadStarted() and M.frame % 30 == 0 then sampleBattle() end
     if canaryInGame and M.partyWipedInBattle and M.partyWipedInBattle() then
       wipeN = wipeN + 1
       if wipeN == WIPE_FRAMES then
@@ -5090,58 +5860,133 @@ function M.run(opts, steps)
     else
       wipeN = 0
     end
-    if M.gameOverFired > 0 and not opts.allowGameOver then
-      finished = true
-      traceFlush()
-      coverageFlush()
-      M.finishRecoveryTrace("run_ended")
-      M.log(string.format("FAIL: GAME OVER fired (GameOver read x%d, " ..
+    if M.gameOverFired > 0 and not RUN.opts.allowGameOver then
+      failed("wipe", string.format("GAME OVER fired (GameOver read x%d, " ..
         "TitleScreen exec x%d, battle wipe x%d) -- the run " ..
         "lost and any further input auto-Continues the last save, which " ..
         "reads as silent time travel.  A ladder that can survive this " ..
         "must reload BEFORE the game-over lands, or clear " ..
         "M.gameOverFired after handling it (see #127's ambush finding).",
-        goReadFired, titleExecFired, wipeFired))
-      emu.stop(3)
+        goReadFired, titleExecFired, wipeFired), 3)
       return
     end
     M.frame = M.frame + 1
     if OT6_LIVE and (M.frame == 20 or M.frame % LIVE_IVL == 0) then M.liveShot() end
-    if M.frame > budget then
-      finished = true
-      traceFlush()
-      coverageFlush()
-      M.finishRecoveryTrace("run_ended")
-      M.log("FAIL: frame budget exceeded (" .. budget .. " frames)")
-      emu.stop(2)
+
+    -- The boot snapshot for the replay: harvested here, a couple of
+    -- frames after it was asked for (below, after the tick).
+    if RUN.s0 and RUN.s0.done and not RUN.s0blob then
+      if RUN.s0.ok then
+        RUN.s0blob = RUN.s0.blob
+        M.log(string.format("[retry] boot snapshot captured at f%d "
+          .. "(%d bytes): the machine as the body's first step found it",
+          M.frame, #RUN.s0blob))
+      else
+        M.log("[retry] boot snapshot FAILED to capture ("
+          .. tostring(RUN.s0.error) .. "); this run cannot retry")
+        RUN.s0blob = ""              -- asked and answered: do not ask again
+      end
+      RUN.s0 = nil
+    end
+
+    if M.frame > RUN.budget then
+      failed("budget", "frame budget exceeded (" .. RUN.budget
+        .. " frames in attempt " .. RUN.attempt .. ")", 2)
       return
     end
+
+    -- A body with no fixture load and no entry contract (the two
+    -- from-power-on generators, and the harness's own selftests) never
+    -- calls M.bootMark, so the seed variation would have nowhere to go.
+    -- Mark the run's own opening instead: idling there is the same
+    -- legitimate thing -- a player who has not started pressing yet.
+    if not RUN.bootMarked and M.frame == BOOT_FALLBACK then
+      M.bootMark(string.format("no fixture load or entry contract in the "
+        .. "first %d frames: the run's own opening", BOOT_FALLBACK))
+    end
+
+    -- The seed variation: idle frames at the boot point, pad neutral, the
+    -- pad restored afterwards so a press the boot step was holding is not
+    -- silently dropped.
+    if RUN.idle > 0 then
+      RUN.idle = RUN.idle - 1
+      M.setPad(nil)
+      if RUN.idle == 0 then
+        M.setPad(RUN.idlePad)
+        RUN.idlePad = nil
+        M.log(string.format("[retry] seed shift done at f%d ($021e=%d, a "
+          .. "battle starting now would seed $be=$%02X)", M.frame,
+          M.seedPhase(), M.seedOf(M.seedPhase())))
+      end
+      return
+    end
+
     -- The absorb guard rides here rather than inside the battle drivers
     -- because a route need not use one of those drivers at all, and every
-    -- test in the tree goes through this one callback.  The tile trace
-    -- rides here for the same reason.
+    -- test in the tree goes through this one callback.  The tile trace and
+    -- the watchdog sampler ride here for the same reason.
     local ok, r = pcall(function()
       traceTick()
       local bad = M.absorbGuardTick()
       if bad then error(bad, 0) end
-      return root:tick()
+      bad = watchTick()
+      if bad then error(bad, 0) end
+      return RUN.root:tick()
     end)
+    -- The boot snapshot for the replay, asked for on the first frame of
+    -- attempt 1 on which no other savestate trampoline is pending (a
+    -- fixture-booted body loads its fixture on frame 1, so this lands a
+    -- few frames later, on the loaded fixture; a checkpoint-booted body
+    -- gets frame 1, the power-on with its battery).  Either is the state
+    -- the replayed body's first step will find, which is all the replay
+    -- needs.  No step is delayed for it: the trampoline fires inside the
+    -- frame's own emulation, so a first-try run lands frame for frame
+    -- where it always did.
+    if ok and RUN.attempt == 1 and RUN.attempts > 1 and M.__body
+       and not RUN.s0 and not RUN.s0blob and M.pendingStateReqs == 0 then
+      RUN.s0 = M.requestSaveState()
+    end
     if not ok then
-      finished = true
-      traceFlush()
-      coverageFlush()
-      M.finishRecoveryTrace("run_ended")
-      M.log("FAIL: " .. tostring(r))
-      emu.stop(1)
+      failed(classify(r), tostring(r), 1)
     elseif r == "done" then
       finished = true
       traceFlush()
       coverageFlush()
+      watchReport()
       M.finishRecoveryTrace("run_ended")
-      M.log("PASS (frame " .. M.frame .. ")")
+      for _, f in ipairs(RUN.failures) do
+        M.log(string.format("[retry] this PASS followed a failed attempt: "
+          .. "%d/%d class=%s: %s", f.attempt, RUN.attempts, f.class, f.msg))
+      end
+      M.log(string.format("PASS (frame %d) attempts=%d/%d", M.frame,
+        RUN.attempt, RUN.attempts))
       emu.stop(0)
+    end
+  end
+
+  -- The runner itself must never die without a verdict.  A Lua error in
+  -- the reload path, the canary, the sampler or the verdict code is
+  -- invisible headless (the script log is not read; docs/TESTING.md's
+  -- "no verdict" signature), so the whole frame body runs under pcall and
+  -- an error there is a FAIL line naming the runner, exit 1.
+  rawAddEventCallback(function()
+    if finished then return end
+    local ok, err = pcall(frame)
+    if not ok and not finished then
+      finished = true
+      pcall(traceFlush)
+      pcall(coverageFlush)
+      pcall(watchReport)
+      pcall(M.finishRecoveryTrace, "run_ended")
+      M.log(string.format("FAIL: segment runner internal error (attempt "
+        .. "%d/%d, phase %s, f%d): %s\n  [retry] this is a harness bug, not "
+        .. "a route or seed finding; nothing was retried.",
+        RUN.attempt, RUN.attempts, tostring(RUN.phase), M.frame,
+        tostring(err)))
+      emu.stop(1)
     end
   end, emu.eventType.startFrame)
 end
 
+end   -- the segment runner's scope
 return M
