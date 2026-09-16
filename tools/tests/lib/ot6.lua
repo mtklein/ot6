@@ -2412,6 +2412,40 @@ local function execActivate()
   end, emu.callbackType.exec, b, b)
 end
 
+-- The unknown-menu guard's ledger (#188), one per run and bucketed by the
+-- $7BC2 state, so the driver's KNOWN_ST table is a measurement rather
+-- than a guess: `seen` counts every pulse a fight driver's button()
+-- sampled at a menu state it does not know, `drops` every time the guard
+-- fired (dropPlan("unknown_menu") and a B out).  Every driver in the run
+-- adds to the same ledger; watchReport prints it beside the verdict as
+-- the `[watch] unknown-menu` line, and the driver logs each state's
+-- first sighting in a battle with the actor, the command row and a
+-- screenshot (the `[unknown-menu]` lines).  Per the standing rule, every
+-- state that shows up here is a verb the driver has yet to learn.
+M.unknownMenu = { seen = {}, drops = {}, order = {} }
+local function unknownMenuNote(kind, st)
+  local T = M.unknownMenu
+  if T.seen[st] == nil and T.drops[st] == nil then T.order[#T.order + 1] = st end
+  T[kind][st] = (T[kind][st] or 0) + 1
+end
+function M.unknownMenuReport()
+  local T = M.unknownMenu
+  if #T.order == 0 then
+    return "unknown-menu drops by $7BC2 state: none (no unknown state sampled)"
+  end
+  table.sort(T.order)
+  local drops, seen, nd, ns = {}, {}, 0, 0
+  for _, st in ipairs(T.order) do
+    drops[#drops + 1] = string.format("$%02X=%d", st, T.drops[st] or 0)
+    seen[#seen + 1] = string.format("$%02X=%d", st, T.seen[st] or 0)
+    nd, ns = nd + (T.drops[st] or 0), ns + (T.seen[st] or 0)
+  end
+  return string.format("unknown-menu drops by $7BC2 state: %s (%d drop(s)); "
+    .. "pulses sampled there: %s (%d); the [unknown-menu] lines name each "
+    .. "state's first sighting per battle", table.concat(drops, " "), nd,
+    table.concat(seen, " "), ns)
+end
+
 function M.newFightDriver(tag, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -2433,6 +2467,28 @@ function M.newFightDriver(tag, opts)
   -- $AD=bolt($04) (bosses-wob.md's element byte convention).
   local CMD_THROW, ST_THROW_OPEN, ST_THROW = 0x08, 0x2B, 0x2D
   local SKEAN_ELEM = { [0xAB] = 0x01, [0xAC] = 0x80, [0xAD] = 0x04 }
+  -- The command window's two side windows (probe_rowdef.lua, #188): LEFT
+  -- at command select opens Row ($05 -> $01 -> $24) and RIGHT opens Def.
+  -- ($05 -> $01 -> $27).  Inside either, A commits the row change or the
+  -- defend as the turn's command, B or the opposite direction closes it
+  -- ($01 -> $05, the command cursor where it was), and the direction that
+  -- opened it is not read at all: LEFT held 120 frames in $24 moved
+  -- nothing (UpdateMenuState_24 @7e81 reads only A, B and RIGHT).  That
+  -- is the v0.17 train_done attempt-1 no-effect trip: a LEFT held from
+  -- the field walk into the battle opened Row, and the driver, not
+  -- knowing $24, sat there until the watchdog tripped.  This driver never
+  -- means to be in either; it backs out with B and keeps its plan.
+  local ST_ROW, ST_DEF = 0x24, 0x27
+  -- EDGAR's Tools family (probe_tools.lua, #188): A on the Tools row ->
+  -- $2E (OpenToolsWindow builds wItemList, ~7 frames) -> $01 -> $30 (the
+  -- list, ST_TOOLS); B from the list -> $01 -> $05 directly
+  -- (CloseToolsWindow is a subroutine there, so $2F is not written); A on
+  -- a tool -> $38 target select, B -> $30.  $2F is the force-close state
+  -- the engine walks through after a commit ($7BCB set: $30 -> $2F ->
+  -- $01 -> $05), and OT6's Blitz, Bushido and Steal ladders reuse this
+  -- shell ($6168 mode byte), so every Sabin and Cyan fight passes here
+  -- too.  Both are transitional: the plan waits them out.
+  local ST_TOOLS_OPEN, ST_TOOLS_CLOSE = 0x2E, 0x2F
   local LSCROLL, LROW = 0x891F, 0x8927
   local MAXMP = 0x3C30
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
@@ -2479,6 +2535,8 @@ function M.newFightDriver(tag, opts)
   local heldFast = false            -- the live steer asked for 3 presses/pulse
   local tgtSpin = 0                    -- frames spent undecided in ST_TGT
   local unknownSt, unknownN = nil, 0   -- unknown-menu-state stall guard
+  local unknownSeen = {}               -- st -> true once logged this battle (#188)
+  local sideWindowN = 0                -- Row/Def. windows backed out of this battle
   local parkSt, parkN = nil, 0         -- parked-KNOWN-window watchdog
   local idleSt, idleN = nil, 0         -- plan-less open-window back-out
   -- The two numbers the heal policy weighs against each other, both measured
@@ -3905,7 +3963,12 @@ function M.newFightDriver(tag, opts)
                      [ST_LORE] = true, [ST_LORE_OPEN] = true, [0x01] = true,
                      -- the Throw family (probe_throw.lua; btlgfx
                      -- UpdateMenuState_2b/2c/2d): open, close, item select
-                     [ST_THROW_OPEN] = true, [0x2C] = true, [ST_THROW] = true }
+                     [ST_THROW_OPEN] = true, [0x2C] = true, [ST_THROW] = true,
+                     -- the command window's side windows (probe_rowdef.lua)
+                     -- and the Tools shell's open and force-close states
+                     -- (probe_tools.lua); see the constants
+                     [ST_ROW] = true, [ST_DEF] = true,
+                     [ST_TOOLS_OPEN] = true, [ST_TOOLS_CLOSE] = true }
   -- The selection windows a plan-less driver backs out of (see the
   -- plan-nil head of button()): every list that waits on A or B.  The
   -- transitional states ($19 lore fill, $2B/$2C throw open/close) are
@@ -4082,15 +4145,50 @@ function M.newFightDriver(tag, opts)
     if M.readByte(MENU) ~= 0 and not KNOWN_ST[st] then
       if st == unknownSt then unknownN = unknownN + 1
       else unknownSt, unknownN = st, 1 end
+      -- The ledger (#188): every pulse sampled here is counted by state,
+      -- and the first sighting of each state in a battle is written down
+      -- with who held the window, where the command cursor sat and what
+      -- the screen showed, so the KNOWN_ST table grows from evidence.
+      unknownMenuNote("seen", st)
+      if not unknownSeen[st] then
+        unknownSeen[st] = true
+        local shot = string.format("unknown_menu_%02X_f%d", st, M.frame)
+        pcall(M.screenshot, shot)
+        local cmds = {}
+        for row = 0, 3 do
+          cmds[#cmds + 1] = string.format("%02X", M.readByte(CMDTBL + actor * 12 + row * 3))
+        end
+        M.log(string.format("[%s] [unknown-menu] state $%02X first seen this "
+          .. "battle at f%d: actor=%d char=%d cmd row=%d cmds=%s plan=%s "
+          .. "screenshot=%s.png", tag or "fight", st, M.frame, actor,
+          M.readByte(BCHID + actor * 2), M.readByte(CMDROW + actor) & 3,
+          table.concat(cmds, ","), plan and plan.kind or "-", shot))
+      end
       if unknownN > 8 then        -- pulses, not frames (the cadence)
         M.log(string.format("[%s] unknown menu state $%02X held %d pulses "
           .. "-- backing out (B)", tag or "fight", st, unknownN))
         unknownSt, unknownN = nil, 0
+        unknownMenuNote("drops", st)
         dropPlan("unknown_menu")
         return { "b" }
       end
     else
       unknownSt, unknownN = nil, 0
+    end
+    -- Row / Def. (see ST_ROW): a side window is open only because a LEFT
+    -- or RIGHT reached the command window, which this driver never
+    -- presses there -- a direction held from the field into the battle
+    -- (train_done, v0.17), or a target-select steer whose window closed
+    -- under it.  Back out with B now, on every path; the plan (a row to
+    -- walk to at $05) is still good once the window is gone.
+    if st == ST_ROW or st == ST_DEF then
+      sideWindowN = sideWindowN + 1
+      M.log(string.format("[%s] [side-window] %s ($%02X) open at f%d (actor=%d "
+        .. "char=%d cmd row=%d plan=%s, #%d this battle) -- not this driver's "
+        .. "press; B out", tag or "fight", st == ST_ROW and "Row" or "Def.",
+        st, M.frame, actor, M.readByte(BCHID + actor * 2),
+        M.readByte(CMDROW + actor) & 3, plan and plan.kind or "-", sideWindowN))
+      return { "b" }
     end
     -- The lore stall guard, checked wherever a lore plan is live rather
     -- than only at plan time: a pursuit wedged inside the window (the
@@ -4296,6 +4394,9 @@ function M.newFightDriver(tag, opts)
       end
       if cc ~= wc then return { wc > cc and "right" or "left" } end
       return { wr > cr and "down" or "up" }
+    end
+    if (st == ST_TOOLS_OPEN or st == ST_TOOLS_CLOSE) and plan.kind == "skill" then
+      return nil                       -- the shell is building / closing; wait
     end
     if st == ST_TOOLS and plan.kind == "skill" then
       local want
@@ -4522,6 +4623,7 @@ function M.newFightDriver(tag, opts)
     parkDropN = 0
     layout, layoutUnreadSaid, steerLast, steerDead = nil, false, nil, {}
     parkSt, parkN, idleSt, idleN = nil, 0, nil, 0
+    unknownSt, unknownN, unknownSeen, sideWindowN = nil, 0, {}, 0
     if healSaid == "parked-out" then healSaid = nil end
     careActor, startSnap, planPulses = nil, nil, 0
     -- Everything the heal policy measured belongs to the battle that just
@@ -5586,6 +5688,9 @@ local function watchReport()
     W.samplesTaken, W.pressFrames, W.trips, W.maxQuietCtl, W.maxQuietProg,
     W.maxQuietScreen, WATCH.noEffectFrames,
     math.floor(WATCH.pressFraction * 100), WATCH.quietFrames))
+  -- the fight drivers' unknown-menu ledger (#188), so the count sits
+  -- beside the verdict of every run rather than in a table nobody measured
+  M.log("[watch] " .. M.unknownMenuReport())
 end
 
 -- The recovery cap (#185's other half).  A driver that drops its plan and
