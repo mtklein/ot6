@@ -407,41 +407,18 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: spend rule and wipe class (#175) checked")
   end),
 
-  -- 12. the raise gate's floor (#174, H.hitFloorExempt) on the map-269
-  -- bytes: Trapper's L4 Flare is cmd $0C atk $95 (measured: "[death]
-  -- f+2135 entity 2 char 1 from 447/447 by slot 2 cmd $0C atk $95"), and
-  -- Rizopas's Battle cmd $00 atk $EE, El Nino cmd $02 atk $6F, Mega Volt
-  -- cmd $0C atk $B8 (the lab's [act] lines).
+  -- 12. the raise gate's floor: every measured hit, a level spell's
+  -- included.  The #174 exemption was measured out (map269-random.md,
+  -- 2026-09-16: 20 Fenix Downs against main's 12, no frames gained) and
+  -- main's gate stands: LOCKE (447) raised to 55 under a measured 447
+  -- (Trapper's L4 Flare) or 55 (its recurrence) is refused.
   H.call(function()
-    local ex, why = H.hitFloorExempt({ cmd = 0x0C, atk = 0x95, fullKills = 2 })
-    H.assertEq(ex, true, "L4 Flare by Lore, two killed from full: not a floor (" .. why .. ")")
-    ex, why = H.hitFloorExempt({ cmd = 0x0C, atk = 0x95, fullKills = 1 })
-    H.assertEq(ex, true, "L4 Flare killing one: still a level spell, not a floor (" .. why .. ")")
-    ex, why = H.hitFloorExempt({ cmd = 0x02, atk = 0x94, fullKills = 0 })
-    H.assertEq(ex, true, "L5 Doom cast by the Magic command: a level spell (" .. why .. ")")
-    ex, why = H.hitFloorExempt({ cmd = 0x00, atk = 0xEE, fullKills = 0 })
-    H.assertEq(ex, false, "Rizopas's Battle: the floor (" .. why .. ")")
-    ex, why = H.hitFloorExempt({ cmd = 0x02, atk = 0x6F, fullKills = 1 })
-    H.assertEq(ex, false, "El Nino taking one member: an ordinary spell, its damage recurs (" .. why .. ")")
-    ex, why = H.hitFloorExempt({ cmd = 0x02, atk = 0x6F, fullKills = 2 })
-    H.assertEq(ex, true, "...but a cast that kills two from full in one action reads as a level spell whatever its id (" .. why .. ")")
-    ex, why = H.hitFloorExempt({ cmd = 0x0C, atk = 0xB8, fullKills = 0 })
-    H.assertEq(ex, false, "Mega Volt by the Lore command: ordinary, a floor (" .. why .. ")")
-    ex, why = H.hitFloorExempt({ cmd = 0x00, atk = 0xEE, fullKills = 2 })
-    H.assertEq(ex, false, "a swing is never exempt, whatever it killed (" .. why .. ")")
-    -- the exemption is the first kill's only: the second Flare that takes
-    -- the raised pair from 55 is the floor (map-269 boostfight A/B, #174)
-    ex, why = H.hitFloorExempt({ cmd = 0x0C, atk = 0x95, fullKills = 0, recurred = true })
-    H.assertEq(ex, false, "L4 Flare that has killed before this battle: the floor now (" .. why .. ")")
-    local rHp, rOk = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = 55 })
+    local rHp, rOk = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = 447 })
+    H.assertEq(rHp * 10 + (rOk and 1 or 0), 550, "LOCKE to 55 under a measured 447 one-shot: no raise")
+    rHp, rOk = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = 55 })
     H.assertEq(rHp * 10 + (rOk and 1 or 0), 550, "LOCKE to 55 under a measured 55 recurrence: no raise")
-    H.assertEq(H.LEVEL_SPELLS[0x98], "L? Pearl", "the level-spell set is const.inc's: $94 $95 $96 $98")
-    H.assertEq(H.LEVEL_SPELLS[0x97], nil, "...and $97 (Reflect???) is not one")
-    -- what the gate then sees: with the Flare's 447 kept aside, the ledger
-    -- has no hit and the raise stands
-    local raiseHp, ok, why2 = H.raiseDecision({ maxhp = 447, power = 2, smallestHit = nil })
-    H.assertEq(raiseHp * 10 + (ok and 1 or 0), 551, "LOCKE (447) to 55 with no floor measured: the raise stands (" .. why2 .. ")")
-    H.log("battle_healpolicy: the raise gate's level-spell exemption (#174) checked")
+    H.assertEq(H.hitFloorExempt, nil, "no level-spell exemption in the lib (#174, measured out)")
+    H.log("battle_healpolicy: the raise gate's floor (#165) checked")
   end),
 
   -- 12b. the battle's layout (#176, H.battleLayout): which way the target

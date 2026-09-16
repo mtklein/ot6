@@ -820,56 +820,6 @@ function M.raiseDecision(o)
     .. "is in reach, and the enemy acts before anyone can top up", raiseHp, hit)
 end
 
--- Is a monster action's damage a per-turn floor for the raise gate
--- (#174)?  The gate (M.raiseDecision) refuses a Fenix Down when the
--- living enemy's smallest hit re-kills the raise; a LEVEL SPELL is not
--- that hit.  Trapper's L4 Flare killed full-HP LOCKE and CELES in one
--- Lore action, and the gate read the 447 as "what this enemy does every
--- turn" and held for the rest of the fight while the two who held the
--- keys stayed down (map269-random.md: control 8050 frames, cared 3355).
--- A level spell lands on a level-multiple, once per caster turn, a third
--- of its turns; the raised member survives the next Battle.  So an
--- action is exempt from the floor when it is a cast (the Magic or Lore
--- command, $02 / $0C -- Battle and the special are $00) AND it is either
--- one of vanilla's level spells (const.inc: L5 Doom $94, L4 Flare $95,
--- L3 Muddle $96, L? Pearl $98) or it killed two or more members from
--- full HP in the one action -- the shape a person recognises on screen
--- whatever the spell was called.  Everything else -- a Battle, El Nino
--- taking one member, a Fire 3 -- stays the floor it was.
---
---   cmd        the monster's command byte ($b5 at ExecCmd)
---   atk        its attack byte ($b6), the ability id after folding
---   fullKills  members this action killed from full HP
---   recurred   this battle, an earlier cast of the same attack already
---              killed someone and was kept aside
---
--- The exemption is for the first kill only.  Once the spell has killed
--- again, the recurrence is measured, not supposed: the map-269 A/B
--- (boostfight, 15 seeds, main's driver against this one) spent 27 Fenix
--- Downs in battle against main's 10 because each raised pair stood at 55
--- HP until the next Flare took them again, while the fight dragged on.
---
--- Returns true and the reason when the action is NOT a floor.
-M.LEVEL_SPELLS = { [0x94] = "L5 Doom", [0x95] = "L4 Flare", [0x96] = "L3 Muddle",
-                   [0x98] = "L? Pearl" }
-function M.hitFloorExempt(o)
-  local cmd, atk, fullKills = o.cmd or 0, o.atk or 0, o.fullKills or 0
-  if cmd ~= 0x02 and cmd ~= 0x0C then return false, "a swing, not a cast" end
-  if o.recurred then
-    return false, string.format("cast $%02X has killed before this battle: it recurs, "
-      .. "so it is the floor now", atk)
-  end
-  if M.LEVEL_SPELLS[atk] then
-    return true, string.format("%s ($%02X) is a level spell: it recurs only on the "
-      .. "caster's turn, on a level-multiple", M.LEVEL_SPELLS[atk], atk)
-  end
-  if fullKills >= 2 then
-    return true, string.format("cast $%02X killed %d members from full HP in one "
-      .. "action: a level-spell shape, not a per-turn hit", atk, fullKills)
-  end
-  return false, string.format("cast $%02X is an ordinary spell: its damage recurs", atk)
-end
-
 -- The keyed line's boost (#174): boost-Fight through randoms is the
 -- default (half damage unbroken plus the swings a pip adds restores
 -- vanilla kill speed), but where a member holds a key the formation's
@@ -2378,8 +2328,6 @@ function M.newFightDriver(tag, opts)
   -- pressing it until the fight is lost.
   local steerLast = nil                -- { dir, sig, kind }
   local steerDead = {}                 -- dir -> presses with no effect
-  local parkDropByState = {}           -- menu state -> plans dropped there
-  local PARK_DROP_CAP = 3              -- ...before the driver fails fast
   -- multi-target latch: one R press on a MULTI_TARGET spell's target screen
   -- sets this to 1 and widens the side mask to every valid ally/monster
   -- (probe_targetall.lua measured it; btlgfx_main.asm @6e9a sets it)
@@ -2416,7 +2364,6 @@ function M.newFightDriver(tag, opts)
   -- member (the raise rule's smallest hit).
   local dmgHit = {}                    -- actor -> { kind, skill, per, n }
   local hitLedger = {}                 -- slot -> { min, minE, on = { [e] = smallest } }
-  local spellKilled = {}               -- atk -> true once an exempt cast has killed (#174)
   local partyHpLast = {}               -- entity -> HP last frame (hit ledger baseline)
   local monHpLast = {}                 -- slot -> HP last frame (damage watch baseline)
   -- The monster action in progress, for the ledger and the death lines
@@ -2794,32 +2741,16 @@ function M.newFightDriver(tag, opts)
   -- takes no turns (Ot6Gate skips them) and is not due to act.  Returns
   -- ok, the raise HP, the hit with its slot and victim (nil when nothing
   -- is measured), and the reason with every number in it.
-  -- A closed monster action's drops go into the hit ledger here (#165,
-  -- #174).  A level spell's, or a cast's that killed two from full, are
-  -- kept aside as L.spell -- on the record, in the raise line, but not
-  -- the smallest hit the gate measures against.
+  -- A closed monster action's drops go into the hit ledger here (#165):
+  -- every hit is the floor, a level spell's included.  The #174 exemption
+  -- (a level spell's kill is not a per-turn floor) was tried and measured
+  -- on the map-269 trio, 15 seeds, main's gate against it: 20 Fenix Downs
+  -- against 12 and no frames gained (8127 vs 8126), because the 55-HP
+  -- raise never survives the next Flare either.  main's gate stands.
   local function commitMonAct(act)
     if #act.drops == 0 then return end
     local L = hitLedger[act.slot] or { on = {} }
     hitLedger[act.slot] = L
-    local exempt, why = M.hitFloorExempt({ cmd = act.cmd, atk = act.atk,
-                                           fullKills = act.fullKills,
-                                           recurred = spellKilled[act.atk] })
-    if exempt and act.kills > 0 then spellKilled[act.atk] = true end
-    if exempt then
-      local parts = {}
-      for _, d in ipairs(act.drops) do
-        parts[#parts + 1] = string.format("e%d:%d->%d", d.e, d.last, d.hp)
-        L.spell = L.spell or { n = 0 }
-        L.spell.n = L.spell.n + 1
-        if L.spell.min == nil or d.drop < L.spell.min then L.spell.min = d.drop end
-        L.spell.atk = act.atk
-      end
-      M.log(string.format("[%s] slot %d's cmd $%02X atk $%02X took %s -- NOT a floor "
-        .. "for the raise gate: %s (#174)", tag or "fight", act.slot, act.cmd, act.atk,
-        table.concat(parts, " "), why))
-      return
-    end
     for _, d in ipairs(act.drops) do
       if L.on[d.e] == nil or d.drop < L.on[d.e] then L.on[d.e] = d.drop end
       if L.min == nil or d.drop < L.min then
@@ -2837,7 +2768,6 @@ function M.newFightDriver(tag, opts)
     local hit, hitSlot, hitOn = nil, nil, nil
     local lethalEta, lethalSlot, lethalPct = nil, nil, nil
     local brokenLethal = nil
-    local spells = {}
     -- The action still open (its drops are committed when it closes) is
     -- read provisionally: a raise planned inside that window otherwise
     -- sees "no enemy hit measured yet" for a hit that just landed.
@@ -2846,26 +2776,17 @@ function M.newFightDriver(tag, opts)
     -- against an empty ledger, and the floor was only committed after.
     local openL = nil
     if monAct ~= nil and #monAct.drops > 0 then
-      local exempt = M.hitFloorExempt({ cmd = monAct.cmd, atk = monAct.atk,
-                                        fullKills = monAct.fullKills,
-                                        recurred = spellKilled[monAct.atk] })
-      if not exempt then
-        local base = hitLedger[monAct.slot] or { on = {} }
-        openL = { on = {}, min = base.min, minE = base.minE, spell = base.spell }
-        for k, v in pairs(base.on) do openL.on[k] = v end
-        for _, d in ipairs(monAct.drops) do
-          if openL.on[d.e] == nil or d.drop < openL.on[d.e] then openL.on[d.e] = d.drop end
-          if openL.min == nil or d.drop < openL.min then openL.min, openL.minE = d.drop, d.e end
-        end
+      local base = hitLedger[monAct.slot] or { on = {} }
+      openL = { on = {}, min = base.min, minE = base.minE }
+      for k, v in pairs(base.on) do openL.on[k] = v end
+      for _, d in ipairs(monAct.drops) do
+        if openL.on[d.e] == nil or d.drop < openL.on[d.e] then openL.on[d.e] = d.drop end
+        if openL.min == nil or d.drop < openL.min then openL.min, openL.minE = d.drop, d.e end
       end
     end
     for s = 0, 5 do
       local L = hitLedger[s]
       if openL ~= nil and s == monAct.slot then L = openL end
-      if L and L.spell and monAlive(s) then
-        spells[#spells + 1] = string.format("slot %d's $%02X (smallest %d, %d hit(s))",
-          s, L.spell.atk, L.spell.min, L.spell.n)
-      end
       if L and monAlive(s) then
         local v, on = L.on[e], e
         if v == nil then v, on = L.min, L.minE end
@@ -2928,10 +2849,6 @@ function M.newFightDriver(tag, opts)
         detail = detail .. string.format("; gauges: nobody else standing to top up "
           .. "(slot %d is %d ticks from acting)", lethalSlot, lethalEta)
       end
-    end
-    if #spells > 0 then
-      detail = detail .. string.format("; level-spell hits not counted as the floor "
-        .. "(#174): %s", table.concat(spells, ", "))
     end
     local _, ok, why = M.raiseDecision(o)
     return ok, raiseHp, hit, hitSlot, hitOn, why .. detail
@@ -3989,6 +3906,7 @@ function M.newFightDriver(tag, opts)
           #steerTrail > 0 and ("; list steer trail (scroll,row/col>want row,col): " .. table.concat(steerTrail, " ")) or ""))
         steerTrail = {}
         parkSt, parkN, planPulses = nil, 0, 0
+        M.recoveryCount(tag or "fight", string.format("budget:%s/%02X", plan.kind, st))
         dropPlan("pulse_budget")
         return { "b" }
       end
@@ -4013,25 +3931,19 @@ function M.newFightDriver(tag, opts)
       else parkSt, parkN = sig, 0 end
       if parkN > 12 then          -- ~360 real frames: button() runs per cadence PULSE
         parkDropN = parkDropN + 1
-        local inSt = (parkDropByState[st] or 0) + 1
-        parkDropByState[st] = inSt
         M.log(string.format("[%s] parked %d pulses in known state $%02X "
-          .. "(plan %s item=%s idx=%s, drop #%d this battle, #%d in this "
-          .. "state) -- dropping the plan and backing out", tag or "fight",
+          .. "(plan %s item=%s idx=%s, drop #%d this battle) "
+          .. "-- dropping the plan and backing out", tag or "fight",
           parkN, st, plan.kind, tostring(plan.item), tostring(plan.idx),
-          parkDropN, inSt))
+          parkDropN))
         parkSt, parkN = nil, 0
         -- Re-planning into the same window that just parked is how a stuck
         -- steer became a lost fight (#176: the J39 back attack dropped the
-        -- plan every 13 pulses until the clock ran out).  Three drops in
-        -- one state is not bad luck; the driver stops and says so.
-        if inSt >= PARK_DROP_CAP then
-          failFast(string.format("state $%02X has parked and dropped %d plans "
-            .. "this battle (last: %s item=%s idx=%s; target window %s, layout "
-            .. "%s) -- re-planning is not getting out of it", st, inSt,
-            plan.kind, tostring(plan.item), tostring(plan.idx), tgtSig(),
-            layoutOf().name))
-        end
+        -- plan every 13 pulses until the clock ran out).  The lib's
+        -- recovery cap (M.recoveryCount, #185) counts the drops of this
+        -- plan in this state and fails fast, with the screenshot and the
+        -- ring, past three of them.
+        M.recoveryCount(tag or "fight", string.format("%s/%02X", plan.kind, st))
         dropPlan("cursor_stalled")
         return { "b" }
       end
@@ -4479,7 +4391,6 @@ function M.newFightDriver(tag, opts)
     menuStreak, tick, battleTick = 0, 0, 0
     plan, planActor, held = nil, nil, {}
     parkDropN = 0
-    parkDropByState = {}
     layout, layoutUnreadSaid, steerLast, steerDead = nil, false, nil, {}
     parkSt, parkN, idleSt, idleN = nil, 0, nil, 0
     if healSaid == "parked-out" then healSaid = nil end
@@ -4492,7 +4403,7 @@ function M.newFightDriver(tag, opts)
     itemRestore, castRestore = {}, {}
     healWatch, healSaid = nil, nil
     dmgWatch, dmgSeen, monHpLast = {}, {}, {}
-    dmgHit, hitLedger, partyHpLast, spellKilled = {}, {}, {}, {}
+    dmgHit, hitLedger, partyHpLast = {}, {}, {}
     monAct, deathSaid, battleDeaths, wipeSaid = nil, {}, {}, false
     raisePending, topUpOwed, unmuddlePending = nil, {}, nil
     raiseQueued = {}
@@ -4674,9 +4585,8 @@ function M.newFightDriver(tag, opts)
       -- one monAct per attributed action: it opens when a slot starts
       -- executing and closes when the attribution window ends.  Its
       -- drops are held until it closes and committed to the ledger
-      -- together, because whether they are a floor at all is a fact
-      -- about the whole action (M.hitFloorExempt, #174: a level spell's
-      -- double kill is not what this enemy does every turn).
+      -- together (commitMonAct), and read provisionally by the raise gate
+      -- while it is open (raiseOk).
       if slot == nil or monAct == nil or monAct.slot ~= slot then
         if monAct ~= nil then commitMonAct(monAct) end
         monAct = nil
@@ -5412,13 +5322,11 @@ end
 -- same plan in the same battle it is not recovering, it is cycling, and the
 -- run says so now rather than after forty of them.
 --
--- NOT wired into the fight driver on this branch: the call site is this
--- file's `parkN > 12` "parked %d pulses in known state" drop inside
--- newFightDriver (wt/driver-boost owns that code).  One line there, just
--- before dropPlan("cursor_stalled") --
---   M.recoveryCount(tag, string.format("%s/%02X", plan.kind, st))
--- -- turns drop #4 of the same plan in the same menu state into a
--- counted, retried fast failure with a screenshot (#185 reached #40).
+-- Wired into the fight driver at both of its drop sites: the `parkN > 12`
+-- "parked %d pulses in known state" drop (key `<kind>/<state>`) and the
+-- pulse-budget drop (key `budget:<kind>/<state>`), so drop #4 of the same
+-- plan in the same menu state is a counted, retried fast failure with a
+-- screenshot (#185 reached #40 before it was).
 function M.recoveryCount(tag, key, cap)
   local k = tostring(tag) .. "|" .. tostring(key)
   local n = (W.recovery[k] or 0) + 1
