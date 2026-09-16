@@ -2029,9 +2029,69 @@ function M.openChest(o)
   }, {})
 end
 
--- M.buyItem: buy `qtyFn()` more of shop row `row`, closed-loop,
--- with the shop already open at its options window (menu state $25).
+-- The shop table (#191).  ShopProp is shop_prop.dat spliced at shop.asm:
+-- 128 records of 9 bytes, byte 0 = shop type in bits 0-2 (1 Weapon, 2
+-- Armor, 3 Item, 4 Relics, 5 Vendor: ShopTypeTextTbl, shop.asm:1816-1822)
+-- and the price adjustment in bits 3-5, bytes 1-8 = the eight rows' item
+-- ids, $FF = empty.  The shop event command $9b parks the shop number at
+-- $0201 (w0201, shop.asm:1794: DrawShopTypeText multiplies it by 9 into the
+-- record), and the buy list is drawn from that record, row r's id landing
+-- at $7E9D89+r (shop.asm:819-821).  So the ROM table says which row an
+-- item is on, and the drawn list says what the menu actually put there.
+local SHOP_TYPES = { [1] = "Weapon", [2] = "Armor", [3] = "Item",
+                     [4] = "Relics", [5] = "Vendor" }
+local SHOP_REC, SHOP_LIST = 9, 0x9D89
+local function shopProp() return M.sym("ShopProp") & 0x3FFFFF end
+
+-- the shop number the open counter parked at $0201
+function M.shopId() return M.readByte(0x0201) end
+
+-- the shop's type code (byte 0 & 7) and its name
+function M.shopType(shop)
+  local t = M.readRomByte(shopProp() + shop * SHOP_REC) & 0x07
+  return t, SHOP_TYPES[t] or string.format("type %d", t)
+end
+
+-- the eight rows' item ids from the ROM table (nil for an empty $FF row)
+function M.shopStock(shop)
+  local rows = {}
+  for r = 0, 7 do
+    local id = M.readRomByte(shopProp() + shop * SHOP_REC + 1 + r)
+    if id ~= 0xFF then rows[r] = id end
+  end
+  return rows
+end
+
+-- the row (0..7) shop `shop` sells item `id` on, or nil
+function M.shopRowOf(shop, id)
+  for r = 0, 7 do
+    if M.readRomByte(shopProp() + shop * SHOP_REC + 1 + r) == id then return r end
+  end
+  return nil
+end
+
+local function shopStockText(shop)
+  local out = {}
+  for r = 0, 7 do
+    local id = M.readRomByte(shopProp() + shop * SHOP_REC + 1 + r)
+    out[#out + 1] = id == 0xFF and "--" or string.format("$%02X", id)
+  end
+  return table.concat(out, " ")
+end
+
+-- M.buyItem: buy `qtyFn()` more of item `id`, closed-loop, with the shop
+-- already open at its options window (menu state $25).
 --
+--  * The row is the ROM shop table's, for the shop the counter opened
+--    ($0201), resolved on the first frame; a caller that still passes one
+--    (the old signature, kept) has it checked against the table, and a
+--    wrong row is a failure before any money moves rather than a silent
+--    purchase of whatever sat on that row.  `row` may be nil, or the
+--    argument omitted altogether: M.buyItem(id, qtyFn, name).  `qtyFn`
+--    may be a plain count.
+--  * Before the confirm the drawn list is read too ($7E9D89+row must hold
+--    the item), and the purchase line logs shop, type, row and id from
+--    both sources.
 --  * The list cursor row (DP $4E) and the quantity (zSelIndex, DP $28) are
 --    read and steered, never press-counted, because menu direction holds
 --    auto-repeat.  Widget deltas: right +1, left -1, up +10, down -10,
@@ -2046,24 +2106,60 @@ end
 --    reads are wrong (the field bag does not update until the shop hands
 --    RAM back).
 function M.buyItem(id, row, qtyFn, name)
+  if type(row) == "function" or type(row) == "string"
+     or (type(row) == "number" and type(qtyFn) == "string") then
+    -- the (id, qtyFn, name) form: no row asked for
+    row, qtyFn, name = nil, row, qtyFn
+  end
+  if type(qtyFn) == "number" then
+    local n = qtyFn
+    qtyFn = function() return n end
+  end
+  name = name or string.format("item $%02X", id)
+  local askedRow = row
   local phase = 0
   local seen27, bought = false, false
   local want = nil
   local lastQty, stall = nil, 0
+  local shop, typeName, gil0, drawnOk = nil, nil, nil, false
   return M.driveUntil(function() return bought end, 20000, {
     M.call(function()
       phase = (phase + 1) % 8
       local st = M.readByte(0x0026)
       if want == nil then
+        -- The row comes from the ROM table for the shop the counter opened
+        -- (the shop event parked its number at $0201 before the options
+        -- window came up), so a caller cannot buy the wrong thing by
+        -- miscounting rows; a row it still passes is checked, not trusted.
+        shop = M.shopId()
+        local _
+        _, typeName = M.shopType(shop)
+        local romRow = M.shopRowOf(shop, id)
+        if romRow == nil then
+          error(string.format("[shop] %s: shop %d (%s) does not sell item $%02X " ..
+            "-- its rows are %s", name, shop, typeName, id, shopStockText(shop)), 0)
+        end
+        if askedRow ~= nil and askedRow ~= romRow then
+          error(string.format("[shop] %s: row %d was asked for, but shop %d (%s) " ..
+            "sells $%02X on row %d (row %d holds %s) -- its rows are %s", name,
+            askedRow, shop, typeName, id, romRow, askedRow,
+            (M.shopStock(shop)[askedRow] and string.format("$%02X", M.shopStock(shop)[askedRow])
+              or "nothing"), shopStockText(shop)), 0)
+        end
+        row = romRow
         want = qtyFn()
+        gil0 = M.gil()
         if want < 1 then
           -- already at (or over) the target: nothing to buy, and no menu
           -- interaction -- the first cut clamped this to 1 and bought a
           -- Fenix Down the bag did not need (30 on a target of 25)
-          M.log(string.format("[shop] %s: already there (%d wanted); skipping", name, want))
+          M.log(string.format("[shop] %s: shop %d (%s) row %d = $%02X; already there " ..
+            "(%d wanted); skipping", name, shop, typeName, row, id, want))
           bought = true; M.setPad({}); return
         end
-        M.log(string.format("[shop] %s: buying %d", name, want))
+        M.log(string.format("[shop] %s: shop %d (%s) row %d = $%02X on the ROM table%s; " ..
+          "buying %d (gil %d)", name, shop, typeName, row, id,
+          askedRow ~= nil and ", as asked" or "", want, gil0))
       end
       if st == 0x27 then
         seen27 = true
@@ -2092,10 +2188,24 @@ function M.buyItem(id, row, qtyFn, name)
       elseif seen27 then
         bought = true
         M.setPad({})
+        M.log(string.format("[shop] %s: bought %d x $%02X from shop %d (%s) row %d; " ..
+          "gil %d -> %d", name, lastQty or want, id, shop, typeName, row, gil0, M.gil()))
       elseif st == 0x25 then
         M.setPad(phase < 2 and { "a" } or {})
       elseif st == 0x26 then
         local cur = M.readByte(0x004E)
+        if cur == row and not drawnOk then
+          -- the list the menu drew is the game's own reading of the same
+          -- record; check it once, before the A that opens the quantity
+          local drawn = M.readByte(SHOP_LIST + row)
+          if drawn ~= id then
+            error(string.format("[shop] %s: the drawn list's row %d holds $%02X, " ..
+              "not $%02X (shop %d, %s; ROM rows %s)", name, row, drawn, id, shop,
+              typeName, shopStockText(shop)), 0)
+          end
+          drawnOk = true
+          M.log(string.format("[shop] %s: the drawn list's row %d shows $%02X too", name, row, id))
+        end
         local btn = cur < row and "down" or cur > row and "up" or "a"
         M.setPad(phase < 2 and { [btn] = true } or {})
       else
@@ -2312,6 +2422,65 @@ local function careKernel(opts)
 
   local function anyNeed() return pick() ~= nil end
 
+  -- Why the members still below the threshold are going unserved, for the
+  -- roster line: "nothing to do" with somebody at 60% is a different fact
+  -- from "nothing to do" with everyone whole, and #184 was filed reading
+  -- the first as a refusal.  One clause per member nobody can help: each
+  -- healing item's count against its floor (and whether the game refused
+  -- it for this target), then the casters -- off, or each one's reason.
+  local ITEM_NAMES = { [CARE_TONIC] = "tonic", [CARE_POTION] = "potion",
+                       [CARE_FENIX] = "fenix" }
+  local function unserved()
+    if pick() ~= nil then return "" end
+    local out = {}
+    for _, c in ipairs(careParty()) do
+      local hp, mx = M.charHp(c), M.charMaxHp(c)
+      local why = {}
+      if hp == 0 then
+        local w = { kind = "item", char = c, item = CARE_FENIX, why = "revive" }
+        why[#why + 1] = string.format("down; fenix %d in the bag%s",
+          M.invCountOf(CARE_FENIX), failed[key(w)] and ", refused" or "")
+      elseif (M.charStatus1(c) & 0xC2) ~= 0 then
+        why[#why + 1] = string.format("status1 $%02X: the menu refuses items and spells alike",
+          M.charStatus1(c))
+      elseif mx > 0 and hp < mx * thresh then
+        for _, id in ipairs({ CARE_TONIC, CARE_POTION }) do
+          local w = { kind = "item", char = c, item = id, why = "heal" }
+          why[#why + 1] = string.format("%s %d in the bag, floor %d%s",
+            ITEM_NAMES[id], M.invCountOf(id), reserve[id] or 0,
+            failed[key(w)] and ", refused" or "")
+        end
+        if not useMagic then
+          why[#why + 1] = "casting off"
+        else
+          for _, k in ipairs(careParty()) do
+            local knows = false
+            for _, s in ipairs(CARE_CURES) do
+              if M.knowsSpell(k, s) then knows = true end
+            end
+            if M.charHp(k) == 0 or (M.charStatus1(k) & 0xC2) ~= 0 then
+              why[#why + 1] = string.format("c%d cannot cast (hp %d, status1 $%02X)",
+                k, M.charHp(k), M.charStatus1(k))
+            elseif not knows then
+              why[#why + 1] = string.format("c%d knows no cure", k)
+            else
+              why[#why + 1] = string.format("c%d mp %d, floor %d%s", k,
+                M.charMp(k), floorOf(k),
+                failed[key({ kind = "cast", char = c, caster = k,
+                             spell = CARE_CURES[1] })] and ", refused" or "")
+            end
+          end
+        end
+      end
+      if #why > 0 then
+        out[#out + 1] = string.format("c%d %d/%d hp: %s", c, hp, mx,
+          table.concat(why, "; "))
+      end
+    end
+    if #out == 0 then return "" end
+    return " -- nothing more can be done: " .. table.concat(out, " | ")
+  end
+
   -- menu slot (the $70 and $3B cursor row) for a character id
   local function slotOf(c)
     for s = 0, 3 do
@@ -2352,6 +2521,7 @@ local function careKernel(opts)
 
   local phase, served, want, pending, tries = 0, false, nil, nil, 0
   local refuseArmed = true
+  local yielded = false
 
   -- Per-plan stall watchdog.  A plan that neither lands nor is abandoned makes
   -- no forward progress, and without a backstop the drive presses at it for
@@ -2382,6 +2552,31 @@ local function careKernel(opts)
     stall = stall + 1
     local st = M.readByte(CARE_ZM)
 
+    -- A battle can own the screen with every cell this kernel reads
+    -- meaning something else: $26 and DP $B5 -- the menu-state byte and
+    -- the mosaic byte the refusal test below reads -- are battle RAM
+    -- there, and $26 can read 05 in a fight.  Measured (#184,
+    -- gen_zozo2_arrival attempt 1, lap 52): a random opened on the world
+    -- map under the X presses, "field menu open" was satisfied 129 frames
+    -- later by a battle-side 05 in $26, the Potion plan was "REFUSED" one
+    -- frame after it was made by $B5's battle value, the cast plan's
+    -- presses walked the battle's Item list, and the close drive's B's
+    -- went into the fight for 2400 frames.  (probe_care_race.lua, 2026-09-
+    -- 16: with the care asked for 0..47 frames before the encounter step
+    -- ends, $26 read $00/$01/$4C/$C0 through the fight's first 400
+    -- frames; the 05 is not what a battle always shows, only what one
+    -- can.)  So the kernel serves nothing while a battle is up: it logs
+    -- once, releases the pad and reports itself yielded, and the caller
+    -- plays the fight the way a walker plays what it meets.
+    if M.battleLoadStarted() then
+      if not yielded then
+        yielded = true
+        M.log(string.format("[%s] a battle owns the screen (menu state $%02X): " ..
+          "the care yields to the fight", tag, st))
+      end
+      M.setPad({}); return
+    end
+
     -- Refusal.  zMosaic is not a flag the game clears: MosaicTask writes
     -- the eight bytes $17 $27 $37 $47 $37 $27 $17 $07 and terminates
     -- (field_menu.asm:3820-3844), and nothing re-zeroes it after menu init
@@ -2391,10 +2586,13 @@ local function careKernel(opts)
     -- cap gave up.  The high nibble is nonzero only while the animation
     -- runs, so that is the edge; re-arming when it clears keeps one
     -- refusal's tail from being charged to the next plan.
+    -- The byte is only a refusal on a menu screen (the refusals come from
+    -- $70 and $3B, both in CARE_SCREENS); read anywhere else it is some
+    -- other module's cell.
     local mosaic = M.readByte(CARE_REFUSE) & 0xF0
     if mosaic == 0 then
       refuseArmed = true
-    elseif want and refuseArmed then
+    elseif want and refuseArmed and CARE_SCREENS[st] then
       refuseArmed = false
       M.log(string.format("[%s] REFUSED by the game: %s", tag, planText(want)))
       failed[key(want)] = true
@@ -2596,11 +2794,11 @@ local function careKernel(opts)
         st ~= 0 and string.format(" status1=%02X", st) or "")
     end
     return string.format(
-      "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d soft=%d remedy=%d",
+      "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d soft=%d remedy=%d%s",
       tag, what, table.concat(out, "  "), M.invCountOf(CARE_TONIC),
       M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX),
       M.invCountOf(CARE_ANTIDOTE), M.invCountOf(CARE_SOFT),
-      M.invCountOf(CARE_REMEDY))
+      M.invCountOf(CARE_REMEDY), unserved())
   end
 
   return {
@@ -2736,6 +2934,22 @@ function M.newCareDriver(opts)
   function D.frame()
     ph = (ph + 1) % 12
     n = n + 1
+    -- A battle under the stop (#184): every mode below reads menu cells
+    -- that are battle RAM once a fight owns the screen.  Measured on the
+    -- world map (probe_care_race.lua, the encounter step ending 0..47
+    -- frames after the stop starts): the open wait pressed X into the
+    -- fight until its 240-frame no-control cap gave the stop up, 378-512
+    -- frames with the party idle in the battle; had $26 read 05 there,
+    -- as it did in gen_zozo2_arrival lap 52, the serve and close modes
+    -- would have pressed into the fight for another 2400 -- and the walk
+    -- fighter that plays the battle waits on this driver either way.  A
+    -- battle is a fight to play, not a menu to close: yield at once and
+    -- the caller's own battle handling takes the frame.
+    if mode ~= "done" and M.battleLoadStarted() then
+      M.log(string.format("[%s] a battle opened under the care stop (while %s, " ..
+        "%d frames in): yielding to the fight", K.tag, mode, n))
+      mode = "done"; M.setPad({}); return
+    end
     if mode == "start" then
       if not K.anyNeed() then
         M.log(K.roster("nothing to do"))
