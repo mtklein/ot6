@@ -408,7 +408,26 @@ H.run({ maxFrames = 150000 }, {
   driveTo(function() return sawSpell(BOLT3) end, 30000,
     "[C] the granted Bolt folds to Bolt3 ($0b) at the queue"),
   H.call(function() celesMode = "defer"; wantPend = 0 end),
-  H.waitFrames(300),
+  -- The first $0b write is the fold entering the queue; the cast itself
+  -- (the second $0b, and the MP charge) comes when it reaches the top,
+  -- behind whatever the boss queued ahead of it.  So this waits on her
+  -- pool moving, still deferring the bystanders as the drive did, rather
+  -- than idling a fixed 300 frames.  Measured 2026-09-16 on the
+  -- n024_entry that 3c0ac59a regenerated: Number 024's timer-30
+  -- WallChange (`0b c1 ff ff c1 ff ff 0b` at $3410) went ahead of the
+  -- Bolt3 and the charge landed 339 frames after the queue write, 39
+  -- past the old idle, which ran out at "mp 75 -> 75" on every lib
+  -- revision back to the one the first baseline passed on.  Active
+  -- mode, clock running throughout ($3a8f=00, turn counter +8 per 16
+  -- frames while SABIN's window was up); the earlier pass had drawn a
+  -- fight with nothing queued ahead of the cast.
+  H.call(function() R.queuedAt = H.frame end),
+  driveTo(function() return mp(celes) ~= R.mp0 end, 3000,
+    "[C] the queued Bolt3 reaches the top of the queue (her pool moves)"),
+  H.call(function()
+    H.log(string.format("[C] pool moved %d frames after Bolt3 entered the queue",
+      H.frame - R.queuedAt))
+  end),
   H.call(function()
     local ids = {}
     for _, v in ipairs(spells) do ids[#ids + 1] = string.format("%02x", v) end
