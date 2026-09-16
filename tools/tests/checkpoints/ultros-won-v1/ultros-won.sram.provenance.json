@@ -1,11 +1,11 @@
 {
   "format": "ot6-provenance/v1",
-  "payload_sha256": "180df5a6814a2a93718219452584b98d091e9dc67246577e37846c96d82a7069",
-  "generator_sig": "f5377f7b4ee985375e37b14765af3cdb94afbcc5927e822f5e336917efd49c60 gen_ultros tools/tests/checkpoints/esper-mtn-save-v1/manifest.json tools/tests/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
+  "payload_sha256": "ba6a7d7634d2ba72d08d3ac969051e662c9272f2d9bf56ad1d185fb693fe4bed",
+  "generator_sig": "fd0bba5821b725eecb6211e2668aa987934cba5590cf720cb5e2bedddc288037 gen_ultros tools/tests/checkpoints/esper-mtn-save-v1/manifest.json tools/tests/checkpoints/esper-mtn-save-v1/esper-mtn-save.sram",
   "ancestors": [
     {
       "path": "tools/tests/checkpoints/esper-mtn-save-v1/manifest.json",
-      "sha256": "b19b45aa8955c8ff18384d895596836e08477254f352d7029eda3fb52a05ec7f"
+      "sha256": "3b35735cc6963c47ed5f23f432a9b9e5b33af6c8c431b070ee4fcb51d16db9f5"
     }
   ]
 }

@@ -2628,10 +2628,28 @@ function M.fieldCare(opts)
   if opts.reserve == nil then opts.reserve = M.CARE_RESERVE end
   local K = careKernel(opts)
   local phase = 0
+  -- A battle can open under the visit: a wandering NPC whose touch is an
+  -- encounter (the burning house's flames, npc_prop map 351: RANDOM, SLOW)
+  -- reaches the party on the frame the menu is asked for.  The battle
+  -- module keeps $26 at 05, the byte the "menu open" read waits on, so
+  -- without a guard the kernel drove menu presses into the fight for 5662
+  -- frames while two members died, and the close drive's B tripped the
+  -- no-effect watchdog (fire_out regeneration 2026-09-16, attempt 3).  So
+  -- every drive here also ends on a live battle, the pad is released, and
+  -- the fight is played the way a walker plays what it meets
+  -- (M.newWalkFighter: boost-Fight, items, its own care stop after) unless
+  -- the caller passes fight = false.
+  local function battle() return M.battleLoadStarted() end
+  local closed = careClose(function()
+    return not CARE_SCREENS[M.readByte(CARE_ZM)]
+  end)
+  local W
   return M.cond(function() return not M.eventTimerLive() end, {
-    M.cond(K.anyNeed, {
+    M.cond(function() return K.anyNeed() and not battle() end, {
       M.logStep(function() return K.roster("opening the menu") end),
-      M.driveUntil(function() return M.readByte(CARE_ZM) == 0x05 end, 1800, {
+      M.driveUntil(function()
+        return battle() or M.readByte(CARE_ZM) == 0x05
+      end, 1800, {
         M.call(function()
           phase = (phase + 1) % 12
           M.setPad(phase < 4 and { "x" } or {})
@@ -2639,13 +2657,11 @@ function M.fieldCare(opts)
       }, K.tag .. ": field menu open"),
       M.release(),
       M.waitFrames(10),
-      M.driveUntil(K.served, K.budget, {
+      M.driveUntil(function() return battle() or K.served() end, K.budget, {
         M.call(K.serveFrame),
       }, K.tag .. ": heal/revive through the field menu"),
       M.release(),
-      M.driveUntil(careClose(function()
-        return not CARE_SCREENS[M.readByte(CARE_ZM)]
-      end), 2400, {
+      M.driveUntil(function() return battle() or closed() end, 2400, {
         M.call(function()
           phase = (phase + 1) % 12
           M.setPad(phase < 4 and { "b" } or {})
@@ -2653,11 +2669,23 @@ function M.fieldCare(opts)
       }, K.tag .. ": back to the field"),
       M.release(),
       M.waitFrames(30),
-      M.logStep(function() return K.roster("done") end),
+      M.logStep(function()
+        return K.roster(battle() and "a battle opened under the care" or "done")
+      end),
     }, {
       -- A care stop that does nothing still logs, so "no log" and "nothing
       -- needed" do not look the same.
       M.logStep(function() return K.roster("nothing to do") end),
+    }),
+    M.cond(function() return battle() and opts.fight ~= false end, {
+      M.logStep(function()
+        return string.format("[%s] a battle is up at the care stop: fighting it", K.tag)
+      end),
+      M.call(function()
+        W = M.newWalkFighter(K.tag .. ": the battle at the care stop", opts)
+      end),
+      M.driveUntil(function() return not W.frame() end, 40000, {},
+        K.tag .. ": the battle at the care stop, and the care after it"),
     }),
   }, {
     M.logStep(function()
@@ -2699,7 +2727,7 @@ function M.newCareDriver(opts)
   -- magic=false.
   if opts.magic == nil then opts.magic = false end
   local K = careKernel(opts)
-  local mode, ph, n = "start", 0, 0
+  local mode, ph, n, idle = "start", 0, 0, 0
   local closed = careClose(function()
     return not CARE_SCREENS[M.readByte(CARE_ZM)]
   end)
@@ -2721,6 +2749,26 @@ function M.newCareDriver(opts)
       if n > 1800 then
         M.log(string.format("[%s] the menu never opened; giving up on this care stop", K.tag))
         mode = "done"; M.setPad({}); return
+      end
+      -- A scene that starts on the battle's last frame (the FlameEater's
+      -- "RELM!!! Where are you?!" tail) owns the field: X there is a press
+      -- the game never answers, and the no-effect watchdog trips on it
+      -- (fire_out regeneration 2026-09-16, attempt 1).  A person cannot
+      -- open the menu in a cutscene either; hold the pad empty while
+      -- nothing is in control, and give the stop up after 240 such frames
+      -- so the caller's own scene-riding step gets the field back.  The
+      -- menu's own lifetime reads as no control too, so the wait applies
+      -- only while no menu screen is up.
+      local ctl = M.worldMode() and (M.worldHasControl() and M.worldAligned())
+                  or (not M.worldMode() and M.hasControl())
+      if not ctl and not CARE_SCREENS[M.readByte(CARE_ZM)] then
+        idle = idle + 1
+        if idle > 240 then
+          M.log(string.format("[%s] a scene owns the field (no control for %d frames); giving up on this care stop", K.tag, idle))
+          mode = "done"
+        end
+        M.setPad({})
+        return
       end
       M.setPad(ph < 4 and { "x" } or {})
       return

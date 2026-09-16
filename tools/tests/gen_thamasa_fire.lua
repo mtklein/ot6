@@ -297,18 +297,22 @@ local function creepNav(tx, ty, opts, step)
   return H.navTo(fx, fy, opts)
 end
 
+-- A flame can touch the party while the care is being asked for; fieldCare
+-- plays the battle that opens under it (and the care after), so a battle
+-- that is already up goes to fieldCare too instead of being SKIPPED past.
 local function care(what)
   return seq({
     H.waitUntilSoft(function()
-      return H.hasControl() and H.tileAligned() and bright() >= 15
-         and not H.dialogWaiting() and not H.battleLoadStarted()
+      return H.battleLoadStarted()
+         or (H.hasControl() and H.tileAligned() and bright() >= 15
+             and not H.dialogWaiting())
     end, 1200, "care " .. what),
     H.cond(function()
-      return H.hasControl() and H.tileAligned() and not H.dialogWaiting()
-         and not H.battleLoadStarted()
+      return H.battleLoadStarted()
+         or (H.hasControl() and H.tileAligned() and not H.dialogWaiting())
     end, {
-      H.waitFrames(60),
-      H.fieldCare({ tag = "care " .. what, threshold = 1.0 }),
+      H.cond(function() return not H.battleLoadStarted() end, { H.waitFrames(60) }),
+      H.fieldCare({ tag = "care " .. what, threshold = 1.0, healer = TERRA }),
     }, {
       H.logStep(function()
         return string.format("[care %s] SKIPPED -- not settled at (%d,%d) map %d",
@@ -410,21 +414,36 @@ local function logStragoJoin()
   end)
 end
 
+-- The house's three loose flames wander (npc_prop map 351: RANDOM, SLOW)
+-- and bfs reads a flame's tile as a wall, so a corridor is blocked for as
+-- long as one sits in it.  navTo's default patience (20 x 45 frames, 15 s)
+-- was not enough for the ambush hall's one corridor from the (26,36)
+-- landing: the fire_out regeneration of 2026-09-16 lost two attempts to
+-- "no path (26,36)->(21,23)" while the run before it cleared the same block
+-- after 9 retries.  A person waits for the flame to drift off (or meets it
+-- and fights the Balloons), so the house walks wait up to 120 retries
+-- (90 s); a flame that reaches the party meanwhile is a battle navTo
+-- plays.
+local HOUSE_PATIENCE = 120
 local WALK = { playBattles = "tactical", healer = TERRA, bank = 3,
                items = true, maxFrames = 20000, healPercent = 85,
+               noPathRetries = HOUSE_PATIENCE,
                magic = { [TERRA] = { spell = ICE_SPELL, boost = false } } }
 -- islands 13/11 only: flee wandering flames rather than fight every one
 -- (see houseWarp's own note on the `flee` parameter, below).
 local FLEE_WALK = { playBattles = "tactical", healer = TERRA, bank = 3,
                      items = true, maxFrames = 20000, healPercent = 85,
+                     noPathRetries = HOUSE_PATIENCE,
                      magic = { [TERRA] = { spell = ICE_SPELL, boost = false } } }
 local FLAMEEATER_WALK = { playBattles = "tactical", healer = TERRA, bank = 3,
-  items = true, maxFrames = 100000, healPercent = 60 }
+  items = true, maxFrames = 100000, healPercent = 60,
+  noPathRetries = HOUSE_PATIENCE }
 
 local function houseWarp(sx, sy, dx, dy, what, playBattles)
   return seq({
     creepNav(sx, sy, { playBattles = playBattles or "tactical", healer = TERRA,
       bank = 3, items = true, maxFrames = 20000, healPercent = 85,
+      noPathRetries = HOUSE_PATIENCE,
       magic = { [TERRA] = { spell = ICE_SPELL, boost = false } },
       avoid = otherWarps(sx, sy),
       arrive = function() return H.fieldX() == dx and H.fieldY() == dy end }),
@@ -1008,9 +1027,19 @@ local function flameEaterAttempt(n)
     }, {
       -- heal-after-every-battle: the boss is no exception, and three of
       -- the lab's protocol wins ended with someone under the standing
-      -- floor -- recover before the win tail so the banked state ships
-      -- whole (zero frames when the party comes out clean).
-      H.careStop("care after the FlameEater"),
+      -- floor.  There is no field to heal on here: the win tail's first
+      -- dialog ("RELM!!! Where are you?!") is up on the battle's last
+      -- frame, so a care stop at this point pressed X into a cutscene
+      -- until the no-effect watchdog tripped (fire_out regeneration
+      -- 2026-09-16, attempt 1: STRAGO at 392/955 after the win).  The
+      -- heal is care("after the win tail") below, the first controllable
+      -- field after the fight.
+      H.logStep(function()
+        return string.format(
+          "[care after the FlameEater] deferred to the win tail's end: TERRA %d/%d LOCKE %d/%d STRAGO %d/%d",
+          H.charHp(TERRA), H.charMaxHp(TERRA), H.charHp(LOCKE), H.charMaxHp(LOCKE),
+          H.charHp(STRAGO), H.charMaxHp(STRAGO))
+      end),
     }),
   })
 end
@@ -1115,7 +1144,15 @@ local steps = {
   -- purse shorts Tonics, not the revives.  Gil is deep here (~70k), so all
   -- three reach their ceilings; the ordering is the route-wide restock rule
   -- (owner: Tonic -> 99, "a rite of passage to get 99 in the bag").
-  H.buyItem(POTION, 1, function() return 15 - H.invCountOf(POTION) end, "POTION to 15"),
+  -- POTION to 45 (#176): the band is ~level x1.5 (docs/design/level-curve.md),
+  -- 39 at the L26 the party holds from the esper-mountain save on, and this
+  -- counter is the last shop before that stretch -- Esper Mountain, Ultros,
+  -- the massacre -- whose measured spend off the old target of 15 was 6
+  -- (fire_out potion=15 -> esper_mtn_save 10 -> ultros_won 9 -> thamasa_done
+  -- 9, the seeded fixtures), so the bag still holds the band at its end:
+  -- 39 + 6 = 45.  Held for #179 (the bigger purchase moved the RNG under
+  -- the walk out) until the segment runner (#178) retried such losses.
+  H.buyItem(POTION, 1, function() return 45 - H.invCountOf(POTION) end, "POTION to 45"),
   H.buyItem(FENIX_DOWN, 6, function() return 20 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 20"),
   H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
@@ -1124,6 +1161,9 @@ local steps = {
       "[shop] Thamasa item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
       H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
       gil(), H.frame))
+    H.assertEq(H.invCountOf(POTION) >= 45, true,
+      "the party leaves Thamasa's shop with 45 Potions -- the L26 band plus the mountain's measured spend")
+    H.assertEq(H.invCountOf(FENIX_DOWN) >= 20, true, "Fenix Downs at 20")
   end),
   shopClose("Thamasa item shop"),
   crossDoor(36, 45, 343, 26, 39, "item shop door 347(36,45)->343(26,39), return"),
@@ -1365,6 +1405,9 @@ local steps = {
       H.fieldX(), H.fieldY()))
     H.screenshot("thamasa_after_fight")
   end),
+  -- heal-after-every-battle: the FlameEater's care, at the first field
+  -- with control after the fight (see the note at the fight's end).
+  care("after the win tail"),
 
   -- ---- 7. leave the house -> Shadow's goodbye ----------------------------
   -- SHADOW's gear, recorded before remove_equip fires, so the exit
