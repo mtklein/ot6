@@ -430,11 +430,14 @@ s52   f13103 0/2/0 flares=5             f12767 0/2/0 flares=4
 s56   f 3508 0/0/0                      f 3508 0/0/0
 ```
 
-`breakfirst` on the final driver: `mean frames=3444, Fenix 2+6, 4/15
-double-kill fights` (2026-09-07: 3462, 4/15).  The boost audit over every
-batch: no death held 3 or more pips (`Boost audit: 34 party death(s), 0
-holding >= 3 BP, 0 wipe(s) across 45 logs`); the spend rule fired where a
-member stood inside a Flare of death with a pip (`actor=3 SPEND (care):
+`breakfirst` on the fix4 batch (`fix4_breakfirst`, the last driver that ran
+the `breakfirst` line -- the final fix5 driver ran only `boostfight` and
+`cared`, so there is no fix5 `breakfirst` figure): `mean frames=3444, Fenix
+2+6, 4/15 double-kill fights` (2026-09-07: 3462, 4/15).  The boost audit
+over every batch: no death held 3 or more pips (`Boost audit: 34 party
+death(s), 0 holding >= 3 BP, 0 wipe(s) across 45 logs`); in the final
+`fix5_boostfight` batch the spend rule fired 3 times (s0, s36, s52), each
+where a member stood inside a Flare of death with a pip (`actor=3 SPEND (care):
 55/443 is inside one round of death (443) holding 1 BP, and no heal saves
 it (item $E8 +50 = 105) -- Fight at 1 BP`).
 
