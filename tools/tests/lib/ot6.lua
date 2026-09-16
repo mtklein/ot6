@@ -4620,6 +4620,12 @@ local function watchTick()
   W.prevCtl = ctl
   local inBattle = ctl:sub(1, 2) == "B:"
   if inBattle and ctl:sub(1, 4) == "B:00" then W.lastUnanswerable = M.frame end
+  -- A menu still open after the last monster died is the engine winding
+  -- the fight down (death animation, the victory fade) under a window it
+  -- will close itself; the driver's B presses there are inert by design
+  -- (measured 2026-09-16 on the Zozo street: three trips, every one with
+  -- monster HP summing to 0 under an open command list)
+  if inBattle and monsterHpSum() == 0 then W.lastUnanswerable = M.frame end
   -- and on the field, a running event with no dialog up is the same
   -- thing: a cutscene is playing and the pad is inert by design (measured
   -- 2026-09-16 on gen_vargas: the Kolts intro, A tapped 151 of 300
