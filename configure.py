@@ -500,6 +500,13 @@ check("test_registration",
       "python3 tools/check_test_registration.py --selftest"
       " && python3 tools/check_test_registration.py",
       ["tools/check_test_registration.py"] + test_luas)
+# the run-log audits' parsers (#154, #175): the report itself is a listing,
+# not a gate, but the line shapes it reads are asserted here
+check("audit_fenix_selftest",
+      "python3 tools/audit_boost.py --selftest"
+      " && python3 tools/audit_fenix.py --selftest",
+      ["tools/audit_boost.py", "tools/audit_fenix.py",
+       "tools/tests/savestate_graph.py"])
 check("ninja_py_selftest", "python3 tools/tests/lib/savestate_ninja.py --selftest",
       ["tools/tests/lib/savestate_ninja.py"])
 check("ninja_sh_selftest", "sh tools/tests/lib/savestate_ninja_selftest.sh",
