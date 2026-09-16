@@ -1392,7 +1392,12 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
   -- #197: the combat items back on top of the bag after every purchase
   -- (the fight driver found the Potion at row 43 downstream of a stop
   -- that did not re-arrange)
-  H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Mobliz item shop)" }),
+  -- Dried Meat first: prepareFeed's moveMeatToFront wants it at slot 0 for
+  -- GAU's feed and gets it there by an Item-menu SWAP, which sent a Potion
+  -- arranged to slot 0 to the meat's old slot at the bag's end (the trench
+  -- ride steered "row 0 -> 21" to it); with the meat already first that
+  -- move is skipped and the Potion rides at slot 1, one press away.
+  H.bagArrange({ DRIED_MEAT, POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Mobliz item shop)" }),
   H.call(function()
     H.assertEq(invSlot(DRIED_MEAT) ~= nil, true, "Dried Meat in the bag")
     H.assertEq(invCount(FENIX_DOWN) >= 6, true,
