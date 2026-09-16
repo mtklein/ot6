@@ -1,5 +1,5 @@
 -- @manual
--- probe_throw.lua -- map SHADOW's Throw window (menu state $24): cursor
+-- probe_throw.lua -- map SHADOW's Throw window (menu states $2B/$2D; $24 is Row): cursor
 -- cells, list base, and the confirm flow, so newFightDriver can learn the
 -- verb (owner: unknown menus are missed opportunities -- Shadow's throw
 -- can be useful).  Boots forest_done (SABIN/CYAN/SHADOW on the Phantom

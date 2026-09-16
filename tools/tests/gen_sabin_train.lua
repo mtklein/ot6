@@ -1166,14 +1166,19 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
       "two Fire Skeans for SHADOW's chip (bought, #74)")
   end),
 
+  -- The aisle hold fights what it meets (#203): the bare 900-frame
+  -- setPad(left) this used to be had no battle check, so a ghost that
+  -- opened a battle mid-hold met a LEFT still down at its command window,
+  -- which opens the Row side window ($24) -- the v0.17 train_done
+  -- attempt-1 no-effect trip, and 3/3 attempts once forest_done moved.
+  -- holdDrive's walk fighter plays the battle and the hold resumes; the
+  -- 900-frame give-up is kept (the wander can block x<=4).
   (function()
     local n = 0
-    return H.driveUntil(function()
+    return holdDrive("left", function()
       n = n + 1
       return H.fieldX() <= 4 or n > 900
-    end, 1000, {
-      H.call(function() H.setPad({ left = true }) end),
-    }, "car B's aisle, held through the ghost wander")
+    end, "car B's aisle, held through the ghost wander", 1000)
   end)(),
   nav(2, 7, { maxFrames = 12000 }),
   holdDrive("left", function() return mapIdx() == 142 end, "B west exit", 4000),
