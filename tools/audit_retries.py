@@ -111,8 +111,13 @@ def main():
             classes.setdefault(at["cls"], []).append((r["script"], at["msg"]))
             print(f"  attempt {at['n']}/{at['of']} {at['cls']:12} f{at['frame']} "
                   f"shift={at['shift']} phase={at['phase']}: {at['msg'][:200]}")
-            if at["shot"]:
-                print(f"      screenshot: {at['shot']}")
+            shot = at["shot"]
+            if not shot:
+                # the watchdog classes name their screenshot inside the message
+                m = re.search(r"Screenshot (\S+);", at["msg"])
+                shot = m.group(1) if m else None
+            if shot:
+                print(f"      screenshot: {shot}")
             if at["n"] in r["ctx"]:
                 print(f"      {r['ctx'][at['n']][:220]}")
     if classes:
