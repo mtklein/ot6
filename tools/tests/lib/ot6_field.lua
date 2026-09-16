@@ -2029,9 +2029,69 @@ function M.openChest(o)
   }, {})
 end
 
--- M.buyItem: buy `qtyFn()` more of shop row `row`, closed-loop,
--- with the shop already open at its options window (menu state $25).
+-- The shop table (#191).  ShopProp is shop_prop.dat spliced at shop.asm:
+-- 128 records of 9 bytes, byte 0 = shop type in bits 0-2 (1 Weapon, 2
+-- Armor, 3 Item, 4 Relics, 5 Vendor: ShopTypeTextTbl, shop.asm:1816-1822)
+-- and the price adjustment in bits 3-5, bytes 1-8 = the eight rows' item
+-- ids, $FF = empty.  The shop event command $9b parks the shop number at
+-- $0201 (w0201, shop.asm:1794: DrawShopTypeText multiplies it by 9 into the
+-- record), and the buy list is drawn from that record, row r's id landing
+-- at $7E9D89+r (shop.asm:819-821).  So the ROM table says which row an
+-- item is on, and the drawn list says what the menu actually put there.
+local SHOP_TYPES = { [1] = "Weapon", [2] = "Armor", [3] = "Item",
+                     [4] = "Relics", [5] = "Vendor" }
+local SHOP_REC, SHOP_LIST = 9, 0x9D89
+local function shopProp() return M.sym("ShopProp") & 0x3FFFFF end
+
+-- the shop number the open counter parked at $0201
+function M.shopId() return M.readByte(0x0201) end
+
+-- the shop's type code (byte 0 & 7) and its name
+function M.shopType(shop)
+  local t = M.readRomByte(shopProp() + shop * SHOP_REC) & 0x07
+  return t, SHOP_TYPES[t] or string.format("type %d", t)
+end
+
+-- the eight rows' item ids from the ROM table (nil for an empty $FF row)
+function M.shopStock(shop)
+  local rows = {}
+  for r = 0, 7 do
+    local id = M.readRomByte(shopProp() + shop * SHOP_REC + 1 + r)
+    if id ~= 0xFF then rows[r] = id end
+  end
+  return rows
+end
+
+-- the row (0..7) shop `shop` sells item `id` on, or nil
+function M.shopRowOf(shop, id)
+  for r = 0, 7 do
+    if M.readRomByte(shopProp() + shop * SHOP_REC + 1 + r) == id then return r end
+  end
+  return nil
+end
+
+local function shopStockText(shop)
+  local out = {}
+  for r = 0, 7 do
+    local id = M.readRomByte(shopProp() + shop * SHOP_REC + 1 + r)
+    out[#out + 1] = id == 0xFF and "--" or string.format("$%02X", id)
+  end
+  return table.concat(out, " ")
+end
+
+-- M.buyItem: buy `qtyFn()` more of item `id`, closed-loop, with the shop
+-- already open at its options window (menu state $25).
 --
+--  * The row is the ROM shop table's, for the shop the counter opened
+--    ($0201), resolved on the first frame; a caller that still passes one
+--    (the old signature, kept) has it checked against the table, and a
+--    wrong row is a failure before any money moves rather than a silent
+--    purchase of whatever sat on that row.  `row` may be nil, or the
+--    argument omitted altogether: M.buyItem(id, qtyFn, name).  `qtyFn`
+--    may be a plain count.
+--  * Before the confirm the drawn list is read too ($7E9D89+row must hold
+--    the item), and the purchase line logs shop, type, row and id from
+--    both sources.
 --  * The list cursor row (DP $4E) and the quantity (zSelIndex, DP $28) are
 --    read and steered, never press-counted, because menu direction holds
 --    auto-repeat.  Widget deltas: right +1, left -1, up +10, down -10,
@@ -2046,24 +2106,60 @@ end
 --    reads are wrong (the field bag does not update until the shop hands
 --    RAM back).
 function M.buyItem(id, row, qtyFn, name)
+  if type(row) == "function" or type(row) == "string"
+     or (type(row) == "number" and type(qtyFn) == "string") then
+    -- the (id, qtyFn, name) form: no row asked for
+    row, qtyFn, name = nil, row, qtyFn
+  end
+  if type(qtyFn) == "number" then
+    local n = qtyFn
+    qtyFn = function() return n end
+  end
+  name = name or string.format("item $%02X", id)
+  local askedRow = row
   local phase = 0
   local seen27, bought = false, false
   local want = nil
   local lastQty, stall = nil, 0
+  local shop, typeName, gil0, drawnOk = nil, nil, nil, false
   return M.driveUntil(function() return bought end, 20000, {
     M.call(function()
       phase = (phase + 1) % 8
       local st = M.readByte(0x0026)
       if want == nil then
+        -- The row comes from the ROM table for the shop the counter opened
+        -- (the shop event parked its number at $0201 before the options
+        -- window came up), so a caller cannot buy the wrong thing by
+        -- miscounting rows; a row it still passes is checked, not trusted.
+        shop = M.shopId()
+        local _
+        _, typeName = M.shopType(shop)
+        local romRow = M.shopRowOf(shop, id)
+        if romRow == nil then
+          error(string.format("[shop] %s: shop %d (%s) does not sell item $%02X " ..
+            "-- its rows are %s", name, shop, typeName, id, shopStockText(shop)), 0)
+        end
+        if askedRow ~= nil and askedRow ~= romRow then
+          error(string.format("[shop] %s: row %d was asked for, but shop %d (%s) " ..
+            "sells $%02X on row %d (row %d holds %s) -- its rows are %s", name,
+            askedRow, shop, typeName, id, romRow, askedRow,
+            (M.shopStock(shop)[askedRow] and string.format("$%02X", M.shopStock(shop)[askedRow])
+              or "nothing"), shopStockText(shop)), 0)
+        end
+        row = romRow
         want = qtyFn()
+        gil0 = M.gil()
         if want < 1 then
           -- already at (or over) the target: nothing to buy, and no menu
           -- interaction -- the first cut clamped this to 1 and bought a
           -- Fenix Down the bag did not need (30 on a target of 25)
-          M.log(string.format("[shop] %s: already there (%d wanted); skipping", name, want))
+          M.log(string.format("[shop] %s: shop %d (%s) row %d = $%02X; already there " ..
+            "(%d wanted); skipping", name, shop, typeName, row, id, want))
           bought = true; M.setPad({}); return
         end
-        M.log(string.format("[shop] %s: buying %d", name, want))
+        M.log(string.format("[shop] %s: shop %d (%s) row %d = $%02X on the ROM table%s; " ..
+          "buying %d (gil %d)", name, shop, typeName, row, id,
+          askedRow ~= nil and ", as asked" or "", want, gil0))
       end
       if st == 0x27 then
         seen27 = true
@@ -2092,10 +2188,24 @@ function M.buyItem(id, row, qtyFn, name)
       elseif seen27 then
         bought = true
         M.setPad({})
+        M.log(string.format("[shop] %s: bought %d x $%02X from shop %d (%s) row %d; " ..
+          "gil %d -> %d", name, lastQty or want, id, shop, typeName, row, gil0, M.gil()))
       elseif st == 0x25 then
         M.setPad(phase < 2 and { "a" } or {})
       elseif st == 0x26 then
         local cur = M.readByte(0x004E)
+        if cur == row and not drawnOk then
+          -- the list the menu drew is the game's own reading of the same
+          -- record; check it once, before the A that opens the quantity
+          local drawn = M.readByte(SHOP_LIST + row)
+          if drawn ~= id then
+            error(string.format("[shop] %s: the drawn list's row %d holds $%02X, " ..
+              "not $%02X (shop %d, %s; ROM rows %s)", name, row, drawn, id, shop,
+              typeName, shopStockText(shop)), 0)
+          end
+          drawnOk = true
+          M.log(string.format("[shop] %s: the drawn list's row %d shows $%02X too", name, row, id))
+        end
         local btn = cur < row and "down" or cur > row and "up" or "a"
         M.setPad(phase < 2 and { [btn] = true } or {})
       else
