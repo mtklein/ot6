@@ -281,6 +281,72 @@ Battery SRAM (the OT6 codex banks $30/$31 included) rides along in Mesen
 savestates, so post-load SRAM is a pure function of the fixture's bytes.
 Scripts key off RAM signals rather than absolute frame numbers.
 
+## The segment runner: retries, watchdogs, seed sweeps (#178)
+
+Runs are bit-reproducible, so a purely additive route change upstream
+(buying more Potions, one more grind lap) reshuffles every later
+encounter, NPC walk and back-attack roll; a segment that passed on its one
+seed then turns that edit into a red build (#179, #185). `H.run` therefore
+runs every script through the **segment runner** at the bottom of
+`lib/ot6.lua`:
+
+- **Retry from the boot snapshot.** compose.py wraps everything after the
+  `local H = dofile(...)` line in `H.segmentBody(function() ... end)`. The
+  runner snapshots the machine on the body's first frame (after a
+  fixture load, when the body starts with one) and, on a **seed-dependent**
+  failure -- a wipe (the canary), a `navTo`/`worldNavTo` "no path", a step
+  timeout, or a watchdog trip -- restores it, re-executes the body from
+  source (fresh locals, fresh step objects; the previous attempt's emu
+  callbacks go inert through an epoch guard), and replays with the seed
+  moved by idle frames at the **boot point** (`H.bootMark`: the fixture
+  load, or `assertEntryContract` after a cold Continue). Default 3
+  attempts for a `gen_*` script, 1 for everything else; `opts.retries`
+  per script, `OT6_RETRIES=<n>` in the environment overrides both. A
+  contract failure (`assertEq`, a checkpoint contract, a Lua error) is a
+  bug and fails at once. Generators with their own ladders keep them: a
+  ladder runs with `allowGameOver`, so its wipes never reach the canary,
+  and its exhaustion message classifies as `other`.
+- **The count.** Every failed attempt logs
+  `[retry] attempt n/N FAILED class=<c> frame=... shift=... phase=... screenshot=<png>: <message>`
+  (plus a `wipe context:` line naming the formation and every seat's
+  HP/BP), the verdict is `PASS (frame F) attempts=n/N`, and
+  `python3 tools/audit_retries.py [logs|dirs]` lists every log that spent
+  more than one attempt, by class, so each class becomes an issue. A
+  retried pass is a pass with its count; it is not a first-try claim.
+- **Watchdogs (look at the screen).** Every 16 frames the runner samples a
+  hash of the frame buffer, the control cells (map/position/menu/dialog on
+  the field; menu byte, menu state, target masks and cursors in a battle),
+  the progress cells (those plus monster HP, party HP and the inventory)
+  and the held pad, and keeps a ring of 24. `no-effect`: the pad has been
+  down 25% of the last 192 frames (~3 s) at an open control and no control
+  cell has read anything new (#185's LEFT into a back-attack target cursor
+  trips here in seconds instead of after the 9000-frame budget).
+  `no-progress`: neither a progress cell nor the screen has shown anything
+  new for 1800 frames (~30 s). Both fail fast with a screenshot named in
+  the FAIL line and the ring dumped to the log, and both are seed-dependent
+  classes, so they are retried. `H.waitFrames(n >= 240)` stands the
+  watchdogs down for its own length; a cutscene step can call
+  `H.watchQuiet(frames, why)`. Every run ends with a
+  `[watch] ... max quiet: ctl=.. prog=.. screen=..` line, which is how the
+  thresholds are measured rather than guessed. Enabled by default for
+  `gen_*` scripts, observation-only elsewhere; `opts.watchdog` and
+  `OT6_WATCHDOG=1/0` override. `H.recoveryCount(tag, key)` is the
+  recovery cap for a driver that drops its plan and backs out: past 3
+  drops of the same plan in one battle it fails fast the same way (not yet
+  wired into the fight driver; see the note at its definition).
+- **Seed sweep.** `python3 tools/tests/seed_sweep.py <state> --seeds K
+  [--jobs N]` regenerates one state K times with K different boot seeds
+  (`OT6_SEED_SHIFT`, spread over the 60-frame seed period), retries off,
+  into `build/sweeps/<state>-<stamp>/` (nothing is published to
+  `build/states`), and prints a per-seed table: verdict, frames, failure
+  class and message. This is how a segment's brittleness is found before
+  a route change exposes it.
+
+`tools/tests/segment_retry.lua` (suite) proves the replay: a `nopath`
+raised on attempt 1 passes on attempt 2 with rebuilt locals and steps;
+`probe_retry_negative.lua` (manual) shows an assert failing on attempt 1
+of 3 with no replay.
+
 ## Failure signatures
 
 - A 255 exit with truncated stdout is a wall-clock cap expiry, not a

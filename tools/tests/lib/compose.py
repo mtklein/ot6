@@ -766,6 +766,11 @@ class CrossTree(Exception):
     """A referenced sidecar exists only outside the composing tree."""
 
 
+BODY_OPEN = ("H.segmentBody(function()  -- the segment body (lib/ot6.lua's "
+             "retry runner replays this)\n")
+BODY_CLOSE = "\nend)  -- H.segmentBody\n"
+
+
 def inline_libs(script: str, lib: str, field: str, contract: str,
                 raw_alias: bool = False):
     """Swap the script's `local H = dofile(".../lib/ot6.lua")` line for the
@@ -780,6 +785,17 @@ def inline_libs(script: str, lib: str, field: str, contract: str,
         ;(function(...)
         <lib/ot6_contract.lua>     -- same shape: checkpoint contracts
         end)(H)
+        H.segmentBody(function()
+        <the rest of the script>
+        end)
+
+    The script's own text becomes the SEGMENT BODY: one function the runner
+    can call again.  That is what makes the retry in lib/ot6.lua honest --
+    a replayed attempt rebuilds every local, closure and step object the
+    script has from source, rather than re-ticking step machinery that
+    carries the failed attempt's counters.  The wrapper adds no scope the
+    script can notice: its file-scope locals were already upvalues of the
+    functions it defines, and nothing in the tree returns from file scope.
 
     Each half is wrapped in a function so its `return M` / `local M = ...`
     binds to the script's H.  The two-scope shape keeps each source file a
@@ -810,9 +826,12 @@ def inline_libs(script: str, lib: str, field: str, contract: str,
                 out.append(alias)
                 out.append(half)
                 out.append("\nend)(H)\n")
+            out.append(BODY_OPEN)
             replaced = True
         else:
             out.append(line)
+    if replaced:
+        out.append(BODY_CLOSE)
     return "".join(out), replaced
 
 
@@ -1095,8 +1114,13 @@ def selftest() -> int:
     check("inline starts the field chunk as a new statement (the ';')",
           ";(function(...)" in got, True)
     check("inline hands BOTH trailing chunks H", got.count("end)(H)"), 2)
-    check("inline leaves the rest of the script alone",
-          got.startswith("-- a test\n") and got.endswith("H.run({}, {})\n"),
+    check("inline leaves the script's own text intact, inside the body",
+          got.startswith("-- a test\n") and "H.run({}, {})\n" in got, True)
+    check("inline wraps the script in the replayable segment body (#178)",
+          "H.segmentBody(function()" in got
+          and got.rstrip().endswith("end)  -- H.segmentBody"), True)
+    check("inline opens the body AFTER the three lib halves",
+          got.find("CONTRACTBODY") < got.find("H.segmentBody(function()"),
           True)
     got2, replaced2 = inline_libs("print('no lib')\n", lib_src, field_src,
                                   contract_src)
@@ -1780,6 +1804,27 @@ def main() -> int:
     # environment, so lib/ot6.lua's coverageFlush stays a no-op otherwise.
     if os.environ.get("OT6_ACTION_TRACE") == "1":
         preamble.append("OT6_ACTION_TRACE = true\n")
+    # The segment runner's knobs (lib/ot6.lua).  Mesen's Lua cannot read the
+    # environment, so they ride the preamble like OT6_SYMS does:
+    #   OT6_SCRIPT      which script this is; `gen_*` means a segment, which
+    #                   is what turns retries and the watchdogs on by default
+    #   OT6_RETRIES     attempts allowed, overriding the default and the
+    #                   script's own opts.retries (seed_sweep.py sets 1)
+    #   OT6_SEED_SHIFT  idle frames at the boot point before the body walks
+    #                   on: the sweep's per-seed offset
+    #   OT6_WATCHDOG    1/0 to force the fast-failure watchdogs on or off
+    preamble.append('OT6_SCRIPT = "%s"\n' % script_path.stem)
+    for var, name in (("OT6_RETRIES", "OT6_RETRIES"),
+                      ("OT6_SEED_SHIFT", "OT6_SEED_SHIFT"),
+                      ("OT6_WATCHDOG", "OT6_WATCHDOG")):
+        raw = os.environ.get(var)
+        if raw is None or raw == "":
+            continue
+        try:
+            preamble.append("%s = %d\n" % (name, int(raw)))
+        except ValueError:
+            print(f"error: {var}={raw!r} is not an integer")
+            return 1
     if os.environ.get("OT6_COVERAGE"):
         preamble.append("OT6_COVERAGE = true  -- lib/ot6.lua coverageFlush (#130)\n")
     if gated:

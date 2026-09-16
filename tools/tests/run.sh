@@ -104,11 +104,16 @@ fi
 # is watchable while it happens with tools/stream/live.py.  OT6_LIVE=0
 # disables; OT6_LIVE=<n> sets the screenshot interval in frames.
 LIVE="${OT6_LIVE:-1}"
-if [ "$LIVE" != 0 ]; then
-  LIVE_LUA="$WDIR/composed_live.lua"
-  { printf 'OT6_LIVE = %s\n' "$LIVE"; cat "$COMPOSED"; } > "$LIVE_LUA"
-  COMPOSED="$LIVE_LUA"
-fi
+# OT6_ART_DIR rides the same prelude: it is where this invocation's decoded
+# artifacts land.  The segment runner (lib/ot6.lua) names the screenshot it
+# took at a fast failure in the FAIL line, and a failed workspace is
+# retained, so that path has to be the real one rather than "somewhere under
+# build/test-runs".
+PRELUDE="$WDIR/composed_live.lua"
+{ [ "$LIVE" = 0 ] || printf 'OT6_LIVE = %s\n' "$LIVE"
+  printf 'OT6_ART_DIR = "%s"\n' "$ART"
+  cat "$COMPOSED"; } > "$PRELUDE"
+COMPOSED="$PRELUDE"
 
 # ------------------------------------------------------------ shared emulator
 # Every worker on this machine execs one read-only Mesen bundle, and nothing
