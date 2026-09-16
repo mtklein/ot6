@@ -123,7 +123,7 @@ Defining source for every row: `ff6/include/const.inc:1487-1533` (`STATUS1`/`2`/
 
 ## D. Battle menu states — the `$7BC2` space
 
-Defining source: `ff6/src/btlgfx/btlgfx_main.asm:12546-12621` — a 66-entry jump table, `$00`–`$41`. Harness whitelist: `lib/ot6.lua:3903-3908` `KNOWN_ST` = `$01, $05, $0A, $0E, $16, $19, $1B, $2B, $2C, $2D, $30, $38` (12 of 66). Guard for the rest: `lib/ot6.lua:4082-4091`, back out with B after 8 pulses.
+Defining source: `ff6/src/btlgfx/btlgfx_main.asm:12546-12621` — a 66-entry jump table, `$00`–`$41`. Harness whitelist: `lib/ot6.lua` `KNOWN_ST` = `$01, $05, $0A, $0E, $16, $19, $1B, $24, $27, $2B, $2C, $2D, $2E, $2F, $30, $38` (16 of 66). Guard for the rest: back out with B after 8 pulses. Since #188 the guard is measured: every run prints `[watch] unknown-menu drops by $7BC2 state: ...` (drops and sampled pulses per state) beside its verdict, and each state's first sighting in a battle is an `[unknown-menu]` log line with the actor, the command row and a screenshot.
 
 | Window | State(s) | Defining line | Class | Evidence / note | Route exposure | Issue |
 |---|---|---|---|---|---|---|
@@ -146,7 +146,7 @@ Defining source: `ff6/src/btlgfx/btlgfx_main.asm:12546-12621` — a 66-entry jum
 | **Leap** | command `$11`, disable bit `$2F49` bit 3 (`battle-ram.txt:616`) | `battle-lists.txt:42` | PARTIAL — avoided, not used | `gen_sabin_gau.lua:369-383` explicitly refuses Leap when it is row 0 | Veldt | #122 (closed) |
 | **MagiTek** | `$28` open, `$2A` select, `$29` close | `:13298`, `:20405`, `:12924` | UNHANDLED | Narshe opening is mashed A (`gen_battle2.lua:52-61`) | Narshe opening, Magitek escape | #111 (closed) |
 | Equip / weapon-shield (Runic's sword pick) | `$0B`, `$0C`, `$13`, `$10` | `:12728`, `:21421`, `:12755`, `:12743` | UNHANDLED | — | any Runic/Gogo path | none |
-| Row `$24` / Defend `$27` | `:19239`, `:19186` | UNHANDLED | — | mis-steer only | none |
+| Row `$24` / Def. `$27` | `:19239`, `:19186` | HANDLED (B-out) | `probe_rowdef.lua` (2026-09-16): LEFT at `$05` opens Row (`$05 -> $01 -> $24`), RIGHT opens Def. (`-> $27`); B or the opposite direction closes (`-> $01 -> $05`, cursor kept); the opening direction is not read inside (LEFT held 120 frames in `$24` moved nothing -- the v0.17 train_done attempt-1 no-effect trip, a LEFT held from the field into the battle by `gen_sabin_train.lua:1169-1176`). The driver backs out with B on every path (`[side-window]` log line) and keeps its plan | a direction reaching the command window | #188 |
 | Character status window | `$3F`, `$40`, `$41` | `:12627`, `:12637`, `:21846` | UNHANDLED | `$41` is *"status window for character target select"* — reachable from the target screen the driver lives in | any ally-target turn | none |
 | Steal/Capture, Jump, Mimic, X-Magic, GP Rain, Health, Shock, Possess | `battle-lists.txt:35-52` | UNHANDLED | Locke's Filch is driven only by `gen_thamasa_fire.lua:663-677` (`ST_THIEF_A`) | Locke throughout; Filch at Thamasa | #55, #68 (closed) |
 | **Menu state queue** `$7BF0`, `$7BF1-$7BFF`; cursor queue `$7BC3-$7BC9` | `battle-ram.txt:1826-1827, 1851-1852` | UNHANDLED | the driver reads only `$7BC2` (cursor state) and `$7BCA` (open flag) — `lib/ot6.lua:2417` — so a *queued* transition is invisible and reads as a stall | every transitional frame | none |

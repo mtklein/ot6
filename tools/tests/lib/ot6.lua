@@ -2467,6 +2467,18 @@ function M.newFightDriver(tag, opts)
   -- $AD=bolt($04) (bosses-wob.md's element byte convention).
   local CMD_THROW, ST_THROW_OPEN, ST_THROW = 0x08, 0x2B, 0x2D
   local SKEAN_ELEM = { [0xAB] = 0x01, [0xAC] = 0x80, [0xAD] = 0x04 }
+  -- The command window's two side windows (probe_rowdef.lua, #188): LEFT
+  -- at command select opens Row ($05 -> $01 -> $24) and RIGHT opens Def.
+  -- ($05 -> $01 -> $27).  Inside either, A commits the row change or the
+  -- defend as the turn's command, B or the opposite direction closes it
+  -- ($01 -> $05, the command cursor where it was), and the direction that
+  -- opened it is not read at all: LEFT held 120 frames in $24 moved
+  -- nothing (UpdateMenuState_24 @7e81 reads only A, B and RIGHT).  That
+  -- is the v0.17 train_done attempt-1 no-effect trip: a LEFT held from
+  -- the field walk into the battle opened Row, and the driver, not
+  -- knowing $24, sat there until the watchdog tripped.  This driver never
+  -- means to be in either; it backs out with B and keeps its plan.
+  local ST_ROW, ST_DEF = 0x24, 0x27
   local LSCROLL, LROW = 0x891F, 0x8927
   local MAXMP = 0x3C30
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
@@ -2514,6 +2526,7 @@ function M.newFightDriver(tag, opts)
   local tgtSpin = 0                    -- frames spent undecided in ST_TGT
   local unknownSt, unknownN = nil, 0   -- unknown-menu-state stall guard
   local unknownSeen = {}               -- st -> true once logged this battle (#188)
+  local sideWindowN = 0                -- Row/Def. windows backed out of this battle
   local parkSt, parkN = nil, 0         -- parked-KNOWN-window watchdog
   local idleSt, idleN = nil, 0         -- plan-less open-window back-out
   -- The two numbers the heal policy weighs against each other, both measured
@@ -3940,7 +3953,10 @@ function M.newFightDriver(tag, opts)
                      [ST_LORE] = true, [ST_LORE_OPEN] = true, [0x01] = true,
                      -- the Throw family (probe_throw.lua; btlgfx
                      -- UpdateMenuState_2b/2c/2d): open, close, item select
-                     [ST_THROW_OPEN] = true, [0x2C] = true, [ST_THROW] = true }
+                     [ST_THROW_OPEN] = true, [0x2C] = true, [ST_THROW] = true,
+                     -- the command window's side windows (probe_rowdef.lua;
+                     -- see ST_ROW)
+                     [ST_ROW] = true, [ST_DEF] = true }
   -- The selection windows a plan-less driver backs out of (see the
   -- plan-nil head of button()): every list that waits on A or B.  The
   -- transitional states ($19 lore fill, $2B/$2C throw open/close) are
@@ -4146,6 +4162,21 @@ function M.newFightDriver(tag, opts)
       end
     else
       unknownSt, unknownN = nil, 0
+    end
+    -- Row / Def. (see ST_ROW): a side window is open only because a LEFT
+    -- or RIGHT reached the command window, which this driver never
+    -- presses there -- a direction held from the field into the battle
+    -- (train_done, v0.17), or a target-select steer whose window closed
+    -- under it.  Back out with B now, on every path; the plan (a row to
+    -- walk to at $05) is still good once the window is gone.
+    if st == ST_ROW or st == ST_DEF then
+      sideWindowN = sideWindowN + 1
+      M.log(string.format("[%s] [side-window] %s ($%02X) open at f%d (actor=%d "
+        .. "char=%d cmd row=%d plan=%s, #%d this battle) -- not this driver's "
+        .. "press; B out", tag or "fight", st == ST_ROW and "Row" or "Def.",
+        st, M.frame, actor, M.readByte(BCHID + actor * 2),
+        M.readByte(CMDROW + actor) & 3, plan and plan.kind or "-", sideWindowN))
+      return { "b" }
     end
     -- The lore stall guard, checked wherever a lore plan is live rather
     -- than only at plan time: a pursuit wedged inside the window (the
@@ -4577,7 +4608,7 @@ function M.newFightDriver(tag, opts)
     parkDropN = 0
     layout, layoutUnreadSaid, steerLast, steerDead = nil, false, nil, {}
     parkSt, parkN, idleSt, idleN = nil, 0, nil, 0
-    unknownSt, unknownN, unknownSeen = nil, 0, {}
+    unknownSt, unknownN, unknownSeen, sideWindowN = nil, 0, {}, 0
     if healSaid == "parked-out" then healSaid = nil end
     careActor, startSnap, planPulses = nil, nil, 0
     -- Everything the heal policy measured belongs to the battle that just
