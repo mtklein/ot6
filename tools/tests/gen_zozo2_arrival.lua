@@ -327,10 +327,14 @@ H.run({ maxFrames = 1200000 }, {
   end, 2000, "world control", 5),
   H.waitFrames(30),
   H.call(function() where("left Jidoor") end),
-  -- Back to the grind column's north end first, stepping east off the
-  -- town's doorstep so no shortest path crosses Jidoor's door tile; from
-  -- (34,99) the approach is the one the route always walked.
-  walk(31, 132, "east of Jidoor's door"),
+  -- The south edge puts the party back on the approach tile (27,129),
+  -- north of the door (attempt 2 measured it), so the walk north never
+  -- crosses the door; from (34,99) the approach is the one the route
+  -- always walked.
+  H.call(function()
+    H.assertEq(H.worldX() == 27 and H.worldY() == 129, true,
+      "Jidoor's south edge returns the party to (27,129)")
+  end),
   walk(34, 112, "back to the grind column"),
   walk(34, 99, "the column's north end"),
   H.call(function()
