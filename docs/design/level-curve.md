@@ -22,7 +22,8 @@
 | Sabin scenario (camp/Doma) | CYAN 13 · SHADOW 11 · SABIN 13 | L11–13 |
 | Sabin's leap done (sabin_done) | UMARO-slot 17 | ~L17 |
 | Battle for Narshe (kefka_won) | LOCKE 12 · EDGAR 13 · SABIN 13 · CELES 12 | L12–13 |
-| Zozo (zozo_done) | LOCKE 14 · EDGAR 15 · SABIN 15 · CELES 14 | L14–15 |
+| Zozo arrival (zozo_arrival) | LOCKE 18 · EDGAR 18 · SABIN 19 · CELES 18 | L18–19 |
+| Zozo (zozo_done) | LOCKE 18 · EDGAR 19 · SABIN 19 · CELES 18 | L18–19 |
 | Opera / Vector (ultros2_entry) | LOCKE 14 · EDGAR 15 · SABIN 15 | L14–15 |
 | Blackjack (post-Vector) | LOCKE 14 · EDGAR 15 · SABIN 15 · CELES 14 | L14–15 |
 | Crescent → Thamasa | TERRA 14 · LOCKE 15 · SHADOW 14 | L14–15 |
@@ -60,9 +61,9 @@ plus the 9 the GhostTrain fight spent = 30, so Baren Falls still holds 21).  The
 reach: Phantom Train 85, Mobliz 12, Nikeah 15, Narshe 3 (the Terra
 scenario's return), Kohlingen 19, Jidoor 22, Vector 24, Thamasa 36.
 
-## Zozo: the level gate nobody authored (#155)
+## Zozo: the level gate nobody authored (#155, levelled for #158)
 
-The routed Zozo party (L14-15 above) meets map 225's solo SlamDancer
+The routed Zozo party as it was (L14-15) met map 225's solo SlamDancer
 (formation $069, 31% of that map's rolls), whose `if_one_monster_type`
 branch casts Fire 2 / Ice 2 / Bolt 2 every turn.  Measured in
 `tools/tests/lab_zozo_street.lua` (15 seeds x 5 policies, raw damage
@@ -72,6 +73,37 @@ gear and Runic do not move it; L17-18 would.  It is vanilla data
 (`monster_prop.dat` $052 is byte-identical to the vanilla ROM) meeting a
 party three levels under vanilla's Zozo tier.  Details, the per-attempt
 table and the retune options: [zozo-street.md](zozo-street.md).
+
+The owner chose levels over a retune (#158).  `gen_zozo2_arrival` grinds
+the x=34 column (world battle group 10) until every member is L18, then
+stops at Jidoor's item shop (shop 22: Potion to 30, Fenix Down to 20; it
+sells no Tonic).  The SlamDancer is L15 whatever the party is, so its roll
+stays where it was; max HP is what moves (LevelUpHP +54 at L17, +57 at
+L18).  L17 would have left LOCKE at 501 and CELES at 497, 5..9 over the
+largest roll seen; L18 is the target.
+
+| fixture | LOCKE | EDGAR | SABIN | CELES | Tonic / Potion / Fenix |
+|---|---|---|---|---|---|
+| grind start, world (34,99) | L13 314 | L14 354 | L15 407 | L13 310 | 75 / 21 / 14 |
+| zozo_arrival | L18 558 | L18 559 | L19 629 | L18 554 | 52 / 30 / 20 |
+| zozo_done | L18 558 | L19 620 | L19 629 | L18 554 | 14 / 31 / 18 |
+
+The grind was 57 laps (43 fights, frames 14897 -> 162667 of the
+generator), no Fenix Down and no death in it.  The first try at the
+crossing's 0.9 care threshold emptied the Tonics by lap 52; the lap stop
+now cares at 0.6 and level-ups do the rest.  The Tonic count is below its
+~level x5 band from here to the next Tonic shop: none is reachable from
+the column (Figaro's shop refuses EDGAR and SABIN).
+
+Measured on the regenerated chain, map 225 with this party
+(`lab_zozo_street.lua`'s control policy on a fixture baked at the P9a
+landing, 15 seeds, every one rolling the solo SlamDancer): 9 casts, 4
+single-target (Ice 2 436 and Bolt 2 464 / 472 on CELES, Bolt 2 484 on
+EDGAR), 5 all-target (207..259 each); 0 deaths, 0 Fenix Downs, 0 wipes.
+Every single-target cast left its target standing (82..136 HP).  The
+street itself (`gen_zozo3_clock` 1 fight, `gen_zozo4_dadaluma` 8 fights
+including one solo SlamDancer's all-target Fire 2) spent no Fenix Down in
+a random; Dadaluma killed EDGAR and CELES (2 Fenix at the care after him).
 
 ## Map 269: the L16 parity trap (#171)
 

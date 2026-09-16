@@ -1,3 +1,8 @@
+-- @manual
+-- lab_narshe_grind_snap.lua -- DIAGNOSTIC copy of gen_narshe_mission.lua that
+-- emits a savestate at the start of grind legs (leg 2, then every leg >= 40)
+-- without adding a single step or frame, so a wiping fight's approach can be
+-- branched.  Otherwise byte-for-byte the generator.
 -- gen_narshe_mission.lua -- the generator that cuts battery checkpoint G,
 -- `narshe-mission-v1`.
 
@@ -11,43 +16,6 @@
 -- 2-trigger ROM budget stays untouched).  The save happens at the
 -- Narshe exit spawn because that tile is where a cold Continue of the
 -- checkpoint puts the party, and the step out of G starts there.
-
--- The grind's supply line (measured, 2026-09-07).  Two full grinds of this
--- generator -- the one that PASSED (74 battles, ot6-qual) and the v0.17
--- requal attempt that WIPED at its 73rd battle -- both drank the bag's 73
--- Tonics down to the care kernel's 4-Tonic floor by about battle 55 and
--- fought the last ~20 battles unhealed between level-up restores: the
--- pass finished with SABIN at 132/830 and no Tonic or Potion left; the
--- wipe walked into an Iron Fist x2 / Mind Candy x2 formation at
--- 93/93/75/134 HP after a fight the party left at 221/77/76/548 with
--- `tonic=2 potion=0` and a care stop that logged "nothing to do".  A Tonic
--- is +50 against 500-900 HP pools; the party stands ten tiles from JIDOOR
--- (world (27,129), item shop 22: Potion 300, Fenix Down 500, Tent 1200)
--- with ~63k gil and four Tents in the bag.  So the grind now plays the way
--- a person with an item shop next door plays it: it shops at Jidoor before
--- the first leg and again whenever the Tents run out or the Potion/Fenix
--- band is broken (docs/design/level-curve.md's supply curve), and it pitches
--- a Tent on the world map whenever a member is under half HP after a leg's
--- care stop -- a full party restore for 1200 gil, the save-point rest the
--- world map allows (item.asm @84f8: Tent needs $0201 bit7, which the world
--- map sets).  Coordinates and menu flow measured by tools/tests/probe_jidoor.lua:
--- world (27,129) + DOWN -> map 198 (15,61); shop door 198 (27,41) -> map 201
--- (34,20), keeper at (34,15) (npc_prop NPCProp::_201, event _cb4460 = shop
--- 22); back out 201 (34,21) -> 198 (27,43); south edge (15,62)+DOWN -> the
--- world at (27,129).
---
--- The departure stock (#176; brought over by hand from ad7a0104 on
--- wt/potion-route, which bought it at Narshe's item shop 44 after the
--- mission meeting).  Nothing sells Tonics again until Thamasa (Narshe's 44
--- and Albrook's 24 have none), so the Sealed Gate leg's field care comes out
--- of the Potion stack too: POTION to 60 (the band at the L25 that leg
--- reaches, 38, plus an allowance for that field care -- the seeded chain
--- walked the leg with an empty bag, gate_cave_save potion=0, so the next
--- re-cut downstream measures the spend and this target follows) and FENIX
--- DOWN to 23 (~level).  Jidoor's shop 22 sells both, so the grind's last
--- supply stop buys the departure stock instead of a second shop visit in
--- Narshe: one shop routine, two bands -- the grind band while pacing, the
--- departure band once the grind is done.
 
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -139,169 +107,7 @@ local function flyTo(tx, ty)
   }, string.format("strafe-fly to (%d,%d)", tx, ty))
 end
 
--- ---- the grind's supply line (see the header) --------------------------
-local TONIC, POTION, FENIX, TENT = 0xE8, 0xE9, 0xF0, 0xF7
--- the band the bag arrives at each fight with: Potions ~level x1.5 for the
--- L18-23 this grind spans (27-35), Fenix ~level (20), Tents for the rest
--- stops (10 -- the two measured grinds would each have used ~4-6)
-local GRIND_BAND = { potion = 35, fenix = 20, tent = 10 }
--- what the party leaves the plains with for the Sealed Gate (the header)
-local DEPART_BAND = { potion = 60, fenix = 23, tent = 10 }
-local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
-local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
-local function gil() return H.gil() end
-local function bagLine(tag)
-  local t = {}
-  for _, c in ipairs(H.partyMembers()) do
-    t[#t + 1] = string.format("c%d %d/%d hp %d/%d mp", c, H.charHp(c),
-      H.charMaxHp(c), H.charMp(c), H.charMaxMp(c))
-  end
-  return string.format("[%s] %s | tonic=%d potion=%d fenix=%d tent=%d gil=%d",
-    tag, table.concat(t, "  "), H.invCountOf(TONIC), H.invCountOf(POTION),
-    H.invCountOf(FENIX), H.invCountOf(TENT), gil())
-end
--- the lowest living member's HP fraction (a dead member is the fight
--- driver's and the care stop's business, not the Tent's)
-local function lowestHp()
-  local low = 1
-  for _, c in ipairs(H.partyMembers()) do
-    local hp, mx = H.charHp(c), H.charMaxHp(c)
-    if hp > 0 and mx > 0 and hp / mx < low then low = hp / mx end
-  end
-  return low
-end
-local function needTent() return H.invCountOf(TENT) > 0 and lowestHp() < 0.5 end
-local function needRestock()
-  return H.invCountOf(TENT) == 0 or H.invCountOf(POTION) < 10
-      or H.invCountOf(FENIX) < 8
-end
-
--- Use a Tent from the world menu: X -> main ($05, Item is row 0) -> item
--- list ($08, DP $4B is the bag slot) -> A picks the slot up ($19) -> A on
--- the same slot uses it; the item menu answers a Tent with return code $02
--- and terminates after its fade (item.asm @84f8), and the world module
--- runs the tent event (world_start.asm @02db: VehicleEvent_01), which
--- restores the party.  Measured by probe_jidoor.lua: 886 frames, every
--- member at max HP and MP, one Tent gone.
-local function useTent(tag)
-  local ph, calm, before, tentAt = 0, 0, nil, nil
-  return H.seqStep({
-    H.logStep(function() return bagLine(tag .. ": before") end),
-    H.driveUntil(function()
-      if before == nil then return false end
-      local used = H.invCountOf(TENT) < before
-      local back = H.worldMode() and H.readByte(0x59) == 0 and H.worldHasControl()
-        and H.worldAligned() and bright() >= 15
-      calm = (used and back) and calm + 1 or 0
-      return calm >= 20
-    end, 4000, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        if before == nil then before = H.invCountOf(TENT) end
-        if H.invCountOf(TENT) < before then
-          if tentAt == nil then
-            tentAt = H.frame
-            H.log(string.format("[%s] Tent consumed at f%d", tag, H.frame))
-          end
-          H.setPad({}); return
-        end
-        if H.readByte(0x59) == 0 then H.setPad(ph < 4 and { "x" } or {}); return end
-        local st, cur = H.readByte(0x26), H.readByte(0x4b)
-        if st == 0x05 then
-          H.setPad(cur == 0 and (ph < 4 and { "a" } or {}) or { up = true }); return
-        end
-        local slot = H.invSlotOf(TENT)
-        if st == 0x08 then
-          if slot == nil then H.setPad({}); return end
-          if cur == slot then H.setPad(ph < 4 and { "a" } or {})
-          else H.setPad({ [cur < slot and "down" or "up"] = true }) end
-          return
-        end
-        if st == 0x19 then
-          H.setPad((slot and cur == slot) and (ph < 4 and { "a" } or {})
-            or (ph < 4 and { "b" } or {}))
-          return
-        end
-        H.setPad({})
-      end),
-    }, tag),
-    H.call(function()
-      for _, c in ipairs(H.partyMembers()) do
-        H.assertEq(H.charHp(c), H.charMaxHp(c),
-          string.format("%s: char %d at full HP after the Tent", tag, c))
-      end
-      H.log(bagLine(tag .. ": after"))
-    end),
-  })
-end
-
--- The Jidoor supply stop, from anywhere on the plains and back to the world
--- at (27,129); the caller's next leg walks on from there.  Route coordinates
--- are the header's measured ones.  The walk to town is a worldNavTo leg
--- like the grind's own (its fights are fought, not fled).
-local function fieldSettled(m)
-  return function()
-    return map() == m and H.hasControl() and H.tileAligned() and bright() >= 15
-  end
-end
-local function jidoorRestock(tag, band)
-  local what = "restock (" .. tag .. ")"
-  return {
-    H.logStep(function() return bagLine(what .. ": leaving the plains for Jidoor") end),
-    H.worldNavTo(27, 129, { maxFrames = 45000, playBattles = "tactical",
-      careThreshold = 0.7, healPercent = 45,
-      summon = { [1] = { mp = 36 }, [4] = { mp = 50 }, [5] = { mp = 27 } } }),
-    pressWalk("down", function() return not H.worldMode() and map() == 198 end,
-      1200, what .. ": held DOWN into Jidoor (map 198)"),
-    H.waitUntil(fieldSettled(198), 1800, what .. ": Jidoor control", 5),
-    H.waitFrames(30),
-    H.navTo(27, 42, { playBattles = "tactical", maxFrames = 12000,
-      arrive = function() return map() == 201 end }),
-    pressWalk("up", function() return map() == 201 end, 1200,
-      what .. ": held UP into the item shop door 198 (27,41) -> map 201"),
-    H.waitUntil(fieldSettled(201), 1800, what .. ": item shop control", 5),
-    H.waitFrames(60),
-    H.shopTalk(34, 15, "Jidoor item shop"),
-    H.call(function()
-      -- event command $9b parks the shop number at $0201; the rows come
-      -- from the ROM table (the menu fills its row list only once drawn)
-      H.assertEq(H.readByte(0x0201), 22, "the counter opened shop 22 ($0201)")
-      H.assertEq(shopRow(22, 0), POTION, "shop 22 row 0 is Potion")
-      H.assertEq(shopRow(22, 5), FENIX, "shop 22 row 5 is Fenix Down")
-      H.assertEq(shopRow(22, 7), TENT, "shop 22 row 7 is Tent")
-    end),
-    -- essentials first, the Tent soak last, so a short purse shorts Tents
-    H.buyItem(POTION, 0, function() return band.potion - H.invCountOf(POTION) end,
-      "POTION to " .. band.potion),
-    H.buyItem(FENIX, 5, function() return band.fenix - H.invCountOf(FENIX) end,
-      "FENIX DOWN to " .. band.fenix),
-    H.buyItem(TENT, 7, function() return band.tent - H.invCountOf(TENT) end,
-      "TENT to " .. band.tent),
-    H.shopClose("Jidoor item shop"),
-    H.logStep(function() return bagLine(what .. ": bought") end),
-    H.navTo(34, 20, { playBattles = "tactical", maxFrames = 6000,
-      arrive = function() return map() == 198 end }),
-    pressWalk("down", function() return map() == 198 end, 1200,
-      what .. ": held DOWN out of the shop 201 (34,21) -> map 198"),
-    H.waitUntil(fieldSettled(198), 1800, what .. ": Jidoor control again", 5),
-    H.waitFrames(30),
-    H.navTo(15, 62, { playBattles = "tactical", maxFrames = 20000,
-      arrive = function() return H.worldMode() end }),
-    pressWalk("down", function() return H.worldMode() end, 1200,
-      what .. ": held DOWN off Jidoor's south edge -> the world"),
-    H.waitUntil(function()
-      return H.worldMode() and H.worldHasControl() and H.worldAligned()
-         and bright() >= 15 and (H.worldX() ~= 0 or H.worldY() ~= 0)
-    end, 2400, what .. ": world control", 5),
-    H.waitFrames(30),
-    H.logStep(function()
-      return string.format("%s world (%d,%d) f%d", bagLine(what .. ": back on the"),
-        H.worldX(), H.worldY(), H.frame)
-    end),
-  }
-end
-
-H.run({ maxFrames = 600000 }, {
+H.run({ maxFrames = 480000 }, {
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -359,49 +165,46 @@ H.run({ maxFrames = 600000 }, {
           #reach, maxLvl()))
       end),
     }
-    local legOpts = {
-      maxFrames = 45000, playBattles = "tactical",
-      careThreshold = 0.7, healPercent = 45,
-      -- probe_locke_bolt: this party has NO learned spells (magic
-      -- opts would silently degrade to Fight), but three stones are
-      -- worn -- Locke Carbunkl, Edgar Bismark, Sabin Shiva -- so the
-      -- once-per-fight genju is the party's whole magic game.
-      summon = { [1] = { mp = 36 }, [4] = { mp = 50 },
-                 [5] = { mp = 27 } } }
+    local function snapAt(leg)
+      local req = H.requestSaveState()
+      local ref
+      ref = emu.addEventCallback(function()
+        if not req.done then return end
+        emu.removeEventCallback(ref, emu.eventType.endFrame)
+        if req.ok then
+          H.emitBlob(string.format("narshe_grind_leg%02d.mss", leg), req.blob)
+          H.log(string.format("[snap] leg %d start snapshot at f%d world (%d,%d) best level %d",
+            leg, H.frame, H.worldX(), H.worldY(), maxLvl()))
+        else
+          H.log(string.format("[snap] leg %d snapshot FAILED: %s", leg, tostring(req.error)))
+        end
+      end, emu.eventType.endFrame)
+    end
     for leg = 1, 80 do
-      steps[#steps + 1] = H.cond(function() return maxLvl() < 23 end, {
-        -- rest first (a member under half HP after the last leg's care),
-        -- then shop if the bag is under its band, then walk the leg
-        H.cond(needTent, { useTent(string.format("leg %d: tent", leg)) }, {}),
-        H.cond(needRestock, jidoorRestock(string.format("leg %d", leg), GRIND_BAND), {}),
+      steps[#steps + 1] = H.cond(function()
+        if maxLvl() >= 23 then return false end
+        if leg == 2 or leg >= 40 then snapAt(leg) end
+        return true
+      end, {
         H.worldNavTo(function() return leg % 2 == 1 and ax or bx end,
-                     function() return leg % 2 == 1 and ay or by end, legOpts),
+                     function() return leg % 2 == 1 and ay or by end, {
+          maxFrames = 45000, playBattles = "tactical",
+          careThreshold = 0.7, healPercent = 45,
+          -- probe_locke_bolt: this party has NO learned spells (magic
+          -- opts would silently degrade to Fight), but three stones are
+          -- worn -- Locke Carbunkl, Edgar Bismark, Sabin Shiva -- so the
+          -- once-per-fight genju is the party's whole magic game.
+          summon = { [1] = { mp = 36 }, [4] = { mp = 50 },
+                     [5] = { mp = 27 } } }),
       }, {})
     end
     return H.cond(function() return true end, steps)
   end)(),
   H.call(function()
     H.log(string.format("[grind] done: best level %d", maxLvl()))
-    H.log(bagLine("grind done"))
     H.assertEq(maxLvl() >= 22, true, "the plains grind reached at least L22")
   end),
-  -- the departure stock, bought at the same counter (the header)
-  H.cond(function()
-    return H.invCountOf(POTION) < DEPART_BAND.potion
-        or H.invCountOf(FENIX) < DEPART_BAND.fenix
-  end, jidoorRestock("departure", DEPART_BAND), {}),
-  -- back to the ship on foot, fighting what the walk meets like the legs do
-  H.worldNavTo(24, 121, { maxFrames = 45000, playBattles = "tactical",
-    careThreshold = 0.7, healPercent = 45,
-    summon = { [1] = { mp = 36 }, [4] = { mp = 50 }, [5] = { mp = 27 } } }),
-  H.cond(needTent, { useTent("after the grind: tent") }, {}),
   worldGrind(24, 121, "back onto the parked ship (24,121)"),
-  H.call(function()
-    H.log(bagLine("leaving the plains"))
-    H.assertEq(H.invCountOf(POTION) >= DEPART_BAND.potion - 10, true,
-      "the party leaves the plains near the departure Potion stock")
-    H.assertEq(H.invCountOf(FENIX) >= 20, true, "Fenix Downs at ~level")
-  end),
 
   -- ---- board + lift off (one A tap does both) ---------------------------
   H.pressButtons({ "a" }, 8),

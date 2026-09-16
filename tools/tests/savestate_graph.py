@@ -401,7 +401,11 @@ STATES = [
     # contract verdict; run.sh only captures SRAM when OT6_CAPTURE_SRM is
     # set, so generating a state can never quietly rewrite a tracked
     # checkpoint.
-    S("narshe_mission", gen="gen_narshe_mission", checkpoint="terra-returned-v1"),
+    # timeout=3600: the Vector-plains grind is ~75 fought battles plus the
+    # Jidoor supply stops; at the 1800 s default the v0.17 requal attempt was
+    # killed once by the wall-clock cap before its retry.
+    S("narshe_mission", gen="gen_narshe_mission", checkpoint="terra-returned-v1",
+      timeout=3600),
     # ---- boundary G -> boundary H ------------------------------------------
     # Step G->H, whole in one generator (gen_narshe_mission's shape): cold-
     # boot the narshe-mission-v1 checkpoint, seat TERRA / bench SETZER in the

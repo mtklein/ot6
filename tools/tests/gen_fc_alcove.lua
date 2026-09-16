@@ -39,12 +39,69 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 -- Apokryphos/Brainpan bolt-weak too; nothing in the pool absorbs bolt.  So
 -- Bolt is a GOOD element here -- an earlier comment claimed the opposite
 -- off a mis-decode and is retracted.  This config is boost-Fight PHYSICAL
--- (break the pips, then hit with non-elemental weapons): whether that or a
--- boost-then-Bolt beats the 7000-HP Dragon more RELIABLY at this level is
--- the open question (the first R cut, raw-nuking Bolt unboosted, wiped;
--- this one won -- but one win is not reliability).  See the descent lab.
+-- for the swingers (break the pips, then hit with non-elemental weapons):
+-- whether that or a boost-then-Bolt beats the 7000-HP Dragon more
+-- RELIABLY at this level is the open question (the first R cut,
+-- raw-nuking Bolt unboosted, wiped; this one won -- but one win is not
+-- reliability).  See the descent lab.
+--
+-- TERRA's Vanish line.  The v0.17 requalification (2026-09-07 17:45,
+-- build/v017-requal1.log) wiped this segment against a LONE Ninja ($003,
+-- 1650 HP, 2 pips slash|pierce, weak bolt|holy) at 394 (57,48): SHADOW's
+-- opening Fight took 87 and the Ninja answered with its retaliation
+-- (ai_script.asm AIScript::_3: `if_cmd FIGHT / set_target SELF / attack
+-- SPECIAL`, its Special is "Inviz"), after which every physical
+-- action the party owned -- 42 Fights and 17 AutoCrossbows over 39,000
+-- frames -- resolved "took 0 off the monsters (0 hit(s))" while the Ninja
+-- hit for 220-839 a round.  This config carried NO magic line, so the
+-- driver had nothing a Vanished target cannot dodge, and the party bled out
+-- through 36 Potions, 11 Tonics and a Fenix Down (f60848).
+--
+-- The first fix (19a6de87) gave TERRA a Bolt line and was inert: at this
+-- checkpoint NOBODY knows Bolt.  The learned table ($1A6E + 54*char,
+-- $FF = learned) read off the regenerated alcove state shows TERRA (L25,
+-- 228 MP, SHIVA worn) with $00 Fire, $04 Drain and $05 Fire 2 and no
+-- $02; LOCKE, SHADOW and EDGAR know nothing in $00-$17.  spellCell finds
+-- no cell and says nothing, so all 13 of her planned turns in that run
+-- read "plan=fight" (build/attempts/fc_alcove-attempt1.log).  Her Fight
+-- is not idle either -- it took 704, 808 and 1312 off broken targets in
+-- the same run -- so a blanket cast line would trade real damage for MP.
+--
+-- "Inviz" is Vanish, not Image: STATUS1::INVISIBLE (bit 4 of $3ee4 +
+-- entity*2, const.inc), under which every physical misses and a spell
+-- lands.  A first cut of this gate read STATUS2::IMAGE and never fired
+-- while two lab seeds wiped to the same all-zero Ninja fight
+-- (worktree build/attempts/lab-try2-imagegate/, seeds p12 and p52), so the gate reads both and
+-- says which it saw.
+--
+-- So the line is what a person does on seeing the Ninja fade out: while a
+-- live monster is Vanished (or Imaged), TERRA casts Fire 2 (20 MP; the
+-- plan-time absorb guard still refuses it on a fire absorber); otherwise
+-- the lookup is empty and she Fights as before.
+local FIRE2, ST1_INVISIBLE, ST2_IMAGE = 0x05, 0x10, 0x04
+local dodgeSaid = nil
+local function dodgerUp()
+  for s = 0, 5 do
+    if H.readWord(0x3BFC + s * 2) > 0 then
+      local e = 4 + s
+      if (H.readByte(0x3EE4 + e * 2) & ST1_INVISIBLE) ~= 0 then return s, "Vanish" end
+      if (H.readByte(0x3EE5 + e * 2) & ST2_IMAGE) ~= 0 then return s, "Image" end
+    end
+  end
+  return nil
+end
+local MAGIC = setmetatable({}, { __index = function(_, id)
+  if id ~= TERRA then return nil end
+  local s, what = dodgerUp()
+  if s == nil then dodgeSaid = nil; return nil end
+  if dodgeSaid ~= s then
+    dodgeSaid = s
+    H.log(string.format("[fc] slot %d wears %s (f%d): TERRA's attack turns go to Fire 2", s, what, H.frame))
+  end
+  return { spell = FIRE2 }
+end })
 local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
-                healPercent = 50 }
+                healPercent = 50, magic = MAGIC }
 
 -- ---- descent (probe_fc_descent -> probe_fc_alcove2) ----------------------
 -- The route doc's VALIDATED crossing, in order (floating-continent-route.md
@@ -63,6 +120,9 @@ local TRIG_LEG2 = {
 local AVOID_LEG2 = { {60,11}, {70,29} }
 local shadowIn = false
 local visited, stuckN, preBurst, burst = {}, 0, nil, nil
+-- the descent reload ladder's state (see descentAttempt below): a lost
+-- attempt sets `lost` and every later step of the crossing stands down
+local lost, lostWhy, descentWon, landingBlob = false, nil, false, nil
 local function key(c) return c[1] .. "," .. c[2] end
 local function triggers() return TRIG_LEG2 end
 local function avoid() return AVOID_LEG2 end
@@ -87,7 +147,7 @@ local F = H.newFightDriver("fc", FIGHT)
 
 local function round(r)
   local tile = nil
-  return H.cond(function() return mapIs(394) end, flatten({
+  return H.cond(function() return mapIs(394) and not lost end, flatten({
     H.cond(function()
       if not mapIs(394) then return false end
       for _, c in ipairs(H.partyMembers()) do
@@ -137,6 +197,10 @@ local function round(r)
         local dirs = { "right", "down", "left", "up" }
         return H.driveUntil(function()
           if x0 == nil then x0, y0 = H.fieldX(), H.fieldY() end
+          if (H.gameOverFired or 0) > 0 then
+            lost, lostWhy = true, lostWhy or string.format("wiped in a burst battle, r%d", r)
+            return true
+          end
           if t2 >= 2200 then return true end
           if math.abs(H.fieldX() - x0) + math.abs(H.fieldY() - y0) >= 3 then return true end
           if t2 % 64 == 0 and t2 > 0 then
@@ -171,15 +235,23 @@ local function round(r)
       (function()
         local near = false
         return H.navTo(function() return tile[1] end, function() return tile[2] end,
-          { maxFrames = 20000, playBattles = "tactical", 
+          { maxFrames = 20000, playBattles = "tactical",
             tool = FIGHT.tool, bank = FIGHT.bank, healPercent = FIGHT.healPercent,
+            magic = FIGHT.magic,
+            -- a wipe ends the ride for the reload ladder instead of raising
+            wipeEndsRide = true,
             avoid = avoid(),
             arrive = function()
               if H.fieldX() == tile[1] and H.fieldY() == tile[2] then near = true end
               return near
             end })
       end)(),
-      H.call(function() visited[key(tile)] = true; stuckN = 0 end),
+      H.call(function()
+        visited[key(tile)] = true; stuckN = 0
+        if (H.gameOverFired or 0) > 0 or H.partyWipedInBattle() then
+          lost, lostWhy = true, lostWhy or string.format("wiped on the walk to (%s), r%d", key(tile), r)
+        end
+      end),
     }, {
       H.call(function()
         H.log(string.format("  deferred (%s): unreachable at walk time", tile and key(tile) or "-"))
@@ -189,9 +261,12 @@ local function round(r)
     (function()
       local t, calm = 0, 0
       return H.driveUntil(function()
+        if lost then return true end
         if not mapIs(394) then return true end
         if (H.gameOverFired or 0) > 0 then
-          error(string.format("a trigger-settle battle was LOST (r%d) -- a lab, not a retry", r), 0)
+          -- a lost crossing is reloaded from the landing save (descentAttempt)
+          lost, lostWhy = true, lostWhy or string.format("wiped in a trigger-settle battle, r%d", r)
+          return true
         end
         if not H.hasControl() or H.dialogWaiting() then calm = 0; return false end
         calm = calm + 1
@@ -242,6 +317,70 @@ local function round(r)
   }), {})
 end
 
+-- ---- the descent reload ladder --------------------------------------------
+-- The crossing is a save-point-to-save-point segment: a person who wipes
+-- on 394 reloads the landing save at (7,12) and crosses again, and the
+-- pool they cross is a gamble (Ninja, Behemoth packs, two 7000-HP
+-- Dragons).  So the descent rides the gen_fc_escape shape: a complete
+-- machine snapshot at the landing after care (docs/TESTING.md: restore a
+-- coherent snapshot, never selected cells), up to ATTEMPTS crossings, each
+-- loss reloaded from that snapshot with the battle seed's phase spread
+-- (H.newSeedLadder: a repeated seed fails the report), and every attempt's
+-- verdict and seed in the log.  A won attempt is a search-selected win --
+-- the attempt table is the record, not a rate -- and the loss lines are
+-- the balance finding.  H.run carries allowGameOver so the wipe canary
+-- counts the loss without ending the run; each navTo carries
+-- wipeEndsRide so the ride ends instead of raising; the burst and settle
+-- loops set `lost` on the canary's counter.
+local ATTEMPTS = 3
+local LD = H.newSeedLadder("FC descent (394 crossing)", { attempts = ATTEMPTS })
+local function seq(steps) return H.cond(function() return true end, steps) end
+
+local function lossReload(n)
+  local req
+  return seq({
+    H.call(function()
+      H.log(string.format("[descent] attempt %d LOST at f%d (%s) -- reloading the landing snapshot, "
+        .. "as a person reloads the 394 (7,12) save", n - 1, H.frame, lostWhy or "?"))
+      req = H.requestLoadState(landingBlob)
+    end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(req, "descent: loss-reload")
+      H.gameOverFired = 0
+      H.log(string.format("[descent] loss-reload done, GameOver cleared, f%d", H.frame))
+    end),
+    H.waitFrames(90),
+  })
+end
+
+local function descentAttempt(n)
+  local rounds = {}
+  for r = 1, 24 do rounds[#rounds + 1] = round(r) end
+  return H.cond(function() return descentWon end, {}, flatten({
+    n > 1 and lossReload(n) or seq({}),
+    H.call(function()
+      lost, lostWhy = false, nil
+      visited, stuckN, preBurst, burst = {}, 0, nil, nil
+      H.log(string.format("[descent] attempt %d at f%d, map %d (%d,%d), fenix=%d potion=%d tonic=%d",
+        n, H.frame, map(), H.fieldX(), H.fieldY(),
+        H.invCountOf(FENIX_DOWN), H.invCountOf(POTION), H.invCountOf(TONIC)))
+    end),
+    LD.spread(n),
+    rounds,
+    H.call(function()
+      if mapIs(358) and not lost then
+        descentWon = true
+        H.log(string.format("[descent] attempt %d reached the alcove (map 358) at f%d", n, H.frame))
+      else
+        H.log(string.format("[descent] attempt %d did not reach the alcove: map %d (%d,%d), lost=%s (%s)",
+          n, map(), H.fieldX(), H.fieldY(), tostring(lost), lostWhy or "-"))
+        lost = true
+      end
+    end),
+  }))
+end
+
 -- ---- best-effort kits (the wave-4 pattern) -------------------------------
 -- EDGAR arrives from the bench bare; the ladders dress him from whatever
 -- the bag holds (present -> worn, absent -> keep, logged).  Ids are the
@@ -260,7 +399,10 @@ local function kitSteps(char, name, pairs_)
 end
 
 
-H.run({ maxFrames = 600000 }, flatten({
+-- allowGameOver: the descent ladder handles a wipe (a counted loss and a
+-- reload of the landing snapshot); every step outside it still raises on
+-- H.gameOverFired, so an unhandled game over is still a failed run.
+H.run({ maxFrames = 600000, allowGameOver = true }, flatten({
   -- ---- 0. cold Continue of Q (fc-landing-v1), contract ---------------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -293,7 +435,7 @@ H.run({ maxFrames = 600000 }, flatten({
       local t3 = 0
       out[#out + 1] = H.cond(function() return not shadowIn end, {
         H.navTo(c[1], c[2], { maxFrames = 9000, playBattles = "tactical", healer = TERRA,
-                              items = true, bank = FIGHT.bank,
+                              items = true, bank = FIGHT.bank, magic = FIGHT.magic,
                               healPercent = FIGHT.healPercent }),
         H.driveUntil(function()
           if (H.gameOverFired or 0) > 0 then
@@ -334,13 +476,39 @@ H.run({ maxFrames = 600000 }, flatten({
       "EDGAR arrives dressed (weapon + armor) from the landing seed")
   end),
   H.fieldCare({ tag = "care on landing", threshold = 0.95 }),
+  -- the landing snapshot the ladder reloads: the whole machine, taken on
+  -- the field with control, after Shadow joined and the party was cared
+  -- for (the state a person's landing save holds)
+  (function()
+    local ckReq
+    return seq({
+      H.waitUntil(function() return H.hasControl() and not H.dialogWaiting() end, 600,
+        "the landing snapshot: field control", 10),
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "the landing snapshot")
+        landingBlob = ckReq.blob
+        H.log(string.format("[descent] landing snapshot taken at f%d, map %d (%d,%d), %d bytes",
+          H.frame, map(), H.fieldX(), H.fieldY(), #landingBlob))
+      end),
+    })
+  end)(),
+  LD.watch(),
   (function()
     local out = {}
-    for r = 1, 24 do
-      out[#out + 1] = round(r)
-    end
+    for n = 1, ATTEMPTS do out[#out + 1] = descentAttempt(n) end
     return out
   end)(),
+  -- the ladder's own audit runs as a step (every attempt that spread must
+  -- have drawn a distinct battle seed) before the verdict
+  LD.report(),
+  H.call(function()
+    if not descentWon then
+      error(string.format("all %d descent attempts lost; the [descent] attempt lines above "
+        .. "are the balance finding (a lab candidate for the owner)", ATTEMPTS), 0)
+    end
+  end),
   -- ---- 4. the alcove: checkpoint R ----------------------------------------
   H.call(function()
     H.assertEq(partyOf(SHADOW) ~= 0, true, "SHADOW in the party")
