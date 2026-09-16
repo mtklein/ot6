@@ -13,9 +13,9 @@
 -- camp first.  So the arc is cut at the points where the game itself hands
 -- control back on a fresh map, and each cut is a link in the generated chain.
 --
--- Every battle on this route is fled (hold L+R): no win, so the leave roll
--- (which only fires on a win) never runs, and this generator makes no
--- state writes.
+-- Every world leg fights what it meets (worldNavTo, tactical); the scene
+-- rider never takes a step, so no encounter can roll under it (#183).
+-- This generator makes no state writes.
 
 -- The route, read off the event script (ff6/src/event/event_main.asm):
 --   hub obj 17 SABIN  $032a -> _cb0a1c            (:39463)
@@ -203,20 +203,22 @@ local function rideUntil(pred, what, budget)
         H.log(string.format("sabin: choice #%d resolved at f%d", ci, H.frame))
       end
 
-      -- 2. battle: flee it with real input (hold L+R).  WoB overworld
-      --    encounters are runnable, and a fled battle earns no win for
-      --    SHADOW's leave roll to run at.  A zero-monster table (not
-      --    expected on this step) gets its text paged.
+      -- 2. battle: none can open here (#183).  rideUntil never presses a
+      --    direction, and only a completed step rolls an encounter; the
+      --    world legs are worldNavTo, which fights.  So no L+R: a battle
+      --    that does come up is logged and left on an empty pad, where
+      --    the watchdog names it.  A zero-monster table (not expected on
+      --    this step) gets its text paged.
       if battN >= 3 then
         quiet = 0
         if battN == 3 then
           local w = H.formationWords()
           H.log(string.format("sabin: battle up f%d (%04X %04X %04X %04X " ..
-            "%04X %04X) -- fleeing", H.frame, w[1], w[2], w[3], w[4], w[5],
-            w[6]))
+            "%04X %04X) -- UNEXPECTED on a no-step ride", H.frame, w[1], w[2],
+            w[3], w[4], w[5], w[6]))
         end
         if H.monstersPresent() > 0 then
-          H.setPad({ l = true, r = true })
+          H.setPad({})
         else
           H.setPad(phase < 4 and { "a" } or {})
         end
