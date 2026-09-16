@@ -35,6 +35,19 @@
 -- (34,20), keeper at (34,15) (npc_prop NPCProp::_201, event _cb4460 = shop
 -- 22); back out 201 (34,21) -> 198 (27,43); south edge (15,62)+DOWN -> the
 -- world at (27,129).
+--
+-- The departure stock (#176; brought over by hand from ad7a0104 on
+-- wt/potion-route, which bought it at Narshe's item shop 44 after the
+-- mission meeting).  Nothing sells Tonics again until Thamasa (Narshe's 44
+-- and Albrook's 24 have none), so the Sealed Gate leg's field care comes out
+-- of the Potion stack too: POTION to 60 (the band at the L25 that leg
+-- reaches, 38, plus an allowance for that field care -- the seeded chain
+-- walked the leg with an empty bag, gate_cave_save potion=0, so the next
+-- re-cut downstream measures the spend and this target follows) and FENIX
+-- DOWN to 23 (~level).  Jidoor's shop 22 sells both, so the grind's last
+-- supply stop buys the departure stock instead of a second shop visit in
+-- Narshe: one shop routine, two bands -- the grind band while pacing, the
+-- departure band once the grind is done.
 
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -131,10 +144,12 @@ local TONIC, POTION, FENIX, TENT = 0xE8, 0xE9, 0xF0, 0xF7
 -- the band the bag arrives at each fight with: Potions ~level x1.5 for the
 -- L18-23 this grind spans (27-35), Fenix ~level (20), Tents for the rest
 -- stops (10 -- the two measured grinds would each have used ~4-6)
-local POTION_TO, FENIX_TO, TENT_TO = 35, 20, 10
-local function gil()
-  return H.readByte(0x1860) | (H.readByte(0x1861) << 8) | (H.readByte(0x1862) << 16)
-end
+local GRIND_BAND = { potion = 35, fenix = 20, tent = 10 }
+-- what the party leaves the plains with for the Sealed Gate (the header)
+local DEPART_BAND = { potion = 60, fenix = 23, tent = 10 }
+local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
+local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
+local function gil() return H.gil() end
 local function bagLine(tag)
   local t = {}
   for _, c in ipairs(H.partyMembers()) do
@@ -229,7 +244,7 @@ local function fieldSettled(m)
     return map() == m and H.hasControl() and H.tileAligned() and bright() >= 15
   end
 end
-local function jidoorRestock(tag)
+local function jidoorRestock(tag, band)
   local what = "restock (" .. tag .. ")"
   return {
     H.logStep(function() return bagLine(what .. ": leaving the plains for Jidoor") end),
@@ -247,13 +262,21 @@ local function jidoorRestock(tag)
     H.waitUntil(fieldSettled(201), 1800, what .. ": item shop control", 5),
     H.waitFrames(60),
     H.shopTalk(34, 15, "Jidoor item shop"),
+    H.call(function()
+      -- event command $9b parks the shop number at $0201; the rows come
+      -- from the ROM table (the menu fills its row list only once drawn)
+      H.assertEq(H.readByte(0x0201), 22, "the counter opened shop 22 ($0201)")
+      H.assertEq(shopRow(22, 0), POTION, "shop 22 row 0 is Potion")
+      H.assertEq(shopRow(22, 5), FENIX, "shop 22 row 5 is Fenix Down")
+      H.assertEq(shopRow(22, 7), TENT, "shop 22 row 7 is Tent")
+    end),
     -- essentials first, the Tent soak last, so a short purse shorts Tents
-    H.buyItem(POTION, 0, function() return POTION_TO - H.invCountOf(POTION) end,
-      "POTION to " .. POTION_TO),
-    H.buyItem(FENIX, 5, function() return FENIX_TO - H.invCountOf(FENIX) end,
-      "FENIX DOWN to " .. FENIX_TO),
-    H.buyItem(TENT, 7, function() return TENT_TO - H.invCountOf(TENT) end,
-      "TENT to " .. TENT_TO),
+    H.buyItem(POTION, 0, function() return band.potion - H.invCountOf(POTION) end,
+      "POTION to " .. band.potion),
+    H.buyItem(FENIX, 5, function() return band.fenix - H.invCountOf(FENIX) end,
+      "FENIX DOWN to " .. band.fenix),
+    H.buyItem(TENT, 7, function() return band.tent - H.invCountOf(TENT) end,
+      "TENT to " .. band.tent),
     H.shopClose("Jidoor item shop"),
     H.logStep(function() return bagLine(what .. ": bought") end),
     H.navTo(34, 20, { playBattles = "tactical", maxFrames = 6000,
@@ -350,19 +373,35 @@ H.run({ maxFrames = 600000 }, {
         -- rest first (a member under half HP after the last leg's care),
         -- then shop if the bag is under its band, then walk the leg
         H.cond(needTent, { useTent(string.format("leg %d: tent", leg)) }, {}),
-        H.cond(needRestock, jidoorRestock(string.format("leg %d", leg)), {}),
+        H.cond(needRestock, jidoorRestock(string.format("leg %d", leg), GRIND_BAND), {}),
         H.worldNavTo(function() return leg % 2 == 1 and ax or bx end,
                      function() return leg % 2 == 1 and ay or by end, legOpts),
       }, {})
     end
     return H.cond(function() return true end, steps)
   end)(),
-  H.cond(needTent, { useTent("after the grind: tent") }, {}),
   H.call(function()
     H.log(string.format("[grind] done: best level %d", maxLvl()))
+    H.log(bagLine("grind done"))
     H.assertEq(maxLvl() >= 22, true, "the plains grind reached at least L22")
   end),
+  -- the departure stock, bought at the same counter (the header)
+  H.cond(function()
+    return H.invCountOf(POTION) < DEPART_BAND.potion
+        or H.invCountOf(FENIX) < DEPART_BAND.fenix
+  end, jidoorRestock("departure", DEPART_BAND), {}),
+  -- back to the ship on foot, fighting what the walk meets like the legs do
+  H.worldNavTo(24, 121, { maxFrames = 45000, playBattles = "tactical",
+    careThreshold = 0.7, healPercent = 45,
+    summon = { [1] = { mp = 36 }, [4] = { mp = 50 }, [5] = { mp = 27 } } }),
+  H.cond(needTent, { useTent("after the grind: tent") }, {}),
   worldGrind(24, 121, "back onto the parked ship (24,121)"),
+  H.call(function()
+    H.log(bagLine("leaving the plains"))
+    H.assertEq(H.invCountOf(POTION) >= DEPART_BAND.potion - 10, true,
+      "the party leaves the plains near the departure Potion stock")
+    H.assertEq(H.invCountOf(FENIX) >= 20, true, "Fenix Downs at ~level")
+  end),
 
   -- ---- board + lift off (one A tap does both) ---------------------------
   H.pressButtons({ "a" }, 8),
