@@ -25,7 +25,10 @@
 -- frame the end was reached, and what (if anything) moved while DOWN was
 -- pressed past it.  The second command line runs the same body with the
 -- watchdogs enforcing: the expected verdict is a no-effect FAIL ~300
--- frames after the first list's end, and no trip while it scrolls.
+-- frames after the first list's end, and no trip while it scrolls.  The
+-- suite counterpart is watchdog_listend.lua (#200): the item list on
+-- vargas_entry walked to its end and past it on attempt 1, and attempt 2
+-- asserting that attempt 1 fell to the trip.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local MENU, MSTATE, ACTOR, CMDTBL, CMDROW, BCHID =

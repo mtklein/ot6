@@ -500,6 +500,13 @@ check("test_registration",
       "python3 tools/check_test_registration.py --selftest"
       " && python3 tools/check_test_registration.py",
       ["tools/check_test_registration.py"] + test_luas)
+# the run-log audits' parsers (#154, #175): the report itself is a listing,
+# not a gate, but the line shapes it reads are asserted here
+check("audit_fenix_selftest",
+      "python3 tools/audit_boost.py --selftest"
+      " && python3 tools/audit_fenix.py --selftest",
+      ["tools/audit_boost.py", "tools/audit_fenix.py",
+       "tools/tests/savestate_graph.py"])
 check("ninja_py_selftest", "python3 tools/tests/lib/savestate_ninja.py --selftest",
       ["tools/tests/lib/savestate_ninja.py"])
 check("ninja_sh_selftest", "sh tools/tests/lib/savestate_ninja_selftest.sh",
@@ -515,6 +522,13 @@ checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
        latch_of("build/ot6.sfc")] + LIBS + checkpoint_files)
+# the segment runner's negative control (#178, #200): a contract failure
+# fails on attempt 1 of 3 with no replay -- a red run a suite cannot expect
+check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
+      ["tools/tests/lib/retry_negative.sh", "tools/tests/run.sh",
+       "tools/tests/lib/compose.py",
+       latch_of("tools/tests/probe_retry_negative.lua"),
+       latch_of("build/ot6.sfc")] + [latch_of(h) for h in LIBS])
 # The verdict depends on the ROM (a stamp records the ROM it was captured
 # on), on the generators (their own sigs), and -- for the drift note, and
 # for any stamp still on the conservative pre-ROM-identity rule -- on the

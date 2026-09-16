@@ -195,6 +195,8 @@ Step constructors:
   Buttons: `a b x y l r start select up down left right`.
 - `H.call(fn)`, `H.logStep(msgOrFn)`, `H.repeatN(n, steps)`,
   `H.driveUntil(pred, maxFrames, steps, what)`, `H.cond(pred, then, else)`.
+- `H.attemptFailures()` — the run's earlier attempts' failures, oldest
+  first (`{ attempt, class, msg, frame }`), empty on attempt 1.
 
 Plain functions:
 
@@ -337,7 +339,14 @@ runs every script through the **segment runner** at the bottom of
   offset moves once per press through every row of the item, magic,
   throw and rage lists, and once a list has hit its end nothing in the
   block moves under a DOWN still pressed, so that still trips no-effect
-  at 300 frames.
+  at 300 frames.  Both exemptions have a negative control in the suite
+  (#200): `watchdog_cantrun.lua` holds L+R at the Whelk, whose formation
+  cannot be run from, and `watchdog_listend.lua` presses DOWN past the
+  end of the item list on `vargas_entry`; each spends attempt 1 on the
+  dead press and attempt 2 asserting, through `H.attemptFailures()`,
+  that attempt 1 fell to `no-effect` with the expected message, so a
+  healthy tree reads `PASS attempts=2/2` and a widened exemption is a red
+  suite the same day.
   `no-progress`: neither a progress cell nor the screen has shown anything
   new for 1800 frames (~30 s). Both fail fast with a screenshot named in
   the FAIL line and the ring dumped to the log, and both are seed-dependent
@@ -361,8 +370,13 @@ runs every script through the **segment runner** at the bottom of
 
 `tools/tests/segment_retry.lua` (suite) proves the replay: a `nopath`
 raised on attempt 1 passes on attempt 2 with rebuilt locals and steps;
-`probe_retry_negative.lua` (manual) shows an assert failing on attempt 1
-of 3 with no replay.
+`lib/retry_negative.sh` (`ninja build/checks/retry_negative.ok`) runs
+`probe_retry_negative.lua` through run.sh and asserts the red verdict a
+suite cannot expect: an assert failing on attempt 1 of 3, no `attempt
+2/3` line, and a FAIL that names `class=assert` as not seed-dependent.
+`H.attemptFailures()` returns the earlier attempts' `{ attempt, class,
+msg, frame }` records, which is how a suite asserts on attempt 1 from
+attempt 2.
 
 ## Failure signatures
 

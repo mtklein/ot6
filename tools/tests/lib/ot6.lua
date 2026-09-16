@@ -5655,6 +5655,22 @@ RUN = {
 }
 M.totalFrames = 0
 
+-- What the earlier attempts of this run fell to, oldest first: one record
+-- { attempt, class, msg, frame } per `[retry] attempt n/N FAILED` line.
+-- Read-only, and empty on a first attempt.  A negative-control suite
+-- (watchdog_cantrun, watchdog_listend) spends attempt 1 on a press the
+-- game is known not to answer and attempt 2 asserting that attempt 1 fell
+-- to the watchdog with the expected class and message, so the exemption
+-- under test is a red suite the day it widens (#200).
+function M.attemptFailures()
+  local out = {}
+  for i, f in ipairs(RUN.failures) do
+    out[i] = { attempt = f.attempt, class = f.class, msg = f.msg,
+               frame = f.frame }
+  end
+  return out
+end
+
 local replayHooks = {}
 function M.onReplay(fn) replayHooks[#replayHooks + 1] = fn end
 
