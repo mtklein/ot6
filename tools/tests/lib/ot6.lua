@@ -4513,7 +4513,7 @@ local function watchReset()
   W.samples = {}
   W.seenCtl, W.seenProg, W.seenScreen, W.pressAt = {}, {}, {}, {}
   W.lastNewCtl, W.lastNewProg, W.lastNewScreen = 0, 0, 0
-  W.prevCtl, W.lastDiffCtl, W.lastUnanswerable = nil, 0, 0
+  W.prevCtl, W.lastDiffCtl, W.lastUnanswerable, W.lastInert = nil, 0, 0, 0
   W.maxQuietCtl, W.maxQuietProg, W.maxQuietScreen = 0, 0, 0
   W.samplesTaken, W.pressFrames = 0, 0
   W.suppressUntil, W.trips = 0, 0
@@ -4620,6 +4620,13 @@ local function watchTick()
   W.prevCtl = ctl
   local inBattle = ctl:sub(1, 2) == "B:"
   if inBattle and ctl:sub(1, 4) == "B:00" then W.lastUnanswerable = M.frame end
+  -- and on the field, a running event with no dialog up is the same
+  -- thing: a cutscene is playing and the pad is inert by design (measured
+  -- 2026-09-16 on gen_vargas: the Kolts intro, A tapped 151 of 300
+  -- frames at an unchanging tile while the scene played)
+  if not inBattle and M.eventRunning() and not M.dialogWaiting() then
+    W.lastInert = M.frame
+  end
   if not W.seenProg[prog] then W.lastNewProg = M.frame end
   W.seenProg[prog] = M.frame
   if screen then
@@ -4670,7 +4677,7 @@ local function watchTick()
   if inBattle then
     stuck = (M.frame - W.lastUnanswerable) >= N and qc >= N
   else
-    stuck = (M.frame - W.lastDiffCtl) >= N
+    stuck = (M.frame - W.lastDiffCtl) >= N and (M.frame - W.lastInert) >= N
   end
   if stuck and pressed >= WATCH.pressFraction * N then
     W.trips = W.trips + 1
