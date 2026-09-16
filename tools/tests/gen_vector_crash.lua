@@ -22,15 +22,14 @@ local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 -- gen_vector_entry's grind-and-replan world walker
 local function worldGrind(tx, ty, what)
   local plan, idx, ph = nil, 1, 0
+  local W = H.newWalkFighter(what or string.format("worldGrind (%d,%d)", tx, ty))
   return H.driveUntil(function()
     return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
       and H.worldHasControl() and H.worldAligned())
   end, 30000, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        plan = nil; H.setPad({ l = true, r = true }); return
-      end
+      if W.frame() then plan = nil; return end
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then plan = nil; H.setPad({}); return end
       if not H.worldAligned() then return end
@@ -42,16 +41,15 @@ local function worldGrind(tx, ty, what)
   }, what or string.format("worldGrind (%d,%d)", tx, ty))
 end
 
--- unconditional held walk (dialogs/battles absorbed); for trigger tiles
--- and scripted stretches where control flickers
+-- unconditional held walk (dialogs absorbed, battles fought -- #183); for
+-- trigger tiles and scripted stretches where control flickers
 local function pressWalk(dir, pred, maxFrames, what)
   local ph = 0
+  local W = H.newWalkFighter("pressWalk: " .. what)
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); return
-      end
+      if W.frame() then return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
     end),
@@ -179,13 +177,11 @@ H.run({ maxFrames = 260000 }, {
   end),
 
   H.navTo(58, 18, { playBattles = "tactical", maxFrames = 20000 }),
-  (function() local ph = 0
+  (function() local ph, W = 0, H.newWalkFighter("face-UP+A on 384 (58,18)")
     return H.driveUntil(function() return sw(0x01F9) == 1 end, 3000, {
       H.call(function()
         ph = (ph + 1) % 8
-        if H.battleLoadStarted() then
-          H.setPad({ l = true, r = true }); return
-        end
+        if W.frame() then return end
         if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
         H.setPad(ph < 4 and { up = true, a = true } or { up = true })
       end),
