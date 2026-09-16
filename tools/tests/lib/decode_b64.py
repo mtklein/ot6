@@ -29,12 +29,19 @@ def main() -> int:
     (outdir / "shots").mkdir(parents=True, exist_ok=True)
 
     chunks = defaultdict(list)
+    ends = defaultdict(list)
     pat = re.compile(r"^\[b64:([^\]]+)\] (\S+)\s*$")
+    endpat = re.compile(r"^\[b64end:([^\]]+)\]")
     with open(log, "r", errors="replace") as f:
         for line in f:
             m = pat.match(line)
             if m:
                 chunks[m.group(1)].append(m.group(2))
+                continue
+            m = endpat.match(line)
+            if m:
+                # the emission that just finished ends at this many chunks
+                ends[m.group(1)].append(len(chunks[m.group(1)]))
 
     # One tag can carry several emissions: a retry-ladder generator calling
     # H.screenshot() once per attempt lands several complete base64 payloads,
@@ -49,14 +56,28 @@ def main() -> int:
         if "/" in tag or "\\" in tag or ".." in tag:
             print(f"skipping suspicious tag: {tag!r}")
             continue
+        # ot6.lua prints a [b64end:<tag>] line after each emission, which is
+        # the exact boundary; fall back to the padding rule for a log from a
+        # lib that predates it (an unpadded emission -- a payload whose byte
+        # length is a multiple of three -- has no detectable boundary there).
         emissions, cur = [], []
-        for part in parts:
-            cur.append(part)
-            if part.endswith("="):
+        bounds = ends.get(tag)
+        if bounds:
+            prev = 0
+            for b in bounds:
+                if b > prev:
+                    emissions.append("".join(parts[prev:b]))
+                    prev = b
+            if prev < len(parts):
+                emissions.append("".join(parts[prev:]))
+        else:
+            for part in parts:
+                cur.append(part)
+                if part.endswith("="):
+                    emissions.append("".join(cur))
+                    cur = []
+            if cur:
                 emissions.append("".join(cur))
-                cur = []
-        if cur:
-            emissions.append("".join(cur))
         if len(emissions) > 1:
             print(f"tag {tag!r}: {len(emissions)} emissions; keeping the last")
         b64 = emissions[-1]

@@ -1050,7 +1050,15 @@ end
 
 function M.assertContract(key, side) judge(lookup(key), key, side) end
 
-function M.assertEntryContract(key) M.assertContract(key, "entry") end
+-- The entry contract is the BOOT POINT of a checkpoint-booted segment:
+-- the cold Continue has landed and the run is standing where the boundary
+-- says it should.  M.bootMark tells the segment runner (lib/ot6.lua), which
+-- idles this attempt's seed shift here before the route walks on; on a
+-- savestate-booted segment M.loadState marks it instead.
+function M.assertEntryContract(key)
+  M.assertContract(key, "entry")
+  M.bootMark("checkpoint " .. tostring(key))
+end
 function M.assertExitContract(key)  M.assertContract(key, "exit")  end
 
 -- The pre-save exit check, for the step into a boundary.  That step walks
