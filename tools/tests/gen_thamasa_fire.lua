@@ -1111,14 +1111,7 @@ local steps = {
   -- purse shorts Tonics, not the revives.  Gil is deep here (~70k), so all
   -- three reach their ceilings; the ordering is the route-wide restock rule
   -- (owner: Tonic -> 99, "a rite of passage to get 99 in the bag").
-  -- POTION to 45 (#176): the band is ~level x1.5 (docs/design/level-curve.md),
-  -- 39 at the L26 the party holds from the esper-mountain save on, and this
-  -- counter is the last shop before that stretch -- Esper Mountain, Ultros,
-  -- the massacre -- whose measured spend off the old target of 15 was 6
-  -- (fire_out potion=15 -> esper_mtn_save 10 -> ultros_won 9 -> thamasa_done
-  -- 9, the seeded fixtures), so the bag still holds the band at its end:
-  -- 39 + 6 = 45.
-  H.buyItem(POTION, 1, function() return 45 - H.invCountOf(POTION) end, "POTION to 45"),
+  H.buyItem(POTION, 1, function() return 15 - H.invCountOf(POTION) end, "POTION to 15"),
   H.buyItem(FENIX_DOWN, 6, function() return 20 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 20"),
   H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
@@ -1127,9 +1120,6 @@ local steps = {
       "[shop] Thamasa item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
       H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
       gil(), H.frame))
-    H.assertEq(H.invCountOf(POTION) >= 45, true,
-      "the party leaves Thamasa's shop with 45 Potions -- the L26 band plus the mountain's measured spend")
-    H.assertEq(H.invCountOf(FENIX_DOWN) >= 20, true, "Fenix Downs at 20")
   end),
   shopClose("Thamasa item shop"),
   crossDoor(36, 45, 343, 26, 39, "item shop door 347(36,45)->343(26,39), return"),

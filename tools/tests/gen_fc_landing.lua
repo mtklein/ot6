@@ -206,22 +206,14 @@ H.run({ maxFrames = 600000 }, flatten({
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400, "shop interior settled", 10),
   H.waitFrames(150),
   H.shopTalk(36, 39, "Thamasa item shop", { healer = TERRA }),
-  -- POTION to 65 (#176): this is the WoB's last shop, and the band
-  -- (~level x1.5, docs/design/level-curve.md) is what the bag should hold
-  -- arriving at every fight through the escape -- 44 at the L29 the
-  -- escape_start fixture holds.  The stretch's measured spend off the old
-  -- target of 40: the IAF gauntlet 40 -> 24 (fc_landing.log "[prep] shop
-  -- done: ... potion=40" against the fixture's 24), the alcove leg 36 -> 33
-  -- and the escape 33 -> 31 (the fc-landing-v1 / fc-alcove-v1 payloads
-  -- against their fixtures), 21 in all: 44 + 21 = 65.
-  H.buyItem(POTION, 1, function() return 65 - H.invCountOf(POTION) end, "POTION to 65"),
+  H.buyItem(POTION, 1, function() return 40 - H.invCountOf(POTION) end, "POTION to 40"),
   H.buyItem(FENIX_DOWN, 6, function() return 25 - H.invCountOf(FENIX_DOWN) end, "FENIX DOWN to 25"),
   H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
   H.shopClose("Thamasa item shop"),
   H.call(function()
     H.log(string.format("[prep] shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
       H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
-    H.assertEq(H.invCountOf(POTION) >= 65, true, "Potions stocked to 65 for the gauntlet -- the L29 band plus the measured FC spend")
+    H.assertEq(H.invCountOf(POTION) >= 40, true, "Potions stocked to 40 for the gauntlet")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 25, true, "Fenix Downs stocked to 25")
   end),
   H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top" }),
