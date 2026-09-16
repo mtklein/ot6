@@ -3,7 +3,7 @@
 Authored 2026-09-07 from `tools/tests/lab_map269_random.lua` (the lab; its
 header carries the decoded rows) and the n024_entry regeneration log
 `build/states/n024_entry.log`.  Every number below is quoted from a
-retained run log under `build/m269lab/` (the batch runner keeps every
+retained run log under `build/attempts/driver-boost/m269lab/` (formerly `build/m269lab/`) (the batch runner keeps every
 attempt; `tools/tests/m269lab_aggregate.py` prints them all).
 
 ## What happened in the regeneration
