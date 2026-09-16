@@ -192,12 +192,13 @@ H.run({ maxFrames = 600000 }, flatten({
   -- shop (POTION to 40 -- the combat heal; FENIX DOWN to ~level; TONIC 99),
   -- then the bag arranged so the combat items sit at slots 0-4, then back
   -- out to the world for the boarding walk (measured: probe_fc_prep.lua).
-  H.driveUntil(function() return not H.worldMode() end, 2000, {
-    H.call(function()
-      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
-      H.setPad({ right = true })
-    end),
-  }, "held RIGHT onto (250,128) -> Thamasa 343 (23,46)"),
+  (function() local W = H.newWalkFighter("held RIGHT onto (250,128)")
+    return H.driveUntil(function() return not H.worldMode() end, 2000, {
+      H.call(function()
+        if W.frame() then return end
+        H.setPad({ right = true })
+      end),
+    }, "held RIGHT onto (250,128) -> Thamasa 343 (23,46)") end)(),
   H.release(),
   H.waitUntil(function() return (mapIs(340) or mapIs(343)) and H.hasControl() end, 3000, "Thamasa map loaded (post-massacre Thamasa is 340; the door asserts the shop)", 5),
   H.waitUntil(function() return bright() >= 15 end, 900, "Thamasa fade-in", 10),
