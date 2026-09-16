@@ -70,6 +70,7 @@ local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E -- live target-cursor masks
 local BP = 0x3E9C                       -- banked boost points, +slot*2
 local TONIC, POTION, ANTIDOTE, FENIX_DOWN = 0xE8, 0xE9, 0xF2, 0xF0
+local REMEDY = 0xF5
 local BUCKLER, HEAVY_SHLD = 0x5A, 0x5B
 local PLUMED_HAT, STAR_PENDANT, JEWEL_RING = 0x6B, 0xB1, 0xB5
 local function SH(s)  return 0x3E38 + (8 + s * 2) end
@@ -1155,6 +1156,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     "FENIX DOWN to 15"),
   buyItem(TONIC, 0, function() return 99 - invCount(TONIC) end, "TONIC to 99"),
   closeShop(),
+  -- #197: the combat items back on top of the bag after every purchase
+  -- (the fight driver found the Potion at row 43 downstream of a stop
+  -- that did not re-arrange)
+  H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (train merchant)" }),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d skeans=%d",
       gil(), invCount(TONIC), invCount(POTION), invCount(FIRE_SKEAN)))
@@ -1166,14 +1171,18 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
       "two Fire Skeans for SHADOW's chip (bought, #74)")
   end),
 
+  -- held LEFT down car B's aisle, time-boxed to 900 frames of control
+  -- because the wandering ghost can block it -- through holdDrive, whose
+  -- walk fighter plays the aisle encounters.  The blind H.setPad hold it
+  -- replaced kept LEFT down inside such an encounter (the command window
+  -- ignores it): no-effect on attempt 1 of the v0.17 cut and on 3/3 seeds
+  -- once the merchant stop grew by the bag arrange (#197).
   (function()
     local n = 0
-    return H.driveUntil(function()
-      n = n + 1
+    return holdDrive("left", function()
+      if H.hasControl() and not inBattle() then n = n + 1 end
       return H.fieldX() <= 4 or n > 900
-    end, 1000, {
-      H.call(function() H.setPad({ left = true }) end),
-    }, "car B's aisle, held through the ghost wander")
+    end, "car B's aisle, held through the ghost wander", 6000)
   end)(),
   nav(2, 7, { maxFrames = 12000 }),
   holdDrive("left", function() return mapIdx() == 142 end, "B west exit", 4000),
