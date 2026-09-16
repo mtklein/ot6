@@ -2479,6 +2479,16 @@ function M.newFightDriver(tag, opts)
   -- knowing $24, sat there until the watchdog tripped.  This driver never
   -- means to be in either; it backs out with B and keeps its plan.
   local ST_ROW, ST_DEF = 0x24, 0x27
+  -- EDGAR's Tools family (probe_tools.lua, #188): A on the Tools row ->
+  -- $2E (OpenToolsWindow builds wItemList, ~7 frames) -> $01 -> $30 (the
+  -- list, ST_TOOLS); B from the list -> $01 -> $05 directly
+  -- (CloseToolsWindow is a subroutine there, so $2F is not written); A on
+  -- a tool -> $38 target select, B -> $30.  $2F is the force-close state
+  -- the engine walks through after a commit ($7BCB set: $30 -> $2F ->
+  -- $01 -> $05), and OT6's Blitz, Bushido and Steal ladders reuse this
+  -- shell ($6168 mode byte), so every Sabin and Cyan fight passes here
+  -- too.  Both are transitional: the plan waits them out.
+  local ST_TOOLS_OPEN, ST_TOOLS_CLOSE = 0x2E, 0x2F
   local LSCROLL, LROW = 0x891F, 0x8927
   local MAXMP = 0x3C30
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
@@ -3954,9 +3964,11 @@ function M.newFightDriver(tag, opts)
                      -- the Throw family (probe_throw.lua; btlgfx
                      -- UpdateMenuState_2b/2c/2d): open, close, item select
                      [ST_THROW_OPEN] = true, [0x2C] = true, [ST_THROW] = true,
-                     -- the command window's side windows (probe_rowdef.lua;
-                     -- see ST_ROW)
-                     [ST_ROW] = true, [ST_DEF] = true }
+                     -- the command window's side windows (probe_rowdef.lua)
+                     -- and the Tools shell's open and force-close states
+                     -- (probe_tools.lua); see the constants
+                     [ST_ROW] = true, [ST_DEF] = true,
+                     [ST_TOOLS_OPEN] = true, [ST_TOOLS_CLOSE] = true }
   -- The selection windows a plan-less driver backs out of (see the
   -- plan-nil head of button()): every list that waits on A or B.  The
   -- transitional states ($19 lore fill, $2B/$2C throw open/close) are
@@ -4382,6 +4394,9 @@ function M.newFightDriver(tag, opts)
       end
       if cc ~= wc then return { wc > cc and "right" or "left" } end
       return { wr > cr and "down" or "up" }
+    end
+    if (st == ST_TOOLS_OPEN or st == ST_TOOLS_CLOSE) and plan.kind == "skill" then
+      return nil                       -- the shell is building / closing; wait
     end
     if st == ST_TOOLS and plan.kind == "skill" then
       local want
