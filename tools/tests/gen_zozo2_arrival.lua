@@ -43,9 +43,19 @@
 -- column, all group 10, no entrance and no trigger on it, and no map load
 -- (the danger counter is zeroed by every battle and every map load, so a
 -- lap that ducks into a town throws away what it has accumulated).  The
--- loop is target-driven off LOCKE's total experience rather than lap count,
--- because he is the lowest of the four and the crossing's own fights
--- already pay part of the bill.
+-- loop is target-driven off the party's levels rather than lap count.
+
+-- The target is L18 for every member (#158, owner: "a one-shot means we're
+-- just too low level; get that hp up by leveling").  Map 225, the first
+-- interior both zozo3 and zozo4 enter, rolls a solo SlamDancer 31% of the
+-- time whose single-target Fire 2 / Ice 2 / Bolt 2 measured 464..492 raw
+-- (docs/design/zozo-street.md, n=5).  The monster is L15 whatever the party
+-- is, so the roll does not grow with the party; max HP does (LevelUpHP,
+-- field/event.asm: +54 at L17, +57 at L18).  L17 puts LOCKE at 501 and
+-- CELES at 497, 5..9 over the largest roll seen in five samples of a
+-- 224..255/256 variance window; L18 puts all four at 554+, ~60 over it.
+-- The grind ends at Jidoor, a few steps south, for the Potion and Fenix
+-- band the higher level asks for (shop 22 sells no Tonic).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -159,19 +169,25 @@ local function crossing()
 end
 
 -- ----------------------------------------------------------- the grind --
--- The target is LOCKE's TOTAL experience, not a level, and it is his rather
--- than the party's because experience is split evenly and he is the lowest
--- of the four, so a target that satisfies him satisfies everyone.
+-- The target is every member's LEVEL (see the header): experience is split
+-- evenly among the living, so the member with the least experience (LOCKE
+-- on this route) is the one the loop is really waiting on.
 
-local EXP_TARGET = 6432
+local LEVEL_TARGET = 18
+local HP_FLOOR = 540      -- the measured 492 roll plus ~10%
 local grindLaps = 0
-local function grindDone() return expOf(LOCKE) >= EXP_TARGET end
+local function minLevel()
+  local m = 99
+  for _, c in ipairs(H.partyMembers()) do m = math.min(m, levelOf(c)) end
+  return m
+end
+local function grindDone() return minLevel() >= LEVEL_TARGET end
 
 local function lap(n)
   return H.cond(function() return not grindDone() end, {
     H.logStep(function()
-      return string.format("grind lap %d: LOCKE L%d xp=%d/%d gil=%d f%d", n,
-        levelOf(LOCKE), expOf(LOCKE), EXP_TARGET, gil(), H.frame)
+      return string.format("grind lap %d: min L%d (target L%d) %s f%d", n,
+        minLevel(), LEVEL_TARGET, rosterLine(), H.frame)
     end),
     walk(34, 112, "grind lap " .. n .. " south"),
     walk(34, 99, "grind lap " .. n .. " north"),
@@ -182,14 +198,13 @@ end
 
 local function grind()
   local steps = {}
-  for n = 1, 36 do steps[#steps + 1] = lap(n) end
+  for n = 1, 160 do steps[#steps + 1] = lap(n) end
   steps[#steps + 1] = H.call(function()
-    H.log(string.format("[grind] %d laps: LOCKE L%d xp=%d (target %d), " ..
-      "gil=%d, f%d", grindLaps, levelOf(LOCKE), expOf(LOCKE), EXP_TARGET,
-      gil(), H.frame))
-    H.assertEq(expOf(LOCKE) >= EXP_TARGET, true,
-      string.format("the grind reached its experience target in %d laps " ..
-        "(LOCKE %d of %d)", grindLaps, expOf(LOCKE), EXP_TARGET))
+    H.log(string.format("[grind] %d laps: min L%d (target L%d), gil=%d, f%d",
+      grindLaps, minLevel(), LEVEL_TARGET, gil(), H.frame))
+    H.assertEq(grindDone(), true,
+      string.format("the grind reached L%d for every member in %d laps " ..
+        "(lowest L%d)", LEVEL_TARGET, grindLaps, minLevel()))
   end)
   return seq(steps)
 end
@@ -205,7 +220,7 @@ local function door(nx, ny, dir, m, what)
   })
 end
 
-H.run({ maxFrames = 600000 }, {
+H.run({ maxFrames = 1200000 }, {
   H.loadState("build/states/figaro_submerged.mss.lua"),
   H.waitFrames(30),
   H.call(function()
@@ -264,6 +279,59 @@ H.run({ maxFrames = 600000 }, {
     H.screenshot("zozo_grind_done")
   end),
 
+  -- 5b. Jidoor's item shop (#158): the level the grind reached raises the
+  --     supply band (docs/design/level-curve.md: Potion ~level x1.5, Fenix
+  --     ~level), and the Zozo climb has no shop.  World door (27,130) from
+  --     (27,129) -> map 198; the item shop is door (27,41) -> map 201
+  --     (34,20), keeper (34,15) running _cb4460 = shop 22 while $00A4 is
+  --     clear (event_main.asm); shop 22 rows: Potion 0, Fenix Down 5, and no
+  --     Tonic.  Out by the south edge, as gen_opera2_open leaves.
+  walk(27, 129, "Jidoor approach",
+       { arrive = function() return not H.worldMode() end }),
+  H.driveUntil(function() return not H.worldMode() and map() == 198 end, 4000, {
+    H.hold({ "down" }), H.waitFrames(4),
+  }, "into Jidoor (map 198)"),
+  H.waitUntil(landed(198, 10), 2400, "Jidoor up", 1),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 22")
+    where("Jidoor")
+  end),
+  H.crossDoor(27, 41, 201, 34, 20, "Jidoor item shop door 198(27,41)->201"),
+  H.shopTalk(34, 15, "Jidoor item shop", { healer = CELES }),
+  H.call(function()
+    H.assertEq(H.readByte(0x0201), 22, "the counter opened shop 22 ($0201)")
+  end),
+  H.buyItem(POTION, 0, function() return 30 - invCount(POTION) end,
+    "POTION to 30"),
+  H.buyItem(FENIX, 5, function() return 20 - invCount(FENIX) end,
+    "FENIX DOWN to 20"),
+  H.shopClose("Jidoor item shop"),
+  H.call(function()
+    H.log(string.format("[shop] Jidoor done: %s", rosterLine()))
+    H.assertEq(invCount(POTION) >= 30, true, "Potions at 30 leaving Jidoor")
+    H.assertEq(invCount(FENIX) >= 20, true, "Fenix Downs at 20 leaving Jidoor")
+  end),
+  H.crossDoor(34, 21, 198, 27, 43, "Jidoor item shop -> street"),
+  H.navTo(16, 61, { maxFrames = 24000, playBattles = "tactical" }),
+  H.driveUntil(function() return H.worldMode() end, 6000, {
+    H.hold({ "down" }), H.waitFrames(4),
+  }, "off Jidoor's south edge"),
+  H.waitUntil(function()
+    return H.worldHasControl() and H.worldAligned() and bright() >= 15
+  end, 2000, "world control", 5),
+  H.waitFrames(30),
+  H.call(function() where("left Jidoor") end),
+  -- Back to the grind column's north end first, stepping east off the
+  -- town's doorstep so no shortest path crosses Jidoor's door tile; from
+  -- (34,99) the approach is the one the route always walked.
+  walk(31, 132, "east of Jidoor's door"),
+  walk(34, 112, "back to the grind column"),
+  walk(34, 99, "the column's north end"),
+  H.call(function()
+    H.assertEq(H.worldMode(), true, "still on the world map after the return")
+  end),
+
   -- 6. the last 26 steps to Zozo: park one tile above the {22,92} entrance,
   --    then step onto it.  arrive bails if a step lands the entrance early.
   walk(22, 91, "zozo approach",
@@ -282,18 +350,21 @@ H.run({ maxFrames = 600000 }, {
     -- The entry-point contract for the climb.  The town that follows drew
     -- the party's wipe once already, so this fixture says what it is
     -- handing over rather than leaving it to be discovered three edges
-    -- down: everyone alive, nobody below half hit points, and LOCKE at the
-    -- level the grind was run for.
+    -- down: everyone alive, nobody below half hit points, and every member
+    -- at the level the grind was run for, with the max HP that level buys.
     for _, c in ipairs(H.partyMembers()) do
       H.assertEq(H.charHp(c) > 0, true,
         string.format("char %d reached Zozo alive", c))
       H.assertEq(H.charHp(c) * 2 >= H.charMaxHp(c), true,
         string.format("char %d is at or above half hp (%d/%d)",
           c, H.charHp(c), H.charMaxHp(c)))
+      H.assertEq(levelOf(c) >= LEVEL_TARGET, true,
+        string.format("char %d reaches Zozo at L%d or better (L%d, xp %d)",
+          c, LEVEL_TARGET, levelOf(c), expOf(c)))
+      H.assertEq(H.charMaxHp(c) >= HP_FLOOR, true,
+        string.format("char %d max HP %d clears the SlamDancer's 492 roll " ..
+          "with margin (floor %d)", c, H.charMaxHp(c), HP_FLOOR))
     end
-    H.assertEq(levelOf(LOCKE) >= 13, true,
-      string.format("LOCKE reaches Zozo at level 13 or better (L%d, xp %d)",
-        levelOf(LOCKE), expOf(LOCKE)))
     H.screenshot("zozo_arrival")
   end),
   H.saveState("zozo_arrival.mss"),
