@@ -327,6 +327,17 @@ runs every script through the **segment runner** at the bottom of
   frames (measured 128-160 apart per character), and as a real no-effect
   only when the formation cannot be run from (`$B1` bit 1, `$2F4B` bit 0)
   or the cells have gone still. The escape cells are progress cells too.
+  A battle list being scrolled is answered in the list windows' cursor
+  block (`$890F..$896E`, one byte per actor indexed by `$62CA`: each
+  list's scroll offset, column and in-window row; btlgfx_ram.inc), which
+  is in the battle signature and, like the escape cells, judged on
+  identity sample to sample rather than novelty (the same actor walking
+  the same rows to the same Potion on its next turn is the list
+  answering). Measured 2026-09-16 (`probe_list_scroll.lua`): the scroll
+  offset moves once per press through every row of the item, magic,
+  throw and rage lists, and once a list has hit its end nothing in the
+  block moves under a DOWN still pressed, so that still trips no-effect
+  at 300 frames.
   `no-progress`: neither a progress cell nor the screen has shown anything
   new for 1800 frames (~30 s). Both fail fast with a screenshot named in
   the FAIL line and the ring dumped to the log, and both are seed-dependent

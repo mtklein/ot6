@@ -5069,7 +5069,8 @@ end
 --      screen that answers nothing (the #185 back attack: LEFT into a
 --      target cursor that only RIGHT moves, 9000 frames of it) fails fast
 --      as `no-effect` (a held L+R in a battle is the run mechanic and is
---      judged on the escape cells instead, see escapeSig); a run that
+--      judged on the escape cells instead, see escapeSig; a battle list
+--      being scrolled is judged on its cursor block, see listSig); a run that
 --      goes visually and mechanically still fails fast as `no-progress`.
 --      Fast, because a 9000-frame step budget
 --      is a poor first line of defence: it burns eight minutes to say what
@@ -5221,21 +5222,57 @@ local function cantRun()
   return (M.readByte(0x00B1) & 0x02) ~= 0 or (M.readByte(0x2F4B) & 0x01) ~= 0
 end
 
+-- The list windows' cursor block.  btlgfx_ram.inc reserves $890F..$896E
+-- as 24 four-byte tables, one byte per actor (indexed by $62CA), and each
+-- battle list keeps its scroll offset, column and in-window row there
+-- (btlgfx_main.asm UpdateMenuState_0a/0e/1b/1e/21/2d/30 and the get_*_poi
+-- readers; GetCursorInput moves the row inside the window and asks the
+-- list handler to scroll only past its last line):
+--   $890F command row              $8913/17/1B magic scroll/col/row
+--   $891F/23/27 lore scroll/col/row  $892B/2F/33 rage scroll/col/row
+--   $8937/3B the state-$21 list      $893F/43 magitek
+--   $8947/4B/4F item scroll/col/row  $8953/57/5B throw scroll/col/row
+--   $895F/63/67 tools scroll/col/row $896B
+-- A DOWN into a long list is answered here and nowhere the earlier
+-- signature looked (actor 0's $890F and $891F, whichever actor's menu was
+-- up): the menu state only alternates between the list and its
+-- scroll-animation state ($0A/$17 for items), both seen before, and the
+-- in-window row sits on the last line while the scroll offset walks.
+-- Measured 2026-09-16 on vector_crash's BASEMENT 3 random: the driver's
+-- 43-row walk to the Potion read as "no-effect: down for 304 frames at
+-- B:01.0A.03.00.00.00.00.00" on all three attempts (probe_list_scroll.lua
+-- has the per-cell trace).  Printed per list so the ring names the cell.
+local function listSig()
+  local a = M.readByte(0x62CA) & 3
+  local function b(addr) return M.readByte(addr + a) end
+  return string.format("c%02X m%02X.%02X.%02X l%02X.%02X.%02X g%02X.%02X.%02X "
+    .. "u%02X.%02X k%02X.%02X i%02X.%02X.%02X t%02X.%02X.%02X o%02X.%02X.%02X x%02X",
+    b(0x890F),
+    b(0x8913), b(0x8917), b(0x891B),
+    b(0x891F), b(0x8923), b(0x8927),
+    b(0x892B), b(0x892F), b(0x8933),
+    b(0x8937), b(0x893B),
+    b(0x893F), b(0x8943),
+    b(0x8947), b(0x894B), b(0x894F),
+    b(0x8953), b(0x8957), b(0x895B),
+    b(0x895F), b(0x8963), b(0x8967),
+    b(0x896B))
+end
+
 -- The CONTROL cells: what an input is supposed to move.  Party HP is
 -- deliberately NOT here -- monsters chewing through the party while the
 -- script presses an inert direction is exactly the #185 hang, and counting
 -- that as movement is how it ran for 9000 frames.
 local function ctlSig()
   if M.battleLoadStarted() then
-    return string.format("B:%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X",
+    return string.format("B:%02X.%02X.%02X.%02X.%02X.%02X %s",
       M.readByte(0x7BCA),          -- menu byte
       M.readByte(0x7BC2),          -- menu state ($38 = target select)
       M.readByte(0x62CA) & 3,      -- whose menu
       M.readByte(0x7B7D),          -- target mask: party side
       M.readByte(0x7B7E),          -- target mask: monster side
       M.readByte(0x7B7F),          -- all-target flag
-      M.readByte(0x890F),          -- command row cursor
-      M.readByte(0x891F))          -- list scroll
+      listSig())                   -- the list windows' cursor block
   end
   if M.worldMode and M.worldMode() then
     return string.format("W:%d.%d.%d.%d.%d", M.worldX(), M.worldY(),
@@ -5272,6 +5309,7 @@ local function watchReset()
   W.suppressUntil, W.trips = 0, 0
   W.battleEpoch, W.inBattle, W.recovery = 0, false, {}
   W.prevEsc, W.lastEscMove, W.escSaid, W.cantRunSaid = nil, 0, false, false
+  W.prevList, W.lastListMove = nil, 0
 end
 watchReset()
 W.enabled = false
@@ -5359,6 +5397,7 @@ local function watchTick()
   if battle and not W.inBattle then
     W.battleEpoch, W.recovery = W.battleEpoch + 1, {}
     W.prevEsc, W.lastEscMove, W.escSaid, W.cantRunSaid = nil, M.frame, false, false
+    W.prevList, W.lastListMove = nil, M.frame
   end
   W.inBattle = battle
   if M.frame % WATCH.sampleEvery ~= 0 then return nil end
@@ -5396,6 +5435,15 @@ local function watchTick()
     local esc = escapeSig()
     if esc ~= W.prevEsc then W.lastEscMove = M.frame end
     W.prevEsc = esc
+    -- The list cursor block is judged on IDENTITY, sample to sample, not
+    -- on novelty: the same actor walking the same rows to the same Potion
+    -- on its next turn revisits every signature of its last walk inside
+    -- WATCH.memoryFrames, and that is the list answering each press, not
+    -- a press the game ignores.  A list that has hit its end under a held
+    -- DOWN stops moving here and trips like anything else.
+    local lst = listSig()
+    if lst ~= W.prevList then W.lastListMove = M.frame end
+    W.prevList = lst
     if curPad.l and curPad.r then
       if cantRun() then
         if not W.cantRunSaid then
@@ -5488,6 +5536,7 @@ local function watchTick()
   local stuck
   if inBattle then
     stuck = (M.frame - W.lastUnanswerable) >= N and qc >= N and not escapeLive
+      and (M.frame - W.lastListMove) >= N
   else
     stuck = (M.frame - W.lastDiffCtl) >= N and (M.frame - W.lastInert) >= N
       and qs >= N
@@ -5496,14 +5545,18 @@ local function watchTick()
     W.trips = W.trips + 1
     local shot = failEvidence("noeffect")
     local escNote = ""
+    if inBattle then
+      escNote = string.format("  The list cursor block (%s) last moved %d "
+        .. "frames ago.", listSig(), M.frame - W.lastListMove)
+    end
     if inBattle and curPad.l and curPad.r then
-      escNote = cantRun()
+      escNote = escNote .. (cantRun()
         and string.format("  L+R is held but this formation cannot be run "
           .. "from ($B1=%02X $2F4B=%02X).", M.readByte(0x00B1),
           M.readByte(0x2F4B))
         or string.format("  L+R is held and the formation can be run from, "
           .. "but the escape cells (%s) have not moved for %d frames.",
-          escapeSig(), M.frame - W.lastEscMove)
+          escapeSig(), M.frame - W.lastEscMove))
     end
     return string.format("no-effect: %s for %d frames at %s -- the pad has "
       .. "been down %d of the last %d frames and no control cell has read "
