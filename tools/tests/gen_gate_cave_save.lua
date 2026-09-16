@@ -43,6 +43,7 @@ end
 local function worldGrind(txIn, tyIn, what)
   local plan, idx, ph = nil, 1, 0
   local function rz(v) return type(v) == "function" and v() or v end
+  local W = H.newWalkFighter(what or "worldGrind")
   return H.driveUntil(function()
     local tx, ty = rz(txIn), rz(tyIn)
     return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
@@ -50,9 +51,7 @@ local function worldGrind(txIn, tyIn, what)
   end, 30000, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        plan = nil; H.setPad({ l = true, r = true }); return
-      end
+      if W.frame() then plan = nil; return end
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then plan = nil; H.setPad({}); return end
       if not H.worldAligned() then return end
@@ -77,16 +76,15 @@ local function maxLvl()
   return m
 end
 
--- unconditional held walk (dialogs/battles absorbed); for trigger tiles
--- and scripted stretches where control flickers
+-- unconditional held walk (dialogs absorbed, battles fought -- #183); for
+-- trigger tiles and scripted stretches where control flickers
 local function pressWalk(dir, pred, maxFrames, what)
   local ph = 0
+  local W = H.newWalkFighter("pressWalk: " .. what)
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); return
-      end
+      if W.frame() then return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
     end),
@@ -508,13 +506,11 @@ H.run({ maxFrames = 480000 }, {
   H.fieldCare({ tag = "care mid-BASEMENT 3, before the save-door loop",
                 threshold = 0.85 }),
   H.navTo(62, 11, { playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [0] = { spell = 0 } }, blitz = 0x5E, summon = { [0] = {}, [5] = {} }, reserve = { [0xF0] = 99 }, maxFrames = 30000 }),
-  (function() local ph = 0
+  (function() local ph, W = 0, H.newWalkFighter("face-UP+A on 384 (62,11)")
     return H.driveUntil(function() return sw(0x0173) == 1 end, 3000, {
       H.call(function()
         ph = (ph + 1) % 8
-        if H.battleLoadStarted() then
-          H.setPad({ l = true, r = true }); return
-        end
+        if W.frame() then return end
         if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
         H.setPad(ph < 4 and { "up", "a" } or { "up" })
       end),
@@ -550,7 +546,9 @@ H.run({ maxFrames = 480000 }, {
       H.call(function()
         ph = (ph + 1) % 8
         if H.battleLoadStarted() then
-          H.setPad({ l = true, r = true }); phase = 0; return
+          -- #183: no L+R here.  The save room, map 386, rolls no
+          -- encounters (tools/audit_encounters.py 386): no battle can open.
+          H.setPad({}); phase = 0; return
         end
         if H.dialogWaiting() then
           H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
