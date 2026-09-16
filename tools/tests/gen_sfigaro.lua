@@ -302,10 +302,226 @@ local function stealDriver(what, maxF)
     }, what .. ": steal the clothes")
 end
 
+-- ===================================================================== --
+-- The gate soldier, battle 11: HeavyArmor $09F x1 (formation 64), fought
+-- three times per generate (B1, R1, R2).  #193 / docs/design/sfigaro-gate.md.
+--
+-- Map 75 rolls no randoms; the HeavyArmor the v0.17 qualification lost to
+-- is this fight.  L12 LOCKE (279 HP, back row) takes a 52-59 Battle a
+-- turn and, once the soldier is under half, a ~150-168 TekLaser; his
+-- shields re-seed to 3 after every break.  The lib's fight driver closes
+-- its whole care block once the monsters' total HP is <= 200 (the
+-- finisher gate, lib/ot6.lua makePlan `totalMon > 200`), and the
+-- soldier's last 200 HP is three chips and a break away, so every
+-- baseline loss was LOCKE at 130-137/279 in that window planning a
+-- 0-BP chip and eating the laser (build/attempts/locke-solo-lab/
+-- sweep-baseline, seeds 0/2/3; seed 1's R1 at 22/279 after the driver
+-- itself said "item $E9 saves").  The lab (lab_sfigaro_gate.lua) measured
+-- the policies (15 seeds each, the whole $021e cycle): the shipped driver
+-- lost 3/15, bank 0 alone won 15/15 but finished one fight at 15 HP,
+-- healPercent 75 alone won 15/15 finishing one at 1 HP; this is the one
+-- that won with a margin (15/15, no fight ending under 196 HP, 2.1
+-- Potions a fight): the ride and driver as H.rideOut ships them with the
+-- bank at 0 (every pip spent as it exists: the break comes sooner, so
+-- fewer enemy turns), plus the one press a person makes there -- a Potion
+-- when LOCKE is under GATE.endgameFloor inside the finisher window.
+--
+-- The ladder is the lib's (H.clearGateSoldier) in shape, with two changes:
+-- the ride is this file's gateRide, and a lost fight ends the ride on the
+-- wipe (the seat-based verdict held 90 frames, as the cider ladder does)
+-- so the next rung reloads the pre-fight blob and re-engages on a new
+-- seed.  Without that exit the run canary's pad freeze (a wipe counts as
+-- a game over, #166) left the annihilated screen unpressed and the
+-- attempt was filed as `no-progress` 1800 frames later, never as a loss.
+-- ===================================================================== --
+local GATE = {
+  -- H.rideOut's driver (lib/ot6_field.lua rideOut) with bank 3 -> 0
+  driver = { tactical = true, boost = true, bank = 0, items = true,
+             healPercent = 60, cadence = 12 },
+  endgameFloor = 175,      -- TekLaser measured up to 168 raw (the lab)
+  endgameTotalMon = 200,   -- the lib's finisher gate
+  wipeFrames = 90,         -- the cider ladder's wipe hold
+}
+local ITEMSCR, ITEMROW, BATTINV = 0x8947, 0x894F, 0x2686
+local ST_ITEM, ST_TGT = 0x0A, 0x38
+local BCHP, BCMAXHP = 0x3BF4, 0x3C1C
+local POTION = 0xE9
+local function battInvIdx(id)
+  for i = 0, 251 do
+    if H.readByte(BATTINV + i * 5) == id
+       and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
+  end
+  return nil
+end
+local function totalMon()
+  local t = 0
+  for s = 0, 5 do t = t + H.readWord(0x3BFC + s * 2) end
+  return t
+end
+-- The endgame Potion steer (the lib's item steer in shape: the absolute
+-- row is scroll + cursor per actor; the battle bag is 5 bytes an entry,
+-- +0 id, +3 count).  Returns true when it owned the frame.
+local function newEndgameSteer(what)
+  local plan, pulse = nil, 0
+  return function()
+    if H.readByte(MENU) == 0 then
+      plan, pulse = nil, 0
+      return false
+    end
+    local actor = H.readByte(ACTOR) & 3
+    local st = H.readByte(MSTATE)
+    if plan == nil then
+      if st ~= ST_CMD then return false end
+      local hp = H.readWord(BCHP + actor * 2)
+      if hp == 0 or hp >= GATE.endgameFloor
+         or totalMon() > GATE.endgameTotalMon then return false end
+      local idx = battInvIdx(POTION)
+      if idx == nil then return false end
+      plan, pulse = { idx = idx }, 0
+      H.log(string.format("[%s] endgame: f%d LOCKE %d/%d under the floor " ..
+        "(%d) with the monsters at %d HP (<= %d, the driver's finisher " ..
+        "gate): Item -> Potion (bag row %d) instead of the driver's turn",
+        what, H.frame, hp, H.readWord(BCMAXHP + actor * 2), GATE.endgameFloor,
+        totalMon(), GATE.endgameTotalMon, idx))
+    end
+    pulse = pulse + 1
+    if pulse > 900 then
+      H.log(string.format("[%s] endgame: f%d the Potion steer did not land " ..
+        "in 900 frames (state %02X); handing the window back", what, H.frame, st))
+      plan = nil
+      return false
+    end
+    local on = pulse % 8 < 4
+    if st == ST_CMD then
+      local cur = H.readByte(0x890F + actor) & 3
+      if cur == 3 then H.setPad(on and { "a" } or {})
+      else H.setPad(on and { cur < 3 and "down" or "up" } or {}) end
+    elseif st == ST_ITEM then
+      local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
+      if cur < plan.idx then H.setPad(on and { "down" } or {})
+      elseif cur > plan.idx then H.setPad(on and { "up" } or {})
+      else H.setPad(on and { "a" } or {}) end
+    elseif st == ST_TGT then
+      H.setPad(on and { "a" } or {})
+    else
+      H.setPad(on and { "b" } or {})
+    end
+    return true
+  end
+end
+-- H.rideOut in shape, with the endgame steer ahead of the driver and the
+-- wipe exit.  `lost` is the ride's verdict for the ladder: nil, or a
+-- string naming the loss.
+local function gateRide(what, budget, onLost)
+  local phase, calm, wipedN = 0, 0, 0
+  local F = H.newFightDriver(what, GATE.driver)
+  local steer = newEndgameSteer(what)
+  return seq({
+    H.driveUntil(function()
+      wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
+      if wipedN >= GATE.wipeFrames then
+        onLost(string.format("PARTY WIPED at f%d (the lib's wipe " ..
+          "predicate, %d frames)", H.frame, GATE.wipeFrames))
+        return true
+      end
+      local ok = H.hasControl() and H.tileAligned() and bright() >= 15
+             and not H.battleLoadStarted() and not H.dialogWaiting()
+             and map() == 75
+      calm = ok and calm + 1 or 0
+      return calm >= 20
+    end, budget or 30000, {
+      H.call(function()
+        phase = (phase + 1) % 8
+        if H.battleLoadStarted() then
+          if not steer() then F.frame() end
+          return
+        end
+        F.idle()
+        if H.hasControl() then H.setPad({}); return end
+        H.setPad(phase < 4 and { "a" } or {})
+      end),
+    }, what),
+    H.release(),
+    H.waitFrames(30),
+  })
+end
+local function clearGate(probeX, probeY, tag)
+  local blob, won = nil, false
+  local L = H.newSeedLadder((tag or "gate soldier") .. " battle 11")
+  local function fightOnce(n)
+    local loadReq, lost = nil, nil
+    return H.cond(function() return won end, {}, {
+      H.logStep(function()
+        return string.format("%s: battle 11 attempt %d at f%d", tag, n, H.frame)
+      end),
+      n > 1 and seq({
+        H.call(function() loadReq = H.requestLoadState(blob) end),
+        H.waitFrames(2),
+        H.call(function()
+          H.checkReq(loadReq, tag .. ": pre-fight reload")
+          -- the restored snapshot restarts the experiment: the canary's
+          -- count (and its pad freeze, which the reload thaws) belong to
+          -- the lost attempt (#163)
+          H.gameOverFired = 0
+        end),
+        H.waitFrames(90),
+      }) or seq({}),
+      L.spread(n),                       -- spread the battle RNG phase
+      H.talkToObj(26, tag .. ": the gate soldier (battle 11)"),
+      gateRide(tag .. ": ride battle 11 out", 30000, function(why) lost = why end),
+      H.cond(function() return lost == nil end, {
+        -- heal-after-every-battle, as rideOut's settle does
+        H.careStop("care after battle (" .. tag .. ": ride battle 11 out)"),
+      }, {}),
+      H.call(function()
+        -- The battle's own verdict, read directly: field byte $1DD1 bit 0
+        -- = 1 means THIS battle was lost.  A ride that ended on the wipe
+        -- never reached the scripted reset, so it is the ride's verdict.
+        won = lost == nil and (H.readByte(0x1DD1) & 1) == 0
+        H.log(string.format(
+          "%s: attempt %d %s ($1DD1.0=%d) at (%d,%d) f%d, probe=%s",
+          tag, n, won and "WON" or ("LOST (" .. (lost or "scenario reset")
+            .. "; reloading the pre-fight blob)"),
+          H.readByte(0x1DD1) & 1, H.fieldX(), H.fieldY(), H.frame,
+          tostring(H.bfsPath(probeX, probeY) ~= nil)))
+      end),
+    })
+  end
+  return H.cond(function() return H.objX(26) == 30 and H.objY(26) == 42 end, {
+    H.logStep(function()
+      return string.format("%s: the gate soldier is on his post (%d,%d) " ..
+        "at f%d; fighting him", tag, H.objX(26), H.objY(26), H.frame)
+    end),
+    H.fieldCare({ tag = "care before " .. tag, threshold = 0.95 }),
+    (function()
+      local req
+      return seq({
+        H.call(function() req = H.requestSaveState() end),
+        H.waitFrames(2),
+        H.call(function()
+          H.checkReq(req, tag .. ": retry blob")
+          blob = req.blob
+        end),
+      })
+    end)(),
+    L.watch(),
+    fightOnce(1), fightOnce(2), fightOnce(3),
+    L.report(),
+    H.call(function()
+      H.assertEq(won, true,
+        tag .. ": battle 11 won within 3 attempts (boosted Fights + the endgame Potion)")
+      H.assertEq(H.bfsPath(probeX, probeY) ~= nil, true,
+        tag .. ": the lane is open again")
+    end),
+  }, {
+    H.logStep(function() return tag .. ": the lane is already open" end),
+  })
+end
+
 -- allowGameOver: the cider-steal ladder deliberately survives a lost
 -- battle 10 (#163); its aftermath ride reads H.gameOverFired as a loss
--- and the next attempt reloads.  (The gate-soldier ladders are the lib's,
--- H.clearGateSoldier: battle 11's loss is scripted, not a game over.)
+-- and the next attempt reloads.  (The gate-soldier ladder above, clearGate,
+-- ends its ride on the wipe and reloads the same way.)
 H.run({ maxFrames = 350000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(60),
@@ -345,7 +561,7 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   -- LOCKE on boosted Fights, with the retry ladder around the engagement.
   -- The probe tile is the cafe entry point the win must open.
   -- ===================================================================== --
-  H.clearGateSoldier(22, 43, "B1 (open the town)"),
+  clearGate(22, 43, "B1 (open the town)"),
   H.call(function()
     H.assertEq(map(), 75, "still in town after battle 11")
     H.assertEq(H.bfsPath(22, 43) ~= nil, true,
@@ -534,7 +750,7 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   hop(24, 34, "W3 east along the main street"),
   hop(30, 36, "W4 to the top of the SE lane"),
 
-  H.clearGateSoldier(30, 43, "R1 (into the SE quarter)"),
+  clearGate(30, 43, "R1 (into the SE quarter)"),
   hop(30, 43, "W5 down the SE lane"),
   hop(34, 43, "W6 east"),
   hop(34, 46, "W7 south"),
@@ -556,7 +772,7 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   go(36, 23, 75, 37, 42, "E2 map 86 (36,23) -> town (37,42)"),
   hop(34, 43, "W9 back west across the SE quarter"),
   -- and back out of the SE quarter, so the same soldier is in the way again
-  H.clearGateSoldier(34, 35, "R2 (out of the SE quarter)"),
+  clearGate(34, 35, "R2 (out of the SE quarter)"),
   go(34, 35, 86, 4, 6, "E3 town (34,35) -> map 86 (4,6)"),
   talkThrough(20, "the grandson (the password)", {
     { want = 1, max = 3, what = 'dlg $00E0 "The password is..." -- 1 = ' ..
