@@ -162,7 +162,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   H.navTo(26, 52, { maxFrames = 9000, playBattles = "tactical", careThreshold = 0.85, healPercent = 45, magic = { [6] = { spell = 2 } }, summon = { [6] = {} } }),
-  (function() local calm = 0
+  (function() local calm, W = 0, H.newWalkFighter("onto the save tile 273 (26,53)")
     return H.driveUntil(function()
       calm = (H.fieldX() == 26 and H.fieldY() == 53 and sw(0x01BF) == 1
               and H.tileAligned() and not H.dialogWaiting()
@@ -170,7 +170,7 @@ H.run({ maxFrames = 90000 }, {
       return calm >= 8
     end, 9000, {
       H.call(function()
-        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+        if W.frame() then return end
         if H.dialogWaiting() then H.setPad({ "a" }); return end
         if H.fieldX() == 26 and H.fieldY() == 53 then H.setPad({}); return end
         H.setPad({ down = true })
@@ -204,7 +204,8 @@ H.run({ maxFrames = 90000 }, {
       return false
     end, 3000, {
       H.call(function()
-        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+        -- #183: no L+R here.  The pad is empty: no step, no encounter roll.
+        if H.battleLoadStarted() then H.setPad({}); return end
         H.setPad({})
       end) }, "twenty settled frames below NUMBER 024")
   end)(),

@@ -24,15 +24,14 @@ end
 local function tapInto(dir, pred, maxFrames, what, calmPred)
   local phase, n, ph, calm = 0, 0, 0, 0
   calmPred = calmPred or settled
+  local W = H.newWalkFighter("tapInto: " .. what)
   return H.driveUntil(function()
     calm = (pred() and calmPred()) and calm + 1 or 0
     return calm >= 8
   end, maxFrames or 12000, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); phase = 0; return
-      end
+      if W.frame() then phase = 0; return end
       if H.dialogWaiting() then
         H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
       end

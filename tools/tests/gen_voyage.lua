@@ -39,16 +39,14 @@ local function worldGrind(tx, ty, what)
   local step = nil
   local DW = { up = { 0, -1 }, down = { 0, 1 },
                left = { -1, 0 }, right = { 1, 0 } }
+  local W = H.newWalkFighter(what or string.format("worldGrind (%d,%d)", tx, ty))
   return H.driveUntil(function()
     return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
       and H.worldHasControl() and H.worldAligned())
   end, 60000, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        plan = nil; step = nil
-        H.setPad({ l = true, r = true }); return
-      end
+      if W.frame() then plan = nil; step = nil; return end
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then
         plan = nil; step = nil; H.setPad({}); return
@@ -88,16 +86,15 @@ local function worldGrind(tx, ty, what)
   }, what or string.format("worldGrind (%d,%d)", tx, ty))
 end
 
--- unconditional held walk (dialogs absorbed; a battle, none of which can
--- roll on these maps, is fled with the real L+R run)
+-- unconditional held walk (dialogs absorbed; a battle -- the one world
+-- step onto Albrook can roll one -- is fought, #183)
 local function pressWalk(dir, pred, maxFrames, what)
   local ph = 0
+  local W = H.newWalkFighter("pressWalk: " .. what)
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); return
-      end
+      if W.frame() then return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
     end),
@@ -145,7 +142,10 @@ local function rideScene(done, maxFrames, what)
   return H.driveUntil(done, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+      -- #183: no L+R here.  rideScene never takes a step, the sail is a
+      -- scripted vehicle ride, and Albrook's maps 323/332 roll no
+      -- encounters (tools/audit_encounters.py 323 332): no battle can open.
+      if H.battleLoadStarted() then H.setPad({}); return end
       if H.worldMode() then H.setPad({}); return end  -- scripted sail: hands off
       if H.readByte(0x59) ~= 0 then
         H.setPad(ph < 4 and { "start" } or {}); return
@@ -177,7 +177,10 @@ local function talkRide(objIdx, done, maxFrames, what)
   return H.driveUntil(done, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+      -- #183: no L+R here.  talkRide walks only Albrook's streets and the
+      -- ship's deck (maps 323/332 roll no encounters,
+      -- tools/audit_encounters.py 323 332): no battle can open.
+      if H.battleLoadStarted() then H.setPad({}); return end
       if H.worldMode() then H.setPad({}); return end  -- scripted sail: hands off
       if H.readByte(0x59) ~= 0 then
         H.setPad(ph < 4 and { "start" } or {}); return

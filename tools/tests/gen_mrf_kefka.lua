@@ -62,6 +62,7 @@ local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 
 -- takes over; the tap keeps the party from sliding past the tile.
 local function tapInto(dir, pred, maxFrames, what)
   local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
+  local W = H.newWalkFighter("tapInto: " .. what)
   return H.driveUntil(function()
     calm = (pred() and settled()) and calm + 1 or 0
     return calm >= 16
@@ -77,9 +78,7 @@ local function tapInto(dir, pred, maxFrames, what)
           tostring(H.eventRunning()), sw(0x01B5),
           H.readByte(0x087f + H.readWord(0x0803))))
       end
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); phase = 0; return
-      end
+      if W.frame() then phase = 0; return end
       if H.dialogWaiting() then
         H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
       end

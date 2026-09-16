@@ -29,26 +29,30 @@ end
 local function shipX() return H.readWord(0x34) >> 4 end
 local function shipY() return H.readWord(0x38) >> 4 end
 
--- unconditional held walk (dialogs/battles absorbed); for trigger tiles
--- and scripted stretches where control flickers
+-- unconditional held walk (dialogs absorbed, battles fought -- #183: the
+-- LEFT onto the reunion trigger walks map 240, which rolls encounters);
+-- for trigger tiles and scripted stretches where control flickers
 local function pressWalk(dir, pred, maxFrames, what)
   local ph = 0
+  local W = H.newWalkFighter("pressWalk: " .. what)
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+      if W.frame() then return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
     end),
   }, what)
 end
--- unconditional talker (A+dir edges)
+-- unconditional talker (A+dir edges).  #183: no L+R -- the direction is
+-- pressed into an occupied NPC tile, so no step completes and no
+-- encounter rolls; an unexpected battle stalls visibly.
 local function pressTalk(dir, pred, maxFrames, what)
   local ph = 0
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+      if H.battleLoadStarted() then H.setPad({}); return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad(ph < 4 and { "a", dir } or { dir })
     end),
@@ -73,12 +77,13 @@ local function planApproach(idx)
     assert(app, "no reachable neighbor for the talk target")
   end)
 end
+-- (#183: no L+R, as pressTalk -- the press faces an occupied tile)
 local function talkApproached(pred, maxFrames, what)
   local ph = 0
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+      if H.battleLoadStarted() then H.setPad({}); return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad(ph < 4 and { "a", app[3] } or { [app[3]] = true })
     end),

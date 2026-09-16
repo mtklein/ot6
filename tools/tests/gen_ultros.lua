@@ -116,6 +116,7 @@ end
 -- without firing it, so tap toward the tile and settle on an aligned rest.
 local function tapToSave(tx, ty, maxFrames, what)
   local phase, n, ph, calm = 0, 0, 0, 0
+  local W = H.newWalkFighter("tapToSave: " .. what)
   local function calmPred()
     return H.tileAligned() and not H.dialogWaiting() and not H.battleLoadStarted()
   end
@@ -133,9 +134,7 @@ local function tapToSave(tx, ty, maxFrames, what)
   end, maxFrames or 12000, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); phase = 0; return
-      end
+      if W.frame() then phase = 0; return end
       if H.dialogWaiting() then
         H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
       end

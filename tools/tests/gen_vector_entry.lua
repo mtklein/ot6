@@ -118,20 +118,19 @@ local function fill(c, pos, slot, id, tag)
 end
 
 -- Robust world walk to (tx,ty): re-plan a worldBfs each time the plan runs
--- out, press the next step, and flee any random encounter with the game's
--- L+R run mechanic.  No edge is ever
+-- out, press the next step, and fight any random encounter it meets
+-- (H.newWalkFighter, #183).  No edge is ever
 -- condemned, so a battle-restored tile is simply retried until a step
 -- lands.  Arrives at (tx,ty) or when the party leaves the world map.
 local function worldGrind(tx, ty, what)
   local plan, idx = nil, 1
+  local W = H.newWalkFighter(what or string.format("worldGrind (%d,%d)", tx, ty))
   return H.driveUntil(function()
     return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
       and H.worldHasControl() and H.worldAligned())
   end, 60000, {
     H.call(function()
-      if H.battleLoadStarted() then
-        plan = nil; H.setPad({ l = true, r = true }); return
-      end
+      if W.frame() then plan = nil; return end
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then plan = nil; H.setPad({}); return end
       if not H.worldAligned() then return end
@@ -316,7 +315,9 @@ H.run({ maxFrames = 160000 }, {
     return H.driveUntil(function() return H.worldMode() end, 8000, {
       H.call(function() hb = hb + 1
         if H.battleLoadStarted() then
-          H.setPad({ l = true, r = true }); return
+          -- #183: no L+R here.  Albrook, map 323, rolls no encounters
+          -- (tools/audit_encounters.py 323): no battle can open.
+          H.setPad({}); return
         end
         if H.dialogWaiting() then
           H.setPad(hb % 8 < 4 and { "a" } or {}); return
@@ -369,13 +370,11 @@ H.run({ maxFrames = 160000 }, {
 
   -- hold LEFT along row 187; the step onto (121,187) fires _ca5ecf ->
   -- load_map 242 {32,61}
-  (function() local hb = 0
+  (function() local hb, W = 0, H.newWalkFighter("hold LEFT onto the Vector trigger")
     return H.driveUntil(function() return not H.worldMode() and map() == 242 end,
       6000, {
       H.call(function() hb = hb + 1
-        if H.battleLoadStarted() then
-          H.setPad({ l = true, r = true }); return
-        end
+        if W.frame() then return end
         H.setPad({ left = true })
       end) }, "hold LEFT onto (121,187) -> the Vector trigger") end)(),
   H.waitUntil(function()

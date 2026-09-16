@@ -80,7 +80,8 @@ local function tapInto(dir, pred, maxFrames, what)
           H.readByte(0x087f + H.readWord(0x0803))))
       end
       if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true }); phase = 0; return
+        -- #183: no L+R here.  tapInto's one use walks map 274, which rolls no encounters (tools/audit_encounters.py 274).
+        H.setPad({}); phase = 0; return
       end
       if H.dialogWaiting() then
         H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
@@ -191,7 +192,9 @@ H.run({ maxFrames = 60000 }, {
       return calm >= 8
     end, 9000, {
       H.call(function()
-        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+        -- #183: no L+R here.  The platform, map 272, rolls no encounters
+        -- (tools/audit_encounters.py 272): no battle can open.
+        if H.battleLoadStarted() then H.setPad({}); return end
         if H.dialogWaiting() then H.setPad({ "a" }); return end
         if H.fieldX() == 3 and H.fieldY() == 55 then H.setPad({}); return end
         H.setPad({ left = true })
@@ -232,7 +235,9 @@ H.run({ maxFrames = 60000 }, {
       return false
     end, 4000, {
       H.call(function()
-        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+        -- #183: no L+R here.  The press faces CID's occupied tile on map
+        -- 272 (no encounters): no step, no roll, no battle.
+        if H.battleLoadStarted() then H.setPad({}); return end
         if H.readByte(0x087f + H.readWord(0x0803)) ~= cid[4] then
           H.setPad({ [cid[3]] = true })
         else

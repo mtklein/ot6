@@ -457,7 +457,9 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
       return false
     end, 3000, {
       H.call(function()
-        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
+        -- #183: no L+R here.  The pad is empty (no step, no encounter
+        -- roll) and map 274 rolls none anyway (tools/audit_encounters.py 274).
+        if H.battleLoadStarted() then H.setPad({}); return end
         H.setPad({})
       end) }, "twenty settled frames below the BIG_SWITCH tile")
   end)(),

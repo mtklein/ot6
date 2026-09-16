@@ -120,7 +120,9 @@ H.run({ maxFrames = 60000 }, {
     return H.driveUntil(function() return map() == 262 end, 4000, {
       H.call(function() hb = hb + 1
         if H.battleLoadStarted() then
-          H.setPad({ l = true, r = true }); return
+          -- #183: no L+R here.  VECTOR, map 242, rolls no encounters
+          -- (tools/audit_encounters.py 242): no battle can open.
+          H.setPad({}); return
         end
         if H.dialogWaiting() then
           H.setPad(hb % 8 < 4 and { "a" } or {}); return
