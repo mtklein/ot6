@@ -40,9 +40,11 @@
 --
 -- The departure stock (#176; brought over by hand from ad7a0104 on
 -- wt/potion-route, which bought it at Narshe's item shop 44 after the
--- mission meeting).  Nothing sells Tonics again until Thamasa (Narshe's 44
--- and Albrook's 24 have none), so the Sealed Gate leg's field care comes out
--- of the Potion stack too: POTION to 60 (the band at the L25 that leg
+-- mission meeting).  Nothing on foot from here sells Tonics (Narshe's 44,
+-- Jidoor's 22 and Albrook's 24 have none), so the Tonics come by airship
+-- from Nikeah (#210: TONIC to 99 before the grind and again on the way to
+-- Narshe; see nikeahTonics below), and the Potion stack covers what the
+-- Sealed Gate leg's field care spends past them: POTION to 60 (the band at the L25 that leg
 -- reaches, 38, plus an allowance for that field care -- the seeded chain
 -- walked the leg with an empty bag, gate_cave_save potion=0, so the next
 -- re-cut downstream measures the spend and this target follows) and FENIX
@@ -104,17 +106,28 @@ end
 
 -- unconditional held walk (dialogs absorbed, battles fought -- #183); for
 -- trigger tiles and scripted stretches where control flickers
+-- maxFrames counts walking frames only: a battle the walk meets (and its
+-- care) is uncounted, with a 20000-frame backstop over everything (#211's
+-- Tent shape).  The #210 regeneration met a random on the step into Narshe
+-- at shift 0 and shift 20 alike, and the fight alone ran the old 1200-frame
+-- budget out (attempts 1 and 2: "timeout after 1200 frames driving toward
+-- held UP onto (84,33) -> NARSHE").
 local function pressWalk(dir, pred, maxFrames, what)
-  local ph = 0
+  local ph, walked = 0, 0
   local W = H.newWalkFighter("pressWalk: " .. what)
-  return H.driveUntil(pred, maxFrames, {
+  return H.withReset(H.driveUntil(pred, maxFrames + 20000, {
     H.call(function()
       ph = (ph + 1) % 8
       if W.frame() then return end
+      walked = walked + 1
+      if walked > maxFrames then
+        error(string.format("timeout after %d walking frames driving toward %s",
+          maxFrames, what), 0)
+      end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
     end),
-  }, what)
+  }, what), function() ph, walked = 0, 0 end)
 end
 
 local function flyTo(tx, ty)
@@ -142,6 +155,12 @@ end
 -- ---- the grind's supply line (see the header) --------------------------
 local TONIC, POTION, FENIX, TENT = 0xE8, 0xE9, 0xF0, 0xF7
 local ANTIDOTE, REMEDY = 0xF2, 0xF5
+-- the Tonic band (docs/design/level-curve.md: ~level x5, cap 99): L21 on
+-- boot, L23 on departure, so the cap either way
+local TONIC_BAND = 99
+-- the stock under which the Nikeah flight is worth taking: the band is a
+-- "~", and a trip of 5520 frames is not made for a handful of Tonics
+local TONIC_TRIP = TONIC_BAND * 3 // 4
 -- the band the bag arrives at each fight with: Potions ~level x1.5 for the
 -- L18-23 this grind spans (27-35), Fenix ~level (20), Tents for the rest
 -- stops (10 -- the two measured grinds would each have used ~4-6)
@@ -374,6 +393,115 @@ local function jidoorRestock(tag, band)
   }
 end
 
+-- ---- the Tonic stop, by airship (#210) ----------------------------------
+-- Field care runs on Tonics (level-curve.md's supply curve: ~level x5, cap
+-- 99), and nothing on foot from here sells them: Jidoor's shop 22 and
+-- Narshe's 44 (the swap $006B made) stock none.  The #198 re-cut booted
+-- this step with tonic=4 (terra-returned-v1) and left the plains with 4 --
+-- the care kernel's floor, i.e. no Tonics at all -- for the Sealed Gate.  A
+-- person holding an airship and 115k gil flies to a town that sells them.
+-- Measured by tools/tests/probe_tonic_airship.lua off this same checkpoint:
+--   * South Figaro (shop 8) is still occupied: landable beside the gate at
+--     (84,112), but its troopers wall the street to the shop (navTo read
+--     no path 20 times).
+--   * Nikeah (shop 15: Tonic row 0) is clean: the Blackjack lands on
+--     (116,61) ($c2=44), world (117,61) -> town 169 (1,35), the counter
+--     keeper at (24,39) talked from (23,39), and the x=0 column walks back
+--     out onto the ship tile (116,61).  Plains -> Nikeah -> plains cost 5520
+--     frames and 4750 gil for 95 Tonics (f1396 -> f6916).
+-- Mobliz (220,115) and Thamasa are farther; Figaro Castle's merchants
+-- refuse EDGAR and SABIN (_ca67de/_ca67e2), who are both in this party.
+local function liftOff(what)
+  return {
+    H.pressButtons({ "a" }, 8),
+    H.waitUntil(function()
+      return H.worldMode() and H.readByte(0xe0) == 0 and H.readByte(0xe2) == 0
+    end, 900, what .. ": liftoff (the flight view zeroes $E0/$E2)", 5),
+    H.waitFrames(240),
+    H.logStep(function()
+      return string.format("[airborne] %s: ship=(%d,%d) f%d", what, shipX(), shipY(), H.frame)
+    end),
+  }
+end
+local function landAt(x, y, what)
+  return {
+    flyTo(x, y),
+    H.release(),
+    H.waitFrames(60),
+    H.call(function()
+      H.assertEq(H.readByte(0xc2) & 0x02, 0, string.format(
+        "%s: $c2 bit1 CLEAR -- (%d,%d) is airship-landable", what, x, y))
+    end),
+    H.pressButtons({ "b" }, 8),
+    H.waitUntil(function() return H.worldX() ~= 0 or H.worldY() ~= 0 end,
+      1200, what .. ": the ship grounds (world position cells rewritten)", 10),
+    H.waitFrames(120),
+    H.call(function()
+      H.assertEq(H.worldX(), x, what .. ": grounded x")
+      H.assertEq(H.worldY(), y, what .. ": grounded y")
+      H.assertEq(H.readByte(0x11FA) & 3, 0, what .. ": on foot on the ship tile")
+    end),
+  }
+end
+-- From the grounded ship, anywhere: fly to Nikeah, buy TONIC to the band,
+-- and stand on foot on the grounded ship at (116,61) again.
+local function nikeahTonics(tag)
+  local what = "Tonic stop (" .. tag .. ")"
+  local start = 0
+  local steps = {}
+  local function add(list) for _, s in ipairs(list) do steps[#steps + 1] = s end end
+  add({ H.call(function()
+    start = H.frame
+    H.log(string.format("[shop] Nikeah stop begins f%d: gil=%d tonic=%d potion=%d fenix=%d",
+      H.frame, H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX)))
+  end) })
+  add(liftOff(what))
+  add(landAt(116, 61, what .. ": Nikeah"))
+  add({
+    worldGrind(117, 61, what .. ": world (117,61) -> Nikeah"),
+    H.waitUntil(fieldSettled(169), 2400, what .. ": Nikeah control (map 169)", 5),
+    -- the town's walkers cross the one street to the counter
+    -- (gen_sabin_trench): wait, as a person would, for it to clear
+    H.waitFrames(150),
+    H.waitUntil(function() return H.bfsPath(24, 41) ~= nil end, 1800,
+      what .. ": a walkable street to the Nikeah counter", 1),
+    H.shopTalk(24, 39, "Nikeah item shop"),
+    H.call(function()
+      H.assertEq(H.shopId(), 15, "the counter opened shop 15 ($0201)")
+      H.assertEq(H.shopRowOf(15, TONIC) ~= nil, true, "shop 15 sells Tonics")
+    end),
+    H.buyItem(TONIC, function() return TONIC_BAND - H.invCountOf(TONIC) end,
+      "TONIC to " .. TONIC_BAND),
+    H.shopClose("Nikeah item shop"),
+    H.bagArrange({ POTION, FENIX, TONIC, ANTIDOTE, REMEDY },
+      { tag = "bag: combat items on top (Nikeah item shop)" }),
+    H.call(function()
+      H.assertEq(H.readByte(0x1869), POTION, what .. ": slot 0 is Potion")
+      H.assertEq(H.invCountOf(TONIC) >= TONIC_BAND, true,
+        what .. ": Tonics at the band")
+      H.log(string.format("[shop] Nikeah item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+        H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.gil(), H.frame))
+    end),
+    H.navTo(1, 35, { playBattles = "tactical", maxFrames = 20000,
+      arrive = function() return H.worldMode() end }),
+    pressWalk("left", function() return H.worldMode() end, 1200,
+      what .. ": Nikeah's x=0 column -> the world (116,61)"),
+    -- the world flags read true a few frames early on the way out; the
+    -- position cells are what settle last (probe_tonic_airship)
+    H.waitFrames(60),
+    H.waitUntil(function()
+      return H.worldMode() and H.worldHasControl() and H.worldAligned()
+        and bright() >= 15 and H.worldX() == 116 and H.worldY() == 61
+    end, 2400, what .. ": back on the ship tile (116,61)", 5),
+    H.waitFrames(30),
+    H.logStep(function()
+      return string.format("[shop] Nikeah stop done: %d frames (f%d -> f%d)",
+        H.frame - start, start, H.frame)
+    end),
+  })
+  return steps
+end
+
 H.run({ maxFrames = 600000 }, {
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -400,6 +528,17 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq(shipX(), 24, "the Blackjack is parked under the party (x)")
     H.assertEq(shipY(), 121, "the Blackjack is parked under the party (y)")
   end),
+
+  -- ---- the Tonic stop before the grind (#210) ----------------------------
+  -- ~75 fights of field care ahead and the bag at the kernel's floor: fly to
+  -- Nikeah, then back to the plains under the ship's old tile
+  H.cond(function() return H.invCountOf(TONIC) < TONIC_TRIP end, (function()
+    local steps = nikeahTonics("before the grind")
+    for _, s in ipairs(liftOff("Nikeah -> the plains")) do steps[#steps + 1] = s end
+    for _, s in ipairs(landAt(24, 121, "back on the plains")) do steps[#steps + 1] = s end
+    steps[#steps + 1] = H.logStep(function() return bagLine("before the grind") end)
+    return steps
+  end)(), {}),
 
   -- ---- the sanctioned grind, on the Vector plains ------------------------
   -- Six measured Sealed-Gate cave wipes with the complete kit say that
@@ -472,6 +611,12 @@ H.run({ maxFrames = 600000 }, {
       "the party leaves the plains near the departure Potion stock")
     H.assertEq(H.invCountOf(FENIX) >= 20, true, "Fenix Downs at ~level")
   end),
+
+  -- ---- the Tonic top-up on the way to Narshe (#210) ----------------------
+  -- the grind drinks the pre-grind stop's Tonics; the Sealed Gate leg
+  -- leaves from here, so the bag goes back to the band first
+  H.cond(function() return H.invCountOf(TONIC) < TONIC_TRIP end,
+    nikeahTonics("departure"), {}),
 
   -- ---- board + lift off (one A tap does both) ---------------------------
   H.pressButtons({ "a" }, 8),

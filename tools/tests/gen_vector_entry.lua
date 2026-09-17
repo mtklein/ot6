@@ -254,6 +254,16 @@ H.run({ maxFrames = 160000 }, {
   -- chain carried 89 in and walked the factory down to 80 (vector_entry
   -- tonic=89 -> ifrit_entry 80), 9 Tonics = 450 HP = 2 Potions at 300.
   -- FENIX DOWN to 16 (~level).
+  -- #210, POTION to 50: the regenerated lineage (#198) boots here at L20
+  -- with tonic=15 potion=37 (post-opera-v1) and reaches terra-returned-v1
+  -- at L21 with tonic=4 potion=20 -- the Tonics at the care kernel's floor
+  -- from mrf-save-room-v1 on (tonic=4 there, at n024-entry-save-v1 and at
+  -- minecart-platform-v1), so the field care of the whole Vector stretch
+  -- came out of the Potion stack.  No Tonic counter is reachable before the
+  -- factory escape: Albrook's 24 and Vector sell none, and the Blackjack
+  -- does not fly yet (probe_tonic_airship: _caf532 returns at the wheel).
+  -- So the Potion target covers it (owner, #176): the band at L21 (32) plus
+  -- the stretch's measured spend, 37 -> 20 = 17, is 49; 50.
   H.call(function()
     H.vars.shopStart = H.frame
     H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 24")
@@ -273,7 +283,7 @@ H.run({ maxFrames = 160000 }, {
     H.assertEq(shopRow(24, 0), POTION, "shop 24 row 0 is Potion")
     H.assertEq(shopRow(24, 5), FENIX_DOWN, "shop 24 row 5 is Fenix Down")
   end),
-  H.buyItem(POTION, 0, function() return 35 - H.invCountOf(POTION) end, "POTION to 35"),
+  H.buyItem(POTION, 0, function() return 50 - H.invCountOf(POTION) end, "POTION to 50"),
   H.buyItem(FENIX_DOWN, 5, function() return 16 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 16"),
   H.call(function()
@@ -286,8 +296,8 @@ H.run({ maxFrames = 160000 }, {
   -- that did not re-arrange)
   H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Albrook item shop)" }),
   H.call(function()
-    H.assertEq(H.invCountOf(POTION) >= 35, true,
-      "the party leaves Albrook with 35 Potions -- the L18 band plus the factory's measured spend and field care")
+    H.assertEq(H.invCountOf(POTION) >= 50, true,
+      "the party leaves Albrook with 50 Potions -- the L21 band plus the Vector stretch's measured spend, its field care included (#210)")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 16, true, "Fenix Downs at 16 (~level)")
     H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
       H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
