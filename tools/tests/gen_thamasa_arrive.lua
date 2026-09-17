@@ -308,6 +308,45 @@ local steps = {
     H.screenshot("thamasa_town_entry")
   end),
 
+  -- ---- 2b. the item shop on arrival (#213) --------------------------------
+  -- Thamasa's shop 35 (Tonic row 0, Potion row 1, Fenix Down row 6) is the
+  -- first counter since the narshe-mission departure that sells Tonics:
+  -- the Sealed Gate cave, Vector, the banquet and Albrook's shop 24 sell
+  -- none, and the airship is dead from the gate on (gen_vector_crash's
+  -- wheel check).  $007D is already set on arrival, so the keeper sells
+  -- (`_cbd730`, not "I've never seen you before").  The seeded chain walked
+  -- the K tile to the L save with tonic=0 and bought only the next morning
+  -- (gen_thamasa_fire), so the world walk in and the care before the save
+  -- ran dry.  A person shops on arriving in town: POTION to 38 and FENIX
+  -- DOWN to 25 (the L25 bands) first, the Tonic soak last, TONIC to 99 (the
+  -- band's cap).  gen_thamasa_fire's stop tops the same counter up again.
+  crossDoor(26, 37, 347, 36, 44, "item shop door 343(26,37)->347(36,44)",
+    { avoid = VIGNETTES }),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
+    "shop interior settled before pathfinding", 10),
+  H.waitFrames(150),
+  H.call(function()
+    H.log(string.format("[shop] Thamasa arrival stop begins: gil=%d tonic=%d potion=%d fenix=%d f%d",
+      H.gil(), H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0), H.frame))
+  end),
+  H.shopTalk(36, 39, "Thamasa item shop (arrival)"),
+  H.call(function()
+    H.assertEq(H.shopId(), 35, "the counter opened shop 35 ($0201)")
+  end),
+  H.buyItem(0xE9, function() return 38 - H.invCountOf(0xE9) end, "POTION to 38"),
+  H.buyItem(0xF0, function() return 25 - H.invCountOf(0xF0) end, "FENIX DOWN to 25"),
+  H.buyItem(0xE8, function() return 99 - H.invCountOf(0xE8) end, "TONIC to 99"),
+  H.shopClose("Thamasa item shop (arrival)"),
+  H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 },
+    { tag = "bag: combat items on top (Thamasa arrival)" }),
+  H.call(function()
+    H.assertEq(H.invCountOf(0xE8) >= 99, true, "Tonics at the band's cap")
+    H.log(string.format("[shop] Thamasa arrival stop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+      H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0), H.gil(), H.frame))
+  end),
+  crossDoor(36, 45, 343, 26, 39, "item shop door 347(36,45)->343(26,39), return",
+    { avoid = VIGNETTES }),
+
   chestAuto(31, 37, 249, "Eyedrop", 0xF3, { avoid = VIGNETTES }),
   chestAuto(43, 30, 248, "Soft", 0xF4, { avoid = VIGNETTES }),
   chestAuto(35, 12, 247, "Green Cherry", 0xF8, { avoid = VIGNETTES }),

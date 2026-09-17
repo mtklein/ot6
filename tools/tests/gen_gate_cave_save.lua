@@ -157,6 +157,92 @@ local function fill(c, pos, slot, id, tag)
   end, { H.equipWeapon(pos, id, { slot = slot, tag = tag }) }, {})
 end
 
+-- ---- the Nikeah stop, by airship (#213) -----------------------------------
+-- The flight to the base pass is the last time this lineage holds a live
+-- airship before Thamasa: the wheel is dead from the Sealed Gate on
+-- (gen_vector_crash's wheel check), and nothing between sells Tonics
+-- (Vector: weapon 27 and armour 28; Albrook's shop 24: no Tonic).  So the
+-- bag leaves here at the band for the whole stretch -- the cave, the crash,
+-- the banquet and the voyage.  gen_narshe_mission already tops TONIC to 99
+-- at Nikeah on its departure (#210), so a lineage cut after that arrives
+-- stocked and flies straight on; this stop fires only when the bag is short
+-- (the seeded narshe-mission-v1 boots tonic=0 potion=0).  Same threshold
+-- as #210's: 3/4 of the band for Tonics, the L25 Potion band (38) for
+-- Potions.  Nikeah (shop 15: Tonic, Potion, Fenix Down) coordinates are
+-- probe_tonic_airship's: land on (116,61), world (117,61) -> town 169
+-- (1,35), the keeper at (24,39), the x=0 column back out onto (116,61).
+local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
+local TONIC_BAND = 99
+local TONIC_TRIP = TONIC_BAND * 3 // 4
+local POTION_BAND = 38
+local function bagLine(tag)
+  return string.format("[%s] tonic=%d potion=%d fenix=%d gil=%d f%d", tag,
+    H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.gil(), H.frame)
+end
+local function nikeahStop()
+  local what = "Nikeah stop"
+  return {
+    H.logStep(function() return bagLine(what .. " begins") end),
+    flyTo(116, 61),
+    H.release(),
+    H.waitFrames(60),
+    H.call(function()
+      H.assertEq(H.readByte(0xc2) & 0x02, 0, what .. ": (116,61) is airship-landable")
+    end),
+    H.pressButtons({ "b" }, 8),
+    H.waitUntil(function() return H.worldX() ~= 0 or H.worldY() ~= 0 end,
+      1200, what .. ": the ship grounds", 10),
+    H.waitFrames(120),
+    H.call(function()
+      H.assertEq(H.worldX(), 116, what .. ": grounded x")
+      H.assertEq(H.worldY(), 61, what .. ": grounded y")
+    end),
+    worldGrind(117, 61, what .. ": world (117,61) -> Nikeah"),
+    H.waitUntil(function()
+      return map() == 169 and H.hasControl() and H.tileAligned() and bright() >= 15
+    end, 2400, what .. ": Nikeah control (map 169)", 5),
+    -- the town's walkers cross the one street to the counter: wait for it
+    H.waitFrames(150),
+    H.waitUntil(function() return H.bfsPath(24, 41) ~= nil end, 1800,
+      what .. ": a walkable street to the Nikeah counter", 1),
+    H.shopTalk(24, 39, "Nikeah item shop"),
+    H.call(function()
+      H.assertEq(H.shopId(), 15, "the counter opened shop 15 ($0201)")
+    end),
+    -- essentials first, the Tonic soak last, so a short purse shorts Tonics
+    H.buyItem(POTION, function() return 60 - H.invCountOf(POTION) end, "POTION to 60"),
+    H.buyItem(FENIX, function() return 24 - H.invCountOf(FENIX) end, "FENIX DOWN to 24"),
+    H.buyItem(TONIC, function() return TONIC_BAND - H.invCountOf(TONIC) end,
+      "TONIC to " .. TONIC_BAND),
+    H.shopClose("Nikeah item shop"),
+    H.bagArrange({ POTION, FENIX, TONIC, ANTIDOTE, REMEDY },
+      { tag = "bag: combat items on top (Nikeah item shop)" }),
+    H.call(function()
+      H.assertEq(H.invCountOf(TONIC) >= TONIC_BAND, true, what .. ": Tonics at the band")
+      H.log(string.format("[shop] Nikeah item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+        H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.gil(), H.frame))
+    end),
+    H.navTo(1, 35, { playBattles = "tactical", maxFrames = 20000,
+      arrive = function() return H.worldMode() end }),
+    pressWalk("left", function() return H.worldMode() end, 1200,
+      what .. ": Nikeah's x=0 column -> the world (116,61)"),
+    H.waitFrames(60),
+    H.waitUntil(function()
+      return H.worldMode() and H.worldHasControl() and H.worldAligned()
+        and bright() >= 15 and H.worldX() == 116 and H.worldY() == 61
+    end, 2400, what .. ": back on the ship tile (116,61)", 5),
+    H.waitFrames(30),
+    -- one A tap boards and lifts off (gen_narshe_mission)
+    H.pressButtons({ "a" }, 8),
+    H.waitUntil(function()
+      return H.worldMode() and H.readByte(0xe0) == 0 and H.readByte(0xe2) == 0
+    end, 900, what .. ": liftoff (the flight view zeroes $E0/$E2)", 5),
+    H.waitFrames(240),
+    H.logStep(function() return bagLine(what .. " done, airborne") end),
+  }
+end
+
 local function landed(m, n)
   local cnt, hb = 0, -600
   return function()
@@ -303,6 +389,11 @@ H.run({ maxFrames = 480000 }, {
     function() return H.worldMode() end, 3000, "(Lift-off)"),
   H.release(),
   H.waitFrames(150),
+  -- ---- 3a. the Nikeah stop, when the bag is short (#213) ---------------
+  H.logStep(function() return bagLine("leaving Narshe") end),
+  H.cond(function()
+    return H.invCountOf(TONIC) < TONIC_TRIP or H.invCountOf(POTION) < POTION_BAND
+  end, nikeahStop(), {}),
   flyTo(163, 194),
   H.release(),
   H.waitFrames(60),

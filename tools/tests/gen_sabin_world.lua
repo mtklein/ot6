@@ -62,6 +62,8 @@ local function objY(i) return H.readWord(0x086d + 0x29 * i) >> 4 end
 local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 local function seq(steps) return H.cond(function() return true end, steps) end
+local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
 
 -- multiple-choice state (src/field/text.asm), same addresses gen_scenario
 -- uses: $056E = cursor row, $056F = option count.  $056F is only final once
@@ -349,6 +351,89 @@ H.run({ maxFrames = 90000 }, {
     end
   end),
 
+  -- ---- 2a. the merchant outside the house (#213) ----------------------------
+  -- Shopped BEFORE SHADOW's scene: the merchant and his chocobo are gone
+  -- from the yard once SHADOW has joined (the second stop found only the
+  -- well and the fence on three seeds: "timeout ... driving toward the
+  -- merchant").
+  -- Map 115's other NPC, obj 18 (npc_prop.asm {16,12}, spawn $0434, set
+  -- from the common route on), is the dry-goods merchant beside the
+  -- chocobo: `_cb0b7e` -> `shop_menu 39` on option 0 of dlg $01C2/$01BD
+  -- (event_main.asm:39681).  He stands at (8,10) in the live object table,
+  -- not the table's {16,12} (probe_sabin_merchant.lua; the first stop here
+  -- walked for (16,13) and read "no path" on three seeds), so he is talked
+  -- to by object, like SHADOW, and A is edged through his two opening
+  -- lines until the shop window is up; option 0 ("See the goods") is the
+  -- default row and is asserted before every A on the choice.
+  -- Shop 39 is a Vendor whose rows include Tonic ($E8) and Fenix Down
+  -- ($F0).  It is the scenario's only Tonic counter before the Phantom
+  -- Train's merchant (shop 85): the camp, Doma and the forest sell nothing,
+  -- and LOCKE's leftover bag walked that stretch dry (sabin_camp tonic=7 ->
+  -- doma_defended 0, camp_escaped 0, forest_done 0 on the seeded chain).
+  -- So a person stocks here: FENIX DOWN to 14 (~level at the L14 the
+  -- stretch reaches) first, then the Tonic soak last so a short purse
+  -- shorts Tonics.  TONIC to 86: the L14 band (70) plus the stretch's
+  -- measured field care.  The dry bag hid that spend, so the first cut
+  -- bought to 85 (band + an allowance) and measured it: sabin_camp 85 ->
+  -- camp_intro 84 -> kefka_done 79 -> doma_defended 76 -> camp_escaped 70
+  -- -> forest_done 69, 16 Tonics to the train's counter, one under the band
+  -- there; 70 + 16 = 86.
+  talkToObj(18, "the merchant beside SHADOW's house"),
+  (function()
+    local ph = 0
+    return H.driveUntil(function() return H.readByte(0x0026) == 0x25 end, 6000, {
+      H.call(function()
+        ph = (ph + 1) % 12
+        if H.dialogWaiting() and H.readByte(CH_MAX) >= 2 then
+          H.assertEq(H.readByte(0x056E), 0, "merchant choice cursor on 0 (See the goods)")
+        end
+        H.setPad(ph < 4 and { "a" } or {})
+      end),
+    }, "the merchant's shop window opens")
+  end)(),
+  H.release(),
+  H.call(function()
+    H.assertEq(H.shopId(), 39, "the merchant opened shop 39 ($0201)")
+    H.assertEq(H.shopRowOf(39, TONIC) ~= nil, true, "shop 39 sells Tonics")
+    H.log(string.format("[shop] house merchant open: gil=%d tonic=%d potion=%d fenix=%d f%d",
+      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.frame))
+  end),
+  H.buyItem(FENIX, function() return 14 - H.invCountOf(FENIX) end, "FENIX DOWN to 14"),
+  H.buyItem(TONIC, function() return 86 - H.invCountOf(TONIC) end, "TONIC to 86"),
+  -- out of the shop: B through the menu, then A through `_cb0bac`'s
+  -- closing line ("See you around.", dlg $01BE) -- H.shopClose presses B only
+  (function()
+    local ph, calm = 0, 0
+    return H.driveUntil(function()
+      local st = H.readByte(0x0026)
+      calm = (H.hasControl() and H.tileAligned() and not H.dialogWaiting()
+        and st ~= 0x25 and st ~= 0x26 and st ~= 0x27) and calm + 1 or 0
+      return calm >= 30
+    end, 3000, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        local st = H.readByte(0x0026)
+        if st == 0x25 or st == 0x26 or st == 0x27 then
+          H.setPad(ph < 4 and { "b" } or {})
+        elseif H.dialogWaiting() then
+          H.setPad(ph < 4 and { "a" } or {})
+        else
+          H.setPad({})
+        end
+      end),
+    }, "the merchant's shop closed")
+  end)(),
+  H.release(),
+  H.bagArrange({ POTION, FENIX, TONIC, ANTIDOTE, REMEDY },
+    { tag = "bag: combat items on top (SHADOW's house merchant)" }),
+  H.call(function()
+    H.assertEq(H.invCountOf(TONIC) >= 86, true,
+      "SABIN leaves the house with 86 Tonics -- the L14 band plus the camp stretch's field care")
+    H.assertEq(H.invCountOf(FENIX) >= 14, true, "Fenix Downs at 14 (~level)")
+    H.log(string.format("[shop] house merchant done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX), H.gil(), H.frame))
+  end),
+
   -- talk to the man: dlg, the dog gag, the name menu, then the Yes/No fork
   talkToObj(16, "SHADOW (the man in the house)"),
   rideUntil(function()
@@ -369,6 +454,7 @@ H.run({ maxFrames = 90000 }, {
     H.log(string.format("[house] SHADOW joined at f%d, party at (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
   end),
+
 
   -- ==================================================================== --
   -- 3. Out and south-east.  Map 115's long entrance is the whole of row

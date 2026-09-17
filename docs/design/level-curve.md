@@ -68,6 +68,8 @@ generator makes (#176):
 
 | shop | where | rows (Tonic / Potion / Fenix) | stop |
 |---|---|---|---|
+| 8 | occupied South Figaro, map 85 off (44,30); no Potion | 0 / - / 5 | `gen_sfigaro` (#213): TONIC to 78 before the gate soldier (the L13 band 65 + the 13 the seeded scenario spent from 20 to locke_done's 7).  The door is in LOCKE's starting pocket only: from the main street past the cafe the shop is unreachable (`probe_locke_tonic`). |
+| 39 | the merchant in the yard of SHADOW's house, map 115 (obj 18 at (8,10)); vendor, no Potion | 0 / - / 1 | `gen_sabin_world` (#213): FENIX DOWN to 14, TONIC to 86 (the L14 band 70 + 16, measured by the first cut's 85 from sabin_camp to forest_done's 69; the 86 cut spent 21, forest_done 65 -- the stretch's care is seed-dependent, 16..21).  Before SHADOW's scene: the merchant is gone from the yard once SHADOW joins (`probe_sabin_merchant`). |
 | 85 | Phantom Train car B, map 85 | 0 / 1 / 4 | `gen_sabin_train`: POTION to 30 (L14 band 21 + the train fight's 9) |
 | 12 | Mobliz, map 164 | 1 / 2 / 5 | `gen_sabin_gau`: POTION to 23 (L15) |
 | 15 | Nikeah, the counter at (24,39) on town map 169 | 0 / 1 / 5 | `gen_sabin_trench`: POTION to 27 (L18).  The last Potion shop before the reunion: the Terra scenario never walks a town with control (its Narshe arrival is the isolated clifftop ledge; Arvis's front door lies past the reunion trigger; the map-22 staging boxes the party -- `probe_narshe_preshop`), so this bag is what TERRA's L13 party (band 20) and the Battle for Narshe (L14, 21) carry. |
@@ -76,7 +78,9 @@ generator makes (#176):
 | 24 | Albrook, map 328 off (7,13); no Tonic | - / 0 / 5 | `gen_vector_entry`: POTION to 50 (#210: the L21 band 32 + the regenerated lineage's measured spend from post-opera-v1's 37 to terra-returned-v1's 20, which includes the field care of a stretch whose Tonics sat at the kernel's floor of 4 from the save room on; was 35).  Vector itself sells no Potions -- weapon 27 and armour 28 only (maps 246/248). |
 | 44 | Narshe again, once `$006B` (the factory escape) swaps shop 3 for 44; no Tonic | - / 0 / 2 | none: `gen_narshe_mission` shops at Jidoor instead (row 22 above) |
 | 15 | Nikeah again, by the Blackjack (lands on world (116,61); town 169 (1,35)) | 0 / 1 / 5 | `gen_narshe_mission` (#210): TONIC to 99 before the plains grind and again on the flight to Narshe, each when the bag is under 74 (3/4 of the L21-23 band of 99).  The first Tonic counter the route can reach after Narshe's swap to 44: the Blackjack's wheel is dead until the factory escape (`_caf532` returns while `$01B3`/`$01B4` is clear -- `probe_tonic_airship`), South Figaro's shop 8 still sits behind the occupation's troopers, and Figaro Castle's merchants refuse EDGAR and SABIN. |
+| 15 | Nikeah, by the Blackjack before the Sealed Gate | 0 / 1 / 5 | `gen_gate_cave_save` (#213): POTION to 60, FENIX DOWN to 24, TONIC to 99, only when the bag is under 3/4 of the Tonic band or under the L25 Potion band (38).  The last live flight: the wheel is dead from the gate on, and nothing to Thamasa sells Tonics.  The seeded `narshe-mission-v1` (tonic=0 potion=0) fires it; `gen_narshe_mission`'s regenerated departure (tonic=99 potion=60) would not. |
 | 24 | Albrook again | - / 0 / 5 | `gen_voyage`: POTION to 38 (L25; no field-care extra: the legs to Thamasa's Tonic counter spent none) |
+| 35 | Thamasa, on arrival | 0 / 1 / 6 | `gen_thamasa_arrive` (#213): POTION to 38, FENIX DOWN to 25, TONIC to 99 before the chests and Strago; the seeded chain walked the K tile to the L save with tonic=0 and first shopped the next morning. |
 | 35 | Thamasa, map 347 off (26,37) | 0 / 1 / 6 | `gen_thamasa_fire`: POTION to 45 (L26 band 39 + 6, the spend the seeded lineage measured from fire_out's 15 to thamasa_done's 9), FENIX DOWN to 20, TONIC to 99.  The re-cut M..P lineage (2026-09-16) spent none of it: fire_out, esper_mtn_save, ultros_won and thamasa_done all carry `potion=45`. |
 | 35 | Thamasa again, the FC prep | 0 / 1 / 6 | `gen_fc_landing`: POTION to 65 (L29 band 44 + 21, the old lineage's measured spend: the IAF gauntlet 16, the alcove leg 3, the escape 2), FENIX DOWN to 25, TONIC to 99, then the bag arranged (combat items on top).  Re-cut 2026-09-16: the gauntlet's winning attempt spent 8 (`fc_landing` lands with `potion=57`, band 41 at L27) and the alcove leg 10 (`fc_alcove` at 47, band 42 at L28); the first two gauntlet attempts wiped in the Air Force fight -- a lab signal, not a fixed segment.  Both targets were held for #179 (the bigger purchase moved the RNG under fire_out's burning-house walk and an IAF wave) until the segment runner (#178) retried such losses; the walk itself needed two fixes a person would make (wait out a wandering flame; heal after the FlameEater's cutscene, not during it), in `gen_thamasa_fire` and `H.fieldCare`/`H.newCareDriver`. |
 
@@ -95,6 +99,14 @@ mission on foot (shops 44 and 24) nothing sells them again until Thamasa
 whole Sealed Gate, crash, banquet and voyage with `tonic=0 potion=0..3`.
 `tools/audit_supplies.py` warns under the Tonic band (~level x5, cap 99)
 from Figaro Castle's shop to the WoR landing, beside the Potion band.
+
+The Floating Continent cannot hold the band on Tonics alone (#213,
+measured on the regenerated `fc_landing`): Thamasa's prep stop leaves at
+`tonic=99`, the between-wave care of the IAF gauntlet uses 33 (99 -> 66)
+and the care at the landing save point 28 more (the party arrives at
+424/960, 469/1129 and 766/1048 HP) to `tonic=38`.  A Tonic is +50 HP
+against L26 maxima near 1000, so one stretch of field care costs ~60, and
+99 is the cap a bag slot holds; the last WoB counter is behind the party.
 
 ## Zozo: the level gate nobody authored (#155, levelled for #158)
 

@@ -535,6 +535,54 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   end),
 
   -- ===================================================================== --
+  -- BEAT 0 (#213): the item shop.  The shop's bump door (44,30) is in the
+  -- starting pocket east of the gate soldier, and nowhere else: from the
+  -- main street past the cafe the reachable set ends at x=37
+  -- (probe_locke_tonic.lua, whose first version booted sfigaro_town and
+  -- read no path).  The counter keeper, map 85 npc at {106,52} (spawn
+  -- $0300), runs `_ca7884`: `shop_menu 8` while $00A4 is clear, which it is
+  -- for the whole scenario -- Tonic row 0, Fenix Down, no Potion.  It is
+  -- the scenario's only Tonic counter: the seeded chain walked in with 20
+  -- and reached locke_done with 7 (sfigaro_passage 18, sfigaro_escape 7).
+  -- TONIC to 78: the L13 band the scenario reaches (65) plus that
+  -- measured spend (13).  Fenix Down stays at the 12 the common route
+  -- carries (~level).  Probe: 58 Tonics, gil 10825 -> 7925.
+  -- ===================================================================== --
+  H.call(function()
+    H.log(string.format("[shop] item shop stop begins: gil=%d tonic=%d potion=%d fenix=%d f%d",
+      H.gil(), H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0), H.frame))
+  end),
+  H.navTo(44, 32, { maxFrames = 12000, playBattles = true }),
+  H.release(),
+  H.driveUntil(function() return map() == 85 end, 1200, {
+    H.hold({ "up" }), H.waitFrames(8),
+  }, "A0 into the item shop (the bump door at (44,30))"),
+  H.release(),
+  settleField(85),
+  H.shopTalk(106, 52, "South Figaro item shop (occupied)"),
+  H.call(function()
+    H.assertEq(H.shopId(), 8, "the counter opened shop 8 ($0201) -- $00A4 clear")
+    H.assertEq(H.shopRowOf(8, 0xE8) ~= nil, true, "shop 8 sells Tonics")
+  end),
+  H.buyItem(0xE8, function() return 78 - H.invCountOf(0xE8) end, "TONIC to 78"),
+  H.shopClose("South Figaro item shop (occupied)"),
+  H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 },
+    { tag = "bag: combat items on top (South Figaro item shop)" }),
+  H.call(function()
+    H.assertEq(H.invCountOf(0xE8) >= 78, true,
+      "LOCKE leaves the shop with 78 Tonics -- the L13 band plus the scenario's measured spend")
+    H.log(string.format("[shop] item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+      H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0), H.gil(), H.frame))
+  end),
+  H.navTo(104, 57, { maxFrames = 20000, playBattles = true }),
+  H.driveUntil(function() return map() == 75 end, 3000, {
+    H.hold({ "down" }), H.waitFrames(8),
+  }, "A1 out of the item shop"),
+  H.release(),
+  settleField(75),
+  H.call(function() where("item shop done") end),
+
+  -- ===================================================================== --
   -- BEAT 1: the soldier who bars the gate.  Map 75 npc 10 = obj 26, spawn
   -- switch $030C, at {30,42}: _ca854f (event_main.asm:20296) opens
   -- `dlg $0174 "Halt!"` + `battle 11, TOWN_EXT` -> formation 64,
