@@ -2944,6 +2944,43 @@ function M.newFightDriver(tag, opts)
   -- shell ($6168 mode byte), so every Sabin and Cyan fight passes here
   -- too.  Both are transitional: the plan waits them out.
   local ST_TOOLS_OPEN, ST_TOOLS_CLOSE = 0x2E, 0x2F
+  -- CYAN's SwdTech (probe_swdtech.lua, #188) is the same shell, not the
+  -- vanilla $37 gauge: OpenCmdMenuTbl[$07] is _c1_bushido_open (bushido
+  -- mode $6168=2) and UpdateMenuState_35, the only way into $37/$36, is
+  -- dead.  Measured: A on SwdTech $05 -> $2E -> $01 -> $30, B -> $01 ->
+  -- $05; the list is the left column only (wItemList 55.04 / 56.0A /
+  -- 57.0D: tech id, MP cost), row i banks boost i+1, a row past the bank
+  -- is refused silently in $30, and a commit queues the tech with NO target
+  -- select ($30 -> $2F -> $01 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00),
+  -- exactly SABIN's Blitz commit (probe_blitz.lua).
+  local CMD_SWDTECH = 0x07
+  -- CELES's Runic (probe_runic.lua): no window.  A on the Runic row goes
+  -- $05 -> $38 with the target latched on herself (chars = 1<<actor); B ->
+  -- $05; A commits ($38 -> $05 -> $0F -> $01 -> $10 -> $01 -> $00).
+  local CMD_RUNIC = 0x0B
+  -- SETZER's Slot (probe_slot.lua): A on Slot $05 -> $06 (OpenSlotWindow)
+  -- -> $01 -> $32 -> $39 -> $08, the reel state.  In $08 the first A starts
+  -- the spin and each later A stops the next reel once it is ready; the
+  -- reel-3 stop commits.  B closes only before the first A ($08 -> $3A ->
+  -- $01 -> $34 -> $33 -> $01 -> $05); after it B is not read.  The commit
+  -- walks $07 -> $3A -> $01 -> $34 -> $33 -> $01 -> $05 -> $0F -> ...
+  local CMD_SLOT, ST_SLOT = 0x0F, 0x08
+  local SLOT_PRESS1 = 0x7B92
+  -- The transitional states every turn walks, measured by the four probes
+  -- (each one frame unless noted): $04 the command window opening ($01 ->
+  -- $04 -> $01 -> $05, UpdateMenuState_04); $0F/$10 the command window
+  -- closing after a commit (UpdateMenuState_05 sees $7BCB, CloseCmdWindow
+  -- queues $01,$10; $10 -> $01 -> $00); $09 the item window opening (~3
+  -- frames, $05 -> $09 -> $01 -> $0A); $41/$40 an ally-targeted item or cure
+  -- ($0A -> $01 -> $41 -> $40 -> $38, and B from that target select -> $40
+  -- -> $01 -> $0A); $31/$02 B in item select while a row is picked up
+  -- (set_item_one's first A) -> $31 -> $02 -> $0A; $26 a Def. commit; and
+  -- Slot's $06/$32/$39 (open, $39 ~8 frames) and $07/$3A/$34/$33 (close,
+  -- $3A ~8 frames).  None of them reads a button a plan needs; the driver
+  -- waits them out.
+  local ST_TRANSITIONAL = { 0x02, 0x04, 0x06, 0x07, 0x09, 0x0F, 0x10, 0x26,
+                            0x31, 0x32, 0x33, 0x34, 0x39, 0x3A, 0x40, 0x41 }
+  local CMDCLOSING = 0x7BCB
   local LSCROLL, LROW = 0x891F, 0x8927
   local MAXMP = 0x3C30
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
@@ -3120,6 +3157,8 @@ function M.newFightDriver(tag, opts)
   local loreSpinN = 0                  -- frames spent on live lore plans
                                        -- since the last landed lore cast
   local loreDead = false               -- the stall guard fired this battle
+  local skillDead = {}                 -- command id -> true: the menu refused
+                                       -- that verb this battle (#188)
 
   -- A command row the cursor can actually land on.  Each $202E row is
   -- three bytes -- id, flags, targeting -- and flags bit 7 is the engine's
@@ -3973,7 +4012,7 @@ function M.newFightDriver(tag, opts)
                 what = string.format("Tools $%02X", tool) })
       end
       if opts.tactical and id == 5 and (opts.blitz or PUMMEL) == PUMMEL
-         and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_BLITZ) then
+         and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_BLITZ) and not skillDead[CMD_BLITZ] then
         offer({ kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
                 row = cmdRow(actor, CMD_BLITZ), boostLeft = bp,
                 chips = 2 * hitChips(slot, 0x04, 0), hits = 2, what = "Pummel" })
@@ -4708,6 +4747,34 @@ function M.newFightDriver(tag, opts)
     -- so an unrevealed axis holds no key; a broken gauge is the unload's
     -- turn and falls through to the lines below.  opts.keyed = false
     -- turns the rule off.
+    -- The skill verbs a generator asks for by name (#188), each through the
+    -- real menu (the probe_* files above the constants):
+    --   opts.runic   -- CELES raises Runic.  true, or a function(actor)
+    --                   answering whether this turn is a Runic turn.
+    --   opts.slot    -- SETZER spins Slot at this turn's boost (the same
+    --                   opts.boost / opts.bank rule the Fight uses; 3 BP
+    --                   buys the triple of reel 1's icon).
+    --   opts.bushido -- CYAN uses a SwdTech: true for the deepest row his
+    --                   bank pays for, or a number capping the tier (1-3).
+    --                   The row IS the boost, so no R is pressed; with
+    --                   opts.bank he fights until the bank reads it.
+    -- A verb the menu refused this battle (skillDead) is not offered again.
+    if opts.runic and id == 6 and not skillDead[CMD_RUNIC]
+       and cmdRow(actor, CMD_RUNIC)
+       and (type(opts.runic) ~= "function" or opts.runic(actor)) then
+      return { kind = "runic", row = cmdRow(actor, CMD_RUNIC) }
+    end
+    if opts.slot and id == 9 and not skillDead[CMD_SLOT] and cmdRow(actor, CMD_SLOT) then
+      return { kind = "slot", row = cmdRow(actor, CMD_SLOT), boostLeft = boost }
+    end
+    if opts.bushido and id == 2 and not skillDead[CMD_SWDTECH]
+       and cmdRow(actor, CMD_SWDTECH) and have >= 1
+       and not (opts.bank and have < opts.bank) then
+      local cap = type(opts.bushido) == "number" and opts.bushido or 3
+      return { kind = "skill", cmd = CMD_SWDTECH, bushido = true,
+               tier = math.max(1, math.min(have, cap, 3)),
+               row = cmdRow(actor, CMD_SWDTECH), boostLeft = 0 }
+    end
     if opts.keyed ~= false then
       local slot = pressTarget()
       if slot == nil then
@@ -4769,7 +4836,7 @@ function M.newFightDriver(tag, opts)
                row = cmdRow(actor, CMD_TOOLS), boostLeft = boost }
     end
     if opts.tactical and id == 5 and M.readWord(CURMP + actor * 2) >= 4
-       and cmdRow(actor, CMD_BLITZ) then
+       and cmdRow(actor, CMD_BLITZ) and not skillDead[CMD_BLITZ] then
       return { kind = "skill", cmd = CMD_BLITZ, skill = opts.blitz or PUMMEL,
                row = cmdRow(actor, CMD_BLITZ), boostLeft = boost }
     end
@@ -4812,7 +4879,10 @@ function M.newFightDriver(tag, opts)
                      -- and the Tools shell's open and force-close states
                      -- (probe_tools.lua); see the constants
                      [ST_ROW] = true, [ST_DEF] = true,
-                     [ST_TOOLS_OPEN] = true, [ST_TOOLS_CLOSE] = true }
+                     [ST_TOOLS_OPEN] = true, [ST_TOOLS_CLOSE] = true,
+                     -- SETZER's reel state (probe_slot.lua)
+                     [ST_SLOT] = true }
+  for _, s in ipairs(ST_TRANSITIONAL) do KNOWN_ST[s] = true end
   -- The selection windows a plan-less driver backs out of (see the
   -- plan-nil head of button()): every list that waits on A or B.  The
   -- transitional states ($19 lore fill, $2B/$2C throw open/close) are
@@ -5088,6 +5158,13 @@ function M.newFightDriver(tag, opts)
         M.readByte(CMDROW + actor) & 3, plan and plan.kind or "-", sideWindowN))
       return { "b" }
     end
+    -- Command select with $7BCB set is the one frame between a commit and
+    -- the window's close ($05 -> $0F, UpdateMenuState_05): nothing there
+    -- reads a button, and a plan made on it is made for a window that is
+    -- already going away.
+    if st == ST_CMD and M.readByte(MENU) ~= 0 and M.readByte(CMDCLOSING) ~= 0 then
+      return nil
+    end
     -- A denied actor's window (#187): Stop, Sleep or Berserk on the
     -- entity whose window this is.  The engine is about to take the
     -- window away (measured: Berserk landing at $7BC2=01 -> the window
@@ -5154,7 +5231,11 @@ function M.newFightDriver(tag, opts)
       -- wiped the party (2026-09-04).  A person backs out again; so
       -- does this, after two pulses of the same window, since a landed
       -- confirm's closing tail also passes through here for a tick.
-      if IDLE_ST[st] then
+      -- A Slot spin that has started cannot be backed out of (B is not
+      -- read once the first A lands, probe_slot.lua): a person finishes
+      -- it.  Before the first A it is a list like the others.
+      if st == ST_SLOT and M.readByte(SLOT_PRESS1) ~= 0 then return { "a" } end
+      if IDLE_ST[st] or st == ST_SLOT then
         if st == idleSt then idleN = idleN + 1 else idleSt, idleN = st, 1 end
         if idleN > 2 then
           M.log(string.format("[%s] no plan and window $%02X still open "
@@ -5192,6 +5273,13 @@ function M.newFightDriver(tag, opts)
       if plan.kind == "heal" or plan.kind == "item" then careActor = actor end
       M.log(string.format("[%s] actor=%d char=%d plan=%s",
         tag or "fight", actor, M.readByte(BCHID + actor * 2), plan.kind))
+      return nil
+    end
+    if st == ST_CMD and plan.committed then
+      -- A verb that commits without a target select (Blitz, SwdTech, Slot)
+      -- was pressed home and this actor's window is open again: that plan
+      -- is spent.  Plan afresh next pulse.
+      dropPlan("confirm_attempt")
       return nil
     end
     if st == ST_CMD then
@@ -5321,6 +5409,44 @@ function M.newFightDriver(tag, opts)
       return nil                       -- the shell is building / closing; wait
     end
     if st == ST_TOOLS and plan.kind == "skill" then
+      local noTarget = plan.cmd == CMD_BLITZ or plan.cmd == CMD_SWDTECH
+      if noTarget and plan.committed then
+        -- the A went in a pulse ago and the list is still up: the engine
+        -- refused it (Ot6BushidoConfirm's bank check, an MP shortfall).
+        -- Not this battle again; back out and plan something else.
+        M.log(string.format("[%s] actor=%d %s row refused in the list ($30) -- "
+          .. "backing out; not offered again this battle", tag or "fight", actor,
+          plan.cmd == CMD_BLITZ and "Blitz" or "SwdTech"))
+        skillDead[plan.cmd] = true
+        dropPlan("skill_refused")
+        return { "b" }
+      end
+      if plan.bushido and plan.skill == nil then
+        -- The SwdTech list is built on open (Ot6BushidoListOpen): left
+        -- column only, row i = boost i+1, +1 = MP cost.  Take the deepest
+        -- row at or under the planned tier that is present, paid for in
+        -- BP (Ot6BushidoConfirm refuses i+1 > bank) and in MP.
+        local bank = M.readByte(BP + actor * 2)
+        local mp = M.readWord(CURMP + actor * 2)
+        for r = plan.tier - 1, 0, -1 do
+          local tid = M.readByte(ITEMLIST + r * 6)
+          if tid ~= 0xFF and r + 1 <= bank and M.readByte(ITEMLIST + r * 6 + 1) <= mp then
+            plan.skill = tid
+            M.log(string.format("[%s] actor=%d SwdTech row %d: tech $%02X at %d BP "
+              .. "(bank %d), %d MP of %d", tag or "fight", actor, r, tid, r + 1,
+              bank, M.readByte(ITEMLIST + r * 6 + 1), mp))
+            break
+          end
+        end
+        if plan.skill == nil then
+          M.log(string.format("[%s] actor=%d no SwdTech row pays at tier %d (bank %d, "
+            .. "%d MP) -- backing out; not offered again this battle", tag or "fight",
+            actor, plan.tier, bank, mp))
+          skillDead[CMD_SWDTECH] = true
+          dropPlan("skill_unavailable")
+          return { "b" }
+        end
+      end
       local want
       for i = 0, 7 do
         if M.readByte(ITEMLIST + i * 3) == plan.skill then want = i; break end
@@ -5330,6 +5456,36 @@ function M.newFightDriver(tag, opts)
       local cc, cr = M.readByte(BLCOL + actor), M.readByte(BLROW + actor)
       if cc ~= wc then return { wc > cc and "right" or "left" } end
       if cr ~= wr then return { wr > cr and "down" or "up" } end
+      if noTarget then
+        plan.committed = M.frame
+        M.log(string.format("[%s] actor=%d %s $%02X committed from the list "
+          .. "(no target select)", tag or "fight", actor,
+          plan.cmd == CMD_BLITZ and "Blitz" or "SwdTech", plan.skill))
+      end
+      return { "a" }
+    end
+    -- Slot's open and close walks ($06 $32 $39 / $07 $3A $34 $33) are in
+    -- ST_TRANSITIONAL and fall through to the wait below.  In the reel
+    -- state every pulse is an A: the first starts the spin, each later one
+    -- stops the next reel once it is ready (an early A is not read), and
+    -- the third stop commits.  The boost was spent at $05 with R, where
+    -- the engine latches it at the first A (Ot6SlotRig).
+    if st == ST_SLOT and plan.kind == "slot" then
+      if not plan.committed then
+        plan.committed = M.frame
+        M.log(string.format("[%s] actor=%d Slot: spinning (bank %d)", tag or "fight",
+          actor, M.readByte(BP + actor * 2)))
+      end
+      return { "a" }
+    end
+    if st == ST_TGT and plan.kind == "runic" then
+      -- the engine latched the target on the caster (chars = 1<<actor,
+      -- probe_runic.lua); there is nothing to steer
+      M.log(string.format("[%s] actor=%d Runic confirmed (target chars=%02X)",
+        tag or "fight", actor, M.readByte(TGTCHARS)))
+      if recovery then recovery.confirm(actor, M.frame,
+        M.readByte(TGTCHARS), M.readByte(TGTMONS)) end
+      dropPlan("confirm_attempt")
       return { "a" }
     end
     if st == ST_TGT then
@@ -5574,6 +5730,12 @@ function M.newFightDriver(tag, opts)
       dropPlan("confirm_attempt")
       return { "a" }
     end
+    if st == ST_SLOT then
+      -- a reel window this plan did not mean to open: back out before the
+      -- spin, finish a spin already running (B is not read after its A)
+      dropPlan()
+      return { M.readByte(SLOT_PRESS1) ~= 0 and "a" or "b" }
+    end
     if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC or st == ST_ESPER
        -- the lore states join the back-out set only when the repertoire is
        -- in play: without opts.nukeLore nothing here ever opens that
@@ -5622,6 +5784,7 @@ function M.newFightDriver(tag, opts)
     -- ladder's reload is a different fight, and a recurrence should dump
     -- again there rather than inherit a dead lore line silently.
     loreSpinN, loreDead = 0, false
+    skillDead = {}
   end
 
   function F.frame()
