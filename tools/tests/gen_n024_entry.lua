@@ -126,7 +126,7 @@ local function lap(n)
     -- The row is six tiles, so a lap with no encounter is the previous
     -- lap's frames again, and the no-progress watchdog reads novelty:
     -- ten quiet laps (~1900 frames) tripped it in all three attempts of
-    -- the first run (build/test-runs/n024_entry.fnIdR7dB, "nothing has
+    -- the first run (build/attempts/n024_entry.fnIdR7dB, "nothing has
     -- moved for 1808 frames" while the ring shows x=4..9..4 walking).
     -- Declared per lap, so a lap that really stalls still trips once this
     -- lapses; navTo's walk budget stays the backstop.
