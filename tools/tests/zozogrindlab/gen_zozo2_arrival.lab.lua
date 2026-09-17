@@ -323,6 +323,50 @@ local function gentle()
   return seq(steps)
 end
 
+-- The step off an approach tile onto a world entrance, played rather than
+-- held blind.  worldNavTo counts the approach tile reached the frame the
+-- party aligns on it, and the encounter roll for that tile (CheckBattleWorld,
+-- world/move.asm:876-883) resolves a few frames later; the old step held
+-- DOWN through whatever came up (the #195 baseline sweep, seed 2: "timeout
+-- after 4000 frames driving toward into Jidoor (map 198)" with a Vulture +
+-- Iron Fist on the screen).  A battle here is fought by the same driver the
+-- walk uses, and the care stop runs on the far side of the door.
+local enteredAfterBattle = {}
+local function enterDoor(dir, m, what)
+  local F, inBattle = nil, false
+  return seq({
+    H.call(function() enteredAfterBattle[what] = false end),
+    H.driveUntil(function()
+      return not H.worldMode() and map() == m and not H.battleLoadStarted()
+    end, 30000, {
+      H.call(function()
+        if H.battleLoadStarted() then
+          if not F then
+            F = H.newFightDriver(what, { tactical = true, boost = true, items = true,
+              healPercent = GRIND.healPercent, bank = GRIND.bank, healer = CELES,
+              reserve = { [POTION] = 3 } })
+          end
+          inBattle, enteredAfterBattle[what] = true, true
+          F.frame()
+        else
+          if inBattle then F.idle(); inBattle = false end
+          if H.worldMode() and H.worldHasControl() and H.worldAligned()
+             and bright() >= 15 then
+            H.setPad({ dir })
+          elseif H.worldMode() then
+            H.setPad({})
+          end
+        end
+      end),
+    }, what),
+    H.release(),
+  })
+end
+local function careIfFought(what, threshold)
+  return H.cond(function() return enteredAfterBattle[what] end,
+    { care("after the fight at " .. what, threshold) }, {})
+end
+
 local function door(nx, ny, dir, m, what)
   return H.cond(function() return true end, {
     H.navTo(nx, ny, { maxFrames = 12000, playBattles = "tactical" }),
@@ -414,11 +458,10 @@ H.run({ maxFrames = 1200000 }, {
   --     49 Tonics x 50 HP = 2450 HP = 9 Potions at 300.
   walk(27, 129, "Jidoor approach",
        { arrive = function() return not H.worldMode() end }),
-  H.driveUntil(function() return not H.worldMode() and map() == 198 end, 4000, {
-    H.hold({ "down" }), H.waitFrames(4),
-  }, "into Jidoor (map 198)"),
+  enterDoor("down", 198, "into Jidoor (map 198)"),
   H.waitUntil(landed(198, 10), 2400, "Jidoor up", 1),
   H.waitFrames(60),
+  careIfFought("into Jidoor (map 198)", GRIND.crossingCare),
   H.call(function()
     H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 22")
     where("Jidoor")
@@ -467,11 +510,10 @@ H.run({ maxFrames = 1200000 }, {
   walk(22, 91, "zozo approach",
        { arrive = function() return not H.worldMode() end }),
   care("outside Zozo", 0.95),
-  H.driveUntil(function() return not H.worldMode() and map() == 221 end, 900, {
-    H.hold({ "down" }), H.waitFrames(4),
-  }, "onto Zozo's entrance tile"),
+  enterDoor("down", 221, "onto Zozo's entrance tile"),
   H.waitUntil(landed(221, 10), 1500, "Zozo street up", 1),
   H.waitFrames(30),
+  careIfFought("onto Zozo's entrance tile", 0.95),
   H.call(function()
     H.assertEq(map(), 221, "on the Zozo exterior (map 221)")
     H.log(string.format("[zozo_arrival] f%d at (%d,%d)",
