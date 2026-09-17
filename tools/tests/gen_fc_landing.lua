@@ -62,6 +62,26 @@ end
 -- party select again, then talk SHADOW into the party beside (10,16).
 local seenBattles, lastActive = 0, false
 local F = H.newFightDriver("IAF", FIGHT)
+-- The Air Force (#201, docs/design/airforce.md): the gauntlet's last fight,
+-- AirForce $113 slot 0 + Laser Gun $145 slot 2 + MissileBay $147 slot 4.
+-- The Laser Gun dying while the bay stands arms the body's countdown
+-- (Speck, then a Count a turn, then WaveCannon), and only the body's own
+-- death ends it; the bay under 1536 HP fires Launcher.  FIGHT's default
+-- targeting killed the gun and then spread the party across the bay and
+-- the body, and at the regeneration's shift 0 the count ran out:
+-- `wipe context ... formation 0113 FFFF 0145 0146 0147 FFFF; seats ...
+-- a0:316/960 bp1 a1:528/1129 bp3 a4:0/1048 bp3`.  A person kills the gun
+-- (the Atomic Ray), then the body the moment the countdown starts, and
+-- lets the bay be.  The same driver options with that kill order passed
+-- that exact fight (the rest of the route byte-identical) and 10 of 10
+-- lab seeds from the Ultros teaser.  The masks are the target window's
+-- monster bits, measured (airforcelab_tgtwatch.py: bit = slot); the gun's
+-- bit is the default cursor and the body's is one LEFT from it.
+local AF_FIGHT = {}
+for k, v in pairs(FIGHT) do AF_FIGHT[k] = v end
+AF_FIGHT.focus = { { slot = 2, mask = 0x04 }, { slot = 0, mask = 0x01 }, { slot = 4, mask = 0x10 } }
+local FAF = H.newFightDriver("IAF", AF_FIGHT)
+local function airForceUp() return H.formationHas({ [0x0113] = true }) end
 
 local function kitSteps(char, name, pairs_)
   local steps = {}
@@ -111,7 +131,10 @@ local function deckDrive(untilKit)
           H.log(string.format("  [IAF battle %d] f%d", seenBattles, H.frame))
         end
         lastActive = active
-        if active or H.battleLoadStarted() then F.frame(); return end
+        if active or H.battleLoadStarted() then
+          if airForceUp() then FAF.frame() else F.frame() end
+          return
+        end
         local ms = H.readByte(ZMENUSTATE)
         if ms >= 0x2c and ms <= 0x2f then
           if not DECK.formed and S.ready() and S.complete() then

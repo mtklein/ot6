@@ -86,6 +86,10 @@ local M0, M2, M4 = 0x01, 0x04, 0x10
 local FOCUS_PODS = { { slot = 2, mask = M2 }, { slot = 4, mask = M4 }, { slot = 0, mask = M0 } }
 local FOCUS_BAY  = { { slot = 4, mask = M4 }, { slot = 2, mask = M2 }, { slot = 0, mask = M0 } }
 local FOCUS_BODY = { { slot = 0, mask = M0 }, { slot = 2, mask = M2 }, { slot = 4, mask = M4 } }
+-- gun first (the default cursor, and it silences Atomic Ray), then the
+-- body: the gun's death starts the body's countdown and only the body's
+-- boss_death stops it; the bay last (its death is not needed)
+local FOCUS_GUNBODY = { { slot = 2, mask = M2 }, { slot = 0, mask = M0 }, { slot = 4, mask = M4 } }
 
 -- The policies.  Every one is a set of the lib's fight-driver options --
 -- the same controller the gen uses, steered differently -- so a policy
@@ -103,6 +107,7 @@ local POLICIES = {
   pods     = with({ focus = FOCUS_PODS }),
   bay      = with({ focus = FOCUS_BAY }),
   body     = with({ focus = FOCUS_BODY }),
+  gunbody  = with({ focus = FOCUS_GUNBODY }),
   -- the once-a-battle summon: EDGAR's Shiva (the stone he wears at the
   -- deck; ice, unweak, but unreflectable and unabsorbed, all parts).
   -- TERRA wears no esper at the teaser (bake: esper=$FF), so the escape
