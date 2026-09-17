@@ -758,6 +758,48 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   -- opens: (15,51) -> map 87 -> (57,48) -> map 86.
   -- ===================================================================== --
   go(57, 13, 83, 35, 14, "celes room -> corridor"),
+
+  -- The mansion-basement save point, taken in passing on the corridor the
+  -- escape already walks -- what a player does on the way out of an
+  -- occupied town with a boss ahead and no shop between here and it.
+  --
+  -- #218: this used to be aimed at map 84 (53,57), and bfsPath answered
+  -- "not reachable" every run, so the save was silently skipped and the
+  -- sfigaro-basement-v1 battery kept whatever was in slot 3 (the Kolts
+  -- summit save).  (53,57) IS a SavePoint (event_trigger.asm
+  -- EventTrigger::_84) but it is in a pocket of map 84 the clock route
+  -- never enters: measured, the escape's map-84 pocket is 82 tiles, bbox
+  -- (5,49)-(22,58) (build/lab/218-basement-probe1.log), and
+  -- short_entrance.dat gives (53,57)'s pocket one door, 86 (57,57) ->
+  -- 84 (56,55) -- itself in a pocket of map 86 reached only through the
+  -- occupied town's (46,40) house door, in a quarter this escape cannot
+  -- reach (218-basement-probe2/3, 218-m86-pockets, 218-m75-pockets2).
+  -- The basement's OTHER vanilla save point, map 88 (11,34), is seven
+  -- steps off this corridor: 83 (40,12) -> 88 (11,36), one room, nineteen
+  -- tiles, 88 (11,37) -> 83 (40,14) back out, $01BF reads set on the tile
+  -- (build/lab/218-m88-save.log, shot m88_on_savepoint.png).
+  go(40, 12, 88, 11, 36, "corridor (40,12) -> basement save room 88 (11,36)"),
+  H.navTo(11, 34, { maxFrames = 8000, playBattles = "tactical",
+                    fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
+  H.release(),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq(map(), 88, "on the basement save room, map 88")
+    H.assertEq(H.fieldX(), 11, "standing on the save tile x=11")
+    H.assertEq(H.fieldY(), 34, "standing on the save tile y=34")
+    H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true,
+      "$01BF SET -- the mansion-basement save point, map 88 (11,34)")
+    H.screenshot("sfigaro_basement_save")
+  end),
+  H.saveGame({ tag = "basement save (map 88 (11,34))" }),
+  H.call(function()
+    -- What went into the battery, read back out of the battery: the save
+    -- slot's own map/tile words, so a save that lands somewhere else can
+    -- never be lifted as this checkpoint (#218).
+    H.assertSavedSlot(88, 11, 34, "sfigaro-basement: the slot-3 save")
+  end),
+  go(11, 37, 83, 40, 14, "basement save room 88 (11,37) -> corridor 83 (40,14)"),
+
   go(45, 12, 84, 8, 57, "corridor (45,12) -> map 84 (8,57)"),
   H.openChest{ stand = { 7, 51 }, face = "down", bit = 26, what = "500 gil",
                nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
@@ -767,23 +809,9 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
                nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
   H.openChest{ stand = { 22, 56 }, face = "up", bit = 29, what = "(empty)",
                nav = { playBattles = "tactical", fleeCap = FLEE_CAP, bank = 3, healer = 6 } },
-  -- The basement save point (53,57) -- vanilla's, passed like a person
-  -- passes it on the escape.  Tolerant: if the tile proves unreachable
-  -- from this side of the maze, log and move on rather than fail the
-  -- scenario; the lifter (gen_seed_basement.lua) asserts the save is
-  -- really aboard before cutting the seed.
-  H.cond(function() return H.bfsPath(53, 57) ~= nil end, {
-    H.navTo(53, 57, { maxFrames = 12000, playBattles = "tactical",
-                      fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
-    H.waitFrames(30),
-    H.call(function()
-      H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true,
-        "$01BF SET -- the basement save point (53,57)")
-    end),
-    H.saveGame({ tag = "basement save" }),
-  }, {
-    H.logStep("basement save point (53,57) not reachable from here; skipped"),
-  }),
+  -- (The save was taken on the corridor above, at map 88 (11,34).  Map
+  -- 84's own SavePoint at (53,57) is in a pocket of this map that the
+  -- clock route cannot enter -- see the note at the save step.)
   windClock(),
   go(15, 51, 87, 20, 33, "clock passage (15,51) -> map 87 (20,33)"),
   H.fieldCare({ tag = "care before the basement shelf", threshold = 0.95 }),

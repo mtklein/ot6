@@ -46,6 +46,89 @@ PROVENANCE_FORMAT = "ot6-provenance/v1"
 SRAM_SIZE = 32768
 _HEX64 = re.compile(r"[0-9a-f]{64}")
 
+# CopyGameDataToSRAM (ff6/src/menu/save.asm:42) copies WRAM $1600-$1FFF into
+# $306000 + SRAMSlotPtrs[slot].  In the 32 KiB battery file that is offset
+# 0x0000 for bank $30's $6000-$7FFF window, so:
+#   payload[0x1ff0]                   = the slot the game last saved to
+#   payload[SLOT_PTR[slot] + (a - 0x1600)] = that slot's copy of WRAM a
+SLOT_PTR = {1: 0x0000, 2: 0x0A00, 3: 0x1400}
+_LAST_SLOT = 0x1FF0
+
+
+def saved_state(data: bytes) -> dict:
+    """What save the battery holds, decoded from the payload bytes alone."""
+    slot = data[_LAST_SLOT]
+    ptr = SLOT_PTR.get(slot)
+    if ptr is None:
+        raise CheckpointError(
+            f"battery byte $307ff0 reads {slot}, not a save slot 1..3")
+
+    def by(addr: int) -> int:
+        return data[ptr + (addr - 0x1600)]
+
+    word = by(0x1F64) | (by(0x1F65) << 8)
+    return {"slot": slot, "map_word": word, "map": word & 0x1FF,
+            "x": by(0x1FC0), "y": by(0x1FC1),
+            "world_x": by(0x1F60), "world_y": by(0x1F61)}
+
+
+def describe_saved(s: dict) -> str:
+    if s["map"] == 0:
+        return (f"slot {s['slot']} world ({s['world_x']},{s['world_y']}) "
+                f"[$1F64=${s['map_word']:04X}]")
+    return (f"slot {s['slot']} map {s['map']} ({s['x']},{s['y']}) "
+            f"[$1F64=${s['map_word']:04X}]")
+
+
+def saved_problem(declared, data: bytes) -> str | None:
+    """Why the battery does not hold the save the manifest declares.
+
+    `saved` is authored beside the payload, not derived from it: it says
+    which save the checkpoint is FOR, so a generator whose save step was
+    skipped (leaving an older save in the slot) cannot be sealed and
+    committed as this checkpoint.  Shape:
+
+        "saved": {"slot": 3, "field": {"map": 88, "x": 11, "y": 34}}
+        "saved": {"slot": 3, "world": {"x": 249, "y": 128}}
+    """
+    if not isinstance(declared, dict):
+        return f"saved must be an object, not {type(declared).__name__}"
+    keys = set(declared) - {"slot"}
+    if keys not in ({"field"}, {"world"}):
+        return ("saved must carry exactly one of 'field' or 'world' "
+                f"(got {sorted(declared)})")
+    actual = saved_state(data)
+    slot = declared.get("slot")
+    if slot is not None and slot != actual["slot"]:
+        return (f"saved declares slot {slot}, but the battery's $307ff0 "
+                f"names slot {actual['slot']}")
+    if "field" in declared:
+        want = declared["field"]
+        if not isinstance(want, dict) or set(want) != {"map", "x", "y"}:
+            return "saved.field must be {map, x, y}"
+        if want["map"] == 0:
+            return ("saved.field map 0 is how a WORLD save encodes; declare "
+                    "'world' instead")
+        if actual["map"] == 0:
+            return (f"saved.field declares map {want['map']}, but the "
+                    f"battery holds {describe_saved(actual)}")
+        got = (actual["map"], actual["x"], actual["y"])
+        if got != (want["map"], want["x"], want["y"]):
+            return (f"saved.field declares map {want['map']} "
+                    f"({want['x']},{want['y']}), but the battery holds "
+                    f"{describe_saved(actual)}")
+    else:
+        want = declared["world"]
+        if not isinstance(want, dict) or set(want) != {"x", "y"}:
+            return "saved.world must be {x, y}"
+        if actual["map"] != 0:
+            return (f"saved.world declares a world save, but the battery "
+                    f"holds {describe_saved(actual)}")
+        if (actual["world_x"], actual["world_y"]) != (want["x"], want["y"]):
+            return (f"saved.world declares ({want['x']},{want['y']}), but "
+                    f"the battery holds {describe_saved(actual)}")
+    return None
+
 
 class CheckpointError(ValueError):
     pass
@@ -124,6 +207,14 @@ def load(checkpoint: Path, expected_layout: str | None = None) -> tuple[dict, Pa
                     "script; a step that consumes an checkpoint must declare "
                     "the layout it understands)")
         )
+    # What save the battery holds, if the manifest says which one it should
+    # (#218).  Decided from the payload bytes, so a checkpoint whose
+    # generator skipped its save is refused here rather than booted.
+    declared = manifest.get("saved")
+    if declared is not None:
+        problem = saved_problem(declared, data)
+        if problem:
+            raise CheckpointError(f"{manifest_path}: {problem}")
     # A mechanical record is verified here, before any boot; a prose one is
     # grandfathered with a warning.
     prov = manifest.get("provenance")
@@ -201,6 +292,13 @@ def seal(checkpoint: Path) -> None:
         else "sidecar is not a JSON object"
     if problem:
         raise CheckpointError(f"{sidecar}: {problem}")
+    # #218: never seal a payload that does not hold the save the manifest is
+    # named for.  The declaration is authored; the bytes decide.
+    declared = manifest.get("saved")
+    if declared is not None:
+        problem = saved_problem(declared, data)
+        if problem:
+            raise CheckpointError(f"{manifest_path}: {problem}")
     manifest["size"] = SRAM_SIZE
     manifest["sha256"] = actual
     manifest["provenance"] = prov
@@ -357,9 +455,83 @@ def selftest() -> None:
             raise AssertionError("seal accepted a payload the sidecar "
                                  "never hashed")
 
+        # ---- the `saved` declaration (#218) ----------------------------
+        # A battery built by hand to hold a known slot-3 field save at map
+        # 88 (11,34): the declaration must accept that and refuse anything
+        # else, including the wrong map, the wrong tile, the wrong slot and
+        # a world-save claim.
+        def battery(slot: int, mapword: int, x: int, y: int,
+                    wx: int = 0, wy: int = 0) -> bytes:
+            b = bytearray(SRAM_SIZE)
+            b[_LAST_SLOT] = slot
+            p = SLOT_PTR[slot]
+            b[p + (0x1F64 - 0x1600)] = mapword & 0xFF
+            b[p + (0x1F65 - 0x1600)] = (mapword >> 8) & 0xFF
+            b[p + (0x1FC0 - 0x1600)] = x
+            b[p + (0x1FC1 - 0x1600)] = y
+            b[p + (0x1F60 - 0x1600)] = wx
+            b[p + (0x1F61 - 0x1600)] = wy
+            return bytes(b)
+
+        field = battery(3, 88, 11, 34)
+        assert saved_state(field) == {
+            "slot": 3, "map_word": 88, "map": 88, "x": 11, "y": 34,
+            "world_x": 0, "world_y": 0}, "saved_state decoded the wrong cells"
+        world = battery(3, 0x2000, 29, 15, 249, 128)
+        assert saved_state(world)["map"] == 0, "world save decoded as a field"
+
+        good = {"slot": 3, "field": {"map": 88, "x": 11, "y": 34}}
+        assert saved_problem(good, field) is None, \
+            "the declaration refused the battery it describes"
+        assert saved_problem({"slot": 3, "world": {"x": 249, "y": 128}},
+                             world) is None, "world declaration refused"
+        for decl, blob, why in (
+            ({"slot": 3, "field": {"map": 103, "x": 57, "y": 8}}, field,
+             "the wrong map (#218's actual failure: the Kolts summit save)"),
+            ({"slot": 3, "field": {"map": 88, "x": 11, "y": 35}}, field,
+             "the wrong tile"),
+            ({"slot": 2, "field": {"map": 88, "x": 11, "y": 34}}, field,
+             "the wrong slot"),
+            ({"slot": 3, "world": {"x": 11, "y": 34}}, field,
+             "a world claim over a field save"),
+            ({"slot": 3, "field": {"map": 0, "x": 29, "y": 15}}, world,
+             "a field claim over a world save"),
+            ({"slot": 3}, field, "neither field nor world"),
+            ({"slot": 3, "field": {"map": 88}}, field, "an incomplete field"),
+            ("map 88", field, "a prose declaration"),
+        ):
+            assert saved_problem(decl, blob) is not None, \
+                f"saved declaration accepted {why}"
+
+        # and end to end: load()/seal() refuse a manifest whose `saved`
+        # block does not match the payload, and pass one that does.
+        (root / "save.srm").write_bytes(field)
+        capture(root, root / "save.srm.provenance.json", root / "save.srm",
+                "ab" * 32 + " gen_cut extras", ["ancestor.stamp"])
+        rec2 = json.loads((root / "save.srm.provenance.json").read_text())
+        saved_base = dict(base, sha256=hashlib.sha256(field).hexdigest(),
+                          provenance=rec2, saved=good)
+        (root / "manifest.json").write_text(json.dumps(saved_base))
+        load(root)
+        seal(root)
+        bad = dict(saved_base,
+                   saved={"slot": 3, "field": {"map": 103, "x": 57, "y": 8}})
+        (root / "manifest.json").write_text(json.dumps(bad))
+        for fn, name in ((load, "load"), (seal, "seal")):
+            try:
+                fn(root)
+            except CheckpointError as exc:
+                assert "saved.field" in str(exc), \
+                    f"{name} refusal does not name the saved block: {exc}"
+            else:
+                raise AssertionError(
+                    f"{name} accepted a battery holding a save the manifest "
+                    f"does not declare")
+
         print("sram_checkpoint selftest: PASS (schema, size, hash, path, "
               "persistent_layout negatives; provenance capture/seal "
-              "round-trip, legacy-v0 warning, malformed-record refusals)")
+              "round-trip, legacy-v0 warning, malformed-record refusals; "
+              "saved-block decode and load/seal refusals)")
 
 
 def main(argv: list[str]) -> int:
@@ -369,9 +541,13 @@ def main(argv: list[str]) -> int:
         elif len(argv) in (2, 3) and argv[0] == "validate":
             # The optional third argument is the consuming step's declared
             # persistent_layout; absent means structural checks only.
-            manifest, _ = load(Path(argv[1]),
-                               argv[2] if len(argv) == 3 else None)
+            manifest, payload = load(Path(argv[1]),
+                                     argv[2] if len(argv) == 3 else None)
             prov = manifest.get("provenance")
+            # Always say what save the battery holds (#218): a checkpoint
+            # that does not yet declare `saved` still prints it, so a wrong
+            # save is visible to whoever runs validate.
+            held = describe_saved(saved_state(payload.read_bytes()))
             print(
                 f"valid {manifest['schema']}: {manifest['size']} bytes "
                 f"sha256={manifest['sha256']} "
@@ -379,6 +555,10 @@ def main(argv: list[str]) -> int:
                 f"provenance="
                 + (PROVENANCE_FORMAT if isinstance(prov, dict)
                    else "legacy-v0")
+                + f" holds={held}"
+                + (" (saved: declared and checked)"
+                   if manifest.get("saved") is not None
+                   else " (saved: undeclared)")
             )
         elif len(argv) in (3, 4) and argv[0] == "materialize":
             materialize(Path(argv[1]), Path(argv[2]),

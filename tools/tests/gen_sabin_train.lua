@@ -21,6 +21,13 @@
 -- (38,9) facing up; valves (7,7)/(9,7) toggle $0184/$0186 (SHUT/OPEN/SHUT
 -- is the smokestack's guard); (32,7) facing-up+A triggers battle 68.
 --
+-- The save point (#218): map 146 is two rooms. The engineer's room the
+-- front door opens on is one pocket; the other, reached from map 152
+-- (8,7) -> 146 (23,12), holds the train's SavePoint at (20,10). Map 152
+-- hangs off the rear strip at 142 (83,8)/(85,8)/(86,8), which is the
+-- pocket car A's EAST door (145 (30,7)/(30,8) -> 142 (75,8)) lands in.
+-- The save is taken there, right after the departure.
+--
 -- No emulator state writes: random/ungated battles are fought by the
 -- library fighter (H.newWalkFighter, #183); battle 47
 -- (the trap ghost) and battle 68 (the Ghost Train) are played with real
@@ -1100,6 +1107,66 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.waitUntil(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15
   end, 4000, "post-departure", 5),
+
+  -- ---- the train's save point, back through the rear cars -------------
+  -- A player who has just been told the train is leaving looks both ways
+  -- out of the car he boarded into, and the way back finds the vanilla
+  -- save point one car along.
+  --
+  -- #218: the save used to be attempted at the far end of the run, from
+  -- the engineer's room, and bfsPath answered "not reachable" every time,
+  -- so the save was skipped and the train-engineer-v1 battery kept
+  -- whatever slot 3 already held (the Kolts summit save, map 103 (57,8)).
+  -- The TILE was right -- map 146 (20,10) is a SavePoint
+  -- (event_trigger.asm EventTrigger::_146) -- but map 146 is two rooms,
+  -- and the engineer's room the front door opens on is a 31-tile pocket,
+  -- bbox (5,7)-(9,13) (build/lab/218-train-diag.log), holding neither
+  -- (20,10) nor (23,13), the door to map 152.  The save point's half is
+  -- entered from 152 (8,7), and map 152 hangs off the REAR strip at 142
+  -- (83,8)/(85,8)/(86,8) -- the pocket car A's EAST door lands in, at
+  -- (75,8).  The route used to step out of car A's WEST door and turn
+  -- away from all of it.  Measured end to end, with $01BF set on the tile
+  -- and both crossings walked back: build/lab/218-train-savepoint2.log,
+  -- shots trainsave_strip142/m152/m146east/on_savepoint.png.
+  nav(29, 7, { maxFrames = 12000 }),
+  holdDrive("right", function() return mapIdx() == 142 end,
+    "car A's east door -> rear strip (75,8)", 4000),
+  settle(142, "rear strip (75,8)"),
+  nav(83, 8, { maxFrames = 20000,
+               arrive = function() return mapIdx() ~= 142 end }),
+  settle(152, "the rear car, map 152"),
+  nav(8, 7, { maxFrames = 20000,
+              arrive = function() return mapIdx() ~= 152 end }),
+  settle(146, "the save car, map 146's east half"),
+  nav(20, 10, { maxFrames = 12000 }),
+  H.release(),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq(mapIdx(), 146, "on the save car, map 146")
+    H.assertEq(H.fieldX(), 20, "standing on the save tile x=20")
+    H.assertEq(H.fieldY(), 10, "standing on the save tile y=10")
+    H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true,
+      "$01BF SET -- the Phantom Train save point, map 146 (20,10)")
+    H.screenshot("train_savepoint")
+  end),
+  H.saveGame({ tag = "train save (map 146 (20,10))" }),
+  H.call(function()
+    -- What went into the battery, read back out of the battery: the save
+    -- slot's own map/tile words, so a save that lands somewhere else can
+    -- never be lifted as this checkpoint (#218).
+    H.assertSavedSlot(146, 20, 10, "train-engineer: the slot-3 save")
+  end),
+  -- and back the way we came, into car A
+  nav(23, 13, { maxFrames = 12000,
+                arrive = function() return mapIdx() ~= 146 end }),
+  settle(152, "the rear car again"),
+  nav(1, 8, { maxFrames = 12000,
+              arrive = function() return mapIdx() ~= 152 end }),
+  settle(142, "rear strip again (82,8)"),
+  nav(74, 8, { maxFrames = 12000,
+               arrive = function() return mapIdx() ~= 142 end }),
+  settle(145, "back in car A"),
+
   nav(2, 7, { maxFrames = 12000 }),
   holdDrive("left", function() return mapIdx() == 142 end, "A west exit", 4000),
   settle(142, "west pocket (66,8)"),
@@ -1285,21 +1352,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     H.assertEq(sw(0x185), 0, "$0185 -- valve 2 open")
     H.assertEq(sw(0x186), 1, "$0186 -- valve 3 shut")
   end),
-  -- The engineer-room save point (20,10) -- vanilla's, taken in passing
-  -- before the GhostTrain.  gen_seed_train.lua lifts the battery riding
-  -- train_done.mss as the train-engineer-v1 seed.  Tolerant: skip with a
-  -- log rather than fail the scenario if the tile proves unreachable.
-  H.cond(function() return H.bfsPath(20, 10) ~= nil end, {
-    nav(20, 10, { maxFrames = 5000 }),
-    H.waitFrames(30),
-    H.call(function()
-      H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true,
-        "$01BF SET -- the engineer save point (20,10)")
-    end),
-    H.saveGame({ tag = "engineer save" }),
-  }, {
-    H.logStep("engineer save point (20,10) not reachable; skipped"),
-  }),
+  -- (The train's save point, map 146 (20,10), was taken back in the rear
+  -- cars -- see the note at the save step.  This half of map 146, the
+  -- engineer's room the front door opens on, is a 31-tile pocket,
+  -- bbox (5,7)-(9,13), that holds neither (20,10) nor (23,13).)
   nav(8, 13, { maxFrames = 5000, arrive = function()
     return mapIdx() == 141 end }),
   settle(141, "outside again"),
