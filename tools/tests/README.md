@@ -310,7 +310,13 @@ runs every script through the **segment runner** at the bottom of
   source (fresh locals, fresh step objects; the previous attempt's emu
   callbacks go inert through an epoch guard), and replays with the seed
   moved by idle frames at the **boot point** (`H.bootMark`: the fixture
-  load, or `assertEntryContract` after a cold Continue). Default 3
+  load, or `assertEntryContract` after a cold Continue). The idle starts
+  on the boot frame itself: whatever the body presses later in that same
+  tick is held back until the idle ends, and the idle lasts until the game
+  clock (`$021e`) has moved the shift's number of ticks, not a frame count
+  (#208: `fc_landing`'s held RIGHT was latched on the boot frame, the walk
+  into Thamasa and its clock-stopped load ran on the game's own clock, and
+  shifts 0..59 all fought one first battle). Default 3
   attempts for a `gen_*` script, 1 for everything else; `opts.retries`
   per script, `OT6_RETRIES=<n>` in the environment overrides both. A
   contract failure (`assertEq`, a checkpoint contract, a Lua error) is a
@@ -328,6 +334,20 @@ runs every script through the **segment runner** at the bottom of
   Annihilated screen (the seat table's wipe shape, `M.wipeVerdict`), so a
   driver keeps its `frame()` and a solo loss gets its `[death]` and
   `[wipe]` lines.
+- **The first battle.** Every attempt logs
+  `[seed] first battle: attempt n/N shift S f... boot+... $021e=.. $be=$.. group $.... key K`
+  at InitBattle's seed store. The key is the battle seed, the battle group
+  and the random-encounter RNG cells (`$1FA1-$1FA4`); the field Rand index
+  `$1F6D` is logged beside it. Two attempts with one key fight the same
+  first battle, i.e. are one sample. A retry whose first battle repeats an
+  earlier attempt's is re-rolled on the spot (`[retry] reroll: ...`, the
+  attempt re-run at an untried shift 7 further on, not counted), and a
+  segment no shift moves fails as `other` after 8 re-rolls.
+  `seed_reroll.lua` (suite, `PASS attempts=2/3`) is the control: on
+  `battle_entry` shift 26 measurably fights shift 0's first battle, so its
+  attempt 2 must be re-rolled once onto a different one.
+  `H.firstBattle()`, `H.earlierFirstBattles()` and `H.rerollCount()` are
+  the read-only views.
 - **The count.** Every failed attempt logs
   `[retry] attempt n/N FAILED class=<c> frame=... shift=... phase=... screenshot=<png>: <message>`
   (plus a `wipe context:` line naming the formation and every seat's
@@ -385,8 +405,18 @@ runs every script through the **segment runner** at the bottom of
   (`OT6_SEED_SHIFT`, spread over the 60-frame seed period), retries off,
   into `build/sweeps/<state>-<stamp>/` (nothing is published to
   `build/states`), and prints a per-seed table: verdict, frames, failure
-  class and message. This is how a segment's brittleness is found before
-  a route change exposes it.
+  class, first-battle key and message, then one
+  `seed k duplicates seed j's first battle` line per repeated key and
+  the count of distinct samples beside the pass count; a duplicate stays
+  in the table and gets a replacement seed at an unused shift
+  (`--replace-duplicates ROUNDS`, default 2). This is how a
+  segment's brittleness is found before a route change exposes it.
+  `--probe [--stride N]` measures instead of playing: the generator runs
+  to its first battle only, once per shift across the 60-frame period
+  (`OT6_SHIFT_PROBE`, the runner's own replay from the boot snapshot),
+  and the table lists each shift's key, `$021e`, seed and frame with
+  duplicates marked, plus `[seedprobe] trace` lines in the log (clock,
+  control and idle transitions after the boot point).
 
 `tools/tests/segment_retry.lua` (suite) proves the replay: a `nopath`
 raised on attempt 1 passes on attempt 2 with rebuilt locals and steps;
