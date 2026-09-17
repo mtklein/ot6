@@ -525,6 +525,13 @@ check("runner_isolation", "sh tools/tests/lib/runner_isolation_selftest.sh",
       ["tools/tests/lib/runner_isolation_selftest.sh", "tools/tests/run.sh"])
 checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
     + glob("tools/tests/checkpoints/*/*.sram")
+# #218: every checkpoint validates, and every line says which save its
+# battery holds.  A manifest that declares `saved` is refused when the
+# payload holds a different one -- the check that was missing when two
+# checkpoints shipped holding the Kolts summit save.
+check("checkpoint_saves", "sh tools/tests/lib/checkpoint_saves.sh",
+      ["tools/tests/lib/checkpoint_saves.sh",
+       "tools/tests/lib/sram_checkpoint.py"] + checkpoint_files)
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
        latch_of("build/ot6.sfc")] + LIBS + checkpoint_files)

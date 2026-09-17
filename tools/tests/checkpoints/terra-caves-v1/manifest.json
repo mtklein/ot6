@@ -2,18 +2,18 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "terra-caves.sram",
   "size": 32768,
-  "sha256": "1a516cafa5e9f9f0e696364077f718fc3af12cd2c3f58a59b797a2adea4566ca",
+  "sha256": "8b9df2b14bf628a9f0f092cd348b49437a0b27bd8318024bc964f406d60dade5",
   "slot": 3,
   "milestone": "terra-caves",
   "persistent_layout": "ot6-codex-o8-v1",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "1a516cafa5e9f9f0e696364077f718fc3af12cd2c3f58a59b797a2adea4566ca",
-    "generator_sig": "e8df38385d671be6f65d17d142b08e0e9c0eda780b2052f5634947f35b173366 gen_seed_terracave",
+    "payload_sha256": "8b9df2b14bf628a9f0f092cd348b49437a0b27bd8318024bc964f406d60dade5",
+    "generator_sig": "979093f89e812a6a70e75812cfde1c7e91bd5e40f9fa0b58eaa69be7d3b8510e gen_seed_terracave",
     "ancestors": [
       {
         "path": "build/states/terra_clifftop.stamp",
-        "sha256": "92cdc1e3f259a520345d38b98d86b1c16bfc3b23599ae67528adacc607a267af"
+        "sha256": "95e690953a89d251866952e86ecbea1c3bce9e071cc4e0a53847eedccbb9c461"
       }
     ]
   }

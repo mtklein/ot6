@@ -55,6 +55,32 @@ Mesen's complete battery file after emulator shutdown and records provenance.
 Seal it with `python3 tools/tests/lib/sram_checkpoint.py seal <dir>` and
 validate before committing; preserve the capture provenance.
 
+A manifest may also declare **which save** the battery is supposed to hold:
+
+```json
+"saved": { "slot": 3, "field": { "map": 88, "x": 11, "y": 34 } }
+"saved": { "slot": 3, "world": { "x": 249, "y": 128 } }
+```
+
+That block is authored beside the payload; the payload's own bytes decide.
+`CopyGameDataToSRAM` (`ff6/src/menu/save.asm`) copies WRAM `$1600-$1FFF`
+into `$306000 + SRAMSlotPtrs[slot]`, so the slot's copy of `$1F64` is the
+saved map and its copy of `$1FC0`/`$1FC1` (field) or `$1F60`/`$1F61`
+(world) is the saved tile. `seal`, `validate` and every `materialize`
+before a boot decode those cells and refuse a mismatch, and `validate`
+prints the save the battery holds whether or not the manifest declares one.
+This is the check that was missing when a generator's save step was
+silently skipped and two checkpoints shipped holding an older save
+(#218): the live half is `H.assertSavedSlot(map, x, y, what)` in
+`lib/ot6_contract.lua`, asserted right after `H.saveGame` in the generator
+that cuts the checkpoint and again in the `gen_seed_*` lifter.
+
+`ninja build/checks/checkpoint_saves.ok`
+(`tools/tests/lib/checkpoint_saves.sh`) runs that validation over every
+tracked checkpoint and prints one line per checkpoint naming the save its
+battery holds. A checkpoint that does not declare `saved` yet still
+prints what it holds; declare it the next time one is re-cut.
+
 ## Field navigation
 
 Addresses (from the vendored disassembly):

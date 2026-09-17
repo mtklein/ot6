@@ -2041,6 +2041,19 @@ def main() -> int:
             return 1
     if os.environ.get("OT6_COVERAGE"):
         preamble.append("OT6_COVERAGE = true  -- lib/ot6.lua coverageFlush (#130)\n")
+    # The SRAM checkpoint run.sh installed for this run, if any (#217).  A
+    # script that boots differently depending on whether it was handed a
+    # checkpoint cannot read the environment -- os.getenv is nil under
+    # Mesen's sandbox, so `os.getenv("OT6_SRAM_CHECKPOINT")` silently
+    # answers "no checkpoint" on a run that has one, and gen_thamasa_arrive
+    # loaded a savestate on a by-hand checkpoint re-cut.  Pass it the same
+    # way the runner's own knobs are passed: as a preamble global, its value
+    # the checkpoint directory exactly as it appeared in the environment.
+    ck = os.environ.get("OT6_SRAM_CHECKPOINT")
+    if ck:
+        preamble.append('OT6_SRAM_CHECKPOINT = %s  -- the checkpoint run.sh '
+                        'installed (#217)\n'
+                        % ('"%s"' % ck.replace("\\", "\\\\").replace('"', '\\"')))
     if gated:
         preamble += write_gate_prologue()
     else:

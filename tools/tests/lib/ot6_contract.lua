@@ -1081,3 +1081,66 @@ function M.assertExitContractPreSave(key)
   end
   judge(pre, key, "exit pre-save; sram checked at the boundary save")
 end
+
+-- ------------------------------------------ what the battery actually holds --
+-- The save SLOT's own copy of the field state, read back out of SRAM.
+--
+-- CopyGameDataToSRAM (ff6/src/menu/save.asm:42) copies WRAM $1600-$1FFF
+-- into $306000 + SRAMSlotPtrs[slot] ($0000 / $0a00 / $1400), so the saved
+-- map word is the slot's copy of $1F64, the saved field tile the slot's
+-- copy of $1FC0/$1FC1, and the saved world tile its copy of $1F60/$1F61.
+-- $307ff0 names the slot the save went to.
+--
+-- #218: a story generator that means to save at a save point, but whose
+-- save step is skipped or lands somewhere else, leaves the battery holding
+-- an OLDER save -- and the `gen_seed_*` cutter that lifts the battery, and
+-- the manifest that names it, are none the wiser.  Both checkpoints that
+-- happened to are re-cut against these reads.  The same three numbers are
+-- declared in the checkpoint's manifest.json ("saved") and re-checked from
+-- the payload bytes by lib/sram_checkpoint.py, so the claim survives the
+-- emulator exiting.
+local SLOT_PTR = { [1] = 0x0000, [2] = 0x0a00, [3] = 0x1400 }
+
+function M.savedSlot(slot)
+  slot = slot or emu.read(0x307ff0, emu.memType.snesMemory)
+  local ptr = SLOT_PTR[slot]
+  if ptr == nil then
+    error(string.format("savedSlot: $307ff0 reads %s, not a save slot 1..3",
+      tostring(slot)), 0)
+  end
+  local base = 0x306000 + ptr
+  local function by(a) return emu.read(base + (a - 0x1600), emu.memType.snesMemory) end
+  local word = by(0x1f64) | (by(0x1f65) << 8)
+  return {
+    slot = slot,
+    mapWord = word,
+    map = word & 0x1ff,
+    x = by(0x1fc0), y = by(0x1fc1),
+    worldX = by(0x1f60), worldY = by(0x1f61),
+  }
+end
+
+-- Assert the slot the game last saved to holds a FIELD save on `map` at
+-- (x,y).  Called right after M.saveGame in the generator that cuts a
+-- checkpoint, so the run fails at the save rather than three hours later
+-- in a lifter.
+function M.assertSavedSlot(map, x, y, what, slot)
+  local s = M.savedSlot(slot)
+  M.log(string.format("[saved] %s: slot %d holds map %d ($%04X) tile (%d,%d), "
+    .. "world tile (%d,%d)", what or "the battery", s.slot, s.map, s.mapWord,
+    s.x, s.y, s.worldX, s.worldY))
+  M.assertEq(s.map, map, (what or "the battery") .. ": saved map")
+  M.assertEq(s.x, x, (what or "the battery") .. ": saved tile x")
+  M.assertEq(s.y, y, (what or "the battery") .. ": saved tile y")
+end
+
+-- The world-save form: `map` reads 0 and the tile lives in $1F60/$1F61.
+function M.assertSavedSlotWorld(x, y, what, slot)
+  local s = M.savedSlot(slot)
+  M.log(string.format("[saved] %s: slot %d holds map %d ($%04X) world tile "
+    .. "(%d,%d)", what or "the battery", s.slot, s.map, s.mapWord,
+    s.worldX, s.worldY))
+  M.assertEq(s.map, 0, (what or "the battery") .. ": saved on the world map")
+  M.assertEq(s.worldX, x, (what or "the battery") .. ": saved world x")
+  M.assertEq(s.worldY, y, (what or "the battery") .. ": saved world y")
+end
