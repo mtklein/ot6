@@ -83,6 +83,21 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(#species, 2, "the whelk formation occupies two slots")
     H.assertEq(species[1].species, SHELL, "slot 0 is the shell $0100")
     H.assertEq(species[2].species, HEAD, "slot 1 is the head $0134")
+    -- the $3F46 id bytes widened by $3F52 agree with $57C0 (#177: the old
+    -- bit (5 - slot) decode read a high bit from another slot); the head
+    -- $0134 is the one whose high bit is set
+    local ids = H.monsterIds()
+    for _, sp in ipairs(species) do
+      H.assertEq(ids[sp.slot + 1], sp.species, string.format(
+        "monsterIds() slot %d reads the formation word $%04X", sp.slot, sp.species))
+    end
+    -- and the live stage view lists what stands there now
+    local stage = {}
+    for _, st in ipairs(H.stageSlots()) do
+      stage[#stage + 1] = string.format("slot %d $%04X", st.slot, st.species)
+    end
+    H.log("on stage now (H.stageSlots): " .. table.concat(stage, ", "))
+    H.assertEq(#stage >= 1, true, "the live stage lists the whelk")
 
     -- 3. the negative control. Live formation, fabricated weapon: the
     -- shell absorbs bolt, so a ThunderBlade in anyone's hand must clash.
