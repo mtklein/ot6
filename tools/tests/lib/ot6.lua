@@ -3749,21 +3749,40 @@ function M.newFightDriver(tag, opts)
       local cost = price[actor] or 0
       if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return nil end
       -- the heals this actor could give themself right now, priced the
-      -- way the care lines below price them
+      -- way the care lines below price them.  Only a heal those lines
+      -- would TAKE can save (#206): the Potion that "saves: 17 + 250 = 267
+      -- survives the 262 round" was the same Potion the heal policy
+      -- refused as "buys back less than it spends", so LOCKE did neither
+      -- and died holding 3 BP.  From the attack lines (the care block
+      -- closed to this actor, or it declined every heal) no heal is
+      -- coming this turn at all.
       local heals = {}
-      if cureRow ~= nil then
-        for _, spell in ipairs(type(opts.cure) == "table" and opts.cure or CURES) do
-          if spellCell(actor, spell, true) then
-            heals[#heals + 1] = { what = string.format("cure $%02X", spell),
-                                  restore = castRestore[spell] }
+      if where == "care" then
+        local allies = 0
+        for e = 0, 3 do
+          if e ~= actor and hpNow[e] > 0 and M.readWord(0x3C1C + e * 2) > 0 then
+            allies = allies + 1
           end
         end
-      end
-      if row ~= nil then
-        local item = (battInvIdx(POTION) and POTION) or (battInvIdx(TONIC) and TONIC)
-        if item then
-          heals[#heals + 1] = { what = string.format("item $%02X", item),
-                                restore = itemRestoreOf(item) }
+        local function taken(restore, mp)
+          return restore == nil or M.healDecision({ hp = hp, maxhp = maxhp,
+            restore = restore, roundCost = cost, allies = allies,
+            threshold = opts.healPercent or 60, mp = mp }) ~= nil
+        end
+        if cureRow ~= nil then
+          for _, spell in ipairs(type(opts.cure) == "table" and opts.cure or CURES) do
+            if spellCell(actor, spell, true) and taken(castRestore[spell], true) then
+              heals[#heals + 1] = { what = string.format("cure $%02X", spell),
+                                    restore = castRestore[spell] }
+            end
+          end
+        end
+        if row ~= nil then
+          local item = (battInvIdx(POTION) and POTION) or (battInvIdx(TONIC) and TONIC)
+          if item and taken(itemRestoreOf(item), false) then
+            heals[#heals + 1] = { what = string.format("item $%02X", item),
+                                  restore = itemRestoreOf(item) }
+          end
         end
       end
       local verdict, why = M.spendDecision({ hp = hp, maxhp = maxhp, roundCost = cost,
@@ -4138,7 +4157,18 @@ function M.newFightDriver(tag, opts)
           end
         end
       end
-      table.sort(cands, function(a, b) return a.pct < b.pct end)
+      -- neediest first: a member inside their priced round (#194) before
+      -- anyone merely under the threshold, the thinnest margin first --
+      -- the Air Force lab's EDGAR at 393/1048 (two Tek Lasers queued) was
+      -- passed over for LOCKE at 363/1129 by percentage and died first
+      for _, c in ipairs(cands) do c.margin = c.hp - (price[c.e] or 0) end
+      table.sort(cands, function(a, b)
+        local la, lb = a.margin <= 0 and (price[a.e] or 0) > 0,
+                       b.margin <= 0 and (price[b.e] or 0) > 0
+        if la ~= lb then return la end
+        if la then return a.margin < b.margin end
+        return a.pct < b.pct
+      end)
       local allies = 0
       for e = 0, 3 do
         if e ~= actor and hpNow[e] > 0 and M.readWord(0x3C1C + e * 2) > 0 then
