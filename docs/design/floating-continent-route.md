@@ -262,6 +262,12 @@ playBattles mode, not a blind `"flee"` (HANDOFF, the flee bullet).
 (two Fenix Downs in one random, run.0FsoIlAX r6). TERRA (Magic) and EDGAR
 (Tools) never swing, so the back row costs them nothing and halves the
 physical damage they take; the deck kit sets TERRA/EDGAR back, LOCKE front.
+**SHADOW is not in that set** — he joins at the landing, after
+`gen_fc_alcove`'s `setRows` has already run, with every equipment slot
+empty and in the front row, and the shipped run dresses him only at the
+save alcove once the crossing is over. Measured over 12 seeds that costs
+the segment 24 deaths and 20 Fenix Downs against 7 and 7 for a dressed,
+back-row SHADOW: [fc-alcove.md](fc-alcove.md) (#221).
 
 **Shadow rejoin — MEASURED (probe_fc_shadow.lua on the fc-landing-v1 seed).**
 At the landing, before any return trip, `$035E=1`, `$035F=1`, the object map
