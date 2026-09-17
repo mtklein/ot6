@@ -2718,6 +2718,7 @@ function M.newFightDriver(tag, opts)
   local freeRoundSaid = false          -- the preemptive free-round line, once
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
+  local finisherSaid = nil             -- the finisher window yielding (#204), once per reason
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
   local parkDropN = 0                  -- watchdog fires this battle (see below)
   local careActor = nil                -- who took this round's one care turn
@@ -3601,8 +3602,94 @@ function M.newFightDriver(tag, opts)
         best.what, best.chips or 0, tostring(slot)))
       return best
     end
-    if (row ~= nil or cureRow ~= nil) and totalMon > 200 and parkDropN < 3
-       and careOpen then
+    -- The finisher gate yields to the enemy's arithmetic (#204).  "Under
+    -- 200 total, attack" was written for a party one poke from ending a
+    -- fight; for solo L12 LOCKE against the 495-HP gate soldier, whose
+    -- shields re-seed to 3 inside that window, the last 200 HP was three
+    -- chips and an unload away -- four more enemy actions -- and every
+    -- baseline loss (docs/design/sfigaro-gate.md; the 15-seed lab, seeds
+    -- 24/40/52) was him at 134-142/279 planning a 0-BP chip with a Potion
+    -- in the bag, killed by the fight's first TekLaser.  The measured
+    -- round cost there read 58-110: not "inside one round", but inside
+    -- the four the kill still needed.  So the window closes the care block
+    -- only while the fight ends before the damage does: it stays closed
+    -- when no member is inside the rounds the kill still needs, priced by
+    -- the press rule's own arithmetic (this actor's chips against the
+    -- shields up, the party's measured broken window against the HP
+    -- left, or this actor chipping it down at the per-hit figure) at the
+    -- round cost measured on that member -- and opens otherwise, handing
+    -- the press rule the kill-this-turn decision it already makes ahead
+    -- of the care (#165).  A member inside one measured round is the
+    -- one-round case of the same rule and opens it whatever the estimate.
+    -- Nothing here reads hidden state: shields, HP and the damage watch
+    -- are what the screen shows.
+    local function finisherYields()
+      local rounds, arith = nil, nil
+      local slot = pressTarget()
+      if slot ~= nil then
+        local left = livingMonsters() > 1 and totalMon or M.readWord(MON_HP + slot * 2)
+        local sh = M.readByte(SH_CUR + slot * 2)
+        local broken = M.readByte(BRK_TICKS + slot * 2) ~= 0
+        local need = broken and 0 or sh
+        local best = bestLine(actor, slot, have)
+        local chips = best and best.chips or 0
+        local window = 0
+        for e = 0, 3 do
+          if hpNow[e] > 0 and dmgSeen[e] then window = window + dmgSeen[e] * 4 end
+        end
+        if need == 0 or chips > 0 then
+          local toBreak = need == 0 and 0 or math.ceil(need / chips)
+          if window > 0 then
+            local unload = math.ceil(left / window)
+            rounds = toBreak + unload
+            arith = string.format("%d to chip %d shield(s) at %d a turn + %d to "
+              .. "unload %d HP at %d a broken round", toBreak, need, chips, unload,
+              left, window)
+          end
+          local dh = dmgHit[actor]
+          if best ~= nil and dh ~= nil and dh.kind == best.kind
+             and (best.kind ~= "skill" or dh.skill == best.skill) and dh.per > 0 then
+            local perTurn = dh.per * (best.hits or 1)
+            local chipRounds = math.ceil(left / perTurn)
+            if rounds == nil or chipRounds < rounds then
+              rounds = chipRounds
+              arith = string.format("%d chipping %d HP down at %d a turn (%s)",
+                chipRounds, left, perTurn, best.what)
+            end
+          end
+        end
+      end
+      for e = 0, 3 do
+        local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
+        local cost = roundCost[e] or 0
+        if hp > 0 and maxhp > 0 and hp < maxhp and cost > 0 then
+          if hp <= cost then
+            return string.format("entity %d (%d/%d) is inside one round of death "
+              .. "(%d)", e, hp, maxhp, cost)
+          end
+          if rounds ~= nil and rounds > 1 and hp <= rounds * cost then
+            return string.format("entity %d (%d/%d) is inside the %d round(s) the "
+              .. "kill still needs (%s) at %d a round = %d", e, hp, maxhp, rounds,
+              arith, cost, rounds * cost)
+          end
+        end
+      end
+      return nil
+    end
+    local finisher = totalMon <= 200
+    local yieldWhy = nil
+    if finisher and (row ~= nil or cureRow ~= nil) and parkDropN < 3 and careOpen then
+      yieldWhy = finisherYields()
+      if yieldWhy ~= nil then
+        local said = string.format("[%s] actor=%d: the finisher window (monsters at "
+          .. "%d HP <= 200) yields -- %s; the care block opens and the press rule "
+          .. "decides a kill this turn against the care (#204)", tag or "fight",
+          actor, totalMon, yieldWhy)
+        if said ~= finisherSaid then finisherSaid = said; M.log(said) end
+      end
+    end
+    if (row ~= nil or cureRow ~= nil) and (not finisher or yieldWhy ~= nil)
+       and parkDropN < 3 and careOpen then
       -- The press rule (#156), the finisher rule's sibling: when this
       -- actor's best unreflectable action chips the target's remaining
       -- shields to zero this turn AND the party's measured damage in the
@@ -4901,7 +4988,7 @@ function M.newFightDriver(tag, opts)
     -- damage decide the next attempt's first turns.
     roundCost, turnSnap = {}, {}
     itemRestore, castRestore = {}, {}
-    healWatch, healSaid = nil, nil
+    healWatch, healSaid, finisherSaid = nil, nil, nil
     dmgWatch, dmgSeen, monHpLast = {}, {}, {}
     dmgHit, hitLedger, partyHpLast = {}, {}, {}
     monAct, deathSaid, battleDeaths, wipeSaid = nil, {}, {}, false
