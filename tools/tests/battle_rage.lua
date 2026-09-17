@@ -214,11 +214,24 @@ local startMp = 50
 local pinMp, pinPend = true, 0
 local RAGE_BASE = 8                  -- Ot6DanceCost's immediate, which
                                      --   Ot6RageCost tail-calls
--- #219: boosting a verb that is not Fight costs escalating MP, and Rage is a
--- chance verb (the boost buys the trance's coin), so the start payment is
--- min(99, floor(base * 2.5^boost + 0.5)) -- 8 / 20 / 50 / 99.  The trance is
--- still ONE payment: every possessed turn after it stays free.
-local function ragePrice(boost)
+-- Rage's start price is FLAT: 8 at every boost level.  #219 made boosting
+-- cost 2.5x the base MP per level; the owner then exempted the three chance
+-- verbs (Steal, Rage, Slot), because a boost on them multiplies nothing -- it
+-- converts variance into reliability across a spread of effects that are not
+-- merely damage -- and the BP it costs is what pays for that certainty.  The
+-- rule is one test: a price escalates exactly when Ot6BoostDmg multiplies the
+-- action, and cmd $10 is in Ot6BoostDmg's gate (this file's own coin arms
+-- rely on that same gate).  The trance is still ONE payment either way: every
+-- possessed turn after the start is free.
+--
+-- Dance is the control that makes this a rule and not a habit: Ot6RageCost
+-- tail-calls Ot6DanceCost, so the two possess-verbs share one base of 8, and
+-- cmd $13 is NOT in the gate, so Dance pays 8 / 20 / 50 / 99 where Rage pays
+-- 8 / 8 / 8 / 8.  battle_dancemp owns that side.
+local function ragePrice(_) return RAGE_BASE end
+-- What a boosted Rage WOULD cost if it escalated, so the arms below can name
+-- the number they are refusing instead of merely not mentioning it.
+local function escalated(boost)
   if boost == 0 then return RAGE_BASE end
   local x = RAGE_BASE
   for _ = 1, boost do x = x * 5 end
@@ -380,11 +393,12 @@ add({
 })
 
 -- 7. The tier latch: 3 BP banked at the start, held for the whole trance ----
--- 99 rather than 50: #219 prices a boost-3 Rage at min(99, 8 x 15.625) = 99,
--- the two-digit ceiling, and Ot6RageStartGate refuses a start the pool cannot
--- pay -- which is the rule working, not the tier latch failing.  The pinned
--- pool is exactly the price, so the arm also pins the cap from the other side.
-add(trance("tier3", function() startMp = 99; pinPend = 3 end,
+-- 50, which is deliberately LESS than the 99 a boost-3 Rage would cost if it
+-- escalated (8 x 15.625 = 125, flattened to the two-digit ceiling).
+-- Ot6RageStartGate refuses a start the pool cannot pay, so under the old rule
+-- this arm could not even begin; that it begins, and debits 8, is the
+-- chance-verb exemption measured rather than asserted about.
+add(trance("tier3", function() startMp = 50; pinPend = 3 end,
   function() coins = {}; pinBe = nil end))
 add(rageStart("tier3"))
 add({
@@ -397,11 +411,18 @@ add({
     H.assertEq(H.readByte(RAGETIER), 3,
       "Cmd_10 latched the pending 3 into OT6_RAGETIER")
     H.log(string.format("tier3: MP %d -> %d after the boosted rage START "
-      .. "(price %d)", _G.__t3mp, mp(actor), ragePrice(3)))
+      .. "(price %d, escalated would be %d)", _G.__t3mp, mp(actor),
+      ragePrice(3), escalated(3)))
     H.assertEq(mp(actor), _G.__t3mp - ragePrice(3), string.format(
-      "a boost-3 trance costs %d, not the base %d: 8 x 15.625 is 125, which "
-      .. "the two-digit ceiling flattens to 99 (#219, ruling 1)",
-      ragePrice(3), RAGE_BASE))
+      "a boost-3 trance costs the FLAT %d, not the %d a 2.5x escalation "
+      .. "would charge: cmd $10 is in Ot6BoostDmg's gate, so the boost buys "
+      .. "the trance's coin rather than a multiplier, and the BP is what pays "
+      .. "for that certainty", ragePrice(3), escalated(3)))
+    H.assertEq(_G.__t3mp < escalated(3), true, string.format(
+      "...and the pinned pool (%d) is BELOW the escalated price (%d), so "
+      .. "Ot6RageStartGate would have refused this start outright under the "
+      .. "old rule.  The trance running at all is the exemption, not a "
+      .. "number this file merely stopped checking", _G.__t3mp, escalated(3)))
     _G.__t3after = mp(actor)
   end),
   ride(300),                              -- several more possessed turns
@@ -590,9 +611,9 @@ end
 local function tierArm(tag, pend, draw, wantCoin, why)
   local seed = nil
   add(trance(tag, function()
-    startMp = math.max(50, ragePrice(pend))   -- #219: the start pays the
-    pinPend = pend                            --   boosted price, so the
-                                              --   pinned pool has to cover it
+    startMp = 50           -- one pool for every tier: the start price does
+    pinPend = pend         --   not move with the boost, so nothing here has
+                           --   to be sized to the tier being tested
   end, function()
     instrument()
     seed = seedFor(draw)
@@ -615,9 +636,11 @@ local function tierArm(tag, pend, draw, wantCoin, why)
     H.call(function()
       H.assertEq(H.readByte(RAGETIER), pend,
         string.format("%s: Cmd_10 latched tier %d", tag, pend))
-      H.assertEq(mp(actor), math.max(50, ragePrice(pend)) - ragePrice(pend),
-        string.format("%s: the start paid %d, the boost-%d price (#219)",
-          tag, ragePrice(pend), pend))
+      H.assertEq(mp(actor), 50 - ragePrice(pend), string.format(
+        "%s: the start paid the flat %d at boost %d -- not the %d a 2.5x "
+        .. "escalation would charge.  Rage is a chance verb: cmd $10 is in "
+        .. "Ot6BoostDmg's gate, so the boost buys the coin's certainty and "
+        .. "the BP pays for it", tag, ragePrice(pend), pend, escalated(pend)))
     end),
     ride(300),
     H.call(function()

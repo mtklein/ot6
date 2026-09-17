@@ -99,13 +99,14 @@ OT6_THIEF_BESTOW = $58
         ; --- row 0: Steal (offset 0) ---
         lda     #OT6_THIEF_STEAL
         sta     $4005
-        jsl     Ot6ThiefCost
-        jsl     Ot6PendPrice    ; Steal is a chance verb: boost buys the
-                                ;   rare/guarantee ladder, so the row escalates
-                                ;   x2.5 per pending level (#219).  Filch and
-                                ;   Bestow below buy nothing from a boost and
-                                ;   stay flat.  Ot6KitRowCost draws the same
-                                ;   split, and Ot6AbilityCost charges it
+        jsl     Ot6ThiefCost    ; flat at every boost level, like the two rows
+                                ;   below it: Ot6BoostDmg gates cmd $05, so
+                                ;   nothing under this command is multiplied
+                                ;   and nothing under it escalates.  Steal's
+                                ;   boost buys the rare/guarantee ladder,
+                                ;   which the BP pays for.  Ot6KitRowCost
+                                ;   draws the same flat number and
+                                ;   Ot6AbilityCost charges it
         sta     $4006
         lda     #$43            ; MANUAL|ONE_SIDE|ENEMY
         sta     $4007

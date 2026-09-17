@@ -10,13 +10,16 @@
 --     below that is refused: the universal insufficient-mp fizzle
 --     (CalcAttackEffect) skips the steal effect, so no item is taken and MP is
 --     not driven negative.
---     Since #219 the 4 is a BASE price: Steal is a chance verb, boost buys it
---     the rare/guarantee ladder (Ot6StealBoostLevel / Ot6StealSlot), so a
---     boosted Steal costs min(99, floor(4 * 2.5^boost + 0.5)) -- 4 / 10 / 25 /
---     63.  Both arms below are boosted, so both measure that price rather than
---     the flat one: the affordable arm at boost 2 (25 of LOCKE's real 37-MP
---     pool) and the refusal arm at boost 3 (63, which no pool in this fixture
---     reaches, which is ruling 2 working).
+--     The 4 is flat at EVERY boost level, and both arms below are boosted so
+--     that they say so.  #219 made boosting cost 2.5x per level; the owner
+--     then exempted the three chance verbs (Steal, Rage, Slot), because a
+--     boost on them multiplies nothing -- it converts variance into
+--     reliability across a spread of outcomes that are not merely damage --
+--     and the BP it costs is what pays for that certainty.  The rule is now
+--     one test: a price escalates exactly when Ot6BoostDmg multiplies the
+--     action, and cmd $05 is in Ot6BoostDmg's gate.  So the affordable arm
+--     at boost 2 must be charged 4 and NOT 25, and the refusal arm at boost 3
+--     must be priced 4 and NOT 63.
 --   * OFF (ff6/rom/ff6-en-nomp.sfc, handed in via OT6_ROM): Ot6AbilityCost is
 --     not assembled, so cmd $05 keeps vanilla's 0 and the identical Steal is
 --     free, deducting 0 MP. The refusal half has nothing to refuse and is
@@ -37,25 +40,33 @@ local ST_CMD, ST_THIEF, ST_ITEM, ST_TGT, ST_TRANS = 0x05, 0x30, 0x0A, 0x38, 0x01
 local CMD_STEAL, CMD_ITEM = 0x05, 0x01
 local NONE = 0xFF
 local TONIC, POTION = 0xE8, 0xE9
-local STEAL_COST = 4                     -- Ot6StealCost's immediate, the BASE
+local STEAL_COST = 4                     -- Ot6StealCost's immediate, flat
 
--- #219's one rule, recomputed rather than copied: Ot6BoostPriceFor does
--- (base * 5^n + 2^(n-1)) >> n capped at 99, which is
--- min(99, floor(base * 2.5^n + 1/2)).
-local function stealPrice(boost)
+-- Steal's price at a given boost: the constant, because cmd $05 is exempt.
+local function stealPrice(_) return STEAL_COST end
+
+-- ...and what it WOULD cost if it were not, so the arms below can name the
+-- number they are refusing rather than merely not mentioning it.  This is
+-- #219's arithmetic, recomputed rather than copied: Ot6BoostPriceFor does
+-- (base * 5^n + 2^(n-1)) >> n capped at 99, i.e.
+-- min(99, floor(base * 2.5^n + 1/2)) -- 4 / 10 / 25 / 63.
+local function escalated(boost)
   if boost == 0 then return STEAL_COST end
   local x = STEAL_COST
   for _ = 1, boost do x = x * 5 end
   return math.min(99, (x + (1 << (boost - 1))) >> boost)
 end
 
--- The affordable arm boosts to 2 rather than 3.  Boost 3 is the structural
--- guarantee (Ot6StealBoostLevel clamps the level to $ff so vanilla's own
--- `bcs` fires), but it now costs 63 and LOCKE joins this fixture with 37, so
--- it is exactly the refusal the third arm measures.  Boost 2 adds 90 to the
--- thief level, and TargetEffect_52 takes its `bmi` shortcut -- an outright
--- steal, no roll -- whenever level + 90 + $32 - target level >= 128, which
--- the arm asserts off live RAM before it presses A rather than assuming.
+-- The affordable arm boosts to 2 rather than 3 for a reason that has nothing
+-- to do with price: boost 3 is the STRUCTURAL guarantee (Ot6StealBoostLevel
+-- clamps the level to $ff so vanilla's own `bcs` fires), which would make the
+-- grant unfalsifiable as evidence that anything was rolled.  Boost 2 adds 90
+-- to the thief level, and TargetEffect_52 takes its `bmi` shortcut -- an
+-- outright steal, no roll -- whenever level + 90 + $32 - target level >= 128,
+-- which the arm asserts off live RAM before it presses A rather than
+-- assuming.  Boost 2 also happens to be the level where the escalation would
+-- have been most visible (25 against LOCKE's real ~37-MP pool), so it is the
+-- arm that shows the exemption is real and not a rounding accident.
 local AFFORD_BOOST, REFUSE_BOOST = 2, 3
 
 local mode                               -- "on" (charges) | "off" (free)
@@ -337,9 +348,15 @@ H.run({ maxFrames = 150000 }, {
       "the steal executed and took an item (both builds)")
     if mode == "on" then
       H.assertEq(rec.qcost, stealPrice(AFFORD_BOOST), string.format(
-        "ON: Ot6AbilityCost priced a boost-%d cmd $05 at %d, the base %d times "
-        .. "2.5 per level (#219)", AFFORD_BOOST, stealPrice(AFFORD_BOOST),
-        STEAL_COST))
+        "ON: Ot6AbilityCost priced a boost-%d cmd $05 at %d -- the FLAT base, "
+        .. "not the %d the 2.5x escalation would have charged.  Steal is a "
+        .. "chance verb: cmd $05 is in Ot6BoostDmg's gate, the boost buys "
+        .. "odds rather than magnitude, and the BP is what pays for it",
+        AFFORD_BOOST, stealPrice(AFFORD_BOOST), escalated(AFFORD_BOOST)))
+      H.assertEq(rec.qcost ~= escalated(AFFORD_BOOST), true, string.format(
+        "ON: and %d really is a different number from the escalated %d, so "
+        .. "this arm can tell the two rules apart", stealPrice(AFFORD_BOOST),
+        escalated(AFFORD_BOOST)))
       H.assertEq(left, mp0 - stealPrice(AFFORD_BOOST), string.format(
         "ON: the steal deducted exactly %d MP", stealPrice(AFFORD_BOOST)))
     else
@@ -447,8 +464,11 @@ H.run({ maxFrames = 150000 }, {
       H.log(string.format("unaffordable steal: queued cost %s, MP stayed %d, granted %s",
         tostring(rec.qcost), left, tostring(rec.grant)))
       H.assertEq(rec.qcost, stealPrice(REFUSE_BOOST), string.format(
-        "ON: the gate priced this boost-%d cmd $05 at %d (#219)",
-        REFUSE_BOOST, stealPrice(REFUSE_BOOST)))
+        "ON: the gate priced this boost-%d cmd $05 at %d, the flat base -- "
+        .. "not the %d the escalation would have charged.  The refusal below "
+        .. "is therefore the pool failing to afford FOUR MP, which is what "
+        .. "earned poverty means, rather than a price nobody could pay",
+        REFUSE_BOOST, stealPrice(REFUSE_BOOST), escalated(REFUSE_BOOST)))
       H.assertEq(rec.grant, nil,
         "ON: too little MP is REFUSED -- no item taken (fizzled), though the "
         .. "3-bp guarantee means it could not have missed")

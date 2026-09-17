@@ -1154,21 +1154,32 @@ Ot6FoldTbl:
 ; flag waits on. that is why a hidden charge must not ship enabled: the menu
 ; still shows these verbs no number.
 ;
-; boost raises the price of everything here except SwdTech (#219).  Blitz and
-; tools keep one id no matter the boost and spend it on Ot6BoostDmg's
-; x2/x4/x8; Steal, Dance and Rage spend it on odds.  Either way the row's
-; base price takes x2.5 per pending level, through Ot6BoostPriceFor, capped at
-; 99.  A boosted SwdTech is the exception because its BP was already spent:
-; Ot6BushidoTier / Ot6QueueFold left $3a7b at the tech the boost bought, whose
-; own per-tech price is what should be charged.  BP buys the tier, and MP
-; prices the cast.
+; Which arms escalate is ONE test, the same test the damage half already
+; makes (#219, refined by the owner 2026-09-17): a verb's price escalates
+; exactly when Ot6BoostDmg multiplies it.  So the gate list over there IS the
+; exemption list over here, and the two halves of the boost canon cannot come
+; to different answers.
 ;
-; Filch and Bestow are not escalated either.  Ot6BoostDmg's cmd-$05 gate
-; refuses to multiply anything under this command and the two rows are not
-; chance verbs, so boosting into them buys nothing at all (Ot6Bestow's header
-; says the same); charging for it would be charging for nothing.  The Steal
-; row itself IS a chance verb -- boost buys the rare/guarantee ladder -- and
-; takes the escalation on its own arm below.
+;   * @boosted (tools $09, blitz $0a) escalates: neither command is in
+;     Ot6BoostDmg's gate, the row keeps one id no matter the boost, and the
+;     boost buys it x2/x4/x8.  So does @dance (cmd $13, also ungated).  The
+;     base price takes x2.5 per pending level, through Ot6BoostPriceFor,
+;     capped at 99.
+;   * @swdtech (cmd $07) is gated, so it is flat here: its BP was already
+;     spent on the tech.  Ot6BushidoTier / Ot6QueueFold left $3a7b at the
+;     tech the boost bought, whose own per-tech price is what is charged.
+;     BP buys the tier, MP prices the cast.
+;   * @steal (cmd $05) and @rage (cmd $10) are gated, so they are flat at
+;     every boost level.  They are CHANCE verbs: the boost converts variance
+;     into reliability across a spread of outcomes that are not merely
+;     damage, and it is already paid for in BP, the scarce resource.  MP
+;     scales with magnitude; BP alone pays for certainty.  Slot (cmd $0f) is
+;     gated too and would be flat for the same reason; it has no arm here
+;     because it is unpriced (base 0), not because it was overlooked.
+;   * Filch and Bestow ride cmd $05's gate with Steal, and for them the
+;     boost buys nothing at all (Ot6Bestow's header says the same), so
+;     charging for it would be charging for nothing.  The whole @steal arm
+;     is therefore flat, with no per-row split.
 ;
 ; entry (jsl from CreateAction, right after jsr GetMPCost): a8/i16,
 ; A = vanilla cost, X = attacker entity, Y = queue slot. db=$7e (the site
@@ -1217,11 +1228,13 @@ Ot6FoldTbl:
         plp
         rtl
 @plainsteal:
-        jsl     Ot6StealCost    ; the flat price, one authority
-        jsl     Ot6BoostPriceFor        ; ...x2.5 per pending boost: boost buys
-                                        ;   Steal the rare/guarantee ladder
-                                        ;   (Ot6StealBoostLevel), so it is a
-                                        ;   chance verb and pays for it (#219)
+        jsl     Ot6StealCost    ; the flat price, one authority, at every
+                                ;   boost level.  Cmd $05 is in Ot6BoostDmg's
+                                ;   gate, so the boost multiplies nothing: it
+                                ;   buys the rare/guarantee ladder
+                                ;   (Ot6StealBoostLevel), which is certainty
+                                ;   across a spread of outcomes rather than
+                                ;   magnitude, and the BP is what pays for it
         plp
         rtl
 @dance: ; dance (cmd $13) is priced at the commit moment only: the mid-dance
@@ -1239,12 +1252,15 @@ Ot6FoldTbl:
         lda     #$00            ; locked-in step: free
         plp
         rtl
-:       jsl     Ot6DanceCost    ; dance-start: the flat price, one authority
-        jsl     Ot6BoostPriceFor        ; ...x2.5 per pending boost.  A boosted
-                                        ;   Dance is a multiplier verb: cmd $13
-                                        ;   is not in Ot6BoostDmg's gate list,
-                                        ;   so every step of the dance the start
-                                        ;   pays for swings at x2/x4/x8
+:       jsl     Ot6DanceCost    ; dance-start: the base price, one authority
+        jsl     Ot6BoostPriceFor        ; ...x2.5 per pending boost.  Dance is
+                                        ;   the one possess-verb that DOES
+                                        ;   escalate: cmd $13 is not in
+                                        ;   Ot6BoostDmg's gate list, so every
+                                        ;   step of the dance the start pays
+                                        ;   for swings at x2/x4/x8.  One test,
+                                        ;   and Dance lands on the other side
+                                        ;   of it from Rage
         plp
         rtl
 @rage:  ; rage is the other possess-verb: flat, charged once at Rage-start,
@@ -1261,11 +1277,13 @@ Ot6FoldTbl:
         lda     #$00            ; locked-in possessed turn: free
         plp
         rtl
-:       jsl     Ot6RageCost     ; rage-start: the flat price, one authority
-        jsl     Ot6BoostPriceFor        ; ...x2.5 per pending boost: boost buys
-                                        ;   the trance's coin (Ot6RageCoin), a
-                                        ;   chance verb, and the tier it latches
-                                        ;   runs the whole battle (#219)
+:       jsl     Ot6RageCost     ; rage-start: the flat price, one authority,
+                                ;   at every boost level.  Cmd $10 is in
+                                ;   Ot6BoostDmg's gate, so the boost
+                                ;   multiplies nothing: it buys the trance's
+                                ;   coin (Ot6RageCoin), certainty across a
+                                ;   spread of effects rather than magnitude,
+                                ;   and the BP is what pays for it
         plp
         rtl
 @swdtech:

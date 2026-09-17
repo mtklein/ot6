@@ -1,8 +1,19 @@
 -- @suite savestate=vargas_won slow
--- battle_boostprice.lua -- #219: every boosted ability except Fight costs
--- escalating MP.  price = min(99, floor(base * 2.5^boost + 0.5)), so a
--- boost buys its multiplier (or its odds) at x2.5 the base price per level,
--- capped at the two-digit ceiling.
+-- battle_boostprice.lua -- #219: boosting a multiplier verb costs escalating
+-- MP.  price = min(99, floor(base * 2.5^boost + 0.5)), so a boost buys its
+-- multiplier at x2.5 the base price per level, capped at the two-digit
+-- ceiling.
+--
+-- Who pays it is ONE test, the same test the damage half makes: a price
+-- escalates exactly when Ot6BoostDmg multiplies the action.  The chance verbs
+-- -- Steal, Rage and Slot -- are on the other side of it and stay flat at
+-- every level: a boost on them multiplies nothing, it converts variance into
+-- reliability across a spread of outcomes that are not merely damage, and the
+-- BP it costs is what pays for that certainty.  MP scales with magnitude; BP
+-- alone pays for certainty.
+--
+-- This file carries both sides of the test, on one fixture and through the
+-- real menu: SABIN's Blitz escalates, LOCKE's Steal does not.
 --
 -- This is the mechanism half of that rule: the boosted number is taken
 -- through the real menu, on a real battle, at a real pending boost raised
@@ -26,9 +37,10 @@
 --   2. boost N stamps min(99, floor(base * 2.5^N + 0.5)) on every learned
 --      Blitz row, and greys exactly the rows that price out of the pool.
 --   3. a boosted Blitz is queued at the boosted price and deducts it.
---   4. LOCKE's Steal row escalates the same way, while Filch and Bestow --
---      which a boost buys nothing at all -- stay flat.
---   5. a boosted Steal is queued at the boosted price and deducts it.
+--   4. LOCKE's whole thief submenu stays FLAT under a boost -- Steal as well
+--      as Filch and Bestow -- and the stamp is checked against the escalated
+--      number it must NOT be, so the arm can tell the two rules apart.
+--   5. a boosted Steal is queued at the flat price and deducts it.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
 
@@ -450,31 +462,45 @@ H.run({ maxFrames = 300000 }, {
   end),
 
   ------------------------------------------- 4/5. LOCKE's Steal, a chance verb --
+  -- The other side of the one test.  Cmd $05 is in Ot6BoostDmg's gate, so no
+  -- row of the thief submenu escalates: Steal's boost buys the rare/guarantee
+  -- ladder (odds, not magnitude) and Filch's and Bestow's buys nothing at
+  -- all.  Each assertion names the escalated number it must not be, so this
+  -- section fails if the escalation ever comes back -- it does not merely
+  -- stop mentioning it.
   openAt(function() return locke end, 1, "steal",
     "LOCKE's thief submenu at boost 1"),
   H.call(function()
-    local price = boosted(STEAL_BASE, 1)
+    local price = STEAL_BASE                     -- flat, at every level
+    local wouldBe = boosted(STEAL_BASE, 1)       -- ...if it escalated
     local q = {}
     for i = 0, 7 do
       local id = H.readByte(ITEMLIST + i * 3)
       if id ~= 0xff then q[id] = H.readByte(ITEMLIST + i * 3 + 1) end
     end
-    H.log(string.format("  boost 1  Steal stamp %s (base %d -> %d), "
-      .. "Filch %s, Bestow %s, pool %d", tostring(q[THIEF_STEAL]),
-      STEAL_BASE, price, tostring(q[THIEF_FILCH]), tostring(q[THIEF_BESTOW]),
+    H.log(string.format("  boost 1  Steal stamp %s (flat %d; escalated would "
+      .. "be %d), Filch %s, Bestow %s, pool %d", tostring(q[THIEF_STEAL]),
+      price, wouldBe, tostring(q[THIEF_FILCH]), tostring(q[THIEF_BESTOW]),
       mp(locke)))
+    H.assertEq(price ~= wouldBe, true, string.format(
+      "the flat price %d and the escalated %d are different numbers, so the "
+      .. "stamp assertion below can fail", price, wouldBe))
     H.assertEq(q[THIEF_STEAL], price, string.format(
-      "Steal at boost 1 is stamped %d: boost buys the rare/guarantee ladder, "
-      .. "so it is a chance verb and pays for it (#219)", price))
+      "Steal at boost 1 is stamped its flat %d, NOT the %d a 2.5x escalation "
+      .. "would draw.  Cmd $05 is in Ot6BoostDmg's gate: the boost buys the "
+      .. "rare/guarantee ladder, which is certainty across a spread of "
+      .. "outcomes rather than magnitude, and the BP already pays for it",
+      price, wouldBe))
     H.assertEq(q[THIEF_FILCH], thiefCostOf(THIEF_FILCH),
-      "Filch stays flat -- Ot6BoostDmg gives cmd $05 no multiplier and Filch "
-      .. "is not a chance verb, so a boost buys it nothing to pay for")
+      "Filch stays flat on the same gate -- and for it a boost buys nothing "
+      .. "at all, so charging for it would be charging for nothing")
     H.assertEq(q[THIEF_BESTOW], thiefCostOf(THIEF_BESTOW),
-      "Bestow stays flat, for the same reason")
+      "Bestow stays flat, for the same reason.  All three thief rows now take "
+      .. "one flat arm, with no per-row split left to go stale")
     H.screenshot("boostprice_steal_boost1")
     rec = { cmd = CMD_STEAL, want = price, slot = locke }
     H.assertEq(mp(locke) >= price, true,
-      "LOCKE can pay the boosted steal out of his real pool")
+      "LOCKE can pay the steal out of his real pool")
     want.slot, want.bank, want.pend = locke, 1, 1
     want.mode, want.row = "steal", THIEF_STEAL
   end),
@@ -483,8 +509,8 @@ H.run({ maxFrames = 300000 }, {
     H.log(string.format("[charge] steal queued cost %s (want %d)",
       tostring(rec.qcost), rec.want))
     H.assertEq(rec.qcost, rec.want, string.format(
-      "Ot6AbilityCost priced the boost-1 Steal at %d, not its base %d",
-      rec.want, STEAL_BASE))
+      "Ot6AbilityCost priced the boost-1 Steal at its flat %d, not the %d the "
+      .. "escalation would have charged", rec.want, boosted(STEAL_BASE, 1)))
   end),
   step("the boosted steal resolves and the pool moves", charged, 20000),
   H.call(function()
@@ -492,9 +518,10 @@ H.run({ maxFrames = 300000 }, {
     H.log(string.format("[charge] LOCKE MP %d -> %d, spent %d",
       rec.mp0, rec.mp0 - spent, spent))
     H.assertEq(spent, rec.want, string.format(
-      "the boost-1 Steal deducted exactly %d MP", rec.want))
+      "the boost-1 Steal deducted exactly %d MP -- the stamp, the per-draw "
+      .. "price and the pool all read the same flat number", rec.want))
     want.mode = "idle"
-    H.log("PASSED: the stamp, the grey and the charge all read one boosted "
-      .. "price, for a multiplier verb and for a chance verb")
+    H.log("PASSED: the stamp, the grey and the charge agree on ONE price per "
+      .. "row -- escalating for the multiplier verb, flat for the chance verb")
   end),
 })

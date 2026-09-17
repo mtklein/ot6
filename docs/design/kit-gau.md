@@ -447,13 +447,16 @@ drawn at col 2 under a cursor at `x = 8` puts the sprite on the leading glyph.
    fills `$2000-$341f` with `$ff` (`battle_main.asm:6096-6102`) before its one
    call to `InitSkills` (`:6162`).
 4. **MP** — `Ot6AbilityCost` (`ot6_boost.asm`): `@rage` arm for
-   command `$10` — RAGE bit of the actor's `$3ef9` set → 0, clear → the
-   start price. Since #219 the 8 is a **base**: Rage is a chance verb (the
-   boost buys the trance's coin), so a boosted start pays
-   `min(99, floor(8 × 2.5^boost + 0.5))` = 8 / 20 / 50 / 99 through
-   `Ot6BoostPriceFor`. One payment still funds the whole trance; every
-   possessed turn after the start stays free. See mp-economy.md's
-   "Boosting costs MP".
+   command `$10` — RAGE bit of the actor's `$3ef9` set → 0, clear → flat 8.
+   The 8 is flat at **every** boost level: #219 made a boost cost 2.5× per
+   level, and the owner then exempted the chance verbs (2026-09-17). Rage is
+   one of them — cmd `$10` is in `Ot6BoostDmg`'s gate, so the boost buys the
+   trance's coin rather than a multiplier, and the BP it costs is what pays
+   for that certainty. Dance shares the same base 8 (`Ot6RageCost`
+   tail-calls `Ot6DanceCost`) and *does* escalate, because cmd `$13` is not
+   in the gate; that pair is the rule in two rows. One payment still funds
+   the whole trance; every possessed turn after the start stays free. See
+   mp-economy.md's "Boosting costs MP".
    `.if OT6_MP_COSTS`-gated like Steal's arm. No `cmd $11` arm: Leap is free
    (§5). The flat price is drawn once on the configurator's title row via the
    `Ot6LoadoutDrawCost` pattern (`field_menu.asm:2831-2860`).
