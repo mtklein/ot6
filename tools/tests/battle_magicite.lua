@@ -61,8 +61,13 @@ local function mp(slot) return H.readWord(0x3C08 + slot*2) end
 local function recMp(charId) return 0x1600 + 37 * charId + 13 end   -- the +13 M.charMp reads
 local CELES_REC_MP = recMp(6)
 local POOL = 31                               -- boot B: 31 = 1 (mod 5), the boundary walk's residue
-local POOL_A = 126                            -- boot A: her maximum, so the 27-MP divine leaves
-                                              -- every kit row live and no live-RAM refund is needed
+-- boot A opens her at her MAXIMUM, read from the fixture's field record
+-- (+15, beside the +13 current MP), so the 27-MP divine leaves every kit
+-- row live and no live-RAM refund is needed.  It was a literal 126 (L16-
+-- L19 Celes); the #198 re-cut ships her at L20 with 169, and the value
+-- under test is "her maximum", not the number.
+local function recMaxMp(charId) return 0x1600 + 37 * charId + 15 end
+local POOL_A = nil                            -- set at boot A from recMaxMp(6)
 local function pinPool(tag, pool, charId, who)
   charId, who = charId or 6, who or "Celes"
   local cur = H.readWord(recMp(charId))
@@ -672,6 +677,8 @@ H.run({ maxFrames = 150000 }, {
       "IFRIT and SHIVA really in the bag ($1A69 give_genju receipts)")
   end),
   H.call(function()
+    POOL_A = H.readWord(recMaxMp(6))
+    H.log(string.format("[bootA] the fixture ships Celes with a %d-MP maximum; boot A opens her there", POOL_A))
     pinPool("bootA", POOL_A)
     -- LOCKE too: the same fixture ships him drained (13 MP; Inferno is 26),
     -- so the Ifrit positive control needs his pool as much as Celes's
@@ -901,8 +908,8 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(R.mp0, POOL,
       "[drain] her pool opens at the lab's pinned 31")
     -- $3BF4 hp, $3C08 mp, $3C1C max hp, $3C30 max mp: one 20-byte stride
-    H.assertEq(H.readWord(0x3C30 + celes*2), 126,
-      "[drain] and her maximum is 126")
+    H.assertEq(H.readWord(0x3C30 + celes*2), H.readWord(recMaxMp(6)),
+      "[drain] and her battle maximum is the fixture's field-record maximum")
     -- The boundary is only a handful of her turns from this start.  The
     -- bench stays on the medic line throughout: decide() branches on the
     -- acting slot, so a bench item-target cursor only ever delays her
