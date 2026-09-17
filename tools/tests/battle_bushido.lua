@@ -188,6 +188,23 @@ local function driveTo(pred, maxF, tag)
     H.call(frame),
   }, tag)
 end
+-- Waiting for a banked tech to resolve is a DRIVEN wait, not a still one.
+-- Whatever window happens to be up when the previous drive stops is then
+-- nobody's to close, and an open command window holds the ATB still, so
+-- the queued tech can never run.  Measured on this fixture
+-- (build/attempts/bushido-chip-handover/lab/bushido_probe1.log): the chip
+-- arm's drive stopped on the frame SHADOW confirmed Item, his list opened
+-- one frame later, and for the whole 900-frame budget nothing moved --
+-- `menu=01 mstate=0a actor=1 pend=1 bp=1 atb(cyan)=009f atb(shadow)=00ff
+-- atb(m0)=31ff`, the same three gauges every sample.  Which window is up
+-- at the handover is the fixture's timing, not the property under test.
+-- Driving through it is safe for what the arms then measure: CYAN is
+-- parked in "defer" and quietA holds the A mash off, so the drive plans
+-- no attack of its own -- SHADOW's care is the only action it can start,
+-- and a Potion chips no shield and moves no monster HP.
+local function resolveTo(pred, tag)
+  return driveTo(pred, 900, tag)
+end
 local function park(tag)
   return H.repeatN(1, {
     H.call(function() cyanMode = "park:" end),
@@ -360,8 +377,8 @@ H.run({ maxFrames = 150000 }, {
       end),
       driveTo(function() return sawSpell(0x55) end, 12000,
         "Dispatch reaches $3410"),
-      H.waitUntil(function() return pend() == 0 end, 900,
-        "the boosted tech resolves", 10),
+      resolveTo(function() return pend() == 0 end,
+        "the boosted tech resolves"),
       H.waitFrames(120),
       H.call(function()
         quietA = false
@@ -458,22 +475,40 @@ H.run({ maxFrames = 150000 }, {
   -- (a) the ceiling sweep and Oblivion: $2020 pokes, real ceiling restored.
   --     The submenu re-enumerates at every open, so each poke and reopen
   --     reads one window of the WIN table.
+  --
+  --     The poke lives in battle RAM, and park() will happily ride the end
+  --     of one battle and the walk into the next to find CYAN's window
+  --     (measured at seed shift 1,
+  --     build/attempts/bushido-chip-handover/lab/bushido_shift1.log: "reopen at
+  --     swept ceiling 5 satisfied after 4685 frames" against ~16 for its
+  --     neighbours, and the window it found enumerated $55 -- InitSkills had
+  --     reinstated his real ceiling in the new battle).  So the poke is
+  --     re-established until the window read is one it actually set: $2020's
+  --     low byte still reading `ceil` at the open is the proof.
   (function()
     local steps = {}
     -- Ceiling 2 leaves the sweep because the arms above cover it naturally.
     for _, ceil in ipairs({ 0, 1, 3, 4, 5, 7 }) do
+      steps[#steps+1] = H.repeatN(3, {
+        H.cond(function() return (H.readWord(KNOWN) & 0xFF) ~= ceil end, {
+          H.call(function()
+            H.setPad({})
+          end),
+          H.pressButtons({ "b" }, 4),                -- close the parked window
+          H.waitFrames(16),
+          H.call(function()
+            -- the isolation write (waived, labeled): the swept ceiling, in
+            -- InitSkills' own garbage-high-byte shape
+            H.writeWord(KNOWN, 0xFF00 | ceil)
+          end),
+          park("reopen at swept ceiling " .. ceil),
+        }, {}),
+      })
       steps[#steps+1] = H.call(function()
-        H.setPad({})
-      end)
-      steps[#steps+1] = H.pressButtons({ "b" }, 4)   -- close the parked window
-      steps[#steps+1] = H.waitFrames(16)
-      steps[#steps+1] = H.call(function()
-        -- the isolation write (waived, labeled): the swept ceiling, in
-        -- InitSkills' own garbage-high-byte shape
-        H.writeWord(KNOWN, 0xFF00 | ceil)
-      end)
-      steps[#steps+1] = park("reopen at swept ceiling " .. ceil)
-      steps[#steps+1] = H.call(function()
+        H.assertEq(H.readWord(KNOWN) & 0xFF, ceil, string.format(
+          "ceil %d: the swept ceiling is still the one this window opened "
+          .. "on (a battle turning over under the sweep reinstates his real "
+          .. "one)", ceil))
         checkWindow(ceil, "ceil " .. ceil)
       end)
     end
@@ -495,15 +530,49 @@ H.run({ maxFrames = 150000 }, {
   --     $02, so the $01 bit is staged into every live monster's weak mask
   --     (the tech's default target is the engine's pick) and the real
   --     Dispatch then runs the engine's own chip path.
+  --
+  --     Whether THIS battle still owes CYAN a SwdTech window is the
+  --     fixture's timing, not the property under test.  Measured
+  --     (build/attempts/bushido-chip-handover/lab/bushido_probe2.log): Kitty
+  --     berserked him at f3360 -- `st2=$10` on every sample from there --
+  --     and a berserk character never takes another window, so he
+  --     auto-Fought the pool from `mon=777` down to `mon=0` and the battle
+  --     ended with the arm's Dispatch never cast.  The arm used to log that
+  --     and return, which is a green that asserted nothing.  It now walks
+  --     into the next encounter and asks again -- Berserk does not survive
+  --     a battle -- for up to TRIES encounters, and says so if none of them
+  --     gave him the turn.
   (function()
+    local TRIES = 4
     local sh0, rv0 = {}, {}
-    return H.repeatN(1, {
-      H.pressButtons({ "b" }, 4),      -- leave the parked window
+    local chipSeen, tries = false, 0
+    local attempt = {
+      H.call(function()
+        tries = tries + 1
+        cyanMode = "defer"; quietA = false
+        H.log(string.format("[chip] attempt %d of %d", tries, TRIES))
+      end),
+      -- leave whatever window is parked (the sweep's, on the first pass)
+      H.pressButtons({ "b" }, 4),
       H.waitFrames(16),
-      H.call(function() cyanMode = "item" end),
+      -- On the first pass this is already true and costs nothing.  On a
+      -- retry it rides the victory/EXP screens out (the drive's A mash),
+      -- walks the field and takes the next encounter.
+      driveTo(function()
+        return H.battleLoadStarted() and monsterHpSum() > 0
+      end, 40000, "[chip] a battle with a live pool to chip"),
+      H.waitFrames(90),
+      H.call(function()
+        for slot = 0, 3 do
+          local id = H.readByte(0x3ED8 + slot*2)
+          if id == 0x02 then cyan = slot end
+          if id == 0x03 then shadow = slot end
+        end
+        cyanMode = "item"
+      end),
       driveTo(function()
         return not H.battleLoadStarted() or bp() >= 1
-      end, 40000, "a real unboosted turn (Item, or Fight with no Tonic or Potion left) rebanks the chip arm's pip"),
+      end, 40000, "[chip] a real unboosted turn (Item, or Fight with no Tonic or Potion left) rebanks the pip"),
       H.cond(function() return H.battleLoadStarted() and bp() >= 1 end, {
         H.call(function()
           for m = 0, 5 do
@@ -521,16 +590,17 @@ H.run({ maxFrames = 150000 }, {
         end),
         driveTo(function()
           return not H.battleLoadStarted() or sawSpell(0x55)
-        end, 20000, "the chip arm's Dispatch reaches $3410"),
+        end, 20000, "[chip] the arm's Dispatch reaches $3410"),
         H.call(function() cyanMode = "defer"; quietA = true end),
-        H.waitUntil(function()
+        resolveTo(function()
           return not H.battleLoadStarted() or pend() == 0
-        end, 900, "the chip arm's tech resolves", 10),
+        end, "[chip] the arm's tech resolves"),
         H.waitFrames(120),
         H.call(function()
           quietA = false
           if not H.battleLoadStarted() then
-            H.log("chip arm: the battle ended under the tech this run")
+            H.log("[chip] the battle ended before the tech landed; "
+              .. "taking the next encounter")
             return
           end
           local chipped, slashVisible = false, false
@@ -554,8 +624,19 @@ H.run({ maxFrames = 150000 }, {
             "the real tech chipped the (staged) slash-weak monster's shields")
           H.assertEq(slashVisible, true,
             "and the chipped target exposes the slash class ($01)")
+          chipSeen = true
         end),
       }, {}),
+    }
+    return H.repeatN(1, {
+      H.repeatN(TRIES, {
+        H.cond(function() return not chipSeen end, attempt, {}),
+      }),
+      H.call(function()
+        H.assertEq(chipSeen, true, string.format(
+          "[chip] one of %d encounters gave CYAN the real SwdTech turn this "
+          .. "arm measures (tried %d)", TRIES, tries))
+      end),
     })
   end)(),
   H.call(function()
