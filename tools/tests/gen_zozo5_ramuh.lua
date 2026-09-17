@@ -163,73 +163,9 @@ local function cellCensus()
   return "cells $00-$13 = " .. table.concat(t, " ")
     .. string.format("  $26=%02X cursor=%02X", mst(), cursorCell())
 end
-local function decode(cell)
-  if cell < 0x10 then
-    return { area = "pool", col = cell % 8, row = cell >= 8 and 1 or 0 }
-  end
-  local b = cell - 0x10
-  return { area = "party", col = b >> 1, row = b & 1 }
-end
-local function stepToward(cur, tgt)
-  local c, t = decode(cur), decode(tgt)
-  if c.area == "pool" and t.area == "party" then return "down"
-  elseif c.area == "party" and t.area == "pool" then return "up"
-  elseif c.area == "pool" then
-    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
-    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
-  else
-    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
-    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
-  end
-  return nil
-end
--- walk the cursor to `tgt` and press `btn` until the pick state reaches
--- doneState and settles there
-local function menuAct(tgt, btn, doneState, what)
-  local phase, settled = 0, 0
-  return H.driveUntil(function()
-    return mst() == doneState and cursorCell() == tgt() and settled >= 8
-  end, 4000, {
-    H.call(function()
-      phase = (phase + 1) % 10
-      if mst() == doneState then settled = settled + 1; H.setPad({}); return end
-      settled = 0
-      if mst() == 0x69 then H.setPad({}); return end
-      local cur = cursorCell()
-      if cur ~= tgt() then
-        local b = stepToward(cur, tgt())
-        if not b then H.setPad({}); return end
-        H.setPad(phase < 4 and { [b] = true } or {})
-        return
-      end
-      H.setPad(phase < 4 and { [btn] = true } or {})
-    end),
-  }, what)
-end
--- take character `id` out of the pool and drop it in the first free slot.
--- Both cells are resolved at the moment the step runs (thunks), and both
--- ends are asserted afterwards: a cursor that wandered onto the wrong cell
--- would otherwise commit whoever it was standing on, silently.
-local function seat(id, name)
-  local src, dst
-  return H.cond(function() return true end, {
-    H.waitUntil(function() return mst() == 0x2d end, 900,
-      name .. ": menu at $2d", 5),
-    H.call(function()
-      src, dst = poolOf(id), freeSeat()
-      H.assertEq(src ~= nil, true, name .. ": found in the pool")
-      H.assertEq(dst ~= nil, true, name .. ": a free party slot exists")
-      H.log(string.format("[party] %s: pool cell $%02X -> slot $%02X",
-        name, src, dst))
-    end),
-    menuAct(function() return src end, "a", 0x2e, name .. ": pick"),
-    menuAct(function() return dst end, "a", 0x2d, name .. ": drop"),
-    H.call(function()
-      H.assertEq(cell9d(dst), id, name .. " landed in the slot it was aimed at")
-      H.assertEq(cell9d(src), 0xFF, name .. "'s pool cell is now empty")
-    end),
-  })
-end
+-- the seats themselves are H.partySelect (lib/ot6_field.lua): each member
+-- found in the pool, walked to its group's lowest empty seat, both cells
+-- asserted
 -- A MENU IS NOT A BATTLE.  $0059 is the field's "menu opening" flag, but it
 -- is also plain direct page, and while the MENU MODULE (bank $C3) owns the
 -- CPU it reads $81 -- so "$0059 ~= 0" is the one cheap signal that says "a
@@ -404,8 +340,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(poolOf(EDGAR) ~= nil, true, "EDGAR is in the pool to take")
     H.assertEq(freeSeats(), 2, "exactly TWO free slots to fill")
   end),
-  seat(SABIN, "SABIN"),
-  seat(EDGAR, "EDGAR"),
+  H.partySelect({ SABIN, EDGAR }, { tag = "party", commit = false }),
   H.call(function()
     H.log("[party] after seating: " .. cellCensus())
     H.assertEq(freeSeats(), 0, "all four slots filled before committing")

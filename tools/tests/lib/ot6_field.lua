@@ -4421,6 +4421,139 @@ function M.newPartySelect(pick)
   return P
 end
 
+-- M.partySelect(members, opts): the step form, for a party menu that owns
+-- the frame (the menu the event's `party_menu` opens: Narshe's defense
+-- split, the Blackjack's swap room, Kefka's aftermath, the Zozo gather
+-- room).  Promoted from the state-fed driver those four generators each
+-- carried.  The menu (field-ram / menu RAM, measured by those generators):
+--   $26            pick state: $2D browsing, $2E carrying a character
+--                  ($69 is the menu's own fade, no input taken)
+--   $7E9D89+cell   the cell's character id, $FF empty.  Cells $00-$0F are
+--                  the pool (two rows of eight: col = cell % 8, row = cell
+--                  >= 8), cells $10+ the groups' seats, four per group
+--                  (group g's seat s is $10 + 4(g-1) + s: col = b >> 1,
+--                  row = b & 1 with b = cell - $10)
+--   $4B+$4A+$5A    the cursor's cell
+-- A is pick-up and drop, START commits.  Each member is found in the pool
+-- at the moment it is seated and dropped into its group's lowest empty
+-- seat; both cells are asserted afterwards (a cursor that wandered would
+-- otherwise commit whoever it stood on).  Reads and presses only.
+--   members  a list of character ids (one group), or a list of such lists
+--            (group g = members[g]); ids are seated in the order given.
+--            A member already seated in its group is left there.
+--   opts.tag         log/step prefix (default "party")
+--   opts.names       id -> name for the step names (default the cast)
+--   opts.menuWait    frames each seat waits for $26=$2D (default 900)
+--   opts.commit      false: leave the menu open (default: START, and wait
+--                    for $0059 to read closed)
+--   opts.commitWait  (default 600), opts.closeWait (default 1200)
+-- M.newPartySelect above is the per-frame form for a rider that already
+-- owns the pad (the Blackjack's IAF launch).
+local PARTY_NAMES = { [0] = "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR",
+  "SABIN", "CELES", "STRAGO", "RELM", "SETZER", "MOG", "GAU", "GOGO", "UMARO" }
+function M.partySelect(members, opts)
+  opts = opts or {}
+  local tag = opts.tag or "party"
+  local names = opts.names or PARTY_NAMES
+  local groups = type(members[1]) == "table" and members or { members }
+  local function mst() return M.readByte(0x0026) end
+  local function cell(c) return M.readByte(0x7E9D89 + c) end
+  local function cursorCell()
+    return M.readByte(0x004b) + M.readByte(0x004a) + M.readByte(0x005a)
+  end
+  local function decode(c)
+    if c < 0x10 then
+      return { area = "pool", col = c % 8, row = c >= 8 and 1 or 0 }
+    end
+    local b = c - 0x10
+    return { area = "party", col = b >> 1, row = b & 1 }
+  end
+  local function stepToward(cur, tgt)
+    local c, t = decode(cur), decode(tgt)
+    if c.area == "pool" and t.area == "party" then return "down"
+    elseif c.area == "party" and t.area == "pool" then return "up"
+    elseif c.area == "pool" then
+      if c.row ~= t.row then return c.row < t.row and "down" or "up" end
+      if c.col ~= t.col then return c.col < t.col and "right" or "left" end
+    else
+      if c.col ~= t.col then return c.col < t.col and "right" or "left" end
+      if c.row ~= t.row then return c.row < t.row and "down" or "up" end
+    end
+    return nil
+  end
+  -- walk the cursor to tgt() and press btn until the pick state reaches
+  -- doneState and holds there 8 frames with the cursor on tgt
+  local function menuAct(tgt, btn, doneState, what)
+    local phase, settled = 0, 0
+    return M.withReset(M.driveUntil(function()
+      return mst() == doneState and cursorCell() == tgt() and settled >= 8
+    end, 4000, {
+      M.call(function()
+        phase = (phase + 1) % 10
+        if mst() == doneState then settled = settled + 1; M.setPad({}); return end
+        settled = 0
+        if mst() == 0x69 then M.setPad({}); return end
+        local cur = cursorCell()
+        if cur ~= tgt() then
+          local b = stepToward(cur, tgt())
+          if not b then M.setPad({}); return end
+          M.setPad(phase < 4 and { [b] = true } or {})
+          return
+        end
+        M.setPad(phase < 4 and { [btn] = true } or {})
+      end),
+    }, what), function() phase, settled = 0, 0 end)
+  end
+  local function census()
+    local t = {}
+    for c = 0x00, 0x1F do t[#t + 1] = string.format("%02X", cell(c)) end
+    return table.concat(t, " ")
+  end
+  local steps = {
+    M.call(function() M.log(string.format("[%s] cells $00-$1F: %s", tag, census())) end),
+  }
+  for g, ids in ipairs(groups) do
+    local base = 0x10 + 4 * (g - 1)
+    for _, id in ipairs(ids) do
+      local name = names[id] or string.format("$%02X", id)
+      local what = string.format("%s: %s -> group %d", tag, name, g)
+      local src, dst, seated
+      steps[#steps + 1] = M.waitUntil(function() return mst() == 0x2d end,
+        opts.menuWait or 900, what .. ": menu at $2d", 5)
+      steps[#steps + 1] = M.call(function()
+        src, dst, seated = nil, nil, false
+        for c = base, base + 3 do if cell(c) == id then seated = true end end
+        if seated then
+          M.log(string.format("[%s] %s already seated in group %d", tag, name, g))
+          return
+        end
+        for c = 0x00, 0x0F do if cell(c) == id then src = c; break end end
+        for c = base, base + 3 do if cell(c) == 0xFF then dst = c; break end end
+        M.assertEq(src ~= nil, true, what .. ": found in the pool")
+        M.assertEq(dst ~= nil, true, what .. ": a free seat in the group")
+        M.log(string.format("[%s] %s: pool cell $%02X -> seat $%02X", tag, name, src, dst))
+      end)
+      steps[#steps + 1] = M.cond(function() return not seated end, {
+        menuAct(function() return src end, "a", 0x2e, what .. ": pick"),
+        menuAct(function() return dst end, "a", 0x2d, what .. ": drop"),
+        M.call(function()
+          M.assertEq(cell(dst), id, what .. ": landed in the seat it was aimed at")
+          M.assertEq(cell(src), 0xFF, what .. ": its pool cell is now empty")
+        end),
+      }, {})
+    end
+  end
+  steps[#steps + 1] = M.call(function() M.log(string.format("[%s] seated: %s", tag, census())) end)
+  if opts.commit ~= false then
+    steps[#steps + 1] = M.waitUntil(function() return mst() == 0x2d end,
+      opts.commitWait or 600, tag .. ": menu at $2d for commit", 5)
+    steps[#steps + 1] = M.pressButtons({ "start" }, 6)
+    steps[#steps + 1] = M.waitUntil(function() return M.readByte(0x0059) == 0 end,
+      opts.closeWait or 1200, tag .. ": menu closed", 5)
+  end
+  return M.seqStep(steps)
+end
+
 -- ------------------------------------------- South Figaro shared toolkit --
 -- gen_sfigaro and gen_tunnelarmr both walk occupied South Figaro.
 

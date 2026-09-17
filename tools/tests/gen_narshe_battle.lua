@@ -24,66 +24,9 @@ local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 en
 local function mst() return H.readByte(0x0026) end
 local function menuUp() return H.readByte(0x0059) ~= 0 end
 local function cell9d(c) return H.readByte(0x7E9D89 + c) end
-local function cursorCell()
-  return H.readByte(0x004b) + H.readByte(0x004a) + H.readByte(0x005a)
-end
-local function decode(cell)
-  if cell < 0x10 then
-    return { area = "pool", col = cell % 8, row = cell >= 8 and 1 or 0 }
-  end
-  local b = cell - 0x10
-  return { area = "party", col = b >> 1, row = b & 1 }
-end
-local function stepToward(cur, tgt)
-  local c, t = decode(cur), decode(tgt)
-  if c.area == "pool" and t.area == "party" then return "down"
-  elseif c.area == "party" and t.area == "pool" then return "up"
-  elseif c.area == "pool" then
-    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
-    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
-  else
-    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
-    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
-  end
-  return nil
-end
-local function menuAct(tgt, btn, doneState, what)
-  local phase, settled = 0, 0
-  return H.driveUntil(function()
-    return mst() == doneState and cursorCell() == tgt and settled >= 8
-  end, 4000, {
-    H.call(function()
-      phase = (phase + 1) % 10
-      if mst() == doneState then
-        settled = settled + 1
-        H.setPad({})
-        return
-      end
-      settled = 0
-      if mst() == 0x69 then H.setPad({}); return end
-      local cur = cursorCell()
-      if cur ~= tgt then
-        local b = stepToward(cur, tgt)
-        if not b then H.setPad({}); return end
-        H.setPad(phase < 4 and { [b] = true } or {})
-        return
-      end
-      H.setPad(phase < 4 and { [btn] = true } or {})
-    end),
-  }, what)
-end
-local function assign(srcCell, dstCell, charId, name)
-  return H.cond(function() return true end, {
-    H.waitUntil(function() return mst() == 0x2d end, 600,
-      name .. ": menu at $2d", 5),
-    menuAct(srcCell, "a", 0x2e, name .. ": pick"),
-    menuAct(dstCell, "a", 0x2d, name .. ": drop"),
-    H.call(function()
-      H.assertEq(cell9d(dstCell), charId, name .. " in the party cell")
-      H.assertEq(cell9d(srcCell), 0xFF, name .. "'s pool cell empty")
-    end),
-  })
-end
+-- the seats themselves are H.partySelect (lib/ot6_field.lua): each member
+-- found in the pool, walked to its group's lowest empty seat, both cells
+-- asserted, START to commit
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
 -- ----------------------------------------------- the input-driven fighter --
@@ -588,16 +531,10 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   -- ==================================================================== --
   -- 2. The assignment: P1=TERRA+EDGAR+CELES P2=CYAN+SABIN P3=LOCKE+GAU.
   -- ==================================================================== --
-  assign(0, 0x10, 0x00, "TERRA -> P1s0"),
-  assign(3, 0x11, 0x04, "EDGAR -> P1s1"),
-  assign(5, 0x12, 0x06, "CELES -> P1s2"),
-  assign(2, 0x14, 0x02, "CYAN -> P2s0"),
-  assign(4, 0x15, 0x05, "SABIN -> P2s1"),
-  assign(1, 0x18, 0x01, "LOCKE -> P3s0"),
-  assign(6, 0x19, 0x0B, "GAU -> P3s1"),
-  H.waitUntil(function() return mst() == 0x2d end, 600, "menu at $2d for commit", 5),
-  H.pressButtons({ "start" }, 6),
-  H.waitUntil(function() return not menuUp() end, 1200, "menu closed", 5),
+  H.partySelect({ { 0x00, 0x04, 0x06 },   -- P1 TERRA EDGAR CELES
+                   { 0x02, 0x05 },         -- P2 CYAN SABIN
+                   { 0x01, 0x0B } },       -- P3 LOCKE GAU
+    { tag = "assign", menuWait = 600 }),
   H.logStep("assignment committed; riding the battle-start event"),
   H.advanceStory(landed(22), 30000, { playBattles = true }),
   H.waitFrames(30),

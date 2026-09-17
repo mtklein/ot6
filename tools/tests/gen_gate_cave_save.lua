@@ -132,61 +132,9 @@ end
 local function mst() return H.readByte(0x0026) end
 local function menuUp() return H.readByte(0x0059) ~= 0 end
 local function cell9d(c) return H.readByte(0x7E9D89 + c) end
-local function cursorCell()
-  return H.readByte(0x004b) + H.readByte(0x004a) + H.readByte(0x005a)
-end
-local function decode(cell)
-  if cell < 0x10 then
-    return { area = "pool", col = cell % 8, row = cell >= 8 and 1 or 0 }
-  end
-  local b = cell - 0x10
-  return { area = "party", col = b >> 1, row = b & 1 }
-end
-local function stepToward(cur, tgt)
-  local c, t = decode(cur), decode(tgt)
-  if c.area == "pool" and t.area == "party" then return "down"
-  elseif c.area == "party" and t.area == "pool" then return "up"
-  elseif c.area == "pool" then
-    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
-    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
-  else
-    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
-    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
-  end
-  return nil
-end
-local function menuAct(tgtIn, btn, doneState, what)
-  local phase, settled = 0, 0
-  local function tgt() return type(tgtIn) == "function" and tgtIn() or tgtIn end
-  return H.driveUntil(function()
-    return mst() == doneState and cursorCell() == tgt() and settled >= 8
-  end, 4000, {
-    H.call(function()
-      phase = (phase + 1) % 10
-      if mst() == doneState then
-        settled = settled + 1
-        H.setPad({})
-        return
-      end
-      settled = 0
-      if mst() == 0x69 then H.setPad({}); return end
-      local cur = cursorCell()
-      if cur ~= tgt() then
-        local b = stepToward(cur, tgt())
-        if not b then H.setPad({}); return end
-        H.setPad(phase < 4 and { [b] = true } or {})
-        return
-      end
-      H.setPad(phase < 4 and { [btn] = true } or {})
-    end),
-  }, what)
-end
-local function cellOf(charId)
-  for c = 0, 0x13 do
-    if cell9d(c) == charId then return c end
-  end
-  return nil
-end
+-- the seats themselves are H.partySelect (lib/ot6_field.lua): each member
+-- found in the pool, walked to its group's lowest empty seat, both cells
+-- asserted, START to commit
 
 -- ------------------------------------------------------------ TERRA's kit --
 -- TERRA rejoins the party in the swap room holding nothing; this is the
@@ -273,38 +221,8 @@ H.run({ maxFrames = 480000 }, {
   end, 3000, "YES on $0528 -> the party menu"),
   H.waitUntil(function() return mst() == 0x2d end, 900, "menu at $2d", 5),
   H.waitFrames(20),
-  (function()
-    local steps = {}
-    local wanted = { { 0x00, "TERRA" }, { 0x01, "LOCKE" },
-                     { 0x04, "EDGAR" }, { 0x05, "SABIN" } }
-    for _, w in ipairs(wanted) do
-      local charId, name = w[1], w[2]
-      local src, dst
-      steps[#steps + 1] = H.waitUntil(function() return mst() == 0x2d end,
-        900, name .. ": menu ready", 5)
-      steps[#steps + 1] = H.call(function()
-        src = cellOf(charId)
-        assert(src and src < 0x10, name .. " not in the pool")
-        dst = nil
-        for c = 0x10, 0x13 do
-          if cell9d(c) == 0xFF then dst = c; break end
-        end
-        assert(dst, "no empty party cell for " .. name)
-      end)
-      steps[#steps + 1] = menuAct(function() return src end, "a", 0x2e,
-        name .. ": pick")
-      steps[#steps + 1] = menuAct(function() return dst end, "a", 0x2d,
-        name .. ": drop")
-      steps[#steps + 1] = H.call(function()
-        H.assertEq(cell9d(dst), charId, name .. " in the party cell")
-      end)
-    end
-    return H.seqStep(steps)
-  end)(),
-  H.waitUntil(function() return mst() == 0x2d end, 600,
-    "menu at $2d for commit", 5),
-  H.pressButtons({ "start" }, 6),
-  H.waitUntil(function() return not menuUp() end, 1200, "menu closed", 5),
+  H.partySelect({ 0x00, 0x01, 0x04, 0x05 },  -- TERRA LOCKE EDGAR SABIN
+    { tag = "swap room" }),
   H.waitUntil(landed(7, 20), 3000, "back on map 7 after update_party", 1),
   H.call(function()
     H.assertEq(partyOf(0x00), 1, "TERRA in party 1 (the base's hard gate)")
