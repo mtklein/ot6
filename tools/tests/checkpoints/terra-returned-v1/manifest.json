@@ -2,17 +2,17 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "terra-returned.sram",
   "size": 32768,
-  "sha256": "dc607adc29d67b2e0ffd028f58e4bb38c366c9a29ef4e2a788fd11898b948a28",
+  "sha256": "fcc5b68330816d1bdfdd2bb2e812981ae68b95630355cdb85885956916689d63",
   "slot": 3,
   "milestone": "terra-returned",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "dc607adc29d67b2e0ffd028f58e4bb38c366c9a29ef4e2a788fd11898b948a28",
-    "generator_sig": "a9c75f70d80f9b4aba0970d3279f8c5b406ef87f5473084adec7a6c6a8e2459d gen_terra_returned_checkpoint",
+    "payload_sha256": "fcc5b68330816d1bdfdd2bb2e812981ae68b95630355cdb85885956916689d63",
+    "generator_sig": "3c191cfec7b79e1e666b927cc61ed597d52450f9428658eea645f4e060e2737d gen_terra_returned_checkpoint",
     "ancestors": [
       {
         "path": "build/states/n128_won.stamp",
-        "sha256": "fb9c61f6e2038631000ce43bd7c056a135883b76364cd91c84b5956baa82de01"
+        "sha256": "36e67db346eb017bf23a536ff6674c4b4ae4b868b7c081e8efd1bb35bc2bfded"
       }
     ]
   },

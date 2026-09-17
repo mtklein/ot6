@@ -2,17 +2,17 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "vector-escape.sram",
   "size": 32768,
-  "sha256": "21ecc23488db454fdde376ba44a2b0905a0b3901a75a195e4e0ddd2a6a6d732f",
+  "sha256": "1707430065428b5fa075cc5244b4c28bc41933fed5b2c11ab5f314ced412c1cf",
   "slot": 3,
   "milestone": "vector-escape",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "21ecc23488db454fdde376ba44a2b0905a0b3901a75a195e4e0ddd2a6a6d732f",
-    "generator_sig": "a2ac0ce07efc4029143005f1c2306be52694c43323486a5b6b84a0e5fdb42981 gen_vector_escape_checkpoint",
+    "payload_sha256": "1707430065428b5fa075cc5244b4c28bc41933fed5b2c11ab5f314ced412c1cf",
+    "generator_sig": "d969416270ec25a4524267eb33351717e1bb78258981cdfa5aeaba2f475f00e0 gen_vector_escape_checkpoint",
     "ancestors": [
       {
         "path": "build/states/n128_won.stamp",
-        "sha256": "fb9c61f6e2038631000ce43bd7c056a135883b76364cd91c84b5956baa82de01"
+        "sha256": "36e67db346eb017bf23a536ff6674c4b4ae4b868b7c081e8efd1bb35bc2bfded"
       }
     ]
   },
