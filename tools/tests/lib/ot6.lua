@@ -1002,6 +1002,145 @@ function M.keyBoost(o)
     chipsAt[bank] or 0)
 end
 
+-- What a boost costs (#219): the driver's copy of the ROM's one price
+-- authority, Ot6BoostPriceFor (ff6/src/battle/ot6_boost.asm).
+--
+--     price = min(99, floor(base * 2.5^boost + 0.5)), never below base
+--
+-- Transcribed from that proc's own integer path rather than written as
+-- `base * 2.5^n` in floats, so the two cannot round apart: 2.5^n = 5^n /
+-- 2^n, so the proc multiplies by 5 n times, shifts right n-1, then
+-- increments and halves.  The 99 ceiling is the price drawers' two
+-- digits, and the floor is its one exception -- the cap may never make a
+-- boost CHEAPER than not boosting (Phoenix's base 110 stands).
+--
+-- This is the only place in the library the 2.5x arithmetic appears.
+-- Every caller that wants to know what a boost will cost reaches here,
+-- the way every ROM surface that states a price reaches Ot6BoostPriceFor.
+function M.boostPrice(base, boost)
+  base, boost = base or 0, boost or 0
+  if boost <= 0 then return base end
+  if boost > 3 then boost = 3 end            -- Ot6Boost caps the spend at 3
+  local p = base
+  for _ = 1, boost do p = p * 5 end
+  p = (p >> (boost - 1))
+  p = (p + 1) >> 1
+  if p > 99 then p = 99 end
+  if p < base then p = base end
+  return p
+end
+
+-- The boost this actor can actually pay for (#219).  Before #219 every
+-- boost but a cast's fold was free, so the driver planned the bank's
+-- whole boost and the engine's universal insufficient-MP gate ate the
+-- turn.  A boost the caster cannot pay is not a plan.
+--
+--   base     the ability's unboosted price (Ot6AbilityCostTbl's row for
+--            a Blitz or a Tool, the live list row's +3 for a cast)
+--   pool     the caster's current MP
+--   want     the boost the bank would spend
+--   reserve  MP the plan must leave behind (the nuke floor); default 0
+--   priceAt  optional f(boost) -> price, for a verb whose ladder is not
+--            the flat 2.5x one: a cast reaches M.spellPrice, because a
+--            family head's boost buys a TIER and pays that tier's own MP
+--
+-- Only the verbs whose price moves with the boost come here.  Fight and
+-- Capture buy swings, SwdTech buys the tech tier and pays that row's own
+-- price, and Slot is unpriced altogether -- none of them has a boost to
+-- afford, and the driver's lines for them pass the bank's boost straight
+-- through.
+--
+-- Returns the deepest level 0..want that `pool - reserve` covers, its
+-- price, and the reason -- STEPPING DOWN rather than dropping the verb.
+-- Why step down instead of abandoning: the boost and the ability are
+-- separable, and the ability is usually the part that was worth having.
+-- Measured on the OT6 shield model, which is what a chip-model turn is
+-- for: a Blitz or a Tool at boost 0 still lands its own hit count and
+-- its own class against the gauge, and the driver's own comparator
+-- (bestLine/fightChips) is what decides whether that beats the free
+-- boosted Fight -- so the step-down feeds the measurement instead of
+-- pre-empting it, and a stepped-down line that no longer wins simply
+-- loses the comparison.  Level 0 is returned when nothing is affordable
+-- and the base price itself is covered; nil when even the base is not,
+-- which IS "drop the verb".
+function M.affordBoost(o)
+  local base, pool = o.base or 0, o.pool or 0
+  local want, reserve = o.want or 0, o.reserve or 0
+  local priceAt = o.priceAt or function(b) return M.boostPrice(base, b) end
+  local budget, asked = pool - reserve, priceAt(want)
+  for b = want, 0, -1 do
+    local p = priceAt(b)
+    if p <= budget then
+      if b == want then
+        return b, p, string.format("boost %d costs %d of %d MP", b, p, pool)
+      end
+      return b, p, string.format("boost %d costs %d, over the %d MP the pool "
+        .. "has spare -- stepped down to %d (%d MP)", want, asked, budget, b, p)
+    end
+  end
+  return nil, priceAt(0), string.format("%d MP of %d cannot pay even the "
+    .. "unboosted %d", budget, pool, priceAt(0))
+end
+
+-- Ot6FoldTbl (ff6/src/battle/ot6_boost.asm), read out of the ROM rather
+-- than copied here: eight tier families, three bytes each --
+-- [head, one boost, two boosts].  The ROM's two scans over it are the
+-- two below: Ot6InFoldTbl asks "is this id anywhere in the table"
+-- (stride 1: heads AND tiers), Ot6FoldTier asks "what does a head fold
+-- to" (stride 3, base column only, so a tier the caster already owns
+-- does not fold again).
+local FOLD_ROWS = 8
+local function foldByte(i)
+  return M.readRomByte((M.sym("Ot6FoldTbl") & 0x3FFFFF) + i)
+end
+
+-- Ot6InFoldTbl: true when boost buys this spell a TIER rather than a
+-- multiplier.  Those are the spells #219 leaves on their vanilla MP
+-- (mp-economy.md, "Unchanged, already escalating by tier"), so the 2.5x
+-- must not be charged on top of them.
+function M.inFoldTbl(id)
+  if id == nil then return false end
+  for i = 0, FOLD_ROWS * 3 - 1 do
+    if foldByte(i) == id then return true end
+  end
+  return false
+end
+
+-- Ot6FoldTier: the tier `steps` boosts buy a family HEAD, or the id
+-- unchanged when it is not a head.  Ot6FoldSteps caps the steps at 2,
+-- so a boost-3 cast folds no further than a boost-2 one.
+function M.foldTier(id, steps)
+  steps = math.max(0, math.min(steps or 0, 2))
+  for r = 0, FOLD_ROWS - 1 do
+    if foldByte(r * 3) == id then return foldByte(r * 3 + steps) end
+  end
+  return id
+end
+
+-- What a boosted CAST costs, and what it will actually cast: Ot6QueueFold's
+-- two arms, in the same order (ot6_boost.asm:509-556).
+--
+--   base   the caster's own list row price, which is the unboosted number
+--
+-- A family head folds up a tier and pays that tier's own vanilla MP; a
+-- tier the caster already owns does not fold again and neither its id nor
+-- its price moves; everything else is a multiplier verb and takes the
+-- 2.5x.  One function so the driver cannot charge a fold 2.5x on top of
+-- its tier, which would be charging twice for one boost.
+function M.spellPrice(id, base, boost)
+  base, boost = base or 0, boost or 0
+  if boost <= 0 then return base, id end
+  if M.inFoldTbl(id) then
+    local to = M.foldTier(id, boost)
+    if to == id then return base, id end
+    -- MagicProp+5, the number Ot6SpellMP re-derives a folded tier's price
+    -- from; M.spellMpCost (the nav half) already reads that byte, so the
+    -- fold's price and the field menu's read the same cell
+    return M.spellMpCost(to), to
+  end
+  return M.boostPrice(base, boost), id
+end
+
 -- Spend it before you die (#175): a member inside one round of death who
 -- holds banked BP, and whom no heal in hand lifts clear of that round,
 -- spends the pips now on their strongest line rather than take a heal
@@ -3016,9 +3155,6 @@ function M.newFightDriver(tag, opts)
   -- sets this to 1 and widens the side mask to every valid ally/monster
   -- (probe_targetall.lua measured it; btlgfx_main.asm @6e9a sets it)
   local TGTALL = 0x7B7F
-  -- folded cure MP by tier (magic_prop_en.dat +$05: $2D/5, $2E/25, $2F/40);
-  -- the fold charges the folded tier's real cost (mp-economy.md)
-  local CURE_MP = { [0x2D] = 5, [0x2E] = 25, [0x2F] = 40 }
   local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
   local AUTOCROSSBOW, PUMMEL = M.AUTOCROSSBOW, 0x5D
   -- The cures, cheapest first: the loop simply casts again if the target
@@ -3692,6 +3828,46 @@ function M.newFightDriver(tag, opts)
     return opts.nukeFloor or (M.readWord(MAXMP + actor * 2) // 4)
   end
 
+  -- Ot6AbilityCostTbl (ot6_boost.asm), the $ff-terminated [id, cost]
+  -- column Ot6CostFor scans: a Blitz's attack id or a Tool's item id ->
+  -- its UNBOOSTED MP.  Read out of the ROM once per battle driver rather
+  -- than mirrored here, so the driver prices the kit the build ships.
+  local abilityCostTbl = nil
+  local function abilityCost(id)
+    if abilityCostTbl == nil then
+      abilityCostTbl = {}
+      local base = M.sym("Ot6AbilityCostTbl") & 0x3FFFFF
+      for i = 0, 63 do
+        local key = M.readRomByte(base + i * 2)
+        if key == 0xFF then break end
+        abilityCostTbl[key] = M.readRomByte(base + i * 2 + 1)
+      end
+    end
+    return abilityCostTbl[id]
+  end
+
+  -- What boost this actor can pay for a kit verb, and what it costs
+  -- (#219).  Blitz and Tools keep one id at every boost and take the flat
+  -- 2.5x ladder (Ot6AbilityCost's @boosted arm), so M.affordBoost's
+  -- default pricer is the right one.  nil for a verb the pool cannot pay
+  -- even unboosted, which is "do not offer this line".
+  local function skillBoost(actor, id, want)
+    local base = abilityCost(id)
+    if base == nil then return want, 0, "unpriced" end   -- not in the column
+    return M.affordBoost({ base = base, want = want,
+                           pool = M.readWord(CURMP + actor * 2) })
+  end
+
+  -- The same for a cast, through M.spellPrice: a family head's boost buys
+  -- a TIER and pays that tier's own vanilla MP, everything else takes the
+  -- 2.5x.  `base` is the caster's own list row price (spellCell's second
+  -- return), which is the unboosted number.
+  local function castBoost(actor, spell, base, want, reserve)
+    return M.affordBoost({ base = base, want = want, reserve = reserve or 0,
+      pool = M.readWord(CURMP + actor * 2),
+      priceAt = function(b) return (M.spellPrice(spell, base, b)) end })
+  end
+
   local function makePlan(actor)
     -- What a round costs this party, measured rather than assumed.  For each
     -- entity, the most HP it has lost between two consecutive turns of the
@@ -4002,20 +4178,34 @@ function M.newFightDriver(tag, opts)
       local id = M.readByte(BCHID + actor * 2)
       local best = nil
       local function offer(p) if best == nil or p.chips > best.chips then best = p end end
+      -- The kit lines are offered at the boost the pool can PAY for
+      -- (#219), not at the bank's: the price escalates 2.5x a level, so a
+      -- bank the MP cannot follow buys a refused command and an
+      -- evaporated turn.  Stepping the level down costs this comparison
+      -- nothing -- a tool is its own hit count and a Pummel its own two,
+      -- so neither line's `chips` moves with the boost; only the Fight's
+      -- swings do -- so the chip model still decides between them on the
+      -- same terms, at the boost that will actually go through.
       local tool = opts.tool or AUTOCROSSBOW
       if opts.tactical and opts.tools ~= false and id == 4
-         and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_TOOLS)
-         and battInvIdx(tool) then
-        offer({ kind = "skill", cmd = CMD_TOOLS, skill = tool,
-                row = cmdRow(actor, CMD_TOOLS), boostLeft = bp,
-                chips = toolChips(slot, tool), hits = TOOL_HITS[tool] or 1,
-                what = string.format("Tools $%02X", tool) })
+         and cmdRow(actor, CMD_TOOLS) and battInvIdx(tool) then
+        local tb = skillBoost(actor, tool, bp)
+        if tb ~= nil then
+          offer({ kind = "skill", cmd = CMD_TOOLS, skill = tool,
+                  row = cmdRow(actor, CMD_TOOLS), boostLeft = tb,
+                  chips = toolChips(slot, tool), hits = TOOL_HITS[tool] or 1,
+                  what = string.format("Tools $%02X at %d BP", tool, tb) })
+        end
       end
       if opts.tactical and id == 5 and (opts.blitz or PUMMEL) == PUMMEL
-         and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_BLITZ) and not skillDead[CMD_BLITZ] then
-        offer({ kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
-                row = cmdRow(actor, CMD_BLITZ), boostLeft = bp,
-                chips = 2 * hitChips(slot, 0x04, 0), hits = 2, what = "Pummel" })
+         and cmdRow(actor, CMD_BLITZ) and not skillDead[CMD_BLITZ] then
+        local bb = skillBoost(actor, PUMMEL, bp)
+        if bb ~= nil then
+          offer({ kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
+                  row = cmdRow(actor, CMD_BLITZ), boostLeft = bb,
+                  chips = 2 * hitChips(slot, 0x04, 0), hits = 2,
+                  what = string.format("Pummel at %d BP", bb) })
+        end
       end
       local fight = cmdRow(actor, CMD_FIGHT)
       if fight ~= nil then
@@ -4482,19 +4672,25 @@ function M.newFightDriver(tag, opts)
       -- already owns that case.
       if cureRow ~= nil and #cands >= 2 then
         local spell = (type(opts.cure) == "table" and opts.cure or CURES)[1]
-        local cell = spellCell(actor, spell, true)
+        local cell, cellMp = spellCell(actor, spell, true)
         local bank = M.readByte(BP + actor * 2)
         if cell ~= nil and bank >= 1 then
           local deep = cands[1].pct < 35 or #cands >= 3
-          local boost = math.min(bank, deep and 2 or 1)
-          local mpc = CURE_MP[spell + boost] or 99
+          local want = math.min(bank, deep and 2 or 1)
+          -- The fold and its price both come from M.spellPrice, which
+          -- reads Ot6FoldTbl and MagicProp: the tier a boost buys and the
+          -- MP it charges are the engine's own numbers rather than a
+          -- table kept here, and a boost the pool cannot pay steps down
+          -- instead of queueing a cast the MP gate then fizzles (#219).
           local floorMp = M.readWord(MAXMP + actor * 2) // 4
-          local pool = M.readWord(CURMP + actor * 2)
-          if pool >= mpc and (deep or pool - mpc >= floorMp) then
+          local boost, mpc, why =
+            castBoost(actor, spell, cellMp, want, deep and 0 or floorMp)
+          if boost ~= nil and boost >= 1 then
+            local _, folded = M.spellPrice(spell, cellMp, boost)
             M.log(string.format("[%s] actor=%d party cure: %d hurt "
               .. "(worst %d%%), boost %d folds $%02X -> $%02X (%d MP), "
-              .. "all allies", tag or "fight", actor, #cands, cands[1].pct,
-              boost, spell, spell + boost, mpc))
+              .. "all allies -- %s", tag or "fight", actor, #cands,
+              cands[1].pct, boost, spell, folded, mpc, why))
             return { kind = "heal", spell = spell, target = cands[1].e,
                      row = cureRow, all = true, boostLeft = boost, reason = "party_hurt" }
           end
@@ -4655,13 +4851,22 @@ function M.newFightDriver(tag, opts)
     end
     if mg and cmdRow(actor, CMD_MAGIC) then
       local cell, cost = spellCell(actor, mg.spell, true)
+      -- The boost is priced before it is planned (#219): a cast at a
+      -- boost the pool cannot pay is refused by the same insufficient-MP
+      -- gate a base cast is, and the turn goes with it.  castBoost steps
+      -- down to the deepest level the pool covers; spellCell has already
+      -- proved the unboosted price, so the step-down cannot fail here.
+      local cb, cmp, cwhy = 0, cost, nil
+      if cell ~= nil and mg.boost ~= false and boost > 0 then
+        cb, cmp, cwhy = castBoost(actor, mg.spell, cost, boost)
+      end
       if cell ~= nil then
-        M.log(string.format("[%s] actor=%d cast $%02X, cell %d, %d MP of %d",
-          tag or "fight", actor, mg.spell, cell, cost,
-          M.readWord(CURMP + actor * 2)))
+        M.log(string.format("[%s] actor=%d cast $%02X, cell %d, %d MP of %d%s",
+          tag or "fight", actor, mg.spell, cell, cmp,
+          M.readWord(CURMP + actor * 2), cwhy and (" -- " .. cwhy) or ""))
         return { kind = "magic", spell = mg.spell,
                  row = cmdRow(actor, CMD_MAGIC),
-                 boostLeft = mg.boost == false and 0 or boost }
+                 boostLeft = cb }
       elseif not spellKnown(actor, mg.spell) then
         -- an inert line is said once per fight per actor (#182), not
         -- skipped in silence
@@ -4725,15 +4930,23 @@ function M.newFightDriver(tag, opts)
               tag or "fight", actor, spell, id))
           end
         end
-        if cell ~= nil
-           and M.readWord(CURMP + actor * 2) - cost >= nukeFloor(actor) then
+        -- The nuke's boost is priced against the SAME reserve the base
+        -- cast is (#219): the floor is what the cure line is owed, so a
+        -- boost that would breach it steps down rather than being taken
+        -- out of the healer's bar.  nil here is "this one is out of
+        -- reach", and the loop moves to the next of the repertoire.
+        local nb, nmp, nwhy = nil, cost, nil
+        if cell ~= nil then
+          nb, nmp, nwhy = castBoost(actor, spell, cost, boost, nukeFloor(actor))
+        end
+        if nb ~= nil then
           if not castVetoed(spell, "nuke") then
             M.log(string.format(
-              "[%s] actor=%d nuke $%02X, cell %d, %d MP of %d",
-              tag or "fight", actor, spell, cell, cost,
-              M.readWord(CURMP + actor * 2)))
+              "[%s] actor=%d nuke $%02X, cell %d, %d MP of %d -- %s",
+              tag or "fight", actor, spell, cell, nmp,
+              M.readWord(CURMP + actor * 2), nwhy))
             return { kind = "magic", spell = spell,
-                     row = cmdRow(actor, CMD_MAGIC), boostLeft = boost }
+                     row = cmdRow(actor, CMD_MAGIC), boostLeft = nb }
           end
         end
       end
@@ -4764,6 +4977,9 @@ function M.newFightDriver(tag, opts)
        and (type(opts.runic) ~= "function" or opts.runic(actor)) then
       return { kind = "runic", row = cmdRow(actor, CMD_RUNIC) }
     end
+    -- Slot's boost is not priced: cmd $0f has no arm in Ot6AbilityCost,
+    -- so Slot is free at every level ("Slot would join them, but Slot is
+    -- unpriced today", mp-economy.md).  Nothing to step down.
     if opts.slot and id == 9 and not skillDead[CMD_SLOT] and cmdRow(actor, CMD_SLOT) then
       return { kind = "slot", row = cmdRow(actor, CMD_SLOT), boostLeft = boost }
     end
@@ -4810,10 +5026,19 @@ function M.newFightDriver(tag, opts)
     -- MakeToolsList's walk of the battle inventory): a plan for a tool
     -- that is not there opens the list, finds no row, backs out and plans
     -- the same thing again, forever.  Without the tool Edgar Fights.
+    -- The MP gate on this line is the tool's own priced boost (#219),
+    -- not a flat 4: AutoCrossbow's base IS 4, but a boosted one is 10 /
+    -- 25 / 63, and the Drill's base alone is 16.  skillBoost answers
+    -- both halves -- the deepest boost the pool pays for, or nil for a
+    -- tool the pool cannot pay at all, in which case EDGAR falls through
+    -- to the free boosted Fight below.
+    local toolBp, toolMp, toolWhy = nil, nil, nil
     if opts.tactical and opts.tools ~= false and id == 4
-       and M.readWord(CURMP + actor * 2) >= 4
        and cmdRow(actor, CMD_TOOLS)
        and battInvIdx(opts.tool or AUTOCROSSBOW) then
+      toolBp, toolMp, toolWhy = skillBoost(actor, opts.tool or AUTOCROSSBOW, boost)
+    end
+    if toolBp ~= nil then
       -- The chip model picks between the tool and the sword (#156): against
       -- a lone monster whose revealed classes EDGAR's blade matches, a
       -- boosted Fight's 1 + 2*BP swings chip more than the tool's one hit
@@ -4824,21 +5049,42 @@ function M.newFightDriver(tag, opts)
       local slot = soleTarget()
       local fight = cmdRow(actor, CMD_FIGHT)
       if slot ~= nil and fight ~= nil then
+        -- the Fight is compared at the BANK's boost, because Fight does
+        -- not escalate and never has to step down (#219 leaves it free)
         local fc, tc = fightChips(actor, slot, boost), toolChips(slot, tool)
         if fc > tc then
           M.log(string.format("[%s] actor=%d Fight at %d BP chips %d against "
-            .. "slot %d, Tools $%02X %d -- Fighting (#156)", tag or "fight",
-            actor, boost, fc, slot, tool, tc))
+            .. "slot %d, Tools $%02X at %d BP %d -- Fighting (#156)",
+            tag or "fight", actor, boost, fc, slot, tool, toolBp, tc))
           return { kind = "fight", row = fight, boostLeft = boost }
         end
       end
+      -- said only when the price moved the plan: a boost that goes
+      -- through as asked is the ordinary turn and the plan= line covers it
+      if toolBp ~= boost then
+        M.log(string.format("[%s] actor=%d Tools $%02X, %d MP of %d -- %s",
+          tag or "fight", actor, tool, toolMp,
+          M.readWord(CURMP + actor * 2), toolWhy))
+      end
       return { kind = "skill", cmd = CMD_TOOLS, skill = tool,
-               row = cmdRow(actor, CMD_TOOLS), boostLeft = boost }
+               row = cmdRow(actor, CMD_TOOLS), boostLeft = toolBp }
     end
-    if opts.tactical and id == 5 and M.readWord(CURMP + actor * 2) >= 4
+    if opts.tactical and id == 5
        and cmdRow(actor, CMD_BLITZ) and not skillDead[CMD_BLITZ] then
-      return { kind = "skill", cmd = CMD_BLITZ, skill = opts.blitz or PUMMEL,
-               row = cmdRow(actor, CMD_BLITZ), boostLeft = boost }
+      -- Same rule as the Tools line: the blitz's own row price, escalated
+      -- (#219).  Suplex at boost 3 is 81 MP against SABIN's 80-MP pool at
+      -- the level he joins, so this line steps down far more often than
+      -- it drops; when even the base is out of reach SABIN Fights.
+      local bp, mp, why = skillBoost(actor, opts.blitz or PUMMEL, boost)
+      if bp ~= nil then
+        if bp ~= boost then
+          M.log(string.format("[%s] actor=%d Blitz $%02X, %d MP of %d -- %s",
+            tag or "fight", actor, opts.blitz or PUMMEL, mp,
+            M.readWord(CURMP + actor * 2), why))
+        end
+        return { kind = "skill", cmd = CMD_BLITZ, skill = opts.blitz or PUMMEL,
+                 row = cmdRow(actor, CMD_BLITZ), boostLeft = bp }
+      end
     end
     -- SHADOW throws an elemental skean when a present monster's REVEALED
     -- weakness matches it (owner: unknown menus are missed opportunities --
@@ -4847,7 +5093,9 @@ function M.newFightDriver(tag, opts)
     -- exactly this (Fire Skean $AB, Water Edge $AC, Bolt Edge $AD -> fire/
     -- water/bolt), and boost multiplies a thrown skean like any damage
     -- verb.  Flow measured by probe_throw.lua: cmd $08 -> $2B builds
-    -- wItemList -> $2D selects -> ST_TGT.
+    -- wItemList -> $2D selects -> ST_TGT.  The boost stays free: cmd $08
+    -- falls out of Ot6AbilityCost's chain with vanilla's own cost, 0, so
+    -- there is no price here to escalate (#219).
     if opts.tactical and opts.throw ~= false and id == 3
        and cmdRow(actor, CMD_THROW) then
       for item, elem in pairs(SKEAN_ELEM) do
