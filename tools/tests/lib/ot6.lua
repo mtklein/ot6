@@ -762,6 +762,71 @@ function M.atbEta(gauge, const)
   return math.ceil((0x10000 - gauge) / const)
 end
 
+-- What one enemy round costs a member between their turns (#206, #194),
+-- priced from the engine's own clock rather than from a sum of past
+-- worsts: the enemy actions that can land before the member's next turn,
+-- each at the worst single action that enemy has measured.  Summing the
+-- worst of each kind overpriced a solo soldier with one action a turn
+-- (TekLaser 149 + Battle 113 = 262 against a 250 Potion, #206: LOCKE died
+-- at 17 HP holding 3 BP); the largest loss seen underpriced two Tek
+-- Lasers from two slots converging on EDGAR before his next turn (#194).
+--
+--   window   ATB ticks until the member's next turn (M.atbEta; for the
+--            member acting now, a full refill of its gauge)
+--   enemies  one per living monster: { slot, eta, period, worst } --
+--            eta the ticks until its gauge fills (0 = full, nil = it
+--            cannot fill), period the ticks a full refill takes (nil =
+--            once at most), worst the largest single action it has landed
+--            (on this member, else on anybody; nil = not measured)
+--   fallback the per-action price for an enemy that acts in the window
+--            with nothing measured (the largest single action any enemy
+--            has landed this battle); nil = such an action adds nothing
+--
+-- A gauge that fills at or inside the window acts once, plus once per
+-- full period that still fits.  Returns the cost, the enemy actions
+-- counted, the arithmetic as a string, and the steady rate: what a
+-- window-long round costs on average (each enemy's worst x window /
+-- period), which is the price for a count of rounds rather than for the
+-- next one (the finisher gate's "the rounds the kill still needs").
+function M.roundCost(o)
+  local window = o.window or 0
+  local cost, actions, parts, rate = 0, 0, {}, 0
+  local gauges = {}
+  for _, en in ipairs(o.enemies or {}) do
+    gauges[#gauges + 1] = string.format("s%d eta %s/%s", en.slot or -1,
+      tostring(en.eta), tostring(en.period))
+    local n = 0
+    if en.eta ~= nil and window >= 0 and en.eta <= window then
+      n = 1
+      if en.period ~= nil and en.period > 0 then
+        n = n + (window - en.eta) // en.period
+      end
+    end
+    local each0 = en.worst or o.fallback
+    if en.eta ~= nil and each0 ~= nil then
+      if en.period ~= nil and en.period > 0 then
+        rate = rate + each0 * window // en.period
+      elseif n > 0 then
+        rate = rate + each0
+      end
+    end
+    if n > 0 then
+      local each, how = en.worst, "worst"
+      if each == nil then each, how = o.fallback, "unmeasured, at the battle's worst" end
+      actions = actions + n
+      if each ~= nil then
+        cost = cost + n * each
+        parts[#parts + 1] = string.format("s%d %dx%d (%s)", en.slot or -1, n, each, how)
+      else
+        parts[#parts + 1] = string.format("s%d %dx? (unmeasured)", en.slot or -1, n)
+      end
+    end
+  end
+  local why = string.format("%d enemy action(s) inside %d ticks%s [%s]", actions, window,
+    #parts > 0 and (": " .. table.concat(parts, " + ")) or "", table.concat(gauges, ", "))
+  return cost, actions, why, rate
+end
+
 -- Is a heal worth the turn it costs?  All of newFightDriver's heal policy,
 -- kept out here as arithmetic on plain numbers so battle_healpolicy can put
 -- the measured cases through it without an emulated fight.
@@ -2502,8 +2567,21 @@ end
 -- Condemned casts, past a FIFO watch's 900-tick expiry, so CELES's Fight
 -- was credited to TERRA's summon on one seed and EDGAR's crossbow on
 -- another.  Read-only.
-local execActor = nil                 -- entity 0..3 whose command ExecCmd entered
-local execDone = {}                   -- { actor, frame } per SaveForMimic, oldest first
+-- Only a menu command counts (#207): the engine runs its own actions
+-- through ExecCmd with the character's X too -- command $22, the dot
+-- tick of Poison / Regen / Seize (battle_main.asm Cmd_22), and the other
+-- engine commands from $1E up (SaveForMimic's own "command >= $1e" line)
+-- -- and a Seized TERRA's drain tick at t=874/1560 settled her pending
+-- Fire 2's watch at 0 before the cast ran at t=1582 for 483 (Air Force
+-- lab terrafire_i0).  Those land in execParty (any party X executing,
+-- which the hit ledger reads as "nobody's") and execSkipped (for the
+-- driver's log), never in execActor / execDone.
+local EXEC_MENU_CMDS = 0x1E           -- commands below this are the menu's
+local execActor = nil                 -- entity 0..3 whose menu command ExecCmd entered
+local execActorCmd = nil              -- { cmd, atk } that command
+local execDone = {}                   -- { actor, frame, cmd, atk } per SaveForMimic, oldest first
+local execParty = nil                 -- entity 0..3 executing anything (menu or engine command)
+local execSkipped = {}                -- { actor, frame, cmd, atk } engine commands run under a party X
 -- and the monster half of the same two observers (#165): the slot 0..5
 -- (X = 8 + slot*2) whose command is executing, and the last one to
 -- return with its frame.  The fight driver's hit ledger credits party HP
@@ -2523,7 +2601,14 @@ local function execActivate()
   local a = M.sym("ExecCmd@battle_code")
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xffff
-    if x < 8 and x % 2 == 0 then execActor = x // 2
+    if x < 8 and x % 2 == 0 then
+      execParty = x // 2
+      local cmd, atk = M.readByte(0xB5), M.readByte(0xB6)
+      if cmd < EXEC_MENU_CMDS then
+        execActor, execActorCmd = x // 2, { cmd = cmd, atk = atk }
+      elseif #execSkipped < 32 then        -- drained by a driver's frame; bounded without one
+        execSkipped[#execSkipped + 1] = { actor = x // 2, frame = M.frame, cmd = cmd, atk = atk }
+      end
     elseif x < 20 and x % 2 == 0 then
       execMon = x // 2 - 4
       execMonCmd, execMonAtk = M.readByte(0xB5), M.readByte(0xB6)
@@ -2533,8 +2618,12 @@ local function execActivate()
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xffff
     if x < 8 and x % 2 == 0 then
-      execDone[#execDone + 1] = { actor = x // 2, frame = M.frame }
-      if execActor == x // 2 then execActor = nil end
+      if execParty == x // 2 then execParty = nil end
+      if execActor == x // 2 then
+        execDone[#execDone + 1] = { actor = x // 2, frame = M.frame,
+          cmd = execActorCmd and execActorCmd.cmd, atk = execActorCmd and execActorCmd.atk }
+        execActor, execActorCmd = nil, nil
+      end
     elseif x < 20 and x % 2 == 0 then
       execMonDone = { slot = x // 2 - 4, frame = M.frame }
       if execMon == x // 2 - 4 then execMon = nil end
@@ -2680,7 +2769,8 @@ function M.newFightDriver(tag, opts)
   -- estimate), and what each monster's actions have taken off each party
   -- member (the raise rule's smallest hit).
   local dmgHit = {}                    -- actor -> { kind, skill, per, n }
-  local hitLedger = {}                 -- slot -> { min, minE, on = { [e] = smallest } }
+  local hitLedger = {}                 -- slot -> { min, minE, on = { [e] = smallest },
+                                       --          max, maxOn = { [e] = largest one action } }
   local partyHpLast = {}               -- entity -> HP last frame (hit ledger baseline)
   local monHpLast = {}                 -- slot -> HP last frame (damage watch baseline)
   -- The monster action in progress, for the ledger and the death lines
@@ -2735,6 +2825,7 @@ function M.newFightDriver(tag, opts)
   local freeRoundSaid = false          -- the preemptive free-round line, once
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
+  local priceSaid = {}                 -- entity -> the last [round] price line said
   local finisherSaid = nil             -- the finisher window yielding (#204), once per reason
   local inertSaid = {}                 -- "actor:spell" -> true once an unknown config spell is said (#182)
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
@@ -3129,6 +3220,15 @@ function M.newFightDriver(tag, opts)
     if #act.drops == 0 then return end
     local L = hitLedger[act.slot] or { on = {} }
     hitLedger[act.slot] = L
+    -- the largest ONE action on each member (a two-hit Battle is one
+    -- action): what the round price (M.roundCost) charges per action
+    L.maxOn = L.maxOn or {}
+    local per = {}
+    for _, d in ipairs(act.drops) do per[d.e] = (per[d.e] or 0) + d.drop end
+    for e, v in pairs(per) do
+      if L.maxOn[e] == nil or v > L.maxOn[e] then L.maxOn[e] = v end
+      if L.max == nil or v > L.max then L.max = v end
+    end
     for _, d in ipairs(act.drops) do
       if L.on[d.e] == nil or d.drop < L.on[d.e] then L.on[d.e] = d.drop end
       if L.min == nil or d.drop < L.min then
@@ -3328,6 +3428,81 @@ function M.newFightDriver(tag, opts)
       end
     end
     turnSnap[actor] = hpNow
+    -- The price every care line below reads (#206, #194): what one enemy
+    -- round costs each member before their next turn, off the gauges and
+    -- the hit ledger (M.roundCost).  The measured inter-turn loss above
+    -- stays the price only while the ledger has nothing attributed yet
+    -- (the opening move, damage no monster action owns).
+    local price, priceWhy, priceRate = {}, {}, {}
+    do
+      local fallback, any = nil, false
+      for s2 = 0, 5 do
+        local L = hitLedger[s2]
+        if L and L.max then
+          any = true
+          if fallback == nil or L.max > fallback then fallback = L.max end
+        end
+      end
+      -- the action still open is read provisionally, as the raise gate does
+      local open = {}
+      if monAct ~= nil then
+        for _, d in ipairs(monAct.drops) do open[d.e] = (open[d.e] or 0) + d.drop end
+        for _, v in pairs(open) do
+          any = true
+          if fallback == nil or v > fallback then fallback = v end
+        end
+      end
+      for e = 0, 3 do
+        if hpNow[e] > 0 and hpNow[e] ~= 0xFFFF and M.readWord(0x3C1C + e * 2) > 0 then
+          if not any then
+            price[e] = roundCost[e] or 0
+            priceWhy[e] = "no enemy action attributed yet: the measured inter-turn loss"
+          else
+            local const = M.readWord(ATB_CONST + e * 2)
+            local eta = etaOf(e * 2)
+            local period = const > 0 and math.ceil(0xFF00 / const) or nil
+            local window = (eta == 0 or eta == nil) and period or eta
+            local enemies = {}
+            for s2 = 0, 5 do
+              if monAlive(s2) then
+                local L = hitLedger[s2]
+                local worst = L and L.maxOn and L.maxOn[e] or (L and L.max) or nil
+                if monAct ~= nil and monAct.slot == s2 then
+                  local v = open[e]
+                  if v == nil then for _, w in pairs(open) do if v == nil or w > v then v = w end end end
+                  if v ~= nil and (worst == nil or v > worst) then worst = v end
+                end
+                local mconst = M.readWord(ATB_CONST + 8 + s2 * 2)
+                enemies[#enemies + 1] = { slot = s2, eta = etaOf(8 + s2 * 2),
+                  period = mconst > 0 and math.ceil(0xFF00 / mconst) or nil, worst = worst }
+              end
+            end
+            if window == nil then
+              price[e], priceWhy[e] = roundCost[e] or 0,
+                "the member's gauge cannot fill: the measured inter-turn loss"
+            else
+              local c, _, why, rate = M.roundCost({ window = window, enemies = enemies,
+                fallback = fallback })
+              price[e], priceWhy[e], priceRate[e] = c, why, rate
+            end
+          end
+        else
+          price[e], priceWhy[e] = 0, "down"
+        end
+      end
+    end
+    -- said once per change, beside the old measured figure, for the log
+    for e = 0, 3 do
+      if price[e] > 0 or (roundCost[e] or 0) > 0 then
+        local said = string.format("entity %d: a round costs %d (%s; measured "
+          .. "inter-turn worst %d)", e, price[e], priceWhy[e], roundCost[e] or 0)
+        local key = (said:gsub(" inside %d+ ticks", ""):gsub(" %[[^%]]*%]", ""))
+        if priceSaid[e] ~= key then
+          priceSaid[e] = key
+          M.log(string.format("[%s] [round] actor=%d deciding: %s", tag or "fight", actor, said))
+        end
+      end
+    end
     -- The Muddle rule (#170, M.muddleRule), before every other line: a
     -- muddled actor defers (X) rather than confirm a command the engine
     -- will re-aim -- measured from n024_entry, muddled SABIN's own
@@ -3571,24 +3746,43 @@ function M.newFightDriver(tag, opts)
     local function spendPlan(where)
       if opts.spend == false or livingMonsters() == 0 then return nil end
       local hp, maxhp = hpNow[actor], M.readWord(0x3C1C + actor * 2)
-      local cost = roundCost[actor] or 0
+      local cost = price[actor] or 0
       if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return nil end
       -- the heals this actor could give themself right now, priced the
-      -- way the care lines below price them
+      -- way the care lines below price them.  Only a heal those lines
+      -- would TAKE can save (#206): the Potion that "saves: 17 + 250 = 267
+      -- survives the 262 round" was the same Potion the heal policy
+      -- refused as "buys back less than it spends", so LOCKE did neither
+      -- and died holding 3 BP.  From the attack lines (the care block
+      -- closed to this actor, or it declined every heal) no heal is
+      -- coming this turn at all.
       local heals = {}
-      if cureRow ~= nil then
-        for _, spell in ipairs(type(opts.cure) == "table" and opts.cure or CURES) do
-          if spellCell(actor, spell, true) then
-            heals[#heals + 1] = { what = string.format("cure $%02X", spell),
-                                  restore = castRestore[spell] }
+      if where == "care" then
+        local allies = 0
+        for e = 0, 3 do
+          if e ~= actor and hpNow[e] > 0 and M.readWord(0x3C1C + e * 2) > 0 then
+            allies = allies + 1
           end
         end
-      end
-      if row ~= nil then
-        local item = (battInvIdx(POTION) and POTION) or (battInvIdx(TONIC) and TONIC)
-        if item then
-          heals[#heals + 1] = { what = string.format("item $%02X", item),
-                                restore = itemRestoreOf(item) }
+        local function taken(restore, mp)
+          return restore == nil or M.healDecision({ hp = hp, maxhp = maxhp,
+            restore = restore, roundCost = cost, allies = allies,
+            threshold = opts.healPercent or 60, mp = mp }) ~= nil
+        end
+        if cureRow ~= nil then
+          for _, spell in ipairs(type(opts.cure) == "table" and opts.cure or CURES) do
+            if spellCell(actor, spell, true) and taken(castRestore[spell], true) then
+              heals[#heals + 1] = { what = string.format("cure $%02X", spell),
+                                    restore = castRestore[spell] }
+            end
+          end
+        end
+        if row ~= nil then
+          local item = (battInvIdx(POTION) and POTION) or (battInvIdx(TONIC) and TONIC)
+          if item and taken(itemRestoreOf(item), false) then
+            heals[#heals + 1] = { what = string.format("item $%02X", item),
+                                  restore = itemRestoreOf(item) }
+          end
         end
       end
       local verdict, why = M.spendDecision({ hp = hp, maxhp = maxhp, roundCost = cost,
@@ -3693,16 +3887,19 @@ function M.newFightDriver(tag, opts)
       end
       for e = 0, 3 do
         local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
-        local cost = roundCost[e] or 0
-        if hp > 0 and maxhp > 0 and hp < maxhp and cost > 0 then
-          if hp <= cost then
+        local cost = price[e] or 0
+        if hp > 0 and maxhp > 0 and hp < maxhp and (cost > 0 or (priceRate[e] or 0) > 0) then
+          if cost > 0 and hp <= cost then
             return string.format("entity %d (%d/%d) is inside one round of death "
               .. "(%d)", e, hp, maxhp, cost)
           end
-          if rounds ~= nil and rounds > 1 and hp <= rounds * cost then
+          -- several rounds are priced at the steady rate, the next one
+          -- at the window price (M.roundCost)
+          local each = math.max(cost, priceRate[e] or 0)
+          if rounds ~= nil and rounds > 1 and hp <= rounds * each then
             return string.format("entity %d (%d/%d) is inside the %d round(s) the "
               .. "kill still needs (%s) at %d a round = %d", e, hp, maxhp, rounds,
-              arith, cost, rounds * cost)
+              arith, each, rounds * each)
           end
         end
       end
@@ -3751,7 +3948,7 @@ function M.newFightDriver(tag, opts)
              and raiseOk(e, actor) then
             needsCare = true
           elseif hp > 0 and maxhp > 0 and hp < maxhp
-             and (hp * 100 // maxhp < threshold or hp <= (roundCost[e] or 0)) then
+             and (hp * 100 // maxhp < threshold or hp <= (price[e] or 0)) then
             needsCare = true
           end
         end
@@ -3765,7 +3962,7 @@ function M.newFightDriver(tag, opts)
         local lethal = nil
         for e = 0, 3 do
           local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
-          if hp > 0 and hp < maxhp and hp <= (roundCost[e] or 0) then
+          if hp > 0 and hp < maxhp and hp <= (price[e] or 0) then
             lethal = e
             break
           end
@@ -3784,7 +3981,7 @@ function M.newFightDriver(tag, opts)
               .. "(%d/%d) is inside one round of death (%d) and %s lands %d "
               .. "chip(s) against %d shield(s) on slot %d -- caring first",
               tag or "fight", actor, lethal, hpNow[lethal],
-              M.readWord(0x3C1C + lethal * 2), roundCost[lethal], best.what,
+              M.readWord(0x3C1C + lethal * 2), price[lethal], best.what,
               best.chips, need, slot)
           end
           return nil, string.format("[%s] actor=%d no press: %s lands %d "
@@ -3824,7 +4021,7 @@ function M.newFightDriver(tag, opts)
             broken and "BROKEN" or (sh .. " shield(s) up"), estWhy,
             lethal ~= nil and string.format(", with entity %d (%d/%d) inside "
               .. "one round of death (%d)", lethal, hpNow[lethal],
-              M.readWord(0x3C1C + lethal * 2), roundCost[lethal]) or ""))
+              M.readWord(0x3C1C + lethal * 2), price[lethal]) or ""))
           return best
         end
         if lethal ~= nil then
@@ -3832,7 +4029,7 @@ function M.newFightDriver(tag, opts)
             .. "(%d/%d) is inside one round of death (%d) and %s would %s "
             .. "slot %d but not kill it (%s%s) -- caring first",
             tag or "fight", actor, lethal, hpNow[lethal],
-            M.readWord(0x3C1C + lethal * 2), roundCost[lethal], best.what,
+            M.readWord(0x3C1C + lethal * 2), price[lethal], best.what,
             broken and "hit broken" or ("chip " .. best.chips .. " of " .. need),
             slot, estWhy, last and "" or "; not the last monster")
         end
@@ -3955,12 +4152,23 @@ function M.newFightDriver(tag, opts)
         -- all four turns went to Tonics that restored nothing.
         if hp > 0 and maxhp > 0 and hp < maxhp then
           local pct = hp * 100 // maxhp
-          if pct < threshold or hp <= (roundCost[e] or 0) then
+          if pct < threshold or hp <= (price[e] or 0) then
             cands[#cands + 1] = { e = e, pct = pct, hp = hp, maxhp = maxhp }
           end
         end
       end
-      table.sort(cands, function(a, b) return a.pct < b.pct end)
+      -- neediest first: a member inside their priced round (#194) before
+      -- anyone merely under the threshold, the thinnest margin first --
+      -- the Air Force lab's EDGAR at 393/1048 (two Tek Lasers queued) was
+      -- passed over for LOCKE at 363/1129 by percentage and died first
+      for _, c in ipairs(cands) do c.margin = c.hp - (price[c.e] or 0) end
+      table.sort(cands, function(a, b)
+        local la, lb = a.margin <= 0 and (price[a.e] or 0) > 0,
+                       b.margin <= 0 and (price[b.e] or 0) > 0
+        if la ~= lb then return la end
+        if la then return a.margin < b.margin end
+        return a.pct < b.pct
+      end)
       local allies = 0
       for e = 0, 3 do
         if e ~= actor and hpNow[e] > 0 and M.readWord(0x3C1C + e * 2) > 0 then
@@ -3997,7 +4205,7 @@ function M.newFightDriver(tag, opts)
         end
       end
       for _, c in ipairs(cands) do
-        local cost = roundCost[c.e] or 0
+        local cost = price[c.e] or 0
         -- The cast, offered first.  A cure's magic_prop power scales with
         -- the caster's magic power and level, so unlike an item's +$14
         -- power byte there is no honest prior for what it restores.  The
@@ -5043,13 +5251,15 @@ function M.newFightDriver(tag, opts)
     roundCost, turnSnap = {}, {}
     itemRestore, castRestore = {}, {}
     healWatch, healSaid, finisherSaid, inertSaid = nil, nil, nil, {}
+    priceSaid = {}
     dmgWatch, dmgSeen, monHpLast = {}, {}, {}
     dmgHit, hitLedger, partyHpLast = {}, {}, {}
     monAct, deathSaid, battleDeaths, wipeSaid = nil, {}, {}, false
     raisePending, topUpOwed, unmuddlePending = nil, {}, nil
     raiseQueued, cureQueued = {}, {}
     statusSaid, cureSaid, freeRoundSaid = {}, nil, false
-    execActor, execDone = nil, {}
+    execActor, execActorCmd, execDone = nil, nil, {}
+    execParty, execSkipped = nil, {}
     execMon, execMonDone = nil, nil
     execMonCmd, execMonAtk = nil, nil
     -- The stall guard's verdict belongs to the battle it watched: a retry
@@ -5181,6 +5391,20 @@ function M.newFightDriver(tag, opts)
     -- the figure is normalized and kept per actor.  A rise (a monster
     -- healing itself, an absorbed hit) only moves the baseline.
     do
+      -- an engine command under a party X (a dot tick) is not that
+      -- member's action: said once per battle per member and command
+      -- when it would have settled a pending watch, which is #207
+      while execSkipped[1] ~= nil do
+        local k = table.remove(execSkipped, 1)
+        local key = string.format("skip:%d:%02X", k.actor, k.cmd)
+        if dmgWatchOf(k.actor) and not inertSaid[key] then
+          inertSaid[key] = true
+          M.log(string.format("[%s] entity %d ran engine command $%02X atk $%02X "
+            .. "(a dot tick or other engine action, not its menu command): its "
+            .. "pending damage watch stays open for the command it chose (#207)",
+            tag or "fight", k.actor, k.cmd, k.atk))
+        end
+      end
       local who = execActor
       if who == nil and execDone[#execDone] ~= nil then
         who = execDone[#execDone].actor
@@ -5215,8 +5439,9 @@ function M.newFightDriver(tag, opts)
           end
           M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
             .. "(%d shielded-equivalent over %d hit(s), %d a hit; the press "
-            .. "rule counts it)", tag or "fight", w.actor, w.kind, w.seen,
-            w.norm, w.n, w.n > 0 and w.norm // w.n or 0))
+            .. "rule counts it) [exec cmd $%02X atk $%02X]", tag or "fight", w.actor,
+            w.kind, w.seen, w.norm, w.n, w.n > 0 and w.norm // w.n or 0,
+            done.cmd or 0xFF, done.atk or 0xFF))
           table.remove(dmgWatch, i)
         end
       end
@@ -5291,7 +5516,7 @@ function M.newFightDriver(tag, opts)
     -- the enemy at "44 or more".
     do
       local slot = execMon
-      if slot == nil and execMonDone ~= nil and execActor == nil
+      if slot == nil and execMonDone ~= nil and execParty == nil
          and M.frame - execMonDone.frame <= DMG_SETTLE then
         slot = execMonDone.slot
       end
@@ -6349,7 +6574,8 @@ local function resetLibState()
   guardArmed, guardSettle = true, 0
   traceMap, traceSet, traceCount = nil, {}, 0
   recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
-  execActor, execDone, execMon, execMonDone = nil, {}, nil, nil
+  execActor, execActorCmd, execDone, execMon, execMonDone = nil, nil, {}, nil, nil
+  execParty, execSkipped = nil, {}
   execHooks = false
   M._killbitFired = false
   watchReset()

@@ -407,6 +407,51 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: spend rule and wipe class (#175) checked")
   end),
 
+  -- 11b. the round price (#206, #194, H.roundCost): the enemy actions
+  -- whose gauges fill inside the member's window, each at the worst
+  -- single action that enemy has landed.  The numbers are the labs':
+  -- the gate soldier's front-row seed 40 ([round] window 182 ticks, the
+  -- soldier's gauge 167 of a 227-tick period) with seed 20's TekLaser
+  -- 149, his worst on LOCKE, and the Air Force lab's bay_i12 EDGAR at
+  -- 393/1048 with two Tek Lasers queued (207 and 196 landed on the party).
+  H.call(function()
+    local c, n, why = H.roundCost({ window = 182,
+      enemies = { { slot = 0, eta = 167, period = 227, worst = 149 } } })
+    H.assertEq(c * 10 + n, 1491, "solo soldier, one action inside LOCKE's window: 149, not the 262 "
+      .. "a TekLaser plus a front-row Battle summed (" .. why .. ")")
+    H.assertEq(H.spendDecision({ hp = 17, maxhp = 279, roundCost = c, bp = 3,
+      heals = { { what = "item $E9", restore = 250 } } }), nil,
+      "LOCKE at 17 under that 149 round: the Potion saves (17 + 250 = 267)")
+    H.assertEq(H.healDecision({ hp = 17, maxhp = 279, restore = 250, roundCost = c,
+      allies = 0, threshold = 60 }), "top-up",
+      "...and the heal policy takes it: 250 outheals a 149 round (it refused it against 262)")
+    local rate
+    c, n, why, rate = H.roundCost({ window = 182,
+      enemies = { { slot = 0, eta = 200, period = 227, worst = 149 } } })
+    H.assertEq(c * 10 + n, 0, "the soldier's gauge fills after LOCKE's: nothing lands first")
+    H.assertEq(rate, 149 * 182 // 227, "...but a count of rounds is priced at the steady rate: 149 x 182/227 = 119")
+    c, n = H.roundCost({ window = 500,
+      enemies = { { slot = 0, eta = 40, period = 227, worst = 149 } } })
+    H.assertEq(c * 10 + n, 4473, "a window three refills long: 40, 267, 494 -- three actions, 447")
+    c, n, why = H.roundCost({ window = 250,
+      enemies = { { slot = 0, eta = 30, period = 300, worst = 207 },
+                  { slot = 2, eta = 90, period = 300, worst = 196 },
+                  { slot = 4, eta = 400, period = 300, worst = 235 } } })
+    H.assertEq(c * 10 + n, 4032, "two Tek Lasers from two slots inside EDGAR's window: 207 + 196 = 403, "
+      .. "the third gauge outside it (" .. why .. ")")
+    H.assertEq(393 <= c, true, "EDGAR at 393 is inside that round; the largest single loss seen (382) said he was not")
+    H.assertEq(H.spendDecision({ hp = 393, maxhp = 1048, roundCost = c, bp = 4, heals = {} }), "spend",
+      "...holding 4 BP with no heal coming: spend")
+    c, n, why = H.roundCost({ window = 250, fallback = 207,
+      enemies = { { slot = 0, eta = 30, period = 300, worst = nil },
+                  { slot = 1, eta = nil, period = nil, worst = 500 } } })
+    H.assertEq(c * 10 + n, 2071, "an unmeasured enemy acting is priced at the battle's worst action; "
+      .. "a gauge that cannot fill (Stop) adds nothing (" .. why .. ")")
+    c, n = H.roundCost({ window = 250, enemies = { { slot = 0, eta = 30, period = 300 } } })
+    H.assertEq(c * 10 + n, 1, "nothing measured anywhere: the action is counted, priced at 0")
+    H.log("battle_healpolicy: round price (#206, #194) checked")
+  end),
+
   -- 12. the raise gate's floor: every measured hit, a level spell's
   -- included.  The #174 exemption was measured out (map269-random.md,
   -- 2026-09-16: 20 Fenix Downs against main's 12, no frames gained) and
