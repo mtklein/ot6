@@ -94,6 +94,16 @@ provenance, or silently disable checks. Use `H.requestSaveState`,
 snapshots, and the versioned SRAM checkpoint path for battery saves. Prefer
 these existing supported paths during iteration.
 
+Evidence must outlive the tree it was produced in. Merge messages and design
+docs quote lines out of logs under `build/attempts/`, `build/lab/` and
+`build/sweeps/`, and an agent worktree takes those with it when it is
+removed, leaving citations that resolve nowhere. Before `git worktree
+remove`, run `python3 tools/retain_evidence.py <worktree> <branch>`: it
+copies those three trees' text evidence into the main tree under
+`build/attempts/<branch>/`, so every cited path still resolves. Cite the
+retained path. A citation whose log was lost this way says so at the
+citation rather than dropping the number.
+
 ## Synthetic mechanism tests
 
 Explicitly isolated mechanism tests may retain declared state-write waivers

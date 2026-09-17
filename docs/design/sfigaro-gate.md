@@ -8,6 +8,14 @@ quoted from a retained log under `build/attempts/locke-solo-lab/` (the
 batch runner keeps every attempt; `tools/tests/sfigarolab_aggregate.py`
 prints them all).
 
+**The `build/attempts/locke-solo-lab/` tree is gone** (#222): it lived in
+the agent worktree this work was done in and went with it.  Every path
+under it cited below is a retained log lost with the agent worktree; see
+the merge message for the quoted lines.  The numbers stand as they were
+quoted; they cannot be re-opened from this tree (the qualification log
+above is in the main tree and still resolves).  `tools/retain_evidence.py`
+keeps the next lab's logs.
+
 ## What happened in the qualification
 
 `sfigaro_town` (gen_sfigaro) attempt 1:
@@ -68,7 +76,8 @@ matter, below.
 ## Why LOCKE dies
 
 Every loss has the same shape.  The three baseline losses
-(`build/attempts/locke-solo-lab/sweep-baseline/sfigaro_town.seed0{0,2,3}.log`):
+(`build/attempts/locke-solo-lab/sweep-baseline/sfigaro_town.seed0{0,2,3}.log`,
+lost with the worktree):
 
     seed00  battle f+4800 ... partyhp=137 ... monhp=s0:117/sh3   -> KEYED: Fight at 0 BP ... -> canary: BATTLE WIPE (f7371)
     seed02  battle f+4800 ... partyhp=134 ... monhp=s0:111/sh3   -> KEYED: Fight at 0 BP ... -> canary: BATTLE WIPE (f7328)
@@ -172,8 +181,8 @@ What the table says:
 
 1. **The shipped driver loses one fight in five** (control 3/15; the
    10-seed baseline sweep of the whole segment lost 3/10 the same way,
-   `build/attempts/locke-solo-lab/sweep-baseline/summary.tsv`).  Every
-   loss is the finisher-window laser above.
+   `build/attempts/locke-solo-lab/sweep-baseline/summary.tsv`, lost with
+   the worktree).  Every loss is the finisher-window laser above.
 2. **A keyed break is not the problem, nor is the boost-Fight default.**
    `boostfight` (no keyed line) loses 2/15 the same way; the keyed chip
    is just what a 0-BP actor does in that window either way.

@@ -433,6 +433,28 @@ suite cannot expect: an assert failing on attempt 1 of 3, no `attempt
 msg, frame }` records, which is how a suite asserts on attempt 1 from
 attempt 2.
 
+## Retaining a worktree's evidence
+
+```sh
+python3 tools/retain_evidence.py <worktree> <branch>      # BEFORE git worktree remove
+```
+
+`build/attempts/`, `build/lab/` and `build/sweeps/` are where a run, a lab
+and a sweep leave the logs a merge message or a design doc then quotes.
+They are gitignored and they live in the worktree the work was done in, so
+`git worktree remove` takes the cited lines with them (#222: three design
+docs carry citations that resolve nowhere). Run the script first: it copies
+those three trees into the main tree under `build/attempts/<branch>/`,
+relative paths preserved, and cite the retained path.
+
+Text evidence only — logs, tables, traces, the one-off script copies a lab
+ran, screenshots under `--max-bytes` — never savestates, ROMs or archives,
+which the graph regenerates; the skips are tallied per extension rather than
+silent. Running it twice copies nothing the second time, and a retained file
+whose bytes differ stops the whole copy and is named, until `--force` says
+to overwrite. `--dry-run` plans without writing, `--selftest` is the check
+(`ninja build/checks/retain_evidence_selftest.ok`).
+
 ## Failure signatures
 
 - A 255 exit with truncated stdout is a wall-clock cap expiry, not a
