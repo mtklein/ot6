@@ -5968,6 +5968,15 @@ local RUN                   -- the current attempt; filled in below
 -- fixture nor a contract ever reaches it.
 local BOOT_FALLBACK = 2400
 
+-- A retry whose first battle repeats an earlier attempt's is re-run at the
+-- next untried shift REROLL_STEP further on (7 is coprime to the 60-phase
+-- period, so the walk reaches every phase), at most MAX_REROLLS times.
+local REROLL_STEP, MAX_REROLLS = 7, 8
+
+-- An idle whose game clock has not moved its shift's worth of ticks after
+-- this many frames past the shift ends anyway, and says so.
+local IDLE_SLACK = 600
+
 -- ---------------------------------------------------------- observation --
 -- Everything here is read-only: frame-buffer reads, RAM reads, and the pad
 -- the script itself is holding.
@@ -6470,6 +6479,8 @@ RUN = {
   nextShift = nil,     -- a replay's shift chosen by the caller, not the gap ladder
   reroll = false,      -- the replay in flight re-runs this attempt (no count)
   rerolls = 0,
+  tried = {},          -- shift % 60 -> true, every shift an attempt has run
+  idleArm = false, idleMoved = 0, idleFrames = 0, idlePrev = 0,
   bootFrame = nil,     -- M.frame at this attempt's boot point
   probe = nil,         -- OT6_SHIFT_PROBE: { stride, shift, rows = {} }
   trace = nil,         -- probe mode: $021e / control transitions after the boot point
@@ -6541,10 +6552,23 @@ function M.bootMark(what)
   M.log(string.format("[retry] boot point: %s at f%d (attempt %d/%d, "
     .. "$021e=%d, seed shift %d idle frames)", tostring(what), M.frame,
     RUN.attempt, RUN.attempts, M.seedPhase(), RUN.shift))
+  -- The idle is owed from THIS frame (#208).  bootMark runs inside a step's
+  -- tick, and seqStep carries straight on into the next step in the same
+  -- tick: gen_fc_landing's held RIGHT was set on the boot frame itself, the
+  -- world map latched it at that frame's input poll, the walk onto
+  -- Thamasa and its 60-frame load (the game clock stopped) ran on the
+  -- game's own clock, and an idle that only began on the NEXT frame was
+  -- swallowed whole: shifts 0..59 all fought the same first battle.  So
+  -- the pad is captured and neutralised AFTER this frame's tick (the
+  -- runner's frame(), below), before the game polls it, and handed back
+  -- when the idle ends.  The idle's length is the game clock's own
+  -- movement ($021e ticks summed, as newSeedLadder counts them), not a
+  -- frame count, so a boot point that sits in a stopped clock (a map load,
+  -- a fade the module does not tick through) still moves the seed.
   if RUN.shift > 0 then
     RUN.idle = RUN.shift
-    RUN.idlePad = {}
-    for _, b in ipairs(ALL_BTN) do RUN.idlePad[b] = curPad[b] end
+    RUN.idleArm = true
+    RUN.idleMoved, RUN.idleFrames, RUN.idlePrev = 0, 0, M.seedPhase()
   end
 end
 
@@ -6605,13 +6629,22 @@ local function seedTraceTick()
   if not t or t.n >= TRACE_FRAMES then return end
   t.n = t.n + 1
   local ph = M.seedPhase()
-  local ticked = ((ph - t.prev) % M.SEED_PERIOD) ~= 0
+  -- A running clock can read unmoved for one sampled frame (it is ticked at
+  -- the end of the owning module's vblank; newSeedLadder's note), so it
+  -- reads STOP only after two still frames in a row.
+  t.still = ((ph - t.prev) % M.SEED_PERIOD) == 0 and (t.still or 0) + 1 or 0
   t.prev = ph
   local ctl = M.hasControl() or (M.worldHasControl and M.worldHasControl()) or false
   local pad = false
   for _, v in pairs(curPad) do if v then pad = true break end end
-  local key = string.format("clock=%s control=%s pad=%s idle=%s",
-    ticked and "tick" or "STOP", ctl and "yes" or "no", pad and "down" or "up",
+  if pad and not t.pressed then
+    t.pressed = true
+    M.log(string.format("[seedprobe] trace f%d (boot+%d) $021e=%d: the body's "
+      .. "first press after the boot point reaches the pad", M.frame,
+      M.frame - (RUN.bootFrame or 0), ph))
+  end
+  local key = string.format("clock=%s control=%s idle=%s",
+    t.still >= 2 and "STOP" or "tick", ctl and "yes" or "no",
     RUN.idle > 0 and "yes" or "no")
   if key ~= t.key then
     t.key = key
@@ -6637,7 +6670,7 @@ local function resetLibState()
   execHooks = false
   M._killbitFired = false
   watchReset()
-  RUN.bootMarked, RUN.idle, RUN.idlePad = false, 0, nil
+  RUN.bootMarked, RUN.idle, RUN.idlePad, RUN.idleArm = false, 0, nil, false
   RUN.lastBattle, RUN.goUnhandled = nil, nil
   RUN.firstBattle, RUN.bootFrame, RUN.trace, RUN.pendingFirst = nil, nil, nil, nil
   local hooks = replayHooks
@@ -6684,6 +6717,7 @@ function M.run(opts, steps)
   RUN.budget = opts.maxFrames or 60000
   RUN.root = seqStep(steps)
   RUN.shift = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
+  RUN.tried[RUN.shift % M.SEED_PERIOD] = true
   -- Probe mode (#208, seed_sweep.py --probe): every sample runs the body
   -- from its boot snapshot to its first battle only, logs the first-battle
   -- key, and replays at the next shift (OT6_SEED_SHIFT, +stride, ... below
@@ -7000,14 +7034,20 @@ function M.run(opts, steps)
         if RUN.reroll then
           RUN.reroll = false
         else
-          RUN.attempt = RUN.attempt + 1
+          RUN.attempt, RUN.rerolls = RUN.attempt + 1, 0
         end
         if RUN.nextShift then
           RUN.shift, RUN.nextShift = RUN.nextShift, nil
         else
           RUN.shift = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
             + RUN.gap * (RUN.attempt - 1)
+          -- the gap ladder never re-runs a shift a re-roll already took
+          for _ = 1, M.SEED_PERIOD do
+            if not RUN.tried[RUN.shift % M.SEED_PERIOD] then break end
+            RUN.shift = RUN.shift + 1
+          end
         end
+        RUN.tried[RUN.shift % M.SEED_PERIOD] = true
         resetLibState()
         M.rearmInputInjection()
         canaryInGame = false
@@ -7112,6 +7152,37 @@ function M.run(opts, steps)
         probeNext()
         return
       end
+      -- A replay whose first battle is an earlier attempt's is that
+      -- attempt again: the shift was absorbed (or landed a whole period
+      -- away), and playing it on would spend an attempt re-losing a known
+      -- loss.  Re-roll THIS attempt at a shift no attempt has run yet.
+      local same = nil
+      for _, prev in ipairs(RUN.firstBattles) do
+        if prev.key == fb.key then same = prev break end
+      end
+      if same and RUN.s0blob and #RUN.s0blob > 0 then
+        RUN.rerolls = RUN.rerolls + 1
+        if RUN.rerolls > MAX_REROLLS then
+          failed("other", string.format("seed shift cannot move this segment: "
+            .. "%d re-rolled shift(s) of attempt %d all fought attempt %d's "
+            .. "first battle (key %s) -- a harness finding (#208), not a route "
+            .. "one", RUN.rerolls - 1, RUN.attempt, same.attempt, fb.key), 1)
+          return
+        end
+        local nxt = RUN.shift + REROLL_STEP
+        for _ = 1, M.SEED_PERIOD do
+          if not RUN.tried[nxt % M.SEED_PERIOD] then break end
+          nxt = nxt + REROLL_STEP
+        end
+        M.log(string.format("[retry] reroll: attempt %d/%d at shift %d fought "
+          .. "attempt %d's first battle (key %s, f%d there, f%d here) -- the "
+          .. "same sample; re-running attempt %d at shift %d instead",
+          RUN.attempt, RUN.attempts, RUN.shift, same.attempt, fb.key,
+          same.frame or -1, fb.frame, RUN.attempt, nxt))
+        RUN.reroll, RUN.nextShift = true, nxt
+        scheduleReplay(string.format("re-rolled to shift %d", nxt))
+        return
+      end
     end
 
     if M.frame > RUN.budget then
@@ -7135,15 +7206,23 @@ function M.run(opts, steps)
     -- The seed variation: idle frames at the boot point, pad neutral, the
     -- pad restored afterwards so a press the boot step was holding is not
     -- silently dropped.
-    if RUN.idle > 0 then
-      RUN.idle = RUN.idle - 1
+    if RUN.idle > 0 and not RUN.idleArm then
+      local ph = M.seedPhase()
+      RUN.idleMoved = RUN.idleMoved + ((ph - RUN.idlePrev) % M.SEED_PERIOD)
+      RUN.idlePrev = ph
+      RUN.idleFrames = RUN.idleFrames + 1
       M.setPad(nil)
-      if RUN.idle == 0 then
+      local stalled = RUN.idleFrames >= RUN.idle + IDLE_SLACK
+      if RUN.idleMoved >= RUN.idle or stalled then
+        RUN.idle = 0
         M.setPad(RUN.idlePad)
         RUN.idlePad = nil
         M.log(string.format("[retry] seed shift done at f%d ($021e=%d, a "
-          .. "battle starting now would seed $be=$%02X)", M.frame,
-          M.seedPhase(), M.seedOf(M.seedPhase())))
+          .. "battle starting now would seed $be=$%02X): %d idle frame(s), "
+          .. "the game clock moved %d of %d%s", M.frame, ph, M.seedOf(ph),
+          RUN.idleFrames, RUN.idleMoved, RUN.shift,
+          stalled and "  -- STALLED: the clock is not running here, so this "
+            .. "shift may not move the run" or ""))
       end
       return
     end
@@ -7160,6 +7239,14 @@ function M.run(opts, steps)
       if bad then error(bad, 0) end
       return RUN.root:tick()
     end)
+    -- The boot point was marked inside that tick: take the pad the body
+    -- went on to set in the same tick, before the game polls it (bootMark).
+    if RUN.idleArm then
+      RUN.idleArm = false
+      RUN.idlePad = {}
+      for _, b in ipairs(ALL_BTN) do RUN.idlePad[b] = curPad[b] end
+      M.setPad(nil)
+    end
     -- The boot snapshot for the replay, asked for on the first frame of
     -- attempt 1 on which no other savestate trampoline is pending (a
     -- fixture-booted body loads its fixture on frame 1, so this lands a
