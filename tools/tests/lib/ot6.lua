@@ -2736,6 +2736,7 @@ function M.newFightDriver(tag, opts)
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
   local finisherSaid = nil             -- the finisher window yielding (#204), once per reason
+  local inertSaid = {}                 -- "actor:spell" -> true once an unknown config spell is said (#182)
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
   local parkDropN = 0                  -- watchdog fires this battle (see below)
   local careActor = nil                -- who took this round's one care turn
@@ -2841,6 +2842,20 @@ function M.newFightDriver(tag, opts)
       end
     end
     return nil
+  end
+  -- Whether `id` is in the actor's compacted list at all, MP and the
+  -- greyed bit aside (#182).  spellCell's nil is "cannot pay or greyed"
+  -- or "does not know it", and the second is a config bug worth a line:
+  -- gen_fc_alcove's Bolt line was inert for 13 of 13 TERRA turns with
+  -- nothing in the log saying so.  With no list to read (the pointer
+  -- outside the list area) this is not the rule's call and answers true.
+  local function spellKnown(actor, id)
+    local base = M.readWord(MLISTPTR + actor * 2)
+    if base < 0x2000 or base > 0x2600 then return true end
+    for cell = 0, 53 do
+      if M.readByte(base + (cell + 1) * 4) == id then return true end
+    end
+    return false
   end
 
   -- OT6's per-monster state, slot-indexed: monsters are entities 4..9 at a
@@ -4143,6 +4158,16 @@ function M.newFightDriver(tag, opts)
         return { kind = "magic", spell = mg.spell,
                  row = cmdRow(actor, CMD_MAGIC),
                  boostLeft = mg.boost == false and 0 or boost }
+      elseif not spellKnown(actor, mg.spell) then
+        -- an inert line is said once per fight per actor (#182), not
+        -- skipped in silence
+        local key = actor .. ":" .. mg.spell
+        if not inertSaid[key] then
+          inertSaid[key] = true
+          M.log(string.format("[%s] actor=%d: config spell $%02X is not in char "
+            .. "%d's learned table -- inert line", tag or "fight", actor,
+            mg.spell, id))
+        end
       end
     end
     -- opts.nuke = { spellId, ... } and opts.nukeLore = { loreId, ... }: the
@@ -4184,6 +4209,18 @@ function M.newFightDriver(tag, opts)
     if opts.nuke and cmdRow(actor, CMD_MAGIC) then
       for _, spell in ipairs(opts.nuke) do
         local cell, cost = spellCell(actor, spell, true)
+        if cell == nil and not spellKnown(actor, spell) then
+          -- the repertoire is party-wide, so a Magic-row actor without
+          -- this one is not a bug by itself; it is still said once per
+          -- fight per actor (#182) so a repertoire nobody knows is visible
+          local key = actor .. ":" .. spell
+          if not inertSaid[key] then
+            inertSaid[key] = true
+            M.log(string.format("[%s] actor=%d: config spell $%02X (nuke) is not "
+              .. "in char %d's learned table -- inert line for this actor",
+              tag or "fight", actor, spell, id))
+          end
+        end
         if cell ~= nil
            and M.readWord(CURMP + actor * 2) - cost >= nukeFloor(actor) then
           if not castVetoed(spell, "nuke") then
@@ -5005,7 +5042,7 @@ function M.newFightDriver(tag, opts)
     -- damage decide the next attempt's first turns.
     roundCost, turnSnap = {}, {}
     itemRestore, castRestore = {}, {}
-    healWatch, healSaid, finisherSaid = nil, nil, nil
+    healWatch, healSaid, finisherSaid, inertSaid = nil, nil, nil, {}
     dmgWatch, dmgSeen, monHpLast = {}, {}, {}
     dmgHit, hitLedger, partyHpLast = {}, {}, {}
     monAct, deathSaid, battleDeaths, wipeSaid = nil, {}, {}, false
