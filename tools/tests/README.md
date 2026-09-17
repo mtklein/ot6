@@ -20,7 +20,9 @@ Run `--check-states` when a fixture-related test fails unexpectedly. It
 names what moved and gives regeneration commands. A fixture is **STALE**
 when the ROM this tree builds is not the ROM it was captured on, when its
 own generator (or the checkpoint it boots from) changed, or when its
-artifact/ancestor bindings fail; **UNBOUND** when its bytes are not the
+artifact/ancestor bindings fail, or when a state it grew from is itself
+stale or unbound (transitively: `STALE via dadaluma_entry <- zozo_arrival`
+names the chain down to the link that moved); **UNBOUND** when its bytes are not the
 ones its stamp vouches for; **UNVERIFIED** when the tree has no built ROM
 to compare against. A change to the shared lib halves alone (`ot6.lua`,
 `ot6_field.lua`, `ot6_contract.lua`) is reported as *provenance drift*:
