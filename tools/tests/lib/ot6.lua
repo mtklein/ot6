@@ -1030,6 +1030,38 @@ function M.boostPrice(base, boost)
   return p
 end
 
+-- Does this command's price move with the boost at all (#219)?
+--
+-- The canon is ONE test, and it is the test the damage half already makes:
+-- a verb's price escalates exactly when Ot6BoostDmg multiplies it.  So
+-- Ot6BoostDmg's command gate (ff6/src/battle/ot6_boostdmg.asm) IS the
+-- exemption list, and this is the driver's copy of it:
+--
+--   $00 fight, $06 capture   boost buys swings, and the row is free
+--   $07 bushido              boost bought the tech tier; the tech's own
+--                            row price is charged
+--   $05 steal, $0f slot,     CHANCE verbs: boost converts variance into
+--   $10 rage                 reliability across a spread of outcomes that
+--                            are not merely damage, and the BP is what
+--                            pays for it.  MP scales with magnitude; BP
+--                            alone pays for certainty (owner, 2026-09-17)
+--
+-- Tier-family spells are the fourth exemption and are not a command: they
+-- fold, and pay the folded tier's own vanilla MP.  M.inFoldTbl answers
+-- that half, so a caller pricing a cast asks there, not here.
+--
+-- The ROM side of this pairing is checked by battle_costtable, which
+-- disassembles the built ROM and counts which of Ot6AbilityCost's arms
+-- are followed by a `jsl Ot6BoostPriceFor` (steal 0, rage 0, dance 1).
+-- battle_boostprice pins this list, so the two cannot drift apart
+-- silently.
+M.BOOST_FLAT_CMDS = { [0x00] = true, [0x05] = true, [0x06] = true,
+                      [0x07] = true, [0x0f] = true, [0x10] = true }
+
+function M.boostEscalates(cmd)
+  return not M.BOOST_FLAT_CMDS[cmd]
+end
+
 -- The boost this actor can actually pay for (#219).  Before #219 every
 -- boost but a cast's fold was free, so the driver planned the bank's
 -- whole boost and the engine's universal insufficient-MP gate ate the

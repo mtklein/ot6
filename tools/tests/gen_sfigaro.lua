@@ -250,12 +250,18 @@ local B_SWITCH_LIVE = 0x3EBD          -- $3EB4 + ($4C >> 3); bit4 = $4C
 -- he can pay before pressing R three times into a row the engine would
 -- grey and a turn the MP gate would fizzle.
 --
--- The gate is written against the rule, not against 63: if Steal leaves
--- the escalating set -- the canon is "a price escalates exactly when
--- Ot6BoostDmg multiplies the action", and Ot6BoostDmg already refuses
--- cmd $05 -- then stealPrice(3) is the one call to follow that change,
--- and the ladder keeps working either way because a cheaper guaranteed
--- tier only ever passes a gate it already passed.
+-- The gate is written against the rule, not against a number.  The canon
+-- is "a price escalates exactly when Ot6BoostDmg multiplies the action",
+-- and Ot6BoostDmg refuses cmd $05, so Steal is FLAT at every boost level
+-- (the owner's chance-verb exemption, 2026-09-17): boost buys it the
+-- rare/guarantee ladder, which is certainty rather than magnitude, and
+-- the BP is what pays for it.  H.boostEscalates is the library's copy of
+-- that gate, so this call follows the rule wherever it goes next rather
+-- than having to be found and edited again.  The ladder keeps working
+-- either way, because a cheaper guaranteed tier only ever passes a gate
+-- it already passed -- the 63 quoted above was the escalating price, and
+-- the gate now reads 4.
+local STEAL_CMD = 0x05
 local stealBase = nil
 local function stealPrice(boost)
   if stealBase == nil then
@@ -264,6 +270,7 @@ local function stealPrice(boost)
       "Ot6StealCost still opens with LDA #imm -- the +1 read is Steal's price")
     stealBase = H.readRomByte(ofs + 1)
   end
+  if not H.boostEscalates(STEAL_CMD) then return stealBase end
   return H.boostPrice(stealBase, boost)
 end
 

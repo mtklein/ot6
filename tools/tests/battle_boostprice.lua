@@ -320,6 +320,42 @@ H.run({ maxFrames = 300000 }, {
     -- and the one case the cap's floor exists for: Phoenix's 110 base
     H.assertEq(H.boostPrice(110, 1), 110,
       "the 99 ceiling never makes a boost cheaper than not boosting")
+    -- WHO reaches that ladder at all.  The canon is one test -- a price
+    -- escalates exactly when Ot6BoostDmg multiplies the action -- so the
+    -- library's copy of that gate is pinned here against Ot6BoostDmg's own
+    -- `cmp #imm / beq` chain, read out of the built ROM.  Without this the
+    -- Lua gate and the ROM gate could drift apart in silence, and the
+    -- driver would refuse boosts the engine would happily have charged 4
+    -- MP for (or plan ones it cannot pay).  The complementary check is
+    -- battle_costtable's, which asks the same question of the ROM's own
+    -- price arms; this one asks it of the driver.
+    local gate = {}
+    do
+      local ofs = H.sym("Ot6BoostDmg") & 0x3FFFFF
+      -- scan the proc's opening command gate: `cmp #imm` ($C9) followed by
+      -- `beq` ($F0), up to the first `lda OT6_BOOST_REVEALED,x` that ends it
+      for i = 0, 96 do
+        if H.readRomByte(ofs + i) == 0xC9 and H.readRomByte(ofs + i + 2) == 0xF0 then
+          gate[H.readRomByte(ofs + i + 1)] = true
+        end
+      end
+      -- cmd $00 is the `beq` off `lda $b5` itself, not a cmp, so it never
+      -- appears as an immediate: add it the way the ROM's comment does.
+      gate[0x00] = true
+    end
+    for cmd in pairs(gate) do
+      H.assertEq(H.boostEscalates(cmd), false, string.format(
+        "cmd $%02X is in Ot6BoostDmg's gate, so the driver must price it flat",
+        cmd))
+    end
+    for cmd in pairs(H.BOOST_FLAT_CMDS) do
+      H.assertEq(gate[cmd] or false, true, string.format(
+        "the driver calls cmd $%02X flat, so Ot6BoostDmg must gate it", cmd))
+    end
+    H.log(string.format("[boostprice] Ot6BoostDmg gates %d command(s); the "
+      .. "driver's flat set matches it exactly", (function()
+        local n = 0; for _ in pairs(gate) do n = n + 1 end; return n
+      end)()))
   end),
   H.waitFrames(20),
   H.loadState(STATE),
