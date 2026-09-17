@@ -2502,8 +2502,21 @@ end
 -- Condemned casts, past a FIFO watch's 900-tick expiry, so CELES's Fight
 -- was credited to TERRA's summon on one seed and EDGAR's crossbow on
 -- another.  Read-only.
-local execActor = nil                 -- entity 0..3 whose command ExecCmd entered
-local execDone = {}                   -- { actor, frame } per SaveForMimic, oldest first
+-- Only a menu command counts (#207): the engine runs its own actions
+-- through ExecCmd with the character's X too -- command $22, the dot
+-- tick of Poison / Regen / Seize (battle_main.asm Cmd_22), and the other
+-- engine commands from $1E up (SaveForMimic's own "command >= $1e" line)
+-- -- and a Seized TERRA's drain tick at t=874/1560 settled her pending
+-- Fire 2's watch at 0 before the cast ran at t=1582 for 483 (Air Force
+-- lab terrafire_i0).  Those land in execParty (any party X executing,
+-- which the hit ledger reads as "nobody's") and execSkipped (for the
+-- driver's log), never in execActor / execDone.
+local EXEC_MENU_CMDS = 0x1E           -- commands below this are the menu's
+local execActor = nil                 -- entity 0..3 whose menu command ExecCmd entered
+local execActorCmd = nil              -- { cmd, atk } that command
+local execDone = {}                   -- { actor, frame, cmd, atk } per SaveForMimic, oldest first
+local execParty = nil                 -- entity 0..3 executing anything (menu or engine command)
+local execSkipped = {}                -- { actor, frame, cmd, atk } engine commands run under a party X
 -- and the monster half of the same two observers (#165): the slot 0..5
 -- (X = 8 + slot*2) whose command is executing, and the last one to
 -- return with its frame.  The fight driver's hit ledger credits party HP
@@ -2523,7 +2536,14 @@ local function execActivate()
   local a = M.sym("ExecCmd@battle_code")
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xffff
-    if x < 8 and x % 2 == 0 then execActor = x // 2
+    if x < 8 and x % 2 == 0 then
+      execParty = x // 2
+      local cmd, atk = M.readByte(0xB5), M.readByte(0xB6)
+      if cmd < EXEC_MENU_CMDS then
+        execActor, execActorCmd = x // 2, { cmd = cmd, atk = atk }
+      elseif #execSkipped < 32 then        -- drained by a driver's frame; bounded without one
+        execSkipped[#execSkipped + 1] = { actor = x // 2, frame = M.frame, cmd = cmd, atk = atk }
+      end
     elseif x < 20 and x % 2 == 0 then
       execMon = x // 2 - 4
       execMonCmd, execMonAtk = M.readByte(0xB5), M.readByte(0xB6)
@@ -2533,8 +2553,12 @@ local function execActivate()
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xffff
     if x < 8 and x % 2 == 0 then
-      execDone[#execDone + 1] = { actor = x // 2, frame = M.frame }
-      if execActor == x // 2 then execActor = nil end
+      if execParty == x // 2 then execParty = nil end
+      if execActor == x // 2 then
+        execDone[#execDone + 1] = { actor = x // 2, frame = M.frame,
+          cmd = execActorCmd and execActorCmd.cmd, atk = execActorCmd and execActorCmd.atk }
+        execActor, execActorCmd = nil, nil
+      end
     elseif x < 20 and x % 2 == 0 then
       execMonDone = { slot = x // 2 - 4, frame = M.frame }
       if execMon == x // 2 - 4 then execMon = nil end
@@ -5049,7 +5073,8 @@ function M.newFightDriver(tag, opts)
     raisePending, topUpOwed, unmuddlePending = nil, {}, nil
     raiseQueued, cureQueued = {}, {}
     statusSaid, cureSaid, freeRoundSaid = {}, nil, false
-    execActor, execDone = nil, {}
+    execActor, execActorCmd, execDone = nil, nil, {}
+    execParty, execSkipped = nil, {}
     execMon, execMonDone = nil, nil
     execMonCmd, execMonAtk = nil, nil
     -- The stall guard's verdict belongs to the battle it watched: a retry
@@ -5181,6 +5206,20 @@ function M.newFightDriver(tag, opts)
     -- the figure is normalized and kept per actor.  A rise (a monster
     -- healing itself, an absorbed hit) only moves the baseline.
     do
+      -- an engine command under a party X (a dot tick) is not that
+      -- member's action: said once per battle per member and command
+      -- when it would have settled a pending watch, which is #207
+      while execSkipped[1] ~= nil do
+        local k = table.remove(execSkipped, 1)
+        local key = string.format("skip:%d:%02X", k.actor, k.cmd)
+        if dmgWatchOf(k.actor) and not inertSaid[key] then
+          inertSaid[key] = true
+          M.log(string.format("[%s] entity %d ran engine command $%02X atk $%02X "
+            .. "(a dot tick or other engine action, not its menu command): its "
+            .. "pending damage watch stays open for the command it chose (#207)",
+            tag or "fight", k.actor, k.cmd, k.atk))
+        end
+      end
       local who = execActor
       if who == nil and execDone[#execDone] ~= nil then
         who = execDone[#execDone].actor
@@ -5215,8 +5254,9 @@ function M.newFightDriver(tag, opts)
           end
           M.log(string.format("[%s] actor=%d's %s took %d off the monsters "
             .. "(%d shielded-equivalent over %d hit(s), %d a hit; the press "
-            .. "rule counts it)", tag or "fight", w.actor, w.kind, w.seen,
-            w.norm, w.n, w.n > 0 and w.norm // w.n or 0))
+            .. "rule counts it) [exec cmd $%02X atk $%02X]", tag or "fight", w.actor,
+            w.kind, w.seen, w.norm, w.n, w.n > 0 and w.norm // w.n or 0,
+            done.cmd or 0xFF, done.atk or 0xFF))
           table.remove(dmgWatch, i)
         end
       end
@@ -5291,7 +5331,7 @@ function M.newFightDriver(tag, opts)
     -- the enemy at "44 or more".
     do
       local slot = execMon
-      if slot == nil and execMonDone ~= nil and execActor == nil
+      if slot == nil and execMonDone ~= nil and execParty == nil
          and M.frame - execMonDone.frame <= DMG_SETTLE then
         slot = execMonDone.slot
       end
@@ -6349,7 +6389,8 @@ local function resetLibState()
   guardArmed, guardSettle = true, 0
   traceMap, traceSet, traceCount = nil, {}, 0
   recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
-  execActor, execDone, execMon, execMonDone = nil, {}, nil, nil
+  execActor, execActorCmd, execDone, execMon, execMonDone = nil, nil, {}, nil, nil
+  execParty, execSkipped = nil, {}
   execHooks = false
   M._killbitFired = false
   watchReset()
