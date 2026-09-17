@@ -468,6 +468,45 @@ H.run({ maxFrames = 600000, allowGameOver = true }, flatten({
     return H.cond(function() return true end, out)
   end)(),
   H.fieldCare({ tag = "care after Shadow", threshold = 0.9 }),
+
+  -- ---- 2b. dress SHADOW and sit him down, HERE ----------------------------
+  -- #221: these two steps used to happen at the save alcove, after the
+  -- crossing was over, and H.setRows above runs before the (10,16) talk
+  -- that adds him -- so SHADOW crossed the whole continent at
+  -- `gear=FF,FF,FF,FF relics=FF,FF` in the FRONT row.  Three of the v0.18
+  -- qualification's four deaths were his, and 15 of 24 across the lab's
+  -- 12-seed spread.  Measured over that spread (docs/design/fc-alcove.md,
+  -- logs under build/lab/fc-alcove/): 24 deaths / 20 Fenix / 1 lost
+  -- crossing becomes 7 / 7 / 0, and the mean falls 45,020 -> 39,504 frames.
+  --
+  -- The ROW is the lever.  In the back row the median of every physical
+  -- landing on him halves -- Brainpan Battle 279 -> 146, Wirey Drgn Wing
+  -- 792 -> 409, Behemoth Take Down 1130 -> 565 -- and the Ninja's Fire
+  -- Skean, which is magical, is unchanged.  Dressing him WITHOUT moving
+  -- him measured worse than leaving both alone (17 deaths, 2 wipes in 6
+  -- seeds), so the two steps travel together.
+  --
+  -- A player collects a naked guest, opens the menu on the spot and puts
+  -- him where he will not be hit; nobody walks a bare-handed Shadow across
+  -- a continent in the front row.  Both steps must land before the descent
+  -- snapshot below, because the ladder reloads it on every attempt.
+  kitSteps(SHADOW, "SHADOW", { { 4, 0xD1 },
+                               { 0, 0x01 }, { 0, 0x04 }, { 0, 0x05 },
+                               { 1, 0x01 }, { 1, 0x04 },
+                               { 2, 0x69 }, { 2, 0x6B },
+                               { 3, 0x84 }, { 3, 0x8A },
+                               { 5, 0xB3 } }),
+  H.setRows({ [SHADOW] = true }, { tag = "SHADOW to the back row" }),
+  H.call(function()
+    H.assertEq((H.readByte(0x1850 + SHADOW) & 0x20) ~= 0, true,
+      "SHADOW is in the back row for the crossing (#221)")
+    local base = 0x1600 + 37 * SHADOW
+    H.assertEq(H.readByte(base + 0x1F) ~= 0xFF, true,
+      "SHADOW carries a weapon into the crossing (#221)")
+    H.assertEq(H.readByte(base + 0x22) ~= 0xFF, true,
+      "SHADOW wears armor into the crossing (#221)")
+  end),
+
   -- ---- 3. dress the continent party, then the descent ---------------------
   -- The seed carries the party dressed on the deck (gen_fc_landing's deck
   -- kit); verify rather than re-ladder (a ladder re-run would walk the
@@ -516,15 +555,10 @@ H.run({ maxFrames = 600000, allowGameOver = true }, flatten({
     H.assertEq(partyOf(SHADOW) ~= 0, true, "SHADOW in the party")
     H.assertEq(mapIs(358), true, "reached the save alcove (map 358)")
   end),
-  -- SHADOW: the bag's spare Genji Glove makes him a second dual-dagger
-  -- fighter (Assassin main, ThiefKnife off), Ninja Gear is his armor;
-  -- relic first so the off-hand ladder sees a weapon slot, not a shield's
-  kitSteps(SHADOW, "SHADOW", { { 4, 0xD1 },
-                               { 0, 0x01 }, { 0, 0x04 }, { 0, 0x05 },
-                               { 1, 0x01 }, { 1, 0x04 },
-                               { 2, 0x69 }, { 2, 0x6B },
-                               { 3, 0x84 }, { 3, 0x8A },
-                               { 5, 0xB3 } }),
+  -- SHADOW's kit (the bag's spare Genji Glove makes him a second
+  -- dual-dagger fighter, Assassin main and ThiefKnife off, with Ninja Gear
+  -- for armor) was put on at the landing instead -- see 2b.  Wearing it
+  -- here, after the crossing, was #221.
   H.navTo(8, 10, { maxFrames = 4000 }),
   H.fieldCare({ tag = "care at the alcove", threshold = 0.95 }),
   H.call(function()
