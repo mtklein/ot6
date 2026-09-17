@@ -71,6 +71,8 @@ local function CURMP(s) return 0x3C08 + s * 2 end
 
 local gauSlot, msPresent = nil, {}
 local classWrites, cmd10Hits, gauDispatches, gauMenus = {}, 0, 0, 0
+local rideN = 0                       -- trance-ride iterations
+local RIDE_TURNS = 3                  -- the possessed turns the ride needs
 local saveRecA = nil                  -- battle A's read of the save record
 local veldtCleared = 0                -- battle B: times the instrument fired
 
@@ -376,14 +378,22 @@ add({
     H.call(function() H.setPad({}) end),
     H.waitFrames(16),
   }, "the RAGE status latches (Cmd_10 ran)"),
-  H.call(function() gauMenus, gauDispatches = 0, 0 end),
+  H.call(function() gauMenus, gauDispatches, rideN = 0, 0, 0 end),
                                       -- count openings/actions from the trance on
   -- ride the trance: the bench is X-cycled, so if the four-row
   -- menu ever offered a possessed Gau a window, the cycling would land
-  -- focus on him and the counter below would catch it.  700 iterations is
-  -- about 6300 frames.
-  H.repeatN(700, {
+  -- focus on him and the counter below would catch it.  The ride lasts
+  -- RIDE_TURNS of Gau's own possessed turns (each one a turn the gate had
+  -- to refuse a menu on), capped at 700 iterations, about 6300 frames.
+  -- It does not sit out the whole cap: the X-deferred bench never acts, so
+  -- every frame past the turns it needs is the monsters' free damage, and
+  -- the #214 gau_joined drew a pair that wiped the idle party 4450 frames
+  -- in (f15743).
+  H.driveUntil(function()
+    return gauDispatches >= RIDE_TURNS or rideN >= 700
+  end, 8000, {
     H.call(function()
+      rideN = rideN + 1
       if H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot then
         gauMenus = gauMenus + 1
       end
@@ -392,12 +402,14 @@ add({
     H.waitFrames(3),
     H.call(function() H.setPad({}) end),
     H.waitFrames(6),
-  }),
+  }, "the trance ridden for " .. RIDE_TURNS .. " possessed Gau turns"),
   H.call(function()
     H.log(string.format("[trance] cmd10=%d gau dispatches=%d menu openings=%d "
-      .. "raging=%s monstersLeft=%d", cmd10Hits, gauDispatches, gauMenus,
+      .. "raging=%s monstersLeft=%d ride=%d iterations partyhp=%d,%d,%d,%d",
+      cmd10Hits, gauDispatches, gauMenus,
       tostring((H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0),
-      H.monstersPresent()))
+      H.monstersPresent(), rideN, H.readWord(0x3BF4), H.readWord(0x3BF6),
+      H.readWord(0x3BF8), H.readWord(0x3BFA)))
     H.assertEq((H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0, true,
       "still possessed after riding the trance")
     H.assertEq(gauDispatches >= 1, true, string.format(
