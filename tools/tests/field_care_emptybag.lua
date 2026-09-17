@@ -1,13 +1,17 @@
 -- @suite savestate=crescent_landing
 -- field_care_emptybag.lua -- #184: field care once the Tonics are gone.
 --
--- The fixture is crescent_landing, a played state that arrives with 0
--- Tonics, 36 Potions and 27 Fenix Downs in the bag (gen_voyage drank the
--- Tonics on the way), standing on the world map at (232,150) with TERRA
--- (who knows Cure), LOCKE and SHADOW.  Nobody is hurt at boot, so every
--- case earns its patient the way a player does: world-map legs with the
--- battles fought (care switched off on the walk), until somebody is under
--- the threshold.  Reads and pad presses only; no inventory or HP writes.
+-- The fixture is crescent_landing, a played state standing on the world
+-- map at (232,150) with TERRA (who knows Cure), LOCKE and SHADOW.  Since
+-- #213's Tonic stops it no longer arrives with an empty Tonic bag (the
+-- #214 cut carries 61), so the suite empties it the way a player does:
+-- corridor legs with the battles fought, and after each wound the field
+-- menu's own Tonic, drunk to full (Potions held back, no casting), until
+-- none are left.  A fixture that already arrives with 0 skips the drain.
+-- Nobody is hurt at boot, so every case earns its patient the same way:
+-- world-map legs with the battles fought (care switched off on the walk),
+-- until somebody is under the threshold.  Reads and pad presses only; no
+-- inventory or HP writes.
 --
 -- What #184's log actually shows (gen_zozo2_arrival attempt 1, lap 52,
 -- copied under build/attempts/zozo-grind/): the "refusals" were not the
@@ -146,6 +150,48 @@ local function walkUntilHurt(n)
   })
 end
 
+-- The drain: while the bag holds a Tonic, walk one leg that stops once a
+-- battle has left anybody short of full, then drink Tonics through the
+-- field menu (M.fieldCare, threshold 1.0, magic off, every Potion held
+-- back) until the party is whole or the Tonics are gone.  A Tonic is
+-- refused at max HP (CheckCanUseItem), so each one needs a real wound.
+local function missing()
+  for _, c in ipairs(H.partyMembers()) do
+    if H.charHp(c) < H.charMaxHp(c) then return true end
+  end
+  return false
+end
+local drinkN = 0
+local function drainTonics(n)
+  local legB = 0
+  return H.seqStep({
+    H.repeatN(n, {
+      H.cond(function() return H.invCountOf(TONIC) > 0 end, {
+        fresh(function()
+          drinkN = drinkN + 1
+          legB = battles
+          local function stop()
+            return battles > legB and missing() and settled()
+          end
+          return {
+            H.seqStep(leg(stop)),
+            H.cond(function() return settled() and missing() end, {
+              H.fieldCare({ tag = "drinking the Tonics down " .. drinkN,
+                threshold = 1.0, magic = false, reserve = { [POTION] = 99 } }),
+              H.call(function() roster("drain " .. drinkN) end),
+            }, {}),
+          }
+        end),
+      }, {}),
+    }),
+    H.call(function()
+      roster("drained")
+      H.assertEq(H.invCountOf(TONIC), 0, string.format(
+        "the party drank its Tonics down to none through the field menu (%d legs)", drinkN))
+    end),
+  })
+end
+
 local b0, mark = {}, {}
 local function snap()
   b0.tonic, b0.potion, b0.fenix = H.invCountOf(TONIC), H.invCountOf(POTION),
@@ -157,20 +203,26 @@ local function snap()
   b0.battles = battles
 end
 
-H.run({ maxFrames = 400000 }, {
+H.run({ maxFrames = 1200000 }, {
   H.loadState(FIX),
   H.waitFrames(60),
   H.waitUntil(settled, 1200, "world control at the landing", 5),
   H.call(function()
     roster("at boot")
-    H.assertEq(H.invCountOf(TONIC), 0, "the fixture arrives with no Tonics")
-    H.assertEq(H.invCountOf(POTION) > 4, true, "and Potions above the care floor")
     H.assertEq(H.knowsSpell(0, CURE), true, "TERRA knows Cure (case 5's caster)")
     H.assertEq(H.worldX() == 232 and H.worldY() == 150, true, "at the landing (232,150)")
   end),
 
+  -- ---- 0. the Tonics are drunk down to none, through the field menu --------
+  drainTonics(200),
+  H.call(function()
+    H.assertEq(H.invCountOf(TONIC), 0, "the bag holds no Tonics")
+    H.assertEq(H.invCountOf(POTION) > 4, true, "and Potions above the care floor")
+    battles = 0                         -- the cases count their own battles
+  end),
+
   -- ---- 1. a battle opens under the driver-form care stop -------------------
-  walkUntilHurt(12),
+  walkUntilHurt(48),
   H.call(function() roster("hurt, before the race") end),
   -- walk on until the next battle's load starts, and stop the walk THERE
   H.repeatN(24, {
@@ -214,7 +266,7 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ---- 2. driver form, 0 Tonics: the Potion heals -------------------------
-  walkUntilHurt(12),
+  walkUntilHurt(48),
   H.call(function() snap(); forget(); roster("case 2: before the driver-form care") end),
   H.careStop("care with no Tonics (driver form)", { threshold = THRESH }),
   H.call(function()
@@ -231,7 +283,7 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ---- 3. step form, magic off, 0 Tonics: the Potion again -----------------
-  walkUntilHurt(12),
+  walkUntilHurt(48),
   H.call(function() snap(); forget(); roster("case 3: before the step-form care") end),
   H.fieldCare({ tag = "care with no Tonics (step form)", threshold = THRESH, magic = false }),
   H.call(function()
@@ -245,7 +297,7 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ---- 4. driver form, Potions reserved away too: says why, no menu -------
-  walkUntilHurt(12),
+  walkUntilHurt(48),
   H.call(function() snap(); forget(); roster("case 4: before the bagless driver-form care") end),
   H.careStop("care with nothing spendable (driver form)",
     { threshold = THRESH, reserve = { [TONIC] = 4, [POTION] = 99 } }),
