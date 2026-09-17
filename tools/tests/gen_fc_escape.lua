@@ -21,9 +21,11 @@
 --
 -- Technique sources (read-only probes): probe_fc_atma4/atma5 (doorstep
 -- and talk), probe_fc_statues (the spine), probe_fc_escape (the route,
--- Nerapa, the wait).  Party: TERRA (RAMUH: Bolt -- Atma and Nerapa are
--- bolt-weak; Nerapa ABSORBS fire, and the driver's absorb guard keeps
--- Fire2 off him), LOCKE, EDGAR, SHADOW.
+-- Nerapa, the wait).  Party: TERRA (no stone; Fire 2 is her attack spell),
+-- LOCKE (MADUIN: Bolt -- Atma and Nerapa are bolt-weak; Nerapa ABSORBS
+-- fire, and the driver's absorb guard keeps Fire2 off him), EDGAR (SHIVA),
+-- SHADOW.  The stones are read off the checkpoint, not assumed: see the
+-- learned-table note at FIGHT below.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -39,12 +41,57 @@ local function shadowSaved() return (H.readByte(0x1EEF) >> 5) & 1 == 1 end -- $0
 
 local LOCKE = 0x01
 local EDGAR = 0x04            -- Shiva's bearer on the escape (the summon table)
--- Bolt is Atma's and Nerapa's row (with slash + pierce: LOCKE's blades,
--- EDGAR's default crossbow); Nerapa ABSORBS fire, and the driver's absorb
--- guard keeps TERRA's Fire2 off him.  Party-wide Bolt as attack magic.
+-- The attack-magic lines, read off the learned table of the checkpoint this
+-- boots ($1A6E + 54*char, $FF = learned; tools/savestate_party.py's shape
+-- finder on fc-alcove-v1's payload, 2026-09-16) rather than assumed:
+--   TERRA  L26, no stone (+$1E = $FF): $00 Fire, $04 Drain, $05 Fire 2,
+--          $2A Warp, $2D Cure, $30 Life, $32 Antdot -- and no Bolt.
+--   LOCKE  L28, MADUIN worn (+$1E = $06): nothing learned in $00-$35.
+--   EDGAR  L27, SHIVA worn (+$1E = $02): nothing learned.
+--   SHADOW L26, no stone: nothing learned.
+-- The battle Magic list is the union of what the actor knows and the worn
+-- stone's spells (spellCell's note in the lib), so LOCKE's Bolt is live for
+-- as long as he wears Maduin (Fire/Ice/Bolt): the 2026-09-16 16:17 run cast
+-- it five times at "cell 8, 6 MP", 465 and 9999 off AtmaWeapon.  The first
+-- cut gave TERRA the same `spell = 2` and it was inert (#182): no Bolt in
+-- her list, spellCell finds no cell, and all 10 of her planned turns in
+-- that run read plan=fight.
+--
+-- TERRA's line is gen_fc_alcove's (f531997e): the 394 pool is the same
+-- seven species, and the Ninja's "Inviz" is Vanish (STATUS1::INVISIBLE,
+-- bit 4 of $3ee4 + entity*2), under which every physical misses and a
+-- spell lands.  While a live monster is Vanished (or Imaged) her attack
+-- turns cast Fire 2 ($05, 20 MP; the plan-time absorb guard still refuses
+-- it on a fire absorber, and Nerapa absorbs fire); otherwise the lookup is
+-- empty and she Fights as before -- on AtmaWeapon (weak fire|ice|bolt +
+-- slash|pierce, 11 pips) her sword chips the slash row and unloaded 6964
+-- on him broken in that run, which a blanket cast line would preempt.
+-- Bolt stays the party nuke: Atma and Nerapa are bolt-weak, nothing on 394
+-- absorbs it, and LOCKE is the one who can pay it.
+local BOLT, FIRE2, ST1_INVISIBLE, ST2_IMAGE = 0x02, 0x05, 0x10, 0x04
+local dodgeSaid = nil
+local function dodgerUp()
+  for s = 0, 5 do
+    if H.readWord(0x3BFC + s * 2) > 0 then
+      local e = 4 + s
+      if (H.readByte(0x3EE4 + e * 2) & ST1_INVISIBLE) ~= 0 then return s, "Vanish" end
+      if (H.readByte(0x3EE5 + e * 2) & ST2_IMAGE) ~= 0 then return s, "Image" end
+    end
+  end
+  return nil
+end
+local MAGIC = setmetatable({ [LOCKE] = { spell = BOLT } }, { __index = function(_, id)
+  if id ~= TERRA then return nil end
+  local s, what = dodgerUp()
+  if s == nil then dodgeSaid = nil; return nil end
+  if dodgeSaid ~= s then
+    dodgeSaid = s
+    H.log(string.format("[fc] slot %d wears %s (f%d): TERRA's attack turns go to Fire 2", s, what, H.frame))
+  end
+  return { spell = FIRE2 }
+end })
 local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
-                healPercent = 60, magic = { [TERRA] = { spell = 2 }, [LOCKE] = { spell = 2 } },
-                nuke = { 2 } }
+                healPercent = 60, magic = MAGIC, nuke = { BOLT } }
 local FA = H.newFightDriver("fc", FIGHT)
 -- AtmaWeapon under his own tag (the Fenix audit files it as the boss it is)
 local FAtma = H.newFightDriver("AtmaWeapon", FIGHT)
@@ -68,11 +115,14 @@ local FAtma = H.newFightDriver("AtmaWeapon", FIGHT)
 -- Nerapa (2800 HP, 5 pips, weak ice|bolt|holy + slash|pierce, absorbs fire,
 -- Condemned on the whole party at the open -- measured: all four carry it
 -- by t=3000 with ~30 s on the count, and it kills at t~7,000): a damage
--- race of ~5,500 frames.  TERRA wears SHIVA ($02: ice, his weakness) and
--- summons it once, LOCKE nukes Bolt, EDGAR's crossbow pierces, SHADOW
--- fights; EDGAR wears no esper (the deck's SHIVA->EDGAR session reported
--- "equipped" but the stone stayed on TERRA -- byte +$1E is $FF in every
--- fixture).  On the current ROM this fight is a coin flip on its seed:
+-- race of ~5,500 frames.  EDGAR wears SHIVA ($02: ice, his weakness) and
+-- summons it once, LOCKE nukes Bolt (through MADUIN), EDGAR's crossbow
+-- pierces, SHADOW fights; TERRA wears no stone (byte +$1E is $FF on the
+-- fc-alcove-v1 payload, $02 on EDGAR's record -- an earlier note here had
+-- them the other way round; the 2026-09-16 16:17 run's own lines are
+-- "actor=2 char=4 plan=summon" and "summon refused for char 0: ...
+-- stone=$FF", so the summon table's TERRA entry is inert and EDGAR's is
+-- the live one).  On the current ROM this fight is a coin flip on its seed:
 -- the 2026-09-07 gen run (mustflee walk, doorstep at 3:51) lost it with
 -- two Fenix Downs and a wipe at t~7,800; the same policy from the same
 -- snapshot with the fight walk (doorstep at 3:41) won it at t~6,000 with
