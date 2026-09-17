@@ -212,35 +212,77 @@ H.run({ maxFrames = 60000 }, {
 
   -- The price column, across the R edge.  Ot6FoldPrices walks all 79 rows
   -- since #219 (it has to: a spell outside a tier family now escalates
-  -- x2.5 per boost rather than folding), so the regression this guards is
-  -- the walk itself -- a column that moved a row it had no business
-  -- moving, or missed one it did.  Exactly two rows may change here,
-  -- because Fire and Cure are the only spells this party knows and both
-  -- are family heads: they go to their folded tiers' own prices, and the
-  -- other 77 rows stay byte-for-byte where battle init left them.
+  -- x2.5 per boost rather than folding), so this guards the walk itself --
+  -- a row it moved that it had no business moving, or one it missed.
+  --
+  -- Every row that moves must land on ONE of the two rules, and which one
+  -- is not a choice: Fire and Cure are tier-family heads, so they go to
+  -- their folded tiers' own vanilla prices (20 and 25) and take no
+  -- escalation; every other row that moves is outside the families, so it
+  -- takes min(99, floor(base x 2.5 + 0.5)) and nothing else.
+  --
+  -- The list carries more than the two spells this party knows: the lore
+  -- rows (master-list positions $36..$4d) keep a real id and a real cost
+  -- for every character, learned or not -- ValidateSpellList's `cpy #$00dc`
+  -- sends them down the price-only arm (battle_main.asm:14601). They are
+  -- unreachable for a caster with no Lore command, but they are priced, and
+  -- they are what makes this arm a live reading of the escalation and not
+  -- only of the fold: on this fixture three of them move, by 2.5x, off the
+  -- ROM's own arithmetic.
   H.driveUntil(function() return pend(terra) >= 1 end, 8000, {
     H.call(function() H.setPad(decide()) end),
   }, "one real R edge arms the boost"),
   H.release(),
   H.waitFrames(30),
   H.call(function()
-    local col1 = costColumn(terra)
-    local moved = {}
+    -- #219's rule, recomputed: (base * 5^n + 2^(n-1)) >> n capped at 99,
+    -- and never below the base (the Phoenix floor in Ot6BoostPriceFor).
+    local function boosted(base, n)
+      if n == 0 then return base end
+      local x = base
+      for _ = 1, n do x = x * 5 end
+      x = (x + (1 << (n - 1))) >> n
+      return math.max(base, math.min(99, x))
+    end
+    local col1, n = costColumn(terra), pend(terra)
+    H.assertEq(n, 1, "the arm measures exactly one pending boost")
+    local moved, escalated = {}, 0
     for i = 0, LIST_ROWS - 1 do
-      if col1[i].cost ~= _G.__col0[i].cost then
+      local was, now = _G.__col0[i].cost, col1[i].cost
+      if now ~= was then
         moved[#moved + 1] = string.format("row %d ($%02x) %d -> %d",
-          i, col1[i].id, _G.__col0[i].cost, col1[i].cost)
+          i, col1[i].id, was, now)
+        if i == _G.__fireRow then
+          H.assertEq(now, FIRE2_MP,
+            "Fire's row now carries Fire 2's own 20 -- the number, the grey "
+            .. "and the confirm read this cell, so all three follow the fold")
+        elseif i == _G.__cureRow then
+          H.assertEq(now, CURE2_MP, "Cure's row now carries Cure 2's own 25. "
+            .. "A tier family does NOT take #219's 2.5x escalation: the fold "
+            .. "IS its escalation")
+        else
+          escalated = escalated + 1
+          H.assertEq(now, boosted(was, n), string.format(
+            "row %d is outside every tier family, so its boosted price is "
+            .. "min(99, floor(%d x 2.5 + 0.5)) = %d, not %d (#219)",
+            i, was, boosted(was, n), now))
+        end
       end
     end
-    H.log("rows the boost re-priced: " .. table.concat(moved, ", "))
-    H.assertEq(#moved, 2, "exactly two rows moved -- the 79-row walk touched "
-      .. "Fire's and Cure's and nothing else")
-    H.assertEq(col1[_G.__fireRow].cost, FIRE2_MP,
-      "Fire's row now carries Fire 2's own 20 -- the number, the grey and "
-      .. "the confirm read this cell, so all three follow the fold")
-    H.assertEq(col1[_G.__cureRow].cost, CURE2_MP,
-      "Cure's row now carries Cure 2's own 25.  A tier family does NOT take "
-      .. "#219's 2.5x escalation: the fold IS its escalation")
+    H.log(string.format("rows the boost re-priced: %s", table.concat(moved, ", ")))
+    H.assertEq(col1[_G.__fireRow].cost ~= _G.__col0[_G.__fireRow].cost, true,
+      "Fire's row moved at all -- the walk reached it")
+    H.assertEq(col1[_G.__cureRow].cost ~= _G.__col0[_G.__cureRow].cost, true,
+      "Cure's row moved at all -- the walk reached it")
+    H.assertEq(escalated > 0, true,
+      "at least one non-family row escalated, so this arm reads #219's 2.5x "
+      .. "out of the ROM and not only the fold")
+    -- No "every row that stayed put had to stay put" mirror of the above:
+    -- a row's own id byte cannot say whether it was legitimately skipped.
+    -- A lore is stored as id - $8b, so Step Mine ($99, the one price the
+    -- walk deliberately leaves alone) reads as $0e and is indistinguishable
+    -- from Pearl.  The moved-rows check above is the direction that matters
+    -- and the one this list can answer.
   end),
   -- One real R edge arms pending 1; the live list then queues the fold.
   -- The drive stops once the cast is charged (mp changed) rather than once

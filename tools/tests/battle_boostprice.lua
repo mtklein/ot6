@@ -119,8 +119,24 @@ local function armWatch()
   emu.addMemoryCallback(function(_, v)
     if rec and not rec.queued and H.readByte(0x3A7A) == rec.cmd then
       rec.qcost, rec.queued = v, true
+      rec.mp0 = mp(rec.slot)   -- the pool AT QUEUE TIME, inside the live
+                               --   battle: the charge lands later, at
+                               --   CalcAttackEffect, and a pool sampled from
+                               --   a step boundary can straddle a battle end
     end
   end, emu.callbackType.write, 0x7E3620, 0x7E3620 + 0xFE)
+end
+
+-- Latch the charge the frame it lands, while the battle is still live.
+-- $3C08 is battle RAM and reads $FFFF once a battle tears down, so a plain
+-- "has the pool moved?" condition can fire on the teardown instead of on the
+-- debit -- measured 2026-09-17: `LOCKE MP 69 -> 65535, spent -65466`.
+local function charged()
+  if rec.spent == nil and H.battleActive() and rec.mp0 then
+    local m = mp(rec.slot)
+    if m < 0x8000 and m < rec.mp0 then rec.spent = rec.mp0 - m end
+  end
+  return rec.spent ~= nil
 end
 
 local sabin, locke                       -- battle slots
@@ -407,14 +423,11 @@ H.run({ maxFrames = 300000 }, {
     H.assertEq(pick ~= nil, true,
       "SABIN can still afford some blitz at boost 1 -- the charge needs a "
       .. "payable row")
-    rec = { cmd = CMD_BLITZ, want = price, id = pick, mp0 = nil }
+    rec = { cmd = CMD_BLITZ, want = price, id = pick, slot = sabin }
     H.log(string.format("charging a boost-1 %s: %d base -> %d boosted, "
       .. "pool %d", nameText(pick), costOf(pick), price, mp(sabin)))
-  end),
-  H.call(function()
     want.slot, want.bank, want.pend = sabin, 1, 1
     want.mode, want.row = "blitz", rec.id
-    rec.mp0 = mp(sabin)
   end),
   step("the boosted blitz is queued", function() return rec.queued end),
   H.call(function()
@@ -424,13 +437,11 @@ H.run({ maxFrames = 300000 }, {
       "Ot6AbilityCost priced the boost-1 %s at %d, not its base %d (#219)",
       nameText(rec.id), rec.want, costOf(rec.id)))
   end),
-  step("the boosted blitz resolves and the pool moves", function()
-    return mp(sabin) ~= rec.mp0
-  end, 20000),
+  step("the boosted blitz resolves and the pool moves", charged, 20000),
   H.call(function()
-    local spent = rec.mp0 - mp(sabin)
+    local spent = rec.spent
     H.log(string.format("[charge] MP %d -> %d, spent %d",
-      rec.mp0, mp(sabin), spent))
+      rec.mp0, rec.mp0 - spent, spent))
     H.assertEq(spent, rec.want, string.format(
       "the boost-1 %s deducted exactly %d MP -- the drawn price, the queued "
       .. "price and the pool all agree (#219, ruling 3)",
@@ -461,7 +472,7 @@ H.run({ maxFrames = 300000 }, {
     H.assertEq(q[THIEF_BESTOW], thiefCostOf(THIEF_BESTOW),
       "Bestow stays flat, for the same reason")
     H.screenshot("boostprice_steal_boost1")
-    rec = { cmd = CMD_STEAL, want = price, mp0 = mp(locke) }
+    rec = { cmd = CMD_STEAL, want = price, slot = locke }
     H.assertEq(mp(locke) >= price, true,
       "LOCKE can pay the boosted steal out of his real pool")
     want.slot, want.bank, want.pend = locke, 1, 1
@@ -475,13 +486,11 @@ H.run({ maxFrames = 300000 }, {
       "Ot6AbilityCost priced the boost-1 Steal at %d, not its base %d",
       rec.want, STEAL_BASE))
   end),
-  step("the boosted steal resolves and the pool moves", function()
-    return mp(locke) ~= rec.mp0
-  end, 20000),
+  step("the boosted steal resolves and the pool moves", charged, 20000),
   H.call(function()
-    local spent = rec.mp0 - mp(locke)
+    local spent = rec.spent
     H.log(string.format("[charge] LOCKE MP %d -> %d, spent %d",
-      rec.mp0, mp(locke), spent))
+      rec.mp0, rec.mp0 - spent, spent))
     H.assertEq(spent, rec.want, string.format(
       "the boost-1 Steal deducted exactly %d MP", rec.want))
     want.mode = "idle"
