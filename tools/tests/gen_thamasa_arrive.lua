@@ -10,8 +10,11 @@
 -- graph edge is prev="crescent_landing" (H.loadState of the .mss, fast,
 -- no title screen); cutting the thamasa-night-v1 checkpoint is a separate
 -- by-hand invocation that cold-Continues crescent-landing-v1's SRAM
--- instead, so this script detects OT6_SRAM_CHECKPOINT and drives the
--- title/Continue menu only in that mode.  Both paths converge on the same
+-- instead, so this script reads the OT6_SRAM_CHECKPOINT global that
+-- lib/compose.py injects (#217 -- os.getenv is nil in Mesen's sandbox and
+-- silently answered "no checkpoint") and drives the title/Continue menu
+-- only in that mode.  Which of the two actually booted is asserted and
+-- logged at the boot step.  Both paths converge on the same
 -- live state (world (232,150), party TERRA-LOCKE-SHADOW) before segment 1
 -- starts.  Re-cutting the checkpoint is:
 --     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/crescent-landing-v1 \
@@ -225,12 +228,18 @@ end
 -- checkpoint run.sh materialized (crescent-landing-v1), which needs the
 -- title-screen/Continue drive gen_voyage's own boot uses.  Both converge
 -- on world (232,150), party TERRA-LOCKE-SHADOW.
-local function envcfg(name)
-  local ok, v = pcall(function() return os.getenv(name) end)
-  if ok and v and v ~= "" then return v end
-  return nil
-end
-local CHECKPOINT_BOOT = envcfg("OT6_SRAM_CHECKPOINT") ~= nil
+--
+-- #217: this switch used to read os.getenv("OT6_SRAM_CHECKPOINT"), which is
+-- nil under Mesen's sandbox (AllowIoOsAccess=false, tools/tests/README.md),
+-- so the pcall always answered "no checkpoint" and a by-hand re-cut
+-- silently loaded build/states/crescent_landing.mss -- a stale seeded copy,
+-- one party level behind the checkpoint it was supposed to Continue.  The
+-- checkpoint now arrives the way the segment runner's own knobs arrive:
+-- lib/compose.py injects it into the composed preamble as the global
+-- OT6_SRAM_CHECKPOINT.  Which boot ran is asserted and logged below, so
+-- this cannot go wrong quietly again.
+local CHECKPOINT = rawget(_G, "OT6_SRAM_CHECKPOINT")
+local CHECKPOINT_BOOT = CHECKPOINT ~= nil and CHECKPOINT ~= ""
 
 local bootSteps
 if CHECKPOINT_BOOT then
@@ -265,6 +274,30 @@ end
 
 -- --------------------------------------------------------------------------
 local steps = {
+  H.call(function()
+    -- Say which of the two boots is about to run, and prove it: a
+    -- checkpoint run must have been handed crescent-landing-v1 and must
+    -- NOT have a crescent_landing savestate to fall back on, and a graph
+    -- run must have the savestate embedded.  (#217: the failure this
+    -- replaces was silent -- the log said nothing about which state the
+    -- run had actually booted.)
+    local states = rawget(_G, "OT6_STATES") or {}
+    local embedded = states["crescent_landing.mss.lua"] ~= nil
+    H.log(string.format(
+      "[boot] mode=%s OT6_SRAM_CHECKPOINT=%s crescent_landing.mss embedded=%s",
+      CHECKPOINT_BOOT and "cold Continue of the SRAM checkpoint"
+                      or "H.loadState of the graph fixture",
+      tostring(CHECKPOINT), tostring(embedded)))
+    if CHECKPOINT_BOOT then
+      H.assertEq(CHECKPOINT:match("crescent%-landing%-v1$") ~= nil, true,
+        "[boot] the checkpoint handed in is crescent-landing-v1 (got "
+        .. tostring(CHECKPOINT) .. ")")
+    else
+      H.assertEq(embedded, true,
+        "[boot] no checkpoint was handed in, so the graph fixture "
+        .. "build/states/crescent_landing.mss must be embedded")
+    end
+  end),
   bootSteps,
   H.waitFrames(30),
   H.call(function()
@@ -273,6 +306,17 @@ local steps = {
       H.frame, CHECKPOINT_BOOT and "checkpoint" or "loadState",
       tostring(H.worldMode()), H.worldX(), H.worldY(),
       H.readByte(0x1850) & 7, H.readByte(0x1851) & 7, H.readByte(0x1853) & 7))
+    -- Which boot actually ran, read off the harness's own record of what
+    -- it loaded (H.lastState is set by H.loadState and by nothing else)
+    -- rather than off the switch that chose the branch.
+    H.log("[boot] fixture loaded by this run: " .. tostring(H.lastState))
+    local wantState = nil
+    if not CHECKPOINT_BOOT then wantState = "crescent_landing.mss.lua" end
+    H.assertEq(H.lastState, wantState,
+      string.format("[boot] the run booted the state it was asked to (%s)",
+        CHECKPOINT_BOOT and "cold Continue of crescent-landing-v1, no "
+                            .. "savestate loaded"
+                        or "H.loadState(crescent_landing.mss)"))
     H.assertEntryContract("crescent-landing-v1")
   end),
 

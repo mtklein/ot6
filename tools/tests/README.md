@@ -243,6 +243,28 @@ Plain functions:
   over (x,y,phase) nodes; `H.chaseTalk(objIdx, maxFrames, what)` — talk to
   a wandering NPC. Both documented at their definitions in
   `lib/ot6_field.lua`.
+- `H.saveGame(opts)` — save through the real Save UI;
+  `H.savedSlot([slot])`, `H.assertSavedSlot(map, x, y, what)` and
+  `H.assertSavedSlotWorld(x, y, what)` read back the save **the battery
+  actually holds** (the slot's own copy of `$1F64` and `$1FC0/$1FC1` or
+  `$1F60/$1F61`). A generator that cuts a checkpoint asserts one right
+  after its `H.saveGame`, so a skipped or misplaced save fails at the save
+  instead of being lifted later as the checkpoint it is not (#218). The
+  same three numbers go in the checkpoint's `manifest.json` under `saved`,
+  where `lib/sram_checkpoint.py` re-checks them from the payload bytes —
+  see [headless play](../../docs/playing-headless.md).
+
+**The environment a script can see.** Mesen's Lua sandbox has no `os`, so
+`os.getenv` is nil and a script cannot read the environment: every knob
+`run.sh` is given is injected by `lib/compose.py` as a global in the
+composed preamble (`OT6_SCRIPT`, `OT6_RETRIES`, `OT6_SEED_SHIFT`,
+`OT6_WATCHDOG`, `OT6_SHIFT_PROBE`, `OT6_ACTION_TRACE`, `OT6_COVERAGE`,
+`OT6_STATES`, `OT6_SYMS`, and — for a script that boots differently with
+and without one — `OT6_SRAM_CHECKPOINT`). A `pcall(os.getenv, ...)` reads
+as "unset" on every run, which is how `gen_thamasa_arrive` silently loaded
+a savestate on a checkpoint re-cut (#217); a dual-boot script reads the
+global and asserts which boot actually ran (`H.lastState` is set by
+`H.loadState` and by nothing else).
 
 ## Mesen 2.1.1 Lua API facts (verified on this binary)
 
