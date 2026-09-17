@@ -166,9 +166,8 @@ the "nobody" deaths are Stone's too.
 baked by `zozogrindlab.py bake` — the generator itself with a `saveState`
 after "west landing" (`build/lab/zozo-grind/bake/bake.log`, lost with the
 worktree: boots `figaro_submerged.mss.lua`, plays the castle exit,
-`[west landing] c1 L13
-xp=6831 314/314 hp ... | gil=12501 tonic=99 potion=27 fenix=15`).  Each
-policy is a derived copy of the generator (the landing fixture in place of
+`[west landing] c1 L13 xp=6831 314/314 hp ... | gil=12501 tonic=99
+potion=27 fenix=15`).  Each policy is a derived copy of the generator (the landing fixture in place of
 the castle exit, the policy written into the generator's `GRIND` table,
 read-only observers, a `[result]` line after "grind done"), run once per
 seed under `run.sh` with retries off and `OT6_SEED_SHIFT` idle frames at
@@ -333,8 +332,8 @@ BP, the battle's status lines once the member's HP sat inside their
 measured round cost and every line naming that actor
 (`build/lab/zozo-grind/banked-sweep.txt`, lost with the worktree).  The
 spend rule (#175, `M.spendDecision` via `spendPlan`) is asked only inside
-the dying actor's
-own command window, and only when `hp <= roundCost[actor]`.  Across the
+the dying actor's own command window, and only when
+`hp <= roundCost[actor]`.  Across the
 qualification and the baseline sweep the deaths at 3+ BP fall in three
 shapes:
 
