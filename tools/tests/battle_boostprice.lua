@@ -295,6 +295,32 @@ end
 local blitzAt = {}          -- boost -> { id -> { qty, attr, mp } }
 
 H.run({ maxFrames = 300000 }, {
+  -- 0. The FIGHT DRIVER's copy of the rule, against this file's own
+  --    recomputation of it.  The driver has to price a boost before it
+  --    plans one (#219: an unaffordable boost is refused and the turn
+  --    evaporates), so H.boostPrice transcribes Ot6BoostPriceFor into
+  --    Lua; everything below then proves that rule against the ROM's
+  --    three surfaces, and this step is what keeps the driver's copy on
+  --    the same rule instead of drifting into a second opinion.
+  H.call(function()
+    local n_checked = 0
+    for base = 0, 255 do
+      for n = 0, 3 do
+        local want = math.max(base, boosted(base, n))   -- never below base
+        local got = H.boostPrice(base, n)
+        if got ~= want then
+          error(string.format("H.boostPrice(%d, %d) = %d, the rule says %d",
+            base, n, got, want))
+        end
+        n_checked = n_checked + 1
+      end
+    end
+    H.assertEq(n_checked, 256 * 4,
+      "H.boostPrice agrees with the rule for every byte base at boost 0..3")
+    -- and the one case the cap's floor exists for: Phoenix's 110 base
+    H.assertEq(H.boostPrice(110, 1), 110,
+      "the 99 ceiling never makes a boost cheaper than not boosting")
+  end),
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),

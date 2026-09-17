@@ -300,6 +300,18 @@ gate). The boost buys swings.
    `battle_boostprice` each assert the flat number against the
    escalated one it must not be.
 
+   Off the ROM there is one more reader: the harness's fight driver has
+   to know what a boost will cost *before* it plans one, since an
+   unaffordable boost is refused and the turn goes with it. That is
+   `M.boostPrice` in `tools/tests/lib/ot6.lua`, the same integer path
+   transcribed into Lua, and it is the only place in the library the
+   2.5x appears -- `M.affordBoost` (how deep a boost the pool covers)
+   and `M.spellPrice` (the fold's tier price, so a folding cast is not
+   charged 2.5x on top of its tier) both reach it. `battle_boostprice`
+   pins the transcription against the rule for every byte base at boost
+   0..3 in the same run that proves the rule against the ROM's three
+   surfaces, so the driver's copy cannot drift into a second opinion.
+
 ### The resulting table
 
 Base prices are `Ot6AbilityCostTbl`'s, `Ot6StealCost`'s and
