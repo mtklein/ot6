@@ -237,6 +237,36 @@ end
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD = 0x05
 local B_SWITCH_LIVE = 0x3EBD          -- $3EB4 + ($4C >> 3); bit4 = $4C
+-- What a Steal costs this attempt (#219).  Two ROM facts, neither of
+-- them written out here as a number: the base is Ot6StealCost's own
+-- immediate (`lda #imm / rtl`, the single authority for Steal's price),
+-- and the boost ladder is H.boostPrice, the library's transcription of
+-- Ot6BoostPriceFor.  Measured on this build: 4 MP unboosted, 63 at the
+-- guaranteed tier, against the mp 70 LOCKE reaches his third attempt
+-- with (build/attempts/boost-price-driver/lab/sfigaro-lane/diag-1.log:
+-- `STEAL attempt 3 ... mp=70 (boost 3 -- guaranteed, 63 MP)` then
+-- `attempt 4 ... mp=7`).  That is a seven-MP margin on a segment whose
+-- ladder ends in "stolen within 3 attempts", so the ladder asks whether
+-- he can pay before pressing R three times into a row the engine would
+-- grey and a turn the MP gate would fizzle.
+--
+-- The gate is written against the rule, not against 63: if Steal leaves
+-- the escalating set -- the canon is "a price escalates exactly when
+-- Ot6BoostDmg multiplies the action", and Ot6BoostDmg already refuses
+-- cmd $05 -- then stealPrice(3) is the one call to follow that change,
+-- and the ladder keeps working either way because a cheaper guaranteed
+-- tier only ever passes a gate it already passed.
+local stealBase = nil
+local function stealPrice(boost)
+  if stealBase == nil then
+    local ofs = H.sym("Ot6StealCost") & 0x3FFFFF
+    H.assertEq(H.readRomByte(ofs), 0xA9,
+      "Ot6StealCost still opens with LDA #imm -- the +1 read is Steal's price")
+    stealBase = H.readRomByte(ofs + 1)
+  end
+  return H.boostPrice(stealBase, boost)
+end
+
 local function stealDriver(what, maxF)
   local mStreak, mSeq, mIdx, mSub, mNoMenu, tries = 0, nil, 1, 0, 0, 0
   return H.driveUntil(function() return not H.battleLoadStarted() end,
@@ -260,7 +290,9 @@ local function stealDriver(what, maxF)
           local bank = H.readByte(0x3E9C + actor * 2)
           local mp = H.readWord(0x3C08 + actor * 2)
           tries = tries + 1
-          if bank >= 3 then
+          local top = stealPrice(3)
+          local guaranteed = bank >= 3 and mp >= top
+          if guaranteed then
             mSeq = { "r", "r", "r", "down", "a", "a", "a" }  -- guaranteed tier
           else
             mSeq = { "down", "a", "a", "a" }                 -- vanilla odds; bank grows
@@ -269,7 +301,11 @@ local function stealDriver(what, maxF)
           H.log(string.format(
             "%s: STEAL attempt %d f%d actor=%d bank=%d mp=%d %s $3EBD=%02X",
             what, tries, H.frame, actor, bank, mp,
-            bank >= 3 and "(boost 3 -- guaranteed)" or "(unboosted)",
+            guaranteed and string.format("(boost 3 -- guaranteed, %d MP)", top)
+              or (bank >= 3
+                  and string.format("(unboosted %d MP: the guaranteed tier is %d, "
+                        .. "over the pool)", stealPrice(0), top)
+                  or string.format("(unboosted, %d MP)", stealPrice(0))),
             H.readByte(B_SWITCH_LIVE)))
         end
         if mIdx <= #mSeq then
@@ -429,6 +465,57 @@ local function gateRide(what, budget, onLost)
     H.waitFrames(30),
   })
 end
+-- Is the lane open?  A route to the probe tile from a SETTLED, controllable
+-- frame -- never from the frame a fight ended on.
+--
+-- MEASURED, build/attempts/boost-price-driver/lab/sfigaro-lane/diag-1.log: the win
+-- frame reads no route at all, and thirty frames later the same tile is
+-- 34 steps away.  An uncapped reach walk taken beside each probe says why:
+--
+--   [laneprobe] B1 ... f12159 (30,43) ctl=true tile=true reach=4991 dist=nil  path=false
+--   [laneprobe] B1 ... f12189 (30,43) ctl=true tile=true reach=4992 dist=34   path=true
+--
+-- 4991 tiles were already reachable on the win frame, so the gate was
+-- open; exactly ONE tile joined the set thirty frames later, and the
+-- probe tile came with it.  The only term in the passability model that
+-- moves while a map stays loaded is the object layer at $7E2000
+-- (ot6_field.lua stepAllowed's last test) -- the tilemap and the two prop
+-- tables are loaded once per map -- so a townsperson was standing on the
+-- probe tile and then stepped off it.  Where the town's NPCs are when the
+-- field resumes is decided by how long the battle ran, which is why any
+-- shift in battle length flips a one-frame probe; the fight driver
+-- pricing its boosts (#219) is one such shift.
+--
+-- A person answers "can I get there" by walking, and a townsperson in the
+-- doorway is something they wait a beat for.  So this waits for a frame
+-- that shows the route and asserts on THAT.  Soft, so a lane that really
+-- is shut fails as an assert -- a bug to fix, not a seed to re-roll.
+local LANE_SETTLE = 900
+local function laneSettles(probeX, probeY, tag)
+  local key, t0 = "lane open: " .. tag, nil
+  return seq({
+    H.call(function() t0 = H.frame end),
+    H.waitUntilSoft(function()
+      return H.hasControl() and H.tileAligned() and bright() >= 15
+         and not H.battleLoadStarted() and not H.dialogWaiting()
+         and map() == 75 and H.bfsPath(probeX, probeY) ~= nil
+    end, LANE_SETTLE, key, 10),
+    -- said every time, so the log shows whether the settle was needed
+    -- rather than leaving it to be inferred
+    H.logStep(function()
+      return string.format("[lane] %s: (%d,%d) read %s at f%d, %d frame(s) "
+        .. "after the fight", tag, probeX, probeY,
+        H.vars[key] and "open" or "SHUT", H.frame, H.frame - t0)
+    end),
+    H.call(function()
+      H.assertEq(H.vars[key], true, string.format(
+        "%s: the lane is open again -- a settled controllable frame with a "
+        .. "route to (%d,%d) inside %d frames", tag, probeX, probeY,
+        LANE_SETTLE))
+    end),
+  })
+end
+
 local function clearGate(probeX, probeY, tag)
   local blob, won = nil, false
   local L = H.newSeedLadder((tag or "gate soldier") .. " battle 11")
@@ -494,9 +581,8 @@ local function clearGate(probeX, probeY, tag)
     H.call(function()
       H.assertEq(won, true,
         tag .. ": battle 11 won within 3 attempts (boosted Fights + the endgame Potion)")
-      H.assertEq(H.bfsPath(probeX, probeY) ~= nil, true,
-        tag .. ": the lane is open again")
     end),
+    laneSettles(probeX, probeY, tag),
   }, {
     H.logStep(function() return tag .. ": the lane is already open" end),
   })
@@ -594,10 +680,13 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   -- The probe tile is the cafe entry point the win must open.
   -- ===================================================================== --
   clearGate(22, 43, "B1 (open the town)"),
+  -- clearGate's own settled probe is this assertion (the gate is the only
+  -- thing between the pocket and (22,43)); this stop keeps the map check
+  -- and the switch dump, and re-reads the lane through the same settle
+  -- rather than taking a second one-frame sample of a live NPC layer.
+  laneSettles(22, 43, "the town opened: the cafe entry point"),
   H.call(function()
     H.assertEq(map(), 75, "still in town after battle 11")
-    H.assertEq(H.bfsPath(22, 43) ~= nil, true,
-      "the town opened: the cafe entry point is reachable now")
     where("town open")
   end),
 
