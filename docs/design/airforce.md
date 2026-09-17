@@ -160,7 +160,115 @@ is the crossbow's all-three, `mons=08` the Speck's slot 3 -- bit = slot.
 
 ## Results
 
-(filled from `python3 tools/tests/airforcelab_aggregate.py` below)
+`python3 tools/tests/airforcelab_aggregate.py` (full per-attempt rows in
+`build/attempts/airforce-lab/table.txt`; frames = mean Air Force battle
+length; fenix/potion = spent in the Air Force fight; bp>=3 = deaths holding
+three or more pips; speck = fights where the body launched it; wcann =
+WaveCannons fired):
+
+```
+policy        n wins losses                     frames fenix potion deaths  bp>=3 speck wcann
+bank0        10    7 lost_gameover:3              9573     0     21      6      0     7     1
+bay          10    9 lost_cap:1                  16524     5     55      6      1    10     6
+body         10    8 lost_gameover:2              8113     3     26     11      5     0     0
+control      10   10 -                           10568     0     14      1      0    10     0
+gunbody      10   10 -                           10465     0     17      1      0    10     0
+heal70       10    8 lost_gameover:2             11584     1     23      4      0    10     3
+pods         10   10 -                           11432     1     18      1      0    10     2
+terrafire    10   10 -                           13296     1     35      2      0    10     2
+```
+
+(`bay_trace`, one run at idle 6, is `bay` with the target-window trace; it
+replayed `bay_i6` exactly: `t=13527`, same kills.)  Seeds drawn per idle
+0..54: `$84 $0C $04 $10 $D8 $B4 $2C $94 $B4 $40` -- idles 30 and 48 drew the
+same seed and, under every policy, the same fight, so the spread is **9
+distinct Air Force seeds**, not 10.  Three `body` runs (idles 0, 6, 12) were
+killed by run.sh's 1800 s wall cap inside the Ultros fight while the host
+ran at load ~50 from other worktrees (`KILLED BY THE TIMEOUT: no verdict,
+and the run lasted 1806s`); they are kept under `timeouts/` and were re-run
+with a 3600 s cap, and those re-runs are the rows above.
+
+The losses, raw:
+
+- **body** (idles 30 and 48, seed `$B4`): the Laser Gun left standing
+  fires Atomic Ray twice -- `[AF] [death] f+4009 entity 1 char 1 from
+  141/1129 by slot 2 cmd $0C atk $B4 bp=0` and `[AF] [death] f+4010 entity
+  0 char 0 from 301/960 by slot 2 cmd $0C atk $B4 bp=3 party_bp=3,0,3,1 --
+  died holding 3 BP`.
+- **bank0** (idles 6, 30, 48): the same early Atomic Ray shape with the
+  pips already spent (`deaths=e1@2573:bp0;e0@3356:bp1`).
+- **heal70** (idles 0 and 6): the count ran out.  `heal70_i6`:
+  `[act] t=9400 start e8 cmd=$0C atk=$CD` (Launcher, bay at 567) `[hp] t=9402
+  entity 0 866 -> 28 (-838)`, `entity 1 679 -> 85 (-594)`; Count 1 at
+  t=10823; `[act] t=12214 start e4 cmd=$0C atk=$B7 ... af=4787/sh1 ...
+  hp=344,219,0` -- WaveCannon onto a party already down one.
+- **bay** (idle 12, `lost_cap` at 24000 frames): the focus steer never
+  reached the bay (below), and EDGAR died holding 4 BP --
+  `[AF] actor=2 no press: entity 1 (363/1129) is inside one round of death
+  (382) and Tools $AA lands 0 chip(s) against 3 shield(s) on slot 4 --
+  caring first`, then `[act] t=7638 start e4 cmd=$0C atk=$B5 tgt=$0004`
+  `[hp] t=7640 entity 2 393 -> 186 (-207)` and `[act] t=7990 start e6
+  cmd=$0C atk=$B5 tgt=$0004` `[hp] t=7991 entity 2 170 -> 0 (-170)`,
+  `[AF] [death] f+8075 entity 2 char 4 from 170/1048 by slot 2 cmd $0C atk
+  $B5 bp=4 party_bp=0,5,4,1 -- died holding 4 BP`.  Two Tek Lasers from
+  two different parts converged on him between his turns (207 + 170 = 377
+  from 393), more than any round cost the driver had measured for him.
+
+**Wave Cannon and Launcher, measured.**  `pods_i0`: `[act] t=11904 start e4
+cmd=$0C atk=$B7 tgt=$0007` `[hp] t=11905 entity 0 960 -> 395 (-565)`,
+`entity 1 1033 -> 321 (-712)`, `entity 2 966 -> 330 (-636)`.
+`terrafire_i30`: `[act] t=10705 start e8 cmd=$0C atk=$CD tgt=$0007` (bay at
+430) `[hp] t=10707 entity 0 491 -> 123 (-368)`, `entity 1 1072 -> 67
+(-1005)`, `entity 2 703 -> 176 (-527)`.  Either one is survivable at full
+HP and a wipe at the few hundred HP the in-fight AoE leaves.
+
+**What the lab does and does not separate.**  From the teaser, `control`,
+`gunbody`, `pods` and `terrafire` all win 10 of 10; they do not separate on
+wins.  `gunbody` and `control` also match on the countdown (Counts summed
+over the 10 fights: 41 each) and on WaveCannons (0 each).  The policies
+that lose are the ones that leave the Laser Gun up (`body`), spend the
+pips as they come (`bank0`), or spend turns the countdown does not allow
+(`heal70`'s care, `bay`'s failed steer).  `terrafire`'s frame counts are
+confounded by #207 (TERRA's Fire2 lands -- `[hit] t=1583 slot 2 hp=2525
+(-483)` -- while the driver records `actor=0's magic took 0 off the
+monsters`, which feeds its press and chip decisions).
+
+**The lab does not reproduce the v0.17 losses.**  All three v0.17 attempts
+arrived at the Air Force exactly as the lab does -- `partyhp=960,1129,1048`
+on the first status line of the fight, and LOCKE's first cast `6 MP of 231`
+(attempts 1 and 2 and `control_i0` alike) -- so the arrival state is not
+the difference; the Air Force seed is, and the v0.17 seeds are not among
+the lab's.  The loss that decides the landing is therefore the v0.17 one
+itself, below.
+
+## The steer cannot reach the bay from the gun
+
+`bay` gave up its focus 31 times across its 10 runs, every one the same
+line: `[AF] focus steer gave up (mons=04 want=10) -- confirming on whoever
+is highlighted`.  `bay_trace_i6` logged the target window every frame
+(`python3 tools/tests/airforcelab_tgtwatch.py
+build/attempts/airforce-lab/bay_trace_i6.log`):
+
+    moves (from --button--> to):
+        9  mons=04 chars=00 --left--> mons=01 chars=00
+        9  mons=04 chars=00 --right--> mons=00 chars=01
+        3  mons=01 chars=00 --down--> mons=10 chars=00
+       10  mons=01 chars=00 --right--> mons=00 chars=01
+        9  mons=01 chars=00 --right--> mons=04 chars=00
+    presses that moved nothing:
+        6  mons=04 chars=00 --down--> (no change)
+        9  mons=04 chars=00 --up--> (no change)
+       21  mons=01 chars=00 --left--> (no change)
+        6  mons=01 chars=00 --up--> (no change)
+
+From the gun (`04`) LEFT goes to the body and RIGHT leaves the monsters for
+the party; UP and DOWN do nothing.  The bay (`10`) is reached only by DOWN
+**from the body**.  The driver's walk (`lib/ot6.lua`, the focus block
+after `opts.focus = { {slot=S, mask=M}, ... }`) rotates left/right/down/up
+every 6 spins of a 24-spin budget, and its DOWN turns land while the
+cursor sits on the gun, so it never presses DOWN from the body.  Once the
+gun is dead the cursor starts on the body and DOWN works (`pods` never gave
+up).  #189 territory: the parts' layout is a graph, not a row.
 
 ## What the driver did, read off the control runs
 
@@ -217,6 +325,73 @@ That is the regeneration's `actor=1's magic took 0 off the monsters`
 (attempt 1, f+33000 and f+35400, both after the gun's death) and the pace
 that let the count run out.
 
+## The decisive fight: v0.17 attempt 1, replayed
+
+The v0.17 regeneration's loss is deterministic.  `seed_sweep.py fc_landing`
+on the unchanged generator (`build/attempts/airforce-lab/sweep_baseline/`)
+returned, for shifts 0, 10, 20 and 30:
+
+    seed  1 shift  10: FAIL frames=59364 wipe GAME OVER fired ...
+    seed  0 shift   0: FAIL frames=59364 wipe GAME OVER fired ...
+    seed  2 shift  20: FAIL frames=59364 wipe GAME OVER fired ...
+    seed  3 shift  30: FAIL frames=59364 wipe GAME OVER fired ...
+
+each with v0.17 attempt 1's own wipe context (`seats at that reading
+a0:316/960 bp1 a1:528/1129 bp3 a4:0/1048 bp3`).  The shift was applied
+(`seed shift done at f1406 ($021e=5, ...)`) and changed nothing: every
+sweep seed reaches `[IAF battle 11] f47210`.  (v0.17's retried attempt 2
+with the same 20-frame shift did diverge, by battle 5; its boot point read
+`$021e=57` against the sweep's `$021e=55`.)  So this route has one
+reproducible losing Air Force fight, and the rest of the route up to it
+is fixed: a generator change that touches only the Air Force's driver
+replays that exact fight.
+
+Three one-off generator copies (`build/attempts/airforce-lab/
+gen_fc_landing_cand_*.lua`, shift 0, retries off, nothing published), each
+a second driver built from `FIGHT` and used only while formation `$113` is
+up:
+
+| candidate | Air Force driver | verdict |
+|---|---|---|
+| `fresh` | `FIGHT`, no focus | `FAIL ... frame=59364` -- `wipe context ... a0:316/960 bp1 a1:528/1129 bp3 a4:0/1048 bp3` (v0.17's, exactly) |
+| `pods` | focus gun -> bay -> body | `PASS (frame 59992) attempts=1/1` |
+| `gunbody` | focus gun -> body -> bay | `PASS (frame 59480) attempts=1/1` |
+
+All three reach `[IAF battle 11] f47210`.  `fresh` shows that the driver's
+state carried over from the earlier waves is not what lost; the kill order
+is.  The two fights are line-for-line identical through f+3900 (the gun is
+dead by f+3000 in both: `monhp=s0:7842/sh7,s2:0/sh0,s4:2821/sh2`) and apart
+by f+4800 (`fresh`: `s0:7173/sh6,...,s4:2103/sh1`; `gunbody`:
+`s0:7675/sh6,...,s4:2641/sh1`).  By f+6300 `gunbody` had the bay dead and
+the body falling (`s0:6348/sh5,s2:0/sh3,s4:0/sh0`), `fresh` had neither
+(`s0:7173/sh6,s2:0/sh3,s4:2103/sh1`); `gunbody` read `s0:3768/sh2` at
+f+8100 and won, `fresh` wiped.  The focus changes which target each
+single-target turn lands on; in this fight the crossbow's all-target
+spend still took the bay first.
+
 ## What landed
 
-(filled after the campaign)
+`tools/tests/gen_fc_landing.lua`: a second fight driver, `FIGHT` plus
+`focus = { gun (slot 2, mask $04), body (slot 0, $01), bay (slot 4, $10) }`,
+driving every frame the Air Force's formation (`$113`) is loaded; every
+other IAF battle keeps `FIGHT` unchanged.  Chosen over `pods` because on
+the lab it matched `control` on wins, Counts and WaveCannons (10/10, 41, 0)
+where `pods` took two cannons, and it passed the decisive fight 512 frames
+sooner.  The masks are the measured window bits; the gun is the default
+cursor and the body is one LEFT from it, so the order never asks for the
+steer this lab showed cannot reach the bay from the gun.
+
+`ninja build/states/fc_landing.mss.lua`:
+
+    [ot6]   [IAF battle 11] f47210
+    [ot6] IAF: 11 battles; FC landing at (4,12)
+    [ot6] PASS (frame 59480) attempts=1/3
+
+No `[death]` line in the Air Force fight.  The `fc-landing-v1` battery
+checkpoint that `gen_fc_alcove` cold-boots was not re-sealed here.
+
+What the landing does not claim: the lab could not separate `gunbody` from
+`control` from the teaser, and the sweep cannot vary this route, so the
+evidence that the order matters is the one reproducible losing fight
+(`fresh` FAIL vs `gunbody` PASS) plus the mechanism (the countdown only
+the body's death stops).  It is not a success rate.
