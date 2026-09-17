@@ -105,6 +105,10 @@ end
 -- for anything else until opts.tool.  So every drive on this climb was
 -- fighting the town with the one Tool that cannot open it.
 local BIO_BLASTER = H.BIO_BLASTER
+-- Set at the equip step: whether monster 334 (leader)'s rare Black Belt
+-- drop is actually in the bag this run.  A retry re-reads it, because the
+-- H.call that sets it runs again from the checkpoint.
+local blackBeltHeld = false
 local CELES = 6
 local ZOZO_FOCUS = {
   { slot = 0, mask = 0x01 }, { slot = 1, mask = 0x02 },
@@ -1211,21 +1215,38 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   -- 1, EDGAR 2, SABIN 3.  slot is 0..5 = R-Hand, L-Hand, Helmet, Armor,
   -- Relic 1, Relic 2; 4 and 5 live on a different menu and equipWeapon
   -- knows which walk to take.
+  -- Four of the five are bought or chested and are therefore always here;
+  -- the Black Belt is NOT.  It is monster 334 (leader)'s RARE drop
+  -- (monster_items.asm: `monster_drop FENIX_DOWN, BLACK_BELT`), so whether
+  -- the party owns one is a die roll back in the Narshe defense, and any
+  -- change upstream that moves the RNG can take it away -- which is what
+  -- happened when the #218 basement save shifted the route.  A rare drop
+  -- cannot be a hard precondition for a segment: assert what the route
+  -- guarantees, and wear the drop when the roll gave us one, which is
+  -- also what a player does when they open the menu and fill empty slots
+  -- with whatever the bag actually holds.
   H.call(function()
     for _, it in ipairs({ { 0x84, "LeatherArmor" }, { 0x5A, "Buckler" },
-                          { 0xB1, "Star Pendant" }, { 0xB2, "Peace Ring" },
-                          { 0xD5, "Black Belt" } }) do
+                          { 0xB1, "Star Pendant" }, { 0xB2, "Peace Ring" } }) do
       H.assertEq(H.invCountOf(it[1]) > 0, true,
         string.format("a %s is in the bag to equip", it[2]))
     end
     H.assertEq(H.readByte(0x1600 + 37 * 5 + 0x1F + 4), 0xB1,
       "SABIN retains the scenario route's Star Pendant")
+    blackBeltHeld = H.invCountOf(0xD5) > 0
+    H.log(string.format("[zozo kit] Black Belt (334's rare drop) in the bag: "
+                        .. "%s", tostring(blackBeltHeld)))
   end),
   H.equipWeapon(1, 0x84, { slot = 3, tag = "CELES LeatherArmor" }),
   H.equipWeapon(1, 0xB1, { slot = 4, tag = "CELES Star Pendant" }),
   H.equipWeapon(1, 0xB2, { slot = 5, tag = "CELES Peace Ring" }),
   H.equipWeapon(3, 0x5A, { slot = 1, tag = "SABIN Buckler" }),
-  H.equipWeapon(3, 0xD5, { slot = 5, tag = "SABIN Black Belt" }),
+  H.cond(function() return blackBeltHeld end, {
+    H.equipWeapon(3, 0xD5, { slot = 5, tag = "SABIN Black Belt" }),
+  }, {
+    H.logStep("no Black Belt this run (334's rare drop did not fall); "
+              .. "SABIN's second relic slot stays empty"),
+  }),
   -- Read the slots back rather than trusting six menu drives.  A seek that
   -- timed out would have failed already, but a drive that landed on the
   -- wrong row would not, and "the menu was opened" and "the item is worn"
@@ -1235,16 +1256,19 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     local function worn(c, s)
       return H.readByte(0x1600 + 37 * c + 0x1F + s)
     end
-    for _, w in ipairs({ { 6, 3, 0x84, "CELES wears the LeatherArmor" },
-                         { 6, 4, 0xB1, "CELES wears the Star Pendant" },
-                         { 6, 5, 0xB2, "CELES wears the Peace Ring" },
-                         { 5, 1, 0x5A, "SABIN carries the Buckler" },
-                         { 5, 4, 0xB1, "SABIN wears the Star Pendant" },
-                         { 5, 5, 0xD5, "SABIN wears the Black Belt" } }) do
+    local wants = { { 6, 3, 0x84, "CELES wears the LeatherArmor" },
+                    { 6, 4, 0xB1, "CELES wears the Star Pendant" },
+                    { 6, 5, 0xB2, "CELES wears the Peace Ring" },
+                    { 5, 1, 0x5A, "SABIN carries the Buckler" },
+                    { 5, 4, 0xB1, "SABIN wears the Star Pendant" } }
+    if blackBeltHeld then
+      wants[#wants + 1] = { 5, 5, 0xD5, "SABIN wears the Black Belt" }
+    end
+    for _, w in ipairs(wants) do
       H.assertEq(worn(w[1], w[2]), w[3], w[4])
     end
-    H.log("[zozo kit] inherited Star Pendant preserved; five empty slots " ..
-      "filled from the bag")
+    H.log(string.format("[zozo kit] inherited Star Pendant preserved; %d " ..
+      "empty slots filled from the bag", blackBeltHeld and 5 or 4))
   end),
   -- CELES and SABIN to the back row.  Physical damage taken is halved there
   -- and only a weapon swing pays for it: ExecCmd sets $B3 = $FF at the top
