@@ -49,8 +49,10 @@
 .if ::OT6_MP_COSTS              ; :: because ca65 resolves .if in the proc's
                                 ;   local scope; force the file-scope flag
         jsl     Ot6CostFor      ; A(id) -> A(cost); preserves X and Y
-        sta     $4006,x         ; wItemList::Qty = MP cost.  Qty is otherwise
-                                ;   unused here, and the row-draw shim reads it
+        jsl     Ot6PendPrice    ; ...x2.5 per pending boost (#219), the same
+                                ;   number Ot6KitRowCost draws and the cmd-$0a
+                                ;   charge takes
+        sta     $4006,x         ; wItemList::Qty = MP cost
 .endif
         inx
         inx
@@ -133,7 +135,16 @@
         ; the column-1 name and its trailing cost together; grey that byte when
         ; the caster cannot afford the row, the twin of magic greying spell+MP
         ; as one.
-        lda     $4006,y         ; wItemList::Qty,y     (column-1 cost)
+        ; The price is re-derived here, per draw, rather than read out of the
+        ; Qty cell the list-open stamped: a boost pressed with the window
+        ; already up re-stages these rows (Ot6Boost -> OT6_RESTAGE ->
+        ; Ot6RestageGate_ext) but never re-runs the open, so a stamped price
+        ; would go stale against the charge the moment the player pressed R.
+        ; Ot6KitRowCost is the same leaf the open stamps through, so the two
+        ; agree at 0 BP and the drawn one is the live answer.
+        lda     $4005,y         ; wItemList::Index,y   (column-1 row id)
+        jsl     Ot6KitRowCost   ; -> this row's price, pending boost included
+        pha                     ; park column-1 cost
         jsl     Ot6AbilityGrey  ; -> $04 grey / $00 white; preserves X and Y
         jsl     Ot6BushidoRowGrey ; bushido (w7e6168=2): also grey a row whose boost
                                 ;   exceeds current bp; blitz passes A through
@@ -141,15 +152,17 @@
         sta     $5758
         lda     #$02
         sta     $575b           ; +6   number command      (column-1 cost)
-        lda     $4006,y         ; wItemList::Qty,y         (column-1 cost value)
-        sta     $575c           ; +7
+        pla
+        sta     $575c           ; +7                       (column-1 cost value)
         lda     #$ff
         sta     $575d           ; +8   space between the columns
         lda     #$04
         sta     $575e           ; +9   set-font command
-        lda     $4009,y         ; column-2 cost: grey column 2's font the same
-        jsl     Ot6AbilityGrey  ;   way; +9/+10 colors column-2's name AND cost
-        ora     #$21            ; +10  font palette: $21 white or $25 grey
+        lda     $4008,y         ; wItemList::Index+3,y (column-2 row id)
+        jsl     Ot6KitRowCost
+        pha                     ; park column-2 cost
+        jsl     Ot6AbilityGrey  ;   grey column 2's font the same way;
+        ora     #$21            ; +10  +9/+10 colors column-2's name AND cost
         sta     $575f
         lda     #$0f
         sta     $5760           ; +11  name command         (column 2)
@@ -157,8 +170,8 @@
         sta     $5761           ; +12
         lda     #$02
         sta     $5762           ; +13  number command       (column-2 cost)
-        lda     $4009,y         ; wItemList::Qty+3,y       (column-2 cost value)
-        sta     $5763           ; +14
+        pla
+        sta     $5763           ; +14                       (column-2 cost value)
         stz     $5764           ; +15  terminator
 .else
         lda     #$0f            ; nomp baseline: the old layout, swap column 2's
@@ -223,6 +236,7 @@
         ; commands (+4,+10) and their ids (+5,+11, DrawToolsListText's) stay put.
         lda     $575a           ; +5 = column-1 tool id (DrawToolsListText wrote it)
         jsl     Ot6CostFor      ;   id -> MP cost (0 if $ff/unpriced)
+        jsl     Ot6PendPrice    ;   ...x2.5 per pending boost (#219); a 0 stays 0
         pha                     ; park column-1 cost
         jsl     Ot6AbilityGrey  ;   cost -> $04 grey / $00 white; preserves X,Y
         ora     #$21            ; +1: font palette, $21 white or $25 grey
@@ -235,6 +249,7 @@
         sta     $5758           ; +3: column-1 cost value
         lda     $5760           ; +11 = column-2 tool id
         jsl     Ot6CostFor
+        jsl     Ot6PendPrice
         pha                     ; park column-2 cost
         jsl     Ot6AbilityGrey
         ora     #$21            ; +7: font palette, $21 white or $25 grey
@@ -310,11 +325,66 @@
 ; in: A = the row's dance id ($ff = empty).  out: A = cost.  preserves X,Y.
 .proc Ot6DanceRowCost
         .a8
+        .i16
         cmp     #$ff
         bne     :+
         lda     #$00            ; empty cell: no price, stays white
         rtl
-:       jml     Ot6DanceCost    ; the one authority (its rtl returns for us)
+:       jsl     Ot6DanceCost    ; the one authority
+        jml     Ot6PendPrice    ; ...x2.5 per pending boost, the same number the
+                                ;   cmd-$13 charge takes (its rtl returns for us)
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a kit row's price: which ladder this window is showing, and what the
+;   pending boost does to it ]
+;
+; The one leaf behind every number the tools shell draws for a kit, and the
+; twin of the charge's own branch in Ot6AbilityCost.  The shell serves four
+; lists and w7e6168 says which (0 real tools, 1 blitz, 2 bushido, 3 thief);
+; real tools never reach here, because DrawToolsListText sends mode 0 to
+; Ot6ToolRowDecorate instead.
+;
+; Who escalates, and why, is Ot6AbilityCost's ruling repeated rather than a
+; second opinion:
+;   * Blitz: one id per row, boost buys Ot6BoostDmg's x2/x4/x8, so x2.5 per
+;     pending level (#219).
+;   * SwdTech: the boost was already spent on picking the row, so the row is
+;     priced at its own table price and nothing escalates.
+;   * Thief: the Steal row is a chance verb (boost buys the rare/guarantee
+;     ladder) and escalates; Filch and Bestow buy nothing from a boost, so
+;     they stay flat.
+;
+; in: A = the row's id ($ff = an empty cell).  out: A = the price.
+; a8/i16, db=$7e; preserves X and Y.  rtl.
+.proc Ot6KitRowCost
+        .a8
+        .i16
+        cmp     #$ff
+        beq     @empty
+        pha                     ; [$01,s] the row id
+        lda     $6168           ; which kit the tools shell is showing
+        cmp     #$02
+        beq     @bushido
+        cmp     #$03
+        beq     @thief
+        pla                     ; blitz
+        jsl     Ot6CostFor
+        jml     Ot6PendPrice
+@bushido:
+        pla
+        jml     Ot6CostFor      ; the tech's own row price, unescalated
+@thief: lda     $01,s           ; the parked row id
+        cmp     #OT6_THIEF_STEAL
+        bne     @flat
+        pla
+        jsl     Ot6ThiefCost
+        jml     Ot6PendPrice
+@flat:  pla                     ; Filch and Bestow: a boost buys them nothing
+        jml     Ot6ThiefCost    ;   (Ot6BoostDmg gates cmd $05), so flat
+@empty: lda     #$00            ; an empty cell draws two blanks and stays white
+        rtl
 .endproc
 .endif  ; OT6_MP_COSTS
 
