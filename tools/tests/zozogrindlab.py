@@ -161,8 +161,13 @@ BOOT_NEW = '''  -- zozogrindlab: the west landing, baked by the generator's own 
   H.call(function()
     labHook()
     H.assertEq(H.worldMode(), true, "the landing fixture is on the world map")
-    where("west landing")
   end),
+  -- the rows lever: the fixture was baked after the generator's own
+  -- setRows (LOCKE front, the rest back), so a rows policy re-applies here
+  H.cond(function() return GRIND.rows[1] == true end, {
+    H.setRows(GRIND.rows, { tag = "zozogrindlab rows" }),
+  }, {}),
+  H.call(function() where("west landing") end),
 ''' % FIXTURE
 
 STOP_OLD = '''    where("grind done")
