@@ -349,8 +349,11 @@ end
 function M.requestLoadState(blob)
   M.finishRecoveryTrace("state_reload")
   -- a restored snapshot restarts the experiment: the post-game-over pad
-  -- freeze (see M.freezePad) ends here, with the game over it answered
+  -- freeze (see M.freezePad) ends here, with the game over it answered --
+  -- and so does the runner's memory of a counted game over the body had
+  -- not handled (#205): a stall after this reload is the reload's own
   M.thawPad()
+  if RUN ~= nil then RUN.goUnhandled = nil end
   local req = {}
   local ref
   M.pendingStateReqs = M.pendingStateReqs + 1
@@ -545,8 +548,21 @@ end
 -- least one character alive.  $FFFF/$FF00 anywhere means these bytes
 -- belong to another module.
 --
--- Known limit: a total party wipe is all zeros, the same shape a menu
--- leaves, so this reports false for a wipe.
+-- A total party wipe is all zeros, the same shape a menu leaves, so the
+-- zeros alone say nothing; the seat table tells them apart (#205): actors
+-- seated ($3ed8), present ($3aa0 bit 0) and a plausible max HP behind
+-- each -- M.wipeVerdict's reading, the one the run canary has trusted
+-- since #166.  Measured on locke_scenario (2026-09-16, a probe through a
+-- field menu, a battle load and a solo loss): outside a battle the table
+-- reads all $FFFF or all zero with the seat bytes $FF/0 and max HP
+-- $FFFF/0; InitParty's frame seats the actor with max HP still 0 (which
+-- the verdict rejects) and LoadCharProp writes the HP the next frame; and
+-- from the one seat's HP hitting 0 until the field writes $FFFF back
+-- (456 frames, LoseBattle's $3ebc bit 0 landing 281 in) the wipe shape
+-- holds without a gap.  So a wipe reads as the battle still being up,
+-- which it is: the engine sits on the Annihilated screen until a press,
+-- and a driver keeps its frame() -- the [death] and [wipe] lines a solo
+-- loss never got, and the A a person presses there.
 function M.battleLoadStarted()
   local anyLive = false
   for i = 0, 3 do
@@ -554,7 +570,8 @@ function M.battleLoadStarted()
     if hp >= 10000 then return false end   -- $FFFF, $FF00: not an HP table
     if hp > 0 then anyLive = true end
   end
-  return anyLive
+  if anyLive then return true end
+  return M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
 end
 
 -- Cheap "is anything on screen" check: an all-black 256x224 screenshot
@@ -2718,6 +2735,8 @@ function M.newFightDriver(tag, opts)
   local freeRoundSaid = false          -- the preemptive free-round line, once
   local healWatch = nil                -- a confirmed heal, awaiting its effect
   local healSaid = nil                 -- last refusal logged, to log it once
+  local finisherSaid = nil             -- the finisher window yielding (#204), once per reason
+  local inertSaid = {}                 -- "actor:spell" -> true once an unknown config spell is said (#182)
   local summonWhyN = 0                 -- summon-refusal diagnostics, capped
   local parkDropN = 0                  -- watchdog fires this battle (see below)
   local careActor = nil                -- who took this round's one care turn
@@ -2823,6 +2842,20 @@ function M.newFightDriver(tag, opts)
       end
     end
     return nil
+  end
+  -- Whether `id` is in the actor's compacted list at all, MP and the
+  -- greyed bit aside (#182).  spellCell's nil is "cannot pay or greyed"
+  -- or "does not know it", and the second is a config bug worth a line:
+  -- gen_fc_alcove's Bolt line was inert for 13 of 13 TERRA turns with
+  -- nothing in the log saying so.  With no list to read (the pointer
+  -- outside the list area) this is not the rule's call and answers true.
+  local function spellKnown(actor, id)
+    local base = M.readWord(MLISTPTR + actor * 2)
+    if base < 0x2000 or base > 0x2600 then return true end
+    for cell = 0, 53 do
+      if M.readByte(base + (cell + 1) * 4) == id then return true end
+    end
+    return false
   end
 
   -- OT6's per-monster state, slot-indexed: monsters are entities 4..9 at a
@@ -3601,8 +3634,94 @@ function M.newFightDriver(tag, opts)
         best.what, best.chips or 0, tostring(slot)))
       return best
     end
-    if (row ~= nil or cureRow ~= nil) and totalMon > 200 and parkDropN < 3
-       and careOpen then
+    -- The finisher gate yields to the enemy's arithmetic (#204).  "Under
+    -- 200 total, attack" was written for a party one poke from ending a
+    -- fight; for solo L12 LOCKE against the 495-HP gate soldier, whose
+    -- shields re-seed to 3 inside that window, the last 200 HP was three
+    -- chips and an unload away -- four more enemy actions -- and every
+    -- baseline loss (docs/design/sfigaro-gate.md; the 15-seed lab, seeds
+    -- 24/40/52) was him at 134-142/279 planning a 0-BP chip with a Potion
+    -- in the bag, killed by the fight's first TekLaser.  The measured
+    -- round cost there read 58-110: not "inside one round", but inside
+    -- the four the kill still needed.  So the window closes the care block
+    -- only while the fight ends before the damage does: it stays closed
+    -- when no member is inside the rounds the kill still needs, priced by
+    -- the press rule's own arithmetic (this actor's chips against the
+    -- shields up, the party's measured broken window against the HP
+    -- left, or this actor chipping it down at the per-hit figure) at the
+    -- round cost measured on that member -- and opens otherwise, handing
+    -- the press rule the kill-this-turn decision it already makes ahead
+    -- of the care (#165).  A member inside one measured round is the
+    -- one-round case of the same rule and opens it whatever the estimate.
+    -- Nothing here reads hidden state: shields, HP and the damage watch
+    -- are what the screen shows.
+    local function finisherYields()
+      local rounds, arith = nil, nil
+      local slot = pressTarget()
+      if slot ~= nil then
+        local left = livingMonsters() > 1 and totalMon or M.readWord(MON_HP + slot * 2)
+        local sh = M.readByte(SH_CUR + slot * 2)
+        local broken = M.readByte(BRK_TICKS + slot * 2) ~= 0
+        local need = broken and 0 or sh
+        local best = bestLine(actor, slot, have)
+        local chips = best and best.chips or 0
+        local window = 0
+        for e = 0, 3 do
+          if hpNow[e] > 0 and dmgSeen[e] then window = window + dmgSeen[e] * 4 end
+        end
+        if need == 0 or chips > 0 then
+          local toBreak = need == 0 and 0 or math.ceil(need / chips)
+          if window > 0 then
+            local unload = math.ceil(left / window)
+            rounds = toBreak + unload
+            arith = string.format("%d to chip %d shield(s) at %d a turn + %d to "
+              .. "unload %d HP at %d a broken round", toBreak, need, chips, unload,
+              left, window)
+          end
+          local dh = dmgHit[actor]
+          if best ~= nil and dh ~= nil and dh.kind == best.kind
+             and (best.kind ~= "skill" or dh.skill == best.skill) and dh.per > 0 then
+            local perTurn = dh.per * (best.hits or 1)
+            local chipRounds = math.ceil(left / perTurn)
+            if rounds == nil or chipRounds < rounds then
+              rounds = chipRounds
+              arith = string.format("%d chipping %d HP down at %d a turn (%s)",
+                chipRounds, left, perTurn, best.what)
+            end
+          end
+        end
+      end
+      for e = 0, 3 do
+        local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
+        local cost = roundCost[e] or 0
+        if hp > 0 and maxhp > 0 and hp < maxhp and cost > 0 then
+          if hp <= cost then
+            return string.format("entity %d (%d/%d) is inside one round of death "
+              .. "(%d)", e, hp, maxhp, cost)
+          end
+          if rounds ~= nil and rounds > 1 and hp <= rounds * cost then
+            return string.format("entity %d (%d/%d) is inside the %d round(s) the "
+              .. "kill still needs (%s) at %d a round = %d", e, hp, maxhp, rounds,
+              arith, cost, rounds * cost)
+          end
+        end
+      end
+      return nil
+    end
+    local finisher = totalMon <= 200
+    local yieldWhy = nil
+    if finisher and (row ~= nil or cureRow ~= nil) and parkDropN < 3 and careOpen then
+      yieldWhy = finisherYields()
+      if yieldWhy ~= nil then
+        local said = string.format("[%s] actor=%d: the finisher window (monsters at "
+          .. "%d HP <= 200) yields -- %s; the care block opens and the press rule "
+          .. "decides a kill this turn against the care (#204)", tag or "fight",
+          actor, totalMon, yieldWhy)
+        if said ~= finisherSaid then finisherSaid = said; M.log(said) end
+      end
+    end
+    if (row ~= nil or cureRow ~= nil) and (not finisher or yieldWhy ~= nil)
+       and parkDropN < 3 and careOpen then
       -- The press rule (#156), the finisher rule's sibling: when this
       -- actor's best unreflectable action chips the target's remaining
       -- shields to zero this turn AND the party's measured damage in the
@@ -4039,6 +4158,16 @@ function M.newFightDriver(tag, opts)
         return { kind = "magic", spell = mg.spell,
                  row = cmdRow(actor, CMD_MAGIC),
                  boostLeft = mg.boost == false and 0 or boost }
+      elseif not spellKnown(actor, mg.spell) then
+        -- an inert line is said once per fight per actor (#182), not
+        -- skipped in silence
+        local key = actor .. ":" .. mg.spell
+        if not inertSaid[key] then
+          inertSaid[key] = true
+          M.log(string.format("[%s] actor=%d: config spell $%02X is not in char "
+            .. "%d's learned table -- inert line", tag or "fight", actor,
+            mg.spell, id))
+        end
       end
     end
     -- opts.nuke = { spellId, ... } and opts.nukeLore = { loreId, ... }: the
@@ -4080,6 +4209,18 @@ function M.newFightDriver(tag, opts)
     if opts.nuke and cmdRow(actor, CMD_MAGIC) then
       for _, spell in ipairs(opts.nuke) do
         local cell, cost = spellCell(actor, spell, true)
+        if cell == nil and not spellKnown(actor, spell) then
+          -- the repertoire is party-wide, so a Magic-row actor without
+          -- this one is not a bug by itself; it is still said once per
+          -- fight per actor (#182) so a repertoire nobody knows is visible
+          local key = actor .. ":" .. spell
+          if not inertSaid[key] then
+            inertSaid[key] = true
+            M.log(string.format("[%s] actor=%d: config spell $%02X (nuke) is not "
+              .. "in char %d's learned table -- inert line for this actor",
+              tag or "fight", actor, spell, id))
+          end
+        end
         if cell ~= nil
            and M.readWord(CURMP + actor * 2) - cost >= nukeFloor(actor) then
           if not castVetoed(spell, "nuke") then
@@ -4901,7 +5042,7 @@ function M.newFightDriver(tag, opts)
     -- damage decide the next attempt's first turns.
     roundCost, turnSnap = {}, {}
     itemRestore, castRestore = {}, {}
-    healWatch, healSaid = nil, nil
+    healWatch, healSaid, finisherSaid, inertSaid = nil, nil, nil, {}
     dmgWatch, dmgSeen, monHpLast = {}, {}, {}
     dmgHit, hitLedger, partyHpLast = {}, {}, {}
     monAct, deathSaid, battleDeaths, wipeSaid = nil, {}, {}, false
@@ -6098,11 +6239,13 @@ RUN = {
   budget = 60000, shift = 0, gap = 20, idle = 0, idlePad = nil,
   bootMarked = false, s0 = nil, s0blob = nil, ld = nil, ldWait = 0,
   failures = {}, lastBattle = nil, epoch = 1, installing = false,
+  goUnhandled = nil,   -- { frame, what }: a counted game over no reload answered (#205)
 }
 M.totalFrames = 0
 
 -- What the earlier attempts of this run fell to, oldest first: one record
--- { attempt, class, msg, frame } per `[retry] attempt n/N FAILED` line.
+-- { attempt, class, msg, frame, context } per `[retry] attempt n/N FAILED`
+-- line (`context` is the wipe context line's text, for class wipe only).
 -- Read-only, and empty on a first attempt.  A negative-control suite
 -- (watchdog_cantrun, watchdog_listend) spends attempt 1 on a press the
 -- game is known not to answer and attempt 2 asserting that attempt 1 fell
@@ -6112,7 +6255,7 @@ function M.attemptFailures()
   local out = {}
   for i, f in ipairs(RUN.failures) do
     out[i] = { attempt = f.attempt, class = f.class, msg = f.msg,
-               frame = f.frame }
+               frame = f.frame, context = f.context }
   end
   return out
 end
@@ -6171,8 +6314,13 @@ function M.bootMark(what)
 end
 
 -- What the fight was, for the attempt line.  Sampled while a battle is up,
--- so it is still readable after the teardown a wipe runs into.
+-- so it is still readable after the teardown a wipe runs into.  Not
+-- resampled once the table reads wiped (battleLoadStarted holds through
+-- the Annihilated screen, #205): the last living reading -- the HP and
+-- pips the party carried into the killing round -- is the context a loss
+-- wants, and the [death] lines carry the exact figures.
 local function sampleBattle()
+  if M.partyWipedInBattle and M.partyWipedInBattle() and RUN.lastBattle then return end
   local seats = {}
   for e = 0, 3 do
     local a = M.readByte(0x3ed8 + e * 2)
@@ -6206,7 +6354,7 @@ local function resetLibState()
   M._killbitFired = false
   watchReset()
   RUN.bootMarked, RUN.idle, RUN.idlePad = false, 0, nil
-  RUN.lastBattle = nil
+  RUN.lastBattle, RUN.goUnhandled = nil, nil
   local hooks = replayHooks
   replayHooks = {}
   for _, fn in ipairs(hooks) do pcall(fn) end
@@ -6336,6 +6484,7 @@ function M.run(opts, steps)
         if pc ~= addr and pc ~= addr + 1 then return end
         goReadFired = goReadFired + 1
         M.gameOverFired = M.gameOverFired + 1
+        RUN.goUnhandled = { frame = M.frame, what = "the GameOver event script was entered" }
         M.freezePad("the GameOver event script was entered")
       end, emu.callbackType.read, addr, addr)
     end
@@ -6347,6 +6496,7 @@ function M.run(opts, steps)
         if canaryInGame then
           titleExecFired = titleExecFired + 1
           M.gameOverFired = M.gameOverFired + 1
+          RUN.goUnhandled = { frame = M.frame, what = "TitleScreen was entered" }
           M.freezePad("TitleScreen was entered")
         end
       end, emu.callbackType.exec, addr, addr)
@@ -6369,22 +6519,23 @@ function M.run(opts, steps)
       .. "totalframes=%d shift=%d phase=%d%s: %s",
       RUN.attempt, RUN.attempts, class, M.frame, M.totalFrames, RUN.shift,
       M.seedPhase(), shot and (" screenshot=" .. shot) or "", tostring(msg)))
+    local context = nil
     if class == "wipe" then
       local b = RUN.lastBattle
       if b then
-        M.log(string.format("[retry] attempt %d/%d wipe context: the last "
-          .. "battle up (f%d) was formation %s; seats at that reading %s "
-          .. "(actor:hp/maxhp bp)", RUN.attempt, RUN.attempts, b.frame,
-          b.formation, b.seats))
+        context = string.format("the last battle up (f%d) was formation %s; "
+          .. "seats at that reading %s (actor:hp/maxhp bp)", b.frame,
+          b.formation, b.seats)
       else
-        M.log(string.format("[retry] attempt %d/%d wipe context: no battle "
-          .. "was sampled in this attempt (the loss was not in a fight this "
-          .. "runner saw)", RUN.attempt, RUN.attempts))
+        context = "no battle was sampled in this attempt (the loss was not in "
+          .. "a fight this runner saw)"
       end
+      M.log(string.format("[retry] attempt %d/%d wipe context: %s", RUN.attempt,
+        RUN.attempts, context))
     end
     RUN.failures[#RUN.failures + 1] =
       { attempt = RUN.attempt, class = class, msg = tostring(msg),
-        frame = M.frame }
+        frame = M.frame, context = context }
   end
 
   local function stopWith(code, class, msg)
@@ -6415,6 +6566,23 @@ function M.run(opts, steps)
   -- Schedule a replay, or stop.  `code` is the exit code a final failure
   -- takes (3 for a game over, 1 for a raised error, 2 for the budget).
   local function failed(class, msg, code)
+    -- A stall that follows a counted game over the body never handled is
+    -- the loss, not the stall (#205): under allowGameOver the count raises
+    -- nothing here, and what a driver then does at the Annihilated screen
+    -- (or the title) is no-effect, no-progress or a step's timeout.  The
+    -- attempt files as the wipe it was, with its context line; a body that
+    -- handled the count by restoring a snapshot (M.requestLoadState clears
+    -- the note) keeps the stall's own class.
+    local go = RUN.goUnhandled
+    if go ~= nil and (class == "noprogress" or class == "noeffect"
+                      or class == "timeout") then
+      msg = string.format("a counted game over the body never handled -- %s at "
+        .. "f%d (GameOver read x%d, TitleScreen exec x%d, battle wipe x%d; "
+        .. "allowGameOver=%s) -- preceded this %s, so the attempt is filed as "
+        .. "the loss: %s", go.what, go.frame, goReadFired, titleExecFired,
+        wipeFired, tostring(RUN.opts.allowGameOver == true), class, tostring(msg))
+      class = "wipe"
+    end
     attemptLine(class, msg)
     local haveS0 = RUN.s0blob and #RUN.s0blob > 0
     if not RETRYABLE[class] or RUN.attempt >= RUN.attempts
@@ -6496,7 +6664,22 @@ function M.run(opts, steps)
           "on the annihilated screen waiting for a press.  Counted as a " ..
           "game over (f%d).", WIPE_FRAMES, table.concat(seats, " "),
           M.readByte(0x3ebc), M.frame))
-        M.freezePad("the party was wiped in battle")
+        RUN.goUnhandled = { frame = M.frame, what = "the party was wiped in battle" }
+        -- Under allowGameOver the pad stays live (#205): the body declared
+        -- a lost fight survivable, and a scripted loss (battle 11's
+        -- scenario reset, docs/design/sfigaro-gate.md) moves on only with
+        -- the press a person makes at the Annihilated screen.  Frozen, that
+        -- press was dropped and the attempt stalled to no-progress 1800
+        -- frames later, filed as a stall instead of the loss it was.  The
+        -- GameOver-read and TitleScreen watches above still freeze: those
+        -- are the real game over, past which any A Continues the last save.
+        if RUN.opts.allowGameOver then
+          M.log(string.format("canary: allowGameOver -- the pad is not frozen on "
+            .. "this count; the body's ladder owns the loss (a stall after it "
+            .. "files as a wipe) (f%d)", M.frame))
+        else
+          M.freezePad("the party was wiped in battle")
+        end
       end
     else
       wipeN = 0
