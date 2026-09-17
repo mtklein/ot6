@@ -2,17 +2,17 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "vector-crash.sram",
   "size": 32768,
-  "sha256": "020e0b2d45417eab2598a6026b8f460ac6db15da8ba43f2755537ab4d754d90b",
+  "sha256": "1fc2bf07c4635860dc62b888f42ba4d67525e44015248c0bb4617ac0b1c9114b",
   "slot": 3,
   "milestone": "vector-crash",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "020e0b2d45417eab2598a6026b8f460ac6db15da8ba43f2755537ab4d754d90b",
-    "generator_sig": "d000673e1af167ebf1c032377a33e48aa6c86577e726d00320f39257f213c28e gen_vector_crash tools/tests/checkpoints/gate-cave-save-v1/manifest.json tools/tests/checkpoints/gate-cave-save-v1/gate-cave-save.sram",
+    "payload_sha256": "1fc2bf07c4635860dc62b888f42ba4d67525e44015248c0bb4617ac0b1c9114b",
+    "generator_sig": "2bdb9569371427f4871d91866fcca4db9143723fe5a3a3f1f0fcb52529f75dfb gen_vector_crash tools/tests/checkpoints/gate-cave-save-v1/manifest.json tools/tests/checkpoints/gate-cave-save-v1/gate-cave-save.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/gate-cave-save-v1/manifest.json",
-        "sha256": "1a21f56f3b0c2b34dd2176b4543d5fa013128b0706e68f09b5effcfa242f49e6"
+        "sha256": "51aa2c36533528a2fe6826656a2c0b194e8086823de5dd6cdbdce25ff993b13b"
       }
     ]
   },
