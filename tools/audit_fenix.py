@@ -30,6 +30,19 @@ driver's plan line ("revive entity 1 with Fenix Down: raise to ...") and a
 Fenix that never landed are not uses.  The frame-stamped `[ot6note]`
 mirror of the `[ot6]` stream is skipped.
 
+WHAT IS ALSO COUNTED, BESIDE THE USES (#220): the bags.  A landed revive
+is the good outcome; the bag pays for every attempt, landed or not.  The
+v0.18 qualification reported 5 landed across 53 logs while the bags fell
+by 14, because vector_crash threw 8 at Zombied members that cannot be
+raised (`actor 1's Fenix Down on entity 2 never landed (841 ticks)`).  So
+this also reads the running counts -- the `fenix=<n>` field of every care
+and shop line, and the `<n> left` tail of a care use -- and sums the drops
+within an attempt as CONSUMED, attributed to the same fight a use would
+be.  A retry restarts the attempt from its checkpoint, which restores the
+bag, so each attempt's baseline starts fresh and a refill never counts as
+a negative spend.  Consumed above landed is its own flag: Fenix spent
+that raised nobody is a strategy gap, not a supply problem.
+
 WHICH FIGHT: an in-battle use belongs to the driver tag on its line; a
 care-stop revival belongs to the nearest preceding `[<tag>] battle f+1`
 line in the same attempt -- the fight that killed the member -- not to
@@ -66,6 +79,14 @@ CARE_USED = re.compile(r"^\[ot6\] \[(?P<tag>[^\]]+)\] used \$F0 on char (?P<char
                        r"(?P<from>\d+) -> (?P<to>\d+) hp")
 LANDED = re.compile(r"^\[ot6\] \[(?P<tag>[^\]]+)\] actor (?P<actor>\d+)'s Fenix Down landed: "
                     r"entity (?P<e>\d+) is at (?P<hp>\d+)/(?P<max>\d+)")
+# a Fenix the driver confirmed and then gave up on: the bag paid, nobody rose
+NEVER_LANDED = re.compile(r"^\[ot6\] \[(?P<tag>[^\]]+)\] actor (?P<actor>\d+)'s Fenix Down "
+                          r"on entity (?P<e>\d+) never landed \((?P<ticks>\d+) ticks\)")
+# the running bag count, wherever it is printed: the `fenix=<n>` field of a
+# care/shop line, and the `<n> left` tail a care use writes after spending one
+BAG_FENIX = re.compile(r"^\[ot6\] \[(?P<tag>[^\]]+)\] .*\bfenix=(?P<n>\d+)")
+BAG_LEFT = re.compile(r"^\[ot6\] \[(?P<tag>[^\]]+)\] used \$F0 on char \d+: .*?, "
+                      r"(?P<n>\d+) left")
 TRACE = "[ot6action] "
 # the fight a care stop follows: the driver's own f+1 line
 BATTLE_UP = re.compile(r"^\[ot6\] \[(?P<tag>[^\]]+)\] battle f\+1 ")
@@ -115,18 +136,36 @@ def segment_of(path):
 
 
 def scan(path):
-    """One log -> (uses, attempts) where uses is a list of dicts
-    (attempt, line, fight, cls, kind, text) and attempts is the verdict's
-    n/N (or the count seen when the log has no verdict)."""
+    """One log -> (uses, verdict, spends).  uses is a list of dicts
+    (attempt, line, fight, cls, kind, text): the revives that landed, plus
+    the confirmed ones that never did (kind 'failed').  spends is the bag
+    drops, same dict shape plus n (how many left the bag).  verdict is the
+    attempts n/N (or the count seen when the log has no verdict)."""
     try:
         lines = open(path, errors="replace").read().splitlines()
     except OSError:
-        return [], "?"
+        return [], "?", []
     traced = any(l.startswith(TRACE) for l in lines)
     uses = []
+    spends = []
+    bag = None                  # the running fenix= count within this attempt
     attempt, max_attempts = 1, None
     last_battle = None          # the most recent [tag] battle f+1 in this attempt
     verdict = None
+
+    def attribute(tag):
+        """A care stop's Fenix belongs to the fight that killed the member;
+        any other tag owns its own (the #154 third-defect rule)."""
+        return last_battle if tag.startswith("care ") else tag
+
+    def bag_now(line, tag, n):
+        """A drop in the running count is a Fenix that left the bag."""
+        nonlocal bag
+        if bag is not None and n < bag:
+            fight = attribute(tag)
+            spends.append(dict(attempt=attempt, line=line, fight=fight,
+                               cls=classify(fight), n=bag - n, text=None))
+        bag = n
     for i, line in enumerate(lines, 1):
         if line.startswith("[ot6note]"):
             continue
@@ -139,6 +178,9 @@ def scan(path):
             attempt = int(m.group(1)) + 1
             max_attempts = int(m.group(2))
             last_battle = None
+            # the retry reloads the checkpoint, so the bag comes back with
+            # it: start the next attempt's baseline from its own first count
+            bag = None
             continue
         m = PASS.match(line)
         if m:
@@ -152,6 +194,27 @@ def scan(path):
         m = BATTLE_UP.match(line)
         if m:
             last_battle = m.group("tag")
+            continue
+        # the bag, before the use rules: a care use prints the count it left
+        # behind, every other care/shop line prints the count it saw
+        m = BAG_LEFT.match(line)
+        if m:
+            # this line is itself proof that one left the bag, so when it is
+            # the attempt's first sighting the baseline is the count before
+            # it rather than after -- otherwise an attempt whose first care
+            # stop revives someone would start counting from zero
+            if bag is None:
+                bag = int(m.group("n")) + 1
+            bag_now(i, m.group("tag"), int(m.group("n")))
+        else:
+            m = BAG_FENIX.match(line)
+            if m:
+                bag_now(i, m.group("tag"), int(m.group("n")))
+        m = NEVER_LANDED.match(line)
+        if m:
+            fight = m.group("tag")
+            uses.append(dict(attempt=attempt, line=i, fight=fight,
+                             cls=classify(fight), kind="failed", text=line))
             continue
         m = CARE_USED.match(line)
         if m:
@@ -180,7 +243,7 @@ def scan(path):
                              cls=classify(fight), kind="battle", text=line))
     if verdict is None:
         verdict = f"{attempt}/{max_attempts or '?'} (no verdict)"
-    return uses, verdict
+    return uses, verdict, spends
 
 
 def parse_since(s):
@@ -228,16 +291,25 @@ def select_logs(globs, since=None, newer=None):
 
 
 def report(paths, verbose=False):
-    rows = {}                     # (segment, attempt) -> {cls: n}
+    rows = {}                     # (segment, attempt) -> {cls: n}, landed only
+    failed = defaultdict(int)     # segment -> confirmed revives that never landed
+    consumed = defaultdict(int)   # segment -> Fenix Downs the bags paid for
+    landed = defaultdict(int)     # segment -> revives that landed
     verdicts = {}                 # segment -> attempts n/N
     detail = []
     for p in paths:
         seg = segment_of(p)
-        uses, verdict = scan(p)
+        uses, verdict, spends = scan(p)
         verdicts[seg] = verdict
         for u in uses:
-            rows.setdefault((seg, u["attempt"]), defaultdict(int))[u["cls"]] += 1
+            if u["kind"] == "failed":
+                failed[seg] += 1
+            else:
+                rows.setdefault((seg, u["attempt"]), defaultdict(int))[u["cls"]] += 1
+                landed[seg] += 1
             detail.append((seg, u))
+        for s in spends:
+            consumed[seg] += s["n"]
 
     flagged = []
     for (seg, attempt), tally in sorted(rows.items()):
@@ -248,13 +320,18 @@ def report(paths, verbose=False):
                 flagged.append((seg, attempt, n, cls))
 
     total = sum(n for t in rows.values() for n in t.values())
+    # what the bags actually paid, beside what rose (#220)
+    spent = sum(consumed.values())
+    nolanding = sum(failed.values())
+    bags = (f"{total} landed, {spent} left the bags"
+            + (f", {nolanding} confirmed and never landed" if nolanding else ""))
     if not flagged:
         print(f"Fenix audit: no threshold violations in the scanned logs "
-              f"({len(paths)} logs, {total} Fenix Down(s) resolved).")
+              f"({len(paths)} logs, {bags}).")
     else:
         print(f"Fenix audit: {len(flagged)} flagged segment/kind(s) "
               f"(>2 Fenix in a boss, or any in a random) across {len(paths)} "
-              f"logs, {total} Fenix Down(s) resolved.\n")
+              f"logs, {bags}.\n")
         print(f"{'segment':28} {'attempt':>7} {'fenix':>5}  {'kind':7} why")
         for seg, attempt, n, cls in sorted(flagged, key=lambda x: (-x[2], x[0], x[1])):
             why = ("boss burned >2 -- underleveled or needs a strategy lab"
@@ -265,6 +342,21 @@ def report(paths, verbose=False):
             att = f"{attempt}/{verdicts[seg].split('/')[1].split()[0]}" \
                 if "/" in verdicts[seg] else str(attempt)
             print(f"{seg[:28]:28} {att:>7} {n:>5}  {cls:7} {why}")
+    # Fenix the bags paid for that raised nobody (#220).  Every one of these
+    # is a turn and an item spent on a member the throw could not raise --
+    # Zombie, or a fight already lost -- which is a strategy gap rather than
+    # a supply one, and the landed count alone hides it.
+    wasted = sorted(((seg, consumed[seg] - landed[seg]) for seg in consumed
+                     if consumed[seg] > landed[seg]), key=lambda x: -x[1])
+    if wasted:
+        print()
+        print("spent without raising anyone (bag drop above landed revives):")
+        for seg, n in wasted:
+            why = (f"{failed[seg]} confirmed and never landed" if failed[seg]
+                   else "no landing line accounts for them")
+            print(f"  {seg}: {consumed[seg]} left the bag, {landed[seg]} landed "
+                  f"-- {n} raised nobody ({why})")
+
     used = sorted({seg for seg, _ in rows})
     if used:
         print()
@@ -280,7 +372,8 @@ def report(paths, verbose=False):
             print(f"  {seg}: attempts={verdicts[seg]}; " + "; ".join(parts))
     if verbose and detail:
         print()
-        print("every resolved Fenix Down (segment attempt line fight kind: the log line):")
+        print("every Fenix Down that resolved or was confirmed and lost "
+              "(segment attempt line fight kind: the log line):")
         for seg, u in detail:
             print(f"  {seg} a{u['attempt']} L{u['line']} [{u['fight'] or '?'}] "
                   f"{u['cls']} {u['kind']}: {u['text'][:160]}")
@@ -307,13 +400,17 @@ def selftest():
         "[ot6] [b70] [death] f+512 entity 2 char 1 from 447/447 by slot 4 cmd $0C atk $95 (ONE ACTION from >= 80%) bp=1 party_bp=1,1,1,1",
         "[ot6] [care after battle (b70)] used $F0 on char 1: 0 -> 55 hp, status1 80 -> 00, 14 left",
         "[ot6note] 9000 [care after battle (b70)] used $F0 on char 1: 0 -> 55 hp, status1 80 -> 00, 14 left",
+        # the bag between the two fights, unchanged since that use
+        "[ot6] [transit a2 care 1] nothing to do: c0 241/241 hp | tonic=67 potion=21 fenix=14 antidote=4 soft=2 remedy=1",
         # a random, an in-battle plan that landed (one use), and a care stop
         "[ot6] [worldNavTo] battle f+1 menu=00 state=00 actor=0 cursor=0 cmds=00,01,02,03 partyhp=447,443 roundcost=0,0 monhp=s2:288/sh2 monsters=1",
         "[ot6] [worldNavTo] actor=1 revive entity 0 with Fenix Down: raise to 55 HP (1/8 of 447), the living enemy's smallest hit 175",
         "[ot6] [worldNavTo] actor 1's Fenix Down landed: entity 0 is at 55/447 at tick 5017 -- a top-up is owed (the care budget opens for it)",
-        "[ot6] [care after battle (worldNavTo)] used $F0 on char 4: 0 -> 44 hp, status1 80 -> 00, 13 left",
-        # a Fenix confirmed but never landed is not a use
+        # a Fenix confirmed but never landed raises nobody and still costs
+        # the bag one (#220): 14 - 1 (the raise above) - 1 (this) - 1 (the
+        # care stop below) = 11
         "[ot6] [worldNavTo] actor 2's Fenix Down on entity 3 never landed (840 ticks) -- forgetting it",
+        "[ot6] [care after battle (worldNavTo)] used $F0 on char 4: 0 -> 44 hp, status1 80 -> 00, 11 left",
         # a care stop with no fight before it in this attempt is unattributed
         "[ot6] [retry] attempt 1/3 FAILED class=wipe frame=9000 totalframes=9000 shift=0 phase=1: GAME OVER fired",
         "[ot6] [care before the climb] used $F0 on char 5: 0 -> 63 hp, status1 80 -> 00, 11 left",
@@ -341,8 +438,8 @@ def selftest():
         open(p, "w").write(untraced + "\n")
         q = os.path.join(d, "states", "cuts", "y.log")
         open(q, "w").write(traced + "\n")
-        uses, verdict = scan(p)
-        tuses, tverdict = scan(q)
+        uses, verdict, spends = scan(p)
+        tuses, tverdict, tspends = scan(q)
         # --since / --newer selection
         os.utime(p, (1_000_000, 1_000_000))
         newer = select_logs([os.path.join(d, "states", "*.log"),
@@ -353,18 +450,35 @@ def selftest():
     got = [(u["attempt"], u["fight"], u["cls"], u["kind"]) for u in uses]
     want = [(1, "b70", "BOSS", "care"),
             (1, "worldNavTo", "RANDOM", "battle"),
+            (1, "worldNavTo", "RANDOM", "failed"),
             (1, "worldNavTo", "RANDOM", "care"),
             (2, None, "?", "care"),
             (2, "IAF", "BOSS", "care")]
     assert got == want, got
     assert verdict == "2/3", verdict
-    # the [ot6note] mirror was not a sixth; the shop/bag lines were none
-    assert len(uses) == 5, len(uses)
+    # the [ot6note] mirror was not a seventh; the shop/bag lines were none
+    assert len(uses) == 6, len(uses)
+    # the bags (#220): 15 -> 14 across the b70 care (1), 14 -> 11 across the
+    # random (the raise, the Fenix that never landed, the care stop = 3),
+    # then the retry reloads and attempt 2 spends 1 + 1.  Six left the bags,
+    # five raised someone, and the difference is the one that never landed.
+    gotspend = [(s["attempt"], s["fight"], s["cls"], s["n"]) for s in spends]
+    wantspend = [(1, "b70", "BOSS", 1),
+                 (1, "worldNavTo", "RANDOM", 3),
+                 (2, None, "?", 1),
+                 (2, "IAF", "BOSS", 1)]
+    assert gotspend == wantspend, gotspend
+    assert sum(s["n"] for s in spends) == 6, spends
+    assert len([u for u in uses if u["kind"] != "failed"]) == 5
+    assert len([u for u in uses if u["kind"] == "failed"]) == 1
     # the traced log: exactly one Fenix, from the trace; the landing line
     # and the dropped plan add nothing; the Potion is not one
     tgot = [(u["attempt"], u["fight"], u["cls"], u["kind"]) for u in tuses]
     assert tgot == [(1, "b70", "BOSS", "battle")], tgot
     assert tverdict == "1/3", tverdict
+    # a traced log that never prints a bag count reports no consumption
+    # rather than guessing one
+    assert tspends == [], tspends
     # keys: a cuts/ log is its own segment
     assert segment_of(os.path.join(ROOT, "build/states/cuts/y.log")) == "cuts/y"
     assert segment_of(os.path.join(ROOT, "build/states/zozo_arrival.log")) == "zozo_arrival"
