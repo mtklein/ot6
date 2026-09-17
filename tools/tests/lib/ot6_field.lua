@@ -400,6 +400,57 @@ end
 -- aim at a coord it only knows at runtime)
 local function resolve(v) return type(v) == "function" and v() or v end
 
+-- M.fightDriverFor(tag, base, fight): M.newFightDriver(tag, base merged
+-- with fight).  Every walker in this file that builds a fight driver
+-- (navTo, advanceStory, worldNavTo, phaseWalk, newWalkFighter, rideOut,
+-- and through them crossDoor, the shop walk and fieldCare) takes a
+-- `fight = { ... }` table and builds its driver here, so any driver option
+-- (focus, keyed, tools, traceTgt, cure, spend, ...) reaches the driver
+-- without the walker naming it.
+--
+-- Precedence: the walker's own named options (healPercent, bank, reserve,
+-- healer, magic, summon, nuke, nukeLore, tool, blitz, and their defaults)
+-- build `base` exactly as before; a key present in `fight` overrides that
+-- key of `base`.  A `fight` that is not a table (fieldCare's own
+-- `fight = false` switch) adds nothing.
+--
+-- A function-valued entry is a live option: it is called as fn(tag, memo)
+-- before every F.frame() and its result is written to that key of the
+-- options table the driver reads (nil clears it), so the value can follow
+-- the stage frame by frame (a kill order recomputed from the live slots).
+-- It reads nil until the driver's first frame.  `memo` is a table private
+-- to this driver, emptied on every F.idle(), for a caller that wants
+-- per-battle state (a log line said once per battle).
+function M.fightDriverFor(tag, base, fight)
+  local o, live = {}, nil
+  for k, v in pairs(base or {}) do o[k] = v end
+  if type(fight) == "table" then
+    for k, v in pairs(fight) do
+      if type(v) == "function" then
+        live = live or {}
+        live[k] = v
+        o[k] = nil
+      else
+        o[k] = v
+      end
+    end
+  end
+  local F = M.newFightDriver(tag, o)
+  if live then
+    local memo = {}
+    local frame, idle = F.frame, F.idle
+    F.frame = function(...)
+      for k, fn in pairs(live) do o[k] = fn(tag, memo) end
+      return frame(...)
+    end
+    F.idle = function(...)
+      for k in pairs(memo) do memo[k] = nil end
+      return idle(...)
+    end
+  end
+  return F
+end
+
 -- Walk to tile (tx,ty) on the current map: BFS a plan over the true
 -- passability model, then execute it one verified step at a time.  Each
 -- iteration (only when user-controlled and tile-aligned): press the step's
@@ -435,6 +486,10 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --                          formation that has not released the party after
 --                          M.FLEE_CAP consecutive battle frames is fought
 --                          out by edge-tapped A instead of hanging the step.
+--   opts.fight     a table merged over the tactical driver's options, key
+--                  by key, after the named ones above (M.fightDriverFor:
+--                  focus, keyed, tools, traceTgt, ...; function entries
+--                  are re-read every battle frame)
 --   opts.calmFrames  consecutive settled frames on the goal tile the
 --                  terminator requires (default 16)
 --   opts.noPathRetries  BFS-no-path retries, 45 idle frames apart, before
@@ -501,14 +556,14 @@ function M.navTo(txIn, tyIn, opts)
   local wipeSeen = false
   local wipeCheck = wipeCanary("navTo", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee" or opts.playBattles == "mustflee")
-      and M.newFightDriver("navTo",
+      and M.fightDriverFor("navTo",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic,
           summon = opts.summon, nuke = opts.nuke, nukeLore = opts.nukeLore,
           tool = opts.tool, blitz = opts.blitz,
-          cadence = opts.cadence }) or nil
+          cadence = opts.cadence }, opts.fight) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   -- the heal-after-every-battle directive: once a mid-walk battle
   -- resolves, run a between-battles care stop (M.newCareDriver, soft)
@@ -775,6 +830,8 @@ end
 --              after that;
 --   dialog  -> edge-tap A;
 --   anything else -> neutral pad.
+-- The tactical driver's options are navTo's (healPercent, bank, ..., and
+-- opts.fight merged over them: M.fightDriverFor).
 function M.advanceStory(pred, maxFrames, opts)
   opts = opts or {}
   local spareSet = {}
@@ -786,13 +843,13 @@ function M.advanceStory(pred, maxFrames, opts)
   local wipeSeen = false
   local wipeCheck = wipeCanary("advanceStory", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee" or opts.playBattles == "mustflee")
-      and M.newFightDriver("advanceStory",
+      and M.fightDriverFor("advanceStory",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic,
           summon = opts.summon, nuke = opts.nuke, nukeLore = opts.nukeLore,
-          tool = opts.tool, blitz = opts.blitz }) or nil
+          tool = opts.tool, blitz = opts.blitz }, opts.fight) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   -- heal-after-every-battle: see navTo's care block; same contract here
   local careD, sawBattle = nil, false
@@ -1037,6 +1094,8 @@ end
 --                            the post-battle world reload restores the
 --                            pre-battle tile with the danger counter
 --                            zeroed, and the walker re-plans from it.
+--   opts.fight     the tactical driver's option table, merged over the
+--                  named options (M.fightDriverFor), as navTo's.
 function M.worldNavTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
@@ -1059,13 +1118,13 @@ function M.worldNavTo(txIn, tyIn, opts)
   local wipeSeen = false
   local wipeCheck = wipeCanary("worldNavTo", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee" or opts.playBattles == "mustflee")
-      and M.newFightDriver("worldNavTo",
+      and M.fightDriverFor("worldNavTo",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
           healer = opts.healer, magic = opts.magic,
           summon = opts.summon, nuke = opts.nuke, nukeLore = opts.nukeLore,
-          tool = opts.tool, blitz = opts.blitz }) or nil
+          tool = opts.tool, blitz = opts.blitz }, opts.fight) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   -- heal-after-every-battle: see navTo's care block; same contract here,
   -- run once the post-battle world reload has fully settled
@@ -1276,6 +1335,9 @@ end
 --   segMargin  = 24             -- optional; frames of slack a k-step
 --                               -- in-phase lane needs beyond 16k
 --   maxFrames, what             -- optional; driveUntil plumbing
+--   healPercent, fight          -- optional; the encounter driver's heal
+--                               -- threshold (55) and an option table
+--                               -- merged over it (M.fightDriverFor)
 function M.phaseWalk(tx, ty, spec)
   local swA, swB = spec.switches.a, spec.switches.b
   local PERIOD = spec.period
@@ -1320,9 +1382,9 @@ function M.phaseWalk(tx, ty, spec)
   -- healed outside battle once it stands on a safe tile, and a wipe is
   -- named a wipe.
   local wipeCheck = wipeCanary("phaseWalk")
-  local tactical = M.newFightDriver("phaseWalk",
+  local tactical = M.fightDriverFor("phaseWalk",
     { tactical = true, boost = true, items = true,
-      healPercent = spec.healPercent or 55 })
+      healPercent = spec.healPercent or 55 }, spec.fight)
   local sawBattle, careD = false, nil
 
   local function curPhase() return swv(swB) == 1 and "b" or "a" end
@@ -2876,7 +2938,8 @@ function M.fieldCare(opts)
   -- every drive here also ends on a live battle, the pad is released, and
   -- the fight is played the way a walker plays what it meets
   -- (M.newWalkFighter: boost-Fight, items, its own care stop after) unless
-  -- the caller passes fight = false.
+  -- the caller passes fight = false.  A `fight` table fights it too, and
+  -- reaches that driver's options (M.newWalkFighter, M.fightDriverFor).
   local function battle() return M.battleLoadStarted() end
   local closed = careClose(function()
     return not CARE_SCREENS[M.readByte(CARE_ZM)]
@@ -3118,7 +3181,7 @@ local FACE_VAL = { up = 0, right = 1, down = 2, left = 3 }
 -- M.crossDoor: walk through the door at (sx,sy) and land on map dm at
 -- (dx,dy).  Stages on a reachable neighbour, holds the direction into the
 -- door tile through the transition, then waits for far-side control and the
--- fade-in.  opts.healer / opts.avoid pass to the walk.
+-- fade-in.  opts.healer / opts.avoid / opts.fight pass to the walk.
 function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
   opts = opts or {}
   local pick, startMap
@@ -3145,7 +3208,7 @@ function M.crossDoor(sx, sy, dm, dx, dy, what, opts)
     M.call(function() pick, startMap = nil, mapLow(); settledAgain() end),
     M.navTo(function() return stage()[1] end, function() return stage()[2] end,
       { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
-        bank = 3, items = true, avoid = opts.avoid,
+        bank = 3, items = true, avoid = opts.avoid, fight = opts.fight,
         arrive = function() return mapLow() ~= startMap end }),
     M.driveUntil(function()
       return mapLow() ~= startMap or (M.fieldX() == dx and M.fieldY() == dy)
@@ -3175,6 +3238,7 @@ M.gil = gilNow
 
 -- M.shopTalk: stand beside the shopkeeper at (nx,ny), face them, and A until
 -- the shop's options window (menu state $25) is open -- M.buyItem's entry.
+-- opts.healer / opts.fight pass to the walk.
 function M.shopTalk(nx, ny, what, opts)
   opts = opts or {}
   local pick
@@ -3196,7 +3260,7 @@ function M.shopTalk(nx, ny, what, opts)
     M.call(function() pick = nil end),
     M.navTo(function() return stage()[1] end, function() return stage()[2] end,
       { maxFrames = 9000, playBattles = "tactical", healer = opts.healer,
-        bank = 3, items = true }),
+        bank = 3, items = true, fight = opts.fight }),
     M.driveUntil(function()
       return M.readByte(0x087f + M.readWord(0x0803)) == FACE_VAL[stage()[3]]
     end, 300, {
@@ -4299,15 +4363,16 @@ end
 --
 -- opts: healPercent (45), careThreshold (0.7), care = false skips the
 -- stop; healer/magic/summon/nuke/nukeLore/tool/blitz/bank/reserve pass to
--- the fight driver as worldNavTo passes them.  W.fought() counts battles.
+-- the fight driver as worldNavTo passes them, and a `fight` table merges
+-- over them (M.fightDriverFor).  W.fought() counts battles.
 function M.newWalkFighter(tag, opts)
   opts = opts or {}
-  local F = M.newFightDriver(tag, {
+  local F = M.fightDriverFor(tag, {
     tactical = true, boost = true, items = true,
     healPercent = opts.healPercent or 45,
     bank = opts.bank, reserve = opts.reserve, healer = opts.healer,
     magic = opts.magic, summon = opts.summon, nuke = opts.nuke,
-    nukeLore = opts.nukeLore, tool = opts.tool, blitz = opts.blitz })
+    nukeLore = opts.nukeLore, tool = opts.tool, blitz = opts.blitz }, opts.fight)
   local battN, fought, careD, settleN = 0, 0, nil, nil
   local function settled()
     if (emu.getState()["ppu.screenBrightness"] or 0) < 15 then return false end
@@ -4385,17 +4450,19 @@ end
 -- The fight itself reads the live command table (M.newFightDriver) rather
 -- than driving a fixed button pattern, so it can boost, use items, and
 -- decide per-turn whether a heal is worth the turn it costs
--- (M.healDecision) instead of always drinking.
-function M.rideOut(what, budget, dstMap)
+-- (M.healDecision) instead of always drinking.  opts.fight is merged over
+-- the driver options below (M.fightDriverFor).
+function M.rideOut(what, budget, dstMap, opts)
+  opts = opts or {}
   local phase, calm = 0, 0
-  local F = M.newFightDriver(what or "rideOut",
+  local F = M.fightDriverFor(what or "rideOut",
     -- bank = 3: unboosted Fights until the actor has three BP, then spend
     -- them.  Shielded damage is halved and a broken monster takes 4x
     -- (Ot6ShieldedMulW, ot6_break.asm:1487-1497), so the fight is won by
     -- breaking the shield rather than by chipping, and a boosted Fight is
     -- what chips.
     { tactical = true, boost = true, bank = 3, items = true,
-      healPercent = 60, cadence = 12 })
+      healPercent = 60, cadence = 12 }, opts.fight)
   return seq({
     M.withReset(M.driveUntil(function()
       local ok = M.hasControl() and M.tileAligned()
