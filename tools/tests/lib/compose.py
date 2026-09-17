@@ -180,7 +180,7 @@ FRESH, DRIFT, STALE, UNBOUND, UNVERIFIED = (
     "fresh", "drift", "stale", "unbound", "unverified")
 
 
-def stamp_status(name, root):
+def stamp_status(name, root, _memo=None):
     """Consume-time compatibility and provenance check for a generated
     fixture.  Returns (verdict, message): (None, None) when there is nothing
     to check (no stamp, or a generator since removed); (FRESH, None) when
@@ -218,8 +218,77 @@ def stamp_status(name, root):
     which writes the full format, or until `compose.py --adopt-stamps`
     (adopt_stamps below) proves from the tree's own records what the
     missing lines would say and appends them.
+
+    Transitivity (#212): a fixture whose own bindings all verify but whose
+    `ancestor` stamp is itself STALE or UNBOUND is STALE too, naming the
+    chain from its ancestor down to the link that moved (`STALE via
+    dadaluma_entry <- zozo_arrival`: dadaluma_entry was generated from a
+    zozo_arrival that has since been regenerated).  The descendant's bytes
+    are exactly what its stamp vouches for, but they grew from a state that
+    is no longer the tree's, so the chain below the moved link is stale all
+    the way down -- the same set ninja regenerates, since every prev= edge
+    depends on its parent's outputs.  Only a build/states stamp ancestor is
+    followed; a checkpoint manifest is its own binding.  A DRIFT or
+    UNVERIFIED ancestor passes nothing down, so a lib-only edit still stales
+    no descendant.  `_memo` lets a whole-tree caller check each stamp once.
     """
     base = name[:-len(".mss.lua")] if name.endswith(".mss.lua") else name
+    verdict, msg, _ = _stamp_status(base, Path(root),
+                                    {} if _memo is None else _memo)
+    return verdict, msg
+
+
+def _stamp_status(base, root, memo):
+    """stamp_status() for one base name, plus its chain: [] when the verdict
+    is the fixture's own (or there is nothing wrong), else the stamp names
+    from its ancestor down to the link that moved.  A STALE verdict from a
+    failed ancestor binding has the one-link chain [ancestor].  memo doubles
+    as the cycle guard (a cycle reads as nothing to inherit)."""
+    if base in memo:
+        return memo[base] or (None, None, [])
+    memo[base] = None
+    verdict, msg = _own_stamp_status(base, root)
+    chain = []
+    anc = _stamp_ancestor(base, root)
+    if verdict == STALE and msg and "the chain below it moved" in msg:
+        chain = [anc] if anc else []
+    elif verdict in (FRESH, DRIFT) and anc:
+        a_verdict, a_msg, a_chain = _stamp_status(anc, root, memo)
+        if a_verdict in (STALE, UNBOUND):
+            chain = [anc] + a_chain
+            last = (memo.get(chain[-1]) or (None,))[0]
+            why = (f"{chain[-1]} is itself {last.upper()}"
+                   if last in (STALE, UNBOUND)
+                   else f"{chain[-2]} was generated from a {chain[-1]} that "
+                        f"has since moved")
+            verdict, msg = STALE, (
+                f"fixture {base} is STALE via {' <- '.join(chain)} -- its "
+                f"own bindings verify, but it grew from a chain that is no "
+                f"longer this tree's ({why}); regenerate: ninja "
+                f"build/states/{base}.mss.lua (issue #212)")
+    memo[base] = (verdict, msg, chain)
+    return verdict, msg, chain
+
+
+def _stamp_ancestor(base, root):
+    """The build/states stamp this fixture's `ancestor` line names, as a base
+    name; None for no stamp, no ancestor, or a checkpoint manifest."""
+    try:
+        lines = (root / "build" / "states" / (base + ".stamp")).read_text() \
+            .splitlines()
+    except OSError:
+        return None
+    for line in lines[1:]:
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] == "ancestor":
+            m = re.fullmatch(r"build/states/([^/]+)\.stamp", parts[1])
+            return m.group(1) if m else None
+    return None
+
+
+def _own_stamp_status(base, root):
+    """stamp_status() without the transitive step: this fixture's own
+    bindings only."""
     stamp = root / "build" / "states" / (base + ".stamp")
     if not stamp.exists():
         return None, None
@@ -376,8 +445,9 @@ def check_states(root):
         return 0
     stale, drift = [], []
     legacy = 0                      # stamps with no rom/generator lines
+    memo = {}
     for s in stamps:
-        verdict, msg = stamp_status(s.stem, root)
+        verdict, msg = stamp_status(s.stem, root, memo)
         if verdict in (STALE, UNBOUND, UNVERIFIED):
             stale.append((s.stem, msg))
         elif verdict == DRIFT:
@@ -442,6 +512,13 @@ def check_states(root):
         print(f"CAUSE: this tree has no built ROM to compare against "
               f"({unverified} of {len(stamps)} are UNVERIFIED, not known "
               f"stale).  ninja build/ot6.sfc, then re-check.")
+    inherited = sum(1 for _, m in stale if " is STALE via " in m)
+    if inherited:
+        print(f"CAUSE: {inherited} of {len(stamps)} are stale only through "
+              f"their chain: each one's own bindings verify, but an "
+              f"ancestor it grew from is stale or was regenerated after it "
+              f"(the `via` chain names the link that moved).  Regenerating "
+              f"a descendant regenerates the chain above it.")
     held = sum(1 for _, m in stale if "predates ROM-identity recording" in m)
     if held:
         print(f"CAUSE: {held} of {len(stamps)} carry pre-ROM-identity "
@@ -1406,6 +1483,139 @@ def selftest() -> int:
         has("a missing ancestor stamp fails the child",
             stamp_check("child", root), "is gone")
         (st / "fake.stamp").write_bytes(kept)
+        # -- transitivity (#212): fake <- child <- grand <- great.  Before,
+        #    only the direct child of a moved state was flagged; everything
+        #    below it read fresh although it grew from the old chain.
+        (st / "grand.mss").write_bytes(b"grand bytes v1")
+        gate("write", "grand", "gen_fake", "build/states/child.stamp")
+        (st / "great.mss").write_bytes(b"great bytes v1")
+        gate("write", "great", "gen_fake", "build/states/grand.stamp")
+        check("a four-generation chain verifies clean at every link",
+              [stamp_status(n, root) for n in ("child", "grand", "great")],
+              [(FRESH, None)] * 3)
+        # Regenerate the root only (new bytes, new stamp), as a re-cut that
+        # stops at one state does.
+        (st / "fake.mss").write_bytes(b"generated bytes v2")
+        gate("write", "fake", "gen_fake", "-")
+        check("the regenerated root is FRESH", stamp_status("fake", root),
+              (FRESH, None))
+        v, m = stamp_status("child", root)
+        check("its direct child is STALE (its own ancestor binding)", v, STALE)
+        has("...with the direct binding's message, no via chain", m,
+            "is not the one it was generated from")
+        check("...and no via chain", " via " in m, False)
+        v, m = stamp_status("grand", root)
+        check("the GRANDCHILD is STALE too, though its own bindings verify",
+              v, STALE)
+        has("...naming the chain to the moved link", m,
+            "fixture grand is STALE via child <- fake --")
+        has("...and what moved", m,
+            "child was generated from a fake that has since moved")
+        v, m = stamp_status("great", root)
+        check("the great-grandchild is STALE", v, STALE)
+        has("...naming the whole chain", m,
+            "fixture great is STALE via grand <- child <- fake --")
+        has("...and a regeneration command for itself", m,
+            "ninja build/states/great.mss.lua")
+        check("stamp_check fails the grandchild", stamp_check("grand", root)
+              is not None, True)
+        memo = {}
+        check("a shared memo gives the same verdicts",
+              [stamp_status(n, root, memo)[0] for n in
+               ("great", "grand", "child", "fake")],
+              [STALE, STALE, STALE, FRESH])
+        # Whole tree: every link below the moved one is counted, and the
+        # inherited ones are named as one cause.
+        (root / "tools" / "tests" / "savestate_graph.py").write_text(
+            'STATES = [{"state": "fake"}, {"state": "child"}, '
+            '{"state": "grand"}, {"state": "great"}]\n')
+        report = io.StringIO()
+        with contextlib.redirect_stdout(report):
+            rc = check_states(root)
+        check("whole-tree: a chain stale below its first link exits 1",
+              (rc, "3 of 4 do not verify (3 STALE)" in report.getvalue()),
+              (1, True))
+        has("...naming the inherited ones as one cause", report.getvalue(),
+            "CAUSE: 2 of 4 are stale only through their chain")
+        has("...and listing the via chain", report.getvalue(),
+            "  fixture great is STALE via grand <- child <- fake --")
+        (root / "tools" / "tests" / "savestate_graph.py").unlink()
+        # Regenerating the chain in order restores every link.
+        (st / "child.mss").write_bytes(b"child bytes v2")
+        gate("write", "child", "gen_fake", "build/states/fake.stamp")
+        check("regenerating the child leaves only the grandchild's direct "
+              "binding and the great-grandchild's chain",
+              [(stamp_status(n, root)[0], " via " in (stamp_status(n, root)[1]
+                or "")) for n in ("child", "grand", "great")],
+              [(FRESH, False), (STALE, False), (STALE, True)])
+        (st / "grand.mss").write_bytes(b"grand bytes v2")
+        gate("write", "grand", "gen_fake", "build/states/child.stamp")
+        (st / "great.mss").write_bytes(b"great bytes v2")
+        gate("write", "great", "gen_fake", "build/states/grand.stamp")
+        check("...and regenerating the rest restores FRESH at every link",
+              [stamp_status(n, root) for n in ("child", "grand", "great")],
+              [(FRESH, None)] * 3)
+        # Compatibility versus provenance still holds down the chain: a
+        # lib-only edit is DRIFT at every link, never inherited staleness.
+        lib_ot6.write_text("ot6.lua v1\n-- a comment\n")
+        check("a lib-only edit is DRIFT at every link, not inherited STALE",
+              [stamp_status(n, root)[0] for n in
+               ("fake", "child", "grand", "great")], [DRIFT] * 4)
+        lib_ot6.write_text("ot6.lua v1\n")
+        # A middle link that is stale for its OWN reason (its generator
+        # changed) stales what grew from it, not what it grew from.
+        (root / "tools" / "tests" / "gen_mid.lua").write_text("mid v1\n")
+        gate("write", "child", "gen_mid", "build/states/fake.stamp")
+        gate("write", "grand", "gen_fake", "build/states/child.stamp")
+        gate("write", "great", "gen_fake", "build/states/grand.stamp")
+        (root / "tools" / "tests" / "gen_mid.lua").write_text("mid v2\n")
+        v, m = stamp_status("child", root)
+        check("a middle link's generator edit stales it", v, STALE)
+        has("...for its own reason", m, "its generator gen_mid changed")
+        check("...its parent stays FRESH", stamp_status("fake", root),
+              (FRESH, None))
+        has("...its child names it as the stale link", stamp_status(
+            "grand", root)[1], "STALE via child -- ")
+        has("...saying it is itself stale", stamp_status("grand", root)[1],
+            "child is itself STALE")
+        has("...and the grandchild below names the two links", stamp_status(
+            "great", root)[1], "STALE via grand <- child -- ")
+        has("...ending at the same stale link", stamp_status(
+            "great", root)[1], "child is itself STALE")
+        (root / "tools" / "tests" / "gen_mid.lua").write_text("mid v1\n")
+        check("restoring the middle generator restores the chain",
+              [stamp_status(n, root)[0] for n in ("child", "grand", "great")],
+              [FRESH] * 3)
+        # An UNBOUND middle link (replaced bytes) stales its descendants.
+        (st / "child.mss").write_bytes(b"HAND-CRAFTED child")
+        check("an UNBOUND middle link", stamp_status("child", root)[0], UNBOUND)
+        v, m = stamp_status("grand", root)
+        check("...stales its child", v, STALE)
+        has("...naming it as UNBOUND", m, "child is itself UNBOUND")
+        (st / "child.mss").write_bytes(b"child bytes v2")
+        # An UNVERIFIED ancestor (no ROM) passes nothing down: each link is
+        # UNVERIFIED on its own account, not STALE through its chain.
+        rom.unlink()
+        check("no ROM: every link UNVERIFIED, none inherited STALE",
+              [stamp_status(n, root)[0] for n in ("child", "grand", "great")],
+              [UNVERIFIED] * 3)
+        rom.write_bytes(b"rom v1")
+        # A cycle in the ancestor lines (hand-edited stamps) terminates.
+        (st / "loop_a.mss").write_bytes(b"a")
+        (st / "loop_b.mss").write_bytes(b"b")
+        gate("write", "loop_a", "gen_fake", "-")
+        gate("write", "loop_b", "gen_fake", "build/states/loop_a.stamp")
+        la = (st / "loop_a.stamp").read_text()
+        (st / "loop_a.stamp").write_text(
+            la + f"ancestor build/states/loop_b.stamp {_sha(st / 'loop_b.stamp')}\n")
+        check("an ancestor cycle terminates with a verdict",
+              stamp_status("loop_a", root)[0] in
+              (FRESH, DRIFT, STALE, UNBOUND), True)
+        for n in ("loop_a", "loop_b", "grand", "great"):
+            (st / (n + ".stamp")).unlink()
+            (st / (n + ".mss")).unlink()
+        gate("write", "child", "gen_fake", "build/states/fake.stamp")
+        kept = (st / "fake.stamp").read_bytes()
         # Pre-provenance stamps: a bare sig line (the old format) must read
         # as unbound even though its sig is current, because nothing ties the
         # bytes to the run that made them.

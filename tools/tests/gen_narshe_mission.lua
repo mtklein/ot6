@@ -228,21 +228,38 @@ end
 -- runs the tent event (world_start.asm @02db: VehicleEvent_01), which
 -- restores the party.  Measured by probe_jidoor.lua: 886 frames, every
 -- member at max HP and MP, one Tent gone.
+--
+-- A battle that opens under the Tent (an encounter rolled on the step the
+-- walk ended on, #211) is fought by the walkers' fighter (H.newWalkFighter,
+-- #183) and its care stop, and the Tent then resumes from wherever the menu
+-- stands; the old X/menu presses had no battle check and sat at the battle's
+-- command menu until the 4000-frame budget ran out.  That budget pays for
+-- the menu work only: battle and care frames are uncounted, with a 60000-
+-- frame backstop over everything so a hung battle still ends the step.
+local TENT_MENU_FRAMES = 4000
 local function useTent(tag)
-  local ph, calm, before, tentAt = 0, 0, nil, nil
+  local ph, calm, before, tentAt, menuN = 0, 0, nil, nil, 0
+  local W = H.newWalkFighter(tag)
   return H.seqStep({
     H.logStep(function() return bagLine(tag .. ": before") end),
-    H.driveUntil(function()
+    H.withReset(H.driveUntil(function()
       if before == nil then return false end
       local used = H.invCountOf(TENT) < before
       local back = H.worldMode() and H.readByte(0x59) == 0 and H.worldHasControl()
         and H.worldAligned() and bright() >= 15
       calm = (used and back) and calm + 1 or 0
       return calm >= 20
-    end, 4000, {
+    end, TENT_MENU_FRAMES + 60000, {
       H.call(function()
         ph = (ph + 1) % 8
         if before == nil then before = H.invCountOf(TENT) end
+        if W.frame() then calm = 0; return end
+        menuN = menuN + 1
+        if menuN > TENT_MENU_FRAMES then
+          error(string.format("timeout after %d frames driving toward %s "
+            .. "(%d battle(s) fought under it, their frames uncounted)",
+            TENT_MENU_FRAMES, tag, W.fought()) .. H.timeoutContext(), 0)
+        end
         if H.invCountOf(TENT) < before then
           if tentAt == nil then
             tentAt = H.frame
@@ -269,7 +286,10 @@ local function useTent(tag)
         end
         H.setPad({})
       end),
-    }, tag),
+    }, tag), function()
+      ph, calm, before, tentAt, menuN = 0, 0, nil, nil, 0
+      W = H.newWalkFighter(tag)
+    end),
     H.call(function()
       for _, c in ipairs(H.partyMembers()) do
         H.assertEq(H.charHp(c), H.charMaxHp(c),
