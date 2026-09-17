@@ -1,18 +1,24 @@
--- gen_fc_landing.lua -- the Floating Continent landing: checkpoint Q.
+-- @manual
+-- lab_airforce_bake.lua -- the Air Force lab's fixture half (#201).
 --
--- Cold-Continues the tracked `thamasa-done-v1` battery (boundary P: the
--- WoB stop line world (249,128) beside the Blackjack), does the prep a
--- person does at Thamasa (Potions/Fenix/Tonics, the bag arranged so the
--- combat items sit on top), boards, forms TERRA LOCKE EDGAR at the deck's
--- party select, fights the whole Imperial Air Force gauntlet (Sky Armor /
--- Spit Fire waves, Ultros IV + Chupon, the Air Force), lands on the
--- continent (394), walks to the landing SavePoint 394 (7,12) and saves --
--- the `fc-landing-v1` checkpoint, the seed at the gauntlet's far side.
--- The descent to the save alcove (358) and SHADOW are gen_fc_alcove's,
--- booted from this seed.
+-- gen_fc_landing.lua's route, verbatim, from the cold Continue of the
+-- tracked `thamasa-done-v1` battery through the Thamasa prep, the boarding,
+-- the deck party select, the IAF waves (EDGAR dressed in the first
+-- between-wave window) to the Ultros teaser ($01F0) -- where it banks
+-- `airforcelab_teaser.mss` (the last field-control window before the
+-- chain's two bosses) -- then the arming walk to (22,6) and Ultros IV +
+-- Chupon under the gen's own FIGHT driver, and at the first input-gated
+-- moment after that battle (a dialog box waiting, or control) before the
+-- Air Force loads, `airforcelab_doorstep.mss`: the Air Force's doorstep,
+-- reached the way the route reaches it, for lab_airforce_template.lua to
+-- branch into policy x seed experiments (docs/TESTING.md: one
+-- legitimately reached snapshot, many experiments).  If the chain goes
+-- from the Ultros fight into the Air Force with no input in between the
+-- log says so and only the teaser snapshot is banked.
 --
--- Reads and pad presses only; the gauntlet is fought for real -- a game
--- over is a loud failure (a lab), never a retry.
+-- Reads and pad presses only; the waves and Ultros are fought for real.
+-- The segment runner retries a wave wipe (seed-dependent) from the boot
+-- snapshot, up to 3 attempts; the Air Force is never fought here.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -41,6 +47,27 @@ local PICK = { TERRA, LOCKE, EDGAR }
 -- AutoCrossbow -- the driver's DEFAULT tool, four pierce hits that sweep
 -- the Sky Armors and, later, the AirForce's pierce-class parts.  Bolt is
 -- every FC boss's row too (Ultros IV, AirForce, Atma, Nerapa).
+-- Character record $1600 + 37*c (field-ram.txt:885-927): +8 level, +9 HP,
+-- +11 max HP, +13 MP, +15 max MP, +$1E esper, +$1F..+$24 weapon/shield/
+-- helm/armor/relic/relic; spells known $1A6E + 54*c + spell ($FF).  The
+-- lab header's "what the party has" row (lab_nerapa_bake's probe).
+local function probeParty(where)
+  for _, c in ipairs(H.partyMembers()) do
+    local b = 0x1600 + 37 * c
+    local known = {}
+    for id = 0, 53 do
+      if H.readByte(0x1A6E + c * 54 + id) == 0xFF then known[#known + 1] = string.format("%02X", id) end
+    end
+    H.log(string.format("[party %s] char=%d L%d hp=%d/%d mp=%d/%d row=%s esper=$%02X gear=%02X,%02X,%02X,%02X,%02X,%02X spells=%s",
+      where, c, H.readByte(b + 8), H.readWord(b + 9), H.readWord(b + 11), H.readWord(b + 13), H.readWord(b + 15),
+      (H.readByte(0x1850 + c) & 0x20) ~= 0 and "back" or "front",
+      H.readByte(b + 0x1E), H.readByte(b + 0x1F), H.readByte(b + 0x20), H.readByte(b + 0x21),
+      H.readByte(b + 0x22), H.readByte(b + 0x23), H.readByte(b + 0x24), table.concat(known, ",")))
+  end
+  H.log(string.format("[bag %s] tonic=%d potion=%d fenix=%d autocrossbow=%d gil=%d",
+    where, H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0), H.invCountOf(H.AUTOCROSSBOW), H.gil()))
+end
+
 local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
                 healPercent = 50, magic = { [TERRA] = { spell = 2 }, [LOCKE] = { spell = 2 } },
                 nuke = { 2 } }
@@ -62,26 +89,6 @@ end
 -- party select again, then talk SHADOW into the party beside (10,16).
 local seenBattles, lastActive = 0, false
 local F = H.newFightDriver("IAF", FIGHT)
--- The Air Force (#201, docs/design/airforce.md): the gauntlet's last fight,
--- AirForce $113 slot 0 + Laser Gun $145 slot 2 + MissileBay $147 slot 4.
--- The Laser Gun dying while the bay stands arms the body's countdown
--- (Speck, then a Count a turn, then WaveCannon), and only the body's own
--- death ends it; the bay under 1536 HP fires Launcher.  FIGHT's default
--- targeting killed the gun and then spread the party across the bay and
--- the body, and at the regeneration's shift 0 the count ran out:
--- `wipe context ... formation 0113 FFFF 0145 0146 0147 FFFF; seats ...
--- a0:316/960 bp1 a1:528/1129 bp3 a4:0/1048 bp3`.  A person kills the gun
--- (the Atomic Ray), then the body the moment the countdown starts, and
--- lets the bay be.  The same driver options with that kill order passed
--- that exact fight (the rest of the route byte-identical) and all 10 runs
--- (9 distinct seeds) from the Ultros teaser.  The masks are the target window's
--- monster bits, measured (airforcelab_tgtwatch.py: bit = slot); the gun's
--- bit is the default cursor and the body's is one LEFT from it.
-local AF_FIGHT = {}
-for k, v in pairs(FIGHT) do AF_FIGHT[k] = v end
-AF_FIGHT.focus = { { slot = 2, mask = 0x04 }, { slot = 0, mask = 0x01 }, { slot = 4, mask = 0x10 } }
-local FAF = H.newFightDriver("IAF", AF_FIGHT)
-local function airForceUp() return H.formationHas({ [0x0113] = true }) end
 
 local function kitSteps(char, name, pairs_)
   local steps = {}
@@ -131,10 +138,7 @@ local function deckDrive(untilKit)
           H.log(string.format("  [IAF battle %d] f%d", seenBattles, H.frame))
         end
         lastActive = active
-        if active or H.battleLoadStarted() then
-          if airForceUp() then FAF.frame() else F.frame() end
-          return
-        end
+        if active or H.battleLoadStarted() then F.frame(); return end
         local ms = H.readByte(ZMENUSTATE)
         if ms >= 0x2c and ms <= 0x2f then
           if not DECK.formed and S.ready() and S.complete() then
@@ -195,7 +199,7 @@ local function deckDrive(untilKit)
        or "deck -> arm Ultros -> the rest of the chain -> the Floating Continent")
 end
 
-H.run({ maxFrames = 600000 }, flatten({
+H.run({ maxFrames = 600000, retries = 3 }, flatten({
   -- ---- 0. cold Continue of P, contract, kits ------------------------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -337,53 +341,76 @@ H.run({ maxFrames = 600000 }, flatten({
   H.call(function()
     H.log(string.format("[deck] the Ultros teaser is up ($01F0) at f%d, at (%d,%d); walking to (22,6)", H.frame, H.fieldX(), H.fieldY()))
   end),
+  H.call(function() probeParty("teaser") end),
+  H.saveState("airforcelab_teaser.mss"),
+  H.logStep(function() return string.format("[bake] airforcelab_teaser banked at f%d, $021e=%d, at (%d,%d)", H.frame, H.readByte(0x021E), H.fieldX(), H.fieldY()) end),
   H.navTo(22, 6, { maxFrames = 6000, playBattles = "tactical", healer = TERRA, magic = FIGHT.magic,
                    nuke = FIGHT.nuke, items = true, bank = FIGHT.bank, healPercent = FIGHT.healPercent,
                    care = false, arrive = function() return not H.hasControl() or H.fieldX() == 22 end }),
-  deckDrive(false),
-  H.call(function()
-    H.assertEq(mapIs(394) and H.hasControl(), true, "the Floating Continent loaded with control: the IAF gauntlet is won")
-    H.assertEq(seenBattles >= 1, true, "the IAF chain was fought, not skipped")
-    H.log(string.format("IAF: %d battles; FC landing at (%d,%d)", seenBattles, H.fieldX(), H.fieldY()))
-    H.screenshot("fc_landing")
-  end),
+  -- ---- 1d. Ultros IV + Chupon, then stop at the Air Force's doorstep ----
+  -- The gen's deckDrive(false) rides the rest of the chain to the
+  -- continent, A-tapping every dialog.  Here the same driver fights
+  -- Ultros IV + Chupon (formation species $168 / $12F), and once that
+  -- battle has torn down nothing is pressed: the first frame the game
+  -- waits on the player (a dialog box, or control) is the doorstep.  If
+  -- the Air Force's formation ($113) loads first, there is no window.
   (function()
-    local t = 0
-    return H.driveUntil(function() return H.hasControl() and not H.dialogWaiting() end, 3000, {
+    local seenUltros, ultrosDone, window, t = false, false, nil, 0
+    return H.driveUntil(function()
+      t = t + 1
+      if (H.gameOverFired or 0) > 0 then
+        error(string.format("the chain was LOST (game over after %d battles) -- a lab, not a retry", seenBattles), 0)
+      end
+      local active, loading = H.battleActive(), H.battleLoadStarted()
+      if (active or loading) and H.formationHas({ [0x0168] = true, [0x012F] = true }) then
+        if not seenUltros then
+          seenUltros = true
+          H.log(string.format("[bake] Ultros IV up at f%d ($021e=%d)", H.frame, H.readByte(0x021E)))
+        end
+      end
+      if (active or loading) and H.formationHas({ [0x0113] = true }) then
+        window = "none"
+        H.log(string.format("[bake] the Air Force loaded at f%d with no input window after Ultros (ultrosDone=%s): only the teaser snapshot is banked", H.frame, tostring(ultrosDone)))
+        return true
+      end
+      if seenUltros and not active and not loading then
+        if not ultrosDone then
+          ultrosDone = true
+          H.log(string.format("[bake] Ultros IV torn down at f%d ($021e=%d); pressing nothing until the game waits on the player", H.frame, H.readByte(0x021E)))
+        end
+        if H.dialogWaiting() then window = "dialog"; return true end
+        if H.hasControl() then window = "control"; return true end
+      end
+      return false
+    end, 40000, {
       H.call(function()
-        t = t + 1
-        if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}) else H.setPad({}) end
+        local active = H.battleActive()
+        if active and not lastActive then
+          seenBattles = seenBattles + 1
+          H.log(string.format("  [IAF battle %d] f%d", seenBattles, H.frame))
+        end
+        lastActive = active
+        if active or H.battleLoadStarted() then F.frame(); return end
+        if not ultrosDone and H.dialogWaiting() then H.setPad(H.frame % 16 < 4 and { "a" } or {}); return end
+        H.setPad({})
       end),
-    }, "arrival settles")
+    }, "arm Ultros -> Ultros IV + Chupon -> the first input-gated moment before the Air Force")
+
   end)(),
-  -- ---- 2. the landing SavePoint: checkpoint Q (fc-landing-v1) -----------
-  -- 394 (7,12) is a SavePoint (the map's trigger block; route doc §4), three
-  -- tiles east of where the Blackjack sets the party down.
-  H.navTo(7, 12, { maxFrames = 6000, playBattles = "tactical", healer = TERRA,
-                   items = true, magic = FIGHT.magic }),
+  H.release(),
   H.call(function()
-    H.assertEq(mapIs(394) and H.fieldX() == 7 and H.fieldY() == 12, true,
-      "standing on the landing SavePoint 394 (7,12)")
+    H.assertEq(seenBattles >= 1, true, "the IAF chain was fought")
+    H.log(string.format("[bake] doorstep reached at f%d: map %d (%d,%d) dialog=%s control=%s $021e=%d battles=%d",
+      H.frame, map(), H.fieldX(), H.fieldY(), tostring(H.dialogWaiting()), tostring(H.hasControl()),
+      H.readByte(0x021E), seenBattles))
   end),
-  -- Rows, here and not on the deck: the between-wave window fits the kit
-  -- but not one more Order-screen session (the regen's fc_landing timed
-  -- out opening it as wave 2 arrived).  TERRA (Magic) and EDGAR (Tools)
-  -- never swing, so the back row costs them nothing and halves the
-  -- physical damage they take; LOCKE fights, front row.  (All three
-  -- arrive back-row from P; only LOCKE moves.)
-  H.setRows({ [TERRA] = true, [EDGAR] = true, [LOCKE] = false }, { tag = "landing rows" }),
-  H.fieldCare({ tag = "care at the landing save point", threshold = 0.95 }),
-  H.call(function()
-    H.assertExitContractPreSave("fc-landing-v1")
-    H.screenshot("fc_landing_q_tile")
-  end),
-  H.saveState("fc_landing.mss"),
-  H.saveGame({ slot = 3, tag = "fc-landing-v1 save" }),
-  H.call(function()
-    H.assertExitContract("fc-landing-v1")
-  end),
-  H.logStep(function()
-    return string.format("fc-landing-v1 saved via the real Save UI at frame %d -- map 394 (%d,%d), slot 3; boundary Q",
-      H.frame, H.fieldX(), H.fieldY())
-  end),
+  H.cond(function() return H.dialogWaiting() or H.hasControl() end, {
+    H.call(function() probeParty("doorstep") end),
+    H.screenshot("airforcelab_doorstep"),
+    H.saveState("airforcelab_doorstep.mss"),
+    H.logStep(function() return string.format("[bake] airforcelab_doorstep banked at f%d, $021e=%d (dialog=%s control=%s)",
+      H.frame, H.readByte(0x021E), tostring(H.dialogWaiting()), tostring(H.hasControl())) end),
+  }, {
+    H.logStep("[bake] no doorstep snapshot: the Air Force loaded straight from the Ultros fight; the lab branches from airforcelab_teaser.mss"),
+  }),
 }))
