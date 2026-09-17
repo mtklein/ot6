@@ -4012,7 +4012,7 @@ function M.newFightDriver(tag, opts)
                 what = string.format("Tools $%02X", tool) })
       end
       if opts.tactical and id == 5 and (opts.blitz or PUMMEL) == PUMMEL
-         and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_BLITZ) then
+         and M.readWord(CURMP + actor * 2) >= 4 and cmdRow(actor, CMD_BLITZ) and not skillDead[CMD_BLITZ] then
         offer({ kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
                 row = cmdRow(actor, CMD_BLITZ), boostLeft = bp,
                 chips = 2 * hitChips(slot, 0x04, 0), hits = 2, what = "Pummel" })
@@ -4836,7 +4836,7 @@ function M.newFightDriver(tag, opts)
                row = cmdRow(actor, CMD_TOOLS), boostLeft = boost }
     end
     if opts.tactical and id == 5 and M.readWord(CURMP + actor * 2) >= 4
-       and cmdRow(actor, CMD_BLITZ) then
+       and cmdRow(actor, CMD_BLITZ) and not skillDead[CMD_BLITZ] then
       return { kind = "skill", cmd = CMD_BLITZ, skill = opts.blitz or PUMMEL,
                row = cmdRow(actor, CMD_BLITZ), boostLeft = boost }
     end
