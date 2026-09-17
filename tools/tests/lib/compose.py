@@ -1813,9 +1813,13 @@ def main() -> int:
     #   OT6_SEED_SHIFT  idle frames at the boot point before the body walks
     #                   on: the sweep's per-seed offset
     #   OT6_WATCHDOG    1/0 to force the fast-failure watchdogs on or off
+    #   OT6_SHIFT_PROBE stride: run the body to its first battle once per
+    #                   shift across one 60-frame period and log each first
+    #                   battle's RNG key (#208; seed_sweep.py --probe)
     preamble.append('OT6_SCRIPT = "%s"\n' % script_path.stem)
     for var, name in (("OT6_RETRIES", "OT6_RETRIES"),
                       ("OT6_SEED_SHIFT", "OT6_SEED_SHIFT"),
+                      ("OT6_SHIFT_PROBE", "OT6_SHIFT_PROBE"),
                       ("OT6_WATCHDOG", "OT6_WATCHDOG")):
         raw = os.environ.get(var)
         if raw is None or raw == "":

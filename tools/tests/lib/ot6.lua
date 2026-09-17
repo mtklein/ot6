@@ -6465,6 +6465,14 @@ RUN = {
   bootMarked = false, s0 = nil, s0blob = nil, ld = nil, ldWait = 0,
   failures = {}, lastBattle = nil, epoch = 1, installing = false,
   goUnhandled = nil,   -- { frame, what }: a counted game over no reload answered (#205)
+  firstBattle = nil,   -- this attempt's first battle, as the seed store saw it (#208)
+  firstBattles = {},   -- every earlier attempt's (and probe sample's), oldest first
+  nextShift = nil,     -- a replay's shift chosen by the caller, not the gap ladder
+  reroll = false,      -- the replay in flight re-runs this attempt (no count)
+  rerolls = 0,
+  bootFrame = nil,     -- M.frame at this attempt's boot point
+  probe = nil,         -- OT6_SHIFT_PROBE: { stride, shift, rows = {} }
+  trace = nil,         -- probe mode: $021e / control transitions after the boot point
 }
 M.totalFrames = 0
 
@@ -6528,6 +6536,8 @@ end
 function M.bootMark(what)
   if RUN.bootMarked then return end
   RUN.bootMarked = true
+  RUN.bootFrame = M.frame
+  if RUN.probe then RUN.trace = { n = 0, key = nil, prev = M.seedPhase() } end
   M.log(string.format("[retry] boot point: %s at f%d (attempt %d/%d, "
     .. "$021e=%d, seed shift %d idle frames)", tostring(what), M.frame,
     RUN.attempt, RUN.attempts, M.seedPhase(), RUN.shift))
@@ -6562,6 +6572,54 @@ local function sampleBattle()
   }
 end
 
+-- ------------------------------------------------ the first battle (#208) --
+-- What a seed shift is FOR is a different first battle, so every attempt
+-- records the RNG state its first battle starts from, at InitBattle's
+-- seed store (M.seedStoreAddr, the exec watch newSeedLadder uses):
+--   $be      the battle seed about to be stored, ($021e * 4) & $FF: the
+--            whole in-battle stream (battle Rand walks RNGTbl from it)
+--   $11E0    the battle group the field or the event handed the battle
+--   $1F6D    the field Rand index (field/reset.asm Rand)
+--   $1FA1-4  the random-encounter indices/counters (field/battle.asm
+--            UpdateBattleRng / UpdateBattleGrpRng): the NEXT encounter
+-- Those cells are the key.  Two attempts with the same key fight the same
+-- first battle from the same party (nothing before it differed but the
+-- frame), so they are one sample: a whole multiple of the 60-frame phase
+-- period lands on the same seed, and a shift the game absorbed (an idle
+-- inside a wait that ends on the game's own clock) lands on the same frame.
+-- The frame and $021e are logged beside the key, not in it.
+local function firstBattleKey(seed, grp)
+  return string.format("be%02X-g%04X-r%02X-e%02X%02X%02X%02X", seed, grp,
+    M.readByte(0x1f6d), M.readByte(0x1fa1), M.readByte(0x1fa2),
+    M.readByte(0x1fa3), M.readByte(0x1fa4))
+end
+M.firstBattleKey = firstBattleKey
+
+-- Probe mode (OT6_SHIFT_PROBE): the transitions of the game clock and of
+-- control from the boot point on -- whether $021e ticked on this frame,
+-- whether the player can act (field or world), whether the pad is down --
+-- so a shift the game swallows shows WHERE it was swallowed.
+local TRACE_FRAMES = 1200
+local function seedTraceTick()
+  local t = RUN.trace
+  if not t or t.n >= TRACE_FRAMES then return end
+  t.n = t.n + 1
+  local ph = M.seedPhase()
+  local ticked = ((ph - t.prev) % M.SEED_PERIOD) ~= 0
+  t.prev = ph
+  local ctl = M.hasControl() or (M.worldHasControl and M.worldHasControl()) or false
+  local pad = false
+  for _, v in pairs(curPad) do if v then pad = true break end end
+  local key = string.format("clock=%s control=%s pad=%s idle=%s",
+    ticked and "tick" or "STOP", ctl and "yes" or "no", pad and "down" or "up",
+    RUN.idle > 0 and "yes" or "no")
+  if key ~= t.key then
+    t.key = key
+    M.log(string.format("[seedprobe] trace f%d (boot+%d) $021e=%d %s map=%d",
+      M.frame, M.frame - (RUN.bootFrame or 0), ph, key, M.readWord(0x1f64) & 0x3ff))
+  end
+end
+
 local function resetLibState()
   RUN.epoch = RUN.epoch + 1          -- the old attempt's callbacks go inert
   M.frame = 0
@@ -6581,6 +6639,7 @@ local function resetLibState()
   watchReset()
   RUN.bootMarked, RUN.idle, RUN.idlePad = false, 0, nil
   RUN.lastBattle, RUN.goUnhandled = nil, nil
+  RUN.firstBattle, RUN.bootFrame, RUN.trace, RUN.pendingFirst = nil, nil, nil, nil
   local hooks = replayHooks
   replayHooks = {}
   for _, fn in ipairs(hooks) do pcall(fn) end
@@ -6625,6 +6684,19 @@ function M.run(opts, steps)
   RUN.budget = opts.maxFrames or 60000
   RUN.root = seqStep(steps)
   RUN.shift = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
+  -- Probe mode (#208, seed_sweep.py --probe): every sample runs the body
+  -- from its boot snapshot to its first battle only, logs the first-battle
+  -- key, and replays at the next shift (OT6_SEED_SHIFT, +stride, ... below
+  -- one 60-frame period past it).  A measurement, never a verdict on the
+  -- route: it PASSes once every shift has been sampled.
+  if type(OT6_SHIFT_PROBE) == "number" and OT6_SHIFT_PROBE > 0 then
+    RUN.probe = { stride = OT6_SHIFT_PROBE, base = RUN.shift, rows = {} }
+    attempts = (M.SEED_PERIOD + OT6_SHIFT_PROBE - 1) // OT6_SHIFT_PROBE
+    RUN.attempts = attempts
+    if not M.__body then
+      error("OT6_SHIFT_PROBE needs a composed segment body to replay", 0)
+    end
+  end
   if opts.watchdog ~= nil then W.enabled = opts.watchdog
   elseif type(OT6_WATCHDOG) == "number" then W.enabled = OT6_WATCHDOG ~= 0
   else W.enabled = isSegment end
@@ -6728,6 +6800,33 @@ function M.run(opts, steps)
       end, emu.callbackType.exec, addr, addr)
     end
   end
+  -- The first battle's RNG state (#208; firstBattleKey above).  Registered
+  -- once through the raw handle, like the canary, and judged in frame():
+  -- the exec fires inside the CPU, where no replay can be scheduled.
+  do
+    local ok, addr = pcall(M.seedStoreAddr)
+    if ok then
+      rawAddMemoryCallback(function()
+        if RUN.phase ~= "run" or RUN.firstBattle then return end
+        -- Mesen fires exec callbacks before the instruction: A is the seed.
+        local seed = emu.getState()["cpu.a"] & 0xff
+        local grp = M.readWord(0x11e0)
+        local fb = { attempt = RUN.attempt, shift = RUN.shift, frame = M.frame,
+          boot = RUN.bootFrame and (M.frame - RUN.bootFrame) or nil,
+          phase = M.seedPhase(), seed = seed, group = grp,
+          key = firstBattleKey(seed, grp) }
+        RUN.firstBattle, RUN.pendingFirst = fb, fb
+        M.log(string.format("[seed] first battle: attempt %d/%d shift %d f%d "
+          .. "boot+%s $021e=%d $be=$%02X group $%04X key %s", fb.attempt,
+          RUN.attempts, fb.shift, fb.frame, tostring(fb.boot), fb.phase, seed,
+          grp, fb.key))
+      end, emu.callbackType.exec, addr, addr)
+    else
+      M.log("[seed] first-battle watch UNAVAILABLE (the seed store did not "
+        .. "resolve: " .. tostring(addr) .. "); no attempt's first battle is "
+        .. "recorded, so duplicate seeds cannot be flagged")
+    end
+  end
 
   -- ---- the failure path, shared by every way an attempt can end --------
   local function attemptLine(class, msg)
@@ -6789,6 +6888,61 @@ function M.run(opts, steps)
     emu.stop(code)
   end
 
+  -- Restore the boot snapshot and replay the body; the reloading branch of
+  -- frame() re-executes it with RUN.nextShift (or the gap ladder's shift).
+  local function scheduleReplay(why)
+    M.log(string.format("[retry] attempt %d/%d: restoring the boot snapshot "
+      .. "(%d bytes) and replaying the body %s",
+      RUN.reroll and RUN.attempt or RUN.attempt + 1, RUN.attempts,
+      #RUN.s0blob, why))
+    M.thawPad()
+    M.setPad(nil)
+    RUN.phase = "reloading"
+    RUN.ld = M.requestLoadState(RUN.s0blob)
+    RUN.ldWait = 0
+  end
+
+  -- Probe mode: the sampled table, then a PASS (a measurement, not a route).
+  local function probeFinish()
+    finished = true
+    watchReport()
+    local seen, distinct = {}, 0
+    M.log(string.format("[seedprobe] %s: first battle per shift (stride %d)",
+      tostring(OT6_SCRIPT or "?"), RUN.probe.stride))
+    for _, r in ipairs(RUN.probe.rows) do
+      if r.key then
+        local dup = seen[r.key]
+        if not dup then seen[r.key] = r.shift; distinct = distinct + 1 end
+        M.log(string.format("[seedprobe] shift %2d: f%d boot+%s $021e=%d "
+          .. "$be=$%02X group $%04X key %s%s", r.shift, r.frame,
+          tostring(r.boot), r.phase, r.seed, r.group, r.key,
+          dup and string.format("  (duplicates shift %d)", dup) or ""))
+      else
+        M.log(string.format("[seedprobe] shift %2d: no battle -- %s: %s",
+          r.shift, r.class, r.msg))
+      end
+    end
+    M.log(string.format("[seedprobe] %d shift(s) sampled, %d distinct first "
+      .. "battle(s)", #RUN.probe.rows, distinct))
+    M.log(string.format("PASS (frame %d) attempts=%d/%d", M.frame,
+      RUN.attempt, RUN.attempts))
+    emu.stop(0)
+  end
+
+  -- Probe mode: this shift's sample is in; on to the next, or finish.
+  local function probeNext()
+    local nxt = RUN.shift + RUN.probe.stride
+    if nxt >= RUN.probe.base + M.SEED_PERIOD or not (RUN.s0blob and #RUN.s0blob > 0) then
+      if nxt < RUN.probe.base + M.SEED_PERIOD then
+        M.log("[seedprobe] no boot snapshot was captured; stopping early")
+      end
+      probeFinish()
+      return
+    end
+    RUN.nextShift = nxt
+    scheduleReplay(string.format("for the next probe sample (shift %d)", nxt))
+  end
+
   -- Schedule a replay, or stop.  `code` is the exit code a final failure
   -- takes (3 for a game over, 1 for a raised error, 2 for the budget).
   local function failed(class, msg, code)
@@ -6810,6 +6964,14 @@ function M.run(opts, steps)
       class = "wipe"
     end
     attemptLine(class, msg)
+    if RUN.probe then
+      RUN.probe.rows[#RUN.probe.rows + 1] =
+        { shift = RUN.shift, class = class, msg = tostring(msg):sub(1, 160) }
+      probeNext()
+      return
+    end
+    RUN.firstBattles[#RUN.firstBattles + 1] = RUN.firstBattle
+      or { attempt = RUN.attempt, shift = RUN.shift }
     local haveS0 = RUN.s0blob and #RUN.s0blob > 0
     if not RETRYABLE[class] or RUN.attempt >= RUN.attempts
        or not M.__body or not haveS0 then
@@ -6820,14 +6982,7 @@ function M.run(opts, steps)
       stopWith(code, class, msg)
       return
     end
-    M.log(string.format("[retry] attempt %d/%d: restoring the boot snapshot "
-      .. "(%d bytes) and replaying the body with a fresh seed",
-      RUN.attempt + 1, RUN.attempts, #RUN.s0blob))
-    M.thawPad()
-    M.setPad(nil)
-    RUN.phase = "reloading"
-    RUN.ld = M.requestLoadState(RUN.s0blob)
-    RUN.ldWait = 0
+    scheduleReplay("with a fresh seed")
   end
 
   local function frame()
@@ -6842,9 +6997,17 @@ function M.run(opts, steps)
             .. tostring(RUN.ld.error))
           return
         end
-        RUN.attempt = RUN.attempt + 1
-        RUN.shift = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
-          + RUN.gap * (RUN.attempt - 1)
+        if RUN.reroll then
+          RUN.reroll = false
+        else
+          RUN.attempt = RUN.attempt + 1
+        end
+        if RUN.nextShift then
+          RUN.shift, RUN.nextShift = RUN.nextShift, nil
+        else
+          RUN.shift = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
+            + RUN.gap * (RUN.attempt - 1)
+        end
         resetLibState()
         M.rearmInputInjection()
         canaryInGame = false
@@ -6939,6 +7102,18 @@ function M.run(opts, steps)
       RUN.s0 = nil
     end
 
+    -- The first battle's key is in (the exec watch above).  A probe sample
+    -- ends here.
+    if RUN.pendingFirst then
+      local fb = RUN.pendingFirst
+      RUN.pendingFirst = nil
+      if RUN.probe then
+        RUN.probe.rows[#RUN.probe.rows + 1] = fb
+        probeNext()
+        return
+      end
+    end
+
     if M.frame > RUN.budget then
       failed("budget", "frame budget exceeded (" .. RUN.budget
         .. " frames in attempt " .. RUN.attempt .. ")", 2)
@@ -6954,6 +7129,8 @@ function M.run(opts, steps)
       M.bootMark(string.format("no fixture load or entry contract in the "
         .. "first %d frames: the run's own opening", BOOT_FALLBACK))
     end
+
+    seedTraceTick()
 
     -- The seed variation: idle frames at the boot point, pad neutral, the
     -- pad restored afterwards so a press the boot step was holding is not
