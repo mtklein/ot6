@@ -22,8 +22,7 @@ patcher (Flips, beat) and open the result instead.
 
 **Nothing in the game.** v0.18 plays exactly like v0.17: the patch is
 identical. This release marks a round of behind-the-scenes work on how
-the game is tested from start to finish, so the next changes can arrive
-sooner and more safely.
+the game is tested from start to finish.
 
 If you already have v0.17, there is no need to switch.
 
