@@ -32,7 +32,8 @@ every run logs its first battle's RNG key (`[seed] first battle: ... key K`,
 lib/ot6.lua), the table carries it, and a seed whose first battle repeats an
 earlier seed's is flagged -- `seed 1 duplicates seed 0's first battle` --
 and not counted as a sample: the last line reports distinct samples beside
-the pass count.
+the pass count.  Each duplicate (kept in the table) gets a replacement seed
+at an unused shift, 7 frames on, for up to --replace-duplicates rounds.
 
     python3 tools/tests/seed_sweep.py fc_landing --probe [--stride 5] [--jobs 2]
 
@@ -236,6 +237,9 @@ def main():
                     help="measure each shift's first battle instead of playing")
     ap.add_argument("--stride", type=int, default=1,
                     help="--probe: shift spacing across the 60-frame period")
+    ap.add_argument("--replace-duplicates", type=int, default=2, metavar="ROUNDS",
+                    help="re-run a seed whose first battle duplicates an earlier "
+                         "seed's at a new shift, up to ROUNDS rounds (0: off)")
     a = ap.parse_args()
 
     e = entry_for(a.state)
@@ -261,16 +265,42 @@ def main():
         print(f"  cold-boots checkpoint {e['checkpoint']} as the graph does")
 
     results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, a.jobs)) as ex:
-        futs = [ex.submit(run_one, k, k * step, gen, env_extra, outdir, timeout, a.state)
-                for k in range(a.seeds)]
-        for f in concurrent.futures.as_completed(futs):
-            r = f.result()
-            results.append(r)
-            print(f"  seed {r['seed']:2d} shift {r['shift']:3d}: {r['verdict']:4s} "
-                  f"frames={r['frames']} {r['cls']} {r['msg'][:100]}", flush=True)
-    results.sort(key=lambda r: r["seed"])
+
+    def batch(jobs):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, a.jobs)) as ex:
+            futs = [ex.submit(run_one, k, shift, gen, env_extra, outdir, timeout, a.state)
+                    for k, shift in jobs]
+            for f in concurrent.futures.as_completed(futs):
+                r = f.result()
+                results.append(r)
+                print(f"  seed {r['seed']:2d} shift {r['shift']:3d}: {r['verdict']:4s} "
+                      f"frames={r['frames']} {r['cls']} {r['msg'][:100]}", flush=True)
+        results.sort(key=lambda r: r["seed"])
+
+    batch([(k, k * step) for k in range(a.seeds)])
     dup_lines, distinct = mark_duplicates(results)
+    # A duplicate is one sample counted twice.  It stays in the table (every
+    # outcome is kept), and a replacement seed runs at a shift no seed has
+    # used -- 7 on from the duplicate's, coprime to the 60-frame period --
+    # so the sweep ends with as many distinct samples as it can get.
+    for rnd in range(a.replace_duplicates):
+        dups = [r for r in results if r["dup_of"] is not None and not r.get("replaced")]
+        if not dups:
+            break
+        used = {r["shift"] % 60 for r in results}
+        nxt, jobs = len(results), []
+        for r in dups:
+            r["replaced"] = True
+            shift = r["shift"] + 7
+            while shift % 60 in used:
+                shift += 7
+            used.add(shift % 60)
+            print(f"  seed {r['seed']} duplicates seed {r['dup_of']}'s first battle: "
+                  f"replacement seed {nxt} at shift {shift} (round {rnd + 1})", flush=True)
+            jobs.append((nxt, shift))
+            nxt += 1
+        batch(jobs)
+        dup_lines, distinct = mark_duplicates(results)
 
     def fb(r):
         f = r.get("first")
@@ -295,9 +325,11 @@ def main():
         for line in dup_lines:
             print(line)
     npass = sum(1 for r in results if r["verdict"] == "PASS")
+    samples = [r for r in results if r["dup_of"] is None]
+    spass = sum(1 for r in samples if r["verdict"] == "PASS")
     print(f"\n{npass}/{len(results)} seeds passed; {distinct} distinct first "
-          f"battle(s) across {len(results)} seeds; table in "
-          f"{outdir.relative_to(ROOT)}/summary.tsv")
+          f"battle(s) across {len(results)} seeds; {spass}/{len(samples)} "
+          f"distinct samples passed; table in {outdir.relative_to(ROOT)}/summary.tsv")
     return 0 if npass == len(results) else 1
 
 

@@ -407,7 +407,9 @@ runs every script through the **segment runner** at the bottom of
   `build/states`), and prints a per-seed table: verdict, frames, failure
   class, first-battle key and message, then one
   `seed k duplicates seed j's first battle` line per repeated key and
-  the count of distinct samples beside the pass count. This is how a
+  the count of distinct samples beside the pass count; a duplicate stays
+  in the table and gets a replacement seed at an unused shift
+  (`--replace-duplicates ROUNDS`, default 2). This is how a
   segment's brittleness is found before a route change exposes it.
   `--probe [--stride N]` measures instead of playing: the generator runs
   to its first battle only, once per shift across the 60-frame period
