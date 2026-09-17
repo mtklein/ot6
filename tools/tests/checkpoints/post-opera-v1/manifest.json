@@ -2,14 +2,19 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "post-opera.sram",
   "size": 32768,
-  "sha256": "d8c8b2e52ac7492d17d8b6ab1b73251461894108b6f3a12035c0bf1da8bd3adb",
+  "sha256": "115f12815d19c917ccf20baaddb80c8f992f81e6060e14feea9c420ae44fa808",
   "slot": 3,
   "milestone": "post-opera",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "d8c8b2e52ac7492d17d8b6ab1b73251461894108b6f3a12035c0bf1da8bd3adb",
-    "generator_sig": "f2788b030dc8aa4f740dadcc614a8ad678913b10687313cff4545ab62e12b3eb gen_post_opera_checkpoint",
-    "ancestors": []
+    "payload_sha256": "115f12815d19c917ccf20baaddb80c8f992f81e6060e14feea9c420ae44fa808",
+    "generator_sig": "b8f0815772eac10bdd5463311e86f7cf8de3bae7a57daa39c5f518b46c41a65f gen_post_opera_checkpoint",
+    "ancestors": [
+      {
+        "path": "build/states/blackjack.stamp",
+        "sha256": "acb172096efeb613cd0d4e7e9b5c875cc13dfb2eaa056b3898b7fcd21db032a8"
+      }
+    ]
   },
   "persistent_layout": "ot6-codex-o8-v1"
 }
