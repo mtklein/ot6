@@ -507,6 +507,12 @@ check("audit_fenix_selftest",
       " && python3 tools/audit_fenix.py --selftest",
       ["tools/audit_boost.py", "tools/audit_fenix.py",
        "tools/tests/savestate_graph.py"])
+# The retention step (#222): evidence a merge message or a design doc
+# quotes must outlive the worktree it was produced in, so the copy's
+# filter, its idempotence and its refusal to clobber are checked here.
+check("retain_evidence_selftest",
+      "python3 tools/retain_evidence.py --selftest",
+      ["tools/retain_evidence.py"])
 check("ninja_py_selftest", "python3 tools/tests/lib/savestate_ninja.py --selftest",
       ["tools/tests/lib/savestate_ninja.py"])
 check("ninja_sh_selftest", "sh tools/tests/lib/savestate_ninja_selftest.sh",

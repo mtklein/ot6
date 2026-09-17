@@ -9,6 +9,13 @@ is quoted from a retained log under `build/lab/zozo-grind/` (the lab keeps
 every attempt; `python3 tools/tests/zozogrindlab.py aggregate` prints them
 all, and `build/lab/zozo-grind/aggregate.txt` is that output).
 
+**The `build/lab/zozo-grind/` tree is gone** (#222): it lived in the agent
+worktree this work was done in and went with it.  Every path under it cited
+below is a retained log lost with the agent worktree; see the merge message
+for the quoted lines.  The numbers stand as they were quoted; they cannot be
+re-opened from this tree.  `tools/retain_evidence.py` keeps the next lab's
+logs.
+
 ## What happened in the qualification
 
 `zozo_arrival` (gen_zozo2_arrival) in the v0.17 tree passed first try,
@@ -43,6 +50,9 @@ seed shift verdict  frames  class        message
 3/6 seeds passed; table in build/lab/zozo-grind/sweep-baseline/summary.tsv
 ```
 
+(That `sweep-baseline/` table and its per-seed logs went with the worktree
+too.)
+
 `[death]` / `used $F0` / deaths to `atk $9F` per seed (grep counts over
 `sweep-baseline/zozo_arrival.seedNN.log`): 9/5/5, 6/6/6, 9/8/6, 5/5/4,
 12/12/11, 12/11/6 — **53 deaths, 47 Fenix Downs, 38 of the deaths to
@@ -54,8 +64,8 @@ bug (below, "The door step").
 The grind column x=34 (y=99..112) and 158 of the crossing's 177 tiles are
 world battle group 10 (`tools/tests/probe_zozo_zones.lua` reads the group
 per tile the way `CheckBattleWorld` does; the grid is
-`build/lab/zozo-grind/zones.log`).  Group 10, decoded by
-`tools/tests/zozogrindlab/decode_group10.py`:
+`build/lab/zozo-grind/zones.log`, lost with the worktree).  Group 10,
+decoded by `tools/tests/zozogrindlab/decode_group10.py`:
 
 | roll | formation | bodies |
 |---|---|---|
@@ -154,8 +164,9 @@ the "nobody" deaths are Stone's too.
 
 `tools/tests/zozogrindlab.py`.  **Fixture**: `build/states/zozogrind_landing.mss`,
 baked by `zozogrindlab.py bake` — the generator itself with a `saveState`
-after "west landing" (`build/lab/zozo-grind/bake/bake.log`: boots
-`figaro_submerged.mss.lua`, plays the castle exit, `[west landing] c1 L13
+after "west landing" (`build/lab/zozo-grind/bake/bake.log`, lost with the
+worktree: boots `figaro_submerged.mss.lua`, plays the castle exit,
+`[west landing] c1 L13
 xp=6831 314/314 hp ... | gil=12501 tonic=99 potion=27 fenix=15`).  Each
 policy is a derived copy of the generator (the landing fixture in place of
 the castle exit, the policy written into the generator's `GRIND` table,
@@ -320,8 +331,9 @@ not because that branch was proven.
 `tools/tests/zozogrindlab/banked_deaths.py` prints, for every death holding
 BP, the battle's status lines once the member's HP sat inside their
 measured round cost and every line naming that actor
-(`build/lab/zozo-grind/banked-sweep.txt`).  The spend rule (#175,
-`M.spendDecision` via `spendPlan`) is asked only inside the dying actor's
+(`build/lab/zozo-grind/banked-sweep.txt`, lost with the worktree).  The
+spend rule (#175, `M.spendDecision` via `spendPlan`) is asked only inside
+the dying actor's
 own command window, and only when `hp <= roundCost[actor]`.  Across the
 qualification and the baseline sweep the deaths at 3+ BP fall in three
 shapes:
@@ -369,8 +381,9 @@ are measured); shape 2 is out of the rule's reach while Muddle holds.
   (`frame=179663`; the seed-48 wipe at `frame=33339`).
 - The first allback batch never moved LOCKE: the lab's boot replacement
   cut the generator's `setRows` step with the castle exit.  Those three
-  attempts are kept under `build/lab/zozo-grind/allback-norows-invalid/`
-  and are not in the table; the lab re-applies the rows now.
+  attempts were kept under `build/lab/zozo-grind/allback-norows-invalid/`
+  (lost with the worktree) and are not in the table; the lab re-applies the
+  rows now.
 - `[unknown-menu] state $04` and `$10` fire in these fights (`unknown_menu_04_f11046.png`, `unknown_menu_10_f14416.png` in the focus seed 0 run).
 - The Tonic bag leaves the grind at 0 in the baseline sweep's seed 2
   (`tonic=0 potion=22 fenix=10` at "Jidoor approach"); the landed run

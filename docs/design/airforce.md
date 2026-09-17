@@ -7,6 +7,13 @@ its header carries the decoded rows), `tools/tests/lab_airforce_bake.lua`
 run log under `build/attempts/airforce-lab/` (the batch runner keeps every
 attempt; `python3 tools/tests/airforcelab_aggregate.py` prints them all).
 
+**The `build/attempts/airforce-lab/` tree is gone** (#222): it lived in the
+agent worktree this work was done in and went with it.  Every path under it
+cited below is a retained run log lost with the agent worktree; see the
+merge message for the quoted lines.  The numbers stand as they were quoted;
+they cannot be re-opened from this tree.  `tools/retain_evidence.py` keeps
+the next lab's logs.
+
 ## What happened in the regeneration
 
 `gen_fc_landing` (v0.17, wt/potion-holds) passed `PASS (frame 61408)
@@ -97,8 +104,9 @@ body's `boss_death` ends the fight whatever else stands (`control_i0`:
 
 ## The party at the doorstep
 
-`build/attempts/airforce-lab/bake.log` (`[party teaser]`, the gen's own
-route from the `thamasa-done-v1` battery: shop, boarding, the deck kit):
+`build/attempts/airforce-lab/bake.log` (lost with the worktree;
+`[party teaser]`, the gen's own route from the `thamasa-done-v1` battery:
+shop, boarding, the deck kit):
 
     [party teaser] char=0 L24 hp=960/960 mp=216/216 row=back esper=$FF gear=0E,5C,6E,89,B7,B1 spells=00,04,05,2D,30,32
     [party teaser] char=1 L26 hp=1129/1129 mp=231/231 row=back esper=$06 gear=0F,05,73,8A,D1,B1 spells=
@@ -161,8 +169,9 @@ is the crossbow's all-three, `mons=08` the Speck's slot 3 -- bit = slot.
 ## Results
 
 `python3 tools/tests/airforcelab_aggregate.py` (full per-attempt rows in
-`build/attempts/airforce-lab/table.txt`; frames = mean Air Force battle
-length; fenix/potion = spent in the Air Force fight; bp>=3 = deaths holding
+`build/attempts/airforce-lab/table.txt`, lost with the worktree; frames =
+mean Air Force battle length; fenix/potion = spent in the Air Force fight;
+bp>=3 = deaths holding
 three or more pips; speck = fights where the body launched it; wcann =
 WaveCannons fired):
 
@@ -247,7 +256,7 @@ itself, below.
 line: `[AF] focus steer gave up (mons=04 want=10) -- confirming on whoever
 is highlighted`.  `bay_trace_i6` logged the target window every frame
 (`python3 tools/tests/airforcelab_tgtwatch.py
-build/attempts/airforce-lab/bay_trace_i6.log`):
+build/attempts/airforce-lab/bay_trace_i6.log`, lost with the worktree):
 
     moves (from --button--> to):
         9  mons=04 chars=00 --left--> mons=01 chars=00
@@ -328,8 +337,8 @@ that let the count run out.
 ## The decisive fight: v0.17 attempt 1, replayed
 
 The v0.17 regeneration's loss is deterministic.  `seed_sweep.py fc_landing`
-on the unchanged generator (`build/attempts/airforce-lab/sweep_baseline/`)
-returned, for shifts 0, 10, 20 and 30:
+on the unchanged generator (`build/attempts/airforce-lab/sweep_baseline/`,
+lost with the worktree) returned, for shifts 0, 10, 20 and 30:
 
     seed  1 shift  10: FAIL frames=59364 wipe GAME OVER fired ...
     seed  0 shift   0: FAIL frames=59364 wipe GAME OVER fired ...
@@ -347,9 +356,9 @@ is fixed: a generator change that touches only the Air Force's driver
 replays that exact fight.
 
 Three one-off generator copies (`build/attempts/airforce-lab/
-gen_fc_landing_cand_*.lua`, shift 0, retries off, nothing published), each
-a second driver built from `FIGHT` and used only while formation `$113` is
-up:
+gen_fc_landing_cand_*.lua`, lost with the worktree; shift 0, retries off,
+nothing published), each a second driver built from `FIGHT` and used only
+while formation `$113` is up:
 
 | candidate | Air Force driver | verdict |
 |---|---|---|
