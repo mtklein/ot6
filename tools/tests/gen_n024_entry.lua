@@ -1,5 +1,6 @@
 -- gen_n024_entry.lua -- v0.6 step 9: magicite_ifrit_shiva (map 264
--- {9,7}) -> {9,5} -> map 269 {44,53} -> {42,12} -> map 271 "MAGITEK RES.
+-- {9,7}) -> a grind on map 264's y=7 row until every member is L21
+-- (#173) -> {9,5} -> map 269 {44,53} -> {42,12} -> map 271 "MAGITEK RES.
 -- FACILITY" {31,28} -> {3,27} -> map 273 {30,60} -> parked at {25,52}
 -- facing UP, one A-press below NUMBER 024.  Generates n024_entry.
 
@@ -65,6 +66,101 @@ local function partyReport(tag)
     H.readByte(0x1EDE), H.readByte(0x1EDF))
 end
 
+-- ------------------------------------------------------------ the roster --
+-- $1600 + 37*c: +8 level, +$11 a 3-byte total experience (the same read
+-- gen_zozo2_arrival's grind logs).
+local POTION, TONIC, FENIX = 0xE9, 0xE8, 0xF0
+local function levelOf(c) return H.readByte(0x1600 + 37 * c + 8) end
+local function expOf(c)
+  local b = 0x1600 + 37 * c + 0x11
+  return H.readByte(b) + (H.readByte(b + 1) << 8) + (H.readByte(b + 2) << 16)
+end
+local function rosterLine()
+  local out = {}
+  for _, c in ipairs(H.partyMembers()) do
+    out[#out + 1] = string.format("c%d L%d xp=%d %d/%d hp %d/%d mp", c,
+      levelOf(c), expOf(c), H.charHp(c), H.charMaxHp(c),
+      H.charMp(c), H.charMaxMp(c))
+  end
+  return string.format("%s | tonic=%d potion=%d fenix=%d",
+    table.concat(out, " | "), H.invCountOf(TONIC), H.invCountOf(POTION),
+    H.invCountOf(FENIX))
+end
+local function minLevel()
+  local m = 99
+  for _, c in ipairs(H.partyMembers()) do m = math.min(m, levelOf(c)) end
+  return m
+end
+local function levels(tag)
+  H.log(string.format("[levels @ %s] min L%d f%d %s", tag, minLevel(),
+    H.frame, rosterLine()))
+end
+
+-- ----------------------------------------------------------- the grind --
+-- Owner decision (#173, 2026-09-17): every member at least L21 before map
+-- 269.  The Trapper trio's L4 Flare (docs/design/map269-random.md) hits
+-- every member whose level is a multiple of 4, and the #198 chain brought
+-- the party here at LOCKE L19 / EDGAR L20 / SABIN L20 / CELES L19 (all
+-- four L20 by map 273), so one Flare killed EDGAR and SABIN from full.
+-- L21 (26360 experience) is clear of L5 Doom, L4 Flare and L3 Muddle;
+-- L24 (39056) is a multiple of 4 again, ~12700 experience past L21, far
+-- more than maps 269/271/273 pay.
+--
+-- Where: the Flan room itself, map 264, the row y=7 between the save-room
+-- door (3,5) and the 269 door (9,5).  It is where the party stands after
+-- the save, the chute down from 263 is one-way ($0273, gen_ifrit_entry),
+-- and its pool (group 104) is Flan x4 / Flan x1 only -- no Trapper.
+-- Flan: L19, 255 HP, defence 13, weak fire, 160 experience (x2 OT6
+-- reward, split among the living): ~320 each for x4, ~80 for x1.
+local LEVEL_TARGET = 21
+local grindLaps = 0
+local function grindDone() return minLevel() >= LEVEL_TARGET end
+local GRIND_NAV = { maxFrames = 9000, playBattles = "tactical",
+                    avoid = { { 3, 6 }, { 9, 6 } } }
+local function lap(n)
+  return H.cond(function() return not grindDone() end, {
+    H.logStep(function()
+      return string.format("grind lap %d: min L%d (target L%d) %s f%d", n,
+        minLevel(), LEVEL_TARGET, rosterLine(), H.frame)
+    end),
+    -- The row is six tiles, so a lap with no encounter is the previous
+    -- lap's frames again, and the no-progress watchdog reads novelty:
+    -- ten quiet laps (~1900 frames) tripped it in all three attempts of
+    -- the first run (build/attempts/n024_entry.fnIdR7dB, "nothing has
+    -- moved for 1808 frames" while the ring shows x=4..9..4 walking).
+    -- Declared per lap, so a lap that really stalls still trips once this
+    -- lapses; navTo's walk budget stays the backstop.
+    H.call(function()
+      H.watchQuiet(1200, n == 1 and "grind laps walk the same six tiles" or nil)
+    end),
+    H.navTo(4, 7, GRIND_NAV),
+    H.navTo(9, 7, GRIND_NAV),
+    H.call(function() grindLaps = n end),
+    -- care between fights: navTo's own after-battle stop (Tonics, then
+    -- Potions) runs after every fight; this lap stop tops up a slow bleed
+    -- with items only (magic = false: Tonics are the field heal)
+    H.fieldCare({ tag = "care grind lap " .. n, threshold = 0.6, magic = false }),
+  }, {})
+end
+local function grind()
+  local steps = {
+    H.call(function()
+      H.assertEq(map(), 264, "grinding on map 264")
+      levels("grind start")
+    end),
+  }
+  for n = 1, 400 do steps[#steps + 1] = lap(n) end
+  steps[#steps + 1] = H.call(function()
+    H.log(string.format("[grind] %d laps: min L%d (target L%d) f%d",
+      grindLaps, minLevel(), LEVEL_TARGET, H.frame))
+    levels("grind end")
+    H.assertEq(grindDone(), true,
+      string.format("the grind reached L%d for every member in %d laps " ..
+        "(lowest L%d)", LEVEL_TARGET, grindLaps, minLevel()))
+  end)
+  return H.cond(function() return true end, steps)
+end
+
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
 local function census(tag, targets)
@@ -90,7 +186,7 @@ local function census(tag, targets)
   end
 end
 
-H.run({ maxFrames = 90000 }, {
+H.run({ maxFrames = 400000 }, {
   H.loadState("build/states/magicite_ifrit_shiva.mss.lua"),
   H.waitFrames(150),
   H.call(function()
@@ -114,6 +210,10 @@ H.run({ maxFrames = 90000 }, {
   H.fieldCare({ tag = "care at the Ifrit & Shiva save", threshold = 0.95 }),
   H.call(function() H.log(partyReport("after the save-room care")) end),
 
+  grind(),
+  H.fieldCare({ tag = "care after the grind", threshold = 0.95, magic = false }),
+  H.call(function() levels("after the grind care") end),
+
   -- 264 {9,5} -> 269 {44,53}
   H.navTo(9, 5, { maxFrames = 9000, playBattles = "tactical", arrive = function() return map() == 269 end }),
   H.waitUntil(function() return map() == 269 and settled() end, 6000,
@@ -123,6 +223,7 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(map(), 269, "map 269")
     H.assertEq(H.fieldX(), 44, "269 landing x")
     H.assertEq(H.fieldY(), 53, "269 landing y")
+    levels("map 269")
     census("269", { { 42, 12, "-> map 271" } })
   end),
 
@@ -137,6 +238,7 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(map(), 271, "map 271")
     H.assertEq(H.fieldX(), 31, "271 landing x")
     H.assertEq(H.fieldY(), 28, "271 landing y")
+    levels("map 271")
     census("271", { { 3, 27, "-> map 273" } })
     H.screenshot("mrf_facility")
   end),
@@ -155,6 +257,7 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(H.fieldX(), 30, "273 landing x")
     H.assertEq(H.fieldY(), 60, "273 landing y")
     H.assertEq(sw(0x0649), 1, "$0649 SET -- NUMBER 024 is on {25,51}")
+    levels("map 273")
     census("273", {
       { 25, 52, "the 024 entry point" },
       { 25, 50, "the door to map 274 (esper tubes)" },
@@ -224,6 +327,7 @@ H.run({ maxFrames = 90000 }, {
       H.frame, map(), H.fieldX(), H.fieldY(),
       H.readByte(0x087f + H.readWord(0x0803))))
     H.log(partyReport("n024_entry"))
+    levels("n024_entry")
     H.screenshot("n024_entry")
   end),
   H.saveState("n024_entry.mss"),
