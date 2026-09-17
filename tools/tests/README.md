@@ -337,12 +337,17 @@ runs every script through the **segment runner** at the bottom of
 - **The first battle.** Every attempt logs
   `[seed] first battle: attempt n/N shift S f... boot+... $021e=.. $be=$.. group $.... key K`
   at InitBattle's seed store. The key is the battle seed, the battle group
-  and the field/encounter RNG cells (`$1F6D`, `$1FA1-$1FA4`): two attempts
-  with one key fight the same first battle, i.e. are one sample. A retry
-  whose first battle repeats an earlier attempt's is re-rolled on the spot
-  (`[retry] reroll: ...`, the attempt re-run at an untried shift 7 further
-  on, not counted), and a segment no shift moves fails as `other` after 8
-  re-rolls.
+  and the random-encounter RNG cells (`$1FA1-$1FA4`); the field Rand index
+  `$1F6D` is logged beside it. Two attempts with one key fight the same
+  first battle, i.e. are one sample. A retry whose first battle repeats an
+  earlier attempt's is re-rolled on the spot (`[retry] reroll: ...`, the
+  attempt re-run at an untried shift 7 further on, not counted), and a
+  segment no shift moves fails as `other` after 8 re-rolls.
+  `seed_reroll.lua` (suite, `PASS attempts=2/3`) is the control: on
+  `battle_entry` shift 26 measurably fights shift 0's first battle, so its
+  attempt 2 must be re-rolled once onto a different one.
+  `H.firstBattle()`, `H.earlierFirstBattles()` and `H.rerollCount()` are
+  the read-only views.
 - **The count.** Every failed attempt logs
   `[retry] attempt n/N FAILED class=<c> frame=... shift=... phase=... screenshot=<png>: <message>`
   (plus a `wipe context:` line naming the formation and every seat's

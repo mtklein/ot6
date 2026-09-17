@@ -6603,21 +6603,40 @@ end
 --   $be      the battle seed about to be stored, ($021e * 4) & $FF: the
 --            whole in-battle stream (battle Rand walks RNGTbl from it)
 --   $11E0    the battle group the field or the event handed the battle
---   $1F6D    the field Rand index (field/reset.asm Rand)
 --   $1FA1-4  the random-encounter indices/counters (field/battle.asm
 --            UpdateBattleRng / UpdateBattleGrpRng): the NEXT encounter
--- Those cells are the key.  Two attempts with the same key fight the same
+-- Those cells are the key.  The field Rand index ($1F6D, field/reset.asm
+-- Rand) is logged beside it and left out: NPC motion walks it every frame
+-- on some maps, and it plays no part in the battle itself.  Two attempts with the same key fight the same
 -- first battle from the same party (nothing before it differed but the
 -- frame), so they are one sample: a whole multiple of the 60-frame phase
 -- period lands on the same seed, and a shift the game absorbed (an idle
 -- inside a wait that ends on the game's own clock) lands on the same frame.
 -- The frame and $021e are logged beside the key, not in it.
 local function firstBattleKey(seed, grp)
-  return string.format("be%02X-g%04X-r%02X-e%02X%02X%02X%02X", seed, grp,
-    M.readByte(0x1f6d), M.readByte(0x1fa1), M.readByte(0x1fa2),
-    M.readByte(0x1fa3), M.readByte(0x1fa4))
+  return string.format("be%02X-g%04X-e%02X%02X%02X%02X", seed, grp,
+    M.readByte(0x1fa1), M.readByte(0x1fa2), M.readByte(0x1fa3),
+    M.readByte(0x1fa4))
 end
 M.firstBattleKey = firstBattleKey
+
+-- Read-only views for a suite (seed_reroll.lua): this attempt's first
+-- battle record (nil before it), the earlier attempts' (oldest first; an
+-- attempt that fell before any battle has no key), and how many times the
+-- current attempt was re-rolled for repeating one of them.
+local function copyFb(f)
+  if not f then return nil end
+  local c = {}
+  for k, v in pairs(f) do c[k] = v end
+  return c
+end
+function M.firstBattle() return copyFb(RUN.firstBattle) end
+function M.earlierFirstBattles()
+  local out = {}
+  for i, f in ipairs(RUN.firstBattles) do out[i] = copyFb(f) end
+  return out
+end
+function M.rerollCount() return RUN.rerolls end
 
 -- Probe mode (OT6_SHIFT_PROBE): the transitions of the game clock and of
 -- control from the boot point on -- whether $021e ticked on this frame,
@@ -6851,9 +6870,9 @@ function M.run(opts, steps)
           key = firstBattleKey(seed, grp) }
         RUN.firstBattle, RUN.pendingFirst = fb, fb
         M.log(string.format("[seed] first battle: attempt %d/%d shift %d f%d "
-          .. "boot+%s $021e=%d $be=$%02X group $%04X key %s", fb.attempt,
-          RUN.attempts, fb.shift, fb.frame, tostring(fb.boot), fb.phase, seed,
-          grp, fb.key))
+          .. "boot+%s $021e=%d $be=$%02X group $%04X key %s ($1F6D=$%02X)",
+          fb.attempt, RUN.attempts, fb.shift, fb.frame, tostring(fb.boot),
+          fb.phase, seed, grp, fb.key, M.readByte(0x1f6d)))
       end, emu.callbackType.exec, addr, addr)
     else
       M.log("[seed] first-battle watch UNAVAILABLE (the seed store did not "
@@ -7041,11 +7060,6 @@ function M.run(opts, steps)
         else
           RUN.shift = (type(OT6_SEED_SHIFT) == "number" and OT6_SEED_SHIFT or 0)
             + RUN.gap * (RUN.attempt - 1)
-          -- the gap ladder never re-runs a shift a re-roll already took
-          for _ = 1, M.SEED_PERIOD do
-            if not RUN.tried[RUN.shift % M.SEED_PERIOD] then break end
-            RUN.shift = RUN.shift + 1
-          end
         end
         RUN.tried[RUN.shift % M.SEED_PERIOD] = true
         resetLibState()
