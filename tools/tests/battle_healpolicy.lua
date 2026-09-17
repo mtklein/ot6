@@ -575,20 +575,22 @@ H.run({ maxFrames = 3000 }, {
       if goal(cur) then break end
     end
     H.assertEq(cur, "mons=10", "the graph reaches the Missile Bay from the gun")
-    H.assertEq(table.concat(presses, ","), "left,left,down", "...by exploring the nearest node first")
+    H.assertEq(table.concat(presses, ","), "left,left,left,down",
+      "...by exploring the nearest node first (the body's LEFT no-op pressed twice to be believed)")
     local d, how, walk = H.newTargetGraph().route("mons=04", goal, mon, order)
     H.assertEq(how, "explore", "a fresh graph explores")
     d, how, walk = G.route("mons=04", goal, mon, order)
     H.assertEq(how .. " " .. walk, "path left,down", "the next window walks the known path")
     H.assertEq(G.record("mons=04", "left", "mons=01"), nil, "a confirmed edge is not news")
-    H.assertEq(G.record("mons=04", "left", "mons=04"), "changed", "a moved edge is")
+    H.assertEq(G.record("mons=04", "left", "mons=04"), "unconfirmed", "a no-op is not believed at once")
+    H.assertEq(G.record("mons=04", "left", "mons=04"), "changed", "...but on its second sighting")
     -- H.focusStep: the old rotation's presses first (left leads) until the
     -- window cycles, a press the graph knows is wasted skipped, then the
     -- graph explores with the crossing (right) after every other
     -- direction, and a known path is walked
     local F, visited, hows, cycled = H.newTargetGraph(), {}, {}, false
     cur, presses = "mons=04", {}
-    for _ = 1, 12 do
+    for _ = 1, 16 do
       visited[cur] = true
       local fd, fhow = H.focusStep(F, cur, goal, { "left", "right", "down", "up" }, {},
         visited, order, cycled, { right = true })
@@ -601,11 +603,12 @@ H.run({ maxFrames = 3000 }, {
       if goal(cur) then break end
     end
     H.assertEq(cur, "mons=10", "focusStep reaches the Missile Bay from the gun")
-    H.assertEq(table.concat(presses, ","), "left,left,right,down,up,left,down",
-      "...left, left (moves nothing, not pressed a third time), right (back on "
-      .. "the gun: cycled), then the gun's down and up, the walk to the body's down")
+    H.assertEq(table.concat(presses, ","), "left,left,left,right,down,down,up,up,left,down",
+      "...left, left twice (moves nothing: believed on the second), right (back on "
+      .. "the gun: cycled), then the gun's down and up (twice each), the walk to the body's down")
     H.assertEq(table.concat(hows, ","),
-      "rotation,rotation,rotation,explore,explore,explore,explore", "...rotation first")
+      "rotation,rotation,rotation,rotation,explore,explore,explore,explore,explore,explore",
+      "...rotation first")
     local pd, phow = H.focusStep(F, "mons=04", goal, { "right" }, {}, {}, order)
     H.assertEq(pd .. " " .. phow, "left path", "a known path beats the rotation")
     local xd, xhow = H.focusStep(F, "mons=01", function() return false end,

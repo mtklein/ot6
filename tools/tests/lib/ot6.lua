@@ -2245,10 +2245,25 @@ function M.newTargetGraph()
   local G = { edges = {} }            -- name -> dir -> name
   -- Record a press: returns "new", "changed" (the old landing, for the
   -- log) or nil when it only confirms what was known.
+  --
+  -- A press that moved nothing is believed only the second time it is
+  -- seen (the old rotation's two-strikes rule): a pulse the window drops
+  -- reads exactly like a direction that does nothing.  Measured on NUMBER
+  -- 128 with the RightBlade standing, the body's LEFT once read as a
+  -- no-op (`mons=01 --left--> mons=01 (was mons=08)`) and, on the same
+  -- seed with the same monsters and graphics mask ($2F2F=$03), landed on
+  -- the blade in the next run; believed at once, the one reading gave up
+  -- every later window.  Returns "unconfirmed" for the first sighting.
+  local noopSeen = {}
   function G.record(from, dir, to)
     local e = G.edges[from]
     if e == nil then e = {}; G.edges[from] = e end
     local old = e[dir]
+    if to == from and old ~= to then
+      local k = from .. "/" .. dir
+      if not noopSeen[k] then noopSeen[k] = true; return "unconfirmed", old end
+    end
+    noopSeen[from .. "/" .. dir] = nil
     e[dir] = to
     if old == nil then return "new" end
     if old ~= to then return "changed", old end
@@ -2978,6 +2993,29 @@ function M.newFightDriver(tag, opts)
   local recovery = (opts.actionTrace or OT6_ACTION_TRACE) and
     M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
   local menuStreak, tick, battleTick = 0, 0, 0
+  -- A focus slot the graph ran out on (#189): slot -> { live, tick }.  A
+  -- part can stand alive and present yet not be selectable -- NUMBER 128's
+  -- RightBlade between a death and its return, where the body's LEFT
+  -- moved nothing twice running and every direction from every node was
+  -- pressed -- so a person steers at the next entry for a while instead
+  -- of spending a dozen presses a window relearning the same dead end.
+  local tgtUnreach = {}
+  local UNREACH_TICKS = 600
+  local function focusReachable(slot)
+    local u = tgtUnreach[slot]
+    if u == nil then return true end
+    local live = 0
+    for s = 0, 5 do
+      if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then
+        live = live | (1 << s)
+      end
+    end
+    if u.live ~= live or battleTick - u.tick >= UNREACH_TICKS then
+      tgtUnreach[slot] = nil
+      return true
+    end
+    return false
+  end
   local plan, planActor, held = nil, nil, {}
   local heldFast = false            -- the live steer asked for 3 presses/pulse
   local tgtSpin = 0                    -- frames spent undecided in ST_TGT
@@ -3317,7 +3355,8 @@ function M.newFightDriver(tag, opts)
     if opts.focus then
       for _, e in ipairs(M.focusSlots(opts.focus)) do
         if M.readWord(MON_HP + e.slot * 2) > 0
-           and (M.readByte(MON_PRESENT + e.slot * 2) & 1) == 1 then return e.slot end
+           and (M.readByte(MON_PRESENT + e.slot * 2) & 1) == 1
+           and focusReachable(e.slot) then return e.slot end
       end
     end
     return soleTarget()
@@ -4865,7 +4904,9 @@ function M.newFightDriver(tag, opts)
         if what ~= nil then
           M.log(string.format("[%s] [tgt-graph] %s --%s--> %s%s (live monsters %02X)",
             tag or "fight", steerLast.node, steerLast.dir, now,
-            what == "changed" and (" (was " .. old .. ")") or "", k))
+            what == "changed" and (" (was " .. old .. ")")
+              or what == "unconfirmed" and " (unconfirmed: a no-op is believed on its second sighting)"
+              or "", k))
         end
       end
     end
@@ -5367,7 +5408,7 @@ function M.newFightDriver(tag, opts)
         -- has left) is skipped rather than steered at
         for _, e in ipairs(M.focusSlots(opts.focus)) do
           if M.readWord(0x3BFC + e.slot * 2) > 0
-             and (M.readByte(0x3AA8 + e.slot * 2) & 1) == 1 then
+             and (M.readByte(0x3AA8 + e.slot * 2) & 1) == 1 and focusReachable(e.slot) then
             want, wantSlot = e.mask, e.slot; break
           end
         end
@@ -5426,6 +5467,10 @@ function M.newFightDriver(tag, opts)
               -- (was mons=08)`); kept, that edge gave up every later window
               -- in the same live set.  The next window learns again.
               tgtGraphs[live] = nil
+              tgtUnreach[wantSlot] = { live = live, tick = battleTick }
+              M.log(string.format("[%s] [tgt-graph] slot %d is not reachable from here now: "
+                .. "the focus steers at the next entry for %d ticks or until the live "
+                .. "monsters change", tag or "fight", wantSlot, UNREACH_TICKS))
               tgtSpin = 24
             end
             M.log(string.format("[%s] focus steer gave up (mons=%02X " ..
@@ -5550,7 +5595,7 @@ function M.newFightDriver(tag, opts)
     plan, planActor, held = nil, nil, {}
     parkDropN = 0
     layout, layoutUnreadSaid, steerLast, steerDead = nil, false, nil, {}
-    tgtGraphs, tgtRouteSaid, tgtVisited, tgtCycled = {}, nil, {}, false
+    tgtGraphs, tgtRouteSaid, tgtVisited, tgtCycled, tgtUnreach = {}, nil, {}, false, {}
     parkSt, parkN, idleSt, idleN = nil, 0, nil, 0
     unknownSt, unknownN, unknownSeen, sideWindowN = nil, 0, {}, 0
     if healSaid == "parked-out" then healSaid = nil end
