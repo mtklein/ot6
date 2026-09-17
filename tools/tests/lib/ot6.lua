@@ -5417,7 +5417,15 @@ function M.newFightDriver(tag, opts)
               end
               M.log(string.format("[%s] [tgt-graph] focus slot %d (want=%02X) from %s: no "
                 .. "known path and no untried direction on the monster side (live "
-                .. "monsters %02X)", tag or "fight", wantSlot, want, here, live))
+                .. "monsters %02X); forgetting this graph", tag or "fight", wantSlot,
+                want, here, live))
+              -- A graph that has run out is wrong, not complete: measured on
+              -- NUMBER 128, the RightBlade (slot 3) died and respawned, and
+              -- while it stood present with HP but not yet targetable the
+              -- body's LEFT landed on the body (`mons=01 --left--> mons=01
+              -- (was mons=08)`); kept, that edge gave up every later window
+              -- in the same live set.  The next window learns again.
+              tgtGraphs[live] = nil
               tgtSpin = 24
             end
             M.log(string.format("[%s] focus steer gave up (mons=%02X " ..
