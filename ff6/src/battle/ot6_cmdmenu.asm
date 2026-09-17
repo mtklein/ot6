@@ -347,14 +347,17 @@
 ; Ot6ToolRowDecorate instead.
 ;
 ; Who escalates, and why, is Ot6AbilityCost's ruling repeated rather than a
-; second opinion:
-;   * Blitz: one id per row, boost buys Ot6BoostDmg's x2/x4/x8, so x2.5 per
-;     pending level (#219).
-;   * SwdTech: the boost was already spent on picking the row, so the row is
-;     priced at its own table price and nothing escalates.
-;   * Thief: the Steal row is a chance verb (boost buys the rare/guarantee
-;     ladder) and escalates; Filch and Bestow buy nothing from a boost, so
-;     they stay flat.
+; second opinion.  One test: a row escalates exactly when Ot6BoostDmg
+; multiplies its command.
+;   * Blitz (cmd $0a): ungated, one id per row, boost buys Ot6BoostDmg's
+;     x2/x4/x8, so x2.5 per pending level (#219).
+;   * SwdTech (cmd $07): gated -- the boost was already spent on picking the
+;     row, so the row is priced at its own table price and nothing escalates.
+;   * Thief (cmd $05): gated, so EVERY row of it is flat, Steal included.
+;     Steal's boost buys the rare/guarantee ladder and Filch's and Bestow's
+;     buys nothing at all; either way the command multiplies nothing, the BP
+;     is what pays for the certainty, and one arm serves all three rows
+;     (owner, 2026-09-17).
 ;
 ; in: A = the row's id ($ff = an empty cell).  out: A = the price.
 ; a8/i16, db=$7e; preserves X and Y.  rtl.
@@ -375,14 +378,8 @@
 @bushido:
         pla
         jml     Ot6CostFor      ; the tech's own row price, unescalated
-@thief: lda     $01,s           ; the parked row id
-        cmp     #OT6_THIEF_STEAL
-        bne     @flat
-        pla
-        jsl     Ot6ThiefCost
-        jml     Ot6PendPrice
-@flat:  pla                     ; Filch and Bestow: a boost buys them nothing
-        jml     Ot6ThiefCost    ;   (Ot6BoostDmg gates cmd $05), so flat
+@thief: pla                     ; Steal, Filch and Bestow alike: Ot6BoostDmg
+        jml     Ot6ThiefCost    ;   gates cmd $05, so no thief row escalates
 @empty: lda     #$00            ; an empty cell draws two blanks and stays white
         rtl
 .endproc

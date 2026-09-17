@@ -133,11 +133,13 @@ house rule stands with its one named exception (Osmose, below).
   price.
 
   The split applies to every costed verb, but since #219 the MP half
-  is itself a function of the boost: a boost that does not buy a tier
-  buys a multiplier or odds instead, and pays 2.5x the base price per
-  level for it. See "Boosting costs MP" below. Steal's base price is
-  4 MP, using the "flat small" row below like every other verb that is
-  free in vanilla, and a boost-3 Steal costs 63.
+  is itself a function of the boost: a boost that buys a damage
+  multiplier pays 2.5x the base price per level for it, while a boost
+  that buys a tier, swings or certainty does not. See "Boosting costs
+  MP" below. Steal's price is 4 MP, using the "flat small" row below
+  like every other verb that is free in vanilla, and it is 4 at every
+  boost level: Steal is a chance verb, so the BP is what pays for the
+  rare/guarantee ladder.
   cmd $05 takes a flat-cost
   path in `Ot6AbilityCost`, a single verb with one price
   keyed on the command rather than on an
@@ -154,14 +156,18 @@ house rule stands with its one named exception (Osmose, below).
 
 ## Boosting costs MP
 
-Owner direction, 2026-09-17 (#219): every boosted ability except Fight
-costs escalating MP, the way boosted magic already does, so boosting is
-a tactical trade rather than a free multiplier.
+Owner direction, 2026-09-17 (#219): a boost that buys a damage
+multiplier costs escalating MP, the way boosted magic already does, so
+boosting is a tactical trade rather than a free multiplier.
 
     price = min(99, floor(base * 2.5^boost + 0.5))
 
 with `boost` the pending boost level 0..3, i.e. x1 / x2.5 / x6.25 /
 x15.625 against the base price, every result capped at 99.
+
+The owner refined the scope the same day: the three *chance verbs* --
+Steal, Rage and Slot -- are exempt and stay flat at every level. "Who
+pays it" below is the one test that decides it, and the reasoning.
 
 **Why 2.5x: it matches magic's own tier scaling.** Boosted tier-family
 magic folds up a tier and pays that tier's vanilla MP, and damage is
@@ -179,39 +185,80 @@ vanilla's starter spells are cheap.
 ### Who pays it
 
 The rule is one test, and it is the same test the damage half already
-makes: **a price escalates exactly when `Ot6BoostDmg` would multiply
-the action, or when the boost buys odds instead.**
+makes:
 
-- **Multiplier verbs, escalate:** Blitz, Tools, Lore, non-tier magic
-  (Drain, Scan, Break, Doom, Pearl, Flare, Quake, Ultima, Osmose,
-  Rflect, Vanish, Dispel, ...), summons, Dance. Boost buys them
-  x2/x4/x8 and nothing else, so the price follows.
-- **Chance verbs, escalate:** Steal (boost buys the rare/guarantee
-  ladder), Rage (boost buys the trance's coin). Slot would join them,
-  but Slot is unpriced today, so there is nothing to escalate.
-- **Unchanged, already escalating by tier:** tier-family magic. A family
-  head folds up a tier and pays that tier's own vanilla MP, which is a
-  steeper escalation than 2.5x (Fire 4 -> Fire 2 20 -> Fire 3 51); a
-  tier the caster already owns does not fold again and gets no
-  multiplier either, so nothing about its price moves. The one gate for
-  both halves is `Ot6InFoldTbl`, a byte-for-byte scan of `Ot6FoldTbl`.
+> **A verb's price escalates exactly when `Ot6BoostDmg` multiplies it.**
 
-  The families are wider than the -ra/-ga lines, and #219's own scope
-  note listed **Bio** as non-tier magic. It is not: `Ot6FoldTbl` carries
-  Poison -> Bio, so Bio is Poison's tier, `Ot6BoostDmg` gives it no
-  multiplier, and boosting into it already buys nothing. Charging 2.5x
-  for that would be charging for nothing, so Bio is exempt with the rest
-  of the families. The same holds for **Cure/Cure 2/Cure 3**,
-  **Life/Life 2**, **Slow/Slow 2** and **Haste/Haste2**. The rule the
-  owner locked -- "unchanged: tier-family magic" -- is what decides
-  this, not the example beside it.
-- **Unchanged, already escalating by tier:** SwdTech. The boost picks
-  the tech, and the tech is charged at its own row price.
-- **Unchanged, free:** Fight and Capture. The boost buys swings.
-- **Unchanged, flat:** Filch and Bestow. `Ot6BoostDmg` refuses to
-  multiply anything under command `$05` and neither row is a chance
-  verb, so boosting into them buys nothing at all and charging for it
-  would be charging for nothing.
+There is nothing else to check. `Ot6BoostDmg`'s command gate names
+fight `$00`, capture `$06`, bushido `$07`, steal `$05`, slot `$0f` and
+rage `$10`, plus every tier-family spell through `Ot6FoldTbl`. That
+list is the exemption list, read straight across. One scan, one gate,
+and the price half and the damage half cannot come to different answers
+about the same action.
+
+**Escalate — the boost multiplies them:** Blitz, Tools, Lore, non-tier
+magic (Drain, Scan, Break, Doom, Pearl, Flare, Quake, Ultima, Osmose,
+Rflect, Vanish, Dispel, …), summons, and **Dance**. None of their
+commands is in the gate, so the boost buys them x2/x4/x8 and nothing
+else, and the price follows at 2.5x per level.
+
+**Flat — the boost buys certainty, and BP already paid for it:**
+**Steal**, **Rage** and **Slot**. These are the *chance verbs*, and the
+owner exempted them on 2026-09-17. Boost on them does not multiply
+anything: it converts variance into reliability across "a more
+interesting mix of effects than just damage boosts" — Steal's
+common/rare/guarantee ladder, Rage's coin and the tier it latches for
+the whole battle, Slot's rig. Boost already costs BP, which is the
+scarce resource. **MP scales with magnitude; BP alone pays for
+certainty.** So their prices stay flat at every level: Steal 4 / 4 / 4 /
+4, Rage 8 / 8 / 8 / 8.
+
+Slot needs no code for this and never did — it is unpriced, base 0, so
+its column is 0 at every level either way. It is named here so a later
+reader does not go looking for the arm that was forgotten; there is no
+arm, and that is the whole of it. Slot is not alone in that: the test
+is silent wherever the base is 0. Leap `$11`, Throw `$08`, Sketch
+`$0d`, Control `$0e`, Mimic `$12` and the rest are outside
+`Ot6BoostDmg`'s gate and so nominally escalate, and 2.5 x 0 is 0, so
+nothing happens. **Whenever one of them is given a price, the one test
+decides its column with no further ruling**, and that column is
+escalating unless its command joins the gate.
+
+Dance is the control that makes this a rule rather than a habit.
+`Ot6RageCost` tail-calls `Ot6DanceCost`, so Rage and Dance share one
+base price of 8, and they are still charged differently — Dance 8 / 20 /
+50 / 99, Rage 8 / 8 / 8 / 8 — because cmd `$13` is not in the gate and
+cmd `$10` is. Two rows, one base, opposite answers, decided by the one
+test and by nothing else. `battle_costtable` prints that pair.
+
+**Flat — the boost buys them nothing at all:** Filch and Bestow. They
+ride cmd `$05`'s gate with Steal, and charging for a boost that buys
+nothing would be charging for nothing (`Ot6Bestow`'s header says the
+same). With Steal flat too, the whole thief submenu is one flat arm:
+`Ot6KitRowCost`'s `@thief` no longer splits per row, and
+`Ot6ThiefListOpen` stamps the Steal row with a bare `Ot6ThiefCost`.
+
+**Already escalating by tier, so unchanged:** tier-family magic. A
+family head folds up a tier and pays that tier's own vanilla MP, which
+is a steeper escalation than 2.5x (Fire 4 -> Fire 2 20 -> Fire 3 51); a
+tier the caster already owns does not fold again and gets no multiplier
+either, so nothing about its price moves. The gate for both halves is
+`Ot6InFoldTbl`, a byte-for-byte scan of `Ot6FoldTbl`.
+
+The families are wider than the -ra/-ga lines, and #219's own scope
+note listed **Bio** as non-tier magic. It is not: `Ot6FoldTbl` carries
+Poison -> Bio, so Bio is Poison's tier, `Ot6BoostDmg` gives it no
+multiplier, and boosting into it already buys nothing. Charging 2.5x
+for that would be charging for nothing, so Bio is exempt with the rest
+of the families. The same holds for **Cure/Cure 2/Cure 3**,
+**Life/Life 2**, **Slow/Slow 2** and **Haste/Haste2**.
+
+**Already escalating by tier, so unchanged:** SwdTech (cmd `$07`, in
+the gate). The boost picks the tech, and the tech is charged at its own
+row price.
+
+**Free, unchanged:** Fight and Capture (cmd `$00` and `$06`, in the
+gate). The boost buys swings.
 
 ### The rulings
 
@@ -233,24 +280,43 @@ the action, or when the boost buys odds instead.**
    exactly like an unaffordable row today. The grey is
    `Ot6AbilityGrey`'s for the kit windows and `CheckMagicEnabled`'s for
    the magic list, and both read the same boosted number the charge
-   takes.
+   takes. This ruling has no bite on the chance verbs: their price does
+   not move, so a boost cannot price Steal or Rage out of a pool that
+   could already afford them.
 3. **Rounding is computed once.** `Ot6BoostPriceFor` is the only place
    the arithmetic lives, and every surface that states a price -- the
    drawn number, the grey, the confirm, the charge -- reaches it, so the
-   charge and the displayed price cannot disagree.
+   charge and the displayed price cannot disagree. The chance verbs
+   simply do not reach it: `Ot6AbilityCost`'s `@steal` and `@rage` arms
+   return the leaf price directly, and `Ot6ThiefListOpen` and
+   `Ot6KitRowCost` draw the same leaf. One authority for the
+   arithmetic, and one list of who consults it.
+4. **A chance verb's price never moves with the boost.** Steal, Rage
+   and Slot are flat at every level, because a boost on them multiplies
+   nothing and the BP it costs is the payment. This is a ruling and not
+   an omission: `battle_costtable` reads `Ot6AbilityCost` out of the
+   built ROM and fails if either arm reaches `Ot6BoostPriceFor` again,
+   and `battle_steal`, `battle_stealmp`, `battle_rage` and
+   `battle_boostprice` each assert the flat number against the
+   escalated one it must not be.
 
 ### The resulting table
 
 Base prices are `Ot6AbilityCostTbl`'s, `Ot6StealCost`'s and
-`Ot6DanceCost`'s; the boosted columns are the formula above.
+`Ot6DanceCost`'s; the boosted columns are the formula above, for the
+rows the one test says escalate. `battle_costtable` prints this whole
+table out of the built ROM, flat rows marked.
 
 | row | base | boost 1 | boost 2 | boost 3 |
 |---|---|---|---|---|
-| Pummel / AutoCrossbow / Steal | 4 | 10 | 25 | 63 |
-| Bestow (flat, never escalates) | 5 | 5 | 5 | 5 |
+| **Steal** (chance verb, flat) | 4 | 4 | 4 | 4 |
+| **Rage** (chance verb, flat) | 8 | 8 | 8 | 8 |
+| **Slot** (chance verb, unpriced) | 0 | 0 | 0 | 0 |
+| Pummel / AutoCrossbow | 4 | 10 | 25 | 63 |
+| Bestow (flat, buys nothing) | 5 | 5 | 5 | 5 |
 | NoiseBlaster / Flash | 6 | 15 | 38 | 94 |
-| Filch (flat, never escalates) | 6 | 6 | 6 | 6 |
-| Bio Blaster / Dance / Rage | 8 | 20 | 50 | 99 |
+| Filch (flat, buys nothing) | 6 | 6 | 6 | 6 |
+| Bio Blaster / **Dance** | 8 | 20 | 50 | 99 |
 | AuraBolt / Debilitator | 10 | 25 | 63 | 99 |
 | Suplex | 13 | 33 | 81 | 99 |
 | Air Anchor | 14 | 35 | 88 | 99 |
@@ -260,6 +326,10 @@ Base prices are `Ot6AbilityCostTbl`'s, `Ot6StealCost`'s and
 | Air Blade | 28 | 70 | 99 | 99 |
 | Spiraler | 50 | 99 | 99 | 99 |
 | Bum Rush | 99 | 99 | 99 | 99 |
+
+Dance and Rage are the pair worth reading twice: one base price, two
+columns, because cmd `$13` is outside `Ot6BoostDmg`'s gate and cmd
+`$10` is inside it.
 
 Magic, for the shape of it -- all of these are outside the tier
 families, so all of them escalate: Scan 3 -> 8 / 19 / 47, Osmose 8 -> 20
@@ -336,7 +406,8 @@ price: a boosted use of it costs `min(99, floor(base * 2.5^boost +
 
 ### Steal's price is real and invisible
 
-The price is 4 MP. This document's baseline measures
+The price is 4 MP, at every boost level: Steal is a chance verb and
+does not escalate ("Who pays it" above). This document's baseline measures
 an ability against the pool at the level it arrives, and Steal
 arrives at Narshe with Locke at LV6 holding 31 MP (measured,
 `probe_mppools.lua` off `worldmap_narshe`), where 4 MP is 12.9%,

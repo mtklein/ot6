@@ -34,10 +34,20 @@
 --      recomputed from this ROM's own base column and held to the
 --      rulings the design locks: the 99 cap, the flattening it causes
 --      for dear rows, Bum Rush already sitting at the cap, and the
---      eight SwdTech rows exempt because their boost was spent picking
---      the row. The ceiling constant is read out of Ot6BoostPriceFor
---      itself, so a ROM that capped somewhere else fails here rather
---      than in a play test.
+--      exempt columns -- the eight SwdTech rows, Steal and Rage -- held
+--      flat across all four levels. The ceiling constant is read out of
+--      Ot6BoostPriceFor itself, so a ROM that capped somewhere else
+--      fails here rather than in a play test.
+--   4c. WHO reaches the escalation, disassembled out of the built ROM
+--      rather than declared in this script. The design rule is one test:
+--      a verb's price escalates exactly when Ot6BoostDmg multiplies it.
+--      Ot6BoostDmg's gate names fight $00, capture $06, bushido $07,
+--      steal $05, slot $0f and rage $10, so exactly two of
+--      Ot6AbilityCost's own arms may reach Ot6BoostPriceFor -- @dance
+--      and @boosted -- and the Steal, Rage and SwdTech arms may not.
+--      This step finds each leaf call in the proc's byte range and asks
+--      whether the escalation follows it, so re-adding the call to a
+--      chance verb fails here and not only in a play test.
 --   5. the Serpent-Trench section. gau_joined is the entry point
 --      gen_sabin_trench.lua boots from, so the trio's pools are read live
 --      out of the fixture and every ability each has learned at that
@@ -339,13 +349,31 @@ H.run({ maxFrames = 20000 }, {
       ANCHOR, ANCHOR))
 
     -- Steal and the possess verbs are leaves, not table rows; read their
-    -- immediates at the source the same way step 3b does.
+    -- immediates at the source the same way step 3b does.  Rage tail-calls
+    -- Ot6DanceCost, so the two possess verbs share one base and differ only
+    -- in whether it escalates -- which makes them the sharpest pair in the
+    -- table for the rule below.
     local steal = H.readRomByte(romOfs(H.sym("Ot6StealCost")) + 1)
     local dance = H.readRomByte(romOfs(H.sym("Ot6DanceCost")) + 1)
-    -- Which columns escalate is the design's own split, not a free choice:
-    -- SwdTech's boost was already spent picking the row, so its column is
-    -- flat at the base price; everything else here buys a multiplier (Blitz,
-    -- Tools) or odds (Steal, Rage, Dance) and takes the 2.5x.
+    -- Ot6RageCost is `jmp Ot6DanceCost`, not an immediate of its own, so
+    -- read the jump and follow it rather than reading a +1 that would be an
+    -- operand byte.
+    local rageOfs, danceAddr = romOfs(H.sym("Ot6RageCost")), H.sym("Ot6DanceCost")
+    H.assertEq(H.readRomByte(rageOfs), 0x4c,
+      "Ot6RageCost is still a JMP (its price is Dance's, tail-called)")
+    H.assertEq(H.readRomByte(rageOfs + 1) | (H.readRomByte(rageOfs + 2) << 8),
+      danceAddr & 0xffff,
+      "...and the JMP still lands on Ot6DanceCost, so Rage's base IS Dance's")
+    local rage = dance
+    -- Which columns escalate is the design's own split, not a free choice,
+    -- and it is ONE test: a price escalates exactly when Ot6BoostDmg
+    -- multiplies the action.  Blitz ($0a), Tools ($09) and Dance ($13) are
+    -- outside that gate, so they take the 2.5x.  SwdTech ($07), Steal ($05)
+    -- and Rage ($10) are inside it, so they are flat at every level: the
+    -- tech's boost was already spent picking the row, and Steal's and Rage's
+    -- boost buys certainty across a spread of outcomes rather than
+    -- magnitude, which the BP already pays for.  Step 4c reads that split
+    -- back off the ROM rather than trusting this table.
     local rows = {}
     for _, kit in ipairs({ { "Blitz", BLITZ, true }, { "SwdTech", SWDTECH, false },
                            { "Tools", TOOLS, true } }) do
@@ -353,8 +381,9 @@ H.run({ maxFrames = 20000 }, {
         rows[#rows + 1] = { kit[1], r[3], r[1], nil, kit[3] }
       end
     end
-    rows[#rows + 1] = { "Steal", "Steal", nil, steal, true }
-    rows[#rows + 1] = { "Possess", "Dance/Rage", nil, dance, true }
+    rows[#rows + 1] = { "Steal", "Steal", nil, steal, false }
+    rows[#rows + 1] = { "Possess", "Dance", nil, dance, true }
+    rows[#rows + 1] = { "Possess", "Rage", nil, rage, false }
 
     local tbl = romOfs(H.sym("Ot6AbilityCostTbl"))
     local function liveCost(key)
@@ -364,7 +393,16 @@ H.run({ maxFrames = 20000 }, {
         if k == key then return H.readRomByte(tbl + i * 2 + 1) end
       end
     end
-    local atCap, exempt = 0, 0
+    local WHYFLAT = {
+      SwdTech = "its boost bought the row, and the row is charged at its "
+             .. "own price (cmd $07 is in Ot6BoostDmg's gate)",
+      Steal   = "cmd $05 is in Ot6BoostDmg's gate: the boost buys the "
+             .. "rare/guarantee ladder, not a multiplier, and the BP pays "
+             .. "for that certainty",
+      Rage    = "cmd $10 is in Ot6BoostDmg's gate: the boost buys the "
+             .. "trance's coin, not a multiplier, and the BP pays for it",
+    }
+    local atCap, exempt, flatKinds = 0, 0, {}
     for _, r in ipairs(rows) do
       local b = r[4] or liveCost(r[3])
       H.assertEq(b ~= nil and b > 0, true, r[2] .. " has a base price")
@@ -375,8 +413,13 @@ H.run({ maxFrames = 20000 }, {
       H.assertEq(c[1], b, r[2] .. ": boost 0 is the base price, untouched")
       if not r[5] then
         exempt = exempt + 1
-        H.assertEq(c[4], b, r[2] .. ": SwdTech does not escalate -- its boost "
-          .. "bought the row, and the row is charged at its own price")
+        local kind = WHYFLAT[r[2]] and r[2] or r[1]
+        flatKinds[kind] = (flatKinds[kind] or 0) + 1
+        for i = 2, 4 do
+          H.assertEq(c[i], b, string.format(
+            "%s at boost %d still costs its base %d -- %s", r[2], i - 1, b,
+            WHYFLAT[kind]))
+        end
       end
       for i = 2, 4 do
         assert(c[i] <= ANCHOR, string.format(
@@ -392,7 +435,16 @@ H.run({ maxFrames = 20000 }, {
           .. "there at every boost (#219, ruling 1: accepted, not a bug)")
       end
     end
-    H.assertEq(exempt, 8, "the eight SwdTech rows are the exempt column")
+    H.assertEq(exempt, 10, "ten rows are exempt from the escalation")
+    H.assertEq(flatKinds.SwdTech, 8, "the eight SwdTech rows are flat")
+    H.assertEq(flatKinds.Steal, 1,
+      "Steal is flat -- the chance-verb exemption, and NOT merely unasserted: "
+      .. "at boost 3 it costs 4 and not 63")
+    H.assertEq(flatKinds.Rage, 1,
+      "Rage is flat -- the same exemption, and the sharpest case in the table: "
+      .. "Rage and Dance share one base (Ot6RageCost tail-calls Ot6DanceCost), "
+      .. "so 8 / 8 / 8 / 8 against Dance's 8 / 20 / 50 / 99 is the whole rule "
+      .. "in one pair of rows")
     H.assertEq(atCap, 1,
       "one escalating row (Bum Rush) ships at the cap and therefore never "
       .. "moves; Cleave is the other, and it is exempt for a different reason")
@@ -410,6 +462,116 @@ H.run({ maxFrames = 20000 }, {
       "Drain's 15 at boost 2 is 94 (93.75, rounded half up)")
     H.log(string.format("boosted column: %d priced rows recomputed and held "
       .. "to the %d cap", #rows, ANCHOR))
+  end),
+
+  ------------------------------- 4c. who reaches the escalation, off the ROM --
+  H.call(function()
+    -- The split in 4b is a table in a Lua script, and a Lua script agrees
+    -- with itself for free.  This step asks the assembled bytes instead.
+    --
+    -- The design rule is one test: a price escalates exactly when
+    -- Ot6BoostDmg multiplies the action.  Ot6BoostDmg's gate names fight
+    -- $00, capture $06, bushido $07, steal $05, slot $0f and rage $10, so in
+    -- Ot6AbilityCost exactly the @dance and @boosted arms may reach
+    -- Ot6BoostPriceFor.  Each arm ends in a leaf call (Ot6StealCost,
+    -- Ot6DanceCost, Ot6RageCost, Ot6CostFor), so "does this arm escalate?"
+    -- is "are the four bytes after its leaf call a jsl Ot6BoostPriceFor?".
+    local function jsl(addr)              -- the 4 bytes of `jsl <addr>`
+      return { 0x22, addr & 0xff, (addr >> 8) & 0xff, (addr >> 16) & 0xff }
+    end
+    local function matches(ofs, bytes)
+      for i, b in ipairs(bytes) do
+        if H.readRomByte(ofs + i - 1) ~= b then return false end
+      end
+      return true
+    end
+    local function sites(lo, hi, bytes)   -- offsets of `bytes` in [lo, hi)
+      local t = {}
+      for o = lo, hi - #bytes do
+        if matches(o, bytes) then t[#t + 1] = o end
+      end
+      return t
+    end
+
+    local PRICE = jsl(H.sym("Ot6BoostPriceFor"))
+    local acLo = romOfs(H.sym("Ot6AbilityCost"))
+    local acHi = romOfs(H.sym("Ot6CostFor"))     -- the next proc in the file
+    H.assertEq(acHi > acLo, true,
+      "Ot6CostFor still follows Ot6AbilityCost, so [Ot6AbilityCost, "
+      .. "Ot6CostFor) is exactly the proc's own bytes")
+
+    local escalating = sites(acLo, acHi, PRICE)
+    local function armEscalates(leaf)
+      local at = sites(acLo, acHi, jsl(H.sym(leaf)))
+      local hits, n = 0, #at
+      for _, o in ipairs(at) do
+        if matches(o + 4, PRICE) then hits = hits + 1 end
+      end
+      return hits, n
+    end
+
+    local sHit, sN = armEscalates("Ot6StealCost")
+    H.assertEq(sN, 1, "one Ot6StealCost call in Ot6AbilityCost (the @steal arm)")
+    H.assertEq(sHit, 0,
+      "the @steal arm does NOT reach Ot6BoostPriceFor: cmd $05 is in "
+      .. "Ot6BoostDmg's gate, so Steal is flat at every boost level.  Boost "
+      .. "buys it the rare/guarantee ladder -- certainty across a spread of "
+      .. "outcomes, not magnitude -- and the BP already pays for that")
+
+    local rHit, rN = armEscalates("Ot6RageCost")
+    H.assertEq(rN, 1, "one Ot6RageCost call in Ot6AbilityCost (the @rage arm)")
+    H.assertEq(rHit, 0,
+      "the @rage arm does NOT reach Ot6BoostPriceFor either: cmd $10 is in "
+      .. "the same gate, and the boost buys the trance's coin")
+
+    local dHit, dN = armEscalates("Ot6DanceCost")
+    H.assertEq(dN, 1, "one Ot6DanceCost call in Ot6AbilityCost (the @dance arm)")
+    H.assertEq(dHit, 1,
+      "the @dance arm DOES reach Ot6BoostPriceFor -- cmd $13 is NOT in "
+      .. "Ot6BoostDmg's gate, so a boosted Dance really is multiplied and "
+      .. "really does pay 2.5x.  Dance and Rage sharing a base price is what "
+      .. "makes this pair the test of the rule rather than of a habit")
+
+    local cHit, cN = armEscalates("Ot6CostFor")
+    H.assertEq(cN, 2,
+      "two Ot6CostFor calls in Ot6AbilityCost: @swdtech and @boosted")
+    H.assertEq(cHit, 1,
+      "exactly one of them escalates -- @boosted (blitz $0a / tools $09, "
+      .. "outside the gate); @swdtech ($07, inside it) does not")
+
+    H.assertEq(#escalating, 2,
+      "Ot6AbilityCost reaches the escalation from exactly 2 of its arms, "
+      .. "@dance and @boosted.  That count IS the design rule: a verb's price "
+      .. "escalates exactly when Ot6BoostDmg multiplies it, and #219's four "
+      .. "call sites became two when the owner exempted the chance verbs")
+    H.log(string.format("Ot6AbilityCost: %d escalating arms (dance %d/%d, "
+      .. "boosted %d/%d); steal %d/%d and rage %d/%d flat",
+      #escalating, dHit, dN, cHit, cN, sHit, sN, rHit, rN))
+
+    -- The drawn price has to make the same split, or the menu and the charge
+    -- disagree.  Ot6KitRowCost's thief arm is now one flat tail-call, so the
+    -- proc holds exactly one escalation (blitz's), and Ot6ThiefListOpen's
+    -- Steal row stamps a bare Ot6ThiefCost with no price call at all.
+    local function jml(addr)
+      return { 0x5c, addr & 0xff, (addr >> 8) & 0xff, (addr >> 16) & 0xff }
+    end
+    local PEND_J, PEND_L = jsl(H.sym("Ot6PendPrice")), jml(H.sym("Ot6PendPrice"))
+    local krLo, krHi = romOfs(H.sym("Ot6KitRowCost")),
+                       romOfs(H.sym("Ot6BushidoRowGrey"))
+    local krN = #sites(krLo, krHi, PEND_J) + #sites(krLo, krHi, PEND_L)
+    H.assertEq(krN, 1,
+      "Ot6KitRowCost draws exactly one escalating ladder (blitz).  SwdTech "
+      .. "never did, and the thief arm no longer does: all three thief rows "
+      .. "take one flat tail-call now, so there is no dead per-row branch")
+    local tlLo, tlHi = romOfs(H.sym("Ot6ThiefListOpen")),
+                       romOfs(H.sym("Ot6ThiefIsNew"))
+    local tlN = #sites(tlLo, tlHi, PEND_J) + #sites(tlLo, tlHi, PEND_L)
+    H.assertEq(tlN, 0,
+      "Ot6ThiefListOpen stamps no escalated price at all -- the Steal row's "
+      .. "Ot6PendPrice call is gone, so the stamp, the per-draw price and the "
+      .. "charge are the same flat number")
+    H.log(string.format("menu side: Ot6KitRowCost %d escalating arm, "
+      .. "Ot6ThiefListOpen %d", krN, tlN))
   end),
 
   --------------------------------------- 5. the Serpent-Trench section -----

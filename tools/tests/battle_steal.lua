@@ -42,42 +42,31 @@ local function bp() return H.readByte(0x3E9C + locke*2) end
 local function pend() return H.readByte(0x3E9D + locke*2) end
 local function mp() return H.readWord(0x3C08 + locke*2) end
 
--- #219: Steal is a chance verb, so its price escalates with the boost --
--- min(99, floor(4 * 2.5^boost + 0.5)) = 4 / 10 / 25 / 63.  This test is about
--- the chance math and not the economy (battle_stealmp owns that), and a
--- boost-3 steal costs 63 against the ~37 MP LOCKE really carries here, so
--- each boosted arm below is funded by a LABELED isolation write, in the same
--- shape as the Sneak Ring bit further down: the pool is topped up to the
--- boosted price before the attempt and nothing else about the attempt is
--- touched.  Without it every 3-bp arm is refused by the universal
--- insufficient-MP fizzle, which is #219's ruling 2 working rather than the
--- tilt failing.
-local STEAL_BASE = 4               -- Ot6StealCost's immediate
-local function stealPrice(boost)
-  if boost == 0 then return STEAL_BASE end
-  local x = STEAL_BASE
+-- Steal's price is FLAT at every boost level, and this file leans on that:
+-- LOCKE plays the whole file out of the pool the fixture really gave him,
+-- with no top-up anywhere.
+--
+-- #219 made a boost cost 2.5x the base MP per level.  The owner then exempted
+-- the three chance verbs (Steal, Rage, Slot): a boost on them multiplies
+-- nothing, it converts variance into reliability across a spread of outcomes
+-- that are not merely damage, and the BP it costs is what pays for that
+-- certainty.  The rule is one test -- a price escalates exactly when
+-- Ot6BoostDmg multiplies the action -- and cmd $05 is in Ot6BoostDmg's gate,
+-- which is the same gate the third hook above already relies on.
+--
+-- While Steal did escalate, a 3-bp steal cost 63 MP against the ~37 LOCKE
+-- carries here, so every boosted arm had to be funded by a labeled isolation
+-- write and a `.writeWord(` waiver.  Both are gone: the exemption removed the
+-- reason, so it removed the waiver.  The price is asserted per attempt below
+-- instead of being paid for.
+local STEAL_FLAT = 4               -- Ot6StealCost's immediate, at every boost
+-- ...and what a boosted steal WOULD cost if it escalated, so each arm names
+-- the number it is refusing rather than merely not mentioning it.
+local function escalated(boost)
+  if boost == 0 then return STEAL_FLAT end
+  local x = STEAL_FLAT
   for _ = 1, boost do x = x * 5 end
   return math.min(99, (x + (1 << (boost - 1))) >> boost)
-end
--- Funded ADDITIVELY, by the surcharge the boost adds over a base steal, so
--- the pool lands exactly where an unboosted attempt would have left it and
--- the arms after this one still have the MP the fixture really gave him.
--- Setting the pool TO the price instead emptied it: measured 2026-09-17,
--- the two 3-bp arms left `mp=0`, every later bare attempt was refused by the
--- insufficient-MP fizzle, the drive never landed a roll, and the party was
--- ground down to `FAIL: GAME OVER fired` at f22550.
-local function fundBoost(boost)
-  local price = stealPrice(boost)
-  if boost == 0 then return end
-  local add = price - STEAL_BASE
-  local want = mp() + add
-  local maxmp = H.readWord(0x3C30 + locke*2)
-  if maxmp < want then H.writeWord(0x3C30 + locke*2, want) end
-  H.log(string.format("[fund] boost %d costs %d MP (#219) against a base %d; "
-    .. "LOCKE holds %d, so +%d -> %d (labeled isolation write: this arm "
-    .. "measures the tilt, not the price, and the charge still lands)",
-    boost, price, STEAL_BASE, mp(), add, want))
-  H.writeWord(0x3C08 + locke*2, want)
 end
 local function lockeHp() return H.readWord(0x3BF4 + locke*2) end
 local function stealRare(s)   return H.readByte(0x3308 + 8 + s*2) end
@@ -132,6 +121,16 @@ local function armWatches()
   emu.addMemoryCallback(function(_, v)
     if rec and rec.code >= 1 and v ~= NONE and not rec.done then rec.grant = v end
   end, emu.callbackType.write, 0x7E32F4, 0x7E32F4 + 18)
+  -- the mp-cost queue store (CreateAction), filtered to command $05: exactly
+  -- what Ot6AbilityCost handed back for this Steal, captured at the source.
+  -- battle_stealmp owns the economy; this file needs the number only to show
+  -- that every arm below -- including the 3-bp ones -- is paid for out of the
+  -- pool the fixture gave LOCKE, with no top-up.
+  emu.addMemoryCallback(function(_, v)
+    if rec and not rec.queued and H.readByte(0x3A7A) == 0x05 then
+      rec.qcost, rec.queued = v, true
+    end
+  end, emu.callbackType.write, 0x7E3620, 0x7E3620 + 0xFE)
 end
 
 -- ------------------------------------------------------ the menu drive --
@@ -202,8 +201,7 @@ local function oneSteal(tag, wantBp, wantPend)
   return H.repeatN(1, {
     H.call(function()
       drive.wantBp, drive.wantPend = wantBp, wantPend
-      fundBoost(wantPend)       -- once, up front: nothing re-tops the pool
-      newRec()                  --   afterwards, so the charge stays visible
+      newRec()
     end),
     H.driveUntil(function() return rec.done == true end, 30000, {
       H.call(function() H.setPad(decide()) end),
@@ -213,9 +211,26 @@ local function oneSteal(tag, wantBp, wantPend)
       local d = {}
       for _, w in ipairs(rec.draws) do d[#d+1] = tostring(w.roll) end
       H.log(string.format("[%s] code=%d grant=%s draws={%s} bp=%d pend=%d "
-        .. "mp=%d hp %s->%s", tag, rec.code, rec.grant and
+        .. "mp=%d qcost=%s hp %s->%s", tag, rec.code, rec.grant and
         string.format("%02X", rec.grant) or "nil", table.concat(d, ","),
-        bp(), pend(), mp(), tostring(rec.hp0), tostring(rec.hp1)))
+        bp(), pend(), mp(), tostring(rec.qcost), tostring(rec.hp0),
+        tostring(rec.hp1)))
+      -- The exemption, asserted on every single attempt this file makes,
+      -- boosted or not: a chance verb's price does not move with the boost.
+      -- This is what lets the whole file run on LOCKE's own pool.
+      H.assertEq(rec.qcost, STEAL_FLAT, string.format(
+        "[%s] a %d-bp Steal was queued at %d MP, the flat price%s.  Cmd $05 "
+        .. "is in Ot6BoostDmg's gate: the boost buys the rare/guarantee "
+        .. "ladder, which is odds and not magnitude, and the BP is what pays "
+        .. "for it", tag, wantPend, STEAL_FLAT,
+        wantPend > 0 and string.format(" -- not the %d an escalating verb "
+          .. "would have cost", escalated(wantPend)) or " (nothing pending)"))
+      if wantPend > 0 then
+        H.assertEq(STEAL_FLAT ~= escalated(wantPend), true, string.format(
+          "[%s] ...and at %d bp the two rules really do give different "
+          .. "numbers (%d vs %d), so that assertion can fail", tag, wantPend,
+          STEAL_FLAT, escalated(wantPend)))
+      end
     end),
     H.waitFrames(60),
   })

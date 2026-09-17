@@ -175,20 +175,30 @@ These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6_boost.asm),
 charged under the `OT6_MP_COSTS` build flag, which defaults ON, so the shipped
 ROM charges them (see mp-economy.md).
 
-**Every number in these tables is a base price.** Since #219, boosting an
-ability that is not Fight costs escalating MP: the row's price becomes
+**Every number in these tables is a base price for the rows that
+escalate.** Since #219, boosting an ability whose damage the boost
+multiplies costs escalating MP: the row's price becomes
 `min(99, floor(base * 2.5^boost + 0.5))`, i.e. x1 / x2.5 / x6.25 / x15.625
-for pending boost 0/1/2/3, capped at 99. Blitz and Tools escalate because
-boost buys them `Ot6BoostDmg`'s x2/x4/x8; Steal, Rage and Dance escalate
-because boost buys them odds or a multiplier; SwdTech does not, because its
-boost was already spent picking the row and the row is charged at its own
-price; Fight and Capture do not, because boost buys swings; and Filch and
-Bestow do not, because boost buys them nothing at all. The one arithmetic
-authority is `Ot6BoostPriceFor` (ff6/src/battle/ot6_boost.asm), which the
-drawn number, the grey, the confirm and the charge all reach, so they cannot
-disagree. The rule, the whole resulting table and the rulings behind it
-(the 99 cap flattening dear rows; an unaffordable boost greyed and refused)
-are in mp-economy.md's "Boosting costs MP".
+for pending boost 0/1/2/3, capped at 99.
+
+Who pays it is one test: **a price escalates exactly when `Ot6BoostDmg`
+multiplies it.** Blitz, Tools and Dance escalate, because their commands are
+outside `Ot6BoostDmg`'s gate and the boost buys them x2/x4/x8. Everything in
+that gate is flat, for its own reason: SwdTech, because the boost was already
+spent picking the row and the row is charged at its own price; Fight and
+Capture, because the boost buys swings; Filch and Bestow, because the boost
+buys them nothing at all; and **Steal, Rage and Slot**, the chance verbs,
+because the boost on them buys certainty across a spread of outcomes rather
+than magnitude, and the BP it costs is what pays for that (owner,
+2026-09-17). So Steal is 4 at every level and Rage is 8 at every level, while
+Dance — which shares Rage's base price of 8 — pays 8 / 20 / 50 / 99.
+
+The one arithmetic authority is `Ot6BoostPriceFor`
+(ff6/src/battle/ot6_boost.asm), which the drawn number, the grey, the confirm
+and the charge all reach, so they cannot disagree. The rule, the whole
+resulting table and the rulings behind it (the 99 cap flattening dear rows;
+an unaffordable boost greyed and refused) are in mp-economy.md's "Boosting
+costs MP".
 
 `Ot6BushidoTier` (ff6/src/battle/ot6_kits.asm)
 replaces the charge gauge's clock in `UpdateMenuState_37`; the window, its
@@ -247,10 +257,12 @@ submenu (the same route Blitz takes) that lists the three moving-window techs by
 name + MP cost, greyed when the caster can't afford the MP *or* the BP. It
 reuses the Tools window shell,
 `Ot6CostFor`, and `Ot6AbilityGrey`, with all cost/grey logic gated `.if
-OT6_MP_COSTS` so the nomp baseline is undisturbed. SwdTech is the one kit
-window whose rows do **not** take #219's 2.5x escalation, for the reason the
-row already exists: the boost is the row, so the row's own price is the
-escalation (`Ot6KitRowCost`'s bushido arm, and `Ot6AbilityCost`'s). The **cursor row is the boost
+OT6_MP_COSTS` so the nomp baseline is undisturbed. SwdTech's rows do **not**
+take #219's 2.5x escalation, for the reason the row already exists: the boost
+is the row, so the row's own price is the escalation (`Ot6KitRowCost`'s
+bushido arm, and `Ot6AbilityCost`'s). The thief window's three rows do not
+escalate either, for the chance-verb reason above, so Blitz is the only kit
+window `Ot6KitRowCost` prices through `Ot6PendPrice`. The **cursor row is the boost
 level** (row 0 = boost 1× … row 2 = boost 3×), so picking a stronger tech spends
 more BP. That keeps the numeral gauge's trade of BP for a stronger cut and
 makes it readable. Confirm banks `$3e9d = r` and reuses `Ot6BushidoTier` to latch the
