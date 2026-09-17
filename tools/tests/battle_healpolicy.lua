@@ -51,7 +51,9 @@
 --   9. the wipe verdict (#166, H.wipeVerdict) on gau_joined's stale-seat
 --      bytes and the Narshe descent's seven-marked party: seats come from
 --      the engine's actor table, LoseBattle's $3ebc bit 0 is a verdict on
---      its own, and bytes another module owns are never a wipe.
+--      its own, and bytes another module owns are never a wipe;
+--  14. the target graph (#189, H.newTargetGraph) on the Air Force's
+--      measured cursor, and a focus entry naming a part by species.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TONIC, POTION = 0xE8, 0xE9
@@ -547,6 +549,46 @@ H.run({ maxFrames = 3000 }, {
     b, why = H.keyBoost({ need = 0, chipsAt = { [0] = 2 }, bank = 2 })
     H.assertEq(b, nil, "a broken gauge is the unload's turn, not the key's (" .. why .. ")")
     H.log("battle_healpolicy: the keyed line's boost (#174) checked")
+  end),
+
+  -- 14. the target graph (#189, H.newTargetGraph) on the Air Force's
+  -- measured cursor: gun $04 --left--> body $01, --right--> the party,
+  -- up/down nothing; body $01 --down--> Missile Bay $10.  The rotation it
+  -- replaced gave up three times from the gun; the graph lands in three
+  -- presses and walks the known path on the next window.  And a focus
+  -- entry names a part by species (H.focusSlots over $1CB's words).
+  H.call(function()
+    local truth = {
+      ["mons=04"] = { left = "mons=01", right = "chars=01", up = "mons=04", down = "mons=04" },
+      ["mons=01"] = { left = "mons=01", right = "mons=04", up = "mons=01", down = "mons=10" } }
+    local G = H.newTargetGraph()
+    local goal = function(n) return n:sub(1, 5) == "mons=" and (tonumber(n:sub(6), 16) & 0x10) ~= 0 end
+    local mon = function(n) return n:sub(1, 5) == "mons=" end
+    local order = { "left", "down", "up", "right" }   -- the crossing (right) last
+    local cur, presses = "mons=04", {}
+    for _ = 1, 8 do
+      local d = G.route(cur, goal, mon, order)
+      if d == nil then break end
+      presses[#presses + 1] = d
+      G.record(cur, d, truth[cur][d])
+      cur = truth[cur][d]
+      if goal(cur) then break end
+    end
+    H.assertEq(cur, "mons=10", "the graph reaches the Missile Bay from the gun")
+    H.assertEq(table.concat(presses, ","), "left,left,down", "...by exploring the nearest node first")
+    local d, how, walk = H.newTargetGraph().route("mons=04", goal, mon, order)
+    H.assertEq(how, "explore", "a fresh graph explores")
+    d, how, walk = G.route("mons=04", goal, mon, order)
+    H.assertEq(how .. " " .. walk, "path left,down", "the next window walks the known path")
+    H.assertEq(G.record("mons=04", "left", "mons=01"), nil, "a confirmed edge is not news")
+    H.assertEq(G.record("mons=04", "left", "mons=04"), "changed", "a moved edge is")
+    local words = { [0] = 0x113, [1] = 0xFFFF, [2] = 0x145, [3] = 0x146, [4] = 0x147, [5] = 0xFFFF }
+    local fs = H.focusSlots({ { species = 0x147 }, { species = 0x146 }, { slot = 0, mask = 0x01 } }, words)
+    H.assertEq(#fs, 3, "three focus entries resolve")
+    H.assertEq(fs[1].slot .. "/" .. fs[1].mask, "4/16", "Missile Bay $147 is slot 4, mask $10")
+    H.assertEq(fs[2].slot .. "/" .. fs[2].mask, "3/8", "Speck $146 is slot 3 before it enters")
+    H.assertEq(fs[3].slot .. "/" .. fs[3].mask, "0/1", "the slot form still reads")
+    H.log("battle_healpolicy: the target graph and species focus (#189) checked")
   end),
 
   -- 8. the table was not skipped
