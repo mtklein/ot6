@@ -75,6 +75,7 @@ tools/tests/battle_runic.lua	.writeWord(
 tools/tests/battle_slots.lua	.writeByte(	quarantine: reels free-run at frame rate, so no input selects an icon on cue
 tools/tests/battle_slots.lua	.writeWord(	quarantine: reels free-run at frame rate, so no input selects an icon on cue
 tools/tests/battle_steal.lua	.writeByte(
+tools/tests/battle_steal.lua	.writeWord(	quarantine: #219 prices a boost-3 Steal at 63 MP and no fixture's LOCKE carries that (figaro_cleared gives him 37), so every boosted arm would be refused by the universal insufficient-MP fizzle; this file measures the rare/guarantee tilt and not the economy (battle_stealmp owns that), so the battle pool is topped up to the boosted price once per attempt and nothing re-tops it, leaving the charge, the roll and the slot pick under test untouched
 tools/tests/battle_subjob.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeWord(	quarantine: pass C banks real BP over ~20k frames while three allies idle in battle 72, and the fighting lineage's fixture wipes before the fold measurement lands; the clamp tops ally HP each drive pulse and never touches the lists, MP, BP, or queue under test
 tools/tests/battle_thief.lua	.writeWord(	quarantine: #122's RNG reshuffle makes the desert pair's chip damage lethal to a deferred party member over the file's one sustained (non-damaging) battle; the floor write never touches the BP ledger under test

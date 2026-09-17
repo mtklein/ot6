@@ -28,6 +28,16 @@
 --      row back at queue time; CreateAction banks it into $3620;
 --      InitPlayerAction stages it into $3a4c; CalcAttackEffect subtracts
 --      it from $3c08.
+--   4b. the boosted column (#219). Every priced row is a BASE price; a
+--      boosted use of an escalating verb costs
+--      min(99, floor(base * 2.5^boost + 0.5)). The whole table is
+--      recomputed from this ROM's own base column and held to the
+--      rulings the design locks: the 99 cap, the flattening it causes
+--      for dear rows, Bum Rush already sitting at the cap, and the
+--      eight SwdTech rows exempt because their boost was spent picking
+--      the row. The ceiling constant is read out of Ot6BoostPriceFor
+--      itself, so a ROM that capped somewhere else fails here rather
+--      than in a play test.
 --   5. the Serpent-Trench section. gau_joined is the entry point
 --      gen_sabin_trench.lua boots from, so the trio's pools are read live
 --      out of the fixture and every ability each has learned at that
@@ -288,6 +298,118 @@ H.run({ maxFrames = 20000 }, {
         .. "spell id $32 (Antdot), not $18", SCAN_ID, SCAN_MP))
     H.log(string.format("magic: %d published prices pinned (%d authored by "
       .. "OT6); Scan = %d", checked, ot6, SCAN_MP))
+  end),
+
+  ------------------------------------------ 4b. the boosted column (#219) --
+  H.call(function()
+    -- The one arithmetic authority is Ot6BoostPriceFor (ot6_boost.asm):
+    --   price = min(99, floor(base * 2.5^boost + 0.5))
+    -- exact in integers as (base * 5^n + 2^(n-1)) >> n.  Recomputed here
+    -- rather than copied, so it is checkable against the base column this
+    -- ROM really ships.
+    local function boosted(b, n)
+      if n == 0 then return b end
+      local x = b
+      for _ = 1, n do x = x * 5 end
+      x = (x + (1 << (n - 1))) >> n
+      return math.min(ANCHOR, x)
+    end
+
+    -- The ceiling lives in the ROM, not in this script: Ot6BoostPriceFor
+    -- ends its scale arm with `cmp #100 / bcc + / lda #99` under a 16-bit
+    -- accumulator, so the immediates are C9 64 00 / 90 xx / A9 63 00.
+    local pf, capAt = romOfs(H.sym("Ot6BoostPriceFor")), nil
+    for i = 0, 0x7f do
+      if H.readRomByte(pf + i) == 0xc9 and H.readRomByte(pf + i + 1) == 0x64
+         and H.readRomByte(pf + i + 2) == 0x00
+         and H.readRomByte(pf + i + 3) == 0x90
+         and H.readRomByte(pf + i + 5) == 0xa9 then
+        capAt = pf + i + 6
+        break
+      end
+    end
+    H.assertEq(capAt ~= nil, true,
+      "Ot6BoostPriceFor still ends its scale arm with `cmp #100 / bcc / "
+      .. "lda #imm` -- the ceiling is read out of the ROM below, so a "
+      .. "rewritten tail has to be re-read here rather than assumed")
+    H.assertEq(H.readRomByte(capAt), ANCHOR, string.format(
+      "the boosted-price ceiling in the ROM is %d.  It is a DISPLAY bound, "
+      .. "not a taste question: the price drawers render two digits, so a "
+      .. "boosted price over %d prints as punctuation (#219, ruling 1)",
+      ANCHOR, ANCHOR))
+
+    -- Steal and the possess verbs are leaves, not table rows; read their
+    -- immediates at the source the same way step 3b does.
+    local steal = H.readRomByte(romOfs(H.sym("Ot6StealCost")) + 1)
+    local dance = H.readRomByte(romOfs(H.sym("Ot6DanceCost")) + 1)
+    -- Which columns escalate is the design's own split, not a free choice:
+    -- SwdTech's boost was already spent picking the row, so its column is
+    -- flat at the base price; everything else here buys a multiplier (Blitz,
+    -- Tools) or odds (Steal, Rage, Dance) and takes the 2.5x.
+    local rows = {}
+    for _, kit in ipairs({ { "Blitz", BLITZ, true }, { "SwdTech", SWDTECH, false },
+                           { "Tools", TOOLS, true } }) do
+      for _, r in ipairs(kit[2]) do
+        rows[#rows + 1] = { kit[1], r[3], r[1], nil, kit[3] }
+      end
+    end
+    rows[#rows + 1] = { "Steal", "Steal", nil, steal, true }
+    rows[#rows + 1] = { "Possess", "Dance/Rage", nil, dance, true }
+
+    local tbl = romOfs(H.sym("Ot6AbilityCostTbl"))
+    local function liveCost(key)
+      for i = 0, 63 do
+        local k = H.readRomByte(tbl + i * 2)
+        if k == 0xff then return nil end
+        if k == key then return H.readRomByte(tbl + i * 2 + 1) end
+      end
+    end
+    local atCap, exempt = 0, 0
+    for _, r in ipairs(rows) do
+      local b = r[4] or liveCost(r[3])
+      H.assertEq(b ~= nil and b > 0, true, r[2] .. " has a base price")
+      local c = {}
+      for n = 0, 3 do c[n + 1] = r[5] and boosted(b, n) or b end
+      H.log(string.format("boost   %-8s %-13s %3d %3d %3d %3d%s",
+        r[1], r[2], c[1], c[2], c[3], c[4], r[5] and "" or "   (flat)"))
+      H.assertEq(c[1], b, r[2] .. ": boost 0 is the base price, untouched")
+      if not r[5] then
+        exempt = exempt + 1
+        H.assertEq(c[4], b, r[2] .. ": SwdTech does not escalate -- its boost "
+          .. "bought the row, and the row is charged at its own price")
+      end
+      for i = 2, 4 do
+        assert(c[i] <= ANCHOR, string.format(
+          "%s at boost %d costs %d -- above the %d ceiling; every OT6 price "
+          .. "drawer renders two digits", r[2], i - 1, c[i], ANCHOR))
+        assert(c[i] >= c[i - 1], string.format(
+          "%s costs %d at boost %d but %d at boost %d -- a dearer boost must "
+          .. "never be cheaper", r[2], c[i], i - 1, c[i - 1], i - 2))
+      end
+      if b == ANCHOR and r[5] then
+        atCap = atCap + 1
+        H.assertEq(c[4], ANCHOR, r[2] .. " is already at the cap and stays "
+          .. "there at every boost (#219, ruling 1: accepted, not a bug)")
+      end
+    end
+    H.assertEq(exempt, 8, "the eight SwdTech rows are the exempt column")
+    H.assertEq(atCap, 1,
+      "one escalating row (Bum Rush) ships at the cap and therefore never "
+      .. "moves; Cleave is the other, and it is exempt for a different reason")
+
+    -- The points the design names by number, so a rounding change cannot
+    -- pass unnoticed.
+    H.assertEq(boosted(4, 1), 10, "4 MP at boost 1 is 10 (4 x 2.5)")
+    H.assertEq(boosted(4, 2), 25, "4 MP at boost 2 is 25 (4 x 6.25)")
+    H.assertEq(boosted(4, 3), 63,
+      "4 MP at boost 3 is 63 (62.5, rounded half up)")
+    H.assertEq(boosted(50, 1), ANCHOR,
+      "Spiraler's 50 hits the cap at boost 1 -- the named consequence of "
+      .. "ruling 1")
+    H.assertEq(boosted(15, 2), 94,
+      "Drain's 15 at boost 2 is 94 (93.75, rounded half up)")
+    H.log(string.format("boosted column: %d priced rows recomputed and held "
+      .. "to the %d cap", #rows, ANCHOR))
   end),
 
   --------------------------------------- 5. the Serpent-Trench section -----

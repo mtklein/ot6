@@ -41,6 +41,34 @@ local locke
 local function bp() return H.readByte(0x3E9C + locke*2) end
 local function pend() return H.readByte(0x3E9D + locke*2) end
 local function mp() return H.readWord(0x3C08 + locke*2) end
+
+-- #219: Steal is a chance verb, so its price escalates with the boost --
+-- min(99, floor(4 * 2.5^boost + 0.5)) = 4 / 10 / 25 / 63.  This test is about
+-- the chance math and not the economy (battle_stealmp owns that), and a
+-- boost-3 steal costs 63 against the ~37 MP LOCKE really carries here, so
+-- each boosted arm below is funded by a LABELED isolation write, in the same
+-- shape as the Sneak Ring bit further down: the pool is topped up to the
+-- boosted price before the attempt and nothing else about the attempt is
+-- touched.  Without it every 3-bp arm is refused by the universal
+-- insufficient-MP fizzle, which is #219's ruling 2 working rather than the
+-- tilt failing.
+local STEAL_BASE = 4
+local function stealPrice(boost)
+  if boost == 0 then return STEAL_BASE end
+  local x = STEAL_BASE
+  for _ = 1, boost do x = x * 5 end
+  return math.min(99, (x + (1 << (boost - 1))) >> boost)
+end
+local function fundBoost(boost)
+  local price = stealPrice(boost)
+  if boost == 0 or mp() >= price then return end
+  local maxmp = H.readWord(0x3C30 + locke*2)
+  if maxmp < price then H.writeWord(0x3C30 + locke*2, price) end
+  H.log(string.format("[fund] boost %d costs %d MP (#219) and LOCKE holds "
+    .. "%d -- topping the battle pool up to %d (labeled isolation write: "
+    .. "this arm measures the tilt, not the price)", boost, price, mp(), price))
+  H.writeWord(0x3C08 + locke*2, price)
+end
 local function lockeHp() return H.readWord(0x3BF4 + locke*2) end
 local function stealRare(s)   return H.readByte(0x3308 + 8 + s*2) end
 local function stealCommon(s) return H.readByte(0x3309 + 8 + s*2) end
@@ -164,7 +192,8 @@ local function oneSteal(tag, wantBp, wantPend)
   return H.repeatN(1, {
     H.call(function()
       drive.wantBp, drive.wantPend = wantBp, wantPend
-      newRec()
+      fundBoost(wantPend)       -- once, up front: nothing re-tops the pool
+      newRec()                  --   afterwards, so the charge stays visible
     end),
     H.driveUntil(function() return rec.done == true end, 30000, {
       H.call(function() H.setPad(decide()) end),

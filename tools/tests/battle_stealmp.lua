@@ -7,9 +7,16 @@
 
 --   * ON  (build/ot6.sfc, the suite default): a Steal is queued at cost 4
 --     (Ot6AbilityCost's flat path), deducts 4 MP when it executes, and a caster
---     below 4 MP is refused: the universal insufficient-mp fizzle
+--     below that is refused: the universal insufficient-mp fizzle
 --     (CalcAttackEffect) skips the steal effect, so no item is taken and MP is
 --     not driven negative.
+--     Since #219 the 4 is a BASE price: Steal is a chance verb, boost buys it
+--     the rare/guarantee ladder (Ot6StealBoostLevel / Ot6StealSlot), so a
+--     boosted Steal costs min(99, floor(4 * 2.5^boost + 0.5)) -- 4 / 10 / 25 /
+--     63.  Both arms below are boosted, so both measure that price rather than
+--     the flat one: the affordable arm at boost 2 (25 of LOCKE's real 37-MP
+--     pool) and the refusal arm at boost 3 (63, which no pool in this fixture
+--     reaches, which is ruling 2 working).
 --   * OFF (ff6/rom/ff6-en-nomp.sfc, handed in via OT6_ROM): Ot6AbilityCost is
 --     not assembled, so cmd $05 keeps vanilla's 0 and the identical Steal is
 --     free, deducting 0 MP. The refusal half has nothing to refuse and is
@@ -30,7 +37,26 @@ local ST_CMD, ST_THIEF, ST_ITEM, ST_TGT, ST_TRANS = 0x05, 0x30, 0x0A, 0x38, 0x01
 local CMD_STEAL, CMD_ITEM = 0x05, 0x01
 local NONE = 0xFF
 local TONIC, POTION = 0xE8, 0xE9
-local STEAL_COST = 4                     -- Ot6StealCost's immediate
+local STEAL_COST = 4                     -- Ot6StealCost's immediate, the BASE
+
+-- #219's one rule, recomputed rather than copied: Ot6BoostPriceFor does
+-- (base * 5^n + 2^(n-1)) >> n capped at 99, which is
+-- min(99, floor(base * 2.5^n + 1/2)).
+local function stealPrice(boost)
+  if boost == 0 then return STEAL_COST end
+  local x = STEAL_COST
+  for _ = 1, boost do x = x * 5 end
+  return math.min(99, (x + (1 << (boost - 1))) >> boost)
+end
+
+-- The affordable arm boosts to 2 rather than 3.  Boost 3 is the structural
+-- guarantee (Ot6StealBoostLevel clamps the level to $ff so vanilla's own
+-- `bcs` fires), but it now costs 63 and LOCKE joins this fixture with 37, so
+-- it is exactly the refusal the third arm measures.  Boost 2 adds 90 to the
+-- thief level, and TargetEffect_52 takes its `bmi` shortcut -- an outright
+-- steal, no roll -- whenever level + 90 + $32 - target level >= 128, which
+-- the arm asserts off live RAM before it presses A rather than assuming.
+local AFFORD_BOOST, REFUSE_BOOST = 2, 3
 
 local mode                               -- "on" (charges) | "off" (free)
 local locke
@@ -285,12 +311,24 @@ H.run({ maxFrames = 150000 }, {
     armWatches()
     mp0 = mp()
     if mode == "on" then
-      H.assertEq(mp0 >= STEAL_COST, true,
-        "his real pool affords the priced steal")
+      H.assertEq(mp0 >= stealPrice(AFFORD_BOOST), true, string.format(
+        "his real pool (%d MP) affords the boost-%d steal (%d MP)",
+        mp0, AFFORD_BOOST, stealPrice(AFFORD_BOOST)))
     end
     drive.target = rareT
+    -- the guarantee premise, off live RAM: thief level + the boost's 90 +
+    -- TargetEffect_52's own $32, less the target's level, has to reach 128
+    -- for the `bmi` outright-steal shortcut (battle_main.asm:9574)
+    local lvT = H.readByte(0x3B18 + locke * 2)
+    local lvM = H.readByte(0x3B18 + 8 + rareT * 2)
+    local margin = lvT + 90 + 0x32 - lvM
+    H.log(string.format("guarantee premise: LOCKE LV%d +90 +$32 - target LV%d "
+      .. "= %d (needs >= 128 for the outright steal)", lvT, lvM, margin))
+    H.assertEq(margin >= 128, true,
+      "boost 2 carries this steal past TargetEffect_52's bmi shortcut, so the "
+      .. "grant below is a guarantee and not a roll")
   end),
-  oneSteal("affordable steal (real pool)", 3, 3),
+  oneSteal("affordable steal (real pool)", AFFORD_BOOST, AFFORD_BOOST),
   H.call(function()
     local left = mp()
     H.log(string.format("affordable steal: queued cost %s, MP %d -> %d, granted %s",
@@ -298,9 +336,12 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(rec.grant ~= nil, true,
       "the steal executed and took an item (both builds)")
     if mode == "on" then
-      H.assertEq(rec.qcost, STEAL_COST,
-        "ON: Ot6AbilityCost priced cmd $05 at 4 (flat path)")
-      H.assertEq(left, mp0 - STEAL_COST, "ON: the steal deducted exactly 4 MP")
+      H.assertEq(rec.qcost, stealPrice(AFFORD_BOOST), string.format(
+        "ON: Ot6AbilityCost priced a boost-%d cmd $05 at %d, the base %d times "
+        .. "2.5 per level (#219)", AFFORD_BOOST, stealPrice(AFFORD_BOOST),
+        STEAL_COST))
+      H.assertEq(left, mp0 - stealPrice(AFFORD_BOOST), string.format(
+        "ON: the steal deducted exactly %d MP", stealPrice(AFFORD_BOOST)))
     else
       H.assertEq(rec.qcost, 0, "OFF: cmd $05 keeps vanilla's 0 (Ot6AbilityCost absent)")
       H.assertEq(left, mp0, "OFF: the steal is FREE -- vanilla behavior, the control")
@@ -399,12 +440,15 @@ H.run({ maxFrames = 150000 }, {
     H.fieldCare({ tag = "before the refusal battle", threshold = 0.9 }),
     enterDesertBattle(2),
     H.call(function() drive.target = rareT end),
-    oneSteal("unaffordable steal (earned poverty)", 3, 3, 400),
+    oneSteal("unaffordable steal (earned poverty)", REFUSE_BOOST,
+      REFUSE_BOOST, 400),
     H.call(function()
       local left = mp()
       H.log(string.format("unaffordable steal: queued cost %s, MP stayed %d, granted %s",
         tostring(rec.qcost), left, tostring(rec.grant)))
-      H.assertEq(rec.qcost, STEAL_COST, "ON: the gate still priced cmd $05 at 4")
+      H.assertEq(rec.qcost, stealPrice(REFUSE_BOOST), string.format(
+        "ON: the gate priced this boost-%d cmd $05 at %d (#219)",
+        REFUSE_BOOST, stealPrice(REFUSE_BOOST)))
       H.assertEq(rec.grant, nil,
         "ON: too little MP is REFUSED -- no item taken (fizzled), though the "
         .. "3-bp guarantee means it could not have missed")

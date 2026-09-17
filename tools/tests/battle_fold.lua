@@ -24,6 +24,8 @@ local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_MAGIC, ST_TGT, ST_TRANS = 0x05, 0x0E, 0x38, 0x01
 local CMD_MAGIC = 0x02
 local FIRE, FIRE2, FIRE2_MP = 0x00, 0x05, 20
+local CURE, CURE2_MP = 0x2D, 25          -- the other family head she knows
+local FIRE_MP, CURE_MP = 4, 5            -- their own base prices
 local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
 
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end
@@ -39,6 +41,27 @@ local function spellIndexOf(slot, id)
   for i = 0, 53 do
     local a = 0x2092 + SPELL_PTR[slot] + i*4
     if H.readByte(a) == id and (H.readByte(a + 1) & 0x80) == 0 then return i end
+  end
+  return nil
+end
+-- the whole cost column of a caster's list: 79 rows (the esper row plus 54
+-- spells and 24 lores), entry+3, the one cell the number, the grey, the
+-- confirm and the charge all read.  Ot6FoldPrices rewrites this column on
+-- every recheck, so a snapshot before and after the boost edge says exactly
+-- which rows the walk touched.
+local LIST_ROWS = 79
+local function costColumn(slot)
+  local t = {}
+  for i = 0, LIST_ROWS - 1 do
+    local a = 0x208E + SPELL_PTR[slot] + i*4
+    t[i] = { id = H.readByte(a), cost = H.readByte(a + 3) }
+  end
+  return t
+end
+local function rowOfSpell(slot, id)
+  for i = 0, LIST_ROWS - 1 do
+    local a = 0x208E + SPELL_PTR[slot] + i*4
+    if i > 0 and H.readByte(a) == id then return i end
   end
   return nil
 end
@@ -123,7 +146,7 @@ end
 
 local plan, idx, goal = nil, 1, { 82, 56 }
 
-H.run({ maxFrames = 45000 }, {
+H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
@@ -172,6 +195,52 @@ H.run({ maxFrames = 45000 }, {
       queued[#queued + 1] = value
     end, emu.callbackType.write, 0x7e3620, 0x7e371f)
     armDamageWatch()
+    _G.__col0 = costColumn(terra)
+    _G.__fireRow = rowOfSpell(terra, FIRE)
+    _G.__cureRow = rowOfSpell(terra, CURE)
+    H.assertEq(_G.__fireRow ~= nil and _G.__cureRow ~= nil, true,
+      "her list really holds rows for Fire and Cure, the two family heads "
+      .. "the boost below re-prices")
+    H.log(string.format("unboosted column: Fire row %d = %d MP, Cure row "
+      .. "%d = %d MP", _G.__fireRow, _G.__col0[_G.__fireRow].cost,
+      _G.__cureRow, _G.__col0[_G.__cureRow].cost))
+    H.assertEq(_G.__col0[_G.__fireRow].cost, FIRE_MP,
+      "Fire's row opens at its own 4")
+    H.assertEq(_G.__col0[_G.__cureRow].cost, CURE_MP,
+      "Cure's row opens at its own 5")
+  end),
+
+  -- The price column, across the R edge.  Ot6FoldPrices walks all 79 rows
+  -- since #219 (it has to: a spell outside a tier family now escalates
+  -- x2.5 per boost rather than folding), so the regression this guards is
+  -- the walk itself -- a column that moved a row it had no business
+  -- moving, or missed one it did.  Exactly two rows may change here,
+  -- because Fire and Cure are the only spells this party knows and both
+  -- are family heads: they go to their folded tiers' own prices, and the
+  -- other 77 rows stay byte-for-byte where battle init left them.
+  H.driveUntil(function() return pend(terra) >= 1 end, 8000, {
+    H.call(function() H.setPad(decide()) end),
+  }, "one real R edge arms the boost"),
+  H.release(),
+  H.waitFrames(30),
+  H.call(function()
+    local col1 = costColumn(terra)
+    local moved = {}
+    for i = 0, LIST_ROWS - 1 do
+      if col1[i].cost ~= _G.__col0[i].cost then
+        moved[#moved + 1] = string.format("row %d ($%02x) %d -> %d",
+          i, col1[i].id, _G.__col0[i].cost, col1[i].cost)
+      end
+    end
+    H.log("rows the boost re-priced: " .. table.concat(moved, ", "))
+    H.assertEq(#moved, 2, "exactly two rows moved -- the 79-row walk touched "
+      .. "Fire's and Cure's and nothing else")
+    H.assertEq(col1[_G.__fireRow].cost, FIRE2_MP,
+      "Fire's row now carries Fire 2's own 20 -- the number, the grey and "
+      .. "the confirm read this cell, so all three follow the fold")
+    H.assertEq(col1[_G.__cureRow].cost, CURE2_MP,
+      "Cure's row now carries Cure 2's own 25.  A tier family does NOT take "
+      .. "#219's 2.5x escalation: the fold IS its escalation")
   end),
   -- One real R edge arms pending 1; the live list then queues the fold.
   -- The drive stops once the cast is charged (mp changed) rather than once
