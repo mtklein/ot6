@@ -27,6 +27,18 @@
 -- EDGAR's MithrilBlade is the party's slash ($0a, ot6_class.asm:57),
 -- SABIN's fists and Pummel cover bludgeon, LOCKE and CELES cover pierce.
 
+-- The one thing in the pool that kills (#195, docs/design/zozo-grind.md):
+-- Iron Fist's AI (ai_script.asm:855) is `if_num_monsters 1: attack BATTLE,
+-- STONE, STONE` -- alone on the stage it casts Stone ($9F, power 40, hit
+-- 75, Muddle) two turns in three, and Stone's target effect $22
+-- (battle_main.asm TargetEffect_22) adds 14 to the damage multiplier when
+-- the caster's level equals the target's: x8.  Iron Fist is L15, so a L15
+-- member takes ~1400 from a cast that lands 240..300 on anyone else; every
+-- other body here swings for 100-180.  Formation $064 (Vulture + Iron
+-- Fist, 31.25% of group 10) is where it happens: the Vulture in slot 0
+-- has three shields, the driver's target order kills it first, and the
+-- Iron Fist is left alone.  GRIND.focus puts the Iron Fist first.
+
 -- Shape of the walk, and why it is segmented.  HANDOFF's rule is that a
 -- world walk which fights its encounters needs a care stop BETWEEN battles
 -- or it wipes, because in-battle healing is bounded by turns and a field
@@ -58,6 +70,23 @@
 -- band the higher level asks for (shop 22 sells no Tonic).
 local H = dofile("tools/tests/lib/ot6.lua")
 
+-- ------------------------------------------------------------- the policy --
+-- The levers the Zozo grind lab measured (#195, docs/design/zozo-grind.md;
+-- tools/tests/zozogrindlab.py derives one variant per policy by rewriting
+-- this table).  Each field is one thing a person at the controller decides.
+local GRIND = {
+  crossingCare = 0.9,    -- the care stop after every crossing hop
+  lapCare = 0.6,         -- the care stop after every grind lap
+  careThreshold = 0.65,  -- worldNavTo's care after every battle (the lib's default)
+  healPercent = 60,      -- the fight driver's in-battle top-up threshold
+  bank = nil,            -- the driver's BP bank (nil = its default); 0 spends every pip as it comes
+  keyed = nil,           -- nil = the keyed chip line; false = the plain boost-Fight default
+  tools = nil,           -- nil = EDGAR's Tools line (the AutoCrossbow, both bodies); false = none
+  rows = { [5] = true }, -- who stands in the back row (EDGAR and CELES already do)
+  focus = "ironfist",    -- "ironfist": kill order puts Iron Fists first (their solo branch is Stone); nil = the driver's order
+  gentle = nil,          -- { untilLevel = L }: grind on the group-9 column by the castle first, to L, then cross
+}
+
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id)
@@ -88,6 +117,7 @@ end
 -- levelling are legible step by step rather than only at the end.
 local POTION, TONIC, FENIX = 0xE9, 0xE8, 0xF0
 local LOCKE, CELES = 1, 6
+local IRON_FIST = 0x06C
 
 local function invCount(id)
   for i = 0, 255 do
@@ -123,6 +153,52 @@ local function where(tag)
   H.log(string.format("[%s] %s", tag, rosterLine()))
 end
 
+-- ------------------------------------------------------ the fight driver --
+-- worldNavTo builds its driver from a fixed option list (tactical, boost,
+-- items, healPercent, bank, reserve, healer, magic, summon, nuke, tool,
+-- blitz); the keyed line and the kill order are not on it.  This wrapper is
+-- the generator's driver config: every driver the walk builds gets
+-- GRIND.keyed, and with GRIND.focus = "ironfist" a kill order recomputed
+-- every frame from the stage -- the Iron Fists first, by species, so the
+-- last body standing is a Vulture (whose solo branch is Special / Shimsham,
+-- power 8) or a Mind Candy (which has no solo branch), never the Stone
+-- caster.  The mask bit is the slot's (set_target_data, btlgfx_main.asm:
+-- $7B7E & $1F is the command's monster target byte); traceTgt logs every
+-- confirm's masks so a wrong bit reads as a "focus steer gave up" line.
+local lib_newFightDriver = H.newFightDriver
+H.newFightDriver = function(tag, opts)
+  opts = opts or {}
+  if GRIND.keyed ~= nil then opts.keyed = GRIND.keyed end
+  if GRIND.tools ~= nil then opts.tools = GRIND.tools end
+  if GRIND.focus == "ironfist" then opts.traceTgt = true end
+  local F = lib_newFightDriver(tag, opts)
+  if GRIND.focus == "ironfist" then
+    local frame, said = F.frame, nil
+    F.frame = function(...)
+      -- species by the full-width formation word ($57C0, M.FORMATION):
+      -- monsterIds()'s high bit reads wrong here (Vulture $02A as $12A)
+      local focus, names = {}, {}
+      for s = 0, 5 do
+        if H.readWord(H.FORMATION + s * 2) == IRON_FIST
+           and H.readWord(0x3BFC + s * 2) > 0 then
+          focus[#focus + 1] = { slot = s, mask = 1 << s }
+          names[#names + 1] = string.format("slot %d", s)
+        end
+      end
+      opts.focus = #focus > 0 and focus or nil
+      local line = #focus > 0 and table.concat(names, ",") or "none"
+      if line ~= said then
+        said = line
+        H.log(string.format("[%s] focus: Iron Fist first -- %s", tag, line))
+      end
+      return frame(...)
+    end
+    local idle = F.idle
+    F.idle = function(...) said = nil; return idle(...) end
+  end
+  return F
+end
+
 -- The care stop between fights.  Potions are reserved down to three because
 -- the fight driver spends them inside a battle; the walk may not empty the
 -- bag on top-ups.  CELES is the only caster here (Ice, Cure, Antdot at
@@ -130,7 +206,7 @@ end
 -- MP in full on level up (ot6_progression.asm:3-6), so MP spent between
 -- fights on a grind is refunded and a Tonic is not.
 local function care(tag, threshold)
-  return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.9,
+  return H.fieldCare({ tag = "care " .. tag, threshold = threshold or GRIND.crossingCare,
                        reserve = { [POTION] = 3 } })
 end
 
@@ -143,7 +219,8 @@ local function walk(x, y, what, opts)
       return string.format("%s -> world (%d,%d): %s", what, x, y, rosterLine())
     end),
     H.worldNavTo(x, y, { maxFrames = 40000, playBattles = "tactical",
-                         healPercent = 60, healer = CELES,
+                         healPercent = GRIND.healPercent, healer = CELES,
+                         bank = GRIND.bank, careThreshold = GRIND.careThreshold,
                          reserve = { [POTION] = 3 },
                          arrive = opts.arrive }),
     H.release(),
@@ -192,12 +269,13 @@ local function lap(n)
     walk(34, 112, "grind lap " .. n .. " south"),
     walk(34, 99, "grind lap " .. n .. " north"),
     H.call(function() grindLaps = n; where("grind lap " .. n) end),
-    -- 0.6, not the crossing's 0.9: no Tonic shop is reachable from here
-    -- (Jidoor's shop 22 sells none), and the first grind at 0.9 drank the
-    -- bag from 75 to 0 by lap 52 (46 of the 84 Tonics at the lap stop,
-    -- build/attempts/zozo_arrival-attempt1.log) while every level-up
-    -- refills HP anyway.  The post-battle care (0.65) still runs.
-    care("grind lap " .. n, 0.6),
+    -- GRIND.lapCare (0.6), not the crossing's 0.9: no Tonic shop is
+    -- reachable from here (Jidoor's shop 22 sells none), and the first
+    -- grind at 0.9 drank the bag from 75 to 0 by lap 52 (46 of the 84
+    -- Tonics at the lap stop, build/attempts/zozo_arrival-attempt1.log)
+    -- while every level-up refills HP anyway.  The post-battle care
+    -- (GRIND.careThreshold) still runs.
+    care("grind lap " .. n, GRIND.lapCare),
   }, {})
 end
 
@@ -212,6 +290,81 @@ local function grind()
         "(lowest L%d)", LEVEL_TARGET, grindLaps, minLevel()))
   end)
   return seq(steps)
+end
+
+-- The gentle laps (GRIND.gentle): the column x=30, y=53..61 north of the
+-- crossing's first hop is world battle group 9 (Red Fang L14 x2 / Red Fang
+-- + Vulture + Red Fang / Vulture x2, 270..430 experience, no Iron Fist:
+-- build/lab/zozo-grind/zones.log, the zone grid read the way
+-- CheckBattleWorld reads it), so a party that grinds there to L16 walks the
+-- Iron Fist ground with nobody at the Stone's level.
+local gentleLaps = 0
+local function gentleLap(n)
+  local L = GRIND.gentle and GRIND.gentle.untilLevel or 0
+  return H.cond(function() return minLevel() < L end, {
+    H.logStep(function()
+      return string.format("gentle lap %d: min L%d (until L%d) %s f%d", n,
+        minLevel(), L, rosterLine(), H.frame)
+    end),
+    walk(30, 53, "gentle lap " .. n .. " north"),
+    walk(30, 61, "gentle lap " .. n .. " south"),
+    H.call(function() gentleLaps = n; where("gentle lap " .. n) end),
+    care("gentle lap " .. n, GRIND.lapCare),
+  }, {})
+end
+local function gentle()
+  if not GRIND.gentle then return H.call(function() end) end
+  local steps = { walk(30, 61, "gentle column") }
+  for n = 1, 120 do steps[#steps + 1] = gentleLap(n) end
+  steps[#steps + 1] = H.call(function()
+    H.log(string.format("[gentle] %d laps: min L%d (until L%d), f%d",
+      gentleLaps, minLevel(), GRIND.gentle.untilLevel, H.frame))
+  end)
+  return seq(steps)
+end
+
+-- The step off an approach tile onto a world entrance, played rather than
+-- held blind.  worldNavTo counts the approach tile reached the frame the
+-- party aligns on it, and the encounter roll for that tile (CheckBattleWorld,
+-- world/move.asm:876-883) resolves a few frames later; the old step held
+-- DOWN through whatever came up (the #195 baseline sweep, seed 2: "timeout
+-- after 4000 frames driving toward into Jidoor (map 198)" with a Vulture +
+-- Iron Fist on the screen).  A battle here is fought by the same driver the
+-- walk uses, and the care stop runs on the far side of the door.
+local enteredAfterBattle = {}
+local function enterDoor(dir, m, what)
+  local F, inBattle = nil, false
+  return seq({
+    H.call(function() enteredAfterBattle[what] = false end),
+    H.driveUntil(function()
+      return not H.worldMode() and map() == m and not H.battleLoadStarted()
+    end, 30000, {
+      H.call(function()
+        if H.battleLoadStarted() then
+          if not F then
+            F = H.newFightDriver(what, { tactical = true, boost = true, items = true,
+              healPercent = GRIND.healPercent, bank = GRIND.bank, healer = CELES,
+              reserve = { [POTION] = 3 } })
+          end
+          inBattle, enteredAfterBattle[what] = true, true
+          F.frame()
+        else
+          if inBattle then F.idle(); inBattle = false end
+          if H.worldMode() and H.worldHasControl() and H.worldAligned()
+             and bright() >= 15 then
+            H.setPad({ dir })
+          elseif H.worldMode() then
+            H.setPad({})
+          end
+        end
+      end),
+    }, what),
+    H.release(),
+  })
+end
+local function careIfFought(what, threshold)
+  return H.cond(function() return enteredAfterBattle[what] end,
+    { care("after the fight at " .. what, threshold) }, {})
 end
 
 local function door(nx, ny, dir, m, what)
@@ -252,7 +405,7 @@ H.run({ maxFrames = 1200000 }, {
   -- physical crossing.  LOCKE stays in front because his Fight chips the
   -- generated pierce/slash rows; EDGAR and CELES already inherit back-row
   -- assignments from the Narshe defense.
-  H.setRows({ [5] = true }, { tag = "Zozo crossing rows" }),
+  H.setRows(GRIND.rows, { tag = "Zozo crossing rows" }),
 
   -- 3. off the castle onto the world: row y=43 is the exit
   H.navTo(28, 42, { maxFrames = 12000, playBattles = "tactical" }),
@@ -268,6 +421,9 @@ H.run({ maxFrames = 1200000 }, {
       H.worldX(), H.worldY()))
     where("west landing")
   end),
+
+  -- 3b. the gentle laps, when the policy asks for them
+  gentle(),
 
   -- 4. south-west to (34,99), fighting, with a care stop every 12 steps.
   crossing(),
@@ -302,11 +458,10 @@ H.run({ maxFrames = 1200000 }, {
   --     49 Tonics x 50 HP = 2450 HP = 9 Potions at 300.
   walk(27, 129, "Jidoor approach",
        { arrive = function() return not H.worldMode() end }),
-  H.driveUntil(function() return not H.worldMode() and map() == 198 end, 4000, {
-    H.hold({ "down" }), H.waitFrames(4),
-  }, "into Jidoor (map 198)"),
+  enterDoor("down", 198, "into Jidoor (map 198)"),
   H.waitUntil(landed(198, 10), 2400, "Jidoor up", 1),
   H.waitFrames(60),
+  careIfFought("into Jidoor (map 198)", GRIND.crossingCare),
   H.call(function()
     H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 22")
     where("Jidoor")
@@ -355,11 +510,10 @@ H.run({ maxFrames = 1200000 }, {
   walk(22, 91, "zozo approach",
        { arrive = function() return not H.worldMode() end }),
   care("outside Zozo", 0.95),
-  H.driveUntil(function() return not H.worldMode() and map() == 221 end, 900, {
-    H.hold({ "down" }), H.waitFrames(4),
-  }, "onto Zozo's entrance tile"),
+  enterDoor("down", 221, "onto Zozo's entrance tile"),
   H.waitUntil(landed(221, 10), 1500, "Zozo street up", 1),
   H.waitFrames(30),
+  careIfFought("onto Zozo's entrance tile", 0.95),
   H.call(function()
     H.assertEq(map(), 221, "on the Zozo exterior (map 221)")
     H.log(string.format("[zozo_arrival] f%d at (%d,%d)",
