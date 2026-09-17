@@ -53,6 +53,13 @@ KEEP_EXT = {
     ".log", ".txt", ".tsv", ".csv", ".json", ".jsonl", ".out", ".err",
     ".md", ".lua", ".py", ".sh", ".ninja", ".diff", ".patch", ".stamp",
     ".yaml", ".yml", ".ini", ".cfg",
+    # A run's captured console.  This one was missing on the first real use
+    # and the tool skipped 29 of them out of a branch whose report cited
+    # them by name (build/attempts/steal_2.console, waiver_gate_probe...),
+    # which is precisely the failure #222 exists to prevent.  The lesson is
+    # that the filter is a promise about citations, so a suffix a report can
+    # cite belongs here rather than in the skip tally.
+    ".console",
 }
 # Screenshots are evidence too (a FAIL line names its frame), but they are
 # binary and unbounded, so they ride the size cap.
