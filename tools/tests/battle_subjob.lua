@@ -76,11 +76,14 @@ local function bagIdxOf(ids)
   return nil
 end
 
--- vanilla XP thresholds: 8*sum(LevelUpExp[0..L-1]) to leave L
-local LEVELUP_EXP = { 4,8,14,24,34,48,62,79, 99,120,143,169,195,224,257,289 }
+-- XP thresholds: 8*sum(LevelUpExp[0..L-1]) to leave L, the sum
+-- CheckLevelUp (battle_main.asm) takes over the ROM's own 98-word table
+-- (event.asm LevelUpExp), read here so any fixture level works.
+local LEVELUP_EXP_ROM = H.sym("LevelUpExp") & 0x3FFFFF
 local function neededXp(L)
+  assert(L >= 1 and L < 99, "a level-up needs 1 <= L < 99, got " .. tostring(L))
   local s = 0
-  for i = 1, L do s = s + LEVELUP_EXP[i] end
+  for i = 0, L - 1 do s = s + H.readRomWord(LEVELUP_EXP_ROM + 2 * i) end
   return 8 * s
 end
 
@@ -462,8 +465,9 @@ H.run({ maxFrames = 150000 }, {
     H.writeByte(XPB,     v         & 0xff)
     H.writeByte(XPB + 1, (v >> 8)  & 0xff)
     H.writeByte(XPB + 2, (v >> 16) & 0xff)
-    H.log(string.format("[D] L=%d stamina=%d mag.pwr=%d, xp pinned one level over",
-      R.lvl0, R.stam0, R.magp0))
+    H.log(string.format("[D] L=%d stamina=%d mag.pwr=%d, xp pinned one level over (%d, ROM LevelUpExp[0..2] = %d %d %d)",
+      R.lvl0, R.stam0, R.magp0, v, H.readRomWord(LEVELUP_EXP_ROM),
+      H.readRomWord(LEVELUP_EXP_ROM + 2), H.readRomWord(LEVELUP_EXP_ROM + 4)))
   end),
   H.clearBattle(20000),
   H.waitFrames(40),
