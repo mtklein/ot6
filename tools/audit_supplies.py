@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Report a fixture that lost its last revive crossing a boundary, and warn
-where the bag is under the Potion band.
+where the bag is under the Potion band or the Tonic band.
 
 Flags a fixture with zero Fenix Downs whose predecessor (named by the graph's
 `prev=` or `checkpoint=` edge) carried some; a root fixture is not audited.
@@ -17,6 +17,13 @@ that generates `wor_landing`, its `also=` siblings included, and anything
 downstream of it), where the party, the shops and the level curve are all
 different.  A fixture under the band is a WARNING (listed, exit code
 unaffected); the fix is a `POTION to N` line at the shop stop before it.
+
+The Tonic band (the same section, #210): Tonics are the field-care heal,
+carried at ~level x5 (cap 99) from the first town that sells them --
+Figaro Castle's shop 4, bought in `gen_edgar`'s run (the `figaro_intro`
+row and its `also=` siblings) -- to the same WoR landing.  Under it is a
+WARNING too; the fix is a `TONIC to N` line at a shop that sells them, or,
+where the route reaches none, the Potion target sized for the field care.
 
 Usage:  python3 tools/audit_supplies.py [--repo .] [--selftest] [-v]
 Exit 0 clean, 1 if a fixture dropped to no revives across a boundary, or if a
@@ -39,6 +46,7 @@ WAIVERS = "tools/supply_waivers.txt"
 
 FENIX_DOWN = 0xF0                      # the WoB's only revival, item id $F0
 POTION = 0xE9                          # the in-combat heal, item id $E9
+TONIC = 0xE8                           # the field-care heal, item id $E8
 INV_IDS = 0x1869 - 0x1600             # inventory ids, offset past the char table
 INV_QTY = 0x1969 - 0x1600             # inventory counts, one byte each
 
@@ -47,6 +55,10 @@ INV_QTY = 0x1969 - 0x1600             # inventory counts, one byte each
 # Figaro's shop 8 stock none (shop_prop.dat), so the band applies from here.
 FIRST_POTION_SHOP = "train_done"
 POTION_BAND_MIN = 10
+# The graph row whose run first buys Tonics (Figaro Castle's shop 4); the
+# row's `also=` artifacts carry the row name, so all three are in band.
+FIRST_TONIC_SHOP_ROW = "figaro_intro"
+TONIC_BAND_CAP = 99
 # The band is a WoB band: the graph row that generates this state (with its
 # `also=` artifacts, escape_start today) and everything downstream of it is
 # the World of Ruin, out of band.
@@ -77,6 +89,12 @@ def potion_band(level: int) -> int:
     return max(POTION_BAND_MIN, -(-3 * level // 2))
 
 
+def tonic_band(level: int) -> int:
+    """Tonics the bag should carry at this party level: ~level x5, capped
+    at 99 (a bag slot's count)."""
+    return min(TONIC_BAND_CAP, 5 * level)
+
+
 def party_level(raw: bytes, cb: int):
     """The active party's highest level, or None if none is flagged active."""
     levels = [m["level"] for m in party_at(raw, cb) if m.get("active")]
@@ -96,6 +114,7 @@ def bag_of_mss(path: str):
     if cb is None:
         return None, "character table not located"
     return {"fenix": revives_in(raw, cb), "potion": count_in(raw, cb, POTION),
+            "tonic": count_in(raw, cb, TONIC),
             "level": party_level(raw, cb)}, None
 
 
@@ -158,6 +177,29 @@ def past_first_potion_shop(name: str, states: dict) -> bool:
             return True
         name = edge["prev"]
     return False
+
+
+def past_first_tonic_shop(name: str, states: dict) -> bool:
+    """Whether the Tonic band applies: the fixture's `prev` chain reaches a
+    fixture of FIRST_TONIC_SHOP_ROW's run, or ends at a checkpoint (every
+    tracked checkpoint is cut downstream of Figaro Castle)."""
+    seen = set()
+    while name and name not in seen:
+        seen.add(name)
+        edge = states.get(name)
+        if edge is None:
+            return False
+        if edge.get("row") == FIRST_TONIC_SHOP_ROW:
+            return True
+        if edge["checkpoint"] and not edge["prev"]:
+            return True
+        name = edge["prev"]
+    return False
+
+
+def in_tonic_band(name: str, states: dict) -> bool:
+    """The Tonic band applies from Figaro Castle's shop to the WoR landing."""
+    return past_first_tonic_shop(name, states) and not in_world_of_ruin(name, states)
 
 
 def in_world_of_ruin(name: str, states: dict) -> bool:
@@ -227,6 +269,10 @@ def selftest(repo: str = ".") -> int:
     check("band at L14 (the train merchant)", potion_band(14), 21)
     check("band at L15 (Mobliz) rounds up", potion_band(15), 23)
     check("band at L27 (the FC entry)", potion_band(27), 41)
+    # the Tonic band: ~level x5, capped at 99
+    check("tonic band at L8 (Figaro Castle)", tonic_band(8), 40)
+    check("tonic band at L19 (Zozo)", tonic_band(19), 95)
+    check("tonic band at L20 caps", tonic_band(20), 99)
 
     # Checked against mrf-save-room-v1, which carries two Fenix Downs.
     cps = dict(checkpoint_payloads(repo))
@@ -234,15 +280,16 @@ def selftest(repo: str = ".") -> int:
         ok = False
         print("  SELFTEST FAIL mrf-save-room-v1 not among tracked checkpoints")
     else:
-        # 13 pins the FIGHTING lineage's re-cut B (2026-09-01); the fled
-        # lineage's payload carried 2.  The pin is the checkpoint reader's
+        # 20 pins the #198 re-cut (832740ee, from the regenerated
+        # ifrit_entry); re-cut B (2026-09-01) carried 13 and the fled
+        # lineage's payload 2.  The pin is the checkpoint reader's
         # regression canary, so it tracks whatever the sealed payload
         # truly holds.
         n, err = revives_of_sram(cps["mrf-save-room-v1"])
-        if err or n != 13:
+        if err or n != 20:
             ok = False
             print(f"  SELFTEST FAIL revives_of_sram(mrf-save-room-v1) "
-                  f"should read 13 Fenix Downs, got {err or n}")
+                  f"should read 20 Fenix Downs, got {err or n}")
 
     # Sanity-check: the graph loads with edges.
     states, _ = load_graph(repo)
@@ -266,6 +313,17 @@ def selftest(repo: str = ".") -> int:
               in_potion_band("fc_alcove", states), True)
         check("but not the WoR landing (wor_landing)",
               in_potion_band("wor_landing", states), False)
+        # the Tonic band starts at Figaro Castle's shop, gen_edgar's row
+        check("no Tonic band before Figaro Castle (figaro_entry)",
+              in_tonic_band("figaro_entry", states), False)
+        check("the Tonic band covers gen_edgar's own artifacts (figaro_cleared)",
+              in_tonic_band("figaro_cleared", states), True)
+        check("and the Locke scenario downstream (celes_freed)",
+              in_tonic_band("celes_freed", states), True)
+        check("and a checkpoint-rooted fixture (narshe_mission)",
+              in_tonic_band("narshe_mission", states), True)
+        check("but not the WoR landing (wor_landing)",
+              in_tonic_band("wor_landing", states), False)
         check("nor its row-mate, the escape's first frame (escape_start)",
               in_potion_band("escape_start", states), False)
         check("a fixture before the train is not in the WoR either (forest_done)",
@@ -311,7 +369,7 @@ def main() -> int:
             return n, f"checkpoint {cp}", err
         return None, "root", "no predecessor"
 
-    scanned, skipped, cliffs, short = 0, [], [], []
+    scanned, skipped, cliffs, short, tshort = 0, [], [], [], []
     for name in sorted(declared):
         path = os.path.join(args.dir, name + ".mss")
         if not os.path.exists(path):
@@ -326,6 +384,10 @@ def main() -> int:
             band = potion_band(bag["level"])
             if bag["potion"] < band:
                 short.append((name, bag["potion"], band, bag["level"]))
+        if in_tonic_band(name, states) and bag["level"] is not None:
+            tband = tonic_band(bag["level"])
+            if bag["tonic"] < tband:
+                tshort.append((name, bag["tonic"], tband, bag["level"]))
         edge = states.get(name, {"prev": None, "checkpoint": None})
         pred, label, perr = predecessor_revives(edge)
         if perr:
@@ -370,6 +432,20 @@ def main() -> int:
                       f"< band {band} (L{level})")
         else:
             print("    " + " ".join(n for n, _, _, _ in short))
+
+    if tshort:
+        print(f"  WARNING: {len(tshort)} fixture(s) under the Tonic band "
+              f"(~level x5, cap {TONIC_BAND_CAP}; the field-care heal, "
+              f"docs/design/level-curve.md) -- top up with a TONIC to N "
+              f"line at a shop that sells them, or size the Potion target "
+              f"for the field care where none is reachable"
+              + ("" if args.verbose else "; -v lists them") + ":")
+        if args.verbose:
+            for name, have, band, level in tshort:
+                print(f"    TONIC SHORT   {name:26s} tonic={have:3d} "
+                      f"< band {band} (L{level})")
+        else:
+            print("    " + " ".join(n for n, _, _, _ in tshort))
 
     stale = sorted(waivers - used)
     if stale:
