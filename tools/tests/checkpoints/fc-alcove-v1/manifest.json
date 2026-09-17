@@ -2,18 +2,18 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "fc-alcove.sram",
   "size": 32768,
-  "sha256": "6d282f808d4853b255904298a96dcd3de59322723a41107ece74d496bc1fe404",
+  "sha256": "d7d60fb2903217d74e9558828dd37335b4fda36673da8e97a2839367463cc3c5",
   "slot": 3,
   "milestone": "fc-alcove",
   "persistent_layout": "ot6-codex-o8-v1",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "6d282f808d4853b255904298a96dcd3de59322723a41107ece74d496bc1fe404",
-    "generator_sig": "333363f5f97bf52a79e9adc9b18f14f6b97aca5ef1b19976fd08791ae74820f6 gen_fc_alcove tools/tests/checkpoints/fc-landing-v1/manifest.json tools/tests/checkpoints/fc-landing-v1/fc-landing.sram",
+    "payload_sha256": "d7d60fb2903217d74e9558828dd37335b4fda36673da8e97a2839367463cc3c5",
+    "generator_sig": "ac4511168bc03cf18ca7d967eb706bac3eff185b4f8fdeafcfe86270c60c7e41 gen_fc_alcove tools/tests/checkpoints/fc-landing-v1/manifest.json tools/tests/checkpoints/fc-landing-v1/fc-landing.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/fc-landing-v1/manifest.json",
-        "sha256": "7f6ae6b1739e138d69fc6ac627fcb040cbce4ebcee85221f54152b55ea14d2ac"
+        "sha256": "919932cee36f0e401bbfc51174c62e031c11da56296b20967b1e989cf76b84f2"
       }
     ]
   }

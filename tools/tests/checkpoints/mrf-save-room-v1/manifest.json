@@ -2,17 +2,17 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "mrf-save-room.sram",
   "size": 32768,
-  "sha256": "afbbae80e223b105d04beeda1b4903fa56381da1f12ada16bc6fc101403040ff",
+  "sha256": "fed3ff0f0ce6681dff414f8127b222c5301d4ac546c186e7e3926d41bfdbe130",
   "slot": 3,
   "milestone": "mrf-save-room",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "afbbae80e223b105d04beeda1b4903fa56381da1f12ada16bc6fc101403040ff",
-    "generator_sig": "ef72b6e26287e5efb062cab276e5df15ca8f886e31f30c338ec2877aa8dcb72e gen_mrf_save_room_checkpoint",
+    "payload_sha256": "fed3ff0f0ce6681dff414f8127b222c5301d4ac546c186e7e3926d41bfdbe130",
+    "generator_sig": "78291552368907eaec2d901e1dae674cbb695604a7c939cdb7b961ae09520298 gen_mrf_save_room_checkpoint",
     "ancestors": [
       {
         "path": "build/states/ifrit_entry.stamp",
-        "sha256": "0d7bff7e12f528c579bea24bb7a7219a448bb589717a42cb2ac30b73f64a7e23"
+        "sha256": "4aab28a704639679dcb4943d7932a473d087698fe9adaecdb4e6e9d6503fce6b"
       }
     ]
   },

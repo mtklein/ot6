@@ -2,18 +2,18 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "thamasa-done.sram",
   "size": 32768,
-  "sha256": "6b83f1dbaf6f2a74002a3bbbc05d8608675d76493a15bc3308a9634b75e38c49",
+  "sha256": "c703492882baefe50fd68afeaa5c7ac46e99ce5ec41526e82b23de7180fd6d2e",
   "slot": 3,
   "milestone": "thamasa-done",
   "persistent_layout": "ot6-codex-o8-v1",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "6b83f1dbaf6f2a74002a3bbbc05d8608675d76493a15bc3308a9634b75e38c49",
-    "generator_sig": "c1424c7a7d668417396a7dde9a2e65c3e6aa86cc508bfddf402d976fadb9900c gen_massacre tools/tests/checkpoints/ultros-won-v1/manifest.json tools/tests/checkpoints/ultros-won-v1/ultros-won.sram",
+    "payload_sha256": "c703492882baefe50fd68afeaa5c7ac46e99ce5ec41526e82b23de7180fd6d2e",
+    "generator_sig": "570ec1e5b7be07c84f8f84c288cbe2f45a5c2e792da9e6a5869e08bb7f7cae61 gen_massacre tools/tests/checkpoints/ultros-won-v1/manifest.json tools/tests/checkpoints/ultros-won-v1/ultros-won.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/ultros-won-v1/manifest.json",
-        "sha256": "32d3331efa8065443c6ca0ff9deeab60db2a370e260f7a1b85e96972237ac17e"
+        "sha256": "eff96cf05ece41971cf27b2f6135a25a54fff6785a78078dfc6084e5f5dd5c11"
       }
     ]
   }
