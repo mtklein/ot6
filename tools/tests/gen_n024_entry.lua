@@ -123,6 +123,16 @@ local function lap(n)
       return string.format("grind lap %d: min L%d (target L%d) %s f%d", n,
         minLevel(), LEVEL_TARGET, rosterLine(), H.frame)
     end),
+    -- The row is six tiles, so a lap with no encounter is the previous
+    -- lap's frames again, and the no-progress watchdog reads novelty:
+    -- ten quiet laps (~1900 frames) tripped it in all three attempts of
+    -- the first run (build/test-runs/n024_entry.fnIdR7dB, "nothing has
+    -- moved for 1808 frames" while the ring shows x=4..9..4 walking).
+    -- Declared per lap, so a lap that really stalls still trips once this
+    -- lapses; navTo's walk budget stays the backstop.
+    H.call(function()
+      H.watchQuiet(1200, n == 1 and "grind laps walk the same six tiles" or nil)
+    end),
     H.navTo(4, 7, GRIND_NAV),
     H.navTo(9, 7, GRIND_NAV),
     H.call(function() grindLaps = n end),
