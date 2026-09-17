@@ -371,6 +371,28 @@ local function osmoseLanded()
   end
   return nil
 end
+-- The windows each line acts on are named in decide(); every other
+-- $7BC2 value is the engine moving between them -- $17 while the item
+-- list scrolls a row, $41/$40 while a target window opens and closes, $09
+-- and $0f/$10 while a list opens.  These lines used to press B in all of
+-- them, and B there backs out of the line's own selection: on the #177
+-- lineage's n024_entry Locke's Tonic (row 22) cost a B at every scrolled
+-- row and 12 target windows cancelled in their opening frame (f4190..f4702,
+-- 2026-09-17), the bench held the menu ~600 frames a turn, Celes's
+-- post-Osmose window never came, and two Magnitude8s ($BC, f6786/f7576)
+-- wiped the party.  So an unhandled state gets no press until it has
+-- stood BACKOUT_F frames (a window nobody drives), and then one B.
+local BACKOUT_F = 90
+local lastSt, lastAct, lastStF = nil, nil, 0
+local backouts = 0
+local function settle(act, st)
+  if H.frame - lastStF < BACKOUT_F then return nil end
+  backouts = backouts + 1
+  lastStF = H.frame
+  H.log(string.format("[settle f%d] actor=%d: menu state $%02x stood %d frames with no line driving it -- B",
+    H.frame, act, st, BACKOUT_F))
+  return "b"
+end
 local function decide()
   heartbeat()
   if H.readByte(MENU) == 0 then
@@ -380,6 +402,10 @@ local function decide()
   mf = mf + 1
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
+  -- How long the menu has sat in this state: an unhandled state is the
+  -- engine between windows and gets no press until it has stood still
+  -- for BACKOUT_F frames (settle below).
+  if st ~= lastSt or act ~= lastAct then lastSt, lastAct, lastStF = st, act, H.frame end
   if st == ST_TRANS then return {} end
   -- One cadence for every window, the item list included.  The item list
   -- used to walk at one press per 30 frames; this fixture's battle mode is
@@ -403,7 +429,7 @@ local function decide()
       -- target screen already open, a bare "a" here confirmed that Fight
       -- on the boss (party2 cmd=00 tgt=0100 at f2422, 2026-09-07)
       btn = summonArmed[locke] and "a" or "b"
-    else btn = "b" end
+    else btn = settle(act, st) end
     if st == ST_CMD then summonArmed[locke] = nil end
     return btn and { [btn] = true } or {}
   end
@@ -445,10 +471,12 @@ local function decide()
       local p = plans[act]
       if p and p.kind == "fight" then btn = steerAlly(p.target)
       else btn = tc.steer(p and p.target, mf) end
-    else btn = "b" end
+    else btn = settle(act, st) end
   elseif act == celes then
     if celesMode == "defer" then
-      btn = (st == ST_CMD) and "x" or "b"
+      if st == ST_CMD then btn = "x"
+      elseif st == ST_ITEM or st == ST_MAGIC or st == ST_ESPER or st == ST_TGT then btn = "b"
+      else btn = settle(act, st) end
     elseif celesMode == "summon" then
       if st == ST_CMD then
         local want = cmdRowOf(celes, CMD_MAGIC)
@@ -462,7 +490,7 @@ local function decide()
         else btn = "up" end
       elseif st == ST_ESPER then btn = "a"; summonArmed[celes] = true
       elseif st == ST_TGT then btn = summonArmed[celes] and "a" or "b"   -- as Locke's
-      else btn = "b" end
+      else btn = settle(act, st) end
       if st == ST_CMD then summonArmed[celes] = nil end
     elseif celesMode == "cast" then
       if st == ST_CMD then
@@ -498,7 +526,7 @@ local function decide()
           end
           btn = tc.steer(worst, mf)
         else btn = "a" end
-      else btn = "b" end
+      else btn = settle(act, st) end
     else                                   -- "park": open her list and hold
       if st == ST_CMD then
         local want = cmdRowOf(celes, CMD_MAGIC)
@@ -507,7 +535,7 @@ local function decide()
         else btn = (cur < want) and "down" or "up" end
       elseif st == ST_MAGIC then btn = nil
       elseif st == ST_ESPER then btn = "b"
-      else btn = "b" end
+      else btn = settle(act, st) end
     end
   end
   return btn and { [btn] = true } or {}
