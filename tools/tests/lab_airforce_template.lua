@@ -112,6 +112,10 @@ local POLICIES = {
   pods_bank0  = with({ focus = FOCUS_PODS, bank = 0 }),
   -- care threshold: heal earlier
   heal70   = with({ healPercent = 70 }),
+  -- bay with a per-frame target-window trace (TGTWATCH below): the focus
+  -- steer's presses and what the window shows after each, for the #189
+  -- steer finding.  Observation only; the policy is bay's.
+  bay_trace = with({ focus = FOCUS_BAY }),
   -- TERRA's attack line: she knows no Bolt (bake: spells 00,04,05,2D,30,
   -- 32 = Fire, Drain, Fire2, Cure, Life, Antdot), so the gen's Bolt line
   -- never fires for her and her free turns are bare Fights; Fire2 ($05)
@@ -153,6 +157,24 @@ local function partyLine()
     pHp(0), pHp(1), pHp(2), pBp(0), pBp(1), pBp(2), pSt2(0), pSt2(1), pSt2(2))
 end
 local function isAF() return H.formationHas({ [AF] = true }) end
+-- TGTWATCH (policy names ending _trace): every frame the battle menu sits
+-- in target select ($7BC2 = $38), log the change of the monster mask
+-- ($7B7E), the party mask ($7B7D), the target group ($7ACE) or the pad the
+-- engine latched ($4218/$4219 read side-effect-free off snesDebug).
+local TGTWATCH = POLICY:sub(-6) == "_trace"
+local tgtLast = nil
+local function tgtWatch(t)
+  if not TGTWATCH then return end
+  local st = H.readByte(0x7BC2)
+  if st ~= 0x38 then tgtLast = nil; return end
+  local pad = emu.read(0x4218, emu.memType.snesDebug) | (emu.read(0x4219, emu.memType.snesDebug) << 8)
+  local sig = string.format("mons=%02X chars=%02X grp=%02X pad=%04X actor=%d",
+    H.readByte(0x7B7E), H.readByte(0x7B7D), H.readByte(0x7ACE), pad, H.readByte(0x62CA) & 3)
+  if sig ~= tgtLast then
+    H.log(string.format("[tgtwatch] t=%d %s", t, sig))
+    tgtLast = sig
+  end
+end
 local function isUltros() return H.formationHas({ [ULTROS4] = true, [CHUPON] = true }) end
 
 -- the seed every InitBattle draws, read off the `sta $be` store the way
@@ -243,6 +265,7 @@ local function fight()
       if H.partyWipedInBattle() then wipedN = wipedN + 1 else wipedN = 0 end
       if wipedN >= 300 then lost, why = true, "wiped"; return true end
       if t >= CAP then lost, why = true, "cap"; return true end
+      tgtWatch(t)
       lastMon, lastMp, lastBp = monLine(), string.format("%d,%d,%d", pMp(0), pMp(1), pMp(2)),
                                 string.format("%d,%d,%d", pBp(0), pBp(1), pBp(2))
       fenixLive = bagNow(FENIX_DOWN, fenixLive or fenix0)
