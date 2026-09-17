@@ -87,6 +87,7 @@ end
 -- 3-byte total experience.  Printed at every hop so the walk's damage and
 -- levelling are legible step by step rather than only at the end.
 local POTION, TONIC, FENIX = 0xE9, 0xE8, 0xF0
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
 local LOCKE, CELES = 1, 6
 
 local function invCount(id)
@@ -321,6 +322,10 @@ H.run({ maxFrames = 1200000 }, {
   H.buyItem(FENIX, 5, function() return 20 - invCount(FENIX) end,
     "FENIX DOWN to 20"),
   H.shopClose("Jidoor item shop"),
+  -- #197: the combat items back on top of the bag after every purchase
+  -- (the fight driver found the Potion at row 43 downstream of a stop
+  -- that did not re-arrange)
+  H.bagArrange({ POTION, FENIX, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Jidoor item shop)" }),
   H.call(function()
     H.log(string.format("[shop] Jidoor done: %s", rosterLine()))
     H.assertEq(invCount(POTION) >= 39, true, "Potions at 39 leaving Jidoor -- the L18 band plus field care")

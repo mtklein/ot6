@@ -52,6 +52,7 @@ local function liveMonsters()
 end
 local DRIED_MEAT, TONIC, POTION, TINCTURE, ETHER, FENIX_DOWN =
   0xFE, 0xE8, 0xE9, 0xEB, 0xEC, 0xF0
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
 local function mstateMenu() return H.readByte(0x0026) end
 local function inState(s) return function() return mstateMenu() == s end end
 local function invSlot(id)
@@ -1388,6 +1389,15 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
   buyItem(TONIC, 1, function() return 99 - invCount(TONIC) end, "TONIC to 99"),
   tapUntil("b", inState(0x25), "options again"),
   tapUntil("b", function() return H.hasControl() end, "shop closed", 2400),
+  -- #197: the combat items back on top of the bag after every purchase
+  -- (the fight driver found the Potion at row 43 downstream of a stop
+  -- that did not re-arrange)
+  -- Dried Meat first: prepareFeed's moveMeatToFront wants it at slot 0 for
+  -- GAU's feed and gets it there by an Item-menu SWAP, which sent a Potion
+  -- arranged to slot 0 to the meat's old slot at the bag's end (the trench
+  -- ride steered "row 0 -> 21" to it); with the meat already first that
+  -- move is skipped and the Potion rides at slot 1, one press away.
+  H.bagArrange({ DRIED_MEAT, POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Mobliz item shop)" }),
   H.call(function()
     H.assertEq(invSlot(DRIED_MEAT) ~= nil, true, "Dried Meat in the bag")
     H.assertEq(invCount(FENIX_DOWN) >= 6, true,

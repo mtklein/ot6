@@ -12,6 +12,7 @@ local function sw(id)
 end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 
@@ -112,6 +113,10 @@ H.run({ maxFrames = 90000 }, {
       H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
   end),
   H.shopClose("Narshe item shop"),
+  -- #197: the combat items back on top of the bag after every purchase
+  -- (the fight driver found the Potion at row 43 downstream of a stop
+  -- that did not re-arrange)
+  H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Narshe item shop)" }),
   H.call(function()
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 15, true, "Fenix Downs at 15 for the Zozo stretch")
     H.assertEq(H.invCountOf(TONIC) >= 90, true, "Tonics topped up for the field care")

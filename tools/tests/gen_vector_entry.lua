@@ -99,6 +99,7 @@ end
 -- is not allowed to do.
 local EMPTY = 0xFF
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local CH_LOCKE, CH_CELES = 1, 6
@@ -280,6 +281,10 @@ H.run({ maxFrames = 160000 }, {
       H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
   end),
   H.shopClose("Albrook item shop"),
+  -- #197: the combat items back on top of the bag after every purchase
+  -- (the fight driver found the Potion at row 43 downstream of a stop
+  -- that did not re-arrange)
+  H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Albrook item shop)" }),
   H.call(function()
     H.assertEq(H.invCountOf(POTION) >= 35, true,
       "the party leaves Albrook with 35 Potions -- the L18 band plus the factory's measured spend and field care")

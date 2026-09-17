@@ -8,6 +8,7 @@ local ZMENUSTATE = 0x26
 local TERRA, LOCKE, STRAGO, SHADOW = 0, 1, 7, 3
 local FIRE_ROD, ICE_ROD = 0x35, 0x36
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local ANTIDOTE, REMEDY = 0xF2, 0xF5
 local ICE_SPELL = 0x01
 local saveArg = nil
 
@@ -1166,6 +1167,10 @@ local steps = {
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 20, true, "Fenix Downs at 20")
   end),
   shopClose("Thamasa item shop"),
+  -- #197: the combat items back on top of the bag after every purchase
+  -- (the fight driver found the Potion at row 43 downstream of a stop
+  -- that did not re-arrange)
+  H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Thamasa item shop)" }),
   crossDoor(36, 45, 343, 26, 39, "item shop door 347(36,45)->343(26,39), return"),
 
   -- ---- 3. the inn: door, innkeeper, the whole fire scene -----------------
