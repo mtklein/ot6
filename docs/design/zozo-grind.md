@@ -297,8 +297,23 @@ The arrival bag is `tonic=55 potion=39 fenix=21`.
 The 6-seed sweep, before and after (retries off, every seed a first try):
 
 ```
-FILL-SWEEP
+                 baseline                                    post-fix
+seed shift   verdict frames  class    deaths Fenix   verdict frames  deaths Fenix
+   0     0   FAIL    136894  wipe          9     5   PASS    190854       0     0
+   1    10   PASS    201529                6     6   PASS    200324       0     0
+   2    20   FAIL    209734  timeout       9     8   PASS    193082       0     0
+   3    30   PASS    210180                5     5   PASS    192244       0     0
+   4    40   FAIL    195440  timeout      12    12   PASS    197676       0     0
+   5    50   PASS    219965               12    11   PASS    199774       0     0
+             3/6 seeds passed; 53 deaths, 47 used $F0      6/6 seeds passed; 0, 0
 ```
+
+(`sweep-baseline/summary.tsv`, `sweep-postfix/summary.tsv`; deaths and
+Fenix are grep counts of `[death]` and `used $F0` in each seed's log.)  No
+post-fix seed drew a battle on a door step (`[care after the fight at` 0
+times), so `enterDoor`'s battle branch is not exercised by these runs; the
+two baseline timeouts are passes after the change because the seeds moved,
+not because that branch was proven.
 
 ## #194: the deaths holding BP
 
