@@ -454,13 +454,21 @@ end
 -- each, positions at $3F4C..$3F51, MSB mask at $3F52.
 --
 -- monstersPresent() counts the present mask ($3F45 low six bits), and
--- monsterIds() decodes the six ID bytes plus their MSBs.  For a monster's
+-- monsterIds() decodes the six ID bytes plus their MSBs.  Both are the
+-- formation's OPENING line-up, copied once at load and never updated
+-- (#177): "the battle has occupants" and "which formation is this" are
+-- theirs to answer; what stands on stage now is M.stageSlots.  For a monster's
 -- SPECIES (0..383) prefer OT6_SPECIES ($57c0, M.formationSpecies): it is
 -- full-width and carries off-stage loads too; these ID low bytes only tell
 -- present slots apart.
 M.MONSTER_IDS = 0x3F46          -- +$02..$07: six 8-bit ID low bytes
 M.MONSTER_PRESENT = 0x3F45      -- +$01, low 6 bits: bit i set => slot i on stage
-M.MONSTER_ID_MSB = 0x3F52       -- +$0E, --abcdef: bit (5-slot) is slot's ID high bit
+M.MONSTER_ID_MSB = 0x3F52       -- +$0E: bit `slot` is that slot's ID high bit
+-- (InitMonsters, battle_main.asm @2ef9: `lda $3f52 / asl2 / sta $ee`, then
+-- slots 5 down to 0 each take the next `asl $ee` carry, so slot s gets
+-- bit s -- audit_encounters.py's `(rec[14] >> slot) & 1`.  The old bit
+-- (5 - slot) read formation $064's Vulture $02A as $12A in the Zozo grind
+-- lab: its +14 byte is $3A, and bit 5 belongs to the empty slot 5)
 M.BATTLE_HP = 0x3BF4
 
 -- OT6 HUD tilemap shadow: 6 lines x stride 14 (+0 cur addr, +2 prev addr,
@@ -482,7 +490,7 @@ function M.monsterIds()
   for slot = 0, 5 do
     if (mask & (1 << slot)) ~= 0 then
       ids[slot + 1] = M.readByte(M.MONSTER_IDS + slot)
-                    | (((msb >> (5 - slot)) & 1) << 8)
+                    | (((msb >> slot) & 1) << 8)
     else
       ids[slot + 1] = 0xFFFF
     end
@@ -1232,6 +1240,29 @@ function M.partyWeapons()
   return out
 end
 
+-- What is on stage right now, slot by slot (#172, #177): the slots whose
+-- presence bit ($3AA8) is set and whose HP is up, each with its species
+-- word ($57C0), the LIVE element record ($3BCC + entity*2: absorbed low
+-- byte, nulled high byte, seeded from MonsterProp +23/+24 by
+-- LoadMonsterProp) and its Reflect bit (status 3 bit 7, $3EF8).  This,
+-- not the formation's opening line-up (M.formationSpecies, $3F45), is
+-- "the monsters in this fight now": battle 70 reads $3F45 = $01 all fight
+-- while Shiva stands on stage in slot 1.
+function M.stageSlots()
+  local out = {}
+  for slot = 0, 5 do
+    if M.readWord(0x3BFC + slot * 2) > 0
+       and (M.readByte(0x3AA8 + slot * 2) & 1) == 1 then
+      out[#out + 1] = {
+        slot = slot, species = M.readWord(M.FORMATION + slot * 2),
+        absorb = M.readByte(0x3BCC + 8 + slot * 2),
+        null = M.readByte(0x3BCC + 9 + slot * 2),
+        reflect = (M.readByte(0x3F00 + slot * 2) & 0x80) ~= 0 }
+    end
+  end
+  return out
+end
+
 -- The formation's species, from OT6's own per-slot stash (OT6_SPECIES,
 -- $57c0, six words) rather than from vanilla's $3F46: OT6_SPECIES is
 -- full-width (0..383) and carries a monster that is loaded but not on
@@ -1242,6 +1273,10 @@ end
 --
 -- OT6_SPECIES is not cleared between battles, so without the mask a short
 -- formation would be checked against the tail of the previous one.
+--
+-- This is the formation as it OPENED ($3F45 is copied once at load and
+-- never updated): a part or sibling that enters later is not in it.  For
+-- what stands on stage now, M.stageSlots.
 -- Formation 504 is legitimately empty, so a zero mask is "nothing to
 -- check" rather than an error.
 M.FORMATION_MASK = 0x3F45
@@ -1306,16 +1341,53 @@ local GUARD_UNREADABLE = 600
 
 M.absorbGuardBattles = 0        -- battles inspected; the positive control
 M.absorbGuardClashes = 0
+M.absorbGuardEntries = 0        -- slots checked after the opening line-up (#177)
 local guardArmed, guardSettle = true, 0
+local guardSeen, guardRandom = {}, false   -- "slot:species" checked; the battle's RANDBTL
 
--- Returns an error message, or nil.  M.run calls this once per battle and
--- routes a message through its own FAIL path.
-function M.absorbGuardTick()
-  if not M.battleLoadStarted() then
-    guardArmed, guardSettle = true, 0
+local function guardReport(clashes, what)
+  M.absorbGuardClashes = M.absorbGuardClashes + #clashes
+  if #clashes == 0 then return nil end
+  local lines = {}
+  for _, c in ipairs(clashes) do lines[#lines + 1] = "  " .. M.clashStr(c) end
+  local body = table.concat(lines, "\n")
+  if guardRandom then
+    M.log("absorb guard: RANDOM encounter, not failed on" .. what .. ":\n" .. body)
     return nil
   end
-  if not guardArmed then return nil end
+  return "absorb guard: someone entered this fight holding a weapon the "
+    .. "formation ABSORBS" .. what .. ", so every swing HEALS it:\n" .. body
+    .. "\nThis is the Cranes bug (issue #81).  Pick the weapon deliberately "
+    .. "for this fight with H.equipWeapon -- weigh class against the boss's "
+    .. "break axis first and element second -- rather than leaving "
+    .. "the game's power-greedy Optimum pick in place."
+end
+
+-- Returns an error message, or nil.  M.run calls this every frame and
+-- routes a message through its own FAIL path.  The opening line-up is
+-- checked once, GUARD_SETTLE frames in (M.formationSpecies, $3F45); after
+-- that every slot that steps on stage (M.stageSlots, $3AA8 -- a part or a
+-- tag-team sibling the script materialises later, #177: battle 70's
+-- Shiva is not in $3F45 at all) is checked the first time it is seen.
+function M.absorbGuardTick()
+  if not M.battleLoadStarted() then
+    guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
+    return nil
+  end
+  if not guardArmed then
+    local fresh = {}
+    for _, st in ipairs(M.stageSlots()) do
+      local key = st.slot .. ":" .. st.species
+      if not guardSeen[key] and st.species < 384 then
+        guardSeen[key] = true
+        fresh[#fresh + 1] = { slot = st.slot, species = st.species }
+      end
+    end
+    if #fresh == 0 then return nil end
+    M.absorbGuardEntries = M.absorbGuardEntries + #fresh
+    return guardReport(M.absorbClashesFor(M.partyWeapons(), fresh),
+      " (a monster that stepped on stage after the opening line-up)")
+  end
   guardSettle = guardSettle + 1
   if guardSettle < GUARD_SETTLE then return nil end
 
@@ -1342,25 +1414,12 @@ function M.absorbGuardTick()
   end
 
   guardArmed = false
+  -- OT6_RANDBTL is InitBP's copy for this battle (it holds until the next
+  -- InitBattle); read once, here, for every check this battle makes
+  guardRandom = M.readByte(M.RANDBTL) ~= 0
   M.absorbGuardBattles = M.absorbGuardBattles + 1
-  local clashes = M.absorbClashesFor(M.partyWeapons(), species)
-  M.absorbGuardClashes = M.absorbGuardClashes + #clashes
-  if #clashes == 0 then return nil end
-
-  local lines = {}
-  for _, c in ipairs(clashes) do lines[#lines + 1] = "  " .. M.clashStr(c) end
-  local body = table.concat(lines, "\n")
-
-  if M.readByte(M.RANDBTL) ~= 0 then
-    M.log("absorb guard: RANDOM encounter, not failed on:\n" .. body)
-    return nil
-  end
-  return "absorb guard: someone entered this fight holding a weapon the "
-    .. "formation ABSORBS, so every swing HEALS it:\n" .. body
-    .. "\nThis is the Cranes bug (issue #81).  Pick the weapon deliberately "
-    .. "for this fight with H.equipWeapon -- weigh class against the boss's "
-    .. "break axis first and element second -- rather than leaving "
-    .. "the game's power-greedy Optimum pick in place."
+  for _, s in ipairs(species) do guardSeen[s.slot .. ":" .. s.species] = true end
+  return guardReport(M.absorbClashesFor(M.partyWeapons(), species), "")
 end
 
 -- ------------------------------------------------------- the step runner --
@@ -2954,16 +3013,14 @@ function M.newFightDriver(tag, opts)
   local MON_HP, MON_PRESENT = 0x3BFC, 0x3AA8
   local SH_CUR, BRK_TICKS = 0x3E40, 0x3E90         -- OT6_SHIELD_CUR/BROKEN_TICKS + 8
   local RV_ELEM, RV_CLASS = 0x3E91, 0x3EA5         -- OT6_REVEALED_ELEM/BOOST_REVEALED + 8
-  local MON_ST3 = 0x3F00                           -- current status 3 ($3EF8) + 8
-  -- the live element record: $3bcc,x is the entity's absorbed (low byte)
-  -- and nullified (high byte) elements, seeded from MonsterProp +23/+24 by
-  -- LoadMonsterProp (battle_main.asm `lda f:MonsterProp+23,x / ora $3bcc,y`)
-  local MON_ELEM = 0x3BCC + 8
 
   -- What is on stage right now, slot by slot, with the LIVE record's
-  -- bytes: the slots whose presence bit ($3AA8) is set and whose HP is up,
-  -- each with its species word, its absorb/null bytes and its Reflect bit.
-  -- This is what the cast guards below judge (#172).
+  -- bytes (M.stageSlots): the slots whose presence bit ($3AA8) is set and
+  -- whose HP is up, each with its species word, its absorb/null bytes
+  -- ($3bcc,x, seeded from MonsterProp +23/+24 by LoadMonsterProp,
+  -- battle_main.asm `lda f:MonsterProp+23,x / ora $3bcc,y`) and its
+  -- Reflect bit.  This is what the cast guards below judge (#172), and
+  -- the status line and the focus lines read it too (#177).
   --
   -- Two things this deliberately does NOT read.  The formation's
   -- present mask ($3F45, M.formationSpecies): that byte is the
@@ -2982,20 +3039,7 @@ function M.newFightDriver(tag, opts)
   -- the guard doubles as the tag-fight strategy: the element flows while
   -- its absorber is off-stage and yields to the sword the moment she
   -- steps on.
-  local function stageSlots()
-    local out = {}
-    for slot = 0, 5 do
-      if M.readWord(MON_HP + slot * 2) > 0
-         and (M.readByte(MON_PRESENT + slot * 2) & 1) == 1 then
-        out[#out + 1] = {
-          slot = slot, species = M.readWord(M.FORMATION + slot * 2),
-          absorb = M.readByte(MON_ELEM + slot * 2),
-          null = M.readByte(MON_ELEM + 1 + slot * 2),
-          reflect = (M.readByte(MON_ST3 + slot * 2) & 0x80) ~= 0 }
-      end
-    end
-    return out
-  end
+  local stageSlots = M.stageSlots
 
   -- The cast guards, shared by every attack-cast line (M.castVeto holds
   -- the decision; this is its log line).  A spell whose element something
@@ -3518,9 +3562,15 @@ function M.newFightDriver(tag, opts)
       end
       local r = M.muddleRule({ actor = actor, status2 = s2, hp = hpNow, maxhp = mx })
       if r == "defer" then
+        local have = M.readByte(BP + actor * 2)
+        local inRound = hpNow[actor] > 0 and (price[actor] or 0) > 0
+          and hpNow[actor] <= price[actor]
         local said = string.format("[%s] actor=%d is MUDDLED (STATUS2 $%02X) -- "
           .. "not planning: its command would be re-aimed by the engine; "
-          .. "deferring the window (X)", tag or "fight", actor, s2[actor])
+          .. "deferring the window (X)%s", tag or "fight", actor, s2[actor],
+          (inRound and have >= 1) and string.format("; inside its priced round "
+            .. "(%d <= %d) holding %d BP, and a muddled spend lands on the party "
+            .. "(#194)", hpNow[actor], price[actor], have) or "")
         if said ~= healSaid then healSaid = said; M.log(said) end
         return { kind = "defer" }
       end
@@ -5139,6 +5189,21 @@ function M.newFightDriver(tag, opts)
           end
         end
       end
+      -- The cast guards again, at the confirm (#177).  The plan was judged
+      -- against the stage when it was made; the menu walk to this window
+      -- takes seconds, and a monster can step on in between -- battle 70's
+      -- CELES planned Ice while Ifrit stood alone and confirmed it after
+      -- Shiva (ice absorb) entered, two zero-damage casts a battle.  A
+      -- cast the live stage now refuses is backed out of (B) and re-planned
+      -- against what stands there.
+      if (plan.kind == "magic" and plan.spell ~= nil) or plan.kind == "lore" then
+        local id = plan.kind == "magic" and plan.spell or (0x8B + plan.lore)
+        if castVetoed(id, plan.kind == "magic" and "cast (at the confirm)"
+                          or "lore (at the confirm)") then
+          dropPlan("stage_changed")
+          return { "b" }
+        end
+      end
       if opts.traceTgt then
         M.log(string.format("[%s] tgt CONFIRM kind=%s actor=%d chars=%02X "
           .. "mons=%02X", tag or "fight", plan.kind, actor,
@@ -5617,13 +5682,15 @@ function M.newFightDriver(tag, opts)
       -- damage the party did, which is what separates a harness bug from a
       -- balance finding.
       local mhp = {}
-      -- present-mask driven (see the focus note above: the old word-stride
-      -- read here printed a slotless garbage list -- "all zero, monsters=3"
-      -- -- that misdiagnosed a live board as dead).  The s%d: tag keeps
-      -- slot identity in the log so that can never happen silently again.
+      -- slot-tagged (the old word-stride read here printed a slotless
+      -- garbage list -- "all zero, monsters=3" -- that misdiagnosed a live
+      -- board as dead).  A slot is listed when it opened the fight ($3F45)
+      -- or stands on stage now ($3AA8, #177: battle 70's Shiva enters slot
+      -- 1 later and the opening mask never lists her); monsters= counts
+      -- the ones alive on stage now (M.stageSlots), not the opening mask.
       local mids = M.monsterIds()
       for s2 = 0, 5 do
-        if mids[s2 + 1] ~= 0xFFFF then
+        if mids[s2 + 1] ~= 0xFFFF or (M.readByte(0x3AA8 + s2 * 2) & 1) == 1 then
           -- hp, and the shield count beside it: shields live at
           -- $3E38 + entity*2 and monsters are entities 4..9, so slot s is
           -- $3E40 + s*2.  Without the shield count the log shows low
@@ -5643,7 +5710,7 @@ function M.newFightDriver(tag, opts)
         tag or "fight", battleTick, menu, state,
         actor, M.readByte(CMDROW + actor) & 3,
         table.concat(rows, ","), table.concat(hp, ","),
-        table.concat(cost, ","), table.concat(mhp, ","), M.monstersPresent()))
+        table.concat(cost, ","), table.concat(mhp, ","), #M.stageSlots()))
     end
     if menu == 0 then
       -- Text pages, victory screens, and the command-window handoff all need
@@ -5993,9 +6060,14 @@ end
 
 local function monsterHpSum()
   if not M.battleLoadStarted() then return 0 end
+  -- the opening line-up ($3F45) and whatever has entered since ($3AA8,
+  -- #177), so a part that steps on later counts and the opening frames,
+  -- before the presence bits land, still read the formation's HP
   local ids, s = M.monsterIds(), 0
   for i = 1, 6 do
-    if ids[i] ~= 0xFFFF then s = s + M.readWord(0x3BFC + (i - 1) * 2) end
+    if ids[i] ~= 0xFFFF or (M.readByte(0x3AA8 + (i - 1) * 2) & 1) == 1 then
+      s = s + M.readWord(0x3BFC + (i - 1) * 2)
+    end
   end
   return s
 end
@@ -6680,8 +6752,8 @@ local function resetLibState()
   M.setPad(nil)
   M.vars = {}
   M.lastState = nil
-  M.absorbGuardBattles, M.absorbGuardClashes = 0, 0
-  guardArmed, guardSettle = true, 0
+  M.absorbGuardBattles, M.absorbGuardClashes, M.absorbGuardEntries = 0, 0, 0
+  guardArmed, guardSettle, guardSeen, guardRandom = true, 0, {}, false
   traceMap, traceSet, traceCount = nil, {}, 0
   recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
   execActor, execActorCmd, execDone, execMon, execMonDone = nil, nil, {}, nil, nil

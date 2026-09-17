@@ -223,9 +223,12 @@ Plain functions:
 - `H.setPad(buttons)` — immediate raw input set.
 - Battle signals: `H.monsterIds()`, `H.monstersPresent()`, `H.partyHp()`,
   `H.battleLoadStarted()`, `H.battleActive()`, `H.screenLooksAlive()`.
-  The six words at $3F46 are a liveness heuristic, not clean IDs; treat
-  `monstersPresent() > 0` as "battle has occupants", nothing finer. To
-  identify a specific fight, match formation species words at $57C0 via
+  `monsterIds()`, `monstersPresent()` and `H.formationSpecies()` read the
+  formation's OPENING line-up ($3F45, copied once at load); treat
+  `monstersPresent() > 0` as "battle has occupants", nothing finer. What
+  stands on stage now (alive, presence bit $3AA8 set, with the live
+  absorb/null/Reflect bytes) is `H.stageSlots()` (#177). To identify a
+  specific fight, match formation species words at $57C0 via
   `H.formationHas`, conditioned on `battleLoadStarted()`.
 - Field navigation (`H.fieldX/Y`, `H.hasControl`, `H.tileAligned`,
   `H.dialogWaiting`, `H.canStep`, `H.movePress`, `H.bfsPath`, `H.navTo`,

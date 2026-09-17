@@ -371,6 +371,68 @@ local function osmoseLanded()
   end
   return nil
 end
+-- The windows each line acts on are named in decide(); every other
+-- $7BC2 value is the engine moving between them -- $17 while the item
+-- list scrolls a row, $41/$40 while a target window opens and closes, $09
+-- and $0f/$10 while a list opens.  These lines used to press B in all of
+-- them, and B there backs out of the line's own selection: on the #177
+-- lineage's n024_entry Locke's Tonic (row 22) cost a B at every scrolled
+-- row and 12 target windows cancelled in their opening frame (f4190..f4702,
+-- 2026-09-17), the bench held the menu ~600 frames a turn, Celes's
+-- post-Osmose window never came, and two Magnitude8s ($BC, f6786/f7576)
+-- wiped the party.  So an unhandled state gets no press until it has
+-- stood BACKOUT_F frames (a window nobody drives), and then one B.
+local BACKOUT_F = 90
+-- A plan made at the command window can be overtaken before its target
+-- window confirms: another bench member's X-Potion lands on the same
+-- ally, or a hit clears the Muddle the plan was for.  On main's lineage
+-- at seed shift 17 (2026-09-17) Sabin sat in a Tonic's target window for
+-- Locke while Edgar's X-Potion (exec f3788, done f4120) healed him to
+-- full, and slot 2 never lit in 18 taps -- the lib's steer bailed; at
+-- shift 31 all three of the bench hit Celes for one Muddle the first hit
+-- had cleared (f3813, f3903, f3988).  A moot plan is dropped, not
+-- confirmed.
+local function planMoot(p)
+  if p == nil then return nil end
+  local s = p.target
+  if p.kind == "fight" then
+    if not alive(s) then return "the ally is down" end
+    if (st2(s) & ST2_MUDDLE) == 0 then return "the Muddle is already cleared" end
+  elseif p.item == FENIX then
+    if alive(s) then return "the ally is already up" end
+  elseif p.item then
+    if not alive(s) then return "the ally is down" end
+    if hp(s) * 100 // maxHp(s) >= HEAL_PCT then
+      return string.format("the ally is back at %d%%", hp(s) * 100 // maxHp(s))
+    end
+  end
+  return nil
+end
+-- The shared targetCursor raises when the wanted slot never lights in a
+-- target window.  A slot that does not light while its plan is still
+-- live is backed out of and re-planned, the way a player whose cursor
+-- skips an ally cancels and chooses again; a third bail in one battle
+-- is raised as the lib raised it.
+local steerBails = 0
+local function safeSteer(act, target)
+  local ok, r = pcall(tc.steer, target, mf)
+  if ok then return r end
+  steerBails = steerBails + 1
+  H.log(string.format("[steer f%d] actor=%d: bail %d this battle: %s", H.frame, act, steerBails, tostring(r)))
+  if steerBails >= 3 then error(r, 0) end
+  plans[act], planKey[act] = nil, nil
+  return "b"
+end
+local lastSt, lastAct, lastStF = nil, nil, 0
+local backouts = 0
+local function settle(act, st)
+  if H.frame - lastStF < BACKOUT_F then return nil end
+  backouts = backouts + 1
+  lastStF = H.frame
+  H.log(string.format("[settle f%d] actor=%d: menu state $%02x stood %d frames with no line driving it -- B",
+    H.frame, act, st, BACKOUT_F))
+  return "b"
+end
 local function decide()
   heartbeat()
   if H.readByte(MENU) == 0 then
@@ -380,6 +442,10 @@ local function decide()
   mf = mf + 1
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
+  -- How long the menu has sat in this state: an unhandled state is the
+  -- engine between windows and gets no press until it has stood still
+  -- for BACKOUT_F frames (settle below).
+  if st ~= lastSt or act ~= lastAct then lastSt, lastAct, lastStF = st, act, H.frame end
   if st == ST_TRANS then return {} end
   -- One cadence for every window, the item list included.  The item list
   -- used to walk at one press per 30 frames; this fixture's battle mode is
@@ -403,7 +469,7 @@ local function decide()
       -- target screen already open, a bare "a" here confirmed that Fight
       -- on the boss (party2 cmd=00 tgt=0100 at f2422, 2026-09-07)
       btn = summonArmed[locke] and "a" or "b"
-    else btn = "b" end
+    else btn = settle(act, st) end
     if st == ST_CMD then summonArmed[locke] = nil end
     return btn and { [btn] = true } or {}
   end
@@ -441,14 +507,24 @@ local function decide()
       end
     elseif st == ST_TGT then
       -- steer onto the plan's slot (a corpse for Fenix Down, the muddled
-      -- ally for Remedy or the hit, the worst-hp ally for a heal)
+      -- ally for Remedy or the hit, the worst-hp ally for a heal) -- unless
+      -- the plan went moot while its windows were open (planMoot), in which
+      -- case back out and plan again at the command window
       local p = plans[act]
-      if p and p.kind == "fight" then btn = steerAlly(p.target)
-      else btn = tc.steer(p and p.target, mf) end
-    else btn = "b" end
+      local moot = planMoot(p)
+      if moot then
+        H.log(string.format("[medic f%d] actor=%d: %s on slot %d is moot (%s) -- backing out to re-plan",
+          H.frame, act, p.item and string.format("item $%02X", p.item) or "hit", p.target, moot))
+        plans[act], planKey[act] = nil, nil
+        btn = "b"
+      elseif p and p.kind == "fight" then btn = steerAlly(p.target)
+      else btn = safeSteer(act, p and p.target) end
+    else btn = settle(act, st) end
   elseif act == celes then
     if celesMode == "defer" then
-      btn = (st == ST_CMD) and "x" or "b"
+      if st == ST_CMD then btn = "x"
+      elseif st == ST_ITEM or st == ST_MAGIC or st == ST_ESPER or st == ST_TGT then btn = "b"
+      else btn = settle(act, st) end
     elseif celesMode == "summon" then
       if st == ST_CMD then
         local want = cmdRowOf(celes, CMD_MAGIC)
@@ -462,7 +538,7 @@ local function decide()
         else btn = "up" end
       elseif st == ST_ESPER then btn = "a"; summonArmed[celes] = true
       elseif st == ST_TGT then btn = summonArmed[celes] and "a" or "b"   -- as Locke's
-      else btn = "b" end
+      else btn = settle(act, st) end
       if st == ST_CMD then summonArmed[celes] = nil end
     elseif celesMode == "cast" then
       if st == ST_CMD then
@@ -496,9 +572,9 @@ local function decide()
               if pct < wpct then worst, wpct = s, pct end
             end
           end
-          btn = tc.steer(worst, mf)
+          btn = safeSteer(act, worst)
         else btn = "a" end
-      else btn = "b" end
+      else btn = settle(act, st) end
     else                                   -- "park": open her list and hold
       if st == ST_CMD then
         local want = cmdRowOf(celes, CMD_MAGIC)
@@ -507,7 +583,7 @@ local function decide()
         else btn = (cur < want) and "down" or "up" end
       elseif st == ST_MAGIC then btn = nil
       elseif st == ST_ESPER then btn = "b"
-      else btn = "b" end
+      else btn = settle(act, st) end
     end
   end
   return btn and { [btn] = true } or {}
@@ -550,6 +626,7 @@ local function enterBoss(tag)
       H.assertEq(locke ~= nil and celes ~= nil, true,
         tag .. ": LOCKE and CELES really fight this")
       plans, planKey, summonArmed = {}, {}, {}
+      steerBails = 0
       R.osmoses = {}
       spells, mpWrites = {}, {}
       emu.addMemoryCallback(function(_, v)
@@ -724,11 +801,35 @@ H.run({ maxFrames = 150000 }, {
         H.log(string.format("[osmose] casting at mp=%d, boss pool=%d", m0, g0))
       end),
       driveTo(function()
+        -- The refill can only show if her pool has room for it: an Osmose
+        -- entered at her maximum pays 8, drains, and is capped straight
+        -- back to where it started.  On main's lineage at seed shift 31
+        -- (2026-09-17) Muddle re-aimed her first Osmose at Edgar
+        -- (tgt=0000, hers 99->126), and the second, at the boss, entered
+        -- at 126 and left at 126 -- the [osmose] rise assertion failed on
+        -- a full pool, not on the price.  So while no Osmose has landed on
+        -- the boss and her pool is within one Osmose of full, she casts
+        -- Shell (15) first, a spell of her own kit, and Osmose after it.
+        -- (Osmose's transfer is applied at ExecCmd and the done callback
+        -- comes ~400 frames later, so an Osmose still in flight is left to
+        -- finish before the pool is judged.)
+        local last = R.osmoses and R.osmoses[#R.osmoses]
+        local inFlight = last ~= nil and last.bossMp1 == nil
+        if osmoseLanded() == nil and not inFlight then
+          local full = H.readWord(0x3C30 + celes*2)
+          local want = (mp(celes) > full - OSMOSE_MP - 1) and SHELL or OSMOSE
+          if castRec ~= recOf(celes, want) then
+            H.log(string.format("[osmose f%d] her pool reads %d of %d: casting %s next",
+              H.frame, mp(celes), full, want == SHELL and "Shell to make room" or "Osmose"))
+            castRec = recOf(celes, want)
+          end
+        end
+        local o = osmoseLanded()
         local debited = false
         for _, v in ipairs(mpWrites) do
-          if (v & 0xff) == ((m0 - OSMOSE_MP) & 0xff) then debited = true end
+          if o and (v & 0xff) == ((o.mp0 - OSMOSE_MP) & 0xff) then debited = true end
         end
-        return debited and bossMp() < g0 and osmoseLanded() ~= nil
+        return debited and bossMp() < g0 and o ~= nil
       end, 20000, "Celes's Osmose is really charged and drains the boss"),
       H.call(function() celesMode = "defer" end),
       H.waitFrames(240),
@@ -743,11 +844,13 @@ H.run({ maxFrames = 150000 }, {
           .. "the boss's pool was lower at its return than at its entry")
         H.assertEq(o ~= nil and o.mp1 > o.mp0, true,
           "[osmose] ...and her own pool rose across that same execution")
-        H.assertEq(seen[(m0 - OSMOSE_MP) & 0xff], true,
-          "[osmose] the caster's MP was debited to exactly mp0-8 (the charge)")
+        H.assertEq(o ~= nil and seen[(o.mp0 - OSMOSE_MP) & 0xff], true,
+          "[osmose] the caster's MP was debited to exactly mp0-8 (the charge; "
+          .. "mp0 = her pool as that landed Osmose entered ExecCmd)")
         H.assertEq(bossMp() < g0, true, "[osmose] the boss's real pool dropped")
-        H.assertEq(mp(celes) > m0, true,
-          "[osmose] and the caster ended NET POSITIVE -- 8 MP is still a refill")
+        H.assertEq(o ~= nil and mp(celes) > o.mp0, true,
+          "[osmose] and the caster ended NET POSITIVE -- 8 MP is still a refill "
+          .. "(against her pool as that Osmose entered)")
         H.screenshot("magicite_osmose")
       end),
     })
