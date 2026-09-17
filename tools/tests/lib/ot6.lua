@@ -2254,15 +2254,11 @@ function M.newTargetGraph()
     if old ~= to then return "changed", old end
     return nil
   end
-  -- The first press toward a goal.  goal(name) says whether a node will
-  -- do; explore(name) whether an untried direction from it is worth a
-  -- press (the steer keeps exploration on the monster side); dirs the
-  -- order untried directions are pressed in (default M.TGT_DIRS; the
-  -- steer puts the layout's crossing direction last, so a press is not
-  -- spent visiting the party column).  Returns the direction, "path" or
-  -- "explore", and the planned walk as a string.
-  function G.route(cur, goal, explore, dirs)
-    dirs = dirs or M.TGT_DIRS
+  -- Breadth first over the known edges from cur: the first press of the
+  -- shortest known walk to a node goal(name) accepts, and the walk as a
+  -- string; nil when no known walk reaches one.  Also returns the visit
+  -- order and predecessor map the exploring half reuses.
+  function G.path(cur, goal)
     local prev, order, seen = {}, { cur }, { [cur] = true }
     local i = 1
     while i <= #order do
@@ -2273,7 +2269,7 @@ function M.newTargetGraph()
           table.insert(walk, 1, prev[at].dir)
           at = prev[at].from
         end
-        return walk[1], "path", table.concat(walk, ",")
+        return walk[1], table.concat(walk, ","), order, prev
       end
       for _, d in ipairs(M.TGT_DIRS) do
         local to = G.edges[n] and G.edges[n][d]
@@ -2285,23 +2281,75 @@ function M.newTargetGraph()
       end
       i = i + 1
     end
-    for _, n in ipairs(order) do
-      if explore == nil or explore(n) then
-        for _, d in ipairs(dirs) do
-          if G.edges[n] == nil or G.edges[n][d] == nil then
-            local walk, at = { d }, n
-            while at ~= cur do
-              table.insert(walk, 1, prev[at].dir)
-              at = prev[at].from
+    return nil, nil, order, prev
+  end
+  -- The first press toward a goal.  goal(name) says whether a node will
+  -- do; explore(name) whether an untried direction from it is worth a
+  -- press (the steer keeps exploration on the monster side); dirs the
+  -- order untried directions are pressed in (default M.TGT_DIRS; the
+  -- steer puts the layout's crossing direction last, so a press is not
+  -- spent visiting the party column).  last (optional, a set of
+  -- directions) is tried only once every known node's other directions
+  -- are: the crossing from the gun is not pressed before the body's DOWN.
+  -- Returns the direction, "path" or "explore", and the planned walk as a
+  -- string.
+  function G.route(cur, goal, explore, dirs, last)
+    dirs = dirs or M.TGT_DIRS
+    local d, walk, order, prev = G.path(cur, goal)
+    if d ~= nil then return d, "path", walk end
+    for pass = 1, 2 do
+      for _, n in ipairs(order) do
+        if explore == nil or explore(n) then
+          for _, dd in ipairs(dirs) do
+            local late = last ~= nil and last[dd] == true
+            if (pass == 2) == late
+               and (G.edges[n] == nil or G.edges[n][dd] == nil) then
+              local w, at = { dd }, n
+              while at ~= cur do
+                table.insert(w, 1, prev[at].dir)
+                at = prev[at].from
+              end
+              return w[1], "explore", table.concat(w, ",")
             end
-            return walk[1], "explore", table.concat(walk, ",")
           end
         end
       end
+      if last == nil then break end
     end
     return nil
   end
   return G
+end
+
+-- One focus-steer press (#189), cheapest first, so a focus the old fixed
+-- rotation reached costs no extra presses and a window that needs no steer
+-- never explores (the caller only asks while the wanted bit is dark):
+--   1. "path": a known walk to a node lighting the focus;
+--   2. "rotation": the press the old rotation makes here (rotation = its
+--      directions from the current lead; dead[d] = no-effect presses this
+--      window, two retire a direction), unless the graph already knows
+--      that press is wasted -- it moves nothing, shuts the window, crosses
+--      to the party, or lands on a node this window already stood on
+--      (visited).  Once the window has cycled (a press landed back on a
+--      node it stood on), the rotation is done: it was about to repeat;
+--   3. "explore": the graph's nearest monster-side node with an untried
+--      direction (order; the directions in last, the crossing, only after
+--      every other).
+-- Returns dir, how, walk; nil when nothing is left to try.
+function M.focusStep(G, here, goal, rotation, dead, visited, order, cycled, last)
+  local d, walk = G.path(here, goal)
+  if d ~= nil then return d, "path", walk end
+  local known = G.edges[here] or {}
+  for _, rd in ipairs(cycled and {} or rotation) do
+    if ((dead and dead[rd]) or 0) < 2 then
+      local to = known[rd]
+      if to == nil or not (to == here or to == "closed" or to:sub(1, 6) == "chars="
+                           or (visited and visited[to])) then
+        return rd, "rotation", rd
+      end
+    end
+  end
+  return G.route(here, goal, function(n) return n:sub(1, 5) == "mons=" end, order, last)
 end
 
 -- A focus entry names its monster by slot ({ slot = S, mask = M }, the
@@ -2910,6 +2958,8 @@ function M.newFightDriver(tag, opts)
   -- answer.  Cleared per battle.
   local tgtGraphs = {}
   local tgtRouteSaid = nil
+  local tgtVisited = {}                -- nodes this target window stood on
+  local tgtCycled = false              -- a steer press landed back on one
   -- multi-target latch: one R press on a MULTI_TARGET spell's target screen
   -- sets this to 1 and widens the side mask to every valid ally/monster
   -- (probe_targetall.lua measured it; btlgfx_main.asm @6e9a sets it)
@@ -4810,6 +4860,7 @@ function M.newFightDriver(tag, opts)
       local g, k = tgtGraph()
       if k == steerLast.live then
         local now = tgtNode()
+        if now ~= steerLast.node and tgtVisited[now] then tgtCycled = true end
         local what, old = g.record(steerLast.node, steerLast.dir, now)
         if what ~= nil then
           M.log(string.format("[%s] [tgt-graph] %s --%s--> %s%s (live monsters %02X)",
@@ -4867,7 +4918,7 @@ function M.newFightDriver(tag, opts)
             .. "monsters %02X)", tag or "fight", steerLast.node, steerLast.dir, st, k))
         end
       end
-      steerDead, steerLast = {}, nil
+      steerDead, steerLast, tgtVisited, tgtCycled = {}, nil, {}, false
     end
     if st == ST_CMD then tgtSpin = 0 end
     -- Unknown-menu-state stall guard, on EVERY path (plan or no plan): the
@@ -5339,23 +5390,29 @@ function M.newFightDriver(tag, opts)
               -- target select pressing it).  Among monsters the walk
               -- is the target graph's (below), not a fixed rotation.
               if mons == 0 then return cross("monsters") end
-              -- the graph walk (#189): the shortest known path to a node
-              -- lighting the focus, else the nearest monster-side node
-              -- with a direction not yet pressed
+              -- the graph walk (#189, M.focusStep): a known path to a
+              -- node lighting the focus, else the old rotation's press
+              -- unless the graph knows it is wasted, else the nearest
+              -- monster-side node with a direction not yet pressed
               local g, live = tgtGraph()
               local here = tgtNode()
+              tgtVisited[here] = true
               local order, crossing = {}, {}
               for _, cd in ipairs(layoutOf().toChars or {}) do crossing[cd] = true end
               for _, cd in ipairs(M.TGT_DIRS) do if not crossing[cd] then order[#order + 1] = cd end end
               for _, cd in ipairs(M.TGT_DIRS) do if crossing[cd] then order[#order + 1] = cd end end
-              local d, how, walk = g.route(here,
+              local rot, rdirs = {}, { "left", "right", "down", "up" }
+              for i = 0, 3 do rot[#rot + 1] = rdirs[1 + ((tgtSpin // 6 + i) % 4)] end
+              local d, how, walk = M.focusStep(g, here,
                 function(n) return n:sub(1, 5) == "mons=" and (tonumber(n:sub(6), 16) & want) ~= 0 end,
-                function(n) return n:sub(1, 5) == "mons=" end, order)
+                rot, steerDead, tgtVisited, order, tgtCycled, crossing)
               if d ~= nil then
-                local said = string.format("[%s] [tgt-graph] focus slot %d (want=%02X) from %s: "
-                  .. "%s %s (live monsters %02X)", tag or "fight", wantSlot, want, here,
-                  how == "path" and "known path" or "exploring, via", walk, live)
-                if said ~= tgtRouteSaid then tgtRouteSaid = said; M.log(said) end
+                if how ~= "rotation" then
+                  local said = string.format("[%s] [tgt-graph] focus slot %d (want=%02X) from %s: "
+                    .. "%s %s (live monsters %02X)", tag or "fight", wantSlot, want, here,
+                    how == "path" and "known path" or "exploring, via", walk, live)
+                  if said ~= tgtRouteSaid then tgtRouteSaid = said; M.log(said) end
+                end
                 return steer(d)
               end
               M.log(string.format("[%s] [tgt-graph] focus slot %d (want=%02X) from %s: no "
@@ -5485,7 +5542,7 @@ function M.newFightDriver(tag, opts)
     plan, planActor, held = nil, nil, {}
     parkDropN = 0
     layout, layoutUnreadSaid, steerLast, steerDead = nil, false, nil, {}
-    tgtGraphs, tgtRouteSaid = {}, nil
+    tgtGraphs, tgtRouteSaid, tgtVisited, tgtCycled = {}, nil, {}, false
     parkSt, parkN, idleSt, idleN = nil, 0, nil, 0
     unknownSt, unknownN, unknownSeen, sideWindowN = nil, 0, {}, 0
     if healSaid == "parked-out" then healSaid = nil end

@@ -582,6 +582,36 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(how .. " " .. walk, "path left,down", "the next window walks the known path")
     H.assertEq(G.record("mons=04", "left", "mons=01"), nil, "a confirmed edge is not news")
     H.assertEq(G.record("mons=04", "left", "mons=04"), "changed", "a moved edge is")
+    -- H.focusStep: the old rotation's presses first (left leads) until the
+    -- window cycles, a press the graph knows is wasted skipped, then the
+    -- graph explores with the crossing (right) after every other
+    -- direction, and a known path is walked
+    local F, visited, hows, cycled = H.newTargetGraph(), {}, {}, false
+    cur, presses = "mons=04", {}
+    for _ = 1, 12 do
+      visited[cur] = true
+      local fd, fhow = H.focusStep(F, cur, goal, { "left", "right", "down", "up" }, {},
+        visited, order, cycled, { right = true })
+      if fd == nil then break end
+      presses[#presses + 1] = fd; hows[#hows + 1] = fhow
+      F.record(cur, fd, truth[cur][fd])
+      local was = cur
+      cur = truth[cur][fd]
+      if cur ~= was and visited[cur] then cycled = true end
+      if goal(cur) then break end
+    end
+    H.assertEq(cur, "mons=10", "focusStep reaches the Missile Bay from the gun")
+    H.assertEq(table.concat(presses, ","), "left,left,right,down,up,left,down",
+      "...left, left (moves nothing, not pressed a third time), right (back on "
+      .. "the gun: cycled), then the gun's down and up, the walk to the body's down")
+    H.assertEq(table.concat(hows, ","),
+      "rotation,rotation,rotation,explore,explore,explore,explore", "...rotation first")
+    local pd, phow = H.focusStep(F, "mons=04", goal, { "right" }, {}, {}, order)
+    H.assertEq(pd .. " " .. phow, "left path", "a known path beats the rotation")
+    local xd, xhow = H.focusStep(F, "mons=01", function() return false end,
+      { "left", "down" }, {}, { ["mons=10"] = true }, order)
+    H.assertEq(xhow, "explore", "a rotation the graph knows is wasted explores")
+    H.assertEq(xd, "up", "...the body's untried direction")
     local words = { [0] = 0x113, [1] = 0xFFFF, [2] = 0x145, [3] = 0x146, [4] = 0x147, [5] = 0xFFFF }
     local fs = H.focusSlots({ { species = 0x147 }, { species = 0x146 }, { slot = 0, mask = 0x01 } }, words)
     H.assertEq(#fs, 3, "three focus entries resolve")
