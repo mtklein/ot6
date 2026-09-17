@@ -212,6 +212,18 @@ local function mp(s)    return H.readWord(CURMP(s)) end
 local actor
 local startMp = 50
 local pinMp, pinPend = true, 0
+local RAGE_BASE = 8                  -- Ot6DanceCost's immediate, which
+                                     --   Ot6RageCost tail-calls
+-- #219: boosting a verb that is not Fight costs escalating MP, and Rage is a
+-- chance verb (the boost buys the trance's coin), so the start payment is
+-- min(99, floor(base * 2.5^boost + 0.5)) -- 8 / 20 / 50 / 99.  The trance is
+-- still ONE payment: every possessed turn after it stays free.
+local function ragePrice(boost)
+  if boost == 0 then return RAGE_BASE end
+  local x = RAGE_BASE
+  for _ = 1, boost do x = x * 5 end
+  return math.min(99, (x + (1 << (boost - 1))) >> boost)
+end
 local instrument, cmd10HitsReset
 local cmd10Hits = 0     -- Cmd_10 entries
 local coinSummary
@@ -330,9 +342,9 @@ add({
   H.call(function()
     local left = mp(actor)
     H.log(string.format("charge: MP %d -> %d after the rage START", startMp, left))
-    H.assertEq(left, startMp - 8,
-      "the trance costs a flat 8 at the start (the Dance rule, one price for "
-      .. "both possess-verbs)")
+    H.assertEq(left, startMp - ragePrice(0),
+      "an UNBOOSTED trance costs a flat 8 at the start (the Dance rule, one "
+      .. "price for both possess-verbs)")
     _G.__afterStart = left
     _G.__tier0 = H.readByte(RAGETIER)
     H.assertEq(_G.__tier0, 0, "unboosted start latched tier 0")
@@ -368,11 +380,15 @@ add({
 })
 
 -- 7. The tier latch: 3 BP banked at the start, held for the whole trance ----
-add(trance("tier3", function() startMp = 50; pinPend = 3 end,
+-- 99 rather than 50: #219 prices a boost-3 Rage at min(99, 8 x 15.625) = 99,
+-- the two-digit ceiling, and Ot6RageStartGate refuses a start the pool cannot
+-- pay -- which is the rule working, not the tier latch failing.  The pinned
+-- pool is exactly the price, so the arm also pins the cap from the other side.
+add(trance("tier3", function() startMp = 99; pinPend = 3 end,
   function() coins = {}; pinBe = nil end))
 add(rageStart("tier3"))
 add({
-  H.call(function() pinMp = false; pinPend = nil end),
+  H.call(function() _G.__t3mp = startMp; pinMp = false; pinPend = nil end),
   H.driveUntil(function() return raging(actor) end, 4000, {
     H.call(tick), H.waitFrames(3),
     H.call(function() H.setPad({}) end), H.waitFrames(6),
@@ -380,6 +396,13 @@ add({
   H.call(function()
     H.assertEq(H.readByte(RAGETIER), 3,
       "Cmd_10 latched the pending 3 into OT6_RAGETIER")
+    H.log(string.format("tier3: MP %d -> %d after the boosted rage START "
+      .. "(price %d)", _G.__t3mp, mp(actor), ragePrice(3)))
+    H.assertEq(mp(actor), _G.__t3mp - ragePrice(3), string.format(
+      "a boost-3 trance costs %d, not the base %d: 8 x 15.625 is 125, which "
+      .. "the two-digit ceiling flattens to 99 (#219, ruling 1)",
+      ragePrice(3), RAGE_BASE))
+    _G.__t3after = mp(actor)
   end),
   ride(300),                              -- several more possessed turns
   H.call(function()
@@ -391,6 +414,9 @@ add({
       .. "Cmd_10 re-entries did not re-latch the consumed pending byte")
     H.assertEq(H.readByte(0x3E9D + actor * 2), 0,
       "the pending boost itself was consumed by the start action")
+    H.assertEq(mp(actor), _G.__t3after,
+      "and every possessed turn after the boosted start is still FREE -- the "
+      .. "escalation prices the START, not the trance (#219)")
     -- tier 3 takes no roll at all (no `inc $be`) and forces entry 1 on every
     -- possessed turn, including the start turn.
     local c0, c1, draws = coinSummary()
@@ -564,8 +590,9 @@ end
 local function tierArm(tag, pend, draw, wantCoin, why)
   local seed = nil
   add(trance(tag, function()
-    startMp = 50
-    pinPend = pend
+    startMp = math.max(50, ragePrice(pend))   -- #219: the start pays the
+    pinPend = pend                            --   boosted price, so the
+                                              --   pinned pool has to cover it
   end, function()
     instrument()
     seed = seedFor(draw)
@@ -588,6 +615,9 @@ local function tierArm(tag, pend, draw, wantCoin, why)
     H.call(function()
       H.assertEq(H.readByte(RAGETIER), pend,
         string.format("%s: Cmd_10 latched tier %d", tag, pend))
+      H.assertEq(mp(actor), math.max(50, ragePrice(pend)) - ragePrice(pend),
+        string.format("%s: the start paid %d, the boost-%d price (#219)",
+          tag, ragePrice(pend), pend))
     end),
     ride(300),
     H.call(function()

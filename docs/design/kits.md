@@ -175,6 +175,21 @@ These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6_boost.asm),
 charged under the `OT6_MP_COSTS` build flag, which defaults ON, so the shipped
 ROM charges them (see mp-economy.md).
 
+**Every number in these tables is a base price.** Since #219, boosting an
+ability that is not Fight costs escalating MP: the row's price becomes
+`min(99, floor(base * 2.5^boost + 0.5))`, i.e. x1 / x2.5 / x6.25 / x15.625
+for pending boost 0/1/2/3, capped at 99. Blitz and Tools escalate because
+boost buys them `Ot6BoostDmg`'s x2/x4/x8; Steal, Rage and Dance escalate
+because boost buys them odds or a multiplier; SwdTech does not, because its
+boost was already spent picking the row and the row is charged at its own
+price; Fight and Capture do not, because boost buys swings; and Filch and
+Bestow do not, because boost buys them nothing at all. The one arithmetic
+authority is `Ot6BoostPriceFor` (ff6/src/battle/ot6_boost.asm), which the
+drawn number, the grey, the confirm and the charge all reach, so they cannot
+disagree. The rule, the whole resulting table and the rulings behind it
+(the 99 cap flattening dear rows; an unaffordable boost greyed and refused)
+are in mp-economy.md's "Boosting costs MP".
+
 `Ot6BushidoTier` (ff6/src/battle/ot6_kits.asm)
 replaces the charge gauge's clock in `UpdateMenuState_37`; the window, its
 numerals, the grey-out of unlearned techs, the A-button latch,
@@ -232,7 +247,10 @@ submenu (the same route Blitz takes) that lists the three moving-window techs by
 name + MP cost, greyed when the caster can't afford the MP *or* the BP. It
 reuses the Tools window shell,
 `Ot6CostFor`, and `Ot6AbilityGrey`, with all cost/grey logic gated `.if
-OT6_MP_COSTS` so the nomp baseline is undisturbed. The **cursor row is the boost
+OT6_MP_COSTS` so the nomp baseline is undisturbed. SwdTech is the one kit
+window whose rows do **not** take #219's 2.5x escalation, for the reason the
+row already exists: the boost is the row, so the row's own price is the
+escalation (`Ot6KitRowCost`'s bushido arm, and `Ot6AbilityCost`'s). The **cursor row is the boost
 level** (row 0 = boost 1× … row 2 = boost 3×), so picking a stronger tech spends
 more BP. That keeps the numeral gauge's trade of BP for a stronger cut and
 makes it readable. Confirm banks `$3e9d = r` and reuses `Ot6BushidoTier` to latch the

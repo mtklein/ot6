@@ -69,7 +69,7 @@ OT6_THIEF_BESTOW = $58
 ; [ open Steal as a submenu, the twin of Ot6BlitzListOpen ]
 ; Three rows in the left column only (cells 0/6/12, the Ot6BushidoWindow shape),
 ; right column and rows past the third $ff so the window renders one clean
-; column.  Per row: Index = the id above, Qty = the MP cost the decorator draws,
+; column.  Per row: Index = the id above, Qty = the MP cost as of this open,
 ; Flags = the row's own targeting byte, which the Tools confirm copies into
 ; w7e7a84 in place of the command's.  That last one is why Bestow can point at
 ; the party while Steal and Filch point at the enemy from the same command:
@@ -100,6 +100,12 @@ OT6_THIEF_BESTOW = $58
         lda     #OT6_THIEF_STEAL
         sta     $4005
         jsl     Ot6ThiefCost
+        jsl     Ot6PendPrice    ; Steal is a chance verb: boost buys the
+                                ;   rare/guarantee ladder, so the row escalates
+                                ;   x2.5 per pending level (#219).  Filch and
+                                ;   Bestow below buy nothing from a boost and
+                                ;   stay flat.  Ot6KitRowCost draws the same
+                                ;   split, and Ot6AbilityCost charges it
         sta     $4006
         lda     #$43            ; MANUAL|ONE_SIDE|ENEMY
         sta     $4007

@@ -24,6 +24,8 @@ local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_MAGIC, ST_TGT, ST_TRANS = 0x05, 0x0E, 0x38, 0x01
 local CMD_MAGIC = 0x02
 local FIRE, FIRE2, FIRE2_MP = 0x00, 0x05, 20
+local CURE, CURE2_MP = 0x2D, 25          -- the other family head she knows
+local FIRE_MP, CURE_MP = 4, 5            -- their own base prices
 local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
 
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end
@@ -39,6 +41,27 @@ local function spellIndexOf(slot, id)
   for i = 0, 53 do
     local a = 0x2092 + SPELL_PTR[slot] + i*4
     if H.readByte(a) == id and (H.readByte(a + 1) & 0x80) == 0 then return i end
+  end
+  return nil
+end
+-- the whole cost column of a caster's list: 79 rows (the esper row plus 54
+-- spells and 24 lores), entry+3, the one cell the number, the grey, the
+-- confirm and the charge all read.  Ot6FoldPrices rewrites this column on
+-- every recheck, so a snapshot before and after the boost edge says exactly
+-- which rows the walk touched.
+local LIST_ROWS = 79
+local function costColumn(slot)
+  local t = {}
+  for i = 0, LIST_ROWS - 1 do
+    local a = 0x208E + SPELL_PTR[slot] + i*4
+    t[i] = { id = H.readByte(a), cost = H.readByte(a + 3) }
+  end
+  return t
+end
+local function rowOfSpell(slot, id)
+  for i = 0, LIST_ROWS - 1 do
+    local a = 0x208E + SPELL_PTR[slot] + i*4
+    if i > 0 and H.readByte(a) == id then return i end
   end
   return nil
 end
@@ -123,7 +146,7 @@ end
 
 local plan, idx, goal = nil, 1, { 82, 56 }
 
-H.run({ maxFrames = 45000 }, {
+H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
@@ -172,6 +195,94 @@ H.run({ maxFrames = 45000 }, {
       queued[#queued + 1] = value
     end, emu.callbackType.write, 0x7e3620, 0x7e371f)
     armDamageWatch()
+    _G.__col0 = costColumn(terra)
+    _G.__fireRow = rowOfSpell(terra, FIRE)
+    _G.__cureRow = rowOfSpell(terra, CURE)
+    H.assertEq(_G.__fireRow ~= nil and _G.__cureRow ~= nil, true,
+      "her list really holds rows for Fire and Cure, the two family heads "
+      .. "the boost below re-prices")
+    H.log(string.format("unboosted column: Fire row %d = %d MP, Cure row "
+      .. "%d = %d MP", _G.__fireRow, _G.__col0[_G.__fireRow].cost,
+      _G.__cureRow, _G.__col0[_G.__cureRow].cost))
+    H.assertEq(_G.__col0[_G.__fireRow].cost, FIRE_MP,
+      "Fire's row opens at its own 4")
+    H.assertEq(_G.__col0[_G.__cureRow].cost, CURE_MP,
+      "Cure's row opens at its own 5")
+  end),
+
+  -- The price column, across the R edge.  Ot6FoldPrices walks all 79 rows
+  -- since #219 (it has to: a spell outside a tier family now escalates
+  -- x2.5 per boost rather than folding), so this guards the walk itself --
+  -- a row it moved that it had no business moving, or one it missed.
+  --
+  -- Every row that moves must land on ONE of the two rules, and which one
+  -- is not a choice: Fire and Cure are tier-family heads, so they go to
+  -- their folded tiers' own vanilla prices (20 and 25) and take no
+  -- escalation; every other row that moves is outside the families, so it
+  -- takes min(99, floor(base x 2.5 + 0.5)) and nothing else.
+  --
+  -- The list carries more than the two spells this party knows: the lore
+  -- rows (master-list positions $36..$4d) keep a real id and a real cost
+  -- for every character, learned or not -- ValidateSpellList's `cpy #$00dc`
+  -- sends them down the price-only arm (battle_main.asm:14601). They are
+  -- unreachable for a caster with no Lore command, but they are priced, and
+  -- they are what makes this arm a live reading of the escalation and not
+  -- only of the fold: on this fixture three of them move, by 2.5x, off the
+  -- ROM's own arithmetic.
+  H.driveUntil(function() return pend(terra) >= 1 end, 8000, {
+    H.call(function() H.setPad(decide()) end),
+  }, "one real R edge arms the boost"),
+  H.release(),
+  H.waitFrames(30),
+  H.call(function()
+    -- #219's rule, recomputed: (base * 5^n + 2^(n-1)) >> n capped at 99,
+    -- and never below the base (the Phoenix floor in Ot6BoostPriceFor).
+    local function boosted(base, n)
+      if n == 0 then return base end
+      local x = base
+      for _ = 1, n do x = x * 5 end
+      x = (x + (1 << (n - 1))) >> n
+      return math.max(base, math.min(99, x))
+    end
+    local col1, n = costColumn(terra), pend(terra)
+    H.assertEq(n, 1, "the arm measures exactly one pending boost")
+    local moved, escalated = {}, 0
+    for i = 0, LIST_ROWS - 1 do
+      local was, now = _G.__col0[i].cost, col1[i].cost
+      if now ~= was then
+        moved[#moved + 1] = string.format("row %d ($%02x) %d -> %d",
+          i, col1[i].id, was, now)
+        if i == _G.__fireRow then
+          H.assertEq(now, FIRE2_MP,
+            "Fire's row now carries Fire 2's own 20 -- the number, the grey "
+            .. "and the confirm read this cell, so all three follow the fold")
+        elseif i == _G.__cureRow then
+          H.assertEq(now, CURE2_MP, "Cure's row now carries Cure 2's own 25. "
+            .. "A tier family does NOT take #219's 2.5x escalation: the fold "
+            .. "IS its escalation")
+        else
+          escalated = escalated + 1
+          H.assertEq(now, boosted(was, n), string.format(
+            "row %d is outside every tier family, so its boosted price is "
+            .. "min(99, floor(%d x 2.5 + 0.5)) = %d, not %d (#219)",
+            i, was, boosted(was, n), now))
+        end
+      end
+    end
+    H.log(string.format("rows the boost re-priced: %s", table.concat(moved, ", ")))
+    H.assertEq(col1[_G.__fireRow].cost ~= _G.__col0[_G.__fireRow].cost, true,
+      "Fire's row moved at all -- the walk reached it")
+    H.assertEq(col1[_G.__cureRow].cost ~= _G.__col0[_G.__cureRow].cost, true,
+      "Cure's row moved at all -- the walk reached it")
+    H.assertEq(escalated > 0, true,
+      "at least one non-family row escalated, so this arm reads #219's 2.5x "
+      .. "out of the ROM and not only the fold")
+    -- No "every row that stayed put had to stay put" mirror of the above:
+    -- a row's own id byte cannot say whether it was legitimately skipped.
+    -- A lore is stored as id - $8b, so Step Mine ($99, the one price the
+    -- walk deliberately leaves alone) reads as $0e and is indistinguishable
+    -- from Pearl.  The moved-rows check above is the direction that matters
+    -- and the one this list can answer.
   end),
   -- One real R edge arms pending 1; the live list then queues the fold.
   -- The drive stops once the cast is charged (mp changed) rather than once

@@ -441,6 +441,16 @@ done:   rtl
 ; recheck having run first.  Ot6FoldPrices keeps the displayed price
 ; agreeing with it.
 ;
+; ---- and a spell that cannot fold pays the escalation instead ----
+;
+; #219: every boosted ability but Fight costs escalating MP.  A spell outside
+; the tier families has no tier to buy, so its boost buys Ot6BoostDmg's
+; x2/x4/x8 and its price takes x2.5 per level (Ot6BoostPriceFor).  That is the
+; same three commands plus summon ($19), which joins the gate here for its
+; price alone: espers are in no family, so the fold arm never sees one.
+; Lore ($0c) reaches this proc with the real lore id in $3a7b, the id
+; MagicProp is indexed by, so one arm serves magic, x-magic, lore and summon.
+;
 ; ---- the counterattack guard cannot use the global "counter executing" flag ----
 ;
 ; GetMPCost's character arm reads the caster's spell-list cost byte
@@ -490,20 +500,57 @@ done:   rtl
         cmp     #$17
         beq     @cmdok          ; $17 x-magic
         cmp     #$0c
-        bne     @keep           ; $0c lore
+        beq     @cmdok          ; $0c lore
+        cmp     #$19
+        bne     @keep           ; $19 summon
 @cmdok: txa                     ; width-neutral character test
         cmp     #$08
         bcs     @keep           ; monsters never boost
         jsl     Ot6FoldSteps    ; pending boost -> OT6_SCR_BIT tier steps
-        beq     @keep           ; unboosted: nothing to fold or re-price
-        lda     $3a7b           ; attack id
+        beq     @keep           ; unboosted: nothing to fold and nothing to
+                                ;   escalate
+        lda     $3a7b
+        cmp     #$99            ; Step Mine, the one spell in the game whose
+        beq     @keep           ;   price is not MagicProp's: battle init
+                                ;   derives it from the play clock straight
+                                ;   into the list row (battle_main.asm:14670)
+                                ;   and there is nothing here to re-derive it
+                                ;   from, so it stays vanilla on both surfaces
+        lda     $3a7a
+        cmp     #$19
+        beq     @summon
+        lda     $3a7b           ; attack id: the real spell or lore id
+        jsl     Ot6InFoldTbl    ; carry set = a tier family (A preserved)
+        bcc     @escalate
         jsl     Ot6FoldTier     ; -> the tier this boost buys
         cmp     $3a7b
-        beq     @keep           ; not a tier family: id came back unchanged
+        beq     @keep           ; a tier the caster already owns: only heads
+                                ;   fold, and Ot6BoostDmg gives a non-head no
+                                ;   multiplier, so neither its id nor its price
+                                ;   moves
         sta     $3a7b           ; queue the folded tier
         jsl     Ot6SpellMP      ; and price it as that tier.  x is still
         sta     $3620,y         ;   the actor, y still the queue slot, so this
-                                ;   overwrites the base cost :13249 just banked
+        bra     @keep           ;   overwrites the base cost :13249 just banked
+@summon:
+        lda     $3a7b           ; Cmd_19 names the esper by index; the record
+        cmp     #$1b            ;   its MP lives in is index + $36, which is
+        bcs     @keep           ;   also what Ot6FoldPrices priced row 0 from.
+        clc                     ;   The range check is not decoration: the +$36
+        adc     #$36            ;   wraps in 8 bits, so a $ff attack byte (what
+                                ;   init_buf_input leaves, and what anything
+                                ;   that reaches command $19 without the esper
+                                ;   row carries) would price as spell $35
+@escalate:
+        ; not a tier family: boost buys this cast Ot6BoostDmg's x2/x4/x8, so
+        ; the price escalates with it (#219).  Re-derived here, on the same A
+        ; the queue consumes, so the charge does not depend on the menu-side
+        ; recheck (Ot6FoldPrices) having run first -- the same rule the fold
+        ; above keeps.  Both arrive at one number because both walk
+        ; MagicProp -> Ot6SpellMP -> Ot6BoostPriceFor.
+        jsl     Ot6SpellMP      ; the base price, relics included
+        jsl     Ot6BoostPriceFor
+        sta     $3620,y
 @keep:  pla
         plp
         rtl
@@ -531,6 +578,175 @@ done:   rtl
         lda     #$02            ; at most two tiers up
 @out:   sta     OT6_SCR_BIT     ; tier steps
         lda     OT6_SCR_BIT     ; re-load so Z reflects the value, not a leftover
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ what a boost costs: the one price-scaling authority ]
+;
+; price = min(99, floor(base * 2.5^boost + 0.5)) for boost 0..3, i.e. x1 /
+; x2.5 / x6.25 / x15.625 against the base price, every result capped at 99
+; (#219).  Boost multiplies a damage verb by x2/x4/x8 (Ot6BoostDmg), so MP
+; scales slightly faster than damage; the ratio matches magic's own -ra -> -ga
+; step, where vanilla pays ~2.5x the MP for ~2x the power.
+;
+; Exact in integers, with no fixed point anywhere: 2.5^n = 5^n / 2^n, so
+;     floor(base * 2.5^n + 1/2) = (base * 5^n + 2^(n-1)) >> n
+; and that in turn is ((base * 5^n) >> (n-1)) incremented and halved, which is
+; what the body does.  The two are equal for every byte base at n = 1, 2 and
+; 3: the discarded bits can only move the rounded result when base * 5^n is
+; congruent to a value mod 2^n that 5^n (odd) cannot produce.  n multiply-by-5
+; steps, n-1 shifts, one round.  base * 5^3 = 125 * 255 = 31875 at worst, so
+; the 16-bit product cannot overflow for any byte cost.
+;
+; The cap is the display's, not taste's: every OT6 price drawer renders two
+; digits (ListText cmd $02, btlgfx_main.asm:15045; Ot6LoadoutDrawCost,
+; ot6_loadout_page.asm:375), so 100 would print as punctuation.  The owner's
+; ruling is that the scaling flattens there rather than that the drawers grow
+; (#219, ruling 1): Spiraler 50 costs 99 from boost 1 up, and Bum Rush,
+; already at the cap, never moves at all.  The one thing the cap may not do
+; is make a boost cheaper than not boosting; see the floor at @round.
+;
+; All three surfaces that state a price -- the drawn number, the grey, and the
+; charge -- reach this proc, so they cannot disagree about what a boost costs
+; (#219, ruling 3).  There is no RAM scratch: the working product lives in a
+; stack-relative slot, because this runs inside Ot6FoldPrices' walk (which
+; owns OT6_SCR_BIT/IDX/SLOT2) and inside the list decorators (which share the
+; icon path's OT6_SCR_COLS).
+;
+; in: A = the base cost (a byte), X = the caster's entity offset.
+; out: A = the scaled cost, a byte.  a8/i16, db=$7e; preserves X and Y.  rtl.
+.proc Ot6BoostPriceFor
+        .a8
+        .i16
+        php
+        rep     #$30            ; a16/i16: a 16-bit product and word pushes
+        .a16
+        phy                     ; the caller's Y
+        and     #$00ff          ; A = the base cost, zero-extended
+        pha                     ; [$01,s] the base
+        sep     #$20
+        .a8
+        lda     OT6_BOOST_REVEALED,x    ; this caster's pending boost
+        cmp     #$04
+        bcc     :+
+        lda     #$03            ; defensive: Ot6Boost already caps the spend at 3
+:       rep     #$20
+        .a16
+        and     #$00ff
+        bne     @scale
+        pla                     ; unboosted: the base price stands, unchanged
+        bra     @out
+@scale: phx                     ; the caller's X, free from here: the boost is
+                                ;   read, and X becomes the shift counter
+        tay                     ; y = n, the multiply counter
+        pha                     ; [$01,s] n, [$05,s] the base
+        lda     $05,s
+        pha                     ; [$01,s] the multiply temp, n at $03,s
+@x5:    sta     $01,s           ; product *= 5, n times -> base * 5^n
+        asl
+        asl                     ;   x4 (no carry: 255*25*4 = 25500)
+        clc
+        adc     $01,s           ;   + itself = x5
+        dey
+        bne     @x5
+        sta     $01,s           ; hand the product back and release the temp
+        pla
+        plx                     ; x = n again, for the shift (the 65816 has no
+                                ;   stack-relative ldy/ldx, and pulling is what
+                                ;   frees the slot anyway)
+@shr:   dex                     ; >> (n-1) ...
+        beq     @round
+        lsr
+        bra     @shr
+@round: inc                     ; ... then (q + 1) >> 1, the rounding step
+        lsr
+        cmp     #100
+        bcc     :+
+        lda     #99             ; the two-digit ceiling (#219, ruling 1)
+:       cmp     $03,s           ; ...but the ceiling never makes a boost
+        bcs     :+              ;   CHEAPER than not boosting.  One price in
+        lda     $03,s           ;   the game is already above it: Phoenix at
+                                ;   110 (MagicProp +$05), which is legal
+                                ;   because the summon window draws three
+                                ;   digits (ListText cmd $16).  Capping a
+                                ;   boosted Phoenix to 99 would pay less for
+                                ;   more, so the base stands instead
+:       plx                     ; the caller's X back
+        ply                     ; drop the base
+@out:   sep     #$20
+        .a8
+        ply                     ; the caller's Y
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ price a base cost for the caster whose menu is open ]
+;
+; Ot6BoostPriceFor's menu-side entry.  The battle list decorators hold a row
+; and a price but no entity offset; the active caster is $62ca, the same slot
+; DrawMagicListText and Ot6AbilityGrey index by, so the number a row draws and
+; the grey beside it come from the one caster whose boost the L/R pips show.
+;
+; in: A = the base cost.  out: A = the scaled cost.  a8/i16, db=$7e;
+; preserves X and Y.  rtl.
+.proc Ot6PendPrice
+        .a8
+        .i16
+        phx
+        phy
+        pha                     ; park the base under the slot arithmetic
+        lda     $62ca           ; active caster slot
+        longa
+        and     #$0003
+        asl                     ; slot -> entity offset (stride 2: chars 0/2/4/6)
+        tax
+        shorta0
+        pla
+        jsl     Ot6BoostPriceFor
+        ply
+        plx
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ is this spell id anywhere in a tier family?  the escalation's own gate ]
+;
+; Ot6BoostDmg asks the same question of $3a7d, byte for byte against the same
+; table, and answers it the same way: a spell in the fold table gets no damage
+; multiplier, because boost spent on it bought a tier (a family head) or
+; bought nothing at all (a tier the caster already owns, which does not fold
+; again -- only heads fold).  Price follows damage: exactly the ids this
+; returns carry SET for are the ones #219 leaves on their vanilla MP, and
+; exactly the ones it returns carry CLEAR for take the 2.5x.  One scan, so the
+; two halves of the boost canon cannot come to different answers about the
+; same spell.
+;
+; in: A = spell id.  out: carry set = in a tier family; A preserved.
+; a8/i16; preserves X and Y.  rtl.
+.proc Ot6InFoldTbl
+        .a8
+        .i16
+        phx
+        pha                     ; [$01,s] the id, matched against every entry
+        ldx     #$0000
+@scan:  lda     f:Ot6FoldTbl,x
+        cmp     $01,s
+        beq     @yes
+        inx                     ; stride 1: heads AND tiers both count here,
+        cpx     #$0018          ;   unlike Ot6FoldTier's stride-3 head scan
+        bcc     @scan
+        pla
+        plx
+        clc
+        rtl
+@yes:   pla
+        plx
+        sec
         rtl
 .endproc
 
@@ -645,6 +861,40 @@ done:   rtl
 
 ; ------------------------------------------------------------------------------
 
+; [ what one spell costs this caster, boost included: magic's price authority ]
+;
+; The magic-side twin of Ot6BoostPriceFor's use on the kit verbs, and the one
+; place the four magic surfaces (the list's number, its grey, the confirm and
+; the charge) get their answer from.
+;
+; Two rules, and Ot6InFoldTbl decides which applies rather than a second
+; opinion doing it:
+;   * a tier-family spell keeps its vanilla MP.  A family head folds up a tier
+;     and pays that tier's own price -- the fold IS the escalation, and a
+;     steeper one than 2.5x (Fire 4 -> Fire 2 20 -> Fire 3 51).  A tier the
+;     caster already owns does not fold again and Ot6BoostDmg gives it no
+;     multiplier either, so nothing about its price moves.  That is #219's
+;     "unchanged, already escalating by tier".
+;   * everything else -- Drain, Quake, Ultima, every Lore, an equipped esper's
+;     summon -- is a multiplier verb under Ot6BoostDmg, so it takes the 2.5x.
+;
+; in: A = the spell id (an esper is its MagicProp record, index + $36),
+; X = the caster's entity offset, OT6_SCR_BIT = the tier steps his boost buys
+; (Ot6FoldSteps').  out: A = the price.  a8/i16, db=$7e; preserves X and Y.
+.proc Ot6MagicPrice
+        .a8
+        .i16
+        jsl     Ot6InFoldTbl    ; carry set = tier family (A preserved)
+        bcs     @tier
+        jsl     Ot6SpellMP      ; the base price, relics included
+        jml     Ot6BoostPriceFor        ; ...x2.5 per pending boost; its rtl
+                                        ;   returns for us
+@tier:  jsl     Ot6FoldTier     ; a head folds; a tier comes back unchanged
+        jml     Ot6SpellMP      ; and either way it is priced as itself, vanilla
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ boost preview in ability lists ]
 
 ; replaces ListTextCmd_0f's `lda ($4f) / sta $2c` (exactly four bytes).
@@ -704,12 +954,26 @@ Ot6FoldTbl:
 
 ; ------------------------------------------------------------------------------
 
-; [ the magic list shows the folded tier's price, and greys on it ]
+; [ the magic list shows what a boosted cast will really cost, and greys on it ]
 ;
 ; Ot6QueueFold charges the folded tier; without this the list would still
 ; show the base spell's number beside the folded name ("Fire 3 ... 4", and
 ; then 51 MP gone) and the confirm would accept a cast the universal
-; insufficient-MP gate then fizzles.
+; insufficient-MP gate then fizzles.  Since #219 the same is true of every
+; spell that does not fold: its price escalates x2.5 per pending boost, so
+; the walk below covers the caster's whole list rather than the eight family
+; heads, and Ot6MagicPrice decides per row which of the two rules applies.
+;
+; The walk is driven off the master spell list $3034 (position -> real id)
+; rather than off the rows themselves, because a lore's row byte is its id
+; minus $8b (battle_main.asm:14648) and would be indistinguishable from a
+; magic id.  Position p is row p+1; row 0 is the equipped esper, whose row
+; byte is an esper index and whose MagicProp record is that index + $36.
+;
+; Cost: 78 rows instead of 8 families, but an unlearned row leaves after two
+; loads, and this is a burst on a recheck request (an L/R edge, or the end of
+; an action), never per-frame work -- the same budget note Ot6Boost's call
+; site already carries.
 ;
 ; Why one byte instead of four hooks.  Everything the player is told about a
 ; magic row's cost reads the same cell, entry+3 of the caster's spell list:
@@ -763,48 +1027,86 @@ Ot6FoldTbl:
         bcs     @out            ; monsters have no boost and no spell list
         ; x is the only register the 65816 can index a long address with
         ; (`lda f:tbl,y` has no encoding), and this walk needs it three
-        ; different ways per family (table cursor, spell id, list entry),
-        ; so the two invariants live in scratch and x is working state.
+        ; different ways per row (master-list cursor, caster, list row), so
+        ; the two invariants live in scratch and x is working state.
         stx     OT6_SCR_SLOT2   ; the caster's entity offset
         jsl     Ot6FoldSteps    ; -> OT6_SCR_BIT (0 restores the base prices)
-        ldx     #$0000
-        stx     OT6_SCR_IDX     ; family cursor (word store: the high byte must
-                                ;   stay 0 for the 8-bit bumps at @next)
-@fam:   ldx     OT6_SCR_IDX
-        lda     f:Ot6FoldTbl,x  ; the family's base id, the id the list holds
+        ; --- row 0: the equipped esper, if he has one ---
+        ; The $ff test below is the whole gate, and it is sufficient:
+        ; InitBattle $ff-fills $2000-$341f before its one call to InitSkills
+        ; (battle_main.asm:6096), the list-fill loop never writes row 0
+        ; (:14644 starts at row 1), and ValidateSpellList writes row 0 only
+        ; for a character who really has magicite equipped (:14556-14566).
+        ; Not $3f2e: that mask means "has already summoned this battle", the
+        ; once-per-battle latch UpdateEnabledMagic uses to disable the row,
+        ; and a disabled row still wants the right number beside it.
         longa
-        and     #$00ff
-        tax
+        lda     $302c,x
+        tax                     ; -> the caster's first list row
         shorta0
-        lda     $3084,x         ; master spell list: spell id -> entry index
-        cmp     #$ff
-        beq     @next           ; this spell owns no list entry at all
-        ldx     OT6_SCR_SLOT2   ; the caster again
-        longa
-        and     #$00ff
-        asl2                    ; entry index * 4 -- GetMPCost's own stride
+        lda     a:$0000,x       ; the esper index ValidateSpellList stored
+        cmp     #$1b            ; $ff (no magicite) or anything outside the
+        bcs     @rows           ;   esper range: no summon row to price.  The
+                                ;   same range check Ot6QueueFold's @summon
+                                ;   makes, so the two cannot price different
+                                ;   records for one row
         clc
-        adc     $302c,x         ; -> this caster's entry for the base spell
-        tax
+        adc     #$36            ; -> the esper's own MagicProp record
+        phx                     ; the row
+        ldx     OT6_SCR_SLOT2   ; the caster (Ot6MagicPrice wants the entity)
+        jsl     Ot6MagicPrice
+        plx                     ; the row back
+        sta     a:$0003,x
+        ; --- rows 1..78: every spell and lore anybody in the party knows ---
+@rows:  ldx     #$0000
+        stx     OT6_SCR_IDX     ; p, the master-list position (word store: the
+                                ;   high byte must stay 0 for the bumps below)
+@row:   ldx     OT6_SCR_IDX
+        lda     $3034,x         ; the master spell list: position -> the REAL
+                                ;   id ($00-$35 magic, $8b-$a2 lore, $ff =
+                                ;   nobody knows it).  The caster's own row
+                                ;   byte cannot stand in for this: a lore is
+                                ;   stored there as id - $8b
+                                ;   (battle_main.asm:14648), which collides
+                                ;   with the magic ids
+        cmp     #$ff
+        beq     @next           ; nobody knows it: dead in every list
+        cmp     #$99
+        beq     @next           ; Step Mine: its price is the play clock's,
+                                ;   not MagicProp's (battle_main.asm:14670),
+                                ;   so recomputing the row would overwrite the
+                                ;   one price in the game this walk cannot
+                                ;   reproduce.  Ot6QueueFold skips it too, so
+                                ;   both surfaces stay vanilla together
+        pha                     ; [$01,s] the real id
+        ldx     OT6_SCR_SLOT2   ; the caster
+        longa
+        lda     OT6_SCR_IDX
+        inc                     ; row = position + 1 (row 0 is the esper), the
+        asl2                    ;   same arithmetic battle init used to fill
+        clc                     ;   the lists (:14644) and GetMPCost uses to
+        adc     $302c,x         ;   read one back (:13268)
+        tax                     ; -> this caster's row for this spell
         shorta0
-        lda     a:$0000,x       ; the entry's id byte
-        bmi     @next           ; $ff: not learned.  leave the row alone; it
+        lda     a:$0000,x       ; the row's id byte
+        bmi     @drop           ; $ff: not learned.  leave the row alone; it
                                 ;   is already disabled, and a price on a row
                                 ;   the caster cannot pick means nothing
-        phx                     ; the entry
-        ldx     OT6_SCR_IDX
-        lda     f:Ot6FoldTbl,x  ; the base id again
-        jsl     Ot6FoldTier     ; -> the tier this boost buys
-        ldx     OT6_SCR_SLOT2   ; the caster (Ot6SpellMP wants the entity)
-        jsl     Ot6SpellMP      ; -> that tier's real cost, relics included
-        plx                     ; the entry back
+        phx                     ; the row
+        lda     $03,s           ; the real id (parked under the row pointer)
+        ldx     OT6_SCR_SLOT2   ; the caster
+        jsl     Ot6MagicPrice   ; -> the fold's tier price, or the escalated
+                                ;   one, by Ot6InFoldTbl's single answer
+        plx                     ; the row back
         sta     a:$0003,x       ; the byte: grey, number, confirm and charge
-@next:  lda     OT6_SCR_IDX     ; cursor + 3 (low byte only; it never reaches
-        clc                     ;   $18, so the high byte stays the 0 above)
-        adc     #$03
+@drop:  pla                     ; drop the parked id
+@next:  longa
+        lda     OT6_SCR_IDX
+        inc
         sta     OT6_SCR_IDX
-        cmp     #$18            ; 8 families
-        bcc     @fam
+        cmp     #$004e          ; 78 rows: 54 spells + 24 lores, the same count
+        shorta0                 ;   UpdateEnabledMagic's own loop walks four
+        bcc     @row            ;   instructions later (:14797)
 @out:   ply
         plx
         pla
@@ -852,11 +1154,21 @@ Ot6FoldTbl:
 ; flag waits on. that is why a hidden charge must not ship enabled: the menu
 ; still shows these verbs no number.
 ;
-; boost never raises the price: blitz and tools keep one id no matter the
-; boost, and a boosted SwdTech has already queued the tech its BP bought
-; (Ot6BushidoTier / Ot6QueueFold leaves $3a7b at that tech), whose own
-; per-tech price is what should be charged: BP buys the tier, and MP
+; boost raises the price of everything here except SwdTech (#219).  Blitz and
+; tools keep one id no matter the boost and spend it on Ot6BoostDmg's
+; x2/x4/x8; Steal, Dance and Rage spend it on odds.  Either way the row's
+; base price takes x2.5 per pending level, through Ot6BoostPriceFor, capped at
+; 99.  A boosted SwdTech is the exception because its BP was already spent:
+; Ot6BushidoTier / Ot6QueueFold left $3a7b at the tech the boost bought, whose
+; own per-tech price is what should be charged.  BP buys the tier, and MP
 ; prices the cast.
+;
+; Filch and Bestow are not escalated either.  Ot6BoostDmg's cmd-$05 gate
+; refuses to multiply anything under this command and the two rows are not
+; chance verbs, so boosting into them buys nothing at all (Ot6Bestow's header
+; says the same); charging for it would be charging for nothing.  The Steal
+; row itself IS a chance verb -- boost buys the rare/guarantee ladder -- and
+; takes the escalation on its own arm below.
 ;
 ; entry (jsl from CreateAction, right after jsr GetMPCost): a8/i16,
 ; A = vanilla cost, X = attacker entity, Y = queue slot. db=$7e (the site
@@ -881,11 +1193,12 @@ Ot6FoldTbl:
         ; battle_main.asm), where the free floor has to survive it.  Falling
         ; out of this chain hands back vanilla's own cost for cmd $11, 0.
         cmp     #$07
-        beq     @costed         ; swdtech
+        beq     @swdtech        ; swdtech: boost bought the tech tier, and the
+                                ;   row it picked is priced at its own price
         cmp     #$09
-        beq     @costed         ; tools
+        beq     @boosted        ; tools
         cmp     #$0a
-        beq     @costed         ; blitz
+        beq     @boosted        ; blitz
         pla                     ; some other verb: hand back vanilla's cost
         plp
         rtl
@@ -905,6 +1218,10 @@ Ot6FoldTbl:
         rtl
 @plainsteal:
         jsl     Ot6StealCost    ; the flat price, one authority
+        jsl     Ot6BoostPriceFor        ; ...x2.5 per pending boost: boost buys
+                                        ;   Steal the rare/guarantee ladder
+                                        ;   (Ot6StealBoostLevel), so it is a
+                                        ;   chance verb and pays for it (#219)
         plp
         rtl
 @dance: ; dance (cmd $13) is priced at the commit moment only: the mid-dance
@@ -923,6 +1240,11 @@ Ot6FoldTbl:
         plp
         rtl
 :       jsl     Ot6DanceCost    ; dance-start: the flat price, one authority
+        jsl     Ot6BoostPriceFor        ; ...x2.5 per pending boost.  A boosted
+                                        ;   Dance is a multiplier verb: cmd $13
+                                        ;   is not in Ot6BoostDmg's gate list,
+                                        ;   so every step of the dance the start
+                                        ;   pays for swings at x2/x4/x8
         plp
         rtl
 @rage:  ; rage is the other possess-verb: flat, charged once at Rage-start,
@@ -940,12 +1262,33 @@ Ot6FoldTbl:
         plp
         rtl
 :       jsl     Ot6RageCost     ; rage-start: the flat price, one authority
+        jsl     Ot6BoostPriceFor        ; ...x2.5 per pending boost: boost buys
+                                        ;   the trance's coin (Ot6RageCoin), a
+                                        ;   chance verb, and the tier it latches
+                                        ;   runs the whole battle (#219)
         plp
         rtl
-@costed:
+@swdtech:
+        ; SwdTech's boost was already spent, on the tech: Ot6BushidoTier left
+        ; $3a7b at the row the BP bought, and that row's own table price is
+        ; what should be charged.  So no escalation here -- BP buys the tier,
+        ; MP prices the cast, and the ladder is already monotonic in the tech
+        ; index (#219: "unchanged, already escalating by tier").
+        pla                     ; drop the parked cost (it is 0 for these)
+        lda     $3a7b           ; the resolved attack id
+        jsl     Ot6CostFor      ; pure table scan: id -> cost in A
+        plp
+        rtl
+@boosted:
+        ; Blitz and Tools keep one id no matter the boost, and boost buys them
+        ; Ot6BoostDmg's x2/x4/x8, so the price is the row's times 2.5 per
+        ; pending level (#219).  X is still the attacker entity (the site
+        ; contract above), which is the caster Ot6BoostPriceFor reads the
+        ; pending boost of.
         pla                     ; drop the parked cost (it is 0 for these)
         lda     $3a7b           ; the resolved id (attack id / tool item id)
         jsl     Ot6CostFor      ; pure table scan: id -> cost in A
+        jsl     Ot6BoostPriceFor
         plp
         rtl
 .endproc
