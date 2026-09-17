@@ -3,7 +3,8 @@
 -- greys what Cyan cannot reach, for two reasons: not enough MP (as in Magic
 -- and Blitz), and not enough BP (the boost the row would spend).
 
---   bp: opens at Ot6InitBP's 1; +1 per item turn; minus the row's boost per
+--   bp: opens at Ot6InitBP's 1; +1 per unboosted turn (an Item, or a Fight
+--       when the bag holds no Tonic or Potion); minus the row's boost per
 --       tech (every tech is a boosted action, so its turn regens nothing).
 --       It opens at 1 in EVERY battle, so a ledger that spans a battle
 --       boundary is not a ledger -- every bank read below is gated on the
@@ -14,7 +15,8 @@
 -- Battles are real world encounters off the fixture tile; when the ledger's
 -- casts end one (Dispatch kills; Retort is the counter stance and mostly
 -- does not), the drive paces to the next.  MP persists across battles, the
--- bank does not.  SHADOW heals with real items.
+-- bank does not.  SHADOW heals with real items while the bag has them, and
+-- passes his turn when it does not.
 --
 -- The fighting lineage's camp_escaped packs carry a Berserk special.  Once
 -- it lands on CYAN ($3EE5,x bit 4), CheckPlayerAction (battle_main.asm:1470,
@@ -31,11 +33,11 @@ local STATE = "build/states/camp_escaped.mss.lua"
 
 local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_ITEM, ST_TOOLS, ST_TGT, ST_TRANS = 0x05, 0x0A, 0x30, 0x38, 0x01
-local CMD_SWDTECH, CMD_ITEM = 0x07, 0x01
+local CMD_SWDTECH, CMD_ITEM, CMD_FIGHT = 0x07, 0x01, 0x00
 local KROW = 0x8967                       -- kit list cursor row (read!)
 local RESTAGE = 0x57D4                    -- the gate's request byte (read!)
 local WHITE, GREY = 0x21, 0x25
-local TONIC, POTION = 0xE8, 0xE9
+local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
 local DISPATCH_MP, RETORT_MP = 4, 10
 
 local cyan, shadow
@@ -96,6 +98,16 @@ local function packStr()
   end
   return table.concat(parts, ",")
 end
+-- the heal stock the drive's item turns draw on (read): when it is empty
+-- the pip-paying turn is a Fight instead, and this says which one ran
+local function bagStr()
+  local n = { [TONIC] = 0, [POTION] = 0 }
+  for i = 0, 251 do
+    local id = H.readByte(0x2686 + i*5)
+    if n[id] then n[id] = n[id] + H.readByte(0x2686 + i*5 + 3) end
+  end
+  return string.format("Tonic %d Potion %d", n[TONIC], n[POTION])
+end
 local function cyanStatusStr()
   return string.format("st1=%02x st2=%02x", H.readByte(0x3EE4 + cyan*2),
     H.readByte(0x3EE5 + cyan*2))
@@ -151,6 +163,44 @@ end
 local mf = 0
 local cyanMode = "defer"
 local shadowThreshold = 60
+-- draining: a void attempt's battle is being ended.  Every window that
+-- would otherwise pass Fights instead, so the drain is the party ending the
+-- fight rather than waiting for a berserked CYAN's swings (measured, shift
+-- 31: CYAN went down, nobody else swung, and the party wiped mid-drain).
+local draining = false
+local tc = H.targetCursor({ mask = 0x7B7D,
+                            dirs = { "down", "up", "left", "right" } })
+local shadowItem = nil                   -- what SHADOW opened Item for
+-- a KO'd party member (STATUS1 DEAD, read); KO outlasts the battle, and a
+-- KO'd CYAN has no window in any later one either
+local function downedSlot()
+  for s2 = 0, 3 do
+    if H.readWord(0x3C1C + s2*2) > 0 and (H.readByte(0x3EE4 + s2*2) & 0x80) ~= 0 then
+      return s2
+    end
+  end
+  return nil
+end
+-- An attempt starts in a live battle with CYAN standing.  While he is KO'd
+-- the party fights on (draining) and SHADOW raises him; the attempt then
+-- builds its bank in whichever battle he is back up in.
+local function liveUp()
+  local live = H.battleLoadStarted() and H.monstersPresent() > 0
+  local down = cyan ~= nil and (H.readByte(0x3EE4 + cyan*2) & 0x80) ~= 0
+  draining = down
+  return live and not down
+end
+local function toCmd(slot, cmd)
+  local want = cmdRowOf(slot, cmd)
+  local cur = H.readByte(CMDROW + slot) & 3
+  if cur == want then return "a" end
+  return (cur < want) and "down" or "up"
+end
+local function passOrFight(slot, st)
+  if st == ST_CMD then return draining and toCmd(slot, CMD_FIGHT) or "x" end
+  if st == ST_TGT and draining then return "a" end
+  return "b"
+end
 local function decide()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
@@ -159,6 +209,11 @@ local function decide()
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
   if st == ST_TRANS then return {} end
+  tc.observe()
+  if act == shadow and st == ST_TGT and shadowItem == FENIX then
+    local btn = tc.steer(downedSlot(), mf)
+    return btn and { [btn] = true } or {}
+  end
   local slow = (st == ST_ITEM)
   if slow then
     if (mf - 1) % 30 >= 6 then return {} end
@@ -172,14 +227,19 @@ local function decide()
       local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
       if h > 0 and m > 0 and h * 100 // m < shadowThreshold then hurt = true end
     end
-    if st == ST_CMD and not hurt then btn = "x"
-    elseif st == ST_CMD then
-      local want = cmdRowOf(shadow, CMD_ITEM)
-      local cur = H.readByte(CMDROW + shadow) & 3
-      if cur == want then btn = "a"
-      else btn = (cur < want) and "down" or "up" end
+    -- A KO'd member comes first (a Fenix Down while the bag has one), then
+    -- the heal.  Nothing to use hands the window on: B out of an empty Item
+    -- list and back into it would hold his window, and CYAN's, forever
+    -- (#215, measured in battle_bushido's copy of this drive).
+    local canCare = bagIdxOf({ TONIC, POTION }) ~= nil
+    local canRaise = downedSlot() ~= nil and bagIdxOf({ FENIX }) ~= nil
+    if st == ST_CMD then
+      shadowItem = (canRaise and FENIX) or (hurt and canCare and TONIC) or nil
+      if shadowItem then btn = toCmd(shadow, CMD_ITEM)
+      else btn = passOrFight(shadow, st) end
     elseif st == ST_ITEM then
-      local want = bagIdxOf({ TONIC, POTION })
+      local want = (shadowItem == FENIX) and bagIdxOf({ FENIX })
+                                         or bagIdxOf({ TONIC, POTION })
       if want == nil then btn = "b"
       else
         local cur = H.readByte(0x8947 + shadow) + H.readByte(0x894F + shadow)
@@ -191,18 +251,22 @@ local function decide()
     else btn = "b" end
   elseif act == cyan then
     if cyanMode == "defer" then
-      btn = (st == ST_CMD) and "x" or "b"
+      btn = passOrFight(cyan, st)
     elseif cyanMode == "item" then
+      -- "item" is the unboosted turn that pays a pip (Ot6ActionEnd's +1).
+      -- With no Tonic or Potion in the bag (the fixture's bag is whatever
+      -- its lineage bought and SHADOW's care has left), that turn is a Fight.
+      local healer = bagIdxOf({ TONIC, POTION }) ~= nil
       if st == ST_CMD then
-        local want = cmdRowOf(cyan, CMD_ITEM)
+        local want = cmdRowOf(cyan, healer and CMD_ITEM or CMD_FIGHT)
         local cur = H.readByte(CMDROW + cyan) & 3
         if cur == want then btn = "a"
         else btn = (cur < want) and "down" or "up" end
       elseif st == ST_ITEM then
         local want = bagIdxOf({ TONIC, POTION })
-        if want == nil then error("bank ran out of items", 0) end
         local cur = H.readByte(0x8947 + cyan) + H.readByte(0x894F + cyan)
-        if cur < want then btn = "down"
+        if want == nil then btn = "b"         -- the last one went: Fight
+        elseif cur < want then btn = "down"
         elseif cur > want then btn = "up"
         else btn = "a" end
       elseif st == ST_TGT then btn = "a"
@@ -226,7 +290,7 @@ local function decide()
       else btn = "b" end
     end
   else
-    btn = (st == ST_CMD) and "x" or "b"
+    btn = passOrFight(act, st)
   end
   return btn and { [btn] = true } or {}
 end
@@ -333,13 +397,14 @@ H.run({ maxFrames = 150000 }, {
     end
     local function oneAttempt(n)
       return H.cond(function() return done end, {}, {
-        driveTo(function() return liveBattle() end, 30000,
+        driveTo(function() return liveUp() end, 30000,
           "a live battle for the bp-2 arm (attempt " .. n .. ")"),
         H.call(function()
           refindSlots()
+          draining = false
           cyanMode = "item"
-          H.log(string.format("  [bp-2 arm %d] pack %s; cyan slot %d bp=%d %s",
-            n, packStr(), cyan, bp(), cyanStatusStr()))
+          H.log(string.format("  [bp-2 arm %d] pack %s; cyan slot %d bp=%d %s; bag %s",
+            n, packStr(), cyan, bp(), cyanStatusStr(), bagStr()))
         end),
         driveTo(function()
           return not liveBattle() or cyanLostMenu() or bp() >= 2
@@ -461,6 +526,7 @@ H.run({ maxFrames = 150000 }, {
               tostring(liveBattle()), tostring(cyanCanMenu()), bp(),
               cyanStatusStr()))
             cyanMode = "defer"
+            draining = true
           end),
           driveTo(function() return not H.battleLoadStarted() end, 60000,
             "the failed attempt's battle drains away (attempt " .. n .. ")"),
@@ -492,13 +558,14 @@ H.run({ maxFrames = 150000 }, {
     end
     local function oneAttempt(n)
       return H.cond(function() return done end, {}, {
-        driveTo(function() return liveBattle() end, 30000,
+        driveTo(function() return liveUp() end, 30000,
           "a live battle for the 0-bank arm (attempt " .. n .. ")"),
         H.call(function()
           refindSlots()
+          draining = false
           cyanMode = "item"
-          H.log(string.format("  [0-bank arm %d] pack %s; cyan slot %d bp=%d %s",
-            n, packStr(), cyan, bp(), cyanStatusStr()))
+          H.log(string.format("  [0-bank arm %d] pack %s; cyan slot %d bp=%d %s; bag %s",
+            n, packStr(), cyan, bp(), cyanStatusStr(), bagStr()))
         end),
         driveTo(function()
           return not liveBattle() or cyanLostMenu() or bp() >= 2
@@ -555,6 +622,7 @@ H.run({ maxFrames = 150000 }, {
               tostring(liveBattle()), tostring(cyanCanMenu()), bp(),
               cyanStatusStr()))
             cyanMode = "defer"
+            draining = true
           end),
           driveTo(function() return not H.battleLoadStarted() end, 60000,
             "the failed attempt's battle drains away (attempt " .. n .. ")"),
@@ -580,13 +648,14 @@ H.run({ maxFrames = 150000 }, {
     end
     local function oneAttempt(n)
       return H.cond(function() return done end, {}, {
-        driveTo(function() return liveBattle() end, 30000,
+        driveTo(function() return liveUp() end, 30000,
           "a live battle for the MP arm (attempt " .. n .. ")"),
         H.call(function()
           refindSlots()
+          draining = false
           cyanMode = "item"
-          H.log(string.format("  [MP arm %d] pack %s; cyan slot %d bp=%d %s",
-            n, packStr(), cyan, bp(), cyanStatusStr()))
+          H.log(string.format("  [MP arm %d] pack %s; cyan slot %d bp=%d %s; bag %s",
+            n, packStr(), cyan, bp(), cyanStatusStr(), bagStr()))
         end),
         driveTo(function()
           return not liveBattle() or cyanLostMenu() or bp() >= 2
@@ -635,6 +704,7 @@ H.run({ maxFrames = 150000 }, {
               tostring(liveBattle()), tostring(cyanCanMenu()), bp(),
               cyanStatusStr()))
             cyanMode = "defer"
+            draining = true
           end),
           driveTo(function() return not H.battleLoadStarted() end, 60000,
             "the failed attempt's battle drains away (attempt " .. n .. ")"),
