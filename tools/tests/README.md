@@ -316,7 +316,18 @@ runs every script through the **segment runner** at the bottom of
   contract failure (`assertEq`, a checkpoint contract, a Lua error) is a
   bug and fails at once. Generators with their own ladders keep them: a
   ladder runs with `allowGameOver`, so its wipes never reach the canary,
-  and its exhaustion message classifies as `other`.
+  and its exhaustion message classifies as `other`. Under `allowGameOver`
+  the canary's battle-wipe count leaves the pad live (the GameOver-read
+  and TitleScreen watches still freeze it): a scripted loss moves on only
+  with the press a person makes at the Annihilated screen (#205). A
+  no-effect, no-progress or timeout that follows a counted game over the
+  body never answered with a snapshot restore files as `wipe`, with its
+  context line; `wipe_reclass.lua` (suite, `PASS attempts=2/2`) is that
+  rule's negative control, a solo LOCKE loss to the gate soldier nobody
+  presses through. `H.battleLoadStarted()` reads true through the
+  Annihilated screen (the seat table's wipe shape, `M.wipeVerdict`), so a
+  driver keeps its `frame()` and a solo loss gets its `[death]` and
+  `[wipe]` lines.
 - **The count.** Every failed attempt logs
   `[retry] attempt n/N FAILED class=<c> frame=... shift=... phase=... screenshot=<png>: <message>`
   (plus a `wipe context:` line naming the formation and every seat's

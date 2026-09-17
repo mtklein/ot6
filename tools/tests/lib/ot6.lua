@@ -349,8 +349,11 @@ end
 function M.requestLoadState(blob)
   M.finishRecoveryTrace("state_reload")
   -- a restored snapshot restarts the experiment: the post-game-over pad
-  -- freeze (see M.freezePad) ends here, with the game over it answered
+  -- freeze (see M.freezePad) ends here, with the game over it answered --
+  -- and so does the runner's memory of a counted game over the body had
+  -- not handled (#205): a stall after this reload is the reload's own
   M.thawPad()
+  if RUN ~= nil then RUN.goUnhandled = nil end
   local req = {}
   local ref
   M.pendingStateReqs = M.pendingStateReqs + 1
@@ -545,8 +548,21 @@ end
 -- least one character alive.  $FFFF/$FF00 anywhere means these bytes
 -- belong to another module.
 --
--- Known limit: a total party wipe is all zeros, the same shape a menu
--- leaves, so this reports false for a wipe.
+-- A total party wipe is all zeros, the same shape a menu leaves, so the
+-- zeros alone say nothing; the seat table tells them apart (#205): actors
+-- seated ($3ed8), present ($3aa0 bit 0) and a plausible max HP behind
+-- each -- M.wipeVerdict's reading, the one the run canary has trusted
+-- since #166.  Measured on locke_scenario (2026-09-16, a probe through a
+-- field menu, a battle load and a solo loss): outside a battle the table
+-- reads all $FFFF or all zero with the seat bytes $FF/0 and max HP
+-- $FFFF/0; InitParty's frame seats the actor with max HP still 0 (which
+-- the verdict rejects) and LoadCharProp writes the HP the next frame; and
+-- from the one seat's HP hitting 0 until the field writes $FFFF back
+-- (456 frames, LoseBattle's $3ebc bit 0 landing 281 in) the wipe shape
+-- holds without a gap.  So a wipe reads as the battle still being up,
+-- which it is: the engine sits on the Annihilated screen until a press,
+-- and a driver keeps its frame() -- the [death] and [wipe] lines a solo
+-- loss never got, and the A a person presses there.
 function M.battleLoadStarted()
   local anyLive = false
   for i = 0, 3 do
@@ -554,7 +570,8 @@ function M.battleLoadStarted()
     if hp >= 10000 then return false end   -- $FFFF, $FF00: not an HP table
     if hp > 0 then anyLive = true end
   end
-  return anyLive
+  if anyLive then return true end
+  return M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
 end
 
 -- Cheap "is anything on screen" check: an all-black 256x224 screenshot
@@ -6185,11 +6202,13 @@ RUN = {
   budget = 60000, shift = 0, gap = 20, idle = 0, idlePad = nil,
   bootMarked = false, s0 = nil, s0blob = nil, ld = nil, ldWait = 0,
   failures = {}, lastBattle = nil, epoch = 1, installing = false,
+  goUnhandled = nil,   -- { frame, what }: a counted game over no reload answered (#205)
 }
 M.totalFrames = 0
 
 -- What the earlier attempts of this run fell to, oldest first: one record
--- { attempt, class, msg, frame } per `[retry] attempt n/N FAILED` line.
+-- { attempt, class, msg, frame, context } per `[retry] attempt n/N FAILED`
+-- line (`context` is the wipe context line's text, for class wipe only).
 -- Read-only, and empty on a first attempt.  A negative-control suite
 -- (watchdog_cantrun, watchdog_listend) spends attempt 1 on a press the
 -- game is known not to answer and attempt 2 asserting that attempt 1 fell
@@ -6199,7 +6218,7 @@ function M.attemptFailures()
   local out = {}
   for i, f in ipairs(RUN.failures) do
     out[i] = { attempt = f.attempt, class = f.class, msg = f.msg,
-               frame = f.frame }
+               frame = f.frame, context = f.context }
   end
   return out
 end
@@ -6258,8 +6277,13 @@ function M.bootMark(what)
 end
 
 -- What the fight was, for the attempt line.  Sampled while a battle is up,
--- so it is still readable after the teardown a wipe runs into.
+-- so it is still readable after the teardown a wipe runs into.  Not
+-- resampled once the table reads wiped (battleLoadStarted holds through
+-- the Annihilated screen, #205): the last living reading -- the HP and
+-- pips the party carried into the killing round -- is the context a loss
+-- wants, and the [death] lines carry the exact figures.
 local function sampleBattle()
+  if M.partyWipedInBattle and M.partyWipedInBattle() and RUN.lastBattle then return end
   local seats = {}
   for e = 0, 3 do
     local a = M.readByte(0x3ed8 + e * 2)
@@ -6293,7 +6317,7 @@ local function resetLibState()
   M._killbitFired = false
   watchReset()
   RUN.bootMarked, RUN.idle, RUN.idlePad = false, 0, nil
-  RUN.lastBattle = nil
+  RUN.lastBattle, RUN.goUnhandled = nil, nil
   local hooks = replayHooks
   replayHooks = {}
   for _, fn in ipairs(hooks) do pcall(fn) end
@@ -6423,6 +6447,7 @@ function M.run(opts, steps)
         if pc ~= addr and pc ~= addr + 1 then return end
         goReadFired = goReadFired + 1
         M.gameOverFired = M.gameOverFired + 1
+        RUN.goUnhandled = { frame = M.frame, what = "the GameOver event script was entered" }
         M.freezePad("the GameOver event script was entered")
       end, emu.callbackType.read, addr, addr)
     end
@@ -6434,6 +6459,7 @@ function M.run(opts, steps)
         if canaryInGame then
           titleExecFired = titleExecFired + 1
           M.gameOverFired = M.gameOverFired + 1
+          RUN.goUnhandled = { frame = M.frame, what = "TitleScreen was entered" }
           M.freezePad("TitleScreen was entered")
         end
       end, emu.callbackType.exec, addr, addr)
@@ -6456,22 +6482,23 @@ function M.run(opts, steps)
       .. "totalframes=%d shift=%d phase=%d%s: %s",
       RUN.attempt, RUN.attempts, class, M.frame, M.totalFrames, RUN.shift,
       M.seedPhase(), shot and (" screenshot=" .. shot) or "", tostring(msg)))
+    local context = nil
     if class == "wipe" then
       local b = RUN.lastBattle
       if b then
-        M.log(string.format("[retry] attempt %d/%d wipe context: the last "
-          .. "battle up (f%d) was formation %s; seats at that reading %s "
-          .. "(actor:hp/maxhp bp)", RUN.attempt, RUN.attempts, b.frame,
-          b.formation, b.seats))
+        context = string.format("the last battle up (f%d) was formation %s; "
+          .. "seats at that reading %s (actor:hp/maxhp bp)", b.frame,
+          b.formation, b.seats)
       else
-        M.log(string.format("[retry] attempt %d/%d wipe context: no battle "
-          .. "was sampled in this attempt (the loss was not in a fight this "
-          .. "runner saw)", RUN.attempt, RUN.attempts))
+        context = "no battle was sampled in this attempt (the loss was not in "
+          .. "a fight this runner saw)"
       end
+      M.log(string.format("[retry] attempt %d/%d wipe context: %s", RUN.attempt,
+        RUN.attempts, context))
     end
     RUN.failures[#RUN.failures + 1] =
       { attempt = RUN.attempt, class = class, msg = tostring(msg),
-        frame = M.frame }
+        frame = M.frame, context = context }
   end
 
   local function stopWith(code, class, msg)
@@ -6502,6 +6529,23 @@ function M.run(opts, steps)
   -- Schedule a replay, or stop.  `code` is the exit code a final failure
   -- takes (3 for a game over, 1 for a raised error, 2 for the budget).
   local function failed(class, msg, code)
+    -- A stall that follows a counted game over the body never handled is
+    -- the loss, not the stall (#205): under allowGameOver the count raises
+    -- nothing here, and what a driver then does at the Annihilated screen
+    -- (or the title) is no-effect, no-progress or a step's timeout.  The
+    -- attempt files as the wipe it was, with its context line; a body that
+    -- handled the count by restoring a snapshot (M.requestLoadState clears
+    -- the note) keeps the stall's own class.
+    local go = RUN.goUnhandled
+    if go ~= nil and (class == "noprogress" or class == "noeffect"
+                      or class == "timeout") then
+      msg = string.format("a counted game over the body never handled -- %s at "
+        .. "f%d (GameOver read x%d, TitleScreen exec x%d, battle wipe x%d; "
+        .. "allowGameOver=%s) -- preceded this %s, so the attempt is filed as "
+        .. "the loss: %s", go.what, go.frame, goReadFired, titleExecFired,
+        wipeFired, tostring(RUN.opts.allowGameOver == true), class, tostring(msg))
+      class = "wipe"
+    end
     attemptLine(class, msg)
     local haveS0 = RUN.s0blob and #RUN.s0blob > 0
     if not RETRYABLE[class] or RUN.attempt >= RUN.attempts
@@ -6583,7 +6627,22 @@ function M.run(opts, steps)
           "on the annihilated screen waiting for a press.  Counted as a " ..
           "game over (f%d).", WIPE_FRAMES, table.concat(seats, " "),
           M.readByte(0x3ebc), M.frame))
-        M.freezePad("the party was wiped in battle")
+        RUN.goUnhandled = { frame = M.frame, what = "the party was wiped in battle" }
+        -- Under allowGameOver the pad stays live (#205): the body declared
+        -- a lost fight survivable, and a scripted loss (battle 11's
+        -- scenario reset, docs/design/sfigaro-gate.md) moves on only with
+        -- the press a person makes at the Annihilated screen.  Frozen, that
+        -- press was dropped and the attempt stalled to no-progress 1800
+        -- frames later, filed as a stall instead of the loss it was.  The
+        -- GameOver-read and TitleScreen watches above still freeze: those
+        -- are the real game over, past which any A Continues the last save.
+        if RUN.opts.allowGameOver then
+          M.log(string.format("canary: allowGameOver -- the pad is not frozen on "
+            .. "this count; the body's ladder owns the loss (a stall after it "
+            .. "files as a wipe) (f%d)", M.frame))
+        else
+          M.freezePad("the party was wiped in battle")
+        end
       end
     else
       wipeN = 0
