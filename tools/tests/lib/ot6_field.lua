@@ -1684,6 +1684,190 @@ function M.chaseTalk(objIdx, maxFrames, what, opts)
   }, what or string.format("chaseTalk obj %02X", objIdx))
 end
 
+-- ------------------------------------------------------- dialog choices --
+-- A multiple-choice dialog, from the field's own cells (ff6/notes/
+-- field-ram.txt:396-401, src/field/text.asm):
+--   $056F  option count.  Built up as the text types out (text.asm:684
+--          counts the choice indicators as they are drawn), so it is final
+--          only once the dialog waits for a keypress ($D3=1, dialogWaiting);
+--          zeroed by the A that confirms (text.asm:425).  Battle RAM
+--          scribbles it, so it is not read while a battle is up.
+--   $056E  cursor row, 0-based.  Moved only while the dialog waits; the
+--          $056D latch lets a held direction move it one row, so steering
+--          presses are edges.  The confirm leaves it alone; the event's
+--          `choice` opcode (event.asm EventCmd_b6) branches on it and only
+--          then clears it, which is after the window has closed.
+--   $00D0  the dialog index (event.asm EventCmd_48/4b, already & $1FFF).
+-- The row the engine took is the cursor on the last frame the window was
+-- up: the A that confirms is handled after the direction branch in the
+-- same frame (text.asm:368-425), and no steering press lands with an A.
+--
+-- M.newChoice(want, opts) -> C, the per-frame half, for a rider that
+-- already owns its pad (dialog paging, battles, walking):
+--   want  number                       every prompt takes that row
+--         function(dlg, max, n) -> row decided live (n = 1-based prompt)
+--         list                         prompt n takes want[n]: a row, or
+--                                      { want = row, max = count, what = }
+--                                      whose max is asserted once waiting
+--   opts.extra  "error" (default): a prompt past the list raises;
+--               "last": it takes the list's last entry
+--   opts.ready  when the window owns the pad:
+--               "waiting" (default)  from $056F >= min, pad empty until the
+--                                    dialog waits, then steer
+--               "count"              steer from $056F >= min (presses
+--                                    before the wait are ignored by the
+--                                    engine; the older generators did this)
+--               "pass"               only while the dialog waits
+--   opts.min      option count that means a window is up (default 2)
+--   opts.inBattle gate predicate (default M.battleLoadStarted); false for
+--                 none
+--   opts.press(ph, kind) -> bool, kind "steer" or "confirm": the pulse
+--                 (default ph < opts.on, on = 4)
+--   opts.onUp(n, max, entry)  once per prompt, on its first waiting frame
+--   opts.tag      prefix for error messages
+-- C.frame(ph) polls and, when a window owns this frame, sets the pad and
+-- returns true.  C.poll() is the observation half alone (idempotent per
+-- frame): every prompt that was entered and has closed logs
+--   [choice] dlg $XXXX: row N of M
+-- (N 0-based, M the option count) and raises if N is not the wanted row.
+-- C.n (prompts entered), C.resolved, C.last = { dlg, row, max, n }, and
+-- C.history, every C.last in order.
+function M.newChoice(want, opts)
+  opts = opts or {}
+  local tag = opts.tag or "choice"
+  local ready = opts.ready or "waiting"
+  assert(ready == "waiting" or ready == "count" or ready == "pass",
+    "newChoice: opts.ready is waiting, count or pass")
+  local minRows = opts.min or 2
+  local gate = opts.inBattle
+  if gate == nil then gate = M.battleLoadStarted end
+  local on = opts.on or 4
+  local press = opts.press or function(ph) return ph < on end
+  local list = type(want) == "table" and want or nil
+  local extra = opts.extra or "error"
+  local C = { n = 0, resolved = 0, last = nil, history = {} }
+  local up, entered, checked, seen = false, false, false, nil
+  local cur, max, dlg, target, entry = 0, 0, 0, nil, nil
+
+  local function entryFor(n, m)
+    if not list then return nil end
+    local e = list[n]
+    if e == nil and extra == "last" then e = list[#list] end
+    if e == nil then
+      error(string.format("%s: unexpected choice prompt #%d (%d options, dlg $%04X) " ..
+        "on map %d -- the route knows of only %d", tag, n, m,
+        M.readWord(0x00D0), M.mapId() & 0x1ff, #list), 0)
+    end
+    return type(e) == "table" and e or { want = e }
+  end
+  local function rowNow()
+    if list then return entry.want end
+    if type(want) == "function" then return want(dlg, max, C.n) end
+    return want
+  end
+
+  function C.poll()
+    if seen == M.frame then return end
+    seen = M.frame
+    local m = (gate and gate()) and 0 or M.readByte(0x056F)
+    up = m >= minRows
+    if up then
+      cur, max, dlg = M.readByte(0x056E), m, M.readWord(0x00D0)
+      local waiting = M.dialogWaiting()
+      if not entered and (ready == "count" or waiting) then
+        entered, checked = true, false
+        C.n = C.n + 1
+        entry = entryFor(C.n, m)
+      end
+      if entered then
+        target = rowNow()
+        if waiting and not checked then
+          checked = true
+          if entry and entry.max then
+            M.assertEq(m, entry.max, string.format("%s choice #%d option count (%s)",
+              tag, C.n, tostring(entry.what)))
+          end
+          if target < 0 or target >= m then
+            error(string.format("%s: choice #%d (dlg $%04X) wants row %d of %d",
+              tag, C.n, dlg, target, m), 0)
+          end
+          if opts.onUp then opts.onUp(C.n, m, entry) end
+        end
+      end
+    elseif entered then
+      entered = false
+      C.resolved = C.resolved + 1
+      C.last = { dlg = dlg, row = cur, max = max, n = C.n }
+      C.history[#C.history + 1] = C.last
+      M.log(string.format("[choice] dlg $%04X: row %d of %d", dlg, cur, max))
+      if cur ~= target then
+        error(string.format("%s: choice #%d (dlg $%04X) landed on row %d of %d, " ..
+          "wanted %d", tag, C.n, dlg, cur, max, target), 0)
+      end
+    end
+  end
+
+  function C.frame(ph)
+    C.poll()
+    if not up then return false end
+    if not entered or (ready ~= "count" and not M.dialogWaiting()) then
+      if ready == "pass" then return false end
+      M.setPad({})
+      return true
+    end
+    if cur < target then M.setPad(press(ph, "steer") and { "down" } or {})
+    elseif cur > target then M.setPad(press(ph, "steer") and { "up" } or {})
+    else M.setPad(press(ph, "confirm") and { "a" } or {}) end
+    return true
+  end
+
+  function C.reset()
+    C.n, C.resolved, C.last, C.history = 0, 0, nil, {}
+    up, entered, checked, seen = false, false, false, nil
+    cur, max, dlg, target, entry = 0, 0, 0, nil, nil
+  end
+  return C
+end
+
+-- M.dialogChoice(want, opts): the step.  Drives until opts.done(C) (default:
+-- every prompt of `want` -- #want for a list, else one -- has closed and no
+-- dialog waits), steering each choice window through M.newChoice (want and
+-- the opts above) and, on every other frame:
+--   opts.battle(ph)  while M.battleLoadStarted(), when given
+--   opts.idle(ph)    otherwise (default: edge-A while a dialog waits)
+-- ph is the step's own pulse, (ph + 1) % opts.period (default 8) per frame.
+-- opts.maxFrames (default 6000), opts.what.  The step carries its C as
+-- step.choice, for a caller that asserts on what landed.
+function M.dialogChoice(want, opts)
+  opts = opts or {}
+  local C = M.newChoice(want, opts)
+  local period, on = opts.period or 8, opts.on or 4
+  local ph = 0
+  local n = type(want) == "table" and #want or 1
+  local done = opts.done or function(c)
+    return c.resolved >= n and not M.dialogWaiting()
+  end
+  local idle = opts.idle or function(p)
+    M.setPad(M.dialogWaiting() and p < on and { "a" } or {})
+  end
+  local step = M.withReset(M.driveUntil(function()
+    C.poll()
+    return done(C)
+  end, opts.maxFrames or 6000, {
+    M.call(function()
+      ph = (ph + 1) % period
+      if opts.battle and M.battleLoadStarted() then opts.battle(ph); return end
+      if C.frame(ph) then return end
+      idle(ph)
+    end),
+  }, opts.what or "dialog choice"), function()
+    ph = 0
+    C.reset()
+  end)
+  step.choice = C
+  return step
+end
+
 -- ------------------------------------------- levers and re-entry escapes --
 -- A lever tile: one 8-frame up+A tap fires the event and the switch flips
 -- at the end of it (~70 frames); holding up with A released never
@@ -4235,6 +4419,139 @@ function M.newPartySelect(pick)
     else tap("b") end
   end
   return P
+end
+
+-- M.partySelect(members, opts): the step form, for a party menu that owns
+-- the frame (the menu the event's `party_menu` opens: Narshe's defense
+-- split, the Blackjack's swap room, Kefka's aftermath, the Zozo gather
+-- room).  Promoted from the state-fed driver those four generators each
+-- carried.  The menu (field-ram / menu RAM, measured by those generators):
+--   $26            pick state: $2D browsing, $2E carrying a character
+--                  ($69 is the menu's own fade, no input taken)
+--   $7E9D89+cell   the cell's character id, $FF empty.  Cells $00-$0F are
+--                  the pool (two rows of eight: col = cell % 8, row = cell
+--                  >= 8), cells $10+ the groups' seats, four per group
+--                  (group g's seat s is $10 + 4(g-1) + s: col = b >> 1,
+--                  row = b & 1 with b = cell - $10)
+--   $4B+$4A+$5A    the cursor's cell
+-- A is pick-up and drop, START commits.  Each member is found in the pool
+-- at the moment it is seated and dropped into its group's lowest empty
+-- seat; both cells are asserted afterwards (a cursor that wandered would
+-- otherwise commit whoever it stood on).  Reads and presses only.
+--   members  a list of character ids (one group), or a list of such lists
+--            (group g = members[g]); ids are seated in the order given.
+--            A member already seated in its group is left there.
+--   opts.tag         log/step prefix (default "party")
+--   opts.names       id -> name for the step names (default the cast)
+--   opts.menuWait    frames each seat waits for $26=$2D (default 900)
+--   opts.commit      false: leave the menu open (default: START, and wait
+--                    for $0059 to read closed)
+--   opts.commitWait  (default 600), opts.closeWait (default 1200)
+-- M.newPartySelect above is the per-frame form for a rider that already
+-- owns the pad (the Blackjack's IAF launch).
+local PARTY_NAMES = { [0] = "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR",
+  "SABIN", "CELES", "STRAGO", "RELM", "SETZER", "MOG", "GAU", "GOGO", "UMARO" }
+function M.partySelect(members, opts)
+  opts = opts or {}
+  local tag = opts.tag or "party"
+  local names = opts.names or PARTY_NAMES
+  local groups = type(members[1]) == "table" and members or { members }
+  local function mst() return M.readByte(0x0026) end
+  local function cell(c) return M.readByte(0x7E9D89 + c) end
+  local function cursorCell()
+    return M.readByte(0x004b) + M.readByte(0x004a) + M.readByte(0x005a)
+  end
+  local function decode(c)
+    if c < 0x10 then
+      return { area = "pool", col = c % 8, row = c >= 8 and 1 or 0 }
+    end
+    local b = c - 0x10
+    return { area = "party", col = b >> 1, row = b & 1 }
+  end
+  local function stepToward(cur, tgt)
+    local c, t = decode(cur), decode(tgt)
+    if c.area == "pool" and t.area == "party" then return "down"
+    elseif c.area == "party" and t.area == "pool" then return "up"
+    elseif c.area == "pool" then
+      if c.row ~= t.row then return c.row < t.row and "down" or "up" end
+      if c.col ~= t.col then return c.col < t.col and "right" or "left" end
+    else
+      if c.col ~= t.col then return c.col < t.col and "right" or "left" end
+      if c.row ~= t.row then return c.row < t.row and "down" or "up" end
+    end
+    return nil
+  end
+  -- walk the cursor to tgt() and press btn until the pick state reaches
+  -- doneState and holds there 8 frames with the cursor on tgt
+  local function menuAct(tgt, btn, doneState, what)
+    local phase, settled = 0, 0
+    return M.withReset(M.driveUntil(function()
+      return mst() == doneState and cursorCell() == tgt() and settled >= 8
+    end, 4000, {
+      M.call(function()
+        phase = (phase + 1) % 10
+        if mst() == doneState then settled = settled + 1; M.setPad({}); return end
+        settled = 0
+        if mst() == 0x69 then M.setPad({}); return end
+        local cur = cursorCell()
+        if cur ~= tgt() then
+          local b = stepToward(cur, tgt())
+          if not b then M.setPad({}); return end
+          M.setPad(phase < 4 and { [b] = true } or {})
+          return
+        end
+        M.setPad(phase < 4 and { [btn] = true } or {})
+      end),
+    }, what), function() phase, settled = 0, 0 end)
+  end
+  local function census()
+    local t = {}
+    for c = 0x00, 0x1F do t[#t + 1] = string.format("%02X", cell(c)) end
+    return table.concat(t, " ")
+  end
+  local steps = {
+    M.call(function() M.log(string.format("[%s] cells $00-$1F: %s", tag, census())) end),
+  }
+  for g, ids in ipairs(groups) do
+    local base = 0x10 + 4 * (g - 1)
+    for _, id in ipairs(ids) do
+      local name = names[id] or string.format("$%02X", id)
+      local what = string.format("%s: %s -> group %d", tag, name, g)
+      local src, dst, seated
+      steps[#steps + 1] = M.waitUntil(function() return mst() == 0x2d end,
+        opts.menuWait or 900, what .. ": menu at $2d", 5)
+      steps[#steps + 1] = M.call(function()
+        src, dst, seated = nil, nil, false
+        for c = base, base + 3 do if cell(c) == id then seated = true end end
+        if seated then
+          M.log(string.format("[%s] %s already seated in group %d", tag, name, g))
+          return
+        end
+        for c = 0x00, 0x0F do if cell(c) == id then src = c; break end end
+        for c = base, base + 3 do if cell(c) == 0xFF then dst = c; break end end
+        M.assertEq(src ~= nil, true, what .. ": found in the pool")
+        M.assertEq(dst ~= nil, true, what .. ": a free seat in the group")
+        M.log(string.format("[%s] %s: pool cell $%02X -> seat $%02X", tag, name, src, dst))
+      end)
+      steps[#steps + 1] = M.cond(function() return not seated end, {
+        menuAct(function() return src end, "a", 0x2e, what .. ": pick"),
+        menuAct(function() return dst end, "a", 0x2d, what .. ": drop"),
+        M.call(function()
+          M.assertEq(cell(dst), id, what .. ": landed in the seat it was aimed at")
+          M.assertEq(cell(src), 0xFF, what .. ": its pool cell is now empty")
+        end),
+      }, {})
+    end
+  end
+  steps[#steps + 1] = M.call(function() M.log(string.format("[%s] seated: %s", tag, census())) end)
+  if opts.commit ~= false then
+    steps[#steps + 1] = M.waitUntil(function() return mst() == 0x2d end,
+      opts.commitWait or 600, tag .. ": menu at $2d for commit", 5)
+    steps[#steps + 1] = M.pressButtons({ "start" }, 6)
+    steps[#steps + 1] = M.waitUntil(function() return M.readByte(0x0059) == 0 end,
+      opts.closeWait or 1200, tag .. ": menu closed", 5)
+  end
+  return M.seqStep(steps)
 end
 
 -- ------------------------------------------- South Figaro shared toolkit --

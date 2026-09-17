@@ -385,32 +385,21 @@ end
 
 -- ---- the Q&A choice machinery -----------------------------------------
 -- Battles cannot start inside the dinner dialogs, so this driver carries
--- no battle branch.
+-- no battle branch beyond an empty pad.  Each window takes the next row of
+-- `targets` (the last row repeats past the end) through H.dialogChoice
+-- (lib/ot6_field.lua), which steers by $056E from the moment $056F counts
+-- two options ("count", 3-of-8 pulses, as this file always did) and
+-- asserts each landed row.
 local function picks(targets, done, maxFrames, what)
-  local ph, ti, wasUp = 0, 0, false
-  return H.driveUntil(function()
-    local d = done()
-    if d then H.setPad({}) end
-    return d
-  end, maxFrames, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      if H.battleLoadStarted() then H.setPad({}); return end
-      local up = H.readByte(0x056f) >= 2
-      if up and not wasUp then ti = ti + 1 end
-      wasUp = up
-      if up then
-        local idx = targets[math.min(ti, #targets)]
-        local cur = H.readByte(0x056e)
-        if cur < idx then H.setPad(ph < 3 and { "down" } or {})
-        elseif cur > idx then H.setPad(ph < 3 and { "up" } or {})
-        else H.setPad(ph < 3 and { "a" } or {}) end
-        return
-      end
-      if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
-      H.setPad({})
-    end),
-  }, what)
+  return H.dialogChoice(targets, {
+    ready = "count", on = 3, extra = "last", maxFrames = maxFrames,
+    what = what, tag = what,
+    done = function() return done() end,
+    battle = function() H.setPad({}) end,
+    idle = function(ph)
+      H.setPad(H.dialogWaiting() and ph < 4 and { "a" } or {})
+    end,
+  })
 end
 
 -- the Q&A scores are relative to whatever the window earned: w0 is

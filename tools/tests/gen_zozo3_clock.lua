@@ -113,29 +113,18 @@ local function encounters(what)
   end
 end
 
+-- one clock dialog: H.dialogChoice (lib/ot6_field.lua) steers $056E to idx
+-- from the moment $056F counts two options ("count", 3-of-8 pulses) and
+-- asserts the landed row; a prompt page ($D3=1) gets edge-A, scrolling
+-- text an empty pad.  Done when the pick's own $01F* latch sets.
 local function clockPick(idx, doneId, what)
-  local ph = 0
-  return H.driveUntil(function() return sw(doneId) == 1 end, 3000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      if sw(doneId) == 1 then H.setPad({}); return end
-      local d3, maxc, cur =
-        H.readByte(0x00d3), H.readByte(0x056f), H.readByte(0x056e)
-      if maxc >= 2 then                       -- choices are up
-        if cur < idx then
-          H.setPad(ph < 3 and { "down" } or {})
-        elseif cur > idx then
-          H.setPad(ph < 3 and { "up" } or {})
-        else
-          H.setPad(ph < 3 and { "a" } or {})  -- at idx: confirm
-        end
-      elseif d3 == 1 then                      -- prompt page: advance it
-        H.setPad(ph < 3 and { "a" } or {})
-      else                                     -- text scrolling: wait
-        H.setPad({})
-      end
-    end),
-  }, what)
+  return H.dialogChoice(idx, {
+    ready = "count", on = 3, maxFrames = 3000, what = what, tag = what,
+    done = function() return sw(doneId) == 1 end,
+    idle = function(ph)
+      H.setPad(H.readByte(0x00d3) == 1 and ph < 3 and { "a" } or {})
+    end,
+  })
 end
 
 H.run({ maxFrames = 90000 }, {

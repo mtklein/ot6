@@ -9,6 +9,15 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
+-- Choice windows on these rides go through H.newChoice (lib/ot6_field.lua):
+-- steered from the moment $056F reads nonzero ("count", min 1), on this
+-- file's 24-frame pulse (a steer press on phase 0-2, the confirm on 12-14),
+-- the landed row asserted when the window closes.
+local function choicePress(ph, kind)
+  if kind == "confirm" then return ph >= 12 and ph < 15 end
+  return ph < 3
+end
+
 
 local ZMENUSTATE = 0x26
 local POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY = 0xE9, 0xF0, 0xE8, 0xF2, 0xF5   -- item ids (the care kernel's)
@@ -260,6 +269,15 @@ local function round(r)
     }),
     (function()
       local t, calm = 0, 0
+      -- a choice box: the (70,29) return prompt wants YES (row 0) on
+      -- leg 1 to go collect SHADOW; every other prompt here is the
+      -- last row (the safe "no"/"wait" answers)
+      -- the (70,29) prompt dlg $0857 lists "0: (No)  1: (Yes)"
+      -- (event_main.asm _ca5a6c): before Shadow the answer is YES --
+      -- the return is what makes him appear -- and with him in, NO.
+      -- (The first cuts had the rows inverted and stayed on 394.)
+      local C = H.newChoice(function() return shadowIn and 0 or 1 end,
+        { ready = "count", min = 1, press = choicePress, tag = "trigger settles r" .. r })
       return H.driveUntil(function()
         if lost then return true end
         if not mapIs(394) then return true end
@@ -275,23 +293,7 @@ local function round(r)
         H.call(function()
           t = t + 1
           if H.battleLoadStarted() or H.battleActive() then F.frame(); return end   -- an encounter on the tile is fought
-          local mx = H.readByte(0x056F)
-          if mx > 0 then
-            -- a choice box: the (70,29) return prompt wants YES (row 0) on
-            -- leg 1 to go collect SHADOW; every other prompt here is the
-            -- last row (the safe "no"/"wait" answers)
-            -- the (70,29) prompt dlg $0857 lists "0: (No)  1: (Yes)"
-            -- (event_main.asm _ca5a6c): before Shadow the answer is YES --
-            -- the return is what makes him appear -- and with him in, NO.
-            -- (The first cuts had the rows inverted and stayed on 394.)
-            local want = shadowIn and 0 or 1
-            local sel = H.readByte(0x056E)
-            local ph = t % 24
-            if sel < want then H.setPad(ph < 3 and { down = true } or {})
-            elseif sel > want then H.setPad(ph < 3 and { up = true } or {})
-            else H.setPad((ph >= 12 and ph < 15) and { "a" } or {}) end
-            return
-          end
+          if C.frame(t % 24) then return end
           if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {})
           else H.setPad({}) end
         end),

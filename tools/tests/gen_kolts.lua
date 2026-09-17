@@ -726,10 +726,14 @@ end
 -- before the talk rather than the rest being assumed.  The rest restores
 -- full HP, full MP, and clears every other persistent status bit -- KO
 -- and poison included.
-local CH_SEL, CH_MAX = 0x056E, 0x056F
 local function innRest(what)
-  local ph, ci, calm = 0, 0, 0
-  local inChoice = false
+  local ph, calm = 0, 0
+  -- the inn's Yes/No through H.newChoice (lib/ot6_field.lua): steered once
+  -- the dialog waits, the landed row asserted when the window closes
+  local C = H.newChoice(0, { tag = what, onUp = function(n, max)
+    H.log(string.format("%s: choice #%d up (%d options) -- taking 0 (Yes)",
+      what, n, max))
+  end })
   return seq({
     H.call(function()
       H.assertEq(gil() >= 80, true, what .. ": the party can pay the 80 GP")
@@ -760,20 +764,7 @@ local function innRest(what)
     end, 30000, {
       H.call(function()
         ph = (ph + 1) % 8
-        local chMax = (not H.battleLoadStarted()) and H.readByte(CH_MAX) or 0
-        if chMax >= 2 then
-          if not H.dialogWaiting() then H.setPad({}); return end
-          if not inChoice then
-            inChoice = true; ci = ci + 1
-            H.log(string.format(
-              "%s: choice #%d up (%d options) -- taking 0 (Yes)",
-              what, ci, chMax))
-          end
-          if H.readByte(CH_SEL) > 0 then H.setPad(ph < 4 and { "up" } or {})
-          else H.setPad(ph < 4 and { "a" } or {}) end
-          return
-        end
-        inChoice = false
+        if C.frame(ph) then return end
         if H.hasControl() and not H.dialogWaiting() then H.setPad({}); return end
         H.setPad(ph < 4 and { "a" } or {})
       end),

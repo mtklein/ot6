@@ -119,7 +119,14 @@ end
 -- pages.
 local function talkPick(idx, doneId, maxFrames, what)
   local ph = 0
-  return H.driveUntil(function() return sw(doneId) == 1 end, maxFrames, {
+  -- the window is H.newChoice (lib/ot6_field.lua): $056E steered from the
+  -- moment $056F counts two options ("count", 3-of-8 pulses), the landed
+  -- row asserted when it closes
+  local C = H.newChoice(idx, { ready = "count", on = 3, tag = what })
+  return H.driveUntil(function()
+    C.poll()
+    return sw(doneId) == 1
+  end, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
       if sw(doneId) == 1 then H.setPad({}); return end
@@ -127,13 +134,8 @@ local function talkPick(idx, doneId, maxFrames, what)
         fighter.frame(); return
       end
       fighter.idle()
-      local d3, maxc, cur =
-        H.readByte(0x00d3), H.readByte(0x056f), H.readByte(0x056e)
-      if maxc >= 2 then                        -- the choice list is up
-        if cur < idx then H.setPad(ph < 3 and { "down" } or {})
-        elseif cur > idx then H.setPad(ph < 3 and { "up" } or {})
-        else H.setPad(ph < 3 and { "a" } or {}) end
-      elseif d3 == 1 then                      -- a text page: advance it
+      if C.frame(ph) then return end           -- the choice list is up
+      if H.readByte(0x00d3) == 1 then          -- a text page: advance it
         H.setPad(ph < 3 and { "a" } or {})
       elseif settled() then
         -- back in control with the switch still clear: the party is

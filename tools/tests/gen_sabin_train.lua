@@ -405,27 +405,22 @@ local function objX(i) return H.readWord(0x086a + 0x29 * i) >> 4 end
 local function objY(i) return H.readWord(0x086d + 0x29 * i) >> 4 end
 local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 local FACE = { up = 0, right = 1, down = 2, left = 3 }
-local function dlgId() return H.readWord(0x00d0) & 0x1FFF end
-local CH_SEL, CH_MAX = 0x056E, 0x056F
 local function mstateMenu() return H.readByte(0x0026) end
 
 -- open the merchant's shop: chase obj 29, poke, steer the $02D0 choice to
 -- 0 (and any other choice to 1), until the menu module reads shop-options
 local function openShop()
   local phase, W = 0, H.newWalkFighter("openShop")
+  -- a choice window: H.newChoice (lib/ot6_field.lua) picks by dialog id,
+  -- owns the pad only while the dialog waits, and asserts the landed row
+  local C = H.newChoice(function(dlg) return dlg == 0x02D0 and 0 or 1 end,
+    { ready = "pass", tag = "openShop" })
   return H.driveUntil(function() return mstateMenu() == 0x25 end, 20000, {
     H.call(function()
       phase = (phase + 1) % 8
       if W.frame() then return end
       -- a choice is open: pick by dialog id (see the hazard note)
-      if H.dialogWaiting() and H.readByte(CH_MAX) >= 2 then
-        local want = dlgId() == 0x02D0 and 0 or 1
-        local sel = H.readByte(CH_SEL)
-        if sel < want then H.setPad(phase < 4 and { "down" } or {})
-        elseif sel > want then H.setPad(phase < 4 and { "up" } or {})
-        else H.setPad(phase < 4 and { "a" } or {}) end
-        return
-      end
+      if C.frame(phase) then return end
       if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
       if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
       local ox, oy = objX(29), objY(29)

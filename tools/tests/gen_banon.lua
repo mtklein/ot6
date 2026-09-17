@@ -210,33 +210,20 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- Talk to BANON and answer his prompt with option 1, "No".
---   a choice list is up ($056F >= 2)     -> walk $056E onto row 1, then A
---   an ordinary page is waiting          -> edge-A to page it
---   anything else (animation, map load)  -> empty pad
--- A blind A while a list is up confirms row 0 (Yes).  `swId` is $0014,
--- $0015 and $0016 for refusals 1, 2 and 3.
+-- Talk to BANON and answer his prompt with option 1, "No", through
+-- H.dialogChoice (lib/ot6_field.lua): the cursor is walked onto row 1 from
+-- $056E and the landed row asserted when the window closes; ordinary pages
+-- get edge-A.  A blind A while a list is up confirms row 0 (Yes).  The
+-- steering starts the moment $056F counts two options ("count"), as it
+-- always did here.  `swId` is $0014, $0015 and $0016 for refusals 1, 2
+-- and 3.
 local function refuseBanon(n, swId, swName)
   local what = string.format("BANON refusal %d (option 1 = No, -> %s)",
     n, swName)
-  local ph = 0
   return seq({
     talkToObj(16, string.format("BANON (refusal %d)", n)),
-    H.driveUntil(function() return sw(swId) == 1 end, 12000, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        if H.readByte(0x056f) >= 2 then
-          if H.readByte(0x056e) ~= 1 then
-            H.setPad(ph < 4 and { down = true } or {})
-          else
-            H.setPad(ph < 4 and { "a" } or {})
-          end
-          return
-        end
-        if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
-        H.setPad({})
-      end),
-    }, what),
+    H.dialogChoice(1, { ready = "count", maxFrames = 12000, what = what,
+      tag = what, done = function() return sw(swId) == 1 end }),
     H.release(),
     H.call(function()
       H.assertEq(sw(swId), 1, what .. ": the No branch ran")

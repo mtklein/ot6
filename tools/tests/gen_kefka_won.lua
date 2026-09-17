@@ -164,66 +164,9 @@ end
 local function mst() return H.readByte(0x0026) end
 local function menuUp() return H.readByte(0x0059) ~= 0 end
 local function cell9d(c) return H.readByte(0x7E9D89 + c) end
-local function cursorCell()
-  return H.readByte(0x004b) + H.readByte(0x004a) + H.readByte(0x005a)
-end
-local function decode(cell)
-  if cell < 0x10 then
-    return { area = "pool", col = cell % 8, row = cell >= 8 and 1 or 0 }
-  end
-  local b = cell - 0x10
-  return { area = "party", col = b >> 1, row = b & 1 }
-end
-local function stepToward(cur, tgt)
-  local c, t = decode(cur), decode(tgt)
-  if c.area == "pool" and t.area == "party" then return "down"
-  elseif c.area == "party" and t.area == "pool" then return "up"
-  elseif c.area == "pool" then
-    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
-    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
-  else
-    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
-    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
-  end
-  return nil
-end
-local function menuAct(tgt, btn, doneState, what)
-  local phase, settled = 0, 0
-  return H.driveUntil(function()
-    return mst() == doneState and cursorCell() == tgt and settled >= 8
-  end, 4000, {
-    H.call(function()
-      phase = (phase + 1) % 10
-      if mst() == doneState then
-        settled = settled + 1
-        H.setPad({})
-        return
-      end
-      settled = 0
-      if mst() == 0x69 then H.setPad({}); return end
-      local cur = cursorCell()
-      if cur ~= tgt then
-        local b = stepToward(cur, tgt)
-        if not b then H.setPad({}); return end
-        H.setPad(phase < 4 and { [b] = true } or {})
-        return
-      end
-      H.setPad(phase < 4 and { [btn] = true } or {})
-    end),
-  }, what)
-end
-local function assign(srcCell, dstCell, charId, name)
-  return H.cond(function() return true end, {
-    H.waitUntil(function() return mst() == 0x2d end, 600,
-      name .. ": menu at $2d", 5),
-    menuAct(srcCell, "a", 0x2e, name .. ": pick"),
-    menuAct(dstCell, "a", 0x2d, name .. ": drop"),
-    H.call(function()
-      H.assertEq(cell9d(dstCell), charId, name .. " in the party cell")
-      H.assertEq(cell9d(srcCell), 0xFF, name .. "'s pool cell empty")
-    end),
-  })
-end
+-- the seats themselves are H.partySelect (lib/ot6_field.lua): each member
+-- found in the pool, walked to its group's lowest empty seat, both cells
+-- asserted, START to commit
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
 -- calm-arrival pred: n consecutive controllable full-bright frames on map m
@@ -415,13 +358,8 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
         string.format("pool cell %d is char $%02X", i - 1, want))
     end
   end),
-  assign(0, 0x10, 0x01, "LOCKE -> slot 0"),
-  assign(4, 0x11, 0x06, "CELES -> slot 1"),
-  assign(2, 0x12, 0x04, "EDGAR -> slot 2"),
-  assign(3, 0x13, 0x05, "SABIN -> slot 3"),
-  H.waitUntil(function() return mst() == 0x2d end, 600, "menu at $2d for commit", 5),
-  H.pressButtons({ "start" }, 6),
-  H.waitUntil(function() return not menuUp() end, 1200, "menu closed", 5),
+  H.partySelect({ 0x01, 0x06, 0x04, 0x05 },  -- LOCKE CELES EDGAR SABIN
+    { tag = "assign", menuWait = 600 }),
   H.logStep("party committed; riding _ccc1b5's reload to control"),
 
   -- the remainder: NPC creates, load_map 30 {60,37}, fade_in, ctrl on
