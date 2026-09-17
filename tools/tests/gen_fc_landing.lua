@@ -16,6 +16,15 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
+-- Choice windows on these rides go through H.newChoice (lib/ot6_field.lua):
+-- steered from the moment $056F reads nonzero ("count", min 1), on this
+-- file's 24-frame pulse (a steer press on phase 0-2, the confirm on 12-14),
+-- the landed row asserted when the window closes.
+local function choicePress(ph, kind)
+  if kind == "confirm" then return ph >= 12 and ph < 15 end
+  return ph < 3
+end
+
 
 local ZMENUSTATE = 0x26
 local POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY = 0xE9, 0xF0, 0xE8, 0xF2, 0xF5   -- item ids (the care kernel's)
@@ -99,6 +108,8 @@ end
 local DECK = { S = H.newPartySelect(PICK), helmT = 0, formed = false, careD = nil }
 local function deckDrive(untilKit)
     local S = DECK.S
+    local C = H.newChoice(0, { ready = "count", min = 1, press = choicePress,
+      tag = "deck" })
     -- The story's own FC cutscene (Gestahl and Kefka on the continent)
     -- visits map 394 with no control long before the party lands there:
     -- the terminal is CONTROL on 394 after the chain's battles were seen.
@@ -143,13 +154,7 @@ local function deckDrive(untilKit)
           end
           S.pulse(); return
         end
-        local mx = H.readByte(0x056F)
-        if mx > 0 then
-          local sel, ph = H.readByte(0x056E), H.frame % 24
-          if sel > 0 then H.setPad(ph < 3 and { up = true } or {})
-          else H.setPad((ph >= 12 and ph < 15) and { "a" } or {}) end
-          return
-        end
+        if C.frame(H.frame % 24) then return end
         -- a live care stop owns the frame until it is done: with the menu
         -- open the field reports no control, so this check sits ABOVE the
         -- control gate (the first cut put it below and hung with the menu

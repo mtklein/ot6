@@ -113,27 +113,19 @@ local function flyTo(tx, ty)
   }, string.format("strafe-fly to (%d,%d)", tx, ty))
 end
 
--- drive the current choice dialog to idx and confirm
+-- drive the current choice dialog to idx and confirm: H.dialogChoice
+-- (lib/ot6_field.lua) steers by $056E from the moment $056F counts two
+-- options ("count", 3-of-8 pulses) and asserts the landed row; a prompt
+-- page ($D3=1) is advanced with edge-A.  idxIn is a row or a function
+-- read live.
 local function choicePick(idxIn, donePred, maxFrames, what)
-  local ph = 0
-  return H.driveUntil(donePred, maxFrames, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      if donePred() then H.setPad({}); return end
-      local idx = type(idxIn) == "function" and idxIn() or idxIn
-      local d3, maxc, cur =
-        H.readByte(0x00d3), H.readByte(0x056f), H.readByte(0x056e)
-      if maxc >= 2 then
-        if cur < idx then H.setPad(ph < 3 and { "down" } or {})
-        elseif cur > idx then H.setPad(ph < 3 and { "up" } or {})
-        else H.setPad(ph < 3 and { "a" } or {}) end
-      elseif d3 == 1 then
-        H.setPad(ph < 3 and { "a" } or {})
-      else
-        H.setPad({})
-      end
-    end),
-  }, what)
+  return H.dialogChoice(idxIn, {
+    ready = "count", on = 3, maxFrames = maxFrames, what = what, tag = what,
+    done = function() return donePred() end,
+    idle = function(ph)
+      H.setPad(H.readByte(0x00d3) == 1 and ph < 3 and { "a" } or {})
+    end,
+  })
 end
 
 -- ------------------------- party menu driver --------------------------

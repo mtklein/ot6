@@ -29,6 +29,15 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
+-- Choice windows on these rides go through H.newChoice (lib/ot6_field.lua):
+-- steered from the moment $056F reads nonzero ("count", min 1), on this
+-- file's 24-frame pulse (a steer press on phase 0-2, the confirm on 12-14),
+-- the landed row asserted when the window closes.
+local function choicePress(ph, kind)
+  if kind == "confirm" then return ph >= 12 and ph < 15 end
+  return ph < 3
+end
+
 
 local TERRA = 0x00
 local function map() return H.mapId() & 0x3ff end
@@ -159,6 +168,8 @@ end
 -- steered to `row` (a function of the choice count), until pred()
 local function absorb(pred, cap, tag, row, driver)
   local t = 0
+  local C = H.newChoice(function(_, mx) return row and row(mx) or (mx - 1) end,
+    { ready = "count", min = 1, press = choicePress, tag = tag })
   driver = driver or FA
   return H.driveUntil(function()
     t = t + 1
@@ -173,14 +184,7 @@ local function absorb(pred, cap, tag, row, driver)
           map(), H.fieldX(), H.fieldY(), tostring(H.dialogWaiting()), tostring(H.hasControl())))
       end
       if H.battleLoadStarted() or H.battleActive() then driver.frame(); return end
-      local mx = H.readByte(0x056F)
-      if mx > 0 then
-        local want, sel, ph = (row and row(mx) or (mx - 1)), H.readByte(0x056E), t % 24
-        if sel < want then H.setPad(ph < 3 and { down = true } or {})
-        elseif sel > want then H.setPad(ph < 3 and { up = true } or {})
-        else H.setPad((ph >= 12 and ph < 15) and { "a" } or {}) end
-        return
-      end
+      if C.frame(t % 24) then return end
       if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {})
       else H.setPad({}) end
     end),
@@ -504,10 +508,13 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   (function()
     local wps = { { 60, 14 }, { 60, 12 }, { 60, 11 } }
     local wi, t, wt, lastK, lastT = 1, 0, 0, -1, 0
+    -- any choice here takes row 0, pressed on phase 0-2; the check sits
+    -- above the battle branch, as it always has, so it is not battle-gated
+    local C = H.newChoice(0, { ready = "count", min = 1, inBattle = false,
+      press = function(ph) return ph < 3 end, tag = "statue spine" })
     return H.driveUntil(function() t = t + 1; return mapIs(393) end, 60000, {
       H.call(function()
-        local mx = H.readByte(0x056F)
-        if mx > 0 then H.setPad(t % 24 < 3 and { "a" } or {}); return end
+        if C.frame(t % 24) then return end
         if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}); return end
         if H.battleLoadStarted() or H.battleActive() then FA.frame(); return end
         if not H.hasControl() then H.setPad({}); return end
@@ -636,6 +643,8 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   end)(),
   (function()
     local t = 0
+    local C = H.newChoice(function(_, mx) return mx - 1 end,
+      { ready = "count", min = 1, press = choicePress, tag = "the humane wait" })
     return H.driveUntil(function() t = t + 1; return t >= 26000 or shadowSaved() end, 26500, {
       H.call(function()
         if t % 2400 == 0 then
@@ -644,14 +653,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
             H.readWord(0x1188), H.readWord(0x118C)))
         end
         if H.battleLoadStarted() or H.battleActive() then FW.frame(); return end
-        local mx = H.readByte(0x056F)
-        if mx > 0 then
-          local want, sel, ph = mx - 1, H.readByte(0x056E), t % 24
-          if sel < want then H.setPad(ph < 3 and { down = true } or {})
-          elseif sel > want then H.setPad(ph < 3 and { up = true } or {})
-          else H.setPad((ph >= 12 and ph < 15) and { "a" } or {}) end
-          return
-        end
+        if C.frame(t % 24) then return end
         if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}); return end
         if not H.hasControl() then H.setPad({}); return end
         local x, y = H.fieldX(), H.fieldY()
@@ -675,6 +677,8 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   -- doc s6), so the wait logs every control component while on 397
   (function()
     local t = 0
+    local C = H.newChoice(0, { ready = "count", min = 1, press = choicePress,
+      tag = "the landing" })
     return H.driveUntil(function()
       t = t + 1
       if (H.gameOverFired or 0) > 0 then error("the landing was LOST (game over)", 0) end
@@ -690,13 +694,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
             H.readByte(0x00e7), H.readByte(0x00e6), H.readByte(0x00e5)))
         end
         if H.battleLoadStarted() or H.battleActive() then FA.frame(); return end
-        local mx = H.readByte(0x056F)
-        if mx > 0 then
-          local sel, ph = H.readByte(0x056E), t % 24
-          if sel > 0 then H.setPad(ph < 3 and { up = true } or {})
-          else H.setPad((ph >= 12 and ph < 15) and { "a" } or {}) end
-          return
-        end
+        if C.frame(t % 24) then return end
         if H.dialogWaiting() then H.setPad(t % 16 < 4 and { "a" } or {}) else H.setPad({}) end
       end),
     }, "the airship flees, the RUIN cutscene, the Solitary Island (397)")

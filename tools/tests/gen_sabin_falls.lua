@@ -106,6 +106,9 @@ end
 -- dialogs tap-A, else hold `dir` (or hands-off when dir is nil).
 local function ride(dir, pred, what, budget, fightMode, choiceWant)
   local phase, hb, quiet, wasIn = 0, -900, 0, false
+  -- a choice window: H.newChoice (lib/ot6_field.lua), owning the pad only
+  -- while the dialog waits, the landed row asserted when the window closes
+  local C = H.newChoice(choiceWant or 0, { ready = "pass", tag = what })
   return H.driveUntil(pred, budget or 30000, {
     H.call(function()
       phase = (phase + 1) % 8
@@ -159,13 +162,7 @@ local function ride(dir, pred, what, budget, fightMode, choiceWant)
       end
 
       -- choice prompts: steer to choiceWant then confirm
-      if H.readByte(CH_MAX) >= 2 and H.dialogWaiting() then
-        local sel, want = H.readByte(CH_SEL), choiceWant or 0
-        if sel < want then H.setPad(phase < 4 and { "down" } or {})
-        elseif sel > want then H.setPad(phase < 4 and { "up" } or {})
-        else H.setPad(phase < 4 and { "a" } or {}) end
-        return
-      end
+      if C.frame(phase) then return end
 
       -- the name menu, on the menu module's own state (gen_sabin_camp)
       if H.readByte(NAME_MENU) == 1 and H.readByte(0x0059) ~= 0

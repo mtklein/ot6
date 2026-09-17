@@ -1684,6 +1684,190 @@ function M.chaseTalk(objIdx, maxFrames, what, opts)
   }, what or string.format("chaseTalk obj %02X", objIdx))
 end
 
+-- ------------------------------------------------------- dialog choices --
+-- A multiple-choice dialog, from the field's own cells (ff6/notes/
+-- field-ram.txt:396-401, src/field/text.asm):
+--   $056F  option count.  Built up as the text types out (text.asm:684
+--          counts the choice indicators as they are drawn), so it is final
+--          only once the dialog waits for a keypress ($D3=1, dialogWaiting);
+--          zeroed by the A that confirms (text.asm:425).  Battle RAM
+--          scribbles it, so it is not read while a battle is up.
+--   $056E  cursor row, 0-based.  Moved only while the dialog waits; the
+--          $056D latch lets a held direction move it one row, so steering
+--          presses are edges.  The confirm leaves it alone; the event's
+--          `choice` opcode (event.asm EventCmd_b6) branches on it and only
+--          then clears it, which is after the window has closed.
+--   $00D0  the dialog index (event.asm EventCmd_48/4b, already & $1FFF).
+-- The row the engine took is the cursor on the last frame the window was
+-- up: the A that confirms is handled after the direction branch in the
+-- same frame (text.asm:368-425), and no steering press lands with an A.
+--
+-- M.newChoice(want, opts) -> C, the per-frame half, for a rider that
+-- already owns its pad (dialog paging, battles, walking):
+--   want  number                       every prompt takes that row
+--         function(dlg, max, n) -> row decided live (n = 1-based prompt)
+--         list                         prompt n takes want[n]: a row, or
+--                                      { want = row, max = count, what = }
+--                                      whose max is asserted once waiting
+--   opts.extra  "error" (default): a prompt past the list raises;
+--               "last": it takes the list's last entry
+--   opts.ready  when the window owns the pad:
+--               "waiting" (default)  from $056F >= min, pad empty until the
+--                                    dialog waits, then steer
+--               "count"              steer from $056F >= min (presses
+--                                    before the wait are ignored by the
+--                                    engine; the older generators did this)
+--               "pass"               only while the dialog waits
+--   opts.min      option count that means a window is up (default 2)
+--   opts.inBattle gate predicate (default M.battleLoadStarted); false for
+--                 none
+--   opts.press(ph, kind) -> bool, kind "steer" or "confirm": the pulse
+--                 (default ph < opts.on, on = 4)
+--   opts.onUp(n, max, entry)  once per prompt, on its first waiting frame
+--   opts.tag      prefix for error messages
+-- C.frame(ph) polls and, when a window owns this frame, sets the pad and
+-- returns true.  C.poll() is the observation half alone (idempotent per
+-- frame): every prompt that was entered and has closed logs
+--   [choice] dlg $XXXX: row N of M
+-- (N 0-based, M the option count) and raises if N is not the wanted row.
+-- C.n (prompts entered), C.resolved, C.last = { dlg, row, max, n }, and
+-- C.history, every C.last in order.
+function M.newChoice(want, opts)
+  opts = opts or {}
+  local tag = opts.tag or "choice"
+  local ready = opts.ready or "waiting"
+  assert(ready == "waiting" or ready == "count" or ready == "pass",
+    "newChoice: opts.ready is waiting, count or pass")
+  local minRows = opts.min or 2
+  local gate = opts.inBattle
+  if gate == nil then gate = M.battleLoadStarted end
+  local on = opts.on or 4
+  local press = opts.press or function(ph) return ph < on end
+  local list = type(want) == "table" and want or nil
+  local extra = opts.extra or "error"
+  local C = { n = 0, resolved = 0, last = nil, history = {} }
+  local up, entered, checked, seen = false, false, false, nil
+  local cur, max, dlg, target, entry = 0, 0, 0, nil, nil
+
+  local function entryFor(n, m)
+    if not list then return nil end
+    local e = list[n]
+    if e == nil and extra == "last" then e = list[#list] end
+    if e == nil then
+      error(string.format("%s: unexpected choice prompt #%d (%d options, dlg $%04X) " ..
+        "on map %d -- the route knows of only %d", tag, n, m,
+        M.readWord(0x00D0), M.mapId() & 0x1ff, #list), 0)
+    end
+    return type(e) == "table" and e or { want = e }
+  end
+  local function rowNow()
+    if list then return entry.want end
+    if type(want) == "function" then return want(dlg, max, C.n) end
+    return want
+  end
+
+  function C.poll()
+    if seen == M.frame then return end
+    seen = M.frame
+    local m = (gate and gate()) and 0 or M.readByte(0x056F)
+    up = m >= minRows
+    if up then
+      cur, max, dlg = M.readByte(0x056E), m, M.readWord(0x00D0)
+      local waiting = M.dialogWaiting()
+      if not entered and (ready == "count" or waiting) then
+        entered, checked = true, false
+        C.n = C.n + 1
+        entry = entryFor(C.n, m)
+      end
+      if entered then
+        target = rowNow()
+        if waiting and not checked then
+          checked = true
+          if entry and entry.max then
+            M.assertEq(m, entry.max, string.format("%s choice #%d option count (%s)",
+              tag, C.n, tostring(entry.what)))
+          end
+          if target < 0 or target >= m then
+            error(string.format("%s: choice #%d (dlg $%04X) wants row %d of %d",
+              tag, C.n, dlg, target, m), 0)
+          end
+          if opts.onUp then opts.onUp(C.n, m, entry) end
+        end
+      end
+    elseif entered then
+      entered = false
+      C.resolved = C.resolved + 1
+      C.last = { dlg = dlg, row = cur, max = max, n = C.n }
+      C.history[#C.history + 1] = C.last
+      M.log(string.format("[choice] dlg $%04X: row %d of %d", dlg, cur, max))
+      if cur ~= target then
+        error(string.format("%s: choice #%d (dlg $%04X) landed on row %d of %d, " ..
+          "wanted %d", tag, C.n, dlg, cur, max, target), 0)
+      end
+    end
+  end
+
+  function C.frame(ph)
+    C.poll()
+    if not up then return false end
+    if not entered or (ready ~= "count" and not M.dialogWaiting()) then
+      if ready == "pass" then return false end
+      M.setPad({})
+      return true
+    end
+    if cur < target then M.setPad(press(ph, "steer") and { "down" } or {})
+    elseif cur > target then M.setPad(press(ph, "steer") and { "up" } or {})
+    else M.setPad(press(ph, "confirm") and { "a" } or {}) end
+    return true
+  end
+
+  function C.reset()
+    C.n, C.resolved, C.last, C.history = 0, 0, nil, {}
+    up, entered, checked, seen = false, false, false, nil
+    cur, max, dlg, target, entry = 0, 0, 0, nil, nil
+  end
+  return C
+end
+
+-- M.dialogChoice(want, opts): the step.  Drives until opts.done(C) (default:
+-- every prompt of `want` -- #want for a list, else one -- has closed and no
+-- dialog waits), steering each choice window through M.newChoice (want and
+-- the opts above) and, on every other frame:
+--   opts.battle(ph)  while M.battleLoadStarted(), when given
+--   opts.idle(ph)    otherwise (default: edge-A while a dialog waits)
+-- ph is the step's own pulse, (ph + 1) % opts.period (default 8) per frame.
+-- opts.maxFrames (default 6000), opts.what.  The step carries its C as
+-- step.choice, for a caller that asserts on what landed.
+function M.dialogChoice(want, opts)
+  opts = opts or {}
+  local C = M.newChoice(want, opts)
+  local period, on = opts.period or 8, opts.on or 4
+  local ph = 0
+  local n = type(want) == "table" and #want or 1
+  local done = opts.done or function(c)
+    return c.resolved >= n and not M.dialogWaiting()
+  end
+  local idle = opts.idle or function(p)
+    M.setPad(M.dialogWaiting() and p < on and { "a" } or {})
+  end
+  local step = M.withReset(M.driveUntil(function()
+    C.poll()
+    return done(C)
+  end, opts.maxFrames or 6000, {
+    M.call(function()
+      ph = (ph + 1) % period
+      if opts.battle and M.battleLoadStarted() then opts.battle(ph); return end
+      if C.frame(ph) then return end
+      idle(ph)
+    end),
+  }, opts.what or "dialog choice"), function()
+    ph = 0
+    C.reset()
+  end)
+  step.choice = C
+  return step
+end
+
 -- ------------------------------------------- levers and re-entry escapes --
 -- A lever tile: one 8-frame up+A tap fires the event and the switch flips
 -- at the end of it (~70 frames); holding up with A released never

@@ -178,37 +178,21 @@ end
 -- built up as the text types out, and it is meaningless during a battle);
 -- $056E is the 0-based selection; the steering presses are edges because
 -- $056D latches a held direction to exactly one row (field/text.asm:368-425).
-local CH_SEL, CH_MAX = 0x056E, 0x056F
 local function rideUntil(pred, what, budget, choices)
-  local phase, dlgN, ci, inChoice = 0, 0, 0, false
+  local phase, dlgN = 0, 0
+  -- `choices` ({ want, max, what } per prompt, in order) through
+  -- H.newChoice (lib/ot6_field.lua): steered only once the dialog waits,
+  -- each landed row asserted when its window closes
+  local C = H.newChoice(choices or {}, { tag = what,
+    onUp = function(n, max, c)
+      H.log(string.format("%s: CHOICE #%d up (%d options) -- taking %d :: %s",
+        what, n, max, c.want, c.what))
+    end })
   return H.driveUntil(pred, budget or 20000, {
     H.call(function()
       phase = (phase + 1) % 8
       dlgN = H.dialogWaiting() and dlgN + 1 or 0
-      local chMax = (not H.battleLoadStarted()) and H.readByte(CH_MAX) or 0
-      if chMax >= 2 then
-        if not H.dialogWaiting() then H.setPad({}); return end
-        if not inChoice then
-          inChoice = true; ci = ci + 1
-          local c = (choices or {})[ci]
-          if not c then
-            error(string.format("%s: unexpected choice prompt #%d (%d options)",
-              what, ci, chMax), 0)
-          end
-          H.assertEq(chMax, c.max,
-            string.format("%s choice #%d option count (%s)", what, ci, c.what))
-          H.log(string.format("%s: CHOICE #%d up (%d options) -- taking %d :: %s",
-            what, ci, chMax, c.want, c.what))
-        end
-        local c, sel = choices[ci], H.readByte(CH_SEL)
-        if sel < c.want then H.setPad(phase < 4 and { "down" } or {})
-        elseif sel > c.want then H.setPad(phase < 4 and { "up" } or {})
-        else H.setPad(phase < 4 and { "a" } or {}) end
-        return
-      elseif inChoice then
-        inChoice = false
-        H.log(string.format("%s: choice #%d resolved at f%d", what, ci, H.frame))
-      end
+      if C.frame(phase) then return end
       if dlgN >= 3 then H.setPad(phase < 4 and { "a" } or {}); return end
       H.setPad({})
     end),

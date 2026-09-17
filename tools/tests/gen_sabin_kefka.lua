@@ -59,7 +59,6 @@ local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 local function seq(steps) return H.cond(function() return true end, steps) end
 
-local CH_SEL, CH_MAX = 0x056E, 0x056F
 local NAME_MENU = 0x0200
 local function monSpecies(i) return H.readWord(0x57c0 + i * 2) end
 local function monHp(i) return H.readWord(0x3bfc + i * 2) end
@@ -163,7 +162,11 @@ end
 -- never touches, and map 120 has none at all.  CHOICES stays empty so an
 -- unexpected prompt is a hard failure rather than a blind A-press.
 local CHOICES = {}   -- this step reaches no `choice` at all
-local ci, inChoice = 0, false
+-- the segment's choices through H.newChoice (lib/ot6_field.lua), on this
+-- file's own battle reading: nothing read while inBattle(), nothing steered
+-- before the dialog waits, a prompt past CHOICES raises, and every landed
+-- row is asserted when its window closes
+local CH = H.newChoice(CHOICES, { tag = "kefka", inBattle = inBattle })
 local nameMenus, battles = 0, {}
 
 local MENU, ACTOR = 0x7BCA, 0x62CA
@@ -386,27 +389,7 @@ local function rideUntil(pred, what, budget)
       battN = inBattle() and battN + 1 or 0
       dlgN  = H.dialogWaiting() and dlgN + 1 or 0
 
-      local chMax = (battN == 0) and H.readByte(CH_MAX) or 0
-      if chMax >= 2 then
-        quiet = 0
-        if not H.dialogWaiting() then H.setPad({}); return end
-        if not inChoice then
-          inChoice = true
-          ci = ci + 1
-          if not CHOICES[ci] then
-            error(string.format("kefka: unexpected choice prompt (%d options) " ..
-              "on map %d at (%d,%d) -- this segment expects none",
-              chMax, map(), H.fieldX(), H.fieldY()), 0)
-          end
-        end
-        local c, sel = CHOICES[ci], H.readByte(CH_SEL)
-        if sel < c.want then H.setPad(phase < 4 and { "down" } or {})
-        elseif sel > c.want then H.setPad(phase < 4 and { "up" } or {})
-        else H.setPad(phase < 4 and { "a" } or {}) end
-        return
-      elseif inChoice then
-        inChoice = false
-      end
+      if CH.frame(phase) then quiet = 0; return end
 
       if battN >= 3 then
         quiet = 0

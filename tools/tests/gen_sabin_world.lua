@@ -66,7 +66,7 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 -- multiple-choice state (src/field/text.asm), same addresses gen_scenario
 -- uses: $056E = cursor row, $056F = option count.  $056F is only final once
 -- the prompt is input-ready, so nothing is read off it before dialogWaiting().
-local CH_SEL, CH_MAX = 0x056E, 0x056F
+local CH_MAX = 0x056F
 local NAME_MENU = 0x0200          -- field/event.asm:3607, #$01 = name change
 
 local FACE = { up = 0, right = 1, down = 2, left = 3 }
@@ -148,7 +148,14 @@ local CHOICES = {
     what = "SHADOW joins (dlg $01CA): 0 = Yes -- option 1 (_cb0b07) " ..
            "deletes him again" },
 }
-local ci, inChoice = 0, false
+-- answered through H.newChoice (lib/ot6_field.lua): nothing read while a
+-- battle is up, nothing steered or asserted before the dialog waits, and
+-- every landed row asserted when its window closes
+local CH = H.newChoice(CHOICES, { tag = "sabin",
+  onUp = function(n, max, c)
+    H.log(string.format("sabin: CHOICE #%d up (%d options) -- taking " ..
+      "option %d :: %s", n, max, c.want, c.what))
+  end })
 local nameMenusSeen = 0
 
 -- The step driver.  Steers choices, flees battles (see the header: no win,
@@ -175,33 +182,7 @@ local function rideUntil(pred, what, budget)
       dlgN  = H.dialogWaiting() and dlgN + 1 or 0
 
       -- 1. a multiple choice: steer to the wanted row, then confirm
-      local chMax = (battN == 0) and H.readByte(CH_MAX) or 0
-      if chMax >= 2 then
-        quiet = 0
-        if not H.dialogWaiting() then H.setPad({}); return end
-        if not inChoice then
-          inChoice = true
-          ci = ci + 1
-          local c = CHOICES[ci]
-          if not c then
-            error(string.format("sabin: unexpected choice prompt #%d (%d " ..
-              "options) on map %d -- this segment knows of only %d",
-              ci, chMax, map(), #CHOICES), 0)
-          end
-          H.assertEq(chMax, c.max,
-            string.format("choice #%d option count (%s)", ci, c.what))
-          H.log(string.format("sabin: CHOICE #%d up (%d options) -- taking " ..
-            "option %d :: %s", ci, chMax, c.want, c.what))
-        end
-        local c, sel = CHOICES[ci], H.readByte(CH_SEL)
-        if sel < c.want then H.setPad(phase < 4 and { "down" } or {})
-        elseif sel > c.want then H.setPad(phase < 4 and { "up" } or {})
-        else H.setPad(phase < 4 and { "a" } or {}) end
-        return
-      elseif inChoice then
-        inChoice = false
-        H.log(string.format("sabin: choice #%d resolved at f%d", ci, H.frame))
-      end
+      if CH.frame(phase) then quiet = 0; return end
 
       -- 2. battle: none can open here (#183).  rideUntil never presses a
       --    direction, and only a completed step rolls an encounter; the

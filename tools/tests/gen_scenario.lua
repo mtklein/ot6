@@ -182,7 +182,15 @@ local CHOICES = {
     what = "save-point tutorial (dlg $000A): 0 = Yes -- the ONLY branch " ..
            "that ends in player_ctrl_on" },
 }
-local ci, inChoice = 0, false
+-- answered through H.newChoice (lib/ot6_field.lua): nothing is read while a
+-- battle is up, nothing steered or asserted before the dialog waits, and
+-- every landed row is asserted when its window closes
+local CH = H.newChoice(CHOICES, { tag = "river",
+  onUp = function(n, max, c)
+    H.log(string.format("river: CHOICE #%d up (%d options) -- taking " ..
+      "option %d :: %s", n, max, c.want, c.what))
+    H.screenshot(string.format("scenario_choice%d", n))
+  end })
 
 -- The fighter.  This river outpaces a blind A-masher: run 1 of the
 -- input-driven test conversion lost BANON in fight #3 (the 3-monster roll)
@@ -318,34 +326,7 @@ local function rideUntil(pred, what, budget, idle, tier)
       -- 1. a multiple choice: steer, then confirm.  Nothing is read or
       --    asserted until the dialog is input-ready ($056F is only final
       --    then), and nothing is read at all during a battle.
-      local chMax = (battN == 0) and H.readByte(CH_MAX) or 0
-      if chMax >= 2 then
-        if not H.dialogWaiting() then H.setPad({}); return end
-        if not inChoice then
-          inChoice = true
-          ci = ci + 1
-          local c = CHOICES[ci]
-          if not c then
-            error(string.format("river: unexpected choice prompt #%d (%d " ..
-              "options) on map %d -- the route knows of only %d",
-              ci, chMax, map(), #CHOICES), 0)
-          end
-          H.assertEq(chMax, c.max,
-            string.format("choice #%d option count (%s)", ci, c.what))
-          H.log(string.format("river: CHOICE #%d up (%d options) -- taking " ..
-            "option %d :: %s", ci, chMax, c.want, c.what))
-          H.screenshot(string.format("scenario_choice%d", ci))
-        end
-        local c, sel = CHOICES[ci], H.readByte(CH_SEL)
-        if sel < c.want then H.setPad(phase < 4 and { "down" } or {})
-        elseif sel > c.want then H.setPad(phase < 4 and { "up" } or {})
-        else H.setPad(phase < 4 and { "a" } or {}) end
-        return
-      elseif inChoice then
-        inChoice = false
-        H.log(string.format("river: choice #%d resolved at f%d (%s)",
-          ci, H.frame, CHOICES[ci].what))
-      end
+      if CH.frame(phase) then return end
 
       -- 2. battle: name it on the rising edge, then FIGHT it -- the same
       --    edge-tapped A drives menus, targets and victory text (see the
@@ -576,7 +557,8 @@ local function rideAttempt(n)
       H.waitFrames(60),
     }, {}),
     H.call(function()               -- fresh per-attempt driver state
-      ci, inChoice, lost, nBattles = 0, false, nil, 0
+      CH.reset()
+      lost, nBattles = nil, 0
       announced = {}
       H.gameOverFired = 0
     end),
@@ -675,7 +657,7 @@ H.run({ maxFrames = 700000, allowGameOver = true }, {
     end
   end),
   H.call(function()
-    H.assertEq(ci, H.vars.tutorialPending and 4 or 3,
+    H.assertEq(CH.n, H.vars.tutorialPending and 4 or 3,
       H.vars.tutorialPending
         and "all four prompts answered: board, fork 1, fork 2, save-point tutorial"
         or "all three prompts answered: board, fork 1, fork 2 (the save-point "

@@ -82,6 +82,11 @@ local rideWipeN = 0
 
 local function ride(dir, pred, what, budget, choiceWant)
   local phase, hb, battN = 0, -900, 0
+  -- a choice window, only ever polled at the one site below that runs off
+  -- the ride map (the ride map's field cells read garbage): H.newChoice
+  -- (lib/ot6_field.lua), owning the pad only while the dialog waits, the
+  -- landed row asserted when the window closes
+  local C = H.newChoice(choiceWant or 0, { ready = "pass", tag = what })
   local F = H.newFightDriver("trench " .. what, { tactical = true,
     boost = true, bank = 3, items = true, healPercent = 60, cadence = 12 })
   return H.driveUntil(function()
@@ -195,13 +200,7 @@ local function ride(dir, pred, what, budget, choiceWant)
         H.setPad({ [dir] = true })
         return
       end
-      if H.readByte(CH_MAX) >= 2 and H.dialogWaiting() then
-        local sel, want = H.readByte(CH_SEL), choiceWant or 0
-        if sel < want then H.setPad(phase < 4 and { "down" } or {})
-        elseif sel > want then H.setPad(phase < 4 and { "up" } or {})
-        else H.setPad(phase < 4 and { "a" } or {}) end
-        return
-      end
+      if C.frame(phase) then return end
       if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
       H.setPad(dir and { [dir] = true } or {})
     end),

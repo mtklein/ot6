@@ -24,21 +24,20 @@ local function dumpsw(tag)
     sw(0x0056), sw(0x0057), sw(0x0111), sw(0x01F0), sw(0x01F1), sw(0x01F2)))
 end
 
--- The aria forks: three chained choice dialogs, correct sequence {0,1,0}.  The
--- choice engine exposes cur=$056e, max=$056f; drive the cursor to idx, confirm.
+-- The aria forks: three chained choice dialogs, correct sequence {0,1,0},
+-- each one H.dialogChoice (lib/ot6_field.lua): the cursor is steered to
+-- idx from $056E and the landed row asserted when the window closes.  The
+-- older steering is kept exactly: presses from the moment $056F counts two
+-- options ("count"), 3-of-8 pulses, and an edge-A on every other frame.
 local function ariaFork(idx, what)
-  local ph, confirmed = 0, false
-  return H.driveUntil(function()
-    if confirmed and H.readByte(0x056f) < 2 and not H.dialogWaiting() then return true end
-    return sw(0x0111)==1 or (map()~=236 and map()~=238)
-  end, 15000, { H.call(function() ph=(ph+1)%8
-    local maxc, cur = H.readByte(0x056f), H.readByte(0x056e)
-    if maxc >= 2 then
-      if cur < idx then H.setPad(ph<3 and {"down"} or {})
-      elseif cur > idx then H.setPad(ph<3 and {"up"} or {})
-      else H.setPad(ph<3 and {"a"} or {}); if ph<3 then confirmed=true end end
-    else H.setPad(ph<4 and {"a"} or {}) end
-  end) }, what)
+  return H.dialogChoice(idx, {
+    ready = "count", on = 3, maxFrames = 15000, what = what, tag = what,
+    done = function(c)
+      if c.resolved >= 1 and not H.dialogWaiting() then return true end
+      return sw(0x0111)==1 or (map()~=236 and map()~=238)
+    end,
+    idle = function(ph) H.setPad(ph<4 and {"a"} or {}) end,
+  })
 end
 
 -- active (vis-bit7) map-236 dance objects in range (Draco / the flowers)
