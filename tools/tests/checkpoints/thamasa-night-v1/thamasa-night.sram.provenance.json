@@ -1,11 +1,15 @@
 {
   "format": "ot6-provenance/v1",
-  "payload_sha256": "1949944f3e8a942209932aa8ca5bc18f097dbf368be659823f57590213376e03",
-  "generator_sig": "96fb10c55bfb1e93195189c5a86ec155e9ab50e9652e6956807088e14e6dcb68 gen_thamasa_arrive tools/tests/checkpoints/crescent-landing-v1/manifest.json tools/tests/checkpoints/crescent-landing-v1/crescent-landing.sram",
+  "payload_sha256": "d0c64dc0d06e6e9cfaf28cc4b17e75898c2b7563b0978232635c76a5f9b026b0",
+  "generator_sig": "6bf73ed84601bbdd184c6dec882582548cd4697ffade4995358f9c468df819cd gen_thamasa_arrive tools/tests/checkpoints/crescent-landing-v1/manifest.json tools/tests/checkpoints/crescent-landing-v1/crescent-landing.sram",
   "ancestors": [
     {
       "path": "tools/tests/checkpoints/crescent-landing-v1/manifest.json",
-      "sha256": "670e15a216dfcaa135ccb81688f462f83cd8556f09bb0f29656223bd04ef25cf"
+      "sha256": "bdc5fd178731cd47dc704c71d8415cb3c214f70bb88824abec23cc4a77175ea1"
+    },
+    {
+      "path": "build/states/crescent_landing.stamp",
+      "sha256": "de5024a18d6fc1c4d62e534129334167d9e85e07db1a05c0835c5b46b522d086"
     }
   ]
 }
