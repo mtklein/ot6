@@ -114,6 +114,12 @@ Cannon is holy, Drill is spear-class, Fire Dance is fire, ...).
   potency tier per BP. Buffs/debuffs: duration per BP.
 - Enemies don't have BP, same asymmetry as Octopath: bosses get shields and
   telegraphs, players get the economy.
+- Boosting also costs MP. Every boosted ability except Fight pays
+  `min(99, floor(base × 2.5^boost + 0.5))` — x1 / x2.5 / x6.25 / x15.625 —
+  so a boost is a trade of two currencies rather than a free multiplier.
+  Tier-family magic and SwdTech are the exceptions, because their boost
+  already escalates by buying a dearer tier. mp-economy.md's "Boosting
+  costs MP" has the rule, the table and the rulings.
 
 **Boost tiers replace spell tiers.** Terra learns *Fire*, once. Boosted once
 it casts as Fira; twice, Firaga. This keeps every spell list at 8 without

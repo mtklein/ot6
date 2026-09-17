@@ -132,11 +132,12 @@ house rule stands with its one named exception (Osmose, below).
   keeps every spell list at 8 entries, and it charges the tier's real
   price.
 
-  The split applies unchanged to every costed verb, including
-  boost-tiered Steal (kits.md): its
-  BP buys the guarantee, and its MP price is unchanged by the
-  boost, using the "flat small" row below
-  like every other verb that is free in vanilla. Steal costs 4 MP.
+  The split applies to every costed verb, but since #219 the MP half
+  is itself a function of the boost: a boost that does not buy a tier
+  buys a multiplier or odds instead, and pays 2.5x the base price per
+  level for it. See "Boosting costs MP" below. Steal's base price is
+  4 MP, using the "flat small" row below like every other verb that is
+  free in vanilla, and a boost-3 Steal costs 63.
   cmd $05 takes a flat-cost
   path in `Ot6AbilityCost`, a single verb with one price
   keyed on the command rather than on an
@@ -151,11 +152,137 @@ house rule stands with its one named exception (Osmose, below).
   records as spells (research/data-formats.md), so they price
   on the vanilla spell baseline: Fire 4, Fire 2 20, Fire 3 51.
 
+## Boosting costs MP
+
+Owner direction, 2026-09-17 (#219): every boosted ability except Fight
+costs escalating MP, the way boosted magic already does, so boosting is
+a tactical trade rather than a free multiplier.
+
+    price = min(99, floor(base * 2.5^boost + 0.5))
+
+with `boost` the pending boost level 0..3, i.e. x1 / x2.5 / x6.25 /
+x15.625 against the base price, every result capped at 99.
+
+**Why 2.5x: it matches magic's own tier scaling.** Boosted tier-family
+magic folds up a tier and pays that tier's vanilla MP, and damage is
+proportional to spell power. Measured off `magic_prop_en.dat`:
+
+| per boost step | MP x | damage x | MP / damage |
+|---|---|---|---|
+| base -> -ra (Fire 4->20, Ice 5->21, Bolt 6->22) | ~4.3 | ~2.85 | 1.5 |
+| -ra -> -ga (20->51, 21->52, 22->53) | ~2.5 | ~2.0 | 1.25 |
+| this rule | 2.5 | 2.0 (Ot6BoostDmg's x2/x4/x8) | 1.25 |
+
+The upper step matches exactly; the lower step is steeper only because
+vanilla's starter spells are cheap.
+
+### Who pays it
+
+The rule is one test, and it is the same test the damage half already
+makes: **a price escalates exactly when `Ot6BoostDmg` would multiply
+the action, or when the boost buys odds instead.**
+
+- **Multiplier verbs, escalate:** Blitz, Tools, Lore, non-tier magic
+  (Drain, Scan, Break, Doom, Pearl, Flare, Quake, Ultima, Osmose,
+  Rflect, Vanish, Dispel, ...), summons, Dance. Boost buys them
+  x2/x4/x8 and nothing else, so the price follows.
+- **Chance verbs, escalate:** Steal (boost buys the rare/guarantee
+  ladder), Rage (boost buys the trance's coin). Slot would join them,
+  but Slot is unpriced today, so there is nothing to escalate.
+- **Unchanged, already escalating by tier:** tier-family magic. A family
+  head folds up a tier and pays that tier's own vanilla MP, which is a
+  steeper escalation than 2.5x (Fire 4 -> Fire 2 20 -> Fire 3 51); a
+  tier the caster already owns does not fold again and gets no
+  multiplier either, so nothing about its price moves. The one gate for
+  both halves is `Ot6InFoldTbl`, a byte-for-byte scan of `Ot6FoldTbl`.
+
+  The families are wider than the -ra/-ga lines, and #219's own scope
+  note listed **Bio** as non-tier magic. It is not: `Ot6FoldTbl` carries
+  Poison -> Bio, so Bio is Poison's tier, `Ot6BoostDmg` gives it no
+  multiplier, and boosting into it already buys nothing. Charging 2.5x
+  for that would be charging for nothing, so Bio is exempt with the rest
+  of the families. The same holds for **Cure/Cure 2/Cure 3**,
+  **Life/Life 2**, **Slow/Slow 2** and **Haste/Haste2**. The rule the
+  owner locked -- "unchanged: tier-family magic" -- is what decides
+  this, not the example beside it.
+- **Unchanged, already escalating by tier:** SwdTech. The boost picks
+  the tech, and the tech is charged at its own row price.
+- **Unchanged, free:** Fight and Capture. The boost buys swings.
+- **Unchanged, flat:** Filch and Bestow. `Ot6BoostDmg` refuses to
+  multiply anything under command `$05` and neither row is a chance
+  verb, so boosting into them buys nothing at all and charging for it
+  would be charging for nothing.
+
+### The rulings
+
+1. **Every price, base or boosted, caps at 99** — except that the cap
+   never makes a boost *cheaper* than not boosting. One price in the
+   game is already above the cap, Phoenix at 110, and it is legal there
+   because the summon window draws three digits (`ListText` command
+   `$16`); capping a boosted Phoenix to 99 would pay less for more, so
+   its base stands. Every other price is under the cap, so for them the
+   rule is just the cap. The two-digit price
+   drawers stay; a boosted price that would pass 99 costs 99. Owner:
+   "capping everything at 99 is very in spirit of ff6. we can let
+   scaling slide when we get really high like that." The scaling
+   therefore flattens for dear abilities -- Spiraler 50 -> 99 at boost
+   1, and Bum Rush, already at 99, never moves at all -- and that is
+   accepted, not a bug. (Cleave is also always 99, but for the other
+   reason: SwdTech does not escalate.)
+2. **A boost the caster's current MP cannot pay is greyed and refused**,
+   exactly like an unaffordable row today. The grey is
+   `Ot6AbilityGrey`'s for the kit windows and `CheckMagicEnabled`'s for
+   the magic list, and both read the same boosted number the charge
+   takes.
+3. **Rounding is computed once.** `Ot6BoostPriceFor` is the only place
+   the arithmetic lives, and every surface that states a price -- the
+   drawn number, the grey, the confirm, the charge -- reaches it, so the
+   charge and the displayed price cannot disagree.
+
+### The resulting table
+
+Base prices are `Ot6AbilityCostTbl`'s, `Ot6StealCost`'s and
+`Ot6DanceCost`'s; the boosted columns are the formula above.
+
+| row | base | boost 1 | boost 2 | boost 3 |
+|---|---|---|---|---|
+| Pummel / AutoCrossbow / Steal | 4 | 10 | 25 | 63 |
+| Bestow (flat, never escalates) | 5 | 5 | 5 | 5 |
+| NoiseBlaster / Flash | 6 | 15 | 38 | 94 |
+| Filch (flat, never escalates) | 6 | 6 | 6 | 6 |
+| Bio Blaster / Dance / Rage | 8 | 20 | 50 | 99 |
+| AuraBolt / Debilitator | 10 | 25 | 63 | 99 |
+| Suplex | 13 | 33 | 81 | 99 |
+| Air Anchor | 14 | 35 | 88 | 99 |
+| Mantra / Drill | 16 | 40 | 99 | 99 |
+| Fire Dance | 17 | 43 | 99 | 99 |
+| Chain Saw | 18 | 45 | 99 | 99 |
+| Air Blade | 28 | 70 | 99 | 99 |
+| Spiraler | 50 | 99 | 99 | 99 |
+| Bum Rush | 99 | 99 | 99 | 99 |
+
+Magic, for the shape of it -- all of these are outside the tier
+families, so all of them escalate: Scan 3 -> 8 / 19 / 47, Osmose 8 -> 20
+/ 50 / 99, Drain 15 -> 38 / 94 / 99, Break 25 -> 63 / 99 / 99, Ultima 80
+-> 99 at every boost. A family head does not appear in that list because
+it folds instead: Fire 4 -> 20 -> 51 -> 51, Cure 5 -> 25 -> 40 -> 40.
+SwdTech's column is unchanged at 4/10/13/16/18/28/50/99, because its
+boost was already spent on the row.
+
+The one spell left out of all of this is Step Mine (lore `$99`). Its
+price is not `MagicProp`'s: battle init derives it from the play clock
+straight into each caster's list row, and nothing at price-resolution
+time can reproduce that, so both the display and the charge skip it and
+it stays vanilla.
+
 ## The verb survey
 
 Already costed, unchanged: **Magic**, **Lore**, and **summons**
-keep their vanilla MP costs (house rule); summons additionally
-stay once per battle (DESIGN.md).
+keep their vanilla MP costs (house rule) for an *unboosted* cast;
+summons additionally stay once per battle (DESIGN.md). A boosted cast
+is priced by "Boosting costs MP" above — the vanilla number is the base
+it scales from, and a tier-family spell keeps it exactly, because its
+boost buys a tier instead.
 
 There is one named exception to the vanilla-MP-costs house rule:
 Osmose `$29` costs 8 MP rather than vanilla's 1. Under OT6 every verb
@@ -191,6 +318,11 @@ Vanilla-free player verbs, with their cost shapes:
 | SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–99 | he pays both currencies (below), and Cleave costs 99 |
 | Dance (Mog) | flat, paid at start | 4–10 | one payment starts a whole-battle state; vanilla's can't-stop-dancing lock is preserved, so the price is per battle rather than per step |
 | Rage (Gau) | flat, paid at start | 8 | one payment starts a whole-battle possession and every possessed turn after it is free, the same rule Dance takes; `Ot6RageCost` tail-calls `Ot6DanceCost` so the two cannot drift |
+
+Every row above that is not marked "free — exception" is a **base**
+price: a boosted use of it costs `min(99, floor(base * 2.5^boost +
+0.5))`. See "Boosting costs MP" above for which verbs escalate and why.
+
 | Leap (Gau) | free — exception | 0 | the free floor rather than an exemption: Leap shares Gau's FIGHT row on the Veldt (kits.md), so on the Veldt it is the Fight command |
 | Sketch (Relm) | flat small | 2–4 | pay to roll; the Sketch bug stays (house rule) and does not refund |
 | Control (Relm, kit not yet built) | flat moderate | 8–12 | vanilla's strongest free verb, giving full command of a monster |
