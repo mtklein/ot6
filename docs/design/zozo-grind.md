@@ -358,10 +358,12 @@ are measured); shape 2 is out of the rule's reach while Muddle holds.
 
 - `H.monsterIds()` reads the Vulture as `$12A` and the Red Fang as `$178`
   in these formations (high bit wrong); `$57C0` (`H.FORMATION`) reads
-  `$02A` / `$078`.  The lab and the landed focus wrapper use `$57C0`.
+  `$02A` / `$078`.  The lab and the landed focus use `$57C0`.
 - `worldNavTo` builds its fight driver from a fixed option list (no
   `keyed`, `focus`, `tools`, `traceTgt`), so a generator cannot set those
-  without wrapping `H.newFightDriver`, as this one now does.
+  without wrapping `H.newFightDriver`, as this one did.  (#209: every
+  walker now takes a `fight = { ... }` table, `H.fightDriverFor`, and the
+  generator passes its focus through it.)
 - `bank = 0` and the walk driver's default (`bank = nil`) are the same
   policy: breakfirst matched control frame-for-frame on seeds 0 and 48
   (`frame=179663`; the seed-48 wipe at `frame=33339`).

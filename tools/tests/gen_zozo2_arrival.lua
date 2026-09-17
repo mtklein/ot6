@@ -155,49 +155,37 @@ local function where(tag)
 end
 
 -- ------------------------------------------------------ the fight driver --
--- worldNavTo builds its driver from a fixed option list (tactical, boost,
--- items, healPercent, bank, reserve, healer, magic, summon, nuke, tool,
--- blitz); the keyed line and the kill order are not on it.  This wrapper is
--- the generator's driver config: every driver the walk builds gets
--- GRIND.keyed, and with GRIND.focus = "ironfist" a kill order recomputed
--- every frame from the stage -- the Iron Fists first, by species, so the
--- last body standing is a Vulture (whose solo branch is Special / Shimsham,
--- power 8) or a Mind Candy (which has no solo branch), never the Stone
--- caster.  The mask bit is the slot's (set_target_data, btlgfx_main.asm:
--- $7B7E & $1F is the command's monster target byte); traceTgt logs every
--- confirm's masks so a wrong bit reads as a "focus steer gave up" line.
-local lib_newFightDriver = H.newFightDriver
-H.newFightDriver = function(tag, opts)
-  opts = opts or {}
-  if GRIND.keyed ~= nil then opts.keyed = GRIND.keyed end
-  if GRIND.tools ~= nil then opts.tools = GRIND.tools end
-  if GRIND.focus == "ironfist" then opts.traceTgt = true end
-  local F = lib_newFightDriver(tag, opts)
-  if GRIND.focus == "ironfist" then
-    local frame, said = F.frame, nil
-    F.frame = function(...)
-      -- species by the full-width formation word ($57C0, M.FORMATION):
-      -- monsterIds()'s high bit reads wrong here (Vulture $02A as $12A)
-      local focus, names = {}, {}
-      for s = 0, 5 do
-        if H.readWord(H.FORMATION + s * 2) == IRON_FIST
-           and H.readWord(0x3BFC + s * 2) > 0 then
-          focus[#focus + 1] = { slot = s, mask = 1 << s }
-          names[#names + 1] = string.format("slot %d", s)
-        end
-      end
-      opts.focus = #focus > 0 and focus or nil
-      local line = #focus > 0 and table.concat(names, ",") or "none"
-      if line ~= said then
-        said = line
-        H.log(string.format("[%s] focus: Iron Fist first -- %s", tag, line))
-      end
-      return frame(...)
+-- The generator's driver config, handed to every walker that builds a fight
+-- driver as its `fight` table (M.fightDriverFor merges it over the walker's
+-- named options): GRIND.keyed and GRIND.tools, and with GRIND.focus =
+-- "ironfist" a kill order recomputed every frame from the stage -- the Iron
+-- Fists first, by species, so the last body standing is a Vulture (whose
+-- solo branch is Special / Shimsham, power 8) or a Mind Candy (which has no
+-- solo branch), never the Stone caster.  The mask bit is the slot's
+-- (set_target_data, btlgfx_main.asm: $7B7E & $1F is the command's monster
+-- target byte); traceTgt logs every confirm's masks so a wrong bit reads as
+-- a "focus steer gave up" line.
+local function ironFistFocus(tag, memo)
+  -- species by the full-width formation word ($57C0, M.FORMATION):
+  -- monsterIds()'s high bit reads wrong here (Vulture $02A as $12A)
+  local focus, names = {}, {}
+  for s = 0, 5 do
+    if H.readWord(H.FORMATION + s * 2) == IRON_FIST
+       and H.readWord(0x3BFC + s * 2) > 0 then
+      focus[#focus + 1] = { slot = s, mask = 1 << s }
+      names[#names + 1] = string.format("slot %d", s)
     end
-    local idle = F.idle
-    F.idle = function(...) said = nil; return idle(...) end
   end
-  return F
+  local line = #focus > 0 and table.concat(names, ",") or "none"
+  if line ~= memo.said then
+    memo.said = line
+    H.log(string.format("[%s] focus: Iron Fist first -- %s", tag, line))
+  end
+  return #focus > 0 and focus or nil
+end
+local FIGHT = { keyed = GRIND.keyed, tools = GRIND.tools }
+if GRIND.focus == "ironfist" then
+  FIGHT.traceTgt, FIGHT.focus = true, ironFistFocus
 end
 
 -- The care stop between fights.  Potions are reserved down to three because
@@ -208,7 +196,7 @@ end
 -- fights on a grind is refunded and a Tonic is not.
 local function care(tag, threshold)
   return H.fieldCare({ tag = "care " .. tag, threshold = threshold or GRIND.crossingCare,
-                       reserve = { [POTION] = 3 } })
+                       reserve = { [POTION] = 3 }, fight = FIGHT })
 end
 
 local function seq(steps) return H.cond(function() return true end, steps) end
@@ -223,7 +211,7 @@ local function walk(x, y, what, opts)
                          healPercent = GRIND.healPercent, healer = CELES,
                          bank = GRIND.bank, careThreshold = GRIND.careThreshold,
                          reserve = { [POTION] = 3 },
-                         arrive = opts.arrive }),
+                         arrive = opts.arrive, fight = FIGHT }),
     H.release(),
   })
 end
@@ -343,9 +331,9 @@ local function enterDoor(dir, m, what)
       H.call(function()
         if H.battleLoadStarted() then
           if not F then
-            F = H.newFightDriver(what, { tactical = true, boost = true, items = true,
+            F = H.fightDriverFor(what, { tactical = true, boost = true, items = true,
               healPercent = GRIND.healPercent, bank = GRIND.bank, healer = CELES,
-              reserve = { [POTION] = 3 } })
+              reserve = { [POTION] = 3 } }, FIGHT)
           end
           inBattle, enteredAfterBattle[what] = true, true
           F.frame()
@@ -370,11 +358,11 @@ end
 
 local function door(nx, ny, dir, m, what)
   return H.cond(function() return true end, {
-    H.navTo(nx, ny, { maxFrames = 12000, playBattles = "tactical" }),
+    H.navTo(nx, ny, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT }),
     H.driveUntil(function() return map() == m end, 900, {
       H.hold({ dir }), H.waitFrames(4),
     }, what .. ": through the door"),
-    H.advanceStory(landed(m, 10), 2400, { playBattles = "tactical" }),
+    H.advanceStory(landed(m, 10), 2400, { playBattles = "tactical", fight = FIGHT }),
     H.waitFrames(150),
   })
 end
@@ -391,7 +379,7 @@ H.run({ maxFrames = 1200000 }, {
   --    doorway (directly reachable, probe_eng61) landing at 59 {10,48};
   --    the keep->gate door (28,32)-side needs the held press.
   H.navTo(11, 32, { arrive = function() return map() == 59 end,
-                    maxFrames = 9000, playBattles = "tactical" }),
+                    maxFrames = 9000, playBattles = "tactical", fight = FIGHT }),
   H.waitUntil(landed(59, 10), 1500, "keep hall", 1),
   H.waitFrames(150),
   door(12, 42, "up", 55, "keep -> the gate map"),
@@ -409,7 +397,7 @@ H.run({ maxFrames = 1200000 }, {
   H.setRows(GRIND.rows, { tag = "Zozo crossing rows" }),
 
   -- 3. off the castle onto the world: row y=43 is the exit
-  H.navTo(28, 42, { maxFrames = 12000, playBattles = "tactical" }),
+  H.navTo(28, 42, { maxFrames = 12000, playBattles = "tactical", fight = FIGHT }),
   H.driveUntil(function() return H.worldMode() end, 900, {
     H.hold({ "down" }), H.waitFrames(4),
   }, "off the castle to the world"),
@@ -467,8 +455,9 @@ H.run({ maxFrames = 1200000 }, {
     H.assertEq(sw(0x00A4), 0, "$00A4 clear -- the item shop opens as shop 22")
     where("Jidoor")
   end),
-  H.crossDoor(27, 41, 201, 34, 20, "Jidoor item shop door 198(27,41)->201"),
-  H.shopTalk(34, 15, "Jidoor item shop", { healer = CELES }),
+  H.crossDoor(27, 41, 201, 34, 20, "Jidoor item shop door 198(27,41)->201",
+              { fight = FIGHT }),
+  H.shopTalk(34, 15, "Jidoor item shop", { healer = CELES, fight = FIGHT }),
   H.call(function()
     H.assertEq(H.readByte(0x0201), 22, "the counter opened shop 22 ($0201)")
   end),
@@ -486,8 +475,8 @@ H.run({ maxFrames = 1200000 }, {
     H.assertEq(invCount(POTION) >= 39, true, "Potions at 39 leaving Jidoor -- the L18 band plus field care")
     H.assertEq(invCount(FENIX) >= 20, true, "Fenix Downs at 20 leaving Jidoor")
   end),
-  H.crossDoor(34, 21, 198, 27, 43, "Jidoor item shop -> street"),
-  H.navTo(16, 61, { maxFrames = 24000, playBattles = "tactical" }),
+  H.crossDoor(34, 21, 198, 27, 43, "Jidoor item shop -> street", { fight = FIGHT }),
+  H.navTo(16, 61, { maxFrames = 24000, playBattles = "tactical", fight = FIGHT }),
   H.driveUntil(function() return H.worldMode() end, 6000, {
     H.hold({ "down" }), H.waitFrames(4),
   }, "off Jidoor's south edge"),
