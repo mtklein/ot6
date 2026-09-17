@@ -8,7 +8,7 @@ local STATE = "build/states/camp_escaped.mss.lua"
 local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_ITEM, ST_TOOLS, ST_BUSHIDO, ST_TGT, ST_TRANS =
   0x05, 0x0A, 0x30, 0x37, 0x38, 0x01
-local CMD_SWDTECH, CMD_ITEM = 0x07, 0x01
+local CMD_SWDTECH, CMD_ITEM, CMD_FIGHT = 0x07, 0x01, 0x00
 local KNOWN, ITEMLIST, KROW = 0x2020, 0x4005, 0x8967
 local TONIC, POTION = 0xE8, 0xE9
 local OT6_SLASH = 0x01
@@ -109,7 +109,11 @@ local function decide()
       local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
       if h > 0 and m > 0 and h * 100 // m < 60 then hurt = true end
     end
-    if st == ST_CMD and not hurt then btn = "x"
+    -- nothing to heal with hands the window on too (measured: with the bag
+    -- empty of both, B out of the list and back into Item held his window
+    -- forever, and CYAN's never came)
+    local canCare = bagIdxOf({ TONIC, POTION }) ~= nil
+    if st == ST_CMD and not (hurt and canCare) then btn = "x"
     elseif st == ST_CMD then
       local want = cmdRowOf(shadow, CMD_ITEM)
       local cur = H.readByte(CMDROW + shadow) & 3
@@ -130,16 +134,20 @@ local function decide()
     if cyanMode == "defer" then
       btn = (st == ST_CMD) and "x" or "b"
     elseif cyanMode == "item" then
+      -- any unboosted turn pays the pip; the camp_escaped bag can hold no
+      -- Tonic or Potion by now (measured: it ships 1 Potion, SHADOW's care
+      -- draws on the same bag), and then he takes the turn as a Fight
+      local healer = bagIdxOf({ TONIC, POTION }) ~= nil
       if st == ST_CMD then
-        local want = cmdRowOf(cyan, CMD_ITEM)
+        local want = cmdRowOf(cyan, healer and CMD_ITEM or CMD_FIGHT)
         local cur = H.readByte(CMDROW + cyan) & 3
         if cur == want then btn = "a"
         else btn = (cur < want) and "down" or "up" end
       elseif st == ST_ITEM then
         local want = bagIdxOf({ TONIC, POTION })
-        if want == nil then error("bank ran out of items", 0) end
         local cur = H.readByte(0x8947 + cyan) + H.readByte(0x894F + cyan)
-        if cur < want then btn = "down"
+        if want == nil then btn = "b"         -- the last one went: Fight
+        elseif cur < want then btn = "down"
         elseif cur > want then btn = "up"
         else btn = "a" end
       elseif st == ST_TGT then btn = "a"
@@ -193,21 +201,24 @@ local function park(tag)
 end
 -- move the parked cursor onto `row` and edge one A, without the tech
 -- steering (for the refusal arms, whose confirm must be refused)
+-- (`row` is a number, or a function read when the walk runs)
 local function pressRowOnce(row)
+  local function r() return type(row) == "function" and row() or row end
   return H.repeatN(1, {
     (function()
       local ph = 0
       return H.driveUntil(function()
-        return H.readByte(MSTATE) == ST_TOOLS and H.readByte(KROW + cyan) == row
+        return H.readByte(MSTATE) == ST_TOOLS and H.readByte(KROW + cyan) == r()
       end, 600, {
         H.call(function()
           ph = (ph + 1) % 8
           if ph >= 4 then H.setPad({}); return end
           local cur = H.readByte(KROW + cyan)
-          H.setPad({ [cur < row and "down" or "up"] = true })
+          H.setPad({ [cur < r() and "down" or "up"] = true })
         end),
         H.waitFrames(1),
-      }, "cursor walked to row " .. row)
+      }, type(row) == "function" and "cursor walked to the spend row"
+                                  or ("cursor walked to row " .. row))
     end)(),
     H.call(function() H.setPad({}) end),
     H.waitFrames(8),
@@ -217,6 +228,15 @@ local function pressRowOnce(row)
 end
 
 local spells = {}
+local ledger = {}
+local function flushLedger(tag)
+  for _, e in ipairs(ledger) do
+    H.log(string.format("[%s] ledger f=%d bank %d -> %d (status2 $%02x%s)",
+      tag, e.f, e.from, e.to, e.st2,
+      (e.st2 & 0x10) ~= 0 and ": Berserk" or ""))
+  end
+  ledger = {}
+end
 local function sawSpell(id)
   for _, v in ipairs(spells) do if v == id then return true end end
   return false
@@ -278,6 +298,17 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(bp(), 1, "the natural opening bank (Ot6InitBP)")
     emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
       emu.callbackType.write, 0x7E3410, 0x7E3410)
+    -- the bank's ledger, observed (a write watch; nothing is written): each
+    -- change with the frame and his status-2 byte, so a regen that lands
+    -- without a window (Berserk's auto-Fight) is on the record
+    local last = bp()
+    emu.addMemoryCallback(function(_, v)
+      if v ~= last then
+        ledger[#ledger + 1] = { f = H.frame, from = last, to = v,
+          st2 = H.readByte(0x3EE5 + cyan*2) }
+        last = v
+      end
+    end, emu.callbackType.write, 0x7E3E9C + cyan*2, 0x7E3E9C + cyan*2)
     H.log(string.format("cyan slot %d, $2020=%04x, monsters %d hp",
       cyan, R.ceiling, monsterHpSum()))
   end),
@@ -346,7 +377,70 @@ H.run({ maxFrames = 150000 }, {
     })
   end)(),
 
-  park("reopen at the 0 bank arm 5 earned"),
+  -- 6. reach 0 BP at an open window through play ----------------------
+  -- Ot6ActionEnd (ot6_boost.asm) is the regen rule: a character's action
+  -- end pays +1 BP unless that action spent a pending boost, which is
+  -- charged instead (no regen on a boosted turn); Ot6InitBP opens every
+  -- battle at 1.  So arm 5's spend leaves 0 for his NEXT window only if no
+  -- other action of his ends first.  One can: measured on the regenerated
+  -- camp_escaped (#215), attack $77 (Kitty) berserks him before the
+  -- window reopens, each auto-Fight pays +1 up to 5, and the battle ends
+  -- without a window, so the next battle's opens at Ot6InitBP's 1.  A
+  -- person who wants the empty bank spends what a window shows on a real
+  -- boosted tech and waits for the next one; this arm does that for as
+  -- many windows as it takes (a bank of 5 is two spends).
+  (function()
+    local WINDOWS = 6
+    local seen, b0, row, boost = false, 0, 0, 1
+    local spend = {
+      pressRowOnce(function() return row end),
+      H.call(function()
+        H.assertEq(pend(), boost, string.format(
+          "[zero] %s banked boost %d of the %d shown", TECH[row], boost, b0))
+        cyanMode = "defer"
+      end),
+      driveTo(function()
+        return not H.battleLoadStarted() or pend() == 0
+      end, 20000, "[zero] the spend resolves or the battle ends"),
+      H.call(function()
+        if not H.battleLoadStarted() then
+          H.log("[zero] the battle ended before the spend resolved")
+          return
+        end
+        H.log(string.format("[zero] %s resolved: bank %d -> %d",
+          TECH[row], b0, bp()))
+        H.assertEq(bp(), b0 - boost,
+          "[zero] the boosted turn was charged its boost and paid no regen")
+      end),
+    }
+    local steps = {
+      H.cond(function() return not seen end, {
+        park("[zero] his next SwdTech window"),
+        H.call(function()
+          flushLedger("zero")
+          b0 = bp()
+          H.log(string.format("[zero] window opens at bank %d pend %d status2 $%02x",
+            b0, pend(), H.readByte(0x3EE5 + cyan*2)))
+          H.assertEq(pend(), 0, "[zero] nothing is pending at an open window")
+          if b0 == 0 then seen = true; return end
+          -- his window here is Dispatch/Retort/Slash at boost 1/2/3: a bank
+          -- of 3+ spends 3 on Slash, a smaller one 1 on Dispatch (Retort's
+          -- stance stays out of the walk)
+          if b0 >= 3 then row, boost = 2, 3 else row, boost = 0, 1 end
+          H.log(string.format("[zero] spending %d of %d on %s",
+            boost, b0, TECH[row]))
+        end),
+        H.cond(function() return not seen end, spend, {}),
+      }, {}),
+    }
+    return H.repeatN(1, {
+      H.repeatN(WINDOWS, steps),
+      H.call(function()
+        H.assertEq(seen, true, string.format(
+          "[zero] one of his next %d windows opened at 0 BP", WINDOWS))
+      end),
+    })
+  end)(),
   H.call(function()
     H.assertEq(bp(), 0, "the ledger: the bank really reads 0")
     H.assertEq(H.readByte(ITEMLIST), 0x55,
@@ -409,7 +503,7 @@ H.run({ maxFrames = 150000 }, {
       H.call(function() cyanMode = "item" end),
       driveTo(function()
         return not H.battleLoadStarted() or bp() >= 1
-      end, 40000, "a real item turn rebanks the chip arm's pip"),
+      end, 40000, "a real unboosted turn (Item, or Fight with no Tonic or Potion left) rebanks the chip arm's pip"),
       H.cond(function() return H.battleLoadStarted() and bp() >= 1 end, {
         H.call(function()
           for m = 0, 5 do
