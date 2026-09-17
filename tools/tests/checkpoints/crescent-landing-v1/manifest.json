@@ -5,15 +5,15 @@
   "slot": 3,
   "milestone": "crescent-landing",
   "persistent_layout": "ot6-codex-o8-v1",
-  "sha256": "acf7dcfdc6d712db12f2c5e24359ddd3262f7a25b9565681b3a9eb5ef6f151d7",
+  "sha256": "365ba0f6ed8103462ed66b83047e222d74294b2758cf9692356c3118085eb5cc",
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "acf7dcfdc6d712db12f2c5e24359ddd3262f7a25b9565681b3a9eb5ef6f151d7",
-    "generator_sig": "14f4efe863537941396e21f65797589455fb1479fa7c2a4ab3b52eb4b46b4263 gen_voyage tools/tests/checkpoints/banquet-done-v1/manifest.json tools/tests/checkpoints/banquet-done-v1/banquet-done.sram",
+    "payload_sha256": "365ba0f6ed8103462ed66b83047e222d74294b2758cf9692356c3118085eb5cc",
+    "generator_sig": "ac1d1107986b021f1382a83537ce1d43fb714f3c95b3db2d60dd64a21d93cf57 gen_voyage tools/tests/checkpoints/banquet-done-v1/manifest.json tools/tests/checkpoints/banquet-done-v1/banquet-done.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/banquet-done-v1/manifest.json",
-        "sha256": "d1adbb5f9d76d76e1586900a614c0124b1b323a80390c6ba22f60b850a995b37"
+        "sha256": "943e4faa0652ca3f08d6773d1434183e772f50de540b74f55138475525378997"
       }
     ]
   }
