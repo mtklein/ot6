@@ -254,10 +254,16 @@ point on Fire.
 **The SwdTech menu UI is a name + cost submenu.** SwdTech does not
 open the vanilla numeral gauge; `OpenCmdMenuTbl[7]` is repointed to a tools-shell
 submenu (the same route Blitz takes) that lists the three moving-window techs by
-name + MP cost, greyed when the caster can't afford the MP *or* the BP. It
-reuses the Tools window shell,
-`Ot6CostFor`, and `Ot6AbilityGrey`, with all cost/grey logic gated `.if
-OT6_MP_COSTS` so the nomp baseline is undisturbed. SwdTech's rows do **not**
+name + MP cost, greyed when the caster can't afford the MP *or* the BP, and
+**refused at the confirm** for either reason: `Ot6KitConfirmMP` for the MP
+(the same gate Blitz, Tools and the thief submenu take, mp-economy.md ruling
+2) and `Ot6BushidoConfirm`'s own bank test for the BP. Both buzz and leave
+the list open, so a row the window draws as unreachable costs nothing to
+try. It reuses the Tools window shell,
+`Ot6CostFor`, and `Ot6AbilityGrey`, with all cost/grey/refusal logic gated
+`.if OT6_MP_COSTS` (in the battle object, and in btlgfx, which is assembled
+once per flag for the two confirm gates) so the nomp baseline is
+undisturbed. SwdTech's rows do **not**
 take #219's 2.5x escalation, for the reason the row already exists: the boost
 is the row, so the row's own price is the escalation (`Ot6KitRowCost`'s
 bushido arm, and `Ot6AbilityCost`'s). The thief window's three rows do not

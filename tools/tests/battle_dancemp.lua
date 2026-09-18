@@ -1,5 +1,16 @@
 -- @suite savestate=moogle_cleared slow
--- battle_dancemp.lua -- Dance costs MP, a flat amount paid at dance start.
+-- battle_dancemp.lua -- Dance costs MP, a flat amount paid at dance start,
+-- and a pool that cannot pay it is greyed AND refused at the confirm.
+--
+-- The isolation arm below used to assert the opposite of that second clause:
+-- the greyed row committed, the turn was spent, and the universal
+-- insufficient-MP gate ate the action at execution with no feedback.  That
+-- was the defect mp-economy.md ruling 2 always described as fixed
+-- ("greyed and refused"); v0.19 made the ROM match the doc.  The dance
+-- confirm (btlgfx UpdateMenuState_21 @85f0) now calls Ot6DanceConfirmMP,
+-- which prices the row through Ot6DanceRowCost -- the leaf that drew the
+-- number -- and takes its verdict from the same Ot6AbilityGrey that greyed
+-- it.  battle_kitrefuse carries the same mechanism on the three kit windows.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/moogle_defense.mss.lua"
@@ -175,6 +186,13 @@ end
 
 local danceId, mp0 = nil, nil
 local costs = {}                        -- cost-queue stores while cmd $13 queues
+-- The two menu sounds, watched so the confirm refusal below is OBSERVED and
+-- not inferred from an absence: $95 is the error buzz (magic's own, and the
+-- dance window's own for an unavailable row) and $96 is the confirm sound.
+-- Direct-page stores land in bank $00, so both the $0000xx and the $7e00xx
+-- views are counted together.
+local buzzes, confirms = 0, 0
+local refused = nil
 
 local function danceCursorToKnown(what)
   -- danceId is discovered at runtime, so the target row/col are computed
@@ -223,6 +241,12 @@ H.run({ maxFrames = 250000 }, {
         costs[#costs + 1] = v
       end
     end, emu.callbackType.write, 0x7E3620, 0x7E371F)
+    for _, base in ipairs({ 0x000000, 0x7E0000 }) do
+      emu.addMemoryCallback(function() buzzes = buzzes + 1 end,
+        emu.callbackType.write, base + 0x95, base + 0x95)
+      emu.addMemoryCallback(function() confirms = confirms + 1 end,
+        emu.callbackType.write, base + 0x96, base + 0x96)
+    end
   end),
 
   -- deployment, gen_moogle's exact march order: P1 unboxes the mound, P3
@@ -315,13 +339,33 @@ H.run({ maxFrames = 250000 }, {
       "...and the cost greys with it (one font colors the pair)")
     H.screenshot("dancemp_grey")
   end),
-  -- the menu lets the commit through, since the block stays out of
-  -- C1 (see Ot6AbilityGrey's scope comment); the refusal is the universal
-  -- execution-time fizzle.
+  -- ...and the confirm REFUSES it.  Since v0.19 the dance window carries the
+  -- other half of magic's affordance: Ot6DanceConfirmMP sits in the dance
+  -- confirm (btlgfx UpdateMenuState_21 @85f0) and prices the row through
+  -- Ot6DanceRowCost -- the leaf that drew the 8 above -- then takes its
+  -- verdict from the same Ot6AbilityGrey the colour took.  A greyed row and
+  -- a refused row are therefore one row.  The refusal lands on vanilla's own
+  -- @8609 buzz, which sits BEFORE the confirm sound, exactly magic's shape.
+  --
+  -- What this arm used to assert -- that the commit went through and the
+  -- universal insufficient-MP fizzle ate it at execution -- was the defect:
+  -- the turn went with it and the player was told nothing
+  -- (mp-economy.md ruling 2, docs/design/narshe-descent.md).  The
+  -- execution-side fizzle is still there as the backstop for a pool that
+  -- moves between the commit and the resolve; battle_mpcost exercises it on
+  -- that seam now.
   danceCursorToKnown("cursor onto the learned dance's cell (isolation arm)"),
-  H.driveUntil(function()
-    return H.readByte(0x32CC + mogSlot * 2) ~= 0xFF
-  end, 1800, {
+  H.call(function()
+    refused = {
+      mp = mpOf(mogSlot), queue = H.readByte(0x32CC + mogSlot * 2),
+      state = H.readByte(0x3EF8 + mogSlot * 2) & 0x01,
+      buzzes = buzzes, confirms = confirms,
+    }
+    costs = {}
+    H.log(string.format("[isolation arm] parked on the greyed row: mp=%d "
+      .. "queue=%02x", refused.mp, refused.queue))
+  end),
+  H.driveUntil(function() return buzzes > refused.buzzes end, 1800, {
     H.call(function()
       ph = ph + 1
       if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == mogSlot then
@@ -329,42 +373,48 @@ H.run({ maxFrames = 250000 }, {
       else H.setPad({}) end
     end),
     H.waitFrames(1),
-  }, "the refused dance still commits (action queued)"),
-  H.driveUntil(function()
-    return H.readByte(0x32CC + mogSlot * 2) == 0xFF
-  end, 12000, {
-    H.call(function()
-      ph = ph + 1
-      -- bystanders keep the clock moving with Defends
-      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= mogSlot then
-        local st = H.readByte(MSTATE)
-        local step = ph % 40
-        if st == ST_DEF then H.setPad(ph % 10 < 5 and { a = true } or {})
-        elseif st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
-        elseif step < 4 then H.setPad({ right = true })
-        elseif step >= 20 and step < 24 then H.setPad({ a = true })
-        else H.setPad({}) end
-      elseif H.readByte(MENU) == 0 then
-        H.setPad(ph % 8 < 4 and { a = true } or {})
-      else H.setPad({}) end
-    end),
-    H.waitFrames(1),
-  }, "the queued dance drains (fizzles at execution)"),
+  }, "the greyed dance is confirmed and buzzes"),
   H.waitFrames(120),
   H.call(function()
+    H.setPad({})
     local c = {}
     for _, v in ipairs(costs) do c[#c + 1] = tostring(v) end
-    H.log("refusal cost queue: {" .. table.concat(c, ",") .. "}")
-    H.assertEq(costs[1], DANCE_COST,
-      "the commit was priced at 8 (it reached the queue -- not a vacuous pass)")
+    H.log(string.format("[isolation arm] after the confirm: mp=%d state=%02x "
+      .. "queue=%02x buzz(+%d) confirm(+%d) costqueue={%s}",
+      mpOf(mogSlot), H.readByte(MSTATE), H.readByte(0x32CC + mogSlot * 2),
+      buzzes - refused.buzzes, confirms - refused.confirms,
+      table.concat(c, ",")))
+    H.assertEq(buzzes > refused.buzzes, true,
+      "the confirm BUZZED ($95, magic's own error sound) -- the refusal is "
+      .. "observed, not inferred from an absence")
+    H.assertEq(confirms, refused.confirms,
+      "...and the confirm sound did NOT play: the dance window refuses "
+      .. "BEFORE `inc $96`, which is vanilla magic's own shape at @81ae")
+    H.assertEq(H.readByte(MSTATE), ST_DANCE,
+      "the dance list is still open -- MOG is still choosing, and his turn "
+      .. "is still his")
+    H.assertEq(#costs, 0,
+      "no action was created: nothing reached the mp-cost queue, so the "
+      .. "refusal cost no turn (it used to cost one -- ruling 2)")
+    H.assertEq(H.readByte(0x32CC + mogSlot * 2), refused.queue,
+      "and nothing was queued for MOG")
     H.assertEq(mpOf(mogSlot), DANCE_COST - 1,
-      "the universal insufficient-MP gate refused: MP unmoved")
+      "the pool is unmoved, and was never driven negative")
     H.assertEq(H.readByte(0x3EF8 + mogSlot * 2) & 0x01, 0,
-      "and the dance never started (no whole-battle state for free)")
-    -- restore the real pool read at battle start; the arm's second write
+      "the dance never started (no whole-battle state for free)")
+    H.screenshot("dancemp_refused")
+    -- back out of the list, then restore the real pool read at battle start;
+    -- the arm's second write
     H.writeWord(0x3C08 + mogSlot * 2, mp0)
     H.log("[isolation arm] MOG's pool restored to the real " .. mp0)
   end),
+  H.driveUntil(function() return H.readByte(MSTATE) == ST_CMD end, 900, {
+    H.call(function()
+      ph = ph + 1
+      H.setPad(ph % 10 < 5 and { b = true } or {})
+    end),
+    H.waitFrames(1),
+  }, "back out of the refused list"),
 
   -- ---- 1. the menu, at the real pool: white row, cost, wallet ----------
   mogMenu("mog's command window (input-driven phases)"),

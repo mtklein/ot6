@@ -20,6 +20,20 @@
 
 .include "btlgfx_ram.inc"
 
+; ot6: the same build-time gate battle_main.asm carries, for the same reason.
+; Bank C1 owns the menu states, so the confirm half of "an unaffordable row is
+; greyed AND refused" (docs/design/mp-economy.md, ruling 2) has to be stated
+; here: Ot6KitConfirmMP at the tools-shell confirm and Ot6DanceConfirmMP at the
+; dance confirm, each a couple of bytes gated on this flag and answered in bank
+; F0.  This module is therefore assembled twice (configure.py), and with
+; `-D OT6_MP_COSTS=0` not one byte of the gates is emitted, so the nomp control
+; ROM's C1 is the same object it always was.  Nothing else in this file reads
+; the flag: the row decorators are ALWAYS-defined F0 shims (code_ext.inc)
+; precisely so that the drawing stays flag-free.
+.ifndef OT6_MP_COSTS
+OT6_MP_COSTS = 1
+.endif
+
 ; ------------------------------------------------------------------------------
 
 inc_lang "btlgfx/attack_anim_frames_%s.inc"
@@ -20381,6 +20395,16 @@ UpdateMenuState_21:
         jsr     _c1849e
         lda     $267e,x
         bmi     @8609
+.if OT6_MP_COSTS
+        ; ot6: the dance window is priced and greyed too (Ot6DanceRowDecorate),
+        ; so it gets the same confirm refusal the kit windows do.  It lands on
+        ; @8609, vanilla's own "this row is not available" buzz, which sits
+        ; BEFORE the confirm sound -- exactly magic's shape.  The call clobbers
+        ; A, so the id the commit stores is reloaded (X is preserved).
+        jsl     Ot6DanceConfirmMP
+        bcc     @8609
+        lda     $267e,x
+.endif
         inc     $96
         sta     w7e7a85
         lda     #$02                    ; self-target
@@ -20665,7 +20689,23 @@ UpdateMenuState_30:
         bne     @8809         ; branch if valid
         inc     $95
         bra     @8818
-@8809:  lda     w7e6168         ; ot6: blitz mode? queue it, no target select
+@8809:
+.if OT6_MP_COSTS
+        ; ot6: magic's other half.  A = the selected row's id (the $ff cell is
+        ; already gone).  Ot6KitConfirmMP prices it through the very leaf the
+        ; row drew through and asks Ot6AbilityGrey the very question the row's
+        ; colour asked, so a greyed row is refused here and an ungreyed one
+        ; cannot be.  Refusing costs the player nothing: no action is queued,
+        ; no boost is spent, the list stays up.  The buzz and the fall to
+        ; @8818 are this window's own refusal for an empty cell, four
+        ; instructions up -- one mechanism, now with two reasons.
+        jsl     Ot6KitConfirmMP
+        bcs     @ot6paid
+        inc     $95             ; error sound; the menu stays open
+        bra     @8818
+@ot6paid:
+.endif
+        lda     w7e6168         ; ot6: blitz mode? queue it, no target select
         beq     :+
         cmp     #$03            ; ot6: thief submenu? take the SAME arm a
         beq     :+              ;   real tool takes -- the row id goes to

@@ -7,9 +7,15 @@
 
 --   * ON  (build/ot6.sfc, the suite default): a Steal is queued at cost 4
 --     (Ot6AbilityCost's flat path), deducts 4 MP when it executes, and a caster
---     below that is refused: the universal insufficient-mp fizzle
---     (CalcAttackEffect) skips the steal effect, so no item is taken and MP is
---     not driven negative.
+--     below that is refused AT THE MENU: since v0.19 the tools-shell confirm
+--     asks Ot6KitConfirmMP whether the caster can pay the row it is about to
+--     commit, and buzzes and stays open when they cannot, so a drained LOCKE
+--     keeps his turn, his pips and his MP instead of spending the turn on a
+--     steal that was always going to fizzle (mp-economy.md ruling 2).  The
+--     universal insufficient-mp fizzle at CalcAttackEffect is still the
+--     backstop for a pool that moves between the commit and the resolve --
+--     battle_mpcost exercises that seam -- but it is no longer what a player
+--     meets.
 --     The 4 is flat at EVERY boost level, and both arms below are boosted so
 --     that they say so.  #219 made boosting cost 2.5x per level; the owner
 --     then exempted the three chance verbs (Steal, Rage, Slot), because a
@@ -28,16 +34,18 @@
 -- The cost is read at the source, unchanged: a write watch on the mp-cost
 -- queue ($3620,y, stored in CreateAction) filtered to command $05
 -- captures what Ot6AbilityCost returned, 4 on ON and 0 on OFF,
--- and the MP delta then confirms the charge landed.  That store fires for
--- both the affordable and the refused steal, since the refusal is downstream
--- at execution, so it also serves as the "the action was created"
--- signal both scenarios wait on.
+-- and the MP delta then confirms the charge landed.  In the refusal arm the
+-- same watch is read the other way round -- it must NOT fire, because the
+-- menu refuses before an action is ever created -- so that arm waits on the
+-- error buzz ($95) instead and asserts the price off the row's own stamp in
+-- the submenu.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/figaro_cleared.mss.lua"
 
 local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_THIEF, ST_ITEM, ST_TGT, ST_TRANS = 0x05, 0x30, 0x0A, 0x38, 0x01
 local CMD_STEAL, CMD_ITEM = 0x05, 0x01
+local ITEMLIST, THIEF_STEAL = 0x4005, 0x56   -- the thief submenu's row buffer
 local NONE = 0xFF
 local TONIC, POTION = 0xE8, 0xE9
 local STEAL_COST = 4                     -- Ot6StealCost's immediate, flat
@@ -104,6 +112,8 @@ end
 
 -- ------------------------------------------------- the observation rig --
 local rec = nil
+local buzzes, confirms = 0, 0
+local snap = nil                         -- arm 3's pre-confirm world
 local function newRec() rec = { code = 0 } end
 local function armWatches()
   emu.addMemoryCallback(function(_, v)
@@ -126,10 +136,21 @@ local function armWatches()
       rec.grant = v
     end
   end, emu.callbackType.write, 0x7E32F4, 0x7E32F4 + 18)
+  -- the two menu sounds, so the confirm refusal in arm 3 is OBSERVED rather
+  -- than inferred from an absence: $95 is magic's error buzz (and the tools
+  -- shell's own refusal for an empty cell), $96 the confirm sound the shell
+  -- stamps on every A press BEFORE the affordability gate.  Direct-page
+  -- stores land in bank $00, so both views are counted together.
+  for _, base in ipairs({ 0x000000, 0x7E0000 }) do
+    emu.addMemoryCallback(function() buzzes = buzzes + 1 end,
+      emu.callbackType.write, base + 0x95, base + 0x95)
+    emu.addMemoryCallback(function() confirms = confirms + 1 end,
+      emu.callbackType.write, base + 0x96, base + 0x96)
+  end
 end
 
 local mf = 0
-local drive = { wantBp = 0, wantPend = 0, target = nil }
+local drive = { wantBp = 0, wantPend = 0, target = nil, hold = false }
 local tc = H.targetCursor({ mask = 0x7B7E })
 -- Where is the machine?  The party's HP is what tells a stuck menu apart
 -- from a party that has been ground down over a long unboosted drain.
@@ -186,7 +207,12 @@ local function decide()
       local cur = H.readByte(CMDROW + locke) & 3
       if cur == want then btn = "a"
       else btn = (cur < want) and "down" or "up" end
-    elseif st == ST_THIEF then btn = "a"
+    elseif st == ST_THIEF then
+      -- drive.hold parks the cursor on the Steal row without confirming, so
+      -- the refusal arm can read the row and snapshot the world before the
+      -- A press it is measuring
+      if drive.hold then return {} end
+      btn = "a"
     elseif st == ST_TGT then
       btn = tc.steer(drive.target, mf)   -- nil target: any monster will do
     else btn = "b" end
@@ -456,24 +482,86 @@ H.run({ maxFrames = 150000 }, {
     -- that is about to die in it
     H.fieldCare({ tag = "before the refusal battle", threshold = 0.9 }),
     enterDesertBattle(2),
-    H.call(function() drive.target = rareT end),
-    oneSteal("unaffordable steal (earned poverty)", REFUSE_BOOST,
-      REFUSE_BOOST, 400),
+    -- Park on the Steal row of the thief submenu at the refusal boost and
+    -- read the world before pressing anything.  Since v0.19 the refusal is
+    -- at the CONFIRM: Ot6KitConfirmMP sits in the tools-shell confirm
+    -- (btlgfx UpdateMenuState_30 @8809) and prices the row through
+    -- Ot6KitRowCost -- the leaf that stamped the number in the list -- then
+    -- takes its verdict from the same Ot6AbilityGrey that greyed it.  So a
+    -- drained LOCKE cannot spend the turn on a steal he cannot pay for; he
+    -- gets magic's buzz and keeps the turn.  This arm asserts that, not the
+    -- absence of a grant.  (The execution-time fizzle is still the backstop
+    -- for a pool that moves between the commit and the resolve; that seam is
+    -- battle_mpcost's.)
     H.call(function()
-      local left = mp()
-      H.log(string.format("unaffordable steal: queued cost %s, MP stayed %d, granted %s",
-        tostring(rec.qcost), left, tostring(rec.grant)))
-      H.assertEq(rec.qcost, stealPrice(REFUSE_BOOST), string.format(
-        "ON: the gate priced this boost-%d cmd $05 at %d, the flat base -- "
-        .. "not the %d the escalation would have charged.  The refusal below "
-        .. "is therefore the pool failing to afford FOUR MP, which is what "
+      drive.target = rareT
+      drive.wantBp, drive.wantPend = REFUSE_BOOST, REFUSE_BOOST
+      drive.hold = true
+      newRec()
+    end),
+    H.driveUntil(function()
+      return H.readByte(MSTATE) == ST_THIEF
+         and (H.readByte(ACTOR) & 3) == locke and pend() == REFUSE_BOOST
+    end, 30000, {
+      H.call(function() H.setPad(decide()) end),
+    }, "the drained LOCKE's thief submenu, at the refusal boost"),
+    H.waitFrames(30),
+    H.call(function()
+      H.setPad({})
+      local stamp
+      for i = 0, 7 do
+        if H.readByte(ITEMLIST + i * 3) == THIEF_STEAL then
+          stamp = H.readByte(ITEMLIST + i * 3 + 1)
+        end
+      end
+      H.log(string.format("[refusal] Steal stamped %s (flat %d; escalated "
+        .. "would be %d), pool %d, bp %d, pend %d", tostring(stamp),
+        stealPrice(REFUSE_BOOST), escalated(REFUSE_BOOST), mp(), bp(), pend()))
+      H.assertEq(stamp, stealPrice(REFUSE_BOOST), string.format(
+        "ON: the row this arm is about to be refused for is priced at the "
+        .. "flat %d, NOT the %d a 2.5x escalation would draw.  The refusal is "
+        .. "therefore the pool failing to afford FOUR MP, which is what "
         .. "earned poverty means, rather than a price nobody could pay",
-        REFUSE_BOOST, stealPrice(REFUSE_BOOST), escalated(REFUSE_BOOST)))
+        stealPrice(REFUSE_BOOST), escalated(REFUSE_BOOST)))
+      H.assertEq(mp() < stealPrice(REFUSE_BOOST), true,
+        "...and the pool really is under it")
+      snap = { mp = mp(), bp = bp(), pend = pend(),
+               qcount = H.readByte(0x7B80),
+               buzzes = buzzes, confirms = confirms }
+      drive.hold = false
+    end),
+    H.driveUntil(function() return buzzes > snap.buzzes end, 1800, {
+      H.call(function() H.setPad(decide()) end),
+    }, "the greyed Steal is confirmed and buzzes"),
+    H.waitFrames(120),
+    H.call(function()
+      H.setPad({})
+      H.log(string.format("[refusal] after the confirm: mp=%d bp=%d pend=%d "
+        .. "state=%02x qcount=%d queued=%s granted=%s buzz(+%d) confirm(+%d)",
+        mp(), bp(), pend(), H.readByte(MSTATE), H.readByte(0x7B80),
+        tostring(rec.queued), tostring(rec.grant), buzzes - snap.buzzes,
+        confirms - snap.confirms))
+      H.assertEq(confirms > snap.confirms, true,
+        "ON: the A press reached the list ($96, stamped before the gate) -- "
+        .. "so what follows is a rejection and not a press that never came")
+      H.assertEq(buzzes > snap.buzzes, true,
+        "ON: ...and the confirm BUZZED ($95, magic's own error sound)")
+      H.assertEq(H.readByte(MSTATE), ST_THIEF,
+        "ON: the thief submenu is still open -- LOCKE is still choosing")
+      H.assertEq(rec.queued, nil,
+        "ON: no action was created -- nothing reached the mp-cost queue, so "
+        .. "the TURN was not spent on a steal that could never happen")
+      H.assertEq(H.readByte(0x7B80), snap.qcount,
+        "ON: and the action-queue commit counter never moved")
       H.assertEq(rec.grant, nil,
-        "ON: too little MP is REFUSED -- no item taken (fizzled), though the "
-        .. "3-bp guarantee means it could not have missed")
-      H.assertEq(left < STEAL_COST, true,
-        "ON: MP not driven negative -- the leftover pool is untouched")
+        "ON: no item taken, though the 3-bp guarantee means a steal that ran "
+        .. "could not have missed")
+      H.assertEq(bp(), snap.bp,
+        "ON: the BP bank is untouched -- refusing costs no pips")
+      H.assertEq(pend(), snap.pend,
+        "ON: the boost is still pending, still the player's to spend")
+      H.assertEq(mp(), snap.mp,
+        "ON: MP unmoved, and never driven negative")
       H.screenshot("stealmp_on_refused")
     end),
   }, {}),

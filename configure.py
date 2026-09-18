@@ -294,10 +294,18 @@ def module_obj(mod, obj, flags):
 
 
 objs_en = [module_obj(m, f"{m}_en", EN_FLAGS) for m in MODULES]
-# the OT6_MP_COSTS=0 control: the battle object alone, flag forced off
-obj_nomp = module_obj("battle", "battlenomp_en",
-                      EN_FLAGS + " -D OT6_MP_COSTS=0")
-objs_nomp = [obj_nomp if o.endswith("battle_en.o") else o for o in objs_en]
+# the OT6_MP_COSTS=0 control: two objects, flag forced off.  battle owns the
+# prices, the charge and the grey; btlgfx owns the menu states, so the confirm
+# half of "greyed AND refused" (mp-economy.md ruling 2) is a couple of gated
+# bytes in bank C1 calling into bank F0.  Assembling btlgfx per flag is what
+# keeps those bytes out of the control ROM: with the flag off neither gate is
+# emitted, so btlgfxnomp_en.o is the byte-for-byte object btlgfx_en.o used to
+# be for both links, and the nomp baseline does not move.
+NOMP_FLAGS = EN_FLAGS + " -D OT6_MP_COSTS=0"
+obj_nomp = module_obj("battle", "battlenomp_en", NOMP_FLAGS)
+obj_nomp_gfx = module_obj("btlgfx", "btlgfxnomp_en", NOMP_FLAGS)
+_swap = {"ff6/obj/battle_en.o": obj_nomp, "ff6/obj/btlgfx_en.o": obj_nomp_gfx}
+objs_nomp = [_swap.get(o, o) for o in objs_en]
 
 # ---------------------------------------------------------------- ROMs -----
 def rom_edge(out, objs, order=()):
