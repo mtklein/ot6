@@ -14,7 +14,7 @@ bake() {
   lua="$OUT/bake_s$k.lua"
   sed -e "s/@DELAY@/$delay/" -e "s/@SEED@/s$k/g" \
     "$ROOT/tools/tests/probe_rafterlab_catwalk_seed.lua" > "$lua"
-  OT6_LIVE=0 OT6_TIMEOUT=900 OT6_WORKER="rafterlab-bake-s$k" \
+  OT6_TIMEOUT=900 OT6_WORKER="rafterlab-bake-s$k" \
     "$ROOT/tools/tests/run.sh" "$lua" "$OUT/bake_s$k.log" > /dev/null 2>&1
   grep -h "CATWALK-s\|banked" "$OUT/bake_s$k.log" | grep '^\[ot6\]' | tail -2
 }

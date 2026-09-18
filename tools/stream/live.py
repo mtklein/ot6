@@ -9,7 +9,7 @@ Follows the newest (or the named) run workspace under build/test-runs/ by
 tailing its growing run.log:
 
   [ot6shot] <f> <b64>   the live screenshot stream (every 128 frames by
-                        default; on in every run.sh run unless OT6_LIVE=0)
+                        default; on in EVERY run.sh run -- no off switch)
   [b64:<tag>] <chunk>   milestone screenshot blobs, shown as frames too
   [ot6pad] <f> <pad>    the live frame counter and held buttons
   [ot6note] <f> <text>  the driver's notes
@@ -424,12 +424,14 @@ def streams_live(log):
     """Does this worker broadcast at all?  True/False, or None if unknowable.
 
     A worker with no screenshot and no frame counter is either still booting
-    or was launched with OT6_LIVE=0, which emits neither -- and those look
-    identical in the log, because the difference is that one of them will
-    never write anything to look at.  run.sh settles it: it prepends
-    `OT6_LIVE = <n>` to the workspace's own composed_live.lua and omits the
-    line entirely when live is off (run.sh:113), so the answer is the first
-    line of the script the emulator is actually running.
+    still booting -- the broadcast is unconditional now, so there is no such
+    thing as a run that will never draw.  A worker without a picture is one
+    whose first screenshot has not reached the log yet, and it will.
+
+    The old answer read the workspace's composed_live.lua for an `OT6_LIVE`
+    preamble, because a run launched with OT6_LIVE=0 emitted neither
+    screenshots nor a frame counter and was indistinguishable from a booting
+    one.  That flag is gone (run.sh), so this always reports True.
     """
     path = os.path.join(os.path.dirname(log), "composed_live.lua")
     try:

@@ -35,7 +35,7 @@ run_one() {
   lua="$OUT/$name.lua"
   sed -e "s/@POLICY@/$POLICY/" -e "s/@IDLE@/$idle/" \
       "$ROOT/tools/tests/lab_nerapa_template.lua" > "$lua"
-  OT6_LIVE=0 OT6_TIMEOUT=1200 OT6_WORKER="nerapalab-$name" \
+  OT6_TIMEOUT=1200 OT6_WORKER="nerapalab-$name" \
     "$ROOT/tools/tests/run.sh" "$lua" "$OUT/$name.log" > /dev/null 2>&1
   grep -h '^\[ot6\] \[result\]' "$OUT/$name.log" || echo "[result-missing] $name"
 }

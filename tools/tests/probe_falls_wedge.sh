@@ -16,7 +16,7 @@ while [ "$s" -lt "$SHARDS" ]; do
   sed -e "s/^local SHARD = 0\$/local SHARD = $s/" \
       -e "s/^local PER_SHARD = 4\$/local PER_SHARD = $PER/" \
       "$ROOT/tools/tests/probe_falls_wedge.lua" > "$copy"
-  OT6_WORKER="falls_s$s" OT6_LIVE=0 OT6_TIMEOUT="${OT6_TIMEOUT:-3600}" \
+  OT6_WORKER="falls_s$s" OT6_TIMEOUT="${OT6_TIMEOUT:-3600}" \
     "$ROOT/tools/tests/run.sh" "$copy" "$ROOT/build/states/probe_falls_wedge_s$s.log" \
     > "$SCRATCH/s$s.out" 2>&1 &
   s=$((s + 1))

@@ -43,7 +43,7 @@ run_one() {
       -e "s/@HEALPCT@/$HEALPCT/" -e "s/@BOOST@/$BOOST/" \
       -e "s/@ITEMS@/$ITEMS/" -e "s/@CURE@/$CURE/" \
       "$ROOT/tools/tests/probe_thamlab_template.lua" > "$lua"
-  OT6_LIVE=0 OT6_TIMEOUT=900 OT6_WORKER="thamlab-$name" \
+  OT6_TIMEOUT=900 OT6_WORKER="thamlab-$name" \
     "$ROOT/tools/tests/run.sh" "$lua" "$OUT/$name.log" > /dev/null 2>&1
   grep -h '^\[ot6\] \[result\]' "$OUT/$name.log" || echo "[result-missing] $name"
 }

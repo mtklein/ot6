@@ -56,10 +56,8 @@ function M.log(msg)
   -- terminal output is `grep '^\[ot6\]' "$RUN_LOG"`, so an unprefixed
   -- continuation line reaches the log file and nothing else.
   msg = tostring(msg)
-  if OT6_LIVE then
-    -- the live broadcast's note stream, one line per call, newlines folded
-    print("[ot6note] " .. (M.frame or 0) .. " " .. msg:gsub("\n", " | "))
-  end
+  -- the live broadcast's note stream, one line per call, newlines folded
+  print("[ot6note] " .. (M.frame or 0) .. " " .. msg:gsub("\n", " | "))
   for line in (msg .. "\n"):gmatch("([^\n]*)\n") do
     print("[ot6] " .. line)
   end
@@ -154,10 +152,13 @@ function M.disableInputInjection()
 end
 
 -- ------------------------------------------------------ live broadcast --
--- run.sh prepends `OT6_LIVE = <n>` to the composed copy (on by default;
--- OT6_LIVE=0 in the environment disables, a number > 1 sets the screenshot
--- interval in frames, default 128).  The taps ride stdout into the run log,
--- which tools/stream/live.py follows while the run happens:
+-- ALWAYS ON.  There is no flag, because an emulator that is playing the
+-- game and cannot be seen on the census is the thing this rules out, and a
+-- flag is exactly how that kept happening: eighteen launchers passed
+-- OT6_LIVE=0, one of them written the same day the others were cleaned up.
+-- A knob that must be set right at every call site is not a guarantee, so
+-- there is no knob.  The taps ride stdout into the run log, which
+-- tools/stream/live.py follows while the run happens:
 --
 --   [ot6shot] <frame> <b64 png>       a screenshot every interval frames
 --   [ot6pad] <frame> <btn+btn|-->     emitted from setPad, only on change
@@ -167,8 +168,7 @@ end
 -- they exist only in the log file.  The frame stamp is M.frame; the pad set
 -- here is latched by the ROM at the frame's inputPolled, so it can land one
 -- frame after the stamp.
-local LIVE_IVL = (type(OT6_LIVE) == "number" and OT6_LIVE > 1) and OT6_LIVE
-                 or 128
+local LIVE_IVL = 128
 function M.liveShot()
   local png = emu.takeScreenshot()
   if png and #png > 0 then
@@ -229,7 +229,7 @@ function M.setPad(buttons)
       curPad[name] = true
     end
   end
-  if OT6_LIVE then recordPad() end
+  recordPad()
 end
 
 -- ------------------------------------------------ callback registration --
@@ -8357,7 +8357,7 @@ function M.run(opts, steps)
       return
     end
     M.frame = M.frame + 1
-    if OT6_LIVE and (M.frame == 20 or M.frame % LIVE_IVL == 0) then M.liveShot() end
+    if M.frame == 20 or M.frame % LIVE_IVL == 0 then M.liveShot() end
 
     -- The boot snapshot for the replay: harvested here, a couple of
     -- frames after it was asked for (below, after the tick).

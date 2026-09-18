@@ -53,7 +53,7 @@ run_one() {
       -e "s/@FIXTURE@/$FIXTURE/" -e "s/@HEALPCT@/$HEALPCT/" \
       -e "s/@BANK@/$BANK/" -e "s/@HEALER@/$HEALER/" \
       "$ROOT/tools/tests/probe_ifritlab_template.lua" > "$lua"
-  OT6_LIVE=0 OT6_TIMEOUT=1200 OT6_WORKER="ifritlab-$name" \
+  OT6_TIMEOUT=1200 OT6_WORKER="ifritlab-$name" \
     "$ROOT/tools/tests/run.sh" "$lua" "$OUT/$name.log" > /dev/null 2>&1
   grep -h '^\[ot6\] \[result\]' "$OUT/$name.log" || echo "[result-missing] $name"
 }

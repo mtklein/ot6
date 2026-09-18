@@ -37,7 +37,7 @@ run_one() {
   lua="$OUT/$name.lua"
   sed -e "s/@POLICY@/$POLICY/" -e "s/@IDLE@/$idle/" -e "s/@FIXTURE@/$FIXTURE/" \
       "$ROOT/tools/tests/lab_airforce_template.lua" > "$lua"
-  OT6_LIVE=0 OT6_TIMEOUT=1800 OT6_WORKER="airforcelab-$name" \
+  OT6_TIMEOUT=1800 OT6_WORKER="airforcelab-$name" \
     OT6_ARTIFACT_DIR="$OUT/artifacts" \
     "$ROOT/tools/tests/run.sh" "$lua" "$OUT/$name.log" > /dev/null 2>&1
   grep -h '^\[ot6\] \[result\]' "$OUT/$name.log" || echo "[result-missing] $name"

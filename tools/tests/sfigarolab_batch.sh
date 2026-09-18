@@ -34,7 +34,7 @@ run_one() {
   lua="$OUT/$name.lua"
   sed -e "s/@POLICY@/$POLICY/" -e "s/@SEED@/$seed/" \
       "$ROOT/tools/tests/lab_sfigaro_gate.lua" > "$lua"
-  OT6_LIVE=0 OT6_TIMEOUT="${OT6_TIMEOUT:-900}" OT6_WORKER="gatelab-$name" \
+  OT6_TIMEOUT="${OT6_TIMEOUT:-900}" OT6_WORKER="gatelab-$name" \
     OT6_ARTIFACT_DIR="$OUT/artifacts" \
     "$ROOT/tools/tests/run.sh" "$lua" "$OUT/$name.log" > /dev/null 2>&1
   grep -h '^\[ot6\] \[result\]' "$OUT/$name.log" || echo "[result-missing] $name"

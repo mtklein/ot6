@@ -35,7 +35,7 @@ run_one() {
   lua="$OUT/$name.lua"
   sed -e "s/@POLICY@/$POLICY/" -e "s/@SEED@/$seed/" -e "s/@MODE@/$MODE/" \
       "$ROOT/tools/tests/lab_map269_random.lua" > "$lua"
-  OT6_LIVE=0 OT6_TIMEOUT=1800 OT6_WORKER="m269lab-$name" \
+  OT6_TIMEOUT=1800 OT6_WORKER="m269lab-$name" \
     OT6_ARTIFACT_DIR="$OUT/artifacts" \
     "$ROOT/tools/tests/run.sh" "$lua" "$OUT/$name.log" > /dev/null 2>&1
   grep -h '^\[ot6\] \[\(result\|walkresult\)\]' "$OUT/$name.log" || echo "[result-missing] $name"

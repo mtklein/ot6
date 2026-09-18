@@ -50,7 +50,7 @@ grep -qF "local DOOR = \"build/states/$STATE.mss.lua\"" "$LUA" || { echo "DOOR s
 grep -q 'saveState("blackjack.mss")' "$LUA" && { echo "saveState rename failed"; exit 2; }
 
 echo "[lab] $TAG: battle 104 from $STATE -> $OUT/ultros_$TAG.log"
-OT6_LIVE=0 OT6_TIMEOUT="${OT6_TIMEOUT:-1200}" OT6_WORKER="rafterlab-ultros-$TAG" \
+OT6_TIMEOUT="${OT6_TIMEOUT:-1200}" OT6_WORKER="rafterlab-ultros-$TAG" \
   "$ROOT/tools/tests/run.sh" "$LUA" "$OUT/ultros_$TAG.log" > /dev/null 2>&1
 rc=$?
 grep -h '^\[ot6\] \[ultros2\] \(battle up\|hit \|battle done\|attempt [0-9]* WON\|PARTY WIPED\|GAME OVER\|ATTEMPT\)' "$OUT/ultros_$TAG.log"

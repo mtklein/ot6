@@ -1,7 +1,7 @@
 -- @manual
 -- probe_backattack_j39.lua -- the fight driver against a BACK ATTACK (#176).
 --
---   OT6_LIVE=0 tools/tests/run.sh tools/tests/probe_backattack_j39.lua \
+--   tools/tests/run.sh tools/tests/probe_backattack_j39.lua \
 --     build/states/backattack_j39.log
 --
 -- Boots `_lab_j39_start.mss` -- the first frame of the J39-row fight the

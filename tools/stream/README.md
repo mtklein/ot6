@@ -4,7 +4,8 @@ No video anywhere: the harness's own stdout stream is the broadcast.
 Every `run.sh` run emits, into its growing run log:
 
 - `[ot6shot] <frame> <b64 png>` -- a screenshot every 128 frames
-  (`OT6_LIVE=<n>` changes the interval, `OT6_LIVE=0` turns the taps off)
+  (`OT6_LIVE=<n>` changes the interval; there is no off switch, so a
+  playing emulator is always on the census)
 - `[ot6pad] <frame> <buttons>` -- the held pad, on every change
 - `[ot6note] <frame> <text>` -- every `H.log` line, frame-stamped
 

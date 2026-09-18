@@ -217,7 +217,7 @@ def run_one(seg, policy, seed):
     log = os.path.join(d, "seed%02d.log" % seed)
     env = dict(os.environ)
     env.update({
-        "OT6_LIVE": "0", "OT6_RETRIES": "1", "OT6_SEED_SHIFT": str(seed),
+        "OT6_RETRIES": "1", "OT6_SEED_SHIFT": str(seed),
         "OT6_NO_PUBLISH": "1", "OT6_KEEP_RUNS": "1",
         "OT6_TIMEOUT": str(SEGMENTS[seg]["timeout"]),
         "OT6_ARTIFACT_DIR": os.path.join(d, "seed%02d" % seed),

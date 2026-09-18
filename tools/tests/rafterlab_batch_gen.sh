@@ -85,7 +85,7 @@ grep -q "HOLDS = { $HOLDS }" "$LUA" || { echo "HOLDS substitution failed"; exit 
 grep -q 'saveState("ultros2_entry.mss")' "$LUA" && { echo "saveState rename failed"; exit 2; }
 
 echo "[lab] $TAG: panic=$PANIC holds={ $HOLDS } driver=${DRIVER:-<shipped>} arrivals=$ARRIVALS -> $OUT/gen_$TAG.log"
-OT6_LIVE=0 OT6_TIMEOUT="${OT6_TIMEOUT:-2400}" OT6_WORKER="rafterlab-gen-$TAG" \
+OT6_TIMEOUT="${OT6_TIMEOUT:-2400}" OT6_WORKER="rafterlab-gen-$TAG" \
   "$ROOT/tools/tests/run.sh" "$LUA" "$OUT/gen_$TAG.log" > "$OUT/gen_$TAG.stdout" 2>&1
 rc=$?
 # the designed FAIL means run.sh publishes no artifacts: the arrival saves

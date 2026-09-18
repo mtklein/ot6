@@ -98,28 +98,25 @@ else
   python3 "$ROOT/tools/tests/lib/compose.py" "$SCRIPT" "$COMPOSED" || exit 2
 fi
 
-# OT6_LIVE: the live-broadcast taps (lib/ot6.lua "live broadcast") key off
-# the OT6_LIVE global, prepended to a copy of the composed script (the
-# sandbox cannot read the environment).  Default ON, so every headless run
-# is watchable while it happens with tools/stream/live.py.  OT6_LIVE=0
-# disables; OT6_LIVE=<n> sets the screenshot interval in frames.
+# The live broadcast (lib/ot6.lua "live broadcast") is unconditional: every
+# headless run streams its screen, its pad and its notes into the run log,
+# and tools/stream/live.py shows every one of them.  There is no flag and no
+# environment variable, on purpose.
 #
-# EVERY run means the labs and the sweeps too.  They each used to force
-# OT6_LIVE=0, none of them saying why, so the census went dark during
-# exactly the multi-hour runs worth watching -- and a lab worker showed up
-# as a black tile that would never fill in.  The owner's ruling
-# (2026-09-18) is that the cost is not worth spending attention on:
-# broadcast by default everywhere, and if a run really is too hot for it,
-# pass an interval (OT6_LIVE=1024) rather than turning it off.
-LIVE="${OT6_LIVE:-1}"
+# There used to be OT6_LIVE, and it is why the census had holes: eighteen
+# launchers passed OT6_LIVE=0 to skip the stream, one of them written the
+# same day the first five were cleaned up, by copying a neighbour.  Chasing
+# call sites cannot give a guarantee -- the next lab copies the last one --
+# so the capability is gone rather than defaulted.  A run that is genuinely
+# too hot for a screenshot every 128 frames should say so and get the
+# interval changed in one place, for everybody.
 # OT6_ART_DIR rides the same prelude: it is where this invocation's decoded
 # artifacts land.  The segment runner (lib/ot6.lua) names the screenshot it
 # took at a fast failure in the FAIL line, and a failed workspace is
 # retained, so that path has to be the real one rather than "somewhere under
 # build/test-runs".
 PRELUDE="$WDIR/composed_live.lua"
-{ [ "$LIVE" = 0 ] || printf 'OT6_LIVE = %s\n' "$LIVE"
-  printf 'OT6_ART_DIR = "%s"\n' "$ART"
+{ printf 'OT6_ART_DIR = "%s"\n' "$ART"
   cat "$COMPOSED"; } > "$PRELUDE"
 COMPOSED="$PRELUDE"
 

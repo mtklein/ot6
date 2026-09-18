@@ -9,7 +9,7 @@
 -- the generator takes.  Nothing is healed, equipped or moved here: the
 -- policies do that per run and log it.
 --
---   OT6_LIVE=0 tools/tests/run.sh tools/tests/probe_m269lab_bake.lua build/m269lab/bake.log
+--   tools/tests/run.sh tools/tests/probe_m269lab_bake.lua build/m269lab/bake.log
 --
 -- Artifact: build/states/m269lab_pre.mss (+ .mss.lua sidecar).
 local H = dofile("tools/tests/lib/ot6.lua")
