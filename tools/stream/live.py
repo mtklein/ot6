@@ -96,6 +96,7 @@ GRID_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 census</title>
 <script>
 const $=id=>document.getElementById(id);
 const nf=n=>(n==null?'\\u2014':Number(n).toLocaleString());
+const esc=t=>String(t==null?'':t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 async function tick(){ try{
   const j = await (await fetch('grid.json?'+Date.now())).json();
   const all = j.workers||[]; const grid=$('grid');
@@ -109,16 +110,27 @@ async function tick(){ try{
   $('empty').style.display = all.length ? 'none' : 'block';
   $('hdr').textContent = all.length ? (all.length+' active worker'+(all.length>1?'s':'')
     + ' · '+all.filter(w=>w.stuck).length+' frozen'
-    + (starting.length ? ' · '+starting.length+' no frame yet' : '')) : '';
-  // Deliberately NOT called "starting": these are live processes (the census
-  // only lists run.logs touched in the last ACTIVE_SEC), but a worker with
-  // neither a screenshot nor a frame counter is either still booting OR a run
-  // with OT6_LIVE=0, which never streams either one.  The census cannot tell
-  // those apart, so it says what it knows.
-  $('starting').textContent = starting.length
-    ? starting.length+' running, no frame yet (booting, or not streaming): '
-      + starting.map(w=>w.name).join(' · ')
-    : '';
+    + (starting.length ? ' · '+starting.length+' without a picture' : '')) : '';
+  // These are live processes either way -- the census only lists run.logs
+  // touched in the last ACTIVE_SEC -- but WHY they have no picture matters:
+  // one group will get one shortly, the other never will.  run.sh settles it
+  // by writing `OT6_LIVE = <n>` into the workspace's composed_live.lua and
+  // omitting it when live is off, which the server reads into w.streams.  A
+  // run that is not broadcasting still gets its latest log line here, since
+  // that is the only thing it has to show.
+  const booting = starting.filter(w=>w.streams !== false);
+  const mute = starting.filter(w=>w.streams === false);
+  let html = '';
+  if(booting.length) html += '<div>' + booting.length
+    + ' booting, no frame yet: <span style="color:#7a7">'
+    + booting.map(w=>esc(w.name)).join(' · ') + '</span></div>';
+  mute.forEach(w=>{ html += '<div style="margin-top:3px">'
+    + '<span style="color:#a96">not broadcasting</span> · '
+    + esc(w.name) + (w.frame!=null ? ' · frame '+nf(w.frame) : '')
+    + (w.last ? '<div style="color:#687;padding-left:14px;white-space:nowrap;'
+      + 'overflow:hidden;text-overflow:ellipsis">' + esc(w.last) + '</div>' : '')
+    + '</div>'; });
+  $('starting').innerHTML = html;
   const seen = new Set();
   ws.forEach(w=>{
     seen.add(w.id);
@@ -408,6 +420,39 @@ def _safe_id(s):
     return re.sub(r"[^A-Za-z0-9_.-]", "_", s)
 
 
+def streams_live(log):
+    """Does this worker broadcast at all?  True/False, or None if unknowable.
+
+    A worker with no screenshot and no frame counter is either still booting
+    or was launched with OT6_LIVE=0, which emits neither -- and those look
+    identical in the log, because the difference is that one of them will
+    never write anything to look at.  run.sh settles it: it prepends
+    `OT6_LIVE = <n>` to the workspace's own composed_live.lua and omits the
+    line entirely when live is off (run.sh:113), so the answer is the first
+    line of the script the emulator is actually running.
+    """
+    path = os.path.join(os.path.dirname(log), "composed_live.lua")
+    try:
+        with open(path, "rb") as f:
+            head = f.read(64)
+    except OSError:
+        return None            # not written yet, or cleaned up: do not guess
+    return head.startswith(b"OT6_LIVE")
+
+
+def _last_note(data):
+    """The newest ordinary [ot6] line in a log tail, for a worker that has no
+    picture to show.  A non-streaming run is not silent, it just is not
+    drawing, and its last line is the most useful thing it has."""
+    for line in reversed(data.splitlines()):
+        if line.startswith(b"[ot6] ") and not line.startswith(b"[ot6] [watch]"):
+            try:
+                return line[6:].decode("utf-8", "replace")[:150]
+            except Exception:
+                return None
+    return None
+
+
 def _tail_bytes(path, n):
     with open(path, "rb") as f:
         f.seek(0, 2)
@@ -507,11 +552,17 @@ def grid_thread(webroot, stop, live_ref=None):
                 except OSError:
                     pass
             have = written.get(wid)
-            workers.append({
+            rec = {
                 "id": wid, "name": name, "frame": frame,
                 "shot": (f"grid/{wid}.png?{have}") if have else None,
                 "stuck": bool(stuck),
-                "live": bool(live_test and dirname.split(".")[0] == live_test)})
+                "live": bool(live_test and dirname.split(".")[0] == live_test)}
+            if not have:
+                # nothing to draw: say WHY, and offer the log line instead of
+                # an empty tile (streams_live / _last_note)
+                rec["streams"] = streams_live(log)
+                rec["last"] = _last_note(data)
+            workers.append(rec)
         # prune tiles/PNGs for workers that finished
         for wid in list(written):
             if wid not in active:
