@@ -245,6 +245,34 @@ end
 local function seqFor(id, tier, slot)
   local bp = H.readByte(BP + slot * 2)
   local boost = bp >= 2 and math.min(bp, 3) or 0
+  -- #230: pressing R is a CLAIM that this caster can pay for what the turn
+  -- is about to name.  Since #219 a boosted Blitz/Tool costs escalating MP,
+  -- so a row the pool covers unboosted prices out the moment pips go on it.
+  -- Since v0.19 the ROM refuses such a row at the CONFIRM (Ot6KitConfirmMP,
+  -- ot6_cmdmenu.asm; battle_kitrefuse): it buzzes, the list stays open, and
+  -- the turn, the pips and the MP are all kept.  That is the right answer
+  -- for a person, who reads the grey -- and it is why a fighter that does
+  -- not read the price now STALLS on the row instead of quietly losing the
+  -- turn to CalcAttackEffect's execution-time gate the way the Narshe
+  -- descent did (#228, docs/design/narshe-descent.md).  A stall is a
+  -- timeout.  H.boostPlan is the one place the check lives (M.affordBoost +
+  -- M.abilityCost, the lib's copy of Ot6BoostPriceFor), and every fighter in
+  -- the tree -- gen_narshe_battle and the library's own driver included --
+  -- goes through it.
+  -- the two costed verbs this fighter reaches for; Fight is free.  EDGAR's
+  -- Tools cursor is unsteered, so the claim is the dearest tool in the bag;
+  -- SABIN's is steered nowhere and the Blitz grid's cell (0,0) is Pummel at
+  -- every level (BlitzLevelTbl), so that one names itself.
+  local costed = nil
+  if id == 4 and tier >= 2 then
+    costed = H.namedTool(slot)
+    if costed == nil then tier = 0 end   -- no tool in the bag: Fight
+  elseif id == 5 and tier >= 3 then costed = 0x5D           -- Pummel
+  end
+  local ok
+  boost, ok = H.boostPlan({ slot = slot, id = costed, want = boost,
+                            tag = "dadaluma" })
+  if not ok then tier = 0 end          -- cannot pay even unboosted: Fight
   local seq = {}
   for _ = 1, boost do seq[#seq + 1] = "r" end
   local function push(...)

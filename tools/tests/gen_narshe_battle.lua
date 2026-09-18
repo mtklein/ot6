@@ -46,7 +46,11 @@ local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 -- know about, or an MP refusal) taps A for two more pulses, backs out with B
 -- and rebuilds from wherever the cursor is.
 local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
-local BCMP, BCMAXMP = 0x3c08, 0x3c30   -- the boost price is paid from these
+-- the boost price is paid from these; seqFor reaches them through
+-- H.boostPlan (#230) rather than by hand, and narshedescentlab's `priced`
+-- policy -- the cut of this fighter that prices but does not ration -- still
+-- reads BCMP directly, so the names stay
+local BCMP, BCMAXMP = 0x3c08, 0x3c30
 local MENU, ACTOR = 0x7bca, 0x62ca -- battle menu open flag / whose menu
 local BP = 0x3e9c                  -- banked boost points, +slot*2
 local function monSpecies(i) return H.readWord(0x57c0 + i * 2) end
@@ -75,15 +79,24 @@ local function seqFor(id, tier, slot)
   local bp = H.readByte(BP + slot * 2)
   local boost = bp >= 2 and math.min(bp, 3) or 0
   -- #219, measured in docs/design/narshe-descent.md: a boost on a verb that
-  -- is not Fight costs MP, and an unaffordable one is GREYED but not refused
-  -- at the confirm (ot6_boost.asm, Ot6AbilityGrey's scope note: the tools and
-  -- blitz windows got the grey, and CalcAttackEffect's universal
-  -- insufficient-MP gate is what refuses the cast -- at execution, after the
-  -- turn and the pips are already spent).  A person reads the grey and picks
-  -- a row they can pay for; this fighter has to read the price.  Unpriced it
-  -- threw away 130 turns across a 12-seed spread and lost 7 of 12 descents.
+  -- is not Fight costs MP, and a boost the pool cannot pay for is not a plan.
+  -- Unpriced, this fighter threw away 130 turns across a 12-seed spread and
+  -- lost 7 of 12 descents, because an unaffordable kit row was then GREYED
+  -- but still committable and CalcAttackEffect's universal insufficient-MP
+  -- gate refused it at EXECUTION, after the turn and the pips were spent.
+  -- v0.19 closed that: Ot6KitConfirmMP (ot6_cmdmenu.asm) refuses the row at
+  -- the CONFIRM, so the window buzzes, stays open, and keeps the turn, the
+  -- pips and the MP (battle_kitrefuse, mp-economy.md ruling 2).
   --
-  -- Two rules, both off M.affordBoost (the lib's copy of Ot6BoostPriceFor):
+  -- The rule below does not change with that, and it matters more, not less.
+  -- A person reads the grey and picks a row they can pay for; a fighter that
+  -- does not read the price now presses A at a row that buzzes and stays
+  -- open -- which is a stall, and a stall is a timeout rather than a quiet
+  -- wasted turn.  So: price the boost before planning it.
+  --
+  -- Two rules, both H.boostPlan's -- the one door every fighter in the tree
+  -- goes through since #230, and itself M.affordBoost, the lib's copy of
+  -- Ot6BoostPriceFor:
   --   * never plan a boost the pool cannot pay, and drop the verb entirely
   --     for Fight when it cannot pay even the unboosted cast
   --   * ration: one turn spends at most a quarter of the caster's MAXIMUM
@@ -93,23 +106,24 @@ local function seqFor(id, tier, slot)
   --     and then nothing for five battles; rationed it buys five x2 ones
   --     across the whole walk.  The cap never blocks the unboosted cast --
   --     the base price is not the boost's to ration.
-  -- The two costed verbs this fighter reaches for are EDGAR's AutoCrossbow
-  -- and SABIN's Pummel; CELES's Runic and everyone's Fight are free and pass
-  -- the bank's boost straight through.
+  -- The two costed verbs this fighter reaches for are EDGAR's Tools row and
+  -- SABIN's Pummel; CELES's Runic and everyone's Fight are free and pass the
+  -- bank's boost straight through.  Which tool the row names is the bag's
+  -- business, not the kit's, so H.namedTool reads it the way the ROM builds
+  -- the window (#230): bag order, tools flag $40, this actor's own cursor
+  -- cell.  On this descent that is AutoCrossbow, the id every one of the
+  -- control's 16 fizzles named.
+  -- SABIN's Blitz grid opens on cell (0,0), which is Pummel at every level.
   local costed = nil
-  if id == 4 and tier >= 2 then costed = 0xAA          -- AutoCrossbow
+  if id == 4 and tier >= 2 then
+    costed = H.namedTool(slot)
+    if costed == nil then tier = 0 end   -- no tool in the bag: Fight
   elseif id == 5 and tier >= 3 then costed = 0x5D      -- Pummel
   end
-  if costed then
-    local base = H.abilityCost(costed) or 0
-    local pool = H.readWord(BCMP + slot * 2)
-    local cap = H.readWord(BCMAXMP + slot * 2) // 4
-    local got = H.affordBoost({ base = base, want = boost,
-                                pool = math.min(pool, cap) })
-    if got == nil and base <= pool then got = 0 end    -- the base is not capped
-    boost = got or 0
-    if got == nil then tier = 0 end                    -- cannot pay: Fight
-  end
+  local ok
+  boost, ok = H.boostPlan({ slot = slot, id = costed, want = boost,
+                            tag = "descent", ration = 4 })
+  if not ok then tier = 0 end                          -- cannot pay: Fight
   local seq = {}
   for _ = 1, boost do seq[#seq + 1] = "r" end
   local function push(...)

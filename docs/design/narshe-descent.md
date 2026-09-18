@@ -429,3 +429,14 @@ monster HP are read at `ExecCmd` and again at `SaveForMimic`, so damage
 belongs to the turn, while HP *lost* is billed to the fight (every drop
 between consecutive samples, seeded from the settled fight-start line),
 because the monsters' rounds land between party turns.
+
+## The class this found (#230)
+
+This fighter was not the only private one. Six more generators pressed R,
+named a costed ability and never asked what the boost cost;
+[private-fighters.md](private-fighters.md) is that unit. Since it landed,
+this fighter's `seqFor` makes its decision through the same one door the
+others do — `H.boostPlan`, with `ration = 4` where they have none — and
+every run in the tree now writes a `[fizzle]` line for a costed action the
+pool could not pay for and a `[refused]` line for a confirm that buzzed, so
+neither is something a lab has to be built to see again.

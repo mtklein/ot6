@@ -723,11 +723,30 @@ local function newAmbushPlan(tag)
       -- base cast to its next tier via Ot6FoldTbl (Ice -> Ice2 -> Ice3), so
       -- this is how the plan gets the bigger AoE hit rather than the base
       -- 4 MP tier every single cast.
+      --
+      -- And that fold is exactly why the boost has to be PRICED here (#230).
+      -- makePlan's spellCellA proved the pool covers Ice's own row price;
+      -- the boost is what turns that row into Ice 2 (20 MP) or Ice 3 (51),
+      -- each charged at its own vanilla MP (Ot6QueueFold -> Ot6SpellMP).
+      -- Claiming a tier the pool cannot pay is not a cast.  Vanilla magic
+      -- has always refused it at the A button (greyed AND refused), so this
+      -- one does not even lose the turn the way an unpriced kit row did
+      -- before v0.19 -- it BUZZES AND STAYS OPEN, and a fighter that keeps
+      -- asking for it stalls there until a watchdog fires.  H.boostPlan with
+      -- `spell` set prices through M.spellPrice, which is the ROM's own two
+      -- arms (a family head folds and pays the tier's own MP; everything
+      -- else takes the 2.5x), and steps the tier down to the one the pool
+      -- covers, so the cast the fighter asks for is one it can commit.
       if st == ST_CMD_A then
         if not plan.boosted then
           local bp = H.readByte(BP_A + actor * 2)
           local want = (bp >= 2) and math.min(bp, 3) or 0
-          plan.boostLeft = plan.boostLeft or want
+          if plan.boostLeft == nil then
+            local cell, base = spellCellA(actor, plan.spell, false)
+            plan.boostLeft = cell == nil and 0
+              or (H.boostPlan({ slot = actor, id = plan.spell, spell = true,
+                                base = base, want = want, tag = "fire" }))
+          end
           if plan.boostLeft > 0 then
             plan.boostLeft = plan.boostLeft - 1
             return "r"

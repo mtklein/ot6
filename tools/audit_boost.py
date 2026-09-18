@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""audit_boost.py -- boost left on the table at every party death (#175).
+"""audit_boost.py -- boost left on the table: at every party death, and in
+every fizzle (#175, #230).
 
 Owner heuristic (2026-09-07): "when we see a dead party with a bunch of
 unused boost pips, it means we've not used the abilities of the characters
@@ -25,6 +26,17 @@ every wipe the way the owner reads one:
                           driver problem first (ot6.lua's spend rule)
 
 Both can hold for one wipe.  A wipe with neither is "worn down".
+
+A FIZZLE is the same finding in its most literal form, and it is counted
+here for that reason (#230).  The library writes one line per costed action
+the pool could not pay for:
+
+    [fizzle] fT slotS charC Tools($09) atk=$AA boost=3 cost=63 pool=25 -- ...
+
+The turn is gone, the monsters took nothing, and the pips banked into the
+boost were burned to buy it -- boost left on the table, spent on nothing.
+A run with fizzles has a fighter that pressed R without checking the caster
+could pay; the library's one place for that check is M.boostPlan.
 
     tools/audit_boost.py [--selftest] [logglob ...]
 
@@ -64,6 +76,11 @@ LAB_UP = re.compile(r"\[lab\] battle up|\[m269lab\] battle up|battle-up present 
 # a wipe the driver did not write itself (the gen fighter, a lab's own
 # verdict, the canary)
 LAB_WIPE = re.compile(r"PARTY WIPED|\[m269lab\] WIPED|canary: BATTLE WIPE|outcome=lost_wiped|outcome=lost_gameover")
+# the library's loud-fizzle line (#230), written by every run
+FIZZLE = re.compile(
+    r"\[fizzle\] f(?P<f>\d+) slot(?P<slot>\d) char(?P<c>\d+) "
+    r"(?P<verb>\S+)\(\$(?P<cmd>[0-9A-F]{2})\) atk=\$(?P<atk>[0-9A-F]{2}) "
+    r"boost=(?P<bp>\d+) cost=(?P<cost>\d+) pool=(?P<pool>\d+)")
 
 
 def worker_of(path):
@@ -132,6 +149,14 @@ def scan(path):
                                source="driver")
             deaths = []
             continue
+        m = FIZZLE.search(line)
+        if m:
+            yield "fizzle", dict(worker=worker, fight=fight, f=int(m["f"]),
+                                 slot=int(m["slot"]), char=int(m["c"]),
+                                 verb=m["verb"], cmd=int(m["cmd"], 16),
+                                 atk=int(m["atk"], 16), bp=int(m["bp"]),
+                                 cost=int(m["cost"]), pool=int(m["pool"]))
+            continue
         m = LAB_DEATH.search(line)
         if m and "[death] f+" not in line:
             if int(m["e"]) in seen_driver:
@@ -150,11 +175,44 @@ def scan(path):
             deaths = []
 
 
+def fizzle_report(fizzles, nlogs):
+    """The most literal boost left on the table (#230): a costed action the
+    pool could not pay for, which burned the turn and the pips banked into
+    it and bought nothing."""
+    if not fizzles:
+        print(f"Fizzle audit: no costed action was refused for MP in the "
+              f"scanned logs ({nlogs} logs).")
+        return
+    bp = sum(z["bp"] for z in fizzles)
+    print(f"Fizzle audit: {len(fizzles)} costed action(s) refused for MP, "
+          f"{bp} boost point(s) burned on them, across {nlogs} logs.  A "
+          f"fizzle is a fighter that pressed R without checking the caster "
+          f"could pay (the check is M.boostPlan, lib/ot6.lua).")
+    print()
+    print(f"{'segment':34} {'f':>8} {'ent':>3} {'char':>4} {'verb':>8} "
+          f"{'atk':>4} {'boost':>5} {'cost':>5} {'pool':>5}")
+    for z in fizzles:
+        print(f"{z['worker'][:34]:34} {z['f']:>8} {z['slot']:>3} {z['char']:>4} "
+              f"{z['verb']:>8} {'$%02X' % z['atk']:>4} {z['bp']:>5} "
+              f"{z['cost']:>5} {z['pool']:>5}")
+    per = defaultdict(lambda: [0, 0])
+    for z in fizzles:
+        per[z["worker"]][0] += 1
+        per[z["worker"]][1] += z["bp"]
+    print()
+    print(f"{'segment':34} {'fizzles':>7} {'bp':>4}  why")
+    for k, (n, b) in sorted(per.items(), key=lambda kv: -kv[1][0]):
+        print(f"{k[:34]:34} {n:>7} {b:>4}  turns and pips spent on actions "
+              "the pool could not pay for")
+    print()
+
+
 def report(paths):
-    deaths, wipes = [], []
+    deaths, wipes, fizzles = [], [], []
     for p in sorted(paths):
         for kind, rec in scan(p):
-            (deaths if kind == "death" else wipes).append(rec)
+            {"death": deaths, "wipe": wipes, "fizzle": fizzles}[kind].append(rec)
+    fizzle_report(fizzles, len(paths))
     if not deaths and not wipes:
         print(f"Boost audit: no party deaths in the scanned logs ({len(paths)} logs).")
         return
@@ -200,6 +258,10 @@ def selftest():
         "[ot6] [navTo] [death] f+3000 entity 0 char 4 from 120/502 by slot 3 cmd $00 atk $EE bp=4 party_bp=4,3,0,0 -- died holding 4 BP",
         "[ot6] [navTo] [death] f+3100 entity 1 char 5 from 60/511 by slot 3 cmd $00 atk $EE bp=3 party_bp=0,3,0,0 -- died holding 3 BP",
         "[ot6] [navTo] [wipe] f+3101 party_bp=0,3,0,0 deaths=e2@f+512:447/447:bp1:one_action;e3@f+513:443/443:bp0:one_action;e0@f+3000:120/502:bp4;e1@f+3100:60/511:bp3 class=one-shot early + died with 4 BP banked",
+        # the library's loud-fizzle line (#230), verbatim from a descent
+        # control run: EDGAR's boosted crossbow against a 25 MP pool
+        "[ot6] [fizzle] f36110 slot1 char4 Tools($09) atk=$AA boost=2 cost=25 pool=21 -- the pool could not pay it: CalcAttackEffect refused the action, the turn and 2 boost point(s) are gone and the pool is still 21.  Pressing R is a claim the caster can pay (M.boostPlan, #230).",
+        "[ot6note] f36110 [fizzle] f36110 slot1 char4 Tools($09) atk=$AA boost=2 cost=25 pool=21 -- the pool could not pay it: CalcAttackEffect refused the action, the turn and 2 boost point(s) are gone and the pool is still 21.  Pressing R is a claim the caster can pay (M.boostPlan, #230).",
     ])
     # a lab whose fighter is not the driver (the Rizopas control): the lab's
     # own battle-up, death and wipe lines are all there is
@@ -218,6 +280,12 @@ def selftest():
         ev = list(scan(p)) + list(scan(q))
     deaths = [r for k, r in ev if k == "death"]
     wipes = [r for k, r in ev if k == "wipe"]
+    fizzles = [r for k, r in ev if k == "fizzle"]
+    # the [ot6note] mirror is not a second fizzle
+    assert len(fizzles) == 1, fizzles
+    assert fizzles[0]["verb"] == "Tools" and fizzles[0]["cmd"] == 0x09
+    assert fizzles[0]["atk"] == 0xAA and fizzles[0]["bp"] == 2
+    assert fizzles[0]["cost"] == 25 and fizzles[0]["pool"] == 21
     assert len(deaths) == 6, deaths                    # the [ot6note] mirror is not a seventh
     assert [d["bp"] for d in deaths] == [1, 0, 4, 3, 0, 1], [d["bp"] for d in deaths]
     assert deaths[0]["one_action"] and deaths[0]["from"] == 447
