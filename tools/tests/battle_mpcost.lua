@@ -28,10 +28,15 @@
 --           poverty arrives, and a Dispatch walk never spends the pool down
 --           because the trash dies first), so the arm keeps the write MP := 1
 --           with the pip rebanked by a real item turn.
---           3a, the MENU: with the pool at 1 the SwdTech row is greyed and
---           its confirm is REFUSED (Ot6KitConfirmMP at the tools-shell
+--           3a, the MENU: CYAN's own command window is driven open FIRST,
+--           the pool is put at 1 there, and then the SwdTech row is greyed
+--           and its confirm is REFUSED (Ot6KitConfirmMP at the tools-shell
 --           confirm, mp-economy.md ruling 2) -- it buzzes, the list stays
---           open, no boost is banked and the turn is still CYAN's.
+--           open, no boost is banked and the turn is still CYAN's.  Both
+--           menu sounds are counted twice over: raw, and again only at
+--           CYAN's own tools shell ($7BCA up, $7BC2 == $30, ACTOR == CYAN).
+--           $95 and $96 are the game's error and confirm sounds everywhere,
+--           so only the narrowed counts say anything about this row.
 --           3b, the EXECUTION BACKSTOP: with the real pool restored the same
 --           Dispatch is committed, and the pool goes broke AT THE LATCH,
 --           which is the one seam the universal insufficient-MP fizzle still
@@ -128,7 +133,7 @@ local function cyanStatusStr()
 end
 
 local mf = 0
-local cyanMode = "defer"                 -- "defer" | "item" | "tech:<row>"
+local cyanMode = "defer"       -- "defer" | "item" | "park" | "tech:<row>"
 local quietA = false                     -- suppress the menu-idle A-mash: it
                                          -- can land on a just-opened window
                                          -- and confirm a bystander's Fight
@@ -174,6 +179,11 @@ local function decide()
   elseif act == cyan then
     if cyanMode == "defer" then
       btn = (st == ST_CMD) and "x" or "b"
+    elseif cyanMode == "park" then
+      -- sit still in his own command window: the arm below needs CYAN's
+      -- turn OPEN before it stages anything, and "b" at $05 would cancel
+      -- back out of it
+      btn = (st == ST_CMD) and nil or "b"
     elseif cyanMode == "item" then
       if st == ST_CMD then
         local want = cmdRowOf(cyan, CMD_ITEM)
@@ -225,7 +235,14 @@ end
 
 local mode                               -- "on" (charges) | "off" (free)
 local spells, mpWrites = {}, {}
-local buzzes, confirms = 0, 0            -- $95 / $96, arm 3a's evidence
+local buzzes, confirms = 0, 0            -- every $95 / $96 write, anywhere
+-- ...and the same two counted only where arm 3a means them: the battle menu
+-- open ($7BCA), the tools shell up ($7BC2 == $30) and CYAN the actor.  $95
+-- and $96 are the game's error and confirm sounds EVERYWHERE, so a raw
+-- count is not evidence about the SwdTech row: it also counts the buzz a
+-- "b" press earns in a state the driver does not recognise, and the battle's
+-- own opening writes them before any window is up.  See the header.
+local kitBuzzes, kitConfirms = 0, 0
 local function sawSpell(id)
   for _, v in ipairs(spells) do if v == id then return true end end
   return false
@@ -293,11 +310,22 @@ H.run({ maxFrames = 200000 }, {
     -- buzz, $96 the confirm sound the kit window stamps on every A press
     -- BEFORE the affordability gate.  Direct-page stores land in bank $00, so
     -- both the $0000xx and $7e00xx views are counted together.
+    -- at CYAN's OWN kit window: the menu open flag up, the tools shell the
+    -- state, and CYAN the actor.  This is the lib's own refusalNote() gate
+    -- (ot6.lua, M.refusals), narrowed to one character.
+    local function atKitWindow()
+      return H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_TOOLS
+         and (H.readByte(ACTOR) & 3) == cyan
+    end
     for _, base in ipairs({ 0x000000, 0x7E0000 }) do
-      emu.addMemoryCallback(function() buzzes = buzzes + 1 end,
-        emu.callbackType.write, base + 0x95, base + 0x95)
-      emu.addMemoryCallback(function() confirms = confirms + 1 end,
-        emu.callbackType.write, base + 0x96, base + 0x96)
+      emu.addMemoryCallback(function()
+        buzzes = buzzes + 1
+        if atKitWindow() then kitBuzzes = kitBuzzes + 1 end
+      end, emu.callbackType.write, base + 0x95, base + 0x95)
+      emu.addMemoryCallback(function()
+        confirms = confirms + 1
+        if atKitWindow() then kitConfirms = kitConfirms + 1 end
+      end, emu.callbackType.write, base + 0x96, base + 0x96)
     end
     H.log(string.format("cyan slot %d bp=1 mp=%d; monsters %d hp", cyan,
       R.mp0, R.g0))
@@ -346,6 +374,7 @@ H.run({ maxFrames = 200000 }, {
     (function()
       local done = false
       local richMp, snap, menuRefused = nil, nil, false
+      local atWindow = false             -- was CYAN's own window really open?
       local steps = {}
       for attempt = 1, 4 do
         steps[#steps+1] = H.cond(function() return done end, {}, {
@@ -373,36 +402,89 @@ H.run({ maxFrames = 200000 }, {
             -- row buzzes and the window stays open: CYAN keeps the turn and
             -- the pip.  Before v0.19 this same press committed, and the turn
             -- and the pip were gone by the time the fizzle below fired.
+            --
+            -- The arm's PRECONDITION is CYAN's own command window, OPEN, with
+            -- the turn still his.  It is established here, not hoped for.  A
+            -- fresh encounter already carries Ot6InitBP's opening 1, so the
+            -- item-turn drive above is satisfied at frame 0 of the battle,
+            -- before any window exists; staging the poverty there and then
+            -- waiting for "a buzz" took the battle's own opening $95 write
+            -- (and the "b" the driver presses in a state it does not know)
+            -- for the SwdTech row saying no, and read $7BC2 == $00 where the
+            -- submenu should have been.  So park in his command window first
+            -- and stage the pool there, which is also what makes the list
+            -- draw the row already greyed.
+            H.call(function() cyanMode = "park"; quietA = true end),
+            (function()
+              local packSeen = false
+              return driveTo(function()
+                if not H.battleLoadStarted() then return true end
+                local packHp = monsterHpSum()
+                if packHp > 0 then packSeen = true end
+                if cyanLostMenu() or (packSeen and packHp == 0) then
+                  return true
+                end
+                return (H.readByte(ACTOR) & 3) == cyan
+                   and H.readByte(MSTATE) == ST_CMD
+              end, 30000, "CYAN's own command window opens (attempt "
+                .. attempt .. ")")
+            end)(),
             H.call(function()
+              atWindow = H.battleLoadStarted() and not cyanLostMenu()
+                and (H.readByte(ACTOR) & 3) == cyan
+                and H.readByte(MSTATE) == ST_CMD
+              if not atWindow then
+                cyanMode = "defer"
+                quietA = false
+                H.log(string.format("  [refusal arm %d] 3a void before the "
+                  .. "window: live=%s menuable=%s state=%02x actor=%d "
+                  .. "monsters %d hp %s", attempt,
+                  tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
+                  H.readByte(MSTATE), H.readByte(ACTOR) & 3, monsterHpSum(),
+                  cyanStatusStr()))
+                return
+              end
               richMp = mp()
               H.writeWord(0x3C08 + cyan*2, 1)
               snap = { bp = bp(), pend = pend(),
-                       buzzes = buzzes, confirms = confirms }
+                       buzzes = buzzes, confirms = confirms,
+                       kitBuzzes = kitBuzzes, kitConfirms = kitConfirms }
               spells = {}
               cyanMode = "tech:0"
-              quietA = true
               H.log(string.format("  [refusal arm %d] 3a menu: pool %d -> 1, "
                 .. "bp=%d pend=%d", attempt, richMp, snap.bp, snap.pend))
             end),
+            -- and the stop is the A press ON THE ROW, inside the submenu
+            -- ($96 with $7BC2 == $30 and CYAN the actor), not "a $95 wrote
+            -- somewhere".  The buzz is then an ASSERTION below rather than
+            -- the thing the drive settles for.
             driveTo(function()
+              if not atWindow then return true end
               return not H.battleLoadStarted() or cyanLostMenu()
-                  or buzzes > snap.buzzes
-            end, 30000, "the broke SwdTech row is confirmed and buzzes "
+                  or kitConfirms > snap.kitConfirms
+            end, 30000, "the broke SwdTech row is confirmed IN the submenu "
               .. "(attempt " .. attempt .. ")"),
             H.waitFrames(90),
             H.call(function()
               menuRefused = false
-              if H.battleLoadStarted() and not cyanLostMenu()
-                 and buzzes > snap.buzzes then
+              if atWindow and H.battleLoadStarted() and not cyanLostMenu()
+                 and kitConfirms > snap.kitConfirms then
                 H.log(string.format("  [refusal arm %d] 3a: state=%02x mp=%d "
-                  .. "bp=%d pend=%d buzz(+%d) confirm(+%d) %s", attempt,
+                  .. "bp=%d pend=%d kitbuzz(+%d) kitconfirm(+%d) "
+                  .. "buzz(+%d) confirm(+%d) %s", attempt,
                   H.readByte(MSTATE), mp(), bp(), pend(),
+                  kitBuzzes - snap.kitBuzzes, kitConfirms - snap.kitConfirms,
                   buzzes - snap.buzzes, confirms - snap.confirms,
                   sawSpell(DISPATCH) and "saw $55" or "quiet"))
-                H.assertEq(confirms > snap.confirms, true,
-                  "ON: the A press reached the list ($96, stamped before the "
-                  .. "gate) -- the buzz is a rejection, not a press that "
-                  .. "never arrived")
+                H.assertEq(kitConfirms > snap.kitConfirms, true,
+                  "ON: the A press reached the SwdTech list ($96 with $7BC2 "
+                  .. "== $30 and CYAN the actor, stamped before the gate) -- "
+                  .. "the refusal is a rejection, not a press that never "
+                  .. "arrived")
+                H.assertEq(kitBuzzes > snap.kitBuzzes, true,
+                  "ON: and the confirm was REFUSED -- $95 buzzed inside "
+                  .. "CYAN's own SwdTech list, where Ot6KitConfirmMP prices "
+                  .. "the row")
                 H.assertEq(H.readByte(MSTATE), ST_TOOLS,
                   "ON: the SwdTech submenu is still open -- CYAN is still "
                   .. "choosing and the turn is still his")
@@ -417,14 +499,20 @@ H.run({ maxFrames = 200000 }, {
                   "ON: and no tech was ever cast")
                 H.screenshot("mpcost_on_menu_refused")
                 menuRefused = true
-              else
+              elseif atWindow then
                 H.log(string.format("  [refusal arm %d] 3a void: live=%s "
-                  .. "menuable=%s %s", attempt,
+                  .. "menuable=%s state=%02x kitconfirm(+%d) %s", attempt,
                   tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
+                  H.readByte(MSTATE), kitConfirms - snap.kitConfirms,
                   cyanStatusStr()))
               end
-              -- the real pool back: 3b's poverty is staged at the LATCH
-              H.writeWord(0x3C08 + cyan*2, richMp)
+              -- the real pool back: 3b's poverty is staged at the LATCH.
+              -- Nothing was staged at all on the void-before-the-window path,
+              -- so there is nothing to put back there.
+              if richMp ~= nil then
+                H.writeWord(0x3C08 + cyan*2, richMp)
+                richMp = nil
+              end
               cyanMode = "defer"
               quietA = false
             end),
@@ -441,9 +529,11 @@ H.run({ maxFrames = 200000 }, {
             end, {
               (function()
                 local m0, g1, latched, packSeen = nil, nil, false, false
+                local rich2 = nil        -- the real pool 3b stages over
                 return H.repeatN(1, {
                   H.call(function()
                     spells = {}
+                    rich2 = mp()
                     cyanMode = "tech:0"
                     -- quiet the idle A-mash NOW, before the latch drive:
                     -- with CYAN at level 13 the fixture's timing drifted so
@@ -490,6 +580,16 @@ H.run({ maxFrames = 200000 }, {
                   H.waitFrames(400),
                   H.call(function() quietA = false end),
                   H.call(function()
+                   -- whatever this attempt decided, the staged poverty is put
+                   -- back before the next one starts.  3b's write is the
+                   -- LAST thing that touches the pool, so leaving it at 1
+                   -- handed attempt N+1 a CYAN who can never afford the row
+                   -- it has to latch: 3a still refused (the pool was already
+                   -- broke), 3b could never commit, and the arm timed out on
+                   -- "the broke Dispatch is latched" having never had a
+                   -- fighting chance (build/attempts/fix1).  A void attempt
+                   -- must leave the fight's own economy behind it.
+                   local function measure()
                     if not H.battleLoadStarted() or not latched then
                       H.log(string.format("  [refusal arm %d] void before the "
                         .. "latch: live=%s menuable=%s monsters %d hp %s",
@@ -522,6 +622,13 @@ H.run({ maxFrames = 200000 }, {
                       "ON: and the refused tech dealt no damage (fizzled)")
                     H.screenshot("mpcost_on_refused")
                     done = true
+                   end
+                   measure()
+                   if rich2 ~= nil and mp() ~= rich2 then
+                     H.writeWord(0x3C08 + cyan*2, rich2)
+                     H.log(string.format("  [refusal arm %d] 3b: the staged "
+                       .. "poverty is put back, pool -> %d", attempt, rich2))
+                   end
                   end),
                 })
               end)(),
