@@ -91,16 +91,29 @@ GRID_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 census</title>
 <span id=hdr style="color:#8a8"></span>
 <a href="progress.html" style="color:#8ac">route map &rarr;</a></div>
 <div id=grid style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:0 14px 18px"></div>
+<div id=starting style="color:#575;padding:0 14px 14px;font-size:11px;line-height:1.7"></div>
 <div id=empty style="color:#575;padding:2px 14px">waiting for workers…</div>
 <script>
 const $=id=>document.getElementById(id);
 const nf=n=>(n==null?'\\u2014':Number(n).toLocaleString());
 async function tick(){ try{
   const j = await (await fetch('grid.json?'+Date.now())).json();
-  const ws = j.workers||[]; const grid=$('grid');
-  $('empty').style.display = ws.length ? 'none' : 'block';
-  $('hdr').textContent = ws.length ? (ws.length+' active worker'+(ws.length>1?'s':'')
-    + ' · '+ws.filter(w=>w.stuck).length+' frozen') : '';
+  const all = j.workers||[]; const grid=$('grid');
+  // A worker that has not emitted a screenshot yet has nothing to show, and a
+  // black tile reading "frame —" is worse than nothing: at 32 workers the
+  // handful that ARE playing get lost in a wall of them.  Those are listed by
+  // name underneath instead, and promote themselves into the grid the moment
+  // they have a frame.
+  const ws = all.filter(w=>w.shot);
+  const starting = all.filter(w=>!w.shot);
+  $('empty').style.display = all.length ? 'none' : 'block';
+  $('hdr').textContent = all.length ? (all.length+' active worker'+(all.length>1?'s':'')
+    + ' · '+all.filter(w=>w.stuck).length+' frozen'
+    + (starting.length ? ' · '+starting.length+' starting' : '')) : '';
+  $('starting').textContent = starting.length
+    ? starting.length+' starting, no frame yet: '
+      + starting.map(w=>w.name).join(' · ')
+    : '';
   const seen = new Set();
   ws.forEach(w=>{
     seen.add(w.id);
