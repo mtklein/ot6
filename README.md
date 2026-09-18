@@ -7,9 +7,9 @@ boost-point turn economy.
 
 ## Status
 
-v0.18 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.18)); it plays exactly
-like v0.17 and marks a round of work on how the game is tested
+v0.19 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.19)); boosting an
+ability now costs extra MP, so it is a decision rather than a reflex
 (details in the release notes). The game is playable from the start through the end of
 the World of Balance: the whole Thamasa arc, the world tour aboard the
 repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
