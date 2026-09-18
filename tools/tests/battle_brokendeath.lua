@@ -141,7 +141,23 @@ local function attempt(n)
   -- so the break lands before the kill.  Under the one-care-per-round
   -- driver the party attacks harder, and without a chip key IFRIT died
   -- through his shields unbroken -- the ladder then had no observation.
-  local F = H.newFightDriver("brokendeath", { tactical = true, boost = true,
+  --
+  -- tactical = FALSE, for the same reason gen_ifrit_magicite.lua turns it
+  -- off on this fight (#235).  Either sibling can take the killing blow,
+  -- so the test needs a key on BOTH gauges or the rung is a coin flip.
+  -- With the tactical kit on, EDGAR spends his turn on AutoCrossbow
+  -- (pierce) and SABIN on Pummel (bludgeon), and neither reaches SHIVA's
+  -- six SLASH shields: only CELES's sword chips her, one a turn, while
+  -- four characters pour damage into her 3000 HP -- so SHIVA reliably
+  -- died UNBROKEN and the attempt produced nothing (measured: 2 of the 3
+  -- rungs at the default shift ended that way both before and after
+  -- #235's fix, build/lab/fight-swings/brokendeath/).  With it off,
+  -- EDGAR's MithrilBlade and SABIN's MetalKnuckle are both SLASH Fights
+  -- and SHIVA has three keys on her, while IFRIT keeps LOCKE's pierce
+  -- pair and CELES's Ice.  The gate under test is untouched; what changes
+  -- is that the observation stops depending on which sibling the tag-team
+  -- happens to leave standing.
+  local F = H.newFightDriver("brokendeath", { tactical = false, boost = true,
     bank = 3, items = true, healPercent = 60, cadence = 12,
     magic = { [6] = { spell = 1, boost = false } } })
   local function mname(m)
