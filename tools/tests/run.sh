@@ -103,6 +103,14 @@ fi
 # sandbox cannot read the environment).  Default ON, so every headless run
 # is watchable while it happens with tools/stream/live.py.  OT6_LIVE=0
 # disables; OT6_LIVE=<n> sets the screenshot interval in frames.
+#
+# EVERY run means the labs and the sweeps too.  They each used to force
+# OT6_LIVE=0, none of them saying why, so the census went dark during
+# exactly the multi-hour runs worth watching -- and a lab worker showed up
+# as a black tile that would never fill in.  The owner's ruling
+# (2026-09-18) is that the cost is not worth spending attention on:
+# broadcast by default everywhere, and if a run really is too hot for it,
+# pass an interval (OT6_LIVE=1024) rather than turning it off.
 LIVE="${OT6_LIVE:-1}"
 # OT6_ART_DIR rides the same prelude: it is where this invocation's decoded
 # artifacts land.  The segment runner (lib/ot6.lua) names the screenshot it

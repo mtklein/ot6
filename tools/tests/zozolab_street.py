@@ -210,7 +210,7 @@ def run(policies):
     for p in policies:
         d = os.path.join(OUT, "street", p)
         os.makedirs(d, exist_ok=True)
-        env = dict(os.environ, OT6_LIVE="0", OT6_TIMEOUT="1800",
+        env = dict(os.environ, OT6_TIMEOUT="1800",
                    OT6_WORKER="zozolab-street-%s" % p, OT6_ARTIFACT_DIR=d)
         cmd = [os.path.join(ROOT, "tools", "tests", "run.sh"),
                os.path.join(OUT, "street_%s.lua" % p),

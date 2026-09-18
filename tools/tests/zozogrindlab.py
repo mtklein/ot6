@@ -222,7 +222,7 @@ def bake(gen=GEN):
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "gen_bake.lua")
     open(path, "w", encoding="utf-8").write(src.replace(anchor, new))
-    env = dict(os.environ, OT6_LIVE="0", OT6_RETRIES="1", OT6_ARTIFACT_DIR=d,
+    env = dict(os.environ, OT6_RETRIES="1", OT6_ARTIFACT_DIR=d,
                OT6_WORKER="zozogrind-bake")
     rc = subprocess.run(["sh", os.path.join(ROOT, "tools/tests/run.sh"), path,
                          os.path.join(d, "bake.log")], cwd=ROOT, env=env).returncode
@@ -242,7 +242,7 @@ def run_one(policy, seed, jobs_env):
     log = os.path.join(d, "seed%02d.log" % seed)
     env = dict(os.environ)
     env.update({
-        "OT6_LIVE": "0", "OT6_RETRIES": "1", "OT6_SEED_SHIFT": str(seed),
+        "OT6_RETRIES": "1", "OT6_SEED_SHIFT": str(seed),
         "OT6_NO_PUBLISH": "1", "OT6_KEEP_RUNS": "1",
         "OT6_TIMEOUT": env.get("OT6_TIMEOUT", "3600"),
         "OT6_ARTIFACT_DIR": os.path.join(d, "seed%02d" % seed),

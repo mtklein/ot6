@@ -132,7 +132,6 @@ def run_one(k, shift, gen, env_extra, outdir, timeout, state):
         "OT6_KEEP_RUNS": "1",
         "OT6_WORKER": f"sweep_{state}_{k:02d}",
         "OT6_TIMEOUT": str(timeout),
-        "OT6_LIVE": env.get("OT6_LIVE", "0"),
     })
     with open(outdir / f"{state}.seed{k:02d}.out", "w") as out:
         rc = subprocess.run(["sh", str(ROOT / "tools/tests/run.sh"),
@@ -185,7 +184,6 @@ def probe(a, e, gen, env_extra, outdir, timeout):
             "OT6_KEEP_RUNS": "1",
             "OT6_WORKER": f"probe_{a.state}_{j:02d}",
             "OT6_TIMEOUT": str(timeout),
-            "OT6_LIVE": env.get("OT6_LIVE", "0"),
         })
         with open(outdir / f"{a.state}.probe{j:02d}.out", "w") as out:
             subprocess.run(["sh", str(ROOT / "tools/tests/run.sh"),
