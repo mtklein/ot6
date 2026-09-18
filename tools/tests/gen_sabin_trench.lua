@@ -87,8 +87,27 @@ local function ride(dir, pred, what, budget, choiceWant)
   -- (lib/ot6_field.lua), owning the pad only while the dialog waits, the
   -- landed row asserted when the window closes
   local C = H.newChoice(choiceWant or 0, { ready = "pass", tag = what })
+  -- Kill order: the Aspiks first (docs/design/trench-dive.md).  The dive's
+  -- three formations are Actaneon x3, Anguiform+Actaneon+Aspik, and
+  -- Actaneon x3 + Aspik x2, and Aspik is the only one of the three whose
+  -- retaliation script answers a hit that is NOT a Fight with Giga Volt
+  -- (`if_cmd FIGHT -> attack BATTLE / end_if / if_hit -> attack GIGA_VOLT`,
+  -- ai_script.asm `; aspik`).  Giga Volt is lightning, power 110, and it
+  -- was measured taking 363 off a 363/363 SABIN -- a one-shot from full,
+  -- and SABIN's auto-targeted Pummel is what draws it: over a 30-run
+  -- spread, 524 party Fights into an Aspik formation drew none and 123
+  -- Blitzes drew 34.  Aspik is also the flimsiest thing on the stage (220
+  -- HP against Actaneon's 230, 2 battle power against 13), so putting the
+  -- party's Fights on it first shortens the window in which the Pummel can
+  -- land on one.  Measured over six seeds: 19 party deaths, 3 wipes and 9
+  -- Fenix Downs become 5, 1 and 2.  The focus is inert on the formations
+  -- that carry no Aspik (focusSlots resolves nothing and the driver picks
+  -- its own target), including the Crescent Mountain walk this driver
+  -- also plays.
+  local ASPIK = 0x0059
   local F = H.newFightDriver("trench " .. what, { tactical = true,
-    boost = true, bank = 3, items = true, healPercent = 60, cadence = 12 })
+    boost = true, bank = 3, items = true, healPercent = 60, cadence = 12,
+    focus = { { species = ASPIK } } })
   return H.driveUntil(function()
     return rideLost ~= nil or pred()
   end, budget or 30000, {
