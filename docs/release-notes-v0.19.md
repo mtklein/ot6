@@ -20,24 +20,32 @@ patcher (Flips, beat) and open the result instead.
 
 ## What's changed
 
-**Boosting an ability now costs extra MP.** Boost still doubles, quadruples
-and octuples what an ability does — but where it used to be free, the MP
-price now climbs with it: two and a half times the ability's usual cost per
-level of boost. A Blitz that costs 10 costs 25 at one pip and 63 at two.
-Nothing ever costs more than 99.
+**Boosting now costs extra MP.** Boost still doubles, quadruples and
+octuples what an ability does — but where it used to be free, the MP price
+now climbs with it: two and a half times the usual cost per level of boost,
+and nothing a two-digit price can show goes past 99. A Blitz that costs 10
+costs 25 at one pip and 63 at two.
 
-So boosting is a decision now. Early on, a full three-pip boost is simply
-out of reach for most characters, and the interesting question each turn is
-whether this fight is worth one pip, two, or none.
+That covers **Blitz, Tools, Dance, the Lores, summons, and every spell
+outside a tier family** — Break, Drain, Scan, Osmose, Ultima and the rest.
+A boosted Ifrit costs 26 normally, 65 at one pip and 99 at two, so calling
+an esper down is a real decision instead of a reflex.
 
-**Four things are deliberately left free.** Boosting **Fight** costs no MP
-at all, and it is the tool for breaking shields and clearing ordinary
-encounters quickly — each pip buys you another swing that lands. **Steal**,
-**Rage** and **Slot** are also unchanged: boosting those buys better odds
-rather than bigger numbers, and the BP is price enough.
+So boosting is a decision generally. Early on a full three-pip boost is
+simply out of reach for most characters, and the interesting question each
+turn is whether this fight is worth one pip, two, or none.
 
-Magic is unchanged too. Boosting a spell still folds it up a tier and
-charges that tier's own MP, exactly as before.
+**What stayed free, and why.** Boosting **Fight** costs no MP at all, and
+it is the tool for breaking shields and clearing ordinary encounters
+quickly — each pip buys another swing that lands. **Steal**, **Rage** and
+**Slot** are unchanged as well: boosting those buys better odds rather than
+bigger numbers, and the BP is price enough.
+
+**Tier-family magic and SwdTech are unchanged for a different reason** —
+they already charged you more. Boosting Fire folds it up to Fire 2 and
+charges Fire 2's own MP, as it always has, and boosting a SwdTech picks a
+higher tech and charges that tech's price. They escalate by climbing a
+ladder rather than by paying a multiplier.
 
 **An ability you cannot afford is now refused instead of wasted.** Pick a
 greyed-out Blitz, Tool, SwdTech, Steal or Dance and the game buzzes and
