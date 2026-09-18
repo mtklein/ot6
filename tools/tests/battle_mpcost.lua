@@ -22,14 +22,22 @@
 --           opening 1-bp bank against his real 67-MP pool. ON: debited to
 --           exactly mp0-4. OFF: the pool does not move. In both cases the
 --           tech lands its hit.
---   refusal (ON only), a labeled isolation arm: an input-driven route to a
---           broke kit-caster is out of reach on this pool's economy (a
---           deferring party is ground down before real poverty arrives,
---           and a Dispatch walk never spends the pool down because the
---           trash dies first), so this arm keeps one write: MP := 1
---           (below Dispatch's cost) with the pip rebanked by a real item
---           turn; the retried Dispatch must fizzle, dealing no damage,
---           leaving the 1 MP untouched and never negative.  A ladder over
+--   refusal (ON only), a labeled isolation arm in two halves: an
+--           input-driven route to a broke kit-caster is out of reach on this
+--           pool's economy (a deferring party is ground down before real
+--           poverty arrives, and a Dispatch walk never spends the pool down
+--           because the trash dies first), so the arm keeps the write MP := 1
+--           with the pip rebanked by a real item turn.
+--           3a, the MENU: with the pool at 1 the SwdTech row is greyed and
+--           its confirm is REFUSED (Ot6KitConfirmMP at the tools-shell
+--           confirm, mp-economy.md ruling 2) -- it buzzes, the list stays
+--           open, no boost is banked and the turn is still CYAN's.
+--           3b, the EXECUTION BACKSTOP: with the real pool restored the same
+--           Dispatch is committed, and the pool goes broke AT THE LATCH,
+--           which is the one seam the universal insufficient-MP fizzle still
+--           exists for (an enemy Rasp between the choice and the swing).  The
+--           tech must fizzle, dealing no damage, leaving the 1 MP untouched
+--           and never negative.  A ladder over
 --           fresh battles: the fighting lineage's camp_escaped packs carry
 --           a Berserk special, and once it lands on CYAN ($3EE5,x bit 4)
 --           CheckPlayerAction (battle_main.asm:1470) auto-picks his turns
@@ -217,6 +225,7 @@ end
 
 local mode                               -- "on" (charges) | "off" (free)
 local spells, mpWrites = {}, {}
+local buzzes, confirms = 0, 0            -- $95 / $96, arm 3a's evidence
 local function sawSpell(id)
   for _, v in ipairs(spells) do if v == id then return true end end
   return false
@@ -280,6 +289,16 @@ H.run({ maxFrames = 200000 }, {
       emu.callbackType.write, 0x7E3410, 0x7E3410)
     emu.addMemoryCallback(function(_, v) mpWrites[#mpWrites + 1] = v end,
       emu.callbackType.write, 0x7e3C08 + cyan*2, 0x7e3C08 + cyan*2)
+    -- the two menu sounds, for arm 3a's confirm refusal: $95 is magic's error
+    -- buzz, $96 the confirm sound the kit window stamps on every A press
+    -- BEFORE the affordability gate.  Direct-page stores land in bank $00, so
+    -- both the $0000xx and $7e00xx views are counted together.
+    for _, base in ipairs({ 0x000000, 0x7E0000 }) do
+      emu.addMemoryCallback(function() buzzes = buzzes + 1 end,
+        emu.callbackType.write, base + 0x95, base + 0x95)
+      emu.addMemoryCallback(function() confirms = confirms + 1 end,
+        emu.callbackType.write, base + 0x96, base + 0x96)
+    end
     H.log(string.format("cyan slot %d bp=1 mp=%d; monsters %d hp", cyan,
       R.mp0, R.g0))
   end),
@@ -326,6 +345,7 @@ H.run({ maxFrames = 200000 }, {
   H.cond(function() return mode == "on" end, {
     (function()
       local done = false
+      local richMp, snap, menuRefused = nil, nil, false
       local steps = {}
       for attempt = 1, 4 do
         steps[#steps+1] = H.cond(function() return done end, {}, {
@@ -345,19 +365,84 @@ H.run({ maxFrames = 200000 }, {
           H.cond(function()
             return H.battleLoadStarted() and not cyanLostMenu() and bp() >= 1
           end, {
+            -- 3a. THE MENU REFUSAL.  Poverty is staged (the isolation write,
+            -- waived and labeled) and the attempt then drives the real
+            -- SwdTech submenu at a real banked pip.  Since v0.19 the
+            -- tools-shell confirm asks Ot6KitConfirmMP whether the caster can
+            -- pay the row (btlgfx UpdateMenuState_30 @8809), so the greyed
+            -- row buzzes and the window stays open: CYAN keeps the turn and
+            -- the pip.  Before v0.19 this same press committed, and the turn
+            -- and the pip were gone by the time the fizzle below fired.
             H.call(function()
-              -- the isolation write (waived, labeled): the broke pool
+              richMp = mp()
               H.writeWord(0x3C08 + cyan*2, 1)
+              snap = { bp = bp(), pend = pend(),
+                       buzzes = buzzes, confirms = confirms }
+              spells = {}
+              cyanMode = "tech:0"
+              quietA = true
+              H.log(string.format("  [refusal arm %d] 3a menu: pool %d -> 1, "
+                .. "bp=%d pend=%d", attempt, richMp, snap.bp, snap.pend))
             end),
+            driveTo(function()
+              return not H.battleLoadStarted() or cyanLostMenu()
+                  or buzzes > snap.buzzes
+            end, 30000, "the broke SwdTech row is confirmed and buzzes "
+              .. "(attempt " .. attempt .. ")"),
+            H.waitFrames(90),
+            H.call(function()
+              menuRefused = false
+              if H.battleLoadStarted() and not cyanLostMenu()
+                 and buzzes > snap.buzzes then
+                H.log(string.format("  [refusal arm %d] 3a: state=%02x mp=%d "
+                  .. "bp=%d pend=%d buzz(+%d) confirm(+%d) %s", attempt,
+                  H.readByte(MSTATE), mp(), bp(), pend(),
+                  buzzes - snap.buzzes, confirms - snap.confirms,
+                  sawSpell(DISPATCH) and "saw $55" or "quiet"))
+                H.assertEq(confirms > snap.confirms, true,
+                  "ON: the A press reached the list ($96, stamped before the "
+                  .. "gate) -- the buzz is a rejection, not a press that "
+                  .. "never arrived")
+                H.assertEq(H.readByte(MSTATE), ST_TOOLS,
+                  "ON: the SwdTech submenu is still open -- CYAN is still "
+                  .. "choosing and the turn is still his")
+                H.assertEq(pend(), snap.pend,
+                  "ON: no boost was banked -- Ot6BushidoConfirm was never "
+                  .. "reached, because the MP gate refused first")
+                H.assertEq(bp(), snap.bp,
+                  "ON: the pip is still in the bank")
+                H.assertEq(mp(), 1,
+                  "ON: the 1 MP is untouched, never negative")
+                H.assertEq(sawSpell(DISPATCH), false,
+                  "ON: and no tech was ever cast")
+                H.screenshot("mpcost_on_menu_refused")
+                menuRefused = true
+              else
+                H.log(string.format("  [refusal arm %d] 3a void: live=%s "
+                  .. "menuable=%s %s", attempt,
+                  tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
+                  cyanStatusStr()))
+              end
+              -- the real pool back: 3b's poverty is staged at the LATCH
+              H.writeWord(0x3C08 + cyan*2, richMp)
+              cyanMode = "defer"
+              quietA = false
+            end),
+            -- 3b. THE EXECUTION BACKSTOP.  The universal insufficient-MP
+            -- fizzle at CalcAttackEffect is still real code and still
+            -- reachable in play -- an enemy Rasp or Osmose between the choice
+            -- and the swing -- so it keeps its own arm.  The poverty is
+            -- staged AT THE LATCH, which is exactly that seam: the Dispatch
+            -- is chosen and committed against a pool that could pay it, the
+            -- pool then goes broke under it, and the tech must fizzle for no
+            -- damage and leave the 1 MP alone.
             H.cond(function()
-              return H.battleLoadStarted() and bp() >= 1
-                and mp() < DISPATCH_COST
+              return menuRefused and H.battleLoadStarted() and bp() >= 1
             end, {
               (function()
                 local m0, g1, latched, packSeen = nil, nil, false, false
                 return H.repeatN(1, {
                   H.call(function()
-                    m0 = mp()
                     spells = {}
                     cyanMode = "tech:0"
                     -- quiet the idle A-mash NOW, before the latch drive:
@@ -389,6 +474,13 @@ H.run({ maxFrames = 200000 }, {
                     end
                     if pend() >= 1 and not latched then
                       latched = true
+                      -- the seam: the action is committed, and the pool goes
+                      -- broke under it before it resolves (the isolation
+                      -- write, waived and labeled).  This is the only way
+                      -- left to reach the execution-side gate, now that the
+                      -- menu refuses an unaffordable row outright.
+                      H.writeWord(0x3C08 + cyan*2, 1)
+                      m0 = 1
                       g1 = monsterHpSum()
                     end
                     return latched

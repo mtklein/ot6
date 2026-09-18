@@ -85,6 +85,14 @@ CODE_EXT_INC = 1
                                  ;   name (cost only under OT6_MP_COSTS; a no-op
                                  ;   otherwise). ALWAYS defined -- the shared C1
                                  ;   btlgfx object jsl's it in both builds.
+.global Ot6KitConfirmMP          ; the confirm half of magic's affordance: the
+.global Ot6DanceConfirmMP        ;   C1 tools-shell (@8809) and dance (@85f0)
+                                 ;   confirms ask these whether the caster can
+                                 ;   pay the row, and buzz instead of committing
+                                 ;   when they cannot.  Defined and referenced
+                                 ;   only under OT6_MP_COSTS -- btlgfx is
+                                 ;   assembled per flag, so the nomp C1 emits
+                                 ;   neither call
 .global Ot6AbilityCost           ; v0.4 mp-cost hook (only defined/referenced
                                  ;   under OT6_MP_COSTS; a weak decl otherwise)
 .global Ot6CostFor               ; pure leaf: attack/tool id in A -> MP cost in A

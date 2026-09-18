@@ -995,11 +995,12 @@ Ot6FoldTbl:
 ;                 (btlgfx_main.asm:19659-19663)
 ;   the charge    GetMPCost's character arm, `lda a:$0003,x`  (:13296)
 ;
-; Three of those four live in bank C1, which is linked as a stock object into
-; both the shipped and the nomp ROM, so a hook in any of them would shift the
-; nomp baseline, the one thing that flag must never do (see Ot6AbilityGrey's
-; header for the same constraint).  Moving the byte they all read costs zero
-; C1 bytes and makes it structurally impossible for the four to disagree.
+; Three of those four live in bank C1.  A hook in any of them would be three
+; hooks that have to agree; moving the byte they all read costs zero C1 bytes
+; and makes it structurally impossible for the four to disagree.  (C1 can now
+; carry flag-gated OT6 code -- btlgfx is assembled per flag, see
+; Ot6AbilityGrey's header -- so this is a design choice about single authority,
+; not a build constraint any more.)
 ;
 ; It is self-restoring, which is why it runs at every tier including zero.
 ; The write is not a mutation of the previous value; it is recomputed
@@ -1618,18 +1619,25 @@ Ot6AbilityCostTbl:
 ; unpriced id Ot6CostFor returned 0 for) is always affordable, so a blank row
 ; never greys.
 ;
-; Scope: this ports the visual half of magic's affordance (grey the row).  The
-; other half, magic's `lda $2093,x / bmi` at the A-button that no-ops the
-; confirm on a disabled spell (btlgfx UpdateMenuState_0e @81ae,
-; btlgfx_main.asm:19675), would live in the tools/blitz confirm
-; (UpdateMenuState_30 @8809, btlgfx_main.asm:20668).  That is btlgfx (bank C1),
-; a stock object linked into both the shipped and the nomp ROM (only the battle
-; object is rebuilt per-flag), so a confirm gate there would shift the nomp
-; baseline byte-for-byte, the one thing this flag must never do.  So the block
-; stays where it is and costs no bytes: CalcAttackEffect's universal
-; insufficient-MP fizzle refuses the cast at execution, and the grey tells
-; the player before they get there.  If the block ever moves menu-side, it
-; belongs beside @8809 gated on this same Ot6AbilityGrey answer.
+; Scope: this is the visual half of magic's affordance (grey the row), and it
+; is now exactly half.  The other half, magic's `lda $2093,x / bmi` at the
+; A-button that refuses the confirm on a disabled spell (btlgfx
+; UpdateMenuState_0e @81ae, btlgfx_main.asm:19673), lives menu-side in the
+; kit/dance confirms and is gated on THIS proc's answer: Ot6KitConfirmMP at the
+; tools-shell confirm (UpdateMenuState_30 @8809, serving blitz, real tools,
+; SwdTech and the thief submenu) and Ot6DanceConfirmMP at the dance confirm
+; (UpdateMenuState_21 @85f0).  Both call in here, so a greyed row and a refused
+; row are the same row by construction.
+;
+; That used to be described as unaffordable, because btlgfx (bank C1) was a
+; stock object linked into both the shipped and the nomp ROM, so a gate there
+; would have moved the nomp baseline byte-for-byte -- the one thing this flag
+; must never do.  The build changed instead of the rule: btlgfx is assembled
+; once per flag (configure.py), the C1 gates sit inside `.if OT6_MP_COSTS`,
+; and the nomp object assembles to the same bytes it always did.
+; CalcAttackEffect's universal insufficient-MP fizzle is still there underneath
+; as the execution-side backstop; the menu no longer lets the player reach it
+; by hand and lose the turn and the banked BP to it.
 ;
 ; a8/i16, db=$7e (the decorators' bank; $3c08/$62ca are $7e battle RAM).  in:
 ; A = MP cost.  out: A = $00 (white) | $04 (grey).  preserves X and Y, because

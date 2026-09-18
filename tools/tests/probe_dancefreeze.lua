@@ -1,6 +1,13 @@
 -- probe_dancefreeze.lua -- reproduces the dance-kill battle freeze and
 -- dumps the engine wait-state mid-freeze. NOT in the suite.
 --
+-- STALE ARM, kept as the record of a fixed freeze: the isolation arm below
+-- drives a greyed dance row through the confirm and waits for the commit.
+-- Since v0.19 that confirm REFUSES an unaffordable row (Ot6DanceConfirmMP,
+-- mp-economy.md ruling 2), so this probe now stalls at
+-- "the refused dance still commits".  battle_dancemp carries the corrected
+-- arm; re-cut this probe from it if the freeze ever needs reproducing again.
+--
 -- Dance costs MP, a flat amount paid at dance start. Ot6AbilityCost's
 -- cmd-$13 arm charges Ot6DanceCost (8 MP) when the actor's DANCE status
 -- ($3ef8 bit 0) is still clear (the commit moment), and 0 on every

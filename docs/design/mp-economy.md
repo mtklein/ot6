@@ -277,12 +277,41 @@ gate). The boost buys swings.
    accepted, not a bug. (Cleave is also always 99, but for the other
    reason: SwdTech does not escalate.)
 2. **A boost the caster's current MP cannot pay is greyed and refused**,
-   exactly like an unaffordable row today. The grey is
+   exactly like an unaffordable spell. The grey is
    `Ot6AbilityGrey`'s for the kit windows and `CheckMagicEnabled`'s for
    the magic list, and both read the same boosted number the charge
    takes. This ruling has no bite on the chance verbs: their price does
    not move, so a boost cannot price Steal or Rage out of a pool that
    could already afford them.
+
+   **Refused means refused at the confirm**, which is the half that was
+   missing until v0.19. Vanilla magic buzzes and stays open when A is
+   pressed on a disabled spell (btlgfx `UpdateMenuState_0e` @81ae);
+   OT6 had ported only the colour, so the kit windows let the player
+   commit a greyed row and the action then died at `CalcAttackEffect`'s
+   universal MP gate, taking the turn and the banked BP with it and
+   saying nothing. #219 made that constant rather than rare, because a
+   boost multiplies the price, and it is what ate sixteen turns in the
+   Narshe descent (`narshe-descent.md`). The confirm now asks the same
+   question the colour asked: `Ot6KitConfirmMP` at the tools-shell
+   confirm (`UpdateMenuState_30` @8809 -- one confirm for Blitz, real
+   Tools, SwdTech and the thief submenu) and `Ot6DanceConfirmMP` at the
+   dance confirm (`UpdateMenuState_21` @85f0). Both price the selected
+   row through the leaf that drew it (`Ot6KitRowCost` /
+   `Ot6DanceRowCost`) and both take their verdict from `Ot6AbilityGrey`,
+   so a greyed row and a refused row are the same row by construction
+   and no fourth opinion about a boosted price exists. Refusing buzzes,
+   leaves the list open, and spends no turn, no BP and no MP.
+   `battle_kitrefuse` is the mechanism suite, on all three kit windows;
+   `battle_dancemp` carries the dance arm. The execution-side fizzle
+   stays underneath as the backstop for a pool that moves between the
+   commit and the resolve; it is no longer something a player can reach
+   by hand.
+
+   Both gates are two branches in bank C1, inside `.if OT6_MP_COSTS`.
+   btlgfx is assembled once per flag for exactly this (`configure.py`),
+   so the `OT6_MP_COSTS=0` control ROM emits neither call and stays the
+   byte-for-byte baseline it was.
 3. **Rounding is computed once.** `Ot6BoostPriceFor` is the only place
    the arithmetic lives, and every surface that states a price -- the
    drawn number, the grey, the confirm, the charge -- reaches it, so the
@@ -472,7 +501,9 @@ kept in a leaf, `Ot6StealCost`
 submenu its row decorator will read the same byte the charge reads and
 the two cannot disagree. The exposure is small at 4 MP: Locke can afford
 7 steals from the pool he joins with, so a player rarely reaches the
-refusal path.
+refusal path. When they do, it is the menu that refuses: the Steal row
+of the thief submenu greys and its confirm buzzes (ruling 2), so a
+drained Locke loses nothing by reaching for it.
 
 ### Cyan pays in both
 
@@ -682,7 +713,11 @@ insufficient-MP fizzle) never fires for them. `Ot6AbilityCost`
 (`ff6/src/battle/ot6_boost.asm:878`) is the single hook, right after that
 `GetMPCost`: for the costed verbs it swaps the 0 for the
 kit price. Both the charge and the insufficient-MP refusal are
-universal, acting on whatever `$3620`→`$3a4c` holds. The cost
+universal, acting on whatever `$3620`→`$3a4c` holds. That
+execution-side refusal is now the backstop rather than the player's
+experience: since v0.19 the menu refuses an unaffordable row at the
+confirm (ruling 2), so the fizzle is only reached when the pool moves
+between the commit and the resolve. The cost
 data is not the record's +$05 byte, because GetMPCost reads the
 character spell-list copy for magic and ignores it for the rest; it is a
 parallel bank-$F0 table `Ot6AbilityCostTbl`, keyed by the id

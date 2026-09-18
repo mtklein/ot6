@@ -146,10 +146,18 @@ one of those turns. Over the whole run:
 source of more than ~60 damage a turn, and two thirds of the turns he spent
 being that were thrown away.
 
-### Why the ROM lets that happen
+### Why the ROM let that happen
 
-Not an oversight — a documented scope decision in #219 itself
-(`ff6/src/battle/ot6_boost.asm`, `Ot6AbilityGrey`'s header):
+**Fixed in v0.19; this section records the measurement that led to the
+fix.** An unaffordable kit row is now refused at the confirm
+(`Ot6KitConfirmMP`, `mp-economy.md` ruling 2), so the sixteen dead turns
+below are no longer reachable: the window buzzes and stays open and the
+turn is still the player's. What follows is what the ROM did when this lab
+ran.
+
+It was not an oversight — a documented scope decision in #219 itself
+(`ff6/src/battle/ot6_boost.asm`, `Ot6AbilityGrey`'s header, since
+rewritten):
 
 > Scope: this ports the visual half of magic's affordance (grey the row).
 > The other half, magic's `lda $2093,x / bmi` at the A-button that no-ops
@@ -166,9 +174,10 @@ turn and the pips are spent. That is fine for a person, who reads the grey.
 It is fatal to a fighter that does not.
 
 (`mp-economy.md` ruling 2 says "greyed **and refused**". For the kit
-windows only the grey shipped; the refusal is the execution-time fizzle.
-The doc and the ROM disagree about *where*, and the ROM's own header says
-why. Noted below for the owner, not changed here.)
+windows only the grey shipped; the refusal was the execution-time fizzle.
+The doc and the ROM disagreed about *where*. The owner's call was to make
+the ROM match the doc, and v0.19 does: see ruling 2 and
+`tools/tests/battle_kitrefuse.lua`.)
 
 ### The one refill point
 
@@ -375,14 +384,15 @@ three-attempt ladder is what it is for.
   numbers say it is sufficient. If it is not, the levers this lab can see
   are the pool, the supply, and the number of refill points on the route —
   not the rate.
-- **Refuse an unaffordable kit row at the confirm.** `Ot6AbilityGrey`'s
-  header already names where it would go (`UpdateMenuState_30 @8809`) and
-  why it is not there (btlgfx is stock in both the shipped and the nomp
-  link, so a gate there would move the nomp baseline byte for byte). It
-  would make the grey mean what `mp-economy.md` ruling 2 says it means, and
-  it would have made this segment's failure impossible for a blind fighter
-  as well as a person. Owner's call; it is a ROM change and a baseline
-  change, and the driver fix does not need it.
+- **Refuse an unaffordable kit row at the confirm.** ~~Owner's call~~ —
+  **taken, and landed in v0.19.** The gate went exactly where
+  `Ot6AbilityGrey`'s header said it would (`UpdateMenuState_30 @8809`,
+  plus the dance confirm at @85f0), and the objection died with the build
+  graph rather than with the rule: btlgfx is now assembled once per flag,
+  the gates sit inside `.if OT6_MP_COSTS`, and the nomp ROM is still the
+  same bytes. The grey now means what `mp-economy.md` ruling 2 says it
+  means, and this segment's failure is impossible for a blind fighter as
+  well as for a person. `tools/tests/battle_kitrefuse.lua`.
 
 ## The lab
 

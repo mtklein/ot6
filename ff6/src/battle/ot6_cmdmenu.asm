@@ -343,8 +343,12 @@
 ; The one leaf behind every number the tools shell draws for a kit, and the
 ; twin of the charge's own branch in Ot6AbilityCost.  The shell serves four
 ; lists and w7e6168 says which (0 real tools, 1 blitz, 2 bushido, 3 thief);
-; real tools never reach here, because DrawToolsListText sends mode 0 to
-; Ot6ToolRowDecorate instead.
+; the DRAW never reaches here in mode 0, because DrawToolsListText sends real
+; tools to Ot6ToolRowDecorate instead.  The CONFIRM does: Ot6KitConfirmMP is
+; one gate for all four lists and prices every one of them here.  Mode 0 needs
+; no arm of its own -- it falls into the blitz arm, which is
+; Ot6CostFor + Ot6PendPrice, byte for byte what Ot6ToolRowDecorate draws
+; through, so the tool row the player sees greyed is the row this refuses.
 ;
 ; Who escalates, and why, is Ot6AbilityCost's ruling repeated rather than a
 ; second opinion.  One test: a row escalates exactly when Ot6BoostDmg
@@ -381,6 +385,85 @@
 @thief: pla                     ; Steal, Filch and Bestow alike: Ot6BoostDmg
         jml     Ot6ThiefCost    ;   gates cmd $05, so no thief row escalates
 @empty: lda     #$00            ; an empty cell draws two blanks and stays white
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the other half of magic's affordance: refuse the row at the A button ]
+;
+; Vanilla magic does two things to a spell the caster cannot pay for. It greys
+; the row (UpdateEnabledMagic -> GetTextColor -> $25), and it REFUSES the
+; confirm: UpdateMenuState_0e's `lda $2093,x / bmi` buzzes ($95) and leaves the
+; list open, so the player loses nothing (btlgfx_main.asm:19673).  Ot6AbilityGrey
+; ported the first half only.  Until this proc the kit windows let the player
+; commit a greyed row: the action was queued, the boost was banked, and the
+; cast then died at CalcAttackEffect's universal MP gate -- the turn and the
+; banked BP gone with no feedback.  #219 made that common rather than rare,
+; because a boost multiplies the price, so a row affordable unboosted prices
+; out the moment BP is spent on it (docs/design/narshe-descent.md).
+;
+; These two procs are that second half, and they are deliberately thin: the
+; price comes from the SAME leaf the drawn number and the charge take, and the
+; verdict comes from the SAME Ot6AbilityGrey the row's colour takes, so
+; "greyed" and "refused" cannot come apart.  There is no fourth opinion about
+; what a boosted row costs.
+;
+; Where they are called from, and why that is affordable now.  Ot6AbilityGrey's
+; header used to say a confirm gate could not live in btlgfx because bank C1 is
+; a stock object linked into both the shipped ROM and the OT6_MP_COSTS=0
+; baseline, so gating there would move the nomp ROM.  That is no longer the
+; shape of the build: btlgfx is assembled once per flag (configure.py), the
+; gates below sit inside `.if OT6_MP_COSTS` blocks in btlgfx_main.asm, and the
+; nomp object therefore assembles to the same bytes it did before.  The kit
+; gate joins the confirm arms C1 already runs for us (@8809 dispatches on
+; w7e6168 and jsl's Ot6BushidoConfirm), and Ot6BushidoConfirm's own BP refusal
+; is the model: buzz, stay open, queue nothing.  Two reasons, one mechanism.
+;
+; The tools-shell entry.  in: A = the selected row's id (C1 has already
+; rejected an $ff cell); w7e6168 says which of the four lists is up.
+; out: carry SET = the caster can pay, carry CLEAR = refuse the confirm.
+; db=$7e, a8.  Index width is the caller's and is restored; the price leaves
+; index 16-bit (Ot6CostFor's `ldx #$0000`), so it is forced here rather than
+; assumed of a C1 menu state.  preserves nothing else.  rtl.
+.proc Ot6KitConfirmMP
+        .a8
+        php
+        rep     #$10            ; i16 for the price leaves
+        .i16
+        jsl     Ot6KitRowCost   ; the one price authority the row DREW through,
+                                ;   pending boost and all
+        jsl     Ot6AbilityGrey  ; ...and the one verdict its colour took
+        plp                     ; caller's index width back (and its flags)
+        bra     Ot6ConfirmVerdict
+.endproc
+
+; The Dance entry.  Dance is a second priced window with a second confirm
+; (UpdateMenuState_21 @85f0), not the tools shell, so it needs its own call;
+; the row it hands us is the dance id out of $267e,x, the same byte
+; Ot6DanceRowDecorate priced and greyed one draw earlier.
+; in: A = dance id.  out: carry set = payable.  db=$7e, a8.  rtl.
+.proc Ot6DanceConfirmMP
+        .a8
+        php
+        rep     #$10
+        .i16
+        jsl     Ot6DanceRowCost
+        jsl     Ot6AbilityGrey
+        plp
+        bra     Ot6ConfirmVerdict
+.endproc
+
+; Ot6AbilityGrey's answer, turned into the carry the C1 gates branch on.  $04
+; is magic's own disabled bit, so "grey" and "refused" are literally the same
+; byte and cannot drift apart.  in: A = $00 | $04.  out: carry.  rtl.
+.proc Ot6ConfirmVerdict
+        .a8
+        cmp     #$04            ; the disabled bit: this row is greyed
+        bne     @pay
+        clc                     ; refuse: C1 buzzes and leaves the list open
+        rtl
+@pay:   sec
         rtl
 .endproc
 .endif  ; OT6_MP_COSTS
