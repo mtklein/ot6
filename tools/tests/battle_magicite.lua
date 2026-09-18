@@ -33,6 +33,8 @@ local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_ITEM, ST_MAGIC, ST_ESPER, ST_TGT, ST_TRANS =
   0x05, 0x0A, 0x0E, 0x16, 0x38, 0x01
 local CMD_MAGIC, CMD_ITEM = 0x02, 0x01
+local CMD_SUMMON = 0x19                  -- what the engine dispatches a divine as
+local TGT_MON0 = 0x0100                  -- target word bit 8 = monster slot 0
 local MSCROLL, MCOL, MROW = 0x8913, 0x8917, 0x891B
 local LISTS = { [0] = 0x208e, [1] = 0x21ca, [2] = 0x2306, [3] = 0x2442 }
 local SUMMONED = 0x3f2e
@@ -326,6 +328,18 @@ end
 local execA = H.sym("ExecCmd@battle_code")
 local execB = H.sym("SaveForMimic")
 local observerOn = false
+-- How many monster actions are between their ExecCmd and their return.
+-- A monster's status rider lands at the END of its action (measured: the
+-- boss's $ef left ExecCmd at f1438 and Celes's Muddle bit appeared with
+-- its return at f1595), so "an enemy action is in flight" is exactly the
+-- window in which a summon confirmed now can be hijacked before it
+-- executes.  summonSafe below refuses to confirm in it.
+local monInFlight = 0
+-- What the engine actually dispatched for each once-per-battle divine:
+-- the caster's status-2 byte and the target word at ExecCmd.  Kept so the
+-- phase can ASSERT the precondition was reached instead of inferring it
+-- from a boss-HP drop that never comes.
+local divineDispatch = {}
 local function installObserver()
   if observerOn then return end
   observerOn = true
@@ -345,10 +359,21 @@ local function installObserver()
       R.osmoses[#R.osmoses + 1] = { frame = H.frame, tgt = tgt,
         bossMp0 = bossMp(), mp0 = mp(celes) }
     end
+    if x >= 8 then monInFlight = monInFlight + 1 end
+    -- the two divines, as dispatched (cmd $19 = Summon): who cast, in what
+    -- shape, and at what.  A caster the engine re-aimed leaves its mark
+    -- here, where the boss-HP wait can only report "nothing happened".
+    if x < 8 and cmd == CMD_SUMMON and (atk == DDUST or atk == INFERNO) then
+      divineDispatch[atk] = divineDispatch[atk] or
+        { frame = H.frame, slot = x // 2, tgt = tgt,
+          st1 = H.readByte(0x3EE4 + (x // 2) * 2),
+          st2 = H.readByte(0x3EE5 + (x // 2) * 2), hp0 = bossHp() }
+    end
   end, emu.callbackType.exec, execA, execA)
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xffff
     if x % 2 ~= 0 or x >= 20 then return end
+    if x >= 8 and monInFlight > 0 then monInFlight = monInFlight - 1 end
     local hps, sts = partyLine()
     H.log(string.format("[done f%d] %s%d | hp=%s st=%s boss=%d/%s", H.frame,
       x < 8 and "party" or "mon", x < 8 and x // 2 or x // 2 - 4, hps, sts,
@@ -388,6 +413,52 @@ end
 -- wiped the party.  So an unhandled state gets no press until it has
 -- stood BACKOUT_F frames (a window nobody drives), and then one B.
 local BACKOUT_F = 90
+-- A divine is once per battle.  Confirming one is therefore the single
+-- irreversible press this file makes, and it was being made on luck: on
+-- the current n024_entry the boss's FIRST action ($ef, ExecCmd f1438) was
+-- still in flight when the esper window confirmed at f1537, its Muddle
+-- landed on Celes with that action's return at f1595, and her queued
+-- Diamond Dust left ExecCmd at f1634 re-aimed (cmd=19 atk=38 tgt=0000).
+-- The summon latched $3f2e and charged its 27 MP, the boss took nothing,
+-- and a wait for "boss HP drops" can only time out -- the divine cannot
+-- be recast.  (build/lab/magicite/repro1.log, and the retained main
+-- baseline it reproduces frame for frame.)
+--
+-- So the confirm waits for the state it needs instead of hoping for it:
+-- the caster's own command is not hijacked, and no enemy action is
+-- between its ExecCmd and its return.  A rider lands with that return, so
+-- an enemy that starts acting AFTER the confirm has that whole action to
+-- run first: on this fixture the boss's actions took 94, 157, 158, 280
+-- and 308 frames from ExecCmd to return (repro1.log), against the 97
+-- frames from the esper confirm at f1537 to the divine's own ExecCmd at
+-- f1634.  Waiting costs only turns; the
+-- esper window is a window a player can sit in, and a Muddle that lands
+-- while it is open closes it and gives the turn back, unspent.
+local ST1_IMP, ST1_PETRIFY = 0x20, 0x40
+local ST2_BERSERK, ST2_SLEEP = 0x10, 0x80
+local function summonUnsafe(s)
+  local a, b = H.readByte(0x3EE4 + s*2), st2(s)
+  if (b & ST2_MUDDLE) ~= 0 then return "Muddled" end
+  if (b & ST2_BERSERK) ~= 0 then return "Berserk" end
+  if (b & ST2_SLEEP) ~= 0 then return "asleep" end
+  if (a & ST1_IMP) ~= 0 then return "an Imp" end
+  if (a & ST1_PETRIFY) ~= 0 then return "petrified" end
+  if monInFlight > 0 then return "an enemy action is in flight" end
+  return nil
+end
+local holdWhy = {}
+local function summonHold(s, who)
+  local why = summonUnsafe(s)
+  if why ~= holdWhy[s] then
+    holdWhy[s] = why
+    if why then
+      H.log(string.format("[divine f%d] %s holds the esper window: %s", H.frame, who, why))
+    else
+      H.log(string.format("[divine f%d] %s confirms the divine: caster clean, no enemy action in flight", H.frame, who))
+    end
+  end
+  return why
+end
 -- A plan made at the command window can be overtaken before its target
 -- window confirms: another bench member's X-Potion lands on the same
 -- ally, or a hit clears the Muddle the plan was for.  On main's lineage
@@ -467,7 +538,9 @@ local function decide()
       if cur == want then btn = "a"
       else btn = (cur < want) and "down" or "up" end
     elseif st == ST_MAGIC then btn = "up"       -- to the top, then the esper window
-    elseif st == ST_ESPER then btn = "a"; summonArmed[locke] = true
+    elseif st == ST_ESPER then
+      if summonHold(locke, "Locke") then btn = nil
+      else btn = "a"; summonArmed[locke] = true end
     elseif st == ST_TGT then
       -- confirm only a target screen this branch opened from the esper
       -- window: when the mode flipped medic -> summon with his Fight's
@@ -541,7 +614,9 @@ local function decide()
         if H.readByte(MSCROLL + celes) + H.readByte(MROW + celes) > 0 then
           btn = "up"
         else btn = "up" end
-      elseif st == ST_ESPER then btn = "a"; summonArmed[celes] = true
+      elseif st == ST_ESPER then
+        if summonHold(celes, "Celes") then btn = nil
+        else btn = "a"; summonArmed[celes] = true end
       elseif st == ST_TGT then btn = summonArmed[celes] and "a" or "b"   -- as Locke's
       else btn = settle(act, st) end
       if st == ST_CMD then summonArmed[celes] = nil end
@@ -593,6 +668,24 @@ local function decide()
   end
   return btn and { [btn] = true } or {}
 end
+-- The divine's one shot, as the engine dispatched it.  This is checked
+-- BEFORE the wait for the boss's HP to move, so a divine the engine
+-- re-aimed off the boss fails saying so, at the frame it happened, rather
+-- than as a 5000-frame timeout on an effect that can never arrive.
+local function divineDispatched(tag, atk, name)
+  local d = divineDispatch[atk]
+  H.assertEq(d ~= nil, true,
+    tag .. " the engine dispatched " .. name .. " as a Summon (cmd $19)")
+  H.log(string.format("%s %s dispatched at f%d by slot %d: caster st=%02x%02x, target word %04x, boss hp %d",
+    tag, name, d.frame, d.slot, d.st1, d.st2, d.tgt, d.hp0))
+  H.assertEq(d.st2 & (ST2_MUDDLE | ST2_BERSERK | ST2_SLEEP), 0,
+    tag .. " " .. name .. " left ExecCmd from a caster whose own command "
+    .. "was still hers (no Muddle/Berserk/Sleep on the once-per-battle turn)")
+  H.assertEq((d.tgt & TGT_MON0) ~= 0, true,
+    tag .. " ...and aimed at NUMBER 024 (target word bit 8): the divine "
+    .. "was pointed at the boss, not re-aimed away from it")
+end
+
 local function driveTo(pred, maxF, tag)
   return H.driveUntil(pred, maxF, {
     H.call(function()
@@ -631,6 +724,7 @@ local function enterBoss(tag)
       H.assertEq(locke ~= nil and celes ~= nil, true,
         tag .. ": LOCKE and CELES really fight this")
       plans, planKey, summonArmed = {}, {}, {}
+      divineDispatch, holdWhy, monInFlight = {}, {}, 0
       steerBails = 0
       R.osmoses = {}
       spells, mpWrites = {}, {}
@@ -728,6 +822,7 @@ H.run({ maxFrames = 150000 }, {
       end, 20000, "Celes's Diamond Dust is really queued and paid for"),
       H.call(function()
         celesMode = "defer"
+        divineDispatched("[ddust]", DDUST, "Diamond Dust")
       end),
       driveTo(function() return bossHp() < R.hp0 end, 5000,
         "Diamond Dust resolves against NUMBER 024"),
@@ -752,7 +847,10 @@ H.run({ maxFrames = 150000 }, {
         return H.readWord(SUMMONED) & mask(locke) ~= 0
            and mp(locke) == lm0 - INFERNO_MP
       end, 20000, "Locke's Inferno is really queued and paid for"),
-      H.call(function() lockeMode = "medic" end),
+      H.call(function()
+        lockeMode = "medic"
+        divineDispatched("[inferno]", INFERNO, "Inferno")
+      end),
       driveTo(function() return bossHp() < R.hpMid end, 5000,
         "Inferno resolves against NUMBER 024"),
       H.call(function()
