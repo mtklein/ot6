@@ -59,7 +59,7 @@ KEEP_EXT = {
     # which is precisely the failure #222 exists to prevent.  The lesson is
     # that the filter is a promise about citations, so a suffix a report can
     # cite belongs here rather than in the skip tally.
-    ".console",
+    ".console", ".stdout", ".stderr",
 }
 # Screenshots are evidence too (a FAIL line names its frame), but they are
 # binary and unbounded, so they ride the size cap.
