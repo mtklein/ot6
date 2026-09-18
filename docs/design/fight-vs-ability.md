@@ -137,40 +137,52 @@ shape:
 
 Eight swings, four hits, one weapon. Six swings, six hits, a pair.
 
-### The one thing the library disagrees with the ROM about
+### The one thing the library disagreed with the ROM about — fixed in #235
 
-`M.fightSwings` (`tools/tests/lib/ot6.lua:1414`) returns `1 + 2*boost` for
-a one-weapon character. The ROM lands `1 + boost`.
+`M.fightSwings` returned `1 + 2*boost` for a one-weapon character where
+the ROM lands `1 + boost`. It has been replaced by two functions that say
+which number they are — `M.fightPasses(boost)` for the swings the loop
+runs and `M.fightHits(hands, boost)` for the hits that land — and both
+callers (`fightChips`, and the `hits` the press rule prices a turn with)
+now take the landed count. The ladder is no longer a constant anybody can
+write down: `battle_healpolicy.lua` derives it from this ROM's own
+`FightAttack` and `Ot6FightBoost`, and `battle_hits.lua` counts the swings
+and the landed hits of a real 2-BP Fight and checks the model against
+them.
 
-```lua
-function M.fightSwings(twoWeapons, boost)
-  if twoWeapons then return 1 + boost, 1 + boost end
-  return 1 + 2 * boost, 0
-end
-```
+The same measurement turned up a second doubling on the same road.
+`M.isWeapon($FF)` answered **true**: `$FF` is the empty-slot sentinel and
+not an item id, but `ItemProp` has thirty bytes at that index and the type
+byte there reads `$01`, "weapon, record in use". This lab's own
+`fvaArmed` had to guard it locally; the driver's `handsOf` did not, so
+every character with a bare off hand was counted as a Genji pair. It is
+guarded in `M.isWeapon` now, with both halves pinned.
 
-The pair branch is right and is pinned right (`battle_healpolicy.lua:172`:
-"Genji pair, 2 BP: 3 + 3 swings"). The single-weapon branch is pinned at
-the wrong value four lines above it (`:168`, "one weapon, 2 BP: 1 + 4
-swings" = 5, where the ROM lands 3), and `battle_hits.lua`'s own header and
-`multi-hit.md` finding 5 both already say `+1` per BP. So it is the
-library's arithmetic that is the outlier, not the documentation.
+**What the error actually cost, measured** (`tools/tests/fightswingslab.py`,
+logs under `build/lab/fight-swings/`). The arithmetic first: running both
+models through the shipped `keyBoost` over every (shields, bank, hands)
+a WoB gauge presents, the chosen boost depth moves in **four** cells, all
+one-weapon — need 3 at bank 2 or 3 (1 → 2 pips), need 4 at bank 3 (2 → 3),
+need 5 at bank 3 (2 → 3) — and the old model claimed a break the ROM
+cannot land in six more. The pair branch never moves; it was right.
 
-It has a consequence, because `fightChips` and `keyBoost`
-(`lib/ot6.lua:3556`, `:990`) are the driver's Fight-versus-ability
-comparator and both read it. For a one-weapon character on a matching axis:
+So the earlier draft of this section overstated one thing and understated
+another. At **six** shields with a full bank the two models pick the same
+depth (3): what was wrong there was the *claim*, not the pip count. The
+depth moves at three, four and five shields — including as a six-shield
+gauge is chipped down past them, which is how it reaches Ifrit and Shiva
+after all.
 
-| shields to break | BP the model thinks it needs | BP the ROM needs |
-|---|---|---|
-| 2 | 1 (model: 3 chips) | 1 (2 chips) |
-| 3 | 1 (model: 3 chips) | **2** |
-| 4 | 2 (model: 5 chips) | **3** |
-| 5-6 | 2-3 (model: 5-7 chips) | **not in one turn: 4 chips is the cap** |
-
-The driver therefore under-boosts, and believes a 5- or 6-shield gauge is a
-one-turn break for a one-weapon character when the ceiling is four chips.
-Six-shield gauges in the WoB include Dadaluma, Ifrit and both Cranes.
-**Noted for the owner, not changed here**; this branch measures.
+In play, on battle 70 over a twelve-seed spread, eleven of twelve fights
+are frame-for-frame identical and one is not. At seed `$84` the driver
+planned `Fight at 2 BP lands 5 chips on 4 shields: the smallest boost that
+breaks this turn`, landed **three** hits, and the gauge went 4 → 1: the
+break did not land, and the fight ran 43 turns and 13,871 frames. With the
+model corrected the same turn planned `Fight at 3 BP lands 4 chips on 4
+shields`, landed four, the gauge went 4 → 0, and the fight ended in 31
+turns and 10,114 frames. Across the corpus, keyed claims judged against
+the gauge they named: 8 kept and 1 broken before, 8 kept and 0 broken
+after. Every seed won in both arms.
 
 ### What a landed hit is worth
 

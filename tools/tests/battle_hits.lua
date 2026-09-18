@@ -15,6 +15,15 @@
 --   once, never more, the boost is consumed (3-2 = 1) with no regen after
 --   the swing, and pending clears.  Plus the earn-on-camera controls: bp
 --   reached 3 by two steals, and pending reached 2 by two R presses.
+--
+--   And then the half of the mechanic arithmetic cannot reach (#235): the
+--   loop runs $3a70 + 1 = 6 PASSES, alternating hands, and an empty hand's
+--   battle power is 0, so a one-weapon character LANDS 3 of those 6.  Two
+--   exec observers count it -- Ot6WeaponClass once per hand per swing,
+--   Ot6HitJoin once per landed hit -- and H.fightHits, the model the
+--   driver plans with, is checked against what they counted.  A pinned
+--   constant nobody checks against the machine is exactly how the old
+--   1 + 2*boost survived in the library.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
@@ -42,6 +51,19 @@ local subject                  -- Locke's battle slot, found by reading $3ED8
 local rPresses = 0             -- real R edges counted at the subject's menu
 local swings, swingRef = {}, nil
 local armed = false
+-- #235: the swing/landed-hit split of the ONE boosted Fight below.
+-- Ot6WeaponClass runs once per hand per swing (_magicpunch calls it for
+-- the swinging hand) with X = the acting entity offset, +1 on the
+-- left-hand pass; Ot6HitJoin runs once per landed hit per target, with Y
+-- the target, so Y >= $08 keeps a monster's counterattack on a character
+-- out of the count.  Both are the #219 lab's own observers.
+-- The window is opened by the subject's first swing and closed by
+-- SaveForMimic, the frame the action resolves, so nothing that lands
+-- outside this one action can be counted into it.
+local fightSwings, fightHits = 0, 0
+local handPass = { [0] = 0, [1] = 0 }
+local counting, closed = false, false
+local hitRefs = {}
 
 -- one pad decision per 8 frames, 4 held + 4 released; returns the button
 -- table to hold this frame.
@@ -75,6 +97,25 @@ local function decide()
         swingRef = emu.addMemoryCallback(function(addr, value)
           swings[#swings + 1] = value
         end, emu.callbackType.write, 0x7e3a70, 0x7e3a70)
+        local wc, hj = H.sym("Ot6WeaponClass"), H.sym("Ot6HitJoin")
+        local sf = H.sym("SaveForMimic")
+        hitRefs.wcAddr, hitRefs.hjAddr, hitRefs.sfAddr = wc, hj, sf
+        hitRefs.wc = emu.addMemoryCallback(function()
+          if closed then return end
+          local x = emu.getState()["cpu.x"] & 0xFFFF
+          if (x & 0xFFFE) ~= subject * 2 then return end
+          counting = true
+          fightSwings = fightSwings + 1
+          handPass[x & 1] = handPass[x & 1] + 1
+        end, emu.callbackType.exec, wc, wc)
+        hitRefs.hj = emu.addMemoryCallback(function()
+          if not counting or closed then return end
+          if (emu.getState()["cpu.y"] & 0xFFFF) < 8 then return end
+          fightHits = fightHits + 1
+        end, emu.callbackType.exec, hj, hj)
+        hitRefs.sf = emu.addMemoryCallback(function()
+          if counting then closed = true end
+        end, emu.callbackType.exec, sf, sf)
       end
       btn = "r"
       if (mf - 1) % 8 == 0 then rPresses = rPresses + 1 end
@@ -163,6 +204,46 @@ H.run({ maxFrames = 45000 }, {
     H.assertEq(maxv, 5, "and nothing queued more")
     H.assertEq(bp(subject), 1, "boost consumed (3-2), regen skipped")
     H.assertEq(pend(subject), 0, "pending cleared")
+
+    -- ---- #235: swings attempted vs hits landed, measured ----------------
+    for _, k in ipairs({ "wc", "hj", "sf" }) do
+      emu.removeMemoryCallback(hitRefs[k], emu.callbackType.exec,
+                               hitRefs[k .. "Addr"], hitRefs[k .. "Addr"])
+    end
+    local rh = H.readByte(0x1600 + 37 * 0x01 + 0x1F)
+    local lh = H.readByte(0x1600 + 37 * 0x01 + 0x20)
+    local hands = (H.isWeapon(rh) and 1 or 0) + (H.isWeapon(lh) and 1 or 0)
+    if hands == 0 then hands = 1 end          -- an empty main hand is a fist
+    H.log(string.format("hits: LOCKE hands=%d (R $%02X, L $%02X) -- "
+      .. "swings=%d (main %d, off %d), landed=%d", hands, rh, lh,
+      fightSwings, handPass[0], handPass[1], fightHits))
+    H.assertEq(hands, 1,
+      "LOCKE carries ONE weapon here: this fixture is the one-weapon case")
+    H.assertEq(fightSwings, H.fightPasses(2), string.format(
+      "the loop ran %d passes for a 2-BP Fight ($3a70 = 5, +1)", fightSwings))
+    H.assertEq(handPass[0] == handPass[1], true, string.format(
+      "the passes alternate hands: %d main, %d off", handPass[0], handPass[1]))
+    local main, off = H.fightHits(hands, 2)
+    H.assertEq(main + off, fightSwings // 2, string.format(
+      "H.fightHits(%d, 2) = %d, half the %d passes the loop just ran: the "
+      .. "other half are the EMPTY hand (#235)", hands, main + off, fightSwings))
+    H.assertEq(off, 0, "and the model gives the empty hand none of them")
+    -- What the volley actually landed.  A whole action can miss (the #219
+    -- lab's histogram is 0 or N, never a value between: the whiffing half
+    -- is the empty hand, not a die roll), so the measurement is asserted
+    -- as that shape rather than as one number a stray miss would redden.
+    -- It is still a real check: 5 -- the count the library used to claim
+    -- for this exact turn -- cannot come out of this ROM either way.
+    H.assertEq(fightHits <= main + off, true, string.format(
+      "the ROM landed %d of %d swings -- never more than the %d a single "
+      .. "armed hand can land", fightHits, fightSwings, main + off))
+    H.assertEq(fightHits == 0 or fightHits == main + off, true, string.format(
+      "landed hits are 0 or %d and never between (measured %d): the "
+      .. "whiffing half is the empty hand", main + off, fightHits))
+    if fightHits == 0 then
+      H.log("hits: this volley missed outright (0 landed) -- the ceiling "
+        .. "is still what was checked")
+    end
     H.screenshot("hits_landed")
   end),
 })

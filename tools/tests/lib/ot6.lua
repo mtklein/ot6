@@ -889,7 +889,8 @@ end
 -- the Rizopas numbers through it without an emulator.
 --
 --   per     shielded-equivalent damage per landed hit, measured
---   hits    hits the action makes (M.fightSwings' sum; a tool's count)
+--   hits    hits the action LANDS (M.fightHits' sum, not its swing count;
+--           a tool's count)
 --   chips   of those, how many chip (the chip model's count)
 --   need    shields left to break; 0 when already broken
 function M.killEstimate(o)
@@ -1580,8 +1581,19 @@ end
 
 -- Item +$00 says weapon (type 1, record in use) -- weaponElement's own
 -- test, exposed for the hand model below.
+--
+-- $FF is the EMPTY SLOT and not an item id (M.partyWeapons skips it, and
+-- so does the engine).  ItemProp has thirty bytes there all the same, and
+-- on this ROM they read $01: "weapon, record in use".  So a bare hand
+-- answered `true` here, and the driver's hand model (handsOf) counted
+-- every empty off hand as a second weapon -- the same doubling #235 is
+-- about, arriving by a second road.  Measured, not reasoned: the #219 lab
+-- hit it first and guarded it locally (fightvsabilitylab.py's fvaArmed,
+-- "ItemProp has a record there and H.isWeapon would read it"); the guard
+-- belongs here, where the driver reads.  weaponClass($FF) still answers
+-- bludgeoning: an empty hand is a fist, it is just not a WEAPON.
 function M.isWeapon(item)
-  if item == nil or item > 0xFF then return false end
+  if item == nil or item >= 0xFF then return false end
   local t = M.readRomByte((M.sym("ItemProp") & 0x3FFFFF)
     + item * ITEM_REC + ITEM_TYPE)
   return (t & 0x80) == 0 and (t & 0x07) == 1
@@ -1598,14 +1610,50 @@ function M.weaponClass(item)
   return c & 0x0F
 end
 
--- Swings a boosted Fight makes, (main hand, off hand): one per armed hand,
--- plus two per BP (Ot6FightBoost adds 2*BP to $3a70, ot6_boost.asm), and
--- with a weapon in each hand (a Genji Glove pair) the swings alternate
--- hands, so each hand gets half.  Plain arithmetic, kept out of the
--- driver so a test can check it without an emulator.
-function M.fightSwings(twoWeapons, boost)
-  if twoWeapons then return 1 + boost, 1 + boost end
-  return 1 + 2 * boost, 0
+-- ---- a boosted Fight: passes attempted, and hits that land (#235) --------
+--
+-- These are two different numbers and the difference is the whole of
+-- #235.  The chain, measured by histogram rather than read off a comment
+-- (the #219 lab: build/attempts/fight-vs-ability/lab/fight-vs-ability/
+-- mechanic.txt, and battle_hits.lua, which counts both against this ROM):
+--
+--   FightAttack writes $3a70 = 1 (battle_main.asm:3519; 7 with an
+--   Offering), Ot6FightBoost adds 2 per pending BP (ot6_boost.asm: one
+--   `asl` then `adc $3a70`), and the multi-attack loop runs $3a70 + 1
+--   passes (`dec $3a70 / bmi`, :8392).  Each pass takes its hand from the
+--   carry out of `lda $3a70 / inc / lsr` (:8285), so the passes ALTERNATE
+--   HANDS whether or not the off hand holds anything -- and an empty
+--   hand's battle power is 0, which takes the "jump if no damage" exit.
+--
+-- So a one-weapon character swings 2 + 2*BP times and lands 1 + BP of
+-- them; a Genji-glove pair lands all of them, 1 + BP per hand.  The
+-- driver wants LANDED hits everywhere -- a chip is per landed hit, and so
+-- is damage -- so the swing count is exposed only under a name that says
+-- what it is, and nothing but the ROM checks calls it.
+--
+-- Plain arithmetic, kept out of the driver so a test can check it against
+-- the ROM without playing a fight.
+
+-- Passes the multi-attack loop runs for a Fight at this boost: $3a70 + 1.
+-- Hands do not enter into it; an empty hand swings too, it just whiffs.
+function M.fightPasses(boost)
+  return 2 + 2 * (boost or 0)
+end
+
+-- Landed hits a boosted Fight makes, (main hand, off hand).  `hands` is
+-- how many of them hold a weapon -- 1 or 2, READ off the character record
+-- (M.isWeapon on $1600 + 37*c + $1F/$20), never assumed: a Genji Glove
+-- pair doubles this exactly as it doubles everything else.  It is a count
+-- and not a boolean on purpose, so a caller that still thinks this
+-- function takes `twoWeapons` fails here instead of silently asking for
+-- the one-hand answer.
+function M.fightHits(hands, boost)
+  assert(hands == 1 or hands == 2,
+    "fightHits(hands, boost): hands is the number of ARMED hands, 1 or 2 "
+    .. "(got " .. tostring(hands) .. ")")
+  boost = boost or 0
+  if hands == 2 then return 1 + boost, 1 + boost end
+  return 1 + boost, 0
 end
 
 -- Both hands of every party member, as { char = c, hand = "R"|"L",
@@ -3870,8 +3918,12 @@ function M.newFightDriver(tag, opts)
   end
   -- The actor's hands ($1600 + 37*char + $1F/$20, the record partyWeapons
   -- reads): main hand, and the off hand only when it holds a weapon (a
-  -- Genji Glove pair); a shield swings nothing.  An empty main hand is a
-  -- fist, which Ot6WeapClassTbl classes as bludgeoning.
+  -- Genji Glove pair); a shield swings nothing, and neither does an empty
+  -- slot ($FF -- M.isWeapon refuses it, see there; this is the one input
+  -- that decides whether a Fight's hits double, so it is READ off the
+  -- character record every time and never inferred from a relic or a
+  -- class).  An empty main hand is a fist, which Ot6WeapClassTbl classes
+  -- as bludgeoning.
   local function handsOf(actor)
     local c = M.readByte(BCHID + actor * 2)
     local r = M.readByte(0x1600 + 37 * c + 0x1F)
@@ -3879,16 +3931,19 @@ function M.newFightDriver(tag, opts)
     if not M.isWeapon(r) and M.isWeapon(l) then return l, nil end
     return r, (M.isWeapon(l) and l or nil)
   end
-  -- Chips a Fight at `boost` lands on `slot`: swings per hand times that
-  -- hand's chips per hit.  LOCKE's Genji pair of ThunderBlade (slash,
-  -- bolt) and Assassin (pierce) at 2 BP is 3 + 3 swings, six chips on a
-  -- slash|pierce-weak gauge -- Nerapa's five, in one action.
+  -- Chips a Fight at `boost` lands on `slot`: LANDED hits per hand times
+  -- that hand's chips per hit -- a chip is per landed hit, and the half of
+  -- a one-weapon character's swings that the empty hand takes lands
+  -- nothing (M.fightHits, #235).  LOCKE's Genji pair of ThunderBlade
+  -- (slash, bolt) and Assassin (pierce) at 2 BP lands 3 + 3 hits, six
+  -- chips on a slash|pierce-weak gauge -- Nerapa's five, in one action;
+  -- one of those blades alone at 2 BP swings six times and lands three.
   local function fightChips(actor, slot, boost)
     local r, l = handsOf(actor)
-    local mainSw, offSw = M.fightSwings(l ~= nil, boost)
-    local n = mainSw * hitChips(slot, M.weaponClass(r), M.weaponElement(r))
+    local mainHits, offHits = M.fightHits(l ~= nil and 2 or 1, boost)
+    local n = mainHits * hitChips(slot, M.weaponClass(r), M.weaponElement(r))
     if l then
-      n = n + offSw * hitChips(slot, M.weaponClass(l), M.weaponElement(l))
+      n = n + offHits * hitChips(slot, M.weaponClass(l), M.weaponElement(l))
     end
     return n
   end
@@ -4582,9 +4637,12 @@ function M.newFightDriver(tag, opts)
       local fight = cmdRow(actor, CMD_FIGHT)
       if fight ~= nil then
         local _, l = handsOf(actor)
-        local mainSw, offSw = M.fightSwings(l ~= nil, bp)
+        -- LANDED hits, not swings: killEstimate multiplies this by the
+        -- damage a hit was measured to do, and a whiffed swing does none
+        -- (#235)
+        local mainHits, offHits = M.fightHits(l ~= nil and 2 or 1, bp)
         offer({ kind = "fight", row = fight, boostLeft = bp,
-                chips = fightChips(actor, slot, bp), hits = mainSw + offSw,
+                chips = fightChips(actor, slot, bp), hits = mainHits + offHits,
                 what = string.format("Fight at %d BP", bp) })
       end
       return best
@@ -5413,10 +5471,10 @@ function M.newFightDriver(tag, opts)
     if toolBp ~= nil then
       -- The chip model picks between the tool and the sword (#156): against
       -- a lone monster whose revealed classes EDGAR's blade matches, a
-      -- boosted Fight's 1 + 2*BP swings chip more than the tool's one hit
-      -- (five to one at 2 BP), and chips are the point of the turn.  A
-      -- formation of several keeps the tool, which hits them all; a tie
-      -- keeps it too.
+      -- boosted Fight's 1 + BP LANDED hits chip more than the tool's one
+      -- hit (three to one at 2 BP for his one blade), and chips are the
+      -- point of the turn.  A formation of several keeps the tool, which
+      -- hits them all; a tie keeps it too.
       local tool = opts.tool or AUTOCROSSBOW
       local slot = soleTarget()
       local fight = cmdRow(actor, CMD_FIGHT)
