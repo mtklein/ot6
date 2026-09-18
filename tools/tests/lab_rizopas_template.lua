@@ -63,9 +63,11 @@
 --       Fight; Pummel/Suplex bludgeon regardless), shield $5A, helm $69,
 --       armor $86, relics $B1 $B5; Blitz known $07 = Pummel, AuraBolt, Suplex.
 -- Bag: Tonic 91, Potion 2, Fenix Down 15.
--- Every Fight swing of either chips (both weapons are SLASH; the row is
--- SLASH|BLUDG); a 1-BP Fight is 3 swings = 3 chips, 2 BP = 5, 3 BP = 7
--- (M.fightSwings).  Pummel is two bludgeoning hits = 2 chips.
+-- Every LANDED Fight hit of either chips (both weapons are SLASH; the row
+-- is SLASH|BLUDG).  Each carries ONE weapon, so half of a boosted Fight's
+-- swings are empty-hand passes and whiff (#235): a 1-BP Fight is 4 swings
+-- and 2 landed hits = 2 chips, 2 BP = 3, 3 BP = 4 (M.fightHits; the swing
+-- count is M.fightPasses).  Pummel is two bludgeoning hits = 2 chips.
 -- ----------------------------------------------------------------------------
 local H = dofile("tools/tests/lib/ot6.lua")
 

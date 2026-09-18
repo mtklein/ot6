@@ -31,8 +31,10 @@
 --      supply and MP is not, so a caster tops up where a drinker would not.
 --      Alone the refusal is about spending turns instead, and a cast spends
 --      one exactly as a drink does, so `mp` changes nothing there;
---   5. the swing model and the class/reflect bits the press rule (#156)
---      counts before it skips a heal;
+--   5. the swing/landed-hit model and the class/reflect bits the press
+--      rule (#156) counts before it skips a heal.  The ladder is DERIVED
+--      from this ROM's FightAttack and Ot6FightBoost rather than pinned as
+--      a constant: #235 was a wrong constant nobody checked;
 --   6. the two #165 rules on the Rizopas seed $64 numbers: the kill-this-
 --      turn estimate (H.killEstimate: hits to the last chip shielded, the
 --      rest x4) that lets a press beat lethal-next-round care only when it
@@ -157,41 +159,131 @@ H.run({ maxFrames = 3000 }, {
   end),
 
   -- 5. the swing half: what the press rule (#156) counts before it skips a
-  -- heal.  The swing model is plain arithmetic (Ot6FightBoost: two swings
-  -- per BP, alternating hands when both hold a weapon); the class and
-  -- reflect bits are read out of this ROM's tables.
+  -- heal.  The class and reflect bits are read out of this ROM's tables,
+  -- and so, now, is the swing ladder itself.
+  --
+  -- #235: this block used to pin "one weapon, 2 BP: 1 + 4 swings" = 5 as a
+  -- bare constant nobody checked against the machine, and the machine
+  -- lands 3.  A constant no one checks is how that survived, so the numbers
+  -- below are DERIVED from the two procs that make them, read out of the
+  -- assembled ROM:
+  --
+  --   FightAttack   lda #$01 ... sta $3a70   (the vanilla swing count)
+  --   Ot6FightBoost asl / clc / adc $3a70 / sta $3a70   (x2 per pending BP)
+  --
+  -- and the loop runs $3a70 + 1 passes (battle_main.asm:8392), alternating
+  -- hands (:8285).  Change either proc and this fails, naming the byte.
+  -- The remaining half of the claim -- that an empty hand's pass really
+  -- whiffs -- is not arithmetic and is measured in play by battle_hits.lua,
+  -- which counts swings and landed hits of a real 2-BP Fight.
   H.call(function()
-    local function swings(two, boost) return table.pack(H.fightSwings(two, boost)) end
-    local s = swings(false, 0)
-    H.assertEq(s[1] * 10 + s[2], 10, "one weapon, 0 BP: 1 swing")
-    s = swings(false, 2)
-    H.assertEq(s[1] * 10 + s[2], 50, "one weapon, 2 BP: 1 + 4 swings")
-    s = swings(true, 0)
-    H.assertEq(s[1] * 10 + s[2], 11, "Genji pair, 0 BP: one swing a hand")
-    s = swings(true, 2)
-    H.assertEq(s[1] * 10 + s[2], 33, "Genji pair, 2 BP: 3 + 3 swings (six chips on a two-class gauge)")
+    local FB = H.sym("Ot6FightBoost") & 0x3FFFFF
+    local FA = H.sym("FightAttack") & 0x3FFFFF
+    local function romBytes(base, n)
+      local t = {}
+      for i = 0, n - 1 do t[#t + 1] = H.readRomByte(base + i) end
+      return t
+    end
+    -- Ot6FightBoost's arithmetic tail: `clc / adc $3a70 / sta $3a70`,
+    -- preceded by the shifts that scale the pending BP.
+    local fb = romBytes(FB, 32)
+    local tail = nil
+    for i = 1, #fb - 6 do
+      if fb[i] == 0x18 and fb[i + 1] == 0x6D and fb[i + 2] == 0x70
+         and fb[i + 3] == 0x3A and fb[i + 4] == 0x8D and fb[i + 5] == 0x70
+         and fb[i + 6] == 0x3A then tail = i; break end
+    end
+    H.assertEq(tail ~= nil, true,
+      "Ot6FightBoost still ends in clc / adc $3a70 / sta $3a70")
+    local asls = 0
+    while tail - 1 - asls >= 1 and fb[tail - 1 - asls] == 0x0A do
+      asls = asls + 1
+    end
+    local perBp = 1 << asls
+    H.assertEq(perBp, 2, string.format(
+      "Ot6FightBoost adds %d swing(s) per pending BP (%d `asl` before the "
+      .. "adc, at $%06X)", perBp, asls, H.sym("Ot6FightBoost")))
+    -- FightAttack's vanilla count: the `lda #$01` the bcc falls through to.
+    local fa = romBytes(FA, 24)
+    local base = nil
+    for i = 1, #fa - 4 do
+      if fa[i] == 0xA9 and fa[i + 1] == 0x01 and fa[i + 2] == 0x90 then
+        base = fa[i + 1]; break
+      end
+    end
+    H.assertEq(base, 1, "FightAttack seeds $3a70 = 1 without an Offering")
+    -- The loop runs $3a70 + 1 passes, so that is the swing count; the model
+    -- must say the same thing, and the hand split must halve it for one
+    -- weapon and keep all of it for a pair.
+    for bp = 0, 3 do
+      local passes = base + perBp * bp + 1
+      H.assertEq(H.fightPasses(bp), passes, string.format(
+        "a %d-BP Fight swings %d times (ROM: $3a70 = %d + %d*%d, loop runs "
+        .. "$3a70 + 1 passes)", bp, passes, base, perBp, bp))
+      local m, o = H.fightHits(1, bp)
+      H.assertEq(m + o, passes // 2, string.format(
+        "one weapon, %d BP: %d swings, %d LANDED hits -- the other half are "
+        .. "empty-hand passes (battle_hits.lua measures this in play)",
+        bp, passes, passes // 2))
+      H.assertEq(o, 0, "one weapon: the off hand lands nothing")
+      m, o = H.fightHits(2, bp)
+      H.assertEq(m + o, passes, string.format(
+        "a Genji pair, %d BP: %d swings, all %d landing, %d a hand",
+        bp, passes, passes, passes // 2))
+      H.assertEq(m == o, true, "a Genji pair splits its passes evenly")
+    end
+    -- and the shape the driver actually asks for: hands is a COUNT, so a
+    -- caller still passing the old boolean is refused rather than answered
+    H.assertEq(pcall(H.fightHits, false, 2), false,
+      "fightHits refuses a boolean where the armed-hand count belongs")
     H.assertEq(H.weaponClass(0x0F), 0x01, "ThunderBlade $0F is slashing")
     H.assertEq(H.weaponClass(0x05), 0x02, "Assassin $05 is piercing")
     H.assertEq(H.weaponClass(H.AUTOCROSSBOW), 0x02, "AutoCrossbow $AA is piercing")
     H.assertEq(H.weaponClass(0xFF), 0x04, "an empty hand is a bludgeoning fist")
+    -- ...but it is not a WEAPON, and this ROM will say it is if asked
+    -- naively (#235).  $FF is the empty-slot sentinel, not an item id;
+    -- ItemProp has thirty bytes at that index all the same, and the type
+    -- byte there reads $01, "weapon, record in use".  The hand model
+    -- (handsOf) reads exactly this to decide whether a Fight's hits
+    -- double, so the guard is load-bearing -- and the check below shows
+    -- BOTH halves: the raw record really does read as a weapon, and
+    -- M.isWeapon refuses it anyway.
+    local ITEM_TYPE_FF = H.readRomByte((H.sym("ItemProp") & 0x3FFFFF) + 0xFF * 30)
+    H.assertEq((ITEM_TYPE_FF & 0x80) == 0 and (ITEM_TYPE_FF & 0x07) == 1, true,
+      string.format("ItemProp[$FF] type byte is $%02X -- it DOES read as a "
+        .. "weapon, which is why the empty slot is refused by id",
+        ITEM_TYPE_FF))
+    H.assertEq(H.isWeapon(0xFF), false,
+      "an empty hand is not a weapon: $FF is the empty slot, not an item id")
+    H.assertEq(H.isWeapon(0x0A), true, "MithrilBlade $0A is a weapon")
+    H.assertEq(H.isWeapon(0x5A), false, "a Buckler $5A is not")
     H.assertEq(H.spellReflectable(0x02), true, "Bolt $02 bounces off Reflect")
     H.assertEq(H.spellReflectable(0x0B), true, "Bolt 3 $0B (the 2-BP fold) bounces too")
     H.assertEq(H.spellReflectable(0x2D), true, "Cure $2D is reflectable (cast at allies, never at the monster)")
     H.assertEq(H.spellReflectable(0x38), false, "Shiva's summon attack $38 ignores Reflect")
     H.assertEq(H.spellReflectable(0x5D), false, "Pummel $5D ignores Reflect")
     H.assertEq(H.spellReflectable(0x8E), false, "Aqua Rake $8E ignores Reflect")
-    H.log("battle_healpolicy: swing model, class and reflect bits checked")
+    H.log("battle_healpolicy: swing/landed-hit model checked AGAINST THIS "
+      .. "ROM's FightAttack and Ot6FightBoost; class and reflect bits checked")
   end),
 
   -- 6. the two #165 rules, on the Rizopas seed $64 numbers (care_i50.log
   -- of the lab: SABIN's Fight landed 74 a hit shielded; Rizopas at 553 HP
   -- behind 1 shield; CYAN 358 max HP raised to 44 and killed by a -44
   -- Battle four times).
+  --
+  -- `hits` is LANDED hits (#235).  SABIN carries one weapon at the falls,
+  -- so the three-hit volley below is his 2-BP Fight -- six swings, three
+  -- of them the empty hand's -- not the 1-BP one this block used to call
+  -- it.  The tie to the model is asserted rather than described.
   H.call(function()
+    local sabinHits = select(1, H.fightHits(1, 2)) + select(2, H.fightHits(1, 2))
+    H.assertEq(sabinHits, 3,
+      "SABIN, one weapon, 2 BP: three landed hits -- the volley priced below")
     -- M.killEstimate: hits to the last chip land shielded, the rest x4
-    local est, toBreak, broken = H.killEstimate({ per = 74, hits = 3, chips = 3, need = 1 })
-    H.assertEq(est, 74 + 2 * 4 * 74, "SABIN's 1-BP Fight (3 swings, 74 a hit) into 1 shield: 74 shielded then two broken hits = 666")
-    H.assertEq(toBreak * 10 + broken, 12, "one swing to the break, two broken")
+    local est, toBreak, broken = H.killEstimate({ per = 74, hits = sabinHits, chips = 3, need = 1 })
+    H.assertEq(est, 74 + 2 * 4 * 74, "SABIN's 2-BP Fight (3 landed hits, 74 a hit) into 1 shield: 74 shielded then two broken hits = 666")
+    H.assertEq(toBreak * 10 + broken, 12, "one hit to the break, two broken")
     H.assertEq(est >= 553, true, "666 covers Rizopas's 553: a kill this turn")
     est = H.killEstimate({ per = 49, hits = 3, chips = 3, need = 1 })
     H.assertEq(est, 49 + 2 * 4 * 49, "the same volley at 49 a hit is 441")
@@ -199,11 +291,11 @@ H.run({ maxFrames = 3000 }, {
     est = H.killEstimate({ per = 74, hits = 3, chips = 3, need = 0 })
     H.assertEq(est, 3 * 4 * 74, "a broken gauge puts every hit in the window: 888")
     est = H.killEstimate({ per = 74, hits = 1, chips = 1, need = 1 })
-    H.assertEq(est, 74, "0 BP: one swing, the break itself, nothing broken")
+    H.assertEq(est, 74, "0 BP: one landed hit, the break itself, nothing broken")
     H.assertEq(H.killEstimate({ per = 74, hits = 3, chips = 1, need = 2 }), nil, "chips short of the shields: no estimate")
     H.assertEq(H.killEstimate({ per = 0, hits = 3, chips = 3, need = 1 }), nil, "nothing measured yet: no estimate")
     est, toBreak, broken = H.killEstimate({ per = 100, hits = 6, chips = 3, need = 2 })
-    H.assertEq(toBreak * 10 + broken, 42, "a Genji pair with one chipping hand: 2 chips of 3 spread over 6 swings is 4 to the break, 2 broken")
+    H.assertEq(toBreak * 10 + broken, 42, "a Genji pair with one chipping hand: 2 chips of 3 spread over 6 landed hits is 4 to the break, 2 broken")
     H.assertEq(est, 4 * 100 + 2 * 400, "priced accordingly: 1200")
     -- M.raiseDecision: Fenix Down's maxhp/8 against the smallest hit
     local raiseHp, ok = H.raiseDecision({ maxhp = 358, power = H.itemPower(0xF0), smallestHit = 44 })

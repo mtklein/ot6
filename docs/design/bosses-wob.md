@@ -391,9 +391,11 @@ L14, 363 HP, MetalKnuckle `$53` (claw: slash on Fight; Pummel and Suplex
 bludgeon regardless), Buckler, Leather Hat, Kung Fu Suit, Star Pendant
 and Jewel Ring, Blitz `$07` = Pummel/AuraBolt/Suplex. Bag: **Tonic 91,
 Potion 2, Fenix Down 15**. Both weapons match the row, so every Fight
-swing chips: a 1-BP Fight is 3 swings = 3 chips, 2 BP 5, 3 BP 7
-(`M.fightSwings`); BP caps at 5 and regenerates one per unboosted turn
-(`ot6_boost.asm:141`).
+hit that lands chips — but each of the two carries one weapon, and half
+of a boosted Fight's swings are empty-hand passes that whiff (#235): a
+1-BP Fight is 4 swings and **2** landed hits = 2 chips, 2 BP 3, 3 BP 4
+(`M.fightHits`; the swing count is `M.fightPasses`). BP caps at 5 and
+regenerates one per unboosted turn (`ot6_boost.asm:141`).
 
 **The burst, measured.** Rizopas's spells land on the whole party as
 often as on one (`[act] … atk=$B8 tgt=$0003` and `tgt=$0001` both occur),
