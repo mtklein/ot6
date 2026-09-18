@@ -28,6 +28,19 @@
 OT6_MP_COSTS = 1
 .endif
 
+; ot6: the #219 boost escalation, the measurement control for it.  The
+; shipped default (1) is the owner's locked rule -- a boosted ability pays
+; min(99, floor(base * 2.5^boost + 0.5)), one authority, Ot6BoostPriceFor.
+; `-D OT6_BOOST_PRICE=0` reassembles the economy as it stood BEFORE #219:
+; every base price still charged, a boost still free.  It exists so a
+; balance question about the escalation can be answered with a before and an
+; after on the same ROM sources rather than with an assertion
+; (docs/design/narshe-descent.md).  It is not a gameplay option and nothing
+; in the graph ships it.
+.ifndef OT6_BOOST_PRICE
+OT6_BOOST_PRICE = 1
+.endif
+
 ; ------------------------------------------------------------------------------
 
 .include "battle/ai_script.inc"
