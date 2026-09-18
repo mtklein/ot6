@@ -1198,6 +1198,198 @@ function M.spellPrice(id, base, boost)
   return M.boostPrice(base, boost), id
 end
 
+-- The dearest Tool the battle bag holds (#230), and its unboosted price.
+--
+-- Why a ceiling rather than a name.  The Tools shell lists the tools the
+-- BAG holds, so what its first cell holds is the bag's business, not the
+-- kit's.  A fighter that opens Tools and confirms without steering the
+-- cursor therefore does not know which row it is about to name -- and
+-- measurement says the guesses in the tree were wrong: gen_scenario's
+-- fighter is commented "AutoCrossbow" and named Bio Blaster ($A4, 8 MP)
+-- on all 21 of its Tools turns across a six-seed spread, while
+-- gen_narshe_battle's named AutoCrossbow ($AA, 4 MP) on all 16 of its.
+-- Pricing the boost against a name the turn may not use is the same
+-- unchecked claim #230 is about, one level down: the scenario's priced
+-- fighter still fizzled 23 times because it stepped Bio Blaster's boost
+-- down to AutoCrossbow's price.
+--
+-- So an unsteered fighter claims what it can honestly claim: enough to pay
+-- for the dearest row it could land on.  It never over-claims, it needs no
+-- per-segment guess, and it stays right when the bag changes mid-segment --
+-- which a measured id would not.  A fighter that DOES steer its cursor
+-- (gen_scenario's SABIN walks right to AuraBolt) knows its id and passes
+-- that instead.
+--
+-- The list itself is the ROM's, read the ROM's way.  MakeToolsList_00..03
+-- (`set_buf_item`, btlgfx_main.asm:13065) fills wItemList by walking the
+-- battle bag IN BAG ORDER -- $2686, 252 entries of stride 5: id at +0,
+-- usage flags at +1, targeting at +2, quantity at +3 -- and appending every
+-- entry whose usage byte carries the tools flag $40.  So the window's cell
+-- N is the Nth such entry, and nothing about the kit or the item ids
+-- decides the order.
+--
+-- Every entry is walked, not up to the first $FF: $FF marks an EMPTY SLOT,
+-- not the end of the table, and the driver's own battInvIdx walks all 252
+-- for the same reason.  A first cut that stopped at the first $FF found no
+-- tools at all, handed boostPlan a nil id, and so read EDGAR's crossbow as
+-- a free verb -- which put the descent's fizzle count back to the control's
+-- 16 exactly (build/lab/private-fighters/descent-regression.txt).
+-- The predicate is `set_buf_item`'s own and ONLY its own -- the usage flag,
+-- not the quantity.  Agreeing with the ROM matters more than being tidy:
+-- a filter the ROM does not apply would shorten this list, shift every cell
+-- index past the dropped row, and price a different tool than the one the
+-- cursor is on, which is the bug this function exists to stop.
+local function toolList()
+  local out = {}
+  for i = 0, 251 do
+    if (M.readByte(0x2687 + i * 5) & 0x40) ~= 0 then
+      out[#out + 1] = M.readByte(0x2686 + i * 5)
+    end
+  end
+  return out
+end
+
+-- Which tool THIS actor's Tools row will name, and its unboosted price
+-- (#230).
+--
+-- The kit window's cursor is per-actor and persists across turns ($8963 col
+-- / $8967 row, a 2-column grid; cell = row*2 + col), so a fighter whose
+-- sequence is "down, A, A, A" -- open Tools, confirm whatever is under the
+-- cursor, confirm the target -- names the cell the cursor is already on.
+-- That is the id to price, and it is NOT a property of the kit: measured,
+-- gen_narshe_battle's EDGAR named AutoCrossbow ($AA, 4 MP) on all 16 of his
+-- descent turns while gen_scenario's named Bio Blaster ($A4, 8 MP) on all
+-- 21 of his river turns, from the same "AutoCrossbow" comment.
+--
+-- When the cursor does not resolve to a row -- an empty list, a stale byte,
+-- a fighter that steers somewhere this cannot predict -- the answer is the
+-- DEAREST tool in the list instead: an honest claim has to cover whatever
+-- the turn actually names, and over-claiming only costs boost depth while
+-- under-claiming costs the turn and the pips.  nil only when the bag holds
+-- no tool at all, which is a Tools row that is not a turn.
+function M.namedTool(slot)
+  local list = toolList()
+  if #list == 0 then return nil, nil end
+  local cell = M.readByte(0x8967 + (slot or 0)) * 2
+             + M.readByte(0x8963 + (slot or 0))
+  local id = list[cell + 1]
+  if id == nil then
+    for _, t in ipairs(list) do
+      if id == nil or (M.abilityCost(t) or 0) > (M.abilityCost(id) or 0) then
+        id = t
+      end
+    end
+  end
+  return id, M.abilityCost(id)
+end
+
+-- ------------------------------------------------- pressing R is a claim --
+-- The ONE place a fighter decides how deep a boost it may press (#230).
+--
+-- Pressing R is a claim that the caster can pay for what the turn is about
+-- to name.  Before #219 that claim was free and every fighter made it
+-- silently; now a boosted Blitz, Tool or cast costs escalating MP, and an
+-- unaffordable one is GREYED BUT STILL SELECTABLE -- it reaches ExecCmd and
+-- is eaten by CalcAttackEffect's universal insufficient-MP gate, after the
+-- turn and the banked BP are already spent.  gen_narshe_battle made that
+-- claim sixteen times in one descent and lost the segment (#228,
+-- docs/design/narshe-descent.md); eight other generators had the same shape
+-- and passed only because their pools happened to last (#230).
+--
+-- So the claim is checked here, once, and every fighter -- the library's
+-- own driver and each generator's private one -- comes through this door.
+-- It is M.affordBoost (the lib's copy of Ot6BoostPriceFor) wearing the two
+-- clothes the callers actually wear:
+--
+--   o.slot     the caster's battle entity 0..3; the pool and its maximum are
+--              read live off $3C08/$3C30 unless o.pool/o.maxPool say otherwise
+--   o.id       the ability the turn will name: a Blitz attack id or a Tool
+--              item id (priced from Ot6AbilityCostTbl), or a spell id with
+--              o.spell set (priced through M.spellPrice, because a family
+--              head's boost buys a TIER and pays that tier's own vanilla MP)
+--   o.base     the unboosted price; defaults to M.abilityCost(o.id) for a
+--              kit verb, and is REQUIRED for a cast (the caster's own list
+--              row price, which is the number the menu prints)
+--   o.want     the boost the bank would spend
+--   o.reserve  MP the plan must leave behind (the nuke floor); default 0
+--   o.tag      when set, the decision logs itself as `[<tag>] [boost] ...`
+--              WHENEVER IT MOVED THE PLAN (a step-down or a drop), which is
+--              the driver's own convention -- a boost that goes through as
+--              asked is the ordinary turn.  The generators' private fighters
+--              pass it; the library's driver logs its own lines instead.
+--   o.ration   one turn may spend at most maxMP/o.ration on the boost.  For
+--              a segment whose only MP refill is a level-up, an unrationed
+--              pool buys two enormous turns and then nothing for five
+--              battles; see the descent's measurement.  The ration never
+--              blocks the UNBOOSTED ability -- the base price is not the
+--              boost's to ration.
+--
+-- Returns:
+--   boost   0..o.want, stepped down to what the pool covers
+--   ok      false when the pool cannot pay even the unboosted ability, i.e.
+--           "drop the verb" -- a fighter answers that by falling back to
+--           Fight, which is free and always affordable
+--   why     one line naming the decision, for the caller's turn log
+--   price   what that boost will actually be charged, or nil for a free verb
+--
+-- A verb the cost column does not carry (Fight, Capture, Runic, Health,
+-- Leap, SwdTech's own tier, Slot) is free: it comes back { want, true }
+-- with the bank's whole boost passed straight through, so a fighter may
+-- route every verb through here without special-casing the free ones.
+local function boostPlanSaid(o, want, boost, ok, why)
+  if o.tag == nil or (ok and boost == want) then return end
+  M.log(string.format("[%s] [boost] slot %s want %d -> %d on $%02X -- %s",
+    o.tag, tostring(o.slot), want, boost, o.id or 0,
+    ok and why or (why .. " (falling back to Fight)")))
+end
+
+function M.boostPlan(o)
+  local want = o.want or 0
+  local pool = o.pool or M.readWord(0x3C08 + (o.slot or 0) * 2)
+  local base = o.base
+  if base == nil then
+    if o.id == nil or o.spell then
+      return want, true, "unpriced (free verb)", 0
+    end
+    base = M.abilityCost(o.id)
+    -- nil = the id is not in Ot6AbilityCostTbl, which is what the ROM's own
+    -- scan (Ot6CostFor's @free arm) reads as costing nothing
+    if base == nil then return want, true, "unpriced (free verb)", 0 end
+  end
+  if base == 0 then return want, true, "free (base 0)", 0 end
+  local priceAt = nil
+  if o.spell then
+    priceAt = function(b) return (M.spellPrice(o.id, base, b)) end
+  end
+  -- The ration is applied by handing affordBoost a SMALLER pool, not a
+  -- smaller want: it then steps the boost down to the deepest level the
+  -- rationed budget covers, exactly as it does for a short pool.
+  local budget = pool
+  if o.ration then
+    local maxMp = o.maxPool or M.readWord(0x3C30 + (o.slot or 0) * 2)
+    budget = math.min(pool, maxMp // o.ration)
+  end
+  local got, price, why = M.affordBoost({ base = base, want = want,
+    pool = budget, reserve = o.reserve or 0, priceAt = priceAt })
+  if got ~= nil then
+    boostPlanSaid(o, want, got, true, why)
+    return got, true, why, price
+  end
+  -- Nothing affordable inside the budget.  The ration is the boost's cap,
+  -- not the ability's, so an unboosted cast the real pool covers still goes.
+  local floor = priceAt and priceAt(0) or base
+  if budget < pool and floor <= pool - (o.reserve or 0) then
+    why = string.format("boost 0: this turn rations %d MP of a %d pool and no "
+      .. "boost fits, but the unboosted %d is not the boost's to ration",
+      budget, pool, floor)
+    boostPlanSaid(o, want, 0, true, why)
+    return 0, true, why, floor
+  end
+  why = string.format("%s -- dropping the verb", why)
+  boostPlanSaid(o, want, 0, false, why)
+  return 0, false, why, floor
+end
+
 -- Spend it before you die (#175): a member inside one round of death who
 -- holds banked BP, and whom no heal in hand lifts clear of that round,
 -- spends the pips now on their strongest line rather than take a heal
@@ -3026,6 +3218,128 @@ local execMonDone = nil               -- { slot, frame } of the last to return
 -- with them set; battle_main.asm).  The hit ledger tells a level spell
 -- from a swing by them (#174) and the [death] line names the killer.
 local execMonCmd, execMonAtk = nil, nil
+
+-- ------------------------------------------------------ a loud fizzle --
+-- A boosted action the caster could not pay for looks EXACTLY like a turn
+-- that did nothing: the menu closed, the gauge emptied, the pips went, and
+-- no number came up.  That is why #228 took a lab to find.  So every run
+-- names one now, off the same two exec observers below, and the count sits
+-- beside the verdict (M.fizzleReport, printed by watchReport).
+--
+-- The predicate is the ROM's own, on the ROM's own operands.  InitPlayerAction
+-- (battle_main.asm:429) parks the queued action's MP cost in $3A4C before the
+-- command runs, and CalcAttackEffect's universal gate is `lda $3c08,x /
+-- sbc $3a4c / bcs paid` (battle_main.asm:8424) -- so a cost in $3A4C larger
+-- than the pool at ExecCmd is a refusal the engine has already decided on.
+-- SaveForMimic then confirms it: the pool did not move, because nothing was
+-- charged.  Both halves, so a verb whose body clears its own cost (the Imp
+-- arm, a mid-dance step, Slot's espers) cannot be mistaken for a refusal.
+--
+-- Command names are BattleCmdProp's order (battle_main.asm), for the log.
+local EXEC_CMD_NAME = {
+  [0x00] = "Fight", [0x01] = "Item", [0x02] = "Magic", [0x03] = "Morph",
+  [0x04] = "Revert", [0x05] = "Steal", [0x06] = "Capture", [0x07] = "SwdTech",
+  [0x08] = "Throw", [0x09] = "Tools", [0x0A] = "Blitz", [0x0B] = "Runic",
+  [0x0C] = "Lore", [0x0D] = "Sketch", [0x0E] = "Control", [0x0F] = "Slot",
+  [0x10] = "Rage", [0x11] = "Leap", [0x12] = "Mimic", [0x13] = "Dance",
+  [0x14] = "Row", [0x15] = "Def", [0x16] = "Jump", [0x17] = "XMagic",
+  [0x18] = "GPRain", [0x19] = "Summon", [0x1A] = "Health", [0x1B] = "Shock",
+  [0x1C] = "Possess", [0x1D] = "MagiTek",
+}
+-- One row per fizzle, plus a per-(char, command) tally.  Read by
+-- tools/audit_boost.py off the `[fizzle]` lines, and by a lab off either.
+M.fizzles = { n = 0, bp = 0, rows = {}, by = {}, order = {} }
+local execCost = {}                   -- $3A4C and the pool, parked at ExecCmd
+local function fizzleNote(x, p, mp)
+  local slot = x // 2
+  local char = M.readByte(0x3ED8 + x)
+  local key = string.format("char%d %s", char, EXEC_CMD_NAME[p.cmd] or "?")
+  local F = M.fizzles
+  if F.by[key] == nil then F.order[#F.order + 1] = key end
+  F.by[key] = (F.by[key] or 0) + 1
+  F.n, F.bp = F.n + 1, F.bp + p.rev
+  local row = string.format("f%d slot%d char%d %s($%02X) atk=$%02X boost=%d "
+    .. "cost=%d pool=%d", p.frame, slot, char, EXEC_CMD_NAME[p.cmd] or "?",
+    p.cmd, p.atk, p.rev, p.cost, p.mp)
+  if #F.rows < 200 then F.rows[#F.rows + 1] = row end
+  M.log(string.format("[fizzle] %s -- the pool could not pay it: "
+    .. "CalcAttackEffect refused the action, the turn and %d boost point(s) "
+    .. "are gone and the pool is still %d.  Pressing R is a claim the caster "
+    .. "can pay (M.boostPlan, #230).", row, p.rev, mp))
+end
+
+function M.fizzleReport()
+  local F = M.fizzles
+  if F.n == 0 then
+    return "fizzles: none (no costed action was refused for MP)"
+  end
+  local parts = {}
+  for _, k in ipairs(F.order) do
+    parts[#parts + 1] = string.format("%s=%d", k, F.by[k])
+  end
+  return string.format("fizzles: %d costed action(s) refused for MP, %d boost "
+    .. "point(s) burned on them -- %s; the [fizzle] lines name each one",
+    F.n, F.bp, table.concat(parts, " "))
+end
+
+-- --------------------------------------------------- a loud REFUSAL too --
+-- v0.19's other half of the same claim.  Ot6KitConfirmMP (ot6_cmdmenu.asm)
+-- now refuses an unaffordable kit row AT THE CONFIRM rather than letting it
+-- reach ExecCmd: the window buzzes, stays open, and keeps the turn, the pips
+-- and the MP (battle_kitrefuse; mp-economy.md ruling 2).  Better for a
+-- person and better for the party -- and WORSE for a blind fighter, whose
+-- symptom changes from one quiet wasted turn into an A press that never
+-- commits.  A fighter that keeps asking sits there until a watchdog fires,
+-- so the run's failure reads as a timeout and says nothing about why.
+--
+-- The buzz is magic's own error sound, `inc $95` (btlgfx
+-- UpdateMenuState_0e @81ae, and now the kit confirm as well); direct-page
+-- stores land in bank $00, so both views are watched, as battle_kitrefuse
+-- watches them.  A buzz inside a LIST window ($7BC2: $30 the tools shell
+-- that serves Blitz/Tools/SwdTech/thief, $0E the magic list) is the confirm
+-- saying no.  It is not exclusively the MP refusal -- an empty cell buzzes
+-- too -- so the line says what it saw rather than why, and the caster's
+-- pool, bank and pending boost are printed beside it so a reader can tell.
+M.refusals = { n = 0, by = {}, order = {} }
+local refusedSaid = 0
+local function refusalNote()
+  -- $95 is the game's error sound everywhere, so the battle menu has to be
+  -- up for this to be a battle confirm at all ($7BCA, the open flag the
+  -- fighters themselves gate on); $7BC2 is stale junk outside a battle.
+  if M.readByte(0x7BCA) == 0 then return end
+  local st = M.readByte(0x7BC2)
+  if st ~= 0x30 and st ~= 0x0E then return end
+  local actor = M.readByte(0x62CA) & 3
+  local char = M.readByte(0x3ED8 + actor * 2)
+  local key = string.format("char%d $%02X", char, st)
+  local R = M.refusals
+  if R.by[key] == nil then R.order[#R.order + 1] = key end
+  R.by[key] = (R.by[key] or 0) + 1
+  R.n = R.n + 1
+  if refusedSaid >= 40 then return end     -- a stalling fighter buzzes a lot
+  refusedSaid = refusedSaid + 1
+  M.log(string.format("[refused] f%d slot%d char%d list $%02X -- the confirm "
+    .. "buzzed and the list stayed open (pool %d/%d, bank %d, pending %d).  "
+    .. "The turn, the pips and the MP are kept; a fighter that keeps asking "
+    .. "for this row stalls on it (M.boostPlan, #230).", M.frame, actor, char,
+    st, M.readWord(0x3C08 + actor * 2), M.readWord(0x3C30 + actor * 2),
+    M.readByte(0x3E9C + actor * 2), M.readByte(0x3E9D + actor * 2)))
+end
+
+function M.refusalReport()
+  local R = M.refusals
+  if R.n == 0 then
+    return "kit/magic confirm refusals: none (no list confirm buzzed)"
+  end
+  local parts = {}
+  for _, k in ipairs(R.order) do
+    parts[#parts + 1] = string.format("%s=%d", k, R.by[k])
+  end
+  return string.format("kit/magic confirm refusals: %d confirm(s) buzzed "
+    .. "inside a list window -- %s; the [refused] lines name the first %d",
+    R.n, table.concat(parts, " "), math.min(R.n, 40))
+end
+
 local execHooks = false
 local function execActivate()
   if execHooks then return end
@@ -3038,6 +3352,9 @@ local function execActivate()
       local cmd, atk = M.readByte(0xB5), M.readByte(0xB6)
       if cmd < EXEC_MENU_CMDS then
         execActor, execActorCmd = x // 2, { cmd = cmd, atk = atk }
+        execCost[x] = { cmd = cmd, atk = atk, cost = M.readWord(0x3A4C),
+          mp = M.readWord(0x3C08 + x), rev = M.readByte(0x3E9D + x),
+          frame = M.frame }
       elseif #execSkipped < 32 then        -- drained by a driver's frame; bounded without one
         execSkipped[#execSkipped + 1] = { actor = x // 2, frame = M.frame, cmd = cmd, atk = atk }
       end
@@ -3051,6 +3368,14 @@ local function execActivate()
     local x = emu.getState()["cpu.x"] & 0xffff
     if x < 8 and x % 2 == 0 then
       if execParty == x // 2 then execParty = nil end
+      local p = execCost[x]
+      execCost[x] = nil
+      if p ~= nil then
+        local mp = M.readWord(0x3C08 + x)
+        if p.cost > 0 and p.cost > p.mp and mp == p.mp then
+          fizzleNote(x, p, mp)
+        end
+      end
       if execActor == x // 2 then
         execDone[#execDone + 1] = { actor = x // 2, frame = M.frame,
           cmd = execActorCmd and execActorCmd.cmd, atk = execActorCmd and execActorCmd.atk }
@@ -3061,6 +3386,11 @@ local function execActivate()
       if execMon == x // 2 - 4 then execMon = nil end
     end
   end, emu.callbackType.exec, b, b)
+  -- and the confirm-side refusal, the same claim caught one step earlier
+  for _, page in ipairs({ 0x000000, 0x7E0000 }) do
+    emu.addMemoryCallback(refusalNote, emu.callbackType.write,
+      page + 0x95, page + 0x95)
+  end
 end
 
 -- The unknown-menu guard's ledger (#188), one per run and bucketed by the
@@ -3885,28 +4215,29 @@ function M.newFightDriver(tag, opts)
     return opts.nukeFloor or (M.readWord(MAXMP + actor * 2) // 4)
   end
 
-  local abilityCost = M.abilityCost
-
-  -- What boost this actor can pay for a kit verb, and what it costs
-  -- (#219).  Blitz and Tools keep one id at every boost and take the flat
-  -- 2.5x ladder (Ot6AbilityCost's @boosted arm), so M.affordBoost's
-  -- default pricer is the right one.  nil for a verb the pool cannot pay
-  -- even unboosted, which is "do not offer this line".
+  -- The driver's two spellings of M.boostPlan (#230), which is the one
+  -- door every fighter in the tree goes through -- this one and the
+  -- generators' private ones alike.  Both keep the driver's own contract:
+  -- nil for a verb the pool cannot pay even unboosted, which the lines
+  -- below read as "do not offer this line".
+  --
+  -- A kit verb (Blitz, Tools) keeps one id at every boost and takes the
+  -- flat 2.5x ladder off Ot6AbilityCostTbl (Ot6AbilityCost's @boosted arm).
   local function skillBoost(actor, id, want)
-    local base = abilityCost(id)
-    if base == nil then return want, 0, "unpriced" end   -- not in the column
-    return M.affordBoost({ base = base, want = want,
-                           pool = M.readWord(CURMP + actor * 2) })
+    local b, ok, why, price = M.boostPlan({ slot = actor, id = id, want = want })
+    if not ok then return nil, price, why end
+    return b, price, why
   end
 
-  -- The same for a cast, through M.spellPrice: a family head's boost buys
-  -- a TIER and pays that tier's own vanilla MP, everything else takes the
+  -- A cast goes through M.spellPrice instead: a family head's boost buys a
+  -- TIER and pays that tier's own vanilla MP, everything else takes the
   -- 2.5x.  `base` is the caster's own list row price (spellCell's second
   -- return), which is the unboosted number.
   local function castBoost(actor, spell, base, want, reserve)
-    return M.affordBoost({ base = base, want = want, reserve = reserve or 0,
-      pool = M.readWord(CURMP + actor * 2),
-      priceAt = function(b) return (M.spellPrice(spell, base, b)) end })
+    local b, ok, why, price = M.boostPlan({ slot = actor, id = spell,
+      spell = true, base = base, want = want, reserve = reserve or 0 })
+    if not ok then return nil, price, why end
+    return b, price, why
   end
 
   local function makePlan(actor)
@@ -7222,6 +7553,11 @@ local function watchReport()
   -- the fight drivers' unknown-menu ledger (#188), so the count sits
   -- beside the verdict of every run rather than in a table nobody measured
   M.log("[watch] " .. M.unknownMenuReport())
+  -- and the loud-fizzle ledger (#230): a costed action refused for MP threw
+  -- away a turn AND the boost banked into it, and it is invisible in a run
+  -- log as anything but a turn that did nothing.
+  M.log("[watch] " .. M.fizzleReport())
+  M.log("[watch] " .. M.refusalReport())
 end
 
 -- The recovery cap (#185's other half).  A driver that drops its plan and
@@ -7501,7 +7837,11 @@ local function resetLibState()
   recoveryObserver, recoveryHooks, recoveryEvents = nil, false, {}
   execActor, execActorCmd, execDone, execMon, execMonDone = nil, nil, {}, nil, nil
   execParty, execSkipped = nil, {}
+  execCost = {}
   execHooks = false
+  -- M.fizzles is NOT reset: a costed action the pool could not pay is a
+  -- finding whichever attempt made it, and the retry ladder's whole point
+  -- is that a lost attempt still happened (#230).
   M._killbitFired = false
   watchReset()
   RUN.bootMarked, RUN.idle, RUN.idlePad, RUN.idleArm = false, 0, nil, false
@@ -7900,6 +8240,12 @@ function M.run(opts, steps)
       return
     end
 
+    -- The exec observers, for EVERY run rather than only the ones that
+    -- happen to use the library's fight driver (#230).  Their loud-fizzle
+    -- half has to reach the generators with private fighters, because those
+    -- are the fighters that pressed R without pricing it.  Idempotent, and
+    -- re-registered after resetLibState makes the last attempt's copy inert.
+    execActivate()
     if not canaryInGame and (M.hasControl() or M.battleLoadStarted()) then
       canaryInGame = true
     end
