@@ -620,6 +620,14 @@ done:   rtl
 .proc Ot6BoostPriceFor
         .a8
         .i16
+.if ::OT6_BOOST_PRICE = 0       ; :: forces the file-scope flag from in-proc
+        rtl                     ; the pre-#219 economy, for the A/B only: A
+                                ;   already holds the base, and a boost is
+                                ;   free at every level.  Every surface that
+                                ;   states a price comes through here, so the
+                                ;   drawn number, the grey and the charge move
+                                ;   together, exactly as they did before #219.
+.endif
         php
         rep     #$30            ; a16/i16: a 16-bit product and word pushes
         .a16

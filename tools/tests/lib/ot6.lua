@@ -1030,6 +1030,31 @@ function M.boostPrice(base, boost)
   return p
 end
 
+-- Ot6AbilityCostTbl (ot6_boost.asm), the $ff-terminated [id, cost] column
+-- Ot6CostFor scans: a Blitz's attack id or a Tool's item id -> its
+-- UNBOOSTED MP.  Read out of the ROM rather than mirrored here, so a caller
+-- prices the kit the build ships; nil for an id the column does not carry,
+-- which is what the ROM's own scan reads as free.
+--
+-- Module-level rather than private to the fight driver (it was the
+-- driver's own local until the Narshe descent lab needed it): a generator
+-- with its own fighter has to reach the same numbers, or its idea of what
+-- a boost costs and the ROM's come apart -- which is exactly the failure
+-- docs/design/narshe-descent.md measures.
+local abilityCostTbl = nil
+function M.abilityCost(id)
+  if abilityCostTbl == nil then
+    abilityCostTbl = {}
+    local base = M.sym("Ot6AbilityCostTbl") & 0x3FFFFF
+    for i = 0, 63 do
+      local key = M.readRomByte(base + i * 2)
+      if key == 0xFF then break end
+      abilityCostTbl[key] = M.readRomByte(base + i * 2 + 1)
+    end
+  end
+  return abilityCostTbl[id]
+end
+
 -- Does this command's price move with the boost at all (#219)?
 --
 -- The canon is ONE test, and it is the test the damage half already makes:
@@ -3860,23 +3885,7 @@ function M.newFightDriver(tag, opts)
     return opts.nukeFloor or (M.readWord(MAXMP + actor * 2) // 4)
   end
 
-  -- Ot6AbilityCostTbl (ot6_boost.asm), the $ff-terminated [id, cost]
-  -- column Ot6CostFor scans: a Blitz's attack id or a Tool's item id ->
-  -- its UNBOOSTED MP.  Read out of the ROM once per battle driver rather
-  -- than mirrored here, so the driver prices the kit the build ships.
-  local abilityCostTbl = nil
-  local function abilityCost(id)
-    if abilityCostTbl == nil then
-      abilityCostTbl = {}
-      local base = M.sym("Ot6AbilityCostTbl") & 0x3FFFFF
-      for i = 0, 63 do
-        local key = M.readRomByte(base + i * 2)
-        if key == 0xFF then break end
-        abilityCostTbl[key] = M.readRomByte(base + i * 2 + 1)
-      end
-    end
-    return abilityCostTbl[id]
-  end
+  local abilityCost = M.abilityCost
 
   -- What boost this actor can pay for a kit verb, and what it costs
   -- (#219).  Blitz and Tools keep one id at every boost and take the flat
