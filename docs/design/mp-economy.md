@@ -32,6 +32,34 @@ therefore the largest cost that can be shown, and no cost anywhere may
 exceed it. `battle_costtable.lua` asserts that bound on every row of
 the live table, not just the rows it pins by name.
 
+**A bound asserted over the table only holds where prices live** (#233).
+The bug report was a turn that cost 159 MP, which is above the ceiling and
+in no table the walk could reach — because it was never a price. `$3a4c`
+carries the in-flight action's staged MP cost, and it is *also*
+`UpdateEnabledMagic`'s own scratch: the "max mp cost"
+`CheckMagicEnabled` compares each list row against, which is the caster's
+current MP plus one. `ExecAction` reaches `ExecCmd` without
+`InitPlayerAction` whenever an entity's command-list pointer is `$ff` (its
+action was removed after it entered the action queue), and that pass
+inherited the scratch — 159 was Celes's 158 MP plus one, and the `$12` in
+the same line was `ExecAction`'s own placeholder command, not a Mimic.
+`CmdTbl[$12]` is `CmdNoEffect`, so nothing was charged and nothing was
+drawn: the number was a lie about the turn, not an overcharge. The
+placeholder now clears the cost with the command (`ExecAction`,
+`battle_main.asm`), so "the staged cost is a cost" holds for every action
+rather than for most of them, and `battle_costtable` step 4d reads both
+halves off the ROM: the clear, and `MagicProp`'s whole 256-record MP
+column against the ceiling rather than the kit table alone. What is
+deliberately *not* done is a clamp at `$3a4c`: Phoenix legitimately costs
+110 there, and clamping would pay less for more (ruling 1 below).
+
+The ceiling has one further vanilla hole, named here so it is not a
+surprise later: Step Mine's list price is derived from the play clock at
+battle init (`battle_main.asm`, `cpx #$0044`), so it is a byte that can
+exceed 99 and be drawn by a two-digit drawer. It is vanilla's, it is
+outside OT6's pricing on both surfaces (see "the one spell left out" at
+the end of the rulings), and no OT6 code produces it.
+
 Vanilla uses the same bound. Measured off `magic_prop_en.dat` +$05, the
 dearest spell in the game is Quick at 99, then Merton at 85
 and Ultima at 80. The number is not imported: 99 is the maximum FF6's own

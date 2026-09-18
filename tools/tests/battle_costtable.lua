@@ -48,6 +48,15 @@
 --      This step finds each leaf call in the proc's byte range and asks
 --      whether the escalation follows it, so re-adding the call to a
 --      chance verb fails here and not only in a play test.
+--   4d. a staged cost is a cost (#233). The ceiling above is asserted over
+--      the price table, and #233 was a cost of 159 that was in no table:
+--      $3a4c is both the in-flight action's staged MP cost and
+--      UpdateEnabledMagic's own "max mp cost" scratch (current MP + 1), and
+--      ExecAction reaches ExecCmd without InitPlayerAction when the entity's
+--      command list pointer is $ff, inheriting it. Read off the ROM: that
+--      ExecAction's placeholder clears $3a4c, that UpdateEnabledMagic's
+--      scratch is what it is, and that MagicProp's whole 256-record MP
+--      column is <= 99 but for Phoenix, the three-digit exception.
 --   5. the Serpent-Trench section. gau_joined is the entry point
 --      gen_sabin_trench.lua boots from, so the trio's pools are read live
 --      out of the fixture and every ability each has learned at that
@@ -117,6 +126,9 @@ local MAGIC_MP = {
 local MAGIC_PROP_REC = 14
 local MAGIC_PROP_MP = 5
 local MAGIC_OT6 = { [0x29] = 1 }        -- id -> the vanilla byte OT6 replaced
+-- the one record in the whole column above the ceiling, and legal there:
+-- summons draw through ListText command $16, which prints three digits.
+local PHOENIX_ID, PHOENIX_MP = 0x50, 110
 local SCAN_ID, SCAN_MP = 0x18, 3
 
 -- ca65 symbol -> snesPrgRom file offset (banks $C0-$FF are HiROM).
@@ -572,6 +584,99 @@ H.run({ maxFrames = 20000 }, {
       .. "charge are the same flat number")
     H.log(string.format("menu side: Ot6KitRowCost %d escalating arm, "
       .. "Ot6ThiefListOpen %d", krN, tlN))
+  end),
+
+  ------------------ 4d. a staged cost is a cost, and nothing else (#233) --
+  H.call(function()
+    -- Everything above holds the ceiling over the price TABLE.  #233 arrived
+    -- as a cost of 159 on a live action -- above the ceiling, and from no row
+    -- any table walk could ever have seen, because it was not a price.
+    --
+    -- $3a4c is "the in-flight action's staged MP cost": InitPlayerAction
+    -- copies the queue's cost into it and CalcAttackEffect's universal gate
+    -- subtracts it (and Ot6DanceStartGate / Ot6RageStartGate read it).  It is
+    -- ALSO UpdateEnabledMagic's own scratch -- the "max mp cost"
+    -- CheckMagicEnabled compares each list row against -- and that number is
+    -- the caster's current MP plus one.  159 was CELES's 158 MP plus one.
+    -- ExecAction's loop head writes a #$12 placeholder command and then
+    -- reaches ExecCmd WITHOUT InitPlayerAction whenever the entity's command
+    -- list pointer is $ff (an action removed after the entity entered the
+    -- action queue), so the cost cell kept the scratch, and $b5 kept the $12
+    -- -- which is why the observer named a character with no Mimic row
+    -- "Mimic".  CmdTbl[$12] is CmdNoEffect, an rts, so nothing was charged
+    -- and nothing was drawn: a lie about the turn's cost rather than a
+    -- 159 MP charge.
+    --
+    -- Two readings off the ROM, so neither half has to be taken on faith:
+    -- that the placeholder now clears the cost as well as the command, and
+    -- that UpdateEnabledMagic's scratch really is MP + 1.
+    local function bytesAt(ofs, want)
+      for i, b in ipairs(want) do
+        if H.readRomByte(ofs + i - 1) ~= b then return false end
+      end
+      return true
+    end
+    local function findWithin(lo, span, want)
+      for o = 0, span do
+        if bytesAt(lo + o, want) then return lo + o end
+      end
+      return nil
+    end
+
+    -- ExecAction's loop head: lda #$12 / sta $b5 / sta $3a7c
+    local PLACEHOLDER = { 0xa9, 0x12, 0x85, 0xb5, 0x8d, 0x7c, 0x3a }
+    local STZ_COST    = { 0x9c, 0x4c, 0x3a }          -- stz $3a4c
+    local head = findWithin(romOfs(H.sym("ExecAction")), 0x20, PLACEHOLDER)
+    H.assertEq(head ~= nil, true,
+      "ExecAction still opens its loop with `lda #$12 / sta $b5 / sta $3a7c` "
+      .. "-- the placeholder command an unstaged pass executes.  If that "
+      .. "moved, re-read the path before re-anchoring this check")
+    H.assertEq(bytesAt(head + #PLACEHOLDER, STZ_COST), true,
+      "ExecAction's placeholder clears the STAGED COST too (`stz $3a4c`), so "
+      .. "an action that InitPlayerAction never staged carries no cost.  "
+      .. "Without it the cell keeps UpdateEnabledMagic's MP+1 scratch and "
+      .. "every reader of $3a4c -- the charge gate, the two possess-verb "
+      .. "start gates, the harness's [fizzle] observer -- is told that turn "
+      .. "costs a number that is not a price and is not bounded by 99 (#233)")
+
+    -- and the scratch it is protecting the cell from: UpdateEnabledMagic's
+    -- `lda $3c09,x / bne / lda $3c08,x / inc / bne / lda #$ff / sta $3a4c`.
+    local SCRATCH = { 0xbd, 0x09, 0x3c, 0xd0, 0x06, 0xbd, 0x08, 0x3c, 0x1a,
+                      0xd0, 0x02, 0xa9, 0xff, 0x8d, 0x4c, 0x3a }
+    H.assertEq(findWithin(romOfs(H.sym("UpdateEnabledMagic")), 0x20, SCRATCH)
+               ~= nil, true,
+      "UpdateEnabledMagic still parks current MP + 1 in $3a4c as its own "
+      .. "'max mp cost' scratch.  That is where 159 came from (158 + 1), and "
+      .. "it is vanilla's: the cell is shared, which is why an unstaged pass "
+      .. "has to clear it rather than inherit it")
+
+    -- Finally, widen the ceiling from the kit table to EVERY byte a staged
+    -- cost can be read from.  GetMPCost's two arms both end at MagicProp+$05
+    -- (the monster arm directly, the character arm through the list byte
+    -- ValidateSpellList seeded from it), and Ot6SpellMP re-derives from the
+    -- same column, so the whole 256-record column is in scope.
+    local mp = romOfs(H.sym("MagicProp"))
+    local over = {}
+    for id = 0, 255 do
+      local cost = H.readRomByte(mp + id * MAGIC_PROP_REC + MAGIC_PROP_MP)
+      if cost > ANCHOR then over[#over + 1] = { id, cost } end
+    end
+    H.assertEq(#over, 1, string.format(
+      "exactly one record in MagicProp's whole 256-entry MP column may sit "
+      .. "above %d; found %d", ANCHOR, #over))
+    H.assertEq(over[1][1], PHOENIX_ID, string.format(
+      "...and it is Phoenix ($%02x), the documented exception: summons draw "
+      .. "their price through ListText command $16, the three-digit routine, "
+      .. "so 110 renders.  None of OT6's two-digit drawers sees it, and "
+      .. "Ot6BoostPriceFor's floor keeps a boosted Phoenix from being capped "
+      .. "down to 99 and so paying less for more (mp-economy.md, ruling 1)",
+      PHOENIX_ID))
+    H.assertEq(over[1][2], PHOENIX_MP,
+      "Phoenix still costs " .. PHOENIX_MP .. " -- the one price above the "
+      .. "ceiling, unchanged")
+    H.log(string.format("staged cost: ExecAction's unstaged pass clears "
+      .. "$3a4c; MagicProp's 256-record column is <= %d everywhere but "
+      .. "Phoenix ($%02x, %d)", ANCHOR, PHOENIX_ID, PHOENIX_MP))
   end),
 
   --------------------------------------- 5. the Serpent-Trench section -----

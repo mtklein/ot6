@@ -221,6 +221,39 @@ ExecAction:
 @0100:  lda     #$12
         sta     $b5
         sta     $3a7c
+.if OT6_MP_COSTS
+        ; ot6 #233: the placeholder above is a command, and the cost cell has
+        ; to be a placeholder too.  $3a4c means "the in-flight action's staged
+        ; MP cost" everywhere it is read -- CalcAttackEffect's universal
+        ; charge (:8422), Ot6DanceStartGate and Ot6RageStartGate -- and
+        ; InitPlayerAction (:434) is the only thing that stages it.  But this
+        ; loop reaches ExecCmd WITHOUT InitPlayerAction whenever the entity's
+        ; command list pointer is $ff (the bmi below, straight to @0183):
+        ; its action was removed after it entered the action queue, so $b5
+        ; keeps the #$12 just written -- command $12 is CmdNoEffect in CmdTbl,
+        ; which is how a cancelled action does nothing -- and $3a4c keeps
+        ; whatever the last writer left.  Between actions the last writer is
+        ; UpdateEnabledMagic (:14736), whose OWN scratch this cell is: it
+        ; parks the caster's current MP + 1 there as the "max mp cost"
+        ; CheckMagicEnabled compares each row against.  That is not a price,
+        ; and it is routinely far above the 99 ceiling every price obeys --
+        ; #233 was a reading of 159, which was CELES's 158 MP plus one.
+        ; Nothing charges it today, because CmdNoEffect is an rts, so this is
+        ; the latent half; the live half is that anything reading the cell
+        ; (the harness's own [fizzle] observer did) is told a lie about what
+        ; this turn costs.  Clearing it here makes "the staged cost is the
+        ; cost" true for every ExecCmd rather than for most of them, and a
+        ; cost above 99 stops being reachable without being a price.
+        ;
+        ; Not a clamp to 99: the ceiling may not be enforced on this cell at
+        ; all, because one legal price is above it.  Phoenix costs 110
+        ; (MagicProp +$05) and is drawn by the three-digit summon routine, so
+        ; a clamp here would quietly make a summoned Phoenix cheaper than
+        ; vanilla -- exactly the "cap never makes a boost cheaper" exception
+        ; Ot6BoostPriceFor carries (mp-economy.md, ruling 1).  The number to
+        ; remove is the one that was never a cost.
+        stz     $3a4c       ; an action that was never staged costs nothing
+.endif
         lda     $32cc,x     ; command list pointer
         bmi     @0183       ; branch if not valid
         asl
