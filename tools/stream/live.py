@@ -109,9 +109,14 @@ async function tick(){ try{
   $('empty').style.display = all.length ? 'none' : 'block';
   $('hdr').textContent = all.length ? (all.length+' active worker'+(all.length>1?'s':'')
     + ' · '+all.filter(w=>w.stuck).length+' frozen'
-    + (starting.length ? ' · '+starting.length+' starting' : '')) : '';
+    + (starting.length ? ' · '+starting.length+' no frame yet' : '')) : '';
+  // Deliberately NOT called "starting": these are live processes (the census
+  // only lists run.logs touched in the last ACTIVE_SEC), but a worker with
+  // neither a screenshot nor a frame counter is either still booting OR a run
+  // with OT6_LIVE=0, which never streams either one.  The census cannot tell
+  // those apart, so it says what it knows.
   $('starting').textContent = starting.length
-    ? starting.length+' starting, no frame yet: '
+    ? starting.length+' running, no frame yet (booting, or not streaming): '
       + starting.map(w=>w.name).join(' · ')
     : '';
   const seen = new Set();
