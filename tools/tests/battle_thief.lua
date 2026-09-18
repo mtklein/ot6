@@ -4,7 +4,10 @@
 
 -- Locke's four command rows are FIGHT, STEAL, MAGIC, ITEM; Steal opens the
 -- Tools-window shell with Steal, Filch and Bestow in it, and the row rides
--- the queued action's attack byte ($2bb0 -> $3a7b -> $b6).
+-- the queued action's attack byte ($2bb0 -> $3a7b -> $b6).  Note that
+-- $2bb0 + slot*8 is NOT where a write callback sees that byte land: phase 5
+-- measured a confirmed, paid-for Bestow with the watch silent.  Nothing
+-- below drives on it.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/figaro_cleared.mss.lua"
@@ -102,6 +105,18 @@ end
 local function row(i)
   local o = ILIST + i * 6
   return H.readByte(o), H.readByte(o + 1), H.readByte(o + 2)
+end
+-- Since v0.19 an unaffordable kit row is refused AT THE CONFIRM: it buzzes
+-- and the list stays open (Ot6KitConfirmMP, mp-economy.md ruling 2).  A
+-- driver that keeps pressing A at such a row therefore never commits and
+-- never times out on its own -- the run's only symptom is the step's
+-- watchdog, which says nothing about why.  So every step below that drives
+-- a priced row states the pool it needs first, and fails with the number.
+local function affords(cost, what)
+  H.assertEq(mp() >= cost, true, string.format(
+    "%s: the pool affords the row (%d MP, needs %d) -- an unaffordable row "
+    .. "is refused at the confirm and the drive below would only time out",
+    what, mp(), cost))
 end
 
 -- ------------------------------------------------------ the menu drive --
@@ -267,7 +282,10 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- 4: Bestow greys at 0 BP; the bank is spent there rather than written ---
-  H.call(function() modeOf[locke] = "boostkit:0" end),   -- R + Steal: 1-1=0
+  H.call(function()                                      -- R + Steal: 1-1=0
+    affords(COST_STEAL, "phase 2, the boosted steal")
+    modeOf[locke] = "boostkit:0"
+  end),
   driveTo(function() return bp(locke) == 0 end, 20000,
     "a boosted Steal spends the bank to 0 (regen skipped)"),
   parkAtSubmenu(locke, "his next window's submenu, at a 0 bank"),
@@ -298,6 +316,7 @@ H.run({ maxFrames = 120000 }, {
     H.vars.hpA = monsterHpSum()
     H.vars.bA = bp(locke)
     H.assertEq(H.vars.bA, 1, "the ledger: bank reads 1 before the filch")
+    affords(COST_FILCH, "phase 3, the filch")
     modeOf[locke] = "kit:1"
   end),
   driveTo(function() return shieldSum() == H.vars.shA - 1 end, 20000,
@@ -322,6 +341,7 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(bp(locke), 3, "the ledger: Locke holds 3 (1+2)")
     H.assertEq(bp(ally), 1,
       "the ledger: the deferred ally still holds her opening 1")
+    affords(COST_BESTOW, "phase 4, the bestow")
     target = ally
     modeOf[locke] = "kit:2"
   end),
@@ -339,7 +359,19 @@ H.run({ maxFrames = 120000 }, {
     H.log("PASSED phase 4: Bestow moves a boost point from Locke to an ally")
   end),
 
-  H.call(function() modeOf[locke] = "kit:0"; modeOf[ally] = "item" end),
+  -- Both banks to the cap on ITEM turns, which is what this step always
+  -- said it did.  Locke used to walk his on kit:0 -- a 4 MP Steal per turn
+  -- -- and the loop does not end until the ALLY's gauge has also filled
+  -- three more times, so how many Steals Locke paid for was decided by how
+  -- the two gauges interleaved: luck, standing in for the precondition the
+  -- capped Filch and Bestow below actually need, which is a pool that can
+  -- pay for them.  Measured: 5 Steals, 37 MP down to 2, and the 6 MP Filch
+  -- was then correctly refused at the confirm (v0.19, Ot6KitConfirmMP) --
+  -- the window held open and the driver pressed A at the greyed row until
+  -- the watchdog fired (4844 buzzed confirms; build/attempts/repro).  On
+  -- item turns the whole test's spend is fixed at 26 of his 37, whatever
+  -- the gauges do.
+  H.call(function() modeOf[locke] = "item"; modeOf[ally] = "item" end),
   driveTo(function() return bp(locke) == 5 and bp(ally) == 5 end, 60000,
     "interleaved item turns walk both banks to the cap"),
   H.call(function() modeOf[ally] = "defer" end),
@@ -365,6 +397,9 @@ H.run({ maxFrames = 120000 }, {
   end)(),
   H.call(function()
     H.vars.shB = shieldSum()
+    H.log(string.format("at the cap: locke mp %d (was %d before the item "
+      .. "turn), bank %d", mp(), H.vars.mpCap, bp(locke)))
+    affords(COST_FILCH, "phase 5, the capped filch")
     modeOf[locke] = "kit:1"
   end),
   driveTo(function() return shieldSum() == H.vars.shB - 1 end, 20000,
@@ -375,23 +410,49 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(bp(locke), 5,
       "a Filch at 5 BP still takes the shield and banks NOTHING (the cap)")
     H.assertEq(bp(ally), 5, "ally at the cap (banked by her own real turns)")
+    affords(COST_BESTOW, "phase 5, the capped bestow")
     target = ally
     modeOf[locke] = "kit:2"
     H.vars.bC = bp(locke)
   end),
-  -- the no-op bestow: nothing observable moves, so drive on the QUEUE
-  -- becoming visible and then settle
+  -- The no-op bestow: none of the numbers this phase asserts on is supposed
+  -- to move, so the drive needs a signal of its own.  It used to wait on a
+  -- write to $2bb0 + slot*8, the queued action's attack byte -- and that
+  -- write never arrives here.  Measured twice: the drive burned its whole
+  -- 20000-frame budget while the pool went 8 -> 3, so the row was confirmed
+  -- and paid for with the watch silent (build/attempts/fix1), and again with
+  -- the watch widened to $2bb0..$2bb5 so it also covered set_target_data's
+  -- second arm at $2bb3,y (btlgfx_main.asm:17285) -- still `queue=false`
+  -- beside a pool that had paid.  Whatever this test believed about where
+  -- the id lands, the drive was waiting on a signal that does not come.
+  --
+  -- So drive on the ROM's own receipt for the row instead: the pool moving
+  -- by exactly Bestow's price.  Ot6ActionEnd charges it, so the debit also
+  -- means the action resolved, which is what the settle below waits for
+  -- anyway, and it is asserted afterwards rather than assumed.  The queue
+  -- watch stays as an observation and the log reports it.
   (function()
-    local sawQ = false
+    local sawQ, mp0 = false, nil
     return H.repeatN(1, {
       H.call(function()
+        mp0 = mp()
+        local q = 0x7E2BB0 + locke*8
         emu.addMemoryCallback(function()
           sawQ = true
-        end, emu.callbackType.write, 0x7E2BB0 + locke*8, 0x7E2BB0 + locke*8)
+        end, emu.callbackType.write, q, q + 5)
       end),
-      driveTo(function() return sawQ end, 20000, "the capped bestow is queued"),
-      H.call(function() modeOf[locke] = "defer"; target = nil end),
+      driveTo(function() return sawQ or mp() <= mp0 - COST_BESTOW end, 20000,
+        "the capped bestow is queued and paid for"),
+      H.call(function()
+        H.log(string.format("capped bestow signal: queue=%s pool %d -> %d",
+          tostring(sawQ), mp0, mp()))
+        modeOf[locke] = "defer"; target = nil
+      end),
       H.waitFrames(400),
+      H.call(function()
+        H.assertEq(mp() <= mp0 - COST_BESTOW, true,
+          "the capped bestow really was confirmed: the pool paid its 5 MP")
+      end),
     })
   end)(),
   H.call(function()
