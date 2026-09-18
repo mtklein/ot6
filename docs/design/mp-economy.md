@@ -408,6 +408,16 @@ it folds instead: Fire 4 -> 20 -> 51 -> 51, Cure 5 -> 25 -> 40 -> 40.
 SwdTech's column is unchanged at 4/10/13/16/18/28/50/99, because its
 boost was already spent on the row.
 
+Those two magic columns are measured and not only tabulated (#226).
+`battle_boostcharge` puts the Ifrit magicite on LOCKE through the field
+menu and takes his kit through the real battle menu on `n024_entry`,
+reading the pool at the queue and again at the charge: a one-pip Inferno
+took 65 and a two-pip one took 99 against a base of 26, a one-pip Drain
+took 38 against 15, and -- the contrast -- a one-pip Fire took 20, which
+is Fire 2's own vanilla MP and not the 10 the 2.5x would have charged.
+Each arm names the number it must not be, so the file cannot pass under
+the other rule.
+
 The one spell left out of all of this is Step Mine (lore `$99`). Its
 price is not `MagicProp`'s: battle init derives it from the play clock
 straight into each caster's list row, and nothing at price-resolution
