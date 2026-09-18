@@ -2,7 +2,7 @@
 """live.py -- watch a headless run while it happens.  No video anywhere:
 the harness's own stdout stream is the broadcast.
 
-    OT6_LIVE=1 tools/tests/run.sh tools/tests/<x>.lua &    # the run
+    tools/tests/run.sh tools/tests/<x>.lua &               # the run
     python3 tools/stream/live.py                           # the viewer
 
 Follows the newest (or the named) run workspace under build/test-runs/ by
@@ -110,23 +110,18 @@ async function tick(){ try{
   $('empty').style.display = all.length ? 'none' : 'block';
   $('hdr').textContent = all.length ? (all.length+' active worker'+(all.length>1?'s':'')
     + ' · '+all.filter(w=>w.stuck).length+' frozen'
-    + (starting.length ? ' · '+starting.length+' without a picture' : '')) : '';
-  // These are live processes either way -- the census only lists run.logs
-  // touched in the last ACTIVE_SEC -- but WHY they have no picture matters:
-  // one group will get one shortly, the other never will.  run.sh settles it
-  // by writing `OT6_LIVE = <n>` into the workspace's composed_live.lua and
-  // omitting it when live is off, which the server reads into w.streams.  A
-  // run that is not broadcasting still gets its latest log line here, since
-  // that is the only thing it has to show.
-  const booting = starting.filter(w=>w.streams !== false);
-  const mute = starting.filter(w=>w.streams === false);
+    + (starting.length ? ' · '+starting.length+' booting' : '')) : '';
+  // Live processes whose first screenshot has not landed yet.  There is no
+  // second case any more: OT6_LIVE is gone and every run broadcasts, so a
+  // worker without a picture is booting rather than mute, and it promotes
+  // itself into the grid as soon as it has a frame.  Its latest log line is
+  // shown meanwhile, since that is all it has.
   let html = '';
-  if(booting.length) html += '<div>' + booting.length
-    + ' booting, no frame yet: <span style="color:#7a7">'
-    + booting.map(w=>esc(w.name)).join(' · ') + '</span></div>';
-  mute.forEach(w=>{ html += '<div style="margin-top:3px">'
-    + '<span style="color:#a96">not broadcasting</span> · '
-    + esc(w.name) + (w.frame!=null ? ' · frame '+nf(w.frame) : '')
+  if(starting.length) html += '<div>' + starting.length
+    + ' booting, no frame yet</div>';
+  starting.forEach(w=>{ html += '<div style="margin-top:3px">'
+    + '<span style="color:#7a7">' + esc(w.name) + '</span>'
+    + (w.frame!=null ? ' · frame '+nf(w.frame) : '')
     + (w.last ? '<div style="color:#687;padding-left:14px;white-space:nowrap;'
       + 'overflow:hidden;text-overflow:ellipsis">' + esc(w.last) + '</div>' : '')
     + '</div>'; });
@@ -420,28 +415,6 @@ def _safe_id(s):
     return re.sub(r"[^A-Za-z0-9_.-]", "_", s)
 
 
-def streams_live(log):
-    """Does this worker broadcast at all?  True/False, or None if unknowable.
-
-    A worker with no screenshot and no frame counter is either still booting
-    still booting -- the broadcast is unconditional now, so there is no such
-    thing as a run that will never draw.  A worker without a picture is one
-    whose first screenshot has not reached the log yet, and it will.
-
-    The old answer read the workspace's composed_live.lua for an `OT6_LIVE`
-    preamble, because a run launched with OT6_LIVE=0 emitted neither
-    screenshots nor a frame counter and was indistinguishable from a booting
-    one.  That flag is gone (run.sh), so this always reports True.
-    """
-    path = os.path.join(os.path.dirname(log), "composed_live.lua")
-    try:
-        with open(path, "rb") as f:
-            head = f.read(64)
-    except OSError:
-        return None            # not written yet, or cleaned up: do not guess
-    return head.startswith(b"OT6_LIVE")
-
-
 def _last_note(data):
     """The newest ordinary [ot6] line in a log tail, for a worker that has no
     picture to show.  A non-streaming run is not silent, it just is not
@@ -560,9 +533,9 @@ def grid_thread(webroot, stop, live_ref=None):
                 "stuck": bool(stuck),
                 "live": bool(live_test and dirname.split(".")[0] == live_test)}
             if not have:
-                # nothing to draw: say WHY, and offer the log line instead of
-                # an empty tile (streams_live / _last_note)
-                rec["streams"] = streams_live(log)
+                # nothing to draw YET -- the broadcast is unconditional, so
+                # this worker is booting and will fill in.  Offer its latest
+                # log line meanwhile, which is all it has.
                 rec["last"] = _last_note(data)
             workers.append(rec)
         # prune tiles/PNGs for workers that finished

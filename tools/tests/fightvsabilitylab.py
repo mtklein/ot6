@@ -560,7 +560,7 @@ def run_one(fixture, policy, jitter, timeout, subdir=None):
     open(lua, "w", encoding="utf-8").write(src)
     env = dict(os.environ)
     env.update({
-        "OT6_LIVE": "0", "OT6_TIMEOUT": str(timeout),
+        "OT6_TIMEOUT": str(timeout),
         "OT6_WORKER": "fvalab-%s-%s" % (fixture, tag),
         "OT6_ARTIFACT_DIR": os.path.join(d, tag),
         "OT6_NO_PUBLISH": "1",
