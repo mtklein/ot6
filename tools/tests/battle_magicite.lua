@@ -273,6 +273,27 @@ local function carePlan()
 end
 local plans, planKey = {}, {}            -- per bench actor: the held plan, its log key
 local summonArmed = {}                   -- per summoner: this window came through the esper list
+-- ...and the summoner's pool AS SHE CONFIRMED IT, which is the only
+-- baseline a "the divine charged its N MP" claim can rest on.
+--
+-- It used to rest on her pool at the top of the fight, and that is a claim
+-- about everyone else's turns as well as her own.  NUMBER 024 muddles, and
+-- a muddled Celes takes a turn of her own before she ever reaches the
+-- esper window: measured at "[exec f1836] party3 cmd=02 atk=23", a spell
+-- nobody chose, in the gap between the muddle landing at f1581 and her
+-- divine at f3107 (build/attempts/<branch>/attempts/bisect/
+-- post-battle_magicite.log).
+-- Her pool was then permanently off the pinned number, "queued and paid
+-- for" could not come true on any later frame, and the drive spent its
+-- whole 20000-frame budget parked in her magic list while the boss ground
+-- the party down -- the run ended in a GAME OVER instead of at the thing
+-- it measures.  Sampling at the confirm keeps the assertion word for word
+-- and stops it depending on nothing else touching her MP first.
+local mpAtArm = {}
+local function armSummon(slot)
+  if not summonArmed[slot] then mpAtArm[slot] = mp(slot) end
+  summonArmed[slot] = true
+end
 -- Steering a Fight onto an ally: the Fight target screen opens on the
 -- monster column, where the party mask ($7b7d) can hold a stale value
 -- and the shared targetCursor confirms early (measured: the first
@@ -540,7 +561,7 @@ local function decide()
     elseif st == ST_MAGIC then btn = "up"       -- to the top, then the esper window
     elseif st == ST_ESPER then
       if summonHold(locke, "Locke") then btn = nil
-      else btn = "a"; summonArmed[locke] = true end
+      else btn = "a"; armSummon(locke) end
     elseif st == ST_TGT then
       -- confirm only a target screen this branch opened from the esper
       -- window: when the mode flipped medic -> summon with his Fight's
@@ -616,7 +637,7 @@ local function decide()
         else btn = "up" end
       elseif st == ST_ESPER then
         if summonHold(celes, "Celes") then btn = nil
-        else btn = "a"; summonArmed[celes] = true end
+        else btn = "a"; armSummon(celes) end
       elseif st == ST_TGT then btn = summonArmed[celes] and "a" or "b"   -- as Locke's
       else btn = settle(act, st) end
       if st == ST_CMD then summonArmed[celes] = nil end
@@ -723,7 +744,7 @@ local function enterBoss(tag)
       end
       H.assertEq(locke ~= nil and celes ~= nil, true,
         tag .. ": LOCKE and CELES really fight this")
-      plans, planKey, summonArmed = {}, {}, {}
+      plans, planKey, summonArmed, mpAtArm = {}, {}, {}, {}
       divineDispatch, holdWhy, monInFlight = {}, {}, 0
       steerBails = 0
       R.osmoses = {}
@@ -818,7 +839,8 @@ H.run({ maxFrames = 150000 }, {
       end),
       driveTo(function()
         return H.readWord(SUMMONED) & mask(celes) ~= 0
-           and mp(celes) == R.mp0 - DDUST_MP
+           and mpAtArm[celes] ~= nil
+           and mp(celes) == mpAtArm[celes] - DDUST_MP
       end, 20000, "Celes's Diamond Dust is really queued and paid for"),
       H.call(function()
         celesMode = "defer"
@@ -840,12 +862,13 @@ H.run({ maxFrames = 150000 }, {
         -- parked window never presses; a Defer was measured NOT to rebuild
         -- them.  An earlier cut pinned 31 here and needed a live-RAM refund
         -- ahead of that rebuild; the higher pin removes the write.)
-        R.ddustDebit = R.mp0 - mp(celes)
+        R.ddustDebit = mpAtArm[celes] - mp(celes)
         lockeMode = "summon"
       end),
       driveTo(function()
         return H.readWord(SUMMONED) & mask(locke) ~= 0
-           and mp(locke) == lm0 - INFERNO_MP
+           and mpAtArm[locke] ~= nil
+           and mp(locke) == mpAtArm[locke] - INFERNO_MP
       end, 20000, "Locke's Inferno is really queued and paid for"),
       H.call(function()
         lockeMode = "medic"
@@ -855,9 +878,10 @@ H.run({ maxFrames = 150000 }, {
         "Inferno resolves against NUMBER 024"),
       H.call(function()
         H.log(string.format("[divines] boss hp %d->%d->%d st3=%02x | celes "
-          .. "mp %d->%d | locke mp %d->%d | $3f2e=%04x", R.hp0, R.hpMid or -1,
-          bossHp(), bossSt3(), R.mp0, mp(celes), lm0, mp(locke),
-          H.readWord(SUMMONED)))
+          .. "mp %d->%d (fight opened at %d) | locke mp %d->%d (opened at "
+          .. "%d) | $3f2e=%04x", R.hp0, R.hpMid or -1,
+          bossHp(), bossSt3(), mpAtArm[celes], mp(celes), R.mp0,
+          mpAtArm[locke], mp(locke), lm0, H.readWord(SUMMONED)))
         H.assertEq(R.hpMid ~= nil and R.hpMid < R.hp0, true,
           "[ddust] the divine HIT (positive control for the status result)")
         H.assertEq(bossHp() < R.hpMid, true, "[inferno] the control divine hit too")
@@ -866,7 +890,8 @@ H.run({ maxFrames = 150000 }, {
           .. "immunity blocks it -- per-monster immunity is still consulted; "
           .. "[inferno] and Inferno carries no rider of its own")
         H.assertEq(R.ddustDebit, DDUST_MP, "[ddust] the summon charged its 27 MP (the debit verified at the queue)")
-        H.assertEq(lm0 - mp(locke), INFERNO_MP, "[inferno] charged its 26 MP")
+        H.assertEq(mpAtArm[locke] - mp(locke), INFERNO_MP,
+          "[inferno] charged its 26 MP")
         H.assertEq(H.readWord(SUMMONED) & mask(celes) ~= 0, true,
           "[latch] the engine set Celes's once-per-battle bit in $3f2e")
         H.assertEq(H.readWord(SUMMONED) & mask(locke) ~= 0, true,
@@ -881,7 +906,7 @@ H.run({ maxFrames = 150000 }, {
     -- Boot A's pool is her maximum, so nothing here needs a refund: the
     -- window below must show the summon row greyed by the LATCH alone,
     -- with every kit row live by MP.
-    H.assertEq(mp(celes), R.mp0 - DDUST_MP, "[latch] her pool is the divine's debit and nothing else (no refund, nothing spent since)")
+    H.assertEq(mp(celes), mpAtArm[celes] - DDUST_MP, "[latch] her pool is the divine's debit and nothing else (no refund, nothing spent since the confirm)")
   end),
   driveTo(function()
     return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC

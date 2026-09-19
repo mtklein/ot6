@@ -469,6 +469,27 @@ H.run({ maxFrames = 150000 }, {
             }),
             H.release(),
             H.waitFrames(60),
+            -- ...and then WAIT for the byte to come to rest instead of
+            -- reading it once.  "The cycle completed" is a liveness
+            -- statement about the gate, and a single sample 60 frames later
+            -- also scores whatever ELSE the fight raised in the meantime.
+            -- #236 made that a real difference rather than a theoretical
+            -- one: an uncontrolled actor now spends its bank, Ot6ActionEnd's
+            -- charge arm moves it, and Ot6BankMoved raises a perfectly
+            -- healthy fresh request whenever a bank moves under an open kit
+            -- window.  Measured landing on the very frame this used to read
+            -- (build/attempts/<branch>/lab/bushido/probe_restage, "f2089
+            -- restage <- $80 pc $f00cb9" one frame after "f2089 e0 <- 0 pc
+            -- $f00d10", the berserked CYAN charging 2 off his bank, with
+            -- OT6_UNCTL = $01).  The wait says what was meant and says it
+            -- about every request raised in the window; the unfixed gate of
+            -- #77 leaves the byte $80 forever, so it still fails here -- on
+            -- this wait, with the byte named.
+            H.call(function()
+              H.vars.restMark, H.vars.restSeen = H.frame, H.readByte(RESTAGE)
+            end),
+            H.waitUntil(function() return H.readByte(RESTAGE) == 0 end, 240,
+              "OT6_RESTAGE to come back to rest (the gate hands it back)", 1),
             H.call(function()
               local seen, sawFresh, sawCycle = {}, false, false
               for _, v in ipairs(restageTrace) do
@@ -477,10 +498,13 @@ H.run({ maxFrames = 150000 }, {
                 if v >= 1 and v <= 3 then sawCycle = true end
               end
               local left = H.readByte(RESTAGE)
+              local settle = H.frame - H.vars.restMark
               local aD, aR = attrOf(NM.Dispatch), attrOf(NM.Retort)
-              H.log(string.format("[#77] restage across the press: %s -> %02x; "
+              H.log(string.format("[#77] restage across the press: %s -> %02x "
+                .. "(60 frames on it read $%02x, at rest %d frame(s) later); "
                 .. "mstate=%02x menu=%d bp=%d pending=%d Dispatch=%s Retort=%s",
-                table.concat(seen, " "), left, H.readByte(MSTATE),
+                table.concat(seen, " "), left, H.vars.restSeen, settle,
+                H.readByte(MSTATE),
                 H.readByte(MENU), bp(), pend(), tostring(aD), tostring(aR)))
               -- positive control: the press has to have reached Ot6Boost at
               -- all.  Its @refold arm banks the pending boost and raises
@@ -499,7 +523,14 @@ H.run({ maxFrames = 150000 }, {
                 "the gate STARTED a staging cycle over the open kit window "
                 .. "(flag 1-3) -- the unfixed gate served the magic list only "
                 .. "and left it $80 (#77)")
-              H.assertEq(left, 0, "and the cycle completed, handing the byte back")
+              -- and it came back promptly.  A fresh request costs one frame
+              -- to raise plus the cycle's four staged lines, so anything
+              -- that rests inside one cycle is the gate draining normally
+              -- and anything longer is a gate that is not draining.
+              H.assertEq(settle <= 8, true, string.format(
+                "and the cycle completed, handing the byte back within one "
+                .. "cycle (%d frame(s) to rest, from $%02x)",
+                settle, H.vars.restSeen))
               H.assertEq(H.readByte(MSTATE), ST_TOOLS,
                 "the window is still up: a re-stage must not walk it shut")
               H.assertEq(aD, WHITE, "Dispatch is still white after the re-stage")

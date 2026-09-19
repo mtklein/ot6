@@ -1962,16 +1962,54 @@ function M.fieldHudPresent()
   return false
 end
 
--- party-window bp pip glyph word for menu row 0 (first party member)
-function M.pipWord()
+-- party-window bp pip glyph word for an arbitrary menu row.  Ot6PipStage
+-- derives the same address as $7814 + (2*row + 1)*32 words, which is byte
+-- 0x68 + row*0x80 from this map's base.
+function M.pipWordRow(row)
   local reg = M.readByte(0x897f)
   local base = ((reg - (reg % 4)) * 256) * 2
-  return emu.readWord(base + 0x68, emu.memType.snesVideoRam)
+  return emu.readWord(base + 0x68 + row * 0x80, emu.memType.snesVideoRam)
+end
+
+-- party-window bp pip glyph word for menu row 0 (first party member)
+function M.pipWord() return M.pipWordRow(0) end
+
+-- THE LIVE pip cell: which row the HUD is actually painting pips in, and
+-- the word standing in it.  Returns nil when the pseudo-line is off.
+--
+-- The party window has exactly ONE pip cell (ot6_hud.asm, Ot6PipStage:
+-- "one cell can only show one row").  It follows the active character
+-- while a battle menu is open and the character who just spent or gained
+-- BP for OT6_PIPTAIL frames after their action resolved, and the flush
+-- BLANKS the row it left to $21ff on the way.  So "row 0 shows pips" is a
+-- fact about where the line happens to be parked on the frame you looked,
+-- not a fact about the HUD: M.pipWord() reads row 0 whether or not the
+-- line is there, and can read a stale glyph nothing has blanked yet.
+-- Read the line where the ROM put it instead.
+--
+-- OT6_PIPPREV ($57ce) rather than OT6_PIPCUR ($57cc): PREV is the cell the
+-- NMI flush last actually wrote, CUR is the one it will write next, so
+-- PREV is the one whose VRAM word is already the painted one.
+function M.livePipCell()
+  local prev = M.readWord(0x57ce)
+  if prev == 0 then return nil end
+  local row = (prev - 0x7834) // 64
+  if row < 0 or row > 3 or (prev - 0x7834) % 64 ~= 0 then return nil end
+  return row, M.pipWordRow(row)
 end
 
 function M.isPipGlyph(w)
   local set = {[0x72]=1,[0x73]=1,[0x75]=1,[0x76]=1,[0x77]=1,[0x79]=1}
   return (w >> 8) == 0x21 and set[w & 0xFF] ~= nil
+end
+
+-- ...and the boost-arrow cluster the SAME cell shows instead while a boost
+-- is pending and uncommitted (Ot6PipStage's @arrow arm, Ot6ArrowCellTbl).
+-- It pulses between palette 0 and 2, so the attribute is $21 or $29.
+function M.isArrowGlyph(w)
+  local set = {[0x68]=1,[0x6c]=1,[0x6d]=1}
+  local attr = w >> 8
+  return (attr == 0x21 or attr == 0x29) and set[w & 0xFF] ~= nil
 end
 
 function M.waitFrames(n)
@@ -6956,12 +6994,42 @@ end
 -- fighting when it works, and it times out on unrunnable formations
 -- and on every event battle whose win-bit the story checks, so callers pick
 -- fight or flee per step and record why.  No writes.
+--
+-- A run can be OVERTAKEN by the fight it is running from.  The party's
+-- already-queued actions keep resolving under the held L+R, and when they
+-- finish the last body the battle ends in a win instead of an escape.  The
+-- spoils that follow ("Got N Exp. point(s)", the level-up and item boxes)
+-- are advanced by A and by nothing else, and battleLoadStarted() reads true
+-- the whole way through them -- so L+R held there is a deadlock, not a slow
+-- run.  Measured: #236 moved battle_slots' H1 battle by four frames (the
+-- regen drive before the flee ran 693 frames instead of 689), the last
+-- monster died just before the run roll landed, and this step sat on the
+-- Exp box for its entire 12000-frame budget
+-- (build/attempts/<branch>/lab/slots/, the failure frame is that screen).
+-- Which of the two ends a nearly-dead formation reaches is not something a
+-- caller can promise, so the step answers both: run while there is anything
+-- to run from, and press through the win when there is not.
+--
+-- "Nothing to run from" is nothing standing (M.stageSlots empty, which is
+-- live presence and live HP) with no battle menu open, so an A never lands
+-- on a command window; a wipe is not this shape and is still the canary's
+-- (a game over freezes the pad before an A can auto-Continue it).
+-- The A cadence is closure state of this constructor's own, so it is named
+-- through withReset (the library's state is the library's to clear, #196).
 function M.fleeBattle(maxFrames)
-  return M.driveUntil(function()
+  local aPhase = 0
+  return M.withReset(M.driveUntil(function()
     return not M.battleLoadStarted()
   end, maxFrames or 9000, {
-    M.call(function() M.setPad({ l = true, r = true }) end),
-  }, "flee battle (hold L+R)")
+    M.call(function()
+      if #M.stageSlots() == 0 and M.readByte(0x7BCA) == 0 then
+        aPhase = (aPhase + 1) % 8
+        M.setPad(aPhase < 4 and { "a" } or {})
+      else
+        M.setPad({ l = true, r = true })
+      end
+    end),
+  }, "flee battle (hold L+R)"), function() aPhase = 0 end)
 end
 
 
