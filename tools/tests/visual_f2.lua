@@ -48,6 +48,9 @@ local function pipVerdict(what)
 end
 
 H.run({ maxFrames = 20000 }, {
+  -- this file's own counters, cleared in the body's first call so a retry
+  -- starts from zero (the library's state is the library's; #196)
+  H.call(function() pip.seen, pip.live, pip.good, pip.junk = 0, 0, 0, nil end),
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
