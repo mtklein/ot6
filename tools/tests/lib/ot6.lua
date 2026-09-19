@@ -7014,9 +7014,11 @@ end
 -- live presence and live HP) with no battle menu open, so an A never lands
 -- on a command window; a wipe is not this shape and is still the canary's
 -- (a game over freezes the pad before an A can auto-Continue it).
+-- The A cadence is closure state of this constructor's own, so it is named
+-- through withReset (the library's state is the library's to clear, #196).
 function M.fleeBattle(maxFrames)
   local aPhase = 0
-  return M.driveUntil(function()
+  return M.withReset(M.driveUntil(function()
     return not M.battleLoadStarted()
   end, maxFrames or 9000, {
     M.call(function()
@@ -7027,7 +7029,7 @@ function M.fleeBattle(maxFrames)
         M.setPad({ l = true, r = true })
       end
     end),
-  }, "flee battle (hold L+R)")
+  }, "flee battle (hold L+R)"), function() aPhase = 0 end)
 end
 
 
