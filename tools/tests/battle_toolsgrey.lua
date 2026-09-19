@@ -20,10 +20,6 @@ local STATE = "build/states/kolts_cave.mss.lua"
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_ITEM, ST_TOOLS, ST_TGT = 0x05, 0x0A, 0x30, 0x38
 local CMD_TOOLS, CMD_ITEM, CMD_FIGHT = 0x09, 0x01, 0x00
--- per-actor latch: this driver confirmed an Item for that actor, so the
--- target select that follows is the heal's and may be steered at a party
--- member.  Cleared the moment the actor's menu leaves the item/target pair.
-local healAsked = {}
 local CMDTBL, ITEMLIST = 0x202E, 0x4005
 local EDGAR = 0x04
 local WHITE, GREY = 0x21, 0x25
@@ -125,6 +121,10 @@ end
 -- ------------------------------------------------------------------------
 local mode = "spend"
 local ph, lane, hb = 0, nil, -600
+-- per-actor latch: this driver confirmed an Item for that actor, so the
+-- target select that follows is the heal's and may be steered at a party
+-- member.  Cleared the moment the actor's menu leaves the item/target pair.
+local healAsked = {}
 local lastMap = nil                     -- names any walk off map 96 (see pulse)
 local BACK = { left = "right", right = "left", up = "down", down = "up" }
 local function pulse()
@@ -201,8 +201,8 @@ local function pulse()
       -- not the heal's, and LOCKE's Steal is enemies-only: hunting a party
       -- slot in it spends the cursor's whole budget and bails with "slot 2
       -- never lit" over a learned map of nothing but monster masks.  That
-      -- is how this file failed on #236's ROM -- see healAsked below for
-      -- how the cursor got parked on Steal, and
+      -- is how this file failed on #236's ROM -- the Defend arm at the
+      -- bottom of this function says how the cursor got parked on Steal, and
       -- build/attempts/<branch>/lab/toolsgrey/targetcursor_bail.png for the
       -- Steal/Filch/Bestow list standing open behind the bail.
       if healAsked[a] then
