@@ -496,6 +496,22 @@ done:   rtl
 ; An empty bank dumps nothing and leaves the grudge standing, so the actor
 ; hits back on the first turn it has anything to hit back with.
 ;
+; WHAT THIS DOES NOT COVER, recorded so it is not rediscovered:
+;
+;   * Umaro's three special arms.  The dump hangs off Ot6FightBoost, which
+;     hangs off FightAttack, and only one of UmaroAttackTbl's four slots IS
+;     FightAttack -- with no relics 158 of 253 rolls (RandBitRateTbl row 0,
+;     $9e/$5f) take that plain swing and carry the dump, and his Throw,
+;     Storm and Charge do not.  Giving those three the swings half needs a
+;     second hook at their own ExecAttack entries.  Umaro is World of Ruin
+;     content, so this is designed and read off the ROM, never played.
+;   * An AI-SCRIPTED character -- Biggs and Wedge in the opening, and any
+;     set piece that drives a party member from a script.  QueueAction sends
+;     them to ExecMonsterAction before it ever reaches the no-pending-action
+;     arm, so they never touch RandCharAction and never set OT6_UNCTL: they
+;     still bank with nothing to spend it on, exactly as everyone did before
+;     this.  One more latch site at that branch would close it.
+;
 ; jsr from Ot6FightBoost only, inside its character and counterattack guards
 ; and only once it has established that nobody bought a boost for this
 ; action.  a8/i16, x = the attacker's entity offset.  Clobbers A, leaves the

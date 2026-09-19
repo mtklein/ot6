@@ -227,6 +227,17 @@ OT6_PIPPEND          := $ed74   ; a deferred pip paint: character slot
 ; proc that early-outs is over budget.  Nonzero = at least one slot has a
 ; live countdown; the painter recomputes it as it walks, so a stale value
 ; costs exactly one walk and the byte needs no init clear.
+;
+; MEASURED SINCE (#236): "essentially no cycle slack" is too strong.  A delay
+; loop of known length on that very path, watched through WaitVblank's own
+; return interval rather than through a phase length, misses no vblank at
+; ~10k cycles per iteration, misses a third of them at ~20k and a third at
+; ~41k (build/lab/canary/, and the calibration table in
+; battle_trueknight.lua).  So the real headroom is thousands of cycles, not
+; tens, and the inline gate above is cheap insurance rather than a
+; requirement.  What the old evidence for "no slack" was actually seeing is
+; a phase span re-rounding by a whole ATB round on a one-frame shift; that
+; is why the canary now counts dropped vblanks instead.
 OT6_BRKLIVE          := $ed75
 OT6_BRKTICK          := $ed76   ; 12 bytes
 OT6_BRKPAL           := $ed82   ; 12 bytes
