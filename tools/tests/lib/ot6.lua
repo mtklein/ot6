@@ -6994,11 +6994,39 @@ end
 -- fighting when it works, and it times out on unrunnable formations
 -- and on every event battle whose win-bit the story checks, so callers pick
 -- fight or flee per step and record why.  No writes.
+--
+-- A run can be OVERTAKEN by the fight it is running from.  The party's
+-- already-queued actions keep resolving under the held L+R, and when they
+-- finish the last body the battle ends in a win instead of an escape.  The
+-- spoils that follow ("Got N Exp. point(s)", the level-up and item boxes)
+-- are advanced by A and by nothing else, and battleLoadStarted() reads true
+-- the whole way through them -- so L+R held there is a deadlock, not a slow
+-- run.  Measured: #236 moved battle_slots' H1 battle by four frames (the
+-- regen drive before the flee ran 693 frames instead of 689), the last
+-- monster died just before the run roll landed, and this step sat on the
+-- Exp box for its entire 12000-frame budget
+-- (build/attempts/<branch>/lab/slots/, the failure frame is that screen).
+-- Which of the two ends a nearly-dead formation reaches is not something a
+-- caller can promise, so the step answers both: run while there is anything
+-- to run from, and press through the win when there is not.
+--
+-- "Nothing to run from" is nothing standing (M.stageSlots empty, which is
+-- live presence and live HP) with no battle menu open, so an A never lands
+-- on a command window; a wipe is not this shape and is still the canary's
+-- (a game over freezes the pad before an A can auto-Continue it).
 function M.fleeBattle(maxFrames)
+  local aPhase = 0
   return M.driveUntil(function()
     return not M.battleLoadStarted()
   end, maxFrames or 9000, {
-    M.call(function() M.setPad({ l = true, r = true }) end),
+    M.call(function()
+      if #M.stageSlots() == 0 and M.readByte(0x7BCA) == 0 then
+        aPhase = (aPhase + 1) % 8
+        M.setPad(aPhase < 4 and { "a" } or {})
+      else
+        M.setPad({ l = true, r = true })
+      end
+    end),
   }, "flee battle (hold L+R)")
 end
 
