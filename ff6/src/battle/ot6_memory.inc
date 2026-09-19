@@ -258,6 +258,49 @@ OT6_RUNICTURNS       := $ed8e   ; 8 bytes (4 characters, stride 2)
 ; interaction nobody asked for and nobody would find.  The rule that a
 ; reactive earn happens once per round is shared; the storage is not.
 OT6_RUNICPAID        := $ed96
+; the retaliation pair (#236).  Two per-character bitmasks in the
+; ----1234 shape OT6_COVERPAID / OT6_RUNICPAID / $3f2f already use.
+;
+; OT6_UNCTL  bit set = the ENGINE, not the player, chose this character's
+;            action.  Set by Ot6UnctlMark at RandCharAction -- vanilla's own
+;            "select berserk/zombie/muddled/charmed/colosseum action"
+;            (battle_main.asm), which is also the arm Umaro reaches, since
+;            CheckPlayerAction refuses him a window by name.  Cleared by
+;            Ot6UnctlClear at the one site that means the opposite: the
+;            frame CheckPlayerAction opens the battle menu for him.  The two
+;            hooks are the two sides of one vanilla decision, so the bit is
+;            the decision, not a re-derivation of it.
+;
+; It sits past InitBP's $70-byte shadow clear, and a stale bit here is a
+; mechanic and not a cosmetic -- it would hand the next battle's first
+; uncontrolled swing a free dump -- so InitBP zeroes it explicitly.
+OT6_UNCTL            := $ed97
+
+; ...and what "got hit" is measured against: the hp each character stood on
+; when its OWN last turn ended, one word per character, stride 2, indexed by
+; the entity offset (0/2/4/6) like OT6_BP_CLASS.  0 = no line yet (the
+; character has not acted in this battle), which is why InitBP zeroes it.
+;
+; Ot6ActionEnd draws the line; Ot6Retaliate reads it and, when the actor now
+; stands BELOW it, dumps and moves the line to where it stands -- so one
+; hurt buys one dump.
+;
+; Why a line and not a damage hook (#236).  The obvious hook is ApplyDmgHP's
+; damage-taken arm, and it was written that way first.  battle_trueknight's
+; frame-budget canary refused it: 1635 frames intact, 1798 -- exactly one
+; missed vblank per battle-loop iteration -- with a `jsl` there, 1635 again
+; with four NOPs in its place (same four bytes, same address), and still
+; 1798 with the called proc reduced to a bare `rtl`.  So it is that site's
+; cycles, at the jsl/rtl alone, and nothing belongs on it
+; (build/attempts/regress/trueknight-{nocalls,clearonly,clear_prov,
+; clear_4nop,prov_rtl}.log).  The line costs one 16-bit load and store per
+; character action instead, on a path that runs once a turn.
+;
+; It also reads better in play than a damage flag: a character is provoked
+; while it stands worse off than when it last swung, so several small hits
+; add up to one grudge, and an ally who heals it back up has genuinely
+; un-provoked it.
+OT6_HPMARK           := $ed98   ; 8 bytes (4 characters, stride 2)
 OT6_BREAK_FLASH      = $18      ; 24 frames: three 4-frame pulses (see
                                 ;   Ot6BreakFlash's `and #$04` cadence)
 OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
@@ -284,6 +327,10 @@ OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
 .assert OT6_RUNICTURNS > OT6_SHADOW + $70 - 1, error, "runic duration sits PAST InitBP's shadow clear (InitBP zeroes it per character)"
 .assert OT6_RUNICPAID <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 .assert OT6_RUNICPAID <> OT6_COVERPAID, error, "the runic and cover earn latches must stay separate ledgers (see OT6_RUNICPAID)"
+.assert OT6_UNCTL = OT6_RUNICPAID + 1, error, "the uncontrolled latch must follow the runic earn latch without a gap"
+.assert OT6_HPMARK = OT6_UNCTL + 1, error, "the hurt line must follow the uncontrolled latch without a gap"
+.assert OT6_UNCTL > OT6_SHADOW + $70 - 1, error, "the retaliation cells sit PAST InitBP's shadow clear (InitBP zeroes them explicitly)"
+.assert OT6_HPMARK + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 
 .endif

@@ -714,7 +714,11 @@ CalcCmdDelay:
 ; B: attack (out)
 
 RandCharAction:
-@0420:  txa
+@0420:  jsl     Ot6UnctlMark            ; ot6 #236: the ENGINE is choosing this
+                                        ;   character's action, so it banks BP
+                                        ;   with nobody to spend it -- latch
+                                        ;   that, and a hit will cash it in
+        txa
         xba
         lda     #6
         jsr     MultAB
@@ -1525,6 +1529,10 @@ _inputcheck:
         lda     $3aa0,x
         ora     #$08
         sta     $3aa0,x                 ; set $3aa0.3 (stop atb gauge)
+        jsl     Ot6UnctlClear           ; ot6 #236: the other side of the same
+                                        ;   decision -- the player has this
+                                        ;   character's window back, so the
+                                        ;   "engine is driving it" latch drops
         jmp     _c211ef                 ; open battle menu
 
 ; ------------------------------------------------------------------------------
