@@ -19,7 +19,11 @@ local STATE = "build/states/kolts_cave.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_ITEM, ST_TOOLS, ST_TGT = 0x05, 0x0A, 0x30, 0x38
-local CMD_TOOLS, CMD_ITEM = 0x09, 0x01
+local CMD_TOOLS, CMD_ITEM, CMD_FIGHT = 0x09, 0x01, 0x00
+-- per-actor latch: this driver confirmed an Item for that actor, so the
+-- target select that follows is the heal's and may be steered at a party
+-- member.  Cleared the moment the actor's menu leaves the item/target pair.
+local healAsked = {}
 local CMDTBL, ITEMLIST = 0x202E, 0x4005
 local EDGAR = 0x04
 local WHITE, GREY = 0x21, 0x25
@@ -182,13 +186,41 @@ local function pulse()
       local cur = H.readByte(0x8947 + a) + H.readByte(0x894F + a)
       if cur < want then H.setPad(slow and { down = true } or {})
       elseif cur > want then H.setPad(slow and { up = true } or {})
-      else H.setPad(slow and { a = true } or {}) end
+      else
+        -- confirming the item is what opens the target select below, and
+        -- the only thing that entitles this driver to steer that window at
+        -- a party member
+        healAsked[a] = true
+        H.setPad(slow and { a = true } or {})
+      end
       return
     elseif st == ST_TGT then
-      local btn = tc.steer(worst, ph)
-      H.setPad(btn and { [btn] = true } or {})
+      -- ...and steer this window toward a PARTY member only when this
+      -- driver is the one that opened it, on the Item it confirmed one
+      -- state ago.  Any other command's target select is the command's,
+      -- not the heal's, and LOCKE's Steal is enemies-only: hunting a party
+      -- slot in it spends the cursor's whole budget and bails with "slot 2
+      -- never lit" over a learned map of nothing but monster masks.  That
+      -- is how this file failed on #236's ROM -- see healAsked below for
+      -- how the cursor got parked on Steal, and
+      -- build/attempts/<branch>/lab/toolsgrey/targetcursor_bail.png for the
+      -- Steal/Filch/Bestow list standing open behind the bail.
+      if healAsked[a] then
+        local btn = tc.steer(worst, ph)
+        H.setPad(btn and { [btn] = true } or {})
+      else
+        H.setPad(ph % 16 < 4 and { a = true } or {})   -- take its default
+      end
+      return
+    elseif st == ST_TOOLS then
+      -- a kit list a bystander opened by accident: back out of it rather
+      -- than pressing A down a list of rows it cannot afford (the run that
+      -- failed buzzed two confirms in here before it reached the cursor)
+      healAsked[a] = false
+      H.setPad(edge and { b = true } or {})
       return
     end
+    if st ~= ST_ITEM and st ~= ST_TGT then healAsked[a] = false end
     if wpct < 55 then                   -- somebody needs the heal
       if st == ST_CMD then
         local want = nil
@@ -205,6 +237,26 @@ local function pulse()
       else
         H.setPad(edge and { b = true } or {})
       end
+      return
+    end
+    -- The bystander's turn: a real Defend, which is RIGHT and then A.
+    -- RIGHT does not move the command cursor -- measured, it takes the
+    -- window from state $05 to $27 and leaves $890F,actor alone
+    -- (build/attempts/<branch>/bisect/lab-defend.log) -- so A confirms
+    -- whatever row the cursor is standing on.  The heal arm above drives
+    -- that same cursor down toward Item one press per pass, and when the
+    -- party heals back over the 55% line mid-walk it just stops, leaving
+    -- the cursor parked wherever it got to.  On LOCKE (rows Fight / Steal /
+    -- -- / Item) that is the Steal row, and RIGHT + A there opens his kit
+    -- list and then an enemies-only target select.  So walk the cursor home
+    -- before confirming: an abandoned walk is this driver's to clean up.
+    local fightRow = nil
+    for i = 0, 3 do
+      if H.readByte(CMDTBL + a * 12 + i * 3) == CMD_FIGHT then fightRow = i end
+    end
+    local cmdCur = H.readByte(0x890F + a)
+    if st == ST_CMD and fightRow ~= nil and cmdCur ~= fightRow then
+      H.setPad(edge and { [cmdCur < fightRow and "down" or "up"] = true } or {})
       return
     end
     local step = ph % 40
