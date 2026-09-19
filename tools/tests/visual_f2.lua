@@ -13,9 +13,10 @@
 -- read row 0: it passed on a glyph nothing had blanked yet, and went red
 -- the day #236 moved the fight by a hair and WEDGE's pip gain pulled the
 -- cell to row 2 four frames before the sample (measured:
--- build/attempts/<branch>/bisect/lab-probe_pips.log, "f1454 ... tail=25
--- slot=2 cur=$78b4 cell=$2175 word=$21ff", the $21ff being row 0 blanked
--- behind the move -- and the pre-merge ROM passing at the very same frame).
+-- build/attempts/<branch>/attempts/bisect/lab-probe_pips.log, "f1454 ...
+-- tail=25 slot=2 cur=$78b4 cell=$2175 word=$21ff", the $21ff being row 0
+-- blanked behind the move -- and the pre-merge ROM, with this fixture's
+-- chain regenerated on it, passing at the very same frame).
 --
 -- What the canary is for is that effect art has not clobbered the OT6 font
 -- cells and that the HUD is still drawing bp.  That is asked here as: over

@@ -281,7 +281,8 @@ local summonArmed = {}                   -- per summoner: this window came throu
 -- a muddled Celes takes a turn of her own before she ever reaches the
 -- esper window: measured at "[exec f1836] party3 cmd=02 atk=23", a spell
 -- nobody chose, in the gap between the muddle landing at f1581 and her
--- divine at f3107 (build/attempts/<branch>/bisect/post-battle_magicite.log).
+-- divine at f3107 (build/attempts/<branch>/attempts/bisect/
+-- post-battle_magicite.log).
 -- Her pool was then permanently off the pinned number, "queued and paid
 -- for" could not come true on any later frame, and the drive spent its
 -- whole 20000-frame budget parked in her magic list while the boss ground

@@ -242,8 +242,8 @@ local function pulse()
     -- The bystander's turn: a real Defend, which is RIGHT and then A.
     -- RIGHT does not move the command cursor -- measured, it takes the
     -- window from state $05 to $27 and leaves $890F,actor alone
-    -- (build/attempts/<branch>/bisect/lab-defend.log) -- so A confirms
-    -- whatever row the cursor is standing on.  The heal arm above drives
+    -- (build/attempts/<branch>/attempts/bisect/lab-defend.log) -- so A
+    -- confirms whatever row the cursor is standing on.  The heal arm above drives
     -- that same cursor down toward Item one press per pass, and when the
     -- party heals back over the 55% line mid-walk it just stops, leaving
     -- the cursor parked wherever it got to.  On LOCKE (rows Fight / Steal /
