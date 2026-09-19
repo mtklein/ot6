@@ -663,6 +663,39 @@ three.
 depth, because Rhinox's gauge has no key any weapon in that party carries.
 No amount of boosting buys a chip axis (section 2.1).
 
+### The one player who never had that choice — #236
+
+Everything above assumes a player deciding when to spend. A character the
+player is **not** driving never had the choice: every writer of the pending
+boost was a player-driven path (the boost press, the SwdTech confirm, the
+thief submenu, the Slot reels), so `Ot6ActionEnd` took its regen arm on
+every one of that character's turns. Measured in battle 66 before the
+change: a berserked EDGAR banked 1-2-3-4-5 over four engine-chosen Fights
+while being hit the whole way, and the charge arm ran zero times
+(`build/attempts/<branch>/lab/uncontrolled/probe_bank.log`). The boost
+economy was simply inert for Umaro, a Berserked ally, a Muddled ally and a
+Colosseum fighter alike — one cause, one class.
+
+The rule now is the owner's: **bank normally; when you are hurt, dump the
+whole bank on your next swing.** It lands on the same ladder this document
+measures — the spend caps at 3 while the bank caps at 5, so a dump is at
+most three pips, which is `1 + 2*3 = 7` in `$3a70`, eight passes, and **four
+landed hits with one weapon, eight with a Genji pair**. It costs BP and no
+MP: Fight is free, and `Ot6BoostDmg` exempts command `$00`/`$06` from the
+damage multiplier, so the pips buy swings and nothing else.
+
+Measured on this ROM, eight seeds, `tools/tests/battle_retaliate.lua` and
+`build/attempts/<branch>/sweeps/retaliate/`: bank 5 → 2, pending 3, `$3a70`
+7, 8 passes (4 main, 4 off), 4 landed of a possible 4, every seed. The
+Muddle case is the same numbers with the volley aimed at the party
+(`build/attempts/<branch>/lab/uncontrolled/lab_retaliate_muddle.log`), which
+is the intent and not an oversight. Umaro and the Colosseum are World of
+Ruin content and are reasoned from the ROM rather than played: Umaro is
+refused a command window by name, so he reaches the same engine arm, but
+only one of his four attack slots is `FightAttack` — with no relics, 158 of
+253 rolls (62.5%) take that plain swing and carry the dump, and his Throw,
+Storm and Charge arms do not.
+
 ## 7. The lab
 
 `tools/tests/fightvsabilitylab.py`. Three arms.

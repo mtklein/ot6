@@ -43,6 +43,12 @@
                                 ;   (0/2/4/6) are ever read, and a stale byte
                                 ;   would give the next battle's Celes a
                                 ;   standing magic shield she never paid for
+        sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
+                                ;   this one" latch (#236): it would hand the
+                                ;   first uncontrolled swing of this battle a
+                                ;   dump nobody earned.  Its twin, the hurt
+                                ;   line OT6_HPMARK, is cleared with the
+                                ;   shadow below, where the stores are 16-bit
         lda     #$01
         sta     OT6_BP_CLASS           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -76,6 +82,14 @@
                                 ;   (spare word + random-encounter flags)
                                 ;   must survive init (see the strip's
                                 ;   block comment at OT6_RANDPEND)
+        sta     f:$7e0000+OT6_HPMARK    ; #236: nobody has a hurt line yet,
+        sta     f:$7e0000+OT6_HPMARK+2  ;   and 0 reads as "has not acted in
+        sta     f:$7e0000+OT6_HPMARK+4  ;   this battle" in Ot6Retaliate.  A
+        sta     f:$7e0000+OT6_HPMARK+6  ;   stale line from the last battle
+                                        ;   would read as a grudge nobody
+                                        ;   earned, so it is cleared here and
+                                        ;   not left to the shadow loop above,
+                                        ;   which stops at $ed61
         sta     f:$7e0000+OT6_LASTLR
         sta     f:$7e0000+OT6_RESTAGE   ; word store: the high byte lands on
                                         ;   vanilla's $57d5 name scratch,
@@ -154,6 +168,11 @@
         txa                     ; width-neutral character test
         cmp     #$08
         bcs     done            ; monsters have no bp
+        longa                   ; #236: where this actor stands as its OWN
+        lda     $3bf4,x         ;   turn ends is the line a later hit is
+        sta     f:$7e0000+OT6_HPMARK,x  ;   measured against.  Drawn on both
+        shorta0                 ;   arms and on every character turn, so the
+                                ;   grudge is always "since I last swung"
         txa                     ; the live pip cell follows this actor
         lsr                     ;   entity offset -> character slot
         sta     f:$7e0000+OT6_PIPSLOT
@@ -411,12 +430,199 @@ done:   rtl
                                 ;   unhooked EndAction, so the pending
                                 ;   would be delivered but never charged
         lda     OT6_BOOST_REVEALED,x         ; pending boost level
+        bne     spend           ; the player bought this one: nothing to
+                                ;   decide, it just swings
+        jsr     Ot6Retaliate    ; ot6 #236: nobody bought one, so this may be
+                                ;   an actor the ENGINE is driving, banking
+                                ;   with no way to spend.  If it is, and it
+                                ;   has been hurt, this swing carries its bank
+        lda     OT6_BOOST_REVEALED,x
         beq     done
-        asl                     ; two swings per bp
+        ; The `clc / adc $3a70 / sta $3a70` tail below is DERIVED by
+        ; battle_healpolicy.lua and battle_retaliate.lua out of the first 32
+        ; bytes of this proc, so the decision above stays short and the
+        ; arithmetic stays where those scans can still find it.
+spend:  asl                     ; two swings per bp
         clc
         adc     $3a70
         sta     $3a70
 done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ an uncontrolled actor that got hurt dumps its bank on this swing ]
+
+; #236.  The boost economy was inert for anyone the player was not driving:
+; every writer of OT6_BOOST_REVEALED is a player-driven path (the boost
+; press, the SwdTech confirm, the thief submenu, the Slot reels), so
+; Ot6ActionEnd took its @gain arm on every one of their turns and the bank
+; climbed to the cap of 5 and stayed there.  Measured, not assumed: a
+; berserked EDGAR in battle 66 banked 1-2-3-4-5 over four engine-chosen
+; Fights while Ot6FightBoost saw pending 0 every time and Ot6ActionEnd took
+; the charge arm zero times (build/lab/uncontrolled/probe_bank.log,
+; retained as build/attempts/<branch>/lab/uncontrolled/probe_bank.log).
+;
+; The owner's rule: bank normally; when you get hit, dump the whole bank on
+; your next attack.  So this is the one writer of the pending byte that is
+; not a player's press, and the three questions it answers are:
+;
+;   who   -- OT6_UNCTL, the engine's own decision (see ot6_memory.inc).  Not
+;            a status test: Berserk and Muddle are status bits, Umaro is a
+;            character and the Colosseum is a mode, and re-deriving that
+;            list here would be four ways to disagree with vanilla.  The
+;            latch is set where vanilla chooses the action FOR the actor and
+;            cleared where vanilla hands the player the window.
+;   when  -- OT6_HPMARK, the hp it stood on when its OWN last turn ended.
+;            "Got hit" is IT STANDS LOWER THAN THAT.  A miss changes
+;            nothing, a connect for 0 changes nothing, and several small
+;            hits add up to one grudge -- which is what "hurt them and they
+;            hit back harder" means at the screen.  The first shape of this
+;            was a flag set on ApplyDmgHP's damage-taken arm;
+;            battle_trueknight's frame-budget canary measured that site as
+;            unaffordable at the jsl alone, so the line moved to
+;            Ot6ActionEnd, which runs once a turn.  See OT6_HPMARK in
+;            ot6_memory.inc for the numbers and the logs.
+;   how much -- the whole bank, capped at 3 because Ot6Boost caps every spend
+;            at 3 while the bank caps at 5.  Three pips is +6 swings, so 4
+;            landed hits with one weapon and 8 with a Genji pair -- four or
+;            eight shield-chip opportunities off one provoked swing.  It
+;            costs BP and no MP: Fight is free, Ot6BoostDmg exempts command
+;            $00/$06 from the damage multiplier, and Ot6AbilityCost and
+;            Ot6QueueFold both ran at queue time, long before this.
+;
+; A player's own boost wins: a nonzero pending here was bought with an R
+; press (or a Slot commit, or a SwdTech confirm) and is left exactly alone.
+; An empty bank dumps nothing and leaves the grudge standing, so the actor
+; hits back on the first turn it has anything to hit back with.
+;
+; WHAT THIS DOES NOT COVER, recorded so it is not rediscovered:
+;
+;   * Umaro's three special arms.  The dump hangs off Ot6FightBoost, which
+;     hangs off FightAttack, and only one of UmaroAttackTbl's four slots IS
+;     FightAttack -- with no relics 158 of 253 rolls (RandBitRateTbl row 0,
+;     $9e/$5f) take that plain swing and carry the dump, and his Throw,
+;     Storm and Charge do not.  Giving those three the swings half needs a
+;     second hook at their own ExecAttack entries.  Umaro is World of Ruin
+;     content, so this is designed and read off the ROM, never played.
+;   * An AI-SCRIPTED character -- Biggs and Wedge in the opening, and any
+;     set piece that drives a party member from a script.  QueueAction sends
+;     them to ExecMonsterAction before it ever reaches the no-pending-action
+;     arm, so they never touch RandCharAction and never set OT6_UNCTL: they
+;     still bank with nothing to spend it on, exactly as everyone did before
+;     this.  One more latch site at that branch would close it.
+;
+; jsr from Ot6FightBoost only, inside its character and counterattack guards
+; and only once it has established that nobody bought a boost for this
+; action.  a8/i16, x = the attacker's entity offset.  Clobbers A, leaves the
+; caller's a8.
+
+.proc Ot6Retaliate
+        .a8
+        .i16
+        lda     f:$7e0000+OT6_UNCTL     ; is the engine driving ANYONE?  This
+        beq     out                     ;   whole-byte test first, because on
+                                        ;   every ordinary turn of every
+                                        ;   ordinary battle it answers no in
+                                        ;   one long load and a branch
+        and     $3018,x
+        beq     out                     ; ...and is this one of them?
+        lda     OT6_BP_CLASS,x
+        beq     out                     ; an empty bank spends nothing, and
+                                        ;   must not eat the grudge: the dump
+                                        ;   waits for the first pip
+        longa
+        lda     f:$7e0000+OT6_HPMARK,x  ; where it stood when its own last
+        beq     unhurt                  ;   turn ended (0 = it has not acted
+        cmp     $3bf4,x                 ;   yet, so there is no line)
+        bcc     unhurt                  ; it stands ABOVE the line
+        beq     unhurt                  ; ...or exactly on it: nothing hurt it
+        lda     $3bf4,x                 ; hurt.  The line moves to where it
+        sta     f:$7e0000+OT6_HPMARK,x  ;   stands NOW, so one hurt buys one
+        shorta0                         ;   dump and the next needs a new hit
+        lda     OT6_BP_CLASS,x
+        cmp     #$04
+        bcc     spend
+        lda     #$03                    ; the spend caps at 3 (Ot6Boost's own
+                                        ;   ceiling) while the bank caps at 5
+spend:  sta     OT6_BOOST_REVEALED,x    ; Ot6ActionEnd charges exactly this
+        rts
+unhurt: shorta0
+out:    rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the engine, not the player, is choosing this character's action ]
+
+; #236.  jsl from the head of RandCharAction (battle_main.asm), vanilla's
+; own "select berserk/zombie/muddled/charmed/colosseum action".  That one
+; site is reached from QueueAction's no-pending-action arm, which a player-
+; driven character never takes (their queued command leaves $32cc valid),
+; and which Dance, Rage and Magitek peel off before it -- so it is exactly
+; the set the owner named, plus Umaro, whom CheckPlayerAction refuses a
+; window by name and who therefore arrives here with every other arm
+; declined.
+;
+; a8 at the call site; A is dead there (RandCharAction's first instruction
+; is `txa`) but is preserved anyway, along with every flag.  x = the entity
+; whose action is being chosen; monsters are ignored.  Index width is the
+; caller's and is not touched.
+
+.proc Ot6UnctlMark
+        .a8
+        php
+        longa
+        pha
+        shorta0
+        .a8
+        txa                     ; width-neutral character test
+        cmp     #$08
+        bcs     out             ; monsters have no bank
+        lda     $3018,x
+        ora     f:$7e0000+OT6_UNCTL
+        sta     f:$7e0000+OT6_UNCTL
+out:    longa
+        pla
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ ...and the player has this one back ]
+
+; #236, the other side of the same vanilla decision: jsl from
+; CheckPlayerAction at the instruction that opens the battle menu, which is
+; reached only after every refusal (monster, Umaro, ai script, colosseum,
+; untargetable, seized/charmed, and CheckStatus's dead/petrified/zombie/
+; asleep/muddled/berserked/dancing/hidden/raging list) has declined.
+;
+; Clearing HERE rather than in Ot6ActionEnd is what keeps a cured status
+; from leaving a dump armed: the latch says who decided the action last,
+; and the window opening is the moment the answer changes back.
+;
+; a8 at the call site, A dead (the caller jumps straight into the menu);
+; preserved anyway.  x = the character.
+
+.proc Ot6UnctlClear
+        .a8
+        php
+        longa
+        pha
+        shorta0
+        .a8
+        txa
+        cmp     #$08
+        bcs     out
+        lda     $3018,x
+        eor     #$ff
+        and     f:$7e0000+OT6_UNCTL
+        sta     f:$7e0000+OT6_UNCTL
+out:    longa
+        pla
+        plp
+        rtl
 .endproc
 
 ; ------------------------------------------------------------------------------

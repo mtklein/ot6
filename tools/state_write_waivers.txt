@@ -70,6 +70,7 @@ tools/tests/battle_magicite.lua	.writeWord(	quarantine: lab conditions the fight
 tools/tests/battle_mpcost.lua	.writeWord(
 tools/tests/battle_rage.lua	.writeByte(
 tools/tests/battle_rage.lua	.writeWord(
+tools/tests/battle_retaliate.lua	.writeByte(	quarantine: #236 needs ONE character the player is not driving, and the class is unreachable on cue in the World of Balance -- Umaro and the Colosseum are World of Ruin, Muddle and Charm are a monster's roll, and the only WoB Berserk the route can draw (CrassHoppr's SPECIAL, battle_statuses.lua) needs up to eleven paced world-map legs to land.  The file writes the one STATUS2 bit (Berserk) onto its subject at one chosen moment and nothing else: the banking before it is the player's own real Fights, the actions after it are the engine's, and the swing count, the landed hits, the charge and both latches under test are all the ROM's and are read, never written
 tools/tests/battle_reveal.lua	emu.write	quarantine: seed-entry mask only reachable via a Cmd_20 reload; phase 2 converted
 tools/tests/battle_runic.lua	.writeByte(
 tools/tests/battle_runic.lua	.writeWord(
