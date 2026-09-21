@@ -11,7 +11,7 @@ local ST_CMD, ST_ITEM, ST_TOOLS, ST_BUSHIDO, ST_TGT, ST_TRANS =
 local ST_DEF = 0x27                   -- the Def. window Right opens
 -- the frames between a press and the window it opens or closes: $01/$04/
 -- $0f/$10 around every open and close, $25/$26 between Right and the Def.
--- window (build/lab/harness-faults/repro/probe_bushido_s21.log).  A press
+-- window (build/attempts/wt/harness-faults/lab/harness-faults/repro/probe_bushido_s21.log).  A press
 -- made there lands on nothing, and a B there cancels the Right.
 local function settling(st)
   return st == 0x01 or st == 0x04 or st == 0x0F or st == 0x10
@@ -125,7 +125,7 @@ local function decide()
     -- w7e4001,x = 4) and the battle clock does not run while a command
     -- window is up, so with SABIN's and SHADOW's gauges both full their
     -- windows cycled X for X and CYAN's queued tech never ran -- measured
-    -- at seed shift 21 (build/lab/harness-faults/repro/probe_bushido_s21.log:
+    -- at seed shift 21 (build/attempts/wt/harness-faults/lab/harness-faults/repro/probe_bushido_s21.log:
     -- `q=01/00/ff pend=1 atb=91/2f/5f` on every frame from f1100 to
     -- f1432, the actor alternating 1/0), the "timeout after 900 frames
     -- driving toward the boosted tech resolves" at shifts 21 and 35.
@@ -244,7 +244,7 @@ end
 --
 -- This used to walk the cursor and edge one A, and whether that edge was
 -- ever seen was the battle's timing, not the test's (#229).  Measured at
--- seed shift 2 (build/lab/harness-faults/repro/probe_bushido_s2.log):
+-- seed shift 2 (build/attempts/wt/harness-faults/lab/harness-faults/repro/probe_bushido_s2.log):
 -- Kitty had berserked him under the open window (`st=00/10/..` from
 -- f690), and on the frame the edge went down --
 --   [probe f748] menu=01 act=2 st=30 krow=0 bp=1 pend=0 bcb=01 q=ff
@@ -318,7 +318,7 @@ end
 -- with the attacker, his command and attack id.  A $3410 write is not
 -- that: "last spell used" is stored when the action is staged, and the
 -- actions queued ahead of his run first.  Measured
--- (build/lab/harness-faults/repro/probe_bushido_s28c.log,
+-- (build/attempts/wt/harness-faults/lab/harness-faults/repro/probe_bushido_s28c.log,
 -- probe_bushido_s31c.log): $3410 read $55 at f3466 / f731; SABIN's
 -- Fight and SHADOW's Defend (shift 28), two monster turns and
 -- Interceptor's counter (shift 31) ran first; his ExecCmd came at

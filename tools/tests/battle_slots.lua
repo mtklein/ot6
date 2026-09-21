@@ -339,7 +339,7 @@ end
 -- force-closes an open menu whose character has left the menu queue
 -- (btlgfx_main.asm @0ca4: w7e4001,x == $ff sets w7e7bcb), and a status
 -- that takes Setzer's turn does exactly that mid-spin.  Measured at seed
--- shifts 21 and 28 (build/lab/harness-faults/repro/slots_s21.log,
+-- shifts 21 and 28 (build/attempts/wt/harness-faults/lab/harness-faults/repro/slots_s21.log,
 -- slots_s28.log): Mind Candy put him to sleep with the reels up, EDGAR's
 -- command window replaced them within 128 frames
 -- (repro/slots_s21/frames/f4608.png the reels, f4736.png EDGAR's window),

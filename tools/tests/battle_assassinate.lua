@@ -27,7 +27,7 @@
 -- tail ... and Ot6BrokenDmg doubles it instead"), and Ot6Assassinate runs
 -- at ChooseTarget, before that hit's chip, so the divine can only take a
 -- body that is still standing AFTER its own break.  Measured with the
--- back-row Imperial (build/lab/harness-faults/repro/assassinate_fixed_s0.log):
+-- back-row Imperial (build/attempts/wt/harness-faults/lab/harness-faults/repro/assassinate_fixed_s0.log):
 -- a shielded chip reads 243->197->151 (~46) and the breaking hit "149"
 -- (frames/f7552.png) to ~184, so a body needs more than two chips plus
 -- the doubled hit, ~280 hp, and every PIERCE-weak body this pool deals
@@ -43,7 +43,7 @@
 -- precondition, saying so.
 --
 -- What else the pool did to the old drive, measured (#239,
--- build/lab/harness-faults/repro/assassinate_s0.log): the bench drive read
+-- build/attempts/wt/harness-faults/lab/harness-faults/repro/assassinate_s0.log): the bench drive read
 -- $27 as an unknown state and pressed B in it, so SABIN sat at
 -- "Fight/Def." for 1200 frames (frames/f1152.png) and Shadow's turn waited
 -- behind him; Interceptor is in the party with Shadow (vanilla:
