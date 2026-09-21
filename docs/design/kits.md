@@ -255,10 +255,13 @@ point on Fire.
 open the vanilla numeral gauge; `OpenCmdMenuTbl[7]` is repointed to a tools-shell
 submenu (the same route Blitz takes) that lists the three moving-window techs by
 name + MP cost, greyed when the caster can't afford the MP *or* the BP, and
-**refused at the confirm** for either reason: `Ot6KitConfirmMP` for the MP
-(the same gate Blitz, Tools and the thief submenu take, mp-economy.md ruling
-2) and `Ot6BushidoConfirm`'s own bank test for the BP. Both buzz and leave
-the list open, so a row the window draws as unreachable costs nothing to
+**refused at the confirm** for either reason: `Ot6KitConfirmMP` (the same
+gate Blitz, Tools and the thief submenu take, mp-economy.md ruling 2) refuses
+the MP reason and, since #232, the BP reason as well, reading the row's grey
+from the same `Ot6BushidoRowGrey` that coloured it; `Ot6BushidoConfirm`'s
+own bank test is the free build's path and the backstop. Either way it
+buzzes and leaves the list open, so a row the window draws as unreachable
+costs nothing to
 try. It reuses the Tools window shell,
 `Ot6CostFor`, and `Ot6AbilityGrey`, with all cost/grey/refusal logic gated
 `.if OT6_MP_COSTS` (in the battle object, and in btlgfx, which is assembled
@@ -401,9 +404,11 @@ shieldless target it is a no-op.
 Bestow is the sketch verbatim. Its debit rides `OT6_BOOST_REVEALED` so that
 `Ot6ActionEnd` does the subtraction, which is the only BP charge path in the game
 and is what stops Bestow being free: if it were charged inline, Ot6ActionEnd would
-still pay Locke his regen and Bestow would yield a pip a turn for 5 MP. It refuses
-at 0 BP (and the row greys), on a self-target, and against an ally already at the
-5 cap.
+still pay Locke his regen and Bestow would yield a pip a turn for 5 MP. At 0 BP
+the row greys and, since #232, the confirm refuses it (`Ot6KitConfirmMP` reads
+the same `Ot6BushidoRowGrey` that coloured it), so the turn and the 5 MP stay
+with the player; a self-target and an ally already at the 5 cap are still
+refused at execution. `battle_bestowrefuse` is the suite.
 
 **Break class: none of the three takes one.** Steal and Bestow deal no damage,
 and Filch deals none either. A class glyph on Filch's row would be wrong about
