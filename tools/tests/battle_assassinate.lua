@@ -56,9 +56,11 @@
 --   1. the breaking hit: Shadow's Fight empties a PIERCE-weak non-boss
 --      body's last shield.  On that hit the ROM's chip path writes
 --      OT6_BROKEN_TICKS for the body with x = Shadow's entity offset; the
---      in-proc $3dd4 Death mark inside Ot6AssassinateGate follows in the
---      same frame with a later sequence number; the body's HP write and its
---      Death status come after that; and the latch is set.
+--      in-proc $3dd4 Death mark inside Ot6AssassinateGate, reached from
+--      Ot6HitJoin (the caller is read off the stack), follows in the same
+--      frame with the next sequence number; the body's HP write and its
+--      Death status are the next two ledger events (the frame counter may
+--      tick once inside the action); and the latch is set.
 --   2. once per battle: the same battle continues, Shadow breaks or strikes
 --      further bodies, monster HP keeps falling (hpDrops, the loud control),
 --      and no second in-proc mark comes; the latch byte never changes again.
@@ -508,13 +510,17 @@ add({
     H.assertEq(b.f == k.f and b.seq < k.seq, true, string.format(
       "the break write precedes the Death mark on the SAME action: break "
       .. "f%d seq%d, mark f%d seq%d", b.f, b.seq, k.f, k.seq))
-    H.assertEq(hpWrite[k.m] ~= nil and hpWrite[k.m].f == k.f
-      and hpWrite[k.m].seq > k.seq, true,
-      "the mark precedes the hit's HP write (ApplyDmg), same frame")
-    H.assertEq(deathAt[k.m] ~= nil and deathAt[k.m].f == k.f
-      and deathAt[k.m].seq > hpWrite[k.m].seq, true,
-      "and UpdateStatus applied the Death after the HP write, same frame: "
-      .. "the breaking hit and the kill are one action")
+    -- ExecAttack is one call chain, but the frame counter can tick inside
+    -- it (an NMI between two of its instructions: sweep shift 42, hp write
+    -- f2376 seq3, Death f2377 seq4), so "one action" is the ledger's order
+    -- with nothing between, and at most one frame boundary crossed.
+    local hw, da = hpWrite[k.m], deathAt[k.m]
+    H.assertEq(hw ~= nil and hw.seq == k.seq + 1 and hw.f - k.f <= 1, true,
+      "the mark precedes the hit's HP write (ApplyDmg), the next ledger "
+      .. "event after it")
+    H.assertEq(da ~= nil and da.seq == hw.seq + 1 and da.f - k.f <= 1, true,
+      "and UpdateStatus applied the Death right after the HP write: the "
+      .. "breaking hit and the kill are one action")
     H.assertEq(dead(k.m), true, "the body is dead")
     H.assertEq(latchByte() & shadowBit() ~= 0, true,
       "Shadow's once-per-battle latch is SET by the kill")
