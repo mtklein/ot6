@@ -520,7 +520,9 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
 ; The Ot6LoadoutCost shim, for the shared (flag-agnostic) menu object: on, it
 ; tail-calls the one price authority; nomp returns 0 and the row draws no
 ; number.  Every row shows the same number by design, because the price is
-; flat, so the column also states the rule.
+; flat, so the column also states the rule.  The battle window draws no
+; number at all and greys instead (Ot6RageRowDecorate, ot6_cmdmenu.asm),
+; off the same leaf, so the two surfaces cannot disagree.
 ; out: A = MP cost (0 under nomp).  rtl.
 .proc Ot6RageRowCost
         .a8
