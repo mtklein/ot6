@@ -36,7 +36,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Runs happen in every git worktree of this repo (agents and the release
-# qualification each get their own), not only under ROOT.  The census, the
+# qualification each get their own), not only under ROOT.  The worker grid, the
 # progress view and the newest-workspace picker all look through the same
 # list, refreshed every 30s, so the owner sees what is actually running.
 _TREES = {"ts": 0.0, "roots": [ROOT]}
@@ -79,15 +79,15 @@ def tree_tag(log):
     return "" if best in ("", ROOT) else os.path.basename(best)
 
 
-# The default landing: a control-room census of EVERY active run worker,
+# The default landing: a worker grid of EVERY active run worker,
 # one tile per live workspace, growing/shrinking as workers start and finish.
 # Data comes from grid.json (grid_thread); each tile's screenshot is a cached
 # PNG under build/live/grid/.  A tile click opens the single-worker detail
 # (live1.html) for that worker.
-GRID_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 census</title>
+GRID_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 workers</title>
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 14px">
-<b style="font-size:16px">live census</b>
+<b style="font-size:16px">live workers</b>
 <span id=hdr style="color:#8a8"></span>
 <a href="progress.html" style="color:#8ac">route map &rarr;</a></div>
 <div id=grid style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:0 14px 18px"></div>
@@ -153,7 +153,7 @@ async function tick(){ try{
     t.querySelector('.nm').textContent = w.name;
     t.querySelector('.fr').textContent = 'frame '+nf(w.frame);
     const badge = t.querySelector('.badge');
-    // stuck (red) outranks the live-view flag (cyan); otherwise a plain rim
+    // stuck (red) takes priority over the live-view flag (cyan); otherwise a plain rim
     if(w.stuck){ t.style.borderColor='#d24b4b';
       badge.textContent='\\u26A0 FROZEN'; badge.style.background='#d24b4b';
       badge.style.color='#fff'; }
@@ -172,7 +172,7 @@ tick(); setInterval(tick, 1000);
 # The single-worker DETAIL view (was index.html; now live1.html).  With no
 # query it follows the server-tailed workspace (the classic big screenshot +
 # live notes, sourced from status.json).  With ?w=<id> it "follows by name":
-# any census worker's big screenshot + frame + stuck, sourced from grid.json
+# any grid worker's big screenshot + frame + stuck, sourced from grid.json
 # (notes stream only for the server-followed worker).
 DETAIL_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 live</title>
 <body style="margin:0;background:#111;color:#cdc;display:grid;place-items:center;min-height:100vh;font:14px ui-monospace,monospace">
@@ -183,7 +183,7 @@ DETAIL_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 live</title>
 <div id=notes style="text-align:left;max-width:min(768px,95vw);margin:0 auto;color:#9a9;white-space:pre-wrap;word-break:break-all"></div>
 <div id=s style="color:#575;padding-top:6px">connecting…</div>
 <div style="padding-top:4px">
-<a href="index.html" style="color:#8ac">&larr; census</a> ·
+<a href="index.html" style="color:#8ac">&larr; workers</a> ·
 <a href="progress.html" style="color:#8ac">route progress &rarr;</a></div>
 </div>
 <script>
@@ -214,11 +214,11 @@ async function tick(){
     if(st.shots!==seen){ seen=st.shots; const u='latest.png?'+seen;
       const t=new Image(); t.onload=()=>{ $('f').src=u; }; t.src=u; }
   } else if(tgt){
-    // census path: a worker the server isn't streaming in detail
+    // grid path: a worker the server isn't streaming in detail
     $('frame').textContent='frame '+nf(tgt.frame);
     $('pad').textContent='';
     $('notes').textContent='(full notes stream on the live-view worker)';
-    $('s').textContent=tgt.name+(tgt.stuck?' · \\u26A0 frozen':' · live')+' · via census';
+    $('s').textContent=tgt.name+(tgt.stuck?' · \\u26A0 frozen':' · live')+' · via grid';
     if(tgt.shot && tgt.shot!==curShot){ curShot=tgt.shot; const u=tgt.shot;
       const t=new Image(); t.onload=()=>{ $('f').src=u; }; t.src=u; }
   } else {
@@ -262,7 +262,7 @@ function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 function render(j){
   if(view==='wob') renderWob(j); else renderGrid(j);
   document.getElementById('hdr').textContent =
-    `${j.done}/${j.total} segments · ${j.elapsed_min} min elapsed · ~${j.eta_min} min of spine left`;
+    `${j.done}/${j.total} segments · ${j.elapsed_min} min elapsed · ~${j.eta_min} min left`;
   document.getElementById('cur').textContent =
     (j.running.length ? ('now playing: ' + j.running.join(', ')) : '')
     + (j.live ? ((j.running.length?'    ':'') + '▶ live view: ' + j.live) : '');
@@ -375,7 +375,7 @@ def _route_coords(names):
 
 
 def write_pages(webroot):
-    # index.html is the census grid (default landing); the classic
+    # index.html is the worker grid (default landing); the classic
     # single-worker detail moves to live1.html
     with open(os.path.join(webroot, "index.html"), "w") as f:
         f.write(GRID_PAGE)
@@ -405,7 +405,7 @@ def ensure_map(webroot):
               "background", file=sys.stderr)
 
 
-# ---- the census grid: one tile per active run worker ----------------------
+# ---- the worker grid: one tile per active run worker ----------------------
 SHOT_B = re.compile(rb"^\[ot6shot\] (\d+) (\S+)")   # bytes, for tail scans
 PAD_B = re.compile(rb"^\[ot6pad\] (\d+)")
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
@@ -569,7 +569,8 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
     """One progress.json payload: every graph edge's status (done when its
     stamp passes compose's freshness check, running when a live workspace
     bears its name, pending otherwise), WoB coords for the map, a
-    remaining-spine ETA from the ninja log's durations, and which single
+    whole-build time-left ETA (the savestate critical path plus the parallel
+    suite phase) from the ninja log's durations, and which single
     edge is on the live view.
 
     live_test is the state name of the workspace follow() is tailing -- the
@@ -578,14 +579,18 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
     is on the live view.  Its name may be an edge's primary state or one of
     its `also` artifacts, so the marked node is the primary edge either way.
     """
-    dur = {}
+    dur, qdur = {}, {}
     try:
         with open(os.path.join(ROOT, "build/ninja/.ninja_log")) as f:
             for line in f:
                 q = line.rstrip("\n").split("\t")
-                if len(q) >= 5 and q[3].startswith("build/states/") \
-                   and q[3].endswith(".mss"):
-                    dur[q[3][13:-4]] = (int(q[1]) - int(q[0])) / 1000
+                if len(q) < 5:
+                    continue
+                o, secs = q[3], (int(q[1]) - int(q[0])) / 1000
+                if o.startswith("build/states/") and o.endswith(".mss"):
+                    dur[o[13:-4]] = secs          # savestate generate edge
+                elif o.startswith("build/results/suite/") and o.endswith(".ok"):
+                    qdur[o[20:-3]] = secs          # a parallel suite test edge
     except OSError:
         pass
     running = set()
@@ -600,9 +605,9 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
         n = e["state"]
         names = [n] + list(e.get("also") or [])
         cost = max((dur.get(x, 0.0) for x in names), default=0.0)
-        # a live workspace outranks content freshness: artifacts from a
-        # superseded edge can pass the stamp check while their replacement
-        # run is mid-flight
+        # a live workspace takes priority over content freshness: artifacts
+        # from a superseded edge can pass the stamp check while their
+        # replacement run is mid-flight
         st = "pending"
         if running & set(names):
             st = "running"
@@ -624,7 +629,7 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
         if live_test and live_test in names:
             ed["live"] = True   # the one node on index.html's live view
         edges.append(ed)
-    # remaining spine: longest chain of not-done edges (file order is
+    # remaining critical path: longest chain of not-done edges (file order is
     # play order; prev links carry the real topology)
     owner = {}
     for e in states:
@@ -645,6 +650,33 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
         fin[n] = b + mine
         return fin[n]
     eta = max((finish(e) for e in states), default=0.0)
+    # `eta` so far is the savestate critical path -- the serial savestate
+    # chain.  A full build has a phase the chain does not see: the suite
+    # tests, many of which run in parallel once the ROM is built and their
+    # state deps are done.  Count it so the figure reads as whole-build
+    # time-left, not just savestate-generation time.  A suite is still-to-run
+    # when its .ok is missing or older than the ROM; these run in parallel, so
+    # divide by an effective worker count (heavy emulator workers -> about
+    # half the logical cores).
+    # During a plain run nothing rebuilds the ROM, every .ok stays fresh, and
+    # this term is zero, so the run ETA is unchanged.
+    try:
+        rom_m = os.path.getmtime(os.path.join(ROOT, "build/ot6.sfc"))
+    except OSError:
+        rom_m = 0.0
+    rem_state = sum((idx[e["state"]]["dur"] or 60)
+                    for e in states if idx[e["state"]]["status"] != "done")
+    rem_suite = 0.0
+    for name, secs in qdur.items():
+        ok = os.path.join(ROOT, f"build/results/suite/{name}.ok")
+        try:
+            fresh = os.path.exists(ok) and os.path.getmtime(ok) >= rom_m
+        except OSError:
+            fresh = False
+        if not fresh:
+            rem_suite += secs
+    par = max((os.cpu_count() or 4) // 2, 1)
+    eta = max(eta, (rem_state + rem_suite) / par)
     return {"edges": edges, "done": done, "total": len(edges),
             "running": sorted(running & set(owner)),
             # the live node's PRIMARY edge name (owner maps `also` -> primary),
@@ -661,10 +693,10 @@ def progress_thread(webroot, stop, live_ref=None):
     states = runpy.run_path(
         os.path.join(ROOT, "tools/tests/savestate_graph.py"))["STATES"]
     xy = _route_coords([e["state"] for e in states])
-    # freshness authority: compose.py's own stamp verification (sig over
+    # freshness check: compose.py's own stamp verification (signature over
     # generator+libs+extras, artifact hash, ancestor chain).  A fresh stamp
-    # is what ninja will not re-run -- modulo a ROM-content change, which
-    # the graph's latch owns and a mid-gate page can ignore honestly.
+    # is what ninja will not re-run -- except for a ROM-content change, which
+    # the graph tracks separately and a mid-gate page can ignore honestly.
     spec = importlib.util.spec_from_file_location(
         "compose", os.path.join(ROOT, "tools/tests/lib/compose.py"))
     compose = importlib.util.module_from_spec(spec)
