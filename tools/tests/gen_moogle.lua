@@ -7,7 +7,9 @@
 --                          controlled frame (map 51, party 1 = LOCKE+3
 --                          moogles at (14,14), Marshal waiting at (15,40))
 --   moogle_cleared.mss  -- the far side: LOCKE leads TERRA on the Narshe
---                          streets (map 20), defense won, control returned
+--                          streets (map 20), defense won, control returned,
+--                          MOG's Mithril Pike and Mithril Shld in the bag
+--                          (#143: he is stripped before the Marshal)
 
 -- Sequence (all one event, _cca2e5, event_trigger.asm map 50 {55,11},
 -- body event_main.asm:102027-103283):
@@ -110,6 +112,108 @@ local function ySwitchTo(p)
     H.pressButtons({ "y" }, 6),
     H.waitFrames(40),
   }, "Y-switch to party " .. p)
+end
+
+-- ------------------------------------------------- MOG's gear (#143) --
+-- MOG enters wearing a Mithril Pike and a Mithril Shld (char_prop.asm
+-- MOG: set_char_prop_equip MITHRIL_PIKE, MITHRIL_SHLD, no fixed_equip;
+-- the guest moogles are fixed_equip) and the win path drops him from the
+-- party with no control in between (_ccadbf: char_party MOG, 0), so
+-- whatever he still wears then is gone.  The menu is open to the player
+-- throughout the defense: CheckMenu (field/menu.asm:205) refuses only on
+-- $1EB8 & $04 (event bit $01C2), which no event writes, and it opened on
+-- the first controllable frame and between waves when pressed
+-- (build/attempts/wt/mog-gear/lab/mog_gear/probe_moogle_menu.log, the
+-- retained copy).  Equip -> MOG -> Empty is
+-- the one-press strip: EquipRemoveAll (menu/equip.asm) moves all four
+-- slots to the bag through IncItemQty, which skips an empty $FF slot.
+-- Menu cells: $26 menu state, $4b the cursor shared by the main menu,
+-- the character list and the options row; $69..$6C the characters the
+-- list shows.
+local MITHRIL_PIKE, MITHRIL_SHLD = 0x1D, 0x5C
+local MOG = 10
+local MOG_BASE = 0x1600 + 37 * MOG
+local ZM, CUR = 0x26, 0x4b
+local ST_MAIN, ST_CHAR, ST_OPT = 0x05, 0x06, 0x36
+local EQUIP_ROW, OPT_EMPTY = 2, 3
+
+local function menuState() return H.readByte(ZM) end
+local function mogGear()
+  return string.format("%02X %02X %02X %02X", H.readByte(MOG_BASE + 0x1F),
+    H.readByte(MOG_BASE + 0x20), H.readByte(MOG_BASE + 0x21),
+    H.readByte(MOG_BASE + 0x22))
+end
+local function mogRow() return (H.readByte(0x1850 + MOG) >> 3) & 0x03 end
+local function bagLine()
+  return string.format("bag pike=%d shield=%d", H.invCountOf(MITHRIL_PIKE),
+    H.invCountOf(MITHRIL_SHLD))
+end
+
+-- With MOG's party active and calm: X, Equip, MOG's row, Empty, then B
+-- out to the field.  Presses are edge taps (4 of 12 frames); every cursor
+-- is read back before the next press.
+local function stripMog()
+  local tag = "strip MOG"
+  local ph = 0
+  local pikeBefore, shieldBefore = 0, 0
+  local function tap(btn) ph = (ph + 1) % 12; H.setPad(ph < 4 and { btn } or {}) end
+  local function seek(state, want, back, fwd, label)
+    return H.driveUntil(function()
+      return menuState() == state and H.readByte(CUR) == want()
+    end, 1800, {
+      H.call(function()
+        if menuState() ~= state then H.setPad({}); return end
+        ph = (ph + 1) % 12
+        H.setPad(ph < 4 and { [H.readByte(CUR) < want() and fwd or back] = true } or {})
+      end),
+    }, tag .. ": " .. label)
+  end
+  local function press(state, label)
+    return H.cond(function() return true end, {
+      H.driveUntil(function() return menuState() == state end, 1800, {
+        H.call(function() tap("a") end),
+      }, tag .. ": " .. label),
+      H.release(), H.waitFrames(10),
+    })
+  end
+  return H.cond(function() return true end, {
+    H.call(function()
+      ph = 0
+      pikeBefore, shieldBefore = H.invCountOf(MITHRIL_PIKE), H.invCountOf(MITHRIL_SHLD)
+      H.assertEq(H.readByte(0x1a6d) & 0x07, H.readByte(0x1850 + MOG) & 0x07,
+        tag .. ": MOG's party is the active one")
+      H.log(string.format("%s: f%d gear %s %s $1EB8=%02X row=%d", tag, H.frame,
+        mogGear(), bagLine(), H.readByte(0x1eb8), mogRow()))
+    end),
+    H.driveUntil(function() return menuState() == ST_MAIN end, 1800, {
+      H.call(function() tap("x") end),
+    }, tag .. ": main menu"),
+    H.release(), H.waitFrames(10),
+    seek(ST_MAIN, function() return EQUIP_ROW end, "up", "down", "cursor on Equip"),
+    H.release(), H.waitFrames(10),
+    press(ST_CHAR, "character list"),
+    seek(ST_CHAR, mogRow, "up", "down", "cursor on MOG"),
+    H.call(function()
+      H.assertEq(H.readByte(0x69 + mogRow()), MOG, tag .. ": the list row under the cursor is MOG")
+    end),
+    H.release(), H.waitFrames(10),
+    press(ST_OPT, "options row"),
+    seek(ST_OPT, function() return OPT_EMPTY end, "left", "right", "cursor on Empty"),
+    H.release(), H.waitFrames(10),
+    H.call(function() H.screenshot("moogle_strip_mog") end),
+    H.pressButtons({ "a" }, 4),
+    H.waitFrames(20),
+    H.call(function()
+      H.log(string.format("%s: f%d after Empty gear %s %s", tag, H.frame, mogGear(), bagLine()))
+      H.assertEq(mogGear(), "FF FF FF FF", tag .. ": MOG's four slots read empty")
+      H.assertEq(H.invCountOf(MITHRIL_PIKE), pikeBefore + 1, tag .. ": one more Mithril Pike in the bag")
+      H.assertEq(H.invCountOf(MITHRIL_SHLD), shieldBefore + 1, tag .. ": one more Mithril Shld in the bag")
+    end),
+    H.driveUntil(function() return H.hasControl() end, 2400, {
+      H.call(function() tap("b") end),
+    }, tag .. ": back out to the field"),
+    H.release(), H.waitFrames(20),
+  })
 end
 
 -- the Marshal's post: npc_prop.asm map 51 NPC_3, {15,40}, static
@@ -322,6 +426,12 @@ H.run({ maxFrames = 200000 }, {
   logPools("waves complete"),
   H.waitUntil(calm(30), 1800, "post-storm calm"),
 
+  -- the storm over and the Marshal still standing is the last moment MOG
+  -- is in a party with the field under control (#143)
+  ySwitchTo(2),
+  H.waitUntil(calm(30), 1800, "party 2 active and calm"),
+  stripMog(),
+
   -- ===================================================================== --
   -- Phase 4c: the Marshal, up to three input-driven attempts.  P2 first
   -- (MOG's squad, the biggest pool), then P1, then P3 if a wipe lands.
@@ -370,8 +480,10 @@ H.run({ maxFrames = 200000 }, {
     local hp, maxhp = H.readWord(0x1609), H.readWord(0x160b)
     H.assertEq(hp > 0 and hp == (maxhp & 0x3fff), true,
       string.format("TERRA at full HP (%d/%d)", hp, maxhp & 0x3fff))
-    H.log(string.format("cleared: map=%d (%d,%d) frame=%d",
-      H.mapId(), H.fieldX(), H.fieldY(), H.frame))
+    H.assertEq(H.invCountOf(MITHRIL_PIKE) >= 1, true, "MOG's Mithril Pike is in the bag")
+    H.assertEq(H.invCountOf(MITHRIL_SHLD) >= 1, true, "MOG's Mithril Shld is in the bag")
+    H.log(string.format("cleared: map=%d (%d,%d) frame=%d %s",
+      H.mapId(), H.fieldX(), H.fieldY(), H.frame, bagLine()))
     H.screenshot("moogle_cleared")
   end),
   H.saveState("moogle_cleared.mss"),
