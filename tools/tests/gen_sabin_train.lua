@@ -103,6 +103,65 @@ local function invCount(id)
   end
   return 0
 end
+-- The lib fight driver's battle-open, [death] and Fenix Down landing lines
+-- (newFightDriver, lib/ot6.lua) for a fight this file drives itself, so
+-- tools/audit_boost.py sees the pips a member held when they fell and
+-- tools/audit_fenix.py the fight a Fenix Down answered (#220).  Ticks count
+-- from the first frame the battle table is live with monsters present; no
+-- monster action is attributed.
+local function newDeathWatch(tag)
+  local W = {}
+  function W.reset()
+    W.tick, W.opened, W.hp, W.said, W.raise = 0, false, {}, {}, {}
+  end
+  W.reset()
+  function W.frame()
+    if not H.battleLoadStarted() then W.reset(); return end
+    if not W.opened and H.monstersPresent() == 0 then return end
+    W.tick = W.tick + 1
+    local pbp = {}
+    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(0x3E9C + p * 2)) end
+    local party_bp = table.concat(pbp, ",")
+    if not W.opened then
+      W.opened = true
+      local hp = {}
+      for e = 0, 3 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + e * 2)) end
+      H.log(string.format("[%s] battle f+%d partyhp=%s party_bp=%s monsters=%d",
+        tag, W.tick, table.concat(hp, ","), party_bp, H.monstersPresent()))
+    end
+    for e = 0, 3 do
+      local hp, maxhp = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+      local last = W.hp[e]
+      if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
+         and not W.said[e] then
+        W.said[e] = true
+        local bp = H.readByte(0x3E9C + e * 2)
+        H.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d by "
+          .. "nobody (no monster action attributed) bp=%d party_bp=%s%s", tag,
+          W.tick, e, H.readByte(0x3ED8 + e * 2), last, maxhp, bp, party_bp,
+          bp >= 3 and string.format(" -- died holding %d BP", bp) or ""))
+      elseif hp > 0 and hp ~= 0xFFFF then
+        W.said[e] = nil
+      end
+      W.hp[e] = hp
+      local r = W.raise[e]
+      if r ~= nil then
+        if hp > 0 and hp ~= 0xFFFF then
+          H.log(string.format("[%s] actor %d's Fenix Down landed: entity %d is at "
+            .. "%d/%d at tick %d", tag, r.by, e, hp, maxhp, W.tick))
+          W.raise[e] = nil
+        elseif W.tick - r.tick > 840 then
+          H.log(string.format("[%s] actor %d's Fenix Down on entity %d never landed "
+            .. "(%d ticks) -- forgetting it", tag, r.by, e, W.tick - r.tick))
+          W.raise[e] = nil
+        end
+      end
+    end
+  end
+  function W.fenix(actor, e) W.raise[e] = { by = actor, tick = W.tick } end
+  return W
+end
+local b47Watch, b68Watch = newDeathWatch("b47"), newDeathWatch("b68")
 -- All four battle status bytes, not just the first.  The fight log used to
 -- print status 1 alone ($3EE4, stride 2), which carries wound/poison/dark and
 -- nothing else; every status that costs a character their turn lives in the
@@ -277,6 +336,7 @@ local function b47Button()
     if mons ~= 0 then return { "right" } end
     local wantMask = 1 << plan.target
     if chars == wantMask then
+      if plan.item == FENIX_DOWN then b47Watch.fenix(actor, plan.target) end
       fPlan, fPlanActor = nil, nil
       return { "a" }
     end
@@ -362,6 +422,7 @@ local function holdDrive(dir, pred, what, budget, fightMode)
       end
       if fightMode == "fight" then
         wipeWatch(what)                    -- every frame, outside the gate
+        b47Watch.frame()
         if lost then H.setPad({}); return end
       end
       if W then
@@ -683,6 +744,7 @@ local function b68Button()
     if mons ~= 0 then return { "right" } end  -- off the monster side
     local wantMask = 1 << plan.target
     if chars == wantMask then
+      if plan.item == FENIX_DOWN then b68Watch.fenix(actor, plan.target) end
       b68.plan, b68.planActor = nil, nil      -- item commits on this confirm
       return { "a" }
     end
@@ -690,6 +752,7 @@ local function b68Button()
     if plan.tgtStall > 20 then
       b68Log(string.format("target steer stalled (chars=%02X want=%02X) " ..
         "-- accepting the current party target", chars, wantMask))
+      if plan.item == FENIX_DOWN then b68Watch.fenix(actor, plan.target) end
       b68.plan, b68.planActor = nil, nil
       return { "a" }                          -- any party target is harmless
     end
@@ -806,6 +869,7 @@ local function b47Attempt(n)
     H.call(function()
       lost, fightTier, wipeN = nil, n, 0
       b47Heals, fPlan, fPlanActor = 0, nil, nil
+      b47Watch.reset()
       H.gameOverFired = 0
     end),
     nav(26, 9, { maxFrames = 3000 }),
@@ -901,6 +965,7 @@ local function b68Attempt(n)
       b68.tornDown, b68.mstreak, b68.sabinDeadN = 0, 0, 0
       b68.oddState, b68.oddN, b68.sabinImpN = nil, 0, 0
       gSlot, sabinE, cyanE, shadowE = nil, nil, nil, nil
+      b68Watch.reset()
     end),
     H.cond(function() return lost ~= nil end, { H.waitFrames(1) }, {
     nav(32, 7, { maxFrames = 8000 }),
@@ -971,6 +1036,7 @@ local function b68Attempt(n)
           -- #163: the wipe watch runs before the inBattle() gate, which
           -- reads a wiped party's all-zero table as "torn down"
           wipeWatch("b68")
+          b68Watch.frame()
           if lost then H.setPad({}); return end
           if not inBattle() then
             b68.tornDown = b68.tornDown + 1

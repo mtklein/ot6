@@ -144,6 +144,52 @@ local function pokeStep(round)
   }, "battle 6 engages [attempt " .. round .. "]")
 end
 
+-- The lib fight driver's battle-open and [death] lines (newFightDriver,
+-- lib/ot6.lua) for a fight this file drives itself, so tools/audit_boost.py
+-- sees the pips a member held when they fell and tools/audit_fenix.py the
+-- fight a Fenix Down answered (#220).  Ticks count from the first frame the
+-- battle table is live with monsters present; no monster action is
+-- attributed.
+local function newDeathWatch(tag)
+  local W = {}
+  function W.reset()
+    W.tick, W.opened, W.hp, W.said = 0, false, {}, {}
+  end
+  W.reset()
+  function W.frame()
+    if not H.battleLoadStarted() then W.reset(); return end
+    if not W.opened and H.monstersPresent() == 0 then return end
+    W.tick = W.tick + 1
+    local pbp = {}
+    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(0x3E9C + p * 2)) end
+    local party_bp = table.concat(pbp, ",")
+    if not W.opened then
+      W.opened = true
+      local hp = {}
+      for e = 0, 3 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + e * 2)) end
+      H.log(string.format("[%s] battle f+%d partyhp=%s party_bp=%s monsters=%d",
+        tag, W.tick, table.concat(hp, ","), party_bp, H.monstersPresent()))
+    end
+    for e = 0, 3 do
+      local hp, maxhp = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+      local last = W.hp[e]
+      if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
+         and not W.said[e] then
+        W.said[e] = true
+        local bp = H.readByte(0x3E9C + e * 2)
+        H.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d by "
+          .. "nobody (no monster action attributed) bp=%d party_bp=%s%s", tag,
+          W.tick, e, H.readByte(0x3ED8 + e * 2), last, maxhp, bp, party_bp,
+          bp >= 3 and string.format(" -- died holding %d BP", bp) or ""))
+      elseif hp > 0 and hp ~= 0xFFFF then
+        W.said[e] = nil
+      end
+      W.hp[e] = hp
+    end
+  end
+  return W
+end
+
 -- the input-driven battle-6 driver: R raises the active character's pending
 -- boost (characters open with 1 bp and regen 1 per unboosted turn;
 -- Ot6InitBP/Ot6ActionEnd), then three edge-tapped A's confirm the
@@ -153,12 +199,14 @@ end
 -- Ends on the won-switch or on 240 settled no-battle frames.
 local function marshalFight(maxFrames)
   local phase, calmN = 0, 0
+  local watch = newDeathWatch("marshal")
   return H.driveUntil(function()
     calmN = (not H.battleLoadStarted()) and calmN + 1 or 0
     return defenseWon() or calmN >= 240
   end, maxFrames, {
     H.call(function()
       phase = (phase + 1) % 32
+      watch.frame()
       if not H.battleLoadStarted() then
         H.setPad(phase % 8 < 4 and { "a" } or {})
         return
