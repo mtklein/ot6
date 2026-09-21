@@ -4385,6 +4385,43 @@ function Driver:focusList()
   return nil
 end
 
+-- The monster slot this actor's Fight breaks best right now, read the way a
+-- person reads the HUD's class cell (#161): among the living monsters, the
+-- one where the hit lands the most break chips.  The chips come from
+-- fightChips -> hitChips, which reads RV_CLASS / RV_ELEM (BATTLE.RV_CLASS /
+-- RV_ELEM, the bytes the HUD draws), so an unrevealed axis counts for
+-- nothing -- the driver aims at a key it can SEE, exactly as a blind player
+-- does, and a Genji Glove pair counts twice because fightChips already
+-- doubles it.  makePlan hands this to a plain Fight as plan.aim, and the
+-- ST_TGT steer aims the cursor there through the focus graph.
+--
+-- Returns nil wherever there is nothing to steer for, leaving the engine's
+-- default cursor and the behaviour byte-identical:
+--   * an authored (opts.focus) or multi-part (self.parts) kill order is in
+--     force -- that targeting wins, the same guard focusList reads, so this
+--     is opt-in-safe;
+--   * opts.aim = false, the lever that stubs the pick back to the old shape;
+--   * fewer than two monsters stand, so the default already lands on the
+--     only one;
+--   * this hand chips every living monster the SAME (best == worst), whether
+--     that is all-zero or a uniform revealed key: class is irrelevant to the
+--     choice here, so the tie is left to the engine and nothing churns.
+-- Otherwise the strictly-best slot, lowest on a tie.
+function Driver:chipAim(actor, boost)
+  if self.opts.aim == false or self.opts.focus or self.parts then return nil end
+  if livingMonsters() < 2 then return nil end
+  local best, bestSlot, worst = -1, nil, nil
+  for s = 0, 5 do
+    if monAlive(s) then
+      local c = fightChips(actor, s, boost)
+      if c > best then best, bestSlot = c, s end
+      if worst == nil or c < worst then worst = c end
+    end
+  end
+  if best <= 0 or best == worst then return nil end
+  return bestSlot
+end
+
 -- The formation's linked parts (#189), read once a battle at the first
 -- command window: the live species words ($57C0, which carry a part not
 -- yet on stage) and each species' AI script out of the ROM (AIScriptPtrs
@@ -5978,7 +6015,12 @@ function Driver:makePlan(actor)
   end
   local fight = cmdRow(actor, BATTLE.CMD_FIGHT)
   if fight == nil then return { kind = "switch" } end
-  return { kind = "fight", row = fight, boostLeft = boost }
+  -- The plain boost-Fight through the randoms (#161): with no authored or
+  -- multi-part kill order it aims at the slot this hand breaks best, so a
+  -- pierce hand takes the pierce-keyed monster and a slash hand the
+  -- slash-keyed one, the way a person reads the HUD class cell.  chipAim is
+  -- nil where there is no such choice, and the cursor keeps its default.
+  return { kind = "fight", row = fight, boostLeft = boost, aim = self:chipAim(actor, boost) }
 end
 
 function Driver:layoutOf()
@@ -6654,6 +6696,14 @@ function Driver:button(actor)
     -- A lore is multi-target: the focus rotation would spin against a
     -- whole-side mask it can never match, so it confirms on the default.
     local focus = self:focusList()
+    -- With no authored or multi-part kill order, a plain Fight may still
+    -- name the monster slot its class breaks best (plan.aim, chipAim/#161):
+    -- steer to it through the same focus graph, as a one-entry list.  An
+    -- authored or multi-part focus wins here byte-identical, because chipAim
+    -- yields nil while one is in force, so plan.aim is unset then.
+    if focus == nil and self.plan.aim ~= nil then
+      focus = { { slot = self.plan.aim, mask = 1 << self.plan.aim } }
+    end
     if focus and self.plan.kind ~= "item" and self.plan.kind ~= "summon"
        and self.plan.kind ~= "heal" and self.plan.kind ~= "lore" and not self.plan.ally then
       local want, wantSlot = nil, nil
