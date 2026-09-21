@@ -307,7 +307,7 @@ else -> `build/states/shots/<tag>`.
 ## Determinism (by construction)
 
 Runs are bit-reproducible: identical scripts pass at identical frames with
-byte-identical artifacts, serial or parallel. The pins:
+byte-identical artifacts, serial or parallel. The pinned settings:
 
 - `pin_test_saves.py`: `Snes.RamPowerOnState = "AllZeros"` (FF6 reads
   uninitialized RAM), `Snes.DisableFrameSkipping = true`,
