@@ -9,7 +9,7 @@ helps with what you are bad at; you do not hand them technical chores.
 
 # Policy
 
-[AGENTS.md](../../AGENTS.md) (landing bar) and [docs/TESTING.md](../../docs/TESTING.md)
+[AGENTS.md](../../AGENTS.md) (merge criteria) and [docs/TESTING.md](../../docs/TESTING.md)
 (what counts as evidence) govern; they supersede older session memory and
 any conflicting wording here. Apply them when delegating, reviewing, and
 interpreting runs.
@@ -25,9 +25,9 @@ interpreting runs.
   what you need. Screenshots and files go through SendUserFile.
 - **You -> critic:** `tools/critic.sh` (local qwen via ollama). Different
   weights, zero project context; self-contained prompts with raw evidence.
-- **You -> GitHub:** `gh`. Issues are the work ledger; releases carry the zip.
+- **You -> GitHub:** `gh`. GitHub Issues is the issue tracker; releases carry the zip.
 - **Owner -> your work:** `tools/stream/live.py` (launch config `ot6-live`,
-  http://127.0.0.1:8611/) is how the owner watches runs: the census grid,
+  http://127.0.0.1:8611/) is how the owner watches runs: the worker grid,
   per-worker detail, the route map. It must be up and truthful whenever
   runs happen, and especially whenever you ask the owner for help.
 
@@ -52,7 +52,7 @@ Then list, as findings: uncommitted work and which branch it belongs on;
 unpushed commits; release drift (VERSION and README claim a version that
 has no tag or GitHub release; release/* branches ahead of main); stale
 worktrees or leftover `worktree-agent-*` branches; critic or live.py down.
-Fix the plumbing (critic, live.py) yourself. Report the rest and propose an
+Fix the infrastructure (critic, live.py) yourself. Report the rest and propose an
 order of work; the owner picks or nods.
 
 Recall the standing directives before planning. They live in the memory
@@ -88,7 +88,7 @@ Every agent prompt ends with this footer, verbatim:
 > failed attempts. Quote raw log lines for every number you report.
 
 While agents run, keep live.py open (`preview_start` name `ot6-live`) and
-glance at the census for frozen workers; a stuck worker is your problem,
+glance at the worker grid for frozen workers; a stuck worker is your problem,
 not the agent's to hide. Do not poll agents; you are notified when they
 finish. If a report reads like a summary rather than evidence, send the
 agent back for the raw lines before believing it.
@@ -111,7 +111,7 @@ Milestones and releases get the full gate before the merge:
 1. **Ombudsman:** an independent agent (read-only) with the charter from the
    ombudsman memory: verify every number against raw logs; hunt invalid
    evidence under docs/TESTING.md (selective state edits in play, weakened
-   assertions, synthetic fixtures in the play lineage, search-selected wins
+   assertions, synthetic fixtures in the play history, search-selected wins
    passed off as success rates) and laziness (TODOs shipped as done,
    unverified assumptions); check every memory directive. Same footer as
    above.
@@ -158,7 +158,7 @@ Blocked means: a measurement you cannot take, a judgment only the owner can
 make, hardware or account access, or the same fix failing twice. Before
 asking:
 
-- Make sure live.py is up and shows the run in question (census tile,
+- Make sure live.py is up and shows the run in question (worker grid tile,
   detail page, route map); if live.py itself is broken, fixing it comes
   first, because it is how the owner will help you.
 - Put the evidence in front of them: the workspace path under
