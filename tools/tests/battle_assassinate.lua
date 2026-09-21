@@ -107,7 +107,7 @@ local function cpu()
   local s = emu.getState()
   return (s["cpu.k"] << 16) | s["cpu.pc"], s["cpu.x"] & 0xFF
 end
-local divineKills = {}   -- { m, f, seq, pc }: $3dd4 Death marks from the gate
+local divineKills = {}   -- { m, f, seq, pc, via }: $3dd4 Death marks from the gate
 local brokeAt = {}       -- m -> { f, seq, atk, pc }: the ROM's first break
                          -- store for the body this ledger (the chip's
                          -- "shields down: break", ot6_break.asm)
@@ -115,17 +115,49 @@ local hpWrite = {}       -- m -> { f, seq }: the first HP write after its mark
 local deathAt = {}       -- m -> { f, seq }: the first Death status after its mark
 local killPending = {}   -- m -> true between the mark and its HP/Death writes
 local watching = false
+-- The gate has two callers and one mark, so the mark's pc alone cannot say
+-- which rule fired: the seam, on a later swing of one multi-swing action,
+-- marks a body the first swing broke in the same frame (measured with the
+-- Ot6HitJoin jsr NOP'd: build/attempts/wt/assassinate-break/negctl_nop.log
+-- f35355, break seq6 then mark seq7, three shields in one action).  So the
+-- caller is read off the stack at the gate's entry: jsr pushed the address
+-- of its own last byte, and the two jsr sites are found in the ROM's bytes.
+local function findJsr(from, to)
+  for a = from, to - 3 do
+    if H.readRomByte(a & 0x3FFFFF) == 0x20
+      and H.readRomWord((a + 1) & 0x3FFFFF) == (GATE & 0xFFFF) then return a end
+  end
+  return nil
+end
+local HITJOIN = H.sym("Ot6HitJoin")
+local jsrHit, jsrSeam = findJsr(HITJOIN, HITJOIN + 0x10), findJsr(SEAM, SEAM + 0x20)
+H.log(string.format("[gate] Ot6AssassinateGate $%06x; jsr in Ot6HitJoin: %s; "
+  .. "jsr in Ot6Assassinate (seam): %s", GATE,
+  jsrHit and string.format("$%06x", jsrHit) or "NONE (the chip-path hook is not there)",
+  jsrSeam and string.format("$%06x", jsrSeam) or "NONE"))
+local gateVia = nil
+emu.addMemoryCallback(function()
+  if not watching then return end
+  pcall(function()
+    local sp = emu.getState()["cpu.sp"] & 0xFFFF
+    local ret = H.readWord(sp + 1)
+    if jsrHit and ret == ((jsrHit + 2) & 0xFFFF) then gateVia = "Ot6HitJoin"
+    elseif jsrSeam and ret == ((jsrSeam + 2) & 0xFFFF) then gateVia = "seam"
+    else gateVia = string.format("$%04x", ret) end
+  end)
+end, emu.callbackType.exec, GATE, GATE)
 emu.addMemoryCallback(function(addr, v)
   if not watching or (v & 0x80) == 0 then return end
   pcall(function()
     local pc = cpu()
     if pc >= GATE and pc < SEAM then
       local m = ((addr - 0x7E0000 - 0x3DD4) - 8) // 2
-      local k = { m = m, f = H.frame, seq = stamp(), pc = pc }
+      local k = { m = m, f = H.frame, seq = stamp(), pc = pc, via = gateVia }
       divineKills[#divineKills + 1] = k
       killPending[m] = true
       H.log(string.format("[divine] f%d seq%d body %d: Death marked in "
-        .. "Ot6AssassinateGate (pc=$%06x)", k.f, k.seq, m, pc))
+        .. "Ot6AssassinateGate (pc=$%06x) via %s", k.f, k.seq, m, pc,
+        tostring(gateVia)))
     end
   end)
 end, emu.callbackType.write, 0x7E3DD4 + 8, 0x7E3DD4 + 0x13)
@@ -227,9 +259,11 @@ end
 -- pressed out (one call per frame) ------------------------------------------
 local T = H.targetCursor()
 local mf, hb, aPhase = 0, -1200, 0
+local tapNo, tapAt = -1, 0   -- the steer's tap being pressed, and since when
 local function fightPulse()
   scanBodies()
   T.observe()
+  if H.readByte(MSTATE) ~= ST_TGT then tapNo = -1 end
   if H.frame - hb >= 600 then
     hb = H.frame
     local parts = {}
@@ -277,14 +311,23 @@ local function fightPulse()
     btn = (cur == 0) and "a" or "up"   -- Fight is row 0
     if not edge then btn = nil end
   elseif st == ST_TGT then
-    -- H.targetCursor: "a" once the cursor sits on the wanted body, a
-    -- direction to tap on the first half of its 16-frame cycle, nil while
-    -- the tap settles; the tap itself is a 4-on/4-off edge
+    -- H.targetCursor: "a" once the cursor sits on the wanted body, else a
+    -- direction, decided once per 16-frame cycle at whatever phase the
+    -- window lit and returned through the cycle's first half.  Each
+    -- decided tap (T.press counts them) is pressed for four frames from
+    -- its decision.  Pressing only on the cycle's own first four frames
+    -- lost a tap decided at phase 4-7, and the steer then booked that
+    -- direction as one that moves nothing and never tried it again
+    -- (preview sweep shifts 28 and 35: LEFT from slot 3 was decided but
+    -- never on the pad, build/attempts/wt/assassinate-break/
+    -- probe_tgt_s28b.log f2942-2955, and the body two cells left was
+    -- "never lit" after 24 taps).
     btn = T.steer(pickTarget(), mf)
     if btn == "a" then
       if not edge then btn = nil end
-    elseif btn ~= nil and (mf - 1) % 16 >= 4 then
-      btn = nil
+    else
+      if btn ~= nil and T.press ~= tapNo then tapNo, tapAt = T.press, mf end
+      btn = (tapNo >= 0 and mf - tapAt < 4) and T.dir or nil
     end
   elseif st == ST_TRANS then
     btn = nil   -- NOTHING in transitional $01: an A held here is still
@@ -461,6 +504,10 @@ add({
     H.assertEq(b.f == k.f and b.seq < k.seq, true, string.format(
       "the break write precedes the Death mark on the SAME action: break "
       .. "f%d seq%d, mark f%d seq%d", b.f, b.seq, k.f, k.seq))
+    H.assertEq(k.via, "Ot6HitJoin",
+      "the mark came through Ot6HitJoin, the chip path of the hit that "
+      .. "broke the body -- not the seam on a later swing (the pre-#239 "
+      .. "rule, which a multi-swing action can still reach)")
     H.assertEq(hpWrite[k.m] ~= nil and hpWrite[k.m].f == k.f
       and hpWrite[k.m].seq > k.seq, true,
       "the mark precedes the hit's HP write (ApplyDmg), same frame")
