@@ -1,4 +1,4 @@
-# Multi-hit as a first-class dial
+# Multi-hit as a tuning dial
 
 Hit count determines break rate: a landed hit that matches a weakness chips a
 shield, so the number of times an action strikes is the strongest lever OT6 has
@@ -363,7 +363,7 @@ Principles, stated so they can be reviewed:
 |---|---|---|
 | **Pummel** | **×2** bludgeoning | Fits P1: 4 MP at level 1, the earliest multi-hit in the game and his signature. Two chips per action against the 31 authored 2-shield species means Sabin breaks trash without help. Power 110 → **55** per hit (P4, straight halving). |
 | **Suplex** | **×1** | P3: this is the single-hit committer. 180 power is the highest in the Blitz list and it stays one number. |
-| **Bum Rush** | **×4** bludgeoning, not ×8 | ×8 breaks every authored gauge but one in a single action (shield census: 31 species at 2, 10 at 3, 4 at 4, 5 at 5, 8 at 6, 5 at 7, one at 8, one at 11), which fails both P5 and P1, because the ultimate would become the opener. ×4 empties trash and the low bosses outright and is still a capstone moment, while bosses with 5 or more shields need Sabin's own Pummel or a partner to finish. Power 128 → **32** per hit (P4): 99 MP already buys the worst damage-per-MP in the Blitz list, and dividing it makes an expensive capstone weaker still against defended targets, applied anyway because leaving it at 128 across four hits would make the ultimate both the best opener and the best nuke. |
+| **Bum Rush** | **×4** bludgeoning, not ×8 | ×8 breaks every authored gauge but one in a single action (shield tally: 31 species at 2, 10 at 3, 4 at 4, 5 at 5, 8 at 6, 5 at 7, one at 8, one at 11), which fails both P5 and P1, because the ultimate would become the opener. ×4 empties trash and the low bosses outright and is still a capstone moment, while bosses with 5 or more shields need Sabin's own Pummel or a partner to finish. Power 128 → **32** per hit (P4): 99 MP already buys the worst damage-per-MP in the Blitz list, and dividing it makes an expensive capstone weaker still against defended targets, applied anyway because leaving it at 128 across four hits would make the ultimate both the best opener and the best nuke. |
 | AuraBolt / Fire Dance / Air Blade | ×1 | Element probes, and Fire Dance/Air Blade are already breadth. Adding rate on top would make Sabin the answer to every fight, and P2 allows him one rate ability, which Pummel is. |
 | Mantra / Spiraler | ×1, and the question does not arise | Neither strikes an enemy. Mantra heals the party and Spiraler is a sacrifice; a hit count on either has nothing to chip. |
 
@@ -427,7 +427,7 @@ hit count.
 
 Every character gets +1 landed hit per BP with any weapon regardless
 (`Ot6FightBoost`, §1.1, measured), so nobody is without a rate lever; Sabin,
-Edgar and Cyan are simply the characters who also have one that costs no BP.
+Edgar and Cyan are the characters who also have one that costs no BP.
 
 ---
 

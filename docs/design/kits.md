@@ -20,7 +20,7 @@ schedule, and everything below is scriptable with zero menu-bank work.
 That reproduces Octopath's early-game arc (develop one job, feel it
 complete, then branch into subjobs and open up): kits fill through the
 WoB, then magicite arrives late-WoB/WoR as the breadth layer. JP
-returns only if playtesting wants a pacing knob.
+returns only if playtesting shows a pacing knob is needed.
 
 **Curated kits (the Ochette/Hikari model).** Two characters learn
 more than 8 and equip a curated subset: Strago (~5 slots) and Gau
@@ -202,7 +202,7 @@ costs MP".
 
 `Ot6BushidoTier` (ff6/src/battle/ot6_kits.asm)
 replaces the charge gauge's clock in `UpdateMenuState_37`; the window, its
-numerals, the grey-out of unlearned techs, the A-button latch,
+numerals, the grey-out of unlearned techs, the A press that stops the gauge,
 `FixPlayerAttack`'s `+$55` and `Cmd_07` are all vanilla and untouched. Boost
 1/2/3 selects a **moving window of three**: Cyan's top three *learned* techs,
 weakest → strongest. There is no 0× tier: `Ot6BushidoTech` clamps a stray 0 up,
@@ -240,7 +240,7 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
   fires as the divine pass built it: selected only when learned and
   unspent, gated at resolution by `Ot6Oblivion` (target must be Broken), and
   dropped back to Quadra Slice (6) here for the rest of any battle whose once-
-  per-battle latch is set. `battle_divines` checks that shape (BP3 = Cleave
+  per-battle flag is set. `battle_divines` checks that shape (BP3 = Cleave
   clear, Quadra Slice spent).
 
 **BP is read, never written.** `Ot6ActionEnd` consumes the spend and skips that
@@ -271,7 +271,7 @@ escalate either, for the chance-verb reason above, so Blitz is the only kit
 window `Ot6KitRowCost` prices through `Ot6PendPrice`. The **cursor row is the boost
 level** (row 0 = boost 1× … row 2 = boost 3×), so picking a stronger tech spends
 more BP. That keeps the numeral gauge's trade of BP for a stronger cut and
-makes it readable. Confirm banks `$3e9d = r` and reuses `Ot6BushidoTier` to latch the
+makes it readable. Confirm banks `$3e9d = r` and reuses `Ot6BushidoTier` to store the
 base+r tech; a row the caster lacks the BP for is greyed and refuses on confirm.
 `SwdTech`'s names render from `BushidoName` (not `AttackName`, whose $55–$5c slots
 are empty pad).
@@ -507,8 +507,8 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
     True Knight takes. Without the cap, the earn would scale with absorbs and
     with how many things are casting; with it, the earn does not scale.
   - **The MP half stays per absorb and uncapped.** Only the BP earn is
-    rationed. Vanilla's restore is the reason a rune knight wants a caster
-    boss, and rationing it would delete the ability's own reward.
+    rationed. Vanilla's restore is the reason a rune knight benefits from a
+    caster boss, and rationing it would delete the ability's own reward.
   - **Vanilla's ally-spell quirk is kept.**
     Runic absorbs a *friendly* cast as readily as a hostile one, and a stance
     that stands for three turns will absorb a lot of Terra's Cures. That is

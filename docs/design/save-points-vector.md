@@ -19,7 +19,7 @@ block is safe at assembly time, because every downstream pointer recomputes.
 
 `ff6/src/event/event_main.asm:100749-100784`:
 
-- gated on `$01B5=0` — the once-per-tile latch, so it fires once per arrival
+- gated on `$01B5=0` — the once-per-tile flag, so it fires once per arrival
   (`:100750`; `$01B5` = `$1EB6` bit 5, decoded at
   `vector-route.md` §7);
 - plays sfx 209 and a blue flash, sets **`$01BF=1`** (`:100752-100755`);

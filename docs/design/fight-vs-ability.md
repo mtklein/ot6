@@ -673,7 +673,7 @@ every one of that character's turns. Measured in battle 66 before the
 change: a berserked EDGAR banked 1-2-3-4-5 over four engine-chosen Fights
 while being hit the whole way, and the charge arm ran zero times
 (`build/attempts/<branch>/lab/uncontrolled/probe_bank.log`). The boost
-economy was simply inert for Umaro, a Berserked ally, a Muddled ally and a
+economy was inert for Umaro, a Berserked ally, a Muddled ally and a
 Colosseum fighter alike — one cause, one class.
 
 The rule now is the owner's: **bank normally; when you are hurt, dump the

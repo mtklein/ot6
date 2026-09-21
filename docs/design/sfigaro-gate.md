@@ -270,7 +270,7 @@ With the freeze thawed as it comes and A tapped the way a person does
 
 LoseBattle's bit (`$3ebc` bit 0) is set only 240-360 frames after the HP
 word hits 0 (TekLaser's animation and the Annihilated message), the
-canary's freeze lands at 300, and the press the screen wants falls after
+canary's freeze lands at 300, and the press the screen needs falls after
 it.  Thawed, the game fades out, reloads map 75 at (47,43) with LOCKE at
 279/279 and `$1DD1` bit 0 set, and the GameOver script is never read nor
 TitleScreen executed.  In seed 1's R1 the same loss came from a Battle

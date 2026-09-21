@@ -54,7 +54,7 @@ Therefore:
 | `$01B2` | party is facing **DOWN** |
 | `$01B3` | party is facing **LEFT** |
 | `$01B4` | **A button is held this frame** |
-| `$01B5` | tile-event bit (cleared on every step — a "once per tile" latch) |
+| `$01B5` | tile-event bit (cleared on every step — a "once per tile" flag) |
 | `$01B6` | map object data needs loading (map-init guard) |
 | `$01B7` | serpent-trench arrow direction |
 

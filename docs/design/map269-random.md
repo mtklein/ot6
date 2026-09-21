@@ -91,7 +91,7 @@ clamped to LOCKE's HP.  The engine's own damage word at `_writedamage`
     [hit] f2909 Trapper(s4) cmd=0C atk=L4Flare tgt=000F dmg=0,0,447,443 raw=16383,16383,802,778 kills=2   (control_s0)
     [hit] f3478 Trapper(s3) cmd=0C atk=L4Flare tgt=000F dmg=0,0,447,443 raw=16383,16383,792,765 kills=2   (breakfirst_s0)
 
-(16383 = no damage word for that entity: EDGAR and SABIN, L17, are simply
+(16383 = no damage word for that entity: EDGAR and SABIN, L17, are
 not targets.)  The vanilla formula agrees: monster magic uses mag.pwr x1.5
 (`battle_main.asm:6853,6933`), so 66*4 + 19*15*66/32 = 851, times the
 224..255/256 spread = **744..851**, no defence term.  Against 447 / 443
@@ -326,7 +326,7 @@ scripted fight with no `navTo` care after it.  Regenerated
 14468.)  `battle_magicite`, `battle_subjob` and `field_subjob`, the suite
 tests that boot `n024_entry`, pass on the regenerated fixture; its CELES
 is still MP-dry, which they assert on.  The Fenix that raises SABIN moved
-from the random's ledger to the save room, where it belongs to battle 70.
+from the random's count to the save room, where it belongs to battle 70.
 The upstream fix -- a care stop in `gen_ifrit_magicite` after battle 70,
 so `magicite_ifrit_shiva` itself is not saved with a dead member -- is
 the same one line and is left for the coordinator (it regenerates that
@@ -356,7 +356,7 @@ LOCKE's HP at any level below the mid-20s.  The levers, cheapest first
   refuses the Fenix for the rest of the fight; for a level spell the
   raised pair face a 1/3 chance once per Trapper second turn, and LOCKE
   down is the bolt key down.  A rule that recognises a spell-kill (the
-  hit came from a `cmd=0C` Lore / a magic attack with no split, or simply
+  hit came from a `cmd=0C` Lore / a magic attack with no split, or
   "the same action killed two members from full") and raises immediately
   would have turned the control fights from ~8000 frames into cared-shaped
   ones after the first Flare.  Separately, the "boost-Fight through

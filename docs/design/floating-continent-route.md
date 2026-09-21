@@ -146,7 +146,7 @@ The IAF is not reached by flying to a location. The sequence is:
 The two gating switches to watch live: **`$009E`** (0→1 = discovery ran) and
 **`$01A2`** (must be 1 = three aboard). The forced three-party is a **route
 decision**: one of TERRA/LOCKE/STRAGO/RELM is benched for the entire IAF+FC.
-Who to keep is a kit question for the FC break fights (AtmaWeapon wants two of
+Who to keep is a kit question for the FC break fights (AtmaWeapon needs two of
 fire/ice/bolt/slash/pierce; §7).
 
 ---
@@ -255,7 +255,7 @@ Behemoth `$020`, Apokryphos `$00c`, Misfit `$0a4`, Ninja `$003`, Wirey Drgn
 encounter-free (`+5 = $00`). (Confirmed with `tools/audit_encounters.py 394`,
 which the FC's `+Rand` flag first exercised — the fix is `e855c36`.) **Several of
 these formations permit a pincer** (e.g. the Apokryphos/Misfit, Ninja, and
-Brainpan groups), so a walk across 394 wants a fight budget or a `"tactical"`
+Brainpan groups), so a walk across 394 needs a fight budget or a `"tactical"`
 playBattles mode, not a blind `"flee"` (HANDOFF, the flee bullet).
 
 **Rows.** The (67,39) walk's Behemoth one-shot a front-row TERRA at 792 HP
@@ -279,7 +279,7 @@ when the party lands (its origin is not an explicit `switch $035E=1` in
 `event_main.asm`, which has only the `:13635` site; a default-on NPC switch
 fits). The talk: NPC at 394 (10,16), event `_cad9a7` (`npc_prop.asm:17437-
 17443`; script `:32586`): `norm_lvl SHADOW` `:32616`, `char_party SHADOW,1`
-`:32625`, `$02F3=1` `:32627`, clears the NPC `$035E=0` `:32633`, met-latch
+`:32625`, `$02F3=1` `:32627`, clears the NPC `$035E=0` `:32633`, met flag
 `$002A=1` `:32634`. Its walkable neighbours are (10,15) and (9,16) only —
 (10,17) and (11,16) are F7 walls (probe_fc_bfs.lua's map dump). So the
 descent is: talk at the landing, then the crossing; (70,29) is avoided
@@ -319,7 +319,7 @@ return twin. A validated crossing: (4,8) → (19,12) (25,19) (40,12)
 Shadow's rejoin sits ahead of the (70,29) "return?" choice: choosing to
 return with Shadow already talked in at (10,16) but not yet rejoined
 triggers the scripted Shadow **removal** (`_cad9fc`), and the (89,25)
-chute reaches that removal branch — so a route that wants Shadow at the
+chute reaches that removal branch — so a route that needs Shadow at the
 save alcove must avoid (70,29) after the talk-in. Shadow's vanilla 1/16
 post-battle leave roll is a NO-OP in OT6 everywhere (`Ot6ShadowLeaves`;
 owner's call 2026-09-01: Shadow stays for the whole game, only scripted
@@ -495,7 +495,7 @@ The IAF trash (Sky Armor / Spit Fire, forms 175/176) carries no drawn gauge in
   ride the existing break/shield tables, not new per-frame code.
 - **The forced three-party (§2/§3) is the stretch's one roster decision.** The
   fourth of TERRA·LOCKE·STRAGO·RELM is benched for the whole IAF+FC. AtmaWeapon
-  (11 shields, five-axis weakness) wants a lineup holding ≥2 of fire/ice/bolt/
+  (11 shields, five-axis weakness) needs a lineup holding ≥2 of fire/ice/bolt/
   slash/pierce; Nerapa absorbs fire (don't bring a fire-only chipper).
 - **A lost fight is a real Game Over** everywhere on this stretch (the IAF
   `_ca5ea9` handler, the escape-clock `GameOver`), unlike the massacre's
@@ -508,7 +508,7 @@ The IAF trash (Sky Armor / Spit Fire, forms 175/176) carries no drawn gauge in
 
 The three segments were re-cut in one sitting on ROM `build/ot6.sfc`
 sha256 `783ac067…` (byte-identical to the main tree's 2026-09-01 19:01
-latch), with `main` merged into the parked branch (the post-v0.17 fight
+content-stable ROM copy), with `main` merged into the parked branch (the post-v0.17 fight
 driver: the cure-MP reserve, brokendeath chips before the kill; Shadow's
 leave roll a no-op). Every run is `tools/tests/run.sh` with
 `OT6_SRAM_CHECKPOINT` on the tracked battery, pad presses and reads only

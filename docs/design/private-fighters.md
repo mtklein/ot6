@@ -391,7 +391,7 @@ why the `[refused]` line exists.
   own list order, which is enough to price it — but a fighter that wanted a
   particular tool would have to walk there, and that is a rewrite of five
   sequence machines that are deliberately dumb (one button per 30-frame
-  pulse). Worth doing if a segment ever wants a specific tool rather than
+  pulse). Worth doing if a segment ever needs a specific tool rather than
   whatever is first in the bag.
 - **Press R inside the window.** `probe_bushido` measured that R still
   raises the pending boost from inside the SwdTech window, which would let

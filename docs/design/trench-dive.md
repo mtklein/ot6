@@ -331,7 +331,7 @@ generate edge played for its verdict only, with `OT6_NO_PUBLISH=1`.
   never found the ceiling. Buying it would be three or four levels off the
   Veldt grind upstream in `gen_sabin_gau`, which reshuffles every later
   encounter in the run. Not measured here, and not proposed for a counter
-  the party can simply decline to provoke.
+  the party can decline to provoke.
 - **Gear.** There is none. Scanning `item_prop_en.dat` for equipment that
   halves, nulls or absorbs lightning gives Force Shld, Cat Hood, Force
   Armor and the Beads — all of them WoR or late WoB, none of them in the

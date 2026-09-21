@@ -84,7 +84,7 @@ was recorded stays on the older conservative whole-signature rule until its
 fixture is regenerated, or until `compose.py --adopt-stamps` proves the
 missing lines from the tree's own records (the current sources still hash to
 the recorded signature, the artifact verifies, and ninja's build log shows
-the ROM content latch last ran before the generate edge with its copy equal
+the ROM copy-if-changed step last ran before the generate edge with its copy equal
 to the current ROM) and appends them; no ROM identity is invented for it,
 and a fixture the records cannot prove is refused. This describes
 the implementation, not an additional owner restriction. Improve
@@ -110,7 +110,7 @@ Explicitly isolated mechanism tests may retain declared state-write waivers
 for fault injection or synthetic setup. They establish the narrow property
 under test, not legal play, balance, or ordinary player experience. They may
 produce isolated unit fixtures, but those fixtures and their descendants must
-never enter the legitimate gameplay/checkpoint lineage. The waiver registry
+never enter the legitimate gameplay/checkpoint history. The waiver registry
 is not a ban on complete snapshot restoration and is not a mandatory countdown
 to zero. This policy adds no authorization to fabricate gameplay state.
 

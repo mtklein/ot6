@@ -106,5 +106,5 @@ new battle code:
    a system to balance around.
 
 The ¤ icon borrows the vanilla sparkle glyph at $df; every consumer keys on
-the code, so a bespoke ¤ can replace the art in place without touching
+the code, so a custom ¤ can replace the art in place without touching
 anything else.

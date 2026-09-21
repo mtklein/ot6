@@ -85,7 +85,7 @@ together, in one scene; see `magicite-tube-six.md`.
   the party has to divide the espers between characters.
 - Espers granting *permits* stay rare (3 in WoB) so that a
   multi-weapon character reads as a deliberate build.
-- Summon-as-divine cadence ✦: the summon does not replace the
+- Summon-as-divine tier ✦: the summon does not replace the
   character's own divine for the battle. Both exist, and both are
   once-per-battle abilities used at the same point in a fight.
 

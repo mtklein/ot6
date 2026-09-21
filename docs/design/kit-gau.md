@@ -21,8 +21,8 @@ at Rage-start, following the Dance model; and boost buys certainty on the coin
 | SRAM | **8 bytes at `$1e1f-$1e26`**, the same save-block scrap the Bushido word lives in; zero-sentinel = AUTO; **no `persistent_layout` bump, zero checkpoints regenerated** (§4, the tradeoff table) |
 | Battle read | one choke point: `InitSkills`' `$257e` list build (`battle_main.asm:14659-14679`) filters through the loadout; the vanilla Rage window, cursor, scroll and confirm are untouched (§3). **AUTO truncates to eight as well, so the full list is not reachable by inaction (§8.0)** |
 | MP | **flat 8 MP at Rage-start**, whole-battle possession, mid-trance turns free; one price rule for both possess-verbs (Rage and Dance) (§5) |
-| Boost | 0 BP vanilla coin; 1 BP special ¾; 2 BP special 15/16; 3 BP the special **every turn for the whole trance**, latched at `Cmd_10`, the Slot-latch pattern (§6) |
-| Boosted Leap | **no rider**: Leap's learn step has no roll to convert; it re-opens if the return-cadence roll is located and playtest wants it (§6.3). **Leap is free** (§5) |
+| Boost | 0 BP vanilla coin; 1 BP special ¾; 2 BP special 15/16; 3 BP the special **every turn for the whole trance**, stored in a flag at `Cmd_10`, the Slot flag pattern (§6) |
+| Boosted Leap | **no rider**: Leap's learn step has no roll to convert; it re-opens if the return roll is located and playtesting shows a need for it (§6.3). **Leap is free** (§5) |
 
 ---
 
@@ -112,7 +112,7 @@ Per machinery layer:
   new screen is `MenuState_7b`'s twin, with cursor prop `{2, 4}`: two columns
   of four on odd rows at vanilla's 12px pitch (§8.0b), one name row per slot.
   Two deltas from
-  Bushido: names come from `MonsterName` via the rage browse's own plumbing
+  Bushido: names come from `MonsterName` via the rage browse's own internals
   (`GetMonsterNamePtr`, `skills.asm:1557-1565`) instead of `BushidoName`;
   and the pool cannot be a drawn grid (255 candidates against Cyan's 8), so
   the L/R cycle through learned rages serves as the browse: the Bushido cycle
@@ -144,7 +144,7 @@ past eight, AUTO truncates by design (§8.0).
 
 The possession machinery this design leaves alone:
 
-- `Cmd_10` (`battle_main.asm:3351-3371`): latches the chosen beast into
+- `Cmd_10` (`battle_main.asm:3351-3371`): stores the chosen beast in
   `$33a8,y`, sets the RAGE status (`$3ef9,y |= $01`, `:3364-3366`), loads the
   beast's properties (`SetRage`, `:1015-1031`), and **immediately executes the
   first possessed action this same turn** (the `_c21554` tail, `:3370`).
@@ -233,25 +233,25 @@ Steal"). The tilt is toward entry 1 (the special) because entry 0 is always plai
 (`monster_rage.asm:3-5`), which is not worth spending BP to make more likely.
 Exact thresholds are M6's to tune; the mechanism is one threshold compare.
 
-### 6.1 The latch — Slot's pattern, whole-trance duration
+### 6.1 The tier flag — Slot's pattern, whole-trance duration
 
 BP is spent once, at the Rage-start action, through the normal
 `Ot6ActionEnd` consume, but the *tier* must outlive that action by the whole
-battle. This is the same problem Slot solves over a shorter span: Slot latches
+battle. This is the same problem Slot solves over a shorter span: Slot stores
 the spin's tier at the first A press (`Ot6SlotRig` → `OT6_SLOTTIER` at `$57ba`,
 `ot6_kits.asm:1490-1530`, `ot6_memory.inc:59-64`) so the charge and the reels
 can never disagree. Rage copies `OT6_BOOST_REVEALED,x` (capped 3) into
 **`OT6_RAGETIER`**, the `$57bb` spare of the same init-exempt strip.
 Staleness is harmless for the same reason it is in Slot: the cell is read only
 while a RAGE status is set, and the only writer of that status (`Cmd_10`)
-always rewrites the latch first. One byte suffices while Gau is the only Rage
+always rewrites the flag first. One byte suffices while Gau is the only Rage
 user; a second user (Gogo, WoR) is when it widens to per-character (§10.7).
 
-**The latch lives at two sites, and both are required.** `RandRage` has
+**The flag is set at two sites, and both are required.** `RandRage` has
 two callers: `Cmd_10` (`battle_main.asm:3351`, before the `_c21554` tail fires
 the first possessed action) covers every later turn, but the *start* turn's
 attack is rolled by `FixPlayerAttack`'s cmd-`$10` arm (`battle_main.asm`
-@4dec) at action LOAD, before `Cmd_10` exists. If the latch were only at
+@4dec) at action LOAD, before `Cmd_10` exists. If the flag were set only at
 `Cmd_10`, the turn the BP was spent on would be the one turn it did not affect,
 and a 3-BP Rage would still be a coin flip on its first turn. Both sites are
 idempotent on the start turn because the pending byte is not consumed until
@@ -496,7 +496,7 @@ Park the non-actor party slots with the Wounded status, not the stop status.
 Parking with stop costs exactly what `battle_slots.lua:114-118` says
 it does: "a stopped character's pending menu stays open forever and starves the
 actor's next turn". The battle then parks on an open list at `cmd10 = 1`, and
-every multi-turn claim ("mid-trance turns are free", "the latch survives several
+every multi-turn claim ("mid-trance turns are free", "the flag survives several
 possessed turns") is vacuously true against a battle that took one
 turn. A wounded row raises no menu, and the same drive then takes five possessed
 turns. Any arm that asserts something about several turns must also assert
@@ -507,7 +507,7 @@ the turn count, or it asserts nothing.
 ## 10. What the machinery cannot express
 
 1. **Per-rage or per-slot boost tiers.** One pending-BP cell per character
-   (`OT6_BOOST_REVEALED`), one latch per trance; "slot 3 always boosted" has
+   (`OT6_BOOST_REVEALED`), one flag per trance; "slot 3 always boosted" has
    no storage and no UI channel. The tier is always a start-of-trance decision.
 2. **Mid-trance rage switching.** The possession runs to battle end or death
    (`battle_main.asm:11572`, `:12371`); switching needs direct status-bit edits
@@ -525,7 +525,7 @@ the turn count, or it asserts nothing.
 5. **Boost on Leap.** No roll exists in the leap-learn path to
    convert (§6.3), so a 3-BP Leap spends for nothing and joins Break/Doom in
    the known chance-verb gap (magicite-tube-six.md §13.4) until the
-   return-cadence roll is located.
+   return roll is located.
 6. **Rage id 255.** The +1 byte encoding tops out at id 254, which is
    vanilla's own ceiling (`InitSkills` stops at `$fe`,
    `battle_main.asm:14676-14678`; `LearnRage` skips index > 255,

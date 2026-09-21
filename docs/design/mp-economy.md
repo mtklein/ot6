@@ -111,7 +111,7 @@ house rule stands with its one named exception (Osmose, below).
 
 - **FF6's MP pool is the resource.** Every character
   already has an MP stat, a growth curve, current/max cells in
-  save RAM, and menu plumbing. OT6 adds no new resource and no
+  save RAM, and menu internals. OT6 adds no new resource and no
   new name; it widens who pays from that pool.
 - **Three currencies.** HP measures danger, MP measures sustain, and BP
   pays for burst. The break interacts with all three: shielded resistance
@@ -235,7 +235,7 @@ else, and the price follows at 2.5x per level.
 owner exempted them on 2026-09-17. Boost on them does not multiply
 anything: it converts variance into reliability across "a more
 interesting mix of effects than just damage boosts" — Steal's
-common/rare/guarantee ladder, Rage's coin and the tier it latches for
+common/rare/guarantee ladder, Rage's coin and the tier it holds for
 the whole battle, Slot's rig. Boost already costs BP, which is the
 scarce resource. **MP scales with magnitude; BP alone pays for
 certainty.** So their prices stay flat at every level: Steal 4 / 4 / 4 /
@@ -344,7 +344,7 @@ gate). The boost buys swings.
    the arithmetic lives, and every surface that states a price -- the
    drawn number, the grey, the confirm, the charge -- reaches it, so the
    charge and the displayed price cannot disagree. The chance verbs
-   simply do not reach it: `Ot6AbilityCost`'s `@steal` and `@rage` arms
+   do not reach it: `Ot6AbilityCost`'s `@steal` and `@rage` arms
    return the leaf price directly, and `Ot6ThiefListOpen` and
    `Ot6KitRowCost` draw the same leaf. One authority for the
    arithmetic, and one list of who consults it.

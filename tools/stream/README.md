@@ -1,11 +1,11 @@
 # tools/stream -- watch headless runs while they happen
 
-No video anywhere: the harness's own stdout stream is the broadcast.
+No video anywhere: the harness's own stdout stream is the output.
 Every `run.sh` run emits, into its growing run log:
 
 - `[ot6shot] <frame> <b64 png>` -- a screenshot every 128 frames
   (always on: there is no flag, so a
-  playing emulator is always on the census)
+  playing emulator is always on the worker grid)
 - `[ot6pad] <frame> <buttons>` -- the held pad, on every change
 - `[ot6note] <frame> <text>` -- every `H.log` line, frame-stamped
 
@@ -18,7 +18,7 @@ python3 tools/stream/live.py            # http://127.0.0.1:8611/
 python3 tools/stream/live.py build/test-runs/<ws> --port 8612
 ```
 
-Started without a named workspace it channel-hops: when the followed run's
-log goes quiet it switches to the newest live run, so one viewer surfs a
-whole `ninja` build.  Latency is Mesen's stdout block buffering -- bursts
+Started without a named workspace it follows the newest run: when the
+followed run's log goes quiet it switches to the newest live run, so one
+viewer follows a whole `ninja` build.  Latency is Mesen's stdout block buffering -- bursts
 every second or so.
