@@ -164,6 +164,9 @@ end
 -- the Marshal's post: npc_prop.asm map 51 NPC_3, {15,40}, static
 local MX, MY = 15, 40
 
+-- the squads in the order they take the Marshal
+local MARSHAL_ORDER = { 1, 3, 2 }
+
 local function marshalAdjacent()
   local dx, dy = MX - H.fieldX(), MY - H.fieldY()
   return math.abs(dx) + math.abs(dy) == 1
@@ -241,13 +244,16 @@ local function settleStep()
   }, "post-attempt settle")
 end
 
--- one full Marshal attempt by squad p: activate it, walk beside the
--- Marshal, poke, fight boosted, settle.  Written flat: cond/driveUntil/
--- navTo steps carry no reset(), so repeated bodies replay latched state.
+-- one full Marshal attempt by squad p: activate it, top it up from what
+-- is left in the bag, walk beside the Marshal, poke, fight boosted,
+-- settle.  Written flat: cond/driveUntil/navTo steps carry no reset(),
+-- so repeated bodies replay latched state.
 local function attempt(p, round)
   return H.cond(function() return defenseWon() end, {}, {
     logPools("attempt " .. round .. " (P" .. p .. ")"),
     ySwitchTo(p),
+    H.fieldCare({ threshold = 0.9, reserve = {}, magic = false,
+                  tag = "care before the Marshal (P" .. p .. ")" }),
     H.navTo(MX, MY - 1, {
       arrive = function()
         return defenseWon()
@@ -361,9 +367,13 @@ H.run({ maxFrames = 200000 }, {
   -- guard, so $060A..$060F clear one by one, two waves per squad at ~90-190
   -- HP each.  advanceStory's playBattles mode is this driver.
   -- ===================================================================== --
+  -- reserve = {}: the care after each wave serves the squad that fought
+  -- and spends the bag down to nothing here -- the Marshal is this
+  -- event's last fight and there is no shop before it (#143, owner's
+  -- ruling; the route's reserve floor holds everywhere else).
   H.advanceStory(function()
     return (H.readByte(0x1f41) & 0xFC) == 0
-  end, 60000, { playBattles = true }),
+  end, 60000, { playBattles = true, reserve = {} }),
   H.logStep(function()
     return string.format("all six wave guards down at frame %d; corridor open",
       H.frame)
@@ -378,16 +388,16 @@ H.run({ maxFrames = 200000 }, {
   stripMog(),
 
   -- ===================================================================== --
-  -- Phase 4c: the Marshal, up to three input-driven attempts.  P2 first
-  -- (MOG's squad, the biggest pool), then P1, then P3 if a wipe lands.
-  -- Battle 6's loss path revives the loser at 1 HP on (14,11) and the
-  -- Marshal still stands, so retrying with the next squad is what a
-  -- player would do.  Attempts 2 and 3 are no-ops when an earlier one
-  -- already cleared it.
+  -- Phase 4c: the Marshal, up to three input-driven attempts, by the
+  -- armed squads first and MOG's stripped squad last (#143, owner's
+  -- ruling: a bare-handed MOG does not lead the last fight).  Battle 6's
+  -- loss path revives the loser at 1 HP on (14,11) and the Marshal still
+  -- stands, so retrying with the next squad is what a player would do.
+  -- Attempts 2 and 3 are no-ops when an earlier one already cleared it.
   -- ===================================================================== --
-  attempt(2, 1),
-  attempt(1, 2),
-  attempt(3, 3),
+  attempt(MARSHAL_ORDER[1], 1),
+  attempt(MARSHAL_ORDER[2], 2),
+  attempt(MARSHAL_ORDER[3], 3),
   H.call(function()
     H.assertEq(defenseWon(), true, "defense won (switch $0631 cleared)")
     H.log(string.format("Marshal down at frame %d; riding the epilogue", H.frame))
