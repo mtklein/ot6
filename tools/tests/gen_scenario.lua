@@ -294,11 +294,57 @@ local function seqFor(id, tier, slot)
   end
   return push("a", "a")                                       -- Fight
 end
+-- The lib fight driver's battle-open and [death] lines (newFightDriver,
+-- lib/ot6.lua) for a fight this file drives itself, so tools/audit_boost.py
+-- sees the pips a member held when they fell and tools/audit_fenix.py the
+-- fight a Fenix Down answered (#220).  Ticks count from the first frame the
+-- battle table is live with monsters present; no monster action is
+-- attributed.
+local function newDeathWatch(tag)
+  local W = {}
+  function W.reset()
+    W.tick, W.opened, W.hp, W.said = 0, false, {}, {}
+  end
+  W.reset()
+  function W.frame()
+    if not H.battleLoadStarted() then W.reset(); return end
+    if not W.opened and H.monstersPresent() == 0 then return end
+    W.tick = W.tick + 1
+    local pbp = {}
+    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(0x3E9C + p * 2)) end
+    local party_bp = table.concat(pbp, ",")
+    if not W.opened then
+      W.opened = true
+      local hp = {}
+      for e = 0, 3 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + e * 2)) end
+      H.log(string.format("[%s] battle f+%d partyhp=%s party_bp=%s monsters=%d",
+        tag, W.tick, table.concat(hp, ","), party_bp, H.monstersPresent()))
+    end
+    for e = 0, 3 do
+      local hp, maxhp = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+      local last = W.hp[e]
+      if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
+         and not W.said[e] then
+        W.said[e] = true
+        local bp = H.readByte(0x3E9C + e * 2)
+        H.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d by "
+          .. "nobody (no monster action attributed) bp=%d party_bp=%s%s", tag,
+          W.tick, e, H.readByte(0x3ED8 + e * 2), last, maxhp, bp, party_bp,
+          bp >= 3 and string.format(" -- died holding %d BP", bp) or ""))
+      elseif hp > 0 and hp ~= 0xFFFF then
+        W.said[e] = nil
+      end
+      W.hp[e] = hp
+    end
+  end
+  return W
+end
 local function rideUntil(pred, what, budget, idle, tier)
   tier = tier or 1
   local phase, battN, dlgN, lastBatt, hb = 0, 0, 0, -1, -900
   local wipeN = 0                -- consecutive wiped frames (#163)
   local bt = nil                 -- live fight: { n, f0, banon, dead }
+  local watch = newDeathWatch("river")
   local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
   local function partyLine()
     local p = {}
@@ -340,6 +386,7 @@ local function rideUntil(pred, what, budget, idle, tier)
       -- is the run canary's count (it now counts a 300-frame battle-side
       -- wipe as a game over and freezes the pad -- allowGameOver on the
       -- run keeps the ladder alive for the reload).
+      watch.frame()
       wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
       if (H.gameOverFired or 0) > 0 and lost == nil then
         lost = string.format("GAME OVER counted by the canary in battle #%d " ..

@@ -87,6 +87,64 @@ local BP = 0x3E9C
 local function pHP(e) return H.readWord(0x3BF4 + e * 2) end
 local function pMaxHP(e) return H.readWord(0x3C1C + e * 2) end
 local function pMP(e) return H.readWord(0x3C08 + e * 2) end
+-- The lib fight driver's battle-open, [death] and Fenix Down landing lines
+-- (newFightDriver, lib/ot6.lua) for a fight this file drives itself, so
+-- tools/audit_boost.py sees the pips a member held when they fell and
+-- tools/audit_fenix.py the fight a Fenix Down answered (#220).  Ticks count
+-- from the first frame the battle table is live with monsters present; no
+-- monster action is attributed.
+local function newDeathWatch(tag)
+  local W = {}
+  function W.reset()
+    W.tick, W.opened, W.hp, W.said, W.raise = 0, false, {}, {}, {}
+  end
+  W.reset()
+  function W.frame()
+    if not H.battleLoadStarted() then W.reset(); return end
+    if not W.opened and H.monstersPresent() == 0 then return end
+    W.tick = W.tick + 1
+    local pbp = {}
+    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(0x3E9C + p * 2)) end
+    local party_bp = table.concat(pbp, ",")
+    if not W.opened then
+      W.opened = true
+      local hp = {}
+      for e = 0, 3 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + e * 2)) end
+      H.log(string.format("[%s] battle f+%d partyhp=%s party_bp=%s monsters=%d",
+        tag, W.tick, table.concat(hp, ","), party_bp, H.monstersPresent()))
+    end
+    for e = 0, 3 do
+      local hp, maxhp = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+      local last = W.hp[e]
+      if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
+         and not W.said[e] then
+        W.said[e] = true
+        local bp = H.readByte(0x3E9C + e * 2)
+        H.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d by "
+          .. "nobody (no monster action attributed) bp=%d party_bp=%s%s", tag,
+          W.tick, e, H.readByte(0x3ED8 + e * 2), last, maxhp, bp, party_bp,
+          bp >= 3 and string.format(" -- died holding %d BP", bp) or ""))
+      elseif hp > 0 and hp ~= 0xFFFF then
+        W.said[e] = nil
+      end
+      W.hp[e] = hp
+      local r = W.raise[e]
+      if r ~= nil then
+        if hp > 0 and hp ~= 0xFFFF then
+          H.log(string.format("[%s] actor %d's Fenix Down landed: entity %d is at "
+            .. "%d/%d at tick %d", tag, r.by, e, hp, maxhp, W.tick))
+          W.raise[e] = nil
+        elseif W.tick - r.tick > 840 then
+          H.log(string.format("[%s] actor %d's Fenix Down on entity %d never landed "
+            .. "(%d ticks) -- forgetting it", tag, r.by, e, W.tick - r.tick))
+          W.raise[e] = nil
+        end
+      end
+    end
+  end
+  function W.fenix(actor, e) W.raise[e] = { by = actor, tick = W.tick } end
+  return W
+end
 -- #163: the wipe predicate, readable on EVERY frame rather than behind a
 -- battleLoadStarted() gate.  A wipe zeroes every battle-HP word, which
 -- that predicate reads as "no battle", so a gated watch misses the one
@@ -333,6 +391,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
   local fought, wasBattle = 0, false
   local stuckN, battleFrames, segFrames = 0, 0, 0
   local segCalm, coasting = 0, false
+  local watch = newDeathWatch("gau walk")
   local function makePlan(actor)
     -- `worldWalkFight()` episodes are constructed before H.run starts, so
     -- resolve this at execution time.  The field party byte is repurposed in
@@ -443,6 +502,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
         if mons ~= 0 then return { "right" } end
         local wantMask = 1 << plan.target
         if chars == wantMask then
+          if plan.item == FENIX_DOWN then watch.fenix(actor, plan.target) end
           plan, planActor = nil, nil
           return { "a" }
         end
@@ -502,6 +562,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     return lost ~= nil or (arriveOffWorld and not H.worldMode()) or calm >= 30
   end, budget or 40000, {
     H.call(function()
+      watch.frame()
       -- #163: the run canary's count is a loss on any frame (it now counts
       -- a 300-frame battle-side wipe as a game over and freezes the pad;
       -- allowGameOver on the run keeps the ladders alive for the reload)
@@ -640,6 +701,7 @@ local function grindStep()
   local retortArmed, retortUnavailable = false, false
   local feeding, targetBankLogged = false, false
   local feedConfirmUntil, feedSubmissions = nil, 0
+  local watch = newDeathWatch("gau grind")
   local function makePlan(actor)
     local row = cmdRowOf(actor, CMD_ITEM)
     local nmon = liveMonsters()
@@ -785,6 +847,7 @@ local function grindStep()
         if mons ~= 0 then return { "right" } end
         local wantMask = 1 << plan.target
         if chars == wantMask then
+          if plan.item == FENIX_DOWN then watch.fenix(actor, plan.target) end
           plan, planActor = nil, nil
           return { "a" }
         end
@@ -867,6 +930,7 @@ local function grindStep()
   end, 250000, {
     H.call(function()
       phase = (phase + 1) % 8
+      watch.frame()
       -- #163: the wipe watch runs before the battleLoadStarted() gate,
       -- every frame (see partyDown): a two-character wipe with the unused
       -- slots at 0 reads as "no battle" and the gated watch below never
