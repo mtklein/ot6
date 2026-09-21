@@ -703,34 +703,66 @@ function M.muddleRule(o)
   return nil
 end
 
--- The turn-denying statuses (#187), read off the same four bytes the
--- Muddle rule reads.  Stop (STATUS3 bit 4, $3ef8): Ot6Gate holds the
--- gauge (battle_main.asm @08d5 `jsl Ot6Gate / bne` "return if target has
--- stop status or is broken"), so no window opens until $3af1's counter
--- runs out.  Sleep and Berserk (STATUS2 bits 7 and 4, $3ee5): the gauge
--- fills, but the ATB-full check @0941 (`peaflg STATUS12, {DEAD, PETRIFY,
--- ZOMBIE, SLEEP, CONFUSE, BERSERK} ... bcc CancelAction`) cancels the
--- menu and hands the turn to the engine -- a sleeper does nothing, a
--- berserker Fights whom RandCharAction picks.  Imp (STATUS1 bit 5, $3ee4)
--- is NOT one of them: an imp keeps its window with every command but
--- Fight, Item and Magic's Imp spell greyed (BattleCmdProp's IMP flag;
--- @1029 zeroes its battle power), so it is a cure question rather than a
--- planning one.  Measured 2026-09-16 (probe_statuses.lua, the world walk
--- off camp_escaped): Berserk landed on SHADOW as his window opened
--- ($7BCA=01 $7BC2=01 actor=1), the driver planned a Fight for him, and
--- the engine took the window away inside the pulse (the plan died as
--- actor_changed); his gauge then read $0097 with $3AA0=$29 for ~1400
--- frames while the engine's own Fights went out under his name.  The
--- driver treats these as arithmetic on the bytes: a denied actor is
--- never planned for, never pressed at, and never counted on to act.
+-- The turn-denying statuses (#187, #224), read off the same four bytes
+-- the Muddle rule reads.  They come in two shapes, and the difference is
+-- what the driver does with the actor's command window:
+--
+-- The engine TAKES the window.  Sleep and Berserk (STATUS2 bits 7 and 4,
+-- $3ee5) and Petrify (STATUS1 bit 6, $3ee4): the ATB-full check @0941
+-- (`peaflg STATUS12, {DEAD, PETRIFY, ZOMBIE, SLEEP, CONFUSE, BERSERK} ...
+-- bcc CancelAction`) cancels the menu and hands the turn to the engine --
+-- a sleeper does nothing, a berserker Fights whom RandCharAction picks, a
+-- statue is dead to the engine (SetStatus_06 @460b sets the dead flag and
+-- clears $3aa0.7, "battle menu can't open") until a Soft.  Measured
+-- 2026-09-16 (probe_statuses.lua, the world walk off camp_escaped):
+-- Berserk landed on SHADOW as his window opened ($7BCA=01 $7BC2=01
+-- actor=1), the driver planned a Fight for him, and the engine took the
+-- window away inside the pulse (the plan died as actor_changed); his
+-- gauge then read $0097 with $3AA0=$29 for ~1400 frames while the
+-- engine's own Fights went out under his name.
+--
+-- The engine KEEPS the window.  Stop (STATUS3 bit 4, $3ef8) and Frozen
+-- (STATUS4 bit 1, $3ef9) are not in that list: a window already open, or
+-- one a full gauge opens before the freeze takes hold (AfterAction2
+-- @083f re-runs the gate @08c6 only after an action), stays open, and
+-- the engine holds the gauge (`_c208c6` leaves $3aa0.4 set: Ot6Gate for
+-- Stop, `lda $3ef9,x / bit #$02` for Frozen) so the actor's ready flag
+-- never re-arms and nothing ever closes it.  Measured on the FC alcove
+-- lab (build/lab/fc-alcove/control, #224): Brainpan's Smirk on EDGAR at
+-- f+298 with his gauge at $E3C7, his command window up at f+600
+-- (`battle f+600 menu=01 state=05 actor=2`), and the driver -- which
+-- pressed nothing at a denied actor's window -- sat 2,276 frames while
+-- SHADOW fell 1050 -> 0 and nobody else got a window (seed 0 fight 6);
+-- Smirk on SHADOW in his own target select at f+421 (seed 35 fight 1),
+-- the driver backing out to $05 and sitting 2,600 frames.  A command
+-- entered at a kept window goes to the pending list and is queued when
+-- the counter clears (the same gate @08c6 clears $3aa0.4 then), so what
+-- a person does is enter one and move on: the window closes, the rest
+-- of the party gets its turns, and the Stopped member's action fires
+-- the moment the status runs out.  M.windowKept names the shape.
+--
+-- Imp (STATUS1 bit 5, $3ee4) is NOT a denial: an imp keeps its window
+-- with every command but Fight, Item and Magic's Imp spell greyed
+-- (BattleCmdProp's IMP flag; @1029 zeroes its battle power), so it is a
+-- cure question rather than a planning one.  The driver treats all of
+-- these as arithmetic on the bytes: a denied actor is never counted on
+-- to act, and is planned for only at a window the engine keeps.
 M.ST1_IMP, M.ST2_BERSERK, M.ST2_SLEEP, M.ST3_STOP = 0x20, 0x10, 0x80, 0x10
---   s1, s2, s3   the entity's STATUS1/2/3 bytes
+M.ST1_PETRIFY, M.ST4_FROZEN = 0x40, 0x02
+--   s1, s2, s3, s4   the entity's STATUS1/2/3/4 bytes
 -- Returns the name of the status that denies the turn, or nil.
 function M.turnDenied(o)
   if ((o.s3 or 0) & M.ST3_STOP) ~= 0 then return "Stop" end
+  if ((o.s4 or 0) & M.ST4_FROZEN) ~= 0 then return "Frozen" end
+  if ((o.s1 or 0) & M.ST1_PETRIFY) ~= 0 then return "Petrify" end
   if ((o.s2 or 0) & M.ST2_SLEEP) ~= 0 then return "Sleep" end
   if ((o.s2 or 0) & M.ST2_BERSERK) ~= 0 then return "Berserk" end
   return nil
+end
+-- Whether the engine keeps a denied actor's open command window (see
+-- above): true for Stop and Frozen, false for the rest and for nil.
+function M.windowKept(denial)
+  return denial == "Stop" or denial == "Frozen"
 end
 -- The cure in the bag for one status bit, from the ROM's own item
 -- records (M.itemStatus1/2) rather than a table of beliefs: the first of
@@ -741,19 +773,92 @@ end
 -- Nothing in that pair carries Berserk's STATUS2 $10 (ROM read 2026-09-16,
 -- build/ot6.sfc ItemProp), so Berserk's cure is "none in the bag" until
 -- the ROM says otherwise; Sleep clears under any physical hit (CalcMaxDmg
--- @0c45 strips sleep and muddle) and Stop only with its counter.
+-- @0c45 strips sleep and muddle) and Stop only with its counter.  Petrify
+-- is Soft ($F4: STATUS1 $40, Petrify only) then Remedy, the field care's
+-- pair.  No item record in this ROM carries Stop (STATUS3 $10), Frozen
+-- (STATUS4 $02) or Condemned (STATUS2 $01) with the remove flag (ItemProp
+-- +19 bit 5; every record read 2026-09-21), so those three have no cure
+-- in the bag and are planned around instead.
 --
 --   byte   1 or 2, which status byte the bit lives in
 --   bit    the status bit
 --   has    function(item) -> true when the bag holds one to spend
 --   items  the candidates in order (optional)
-M.GREEN_CHERRY, M.REMEDY = 0xF8, 0xF5
+M.GREEN_CHERRY, M.REMEDY, M.SOFT = 0xF8, 0xF5, 0xF4
 function M.statusCure(o)
   for _, item in ipairs(o.items or { M.GREEN_CHERRY, M.REMEDY }) do
     local rec
     if o.byte == 2 then rec = M.itemStatus2(item) else rec = M.itemStatus1(item) end
     if (rec & o.bit) ~= 0 and o.has(item) then return item end
   end
+  return nil
+end
+
+-- Vanish (STATUS1 bit 4) and Image (STATUS2 bit 2) on a monster (#190):
+-- every physical hit on it misses and a spell lands.  Measured on the FC
+-- alcove's Ninja (gen_fc_alcove.lua): after its "Inviz", 42 Fights and 17
+-- AutoCrossbows over 39,000 frames "took 0 off the monsters (0 hit(s))"
+-- while it hit for 220-839 a round.  Returns which of the two the bytes
+-- carry, Vanish first, or nil.
+--   s1, s2   the monster's STATUS1/2 bytes
+M.ST1_VANISH, M.ST2_IMAGE = 0x10, 0x04
+function M.dodges(o)
+  if ((o.s1 or 0) & M.ST1_VANISH) ~= 0 then return "Vanish" end
+  if ((o.s2 or 0) & M.ST2_IMAGE) ~= 0 then return "Image" end
+  return nil
+end
+-- The first monster slot on stage that the party's physical attacks
+-- would miss, and why (M.dodges on the live cells: a monster is entity
+-- 4 + slot, so its status bytes sit at $3EE4/$3EE5 + (4 + slot) * 2), or
+-- nil when every living monster can be hit.
+function M.dodgerUp()
+  for s = 0, 5 do
+    if M.readWord(0x3BFC + s * 2) > 0 and (M.readByte(0x3AA8 + s * 2) & 1) == 1 then
+      local what = M.dodges({ s1 = M.readByte(0x3EE4 + (4 + s) * 2),
+                              s2 = M.readByte(0x3EE5 + (4 + s) * 2) })
+      if what ~= nil then return s, what end
+    end
+  end
+  return nil
+end
+
+-- Condemned (STATUS2 bit 0, #190): the engine counts $3B05 + entity*2
+-- down from StartCondemn's 20 + max(0, 60 - (level + rand(level)))
+-- (@09b4) and casts Doom at 1 (@5ab1: `cmp #2 / bcc`, dec, dec, bne,
+-- CondemnDeath), so the number shown is the byte less one and the death
+-- lands when it reads 0.  One count is four visits of the entity's status
+-- counter: DecCounters visits each entity once per 16 battle-time ticks
+-- of 2 frames and $3adc gains 64 a visit at normal speed (CalcSpeed
+-- @09d2; 32 under Slow, 84 under Haste), so 128 frames at normal speed
+-- -- the Stop and Freeze counters ($3AF1, $3F0D) count on the same
+-- visits (@5a9f, just above), so M.COUNT_FRAMES prices those too.
+-- Nothing in the bag clears the bit (M.statusCure's note), and the
+-- Fenix Down after the Doom raises the member clear of it (SetStatus_07
+-- @4600 clears Condemned with the wound), so the count is a clock and
+-- the question is which turns are worth spending on the member.
+M.ST2_CONDEMNED, M.COUNT_FRAMES = 0x01, 128
+-- The count shown over a condemned member, or nil when not condemned.
+--   s2     the member's STATUS2 byte
+--   count  the $3B05 byte
+function M.doomCount(o)
+  if ((o.s2 or 0) & M.ST2_CONDEMNED) == 0 then return nil end
+  return math.max(0, (o.count or 0) - 1)
+end
+-- What a person does about a condemned member: keeps fighting, keeps a
+-- Fenix Down for the fall, and stops spending turns on a member the
+-- clock takes before they can act again -- a heal on them restores HP
+-- the Doom takes anyway, and their own last turn goes to damage with
+-- every pip (the spend rule's shape, #175).  Returns "last" when the
+-- count runs out before the member's next turn, else nil.
+--   count           M.doomCount (nil = not condemned)
+--   turnFrames      frames until the member's next turn (M.atbEta x 2;
+--                   for the member acting now, a full refill); nil = it
+--                   cannot fill
+--   framesPerCount  optional, M.COUNT_FRAMES by default
+function M.doomRule(o)
+  if o.count == nil then return nil end
+  local frames = o.count * (o.framesPerCount or M.COUNT_FRAMES)
+  if o.turnFrames == nil or frames <= o.turnFrames then return "last" end
   return nil
 end
 
@@ -3731,8 +3836,14 @@ function M.newFightDriver(tag, opts)
   local ATB, ATB_CONST, ST2 = 0x3218, 0x3AC8, 0x3EE5
   -- and STATUS1 ($3ee4) / STATUS3 ($3ef8) for the turn-denying statuses
   -- and Imp (#187, M.turnDenied / M.statusCure)
-  local ST1, ST3 = 0x3EE4, 0x3EF8
-  local statusSaid = {}                -- "e:name" -> true once said this battle
+  local ST1, ST3, ST4 = 0x3EE4, 0x3EF8, 0x3EF9
+  -- the Stop and Freeze counters (#224) and the Condemned count (#190),
+  -- one byte per entity at X = entity*2
+  local COUNTER = { Stop = 0x3AF1, Frozen = 0x3F0D, Doom = 0x3B05 }
+  -- "e:name" -> "on"/"off" and "e:name:n" landings; "kept:e" once the
+  -- kept-window plan line is said; "doom:e" the count its last-turn line
+  -- was said at
+  local statusSaid = {}
   local cureSaid = nil                 -- the last cure refusal logged, once
   local freeRoundSaid = false          -- the preemptive free-round line, once
   local healWatch = nil                -- a confirmed heal, awaiting its effect
@@ -4058,14 +4169,35 @@ function M.newFightDriver(tag, opts)
   -- The four status bytes' verdict on a party entity (#187): the name of
   -- the status denying its turn, or nil; and whether it is an imp.
   local function statusOf(e)
-    return M.readByte(ST1 + e * 2), M.readByte(ST2 + e * 2), M.readByte(ST3 + e * 2)
+    return M.readByte(ST1 + e * 2), M.readByte(ST2 + e * 2),
+           M.readByte(ST3 + e * 2), M.readByte(ST4 + e * 2)
   end
   local function denied(e)
-    local s1, s2, s3 = statusOf(e)
-    return M.turnDenied({ s1 = s1, s2 = s2, s3 = s3 })
+    local s1, s2, s3, s4 = statusOf(e)
+    return M.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
   end
-  local function isImp(e)
-    return (M.readByte(ST1 + e * 2) & M.ST1_IMP) ~= 0
+  -- ...and, for Stop and Frozen, the counter the engine clears it on
+  -- ($3AF1 / $3F0D + entity*2; SetStatus_14 @467d seeds Stop's at $12)
+  local function denialCounter(e, den)
+    if COUNTER[den] == nil then return nil end
+    return M.readByte(COUNTER[den] + e * 2)
+  end
+  local function status1Has(e, bit)
+    return (M.readByte(ST1 + e * 2) & bit) ~= 0
+  end
+  -- Whether the Doom takes entity e before it can act again
+  -- (M.doomRule), and the count over it (M.doomCount; nil when not
+  -- condemned): for the member acting now, its next turn is a full
+  -- refill away; for anyone else, wherever its gauge stands.
+  local function doomLast(e, actor)
+    local count = M.doomCount({ s2 = M.readByte(ST2 + e * 2),
+                                count = M.readByte(COUNTER.Doom + e * 2) })
+    if count == nil then return nil, nil end
+    local const = M.readWord(ATB_CONST + e * 2)
+    local eta = etaOf(e * 2)
+    local period = const > 0 and math.ceil(0xFF00 / const) or nil
+    local ticks = (e == actor or eta == 0) and period or eta
+    return M.doomRule({ count = count, turnFrames = ticks and ticks * 2 or nil }), count
   end
   local function bagCount(id)
     local n = 0
@@ -4074,11 +4206,17 @@ function M.newFightDriver(tag, opts)
     end
     return n
   end
-  -- The cure the bag holds for entity e's Imp (Green Cherry, then Remedy)
-  -- or Berserk (nothing in this ROM), through M.statusCure and the
-  -- reserve-aware battInvIdx.
+  -- The cure the bag holds for entity e's Petrify (Soft, then Remedy),
+  -- Imp (Green Cherry, then Remedy) or Berserk (nothing in this ROM),
+  -- through M.statusCure and the reserve-aware battInvIdx.  A statue
+  -- first: it is dead to the engine until the Soft, and a party of
+  -- statues is a game over.
   local function cureFor(e)
-    if isImp(e) then
+    if status1Has(e, M.ST1_PETRIFY) then
+      return M.statusCure({ byte = 1, bit = M.ST1_PETRIFY, items = { M.SOFT, M.REMEDY },
+        has = function(item) return battInvIdx(item) ~= nil end }), "Petrify"
+    end
+    if status1Has(e, M.ST1_IMP) then
       return M.statusCure({ byte = 1, bit = M.ST1_IMP,
         has = function(item) return battInvIdx(item) ~= nil end }), "Imp"
     end
@@ -4480,6 +4618,20 @@ function M.newFightDriver(tag, opts)
                  ally = true, reason = "unmuddle" }
       end
     end
+    -- A window the engine kept for a Stopped or Frozen actor (#224,
+    -- M.windowKept): the command entered here waits for the counter, so
+    -- a heal, a cure or a raise would land on a fight that has moved on.
+    -- The care lines are closed to it and the attack lines below plan as
+    -- usual -- the engine re-aims an action whose target has fallen by
+    -- the time it fires.  Said once per battle per actor.
+    local kept = M.windowKept(denied(actor))
+    if kept and not statusSaid["kept:" .. actor] then
+      statusSaid["kept:" .. actor] = true
+      M.log(string.format("[%s] actor=%d plans at the window the engine kept under %s "
+        .. "(counter %d x %d frames): the care lines are closed to it, an attack is "
+        .. "entered now and fires when the status clears (#224)", tag or "fight",
+        actor, denied(actor), denialCounter(actor, denied(actor)) or 0, M.COUNT_FRAMES))
+    end
     -- The status cure line (#187), after the Muddle rule and before any
     -- heal: an imp's Fight lands for 0 and its Magic keeps only Imp, so
     -- a turn that cures it is worth more than the turn it spends -- the
@@ -4489,11 +4641,11 @@ function M.newFightDriver(tag, opts)
     -- M.statusCure (Green Cherry, then Remedy); with nothing in the bag
     -- that carries the bit the refusal is said once and the actor plans
     -- on.  Berserk goes through the same gate and, in this ROM, always
-    -- lands on "none in the bag" (Remedy's STATUS2 byte is $48).  A cure
-    -- is care: it takes the round's care turn when the budget is open,
-    -- and the imp's self-cure goes regardless, since the alternative is
-    -- a zero.
-    if parkDropN < 3 and cmdRow(actor, CMD_ITEM) ~= nil and opts.items ~= false then
+    -- lands on "none in the bag" (Remedy's STATUS2 byte is $48).  A
+    -- statue gets a Soft, then a Remedy, the same way.  A cure is care:
+    -- it takes the round's care turn when the budget is open, and the
+    -- imp's self-cure goes regardless, since the alternative is a zero.
+    if parkDropN < 3 and not kept and cmdRow(actor, CMD_ITEM) ~= nil and opts.items ~= false then
       local order = { actor }
       for e = 0, 3 do if e ~= actor then order[#order + 1] = e end end
       for _, e in ipairs(order) do
@@ -4567,6 +4719,7 @@ function M.newFightDriver(tag, opts)
     -- driver already spends `opts.magic` on the attack line below.
     local cureRow = mayHeal and opts.cure ~= false
         and cmdRow(actor, CMD_MAGIC) or nil
+    if kept then row, cureRow = nil, nil end
     -- The finisher rule: with the fight one poke from over, healing is
     -- the wrong verb no matter how hurt anyone is.  The Sealed-Gate wipe
     -- died with the last Ninja at 61 HP while three straight turns went
@@ -4634,6 +4787,23 @@ function M.newFightDriver(tag, opts)
     if opts.boost then
       if opts.bank and have < opts.bank then boost = 0
       else boost = math.min(have, 3) end
+    end
+    -- The Doom's last turn (#190, M.doomRule): a condemned actor whose
+    -- count runs out before its next turn takes no care -- a heal on it
+    -- restores HP the Doom takes anyway -- and spends every pip on the
+    -- attack lines below rather than die holding them (#175).
+    do
+      local last, count = doomLast(actor, actor)
+      if last == "last" then
+        row, cureRow = nil, nil
+        if opts.boost then boost = math.min(have, 3) end
+        if statusSaid["doom:" .. actor] ~= count then
+          statusSaid["doom:" .. actor] = count
+          M.log(string.format("[%s] actor=%d is CONDEMNED at %d (x %d frames) and its "
+            .. "next turn is a full gauge away: no care for it, and this turn spends "
+            .. "its %d BP (#190)", tag or "fight", actor, count, M.COUNT_FRAMES, have))
+        end
+      end
     end
     -- This actor's strongest unreflectable line against `slot` by the
     -- chip model, at `bp` boost: the tool first so a tie keeps the
@@ -5106,7 +5276,19 @@ function M.newFightDriver(tag, opts)
         -- all four turns went to Tonics that restored nothing.
         if hp > 0 and maxhp > 0 and hp < maxhp then
           local pct = hp * 100 // maxhp
-          if pct < threshold or hp <= (price[e] or 0) then
+          -- a statue is the cure line's, not a patient (a Potion cannot
+          -- even land on it); a condemned member the clock takes before
+          -- its next turn is not one either (#190, M.doomRule)
+          local last, count = doomLast(e, actor)
+          if status1Has(e, M.ST1_PETRIFY) then
+            -- the cure line above already said what the bag holds
+          elseif last == "last" then
+            local said = string.format("[%s] actor=%d no heal on entity %d (%d/%d): it is "
+              .. "CONDEMNED at %d (x %d frames) and the Doom beats its next turn -- a heal "
+              .. "on it is a turn thrown away (#190)", tag or "fight", actor, e, hp, maxhp,
+              count, M.COUNT_FRAMES)
+            if said ~= healSaid then healSaid = said; M.log(said) end
+          elseif pct < threshold or hp <= (price[e] or 0) then
             cands[#cands + 1] = { e = e, pct = pct, hp = hp, maxhp = maxhp }
           end
         end
@@ -5881,19 +6063,30 @@ function M.newFightDriver(tag, opts)
     if st == ST_CMD and M.readByte(MENU) ~= 0 and M.readByte(CMDCLOSING) ~= 0 then
       return nil
     end
-    -- A denied actor's window (#187): Stop, Sleep or Berserk on the
-    -- entity whose window this is.  The engine is about to take the
-    -- window away (measured: Berserk landing at $7BC2=01 -> the window
-    -- gone within the pulse) or never meant to open one, so nothing here
-    -- is a stall: the park, idle and target-spin counters are stood
-    -- down, a plan for this actor is dropped without a recovery count,
-    -- and no button is pressed at the command window.  A selection list
-    -- or the target screen left open under it is closed with B, because
-    -- in Wait mode an open list holds the battle clock and the status
-    -- would never run out.
+    -- A denied actor's window (#187, #224): a turn-denying status on the
+    -- entity whose window this is.  Two shapes (M.windowKept):
+    --
+    -- Sleep, Berserk, Petrify: the engine is about to take the window
+    -- away (measured: Berserk landing at $7BC2=01 -> the window gone
+    -- within the pulse) or never meant to open one, so nothing here is a
+    -- stall: the park, idle and target-spin counters are stood down, a
+    -- plan for this actor is dropped without a recovery count, and no
+    -- button is pressed at the command window.  A selection list or the
+    -- target screen left open under it is closed with B, because in Wait
+    -- mode an open list holds the battle clock and the status would
+    -- never run out.
+    --
+    -- Stop, Frozen: the engine keeps the window, and pressing nothing at
+    -- it is the stall that killed SHADOW (#224: 2,276 frames at
+    -- `menu=01 state=05 actor=2` with nobody acting).  A command entered
+    -- here waits for the counter and fires when it clears, so an attack
+    -- plan stands and is pressed home like any other; a care plan (a
+    -- heal, a cure, a raise) would land on a fight that has moved on and
+    -- is dropped for an attack -- makePlan closes the care lines to a
+    -- kept window (`kept`).
     do
       local den = M.readByte(MENU) ~= 0 and denied(actor) or nil
-      if den ~= nil then
+      if den ~= nil and not M.windowKept(den) then
         parkSt, parkN, idleSt, idleN, tgtSpin = nil, 0, nil, 0, 0
         if plan ~= nil and planActor == actor then
           M.log(string.format("[%s] actor=%d is under %s with its window at "
@@ -5901,6 +6094,16 @@ function M.newFightDriver(tag, opts)
             .. "without a recovery count", tag or "fight", actor, den, st, plan.kind))
           dropPlan("denied_" .. den)
         end
+        if IDLE_ST[st] or st == ST_TGT then return { "b" } end
+        return nil
+      elseif den ~= nil and plan ~= nil and planActor == actor
+             and (plan.kind == "item" or plan.kind == "heal" or plan.kind == "summon") then
+        M.log(string.format("[%s] actor=%d is under %s with its window at state $%02X "
+          .. "-- the engine keeps the window and the command waits %d counts for the "
+          .. "counter, so this %s would land on a fight that has moved on; dropping it "
+          .. "for an attack (#224)", tag or "fight", actor, den, st,
+          denialCounter(actor, den) or 0, plan.kind))
+        dropPlan("denied_" .. den)
         if IDLE_ST[st] or st == ST_TGT then return { "b" } end
         return nil
       end
@@ -6516,28 +6719,38 @@ function M.newFightDriver(tag, opts)
       for e = 0, 3 do snap[e] = M.readWord(0x3BF4 + e * 2) end
       startSnap = snap
     end
-    -- The [status] line (#187), once per battle per entity per status:
+    -- The [status] line (#187), once per landing per entity per status:
     -- what landed, what the engine does with it, and what the bag holds
     -- for it -- said the frame it lands, so the driver's next lines read
-    -- against it; and once when it clears.
+    -- against it; and once each time it clears.  (Once per BATTLE hid
+    -- every second Stop from the same Brainpan trio: fc-alcove control
+    -- seed 35 fight 1 shows SHADOW's window open with no plan from f+4500
+    -- to f+6300 and no [status] line for it, #224.)
     if battleTick > 4 then
       for e = 0, 3 do
         if M.readWord(0x3C1C + e * 2) > 0 then
-          local s1, s2, s3 = statusOf(e)
+          local s1, s2, s3, s4 = statusOf(e)
           local names = {}
-          local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3 })
+          local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
           if den then names[#names + 1] = den end
           if (s1 & M.ST1_IMP) ~= 0 then names[#names + 1] = "Imp" end
+          if (s2 & M.ST2_CONDEMNED) ~= 0 then names[#names + 1] = "Condemned" end
           local on = {}
           for _, name in ipairs(names) do
             on[name] = true
             local key = e .. ":" .. name
-            if not statusSaid[key] then
+            if statusSaid[key] ~= "on" then
               statusSaid[key] = "on"
+              statusSaid[key .. ":n"] = (statusSaid[key .. ":n"] or 0) + 1
               local what
-              if name == "Stop" then
-                what = "the engine holds its gauge (Ot6Gate; $3AF1 counts $12 ticks "
-                  .. "down) and opens no window for it; planning around it"
+              if name == "Stop" or name == "Frozen" then
+                local own = M.readByte(MENU) ~= 0 and (M.readByte(ACTOR) & 3) == e
+                what = string.format("the engine holds its gauge (%s) for %d counts of "
+                  .. "%d frames and %s; a command entered at a window it keeps waits "
+                  .. "for the counter (#224)", name == "Stop" and "Ot6Gate, $3AF1"
+                  or "$3ef9 bit 1, $3F0D", denialCounter(e, name) or 0, M.COUNT_FRAMES,
+                  own and "keeps the window it has open NOW: planning an attack for it"
+                  or "keeps any window already open for it; planning around it")
               elseif name == "Sleep" then
                 what = "the ATB-full check cancels its menu (battle_main @0941); a "
                   .. "physical hit on it clears the bit (@0c45), else the counter "
@@ -6548,6 +6761,20 @@ function M.newFightDriver(tag, opts)
                   .. (item and string.format("$%02X x%d", item, bagCount(item))
                       or string.format("none in the bag (Remedy x%d carries no Berserk bit)",
                         bagCount(M.REMEDY)))
+              elseif name == "Petrify" then
+                local item = cureFor(e)
+                what = "dead to the engine (SetStatus_06: the dead flag, no window) until "
+                  .. "a Soft; cure: "
+                  .. (item and string.format("$%02X x%d (planned next turn)", item,
+                        bagCount(item))
+                      or string.format("none in the bag (Soft %d, Remedy %d)",
+                        bagCount(M.SOFT), bagCount(M.REMEDY)))
+              elseif name == "Condemned" then
+                what = string.format("the count reads %d (one count = %d frames; Doom at 0; "
+                  .. "no item clears the bit): heals on it stop once the clock beats its "
+                  .. "next turn, its last turn spends every pip, a Fenix Down raises it "
+                  .. "clear (#190)", M.doomCount({ s2 = s2,
+                    count = M.readByte(COUNTER.Doom + e * 2) }) or 0, M.COUNT_FRAMES)
               else
                 local item = cureFor(e)
                 what = "its Fight lands for 0 (battle power zeroed @1029) and its Magic "
@@ -6557,21 +6784,26 @@ function M.newFightDriver(tag, opts)
                       or string.format("none in the bag (Green Cherry %d, Remedy %d)",
                         bagCount(M.GREEN_CHERRY), bagCount(M.REMEDY)))
               end
-              M.log(string.format("[%s] [status] f+%d entity %d char %d %s (STATUS1/2/3 "
-                .. "$%02X/$%02X/$%02X, atb=%04X menu=%02X st=%02X actor=%d): %s",
+              local n = statusSaid[key .. ":n"]
+              M.log(string.format("[%s] [status] f+%d entity %d char %d %s (STATUS1/2/3/4 "
+                .. "$%02X/$%02X/$%02X/$%02X, atb=%04X menu=%02X st=%02X actor=%d%s): %s",
                 tag or "fight", battleTick, e, M.readByte(BCHID + e * 2),
                 name == "Imp" and "is an IMP" or ("is under " .. name:upper()),
-                s1, s2, s3, M.readWord(ATB + e * 2), M.readByte(MENU),
-                M.readByte(MSTATE), M.readByte(ACTOR) & 3, what))
+                s1, s2, s3, s4, M.readWord(ATB + e * 2), M.readByte(MENU),
+                M.readByte(MSTATE), M.readByte(ACTOR) & 3,
+                n > 1 and string.format(", landing %d this battle", n) or "", what))
             end
           end
-          for _, name in ipairs({ "Stop", "Sleep", "Berserk", "Imp" }) do
+          for _, name in ipairs({ "Stop", "Frozen", "Petrify", "Sleep", "Berserk",
+                                  "Imp", "Condemned" }) do
             local key = e .. ":" .. name
             if statusSaid[key] == "on" and not on[name] then
               statusSaid[key] = "off"
               M.log(string.format("[%s] [status] f+%d entity %d's %s is CLEARED "
-                .. "(STATUS1/2/3 $%02X/$%02X/$%02X)", tag or "fight", battleTick, e,
-                name, s1, s2, s3))
+                .. "(STATUS1/2/3/4 $%02X/$%02X/$%02X/$%02X%s)", tag or "fight", battleTick, e,
+                name, s1, s2, s3, s4, name == "Condemned"
+                and (M.readWord(0x3BF4 + e * 2) == 0 and "; the Doom landed"
+                     or "; the count did not run out") or ""))
             end
           end
         end
