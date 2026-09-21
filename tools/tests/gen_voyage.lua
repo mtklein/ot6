@@ -27,6 +27,7 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
 local ANTIDOTE, REMEDY = 0xF2, 0xF5
+local TINCTURE, REVIVIFY = 0xEB, 0xF1
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local function partyCount()
@@ -321,9 +322,17 @@ local steps = {
   H.buyItem(POTION, 0, function() return 38 - H.invCountOf(POTION) end, "POTION to 38"),
   H.buyItem(FENIX_DOWN, 5, function() return 25 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 25"),
+  -- REVIVIFY to 3 and TINCTURE to 7 (#231, docs/design/supply.md): the
+  -- Zombie cure, and the MP band at L26 (~level / 4) for the island walk
+  -- and Thamasa's approach; after the revives.
+  H.buyItem(REVIVIFY, 4, function() return 3 - H.invCountOf(REVIVIFY) end,
+    "REVIVIFY to 3"),
+  H.buyItem(TINCTURE, 1, function() return 7 - H.invCountOf(TINCTURE) end,
+    "TINCTURE to 7"),
   H.call(function()
-    H.log(string.format("[shop] Albrook item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
-      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
+    H.log(string.format("[shop] Albrook item shop done: tonic=%d potion=%d fenix=%d tincture=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
+      H.invCountOf(TINCTURE), H.gil(), H.frame))
   end),
   H.shopClose("Albrook item shop"),
   -- #197: the combat items back on top of the bag after every purchase
@@ -334,8 +343,11 @@ local steps = {
     H.assertEq(H.invCountOf(POTION) >= 38, true,
       "the party leaves Albrook with the Potion band (38 at L25) -- the in-combat heal")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 25, true, "Fenix Downs at 25")
-    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
-      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+    H.assertEq(H.invCountOf(TINCTURE) >= 7, true, "Tinctures at 7 -- the L26 MP band (#231)")
+    H.assertEq(H.invCountOf(REVIVIFY) >= 3, true, "Revivifies at 3 (#231)")
+    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d tincture=%d",
+      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
+      H.invCountOf(TINCTURE)))
   end),
   -- out: the (37,55) event trigger, one tile below the arrival tile
   H.navTo(37, 54, { maxFrames = 6000, playBattles = "tactical" }),

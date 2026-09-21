@@ -13,6 +13,7 @@ end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
 local ANTIDOTE, REMEDY = 0xF2, 0xF5
+local TINCTURE = 0xEB
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 
@@ -104,13 +105,23 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(shopRow(3, 0), TONIC, "shop 3 row 0 is Tonic")
     H.assertEq(shopRow(3, 1), POTION, "shop 3 row 1 is Potion")
     H.assertEq(shopRow(3, 4), FENIX_DOWN, "shop 3 row 4 is Fenix Down")
+    H.assertEq(shopRow(3, 2), TINCTURE, "shop 3 row 2 is Tincture")
   end),
   H.buyItem(FENIX_DOWN, 4, function() return 15 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 15"),
+  -- TINCTURE to 4 (#231): the MP column of the supply band, ~level / 4 at
+  -- the L14 this party holds (docs/design/supply.md).  This is the first
+  -- Tincture counter whose purse can carry them (Figaro Castle's could
+  -- not), and nothing from here to Jidoor sells one.  6000 gil of the
+  -- 16,871 kefka_won holds; after the revives and before the Tonic soak,
+  -- so a short purse shorts Tonics first.
+  H.buyItem(TINCTURE, 2, function() return 4 - H.invCountOf(TINCTURE) end,
+    "TINCTURE to 4"),
   H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
   H.call(function()
-    H.log(string.format("[shop] Narshe item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
-      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
+    H.log(string.format("[shop] Narshe item shop done: tonic=%d potion=%d fenix=%d tincture=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
+      H.invCountOf(TINCTURE), H.gil(), H.frame))
   end),
   H.shopClose("Narshe item shop"),
   -- #197: the combat items back on top of the bag after every purchase
@@ -119,6 +130,7 @@ H.run({ maxFrames = 90000 }, {
   H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top (Narshe item shop)" }),
   H.call(function()
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 15, true, "Fenix Downs at 15 for the Zozo stretch")
+    H.assertEq(H.invCountOf(TINCTURE) >= 4, true, "Tinctures at 4, the L14 MP band (#231)")
     H.assertEq(H.invCountOf(TONIC) >= 90, true, "Tonics topped up for the field care")
     H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
       H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))

@@ -1983,6 +1983,15 @@ end
 --                 floor is not zero.
 -- opts.reserve    { [itemId] = n } -- keep n of that item unspent, so a step
 --                 can hold Potions back for the fight it is walking toward
+-- opts.mpBand     a living member under this fraction of their max MP
+--                 drinks a Tincture, and another if still under (default
+--                 0.25; #231, docs/design/supply.md)
+-- opts.tincture   false switches the Tincture arm off (default on)
+-- opts.tent       false switches the Tent arm off (default on): where the
+--                 item list offers a Tent -- a save point or the world map
+--                 -- one is pitched instead of the items whenever a
+--                 Tincture would be due for anyone or the party's HP hole
+--                 is past 24 Tonics' worth, a Tent's own price
 -- opts.maxFrames  budget for the whole visit (default 24000)
 -- opts.maxTries   plans to attempt before giving up (default 48)
 -- opts.tag        log prefix
@@ -2011,6 +2020,20 @@ local CARE_MAGIC_GATE = 0x7a                  -- zSkillsTextColor[1] = Magic
 local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
 local CARE_ANTIDOTE, CARE_SOFT, CARE_REMEDY = 0xF2, 0xF4, 0xF5
 local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
+-- The MP side (#231, docs/design/supply.md).  A Tincture is +50 MP for
+-- 1500 and works anywhere; a Tent is the whole party's both pools for
+-- 1200 and works only where the item list offers it: on a save point
+-- (OpenMainMenu copies the save-enable bit $1EB7.7 into $0201.7,
+-- field/menu.asm:229-235, and item.asm @84f8 greys the Tent off that bit)
+-- or on the world map (the world module sets the same bit; measured by
+-- gen_narshe_mission's Tent stops).  Elixirs, Ethers and X-Ethers are
+-- deliberately not named here: they are never the field's to spend (the
+-- owner's ruling on #231; a dry caster mid-fight is the fight driver's
+-- call, tools/tests/lib/ot6.lua).
+local CARE_TINCTURE, CARE_TENT = 0xEB, 0xF7
+-- The HP deficit past which a Tent beats the Tonics that would fill it:
+-- 1200 gil is 24 Tonics, so 24 x 50 HP.
+local TENT_WORTH_HP = 24 * 50
 
 -- ---- clearing a status ----
 --
@@ -2554,9 +2577,45 @@ local function careKernel(opts)
   local useMagic = opts.magic ~= false
   local mpFloor = opts.mpFloor or 0.25
   local maxTries = opts.maxTries or 48
+  -- The MP band (#231): a living member whose MP is under this fraction of
+  -- their maximum drinks a Tincture, and another if still under.  Every
+  -- member is a caster in OT6 (every verb but Fight costs MP), so there is
+  -- no list of who qualifies.  opts.tincture = false and opts.tent = false
+  -- switch each arm off for a step that wants neither.
+  local mpBand = opts.mpBand or 0.25
+  local useTincture = opts.tincture ~= false
+  local useTent = opts.tent ~= false
 
   local function avail(id)
     return math.max(0, M.invCountOf(id) - (reserve[id] or 0))
+  end
+
+  -- alive, not petrified or zombie (the heals' own refusal mask), and
+  -- under the MP band
+  local function mpShort(c)
+    local mp, mx = M.charMp(c), M.charMaxMp(c)
+    return M.charHp(c) > 0 and (M.charStatus1(c) & 0xC2) == 0
+       and mx > 0 and mp < mx * mpBand
+  end
+
+  -- what the whole party is missing, summed over the members a heal can
+  -- reach
+  local function partyShort()
+    local hp, mp = 0, 0
+    for _, c in ipairs(careParty()) do
+      if M.charHp(c) > 0 and (M.charStatus1(c) & 0xC2) == 0 then
+        hp = hp + M.charMaxHp(c) - M.charHp(c)
+        mp = mp + M.charMaxMp(c) - M.charMp(c)
+      end
+    end
+    return hp, mp
+  end
+
+  -- Where the item list offers a Tent: the world map, or a field map
+  -- while the save-enable bit is up (it is set by the SavePoint script's
+  -- sparkle and cleared again on the next orthogonal step).
+  local function tentUsable()
+    return M.worldMode() or (M.readByte(0x1EB7) & 0x80) ~= 0
   end
 
   -- MP a caster keeps back.  Below 1 the option is a fraction of their own
@@ -2571,6 +2630,8 @@ local function careKernel(opts)
   local function key(w)
     if w.kind == "cast" then
       return string.format("%d:cast:%d:%d", w.char, w.caster, w.spell)
+    elseif w.kind == "tent" then
+      return "tent"
     end
     return string.format("%d:item:%d", w.char, w.item)
   end
@@ -2581,10 +2642,14 @@ local function careKernel(opts)
         "(%d/%d hp, caster %d/%d mp)", w.why, w.char, w.spell, w.caster,
         M.charHp(w.char), M.charMaxHp(w.char),
         M.charMp(w.caster), M.charMaxMp(w.caster))
+    elseif w.kind == "tent" then
+      local hp, mp = partyShort()
+      return string.format("%s (the party %d hp and %d mp short, %d in the bag)",
+        w.why, hp, mp, M.invCountOf(CARE_TENT))
     end
-    return string.format("%s char %d with $%02X (%d/%d hp, status1 %02X)",
+    return string.format("%s char %d with $%02X (%d/%d hp, %d/%d mp, status1 %02X)",
       w.why, w.char, w.item, M.charHp(w.char), M.charMaxHp(w.char),
-      M.charStatus1(w.char))
+      M.charMp(w.char), M.charMaxMp(w.char), M.charStatus1(w.char))
   end
 
   -- Whoever the drive last set the Skills screens up for stays the caster
@@ -2672,11 +2737,49 @@ local function careKernel(opts)
     return nil
   end
 
+  -- A Tent where the item list offers one (a save point, the world map),
+  -- when it is the cheaper answer: whenever a Tincture would otherwise be
+  -- due for anyone (1200 for everything against 1500 for 50 MP), or the
+  -- party's HP hole alone is past the 24 Tonics a Tent costs.  Below that
+  -- the Tonics are cheaper and the Tent is kept (supply.md, the rule for
+  -- each option).
+  local function pickTent()
+    if not useTent or not tentUsable() or avail(CARE_TENT) < 1 then return nil end
+    local w = { kind = "tent", item = CARE_TENT, why = "pitch a Tent" }
+    if failed[key(w)] then return nil end
+    local hp = partyShort()
+    local due = hp >= TENT_WORTH_HP
+    for _, c in ipairs(careParty()) do
+      if mpShort(c) then due = true end
+    end
+    return due and w or nil
+  end
+
+  -- A Tincture on the member furthest under the MP band; the loop picks
+  -- again if they are still under it, so a deep hole gets two.
+  local function pickTincture()
+    if not useTincture then return nil end
+    local dry = {}
+    for _, c in ipairs(careParty()) do
+      if mpShort(c) then
+        dry[#dry + 1] = { c = c, r = M.charMp(c) / M.charMaxMp(c) }
+      end
+    end
+    table.sort(dry, function(a, b) return a.r < b.r end)
+    for _, d in ipairs(dry) do
+      local w = { kind = "item", char = d.c, item = CARE_TINCTURE, why = "restore mp" }
+      if avail(CARE_TINCTURE) > 0 and not failed[key(w)] then return w end
+    end
+    return nil
+  end
+
   -- Pick in the order a player would: revive first, then clear a status the
-  -- bag can clear, then top up whoever is worst off, casting where the party
-  -- can cast and reaching for the bag where it cannot.  Members are tried
-  -- worst-first rather than only the worst being tried, so one member nobody
-  -- can help does not stop the rest from being served.
+  -- bag can clear, then a Tent if one is offered and worth it, then top up
+  -- whoever is worst off, casting where the party can cast and reaching
+  -- for the bag where it cannot, then a Tincture on whoever is under the
+  -- MP band.  Members are tried worst-first rather than only the worst
+  -- being tried, so one member nobody can help does not stop the rest
+  -- from being served.
   local function pick()
     for _, c in ipairs(careParty()) do
       local w = { kind = "item", char = c, item = CARE_FENIX, why = "revive" }
@@ -2688,6 +2791,8 @@ local function careKernel(opts)
       local w = pickStatusCure(c)
       if w ~= nil then return w end
     end
+    local tent = pickTent()
+    if tent ~= nil then return tent end
     local hurt = {}
     for _, c in ipairs(careParty()) do
       local hp, mx = M.charHp(c), M.charMaxHp(c)
@@ -2712,7 +2817,7 @@ local function careKernel(opts)
       if w == nil and useMagic then w = pickCast(h.c) end
       if w ~= nil then return w end
     end
-    return nil
+    return pickTincture()
   end
 
   local function anyNeed() return pick() ~= nil end
@@ -2726,7 +2831,8 @@ local function careKernel(opts)
   local ITEM_NAMES = { [CARE_TONIC] = "tonic", [CARE_POTION] = "potion",
                        [CARE_FENIX] = "fenix", [CARE_REVIVIFY] = "revivify",
                        [CARE_ANTIDOTE] = "antidote", [CARE_EYEDROP] = "eyedrop",
-                       [CARE_SOFT] = "soft", [CARE_REMEDY] = "remedy" }
+                       [CARE_SOFT] = "soft", [CARE_REMEDY] = "remedy",
+                       [CARE_TINCTURE] = "tincture", [CARE_TENT] = "tent" }
   local function unserved()
     if pick() ~= nil then return "" end
     local out = {}
@@ -2780,10 +2886,29 @@ local function careKernel(opts)
           end
         end
       end
+      if mpShort(c) then
+        -- under the MP band and still there: the Tincture the bag would
+        -- not offer, and the Tent the map would not
+        local w = { kind = "item", char = c, item = CARE_TINCTURE, why = "restore mp" }
+        why[#why + 1] = string.format("mp %d/%d under the band (%.2f): %s",
+          M.charMp(c), M.charMaxMp(c), mpBand,
+          not useTincture and "tinctures off"
+          or string.format("tincture %d in the bag, floor %d%s",
+               M.invCountOf(CARE_TINCTURE), reserve[CARE_TINCTURE] or 0,
+               failed[key(w)] and ", refused" or ""))
+      end
       if #why > 0 then
         out[#out + 1] = string.format("c%d %d/%d hp: %s", c, hp, mx,
           table.concat(why, "; "))
       end
+    end
+    if #out > 0 and M.invCountOf(CARE_TENT) > 0 then
+      out[#out + 1] = string.format("tent %d in the bag, %s",
+        M.invCountOf(CARE_TENT),
+        not useTent and "tents off"
+        or not tentUsable() and "no save point underfoot"
+        or failed["tent"] and "refused"
+        or string.format("floor %d", reserve[CARE_TENT] or 0))
     end
     if #out == 0 then return "" end
     return " -- nothing more can be done: " .. table.concat(out, " | ")
@@ -2918,8 +3043,34 @@ local function careKernel(opts)
       local landed
       if pending.kind == "item" then
         landed = M.charHp(pending.char) ~= pending.hp
+              or M.charMp(pending.char) ~= pending.mp
               or M.charStatus1(pending.char) ~= pending.st1
               or M.invCountOf(pending.item) < pending.qty
+      elseif pending.kind == "tent" then
+        -- The Tent leaves the menu on its own (the item menu answers it
+        -- with return code $02 and terminates after its fade, item.asm
+        -- @84f8) and the field or world module then runs the tent event,
+        -- which is what restores the party; so the landing is the event's
+        -- end -- the bag one lighter AND every reachable member whole --
+        -- and the stall clock is held while the game is visibly doing the
+        -- work (the count has already dropped).
+        local used = M.invCountOf(CARE_TENT) < pending.qty
+        if used then stall = 0 end
+        local hp, mp = partyShort()
+        -- The restore lands early in the event (measured on the Mt Kolts
+        -- summit save point, probe_tent_summit: whole within 60 frames of
+        -- the confirm) and the jingle plays on with control off, so the
+        -- landing also waits for the map to have the party back -- once,
+        -- not for a quiet run of frames: a party standing on a save point
+        -- has the SavePoint script re-fire under it every ~30 frames
+        -- (probe_tent_summit: `move=02 ev=CA:0000 hasControl=true` and
+        -- `move=04 ev=CC:9AF3 hasControl=false` alternating for the whole
+        -- 1500 frames watched), so control there is a flicker by the
+        -- game's own doing and a debounce never lands.  "Whole" is what
+        -- keeps the one frame honest: it cannot hold before the event's
+        -- restore, so the first controlled frame after it is the tent's
+        -- tail letting go.
+        landed = used and hp == 0 and mp == 0 and careBackOnMap()
       else
         landed = M.charHp(pending.char) ~= pending.hp
               or M.charMp(pending.caster) ~= pending.mp
@@ -2927,11 +3078,15 @@ local function careKernel(opts)
       if landed then
         if pending.kind == "item" then
           M.log(string.format(
-            "[%s] used $%02X on char %d: %d -> %d hp, status1 %02X -> %02X, " ..
+            "[%s] used $%02X on char %d: %d -> %d hp, %d -> %d mp, status1 %02X -> %02X, " ..
             "%d left",
             tag, pending.item, pending.char, pending.hp,
-            M.charHp(pending.char), pending.st1,
+            M.charHp(pending.char), pending.mp, M.charMp(pending.char), pending.st1,
             M.charStatus1(pending.char), M.invCountOf(pending.item)))
+        elseif pending.kind == "tent" then
+          M.log(string.format(
+            "[%s] pitched a Tent: the party whole in both pools, %d left (%d frames)",
+            tag, M.invCountOf(CARE_TENT), M.frame - pending.frame))
         else
           M.log(string.format(
             "[%s] char %d cast $%02X on char %d: %d -> %d hp, caster %d -> %d mp",
@@ -2970,7 +3125,35 @@ local function careKernel(opts)
     -- in $08 to $17, in $17 to $05, in $1A to $0A, and in $0A straight to
     -- $05.
     local held = nil
-    if want.kind == "item" then
+    if want.kind == "tent" then
+      -- $05 -> $08 -> $19 -> A on the same slot, and the menu leaves by
+      -- itself; nothing is pressed once the bag count has dropped, and
+      -- nothing is pressed on any screen the game shows while the tent
+      -- event runs (the pending block above watches for its end).  The
+      -- A is pressed on the 4-on/8-off cadence like every other press,
+      -- so the confirm stays armed until the count moves.
+      if pending and M.invCountOf(CARE_TENT) < pending.qty then M.setPad({}); return end
+      if st == 0x05 then
+        held = steer(M.readByte(CARE_CUR), 0)          -- Item is row 0
+      elseif st == 0x08 then
+        local slot = M.invSlotOf(CARE_TENT)
+        if slot == nil then abandon(want, "not in the bag"); M.setPad({}); return end
+        held = steer(M.readByte(CARE_CUR), slot)
+      elseif st == 0x19 then
+        local slot = M.invSlotOf(CARE_TENT)
+        if slot and M.readByte(CARE_CUR) == slot then
+          pending = pending or { kind = "tent", qty = M.invCountOf(CARE_TENT),
+                                 frame = M.frame }
+          held = { "a" }
+        else
+          held = { "b" }
+        end
+      elseif CARE_SCREENS[st] then
+        held = { "b" }
+      else
+        M.setPad({}); return            -- fades and transients: hands off
+      end
+    elseif want.kind == "item" then
       if st == 0x05 then
         held = steer(M.readByte(CARE_CUR), 0)          -- Item is row 0
       elseif st == 0x08 then
@@ -2997,7 +3180,7 @@ local function careKernel(opts)
           local cur = M.readByte(CARE_CUR)
           if cur == slot then
             pending = { kind = "item", char = want.char, item = want.item,
-                        hp = M.charHp(want.char),
+                        hp = M.charHp(want.char), mp = M.charMp(want.char),
                         st1 = M.charStatus1(want.char),
                         qty = M.invCountOf(want.item) }
             held = { "a" }
@@ -3103,11 +3286,12 @@ local function careKernel(opts)
     end
     return string.format(
       "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d soft=%d remedy=%d " ..
-      "revivify=%d%s",
+      "revivify=%d tincture=%d tent=%d%s",
       tag, what, table.concat(out, "  "), M.invCountOf(CARE_TONIC),
       M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX),
       M.invCountOf(CARE_ANTIDOTE), M.invCountOf(CARE_SOFT),
-      M.invCountOf(CARE_REMEDY), M.invCountOf(CARE_REVIVIFY), unserved())
+      M.invCountOf(CARE_REMEDY), M.invCountOf(CARE_REVIVIFY),
+      M.invCountOf(CARE_TINCTURE), M.invCountOf(CARE_TENT), unserved())
   end
 
   return {
@@ -3219,8 +3403,10 @@ end
 -- Revival is deliberately NOT reserved (a dead member outweighs a thin
 -- bag), so CARE_FENIX is absent here.  The floor is the between-shops
 -- safety net; the route's shop restocks (owner guideline) are what keep
--- the bag actually stocked for the 0.9 top-off.
-M.CARE_RESERVE = { [CARE_TONIC] = 4, [CARE_POTION] = 4 }
+-- the bag actually stocked for the 0.9 top-off.  The last Tincture is
+-- kept the same way (#231); Tents are not reserved, because the last one
+-- at the last save point is the one that matters.
+M.CARE_RESERVE = { [CARE_TONIC] = 4, [CARE_POTION] = 4, [CARE_TINCTURE] = 1 }
 
 function M.newCareDriver(opts)
   opts = opts or {}
@@ -3527,6 +3713,96 @@ function M.shopClose(what)
     }, what .. ": shop closed"),
     M.release(),
     M.waitFrames(30),
+  })
+end
+
+-- M.innRest: a night at an inn through the real talk -- the whole party
+-- to full HP and full MP with every status cleared, for the price the
+-- keeper names (the rest routine _cacd3c; docs/design/supply.md lists the
+-- route's inns: 80 at South Figaro up to 350, Thamasa's 1).  Promoted
+-- from gen_kolts's innRest with the keeper's talk spot and the price as
+-- arguments:
+--
+--   opts.spot   {x, y}: the tile the party stands on to talk
+--   opts.face   the direction the keeper is in (default "up")
+--   opts.price  the charge, asserted against the purse before the talk --
+--               `take_gil` sets $01BE when the party cannot pay, the
+--               keeper says "Not enough money" and nobody rests
+--   opts.tag    log prefix
+--   opts.nav    navTo overrides for the walk to the spot
+--
+-- The keeper's Yes/No is taken through M.newChoice (row 0 = Yes), the
+-- night is ridden out until the party has control back, and every member
+-- is asserted whole afterwards.
+function M.innRest(opts)
+  opts = opts or {}
+  local what = opts.tag or "the inn"
+  local face = opts.face or "up"
+  local price = opts.price or 0
+  local nav = { maxFrames = 20000, playBattles = "tactical" }
+  for k, v in pairs(opts.nav or {}) do nav[k] = v end
+  local ph, calm = 0, 0
+  local C = M.newChoice(0, { tag = what, onUp = function(n, max)
+    M.log(string.format("%s: choice #%d up (%d options) -- taking 0 (Yes)",
+      what, n, max))
+  end })
+  local function partyLine(when)
+    local t = {}
+    for _, c in ipairs(M.partyMembers()) do
+      t[#t + 1] = string.format("c%d %d/%d hp %d/%d mp", c, M.charHp(c),
+        M.charMaxHp(c), M.charMp(c), M.charMaxMp(c))
+    end
+    return string.format("[%s] %s: %s | gil=%d", what, when,
+      table.concat(t, "  "), M.gil())
+  end
+  return M.seqStep({
+    M.call(function()
+      M.assertEq(M.gil() >= price, true,
+        string.format("%s: the party can pay the %d GP (gil %d)", what, price, M.gil()))
+      M.log(partyLine("before the night"))
+    end),
+    M.navTo(opts.spot[1], opts.spot[2], nav),
+    M.release(), M.waitFrames(20),
+    M.call(function()
+      M.assertEq(M.fieldX() == opts.spot[1] and M.fieldY() == opts.spot[2], true,
+        string.format("%s: on the keeper's talk spot (%d,%d)", what,
+          opts.spot[1], opts.spot[2]))
+    end),
+    M.driveUntil(function()
+      return M.eventRunning() or M.dialogWaiting()
+    end, 6000, {
+      M.call(function()
+        if not (M.hasControl() and M.tileAligned()) then M.setPad({}); return end
+        if M.readByte(0x087f + M.readWord(0x0803)) ~= FACE_VAL[face] then
+          M.setPad({ [face] = true }); return
+        end
+        M.setPad((M.frame % 8 < 4) and { "a" } or {})
+      end),
+    }, what .. ": engage the keeper"),
+    M.release(),
+    M.driveUntil(function()
+      local ok = M.hasControl() and M.tileAligned() and bright() >= 15
+             and not M.dialogWaiting() and not M.eventRunning()
+      calm = ok and calm + 1 or 0
+      return calm >= 30
+    end, 30000, {
+      M.call(function()
+        ph = (ph + 1) % 8
+        if C.frame(ph) then return end
+        if M.hasControl() and not M.dialogWaiting() then M.setPad({}); return end
+        M.setPad(ph < 4 and { "a" } or {})
+      end),
+    }, what .. ": the night passes"),
+    M.release(), M.waitFrames(30),
+    M.call(function()
+      for _, c in ipairs(M.partyMembers()) do
+        M.assertEq(M.charHp(c), M.charMaxHp(c),
+          string.format("%s: char %d woke at full hp", what, c))
+        M.assertEq(M.charMp(c), M.charMaxMp(c),
+          string.format("%s: char %d woke at full mp", what, c))
+      end
+      M.log(partyLine("after the night"))
+    end),
   })
 end
 

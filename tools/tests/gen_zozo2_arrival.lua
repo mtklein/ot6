@@ -117,6 +117,7 @@ end
 -- levelling are legible step by step rather than only at the end.
 local POTION, TONIC, FENIX = 0xE9, 0xE8, 0xF0
 local ANTIDOTE, REMEDY = 0xF2, 0xF5
+local TINCTURE, REVIVIFY = 0xEB, 0xF1
 local LOCKE, CELES = 1, 6
 local IRON_FIST = 0x06C
 
@@ -465,6 +466,15 @@ H.run({ maxFrames = 1200000 }, {
     "POTION to 39"),
   H.buyItem(FENIX, 5, function() return 20 - invCount(FENIX) end,
     "FENIX DOWN to 20"),
+  -- REVIVIFY to 3 and TINCTURE to 5 (#231, docs/design/supply.md): the
+  -- Zombie cure the route otherwise never buys, and the MP column of the
+  -- band at the L19 the grind reached (~level / 4).  8,400 gil of the
+  -- ~82,000 the grind earned; after the revives, so a short purse shorts
+  -- these first.
+  H.buyItem(REVIVIFY, 4, function() return 3 - invCount(REVIVIFY) end,
+    "REVIVIFY to 3"),
+  H.buyItem(TINCTURE, 1, function() return 5 - invCount(TINCTURE) end,
+    "TINCTURE to 5"),
   H.shopClose("Jidoor item shop"),
   -- #197: the combat items back on top of the bag after every purchase
   -- (the fight driver found the Potion at row 43 downstream of a stop
@@ -474,6 +484,8 @@ H.run({ maxFrames = 1200000 }, {
     H.log(string.format("[shop] Jidoor done: %s", rosterLine()))
     H.assertEq(invCount(POTION) >= 39, true, "Potions at 39 leaving Jidoor -- the L18 band plus field care")
     H.assertEq(invCount(FENIX) >= 20, true, "Fenix Downs at 20 leaving Jidoor")
+    H.assertEq(invCount(TINCTURE) >= 5, true, "Tinctures at 5 leaving Jidoor -- the L19 MP band (#231)")
+    H.assertEq(invCount(REVIVIFY) >= 3, true, "Revivifies at 3 leaving Jidoor (#231)")
   end),
   H.crossDoor(34, 21, 198, 27, 43, "Jidoor item shop -> street", { fight = FIGHT }),
   H.navTo(16, 61, { maxFrames = 24000, playBattles = "tactical", fight = FIGHT }),

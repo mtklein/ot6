@@ -155,6 +155,7 @@ end
 -- ---- the grind's supply line (see the header) --------------------------
 local TONIC, POTION, FENIX, TENT = 0xE8, 0xE9, 0xF0, 0xF7
 local ANTIDOTE, REMEDY = 0xF2, 0xF5
+local TINCTURE, REVIVIFY = 0xEB, 0xF1
 -- the Tonic band (docs/design/level-curve.md: ~level x5, cap 99): L21 on
 -- boot, L23 on departure, so the cap either way
 local TONIC_BAND = 99
@@ -164,9 +165,13 @@ local TONIC_TRIP = TONIC_BAND * 3 // 4
 -- the band the bag arrives at each fight with: Potions ~level x1.5 for the
 -- L18-23 this grind spans (27-35), Fenix ~level (20), Tents for the rest
 -- stops (10 -- the two measured grinds would each have used ~4-6)
-local GRIND_BAND = { potion = 35, fenix = 20, tent = 10 }
+-- Tinctures at the MP band (~level / 4 at the L22-23 the grind ends at,
+-- #231, docs/design/supply.md) and three Revivifies, the Zombie cure the
+-- route otherwise never buys; both at every restock, after the revives
+-- and before the Tents.
+local GRIND_BAND = { potion = 35, fenix = 20, tincture = 6, revivify = 3, tent = 10 }
 -- what the party leaves the plains with for the Sealed Gate (the header)
-local DEPART_BAND = { potion = 60, fenix = 23, tent = 10 }
+local DEPART_BAND = { potion = 60, fenix = 23, tincture = 6, revivify = 3, tent = 10 }
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local function gil() return H.gil() end
@@ -352,12 +357,18 @@ local function jidoorRestock(tag, band)
       H.assertEq(shopRow(22, 0), POTION, "shop 22 row 0 is Potion")
       H.assertEq(shopRow(22, 5), FENIX, "shop 22 row 5 is Fenix Down")
       H.assertEq(shopRow(22, 7), TENT, "shop 22 row 7 is Tent")
+      H.assertEq(shopRow(22, 1), TINCTURE, "shop 22 row 1 is Tincture")
+      H.assertEq(shopRow(22, 4), REVIVIFY, "shop 22 row 4 is Revivify")
     end),
     -- essentials first, the Tent soak last, so a short purse shorts Tents
     H.buyItem(POTION, 0, function() return band.potion - H.invCountOf(POTION) end,
       "POTION to " .. band.potion),
     H.buyItem(FENIX, 5, function() return band.fenix - H.invCountOf(FENIX) end,
       "FENIX DOWN to " .. band.fenix),
+    H.buyItem(REVIVIFY, 4, function() return band.revivify - H.invCountOf(REVIVIFY) end,
+      "REVIVIFY to " .. band.revivify),
+    H.buyItem(TINCTURE, 1, function() return band.tincture - H.invCountOf(TINCTURE) end,
+      "TINCTURE to " .. band.tincture),
     H.buyItem(TENT, 7, function() return band.tent - H.invCountOf(TENT) end,
       "TENT to " .. band.tent),
     H.shopClose("Jidoor item shop"),

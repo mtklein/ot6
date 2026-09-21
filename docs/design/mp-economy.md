@@ -749,7 +749,10 @@ level, current HP and MP are set to the new maximums.
 - Attrition works differently. Tents, inns, and save points stop
   being the only income; they matter most inside long
   same-level stretches and least right after a level. HP
-  refills too, which reduces dungeon attrition.
+  refills too, which reduces dungeon attrition.  The supply side of
+  that -- what a Tincture, a Tent and an inn cost per point off the
+  ROM, where each stands against the route's dry stretches, and the
+  MP column of the supply band -- is [supply.md](supply.md) (#231).
 
 MP-drain verbs stay, on Octopath's pattern, where they are balanced by
 dealing little or no damage themselves and appearing on only a few
