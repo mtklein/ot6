@@ -193,6 +193,29 @@ local function pokeStep(round)
   }, "battle 6 engages [attempt " .. round .. "]")
 end
 
+-- Battle menu cells (battle_dancemp.lua): $7BCA a command window is up,
+-- $62CA whose battle slot, $7BC2 its state -- $05 the command list, $21
+-- the dance list, $38 the target cursor; $202E + 12*slot the slot's four
+-- commands, $890F + slot the command cursor, $8937/$893B + slot the dance
+-- list's column/row; $3ED8 + 2*slot the slot's character.
+local MENU, ACTOR, MENU_STATE = 0x7BCA, 0x62CA, 0x7BC2
+local ST_COMMANDS, ST_DANCES, ST_TARGET = 0x05, 0x21, 0x38
+local COMMANDS, CMD_DANCE = 0x202E, 0x13
+
+local function knownDance()
+  local mask = H.readByte(DANCES)
+  for d = 0, 7 do
+    if (mask >> d) & 1 == 1 then return d end
+  end
+  return nil
+end
+local function mogBattleSlot()
+  for s = 0, 3 do
+    if H.readByte(0x3ED8 + s * 2) == MOG then return s end
+  end
+  return nil
+end
+
 -- the input-driven battle-6 driver: R raises the active character's pending
 -- boost (characters open with 1 bp and regen 1 per unboosted turn;
 -- Ot6InitBP/Ot6ActionEnd), then three edge-tapped A's confirm the
@@ -200,8 +223,65 @@ end
 -- gone (a win's teardown, or a wipe, which zeroes the HP table), keep
 -- tapping A: a loss parks on the Annihilated screen until a keypress.
 -- Ends on the won-switch or on 240 settled no-battle frames.
+--
+-- MOG's own turn is Dance, not the bare-handed Fight the loop would pick
+-- (#143: his pike is in the bag by now, and the cave waves taught him
+-- Dusk Requiem): one R for the dance's pip, the cursor onto Dance, A,
+-- the cursor onto the dance he knows, A, A at the target cursor.  A
+-- started dance runs the rest of the battle on its own; if his command
+-- list comes back, he dances again.  With no dance known he Fights.
 local function marshalFight(maxFrames)
   local phase, calmN = 0, 0
+  local ph, boosted, chosen = 0, false, false
+  local slot, danceId, seen = nil, nil, 0
+  local loggedState = {}
+  local function edge() return ph % 10 < 5 end
+  local function danceTurn(a)
+    local st = H.readByte(MENU_STATE)
+    ph = ph + 1
+    if st == ST_COMMANDS then
+      if chosen then chosen, boosted, ph = false, false, 1 end
+      if not boosted then
+        H.setPad(ph <= 4 and { "r" } or {})
+        if ph >= 8 then boosted = true end
+        return
+      end
+      local want = nil
+      for i = 0, 3 do
+        if H.readByte(COMMANDS + a * 12 + i * 3) == CMD_DANCE then want = i end
+      end
+      if not want then
+        H.log(string.format("[dance] f%d MOG's command list has no Dance; he Fights", H.frame))
+        danceId = nil
+        H.setPad({})
+        return
+      end
+      local cur = H.readByte(0x890F + a)
+      if cur == want then H.setPad(edge() and { "a" } or {})
+      elseif cur < want then H.setPad(edge() and { "down" } or {})
+      else H.setPad(edge() and { "up" } or {}) end
+    elseif st == ST_DANCES then
+      local row, col = danceId // 2, danceId % 2
+      local cr, cc = H.readByte(0x893B + a), H.readByte(0x8937 + a)
+      if cr ~= row then H.setPad(edge() and { [(cr < row) and "down" or "up"] = true } or {})
+      elseif cc ~= col then H.setPad(edge() and { [(cc < col) and "right" or "left"] = true } or {})
+      else
+        if not chosen then
+          H.log(string.format("[dance] f%d MOG picks dance %d", H.frame, danceId))
+        end
+        chosen = true
+        H.setPad(edge() and { "a" } or {})
+      end
+    elseif st == ST_TARGET then
+      H.setPad(edge() and { "a" } or {})
+    else
+      if not loggedState[st] then
+        loggedState[st] = true
+        H.log(string.format("[dance] f%d MOG's window in state $%02X; waiting", H.frame, st))
+      end
+      H.setPad({})
+    end
+  end
   return H.driveUntil(function()
     calmN = (not H.battleLoadStarted()) and calmN + 1 or 0
     return defenseWon() or calmN >= 240
@@ -209,7 +289,20 @@ local function marshalFight(maxFrames)
     H.call(function()
       phase = (phase + 1) % 32
       if not H.battleLoadStarted() then
+        seen = 0
         H.setPad(phase % 8 < 4 and { "a" } or {})
+        return
+      end
+      seen = seen + 1
+      if seen == 30 then
+        slot, danceId = mogBattleSlot(), knownDance()
+        local bg = H.readByte(0x11E2)
+        H.log(string.format("[dance] f%d MOG slot=%s knows $%02X -> dance %s; background %02X teaches %d",
+          H.frame, tostring(slot), H.readByte(DANCES), tostring(danceId), bg,
+          H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + bg)))
+      end
+      if slot and danceId and H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == slot then
+        danceTurn(slot)
         return
       end
       if phase < 4 then H.setPad({ "r" })
@@ -379,7 +472,8 @@ H.run({ maxFrames = 200000 }, {
 
   -- ===================================================================== --
   -- Phase 4c: the Marshal, up to three input-driven attempts.  P2 first
-  -- (MOG's squad, the biggest pool), then P1, then P3 if a wipe lands.
+  -- (MOG's squad, the biggest pool; MOG dances), then P1, then P3 if a
+  -- wipe lands.
   -- Battle 6's loss path revives the loser at 1 HP on (14,11) and the
   -- Marshal still stands, so retrying with the next squad is what a
   -- player would do.  Attempts 2 and 3 are no-ops when an earlier one
