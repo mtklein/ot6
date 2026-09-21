@@ -6042,7 +6042,7 @@ function Driver:button(actor)
   if self.plan ~= nil and self.planActor == actor and self.plan.kind == "lore"
      and self.loreSpinN > BATTLE.LORE_STALL and not self.loreDead then
     self:loreDiagnose(actor, loreCell(actor, self.plan.lore, false))
-    self:dropPlan()
+    self:dropPlan("lore_stalled")
     return { "b" }
   end
   if self.plan == nil or self.planActor ~= actor then
@@ -6158,7 +6158,7 @@ function Driver:button(actor)
     -- read here returns nil, drops the plan, presses B, and re-plans,
     -- without end.
     local want = self.plan.idx or self:battInvIdx(self.plan.item)
-    if want == nil then self:traceDrop("item_unavailable"); self.plan, self.planActor = nil, nil; return { "b" } end
+    if want == nil then self:dropPlan("item_unavailable"); return { "b" } end
     local cur = M.readByte(BATTLE.ITEMSCR + actor) + M.readByte(BATTLE.ITEMROW + actor)
     -- A far row is walked at three presses per pulse rather than one
     -- (the frame loop's `fast`): one press per 30-frame pulse put the
@@ -6191,7 +6191,7 @@ function Driver:button(actor)
     -- engine has since greyed) drops the plan rather than steering to
     -- whatever now occupies the old row.
     local cell = spellCell(actor, self.plan.spell, false)
-    if cell == nil then self:traceDrop("spell_unavailable"); self.plan, self.planActor = nil, nil; return { "b" } end
+    if cell == nil then self:dropPlan("spell_unavailable"); return { "b" } end
     local wr, wc = cell // 2, cell % 2
     local ar = M.readByte(BATTLE.MSCROLL + actor) + M.readByte(BATTLE.MROW + actor)
     local col = M.readByte(BATTLE.MCOL + actor)
@@ -6216,7 +6216,7 @@ function Driver:button(actor)
     -- plan time.  A lore the engine no longer offers a row for drops
     -- the plan instead of steering to whatever holds the old row.
     local want = loreCell(actor, self.plan.lore, false)
-    if want == nil then self.plan, self.planActor = nil, nil; return { "b" } end
+    if want == nil then self:dropPlan("lore_unavailable"); return { "b" } end
     local cur = M.readByte(BATTLE.LSCROLL + actor) + M.readByte(BATTLE.LROW + actor)
     if cur < want then return { "down" } end
     if cur > want then return { "up" } end
@@ -6237,7 +6237,7 @@ function Driver:button(actor)
       if rid == self.plan.item then want = i; break end
       if rid == 0xFF then break end
     end
-    if want == nil then self.plan, self.planActor = nil, nil; return { "b" } end
+    if want == nil then self:dropPlan("throw_unavailable"); return { "b" } end
     local wc, wr = want % 2, want // 2
     local cc, cr = M.readByte(BATTLE.BLCOL + actor), M.readByte(BATTLE.BLROW + actor)
     if cc == wc and cr == wr then return { "a" } end
@@ -6246,7 +6246,8 @@ function Driver:button(actor)
       M.log(string.format("[%s] throw steer gave up (row %d,%d vs want "
         .. "%d,%d) -- backing out, not throwing blind", self.tag or "fight",
         cr, cc, wr, wc))
-      self.plan, self.planActor, self.tgtSpin = nil, nil, 0
+      self:dropPlan("throw_steer")
+      self.tgtSpin = 0
       return { "b" }
     end
     if cc ~= wc then return { wc > cc and "right" or "left" } end
@@ -6298,7 +6299,7 @@ function Driver:button(actor)
     for i = 0, 7 do
       if M.readByte(BATTLE.ITEMLIST + i * 3) == self.plan.skill then want = i; break end
     end
-    if want == nil then self.plan, self.planActor = nil, nil; return { "b" } end
+    if want == nil then self:dropPlan("skill_row_missing"); return { "b" } end
     local wc, wr = want % 2, want // 2
     local cc, cr = M.readByte(BATTLE.BLCOL + actor), M.readByte(BATTLE.BLROW + actor)
     if cc ~= wc then return { wc > cc and "right" or "left" } end
@@ -6580,7 +6581,7 @@ function Driver:button(actor)
   if st == BATTLE.ST_SLOT then
     -- a reel window this plan did not mean to open: back out before the
     -- spin, finish a spin already running (B is not read after its A)
-    self:dropPlan()
+    self:dropPlan("slot_unplanned")
     return { M.readByte(BATTLE.SLOT_PRESS1) ~= 0 and "a" or "b" }
   end
   if st == BATTLE.ST_ITEM or st == BATTLE.ST_TOOLS or st == BATTLE.ST_MAGIC or st == BATTLE.ST_ESPER
@@ -6588,7 +6589,7 @@ function Driver:button(actor)
      -- in play: without opts.nukeLore nothing here ever opens that
      -- window, and the default driver stays byte-identical.
      or (self.opts.nukeLore and (st == BATTLE.ST_LORE or st == BATTLE.ST_LORE_OPEN)) then
-    self:dropPlan()
+    self:dropPlan("window_unplanned")
     return { "b" }
   end
   return nil
@@ -7112,7 +7113,7 @@ function Driver:frame()
   -- can ask for it.
   local ph = self.tick % (self.opts.cadence or 30)
   local actor = M.readByte(BATTLE.ACTOR) & 3
-  if self.plan and self.planActor ~= actor then self:traceDrop("actor_changed"); self.plan, self.planActor = nil, nil end
+  if self.plan and self.planActor ~= actor then self:dropPlan("actor_changed") end
   -- The stall guard's clock: frames spent on a LIVE lore plan, rather
   -- than wall clock since the first offer, so another actor's slow turn
   -- between two pursuits cannot fire it.
@@ -7264,7 +7265,7 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     -- reading rather than from a fixed idea of where they stand.
     layoutUnreadSaid = false,
   }, Driver)
-  local F = {}
+  local F = { driver = D }
   function F.idle() D:idle() end
   function F.frame() D:frame() end
   return F
