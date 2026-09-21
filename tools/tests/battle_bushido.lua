@@ -8,6 +8,15 @@ local STATE = "build/states/camp_escaped.mss.lua"
 local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_ITEM, ST_TOOLS, ST_BUSHIDO, ST_TGT, ST_TRANS =
   0x05, 0x0A, 0x30, 0x37, 0x38, 0x01
+local ST_DEF = 0x27                   -- the Def. window Right opens
+-- the frames between a press and the window it opens or closes: $01/$04/
+-- $0f/$10 around every open and close, $25/$26 between Right and the Def.
+-- window (build/lab/harness-faults/repro/probe_bushido_s21.log).  A press
+-- made there lands on nothing, and a B there cancels the Right.
+local function settling(st)
+  return st == 0x01 or st == 0x04 or st == 0x0F or st == 0x10
+      or st == 0x25 or st == 0x26
+end
 local CMD_SWDTECH, CMD_ITEM, CMD_FIGHT = 0x07, 0x01, 0x00
 local KNOWN, ITEMLIST, KROW = 0x2020, 0x4005, 0x8967
 local TONIC, POTION = 0xE8, 0xE9
@@ -95,7 +104,7 @@ local function decide()
   mf = mf + 1
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
-  if st == ST_TRANS then return {} end
+  if settling(st) then return {} end
   local slow = (st == ST_ITEM)
   if slow then
     if (mf - 1) % 30 >= 6 then return {} end
@@ -109,11 +118,20 @@ local function decide()
       local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
       if h > 0 and m > 0 and h * 100 // m < 60 then hurt = true end
     end
-    -- nothing to heal with hands the window on too (measured: with the bag
-    -- empty of both, B out of the list and back into Item held his window
-    -- forever, and CYAN's never came)
+    -- nothing to heal with spends the turn on a Defend (measured: with the
+    -- bag empty of both, B out of the list and back into Item held his
+    -- window forever, and CYAN's never came).  A Defend, not X: X passes
+    -- the turn to the back of the menu queue (btlgfx window_close,
+    -- w7e4001,x = 4) and the battle clock does not run while a command
+    -- window is up, so with SABIN's and SHADOW's gauges both full their
+    -- windows cycled X for X and CYAN's queued tech never ran -- measured
+    -- at seed shift 21 (build/lab/harness-faults/repro/probe_bushido_s21.log:
+    -- `q=01/00/ff pend=1 atb=91/2f/5f` on every frame from f1100 to
+    -- f1432, the actor alternating 1/0), the "timeout after 900 frames
+    -- driving toward the boosted tech resolves" at shifts 21 and 35.
     local canCare = bagIdxOf({ TONIC, POTION }) ~= nil
-    if st == ST_CMD and not (hurt and canCare) then btn = "x"
+    if st == ST_CMD and not (hurt and canCare) then btn = "right"
+    elseif st == ST_DEF then btn = "a"
     elseif st == ST_CMD then
       local want = cmdRowOf(shadow, CMD_ITEM)
       local cur = H.readByte(CMDROW + shadow) & 3
@@ -171,7 +189,10 @@ local function decide()
       else btn = "b" end
     end
   else
-    btn = (st == ST_CMD) and "x" or "b"
+    -- the bench spends its turn on a real Defend (see SHADOW's arm above)
+    if st == ST_CMD then btn = "right"
+    elseif st == ST_DEF then btn = "a"
+    else btn = "b" end
   end
   return btn and { [btn] = true } or {}
 end
@@ -216,35 +237,106 @@ local function park(tag)
     H.waitFrames(20),
   })
 end
--- move the parked cursor onto `row` and edge one A, without the tech
--- steering (for the refusal arms, whose confirm must be refused)
--- (`row` is a number, or a function read when the walk runs)
-local function pressRowOnce(row)
+-- Confirm `row` in CYAN's parked SwdTech window, without the tech
+-- steering, and read the ROM's answer into H.vars.confirm: "banked" (his
+-- pending bank moved), "refused" (the list buzzed, H.refusals) or "lost"
+-- (the battle took the window before it answered).
+--
+-- This used to walk the cursor and edge one A, and whether that edge was
+-- ever seen was the battle's timing, not the test's (#229).  Measured at
+-- seed shift 2 (build/lab/harness-faults/repro/probe_bushido_s2.log):
+-- Kitty had berserked him under the open window (`st=00/10/..` from
+-- f690), and on the frame the edge went down --
+--   [probe f748] menu=01 act=2 st=30 krow=0 bp=1 pend=0 bcb=01 q=ff
+-- -- the battle had dropped him from the menu queue (w7e4001+cyan = $ff)
+-- and raised the force-close (btlgfx_main.asm @0ca4), so the window slid
+-- away under the press ($30 -> $2f -> $01 -> $05 -> $0f -> $01 over the
+-- next twelve frames) with nothing banked and nothing buzzed:
+--   assertEq failed: row 0 banked boost 1 ($3e9d = 1): got 0, want 1
+-- So the edge is made only while the window is his, repeated until the
+-- ROM answers, and a window that goes unanswered is reported as "lost"
+-- rather than read as an answer.  `row` is a number, or a function read
+-- when the walk runs.  opts.repark parks his next window and asks again
+-- until answered, for the arms whose premise (the bank the window opened
+-- at) holds across windows; an arm whose premise is read at each window
+-- asks once and answers "lost" itself.
+local function confirmRow(row, tag, opts)
+  opts = opts or {}
   local function r() return type(row) == "function" and row() or row end
-  return H.repeatN(1, {
-    (function()
-      local ph = 0
-      return H.driveUntil(function()
-        return H.readByte(MSTATE) == ST_TOOLS and H.readByte(KROW + cyan) == r()
-      end, 600, {
-        H.call(function()
-          ph = (ph + 1) % 8
-          if ph >= 4 then H.setPad({}); return end
-          local cur = H.readByte(KROW + cyan)
-          H.setPad({ [cur < r() and "down" or "up"] = true })
-        end),
-        H.waitFrames(1),
-      }, type(row) == "function" and "cursor walked to the spend row"
-                                  or ("cursor walked to row " .. row))
-    end)(),
+  local n0, p0 = 0, 0
+  local function windowUp()
+    return H.battleLoadStarted() and H.readByte(MENU) ~= 0
+      and (H.readByte(ACTOR) & 3) == cyan and H.readByte(MSTATE) == ST_TOOLS
+  end
+  local function answered() return pend() ~= p0 or H.refusals.n > n0 end
+  local ph = 0
+  local ask = H.repeatN(1, {
+    H.call(function() n0, p0 = H.refusals.n, pend() end),
+    H.driveUntil(function()
+      return not windowUp() or H.readByte(KROW + cyan) == r()
+    end, 600, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        if ph >= 4 or not windowUp() then H.setPad({}); return end
+        local cur = H.readByte(KROW + cyan)
+        H.setPad({ [cur < r() and "down" or "up"] = true })
+      end),
+      H.waitFrames(1),
+    }, tag .. ": cursor walked to the row"),
     H.call(function() H.setPad({}) end),
     H.waitFrames(8),
-    H.pressButtons({ "a" }, 4),
-    H.waitFrames(16),
+    H.driveUntil(function() return answered() or not windowUp() end, 600, {
+      H.cond(windowUp, { H.pressButtons({ "a" }, 4) }, {}),
+      H.waitFrames(12),
+    }, tag .. ": the confirm answered"),
+    H.waitFrames(8),
+    H.call(function()
+      if pend() ~= p0 then H.vars.confirm = "banked"
+      elseif H.refusals.n > n0 then H.vars.confirm = "refused"
+      else
+        H.vars.confirm = "lost"
+        H.log(string.format("%s: the window went at f%d before the confirm "
+          .. "was answered", tag, H.frame))
+      end
+    end),
+  })
+  if not opts.repark then return ask end
+  return H.repeatN(1, {
+    H.call(function() H.vars.confirm = nil end),
+    H.driveUntil(function()
+      return H.vars.confirm == "banked" or H.vars.confirm == "refused"
+    end, 40000, {
+      H.cond(function() return not windowUp() end,
+        { park(tag .. ": his SwdTech window, again") }, {}),
+      ask,
+    }, tag .. ": a window that answered the confirm"),
   })
 end
 
-local spells = {}
+-- CYAN's actions as the engine starts them: one record per ExecCmd
+-- (battle_main.asm, the dispatch of the action at the top of the queue)
+-- with the attacker, his command and attack id.  A $3410 write is not
+-- that: "last spell used" is stored when the action is staged, and the
+-- actions queued ahead of his run first.  Measured
+-- (build/lab/harness-faults/repro/probe_bushido_s28c.log,
+-- probe_bushido_s31c.log): $3410 read $55 at f3466 / f731; SABIN's
+-- Fight and SHADOW's Defend (shift 28), two monster turns and
+-- Interceptor's counter (shift 31) ran first; his ExecCmd came at
+-- f3928 / f1332 and Ot6ActionEnd 440 / 415 frames after it -- 903 and
+-- 1017 frames after the write, past the 900-frame resolve budget that
+-- used to be counted from the write ("timeout after 900 frames driving
+-- toward the boosted tech resolves", shifts 12, 21, 31, 35, 36 across the
+-- sweeps).  The resolve wait now starts at his ExecCmd, the action's own
+-- start.
+local started = {}
+local function techStarted(id)
+  for _, s in ipairs(started) do
+    if s.x == cyan * 2 and s.cmd == CMD_SWDTECH and s.atk == id then
+      return true
+    end
+  end
+  return false
+end
 local ledger = {}
 local function flushLedger(tag)
   for _, e in ipairs(ledger) do
@@ -253,10 +345,6 @@ local function flushLedger(tag)
       (e.st2 & 0x10) ~= 0 and ": Berserk" or ""))
   end
   ledger = {}
-end
-local function sawSpell(id)
-  for _, v in ipairs(spells) do if v == id then return true end end
-  return false
 end
 local function checkWindow(ceil, tag)
   local techs = WIN[ceil]
@@ -313,8 +401,13 @@ H.run({ maxFrames = 150000 }, {
       .. "BushidoLevelTbl 1/6/12 with 15 still ahead; the high byte "
       .. "carries InitSkills' garbage, the #4 regression's true shape)")
     H.assertEq(bp(), 1, "the natural opening bank (Ot6InitBP)")
-    emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
-      emu.callbackType.write, 0x7E3410, 0x7E3410)
+    emu.addMemoryCallback(function()
+      pcall(function()
+        started[#started + 1] = {
+          x = emu.getState()["cpu.x"] & 0xFF,
+          cmd = H.readByte(0xB5), atk = H.readByte(0x3A7D) }
+      end)
+    end, emu.callbackType.exec, H.sym("ExecCmd@battle_code"))
     -- the bank's ledger, observed (a write watch; nothing is written): each
     -- change with the frame and his status-2 byte, so a regen that lands
     -- without a window (Berserk's auto-Fight) is on the record
@@ -352,8 +445,14 @@ H.run({ maxFrames = 150000 }, {
   end),
 
   -- 4. a row beyond the bank cannot commit ---------------------------------
-  pressRowOnce(1),                     -- Retort = boost 2 > the real bank of 1
+  -- (the bank is Ot6InitBP's 1 at every window he gets without acting, in
+  -- this battle or the next, so a window the battle takes away is parked
+  -- again and asked again)
+  confirmRow(1, "retort at bank 1", { repark = true }),
+                                       -- Retort = boost 2 > the real bank of 1
   H.call(function()
+    H.assertEq(H.vars.confirm, "refused",
+      "confirming a row beyond current bp was refused (the list buzzed)")
     H.assertEq(H.readByte(MSTATE), ST_TOOLS,
       "confirming a row beyond current bp did not commit -- still in the submenu")
     H.assertEq(pend(), 0, "no boost was banked for the refused row")
@@ -366,17 +465,18 @@ H.run({ maxFrames = 150000 }, {
   (function()
     local g0
     return H.repeatN(1, {
+      H.call(function() started = {} end),
+      confirmRow(0, "dispatch at bank 1", { repark = true }),
+                                       -- Dispatch = boost 1 = the whole bank
       H.call(function()
+        -- read at the window that answered: the confirm may have been
+        -- answered at a later window, in a later battle
         g0 = monsterHpSum()
-        spells = {}
-      end),
-      pressRowOnce(0),                 -- Dispatch = boost 1 = the whole bank
-      H.call(function()
         H.assertEq(pend(), 1, "row 0 banked boost 1 ($3e9d = 1)")
         cyanMode = "defer"; quietA = true
       end),
-      driveTo(function() return sawSpell(0x55) end, 12000,
-        "Dispatch reaches $3410"),
+      driveTo(function() return techStarted(0x55) end, 12000,
+        "Dispatch reaches ExecCmd"),
       resolveTo(function() return pend() == 0 end,
         "the boosted tech resolves"),
       H.waitFrames(120),
@@ -394,7 +494,7 @@ H.run({ maxFrames = 150000 }, {
     })
   end)(),
 
-  -- 6. reach 0 BP at an open window through play ----------------------
+  -- 6. reach 0 BP at an open window through play, and be refused there --
   -- Ot6ActionEnd (ot6_boost.asm) is the regen rule: a character's action
   -- end pays +1 BP unless that action spent a pending boost, which is
   -- charged instead (no regen on a boosted turn); Ot6InitBP opens every
@@ -405,30 +505,56 @@ H.run({ maxFrames = 150000 }, {
   -- without a window, so the next battle's opens at Ot6InitBP's 1.  A
   -- person who wants the empty bank spends what a window shows on a real
   -- boosted tech and waits for the next one; this arm does that for as
-  -- many windows as it takes (a bank of 5 is two spends).
+  -- many windows as it takes (a bank of 5 is two spends), and at the
+  -- window that opens at 0 asks for row 0 and must be refused.  Each
+  -- window's premise -- the bank it opened at -- is read at that window,
+  -- so a window the battle takes away unanswered counts for nothing and
+  -- the next one is asked afresh (a lost window is what Kitty's Berserk
+  -- does to an open one, #229, one more window than the spends need).
   (function()
-    local WINDOWS = 6
+    local WINDOWS = 8
     local seen, b0, row, boost = false, 0, 0, 1
     local spend = {
-      pressRowOnce(function() return row end),
+      confirmRow(function() return row end, "[zero] the spend row"),
+      H.cond(function() return H.vars.confirm == "lost" end, {}, {
+        H.call(function()
+          H.assertEq(pend(), boost, string.format(
+            "[zero] %s banked boost %d of the %d shown", TECH[row], boost, b0))
+          cyanMode = "defer"
+        end),
+        driveTo(function()
+          return not H.battleLoadStarted() or pend() == 0
+        end, 20000, "[zero] the spend resolves or the battle ends"),
+        H.call(function()
+          if not H.battleLoadStarted() then
+            H.log("[zero] the battle ended before the spend resolved")
+            return
+          end
+          H.log(string.format("[zero] %s resolved: bank %d -> %d",
+            TECH[row], b0, bp()))
+          H.assertEq(bp(), b0 - boost,
+            "[zero] the boosted turn was charged its boost and paid no regen")
+        end),
+      }),
+    }
+    local refuse = {
       H.call(function()
-        H.assertEq(pend(), boost, string.format(
-          "[zero] %s banked boost %d of the %d shown", TECH[row], boost, b0))
-        cyanMode = "defer"
+        H.assertEq(H.readByte(ITEMLIST), 0x55,
+          "row 0 still enumerates Dispatch at 0 bp -- the list is shown, not emptied")
       end),
-      driveTo(function()
-        return not H.battleLoadStarted() or pend() == 0
-      end, 20000, "[zero] the spend resolves or the battle ends"),
-      H.call(function()
-        if not H.battleLoadStarted() then
-          H.log("[zero] the battle ended before the spend resolved")
-          return
-        end
-        H.log(string.format("[zero] %s resolved: bank %d -> %d",
-          TECH[row], b0, bp()))
-        H.assertEq(bp(), b0 - boost,
-          "[zero] the boosted turn was charged its boost and paid no regen")
-      end),
+      confirmRow(0, "[zero] row 0 at 0 bp"),
+      H.cond(function() return H.vars.confirm == "lost" end, {}, {
+        H.call(function()
+          H.assertEq(H.vars.confirm, "refused",
+            "0 bp: the row-0 confirm was refused (the list buzzed)")
+          H.assertEq(H.readByte(MSTATE), ST_TOOLS,
+            "0 bp: even row 0 (boost 1) is refused -- there is no free Bushido (#38)")
+          H.assertEq(pend(), 0, "and nothing was banked")
+          H.assertEq(bp(), 0, "the ledger: the bank really reads 0")
+          H.screenshot("bushido_zero_refused")
+          seen = true
+        end),
+      }),
     }
     local steps = {
       H.cond(function() return not seen end, {
@@ -439,7 +565,7 @@ H.run({ maxFrames = 150000 }, {
           H.log(string.format("[zero] window opens at bank %d pend %d status2 $%02x",
             b0, pend(), H.readByte(0x3EE5 + cyan*2)))
           H.assertEq(pend(), 0, "[zero] nothing is pending at an open window")
-          if b0 == 0 then seen = true; return end
+          if b0 == 0 then return end
           -- his window here is Dispatch/Retort/Slash at boost 1/2/3: a bank
           -- of 3+ spends 3 on Slash, a smaller one 1 on Dispatch (Retort's
           -- stance stays out of the walk)
@@ -447,29 +573,18 @@ H.run({ maxFrames = 150000 }, {
           H.log(string.format("[zero] spending %d of %d on %s",
             boost, b0, TECH[row]))
         end),
-        H.cond(function() return not seen end, spend, {}),
+        H.cond(function() return b0 == 0 end, refuse, spend),
       }, {}),
     }
     return H.repeatN(1, {
       H.repeatN(WINDOWS, steps),
       H.call(function()
         H.assertEq(seen, true, string.format(
-          "[zero] one of his next %d windows opened at 0 BP", WINDOWS))
+          "[zero] one of his next %d windows opened at 0 BP and answered "
+          .. "the row-0 confirm", WINDOWS))
       end),
     })
   end)(),
-  H.call(function()
-    H.assertEq(bp(), 0, "the ledger: the bank really reads 0")
-    H.assertEq(H.readByte(ITEMLIST), 0x55,
-      "row 0 still enumerates Dispatch at 0 bp -- the list is shown, not emptied")
-  end),
-  pressRowOnce(0),
-  H.call(function()
-    H.assertEq(H.readByte(MSTATE), ST_TOOLS,
-      "0 bp: even row 0 (boost 1) is refused -- there is no free Bushido (#38)")
-    H.assertEq(pend(), 0, "and nothing was banked")
-    H.screenshot("bushido_zero_refused")
-  end),
 
   -- ============ labeled isolation arms ====================================
   -- (a) the ceiling sweep and Oblivion: $2020 pokes, real ceiling restored.
@@ -585,12 +700,12 @@ H.run({ maxFrames = 150000 }, {
               H.writeByte(a, H.readByte(a) | OT6_SLASH)
             end
           end
-          spells = {}
+          started = {}
           cyanMode = "tech:0"
         end),
         driveTo(function()
-          return not H.battleLoadStarted() or sawSpell(0x55)
-        end, 20000, "[chip] the arm's Dispatch reaches $3410"),
+          return not H.battleLoadStarted() or techStarted(0x55)
+        end, 20000, "[chip] the arm's Dispatch reaches ExecCmd"),
         H.call(function() cyanMode = "defer"; quietA = true end),
         resolveTo(function()
           return not H.battleLoadStarted() or pend() == 0
