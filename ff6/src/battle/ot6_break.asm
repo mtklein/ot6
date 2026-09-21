@@ -647,7 +647,7 @@ done:   rtl
 
 ; ------------------------------------------------------------------------------
 
-; [ every landed hit: weapon-class chip, then broken double ]
+; [ every landed hit: weapon-class chip, Shadow's divine, then broken double ]
 
 ; replaces the bare broken-double jsl at the elemental join @0c1e, so it
 ; runs for every damaging hit against every target, including hits whose
@@ -656,12 +656,18 @@ done:   rtl
 ; the damage loop runs i8, so pin i16 here for the chip's species/codex
 ; indexing; entity offsets survive the rep, because 8-bit index mode forces
 ; the high bytes to zero. preserves x/y.
+;
+; the assassinate gate comes after the class chip (and after Ot6Chip's
+; element chip, one call earlier at @0c0e) so a hit that empties the last
+; shield reads its own break: Shadow's breaking hit is his kill, once per
+; battle (Ot6AssassinateGate, ot6_divine.asm).
 
 .proc Ot6HitJoin
         .a8
         php
         longi
         jsr     Ot6ClassChip
+        jsr     Ot6AssassinateGate      ; ot6: shadow's break is his divine
         jsr     Ot6ShieldedDmg  ; ot6: sturdiness while shields hold
         plp
         jmp     Ot6BrokenDmg    ; tail-call: its rtl returns to vanilla

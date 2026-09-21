@@ -537,8 +537,11 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
 ## Sketches (join order, WoB)
 
 - **Shadow — Assassin (piercing, thrown)**: Throw ✦ signature; smoke
-  and exit tricks; divine **Assassinate**, an instant kill on a Broken
-  non-boss. Interceptor is a passive.
+  and exit tricks; divine **Assassinate**: once a battle, the hit of his
+  that breaks an enemy kills it outright on that hit -- break it and it
+  dies -- and so does a hit of his on an enemy someone else already
+  Broke. A boss is only Broken, and the divine is kept for a body it can
+  kill (owner ruling, #239). Interceptor is a passive.
 - **Setzer — Gambler/Merchant (special ¤: dice, cards; darts =
   piercing)**: Slot ✦ signature; Coin Toss, Hired Help (pay GP for
   effects) carry the merchant house; divine **Jackpot**, a

@@ -38,7 +38,7 @@ touches vanilla behavior where a pillar requires it.
 | Setzer | Gambler/Merchant | Cards & dice | — | Slots from the start (signature); Coin Toss, Hired Help (pay GP for effects); divine is a new top-end ability, never Slots itself |
 | Strago | Scholar | Rod | Fire/Ice/Lightning | 8 Lores, Aqua Breath as the free signature; **Analyze** (reveals shields and weaknesses) cheap at #2 |
 | Relm | Painter | Brush | — | Sketch stays as signature |
-| Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature) |
+| Shadow | Assassin | Dagger (thrown) | Dark | Throw (signature); divine: Assassinate, once a battle: the hit of his that breaks an enemy kills it outright, as does a hit on one already Broken; a boss is only Broken |
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim |
 | Umaro / Gogo | Berserker / Mime | — | — | bonus characters; Gogo has access to every job and masters none |
 
