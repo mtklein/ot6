@@ -300,7 +300,7 @@ gen_scenario.lua   gen_sabin_gau.lua         gen_vargas.lua  gen_zozo4_dadaluma.
 ```
 
 They pass today because their pools last the fights they play. Narshe is
-simply the longest stretch with no refill point and the smallest pool. That
+the longest stretch with no refill point and the smallest pool. That
 is its own issue, not this one.
 
 **2. The bag has MP in it and nothing in the harness knows.**
