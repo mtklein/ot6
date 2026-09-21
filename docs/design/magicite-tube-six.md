@@ -18,7 +18,7 @@ is learned, the summon is the once-per-battle divine
 stone is treated as an identity seed. Its PASSIVE column (*Trinity*,
 *Gorgon Eye*, *Ghostwalk*, *Facet*, *Tidal*, *Purity*) is unbuildable, because
 no passive channel exists in the ROM, so each entry is re-expressed here
-through what is buildable or recorded in §12's ledger. The seed names are kept
+through what is buildable or recorded in §12. The seed names are kept
 as each stone's documentation nickname.
 
 ---
@@ -62,7 +62,7 @@ magicite-ifrit-shiva.md §1 is the authority on what the machinery can express:
 `:203-252` `Ot6UnionEspers`), a while-worn stat package of four *signed*
 nibbles, −7..+7 each, over Vigor/Speed/Stamina/Mag.Pwr in vanilla's own
 `ItemProp+16/+17` layout (`ot6_progression.asm`, `Ot6EsperStatMod`), the
-once-per-battle summon on vanilla's `$3f2e` latch (`battle_main.asm:12852` sets
+once-per-battle summon on vanilla's `$3f2e` flag (`battle_main.asm:12852` sets
 it, `:14550` greys the menu row), boost folding for 8 families only
 (`Ot6FoldTbl`, `ot6_boost.asm:340-348`), and the ×2/×4/×8 multiplier on
 non-folding damage (`Ot6BoostDmg`, `ot6_kits.asm:1190-1256`; summons are not
@@ -414,7 +414,7 @@ and the grant channel cannot create new spells (§12.5). Sea Song is the
 only water verb the party can field in this era, which makes Bismark's
 divine unique in kind as well as in size: Ing in the cave, and Mega Armor and
 Commando at the banquet, are all water-weak, and boost multiplies it. Tidal,
-the chip passive, goes into the ledger; the water identity stays on the divine.
+the chip passive, goes into §12; the water identity stays on the divine.
 
 **Life is removed** from the vanilla row, restoring kits.md's revival rule
 (§1). Fire/Ice/Bolt are removed as Maduin's job.
@@ -582,8 +582,8 @@ Bismark is the second vigor stone, so Ifrit no longer owns that stat alone.
 
 **Unchanged, explicitly:** all six summon records `$3b/$3c/$3d/$49/$4a/$4d`
 (the MagicProp splice gains nothing); every learn-rate byte (stays 0); every
-`GENJU_BONUS` byte (stays `$ff`); `Ot6FoldTbl`; the `$3f2e` summon latch and
-the `$3ecb` kit-divine latch stay separate (the Ifrit §4.4 ruling applies:
+`GENJU_BONUS` byte (stays `$ff`); `Ot6FoldTbl`; the `$3f2e` summon flag and
+the `$3ecb` kit-divine flag stay separate (the Ifrit §4.4 ruling applies:
 fusing them would penalise wearing a stone).
 
 **Menu copy: no work required.** The detail page renders granted spell
@@ -594,7 +594,7 @@ names and the while-worn stat mod directly from these two tables
 
 ## 12. What the shipped machinery cannot express
 
-This is the full ledger. Of the Ifrit/Shiva §12 list, HP/MP-percentage mods
+This is the full list. Of the Ifrit/Shiva §12 list, HP/MP-percentage mods
 still cannot be expressed; two-sided and multi-stat mods now can (§1). New or
 newly-instantiated items:
 
@@ -613,7 +613,7 @@ newly-instantiated items:
 5. **A water spell in a kit** (Bismark's *Tidal*). Structural: no
    water-element record exists in the player-magic range (`magic_prop_en.dat`
    `$00-$35` scanned, +0x01 bit `$80`: none), and the grant channel cannot
-   create records. Water is expressible only at divine cadence (Sea Song),
+   create records. Water is expressible only at divine tier (Sea Song),
    unless a vanilla record is deliberately re-authored to water, which
    would be a global spell change of the Osmose-exception class.
 6. **Unicorn's *Purity*** ("status durations halved") — no passive channel,

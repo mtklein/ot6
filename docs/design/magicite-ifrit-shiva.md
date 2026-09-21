@@ -252,7 +252,7 @@ Celes 34); vanilla's per-level esper bonuses are deleted
 Vanilla record `$37` kept as-is: fire, all enemies, power 51, **26 MP**,
 unblockable (+0x04 = `$20`, hit rate 0).
 
-- **Once per battle, per character**, by vanilla's own latch — `tsb $3f2e` in
+- **Once per battle, per character**, by vanilla's own flag — `tsb $3f2e` in
   `FixPlayerAttack` (`battle_main.asm:12747`), read by the Magic menu's enable
   pass (`battle_main.asm:14436-14439`).
 - **Boost multiplies it.** `Ot6BoostDmg` exempts only fight, capture, bushido
@@ -260,9 +260,9 @@ unblockable (+0x04 = `$20`, hit rate 0).
   Inferno is ×8 on every enemy for its flat 26 MP.
 - The Right Crane absorbs fire; Number 128 and 024 are unaffected by it.
 
-### 4.4 Divine cadence: the summon does **not** replace the character's divine
+### 4.4 Divine tier: the summon does **not** replace the character's divine
 
-The summon and a kit divine are separate latches. The summon rides vanilla's
+The summon and a kit divine are separate flags. The summon rides vanilla's
 `$3f2e`; kit divines ride OT6's `OT6_DIVINE_USED` at `$3ecb`
 (`ot6_memory.inc:42-44`, used by `Ot6Oblivion` / `Ot6Assassinate`,
 `ot6_kits.asm:264`, `:346`). They are different resources: the summon lives on
@@ -415,7 +415,7 @@ from `Ot6EsperStatTbl`.
 
 Six stones for four slots.
 
-| stone | wants to be worn by | competes with |
+| stone | best worn by | competes with |
 |---|---|---|
 | Ramuh | any caster | — |
 | Kirin | the designated healer | Ifrit (partly) |
@@ -463,7 +463,7 @@ is §6's problem stated as a number.
 - **A boost/fold family for anything outside the 8 rows.** `Ot6FoldTbl` is
   scanned with a hard `cpx #$0018` bound in three places
   (`ot6_boost.asm:255,:317`, `ot6_kits.asm:1233`).
-- **Per-esper summon gating beyond vanilla's.** The once-per-battle latch is
+- **Per-esper summon gating beyond vanilla's.** The once-per-battle flag is
   vanilla's `$3f2e` and is per-character, party-wide-uniform. There is no way
   to say "this summon is twice per battle" or "this summon requires a Broken
   target" the way `Ot6Oblivion` can for a kit divine.
