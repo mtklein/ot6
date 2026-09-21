@@ -133,8 +133,9 @@ local function onFoot()
   return (H.readByte(0x11FA) & 3) == 0 and H.readByte(0x11F3) == 0
 end
 
--- wait for a character's menu; consume any other character's menu with a
--- real Defend (right swaps Fight->Def, then A)
+-- wait for a character's menu; hand any other character's window on with
+-- X (btlgfx UpdateMenuState_05: X closes the window and passes the turn,
+-- w7e7bcc = 1)
 local stallShot = nil
 local function menuFor(charId, what)
   local ph = 0
@@ -143,7 +144,7 @@ local function menuFor(charId, what)
   local function up()
     return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == slotOf[charId]
   end
-  return H.driveUntil(up, 30000, {
+  return H.withReset(H.driveUntil(up, 30000, {
     H.call(function()
       ph = ph + 1
       started = started or H.frame
@@ -179,7 +180,16 @@ local function menuFor(charId, what)
         H.setPad({})
       end
     end),
-  }, what)
+  }, what), function() ph, started = 0, nil end)
+end
+
+-- Setzer's window is up: the menu open flag with him as the actor.  The
+-- reels are that window in state $08 (btlgfx UpdateMenuState_08).
+local function setzerWindow()
+  return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == slotOf[SETZER]
+end
+local function reelsLive()
+  return setzerWindow() and H.readByte(MSTATE) == 0x08
 end
 
 -- Bank boost pips with real R presses, by feedback.  Ot6Boost latches a
@@ -193,7 +203,7 @@ end
 -- not get there.  The caller's assertion on the count stays.
 local function bankPending(want, what)
   local taps = 0
-  return H.repeatN(1, {
+  return H.withReset(H.repeatN(1, {
     H.driveUntil(function() return pend(actor) >= want end, 1500, {
       H.call(function()
         if taps >= 12 then
@@ -201,20 +211,26 @@ local function bankPending(want, what)
             .. "%d (want %d) -- the press is not being latched at all",
             what, taps, pend(actor), want), 0)
         end
-        H.assertEq(H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == slotOf[SETZER],
-          true, what .. ": setzer's command window is up for the R tap")
+        H.assertEq(setzerWindow(), true,
+          what .. ": setzer's command window is up for the R tap")
         taps = taps + 1
       end),
       H.pressButtons({ "r" }, 6), H.waitFrames(20),
     }, what .. ": R taps bank pending " .. want),
     H.call(function()
+      if want == 0 and taps == 0 then return end
       H.log(string.format("%s: pending %d after %d R tap(s)%s", what,
         pend(actor), taps, taps > want and string.format(
           " (%d landed on frames Ot6Boost did not run)", taps - want) or ""))
     end),
-  })
+  }), function() taps = 0 end)
 end
 
+-- Open the Slot window from Setzer's command window: the cursor onto the
+-- Slot row (verified against the live cursor cell), A, and the live reel
+-- state.  Every press is made only while the window is still his, and
+-- each drive also ends when it is not, so a window the battle takes away
+-- here is answered by the caller rather than tapped at.
 local function openSlotWindow(what)
   local row = nil
   return H.repeatN(1, {
@@ -228,43 +244,26 @@ local function openSlotWindow(what)
       H.assertEq(row ~= nil, true, "setzer's menu offers Slot")
     end),
     H.driveUntil(function()
-      return H.readByte(0x890F + slotOf[SETZER]) == row
+      return not setzerWindow() or H.readByte(0x890F + slotOf[SETZER]) == row
     end, 900, {
       H.call(function()
         local cur = H.readByte(0x890F + slotOf[SETZER])
-        if cur < row then H.setPad({ down = true })
+        if not setzerWindow() then H.setPad({})
+        elseif cur < row then H.setPad({ down = true })
         elseif cur > row then H.setPad({ up = true }) end
       end),
       H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(10),
     }, what .. ": cursor on the Slot row"),
     H.driveUntil(function()
-      return H.readByte(MSTATE) == 0x08 and H.readByte(PRESS[1]) == 0
-             and H.readByte(STOP[1]) == 0
+      return not setzerWindow()
+        or (H.readByte(MSTATE) == 0x08 and H.readByte(PRESS[1]) == 0
+            and H.readByte(STOP[1]) == 0)
     end, 1500, {
-      H.call(function() H.setPad({ a = true }) end),
+      H.call(function() H.setPad(setzerWindow() and { a = true } or {}) end),
       H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(20),
     }, what .. ": slot window open"),
-    H.waitFrames(12),
+    H.cond(reelsLive, { H.waitFrames(12) }, {}),
   })
-end
-
-local function pressAUntilFnH(predFn, what)
-  return H.driveUntil(predFn, 3000, {
-    H.call(function() H.setPad({ a = true }) end),
-    H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(11),
-  }, what)
-end
-local function pressAUntilH(addr, what)
-  return pressAUntilFnH(function() return H.readByte(addr) ~= 0 end, what)
-end
-local function pressCommitH(what)
-  return H.repeatN(1, {
-    H.call(function() results = {} end),
-    pressAUntilFnH(function() return #results > 0 end, what),
-  })
-end
-local function waitStopH(r, what)
-  return H.waitUntil(function() return H.readByte(STOP[r]) ~= 0 end, 900, what, 2)
 end
 
 -- Walk the plain until an encounter worth spinning in turns up, then take
@@ -333,21 +332,82 @@ local function drawBattle(tag, tries)
   return steps
 end
 
--- one full spin played through real input at the current pending tier;
--- asserts run via `checks`
-local function playedSpin(tag, checks)
-  return {
+-- One Slot spin at pending tier `want`, played through real input and
+-- driven to its commit; asserts run via `checks`.
+--
+-- The reels are not a window the drive can hold.  Every frame the battle
+-- force-closes an open menu whose character has left the menu queue
+-- (btlgfx_main.asm @0ca4: w7e4001,x == $ff sets w7e7bcb), and a status
+-- that takes Setzer's turn does exactly that mid-spin.  Measured at seed
+-- shifts 21 and 28 (build/lab/harness-faults/repro/slots_s21.log,
+-- slots_s28.log): Mind Candy put him to sleep with the reels up, EDGAR's
+-- command window replaced them within 128 frames
+-- (repro/slots_s21/frames/f4608.png the reels, f4736.png EDGAR's window),
+-- and the A taps meant for reel 1 (shift 21) and the commit (shift 28)
+-- fell on the windows that followed -- the shift-28 run ended on the
+-- world map with the battle fought out by those taps.  So every tap here
+-- is made only while the reels are Setzer's, a spin that loses its window
+-- is void, and the drive plays another from his next turn: the menu, the
+-- bank, the Slot row, the reels, the commit.  The per-reel checks run on
+-- the spin that is live; the commit check on the one that committed.
+local function playedSpin(tag, checks, want)
+  local spins, committed = 0, false
+  local function tapA(pred, what)
+    return H.driveUntil(function() return not reelsLive() or pred() end, 3000, {
+      H.call(function() H.setPad({ a = true }) end),
+      H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(11),
+    }, what)
+  end
+  local function pressReel(r)
+    return tapA(function() return H.readByte(PRESS[r]) ~= 0 end,
+      tag .. " press" .. r)
+  end
+  local function waitStop(r)
+    return H.waitUntil(function()
+      return not reelsLive() or H.readByte(STOP[r]) ~= 0
+    end, 900, tag .. " reel" .. r, 2)
+  end
+  local function live(steps) return H.cond(reelsLive, steps, {}) end
+  local function check(name)
+    return H.call(function() if checks[name] then checks[name]() end end)
+  end
+  local attempt = {
+    menuFor(SETZER, tag .. ": setzer's window"),
+    bankPending(want, tag),
     openSlotWindow(tag),
-    pressAUntilH(PRESS[1], tag .. " press1"),
-    H.call(function() if checks.afterPress1 then checks.afterPress1() end end),
-    waitStopH(1, tag .. " reel1"),
-    pressAUntilH(PRESS[2], tag .. " press2"),
-    H.call(function() if checks.afterPress2 then checks.afterPress2() end end),
-    waitStopH(2, tag .. " reel2"),
-    pressAUntilH(PRESS[3], tag .. " press3"),
-    waitStopH(3, tag .. " reel3"),
-    pressCommitH(tag .. " commit"),
-    H.call(function() if checks.afterCommit then checks.afterCommit() end end),
+    H.call(function() spins = spins + 1 end),
+    live({ pressReel(1) }),
+    live({ check("afterPress1"), waitStop(1) }),
+    live({ pressReel(2) }),
+    live({ check("afterPress2"), waitStop(2) }),
+    live({ pressReel(3) }),
+    live({ waitStop(3) }),
+    live({
+      H.call(function() results = {} end),
+      tapA(function()
+        if #results > 0 then committed = true end
+        return committed
+      end, tag .. " commit"),
+    }),
+    H.call(function()
+      if not committed then
+        H.log(string.format("%s: the reels went at f%d before spin %d "
+          .. "committed -- playing another from his next turn", tag, H.frame,
+          spins))
+      end
+    end),
+  }
+  return {
+    H.call(function() spins, committed = 0, false end),
+    H.driveUntil(function()
+      return committed or not H.battleLoadStarted()
+    end, 30000, attempt, tag .. ": a spin played to its commit"),
+    H.call(function()
+      H.assertEq(committed, true,
+        tag .. ": a spin was played to its commit before the battle ended")
+      H.log(string.format("%s: committed on spin %d", tag, spins))
+      if checks.afterCommit then checks.afterCommit() end
+    end),
   }
 end
 
@@ -409,7 +469,7 @@ add(playedSpin("H1", {
   afterCommit = function()
     H.assertEq(pend(actor), 1, "H1: the commit re-banked the latched tier 1")
   end,
-}))
+}, 1))
 add({
   (function()
     local hb = -600
@@ -439,7 +499,7 @@ add({
   -- --------------------------- bank the first pip back with a plain spin
   menuFor(SETZER, "setzer menu (bank spin 1)"),
 })
-add(playedSpin("bank1", {}))
+add(playedSpin("bank1", {}, 0))
 add({
   H.driveUntil(function() return bp(actor) == 1 end, 15000, {
     H.call(function()
@@ -472,7 +532,7 @@ add({
   end),
   menuFor(SETZER, "setzer menu (bank spin 2)"),
 })
-add(playedSpin("bank2", {}))
+add(playedSpin("bank2", {}, 0))
 add({
   H.driveUntil(function() return bp(actor) == 2 end, 15000, {
     H.call(function()
@@ -516,7 +576,7 @@ add(playedSpin("H2", {
   afterCommit = function()
     H.assertEq(pend(actor), 2, "H2: the commit re-banked the latched tier 2")
   end,
-}))
+}, 2))
 add({
   (function()
     local hb = -600
