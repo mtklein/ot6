@@ -837,12 +837,18 @@ end
 -- @4600 clears Condemned with the wound), so the count is a clock and
 -- the question is which turns are worth spending on the member.
 M.ST2_CONDEMNED, M.COUNT_FRAMES = 0x01, 128
--- The count shown over a condemned member, or nil when not condemned.
+-- The count shown over a condemned member, or nil when not condemned
+-- or not counting yet: the bit lands with the status and the byte is
+-- written by StartCondemn on the update flag after it ($3204 bit 5 ->
+-- AfterAction2), so for a beat the bit is up over a byte of $00, "not
+-- shown" (battle-ram.txt:922) -- measured on Nerapa's opening, where a
+-- count read as 0 there refused a heal on a member at 1153/1207 whose
+-- count then read 32.
 --   s2     the member's STATUS2 byte
 --   count  the $3B05 byte
 function M.doomCount(o)
-  if ((o.s2 or 0) & M.ST2_CONDEMNED) == 0 then return nil end
-  return math.max(0, (o.count or 0) - 1)
+  if ((o.s2 or 0) & M.ST2_CONDEMNED) == 0 or (o.count or 0) == 0 then return nil end
+  return o.count - 1
 end
 -- What a person does about a condemned member: keeps fighting, keeps a
 -- Fenix Down for the fall, and stops spending turns on a member the
@@ -6734,7 +6740,9 @@ function M.newFightDriver(tag, opts)
           local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
           if den then names[#names + 1] = den end
           if (s1 & M.ST1_IMP) ~= 0 then names[#names + 1] = "Imp" end
-          if (s2 & M.ST2_CONDEMNED) ~= 0 then names[#names + 1] = "Condemned" end
+          -- once the count is running (M.doomCount's note), not on the bit
+          local doom = M.doomCount({ s2 = s2, count = M.readByte(COUNTER.Doom + e * 2) })
+          if doom ~= nil then names[#names + 1] = "Condemned" end
           local on = {}
           for _, name in ipairs(names) do
             on[name] = true
@@ -6773,8 +6781,7 @@ function M.newFightDriver(tag, opts)
                 what = string.format("the count reads %d (one count = %d frames; Doom at 0; "
                   .. "no item clears the bit): heals on it stop once the clock beats its "
                   .. "next turn, its last turn spends every pip, a Fenix Down raises it "
-                  .. "clear (#190)", M.doomCount({ s2 = s2,
-                    count = M.readByte(COUNTER.Doom + e * 2) }) or 0, M.COUNT_FRAMES)
+                  .. "clear (#190)", doom, M.COUNT_FRAMES)
               else
                 local item = cureFor(e)
                 what = "its Fight lands for 0 (battle power zeroed @1029) and its Magic "

@@ -663,6 +663,8 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(H.dodges({}), nil, "no bytes, no dodge")
     H.assertEq(H.doomCount({ s2 = 0x01, count = 0x1B }), 26, "$3B05 $1B under the bit shows 26")
     H.assertEq(H.doomCount({ s2 = 0x01, count = 0x01 }), 0, "...$01 shows 0 (the Doom's frame)")
+    H.assertEq(H.doomCount({ s2 = 0x01, count = 0x00 }), nil,
+      "the bit over a $00 byte: not counting yet (StartCondemn runs a beat after the status)")
     H.assertEq(H.doomCount({ s2 = 0x00, count = 0x1B }), nil, "no bit, no count")
     H.assertEq(H.COUNT_FRAMES, 128, "one count is 128 frames at normal speed")
     -- the Nerapa numbers: a member at 30 with a gauge 250 ticks (500
