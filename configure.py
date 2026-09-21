@@ -24,7 +24,7 @@ from the root):
                  each via tools/build/link_rom.sh.  The two links share the
                  cfg-hardcoded temp_lz scratch dir, so nomp is order-only
                  after en.
-  build/ot6.sfc  a content latch of ff6-en.sfc: mtime bumps with unchanged
+  build/ot6.sfc  copy_if_changed of ff6-en.sfc: mtime bumps with unchanged
                  bytes prune everything downstream (restat).
   savestates     the story-chain graph, embedded from
                  tools/tests/lib/savestate_ninja.py (the same data file,
@@ -111,11 +111,11 @@ w("rule sh")
 w("  command = $cmd")
 w("  description = $desc")
 w()
-w("# Content latch: re-runs on any mtime bump, rewrites only on a byte")
+w("# copy_if_changed: re-runs on any mtime bump, rewrites only on a byte")
 w("# change; restat = 1 prunes everything downstream when it did not.")
-w("rule latch")
+w("rule copy_if_changed")
 w("  command = mkdir -p $$(dirname $out) && { cmp -s $in $out || cp $in $out; }")
-w("  description = latch $in")
+w("  description = copy_if_changed $in")
 w("  restat = 1")
 w()
 w("# ca65 runs with cwd=ff6 (sources use ff6-relative include/incbin paths);")
@@ -137,13 +137,13 @@ w("  command = $env nice tools/build/run_suite_test.sh $test $out")
 w("  description = suite $test")
 w()
 
-# ---------------------------------------------------------------- latches --
-latch_edges = {}
+# -------------------------------------------------------- copy_if_changed --
+copy_if_changed_edges = {}
 
 
-def latch_of(src):
+def copy_if_changed_from(src):
     dep = f"build/ninja/src/{src}"
-    latch_edges[dep] = src
+    copy_if_changed_edges[dep] = src
     return dep
 
 
@@ -169,13 +169,13 @@ for j in glob("src/text/*_en.json", "ff6") + ["ff6/src/text/mte_tbl_jp.json"]:
            desc=f"encode_text {j}")
     generated += outs
 # the dlg pair: split, encode both, recombine -- one edge, both dats out.
-# The json INPUTS arrive through content latches because split/combine
+# The json INPUTS arrive through copy_if_changed edges because split/combine
 # rewrite them in place (strings migrate across the two-file boundary and
-# back, byte-identically): the latch re-runs on the mtime bump, finds the
+# back, byte-identically): the copy re-runs on the mtime bump, finds the
 # bytes unchanged, and restat prunes this edge instead of cycling it.
 w.edge(["ff6/src/text/dlg1_en.dat", "ff6/src/text/dlg2_en.dat",
         "ff6/include/text/dlg1_en.inc", "ff6/include/text/dlg2_en.inc"],
-       "sh", [latch_of(j) for j in sorted(dlg)],
+       "sh", [copy_if_changed_from(j) for j in sorted(dlg)],
        implicit=codec + ["ff6/tools/fix_dlg.py"],
        cmd="cd ff6 && python3 tools/fix_dlg.py split en"
            " && python3 tools/encode_text.py src/text/dlg1_en.json"
@@ -333,9 +333,9 @@ w.edge(["build/checks/base_rom.ok"], "sh", [BASE],
        desc="verify base ROM (FF3us 1.0)")
 qual.append("build/checks/base_rom.ok")
 
-# build/ot6.sfc is a content latch of the linked ROM: a relink that produces
-# identical bytes regenerates nothing downstream.
-w.edge(["build/ot6.sfc"], "latch", ["ff6/rom/ff6-en.sfc"])
+# build/ot6.sfc is a copy of the linked ROM rewritten only when its bytes
+# change: a relink that produces identical bytes regenerates nothing downstream.
+w.edge(["build/ot6.sfc"], "copy_if_changed", ["ff6/rom/ff6-en.sfc"])
 
 w.edge(["build/checks/nomp_distinct.ok"], "sh",
        ["build/ot6.sfc", "ff6/rom/ff6-en-nomp.sfc"],
@@ -354,7 +354,7 @@ if errors:
     for e in errors:
         print(f"savestate_graph: {e}", file=sys.stderr)
     sys.exit(1)
-sn.emit_state_edges(w, states, ROOT, latch_of)
+sn.emit_state_edges(w, states, ROOT, copy_if_changed_from)
 # Every name a test can reference includes the `also=` siblings: a state
 # like figaro_cleared is emitted by gen_edgar's edge as an also-artifact,
 # and fixture_deps() filtering against primary names only silently dropped
@@ -410,8 +410,8 @@ for f in glob("tools/tests/*.lua"):
     t = Path(f).stem
     suite_tests.append(t)
     attrs = m.group(1)
-    deps = [latch_of("build/ot6.sfc"), latch_of(f)]
-    deps += [latch_of(h) for h in LIBS] + HARNESS
+    deps = [copy_if_changed_from("build/ot6.sfc"), copy_if_changed_from(f)]
+    deps += [copy_if_changed_from(h) for h in LIBS] + HARNESS
     deps += fixture_deps(f)
     fm = re.search(r"savestate=([A-Za-z0-9_]+)", attrs)
     if fm and f"build/states/{fm.group(1)}.mss" not in deps:
@@ -421,7 +421,7 @@ for f in glob("tools/tests/*.lua"):
     env = TEST_ENV.get(t, "")
     if "OT6_SRAM_CHECKPOINT=" in env:
         key = env.split("OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/")[1].split()[0]
-        deps += [latch_of(a) for a in sn.checkpoint_inputs(ROOT, key)]
+        deps += [copy_if_changed_from(a) for a in sn.checkpoint_inputs(ROOT, key)]
     w.edge([f"build/results/suite/{t}.ok"], "suitetest", implicit=deps,
            test=t, env=env)
     qual.append(f"build/results/suite/{t}.ok")
@@ -429,9 +429,9 @@ for f in glob("tools/tests/*.lua"):
 # the mpcost A/B: the OFF half (free -- the negative control) on the nomp ROM
 for t in ("battle_mpcost", "battle_stealmp"):
     w.edge([f"build/results/nomp/{t}.ok"], "sh",
-           implicit=[latch_of(f"tools/tests/{t}.lua"), "ff6/rom/ff6-en-nomp.sfc",
-                     latch_of("build/ot6.sfc")]
-                    + [latch_of(h) for h in LIBS] + HARNESS
+           implicit=[copy_if_changed_from(f"tools/tests/{t}.lua"), "ff6/rom/ff6-en-nomp.sfc",
+                     copy_if_changed_from("build/ot6.sfc")]
+                    + [copy_if_changed_from(h) for h in LIBS] + HARNESS
                     + fixture_deps(f"tools/tests/{t}.lua"),
            cmd=f"mkdir -p build/results/nomp && "
                f"OT6_ROM=$$PWD/ff6/rom/ff6-en-nomp.sfc OT6_WORKER=nomp_{t} "
@@ -542,24 +542,24 @@ check("checkpoint_saves", "sh tools/tests/lib/checkpoint_saves.sh",
        "tools/tests/lib/sram_checkpoint.py"] + checkpoint_files)
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
-       latch_of("build/ot6.sfc")] + LIBS + checkpoint_files)
+       copy_if_changed_from("build/ot6.sfc")] + LIBS + checkpoint_files)
 # the segment runner's negative control (#178, #200): a contract failure
 # fails on attempt 1 of 3 with no replay -- a red run a suite cannot expect
 check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
       ["tools/tests/lib/retry_negative.sh", "tools/tests/run.sh",
        "tools/tests/lib/compose.py",
-       latch_of("tools/tests/probe_retry_negative.lua"),
-       latch_of("build/ot6.sfc")] + [latch_of(h) for h in LIBS])
+       copy_if_changed_from("tools/tests/probe_retry_negative.lua"),
+       copy_if_changed_from("build/ot6.sfc")] + [copy_if_changed_from(h) for h in LIBS])
 # The verdict depends on the ROM (a stamp records the ROM it was captured
 # on), on the generators (their own sigs), and -- for the drift note, and
 # for any stamp still on the conservative pre-ROM-identity rule -- on the
-# lib halves, all through the same latches the generate and suite edges
+# lib halves, all through the same copy_if_changed edges the generate and suite edges
 # use, so the check re-runs exactly when its answer can move.
 check("check_states", "python3 tools/tests/lib/compose.py --check-states",
       ["tools/tests/lib/compose.py", "tools/tests/lib/savestate_stamp.sh",
-       sn.GRAPH, latch_of("build/ot6.sfc")]
-      + [latch_of(f"tools/tests/{e['gen']}.lua") for e in states if e.get("gen")]
-      + [latch_of(h) for h in LIBS] + all_stamps)
+       sn.GRAPH, copy_if_changed_from("build/ot6.sfc")]
+      + [copy_if_changed_from(f"tools/tests/{e['gen']}.lua") for e in states if e.get("gen")]
+      + [copy_if_changed_from(h) for h in LIBS] + all_stamps)
 
 # the four fixture audits: real inputs replace the old make-level stamp
 AUDIT_COMMON = all_stamps + checkpoint_files
@@ -609,10 +609,10 @@ w.edge([f"build/release/ot6-v{VERSION}.zip"], "sh",
            f' "ot6-v{VERSION}/RELEASE_NOTES.md"',
        desc=f"release zip v{VERSION}")
 
-# ------------------------------------------------------- latches + regen ---
+# ----------------------------------------------- copy_if_changed + regen ---
 w()
-for dep, src in sorted(latch_edges.items()):
-    w.edge([dep], "latch", [src])
+for dep, src in sorted(copy_if_changed_edges.items()):
+    w.edge([dep], "copy_if_changed", [src])
 w()
 w("rule configure")
 w("  command = python3 configure.py")

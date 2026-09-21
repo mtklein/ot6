@@ -3,15 +3,15 @@
 (tools/tests/savestate_graph.py) as build/build.ninja.
 
 Every compatibility input to a generated state (the ROM, the generator
-.lua, checkpoint manifests and payloads) is routed through a content latch
+.lua, checkpoint manifests and payloads) is routed through a copy_if_changed
 edge:
 
-    build build/ninja/src/<path>: latch <path>      (cmp -s || cp; restat=1)
+    build build/ninja/src/<path>: copy_if_changed <path>   (cmp -s || cp; restat=1)
 
-The latch re-runs on any mtime bump, rewrites its output only when bytes
+The copy re-runs on any mtime bump, rewrites its output only when bytes
 differ, and `restat = 1` prunes everything downstream when it did not move.
-Generated states themselves are not latched: a regenerated .mss is new
-bytes, and everything booted from it must replay.
+Generated states themselves are not copied this way: a regenerated .mss is
+new bytes, and everything booted from it must replay.
 
 Not a dependency of a generate edge (so a harness edit never invalidates a
 generated state): the three composed-in lib halves (ot6.lua, ot6_field.lua,
@@ -19,7 +19,7 @@ ot6_contract.lua), run.sh, compose.py, decode_b64.py, pin_test_saves.py,
 sram_checkpoint.py, ff6-en.dbg.  docs/TESTING.md: a change to logging,
 assertions, or controller policy does not by itself make a legitimately
 reached snapshot illegitimate; changed ROM code/layout can.  The lib halves
-are still latched inputs of every suite test, audit and selftest edge
+are still copy_if_changed inputs of every suite test, audit and selftest edge
 (configure.py), so a lib edit re-runs what asserts, not what was played.
 
 Each state-generating edge `write`s build/states/<state>.stamp after
@@ -53,11 +53,11 @@ SELF = "tools/tests/lib/savestate_ninja.py"
 GRAPH = "tools/tests/savestate_graph.py"
 OUT = "build/build.ninja"
 ROM = "build/ot6.sfc"
-LATCH_DIR = "build/ninja/src"
+COPY_IF_CHANGED_DIR = "build/ninja/src"
 # The three lib halves compose.py inlines into every composed generator, in
 # inline order.  They are provenance (the stamp records their hashes), not
 # scheduling inputs of a generate edge: a lib edit re-runs the suite tests,
-# audits and selftests that assert on fixtures (configure.py latches them
+# audits and selftests that assert on fixtures (configure.py routes them through copy_if_changed
 # there), never the play that produced a fixture.
 LIB_HALVES = (
     "tools/tests/lib/ot6.lua",
@@ -162,14 +162,14 @@ def validate(states, root):
     return errors
 
 
-def latch(rel):
-    return f"{LATCH_DIR}/{rel}"
+def copy_if_changed_from(rel):
+    return f"{COPY_IF_CHANGED_DIR}/{rel}"
 
 
 def emit_state_rules(w):
     """The generate and seed rule definitions, shared by standalone emission
-    and the root configure.py's embedded emission (which owns the latch and
-    regen rules itself, so they are not here)."""
+    and the root configure.py's embedded emission (which owns the copy_if_changed
+    and regen rules itself, so they are not here)."""
     w("# One generate: run.sh composes the generator with the lib halves, boots")
     w("# Mesen, and publishes $state.mss + $state.mss.lua atomically into")
     w("# build/states -- OT6_EXPECT_ARTIFACT makes a run that passes without")
@@ -206,11 +206,11 @@ def emit_state_rules(w):
     w("")
 
 
-def emit_state_edges(w, states, root, latch_of):
-    """The per-state build statements.  latch_of(path) -> the dependency path
-    to use for a latched source; the caller owns emitting the latch edges
-    themselves (so a source shared with other parts of a larger graph is
-    latched exactly once)."""
+def emit_state_edges(w, states, root, copy_if_changed_from):
+    """The per-state build statements.  copy_if_changed_from(path) -> the dependency path
+    to use for a copied source; the caller owns emitting the copy_if_changed
+    edges themselves (so a source shared with other parts of a larger graph
+    is copied exactly once)."""
     for e in states:
         s = e["state"]
         names = [s] + list(e.get("also") or [])
@@ -228,7 +228,7 @@ def emit_state_edges(w, states, root, latch_of):
         # Compatibility inputs only: the ROM and this state's own generator
         # (plus its checkpoint inputs below).  The lib halves are deliberately
         # absent -- see the module header.
-        deps = [latch_of(ROM), latch_of(f"tools/tests/{gen}.lua")]
+        deps = [copy_if_changed_from(ROM), copy_if_changed_from(f"tools/tests/{gen}.lua")]
         # Wall-clock default for generation edges: 1800 s rather than run.sh's
         # 600 s, because bare `ninja` fans every runnable generator out at
         # once and equally-niced emulators stretch each other's wall clock.
@@ -250,7 +250,7 @@ def emit_state_edges(w, states, root, latch_of):
         if e.get("checkpoint"):
             key = e["checkpoint"]
             ins = checkpoint_inputs(root, key)
-            deps += [latch_of(a) for a in ins]
+            deps += [copy_if_changed_from(a) for a in ins]
             env.append(f"OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/{key}")
             extras = " ".join(ins)
             ancestor = f"tools/tests/checkpoints/{key}/manifest.json"
@@ -283,9 +283,9 @@ def emit_state_edges(w, states, root, latch_of):
     w("")
 
 
-def latched_sources(states, root):
-    """Every source path the state edges route through a latch, in first-use
-    order: the ROM, each generator, each checkpoint input."""
+def copy_if_changed_sources(states, root):
+    """Every source path the state edges route through a copy_if_changed
+    edge, in first-use order: the ROM, each generator, each checkpoint input."""
     out = [ROM]
     for e in states:
         if e.get("gen"):
@@ -319,20 +319,20 @@ def emit(states, root):
     w("  generator = 1")
     w("  restat = 1")
     w("")
-    w("# Content latch: re-runs on any mtime bump, rewrites only on a byte")
+    w("# copy_if_changed: re-runs on any mtime bump, rewrites only on a byte")
     w("# change; restat = 1 prunes everything downstream when it did not.")
-    w("rule latch")
+    w("rule copy_if_changed")
     w("  command = mkdir -p $$(dirname $out) && { cmp -s $in $out || cp $in $out; }")
-    w("  description = latch $in")
+    w("  description = copy_if_changed $in")
     w("  restat = 1")
     w("")
     emit_state_rules(w)
     w(f"build {OUT}: regen {SELF} {GRAPH}")
     w("")
-    for src in latched_sources(states, root):
-        w(f"build {latch(src)}: latch {src}")
+    for src in copy_if_changed_sources(states, root):
+        w(f"build {copy_if_changed_from(src)}: copy_if_changed {src}")
     w("")
-    emit_state_edges(w, states, root, latch)
+    emit_state_edges(w, states, root, copy_if_changed_from)
     sidecars = " ".join(f"build/states/{e['state']}.mss.lua" for e in states)
     w(f"build savestates: phony {sidecars}")
     w("default savestates")
@@ -451,18 +451,18 @@ def selftest():
 
         # the emitted text contains the pieces the build depends on
         text = emit(good, root)
-        check("latch rule is restat", "rule latch" in text and
-              text.split("rule latch")[1].split("rule ")[0].count(
+        check("copy_if_changed rule is restat", "rule copy_if_changed" in text and
+              text.split("rule copy_if_changed")[1].split("rule ")[0].count(
                   "restat = 1") == 1)
         gen_lines = [l for l in text.splitlines() if ": generate" in l]
         check("every generate edge depends on the ROM and its own generator",
-              gen_lines and all(f"{LATCH_DIR}/{ROM}" in line
-                                and f"{LATCH_DIR}/tools/tests/gen_ok.lua" in line
+              gen_lines and all(f"{COPY_IF_CHANGED_DIR}/{ROM}" in line
+                                and f"{COPY_IF_CHANGED_DIR}/tools/tests/gen_ok.lua" in line
                                 for line in gen_lines))
         check("no generate edge depends on a lib half (docs/TESTING.md)",
-              not any(f"{LATCH_DIR}/{h}" in line
+              not any(f"{COPY_IF_CHANGED_DIR}/{h}" in line
                       for line in gen_lines for h in LIB_HALVES))
-        check("no lib half is latched by the standalone graph at all",
+        check("no lib half is routed through copy_if_changed by the standalone graph at all",
               not any(h in text for h in LIB_HALVES))
         check("checkpointed generate edge hashes manifest before payload",
               "tools/tests/checkpoints/good-v1/manifest.json "
