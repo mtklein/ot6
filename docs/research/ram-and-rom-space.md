@@ -50,8 +50,14 @@ the battle **graphics** module (HDMA/sprite/animation buffers).
 - Persistent state: community practice is SRAM expansion (vanilla: 8 Kb at
   $306000-$307FFF); see https://www.ff6hacking.com/forums/thread-3694-post-37598.html.
   OT6's JP reuses existing AP storage, so this is probably not needed.
-- Save-region scraps: $1E1D-$1E3F (~35 bytes), $1E70-$1E7F (madsiur,
-  https://www.ff6hacking.com/forums/printthread.php?tid=1408).
+- Save-region scrap: $1E1D-$1E3F. OT6 already uses $1E1D-$1E2B for the
+  Bushido/Rage/Lore loadouts, leaving $1E2C-$1E3F (20 bytes) free. See
+  docs/design/save-layout.md for the committed layout and the append-only
+  rule. Note: the widely-cited $1E70-$1E7F "scrap" (madsiur,
+  https://www.ff6hacking.com/forums/printthread.php?tid=1408) is NOT free in
+  this codebase -- $1E40-$1E7F is the treasure-opened bitfield (player.asm
+  sets a bit per chest, event.asm clears the range), so a new field there
+  would corrupt chest state.
 
 ## ROM free space + expansion
 
