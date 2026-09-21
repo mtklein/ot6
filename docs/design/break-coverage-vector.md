@@ -439,7 +439,7 @@ Blunt weapons are sold at Narshe (shop 0: Flail, Full Moon), Kohlingen
 (shop 17: Flail, Full Moon), Jidoor (shop 20: Full Moon) and Tzen (shop 29:
 Full Moon, Boomerang). Vector's own weapon shop (27) and Albrook's (25) stock
 none, which matters only to a party that brought neither Sabin nor Gau and
-still wants bludgeon.
+still needs bludgeon.
 
 Bludgeon is therefore the area's one deliberate class, and it is reachable:
 free for the cost of a party pick, or buyable for the cost of a weapon slot.

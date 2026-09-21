@@ -1,11 +1,11 @@
 # Break coverage — the Sealed Gate cave (maps 382–386)
 
-Authored 2026-09-01, from the ground-truth fighting lineage's measurements.
+Authored 2026-09-01, from the ground-truth fighting run's measurements.
 `tools/tests/battle_breakgate.lua` re-verifies the rows from the shipped ROM.
 
 ## Why this area needed authoring
 
-The fled lineage never fought here, so the cave shipped on generated floor
+The run that fled never fought here, so the cave shipped on generated floor
 rows nobody had answered. Measured (14 rounds of honest play, the mission
 party TERRA/LOCKE/EDGAR/SABIN): at L18 the 4-stacks out-damage the party
 ~2:1 with the full kit; after the sanctioned plains grind, an **L23** party
@@ -42,6 +42,6 @@ Enter topped (care 0.85), heal only under 45, and lead SABIN with
 exactly this); TERRA carries Fire for the brute fights behind the absorb
 guard (#99 refuses it wherever a ninja stands); RAMUH/SHIVA summons open
 the stacks once per battle; the Genji pair chips the pierce axis twice a
-swing. The plains grind (engine-censused pacing at boundary F's (24,121))
+swing. The plains grind (engine-surveyed pacing at boundary F's (24,121))
 covers the level gap the fled route hid and pre-pays part of the
 documented FC gap.
