@@ -501,13 +501,13 @@ add({
     H.assertEq(b.atk, shadowSlot * 2,
       "the break store's attacker (cpu x at the store) is SHADOW: his own "
       .. "hit broke it")
+    H.assertEq(k.via, "Ot6HitJoin",
+      "the mark came through Ot6HitJoin, the chip path of the hit that "
+      .. "broke the body -- not the seam on a later swing or a later action "
+      .. "(the pre-#239 rule, still live for a body already Broken)")
     H.assertEq(b.f == k.f and b.seq < k.seq, true, string.format(
       "the break write precedes the Death mark on the SAME action: break "
       .. "f%d seq%d, mark f%d seq%d", b.f, b.seq, k.f, k.seq))
-    H.assertEq(k.via, "Ot6HitJoin",
-      "the mark came through Ot6HitJoin, the chip path of the hit that "
-      .. "broke the body -- not the seam on a later swing (the pre-#239 "
-      .. "rule, which a multi-swing action can still reach)")
     H.assertEq(hpWrite[k.m] ~= nil and hpWrite[k.m].f == k.f
       and hpWrite[k.m].seq > k.seq, true,
       "the mark precedes the hit's HP write (ApplyDmg), same frame")
