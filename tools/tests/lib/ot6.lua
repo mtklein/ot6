@@ -4160,7 +4160,7 @@ end
 -- +$14 power byte; it is a prior and not the answer, because power is an
 -- input to the engine's heal routine rather than its output.  The first
 -- use that lands replaces it with the HP that actually came back
--- (F.frame's healWatch).
+-- (watchHeal's healWatch).
 function Driver:itemRestoreOf(item)
   return self.itemRestore[item] or M.itemPower(item)
 end
@@ -6513,7 +6513,7 @@ function Driver:button(actor)
       self.healWatch = watch
     end
     -- The raise-then-top-up pair (#168): a confirmed Fenix Down is
-    -- pending until the target's HP moves (F.frame); a confirmed heal
+    -- pending until the target's HP moves (watchPendingCare); a confirmed heal
     -- on a raised member pays the top-up owed.
     if self.plan.ally then
       self.unmuddlePending = { e = self.plan.target, by = actor, tick = self.battleTick }
@@ -6523,7 +6523,7 @@ function Driver:button(actor)
     elseif self.plan.kind == "item" and self.plan.target
        and type(self.plan.reason) == "string" and self.plan.reason:sub(1, 5) == "cure " then
       -- a confirmed status cure (#187): nobody plans another on this
-      -- entity until the bit clears (F.frame) or the window lapses
+      -- entity until the bit clears (watchPendingCare) or the window lapses
       self.cureQueued[self.plan.target] = { by = actor, tick = self.battleTick, item = self.plan.item }
     elseif (self.plan.kind == "item" or self.plan.kind == "heal") and self.plan.target
        and self.topUpOwed[self.plan.target] then
@@ -6533,7 +6533,7 @@ function Driver:button(actor)
       self.topUpOwed[self.plan.target] = nil
     end
     -- and what a damage plan lands, for the press rule's window (the
-    -- dmgWatch queue above; F.frame credits and settles it).  A Fight
+    -- dmgWatch queue; watchDamage credits and settles it).  A Fight
     -- on a muddled ally (#170) moves no monster HP and is not one.
     if not self.plan.ally and (self.plan.kind == "fight" or self.plan.kind == "skill" or self.plan.kind == "magic"
        or self.plan.kind == "summon" or self.plan.kind == "throw" or self.plan.kind == "lore") then
@@ -7220,7 +7220,7 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     finisherSaid = nil,                -- the finisher window yielding (#204), once per reason
     inertSaid = {},                    -- "actor:spell" -> true once an unknown config spell is said (#182)
     summonWhyN = 0,                    -- summon-refusal diagnostics, capped
-    parkDropN = 0,                     -- watchdog fires this battle (see below)
+    parkDropN = 0,                     -- watchdog fires this battle (see button)
     careActor = nil,                   -- who took this round's one care turn
     startSnap = nil,                   -- party HP when the battle opened
     planPulses = 0,                    -- pulses the live plan has consumed
@@ -7247,8 +7247,8 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     dmgSeen = {},                      -- entity -> shielded-equivalent HP its last action took
     -- The layout, read once per battle and said out loud (#176): a person
     -- sees at a glance which side the monsters are on, and every direction
-    -- the target steer presses below is derived from this reading rather
-    -- than from a fixed idea of where they stand.
+    -- the target steer (cross, in button) presses is derived from this
+    -- reading rather than from a fixed idea of where they stand.
     layoutUnreadSaid = false,
   }, Driver)
   local F = {}
