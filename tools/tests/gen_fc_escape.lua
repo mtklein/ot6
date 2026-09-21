@@ -298,10 +298,13 @@ local function nerapaAttempt(n)
           return true
         end
         if t % 300 == 0 then
+          -- the count over each member (H.doomCount, #190: the number
+          -- shown, nil when not condemned); the driver plans on it
           local st = {}
           for slot = 0, 3 do
-            st[#st + 1] = string.format("%d:%s/%d", slot,
-              (H.readByte(0x3EE5 + slot * 2) & 1) == 1 and "C" or "-", H.readByte(0x3B05 + slot * 2))
+            local count = H.doomCount({ s2 = H.readByte(0x3EE5 + slot * 2),
+                                        count = H.readByte(0x3B05 + slot * 2) })
+            st[#st + 1] = string.format("%d:%s", slot, count and ("C" .. count) or "-")
           end
           H.log(string.format("[Nerapa] attempt %d t=%d condemned %s master=%d", n, t,
             table.concat(st, " "), H.readWord(0x1189)))

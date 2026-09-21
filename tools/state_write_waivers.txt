@@ -56,6 +56,8 @@ tools/tests/battle_counterfold.lua	.writeByte(
 tools/tests/battle_dancemp.lua	.writeWord(
 tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(
+tools/tests/battle_doom.lua	.writeByte(	quarantine: #190 mechanism staging -- Condemned is poked in the engine's own shape (STATUS2 $01 and the $3B05 count, all StartCondemn writes) because the route's only source is Nerapa on the FC escape; the property under test is the driver's read of the count
+tools/tests/battle_doom.lua	.writeWord(	quarantine: #190 mechanism staging -- the patient's HP is set to a third so the heal line has a member to refuse, battle_healerdown's shape
 tools/tests/battle_dotchip.lua	.writeByte(
 tools/tests/battle_dotchip.lua	.writeWord(
 tools/tests/battle_esperstats.lua	.writeByte(
@@ -77,12 +79,14 @@ tools/tests/battle_runic.lua	.writeWord(
 tools/tests/battle_slots.lua	.writeByte(	quarantine: reels free-run at frame rate, so no input selects an icon on cue
 tools/tests/battle_slots.lua	.writeWord(	quarantine: reels free-run at frame rate, so no input selects an icon on cue
 tools/tests/battle_steal.lua	.writeByte(
+tools/tests/battle_stopwindow.lua	.writeByte(	quarantine: #224 mechanism staging -- Stop is poked onto the actor whose command window is open, in the engine's own shape (STATUS3 $10, $3AF1=$12, $3AA0 bit 4), because Brainpan's Smirk into an open window is a Floating Continent roll no fixture near a save point draws on cue; the property under test is the driver's answer to the kept window
 tools/tests/battle_subjob.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeWord(	quarantine: pass C banks real BP over ~20k frames while three allies idle in battle 72, and the fighting lineage's fixture wipes before the fold measurement lands; the clamp tops ally HP each drive pulse and never touches the lists, MP, BP, or queue under test
 tools/tests/battle_thief.lua	.writeWord(	quarantine: #122's RNG reshuffle makes the desert pair's chip damage lethal to a deferred party member over the file's one sustained (non-damaging) battle; the floor write never touches the BP ledger under test
 tools/tests/battle_toolsgrey.lua	.writeWord(	quarantine: #124's re-rolled battle RNG made the cave pack die under EDGAR mid-spend, stalling the boundary walk in target-select and refilling his pool on the level-up; the pin holds the pack's battle HP tall so every tool cast has a live target and no kill lands, and it never touches the MP pool or the tools-grey cell under test
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
+tools/tests/battle_vanish.lua	.writeByte(	quarantine: #190 mechanism staging -- Vanish and Image are poked onto a monster on stage (the bit is all the engine's status set leaves for them) because the Ninja's Inviz is on the Floating Continent; the property under test is the lib's read and the miss it predicts
 tools/tests/codex_ctx.lua	.writeWord(	quarantine: the Veldt serves the SAVE's recorded history, and the fighting lineage's history feeds the gau_joined trio packs that wiped the read-half search; the clamp tops ally HP each resolve pulse and never touches the codex pages or seed bits under test
 tools/tests/field_healpolicy.lua	.writeWord(	quarantine: the healthy-fixture campaign (#122 fallout) leaves no savestate that arrives hurt, so the test writes its own patient's HP
 tools/tests/field_subjob.lua	.writeByte(

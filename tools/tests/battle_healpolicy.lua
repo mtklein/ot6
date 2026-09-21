@@ -619,6 +619,71 @@ H.run({ maxFrames = 3000 }, {
     H.log("battle_healpolicy: the turn-denying statuses (#187) and the preemptive flag (#186) checked")
   end),
 
+  -- 12d. the two shapes of a denied window (#224, H.windowKept): Stop and
+  -- Frozen keep the window the engine has open (CheckPlayerAction @091f
+  -- cancels the menu for Sleep, Berserk and Petrify only), so a command
+  -- entered there waits for the counter; Petrify (STATUS1 $40) and Frozen
+  -- (STATUS4 $02) are denials, and a statue's cure is Soft $F4 then
+  -- Remedy (ROM: Soft STATUS1 $40, Remedy $65; no item record carries
+  -- Stop, Frozen or Condemned with the remove flag, read 2026-09-21).
+  H.call(function()
+    H.assertEq(H.turnDenied({ s1 = 0x40, s2 = 0, s3 = 0, s4 = 0 }), "Petrify", "STATUS1 bit 6 is Petrify")
+    H.assertEq(H.turnDenied({ s1 = 0, s2 = 0, s3 = 0, s4 = 0x02 }), "Frozen", "STATUS4 bit 1 is Frozen")
+    H.assertEq(H.turnDenied({ s1 = 0x40, s2 = 0x80, s3 = 0, s4 = 0x02 }), "Frozen",
+      "Frozen is named before Petrify and Sleep (the kept-window shape first)")
+    H.assertEq(H.windowKept("Stop"), true, "Stop keeps the window")
+    H.assertEq(H.windowKept("Frozen"), true, "Frozen keeps the window")
+    H.assertEq(H.windowKept("Sleep"), false, "Sleep does not (the engine cancels the menu)")
+    H.assertEq(H.windowKept("Berserk"), false, "Berserk does not")
+    H.assertEq(H.windowKept("Petrify"), false, "Petrify does not")
+    H.assertEq(H.windowKept(nil), false, "no denial, no kept window")
+    local bag = { [0xF4] = true, [0xF5] = true }
+    H.assertEq(H.statusCure({ byte = 1, bit = 0x40, items = { 0xF4, 0xF5 },
+      has = function(i) return bag[i] end }), 0xF4, "a statue with a Soft in the bag: the Soft")
+    bag = { [0xF5] = true }
+    H.assertEq(H.statusCure({ byte = 1, bit = 0x40, items = { 0xF4, 0xF5 },
+      has = function(i) return bag[i] end }), 0xF5, "...with only Remedies: the Remedy (its record carries Petrify)")
+    bag = { [0xF8] = true, [0xF5] = true }
+    H.assertEq(H.statusCure({ byte = 2, bit = 0x01, has = function(i) return bag[i] end }), nil,
+      "Condemned: nothing in the bag carries STATUS2 $01")
+    H.log("battle_healpolicy: the kept-window shape (#224), Petrify and Frozen (#187) checked")
+  end),
+
+  -- 12e. the promoted generator reads (#190): Vanish/Image (H.dodges,
+  -- gen_fc_alcove's gate -- STATUS1 $10 first, then STATUS2 $04) and the
+  -- Condemned count and clock (H.doomCount / H.doomRule, gen_fc_escape's
+  -- Nerapa log): $3B05 is the number shown plus one, one count is 128
+  -- frames at normal speed, and a heal is thrown away on a member the
+  -- Doom takes before their next turn.
+  H.call(function()
+    H.assertEq(H.dodges({ s1 = 0x10, s2 = 0 }), "Vanish", "STATUS1 bit 4 is Vanish")
+    H.assertEq(H.dodges({ s1 = 0, s2 = 0x04 }), "Image", "STATUS2 bit 2 is Image")
+    H.assertEq(H.dodges({ s1 = 0x10, s2 = 0x04 }), "Vanish", "both: Vanish is named")
+    H.assertEq(H.dodges({ s1 = 0x20, s2 = 0x20 }), nil, "Imp and Muddle dodge nothing")
+    H.assertEq(H.dodges({}), nil, "no bytes, no dodge")
+    H.assertEq(H.doomCount({ s2 = 0x01, count = 0x1B }), 26, "$3B05 $1B under the bit shows 26")
+    H.assertEq(H.doomCount({ s2 = 0x01, count = 0x01 }), 0, "...$01 shows 0 (the Doom's frame)")
+    H.assertEq(H.doomCount({ s2 = 0x01, count = 0x00 }), nil,
+      "the bit over a $00 byte: not counting yet (StartCondemn runs a beat after the status)")
+    H.assertEq(H.doomCount({ s2 = 0x00, count = 0x1B }), nil, "no bit, no count")
+    H.assertEq(H.COUNT_FRAMES, 128, "one count is 128 frames at normal speed")
+    -- the Nerapa numbers: a member at 30 with a gauge 250 ticks (500
+    -- frames) from full is 3,840 frames from the Doom -- not their last
+    -- turn; at 3 (384 frames) it is
+    H.assertEq(H.doomRule({ count = 30, turnFrames = 500 }), nil,
+      "30 counts against a 500-frame turn: the member acts again first")
+    H.assertEq(H.doomRule({ count = 3, turnFrames = 500 }), "last",
+      "3 counts (384 frames) against a 500-frame turn: the last turn")
+    H.assertEq(H.doomRule({ count = 4, turnFrames = 500 }), nil,
+      "4 counts (512 frames) against a 500-frame turn: one more turn comes")
+    H.assertEq(H.doomRule({ count = 4, turnFrames = nil }), "last",
+      "a gauge that cannot fill: the last turn whatever the count")
+    H.assertEq(H.doomRule({ count = 4, turnFrames = 500, framesPerCount = 256 }), nil,
+      "...at Slow's 256 a count, 4 counts outlast the turn")
+    H.assertEq(H.doomRule({ count = nil, turnFrames = 100 }), nil, "not condemned: nothing to say")
+    H.log("battle_healpolicy: Vanish/Image and the Condemned clock (#190) checked")
+  end),
+
   -- 13. the keyed line's boost (#174, H.keyBoost) on the map-269 trio
   -- (Trapper: 2 shields, BLUDG key) and Nerapa (5 shields, SLASH|PIERCE):
   -- chips per boost are the chip model's for each member's hands.
