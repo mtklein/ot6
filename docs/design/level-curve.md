@@ -44,6 +44,15 @@ town that sells the item, scales with the active party's highest level:
 | Tonic | ~level x5, cap 99 | Figaro Castle (shop 4, `gen_edgar`) |
 | Fenix Down | ~level, ~15-20 | South Figaro (shop 8, `gen_kolts`) |
 | **Potion** | **~level x1.5, minimum 10** | the Phantom Train's ghost merchant (shop 85, `gen_sabin_train`; L14 -> 21) |
+| **Tincture** | **~level / 4, rounded up** (the MP column, #231: one caster's pool per stretch; [supply.md](supply.md)) | Narshe (shop 3, `gen_zozo1_submerge`; L14 -> 4).  Figaro Castle sells them too, and its purse cannot carry one. |
+| Tent | 4 from Albrook (the factory's two save points), 10 from Jidoor | Albrook (shop 24, `gen_vector_entry`); `gen_narshe_mission`'s TENT to 10 stands |
+| Revivify | 3 | Jidoor (shop 22, `gen_zozo2_arrival`) |
+
+The MP rows are measured and ruled on in [supply.md](supply.md): the
+prices and yields off `item_prop_en.dat`, the inns' prices per town, where
+the counters and save points stand against the Narshe descent, the Vector
+approach and the Floating Continent prep, and the rule for each option
+(Tonic, Potion, Tincture, Tent, inn, and the one rule for Elixirs).
 
 The Potion band starts at the first town that sells them.  On this route
 that is the Phantom Train (`shop_prop.dat`: Figaro's shop 4 and South
