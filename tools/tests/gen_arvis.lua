@@ -1,9 +1,11 @@
 -- gen_arvis.lua -- win the Whelk and ride the esper scene to Terra's
 -- wake-up in Arvis's house.  From whelk_entry.mss (party calm at (42,6),
 -- map 41): step onto the trigger at (42,5), page the guard dialogs, then
--- play the Whelk fight.  Head up: everyone attacks the head; at one
--- shield remaining, TERRA casts TekMissile to break it.  Head hidden:
--- the party casts Heal Force.  The event sets switch $0135 ($1EA6 bit
+-- play the Whelk fight.  Head up: everyone fires a Fire Beam at the head
+-- boosted with the whole bank; at one shield remaining, TERRA fires
+-- TekMissile to break it.  Head hidden: the party casts Heal Force, one
+-- pip on it when the bank is at 2, so nobody ever ends a turn holding 3
+-- (#246).  The event sets switch $0135 ($1EA6 bit
 -- $20).  North of the fight, (41..43, y=4) exits to the Tritoch chamber
 -- (map 0x2A); the trigger at (87,12) starts the esper scene (Tritoch
 -- spared), ending with Terra waking in Arvis's house (map 30).  Saves
@@ -105,6 +107,7 @@ end
 local aPhase = 0
 
 local MENU  = 0x7bca               -- battle menu open flag
+local MSTATE = 0x7bc2              -- battle menu state ($05 = command select)
 local ACTOR = 0x62ca               -- whose menu it is (char slot)
 local MHP   = 0x3bfc               -- monster cur hp, +slot*2
 local SHLD  = 0x3e40               -- monster cur shields, +slot*2
@@ -113,6 +116,7 @@ local ALIVE = 0x3aa8               -- monster presence bit0, +slot*2
 local MSTAT = 0x3eec               -- monster status-1, +slot*2 ($c2 = gone/hidden)
 local SPEC  = 0x57c0               -- formation species words
 local CHID  = 0x3ed8               -- char id, +slot*2 (0 = terra)
+local BP    = 0x3e9c               -- boost bank, +slot*2 (OT6_BP_CLASS)
 
 local hs, terra                    -- head slot, terra's char slot
 local function broken() return H.readByte(TIMER + hs * 2) > 0 end
@@ -121,11 +125,29 @@ local function headAlive()
   return (H.readByte(ALIVE + hs * 2) & 1) == 1
      and (H.readByte(MSTAT + hs * 2) & 0xc2) == 0
 end
+local function bank(actor) return H.readByte(BP + actor * 2) end
 
+-- The Magitek list, two columns filled row by row, so the same cells
+-- serve Terra's eight beams and the soldiers' four: Fire Beam is the
+-- first cell, Heal Force row 2 left, TekMissile row 3 right.  Measured
+-- 2026-09-21 from the ExecCmd ledger in build/attempts/wt-whelk-boost/
+-- probes/whelk_probe_old.log, where the old a,right,a,a fired Bolt Beam
+-- ($84) at whatever the cursor sat on -- the shell, once the head hid,
+-- and the shell answers any hit with Mega Volt.
+local FIRE_BEAM  = { "a", "a", "a" }
+local HEAL_FORCE = { "a", "down", "down", "a", "a" }
+local TEKMISSILE = { "a", "down", "down", "down", "right", "a", "a" }
+
+-- A beam planned while the head is up lands 170-890 frames later (the
+-- same ledger: plan f9394, ExecCmd f9874), and the head hides again
+-- 1200-1750 frames after it shows, with one or two beams landed; a beam
+-- that lands after the hide hits the shell instead, and the shell's
+-- counter Mega Volt is what killed both members of the old run.  So
+-- beams are planned only inside the first FRESH frames of a show.
 local lastShow, lastUp = nil, nil
 local hitsSinceShow = 0
 local lastHp, lastSh = nil, nil
-local FRESH = 1400
+local FRESH = 500
 local function observeHead()
   if hs == nil then return end
   local up = headAlive()
@@ -143,39 +165,67 @@ local function observeHead()
   end
 end
 
-local function seqFor(actor)
+-- What this turn fires and how many pips go on it.  A beam takes the
+-- whole bank (the boost-Fight default; R is live in the Magitek command
+-- window, and one boost-3 Fire Beam took the head from 1500 to 0 in
+-- build/attempts/wt-whelk-boost/probes/whelk_probe_boost.log).  A Heal
+-- Force takes one pip when the bank is at 2: the pip that would otherwise
+-- make 3 at the turn's end.  Both together keep every bank under 3, so
+-- no member can fall holding the pips tools/audit_boost.py flags (#246).
+local function turnFor(actor)
   local freshWindow = headAlive() and lastShow
     and (H.frame - lastShow) < FRESH and hitsSinceShow < 2
+  local b = bank(actor)
   if not freshWindow then
-    if actor == terra then
-      return { "a", "right", "a", "a" }                        -- Heal Force
-    end
-    return { "a", "down", "down", "a", "a" }                   -- Heal Force
+    return "Heal Force", HEAL_FORCE, b >= 2 and 1 or 0
   end
   if actor == terra and not broken() and shields() == 1 then
-    return { "a", "down", "down", "down", "right", "a", "a" }  -- TekMissile
+    return "TekMissile", TEKMISSILE, math.min(3, b)
   end
-  return { "a", "a", "a" }                            -- first beam, head
+  return "Fire Beam", FIRE_BEAM, math.min(3, b)
+end
+
+-- R raises the pending boost by one per press while the command window
+-- is open (Ot6Boost, ot6_hud.asm), so the presses go in front of the cell.
+local function seqFor(actor)
+  local name, cell, boost = turnFor(actor)
+  local seq = {}
+  for _ = 1, boost do seq[#seq + 1] = "r" end
+  for _, b in ipairs(cell) do seq[#seq + 1] = b end
+  return seq, name, boost
 end
 
 -- The lib fight driver's battle-open and [death] lines (newFightDriver,
 -- lib/ot6.lua) for a fight this file drives itself, so tools/audit_boost.py
 -- sees the pips a member held when they fell and tools/audit_fenix.py the
 -- fight a Fenix Down answered (#220).  Ticks count from the first frame the
--- battle table is live with monsters present; no monster action is
--- attributed.
+-- battle table is live with monsters present.  The killer is the monster
+-- action ExecCmd is running when the HP reaches 0 (its slot and the $b5/$b6
+-- command and attack), the way the lib's hit ledger names one; a drop
+-- with no monster action running is nobody's.
 local function newDeathWatch(tag)
   local W = {}
   function W.reset()
-    W.tick, W.opened, W.hp, W.said = 0, false, {}, {}
+    W.tick, W.opened, W.hp, W.said, W.act = 0, false, {}, {}, nil
   end
   W.reset()
+  local execCmd, saveForMimic = H.sym("ExecCmd@battle_code"), H.sym("SaveForMimic")
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xffff
+    if x >= 8 and x < 20 and x % 2 == 0 then
+      W.act = { slot = x // 2 - 4, cmd = H.readByte(0xB5), atk = H.readByte(0xB6) }
+    end
+  end, emu.callbackType.exec, execCmd, execCmd)
+  emu.addMemoryCallback(function()
+    local x = emu.getState()["cpu.x"] & 0xffff
+    if W.act ~= nil and x // 2 - 4 == W.act.slot then W.act = nil end
+  end, emu.callbackType.exec, saveForMimic, saveForMimic)
   function W.frame()
     if not H.battleLoadStarted() then W.reset(); return end
     if not W.opened and H.monstersPresent() == 0 then return end
     W.tick = W.tick + 1
     local pbp = {}
-    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(0x3E9C + p * 2)) end
+    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(BP + p * 2)) end
     local party_bp = table.concat(pbp, ",")
     if not W.opened then
       W.opened = true
@@ -190,10 +240,12 @@ local function newDeathWatch(tag)
       if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
          and not W.said[e] then
         W.said[e] = true
-        local bp = H.readByte(0x3E9C + e * 2)
+        local bp = H.readByte(BP + e * 2)
+        local by = W.act and string.format("slot %d cmd $%02X atk $%02X",
+          W.act.slot, W.act.cmd, W.act.atk) or "nobody (no monster action running)"
         H.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d by "
-          .. "nobody (no monster action attributed) bp=%d party_bp=%s%s", tag,
-          W.tick, e, H.readByte(0x3ED8 + e * 2), last, maxhp, bp, party_bp,
+          .. "%s bp=%d party_bp=%s%s", tag, W.tick, e, H.readByte(CHID + e * 2),
+          last, maxhp, by, bp, party_bp,
           bp >= 3 and string.format(" -- died holding %d BP", bp) or ""))
       elseif hp > 0 and hp ~= 0xFFFF then
         W.said[e] = nil
@@ -207,23 +259,34 @@ local whelkWatch = newDeathWatch("whelk")
 
 -- Battle menus ignore input during their open animation, so presses only
 -- start after the menu flag holds 4 consecutive pulses; when no menu is up,
--- A is edge-tapped every other pulse.
-local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
+-- A is edge-tapped every other pulse.  The next member's window can open
+-- before the flag ever reads closed, so the sequence is also rebuilt when
+-- the window's owner changes, with the same 4-pulse settle.  A finished
+-- sequence whose window is still the same owner's after 4 more pulses did
+-- not take: B backs out and it is rebuilt.
+local mStreak, mSeq, mIdx, mIdle, mNoMenu, mActor = 0, nil, 1, 0, 0, nil
 local function policyPulse()
   if hs == nil or H.readByte(MENU) == 0 then
-    mStreak, mSeq, mIdx, mStall = 0, nil, 1, 0
+    mStreak, mSeq, mIdx, mIdle, mActor = 0, nil, 1, 0, nil
     mNoMenu = mNoMenu + 1
     return mNoMenu % 2 == 0 and { "a" } or {}
   end
   mNoMenu = 0
+  local actor = H.readByte(ACTOR)
+  if mActor ~= nil and actor ~= mActor then
+    mStreak, mSeq, mIdx, mIdle = 0, nil, 1, 0
+  end
+  mActor = actor
   mStreak = mStreak + 1
   if mStreak < 4 then return {} end
   if mSeq == nil then
-    local actor = H.readByte(ACTOR)
-    mSeq, mIdx = seqFor(actor), 1
+    local name, boost
+    mSeq, name, boost = seqFor(actor)
+    mIdx = 1
     H.log(string.format(
-      "whelk cast f%d actor=%d seq=%s | head hp=%d sh=%d tmr=%d up=%s | party %d/%d/%d",
-      H.frame, actor, table.concat(mSeq, ","),
+      "whelk cast f%d actor=%d %s boost=%d bank=%d state=$%02X seq=%s | head hp=%d sh=%d tmr=%d up=%s | party %d/%d/%d",
+      H.frame, actor, name, boost, bank(actor), H.readByte(MSTATE),
+      table.concat(mSeq, ","),
       H.readWord(MHP + hs * 2), shields(), H.readByte(TIMER + hs * 2),
       tostring(headAlive()),
       H.readWord(0x3bf4), H.readWord(0x3bf6), H.readWord(0x3bf8)))
@@ -233,12 +296,14 @@ local function policyPulse()
     mIdx = mIdx + 1
     return { b }
   end
-  mStall = mStall + 1
-  if mStall > 2 then
-    mSeq, mStall = nil, 0              -- back out; rebuild from scratch
+  mIdle = mIdle + 1
+  if mIdle > 4 then
+    H.log(string.format("whelk cast f%d actor=%d did not take (state=$%02X); backing out",
+      H.frame, actor, H.readByte(MSTATE)))
+    mSeq, mIdle = nil, 0
     return { "b" }
   end
-  return { "a" }
+  return {}
 end
 
 -- Slots are found on the first open menu (formation words and char ids
@@ -313,7 +378,8 @@ H.run({ maxFrames = 120000 }, {
   }, "whelk event fires"),
 
   -- Real menus, real target defaults, real turns; the retract cycle sets
-  -- the fight's pace and Heal Force spends the hidden phases.
+  -- the fight's pace, the bank goes on the beams and Heal Force spends
+  -- the hidden phases.
   H.logStep("whelk battle up; playing it (tutorial policy)"),
   winWhelk(),
   H.call(function()
