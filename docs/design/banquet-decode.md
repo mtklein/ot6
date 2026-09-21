@@ -10,14 +10,14 @@ Companion to `sealed-gate-route.md`, the v0.7 route survey this block sits in.
 
 ## 1. State machine: how the block enters and leaves
 
-| step | where | latch | evidence |
+| step | where | flag | evidence |
 |---|---|---|---|
 | castle escort | 243 (8,18) trigger | `$013A=1`, `$062F=1`, opens the 243 (15,8) door via `mod_bg_tiles {14,8}` | `event_trigger.asm:1094` → `_cc835c`, `event_main.asm:97039-97078` |
 | 250 first entry | map-init | `$013B=1`, `$062D=0`, opens a door at {22,29} | `map_init_event.asm:269` → `_cc839e`, `:97079-97098` |
 | banquet start | 250 (54,16), face-UP+A on the dais | `$007C=1`, `set_var 0,0`, `start_timer 0,14400,_cc8a96,{FIELD_VISIBLE,BANQUET,MENU_BATTLE_VISIBLE}`, `$0634=1` (window soldiers appear), `$062E/$0630=0` | `event_trigger.asm:1123` → `_cc8490` `:97242`; gates `:97243-97247` (`$01B4`,`$01B0`,`$007C=0`); tail `:97414-97420` |
-| the 4-minute circuit | maps 243/244/250/252 | per-soldier latches `$0217-$022E`, talk counter slots `$014F,$0200-$0216` | §2, §3 |
+| the 4-minute circuit | maps 243/244/250/252 | per-soldier flags `$0217-$022E`, talk counter slots `$014F,$0200-$0216` | §2, §3 |
 | dinner | timer-0 expiry, wherever the party stands | `stop_timer 0`, **`$013C=1`** (stops all further soldier scoring), `load_map 5` "That evening…", `$062C=1`, `load_map 251 {80,25}` | `_cc8a96` `:98045-98069` |
-| Q&A + challenge | 251 dinner table | `$0230-$0236` question bookkeeping, `$0237` challenge latch, `$01B5` table-trigger re-arm | §4 |
+| Q&A + challenge | 251 dinner table | `$0230-$0236` question bookkeeping, `$0237` challenge flag, `$01B5` table-trigger re-arm | §4 |
 | roster rewrite | Q&A tail | `$02F0-$02F9` forced (`:98934-98943`), `norm_lvl LOCKE/TERRA` (`:98944-98945`), `remove_equip CYAN/EDGAR/SABIN/SETZER` (`:98953-98956`, GAU `:98920`, MOG `:98932`), `char_party` → TERRA+LOCKE only (`:99079-99101`), **`$007D=1`** (`:99133`), control back on 251 (`:99142-99144`) |
 | the messenger | 250 (23,12) walk-on | reward ladder (§5.1), `set_var 0,0`, **`$0238=1`** | `event_trigger.asm:1131` → `_cc91c0` `:99146-99264`; gated `$007D=1 && $0238=0` `:99147-99150` |
 
@@ -29,7 +29,7 @@ The block can be left, but not re-entered. The 243 south rows
 reach the saveable world map. Coming back is not possible: the 243 (15,8)
 door into 250 was opened by `_cc835c`'s transient `mod_bg_tiles`, 243's
 map-init is `EventReturn` (`map_init_event.asm:262`) and the escort is
-`$013A`-latched dead, so a re-entry of 243 shows the closed door and the
+`$013A`-flagged dead, so a re-entry of 243 shows the closed door and the
 map is a dead-end pocket (§5.2). This does not block progress, because the
 timer callback collects the party from any field map (§5.3).
 
@@ -84,21 +84,21 @@ after the rewards (`:99261`).
 The talk counter is one global 24-slot ladder, `_cc88bf`
 (`:97835-98002`): each call takes the next unclaimed slot
 (`$014F`, then `$0200-$0216`), does `add_var 0,1`, and toasts "N people".
-24 callers exist, each latching its own switch first, so ladder
+24 callers exist, each setting its own switch first, so ladder
 capacity = caller count = 24. Scoring is confined to the window by two
-complementary mechanisms: the `$062F`-population scripts (latches
+complementary mechanisms: the `$062F`-population scripts (flags
 `$0217-$0223`, plus `_cc873b`/`_cc8782`) each gate on
 `$007C=1 && $013C=0` because their NPCs exist outside the window too,
 while the `$0634`-population scripts (the other nine) gate only on their
-own latch, because their NPCs exist only inside the window (`$0634` set
+own flag, because their NPCs exist only inside the window (`$0634` set
 `:97416`, cleared `:99117`).
 
-Census, per map (NPC records in `event/npc_prop.asm`; the two visibility
+Survey, per map (NPC records in `event/npc_prop.asm`; the two visibility
 populations that exist during the window are `$062F`, set at castle entry
 `:97077`, and `$0634`, set at banquet start `:97416`; the `$062B`
 pre-attack population was cleared by the v0.6 escape, `:96986`):
 
-| map | pos | event | latch | says / does | points |
+| map | pos | event | flag | says / does | points |
 |---|---|---|---|---|---|
 | 243 | (8,18) | `_cc8796` `:97711` | $0224 | "I've slain too many people." | +1 |
 | 243 | (12,14) | `_cc873b` `:97670` | $022B | **battle 26** (Mega Armor) | +1, +5 clean |
@@ -201,14 +201,14 @@ Choice targets are in listed order (`choice` macro,
    disperses the party, control on (`:98543-98593`).
    - **Troopers' challenge** `_cc8a47` (`:98011-98044`): four
      EMPEROR_SERVANT NPCs at 251 (76,16)/(78,16)/(82,16)/(84,16)
-     (`npc_prop.asm:11510-11540`), `$0237`-latched. "Sure" →
+     (`npc_prop.asm:11510-11540`), `$0237`-flagged. "Sure" →
      `start_timer 0,7200,EventReturn` (reuses timer 0, which is free
      because the master timer is already stopped) → **battle 30** → same
      clean-win idiom → **+5 ★** → `stop_timer 0`.
    - Return to the table: walk-on trigger 251 (80,20)
      (`event_trigger.asm:1134` → `_cc8e63` `:98594`), "Shall we begin
      again?" → Yes (`$01B5` is the stand-on-tile re-arm, not a story
-     latch).
+     flag).
 10. **The favor** (`:98660-98692`): peace +3 ·
     **"That your war's truly over." +5 ★** · sorry +1
 11. **Accompany Gestahl** (`:98746-98762`): **Yes on the first ask +3 ★**
@@ -263,7 +263,7 @@ Three route constraints govern the window:
   blocked at (16,30) and (30,30) by the `$0630` "Gestahl waits
   inside" servants. `_cc8490` clears `$0630` at `event_main.asm:97415`,
   one line before `$007C=1`, so the castle opens when the timer
-  starts and any route census taken earlier is invalid.
+  starts and any route survey taken earlier is invalid.
 - Map 243 is a one-way pocket. Its (15,8) door into 250 was opened by
   the escort's transient `mod_bg_tiles` (`_cc835c`, `:97070`), and a
   re-entry shows the closed door with no reachable exit. 243 must be
@@ -323,7 +323,7 @@ Per-unit costs (timer `$1189`, counting down from 14400):
 Timing constraints, for the gen's asserts: the window
 budget is 14400 frames minus the battles taken (timer runs in-battle);
 battle 30 has its own 7200; a battle still running when its timer expires
-ends with `$45` set, which loses the points but wedges nothing. The fights
+ends with `$45` set, which loses the points but stalls nothing. The fights
 are the only variable-cost item, so they are what to accelerate.
 
 ### 5.3 The timer across save, reset and load
