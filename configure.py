@@ -572,6 +572,8 @@ check("check_states", "python3 tools/tests/lib/compose.py --check-states",
 AUDIT_COMMON = all_stamps + checkpoint_files
 check("audit_equipment", "python3 tools/audit_equipment.py",
       ["tools/audit_equipment.py"] + AUDIT_COMMON)
+check("check_mog_gear", "python3 tools/check_mog_gear.py",
+      ["tools/check_mog_gear.py", "build/states/moogle_cleared.mss"])
 check("audit_party_hp",
       "python3 tools/audit_party_hp.py --selftest"
       " && python3 tools/audit_party_hp.py",

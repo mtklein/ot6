@@ -7,7 +7,9 @@
 --                          controlled frame (map 51, party 1 = LOCKE+3
 --                          moogles at (14,14), Marshal waiting at (15,40))
 --   moogle_cleared.mss  -- the far side: LOCKE leads TERRA on the Narshe
---                          streets (map 20), defense won, control returned
+--                          streets (map 20), defense won, control returned,
+--                          MOG's Mithril Pike and Mithril Shld in the bag
+--                          (#143: he is stripped before the Marshal)
 
 -- Sequence (all one event, _cca2e5, event_trigger.asm map 50 {55,11},
 -- body event_main.asm:102027-103283):
@@ -112,8 +114,58 @@ local function ySwitchTo(p)
   }, "Y-switch to party " .. p)
 end
 
+-- ------------------------------------------------- MOG's gear (#143) --
+-- MOG enters wearing a Mithril Pike and a Mithril Shld (char_prop.asm
+-- MOG: set_char_prop_equip MITHRIL_PIKE, MITHRIL_SHLD, no fixed_equip;
+-- the guest moogles are fixed_equip) and the win path drops him from the
+-- party with no control in between (_ccadbf: char_party MOG, 0), so
+-- whatever he still wears then is gone.  The menu is open to the player
+-- throughout the defense: CheckMenu (field/menu.asm:205) refuses only on
+-- $1EB8 & $04 (event bit $01C2), which no event writes, and it opened on
+-- the first controllable frame and between waves when pressed
+-- (build/attempts/wt/mog-gear/lab/mog_gear/probe_moogle_menu.log, the
+-- retained copy).  Equip -> MOG -> Empty is
+-- the one-press strip (H.emptyEquip, lib/ot6_field.lua).
+local MITHRIL_PIKE, MITHRIL_SHLD = 0x1D, 0x5C
+local MOG = 10
+local MOG_BASE = 0x1600 + 37 * MOG
+local DANCES = 0x1D4C
+
+local function mogGear()
+  return string.format("%02X %02X %02X %02X", H.readByte(MOG_BASE + 0x1F),
+    H.readByte(MOG_BASE + 0x20), H.readByte(MOG_BASE + 0x21),
+    H.readByte(MOG_BASE + 0x22))
+end
+local function mogRow() return (H.readByte(0x1850 + MOG) >> 3) & 0x03 end
+local function bagLine()
+  return string.format("bag pike=%d shield=%d", H.invCountOf(MITHRIL_PIKE),
+    H.invCountOf(MITHRIL_SHLD))
+end
+
+-- With MOG's party active and calm: the bag before, the Empty walk, and
+-- the bag after (one more of each piece).
+local function stripMog()
+  local tag = "strip MOG"
+  local pikeBefore, shieldBefore = 0, 0
+  return H.cond(function() return true end, {
+    H.call(function()
+      pikeBefore, shieldBefore = H.invCountOf(MITHRIL_PIKE), H.invCountOf(MITHRIL_SHLD)
+      H.log(string.format("%s: f%d gear %s %s $1EB8=%02X row=%d dances=$%02X", tag,
+        H.frame, mogGear(), bagLine(), H.readByte(0x1eb8), mogRow(), H.readByte(DANCES)))
+    end),
+    H.emptyEquip(MOG, { tag = tag, check = function()
+      H.log(string.format("%s: f%d after Empty gear %s %s", tag, H.frame, mogGear(), bagLine()))
+      H.assertEq(H.invCountOf(MITHRIL_PIKE), pikeBefore + 1, tag .. ": one more Mithril Pike in the bag")
+      H.assertEq(H.invCountOf(MITHRIL_SHLD), shieldBefore + 1, tag .. ": one more Mithril Shld in the bag")
+    end }),
+  })
+end
+
 -- the Marshal's post: npc_prop.asm map 51 NPC_3, {15,40}, static
 local MX, MY = 15, 40
+
+-- the squads in the order they take the Marshal
+local MARSHAL_ORDER = { 1, 3, 2 }
 
 local function marshalAdjacent()
   local dx, dy = MX - H.fieldX(), MY - H.fieldY()
@@ -144,6 +196,52 @@ local function pokeStep(round)
   }, "battle 6 engages [attempt " .. round .. "]")
 end
 
+-- The lib fight driver's battle-open and [death] lines (newFightDriver,
+-- lib/ot6.lua) for a fight this file drives itself, so tools/audit_boost.py
+-- sees the pips a member held when they fell and tools/audit_fenix.py the
+-- fight a Fenix Down answered (#220).  Ticks count from the first frame the
+-- battle table is live with monsters present; no monster action is
+-- attributed.
+local function newDeathWatch(tag)
+  local W = {}
+  function W.reset()
+    W.tick, W.opened, W.hp, W.said = 0, false, {}, {}
+  end
+  W.reset()
+  function W.frame()
+    if not H.battleLoadStarted() then W.reset(); return end
+    if not W.opened and H.monstersPresent() == 0 then return end
+    W.tick = W.tick + 1
+    local pbp = {}
+    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(0x3E9C + p * 2)) end
+    local party_bp = table.concat(pbp, ",")
+    if not W.opened then
+      W.opened = true
+      local hp = {}
+      for e = 0, 3 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + e * 2)) end
+      H.log(string.format("[%s] battle f+%d partyhp=%s party_bp=%s monsters=%d",
+        tag, W.tick, table.concat(hp, ","), party_bp, H.monstersPresent()))
+    end
+    for e = 0, 3 do
+      local hp, maxhp = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+      local last = W.hp[e]
+      if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
+         and not W.said[e] then
+        W.said[e] = true
+        local bp = H.readByte(0x3E9C + e * 2)
+        H.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d by "
+          .. "nobody (no monster action attributed) bp=%d party_bp=%s%s", tag,
+          W.tick, e, H.readByte(0x3ED8 + e * 2), last, maxhp, bp, party_bp,
+          bp >= 3 and string.format(" -- died holding %d BP", bp) or ""))
+      elseif hp > 0 and hp ~= 0xFFFF then
+        W.said[e] = nil
+      end
+      W.hp[e] = hp
+    end
+  end
+  return W
+end
+
 -- the input-driven battle-6 driver: R raises the active character's pending
 -- boost (characters open with 1 bp and regen 1 per unboosted turn;
 -- Ot6InitBP/Ot6ActionEnd), then three edge-tapped A's confirm the
@@ -153,12 +251,14 @@ end
 -- Ends on the won-switch or on 240 settled no-battle frames.
 local function marshalFight(maxFrames)
   local phase, calmN = 0, 0
+  local watch = newDeathWatch("marshal")
   return H.driveUntil(function()
     calmN = (not H.battleLoadStarted()) and calmN + 1 or 0
     return defenseWon() or calmN >= 240
   end, maxFrames, {
     H.call(function()
       phase = (phase + 1) % 32
+      watch.frame()
       if not H.battleLoadStarted() then
         H.setPad(phase % 8 < 4 and { "a" } or {})
         return
@@ -192,13 +292,16 @@ local function settleStep()
   }, "post-attempt settle")
 end
 
--- one full Marshal attempt by squad p: activate it, walk beside the
--- Marshal, poke, fight boosted, settle.  Written flat: cond/driveUntil/
--- navTo steps carry no reset(), so repeated bodies replay latched state.
+-- one full Marshal attempt by squad p: activate it, top it up from what
+-- is left in the bag, walk beside the Marshal, poke, fight boosted,
+-- settle.  Written flat: cond/driveUntil/navTo steps carry no reset(),
+-- so repeated bodies replay latched state.
 local function attempt(p, round)
   return H.cond(function() return defenseWon() end, {}, {
     logPools("attempt " .. round .. " (P" .. p .. ")"),
     ySwitchTo(p),
+    H.fieldCare({ threshold = 0.9, reserve = {}, magic = false,
+                  tag = "care before the Marshal (P" .. p .. ")" }),
     H.navTo(MX, MY - 1, {
       arrive = function()
         return defenseWon()
@@ -312,9 +415,13 @@ H.run({ maxFrames = 200000 }, {
   -- guard, so $060A..$060F clear one by one, two waves per squad at ~90-190
   -- HP each.  advanceStory's playBattles mode is this driver.
   -- ===================================================================== --
+  -- reserve = {}: the care after each wave serves the squad that fought
+  -- and spends the bag down to nothing here -- the Marshal is this
+  -- event's last fight and there is no shop before it (#143, owner's
+  -- ruling; the route's reserve floor holds everywhere else).
   H.advanceStory(function()
     return (H.readByte(0x1f41) & 0xFC) == 0
-  end, 60000, { playBattles = true }),
+  end, 60000, { playBattles = true, reserve = {} }),
   H.logStep(function()
     return string.format("all six wave guards down at frame %d; corridor open",
       H.frame)
@@ -322,17 +429,23 @@ H.run({ maxFrames = 200000 }, {
   logPools("waves complete"),
   H.waitUntil(calm(30), 1800, "post-storm calm"),
 
+  -- the storm over and the Marshal still standing is the last moment MOG
+  -- is in a party with the field under control (#143)
+  ySwitchTo(2),
+  H.waitUntil(calm(30), 1800, "party 2 active and calm"),
+  stripMog(),
+
   -- ===================================================================== --
-  -- Phase 4c: the Marshal, up to three input-driven attempts.  P2 first
-  -- (MOG's squad, the biggest pool), then P1, then P3 if a wipe lands.
-  -- Battle 6's loss path revives the loser at 1 HP on (14,11) and the
-  -- Marshal still stands, so retrying with the next squad is what a
-  -- player would do.  Attempts 2 and 3 are no-ops when an earlier one
-  -- already cleared it.
+  -- Phase 4c: the Marshal, up to three input-driven attempts, by the
+  -- armed squads first and MOG's stripped squad last (#143, owner's
+  -- ruling: a bare-handed MOG does not lead the last fight).  Battle 6's
+  -- loss path revives the loser at 1 HP on (14,11) and the Marshal still
+  -- stands, so retrying with the next squad is what a player would do.
+  -- Attempts 2 and 3 are no-ops when an earlier one already cleared it.
   -- ===================================================================== --
-  attempt(2, 1),
-  attempt(1, 2),
-  attempt(3, 3),
+  attempt(MARSHAL_ORDER[1], 1),
+  attempt(MARSHAL_ORDER[2], 2),
+  attempt(MARSHAL_ORDER[3], 3),
   H.call(function()
     H.assertEq(defenseWon(), true, "defense won (switch $0631 cleared)")
     H.log(string.format("Marshal down at frame %d; riding the epilogue", H.frame))
@@ -370,8 +483,10 @@ H.run({ maxFrames = 200000 }, {
     local hp, maxhp = H.readWord(0x1609), H.readWord(0x160b)
     H.assertEq(hp > 0 and hp == (maxhp & 0x3fff), true,
       string.format("TERRA at full HP (%d/%d)", hp, maxhp & 0x3fff))
-    H.log(string.format("cleared: map=%d (%d,%d) frame=%d",
-      H.mapId(), H.fieldX(), H.fieldY(), H.frame))
+    H.assertEq(H.invCountOf(MITHRIL_PIKE) >= 1, true, "MOG's Mithril Pike is in the bag")
+    H.assertEq(H.invCountOf(MITHRIL_SHLD) >= 1, true, "MOG's Mithril Shld is in the bag")
+    H.log(string.format("cleared: map=%d (%d,%d) frame=%d %s",
+      H.mapId(), H.fieldX(), H.fieldY(), H.frame, bagLine()))
     H.screenshot("moogle_cleared")
   end),
   H.saveState("moogle_cleared.mss"),
