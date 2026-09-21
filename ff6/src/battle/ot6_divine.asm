@@ -4,6 +4,8 @@
 ; Ot6Oblivion (Cyan) and Ot6Assassinate (Shadow): the two divines whose gate
 ; cannot be read at command-select time, so they hook CalcAttackEffect instead.
 ; The select-time half of Oblivion is Ot6BushidoOblivion, in ot6_bushido.asm.
+; Assassinate's gate is also reached from Ot6HitJoin (ot6_break.asm), on the
+; hit that breaks a body.
 ; ------------------------------------------------------------------------------
 
 ; ==============================================================================
@@ -127,23 +129,67 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
-; [ Assassinate (Shadow, divine): instant-kill a Broken non-boss ]
+; [ Assassinate (Shadow, divine): the gate and the kill ]
 ;
-; The two gates are the Broken check (OT6_BROKEN_TICKS nonzero) and the
-; non-boss check ($3aa1 bit 2, the instant-death-protection bit a boss
-; carries, the same one ScimitarEffect reads at battle_main.asm:9147). Both
-; are read at the same seam Oblivion uses, after ChooseTarget in
-; CalcAttackEffect where the target exists, so the kill is the same guaranteed
-; $3dd4 Death mark (SetStatus1's byte, applied by UpdateStatus for every
-; present entity regardless of the hit roll) and the once-per-battle gate is
-; the shared OT6_DIVINE_USED bit. A Broken non-boss dies; a boss (Death cannot
-; kill it) or an unbroken target is left alone, and the ordinary attack stands
-; as the no-op fallback.
+; x = attacker, y = target, both entity offsets.  Shadow's hit on a Broken
+; non-boss kills it: Death is marked in the target's "status to set" ($3dd4,
+; SetStatus1's byte, applied by UpdateStatus at the tail of the same action
+; for every present entity, whatever the hit roll) and the once-per-battle
+; latch is spent.  Anything else leaves the attack as it was: an attacker
+; who is not Shadow (char id $03, $3ed8 keyed by the entity offset since
+; offset = slot*2), a divine already spent (OT6_DIVINE_USED, the attacker's
+; $3018 bit), a character target, an unbroken target, or a boss ($3aa1 bit
+; 2, the instant-death protection ScimitarEffect reads at
+; battle_main.asm:9147; Death cannot kill it, so the latch is kept).
 ;
-; Gated on the attacker being Shadow (char id $03, $3ed8 keyed by the entity
-; offset since offset = slot*2) with an unspent divine: any attack Shadow
-; lands on a Broken non-boss assassinates it, once per battle. It is dormant
-; while no Shadow is fielded, so the char-id gate never matches.
+; Two callers, because of where a break is decided inside one action.
+; Ot6HitJoin (ot6_break.asm) calls it for every landed hit, after both chip
+; procs have run, so the hit that empties the last shield reads its own
+; break here: the "shields down: break" store to OT6_BROKEN_TICKS (Ot6Chip,
+; Ot6ClassChip) comes first, this gate next, then _c262ef's ApplyDmg takes
+; the doubled hit off the HP and ExecAttack's UpdateStatus applies the
+; Death.  The hit that breaks a non-boss is the kill (#239).  Ot6Assassinate
+; below calls it from the ChooseTarget seam, before the hit roll, for a body
+; already Broken when Shadow's attack resolves.
+;
+; a8; the index width is the caller's (Ot6HitJoin i16, Ot6Assassinate i8),
+; so every index test goes through a and nothing compares an immediate
+; against x or y.  db=$7e.  preserves x/y; clobbers a.
+
+.proc Ot6AssassinateGate
+        .a8
+        txa                     ; attacker entity offset, width-neutral test
+        cmp     #$08
+        bcs     done            ; monster attacker: never
+        lda     $3ed8,x         ; attacker char id
+        cmp     #$03            ; CHAR::SHADOW
+        bne     done            ; not shadow: dormant
+        lda     $3018,x         ; attacker's entity bit ($01/$02/$04/$08)
+        and     OT6_DIVINE_USED
+        bne     done            ; divine already spent this battle
+        tya                     ; target entity offset, width-neutral test
+        cmp     #$08
+        bcc     done            ; a character target: not an enemy
+        lda     OT6_BROKEN_TICKS,y
+        beq     done            ; not Broken, this hit's chip included
+        lda     $3aa1,y
+        bit     #$04            ; a boss (instant-death protected)?
+        bne     done            ; yes: Death cannot kill it, the latch is kept
+        lda     $3dd4,y
+        ora     #$80            ; Death (status to set)
+        sta     $3dd4,y
+        lda     $3018,x
+        tsb     OT6_DIVINE_USED ; latch: divine spent this battle
+done:   rts
+.endproc
+
+; [ Assassinate at the ChooseTarget seam: the primary monster target ]
+;
+; The seam Oblivion uses, after ChooseTarget in CalcAttackEffect, where the
+; target mask exists and the hit has not rolled.  Resolves $b9's lowest
+; monster bit to its entity offset and puts it to the gate above, so a body
+; already Broken dies whatever the hit roll.  The hit that breaks a body
+; reaches the gate from Ot6HitJoin instead.
 ;
 ; entry: jsl from CalcAttackEffect just after ChooseTarget (beside Ot6Oblivion).
 ; a16/i8, db=$7e; x = attacker entity offset, $b8/$b9 = target mask. preserves
@@ -154,44 +200,21 @@ done:   plp
         shortai
         .a8
         .i8
-        cpx     #$08
-        bcs     done            ; monster attacker: never
-        lda     $3ed8,x         ; attacker char id (offset = slot*2)
-        cmp     #$03            ; CHAR::SHADOW
-        bne     done            ; not shadow: dormant
-        lda     $3018,x
-        and     OT6_DIVINE_USED
-        bne     done            ; divine already spent this battle
-        phx                     ; save attacker (i8, 1 byte)
+        phy
         ; --- primary target -> entity offset. $b8 low = characters (bit c ->
         ;     offset c*2), $b9 high = monsters (bit m -> offset 8 + m*2). We want
         ;     an enemy, so scan the monster half only. ---
-        ldx     #$08
+        ldy     #$08
         lda     $b9             ; monster mask (slots 0-5)
 @mon:   lsr
         bcs     @have
-        inx
-        inx
-        cpx     #$14
+        iny
+        iny
+        cpy     #$14
         bcc     @mon
-        plx                     ; no monster target: bail
-        bra     done
-@have:  cpx     #$08
-        bcc     @bail           ; a character target: not an enemy
-        lda     OT6_BROKEN_TICKS,x         ; Broken?
-        beq     @bail           ; no: ordinary attack
-        lda     $3aa1,x
-        bit     #$04            ; a boss (instant-death protected)?
-        bne     @bail           ; yes: no-op fallback (Death cannot kill it)
-        ; --- Broken non-boss: assassinate (guaranteed) + spend the divine ---
-        lda     $3dd4,x
-        ora     #$80            ; Death (status to set)
-        sta     $3dd4,x
-        plx                     ; x = attacker entity offset
-        lda     $3018,x
-        tsb     OT6_DIVINE_USED
-        bra     done
-@bail:  plx                     ; restore attacker; the attack stands untouched
-done:   plp
+        bra     done            ; no monster target: the attack stands
+@have:  jsr     Ot6AssassinateGate
+done:   ply
+        plp
         rtl
 .endproc
