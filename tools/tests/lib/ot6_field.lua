@@ -4350,6 +4350,88 @@ function M.equipKit(charId, items, opts)
   return M.seqStep(steps)
 end
 
+-- M.emptyEquip: strip one character of the active party through Equip ->
+-- Empty, then B out to the field.  Empty is EquipRemoveAll
+-- (menu/equip.asm): the weapon, shield, helmet and armor slots go to the
+-- bag through IncItemQty, which skips a slot that is already empty;
+-- relics are the other menu and stay.  Written for the Moogle defense
+-- (#143), where MOG leaves the party with whatever he still wears.  The
+-- character's list row is read from $1850 at run time and the row under
+-- the cursor is checked against the list's own $69+row before the
+-- options open; after the press the four slot bytes are asserted empty,
+-- then opts.check (if given) runs, for a caller asserting what the bag
+-- gained, before the menu closes.  Reads and presses only.
+function M.emptyEquip(charId, opts)
+  opts = opts or {}
+  local tag = opts.tag or string.format("empty char %d", charId)
+  local base = 0x1600 + 37 * charId
+  local ZM, CUR = 0x26, 0x4b
+  local ST_MAIN, ST_CHAR, ST_OPT = 0x05, 0x06, 0x36
+  local EQUIP_ROW, OPT_EMPTY = 2, 3
+  local ph = 0
+  local function st() return M.readByte(ZM) end
+  local function row() return (M.readByte(0x1850 + charId) >> 3) & 0x03 end
+  local function four()
+    return string.format("%02X %02X %02X %02X", M.readByte(base + 0x1F),
+      M.readByte(base + 0x20), M.readByte(base + 0x21), M.readByte(base + 0x22))
+  end
+  local function tap(btn) ph = (ph + 1) % 12; M.setPad(ph < 4 and { btn } or {}) end
+  local function seek(state, want, back, fwd, label)
+    return M.driveUntil(function()
+      return st() == state and M.readByte(CUR) == want()
+    end, 1800, {
+      M.call(function()
+        if st() ~= state then M.setPad({}); return end
+        ph = (ph + 1) % 12
+        M.setPad(ph < 4 and { [M.readByte(CUR) < want() and fwd or back] = true } or {})
+      end),
+    }, tag .. ": " .. label)
+  end
+  local function press(state, label)
+    return M.seqStep({
+      M.driveUntil(function() return st() == state end, 1800, {
+        M.call(function() tap("a") end),
+      }, tag .. ": " .. label),
+      M.release(), M.waitFrames(10),
+    })
+  end
+  return M.seqStep({
+    M.call(function()
+      ph = 0
+      M.assertEq(M.readByte(0x1850 + charId) & 0x07, M.readByte(0x1A6D) & 0x07,
+        tag .. ": character is in the active party")
+      M.log(string.format("[%s] char=%d row=%d before=%s", tag, charId, row(), four()))
+    end),
+    M.driveUntil(function() return st() == ST_MAIN end, 1800, {
+      M.call(function() tap("x") end),
+    }, tag .. ": main menu"),
+    M.release(), M.waitFrames(10),
+    seek(ST_MAIN, function() return EQUIP_ROW end, "up", "down", "cursor on Equip"),
+    M.release(), M.waitFrames(10),
+    press(ST_CHAR, "character list"),
+    seek(ST_CHAR, row, "up", "down", "cursor on the character"),
+    M.call(function()
+      M.assertEq(M.readByte(0x69 + row()), charId,
+        tag .. ": the list row under the cursor is the character")
+    end),
+    M.release(), M.waitFrames(10),
+    press(ST_OPT, "options row"),
+    seek(ST_OPT, function() return OPT_EMPTY end, "left", "right", "cursor on Empty"),
+    M.release(), M.waitFrames(10),
+    M.pressButtons({ "a" }, 4),
+    M.waitFrames(20),
+    M.call(function()
+      M.log(string.format("[%s] char=%d after=%s", tag, charId, four()))
+      M.assertEq(four(), "FF FF FF FF", tag .. ": the four slots read empty")
+      if opts.check then opts.check() end
+    end),
+    M.driveUntil(function() return M.hasControl() end, 2400, {
+      M.call(function() tap("b") end),
+    }, tag .. ": back out to the field"),
+    M.release(), M.waitFrames(20),
+  })
+end
+
 -- ------------------------------------------------- the party select --
 -- M.newPartySelect(pick): a driver for the game's multi-party select
 -- screen (menu states $2D character grid / $2E group slots), forming ONE

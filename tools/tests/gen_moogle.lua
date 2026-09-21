@@ -125,19 +125,12 @@ end
 -- the first controllable frame and between waves when pressed
 -- (build/attempts/wt/mog-gear/lab/mog_gear/probe_moogle_menu.log, the
 -- retained copy).  Equip -> MOG -> Empty is
--- the one-press strip: EquipRemoveAll (menu/equip.asm) moves all four
--- slots to the bag through IncItemQty, which skips an empty $FF slot.
--- Menu cells: $26 menu state, $4b the cursor shared by the main menu,
--- the character list and the options row; $69..$6C the characters the
--- list shows.
+-- the one-press strip (H.emptyEquip, lib/ot6_field.lua).
 local MITHRIL_PIKE, MITHRIL_SHLD = 0x1D, 0x5C
 local MOG = 10
 local MOG_BASE = 0x1600 + 37 * MOG
-local ZM, CUR = 0x26, 0x4b
-local ST_MAIN, ST_CHAR, ST_OPT = 0x05, 0x06, 0x36
-local EQUIP_ROW, OPT_EMPTY = 2, 3
+local DANCES = 0x1D4C
 
-local function menuState() return H.readByte(ZM) end
 local function mogGear()
   return string.format("%02X %02X %02X %02X", H.readByte(MOG_BASE + 0x1F),
     H.readByte(MOG_BASE + 0x20), H.readByte(MOG_BASE + 0x21),
@@ -149,70 +142,22 @@ local function bagLine()
     H.invCountOf(MITHRIL_SHLD))
 end
 
--- With MOG's party active and calm: X, Equip, MOG's row, Empty, then B
--- out to the field.  Presses are edge taps (4 of 12 frames); every cursor
--- is read back before the next press.
+-- With MOG's party active and calm: the bag before, the Empty walk, and
+-- the bag after (one more of each piece).
 local function stripMog()
   local tag = "strip MOG"
-  local ph = 0
   local pikeBefore, shieldBefore = 0, 0
-  local function tap(btn) ph = (ph + 1) % 12; H.setPad(ph < 4 and { btn } or {}) end
-  local function seek(state, want, back, fwd, label)
-    return H.driveUntil(function()
-      return menuState() == state and H.readByte(CUR) == want()
-    end, 1800, {
-      H.call(function()
-        if menuState() ~= state then H.setPad({}); return end
-        ph = (ph + 1) % 12
-        H.setPad(ph < 4 and { [H.readByte(CUR) < want() and fwd or back] = true } or {})
-      end),
-    }, tag .. ": " .. label)
-  end
-  local function press(state, label)
-    return H.cond(function() return true end, {
-      H.driveUntil(function() return menuState() == state end, 1800, {
-        H.call(function() tap("a") end),
-      }, tag .. ": " .. label),
-      H.release(), H.waitFrames(10),
-    })
-  end
   return H.cond(function() return true end, {
     H.call(function()
-      ph = 0
       pikeBefore, shieldBefore = H.invCountOf(MITHRIL_PIKE), H.invCountOf(MITHRIL_SHLD)
-      H.assertEq(H.readByte(0x1a6d) & 0x07, H.readByte(0x1850 + MOG) & 0x07,
-        tag .. ": MOG's party is the active one")
-      H.log(string.format("%s: f%d gear %s %s $1EB8=%02X row=%d", tag, H.frame,
-        mogGear(), bagLine(), H.readByte(0x1eb8), mogRow()))
+      H.log(string.format("%s: f%d gear %s %s $1EB8=%02X row=%d dances=$%02X", tag,
+        H.frame, mogGear(), bagLine(), H.readByte(0x1eb8), mogRow(), H.readByte(DANCES)))
     end),
-    H.driveUntil(function() return menuState() == ST_MAIN end, 1800, {
-      H.call(function() tap("x") end),
-    }, tag .. ": main menu"),
-    H.release(), H.waitFrames(10),
-    seek(ST_MAIN, function() return EQUIP_ROW end, "up", "down", "cursor on Equip"),
-    H.release(), H.waitFrames(10),
-    press(ST_CHAR, "character list"),
-    seek(ST_CHAR, mogRow, "up", "down", "cursor on MOG"),
-    H.call(function()
-      H.assertEq(H.readByte(0x69 + mogRow()), MOG, tag .. ": the list row under the cursor is MOG")
-    end),
-    H.release(), H.waitFrames(10),
-    press(ST_OPT, "options row"),
-    seek(ST_OPT, function() return OPT_EMPTY end, "left", "right", "cursor on Empty"),
-    H.release(), H.waitFrames(10),
-    H.call(function() H.screenshot("moogle_strip_mog") end),
-    H.pressButtons({ "a" }, 4),
-    H.waitFrames(20),
-    H.call(function()
+    H.emptyEquip(MOG, { tag = tag, check = function()
       H.log(string.format("%s: f%d after Empty gear %s %s", tag, H.frame, mogGear(), bagLine()))
-      H.assertEq(mogGear(), "FF FF FF FF", tag .. ": MOG's four slots read empty")
       H.assertEq(H.invCountOf(MITHRIL_PIKE), pikeBefore + 1, tag .. ": one more Mithril Pike in the bag")
       H.assertEq(H.invCountOf(MITHRIL_SHLD), shieldBefore + 1, tag .. ": one more Mithril Shld in the bag")
-    end),
-    H.driveUntil(function() return H.hasControl() end, 2400, {
-      H.call(function() tap("b") end),
-    }, tag .. ": back out to the field"),
-    H.release(), H.waitFrames(20),
+    end }),
   })
 end
 
