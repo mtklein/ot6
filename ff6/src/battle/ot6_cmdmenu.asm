@@ -2,10 +2,10 @@
 ; Battle command submenus: list builders and per-row draw shims
 ;
 ; Everything OT6 adds to the in-battle command windows: Blitz-as-a-menu, the
-; priced/greyed row decorators for Blitz, Tools and Dance, and Cyan's SwdTech
-; submenu (open, window fill, confirm). All of it is called from btlgfx bank
-; $C1/$C3 shims. The Steal submenu is the same shape but lives with its kit,
-; in ot6_thief.asm.
+; priced/greyed row decorators for Blitz, Tools and Dance, the greyed rows of
+; the Rage window, and Cyan's SwdTech submenu (open, window fill, confirm).
+; All of it is called from btlgfx bank $C1/$C3 shims. The Steal submenu is
+; the same shape but lives with its kit, in ot6_thief.asm.
 ; ------------------------------------------------------------------------------
 
 ; [ open the Blitz command as a menu ]
@@ -337,6 +337,59 @@
 
 ; ------------------------------------------------------------------------------
 
+; [ grey both columns of a Rage menu row the caster cannot afford ]
+;
+; DrawRageListText (btlgfx, bank C1) jsl's here after copying the template
+; and storing the two row ids, where DrawDanceListText calls
+; Ot6DanceRowDecorate.  Rage's price is flat (Ot6RageCost: 8 at every boost
+; level, the chance-verb rule in docs/design/mp-economy.md), so a per-row
+; number would say the same thing on every row and the wallet already says
+; it; the template keeps vanilla's layout, no cost stamped.  What the window
+; lacked was magic's grey: until #225 a Gau under 8 MP could pick a beast and
+; lose the turn to CalcAttackEffect's universal fizzle with no warning.  So
+; the two font bytes (+3 for column 1, +9 for column 2: the RageListText
+; template's $04,$21 pairs) take Ot6AbilityGrey's answer for the one price,
+; and every beast greys at once, because the whole verb is out of reach
+; together -- the presentation a 0-BP SwdTech window gets from
+; Ot6BushidoRowGrey.  An empty ($ff) cell stays white, as in the dance
+; window.
+;
+; The C1 call sits inside `.if OT6_MP_COSTS` (unlike the dance decorator's),
+; so this proc is flag-gated with the confirm gates below and the nomp ROM
+; keeps its bytes.
+;
+; entry from a jsl: db=$7e, a8/i16 (DrawRageListText's own widths).
+; w7e5755 = $5755 near; the literals below are its offsets.  clobbers A only.
+.proc Ot6RageRowDecorate
+        .a8
+        .i16
+        lda     $575a           ; +5 = column-1 rage id (the caller wrote it)
+        jsl     Ot6RageRowGrey  ;   -> $04 grey / $00 white
+        ora     #$21
+        sta     $5758           ; +3: column-1 font palette
+        lda     $5760           ; +11 = column-2 rage id
+        jsl     Ot6RageRowGrey
+        ora     #$21
+        sta     $575e           ; +9: column-2 font palette
+        rtl
+.endproc
+
+; [ a rage row's grey: the flat price against the caster's pool ]
+; in: A = the row's rage id ($ff = empty).  out: A = $00 (white) | $04
+; (grey).  preserves X and Y.
+.proc Ot6RageRowGrey
+        .a8
+        .i16
+        cmp     #$ff
+        bne     :+
+        lda     #$00            ; empty cell: nothing to pay for, stays white
+        rtl
+:       jsl     Ot6RageCost     ; the one authority, the price the start pays
+        jml     Ot6AbilityGrey  ; ...and the one verdict (its rtl returns for us)
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ a kit row's price: which ladder this window is showing, and what the
 ;   pending boost does to it ]
 ;
@@ -403,7 +456,7 @@
 ; because a boost multiplies the price, so a row affordable unboosted prices
 ; out the moment BP is spent on it (docs/design/narshe-descent.md).
 ;
-; These two procs are that second half, and they are deliberately thin: the
+; These procs are that second half, and they are deliberately thin: the
 ; price comes from the SAME leaf the drawn number and the charge take, and the
 ; verdict comes from the SAME Ot6AbilityGrey the row's colour takes, so
 ; "greyed" and "refused" cannot come apart.  There is no fourth opinion about
@@ -464,6 +517,24 @@
         rep     #$10
         .i16
         jsl     Ot6DanceRowCost
+        jsl     Ot6AbilityGrey
+        plp
+        bra     Ot6ConfirmVerdict
+.endproc
+
+; The Rage entry.  The rage window is the third priced window with a confirm
+; of its own (UpdateMenuState_1e @852a), and the row it hands us is the rage
+; id out of $257e,x, the byte Ot6RageRowDecorate greyed one draw earlier; C1
+; has already rejected an $ff cell, so there is no empty-cell arm here, and
+; the price is Ot6RageCost's flat one, so no pending boost is asked about.
+; in: A = rage id.  out: carry set = payable.  db=$7e, a8.  X and Y are
+; preserved (the commit reloads the id through X).  rtl.
+.proc Ot6RageConfirmMP
+        .a8
+        php
+        rep     #$10
+        .i16
+        jsl     Ot6RageCost
         jsl     Ot6AbilityGrey
         plp
         bra     Ot6ConfirmVerdict

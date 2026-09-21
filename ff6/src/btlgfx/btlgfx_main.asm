@@ -23,13 +23,15 @@
 ; ot6: the same build-time gate battle_main.asm carries, for the same reason.
 ; Bank C1 owns the menu states, so the confirm half of "an unaffordable row is
 ; greyed AND refused" (docs/design/mp-economy.md, ruling 2) has to be stated
-; here: Ot6KitConfirmMP at the tools-shell confirm and Ot6DanceConfirmMP at the
-; dance confirm, each a couple of bytes gated on this flag and answered in bank
-; F0.  This module is therefore assembled twice (configure.py), and with
-; `-D OT6_MP_COSTS=0` not one byte of the gates is emitted, so the nomp control
-; ROM's C1 is the same object it always was.  Nothing else in this file reads
-; the flag: the row decorators are ALWAYS-defined F0 shims (code_ext.inc)
-; precisely so that the drawing stays flag-free.
+; here: Ot6KitConfirmMP at the tools-shell confirm, Ot6DanceConfirmMP at the
+; dance confirm and Ot6RageConfirmMP at the rage confirm, each a couple of
+; bytes gated on this flag and answered in bank F0.  This module is therefore
+; assembled twice (configure.py), and with `-D OT6_MP_COSTS=0` not one byte of
+; the gates is emitted, so the nomp control ROM's C1 is the same object it
+; always was.  The Blitz, Tools and Dance row decorators are ALWAYS-defined F0
+; shims (code_ext.inc) so that drawing stays flag-free; the rage window's grey
+; (Ot6RageRowDecorate) came after the per-flag assembly and is gated like the
+; confirms.
 .ifndef OT6_MP_COSTS
 OT6_MP_COSTS = 1
 .endif
@@ -11109,6 +11111,11 @@ DrawRageListText:
         sta     w7e5755+5
         lda     $257f,y
         sta     w7e5755+11
+.if OT6_MP_COSTS
+        jsl     Ot6RageRowDecorate      ; ot6: grey both columns when the flat
+                                        ;   price is past the pool (#225); no
+                                        ;   cost drawn, vanilla's layout kept
+.endif
         jsr     InitListTextTfr
         jsr     DrawListText
         ply
@@ -20296,6 +20303,15 @@ UpdateMenuState_1e:
         lda     $257e,x
         cmp     #$ff
         beq     @8548
+.if OT6_MP_COSTS
+        ; ot6: the rage window is greyed too (Ot6RageRowDecorate), so it gets
+        ; the confirm refusal the dance window has at @85f0.  It lands on
+        ; @8548, vanilla's own "this row is not available" buzz, which sits
+        ; BEFORE the confirm sound -- magic's shape.  The call clobbers A and
+        ; preserves X; the commit below reloads the id through X anyway.
+        jsl     Ot6RageConfirmMP
+        bcc     @8548
+.endif
         inc     $96
         lda     $257e,x
         sta     w7e7a85

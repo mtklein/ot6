@@ -344,6 +344,26 @@ gate). The boost buys swings.
    btlgfx is assembled once per flag for exactly this (`configure.py`),
    so the `OT6_MP_COSTS=0` control ROM emits neither call and stays the
    byte-for-byte baseline it was.
+
+   **Rage has the same surface, without a number** (#225). Rage's price
+   is flat, so a per-row price would say the same thing on every row and
+   the wallet already says it; what the window lacked was the grey and
+   the refusal, and until #225 a Gau under 8 MP could pick a beast and
+   lose the turn to the execution fizzle with no warning. The command row
+   is not the place for it: the four-row command window's only colour is
+   vanilla's disabled bit (`$202f`, set by `UpdateCmdList` on Mute, Imp,
+   Morph and equipment changes, never on the pool moving), and a row with
+   that bit set is skipped by the cursor (`check_command`), which is a
+   different idiom from magic's buzz. So the surface is the Rage window
+   itself, the dance window's shape: `DrawRageListText` greys both
+   columns through `Ot6RageRowDecorate` (the flat `Ot6RageCost` against
+   the pool, `Ot6AbilityGrey`'s verdict, every beast grey at once because
+   the whole verb is out of reach together, as a 0-BP SwdTech window is)
+   and the rage confirm (`UpdateMenuState_1e` @852a) asks
+   `Ot6RageConfirmMP` the same question and lands on vanilla's own
+   not-available buzz, before the confirm sound. Both C1 calls sit
+   inside `.if OT6_MP_COSTS`; the control ROM is unchanged.
+   `battle_ragerefuse` is the suite.
 3. **Rounding is computed once.** `Ot6BoostPriceFor` is the only place
    the arithmetic lives, and every surface that states a price -- the
    drawn number, the grey, the confirm, the charge -- reaches it, so the
