@@ -142,7 +142,9 @@ COMPOSED="$PRELUDE"
 # docs/TOOLING.md), so macOS runs a Gatekeeper assessment on every new bundle
 # path.
 SRC_APP="$ROOT/tools/Mesen.app"
-MESEN_CACHE="$HOME/Library/Caches/ot6"
+# OT6_MESEN_CACHE relocates the cache (shared_emulator_selftest.sh provisions
+# into a scratch one); the default is the machine-wide path above.
+MESEN_CACHE="${OT6_MESEN_CACHE:-$HOME/Library/Caches/ot6}"
 SHARED_APP="$MESEN_CACHE/Mesen-test.app"
 # Rebuild the shared copy when the source bundle changes (a Mesen upgrade).
 # -L: in a worktree tools/Mesen.app is a symlink into the main tree.
@@ -162,39 +164,51 @@ if ! shared_app_ready; then
   # nests it rather than replacing it, which would corrupt the bundle).
   mkdir -p "$MESEN_CACHE"
   LOCK="$MESEN_CACHE/.build.lock"
-  if mkdir "$LOCK" 2>/dev/null; then held=1; else
-    held=""; waited=0
-    while [ -d "$LOCK" ] && ! shared_app_ready; do
-      sleep 1; waited=$((waited + 1))
-      [ "$waited" -gt 180 ] && { echo "stale lock $LOCK; remove it and retry"; exit 2; }
-    done
-    shared_app_ready || { mkdir "$LOCK" 2>/dev/null && held=1; }
-  fi
+  held=""; waited=0
+  until shared_app_ready; do
+    if mkdir "$LOCK" 2>/dev/null; then held=1; break; fi
+    sleep 1; waited=$((waited + 1))
+    [ "$waited" -gt 180 ] && { echo "stale lock $LOCK; remove it and retry"; exit 2; }
+  done
   if [ -n "$held" ]; then
     # Release the lock however we leave: a run that dies mid-build must not
     # wedge every later worker behind a lock nobody holds.
     HELD_LOCK="$LOCK"
-    echo "creating shared test emulator (one-time; expect a Gatekeeper scan)..."
-    TMP="$MESEN_CACHE/.build.$$"
-    rm -rf "$TMP" "$SHARED_APP" "$SHARED_APP.stamp"
-    # cp -c = APFS clonefile: instant and ~zero physical disk.  -L because in
-    # a worktree the source is a symlink and cp -R would copy the LINK.
-    cp -c -RL "$SRC_APP" "$TMP" 2>/dev/null || cp -RL "$SRC_APP" "$TMP" || {
-      rm -rf "$TMP"; echo "could not copy $SRC_APP"; exit 2; }
-    # No settings.json (nor the .bak rotation Mesen leaves beside it) may
-    # survive into the copy, or portable mode wins and every worker is back
-    # on one shared config.
-    rm -f "$TMP/Contents/MacOS/settings.json" "$TMP"/Contents/MacOS/settings.*.bak
-    # Profile dirs the source bundle accumulated while it was portable belong
-    # to the user's play profile, not to the tests; they must not ride along.
-    rm -rf "$TMP/Contents/MacOS/Saves" "$TMP/Contents/MacOS/SaveStates" \
-           "$TMP/Contents/MacOS/RecentGames" "$TMP/Contents/MacOS/Debugger"
-    mv "$TMP" "$SHARED_APP"
-    printf '%s' "$SRC_STAMP" > "$SHARED_APP.stamp"
+    # Look again under the lock.  The look that sent us here can predate the
+    # previous holder's last step, and a rebuild on that stale look tears a
+    # finished bundle down under every worker between its own look and its
+    # exec (#242: three generate edges died that way on a cold cache).
+    if ! shared_app_ready; then
+      echo "creating shared test emulator (one-time; expect a Gatekeeper scan)..."
+      TMP="$MESEN_CACHE/.build.$$"
+      rm -rf "$TMP" "$SHARED_APP" "$SHARED_APP.stamp"
+      # cp -c = APFS clonefile: instant and ~zero physical disk.  -L because
+      # in a worktree the source is a symlink and cp -R would copy the LINK.
+      cp -c -RL "$SRC_APP" "$TMP" 2>/dev/null || cp -RL "$SRC_APP" "$TMP" || {
+        rm -rf "$TMP"; echo "could not copy $SRC_APP"; exit 2; }
+      # No settings.json (nor the .bak rotation Mesen leaves beside it) may
+      # survive into the copy, or portable mode wins and every worker is back
+      # on one shared config.
+      rm -f "$TMP/Contents/MacOS/settings.json" "$TMP"/Contents/MacOS/settings.*.bak
+      # Profile dirs the source bundle accumulated while it was portable
+      # belong to the user's play profile, not to the tests; they must not
+      # ride along.
+      rm -rf "$TMP/Contents/MacOS/Saves" "$TMP/Contents/MacOS/SaveStates" \
+             "$TMP/Contents/MacOS/RecentGames" "$TMP/Contents/MacOS/Debugger"
+      mv "$TMP" "$SHARED_APP"
+      printf '%s' "$SRC_STAMP" > "$SHARED_APP.stamp"
+    fi
     rm -rf "$LOCK"; HELD_LOCK=""
   fi
 fi
 shared_app_ready || { echo "shared test emulator missing at $SHARED_APP"; exit 2; }
+# Test-only: shared_emulator_selftest.sh drives many workers through the
+# gate above against a scratch cache and stops each one here, before the
+# Gatekeeper scan a fresh bundle path would cost.
+if [ -n "${OT6_PROVISION_PROBE_OUT:-}" ]; then
+  printf '%s\n' "$SHARED_APP" > "$OT6_PROVISION_PROBE_OUT"
+  exit 0
+fi
 
 # Remove any stale per-worker bundle in build/.  Test -L as well as -e: it
 # may be a symlink whose target is gone, and -e alone is false for that.

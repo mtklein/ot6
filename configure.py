@@ -16,7 +16,12 @@ from the root):
   ff6 assets     tracked-source encoders: text json -> .dat/.inc, mml ->
                  song/sfx .asm, monster stencils, lzss compression, the SPC
                  program.  They write tracked paths (committed outputs; a
-                 clean build reproduces them byte-for-byte).
+                 build from a clean git tree reproduces them byte-for-byte).
+                 Never `ninja -t clean`: it deletes those tracked outputs,
+                 and the encoders update several of them in place
+                 (update_array_inc.py asserts the .inc exists), so the tree
+                 can no longer build.  A clean build means a clean git tree
+                 (`git status` empty), not a cleaned build directory.
   ff6 objects    ca65 with --create-dep; depfiles are rebased to root-relative
                  paths (tools/build/rebase_depfile.py) because ca65 runs with
                  cwd=ff6 and ninja resolves depfile paths against the root.
@@ -531,6 +536,8 @@ check("stamp_selftest", "sh tools/tests/lib/savestate_stamp_selftest.sh",
        "tools/tests/lib/savestate_stamp.sh"])
 check("runner_isolation", "sh tools/tests/lib/runner_isolation_selftest.sh",
       ["tools/tests/lib/runner_isolation_selftest.sh", "tools/tests/run.sh"])
+check("shared_emulator", "sh tools/tests/lib/shared_emulator_selftest.sh",
+      ["tools/tests/lib/shared_emulator_selftest.sh", "tools/tests/run.sh"])
 checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
     + glob("tools/tests/checkpoints/*/*.sram")
 # #218: every checkpoint validates, and every line says which save its

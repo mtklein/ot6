@@ -133,6 +133,11 @@ No worker owns a copy of the emulator. Every worker execs one shared
 read-only bundle at `~/Library/Caches/ot6/Mesen-test.app`, cloned from
 `tools/Mesen.app` once per machine with its `settings.json` stripped, and
 each gets its own `CFFIXED_USER_HOME`, so nothing is written inside the app.
+`OT6_MESEN_CACHE` relocates that cache (`lib/shared_emulator_selftest.sh`
+provisions into a scratch one). Many workers arriving at a cold cache build
+it exactly once -- the builder looks again under the lock before the
+destructive step -- and every one is handed the finished bundle (#242;
+`build/checks/shared_emulator.ok` guards it).
 Two properties this depends on:
 
 * A `settings.json` beside the binary puts Mesen in portable mode with one
