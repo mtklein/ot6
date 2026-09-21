@@ -89,6 +89,8 @@ tools/tests/battle_toolsgrey.lua	.writeWord(	quarantine: #124's re-rolled battle
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
 tools/tests/battle_vanish.lua	.writeByte(	quarantine: #190 mechanism staging -- Vanish and Image are poked onto a monster on stage (the bit is all the engine's status set leaves for them) because the Ninja's Inviz is on the Floating Continent; the property under test is the lib's read and the miss it predicts
+tools/tests/battle_zombieraise.lua	.writeByte(	quarantine: #245 mechanism staging -- an ally is poked to 0 HP with STATUS1 $80|$02 (dead and Zombie) at another member's open command window, because Zombie is a monster special's roll (Zombone in the Sealed Gate cave) hours from any fixture; the property under test is the raise rule's read of the bit
+tools/tests/battle_zombieraise.lua	.writeWord(	quarantine: #245 mechanism staging, same reason as its writeByte line
 tools/tests/codex_ctx.lua	.writeWord(	quarantine: the Veldt serves the SAVE's recorded history, and the fighting lineage's history feeds the gau_joined trio packs that wiped the read-half search; the clamp tops ally HP each resolve pulse and never touches the codex pages or seed bits under test
 tools/tests/field_healpolicy.lua	.writeWord(	quarantine: the healthy-fixture campaign (#122 fallout) leaves no savestate that arrives hurt, so the test writes its own patient's HP
 tools/tests/field_subjob.lua	.writeByte(

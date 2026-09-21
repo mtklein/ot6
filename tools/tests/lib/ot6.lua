@@ -749,6 +749,8 @@ end
 -- to act, and is planned for only at a window the engine keeps.
 M.ST1_IMP, M.ST2_BERSERK, M.ST2_SLEEP, M.ST3_STOP = 0x20, 0x10, 0x80, 0x10
 M.ST1_PETRIFY, M.ST4_FROZEN = 0x40, 0x02
+-- and Zombie (STATUS1 bit 1), which no raise lands on (M.raiseDecision)
+M.ST1_ZOMBIE = 0x02
 --   s1, s2, s3, s4   the entity's STATUS1/2/3/4 bytes
 -- Returns the name of the status that denies the turn, or nil.
 function M.turnDenied(o)
@@ -1046,11 +1048,21 @@ end
 --   smallestHit  the living enemy's smallest observed hit, or nil
 --   killInReach  (b) above, boolean
 --   topUpFirst   (a) above, boolean;  topUp  the HP that top-up gives
+--   zombie       STATUS1 $02 on the fallen member (#245): a Fenix Down
+--                never lands on one -- vector_crash spent 8 that way, each
+--                "never landed (841 ticks) -- forgetting it" (#220,
+--                build/attempts/v018-qual1.log:8551) -- and the field
+--                care's Revivify clears the bit after the fight (ff443cb0)
 --
 -- Returns the raise HP, true to raise / false to refuse, and the reason.
 function M.raiseDecision(o)
   local maxhp, power = o.maxhp or 0, o.power or 2
   local raiseHp = (maxhp * power) >> 4
+  if o.zombie then
+    return raiseHp, false, "a ZOMBIE (STATUS1 $02): a Fenix Down never lands on one "
+      .. "(vector_crash spent 8 that way, #220); the field care's Revivify clears it "
+      .. "after the fight"
+  end
   if raiseHp <= 0 then return raiseHp, false, "nothing to raise to" end
   local hit = o.smallestHit
   if hit == nil then return raiseHp, true, "no enemy hit measured yet" end
@@ -4344,7 +4356,8 @@ function Driver:raiseOk(e, actor)
       end
     end
   end
-  local o = { maxhp = maxhp, power = M.itemPower(BATTLE.FENIX_DOWN), smallestHit = hit }
+  local o = { maxhp = maxhp, power = M.itemPower(BATTLE.FENIX_DOWN), smallestHit = hit,
+              zombie = status1Has(e, M.ST1_ZOMBIE) }
   local detail = ""
   if hit ~= nil and hit >= raiseHp then
     -- (b) a kill in reach: the last monster against the party's window
