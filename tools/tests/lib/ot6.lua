@@ -7323,20 +7323,45 @@ end
 -- (a game over freezes the pad before an A can auto-Continue it).
 -- The A cadence is closure state of this constructor's own, so it is named
 -- through withReset (the library's state is the library's to clear, #196).
+--
+-- What the run presses this frame (#245), pure so a test can put the two
+-- shapes side by side:
+--   standing   monsters alive and on stage (the M.stageSlots count)
+--   menu       $7BCA, nonzero while a battle menu window is up
+--   state      $7BC2, that window's state (BATTLE.ST_CMD: the command window)
+--   phase      a frame counter for the A and B cadences
+-- Nothing standing and no window: A through the spoils (above).  A
+-- selection window up: B beside the L+R.  In Wait mode a list or a target
+-- window stops the battle clock -- btlgfx UpdateMenuState_05 `inc $2f41`
+-- at the A that opens one, and UpdateBattleTime (`lda $2f41 / and $3a8f /
+-- bne`) skips the tick while it is set -- and the run counter only moves
+-- on the tick (CheckRunAway, from the tick's per-entity walk), so a lone
+-- survivor whose list was open when the others fell holds L+R for the
+-- whole budget (battle_assassinate shift 42 sat 8752 frames that way).
+-- The command window itself runs the clock (`stz $2f41` at its entry),
+-- and nothing at it reads B, so B is pressed only where it closes
+-- something.  Measured in battle_fleesolo.
+function M.fleePress(o)
+  if o.standing == 0 and o.menu == 0 then
+    return (o.phase % 8 < 4) and { a = true } or {}
+  end
+  if o.menu ~= 0 and o.state ~= BATTLE.ST_CMD then
+    return { l = true, r = true, b = (o.phase % 8 < 4) }
+  end
+  return { l = true, r = true }
+end
+
 function M.fleeBattle(maxFrames)
-  local aPhase = 0
+  local phase = 0
   return M.withReset(M.driveUntil(function()
     return not M.battleLoadStarted()
   end, maxFrames or 9000, {
     M.call(function()
-      if #M.stageSlots() == 0 and M.readByte(0x7BCA) == 0 then
-        aPhase = (aPhase + 1) % 8
-        M.setPad(aPhase < 4 and { "a" } or {})
-      else
-        M.setPad({ l = true, r = true })
-      end
+      phase = (phase + 1) % 8
+      M.setPad(M.fleePress({ standing = #M.stageSlots(), menu = M.readByte(BATTLE.MENU),
+                             state = M.readByte(BATTLE.MSTATE), phase = phase }))
     end),
-  }, "flee battle (hold L+R)"), function() aPhase = 0 end)
+  }, "flee battle (hold L+R)"), function() phase = 0 end)
 end
 
 

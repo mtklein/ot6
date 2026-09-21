@@ -62,6 +62,8 @@ tools/tests/battle_dotchip.lua	.writeByte(
 tools/tests/battle_dotchip.lua	.writeWord(
 tools/tests/battle_esperstats.lua	.writeByte(
 tools/tests/battle_esperstats_tube6.lua	.writeByte(
+tools/tests/battle_fleesolo.lua	.writeByte(	quarantine: #245 mechanism staging -- two members are poked dead (hp=0 + STATUS1 $80, the engine's own corpse shape) under a third's open Item list, because a natural double death under an open list is a roll no fixture near a save point makes on cue; the property under test is the flee step's read of the window and the engine's own run counter
+tools/tests/battle_fleesolo.lua	.writeWord(	quarantine: #245 mechanism staging, same reason as its writeByte line
 tools/tests/battle_fontrestore.lua	.writeByte(	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
 tools/tests/battle_fontrestore.lua	emu.write	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
 tools/tests/battle_gaufight.lua	.writeByte(
