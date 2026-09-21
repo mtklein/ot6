@@ -83,13 +83,13 @@ local F = H.newFightDriver("IAF", FIGHT)
 -- (the Atomic Ray), then the body the moment the countdown starts, and
 -- lets the bay be.  The same driver options with that kill order passed
 -- that exact fight (the rest of the route byte-identical) and all 10 runs
--- (9 distinct seeds) from the Ultros teaser.  The masks are the target window's
--- monster bits, measured (airforcelab_tgtwatch.py: bit = slot); the gun's
--- bit is the default cursor and the body's is one LEFT from it.
-local AF_FIGHT = {}
-for k, v in pairs(FIGHT) do AF_FIGHT[k] = v end
-AF_FIGHT.focus = { { slot = 2, mask = 0x04 }, { slot = 0, mask = 0x01 }, { slot = 4, mask = 0x10 } }
-local FAF = H.newFightDriver("IAF", AF_FIGHT)
+-- (9 distinct seeds) from the Ultros teaser.  That order was a mask this
+-- file authored; the driver now plans it from the formation's own
+-- scripts (#189, readParts): the gun's death sets battle switch 0.0,
+-- which the body's script counts from, the body's death ends the fight,
+-- the Speck is the body's own and the bay's death changes nothing --
+-- kill order {2, 0}, the same driver on the same options.
+local FAF = H.newFightDriver("IAF", FIGHT)
 local function airForceUp() return H.formationHas({ [0x0113] = true }) end
 
 local function kitSteps(char, name, pairs_)

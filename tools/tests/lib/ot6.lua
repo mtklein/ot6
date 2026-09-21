@@ -2991,6 +2991,165 @@ function M.focusSlots(focus, words)
   return out
 end
 
+-- ---- multi-part monsters (#189) ---------------------------------------
+-- battle_monsters.dat says which slots a formation fills and with what
+-- (15 bytes a formation: +1 the present mask, +2..+7 the species low
+-- bytes with $FF for an empty slot, +14 the species high bits -- the
+-- decode tools/audit_encounters.py's Data.bodies does, copied here so the
+-- driver reads the ROM it boots).  What those slots ARE to one another is
+-- in their AI scripts (ff6/src/battle/ai_script.asm; AIScriptPtrs one word
+-- a species into AIScript): a main section and a retaliation section,
+-- each ended by $FF, of opcodes $F0..$FE at fixed lengths (M.AI_OP_LEN)
+-- and single attack bytes under $F0.  A block is its `if` conditions
+-- ($FC, one after another) then its commands then one $FE.  The
+-- retaliation block whose conditions include `if_self_dead` (FC 12 00 00)
+-- is what a part's death does, and M.partRoles reads it for three
+-- shapes, measured on the two route fights (the bytes are in
+-- parts_selftest, from the built ROM):
+--   boss_death    F5 anim $0C op 1 mask $FF: its death ends the fight --
+--                 the BODY (Number 128 $10B, the Air Force $113)
+--   restore self  F5 anim, op 0 or 2, a mask with its own bit: it comes
+--                 back on its own death -- the blades $13F/$140 (INSTANT
+--                 restore then a FADE_UP hide there, the FADE_DOWN
+--                 restore in the main section on the monster timer)
+--   set switch    F9 01 var sw: its death arms a switch another slot's
+--                 script reads (FC 14 var sw) -- the Laser Gun $145 sets
+--                 0.0 with two standing and the Air Force's main section
+--                 counts six turns from it to WAVECANNON
+-- and every section for `restore_monsters` of OTHER slots (the Air Force
+-- brings the Speck $146 into slot 3, present bit clear until then).
+-- M.partsPlan turns the roles into a kill order, and the driver
+-- (readParts) reads the live species words and the ROM once a battle.
+M.AI_OP_LEN = { [0xF0] = 4, [0xF1] = 2, [0xF2] = 4, [0xF3] = 3, [0xF4] = 4, [0xF5] = 4,
+                [0xF6] = 4, [0xF7] = 2, [0xF8] = 3, [0xF9] = 4, [0xFA] = 4, [0xFB] = 3,
+                [0xFC] = 4, [0xFD] = 1, [0xFE] = 1, [0xFF] = 1 }
+M.AI_SCRIPT_MAX = 2048            -- bytes walked before a script with no end is given up on
+
+-- The formation record's 15 bytes, byteAt(i) for i = 0..14.  Returns the
+-- present mask and the species per filled slot.
+function M.formationRecord(byteAt)
+  local out = { present = byteAt(1) & 0x3F, species = {} }
+  for slot = 0, 5 do
+    local lo = byteAt(2 + slot)
+    if lo ~= 0xFF then out.species[slot] = lo | (((byteAt(14) >> slot) & 1) << 8) end
+  end
+  return out
+end
+
+-- One species' script, byteAt(i) from its first byte, for the monster in
+-- `slot`.  Returns endsBattle, respawns, arms (the switches its death
+-- sets), reads (the switches its script tests), restores and kills (the
+-- masks of OTHER slots it brings in or takes out anywhere in the script).
+function M.partRoles(byteAt, slot)
+  local r = { endsBattle = false, respawns = false, arms = {}, reads = {}, restores = 0, kills = 0 }
+  local own = 1 << slot
+  local i, section = 0, 0
+  local conds, inDeath = false, false  -- inside a block's conditions; the block's are if_self_dead
+  while section < 2 and i < M.AI_SCRIPT_MAX do
+    local op = byteAt(i)
+    local len = M.AI_OP_LEN[op] or 1
+    if op == 0xFC then
+      if not conds then conds, inDeath = true, false end
+      if section == 1 and byteAt(i + 1) == 0x12 and byteAt(i + 2) == 0 and byteAt(i + 3) == 0 then
+        inDeath = true
+      end
+      if byteAt(i + 1) == 0x14 then r.reads[#r.reads + 1] = { var = byteAt(i + 2), switch = byteAt(i + 3) } end
+    else
+      conds = false
+      if op == 0xFE then
+        inDeath = false
+      elseif op == 0xFF then
+        section, inDeath = section + 1, false
+      elseif op == 0xF5 then
+        local anim, mode, mask = byteAt(i + 1), byteAt(i + 2), byteAt(i + 3)
+        if mask == 0 then mask = own end
+        if mode == 1 and (anim == 0x0C or mask == 0xFF) then
+          if inDeath then r.endsBattle = true end
+        elseif mode == 1 then
+          r.kills = r.kills | (mask & ~own & 0x3F)
+        elseif mode == 0 or mode == 2 then
+          if inDeath and (mask & own) ~= 0 then r.respawns = true end
+          r.restores = r.restores | (mask & ~own & 0x3F)
+        end
+      elseif op == 0xF9 and byteAt(i + 1) == 1 and inDeath then
+        r.arms[#r.arms + 1] = { var = byteAt(i + 2), switch = byteAt(i + 3) }
+      end
+    end
+    i = i + len
+  end
+  return r
+end
+
+-- The kill order for a formation of linked parts, or nil for one that is
+-- not: no slot's death ends the fight, more than one slot's does (the
+-- Whelk's shell and head, $1B0, each carry a boss_death and restore the
+-- other; nothing here says which to hit), or none of the others is tied
+-- to the one by a script.  o.slots[slot] = { species, roles }.
+--   body    the one slot whose death ends the fight
+--   order   the slots to take, first to last: every part whose death
+--           arms a switch another slot reads, in slot order, then the
+--           body.  A part that comes back on its own death is not
+--           chased, and neither is one whose death changes nothing in
+--           the script (a part another slot brings in, or plain filler):
+--           the body's death ends the fight whatever else stands, so
+--           their HP is turns spent for nothing
+--   skip    slot -> why it is left alone;  note  slot -> its role, for the log
+-- Measured against the two route fights: Number 128 ($1BA) reads body,
+-- blades respawn -> order {0}; the Air Force ($1CB) reads body, the gun
+-- arms 0.0 the body reads, the Speck is the body's, the bay is filler ->
+-- order {2, 0}: the orders gen_n128 and gen_fc_landing had authored by
+-- hand, the second the best of docs/design/airforce.md's eight policies
+-- (gunbody 10/10 wins, 0 Fenix; body first 8/10; bay first 9/10 at 1.6x
+-- the frames).
+function M.partsPlan(o)
+  local slots = o.slots
+  local body, bodies = nil, 0
+  for slot = 0, 5 do
+    if slots[slot] and slots[slot].roles.endsBattle then body, bodies = body or slot, bodies + 1 end
+  end
+  if bodies ~= 1 then return nil end
+  local order, skip, note, linked = {}, {}, {}, false
+  for slot = 0, 5 do
+    local p = slots[slot]
+    if p and slot ~= body then
+      local armsFor, spawner = nil, nil
+      for _, a in ipairs(p.roles.arms) do
+        for s2 = 0, 5 do
+          local q = slots[s2]
+          if q and s2 ~= slot then
+            for _, rd in ipairs(q.roles.reads) do
+              if rd.var == a.var and rd.switch == a.switch then armsFor = { slot = s2, var = a.var, switch = a.switch } end
+            end
+          end
+        end
+      end
+      for s2 = 0, 5 do
+        local q = slots[s2]
+        if q and s2 ~= slot and (q.roles.restores & (1 << slot)) ~= 0 then spawner = s2 end
+      end
+      if p.roles.respawns then
+        skip[slot] = "comes back on its own death"
+        linked = true
+      elseif armsFor ~= nil then
+        order[#order + 1] = slot
+        note[slot] = string.format("its death arms switch %d.%d, which slot %d's script reads",
+          armsFor.var, armsFor.switch, armsFor.slot)
+        linked = true
+      elseif spawner ~= nil then
+        skip[slot] = string.format("slot %d's script brings it in; its death changes nothing", spawner)
+        linked = true
+      else
+        skip[slot] = "its death changes nothing in the script"
+      end
+      note[slot] = note[slot] or skip[slot]
+    end
+  end
+  if not linked then return nil end
+  order[#order + 1] = body
+  note[body] = "its death ends the fight"
+  return { body = body, order = order, skip = skip, note = note }
+end
+
 -- ------------------------------------------------------- target cursor --
 -- The battle target-select steering machine.  Facts it encodes:
 --   * the live cursor mask ($7B7E monster / $7B7D character) blinks,
@@ -4217,9 +4376,97 @@ function Driver:castVetoed(abilityId, what)
   return true
 end
 
+-- The kill order in force: the authored one (opts.focus) where a
+-- generator wrote one, else the one readParts planned from the
+-- formation's own scripts (#189), else nil (the engine's default cursor).
+function Driver:focusList()
+  if self.opts.focus then return self.opts.focus end
+  if self.parts then return self.parts.focus end
+  return nil
+end
+
+-- The formation's linked parts (#189), read once a battle at the first
+-- command window: the live species words ($57C0, which carry a part not
+-- yet on stage) and each species' AI script out of the ROM (AIScriptPtrs
+-- / AIScript, M.partRoles), through M.partsPlan.  A formation the plan
+-- has nothing to say about reads false and the focus stays the
+-- caller's; a planned one is said once, part by part, with its order.
+function Driver:readParts()
+  local ptrs, base = M.sym("AIScriptPtrs") & 0x3FFFFF, M.sym("AIScript") & 0x3FFFFF
+  local slots = {}
+  for slot = 0, 5 do
+    local species = M.readWord(M.FORMATION + slot * 2)
+    if species ~= 0xFFFF and species < 0x180 then
+      local off = M.readRomWord(ptrs + species * 2)
+      slots[slot] = { species = species,
+                      roles = M.partRoles(function(i) return M.readRomByte(base + off + i) end, slot) }
+    end
+  end
+  local plan = M.partsPlan({ slots = slots })
+  if plan == nil then self.parts = false; return end
+  plan.focus, plan.slots = {}, slots
+  for _, s in ipairs(plan.order) do plan.focus[#plan.focus + 1] = { slot = s, mask = 1 << s } end
+  -- the switches the body's script reads, watched below for the moment
+  -- a part's death sets one (GetBattleVar: $3EB0 + var, bit = switch)
+  plan.switches = {}
+  for _, rd in ipairs(slots[plan.body].roles.reads) do
+    plan.switches[#plan.switches + 1] = { var = rd.var, switch = rd.switch, addr = 0x3EB0 + rd.var,
+                                          bit = 1 << rd.switch }
+  end
+  self.parts = plan
+  local said = {}
+  for slot = 0, 5 do
+    if slots[slot] then
+      said[#said + 1] = string.format("slot %d ($%03X%s): %s", slot, slots[slot].species,
+        monAlive(slot) and "" or ", off stage", plan.note[slot])
+    end
+  end
+  local order = {}
+  for _, s in ipairs(plan.order) do order[#order + 1] = tostring(s) end
+  M.log(string.format("[%s] [parts] a linked formation: %s; kill order %s%s", self.tag or "fight",
+    table.concat(said, "; "), table.concat(order, " then "),
+    self.opts.focus and " (an authored focus list is in force instead)" or ""))
+end
+
+-- What the parts do as the fight runs (#189), for the ledger a person
+-- would keep: each slot falling and returning (how many ticks later),
+-- and each switch the body reads going up.
+function Driver:watchParts()
+  if not self.parts then return end
+  for slot = 0, 5 do
+    if self.parts.slots[slot] then
+      local up = monAlive(slot)
+      local last = self.partsLast[slot]
+      if last ~= nil and up ~= last then
+        if up then
+          M.log(string.format("[%s] [parts] f+%d slot %d ($%03X) returned%s", self.tag or "fight",
+            self.battleTick, slot, self.parts.slots[slot].species,
+            self.partsFell[slot] and string.format(", %d ticks after it fell",
+              self.battleTick - self.partsFell[slot]) or ""))
+        else
+          self.partsFell[slot] = self.battleTick
+          M.log(string.format("[%s] [parts] f+%d slot %d ($%03X) fell", self.tag or "fight",
+            self.battleTick, slot, self.parts.slots[slot].species))
+        end
+      end
+      self.partsLast[slot] = up
+    end
+  end
+  for _, sw in ipairs(self.parts.switches) do
+    local set = (M.readByte(sw.addr) & sw.bit) ~= 0
+    local key = sw.var .. "." .. sw.switch
+    if set and not self.partsSwitch[key] then
+      self.partsSwitch[key] = true
+      M.log(string.format("[%s] [parts] f+%d switch %s SET ($%04X bit %d): the body's script "
+        .. "reads it from here", self.tag or "fight", self.battleTick, key, sw.addr, sw.switch))
+    end
+  end
+end
+
 function Driver:pressTarget()
-  if self.opts.focus then
-    for _, e in ipairs(M.focusSlots(self.opts.focus)) do
+  local focus = self:focusList()
+  if focus then
+    for _, e in ipairs(M.focusSlots(focus)) do
       if M.readWord(BATTLE.MON_HP + e.slot * 2) > 0
          and (M.readByte(BATTLE.MON_PRESENT + e.slot * 2) & 1) == 1
          and self:focusReachable(e.slot) then return e.slot end
@@ -6391,26 +6638,29 @@ function Driver:button(actor)
           self.tag or "fight", chars, wantMask))
       end
     end
-    -- opts.focus = { {slot=S, mask=M} or {species=ID}, ... }: monster
-    -- kill order, steered against the live target mask ($7B7E) the way
-    -- the item line steers $7B7D.  Each entry names a monster slot, or
-    -- a species the formation words resolve to slots (M.focusSlots: a
-    -- multi-part boss's part by its own id); the $7B7E bit that puts
-    -- the cursor on slot S is 1 << S (btlgfx MonsterMaskTbl), and where
-    -- that bit sits on screen is what the target graph learns.  Focus
-    -- picks the first entry whose slot is alive and on stage; single-target
-    -- plans steer to its mask (summons, items and cures keep their own
-    -- targeting), and the tgtSpin backstop still confirms rather than
-    -- holding the turn open.
+    -- The focus list (focusList: opts.focus = { {slot=S, mask=M} or
+    -- {species=ID}, ... } as authored, else the kill order readParts
+    -- planned from the formation's scripts, #189): monster kill order,
+    -- steered against the live target mask ($7B7E) the way the item line
+    -- steers $7B7D.  Each entry names a monster slot, or a species the
+    -- formation words resolve to slots (M.focusSlots: a multi-part
+    -- boss's part by its own id); the $7B7E bit that puts the cursor on
+    -- slot S is 1 << S (btlgfx MonsterMaskTbl), and where that bit sits
+    -- on screen is what the target graph learns.  Focus picks the first
+    -- entry whose slot is alive and on stage; single-target plans steer
+    -- to its mask (summons, items and cures keep their own targeting),
+    -- and the tgtSpin backstop still confirms rather than holding the
+    -- turn open.
     -- A lore is multi-target: the focus rotation would spin against a
     -- whole-side mask it can never match, so it confirms on the default.
-    if self.opts.focus and self.plan.kind ~= "item" and self.plan.kind ~= "summon"
+    local focus = self:focusList()
+    if focus and self.plan.kind ~= "item" and self.plan.kind ~= "summon"
        and self.plan.kind ~= "heal" and self.plan.kind ~= "lore" and not self.plan.ally then
       local want, wantSlot = nil, nil
       -- the first entry standing on the stage now: alive, and its
       -- presence bit ($3AA8) set -- a part that has not entered yet (or
       -- has left) is skipped rather than steered at
-      for _, e in ipairs(M.focusSlots(self.opts.focus)) do
+      for _, e in ipairs(M.focusSlots(focus)) do
         if M.readWord(0x3BFC + e.slot * 2) > 0
            and (M.readByte(0x3AA8 + e.slot * 2) & 1) == 1 and self:focusReachable(e.slot) then
           want, wantSlot = e.mask, e.slot; break
@@ -6605,6 +6855,7 @@ function Driver:idle()
   self.plan, self.planActor, self.held = nil, nil, {}
   self.parkDropN = 0
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
+  self.parts, self.partsLast, self.partsFell, self.partsSwitch = nil, {}, {}, {}
   self.tgtGraphs, self.tgtRouteSaid, self.tgtVisited, self.tgtCycled, self.tgtUnreach = {}, nil, {}, false, {}
   self.parkSt, self.parkN, self.idleSt, self.idleN = nil, 0, nil, 0
   self.unknownSt, self.unknownN, self.unknownSeen, self.sideWindowN = nil, 0, {}, 0
@@ -7062,6 +7313,7 @@ function Driver:frame()
   self:watchDamage()
   self:watchPendingCare()
   self:watchHits()
+  self:watchParts()
   local menu = M.readByte(BATTLE.MENU)
   self:logBattleLine(menu)
   if menu == 0 then
@@ -7077,8 +7329,10 @@ function Driver:frame()
   self.menuStreak = self.menuStreak + 1
   if self.menuStreak < 4 then M.setPad({}); return end
   -- the layout is read once the command window is up (InitBattle has
-  -- run by then) and said at that moment, before any steer needs it
+  -- run by then) and said at that moment, before any steer needs it;
+  -- the formation's parts the same way (readParts, #189)
   if self.layout == nil then self:layoutOf() end
+  if self.parts == nil then self:readParts() end
   local traceActor = M.readByte(BATTLE.ACTOR) & 3
   if self.opts.trace and M.readByte(BATTLE.MSTATE) == BATTLE.ST_ITEM then
     -- the item window, in full: the cursor sum the driver steers ($8947
@@ -7139,6 +7393,12 @@ function M.newFightDriver(tag, opts)
     -- battle and logged; a side attack's group can move, so the crossing
     -- direction is re-read each time it is needed.
     layout = nil,
+    -- The formation's linked parts (#189, readParts): nil until the first
+    -- command window, false for a formation with none, else M.partsPlan's
+    -- kill order with its focus list; and the watch's memory of each
+    -- slot standing, the tick each fell, and the switches seen set.
+    parts = nil,
+    partsLast = {}, partsFell = {}, partsSwitch = {},
     -- Every steer press and whether it moved anything: a direction that
     -- twice changed no cell in the target window is not a direction here
     -- (in a back attack LEFT is an rts), and the driver says so rather than
