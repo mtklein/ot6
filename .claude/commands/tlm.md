@@ -140,8 +140,10 @@ owner asks. Steps, in order, none skipped:
    tag); update README's "vX.Y is the current release" line and tag link.
 3. Commit as `release: vX.Y -- <Name> (version bump + release notes)` on
    main; fast-forward release/vX.Y to it.
-4. `ninja` from clean: `build/release/ot6-vX.Y.zip` must build. That run
-   is the qualification; keep its log.
+4. `ninja` from a clean git tree (`git status` empty; never `ninja -t
+   clean`, which deletes the tracked generated sources the ff6 encoders
+   write and leaves the build unable to run): `build/release/ot6-vX.Y.zip`
+   must build. That run is the qualification; keep its log.
 5. Ombudsman + critic on the release notes against the log since the last
    tag (every claim in the notes must name a commit or a test).
 6. `git tag -a vX.Y -m "OT6 vX.Y -- <Name>"`, `git push origin main

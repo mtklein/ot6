@@ -16,7 +16,12 @@ from the root):
   ff6 assets     tracked-source encoders: text json -> .dat/.inc, mml ->
                  song/sfx .asm, monster stencils, lzss compression, the SPC
                  program.  They write tracked paths (committed outputs; a
-                 clean build reproduces them byte-for-byte).
+                 build from a clean git tree reproduces them byte-for-byte).
+                 Never `ninja -t clean`: it deletes those tracked outputs,
+                 and the encoders update several of them in place
+                 (update_array_inc.py asserts the .inc exists), so the tree
+                 can no longer build.  A clean build means a clean git tree
+                 (`git status` empty), not a cleaned build directory.
   ff6 objects    ca65 with --create-dep; depfiles are rebased to root-relative
                  paths (tools/build/rebase_depfile.py) because ca65 runs with
                  cwd=ff6 and ninja resolves depfile paths against the root.
