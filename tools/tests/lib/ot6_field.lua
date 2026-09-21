@@ -1937,8 +1937,7 @@ end
 -- --------------------------------------------------------- field care --
 -- M.fieldCare: open the field menu and revive, cure and heal the party with
 -- real presses, then close it again.  The status pass is CARE_STATUS_CURES
--- below, and it is one bit today: poison, because poison is the only status
--- that walking makes worse.
+-- below.
 --
 -- ZMENUSTATE = DP $26, and the shared list cursor is DP $4B.
 -- Item path: $05 main menu (Item row 0) -A-> $08 item list ($4B is the
@@ -2024,7 +2023,7 @@ local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
 -- the bag has none of that one: the single-purpose item first, Remedy as
 -- the fallback, since without it a party holding Remedies and no Antidote
 -- would carry the bit for the rest of the route.
-local CARE_EYEDROP = 0xF3
+local CARE_EYEDROP, CARE_REVIVIFY = 0xF3, 0xF1
 local CARE_STATUS_CURES = {
   { bit = 0x40, items = { CARE_SOFT, CARE_REMEDY }, what = "petrify" },
   { bit = 0x04, items = { CARE_ANTIDOTE, CARE_REMEDY }, what = "poison" },
@@ -2033,6 +2032,11 @@ local CARE_STATUS_CURES = {
   -- the bag and nothing reaching for them
   { bit = 0x01, items = { CARE_EYEDROP, CARE_REMEDY }, what = "dark" },
   { bit = 0x20, items = { CARE_REMEDY }, what = "imp" },
+  -- Zombie persists too, and Remedy's mask ($65, item.asm @8bb2) leaves it,
+  -- so Revivify is the one field cure.  A zombied member walks into the
+  -- next fight attacking the party, and the fight driver's raise rule spent
+  -- eight Fenix Downs on two of them at the Vector crash site (#220)
+  { bit = 0x02, items = { CARE_REVIVIFY }, what = "zombie" },
 }
 local MAGIC_LIST, MAGIC_COLOUR = 0x7E9D89, 0x7E9E09
 
@@ -2643,12 +2647,15 @@ local function careKernel(opts)
   -- Ordered before healing rather than after it, because poison drains on
   -- every step (player.asm:593-613): HP restored while the bit is still set
   -- starts draining again the moment the menu closes, so curing first is
-  -- both what a player does and the cheaper order.  A dead, petrified or
-  -- zombie target is skipped, because CheckCanUseItem's own first test is
-  -- the wound branch (item.asm:2282-2286) and a Fenix Down is the only
-  -- thing it accepts there; the revive pass above is what serves them.
+  -- both what a player does and the cheaper order.  A dead target is
+  -- skipped, because CheckCanUseItem's own first test is the wound branch
+  -- (item.asm:2282-2286) and a Fenix Down is the only thing it accepts
+  -- there; the revive pass above is what serves them.  Every other cure
+  -- item checks its own bit and nothing else (@8b8e-@8bbb), so a petrified
+  -- or zombied member is served here: the $C2 mask belongs to the heals,
+  -- which the game refuses on them (@8bc4).
   local function pickStatusCure(target)
-    if M.charHp(target) == 0 or (M.charStatus1(target) & 0xC2) ~= 0 then
+    if M.charHp(target) == 0 or (M.charStatus1(target) & 0x80) ~= 0 then
       return nil
     end
     for _, cure in ipairs(CARE_STATUS_CURES) do
@@ -2715,7 +2722,9 @@ local function careKernel(opts)
   -- healing item's count against its floor (and whether the game refused
   -- it for this target), then the casters -- off, or each one's reason.
   local ITEM_NAMES = { [CARE_TONIC] = "tonic", [CARE_POTION] = "potion",
-                       [CARE_FENIX] = "fenix" }
+                       [CARE_FENIX] = "fenix", [CARE_REVIVIFY] = "revivify",
+                       [CARE_ANTIDOTE] = "antidote", [CARE_EYEDROP] = "eyedrop",
+                       [CARE_SOFT] = "soft", [CARE_REMEDY] = "remedy" }
   local function unserved()
     if pick() ~= nil then return "" end
     local out = {}
@@ -2726,9 +2735,20 @@ local function careKernel(opts)
         local w = { kind = "item", char = c, item = CARE_FENIX, why = "revive" }
         why[#why + 1] = string.format("down; fenix %d in the bag%s",
           M.invCountOf(CARE_FENIX), failed[key(w)] and ", refused" or "")
-      elseif (M.charStatus1(c) & 0xC2) ~= 0 then
-        why[#why + 1] = string.format("status1 $%02X: the menu refuses items and spells alike",
-          M.charStatus1(c))
+      elseif (M.charStatus1(c) & 0x42) ~= 0 then
+        -- petrified or zombied: the heals are refused, only the cure's own
+        -- row can serve them, and it did not
+        for _, cure in ipairs(CARE_STATUS_CURES) do
+          if (M.charStatus1(c) & cure.bit) ~= 0 then
+            for _, item in ipairs(cure.items) do
+              local w = { kind = "item", char = c, item = item,
+                          why = "cure " .. cure.what }
+              why[#why + 1] = string.format("%s: %s %d in the bag, floor %d%s",
+                cure.what, ITEM_NAMES[item], M.invCountOf(item), reserve[item] or 0,
+                failed[key(w)] and ", refused" or "")
+            end
+          end
+        end
       elseif mx > 0 and hp < mx * thresh then
         for _, id in ipairs({ CARE_TONIC, CARE_POTION }) do
           local w = { kind = "item", char = c, item = id, why = "heal" }
@@ -3080,11 +3100,12 @@ local function careKernel(opts)
         st ~= 0 and string.format(" status1=%02X", st) or "")
     end
     return string.format(
-      "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d soft=%d remedy=%d%s",
+      "[%s] %s: %s | tonic=%d potion=%d fenix=%d antidote=%d soft=%d remedy=%d " ..
+      "revivify=%d%s",
       tag, what, table.concat(out, "  "), M.invCountOf(CARE_TONIC),
       M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX),
       M.invCountOf(CARE_ANTIDOTE), M.invCountOf(CARE_SOFT),
-      M.invCountOf(CARE_REMEDY), unserved())
+      M.invCountOf(CARE_REMEDY), M.invCountOf(CARE_REVIVIFY), unserved())
   end
 
   return {
