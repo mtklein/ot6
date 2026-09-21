@@ -172,9 +172,13 @@ route carries the inn, and the sixth is the fight driver's.
   cheapest per point whenever more than a handful of Tonics' worth is
   missing, and the only full MP refill that costs less than one Tincture.
   An inn is a walk and a talk, not a menu, so it is the route's step
-  (`M.innRest`, the shape `gen_kolts` already has), taken at the stops
-  whose next stretch has no counter: Albrook before Vector, Thamasa's
-  1-GP bed before the gauntlet.
+  (`M.innRest`, `gen_kolts`'s `innRest` promoted with the keeper's spot
+  and the price as arguments), taken at a stop whose next stretch has no
+  counter when somebody is short: Albrook before Vector (`gen_vector_entry`;
+  the seeded boot reached the shop with LOCKE 471/619, EDGAR 475/620 and
+  127/149 MP).  Thamasa's 1-GP bed before the gauntlet is not taken,
+  because `thamasa_done` arrives whole in both pools (measured); the step
+  is there for a lineage that does not.
 - **Elixir** -- never in the field.  `careKernel` does not name `$EE`,
   `$EC` or `$ED`, and a roster that lists two Elixirs at a care stop is
   correct to leave them.  A dry caster mid-fight is the fight driver's

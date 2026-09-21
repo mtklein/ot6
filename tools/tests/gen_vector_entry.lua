@@ -342,6 +342,57 @@ H.run({ maxFrames = 160000 }, {
       H.frame - H.vars.shopStart, H.vars.shopStart, H.frame, H.fieldX(), H.fieldY()))
   end),
 
+  -- The inn (#231, docs/design/supply.md): 300 GP for the whole party's
+  -- both pools before the factory, the stretch with no counter and the
+  -- squeeze the fixtures measured (119-226 MP short per stop), against a
+  -- Tincture's 1500 for 50 MP; a person who has just shopped sleeps
+  -- before leaving town.  Off the ROM's tables: the door is 323 (54,12) ->
+  -- 325 (58,56) (short_entrance.dat), the keeper stands at (56,51) facing
+  -- down (npc_prop map 325, event _cc614a: "300 GP if you wanna stay")
+  -- behind his counter, so the talk spot is two tiles below him at
+  -- (56,53), the shape South Figaro's keeper at (81,17) and gen_kolts's
+  -- spot (81,19) have (the first cut asked for (56,52), the counter tile:
+  -- "navTo: no path (58,56)->(56,52)"); the night puts the party by the
+  -- beds at (57,37), and the way out is the (58,57) event trigger below
+  -- the arrival tile (event_trigger.asm).
+  -- Taken only when somebody is short: the seeded post-opera-v1 boot
+  -- reached this tile with LOCKE at 471/619 and EDGAR at 475/620 and 127
+  -- of 149 MP after the world walk.
+  H.cond(function()
+    for _, c in ipairs(H.partyMembers()) do
+      if H.charHp(c) < H.charMaxHp(c) or H.charMp(c) < H.charMaxMp(c) then
+        return true
+      end
+    end
+    H.log("[inn] the party is whole; no night at Albrook")
+    return false
+  end, {
+    H.crossDoor(54, 12, 325, 58, 56, "inn door 323(54,12)->325(58,56)"),
+    H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 2400,
+      "inn interior settled", 10),
+    H.waitFrames(60),
+    H.innRest({ spot = { 56, 53 }, face = "up", price = 300, tag = "Albrook inn" }),
+    H.navTo(58, 56, { maxFrames = 6000, playBattles = "tactical" }),
+    (function() local hb = 0
+      return H.driveUntil(function() return map() == 323 end, 900, {
+        H.call(function() hb = hb + 1
+          if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+          H.setPad({ down = true })
+        end) }, "held DOWN onto the (58,57) trigger -> Albrook 323") end)(),
+    H.release(),
+    H.waitUntil(function()
+      return map() == 323 and H.hasControl() and H.tileAligned() and bright() >= 15
+    end, 2400, "back on Albrook's streets after the night", 5),
+    H.waitFrames(30),
+    -- the walk out below holds LEFT and UP from the item shop's landing
+    -- (2,17), and the inn door lands at (54,14) on the far side of town
+    -- (the first cut timed out after 8000 frames of held LEFT/UP from
+    -- there); so back to that tile first
+    H.navTo(2, 17, { maxFrames = 12000, playBattles = "tactical" }),
+    H.release(),
+    H.waitFrames(20),
+  }, {}),
+
   -- Back out.  Map 323's world exits are LONG entrances on its west and
   -- north edges (decoded from LongEntrance, $EDF480/$EDF882): a vertical
   -- run at x=0, y=0..29 -> world (137,203), and two horizontal runs at
