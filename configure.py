@@ -536,6 +536,8 @@ check("stamp_selftest", "sh tools/tests/lib/savestate_stamp_selftest.sh",
        "tools/tests/lib/savestate_stamp.sh"])
 check("runner_isolation", "sh tools/tests/lib/runner_isolation_selftest.sh",
       ["tools/tests/lib/runner_isolation_selftest.sh", "tools/tests/run.sh"])
+check("shared_emulator", "sh tools/tests/lib/shared_emulator_selftest.sh",
+      ["tools/tests/lib/shared_emulator_selftest.sh", "tools/tests/run.sh"])
 checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
     + glob("tools/tests/checkpoints/*/*.sram")
 # #218: every checkpoint validates, and every line says which save its
