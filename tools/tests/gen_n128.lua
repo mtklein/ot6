@@ -147,8 +147,10 @@ local function rideDriver(pred, lostRef, maxFrames, what)
   local Ftrash = H.newFightDriver("n128 trash", { tactical = true,
     boost = true, bank = 1, items = true, healer = SABIN,
     healPercent = 95, cadence = 12 })
-  -- Fight 6 steers every single-target confirm onto the body through the
-  -- library's own focus machine.
+  -- Fight 6 steers every single-target confirm onto the body: the
+  -- driver reads the formation's scripts (#189, readParts) -- the body's
+  -- death ends the fight, each blade restores itself on its own -- and
+  -- plans the kill order {0} that this file used to author as a mask.
 
   -- LOCKE's Bolt is on this driver and not on the trash one: Ramuh's
   -- grant is spent on the fight whose element row it was chosen for.
@@ -159,8 +161,7 @@ local function rideDriver(pred, lostRef, maxFrames, what)
   local Fboss = H.newFightDriver("n128 boss", { tactical = true,
     boost = true, bank = 1, items = true, healer = SABIN,
     healPercent = 85, cadence = 12,
-    magic = { [LOCKE] = { spell = BOLT, boost = false } },
-    focus = { { slot = 0, mask = 0x01 } } })
+    magic = { [LOCKE] = { spell = BOLT, boost = false } } })
   local wipedN = 0
   return H.driveUntil(function() return lostRef.lost or pred() end, maxFrames, {
     H.call(function()
@@ -217,8 +218,8 @@ local function rideDriver(pred, lostRef, maxFrames, what)
         supplyReport("fight " .. #fights .. " start")
         if #fights == 6 then
           H.assertEq(w[1], 0x010b,
-            "fight 6 puts NUMBER 128 in monster slot 0, which is the slot "
-            .. "Fboss's focus list steers to (mask $01)")
+            "fight 6 puts NUMBER 128 in monster slot 0, the body the "
+            .. "driver's parts plan steers to")
           fight6[#fight6 + 1] = {
             hp = { H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8) },
             tonic = bagCount(0xE8), potion = bagCount(0xE9),
