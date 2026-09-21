@@ -23,7 +23,7 @@ own generator (or the checkpoint it boots from) changed, or when its
 artifact/ancestor bindings fail, or when a state it grew from is itself
 stale or unbound (transitively: `STALE via dadaluma_entry <- zozo_arrival`
 names the chain down to the link that moved); **UNBOUND** when its bytes are not the
-ones its stamp vouches for; **UNVERIFIED** when the tree has no built ROM
+ones its stamp records; **UNVERIFIED** when the tree has no built ROM
 to compare against. A change to the shared lib halves alone (`ot6.lua`,
 `ot6_field.lua`, `ot6_contract.lua`) is reported as *provenance drift*:
 informational, exit 0, the fixture stays a valid snapshot. That is the
@@ -40,11 +40,11 @@ say, and refuses (saying why, per fixture) otherwise. The proof is: the
 stamp's sig still equals the current sig over generator + lib halves (so the
 `generator` and `lib` lines are the current hashes); the `.mss` still
 matches its `artifact` line; and ninja's build log (`build/ninja/.ninja_log`)
-shows the ROM content latch `build/ninja/src/build/ot6.sfc` last ran before
-the state's generate edge started while its copy is byte-equal to
-`build/ot6.sfc` (the latch is rewritten only on a ROM content change, and
+shows the ROM copy-if-changed step `build/ninja/src/build/ot6.sfc` last ran
+before the state's generate edge started while its copy is byte-equal to
+`build/ot6.sfc` (that copy is rewritten only on a ROM content change, and
 every generate edge depends on it, so the state was generated on the current
-ROM). Nothing is invented: a stamp whose sig already moved, whose ROM latch
+ROM). Nothing is invented: a stamp whose sig already moved, whose ROM copy
 ran after the generate, whose artifact moved, or which has no ninja record is
 left as it is. The original sig line is kept; children bound by `ancestor`
 to the parent's old bytes are rebound to its new bytes; every rewrite keeps
@@ -59,14 +59,14 @@ one entry per state. `configure.py` embeds it into `build.ninja` (via
 compatibility inputs: the ROM bytes, its generator `gen_*.lua`, and, for a
 segment that starts from a saved checkpoint, that checkpoint's manifest and
 SRAM payload. Every one is a declared ninja dependency routed through a
-content latch edge (`cmp || cp` with `restat = 1`), so staleness is decided
+copy-if-changed edge (`cmp || cp` with `restat = 1`), so staleness is decided
 by content: a rebuild that bumps timestamps without moving bytes regenerates
 nothing; a changed input re-runs every transitive dependent. Editing one
 generator regenerates only the states it feeds; a ROM content change
 regenerates the whole chain. The three lib halves `lib/compose.py` inlines
 (`ot6.lua`, `ot6_field.lua`, `ot6_contract.lua`) are **not** generate-edge
 inputs: editing one re-runs every suite test, audit and selftest that
-latches it, and regenerates no fixture (docs/TESTING.md: a change to
+depends on it, and regenerates no fixture (docs/TESTING.md: a change to
 logging, assertions, or controller policy does not by itself make a
 legitimately reached snapshot illegitimate). `lib/savestate_ninja_selftest.sh`
 checks those semantics against real ninja on a mock tree in seconds, with no
@@ -93,7 +93,7 @@ on disk, and the ninja graph and the checker agree on what is stale.
 is a fixed input to both sigs: bumping it deliberately stales every stamp
 in the checker (the graph does not track it; regenerate by hand).
 
-The scenario split is played on **one pinned lineage** — Locke, then Sabin,
+The scenario split is played on **one pinned playthrough** — Locke, then Sabin,
 then Terra — the way a single player with one cartridge plays it: scenario
 choice is order, not branching.  Each scenario's generators run exactly once;
 Sabin's opener boots `locke_done`, Terra's boots `sabin_done`, and Terra's
@@ -201,7 +201,7 @@ Step constructors:
   as built; `repeatN` resets its body after every pass, `driveUntil` after
   every body cycle, and `seqStep`/`cond` forward a reset to their children
   (#196). The library's state (a fold's pass count, a drive's frame count,
-  a navigator's plan and walk budget, a shop drive's "bought" latch) is
+  a navigator's plan and walk budget, a shop drive's "bought" flag) is
   the library's to clear; a test's own counters are the test's, cleared in
   the body's first `H.call`. A constructor with closure state of its own
   names it through `H.withReset(step, fn)`. `step_reset.lua` pins the
@@ -341,7 +341,7 @@ runs every script through the **segment runner** at the bottom of
   on the boot frame itself: whatever the body presses later in that same
   tick is held back until the idle ends, and the idle lasts until the game
   clock (`$021e`) has moved the shift's number of ticks, not a frame count
-  (#208: `fc_landing`'s held RIGHT was latched on the boot frame, the walk
+  (#208: `fc_landing`'s held RIGHT was registered on the boot frame, the walk
   into Thamasa and its clock-stopped load ran on the game's own clock, and
   shifts 0..59 all fought one first battle). Default 3
   attempts for a `gen_*` script, 1 for everything else; `opts.retries`
@@ -577,7 +577,8 @@ material, not clean balance evidence. A log with no plans proves nothing about
 execution reliability. The summary consumes **one run log**, not concatenated
 runs with colliding IDs.
 
-Fast ledger/parser checks (the standalone ledger check needs Lua 5.4 or newer):
+Fast recovery-trace and parser checks (the standalone recovery-trace check
+needs Lua 5.4 or newer):
 
 ```sh
 lua tools/tests/recovery_trace_selftest.lua
