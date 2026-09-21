@@ -496,26 +496,29 @@ done:   rtl
 ; An empty bank dumps nothing and leaves the grudge standing, so the actor
 ; hits back on the first turn it has anything to hit back with.
 ;
-; WHAT THIS DOES NOT COVER, recorded so it is not rediscovered:
+; WHO ELSE REACHES THIS, recorded so it is not rediscovered:
 ;
-;   * Umaro's three special arms.  The dump hangs off Ot6FightBoost, which
-;     hangs off FightAttack, and only one of UmaroAttackTbl's four slots IS
-;     FightAttack -- with no relics 158 of 253 rolls (RandBitRateTbl row 0,
-;     $9e/$5f) take that plain swing and carry the dump, and his Throw,
-;     Storm and Charge do not.  Giving those three the swings half needs a
-;     second hook at their own ExecAttack entries.  Umaro is World of Ruin
-;     content, so this is designed and read off the ROM, never played.
-;   * An AI-SCRIPTED character -- Biggs and Wedge in the opening, and any
-;     set piece that drives a party member from a script.  QueueAction sends
-;     them to ExecMonsterAction before it ever reaches the no-pending-action
-;     arm, so they never touch RandCharAction and never set OT6_UNCTL: they
-;     still bank with nothing to spend it on, exactly as everyone did before
-;     this.  One more latch site at that branch would close it.
+;   * Umaro's four arms (#237).  Only the last of UmaroAttackTbl's slots is
+;     FightAttack, so a dump that hung off Ot6FightBoost alone reached his
+;     plain swing (158 of 253 relic-less rolls, RandBitRateTbl row 0) and
+;     none of Throw, Storm or Charge.  Ot6UmaroRetaliate arms it at his
+;     chooser, before the roll, and each arm delivers it its own way (see
+;     there).  Umaro is World of Ruin content: designed and read off the
+;     ROM, proven by battle_retaliate_umaro.lua as a staged mechanism test,
+;     never played on the route.
+;   * An AI-SCRIPTED character (#238) -- CYAN in the Doma courtyard defence,
+;     and any set piece that drives a party member from a script.  QueueAction
+;     sends it to ExecMonsterAction before it ever reaches the no-pending-
+;     action arm, so it never passes RandCharAction; Ot6UnctlMark hangs off
+;     ExecMonsterAction's head as well, and the script's plain Fight then
+;     arrives here like anyone else's (battle_retaliate_script.lua).  A
+;     SwdTech the script picks instead carries no dump, as no non-Fight
+;     command does.
 ;
-; jsr from Ot6FightBoost only, inside its character and counterattack guards
-; and only once it has established that nobody bought a boost for this
-; action.  a8/i16, x = the attacker's entity offset.  Clobbers A, leaves the
-; caller's a8.
+; jsr from Ot6FightBoost and Ot6UmaroRetaliate, each inside its counterattack
+; guard, for a character, and only once it has established that nobody
+; bought a boost for this action.  a8/i16, x = the attacker's entity offset.
+; Clobbers A, leaves the caller's a8.
 
 .proc Ot6Retaliate
         .a8
@@ -564,10 +567,22 @@ out:    rts
 ; window by name and who therefore arrives here with every other arm
 ; declined.
 ;
-; a8 at the call site; A is dead there (RandCharAction's first instruction
-; is `txa`) but is preserved anyway, along with every flag.  x = the entity
-; whose action is being chosen; monsters are ignored.  Index width is the
-; caller's and is not touched.
+; #238.  And jsl from the head of ExecMonsterAction, the other place
+; vanilla chooses an action FOR an entity: a character with an AI script
+; ($3255,x valid -- CYAN in the Doma courtyard defence, any set piece that
+; drives a party member from a script) is sent there by QueueAction's
+; character arm before the no-pending-action arm is ever reached, so it
+; never passes RandCharAction.  CheckPlayerAction refuses such a character
+; a window at its own ai-script test, ahead of Ot6UnctlClear, so the latch
+; stands for as long as the script drives.  Monsters reach that head on
+; every action of theirs and are ignored by the test below, at the cost of
+; one jsl.
+;
+; a8 at both call sites; A is dead at each (RandCharAction's first
+; instruction is `txa`, ExecMonsterAction's is `longa`) but is preserved
+; anyway, along with every flag.  x = the entity whose action is being
+; chosen; monsters are ignored.  Index width is the caller's and is not
+; touched.
 
 .proc Ot6UnctlMark
         .a8
@@ -622,6 +637,89 @@ out:    longa
 out:    longa
         pla
         plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a provoked Umaro dumps on whichever arm the roll picks ]
+
+; #237.  jsl from the head of _163b (battle_main.asm), the chooser Cmd_06
+; sends Umaro to instead of FightAttack.  Only the last of UmaroAttackTbl's
+; four slots is FightAttack, so a dump that hung off Ot6FightBoost alone
+; reached his plain swing and none of Throw, Storm or Charge; arming it
+; here, before the roll, reaches all four.
+;
+; What each arm then buys with it is that arm's own business, and it is
+; not one thing:
+;   * FightAttack: swings, through Ot6FightBoost, which finds the pending
+;     byte already set and spends it.
+;   * Charge and Storm: the damage multiplier, through Ot6BoostDmg.  Charge
+;     executes as command $23 and Storm as command $02 with $b6 = $54,
+;     neither on that proc's exempt list.  Its tier test had to be gated to
+;     the four spell commands and keyed on $b6 first: an engine-driven
+;     character's queue holds attack $00, which read as Fire (see the
+;     header of Ot6BoostDmg for the measurement).
+;   * Throw: extra throws, through Ot6ThrowBoost below.  Throw runs its
+;     damage roll with x = the thrown ally (UmaroAttack_00's `tyx` after
+;     BitToTargetID), so Ot6BoostDmg reads the ally's pending byte there,
+;     not Umaro's, and can deliver nothing.
+;
+; The same two guards as Ot6FightBoost, in the same order: a counterattack
+; (ExecRetal's $b1.0) never boosts, and a pending byte someone already set
+; is left alone.  Cmd_06 established that this is a character (`cpy #$08`)
+; before it tested the name, so there is no monster test here.
+;
+; a8/i16 at the site, y = Umaro's entity offset, x dead (ExecCmd's command
+; index); x is preserved anyway.  A is clobbered, and is dead: _163b's own
+; first instruction is `stz $fe`.
+
+.proc Ot6UmaroRetaliate
+        .a8
+        .i16
+        phx
+        tyx
+        lda     $b1
+        lsr
+        bcs     done
+        lda     OT6_BOOST_REVEALED,x
+        bne     done
+        jsr     Ot6Retaliate
+done:   plx
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a dumped Throw throws again, once per pip ]
+
+; #237.  jsl from UmaroAttack_00 (battle_main.asm) once it has an ally to
+; throw, immediately before its `jsr RandBit`.  One extra throw per pending
+; pip goes into $3a70, the multi-attack count ExecAttack's tail consumes
+; (`dec $3a70 / bmi / pea ExecAttack-1`), so a 3-pip dump is four throws:
+; the landed-hit ladder of a one-weapon Fight, which is what a dump buys
+; everywhere else.  $3a70 is 0 here -- InitGfxScript cleared it for this
+; action and nothing on Throw's path writes it -- and this site runs once
+; per action: the loop re-enters ExecAttack, never the arm.  When no ally
+; can be thrown, UmaroAttack_00 falls back to Charge before this site, and
+; Charge takes the multiplier alone.
+;
+; No multiplier stacks on this: the pending byte Ot6BoostDmg would read is
+; the thrown ally's, which nobody armed.
+;
+; a8/i16, y = Umaro's entity offset.  A holds the candidate mask RandBit is
+; about to consume and is preserved; x is dead (the ally scan's index).
+
+.proc Ot6ThrowBoost
+        .a8
+        .i16
+        pha
+        lda     OT6_BOOST_REVEALED,y
+        beq     done
+        clc
+        adc     $3a70
+        sta     $3a70
+done:   pla
         rtl
 .endproc
 

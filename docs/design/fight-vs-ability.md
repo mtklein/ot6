@@ -692,9 +692,18 @@ Muddle case is the same numbers with the volley aimed at the party
 is the intent and not an oversight. Umaro and the Colosseum are World of
 Ruin content and are reasoned from the ROM rather than played: Umaro is
 refused a command window by name, so he reaches the same engine arm, but
-only one of his four attack slots is `FightAttack` — with no relics, 158 of
-253 rolls (62.5%) take that plain swing and carry the dump, and his Throw,
-Storm and Charge arms do not.
+only one of his four attack slots is `FightAttack`, so the dump is armed at
+his chooser, ahead of the roll (#237, `Ot6UmaroRetaliate`): his plain swing
+takes it as swings, Charge and Storm as the damage multiplier, and Throw as
+one extra throw per pip (`Ot6ThrowBoost`). That is a staged mechanism test
+(`tools/tests/battle_retaliate_umaro.lua`, a party member of the TunnelArmr
+fight renamed to him), never route play.
+
+A character an AI script drives — CYAN in the Doma courtyard defence — is
+also one the player is not driving, and reaches `ExecMonsterAction` without
+ever passing `RandCharAction`; the latch is set there too (#238), and
+`tools/tests/battle_retaliate_script.lua` plays that defence and measures
+his provoked scripted Fight dumping.
 
 ## 7. The lab
 
