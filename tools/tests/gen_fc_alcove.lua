@@ -81,27 +81,19 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 -- lands.  A first cut of this gate read STATUS2::IMAGE and never fired
 -- while two lab seeds wiped to the same all-zero Ninja fight
 -- (worktree build/attempts/lab-try2-imagegate/, seeds p12 and p52), so the gate reads both and
--- says which it saw.
+-- says which it saw -- H.dodgerUp, the lib's read of the live status
+-- cells (M.dodges on STATUS1 bit 4 / STATUS2 bit 2 of each monster on
+-- stage, #190).
 --
 -- So the line is what a person does on seeing the Ninja fade out: while a
 -- live monster is Vanished (or Imaged), TERRA casts Fire 2 (20 MP; the
 -- plan-time absorb guard still refuses it on a fire absorber); otherwise
 -- the lookup is empty and she Fights as before.
-local FIRE2, ST1_INVISIBLE, ST2_IMAGE = 0x05, 0x10, 0x04
+local FIRE2 = 0x05
 local dodgeSaid = nil
-local function dodgerUp()
-  for s = 0, 5 do
-    if H.readWord(0x3BFC + s * 2) > 0 then
-      local e = 4 + s
-      if (H.readByte(0x3EE4 + e * 2) & ST1_INVISIBLE) ~= 0 then return s, "Vanish" end
-      if (H.readByte(0x3EE5 + e * 2) & ST2_IMAGE) ~= 0 then return s, "Image" end
-    end
-  end
-  return nil
-end
 local MAGIC = setmetatable({}, { __index = function(_, id)
   if id ~= TERRA then return nil end
-  local s, what = dodgerUp()
+  local s, what = H.dodgerUp()
   if s == nil then dodgeSaid = nil; return nil end
   if dodgeSaid ~= s then
     dodgeSaid = s

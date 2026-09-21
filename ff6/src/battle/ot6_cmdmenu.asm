@@ -409,6 +409,15 @@
 ; "greyed" and "refused" cannot come apart.  There is no fourth opinion about
 ; what a boosted row costs.
 ;
+; The kit entry asks one more question of the same kind (#232): the row's
+; BP reason, from the SAME Ot6BushidoRowGrey the row's colour also took.
+; That arm greys Bestow when the caster holds no pip and a SwdTech tier past
+; the bank, and until #232 Bestow's grey was advice: the confirm let the row
+; through, the action was queued and paid for, and Ot6Bestow no-op'd at
+; execution -- the turn and the MP gone with no feedback, the defect this
+; gate was built for, in the other currency.  The two greys are OR'd into
+; one byte, so a row greyed for either reason is refused for that reason.
+;
 ; Where they are called from, and why that is affordable now.  Ot6AbilityGrey's
 ; header used to say a confirm gate could not live in btlgfx because bank C1 is
 ; a stock object linked into both the shipped ROM and the OT6_MP_COSTS=0
@@ -421,19 +430,25 @@
 ; is the model: buzz, stay open, queue nothing.  Two reasons, one mechanism.
 ;
 ; The tools-shell entry.  in: A = the selected row's id (C1 has already
-; rejected an $ff cell); w7e6168 says which of the four lists is up.
+; rejected an $ff cell), X = that cell's wItemList offset (_c18470's, row*6
+; for the single-column lists); w7e6168 says which of the four lists is up.
 ; out: carry SET = the caster can pay, carry CLEAR = refuse the confirm.
 ; db=$7e, a8.  Index width is the caller's and is restored; the price leaves
 ; index 16-bit (Ot6CostFor's `ldx #$0000`), so it is forced here rather than
-; assumed of a C1 menu state.  preserves nothing else.  rtl.
+; assumed of a C1 menu state.  X and Y are preserved: the B-button arm the
+; refusal falls to reads the cursor block through Y.  rtl.
 .proc Ot6KitConfirmMP
         .a8
         php
         rep     #$10            ; i16 for the price leaves
         .i16
+        phy
         jsl     Ot6KitRowCost   ; the one price authority the row DREW through,
                                 ;   pending boost and all
         jsl     Ot6AbilityGrey  ; ...and the one verdict its colour took
+        txy                     ; the cell offset the decorator's Y carried
+        jsl     Ot6BushidoRowGrey ; ...and the BP reason the same row took
+        ply
         plp                     ; caller's index width back (and its flags)
         bra     Ot6ConfirmVerdict
 .endproc
@@ -481,9 +496,7 @@
 ; greys all three rows: the list still shows what the bank would buy (the
 ; teaching surface) and refuses every row, the same presentation an
 ; unaffordable spell gets, rather than a list that changes length with the
-; wallet.  Blitz mode (w7e6168 = 1) passes the MP grey through untouched.  Only
-; reached from Ot6BlitzRowDecorate's OT6_MP_COSTS block, so it lives behind the
-; same flag.
+; wallet.  Blitz mode (w7e6168 = 1) passes the MP grey through untouched.
 ;
 ; Thief mode (w7e6168 = 3) is a second consumer, for the same kind of
 ; reason: Bestow cannot do anything at 0 BP, because there is no pip to hand
@@ -494,7 +507,13 @@
 ; caster-lookup and the stack protocol and nothing else.  Steal and Filch have no
 ; BP precondition and are never greyed by this arm.
 ;
-; a8/i16.  in: A = the MP grey ($00/$04), Y = drawn-row*6.
+; Two callers, one answer: Ot6BlitzRowDecorate colours the row by it, and
+; Ot6KitConfirmMP refuses the confirm by it (#232), so a row this greys is a
+; row the A button rejects, whichever arm greyed it.  Both live behind the
+; OT6_MP_COSTS flag, so this does too.
+;
+; a8/i16.  in: A = the MP grey ($00/$04), Y = the row's wItemList offset
+; (row*6: the decorator's drawn row, or the confirm's selected cell).
 ; out: A = A | ($04 if the row is out of reach of the caster's bank).
 ; preserves X and Y.
 .proc Ot6BushidoRowGrey
@@ -696,7 +715,10 @@
 ; already rejected an $ff (empty) cell, so X points at a real left-column tech
 ; cell: X = row*6, and row = boost r. Refuse (buzz, stay open) a row the caster
 ; lacks the BP for, i.e. r > current bp (OT6_BP_CLASS,entity), the confirm twin of the
-; menu's bp-grey. Otherwise bank the boost (OT6_BOOST_REVEALED,entity = r; Ot6ActionEnd then
+; menu's bp-grey.  On the priced build Ot6KitConfirmMP has already refused
+; that row through Ot6BushidoRowGrey's own test one call earlier, so this
+; refusal is reached under nomp, where there is no grey and no gate, and
+; stands as the backstop otherwise. Otherwise bank the boost (OT6_BOOST_REVEALED,entity = r; Ot6ActionEnd then
 ; charges r and skips that turn's regen, as an L/R spend would have),
 ; latch the tech Ot6BushidoTier returns for boost r into the action queue, and
 ; close the menu. FixPlayerAttack's +$55 and Cmd_07's dispatch stay untouched.

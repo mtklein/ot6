@@ -328,8 +328,12 @@ gate). The boost buys swings.
    row through the leaf that drew it (`Ot6KitRowCost` /
    `Ot6DanceRowCost`) and both take their verdict from `Ot6AbilityGrey`,
    so a greyed row and a refused row are the same row by construction
-   and no fourth opinion about a boosted price exists. Refusing buzzes,
-   leaves the list open, and spends no turn, no BP and no MP.
+   and no fourth opinion about a boosted price exists. Since #232 the
+   tools-shell confirm also ORs in the row's BP grey from
+   `Ot6BushidoRowGrey`, so a Bestow at 0 BP (and a SwdTech tier past the
+   bank) is refused at the same gate; `battle_bestowrefuse` is that arm's
+   suite. Refusing buzzes, leaves the list open, and spends no turn, no
+   BP and no MP.
    `battle_kitrefuse` is the mechanism suite, on all three kit windows;
    `battle_dancemp` carries the dance arm. The execution-side fizzle
    stays underneath as the backstop for a pool that moves between the
