@@ -86,6 +86,7 @@ tools/tests/battle_trueknight.lua	.writeWord(
 tools/tests/codex_ctx.lua	.writeWord(	quarantine: the Veldt serves the SAVE's recorded history, and the fighting lineage's history feeds the gau_joined trio packs that wiped the read-half search; the clamp tops ally HP each resolve pulse and never touches the codex pages or seed bits under test
 tools/tests/field_healpolicy.lua	.writeWord(	quarantine: the healthy-fixture campaign (#122 fallout) leaves no savestate that arrives hurt, so the test writes its own patient's HP
 tools/tests/field_subjob.lua	.writeByte(
+tools/tests/field_zombiecure.lua	.writeByte(	quarantine: Zombie and Petrify are a monster special's roll (Zombone in the Sealed Gate cave is the walked route's one Zombie pool), not producible on cue, and the exit contract ships no fixture carrying either; the file writes the one status-1 bit onto LOCKE from the boot snapshot, and the plan, the menu walk, the item's acceptance, the bag delta and the cleared bit under test are the game's own, read back
 tools/tests/gen_battle2.lua	.writeWord(
 tools/tests/lib/ot6.lua	.writeByte(
 tools/tests/lib/ot6.lua	.writeWord(
