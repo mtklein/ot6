@@ -273,14 +273,16 @@ OT6_RUNICPAID        := $ed96
 ; ----1234 shape OT6_COVERPAID / OT6_RUNICPAID / $3f2f already use.
 ;
 ; OT6_UNCTL  bit set = the ENGINE, not the player, chose this character's
-;            action.  Set by Ot6UnctlMark at RandCharAction -- vanilla's own
-;            "select berserk/zombie/muddled/charmed/colosseum action"
-;            (battle_main.asm), which is also the arm Umaro reaches, since
-;            CheckPlayerAction refuses him a window by name.  Cleared by
-;            Ot6UnctlClear at the one site that means the opposite: the
-;            frame CheckPlayerAction opens the battle menu for him.  The two
-;            hooks are the two sides of one vanilla decision, so the bit is
-;            the decision, not a re-derivation of it.
+;            action.  Set by Ot6UnctlMark at the two sites vanilla chooses
+;            FOR an entity: RandCharAction -- its own "select berserk/
+;            zombie/muddled/charmed/colosseum action" (battle_main.asm),
+;            which is also the arm Umaro reaches, since CheckPlayerAction
+;            refuses him a window by name -- and ExecMonsterAction, where
+;            QueueAction sends a character with an AI script (#238).
+;            Cleared by Ot6UnctlClear at the one site that means the
+;            opposite: the frame CheckPlayerAction opens the battle menu for
+;            him.  The hooks are the sides of one vanilla decision, so the
+;            bit is the decision, not a re-derivation of it.
 ;
 ; It sits past InitBP's $70-byte shadow clear, and a stale bit here is a
 ; mechanic and not a cosmetic -- it would hand the next battle's first

@@ -502,7 +502,12 @@ InitPlayerAction:
 ; [ execute ai ]
 
 ExecMonsterAction:
-@02dc:  longa
+@02dc:  jsl     Ot6UnctlMark            ; ot6 #238: a SCRIPT is choosing this
+                                        ;   entity's action.  For a character
+                                        ;   that is the engine driving it, and
+                                        ;   the latch says so; a monster is
+                                        ;   ignored inside
+        longa
         stz     $3a98
         lda     $3254,x
         sta     $f0
@@ -3575,7 +3580,9 @@ _161b:  tyx
         jmp     ExecAttack
 
 ; choose umaro's attack
-_163b:  stz     $fe
+_163b:  jsl     Ot6UmaroRetaliate       ; ot6 #237: a provoked Umaro dumps on
+                                        ;   whichever arm the roll below picks
+        stz     $fe
         lda     #$c6
         cmp     $3cd0,y
         beq     @1649
@@ -3660,6 +3667,8 @@ UmaroAttack_00:
         clr_a
         pla
         beq     UmaroAttack_02
+        jsl     Ot6ThrowBoost           ; ot6 #237: a dumped Throw throws
+                                        ;   again, once per pip
         jsr     RandBit
         jsr     BitToTargetID
         tyx

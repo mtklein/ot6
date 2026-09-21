@@ -168,10 +168,13 @@ H.run({ maxFrames = 150000 }, {
     -- 2. His action script does NOT route wholly through FightAttack.
     --    UmaroAttackTbl has four entries and exactly ONE of them is
     --    FightAttack; the other three (Throw, Storm, Charge) are his own
-    --    arms and carry no Ot6FightBoost, so a provoked Umaro dumps on his
-    --    plain swing and not on those.  The share of rolls that take the
-    --    plain swing with no relics equipped is read out of the ROM's own
-    --    rate table rather than guessed.
+    --    arms and carry no Ot6FightBoost, which is why the dump is armed
+    --    at his chooser, before the roll (Ot6UmaroRetaliate, #237), and
+    --    not inside FightAttack alone.  battle_retaliate_umaro.lua stages
+    --    him and measures all four arms; this file only pins the table
+    --    shape that reasoning rests on.  The share of relic-less rolls
+    --    that take the plain swing is read out of the ROM's own rate table
+    --    rather than guessed.
     local cp = {}
     local CPA = H.sym("CheckPlayerAction") & 0x3FFFFF
     for i = 0, 47 do cp[#cp + 1] = H.readRomByte(CPA + i) end
@@ -197,7 +200,8 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(plain, 1, string.format(
       "exactly one of Umaro's four arms is FightAttack ($%04X %04X %04X "
       .. "%04X vs FightAttack $%04X): the swings half of the dump reaches "
-      .. "his plain swing and NOT his Throw, Storm or Charge",
+      .. "only his plain swing, so Throw, Storm and Charge need the dump "
+      .. "armed ahead of the roll (#237)",
       arms[0], arms[1], arms[2], arms[3], FAW))
     H.assertEq(arms[3], FAW, "and it is the last slot, the one the "
       .. "relic-less roll shares with Charge")
@@ -205,9 +209,9 @@ H.run({ maxFrames = 150000 }, {
     local r0, r1 = H.readRomByte(RATE), H.readRomByte(RATE + 1)
     H.log(string.format("[rom/wor] Umaro with no relics: RandBitWithRate "
       .. "row 0 weights $%02X/$%02X, so %d of %d rolls (%.1f%%) take the "
-      .. "plain FightAttack arm the dump hooks, and the rest take Charge "
-      .. "-- REASONED from this ROM, not played: the WoR is not routed",
-      r0, r1, r0, r0 + r1, 100.0 * r0 / (r0 + r1)))
+      .. "plain FightAttack arm and the rest take Charge; the dump reaches "
+      .. "both since #237 -- REASONED from this ROM, not played: the WoR "
+      .. "is not routed", r0, r1, r0, r0 + r1, 100.0 * r0 / (r0 + r1)))
     -- 3. The Colosseum is a MODE, $3a97, and RandCharAction is where
     --    vanilla folds it in beside Berserk, Muddle and Charm -- so it
     --    arrives at the same latch with no extra test here.  Nothing in

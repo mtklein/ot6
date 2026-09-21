@@ -15,7 +15,21 @@
 ; fight and capture spend their boost on extra swings (Ot6FightBoost),
 ; tier-family spells spend it on tiers (Ot6QueueFold), and bushido
 ; spends it on the tech ladder (Ot6BushidoTier). The multiplier serves
-; everything else. $3a7d = the action's attack id.
+; everything else.
+;
+; The tier test asks two things: is this one of the four commands
+; Ot6QueueFold folds (Ot6FoldCmdTbl: magic, x-magic, lore, summon --
+; nothing else can have bought a tier), and is the spell being cast, $b6,
+; in the fold table.  $b6 is the spell whose props are loaded (magic_atmk's
+; `lda $b6`); the queued attack byte $3a7d is the same id for a queued cast
+; and NOT for one the handler substituted.  Both halves were measured, not
+; reasoned (#237, build/lab/umaro/diag-charge-shift0.log): an engine-driven
+; character's queue holds command/attack $0000 (RandCharAction's `stz
+; $3a7c`), so Umaro's Charge arrived here as command $23 with $3a7d = $00,
+; Storm as command $02 with $b6 = $54 and $3a7d = $00, and a scan keyed on
+; $3a7d alone matched both against Ot6FoldTbl's first entry, Fire ($00),
+; and multiplied neither: `dmg x2/p3:174->174`, three pips charged for
+; nothing.
 
 .proc Ot6BoostDmg
         php                     ; caller width varies: pin our own
@@ -57,15 +71,23 @@
         lda     OT6_BOOST_REVEALED,x         ; pending boost level
         beq     done
         phx
-        ldx     #$0000
+        ldx     #$0003          ; only a spell command can have bought a
+@cmd:   lda     $b5             ;   tier: Ot6QueueFold's own four, mirrored
+        cmp     f:Ot6FoldCmdTbl,x  ; in Ot6FoldCmdTbl.  A table and not a
+        beq     @spell          ;   `cmp #imm / beq` chain: battle_boostprice
+        dex                     ;   reads every `cmp #imm / beq` in this
+        bpl     @cmd            ;   proc's first 96 bytes as a command the
+        plx                     ;   multiplier EXEMPTS, and these four are
+        bra     @plain          ;   the opposite of exempt
+@spell: ldx     #$0000
 @scan:  lda     f:Ot6FoldTbl,x  ; tier-family spell? tiers are the boost
-        cmp     $3a7d
+        cmp     $b6             ; the spell being cast (see the header)
         beq     @tier
         inx
         cpx     #$0018
         bcc     @scan
         plx
-        lda     OT6_BOOST_REVEALED,x         ; pending boost level (reload)
+@plain: lda     OT6_BOOST_REVEALED,x         ; pending boost level (reload)
         bra     @mul0
 @tier:  plx
         bra     done
@@ -86,3 +108,8 @@
 done:   plp
         rtl
 .endproc
+
+; the commands whose cast Ot6QueueFold may have folded to a tier -- magic,
+; x-magic, lore, summon -- in the order of its own gate (ot6_boost.asm)
+Ot6FoldCmdTbl:
+        .byte   $02, $17, $0c, $19
