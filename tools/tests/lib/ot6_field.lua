@@ -569,7 +569,7 @@ function M.navTo(txIn, tyIn, opts)
   -- resolves, run a between-battles care stop (M.newCareDriver, soft)
   -- before walking on, so the next fight starts whole.  opts.care=false
   -- opts out; a live event timer opts the scene out automatically.
-  local careD, sawBattle = nil, false
+  local careD, sawBattle, fought = nil, false, nil
   local function drop(why)  -- discard the plan, logging why once, not per frame
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -652,6 +652,7 @@ function M.navTo(txIn, tyIn, opts)
       -- 1. battle: clear it, but never the goal formation
       if battN >= 3 then
         sawBattle = true
+        fought = M.readByte(0x1A6D) & 0x07
         drop("battle")
         if next(spareSet) and M.formationHas(spareSet) then
           M.setPad({})                 -- goal fight: left alone for arrive()
@@ -701,7 +702,7 @@ function M.navTo(txIn, tyIn, opts)
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
             threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
-            tag = "care after battle (navTo)" })
+            party = fought, tag = "care after battle (navTo)" })
           careD.frame()
           if not careD.done() then return end
           careD = nil
@@ -813,7 +814,7 @@ function M.navTo(txIn, tyIn, opts)
     M.navReset()
     walked, plan, idx, pend, aPhase, calm = 0, nil, 1, nil, 0, 0
     battN, dlgN, lostN, noPathN, pause = 0, 0, 0, 0, 0
-    wipeSeen, careD, sawBattle = false, nil, false
+    wipeSeen, careD, sawBattle, fought = false, nil, false, nil
   end)
 end
 
@@ -852,7 +853,7 @@ function M.advanceStory(pred, maxFrames, opts)
           tool = opts.tool, blitz = opts.blitz }, opts.fight) or nil
   local flee = tactical and newFlee(opts, tactical) or nil
   -- heal-after-every-battle: see navTo's care block; same contract here
-  local careD, sawBattle = nil, false
+  local careD, sawBattle, fought = nil, false, nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.withReset(M.driveUntil(function()
     -- never complete mid-care: pred() can be map/switch-based and go true
@@ -883,6 +884,7 @@ function M.advanceStory(pred, maxFrames, opts)
       if battN >= 3 then
         sawBattle = true
         if battN == 3 then             -- rising edge: name the fight once
+          fought = M.readByte(0x1A6D) & 0x07
           local w = M.formationWords()
           M.log(string.format("story: battle up (%04X %04X %04X %04X %04X %04X)",
             w[1], w[2], w[3], w[4], w[5], w[6]))
@@ -927,7 +929,7 @@ function M.advanceStory(pred, maxFrames, opts)
         if opts.care ~= false and not M.eventTimerLive() then
           careD = M.newCareDriver({
             threshold = opts.careThreshold or 0.65, reserve = opts.reserve,
-            tag = "care after battle (advanceStory)" })
+            party = fought, tag = "care after battle (advanceStory)" })
           careD.frame()
           if not careD.done() then return end
           careD = nil
@@ -939,7 +941,7 @@ function M.advanceStory(pred, maxFrames, opts)
     -- as-built (#196): a wipe or a care stop the last pass ended on must
     -- not end the next pass on its first frame
     aPhase, battN, dlgN, hb = 0, 0, 0, -600
-    wipeSeen, careD, sawBattle = false, nil, false
+    wipeSeen, careD, sawBattle, fought = false, nil, false, nil
   end)
 end
 
@@ -3237,6 +3239,17 @@ function M.newCareDriver(opts)
   local closed = careClose(function()
     return not CARE_SCREENS[M.readByte(CARE_ZM)]
   end)
+  -- opts.party: the squad the care is for, on a map that holds several
+  -- (the Moogle defense: a collision battle engages the squad it hits,
+  -- not the one being walked, and the menu shows only the walked one).
+  -- Y cycles the walked squad 1 -> 2 -> 3 -> 1 (ChangeParty, obj.asm,
+  -- $1A6D), a press the game takes only with control, aligned and no
+  -- event running; once the menu has closed the walk goes back to the
+  -- squad it started from.
+  local walked = M.readByte(0x1A6D) & 0x07
+  local wanted = opts.party
+  local switching = wanted ~= nil and wanted ~= walked
+  if switching then mode = "switch" end
   local D = {}
   function D.done() return mode == "done" end
   function D.frame()
@@ -3258,10 +3271,25 @@ function M.newCareDriver(opts)
         "%d frames in): yielding to the fight", K.tag, mode, n))
       mode = "done"; M.setPad({}); return
     end
+    if mode == "switch" or mode == "switchback" then
+      local p = mode == "switch" and wanted or walked
+      if (M.readByte(0x1A6D) & 0x07) == p and M.hasControl() and M.tileAligned() then
+        M.log(string.format("[%s] walking squad %d", K.tag, p))
+        mode, n = (mode == "switch") and "start" or "done", 0
+        M.setPad({}); return
+      end
+      if n > 1800 then
+        M.log(string.format("[%s] the Y-switch to squad %d never landed; giving up on this care stop", K.tag, p))
+        mode = "done"; M.setPad({}); return
+      end
+      M.setPad(n % 46 < 6 and { "y" } or {})
+      return
+    end
     if mode == "start" then
       if not K.anyNeed() then
         M.log(K.roster("nothing to do"))
-        mode = "done"; M.setPad({}); return
+        mode, n = switching and "switchback" or "done", 0
+        M.setPad({}); return
       end
       M.log(K.roster("opening the menu"))
       mode, n = "open", 0
@@ -3317,7 +3345,7 @@ function M.newCareDriver(opts)
     if mode == "settle" then             -- the step form's 30-frame settle
       if n >= 30 then
         M.log(K.roster("done"))
-        mode = "done"
+        mode, n = switching and "switchback" or "done", 0
       end
       M.setPad({})
       return
