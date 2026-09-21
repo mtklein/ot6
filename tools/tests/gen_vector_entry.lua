@@ -100,6 +100,7 @@ end
 local EMPTY = 0xFF
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
 local ANTIDOTE, REMEDY = 0xF2, 0xF5
+local TINCTURE, REVIVIFY, TENT = 0xEB, 0xF1, 0xF7
 local SHOP_PROP = H.sym("ShopProp") & 0x3FFFFF   -- shop_prop.dat: 9 bytes per shop, items at +1
 local function shopRow(shop, row) return H.readRomByte(SHOP_PROP + shop * 9 + 1 + row) end
 local CH_LOCKE, CH_CELES = 1, 6
@@ -282,13 +283,30 @@ H.run({ maxFrames = 160000 }, {
     H.assertEq(H.readByte(0x0201), 24, "the counter opened shop 24 ($0201)")
     H.assertEq(shopRow(24, 0), POTION, "shop 24 row 0 is Potion")
     H.assertEq(shopRow(24, 5), FENIX_DOWN, "shop 24 row 5 is Fenix Down")
+    H.assertEq(shopRow(24, 1), TINCTURE, "shop 24 row 1 is Tincture")
+    H.assertEq(shopRow(24, 4), REVIVIFY, "shop 24 row 4 is Revivify")
+    H.assertEq(shopRow(24, 6), TENT, "shop 24 row 6 is Tent")
   end),
   H.buyItem(POTION, 0, function() return 50 - H.invCountOf(POTION) end, "POTION to 50"),
   H.buyItem(FENIX_DOWN, 5, function() return 16 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 16"),
+  -- #231 (docs/design/supply.md): the factory ahead is the Vector approach
+  -- squeeze -- 119-226 MP short per stop on the seeded chain, with a save
+  -- point underfoot twice (the save room 270 and OT6's 273).  REVIVIFY to
+  -- 3, the Zombie cure; TINCTURE to 5, the MP band at L20 (~level / 4),
+  -- for the stretches between those save points; TENT to 4, one per save
+  -- point and two for the world legs, the whole party's both pools for
+  -- 1200 where the item list offers it.  After the revives, before
+  -- nothing (Albrook sells no Tonic).
+  H.buyItem(REVIVIFY, 4, function() return 3 - H.invCountOf(REVIVIFY) end,
+    "REVIVIFY to 3"),
+  H.buyItem(TINCTURE, 1, function() return 5 - H.invCountOf(TINCTURE) end,
+    "TINCTURE to 5"),
+  H.buyItem(TENT, 6, function() return 4 - H.invCountOf(TENT) end, "TENT to 4"),
   H.call(function()
-    H.log(string.format("[shop] Albrook item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
-      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
+    H.log(string.format("[shop] Albrook item shop done: tonic=%d potion=%d fenix=%d tincture=%d tent=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
+      H.invCountOf(TINCTURE), H.invCountOf(TENT), H.gil(), H.frame))
   end),
   H.shopClose("Albrook item shop"),
   -- #197: the combat items back on top of the bag after every purchase
@@ -299,8 +317,12 @@ H.run({ maxFrames = 160000 }, {
     H.assertEq(H.invCountOf(POTION) >= 50, true,
       "the party leaves Albrook with 50 Potions -- the L21 band plus the Vector stretch's measured spend, its field care included (#210)")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 16, true, "Fenix Downs at 16 (~level)")
-    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d",
-      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN)))
+    H.assertEq(H.invCountOf(TINCTURE) >= 5, true, "Tinctures at 5 -- the L20 MP band (#231)")
+    H.assertEq(H.invCountOf(TENT) >= 4, true, "Tents at 4 for the factory's save points (#231)")
+    H.assertEq(H.invCountOf(REVIVIFY) >= 3, true, "Revivifies at 3 (#231)")
+    H.log(string.format("[shop] leaving the shop: gil=%d tonics=%d potions=%d fenix=%d tincture=%d tent=%d",
+      H.gil(), H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
+      H.invCountOf(TINCTURE), H.invCountOf(TENT)))
   end),
   -- out: the (37,55) event trigger, one tile below the arrival tile
   H.navTo(37, 54, { maxFrames = 6000, playBattles = "tactical" }),

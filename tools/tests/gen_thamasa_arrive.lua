@@ -379,14 +379,25 @@ local steps = {
   end),
   H.buyItem(0xE9, function() return 38 - H.invCountOf(0xE9) end, "POTION to 38"),
   H.buyItem(0xF0, function() return 25 - H.invCountOf(0xF0) end, "FENIX DOWN to 25"),
+  -- #231 (docs/design/supply.md): REVIVIFY to 3, the Zombie cure; TINCTURE
+  -- to 7, the MP band at L26 (~level / 4); TENT to 10, the band the bag
+  -- has carried since Jidoor, for the save points ahead (Thamasa's own at
+  -- 343 (33,25), the mountain's, the landing's).  After the revives and
+  -- before the Tonic soak, so a short purse shorts Tonics first.
+  H.buyItem(0xF1, function() return 3 - H.invCountOf(0xF1) end, "REVIVIFY to 3"),
+  H.buyItem(0xEB, function() return 7 - H.invCountOf(0xEB) end, "TINCTURE to 7"),
+  H.buyItem(0xF7, function() return 10 - H.invCountOf(0xF7) end, "TENT to 10"),
   H.buyItem(0xE8, function() return 99 - H.invCountOf(0xE8) end, "TONIC to 99"),
   H.shopClose("Thamasa item shop (arrival)"),
   H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 },
     { tag = "bag: combat items on top (Thamasa arrival)" }),
   H.call(function()
     H.assertEq(H.invCountOf(0xE8) >= 99, true, "Tonics at the band's cap")
-    H.log(string.format("[shop] Thamasa arrival stop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
-      H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0), H.gil(), H.frame))
+    H.assertEq(H.invCountOf(0xEB) >= 7, true, "Tinctures at 7 -- the L26 MP band (#231)")
+    H.assertEq(H.invCountOf(0xF7) >= 10, true, "Tents at 10 (#231)")
+    H.log(string.format("[shop] Thamasa arrival stop done: tonic=%d potion=%d fenix=%d tincture=%d tent=%d gil=%d f%d",
+      H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0),
+      H.invCountOf(0xEB), H.invCountOf(0xF7), H.gil(), H.frame))
   end),
   crossDoor(36, 45, 343, 26, 39, "item shop door 347(36,45)->343(26,39), return",
     { avoid = VIGNETTES }),

@@ -9,6 +9,7 @@ local TERRA, LOCKE, STRAGO, SHADOW = 0, 1, 7, 3
 local FIRE_ROD, ICE_ROD = 0x35, 0x36
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
 local ANTIDOTE, REMEDY = 0xF2, 0xF5
+local TINCTURE, REVIVIFY, TENT = 0xEB, 0xF1, 0xF7
 local ICE_SPELL = 0x01
 local saveArg = nil
 
@@ -1175,15 +1176,26 @@ local steps = {
   H.buyItem(POTION, 1, function() return 45 - H.invCountOf(POTION) end, "POTION to 45"),
   H.buyItem(FENIX_DOWN, 6, function() return 20 - H.invCountOf(FENIX_DOWN) end,
     "FENIX DOWN to 20"),
+  -- #231 (docs/design/supply.md): REVIVIFY to 3, TINCTURE to 7 (the MP
+  -- band at L27, ~level / 4, for the mountain's stretches between its save
+  -- point and Ultros) and TENT to 10 for that save point; after the
+  -- revives and before the Tonic soak.
+  H.buyItem(REVIVIFY, 5, function() return 3 - H.invCountOf(REVIVIFY) end,
+    "REVIVIFY to 3"),
+  H.buyItem(TINCTURE, 2, function() return 7 - H.invCountOf(TINCTURE) end,
+    "TINCTURE to 7"),
+  H.buyItem(TENT, 7, function() return 10 - H.invCountOf(TENT) end, "TENT to 10"),
   H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
   H.call(function()
     H.log(string.format(
-      "[shop] Thamasa item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
+      "[shop] Thamasa item shop done: tonic=%d potion=%d fenix=%d tincture=%d tent=%d gil=%d f%d",
       H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
-      gil(), H.frame))
+      H.invCountOf(TINCTURE), H.invCountOf(TENT), gil(), H.frame))
     H.assertEq(H.invCountOf(POTION) >= 45, true,
       "the party leaves Thamasa's shop with 45 Potions -- the L26 band plus the mountain's measured spend")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 20, true, "Fenix Downs at 20")
+    H.assertEq(H.invCountOf(TINCTURE) >= 7, true, "Tinctures at 7 -- the L27 MP band (#231)")
+    H.assertEq(H.invCountOf(TENT) >= 10, true, "Tents at 10 (#231)")
   end),
   shopClose("Thamasa item shop"),
   -- #197: the combat items back on top of the bag after every purchase

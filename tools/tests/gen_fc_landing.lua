@@ -28,6 +28,7 @@ end
 
 local ZMENUSTATE = 0x26
 local POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY = 0xE9, 0xF0, 0xE8, 0xF2, 0xF5   -- item ids (the care kernel's)
+local TINCTURE, REVIVIFY, TENT = 0xEB, 0xF1, 0xF7
 local TERRA, LOCKE, SHADOW, EDGAR = 0x00, 0x01, 0x03, 0x04
 local RAMUH, SHIVA = 0x00, 0x02
 local function map() return H.mapId() & 0x3ff end
@@ -247,13 +248,25 @@ H.run({ maxFrames = 600000 }, flatten({
   -- runner (#178) retried such losses.
   H.buyItem(POTION, 1, function() return 65 - H.invCountOf(POTION) end, "POTION to 65"),
   H.buyItem(FENIX_DOWN, 6, function() return 25 - H.invCountOf(FENIX_DOWN) end, "FENIX DOWN to 25"),
+  -- #231 (docs/design/supply.md): the last counter in the WoB.  REVIVIFY
+  -- to 3; TINCTURE to 7, the MP band at L28 (~level / 4) for the walks
+  -- between the continent's save points; TENT to 10 for those save points
+  -- (394 (7,12) and 358 (8,10)), where a Tent restores the whole party's
+  -- both pools for 1200 -- fc_landing stood on the first at TERRA 178/228,
+  -- LOCKE 73/256, EDGAR 114/218 MP with ten of them unpitched.
+  H.buyItem(REVIVIFY, 5, function() return 3 - H.invCountOf(REVIVIFY) end, "REVIVIFY to 3"),
+  H.buyItem(TINCTURE, 2, function() return 7 - H.invCountOf(TINCTURE) end, "TINCTURE to 7"),
+  H.buyItem(TENT, 7, function() return 10 - H.invCountOf(TENT) end, "TENT to 10"),
   H.buyItem(TONIC, 0, function() return 99 - H.invCountOf(TONIC) end, "TONIC to 99"),
   H.shopClose("Thamasa item shop"),
   H.call(function()
-    H.log(string.format("[prep] shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
-      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN), H.gil(), H.frame))
+    H.log(string.format("[prep] shop done: tonic=%d potion=%d fenix=%d tincture=%d tent=%d gil=%d f%d",
+      H.invCountOf(TONIC), H.invCountOf(POTION), H.invCountOf(FENIX_DOWN),
+      H.invCountOf(TINCTURE), H.invCountOf(TENT), H.gil(), H.frame))
     H.assertEq(H.invCountOf(POTION) >= 65, true, "Potions stocked to 65 for the gauntlet -- the L29 band plus the measured FC spend")
     H.assertEq(H.invCountOf(FENIX_DOWN) >= 25, true, "Fenix Downs stocked to 25")
+    H.assertEq(H.invCountOf(TINCTURE) >= 7, true, "Tinctures stocked to 7 -- the L28 MP band (#231)")
+    H.assertEq(H.invCountOf(TENT) >= 10, true, "Tents at 10 for the continent's save points (#231)")
   end),
   H.bagArrange({ POTION, FENIX_DOWN, TONIC, ANTIDOTE, REMEDY }, { tag = "bag: combat items on top" }),
   H.call(function()

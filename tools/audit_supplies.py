@@ -25,6 +25,16 @@ row and its `also=` siblings) -- to the same WoR landing.  Under it is a
 WARNING too; the fix is a `TONIC to N` line at a shop that sells them, or,
 where the route reaches none, the Potion target sized for the field care.
 
+The Tincture band (docs/design/supply.md, #231): Tinctures are the
+field-care MP restore, carried at ~level / 4 rounded up (one caster's
+pool per stretch) from the first counter whose purse can carry them --
+Narshe's shop 3, bought in `gen_zozo1_submerge`'s run (the
+`figaro_submerged` row) -- to the same WoR landing.  Figaro Castle sells
+them earlier and its purse cannot (supply.md, squeeze 1), so the band
+starts at Narshe.  Under it is a WARNING; the fix is a `TINCTURE to N`
+line at a counter that sells them (Narshe 3, Jidoor 22, Albrook 24,
+Thamasa 35).
+
 Usage:  python3 tools/audit_supplies.py [--repo .] [--selftest] [-v]
 Exit 0 clean, 1 if a fixture dropped to no revives across a boundary, or if a
 waiver has gone stale.
@@ -47,6 +57,7 @@ WAIVERS = "tools/supply_waivers.txt"
 FENIX_DOWN = 0xF0                      # the WoB's only revival, item id $F0
 POTION = 0xE9                          # the in-combat heal, item id $E9
 TONIC = 0xE8                           # the field-care heal, item id $E8
+TINCTURE = 0xEB                        # the field-care MP restore, item id $EB
 INV_IDS = 0x1869 - 0x1600             # inventory ids, offset past the char table
 INV_QTY = 0x1969 - 0x1600             # inventory counts, one byte each
 
@@ -59,6 +70,9 @@ POTION_BAND_MIN = 10
 # row's `also=` artifacts carry the row name, so all three are in band.
 FIRST_TONIC_SHOP_ROW = "figaro_intro"
 TONIC_BAND_CAP = 99
+# The graph row whose run first buys Tinctures (Narshe's shop 3, after the
+# Battle for Narshe).
+FIRST_TINCTURE_SHOP_ROW = "figaro_submerged"
 # The band is a WoB band: the graph row that generates this state (with its
 # `also=` artifacts, escape_start today) and everything downstream of it is
 # the World of Ruin, out of band.
@@ -95,6 +109,13 @@ def tonic_band(level: int) -> int:
     return min(TONIC_BAND_CAP, 5 * level)
 
 
+def tincture_band(level: int) -> int:
+    """Tinctures the bag should carry at this party level: ~level / 4,
+    rounded up -- 50 MP each against pools that grow ~9 MP a level, so one
+    caster's whole pool per stretch (docs/design/supply.md)."""
+    return -(-level // 4)
+
+
 def party_level(raw: bytes, cb: int):
     """The active party's highest level, or None if none is flagged active."""
     levels = [m["level"] for m in party_at(raw, cb) if m.get("active")]
@@ -115,6 +136,7 @@ def bag_of_mss(path: str):
         return None, "character table not located"
     return {"fenix": revives_in(raw, cb), "potion": count_in(raw, cb, POTION),
             "tonic": count_in(raw, cb, TONIC),
+            "tincture": count_in(raw, cb, TINCTURE),
             "level": party_level(raw, cb)}, None
 
 
@@ -179,17 +201,17 @@ def past_first_potion_shop(name: str, states: dict) -> bool:
     return False
 
 
-def past_first_tonic_shop(name: str, states: dict) -> bool:
-    """Whether the Tonic band applies: the fixture's `prev` chain reaches a
-    fixture of FIRST_TONIC_SHOP_ROW's run, or ends at a checkpoint (every
-    tracked checkpoint is cut downstream of Figaro Castle)."""
+def past_row(name: str, states: dict, row: str) -> bool:
+    """Whether the fixture's `prev` chain reaches a fixture of `row`'s run,
+    or ends at a checkpoint (every tracked checkpoint is cut downstream of
+    both Figaro Castle and Narshe's post-Kefka counter)."""
     seen = set()
     while name and name not in seen:
         seen.add(name)
         edge = states.get(name)
         if edge is None:
             return False
-        if edge.get("row") == FIRST_TONIC_SHOP_ROW:
+        if edge.get("row") == row:
             return True
         if edge["checkpoint"] and not edge["prev"]:
             return True
@@ -197,9 +219,21 @@ def past_first_tonic_shop(name: str, states: dict) -> bool:
     return False
 
 
+def past_first_tonic_shop(name: str, states: dict) -> bool:
+    """Whether the Tonic band applies: from Figaro Castle's shop on."""
+    return past_row(name, states, FIRST_TONIC_SHOP_ROW)
+
+
 def in_tonic_band(name: str, states: dict) -> bool:
     """The Tonic band applies from Figaro Castle's shop to the WoR landing."""
     return past_first_tonic_shop(name, states) and not in_world_of_ruin(name, states)
+
+
+def in_tincture_band(name: str, states: dict) -> bool:
+    """The Tincture band applies from Narshe's shop 3 (after the Battle for
+    Narshe) to the WoR landing."""
+    return (past_row(name, states, FIRST_TINCTURE_SHOP_ROW)
+            and not in_world_of_ruin(name, states))
 
 
 def in_world_of_ruin(name: str, states: dict) -> bool:
@@ -273,6 +307,18 @@ def selftest(repo: str = ".") -> int:
     check("tonic band at L8 (Figaro Castle)", tonic_band(8), 40)
     check("tonic band at L19 (Zozo)", tonic_band(19), 95)
     check("tonic band at L20 caps", tonic_band(20), 99)
+    # the Tincture band: ~level / 4, rounded up
+    check("tincture band at L14 (Narshe's counter)", tincture_band(14), 4)
+    check("tincture band at L16 is exact", tincture_band(16), 4)
+    check("tincture band at L17 rounds up", tincture_band(17), 5)
+    check("tincture band at L28 (the FC prep)", tincture_band(28), 7)
+    # the short test itself, on a synthetic bag: under the band is short,
+    # at it is not (the negative control), over it is not
+    check("3 Tinctures at L14 is under the band",
+          3 < tincture_band(14), True)
+    check("4 Tinctures at L14 is not (negative control)",
+          4 < tincture_band(14), False)
+    check("9 Tinctures at L28 is not", 9 < tincture_band(28), False)
 
     # Checked against mrf-save-room-v1, which carries two Fenix Downs.
     cps = dict(checkpoint_payloads(repo))
@@ -328,6 +374,26 @@ def selftest(repo: str = ".") -> int:
               in_potion_band("escape_start", states), False)
         check("a fixture before the train is not in the WoR either (forest_done)",
               in_world_of_ruin("forest_done", states), False)
+        # the Tincture band starts at Narshe's shop 3, gen_zozo1_submerge's
+        # row, not at Figaro Castle's counter (the purse there cannot carry
+        # one) -- so the whole Battle for Narshe is out of it
+        check("no Tincture band at Figaro Castle (figaro_cleared)",
+              in_tincture_band("figaro_cleared", states), False)
+        check("nor at the descent's foot (narshe_battle, negative control)",
+              in_tincture_band("narshe_battle", states), False)
+        check("nor at kefka_won, the fixture the Narshe stop boots from",
+              in_tincture_band("kefka_won", states), False)
+        check("the Tincture band starts with gen_zozo1_submerge's own artifact "
+              "(figaro_submerged)",
+              in_tincture_band("figaro_submerged", states), True)
+        check("and covers the Zozo grind downstream (zozo_arrival)",
+              in_tincture_band("zozo_arrival", states), True)
+        check("and a checkpoint-rooted fixture (vector_entry)",
+              in_tincture_band("vector_entry", states), True)
+        check("and the FC alcove (fc_alcove)",
+              in_tincture_band("fc_alcove", states), True)
+        check("but not the WoR landing (wor_landing)",
+              in_tincture_band("wor_landing", states), False)
 
     print("audit_supplies selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
@@ -369,7 +435,7 @@ def main() -> int:
             return n, f"checkpoint {cp}", err
         return None, "root", "no predecessor"
 
-    scanned, skipped, cliffs, short, tshort = 0, [], [], [], []
+    scanned, skipped, cliffs, short, tshort, mpshort = 0, [], [], [], [], []
     for name in sorted(declared):
         path = os.path.join(args.dir, name + ".mss")
         if not os.path.exists(path):
@@ -388,6 +454,10 @@ def main() -> int:
             tband = tonic_band(bag["level"])
             if bag["tonic"] < tband:
                 tshort.append((name, bag["tonic"], tband, bag["level"]))
+        if in_tincture_band(name, states) and bag["level"] is not None:
+            mband = tincture_band(bag["level"])
+            if bag["tincture"] < mband:
+                mpshort.append((name, bag["tincture"], mband, bag["level"]))
         edge = states.get(name, {"prev": None, "checkpoint": None})
         pred, label, perr = predecessor_revives(edge)
         if perr:
@@ -446,6 +516,19 @@ def main() -> int:
                       f"< band {band} (L{level})")
         else:
             print("    " + " ".join(n for n, _, _, _ in tshort))
+
+    if mpshort:
+        print(f"  WARNING: {len(mpshort)} fixture(s) under the Tincture band "
+              f"(~level / 4; the field-care MP restore, docs/design/supply.md) "
+              f"-- top up with a TINCTURE to N line at a counter that sells "
+              f"them (Narshe 3, Jidoor 22, Albrook 24, Thamasa 35)"
+              + ("" if args.verbose else "; -v lists them") + ":")
+        if args.verbose:
+            for name, have, band, level in mpshort:
+                print(f"    TINCTURE SHORT {name:25s} tincture={have:2d} "
+                      f"< band {band} (L{level})")
+        else:
+            print("    " + " ".join(n for n, _, _, _ in mpshort))
 
     stale = sorted(waivers - used)
     if stale:
