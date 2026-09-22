@@ -43,6 +43,8 @@
                                 ;   (0/2/4/6) are ever read, and a stale byte
                                 ;   would give the next battle's Celes a
                                 ;   standing magic shield she never paid for
+        sta     f:$7e0000+OT6_WEAPSPELL ; nor a weapon-spell flag from the
+                                ;   last battle's final pass
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
                                 ;   this one" flag (#236): it would hand the
                                 ;   first uncontrolled swing of this battle a
@@ -656,10 +658,10 @@ out:    longa
 ;     byte already set and spends it.
 ;   * Charge and Storm: the damage multiplier, through Ot6BoostDmg.  Charge
 ;     executes as command $23 and Storm as command $02 with $b6 = $54,
-;     neither on that proc's exempt list.  Its tier test had to be gated to
-;     the four spell commands and keyed on $b6 first: an engine-driven
-;     character's queue holds attack $00, which read as Fire (see the
-;     header of Ot6BoostDmg for the measurement).
+;     neither on that proc's exempt list.  Its tier test asks the queued
+;     command first, and an engine-driven character's queue holds
+;     command/attack $0000: not a fold command, so the queued $00 is never
+;     read as Fire (see the header of Ot6BoostDmg).
 ;   * Throw: extra throws, through Ot6ThrowBoost below.  Throw runs its
 ;     damage roll with x = the thrown ally (UmaroAttack_00's `tyx` after
 ;     BitToTargetID), so Ot6BoostDmg reads the ally's pending byte there,

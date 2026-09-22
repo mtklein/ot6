@@ -16,6 +16,7 @@ CODE_EXT_INC = 1
 .global Ot6ToolListIcon_ext
 .global Ot6BgHud_ext, Ot6BgHudFlush_ext, Ot6PipGlyph_ext
 .global Ot6ActionEnd, Ot6BoostDmg, Ot6InitBP
+.global Ot6WeaponSpellQueued, Ot6WeaponSpellPass
 .global Ot6CodexSaveAs          ; copy slot-local weakness knowledge on Save As
 .global Ot6CodexNewGame, Ot6CodexLoaded
 .global Ot6BushidoTier
