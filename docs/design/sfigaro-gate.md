@@ -1,5 +1,32 @@
 # The South Figaro gate soldier — solo LOCKE vs HeavyArmor (#193)
 
+> **SUPERSEDED 2026-09-22 (#244 / #145): the gate soldier is no longer
+> fought.**  The route now infiltrates in DISGUISE — the merchant's clothes
+> ($0104, stolen from the item-shop merchant) open the servant's-house
+> basement, and LOCKE crosses to the west of town underground, past the
+> soldier's post at map 75 (30,42), without ever engaging him.  The whole
+> leg is two Steal fights on the Merchant enemy (formation 43) and **zero
+> HeavyArmor**.  `tools/tests/gen_sfigaro.lua` drives it; the generated
+> battle log shows exactly the two Merchant Steals, and an 8-seed
+> retries-off sweep of `sfigaro_town` passes 8/8 with 8 distinct
+> first-battle samples.
+>
+> The one thing that took measuring (see `gen_sfigaro.lua` BEAT 3 and
+> `tools/tests/probe_richman_return.lua`): the basement is one-way across a
+> **map reload**.  The grandson steps aside for a merchant via an
+> `obj_script`, not a spawn slot, and $01F0 clears on reload, so on
+> re-entering from the west he is back at (6,10) blocking the corridor to
+> the old-man warp (10,7).  Because $01F0 re-cleared, talking to him again
+> (still $0104) takes `_ca7bf8` a second time and he steps aside again;
+> from there every step to the passage is a same-map warp, so the corridor
+> stays open.  The owner was right that the HeavyArmor is avoidable; #145's
+> "unavoidable chokepoint" BFS did not model the disguise-gated basement.
+>
+> Everything below is the retained measurement of the FIGHT (when the route
+> still fought it), kept as evidence for the supply/finisher findings; it no
+> longer describes the shipped route.  The `GATE`/`clearGate` apparatus it
+> refers to came out of `gen_sfigaro.lua` with the disguise route.
+
 Authored 2026-09-16 from `tools/tests/lab_sfigaro_gate.lua` (the lab; its
 header carries the decoded rows), the v0.17 qualification log
 (`build/attempts/baseline-2026-09-16/v017-requal2.log` in the main tree)

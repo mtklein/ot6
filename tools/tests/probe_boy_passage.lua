@@ -90,18 +90,32 @@ H.run({ maxFrames = 80000 }, {
       H.bfsPath(22, 43) and "YES" or "no", H.bfsPath(22, 47) and "YES" or "no",
       H.bfsPath(22, 13) and "YES" or "no", H.bfsPath(37, 41) and "YES" or "no"))
   end),
-  -- OLD-MAN REACH TEST: from the west, re-enter the grandson region via the
-  -- OTHER door (22,13 -> map 86 (8,25)) and see whether the old-man warp (10,7)
-  -- / old-man region is reachable WITHOUT passing the re-blocked grandson.
-  H.navTo(22, 14, { maxFrames = 12000, playBattles = true }),
-  H.driveUntil(function() return map() == 86 end, 3000, { H.hold({ "up" }), H.waitFrames(8) },
-    "into grandson region via (22,13)"),
+  -- RICH-MAN'S-HOUSE RETURN ROUTE TEST: put on the Imperial disguise ($0103)
+  -- and see whether the map-81 doors / terrace are reachable from the cider
+  -- region (the return route is town75 -> 81 -> 83 -> 84 -> 87 -> old man).
+  H.call(function()
+    setsw(0x0103, 1)
+    H.log(string.format("[end] cider region, $0103 on: map81 doorstep (23,16)=%s (15,19)=%s (24,15)=%s",
+      H.bfsPath(23, 16) and "YES" or "no", H.bfsPath(15, 19) and "YES" or "no",
+      H.bfsPath(24, 15) and "YES" or "no"))
+  end),
+  -- drive into map 81 (town 23,15 -> 81) and on toward map 83, then check the
+  -- old-man region reachability (83 -> 84 -> 87 -> 86 old man)
+  H.navTo(23, 16, { maxFrames = 15000, playBattles = true }),
+  H.driveUntil(function() return map() == 81 end, 3000, { H.hold({ "up" }), H.waitFrames(8) },
+    "into map 81"),
   H.release(), H.waitFrames(90),
   H.call(function()
-    H.log(string.format("[boy] via (22,13): map=%d at (%d,%d); grandson(obj20)=(%d,%d); "
-      .. "warp(10,7) reach=%s (10,8) reach=%s old-man-warp-land(33,10) reach=%s old man(28,17) reach=%s",
-      map(), H.fieldX(), H.fieldY(), H.objX(20), H.objY(20),
-      H.bfsPath(10, 7) and "YES" or "no", H.bfsPath(10, 8) and "YES" or "no",
-      H.bfsPath(33, 10) and "YES" or "no", H.bfsPath(28, 17) and "YES" or "no"))
+    H.log(string.format("[end] into map 81: map=%d at (%d,%d)", map(), H.fieldX(), H.fieldY()))
+    -- scan objects (officers?) and check the map-81 -> 83 door reachability
+    for o = 16, 31 do
+      local x, y = H.objX(o), H.objY(o)
+      if x >= 0 and x < 128 and y >= 0 and y < 64 then
+        H.log(string.format("[end]   obj %d at (%d,%d)", o, x, y))
+      end
+    end
+    for _, t in ipairs({ {28,9,"->map83"}, {4,16,"<-town75(15,18)"}, {16,15,"<-town75(23,15)"} }) do
+      H.log(string.format("[end]   m81 (%d,%d)%s reach=%s", t[1], t[2], t[3], H.bfsPath(t[1],t[2]) and "YES" or "no"))
+    end
   end),
 })
