@@ -389,6 +389,16 @@ TEST_ENV = {
     # an 80-win cap at ~4000 frames a win is ~320k frames, ~1600 s at the
     # ~200 frames/s a loaded machine emulates; the 600 s default cap is far short
     "battle_shadowstays": "OT6_TIMEOUT=3600",
+    # each budgets its encounters for EVERY encounter-counter state the
+    # game can deal, not the fixture's (lib/ot6_field.lua's
+    # worstCaseEncounters), so its worst case is well past the default cap
+    # even though a typical run is short: classtarget's 23 lane encounters
+    # plus the A/B are ~66k frames; statuses' 36 battles for 16 exposures
+    # ~115k; levelup's 40-battle step list ~85k -- at the ~100 frames/s a
+    # loaded machine emulates, 11 to 19 minutes
+    "battle_classtarget": "OT6_TIMEOUT=3600",
+    "battle_statuses": "OT6_TIMEOUT=3600",
+    "battle_levelup": "OT6_TIMEOUT=3600",
 }
 
 # any <name>.mss reference, path-qualified or bare -- compose.py resolves
