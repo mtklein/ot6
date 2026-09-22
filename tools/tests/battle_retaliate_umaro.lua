@@ -449,7 +449,7 @@ H.run({ maxFrames = 60000, retries = 3 }, {
     -- A name-refused character's full gauge already auto-commands through
     -- RandCharAction, Berserk or not, so at some seeds the engine has
     -- chosen a turn for him (a random command row of the staged
-    -- character's, and the latch) before this point; logged, not asserted.
+    -- character's, and the flag) before this point; logged, not asserted.
     H.log(string.format("[stage] f%d before the relics and Berserk: bank %d, "
       .. "hurt line %d, OT6_UNCTL $%02X, %d action end(s) of his so far",
       H.frame, bp(SUBJ), H.readWord(D.mark), H.readByte(D.unctl), #L.ends))

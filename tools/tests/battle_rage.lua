@@ -258,7 +258,7 @@ local function pinGau()
   end
   if actor then
     -- pinPend is nil once the rage has been confirmed, so re-pinning does not
-    -- overwrite the pending byte the latch is about to read.
+    -- overwrite the pending byte Ot6RageTierFlag is about to read.
     if pinPend then H.writeByte(0x3E9D + actor * 2, pinPend) end
     if pinMp then H.writeWord(CURMP(actor), startMp) end
     for _, s in ipairs(PARTY) do
@@ -351,7 +351,7 @@ add({
   H.driveUntil(function() return raging(actor) end, 4000, {
     H.call(tick), H.waitFrames(3),
     H.call(function() H.setPad({}) end), H.waitFrames(6),
-  }, "charge: the RAGE status latches (Cmd_10 ran)"),
+  }, "charge: the RAGE status is set (Cmd_10 ran)"),
   H.call(function()
     local left = mp(actor)
     H.log(string.format("charge: MP %d -> %d after the rage START", startMp, left))
@@ -360,7 +360,7 @@ add({
       .. "price for both possess-verbs)")
     _G.__afterStart = left
     _G.__tier0 = H.readByte(RAGETIER)
-    H.assertEq(_G.__tier0, 0, "unboosted start latched tier 0")
+    H.assertEq(_G.__tier0, 0, "unboosted start stored tier 0")
   end),
   ride(300),
   H.call(function()
@@ -371,8 +371,8 @@ add({
     H.assertEq(mp(actor), _G.__afterStart,
       "every possessed turn after the start is FREE -- one payment, whole battle")
     H.assertEq(H.readByte(RAGETIER), _G.__tier0,
-      "the latched tier survived the mid-trance Cmd_10 re-entries")
-    H.log("CHARGE: 8 once, then nothing -- and the tier latch held")
+      "the stored tier survived the mid-trance Cmd_10 re-entries")
+    H.log("CHARGE: 8 once, then nothing -- and the tier store held")
   end),
 })
 
@@ -392,7 +392,7 @@ add({
   end),
 })
 
--- 7. The tier latch: 3 BP banked at the start, held for the whole trance ----
+-- 7. The tier store: 3 BP banked at the start, held for the whole trance ----
 -- 50, which is deliberately LESS than the 99 a boost-3 Rage would cost if it
 -- escalated (8 x 15.625 = 125, flattened to the two-digit ceiling).
 -- Ot6RageStartGate refuses a start the pool cannot pay, so under the old rule
@@ -406,10 +406,10 @@ add({
   H.driveUntil(function() return raging(actor) end, 4000, {
     H.call(tick), H.waitFrames(3),
     H.call(function() H.setPad({}) end), H.waitFrames(6),
-  }, "tier3: the RAGE status latches"),
+  }, "tier3: the RAGE status is set"),
   H.call(function()
     H.assertEq(H.readByte(RAGETIER), 3,
-      "Cmd_10 latched the pending 3 into OT6_RAGETIER")
+      "Cmd_10 stored the pending 3 into OT6_RAGETIER")
     H.log(string.format("tier3: MP %d -> %d after the boosted rage START "
       .. "(price %d, escalated would be %d)", _G.__t3mp, mp(actor),
       ragePrice(3), escalated(3)))
@@ -432,7 +432,7 @@ add({
       cmd10Hits))
     H.assertEq(H.readByte(RAGETIER), 3,
       "and it is STILL 3 after several possessed turns -- the mid-trance "
-      .. "Cmd_10 re-entries did not re-latch the consumed pending byte")
+      .. "Cmd_10 re-entries did not re-store the consumed pending byte")
     H.assertEq(H.readByte(0x3E9D + actor * 2), 0,
       "the pending boost itself was consumed by the start action")
     H.assertEq(mp(actor), _G.__t3after,
@@ -446,7 +446,7 @@ add({
     H.assertEq(#coins >= 2, true,
       "tier3: the trance rolled more than once (got " .. #coins .. ")")
     for _, e in ipairs(coins) do
-      H.assertEq(e.tier, 3, "tier3: every roll saw the latched 3")
+      H.assertEq(e.tier, 3, "tier3: every roll saw the stored 3")
       H.assertEq(e.coin, 1,
         "tier3: the special, every turn -- 3 BP buys the whole trance")
       H.assertEq(e.draws, 0,
@@ -632,10 +632,10 @@ local function tierArm(tag, pend, draw, wantCoin, why)
     H.driveUntil(function() return raging(actor) end, 4000, {
       H.call(tick), H.waitFrames(3),
       H.call(function() H.setPad({}) end), H.waitFrames(6),
-    }, tag .. ": the RAGE status latches"),
+    }, tag .. ": the RAGE status is set"),
     H.call(function()
       H.assertEq(H.readByte(RAGETIER), pend,
-        string.format("%s: Cmd_10 latched tier %d", tag, pend))
+        string.format("%s: Cmd_10 stored tier %d", tag, pend))
       H.assertEq(mp(actor), 50 - ragePrice(pend), string.format(
         "%s: the start paid the flat %d at boost %d -- not the %d a 2.5x "
         .. "escalation would charge.  Rage is a chance verb: cmd $10 is in "
@@ -662,7 +662,7 @@ local function tierArm(tag, pend, draw, wantCoin, why)
         "%s: every one of the %d rolls picked entry %d (%s)",
         tag, #coins, wantCoin, why))
       for _, e in ipairs(coins) do
-        H.assertEq(e.tier, pend, tag .. ": every roll saw the latched tier "
+        H.assertEq(e.tier, pend, tag .. ": every roll saw the stored tier "
           .. "-- the START turn included (it is rolled at action load)")
         -- tiers 1 and 2 spend exactly one extra draw per turn: the one pinned here
         H.assertEq(e.draws, 1, string.format(
@@ -688,7 +688,7 @@ add({
   H.driveUntil(function() return raging(actor) end, 4000, {
     H.call(tick), H.waitFrames(3),
     H.call(function() H.setPad({}) end), H.waitFrames(6),
-  }, "t0-vanilla: the RAGE status latches"),
+  }, "t0-vanilla: the RAGE status is set"),
   ride(300),
   H.call(function()
     local c0, c1, draws = coinSummary()
@@ -859,7 +859,7 @@ add({
       .. "nothing driven negative.  A Gau at zero MP can still take the "
       .. "Veldt's action, which is what makes sharing the FIGHT row safe")
     H.log("PASSED: list filter + AUTO truncation, trance price, refusal gate, "
-      .. "tier latch, the tier-1/tier-2 coin at both boundaries, the width "
+      .. "tier store, the tier-1/tier-2 coin at both boundaries, the width "
       .. "restore, and Leap free at a full pool and at zero")
   end),
 })

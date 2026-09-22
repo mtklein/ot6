@@ -24,12 +24,12 @@ CODE_EXT_INC = 1
 .global Ot6StealBoostLevel, Ot6StealSlot   ; boost-tiered steal (chance verb)
 .global Ot6SlotRig, Ot6SlotDrift           ; boost-tiered Slot (chance verb):
 .global Ot6SlotMiss, Ot6SlotCommit         ;   rig/drift/miss tiers + the
-                                           ;   latched-tier charge at commit
+                                           ;   stored-tier charge at commit
 .global Ot6ThiefListOpen         ; #55 locke's kit: steal -> tools-shell submenu
 .global Ot6ThiefExec             ;   Cmd_05's execute-side dispatch (filch/bestow)
 .global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
 .global Ot6BushidoListOpen       ; v0.5 bushido submenu (#8): swdtech -> tools shell
-.global Ot6BushidoConfirm        ;   confirm shim: row r -> boost r + latch tech
+.global Ot6BushidoConfirm        ;   confirm shim: row r -> boost r + commit tech
 .global Ot6BushidoWindow         ;   enumerate the <=4 window techs into wItemList
 .global Ot6LoadoutOpen           ; v0.5 loadout (#8 Layer B): F0 state logic the
 .global Ot6LoadoutInput          ;   thin C3 configurator shim jsl's -- seed the

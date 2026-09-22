@@ -375,9 +375,9 @@ Ot6RewardMulW:
 ; change the party between z 0/2/3 while a step is resolving.  If
 ; CheckBattleSub rolls on that ladder, EventScript_RandBattle stops
 ; forever at $ca0029 waiting for the pre-battle scroll/object movement
-; to settle; the battle latch never comes up and player control never
+; to settle; the battle flag never comes up and player control never
 ; returns (measured: the (29,41)->(30,41) step, 66b8908 -- a PRE-battle
-; hang, battleLoadStarted never latches, with no Shadow in the party).
+; hang, battleLoadStarted never sets, with no Shadow in the party).
 ; The rectangle is the shaft's complete authored route (x 29..40,
 ; y 31..61); other rooms in composite map 225 lie outside it and keep
 ; their encounter pool.

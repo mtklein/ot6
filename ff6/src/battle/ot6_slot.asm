@@ -42,26 +42,26 @@
 ; Ot6SlotMiss keeps the avoid mark on a 7-pair, so a battle that forbids
 ; joker doom cannot be bought out of it (vanilla's own prohibition, kept).
 ;
-; The charge. The tier is latched from OT6_BOOST_REVEALED at the first A
+; The charge. The tier is stored from OT6_BOOST_REVEALED at the first A
 ; press (the spin cannot be backed out of after that: B exits only while
-; w7e7b92/93/94 are all clear, @7fec), and Ot6SlotCommit writes the latch
+; w7e7b92/93/94 are all clear, @7fec), and Ot6SlotCommit writes the store
 ; back to OT6_BOOST_REVEALED at the commit press, so Ot6ActionEnd charges
-; the tier the reels were spun with. Without the latch an L/R edge
+; the tier the reels were spun with. Without the store an L/R edge
 ; during the multi-second spin changes the charge without changing the reels.
 ; There is no MP price on Slot in this change.
 ;
-; The latch lives in the $57ba spare byte of the init-exempt OT6 strip
+; The store lives in the $57ba spare byte of the init-exempt OT6 strip
 ; ($57ba-$57bf, ot6_hud.asm's block comment), because these procs assemble
 ; into bank $f0. Stale values are harmless: every read below happens inside a
-; spin, and every spin's first press rewrites the latch.
+; spin, and every spin's first press rewrites the store.
 ; OT6_SLOTTIER lives in ot6_memory.inc with the rest of the $57xx strip.
 ; ------------------------------------------------------------------------------
 
-; [ latch the spin's tier + tier the rig byte (first A press of a spin) ]
+; [ store the spin's tier + tier the rig byte (first A press of a spin) ]
 ;
 ; replaces UpdateMenuState_08's `sta w7e6179` (the rig-byte store): A arrives
 ; holding vanilla's freshly drawn rig byte (Rand, or Rand|$3c when the battle
-; disables joker doom) and leaves stored to w7e6179, tiered. Also the latch
+; disables joker doom) and leaves stored to w7e6179, tiered. Also the store
 ; write: OT6_SLOTTIER = the active character's pending boost, capped at 3.
 ; a8, db=$7e (the menu bank's own context); index width unknown at the site,
 ; so php/longi pins it. clobbers x (the caller's next act reads no register).
@@ -82,7 +82,7 @@
         cmp     #$04
         bcc     :+
         lda     #$03            ; (defensive: Ot6Boost already caps at 3)
-:       sta     f:$7e0000+OT6_SLOTTIER     ; the spin's tier, latched
+:       sta     f:$7e0000+OT6_SLOTTIER     ; the spin's tier, stored
         cmp     #$02
         bcs     @force          ; tier 2/3: the rig is forced, not rolled
         pla                     ; tier 0/1: vanilla's own rig byte stands
@@ -154,14 +154,14 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ commit the spin: queue the actor + re-bank the latched tier ]
+; [ commit the spin: queue the actor + re-bank the stored tier ]
 ;
 ; replaces the commit press's `lda w7e62ca / sta $2bae,y` (@7fd9): the vanilla
 ; store first (y = the queue row _c16d56 just computed), then the charge fix:
-; OT6_BOOST_REVEALED = the latch, so Ot6ActionEnd charges the tier the reels
+; OT6_BOOST_REVEALED = the store, so Ot6ActionEnd charges the tier the reels
 ; were spun with. An L edge mid-spin can no longer buy a chosen
 ; triple at a discount, and an R edge mid-spin (banked but never read by the
-; already-latched spin) is handed back rather than charged for nothing.
+; already-stored spin) is handed back rather than charged for nothing.
 ; Delivered equals charged in both directions (battle_lateboost's rule).
 ; a8, db=$7e; y preserved (the sta uses it before any width games).
 .proc Ot6SlotCommit

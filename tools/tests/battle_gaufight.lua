@@ -44,7 +44,7 @@
 --      weakness byte carries bludgeoning, checked both ways.
 --   4. rage possession is unaffected (battle A): rage is started from row 1 of
 --      the real menu, the window's cursor is steered to entry 0 by d-pad
---      against the live cursor cells with no pokes, the RAGE status latches,
+--      against the live cursor cells with no pokes, the RAGE status is set,
 --      at least one autonomous Gau action dispatches, and the X-cycled focus
 --      never lands on Gau, so CheckPlayerAction's STATUS34
 --      {DANCE, HIDE, RAGE} gate holds.
@@ -377,7 +377,7 @@ add({
     H.waitFrames(3),
     H.call(function() H.setPad({}) end),
     H.waitFrames(16),
-  }, "the RAGE status latches (Cmd_10 ran)"),
+  }, "the RAGE status is set (Cmd_10 ran)"),
   H.call(function() gauMenus, gauDispatches, rideN = 0, 0, 0 end),
                                       -- count openings/actions from the trance on
   -- ride the trance: the bench is X-cycled, so if the four-row

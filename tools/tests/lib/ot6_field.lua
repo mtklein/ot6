@@ -136,7 +136,7 @@ end
 -- does not mean bit 1 is the soft one, and CANT_RUN stays $02.
 -- Measured (probe_flee_world.lua, camp_escaped, two world-map randoms):
 -- $b1 read 00, L+R was held from battle frame 3, $2f45 went 1, $3a38
--- latched "a character just ran away" at frames 243 and 371, and both
+-- flagged "a character just ran away" at frames 243 and 371, and both
 -- fights ended with the party gone and the monsters alive.  On the FC
 -- escape map 393 the one formation is Naughty ($169, +19 = $8D: bit 3
 -- no-run AND bit 0 harder-to-run), so $b1 reads $06 from frame 3 and the
@@ -922,7 +922,7 @@ function M.advanceStory(pred, maxFrames, opts)
       end
       -- a battle resolved earlier in the ride and control is back:
       -- recover OUTSIDE combat before riding on.  A ride whose scene
-      -- never returns control leaves the latch armed; the caller's
+      -- never returns control leaves the flag armed; the caller's
       -- own care stop then owns it.
       if sawBattle and M.hasControl() and M.tileAligned() then
         sawBattle = false
@@ -962,7 +962,7 @@ end
 --   $E7     bit0 = world event script running (Figaro/Narshe triggers)
 --   $19     fade/exit trigger (nonzero = leaving the world map)
 --   $E8     bit0 = menu opening, bit3 = once-per-tile event/battle
---            latch, bit4 = reload-world (battle return, zone eater)
+--            flag, bit4 = reload-world (battle return, zone eater)
 --
 -- Movement is latched to the step: input is gated on both fractions being
 -- zero, so a begun step always continues to the next tile boundary; the
@@ -1695,7 +1695,7 @@ end
 --          zeroed by the A that confirms (text.asm:425).  Battle RAM
 --          scribbles it, so it is not read while a battle is up.
 --   $056E  cursor row, 0-based.  Moved only while the dialog waits; the
---          $056D latch lets a held direction move it one row, so steering
+--          $056D flag lets a held direction move it one row, so steering
 --          presses are edges.  The confirm leaves it alone; the event's
 --          `choice` opcode (event.asm EventCmd_b6) branches on it and only
 --          then clears it, which is after the window has closed.
@@ -2522,7 +2522,7 @@ function M.buyItem(id, row, qtyFn, name)
       end
     end),
   }, "buy " .. name), function()
-    -- as-built (#196): the row, the quantity and the "bought" latch are
+    -- as-built (#196): the row, the quantity and the "bought" flag are
     -- resolved again for the shop the NEXT pass finds open
     phase, seen27, bought, want = 0, false, false, nil
     lastQty, stall = nil, 0

@@ -209,7 +209,7 @@ H.run({ maxFrames = 40000 }, {
     H.writeByte(0x8963 + slot, 0)      -- column 0
     H.writeByte(0x8967 + slot, 2)      -- row 2 (boost 3 -> word slot 3 = tech 3)
     -- Ot6BushidoConfirm reads y = (w7e7b80 & 3) * 8 before it inc's $7b80, so
-    -- snapshot that queue index now to read the tech it latches.
+    -- snapshot that queue index now to read the tech it stores.
     _G.__preY = (H.readByte(0x7B80) & 0x03) * 8
     H.screenshot("bushido_loadout_manual")
   end),
@@ -217,11 +217,11 @@ H.run({ maxFrames = 40000 }, {
   H.pressButtons({ "a" }, 4), H.waitFrames(10),
   H.call(function()
     H.assertEq(pend(actor), 3, "confirming row 2 banked boost 3 ($3e9d = 3)")
-    -- $2bb0,y holds the latched tech index (FixPlayerAttack adds +$55 later)
-    local latched = H.readByte(0x2BB0 + _G.__preY)
-    H.assertEq(latched, slots[4],
-      "confirm latched the STORED tech for boost 3 (index " .. slots[4] .. ", not auto's 7)")
-    H.log(string.format("CONFIRM: row 2 -> boost 3, latched stored tech index %d", latched))
+    -- $2bb0,y holds the stored tech index (FixPlayerAttack adds +$55 later)
+    local stored = H.readByte(0x2BB0 + _G.__preY)
+    H.assertEq(stored, slots[4],
+      "confirm committed the STORED tech for boost 3 (index " .. slots[4] .. ", not auto's 7)")
+    H.log(string.format("CONFIRM: row 2 -> boost 3, committed stored tech index %d", stored))
     H.log("PASSED: loadout read hook enumerates/validates/confirms the stored slots")
   end),
 })

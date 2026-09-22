@@ -725,7 +725,7 @@ H.run({ maxFrames = 150000, allowGameOver = true }, {  -- the #84 chest pickup r
     H.assertEq(inParty(5), true, "SABIN is the party again")
     H.assertEq(inParty(3), true, "SHADOW too")
     H.assertEq(inParty(2), false, "CYAN is out again")
-    -- $02E2 is the gate scene's own latch: _cb0c2f/_cb0c47/_cb0c5e all open
+    -- $02E2 is the gate scene's own flag: _cb0c2f/_cb0c47/_cb0c5e all open
     -- `if_switch $02E2=1, EventReturn` (:39786, :39797, :39807), so with it
     -- set the three gate tiles are inert and the next step can walk south
     -- across them without replaying the interlude.

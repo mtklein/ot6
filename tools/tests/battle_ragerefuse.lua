@@ -36,7 +36,7 @@
 --      see.
 --   3. the real pool restored, the same window re-opened: both columns
 --      WHITE, the same beast commits, cmd $10 is queued at the drawn 8, the
---      RAGE status latches and the start pays exactly 8 -- so the refusal is
+--      RAGE status is set and the start pays exactly 8 -- so the refusal is
 --      a gate, not a wall, and Rage still works (battle_rage owns the trance
 --      itself).
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -134,7 +134,7 @@ local resolved = {}
 -- ...and GAU's pool cell itself, every 16-bit store to it: the start's
 -- charge is read off the store that makes it, not off the cell later,
 -- because the bench can finish the fight in the frames between the trance
--- latching and a later read, and $3c08 reads garbage once the battle tears
+-- storing and a later read, and $3c08 reads garbage once the battle tears
 -- down (measured: build/sweeps/battle_ragerefuse/attempt1/shift35.log,
 -- "mp=17732 raging=true" on the world map).
 local poolWrites = {}
@@ -175,7 +175,7 @@ end
 -- battle_gaufight's bench: SABIN and CYAN X-cycle every window they are
 -- handed and never act.  A Veldt Brawler has 27 HP and dies to one swing,
 -- and arm 3 needs the fight alive until GAU's start resolves, because a
--- start whose targets are already dead latches the trance and never reaches
+-- start whose targets are already dead stores the trance and never reaches
 -- the charge.  Measured with battle_kitrefuse's right-then-A Defend bench
 -- instead: on seed shift 35 that sequence queued Fights ("[queue f624] cmd
 -- $00 cost 0 actor=0", build/attempts/ragerefuse/shift35_benchdefend_queue
@@ -498,7 +498,7 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(buzzes, before.buzzes, "...and no buzz this time")
     want.mode = "defer"
   end),
-  step("the RAGE status latches (Cmd_10 ran the start)",
+  step("the RAGE status is set (Cmd_10 ran the start)",
     function() return raging(gau) end, 4000),
   step("the start pays (a store to GAU's pool cell)",
     function() return #poolWrites > before.pool end, 600),

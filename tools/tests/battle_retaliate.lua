@@ -143,12 +143,12 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(D.cap < BANK_CAP, true,
       "the cap really is a cap here: a full bank of " .. BANK_CAP
       .. " cannot all be spent at once, so the dump is testable")
-    -- the two latch cells, read out of the assembled symbols rather than
+    -- the two flag cells, read out of the assembled symbols rather than
     -- copied into this file
     D.unctl = 0x7E0000 + (H.sym("OT6_UNCTL") & 0xFFFF)
     D.mark  = 0x7E0000 + (H.sym("OT6_HPMARK") & 0xFFFF) + SUBJ * 2
     H.assertEq(D.mark - SUBJ * 2, D.unctl + 1,
-      "ot6_memory.inc keeps the latch and the hurt line adjacent")
+      "ot6_memory.inc keeps the flag and the hurt line adjacent")
     H.log(string.format("[rom] $3a70 = %d + %d*bp; spend cap %d; "
       .. "OT6_UNCTL $%06X, subject's hurt line $%06X",
       D.base, D.perBp, D.cap, D.unctl, D.mark))
@@ -214,7 +214,7 @@ H.run({ maxFrames = 150000 }, {
       .. "is not routed", r0, r1, r0, r0 + r1, 100.0 * r0 / (r0 + r1)))
     -- 3. The Colosseum is a MODE, $3a97, and RandCharAction is where
     --    vanilla folds it in beside Berserk, Muddle and Charm -- so it
-    --    arrives at the same latch with no extra test here.  Nothing in
+    --    arrives at the same flag with no extra test here.  Nothing in
     --    the WoB can enter it, so that is all this file says about it.
   end),
 
@@ -385,7 +385,7 @@ H.run({ maxFrames = 150000 }, {
       .. "(Ot6ActionEnd's gain arm, %d of his actions resolved)",
       BANK_CAP, L.playerFights))
     H.assertEq(L.unctlDuringA, 0,
-      "OT6_UNCTL never set while the PLAYER was driving him: the latch is "
+      "OT6_UNCTL never set while the PLAYER was driving him: the flag is "
       .. "the engine's decision, not a status read")
     H.assertEq(#L.dumps, 0,
       "and nothing dumped: a player's unboosted Fight spends no pips")

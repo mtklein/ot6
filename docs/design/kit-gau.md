@@ -461,7 +461,7 @@ drawn at col 2 under a cursor at `x = 8` puts the sprite on the leading glyph.
    (§5). The flat price is drawn once on the configurator's title row via the
    `Ot6LoadoutDrawCost` pattern (`field_menu.asm:2831-2860`).
 5. **Boost** —
-   - `Ot6RageTierLatch`, hooked at **both** `RandRage` callers — `Cmd_10`
+   - `Ot6RageTierFlag`, hooked at **both** `RandRage` callers — `Cmd_10`
      entry (`battle_main.asm:3351`, before `:3370`'s `_c21554` tail) and
      `FixPlayerAttack`'s cmd-`$10` arm at action LOAD (§6.1):
      `OT6_BOOST_REVEALED,x` capped 3 → `OT6_RAGETIER`.

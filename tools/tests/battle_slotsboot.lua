@@ -33,7 +33,7 @@ local RIG, HELP1, MARK, DRIFT = 0x6179, 0x617B, 0x617C, 0x617D
 local POS  = { 0x7B8C, 0x7B8D, 0x7B8E }
 local STOP = { 0x7B8F, 0x7B90, 0x7B91 }
 local PRESS = { 0x7B92, 0x7B93, 0x7B94 }
-local LATCH, JOKER = 0x57BA, 0x2F49
+local SLOTTIER, JOKER = 0x57BA, 0x2F49
 local SETZER = 0x09
 
 local REEL = {
@@ -276,7 +276,7 @@ H.run({ maxFrames = 400000 }, {
   openSlotWindow("spin1"),
   pressAUntil(PRESS[1], "spin1 press1"),
   H.call(function()
-    H.assertEq(H.readByte(LATCH), 0, "spin1: latched tier 0")
+    H.assertEq(H.readByte(SLOTTIER), 0, "spin1: stored tier 0")
     H.log(string.format("spin1: rig=$%02x (vanilla draw, untouched)", H.readByte(RIG)))
   end),
   waitStop(1, "spin1 reel1"), pressAUntil(PRESS[2], "spin1 press2"),
@@ -316,7 +316,7 @@ H.run({ maxFrames = 400000 }, {
   openSlotWindow("spin3"),
   pressAUntil(PRESS[1], "spin3 press1"),
   H.call(function()
-    H.assertEq(H.readByte(LATCH), 3, "spin3: latched tier 3 at the first press")
+    H.assertEq(H.readByte(SLOTTIER), 3, "spin3: stored tier 3 at the first press")
     local want = (H.readByte(JOKER) & 4) ~= 0 and 0x3C or 0x00
     H.assertEq(H.readByte(RIG), want, "spin3: rig forced benevolent")
   end),
@@ -356,7 +356,7 @@ H.run({ maxFrames = 400000 }, {
         string.format("spin3: THE CHOSEN TRIPLE queued (icon %d -> index %d)",
           chosen, chosen + 1))
     end
-    H.assertEq(pend(), 3, "spin3: the commit banked the latched tier")
+    H.assertEq(pend(), 3, "spin3: the commit banked the stored tier")
     H.screenshot("slotsboot_chosen")
   end),
   H.driveUntil(function() return pend() == 0 end, 15000,

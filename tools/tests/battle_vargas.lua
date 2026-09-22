@@ -166,7 +166,7 @@ local function resetM()
 end
 resetM()
 
-local function latchSubmit()
+local function submitFlag()
   if pressKind == "bio" then
     bioFired = true
   elseif pressKind == "blitz" then
@@ -206,7 +206,7 @@ end
 local function pulse()
   local a = H.readByte(ACTOR)
   if M.actor ~= a then
-    latchSubmit()
+    submitFlag()
     resetM()
     M.actor, M.plan = a, decidePlan(a)
     if M.plan.kind ~= "fight" and M.plan.kind ~= "wait" then
@@ -224,7 +224,7 @@ local function pulse()
     if M.plan.kind == "bio" or M.plan.kind == "blitz" then
       nudges = nudges + 1
     end
-    pressKind = nil                      -- a backed-out confirm never latches
+    pressKind = nil                      -- a backed-out confirm never flags
     M.n, M.via, M.d = 0, nil, 0
     M.plan = { kind = "fight" }
     return { "b" }
@@ -342,7 +342,7 @@ local function pulse()
     end
     if M.plan.kind == "bio" or M.plan.kind == "blitz" then
       if M.via ~= "toolshell" then return (ph < 5) and { "b" } or {} end
-      -- edge-press A until the window closes; latchSubmit() makes the
+      -- edge-press A until the window closes; submitFlag() makes the
       -- action single-shot
       M.tgtN = M.tgtN + 1
       if M.tgtN == 1 and M.plan.kind == "bio" then
@@ -368,7 +368,7 @@ local function fightDriver()
       H.log(string.format("[vargas f%d %s]%s", H.frame, mode, hpLine()))
     end
     if H.readByte(MENU) == 0 then
-      latchSubmit()
+      submitFlag()
       resetM()
       H.setPad(H.frame % 8 < 4 and { "a" } or {})
       return

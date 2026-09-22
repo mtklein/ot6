@@ -123,10 +123,10 @@
 ; outside it. it is selected here only when learned and unspent, and gated at
 ; resolution by Ot6Oblivion (hooked after ChooseTarget in CalcAttackEffect,
 ; because the target does not exist at command-latch time, swdtech being in
-; RetargetCmdTbl). read the once-per-battle latch here and drop a spent
+; RetargetCmdTbl). read the once-per-battle flag here and drop a spent
 ; Oblivion back to Tempest (6) so BP3 keeps a live top tier. (a divine is spent
 ; only on a broken, killable target; an unbroken/boss target folds to tempest at
-; resolution and leaves the latch clear, so the menu keeps offering it.)
+; resolution and leaves the flag clear, so the menu keeps offering it.)
 ; a8/i16.  in: A = tech (0..7).  out: A = tech (a spent tech-7 -> 6).  clobbers X.
 .proc Ot6BushidoOblivion
         .a8
@@ -167,6 +167,6 @@
         pha
         asl5                    ; level * 32, the counter value vanilla's
         sta     $7b82           ;   bar drew, so w7e7b82 still feeds the
-        pla                     ;   latch, the fill, and battle_mpcost's level()
+        pla                     ;   flag, the fill, and battle_mpcost's level()
         rtl
 .endproc

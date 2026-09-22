@@ -66,7 +66,7 @@ on its own, with the verdict's attempts=n/N beside it.  A ninja log (a
 retained qualification run under build/attempts) holds every edge's run
 output after that edge's `[k/N] generate <state> <- <gen>` line, so it is
 split into one segment per edge, `<log>:<state>`; edges with no run
-output (latches, checks) are dropped.  The default scan is the CURRENT
+output (copies, checks) are dropped.  The default scan is the CURRENT
 state logs only: build/states/<state>.log for every state in
 tools/tests/savestate_graph.py.  Name globs to scan anything else
 (build/test-runs/*/run.log, build/attempts/v018-qual1.log, a lab
@@ -552,11 +552,11 @@ def selftest():
         "[ot6] [post-train care] done: c2 358/358 hp 96/96 mp | tonic=77 potion=27 fenix=13 antidote=4 soft=2 remedy=0",
         "[ot6] PASS (frame 47820) attempts=1/3",
     ])
-    # a ninja log: two generate edges' run output, a latch, a check, and an
+    # a ninja log: two generate edges' run output, a copy, a check, and an
     # edge line printed at its start with no output (ninja prints it again,
     # ahead of the output, when the edge finishes)
     ninja = "\n".join([
-        "[1/9] latch tools/tests/gen_x.lua",
+        "[1/9] copy_if_changed tools/tests/gen_x.lua",
         "[2/9] generate x <- gen_x",
         "[3/9] generate y <- gen_y",
         "[2/9] generate x <- gen_x",
@@ -692,7 +692,7 @@ def selftest():
     assert ("  t attempt 1/3 [b68]: 2 left the bag, 0 landed -- 2 raised nobody "
             "(no landing line accounts for them; 1 death(s) logged in that fight)") in out2.getvalue(), out2.getvalue()
     # the ninja log: one segment per edge with run output, named by the
-    # edge; the latch, the check and the edge line with nothing after it
+    # edge; the copy, the check and the edge line with nothing after it
     # are not segments, and the suite edge is one
     assert [s for s, _ in nsegs] == ["attempts/qual:x", "attempts/qual:y", "attempts/qual:battle_z"], nsegs
     assert scan_lines(nsegs[0][1])[1] == "2/3" and scan_lines(nsegs[1][1])[1] == "1/3"

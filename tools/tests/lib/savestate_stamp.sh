@@ -43,7 +43,7 @@
 # identity for it.  `compose.py --adopt-stamps` appends the missing lines
 # to such a stamp only when the tree's own records prove them: the sig
 # still matches the current sources, the artifact verifies, and ninja's
-# build log shows the ROM content latch last ran before the generate edge
+# build log shows the ROM content copy-if-changed step last ran before the generate edge
 # and its copy is the current ROM (see adopt_stamps in compose.py).
 set -u
 

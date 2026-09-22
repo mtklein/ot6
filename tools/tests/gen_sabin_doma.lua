@@ -408,7 +408,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(inBattle(), false, "no battle")
     H.assertEq(inParty(5), true, "SABIN is the party again")
     H.assertEq(inParty(2), false, "CYAN is an NPC here, not a party member")
-    H.assertEq(sw(0x007D), 0, "$007D still clear (the scene's own latch)")
+    H.assertEq(sw(0x007D), 0, "$007D still clear (the scene's own flag)")
     H.assertEq(sw(0x0033), 1, "$0033 set -- CYAN's defence is underway")
     H.assertEq(sw(0x0044), 0, "$0044 clear -- the scenario is not done")
     H.log("[doma] battles seen: " .. table.concat(battles, " "))

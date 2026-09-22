@@ -44,9 +44,9 @@
 --   $056F  number of options; >= 2 means a multiple choice is live, and the
 --          engine zeroes it the moment A confirms (:425)
 --   $056E  current selection, 0-based
---   $056D  "selection is changing" latch, set when a direction moves the
+--   $056D  "selection is changing" flag, set when a direction moves the
 --          cursor, cleared only on a frame with NO direction held (:380)
--- That latch is why the steering presses are edge presses (4 on / 4 off)
+-- That flag is why the steering presses are edge presses (4 on / 4 off)
 -- like every other input in this suite: a held DOWN moves the cursor one
 -- row and no further.  DOWN/RIGHT increment (and stop at $056F), UP/LEFT
 -- decrement (and stop at 0).
@@ -86,10 +86,10 @@
 --     lda $087f,y / tax / lda $1eb6 / and #$f0 / ora f:BitOrTbl,x
 -- i.e. bits 0-3 are the party's facing direction, one-hot, in the engine's
 -- own 0=up 1=right 2=down 3=left encoding (BitOrTbl, :5523); bit4 is "A is
--- held"; bit5 is the once-per-tile event latch player.asm:529 clears on
+-- held"; bit5 is the once-per-tile event flag player.asm:529 clears on
 -- every step.  So, read properly:
 --     $01B0 = facing UP      $01B2 = facing DOWN     $01B4 = A held
---     $01B1 = facing RIGHT   $01B3 = facing LEFT     $01B5 = tile-event latch
+--     $01B1 = facing RIGHT   $01B3 = facing LEFT     $01B5 = tile-event flag
 -- `if_switch $01B2=0, EventReturn` means "unless the party is facing DOWN".
 -- Hence the handoffs below are a plain held DOWN, which both walks the
 -- party onto the trigger and leaves it facing the right way, rather than a
@@ -102,7 +102,7 @@
 -- scrap-of-paper trigger _cb002b needs $01B4 and $01B2, so it is an examine
 -- (press A facing down), not a step, which is why gen_banon never tripped it.
 -- And _cb059f's own `if_switch $01B5=1, EventReturn` / `switch $01B5=1` is
--- just the standard once-per-tile latch, not a story flag.
+-- just the standard once-per-tile flag, not a story flag.
 
 -- Ultros: `battle 103, RIVER` at _cb08db (:39301), won with real input, the
 -- first real Ultros in this chain's history.  He has an authored shield

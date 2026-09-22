@@ -4,7 +4,7 @@
 -- The drive talks to all 24 scoring soldiers and wins the four fights
 -- clean, inside the 14400-frame timer.  Every soldier is a chaseTalk
 -- against its object index (0x10 + npc_prop record position; eleven of
--- the 24 wander), terminated on the soldier's own latch switch or on
+-- the 24 wander), terminated on the soldier's own flag switch or on
 -- $013C.  $013C means the dinner fired and the window expired; in that
 -- case the probe fails and reports the var0/timer measurement.
 --
@@ -37,22 +37,22 @@ local function logCheckpoint(name)
   end)
 end
 
--- one scoring soldier: chase its object, talk, terminate on its latch,
+-- one scoring soldier: chase its object, talk, terminate on its flag,
 -- or on $013C (window expired), in which case fail with the measurement
-local function soldier(objIdx, latch, what)
+local function soldier(objIdx, flag, what)
   expect = expect + 1
   local want = expect
   return {
     H.chaseTalk(objIdx, 12000, what, {
-      done = function() return sw(latch) == 1 or sw(0x013C) == 1 end,
+      done = function() return sw(flag) == 1 or sw(0x013C) == 1 end,
     }),
     H.call(function()
-      if sw(0x013C) == 1 and sw(latch) == 0 then
+      if sw(0x013C) == 1 and sw(flag) == 0 then
         error(string.format(
           "WINDOW EXPIRED during %s: var0=%d of 44, timer=%d, frame %d",
           what, var0(), timerCount(), H.frame), 0)
       end
-      H.assertEq(sw(latch), 1, what .. ": latch set")
+      H.assertEq(sw(flag), 1, what .. ": flag set")
       H.assertEq(var0(), want, what .. ": var0 (+1 talk)")
     end),
     logCheckpoint(what),
@@ -61,20 +61,20 @@ end
 
 -- one fight soldier: same chase; the battle is battle-clear-write cleared by
 -- chaseTalk itself; afterwards assert species, clean flags, +6
-local function fightSoldier(objIdx, latch, species, what)
+local function fightSoldier(objIdx, flag, species, what)
   expect = expect + 6
   local want = expect
   return {
     H.chaseTalk(objIdx, 18000, what, {
-      done = function() return sw(latch) == 1 or sw(0x013C) == 1 end,
+      done = function() return sw(flag) == 1 or sw(0x013C) == 1 end,
     }),
     H.call(function()
-      if sw(0x013C) == 1 and sw(latch) == 0 then
+      if sw(0x013C) == 1 and sw(flag) == 0 then
         error(string.format(
           "WINDOW EXPIRED during %s: var0=%d of 44, timer=%d, frame %d",
           what, var0(), timerCount(), H.frame), 0)
       end
-      H.assertEq(sw(latch), 1, what .. ": latch set")
+      H.assertEq(sw(flag), 1, what .. ": flag set")
       local w, found = H.formationWords(), false
       for i = 1, 6 do if w[i] == species then found = true end end
       H.assertEq(found, true, string.format(

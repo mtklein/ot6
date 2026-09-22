@@ -1,6 +1,6 @@
 -- probe_banquet_recall.lua -- read-only instrument.
--- Measures whether the banquet's first-question record latches, when it
--- latches, and whether recall's +5 follows it.  Zero state writes; pad
+-- Measures whether the banquet's first-question record flags, when it
+-- flags, and whether recall's +5 follows it.  Zero state writes; pad
 -- input and reads only, plus in-run savestate blobs to replay the same
 -- choice point with all three answers.
 --
@@ -9,14 +9,14 @@
 --     if_switch $0230=1, skip
 --     switch $0230=1  /  switch $023(1+i)=1
 -- The +2 lands before the record switches execute, so a read taken on
--- the frame var0 crosses its milestone can race the latch by a few
--- event ticks; a settled read one prompt later shows the record latched.
+-- the frame var0 crosses its milestone can race the flag by a few
+-- event ticks; a settled read one prompt later shows the record flagged.
 -- $0230 has no writer outside the three branches and no clearer anywhere
 -- in the ROM.
 --
 -- The measurement, in one run, from the banquet_dinner_scratch state:
 --   1. a write-watch on WRAM $1EC6, the byte carrying switches
---      $0230-$0237, logs every CPU write with its frame, so the latch
+--      $0230-$0237, logs every CPU write with its frame, so the flag
 --      moment is measured rather than inferred;
 --   2. drive toast/kefka/doma/celes, blob the first-question choice, and
 --      replay it three times: pick option i, ride to the next prompt,
@@ -178,9 +178,9 @@ H.run({ maxFrames = 120000 }, {
         H.log(string.format("[first=%d] SETTLED at the next prompt: %s",
           i, recbits()))
         H.assertEq(sw(0x0230), 1,
-          string.format("first=%d: $0230 latched (settled)", i))
+          string.format("first=%d: $0230 flagged (settled)", i))
         H.assertEq(sw(0x0231 + i), 1,
-          string.format("first=%d: $023%d latched (settled)", i, 1 + i))
+          string.format("first=%d: $023%d flagged (settled)", i, 1 + i))
         for k = 0, 2 do
           if k ~= i then
             H.assertEq(sw(0x0231 + k), 0,
@@ -276,7 +276,7 @@ H.run({ maxFrames = 120000 }, {
   end)(),
 
   H.call(function()
-    H.log("== VERDICT: the record latches (a few frames after the +2 -- see "
+    H.log("== VERDICT: the record flags (a few frames after the +2 -- see "
       .. "the $1EC6 watch lines), one bit per first choice, and recall "
       .. "pays +5 exactly on the matching answer.  No decode error, no "
       .. "defect; the gen's zero-read was an instrumentation race. ==")

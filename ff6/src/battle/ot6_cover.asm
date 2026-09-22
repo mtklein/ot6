@@ -31,7 +31,7 @@
 ; an out-of-turn reward paid during the attacker's action, whose ActionEnd
 ; leaves at its `cmp #$08` monster gate without ever reaching the blocker's
 ; row. Pay is once per round: the first cover each round banks, further
-; covers that round protect but do not pay; the latch is cleared in
+; covers that round protect but do not pay; the flag is cleared in
 ; Ot6ActionEnd, the same tick that decides the blocker's own regen, and is
 ; set only when a pip is actually banked.
 ;
@@ -69,7 +69,7 @@
                                 ;   window he has open
         lda     $3018,x
         ora     f:$7e0000+OT6_COVERPAID
-        sta     f:$7e0000+OT6_COVERPAID  ; latch: paid this round
+        sta     f:$7e0000+OT6_COVERPAID  ; flag: paid this round
         txa                     ; defer the pip: the live cell is armed
         lsr                     ;   on the damage-numeral frame, not here
         inc                     ;   slot + 1, 0 = nothing pending

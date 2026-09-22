@@ -17,7 +17,7 @@ local FIX = "build/states/camp_escaped.mss.lua"
 local WANT_BATTLES = 2
 
 local battles, inBattle, bN = 0, false, 0
-local ranLatch = false
+local ranFlag = false
 local hpLine = function()
   local out = {}
   for _, c in ipairs(H.partyMembers()) do
@@ -30,7 +30,7 @@ end
 emu.addEventCallback(function()
   local live = H.battleLoadStarted()
   if live and not inBattle then
-    inBattle, bN, ranLatch = true, 0, false
+    inBattle, bN, ranFlag = true, 0, false
     battles = battles + 1
     H.log(string.format("[flee probe] battle %d up at f%d formation %04X %04X %04X %04X %04X %04X",
       battles, H.frame, H.readWord(0x57C0), H.readWord(0x57C2), H.readWord(0x57C4),
@@ -38,8 +38,8 @@ emu.addEventCallback(function()
   end
   if inBattle then
     bN = bN + 1
-    if H.readByte(0x3a38) ~= 0 and not ranLatch then
-      ranLatch = true
+    if H.readByte(0x3a38) ~= 0 and not ranFlag then
+      ranFlag = true
       H.log(string.format("[flee probe] battle %d: $3a38=%02X -- a character JUST RAN AWAY at battle frame %d (f%d)",
         battles, H.readByte(0x3a38), bN, H.frame))
     end
@@ -53,7 +53,7 @@ emu.addEventCallback(function()
   if not live and inBattle then
     inBattle = false
     H.log(string.format("[flee probe] battle %d down at f%d after %d frames: ran=%s monstersPresent=%d $3ebc=%02X | %s",
-      battles, H.frame, bN, tostring(ranLatch), H.monstersPresent(), H.readByte(0x3ebc), hpLine()))
+      battles, H.frame, bN, tostring(ranFlag), H.monstersPresent(), H.readByte(0x3ebc), hpLine()))
   end
 end, emu.eventType.startFrame)
 

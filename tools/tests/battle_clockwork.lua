@@ -6,8 +6,8 @@
 -- boost banked by the swdtech submenu row, guards stopped with HP and
 -- shields pinned, MP pinned once (guests carry 0 MP and the universal fizzle
 -- would otherwise consume the tech).  Phase 3 re-stages SETZER for the Slot
--- input gate: an R or L edge during a latched spin (first reel pressed) must
--- be inert, with no pending change and no ching or click, because the latch
+-- input gate: an R or L edge during a stored spin (first reel pressed) must
+-- be inert, with no pending change and no ching or click, because the store
 -- has already decided the charge and the sound would acknowledge input the
 -- reels ignore.
 
@@ -173,7 +173,7 @@ H.run({ maxFrames = 40000 }, {
     H.waitFrames(2),
     H.call(function() H.setPad({}) end),
     H.waitFrames(14),
-  }, "submenu closes on a latch"),
+  }, "submenu closes on a store"),
   H.call(function()
     pinActor = false
     watch = true            -- sampling starts: committed, in flight
@@ -224,7 +224,7 @@ H.run({ maxFrames = 40000 }, {
     H.screenshot("clockwork_revealed")
   end),
 
-  -- ------------------- 3. a latched Slot spin ignores L/R, silently -------
+  -- ------------------- 3. a stored Slot spin ignores L/R, silently -------
   H.call(function()
     phase3 = true
     pinActor = false
@@ -244,12 +244,12 @@ H.run({ maxFrames = 40000 }, {
   H.call(function()
     actor = H.readByte(ACTOR)
     H.writeByte(0x3E9C + actor * 2, 3)          -- bp to spend
-    H.writeByte(0x3E9D + actor * 2, 1)          -- pending 1 = the latch tier
+    H.writeByte(0x3E9D + actor * 2, 1)          -- pending 1 = the store tier
   end),
-  H.pressButtons({ "a" }, 4), H.waitFrames(10),  -- first reel press: LATCHED
+  H.pressButtons({ "a" }, 4), H.waitFrames(10),  -- first reel press: STORED
   H.call(function()
-    H.assertEq(H.readByte(0x7B92) ~= 0, true, "reel 1 press latched the spin")
-    H.assertEq(H.readByte(0x57BA), 1, "Ot6SlotRig latched tier 1")
+    H.assertEq(H.readByte(0x7B92) ~= 0, true, "reel 1 press stored the spin")
+    H.assertEq(H.readByte(0x57BA), 1, "Ot6SlotRig stored tier 1")
     sfxWatch()
   end),
   H.pressButtons({ "r" }, 6), H.waitFrames(16),
@@ -257,7 +257,7 @@ H.run({ maxFrames = 40000 }, {
   H.pressButtons({ "l" }, 6), H.waitFrames(16),
   H.call(function()
     H.assertEq(H.readByte(0x3E9D + actor * 2), 1,
-      "L/R during a latched spin bank nothing (the latch decides the charge)")
+      "L/R during a stored spin bank nothing (the store decides the charge)")
     H.assertEq(sfx.ching, 0, "no ching: the HUD does not acknowledge inert R")
     H.assertEq(sfx.click, 0, "no click: nor inert L")
     H.assertEq(sfx.error, 0, "and no buzz either -- fully silent")

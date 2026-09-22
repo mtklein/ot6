@@ -9,14 +9,14 @@
 --     refuses to stop on the completing icon (the rigged miss).
 
 -- The hooks under test:
---   Ot6SlotRig    -- latches the spin's tier ($57ba) at the first press and
+--   Ot6SlotRig    -- stores the spin's tier ($57ba) at the first press and
 --                    stores the rig byte: untouched at 0-1 bp, forced 0 (or
 --                    $3c under the $2f49.2 joker-doom battle gate) at 2-3 bp.
 --   Ot6SlotDrift  -- blessed drift budget: 4 to the byte below 3 bp, $ff at
 --                    3 bp (longer than the 16-icon strip).
 --   Ot6SlotMiss   -- the rigged miss: vanilla avoid-mark at 0 bp, bought off
 --                    at 1+ bp.  A 7-pair under the joker gate stays refused.
---   Ot6SlotCommit -- re-banks the latched tier into OT6_BOOST_REVEALED at
+--   Ot6SlotCommit -- re-banks the stored tier into OT6_BOOST_REVEALED at
 --                    the commit press, so Ot6ActionEnd charges exactly the
 --                    tier the reels were spun with.
 --   Ot6BoostDmg's $0f gate: slot attacks never get the damage multiplier.
@@ -27,11 +27,11 @@
 --   The input-driven half (no writes): a second natural boot of the
 --   terra-returned-v1 SRAM checkpoint, driving the two tiers slotsboot
 --   leaves unchecked with real R presses on earned bp:
---     H1 (1 bp): latch = 1, the 1-bp charge with regen skipped, and the
+--     H1 (1 bp): store = 1, the 1-bp charge with regen skipped, and the
 --        commit re-bank.  Tier 1 leaves the drawn rig alone, so no rig
 --        value is asserted here; that half lives in the quarantine lab
 --        where the byte can be planted.
---     H2 (2 bp): latch = 2, the rig forced benevolent ($00, or $3c under a
+--     H2 (2 bp): store = 2, the rig forced benevolent ($00, or $3c under a
 --        real joker gate), read rather than written, with reel-2 help
 --        blessed toward the icon reel 1 stopped on, vanilla's 4-icon
 --        budget stored by the $f0 hook, and the 2-bp charge.  H2 is played
@@ -61,8 +61,8 @@ local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local RIG, HELP1, MARK, DRIFT = 0x6179, 0x617B, 0x617C, 0x617D
 local POS  = { 0x7B8C, 0x7B8D, 0x7B8E }   -- reel 1/2/3 position (icon = >>4)
 local STOP = { 0x7B8F, 0x7B90, 0x7B91 }   -- reel stopped flags
-local PRESS = { 0x7B92, 0x7B93, 0x7B94 }  -- press latches 1/2/3
-local LATCH, JOKER = 0x57BA, 0x2F49
+local PRESS = { 0x7B92, 0x7B93, 0x7B94 }  -- press stores 1/2/3
+local SLOTTIER, JOKER = 0x57BA, 0x2F49
 local SETZER, NONE = 0x09, 0xFF
 local PARTY = { 0, 1, 2 }
 local function ENT_M(s) return 8 + s * 2 end
@@ -192,7 +192,7 @@ local function reelsLive()
   return setzerWindow() and H.readByte(MSTATE) == 0x08
 end
 
--- Bank boost pips with real R presses, by feedback.  Ot6Boost latches a
+-- Bank boost pips with real R presses, by feedback.  Ot6Boost stores a
 -- press ($57d2) only on frames it runs, and it does not run while an
 -- enemy's hit animation plays over the command window: on this ROM the
 -- second of two fixed-cadence presses fell on such a frame and banked
@@ -208,7 +208,7 @@ local function bankPending(want, what)
       H.call(function()
         if taps >= 12 then
           error(string.format("%s: R tapped %d times and pending still reads "
-            .. "%d (want %d) -- the press is not being latched at all",
+            .. "%d (want %d) -- the press is not being stored at all",
             what, taps, pend(actor), want), 0)
         end
         H.assertEq(setzerWindow(), true,
@@ -461,13 +461,13 @@ add({
 })
 add(playedSpin("H1", {
   afterPress1 = function()
-    H.assertEq(H.readByte(LATCH), 1,
-      "H1: Ot6SlotRig latched tier 1 at the first press")
+    H.assertEq(H.readByte(SLOTTIER), 1,
+      "H1: Ot6SlotRig stored tier 1 at the first press")
     H.log(string.format("H1: rig drawn $%02x (tier 1 leaves it alone -- "
       .. "value is the roll's own)", H.readByte(RIG)))
   end,
   afterCommit = function()
-    H.assertEq(pend(actor), 1, "H1: the commit re-banked the latched tier 1")
+    H.assertEq(pend(actor), 1, "H1: the commit re-banked the stored tier 1")
   end,
 }, 1))
 add({
@@ -552,7 +552,7 @@ add({
 })
 add(playedSpin("H2", {
   afterPress1 = function()
-    H.assertEq(H.readByte(LATCH), 2, "H2: latched tier 2")
+    H.assertEq(H.readByte(SLOTTIER), 2, "H2: stored tier 2")
     local want = (H.readByte(JOKER) & 4) ~= 0 and 0x3C or 0x00
     H.assertEq(H.readByte(RIG), want, string.format(
       "H2: THE RIG FORCED BENEVOLENT ($%02x) at 2 bp -- read off the "
@@ -574,7 +574,7 @@ add(playedSpin("H2", {
     end
   end,
   afterCommit = function()
-    H.assertEq(pend(actor), 2, "H2: the commit re-banked the latched tier 2")
+    H.assertEq(pend(actor), 2, "H2: the commit re-banked the stored tier 2")
   end,
 }, 2))
 add({
@@ -603,7 +603,7 @@ add({
     H.assertEq(#mulHits, 0,
       "EXEMPTION (unrigged half): the damage multiplier never ran under cmd "
       .. "$0f across all four natural resolutions")
-    H.log("unrigged half complete: tier-1 and tier-2 latch/rig/bless/economy "
+    H.log("unrigged half complete: tier-1 and tier-2 store/rig/bless/economy "
       .. "on a natural boot")
   end),
 })
@@ -740,7 +740,7 @@ add({
   openReels(),
   pressAUntil(PRESS[1], "t0 press1"),
   H.call(function()
-    H.assertEq(H.readByte(LATCH), 0, "t0: latch = 0 (tier-0 spin)")
+    H.assertEq(H.readByte(SLOTTIER), 0, "t0: store = 0 (tier-0 spin)")
     H.log(string.format("t0: rig drawn $%02x, poking $ff (all-cursed)", H.readByte(RIG)))
     H.writeByte(RIG, 0xFF)
   end),
@@ -788,7 +788,7 @@ add({
   openReels(),
   pressAUntil(PRESS[1], "t1 press1"),
   H.call(function()
-    H.assertEq(H.readByte(LATCH), 1, "t1: latch = 1")
+    H.assertEq(H.readByte(SLOTTIER), 1, "t1: store = 1")
     H.writeByte(RIG, 0xFF)          -- tier 1 keeps the drawn rig: curse it all
   end),
   waitStop(1, "t1 reel1 stops"),
@@ -836,7 +836,7 @@ add({
   openReels(),
   pressAUntil(PRESS[1], "t2 press1"),
   H.call(function()
-    H.assertEq(H.readByte(LATCH), 2, "t2: latch = 2")
+    H.assertEq(H.readByte(SLOTTIER), 2, "t2: store = 2")
     local want = (H.readByte(JOKER) & 4) ~= 0 and 0x3C or 0x00
     H.assertEq(H.readByte(RIG), want,
       string.format("t2: rig forced benevolent ($%02x)", want))
@@ -889,7 +889,7 @@ add({
   openReels(),
   pressAUntil(PRESS[1], "t3 press1"),
   H.call(function()
-    H.assertEq(H.readByte(LATCH), 3, "t3: latch = 3")
+    H.assertEq(H.readByte(SLOTTIER), 3, "t3: store = 3")
   end),
   waitStop(1, "t3 reel1 stops"),
   H.call(function() H.writeByte(POS[1], 0x50) end),   -- icon1 = REEL1[5] = 5

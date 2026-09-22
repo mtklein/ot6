@@ -5,7 +5,7 @@
 -- Cmd_0b sets $3E4C.2 on the actor and ends her turn; RunicEffect resolves
 -- the next runic-able attack, clears the stance bit, and retargets it into
 -- an MP restore.  Ot6RunicBP additionally banks +1 BP, capped at 5.
--- Ot6RunicRaise latches OT6_RUNICTURNS from the pending boost; Ot6RunicHold
+-- Ot6RunicRaise flags OT6_RUNICTURNS from the pending boost; Ot6RunicHold
 -- ticks it down each of Celes's QueueActions and holds the stance up while
 -- it is nonzero; the BP earn from an absorb landing on a held stance is
 -- capped at +1 per round.
@@ -24,7 +24,7 @@
 -- Phases: 1-2 enter the stance and baseline the bank; 2. negative control;
 -- 3. positive (MP and +1 BP); 4. the party-window pip glyph reflects the
 -- new bank; 5. the bank caps at 5 rather than wrapping, and an unboosted
--- Runic latches 0 turns; 6. a boosted raise latches N turns per tier;
+-- Runic flags 0 turns; 6. a boosted raise flags N turns per tier;
 -- 7. several absorbs landing in one round of a held stance bank only +1 BP
 -- total, not one per absorb; 8. the stance survives exactly the paid turns
 -- and drops on the next one.
@@ -297,7 +297,7 @@ local function castPhase(want, label, maxFrames)
   })
 end
 
--- raise the stance with N boost points pending, so Ot6RunicRaise latches N
+-- raise the stance with N boost points pending, so Ot6RunicRaise flags N
 -- turns of duration.  Wraps enterRunic; armBoost is cleared the instant the
 -- stance is up, or every later turn would be boosted too.
 --
@@ -319,7 +319,7 @@ local function enterRunicBoosted(n, label)
       H.log(string.format("%s: runic up with %d pending -> OT6_RUNICTURNS=%d",
         label, n, turns(celes)))
       H.assertEq(turns(celes), n, string.format(
-        "Ot6RunicRaise latched %d turns of stance from a %d-BP raise", n, n))
+        "Ot6RunicRaise flagged %d turns of stance from a %d-BP raise", n, n))
     end),
   })
 end
@@ -543,16 +543,16 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(mp(celes) > before.mp, true, "mp still restored at a full bank")
     -- a bare `inc` would read 6 here; a wrapped byte would read 0
     H.assertEq(bp(celes), 5, "an absorb at 5 bp stays 5 -- capped, not wrapped")
-    -- everything above was an unboosted Runic: Ot6RunicRaise latches 0,
+    -- everything above was an unboosted Runic: Ot6RunicRaise flags 0,
     -- Ot6RunicHold does nothing, and the stance restore is gated on the
     -- same 0.
     H.assertEq(turns(celes), 0,
-      "an UNBOOSTED Runic latches no duration (phases 1-5 were vanilla)")
+      "an UNBOOSTED Runic flags no duration (phases 1-5 were vanilla)")
   end),
 
   -- ============================= boost buys the stance a duration ======
   --
-  -- ------------------------------------ 6. the raise latches a duration --
+  -- ------------------------------------ 6. the raise flags a duration --
   enterRunicBoosted(1, "boost1"),
   enterRunicBoosted(2, "boost2"),
   enterRunicBoosted(3, "boosted"),

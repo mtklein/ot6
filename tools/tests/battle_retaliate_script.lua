@@ -9,7 +9,7 @@
 -- retained as build/attempts/<branch>/lab/scripted/red-script.log): every
 -- writer of OT6_UNCTL was RandCharAction's, and a scripted character never
 -- passes RandCharAction -- QueueAction sends it to ExecMonsterAction first
--- -- so CYAN in the Doma courtyard defence logged `latch=$00` at all five
+-- -- so CYAN in the Doma courtyard defence logged `flag=$00` at all five
 -- of his scripted actions over two waves, his bank read 1 2 1 2 3 at his
 -- action ends with every one of them the gain arm, the soldiers cut him
 -- 358 -> 324 and 358 -> 322, and his provoked Fight (`f5093 e2 bank=3
@@ -35,7 +35,7 @@
 -- through ExecRetal and is guarded out by design) queued while he stood
 -- below the hp line his own last turn drew, with a pip in the bank.  That
 -- condition is decided by the machine's own cells and not by the dump, so a
--- ROM without the latch reaches the verdict and fails AT the assertion
+-- ROM without the flag reaches the verdict and fails AT the assertion
 -- rather than timing out.  A seed on which the soldiers never provoke him
 -- across the three waves runs out the budget instead, which the segment
 -- runner classifies as seed-dependent and retries at the next shift.
@@ -78,7 +78,7 @@ local SUBJ = nil                        -- CYAN's entity index, read at battle u
 local L = {
   scriptActs = 0,                       -- ExecMonsterAction with x = CYAN
   randActs = 0,                         -- RandCharAction with x = CYAN
-  latchAtFirstAct = nil,                -- OT6_UNCTL's CYAN bit, one frame after his first scripted act
+  flagAtFirstAct = nil,                -- OT6_UNCTL's CYAN bit, one frame after his first scripted act
   fights = {},                          -- every plain Fight of his: {f, pending, bank, hp, mark, provoked}
   counters = 0,                         -- Ot6FightBoost reached under $b1.0
   ends = {},                            -- every Ot6ActionEnd for him: {f, bank, pending}
@@ -124,7 +124,7 @@ local function installObservers()
     if not xIsSubj() then return end
     L.scriptActs = L.scriptActs + 1
     H.log(string.format("[script] f%d ExecMonsterAction for e%d (act %d) "
-      .. "bank=%d pending=%d hp=%d latch=$%02X", H.frame, SUBJ,
+      .. "bank=%d pending=%d hp=%d flag=$%02X", H.frame, SUBJ,
       L.scriptActs, bp(SUBJ), pend(SUBJ), hp(SUBJ), H.readByte(D.unctl)))
   end, emu.callbackType.exec, sEMA, sEMA)
   emu.addMemoryCallback(function()
@@ -204,23 +204,23 @@ local function installObservers()
     if W.open and not W.closed then W.closed = true end
   end, emu.callbackType.exec, sSF, sSF)
 
-  -- his hurt line, from its writes; and hp drops, latch, and the line as
+  -- his hurt line, from its writes; and hp drops, flag, and the line as
   -- it stood at the start of the frame
-  local lastHp, lastLatch = nil, nil
+  local lastHp, lastFlag = nil, nil
   emu.addEventCallback(function()
     if SUBJ == nil or not H.battleLoadStarted() then lastHp = nil; return end
     local h = hp(SUBJ)
     if lastHp ~= nil and h < lastHp then L.hurts = L.hurts + 1 end
     lastHp = h
     L.markAtStart = H.readWord(D.mark)
-    local latch = H.readByte(D.unctl)
-    if latch ~= lastLatch then
-      H.log(string.format("[latch] f%d OT6_UNCTL $%02X -> $%02X (e%d's bit $%02X)",
-        H.frame, lastLatch or 0, latch, SUBJ, H.readByte(0x3018 + SUBJ * 2)))
-      lastLatch = latch
+    local flag = H.readByte(D.unctl)
+    if flag ~= lastFlag then
+      H.log(string.format("[flag] f%d OT6_UNCTL $%02X -> $%02X (e%d's bit $%02X)",
+        H.frame, lastFlag or 0, flag, SUBJ, H.readByte(0x3018 + SUBJ * 2)))
+      lastFlag = flag
     end
-    if L.scriptActs >= 1 and L.latchAtFirstAct == nil then
-      L.latchAtFirstAct = (latch & H.readByte(0x3018 + SUBJ * 2)) ~= 0
+    if L.scriptActs >= 1 and L.flagAtFirstAct == nil then
+      L.flagAtFirstAct = (flag & H.readByte(0x3018 + SUBJ * 2)) ~= 0
     end
     if W.ended and W.bankAfter == nil and H.frame ~= W.endF then
       W.bankAfter = bp(SUBJ)
@@ -397,9 +397,9 @@ H.run({ maxFrames = 60000, retries = 3 }, {
       .. "the dump: pending %d = min(bank, cap %d), and NOT the 0 a "
       .. "scripted character was left with before #238", r.f, r.hp, r.mark,
       r.bank, want, D.cap))
-    H.assertEq(L.latchAtFirstAct, true,
+    H.assertEq(L.flagAtFirstAct, true,
       "OT6_UNCTL carried his bit from his first scripted action on: the "
-      .. "latch is set where the script chooses for him")
+      .. "flag is set where the script chooses for him")
 
     -- the swings the dump bought, and the pips it cost
     local wantA70 = D.base + D.perBp * want

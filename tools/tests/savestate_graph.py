@@ -28,7 +28,7 @@
 #       its staleness -- ninja's order-only dependency.
 #
 # What participates in a state's staleness (all by CONTENT, via the
-# generator's latch edges -- a checkout's mtime bump regenerates nothing):
+# generator's copy-if-changed edges -- a checkout's mtime bump regenerates nothing):
 #   * the ROM (build/ot6.sfc),
 #   * the generator .lua,
 #   * all three composed-in lib halves: lib/ot6.lua, lib/ot6_field.lua and
@@ -176,7 +176,7 @@ STATES = [
     # gen_sabin_magitek: the Imperial Camp escape -- ride the fight/interlude
     # gauntlet out to the World of Balance.  Battles 15/16/17 are each WON BY
     # TAP-A (writing the battle-clearing flag instead softlocks on GameOver),
-    # and each latchless re-firing trigger is left by holding the corridor's
+    # and each flagless re-firing trigger is left by holding the corridor's
     # walkable direction through the ~25% control flap (see the generator
     # header).
     S("camp_escaped", gen="gen_sabin_magitek", prev="doma_defended"),
@@ -262,7 +262,7 @@ STATES = [
       timeout=3600),
     # gen_zozo3_clock: the street's CAFE door (42,28) -> the clock room (map
     # 225) -> the clock tile {98,59} -> 6:10:50 across three CHAINED choice
-    # dialogs, each verified by its own $01F* latch -> the hidden staircase
+    # dialogs, each verified by its own $01F* flag -> the hidden staircase
     # opens ($01F0).
     S("zozo_clock_solved", gen="gen_zozo3_clock", prev="zozo_arrival"),
     # gen_zozo4_dadaluma: the crane maze -- five doors, the stair room's

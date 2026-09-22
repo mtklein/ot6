@@ -505,7 +505,7 @@ ExecMonsterAction:
 @02dc:  jsl     Ot6UnctlMark            ; ot6 #238: a SCRIPT is choosing this
                                         ;   entity's action.  For a character
                                         ;   that is the engine driving it, and
-                                        ;   the latch says so; a monster is
+                                        ;   the flag says so; a monster is
                                         ;   ignored inside
         longa
         stz     $3a98
@@ -721,7 +721,7 @@ CalcCmdDelay:
 RandCharAction:
 @0420:  jsl     Ot6UnctlMark            ; ot6 #236: the ENGINE is choosing this
                                         ;   character's action, so it banks BP
-                                        ;   with nobody to spend it -- latch
+                                        ;   with nobody to spend it -- flag
                                         ;   that, and a hit will cash it in
         txa
         xba
@@ -1537,7 +1537,7 @@ _inputcheck:
         jsl     Ot6UnctlClear           ; ot6 #236: the other side of the same
                                         ;   decision -- the player has this
                                         ;   character's window back, so the
-                                        ;   "engine is driving it" latch drops
+                                        ;   "engine is driving it" flag drops
         jmp     _c211ef                 ; open battle menu
 
 ; ------------------------------------------------------------------------------
@@ -3425,19 +3425,19 @@ Cmd_10:
         ; universal insufficient-MP fizzle refuses the cast but runs after
         ; this command body, so a Gau who cannot pay would keep the
         ; whole-battle RAGE status for free and every possessed turn after it
-        ; is priced at 0.  Skip the beast latch and the status set and run the
+        ; is priced at 0.  Skip the beast flag and the status set and run the
         ; plain exec, whose fizzle is the standard refusal surface.
         jsl     Ot6RageStartGate        ; carry set = cannot pay the start
         bcc     @ot6_paid
         jmp     Cmd_02
 @ot6_paid:
 .endif
-        ; ot6: latch the trance's boost tier before anything else, and
+        ; ot6: record the trance's boost tier before anything else, and
         ; only on the start turn (the proc's own RAGE-bit test), because a
         ; mid-trance re-entry would read the already-consumed pending byte and
         ; drop the possession to tier 0.  Slot's OT6_SLOTTIER pattern
         ; at whole-battle range.
-        jsl     Ot6RageTierLatch
+        jsl     Ot6RageTierFlag
 @1560:  lda     $33a8,y
         inc
         bne     @1579
@@ -13064,13 +13064,13 @@ FixPlayerAttack:
         ; ot6: the start turn's coin is rolled here, not in Cmd_10.  The
         ; menu's beast lands in $33a8,y and vanilla rolls the attack right
         ; away, so this RandRage runs before Cmd_10 and before its
-        ; Ot6RageTierLatch.  Latching here as well fixes that: the proc only
-        ; latches while the RAGE status is still clear, so this is the start
+        ; Ot6RageTierFlag.  Recording here as well fixes that: the proc only
+        ; records while the RAGE status is still clear, so this is the start
         ; turn by construction and
-        ; Cmd_10's own latch (which re-reads the not-yet-consumed pending byte)
-        ; is idempotent.  A = the beast id here, and the latch is a8 so it
+        ; Cmd_10's own record (which re-reads the not-yet-consumed pending byte)
+        ; is idempotent.  A = the beast id here, and the store is a8 so it
         ; touches only A's low half, which RandRage overwrites with its result.
-        jsl     Ot6RageTierLatch
+        jsl     Ot6RageTierFlag
         jsr     RandRage
         xba
         pla

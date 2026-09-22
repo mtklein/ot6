@@ -452,10 +452,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     H.assertEq(partyOf(0x02), 0, "CYAN stays to guard Narshe")
     H.assertEq(partyOf(0x0B), 0, "GAU stays to guard Narshe")
     H.assertEq(partyOf(0x00), 0, "TERRA is gone")
-    H.assertEq(sw(0x0139), 1, "$0139 SET -- the battle-won latch")
+    H.assertEq(sw(0x0139), 1, "$0139 SET -- the battle-won flag")
     H.assertEq(sw(0x0612), 0, "$0612 clear -- KEFKA gone")
     H.assertEq(sw(0x061D), 0, "raiders retired")
-    -- the tail-completion latches are set only once _ccc1b5's caller runs
+    -- the tail-completion flags are set only once _ccc1b5's caller runs
     -- to its return
     H.assertEq(sw(0x0602), 1, "$0602 SET -- the post-menu stretch ran")
     H.assertEq(sw(0x010B), 1, "$010B SET -- ditto")

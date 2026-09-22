@@ -97,7 +97,7 @@ local function armBank()
 end
 
 local PIPTAIL, PIPSLOT, PIPPEND = 0x57BB, 0xED6B, 0xED74
-local COVERPAID = 0xED72         -- the once-per-round cover-earn latch
+local COVERPAID = 0xED72         -- the once-per-round cover-earn flag
 local NUMCTR_SRC = 0x632E         -- the damage-numeral thread counter itself
 
 local pipArms = {}    -- { f = frame, slot = who } per OT6_PIPTAIL arm
@@ -310,7 +310,7 @@ H.run({ maxFrames = 60000 }, {
     -- already non-zero.  Both used to read as product failures on builds
     -- either side of #236 (build/sweeps/trueknight/), on the baseline as
     -- much as on the change.  They are staging, so they are staged: the
-    -- earn latch and the deferred-pip cell start where the bank and the
+    -- earn flag and the deferred-pip cell start where the bank and the
     -- relic bit do.  InitBP's own clear of OT6_PIPPEND is asserted at the
     -- top of the run, on the frame the battle goes live, where no cover can
     -- have happened yet -- that property did not move, it moved earlier.

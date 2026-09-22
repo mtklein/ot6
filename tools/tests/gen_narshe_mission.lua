@@ -706,7 +706,7 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq(map(), 30, "the meeting is on map 30 (upper Narshe)")
     H.assertEq(sw(0x0076), 1,
       "$0076 SET -- the mission handoff (event_main.asm:94170)")
-    H.assertEq(sw(0x064E), 1, "$064E SET -- the meeting scene latch")
+    H.assertEq(sw(0x064E), 1, "$064E SET -- the meeting scene flag")
     H.assertEq(sw(0x045E), 0,
       "$045E CLEAR -- the Imperial-Base soldier NPCs were withdrawn "
       .. "(:94171-94180)")
