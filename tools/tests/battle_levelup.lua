@@ -18,6 +18,17 @@
 --             keeps spent state: current HP and MP never exceed the latched
 --             pre-battle values, and the arm only counts as exercised when
 --             a non-leveler ended a battle below max.
+--
+-- How many battles: the climber's deficit over the least XP a win here
+-- can pay, plus slack -- both read at run time, not assumed.  The fixture's
+-- deficit moves with every regeneration of the chain (the XP the route's
+-- earlier randoms paid), and which formations the grass deals is the
+-- save's encounter counter's to choose: the pool is a lone Leafer at
+-- 160/256 beside Leafer x2 + Dark Wind at 96/256, so a fixture can meet
+-- nothing but lone Leafers.  The least a win pays is the pool's smallest
+-- formation, read from the ROM below (winXp); every battle's actual pay
+-- is logged beside it, and a failed verdict names any battle that paid
+-- the climber less.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
@@ -50,12 +61,39 @@ local function worldReady()
      and (H.readByte(0x00e7) & 0x01) == 0
 end
 
+-- The XP one random win pays each member for formation `f`: WinBattle
+-- (battle_main.asm @5d91) sums the defeated monsters' MonsterProp+12
+-- words, Ot6RewardScale_ext scales a random battle's sum by
+-- Ot6RewardMulW/16, and the result is divided among the members alive at
+-- the end ($3a76).  With everyone standing that is the least it pays; an
+-- Exp. Egg doubles a share and a fallen member raises the others'.
+local MONSTER_PROP = H.sym("MonsterProp") & 0x3FFFFF
+local REWARD_MUL = H.sym("Ot6RewardMulW") & 0x3FFFFF
+local function winXp(f, alive)
+  local sum = 0
+  for _, sp in ipairs(f.species) do sum = sum + H.readRomWord(MONSTER_PROP + sp * 32 + 12) end
+  return (sum * H.readRomByte(REWARD_MUL) // 16) // alive
+end
+-- the grass legs' goals (battleLeg's walk toggles between them)
+local GOALS = { { 82, 56 }, { 82, 50 } }
+-- battles allowed after the one that crosses the line: one for the
+-- negatives that need a post-level battle, one spare
+local SLACK = 2
+-- legs built into the step list; the run takes the first `budget` of them
+local MAX_LEGS = 40
+
 local members = {}          -- roster char indices in the active party
 local base = {}             -- per-char pre-battle latch
 local positives = 0
 local hpNegSeen, mpNegSeen = false, false
 local battles = 0
 local battleHpDeficit = false
+local budget = nil          -- battles this run may fight (set at the precondition)
+local winMin = nil          -- the least XP a win here pays a member (from the ROM)
+local climber = nil
+local underpaid = {}        -- battles that paid the climber less than winMin
+local battleAge = 0
+local skipSaid = false
 local function done()
   return positives >= 1 and hpNegSeen and mpNegSeen
 end
@@ -185,6 +223,9 @@ add({
   H.loadState(STATE),
   H.waitFrames(10),
   H.waitUntil(worldReady, 500, "world-map control", 5),
+  -- the precondition plans the legs' paths over the world tilemap in
+  -- WRAM, so the map must be settled (loaded and faded in)
+  H.waitUntil(function() return H.worldSettled() end, 1500, "the world map settled", 5),
   H.call(function()
     for c = 0, 15 do
       if (H.readByte(0x1850 + c) & 0x07) ~= 0 then members[#members + 1] = c end
@@ -205,13 +246,34 @@ add({
         "char " .. c .. " max MP carries no boost tier")
       if deficit == nil or d < deficit then nearest, deficit = c, d end
     end
-    -- the precondition: somebody is near enough that a couple of grass
-    -- battles cross the line.
-    H.assertEq(deficit <= 200, true, string.format(
-      "char %d is within reach of a level (deficit %d) -- if this "
-      .. "fires, the fixture regeneration moved the XP and the fixture choice "
-      .. "needs re-measuring, not a bigger budget", nearest, deficit))
-    H.log(string.format("climber: char %d, %d XP short", nearest, deficit))
+    -- the least a win on the grass legs pays one member, from the ROM:
+    -- every formation in every group the legs' paths roll from, with the
+    -- whole party standing
+    local groups = H.worldPathGroups({ { H.worldX(), H.worldY() }, GOALS[1], GOALS[2], GOALS[1] })
+    H.assertEq(#groups > 0, true, "the grass legs roll random battles somewhere on their paths")
+    for _, g in ipairs(groups) do
+      local pool = H.encounterPool(g)
+      for slot = 1, 4 do
+        for _, f in ipairs(pool[slot].formations) do
+          local xp = winXp(f, #members)
+          H.log(string.format("grass pool: group %d slot %d (%d/256) formation %d pays %d XP "
+            .. "a member", g, slot, pool[slot].odds, f.id, xp))
+          if winMin == nil or xp < winMin then winMin = xp end
+        end
+      end
+    end
+    H.assertEq(winMin > 0, true, "every formation the grass deals pays XP")
+    -- the budget: enough least-paying wins to cross the line, plus SLACK
+    climber = nearest
+    budget = (deficit + winMin - 1) // winMin + SLACK
+    H.log(string.format("climber: char %d, %d XP short; the least a win pays is %d, so "
+      .. "the budget is %d battle(s) (%d to cross + %d slack)", nearest, deficit, winMin,
+      budget, budget - SLACK, SLACK))
+    -- the precondition, consistent with the budget: the step list holds
+    -- MAX_LEGS battles, so the deficit must be crossable inside them
+    H.assertEq(budget <= MAX_LEGS, true, string.format(
+      "char %d's deficit (%d XP at %d a win) is crossable within the %d battles the "
+      .. "step list holds", nearest, deficit, winMin, MAX_LEGS))
   end),
 })
 
@@ -247,8 +309,21 @@ local function battleLeg(n)
       end),
     }, "grass-area encounter " .. n),
     H.release(),
+    H.call(function() battleAge = 0 end),
     H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
-      H.call(battlePulse),
+      H.call(function()
+        battleAge = battleAge + 1
+        if battleAge == 60 then
+          -- the formation as it opened, for the record (reads only)
+          local names = {}
+          for _, s in ipairs(H.formationSpecies()) do
+            names[#names + 1] = string.format("%03X", s.species)
+          end
+          H.log(string.format("battle %d: formation %d [%s]", n,
+            H.readWord(0x11E0) & 0x1FF, table.concat(names, " ")))
+        end
+        battlePulse()
+      end),
     }, "battle " .. n .. " fought through the real menus"),
     H.call(function() H.setPad({}) end),
     H.waitUntil(worldReady, 1500, "back on the world after battle " .. n, 5),
@@ -291,31 +366,44 @@ local function battleLeg(n)
           if curMp(c) < (maxMp(c) & 0x3FFF) then mpNegSeen = true end
         end
       end
+      -- the budget's premise, read live: no win pays the climber less
+      -- than the pool's least-paying formation
+      local paid = exp(climber) - base[climber].exp
+      if paid < winMin then underpaid[#underpaid + 1] = n .. ":" .. paid end
       H.log(string.format("after battle %d: positives=%d hpNeg=%s mpNeg=%s "
-        .. "casts planned=%d reached-list=%d", n, positives,
-        tostring(hpNegSeen), tostring(mpNegSeen), firePlanned, fireListSeen))
+        .. "casts planned=%d reached-list=%d; the climber was paid %d (the pool's least %d)",
+        n, positives, tostring(hpNegSeen), tostring(mpNegSeen), firePlanned,
+        fireListSeen, paid, winMin))
     end),
   }
   if n <= 2 then
     add(advance)
   else
-    add({ H.cond(function() return not done() end, advance, {
+    add({ H.cond(function() return not done() and n <= budget end, advance, {
       H.call(function()
-        H.log(string.format("battle %d skipped -- goal already met", n))
+        if not skipSaid then
+          skipSaid = true
+          H.log(string.format("battles %d..%d skipped -- %s", n, MAX_LEGS,
+            done() and "goal already met" or ("past the budget of " .. budget)))
+        end
       end),
     }) })
   end
 end
 
--- Budget: up to 6 earned battles; two are always fought (the crossing one
--- and at least one post-level negative), the rest only while needed.
-for n = 1, 6 do battleLeg(n) end
+-- Budget: the precondition's `budget` of earned battles (the climber's
+-- deficit over the least a win pays, plus SLACK); two are always fought
+-- (the crossing one and at least one post-level negative), the rest only
+-- while needed.
+for n = 1, MAX_LEGS do battleLeg(n) end
 
 add({
   H.call(function()
     H.assertEq(positives >= 1, true, string.format(
       "a level was EARNED and its refill observed (%d level-ups across %d "
-      .. "battles)", positives, battles))
+      .. "battles, of a budget of %d at the least %d XP a win; battles that paid "
+      .. "the climber less than that: %s)", positives, battles, budget, winMin,
+      #underpaid > 0 and table.concat(underpaid, " ") or "none"))
     -- the negative arms must have been exercised, or their <=
     -- comparisons above were comparing full to full
     H.assertEq(hpNegSeen, true,
