@@ -76,12 +76,13 @@ local slot1Before, slot3Before, tempBefore = nil, nil, nil
 -- Staging the Veldt's formation for the write and read battles.  The Veldt
 -- deals from the list of fought formations at $1ddd: GetVeldtBattle
 -- (field/battle.asm) moves its pointer $1fa5 one nonzero byte (a group of
--- eight formations) per encounter and picks inside the group from a random
--- start bit.  The formation that taught in the measured run, f57 (Stray
--- Cat, Beakor, CrassHopper x2), comes up once in eight visits to its group
--- and its group once per fifteen encounters, so natural draws meet it about
--- once in 120 encounters (#244: the write half met it by luck at battle 8,
--- and the read half then ran 40 tries without meeting Beakor again).  So
+-- eight formations) per encounter and picks inside the group with
+-- UpdateBattleGrpRng, a counter at $1fa2/$1fa3.  Those counters are save
+-- data, so which formations this fixture's encounters deal is fixed.  The
+-- formation that taught in the measured run, f57 (Stray Cat, Beakor,
+-- CrassHopper x2), is one of three in its group and is dealt only when the
+-- counter lands on one start bit of eight (#244: the write half met it at
+-- battle 8, and the read half's 40 encounters never dealt it again).  So
 -- both halves choose the formation: an exec callback on the instruction
 -- after GetVeldtBattle stores its pick to $11e0 replaces the pick while
 -- `staged` is set.  What is under test -- which codex page the ROM writes

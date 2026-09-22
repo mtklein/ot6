@@ -231,14 +231,15 @@ add({
 -- The draw budget comes from the Veldt's own list.  GetVeldtBattle
 -- (field/battle.asm) keeps the fought formations as a bit list at $1ddd,
 -- moves its pointer $1fa5 one nonzero byte (a group of eight formations)
--- per encounter, and picks at random only inside that group.  So one pass
--- over the list's nonzero bytes visits every group once, and two passes
--- bound the search.  A fixed count was a luck precondition: gau_joined's
--- pointer starts the walk at groups 0-5, where trance-sized formations are
--- few, and six draws miss on about 38% of seeds (computed from the list
--- this fixture holds and the draw rule; the failing run's six draws dealt
--- 54, 184, 142, 410, 420 and 107 HP).  The seventh draw reaches group 6,
--- whose only formation is CrassHopper x3 (729 HP).
+-- per encounter, and picks inside the group with UpdateBattleGrpRng, a
+-- counter at $1fa2/$1fa3.  All three live in the save data, so from a given
+-- fixture the draws are fixed and the boot seed does not change them (an
+-- 8-seed sweep drew the same formations every time).  One pass over the
+-- list's nonzero bytes visits every group once, and two passes bound the
+-- search.  A fixed count of six depended on where the fixture's counters
+-- happened to sit: #145's regeneration of gau_joined moved them, and the
+-- first six draws are now 54, 184, 142, 410, 420 and 107 HP.  The seventh
+-- reaches group 6, whose only formation is CrassHopper x3 (729 HP).
 local VELDT_LIST, MAX_DRAWS = 0x1DDD, 32
 add({ H.call(function()
   H.vars.suitable = false
