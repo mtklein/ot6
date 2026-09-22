@@ -18,15 +18,15 @@
 --      the real Save command, pad input only.  Ot6CodexSaveAs copies
 --      the ACTIVE page (slot 3's) to the destination, so at this
 --      instant slot 1 equals slot 3 and lifecycle reads 1.
---   2. fight until the Veldt's varied formations teach something through
---      the party's real weapon classes.  Every changed byte must land in
---      the slot-1 page and none in the slot-3 or transient pages.
---      After this battle the pages differ by exactly the earned bytes.
---   3. fight again and read the seed before any input: a present monster
---      of a just-taught species must enter pre-revealed with the taught
---      bits, which is the read half.  Only the slot-1 page carries those
---      bits.  (Species not in the taught set defer the check to the next
---      encounter, with bounded retries, fled with the run mechanic.)
+--   2. fight a Veldt battle, formation staged (see "Staging" below), until
+--      it teaches something through the party's real weapon classes.
+--      Every changed byte must land in the slot-1 page and none in the
+--      slot-3 or transient pages.  After this battle the pages differ by
+--      exactly the earned bytes.
+--   3. stage a formation holding a just-taught species, and read the seed
+--      of that fresh battle before any input: the taught monster must
+--      enter pre-revealed with the taught bits, which is the read half.
+--      Only the slot-1 page carries those bits.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/gau_joined.mss.lua"
 
@@ -72,6 +72,62 @@ end
 -- keyed for step 3's seed check
 local taught, taughtN = {}, 0
 local slot1Before, slot3Before, tempBefore = nil, nil, nil
+
+-- Staging the Veldt's formation for the write and read battles.  The Veldt
+-- deals from the list of fought formations at $1ddd: GetVeldtBattle
+-- (field/battle.asm) moves its pointer $1fa5 one nonzero byte (a group of
+-- eight formations) per encounter and picks inside the group from a random
+-- start bit.  The formation that taught in the measured run, f57 (Stray
+-- Cat, Beakor, CrassHopper x2), comes up once in eight visits to its group
+-- and its group once per fifteen encounters, so natural draws meet it about
+-- once in 120 encounters (#244: the write half met it by luck at battle 8,
+-- and the read half then ran 40 tries without meeting Beakor again).  So
+-- both halves choose the formation: an exec callback on the instruction
+-- after GetVeldtBattle stores its pick to $11e0 replaces the pick while
+-- `staged` is set.  What is under test -- which codex page the ROM writes
+-- during the battle and which page it merges at the battle's seed -- is
+-- untouched: the fight, the chips, the page writes and the seed merge are
+-- the ROM's.  Declared in tools/state_write_waivers.txt.
+local VELDT_LIST, WRITE_FORMATION = 0x1DDD, 57
+local FORMATIONS = H.sym("BattleMonsters") & 0x3FFFFF
+local staged = nil
+local function inVeldtList(f)
+  return (H.readByte(VELDT_LIST + (f >> 3)) >> (f & 7)) & 1 == 1
+end
+-- the first formation in the Veldt list that holds a species step 2 taught
+local function readFormation()
+  for f = 0, 511 do
+    if inVeldtList(f) then
+      local rec = H.formationRecord(function(i)
+        return H.readRomByte(FORMATIONS + f * 15 + i)
+      end)
+      for slot = 0, 5 do
+        local sp = rec.species[slot]
+        if sp and (rec.present >> slot) & 1 == 1 and taught[sp] then return f end
+      end
+    end
+  end
+  return nil
+end
+do
+  local gvb, hook = H.sym("GetVeldtBattle"), nil
+  for a = gvb, gvb + 0x60 do             -- sta f:$0011e0 = 8F E0 11 00
+    if H.readRomByte(a & 0x3FFFFF) == 0x8F
+       and H.readRomByte((a + 1) & 0x3FFFFF) == 0xE0
+       and H.readRomByte((a + 2) & 0x3FFFFF) == 0x11
+       and H.readRomByte((a + 3) & 0x3FFFFF) == 0x00 then
+      hook = a + 4; break
+    end
+  end
+  assert(hook, "GetVeldtBattle's store to $11e0 not found")
+  emu.addMemoryCallback(function()
+    if staged ~= nil then
+      H.log(string.format("[ctx] staged the Veldt's pick $%03X -> f%d",
+        H.readWord(0x11E0) & 0x1FF, staged))
+      H.writeWord(0x11E0, staged)
+    end
+  end, emu.callbackType.exec, hook, hook)
+end
 
 -- the in-battle action driver: everyone Fights; 4-frame-held presses on a
 -- 5-on/5-off cadence.
@@ -419,10 +475,16 @@ local actions = {
     H.pressButtons({ "b" }, 4), H.waitFrames(20),
   }, "world control after menu close"),
 
-  -- 2. the write half: pace the Veldt, fight whatever
-  -- interrupts, and after each battle diff both pages.  The first battle that
-  -- teaches must have written the slot-1 page and only it.  (Desert
-  -- encounters teach nothing to this kit, the loop keeps walking.)
+  -- 2. the write half: pace the Veldt into the staged formation, fight it,
+  -- and after each battle diff both pages.  The first battle that teaches
+  -- must have written the slot-1 page and only it.
+  H.call(function()
+    H.assertEq(inVeldtList(WRITE_FORMATION), true, string.format(
+      "the staged write formation f%d is one the Veldt deals here "
+      .. "(its bit is set in the fought list $1ddd)", WRITE_FORMATION))
+    H.log(string.format("[ctx] slot-1 class byte for Beakor ($029) before "
+      .. "the write half: %02X", sram(SLOT1 + 0x190 + 0x29)))
+  end),
   (function()
     local fights = 0
     local function account()
@@ -464,14 +526,15 @@ local actions = {
     -- history (Shadow stays, so his battles are in it) serves this trio
     -- packs that a party walking in half-dead does not survive: measured,
     -- the un-healed search entered its seventh fight with SABIN at 64 HP
-    -- and wiped.  The bail-out follows the fixture: the teachable pairing
-    -- sits fourth in the Veldt's eight-formation cycle, so two full cycles
-    -- bound the search.
+    -- and wiped.  The formation is staged, so one battle normally teaches;
+    -- the bound only covers a staged battle whose teaching hit did not land.
     local function writeTry(n)
       return H.cond(function() return taughtN == 0 end, {
+        H.call(function() staged = WRITE_FORMATION end),
         H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
           H.call(patrolPulse),
         }, "find write-half encounter " .. n),
+        H.call(function() staged = nil end),
         H.call(battleReset),
         H.driveUntil(function() return not H.battleLoadStarted() end, 15000, {
           H.call(battlePulse),
@@ -587,9 +650,15 @@ end
 
 local function readTry(n)
   return H.cond(function() return readChecked == 0 end, {
+    H.call(function()
+      staged = readFormation()
+      H.assertEq(staged ~= nil, true,
+        "the Veldt list holds a formation with a species step 2 taught")
+    end),
     H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
       H.call(patrolPulse),
     }, "find read-half encounter " .. n),
+    H.call(function() staged = nil end),
     H.waitUntil(function() return H.monstersPresent() > 0 end, 1200,
       "read-half monsters populate " .. n, 5),
     -- wait for the alive bits the check reads, not a blind settle: the
@@ -615,8 +684,9 @@ local function readTry(n)
   }, {})
 end
 
--- The retry bound follows the fixture's draw rate for the taught species.
-for n = 1, 40 do actions[#actions + 1] = readTry(n) end
+-- The read formation is staged, so the first try normally sees a taught
+-- species; the bound only covers an encounter that did not load it.
+for n = 1, 4 do actions[#actions + 1] = readTry(n) end
 actions[#actions + 1] = H.call(function()
   H.assertEq(readChecked > 0, true,
     "READ HALF: at least one taught-species monster was checked at seed")

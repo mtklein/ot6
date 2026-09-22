@@ -227,8 +227,30 @@ add({
 -- ride needs the fight alive for at least 3 possessed turns, so a draw under
 -- 500 total monster HP is resolved and re-walked.  Nothing is poked in any
 -- draw; the selection is done by playing.
-add({ H.call(function() H.vars.suitable = false end) })
-for n = 1, 6 do
+--
+-- The draw budget comes from the Veldt's own list.  GetVeldtBattle
+-- (field/battle.asm) keeps the fought formations as a bit list at $1ddd,
+-- moves its pointer $1fa5 one nonzero byte (a group of eight formations)
+-- per encounter, and picks at random only inside that group.  So one pass
+-- over the list's nonzero bytes visits every group once, and two passes
+-- bound the search.  A fixed count was a luck precondition: gau_joined's
+-- pointer starts the walk at groups 0-5, where trance-sized formations are
+-- few, and six draws miss on about 38% of seeds (computed from the list
+-- this fixture holds and the draw rule; the failing run's six draws dealt
+-- 54, 184, 142, 410, 420 and 107 HP).  The seventh draw reaches group 6,
+-- whose only formation is CrassHopper x3 (729 HP).
+local VELDT_LIST, MAX_DRAWS = 0x1DDD, 32
+add({ H.call(function()
+  H.vars.suitable = false
+  local groups = 0
+  for i = 0, 63 do
+    if H.readByte(VELDT_LIST + i) ~= 0 then groups = groups + 1 end
+  end
+  H.vars.drawCap = math.min(2 * groups, MAX_DRAWS)
+  H.log(string.format("battle A: the Veldt list holds %d formation groups; "
+    .. "draw budget %d (two passes)", groups, H.vars.drawCap))
+end) })
+for n = 1, MAX_DRAWS do
   local w = {}
   for _, s in ipairs(walkIntoEncounter("battle A draw " .. n)) do w[#w + 1] = s end
   w[#w + 1] = H.call(function()
@@ -249,12 +271,16 @@ for n = 1, 6 do
                       maxFrames = 12000 }),
       }, {}) }, {})
   if n == 1 then add(w)
-  else add({ H.cond(function() return not H.vars.suitable end, w, {}) }) end
+  else
+    add({ H.cond(function()
+      return not H.vars.suitable and n <= H.vars.drawCap
+    end, w, {}) })
+  end
 end
 add({
   H.call(function()
     H.assertEq(H.vars.suitable, true,
-      "the Veldt dealt a trance-sized formation within six draws")
+      "the Veldt dealt a trance-sized formation within two passes of its list")
   end),
 })
 
