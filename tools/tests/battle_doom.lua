@@ -75,15 +75,31 @@ local F = nil
 local doomedA, bpA, lineA, frameA = nil, nil, nil, nil
 local doomedB, actorB, lineB, frameB = nil, nil, nil, nil
 local deathFrame, deathLine = nil, nil
-local lastCount, lastCountFrame, periods = {}, {}, {}
+local lastCount, lastCountFrame, periods, decremented = {}, {}, {}, {}
 
 local function watchCounts()
   for e = 0, 3 do
-    local c = H.doomCount({ s2 = H.readByte(ST2 + e * 2), count = H.readByte(DOOM_COUNT + e * 2) })
-    if c ~= nil and lastCount[e] ~= nil and c < lastCount[e] and lastCountFrame[e] ~= nil then
-      periods[#periods + 1] = H.frame - lastCountFrame[e]
+    -- Read the raw $3B05 byte while the Condemned bit is set, not H.doomCount.
+    -- A decrement is the byte stepping down while still condemned, OR the bit
+    -- clearing while the byte was still positive: the Doom fires at 1 and
+    -- clears the bit in the same DecCounters visit, so that last step reads as
+    -- byte -> nil (never an observable 1), yet the interval into it is still a
+    -- full cycle.
+    local condemned = (H.readByte(ST2 + e * 2) & 0x01) ~= 0
+    local b = condemned and H.readByte(DOOM_COUNT + e * 2) or nil
+    local stepped = lastCount[e] ~= nil and lastCountFrame[e] ~= nil
+      and ((b ~= nil and b < lastCount[e]) or (b == nil and lastCount[e] > 0))
+    if stepped then
+      -- Skip the partial first cycle.  The poke lands mid-accumulator (the
+      -- engine's $3adc / CalcSpeed is not reset by writing the count byte), so
+      -- the gap from the poke to the FIRST decrement is a fraction of a cycle,
+      -- not the count's cadence -- measured here at 84 frames against a real
+      -- 128.  Only the gap between two real decrements is a full cycle, so a
+      -- period is recorded from the second decrement on (#190, M.COUNT_FRAMES).
+      if decremented[e] then periods[#periods + 1] = H.frame - lastCountFrame[e] end
+      decremented[e] = true
     end
-    if c ~= lastCount[e] then lastCount[e], lastCountFrame[e] = c, H.frame end
+    if b ~= lastCount[e] then lastCount[e], lastCountFrame[e] = b, H.frame end
   end
 end
 
@@ -123,8 +139,14 @@ H.run({ maxFrames = 90000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "battle armed", 5),
 
   H.call(function()
+    -- freeRound = "care": this Mt. Kolts encounter opens as a preemptive
+    -- strike, whose free round otherwise defers every top-up one turn for an
+    -- attack (#186), skipping the heal-candidate loop where #190's refusal
+    -- lives.  The lever keeps the heals so the condemned member is actually
+    -- weighed as a patient -- which is the decision this test observes.
     F = H.newFightDriver("doom", { tactical = true, boost = true, bank = 2,
-                                   items = true, healPercent = 60 })
+                                   items = true, healPercent = 60,
+                                   freeRound = "care" })
   end),
 
   -- A. the first open command window of a member with a Fight row and a
@@ -169,6 +191,16 @@ H.run({ maxFrames = 90000 }, {
     H.writeByte(ST2 + c * 2, H.readByte(ST2 + c * 2) | 0x01)
     H.writeByte(DOOM_COUNT + c * 2, 2)
     H.writeWord(0x3BF4 + c * 2, math.max(1, maxhp(c) // 3))
+    -- doomedA's corpse (its own Doom already landed) is a revivable body, and
+    -- the driver's raise block sits ahead of the heal loop: with a Fenix Down
+    -- in the battle bag (the mog-gear route now carries one) it returns a
+    -- revive before it ever weighs healing the condemned member -- correct,
+    -- higher-priority play, but not the decision #190's rule is about.  Zero
+    -- the battle-bag Fenix (id $F0) so this turn's care decision is the heal
+    -- we mean to see refused; the corpse stays down, which part C still wants.
+    for i = 0, 251 do
+      if H.readByte(0x2686 + i * 5) == 0xF0 then H.writeByte(0x2686 + i * 5 + 3, 0) end
+    end
     doomedB, actorB, lineB, frameB = c, e, #lines, H.frame
     H.log(string.format("[test] f%d Condemned poked onto entity %d char %d (count 1, %d frames; "
       .. "its next turn %s frames away) and its HP set to %d/%d, at actor %d's open command window",

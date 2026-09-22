@@ -56,7 +56,7 @@ tools/tests/battle_counterfold.lua	.writeByte(
 tools/tests/battle_dancemp.lua	.writeWord(
 tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(
-tools/tests/battle_doom.lua	.writeByte(	quarantine: #190 mechanism staging -- Condemned is poked in the engine's own shape (STATUS2 $01 and the $3B05 count, all StartCondemn writes) because the route's only source is Nerapa on the FC escape; the property under test is the driver's read of the count
+tools/tests/battle_doom.lua	.writeByte(	quarantine: #190 mechanism staging -- Condemned is poked in the engine's own shape (STATUS2 $01 and the $3B05 count, all StartCondemn writes) because the route's only source is Nerapa on the FC escape; the property under test is the driver's read of the count.  Also zeroes the battle-bag Fenix Down (BATTINV $2686 count) so the condemned member's care decision is the heal #190 refuses, not a legitimate revive of the corpse doomedA's own Doom leaves
 tools/tests/battle_doom.lua	.writeWord(	quarantine: #190 mechanism staging -- the patient's HP is set to a third so the heal line has a member to refuse, battle_healerdown's shape
 tools/tests/battle_dotchip.lua	.writeByte(
 tools/tests/battle_dotchip.lua	.writeWord(
