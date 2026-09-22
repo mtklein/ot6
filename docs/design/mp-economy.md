@@ -227,11 +227,19 @@ about the same action.
 The tier-family half reads the action as it was queued (`$3a7c`/`$3a7d`,
 the same command and attack `Ot6QueueFold` read): the queued command is
 magic, x-magic, lore or summon (`Ot6FoldCmdTbl`) and the queued attack is
-in `Ot6FoldTbl`. So a spell that rides another command is multiplied even
-when it is a family spell, because nothing folded it: a weapon's on-hit
-cast during a boosted Fight (Blizzard's Ice), a rod or shield used from
-Item, a sketched attack. So is a Throw of a Dirk or MithrilKnife, whose
-item ids equal Fire's and Ice's. `battle_procboost` guards the Fight case.
+in `Ot6FoldTbl`. So a family spell that rides another command is
+multiplied, because nothing folded it: a rod or shield used from Item, a
+sketched attack, the Magicite item's esper. So is a Throw of a Dirk or
+MithrilKnife, whose item ids equal Fire's and Ice's.
+
+One more thing is never multiplied, and it has no price to escalate: a
+weapon's own on-hit spell (Blizzard's Ice, Tempest's Wind Slash), whatever
+action carries it. A boosted Fight buys extra swings; the spell a weapon
+casts off one of them is part of that swing, not a second boost (owner,
+v0.21). The weapon sources mark the follow-up they queue
+(`OT6_WEAPSPELL`), because its bytes are the same as Sketch's or
+Magicite's. `battle_procboost` asserts the table: a tier cast skipped, a
+weapon's spell unmultiplied, a Throw and an Ice Rod multiplied.
 
 **Escalate — the boost multiplies them:** Blitz, Tools, Lore, non-tier
 magic (Drain, Scan, Break, Doom, Pearl, Flare, Quake, Ultima, Osmose,
