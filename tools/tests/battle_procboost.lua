@@ -7,6 +7,8 @@
 --     is magic/x-magic/lore/summon and the QUEUED attack is in Ot6FoldTbl;
 --   * a weapon's own on-hit spell is not multiplied (owner ruling, v0.21):
 --     the boost bought that weapon's swings, not a second boost on its cast;
+--   * a Rage is not multiplied: its boost bought the coin (the queued
+--     command is $10; the beast's attack runs under its own command);
 --   * everything else past the command gate is.
 -- The executing $b5/$b6 cannot tell these apart: a Fight's Blizzard Ice, an
 -- Ice Rod used from Item and a folded Ice cast all run as command $02 with a
@@ -29,8 +31,14 @@
 --   magicite  LOCKE's Magicite from Item: any damage its esper deals leaves x8
 --           (which esper answers is the item's own roll; a harmless one is
 --           logged, not failed)
+-- Then from gau_joined (GAU, SABIN, CYAN on the Veldt), the same shape:
+--   rage    GAU's Rage at boost 3 (tier 3: the special every turn) on each of
+--           the first RAGE_ENTRIES cells of his rage window: every damage the
+--           start turn's attack deals leaves unmultiplied, and at least one
+--           cell's special ran under a command other than Fight
 -- Negative controls: f0484b6f (OT6_ROM/OT6_DBG) fails `rod` (Ice 2 read as a
--- folded cast); a build with Ot6WeaponSpellQueued's store NOPed fails `fight`.
+-- folded cast); a build with Ot6WeaponSpellQueued's store NOPed fails `fight`;
+-- 95fc3f30 (no queued-Rage test) fails `rage`.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/fc_alcove.mss.lua"
@@ -41,18 +49,21 @@ local TERRA, LOCKE, SHADOW = 0x00, 0x01, 0x03
 local ICE_ROD, MITHRIL_KNIFE, MAGICITE = 0x36, 0x01, 0xF9
 local FIRE, FIRE3 = 0x00, 0x09
 local FIGHT_TRIES, MAGICITE_TRIES, WAIT_STEP = 12, 6, 48
+local GAU, RAGE_ENTRIES = 0x0B, 4
+local GAU_STATE = "build/states/gau_joined.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL, CMDROW, BCHID = 0x202E, 0x890F, 0x3ED8
 local ST_CMD, ST_DEF, ST_TGT = 0x05, 0x27, 0x38
-local ST_ITEM, ST_MAGIC, ST_THROW = 0x0A, 0x0E, 0x2D
+local ST_ITEM, ST_MAGIC, ST_THROW, ST_RAGE = 0x0A, 0x0E, 0x2D, 0x1E
+local RSCROLL, RCOL, RROW = 0x892B, 0x892F, 0x8933   -- the rage cursor, by slot
 local ITEMLIST, BATTINV = 0x4005, 0x2686
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local THROW_SCROLL, THROW_ROW = 0x8953, 0x895B
 local MSCROLL, MCOL, MROW, MLISTPTR = 0x8913, 0x8917, 0x891B, 0x302C
 local BANK, PEND = 0x3E9C, 0x3E9D
 local HANDS = 0x3CA8
-local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_THROW = 0x00, 0x01, 0x02, 0x08
+local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_THROW, CMD_RAGE = 0x00, 0x01, 0x02, 0x08, 0x10
 
 local slotOf, snap, armed = {}, nil, nil
 local weapspell                               -- OT6_WEAPSPELL, off the dbg
@@ -170,11 +181,20 @@ local function listStep(c, st)
     if ar ~= wr then return ar < wr and "down" or "up" end
     if col ~= wc then return col < wc and "right" or "left" end
     return "a"
+  elseif c.verb == "rage" then
+    if st ~= ST_RAGE then return nil end
+    local wr, wc = c.entry // 2, c.entry % 2
+    local row = H.readByte(RSCROLL + s) + H.readByte(RROW + s)
+    local col = H.readByte(RCOL + s)
+    if col ~= wc then return wc > col and "right" or "left" end
+    if row ~= wr then return wr > row and "down" or "up" end
+    return "a"
   end
 end
 
-local CMD_OF = { fight = CMD_FIGHT, throw = CMD_THROW, item = CMD_ITEM, magic = CMD_MAGIC }
-local LIST_OF = { throw = ST_THROW, item = ST_ITEM, magic = ST_MAGIC }
+local CMD_OF = { fight = CMD_FIGHT, throw = CMD_THROW, item = CMD_ITEM, magic = CMD_MAGIC,
+                 rage = CMD_RAGE }
+local LIST_OF = { throw = ST_THROW, item = ST_ITEM, magic = ST_MAGIC, rage = ST_RAGE }
 local phase, held = "idle", nil
 local function decide(c)
   local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
@@ -430,4 +450,82 @@ steps[#steps + 1] = H.call(function()
     mc > 0 and string.format("x%d on %d call(s)", MULT, mc) or "dealt no damage in the tries"))
 end)
 
-H.run({ maxFrames = 300000 }, steps)
+-- ---- the Rage row, from gau_joined ---------------------------------------
+local RAGE = {}
+for e = 0, RAGE_ENTRIES - 1 do
+  RAGE[#RAGE + 1] = { name = "rage entry " .. e, char = GAU, verb = "rage", entry = e, tries = 1 }
+end
+for _, s in ipairs({
+  H.call(function() snap, armed = nil, nil end),
+  H.loadState(GAU_STATE),
+  H.waitFrames(20),
+  H.waitUntil(function() return H.worldMode() and H.worldHasControl() end, 3000, "world control", 5),
+  (function()
+    local dirs = { "left", "right", "up", "down" }
+    local di, lastPos, n = 1, nil, 0
+    return H.driveUntil(function() return H.battleLoadStarted() end, 30000, {
+      H.call(function()
+        if not H.worldHasControl() then H.setPad({}) return end
+        n = n + 1
+        local pos = H.worldX() * 256 + H.worldY()
+        if n >= 24 then
+          if pos == lastPos then di = di % 4 + 1
+          else di = (di % 2 == 1) and di + 1 or di - 1 end
+          lastPos, n = pos, 0
+        end
+        H.setPad({ [dirs[di]] = true })
+      end),
+    }, "a Veldt encounter")
+  end)(),
+  H.release(),
+  H.waitUntil(function() return H.battleActive() end, 900, "Veldt battle up", 5),
+  H.call(function()
+    slotOf = {}
+    for s = 0, 3 do
+      local id = H.readByte(BCHID + s * 2)
+      if id ~= 0xFF then slotOf[id] = s end
+    end
+    assert(slotOf[GAU], "GAU is in the battle")
+    assert(cmdRow(slotOf[GAU], CMD_RAGE), "GAU has a Rage row")
+    H.log(string.format("[procboost] GAU slot %d; %d rages learned", slotOf[GAU], H.readByte(0x3A9A)))
+  end),
+  H.driveUntil(function() return snap ~= nil end, 30000, {
+    H.call(function()
+      local s = slotOf[GAU]
+      if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD and (H.readByte(ACTOR) & 3) == s
+         and H.readByte(BANK + s * 2) >= BOOST and H.readByte(PEND + s * 2) == 0 then
+        H.setPad({})
+        snap = H.requestSaveState()
+        return
+      end
+      defendOthers(-1)
+    end),
+  }, "GAU's window with " .. BOOST .. " pips"),
+  H.waitFrames(2),
+  H.call(function() H.checkReq(snap, "snapshot at GAU's window") end),
+}) do steps[#steps + 1] = s end
+for _, c in ipairs(RAGE) do
+  if c.entry < 8 then
+    for _, s in ipairs(tryCase(c, 1)) do steps[#steps + 1] = s end
+  end
+end
+steps[#steps + 1] = H.call(function()
+  local specials, dealt = 0, 0
+  for _, c in ipairs(RAGE) do
+    if c.hit then
+      H.assertEq(c.hit.pendAtConfirm, BOOST, c.name .. ": pending boost at the confirm")
+      for _, k in ipairs(c.hit.calls) do
+        H.assertEq(k.a7c, CMD_RAGE, c.name .. ": the queued command is Rage")
+        if k.din > 0 then dealt = dealt + 1 end
+        if k.b5 ~= CMD_FIGHT and k.b5 ~= CMD_RAGE and k.din > 0 then specials = specials + 1 end
+        H.assertEq(k.dout, k.din, string.format(
+          "%s: the beast's $%02X (command $%02X) leaves unmultiplied (%d in)", c.name, k.b6, k.b5, k.din))
+      end
+    end
+  end
+  H.assertEq(specials > 0, true, "a boosted Rage's special ran under its own command and dealt damage")
+  H.log(string.format("[procboost] rage verdict: %d damage call(s) unmultiplied, %d of them a "
+    .. "special under its own command", dealt, specials))
+end)
+
+H.run({ maxFrames = 400000 }, steps)
