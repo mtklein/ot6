@@ -20,27 +20,36 @@ patcher (Flips, beat) and open the result instead.
 
 ## What's changed
 
-**Shadow's Assassinate fires on the break.** Shadow's divine used to kill only
-an enemy that was already Broken, and his breaking hit usually killed the enemy
-by itself first, so the divine rarely had anything to do. Now the hit of his
-that empties an enemy's last shield kills it outright on that hit — break it
-and it dies — and his attack on an enemy someone else already Broke still kills
-too. Once per battle. A boss is only Broken, never killed, and the divine waits
-for a body it can finish.
+**Shadow's break is a kill.** Shadow has a once-per-battle instant kill. It
+used to work only on an enemy that was already Broken, and his breaking hit
+usually killed the enemy by itself first, so it rarely came up. Now the hit of
+his that empties an enemy's last shield kills it outright — break it and it
+dies — and it still works on an enemy that's already Broken. Enemies immune to
+instant death, every boss among them, are only Broken, and the kill waits for
+a body it can finish.
 
 **Greyed commands are refused, not wasted.** Rage costs Gau a flat 8 MP; when
-he has less, every beast in the Rage list is now greyed and picking one buzzes
-instead of spending his turn on nothing. The same goes for Locke's Bestow when
-he has no boost pip to give, and for a SwdTech tier past Cyan's boost bank.
+he can't pay it, every beast in the Rage list is now greyed and picking one
+buzzes instead of spending his turn on nothing. The same goes for Locke's
+Bestow when he has no boost pip to give.
 
 **More allies spend their boost when provoked.** Since v0.20, an ally the game
 is steering — Berserked or Muddled — dumps its banked pips on its next attack
-after it's hurt. That now also covers allies an event is driving, like Cyan
-holding the line on his own during the siege of Doma, and every one of Umaro's
-attacks: his plain swing gains extra hits, Charge and Storm hit harder, and
-Throw throws again once per pip.
+after it's hurt. Now Cyan does too in the Doma Castle courtyard fights, where
+he fights on his own beside Sabin, and Umaro's Throw, Storm and Charge carry the dump as well
+as his plain swing: Charge and Storm hit harder, and Throw throws again once
+per pip.
 
-**Saves carry over.** Saves from v0.20 load and play on in v0.21.
+**A boost pays off once.** Shadow's boosted Throw now hits harder with every
+throwable weapon; nineteen of them, the Dirk and MithrilKnife among them, used
+to take the pips and throw no harder. The same rule trims two double payoffs.
+A boosted Fight buys extra swings, so the spell a weapon casts off one of them
+(Blizzard's Ice, Tempest's Wind Slash) now lands at its normal strength
+instead of multiplied as well. A boosted Rage buys the certainty of the
+beast's special, not extra damage on top of it.
+
+**Saves carry over.** In-game saves from v0.20 load in v0.21. Emulator save
+states don't carry across versions, so load from an in-game save.
 
 ## A warning about Sketch
 

@@ -9,9 +9,9 @@ boost-point turn economy.
 
 v0.21 is the current release
 ([tag](https://github.com/mtklein/ot6/releases/tag/v0.21)); Shadow's hit
-that breaks an enemy now kills it outright, and greyed commands (Rage,
-Bestow, SwdTech tiers) are refused instead of wasting the turn (details in
-the release notes). The game is playable from the start through the end of
+that breaks an enemy now kills it outright, and greyed Rage and Bestow
+picks are refused instead of wasting the turn (details in the release
+notes). The game is playable from the start through the end of
 the World of Balance: the whole Thamasa arc, the world tour aboard the
 repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
 and the escape — stopping where the game sets you down in the World of Ruin.
