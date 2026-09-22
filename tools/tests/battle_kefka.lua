@@ -32,7 +32,7 @@
 -- it and escalates the policy tier, for three attempts total.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/kefka_entry.mss.lua"
+local ENTRY = "build/states/kefka_entry.mss.lua"
 
 local KEFKA = 0x014A
 
@@ -249,7 +249,7 @@ local function attempt(n)
 end
 
 H.run({ maxFrames = 300000 }, {
-  H.loadState(DOOR),
+  H.loadState(ENTRY),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.mapId() & 0x1ff, 22, "booted on map 22")

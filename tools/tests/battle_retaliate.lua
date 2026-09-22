@@ -50,7 +50,7 @@
 -- -- which are precisely what the old behaviour produced here, so this file
 -- cannot pass on a ROM without the feature.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/vargas_entry.mss.lua"
+local ENTRY = "build/states/vargas_entry.mss.lua"
 
 local SUBJ = 0                          -- EDGAR's entity index at vargas_entry
 local BERSERK = 0x10                    -- STATUS2 bit 4 (const.inc)
@@ -93,7 +93,7 @@ local W = { open = false, closed = false, swings = 0, hits = 0,
             hand = { [0] = 0, [1] = 0 }, bank = nil }
 
 H.run({ maxFrames = 150000 }, {
-  H.loadState(DOOR),
+  H.loadState(ENTRY),
   H.waitFrames(30),
 
   -- ================================================================== --

@@ -43,7 +43,7 @@
 -- EVERY EXPECTED NUMBER IS DERIVED from the built ROM, never pinned, the
 -- same way battle_retaliate.lua derives them.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/camp_cleared.mss.lua"
+local ENTRY = "build/states/camp_cleared.mss.lua"
 
 local CHAR_CYAN = 0x02
 local CYAN_OBJ = 18                     -- map 119's warrior NPC (gen_sabin_escape)
@@ -303,7 +303,7 @@ local function battleFrame()
 end
 
 H.run({ maxFrames = 60000, retries = 3 }, {
-  H.loadState(DOOR),
+  H.loadState(ENTRY),
   H.waitFrames(30),
 
   -- the ROM's own arithmetic, before a single button is pressed

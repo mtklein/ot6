@@ -435,7 +435,7 @@ because the monsters' rounds land between party turns.
 This fighter was not the only private one. Six more generators pressed R,
 named a costed ability and never asked what the boost cost;
 [private-fighters.md](private-fighters.md) is that unit. Since it landed,
-this fighter's `seqFor` makes its decision through the same one door the
+this fighter's `seqFor` makes its decision through the same one entry point the
 others do — `H.boostPlan`, with `ration = 4` where they have none — and
 every run in the tree now writes a `[fizzle]` line for a costed action the
 pool could not pay for and a `[refused]` line for a confirm that buzzed, so

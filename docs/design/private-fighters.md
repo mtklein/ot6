@@ -37,7 +37,7 @@ grey — and it makes this unit **more** necessary, not less:
 A person reads the grey. A fighter has to read the price.
 
 The library's fight driver learned to (`M.affordBoost`, #219). But a
-generator with its **own private fighter** never went through that door:
+generator with its **own private fighter** never went through that entry point:
 it read the bank, pressed R that many times, named a costed ability, and
 never asked what the boost cost. `gen_narshe_battle` did that sixteen
 times in one descent and lost the segment three attempts running (#228).
@@ -94,7 +94,7 @@ Three free-looking verbs were checked against the ROM rather than assumed:
 
 ## The fix
 
-**One door: `H.boostPlan` (`M.boostPlan`, `lib/ot6.lua`).** It takes the
+**One entry point: `H.boostPlan` (`M.boostPlan`, `lib/ot6.lua`).** It takes the
 caster's slot, the ability the turn will name, the boost the bank would
 spend, and an optional reserve and ration, and returns the boost the pool
 can actually pay for, whether the verb survives at all, and one line saying
@@ -165,7 +165,7 @@ policy prices against `$AA` again, the ROM names `$AA` on every Tools turn,
 0 fizzles — and seed 0 passes at **frame 33361**, the exact frame
 `narshe-descent.md` records for the shipped generate edge.
 
-### The descent, re-measured through the one door
+### The descent, re-measured through the one entry point
 
 `gen_narshe_battle` now makes the same call as the other six, with
 `ration = 4` where they have none. Its own lab, six shifts on the v0.19 ROM

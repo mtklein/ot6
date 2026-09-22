@@ -72,7 +72,7 @@
 -- covers is the roll's; the run logs them, and the 8-shift sweep's union
 -- is where all three non-Fight arms are seen.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/tunnelarmr_entry.mss.lua"
+local ENTRY = "build/states/tunnelarmr_entry.mss.lua"
 local TUNNELARMR = 0x0104                -- formation species word (const.inc)
 
 local CHAR_UMARO = 0x0D                 -- CHAR::UMARO (const.inc)
@@ -343,7 +343,7 @@ local function measured()
 end
 
 H.run({ maxFrames = 60000, retries = 3 }, {
-  H.loadState(DOOR),
+  H.loadState(ENTRY),
   H.waitFrames(30),
 
   H.call(function()
