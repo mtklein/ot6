@@ -12,7 +12,7 @@
 --
 -- Where the kill lives, against the action's order in battle_main.asm.
 -- ExecAttack -> CalcAttackEffect: ChooseTarget, then Ot6Oblivion and
--- Ot6Assassinate (the seam: before the hit roll, the primary target's
+-- Ot6Assassinate (the hook point: before the hit roll, the primary target's
 -- Broken read); CheckHit fills $a4 with the targets that landed (@33b1);
 -- the per-target loop (@3440) calls CalcTargetDmg for each of those, whose
 -- @0c0e Ot6Chip (element) and @0c1e Ot6HitJoin (Ot6ClassChip, then
@@ -27,7 +27,7 @@
 --
 -- Why the older instrument could never fire here.  The breaking hit is not
 -- attenuated and is doubled (ot6_break.asm, Ot6ShieldedMulW and
--- Ot6BrokenDmg), and the divine used to resolve at the seam only, before
+-- Ot6BrokenDmg), and the divine used to resolve at the hook point only, before
 -- that hit's chip, so it could only take a body still standing AFTER its
 -- own break: ~280 hp against the back-row Imperial, and every PIERCE-weak
 -- body this pool deals (CrassHoppr, 243) died on its own break, four fights
@@ -70,7 +70,7 @@
 --      carries -- before any chip (this file's one write), then Shadow
 --      breaks it by real chips: the break write comes, no mark, no latch
 --      spent.  When the body outlives its doubled break, his next landed hit
---      on it (the seam's Broken read) draws no mark either.
+--      on it (the hook point's Broken read) draws no mark either.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
 
@@ -101,7 +101,7 @@ local function shadowBit() return 1 << shadowSlot end
 -- ---- the ledger: the ROM's writes, in the ROM's order -------------------
 -- One sequence counter across every callback below, so two writes in the
 -- same frame still say which came first.
-local GATE, SEAM = H.sym("Ot6AssassinateGate"), H.sym("Ot6Assassinate")
+local GATE, SITE = H.sym("Ot6AssassinateGate"), H.sym("Ot6Assassinate")
 local CLASSCHIP, ELEMCHIP = H.sym("Ot6ClassChip"), H.sym("Ot6Chip")
 local seq = 0
 local function stamp() seq = seq + 1; return seq end
@@ -118,7 +118,7 @@ local deathAt = {}       -- m -> { f, seq }: the first Death status after its ma
 local killPending = {}   -- m -> true between the mark and its HP/Death writes
 local watching = false
 -- The gate has two callers and one mark, so the mark's pc alone cannot say
--- which rule fired: the seam, on a later swing of one multi-swing action,
+-- which rule fired: the hook point, on a later swing of one multi-swing action,
 -- marks a body the first swing broke in the same frame (measured with the
 -- Ot6HitJoin jsr NOP'd: build/attempts/wt/assassinate-break/negctl_nop.log
 -- f35355, break seq6 then mark seq7, three shields in one action).  So the
@@ -132,11 +132,11 @@ local function findJsr(from, to)
   return nil
 end
 local HITJOIN = H.sym("Ot6HitJoin")
-local jsrHit, jsrSeam = findJsr(HITJOIN, HITJOIN + 0x10), findJsr(SEAM, SEAM + 0x20)
+local jsrHit, jsrSite = findJsr(HITJOIN, HITJOIN + 0x10), findJsr(SITE, SITE + 0x20)
 H.log(string.format("[gate] Ot6AssassinateGate $%06x; jsr in Ot6HitJoin: %s; "
-  .. "jsr in Ot6Assassinate (seam): %s", GATE,
+  .. "jsr in Ot6Assassinate (hook point): %s", GATE,
   jsrHit and string.format("$%06x", jsrHit) or "NONE (the chip-path hook is not there)",
-  jsrSeam and string.format("$%06x", jsrSeam) or "NONE"))
+  jsrSite and string.format("$%06x", jsrSite) or "NONE"))
 local gateVia = nil
 emu.addMemoryCallback(function()
   if not watching then return end
@@ -144,7 +144,7 @@ emu.addMemoryCallback(function()
     local sp = emu.getState()["cpu.sp"] & 0xFFFF
     local ret = H.readWord(sp + 1)
     if jsrHit and ret == ((jsrHit + 2) & 0xFFFF) then gateVia = "Ot6HitJoin"
-    elseif jsrSeam and ret == ((jsrSeam + 2) & 0xFFFF) then gateVia = "seam"
+    elseif jsrSite and ret == ((jsrSite + 2) & 0xFFFF) then gateVia = "site"
     else gateVia = string.format("$%04x", ret) end
   end)
 end, emu.callbackType.exec, GATE, GATE)
@@ -152,7 +152,7 @@ emu.addMemoryCallback(function(addr, v)
   if not watching or (v & 0x80) == 0 then return end
   pcall(function()
     local pc = cpu()
-    if pc >= GATE and pc < SEAM then
+    if pc >= GATE and pc < SITE then
       local m = ((addr - 0x7E0000 - 0x3DD4) - 8) // 2
       local k = { m = m, f = H.frame, seq = stamp(), pc = pc, via = gateVia }
       divineKills[#divineKills + 1] = k
@@ -443,7 +443,7 @@ add({
   H.waitFrames(20),
   -- SHADOW to the back row, through the real Order screen (H.setRows): the
   -- back row halves his physical damage, so the bodies outlive more of
-  -- his chips (arm 2's second break, arm 3's seam half).
+  -- his chips (arm 2's second break, arm 3's hook point half).
   H.setRows({ [SHADOW] = true }, { tag = "shadow back row" }),
 })
 
@@ -505,7 +505,7 @@ add({
       .. "hit broke it")
     H.assertEq(k.via, "Ot6HitJoin",
       "the mark came through Ot6HitJoin, the chip path of the hit that "
-      .. "broke the body -- not the seam on a later swing or a later action "
+      .. "broke the body -- not the hook point on a later swing or a later action "
       .. "(the pre-#239 rule, still live for a body already Broken)")
     H.assertEq(b.f == k.f and b.seq < k.seq, true, string.format(
       "the break write precedes the Death mark on the SAME action: break "
@@ -628,7 +628,7 @@ add({
             m, mhp(m), counters, tostring(H.battleLoadStarted())))
         end
       end),
-      -- the seam half, when the body outlived its doubled break: Shadow's
+      -- the hook point half, when the body outlived its doubled break: Shadow's
       -- next landed hit on the Broken 'boss' draws no mark either
       H.cond(function()
         return broke and alive(H.vars.bossBody) and H.battleLoadStarted()
@@ -639,7 +639,7 @@ add({
             or not H.battleLoadStarted()
         end, 30000, "Shadow lands on the Broken 'boss' (isolation arm)"),
         H.call(function()
-          H.log(string.format("[isolation arm] seam half: brokenHits=%d (was "
+          H.log(string.format("[isolation arm] hook point half: brokenHits=%d (was "
             .. "%d) divineKills=%d latch=$%02x hp=%d alive=%s", brokenHits,
             H.vars.brokenHits0, #divineKills, latchByte(),
             mhp(H.vars.bossBody), tostring(alive(H.vars.bossBody))))
@@ -649,7 +649,7 @@ add({
               .. "in-proc Death mark")
             H.assertEq(latchByte() & shadowBit(), 0,
               "and no divine was spent on it")
-            H.vars.seamHalf = true
+            H.vars.siteHalf = true
           end
         end),
       }, {}),
@@ -662,9 +662,9 @@ add({
         H.assertEq(broke, true, string.format(
           "Shadow broke a body carrying the boss bit within %d fight(s) "
           .. "(fought %d)", FIGHTS, fights))
-        H.log(string.format("[isolation arm] done: fights=%d seam half %s "
+        H.log(string.format("[isolation arm] done: fights=%d hook point half %s "
           .. "divineKills=%d latch=$%02x interceptor=%d", fights,
-          H.vars.seamHalf and "reached" or "not reached (the body died on "
+          H.vars.siteHalf and "reached" or "not reached (the body died on "
           .. "its doubled break)", #divineKills, latchByte(), counters))
         H.assertEq(#divineKills, 0, "no in-proc Death mark in the whole arm")
         watching = false

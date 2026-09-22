@@ -31,7 +31,7 @@
 ; (battle_main.asm:12810), which clears the target there; the target is then
 ; re-chosen at resolution.
 ;
-; The gate is read at the one seam where the target exists and
+; The gate is read at the one point where the target exists and
 ; the attack's properties are still editable: immediately after ChooseTarget in
 ; CalcAttackEffect (battle_main.asm:8185), which fills $b8/$b9 for this attack.
 ; Here x is still the attacker (CalcAttackEffect indexes $3c08,x etc. right
@@ -149,7 +149,7 @@ done:   plp
 ; Ot6ClassChip) comes first, this gate next, then _c262ef's ApplyDmg takes
 ; the doubled hit off the HP and ExecAttack's UpdateStatus applies the
 ; Death.  The hit that breaks a non-boss is the kill (#239).  Ot6Assassinate
-; below calls it from the ChooseTarget seam, before the hit roll, for a body
+; below calls it from the ChooseTarget hook point, before the hit roll, for a body
 ; already Broken when Shadow's attack resolves.
 ;
 ; a8; the index width is the caller's (Ot6HitJoin i16, Ot6Assassinate i8),
@@ -183,9 +183,9 @@ done:   plp
 done:   rts
 .endproc
 
-; [ Assassinate at the ChooseTarget seam: the primary monster target ]
+; [ Assassinate at the ChooseTarget hook point: the primary monster target ]
 ;
-; The seam Oblivion uses, after ChooseTarget in CalcAttackEffect, where the
+; The hook point Oblivion uses, after ChooseTarget in CalcAttackEffect, where the
 ; target mask exists and the hit has not rolled.  Resolves $b9's lowest
 ; monster bit to its entity offset and puts it to the gate above, so a body
 ; already Broken dies whatever the hit roll.  The hit that breaks a body

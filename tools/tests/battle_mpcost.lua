@@ -39,7 +39,7 @@
 --           so only the narrowed counts say anything about this row.
 --           3b, the EXECUTION BACKSTOP: with the real pool restored the same
 --           Dispatch is committed, and the pool goes broke AT THE LATCH,
---           which is the one seam the universal insufficient-MP fizzle still
+--           which is the one hook point the universal insufficient-MP fizzle still
 --           exists for (an enemy Rasp between the choice and the swing).  The
 --           tech must fizzle, dealing no damage, leaving the 1 MP untouched
 --           and never negative.  A ladder over
@@ -520,7 +520,7 @@ H.run({ maxFrames = 200000 }, {
             -- fizzle at CalcAttackEffect is still real code and still
             -- reachable in play -- an enemy Rasp or Osmose between the choice
             -- and the swing -- so it keeps its own arm.  The poverty is
-            -- staged AT THE LATCH, which is exactly that seam: the Dispatch
+            -- staged AT THE LATCH, which is exactly that hook point: the Dispatch
             -- is chosen and committed against a pool that could pay it, the
             -- pool then goes broke under it, and the tech must fizzle for no
             -- damage and leave the 1 MP alone.
@@ -564,7 +564,7 @@ H.run({ maxFrames = 200000 }, {
                     end
                     if pend() >= 1 and not latched then
                       latched = true
-                      -- the seam: the action is committed, and the pool goes
+                      -- the hook point: the action is committed, and the pool goes
                       -- broke under it before it resolves (the isolation
                       -- write, waived and labeled).  This is the only way
                       -- left to reach the execution-side gate, now that the

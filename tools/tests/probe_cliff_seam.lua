@@ -1,5 +1,5 @@
 -- probe_cliff_seam.lua -- the last gap: map 21 (32,21) -> (36,2).  Drives
--- the seam directly with long holds, staying east of x=31 so the
+-- the gap directly with long holds, staying east of x=31 so the
 -- (30,20) row cannot teleport the party to 43.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x1ff) == m end
@@ -12,7 +12,7 @@ H.run({ maxFrames = 30000 }, {
   -- wob_chase23C starts on map 21 at (30,22); shift east to (32,21) first
   H.navTo(32, 21, { maxFrames = 6000, playBattles = "flee" }),
   H.call(function()
-    H.log(string.format("start seam at (%d,%d)", H.fieldX(), H.fieldY()))
+    H.log(string.format("start gap at (%d,%d)", H.fieldX(), H.fieldY()))
   end),
   H.driveUntil(function()
     return mapIs(22) or (mapIs(21) and H.fieldY() <= 4)
@@ -24,15 +24,15 @@ H.run({ maxFrames = 30000 }, {
       if t % 350 == 0 then phase = (phase % #holds) + 1 end
       H.setPad(holds[phase])
       if t % 600 == 0 then
-        H.log(string.format("  seam t=%d map=%d (%d,%d)", t,
+        H.log(string.format("  gap t=%d map=%d (%d,%d)", t,
           H.mapId() & 0x1ff, H.fieldX(), H.fieldY()))
       end
     end),
-  }, "up the seam"),
+  }, "up the gap"),
   H.call(function()
-    H.log(string.format("SEAM RESULT map=%d (%d,%d)", H.mapId() & 0x1ff,
+    H.log(string.format("GAP RESULT map=%d (%d,%d)", H.mapId() & 0x1ff,
       H.fieldX(), H.fieldY()))
-    H.screenshot("seam")
+    H.screenshot("gap")
   end),
   H.logStep(function() return "done" end),
 })
