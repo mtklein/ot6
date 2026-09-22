@@ -3437,7 +3437,7 @@ Cmd_10:
         ; mid-trance re-entry would read the already-consumed pending byte and
         ; drop the possession to tier 0.  Slot's OT6_SLOTTIER pattern
         ; at whole-battle range.
-        jsl     Ot6RageTierFlag
+        jsl     Ot6RageTierStore
 @1560:  lda     $33a8,y
         inc
         bne     @1579
@@ -13064,13 +13064,13 @@ FixPlayerAttack:
         ; ot6: the start turn's coin is rolled here, not in Cmd_10.  The
         ; menu's beast lands in $33a8,y and vanilla rolls the attack right
         ; away, so this RandRage runs before Cmd_10 and before its
-        ; Ot6RageTierFlag.  Recording here as well fixes that: the proc only
+        ; Ot6RageTierStore.  Recording here as well fixes that: the proc only
         ; records while the RAGE status is still clear, so this is the start
         ; turn by construction and
         ; Cmd_10's own record (which re-reads the not-yet-consumed pending byte)
         ; is idempotent.  A = the beast id here, and the store is a8 so it
         ; touches only A's low half, which RandRage overwrites with its result.
-        jsl     Ot6RageTierFlag
+        jsl     Ot6RageTierStore
         jsr     RandRage
         xba
         pla

@@ -564,7 +564,7 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
 ; entry: jsl from either site, a8, Y = attacker entity, db=$7e.  Index width is
 ; not assumed; Y only ever indexes two absolute tables with an entity index.
 ; clobbers A's low half only (a8), preserving B for FixPlayerAttack's xba.
-.proc Ot6RageTierFlag
+.proc Ot6RageTierStore
         .a8
         lda     $3ef9,y         ; status 4
         lsr                     ; bit 0 = RAGE: already possessed?

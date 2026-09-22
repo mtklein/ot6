@@ -258,7 +258,7 @@ local function pinGau()
   end
   if actor then
     -- pinPend is nil once the rage has been confirmed, so re-pinning does not
-    -- overwrite the pending byte Ot6RageTierFlag is about to read.
+    -- overwrite the pending byte Ot6RageTierStore is about to read.
     if pinPend then H.writeByte(0x3E9D + actor * 2, pinPend) end
     if pinMp then H.writeWord(CURMP(actor), startMp) end
     for _, s in ipairs(PARTY) do
