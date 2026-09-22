@@ -225,6 +225,20 @@ steps[#steps + 1] = H.call(function()
   local ok = pcall(aimsAtCirpius, pickOff)
   H.assertEq(ok, false,
     "the aims-at-a-Cirpius assertion FAILS under the stubbed old-shape pick")
+
+  -- opt-in-safe: an authored kill order (opts.focus) or a multi-part plan
+  -- (self.parts) still wins, so their targeting stays byte-identical -- the
+  -- same guard focusList reads.  On THIS fight, where the class pick would
+  -- otherwise steer to a Cirpius, both suppress it back to nil (the default
+  -- cursor the authored targeting then supplies itself).
+  local foc = H.newFightDriver("sel-focus", { tactical = true, aim = true })
+  foc.driver.opts.focus = { { slot = S.tusk, mask = 1 << S.tusk } }
+  H.assertEq(foc.driver:chipAim(S.terra, 0), nil,
+    "an authored opts.focus wins: chipAim makes no class pick")
+  local par = H.newFightDriver("sel-parts", { tactical = true, aim = true })
+  par.driver.parts = { focus = { { slot = S.tusk, mask = 1 << S.tusk } } }
+  H.assertEq(par.driver:chipAim(S.terra, 0), nil,
+    "a multi-part self.parts wins: chipAim makes no class pick")
 end)
 
 -- 3. outcome A/B: aim-on breaks more Cirpius and ends the fight sooner.
