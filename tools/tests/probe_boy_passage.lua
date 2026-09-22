@@ -84,8 +84,24 @@ H.run({ maxFrames = 80000 }, {
   H.release(), H.waitFrames(90),
   H.call(function()
     H.log(string.format("[boy] OUT to town: map=%d at (%d,%d); cider door approach (22,43) reach=%s; "
-      .. "Imperial soldier (22,47) reach=%s",
+      .. "Imperial soldier (22,47) reach=%s; grandson N door (22,13) reach=%s; "
+      .. "old man house door (37,41) reach=%s",
       map(), H.fieldX(), H.fieldY(),
-      H.bfsPath(22, 43) and "YES" or "no", H.bfsPath(22, 47) and "YES" or "no"))
+      H.bfsPath(22, 43) and "YES" or "no", H.bfsPath(22, 47) and "YES" or "no",
+      H.bfsPath(22, 13) and "YES" or "no", H.bfsPath(37, 41) and "YES" or "no"))
+  end),
+  -- OLD-MAN REACH TEST: from the west, re-enter the grandson region via the
+  -- OTHER door (22,13 -> map 86 (8,25)) and see whether the old-man warp (10,7)
+  -- / old-man region is reachable WITHOUT passing the re-blocked grandson.
+  H.navTo(22, 14, { maxFrames = 12000, playBattles = true }),
+  H.driveUntil(function() return map() == 86 end, 3000, { H.hold({ "up" }), H.waitFrames(8) },
+    "into grandson region via (22,13)"),
+  H.release(), H.waitFrames(90),
+  H.call(function()
+    H.log(string.format("[boy] via (22,13): map=%d at (%d,%d); grandson(obj20)=(%d,%d); "
+      .. "warp(10,7) reach=%s (10,8) reach=%s old-man-warp-land(33,10) reach=%s old man(28,17) reach=%s",
+      map(), H.fieldX(), H.fieldY(), H.objX(20), H.objY(20),
+      H.bfsPath(10, 7) and "YES" or "no", H.bfsPath(10, 8) and "YES" or "no",
+      H.bfsPath(33, 10) and "YES" or "no", H.bfsPath(28, 17) and "YES" or "no"))
   end),
 })
