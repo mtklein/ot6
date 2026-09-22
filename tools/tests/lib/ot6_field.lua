@@ -1336,7 +1336,7 @@ end
 --   windowHold = 132            -- optional; fsf to start the window hold
 --   segMargin  = 24             -- optional; frames of slack a k-step
 --                               -- in-phase lane needs beyond 16k
---   maxFrames, what             -- optional; driveUntil plumbing
+--   maxFrames, what             -- optional; driveUntil internals
 --   healPercent, fight          -- optional; the encounter driver's heal
 --                               -- threshold (55) and an option table
 --                               -- merged over it (M.fightDriverFor)
