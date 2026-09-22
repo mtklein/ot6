@@ -67,6 +67,20 @@ local terra, execd = nil, {}
 local pendAtTarget, bpAtTarget
 local ching, chingRef = 0, nil
 
+-- The battle item-menu row of a zero-cost restorative to spend the banking
+-- turn on (Tonic first, then Potion).  #143's mog-gear route unequips MOG's
+-- Mithril Pike/Shld into the bag ahead of the consumables, so the Tonic is no
+-- longer the top row: walk the cursor to it by id ($2686 is the menu-order
+-- battle bag, stride 5: +0 id, +3 count) rather than to row 0.
+local function bankItemRow()
+  for r = 0, 31 do
+    local id = H.readByte(0x2686 + r * 5)
+    if id == 0xFF then break end
+    if (id == 0xE8 or id == 0xE9) and H.readByte(0x2686 + r * 5 + 3) > 0 then return r end
+  end
+  return nil
+end
+
 -- bank one real Tonic turn (Locke defers with X); 6-on/24-off, because the
 -- item window refuses a faster edge train
 local mf = 0
@@ -89,7 +103,11 @@ local function bankDecide()
     else btn = (cur < want) and "down" or "up" end
   elseif s == ST_ITEM then
     local cur = H.readByte(0x8947 + terra) + H.readByte(0x894F + terra)
-    if cur > 0 then btn = "up" else btn = "a" end
+    local want = bankItemRow()
+    if want == nil then btn = "b"
+    elseif cur < want then btn = "down"
+    elseif cur > want then btn = "up"
+    else btn = "a" end
   elseif s == ST_TGT then
     btn = "a"
   else
