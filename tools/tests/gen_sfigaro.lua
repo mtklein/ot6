@@ -622,10 +622,89 @@ local function clearGate(probeX, probeY, tag)
   })
 end
 
--- allowGameOver: the cider-steal sweep deliberately survives a lost
--- battle 10 (#163); its aftermath ride reads H.gameOverFired as a loss
--- and the next attempt reloads.  (The gate-soldier ladder above, clearGate,
--- ends its ride on the wipe and reloads the same way.)
+-- A Steal fight on the Merchant enemy (battle 10, formation 43): talk into
+-- the fight, Steal (stealDriver R-R-R for the guaranteed tier), ride the
+-- aftermath, and assert the flag the steal's reaction script sets.  Retries
+-- up to 3 with L.spread on a loss, reloading a pre-talk blob.  Used for both
+-- of the leg's two fights: the Item Shop merchant (map 85 -> $0104, the
+-- merchant disguise) and the cider runner (map 78 -> $01D0, the cider).
+local function stealMerchant(obj, mapId, tag, stolenFlag)
+  local blob, stolen = nil, false
+  local function attempt(n)
+    local loadReq, wipedN, lostEarly = nil, 0, nil
+    return H.cond(function() return stolen end, {}, {
+      H.logStep(function() return string.format("%s: steal attempt %d at f%d", tag, n, H.frame) end),
+      n > 1 and seq({
+        H.call(function() loadReq = H.requestLoadState(blob) end),
+        H.waitFrames(2),
+        H.call(function() H.checkReq(loadReq, tag .. ": pre-talk reload"); H.gameOverFired = 0 end),
+        H.waitFrames(90),
+      }) or seq({}),
+      L.spread(n),
+      H.talkToObj(obj, tag),
+      (function()
+        local ph = 0
+        return H.driveUntil(function() return H.battleLoadStarted() end, 9000, {
+          H.call(function() ph = (ph + 1) % 8; H.setPad(ph < 4 and { "a" } or {}) end),
+        }, tag .. ": ride the scene into battle 10")
+      end)(),
+      H.release(),
+      H.waitUntil(function() return H.battleActive() end, 6000, tag .. ": battle 10 up", 10),
+      H.waitFrames(90),
+      H.call(function()
+        H.assertEq(H.formationHas({ [0x013A] = true }), true, tag .. ": formation 43 -- Merchant $13A")
+      end),
+      stealDriver(tag),
+      (function()
+        local ph, calm, waited = 0, 0, 0
+        return H.driveUntil(function()
+          wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
+          if (H.gameOverFired or 0) > 0 and not lostEarly then
+            lostEarly = string.format("GAME OVER at f%d", H.frame)
+          elseif wipedN >= 90 and not lostEarly then
+            lostEarly = string.format("PARTY WIPED at f%d", H.frame)
+          end
+          if lostEarly then return true end
+          local ok = H.hasControl() and H.tileAligned() and bright() >= 15
+                 and not H.battleLoadStarted() and not H.dialogWaiting() and map() == mapId
+          calm = ok and calm + 1 or 0; waited = waited + 1
+          return calm >= 20 or waited >= 20000
+        end, 20500, {
+          H.call(function()
+            ph = (ph + 1) % 8
+            if lostEarly or H.hasControl() then H.setPad({}); return end
+            H.setPad(ph < 4 and { "a" } or {})
+          end),
+        }, tag .. ": ride the aftermath out")
+      end)(),
+      H.release(),
+      H.waitFrames(30),
+      H.call(function()
+        stolen = lostEarly == nil and sw(stolenFlag) == 1 and map() == mapId and H.hasControl()
+        H.log(string.format("%s attempt %d: %04X=%d $1DD2=%02X map=%d -> %s", tag, n,
+          stolenFlag, sw(stolenFlag), H.readByte(0x1dd2), map(),
+          stolen and "STOLEN" or (lostEarly and ("LOST: " .. lostEarly) or "no steal; retrying")))
+      end),
+    })
+  end
+  return seq({
+    (function()
+      local req
+      return seq({
+        H.call(function() req = H.requestSaveState() end),
+        H.waitFrames(2),
+        H.call(function() H.checkReq(req, tag .. ": retry blob"); blob = req.blob end),
+      })
+    end)(),
+    attempt(1), attempt(2), attempt(3),
+    H.call(function()
+      H.assertEq(stolen, true, tag .. ": stolen within 3 attempts")
+    end),
+  })
+end
+
+-- allowGameOver: a lost steal survives as a counted loss and the next attempt
+-- reloads (#163); allowGameOver keeps the run alive for that reload.
 H.run({ maxFrames = 350000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(60),
@@ -635,31 +714,21 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
     H.assertEq(sw(0x0105), 1, "$0105 -- LOCKE's scenario is live")
     H.assertEq(sw(0x001E), 0, "$001E clear -- the scenario is not done")
   end),
-  -- LOCKE's kit for the three gate fights (#244).  He already CARRIES far
-  -- better gear than the Dirk this used to equip -- locke_scenario's bag holds
-  -- a MithrilBlade ($0A, battle power 38 vs the Dirk's 26), a HeavyShield
-  -- ($5B, def/mdef 22) and a PlumedHat ($6B, def/mdef 14/9) -- so this dresses
-  -- him in it (all three are LOCKE-equippable, checked against the item_prop
-  -- equip masks).  The HeavyShield is the load-bearing change: its +22 mdef
-  -- cuts the HeavyArmor's TekLaser from ~160 to a measured 123 and its Battle
-  -- from ~60 to ~48 (build/attempts/.../gear runs), which is what makes the
-  -- three fights survivable on the 2 Potions the route can carry.
+  -- STEP 0 (#244/#145): re-equip LOCKE.  The scenario strips his gear on
+  -- entry, but locke_scenario's bag still HOLDS his kit -- a MithrilBlade
+  -- ($0A), a MithrilShield ($5C, mdef 18, his best shield) and a PlumedHat
+  -- ($6B) -- so this puts it back on (all LOCKE-equippable per the item_prop
+  -- masks).  The whole leg is now two minor Steal fights (a trivialised
+  -- HeavyArmor is never fought), so this is about a clean, quick steal rather
+  -- than surviving the gate soldier.
   H.equipLoadout(1, {
-    { 0, 0x0A }, -- MithrilBlade (was Dirk)
-    { 1, 0x5B }, -- HeavyShield (was empty -- the survivability change)
-    { 2, 0x6B }, -- PlumedHat (was Leather Hat)
-    { 3, 0x84 }, -- LeatherArmor (the only body armor he carries)
-  }, { tag = "LOCKE occupied-town kit" }),
-
-  -- The back row halves the soldier's physical.  It does not win battle 11.
-  -- The note that used to sit here said front row, on a comparison that was
-  -- never run: "front and back measure identically" came from two runs with
-  -- no equipment, where LOCKE did eight damage either way because he was
-  -- punching.  The note that replaced it claimed the back row won the fight
-  -- ("shields 3 -> 0 three times over, 495 hp -> 0, LOCKE never below 112")
-  -- and that is falsified, so it is gone rather than left for contrast.
-
+    { 0, 0x0A }, -- MithrilBlade
+    { 1, 0x5C }, -- MithrilShield
+    { 2, 0x6B }, -- PlumedHat
+    { 3, 0x84 }, -- LeatherArmor (the only body armour he carries)
+  }, { tag = "LOCKE re-equipped from his bag" }),
   H.setRows({ [1] = true }, { tag = "locke solo rows" }),
+  L.watch(),   -- the two Steal fights share this seed sweep (retry spread)
   H.call(function()
     where("boot")
   end),
@@ -704,6 +773,22 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
     H.log(string.format("[shop] item shop done: tonic=%d potion=%d fenix=%d gil=%d f%d",
       H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0), H.gil(), H.frame))
   end),
+
+  -- ===================================================================== --
+  -- STEP 1 (#244): the mouthy merchant by the clock, map 85 obj 16 at
+  -- {103,51}, _ca85e6 -> battle 10 (formation 43, Merchant $13A).  Steal his
+  -- clothes -> $0104, the MERCHANT disguise that opens the grandson's basement
+  -- passage.  The Item Shop is in the entrance pocket, so this needs no fight
+  -- past the gate soldier.
+  -- ===================================================================== --
+  H.navTo(103, 53, { maxFrames = 12000, playBattles = true }),
+  H.release(),
+  stealMerchant(16, 85, "the Item Shop merchant", 0x0104),
+  H.call(function()
+    H.assertEq(sw(0x0104), 1, "$0104 -- wearing the merchant's clothes")
+    where("merchant disguise")
+  end),
+
   H.navTo(104, 57, { maxFrames = 20000, playBattles = true }),
   H.driveUntil(function() return map() == 75 end, 3000, {
     H.hold({ "down" }), H.waitFrames(8),
@@ -713,177 +798,58 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   H.call(function() where("item shop done") end),
 
   -- ===================================================================== --
-  -- BEAT 1: the soldier who bars the gate.  Map 75 npc 10 = obj 26, spawn
-  -- switch $030C, at {30,42}: _ca854f (event_main.asm:20296) opens
-  -- `dlg $0174 "Halt!"` + `battle 11, TOWN_EXT` -> formation 64,
-  -- HeavyArmor $09F.  He blocks the route: (30,42) is the only tile joining
-  -- the starting pocket to the rest of town, and BFS reaches exactly 107
-  -- tiles until he is gone.  The fight can be won any way (the clothes
-  -- branches belong to a different fight), and it is input-driven now: solo
-  -- LOCKE on boosted Fights, with the retry sweep around the engagement.
-  -- The probe tile is the cafe entry point the win must open.
+  -- BEAT 1 (#244/#145): the merchant-disguise bypass past the HeavyArmor.
+  -- The old man's house door, town (37,40) -> map 86 (36,22), is in the
+  -- reachable pocket.  Downstairs is the same-map warp (32,11) -> (9,8).
+  -- The grandson, map 86 obj 20 at {6,10}, runs _ca7bcd: with $0104 (the
+  -- merchant disguise, $0107 still clear) he takes _ca7bf8 -- "Merchant,
+  -- you may proceed" -- sets $01F0 and STEPS ASIDE (obj_script NPC_5 moves
+  -- him to (6,11)), opening the corridor WEST.  Walking out (4,4) -> town 75
+  -- (34,34) lands LOCKE WEST of the gate soldier, who is never touched.
+  -- (Measured in probe_boy_passage.lua.)
   -- ===================================================================== --
-  clearGate(22, 43, "B1 (open the town)"),
-  -- clearGate's own settled probe is this assertion (the gate is the only
-  -- thing between the pocket and (22,43)); this stop keeps the map check
-  -- and the switch dump, and re-reads the lane through the same settle
-  -- rather than taking a second one-frame sample of a live NPC layer.
-  laneSettles(22, 43, "the town opened: the cafe entry point"),
+  go(37, 40, 86, 36, 22, "B1 into the old man's house (town 37,40 -> map 86)"),
+  go(32, 11, 86, 9, 8, "B2 downstairs (same-map warp 32,11 -> 9,8)"),
+  H.navTo(7, 10, { maxFrames = 12000, playBattles = true }),
+  H.release(),
+  H.talkToObj(20, "the grandson (merchant gate -> steps aside)"),
+  (function()
+    local ph = 0
+    return H.driveUntil(function()
+      return H.hasControl() and not H.dialogWaiting() and not H.eventRunning()
+    end, 12000, {
+      H.call(function() ph = (ph + 1) % 8; H.setPad(ph < 4 and { "a" } or {}) end),
+    }, "ride the grandson's merchant dialog")
+  end)(),
+  H.release(), H.waitFrames(60),
   H.call(function()
-    H.assertEq(map(), 75, "still in town after battle 11")
-    where("town open")
+    H.assertEq(sw(0x01F0), 1, "$01F0 -- the grandson stepped aside (merchant)")
+    where("grandson stepped aside")
+  end),
+  go(4, 4, 75, 34, 34, "B3 out the west passage (4,4 -> town 75 (34,34), WEST)"),
+  H.call(function()
+    H.assertEq(map(), 75, "out to the WEST town, past the gate soldier -- no fight")
+    where("west town")
   end),
 
   -- ===================================================================== --
-  -- BEAT 2: the cafe's cider runner.  Map 78 npc 6 = obj 22 at {75,39},
-  -- behind the annex warp (33,46)->(74,43).  `battle 10, TOWN_INT` ->
-  -- formation 43, Merchant $13A (slot 1, $13B, is the b.day suit the steal
-  -- swaps him for).  Steal from him rather than killing him; see note 1.
+  -- BEAT 2: the cider runner (the leg's second and last Steal fight).  Map
+  -- 78 obj 22 at {75,39}, behind the annex warp (33,46)->(74,43).  battle 10
+  -- (formation 43, Merchant $13A) -> Steal -> $01D0 (the cider).  Reachable
+  -- now that LOCKE is in the west town.
   -- ===================================================================== --
   go(22, 42, 78, 26, 52, "C1 town (22,42) -> map 78 (26,52) [CAFE]"),
   go(33, 46, 78, 74, 43, "C2 map 78 (33,46) -> (74,43) [annex warp]"),
-  -- The steal has its own retry sweep: an attempt that ends the fight
-  -- without b_switch $4C (LOCKE down, or the fight won another way) reloads
-  -- the pre-talk blob and re-engages at a different frame phase.  The
-  -- formation assert still runs on every attempt.
-  (function()
-    local blob, stolen = nil, false
-    local function stealAttempt(n)
-      local loadReq
-      local wipedN, lostEarly = 0, nil
-      return H.cond(function() return stolen end, {}, {
-        H.logStep(function()
-          return string.format("cider steal attempt %d at f%d", n, H.frame)
-        end),
-        n > 1 and seq({
-          H.call(function() loadReq = H.requestLoadState(blob) end),
-          H.waitFrames(2),
-          H.call(function()
-            H.checkReq(loadReq, "cider: pre-talk reload")
-            -- the restored snapshot restarts the experiment: the canary's
-            -- count (and its pad freeze, which the reload thaws) belong
-            -- to the lost attempt (#163)
-            H.gameOverFired = 0
-          end),
-          H.waitFrames(90),
-        }) or seq({}),
-        L.spread(n),                     -- spread the battle RNG phase (#83)
-        H.talkToObj(22, "the cider runner"),
-        -- ride the two dialogs into the fight directly: advanceStory's
-        -- playBattles mode would blind-tap A in the fight, and A on the
-        -- resting cursor is FIGHT, which would kill the merchant
-        (function()
-          local ph = 0
-          return H.driveUntil(function() return H.battleLoadStarted() end, 9000, {
-            H.call(function()
-              ph = (ph + 1) % 8
-              H.setPad(ph < 4 and { "a" } or {})
-            end),
-          }, "the cider scene reaches battle 10")
-        end)(),
-        H.release(),
-        H.waitUntil(function() return H.battleActive() end, 6000,
-          "battle 10 up", 10),
-        H.waitFrames(90),
-        H.call(function()
-          H.assertEq(H.formationHas({ [0x013A] = true }), true,
-            "battle 10 is formation 43 -- Merchant $13A")
-          local w = H.formationWords()
-          H.log(string.format(
-            "battle 10: %04X %04X %04X %04X %04X %04X  $3EBD=%02X",
-            w[1], w[2], w[3], w[4], w[5], w[6], H.readByte(B_SWITCH_LIVE)))
-        end),
-        stealDriver("the cider runner"),
-        -- The aftermath ride is soft: on the steal the scene settles back on
-        -- map 78, and on a loss the game-over screen never settles.  A hard
-        -- timeout here would abort the whole generate instead of letting the
-        -- ladder reload and retry, so this ride gives up after its budget
-        -- and lets the $1DD2 check below decide.
-        -- #163: a lost battle 10 (LOCKE down) is a wipe, and a wipe zeroes
-        -- every battle-HP word, which battleLoadStarted() reads as "no
-        -- battle" -- so stealDriver ends on the first wiped frame and this
-        -- ride's A-taps would press into the Annihilated screen for the
-        -- rest of its 20000-frame budget.  The lib's wipe predicate held
-        -- 90 straight frames, or the run canary's count (it now counts a
-        -- 300-frame battle-side wipe as a game over and freezes the pad;
-        -- allowGameOver on the run keeps the sweep alive for the
-        -- reload), ends the ride as a named loss instead.
-        (function()
-          local ph, calm, waited = 0, 0, 0
-          return H.driveUntil(function()
-            wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
-            if (H.gameOverFired or 0) > 0 and not lostEarly then
-              lostEarly = string.format("GAME OVER counted by the canary " ..
-                "at f%d", H.frame)
-            elseif wipedN >= 90 and not lostEarly then
-              lostEarly = string.format("PARTY WIPED at f%d (the lib's " ..
-                "wipe predicate, 90 frames)", H.frame)
-            end
-            if lostEarly then return true end
-            local ok = H.hasControl() and H.tileAligned() and bright() >= 15
-                   and not H.battleLoadStarted() and not H.dialogWaiting()
-                   and map() == 78
-            calm = ok and calm + 1 or 0
-            waited = waited + 1
-            return calm >= 20 or waited >= 20000
-          end, 20500, {
-            H.call(function()
-              ph = (ph + 1) % 8
-              if lostEarly or H.hasControl() then H.setPad({}); return end
-              H.setPad(ph < 4 and { "a" } or {})
-            end),
-          }, "ride the steal's aftermath out (soft)")
-        end)(),
-        H.release(),
-        H.waitFrames(30),
-        H.call(function()
-          stolen = lostEarly == nil and (H.readByte(0x1dd2) >> 4) & 1 == 1
-            and map() == 78 and H.hasControl()
-          H.log(string.format("cider attempt %d: $1DD2=%02X map=%d -> %s", n,
-            H.readByte(0x1dd2), map(),
-            stolen and "STOLEN" or (lostEarly and ("LOST: " .. lostEarly ..
-              "; retrying") or "no steal; retrying")))
-        end),
-      })
-    end
-    return seq({
-      (function()
-        local req
-        return seq({
-          H.call(function() req = H.requestSaveState() end),
-          H.waitFrames(2),
-          H.call(function()
-            H.checkReq(req, "cider: retry blob")
-            blob = req.blob
-          end),
-        })
-      end)(),
-      L.watch(),
-      stealAttempt(1), stealAttempt(2), stealAttempt(3),
-      L.report(),
-      H.call(function()
-        H.assertEq(stolen, true,
-          "the clothes were STOLEN within 3 attempts")
-      end),
-    })
-  end)(),
+  stealMerchant(22, 78, "the cider runner", 0x01D0),
   H.call(function()
-    where("after the steal")
-    H.log(string.format("post-fight $1DD2=%02X (b_switch $4C=%d $4D=%d)",
-      H.readByte(0x1dd2), (H.readByte(0x1dd2) >> 4) & 1,
-      (H.readByte(0x1dd2) >> 5) & 1))
-    H.assertEq((H.readByte(0x1dd2) >> 4) & 1, 1,
-      "b_switch $4C -- the steal's reaction script fired")
+    where("after the cider")
     H.assertEq(sw(0x01D0), 1, "$01D0 -- took the old man's cider")
-    H.assertEq(sw(0x0104), 1, "$0104 -- wearing the merchant's clothes")
-    H.assertEq(sw(0x0103), 0, "$0103 clear -- not the soldier's uniform")
+    H.assertEq(sw(0x0104), 1, "$0104 -- still wearing the merchant's clothes")
   end),
-
-  -- back out of the annex and into town
   go(75, 42, 78, 34, 45, "C3 map 78 (75,42) -> (34,45) [annex warp back]"),
   go(26, 53, 75, 22, 44, "C4 map 78 (26,53) -> town (22,44)"),
   H.call(function()
-    H.assertEq(map(), 75, "back in South Figaro")
+    H.assertEq(map(), 75, "back in South Figaro (west)")
     where("sfigaro_town")
     for c = 0, 15 do
       if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
@@ -901,26 +867,14 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   end),
 
   -- ===================================================================== --
-  -- BEAT 3: the cider buys the old man's story.  Map 86 npc 1 = obj 17 at
-  -- {28,17}, reached only through town (37,40) -> map 86 (36,22).  The
-  -- room has one outside door and one same-map warp, and the warp only
-  -- leads to the (9,8) landing and back.  _ca7b88 (:18670) takes the
-  -- $01D0 branch _ca7bae: "there is one that leads to the rich man's
-  -- house... give my grandson the password", ending `switch $0107=1`.
-  -- The walk there is broken into hops (note 4): (22,44) -> (37,41) is a
-  -- 49-step query and it is the one that runs the BFS cap dry.
+  -- BEAT 3: give the old man his cider.  He is map 86 obj 17 at {28,17} in
+  -- the old-man region; from the west town, re-enter the grandson region
+  -- (town 34,35 -> map 86 (4,6)) -- the grandson is stepped aside now -- and
+  -- take the warp (10,7) -> (33,10) back into the old-man region.  _ca7b88's
+  -- $01D0 branch names the passage and sets $0107.
   -- ===================================================================== --
-  hop(19, 44, "W1 west along the canal"),
-  hop(19, 34, "W2 north to the main street"),
-  hop(24, 34, "W3 east along the main street"),
-  hop(30, 36, "W4 to the top of the SE lane"),
-
-  clearGate(30, 43, "R1 (into the SE quarter)"),
-  hop(30, 43, "W5 down the SE lane"),
-  hop(34, 43, "W6 east"),
-  hop(34, 46, "W7 south"),
-  hop(36, 46, "W8 to the old man's entry point"),
-  go(37, 40, 86, 36, 22, "E1 town (37,40) -> map 86 (36,22)"),
+  go(34, 35, 86, 4, 6, "E1 town (34,35) -> map 86 (4,6) [grandson region]"),
+  go(10, 7, 86, 33, 10, "E2 warp (10,7) -> (33,10) [old-man region]"),
   talkThrough(17, "the old man (cider -> $0107)"),
   H.call(function()
     where("after the old man")
@@ -928,23 +882,19 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   end),
 
   -- ===================================================================== --
-  -- BEAT 4: the grandson and the password.  Map 86 npc 4 = obj 20 at
-  -- {6,10}, in the other map-86 house, the one town (34,35) enters at
-  -- (4,6), so this is out to town and back in, not a warp.  _ca7bcd
-  -- (:18738) tests $0107 before the "you may proceed" branch, so with the
-  -- old man already told, one conversation goes straight to the prompt.
+  -- BEAT 4: the grandson and the password.  Back down the warp (32,11)->(9,8)
+  -- to obj 20; with $0107 set, _ca7bcd goes straight to the password prompt.
+  -- Pick 1 = "Courage"; 0/2 jump to _ca7c28 "Imperial spy!" -> the scenario
+  -- reset.  Sets $01F1 and rewrites (4,15) from wall to the passage stair.
   -- ===================================================================== --
-  go(36, 23, 75, 37, 42, "E2 map 86 (36,23) -> town (37,42)"),
-  hop(34, 43, "W9 back west across the SE quarter"),
-  -- and back out of the SE quarter, so the same soldier is in the way again
-  clearGate(34, 35, "R2 (out of the SE quarter)"),
-  go(34, 35, 86, 4, 6, "E3 town (34,35) -> map 86 (4,6)"),
+  go(32, 11, 86, 9, 8, "E3 back downstairs (warp 32,11 -> 9,8)"),
+  H.navTo(7, 10, { maxFrames = 12000, playBattles = true }),
+  H.release(),
   talkThrough(20, "the grandson (the password)", {
     { want = 1, max = 3, what = 'dlg $00E0 "The password is..." -- 1 = ' ..
       '"Courage".  Options 0 ("Rose bud") and 2 ("Failure") BOTH jump to ' ..
       '_ca7c28, "You are an Imperial spy!", which fades out and calls ' ..
-      '_ca85ba -- the scenario reset that dumps LOCKE back on (47,43) with ' ..
-      'both disguise switches cleared (event_main.asm:18754-18762)' },
+      '_ca85ba -- the scenario reset (event_main.asm:18754-18762)' },
   }),
   H.call(function()
     where("after the password")
@@ -980,4 +930,5 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   H.logStep(function()
     return string.format("sfigaro_passage generated at frame %d", H.frame)
   end),
+  L.report(),
 })
