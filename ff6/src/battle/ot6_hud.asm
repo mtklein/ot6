@@ -964,7 +964,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ; row: the MP number, the grey and the A-button's refusal all read
         ; spell-list byte 3, which Ot6FoldPrices rewrites off this same
         ; pending value, and the enabled bits are then re-derived from it by
-        ; vanilla's own UpdateEnabledMagic, which Ot6FoldPrices hangs off.
+        ; vanilla's own UpdateEnabledMagic, which Ot6FoldPrices hooks into.
         ;
         ; Called directly rather than through vanilla's $3204 bit-7 request:
         ; that request is consumed in AfterAction2, "update targets after

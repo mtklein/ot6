@@ -157,7 +157,7 @@ OT6_QMARK := $bf                ; '?' glyph (unrevealed weakness slot)
 ;
 ; What it costs, per menu open: eight tiles.  The 4bpp pass writes 8 data
 ; words + 8 zero words each = 128 word writes; the 2bpp pass 8 each = 64.
-; The font expansions they hang off write 4096 and 3072 words respectively
+; The font expansions they hook into write 4096 and 3072 words respectively
 ; (and LoadFontGfx4bpp then streams 2048 more for WindowGfx before our hook
 ; runs at all), so this is +3.1% and +2.1% of an upload already happening, and
 ; +2.1% of LoadFontGfx4bpp end to end.  All of it in the same forced-blank
@@ -171,7 +171,7 @@ OT6_QMARK := $bf                ; '?' glyph (unrevealed weakness slot)
 ; and 6 (name change, SwdTech rename) call LoadFontGfx4bpp without
 ; LoadFontGfx2bpp (menu_gfx.asm:52,108), so a single proc writing $6000 as
 ; well would overwrite whatever else those types put there.  Each entry
-; patches only the copy the loader it hangs off has just laid down.
+; patches only the copy the loader it hooks into has just laid down.
 ;
 ; ------------------------------------------------------------------------------
 

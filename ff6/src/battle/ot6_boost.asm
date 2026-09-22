@@ -86,7 +86,7 @@
         sta     f:$7e0000+OT6_HPMARK+2  ;   and 0 reads as "has not acted in
         sta     f:$7e0000+OT6_HPMARK+4  ;   this battle" in Ot6Retaliate.  A
         sta     f:$7e0000+OT6_HPMARK+6  ;   stale line from the last battle
-                                        ;   would read as a grudge nobody
+                                        ;   would read as a retaliation tally nobody
                                         ;   earned, so it is cleared here and
                                         ;   not left to the shadow loop above,
                                         ;   which stops at $ed61
@@ -172,7 +172,7 @@
         lda     $3bf4,x         ;   turn ends is the line a later hit is
         sta     f:$7e0000+OT6_HPMARK,x  ;   measured against.  Drawn on both
         shorta0                 ;   arms and on every character turn, so the
-                                ;   grudge is always "since I last swung"
+                                ;   retaliation tally is always "since I last swung"
         txa                     ; the live pip cell follows this actor
         lsr                     ;   entity offset -> character slot
         sta     f:$7e0000+OT6_PIPSLOT
@@ -476,7 +476,7 @@ done:   rtl
 ;   when  -- OT6_HPMARK, the hp it stood on when its OWN last turn ended.
 ;            "Got hit" is IT STANDS LOWER THAN THAT.  A miss changes
 ;            nothing, a connect for 0 changes nothing, and several small
-;            hits add up to one grudge -- which is what "hurt them and they
+;            hits add up to one retaliation tally -- which is what "hurt them and they
 ;            hit back harder" means at the screen.  The first shape of this
 ;            was a flag set on ApplyDmgHP's damage-taken arm;
 ;            battle_trueknight's frame-budget canary measured that site as
@@ -493,13 +493,13 @@ done:   rtl
 ;
 ; A player's own boost wins: a nonzero pending here was bought with an R
 ; press (or a Slot commit, or a SwdTech confirm) and is left exactly alone.
-; An empty bank dumps nothing and leaves the grudge standing, so the actor
+; An empty bank dumps nothing and leaves the retaliation tally standing, so the actor
 ; hits back on the first turn it has anything to hit back with.
 ;
 ; WHO ELSE REACHES THIS, recorded so it is not rediscovered:
 ;
 ;   * Umaro's four arms (#237).  Only the last of UmaroAttackTbl's slots is
-;     FightAttack, so a dump that hung off Ot6FightBoost alone reached his
+;     FightAttack, so a dump that hooked into Ot6FightBoost alone reached his
 ;     plain swing (158 of 253 relic-less rolls, RandBitRateTbl row 0) and
 ;     none of Throw, Storm or Charge.  Ot6UmaroRetaliate arms it at his
 ;     chooser, before the roll, and each arm delivers it its own way (see
@@ -509,7 +509,7 @@ done:   rtl
 ;   * An AI-SCRIPTED character (#238) -- CYAN in the Doma courtyard defence,
 ;     and any set piece that drives a party member from a script.  QueueAction
 ;     sends it to ExecMonsterAction before it ever reaches the no-pending-
-;     action arm, so it never passes RandCharAction; Ot6UnctlMark hangs off
+;     action arm, so it never passes RandCharAction; Ot6UnctlMark hooks into
 ;     ExecMonsterAction's head as well, and the script's plain Fight then
 ;     arrives here like anyone else's (battle_retaliate_script.lua).  A
 ;     SwdTech the script picks instead carries no dump, as no non-Fight
@@ -532,7 +532,7 @@ done:   rtl
         beq     out                     ; ...and is this one of them?
         lda     OT6_BP_CLASS,x
         beq     out                     ; an empty bank spends nothing, and
-                                        ;   must not eat the grudge: the dump
+                                        ;   must not eat the retaliation tally: the dump
                                         ;   waits for the first pip
         longa
         lda     f:$7e0000+OT6_HPMARK,x  ; where it stood when its own last
@@ -646,7 +646,7 @@ out:    longa
 
 ; #237.  jsl from the head of _163b (battle_main.asm), the chooser Cmd_06
 ; sends Umaro to instead of FightAttack.  Only the last of UmaroAttackTbl's
-; four slots is FightAttack, so a dump that hung off Ot6FightBoost alone
+; four slots is FightAttack, so a dump that hooked into Ot6FightBoost alone
 ; reached his plain swing and none of Throw, Storm or Charge; arming it
 ; here, before the roll, reaches all four.
 ;

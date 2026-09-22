@@ -36,7 +36,7 @@
 --      spend: pending = 3 (the bank is 5, the spend caps at 3), $3a70 = 7,
 --      the loop runs 8 passes, a one-weapon character lands 4 of them, and
 --      Ot6ActionEnd charges 3 off the bank, leaving 2.
---   C. the grudge is CONSUMED.  The dump is armed while he stands BELOW
+--   C. the retaliation tally is CONSUMED.  The dump is armed while he stands BELOW
 --      the hp line his own last turn drew (OT6_HPMARK), and the same frame
 --      moves that line down to where he stands, so one hurt buys one dump
 --      and the next needs a new hit.
@@ -88,7 +88,7 @@ local L = {
 }
 -- the ONE action under the microscope: opened by the ROM's own dump write
 -- (which happens inside Ot6FightBoost, before it touches $3a70) and closed
--- by SaveForMimic -- battle_hits.lua's window, hung off the dump
+-- by SaveForMimic -- battle_hits.lua's window, hooked into the dump
 local W = { open = false, closed = false, swings = 0, hits = 0,
             hand = { [0] = 0, [1] = 0 }, bank = nil }
 
@@ -164,7 +164,7 @@ H.run({ maxFrames = 150000 }, {
     --    never queues a player command, never leaves $32cc valid, and
     --    therefore reaches QueueAction's no-pending-action arm -- which,
     --    with no Dance, Rage or Magitek status, is `jsr RandCharAction`,
-    --    the one site Ot6UnctlMark hangs off.
+    --    the one site Ot6UnctlMark hooks into.
     -- 2. His action script does NOT route wholly through FightAttack.
     --    UmaroAttackTbl has four entries and exactly ONE of them is
     --    FightAttack; the other three (Throw, Storm, Charge) are his own
@@ -235,7 +235,7 @@ H.run({ maxFrames = 150000 }, {
       "OT6_UNCTL starts the battle clear (InitBP)")
     H.assertEq(H.readWord(D.mark), 0,
       "the subject's hurt line starts the battle at 0 = 'has not acted' "
-      .. "(InitBP), so nothing stale can read as a grudge")
+      .. "(InitBP), so nothing stale can read as a retaliation tally")
 
     -- the subject's armed hands, READ off his character record
     local c = H.readByte(0x3ED8 + SUBJ * 2)
@@ -298,7 +298,7 @@ H.run({ maxFrames = 150000 }, {
 
     -- and every write to his hurt line: Ot6ActionEnd draws it at the end of
     -- each of his turns, and Ot6Retaliate moves it down when it spends a
-    -- grudge.  The dump callback below necessarily still sees the OLD line,
+    -- retaliation tally.  The dump callback below necessarily still sees the OLD line,
     -- because Ot6Retaliate arms the pending byte after it moves the line --
     -- so both halves are read here, from the writes themselves.
     -- a 16-bit store fires this once per byte, so the cell is re-read
@@ -521,7 +521,7 @@ H.run({ maxFrames = 150000 }, {
         return #t > 0 and table.concat(t, " ") or "none"
       end)()))
     H.assertEq(moved.v < d.mark, true, string.format(
-      "the line fell from %d to %d: the grudge was spent, not re-armed",
+      "the line fell from %d to %d: the retaliation tally was spent, not re-armed",
       d.mark, moved.v))
     H.assertEq(#L.dumps <= L.hurts, true, string.format(
       "%d dump(s) over %d hp drop(s): a dump is never conjured out of a "

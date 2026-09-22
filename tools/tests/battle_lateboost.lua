@@ -2,7 +2,7 @@
 -- battle_lateboost: where the boost window closes.
 --
 -- During target select, boosting is legal and fully effective: DESIGN.md
--- prices boost "when confirming an action", and Ot6QueueFold hangs off
+-- prices boost "when confirming an action", and Ot6QueueFold hooks into
 -- CreateAction, which runs after target select, so the tier folds, the
 -- points are charged, and tier damage lands.  After the target is
 -- confirmed, points must not be taken: CreateAction has already frozen

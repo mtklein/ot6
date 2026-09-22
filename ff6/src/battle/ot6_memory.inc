@@ -311,7 +311,7 @@ OT6_UNCTL            := $ed97
 ;
 ; It also reads better in play than a damage flag: a character is provoked
 ; while it stands worse off than when it last swung, so several small hits
-; add up to one grudge, and an ally who heals it back up has genuinely
+; add up to one retaliation tally, and an ally who heals it back up has genuinely
 ; un-provoked it.
 OT6_HPMARK           := $ed98   ; 8 bytes (4 characters, stride 2)
 OT6_BREAK_FLASH      = $18      ; 24 frames: three 4-frame pulses (see
