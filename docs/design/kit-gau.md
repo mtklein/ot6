@@ -21,7 +21,7 @@ at Rage-start, following the Dance model; and boost buys certainty on the coin
 | SRAM | **8 bytes at `$1e1f-$1e26`**, the same save-block scrap the Bushido word lives in; zero-sentinel = AUTO; **no `persistent_layout` bump, zero checkpoints regenerated** (§4, the tradeoff table) |
 | Battle read | one choke point: `InitSkills`' `$257e` list build (`battle_main.asm:14659-14679`) filters through the loadout; the vanilla Rage window, cursor, scroll and confirm are untouched (§3). **AUTO truncates to eight as well, so the full list is not reachable by inaction (§8.0)** |
 | MP | **flat 8 MP at Rage-start**, whole-battle possession, mid-trance turns free; one price rule for both possess-verbs (Rage and Dance) (§5) |
-| Boost | 0 BP vanilla coin; 1 BP special ¾; 2 BP special 15/16; 3 BP the special **every turn for the whole trance**, stored in a flag at `Cmd_10`, the Slot flag pattern (§6) |
+| Boost | 0 BP vanilla coin; 1 BP special ¾; 2 BP special 15/16; 3 BP the special **every turn for the whole trance**, stored in a flag at `Cmd_10`, the Slot flag pattern (§6). The coin is the whole purchase: no damage multiplier and no extra swings (§6.2) |
 | Boosted Leap | **no rider**: Leap's learn step has no roll to convert; it re-opens if the return roll is located and playtesting shows a need for it (§6.3). **Leap is free** (§5) |
 
 ---
@@ -272,17 +272,52 @@ The roll hook replaces `RandRage`'s `jsr RandCarry / rol` pick
   Measured in v0.21 (`probe_rage_boost`): that `lda $b5 / cmp #$10` gate
   never saw a Rage.  `Cmd_10` runs the beast's attack through `_c21554`, which
   sets `$b5` to the attack's own command (`$02` for a spell, `$0c` for a
-  lore-range special) before any damage, so every build from the gate's
-  landing through v0.21's candidates multiplied the start turn's special
-  (a boost-3 `$9F` special: `797->6376`).  The exemption now reads the
-  queued command, `$3a7c = $10`; the `$b5` entry stays because it is the one
-  the price gate reads.  `battle_procboost` asserts it.
+  lore-range special) before any damage, so the start turn's special was
+  multiplied on every build measured: v0.20 (ROM b7bb855b), f0484b6f and
+  95fc3f30 each logged a boost-3 `$9F` special at `797->6376`
+  (`build/attempts/wt-boost-payoff/lab/throwboost/rage_v020.log`,
+  `rage_f0484b6f.log` and `rage_final.log` in that directory, each run from
+  the f0484b6f `gau_joined` snapshot, as their own STALE warnings say).  The
+  one exception was a special that is itself a tier-family spell: v0.20's
+  tier test read the queued attack alone, so Poison (`$03`) went unmultiplied
+  there (`special $03 ... 498->498`, `rage_v020.log`), by accident rather than
+  by the `$10` gate, and 95fc3f30's test, which also reads the queued
+  command, multiplied it (`498->3984`, `rage_final.log`).  The exemption now
+  reads the queued command, `$3a7c = $10`; the `$b5` entry stays because it is
+  the one the price gate reads.  `battle_procboost` asserts it.
+- **`Ot6FightBoost` gates the same queued command** (v0.21): a Rage buys no
+  extra swings.  A beast whose special is the physical "Special" (`$EF`) runs
+  it through `FightAttack`, because `GetCmdForAI` maps attacks `$EE-$EF` to
+  command `$00` (`AttackForAITbl` / `CmdForAITbl`, `battle_main.asm`), and
+  `Ot6FightBoost` gave it Fight's two swings per pending pip: a 3-BP
+  Rage-start bought the certain special *and* six more passes of it.
+  Measured on 8032a150 with `gau_joined` regenerated on it: `rage entry 4 ...
+  beast $19 (special $EF) ... ; Ot6FightBoost: 3a7c=$10 3a7d=$EF p3 3a70
+  1->7`, and four damage calls where the passes landed
+  (`build/lab/ragenoswings/procboost_red_8032.log`, retained as
+  `build/attempts/<branch>/lab/ragenoswings/procboost_red_8032.log`; the same
+  four calls in `rage_final.log` and `rage_v020.log`).  Four of the eight
+  rages at `gau_joined` are that class (Lobo, Hornet, Trilobiter, Exocite),
+  exactly the four the Rage row used to skip.  The test
+  `lda $3a7c / cmp #$10 / beq done` sits ahead of both the pending read and
+  the retaliation dump (#236), so a Rage turn keeps `FightAttack`'s vanilla
+  count whoever armed the byte, and the pips are still charged by
+  `Ot6ActionEnd` exactly as for a spell special: the coin was the purchase.
+  `battle_procboost` plays every learned rage at boost 3 and asserts `$3a70`
+  is where `FightAttack` put it; with the gate, the same cell reads
+  `Ot6FightBoost: 3a7c=$10 3a7d=$EF p3 3a70 1->1 ; bank 3->0 pending 0, mp
+  95->87`, one damage call
+  (`build/lab/ragenoswings/green/suite_battle_procboost.log`, retained the
+  same way).
 - **Mid-trance turns touch no boost machinery**: no fold, no
-  multiplier, and no `Ot6ActionEnd` consumption beyond vanilla's. A possessed
-  Gau has no menu, so no pending boost arises on his auto-turns; BP he regens
-  during the trance banks and cannot be spent until the next battle's
-  Rage-start (§10.8, a real cost, and similar to how Cyan banks BP for a later
-  purchase).
+  multiplier, no swings, and no `Ot6ActionEnd` consumption beyond vanilla's. A
+  possessed Gau has no menu, so no pending boost arises on his auto-turns; BP
+  he regens during the trance banks and cannot be spent until the next
+  battle's Rage-start (§10.8, a real cost, and similar to how Cyan banks BP
+  for a later purchase).  An engine-driven Gau (berserk, muddle, charm and the
+  Colosseum can pick Rage through `RandCharAction`) does not dump his bank on
+  a rage turn either: `Ot6FightBoost`'s Rage test comes before
+  `Ot6Retaliate`.
 
 Deterministic A/B evidence follows the `battle_slots.lua` discipline
 (`tools/tests/battle_slots.lua:28-50`): same drive, one pending byte
@@ -459,8 +494,8 @@ drawn at col 2 under a cursor at `x = 8` puts the sprite on the leading glyph.
    The 8 is flat at **every** boost level: #219 made a boost cost 2.5× per
    level, and the owner then exempted the chance verbs (2026-09-17). Rage is
    one of them — cmd `$10` is in `Ot6BoostDmg`'s gate, so the boost buys the
-   trance's coin rather than a multiplier, and the BP it costs is what pays
-   for that certainty. Dance shares the same base 8 (`Ot6RageCost`
+   trance's coin rather than a multiplier (or `FightAttack`'s swings, §6.2),
+   and the BP it costs is what pays for that certainty. Dance shares the same base 8 (`Ot6RageCost`
    tail-calls `Ot6DanceCost`) and *does* escalate, because cmd `$13` is not
    in the gate; that pair is the rule in two rows. One payment still funds
    the whole trance; every possessed turn after the start stays free. See
@@ -477,7 +512,11 @@ drawn at col 2 under a cursor at `x = 8` puts the sprite on the leading glyph.
      `jsr RandCarry / rol`: tier 0 → vanilla coin; 1/2 → threshold compare
      (`$40`/`$10`); 3 → force entry 1.
    - `Ot6BoostDmg`: `cmp #$10 / beq done` beside the `$0f` gate
-     (`ot6_kits.asm:1215-1224`).
+     (`ot6_kits.asm:1215-1224`), and the queued-command test
+     `lda $3a7c / cmp #$10 / beq done` that actually exempts a Rage (§6.2).
+   - `Ot6FightBoost`: the same queued-command test ahead of its pending read,
+     so a physical Special (`$EF`, run through `FightAttack`) takes no extra
+     swings (§6.2).
 6. **Field menu** — `SkillsOption_05` (`field_menu.asm:1323`) is repointed
    under `.if LANG_EN` to a `MENU_STATE` twin of `$7b`
    (`field_menu.asm:2694-2716`): `cursor_prop {2, 4}` over the odd-row
