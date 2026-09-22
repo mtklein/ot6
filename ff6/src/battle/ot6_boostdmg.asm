@@ -22,7 +22,9 @@
 ; cannot see it, because Cmd_10 runs the beast's attack through _c21554, which
 ; sets $b5 to that attack's own command ($02 for a spell, $0c for a lore
 ; range special) before any damage while the start turn's boost is still
-; pending; so the test is on the queued command, $3a7c = $10.
+; pending; so the test is on the queued command, $3a7c = $10.  Ot6FightBoost
+; makes the same test, so a physical Special ($ef, which runs as command $00
+; through FightAttack) takes no extra swings either.
 ;
 ; A weapon's own on-hit spell is not multiplied (owner ruling, v0.21): a
 ; boosted Fight buys extra swings, and the spell a weapon casts off one of

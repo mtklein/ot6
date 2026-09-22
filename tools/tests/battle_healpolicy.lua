@@ -185,8 +185,10 @@ H.run({ maxFrames = 3000 }, {
       return t
     end
     -- Ot6FightBoost's arithmetic tail: `clc / adc $3a70 / sta $3a70`,
-    -- preceded by the shifts that scale the pending BP.
-    local fb = romBytes(FB, 32)
+    -- preceded by the shifts that scale the pending BP.  40 bytes, the
+    -- window battle_retaliate*.lua read: the proc's gates grew past 32 when
+    -- a queued Rage stopped buying swings (kit-gau.md §6.2).
+    local fb = romBytes(FB, 40)
     local tail = nil
     for i = 1, #fb - 6 do
       if fb[i] == 0x18 and fb[i + 1] == 0x6D and fb[i + 2] == 0x70
