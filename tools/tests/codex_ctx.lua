@@ -140,14 +140,14 @@ end
 -- party member can newly reveal, that member delivers it (Fight for a
 -- weapon-class match, the Pummel list walk for the blitz class) at that
 -- monster, the other characters Defend, and Gau -- who has no Fight row to
--- swap into Def -- burns his turn on a Tonic; when nothing present is
+-- swap into Def -- hands his window on with X; when nothing present is
 -- teachable, the library's full-kit driver finishes the battle (see
 -- battlePulse's modes).  All of it is read from the battle's own seeded
 -- state (weak mask $3e9c+off, revealed bits $3e9d+off), so nothing here
 -- pins a species id.
-local ST_TOOLS, ST_ITEM = 0x30, 0x0A
+local ST_TOOLS = 0x30
 local CMD_FIGHT, CMD_ITEM, CMD_BLITZ = 0x00, 0x01, 0x0A
-local ITEMLIST, PUMMEL, PUMMEL_COST, TONIC = 0x4005, 0x5D, 4, 0xE8
+local ITEMLIST, PUMMEL, PUMMEL_COST = 0x4005, 0x5D, 4
 local WEAPCLASS = H.sym("Ot6WeapClassTbl") & 0x3FFFFF
 -- an ability's class byte, the scan Ot6SkillClass makes: (id, class)
 -- pairs, $ff-terminated, absent = classless
@@ -170,13 +170,6 @@ local function cmdCellOf(slot, cmd)
   return nil
 end
 local function mpOf(slot) return H.readWord(0x3C08 + slot * 2) end
-local function battleBagIdxOf(id)
-  for i = 0, 251 do
-    if H.readByte(0x2686 + i * 5) == id
-       and H.readByte(0x2686 + i * 5 + 3) > 0 then return i end
-  end
-  return nil
-end
 local function canTeach(cls)
   for m = 0, 5 do
     if H.readByte(0x3aa8 + m * 2) % 2 == 1 then
@@ -253,8 +246,8 @@ local function monsterHp(sp) return H.readRomWord(MONPROP + sp * 32 + 8) end
 --     Ot6VeldtRow rewrites his Fight row to Leap.
 --   * "blitz": a Blitz row, Pummel known ($1d28 bit 0) and its MP.
 -- The command build has other rewrites (a relic's Fight -> Jump, say)
--- that this does not model; the first write battle checks the prediction
--- against the battle's own command table (see `teacherSeen`).
+-- that this does not model; every write battle checks the prediction
+-- against the battle's own command table (see `predictionHeld`).
 local function fieldTeachers()
   local out = {}
   local active = H.readByte(0x1A6D) & 0x07
@@ -321,7 +314,18 @@ local function writeCandidates(teachers)
   return out
 end
 local writeChoice = nil                 -- the chosen candidate, set in step 2
-local teacherSeen = false               -- a teacher at any command menu this battle
+-- The prediction, judged once a write battle's seed has settled
+-- (judgePrediction): with the chosen species on stage and its chosen bits
+-- still open, does the battle's own command table give some seated member
+-- a row that teaches them (HP aside: a teacher felled early is the fight's
+-- luck, not the model's error)?  true/false, or nil when the species was
+-- not on stage to judge.
+local predictionHeld = nil
+-- Set once a battle's seed has settled (settleSeed below): the species
+-- words, masks and command tables read before it can be half-written.
+-- Measured: an open-menu gate ($7BCA, already nonzero as the battle loads)
+-- read f21's slot 2 as weak=00 sh=0/0 beside its seeded twin in slot 3.
+local seeded = false
 -- Per-battle diagnostics: the [dbg] seeded-state dump, the [steer] role
 -- log, and the per-battle attack-class tally.
 local lastActor, mfM = nil, 0
@@ -337,8 +341,8 @@ end, emu.callbackType.write, 0x7e57b8, 0x7e57b8)
 --             it can newly reveal: that teacher Fights (or Pummels) with
 --             the target cursor steered onto the teachable monster, the
 --             bystanders Defend, and a bystander with no Fight row (Gau,
---             whose Fight row is Leap on the Veldt) burns the turn on a
---             Tonic, or hands the window on with X when the bag has none;
+--             whose Fight row is Leap on the Veldt) hands the window on
+--             with X;
 --   "finish"  nothing on stage is left to teach (taught, or never
 --             teachable): the library's full-kit fight driver wins the
 --             battle -- items, heals, revives, tactical skills, one healer
@@ -356,7 +360,8 @@ local function battleReset()
   dbgLogged = false
   steerLogged = {}
   atkSeen = {}
-  teacherSeen = false
+  predictionHeld = nil
+  seeded = false
   mode, finisher, chosenRole = "teach", nil, {}
   tapNo, tapAt = -1, 0
 end
@@ -390,20 +395,69 @@ local function walkToCell(a, cell, hold)
   if cur ~= cell then btn = (cur < cell) and "down" or "up" end
   H.setPad(hold and { [btn] = true } or {})
 end
+local function judgePrediction()
+  local open = nil                      -- the chosen bits the seed left open
+  for m = 0, 5 do
+    if H.readByte(0x3aa8 + m * 2) % 2 == 1
+       and H.readWord(0x57C0 + m * 2) == writeChoice.sp then
+      local off = 8 + m * 2
+      open = H.readByte(0x3e9c + off) & ~H.readByte(0x3e9d + off)
+        & writeChoice.bits
+    end
+  end
+  if open ~= nil then
+    predictionHeld = false
+    for s = 0, 3 do
+      if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
+        if cmdCellOf(s, CMD_FIGHT) ~= nil and attackClassOf(s) & open ~= 0 then
+          predictionHeld = true
+        end
+        if cmdCellOf(s, CMD_BLITZ) ~= nil and mpOf(s) >= PUMMEL_COST
+           and PUMMEL_CLASS & open ~= 0 then
+          predictionHeld = true
+        end
+      end
+    end
+  end
+  H.log(string.format("[ctx] seeded: species $%03X %s; a seated member's "
+    .. "row can teach them: %s", writeChoice.sp,
+    open == nil and "not on stage"
+      or string.format("on stage with chosen bits %02X still open", open),
+    tostring(predictionHeld)))
+end
+-- A battle's seed, settled: the monsters populate, their alive bits land,
+-- then 90 frames with the pad released (the read half's settle), and only
+-- then is anything read off the seeded tables.
+local function settleSeed(tag)
+  return H.repeatN(1, {
+    H.call(function() H.setPad({}) end),
+    H.waitUntil(function() return H.monstersPresent() > 0 end, 1200,
+      tag .. ": monsters populate", 5),
+    H.waitUntil(function()
+      for slot = 0, 5 do
+        if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then return true end
+      end
+      return false
+    end, 900, tag .. ": alive bits seed", 5),
+    H.waitFrames(90),
+    H.call(function() seeded = true end),
+  })
+end
 local fightSpecies = {}
 local function battlePulse()
   if H.monstersPresent() > 0 then
+    -- species and the [dbg] dump are read once the seed has settled; a
+    -- word past the species range is not a species (measured: $5554 and
+    -- $5958 turn up in alive slots even after the settle) and is dropped
     local anyAlive = false
     for s = 0, 5 do
       if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
         anyAlive = true
-        fightSpecies[H.readWord(0x57C0 + s * 2)] = true
+        local sp = H.readWord(0x57C0 + s * 2)
+        if seeded and sp < 0x180 then fightSpecies[sp] = true end
       end
     end
-    -- dumped at the first open command menu, not the first alive bit:
-    -- the seed walks the slots after the alive bits land, so an earlier
-    -- dump reads a slot's species and masks before they are written
-    if anyAlive and not dbgLogged and H.readByte(MENU) ~= 0 then
+    if anyAlive and not dbgLogged and seeded then
       dbgLogged = true
       local t = {}
       for s = 0, 3 do
@@ -434,7 +488,6 @@ local function battlePulse()
   if st ~= ST_TGT then tapNo = -1 end
   if menu == 0 or st == ST_CMD then
     local present = teacherPresent()
-    if present and menu ~= 0 then teacherSeen = true end
     local want = present and "teach" or "finish"
     if want ~= mode then
       H.log(string.format("[ctx] battle mode %s -> %s", mode, want))
@@ -484,12 +537,10 @@ local function battlePulse()
       if step < 4 then H.setPad({ right = true })
       elseif step >= 20 and step < 24 then H.setPad({ a = true })
       else H.setPad({}) end
-    elseif cmdCellOf(a, CMD_ITEM) ~= nil and battleBagIdxOf(TONIC) ~= nil then
-      -- no Fight row to swap into Def (Gau on the Veldt): burn the turn on
-      -- a real Tonic (the ST_ITEM branch below picks it)
-      walkToCell(a, cmdCellOf(a, CMD_ITEM), hold)
     else
-      -- nothing harmless to spend the turn on: hand the window on (X)
+      -- no Fight row to swap into Def (Gau, whose row 0 is Leap on the
+      -- Veldt): hand the window on with X, vanilla's turn-cycling key, as
+      -- the library's driver does for him
       H.setPad(hold and { x = true } or {})
     end
     return
@@ -510,21 +561,10 @@ local function battlePulse()
     else
       btn = "b"
     end
-  elseif st == ST_ITEM then
-    -- the turn-burn: the Tonic row of the battle bag
-    local want = battleBagIdxOf(TONIC)
-    if want == nil then btn = "b"
-    else
-      local cur = H.readByte(0x8947 + a) + H.readByte(0x894F + a)
-      btn = "a"
-      if cur < want then btn = "down"
-      elseif cur > want then btn = "up" end
-    end
   elseif st == ST_TGT then
     -- a teacher's swing goes to the monster it can teach (H.targetCursor:
     -- "a" once the cursor sits there, else a tap; each decided tap is held
-    -- four frames from its decision, battle_assassinate's pattern); the
-    -- Tonic takes its default target
+    -- four frames from its decision, battle_assassinate's pattern)
     local role, slot = chosenRole[a], nil
     if role == "fight" then slot = teachSlotFor(attackClassOf(a))
     elseif role == "blitz" then slot = teachSlotFor(PUMMEL_CLASS) end
@@ -734,18 +774,16 @@ local actions = {
       H.log(string.format("[ctx] battle %d done, taught %d byte(s) so far " ..
         "(species %s; atkclass %s)", fights, taughtN,
         table.concat(sp, " "), table.concat(ac, " ")))
-      -- the choice's prediction, checked against the battle it staged: a
-      -- battle that taught nothing must at least have put the species on
-      -- stage and a teacher at a command menu, or the field-side model
-      -- disagrees with the battle's and no retry can fix it
+      -- the choice's prediction, judged at this battle's settled seed
+      -- (predictionHeld): a battle that taught nothing with the species on
+      -- stage and no teaching row in the battle's own tables means the
+      -- field-side model disagrees with the battle's, and no retry can fix
+      -- that.  A species not on stage then is not judged: retried.
       if taughtN == 0 then
-        H.assertEq(fightSpecies[writeChoice.sp] == true, true, string.format(
-          "write battle %d: the staged f%d put the chosen species $%03X on "
-          .. "stage", fights, writeChoice.f, writeChoice.sp))
-        H.assertEq(teacherSeen, true, string.format(
-          "write battle %d: a teacher for species $%03X's class bits %02X "
-          .. "stood at a command menu (the field records predicted one; the "
-          .. "battle's command table or seeded masks disagree)", fights,
+        H.assertEq(predictionHeld ~= false, true, string.format(
+          "write battle %d: with species $%03X on stage, the battle's command "
+          .. "table and seeded masks give a member a role that can teach its "
+          .. "class bits %02X, as the field records predicted", fights,
           writeChoice.sp, writeChoice.bits))
       end
       fightSpecies = {}
@@ -770,6 +808,8 @@ local actions = {
         }, "find write-half encounter " .. n),
         H.call(function() staged = nil end),
         H.call(battleReset),
+        settleSeed("write-half battle " .. n),
+        H.call(judgePrediction),
         H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
           H.call(battlePulse),
         }, "fight write-half battle " .. n),
@@ -907,7 +947,7 @@ local function readTry(n)
     end, 900, "read-half alive bits seed " .. n, 5),
     H.waitFrames(90),
     H.call(checkReadSeed),
-    H.call(battleReset),
+    H.call(function() battleReset(); seeded = true end),
     resolveReadBattle(n),
   }, {})
 end
