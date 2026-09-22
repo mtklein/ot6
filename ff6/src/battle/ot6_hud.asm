@@ -1837,7 +1837,7 @@ Ot6ShieldTbl:
         ; ---- audit_break_coverage.py's two break-dark areas ------------
         ; (owner-approved 2026-09-01.)  Both were beatable on raw stats,
         ; which is how the fled lineage shipped them dark: the break loop
-        ; simply did not exist there.  Vanilla bits stay -- the four Zozo
+        ; did not exist there.  Vanilla bits stay -- the four Zozo
         ; bodies are all poison-weak (Bio Blaster is a live key whenever
         ; EDGAR is picked), and Cirpius carries no vanilla weakness at
         ; all (Ot6ElemAddTbl gives it poison), so its class row is its

@@ -32,7 +32,7 @@ A boosted Ifrit costs 26 normally, 65 at one pip and 99 at two, so calling
 an esper down is a real decision instead of a reflex.
 
 So boosting is a decision generally. Early on a full three-pip boost is
-simply out of reach for most characters, and the interesting question each
+out of reach for most characters, and the interesting question each
 turn is whether this fight is worth one pip, two, or none.
 
 **What stayed free, and why.** Boosting **Fight** costs no MP at all, and
@@ -51,7 +51,7 @@ ladder rather than by paying a multiplier.
 greyed-out Blitz, Tool, SwdTech, Steal or Dance and the game buzzes and
 leaves the list open, the way it always has for magic. Your turn, your
 banked pips and your MP all stay yours. Previously it let you commit, and
-the attack simply did nothing.
+the attack did nothing.
 
 ## A warning about Sketch
 

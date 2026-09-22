@@ -62,7 +62,7 @@ local function pressInto(dir, pred, maxFrames, what)
 end
 
 -- Same as pressInto, but a timeout is a valid, expected outcome here (the
--- entrance tile may simply refuse the step) rather than a script failure:
+-- entrance tile may refuse the step) rather than a script failure:
 -- logs and moves on instead of raising.  Used only for the world-entrance
 -- step, where "the party never leaves the approach tile" is itself the
 -- hazard-8 "geometry blocks it" answer this probe is checking for.

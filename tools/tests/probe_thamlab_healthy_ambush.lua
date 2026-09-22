@@ -6,7 +6,7 @@
 -- per-turn plan with ONE measured fix and a few screened variants.  The fix: the battle lore
 -- window is POSITIONAL BY LORE ID -- row index == loreId, unlearned /
 -- unoffered ids render as empty rows -- so the cursor row wanted for a
--- lore is simply its id, NOT the "compacted list" model the gen computes
+-- lore is its id, NOT the "compacted list" model the gen computes
 -- (count of offered ids below it).  Evidence (control run
 -- build/thamlab/ambush_control_v2_s0.log, LORE-STALL dump f7233): learned
 -- lores {3,7,20}; $306A signatures only at those ids (8E/92/9F); $1E27

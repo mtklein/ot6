@@ -20,7 +20,7 @@ monster lines already used, e.g.
 
 Nothing was renamed: the aggregate keys keep their old meaning, so
 bal_mines and metrics_battle logs from before the fan-out still tabulate
-exactly as they did -- the per-character sections simply do not render
+exactly as they did -- the per-character sections do not render
 for a log that has no char_* lines. Where a column was solo-Terra
 specific (MP spent, ending HP) it now reads the party lines when they are
 present and falls back to the old `terra_*` keys when they are not.

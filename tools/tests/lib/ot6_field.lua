@@ -922,7 +922,7 @@ function M.advanceStory(pred, maxFrames, opts)
       end
       -- a battle resolved earlier in the ride and control is back:
       -- recover OUTSIDE combat before riding on.  A ride whose scene
-      -- never returns control simply leaves the latch armed; the caller's
+      -- never returns control leaves the latch armed; the caller's
       -- own care stop then owns it.
       if sawBattle and M.hasControl() and M.tileAligned() then
         sawBattle = false
@@ -1973,7 +1973,7 @@ end
 --                 nothing for a target (default true).  The bag is always
 --                 tried first; set false on a step that must keep every
 --                 point of MP for the fight it is walking toward, and the
---                 target simply goes unhealed once the bag is empty.
+--                 target goes unhealed once the bag is empty.
 --                 Revival is always a Fenix Down.
 -- opts.mpFloor    MP a caster keeps back: a fraction of their maximum below
 --                 1, an absolute number at or above it (default 0.25).  A
@@ -2671,7 +2671,7 @@ local function careKernel(opts)
   end
 
   -- The cheapest cure the party can put on this target.  Cheapest rather
-  -- than biggest: MP is the resource being rationed and the loop simply
+  -- than biggest: MP is the resource being rationed and the loop
   -- casts again if the target is still short, so two Cures beat one Cure 2
   -- wherever the prices are vanilla's.  Overshoot is wasted MP.
   local function pickCast(target)
@@ -5083,7 +5083,7 @@ end
 -- 600 uncontrolled frames so a scripted stretch that never hands control
 -- back still walks on).  A dialog during the reload is left to the walker,
 -- whose own A-tap branch pages it.  A walker whose predicate fires mid-
--- care simply ends; driveUntil releases the pad.
+-- care ends; driveUntil releases the pad.
 --
 -- opts: healPercent (45), careThreshold (0.7), care = false skips the
 -- stop; healer/magic/summon/nuke/nukeLore/tool/blitz/bank/reserve pass to

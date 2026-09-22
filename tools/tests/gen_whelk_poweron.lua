@@ -226,7 +226,7 @@ local steps = {
   -- ===================================================================== --
   -- Phase 1: power-on -> title -> automatic intro march.
   -- Reused VERBATIM from gen_battle_state.lua:26-34 (the only existing
-  -- power-on play): the srm inject is simply dropped -- New Game on empty
+  -- power-on play): the srm inject is dropped -- New Game on empty
   -- SRAM needs nothing injected.
   -- ===================================================================== --
   H.waitFrames(355),

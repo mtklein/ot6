@@ -122,7 +122,7 @@ end
 -- Robust world walk to (tx,ty): re-plan a worldBfs each time the plan runs
 -- out, press the next step, and fight any random encounter it meets
 -- (H.newWalkFighter, #183).  No edge is ever
--- condemned, so a battle-restored tile is simply retried until a step
+-- condemned, so a battle-restored tile is retried until a step
 -- lands.  Arrives at (tx,ty) or when the party leaves the world map.
 local function worldGrind(tx, ty, what)
   local plan, idx = nil, 1

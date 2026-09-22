@@ -616,7 +616,7 @@ end
 -- large number of frames before setting off.  Rat wander is a pure
 -- function of the chase clock (measured: blind to party input), so a
 -- reload replays the same rat schedule and the hold shifts only the
--- party's phase within it; note that the reload's 92-frame settle is
+-- party's phase within it; the reload's 92-frame settle is
 -- itself a hold attempt 1 never had, so a reloaded hold 0 is not
 -- attempt 1 again.  The fights are not replayed exactly (the same hold
 -- re-run from the same reload has arrived with 5349 and with 6585), so

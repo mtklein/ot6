@@ -1240,7 +1240,7 @@ end
 -- its own class against the gauge, and the driver's own comparator
 -- (bestLine/fightChips) is what decides whether that beats the free
 -- boosted Fight -- so the step-down feeds the measurement instead of
--- pre-empting it, and a stepped-down line that no longer wins simply
+-- pre-empting it, and a stepped-down line that no longer wins
 -- loses the comparison.  Level 0 is returned when nothing is affordable
 -- and the base price itself is covered; nil when even the base is not,
 -- which IS "drop the verb".
@@ -3898,7 +3898,7 @@ local BATTLE = {
   TGTALL = 0x7B7F,
   TONIC = 0xE8, POTION = 0xE9, FENIX_DOWN = 0xF0,
   AUTOCROSSBOW = M.AUTOCROSSBOW, PUMMEL = 0x5D,
-  -- The cures, cheapest first: the loop simply casts again if the target
+  -- The cures, cheapest first: the loop casts again if the target
   -- is still short, so overshoot is only wasted MP.  Under OT6 the upper
   -- tiers are folds of the base spell rather than separate grants, so in
   -- practice only the first of these is ever found in the list.
@@ -8466,7 +8466,7 @@ end
 
 -- compose.py wraps everything after the `local H = dofile(...)` line in a
 -- call to this, so the runner can replay the body.  A script composed
--- before this existed (or composed by hand) simply never calls it: the
+-- before this existed (or composed by hand) never calls it: the
 -- runner then reports that retries are unavailable rather than pretending.
 function M.segmentBody(fn)
   M.__body = fn
