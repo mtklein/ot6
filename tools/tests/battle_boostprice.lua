@@ -36,6 +36,13 @@
 --   1. boost 0 is the base price, on the same window, as the control.
 --   2. boost N stamps min(99, floor(base * 2.5^N + 0.5)) on every learned
 --      Blitz row, and greys exactly the rows that price out of the pool.
+--      N is 1 and 2 always, and 3 as well when the pool needs it: the
+--      level the grey is shown flipping at is CHOSEN from SABIN's live pool
+--      and learned set (the shallowest boost at which a row he can pay
+--      unboosted prices out), because every ROM change regenerates the
+--      chain and reshuffles both.  A pool no boost can price a learned row
+--      out of (99 and up, say) is spent down first with real unboosted
+--      Blitzes until one can.
 --   3. a boosted Blitz is queued at the boosted price and deducts it.
 --   4. LOCKE's whole thief submenu stays FLAT under a boost -- Steal as well
 --      as Filch and Bestow -- and the stamp is checked against the escalated
@@ -53,6 +60,7 @@ local BLITZ_ATK0 = 0x5D
 local THIEF_STEAL, THIEF_FILCH, THIEF_BESTOW = 0x56, 0x57, 0x58
 local WHITE, GREY = 0x21, 0x25
 local ANCHOR = 99
+local MAX_BOOST = 3                     -- Ot6Boost caps a spend at 3
 
 local function bp(s) return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
@@ -91,6 +99,43 @@ local function thiefCostOf(id)
 end
 local STEAL_BASE                            -- Ot6StealCost's immediate
 
+-- The rows the grey can be SHOWN flipping on at boost n: learned blitzes
+-- the pool pays unboosted (white at boost 0) whose boosted price it does
+-- not (grey at boost n).  Everything about the choice of n is read off the
+-- live pool and learned set and priced by the rule above; nothing assumes
+-- the pool the fixture happened to hold.
+local learned = {}                       -- SABIN's learned blitz ids
+local function flipsAt(pool, n)
+  local out = {}
+  for _, id in ipairs(learned) do
+    local base = costOf(id)
+    if base <= pool and boosted(base, n) > pool then out[#out + 1] = id end
+  end
+  return out
+end
+-- the shallowest boost that prices a payable row out of `pool`, or nil
+local function greyLevel(pool)
+  for n = 1, MAX_BOOST do
+    if #flipsAt(pool, n) > 0 then return n end
+  end
+  return nil
+end
+-- the cheapest learned blitz `pool` pays unboosted: the spend-down's row,
+-- and the one that steps the pool down finely enough that it cannot skip
+-- a flip window (each window [base, boosted(base, 3) - 1] is wider than
+-- its own base)
+local function cheapestPayable(pool)
+  local pick
+  for _, id in ipairs(learned) do
+    if costOf(id) <= pool and (pick == nil or costOf(id) < costOf(pick)) then
+      pick = id
+    end
+  end
+  return pick
+end
+local GREY_AT                            -- the chosen flip level (1..3)
+local LEVELS = { 1, 2 }                  -- boost levels read; + GREY_AT
+
 -- name glyph runs, for the font-attribute read (battle_blitzgrey's idiom)
 local ATKNAME = H.sym("AttackName") & 0x3FFFFF
 local ATKNAME_0, NAME_SIZE = 0x51, 10
@@ -107,6 +152,7 @@ local function nameText(id)
   for _, b in ipairs(nameSeq(id)) do
     if b >= 0x80 and b <= 0x99 then s = s .. string.char(65 + b - 0x80)
     elseif b >= 0x9a and b <= 0xb3 then s = s .. string.char(97 + b - 0x9a)
+    elseif b == 0xfe or b == 0xff then s = s .. " "
     else s = s .. "?" end
   end
   return s
@@ -152,7 +198,6 @@ local function charged()
 end
 
 local sabin, locke                       -- battle slots
-local learned = {}                       -- SABIN's learned blitz ids
 local want = { slot = nil, bank = 0, pend = 0, mode = "idle", row = nil }
 local ph, hb = 0, -900
 -- the encounter lane: one step out of the anchor tile and one step back,
@@ -192,13 +237,41 @@ end
 -- progress.  Only then is the bank filled, and only then is the pending
 -- raised back to exactly what the arm asked for -- exactly, because the
 -- price under test is a function of it.
+-- Is anyone down, or badly hurt?  battle_kitrefuse's shape: an all-Defend
+-- party never ends a fight, and a spend-down can take several, so the
+-- bystanders swing instead of deferring once the party is in trouble.
+local function partyHurt()
+  for s = 0, 3 do
+    local h, m = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2)
+    if m > 0 and m < 9999 and (h == 0 or h * 100 // m < 55) then return true end
+  end
+  return false
+end
+-- ...and between battles, the route's own care stop (Tonics, never a cast;
+-- instantly done when nobody needs it), so a run that crosses battles does
+-- not carry one fight's attrition into the next.
+local care, careDue = nil, false
+
 local function pulse()
   ph = ph + 1
   heartbeat()
   local edge = ph % 10 < 5
   if not H.battleLoadStarted() then
+    -- a care stop in progress owns the pad until it is done, menu and all
+    -- (the menu takes field control away, so this comes first)
+    if care then
+      care.frame()
+      if care.done() then care, careDue = nil, false end
+      return
+    end
     if not (H.hasControl() and H.tileAligned()) then
       H.setPad(ph % 8 < 4 and { a = true } or {})
+      return
+    end
+    if careDue then
+      care = H.newCareDriver({ tag = "boostprice care", threshold = 0.65 })
+      care.frame()
+      if care.done() then care, careDue = nil, false end
       return
     end
     local x, y = H.fieldX(), H.fieldY()
@@ -215,6 +288,7 @@ local function pulse()
     return
   end
   lane = nil                    -- re-anchor at the next field return
+  care, careDue = nil, true     -- care at the next field control
   if H.readByte(MENU) == 0 then
     H.setPad(ph % 8 < 4 and { a = true } or {})
     return
@@ -223,6 +297,18 @@ local function pulse()
   if st == ST_TRANS then H.setPad({}) return end
   if want.slot == nil or a ~= want.slot then
     local sub = ph % 40
+    if partyHurt() then
+      -- swing: row 0, with `left` putting Fight back in a row a Defend
+      -- swapped to Def. (battle_kitrefuse's bystander)
+      if st == ST_TGT then H.setPad(ph % 8 < 4 and { a = true } or {}) return end
+      if st ~= ST_CMD then H.setPad(ph % 8 < 4 and { b = true } or {}) return end
+      local cur = H.readByte(CMDROW + a) & 3
+      if cur ~= 0 then H.setPad(sub < 4 and { up = true } or {})
+      elseif sub < 4 then H.setPad({ left = true })
+      elseif sub >= 20 and sub < 24 then H.setPad({ a = true })
+      else H.setPad({}) end
+      return
+    end
     if sub < 4 then H.setPad({ right = true })
     elseif sub >= 20 and sub < 24 then H.setPad({ a = true })
     else H.setPad({}) end
@@ -398,6 +484,70 @@ H.run({ maxFrames = 300000 }, {
     H.assertEq(locke ~= nil, true, "LOCKE is in this party")
     H.log(string.format("SABIN slot %d (%d MP), LOCKE slot %d (%d MP)",
       sabin, mp(sabin), locke, mp(locke)))
+    H.assertEq(mp(locke) >= STEAL_BASE, true, string.format(
+      "LOCKE's %d MP covers the flat %d Steal the chance-verb arm charges",
+      mp(locke), STEAL_BASE))
+  end),
+
+  ----------------------- 0. the pool the grey is shown against, chosen live --
+  -- Which boost first prices a payable row out is a function of SABIN's
+  -- pool and learned set, and both move whenever the chain is regenerated
+  -- (a level is a new maximum, Ot6LevelUpHeal refills to it, and the fight
+  -- before the fixture spends whatever it spends).  So the level is read
+  -- off the live pool here.  When no legal boost prices anything out -- a
+  -- pool of 99 or more, or a learned set too cheap for the pool -- SABIN
+  -- spends it down first, the way a player would: real unboosted Blitzes
+  -- of the cheapest learned row, each one charged by the ROM, until some
+  -- boost can.
+  H.call(function()
+    local pool = mp(sabin)
+    local names = {}
+    for n = 1, MAX_BOOST do
+      local f = {}
+      for _, id in ipairs(flipsAt(pool, n)) do f[#f + 1] = nameText(id) end
+      names[#names + 1] = string.format("boost %d {%s}", n, table.concat(f, " "))
+    end
+    H.log(string.format("[pool] SABIN %d MP; payable rows each boost prices "
+      .. "out: %s", pool, table.concat(names, ", ")))
+    if greyLevel(pool) ~= nil then return end
+    local row = cheapestPayable(pool)
+    H.assertEq(row ~= nil, true, string.format(
+      "no boost 1..%d prices a payable blitz out of SABIN's %d MP, and he "
+      .. "pays some blitz unboosted to spend it down with (without one this "
+      .. "state cannot show ruling 2's grey)", MAX_BOOST, pool))
+    H.log(string.format("[pool] no boost 1..%d prices a payable row out of "
+      .. "%d MP: spending down with unboosted %s (%d MP each)", MAX_BOOST,
+      pool, nameText(row), costOf(row)))
+    want.slot, want.bank, want.pend = sabin, 0, 0
+    want.mode, want.row = "blitz", row
+  end),
+  step("SABIN's pool is one some boost 1..3 prices a learned row out of",
+    function()
+      if not (H.battleLoadStarted() and H.monstersPresent() > 0) then
+        return false
+      end
+      local m = mp(sabin)
+      return m > 0 and m < 0x8000 and greyLevel(m) ~= nil
+    end, 400000),
+  H.call(function()
+    want.mode, want.row = "idle", nil
+    local pool = mp(sabin)
+    GREY_AT = greyLevel(pool)
+    if GREY_AT > LEVELS[#LEVELS] then LEVELS[#LEVELS + 1] = GREY_AT end
+    local f = {}
+    for _, id in ipairs(flipsAt(pool, GREY_AT)) do f[#f + 1] = nameText(id) end
+    H.log(string.format("[pool] %d MP: boost %d is the shallowest that prices "
+      .. "a payable row out (%s); reading boosts %s", pool, GREY_AT,
+      table.concat(f, " "), table.concat(LEVELS, "/")))
+    -- the charge arm below needs a row the pool pays AT a boost; checked
+    -- here, before any of it runs, rather than discovered there
+    local payable = false
+    for _, id in ipairs(learned) do
+      if boosted(costOf(id), 1) <= pool then payable = true end
+    end
+    H.assertEq(payable, true, string.format(
+      "SABIN's %d MP pays some learned blitz at boost 1 -- the charge arm "
+      .. "needs a payable boosted row", pool))
   end),
 
   ----------------------------------------- 1. boost 0: the base, the control --
@@ -427,51 +577,62 @@ H.run({ maxFrames = 300000 }, {
   ----------------------------------- 2/3. boost N: the stamp, the grey, the charge --
   (function()
     -- Every character opens at 1 BP (Ot6InitBP) and banks +1 per unboosted
-    -- action, so boost 2 costs one real Fight first.  Two is enough to show
-    -- the rule twice over with different multipliers, and the third level is
-    -- covered arithmetically over the whole column in battle_costtable.
+    -- action, so boost 2 costs one real Fight first and boost 3 two.  Boosts
+    -- 1 and 2 are always read, which shows the rule twice over with
+    -- different multipliers; boost 3 is read too when it is the shallowest
+    -- level the live pool greys a payable row at (GREY_AT, chosen above).
+    -- The whole column at every level is covered arithmetically in
+    -- battle_costtable.
     local steps = {}
-    for _, n in ipairs({ 1, 2 }) do
-      steps[#steps + 1] = openAt(function() return sabin end, n, "blitz",
-        string.format("SABIN's blitz window at boost %d", n))
-      steps[#steps + 1] = H.call(function()
-        local pool = mp(sabin)
-        blitzAt[n] = {}
-        for _, id in ipairs(learned) do
-          local qty
-          for i = 0, 7 do
-            if H.readByte(ITEMLIST + i * 3) == id then
-              qty = H.readByte(ITEMLIST + i * 3 + 1)
+    for n = 1, MAX_BOOST do
+      local function wanted()
+        for _, l in ipairs(LEVELS) do if l == n then return true end end
+        return false
+      end
+      steps[#steps + 1] = H.cond(wanted, {
+        openAt(function() return sabin end, n, "blitz",
+          string.format("SABIN's blitz window at boost %d", n)),
+        H.call(function()
+          local pool = mp(sabin)
+          blitzAt[n] = {}
+          for _, id in ipairs(learned) do
+            local qty
+            for i = 0, 7 do
+              if H.readByte(ITEMLIST + i * 3) == id then
+                qty = H.readByte(ITEMLIST + i * 3 + 1)
+              end
             end
+            local price = boosted(costOf(id), n)
+            local attr = attrOf(nameSeq(id))
+            blitzAt[n][id] = { qty = qty, attr = attr, mp = pool }
+            H.log(string.format("  boost %d  %-10s stamp %s  attr %s  "
+              .. "(base %d -> %d, pool %d)", n, nameText(id), tostring(qty),
+              attr and string.format("$%02x", attr) or "nil",
+              costOf(id), price, pool))
+            H.assertEq(qty, price, string.format(
+              "%s at boost %d is stamped %d = min(99, floor(%d x 2.5^%d + 0.5)) "
+              .. "(#219)", nameText(id), n, price, costOf(id), n))
+            H.assertEq(attr, (pool >= price) and WHITE or GREY, string.format(
+              "%s at boost %d costs %d against a %d pool, so the row renders "
+              .. "%s -- the grey reads the BOOSTED price (#219, ruling 2)",
+              nameText(id), n, price, pool,
+              (pool >= price) and "white" or "grey"))
           end
-          local price = boosted(costOf(id), n)
-          local attr = attrOf(nameSeq(id))
-          blitzAt[n][id] = { qty = qty, attr = attr, mp = pool }
-          H.log(string.format("  boost %d  %-10s stamp %s  attr %s  "
-            .. "(base %d -> %d, pool %d)", n, nameText(id), tostring(qty),
-            attr and string.format("$%02x", attr) or "nil",
-            costOf(id), price, pool))
-          H.assertEq(qty, price, string.format(
-            "%s at boost %d is stamped %d = min(99, floor(%d x 2.5^%d + 0.5)) "
-            .. "(#219)", nameText(id), n, price, costOf(id), n))
-          H.assertEq(attr, (pool >= price) and WHITE or GREY, string.format(
-            "%s at boost %d costs %d against a %d pool, so the row renders "
-            .. "%s -- the grey reads the BOOSTED price (#219, ruling 2)",
-            nameText(id), n, price, pool,
-            (pool >= price) and "white" or "grey"))
-        end
-        H.screenshot("boostprice_blitz_boost" .. n)
-      end)
+          H.screenshot("boostprice_blitz_boost" .. n)
+        end),
+      }, {})
     end
     return H.repeatN(1, steps)
   end)(),
 
   H.call(function()
     -- the grey has to have moved somewhere, or the colour assertion above
-    -- proved nothing about the boost
+    -- proved nothing about the boost.  GREY_AT was chosen so that it must
+    -- have: every row the live pool says flips there is checked by name,
+    -- white unboosted and grey at GREY_AT, on the windows actually drawn.
     local flipped = {}
     for _, id in ipairs(learned) do
-      for _, n in ipairs({ 1, 2 }) do
+      for _, n in ipairs(LEVELS) do
         if blitzAt[0][id].attr == WHITE and blitzAt[n][id].attr == GREY then
           flipped[#flipped + 1] = string.format("%s at boost %d",
             nameText(id), n)
@@ -480,6 +641,14 @@ H.run({ maxFrames = 300000 }, {
     end
     H.log("rows the boost priced out: " ..
       (next(flipped) and table.concat(flipped, ", ") or "none"))
+    for _, id in ipairs(flipsAt(blitzAt[GREY_AT][learned[1]].mp, GREY_AT)) do
+      H.assertEq(blitzAt[0][id].attr == WHITE and blitzAt[GREY_AT][id].attr == GREY,
+        true, string.format(
+        "%s (base %d) is white unboosted and grey at boost %d, where it costs "
+        .. "%d against the %d pool -- the shallowest boost the live pool "
+        .. "prices it out at", nameText(id), costOf(id), GREY_AT,
+        boosted(costOf(id), GREY_AT), blitzAt[GREY_AT][id].mp))
+    end
     H.assertEq(#flipped > 0, true, string.format(
       "at least one learned blitz that SABIN could afford unboosted is "
       .. "greyed once boosted -- otherwise the pool (%d MP) is too deep for "
