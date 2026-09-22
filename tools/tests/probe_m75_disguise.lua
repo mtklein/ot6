@@ -14,13 +14,13 @@ local DELTA = { up = { 0, -1 }, down = { 0, 1 }, left = { -1, 0 },
                 right = { 1, 0 }, upleft = { -1, -1 }, upright = { 1, -1 },
                 downleft = { -1, 1 }, downright = { 1, 1 } }
 
-local function flood(tag, marks)
-  local seen, q, qi, done, order
+local function flood(tag, marks, paths)
+  local seen, parent, q, qi, done
   return seq({
     H.call(function()
       local sx, sy = H.fieldX(), H.fieldY()
       seen = { [sy * 256 + sx] = true }
-      order = { [sy * 256 + sx] = 1 }
+      parent = {}
       q, qi, done = { { sx, sy } }, 1, false
       H.log(string.format("=== flood %s: map %d from (%d,%d) ===", tag, map(), sx, sy))
     end),
@@ -36,7 +36,7 @@ local function flood(tag, marks)
               local nx, ny = x + DELTA[d][1], y + DELTA[d][2]
               local k = ny * 256 + nx
               if not seen[k] and nx >= 0 and ny >= 0 and nx < 256 and ny < 256 then
-                seen[k] = true; q[#q + 1] = { nx, ny }; order[k] = #q
+                seen[k] = true; parent[k] = y * 256 + x; q[#q + 1] = { nx, ny }
               end
             end
           end
@@ -52,6 +52,27 @@ local function flood(tag, marks)
         local k = m[2] * 256 + m[1]
         H.log(string.format("   (%2d,%2d) %-40s %s", m[1], m[2], m[3],
           seen[k] and "REACHABLE" or "not reachable"))
+      end
+      -- reconstruct + print the walkable path to each target (waypoints
+      -- every `step` tiles, for hop() chains that stay inside the BFS cap)
+      for _, p in ipairs(paths or {}) do
+        local tk = p[2] * 256 + p[1]
+        if not seen[tk] then
+          H.log(string.format("PATH to (%d,%d) %s: not reachable", p[1], p[2], p[3]))
+        else
+          local chain, k = {}, tk
+          while k do chain[#chain + 1] = k; k = parent[k] end
+          local out = {}
+          local step = p[4] or 6
+          for i = #chain, 1, -1 do
+            local idx = #chain - i
+            if idx % step == 0 or i == 1 then
+              out[#out + 1] = string.format("(%d,%d)", chain[i] % 256, chain[i] // 256)
+            end
+          end
+          H.log(string.format("PATH to (%d,%d) %s [%d steps]: %s", p[1], p[2],
+            p[3], #chain - 1, table.concat(out, " ")))
+        end
       end
     end),
   })
@@ -81,5 +102,28 @@ H.run({ maxFrames = 40000 }, {
       map(), H.fieldX(), H.fieldY(), sw(0x0103), sw(0x0104), sw(0x0318), sw(0x0319), sw(0x01D0)))
     H.assertEq(map(), 75, "booted on map 75")
   end),
-  flood("map 75 from the boot pocket (no disguise)", MARKS),
+  flood("map 75 from the boot pocket (no disguise)", MARKS, {
+    { 22, 43, "cider cafe entry", 5 },
+    { 34, 35, "grandson door approach", 5 },
+    { 37, 41, "old man door approach", 5 },
+  }),
+  -- The z-AWARE check: the flood above dedups by (x,y) only, so it can cross
+  -- z-levels invalidly.  H.bfsPath is the real, z-aware nav (nodes are
+  -- (x,y,z)); this is what #145 and navTo actually use.  Raise the cap so
+  -- the map-size limit is not the reason for a nil.
+  H.call(function()
+    H.BFS_CAP = 20000
+    H.log(string.format("[probe] z=%d at (%d,%d); BFS_CAP=%d",
+      H.readByte(0x00b2) & 3, H.fieldX(), H.fieldY(), H.BFS_CAP))
+    for _, t in ipairs({
+      { 22, 43, "cider cafe entry" }, { 30, 43, "SE lane" },
+      { 34, 35, "grandson door approach" }, { 37, 41, "old man door approach" },
+      { 22, 47, "Imperial soldier" }, { 44, 32, "item shop doorstep" },
+      { 40, 34, "main street (mid)" }, { 24, 34, "main street (west)" },
+    }) do
+      local p = H.bfsPath(t[1], t[2])
+      H.log(string.format("   H.bfsPath (z-aware) -> (%2d,%2d) %-26s %s",
+        t[1], t[2], t[3], p and (#p .. " steps") or "NO PATH (nil)"))
+    end
+  end),
 })
