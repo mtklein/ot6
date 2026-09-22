@@ -138,13 +138,14 @@ end
 --
 -- Teach steering: when a live monster's weak mask still has a bit some
 -- party member can newly reveal, that member delivers it (Fight for a
--- weapon-class match, the Pummel list walk for the blitz class) at that
--- monster, the other characters Defend, and Gau -- who has no Fight row to
--- swap into Def -- hands his window on with X; when nothing present is
--- teachable, the library's full-kit driver finishes the battle (see
--- battlePulse's modes).  All of it is read from the battle's own seeded
--- state (weak mask $3e9c+off, revealed bits $3e9d+off), so nothing here
--- pins a species id.
+-- weapon-class match, aimed at that monster; the Pummel list walk for the
+-- blitz class, which OT6's Blitz commits with no target select, so the
+-- engine picks the body), the other characters Defend, and Gau -- who has
+-- no Fight row to swap into Def -- hands his window on with X; when
+-- nothing present is teachable, the library's full-kit driver finishes the
+-- battle (see battlePulse's modes).  All of it is read from the battle's
+-- own seeded state (weak mask $3e9c+off, revealed bits $3e9d+off), so
+-- nothing here pins a species id.
 local ST_TOOLS = 0x30
 -- The command window's side states and the transitional ones, as the
 -- library's driver measured them (ot6.lua, BATTLE.ST_ROW/ST_DEF and
@@ -351,9 +352,12 @@ end, emu.callbackType.write, 0x7e57b8, 0x7e57b8)
 -- The battle runs in one of two modes, decided at every command window
 -- (and between windows), never inside a submenu:
 --   "teach"   a teacher stands and a live monster still has a class bit
---             it can newly reveal: that teacher Fights (or Pummels) with
---             the target cursor steered onto the teachable monster, the
---             bystanders Defend, and a bystander with no Fight row (Gau,
+--             it can newly reveal: that teacher Fights with the target
+--             cursor steered onto the teachable monster (or Pummels, whose
+--             target the engine picks: measured, force_f21_trace.log
+--             f1644, a Pummel landing on slot 3's Rhodox beside slot 4's
+--             teachable GreaseMonk; the teacher Pummels again next turn),
+--             the bystanders Defend, and a bystander with no Fight row (Gau,
 --             whose Fight row is Leap on the Veldt) hands the window on
 --             with X;
 --   "finish"  nothing on stage is left to teach (taught, or never
@@ -582,10 +586,10 @@ local function battlePulse()
   elseif st == ST_TGT then
     -- a teacher's swing goes to the monster it can teach (H.targetCursor:
     -- "a" once the cursor sits there, else a tap; each decided tap is held
-    -- four frames from its decision, battle_assassinate's pattern)
-    local role, slot = chosenRole[a], nil
-    if role == "fight" then slot = teachSlotFor(attackClassOf(a))
-    elseif role == "blitz" then slot = teachSlotFor(PUMMEL_CLASS) end
+    -- four frames from its decision, battle_assassinate's pattern); a
+    -- Pummel never comes here, its commit has no target select
+    local slot = nil
+    if chosenRole[a] == "fight" then slot = teachSlotFor(attackClassOf(a)) end
     if slot == nil then
       btn = "a"
     else
