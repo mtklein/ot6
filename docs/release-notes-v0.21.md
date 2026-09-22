@@ -25,7 +25,7 @@ used to work only on an enemy that was already Broken, and his breaking hit
 usually killed the enemy by itself first, so it rarely came up. Now the hit of
 his that empties an enemy's last shield kills it outright — break it and it
 dies — and it still works on an enemy that's already Broken. Enemies immune to
-instant death, every boss among them, are only Broken, and the kill waits for
+instant death, most bosses among them, are only Broken, and the kill waits for
 a body it can finish.
 
 **Greyed commands are refused, not wasted.** Rage costs Gau a flat 8 MP; when
@@ -34,11 +34,9 @@ buzzes instead of spending his turn on nothing. The same goes for Locke's
 Bestow when he has no boost pip to give.
 
 **More allies spend their boost when provoked.** Since v0.20, an ally the game
-is steering — Berserked or Muddled — dumps its banked pips on its next attack
-after it's hurt. Now Cyan does too in the Doma Castle courtyard fights, where
-he fights on his own beside Sabin, and Umaro's Throw, Storm and Charge carry the dump as well
-as his plain swing: Charge and Storm hit harder, and Throw throws again once
-per pip.
+is steering — Berserked or Muddled — spends all its banked pips on its next
+attack after it's hurt. Now Cyan does too in the Imperial Camp fights, where
+he fights on his own beside Sabin and Shadow.
 
 **A boost pays off once.** Shadow's boosted Throw now hits harder with every
 throwable weapon; nineteen of them, the Dirk and MithrilKnife among them, used
@@ -46,7 +44,7 @@ to take the pips and throw no harder. The same rule trims two double payoffs.
 A boosted Fight buys extra swings, so the spell a weapon casts off one of them
 (Blizzard's Ice, Tempest's Wind Slash) now lands at its normal strength
 instead of multiplied as well. A boosted Rage buys the certainty of the
-beast's special, not extra damage on top of it.
+beast's special, and no longer also hits harder or more often.
 
 **Saves carry over.** In-game saves from v0.20 load in v0.21. Emulator save
 states don't carry across versions, so load from an in-game save.
