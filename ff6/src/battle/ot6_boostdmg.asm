@@ -15,7 +15,14 @@
 ; fight and capture spend their boost on extra swings (Ot6FightBoost),
 ; tier-family spells spend it on tiers (Ot6QueueFold), and bushido
 ; spends it on the tech ladder (Ot6BushidoTier). The multiplier serves
-; everything else, with two exceptions past the command gate.
+; everything else, with three exceptions past the command gate.
+;
+; A Rage is not multiplied: its boost bought the coin (Ot6RageCoin holds the
+; special for the whole trance, OT6_RAGETIER).  The command gate's $10 entry
+; cannot see it, because Cmd_10 runs the beast's attack through _c21554, which
+; sets $b5 to that attack's own command ($02 for a spell, $0c for a lore
+; range special) before any damage while the start turn's boost is still
+; pending; so the test is on the queued command, $3a7c = $10.
 ;
 ; A weapon's own on-hit spell is not multiplied (owner ruling, v0.21): a
 ; boosted Fight buys extra swings, and the spell a weapon casts off one of
@@ -67,10 +74,12 @@
         cmp     #$10
         beq     done            ; $10 rage: boost bought the coin's
                                 ;   certainty (Ot6RageCoin), never a damage
-                                ;   multiplier. Cmd_10 executes the first
-                                ;   possessed action in the same turn while
-                                ;   the pending boost is still live, so this
-                                ;   gate is required on the start turn too
+                                ;   multiplier.  Rage's attacks never reach
+                                ;   here as $10 ($b5 is the beast attack's own
+                                ;   command by then); the queued-command test
+                                ;   below is what exempts them.  This entry
+                                ;   is the one the price gate reads
+                                ;   (battle_boostprice, battle_costtable)
         cmp     #$0f
         beq     done            ; $0f slot: boost bought the reel's
                                 ;   certainty (Ot6SlotRig), never a damage
@@ -81,6 +90,10 @@
                                 ;   Ot6StealSlot), never a damage multiplier
         lda     OT6_BOOST_REVEALED,x         ; pending boost level
         beq     done
+        lda     $3a7c           ; a Rage start turn: Cmd_10 hands the beast's
+        cmp     #$10            ;   attack to _c21554, which rewrites $b5 to
+        beq     done            ;   that attack's own command before any
+                                ;   damage, while the boost is still pending
         lda     f:$7e0000+OT6_WEAPSPELL
         bit     #$40            ; a weapon's own on-hit spell: the boost
         bne     done            ;   bought that weapon's swings, not this
