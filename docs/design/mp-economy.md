@@ -232,6 +232,10 @@ multiplied, because nothing folded it: a rod or shield used from Item, a
 sketched attack, the Magicite item's esper. So is a Throw of a Dirk or
 MithrilKnife, whose item ids equal Fire's and Ice's.
 
+Rage's exemption reads the queued command too (`$3a7c = $10`): the
+beast's attack runs under its own command, so the command gate's `$10`
+never sees it.
+
 One more thing is never multiplied, and it has no price to escalate: a
 weapon's own on-hit spell (Blizzard's Ice, Tempest's Wind Slash), whatever
 action carries it. A boosted Fight buys extra swings; the spell a weapon
