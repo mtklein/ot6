@@ -253,7 +253,7 @@ because the canary's "counted as a game over" has no effect under
 `allowGameOver` except the freeze, and the freeze turns a recoverable
 scripted loss into a stall.  The fix is in the report for the lib's
 editor; the generator-side mitigation (a ride that ends on the wipe and
-reloads, as the cider ladder does) is in `gen_sfigaro.lua`'s `clearGate`.
+reloads, as the cider sweep does) is in `gen_sfigaro.lua`'s `clearGate`.
 
 ### The aftermath, measured
 
@@ -280,7 +280,7 @@ ladder's reload path ran.
 ## What landed
 
 `gen_sfigaro.lua` now carries a `GATE` config and a generator-local
-`clearGate` ladder (the lib's `H.clearGateSoldier` in shape):
+`clearGate` sweep (the lib's `H.clearGateSoldier` in shape):
 
 - `GATE.driver` = `H.rideOut`'s driver with **bank 3 → 0**;
 - `GATE.endgameFloor = 175` / `GATE.endgameTotalMon = 200`: inside the
@@ -288,7 +288,7 @@ ladder's reload path ran.
   bag drinks it (the generator steers Item → Potion itself, the lib's
   item steer in shape);
 - the ride ends on the wipe (the seat-based predicate held 90 frames, as
-  the cider ladder does) and the next rung reloads the pre-fight blob, so
+  the cider sweep does) and the next rung reloads the pre-fight blob, so
   a lost battle 11 is a counted `LOST (PARTY WIPED ...)` line and a
   retry, never a `no-progress` stall.
 

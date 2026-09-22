@@ -12,7 +12,7 @@
 -- so the pause cannot be attacked -- and banks rafterlab_catwalk_@SEED@
 -- on the catwalk.  The pause costs @DELAY@ chase-clock frames; that tax
 -- is real and reported in the banked timer, and it is the same price the
--- generator's own retry ladder pays for a fresh arrangement.
+-- generator's own retry sweep pays for a fresh arrangement.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local DELAY = tonumber("@DELAY@") or 0

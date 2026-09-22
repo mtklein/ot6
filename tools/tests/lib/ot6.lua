@@ -108,7 +108,7 @@ function M.emitBlob(tag, data)
     print("[b64:" .. tag .. "] " .. enc:sub(i, i + 3999))
   end
   -- The end marker (lib/decode_b64.py): one tag can carry several
-  -- emissions in one log -- a ladder screenshotting each attempt, and now
+  -- emissions in one log -- a sweep screenshotting each attempt, and now
   -- a retried segment re-emitting every artifact on its replay.  The
   -- decoder used to split them on base64 padding alone, which cannot see
   -- a boundary when the payload's length is a multiple of three; that
@@ -153,7 +153,7 @@ end
 
 -- ------------------------------------------------------ live broadcast --
 -- ALWAYS ON.  There is no flag, because an emulator that is playing the
--- game and cannot be seen on the census is the thing this rules out, and a
+-- game and cannot be seen on the survey is the thing this rules out, and a
 -- flag is exactly how that kept happening: eighteen launchers passed
 -- OT6_LIVE=0, one of them written the same day the others were cleaned up.
 -- A knob that must be set right at every call site is not a guarantee, so
@@ -193,9 +193,9 @@ end
 -- annihilated screen, the fade, or the title's Continue -- and one A there
 -- loads the last save while every predicate reads healthy again.  So from
 -- the moment the canary counts a game over until the script restores a
--- snapshot (M.requestLoadState, the ladders' recovery path), setPad holds
+-- snapshot (M.requestLoadState, the sweeps' recovery path), setPad holds
 -- the pad neutral.  A run without allowGameOver has already stopped by
--- then; a ladder that reloads and clears M.gameOverFired never notices.
+-- then; a sweep that reloads and clears M.gameOverFired never notices.
 M.padFrozen = false
 local padFrozenSaid = false
 function M.freezePad(why)
@@ -244,7 +244,7 @@ end
 -- the raw handles captured here, before that shim exists: the one-shot
 -- savestate trampolines (an inert load trampoline would strand the run
 -- mid-reload) and the run canary (an inert canary is a silent
--- auto-Continue).  Everything else -- the ladders' seed watchers, the
+-- auto-Continue).  Everything else -- the sweeps' seed watchers, the
 -- recovery/exec observers, a generator's own logging watches -- is
 -- re-registered by the replayed body and wants the old copy inert.
 local rawAddMemoryCallback = emu.addMemoryCallback
@@ -310,7 +310,7 @@ end
 -- an exec memory callback for the main CPU, not inside an event callback.
 -- So requests go through a one-shot trampoline: register an exec callback
 -- over the full address space, do the work on its first fire, and
--- unregister from within the callback.  Results are harvested a frame or
+-- unregister from within the callback.  Results are collected a frame or
 -- two later by the calling step.
 --
 -- Persistence: sandboxed Lua cannot write files, so blobs round-trip through
@@ -457,12 +457,12 @@ end
 -- monsterIds() decodes the six ID bytes plus their MSBs.  Both are the
 -- formation's OPENING line-up, copied once at load and never updated
 -- (#177): "the battle has occupants" and "which formation is this" are
--- theirs to answer; what stands on stage now is M.stageSlots.  For a monster's
+-- theirs to answer; what stands in the formation now is M.activeSlots.  For a monster's
 -- SPECIES (0..383) prefer OT6_SPECIES ($57c0, M.formationSpecies): it is
--- full-width and carries off-stage loads too; these ID low bytes only tell
+-- full-width and carries loads for absent slots too; these ID low bytes only tell
 -- present slots apart.
 M.MONSTER_IDS = 0x3F46          -- +$02..$07: six 8-bit ID low bytes
-M.MONSTER_PRESENT = 0x3F45      -- +$01, low 6 bits: bit i set => slot i on stage
+M.MONSTER_PRESENT = 0x3F45      -- +$01, low 6 bits: bit i set => slot i in the formation
 M.MONSTER_ID_MSB = 0x3F52       -- +$0E: bit `slot` is that slot's ID high bit
 -- (InitMonsters, battle_main.asm @2ef9: `lda $3f52 / asl2 / sta $ee`, then
 -- slots 5 down to 0 each take the next `asl $ee` carry, so slot s gets
@@ -498,7 +498,7 @@ function M.monsterIds()
   return ids
 end
 
--- How many monsters are on stage: popcount of the present mask's low six
+-- How many monsters are in the formation: popcount of the present mask's low six
 -- bits ($3F45).
 function M.monstersPresent()
   local mask = M.readByte(M.MONSTER_PRESENT) & 0x3F
@@ -809,7 +809,7 @@ function M.dodges(o)
   if ((o.s2 or 0) & M.ST2_IMAGE) ~= 0 then return "Image" end
   return nil
 end
--- The first monster slot on stage that the party's physical attacks
+-- The first monster slot in the formation that the party's physical attacks
 -- would miss, and why (M.dodges on the live cells: a monster is entity
 -- 4 + slot, so its status bytes sit at $3EE4/$3EE5 + (4 + slot) * 2), or
 -- nil when every living monster can be hit.
@@ -1240,7 +1240,7 @@ end
 -- its own class against the gauge, and the driver's own comparator
 -- (bestLine/fightChips) is what decides whether that beats the free
 -- boosted Fight -- so the step-down feeds the measurement instead of
--- pre-empting it, and a stepped-down line that no longer wins simply
+-- pre-empting it, and a stepped-down line that no longer wins
 -- loses the comparison.  Level 0 is returned when nothing is affordable
 -- and the base price itself is covered; nil when even the base is not,
 -- which IS "drop the verb".
@@ -1673,7 +1673,7 @@ end
 -- reflectable its magic_prop reflect bit, and slots the monsters ON
 -- STAGE -- alive and present -- each { slot, species, absorb, null,
 -- reflect } read from the slot's live record (the fight driver's
--- stageSlots).  Returns the offending slot and why: "absorb" (any element
+-- activeSlots).  Returns the offending slot and why: "absorb" (any element
 -- of the cast is drunk: a heal for the enemy), "reflect" (a reflectable
 -- cast at a Reflect bearer lands on the party), or "null" (every element
 -- of the cast is nulled: a wasted turn).  Absorb is judged across the
@@ -1799,15 +1799,15 @@ function M.partyWeapons()
   return out
 end
 
--- What is on stage right now, slot by slot (#172, #177): the slots whose
+-- What is in the formation right now, slot by slot (#172, #177): the slots whose
 -- presence bit ($3AA8) is set and whose HP is up, each with its species
 -- word ($57C0), the LIVE element record ($3BCC + entity*2: absorbed low
 -- byte, nulled high byte, seeded from MonsterProp +23/+24 by
 -- LoadMonsterProp) and its Reflect bit (status 3 bit 7, $3EF8).  This,
 -- not the formation's opening line-up (M.formationSpecies, $3F45), is
 -- "the monsters in this fight now": battle 70 reads $3F45 = $01 all fight
--- while Shiva stands on stage in slot 1.
-function M.stageSlots()
+-- while Shiva stands in the formation in slot 1.
+function M.activeSlots()
   local out = {}
   for slot = 0, 5 do
     if M.readWord(0x3BFC + slot * 2) > 0
@@ -1835,7 +1835,7 @@ end
 --
 -- This is the formation as it OPENED ($3F45 is copied once at load and
 -- never updated): a part or sibling that enters later is not in it.  For
--- what stands on stage now, M.stageSlots.
+-- what stands in the formation now, M.activeSlots.
 -- Formation 504 is legitimately empty, so a zero mask is "nothing to
 -- check" rather than an error.
 M.FORMATION_MASK = 0x3F45
@@ -1925,7 +1925,7 @@ end
 -- Returns an error message, or nil.  M.run calls this every frame and
 -- routes a message through its own FAIL path.  The opening line-up is
 -- checked once, GUARD_SETTLE frames in (M.formationSpecies, $3F45); after
--- that every slot that steps on stage (M.stageSlots, $3AA8 -- a part or a
+-- that every slot that steps in the formation (M.activeSlots, $3AA8 -- a part or a
 -- tag-team sibling the script materialises later, #177: battle 70's
 -- Shiva is not in $3F45 at all) is checked the first time it is seen.
 function M.absorbGuardTick()
@@ -1935,7 +1935,7 @@ function M.absorbGuardTick()
   end
   if not guardArmed then
     local fresh = {}
-    for _, st in ipairs(M.stageSlots()) do
+    for _, st in ipairs(M.activeSlots()) do
       local key = st.slot .. ":" .. st.species
       if not guardSeen[key] and st.species < 384 then
         guardSeen[key] = true
@@ -1945,7 +1945,7 @@ function M.absorbGuardTick()
     if #fresh == 0 then return nil end
     M.absorbGuardEntries = M.absorbGuardEntries + #fresh
     return guardReport(M.absorbClashesFor(M.partyWeapons(), fresh),
-      " (a monster that stepped on stage after the opening line-up)")
+      " (a monster that stepped in the formation after the opening line-up)")
   end
   guardSettle = guardSettle + 1
   if guardSettle < GUARD_SETTLE then return nil end
@@ -2419,10 +2419,10 @@ end
 -- is (frames * 4) & $FF: 60 values, one per phase.  $be then indexes
 -- RNGTbl (256 bytes), which every battle Rand/RandA/RandCarry walks.
 --
--- newSeedLadder spaces attempts by holding until $021e has advanced to
+-- newSeedSweep spaces attempts by holding until $021e has advanced to
 -- each attempt's own target phase (as widely as 60 phases allow), rather
 -- than by a fixed frame count, and reads the seed each attempt actually
--- drew off the store instruction, requiring it be distinct.  A ladder that
+-- drew off the store instruction, requiring it be distinct.  A sweep that
 -- plays one fight twice fails the run instead of passing silently.
 --
 -- The hold counts $021e's own movement rather than waiting for it to equal
@@ -2477,7 +2477,7 @@ end
 -- comparisons and local debugging. Use snapshot restoration directly for
 -- those experiments; this helper intentionally checks seed diversity.
 --
---   local L = H.newSeedLadder("battle 70")
+--   local L = H.newSeedSweep("battle 70")
 --   H.run({...}, {
 --     ...
 --     L.watch(),                  -- once, before the first attempt
@@ -2496,16 +2496,16 @@ end
 -- across attempts, and present for every attempt that ran.
 --
 -- opts.attempts (default 3) only sets the spacing; it is not a licence to
--- widen the ladder.
+-- widen the sweep.
 --
 -- opts.phaseSource replaces the live read of $021e, for callers that need
 -- to drive the hold with a synthetic sampler instead of the counter.
-function M.newSeedLadder(tag, opts)
+function M.newSeedSweep(tag, opts)
   opts = opts or {}
   local attempts = opts.attempts or 3
   local gap = opts.gap or (M.SEED_PERIOD // attempts)
   local phaseOf = opts.phaseSource or M.seedPhase
-  local L = { tag = tag or "ladder", seeds = {}, extras = {}, targets = {},
+  local L = { tag = tag or "sweep", seeds = {}, extras = {}, targets = {},
               spreads = {} }
   local base, cur, watching = nil, 0, false
 
@@ -2521,7 +2521,7 @@ function M.newSeedLadder(tag, opts)
       M.log(string.format("[%s] watching the battle seed store at $%06X "
         .. "(InitBattle=$%06X)", L.tag, addr, M.sym("InitBattle")))
       emu.addMemoryCallback(function()
-        if cur == 0 then return end               -- battles before the ladder
+        if cur == 0 then return end               -- battles before the sweep
         -- Mesen fires exec callbacks before the instruction runs, so A is the
         -- value about to land in $be.
         local seed = emu.getState()["cpu.a"] & 0xff
@@ -2622,7 +2622,7 @@ function M.newSeedLadder(tag, opts)
 
   -- The check.  Fails on a repeated seed, and fails when nothing was
   -- recorded, so a watcher pointed at the wrong instruction cannot report the
-  -- same green as a ladder that genuinely spread.
+  -- same green as a sweep that genuinely spread.
   L.report = function()
     return M.call(function()
       local ran, silent = {}, {}
@@ -2636,7 +2636,7 @@ function M.newSeedLadder(tag, opts)
       assert(#silent == 0, string.format(
         "%s: attempt(s) %s took a battle RNG phase and then drew no seed.  The "
         .. "watcher is on `sta $be` at battle init, so either that attempt "
-        .. "never reached a battle -- in which case this ladder's shape moved "
+        .. "never reached a battle -- in which case this sweep's shape moved "
         .. "and the spread is in the wrong place -- or the watcher missed one.",
         L.tag, table.concat(silent, ", ")))
       assert(#ran > 0, L.tag .. ": no battle seeding was recorded for any "
@@ -2654,7 +2654,7 @@ function M.newSeedLadder(tag, opts)
             .. "$%02X (game-time phase %d).  Same seed and the same route is "
             .. "the same fight, so these %d attempts are fewer than %d "
             .. "different fights and their verdict is not evidence about the "
-            .. "encounter.  Spread the attempts, do not widen the ladder (#74).",
+            .. "encounter.  Spread the attempts, do not widen the sweep (#74).",
             L.tag, prev, n, s.seed, s.phase, #ran, #ran), 0)
         end
         bySeed[s.seed] = n
@@ -2662,7 +2662,7 @@ function M.newSeedLadder(tag, opts)
       M.log(string.format("[%s] %d attempt(s), %d distinct battle RNG seeds",
         L.tag, #ran, #ran))
       -- Go inert.  The exec callback cannot be removed from outside one
-      -- (Mesen wants that on the CPU's own thread), so a finished ladder's
+      -- (Mesen wants that on the CPU's own thread), so a finished sweep's
       -- watcher would otherwise keep charging later battles to its last
       -- attempt.
       cur = 0
@@ -3898,7 +3898,7 @@ local BATTLE = {
   TGTALL = 0x7B7F,
   TONIC = 0xE8, POTION = 0xE9, FENIX_DOWN = 0xF0,
   AUTOCROSSBOW = M.AUTOCROSSBOW, PUMMEL = 0x5D,
-  -- The cures, cheapest first: the loop simply casts again if the target
+  -- The cures, cheapest first: the loop casts again if the target
   -- is still short, so overshoot is only wasted MP.  Under OT6 the upper
   -- tiers are folds of the base spell rather than separate grants, so in
   -- practice only the first of these is ever found in the list.
@@ -4024,8 +4024,8 @@ local function spellKnown(actor, id)
   return false
 end
 
--- What is on stage right now, slot by slot, with the LIVE record's
--- bytes (M.stageSlots): the slots whose presence bit ($3AA8) is set and
+-- What is in the formation right now, slot by slot, with the LIVE record's
+-- bytes (M.activeSlots): the slots whose presence bit ($3AA8) is set and
 -- whose HP is up, each with its species word, its absorb/null bytes
 -- ($3bcc,x, seeded from MonsterProp +23/+24 by LoadMonsterProp,
 -- battle_main.asm `lda f:MonsterProp+23,x / ora $3bcc,y`) and its
@@ -4036,20 +4036,20 @@ end
 -- present mask ($3F45, M.formationSpecies): that byte is the
 -- formation record's opening line-up, copied once at load and never
 -- updated, so a monster the script materialises later is not in it --
--- battle 70 reads $01 while Shiva stands on stage in slot 1, and a
+-- battle 70 reads $01 while Shiva stands in the formation in slot 1, and a
 -- guard enumerating that mask never saw her (CELES's Ice "took 0 off
 -- the monsters" three times a fight while she drank it).  And the ROM's
 -- species record: the slot's own $3bcc bytes are the engine's truth
 -- for whatever occupies it, seeded from the same record and robust to
 -- a slot being reloaded.  Only a slot that is alive AND on the field
--- can drink a cast: a tag-team sibling waiting off-stage is
+-- can drink a cast: a tag-team sibling waiting out of the formation is
 -- untargetable, and counting it vetoed the element for the whole fight
 -- (Ifrit & Shiva: Shiva's ice absorb blocked the Ice casts the fight's
 -- own design doc prescribes against Ifrit).  With the presence filter
 -- the guard doubles as the tag-fight strategy: the element flows while
--- its absorber is off-stage and yields to the sword the moment she
+-- its absorber is out of the formation and yields to the sword the moment she
 -- steps on.
-local stageSlots = M.stageSlots
+local activeSlots = M.activeSlots
 
 -- ---- the chip model (#156) -------------------------------------------
 -- What a person counts off the HUD before pressing: the target's shield
@@ -4338,7 +4338,7 @@ end
 
 -- The cast guards, shared by every attack-cast line (M.castVeto holds
 -- the decision; this is its log line).  A spell whose element something
--- on stage ABSORBS is a heal for the enemy (#99); a reflectable spell
+-- in the formation ABSORBS is a heal for the enemy (#99); a reflectable spell
 -- (magic_prop +3 bit 1 clear) cast at a monster under Reflect -- status
 -- 3 bit 7 -- deals it nothing and lands its full damage on a party
 -- member (#156: measured on Nerapa, every Bolt/Ice at every tier dealt
@@ -4357,7 +4357,7 @@ end
 -- half.  True means the cast is off the table this turn.
 function Driver:castVetoed(abilityId, what)
   local elem = M.spellElement(abilityId)
-  local s, why = M.castVeto(elem, M.spellReflectable(abilityId), stageSlots())
+  local s, why = M.castVeto(elem, M.spellReflectable(abilityId), activeSlots())
   if not s then return false end
   if why == "absorb" then
     M.log(string.format(
@@ -4424,7 +4424,7 @@ end
 
 -- The formation's linked parts (#189), read once a battle at the first
 -- command window: the live species words ($57C0, which carry a part not
--- yet on stage) and each species' AI script out of the ROM (AIScriptPtrs
+-- yet in the formation) and each species' AI script out of the ROM (AIScriptPtrs
 -- / AIScript, M.partRoles), through M.partsPlan.  A formation the plan
 -- has nothing to say about reads false and the focus stays the
 -- caller's; a planned one is said once, part by part, with its order.
@@ -4455,7 +4455,7 @@ function Driver:readParts()
   for slot = 0, 5 do
     if slots[slot] then
       said[#said + 1] = string.format("slot %d ($%03X%s): %s", slot, slots[slot].species,
-        monAlive(slot) and "" or ", off stage", plan.note[slot])
+        monAlive(slot) and "" or ", out of the formation", plan.note[slot])
     end
   end
   local order = {}
@@ -5739,7 +5739,7 @@ function Driver:makePlan(actor)
   -- the tier it folds to, so a caller-supplied row and MP price would be
   -- wrong to hand in.  spellCell answers both from the engine.  A
   -- character who cannot pay falls through to the branches below, so a
-  -- mage out of MP Fights instead of wedging the menu.
+  -- mage out of MP Fights instead of stalling the menu.
   --
   -- opts.magic[id].boost = false keeps the cast at its base tier, which is
   -- what a caller wants when the point is the element rather than the
@@ -6326,7 +6326,7 @@ function Driver:button(actor)
     end
   end
   -- The lore stall guard, checked wherever a lore plan is live rather
-  -- than only at plan time: a pursuit wedged inside the window (the
+  -- than only at plan time: a pursuit stalled inside the window (the
   -- wrong-row failure mode) never returns to makePlan on its own.
   if self.plan ~= nil and self.planActor == actor and self.plan.kind == "lore"
      and self.loreSpinN > BATTLE.LORE_STALL and not self.loreDead then
@@ -6689,7 +6689,7 @@ function Driver:button(actor)
     -- boss's part by its own id); the $7B7E bit that puts the cursor on
     -- slot S is 1 << S (btlgfx MonsterMaskTbl), and where that bit sits
     -- on screen is what the target graph learns.  Focus picks the first
-    -- entry whose slot is alive and on stage; single-target plans steer
+    -- entry whose slot is alive and in the formation; single-target plans steer
     -- to its mask (summons, items and cures keep their own targeting),
     -- and the tgtSpin backstop still confirms rather than holding the
     -- turn open.
@@ -6912,7 +6912,7 @@ function Driver:idle()
   if self.healSaid == "parked-out" then self.healSaid = nil end
   self.careActor, self.startSnap, self.planPulses = nil, nil, 0
   -- Everything the heal policy measured belongs to the battle that just
-  -- ended.  A retry ladder replays the same fight from a reload, and
+  -- ended.  A retry sweep replays the same fight from a reload, and
   -- carrying a round cost across the boundary would let one attempt's
   -- damage decide the next attempt's first turns.
   self.roundCost, self.turnSnap = {}, {}
@@ -6930,7 +6930,7 @@ function Driver:idle()
   execMon, execMonDone = nil, nil
   execMonCmd, execMonAtk = nil, nil
   -- The stall guard's verdict belongs to the battle it watched: a retry
-  -- ladder's reload is a different fight, and a recurrence should dump
+  -- sweep's reload is a different fight, and a recurrence should dump
   -- again there rather than inherit a dead lore line silently.
   self.loreSpinN, self.loreDead = 0, false
   self.skillDead = {}
@@ -7299,9 +7299,9 @@ function Driver:logBattleLine(menu)
     -- slot-tagged (the old word-stride read here printed a slotless
     -- garbage list -- "all zero, monsters=3" -- that misdiagnosed a live
     -- board as dead).  A slot is listed when it opened the fight ($3F45)
-    -- or stands on stage now ($3AA8, #177: battle 70's Shiva enters slot
+    -- or stands in the formation now ($3AA8, #177: battle 70's Shiva enters slot
     -- 1 later and the opening mask never lists her); monsters= counts
-    -- the ones alive on stage now (M.stageSlots), not the opening mask.
+    -- the ones alive in the formation now (M.activeSlots), not the opening mask.
     local mids = M.monsterIds()
     for s2 = 0, 5 do
       if mids[s2 + 1] ~= 0xFFFF or (M.readByte(0x3AA8 + s2 * 2) & 1) == 1 then
@@ -7324,7 +7324,7 @@ function Driver:logBattleLine(menu)
       self.tag or "fight", self.battleTick, menu, state,
       actor, M.readByte(BATTLE.CMDROW + actor) & 3,
       table.concat(rows, ","), table.concat(hp, ","),
-      table.concat(cost, ","), table.concat(mhp, ","), #M.stageSlots()))
+      table.concat(cost, ","), table.concat(mhp, ","), #M.activeSlots()))
   end
 end
 
@@ -7641,7 +7641,7 @@ end
 -- caller can promise, so the step answers both: run while there is anything
 -- to run from, and press through the win when there is not.
 --
--- "Nothing to run from" is nothing standing (M.stageSlots empty, which is
+-- "Nothing to run from" is nothing standing (M.activeSlots empty, which is
 -- live presence and live HP) with no battle menu open, so an A never lands
 -- on a command window; a wipe is not this shape and is still the canary's
 -- (a game over freezes the pad before an A can auto-Continue it).
@@ -7650,7 +7650,7 @@ end
 --
 -- What the run presses this frame (#245), pure so a test can put the two
 -- shapes side by side:
---   standing   monsters alive and on stage (the M.stageSlots count)
+--   standing   monsters alive and in the formation (the M.activeSlots count)
 --   menu       $7BCA, nonzero while a battle menu window is up
 --   state      $7BC2, that window's state (BATTLE.ST_CMD: the command window)
 --   phase      a frame counter for the A and B cadences
@@ -7682,7 +7682,7 @@ function M.fleeBattle(maxFrames)
   end, maxFrames or 9000, {
     M.call(function()
       phase = (phase + 1) % 8
-      M.setPad(M.fleePress({ standing = #M.stageSlots(), menu = M.readByte(BATTLE.MENU),
+      M.setPad(M.fleePress({ standing = #M.activeSlots(), menu = M.readByte(BATTLE.MENU),
                              state = M.readByte(BATTLE.MSTATE), phase = phase }))
     end),
   }, "flee battle (hold L+R)"), function() phase = 0 end)
@@ -7692,7 +7692,7 @@ end
 -- ---- the tile trace ---------------------------------------------------
 -- Records which tiles the party actually stood on, per map, and emits them
 -- as [tiles] log lines at each map change and at run end.  Read-only:
--- nothing written.  tools/chest_visibility.py harvests these lines from a
+-- nothing written.  tools/chest_visibility.py collects these lines from a
 -- regen log and intersects them with the chest table.  Samples only at
 -- tileAligned(), which keeps a mid-step direction-skewed coordinate out of
 -- the record; battle and menu frames re-record the frozen field tile,
@@ -7828,7 +7828,7 @@ end
 --
 -- HOW THE REPLAY IS CLEAN.  The step machine cannot be rewound: a step
 -- object holds its own counters, driveUntil has no reset at all, and the
--- generator's own upvalues (blobs, ladder tallies, "did we already buy it"
+-- generator's own upvalues (blobs, sweep tallies, "did we already buy it"
 -- flags) are the state that really matters.  So nothing is rewound.
 -- lib/compose.py wraps everything after the `local H = dofile(...)` line in
 -- `H.segmentBody(function() ... end)`, and an attempt is that function run
@@ -7850,11 +7850,11 @@ end
 -- emulator's own.
 --
 -- A GENERATOR WITH ITS OWN LADDER (gen_fc_alcove, gen_fc_escape,
--- gen_zozo4_dadaluma and the #163 ladders) is not double-retried: it runs
+-- gen_zozo4_dadaluma and the #163 sweeps) is not double-retried: it runs
 -- with allowGameOver, so its wipes never reach the canary, and when its
--- ladder is exhausted it raises its own message ("battle 69 not won in 3
+-- sweep is exhausted it raises its own message ("battle 69 not won in 3
 -- attempts"), which classifies as `other` and fails at once.  What the
--- default catches for those files is the part their ladder never covered:
+-- default catches for those files is the part their sweep never covered:
 -- the climb to the fight (#185 is exactly that).  A segment that wants out
 -- entirely passes opts.retries = 1.
 --
@@ -8390,9 +8390,9 @@ local function classify(msg)
   if msg:find("no path", 1, true) then return "nopath" end
   if msg:find("timeout after", 1, true) then return "timeout" end
   -- Only the lib's own wipe texts: the canary's verdict and the
-  -- unladdered encounter canary.  A generator's ladder reports its last
+  -- unswept encounter canary.  A generator's sweep reports its last
   -- loss inside its own exhaustion message ("not won in 3 attempts --
-  -- last loss: PARTY WIPED at f..."), and that is a ladder that already
+  -- last loss: PARTY WIPED at f..."), and that is a sweep that already
   -- retried, whose verdict is the balance finding: `other`, no re-roll.
   if msg:find("THE PARTY IS WIPED", 1, true)
      or msg:find("^GAME OVER fired") then return "wipe" end
@@ -8409,7 +8409,7 @@ RUN = {
   goUnhandled = nil,   -- { frame, what }: a counted game over no reload answered (#205)
   firstBattle = nil,   -- this attempt's first battle, as the seed store saw it (#208)
   firstBattles = {},   -- every earlier attempt's (and probe sample's), oldest first
-  nextShift = nil,     -- a replay's shift chosen by the caller, not the gap ladder
+  nextShift = nil,     -- a replay's shift chosen by the caller, not the gap sweep
   reroll = false,      -- the replay in flight re-runs this attempt (no count)
   rerolls = 0,
   tried = {},          -- shift % 60 -> true, every shift an attempt has run
@@ -8466,7 +8466,7 @@ end
 
 -- compose.py wraps everything after the `local H = dofile(...)` line in a
 -- call to this, so the runner can replay the body.  A script composed
--- before this existed (or composed by hand) simply never calls it: the
+-- before this existed (or composed by hand) never calls it: the
 -- runner then reports that retries are unavailable rather than pretending.
 function M.segmentBody(fn)
   M.__body = fn
@@ -8495,7 +8495,7 @@ function M.bootMark(what)
   -- the pad is captured and neutralised AFTER this frame's tick (the
   -- runner's frame(), below), before the game polls it, and handed back
   -- when the idle ends.  The idle's length is the game clock's own
-  -- movement ($021e ticks summed, as newSeedLadder counts them), not a
+  -- movement ($021e ticks summed, as newSeedSweep counts them), not a
   -- frame count, so a boot point that sits in a stopped clock (a map load,
   -- a fade the module does not tick through) still moves the seed.
   if RUN.shift > 0 then
@@ -8532,7 +8532,7 @@ end
 -- ------------------------------------------------ the first battle (#208) --
 -- What a seed shift is FOR is a different first battle, so every attempt
 -- records the RNG state its first battle starts from, at InitBattle's
--- seed store (M.seedStoreAddr, the exec watch newSeedLadder uses):
+-- seed store (M.seedStoreAddr, the exec watch newSeedSweep uses):
 --   $be      the battle seed about to be stored, ($021e * 4) & $FF: the
 --            whole in-battle stream (battle Rand walks RNGTbl from it)
 --   $11E0    the battle group the field or the event handed the battle
@@ -8582,7 +8582,7 @@ local function seedTraceTick()
   t.n = t.n + 1
   local ph = M.seedPhase()
   -- A running clock can read unmoved for one sampled frame (it is ticked at
-  -- the end of the owning module's vblank; newSeedLadder's note), so it
+  -- the end of the owning module's vblank; newSeedSweep's note), so it
   -- reads STOP only after two still frames in a row.
   t.still = ((ph - t.prev) % M.SEED_PERIOD) == 0 and (t.still or 0) + 1 or 0
   t.prev = ph
@@ -8622,7 +8622,7 @@ local function resetLibState()
   execCost = {}
   execHooks = false
   -- M.fizzles is NOT reset: a costed action the pool could not pay is a
-  -- finding whichever attempt made it, and the retry ladder's whole point
+  -- finding whichever attempt made it, and the retry sweep's whole point
   -- is that a lost attempt still happened (#230).
   M._killbitFired = false
   watchReset()
@@ -8704,7 +8704,7 @@ function M.run(opts, steps)
   -- after which the session has TIME-TRAVELED (roster and switches
   -- revert) while every naive predicate reads healthy.  So the default is
   -- LOUD: GameOver ends the attempt, unless the route declares it
-  -- survivable (opts.allowGameOver, or a ladder setting M.gameOverFired =
+  -- survivable (opts.allowGameOver, or a sweep setting M.gameOverFired =
   -- 0 after handling its reload).
   --
   -- READ watch, not exec: GameOver in bank $CC is EVENT SCRIPT DATA -- the
@@ -8879,7 +8879,7 @@ function M.run(opts, steps)
   end
 
   -- Restore the boot snapshot and replay the body; the reloading branch of
-  -- frame() re-executes it with RUN.nextShift (or the gap ladder's shift).
+  -- frame() re-executes it with RUN.nextShift (or the gap sweep's shift).
   local function scheduleReplay(why)
     M.log(string.format("[retry] attempt %d/%d: restoring the boot snapshot "
       .. "(%d bytes) and replaying the body %s",
@@ -9061,7 +9061,7 @@ function M.run(opts, steps)
         -- are the real game over, past which any A Continues the last save.
         if RUN.opts.allowGameOver then
           M.log(string.format("canary: allowGameOver -- the pad is not frozen on "
-            .. "this count; the body's ladder owns the loss (a stall after it "
+            .. "this count; the body's sweep owns the loss (a stall after it "
             .. "files as a wipe) (f%d)", M.frame))
         else
           M.freezePad("the party was wiped in battle")
@@ -9074,7 +9074,7 @@ function M.run(opts, steps)
       failed("wipe", string.format("GAME OVER fired (GameOver read x%d, " ..
         "TitleScreen exec x%d, battle wipe x%d) -- the run " ..
         "lost and any further input auto-Continues the last save, which " ..
-        "reads as silent time travel.  A ladder that can survive this " ..
+        "reads as silent time travel.  A sweep that can survive this " ..
         "must reload BEFORE the game-over lands, or clear " ..
         "M.gameOverFired after handling it (see #127's ambush finding).",
         goReadFired, titleExecFired, wipeFired), 3)
@@ -9083,7 +9083,7 @@ function M.run(opts, steps)
     M.frame = M.frame + 1
     if M.frame == 20 or M.frame % LIVE_IVL == 0 then M.liveShot() end
 
-    -- The boot snapshot for the replay: harvested here, a couple of
+    -- The boot snapshot for the replay: collected here, a couple of
     -- frames after it was asked for (below, after the tick).
     if RUN.s0 and RUN.s0.done and not RUN.s0blob then
       if RUN.s0.ok then

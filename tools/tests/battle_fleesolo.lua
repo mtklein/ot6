@@ -74,7 +74,7 @@ local function oldShape(arm, frames)
     return not H.battleLoadStarted() or n > frames
   end, frames + 120, {
     H.call(function()
-      standingAtEnd[arm] = #H.stageSlots()
+      standingAtEnd[arm] = #H.activeSlots()
       H.setPad({ l = true, r = true })
     end),
   }, "arm " .. arm .. ": the old shape, L+R only")
@@ -168,7 +168,7 @@ H.run({ maxFrames = 120000 }, {
       stagedFrame = H.frame
       H.log(string.format("[test] f%d staged: entity %d alone at its open Item list "
         .. "(menu=%02X st=%02X), the others at 0 HP; %s; %d monster(s) standing",
-        H.frame, survivor, H.readByte(MENU), st, counters(), #H.stageSlots()))
+        H.frame, survivor, H.readByte(MENU), st, counters(), #H.activeSlots()))
       return true
     end, 20000, {
       H.call(function()
@@ -196,7 +196,7 @@ H.run({ maxFrames = 120000 }, {
   H.call(function()
     H.log(string.format("[test] arm 1 (old shape, list open) after 1800 frames: battle=%s "
       .. "ran=%s standing=%d %s", tostring(H.battleLoadStarted()), tostring(ranSeen[1]),
-      #H.stageSlots(), counters()))
+      #H.activeSlots(), counters()))
     H.assertEq(H.battleLoadStarted() and ranSeen[1] == nil, true,
       "1. L+R alone under the open list for 1800 frames: nobody ran and the battle is "
       .. "still up -- the clock is stopped ($2F41) and the run counter never moves")
@@ -211,7 +211,7 @@ H.run({ maxFrames = 120000 }, {
     local flee = H.fleeBattle(6000)
     return H.driveUntil(function()
       if H.readByte(RAN) ~= 0 and ranSeen[2] == nil then ranSeen[2] = H.frame end
-      if H.battleLoadStarted() then standingAtEnd[2] = #H.stageSlots() end
+      if H.battleLoadStarted() then standingAtEnd[2] = #H.activeSlots() end
       return not H.battleLoadStarted()
     end, 6000, { flee }, "arm 2: M.fleeBattle from the staged moment")
   end)(),

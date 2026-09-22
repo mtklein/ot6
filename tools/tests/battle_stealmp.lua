@@ -14,7 +14,7 @@
 --     steal that was always going to fizzle (mp-economy.md ruling 2).  The
 --     universal insufficient-mp fizzle at CalcAttackEffect is still the
 --     backstop for a pool that moves between the commit and the resolve --
---     battle_mpcost exercises that seam -- but it is no longer what a player
+--     battle_mpcost exercises that hook point -- but it is no longer what a player
 --     meets.
 --     The 4 is flat at EVERY boost level, and both arms below are boosted so
 --     that they say so.  #219 made boosting cost 2.5x per level; the owner
@@ -491,7 +491,7 @@ H.run({ maxFrames = 150000 }, {
     -- drained LOCKE cannot spend the turn on a steal he cannot pay for; he
     -- gets magic's buzz and keeps the turn.  This arm asserts that, not the
     -- absence of a grant.  (The execution-time fizzle is still the backstop
-    -- for a pool that moves between the commit and the resolve; that seam is
+    -- for a pool that moves between the commit and the resolve; that hook point is
     -- battle_mpcost's.)
     H.call(function()
       drive.target = rareT

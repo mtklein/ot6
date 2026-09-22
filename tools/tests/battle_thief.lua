@@ -4,7 +4,7 @@
 
 -- Locke's four command rows are FIGHT, STEAL, MAGIC, ITEM; Steal opens the
 -- Tools-window shell with Steal, Filch and Bestow in it, and the row rides
--- the queued action's attack byte ($2bb0 -> $3a7b -> $b6).  Note that
+-- the queued action's attack byte ($2bb0 -> $3a7b -> $b6).
 -- $2bb0 + slot*8 is NOT where a write callback sees that byte land: phase 5
 -- measured a confirmed, paid-for Bestow with the watch silent.  Nothing
 -- below drives on it.

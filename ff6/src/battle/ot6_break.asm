@@ -297,7 +297,7 @@ Ot6ElemAddTbl:
         inx
         inx
         bra     @scan
-@band:  lda     OT6_SPECIES-8,y ; species -> census band 0-3
+@band:  lda     OT6_SPECIES-8,y ; species -> survey band 0-3
         ldx     #$0000
         cmp     #$0060
         bcc     @mul
@@ -341,7 +341,7 @@ hpmul:  .a16
 .endproc
 
 ; hp multiplier per species-id band, in 16ths ($10 = 1x, $28 = 2.5x).
-; bands follow the species census: $00-$5f the wob trash the demo
+; bands follow the species survey: $00-$5f the wob trash the demo
 ; fights, $60-$bf mid trash, $c0-$ff late trash, $100+ bosses/events.
 ; authored rows are exempt before this table applies; $100+ stays
 ; 1x so unauthored event species (doom gaze's saved-hp reload in
@@ -375,9 +375,9 @@ Ot6RewardMulW:
 ; change the party between z 0/2/3 while a step is resolving.  If
 ; CheckBattleSub rolls on that ladder, EventScript_RandBattle stops
 ; forever at $ca0029 waiting for the pre-battle scroll/object movement
-; to settle; the battle latch never comes up and player control never
+; to settle; the battle flag never comes up and player control never
 ; returns (measured: the (29,41)->(30,41) step, 66b8908 -- a PRE-battle
-; hang, battleLoadStarted never latches, with no Shadow in the party).
+; hang, battleLoadStarted never sets, with no Shadow in the party).
 ; The rectangle is the shaft's complete authored route (x 29..40,
 ; y 31..61); other rooms in composite map 225 lie outside it and keep
 ; their encounter pool.

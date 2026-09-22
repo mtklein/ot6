@@ -657,7 +657,7 @@
 ; [ open Cyan's SwdTech as a submenu ]
 ;
 ; vanilla SwdTech ran a free numeral gauge (UpdateMenuState_35/37, now dead):
-; a bar climbed one unit every 4 frames, the tech was bar>>5, and A latched
+; a bar climbed one unit every 4 frames, the tech was bar>>5, and A committed
 ; whatever level it happened to show. This module deletes the gauge and drives
 ; SwdTech through the Tools window shell instead, the twin of Ot6BlitzListOpen.
 ; OpenCmdMenuTbl[7] now hits a C1 stub that jsl's here then jmp's OpenToolsWindow.
@@ -669,7 +669,7 @@
 ; right column and any unused rows are $ff (empty), so the window renders a
 ; single column of 3.
 ; Confirm (Ot6BushidoConfirm) maps the picked cell back to r, banks OT6_BOOST_REVEALED=r, and
-; latches Ot6BushidoTier's tech, so single-select and enumeration share the
+; commits Ot6BushidoTier's tech, so single-select and enumeration share the
 ; same base+boost math and cannot diverge.
 ;
 ; entry: jsl from the C1 stub, db=$7e, a8/i16. clobbers a/x/y (the caller's next
@@ -718,7 +718,7 @@
 ; 0x tier is retired, so the window is three rows deep and row 3 always stays
 ; $ff (blank, and the C1 confirm refuses it). tech[i] shares Ot6BushidoTech's
 ; base+boost math and Ot6BushidoOblivion's top-tier swap with single-select, so
-; the menu cannot offer a tech the confirm latch would not fire. When Cyan
+; the menu cannot offer a tech the confirm commit would not fire. When Cyan
 ; knows fewer than three techs (ceiling < 2) only the known rows are emitted; a
 ; boost past the ceiling would cap to a duplicate tech, so its row is left
 ; $ff (unselectable) rather than shown.
@@ -791,7 +791,7 @@
 ; refusal is reached under nomp, where there is no grey and no gate, and
 ; stands as the backstop otherwise. Otherwise bank the boost (OT6_BOOST_REVEALED,entity = r; Ot6ActionEnd then
 ; charges r and skips that turn's regen, as an L/R spend would have),
-; latch the tech Ot6BushidoTier returns for boost r into the action queue, and
+; write the tech Ot6BushidoTier returns for boost r into the action queue, and
 ; close the menu. FixPlayerAttack's +$55 and Cmd_07's dispatch stay untouched.
 ;
 ; entry: db=$7e, a8/i16, X = selected cell byte offset (_c18470's). rtl.

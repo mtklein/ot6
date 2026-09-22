@@ -701,7 +701,7 @@ fight renamed to him), never route play.
 
 A character an AI script drives — CYAN in the Doma courtyard defence — is
 also one the player is not driving, and reaches `ExecMonsterAction` without
-ever passing `RandCharAction`; the latch is set there too (#238), and
+ever passing `RandCharAction`; the flag is set there too (#238), and
 `tools/tests/battle_retaliate_script.lua` plays that defence and measures
 his provoked scripted Fight dumping.
 

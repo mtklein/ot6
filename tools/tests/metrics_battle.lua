@@ -370,7 +370,7 @@ local function pulse()
   end
   local slot = H.readByte(ACTOR)
   local rec = bySlot[slot]
-  if rec == nil then return { "a" } end          -- unknown actor: don't wedge
+  if rec == nil then return { "a" } end          -- unknown actor: don't stall
   if ep.slot ~= slot then
     resetEpisode()
     ep.slot = slot

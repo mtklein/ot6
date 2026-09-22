@@ -472,7 +472,7 @@ end
 -- the same "only a real win reaches the tail" shape $0090 gives
 -- FlameEater, so the ladder here watches $050A instead of a battle-menu
 -- flag.
-local L45 = H.newSeedLadder("ambush (battle 45)", { attempts = 5 })
+local L45 = H.newSeedSweep("ambush (battle 45)", { attempts = 5 })
 local ambBlob, ambWon = nil, false
 
 local function ambushAttempt(n)
@@ -554,11 +554,11 @@ end
 -- Dadaluma/TunnelArmr use); a loss is vanilla GameOver.  L26 HP8400 vs a
 -- party around L16-19 is a long fight -- newFightDriver's own tactical
 -- kit (boosted Fight, TERRA's Cure, the item bag) fights it honestly, no
--- bespoke per-turn plan (the Aqua Rake/Ice Rod optimizations are filed,
--- not built -- see the header).  A seed ladder (H.newSeedLadder, 5 rungs
+-- custom per-turn plan (the Aqua Rake/Ice Rod optimizations are filed,
+-- not built -- see the header).  A seed sweep (H.newSeedSweep, 5 rungs
 -- like gen_sabin_train's battle 68) retries a loss from a checkpoint taken
 -- just before the trigger tile, with a care stop each attempt.
-local L79 = H.newSeedLadder("FlameEater (battle 79)", { attempts = 5 })
+local L79 = H.newSeedSweep("FlameEater (battle 79)", { attempts = 5 })
 local feBlob, feWon = nil, false
 
 local function flameEaterAttempt(n)
@@ -844,7 +844,7 @@ local steps = {
   ambushAttempt(5),
   H.call(function()
     if not ambWon then
-      error("ambush (battle 45): all 5 seed-ladder attempts lost", 0)
+      error("ambush (battle 45): all 5 seed-sweep attempts lost", 0)
     end
   end),
   L45.report(),

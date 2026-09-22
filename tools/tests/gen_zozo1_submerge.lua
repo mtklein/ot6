@@ -66,7 +66,7 @@ H.run({ maxFrames = 90000 }, {
   --    {49,14}.  Tier 1's invisible door-NPC no longer stands there
   --    (probe_n30: reachable in 9, tile unoccupied), and the tier-1
   --    corridor exit's (53,8) clifftop position is isolated after the
-  --    battle (probe_n20 census after full settle: zero reachable tiles),
+  --    battle (probe_n20 survey after full settle: zero reachable tiles),
   --    so the front door is now the only way to the streets.
   H.navTo(55, 35, { arrive = function() return map() == 20 end,
                     maxFrames = 12000, playBattles = "tactical" }),

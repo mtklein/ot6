@@ -505,7 +505,7 @@ ExecMonsterAction:
 @02dc:  jsl     Ot6UnctlMark            ; ot6 #238: a SCRIPT is choosing this
                                         ;   entity's action.  For a character
                                         ;   that is the engine driving it, and
-                                        ;   the latch says so; a monster is
+                                        ;   the flag says so; a monster is
                                         ;   ignored inside
         longa
         stz     $3a98
@@ -721,7 +721,7 @@ CalcCmdDelay:
 RandCharAction:
 @0420:  jsl     Ot6UnctlMark            ; ot6 #236: the ENGINE is choosing this
                                         ;   character's action, so it banks BP
-                                        ;   with nobody to spend it -- latch
+                                        ;   with nobody to spend it -- flag
                                         ;   that, and a hit will cash it in
         txa
         xba
@@ -1537,7 +1537,7 @@ _inputcheck:
         jsl     Ot6UnctlClear           ; ot6 #236: the other side of the same
                                         ;   decision -- the player has this
                                         ;   character's window back, so the
-                                        ;   "engine is driving it" latch drops
+                                        ;   "engine is driving it" flag drops
         jmp     _c211ef                 ; open battle menu
 
 ; ------------------------------------------------------------------------------
@@ -3425,19 +3425,19 @@ Cmd_10:
         ; universal insufficient-MP fizzle refuses the cast but runs after
         ; this command body, so a Gau who cannot pay would keep the
         ; whole-battle RAGE status for free and every possessed turn after it
-        ; is priced at 0.  Skip the beast latch and the status set and run the
+        ; is priced at 0.  Skip the beast flag and the status set and run the
         ; plain exec, whose fizzle is the standard refusal surface.
         jsl     Ot6RageStartGate        ; carry set = cannot pay the start
         bcc     @ot6_paid
         jmp     Cmd_02
 @ot6_paid:
 .endif
-        ; ot6: latch the trance's boost tier before anything else, and
+        ; ot6: record the trance's boost tier before anything else, and
         ; only on the start turn (the proc's own RAGE-bit test), because a
         ; mid-trance re-entry would read the already-consumed pending byte and
         ; drop the possession to tier 0.  Slot's OT6_SLOTTIER pattern
         ; at whole-battle range.
-        jsl     Ot6RageTierLatch
+        jsl     Ot6RageTierFlag
 @1560:  lda     $33a8,y
         inc
         bne     @1579
@@ -7088,7 +7088,7 @@ OSMOSE_MP_VANILLA  = 1                  ; the byte this replaces
 ; so CheckHit's multi-target arm (`bit #$20` at @22a1) branches straight to
 ; the carry-clear exit @22e8, an unconditional hit with no roll.  The
 ; per-target loop at @3440 then calls MagicStatusEffect unconditionally, which
-; stages $11ac into $3de8 ("status 3/4 to set"), and InitStatusVars masks THAT
+; writes $11ac into $3de8 ("status 3/4 to set"), and InitStatusVars masks THAT
 ; against $3330 ("blocked status 3/4", the per-monster immunity) before it is
 ; applied.  So an unblockable damage spell does apply its status bytes without
 ; a roll, and per-monster immunity is still consulted.
@@ -8459,7 +8459,7 @@ CalcAttackEffect:
         jsl     Ot6Oblivion     ; ot6: divine gate -- ChooseTarget has set $b8/$b9,
                                 ;   so the Broken/boss test finally has its target.
                                 ;   x=attacker, $3a7d=attack id, props still editable.
-        jsl     Ot6Assassinate  ; ot6: Shadow's divine -- same seam, Broken non-boss
+        jsl     Ot6Assassinate  ; ot6: Shadow's divine -- same hook point, Broken non-boss
                                 ;   instant kill (dormant until Shadow is fielded).
         phx
         lda     $b8         ; targets
@@ -13064,13 +13064,13 @@ FixPlayerAttack:
         ; ot6: the start turn's coin is rolled here, not in Cmd_10.  The
         ; menu's beast lands in $33a8,y and vanilla rolls the attack right
         ; away, so this RandRage runs before Cmd_10 and before its
-        ; Ot6RageTierLatch.  Latching here as well fixes that: the proc only
-        ; latches while the RAGE status is still clear, so this is the start
+        ; Ot6RageTierFlag.  Recording here as well fixes that: the proc only
+        ; records while the RAGE status is still clear, so this is the start
         ; turn by construction and
-        ; Cmd_10's own latch (which re-reads the not-yet-consumed pending byte)
-        ; is idempotent.  A = the beast id here, and the latch is a8 so it
+        ; Cmd_10's own record (which re-reads the not-yet-consumed pending byte)
+        ; is idempotent.  A = the beast id here, and the store is a8 so it
         ; touches only A's low half, which RandRage overwrites with its result.
-        jsl     Ot6RageTierLatch
+        jsl     Ot6RageTierFlag
         jsr     RandRage
         xba
         pla
@@ -15332,9 +15332,9 @@ DecCounters:
 ; instructions in the other order, same byte count, and every vanilla
 ; consumer below (stop, condemn, run-away, dot) still sits behind the
 ; presence test as before.  What changes is that Ot6Tick now reaches
-; a monster that is off stage.  Tag fights clear $3aa0.0 on the sibling that
+; a monster that is out of the formation.  Tag fights clear $3aa0.0 on the sibling that
 ; leaves (battle 70's swap is an AI turn, ai_script.asm:4523-4529), and a
-; Broken one used to freeze there while off stage.  The break is a real-time
+; Broken one used to freeze there while out of the formation.  The break is a real-time
 ; window; being off screen should not bank it.  Letting $3adc accumulate while
 ; absent is the only vanilla-side
 ; effect, and it changes nothing but that counter's phase on re-entry.
@@ -16997,7 +16997,7 @@ MonsterSpecialAnim:
 ; $C2:FE00 -- decompress code's data table -- and the CPU ran off into a
 ; STP: every 1/16 leave roll that passed after a won battle with Shadow
 ; aboard froze the game (measured, probe_shadow_leaves_wedge.lua: cpu.k=$C2
-; pc=$FEFA, cycle count frozen).  The "$ca0029 wedge" the encounter-
+; pc=$FEFA, cycle count frozen).  The "$ca0029 stall" the encounter-
 ; suppression rectangles were authored against was this halt seen from
 ; the field.
 .segment "battle_code"

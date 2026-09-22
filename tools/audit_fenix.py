@@ -41,7 +41,7 @@ the bags fell by 14):
 The threshold test runs on whichever of the two counts is larger for the
 fight: a boss the bags paid 8 into is flagged even when nobody rose.  Shop
 lines ("row 5 is Fenix Down = 240"), the driver's plan line ("revive entity
-1 with Fenix Down: raise to ...") and a bespoke driver's plan line ("revive:
+1 with Fenix Down: raise to ...") and a custom driver's plan line ("revive:
 e0 is down -- FENIX DOWN") are not uses.  The frame-stamped `[ot6note]`
 mirror of the `[ot6]` stream is skipped.
 
@@ -53,7 +53,7 @@ drop seen outside a battle, belongs to the nearest preceding
 member -- not to the care tag (a post-boss field care used to read as
 "Fenix in randoms").  A fight the audit never saw open (no `battle f+1`
 line before the care stop) leaves its Fenix unattributed, kind `?`.  The
-bespoke set-piece drivers (the Ghost Train, Vargas, the Whelk, ...) write
+custom set-piece drivers (the Ghost Train, Vargas, the Whelk, ...) write
 that line and the lib driver's `[death]` line themselves since #220, so a
 death in one of those fights and the Fenix that answered it are both
 visible; the deaths seen in a fight are printed beside a bag drop no
@@ -66,14 +66,14 @@ on its own, with the verdict's attempts=n/N beside it.  A ninja log (a
 retained qualification run under build/attempts) holds every edge's run
 output after that edge's `[k/N] generate <state> <- <gen>` line, so it is
 split into one segment per edge, `<log>:<state>`; edges with no run
-output (latches, checks) are dropped.  The default scan is the CURRENT
+output (copies, checks) are dropped.  The default scan is the CURRENT
 state logs only: build/states/<state>.log for every state in
 tools/tests/savestate_graph.py.  Name globs to scan anything else
 (build/test-runs/*/run.log, build/attempts/v018-qual1.log, a lab
 directory); --since 2h / --since 2026-09-16 / --newer <file> keep only
 logs written since then.
 
-A fight is BOSS when its driver tag is a bespoke set-piece driver or a
+A fight is BOSS when its driver tag is a custom set-piece driver or a
 spared/event formation; RANDOM when it is ordinary traversal (navTo /
 worldNavTo / advanceStory / rideOut / a world walk); `?` otherwise.
 """
@@ -107,7 +107,7 @@ BAG_LEFT = re.compile(r"^\[ot6\] \[(?P<tag>[^\]]+)\] used \$F0 on char \d+: .*?,
 TRACE = "[ot6action] "
 # the fight a care stop follows: the driver's own f+1 line
 BATTLE_UP = re.compile(r"^\[ot6\] \[(?P<tag>[^\]]+)\] battle f\+1 ")
-# a party death, the lib driver's line and the bespoke drivers' copy of it
+# a party death, the lib driver's line and the custom drivers' copy of it
 DEATH = re.compile(r"^\[ot6\] \[(?P<tag>[^\]]+)\] \[death\] f\+(?P<tick>\d+) entity (?P<e>\d) "
                    r"char (?P<char>\d+) from (?P<from>\d+)/(?P<max>\d+) by ")
 # the attempt boundaries and the verdict (tools/audit_retries.py's shapes)
@@ -118,7 +118,7 @@ FAIL = re.compile(r"^\[ot6\] FAIL: ")
 # a ninja log's edge line; the edge's run output follows it
 NINJA_EDGE = re.compile(r"^\[\d+/\d+\] (?P<verb>\S+) (?P<name>\S+)")
 
-# bespoke set-piece / boss driver tags (extend as the route grows)
+# custom set-piece / boss driver tags (extend as the route grows)
 BOSS_HINT = re.compile(
     r"\bb\d+\b|FlameEater|ambush|Ultros|Kefka|Vargas|Whelk|Dadaluma|TunnelArmr|"
     r"Ifrit|Shiva|Number|Cranes|Atma|pursuit|boss|magitek|"
@@ -531,11 +531,11 @@ def selftest():
         '[ot6action] {"actor":2,"elapsed_frames":40,"event":"drop","frame":7040,"id":4,"reason":"new_plan","v":1}',
         "[ot6] PASS (frame 9000) attempts=1/3",
     ])
-    # a bespoke set-piece driver (the Ghost Train, gen_sabin_train) writing
+    # a custom set-piece driver (the Ghost Train, gen_sabin_train) writing
     # the lib driver's battle-open, [death] and landing lines itself (#220):
     # the bag pays 2 into b68, one lands, one is thrown at a member the
     # train kills again before it lands and is forgotten
-    bespoke = "\n".join([
+    custom = "\n".join([
         "[ot6] [retry] segment runner: gen_sabin_train, up to 3 attempt(s), seed shift 0, watchdogs ON (no-effect 300 frames, no-progress 1800)",
         "[ot6] [pre-smokestack care] done: c2 358/358 hp 96/96 mp | tonic=86 potion=30 fenix=15 antidote=4 soft=2 remedy=0",
         "[ot6] [b68] battle f+1 partyhp=363,282,358,0 party_bp=1,1,1,0",
@@ -552,11 +552,11 @@ def selftest():
         "[ot6] [post-train care] done: c2 358/358 hp 96/96 mp | tonic=77 potion=27 fenix=13 antidote=4 soft=2 remedy=0",
         "[ot6] PASS (frame 47820) attempts=1/3",
     ])
-    # a ninja log: two generate edges' run output, a latch, a check, and an
+    # a ninja log: two generate edges' run output, a copy, a check, and an
     # edge line printed at its start with no output (ninja prints it again,
     # ahead of the output, when the edge finishes)
     ninja = "\n".join([
-        "[1/9] latch tools/tests/gen_x.lua",
+        "[1/9] copy_if_changed tools/tests/gen_x.lua",
         "[2/9] generate x <- gen_x",
         "[3/9] generate y <- gen_y",
         "[2/9] generate x <- gen_x",
@@ -589,7 +589,7 @@ def selftest():
         q = os.path.join(d, "build", "states", "cuts", "y.log")
         open(q, "w").write(traced + "\n")
         r = os.path.join(d, "build", "states", "train_done.log")
-        open(r, "w").write(bespoke + "\n")
+        open(r, "w").write(custom + "\n")
         z = os.path.join(d, "build", "states", "z.log")
         open(z, "w").write(lagged + "\n")
         n = os.path.join(d, "build", "attempts", "qual.log")
@@ -648,7 +648,7 @@ def selftest():
     # rather than guessing one
     assert tspends == [], tspends
     assert tdeaths == [], tdeaths
-    # the bespoke driver's log: its battle-open line attributes the bag's
+    # the custom driver's log: its battle-open line attributes the bag's
     # 2 to b68 (BOSS), one landed, one never landed, two deaths, and the
     # mirrored death and the LOST line are not deaths
     bgot = [(u["attempt"], u["fight"], u["cls"], u["kind"]) for u in buses]
@@ -692,7 +692,7 @@ def selftest():
     assert ("  t attempt 1/3 [b68]: 2 left the bag, 0 landed -- 2 raised nobody "
             "(no landing line accounts for them; 1 death(s) logged in that fight)") in out2.getvalue(), out2.getvalue()
     # the ninja log: one segment per edge with run output, named by the
-    # edge; the latch, the check and the edge line with nothing after it
+    # edge; the copy, the check and the edge line with nothing after it
     # are not segments, and the suite edge is one
     assert [s for s, _ in nsegs] == ["attempts/qual:x", "attempts/qual:y", "attempts/qual:battle_z"], nsegs
     assert scan_lines(nsegs[0][1])[1] == "2/3" and scan_lines(nsegs[1][1])[1] == "1/3"
@@ -711,7 +711,7 @@ def selftest():
     assert classify("b72") == "BOSS" and classify("Kefka vs Leo") == "BOSS"
     assert classify("world walk -> Jidoor approach (27,129)") == "RANDOM"
     assert classify("healerdown") == "?"
-    # the bespoke drivers' tags (#220)
+    # the custom drivers' tags (#220)
     for tag in ("b47", "b68", "vargas", "whelk", "marshal", "escape", "camp",
                 "descent", "kefka", "ultros2", "rapids", "river"):
         assert classify(tag) == "BOSS", tag

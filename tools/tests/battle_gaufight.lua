@@ -44,7 +44,7 @@
 --      weakness byte carries bludgeoning, checked both ways.
 --   4. rage possession is unaffected (battle A): rage is started from row 1 of
 --      the real menu, the window's cursor is steered to entry 0 by d-pad
---      against the live cursor cells with no pokes, the RAGE status latches,
+--      against the live cursor cells with no pokes, the RAGE status is set,
 --      at least one autonomous Gau action dispatches, and the X-cycled focus
 --      never lands on Gau, so CheckPlayerAction's STATUS34
 --      {DANCE, HIDE, RAGE} gate holds.
@@ -127,7 +127,7 @@ end
 -- resolve an unwanted battle: flee (L+R), falling back to winning it through
 -- the real menus if flight stalls (an unrunnable set-piece formation).
 local function resolveBattle(tag)
-  -- The single-lineage Veldt pool carries every formation the playthrough
+  -- The single-run Veldt pool carries every formation the playthrough
   -- has seen, armor draws included, so the fallback fights with the full
   -- kit (items, heals, revives, tactical skills) -- an unarmed tap-fighter
   -- wiped here against an M-TekArmor draw.  $b1 bit 1 is the engine's own
@@ -377,7 +377,7 @@ add({
     H.waitFrames(3),
     H.call(function() H.setPad({}) end),
     H.waitFrames(16),
-  }, "the RAGE status latches (Cmd_10 ran)"),
+  }, "the RAGE status is set (Cmd_10 ran)"),
   H.call(function() gauMenus, gauDispatches, rideN = 0, 0, 0 end),
                                       -- count openings/actions from the trance on
   -- ride the trance: the bench is X-cycled, so if the four-row

@@ -1,5 +1,5 @@
 -- probe_fc_dump394s.lua -- dump 394's tile props from fc_shadow (the
--- crossing lineage), whose mod_bg_tiles history differs from alcove2's.
+-- crossing run), whose mod_bg_tiles history differs from alcove2's.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x3ff) == m end
 H.run({ maxFrames = 20000 }, {

@@ -11,9 +11,9 @@
 -- OBLIVION (Cyan, Bushido tech 8, attack $5C).  Ot6Oblivion (hooked right
 -- after ChooseTarget in CalcAttackEffect) reads the target's broken timer:
 --   * Broken and killable   -> marks Death in the target's $3dd4 directly and
---     sets the once-per-battle latch.
+--     sets the once-per-battle flag.
 --   * unbroken or Broken boss -> rewrites the loaded props to a Tempest hit in
---     place (power 70, Death cleared): the reduced fallback, with the latch
+--     place (power 70, Death cleared): the reduced fallback, with the flag
 --     left clear.
 --
 -- Boots cyan_defence: a real solo Cyan (L11, katana) on map 120, surrounded
@@ -38,7 +38,7 @@
 -- enumerate the divine, and MP := 999 so the 99-MP cast is not refused.
 -- The boss-gate negative additionally sets the target's $3aa1 bit 2 (the
 -- boss bit), since no generated battle fields a death-protected body
--- beside Cyan. The latch-driven enumeration keeps its own latch pokes,
+-- beside Cyan. The flag-driven enumeration keeps its own flag pokes,
 -- since the only real setter in play is the kill, and killing the solo
 -- commander ends the battle before the window could reopen.
 
@@ -63,7 +63,7 @@ local cyanSlot, msPresent = nil, {}
 local b1HpBefore = nil
 local function bp() return H.readByte(0x3E9C + cyanSlot * 2) end
 local function pend() return H.readByte(0x3E9D + cyanSlot * 2) end
-local function latchSet() return (H.readByte(DIVINE_USED) & (1 << cyanSlot)) ~= 0 end
+local function flagSet() return (H.readByte(DIVINE_USED) & (1 << cyanSlot)) ~= 0 end
 local function inWindow() return H.readByte(MSTATE) == ST_SUB end
 local function rowId(r) return H.readByte(ITEMLIST + r * 6) end
 
@@ -199,7 +199,7 @@ local function castRow2(what)
       H.waitFrames(2),
       H.call(function() H.setPad({}) end),
       H.waitFrames(14),
-    }, what .. ": Oblivion latched from row 2"),
+    }, what .. ": Oblivion flagged from row 2"),
   }
 end
 
@@ -250,9 +250,9 @@ local function bootBattle(obj, what)
         parts[#parts + 1] = string.format("m%d hp=%d sh=%d brk=%02x", m,
           mhp(m), sh(m), brk(m))
       end
-      H.log(string.format("[%s] cyan slot %d bp=%d latch=%02x | %s", what,
+      H.log(string.format("[%s] cyan slot %d bp=%d flag=%02x | %s", what,
         cyanSlot, bp(), H.readByte(DIVINE_USED), table.concat(parts, " | ")))
-      H.assertEq(latchSet(), false, what .. ": divine latch clear at start")
+      H.assertEq(flagSet(), false, what .. ": divine flag clear at start")
       divineKills = {}
       watching = true
     end),
@@ -279,32 +279,32 @@ add({
   H.waitFrames(6),
   H.call(function()
     H.assertEq(rowId(2), 0x5C,
-      "latch CLEAR: row 2 (boost 3) enumerates Oblivion ($5c)")
+      "flag CLEAR: row 2 (boost 3) enumerates Oblivion ($5c)")
     H.screenshot("divine_oblivion_selectable")
   end),
-  -- labeled arm: the latch-driven enumeration (see header).  The set
+  -- labeled arm: the flag-driven enumeration (see header).  The set
   -- side cannot be produced by play here, because the only setter in normal
-  -- play kills the solo commander and ends the battle, so the latch bit is
+  -- play kills the solo commander and ends the battle, so the flag bit is
   -- poked set, read, and poked clear again; the poke never leaves this block.
-  closeWindow("battle 1: close, then set the latch and reopen"),
+  closeWindow("battle 1: close, then set the flag and reopen"),
   H.call(function()
     H.writeByte(DIVINE_USED, H.readByte(DIVINE_USED) | (1 << cyanSlot))
   end),
-  openWindow("battle 1: reopen with the latch SET (labeled poke)"),
+  openWindow("battle 1: reopen with the flag SET (labeled poke)"),
   H.waitFrames(6),
   H.call(function()
-    H.assertEq(rowId(2), 0x5B, "latch SET: row 2 falls back to Tempest ($5b)")
+    H.assertEq(rowId(2), 0x5B, "flag SET: row 2 falls back to Tempest ($5b)")
   end),
-  closeWindow("battle 1: close, then clear the latch and reopen"),
+  closeWindow("battle 1: close, then clear the flag and reopen"),
   H.call(function()
     H.writeByte(DIVINE_USED,
       H.readByte(DIVINE_USED) & (~(1 << cyanSlot) & 0xFF))
   end),
-  openWindow("battle 1: reopen with the latch CLEAR again"),
+  openWindow("battle 1: reopen with the flag CLEAR again"),
   H.waitFrames(6),
   H.call(function()
-    H.assertEq(rowId(2), 0x5C, "latch cleared: Oblivion ($5c) returns")
-    H.assertEq(latchSet(), false, "latch left clear for the fallback cast")
+    H.assertEq(rowId(2), 0x5C, "flag cleared: Oblivion ($5c) returns")
+    H.assertEq(flagSet(), false, "flag left clear for the fallback cast")
   end),
 })
 add({ H.call(function() b1HpBefore = mhp(msPresent[1]) end) })
@@ -315,14 +315,14 @@ add({
   H.call(function()
     local m = msPresent[1]
     H.log(string.format("[battle 1] after: hp=%d dead=%s present=%s "
-      .. "inProcKills=%d latch=%02x", mhp(m), tostring(dead(m)),
+      .. "inProcKills=%d flag=%02x", mhp(m), tostring(dead(m)),
       tostring(present(m)), #divineKills, H.readByte(DIVINE_USED)))
     H.assertEq(#divineKills, 0,
       "the UNBROKEN target drew NO in-proc Death mark -- the gate "
       .. "surgeried the hit to Tempest")
     H.assertEq(dead(m), false, "the unbroken commander took no Death")
     H.assertEq(present(m), true, "and is still present")
-    H.assertEq(latchSet(), false, "the divine latch stays CLEAR on a fallback")
+    H.assertEq(flagSet(), false, "the divine flag stays CLEAR on a fallback")
     H.assertEq(mhp(m) < b1HpBefore, true, string.format(
       "the reduced fallback DEALT damage (hp %d -> %d) -- a power-0 or "
       .. "bailing unbroken arm fails here", b1HpBefore, mhp(m)))
@@ -352,7 +352,7 @@ add({
   openWindow("battle 2: swdtech submenu opens"),
   H.waitFrames(6),
   H.call(function()
-    H.assertEq(rowId(2), 0x5C, "Oblivion ($5c) on row 2 (latch clear)")
+    H.assertEq(rowId(2), 0x5C, "Oblivion ($5c) on row 2 (flag clear)")
   end),
 })
 add(castRow2("battle 2"))
@@ -360,16 +360,16 @@ add({
   resolveCast("battle 2: the broken-target action resolves"),
   H.waitFrames(60),
   H.call(function()
-    H.log(string.format("[battle 2] after: inProcKills=%d latch=%02x",
+    H.log(string.format("[battle 2] after: inProcKills=%d flag=%02x",
       #divineKills, H.readByte(DIVINE_USED)))
     H.assertEq(#divineKills, 1,
       "Oblivion inflicted its guaranteed Death on the Broken commander -- "
       .. "one in-proc mark, no more")
     H.assertEq(dead(divineKills[1]), true,
       "and that body is dead (the engine's own resolution)")
-    H.assertEq(latchSet(), true,
-      "the engine SET the divine latch on the kill -- the set-side "
-      .. "latch edge (battle 1's poked pair covers only the enumeration)")
+    H.assertEq(flagSet(), true,
+      "the engine SET the divine flag on the kill -- the set-side "
+      .. "flag edge (battle 1's poked pair covers only the enumeration)")
     watching = false
     H.screenshot("divine_oblivion_kill")
   end),
@@ -399,7 +399,7 @@ add({
   H.waitFrames(6),
   H.call(function()
     H.assertEq(rowId(2), 0x5C,
-      "fresh battle: the latch is battle-scoped, Oblivion ($5c) returns "
+      "fresh battle: the flag is battle-scoped, Oblivion ($5c) returns "
       .. "with no poke ever having touched $3ecb")
   end),
 })
@@ -410,13 +410,13 @@ add({
   H.call(function()
     local m = msPresent[1]
     H.log(string.format("[battle 3] after: hp=%d dead=%s inProcKills=%d "
-      .. "latch=%02x", mhp(m), tostring(dead(m)), #divineKills,
+      .. "flag=%02x", mhp(m), tostring(dead(m)), #divineKills,
       H.readByte(DIVINE_USED)))
     H.assertEq(#divineKills, 0,
       "a Broken BOSS drew NO in-proc Death mark -- the gate withholds the "
       .. "kill from a death-protected body")
     H.assertEq(dead(m), false, "the boss took no Death")
-    H.assertEq(latchSet(), false, "and no divine was spent on it")
+    H.assertEq(flagSet(), false, "and no divine was spent on it")
     watching = false
     H.screenshot("divine_oblivion_boss")
   end),

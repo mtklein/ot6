@@ -60,7 +60,7 @@ H.run({ maxFrames = 60000 }, {
     playBattles = "flee",
     arrive = function()
       if mapIdx() == 133 then return true end          -- genuine success
-      -- dense tap through the battle window: the wedge forms in the
+      -- dense tap through the battle window: the stall forms in the
       -- ~900 frames after the encounter fires, so sample fast there
       local cadence = H.battleLoadStarted() and 60 or 300
       if H.frame - hb >= cadence then

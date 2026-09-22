@@ -290,7 +290,7 @@ Ot6DrawBushName:
         shorta
         jsr     _c35328                 ; BushidoName array ptr ($eb/$ef/$f1)
         lda     $e5
-        jsr     LoadArrayItem           ; stage the 12-tile name into $7e9e8b
+        jsr     LoadArrayItem           ; write the 12-tile name into $7e9e8b
         jmp     DrawPosTextBuf
 
 ; ---- a row's MP cost, "nn MP" (blanks when cost 0).  in: A=cost,$e6=row,X=col --

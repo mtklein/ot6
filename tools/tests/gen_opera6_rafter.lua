@@ -29,7 +29,7 @@
 --     both 0 (never arrived); verified-step fight-through 4163; the
 --     dodge policy used below 6938 with 100% arrival, ~3.0 fights.
 --
--- Re-measured 2026-09-07 on the v0.16 lineage (issue #160: the
+-- Re-measured 2026-09-07 on the v0.16 run (issue #160: the
 -- qualification crossed seven times chasing a 6000-frame bar).  35
 -- crossings of this policy from the qualification's own catwalk snapshot
 -- -- its 7, plus 28 through tools/tests/rafterlab_batch_gen.sh over holds
@@ -178,12 +178,12 @@ end
 -- `res` is a one-field table the caller reads afterwards: res.ok is true only
 -- if the party is standing on the goal.  The two ways to fail -- the chase
 -- clock running out, and a lost rat fight, which is a wipe -- both end the
--- drive quietly with res.ok false, because the caller is a retry ladder
+-- drive quietly with res.ok false, because the caller is a retry sweep
 -- that reloads and tries again.  `hold` (number or thunk) is that ladder's
 -- arrangement seed: aligned frames to stand still before setting off.
 --
 -- The policy is the lab's "dodge-h" (probe_rafterlab_dodge.lua); what it
--- yields on the current lineage is measured in the header above:
+-- yields on the current run is measured in the header above:
 --   * pulsed walking: every press is released on the first unaligned
 --     frame (a begun 16px step completes on its own); a press held
 --     through a step chains past junctions whose BOTH neighbors are
@@ -487,7 +487,7 @@ local function crossRafters(tx, ty, maxF, hold, res, what)
     wipeN = H.partyWiped() and wipeN + 1 or 0
     -- #163: the run canary's count is the same loss (it counts a
     -- 300-frame battle-side wipe as a game over and freezes the pad;
-    -- allowGameOver on the run keeps the ladder alive for the reload)
+    -- allowGameOver on the run keeps the sweep alive for the reload)
     if (H.gameOverFired or 0) > 0 and not lost then
       lost = "a lost rat fight (the run canary counted a game over)"
       H.log(string.format("cross: GAME OVER counted by the canary at f%d -- " ..
@@ -599,7 +599,7 @@ local function toDoor(tx,ty,bumpDir,destMap,what)
   })
 end
 
--- The crossing's retry ladder.  Attempt 1 runs from where the walk already
+-- The crossing's retry sweep.  Attempt 1 runs from where the walk already
 -- stands and is BANKED whenever it arrives standing with MIN_CROSS_TIMER
 -- still on the clock.  Margin past that floor buys nothing: the Ultros
 -- interaction's first opcode is `stop_timer 0` (ff6/src/event/
@@ -608,7 +608,7 @@ end
 -- is the facing press, the rat-free wait (19 frames in every measured
 -- run) and the >= 600 frames the exit contract asserts.  A person
 -- crosses once; the v0.16 qualification crossed seven times chasing a
--- 6000 bar this lineage clears about one time in twenty (issue #160).
+-- 6000 bar this run clears about one time in twenty (issue #160).
 --
 -- The later rungs are the fallback for a crossing that FAILED -- the
 -- clock ran out, a rat fight was lost, the party arrived hurt or under
@@ -616,7 +616,7 @@ end
 -- large number of frames before setting off.  Rat wander is a pure
 -- function of the chase clock (measured: blind to party input), so a
 -- reload replays the same rat schedule and the hold shifts only the
--- party's phase within it; note that the reload's 92-frame settle is
+-- party's phase within it; the reload's 92-frame settle is
 -- itself a hold attempt 1 never had, so a reloaded hold 0 is not
 -- attempt 1 again.  The fights are not replayed exactly (the same hold
 -- re-run from the same reload has arrived with 5349 and with 6585), so
@@ -628,7 +628,7 @@ local HOLDS = { 0, 250, 550, 900, 1300, 1750 }
 local ARRIVAL_HP_DIV = 8
 -- lab only (rafterlab_batch_gen.sh RAFTERLAB_ARRIVALS=1): a prefix here
 -- saves every arrival at (14,7), banked or not, as <prefix>arrival_<n>.mss
--- so the Ultros 2 fight can be measured from each.  nil in the lineage.
+-- so the Ultros 2 fight can be measured from each.  nil in the run.
 local LAB_ARRIVAL_PREFIX = nil
 local catwalkBlob = nil                -- captured on the catwalk, below
 
@@ -718,7 +718,7 @@ local function crossAttempt(n, hold)
   })
 end
 
--- allowGameOver: the crossing ladder deliberately survives a lost rat
+-- allowGameOver: the crossing sweep deliberately survives a lost rat
 -- fight (#163); crossRafters reads H.gameOverFired as a loss and the
 -- next attempt reloads.
 H.run({ maxFrames = 420000, allowGameOver = true }, {

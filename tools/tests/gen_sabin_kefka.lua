@@ -347,7 +347,7 @@ local function fightPulse(_)
   if fStreak < 4 then H.setPad({}); return end
   fTick = fTick + 1
   -- the fighter's own heartbeat: menu state, cursor cells, plan -- the
-  -- numbers a wedge diagnosis needs (300-frame cadence)
+  -- numbers a stall diagnosis needs (300-frame cadence)
   if H.frame - fHb >= 300 then
     fHb = H.frame
     local a = H.readByte(ACTOR)
@@ -556,7 +556,7 @@ local function stepOnto(x, y, untilPred, what, budget)
   })
 end
 
--- ------------------------------------------------------ the retry ladder --
+-- ------------------------------------------------------ the retry sweep --
 -- One pursuit attempt: (attempt 2+) reload the checkpoint with a small
 -- stagger, escalate the fighter, walk onto the trigger, fight battle 44,
 -- and ride the whole tail to CYAN's control on map 121.  `lost` short-
@@ -595,7 +595,7 @@ local function pursuitAttempt(n)
         frames = frames + 1
         if frames > 23000 and lost == nil then
           lost = string.format("pursuit attempt %d deadline (23000 " ..
-            "frames) with no win and no wipe seen -- a genuine wedge, " ..
+            "frames) with no win and no wipe seen -- a genuine stall, " ..
             "see #159/#163 [%s]", n, partyLine())
           H.log("kefka: LOST -- " .. lost)
         end
@@ -610,7 +610,7 @@ local function pursuitAttempt(n)
         frames = frames + 1
         if frames > 39000 and lost == nil then
           lost = string.format("attempt %d deadline (39000 frames) with no " ..
-            "win and no wipe seen -- a genuine wedge, see #159/#163 [%s]",
+            "win and no wipe seen -- a genuine stall, see #159/#163 [%s]",
             n, partyLine())
           H.log("kefka: LOST -- " .. lost)
         end

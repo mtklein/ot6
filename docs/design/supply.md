@@ -178,7 +178,7 @@ route carries the inn, and the sixth is the fight driver's.
   the seeded boot reached the shop with LOCKE 471/619, EDGAR 475/620 and
   127/149 MP).  Thamasa's 1-GP bed before the gauntlet is not taken,
   because `thamasa_done` arrives whole in both pools (measured); the step
-  is there for a lineage that does not.
+  is there for a run that does not.
 - **Elixir** -- never in the field.  `careKernel` does not name `$EE`,
   `$EC` or `$ED`, and a roster that lists two Elixirs at a care stop is
   correct to leave them.  A dry caster mid-fight is the fight driver's

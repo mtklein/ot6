@@ -1,5 +1,5 @@
 -- gen_kefka_won.lua -- boot kefka_entry, win battle 57 with real input (a
--- three-attempt retry ladder off the booted entry point).  Then ride the
+-- three-attempt retry sweep off the booted entry point).  Then ride the
 -- whole win tail (the esper cliff on map 23, TERRA's morph, the flight
 -- across the world, the regroup in Arvis's house) through the party-select
 -- menu to the first controllable frame, and generate kefka_won.mss on map
@@ -157,7 +157,7 @@ local function mkFighter(tier, tag)
   -- The lib's wipe predicate held 90 straight frames is the loss; so is
   -- the run canary's count (it now counts a 300-frame battle-side wipe as
   -- a game over and freezes the pad -- allowGameOver on the run keeps the
-  -- ladder alive for the reload).
+  -- sweep alive for the reload).
   function F.watch()
     watch.frame()
     wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
@@ -351,14 +351,14 @@ end
 
 -- Budget: the input-driven fight costs real ATB rounds and the ladder
 -- may replay it three times.
--- allowGameOver: the ladder deliberately survives a lost battle 57
+-- allowGameOver: the sweep deliberately survives a lost battle 57
 -- (#163); F.watch reads H.gameOverFired as a loss and the next attempt
 -- reloads.
 H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState("build/states/kefka_entry.mss.lua"),
   H.waitFrames(30),
 
-  -- the ladder's checkpoint is the booted entry point, one clean edge-A
+  -- the sweep's checkpoint is the booted entry point, one clean edge-A
   -- from battle 57
   (function()
     local ckReq
@@ -452,10 +452,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     H.assertEq(partyOf(0x02), 0, "CYAN stays to guard Narshe")
     H.assertEq(partyOf(0x0B), 0, "GAU stays to guard Narshe")
     H.assertEq(partyOf(0x00), 0, "TERRA is gone")
-    H.assertEq(sw(0x0139), 1, "$0139 SET -- the battle-won latch")
+    H.assertEq(sw(0x0139), 1, "$0139 SET -- the battle-won flag")
     H.assertEq(sw(0x0612), 0, "$0612 clear -- KEFKA gone")
     H.assertEq(sw(0x061D), 0, "raiders retired")
-    -- the tail-completion latches are set only once _ccc1b5's caller runs
+    -- the tail-completion flags are set only once _ccc1b5's caller runs
     -- to its return
     H.assertEq(sw(0x0602), 1, "$0602 SET -- the post-menu stretch ran")
     H.assertEq(sw(0x010B), 1, "$010B SET -- ditto")

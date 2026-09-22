@@ -77,7 +77,7 @@
 -- with the lib driver's plain kit (boosted Fight from whoever holds it,
 -- TERRA's Cure).
 --
--- The ambush is fought with a bespoke driver (newAmbushPlan, below), not
+-- The ambush is fought with a custom driver (newAmbushPlan, below), not
 -- H.newFightDriver: STRAGO alive casts Aqua Rake (lore id 3) every turn
 -- (multi-target water, all four Balloons are weak to it, and it also
 -- lowers their current HP so a surviving Balloon's self-destruct does
@@ -835,7 +835,7 @@ end
 -- M.run arms an exec canary on the event GameOver routine ($CC/E568) and
 -- fails the whole run (H.gameOverFired > 0 -> emu.stop(3)) the frame after
 -- it fires, unless opts.allowGameOver is set. This file's H.run() call
--- passes allowGameOver=true (both fights below are seed ladders built to
+-- passes allowGameOver=true (both fights below are seed sweeps built to
 -- survive a loss), so the canary alone no longer aborts the run -- but a
 -- real GameOver must still never be allowed to reach a title-screen
 -- Continue prompt.
@@ -869,7 +869,7 @@ end
 -- the very end, after the post-battle teardown -- the same "only a real
 -- win reaches the tail" shape $0090 gives FlameEater -- so the ladder here
 -- watches $050A instead of a battle-menu flag.
-local L45 = H.newSeedLadder("ambush (battle 45)", { attempts = 5 })
+local L45 = H.newSeedSweep("ambush (battle 45)", { attempts = 5 })
 local ambBlob, ambWon = nil, false
 
 -- battleLoadStarted()/battleActive() are both known-flaky on a single
@@ -881,7 +881,7 @@ local ambBlob, ambWon = nil, false
 local CONFIRM_BATTLE_GONE = 90
 
 -- ==================================================== the ambush FIGHT PLAN
--- Bespoke driver for this one fight, modeled on gen_narshe_battle.lua's
+-- Custom driver for this one fight, modeled on gen_narshe_battle.lua's
 -- raw per-character button-sequence fighter and battle_thief.lua's
 -- state-machine decide() -- not H.newFightDriver, which has no Lore arm at
 -- all and whose unconditional item/cure loop produces a revive treadmill
@@ -1293,10 +1293,10 @@ end
 -- Dadaluma/TunnelArmr use); a loss is vanilla GameOver.  L26 HP8400 vs a
 -- party around L16-19 is a long fight -- newFightDriver's own tactical
 -- kit (boosted Fight, TERRA's Cure, the item bag) fights it honestly, no
--- bespoke per-turn plan. A seed ladder (H.newSeedLadder, 5 rungs) retries
+-- custom per-turn plan. A seed sweep (H.newSeedSweep, 5 rungs) retries
 -- a loss from a checkpoint taken just before the trigger tile, with a
 -- care stop each attempt.
-local L79 = H.newSeedLadder("FlameEater (battle 79)", { attempts = 5 })
+local L79 = H.newSeedSweep("FlameEater (battle 79)", { attempts = 5 })
 local feBlob, feWon = nil, false
 
 local function flameEaterAttempt(n)
@@ -1704,7 +1704,7 @@ local steps = {
   ambushAttempt(5),
   H.call(function()
     if not ambWon then
-      error("ambush (battle 45): all 5 seed-ladder attempts lost", 0)
+      error("ambush (battle 45): all 5 seed-sweep attempts lost", 0)
     end
   end),
   L45.report(),
@@ -1748,7 +1748,7 @@ local steps = {
   houseWarp(21, 49, 46, 54, "P8 (21,49)->(46,54): into FlameEater's chamber"),
   care("before the FlameEater trigger"),
 
-  -- checkpoint the entry point for the retry ladder, once
+  -- checkpoint the entry point for the retry sweep, once
   H.call(function() H.log("[ot6] checkpointing before the FlameEater trigger") end),
   (function()
     local ckReq
@@ -1769,7 +1769,7 @@ local steps = {
   flameEaterAttempt(5),
   H.call(function()
     if not feWon then
-      error("FlameEater: all 5 seed-ladder attempts lost", 0)
+      error("FlameEater: all 5 seed-sweep attempts lost", 0)
     end
   end),
   L79.report(),

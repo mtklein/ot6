@@ -61,7 +61,7 @@ TINCTURE = 0xEB                        # the field-care MP restore, item id $EB
 INV_IDS = 0x1869 - 0x1600             # inventory ids, offset past the char table
 INV_QTY = 0x1969 - 0x1600             # inventory counts, one byte each
 
-# The first fixture past a shop that sells Potions on the routed lineage:
+# The first fixture past a shop that sells Potions on the routed run:
 # the Phantom Train's ghost merchant (shop 85).  Figaro's shop 4 and South
 # Figaro's shop 8 stock none (shop_prop.dat), so the band applies from here.
 FIRST_POTION_SHOP = "train_done"
@@ -328,7 +328,7 @@ def selftest(repo: str = ".") -> int:
     else:
         # 20 pins the #198 re-cut (832740ee, from the regenerated
         # ifrit_entry); re-cut B (2026-09-01) carried 13 and the fled
-        # lineage's payload 2.  The pin is the checkpoint reader's
+        # run's payload 2.  The pin is the checkpoint reader's
         # regression canary, so it tracks whatever the sealed payload
         # truly holds.
         n, err = revives_of_sram(cps["mrf-save-room-v1"])

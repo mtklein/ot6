@@ -474,7 +474,7 @@ qualification's shape (a member down, the other soloing on the bag).
 (`lab_rizopas_bake.lua`: `store seed=$18`), was not landed by any prompt
 tried (35, 36 and 37 drew `$14`, 38 and 39 `$28` — the knob steps over
 phase 6); the
-qualification lineage's actual seed is unrecorded (the gen never logged
+qualification run's actual seed is unrecorded (the gen never logged
 `$be`) and the walk has drifted since (CYAN reached the jump at 338/358
 then, 307/358 now), so "the qualification's seed" is not a reproducible
 target — the spread above brackets it with `$14` (one phase off) and

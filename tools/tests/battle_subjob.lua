@@ -166,7 +166,7 @@ end
 local mf = 0
 local celesMode = "defer"                -- "defer"|"cast"
 local wantPend, castRec = 0, nil
-local tgtLatch, tgtAge, tgtPress
+local tgtFlag, tgtAge, tgtPress
 local function decide()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
@@ -174,11 +174,11 @@ local function decide()
   if H.readByte(MSTATE) == ST_TGT then
     local m = H.readByte(0x7B7D)
     if m ~= 0 then
-      if m == tgtLatch then tgtAge = (tgtAge or 0) + 1
-      else tgtLatch, tgtAge = m, 1 end
+      if m == tgtFlag then tgtAge = (tgtAge or 0) + 1
+      else tgtFlag, tgtAge = m, 1 end
     end
   else
-    tgtLatch, tgtAge, tgtPress = nil, 0, 0
+    tgtFlag, tgtAge, tgtPress = nil, 0, 0
   end
   mf = mf + 1
   local act = H.readByte(ACTOR) & 3
@@ -221,7 +221,7 @@ local function decide()
           if pct < wpct then worst, wpct = s, pct end
         end
       end
-      if worst == nil or tgtLatch == (1 << worst) and (tgtAge or 0) >= 4 then
+      if worst == nil or tgtFlag == (1 << worst) and (tgtAge or 0) >= 4 then
         btn = "a"
       else
         local dirs = { "down", "up", "left", "right" }
@@ -283,7 +283,7 @@ local function driveTo(pred, maxF, tag)
     H.call(function()
       -- Life support, not play: the fold/MP measurements need CELES to
       -- bank real BP turns while three allies idle in a boss fight, and
-      -- the fighting lineage's fixture wipes before the ~20k-frame pass
+      -- the fighting run's fixture wipes before the ~20k-frame pass
       -- C completes (the fled fixture squeaked through on luck).  HP is
       -- not a measured quantity -- lists, MP, BP and the queue are --
       -- so the patient is clamped alive: every ally's battle HP tops to
@@ -335,7 +335,7 @@ H.run({ maxFrames = 150000 }, {
   H.call(function()
     H.assertEq(H.readByte(0x1A69) & 0x01, 0x01,
       "RAMUH is genuinely owned ($1A69 bit 0, the Zozo gift)")
-    -- The fighting lineage's n024_entry arrives with CELES wearing RAMUH
+    -- The fighting run's n024_entry arrives with CELES wearing RAMUH
     -- (the facility fix dresses her in town); the negative control needs
     -- her bare, and the grant is computed live from the worn byte, so
     -- clearing it IS the never-wore-it state.  Declared in

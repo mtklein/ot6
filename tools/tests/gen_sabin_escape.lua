@@ -356,7 +356,7 @@ local function fightPulse(_)
   if fStreak < 4 then H.setPad({}); return end
   fTick = fTick + 1
   -- the fighter's own heartbeat: menu state, cursor cells, plan -- the
-  -- numbers a wedge diagnosis needs (300-frame cadence)
+  -- numbers a stall diagnosis needs (300-frame cadence)
   if H.frame - fHb >= 300 then
     fHb = H.frame
     local a = H.readByte(ACTOR)
@@ -594,7 +594,7 @@ local function talkForFight(cx, cy, wantSw, what, budget)
         n = n + 1
         if n > cap and lost == nil then
           lost = string.format("%s: attempt deadline at %d frames with no " ..
-            "win and no wipe seen -- a genuine wedge, see #159/#163 [%s]",
+            "win and no wipe seen -- a genuine stall, see #159/#163 [%s]",
             what, cap, partyLine())
           H.log("escape: LOST -- " .. lost)
         end
@@ -642,7 +642,7 @@ end
 local function cyanX() return objX(18) end
 local function cyanY() return objY(18) end
 
--- ------------------------------------------------------ the retry ladder --
+-- ------------------------------------------------------ the retry sweep --
 -- One waves attempt: (attempt 2+) reload the boot-moment checkpoint with a
 -- small stagger and the fighter escalated, then take the three talks in
 -- order; a `lost` mid-run short-circuits the remaining waves so the next
@@ -707,7 +707,7 @@ H.run({ maxFrames = 250000, allowGameOver = true }, {
       H.frame, H.fieldX(), H.fieldY(), cyanX(), cyanY()))
   end),
 
-  -- 1. the three waves, with real input, behind the ladder.  CYAN moves
+  -- 1. the three waves, with real input, behind the sweep.  CYAN moves
   --    between
   -- them, so his tile is a thunk.
   (function()

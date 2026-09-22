@@ -36,7 +36,7 @@ local function bagLine(tag)
     H.invCountOf(FENIX))
 end
 
--- the generator's pacing pair (its census picks these on this plain)
+-- the generator's pacing pair (its survey picks these on this plain)
 local ax, ay, bx, by = 38, 112, 24, 120
 local wiped = false
 local steps = {

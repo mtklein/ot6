@@ -14,7 +14,7 @@
 --      fire/ice) + lib newFightDriver {tactical, boost, bank=3, items,
 --      healer=LOCKE, nuke={Ice}}, with per-300-frame sibling telemetry,
 --      shield-chip edges, swap edges, and the absorb-guard question
---      (does the driver refuse Celes' Ice because off-stage SHIVA $0108
+--      (does the driver refuse Celes' Ice because a SHIVA $0108 not in the formation
 --      is a formation species?) answered by the driver's own log lines.
 -- PASSes whether the recon fight wins or loses; only the fixture bank
 -- itself is load-bearing.  One [result] line either way.

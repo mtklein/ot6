@@ -9,7 +9,7 @@
 #             classfix class-correct loadout (pierce for Ifrit's 6 pierce
 #                      shields, slash for Shiva's 6 slash) + lib driver + a
 #                      designated healer + nuke={Ice}
-#             bespoke  the design-doc per-turn play: CELES casts boosted Ice
+#             custom  the design-doc per-turn play: CELES casts boosted Ice
 #                      ONLY while IFRIT holds the stage (Shiva absorbs ice),
 #                      everyone else Fights class-correct (unboosted while the
 #                      staged sibling still has shields -- chip is per-hit, so
@@ -27,7 +27,7 @@
 # HEALPCT, BANK, HEALER, JOBS, TAG, FIXTURE.
 #
 # Machine etiquette: JOBS defaults to 2 and is clamped to 2 (this campaign's
-# ceiling on concurrent emulator runs per agent while a release census runs).
+# ceiling on concurrent emulator runs per agent while a release survey runs).
 #
 # Results and per-run logs land in build/ifritlab/.
 set -u

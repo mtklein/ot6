@@ -484,7 +484,7 @@ local function lossReload(blobFn, tag)
   })
 end
 
-local L45 = H.newSeedLadder("ambush (battle 45)", { attempts = 5 })
+local L45 = H.newSeedSweep("ambush (battle 45)", { attempts = 5 })
 local ambBlob, ambWon = nil, false
 
 local CONFIRM_BATTLE_GONE = 90
@@ -954,10 +954,10 @@ end
 -- Dadaluma/TunnelArmr use); a loss is vanilla GameOver.  L26 HP8400 vs a
 -- party around L16-19 is a long fight -- newFightDriver's own tactical
 -- kit (boosted Fight, TERRA's Cure, the item bag) fights it honestly, no
--- bespoke per-turn plan.  A seed ladder (H.newSeedLadder, 5 rungs
+-- custom per-turn plan.  A seed sweep (H.newSeedSweep, 5 rungs
 -- like gen_sabin_train's battle 68) retries a loss from a checkpoint taken
 -- just before the trigger tile, with a care stop each attempt.
-local L79 = H.newSeedLadder("FlameEater (battle 79)", { attempts = 5 })
+local L79 = H.newSeedSweep("FlameEater (battle 79)", { attempts = 5 })
 local feBlob, feWon = nil, false
 
 local function flameEaterAttempt(n)
@@ -1123,7 +1123,7 @@ local steps = {
       H.charHp(TERRA), H.charMaxHp(TERRA), H.charHp(LOCKE), H.charMaxHp(LOCKE)))
   end),
   -- Best-effort: each gear piece equips only if the bag holds it; a piece
-  -- this lineage never bought or already wears keeps the current slot,
+  -- this run never bought or already wears keeps the current slot,
   -- with a log.  (Same inline pattern as gen_ifrit_magicite /
   -- gen_banquet_done: a shared lib helper would re-stale every generated
   -- state in the chain.)
@@ -1140,7 +1140,7 @@ local steps = {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end
@@ -1358,7 +1358,7 @@ local steps = {
   ambushAttempt(5),
   H.call(function()
     if not ambWon then
-      error("ambush (battle 45): all 5 seed-ladder attempts lost", 0)
+      error("ambush (battle 45): all 5 seed-sweep attempts lost", 0)
     end
   end),
   L45.report(),
@@ -1400,7 +1400,7 @@ local steps = {
   houseWarp(21, 49, 46, 54, "P8 (21,49)->(46,54): into FlameEater's chamber"),
   care("before the FlameEater trigger"),
 
-  -- checkpoint the entry point for the retry ladder, once
+  -- checkpoint the entry point for the retry sweep, once
   H.call(function() H.log("[ot6] checkpointing before the FlameEater trigger") end),
   (function()
     local ckReq
@@ -1421,7 +1421,7 @@ local steps = {
   flameEaterAttempt(5),
   H.call(function()
     if not feWon then
-      error("FlameEater: all 5 seed-ladder attempts lost", 0)
+      error("FlameEater: all 5 seed-sweep attempts lost", 0)
     end
   end),
   L79.report(),

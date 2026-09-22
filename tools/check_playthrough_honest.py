@@ -8,7 +8,7 @@ library snapshot helpers or require continuous replay from the game's start.
 A generator (tools/tests/gen_*.lua) may not write emulated game state -- no
 emu.write, no M.writeByte/writeWord, and no M.clearBattle (which writes the
 kill-bit through the library) -- unless named in UNIT_FIXTURE_GENERATORS as
-a standalone unit fixture: a leaf off the story spine nothing boots from.
+a standalone unit fixture: a leaf off the critical path nothing boots from.
 Suite tests, probes and measurement instruments are out of scope; those are
 governed by check_state_writes.py.
 
@@ -28,12 +28,12 @@ import sys
 WRITE_TOKENS = (".writeByte(", ".writeWord(", "emu.write", "clearBattle")
 
 # Generators exempt because they mint a standalone unit fixture off the
-# story spine -- a leaf nothing boots from.
+# critical path -- a leaf nothing boots from.
 UNIT_FIXTURE_GENERATORS = {
     "gen_battle2": "standalone sprite-anchor check: clamps the two guards to "
                    "1 HP to reach the mixed-formation render state fast. Its "
                    "state battle2_entry is a leaf (savestate_graph: no "
-                   "children), off the whelk_entry story spine, so nothing on "
+                   "children), off the whelk_entry critical path, so nothing on "
                    "the release playthrough boots from it.",
 }
 
@@ -90,7 +90,7 @@ def selftest() -> int:
     check("honest input is not a write",
           writes_token_in('H.navTo(25, 52, { playBattles = "flee" })'), False)
 
-    # gen_battle2 must still be a leaf off the spine, or the exemption is
+    # gen_battle2 must still be a leaf off the critical path, or the exemption is
     # wrong.
     try:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -101,7 +101,7 @@ def selftest() -> int:
                 or s.get("checkpoint") == "battle2_entry"]
         if kids:
             ok = False
-            print(f"  SELFTEST FAIL gen_battle2 is allowlisted as an off-spine "
+            print(f"  SELFTEST FAIL gen_battle2 is allowlisted as an off-critical-path "
                   f"leaf, but battle2_entry now has descendants {kids} -- it is "
                   f"on the playthrough and must not write state")
     except Exception as e:
@@ -137,7 +137,7 @@ def main() -> int:
               "actually reached, and every state below it inherits that.\n"
               "Drive the state through real input instead (playBattles="
               '"flee"/"tactical", real menus, real items).  If this generator '
-              "truly\nmints a standalone unit fixture off the story spine "
+              "truly\nmints a standalone unit fixture off the critical path "
               "(a leaf nothing boots from), add it to "
               "UNIT_FIXTURE_GENERATORS with the\nreason -- but check the graph "
               "first.")

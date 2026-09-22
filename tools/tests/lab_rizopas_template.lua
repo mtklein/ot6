@@ -329,7 +329,7 @@ local function bagNow(id, baseline)
 end
 
 -- the seed InitBattle draws, read off the `sta $be` store the way
--- H.newSeedLadder reads it (lib/ot6.lua "battle rng seed")
+-- H.newSeedSweep reads it (lib/ot6.lua "battle rng seed")
 local seedDrawn, seedN = nil, 0
 local function armSeedWatch()
   local addr = H.seedStoreAddr()

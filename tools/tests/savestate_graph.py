@@ -28,7 +28,7 @@
 #       its staleness -- ninja's order-only dependency.
 #
 # What participates in a state's staleness (all by CONTENT, via the
-# generator's latch edges -- a checkout's mtime bump regenerates nothing):
+# generator's copy-if-changed edges -- a checkout's mtime bump regenerates nothing):
 #   * the ROM (build/ot6.sfc),
 #   * the generator .lua,
 #   * all three composed-in lib halves: lib/ot6.lua, lib/ot6_field.lua and
@@ -127,7 +127,7 @@ STATES = [
     S("locke_scenario", gen="gen_scenario_locke", prev="scenario_hub"),
 
     # ---- the pinned scenario order (owner, 2026-08-26): LOCKE -> SABIN
-    # -> TERRA, one lineage, nothing replayed.  One player, one
+    # -> TERRA, one run, nothing replayed.  One player, one
     # cartridge: scenario choice is order, not branching.  TERRA goes
     # last because gen_terra_done's ending is the reunion-aware one.
     #
@@ -176,7 +176,7 @@ STATES = [
     # gen_sabin_magitek: the Imperial Camp escape -- ride the fight/interlude
     # gauntlet out to the World of Balance.  Battles 15/16/17 are each WON BY
     # TAP-A (writing the battle-clearing flag instead softlocks on GameOver),
-    # and each latchless re-firing trigger is left by holding the corridor's
+    # and each flagless re-firing trigger is left by holding the corridor's
     # walkable direction through the ~25% control flap (see the generator
     # header).
     S("camp_escaped", gen="gen_sabin_magitek", prev="doma_defended"),
@@ -262,7 +262,7 @@ STATES = [
       timeout=3600),
     # gen_zozo3_clock: the street's CAFE door (42,28) -> the clock room (map
     # 225) -> the clock tile {98,59} -> 6:10:50 across three CHAINED choice
-    # dialogs, each verified by its own $01F* latch -> the hidden staircase
+    # dialogs, each verified by its own $01F* flag -> the hidden staircase
     # opens ($01F0).
     S("zozo_clock_solved", gen="gen_zozo3_clock", prev="zozo_arrival"),
     # gen_zozo4_dadaluma: the crane maze -- five doors, the stair room's
@@ -573,9 +573,9 @@ STATES = [
     # (ai_script.asm:6267-6355), so the whole offense is elemental WEAPONS
     # (TERRA's Fire Rod / LOCKE's ThunderBlade = bolt) swung as physical
     # Fights and healing is item-only -- zero MAGIC commands, the form never
-    # arms.  A 5-rung seed ladder (H.newSeedLadder) retries a loss from a
+    # arms.  A 5-rung seed sweep (H.newSeedSweep) retries a loss from a
     # savestate taken just after the lore scene.  timeout=1800: the 22000-HP
-    # fight behind a seed ladder plus two warp-maze crossings runs past
+    # fight behind a seed sweep plus two warp-maze crossings runs past
     # run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
     # deliberate by-hand operation:
     #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/esper-mtn-save-v1 \
@@ -591,14 +591,14 @@ STATES = [
     # 375 (15,17) -- the save comp -> (11,51) $0097 shortcut -> the SE
     # compartment -> 372 (51,17) -> 372 (40,19) -> the pocket (16,9), all navTo
     # hops -- then ride the atomic massacre chain: solo Leo's battle 124 (a real
-    # loseable fight whose loss is a GAME OVER, behind a 5-rung seed ladder off a
+    # loseable fight whose loss is a GAME OVER, behind a 5-rung seed sweep off a
     # pre-fight savestate with a GameOver read-canary), the scripted theater
     # battles 105/97, Leo's death, the party restore, the burial and the
     # Blackjack's return, and the real world Save at the stop line world
     # (249,128) -- the `thamasa-done-v1` checkpoint.  checkpoint=, not prev=:
     # this state cold-Continues the tracked ultros-won-v1 battery rather than a
     # savestate link, the gen_ultros / gen_esper_mtn shape.  timeout=1800: the
-    # warp-maze climb, a seed-laddered solo fight, and the long scripted tail run
+    # warp-maze climb, a seed-swept solo fight, and the long scripted tail run
     # past run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
     # deliberate by-hand operation:
     #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/ultros-won-v1 \

@@ -339,7 +339,7 @@ local function fightPulse(_)
   if fStreak < 4 then H.setPad({}); return end
   fTick = fTick + 1
   -- the fighter's own heartbeat: menu state, cursor cells, plan -- the
-  -- numbers a wedge diagnosis needs (300-frame cadence)
+  -- numbers a stall diagnosis needs (300-frame cadence)
   if H.frame - fHb >= 300 then
     fHb = H.frame
     local a = H.readByte(ACTOR)
@@ -517,7 +517,7 @@ local function landedField(m, n)
   end
 end
 
--- ------------------------------------------------------ the retry ladder --
+-- ------------------------------------------------------ the retry sweep --
 -- One commander attempt: (attempt 2+) reload the checkpoint with a small
 -- stagger, reset the fighter to the escalated tier, poke the commander, and
 -- ride the fight + interlude tail back to the camp.  `lost` short-circuits
@@ -558,7 +558,7 @@ local function cmdAttempt(n)
         frames = frames + 1
         if frames > 29000 and lost == nil then
           lost = string.format("attempt %d deadline (29000 frames) with no " ..
-            "win and no wipe seen -- a genuine wedge, see #159/#163 [%s]",
+            "win and no wipe seen -- a genuine stall, see #159/#163 [%s]",
             n, partyLine())
           H.log("camp: LOST -- " .. lost)
         end
@@ -576,7 +576,7 @@ local function cmdAttempt(n)
   }, {})
 end
 
--- allowGameOver: the two retry ladders below (battle 46, battle 42)
+-- allowGameOver: the two retry sweeps below (battle 46, battle 42)
 -- deliberately survive a lost fight (#163); rideUntil's loss watch reads
 -- H.gameOverFired as a loss and the next attempt reloads.
 H.run({ maxFrames = 150000, allowGameOver = true }, {  -- the #84 chest pickup rides on the end
@@ -619,7 +619,7 @@ H.run({ maxFrames = 150000, allowGameOver = true }, {  -- the #84 chest pickup r
   -- 2. THE COMMANDER.  obj 16, parked on (33,54) by :61266-61269.  Its
   -- `battle 46` is event battle GROUP 46 = formation 409 = one $14e
   -- (event_battle_group.dat, 4 bytes/group).  Fought for REAL (see the
-  -- header), behind a three-attempt retry ladder on the cyan_defence-
+  -- header), behind a three-attempt retry sweep on the cyan_defence-
   -- moment checkpoint: a loss reloads and re-pokes with the fighter
   -- escalated (tier 2+ dumps boost at 1 BP) plus a small reload stagger,
   -- which reshuffles every subsequent interleaving and roll.
@@ -725,7 +725,7 @@ H.run({ maxFrames = 150000, allowGameOver = true }, {  -- the #84 chest pickup r
     H.assertEq(inParty(5), true, "SABIN is the party again")
     H.assertEq(inParty(3), true, "SHADOW too")
     H.assertEq(inParty(2), false, "CYAN is out again")
-    -- $02E2 is the gate scene's own latch: _cb0c2f/_cb0c47/_cb0c5e all open
+    -- $02E2 is the gate scene's own flag: _cb0c2f/_cb0c47/_cb0c5e all open
     -- `if_switch $02E2=1, EventReturn` (:39786, :39797, :39807), so with it
     -- set the three gate tiles are inert and the next step can walk south
     -- across them without replaying the interlude.

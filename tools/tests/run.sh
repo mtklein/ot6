@@ -103,7 +103,7 @@ fi
 # and tools/stream/live.py shows every one of them.  There is no flag and no
 # environment variable, on purpose.
 #
-# There used to be OT6_LIVE, and it is why the census had holes: eighteen
+# There used to be OT6_LIVE, and it is why the survey had holes: eighteen
 # launchers passed OT6_LIVE=0 to skip the stream, one of them written the
 # same day the first five were cleaned up, by copying a neighbour.  Chasing
 # call sites cannot give a guarantee -- the next lab copies the last one --
@@ -172,7 +172,7 @@ if ! shared_app_ready; then
   done
   if [ -n "$held" ]; then
     # Release the lock however we leave: a run that dies mid-build must not
-    # wedge every later worker behind a lock nobody holds.
+    # stall every later worker behind a lock nobody holds.
     HELD_LOCK="$LOCK"
     # Look again under the lock.  The look that sent us here can predate the
     # previous holder's last step, and a rebuild on that stale look tears a

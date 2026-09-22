@@ -138,30 +138,30 @@ end
 -- ---- the talk-only greedy window --------------------------------------
 -- The 24 banquet soldiers; the four marked `fight` are skipped.
 local SOLDIERS = {
-  { map = 250, obj = 0x10, latch = 0x0217, name = "250 (21,24)" },
-  { map = 250, obj = 0x11, latch = 0x0218, name = "250 (25,24)" },
-  { map = 250, obj = 0x12, latch = 0x0219, name = "250 (21,18)" },
-  { map = 250, obj = 0x13, latch = 0x021A, name = "250 (25,18)" },
-  { map = 250, obj = 0x19, latch = 0x021F, name = "250 (98,51)" },
-  { map = 250, obj = 0x1E, latch = 0x0226, name = "250 (51,50) B27", fight = 0x0c7 },
-  { map = 250, obj = 0x1F, latch = 0x0227, name = "250 (9,49)" },
-  { map = 250, obj = 0x20, latch = 0x0228, name = "250 (110,51) B27", fight = 0x0c7 },
-  { map = 250, obj = 0x21, latch = 0x0229, name = "250 (120,13)" },
-  { map = 250, obj = 0x22, latch = 0x022A, name = "250 (115,16)" },
-  { map = 243, obj = 0x16, latch = 0x0224, name = "243 (8,18)" },
-  { map = 243, obj = 0x17, latch = 0x022B, name = "243 (12,14) B26", fight = 0x102 },
-  { map = 243, obj = 0x18, latch = 0x022C, name = "243 (18,14)" },
-  { map = 244, obj = 0x24, latch = 0x0220, name = "244 (11,23)" },
-  { map = 244, obj = 0x25, latch = 0x0221, name = "244 (25,23)" },
-  { map = 244, obj = 0x26, latch = 0x0222, name = "244 (16,14)" },
-  { map = 244, obj = 0x27, latch = 0x0223, name = "244 (20,14)" },
-  { map = 244, obj = 0x28, latch = 0x0225, name = "244 (10,17)" },
-  { map = 252, obj = 0x10, latch = 0x021B, name = "252 (40,56)" },
-  { map = 252, obj = 0x11, latch = 0x021C, name = "252 (42,52)" },
-  { map = 252, obj = 0x12, latch = 0x021D, name = "252 (42,56)" },
-  { map = 252, obj = 0x13, latch = 0x021E, name = "252 (37,57)" },
-  { map = 252, obj = 0x14, latch = 0x022D, name = "252 (42,57) B27", fight = 0x0c7 },
-  { map = 252, obj = 0x15, latch = 0x022E, name = "252 (40,54)" },
+  { map = 250, obj = 0x10, flag = 0x0217, name = "250 (21,24)" },
+  { map = 250, obj = 0x11, flag = 0x0218, name = "250 (25,24)" },
+  { map = 250, obj = 0x12, flag = 0x0219, name = "250 (21,18)" },
+  { map = 250, obj = 0x13, flag = 0x021A, name = "250 (25,18)" },
+  { map = 250, obj = 0x19, flag = 0x021F, name = "250 (98,51)" },
+  { map = 250, obj = 0x1E, flag = 0x0226, name = "250 (51,50) B27", fight = 0x0c7 },
+  { map = 250, obj = 0x1F, flag = 0x0227, name = "250 (9,49)" },
+  { map = 250, obj = 0x20, flag = 0x0228, name = "250 (110,51) B27", fight = 0x0c7 },
+  { map = 250, obj = 0x21, flag = 0x0229, name = "250 (120,13)" },
+  { map = 250, obj = 0x22, flag = 0x022A, name = "250 (115,16)" },
+  { map = 243, obj = 0x16, flag = 0x0224, name = "243 (8,18)" },
+  { map = 243, obj = 0x17, flag = 0x022B, name = "243 (12,14) B26", fight = 0x102 },
+  { map = 243, obj = 0x18, flag = 0x022C, name = "243 (18,14)" },
+  { map = 244, obj = 0x24, flag = 0x0220, name = "244 (11,23)" },
+  { map = 244, obj = 0x25, flag = 0x0221, name = "244 (25,23)" },
+  { map = 244, obj = 0x26, flag = 0x0222, name = "244 (16,14)" },
+  { map = 244, obj = 0x27, flag = 0x0223, name = "244 (20,14)" },
+  { map = 244, obj = 0x28, flag = 0x0225, name = "244 (10,17)" },
+  { map = 252, obj = 0x10, flag = 0x021B, name = "252 (40,56)" },
+  { map = 252, obj = 0x11, flag = 0x021C, name = "252 (42,52)" },
+  { map = 252, obj = 0x12, flag = 0x021D, name = "252 (42,56)" },
+  { map = 252, obj = 0x13, flag = 0x021E, name = "252 (37,57)" },
+  { map = 252, obj = 0x14, flag = 0x022D, name = "252 (42,57) B27", fight = 0x0c7 },
+  { map = 252, obj = 0x15, flag = 0x022E, name = "252 (40,54)" },
 }
 
 local CROSS = {
@@ -177,7 +177,7 @@ local CROSS = {
 }
 local DOOR243 = { { 22, 34 }, { 23, 34 }, { 24, 34 } }
 
-local latchedLog, crossUse, failCount, routeLog = {}, {}, {}, {}
+local flagLog, crossUse, failCount, routeLog = {}, {}, {}, {}
 local windowScore, windowSoldiers = nil, nil   -- the measurement
 
 local function circuitSettled()
@@ -187,9 +187,9 @@ end
 
 local TALK_BELOW, FIGHT_BELOW = 23, 18
 
-local function soldierDone(s) return sw(s.latch) == 1 end
+local function soldierDone(s) return sw(s.flag) == 1 end
 local function eligible(s)
-  if soldierDone(s) or (failCount[s.latch] or 0) >= 1 then return false end
+  if soldierDone(s) or (failCount[s.flag] or 0) >= 1 then return false end
   if s.fight == 0x0c7 then return var0() < FIGHT_BELOW end  -- Commando
   return not s.fight                                        -- talk (B26 excl.)
 end
@@ -245,7 +245,7 @@ local function leastUsedCrossing()
 end
 
 local function circuitRunner()
-  local cur, curWhat, curLatch = nil, nil, nil
+  local cur, curWhat, curFlag = nil, nil, nil
   local stuckAt, cappedAt = nil, nil
   local inFight, ph = false, 0
   local chestTries = 0
@@ -259,7 +259,7 @@ local function circuitRunner()
       if H.battleLoadStarted() then
         if not inFight then
           inFight = true
-          cur, curWhat, curLatch = nil, nil, nil
+          cur, curWhat, curFlag = nil, nil, nil
           routeLog[#routeLog + 1] = string.format(
             "f%-6d t=%-5d FIGHT opens (var0=%d)", H.frame, timerCount(), var0())
         end
@@ -293,11 +293,11 @@ local function circuitRunner()
         if not ok then
           routeLog[#routeLog + 1] = string.format("f%-6d ABORT  %s",
             H.frame, curWhat)
-          if curLatch then
-            failCount[curLatch] = (failCount[curLatch] or 0) + 1
+          if curFlag then
+            failCount[curFlag] = (failCount[curFlag] or 0) + 1
           end
         end
-        cur, curWhat, curLatch = nil, nil, nil
+        cur, curWhat, curFlag = nil, nil, nil
         return "frame"
       end
       if not circuitSettled() then
@@ -312,7 +312,7 @@ local function circuitRunner()
           or (H.bfsPath(42, 56) and { { 42, 56 }, "up" })
         if stand then
           chestTries = chestTries + 1
-          curWhat, curLatch = "252 Tincture chest", nil
+          curWhat, curFlag = "252 Tincture chest", nil
           routeLog[#routeLog + 1] = string.format(
             "f%-6d t=%-5d chest  252 Tincture (try %d)",
             H.frame, timerCount(), chestTries)
@@ -336,7 +336,7 @@ local function circuitRunner()
       end
       local s, len = nearestSoldier()
       if s then
-        curWhat, curLatch = s.name, s.latch
+        curWhat, curFlag = s.name, s.flag
         routeLog[#routeLog + 1] = string.format(
           "f%-6d t=%-5d talk   %s (%d steps)",
           H.frame, timerCount(), s.name, len or -1)
@@ -349,7 +349,7 @@ local function circuitRunner()
       local c, key = leastUsedCrossing()
       if c then
         crossUse[key] = (crossUse[key] or 0) + 1
-        curWhat, curLatch = "cross " .. key, nil
+        curWhat, curFlag = "cross " .. key, nil
         routeLog[#routeLog + 1] = string.format(
           "f%-6d t=%-5d cross  %s (use %d)",
           H.frame, timerCount(), key, crossUse[key])
@@ -372,7 +372,7 @@ local function circuitRunner()
         stuckAt = H.frame
         H.log(string.format(
           "== circuit idle at f%d: map %d (%d,%d) timer=%d var0=%d -- no "
-          .. "reachable un-latched talk soldier and no reachable crossing ==",
+          .. "reachable un-flagged talk soldier and no reachable crossing ==",
           H.frame, map(), H.fieldX(), H.fieldY(), timerCount(), var0()))
         for _, l in ipairs(routeLog) do H.log("[route] " .. l) end
       end
@@ -451,8 +451,8 @@ local steps = {
   H.waitUntil(landed(253, 10), 2400, "Vector 253 (post-attack)", 1),
   H.waitFrames(30),
 
-  -- The kit lists were authored against the fled lineage's exact bag; the
-  -- fighting lineage carries different spares, and LOCKE arrives already
+  -- The kit lists were authored against the fled run's exact bag; the
+  -- fighting run carries different spares, and LOCKE arrives already
   -- dual-wielding under the Genji Glove (owner doctrine: his left hand
   -- holds a SECOND WEAPON, not a shield -- the { 1, $5A } Buckler this kit
   -- used to force is the anti-pattern the wave-4 kits removed).  Each slot
@@ -464,7 +464,7 @@ local steps = {
   (function()
     local KITS = {
       -- TERRA has no Genji Glove, so her L-hand takes a shield if the bag
-      -- holds one (her row arrives with slot 1 empty on this lineage).
+      -- holds one (her row arrives with slot 1 empty on this run).
       { 0, "TERRA", { { 0, 0x0E }, { 1, 0x5A }, { 1, 0x5C },
                       { 2, 0x6A }, { 3, 0x84 } } },
       { 1, "LOCKE", { { 0, 0x0F }, { 1, 0x00 }, { 1, 0x01 }, { 1, 0x02 },
@@ -480,7 +480,7 @@ local steps = {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end
@@ -680,7 +680,7 @@ local steps = {
   H.call(function()
     H.assertEq((dinner.b30Species or 0) >= 1, true,
       "battle 30: Sp Forces ($0c2) formation (seen live during the fight)")
-    H.assertEq(sw(0x0237), 1, "$0237 -- the challenge latch")
+    H.assertEq(sw(0x0237), 1, "$0237 -- the challenge flag")
     H.assertEq((dinner.b30Clean or 0xFF), 0,
       "battle 30 CLEAN win -- $40/$44/$45 clear at teardown (a timer-expiry "
       .. "'win' pays nothing and must fail here)")

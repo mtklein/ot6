@@ -207,7 +207,7 @@ local function mkFighter(tier, tag)
   -- The lib's wipe predicate held 90 straight frames is the loss; so is
   -- the run canary's count (it now counts a 300-frame battle-side wipe as
   -- a game over and freezes the pad -- allowGameOver on the run keeps the
-  -- ladders alive for the reload).
+  -- sweeps alive for the reload).
   function F.watch()
     watch.frame()
     wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
@@ -348,7 +348,7 @@ local function descentBody(tier, wi0, wi1)
     end
     if F.lost then
       descLost = F.lost
-      return true                       -- wiped; the ladder decides
+      return true                       -- wiped; the sweep decides
     end
     if map() ~= 22 and not H.battleLoadStarted() then
       descLost = string.format("left map 22 outside a battle (map=%d f%d " ..
@@ -567,7 +567,7 @@ end
 -- Budgets: input-driven fights spend real ATB rounds on every descent
 -- collision and on KEFKA himself, and the ladders may replay the descent
 -- and the fight up to three times each.
--- allowGameOver: the descent and KEFKA ladders deliberately survive a
+-- allowGameOver: the descent and KEFKA sweeps deliberately survive a
 -- lost fight (#163); F.watch reads H.gameOverFired as a loss and the
 -- next attempt reloads.
 H.run({ maxFrames = 600000, allowGameOver = true }, {
@@ -663,7 +663,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
     H.screenshot("narshe_battle")
   end),
 
-  -- The combined lineage has no spare Dirk or LeatherArmor for CELES --
+  -- The combined run has no spare Dirk or LeatherArmor for CELES --
   -- LOCKE still owns those -- and she already carries the MithrilBlade
   -- from the TunnelArmr route.
   H.call(function()

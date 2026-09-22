@@ -10,7 +10,7 @@
 -- See gen_mrf_save_room_checkpoint.lua for the codex-witness seeding and the
 -- $307ff0 sentinel this file reuses.
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("cranes ride")
+local L = H.newSeedSweep("cranes ride")
 
 local ZMENUSTATE = 0x26
 local saveArg = nil
@@ -177,9 +177,9 @@ H.run({ maxFrames = 160000 }, {
   H.equipEsper(0, 7, { tag = "BISMARK -> EDGAR" }),
   H.equipEsper(1, 2, { tag = "SHIVA -> SABIN" }),
   H.equipEsper(2, 19, { tag = "CARBUNKL -> LOCKE" }),
-  -- Both swaps are best-effort: the fighting lineage's LOCKE already
+  -- Both swaps are best-effort: the fighting run's LOCKE already
   -- WIELDS Guardian in his Genji offhand (it is on his hand, not in the
-  -- bag), and the bag's dagger spread differs from the fled lineage's.
+  -- bag), and the bag's dagger spread differs from the fled run's.
   H.cond(function() return H.invSlotOf(0x01) ~= nil end,
     { H.equipWeapon(0, 0x01, { tag = "EDGAR MithrilKnife" }) },
     { H.logStep("no bagged MithrilKnife; EDGAR keeps his weapon") }),

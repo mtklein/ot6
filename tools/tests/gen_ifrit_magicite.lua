@@ -17,7 +17,7 @@
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("battle 70")
+local L = H.newSeedSweep("battle 70")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -122,7 +122,7 @@ local function tapInto(dir, pred, maxFrames, what)
   }, what)
 end
 
-local function census(tag, targets)
+local function survey(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
   local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
@@ -136,11 +136,11 @@ local function census(tag, targets)
       end
     end
   end
-  H.log(string.format("[census %s] from (%d,%d) on map %d: %d tiles reachable",
+  H.log(string.format("[survey %s] from (%d,%d) on map %d: %d tiles reachable",
     tag, sx, sy, map(), #q))
   for _, t in ipairs(targets or {}) do
     local p = H.bfsPath(t[1], t[2])
-    H.log(string.format("[census %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
+    H.log(string.format("[survey %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
       t[3] or "", p and (#p .. " steps: " .. table.concat(p, " ")) or "NO PATH"))
   end
 end
@@ -213,7 +213,7 @@ local function ifritAttempt(n)
   -- (bosses-wob.md par.13: "Celes can chip both siblings by herself, with
   -- Ice into Ifrit and her sword into Shiva", and "a Broken sibling takes
   -- no turns" -- the break SILENCES the AoE).  The absorb guard is the
-  -- stage selector: while Shiva (ice-absorb) is off-stage the cast flows
+  -- stage selector: while Shiva (ice-absorb) is out of the formation the cast flows
   -- at Ifrit's ice weakness; the moment she steps on, the guard refuses
   -- and Celes falls through to her slash sword, Shiva's own key.
   -- boost=false: base-tier Ice is 5 MP -- eleven chips from her pool --
@@ -277,7 +277,7 @@ local function ifritAttempt(n)
       H.screenshot("ifrit_battle")
     end),
     -- hands off until Ifrit takes the stage (the fly-in; input during the
-    -- window-open animation wedges the battle menu)
+    -- window-open animation stalls the battle menu)
     H.waitUntil(function() return onfield(ISLOT) == 1 end, 3600,
       "ifrit takes the stage", 10),
     H.waitFrames(90),
@@ -292,7 +292,7 @@ local function ifritAttempt(n)
     -- lib's wipe predicate holds and ends on its 120-frame count, or on
     -- the run canary's count (it now counts a 300-frame battle-side wipe
     -- as a game over and freezes the pad -- allowGameOver on the run
-    -- keeps the ladder alive for the reload).
+    -- keeps the sweep alive for the reload).
     H.driveUntil(function()
       if (H.gameOverFired or 0) > 0 then return true end
       if wiped >= 120 then return true end
@@ -387,7 +387,7 @@ local function ifritAttempt(n)
   })
 end
 
--- allowGameOver: the battle-70 ladder deliberately survives a lost fight
+-- allowGameOver: the battle-70 sweep deliberately survives a lost fight
 -- (#163); the fight drive reads H.gameOverFired as a loss and reloads.
 H.run({ maxFrames = 300000, allowGameOver = true }, {
   H.waitFrames(350),
@@ -430,8 +430,8 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   --    not element, ThunderBlade is OT6_SLASH, and Shiva's break axis is
   --    slashing -- breaking her is how this fight is won.
 
-  -- The kit lists were authored against the fled lineage's exact bag; the
-  -- fighting lineage carries different spares (more chests fought to, other
+  -- The kit lists were authored against the fled run's exact bag; the
+  -- fighting run carries different spares (more chests fought to, other
   -- shops afforded).  Each slot equips best-effort: present -> worn,
   -- absent -> the character keeps what they have, with a log.  The break
   -- plan needs slash CLASS on all four, which every fallback preserves.
@@ -466,7 +466,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end
@@ -495,7 +495,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     H.assertEq(H.readByte(0x1A6E + 6 * 54 + 0x01), 0xFF,
       "CELES knows Ice -- the chip axis into Ifrit (bosses-wob.md par.13)")
   end),
-  -- capture the entry point as the retry ladder's reload blob
+  -- capture the entry point as the retry sweep's reload blob
   (function()
     local req
     return seq({
@@ -509,7 +509,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     })
   end)(),
 
-  -- 2. battle 70, played with real input, on the phase-spread retry ladder
+  -- 2. battle 70, played with real input, on the phase-spread retry sweep
   L.watch(),
   ifritAttempt(1),
   ifritAttempt(2),
@@ -632,7 +632,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     })
   end)(),
   H.call(function()
-    census("magicite_ifrit_shiva", {
+    survey("magicite_ifrit_shiva", {
       { 3, 5, "door -> map 270 (save room)" },
       { 9, 5, "door -> map 269 (onward)" },
       { 6, 6, "_cc75f6, back up to 263" },

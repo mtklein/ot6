@@ -176,7 +176,7 @@ H.run({ maxFrames = 120000 }, {
   -- run where the three fights happened to cost nothing.
   -- reserve = {}: this is a segment boundary with a shop two maps ahead
   -- (the ghost merchant restocks Tonics on the train), and the fighting
-  -- lineage arrives here with the bag at the reserve floor.  A person
+  -- run arrives here with the bag at the reserve floor.  A person
   -- spends their last Tonics to put the party on its feet before walking
   -- the world; holding the floor here shipped SHADOW at 12% and SABIN at
   -- 5% and failed the exit contract (measured).

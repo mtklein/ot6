@@ -171,7 +171,7 @@ Ot6DrawLoreName:
         lda     #^Ot6LoreNameBase
         sta     $f1
         lda     $e5
-        jsr     LoadArrayItem           ; stage the name into $7e9e8b
+        jsr     LoadArrayItem           ; write the name into $7e9e8b
         jmp     DrawPosTextBuf
 @blank: ldx     #$9e8b                  ; the rage page's 10-cell marker: same
         stx     hWMADDL                 ;   field width, same overwrite property

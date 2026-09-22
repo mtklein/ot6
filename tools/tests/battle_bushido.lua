@@ -391,7 +391,7 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(H.readByte(0x3BA4 + cyan*2) & 0x02, 0x02,
       "his real katana carries the SWDTECH flag (read, not written)")
     H.assertEq(H.readByte(0x1600 + 2*37 + 8), 14,
-      "CYAN arrives at camp_escaped at level 14 -- the fighting lineage "
+      "CYAN arrives at camp_escaped at level 14 -- the fighting run "
       .. "runs one level ahead of the fled curve, still past "
       .. "BushidoLevelTbl's third threshold (12) and below its fourth "
       .. "(15), which is what sets the ceiling below")

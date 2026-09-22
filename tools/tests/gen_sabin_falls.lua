@@ -274,7 +274,7 @@ local function jumpAttempt(n)
         frames = frames + 1
         if frames > 39000 and lost == nil then
           lost = string.format("attempt %d deadline (39000 frames) with " ..
-            "no win and no wipe seen -- a genuine wedge, see #159 [%s]", n,
+            "no win and no wipe seen -- a genuine stall, see #159 [%s]", n,
             partyLine())
           H.log("[falls] LOST -- " .. lost)
         end
@@ -295,7 +295,7 @@ local function jumpAttempt(n)
   }, {})
 end
 
--- allowGameOver: the retry ladder above deliberately survives a lost
+-- allowGameOver: the retry sweep above deliberately survives a lost
 -- battle 18 (#159); the ride reads H.gameOverFired as a loss and reloads.
 H.run({ maxFrames = 250000, allowGameOver = true }, {
   H.loadState(DOOR),

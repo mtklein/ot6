@@ -80,7 +80,7 @@ M.contracts["post-opera-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex row (ULTROS2; measured EMPTY, unseeded)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex row (ULTROS2; the fighting lineage revealed slash|pierce at the Lete -- re-measured 2026-08-31)" },
+    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex row (ULTROS2; the fighting run revealed slash|pierce at the Lete -- re-measured 2026-08-31)" },
   },
 }
 
@@ -105,11 +105,11 @@ M.contracts["mrf-save-room-v1"] = {
   slot = 3,
   field = { map = 270, x = 25, y = 10 },   -- the vanilla save room off the alcove
   switches = {
-    { 0x01F0, 0, "the sympathizer's distraction latch is CLEAR (§5 A->B exit)" },
+    { 0x01F0, 0, "the sympathizer's distraction flag is CLEAR (§5 A->B exit)" },
     { 0x005F, 1, "Kefka's esper-drain scene has run" },
     { 0x0060, 0, "battle 70 (Ifrit/Shiva) is still ahead" },
     { 0x0646, 1, "the dying Ifrit/Shiva pair still stands on the doors" },
-    { 0x0273, 0, "the alcove is not locked (post-fight latch clear)" },
+    { 0x0273, 0, "the alcove is not locked (post-fight flag clear)" },
     { 0x0068, 0, "the tube-room set piece is ahead" },
     { 0x0069, 0, "the factory escape has not happened" },
   },
@@ -128,7 +128,7 @@ M.contracts["mrf-save-room-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -159,7 +159,7 @@ M.contracts["n024-entry-save-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -188,7 +188,7 @@ M.contracts["minecart-platform-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -198,10 +198,10 @@ M.contracts["vector-escape-v1"] = {
   field = { map = 240, x = 58, y = 7 },    -- the escape-map save point ($06AE)
   switches = {
     { 0x0069, 1, "the escape happened -- 262 (28,9) now exits to 240 (§5 D->E)" },
-    { 0x0666, 1, "escape-scene latch" },
+    { 0x0666, 1, "escape-scene flag" },
     { 0x06AE, 1, "the 240 (58,7) save-point sparkle is revealed" },
     { 0x006B, 0, "the Setzer reunion is still ahead" },
-    { 0x02BC, 0, "`cutscene TRAIN` latch cleared by the escape" },
+    { 0x02BC, 0, "`cutscene TRAIN` flag cleared by the escape" },
   },
   party = {
     size = 3,
@@ -217,7 +217,7 @@ M.contracts["vector-escape-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -262,7 +262,7 @@ M.contracts["terra-returned-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -297,7 +297,7 @@ M.contracts["narshe-mission-v1"] = {
   },
   switches = {
     { 0x0076, 1, "the Narshe mission meeting has run (event_main.asm:94170)" },
-    { 0x064E, 1, "the meeting-scene latch" },
+    { 0x064E, 1, "the meeting-scene flag" },
     { 0x045E, 0, "the Imperial-Base soldiers were withdrawn (:94171-94180)" },
     { 0x0079, 0, "CLEAR -- the Sealed Gate scene is still ahead" },
     { 0x02F0, 1, "TERRA is available (she is seated in step G->H, not here)" },
@@ -319,7 +319,7 @@ M.contracts["narshe-mission-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -361,7 +361,7 @@ M.contracts["gate-cave-save-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -389,10 +389,10 @@ M.contracts["vector-crash-v1"] = {
   },
   switches = {
     { 0x0079, 1, "the Sealed Gate scene ran (event_main.asm:46316)" },
-    { 0x0471, 1, "the gate-scene tail latch (:46313)" },
+    { 0x0471, 1, "the gate-scene tail flag (:46313)" },
     { 0x007A, 1, "THE AIRSHIP IS DEAD (:44451) -- no step after I may fly" },
     { 0x007B, 1, "Vector's soldier machinery stands down (:44453)" },
-    { 0x01BA, 1, "the crash latch (:44452)" },
+    { 0x01BA, 1, "the crash flag (:44452)" },
     { 0x0242, 1, "the base entrance went silent forever (:44351)" },
     { 0x0246, 0, "no active airship" },
     { 0x0172, 1, "the base's no-soldiers beat stands" },
@@ -414,7 +414,7 @@ M.contracts["vector-crash-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -482,7 +482,7 @@ M.contracts["banquet-done-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -542,7 +542,7 @@ M.contracts["crescent-landing-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -604,7 +604,7 @@ M.contracts["thamasa-night-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -660,7 +660,7 @@ M.contracts["fire-out-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -715,7 +715,7 @@ M.contracts["esper-mtn-save-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -764,8 +764,8 @@ M.contracts["ultros-won-v1"] = {
   -- no chest is opened this segment, so the bag is N's carried through.
   -- The Fire Rod is WORN by STRAGO ($07) in place of his Ice Rod; both
   -- it[4] checks find the weapon on its wearer rather than in the $1869
-  -- bag.  The fled lineage carried a spare ThunderBlade that TERRA took in
-  -- prep; the fighting lineage's ONE ThunderBlade has ridden LOCKE's Genji
+  -- bag.  The fled run carried a spare ThunderBlade that TERRA took in
+  -- prep; the fighting run's ONE ThunderBlade has ridden LOCKE's Genji
   -- main hand since the banquet kit, so the prep leaves TERRA's weapon
   -- alone (gen_ultros conds on the bag) and the blade is found on LOCKE.
   items = {
@@ -776,7 +776,7 @@ M.contracts["ultros-won-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -830,7 +830,7 @@ M.contracts["thamasa-done-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -889,7 +889,7 @@ M.contracts["fc-alcove-v1"] = {
   field = { map = 358, x = 8, y = 10 },   -- the alcove's SavePoint tile
   switches = {
     { 0x009E, 1, "the FC-discovery cutscene ran (carried from Q)" },
-    { 0x01B5, 1, "the alcove entry latched (:32517) -- (70,29) is dead" },
+    { 0x01B5, 1, "the alcove entry flagged (:32517) -- (70,29) is dead" },
     { 0x02F3, 1, "SHADOW available again (:32627)" },
     { 0x035F, 1, "AtmaWeapon still stands at 394 (60,15)" },
   },

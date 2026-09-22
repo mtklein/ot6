@@ -353,7 +353,7 @@ H.run({ maxFrames = 250000 }, {
   -- (mp-economy.md ruling 2, docs/design/narshe-descent.md).  The
   -- execution-side fizzle is still there as the backstop for a pool that
   -- moves between the commit and the resolve; battle_mpcost exercises it on
-  -- that seam now.
+  -- that hook point now.
   danceCursorToKnown("cursor onto the learned dance's cell (isolation arm)"),
   H.call(function()
     refused = {

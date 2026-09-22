@@ -158,13 +158,13 @@ local function fill(c, pos, slot, id, tag)
 end
 
 -- ---- the Nikeah stop, by airship (#213) -----------------------------------
--- The flight to the base pass is the last time this lineage holds a live
+-- The flight to the base pass is the last time this run holds a live
 -- airship before Thamasa: the wheel is dead from the Sealed Gate on
 -- (gen_vector_crash's wheel check), and nothing between sells Tonics
 -- (Vector: weapon 27 and armour 28; Albrook's shop 24: no Tonic).  So the
 -- bag leaves here at the band for the whole stretch -- the cave, the crash,
 -- the banquet and the voyage.  gen_narshe_mission already tops TONIC to 99
--- at Nikeah on its departure (#210), so a lineage cut after that arrives
+-- at Nikeah on its departure (#210), so a run cut after that arrives
 -- stocked and flies straight on; this stop fires only when the bag is short
 -- (the seeded narshe-mission-v1 boots tonic=0 potion=0).  Same threshold
 -- as #210's: 3/4 of the band for Tonics, the L25 Potion band (38) for
@@ -331,7 +331,7 @@ H.run({ maxFrames = 480000 }, {
       gear(CH_TERRA, 0x22)))
   end),
   -- Strongest-first ladder: the EMPTY-slot guard makes the first present
-  -- weapon land and every later rung skip.  The fighting lineage's bag
+  -- weapon land and every later rung skip.  The fighting run's bag
   -- may lack the Blizzard (a fled-route chest), but the Cranes fix freed
   -- LOCKE's ThunderBlade, and every rung is mask-valid for TERRA.
   fill(CH_TERRA, 0, 0, 0x0E, "TERRA Blizzard"),

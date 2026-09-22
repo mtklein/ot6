@@ -3,7 +3,7 @@
 -- the fight driver it builds.
 --
 -- Boots nothing (power-on, the game untouched, like step_reset.lua): what
--- is under test is the option plumbing, so M.newFightDriver is replaced for
+-- is under test is the option internals, so M.newFightDriver is replaced for
 -- the length of the check by a recorder that returns a stub driver and
 -- keeps the options table each walker hands it.  Every walker in
 -- lib/ot6_field.lua that builds a driver at construction is built once

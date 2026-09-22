@@ -107,7 +107,7 @@ local function tapInto(dir, pred, maxFrames, what)
   }, what)
 end
 
-local function census(tag, targets)
+local function survey(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
   local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
@@ -121,17 +121,17 @@ local function census(tag, targets)
       end
     end
   end
-  H.log(string.format("[census %s] from (%d,%d) on map %d: %d tiles reachable",
+  H.log(string.format("[survey %s] from (%d,%d) on map %d: %d tiles reachable",
     tag, sx, sy, map(), #q))
   for _, t in ipairs(targets or {}) do
     local p = H.bfsPath(t[1], t[2])
-    H.log(string.format("[census %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
+    H.log(string.format("[survey %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
       t[3] or "", p and (#p .. " steps: " .. table.concat(p, " ")) or "NO PATH"))
   end
 end
 
 local CROSS_ATTEMPTS = 6
-local L = H.newSeedLadder("mrf crossing", { attempts = CROSS_ATTEMPTS })
+local L = H.newSeedSweep("mrf crossing", { attempts = CROSS_ATTEMPTS })
 local crossed, crossLost, crossBlob = false, nil, nil
 
 local function crossBody()
@@ -204,7 +204,7 @@ local function crossAttempt(n)
   }, {})
 end
 
--- allowGameOver: the crossing ladder deliberately loses attempts and
+-- allowGameOver: the crossing sweep deliberately loses attempts and
 -- reloads the full-healed crossBlob before taking the next battle-RNG
 -- phase, so a wipe's Game Over is expected.  Correctness is ground-truth
 -- guarded: every attempt rewinds to a known-good party, `crossed` only
@@ -236,7 +236,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
                 threshold = 0.85 }),
 
   -- Capture the pre-crossing checkpoint: the full-healed party at the
-  -- landing, the retry ladder's rewind point.  Nothing is written to the
+  -- landing, the retry sweep's rewind point.  Nothing is written to the
   -- game; this is just this boot's own state.
   (function()
     local req
@@ -263,7 +263,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.call(function()
     if not crossed then
       error(string.format("the Magitek Factory upper-floor crossing was not "
-        .. "survived in %d seed-ladder attempts (last loss: %s).  If every "
+        .. "survived in %d seed-sweep attempts (last loss: %s).  If every "
         .. "phase loses even from a full-healed party, that is a balance "
         .. "finding about this pincer, not a route bug -- capture the numbers.",
         CROSS_ATTEMPTS, tostring(crossLost)), 0)
@@ -293,9 +293,9 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   end),
   H.saveState("mrf_chute.mss"),
 
-  -- 3. census of the lower half, so the next step is planned from measurement.
+  -- 3. survey of the lower half, so the next step is planned from measurement.
   H.call(function()
-    census("mrf_chute", {
+    survey("mrf_chute", {
       { 11, 45, "_cc78d0" },
       { 22, 53, "the scripted 263 transition _cc7651" },
       { 22, 54, "its twin _cc765f" },

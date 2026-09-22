@@ -100,7 +100,7 @@ H.run({ maxFrames = 40000 }, {
           -- on a second cell swaps them (A on the same occupied cell opens
           -- Status).
           local function navTo(target)
-            if ex.still > 90 then          -- wedged: jiggle out
+            if ex.still > 90 then          -- stalled: jiggle out
               ex.di = ex.di % #exDirs + 1
               ex.still = 60
               tap(exDirs[ex.di])

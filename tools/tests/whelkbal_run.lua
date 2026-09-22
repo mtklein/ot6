@@ -92,7 +92,7 @@ end
 --   heal force (2,0), both lists  A dn dn A A   (self-target by default;
 --     the soldiers' 4-cell list stages sparsely, as Fire|Bolt / Ice / Heal,
 --     so Heal Force is (2,0) for everyone; (1,1) is a blank cell the
---     cursor can walk onto and wedge)
+--     cursor can walk onto and stall)
 --   tekmissile  terra (3,1)       A dn dn dn rt A A
 local function seqFor(actor)
   local hidden = not headAlive()

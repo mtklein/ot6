@@ -146,7 +146,7 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 900,
     "control back on 394", 10),
   H.waitFrames(30),
-  -- the ladder's checkpoint: the pre-encounter moment, in memory
+  -- the sweep's checkpoint: the pre-encounter moment, in memory
   (function()
     local req
     return H.cond(function() return true end, {

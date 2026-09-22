@@ -5,7 +5,7 @@
 -- as the stall that follows the loss.
 --
 -- The shape of the bug (docs/design/sfigaro-gate.md): gen_sfigaro runs
--- with allowGameOver for its cider ladder; the seat-based wipe count fired
+-- with allowGameOver for its cider sweep; the seat-based wipe count fired
 -- on a lost battle 11, froze the pad, the Annihilated screen never got its
 -- press, and 1800 still frames later the no-progress watchdog filed the
 -- attempt as `noprogress` with a stale field signature -- the v0.17
@@ -61,7 +61,7 @@ if attempt == 1 then
         .. "stays neutral from here", H.frame, H.readWord(0x3BF4), H.readWord(0x3C1C)))
     end),
     H.waitUntil(function() return H.formationHas({ [HEAVYARMOR] = true }) end,
-      600, "formation 64 (HeavyArmor $009F) on stage", 10),
+      600, "formation 64 (HeavyArmor $009F) in the formation", 10),
     -- the loss, unpressed: the predicate never returns true on its own --
     -- the watchdog is expected to end the attempt within its window
     -- (1800 quiet frames after the Annihilated screen settles); the

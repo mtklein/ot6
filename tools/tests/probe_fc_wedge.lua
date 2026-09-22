@@ -1,4 +1,4 @@
--- probe_fc_wedge.lua -- anatomy of the chute-landing wedge.  Boot
+-- probe_fc_wedge.lua -- anatomy of the chute-landing stall.  Boot
 -- fc_shadow, walk the proven route to (82,30), ride the (89,25) tunnel,
 -- then dump the party's fine-position/object state and probe each
 -- direction, logging what the engine does with each hold.
@@ -9,7 +9,7 @@ local function snap(tag)
   for _, a in ipairs({0x0866,0x0867,0x0868,0x0869,0x086A,0x086B,0x086C,0x086D}) do
     b[#b+1] = string.format("%02X", H.readByte(a))
   end
-  H.log(string.format("[wedge %s] (%d,%d) ctrl=%s aligned=%s $b2=%02X 866-86D=%s",
+  H.log(string.format("[stall %s] (%d,%d) ctrl=%s aligned=%s $b2=%02X 866-86D=%s",
     tag, H.fieldX(), H.fieldY(), tostring(H.hasControl()),
     tostring(H.tileAligned and H.tileAligned() or "?"), H.readByte(0xb2),
     table.concat(b, " ")))

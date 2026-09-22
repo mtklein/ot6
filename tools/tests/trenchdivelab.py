@@ -29,7 +29,7 @@ is not a region of the generator but the DRIVER, and the axes are:
     pre-#219 boost economy.
 
 `run` plays the generator exactly as the ninja graph does -- from the tracked
-`gau_joined` fixture, with the generator's OWN three-attempt dive ladder
+`gau_joined` fixture, with the generator's OWN three-attempt dive sweep
 intact -- with the segment runner's retries OFF (OT6_RETRIES=1, so every seed
 reports the ladder's own verdict and not a re-boot), and OT6_SEED_SHIFT idle
 frames at the boot point.  Nothing is published to build/states.  Every
@@ -173,7 +173,7 @@ local tdFight, tdMask, tdStable, tdIn, tdAtt = 0, -1, 0, false, 0
 local tdPending, tdEvents = {}, {}
 local function tdPush(s) tdEvents[#tdEvents + 1] = s end
 
--- The generator's dive ladder reloads a snapshot on a lost ride.  Its
+-- The generator's dive sweep reloads a snapshot on a lost ride.  Its
 -- attempt number is not in RAM, so the lab takes it from the generator's
 -- own log line through this global (one assignment, in the derived copy).
 TDATTEMPT = 0

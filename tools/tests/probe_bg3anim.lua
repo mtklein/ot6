@@ -9,7 +9,7 @@
 --   screen), $800E (bg3 scroll hdma type), $62C9 (anim tile quadrant),
 --   $7B21 (bg3 anim tile upload pending), bg3 scroll $4AF5/$4AF7,
 --   OT6_SCRIPTBUSY $57BF, dialog latch $64D5,
---   a census of the $400 map words: fill($01EE) / hud(attr $21 + claimed
+--   a survey of the $400 map words: fill($01EE) / hud(attr $21 + claimed
 --   glyph) / zero / other (+ first three "other" samples with addresses),
 --   and a 16-byte canary compare of the fire-icon font cell ($EB) vs ROM.
 -- Screenshots every 8 frames through the effect window.
@@ -54,7 +54,7 @@ local function fireIconIntact()
   return -1
 end
 
-local function census()
+local function survey()
   local fill, hud, zero, other, oth = 0, 0, 0, 0, {}
   for w = 0, 0x3ff do
     local lo = emu.read((0x5400 + w) * 2, VR)
@@ -79,7 +79,7 @@ end
 
 local frameN = 0
 local function report(tag)
-  local fill, hud, zero, other, oth = census()
+  local fill, hud, zero, other, oth = survey()
   H.log(string.format(
     "[bg3] f=%d %s 2105=%02x main=%02x scrT=%02x quad=%02x up=%02x " ..
     "scroll=%04x,%04x busy=%02x dlg=%02x canary=%d " ..

@@ -195,7 +195,7 @@ dress        6     6      17      9      2      48    49645
 (`wipes` counts `[descent] attempt N LOST` — a lost crossing reloaded from
 the landing save, the way a person reloads the 394 (7,12) save. `frames` is
 the mean over passing runs, from the cold Continue. Every run passed: the
-segment's own 3-attempt reload ladder absorbs a wipe.)
+segment's own 3-attempt reload sweep absorbs a wipe.)
 
 Per seed, deaths / Fenix Downs (the full table with frames and RNG keys is
 `aggregate.txt`):

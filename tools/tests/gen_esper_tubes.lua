@@ -14,11 +14,11 @@
 --   OT6_SRAM_CHECKPOINT whose manifest declares a different
 --   persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
--- The retry ladder's spread and its collision check: each attempt is held
+-- The retry sweep's spread and its collision check: each attempt is held
 -- until the game-time frame counter the battle seed is made of reaches
 -- its own phase, and L.report() fails if two attempts drew one seed,
 -- which would make this ladder one fight played twice.
-local L = H.newSeedLadder("battle 72")
+local L = H.newSeedSweep("battle 72")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -154,7 +154,7 @@ local function n024Attempt(n)
     -- A into the Annihilated screen for up to 3000 frames.  The lib's
     -- wipe predicate held 90 straight frames, or the run canary's count
     -- (it now counts a 300-frame battle-side wipe as a game over and
-    -- freezes the pad -- allowGameOver on the run keeps the ladder alive
+    -- freezes the pad -- allowGameOver on the run keeps the sweep alive
     -- for the reload), names the loss here instead and skips the taps.
     H.driveUntil(function()
       wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
@@ -230,7 +230,7 @@ local function n024Attempt(n)
   })
 end
 
-local function census(tag, targets)
+local function survey(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
   local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
@@ -244,17 +244,17 @@ local function census(tag, targets)
       end
     end
   end
-  H.log(string.format("[census %s] from (%d,%d) on map %d: %d tiles reachable",
+  H.log(string.format("[survey %s] from (%d,%d) on map %d: %d tiles reachable",
     tag, sx, sy, map(), #q))
   for _, t in ipairs(targets or {}) do
     local p = H.bfsPath(t[1], t[2])
-    H.log(string.format("[census %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
+    H.log(string.format("[survey %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
       t[3] or "", p and (#p .. " steps: " .. table.concat(p, " ")) or "NO PATH"))
   end
 end
 
 
--- allowGameOver: the battle-72 ladder deliberately survives a lost fight
+-- allowGameOver: the battle-72 sweep deliberately survives a lost fight
 -- (#163); the fight drive reads H.gameOverFired as a loss and the next
 -- attempt reloads.
 H.run({ maxFrames = 300000, allowGameOver = true }, {
@@ -318,7 +318,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end
@@ -331,7 +331,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
       "back at the entry point, armed and topped up")
     H.log(partyReport("024 entry point, prepared"))
   end),
-  -- capture the prepared entry point as the retry ladder's reload blob
+  -- capture the prepared entry point as the retry sweep's reload blob
   (function()
     local req
     return seq({
@@ -345,7 +345,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     })
   end)(),
 
-  -- 2. battle 72, played with real input, on the phase-spread retry ladder
+  -- 2. battle 72, played with real input, on the phase-spread retry sweep
   L.watch(),
   n024Attempt(1),
   n024Attempt(2),
@@ -411,7 +411,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     H.assertEq(H.fieldX(), 10, "274 landing x")
     H.assertEq(H.fieldY(), 25, "274 landing y")
     H.assertEq(sw(0x0068), 0, "$0068 CLEAR -- the Cid scene has not run")
-    census("274", {
+    survey("274", {
       { 10, 9, "the BIG_SWITCH trigger _cc7a60" },
       { 20, 13, "the lift trigger _cc7f43 ($0068-gated)" },
     })

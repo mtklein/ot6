@@ -1,4 +1,4 @@
--- probe_eng61.lua -- exits census from the engine-room platform (6,34).
+-- probe_eng61.lua -- exits survey from the engine-room platform (6,34).
 local H = dofile("tools/tests/lib/ot6.lua")
 H.run({ maxFrames = 9000 }, {
   H.loadState("build/states/figaro_submerged.mss.lua"),

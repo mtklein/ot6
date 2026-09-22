@@ -79,7 +79,7 @@ OT6_LOREROWS         = 5
 ; Battle-only scratch. InitBattle clears through $3ed3. OT6_DIVINE_USED is
 ; one per-character bitmask; the walkers use the interleaved even words.
 ; OT6_DIVINE_USED survives a Cmd_20 scene-change reload, so a multi-phase
-; boss keeps its "divine already spent" latch across the reload.
+; boss keeps its "divine already spent" flag across the reload.
 OT6_DIVINE_USED      := $3ecb
 OT6_SCR_SLOT2        := $3ecc
 OT6_SCR_BIT          := $3ece
@@ -93,7 +93,7 @@ OT6_SCR_COLS         := $3ed2
 OT6_MAPBASE          := $57b6
 OT6_ATKCLASS         := $57b8
 OT6_FONTDIRTY        := $57b9
-OT6_SLOTTIER         := $57ba   ; Slot's latched boost tier:
+OT6_SLOTTIER         := $57ba   ; Slot's stored boost tier:
                                 ;   written at the spin's first A press by
                                 ;   Ot6SlotRig, re-banked into
                                 ;   OT6_BOOST_REVEALED by Ot6SlotCommit so
@@ -162,7 +162,7 @@ OT6_PIPSLOT          := $ed6b   ; the character slot the live pip cell
 ; that.  Equality is the current, intended fit ($ed61 + 10 =
 ; $ed6b), so the bound is <=, not <.
 .assert OT6_WALLETCELLS + OT6_WALLET_W * 2 <= OT6_PIPSLOT, error, "OT6 wallet cells run into OT6_PIPSLOT"
-OT6_RAGETIER         := $ed73   ; the boost tier latched at Cmd_10 for the
+OT6_RAGETIER         := $ed73   ; the boost tier stored at Cmd_10 for the
                                 ;   whole trance (Slot's OT6_SLOTTIER pattern at
                                 ;   longer range: BP is spent once at the
                                 ;   Rage-start action but the tier must outlive
@@ -172,7 +172,7 @@ OT6_RAGETIER         := $ed73   ; the boost tier latched at Cmd_10 for the
                                 ;   as Slot's: it is read only while a RAGE
                                 ;   status is set, and
                                 ;   the only writer of that status (Cmd_10)
-                                ;   always rewrites the latch first.
+                                ;   always rewrites the store first.
 OT6_NUMCTR           := $ed71   ; last-seen damage-numeral thread counter
                                 ;   ($632e).  a change means GfxCmd_0b has
                                 ;   allocated a numeral (the damage frame)
@@ -247,7 +247,7 @@ OT6_BRKPAL           := $ed82   ; 12 bytes
 ; Celes's next action (battle_main.asm:8671 and :511).
 ;
 ; Turns, one byte per character, stride 2 and indexed by the entity offset
-; (0/2/4/6) like OT6_BP_CLASS.  Ot6RunicRaise latches the pending boost here
+; (0/2/4/6) like OT6_BP_CLASS.  Ot6RunicRaise records the pending boost here
 ; at Cmd_0b, Ot6RunicHold decrements it at each of her QueueActions and puts
 ; the stance bit back, and 0 means vanilla Runic: one absorb, then it clears.
 ; The odd bytes are unused.  It is a turn count rather than an absorb count
@@ -257,14 +257,14 @@ OT6_BRKPAL           := $ed82   ; 12 bytes
 ; past the shadow clear and a stale value would give the next battle a
 ; standing stance nobody raised, which is a mechanic and not a cosmetic.
 OT6_RUNICTURNS       := $ed8e   ; 8 bytes (4 characters, stride 2)
-; the once-per-round absorb-earn latch, a per-character bitmask
+; the once-per-round absorb-earn flag, a per-character bitmask
 ; (----1234, the OT6_COVERPAID / $3f2f shape).  Bit set = that character's
 ; Runic has already banked its BP this round.
 ;
-; This is a separate byte from OT6_COVERPAID by design.  The cover latch has
+; This is a separate byte from OT6_COVERPAID by design.  The cover flag has
 ; the same shape and four spare high bits, but they are different verbs with
 ; different prices: Runic costs a turn, and a
-; True Knight cover costs a relic slot and nothing else.  One shared latch
+; True Knight cover costs a relic slot and nothing else.  One shared flag
 ; would make equipping True Knight reduce Celes's Runic earn, an
 ; interaction nobody asked for and nobody would find.  The rule that a
 ; reactive earn happens once per round is shared; the storage is not.
@@ -311,7 +311,7 @@ OT6_UNCTL            := $ed97
 ;
 ; It also reads better in play than a damage flag: a character is provoked
 ; while it stands worse off than when it last swung, so several small hits
-; add up to one grudge, and an ally who heals it back up has genuinely
+; add up to one retaliation tally, and an ally who heals it back up has genuinely
 ; un-provoked it.
 OT6_HPMARK           := $ed98   ; 8 bytes (4 characters, stride 2)
 OT6_BREAK_FLASH      = $18      ; 24 frames: three 4-frame pulses (see
@@ -320,13 +320,13 @@ OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
                                 ;   (btlgfx_main.asm:26054); see Ot6BreakArm
 .assert OT6_RVPEND_ELEM = OT6_SHADOW + (14 * 6), error, "reveal-pending must follow the shadow (InitBP clears both in one loop)"
 .assert OT6_WALLETPREV + 1 <= OT6_SHADOW + $70 - 1, error, "wallet cur/prev must sit inside InitBP's $70-byte clear"
-.assert OT6_COVERPAID = OT6_NUMCTR + 1, error, "cover-earn latch must follow the numeral counter (both live past InitBP's shadow clear)"
-.assert OT6_COVERPAID > OT6_SHADOW + $70 - 1, error, "cover-earn latch must sit PAST InitBP's shadow clear (it is cleared by its own store)"
+.assert OT6_COVERPAID = OT6_NUMCTR + 1, error, "cover-earn flag must follow the numeral counter (both live past InitBP's shadow clear)"
+.assert OT6_COVERPAID > OT6_SHADOW + $70 - 1, error, "cover-earn flag must sit PAST InitBP's shadow clear (it is cleared by its own store)"
 .assert OT6_COVERPAID + 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 .assert OT6_NUMCTR + 1 < OT6_RAGETIER, error, "OT6 rage tier overlaps the numeral counter"
-.assert OT6_RAGETIER >= OT6_SHADOW + $70, error, "OT6 rage tier must sit PAST InitBP's shadow clear (it is latched per trance, not per battle)"
+.assert OT6_RAGETIER >= OT6_SHADOW + $70, error, "OT6 rage tier must sit PAST InitBP's shadow clear (it is stored per trance, not per battle)"
 .assert OT6_RAGETIER <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
-.assert OT6_COVERPAID <> OT6_RAGETIER, error, "cover-earn latch and rage tier collide"
+.assert OT6_COVERPAID <> OT6_RAGETIER, error, "cover-earn flag and rage tier collide"
 .assert OT6_PIPPEND > OT6_RAGETIER, error, "deferred-pip cell must not collide with the rage tier"
 .assert OT6_PIPPEND > OT6_SHADOW + $70 - 1, error, "deferred-pip cell must sit PAST InitBP's shadow clear (InitBP zeroes it explicitly)"
 .assert OT6_PIPPEND <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
@@ -336,12 +336,12 @@ OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
 .assert OT6_BRKTICK > OT6_SHADOW + $70 - 1, error, "break-flash state sits PAST InitBP's shadow clear (Ot6SeedShields zeroes it per slot)"
 .assert OT6_BRKPAL + 12 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 .assert OT6_RUNICTURNS >= OT6_BRKPAL + 12, error, "runic duration must not collide with the break-flash palette bank"
-.assert OT6_RUNICPAID = OT6_RUNICTURNS + 8, error, "the runic earn latch must follow its duration array without overlap"
+.assert OT6_RUNICPAID = OT6_RUNICTURNS + 8, error, "the runic earn flag must follow its duration array without overlap"
 .assert OT6_RUNICTURNS > OT6_SHADOW + $70 - 1, error, "runic duration sits PAST InitBP's shadow clear (InitBP zeroes it per character)"
 .assert OT6_RUNICPAID <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
-.assert OT6_RUNICPAID <> OT6_COVERPAID, error, "the runic and cover earn latches must stay separate ledgers (see OT6_RUNICPAID)"
-.assert OT6_UNCTL = OT6_RUNICPAID + 1, error, "the uncontrolled latch must follow the runic earn latch without a gap"
-.assert OT6_HPMARK = OT6_UNCTL + 1, error, "the hurt line must follow the uncontrolled latch without a gap"
+.assert OT6_RUNICPAID <> OT6_COVERPAID, error, "the runic and cover earn flags must stay separate ledgers (see OT6_RUNICPAID)"
+.assert OT6_UNCTL = OT6_RUNICPAID + 1, error, "the uncontrolled flag must follow the runic earn flag without a gap"
+.assert OT6_HPMARK = OT6_UNCTL + 1, error, "the hurt line must follow the uncontrolled flag without a gap"
 .assert OT6_UNCTL > OT6_SHADOW + $70 - 1, error, "the retaliation cells sit PAST InitBP's shadow clear (InitBP zeroes them explicitly)"
 .assert OT6_HPMARK + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 

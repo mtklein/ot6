@@ -65,7 +65,7 @@
 -- are read off battle RAM on each fight's rising edge and logged, because a
 -- balance claim about this step has to rest on what the ROM seeds.
 local H = dofile("tools/tests/lib/ot6.lua")
--- the pinned lineage: TERRA plays last, so the hub dispatch boots
+-- the pinned run: TERRA plays last, so the hub dispatch boots
 -- SABIN's ending (back at the hub, $001E and $0044 set)
 local HUB = "build/states/sabin_done.mss.lua"
 
@@ -167,7 +167,7 @@ end
 --     EDGAR (4), tier 2+  down A A A   Tools -> AutoCrossbow (escalation)
 --     everyone else       A A          Fight, default target
 -- A loss (Banon down 90 straight frames, or a wipe) sets `lost` for the
--- retry ladder instead of erroring: reload the rapids_start checkpoint,
+-- retry sweep instead of erroring: reload the rapids_start checkpoint,
 -- escalate the tier, ride again.  Three attempts, then fail with every
 -- attempt's numbers on the record.
 local BCHID, BCHP = 0x3ed8, 0x3bf4
@@ -317,7 +317,7 @@ local function rideUntil(pred, what, budget, tier)
       -- The lib's wipe predicate held 90 straight frames is the loss; so
       -- is the run canary's count (it now counts a 300-frame battle-side
       -- wipe as a game over and freezes the pad -- allowGameOver on the
-      -- run keeps the ladder alive for the reload).
+      -- run keeps the sweep alive for the reload).
       watch.frame()
       wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
       if (H.gameOverFired or 0) > 0 and lost == nil then
@@ -521,7 +521,7 @@ end
 
 -- 120000 was the battle-clear-write-era budget; input-driven fights spend
 -- real ATB rounds, and the reload-verified generation replays its own boot
--- ------------------------------------------------------ the retry ladder --
+-- ------------------------------------------------------ the retry sweep --
 -- gen_scenario's ladder, on this step's own checkpoint: a lost ride 2 is
 -- accepted, the rapids_start-moment capture is reloaded (a player
 -- reloading their save), and the ride is taken again with the fighter
@@ -629,7 +629,7 @@ local function genAttempt(n)
   }, {})
 end
 
--- allowGameOver: the ride ladder deliberately survives a lost ride 2
+-- allowGameOver: the ride sweep deliberately survives a lost ride 2
 -- (#163); rideUntil reads H.gameOverFired as a loss and the next attempt
 -- reloads.
 H.run({ maxFrames = 200000, allowGameOver = true }, {
@@ -688,7 +688,7 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
   H.logStep(function()
     return string.format("rapids_start generated at frame %d", H.frame)
   end),
-  -- the ladder's checkpoint: the same moment rapids_start captures
+  -- the sweep's checkpoint: the same moment rapids_start captures
   (function()
     local ckReq
     return seq({
@@ -706,7 +706,7 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
   -- ===================================================================== --
   -- THE RIDE, PART 2: `battle 8, RIVER`, the two if_rand fights, and the
   -- spill onto the World of Balance at (93,41) (:39455-39459).  Up to
-  -- three input-driven attempts (see the ladder above).
+  -- three input-driven attempts (see the sweep above).
   -- ===================================================================== --
   ride2Attempt(1),
   ride2Attempt(2),

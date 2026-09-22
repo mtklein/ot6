@@ -964,7 +964,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ; row: the MP number, the grey and the A-button's refusal all read
         ; spell-list byte 3, which Ot6FoldPrices rewrites off this same
         ; pending value, and the enabled bits are then re-derived from it by
-        ; vanilla's own UpdateEnabledMagic, which Ot6FoldPrices hangs off.
+        ; vanilla's own UpdateEnabledMagic, which Ot6FoldPrices hooks into.
         ;
         ; Called directly rather than through vanilla's $3204 bit-7 request:
         ; that request is consumed in AfterAction2, "update targets after
@@ -1836,8 +1836,8 @@ Ot6ShieldTbl:
         .byte   5, OT6_SLASH|OT6_PIERCE ; nerapa: sprint fight, low gauge
         ; ---- audit_break_coverage.py's two break-dark areas ------------
         ; (owner-approved 2026-09-01.)  Both were beatable on raw stats,
-        ; which is how the fled lineage shipped them dark: the break loop
-        ; simply did not exist there.  Vanilla bits stay -- the four Zozo
+        ; which is how the fled run shipped them dark: the break loop
+        ; did not exist there.  Vanilla bits stay -- the four Zozo
         ; bodies are all poison-weak (Bio Blaster is a live key whenever
         ; EDGAR is picked), and Cirpius carries no vanilla weakness at
         ; all (Ot6ElemAddTbl gives it poison), so its class row is its
@@ -1864,7 +1864,7 @@ Ot6ShieldTbl:
                                 ;   AutoCrossbow sweeps it, the pipsqueak
                                 ;   pattern.  poison vanilla
         ; ---- the sealed gate cave (maps 382-386) -----------------------
-        ; The fled lineage never fought here, so the area shipped on floor
+        ; The fled run never fought here, so the area shipped on floor
         ; rows the mission party cannot answer: measured (2026-09-01, 14
         ; rounds of honest play), an L23 TERRA/LOCKE/EDGAR/SABIN dealt the
         ; $082+$048 trio ~150 of its 4191 HP in five rounds.  Vanilla's

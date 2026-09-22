@@ -83,7 +83,7 @@ end
 
 -- The canary returns true once a wipe has held for 300 frames.  It normally
 -- also raises, since a wipe is the end of the run.  `soft` hands the verdict
--- back to the caller instead, for a retry ladder that reloads and retries on
+-- back to the caller instead, for a retry sweep that reloads and retries on
 -- a loss rather than treating it as a failed run.
 local function wipeCanary(tag, soft)
   local n, said = 0, false
@@ -99,7 +99,7 @@ local function wipeCanary(tag, soft)
     if not said then
       said = true
       M.log(string.format("%s: the party is wiped (0 hp for 300 frames); " ..
-        "ending this ride so the caller's ladder can retry", tag))
+        "ending this ride so the caller's sweep can retry", tag))
     end
     return true
   end
@@ -136,7 +136,7 @@ end
 -- does not mean bit 1 is the soft one, and CANT_RUN stays $02.
 -- Measured (probe_flee_world.lua, camp_escaped, two world-map randoms):
 -- $b1 read 00, L+R was held from battle frame 3, $2f45 went 1, $3a38
--- latched "a character just ran away" at frames 243 and 371, and both
+-- flagged "a character just ran away" at frames 243 and 371, and both
 -- fights ended with the party gone and the monsters alive.  On the FC
 -- escape map 393 the one formation is Naughty ($169, +19 = $8D: bit 3
 -- no-run AND bit 0 harder-to-run), so $b1 reads $06 from frame 3 and the
@@ -552,7 +552,7 @@ function M.navTo(txIn, tyIn, opts)
   -- once M.FLEE_CAP frames pass without the formation releasing the party
   --
   -- opts.wipeEndsRide: a party wipe ends this ride instead of raising, for a
-  -- caller whose retry ladder reloads and retries.  Off by default.
+  -- caller whose retry sweep reloads and retries.  Off by default.
   local wipeSeen = false
   local wipeCheck = wipeCanary("navTo", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee" or opts.playBattles == "mustflee")
@@ -625,7 +625,7 @@ function M.navTo(txIn, tyIn, opts)
       battN = M.battleLoadStarted() and battN + 1 or 0
       -- forensics (once per battle): the tile the party stood on when the
       -- battle came up, its props and its neighbours', and the event script
-      -- pointer -- the shape of the $ca0029 wedge (a battle starting while a
+      -- pointer -- the shape of the $ca0029 stall (a battle starting while a
       -- step is resolving on z-flux tiles) is a black screen with the battle
       -- RAM populated, and these are what decide it (fire_out, run.IgBKYd89)
       if battN == 1 then
@@ -922,7 +922,7 @@ function M.advanceStory(pred, maxFrames, opts)
       end
       -- a battle resolved earlier in the ride and control is back:
       -- recover OUTSIDE combat before riding on.  A ride whose scene
-      -- never returns control simply leaves the latch armed; the caller's
+      -- never returns control leaves the flag armed; the caller's
       -- own care stop then owns it.
       if sawBattle and M.hasControl() and M.tileAligned() then
         sawBattle = false
@@ -962,7 +962,7 @@ end
 --   $E7     bit0 = world event script running (Figaro/Narshe triggers)
 --   $19     fade/exit trigger (nonzero = leaving the world map)
 --   $E8     bit0 = menu opening, bit3 = once-per-tile event/battle
---            latch, bit4 = reload-world (battle return, zone eater)
+--            flag, bit4 = reload-world (battle return, zone eater)
 --
 -- Movement is latched to the step: input is gated on both fractions being
 -- zero, so a begun step always continues to the next tile boundary; the
@@ -1336,7 +1336,7 @@ end
 --   windowHold = 132            -- optional; fsf to start the window hold
 --   segMargin  = 24             -- optional; frames of slack a k-step
 --                               -- in-phase lane needs beyond 16k
---   maxFrames, what             -- optional; driveUntil plumbing
+--   maxFrames, what             -- optional; driveUntil internals
 --   healPercent, fight          -- optional; the encounter driver's heal
 --                               -- threshold (55) and an option table
 --                               -- merged over it (M.fightDriverFor)
@@ -1695,7 +1695,7 @@ end
 --          zeroed by the A that confirms (text.asm:425).  Battle RAM
 --          scribbles it, so it is not read while a battle is up.
 --   $056E  cursor row, 0-based.  Moved only while the dialog waits; the
---          $056D latch lets a held direction move it one row, so steering
+--          $056D flag lets a held direction move it one row, so steering
 --          presses are edges.  The confirm leaves it alone; the event's
 --          `choice` opcode (event.asm EventCmd_b6) branches on it and only
 --          then clears it, which is after the window has closed.
@@ -1973,7 +1973,7 @@ end
 --                 nothing for a target (default true).  The bag is always
 --                 tried first; set false on a step that must keep every
 --                 point of MP for the fight it is walking toward, and the
---                 target simply goes unhealed once the bag is empty.
+--                 target goes unhealed once the bag is empty.
 --                 Revival is always a Fenix Down.
 -- opts.mpFloor    MP a caster keeps back: a fraction of their maximum below
 --                 1, an absolute number at or above it (default 0.25).  A
@@ -2522,7 +2522,7 @@ function M.buyItem(id, row, qtyFn, name)
       end
     end),
   }, "buy " .. name), function()
-    -- as-built (#196): the row, the quantity and the "bought" latch are
+    -- as-built (#196): the row, the quantity and the "bought" flag are
     -- resolved again for the shop the NEXT pass finds open
     phase, seen27, bought, want = 0, false, false, nil
     lastQty, stall = nil, 0
@@ -2671,7 +2671,7 @@ local function careKernel(opts)
   end
 
   -- The cheapest cure the party can put on this target.  Cheapest rather
-  -- than biggest: MP is the resource being rationed and the loop simply
+  -- than biggest: MP is the resource being rationed and the loop
   -- casts again if the target is still short, so two Cures beat one Cure 2
   -- wherever the prices are vanilla's.  Overshoot is wasted MP.
   local function pickCast(target)
@@ -3548,7 +3548,7 @@ end
 function M.careStop(tag, opts)
   opts = opts or {}
   opts.tag = opts.tag or tag or "care after battle"
-  -- 0.65, not 0.9: the fighting lineage meets several times the battles the
+  -- 0.65, not 0.9: the fighting run meets several times the battles the
   -- flee route did, and topping to 90% after every one of them drank ~96
   -- Tonics by the Imperial Camp (measured; the bag hit the reserve floor
   -- with two scenarios still to go).  A person walks a little hurt and
@@ -4911,13 +4911,13 @@ function M.partySelect(members, opts)
       end),
     }, what), function() phase, settled = 0, 0 end)
   end
-  local function census()
+  local function survey()
     local t = {}
     for c = 0x00, 0x1F do t[#t + 1] = string.format("%02X", cell(c)) end
     return table.concat(t, " ")
   end
   local steps = {
-    M.call(function() M.log(string.format("[%s] cells $00-$1F: %s", tag, census())) end),
+    M.call(function() M.log(string.format("[%s] cells $00-$1F: %s", tag, survey())) end),
   }
   for g, ids in ipairs(groups) do
     local base = 0x10 + 4 * (g - 1)
@@ -4950,7 +4950,7 @@ function M.partySelect(members, opts)
       }, {})
     end
   end
-  steps[#steps + 1] = M.call(function() M.log(string.format("[%s] seated: %s", tag, census())) end)
+  steps[#steps + 1] = M.call(function() M.log(string.format("[%s] seated: %s", tag, survey())) end)
   if opts.commit ~= false then
     steps[#steps + 1] = M.waitUntil(function() return mst() == 0x2d end,
       opts.commitWait or 600, tag .. ": menu at $2d for commit", 5)
@@ -5062,7 +5062,7 @@ function M.talkToObj(obj, what, maxF)
 end
 
 -- M.newWalkFighter (#183): fight-and-care for a generator's own walker.
--- A bespoke driveUntil walker (a held press onto a trigger tile, a
+-- A custom driveUntil walker (a held press onto a trigger tile, a
 -- grind-and-replan world walk, a tap into a save tile) used to hold L+R
 -- when a battle opened under it, which runs from the fight: no XP, and on
 -- a pincer roll no escape at all (tools/audit_encounters.py).  The route
@@ -5083,7 +5083,7 @@ end
 -- 600 uncontrolled frames so a scripted stretch that never hands control
 -- back still walks on).  A dialog during the reload is left to the walker,
 -- whose own A-tap branch pages it.  A walker whose predicate fires mid-
--- care simply ends; driveUntil releases the pad.
+-- care ends; driveUntil releases the pad.
 --
 -- opts: healPercent (45), careThreshold (0.7), care = false skips the
 -- stop; healer/magic/summon/nuke/nukeLore/tool/blitz/bank/reserve pass to
@@ -5237,7 +5237,7 @@ end
 -- three times and each crossing is its own three fights.
 function M.clearGateSoldier(probeX, probeY, tag)
   local blob, won = nil, false
-  local L = M.newSeedLadder((tag or "gate soldier") .. " battle 11")
+  local L = M.newSeedSweep((tag or "gate soldier") .. " battle 11")
   local function fightOnce(n)
     local loadReq
     return M.cond(function() return won end, {}, {

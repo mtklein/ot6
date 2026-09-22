@@ -829,7 +829,7 @@ local function grindToAppearance()
   }, "grind to GAU's first appearance")
 end
 
--- observation: whether a command menu opens while GAU is on stage.  Stage 1
+-- observation: whether a command menu opens while GAU is in the formation.  Stage 1
 -- is hands-off (12000 frames).  If no menu opens, stage 2 taps A at a human
 -- rate (dismissing GAU's "Ooh_I'm hungry!" turn dialogs), which
 -- distinguishes "menu blocked behind an un-dismissed battle dialog" from
@@ -1121,14 +1121,14 @@ H.run({ maxFrames = 700000 }, {
   H.call(function()
     if menuOpenedAt then
       H.log(string.format("[gaufeed] MEASUREMENT: command menu OPEN at f%d " ..
-        "(stage %s) with GAU on stage -- %s", menuOpenedAt,
+        "(stage %s) with GAU in the formation -- %s", menuOpenedAt,
         tostring(menuStage), engineLine()))
       H.screenshot("gaufeed_menu_open")
     else
       H.log(string.format("[gaufeed] MEASUREMENT: NO menu opened " ..
         "(window ended f%s) -- %s", tostring(windowEndedAt), engineLine()))
       H.screenshot("gaufeed_no_menu")
-      error("no command menu opened while GAU was on stage (hands-off AND " ..
+      error("no command menu opened while GAU was in the formation (hands-off AND " ..
         "A-taps) -- see the [observe*] rows for the engine state timeline", 0)
     end
   end),

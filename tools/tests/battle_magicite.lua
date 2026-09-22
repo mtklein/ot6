@@ -49,7 +49,7 @@ local function bossSt3() return H.readByte(0x3EF8 + 8 + BOSS*2) end
 local locke, celes
 local function mp(slot) return H.readWord(0x3C08 + slot*2) end
 
--- The fighting lineage's n024_entry ships Celes MP-DRY: she arrives at
+-- The fighting run's n024_entry ships Celes MP-DRY: she arrives at
 -- 1 of 126, having nuked Ifrit with Ice through the reserve (a deep fight
 -- breaches it by design) and cured the party in the Ifrit/Shiva battle one
 -- door earlier, with no inn between that door and this one.  That is
@@ -58,7 +58,7 @@ local function mp(slot) return H.readWord(0x3C08 + slot*2) end
 -- step onto exactly 6, the 7-MP boundary).  So the lab pins her FIELD
 -- record to 31 before each boot -- a lab condition the fixture cannot
 -- supply on cue (waivered in state_write_waivers.txt), and one that
--- touches nothing under test: the prices, latches, debit deltas and the
+-- touches nothing under test: the prices, flags, debit deltas and the
 -- $331c immunity all read the same whatever the pool opens at.
 local function recMp(charId) return 0x1600 + 37 * charId + 13 end   -- the +13 M.charMp reads
 local CELES_REC_MP = recMp(6)
@@ -206,7 +206,7 @@ end
 -- against a L24 boss does not survive a deferring bench; Celes runs the
 -- arms.  The medic line is on for the whole fight, parks included: the
 -- one time it was switched off "briefly for menu assertions" (the two
--- latch windows and boot B's walk) the regenerated n024_entry wiped the
+-- flag windows and boot B's walk) the regenerated n024_entry wiped the
 -- party under it -- see carePlan below.
 local mf = 0
 local celesMode = "defer"                -- "defer"|"summon"|"cast"|"park"
@@ -427,7 +427,7 @@ end
 -- list scrolls a row, $41/$40 while a target window opens and closes, $09
 -- and $0f/$10 while a list opens.  These lines used to press B in all of
 -- them, and B there backs out of the line's own selection: on the #177
--- lineage's n024_entry Locke's Tonic (row 22) cost a B at every scrolled
+-- run's n024_entry Locke's Tonic (row 22) cost a B at every scrolled
 -- row and 12 target windows cancelled in their opening frame (f4190..f4702,
 -- 2026-09-17), the bench held the menu ~600 frames a turn, Celes's
 -- post-Osmose window never came, and two Magnitude8s ($BC, f6786/f7576)
@@ -440,7 +440,7 @@ local BACKOUT_F = 90
 -- still in flight when the esper window confirmed at f1537, its Muddle
 -- landed on Celes with that action's return at f1595, and her queued
 -- Diamond Dust left ExecCmd at f1634 re-aimed (cmd=19 atk=38 tgt=0000).
--- The summon latched $3f2e and charged its 27 MP, the boss took nothing,
+-- The summon flagged $3f2e and charged its 27 MP, the boss took nothing,
 -- and a wait for "boss HP drops" can only time out -- the divine cannot
 -- be recast.  (build/lab/magicite/repro1.log, and the retained main
 -- baseline it reproduces frame for frame.)
@@ -482,7 +482,7 @@ local function summonHold(s, who)
 end
 -- A plan made at the command window can be overtaken before its target
 -- window confirms: another bench member's X-Potion lands on the same
--- ally, or a hit clears the Muddle the plan was for.  On main's lineage
+-- ally, or a hit clears the Muddle the plan was for.  On main's run
 -- at seed shift 17 (2026-09-17) Sabin sat in a Tonic's target window for
 -- Locke while Edgar's X-Potion (exec f3788, done f4120) healed him to
 -- full, and slot 2 never lit in 18 taps -- the lib's steer bailed; at
@@ -712,10 +712,10 @@ local function driveTo(pred, maxF, tag)
     H.call(function()
       -- Wall pin, not play: NUMBER 024's WallChange re-rolls its
       -- absorbed/nullified elements at random, and the fighting
-      -- lineage's fixture rolled a wall that ate Inferno's fire -- the
-      -- summon queued, paid, and latched, then "resolves" (boss HP
+      -- run's fixture rolled a wall that ate Inferno's fire -- the
+      -- summon queued, paid, and flagged, then "resolves" (boss HP
       -- drops) never came, and a once-per-battle divine cannot retry.
-      -- The properties under test are kit prices, latches, and the
+      -- The properties under test are kit prices, flags, and the
       -- status rider (species immunity at $331c), never the wall, so
       -- the boss's $3bcc absorb/null word is held at zero while this
       -- file drives.  Declared in state_write_waivers.txt.
@@ -784,7 +784,7 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(fld(OSMOSE, 5), OSMOSE_MP, "Osmose ($29) repriced to 8 MP in the record")
   end),
 
-  -- ============================= boot A: the kits, the divine, the latch ==
+  -- ============================= boot A: the kits, the divine, the flag ==
   H.loadState(STATE),
   H.waitFrames(60),
   H.call(function()
@@ -819,7 +819,7 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(costOf(celes, OSMOSE), OSMOSE_MP, "[shiva] Osmose published at 8 MP")
     H.assertEq(costOf(celes, SHELL), SHELL_MP, "[shiva] Shell published at 15 MP")
     H.assertEq(H.readWord(SUMMONED) & (mask(locke) | mask(celes)), 0,
-      "[latch] $3f2e clear: nobody has summoned yet")
+      "[flag] $3f2e clear: nobody has summoned yet")
     -- 3. the species facts the divine arm depends on, read not written
     H.assertEq(bossAllow34() & STATUS3_SLOW, 0,
       "[ddust] NUMBER 024's own authored status word BLOCKS Slow "
@@ -850,7 +850,7 @@ H.run({ maxFrames = 150000 }, {
         "Diamond Dust resolves against NUMBER 024"),
       H.call(function()
         -- $3410 is a shared numeric ability id: a monster action can also
-        -- write $37/$38.  Take the damage baseline only after Celes's latch,
+        -- write $37/$38.  Take the damage baseline only after Celes's flag,
         -- debit and HP change have jointly identified her real summon.
         R.hpMid = bossHp()
         -- The debit is read here, at the queue, and remembered: boot A's
@@ -893,9 +893,9 @@ H.run({ maxFrames = 150000 }, {
         H.assertEq(mpAtArm[locke] - mp(locke), INFERNO_MP,
           "[inferno] charged its 26 MP")
         H.assertEq(H.readWord(SUMMONED) & mask(celes) ~= 0, true,
-          "[latch] the engine set Celes's once-per-battle bit in $3f2e")
+          "[flag] the engine set Celes's once-per-battle bit in $3f2e")
         H.assertEq(H.readWord(SUMMONED) & mask(locke) ~= 0, true,
-          "[latch] ...and Locke's, for his own summon")
+          "[flag] ...and Locke's, for his own summon")
         H.screenshot("magicite_ddust")
       end),
     })
@@ -904,21 +904,21 @@ H.run({ maxFrames = 150000 }, {
   H.call(function()
     celesMode = "park"
     -- Boot A's pool is her maximum, so nothing here needs a refund: the
-    -- window below must show the summon row greyed by the LATCH alone,
+    -- window below must show the summon row greyed by the flag alone,
     -- with every kit row live by MP.
-    H.assertEq(mp(celes), mpAtArm[celes] - DDUST_MP, "[latch] her pool is the divine's debit and nothing else (no refund, nothing spent since the confirm)")
+    H.assertEq(mp(celes), mpAtArm[celes] - DDUST_MP, "[flag] her pool is the divine's debit and nothing else (no refund, nothing spent since the confirm)")
   end),
   driveTo(function()
     return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
   end, 20000, "her next window's list is open"),
   -- The window's enabled bits were built at her action's end, at the
-  -- post-divine pool (99 of 126 here): the summon row greys by the latch,
+  -- post-divine pool (99 of 126 here): the summon row greys by the flag,
   -- the kit rows stay live by MP.
   H.call(function()
     H.setPad({})
-    H.assertEq(esperCost(celes), DDUST_MP, "[latch] ...still priced at 27")
+    H.assertEq(esperCost(celes), DDUST_MP, "[flag] ...still priced at 27")
     H.assertEq(recEnabled(celes, recOf(celes, ICE)), true,
-      "[latch] her Ice row stays live after the summon")
+      "[flag] her Ice row stays live after the summon")
   end),
 
   (function()
@@ -933,7 +933,7 @@ H.run({ maxFrames = 150000 }, {
       driveTo(function()
         -- The refill can only show if her pool has room for it: an Osmose
         -- entered at her maximum pays 8, drains, and is capped straight
-        -- back to where it started.  On main's lineage at seed shift 31
+        -- back to where it started.  On main's run at seed shift 31
         -- (2026-09-17) Muddle re-aimed her first Osmose at Edgar
         -- (tgt=0000, hers 99->126), and the second, at the boss, entered
         -- at 126 and left at 126 -- the [osmose] rise assertion failed on
@@ -988,7 +988,7 @@ H.run({ maxFrames = 150000 }, {
 
   -- Now that Osmose has restored her above 27 MP, the spent summon row's
   -- grey cannot be explained by price.  Re-open the same live list and bind
-  -- the verdict uniquely to the once-per-battle latch.
+  -- the verdict uniquely to the once-per-battle flag.
   H.call(function() celesMode = "park" end),
   driveTo(function()
     return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
@@ -996,11 +996,11 @@ H.run({ maxFrames = 150000 }, {
   H.call(function()
     H.setPad({})
     H.assertEq(mp(celes) >= DDUST_MP, true,
-      "[latch] Osmose restored enough MP to afford another summon")
+      "[flag] Osmose restored enough MP to afford another summon")
     H.assertEq(esperEnabled(celes), false,
-      "[latch] the affordable spent summon is grey from $3f2e")
+      "[flag] the affordable spent summon is grey from $3f2e")
     H.assertEq(recEnabled(celes, recOf(celes, ICE)), true,
-      "[latch] an ordinary affordable spell remains live beside it")
+      "[flag] an ordinary affordable spell remains live beside it")
   end),
 
   -- ============================ boot B: the re-offer and the boundary ==
@@ -1015,10 +1015,10 @@ H.run({ maxFrames = 150000 }, {
     -- 7. the re-offer half of once-per-battle: a fresh battle offers the
     -- summon again (boot A's was spent and greyed when its battle ended)
     H.assertEq(esperEnabled(celes), true,
-      "[latch] a NEW battle offers the summon again -- the latch is "
+      "[flag] a NEW battle offers the summon again -- the flag is "
       .. "per-battle, not forever")
     H.assertEq(H.readWord(SUMMONED) & mask(celes), 0,
-      "[latch] ...because battle init cleared $3f2e")
+      "[flag] ...because battle init cleared $3f2e")
     R.mp0 = mp(celes)
     -- Her pool is the lab's 31 (pinPool above; the fled fixture carried
     -- 41 of 106, the first fighting re-cut 31 of 126, the current one 1 of
@@ -1094,7 +1094,7 @@ H.run({ maxFrames = 150000 }, {
       "[boundary] Shell (15) is greyed")
     -- no summon was spent this battle, so this grey comes only from the MP gate
     H.assertEq(esperEnabled(celes), false,
-      "[boundary] and the 27 MP summon is greyed too (no latch spent in "
+      "[boundary] and the 27 MP summon is greyed too (no flag spent in "
       .. "this battle -- the grey is the price alone)")
     H.screenshot("magicite_boundary")
     H.log("[magicite] all scenarios passed")

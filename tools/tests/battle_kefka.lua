@@ -32,7 +32,7 @@
 -- it and escalates the policy tier, for three attempts total.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/kefka_entry.mss.lua"
+local ENTRY = "build/states/kefka_entry.mss.lua"
 
 local KEFKA = 0x014A
 
@@ -162,7 +162,7 @@ local function mkFighter(tier, tag)
   return F
 end
 
--- ------------------------------------------------- the attempt ladder --
+-- ------------------------------------------------- the attempt sweep --
 local doorBlob, won, lostWhy = nil, false, nil
 
 local function attempt(n)
@@ -249,7 +249,7 @@ local function attempt(n)
 end
 
 H.run({ maxFrames = 300000 }, {
-  H.loadState(DOOR),
+  H.loadState(ENTRY),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.mapId() & 0x1ff, 22, "booted on map 22")
@@ -257,7 +257,7 @@ H.run({ maxFrames = 300000 }, {
       "at (19,36), KEFKA's entry point")
     H.assertEq(H.readByte(0x1a6d), 1, "party 1 (TERRA+EDGAR+CELES) active")
   end),
-  -- capture the entry point once: the retry ladder's rewind point (this
+  -- capture the entry point once: the retry sweep's rewind point (this
   -- boot's own state; nothing is written to the game)
   (function()
     local req

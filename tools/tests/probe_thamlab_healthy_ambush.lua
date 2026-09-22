@@ -2,11 +2,11 @@
 --
 -- The ambush (battle 45) from the HEALTHY fixture
 -- (thamlab_ambush_healthy.mss, probe_thamlab_grind.lua: the bake's route
--- plus a Crescent Island world grind to L22+), under the gen's bespoke
+-- plus a Crescent Island world grind to L22+), under the gen's custom
 -- per-turn plan with ONE measured fix and a few screened variants.  The fix: the battle lore
 -- window is POSITIONAL BY LORE ID -- row index == loreId, unlearned /
 -- unoffered ids render as empty rows -- so the cursor row wanted for a
--- lore is simply its id, NOT the "compacted list" model the gen computes
+-- lore is its id, NOT the "compacted list" model the gen computes
 -- (count of offered ids below it).  Evidence (control run
 -- build/thamlab/ambush_control_v2_s0.log, LORE-STALL dump f7233): learned
 -- lores {3,7,20}; $306A signatures only at those ids (8E/92/9F); $1E27
@@ -80,7 +80,7 @@ local function pressWalk(dir, pred, maxFrames, what)
 end
 
 -- ------------------------------------------------------------------------
--- The gen's bespoke per-turn ambush battle plan, with the lore-row fix and
+-- The gen's custom per-turn ambush battle plan, with the lore-row fix and
 -- the variant knobs described in the header.
 local MENU_A, ACTOR_A, MSTATE_A = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL_A, CMDROW_A = 0x202E, 0x890F

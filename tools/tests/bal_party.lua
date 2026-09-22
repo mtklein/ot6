@@ -37,7 +37,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 -- ------------------------------------------------------------- knobs --
 -- env overrides: the four knobs a sweep touches read an env var first and
 -- fall back to the literal default below. pcall-guarded: if Mesen's lua
--- sandbox hides os.getenv the read simply yields the default.
+-- sandbox hides os.getenv the read yields the default.
 local function envcfg(name)
   local ok, v = pcall(function() return os.getenv(name) end)
   if ok and v and v ~= "" then return v end

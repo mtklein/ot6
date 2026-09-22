@@ -17,11 +17,11 @@ ROM="Final Fantasy III (USA).sfc"
 [ -e "$HERE/tools/bin" ] || ln -s "$MAIN/tools/bin" "$HERE/tools/bin"
 
 # Seed generated savestates so boot-chain fixtures don't replay the whole
-# game, plus build/ninja (the content latches and .ninja_log; ninja treats
+# game, plus build/ninja (the content copy-if-changed steps and .ninja_log; ninja treats
 # an edge with no build-log entry as never built, so seeded states without
 # the log would replay the whole chain). -p preserves mtimes so the log's
 # recorded times still describe the copied files; real drift regenerates
-# through the latch edges' content compare.
+# through the copy-if-changed edges' content compare.
 #
 # Prefer a sibling worktree on the same commit whose own saved games verify
 # (same commit = same generators and library, which is exactly what

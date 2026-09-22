@@ -14,7 +14,7 @@
 -- script rather than to hp, which is the intended design ("Jank: the Blitz
 -- gate stays").
 
--- The retry ladder is the game's own defeat flow made explicit: the
+-- The retry sweep is the game's own defeat flow made explicit: the
 -- entry point is captured once at boot (a savestate blob in memory, with no
 -- writes); a party wipe tears the battle down into Game Over instead of
 -- the reunion, the attempt's post-fight ride ends there rather than on
@@ -28,7 +28,7 @@
 -- reload the capture as the consumer timeline, give it 300 frames, and
 -- require the same calm map-98 field before accepting the blob.
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("battle 66")
+local L = H.newSeedSweep("battle 66")
 local DOOR = "build/states/vargas_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -183,7 +183,7 @@ local function pulse()
   M.n = M.n + 1
   local ph = M.n % 10
   local st = H.readByte(MSTATE)
-  if M.n > 1200 then                     -- wedge watchdog: back out, Fight
+  if M.n > 1200 then                     -- stall watchdog: back out, Fight
     H.log(string.format("[vargas wd f%d] actor=%d st=%02X plan=%s",
       H.frame, a, st, M.plan.kind))
     M.n, M.via, M.d = 0, nil, 0
@@ -296,7 +296,7 @@ local function pulse()
   return {}                              -- transient open/close: hands off
 end
 
--- --------------------------------------------------- the retry ladder --
+-- --------------------------------------------------- the retry sweep --
 local entryBlob = nil                 -- captured once, below
 local fightWon = false
 
@@ -386,7 +386,7 @@ local function fightAttempt(n)
         if giveUp > 28000 then return true end       -- soft timeout: no win
         -- #163: the run canary's count is the loss too (it counts a
         -- 300-frame battle-side wipe as a game over and freezes the pad;
-        -- allowGameOver on the run keeps the ladder alive for the reload)
+        -- allowGameOver on the run keeps the sweep alive for the reload)
         if (H.gameOverFired or 0) > 0 then return true end
         local ok = (H.mapId() & 0x1ff) == 98 and H.hasControl()
           and H.tileAligned() and bright() >= 15
@@ -455,13 +455,13 @@ local function genAttempt(n)
   }, {})
 end
 
--- allowGameOver: the battle-66 ladder deliberately survives a lost fight
+-- allowGameOver: the battle-66 sweep deliberately survives a lost fight
 -- (#163); the post-fight ride ends on the lib's wipe canary or on
 -- H.gameOverFired and the next attempt reloads.
 H.run({ maxFrames = 700000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
-  -- capture the entry point once: the retry ladder's rewind point.  The blob
+  -- capture the entry point once: the retry sweep's rewind point.  The blob
   -- is this boot's own state, and nothing is written to the game.
   (function()
     local req
@@ -471,7 +471,7 @@ H.run({ maxFrames = 700000, allowGameOver = true }, {
       H.call(function()
         H.checkReq(req, "entry point capture")
         entryBlob = req.blob
-        H.log(string.format("entry point captured (%d bytes) for the retry ladder",
+        H.log(string.format("entry point captured (%d bytes) for the retry sweep",
           #entryBlob))
       end),
     }, {})

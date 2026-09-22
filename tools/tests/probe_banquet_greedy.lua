@@ -2,7 +2,7 @@
 --
 -- Boots a live banquet window (banquet_window.mss) and drives the
 -- soldier circuit greedily until the 14400-frame timer expires and
--- `$013C` latches, then reports the var0 the window earned.  That number
+-- `$013C` flags, then reports the var0 the window earned.  That number
 -- decides which reward tier the chain of generated savestates ships:
 -- >=50 Doma, >=67 base weapons, >=77 Tintinabar, >=90 Charm Bangle.
 --
@@ -10,7 +10,7 @@
 -- interior is several disjoint regions joined by stair/door entrances,
 -- and which region the party can reach depends on banquet state (the
 -- $0630 servants at (16,30)/(30,30) block passage through the castle
--- until _cc8490 clears them).  It talks to every reachable un-latched
+-- until _cc8490 clears them).  It talks to every reachable un-flagged
 -- soldier on this map nearest-first, and when none is reachable, takes
 -- the least-used reachable crossing.
 --
@@ -35,30 +35,30 @@ end
 -- the 24 scoring soldiers; object indices are 0x10 + npc_prop record
 -- position within each map's block
 local SOLDIERS = {
-  { map = 250, obj = 0x10, latch = 0x0217, name = "250 (21,24)" },
-  { map = 250, obj = 0x11, latch = 0x0218, name = "250 (25,24)" },
-  { map = 250, obj = 0x12, latch = 0x0219, name = "250 (21,18)" },
-  { map = 250, obj = 0x13, latch = 0x021A, name = "250 (25,18)" },
-  { map = 250, obj = 0x19, latch = 0x021F, name = "250 (98,51)" },
-  { map = 250, obj = 0x1E, latch = 0x0226, name = "250 (51,50) B27", fight = 0x0c7 },
-  { map = 250, obj = 0x1F, latch = 0x0227, name = "250 (9,49)" },
-  { map = 250, obj = 0x20, latch = 0x0228, name = "250 (110,51) B27", fight = 0x0c7 },
-  { map = 250, obj = 0x21, latch = 0x0229, name = "250 (120,13)" },
-  { map = 250, obj = 0x22, latch = 0x022A, name = "250 (115,16)" },
-  { map = 243, obj = 0x16, latch = 0x0224, name = "243 (8,18)" },
-  { map = 243, obj = 0x17, latch = 0x022B, name = "243 (12,14) B26", fight = 0x102 },
-  { map = 243, obj = 0x18, latch = 0x022C, name = "243 (18,14)" },
-  { map = 244, obj = 0x24, latch = 0x0220, name = "244 (11,23)" },
-  { map = 244, obj = 0x25, latch = 0x0221, name = "244 (25,23)" },
-  { map = 244, obj = 0x26, latch = 0x0222, name = "244 (16,14)" },
-  { map = 244, obj = 0x27, latch = 0x0223, name = "244 (20,14)" },
-  { map = 244, obj = 0x28, latch = 0x0225, name = "244 (10,17)" },
-  { map = 252, obj = 0x10, latch = 0x021B, name = "252 (40,56)" },
-  { map = 252, obj = 0x11, latch = 0x021C, name = "252 (42,52)" },
-  { map = 252, obj = 0x12, latch = 0x021D, name = "252 (42,56)" },
-  { map = 252, obj = 0x13, latch = 0x021E, name = "252 (37,57)" },
-  { map = 252, obj = 0x14, latch = 0x022D, name = "252 (42,57) B27", fight = 0x0c7 },
-  { map = 252, obj = 0x15, latch = 0x022E, name = "252 (40,54)" },
+  { map = 250, obj = 0x10, flag = 0x0217, name = "250 (21,24)" },
+  { map = 250, obj = 0x11, flag = 0x0218, name = "250 (25,24)" },
+  { map = 250, obj = 0x12, flag = 0x0219, name = "250 (21,18)" },
+  { map = 250, obj = 0x13, flag = 0x021A, name = "250 (25,18)" },
+  { map = 250, obj = 0x19, flag = 0x021F, name = "250 (98,51)" },
+  { map = 250, obj = 0x1E, flag = 0x0226, name = "250 (51,50) B27", fight = 0x0c7 },
+  { map = 250, obj = 0x1F, flag = 0x0227, name = "250 (9,49)" },
+  { map = 250, obj = 0x20, flag = 0x0228, name = "250 (110,51) B27", fight = 0x0c7 },
+  { map = 250, obj = 0x21, flag = 0x0229, name = "250 (120,13)" },
+  { map = 250, obj = 0x22, flag = 0x022A, name = "250 (115,16)" },
+  { map = 243, obj = 0x16, flag = 0x0224, name = "243 (8,18)" },
+  { map = 243, obj = 0x17, flag = 0x022B, name = "243 (12,14) B26", fight = 0x102 },
+  { map = 243, obj = 0x18, flag = 0x022C, name = "243 (18,14)" },
+  { map = 244, obj = 0x24, flag = 0x0220, name = "244 (11,23)" },
+  { map = 244, obj = 0x25, flag = 0x0221, name = "244 (25,23)" },
+  { map = 244, obj = 0x26, flag = 0x0222, name = "244 (16,14)" },
+  { map = 244, obj = 0x27, flag = 0x0223, name = "244 (20,14)" },
+  { map = 244, obj = 0x28, flag = 0x0225, name = "244 (10,17)" },
+  { map = 252, obj = 0x10, flag = 0x021B, name = "252 (40,56)" },
+  { map = 252, obj = 0x11, flag = 0x021C, name = "252 (42,52)" },
+  { map = 252, obj = 0x12, flag = 0x021D, name = "252 (42,56)" },
+  { map = 252, obj = 0x13, flag = 0x021E, name = "252 (37,57)" },
+  { map = 252, obj = 0x14, flag = 0x022D, name = "252 (42,57) B27", fight = 0x0c7 },
+  { map = 252, obj = 0x15, flag = 0x022E, name = "252 (40,54)" },
 }
 
 -- every crossing out of every circuit map (short + long entrance tables,
@@ -82,8 +82,8 @@ local CROSS = {
 -- so any plan made while 243 is still off-limits must route around it.
 local DOOR243 = { { 22, 34 }, { 23, 34 }, { 24, 34 } }
 
-local latched, crossUse = {}, {}
--- soldier latch -> failed chase attempts.  One attempt per soldier:
+local flagged, crossUse = {}, {}
+-- soldier flag -> failed chase attempts.  One attempt per soldier:
 -- inside a fixed window, a retry costs more frames than the point it
 -- might win.
 local failCount = {}
@@ -97,7 +97,7 @@ local function settled()
      and not H.dialogWaiting() and not H.battleLoadStarted()
 end
 
-local function done(s) return sw(s.latch) == 1 end
+local function done(s) return sw(s.flag) == 1 end
 
 -- true while anything outside the 243 pocket is still scoreable
 function AVOID243()
@@ -107,7 +107,7 @@ function AVOID243()
   return false
 end
 
--- nearest reachable un-latched soldier on this map: BFS to each of the
+-- nearest reachable un-flagged soldier on this map: BFS to each of the
 -- object's four current neighbours (the object stands on its own tile)
 local function avoidNow()
   if map() == 250 and AVOID243() then
@@ -122,7 +122,7 @@ local function nearestSoldier()
   local best, bestLen
   local av = avoidNow()
   for _, s in ipairs(SOLDIERS) do
-    if s.map == map() and not done(s) and (failCount[s.latch] or 0) < 1 then
+    if s.map == map() and not done(s) and (failCount[s.flag] or 0) < 1 then
       local ox, oy = objAt(s.obj)
       for _, d in ipairs({ { 0, 1 }, { 0, -1 }, { 1, 0 }, { -1, 0 } }) do
         local p = H.bfsPath(ox + d[1], oy + d[2], nil, av)
@@ -135,7 +135,7 @@ end
 
 -- Map 243 is a one-way pocket during the window: the (15,8) door into
 -- 250 was opened by the escort's transient `mod_bg_tiles`, and 243's
--- own map-init leaves it $013A-latched dead, so re-entering 243 shows
+-- own map-init leaves it $013A-flagged dead, so re-entering 243 shows
 -- the static closed door.  243 must be visited last.
 local function leastUsedCrossing()
   local best, bestKey, bestScore
@@ -164,7 +164,7 @@ end
 -- run a sub-step to completion inside our own tick; a raising sub-step
 -- (navTo no-path, a timeout) is caught and the driver re-picks
 local function runner()
-  local cur, curWhat, curLatch = nil, nil, nil
+  local cur, curWhat, curFlag = nil, nil, nil
   local expiredAt, expiredVar = nil, nil
   local lastMap, sinceProgress = nil, 0
   return {
@@ -185,17 +185,17 @@ local function runner()
         if ok and r == "frame" then return "frame" end
         if not ok then
           log[#log + 1] = string.format("f%-6d ABORT  %s", H.frame, curWhat)
-          if curLatch then
-            failCount[curLatch] = (failCount[curLatch] or 0) + 1
+          if curFlag then
+            failCount[curFlag] = (failCount[curFlag] or 0) + 1
           end
         end
-        cur, curWhat, curLatch = nil, nil, nil
+        cur, curWhat, curFlag = nil, nil, nil
         return "frame"
       end
       if not settled() then H.setPad({}); return "frame" end
       local s, len = nearestSoldier()
       if s then
-        curWhat, curLatch = s.name, s.latch
+        curWhat, curFlag = s.name, s.flag
         log[#log + 1] = string.format("f%-6d t=%-5d talk   %s (%d steps)",
           H.frame, timerCount(), s.name, len or -1)
         cur = H.chaseTalk(s.obj, 1500, s.name, {
@@ -207,7 +207,7 @@ local function runner()
       local c, key = leastUsedCrossing()
       if c then
         crossUse[key] = (crossUse[key] or 0) + 1
-        curWhat, curLatch = "cross " .. key, nil
+        curWhat, curFlag = "cross " .. key, nil
         log[#log + 1] = string.format("f%-6d t=%-5d cross  %s (use %d)",
           H.frame, timerCount(), key, crossUse[key])
         local fromMap, fx, fy = map(), H.fieldX(), H.fieldY()
@@ -229,7 +229,7 @@ local function runner()
         self.stuckAt = H.frame
         H.log(string.format(
           "== STUCK at f%d: map %d (%d,%d) timer=%d var0=%d -- no reachable "
-          .. "un-latched soldier and no reachable crossing ==",
+          .. "un-flagged soldier and no reachable crossing ==",
           H.frame, map(), H.fieldX(), H.fieldY(), timerCount(), var0()))
         for _, c in ipairs(CROSS[map()] or {}) do
           H.log(string.format("   crossing (%d,%d): %s", c[1], c[2],
@@ -282,7 +282,7 @@ H.run({ maxFrames = 40000 }, {
       .. "frame %d ==", var0(), timerCount(), H.frame))
     local n = 0
     for _, s in ipairs(SOLDIERS) do if done(s) then n = n + 1 end end
-    H.log(string.format("== soldiers latched: %d of 24 ==", n))
+    H.log(string.format("== soldiers flagged: %d of 24 ==", n))
     H.screenshot("bq_greedy_expiry")
   end),
   H.saveState("banquet_greedy_dinner.mss"),

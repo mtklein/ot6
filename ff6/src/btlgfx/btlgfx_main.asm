@@ -9551,7 +9551,7 @@ window_open:
 
 UpdateCharText:
 @44be:  jsl     Ot6BgHud_ext            ; ot6: hud shadow (main loop, cheap
-        lda     w7e7b98       ;        nmi: heavy nmi work wedges menus)
+        lda     w7e7b98       ;        nmi: heavy nmi work stalls menus)
         ora     w7e7b9c
         bne     @44d7
         lda     w7e7b99       ;

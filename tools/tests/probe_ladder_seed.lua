@@ -1,5 +1,5 @@
 -- probe_ladder_seed.lua -- read-only instrument: does the three-attempt
--- retry ladder actually play three different fights?
+-- retry sweep actually play three different fights?
 --
 -- The claim under test, as the generators state it: "H.waitFrames((n-1)*37)
 -- -- vary the battle RNG seed".  This probe reads the seed directly to
@@ -61,7 +61,7 @@ local seen = {}                          -- ordered list of observed seeds
 local attemptNow, runNow = 0, 0
 local LEADS = { [1] = 0, [2] = 36 }
 
--- One run of the three-attempt ladder, with `lead` frames inserted between
+-- One run of the three-attempt sweep, with `lead` frames inserted between
 -- the blob capture and attempt 1's entry drive.
 local function ladder(run, lead)
   local steps = { H.logStep(string.format(
@@ -133,7 +133,7 @@ H.run({ maxFrames = 20000 }, {
     })
   end)(),
 
-  -- The entry-point blob the ladder reloads between attempts.
+  -- The entry-point blob the sweep reloads between attempts.
   (function()
     local req
     return H.seqStep({

@@ -565,7 +565,7 @@ H.run({ maxFrames = 90000 }, {
         tap("b", 6, 16); tap("b", 6, 16)   -- converge to the root menu
         tap("a", 6, 40)                    -- MagiTek -> list (long settle:
                                            --   input during window-open
-                                           --   wedges the staged rows)
+                                           --   stalls the staged rows)
         for _ = 1, 3 do tap("down", 6, 16) end
         tap("right", 6, 16)                -- bottom-right: TekMissile
         tap("a", 6, 20)                    -- pick the cell
@@ -643,7 +643,7 @@ H.run({ maxFrames = 90000 }, {
     -- when Terra holds the menu, converge to the root command list, then
     -- one 'a' opens Tools (every slot is Tools).  The long idle tail lets
     -- the rows render before the predicate fires; input during window-open
-    -- wedges the staged rows, so the settle after 'a' is long.
+    -- stalls the staged rows, so the settle after 'a' is long.
     H.call(function()
       repokeHp()
       pinParty()

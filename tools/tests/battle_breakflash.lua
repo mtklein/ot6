@@ -397,7 +397,7 @@ H.run({ maxFrames = 60000 }, {
       .. "gauges moved during them", H.vars.liveFrames, H.vars.atbMoved))
     H.assertEq(H.vars.atbMoved > 0, true,
       "atb keeps running across a live break flash -- #33's signature (every "
-      .. "gauge frozen, menus wedged shut) does not reproduce")
+      .. "gauge frozen, menus stalled shut) does not reproduce")
   end),
   H.driveUntil(function() return H.readByte(0x7bca) ~= 0 end, 6000, {
     H.call(function() pinLab() end), H.waitFrames(4),

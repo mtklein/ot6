@@ -13,19 +13,19 @@ local FIX = "build/states/vargas_entry.mss.lua"
 local VARGAS = 0x0103
 local OBSERVE = 2400        -- battle frames to watch before ending the probe
 
-local inBattle, bN, ranLatch = false, 0, false
+local inBattle, bN, ranFlag = false, 0, false
 emu.addEventCallback(function()
   local live = H.battleLoadStarted()
   if live and not inBattle then
-    inBattle, bN, ranLatch = true, 0, false
+    inBattle, bN, ranFlag = true, 0, false
     H.log(string.format("[flee probe] battle up at f%d formation %04X %04X %04X %04X %04X %04X",
       H.frame, H.readWord(0x57C0), H.readWord(0x57C2), H.readWord(0x57C4),
       H.readWord(0x57C6), H.readWord(0x57C8), H.readWord(0x57CA)))
   end
   if inBattle then
     bN = bN + 1
-    if H.readByte(0x3a38) ~= 0 and not ranLatch then
-      ranLatch = true
+    if H.readByte(0x3a38) ~= 0 and not ranFlag then
+      ranFlag = true
       H.log(string.format("[flee probe] $3a38=%02X -- a character JUST RAN AWAY at battle frame %d",
         H.readByte(0x3a38), bN))
     end
@@ -38,7 +38,7 @@ emu.addEventCallback(function()
   end
   if not live and inBattle then
     inBattle = false
-    H.log(string.format("[flee probe] battle down at f%d after %d frames: ran=%s", H.frame, bN, tostring(ranLatch)))
+    H.log(string.format("[flee probe] battle down at f%d after %d frames: ran=%s", H.frame, bN, tostring(ranFlag)))
   end
 end, emu.eventType.startFrame)
 

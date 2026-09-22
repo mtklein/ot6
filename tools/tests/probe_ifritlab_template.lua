@@ -19,7 +19,7 @@
 --                      Ifrit's 6 pierce shields, non-elem slash for Shiva's
 --                      6 slash) + the same lib driver + healer designation
 --                      + nuke={Ice}
---             bespoke  the design-doc play, per-turn: CELES casts boosted
+--             custom  the design-doc play, per-turn: CELES casts boosted
 --                      Ice ONLY while IFRIT holds the stage (Shiva absorbs
 --                      ice), everyone else Fights with the class-correct
 --                      loadout (unboosted while the stage sibling still has
@@ -45,7 +45,7 @@ local SEED     = tonumber("@SEED@")    or 0
 local HEALPCT  = tonumber("@HEALPCT@") or 60
 local BANK     = tonumber("@BANK@")    or 3
 local HEALER   = tonumber("@HEALER@")  or 1
-if STRATEGY:find("@") then STRATEGY = "bespoke" end
+if STRATEGY:find("@") then STRATEGY = "custom" end
 if FIXTURE:find("@") then FIXTURE = "ifritlab_entry" end
 
 local LOCKE, EDGAR, SABIN, CELES = 1, 4, 5, 6
@@ -171,7 +171,7 @@ local function classLoadout()
   })
 end
 
--- ------------------------------------------------------- the bespoke --
+-- ------------------------------------------------------- the custom --
 -- The design-doc play (docs/design/magicite-ifrit-shiva.md §2.2-2.3,
 -- bosses-wob.md §13): read the stage.  IFRIT (6 pierce shields, weak ice,
 -- absorbs fire, nulls the rest) opens; every landed hit or Magic command
@@ -191,7 +191,7 @@ local ITEMSCR_B, ITEMROW_B, BATTINV_B = 0x8947, 0x894F, 0x2686
 local MLISTPTR_B = 0x302C
 local MSCROLL_B, MCOL_B, MROW_B = 0x8913, 0x8917, 0x891B
 local CURMP_B = 0x3C08
-local bespokeCharTC = H.targetCursor({ mask = 0x7B7D,
+local customCharTC = H.targetCursor({ mask = 0x7B7D,
   dirs = { "down", "up", "left", "right" } })
 
 local function spellCellB(actor, id, strict)
@@ -224,13 +224,13 @@ local function bagIdxOfB(ids)
   return nil
 end
 
-local function newBespokePlan(tag, slots)
+local function newCustomPlan(tag, slots)
   local F = {}
   local phase, mf = 0, 0
   local turnActor, turnPlan = nil, nil
   local iceCasts, bursts = 0, 0
   local function stageSibling()
-    -- whichever sibling is on stage and alive right now
+    -- whichever sibling is in the formation and alive right now
     if onfield(slots.I) == 1 and mhp(slots.I) > 0 then return "ifrit" end
     if onfield(slots.S) == 1 and mhp(slots.S) > 0 then return "shiva" end
     return nil
@@ -308,8 +308,8 @@ local function newBespokePlan(tag, slots)
       elseif st == ST_TGT_B then
         plan.tgtSpin = (plan.tgtSpin or 0) + 1
         if plan.tgtSpin > 240 then return "a" end
-        bespokeCharTC.observe()
-        return bespokeCharTC.steer(plan.target, mf)
+        customCharTC.observe()
+        return customCharTC.steer(plan.target, mf)
       end
       return "b"
     end
@@ -342,7 +342,7 @@ local function newBespokePlan(tag, slots)
         if col > wc then return "left" end
         return "a"
       elseif st == ST_TGT_B then
-        return "a"                       -- one monster on stage
+        return "a"                       -- one monster in the formation
       end
       return "b"
     end
@@ -456,8 +456,8 @@ local function newStrategyDriver()
     return H.newFightDriver("lab-commit", { tactical = false, boost = true,
       bank = BANK, items = true, healPercent = HEALPCT, cadence = 12 })
   end
-  if STRATEGY == "bespoke" then
-    return newBespokePlan("lab-bespoke", slots)
+  if STRATEGY == "custom" then
+    return newCustomPlan("lab-custom", slots)
   end
   error("unknown STRATEGY " .. STRATEGY, 0)
 end

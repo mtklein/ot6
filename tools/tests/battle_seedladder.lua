@@ -1,6 +1,6 @@
 -- @suite
--- battle_seedladder.lua -- H.newSeedLadder must draw three distinct battle
--- RNG seeds across a three-attempt retry ladder, and its report() must
+-- battle_seedladder.lua -- H.newSeedSweep must draw three distinct battle
+-- RNG seeds across a three-attempt retry sweep, and its report() must
 -- actually fail when that isn't true.
 --
 -- The battle RNG seed is (game-time frames * 4) & $FF, computed once per
@@ -114,8 +114,8 @@ local function attempt(L, n, sopts)
   })
 end
 
-local POS = H.newSeedLadder("spread ladder")
-local NEG = H.newSeedLadder("collision control")
+local POS = H.newSeedSweep("spread sweep")
+local NEG = H.newSeedSweep("collision control")
 
 H.run({ maxFrames = 8000 }, {
   H.waitFrames(20),
@@ -171,7 +171,7 @@ H.run({ maxFrames = 8000 }, {
 
   -- 3. The other two ways report() could be vacuous.
   H.call(function()
-    local EMPTY = H.newSeedLadder("empty control")
+    local EMPTY = H.newSeedSweep("empty control")
     local ok, err = pcall(EMPTY.report().tick)
     H.assertEq(ok, false,
       "a ladder that recorded no seeding at all FAILS rather than passing")
@@ -183,7 +183,7 @@ H.run({ maxFrames = 8000 }, {
   -- the other attempts still compare fine, so the ladder would report green
   -- while covering one fewer fight than it claims.  SILENT spreads and stops.
   (function()
-    local SILENT = H.newSeedLadder("silent-attempt control")
+    local SILENT = H.newSeedSweep("silent-attempt control")
     return H.seqStep({
       SILENT.watch(),
       SILENT.spread(1),
@@ -203,7 +203,7 @@ H.run({ maxFrames = 8000 }, {
   (function()
     local START = 1
     local blind = neverSampled(START, 30)
-    local A = H.newSeedLadder("aliasing control",
+    local A = H.newSeedSweep("aliasing control",
                               { phaseSource = aliasedSampler(START) })
     local out = {}
     return H.seqStep({
@@ -232,7 +232,7 @@ H.run({ maxFrames = 8000 }, {
   -- that must not become "wait a bit and hope": a ladder that cannot spread
   -- has to say so rather than run a second attempt on the first one's seed.
   (function()
-    local S = H.newSeedLadder("stopped counter control",
+    local S = H.newSeedSweep("stopped counter control",
                               { phaseSource = function() return 30 end })
     local out = {}
     return H.seqStep({

@@ -36,7 +36,7 @@
 --      spend: pending = 3 (the bank is 5, the spend caps at 3), $3a70 = 7,
 --      the loop runs 8 passes, a one-weapon character lands 4 of them, and
 --      Ot6ActionEnd charges 3 off the bank, leaving 2.
---   C. the grudge is CONSUMED.  The dump is armed while he stands BELOW
+--   C. the retaliation tally is CONSUMED.  The dump is armed while he stands BELOW
 --      the hp line his own last turn drew (OT6_HPMARK), and the same frame
 --      moves that line down to where he stands, so one hurt buys one dump
 --      and the next needs a new hit.
@@ -50,7 +50,7 @@
 -- -- which are precisely what the old behaviour produced here, so this file
 -- cannot pass on a ROM without the feature.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/vargas_entry.mss.lua"
+local ENTRY = "build/states/vargas_entry.mss.lua"
 
 local SUBJ = 0                          -- EDGAR's entity index at vargas_entry
 local BERSERK = 0x10                    -- STATUS2 bit 4 (const.inc)
@@ -88,12 +88,12 @@ local L = {
 }
 -- the ONE action under the microscope: opened by the ROM's own dump write
 -- (which happens inside Ot6FightBoost, before it touches $3a70) and closed
--- by SaveForMimic -- battle_hits.lua's window, hung off the dump
+-- by SaveForMimic -- battle_hits.lua's window, hooked into the dump
 local W = { open = false, closed = false, swings = 0, hits = 0,
             hand = { [0] = 0, [1] = 0 }, bank = nil }
 
 H.run({ maxFrames = 150000 }, {
-  H.loadState(DOOR),
+  H.loadState(ENTRY),
   H.waitFrames(30),
 
   -- ================================================================== --
@@ -143,12 +143,12 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(D.cap < BANK_CAP, true,
       "the cap really is a cap here: a full bank of " .. BANK_CAP
       .. " cannot all be spent at once, so the dump is testable")
-    -- the two latch cells, read out of the assembled symbols rather than
+    -- the two flag cells, read out of the assembled symbols rather than
     -- copied into this file
     D.unctl = 0x7E0000 + (H.sym("OT6_UNCTL") & 0xFFFF)
     D.mark  = 0x7E0000 + (H.sym("OT6_HPMARK") & 0xFFFF) + SUBJ * 2
     H.assertEq(D.mark - SUBJ * 2, D.unctl + 1,
-      "ot6_memory.inc keeps the latch and the hurt line adjacent")
+      "ot6_memory.inc keeps the flag and the hurt line adjacent")
     H.log(string.format("[rom] $3a70 = %d + %d*bp; spend cap %d; "
       .. "OT6_UNCTL $%06X, subject's hurt line $%06X",
       D.base, D.perBp, D.cap, D.unctl, D.mark))
@@ -164,7 +164,7 @@ H.run({ maxFrames = 150000 }, {
     --    never queues a player command, never leaves $32cc valid, and
     --    therefore reaches QueueAction's no-pending-action arm -- which,
     --    with no Dance, Rage or Magitek status, is `jsr RandCharAction`,
-    --    the one site Ot6UnctlMark hangs off.
+    --    the one site Ot6UnctlMark hooks into.
     -- 2. His action script does NOT route wholly through FightAttack.
     --    UmaroAttackTbl has four entries and exactly ONE of them is
     --    FightAttack; the other three (Throw, Storm, Charge) are his own
@@ -214,7 +214,7 @@ H.run({ maxFrames = 150000 }, {
       .. "is not routed", r0, r1, r0, r0 + r1, 100.0 * r0 / (r0 + r1)))
     -- 3. The Colosseum is a MODE, $3a97, and RandCharAction is where
     --    vanilla folds it in beside Berserk, Muddle and Charm -- so it
-    --    arrives at the same latch with no extra test here.  Nothing in
+    --    arrives at the same flag with no extra test here.  Nothing in
     --    the WoB can enter it, so that is all this file says about it.
   end),
 
@@ -235,7 +235,7 @@ H.run({ maxFrames = 150000 }, {
       "OT6_UNCTL starts the battle clear (InitBP)")
     H.assertEq(H.readWord(D.mark), 0,
       "the subject's hurt line starts the battle at 0 = 'has not acted' "
-      .. "(InitBP), so nothing stale can read as a grudge")
+      .. "(InitBP), so nothing stale can read as a retaliation tally")
 
     -- the subject's armed hands, READ off his character record
     local c = H.readByte(0x3ED8 + SUBJ * 2)
@@ -298,7 +298,7 @@ H.run({ maxFrames = 150000 }, {
 
     -- and every write to his hurt line: Ot6ActionEnd draws it at the end of
     -- each of his turns, and Ot6Retaliate moves it down when it spends a
-    -- grudge.  The dump callback below necessarily still sees the OLD line,
+    -- retaliation tally.  The dump callback below necessarily still sees the OLD line,
     -- because Ot6Retaliate arms the pending byte after it moves the line --
     -- so both halves are read here, from the writes themselves.
     -- a 16-bit store fires this once per byte, so the cell is re-read
@@ -385,7 +385,7 @@ H.run({ maxFrames = 150000 }, {
       .. "(Ot6ActionEnd's gain arm, %d of his actions resolved)",
       BANK_CAP, L.playerFights))
     H.assertEq(L.unctlDuringA, 0,
-      "OT6_UNCTL never set while the PLAYER was driving him: the latch is "
+      "OT6_UNCTL never set while the PLAYER was driving him: the flag is "
       .. "the engine's decision, not a status read")
     H.assertEq(#L.dumps, 0,
       "and nothing dumped: a player's unboosted Fight spends no pips")
@@ -521,7 +521,7 @@ H.run({ maxFrames = 150000 }, {
         return #t > 0 and table.concat(t, " ") or "none"
       end)()))
     H.assertEq(moved.v < d.mark, true, string.format(
-      "the line fell from %d to %d: the grudge was spent, not re-armed",
+      "the line fell from %d to %d: the retaliation tally was spent, not re-armed",
       d.mark, moved.v))
     H.assertEq(#L.dumps <= L.hurts, true, string.format(
       "%d dump(s) over %d hp drop(s): a dump is never conjured out of a "

@@ -755,11 +755,11 @@ local function lossReload(blobFn, tag)
 end
 
 -- ------------------------------------------------ the ambush battle 45 --
--- The bake's bespoke per-turn plan with ONE change: the POSITIONAL
+-- The bake's custom per-turn plan with ONE change: the POSITIONAL
 -- lore-row model (row == loreId), the fix probe_thamlab_ambush_fix.lua
 -- measured correct (the compacted model held the cursor on the wrong row
 -- and stalled).
-local L45 = H.newSeedLadder("ambush (battle 45)", { attempts = 5 })
+local L45 = H.newSeedSweep("ambush (battle 45)", { attempts = 5 })
 local ambBlob, ambWon = nil, false
 local CONFIRM_BATTLE_GONE = 90
 
@@ -1429,7 +1429,7 @@ local steps = {
   ambushAttempt(5),
   H.call(function()
     if not ambWon then
-      error("ambush (battle 45): all 5 seed-ladder attempts lost", 0)
+      error("ambush (battle 45): all 5 seed-sweep attempts lost", 0)
     end
   end),
   L45.report(),

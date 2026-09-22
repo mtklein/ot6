@@ -537,18 +537,18 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
 
 ; ------------------------------------------------------------------------------
 
-; [ latch the trance's boost tier (Cmd_10's entry) ]
+; [ store the trance's boost tier (Cmd_10's entry) ]
 ;
 ; BP is spent once, at the Rage-start action, through the normal Ot6ActionEnd
 ; consume, but the tier must outlive that action for the whole battle, because
 ; every possessed turn after it rolls the same tilted coin.  That is Slot's
-; problem at longer range: Ot6SlotRig latches the spin's tier so the charge and
-; the reels cannot disagree; this latches the trance's tier so the charge and
+; problem at longer range: Ot6SlotRig records the spin's tier so the charge and
+; the reels cannot disagree; this records the trance's tier so the charge and
 ; the whole possession cannot disagree.
 ;
 ; It fires only on the start turn, the turn whose RAGE status bit is still
 ; clear.  A mid-trance Cmd_10 (every possessed turn re-enters here) finds the
-; bit set and leaves the latch alone; latching there would read the already-
+; bit set and leaves the store alone; recording there would read the already-
 ; consumed pending byte and drop the trance to tier 0.
 ;
 ; Two call sites, and the second one is why the ladder works on the start turn:
@@ -557,18 +557,18 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
 ;     Without this site the tier would not apply until one turn after the BP
 ;     was spent, the one turn it should have bought.
 ;   * Cmd_10 itself, for the auto-queued possessed turns, and as a redundant
-;     latch if the load path is ever reached differently.
+;     store if the load path is ever reached differently.
 ; Both are idempotent on the start turn: the pending byte is not consumed until
-; Ot6ActionEnd, so the second latch stores the same value the first did.
+; Ot6ActionEnd, so the second call stores the same value the first did.
 ;
 ; entry: jsl from either site, a8, Y = attacker entity, db=$7e.  Index width is
 ; not assumed; Y only ever indexes two absolute tables with an entity index.
 ; clobbers A's low half only (a8), preserving B for FixPlayerAttack's xba.
-.proc Ot6RageTierLatch
+.proc Ot6RageTierFlag
         .a8
         lda     $3ef9,y         ; status 4
         lsr                     ; bit 0 = RAGE: already possessed?
-        bcs     @done           ; mid-trance turn: the latched tier stands
+        bcs     @done           ; mid-trance turn: the stored tier stands
         lda     OT6_BOOST_REVEALED,y     ; pending boost 0-3
         cmp     #$04
         bcc     :+

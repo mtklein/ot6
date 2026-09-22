@@ -10,7 +10,7 @@
 --    $01B4 & $01B0 & !$01F0.  $01B0-$01B7 are not story switches; they are
 --    the live control-flag bits of $1EB6 (field/event.asm UpdateCtrlFlags:
 --    bit0-3 = facing up/right/down/left, bit4 = A held, bit5 = tile
---    latch).  Activating the clock means standing on it, facing up, and
+--    flag).  Activating the clock means standing on it, facing up, and
 --    holding A.
 --  * the time-telling NPCs in town all give the wrong time; the correct
 --    answer is hard-coded in the choice graph: hour dlg $041D, only index 2
@@ -116,7 +116,7 @@ end
 -- one clock dialog: H.dialogChoice (lib/ot6_field.lua) steers $056E to idx
 -- from the moment $056F counts two options ("count", 3-of-8 pulses) and
 -- asserts the landed row; a prompt page ($D3=1) gets edge-A, scrolling
--- text an empty pad.  Done when the pick's own $01F* latch sets.
+-- text an empty pad.  Done when the pick's own $01F* flag sets.
 local function clockPick(idx, doneId, what)
   return H.dialogChoice(idx, {
     ready = "count", on = 3, maxFrames = 3000, what = what, tag = what,
@@ -160,7 +160,7 @@ H.run({ maxFrames = 90000 }, {
       H.fieldX(), H.fieldY(), H.readByte(0x056e)))
   end),
 
-  -- 3. 6:10:50.  Each pick confirms its own $01F* latch: hour idx 2 sets
+  -- 3. 6:10:50.  Each pick confirms its own $01F* flag: hour idx 2 sets
   --    $01F1 (_ca96e2), minute idx 0 sets $01F2 (_ca96f8), second idx 4
   --    reaches the if_all success at _ca970e which sets $01F0 (_ca9725).
   --    Confirming the hour also opens the minute dialog, so the next
@@ -169,7 +169,7 @@ H.run({ maxFrames = 90000 }, {
   clockPick(0, 0x01F2, "minute = 0:10"),
   clockPick(4, 0x01F0, "second = 0:00:50 -> the staircase"),
 
-  -- 4. the success shake runs ~2s; $01F0 is already latched by clockPick
+  -- 4. the success shake runs ~2s; $01F0 is already set by clockPick
   H.waitUntil(function() return sw(0x01F0) == 1 end, 900,
     "$01F0 -- the staircase revealed", 5),
   -- step off the clock tile {98,59}: its trigger _ca96bd re-fires every

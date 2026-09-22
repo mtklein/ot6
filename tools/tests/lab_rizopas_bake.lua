@@ -16,7 +16,7 @@
 -- Then, AFTER the snapshot is banked, it continues along the generator's
 -- own path (H.navTo(13,11), hold up, answer "Jump?") with the lib's seed
 -- watch armed and stops at battle-up: that measures the seed the
--- qualification lineage draws in this tree ($be at InitBattle's store),
+-- qualification run draws in this tree ($be at InitBattle's store),
 -- so the lab's declared spread can include it by measurement rather than
 -- by guess.  Nothing here fights Rizopas: the run ends at battle-up.
 --
@@ -164,7 +164,7 @@ local function probeParty(tag)
 end
 
 -- the seed the gen path draws: read off the `sta $be` store, the way
--- H.newSeedLadder and the Nerapa lab read it
+-- H.newSeedSweep and the Nerapa lab read it
 local seedDrawn, seedN = nil, 0
 local function armSeedWatch()
   local addr = H.seedStoreAddr()

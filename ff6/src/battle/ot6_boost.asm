@@ -12,28 +12,28 @@
         shorta0
         ; consume the random-encounter marker: the field trigger set
         ; OT6_RANDPEND (to the magic value) just before this battle
-        ; started; latch a normalized 0/1 as this battle's flag and clear
+        ; started; flag a normalized 0/1 as this battle's flag and clear
         ; the marker, so event battles (which never pass the trigger)
         ; always read a stale-proof 0.
         lda     f:$7e0000+OT6_RANDPEND
         cmp     #OT6_RANDMAGIC
         beq     @mark
         lda     #$00
-        bra     @latch
+        bra     @flag
 @mark:  lda     #$01
-@latch: sta     f:$7e0000+OT6_RANDBTL
+@flag: sta     f:$7e0000+OT6_RANDBTL
         lda     #$00
         sta     f:$7e0000+OT6_RANDPEND
         sta     f:$7e0000+OT6_HUDVEIL   ; a stale veil never survives init
         sta     f:$7e0000+OT6_SCRIPTBUSY ; nor a stuck anchor-adopt gate
         sta     f:$7e0000+OT6_PIPTAIL   ; nor a stale pip-paint tail
-        sta     f:$7e0000+OT6_COVERPAID ; nor a stale cover-earn latch: a
+        sta     f:$7e0000+OT6_COVERPAID ; nor a stale cover-earn flag: a
                                 ;   stale bit would eat the first cover of
                                 ;   the battle instead of costing a no-op
         sta     f:$7e0000+OT6_PIPPEND   ; nor a deferred pip paint: a stale
                                 ;   slot would paint a spurious pip on the
                                 ;   first damage numeral of the next battle
-        sta     f:$7e0000+OT6_RUNICPAID ; nor a stale runic-earn latch: a
+        sta     f:$7e0000+OT6_RUNICPAID ; nor a stale runic-earn flag: a
                                 ;   stale bit here suppresses a real earn
                                 ;   rather than costing a no-op
         sta     f:$7e0000+OT6_RUNICTURNS      ; nor a standing Runic nobody
@@ -44,7 +44,7 @@
                                 ;   would give the next battle's Celes a
                                 ;   standing magic shield she never paid for
         sta     f:$7e0000+OT6_UNCTL     ; nor a stale "the engine is driving
-                                ;   this one" latch (#236): it would hand the
+                                ;   this one" flag (#236): it would hand the
                                 ;   first uncontrolled swing of this battle a
                                 ;   dump nobody earned.  Its twin, the hurt
                                 ;   line OT6_HPMARK, is cleared with the
@@ -86,7 +86,7 @@
         sta     f:$7e0000+OT6_HPMARK+2  ;   and 0 reads as "has not acted in
         sta     f:$7e0000+OT6_HPMARK+4  ;   this battle" in Ot6Retaliate.  A
         sta     f:$7e0000+OT6_HPMARK+6  ;   stale line from the last battle
-                                        ;   would read as a grudge nobody
+                                        ;   would read as a retaliation tally nobody
                                         ;   earned, so it is cleared here and
                                         ;   not left to the shadow loop above,
                                         ;   which stops at $ed61
@@ -172,7 +172,7 @@
         lda     $3bf4,x         ;   turn ends is the line a later hit is
         sta     f:$7e0000+OT6_HPMARK,x  ;   measured against.  Drawn on both
         shorta0                 ;   arms and on every character turn, so the
-                                ;   grudge is always "since I last swung"
+                                ;   retaliation tally is always "since I last swung"
         txa                     ; the live pip cell follows this actor
         lsr                     ;   entity offset -> character slot
         sta     f:$7e0000+OT6_PIPSLOT
@@ -273,7 +273,7 @@ done:   jsr     Ot6PipPending
 ;     turn she raised Runic is still paid for what she catches: the
 ;     stance costs her the turn either way, and charging it twice would
 ;     make boosting into Runic worse than not boosting.
-;   - once per round (OT6_RUNICPAID), the same latch True Knight's cover
+;   - once per round (OT6_RUNICPAID), the same flag True Knight's cover
 ;     earn uses.
 ;
 ; ---- capped once per round: why ----
@@ -322,13 +322,13 @@ done:   jsr     Ot6PipPending
         bcs     done            ; the bank cap holds; an absorb never wraps
         inc
         sta     OT6_BP_CLASS,y
-        lda     $3018,y         ; latch: paid this round.  set only when a pip
+        lda     $3018,y         ; flag: paid this round.  set only when a pip
         ora     f:$7e0000+OT6_RUNICPAID  ;   was really banked, so a capped-away
         sta     f:$7e0000+OT6_RUNICPAID  ;   earn at 5 bp costs nothing:
                                 ;   inside one round nothing but her own
                                 ;   action can lower a held character's
                                 ;   bank, and that action is the boundary
-                                ;   that clears this latch
+                                ;   that clears this flag
         jsr     Ot6BankMoved    ; an absorb is the reactive case the
                                 ;   kit window could not see -- Celes's bank
                                 ;   rises with her own window open and nothing
@@ -383,7 +383,7 @@ done:   rtl
 ;
 ; The decrement happens here, at the moment she takes a turn, so the
 ; counter measures what the player is promised: turns she gets to
-; act under the shield.  With N latched, her Nth post-raise turn still
+; act under the shield.  With N flagged, her Nth post-raise turn still
 ; restores the stance (the store goes to 0 but the bit goes back), and her
 ; N+1th finds 0 and lets vanilla's clear stand.  A monster's QueueAction
 ; falls out at the character test, and an unboosted Runic reads 0 and is
@@ -471,12 +471,12 @@ done:   rtl
 ;            a status test: Berserk and Muddle are status bits, Umaro is a
 ;            character and the Colosseum is a mode, and re-deriving that
 ;            list here would be four ways to disagree with vanilla.  The
-;            latch is set where vanilla chooses the action FOR the actor and
+;            flag is set where vanilla chooses the action FOR the actor and
 ;            cleared where vanilla hands the player the window.
 ;   when  -- OT6_HPMARK, the hp it stood on when its OWN last turn ended.
 ;            "Got hit" is IT STANDS LOWER THAN THAT.  A miss changes
 ;            nothing, a connect for 0 changes nothing, and several small
-;            hits add up to one grudge -- which is what "hurt them and they
+;            hits add up to one retaliation tally -- which is what "hurt them and they
 ;            hit back harder" means at the screen.  The first shape of this
 ;            was a flag set on ApplyDmgHP's damage-taken arm;
 ;            battle_trueknight's frame-budget canary measured that site as
@@ -493,13 +493,13 @@ done:   rtl
 ;
 ; A player's own boost wins: a nonzero pending here was bought with an R
 ; press (or a Slot commit, or a SwdTech confirm) and is left exactly alone.
-; An empty bank dumps nothing and leaves the grudge standing, so the actor
+; An empty bank dumps nothing and leaves the retaliation tally standing, so the actor
 ; hits back on the first turn it has anything to hit back with.
 ;
 ; WHO ELSE REACHES THIS, recorded so it is not rediscovered:
 ;
 ;   * Umaro's four arms (#237).  Only the last of UmaroAttackTbl's slots is
-;     FightAttack, so a dump that hung off Ot6FightBoost alone reached his
+;     FightAttack, so a dump that hooked into Ot6FightBoost alone reached his
 ;     plain swing (158 of 253 relic-less rolls, RandBitRateTbl row 0) and
 ;     none of Throw, Storm or Charge.  Ot6UmaroRetaliate arms it at his
 ;     chooser, before the roll, and each arm delivers it its own way (see
@@ -509,7 +509,7 @@ done:   rtl
 ;   * An AI-SCRIPTED character (#238) -- CYAN in the Doma courtyard defence,
 ;     and any set piece that drives a party member from a script.  QueueAction
 ;     sends it to ExecMonsterAction before it ever reaches the no-pending-
-;     action arm, so it never passes RandCharAction; Ot6UnctlMark hangs off
+;     action arm, so it never passes RandCharAction; Ot6UnctlMark hooks into
 ;     ExecMonsterAction's head as well, and the script's plain Fight then
 ;     arrives here like anyone else's (battle_retaliate_script.lua).  A
 ;     SwdTech the script picks instead carries no dump, as no non-Fight
@@ -532,7 +532,7 @@ done:   rtl
         beq     out                     ; ...and is this one of them?
         lda     OT6_BP_CLASS,x
         beq     out                     ; an empty bank spends nothing, and
-                                        ;   must not eat the grudge: the dump
+                                        ;   must not eat the retaliation tally: the dump
                                         ;   waits for the first pip
         longa
         lda     f:$7e0000+OT6_HPMARK,x  ; where it stood when its own last
@@ -573,7 +573,7 @@ out:    rts
 ; drives a party member from a script) is sent there by QueueAction's
 ; character arm before the no-pending-action arm is ever reached, so it
 ; never passes RandCharAction.  CheckPlayerAction refuses such a character
-; a window at its own ai-script test, ahead of Ot6UnctlClear, so the latch
+; a window at its own ai-script test, ahead of Ot6UnctlClear, so the flag
 ; stands for as long as the script drives.  Monsters reach that head on
 ; every action of theirs and are ignored by the test below, at the cost of
 ; one jsl.
@@ -614,7 +614,7 @@ out:    longa
 ; asleep/muddled/berserked/dancing/hidden/raging list) has declined.
 ;
 ; Clearing HERE rather than in Ot6ActionEnd is what keeps a cured status
-; from leaving a dump armed: the latch says who decided the action last,
+; from leaving a dump armed: the flag says who decided the action last,
 ; and the window opening is the moment the answer changes back.
 ;
 ; a8 at the call site, A dead (the caller jumps straight into the menu);
@@ -646,7 +646,7 @@ out:    longa
 
 ; #237.  jsl from the head of _163b (battle_main.asm), the chooser Cmd_06
 ; sends Umaro to instead of FightAttack.  Only the last of UmaroAttackTbl's
-; four slots is FightAttack, so a dump that hung off Ot6FightBoost alone
+; four slots is FightAttack, so a dump that hooked into Ot6FightBoost alone
 ; reached his plain swing and none of Throw, Storm or Charge; arming it
 ; here, before the roll, reaches all four.
 ;
@@ -1351,7 +1351,7 @@ Ot6FoldTbl:
         ; (:14644 starts at row 1), and ValidateSpellList writes row 0 only
         ; for a character who really has magicite equipped (:14556-14566).
         ; Not $3f2e: that mask means "has already summoned this battle", the
-        ; once-per-battle latch UpdateEnabledMagic uses to disable the row,
+        ; once-per-battle flag UpdateEnabledMagic uses to disable the row,
         ; and a disabled row still wants the right number beside it.
         longa
         lda     $302c,x
@@ -1794,7 +1794,7 @@ Ot6ThiefCostTbl:
 ; RAGE status for free and every possessed turn after it costs 0.  A fizzled Rage
 ; must not lock the whole-battle state for nothing.  When the queued cost
 ; ($3a4c, staged at action load) exceeds the pool, Cmd_10 skips the status set
-; and the beast latch entirely and runs the plain exec, whose fizzle shows the
+; and the beast flag entirely and runs the plain exec, whose fizzle shows the
 ; standard refusal surface.  Mid-trance turns queue at 0 (Ot6AbilityCost's
 ; cmd-$10 arm), so this gate never fires on a possessed turn.
 ; entry: jsl from Cmd_10, a8/i8 (command context), y = attacker entity, db=$7e.

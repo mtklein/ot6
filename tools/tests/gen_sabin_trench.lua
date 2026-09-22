@@ -129,7 +129,7 @@ local function ride(dir, pred, what, budget, choiceWant)
       -- frame alongside the ride-map signature, and the canary's count is
       -- a loss too: it now counts a 300-frame battle-side wipe as a game
       -- over and freezes the pad, and allowGameOver on the run keeps the
-      -- ladder alive for the reload.
+      -- sweep alive for the reload.
       if not rideLost then
         local wiped = H.partyWipedInBattle()
         if not wiped and mapIdx() == 2 then
@@ -226,7 +226,7 @@ local function ride(dir, pred, what, budget, choiceWant)
   }, what)
 end
 
--- The dive ladder (see the call-site comment): checkpoint before the
+-- The dive sweep (see the call-site comment): checkpoint before the
 -- (25,18) helmet talk, an attempt is helmet scene -> dive -> Nikeah,
 -- a wipe (or a ride that never lands) reloads with the house 17-frame
 -- stagger for a different underwater-battle timeline.
@@ -279,7 +279,7 @@ local function diveAttempt(n)
         mapIdx(), H.fieldX(), H.fieldY()))
     end),
     (function()
-      -- raising the budget would abort the ladder; a ride that neither
+      -- raising the budget would abort the sweep; a ride that neither
       -- lands nor wipes inside 55000 frames is a loss for this
       -- timeline, named as such so the stagger gets its turn
       local frames = 0
@@ -307,7 +307,7 @@ local function diveAttempt(n)
   }, {})
 end
 
--- allowGameOver: the dive ladder below deliberately survives a lost ride
+-- allowGameOver: the dive sweep below deliberately survives a lost ride
 -- (#163); ride() reads H.gameOverFired as a loss and the next attempt
 -- reloads.
 H.run({ maxFrames = 200000, allowGameOver = true }, {
@@ -438,7 +438,7 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
   -- The passability model reads nothing useful for a while after the map
   -- load (probe_nikeah_town: bfs finds no path at all at +20 and at +150
   -- frames, and a 44-step path to the counter's talk tile at +300/+400),
-  -- and shopTalk caches its staging pick on the first census, so let the
+  -- and shopTalk caches its staging pick on the first survey, so let the
   -- town settle before pathfinding.  A fixed settle is not enough: the
   -- town's walkers cross the one street to the counter, so the talk tile
   -- (24,41) reads reachable or not by the frame (probe_nikeah_town2 off

@@ -43,7 +43,7 @@
 # identity for it.  `compose.py --adopt-stamps` appends the missing lines
 # to such a stamp only when the tree's own records prove them: the sig
 # still matches the current sources, the artifact verifies, and ninja's
-# build log shows the ROM content latch last ran before the generate edge
+# build log shows the ROM content copy-if-changed step last ran before the generate edge
 # and its copy is the current ROM (see adopt_stamps in compose.py).
 set -u
 
@@ -170,7 +170,7 @@ case "$cmd" in
     ancestor="${4:?write needs an ancestor (a .stamp/manifest.json path relative to the tree root, or - for a power-on root)}"
     shift 4
     # Bind the artifact first: a stamp that cannot name the bytes it
-    # vouches for must not exist.  The .mss was published by the
+    # records must not exist.  The .mss was published by the
     # same generating command a moment ago, so a miss here is a wiring bug.
     mss="$STATES/$state.mss"
     [ -f "$mss" ] ||

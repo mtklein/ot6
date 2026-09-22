@@ -39,7 +39,7 @@
 -- and refuses to run if those two happen to coincide, so the file cannot
 -- pass under the wrong rule and cannot pass vacuously.
 --
--- Why n024_entry.  It is the fixture where the magicite lineage lives
+-- Why n024_entry.  It is the fixture where the magicite run lives
 -- (battle_magicite runs here), its party carries both stones, and LOCKE
 -- arrives with a 172-MP pool -- deep enough to pay 65 + 4 + 38 + 20 in one
 -- battle and 99 in another, which no earlier fixture's caster can.  The
@@ -58,7 +58,7 @@ local ST_TRANS, ST_CMD, ST_ITEM, ST_MAGIC, ST_ESPER, ST_TGT, ST_DEF =
 local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_SUMMON = 0x00, 0x01, 0x02, 0x19
 local MLISTPTR = 0x302C                  -- per-slot pointer to the spell list
 local MSCROLL, MCOL, MROW = 0x8913, 0x8917, 0x891B
-local SUMMONED = 0x3F2E                  -- the once-per-battle divine latch
+local SUMMONED = 0x3F2E                  -- the once-per-battle divine flag
 local RELIC2 = 0x3C45                    -- relic effects 2: $40 economizer,
 local RELIC_MP = 0x60                    --   $20 gold hairpin
 
@@ -334,7 +334,7 @@ local function pulse()
         elseif col < wc then btn = "right"
         elseif col > wc then btn = "left"
         else
-          -- the number the player is looking at, latched at the confirm
+          -- the number the player is looking at, stored at the confirm
           rec.drawn, armed = recCost(a, n), true
           btn = "a"
         end

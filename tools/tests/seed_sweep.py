@@ -24,7 +24,7 @@ the segment held on 8 seeds; a sweep with one FAIL says which seed and what
 class -- that failure is the finding, and its log and screenshots are kept.
 
 Seeds: K shifts spread across the 60-frame battle seed period ($021e; see
-newSeedLadder in lib/ot6.lua).  --step overrides the spacing.
+newSeedSweep in lib/ot6.lua).  --step overrides the spacing.
 
 A shift is only a different sample if the game did not absorb it (#208: a
 cold Continue's idle inside a wait that ends on the game's own clock).  So

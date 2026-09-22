@@ -789,7 +789,7 @@ local function gearTrip()
     enterDoor(35, 19, 77, "armor shop"),
     counterShop(114, 12, "shop 6 (armor)"),
     buyTo(HEAVYSHLD, 1, 2, 400, "HEAVY SHLD to 2"),
-    buyTo(PLUMEDHAT, 3, 2, 250, "PLUMED HAT to 2 -- one per scenario order, the Heavy Shld precedent: the Locke lineage wears one onto a head before the split hands the bag to SABIN's train"),
+    buyTo(PLUMEDHAT, 3, 2, 250, "PLUMED HAT to 2 -- one per scenario order, the Heavy Shld precedent: the Locke run wears one onto a head before the split hands the bag to SABIN's train"),
     closeShop(77, "shop 6"),
     H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (shop 6 (armor))" }),
     leaveDoor(114, 16, "shop 6"),
@@ -800,7 +800,7 @@ local function gearTrip()
         "two Heavy Shlds cover both scenario orders")
       H.assertEq(invCount(PLUMEDHAT) >= 2, true,
         "two Plumed Hats cover SHADOW in either scenario order (#84 wave: "
-        .. "one hat was worn by the Locke lineage and s2_train found the bag "
+        .. "one hat was worn by the Locke run and s2_train found the bag "
         .. "empty)")
       H.assertEq(invCount(MITHRILKNIFE) >= 1, true,
         "a spare MithrilKnife is in the bag -- nobody wears it here; it is " ..

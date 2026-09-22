@@ -41,11 +41,11 @@
 --
 -- THE GAP, measured before it was closed (build/lab/umaro/red-umaro.log,
 -- retained as build/attempts/<branch>/lab/umaro/red-umaro.log): the dump
--- hung off Ot6FightBoost, which hangs off FightAttack, and FightAttack is
+-- hooked into Ot6FightBoost, which hooks into FightAttack, and FightAttack is
 -- only the LAST of UmaroAttackTbl's four slots.  A provoked Throw reached
 -- its roll with pending 0 -- `f1806 Throw PROVOKED: bank 3, hp 489 vs
 -- line 546; pending at roll 0` -- ran one pass at plain damage, and
--- Ot6ActionEnd took the gain arm: the grudge was spent on nothing, and
+-- Ot6ActionEnd took the gain arm: the retaliation tally was spent on nothing, and
 -- the bank climbed 1 2 3 4 5.
 --
 -- WHAT EACH ARM BUYS WITH THE DUMP, and why it is not one thing:
@@ -72,7 +72,7 @@
 -- covers is the roll's; the run logs them, and the 8-shift sweep's union
 -- is where all three non-Fight arms are seen.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/tunnelarmr_entry.mss.lua"
+local ENTRY = "build/states/tunnelarmr_entry.mss.lua"
 local TUNNELARMR = 0x0104                -- formation species word (const.inc)
 
 local CHAR_UMARO = 0x0D                 -- CHAR::UMARO (const.inc)
@@ -343,7 +343,7 @@ local function measured()
 end
 
 H.run({ maxFrames = 60000, retries = 3 }, {
-  H.loadState(DOOR),
+  H.loadState(ENTRY),
   H.waitFrames(30),
 
   H.call(function()
@@ -449,7 +449,7 @@ H.run({ maxFrames = 60000, retries = 3 }, {
     -- A name-refused character's full gauge already auto-commands through
     -- RandCharAction, Berserk or not, so at some seeds the engine has
     -- chosen a turn for him (a random command row of the staged
-    -- character's, and the latch) before this point; logged, not asserted.
+    -- character's, and the flag) before this point; logged, not asserted.
     H.log(string.format("[stage] f%d before the relics and Berserk: bank %d, "
       .. "hurt line %d, OT6_UNCTL $%02X, %d action end(s) of his so far",
       H.frame, bp(SUBJ), H.readWord(D.mark), H.readByte(D.unctl), #L.ends))
@@ -502,7 +502,7 @@ H.run({ maxFrames = 60000, retries = 3 }, {
       "at least one provoked Throw/Storm/Charge resolved (%d)", L.provokedSpecial))
 
     -- THE CLAIM, FIRST: every provoked non-Fight arm carried the dump,
-    -- armed at the chooser before the roll -- a ROM whose dump hangs off
+    -- armed at the chooser before the roll -- a ROM whose dump hooks into
     -- FightAttack alone arrives here with pending 0 on every one of them
     for _, w in ipairs(L.windows) do
       if w.provoked and w.arm ~= 3 then

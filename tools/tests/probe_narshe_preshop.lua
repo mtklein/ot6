@@ -2,11 +2,11 @@
 -- probe_narshe_preshop.lua -- can the Terra party reach Narshe's item shop
 -- (map 26 via map 20's (41,22) door) between the clifftop arrival and the
 -- reunion trigger at Arvis's (66,35)?  (#176: the reunion staging on map 22
--- boxes the party -- navTo's census from (20,9) is one tile -- so the only
+-- boxes the party -- navTo's survey from (20,9) is one tile -- so the only
 -- pre-battle window for the shop is before _ccb3fa fires.)  Boots
 -- terra_clifftop, walks the back door into Arvis's house, and reports the
 -- bfs paths to the front door (55,35) and whether they cross the trigger;
--- if the front door is reachable it walks out and censuses the streets.
+-- if the front door is reachable it walks out and surveys the streets.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

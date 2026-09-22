@@ -1,5 +1,5 @@
 -- probe_itemuse.lua -- measure the battle Item menu's press semantics, on
--- the fixture that wedged: cyan_defence (CYAN alone, battle 46).
+-- the fixture that stalled: cyan_defence (CYAN alone, battle 46).
 -- Drives the commander talk, waits for CYAN's command menu, steers to the
 -- item row, and then logs every relevant byte per A-press pulse while
 -- trying to use the top item: menu state $7BC2, cursor cells, the

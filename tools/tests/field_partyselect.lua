@@ -19,7 +19,7 @@ local function map() return H.mapId() & 0x1ff end
 local function mst() return H.readByte(0x0026) end
 local function cell(c) return H.readByte(0x7E9D89 + c) end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
-local function census()
+local function survey()
   local t = {}
   for c = 0x00, 0x1F do t[#t + 1] = string.format("%02X", cell(c)) end
   return table.concat(t, " ")
@@ -32,7 +32,7 @@ local OTHER = { { GAU, SABIN }, { LOCKE }, { CELES, CYAN, TERRA, EDGAR } }
 
 local function seatsHold(groups, what)
   return H.call(function()
-    H.log(string.format("[%s] cells $00-$1F: %s", what, census()))
+    H.log(string.format("[%s] cells $00-$1F: %s", what, survey()))
     for g, ids in ipairs(groups) do
       for s, id in ipairs(ids) do
         H.assertEq(cell(0x10 + 4 * (g - 1) + (s - 1)), id,
@@ -96,9 +96,9 @@ H.run({ maxFrames = 60000 }, {
   H.waitUntil(function() return mst() == 0x2d end, 900, "B: menu at $2d", 5),
   H.partySelect(OTHER, { tag = "B", commit = false }),
   seatsHold(OTHER, "B"),
-  H.call(function() before = census() end),
+  H.call(function() before = survey() end),
   H.partySelect(OTHER, { tag = "B again", commit = false }),
   H.call(function()
-    H.assertEq(census(), before, "B again: members already seated stay put")
+    H.assertEq(survey(), before, "B again: members already seated stay put")
   end),
 })

@@ -121,7 +121,7 @@ local TRIG_LEG2 = {
 local AVOID_LEG2 = { {60,11}, {70,29} }
 local shadowIn = false
 local visited, stuckN, preBurst, burst = {}, 0, nil, nil
--- the descent reload ladder's state (see descentAttempt below): a lost
+-- the descent reload sweep's state (see descentAttempt below): a lost
 -- attempt sets `lost` and every later step of the crossing stands down
 local lost, lostWhy, descentWon, landingBlob = false, nil, false, nil
 local function key(c) return c[1] .. "," .. c[2] end
@@ -239,7 +239,7 @@ local function round(r)
           { maxFrames = 20000, playBattles = "tactical",
             tool = FIGHT.tool, bank = FIGHT.bank, healPercent = FIGHT.healPercent,
             magic = FIGHT.magic,
-            -- a wipe ends the ride for the reload ladder instead of raising
+            -- a wipe ends the ride for the reload sweep instead of raising
             wipeEndsRide = true,
             avoid = avoid(),
             arrive = function()
@@ -311,7 +311,7 @@ local function round(r)
   }), {})
 end
 
--- ---- the descent reload ladder --------------------------------------------
+-- ---- the descent reload sweep --------------------------------------------
 -- The crossing is a save-point-to-save-point segment: a person who wipes
 -- on 394 reloads the landing save at (7,12) and crosses again, and the
 -- pool they cross is a gamble (Ninja, Behemoth packs, two 7000-HP
@@ -319,7 +319,7 @@ end
 -- machine snapshot at the landing after care (docs/TESTING.md: restore a
 -- coherent snapshot, never selected cells), up to ATTEMPTS crossings, each
 -- loss reloaded from that snapshot with the battle seed's phase spread
--- (H.newSeedLadder: a repeated seed fails the report), and every attempt's
+-- (H.newSeedSweep: a repeated seed fails the report), and every attempt's
 -- verdict and seed in the log.  A won attempt is a search-selected win --
 -- the attempt table is the record, not a rate -- and the loss lines are
 -- the balance finding.  H.run carries allowGameOver so the wipe canary
@@ -327,7 +327,7 @@ end
 -- wipeEndsRide so the ride ends instead of raising; the burst and settle
 -- loops set `lost` on the canary's counter.
 local ATTEMPTS = 3
-local LD = H.newSeedLadder("FC descent (394 crossing)", { attempts = ATTEMPTS })
+local LD = H.newSeedSweep("FC descent (394 crossing)", { attempts = ATTEMPTS })
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 local function lossReload(n)
@@ -387,7 +387,7 @@ local function kitSteps(char, name, pairs_)
     steps[#steps + 1] = H.cond(
       function() return H.invSlotOf(item) ~= nil end,
       { H.equipLoadout(char, { { slot, item } }, { tag = tag, optional = true }) },
-      { H.logStep(string.format("%s: $%02X not in this lineage's bag; keeping current gear", tag, item)) })
+      { H.logStep(string.format("%s: $%02X not in this run's bag; keeping current gear", tag, item)) })
   end
   return steps
 end
@@ -481,7 +481,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, flatten({
   -- A player collects a naked guest, opens the menu on the spot and puts
   -- him where he will not be hit; nobody walks a bare-handed Shadow across
   -- a continent in the front row.  Both steps must land before the descent
-  -- snapshot below, because the ladder reloads it on every attempt.
+  -- snapshot below, because the sweep reloads it on every attempt.
   kitSteps(SHADOW, "SHADOW", { { 4, 0xD1 },
                                { 0, 0x01 }, { 0, 0x04 }, { 0, 0x05 },
                                { 1, 0x01 }, { 1, 0x04 },
@@ -509,7 +509,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, flatten({
       "EDGAR arrives dressed (weapon + armor) from the landing seed")
   end),
   H.fieldCare({ tag = "care on landing", threshold = 0.95 }),
-  -- the landing snapshot the ladder reloads: the whole machine, taken on
+  -- the landing snapshot the sweep reloads: the whole machine, taken on
   -- the field with control, after Shadow joined and the party was cared
   -- for (the state a person's landing save holds)
   (function()

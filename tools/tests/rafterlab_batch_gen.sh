@@ -15,7 +15,7 @@
 #     so exactly six are required);
 #   * the dodge policy's PANIC floor replaced by <panic>;
 #   * every H.saveState name prefixed rafterlab_<tag>_, so parallel runs
-#     write nothing into the fixture lineage (build/states/ultros2_entry.mss
+#     write nothing into the fixture run (build/states/ultros2_entry.mss
 #     and the two mid-route checkpoints stay untouched),
 # and runs it through run.sh.  The approach from opera_dance_done is replayed
 # each run (about a minute), which is what makes every run start from the
@@ -27,7 +27,7 @@
 # lines (and, since #164, "[rafters] attempt N arrival hp at (14,7): c1 H/M
 # c4 H/M c5 H/M, ...").  Fold them with rafterlab_aggregate_gen.py.
 #
-# Optional environment (both leave the lineage's generator untouched):
+# Optional environment (both leave the run's generator untouched):
 #   RAFTERLAB_DRIVER='{ tactical = true, boost = false, cure = false, items = false, cadence = 12 }'
 #       replaces the generator's one-line RAT_DRIVER table (the rat fights'
 #       newFightDriver options), so a candidate fight policy is measured with

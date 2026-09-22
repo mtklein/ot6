@@ -18,7 +18,7 @@
 --      anything is castable is measured, not assumed: the probe logs each
 --      actor's command table and spellCell/Lore gate verdicts.  If nobody
 --      can cast, the assertion is the clean no-castable-nuke fallthrough:
---      plan=fight turns happen, no wedge, no lore window ever opened.
+--      plan=fight turns happen, no stall, no lore window ever opened.
 --
 -- The REAL measurement (FlameEater/ambush win rates under the repertoire)
 -- runs later against the thamlab fixtures; this file only proves the new

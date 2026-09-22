@@ -45,7 +45,7 @@
 -- sidekicks. The post-battle event _ca5ea9 gates on battle-switch $40
 -- exactly like Kefka/Vargas: a real win despawns him (hide_obj NPC_14,
 -- $034A=0, fade_in, control back on (30,13), the porch opens); a loss is
--- `call GameOver`. The fight is played; see the fighter and retry ladder
+-- `call GameOver`. The fight is played; see the fighter and retry sweep
 -- at the fight site. This file writes no emulated game state anywhere,
 -- and every mid-route encounter on the climb is played by the library
 -- fighter -- see `encounters` below for what replaced blind A taps.
@@ -129,8 +129,8 @@ end
 -- taken over (a battle is up), false when the caller should get on with
 -- walking.
 -- onWipe: optional soft sink.  Without it a wipe is a hard FAIL (the right
--- default: an unladdered drive that wiped has nothing to recover to).  A
--- retry ladder passes one, gets the wipe line as a value instead of an
+-- default: an unswept drive that wiped has nothing to recover to).  A
+-- retry sweep passes one, gets the wipe line as a value instead of an
 -- error, and reloads its checkpoint; after the sink fires this callback
 -- goes inert (the game is on its Game Over path and only a reload helps).
 local function encounters(what, onWipe)
@@ -311,7 +311,7 @@ local function mkFighter(tier, tag)
   -- The lib's wipe predicate held 90 straight frames is the loss; so is
   -- the run canary's count (it now counts a 300-frame battle-side wipe as
   -- a game over and freezes the pad -- allowGameOver on the run keeps the
-  -- ladder alive for the reload).
+  -- sweep alive for the reload).
   function F.watch()
     wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
     if (H.gameOverFired or 0) > 0 and not F.lost then
@@ -1215,7 +1215,7 @@ end
 
 -- allowGameOver: the climb, stair and Dadaluma ladders deliberately
 -- survive a lost fight (#163); encounters()' onWipe sink and F.watch read
--- H.gameOverFired as a loss and the next attempt reloads.  An unladdered
+-- H.gameOverFired as a loss and the next attempt reloads.  An unswept
 -- encounters() still raises on it.
 H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState("build/states/zozo_arrival.mss.lua"),

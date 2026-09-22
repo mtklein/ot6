@@ -48,7 +48,7 @@ local CARBUNKL, PHANTOM, UNICORN = 0x13, 0x14, 0x17
 local LIST0  = 0x208e            -- compacted master Magic list, 4-byte records
 local STAM, MAGPWR, SPEED, VIGOR = 0x3b40, 0x3b41, 0x3b19, 0x3b2c
 
--- field menu plumbing (menu_ram.inc)
+-- field menu internals (menu_ram.inc)
 local ZMENUSTATE, ZCURSOR, ZSELINDEX, ZLISTTYPE = 0x26, 0x4b, 0x28, 0x2a
 local ZCHARID, Z99 = 0x69, 0x99
 local SKILLCOLOR = 0x79
@@ -234,7 +234,7 @@ local function driveSteps(tag, esper)
       H.assertEq(leader ~= nil, true, "[" .. tag .. "] a party leader resolved")
     end),
   }
-  -- The fighting lineage's minecart party arrives wearing stones (a
+  -- The fighting run's minecart party arrives wearing stones (a
   -- played save should); this laboratory needs bare records on BOTH
   -- passes, because the union measure spans the whole party.  Same
   -- sanctioned poke as battle_esperstats.lua -- the bump and grant are

@@ -14,7 +14,7 @@
 -- $010B (NUMBER 128) with both blades.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("minecart ride")
+local L = H.newSeedSweep("minecart ride")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -65,7 +65,7 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
-local function census(tag, targets)
+local function survey(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
   local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
@@ -79,11 +79,11 @@ local function census(tag, targets)
       end
     end
   end
-  H.log(string.format("[census %s] from (%d,%d) on map %d: %d tiles reachable",
+  H.log(string.format("[survey %s] from (%d,%d) on map %d: %d tiles reachable",
     tag, sx, sy, map(), #q))
   for _, t in ipairs(targets or {}) do
     local p = H.bfsPath(t[1], t[2])
-    H.log(string.format("[census %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
+    H.log(string.format("[survey %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
       t[3] or "", p and (#p .. " steps: " .. table.concat(p, " ")) or "NO PATH"))
   end
 end
@@ -175,7 +175,7 @@ local function rideDriver(pred, lostRef, maxFrames, what)
       -- The lib's wipe predicate held 120 straight frames (this file's
       -- own debounce) is the loss; so is the run canary's count (it now
       -- counts a 300-frame battle-side wipe as a game over and freezes
-      -- the pad -- allowGameOver on the run keeps the ladder alive for
+      -- the pad -- allowGameOver on the run keeps the sweep alive for
       -- the reload).
       wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
       if not lostRef.lost and (H.gameOverFired or 0) > 0 then
@@ -229,7 +229,7 @@ local function rideDriver(pred, lostRef, maxFrames, what)
         end
       end
       if battN >= 3 then
-        -- a wipe never sets $0069; catch it here so the ladder can act.
+        -- a wipe never sets $0069; catch it here so the sweep can act.
         -- Debounced 120 frames: the HP table can read zero for a moment
         -- while a battle deals the party in.
         local alive = false
@@ -314,7 +314,7 @@ local function rideAttempt(n)
       H.log(string.format("[ride] cutscene TRAIN entered at frame %d", H.frame))
       H.screenshot("minecart_ride")
     end),
-    -- ride it out; terminates early on a detected wipe so the ladder can
+    -- ride it out; terminates early on a detected wipe so the sweep can
     -- reload instead of timing out
     rideDriver(function()
       return map() == 240 and sw(0x0069) == 1 and settled()
@@ -333,7 +333,7 @@ local function rideAttempt(n)
   })
 end
 
--- allowGameOver: the ride ladder deliberately survives a lost ride
+-- allowGameOver: the ride sweep deliberately survives a lost ride
 -- (#163); rideDriver reads H.gameOverFired as a loss and the next attempt
 -- reloads.
 H.run({ maxFrames = 400000, allowGameOver = true }, {
@@ -399,7 +399,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end
@@ -416,10 +416,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
 
   -- So:
 
-  -- Rows computed LIVE from $1850 ((byte>>3)&3): the fled lineage's
+  -- Rows computed LIVE from $1850 ((byte>>3)&3): the fled run's
   -- hard-coded rows put KIRIN on whoever happened to sit at row 1, and
-  -- this lineage's party order differs.
-  -- RAMUH -> LOCKE goes FIRST: this lineage arrives with LOCKE already
+  -- this run's party order differs.
+  -- RAMUH -> LOCKE goes FIRST: this run arrives with LOCKE already
   -- wearing KIRIN (an earlier prep's choice), and the game refuses to
   -- equip a stone another character wears -- so LOCKE must trade up to
   -- RAMUH before SABIN can take KIRIN (measured: the old order no-opped
@@ -451,7 +451,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0, "facing CID again")
     H.log(partyReport("ride entry point, prepared"))
   end),
-  -- capture the prepared entry point as the retry ladder's reload blob
+  -- capture the prepared entry point as the retry sweep's reload blob
   (function()
     local req
     return seq({
@@ -465,7 +465,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     })
   end)(),
 
-  -- 2. the ride, on the phase-spread retry ladder
+  -- 2. the ride, on the phase-spread retry sweep
   L.watch(),
   rideAttempt(1),
   rideAttempt(2),
@@ -576,7 +576,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     })
   end)(),
   H.call(function()
-    census("n128_won", {
+    survey("n128_won", {
       { 58, 7, "the save point revealed by $06AE" },
       { 52, 40, "the Setzer reunion trigger _cc817f" },
     })

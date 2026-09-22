@@ -9,11 +9,11 @@
 ; ------------------------------------------------------------------------------
 
 ; ==============================================================================
-; Divine abilities (kit slot 8): resolution-time gates + once-per-battle latch
+; Divine abilities (kit slot 8): resolution-time gates + once-per-battle flag
 ;
 ; The kit-8 divines whose gates cannot be read at command-select time land here,
 ; gated at resolution, where the target exists. Each is once-per-battle
-; through OT6_DIVINE_USED (per-character bit, $3ecb): the latch is read at select
+; through OT6_DIVINE_USED (per-character bit, $3ecb): the flag is read at select
 ; time (Ot6BushidoTier drops a spent Oblivion back to Tempest) and set when
 ; the divine lands. Every divine uses the boost economy the same way its kit
 ; does: BP is spent through Ot6ActionEnd like any boosted
@@ -31,7 +31,7 @@
 ; (battle_main.asm:12810), which clears the target there; the target is then
 ; re-chosen at resolution.
 ;
-; The gate is read at the one seam where the target exists and
+; The gate is read at the one point where the target exists and
 ; the attack's properties are still editable: immediately after ChooseTarget in
 ; CalcAttackEffect (battle_main.asm:8185), which fills $b8/$b9 for this attack.
 ; Here x is still the attacker (CalcAttackEffect indexes $3c08,x etc. right
@@ -44,7 +44,7 @@
 ;                           UpdateStatus :11067 for every present entity inde-
 ;                           pendent of the hit roll).  This is a guaranteed
 ;                           kill, the same ruling Assassinate takes. Set the
-;                           once-per-battle latch.
+;                           once-per-battle flag.
 ;   unbroken, OR a Broken
 ;   but death-immune boss -> the props are patched to a Tempest-like hit in
 ;                           place: power 70, Status-1 cleared (no Death), the
@@ -52,12 +52,12 @@
 ;                           per-target loop then lands a 70-power elementless
 ;                           slash, the reduced fallback. Keeping a real hit as
 ;                           the fallback is why Oblivion could rejoin
-;                           the BP3 tier without retiring Tempest, and the latch
+;                           the BP3 tier without retiring Tempest, and the flag
 ;                           stays clear (the divine was not spent), so the menu
 ;                           keeps offering Oblivion until it lands.
 ;
 ; The death-immune fold matters because a boss can be Broken too: without it,
-; Oblivion against a Broken boss would spend the once-per-battle latch on a
+; Oblivion against a Broken boss would spend the once-per-battle flag on a
 ; target Death cannot kill. Folding it to a Tempest hit spends the turn on
 ; damage and leaves the divine unspent.
 ;
@@ -110,7 +110,7 @@
         cpx     #$08
         bcs     done            ; (defensive: only characters own a divine)
         lda     $3018,x         ; attacker's entity bit ($01/$02/$04/$08)
-        tsb     OT6_DIVINE_USED ; latch: divine spent this battle
+        tsb     OT6_DIVINE_USED ; flag: divine spent this battle
         bra     done
 @tempest:
         plx                     ; discard the saved attacker (unused on this arm)
@@ -135,12 +135,12 @@ done:   plp
 ; non-boss kills it: Death is marked in the target's "status to set" ($3dd4,
 ; SetStatus1's byte, applied by UpdateStatus at the tail of the same action
 ; for every present entity, whatever the hit roll) and the once-per-battle
-; latch is spent.  Anything else leaves the attack as it was: an attacker
+; flag is spent.  Anything else leaves the attack as it was: an attacker
 ; who is not Shadow (char id $03, $3ed8 keyed by the entity offset since
 ; offset = slot*2), a divine already spent (OT6_DIVINE_USED, the attacker's
 ; $3018 bit), a character target, an unbroken target, or a boss ($3aa1 bit
 ; 2, the instant-death protection ScimitarEffect reads at
-; battle_main.asm:9147; Death cannot kill it, so the latch is kept).
+; battle_main.asm:9147; Death cannot kill it, so the flag is kept).
 ;
 ; Two callers, because of where a break is decided inside one action.
 ; Ot6HitJoin (ot6_break.asm) calls it for every landed hit, after both chip
@@ -149,7 +149,7 @@ done:   plp
 ; Ot6ClassChip) comes first, this gate next, then _c262ef's ApplyDmg takes
 ; the doubled hit off the HP and ExecAttack's UpdateStatus applies the
 ; Death.  The hit that breaks a non-boss is the kill (#239).  Ot6Assassinate
-; below calls it from the ChooseTarget seam, before the hit roll, for a body
+; below calls it from the ChooseTarget hook point, before the hit roll, for a body
 ; already Broken when Shadow's attack resolves.
 ;
 ; a8; the index width is the caller's (Ot6HitJoin i16, Ot6Assassinate i8),
@@ -174,18 +174,18 @@ done:   plp
         beq     done            ; not Broken, this hit's chip included
         lda     $3aa1,y
         bit     #$04            ; a boss (instant-death protected)?
-        bne     done            ; yes: Death cannot kill it, the latch is kept
+        bne     done            ; yes: Death cannot kill it, the flag is kept
         lda     $3dd4,y
         ora     #$80            ; Death (status to set)
         sta     $3dd4,y
         lda     $3018,x
-        tsb     OT6_DIVINE_USED ; latch: divine spent this battle
+        tsb     OT6_DIVINE_USED ; flag: divine spent this battle
 done:   rts
 .endproc
 
-; [ Assassinate at the ChooseTarget seam: the primary monster target ]
+; [ Assassinate at the ChooseTarget hook point: the primary monster target ]
 ;
-; The seam Oblivion uses, after ChooseTarget in CalcAttackEffect, where the
+; The hook point Oblivion uses, after ChooseTarget in CalcAttackEffect, where the
 ; target mask exists and the hit has not rolled.  Resolves $b9's lowest
 ; monster bit to its entity offset and puts it to the gate above, so a body
 ; already Broken dies whatever the hit roll.  The hit that breaks a body

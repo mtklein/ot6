@@ -81,7 +81,7 @@ H.run({ maxFrames = 90000 }, {
   H.call(function()
     -- pick a pacing partner tile: a passable neighbor that is not toward
     -- the Vector entrance column (x 138/139, an event trigger rather than
-    -- a battle; stepping onto it leaves the world and wedges the pace)
+    -- a battle; stepping onto it leaves the world and stalls the pace)
     local x, y = H.vars.bandX, H.vars.bandY
     local pair = nil
     for _, d in ipairs({ { "left", -1, 0 }, { "up", 0, -1 }, { "down", 0, 1 } }) do

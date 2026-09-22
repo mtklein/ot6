@@ -1,8 +1,8 @@
 -- @manual
--- probe_falls_wedge.lua -- #159: measure the Baren Falls "wedge".  In the
+-- probe_falls_wedge.lua -- #159: measure the Baren Falls "stall".  In the
 -- v0.16 qualification gen_sabin_falls' attempt 1 sat on map 156 (13,9)
 -- with ctl=false dlg=false b=false from f18833 to its 39000-frame deadline
--- and was declared "assumed wiped or wedged".  This probe boots the
+-- and was declared "assumed wiped or stalled".  This probe boots the
 -- generator's own fixture (train_done), walks to the falls the way the
 -- generator does, snapshots the post-arrival tile ONCE (in memory, and
 -- emitted as build/states/falls_prejump.mss by shard 0), then branches
@@ -20,8 +20,8 @@
 -- Per attempt the outcome is one of WON (map 159, $003F, control), WIPED
 -- (M.partyWipedInBattle held 90 frames -- the generator's own inBattle()
 -- and wipe watch are blind to an all-zero HP table, so this is measured
--- separately), or WEDGE (the 20000-frame deadline with neither).  The
--- first WIPED and the first WEDGE each get a snapshot and a screenshot.
+-- separately), or STALL (the 20000-frame deadline with neither).  The
+-- first WIPED and the first STALL each get a snapshot and a screenshot.
 -- After a wipe the probe keeps observing hands-off, then (labelled) thaws
 -- the canary's pad freeze and taps A ONCE to see where the engine goes.
 --
@@ -397,7 +397,7 @@ end
 
 local pre = nil                      -- the post-arrival snapshot request
 local results = {}
-local firstWipeSaved, firstWedgeSaved = false, false
+local firstWipeSaved, firstStallSaved = false, false
 
 local function attempt(k)
   local i = SHARD * PER_SHARD + (k - 1)          -- global attempt index
@@ -522,13 +522,13 @@ local function attempt(k)
           H.screenshot(string.format("falls_wipe_s%d", SHARD))
         end
       else
-        R.outcome = "WEDGE"
-        H.log(string.format("[attempt %d] WEDGE: deadline %d with no control, " ..
+        R.outcome = "STALL"
+        H.log(string.format("[attempt %d] STALL: deadline %d with no control, " ..
           "no win, no wipe", i, ATTEMPT_DEADLINE))
-        dumpControl("wedge")
-        dumpScript("wedge")
-        if not firstWedgeSaved then
-          firstWedgeSaved = true
+        dumpControl("stall")
+        dumpScript("stall")
+        if not firstStallSaved then
+          firstStallSaved = true
           H.screenshot(string.format("falls_wedge_s%d", SHARD))
         end
       end
@@ -538,8 +538,8 @@ local function attempt(k)
       H.call(function() R.wipeSnap = true end),
       H.saveState("falls_wipe.mss"),
     }, {}),
-    H.cond(function() return R.outcome == "WEDGE" and not R.wedgeSnap end, {
-      H.call(function() R.wedgeSnap = true end),
+    H.cond(function() return R.outcome == "STALL" and not R.stallSnap end, {
+      H.call(function() R.stallSnap = true end),
       H.saveState(string.format("falls_wedge_s%d.mss", SHARD)),
     }, {}),
     -- after a wipe: what does the engine do with the pad neutral, and

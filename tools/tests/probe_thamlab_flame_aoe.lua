@@ -31,7 +31,7 @@
 -- below (sed).  Tokens:
 --   LAB       flame | ambush
 --   STRATEGY  control (the gen's own approach for that lab: the lib
---             newFightDriver for flame, the gen's bespoke per-turn ambush
+--             newFightDriver for flame, the gen's custom per-turn ambush
 --             plan for ambush) | taps (blind A-taps, the floor)
 --   SEED      frames to stand still before engaging; NOTE $021e has
 --             period 60, so only SEED mod 60 matters
@@ -109,7 +109,7 @@ local function pressWalk(dir, pred, maxFrames, what)
 end
 
 -- ------------------------------------------------------------------------
--- The gen's bespoke per-turn ambush battle plan, verbatim (the "control"
+-- The gen's custom per-turn ambush battle plan, verbatim (the "control"
 -- strategy for lab=ambush).
 local MENU_A, ACTOR_A, MSTATE_A = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL_A, CMDROW_A = 0x202E, 0x890F
@@ -688,7 +688,7 @@ local function newFlamePlan(tag)
     local st = H.readByte(MSTATE_A)
     if st == 0x01 then H.setPad({}); return end   -- ST_TRANS
     -- GENERIC progress watchdog (the lesson of flame_aoe_s20's 140k-frame
-    -- stall: LOCKE's magic plan wedged in an a/b loop -- the plan survives
+    -- stall: LOCKE's magic plan stalled in an a/b loop -- the plan survives
     -- across the re-opened command window, so a cast that stopped being
     -- payable spins forever, and only the LORE branch had a watchdog).
     -- 1200 open-menu frames with no fresh plan and no landed confirm =>

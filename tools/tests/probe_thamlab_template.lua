@@ -14,7 +14,7 @@
 -- below (sed).  Tokens:
 --   LAB       flame | ambush
 --   STRATEGY  control (the gen's own approach for that lab: the lib
---             newFightDriver for flame, the gen's bespoke per-turn ambush
+--             newFightDriver for flame, the gen's custom per-turn ambush
 --             plan for ambush) | taps (blind A-taps, the floor)
 --   SEED      frames to stand still before engaging; NOTE $021e has
 --             period 60, so only SEED mod 60 matters
@@ -90,7 +90,7 @@ local function pressWalk(dir, pred, maxFrames, what)
 end
 
 -- ------------------------------------------------------------------------
--- The gen's bespoke per-turn ambush battle plan, verbatim (the "control"
+-- The gen's custom per-turn ambush battle plan, verbatim (the "control"
 -- strategy for lab=ambush).
 local MENU_A, ACTOR_A, MSTATE_A = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL_A, CMDROW_A = 0x202E, 0x890F
