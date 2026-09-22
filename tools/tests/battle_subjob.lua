@@ -363,8 +363,17 @@ H.run({ maxFrames = 150000 }, {
   H.call(function()
     emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
       emu.callbackType.write, 0x7e3410, 0x7e3410)
-    emu.addMemoryCallback(function(_, v) mpWrites[#mpWrites + 1] = v end,
-      emu.callbackType.write, 0x7e3C08 + celes*2, 0x7e3C08 + celes*2)
+    -- Every write to her pool, with the pool as it stood (the callback runs
+    -- before the store: measured, each write's "old" is the previous one's
+    -- result) and the command/spell whose props are loaded ($b5/$b6).  Her
+    -- own cast is charged at @32e0 with $b6 = the spell she is casting, so
+    -- the folded Bolt3's charge is the write under $b6 = $0b; anything else
+    -- that moves her pool (a muddled turn's own cast, a Rasp) names its own.
+    emu.addMemoryCallback(function(_, v)
+      mpWrites[#mpWrites + 1] = { frame = H.frame, old = mp(celes), lo = v,
+        cmd = H.readByte(0xb5), spell = H.readByte(0xb6),
+        st2 = H.readByte(0x3EE5 + celes * 2) }
+    end, emu.callbackType.write, 0x7e3C08 + celes*2, 0x7e3C08 + celes*2)
     local set = listSet(celes)
     H.log("[B] Ramuh celes list: " .. fmt(set))
     H.assertEq(has(set, BOLT), true, "Ramuh grants Bolt into the list")
@@ -407,15 +416,40 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(R.mp0 >= BOLT3_MP, true,
       "[C] her real pool pays Bolt3's 53 once")
     celesMode = "cast"; wantPend = 2; castRec = recOf(celes, BOLT)
+    R.writes0 = #mpWrites
   end),
   driveTo(function() return sawSpell(BOLT3) end, 30000,
     "[C] the granted Bolt folds to Bolt3 ($0b) at the queue"),
-  H.call(function() celesMode = "defer"; wantPend = 0 end),
+  -- The pool is measured from here, the frame the fold queued, not from the
+  -- item turn: the boss acts in between, and what it does to her is play.
+  -- Measured 2026-09-22 on the n024_entry that e77a6516's ROM change
+  -- regenerated (the pre-merge ROM draws the same fight from those bytes):
+  -- Number 024's Special muddled CELES (STATUS2 $20) before her next
+  -- window, and for ~8800 frames she acted on her own while four writes
+  -- moved her pool under $b5=$02 -- -3 ($b6=$18), -6 (Bolt), -12 (Rasp),
+  -- +3 ($18) -- so the fold queued at 162, the item-turn baseline of 180
+  -- read as "her pool already moved", and the debit to 180-53 was never
+  -- there to see.
+  H.call(function()
+    celesMode = "defer"; wantPend = 0
+    R.queuedAt, R.mpQ, R.writesQ = H.frame, mp(celes), #mpWrites
+    local moves = {}
+    for i = R.writes0 + 1, R.writesQ do
+      local w = mpWrites[i]
+      moves[#moves + 1] = string.format("f%d %d->%d ($b5=%02X $b6=%02X STATUS2=$%02X)",
+        w.frame, w.old, (w.old & 0xff00) | w.lo, w.cmd, w.spell, w.st2)
+    end
+    H.log(string.format("[C] her pool %d at the item turn, %d as the fold queued; moved in "
+      .. "between by %d write(s)%s", R.mp0, R.mpQ, #moves,
+      #moves > 0 and (": " .. table.concat(moves, ", ")) or ""))
+    H.assertEq(R.mpQ >= BOLT3_MP, true,
+      "[C] her real pool still pays Bolt3's 53 as the fold queues")
+  end),
   -- The first $0b write is the fold entering the queue; the cast itself
   -- (the second $0b, and the MP charge) comes when it reaches the top,
-  -- behind whatever the boss queued ahead of it.  So this waits on her
-  -- pool moving, still deferring the bystanders as the drive did, rather
-  -- than idling a fixed 300 frames.  Measured 2026-09-16 on the
+  -- behind whatever the boss queued ahead of it.  So this waits on the
+  -- charge itself, still deferring the bystanders as the drive did,
+  -- rather than idling a fixed 300 frames.  Measured 2026-09-16 on the
   -- n024_entry that 3c0ac59a regenerated: Number 024's timer-30
   -- WallChange (`0b c1 ff ff c1 ff ff 0b` at $3410) went ahead of the
   -- Bolt3 and the charge landed 339 frames after the queue write, 39
@@ -424,26 +458,33 @@ H.run({ maxFrames = 150000 }, {
   -- mode, clock running throughout ($3a8f=00, turn counter +8 per 16
   -- frames while SABIN's window was up); the earlier pass had drawn a
   -- fight with nothing queued ahead of the cast.
-  H.call(function() R.queuedAt = H.frame end),
-  driveTo(function() return mp(celes) ~= R.mp0 end, 3000,
-    "[C] the queued Bolt3 reaches the top of the queue (her pool moves)"),
+  driveTo(function()
+    for i = R.writesQ + 1, #mpWrites do
+      if mpWrites[i].spell == BOLT3 then R.charge = i; return true end
+    end
+    return false
+  end, 3000, "[C] the queued Bolt3 reaches the top of the queue (her pool is charged)"),
   H.call(function()
-    H.log(string.format("[C] pool moved %d frames after Bolt3 entered the queue",
-      H.frame - R.queuedAt))
+    local c = mpWrites[R.charge]
+    H.log(string.format("[C] pool charged %d frames after Bolt3 entered the queue",
+      c.frame - R.queuedAt))
   end),
   H.call(function()
     local ids = {}
     for _, v in ipairs(spells) do ids[#ids + 1] = string.format("%02x", v) end
     H.log("[C] $3410 sequence: " .. table.concat(ids, " "))
+    local c = mpWrites[R.charge]
     local mp1 = mp(celes)
-    local seen = {}
-    for _, v in ipairs(mpWrites) do seen[v & 0xff] = true end
-    H.log(string.format("[C] mp %d -> %d", R.mp0, mp1))
+    H.log(string.format("[C] mp %d -> %d: the write under $b5=%02X $b6=%02X took %d -> %d "
+      .. "(%d write(s) after the fold queued, the charge is #%d)", R.mpQ, mp1, c.cmd, c.spell,
+      c.old, (c.old & 0xff00) | c.lo, #mpWrites - R.writesQ, R.charge - R.writesQ))
     H.assertEq(sawSpell(BOLT3), true,
       "granted Bolt at 2 real BP executed as Bolt3 ($0b) via the fold")
-    H.assertEq(seen[(R.mp0 - BOLT3_MP) & 0xff], true,
-      "[C] the pool was debited to exactly mp0-53 (the write watch)")
-    H.assertEq(R.mp0 - mp1, BOLT3_MP,
+    H.assertEq(c.cmd, CMD_MAGIC, "[C] the charge is her Magic command's (the cast, not a hit)")
+    H.assertEq(c.lo, (c.old - BOLT3_MP) & 0xff,
+      "[C] the pool was debited to exactly mp0-53 (the write watch, mp0 = the pool the charge found)")
+    H.assertEq(R.charge, #mpWrites, "[C] nothing else moved her pool after the charge")
+    H.assertEq(c.old - mp1, BOLT3_MP,
       "the folded Bolt3 was charged Bolt3's own 53 MP -- an untaught tier "
       .. "is still reachable by folding, and is now a purchase (#64)")
     H.screenshot("subjob_fold")
