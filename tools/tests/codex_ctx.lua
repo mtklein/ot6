@@ -146,6 +146,19 @@ end
 -- state (weak mask $3e9c+off, revealed bits $3e9d+off), so nothing here
 -- pins a species id.
 local ST_TOOLS = 0x30
+-- The command window's side states and the transitional ones, as the
+-- library's driver measured them (ot6.lua, BATTLE.ST_ROW/ST_DEF and
+-- BATTLE.ST_TRANSITIONAL, plus $01 and the tools shell's $2E/$2F): RIGHT at
+-- $05 walks $01 -> $27 (Def.), where A commits the defend; a B in $01 or
+-- $27 cancels it.  None of the transitional states reads a button the
+-- driver needs, so they get none.
+local ST_ROW, ST_DEF = 0x24, 0x27
+local ST_WAIT = {}
+for _, st in ipairs({ 0x01, 0x02, 0x04, 0x06, 0x07, 0x09, 0x0F, 0x10, 0x26,
+                      0x2E, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x39, 0x3A, 0x40,
+                      0x41 }) do
+  ST_WAIT[st] = true
+end
 local CMD_FIGHT, CMD_ITEM, CMD_BLITZ = 0x00, 0x01, 0x0A
 local ITEMLIST, PUMMEL, PUMMEL_COST = 0x4005, 0x5D, 4
 local WEAPCLASS = H.sym("Ot6WeapClassTbl") & 0x3FFFFF
@@ -531,12 +544,9 @@ local function battlePulse()
       -- to Pummel
       walkToCell(a, cmdCellOf(a, CMD_BLITZ), hold)
     elseif cmdCellOf(a, CMD_FIGHT) ~= nil then
-      -- a bystander with a Fight row: real Defend (right swaps
-      -- Fight->Def, then A), slow cadence so the swap settles
-      local step = mfM % 40
-      if step < 4 then H.setPad({ right = true })
-      elseif step >= 20 and step < 24 then H.setPad({ a = true })
-      else H.setPad({}) end
+      -- a bystander with a Fight row: a real Defend, RIGHT here opens the
+      -- Def. window and the ST_DEF branch below takes it with A
+      H.setPad(hold and { right = true } or {})
     else
       -- no Fight row to swap into Def (Gau, whose row 0 is Leap on the
       -- Veldt): hand the window on with X, vanilla's turn-cycling key, as
@@ -561,6 +571,14 @@ local function battlePulse()
     else
       btn = "b"
     end
+  elseif st == ST_DEF then
+    -- the bystander's Defend commits here; a teacher never asked for it
+    btn = (chosenRole[a] == nil) and "a" or "b"
+  elseif st == ST_ROW then
+    btn = "b"                           -- never pressed for: back out
+  elseif ST_WAIT[st] then
+    H.setPad({})                        -- nothing here reads a button
+    return
   elseif st == ST_TGT then
     -- a teacher's swing goes to the monster it can teach (H.targetCursor:
     -- "a" once the cursor sits there, else a tap; each decided tap is held
@@ -580,10 +598,9 @@ local function battlePulse()
       end
     end
   else
-    -- transitional states and battle messages: the reveal banner blocks
-    -- the queue until dismissed.  Tap B, not A -- B dismisses banners and
-    -- messages just as well but can never confirm a just-opened command
-    -- window's row 0.
+    -- battle messages: the reveal banner blocks the queue until
+    -- dismissed.  Tap B, not A -- B dismisses banners and messages just as
+    -- well but can never confirm a just-opened command window's row 0.
     btn = "b"
   end
   H.setPad((hold and btn) and { [btn] = true } or {})
