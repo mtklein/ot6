@@ -755,7 +755,7 @@ local function lossReload(blobFn, tag)
 end
 
 -- ------------------------------------------------ the ambush battle 45 --
--- The bake's bespoke per-turn plan with ONE change: the POSITIONAL
+-- The bake's custom per-turn plan with ONE change: the POSITIONAL
 -- lore-row model (row == loreId), the fix probe_thamlab_ambush_fix.lua
 -- measured correct (the compacted model held the cursor on the wrong row
 -- and stalled).

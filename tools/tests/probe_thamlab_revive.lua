@@ -75,7 +75,7 @@ local function pressWalk(dir, pred, maxFrames, what)
 end
 
 -- ------------------------------------------------------------------------
--- The gen's bespoke per-turn ambush battle plan, with the lore-row fix and
+-- The gen's custom per-turn ambush battle plan, with the lore-row fix and
 -- the variant knobs described in the header.
 local MENU_A, ACTOR_A, MSTATE_A = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL_A, CMDROW_A = 0x202E, 0x890F

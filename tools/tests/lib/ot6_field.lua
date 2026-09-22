@@ -5062,7 +5062,7 @@ function M.talkToObj(obj, what, maxF)
 end
 
 -- M.newWalkFighter (#183): fight-and-care for a generator's own walker.
--- A bespoke driveUntil walker (a held press onto a trigger tile, a
+-- A custom driveUntil walker (a held press onto a trigger tile, a
 -- grind-and-replan world walk, a tap into a save tile) used to hold L+R
 -- when a battle opened under it, which runs from the fight: no XP, and on
 -- a pincer roll no escape at all (tools/audit_encounters.py).  The route

@@ -1,6 +1,6 @@
 -- probe_thamlab_ambush_fix.lua -- Thamasa fire lab, ambush-strategy agent.
 --
--- The ambush (battle 45) under the gen's bespoke per-turn plan, with ONE
+-- The ambush (battle 45) under the gen's custom per-turn plan, with ONE
 -- measured fix and a few screened variants.  The fix: the battle lore
 -- window is POSITIONAL BY LORE ID -- row index == loreId, unlearned /
 -- unoffered ids render as empty rows -- so the cursor row wanted for a
@@ -78,7 +78,7 @@ local function pressWalk(dir, pred, maxFrames, what)
 end
 
 -- ------------------------------------------------------------------------
--- The gen's bespoke per-turn ambush battle plan, with the lore-row fix and
+-- The gen's custom per-turn ambush battle plan, with the lore-row fix and
 -- the variant knobs described in the header.
 local MENU_A, ACTOR_A, MSTATE_A = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL_A, CMDROW_A = 0x202E, 0x890F

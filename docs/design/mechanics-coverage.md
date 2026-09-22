@@ -103,7 +103,7 @@ Defining source for every row: `ff6/include/const.inc:1487-1533` (`STATUS1`/`2`/
 
 | Bit | Status | Class | Evidence | Route exposure | Issue |
 |---|---|---|---|---|---|
-| 0 | Rage | UNHANDLED | Gau's Rage is driven only by `gen_sabin_gau.lua:376-383,431-434` (bespoke, fixture-local) | Veldt fixture only; Gau otherwise benched | #140, #40, #122 (closed) |
+| 0 | Rage | UNHANDLED | Gau's Rage is driven only by `gen_sabin_gau.lua:376-383,431-434` (custom, fixture-local) | Veldt fixture only; Gau otherwise benched | #140, #40, #122 (closed) |
 | 1 | Frozen | HANDLED (planned around) / not measured live | `M.turnDenied` names it and `M.windowKept` gives it the Stop shape: the engine holds the gauge (`_c208c6`'s frozen check) and keeps an open window, so the driver enters an attack there; `$3F0D` is read for the log. No fire cure line, no fixture draws it | Ice-3/Absolute 0 rows | #224 |
 | 2 | Reraise | UNHANDLED | no read | esper grants | none |
 | 3 | Morph | UNHANDLED | `$3EE2` morphed-character and `$3B04` morph gauge unread; `gen_kefka_won.lua:387` drives the *cutscene* morph, not the command | Terra's Morph post-esper | none |

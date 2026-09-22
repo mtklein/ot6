@@ -77,7 +77,7 @@
 -- with the lib driver's plain kit (boosted Fight from whoever holds it,
 -- TERRA's Cure).
 --
--- The ambush is fought with a bespoke driver (newAmbushPlan, below), not
+-- The ambush is fought with a custom driver (newAmbushPlan, below), not
 -- H.newFightDriver: STRAGO alive casts Aqua Rake (lore id 3) every turn
 -- (multi-target water, all four Balloons are weak to it, and it also
 -- lowers their current HP so a surviving Balloon's self-destruct does
@@ -881,7 +881,7 @@ local ambBlob, ambWon = nil, false
 local CONFIRM_BATTLE_GONE = 90
 
 -- ==================================================== the ambush FIGHT PLAN
--- Bespoke driver for this one fight, modeled on gen_narshe_battle.lua's
+-- Custom driver for this one fight, modeled on gen_narshe_battle.lua's
 -- raw per-character button-sequence fighter and battle_thief.lua's
 -- state-machine decide() -- not H.newFightDriver, which has no Lore arm at
 -- all and whose unconditional item/cure loop produces a revive treadmill
@@ -1293,7 +1293,7 @@ end
 -- Dadaluma/TunnelArmr use); a loss is vanilla GameOver.  L26 HP8400 vs a
 -- party around L16-19 is a long fight -- newFightDriver's own tactical
 -- kit (boosted Fight, TERRA's Cure, the item bag) fights it honestly, no
--- bespoke per-turn plan. A seed ladder (H.newSeedLadder, 5 rungs) retries
+-- custom per-turn plan. A seed ladder (H.newSeedLadder, 5 rungs) retries
 -- a loss from a checkpoint taken just before the trigger tile, with a
 -- care stop each attempt.
 local L79 = H.newSeedLadder("FlameEater (battle 79)", { attempts = 5 })

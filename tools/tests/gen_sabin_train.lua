@@ -405,7 +405,7 @@ end
 
 -- holdDrive: hold `dir` toward pred; dialogs tap-A; battles are fought --
 -- corridor encounters by the library fighter (#183: they used to be fled,
--- which earned no XP), the win-gated battle 47 by the bespoke boost
+-- which earned no XP), the win-gated battle 47 by the custom boost
 -- machine plus wipe watch ("fight").
 local function holdDrive(dir, pred, what, budget, fightMode)
   local phase, hb = 0, -600

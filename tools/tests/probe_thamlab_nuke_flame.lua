@@ -11,7 +11,7 @@
 -- (thamlab bake header).  The strategy under test is the owner directive:
 -- TERRA and LOCKE boosted Ice (Ot6FoldTbl folds the boosted base cast to
 -- Ice2, the AoE tier), STRAGO Aqua Rake (lore 3), all through the lib
--- driver rather than a bespoke plan.  Absorb guards, the nuke MP floor,
+-- driver rather than a custom plan.  Absorb guards, the nuke MP floor,
 -- and the lore stall guard are all live; a refusal or a stall is data and
 -- shows up in the log.
 --

@@ -9,7 +9,7 @@
 #             classfix class-correct loadout (pierce for Ifrit's 6 pierce
 #                      shields, slash for Shiva's 6 slash) + lib driver + a
 #                      designated healer + nuke={Ice}
-#             bespoke  the design-doc per-turn play: CELES casts boosted Ice
+#             custom  the design-doc per-turn play: CELES casts boosted Ice
 #                      ONLY while IFRIT holds the stage (Shiva absorbs ice),
 #                      everyone else Fights class-correct (unboosted while the
 #                      staged sibling still has shields -- chip is per-hit, so

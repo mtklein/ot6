@@ -554,7 +554,7 @@ end
 -- Dadaluma/TunnelArmr use); a loss is vanilla GameOver.  L26 HP8400 vs a
 -- party around L16-19 is a long fight -- newFightDriver's own tactical
 -- kit (boosted Fight, TERRA's Cure, the item bag) fights it honestly, no
--- bespoke per-turn plan (the Aqua Rake/Ice Rod optimizations are filed,
+-- custom per-turn plan (the Aqua Rake/Ice Rod optimizations are filed,
 -- not built -- see the header).  A seed ladder (H.newSeedLadder, 5 rungs
 -- like gen_sabin_train's battle 68) retries a loss from a checkpoint taken
 -- just before the trigger tile, with a care stop each attempt.
