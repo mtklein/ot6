@@ -230,7 +230,7 @@ def stamp_status(name, root, _memo=None):
     chain from its ancestor down to the link that moved (`STALE via
     dadaluma_entry <- zozo_arrival`: dadaluma_entry was generated from a
     zozo_arrival that has since been regenerated).  The descendant's bytes
-    are exactly what its stamp vouches for, but they grew from a state that
+    are exactly what its stamp records, but they grew from a state that
     is no longer the tree's, so the chain below the moved link is stale all
     the way down -- the same set ninja regenerates, since every prev= edge
     depends on its parent's outputs.  Only a build/states stamp ancestor is
@@ -383,8 +383,8 @@ def _own_stamp_status(base, root):
     if actual != art[0]:
         return UNBOUND, (
             f"fixture {base} is UNBOUND -- build/states/{base}.mss "
-            f"(sha {actual[:12]}) is not the artifact its stamp vouches "
-            f"for (sha {art[0][:12]}): the state was replaced without a "
+            f"(sha {actual[:12]}) is not the artifact its stamp records "
+            f"(sha {art[0][:12]}): the state was replaced without a "
             f"generation run; regenerate: ninja build/states/{base}.mss.lua "
             f"(issue #75)")
 
@@ -498,7 +498,7 @@ def check_states(root):
     summary = ", ".join(f"{n} {k}" for k, n in sorted(verdicts.items()))
     print(f"fixtures: {len(stale)} of {len(stamps)} do not verify "
           f"({summary}) -- generated on another ROM or by a changed "
-          f"generator, carrying bytes their stamps do not vouch for, or "
+          f"generator, carrying bytes their stamps do not record, or "
           f"unverifiable in this tree{tail}.")
 
     # Name the one cause when there is one.  Every fixture is a snapshot of
@@ -701,7 +701,7 @@ def adoption_proof(base, root, records, rom_now, rom_copy_sha):
             f"derived from sources that changed; {regen}")
 
     # 3. the artifact (cheap, and pointless to reason about the ROM for a
-    #    fixture whose bytes are not the ones the stamp vouches for).
+    #    fixture whose bytes are not the ones the stamp records).
     art = fields["artifact"][0][0]
     mss = root / "build" / "states" / (base + ".mss")
     if not mss.exists():
@@ -710,7 +710,7 @@ def adoption_proof(base, root, records, rom_now, rom_copy_sha):
     if actual != art:
         return "refused", (
             f"its artifact moved: build/states/{base}.mss is sha "
-            f"{actual[:12]}, the stamp vouches for {art[:12]}; {regen}")
+            f"{actual[:12]}, the stamp records {art[:12]}; {regen}")
 
     # 2. the ROM, from ninja's records.
     if rom_now is None:

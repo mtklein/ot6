@@ -196,7 +196,7 @@ def emit_state_rules(w):
     w("# both halves AND the stamp.  No generator, no emulator.  The stamp")
     w("# copy is correct by construction: the seed's bytes ARE the source's")
     w("# bytes, so the source's stamp -- its sig, its artifact hash, its")
-    w("# ancestor -- vouches for the copy verbatim, and the copied stamp is")
+    w("# ancestor -- records the copy verbatim, and the copied stamp is")
     w("# what lets a stacked generate edge bind ITS ancestor line to a real file (#75).")
     w("rule seed")
     w("  command = cp build/states/$src.mss build/states/$state.mss && "

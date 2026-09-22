@@ -165,7 +165,7 @@ check "and the family is quiescent again afterwards" "" "$ran"
 # 6. a composed-in lib half is provenance, not a scheduling input: editing
 #    one regenerates nothing (docs/TESTING.md -- a logging, assertion or
 #    controller-policy change does not by itself invalidate a legitimately
-#    reached snapshot).  The stamps keep vouching for what they were made
+#    reached snapshot).  The stamps keep recording what they were made
 #    from: the old lib hashes stay recorded, and nothing rewrites them.
 for half in ot6.lua ot6_field.lua ot6_contract.lua; do
   sleep 1
