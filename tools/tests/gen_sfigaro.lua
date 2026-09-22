@@ -228,7 +228,8 @@ end
 -- presses R-R-R first and takes the guaranteed steal.  Worst case is three
 -- attempts, 12 MP, against the pool the fixture logs.  The merchant's
 -- reaction script (`if_cmd STEAL`, AIScript::_314) sets b_switch $4C and
--- ends the fight; the caller asserts $1DD2 bit 4.
+-- ends the fight; the caller asserts the switch the steal sets ($0104 for
+-- the merchant's clothes, $01D0 for the cider).
 
 -- The menu machine is armr-style: presses start only after the menu flag
 -- holds 4 consecutive pulses, a new sequence is only built while the menu

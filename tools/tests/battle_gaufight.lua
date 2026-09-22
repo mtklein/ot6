@@ -240,7 +240,7 @@ add({
 -- happened to sit: #145's regeneration of gau_joined moved them, and the
 -- first six draws are now 54, 184, 142, 410, 420 and 107 HP.  The seventh
 -- reaches group 6, whose only formation is CrassHopper x3 (729 HP).
-local VELDT_LIST, MAX_DRAWS = 0x1DDD, 32
+local VELDT_LIST, MAX_DRAWS = 0x1DDD, 128   -- two passes over all 64 bytes
 add({ H.call(function()
   H.vars.suitable = false
   local groups = 0
