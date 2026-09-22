@@ -167,6 +167,7 @@ tools/tests/probe_v07_i_negative.lua	.writeByte(
 tools/tests/probe_v07_j_negative.lua	.writeByte(
 tools/tests/probe_vargas.lua	.writeByte(
 tools/tests/probe_vargas.lua	.writeWord(
+tools/tests/probe_verbs_boost.lua	.writeByte(	quarantine: probe expedient -- one Tempest is written into an empty bag slot of forest_done, because Tempest is Cyan's katana alone and no fixture with Cyan carries one; the equip (field menu), the swing, the attacker-effect roll and the Wind Slash pass under measurement are the ROM's
 tools/tests/save_checksum.lua	emu.write	quarantine: the 1-in-65536 zero-checksum save (owner-named)
 tools/tests/battle_healerdown.lua	.writeByte(	quarantine: #128 regression staging -- the healer death (engine corpse shape hp=0+st1 $80) and a Fenix Down are poked because a real targeted kill couples to formation luck; the property under test is the driver policy, not the fight
 tools/tests/battle_healerdown.lua	.writeWord(	quarantine: #128 regression staging, same reason as its writeByte line

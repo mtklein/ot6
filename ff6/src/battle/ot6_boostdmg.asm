@@ -10,26 +10,44 @@
 ; ------------------------------------------------------------------------------
 
 ; called at the tail of the physical and magic base-damage calcs.
-; damage x2/x3/x4 for pending boost 1/2/3; the per-target 9999 cap
+; damage x2/x4/x8 for pending boost 1/2/3; the per-target 9999 cap
 ; still applies downstream. a8/i16, x = attacker, 16-bit damage $11b0.
 ; fight and capture spend their boost on extra swings (Ot6FightBoost),
 ; tier-family spells spend it on tiers (Ot6QueueFold), and bushido
 ; spends it on the tech ladder (Ot6BushidoTier). The multiplier serves
-; everything else.
+; everything else, with three exceptions past the command gate.
 ;
-; The tier test asks two things: is this one of the four commands
-; Ot6QueueFold folds (Ot6FoldCmdTbl: magic, x-magic, lore, summon --
-; nothing else can have bought a tier), and is the spell being cast, $b6,
-; in the fold table.  $b6 is the spell whose props are loaded (magic_atmk's
-; `lda $b6`); the queued attack byte $3a7d is the same id for a queued cast
-; and NOT for one the handler substituted.  Both halves were measured, not
-; reasoned (#237, build/lab/umaro/diag-charge-shift0.log): an engine-driven
-; character's queue holds command/attack $0000 (RandCharAction's `stz
-; $3a7c`), so Umaro's Charge arrived here as command $23 with $3a7d = $00,
-; Storm as command $02 with $b6 = $54 and $3a7d = $00, and a scan keyed on
-; $3a7d alone matched both against Ot6FoldTbl's first entry, Fire ($00),
-; and multiplied neither: `dmg x2/p3:174->174`, three pips charged for
-; nothing.
+; A Rage is not multiplied: its boost bought the coin (Ot6RageCoin holds the
+; special for the whole trance, OT6_RAGETIER).  The command gate's $10 entry
+; cannot see it, because Cmd_10 runs the beast's attack through _c21554, which
+; sets $b5 to that attack's own command ($02 for a spell, $0c for a lore
+; range special) before any damage while the start turn's boost is still
+; pending; so the test is on the queued command, $3a7c = $10.
+;
+; A weapon's own on-hit spell is not multiplied (owner ruling, v0.21): a
+; boosted Fight buys extra swings, and the spell a weapon casts off one of
+; them (Blizzard's Ice, Tempest's Wind Slash) is part of that swing, not a
+; second purchase -- whatever action carries it (Fight, Capture, Jump, an
+; engine-driven Fight).  The cast runs as a follow-up pass of the same action
+; with $b5 = $02 and $b6 = the spell, the same bytes Sketch, the Magicite item
+; or Umaro's Storm produce, so the weapon sources mark it themselves:
+; OT6_WEAPSPELL bit 6 (Ot6WeaponSpellQueued / Ot6WeaponSpellPass, below).
+;
+; A tier-family spell is not multiplied either: its boost bought the tier.
+; That test reads the action as it was queued, $3a7c/$3a7d, which
+; InitPlayerAction copies out of the queue when the action starts and nothing
+; rewrites for the rest of it.  Ot6QueueFold folds at queue time, and only when
+; the queued command is magic, x-magic, lore or summon (Ot6FoldCmdTbl) and the
+; queued attack is a fold-table spell, so exactly those actions spent their
+; boost on a tier.  The command half matters: Throw's attack byte is an item
+; id, and a Dirk ($00) or MithrilKnife ($01) reads as Fire or Ice; an
+; engine-chosen action queues command/attack $0000 (RandCharAction), which the
+; attack half alone reads as Fire (Umaro's Charge and Storm).  The queued pair
+; and not the executing $b5/$b6: handlers rewrite $b5/$b6 mid-action, so a rod
+; or shield used from Item runs as command $02 with the item's spell (Cmd_01)
+; and a sketched attack under whatever command GetCmdForAI names, and neither
+; was folded.  Measured: probe_throw_boost, probe_fight_proc_boost,
+; probe_verbs_boost; battle_procboost guards the table.
 
 .proc Ot6BoostDmg
         php                     ; caller width varies: pin our own
@@ -56,10 +74,12 @@
         cmp     #$10
         beq     done            ; $10 rage: boost bought the coin's
                                 ;   certainty (Ot6RageCoin), never a damage
-                                ;   multiplier. Cmd_10 executes the first
-                                ;   possessed action in the same turn while
-                                ;   the pending boost is still live, so this
-                                ;   gate is required on the start turn too
+                                ;   multiplier.  Rage's attacks never reach
+                                ;   here as $10 ($b5 is the beast attack's own
+                                ;   command by then); the queued-command test
+                                ;   below is what exempts them.  This entry
+                                ;   is the one the price gate reads
+                                ;   (battle_boostprice, battle_costtable)
         cmp     #$0f
         beq     done            ; $0f slot: boost bought the reel's
                                 ;   certainty (Ot6SlotRig), never a damage
@@ -70,9 +90,16 @@
                                 ;   Ot6StealSlot), never a damage multiplier
         lda     OT6_BOOST_REVEALED,x         ; pending boost level
         beq     done
+        lda     $3a7c           ; a Rage start turn: Cmd_10 hands the beast's
+        cmp     #$10            ;   attack to _c21554, which rewrites $b5 to
+        beq     done            ;   that attack's own command before any
+                                ;   damage, while the boost is still pending
+        lda     f:$7e0000+OT6_WEAPSPELL
+        bit     #$40            ; a weapon's own on-hit spell: the boost
+        bne     done            ;   bought that weapon's swings, not this
         phx
         ldx     #$0003          ; only a spell command can have bought a
-@cmd:   lda     $b5             ;   tier: Ot6QueueFold's own four, mirrored
+@cmd:   lda     $3a7c           ;   tier: Ot6QueueFold's own four, mirrored
         cmp     f:Ot6FoldCmdTbl,x  ; in Ot6FoldCmdTbl.  A table and not a
         beq     @spell          ;   `cmp #imm / beq` chain: battle_boostprice
         dex                     ;   reads every `cmp #imm / beq` in this
@@ -81,7 +108,7 @@
         bra     @plain          ;   the opposite of exempt
 @spell: ldx     #$0000
 @scan:  lda     f:Ot6FoldTbl,x  ; tier-family spell? tiers are the boost
-        cmp     $b6             ; the spell being cast (see the header)
+        cmp     $3a7d           ; the queued attack (see the header)
         beq     @tier
         inx
         cpx     #$0018
@@ -113,3 +140,43 @@ done:   plp
 ; x-magic, lore, summon -- in the order of its own gate (ot6_boost.asm)
 Ot6FoldCmdTbl:
         .byte   $02, $17, $0c, $19
+
+; ------------------------------------------------------------------------------
+
+; [ a weapon queued its own spell as the follow-up in $3400 ]
+
+; jsl from CheckWeaponMagic (a weapon's random on-hit cast) and from Tempest's
+; attacker effect (Wind Slash), each right where it writes $3400.  Those two
+; are the weapon sources of a follow-up; Sketch and the Magicite item write
+; $3400 too, and do not call this.  a8, preserves A.
+.proc Ot6WeaponSpellQueued
+        .a8
+        pha
+        lda     #$80
+        sta     f:$7e0000+OT6_WEAPSPELL
+        pla
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ is the attack pass now starting a weapon's own spell? ]
+
+; jsl from the head of _c237eb, which every ExecAttack pass runs before its
+; damage calc and which is where a queued follow-up in $3400 becomes the
+; pass's attack.  A follow-up pass inherits the weapon bit its source set; any
+; other pass clears the flag, so the bit cannot reach a later pass or the next
+; action.  a8; clobbers A (the caller's next instruction reloads $3400).
+.proc Ot6WeaponSpellPass
+        .a8
+        lda     $3400
+        cmp     #$ff
+        beq     @plain          ; nothing queued: the action's own pass
+        lda     f:$7e0000+OT6_WEAPSPELL
+        and     #$80            ; queued by a weapon?
+        lsr                     ;   bit 7 -> bit 6: this pass is its spell
+        bra     @store
+@plain: lda     #$00
+@store: sta     f:$7e0000+OT6_WEAPSPELL
+        rtl
+.endproc

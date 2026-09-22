@@ -8983,6 +8983,9 @@ CheckWeaponMagic:
         xba
         and     #$3f
         sta     $3400       ; set spell index
+        jsl     Ot6WeaponSpellQueued    ; ot6: the follow-up is this weapon's
+                                        ;   own spell, which boost does not
+                                        ;   multiply (ot6_boostdmg.asm)
         lda     #$10
         trb     $b2         ; follow-up spell hits same target
         inc     $3a70       ; increment number of attacks
@@ -9294,6 +9297,8 @@ RandGenju:
 
 _c237eb:
 _loadmagic3:
+        jsl     Ot6WeaponSpellPass      ; ot6: is this pass a weapon's own
+                                        ;   spell?  (before any damage calc)
 @37eb:  lda     $3400
         cmp     #$ff
         beq     @3837
@@ -10653,6 +10658,8 @@ AttackerEffect_0b:
         bcs     _3fb6       ; 50% chance to return
         stz     $11a6       ; clear attack power
         lda     #$65        ; cast wind slash
+        jsl     Ot6WeaponSpellQueued    ; ot6: a weapon's own spell, as
+                                        ;   CheckWeaponMagic's (A preserved)
         bra     _3fb0
 
 ; ------------------------------------------------------------------------------

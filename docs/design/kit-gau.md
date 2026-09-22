@@ -269,6 +269,14 @@ The roll hook replaces `RandRage`'s `jsr RandCarry / rol` pick
   (`:3370`); without it, a 3-BP Rage-start would buy the guaranteed special and
   multiply it as well, which is the double-dip `kits.md`'s "Boost-tiered Steal"
   rules out.
+  Measured in v0.21 (`probe_rage_boost`): that `lda $b5 / cmp #$10` gate
+  never saw a Rage.  `Cmd_10` runs the beast's attack through `_c21554`, which
+  sets `$b5` to the attack's own command (`$02` for a spell, `$0c` for a
+  lore-range special) before any damage, so every build from the gate's
+  landing through v0.21's candidates multiplied the start turn's special
+  (a boost-3 `$9F` special: `797->6376`).  The exemption now reads the
+  queued command, `$3a7c = $10`; the `$b5` entry stays because it is the one
+  the price gate reads.  `battle_procboost` asserts it.
 - **Mid-trance turns touch no boost machinery**: no fold, no
   multiplier, and no `Ot6ActionEnd` consumption beyond vanilla's. A possessed
   Gau has no menu, so no pending boost arises on his auto-turns; BP he regens

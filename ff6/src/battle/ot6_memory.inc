@@ -345,5 +345,23 @@ OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
 .assert OT6_UNCTL > OT6_SHADOW + $70 - 1, error, "the retaliation cells sit PAST InitBP's shadow clear (InitBP zeroes them explicitly)"
 .assert OT6_HPMARK + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; a weapon's own on-hit spell is not boosted (owner ruling, v0.21): a boosted
+; Fight buys extra swings, and the spell a weapon casts off one of them is
+; part of that swing, not a second purchase.  The weapon sources queue the
+; spell as a follow-up pass of the same action through $3400, which Sketch and
+; Magicite share, so the bytes the pass carries cannot say where it came from;
+; this flag says it at the source.
+;   bit 7  a weapon source queued the spell now waiting in $3400
+;          (Ot6WeaponSpellQueued, from CheckWeaponMagic and Tempest's
+;          attacker effect)
+;   bit 6  the attack pass now running is that spell (Ot6WeaponSpellPass,
+;          at the head of every pass, moves bit 7 here and clears it)
+; Ot6BoostDmg skips its multiplier while bit 6 is set.  Every pass rewrites
+; the byte before any damage is computed, so neither bit outlives the pass
+; after the one that set it; InitBP zeroes it anyway.
+OT6_WEAPSPELL        := $eda0
+.assert OT6_WEAPSPELL = OT6_HPMARK + 8, error, "the weapon-spell flag must follow the hurt line without a gap"
+.assert OT6_WEAPSPELL <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 
 .endif
