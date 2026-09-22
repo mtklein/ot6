@@ -127,7 +127,7 @@ STATES = [
     S("locke_scenario", gen="gen_scenario_locke", prev="scenario_hub"),
 
     # ---- the pinned scenario order (owner, 2026-08-26): LOCKE -> SABIN
-    # -> TERRA, one lineage, nothing replayed.  One player, one
+    # -> TERRA, one run, nothing replayed.  One player, one
     # cartridge: scenario choice is order, not branching.  TERRA goes
     # last because gen_terra_done's ending is the reunion-aware one.
     #

@@ -127,7 +127,7 @@ end
 -- resolve an unwanted battle: flee (L+R), falling back to winning it through
 -- the real menus if flight stalls (an unrunnable set-piece formation).
 local function resolveBattle(tag)
-  -- The single-lineage Veldt pool carries every formation the playthrough
+  -- The single-run Veldt pool carries every formation the playthrough
   -- has seen, armor draws included, so the fallback fights with the full
   -- kit (items, heals, revives, tactical skills) -- an unarmed tap-fighter
   -- wiped here against an M-TekArmor draw.  $b1 bit 1 is the engine's own

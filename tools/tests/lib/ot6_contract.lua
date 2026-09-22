@@ -80,7 +80,7 @@ M.contracts["post-opera-v1"] = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
     { 0x316810 + 0x012d, 0x00, "bank-31 element-codex row (ULTROS2; measured EMPTY, unseeded)" },
-    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex row (ULTROS2; the fighting lineage revealed slash|pierce at the Lete -- re-measured 2026-08-31)" },
+    { 0x316990 + 0x012d, 0x03, "bank-31 class-codex row (ULTROS2; the fighting run revealed slash|pierce at the Lete -- re-measured 2026-08-31)" },
   },
 }
 
@@ -128,7 +128,7 @@ M.contracts["mrf-save-room-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -159,7 +159,7 @@ M.contracts["n024-entry-save-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -188,7 +188,7 @@ M.contracts["minecart-platform-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -217,7 +217,7 @@ M.contracts["vector-escape-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -262,7 +262,7 @@ M.contracts["terra-returned-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -319,7 +319,7 @@ M.contracts["narshe-mission-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -361,7 +361,7 @@ M.contracts["gate-cave-save-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -414,7 +414,7 @@ M.contracts["vector-crash-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -482,7 +482,7 @@ M.contracts["banquet-done-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -542,7 +542,7 @@ M.contracts["crescent-landing-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -604,7 +604,7 @@ M.contracts["thamasa-night-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -660,7 +660,7 @@ M.contracts["fire-out-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -715,7 +715,7 @@ M.contracts["esper-mtn-save-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -764,8 +764,8 @@ M.contracts["ultros-won-v1"] = {
   -- no chest is opened this segment, so the bag is N's carried through.
   -- The Fire Rod is WORN by STRAGO ($07) in place of his Ice Rod; both
   -- it[4] checks find the weapon on its wearer rather than in the $1869
-  -- bag.  The fled lineage carried a spare ThunderBlade that TERRA took in
-  -- prep; the fighting lineage's ONE ThunderBlade has ridden LOCKE's Genji
+  -- bag.  The fled run carried a spare ThunderBlade that TERRA took in
+  -- prep; the fighting run's ONE ThunderBlade has ridden LOCKE's Genji
   -- main hand since the banquet kit, so the prep leaves TERRA's weapon
   -- alone (gen_ultros conds on the bag) and the blade is found on LOCKE.
   items = {
@@ -776,7 +776,7 @@ M.contracts["ultros-won-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }
@@ -830,7 +830,7 @@ M.contracts["thamasa-done-v1"] = {
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting lineage: no elem chip on him yet)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex witness (ULTROS2; fighting run: no elem chip on him yet)" },
     { 0x316990 + 0x012d, 0x03, "bank-31 class-codex witness (ULTROS2; slash|pierce, revealed at the Lete and carried by the codex)" },
   },
 }

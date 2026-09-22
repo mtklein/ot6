@@ -451,8 +451,8 @@ local steps = {
   H.waitUntil(landed(253, 10), 2400, "Vector 253 (post-attack)", 1),
   H.waitFrames(30),
 
-  -- The kit lists were authored against the fled lineage's exact bag; the
-  -- fighting lineage carries different spares, and LOCKE arrives already
+  -- The kit lists were authored against the fled run's exact bag; the
+  -- fighting run carries different spares, and LOCKE arrives already
   -- dual-wielding under the Genji Glove (owner doctrine: his left hand
   -- holds a SECOND WEAPON, not a shield -- the { 1, $5A } Buckler this kit
   -- used to force is the anti-pattern the wave-4 kits removed).  Each slot
@@ -464,7 +464,7 @@ local steps = {
   (function()
     local KITS = {
       -- TERRA has no Genji Glove, so her L-hand takes a shield if the bag
-      -- holds one (her row arrives with slot 1 empty on this lineage).
+      -- holds one (her row arrives with slot 1 empty on this run).
       { 0, "TERRA", { { 0, 0x0E }, { 1, 0x5A }, { 1, 0x5C },
                       { 2, 0x6A }, { 3, 0x84 } } },
       { 1, "LOCKE", { { 0, 0x0F }, { 1, 0x00 }, { 1, 0x01 }, { 1, 0x02 },
@@ -480,7 +480,7 @@ local steps = {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end

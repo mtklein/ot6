@@ -1,10 +1,10 @@
 #!/bin/sh
-# recut_wave4.sh -- re-hang the Vector-era chain off the fighting lineage.
+# recut_wave4.sh -- re-hang the Vector-era chain off the fighting run.
 #
 # The chain from vector_entry onward cold-boots the lettered SRAM
 # checkpoints (A: post-opera, B: mrf-save-room, C: n024-entry-save,
 # D: minecart-platform, E: vector-escape, F: terra-returned), and those
-# payloads still hold the FLED lineage's party.  The graph's own rule --
+# payloads still hold the FLED run's party.  The graph's own rule --
 # "editing either [manifest or payload] regenerates every state hung off
 # the checkpoint" -- makes the re-cut cascade mechanical:
 #
@@ -44,4 +44,4 @@ build n128_won
 cut   gen_vector_escape_checkpoint     vector-escape-v1     vector-escape.sram
 cut   gen_terra_returned_checkpoint    terra-returned-v1    terra-returned.sram
 
-echo "=== wave 4 re-hung on the fighting lineage ==="
+echo "=== wave 4 re-hung on the fighting run ==="

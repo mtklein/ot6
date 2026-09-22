@@ -279,8 +279,8 @@ H.run({ maxFrames = 250000 }, {
 
   -- 1. the player's prep, all through real menus: preserve this fixture's
   --    actual named kit, then top up HP with the bag's own items
-  --    (H.fieldCare).  The old arm asked this independent lineage for the
-  --    checkpoint lineage's two ThunderBlades; neither exists in this save,
+  --    (H.fieldCare).  The old arm asked this independent run for the
+  --    checkpoint run's two ThunderBlades; neither exists in this save,
   --    so that was a fixture fabrication disguised as menu input.  EDGAR's
   --    MithrilBlade supplies slash, while the daggers and Tools cover pierce.
   -- Best-effort, like the wave-4 kits: each slot conds on the bag
@@ -307,7 +307,7 @@ H.run({ maxFrames = 250000 }, {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end

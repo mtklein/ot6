@@ -1836,7 +1836,7 @@ Ot6ShieldTbl:
         .byte   5, OT6_SLASH|OT6_PIERCE ; nerapa: sprint fight, low gauge
         ; ---- audit_break_coverage.py's two break-dark areas ------------
         ; (owner-approved 2026-09-01.)  Both were beatable on raw stats,
-        ; which is how the fled lineage shipped them dark: the break loop
+        ; which is how the fled run shipped them dark: the break loop
         ; did not exist there.  Vanilla bits stay -- the four Zozo
         ; bodies are all poison-weak (Bio Blaster is a live key whenever
         ; EDGAR is picked), and Cirpius carries no vanilla weakness at
@@ -1864,7 +1864,7 @@ Ot6ShieldTbl:
                                 ;   AutoCrossbow sweeps it, the pipsqueak
                                 ;   pattern.  poison vanilla
         ; ---- the sealed gate cave (maps 382-386) -----------------------
-        ; The fled lineage never fought here, so the area shipped on floor
+        ; The fled run never fought here, so the area shipped on floor
         ; rows the mission party cannot answer: measured (2026-09-01, 14
         ; rounds of honest play), an L23 TERRA/LOCKE/EDGAR/SABIN dealt the
         ; $082+$048 trio ~150 of its 4191 HP in five rounds.  Vanilla's

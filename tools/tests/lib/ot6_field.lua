@@ -3548,7 +3548,7 @@ end
 function M.careStop(tag, opts)
   opts = opts or {}
   opts.tag = opts.tag or tag or "care after battle"
-  -- 0.65, not 0.9: the fighting lineage meets several times the battles the
+  -- 0.65, not 0.9: the fighting run meets several times the battles the
   -- flee route did, and topping to 90% after every one of them drank ~96
   -- Tonics by the Imperial Camp (measured; the bag hit the reserve floor
   -- with two scenarios still to go).  A person walks a little hurt and

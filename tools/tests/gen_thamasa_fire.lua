@@ -1123,7 +1123,7 @@ local steps = {
       H.charHp(TERRA), H.charMaxHp(TERRA), H.charHp(LOCKE), H.charMaxHp(LOCKE)))
   end),
   -- Best-effort: each gear piece equips only if the bag holds it; a piece
-  -- this lineage never bought or already wears keeps the current slot,
+  -- this run never bought or already wears keeps the current slot,
   -- with a log.  (Same inline pattern as gen_ifrit_magicite /
   -- gen_banquet_done: a shared lib helper would re-stale every generated
   -- state in the chain.)
@@ -1140,7 +1140,7 @@ local steps = {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end

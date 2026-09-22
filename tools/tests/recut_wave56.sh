@@ -1,5 +1,5 @@
 #!/bin/sh
-# recut_wave56.sh -- re-hang boundaries G through P on the fighting lineage.
+# recut_wave56.sh -- re-hang boundaries G through P on the fighting run.
 #
 # Same pattern as recut_wave4.sh, but this stretch's gens each cold-boot
 # the PREVIOUS boundary's checkpoint and cut the NEXT one in a single
@@ -44,4 +44,4 @@ step gen_esper_mtn      fire-out-v1         esper-mtn-save-v1   esper-mtn-save.s
 step gen_ultros         esper-mtn-save-v1   ultros-won-v1       ultros-won.sram
 step gen_massacre       ultros-won-v1       thamasa-done-v1     thamasa-done.sram
 
-echo "=== waves 5+6 re-hung on the fighting lineage: the chain reaches the FC stop line ==="
+echo "=== waves 5+6 re-hung on the fighting run: the chain reaches the FC stop line ==="

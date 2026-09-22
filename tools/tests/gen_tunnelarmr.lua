@@ -713,7 +713,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   --    this fixture as LOCKE's boosted steal off the South Figaro merchant
   --    in gen_sfigaro (monster 314, `monster_steal GUARDIAN, PLUMED_HAT`,
   --    monster_items.asm:1901), which that step's ladder makes certain.  The
-  --    fallbacks are the MithrilKnife (30) and the Dirk (26), so a lineage
+  --    fallbacks are the MithrilKnife (30) and the Dirk (26), so a run
   --    that stops delivering it still arms both hands with the right class.
   preferItem(CH_LOCKE, 1, 0x20, { MITHRILKNIFE, DIRK }, "locke off hand"),
   preferItem(CH_LOCKE, 0, 0x1f, { GUARDIAN, MITHRILKNIFE, DIRK },

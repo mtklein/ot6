@@ -399,7 +399,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end
@@ -416,10 +416,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
 
   -- So:
 
-  -- Rows computed LIVE from $1850 ((byte>>3)&3): the fled lineage's
+  -- Rows computed LIVE from $1850 ((byte>>3)&3): the fled run's
   -- hard-coded rows put KIRIN on whoever happened to sit at row 1, and
-  -- this lineage's party order differs.
-  -- RAMUH -> LOCKE goes FIRST: this lineage arrives with LOCKE already
+  -- this run's party order differs.
+  -- RAMUH -> LOCKE goes FIRST: this run arrives with LOCKE already
   -- wearing KIRIN (an earlier prep's choice), and the game refuses to
   -- equip a stone another character wears -- so LOCKE must trade up to
   -- RAMUH before SABIN can take KIRIN (measured: the old order no-opped

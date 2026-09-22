@@ -29,7 +29,7 @@
 --     both 0 (never arrived); verified-step fight-through 4163; the
 --     dodge policy used below 6938 with 100% arrival, ~3.0 fights.
 --
--- Re-measured 2026-09-07 on the v0.16 lineage (issue #160: the
+-- Re-measured 2026-09-07 on the v0.16 run (issue #160: the
 -- qualification crossed seven times chasing a 6000-frame bar).  35
 -- crossings of this policy from the qualification's own catwalk snapshot
 -- -- its 7, plus 28 through tools/tests/rafterlab_batch_gen.sh over holds
@@ -183,7 +183,7 @@ end
 -- arrangement seed: aligned frames to stand still before setting off.
 --
 -- The policy is the lab's "dodge-h" (probe_rafterlab_dodge.lua); what it
--- yields on the current lineage is measured in the header above:
+-- yields on the current run is measured in the header above:
 --   * pulsed walking: every press is released on the first unaligned
 --     frame (a begun 16px step completes on its own); a press held
 --     through a step chains past junctions whose BOTH neighbors are
@@ -608,7 +608,7 @@ end
 -- is the facing press, the rat-free wait (19 frames in every measured
 -- run) and the >= 600 frames the exit contract asserts.  A person
 -- crosses once; the v0.16 qualification crossed seven times chasing a
--- 6000 bar this lineage clears about one time in twenty (issue #160).
+-- 6000 bar this run clears about one time in twenty (issue #160).
 --
 -- The later rungs are the fallback for a crossing that FAILED -- the
 -- clock ran out, a rat fight was lost, the party arrived hurt or under
@@ -628,7 +628,7 @@ local HOLDS = { 0, 250, 550, 900, 1300, 1750 }
 local ARRIVAL_HP_DIV = 8
 -- lab only (rafterlab_batch_gen.sh RAFTERLAB_ARRIVALS=1): a prefix here
 -- saves every arrival at (14,7), banked or not, as <prefix>arrival_<n>.mss
--- so the Ultros 2 fight can be measured from each.  nil in the lineage.
+-- so the Ultros 2 fight can be measured from each.  nil in the run.
 local LAB_ARRIVAL_PREFIX = nil
 local catwalkBlob = nil                -- captured on the catwalk, below
 

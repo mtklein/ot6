@@ -36,7 +36,7 @@ The World of Ruin is entirely UNCLAIMED as of 2026-09-01.
 """
 
 # ---- THE TUNING CLAIM (may only grow) -----------------------------------
-# Field maps the fighting lineage has validated by play, area by area,
+# Field maps the fighting run has validated by play, area by area,
 # plus the WoB world sectors (world_battle_group.dat bytes 0-255; bytes
 # 256-511 are the WoR and are unclaimed).
 CLAIMED_FIELD = set(

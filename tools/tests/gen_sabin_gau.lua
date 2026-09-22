@@ -289,7 +289,7 @@ end
 -- already at the front the menu is never opened and the caller is left
 -- pressing buttons at the field.
 
--- Why the two lineages differ in where the meat lands is UNVERIFIED: the
+-- Why the two runs differ in where the meat lands is UNVERIFIED: the
 -- observable difference is that this one arrived at the counter with
 -- tonic=0 in the bag and s2 arrived with tonic=99, and an emptied stack
 -- plausibly frees the front slot the purchase then takes.  The repair does

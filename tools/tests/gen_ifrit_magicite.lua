@@ -430,8 +430,8 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   --    not element, ThunderBlade is OT6_SLASH, and Shiva's break axis is
   --    slashing -- breaking her is how this fight is won.
 
-  -- The kit lists were authored against the fled lineage's exact bag; the
-  -- fighting lineage carries different spares (more chests fought to, other
+  -- The kit lists were authored against the fled run's exact bag; the
+  -- fighting run carries different spares (more chests fought to, other
   -- shops afforded).  Each slot equips best-effort: present -> worn,
   -- absent -> the character keeps what they have, with a log.  The break
   -- plan needs slash CLASS on all four, which every fallback preserves.
@@ -466,7 +466,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
           function() return H.invSlotOf(item) ~= nil end,
           { H.equipLoadout(char, { { slot, item } }, { tag = tag }) },
           { H.logStep(string.format(
-              "%s: $%02X not in this lineage's bag; keeping current gear",
+              "%s: $%02X not in this run's bag; keeping current gear",
               tag, item)) })
       end
     end

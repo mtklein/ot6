@@ -49,7 +49,7 @@ local function bossSt3() return H.readByte(0x3EF8 + 8 + BOSS*2) end
 local locke, celes
 local function mp(slot) return H.readWord(0x3C08 + slot*2) end
 
--- The fighting lineage's n024_entry ships Celes MP-DRY: she arrives at
+-- The fighting run's n024_entry ships Celes MP-DRY: she arrives at
 -- 1 of 126, having nuked Ifrit with Ice through the reserve (a deep fight
 -- breaches it by design) and cured the party in the Ifrit/Shiva battle one
 -- door earlier, with no inn between that door and this one.  That is
@@ -427,7 +427,7 @@ end
 -- list scrolls a row, $41/$40 while a target window opens and closes, $09
 -- and $0f/$10 while a list opens.  These lines used to press B in all of
 -- them, and B there backs out of the line's own selection: on the #177
--- lineage's n024_entry Locke's Tonic (row 22) cost a B at every scrolled
+-- run's n024_entry Locke's Tonic (row 22) cost a B at every scrolled
 -- row and 12 target windows cancelled in their opening frame (f4190..f4702,
 -- 2026-09-17), the bench held the menu ~600 frames a turn, Celes's
 -- post-Osmose window never came, and two Magnitude8s ($BC, f6786/f7576)
@@ -482,7 +482,7 @@ local function summonHold(s, who)
 end
 -- A plan made at the command window can be overtaken before its target
 -- window confirms: another bench member's X-Potion lands on the same
--- ally, or a hit clears the Muddle the plan was for.  On main's lineage
+-- ally, or a hit clears the Muddle the plan was for.  On main's run
 -- at seed shift 17 (2026-09-17) Sabin sat in a Tonic's target window for
 -- Locke while Edgar's X-Potion (exec f3788, done f4120) healed him to
 -- full, and slot 2 never lit in 18 taps -- the lib's steer bailed; at
@@ -712,7 +712,7 @@ local function driveTo(pred, maxF, tag)
     H.call(function()
       -- Wall pin, not play: NUMBER 024's WallChange re-rolls its
       -- absorbed/nullified elements at random, and the fighting
-      -- lineage's fixture rolled a wall that ate Inferno's fire -- the
+      -- run's fixture rolled a wall that ate Inferno's fire -- the
       -- summon queued, paid, and latched, then "resolves" (boss HP
       -- drops) never came, and a once-per-battle divine cannot retry.
       -- The properties under test are kit prices, latches, and the
@@ -933,7 +933,7 @@ H.run({ maxFrames = 150000 }, {
       driveTo(function()
         -- The refill can only show if her pool has room for it: an Osmose
         -- entered at her maximum pays 8, drains, and is capped straight
-        -- back to where it started.  On main's lineage at seed shift 31
+        -- back to where it started.  On main's run at seed shift 31
         -- (2026-09-17) Muddle re-aimed her first Osmose at Edgar
         -- (tgt=0000, hers 99->126), and the second, at the boss, entered
         -- at 126 and left at 126 -- the [osmose] rise assertion failed on

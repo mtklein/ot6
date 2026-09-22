@@ -255,7 +255,7 @@ H.run({ maxFrames = 160000 }, {
   -- chain carried 89 in and walked the factory down to 80 (vector_entry
   -- tonic=89 -> ifrit_entry 80), 9 Tonics = 450 HP = 2 Potions at 300.
   -- FENIX DOWN to 16 (~level).
-  -- #210, POTION to 50: the regenerated lineage (#198) boots here at L20
+  -- #210, POTION to 50: the regenerated run (#198) boots here at L20
   -- with tonic=15 potion=37 (post-opera-v1) and reaches terra-returned-v1
   -- at L21 with tonic=4 potion=20 -- the Tonics at the care kernel's floor
   -- from mrf-save-room-v1 on (tonic=4 there, at n024-entry-save-v1 and at

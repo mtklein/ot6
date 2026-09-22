@@ -258,7 +258,7 @@ local function driveSteps(tag, esper)
       H.assertEq(leader ~= nil, true, "[" .. tag .. "] a party leader resolved")
     end),
   }
-  -- The fighting lineage's minecart party arrives wearing stones (a
+  -- The fighting run's minecart party arrives wearing stones (a
   -- played save should); this laboratory needs bare records on BOTH
   -- passes, because the union measure spans the whole party.  The bump
   -- and the granted list are computed live from the worn byte (README:

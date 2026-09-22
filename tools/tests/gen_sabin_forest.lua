@@ -21,7 +21,7 @@
 --        (dlg $02A4, $0038), then W to (72,10) _cba8f1 boarding cutscene ->
 --        `load_map 145,{26,11}` (event_main.asm:62961), $017C cleared to 0.
 -- No scripted battles/choices/name-menus on the walk; only random
--- encounters and the boarding dialogs (tap-A). The fighting lineage fights
+-- encounters and the boarding dialogs (tap-A). The fighting run fights
 -- its encounters (the shared navigator, FIGHT_NOT_FLEE); SHADOW's presence
 -- has no timing dependence because OT6 makes the 1/16 leave roll a no-op
 -- (Ot6ShadowLeaves, battle_main.asm). This generator makes no state writes.
@@ -228,7 +228,7 @@ H.run({ maxFrames = 120000 }, {
     -- SHADOW aboard by DESIGN: OT6's Ot6ShadowLeaves makes the vanilla
     -- 1/16 leave roll a no-op (owner's call, 2026-09-01: Shadow stays for
     -- the whole game; only scripted departures remain), so the fighting
-    -- lineage's won battles here cannot lose him.  (Until that day a
+    -- run's won battles here cannot lose him.  (Until that day a
     -- passing roll HALTED the game -- a mis-banked jump -- so this line
     -- had never seen a passed roll either way.)
     H.assertEq(inParty(3), true, "SHADOW aboard -- the leave roll is a no-op by design (Ot6ShadowLeaves)")

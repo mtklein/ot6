@@ -663,7 +663,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
     H.screenshot("narshe_battle")
   end),
 
-  -- The combined lineage has no spare Dirk or LeatherArmor for CELES --
+  -- The combined run has no spare Dirk or LeatherArmor for CELES --
   -- LOCKE still owns those -- and she already carries the MithrilBlade
   -- from the TunnelArmr route.
   H.call(function()

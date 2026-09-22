@@ -284,7 +284,7 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
   end, 3000, "settled off the save trigger", 5),
   -- Both swaps are best-effort chip optimization, not win conditions: the
   -- espers end this fight on the script's schedule regardless of break
-  -- state (bosses-wob.md par.17).  On the fighting lineage the bag's one
+  -- state (bosses-wob.md par.17).  On the fighting run the bag's one
   -- ThunderBlade rides LOCKE's Genji off-hand, and a person would not
   -- strip a party member's hand to arm another; absent from the bag,
   -- each wearer keeps their current weapon, with a log.
@@ -296,7 +296,7 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
         "TERRA wields the ThunderBlade (bolt weakness)")
     end),
   }, {
-    H.logStep("ThunderBlade -> TERRA: not in this lineage's bag; " ..
+    H.logStep("ThunderBlade -> TERRA: not in this run's bag; " ..
       "TERRA keeps her current weapon"),
   }),
   H.cond(function() return H.invSlotOf(FIRE_ROD) ~= nil end, {
@@ -307,7 +307,7 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
         "STRAGO wields the Fire Rod (fire weakness, unshielded bludgeon)")
     end),
   }, {
-    H.logStep("Fire Rod -> STRAGO: not in this lineage's bag; " ..
+    H.logStep("Fire Rod -> STRAGO: not in this run's bag; " ..
       "STRAGO keeps his current weapon"),
   }),
   H.fieldCare({ tag = "prep full-heal at the save region", threshold = 1.0 }),

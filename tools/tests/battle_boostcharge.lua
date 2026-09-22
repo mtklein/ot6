@@ -39,7 +39,7 @@
 -- and refuses to run if those two happen to coincide, so the file cannot
 -- pass under the wrong rule and cannot pass vacuously.
 --
--- Why n024_entry.  It is the fixture where the magicite lineage lives
+-- Why n024_entry.  It is the fixture where the magicite run lives
 -- (battle_magicite runs here), its party carries both stones, and LOCKE
 -- arrives with a 172-MP pool -- deep enough to pay 65 + 4 + 38 + 20 in one
 -- battle and 99 in another, which no earlier fixture's caster can.  The

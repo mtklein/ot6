@@ -7,11 +7,11 @@
 --
 -- The drive:
 --   0. the boot state is the mid-lifecycle control, read rather than
---      staged: the fighting lineage saves at every save point (the .srm
+--      staged: the fighting run saves at every save point (the .srm
 --      seed program), so gau_joined arrives at lifecycle 3 with the
 --      slot-3 page populated by post-first-save fights, the transient
 --      page frozen at whatever the pre-first-save opening taught, and
---      slots 1 and 2 byte-for-byte empty.  (The fled lineage's
+--      slots 1 and 2 byte-for-byte empty.  (The fled run's
 --      never-saved control -- lifecycle 0, transient active -- no
 --      longer exists in any chain fixture.)
 --   1. stand on the Veldt at (214,149) and save into EMPTY slot 1 via
@@ -337,7 +337,7 @@ local actions = {
   H.waitFrames(10),
   H.waitUntil(worldReady, 500, "world-map control", 5),
 
-  -- 0. the mid-lifecycle control, read: the fighting lineage saves into
+  -- 0. the mid-lifecycle control, read: the fighting run saves into
   -- slot 3 at every save point, so its post-save fights taught the
   -- slot-3 page and only it; slots 1 and 2 have never been saved.
   H.call(function()
@@ -460,7 +460,7 @@ local actions = {
     -- One try per encounter: pace until a battle loads, fight it through
     -- the real menus, diff the pages, and -- unless it taught -- heal
     -- through the field menu (Tonics first) before pacing again.  The
-    -- Veldt serves the SAVE's recorded history, and the fighting lineage's
+    -- Veldt serves the SAVE's recorded history, and the fighting run's
     -- history (Shadow stays, so his battles are in it) serves this trio
     -- packs that a party walking in half-dead does not survive: measured,
     -- the un-healed search entered its seventh fight with SABIN at 64 HP
@@ -564,7 +564,7 @@ local function resolveReadBattle(n)
       frames = frames + 1
       -- Life support, not play: the read half only needs ONE battle whose
       -- species is taught, and the Veldt serves the SAVE's recorded
-      -- history -- the fighting lineage's history feeds this trio far
+      -- history -- the fighting run's history feeds this trio far
       -- harder packs than the fled control ever met (measured: a read
       -- search wiped resolving an unmatched pack).  Party HP is not a
       -- measured quantity here -- seed bits are -- so every living

@@ -689,7 +689,7 @@ H.run({ maxFrames = 700000, allowGameOver = true }, {
       "$0176 clear -- the ride's continuations are armed (every segment of the " ..
       "river ends `if_switch $0176=0, <next>`)")
     H.assertEq((H.readByte(0x185e) & 0x07) ~= 0, true, "BANON in the party")
-    -- The fighting lineage saves at the Mt. Kolts summit save point, which
+    -- The fighting run saves at the Mt. Kolts summit save point, which
     -- consumes the one-time save-point tutorial ($0133) BEFORE this ride.
     -- The (6,13) landing prompt (CHOICES[4]) then never fires: SavePoint's
     -- $0133 gate takes its short, ctrl-restoring path.  Expect 4 prompts

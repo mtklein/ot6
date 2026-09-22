@@ -9,7 +9,7 @@
 --       It opens at 1 in EVERY battle, so a ledger that spans a battle
 --       boundary is not a ledger -- every bank read below is gated on the
 --       battle it was built in (passes 2-5 are retry ladders).
---   MP: his real pool (92 on the fighting lineage), spent 4 a Dispatch and
+--   MP: his real pool (92 on the fighting run), spent 4 a Dispatch and
 --       10 a Retort.
 
 -- Battles are real world encounters off the fixture tile; when the ledger's
@@ -18,7 +18,7 @@
 -- bank does not.  SHADOW heals with real items while the bag has them, and
 -- passes his turn when it does not.
 --
--- The fighting lineage's camp_escaped packs carry a Berserk special.  Once
+-- The fighting run's camp_escaped packs carry a Berserk special.  Once
 -- it lands on CYAN ($3EE5,x bit 4), CheckPlayerAction (battle_main.asm:1470,
 -- STATUS12 {DEAD, PETRIFY, ZOMBIE, SLEEP, CONFUSE, BERSERK}) auto-picks his
 -- turns and his command window never opens again in that battle -- his
@@ -255,7 +255,7 @@ local function decide()
     elseif cyanMode == "item" then
       -- "item" is the unboosted turn that pays a pip (Ot6ActionEnd's +1).
       -- With no Tonic or Potion in the bag (the fixture's bag is whatever
-      -- its lineage bought and SHADOW's care has left), that turn is a Fight.
+      -- its run bought and SHADOW's care has left), that turn is a Fight.
       local healer = bagIdxOf({ TONIC, POTION }) ~= nil
       if st == ST_CMD then
         local want = cmdRowOf(cyan, healer and CMD_ITEM or CMD_FIGHT)

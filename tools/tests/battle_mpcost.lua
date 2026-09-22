@@ -43,7 +43,7 @@
 --           exists for (an enemy Rasp between the choice and the swing).  The
 --           tech must fizzle, dealing no damage, leaving the 1 MP untouched
 --           and never negative.  A ladder over
---           fresh battles: the fighting lineage's camp_escaped packs carry
+--           fresh battles: the fighting run's camp_escaped packs carry
 --           a Berserk special, and once it lands on CYAN ($3EE5,x bit 4)
 --           CheckPlayerAction (battle_main.asm:1470) auto-picks his turns
 --           and his window never opens again in that battle, so an

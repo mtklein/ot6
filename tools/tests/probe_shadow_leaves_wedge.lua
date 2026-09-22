@@ -1,5 +1,5 @@
 -- @manual
--- probe_shadow_leaves_wedge.lua -- replay the fighting lineage's forest leg
+-- probe_shadow_leaves_wedge.lua -- replay the fighting run's forest leg
 -- (gen_sabin_forest.lua: world -> map 132 -> the (28,7) exit) step for step
 -- on the same fixture the 16:52 forest_done stall booted (camp_escaped,
 -- sha 59dff2382bde), with READ-ONLY observers riding alongside:

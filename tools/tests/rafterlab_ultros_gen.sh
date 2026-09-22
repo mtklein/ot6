@@ -12,7 +12,7 @@
 # copy of gen_opera7_blackjack.lua in build/rafterlab/ with
 #   * DOOR swapped from ultros2_entry to that snapshot;
 #   * every H.saveState name prefixed rafterlab_<tag>_, so nothing is written
-#     into the fixture lineage (build/states/blackjack.mss stays untouched),
+#     into the fixture run (build/states/blackjack.mss stays untouched),
 # and runs it through run.sh.  The whole generator runs (the Blackjack ride
 # after the fight is a minute); the measurement is the "[ultros2]" lines:
 # "hit fN slot=S char=C a->b (-d)" per hit taken, "battle done ... party

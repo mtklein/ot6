@@ -387,7 +387,7 @@ local function kitSteps(char, name, pairs_)
     steps[#steps + 1] = H.cond(
       function() return H.invSlotOf(item) ~= nil end,
       { H.equipLoadout(char, { { slot, item } }, { tag = tag, optional = true }) },
-      { H.logStep(string.format("%s: $%02X not in this lineage's bag; keeping current gear", tag, item)) })
+      { H.logStep(string.format("%s: $%02X not in this run's bag; keeping current gear", tag, item)) })
   end
   return steps
 end

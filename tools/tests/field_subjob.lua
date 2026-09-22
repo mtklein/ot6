@@ -64,7 +64,7 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 1000, "field control A", 5),
   H.call(function()
-    -- The fighting lineage's n024_entry arrives with stones worn (a
+    -- The fighting run's n024_entry arrives with stones worn (a
     -- played save should); the negative control needs Edgar bare, and
     -- the WHOLE party freed -- pass B hands Kirin to Edgar through the
     -- real menu, and the one-owner rule refuses a stone someone else

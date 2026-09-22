@@ -2,7 +2,7 @@
 # reseal_seeds.sh -- re-cut every SRM seed whose boot state has moved past
 # its sealed provenance.  Idempotent: a seed whose provenance is newer than
 # its boot state is skipped, so running this after every chain wave keeps
-# the seed set coherent with the lineage at no extra cost.
+# the seed set coherent with the run at no extra cost.
 #
 #   tools/tests/reseal_seeds.sh            # sweep everything stale
 #
