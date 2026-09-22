@@ -224,6 +224,15 @@ list is the exemption list, read straight across. One scan, one gate,
 and the price half and the damage half cannot come to different answers
 about the same action.
 
+The tier-family half reads the action as it was queued (`$3a7c`/`$3a7d`,
+the same command and attack `Ot6QueueFold` read): the queued command is
+magic, x-magic, lore or summon (`Ot6FoldCmdTbl`) and the queued attack is
+in `Ot6FoldTbl`. So a spell that rides another command is multiplied even
+when it is a family spell, because nothing folded it: a weapon's on-hit
+cast during a boosted Fight (Blizzard's Ice), a rod or shield used from
+Item, a sketched attack. So is a Throw of a Dirk or MithrilKnife, whose
+item ids equal Fire's and Ice's. `battle_procboost` guards the Fight case.
+
 **Escalate — the boost multiplies them:** Blitz, Tools, Lore, non-tier
 magic (Drain, Scan, Break, Doom, Pearl, Flare, Quake, Ultima, Osmose,
 Rflect, Vanish, Dispel, …), summons, and **Dance**. None of their
