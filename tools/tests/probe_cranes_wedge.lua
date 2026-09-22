@@ -8,7 +8,7 @@
 --     up to 25 times: the event PC ($00e5-7), the control gates, the
 --     choice cells ($056e/f), and the full object table;
 --   * it also drives a held direction burst and a B tap, each logged.
--- Ends after the wedge dump cycle or on reaching map 219.
+-- Ends after the stall dump cycle or on reaching map 219.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -95,7 +95,7 @@ H.run({ maxFrames = 200000 }, {
   H.release(),
 
   -- the instrumented ride: tactical fighter, with battle-edge dumps and
-  -- the wedge instrument
+  -- the stall instrument
   (function()
     local F = H.newFightDriver("cranes probe",
       TIMELINE == "A"
@@ -104,7 +104,7 @@ H.run({ maxFrames = 200000 }, {
         or  { tactical = false, boost = false, items = false, cadence = 12 })
     local ph, battN, wasBatt = 0, 0, false
     local quiet, lastX, lastY, lastDump = 0, -1, -1, 0
-    local wedgeDumps, pokes = 0, 0
+    local stallDumps, pokes = 0, 0
     local tracing, lastPC, traceN, ctlHold, rearmed = false, nil, 0, 0, nil
     return H.driveUntil(function()
       if map() == 219 then H.log("[verdict] STORY CONTINUES (flashback)"); return true end
@@ -112,7 +112,7 @@ H.run({ maxFrames = 200000 }, {
         rearmed = (rearmed or 0) + 1
         if rearmed == 1 then H.log("[verdict] BATTLE RE-TRIGGERED (retry loop)") end
       end
-      return wedgeDumps >= 25
+      return stallDumps >= 25
     end, 180000, {
       H.call(function()
         ph = (ph + 1) % 8
@@ -159,7 +159,7 @@ H.run({ maxFrames = 200000 }, {
         end
         if battN > 0 then F.idle(); H.setPad({}); return end
         F.idle()
-        -- wedge detection: no battle, no control, position frozen
+        -- stall detection: no battle, no control, position frozen
         local x, y = H.fieldX(), H.fieldY()
         if x == lastX and y == lastY and not H.hasControl()
            and not H.dialogWaiting() then
@@ -170,8 +170,8 @@ H.run({ maxFrames = 200000 }, {
         lastX, lastY = x, y
         if quiet > 400 and H.frame - lastDump >= 600 then
           lastDump = H.frame
-          wedgeDumps = wedgeDumps + 1
-          dump("quiet " .. wedgeDumps)
+          stallDumps = stallDumps + 1
+          dump("quiet " .. stallDumps)
         end
         -- Edge-A only: once the fight is over, edge-taps A through the
         -- whole post-Cranes scene, whether or not dlg is set.
@@ -191,6 +191,6 @@ H.run({ maxFrames = 200000 }, {
       map() == 219 and "REACHED THE FLASHBACK"
       or (H.hasControl() and "CONTROL RETURNED on this map -- the ride must walk on from here"
       or "no control -- genuinely stuck")))
-    H.screenshot("cranes_wedge_end")
+    H.screenshot("cranes_stall_end")
   end),
 })

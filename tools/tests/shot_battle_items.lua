@@ -47,7 +47,7 @@ H.run({ maxFrames = 60000 }, {
   end)(),
   H.call(function() H.setPad({}) end),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
-  -- input during the first window-open animation wedges the battle menu
+  -- input during the first window-open animation stalls the battle menu
   H.waitFrames(240),
 
   H.waitUntil(function() return H.readByte(MENU) ~= 0 end, 1200,

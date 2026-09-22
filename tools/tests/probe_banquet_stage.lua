@@ -233,7 +233,7 @@ H.run({ maxFrames = 120000 }, {
   --   * the {22,29} doorway is a door tile the BFS model reads as a wall;
   --     a held up press crosses it;
   --   * (23,12) is the messenger trigger; even gated off ($007D=0) it
-  --     re-enters at every rest frame and wedges navTo.  A held press
+  --     re-enters at every rest frame and stalls navTo.  A held press
   --     skips walk-over triggers, so the messenger tile and the (23,9)
   --     stairs are crossed in one pressWalk;
   --   * (23,9) -> (54,34) (short entrance), and from (54,34) the dais is

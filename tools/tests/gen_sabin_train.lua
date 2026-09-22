@@ -888,7 +888,7 @@ local function b47Attempt(n)
         frames = frames + 1
         if frames > 29000 and lost == nil then
           lost = string.format("b47 attempt %d deadline (29000 frames) with " ..
-            "no win and no wipe seen -- a genuine wedge, see #159/#163 [%s]",
+            "no win and no wipe seen -- a genuine stall, see #159/#163 [%s]",
             n, partyLine())
           H.log("[train] LOST -- " .. lost)
         end

@@ -16997,7 +16997,7 @@ MonsterSpecialAnim:
 ; $C2:FE00 -- decompress code's data table -- and the CPU ran off into a
 ; STP: every 1/16 leave roll that passed after a won battle with Shadow
 ; aboard froze the game (measured, probe_shadow_leaves_wedge.lua: cpu.k=$C2
-; pc=$FEFA, cycle count frozen).  The "$ca0029 wedge" the encounter-
+; pc=$FEFA, cycle count frozen).  The "$ca0029 stall" the encounter-
 ; suppression rectangles were authored against was this halt seen from
 ; the field.
 .segment "battle_code"

@@ -277,7 +277,7 @@ local function ifritAttempt(n)
       H.screenshot("ifrit_battle")
     end),
     -- hands off until Ifrit takes the stage (the fly-in; input during the
-    -- window-open animation wedges the battle menu)
+    -- window-open animation stalls the battle menu)
     H.waitUntil(function() return onfield(ISLOT) == 1 end, 3600,
       "ifrit takes the stage", 10),
     H.waitFrames(90),

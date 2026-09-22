@@ -625,7 +625,7 @@ function M.navTo(txIn, tyIn, opts)
       battN = M.battleLoadStarted() and battN + 1 or 0
       -- forensics (once per battle): the tile the party stood on when the
       -- battle came up, its props and its neighbours', and the event script
-      -- pointer -- the shape of the $ca0029 wedge (a battle starting while a
+      -- pointer -- the shape of the $ca0029 stall (a battle starting while a
       -- step is resolving on z-flux tiles) is a black screen with the battle
       -- RAM populated, and these are what decide it (fire_out, run.IgBKYd89)
       if battN == 1 then

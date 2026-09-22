@@ -183,7 +183,7 @@ local function pulse()
   M.n = M.n + 1
   local ph = M.n % 10
   local st = H.readByte(MSTATE)
-  if M.n > 1200 then                     -- wedge watchdog: back out, Fight
+  if M.n > 1200 then                     -- stall watchdog: back out, Fight
     H.log(string.format("[vargas wd f%d] actor=%d st=%02X plan=%s",
       H.frame, a, st, M.plan.kind))
     M.n, M.via, M.d = 0, nil, 0

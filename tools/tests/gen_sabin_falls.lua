@@ -274,7 +274,7 @@ local function jumpAttempt(n)
         frames = frames + 1
         if frames > 39000 and lost == nil then
           lost = string.format("attempt %d deadline (39000 frames) with " ..
-            "no win and no wipe seen -- a genuine wedge, see #159 [%s]", n,
+            "no win and no wipe seen -- a genuine stall, see #159 [%s]", n,
             partyLine())
           H.log("[falls] LOST -- " .. lost)
         end

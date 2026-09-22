@@ -120,7 +120,7 @@ end
 -- Cure at grid (0,0), and Fire sits at (1,1). The sequence below commits
 -- base Fire on the default enemy target.
 -- Two rules: input into a just-opened battle window is dropped (and can
--- wedge the menu), so the driver waits for the menu flag to hold 4
+-- stall the menu), so the driver waits for the menu flag to hold 4
 -- consecutive pulses (~120 frames) before its first press of an episode; and
 -- if the sequence runs dry with the menu still open, it nudges with A twice,
 -- then backs out with B and restarts the sequence from the top.

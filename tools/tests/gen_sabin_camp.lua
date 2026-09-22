@@ -339,7 +339,7 @@ local function fightPulse(_)
   if fStreak < 4 then H.setPad({}); return end
   fTick = fTick + 1
   -- the fighter's own heartbeat: menu state, cursor cells, plan -- the
-  -- numbers a wedge diagnosis needs (300-frame cadence)
+  -- numbers a stall diagnosis needs (300-frame cadence)
   if H.frame - fHb >= 300 then
     fHb = H.frame
     local a = H.readByte(ACTOR)
@@ -558,7 +558,7 @@ local function cmdAttempt(n)
         frames = frames + 1
         if frames > 29000 and lost == nil then
           lost = string.format("attempt %d deadline (29000 frames) with no " ..
-            "win and no wipe seen -- a genuine wedge, see #159/#163 [%s]",
+            "win and no wipe seen -- a genuine stall, see #159/#163 [%s]",
             n, partyLine())
           H.log("camp: LOST -- " .. lost)
         end

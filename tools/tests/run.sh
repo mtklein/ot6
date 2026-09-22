@@ -172,7 +172,7 @@ if ! shared_app_ready; then
   done
   if [ -n "$held" ]; then
     # Release the lock however we leave: a run that dies mid-build must not
-    # wedge every later worker behind a lock nobody holds.
+    # stall every later worker behind a lock nobody holds.
     HELD_LOCK="$LOCK"
     # Look again under the lock.  The look that sent us here can predate the
     # previous holder's last step, and a rebuild on that stale look tears a

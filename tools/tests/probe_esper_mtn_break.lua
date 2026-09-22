@@ -25,7 +25,7 @@
 --      nothing else, sampling hasControl()/eventRunning()/dialogWaiting()
 --      and switches $008D, $0096, $0097 on a steady cadence.
 --   A drive that never reaches "control back, tile aligned, no dialog"
---   inside that budget raises a driveUntil timeout -- that is the wedge
+--   inside that budget raises a driveUntil timeout -- that is the stall
 --   signature, left unhandled by design: the timeout text plus the last
 --   logged sample are the verdict.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -215,13 +215,13 @@ local steps = {
       H.screenshot("p127_statue_trigger_stepped")
     end),
 
-    -- The wedge watch: control back, tile aligned, no dialog waiting,
+    -- The stall watch: control back, tile aligned, no dialog waiting,
     -- within 1800 frames (30s).  If this raises a timeout, that is the
-    -- wedge verdict; the periodic [p127 ride] lines above it in the log
+    -- stall verdict; the periodic [p127 ride] lines above it in the log
     -- are the trace ($008D/$0096/$0097, hasControl/eventRunning/dialog).
     ride(function()
       return H.hasControl() and H.tileAligned() and not H.dialogWaiting()
-    end, 1800, 60, "wedge watch: control back after the statue-lore trigger"),
+    end, 1800, 60, "stall watch: control back after the statue-lore trigger"),
 
     H.call(function()
       logState("after_trigger_control_returned")

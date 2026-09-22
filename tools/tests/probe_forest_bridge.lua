@@ -143,7 +143,7 @@ local function watch(goal)
         A.n, A.battles, H.frame, rel, H.fieldX(), H.fieldY(), evpc()))
       A.endedAt = nil
     end
-    -- dense watch through the post-battle window (the wedge, if it forms,
+    -- dense watch through the post-battle window (the stall, if it forms,
     -- forms here) -- every 60 frames until control is back
     if A.endedAt and H.frame - A.lastDump >= 60 then
       A.lastDump = H.frame

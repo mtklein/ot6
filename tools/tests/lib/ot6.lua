@@ -5739,7 +5739,7 @@ function Driver:makePlan(actor)
   -- the tier it folds to, so a caller-supplied row and MP price would be
   -- wrong to hand in.  spellCell answers both from the engine.  A
   -- character who cannot pay falls through to the branches below, so a
-  -- mage out of MP Fights instead of wedging the menu.
+  -- mage out of MP Fights instead of stalling the menu.
   --
   -- opts.magic[id].boost = false keeps the cast at its base tier, which is
   -- what a caller wants when the point is the element rather than the
@@ -6326,7 +6326,7 @@ function Driver:button(actor)
     end
   end
   -- The lore stall guard, checked wherever a lore plan is live rather
-  -- than only at plan time: a pursuit wedged inside the window (the
+  -- than only at plan time: a pursuit stalled inside the window (the
   -- wrong-row failure mode) never returns to makePlan on its own.
   if self.plan ~= nil and self.planActor == actor and self.plan.kind == "lore"
      and self.loreSpinN > BATTLE.LORE_STALL and not self.loreDead then

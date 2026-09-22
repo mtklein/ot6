@@ -1,11 +1,11 @@
 -- @manual
 -- probe_shadow_leaves_wedge.lua -- replay the fighting lineage's forest leg
 -- (gen_sabin_forest.lua: world -> map 132 -> the (28,7) exit) step for step
--- on the same fixture the 16:52 forest_done wedge booted (camp_escaped,
+-- on the same fixture the 16:52 forest_done stall booted (camp_escaped,
 -- sha 59dff2382bde), with READ-ONLY observers riding alongside:
 --   * exec watches on the field's RandBattle machinery (Ot6MarkRandom,
 --     InitObjScript, ObjCmd_d7/ff, EventCmd_4e, ExecBattle, LoadMap,
---     EventCmd_b7/47): the field half of the "$ca0029 wedge";
+--     EventCmd_b7/47): the field half of the "$ca0029 stall";
 --   * exec watches on the battle's end path (CheckBattleEnd, WinBattle,
 --     ShadowLeaves, Ot6ShadowLeaves, _48c4/_488f, TerminateBattle) and on
 --     $C2:FE00-$C2:FFFF, where a bank-relative `jmp Ot6ShadowLeaves`
@@ -17,7 +17,7 @@
 --   * per-frame RAM dumps around the roll and around the kill, and CPU PC
 --     samples once ShadowLeaves has fired.
 -- The pad is driven by the same navigators with the same options as the
--- generator, so the emulation is the wedge run's; the observers only read.
+-- generator, so the emulation is the stall run's; the observers only read.
 -- No state writes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_escaped.mss.lua"
@@ -253,7 +253,7 @@ emu.addEventCallback(function()
   end
 end, emu.eventType.startFrame)
 
--- the replay may end once the wedge is established (or on genuine success)
+-- the replay may end once the stall is established (or on genuine success)
 local function stopNow()
   if slFrame and H.frame > slFrame + 450 then return true end
   if killFrame and H.frame > killFrame + 3000 and H.battleLoadStarted() then return true end
@@ -262,7 +262,7 @@ end
 
 -- ------------------------------------------- the generator's own steps --
 -- (gen_sabin_forest.lua, verbatim through crossTo(28, 7, 133)'s navTo, with
--- only the navTo's `arrive` widened by stopNow so the wedge ends the ride)
+-- only the navTo's `arrive` widened by stopNow so the stall ends the ride)
 local function worldToMap(tx, ty, what, budget)
   return H.worldNavTo(tx, ty, {
     maxFrames = budget or 25000,

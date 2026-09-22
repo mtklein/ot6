@@ -688,7 +688,7 @@ local function newFlamePlan(tag)
     local st = H.readByte(MSTATE_A)
     if st == 0x01 then H.setPad({}); return end   -- ST_TRANS
     -- GENERIC progress watchdog (the lesson of flame_aoe_s20's 140k-frame
-    -- stall: LOCKE's magic plan wedged in an a/b loop -- the plan survives
+    -- stall: LOCKE's magic plan stalled in an a/b loop -- the plan survives
     -- across the re-opened command window, so a cast that stopped being
     -- payable spins forever, and only the LORE branch had a watchdog).
     -- 1200 open-menu frames with no fresh plan and no landed confirm =>

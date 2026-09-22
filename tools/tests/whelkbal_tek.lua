@@ -77,7 +77,7 @@ local function castStep(donePred, budget, what)
           lap = lap + 1
         else
           -- Heal Force is (2,0) in both magitek lists and self-targets by
-          -- default; (1,1) is a blank cell the cursor can wedge on.
+          -- default; (1,1) is a blank cell the cursor can stall on.
           mySeq = { "a", "down", "down", "a", "a" }
         end
         idx = 1
