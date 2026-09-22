@@ -1,5 +1,5 @@
 -- probe_fc_statues.lua -- from fc_atma_down (60,16, AtmaWeapon just
--- fell), heal up, walk the spine north onto the (60,11) trigger, absorb
+-- fell), heal up, walk the path north onto the (60,11) trigger, absorb
 -- the statue cutscene, and land on the escape map 393 at (67,16).  Banks
 -- fc_escape_start.mss right after Shadow's "Get outta here" dialog --
 -- the 6:00 master clock and the 5:55 Shadow timer start at that dialog,
@@ -7,7 +7,7 @@
 -- 394 before the trigger.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function mapIs(m) return (H.mapId() & 0x3ff) == m end
-local FA = H.newFightDriver("spine", { tactical = true, boost = true, bank = 3,
+local FA = H.newFightDriver("path", { tactical = true, boost = true, bank = 3,
   items = true, healPercent = 60, magic = { [0x07] = { spell = 2 } } })
 H.run({ maxFrames = 80000 }, {
   H.loadState("build/states/fc_atma_down.mss.lua"),
@@ -15,7 +15,7 @@ H.run({ maxFrames = 80000 }, {
   H.fieldCare({ tag = "post-atma", threshold = 0.95 }),
   H.release(),
   H.waitFrames(30),
-  -- north up the stair spine onto the statue trigger; stall rotation
+  -- north up the stair path onto the statue trigger; stall rotation
   -- because y12-14 are prop-3 stairs that only move on diagonal input
   (function()
     local wps = { {60,14}, {60,12}, {60,11} }
@@ -27,7 +27,7 @@ H.run({ maxFrames = 80000 }, {
     end, 60000, {
       H.call(function()
         if t % 2400 == 0 then
-          H.log(string.format("  [spine] t=%d map=%d (%d,%d) wp=%d", t,
+          H.log(string.format("  [path] t=%d map=%d (%d,%d) wp=%d", t,
             H.mapId() & 0x3ff, H.fieldX(), H.fieldY(), wi))
         end
         local mx = H.readByte(0x056F)

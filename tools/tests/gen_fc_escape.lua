@@ -9,7 +9,7 @@
 -- contract, top up, walk out onto 394 and up to AtmaWeapon's doorstep
 -- (60,16) below his NPC at (60,15), talk with the clean gesture (face,
 -- release, A while stationary), FIGHT him with the tactical driver until
--- switch $035F clears, heal back on 394, climb the stair spine onto the
+-- switch $035F clears, heal back on 394, climb the stair path onto the
 -- (60,11) statue trigger, absorb the scene onto the escape map 393 at
 -- (67,16) -- the 6:00 master clock and the 5:55 Shadow clock start at
 -- Shadow's "Get outta here" and run through menus and battles, so no
@@ -20,7 +20,7 @@
 -- nothing is written.
 --
 -- Technique sources (read-only probes): probe_fc_atma4/atma5 (doorstep
--- and talk), probe_fc_statues (the spine), probe_fc_escape (the route,
+-- and talk), probe_fc_statues (the path), probe_fc_escape (the route,
 -- Nerapa, the wait).  Party: TERRA (no stone; Fire 2 is her attack spell),
 -- LOCKE (MADUIN: Bolt -- Atma and Nerapa are bolt-weak; Nerapa ABSORBS
 -- fire, and the driver's absorb guard keeps Fire2 off him), EDGAR (SHIVA),
@@ -507,14 +507,14 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   H.release(),
   H.waitFrames(30),
 
-  -- ---- 3. the statue spine onto (60,11) -> map 393 --------------------------
+  -- ---- 3. the statue path onto (60,11) -> map 393 --------------------------
   (function()
     local wps = { { 60, 14 }, { 60, 12 }, { 60, 11 } }
     local wi, t, wt, lastK, lastT = 1, 0, 0, -1, 0
     -- any choice here takes row 0, pressed on phase 0-2; the check sits
     -- above the battle branch, as it always has, so it is not battle-gated
     local C = H.newChoice(0, { ready = "count", min = 1, inBattle = false,
-      press = function(ph) return ph < 3 end, tag = "statue spine" })
+      press = function(ph) return ph < 3 end, tag = "statue path" })
     return H.driveUntil(function() t = t + 1; return mapIs(393) end, 60000, {
       H.call(function()
         if C.frame(t % 24) then return end

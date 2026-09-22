@@ -84,11 +84,11 @@ H.run({ maxFrames = 150000 }, {
   ride(52, 24, "reveal 52,24"),
   leg(82, 30),
   ride(89, 25, "tunnel 89,25"),
-  -- y29 corridor + ladder + spine, all blind (bfs-dark territory)
+  -- y29 corridor + ladder + path, all blind (bfs-dark territory)
   blind({ {70,29},{64,29},{63,29},{63,28},{63,25},{63,24},
           {62,24},{62,23},{60,23},{60,16} },
     function() return H.fieldX() == 60 and H.fieldY() <= 17 end,
-    12000, "corridor-ladder-spine"),
+    12000, "corridor-ladder-path"),
   H.release(),
   H.waitFrames(120),
   H.call(function()
