@@ -131,7 +131,7 @@ local function fvaShieldSum()
   end
   return t
 end
--- Monster HP, over the slots that are actually on stage.  $3BFC is not
+-- Monster HP, over the slots that are actually in the formation.  $3BFC is not
 -- cleared for an absent slot, so an ungated sum carries the previous
 -- formation's tail and never reaches zero.
 local function fvaMonSum()
@@ -195,7 +195,7 @@ local function fvaEmit(c)
     c.cnt and (c.cnt + 1) or "-", c.swings, c.hits,
     math.max(0, c.mon - mon), math.max(0, c.sh - sh), c.mp, mp,
     math.max(0, c.mp - mp))
-  if c.live == 0 then return end         -- nothing on stage: not a turn
+  if c.live == 0 then return end         -- nothing in the formation: not a turn
   -- the ladder cell: one row per (command, hands, revealed boost)
   local key = string.format("%s/h%d/b%d", name, c.hands, c.rev)
   local e = FVA.cells[key]

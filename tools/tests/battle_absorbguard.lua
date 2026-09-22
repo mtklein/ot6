@@ -93,10 +93,10 @@ H.run({ maxFrames = 30000 }, {
     end
     -- and the live stage view lists what stands there now
     local stage = {}
-    for _, st in ipairs(H.stageSlots()) do
+    for _, st in ipairs(H.activeSlots()) do
       stage[#stage + 1] = string.format("slot %d $%04X", st.slot, st.species)
     end
-    H.log("on stage now (H.stageSlots): " .. table.concat(stage, ", "))
+    H.log("in the formation now (H.activeSlots): " .. table.concat(stage, ", "))
     H.assertEq(#stage >= 1, true, "the live stage lists the whelk")
 
     -- 3. the negative control. Live formation, fabricated weapon: the

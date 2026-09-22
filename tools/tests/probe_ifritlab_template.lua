@@ -230,7 +230,7 @@ local function newCustomPlan(tag, slots)
   local turnActor, turnPlan = nil, nil
   local iceCasts, bursts = 0, 0
   local function stageSibling()
-    -- whichever sibling is on stage and alive right now
+    -- whichever sibling is in the formation and alive right now
     if onfield(slots.I) == 1 and mhp(slots.I) > 0 then return "ifrit" end
     if onfield(slots.S) == 1 and mhp(slots.S) > 0 then return "shiva" end
     return nil
@@ -342,7 +342,7 @@ local function newCustomPlan(tag, slots)
         if col > wc then return "left" end
         return "a"
       elseif st == ST_TGT_B then
-        return "a"                       -- one monster on stage
+        return "a"                       -- one monster in the formation
       end
       return "b"
     end

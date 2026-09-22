@@ -2040,7 +2040,7 @@ Ot6BlitzDrawName:
         lda     #^AttackName
         sta     $f1
         lda     $e5
-        jsr     LoadArrayItem           ; stage the 10-tile name into $7e9e8b
+        jsr     LoadArrayItem           ; write the 10-tile name into $7e9e8b
         jmp     DrawPosTextBuf
 
 ; ---- the not-yet-learned marker.  in: $e6 = row, X = col ----
@@ -2157,7 +2157,7 @@ Ot6BlitzCursorPos:
 ;
 ; The description window stays blank: the thief rows have no entry in any of
 ; the cf-bank desc assets (those are fixed_block segments), so DrawThiefMenu
-; stages $ff into $7e9d89[0..2] and LoadThiefDesc runs the same LoadBigText
+; writes $ff into $7e9d89[0..2] and LoadThiefDesc runs the same LoadBigText
 ; path an unlearned Blitz row uses, which renders the empty string.  Staging
 ; every frame matters: without it the box keeps whatever the previous page
 ; (say a Blitz description) left in the $7e9ec9 buffer.

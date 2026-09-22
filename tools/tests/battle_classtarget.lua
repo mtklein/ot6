@@ -82,7 +82,7 @@ local function laneStep()
   H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
 end
 
--- Is the encounter now on stage a mixed one -- a keyed Cirpius beside an
+-- Is the encounter now in the formation a mixed one -- a keyed Cirpius beside an
 -- unkeyed monster?  Only such a formation exercises the pick; a uniform pool
 -- (Cirpius x3) leaves chipAim nil by design, so those are fought and skipped.
 local function mixedNow()

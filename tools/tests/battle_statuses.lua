@@ -120,7 +120,7 @@ end
 local PACE_A, PACE_B = { 176, 71 }, { 178, 81 }
 -- How many laps is measured, not guessed.  build/lab/statuses/probe_pace.lua
 -- walked this leg with a 14-lap budget and logged the stage species and
--- every monster dispatch: CrassHopprs are on stage on every seed, but the
+-- every monster dispatch: CrassHopprs are in the formation on every seed, but the
 -- Berserk needs one of them to live to its turn AND its script to pick
 -- SPECIAL AND the rider to stick.  It arrived in battle 5 at shift 13
 -- (probe_shift13_deep.log, f10311) and in battle 8 at shift 7

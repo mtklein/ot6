@@ -26,7 +26,7 @@
 --      row's cost from MagicProp+5 through _c25723; ValidateSpellList runs
 --      it through CalcMPCost for the caster's relics; GetMPCost reads the
 --      row back at queue time; CreateAction banks it into $3620;
---      InitPlayerAction stages it into $3a4c; CalcAttackEffect subtracts
+--      InitPlayerAction writes it into $3a4c; CalcAttackEffect subtracts
 --      it from $3c08.
 --   4b. the boosted column (#219). Every priced row is a BASE price; a
 --      boosted use of an escalating verb costs

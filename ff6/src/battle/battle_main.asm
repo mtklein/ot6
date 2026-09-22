@@ -7088,7 +7088,7 @@ OSMOSE_MP_VANILLA  = 1                  ; the byte this replaces
 ; so CheckHit's multi-target arm (`bit #$20` at @22a1) branches straight to
 ; the carry-clear exit @22e8, an unconditional hit with no roll.  The
 ; per-target loop at @3440 then calls MagicStatusEffect unconditionally, which
-; stages $11ac into $3de8 ("status 3/4 to set"), and InitStatusVars masks THAT
+; writes $11ac into $3de8 ("status 3/4 to set"), and InitStatusVars masks THAT
 ; against $3330 ("blocked status 3/4", the per-monster immunity) before it is
 ; applied.  So an unblockable damage spell does apply its status bytes without
 ; a roll, and per-monster immunity is still consulted.
@@ -15332,9 +15332,9 @@ DecCounters:
 ; instructions in the other order, same byte count, and every vanilla
 ; consumer below (stop, condemn, run-away, dot) still sits behind the
 ; presence test as before.  What changes is that Ot6Tick now reaches
-; a monster that is off stage.  Tag fights clear $3aa0.0 on the sibling that
+; a monster that is out of the formation.  Tag fights clear $3aa0.0 on the sibling that
 ; leaves (battle 70's swap is an AI turn, ai_script.asm:4523-4529), and a
-; Broken one used to freeze there while off stage.  The break is a real-time
+; Broken one used to freeze there while out of the formation.  The break is a real-time
 ; window; being off screen should not bank it.  Letting $3adc accumulate while
 ; absent is the only vanilla-side
 ; effect, and it changes nothing but that counter's phase on re-entry.

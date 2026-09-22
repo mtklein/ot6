@@ -149,7 +149,7 @@ local function hands(slot)
   if H.isWeapon(l) then n = n + 1 end
   return n, r, l
 end
-local function stageSlot()
+local function activeSlot()
   -- the body an untargeted swing meets: the on-field monster with HP
   for m = 0, 5 do
     if onfield(m) == 1 and mhp(m) > 0 then return m end
@@ -170,7 +170,7 @@ local function armObservers()
     if cmd >= 0x1E then CUR = nil return end
     local slot = x // 2
     local nh, rh, lh = hands(slot)
-    local tgt = stageSlot()
+    local tgt = activeSlot()
     CUR = {
       x = x, slot = slot, cix = H.readByte(CHARIX + x), cmd = cmd,
       atk = H.readByte(0xB6), bp = H.readByte(BP + x),

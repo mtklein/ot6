@@ -237,7 +237,7 @@ driver, `tools/tests/gen_sabin_trench.lua`:
 
 `opts.focus` is the driver's existing kill-order steer (`M.focusSlots`):
 it points every single-target plan at the first named species that is
-alive and on stage. It cannot steer the Pummel — nothing can, the row
+alive and in the formation. It cannot steer the Pummel — nothing can, the row
 auto-confirms — but it puts CYAN's and GAU's Fights on the Aspiks, which
 are also the flimsiest things on the stage (220 HP against Actaneon's 230,
 2 battle power against 13), and a dead Aspik has no counter to give. It is

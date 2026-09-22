@@ -103,7 +103,7 @@ local function fclabMonShields(i) return H.readByte(0x3E40 + i * 2) end
 -- Which slots the formation opened with: the occupied-slot mask $3F45
 -- (H.MONSTER_PRESENT), the same byte M.monsterIds decodes from, and the
 -- ONLY reliable answer here.  $3AA8 (the per-slot presence bit) and $3BFC
--- (HP) are NOT cleared between battles: reading "on stage" from them lists
+-- (HP) are NOT cleared between battles: reading "in the formation" from them lists
 -- the tail of the previous fight for a slot this formation never filled,
 -- which is how two earlier cuts of this lab called formation 188 -- Ninja
 -- + Wirey Drgn, mask $05 -- "Ninja+Ninja+WireyDrgn" while the driver's own

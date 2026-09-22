@@ -238,7 +238,7 @@ Ot6DrawRageName:
         beq     @blank
         jsr     GetMonsterNamePtr       ; MonsterName array ptr ($eb/$ef/$f1)
         lda     $e5
-        jsr     LoadArrayItem           ; stage the name into $7e9e8b
+        jsr     LoadArrayItem           ; write the name into $7e9e8b
         jmp     DrawPosTextBuf
 @blank: ldx     #$9e8b                  ; the marker is MonsterName::ITEM_SIZE
         stx     hWMADDL                 ;   cells wide, so it still overwrites

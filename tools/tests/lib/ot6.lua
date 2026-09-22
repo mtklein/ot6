@@ -457,12 +457,12 @@ end
 -- monsterIds() decodes the six ID bytes plus their MSBs.  Both are the
 -- formation's OPENING line-up, copied once at load and never updated
 -- (#177): "the battle has occupants" and "which formation is this" are
--- theirs to answer; what stands on stage now is M.stageSlots.  For a monster's
+-- theirs to answer; what stands in the formation now is M.activeSlots.  For a monster's
 -- SPECIES (0..383) prefer OT6_SPECIES ($57c0, M.formationSpecies): it is
--- full-width and carries off-stage loads too; these ID low bytes only tell
+-- full-width and carries loads for absent slots too; these ID low bytes only tell
 -- present slots apart.
 M.MONSTER_IDS = 0x3F46          -- +$02..$07: six 8-bit ID low bytes
-M.MONSTER_PRESENT = 0x3F45      -- +$01, low 6 bits: bit i set => slot i on stage
+M.MONSTER_PRESENT = 0x3F45      -- +$01, low 6 bits: bit i set => slot i in the formation
 M.MONSTER_ID_MSB = 0x3F52       -- +$0E: bit `slot` is that slot's ID high bit
 -- (InitMonsters, battle_main.asm @2ef9: `lda $3f52 / asl2 / sta $ee`, then
 -- slots 5 down to 0 each take the next `asl $ee` carry, so slot s gets
@@ -498,7 +498,7 @@ function M.monsterIds()
   return ids
 end
 
--- How many monsters are on stage: popcount of the present mask's low six
+-- How many monsters are in the formation: popcount of the present mask's low six
 -- bits ($3F45).
 function M.monstersPresent()
   local mask = M.readByte(M.MONSTER_PRESENT) & 0x3F
@@ -809,7 +809,7 @@ function M.dodges(o)
   if ((o.s2 or 0) & M.ST2_IMAGE) ~= 0 then return "Image" end
   return nil
 end
--- The first monster slot on stage that the party's physical attacks
+-- The first monster slot in the formation that the party's physical attacks
 -- would miss, and why (M.dodges on the live cells: a monster is entity
 -- 4 + slot, so its status bytes sit at $3EE4/$3EE5 + (4 + slot) * 2), or
 -- nil when every living monster can be hit.
@@ -1673,7 +1673,7 @@ end
 -- reflectable its magic_prop reflect bit, and slots the monsters ON
 -- STAGE -- alive and present -- each { slot, species, absorb, null,
 -- reflect } read from the slot's live record (the fight driver's
--- stageSlots).  Returns the offending slot and why: "absorb" (any element
+-- activeSlots).  Returns the offending slot and why: "absorb" (any element
 -- of the cast is drunk: a heal for the enemy), "reflect" (a reflectable
 -- cast at a Reflect bearer lands on the party), or "null" (every element
 -- of the cast is nulled: a wasted turn).  Absorb is judged across the
@@ -1799,15 +1799,15 @@ function M.partyWeapons()
   return out
 end
 
--- What is on stage right now, slot by slot (#172, #177): the slots whose
+-- What is in the formation right now, slot by slot (#172, #177): the slots whose
 -- presence bit ($3AA8) is set and whose HP is up, each with its species
 -- word ($57C0), the LIVE element record ($3BCC + entity*2: absorbed low
 -- byte, nulled high byte, seeded from MonsterProp +23/+24 by
 -- LoadMonsterProp) and its Reflect bit (status 3 bit 7, $3EF8).  This,
 -- not the formation's opening line-up (M.formationSpecies, $3F45), is
 -- "the monsters in this fight now": battle 70 reads $3F45 = $01 all fight
--- while Shiva stands on stage in slot 1.
-function M.stageSlots()
+-- while Shiva stands in the formation in slot 1.
+function M.activeSlots()
   local out = {}
   for slot = 0, 5 do
     if M.readWord(0x3BFC + slot * 2) > 0
@@ -1835,7 +1835,7 @@ end
 --
 -- This is the formation as it OPENED ($3F45 is copied once at load and
 -- never updated): a part or sibling that enters later is not in it.  For
--- what stands on stage now, M.stageSlots.
+-- what stands in the formation now, M.activeSlots.
 -- Formation 504 is legitimately empty, so a zero mask is "nothing to
 -- check" rather than an error.
 M.FORMATION_MASK = 0x3F45
@@ -1925,7 +1925,7 @@ end
 -- Returns an error message, or nil.  M.run calls this every frame and
 -- routes a message through its own FAIL path.  The opening line-up is
 -- checked once, GUARD_SETTLE frames in (M.formationSpecies, $3F45); after
--- that every slot that steps on stage (M.stageSlots, $3AA8 -- a part or a
+-- that every slot that steps in the formation (M.activeSlots, $3AA8 -- a part or a
 -- tag-team sibling the script materialises later, #177: battle 70's
 -- Shiva is not in $3F45 at all) is checked the first time it is seen.
 function M.absorbGuardTick()
@@ -1935,7 +1935,7 @@ function M.absorbGuardTick()
   end
   if not guardArmed then
     local fresh = {}
-    for _, st in ipairs(M.stageSlots()) do
+    for _, st in ipairs(M.activeSlots()) do
       local key = st.slot .. ":" .. st.species
       if not guardSeen[key] and st.species < 384 then
         guardSeen[key] = true
@@ -1945,7 +1945,7 @@ function M.absorbGuardTick()
     if #fresh == 0 then return nil end
     M.absorbGuardEntries = M.absorbGuardEntries + #fresh
     return guardReport(M.absorbClashesFor(M.partyWeapons(), fresh),
-      " (a monster that stepped on stage after the opening line-up)")
+      " (a monster that stepped in the formation after the opening line-up)")
   end
   guardSettle = guardSettle + 1
   if guardSettle < GUARD_SETTLE then return nil end
@@ -4024,8 +4024,8 @@ local function spellKnown(actor, id)
   return false
 end
 
--- What is on stage right now, slot by slot, with the LIVE record's
--- bytes (M.stageSlots): the slots whose presence bit ($3AA8) is set and
+-- What is in the formation right now, slot by slot, with the LIVE record's
+-- bytes (M.activeSlots): the slots whose presence bit ($3AA8) is set and
 -- whose HP is up, each with its species word, its absorb/null bytes
 -- ($3bcc,x, seeded from MonsterProp +23/+24 by LoadMonsterProp,
 -- battle_main.asm `lda f:MonsterProp+23,x / ora $3bcc,y`) and its
@@ -4036,20 +4036,20 @@ end
 -- present mask ($3F45, M.formationSpecies): that byte is the
 -- formation record's opening line-up, copied once at load and never
 -- updated, so a monster the script materialises later is not in it --
--- battle 70 reads $01 while Shiva stands on stage in slot 1, and a
+-- battle 70 reads $01 while Shiva stands in the formation in slot 1, and a
 -- guard enumerating that mask never saw her (CELES's Ice "took 0 off
 -- the monsters" three times a fight while she drank it).  And the ROM's
 -- species record: the slot's own $3bcc bytes are the engine's truth
 -- for whatever occupies it, seeded from the same record and robust to
 -- a slot being reloaded.  Only a slot that is alive AND on the field
--- can drink a cast: a tag-team sibling waiting off-stage is
+-- can drink a cast: a tag-team sibling waiting out of the formation is
 -- untargetable, and counting it vetoed the element for the whole fight
 -- (Ifrit & Shiva: Shiva's ice absorb blocked the Ice casts the fight's
 -- own design doc prescribes against Ifrit).  With the presence filter
 -- the guard doubles as the tag-fight strategy: the element flows while
--- its absorber is off-stage and yields to the sword the moment she
+-- its absorber is out of the formation and yields to the sword the moment she
 -- steps on.
-local stageSlots = M.stageSlots
+local activeSlots = M.activeSlots
 
 -- ---- the chip model (#156) -------------------------------------------
 -- What a person counts off the HUD before pressing: the target's shield
@@ -4338,7 +4338,7 @@ end
 
 -- The cast guards, shared by every attack-cast line (M.castVeto holds
 -- the decision; this is its log line).  A spell whose element something
--- on stage ABSORBS is a heal for the enemy (#99); a reflectable spell
+-- in the formation ABSORBS is a heal for the enemy (#99); a reflectable spell
 -- (magic_prop +3 bit 1 clear) cast at a monster under Reflect -- status
 -- 3 bit 7 -- deals it nothing and lands its full damage on a party
 -- member (#156: measured on Nerapa, every Bolt/Ice at every tier dealt
@@ -4357,7 +4357,7 @@ end
 -- half.  True means the cast is off the table this turn.
 function Driver:castVetoed(abilityId, what)
   local elem = M.spellElement(abilityId)
-  local s, why = M.castVeto(elem, M.spellReflectable(abilityId), stageSlots())
+  local s, why = M.castVeto(elem, M.spellReflectable(abilityId), activeSlots())
   if not s then return false end
   if why == "absorb" then
     M.log(string.format(
@@ -4424,7 +4424,7 @@ end
 
 -- The formation's linked parts (#189), read once a battle at the first
 -- command window: the live species words ($57C0, which carry a part not
--- yet on stage) and each species' AI script out of the ROM (AIScriptPtrs
+-- yet in the formation) and each species' AI script out of the ROM (AIScriptPtrs
 -- / AIScript, M.partRoles), through M.partsPlan.  A formation the plan
 -- has nothing to say about reads false and the focus stays the
 -- caller's; a planned one is said once, part by part, with its order.
@@ -4455,7 +4455,7 @@ function Driver:readParts()
   for slot = 0, 5 do
     if slots[slot] then
       said[#said + 1] = string.format("slot %d ($%03X%s): %s", slot, slots[slot].species,
-        monAlive(slot) and "" or ", off stage", plan.note[slot])
+        monAlive(slot) and "" or ", out of the formation", plan.note[slot])
     end
   end
   local order = {}
@@ -6689,7 +6689,7 @@ function Driver:button(actor)
     -- boss's part by its own id); the $7B7E bit that puts the cursor on
     -- slot S is 1 << S (btlgfx MonsterMaskTbl), and where that bit sits
     -- on screen is what the target graph learns.  Focus picks the first
-    -- entry whose slot is alive and on stage; single-target plans steer
+    -- entry whose slot is alive and in the formation; single-target plans steer
     -- to its mask (summons, items and cures keep their own targeting),
     -- and the tgtSpin backstop still confirms rather than holding the
     -- turn open.
@@ -7299,9 +7299,9 @@ function Driver:logBattleLine(menu)
     -- slot-tagged (the old word-stride read here printed a slotless
     -- garbage list -- "all zero, monsters=3" -- that misdiagnosed a live
     -- board as dead).  A slot is listed when it opened the fight ($3F45)
-    -- or stands on stage now ($3AA8, #177: battle 70's Shiva enters slot
+    -- or stands in the formation now ($3AA8, #177: battle 70's Shiva enters slot
     -- 1 later and the opening mask never lists her); monsters= counts
-    -- the ones alive on stage now (M.stageSlots), not the opening mask.
+    -- the ones alive in the formation now (M.activeSlots), not the opening mask.
     local mids = M.monsterIds()
     for s2 = 0, 5 do
       if mids[s2 + 1] ~= 0xFFFF or (M.readByte(0x3AA8 + s2 * 2) & 1) == 1 then
@@ -7324,7 +7324,7 @@ function Driver:logBattleLine(menu)
       self.tag or "fight", self.battleTick, menu, state,
       actor, M.readByte(BATTLE.CMDROW + actor) & 3,
       table.concat(rows, ","), table.concat(hp, ","),
-      table.concat(cost, ","), table.concat(mhp, ","), #M.stageSlots()))
+      table.concat(cost, ","), table.concat(mhp, ","), #M.activeSlots()))
   end
 end
 
@@ -7641,7 +7641,7 @@ end
 -- caller can promise, so the step answers both: run while there is anything
 -- to run from, and press through the win when there is not.
 --
--- "Nothing to run from" is nothing standing (M.stageSlots empty, which is
+-- "Nothing to run from" is nothing standing (M.activeSlots empty, which is
 -- live presence and live HP) with no battle menu open, so an A never lands
 -- on a command window; a wipe is not this shape and is still the canary's
 -- (a game over freezes the pad before an A can auto-Continue it).
@@ -7650,7 +7650,7 @@ end
 --
 -- What the run presses this frame (#245), pure so a test can put the two
 -- shapes side by side:
---   standing   monsters alive and on stage (the M.stageSlots count)
+--   standing   monsters alive and in the formation (the M.activeSlots count)
 --   menu       $7BCA, nonzero while a battle menu window is up
 --   state      $7BC2, that window's state (BATTLE.ST_CMD: the command window)
 --   phase      a frame counter for the A and B cadences
@@ -7682,7 +7682,7 @@ function M.fleeBattle(maxFrames)
   end, maxFrames or 9000, {
     M.call(function()
       phase = (phase + 1) % 8
-      M.setPad(M.fleePress({ standing = #M.stageSlots(), menu = M.readByte(BATTLE.MENU),
+      M.setPad(M.fleePress({ standing = #M.activeSlots(), menu = M.readByte(BATTLE.MENU),
                              state = M.readByte(BATTLE.MSTATE), phase = phase }))
     end),
   }, "flee battle (hold L+R)"), function() phase = 0 end)

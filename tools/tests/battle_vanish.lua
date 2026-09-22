@@ -7,11 +7,11 @@
 -- the party owned resolved for 0 while it hit for 220-839 a round; the
 -- generator's gate switched TERRA to Fire 2 while a live monster wore
 -- Vanish or Image.  That read now lives in the lib -- STATUS1 bit 4
--- ($3EE4) and STATUS2 bit 2 ($3EE5) of each monster on stage (entity
+-- ($3EE4) and STATUS2 bit 2 ($3EE5) of each monster in the formation (entity
 -- 4 + slot) -- and the generator is its first caller.
 --
 -- This is a focused mechanism test and stages with sanctioned expedient
--- writes: the status is POKED onto a monster on stage (the bit is all
+-- writes: the status is POKED onto a monster in the formation (the bit is all
 -- the engine's status set leaves for these two), because the Ninja's
 -- Inviz is on the Floating Continent and no fixture near a save point
 -- draws a Vanish on cue.  The battle is a natural Mt. Kolts cave
@@ -92,7 +92,7 @@ H.run({ maxFrames = 90000 }, {
   H.call(function()
     local slots = {}
     for s = 0, 5 do if monAlive(s) then slots[#slots + 1] = s end end
-    H.assertEq(#slots >= 1, true, "a monster is on stage")
+    H.assertEq(#slots >= 1, true, "a monster is in the formation")
     local s = slots[1]
     local e = 4 + s
     H.assertEq(H.dodgerUp(), nil, "the untouched stage: nothing dodges")

@@ -53,7 +53,7 @@ Three things are in those lines:
 ## The fight, decoded
 
 Formation `$1CB` (`battle_monsters.dat`): present mask `$15` -- slots 0, 2,
-4; species `113 -- 145 146 147 --`.  The Speck sits in slot 3, off stage
+4; species `113 -- 145 146 147 --`.  The Speck sits in slot 3, out of the formation
 until the body's script restores it.
 
 | part | slot | HP | def / mdef / mpow | speed | shields (Ot6ShieldTbl) | weak (+25) |

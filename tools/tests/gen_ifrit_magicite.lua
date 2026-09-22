@@ -213,7 +213,7 @@ local function ifritAttempt(n)
   -- (bosses-wob.md par.13: "Celes can chip both siblings by herself, with
   -- Ice into Ifrit and her sword into Shiva", and "a Broken sibling takes
   -- no turns" -- the break SILENCES the AoE).  The absorb guard is the
-  -- stage selector: while Shiva (ice-absorb) is off-stage the cast flows
+  -- stage selector: while Shiva (ice-absorb) is out of the formation the cast flows
   -- at Ifrit's ice weakness; the moment she steps on, the guard refuses
   -- and Celes falls through to her slash sword, Shiva's own key.
   -- boost=false: base-tier Ice is 5 MP -- eleven chips from her pool --

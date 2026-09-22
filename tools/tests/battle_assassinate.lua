@@ -283,7 +283,7 @@ local function fightPulse()
     -- no window up: an animation, or the spoils.  battleLoadStarted()
     -- reads true through the victory boxes and A alone advances them
     -- (M.fleeBattle's finding), so a fight nobody stands in is pressed out.
-    if #H.stageSlots() == 0 then
+    if #H.activeSlots() == 0 then
       aPhase = (aPhase + 1) % 8
       H.setPad(aPhase < 4 and { a = true } or {})
     else

@@ -421,7 +421,7 @@ H.run({ maxFrames = 3000 }, {
   -- Ifrit $0109 (absorb $01 fire, null $FC) and Shiva $0108 (absorb $02
   -- ice, null $FC), MonsterProp +23/+24, read from this ROM; CELES's Ice
   -- $01 is element $02 and reflectable.  The stage is whoever is present
-  -- and alive; the fight driver's stageSlots reads it from the live
+  -- and alive; the fight driver's activeSlots reads it from the live
   -- records, and the mask the old guard enumerated ($3F45, the
   -- formation's opening line-up) read $01 all fight, so Shiva in slot 1
   -- was never on its list.
@@ -437,14 +437,14 @@ H.run({ maxFrames = 3000 }, {
     end
     local ice, refl = H.spellElement(0x01), H.spellReflectable(0x01)
     local s, why = H.castVeto(ice, refl, { mon(0, IFRIT) })
-    H.assertEq(s, nil, "Ifrit alone on stage: Ice flows (his weakness)")
+    H.assertEq(s, nil, "Ifrit alone in the formation: Ice flows (his weakness)")
     s, why = H.castVeto(ice, refl, { mon(1, SHIVA) })
-    H.assertEq(s and s.slot, 1, "Shiva on stage in slot 1: Ice is refused")
+    H.assertEq(s and s.slot, 1, "Shiva in the formation in slot 1: Ice is refused")
     H.assertEq(why, "absorb", "...because she ABSORBS it")
     s, why = H.castVeto(ice, refl, { mon(0, IFRIT), mon(1, SHIVA) })
-    H.assertEq(why, "absorb", "both on stage: the absorber wins the veto")
+    H.assertEq(why, "absorb", "both in the formation: the absorber wins the veto")
     s, why = H.castVeto(ice, refl, {})
-    H.assertEq(s, nil, "nobody on stage (the fly-in): nothing to refuse")
+    H.assertEq(s, nil, "nobody in the formation (the fly-in): nothing to refuse")
     -- the live byte is what is judged, not the species: a slot whose record
     -- says no absorb passes even under Shiva's species word
     s, why = H.castVeto(ice, refl, { { slot = 1, species = SHIVA, absorb = 0, null = 0, reflect = false } })
