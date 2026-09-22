@@ -360,11 +360,38 @@ end
 -- seed.  Without that exit the run canary's pad freeze (a wipe counts as
 -- a game over, #166) left the annihilated screen unpressed and the
 -- attempt was filed as `no-progress` 1800 frames later, never as a loss.
+--
+-- SUPPLY (measured 2026-09-21): the lab above ran on a bag of ~6 Potions
+-- ("2.1 a fight, no fight under 196 HP").  The route now DELIVERS ONLY 2 --
+-- locke_scenario boots with 2, the occupied-town item shop (shop 8) sells
+-- Tonic + Fenix and NO Potion (docs/research/south-figaro-shop-route.md
+-- section 2: the Potion-selling alternate shop 63 is $00A4-gated to the
+-- downstream Celes escape), and there is no Potion chest on the leg.  With
+-- healPercent 60 the in-combat top-up spends a Potion EARLY -- LOCKE below
+-- 60% (167) while the soldier is still > 200 HP, so the endgame steer
+-- cannot fire and a full Potion tops him up (measured B1: "heal entity 0
+-- (142/279) with $E9 ... (top-up)").  B1 then spends BOTH Potions
+-- (top-up + endgame) and R1 wipes with `potion=0` and nothing but Tonics,
+-- whose 50 cannot cover the 87-168 round ("$E8 restores 50 and a round
+-- costs 87 ... buys back less than it spends").
+--
+-- healPercent 30 RESERVES the scarce Potion for the endgame: LOCKE fights
+-- down to ~30% (the endgame steer, floor 175, drinks it inside the
+-- finisher window instead), so B1 spends 1 Potion, R1 the other, and R2
+-- wins on boosted Fights alone.  8-seed first-try sweep 8/8
+-- (build/attempts/wt/sfigaro-battle11/sweeps/hp30, retained per
+-- docs/TESTING.md) -- but it wins RETRY-HEAVILY: R2 always reaches 0
+-- Potions, 7 fight-losses across the 8 playthroughs, some fights won at
+-- 1/279.  This un-blocks the fixture (the deterministic R1 wipe) but battle
+-- 11 at 2 Potions is a lab candidate for a durable supply answer (fewer
+-- gate crossings, or Potions the route can actually carry).  #244.
 -- ===================================================================== --
 local GATE = {
-  -- H.rideOut's driver (lib/ot6_field.lua rideOut) with bank 3 -> 0
+  -- H.rideOut's driver (lib/ot6_field.lua rideOut) with bank 3 -> 0.
+  -- healPercent 60 -> 30 reserves the scarce Potion for the endgame steer;
+  -- see the SUPPLY note above.
   driver = { tactical = true, boost = true, bank = 0, items = true,
-             healPercent = 60, cadence = 12 },
+             healPercent = 30, cadence = 12 },
   endgameFloor = 175,      -- TekLaser measured up to 168 raw (the lab)
   endgameTotalMon = 200,   -- the lib's finisher gate
   wipeFrames = 90,         -- the cider sweep's wipe hold
