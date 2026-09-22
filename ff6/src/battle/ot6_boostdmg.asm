@@ -17,19 +17,24 @@
 ; spends it on the tech ladder (Ot6BushidoTier). The multiplier serves
 ; everything else.
 ;
-; The tier test asks two things: is this one of the four commands
-; Ot6QueueFold folds (Ot6FoldCmdTbl: magic, x-magic, lore, summon --
-; nothing else can have bought a tier), and is the spell being cast, $b6,
-; in the fold table.  $b6 is the spell whose props are loaded (magic_atmk's
-; `lda $b6`); the queued attack byte $3a7d is the same id for a queued cast
-; and NOT for one the handler substituted.  Both halves were measured, not
-; reasoned (#237, build/lab/umaro/diag-charge-shift0.log): an engine-driven
-; character's queue holds command/attack $0000 (RandCharAction's `stz
-; $3a7c`), so Umaro's Charge arrived here as command $23 with $3a7d = $00,
-; Storm as command $02 with $b6 = $54 and $3a7d = $00, and a scan keyed on
-; $3a7d alone matched both against Ot6FoldTbl's first entry, Fire ($00),
-; and multiplied neither: `dmg x2/p3:174->174`, three pips charged for
-; nothing.
+; The tier test reads the action as it was queued: $3a7c/$3a7d, the command
+; and attack InitPlayerAction copies out of the queue when the action starts,
+; which nothing rewrites for the rest of it.  Ot6QueueFold folds at queue
+; time, and only when the queued command is magic, x-magic, lore or summon
+; (Ot6FoldCmdTbl) and the queued attack is a fold-table spell, so exactly
+; those actions spent their boost on a tier.  Both halves are needed.  The
+; command half: Throw's attack byte is an item id, and a Dirk ($00) or
+; MithrilKnife ($01) reads as Fire or Ice; an engine-chosen action queues
+; command/attack $0000 (RandCharAction), which the attack half alone reads
+; as Fire.  The queued pair and not the executing $b5/$b6: handlers rewrite
+; $b5/$b6 mid-action, and the rewritten pair can look like a folded cast
+; that never folded.  A weapon's on-hit spell runs as command $02 with $b6 =
+; the spell (_c237eb), a rod or shield used from Item as command $02 with the
+; item's spell (Cmd_01), a sketched attack under whatever command
+; GetCmdForAI names, and Umaro's Storm as command $02 with $b6 = $54.  None
+; of those was folded, so each takes the multiplier.  Measured on both keys:
+; probe_fight_proc_boost (a boosted Fight's Blizzard Ice, `820->820` on the
+; $b6 key) and probe_throw_boost; battle_procboost guards the first.
 
 .proc Ot6BoostDmg
         php                     ; caller width varies: pin our own
@@ -72,7 +77,7 @@
         beq     done
         phx
         ldx     #$0003          ; only a spell command can have bought a
-@cmd:   lda     $b5             ;   tier: Ot6QueueFold's own four, mirrored
+@cmd:   lda     $3a7c           ;   tier: Ot6QueueFold's own four, mirrored
         cmp     f:Ot6FoldCmdTbl,x  ; in Ot6FoldCmdTbl.  A table and not a
         beq     @spell          ;   `cmp #imm / beq` chain: battle_boostprice
         dex                     ;   reads every `cmp #imm / beq` in this
@@ -81,7 +86,7 @@
         bra     @plain          ;   the opposite of exempt
 @spell: ldx     #$0000
 @scan:  lda     f:Ot6FoldTbl,x  ; tier-family spell? tiers are the boost
-        cmp     $b6             ; the spell being cast (see the header)
+        cmp     $3a7d           ; the queued attack (see the header)
         beq     @tier
         inx
         cpx     #$0018
