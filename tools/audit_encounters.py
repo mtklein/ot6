@@ -50,7 +50,7 @@ Usage:  python3 tools/audit_encounters.py [--repo ROOT] [--selftest]
 Maps are decimal or 0x-hex.  --summary adds the per-arrangement map lists
 (which of the named maps can roll a back / side / pincer, and which cannot)
 after the per-map reports; --all names every map in map_prop.dat; --route
-harvests the maps the party actually stood on from the `[tiles] map=N`
+collects the maps the party actually stood on from the `[tiles] map=N`
 trace lines of the given run logs (a regeneration's build/states/*.log),
 so the lists are the route's own maps, and implies --summary.  Exit 0; the
 tool reports, it does not judge a route.  --selftest exits 1 if the decode
@@ -245,7 +245,7 @@ def summary(data, maps):
 
 def route_maps(logs):
     """Map ids the party stood on, from the [tiles] trace lines of run logs
-    (the same lines tools/chest_visibility.py harvests)."""
+    (the same lines tools/chest_visibility.py collects)."""
     maps = set()
     for path in logs:
         with open(path, encoding="utf-8", errors="replace") as f:
@@ -298,7 +298,7 @@ def selftest(root):
     check("arr_label orders back+pincer+side", arr_label({"side", "back",
           "pincer", "normal"}), "back+pincer+side")
     check("arr_label front only", arr_label({"normal"}), "front only")
-    # a route harvest reads the [tiles] lines and nothing else
+    # collecting a route reads the [tiles] lines and nothing else
     import tempfile
     with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False) as t:
         t.write("[ot6] [tiles] map=225 n=2 xy=1:1,2:2\n"
@@ -306,7 +306,7 @@ def selftest(root):
                 "[ot6] [tiles] map=98 n=1 xy=5:5\n"
                 "[ot6] nav: planned 3 steps from (1,1)\n")
         tpath = t.name
-    check("route_maps harvests the [tiles] maps once each",
+    check("route_maps collects the [tiles] maps once each",
           route_maps([tpath]), [98, 225])
     os.unlink(tpath)
 

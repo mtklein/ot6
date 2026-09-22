@@ -2,7 +2,7 @@
 """Which chests did the route SEE, and are therefore expected to open.
 
 Takes the tiles the party actually stood on (the [tiles] trace lines M.run
-emits, harvested from a regen log), widens each to what the screen actually
+emits, collected from a regen log), widens each to what the screen actually
 shows, and intersects with the treasure table audit_chests.py decodes.
 
 The camera model: with the party at pixel (px,py) the BG1 scroll is
@@ -42,7 +42,7 @@ TILE = 16
 TILES_RE = re.compile(r"\[tiles\] map=(\d+) n=\d+ xy=(\S+)")
 
 
-def harvest(paths):
+def collect(paths):
     """{map: set of (x, y)} unioned across every [tiles] line in the logs."""
     walked = {}
     for p in paths:
@@ -100,10 +100,10 @@ def selftest():
                 "[ot6] [tiles] map=242 n=1 xy=10:10\n"
                 "[ot6] [tiles] map=98 n=1 xy=5:5\n")
         path = f.name
-    w = harvest([path])
+    w = collect([path])
     os.unlink(path)
-    check("harvest unions per map", w[242], {(56, 35), (57, 36), (10, 10)})
-    check("harvest keeps maps apart", w[98], {(5, 5)})
+    check("collect unions per map", w[242], {(56, 35), (57, 36), (10, 10)})
+    check("collect keeps maps apart", w[98], {(5, 5)})
     # party tile (13,31) -> scroll (96,384); the Flame Sabre chest (3,25) at
     # px 48..63 x 400..415 sits left of the view.
     check("the measured mid-chute frame excludes the Flame Sabre",
@@ -137,7 +137,7 @@ def main():
               "lines (a savestate-generation log covers the route)")
         return 2
 
-    walked = harvest(args.logs)
+    walked = collect(args.logs)
     if not walked:
         print("chest_visibility: no [tiles] lines found in the given logs -- "
               "was the tree regenerated with the tracer in lib/ot6.lua?")

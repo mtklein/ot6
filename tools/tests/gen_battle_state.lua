@@ -32,7 +32,7 @@ H.run({ maxFrames = 60000 }, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
     H.call(function()
-      -- harvest last cycle's savestate request, then issue a new one every ~150 frames
+      -- collect last cycle's savestate request, then issue a new one every ~150 frames
       if saveReq and saveReq.done and saveReq.blob then
         entryPrev = entry
         entry = saveReq.blob

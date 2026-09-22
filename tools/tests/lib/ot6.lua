@@ -310,7 +310,7 @@ end
 -- an exec memory callback for the main CPU, not inside an event callback.
 -- So requests go through a one-shot trampoline: register an exec callback
 -- over the full address space, do the work on its first fire, and
--- unregister from within the callback.  Results are harvested a frame or
+-- unregister from within the callback.  Results are collected a frame or
 -- two later by the calling step.
 --
 -- Persistence: sandboxed Lua cannot write files, so blobs round-trip through
@@ -7692,7 +7692,7 @@ end
 -- ---- the tile trace ---------------------------------------------------
 -- Records which tiles the party actually stood on, per map, and emits them
 -- as [tiles] log lines at each map change and at run end.  Read-only:
--- nothing written.  tools/chest_visibility.py harvests these lines from a
+-- nothing written.  tools/chest_visibility.py collects these lines from a
 -- regen log and intersects them with the chest table.  Samples only at
 -- tileAligned(), which keeps a mid-step direction-skewed coordinate out of
 -- the record; battle and menu frames re-record the frozen field tile,
@@ -9083,7 +9083,7 @@ function M.run(opts, steps)
     M.frame = M.frame + 1
     if M.frame == 20 or M.frame % LIVE_IVL == 0 then M.liveShot() end
 
-    -- The boot snapshot for the replay: harvested here, a couple of
+    -- The boot snapshot for the replay: collected here, a couple of
     -- frames after it was asked for (below, after the tick).
     if RUN.s0 and RUN.s0.done and not RUN.s0blob then
       if RUN.s0.ok then
