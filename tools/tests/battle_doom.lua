@@ -26,8 +26,15 @@
 --      boost is every pip it holds, and the driver said why;
 --   B. at the next window of another, uncondemned actor, a third member
 --      is condemned at 1 (128 frames) and hurt to a third: the driver
---      says it is throwing no heal at them, and no heal or item plan
---      names them before the Doom lands.
+--      says it is throwing no heal at them, naming the count the member's
+--      $3B05 holds as it says so, and no heal or item plan names them
+--      before the Doom lands.  That count is 1 or 0: the poke lands
+--      wherever the member's $3adc accumulator stands, so its first
+--      decrement comes 0-128 frames later, and the driver speaks 8-44
+--      frames after the window opens (12 seeds).  At 0 the Doom is queued
+--      (CondemnDeath is CreateImmediateAction); either way it beats the
+--      member's next turn, which is what the line claims and what is
+--      checked against the gauge at that frame.
 -- Then the Doom lands (a [death] line with nobody's action attributed)
 -- and the CLEARED line says so.  The count's own clock is measured on the
 -- way (frames between decrements) and logged beside H.COUNT_FRAMES.
@@ -40,12 +47,8 @@ local MENU, ACTOR, MSTATE, CMDTBL, BCHID, BP = 0x7BCA, 0x62CA, 0x7BC2, 0x202E, 0
 local ST2, DOOM_COUNT, ATB, ATB_CONST = 0x3EE5, 0x3B05, 0x3218, 0x3AC8
 local ST_CMD, CMD_FIGHT, CMD_ITEM = 0x05, 0x00, 0x01
 
-local lines = {}
+local lines, saidAt = {}, {}
 local rawLog = H.log
-H.log = function(msg)
-  lines[#lines + 1] = tostring(msg)
-  return rawLog(msg)
-end
 
 local function map() return H.mapId() & 0x1ff end
 local function hp(e) return H.readWord(0x3BF4 + e * 2) end
@@ -75,27 +78,50 @@ local F = nil
 local doomedA, bpA, lineA, frameA = nil, nil, nil, nil
 local doomedB, actorB, lineB, frameB = nil, nil, nil, nil
 local deathFrame, deathLine = nil, nil
+
+-- Every line the driver says is kept, and once B's member is condemned, so
+-- is what that member's count and gauge read on the frame it was said: the
+-- driver reads them on that same frame, so B's refusal is checked against
+-- the state it described rather than against the count at the poke.
+H.log = function(msg)
+  lines[#lines + 1] = tostring(msg)
+  if doomedB ~= nil then
+    saidAt[#lines] = {
+      frame = H.frame,
+      count = H.doomCount({ s2 = H.readByte(ST2 + doomedB * 2),
+                            count = H.readByte(DOOM_COUNT + doomedB * 2) }),
+      turn = turnFrames(doomedB),
+    }
+  end
+  return rawLog(msg)
+end
 local lastCount, lastCountFrame, periods, decremented = {}, {}, {}, {}
 
 local function watchCounts()
   for e = 0, 3 do
     -- Read the raw $3B05 byte while the Condemned bit is set, not H.doomCount.
-    -- A decrement is the byte stepping down while still condemned, OR the bit
-    -- clearing while the byte was still positive: the Doom fires at 1 and
-    -- clears the bit in the same DecCounters visit, so that last step reads as
-    -- byte -> nil (never an observable 1), yet the interval into it is still a
-    -- full cycle.
+    -- A decrement is the byte stepping down while still condemned, or the bit
+    -- clearing straight from 2 or more.  The step to 1 is DecCounters calling
+    -- CondemnDeath, which queues the Doom (CreateImmediateAction).  With
+    -- nothing ahead of it the Doom lands on the frame of the step, so the
+    -- byte is never seen at 1 and the bit clearing IS the step (measured: 2
+    -- -> clear 128 frames after 3 -> 2).  Behind other actions it waits, and
+    -- the byte reads 1 with the bit set until it lands (measured 18 and 243
+    -- frames): that clear is the queue's timing, not the count's, and is not
+    -- a step.
     local condemned = (H.readByte(ST2 + e * 2) & 0x01) ~= 0
     local b = condemned and H.readByte(DOOM_COUNT + e * 2) or nil
     local stepped = lastCount[e] ~= nil and lastCountFrame[e] ~= nil
-      and ((b ~= nil and b < lastCount[e]) or (b == nil and lastCount[e] > 0))
+      and ((b ~= nil and b < lastCount[e]) or (b == nil and lastCount[e] >= 2))
     if stepped then
       -- Skip the partial first cycle.  The poke lands mid-accumulator (the
       -- engine's $3adc / CalcSpeed is not reset by writing the count byte), so
       -- the gap from the poke to the FIRST decrement is a fraction of a cycle,
-      -- not the count's cadence -- measured here at 84 frames against a real
-      -- 128.  Only the gap between two real decrements is a full cycle, so a
-      -- period is recorded from the second decrement on (#190, M.COUNT_FRAMES).
+      -- not the count's cadence -- measured at 6 frames with $3adc at $C0 on
+      -- the poke.  Only the gap between two real decrements is a full cycle,
+      -- so a period is recorded from the second decrement on (#190,
+      -- M.COUNT_FRAMES).  A's count (poked at 2) steps twice before its Doom,
+      -- so it gives one period; B's (poked at 1) steps once and gives none.
       if decremented[e] then periods[#periods + 1] = H.frame - lastCountFrame[e] end
       decremented[e] = true
     end
@@ -246,14 +272,29 @@ H.run({ maxFrames = 90000 }, {
       H.log("[test] the condemned actor held 0 BP at its window: the spend is asserted on the line, not the pips")
     end
     -- B. no heal on the hurt, condemned third member
-    local refused, healed = nil, nil
+    local refused, refusedAt, refusedCount, healed = nil, nil, nil, nil
     for i = lineB + 1, (deathLine or #lines) do
       local s = lines[i]
-      if refused == nil and s:find("no heal on entity " .. doomedB .. " %(") and s:find("CONDEMNED at 1") then refused = s end
+      if refused == nil then
+        local n = s:match("no heal on entity " .. doomedB .. " %(%d+/%d+%): it is CONDEMNED at (%d+) "
+          .. "%(x %d+ frames%) and the Doom beats its next turn")
+        if n ~= nil then refused, refusedAt, refusedCount = s, i, tonumber(n) end
+      end
       if s:find("heal entity " .. doomedB .. " %(") or s:find("cure entity " .. doomedB .. " %(") then healed = s end
     end
     H.assertEq(refused ~= nil, true, string.format("actor %d refused the heal on the condemned "
       .. "entity %d and said why", actorB, doomedB))
+    local at = saidAt[refusedAt]
+    H.log(string.format("[test] the refusal was said at f%d, %d frames after the poke at count 1: "
+      .. "entity %d's count read %s there and its next turn was %s frames away",
+      at.frame, at.frame - frameB, doomedB, tostring(at.count), tostring(at.turn)))
+    H.assertEq(refusedCount, at.count,
+      "...naming the count the member's $3B05 held on the frame it was said")
+    H.assertEq(at.count ~= nil and at.count <= 1, true,
+      "...a count at or under the 1 it was poked at (it only runs down)")
+    H.assertEq(at.turn == nil or at.count * H.COUNT_FRAMES <= at.turn, true,
+      "...and the Doom did beat the member's next turn then (count x "
+      .. H.COUNT_FRAMES .. " <= frames to it)")
     H.assertEq(healed, nil, "no heal or cure plan named the condemned member before the Doom")
     -- the Doom landed, and the driver read it as nobody's action
     local death, cleared = nil, nil
