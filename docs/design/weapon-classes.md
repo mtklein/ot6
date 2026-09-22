@@ -88,6 +88,24 @@ vanilla, elemental weapons rotate in and out on raw stats; here every
 chest and shop upgrade also changes what the party can chip. Multi-hit
 actions chip per hit ✦ (Quadra Slam, boosted Fight).
 
+## The driver reads the class cell ✦
+
+The tactical fight driver plays the class the way a person reads the
+HUD: a plain boost-Fight is aimed at the living monster its hand breaks
+best, not the engine's default cursor. `Driver:chipAim`
+(`tools/tests/lib/ot6.lua`) scores each present slot by the break chips
+the hit would land — `fightChips`→`hitChips` over the *revealed* cells
+only (`RV_CLASS`/`RV_ELEM`, `$3EA5`/`$3E91`, the same bytes the HUD
+draws; a Genji Glove pair counts twice) — and hands the best slot to the
+plan, which steers the cursor there. So a pierce hand takes the
+pierce-keyed monster and a slash hand the slash-keyed one, and break is
+the rhythm of every random, not only the bosses. Levers, not laws
+(`no-nevers`): it reads only what the fight has shown, defers to any
+authored or multi-part kill order (that targeting still wins,
+byte-identical), and leaves the default cursor where class is irrelevant
+— a lone monster, or one revealed key shared by the whole formation.
+`opts.aim=false` turns it off. (#161; measured in `battle_classtarget`.)
+
 ## Skills carry their own class ✦
 
 The chip check reads the *action's* class byte, never the wielder's:
