@@ -9,7 +9,7 @@ local CHESTS = {
   { "Gold Shld",    86, 14, 53 },
   { "ThunderBlade", 87, 25, 44 },
 }
-local function census(tag)
+local function survey(tag)
   return H.call(function()
     H.log(string.format("[262 %s] at (%d,%d) map=%d", tag, H.fieldX(),
       H.fieldY(), H.mapId() & 0x1ff))
@@ -29,7 +29,7 @@ H.run({ maxFrames = 30000 }, {
   H.loadState("build/states/mrf_chute.mss.lua"),
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() end, 1000, "ctl", 5),
-  census("boot(10,45)"),
+  survey("boot(10,45)"),
   -- ride the {11,45} conveyor: one step right, ungated scripted ride to {20,45}
   H.call(function() H.setPad({ right = true }) end),
   H.waitUntil(function()
@@ -37,5 +37,5 @@ H.run({ maxFrames = 30000 }, {
   end, 2000, "the conveyor landed", 10),
   H.call(function() H.setPad({}) end),
   H.waitFrames(30),
-  census("post-conveyor"),
+  survey("post-conveyor"),
 })

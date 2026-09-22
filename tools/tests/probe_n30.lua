@@ -1,4 +1,4 @@
--- probe_n30.lua -- census inside map 30 (Narshe interiors) from
+-- probe_n30.lua -- survey inside map 30 (Narshe interiors) from
 -- kefka_won's {60,37}: which town doors BFS can reach, and whether the
 -- front door's blocker NPC is still present post-battle.
 --
@@ -19,7 +19,7 @@ H.run({ maxFrames = 20000 }, {
   H.loadState("build/states/kefka_won.mss.lua"),
   H.waitFrames(30),
   H.call(function()
-    H.log(string.format("[census30] from (%d,%d)", H.fieldX(), H.fieldY()))
+    H.log(string.format("[survey30] from (%d,%d)", H.fieldX(), H.fieldY()))
     for _, t in ipairs(TARGETS) do
       local p = H.bfsPath(t[1], t[2])
       local ob = H.readByte(0x7E2000 + (t[2] & 0xFF) * 256 + (t[1] & 0xFF))
@@ -28,7 +28,7 @@ H.run({ maxFrames = 20000 }, {
     end
   end),
 
-  -- through the front door and census the town side
+  -- through the front door and survey the town side
   H.navTo(55, 35, { arrive = function() return (H.mapId() & 0x1ff) == 20 end,
                     maxFrames = 6000, playBattles = "tactical" }),
   H.waitUntil(function()
@@ -37,7 +37,7 @@ H.run({ maxFrames = 20000 }, {
   end, 1200, "streets bright", 5),
   H.waitFrames(150),
   H.call(function()
-    H.log(string.format("[census20] from (%d,%d)", H.fieldX(), H.fieldY()))
+    H.log(string.format("[survey20] from (%d,%d)", H.fieldX(), H.fieldY()))
     for _, t in ipairs({ { 38, 61, "south gate" }, { 38, 62, "exit row" },
         { 41, 36, "door 28" }, { 22, 44, "door 41b" }, { 33, 54, "door 104" },
         { 52, 37, "door 30a" }, { 32, 30, "door 24" }, { 29, 25, "door 27" },

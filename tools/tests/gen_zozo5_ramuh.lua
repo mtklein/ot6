@@ -157,7 +157,7 @@ local function freeSeats()
   for c = 0x10, 0x13 do if cell9d(c) == 0xFF then n = n + 1 end end
   return n
 end
-local function cellCensus()
+local function cellSurvey()
   local t = {}
   for c = 0x00, 0x13 do t[#t + 1] = string.format("%02X", cell9d(c)) end
   return "cells $00-$13 = " .. table.concat(t, " ")
@@ -330,7 +330,7 @@ H.run({ maxFrames = 200000 }, {
 
   H.waitFrames(20),
   H.call(function()
-    H.log("[party] " .. cellCensus())
+    H.log("[party] " .. cellSurvey())
     H.assertEq(mst(), 0x2d, "party menu interactive (pick state $2d)")
     -- the forced two must already be seated (NO_RESET) -- if they are not,
     -- this is not the menu we think it is and the seats below are guesses
@@ -342,7 +342,7 @@ H.run({ maxFrames = 200000 }, {
   end),
   H.partySelect({ SABIN, EDGAR }, { tag = "party", commit = false }),
   H.call(function()
-    H.log("[party] after seating: " .. cellCensus())
+    H.log("[party] after seating: " .. cellSurvey())
     H.assertEq(freeSeats(), 0, "all four slots filled before committing")
   end),
   H.waitUntil(function() return mst() == 0x2d end, 900,

@@ -8,7 +8,7 @@
 --     264 {9,5}   -> 269 {44,53}
 --     269 {42,12} -> 271 {31,28}
 --     271 {3,27}  -> 273 {30,60}
--- Unlike maps 262/263, 269/271/273 are single walking regions; the census
+-- Unlike maps 262/263, 269/271/273 are single walking regions; the survey
 -- after each landing is logged below as the evidence.
 
 -- NUMBER 024 is map 273 NPC_1 at {25,51}, behind switch $0649, with event
@@ -163,7 +163,7 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
-local function census(tag, targets)
+local function survey(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
   local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
@@ -177,11 +177,11 @@ local function census(tag, targets)
       end
     end
   end
-  H.log(string.format("[census %s] from (%d,%d) on map %d: %d tiles reachable",
+  H.log(string.format("[survey %s] from (%d,%d) on map %d: %d tiles reachable",
     tag, sx, sy, map(), #q))
   for _, t in ipairs(targets or {}) do
     local p = H.bfsPath(t[1], t[2])
-    H.log(string.format("[census %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
+    H.log(string.format("[survey %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
       t[3] or "", p and (#p .. " steps: " .. table.concat(p, " ")) or "NO PATH"))
   end
 end
@@ -224,7 +224,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(H.fieldX(), 44, "269 landing x")
     H.assertEq(H.fieldY(), 53, "269 landing y")
     levels("map 269")
-    census("269", { { 42, 12, "-> map 271" } })
+    survey("269", { { 42, 12, "-> map 271" } })
   end),
 
   -- 269 {42,12} -> 271 {31,28}
@@ -239,7 +239,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(H.fieldX(), 31, "271 landing x")
     H.assertEq(H.fieldY(), 28, "271 landing y")
     levels("map 271")
-    census("271", { { 3, 27, "-> map 273" } })
+    survey("271", { { 3, 27, "-> map 273" } })
     H.screenshot("mrf_facility")
   end),
 
@@ -258,7 +258,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(H.fieldY(), 60, "273 landing y")
     H.assertEq(sw(0x0649), 1, "$0649 SET -- NUMBER 024 is on {25,51}")
     levels("map 273")
-    census("273", {
+    survey("273", {
       { 25, 52, "the 024 entry point" },
       { 25, 50, "the door to map 274 (esper tubes)" },
     })

@@ -104,7 +104,7 @@ local function tapInto(dir, pred, maxFrames, what)
   }, what)
 end
 
-local function census(tag, targets)
+local function survey(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
   local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
@@ -118,11 +118,11 @@ local function census(tag, targets)
       end
     end
   end
-  H.log(string.format("[census %s] from (%d,%d) on map %d: %d tiles reachable",
+  H.log(string.format("[survey %s] from (%d,%d) on map %d: %d tiles reachable",
     tag, sx, sy, map(), #q))
   for _, t in ipairs(targets or {}) do
     local p = H.bfsPath(t[1], t[2])
-    H.log(string.format("[census %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
+    H.log(string.format("[survey %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
       t[3] or "", p and (#p .. " steps: " .. table.concat(p, " ")) or "NO PATH"))
   end
 end
@@ -157,7 +157,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldX(), 40, "ride exit x (_cc75d0 pos {40,26} + DOWN 4)")
     H.assertEq(H.fieldY(), 30, "ride exit y")
     H.log(string.format("[ride] landed at (%d,%d)", H.fieldX(), H.fieldY()))
-    census("after the ride", {
+    survey("after the ride", {
       { 40, 32, "the Kefka trigger row _cc7431" },
       { 37, 44, "the chute to map 264 _cc7581" },
       { 42, 41, "_cc78e0 lift" },
@@ -184,7 +184,7 @@ H.run({ maxFrames = 60000 }, {
   H.saveState("mrf_kefka.mss"),
 
   H.call(function()
-    census("mrf_kefka", {
+    survey("mrf_kefka", {
       { 36, 44, "the chute to map 264 _cc7565" },
       { 37, 44, "_cc7581" },
       { 38, 44, "_cc7573" },

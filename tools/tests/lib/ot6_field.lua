@@ -4911,13 +4911,13 @@ function M.partySelect(members, opts)
       end),
     }, what), function() phase, settled = 0, 0 end)
   end
-  local function census()
+  local function survey()
     local t = {}
     for c = 0x00, 0x1F do t[#t + 1] = string.format("%02X", cell(c)) end
     return table.concat(t, " ")
   end
   local steps = {
-    M.call(function() M.log(string.format("[%s] cells $00-$1F: %s", tag, census())) end),
+    M.call(function() M.log(string.format("[%s] cells $00-$1F: %s", tag, survey())) end),
   }
   for g, ids in ipairs(groups) do
     local base = 0x10 + 4 * (g - 1)
@@ -4950,7 +4950,7 @@ function M.partySelect(members, opts)
       }, {})
     end
   end
-  steps[#steps + 1] = M.call(function() M.log(string.format("[%s] seated: %s", tag, census())) end)
+  steps[#steps + 1] = M.call(function() M.log(string.format("[%s] seated: %s", tag, survey())) end)
   if opts.commit ~= false then
     steps[#steps + 1] = M.waitUntil(function() return mst() == 0x2d end,
       opts.commitWait or 600, tag .. ": menu at $2d for commit", 5)

@@ -221,7 +221,7 @@ H.run({ maxFrames = 260000 }, {
   end),
 
   -- ---- 3. the gate door and the scene -------------------------------------
-  -- the door row (9..11,27) is approached from the south (census G: the
+  -- the door row (9..11,27) is approached from the south (survey G: the
   -- x=9..11 column below it is the only walkway; (12,27) is not walkable),
   -- so the entry point is (10,28), the same tile the scene exits onto
   H.navTo(10, 28, { playBattles = "tactical", maxFrames = 20000 }),

@@ -297,7 +297,7 @@ Ot6ElemAddTbl:
         inx
         inx
         bra     @scan
-@band:  lda     OT6_SPECIES-8,y ; species -> census band 0-3
+@band:  lda     OT6_SPECIES-8,y ; species -> survey band 0-3
         ldx     #$0000
         cmp     #$0060
         bcc     @mul
@@ -341,7 +341,7 @@ hpmul:  .a16
 .endproc
 
 ; hp multiplier per species-id band, in 16ths ($10 = 1x, $28 = 2.5x).
-; bands follow the species census: $00-$5f the wob trash the demo
+; bands follow the species survey: $00-$5f the wob trash the demo
 ; fights, $60-$bf mid trash, $c0-$ff late trash, $100+ bosses/events.
 ; authored rows are exempt before this table applies; $100+ stays
 ; 1x so unauthored event species (doom gaze's saved-hp reload in

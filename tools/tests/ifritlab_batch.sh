@@ -27,7 +27,7 @@
 # HEALPCT, BANK, HEALER, JOBS, TAG, FIXTURE.
 #
 # Machine etiquette: JOBS defaults to 2 and is clamped to 2 (this campaign's
-# ceiling on concurrent emulator runs per agent while a release census runs).
+# ceiling on concurrent emulator runs per agent while a release survey runs).
 #
 # Results and per-run logs land in build/ifritlab/.
 set -u

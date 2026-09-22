@@ -554,9 +554,9 @@ H.run({ maxFrames = 600000 }, {
   -- ---- the sanctioned grind, on the Vector plains ------------------------
   -- Six measured Sealed-Gate cave wipes with the complete kit say that
   -- area is a leveling gate at L18, and BOTH its approach pockets are
-  -- door-to-door shelves with no pacing ground (censused) -- you arrive
+  -- door-to-door shelves with no pacing ground (surveyed) -- you arrive
   -- leveled or you don't.  The last open ground before it is right here:
-  -- the plains under the parked Blackjack.  The engine censuses its own
+  -- the plains under the parked Blackjack.  The engine surveys its own
   -- pacing pair; level-ups full-restore (the OT6 rule) so the loop
   -- part-sustains; capped legs; goal 21 (level-curve.md's
   -- reasonable-grind rule, which also narrows the documented FC gap).
@@ -573,12 +573,12 @@ H.run({ maxFrames = 600000 }, {
             end
           end
         end
-        H.assertEq(#reach >= 2, true, "the plains census found pacing ground")
+        H.assertEq(#reach >= 2, true, "the plains survey found pacing ground")
         table.sort(reach, function(u, v) return u[3] > v[3] end)
         ax, ay = reach[1][1], reach[1][2]
         bx, by = reach[#reach][1], reach[#reach][2]
         H.log(string.format("[grind] pacing (%d,%d) <-> (%d,%d) "
-          .. "(census: %d reachable; best level %d)", ax, ay, bx, by,
+          .. "(survey: %d reachable; best level %d)", ax, ay, bx, by,
           #reach, maxLvl()))
       end),
     }

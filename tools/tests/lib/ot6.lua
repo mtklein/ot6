@@ -153,7 +153,7 @@ end
 
 -- ------------------------------------------------------ live broadcast --
 -- ALWAYS ON.  There is no flag, because an emulator that is playing the
--- game and cannot be seen on the census is the thing this rules out, and a
+-- game and cannot be seen on the survey is the thing this rules out, and a
 -- flag is exactly how that kept happening: eighteen launchers passed
 -- OT6_LIVE=0, one of them written the same day the others were cleaned up.
 -- A knob that must be set right at every call site is not a guarantee, so

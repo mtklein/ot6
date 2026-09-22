@@ -31,7 +31,7 @@ local CHESTS = {
   { 32, 57, "Gold Armor bit 93" },
 }
 
-local function census()
+local function survey()
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
   local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
@@ -45,7 +45,7 @@ local function census()
       end
     end
   end
-  H.log(string.format("[census] from (%d,%d) on map %d: %d tiles reachable",
+  H.log(string.format("[survey] from (%d,%d) on map %d: %d tiles reachable",
     sx, sy, map(), #q))
   return seen
 end
@@ -54,7 +54,7 @@ local function survey(tag, withGrids)
   return H.call(function()
     H.log(string.format("[probe %s] map=%d at (%d,%d)", tag, map(),
       H.fieldX(), H.fieldY()))
-    census()
+    survey()
     for _, c in ipairs(CHESTS) do
       local cx, cy = c[1], c[2]
       if withGrids then

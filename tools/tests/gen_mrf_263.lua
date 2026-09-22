@@ -102,7 +102,7 @@ local function tapInto(dir, pred, maxFrames, what)
   }, what)
 end
 
-local function census(tag, targets)
+local function survey(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
   local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
@@ -116,11 +116,11 @@ local function census(tag, targets)
       end
     end
   end
-  H.log(string.format("[census %s] from (%d,%d) on map %d: %d tiles reachable",
+  H.log(string.format("[survey %s] from (%d,%d) on map %d: %d tiles reachable",
     tag, sx, sy, map(), #q))
   for _, t in ipairs(targets or {}) do
     local p = H.bfsPath(t[1], t[2])
-    H.log(string.format("[census %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
+    H.log(string.format("[survey %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
       t[3] or "", p and (#p .. " steps: " .. table.concat(p, " ")) or "NO PATH"))
   end
 end
@@ -157,7 +157,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldX(), 20, "conveyor exit x (obj_script move list)")
     H.assertEq(H.fieldY(), 45, "conveyor exit y")
     H.log(string.format("[conveyor] landed at (%d,%d)", H.fieldX(), H.fieldY()))
-    census("after the conveyor", {
+    survey("after the conveyor", {
       { 22, 53, "the scripted 263 transition _cc7651" },
       { 22, 54, "its twin _cc765f" },
       { 10, 54, "_cc7682 lift down" },
@@ -199,7 +199,7 @@ H.run({ maxFrames = 60000 }, {
   H.saveState("mrf_263.mss"),
 
   H.call(function()
-    census("mrf_263", {
+    survey("mrf_263", {
       { 36, 44, "the chute to map 264 _cc7565" },
       { 37, 44, "_cc7581" },
       { 38, 44, "_cc7573" },

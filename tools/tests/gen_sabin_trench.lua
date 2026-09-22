@@ -438,7 +438,7 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
   -- The passability model reads nothing useful for a while after the map
   -- load (probe_nikeah_town: bfs finds no path at all at +20 and at +150
   -- frames, and a 44-step path to the counter's talk tile at +300/+400),
-  -- and shopTalk caches its staging pick on the first census, so let the
+  -- and shopTalk caches its staging pick on the first survey, so let the
   -- town settle before pathfinding.  A fixed settle is not enough: the
   -- town's walkers cross the one street to the counter, so the talk tile
   -- (24,41) reads reachable or not by the frame (probe_nikeah_town2 off

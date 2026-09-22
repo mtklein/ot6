@@ -64,7 +64,7 @@ local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 
 -- the map is navigable from here.  Caveat: canStep uses the party's
 -- current z-level for every node, where bfsPath tracks z along the path,
 -- so this is a lower bound on a z-split map.
-local function census(tag, targets)
+local function survey(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local seen, q, qi = { [sy * 256 + sx] = true }, { { sx, sy } }, 1
   local minx, maxx, miny, maxy = sx, sx, sy, sy
@@ -83,11 +83,11 @@ local function census(tag, targets)
     end
   end
   H.log(string.format(
-    "[census %s] from (%d,%d) on map %d: %d tiles reachable, bbox x %d..%d y %d..%d",
+    "[survey %s] from (%d,%d) on map %d: %d tiles reachable, bbox x %d..%d y %d..%d",
     tag, sx, sy, map(), #q, minx, maxx, miny, maxy))
   for _, t in ipairs(targets or {}) do
     local p = H.bfsPath(t[1], t[2])
-    H.log(string.format("[census %s] bfsPath -> (%d,%d) %s : %s", tag,
+    H.log(string.format("[survey %s] bfsPath -> (%d,%d) %s : %s", tag,
       t[1], t[2], t[3] or "",
       p and (#p .. " steps") or "NO PATH"))
   end
@@ -149,10 +149,10 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("mrf_entry.mss"),
 
-  -- 3. The census.  Run after the state is generated so the banked state
+  -- 3. The survey.  Run after the state is generated so the banked state
   --    is unaffected by it.
   H.call(function()
-    census("mrf_entry", {
+    survey("mrf_entry", {
       { 22, 53, "the scripted 263 transition trigger" },
       { 22, 54, "its twin" },
       { 12, 60, "the short entrance to 263" },
