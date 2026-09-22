@@ -208,20 +208,20 @@ local function talk(face, cap, tag)
   }, tag)
 end
 
--- ---- the Nerapa seed ladder ---------------------------------------------
+-- ---- the Nerapa seed sweep ---------------------------------------------
 -- Nerapa is a real loseable fight under two clocks (Condemned on the whole
 -- party at the open, the 6:00 escape clock), and on the current ROM the
 -- same policy wins or loses it on the battle seed alone (the 2026-09-07
 -- attempts: lost at t~7,800 with two Fenix Downs from one doorstep
 -- arrival, won at t~6,000 with none from another).  So it rides the
 -- gen_massacre / gen_ultros shape: a savestate at the doorstep, a
--- 5-rung seed ladder (H.newSeedLadder spreads the battle seed's phase
+-- 5-rung seed sweep (H.newSeedSweep spreads the battle seed's phase
 -- across the rungs and fails on a repeated seed), each loss reloaded
 -- from that snapshot -- the whole machine, clocks included, so every
 -- attempt opens with the same time left -- and the ladder's report
 -- names the seed of every attempt.  A won rung is a search-selected
 -- win: the attempt table is the record, not a rate.
-local L81 = H.newSeedLadder("Nerapa (battle 81)", { attempts = 5 })
+local L81 = H.newSeedSweep("Nerapa (battle 81)", { attempts = 5 })
 local nerapaBlob, nerapaWon = nil, false
 local function seq(steps) return H.cond(function() return true end, steps) end
 
@@ -626,7 +626,7 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   L81.report(),
   H.call(function()
     if not nerapaWon then
-      error("all 5 Nerapa seed-ladder attempts lost; the per-attempt lines above "
+      error("all 5 Nerapa seed-sweep attempts lost; the per-attempt lines above "
         .. "are the balance finding (a lab candidate for the owner)", 0)
     end
     H.assertEq(nerapaUp(), false, "Nerapa defeated")

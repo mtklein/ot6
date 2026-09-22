@@ -23,7 +23,7 @@
 -- are observations used to close the loop. Wins are earned by the house
 -- menu-episode machine (bank boost to 2, dump on Fight), with a self-heal
 -- branch under 40% HP. A wipe reloads a pre-grind checkpoint behind a
--- three-attempt retry ladder (17-frame stagger).
+-- three-attempt retry sweep (17-frame stagger).
 --
 -- The generated state is verified by reload, not just a calm capture: a
 -- capture taken with full world control satisfied can still boot into a
@@ -554,7 +554,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       segFrames = segFrames + 1
       if segFrames > (budget or 40000) - 400 and lost == nil then
         lost = string.format("segment %s timed out (%d frames, at %d,%d) " ..
-          "-- a stiff draw; the ladder reloads", what, segFrames,
+          "-- a stiff draw; the sweep reloads", what, segFrames,
           H.worldX(), H.worldY())
         H.log("[gau] " .. lost)
       end
@@ -565,7 +565,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       watch.frame()
       -- #163: the run canary's count is a loss on any frame (it now counts
       -- a 300-frame battle-side wipe as a game over and freezes the pad;
-      -- allowGameOver on the run keeps the ladders alive for the reload)
+      -- allowGameOver on the run keeps the sweeps alive for the reload)
       if (H.gameOverFired or 0) > 0 and not lost then
         lost = string.format("GAME OVER counted by the canary during %s " ..
           "at f%d [%s]", what, H.frame, partyLine())
@@ -1022,7 +1022,7 @@ local function grindStep()
   }, "GAU joins the party")
 end
 
--- ------------------------------------------------------ the retry ladder --
+-- ------------------------------------------------------ the retry sweep --
 local grindBlob, grindWon = nil, false
 local function grindAttempt(n)
   local ldReq
@@ -1205,7 +1205,7 @@ local function transitAttempt(n)
   return H.cond(function() return not transitDone end, steps, {})
 end
 
--- The staging-walk ladder (see the SIEGE comment at the call site): the
+-- The staging-walk sweep (see the SIEGE comment at the call site): the
 -- checkpoint is cut on the live world just south of Mobliz, and an
 -- attempt is the whole segmented siege -- fight one battle, field-care,
 -- repeat -- ending parked at (215,119).  A wipe reloads with the house
@@ -1257,7 +1257,7 @@ local function walkAttempt(n)
     }, {})
   end
   -- no non-segmented closer here: a raising driveUntil inside an attempt
-  -- would abort the LADDER, and 30 fought-and-cared segments that never
+  -- would abort the SWEEP, and 30 fought-and-cared segments that never
   -- parked is a loss for THIS timeline, not for the step
   steps[#steps + 1] = H.call(function()
     if lost == nil and H.worldMode() and H.worldX() == 215
@@ -1513,7 +1513,7 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
     end
   end),
 
-  -- the grind, with real input, behind the ladder (see the header)
+  -- the grind, with real input, behind the sweep (see the header)
   (function()
     local ckReq
     return H.cond(function() return true end, {

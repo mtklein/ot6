@@ -9,10 +9,10 @@
 -- healing:
 
 -- Under 15360 HP Ultros self-casts Haste+Safe (Safe halves physical damage
--- taken), so the back half of the fight is slower; the seed ladder + a deep
+-- taken), so the back half of the fight is slower; the seed sweep + a deep
 -- item bag (22 Tonics / 9 Potions / 15 Fenix Downs at N) carry it.  A missed-
 -- win attempt reloads the entry-point savestate and re-fights on a spread
--- battle seed (H.newSeedLadder, gen_thamasa_fire's FlameEater pattern), with
+-- battle seed (H.newSeedSweep, gen_thamasa_fire's FlameEater pattern), with
 -- the GameOver read-canary (lib) the ground-truth loss signal.
 
 -- No chests: none sit on the walked route (the mountain chests are all off
@@ -158,7 +158,7 @@ local function tapToSave(tx, ty, maxFrames, what)
 end
 
 -- =============================================================== the FIGHT ==
-local L125 = H.newSeedLadder("Ultros III (battle 125)", { attempts = 5 })
+local L125 = H.newSeedSweep("Ultros III (battle 125)", { attempts = 5 })
 local ultBlob, ultWon = nil, false
 
 local function ultrosAttempt(n)
@@ -347,7 +347,7 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
     H.log(string.format("[ot6] lore seen f%d (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
   end),
-  -- THE SEED-LADDER ENTRY POINT: capture the pre-fight savestate here, lore
+  -- THE SEED-SWEEP ENTRY POINT: capture the pre-fight savestate here, lore
   -- seen and Ultros not yet fought, so a lost attempt re-fights without
   -- replaying the lore scene.
   (function()
@@ -370,7 +370,7 @@ H.run({ maxFrames = 5000000, allowGameOver = true }, {
   ultrosAttempt(5),
   H.call(function()
     if not ultWon then
-      error(L125.report() .. " -- all 5 Ultros III seed-ladder attempts lost; "
+      error(L125.report() .. " -- all 5 Ultros III seed-sweep attempts lost; "
         .. "see the per-attempt numbers above (no Sketch, no enemy-stat "
         .. "change -- report and stop per the dispatch)", 0)
     end

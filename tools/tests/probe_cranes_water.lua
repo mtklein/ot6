@@ -12,7 +12,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 -- Each attempt is held until the game-time frame counter the battle seed
 -- is made of reaches its own phase; L.report() fails if two attempts drew
 -- the same seed, which would make this one Cranes fight played twice.
-local L = H.newSeedLadder("cranes water")
+local L = H.newSeedSweep("cranes water")
 
 local ZMENUSTATE, ZCURSOR = 0x26, 0x4b
 local ST_MAIN, ST_CHAR, ST_SKILLS, ST_LIST, ST_DETAIL = 0x05, 0x06, 0x0a, 0x1e, 0x4d

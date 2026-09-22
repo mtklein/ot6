@@ -178,7 +178,7 @@ end
 -- `res` is a one-field table the caller reads afterwards: res.ok is true only
 -- if the party is standing on the goal.  The two ways to fail -- the chase
 -- clock running out, and a lost rat fight, which is a wipe -- both end the
--- drive quietly with res.ok false, because the caller is a retry ladder
+-- drive quietly with res.ok false, because the caller is a retry sweep
 -- that reloads and tries again.  `hold` (number or thunk) is that ladder's
 -- arrangement seed: aligned frames to stand still before setting off.
 --
@@ -487,7 +487,7 @@ local function crossRafters(tx, ty, maxF, hold, res, what)
     wipeN = H.partyWiped() and wipeN + 1 or 0
     -- #163: the run canary's count is the same loss (it counts a
     -- 300-frame battle-side wipe as a game over and freezes the pad;
-    -- allowGameOver on the run keeps the ladder alive for the reload)
+    -- allowGameOver on the run keeps the sweep alive for the reload)
     if (H.gameOverFired or 0) > 0 and not lost then
       lost = "a lost rat fight (the run canary counted a game over)"
       H.log(string.format("cross: GAME OVER counted by the canary at f%d -- " ..
@@ -599,7 +599,7 @@ local function toDoor(tx,ty,bumpDir,destMap,what)
   })
 end
 
--- The crossing's retry ladder.  Attempt 1 runs from where the walk already
+-- The crossing's retry sweep.  Attempt 1 runs from where the walk already
 -- stands and is BANKED whenever it arrives standing with MIN_CROSS_TIMER
 -- still on the clock.  Margin past that floor buys nothing: the Ultros
 -- interaction's first opcode is `stop_timer 0` (ff6/src/event/
@@ -718,7 +718,7 @@ local function crossAttempt(n, hold)
   })
 end
 
--- allowGameOver: the crossing ladder deliberately survives a lost rat
+-- allowGameOver: the crossing sweep deliberately survives a lost rat
 -- fight (#163); crossRafters reads H.gameOverFired as a loss and the
 -- next attempt reloads.
 H.run({ maxFrames = 420000, allowGameOver = true }, {

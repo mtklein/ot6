@@ -36,7 +36,7 @@
 -- entities behind them, so the slot scan below prefers the lowest slot per
 -- species.
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("battle 70")
+local L = H.newSeedSweep("battle 70")
 
 local STATE = "build/states/ifrit_entry.mss.lua"
 local IFRIT, SHIVA = 0x0109, 0x0108
@@ -315,7 +315,7 @@ H.run({ maxFrames = 250000 }, {
   end)(),
   H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
 
-  -- 2. capture the prepared entry point as the retry ladder's reload blob
+  -- 2. capture the prepared entry point as the retry sweep's reload blob
   (function()
     local req
     return seq({
@@ -329,7 +329,7 @@ H.run({ maxFrames = 250000 }, {
     })
   end)(),
 
-  -- 3. the fight, on the phase-spread ladder
+  -- 3. the fight, on the phase-spread sweep
   L.watch(),
   attempt(1),
   attempt(2),

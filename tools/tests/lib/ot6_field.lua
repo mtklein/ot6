@@ -83,7 +83,7 @@ end
 
 -- The canary returns true once a wipe has held for 300 frames.  It normally
 -- also raises, since a wipe is the end of the run.  `soft` hands the verdict
--- back to the caller instead, for a retry ladder that reloads and retries on
+-- back to the caller instead, for a retry sweep that reloads and retries on
 -- a loss rather than treating it as a failed run.
 local function wipeCanary(tag, soft)
   local n, said = 0, false
@@ -99,7 +99,7 @@ local function wipeCanary(tag, soft)
     if not said then
       said = true
       M.log(string.format("%s: the party is wiped (0 hp for 300 frames); " ..
-        "ending this ride so the caller's ladder can retry", tag))
+        "ending this ride so the caller's sweep can retry", tag))
     end
     return true
   end
@@ -552,7 +552,7 @@ function M.navTo(txIn, tyIn, opts)
   -- once M.FLEE_CAP frames pass without the formation releasing the party
   --
   -- opts.wipeEndsRide: a party wipe ends this ride instead of raising, for a
-  -- caller whose retry ladder reloads and retries.  Off by default.
+  -- caller whose retry sweep reloads and retries.  Off by default.
   local wipeSeen = false
   local wipeCheck = wipeCanary("navTo", opts.wipeEndsRide)
   local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee" or opts.playBattles == "mustflee")
@@ -5237,7 +5237,7 @@ end
 -- three times and each crossing is its own three fights.
 function M.clearGateSoldier(probeX, probeY, tag)
   local blob, won = nil, false
-  local L = M.newSeedLadder((tag or "gate soldier") .. " battle 11")
+  local L = M.newSeedSweep((tag or "gate soldier") .. " battle 11")
   local function fightOnce(n)
     local loadReq
     return M.cond(function() return won end, {}, {

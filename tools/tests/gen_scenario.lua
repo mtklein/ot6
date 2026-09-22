@@ -221,7 +221,7 @@ local CH = H.newChoice(CHOICES, { tag = "river",
 -- mid-round revive the policy could produce -- is the game over the river
 -- exists to threaten; a full party wipe is the same fact the long way.
 -- Neither errors out of the run any more: they set `lost`, the attempt's
--- pred fires, and the RETRY LADDER below reloads the pre-board checkpoint
+-- pred fires, and the RETRY SWEEP below reloads the pre-board checkpoint
 -- -- the generator script's spelling of a player reloading their save -- and
 -- rides again with the escalated tier.
 local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
@@ -385,7 +385,7 @@ local function rideUntil(pred, what, budget, idle, tier)
       -- The lib's wipe predicate held 90 straight frames is the loss; so
       -- is the run canary's count (it now counts a 300-frame battle-side
       -- wipe as a game over and freezes the pad -- allowGameOver on the
-      -- run keeps the ladder alive for the reload).
+      -- run keeps the sweep alive for the reload).
       watch.frame()
       wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
       if (H.gameOverFired or 0) > 0 and lost == nil then
@@ -607,7 +607,7 @@ local function walkOffLandings()
   H.setPad({ down = true })
 end
 
--- ------------------------------------------------------ the retry ladder --
+-- ------------------------------------------------------ the retry sweep --
 -- A lost river run is ACCEPTED, not rigged around: the checkpoint captured
 -- at the entry point (before the boarding trigger) is reloaded -- the
 -- generator's spelling of a player reloading their save -- and the ride is
@@ -674,7 +674,7 @@ local function rideAttempt(n)
   }, {})
 end
 
--- allowGameOver: the river ladder deliberately survives a lost ride
+-- allowGameOver: the river sweep deliberately survives a lost ride
 -- (#163); rideUntil reads H.gameOverFired as a loss and the next attempt
 -- reloads.
 H.run({ maxFrames = 700000, allowGameOver = true }, {

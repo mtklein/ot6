@@ -14,11 +14,11 @@
 --   OT6_SRAM_CHECKPOINT whose manifest declares a different
 --   persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
--- The retry ladder's spread and its collision check: each attempt is held
+-- The retry sweep's spread and its collision check: each attempt is held
 -- until the game-time frame counter the battle seed is made of reaches
 -- its own phase, and L.report() fails if two attempts drew one seed,
 -- which would make this ladder one fight played twice.
-local L = H.newSeedLadder("battle 72")
+local L = H.newSeedSweep("battle 72")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -154,7 +154,7 @@ local function n024Attempt(n)
     -- A into the Annihilated screen for up to 3000 frames.  The lib's
     -- wipe predicate held 90 straight frames, or the run canary's count
     -- (it now counts a 300-frame battle-side wipe as a game over and
-    -- freezes the pad -- allowGameOver on the run keeps the ladder alive
+    -- freezes the pad -- allowGameOver on the run keeps the sweep alive
     -- for the reload), names the loss here instead and skips the taps.
     H.driveUntil(function()
       wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
@@ -254,7 +254,7 @@ local function survey(tag, targets)
 end
 
 
--- allowGameOver: the battle-72 ladder deliberately survives a lost fight
+-- allowGameOver: the battle-72 sweep deliberately survives a lost fight
 -- (#163); the fight drive reads H.gameOverFired as a loss and the next
 -- attempt reloads.
 H.run({ maxFrames = 300000, allowGameOver = true }, {
@@ -331,7 +331,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
       "back at the entry point, armed and topped up")
     H.log(partyReport("024 entry point, prepared"))
   end),
-  -- capture the prepared entry point as the retry ladder's reload blob
+  -- capture the prepared entry point as the retry sweep's reload blob
   (function()
     local req
     return seq({
@@ -345,7 +345,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     })
   end)(),
 
-  -- 2. battle 72, played with real input, on the phase-spread retry ladder
+  -- 2. battle 72, played with real input, on the phase-spread retry sweep
   L.watch(),
   n024Attempt(1),
   n024Attempt(2),

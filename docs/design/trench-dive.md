@@ -15,7 +15,7 @@ itself regenerates on.
 
 ## What the build says
 
-`sabin_done` passes and burns its own retry ladder doing it
+`sabin_done` passes and burns its own retry sweep doing it
 (`build/states/sabin_done.log`, `tools/audit_boost.py ... -v`):
 
 ```
@@ -216,7 +216,7 @@ numbers below show.
 Six `OT6_SEED_SHIFT` values, 0 through 25 in steps of 5 — idle frames the
 segment runner inserts at the boot point, the beat a player pauses before
 walking on — with the segment runner's retries **off** (`OT6_RETRIES=1`),
-so every seed reports the generator's **own** three-attempt dive ladder and
+so every seed reports the generator's **own** three-attempt dive sweep and
 not a re-boot on top of it. Nothing is published to `build/states`. All six
 shifts draw a different first battle (`be44`, `be5C`, `be70`, `be80`,
 `be94`, `beAC`), so six shifts are six distinct samples.
@@ -368,7 +368,7 @@ exactly once.
 
 The derived script is the generator verbatim plus two read-only CPU exec
 observers, one settled per-battle line naming the formation by species, one
-party line, and one assignment carrying the dive ladder's attempt number.
+party line, and one assignment carrying the dive sweep's attempt number.
 Every substitution asserts it matched exactly once, so a generator edit
 that moves an anchor fails the derivation rather than silently measuring
 something else.

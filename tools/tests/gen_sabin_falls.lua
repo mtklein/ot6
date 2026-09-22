@@ -295,7 +295,7 @@ local function jumpAttempt(n)
   }, {})
 end
 
--- allowGameOver: the retry ladder above deliberately survives a lost
+-- allowGameOver: the retry sweep above deliberately survives a lost
 -- battle 18 (#159); the ride reads H.gameOverFired as a loss and reloads.
 H.run({ maxFrames = 250000, allowGameOver = true }, {
   H.loadState(DOOR),

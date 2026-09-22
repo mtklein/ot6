@@ -517,7 +517,7 @@ local function landedField(m, n)
   end
 end
 
--- ------------------------------------------------------ the retry ladder --
+-- ------------------------------------------------------ the retry sweep --
 -- One commander attempt: (attempt 2+) reload the checkpoint with a small
 -- stagger, reset the fighter to the escalated tier, poke the commander, and
 -- ride the fight + interlude tail back to the camp.  `lost` short-circuits
@@ -576,7 +576,7 @@ local function cmdAttempt(n)
   }, {})
 end
 
--- allowGameOver: the two retry ladders below (battle 46, battle 42)
+-- allowGameOver: the two retry sweeps below (battle 46, battle 42)
 -- deliberately survive a lost fight (#163); rideUntil's loss watch reads
 -- H.gameOverFired as a loss and the next attempt reloads.
 H.run({ maxFrames = 150000, allowGameOver = true }, {  -- the #84 chest pickup rides on the end
@@ -619,7 +619,7 @@ H.run({ maxFrames = 150000, allowGameOver = true }, {  -- the #84 chest pickup r
   -- 2. THE COMMANDER.  obj 16, parked on (33,54) by :61266-61269.  Its
   -- `battle 46` is event battle GROUP 46 = formation 409 = one $14e
   -- (event_battle_group.dat, 4 bytes/group).  Fought for REAL (see the
-  -- header), behind a three-attempt retry ladder on the cyan_defence-
+  -- header), behind a three-attempt retry sweep on the cyan_defence-
   -- moment checkpoint: a loss reloads and re-pokes with the fighter
   -- escalated (tier 2+ dumps boost at 1 BP) plus a small reload stagger,
   -- which reshuffles every subsequent interleaving and roll.

@@ -31,7 +31,7 @@
 --    never came.  Only a same-map warp has no map change to watch.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("cider steal")
+local L = H.newSeedSweep("cider steal")
 local DOOR = "build/states/locke_scenario.mss.lua"
 
 -- map compares stay masked: loaders leave flag bits in $1F64's high byte
@@ -355,7 +355,7 @@ end
 --
 -- The ladder is the lib's (H.clearGateSoldier) in shape, with two changes:
 -- the ride is this file's gateRide, and a lost fight ends the ride on the
--- wipe (the seat-based verdict held 90 frames, as the cider ladder does)
+-- wipe (the seat-based verdict held 90 frames, as the cider sweep does)
 -- so the next rung reloads the pre-fight blob and re-engages on a new
 -- seed.  Without that exit the run canary's pad freeze (a wipe counts as
 -- a game over, #166) left the annihilated screen unpressed and the
@@ -367,7 +367,7 @@ local GATE = {
              healPercent = 60, cadence = 12 },
   endgameFloor = 175,      -- TekLaser measured up to 168 raw (the lab)
   endgameTotalMon = 200,   -- the lib's finisher gate
-  wipeFrames = 90,         -- the cider ladder's wipe hold
+  wipeFrames = 90,         -- the cider sweep's wipe hold
 }
 local ITEMSCR, ITEMROW, BATTINV = 0x8947, 0x894F, 0x2686
 local ST_ITEM, ST_TGT = 0x0A, 0x38
@@ -525,7 +525,7 @@ end
 
 local function clearGate(probeX, probeY, tag)
   local blob, won = nil, false
-  local L = H.newSeedLadder((tag or "gate soldier") .. " battle 11")
+  local L = H.newSeedSweep((tag or "gate soldier") .. " battle 11")
   local function fightOnce(n)
     local loadReq, lost = nil, nil
     return H.cond(function() return won end, {}, {
@@ -595,7 +595,7 @@ local function clearGate(probeX, probeY, tag)
   })
 end
 
--- allowGameOver: the cider-steal ladder deliberately survives a lost
+-- allowGameOver: the cider-steal sweep deliberately survives a lost
 -- battle 10 (#163); its aftermath ride reads H.gameOverFired as a loss
 -- and the next attempt reloads.  (The gate-soldier ladder above, clearGate,
 -- ends its ride on the wipe and reloads the same way.)
@@ -683,7 +683,7 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   -- the starting pocket to the rest of town, and BFS reaches exactly 107
   -- tiles until he is gone.  The fight can be won any way (the clothes
   -- branches belong to a different fight), and it is input-driven now: solo
-  -- LOCKE on boosted Fights, with the retry ladder around the engagement.
+  -- LOCKE on boosted Fights, with the retry sweep around the engagement.
   -- The probe tile is the cafe entry point the win must open.
   -- ===================================================================== --
   clearGate(22, 43, "B1 (open the town)"),
@@ -705,7 +705,7 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   -- ===================================================================== --
   go(22, 42, 78, 26, 52, "C1 town (22,42) -> map 78 (26,52) [CAFE]"),
   go(33, 46, 78, 74, 43, "C2 map 78 (33,46) -> (74,43) [annex warp]"),
-  -- The steal has its own retry ladder: an attempt that ends the fight
+  -- The steal has its own retry sweep: an attempt that ends the fight
   -- without b_switch $4C (LOCKE down, or the fight won another way) reloads
   -- the pre-talk blob and re-engages at a different frame phase.  The
   -- formation assert still runs on every attempt.
@@ -769,7 +769,7 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
         -- rest of its 20000-frame budget.  The lib's wipe predicate held
         -- 90 straight frames, or the run canary's count (it now counts a
         -- 300-frame battle-side wipe as a game over and freezes the pad;
-        -- allowGameOver on the run keeps the ladder alive for the
+        -- allowGameOver on the run keeps the sweep alive for the
         -- reload), ends the ride as a named loss instead.
         (function()
           local ph, calm, waited = 0, 0, 0

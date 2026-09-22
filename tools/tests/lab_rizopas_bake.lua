@@ -164,7 +164,7 @@ local function probeParty(tag)
 end
 
 -- the seed the gen path draws: read off the `sta $be` store, the way
--- H.newSeedLadder and the Nerapa lab read it
+-- H.newSeedSweep and the Nerapa lab read it
 local seedDrawn, seedN = nil, 0
 local function armSeedWatch()
   local addr = H.seedStoreAddr()

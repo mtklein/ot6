@@ -642,7 +642,7 @@ end
 local function cyanX() return objX(18) end
 local function cyanY() return objY(18) end
 
--- ------------------------------------------------------ the retry ladder --
+-- ------------------------------------------------------ the retry sweep --
 -- One waves attempt: (attempt 2+) reload the boot-moment checkpoint with a
 -- small stagger and the fighter escalated, then take the three talks in
 -- order; a `lost` mid-run short-circuits the remaining waves so the next
@@ -707,7 +707,7 @@ H.run({ maxFrames = 250000, allowGameOver = true }, {
       H.frame, H.fieldX(), H.fieldY(), cyanX(), cyanY()))
   end),
 
-  -- 1. the three waves, with real input, behind the ladder.  CYAN moves
+  -- 1. the three waves, with real input, behind the sweep.  CYAN moves
   --    between
   -- them, so his tile is a thunk.
   (function()

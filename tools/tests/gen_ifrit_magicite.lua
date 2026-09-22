@@ -17,7 +17,7 @@
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("battle 70")
+local L = H.newSeedSweep("battle 70")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -292,7 +292,7 @@ local function ifritAttempt(n)
     -- lib's wipe predicate holds and ends on its 120-frame count, or on
     -- the run canary's count (it now counts a 300-frame battle-side wipe
     -- as a game over and freezes the pad -- allowGameOver on the run
-    -- keeps the ladder alive for the reload).
+    -- keeps the sweep alive for the reload).
     H.driveUntil(function()
       if (H.gameOverFired or 0) > 0 then return true end
       if wiped >= 120 then return true end
@@ -387,7 +387,7 @@ local function ifritAttempt(n)
   })
 end
 
--- allowGameOver: the battle-70 ladder deliberately survives a lost fight
+-- allowGameOver: the battle-70 sweep deliberately survives a lost fight
 -- (#163); the fight drive reads H.gameOverFired as a loss and reloads.
 H.run({ maxFrames = 300000, allowGameOver = true }, {
   H.waitFrames(350),
@@ -495,7 +495,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     H.assertEq(H.readByte(0x1A6E + 6 * 54 + 0x01), 0xFF,
       "CELES knows Ice -- the chip axis into Ifrit (bosses-wob.md par.13)")
   end),
-  -- capture the entry point as the retry ladder's reload blob
+  -- capture the entry point as the retry sweep's reload blob
   (function()
     local req
     return seq({
@@ -509,7 +509,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
     })
   end)(),
 
-  -- 2. battle 70, played with real input, on the phase-spread retry ladder
+  -- 2. battle 70, played with real input, on the phase-spread retry sweep
   L.watch(),
   ifritAttempt(1),
   ifritAttempt(2),

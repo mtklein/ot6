@@ -31,7 +31,7 @@
 -- No emulator state writes: random/ungated battles are fought by the
 -- library fighter (H.newWalkFighter, #183); battle 47
 -- (the trap ghost) and battle 68 (the Ghost Train) are played with real
--- input, each behind a checkpoint retry ladder. SABIN's first two turns
+-- input, each behind a checkpoint retry sweep. SABIN's first two turns
 -- against the Ghost Train are AuraBolt (chips a shield, reveals HOLY) and
 -- Pummel (chips another, reveals OT6_BLUDG); after that all three attack
 -- with banked-boost Fights, healing under 50% from the ghost merchant's
@@ -829,8 +829,8 @@ local function b68Observe()
 end
 
 
-local L47 = H.newSeedLadder("battle 47")
-local L68 = H.newSeedLadder("battle 68", { attempts = 5 })
+local L47 = H.newSeedSweep("battle 47")
+local L68 = H.newSeedSweep("battle 68", { attempts = 5 })
 local b47Blob, b47won = nil, false
 local function b47Won() return b47won end
 local function b47Checkpoint()
@@ -1329,7 +1329,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     return sw(0x3D) == 1 and H.hasControl() and H.tileAligned()
   end, "bait the follower ghost", 4000),
 
-  -- ---- battle 47, with real input, behind the ladder ----
+  -- ---- battle 47, with real input, behind the sweep ----
   b47Checkpoint(),
   L47.watch(),
   b47Attempt(1),

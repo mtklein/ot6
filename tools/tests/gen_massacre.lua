@@ -102,7 +102,7 @@ local function lossReload(blobFn, tag)
 end
 
 -- ============================================================ battle 124 ==
-local L124 = H.newSeedLadder("Kefka vs Leo (battle 124)", { attempts = 5 })
+local L124 = H.newSeedSweep("Kefka vs Leo (battle 124)", { attempts = 5 })
 local leoBlob, leoWon = nil, false
 local CONFIRM_GONE = 90
 
@@ -263,7 +263,7 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
     H.screenshot("massacre_solo_leo")
   end),
 
-  -- ---- 4. approach the Kefka NPC (24,18); battle 124 seed ladder --------
+  -- ---- 4. approach the Kefka NPC (24,18); battle 124 seed sweep --------
   -- Stage at (24,19), one tile below Kefka, avoiding the exit-row triggers
   -- (x=9 col; y=45-46; x=24-28 y=15-16) that fire battle 75 in the Leo
   -- window.  navTo the approach tile, then capture the pre-battle-124 blob.
@@ -301,7 +301,7 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
   leoAttempt(5),
   H.call(function()
     if not leoWon then
-      error(L124.report() .. " -- all 5 battle-124 seed-ladder attempts lost "
+      error(L124.report() .. " -- all 5 battle-124 seed-sweep attempts lost "
         .. "(GameOver each); the per-attempt numbers above are the balance "
         .. "finding (#74-style; a solo-guest wall for the owner) -- do not "
         .. "touch enemy stats", 0)

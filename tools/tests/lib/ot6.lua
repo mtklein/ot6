@@ -108,7 +108,7 @@ function M.emitBlob(tag, data)
     print("[b64:" .. tag .. "] " .. enc:sub(i, i + 3999))
   end
   -- The end marker (lib/decode_b64.py): one tag can carry several
-  -- emissions in one log -- a ladder screenshotting each attempt, and now
+  -- emissions in one log -- a sweep screenshotting each attempt, and now
   -- a retried segment re-emitting every artifact on its replay.  The
   -- decoder used to split them on base64 padding alone, which cannot see
   -- a boundary when the payload's length is a multiple of three; that
@@ -193,9 +193,9 @@ end
 -- annihilated screen, the fade, or the title's Continue -- and one A there
 -- loads the last save while every predicate reads healthy again.  So from
 -- the moment the canary counts a game over until the script restores a
--- snapshot (M.requestLoadState, the ladders' recovery path), setPad holds
+-- snapshot (M.requestLoadState, the sweeps' recovery path), setPad holds
 -- the pad neutral.  A run without allowGameOver has already stopped by
--- then; a ladder that reloads and clears M.gameOverFired never notices.
+-- then; a sweep that reloads and clears M.gameOverFired never notices.
 M.padFrozen = false
 local padFrozenSaid = false
 function M.freezePad(why)
@@ -244,7 +244,7 @@ end
 -- the raw handles captured here, before that shim exists: the one-shot
 -- savestate trampolines (an inert load trampoline would strand the run
 -- mid-reload) and the run canary (an inert canary is a silent
--- auto-Continue).  Everything else -- the ladders' seed watchers, the
+-- auto-Continue).  Everything else -- the sweeps' seed watchers, the
 -- recovery/exec observers, a generator's own logging watches -- is
 -- re-registered by the replayed body and wants the old copy inert.
 local rawAddMemoryCallback = emu.addMemoryCallback
@@ -2419,10 +2419,10 @@ end
 -- is (frames * 4) & $FF: 60 values, one per phase.  $be then indexes
 -- RNGTbl (256 bytes), which every battle Rand/RandA/RandCarry walks.
 --
--- newSeedLadder spaces attempts by holding until $021e has advanced to
+-- newSeedSweep spaces attempts by holding until $021e has advanced to
 -- each attempt's own target phase (as widely as 60 phases allow), rather
 -- than by a fixed frame count, and reads the seed each attempt actually
--- drew off the store instruction, requiring it be distinct.  A ladder that
+-- drew off the store instruction, requiring it be distinct.  A sweep that
 -- plays one fight twice fails the run instead of passing silently.
 --
 -- The hold counts $021e's own movement rather than waiting for it to equal
@@ -2477,7 +2477,7 @@ end
 -- comparisons and local debugging. Use snapshot restoration directly for
 -- those experiments; this helper intentionally checks seed diversity.
 --
---   local L = H.newSeedLadder("battle 70")
+--   local L = H.newSeedSweep("battle 70")
 --   H.run({...}, {
 --     ...
 --     L.watch(),                  -- once, before the first attempt
@@ -2496,16 +2496,16 @@ end
 -- across attempts, and present for every attempt that ran.
 --
 -- opts.attempts (default 3) only sets the spacing; it is not a licence to
--- widen the ladder.
+-- widen the sweep.
 --
 -- opts.phaseSource replaces the live read of $021e, for callers that need
 -- to drive the hold with a synthetic sampler instead of the counter.
-function M.newSeedLadder(tag, opts)
+function M.newSeedSweep(tag, opts)
   opts = opts or {}
   local attempts = opts.attempts or 3
   local gap = opts.gap or (M.SEED_PERIOD // attempts)
   local phaseOf = opts.phaseSource or M.seedPhase
-  local L = { tag = tag or "ladder", seeds = {}, extras = {}, targets = {},
+  local L = { tag = tag or "sweep", seeds = {}, extras = {}, targets = {},
               spreads = {} }
   local base, cur, watching = nil, 0, false
 
@@ -2521,7 +2521,7 @@ function M.newSeedLadder(tag, opts)
       M.log(string.format("[%s] watching the battle seed store at $%06X "
         .. "(InitBattle=$%06X)", L.tag, addr, M.sym("InitBattle")))
       emu.addMemoryCallback(function()
-        if cur == 0 then return end               -- battles before the ladder
+        if cur == 0 then return end               -- battles before the sweep
         -- Mesen fires exec callbacks before the instruction runs, so A is the
         -- value about to land in $be.
         local seed = emu.getState()["cpu.a"] & 0xff
@@ -2622,7 +2622,7 @@ function M.newSeedLadder(tag, opts)
 
   -- The check.  Fails on a repeated seed, and fails when nothing was
   -- recorded, so a watcher pointed at the wrong instruction cannot report the
-  -- same green as a ladder that genuinely spread.
+  -- same green as a sweep that genuinely spread.
   L.report = function()
     return M.call(function()
       local ran, silent = {}, {}
@@ -2636,7 +2636,7 @@ function M.newSeedLadder(tag, opts)
       assert(#silent == 0, string.format(
         "%s: attempt(s) %s took a battle RNG phase and then drew no seed.  The "
         .. "watcher is on `sta $be` at battle init, so either that attempt "
-        .. "never reached a battle -- in which case this ladder's shape moved "
+        .. "never reached a battle -- in which case this sweep's shape moved "
         .. "and the spread is in the wrong place -- or the watcher missed one.",
         L.tag, table.concat(silent, ", ")))
       assert(#ran > 0, L.tag .. ": no battle seeding was recorded for any "
@@ -2654,7 +2654,7 @@ function M.newSeedLadder(tag, opts)
             .. "$%02X (game-time phase %d).  Same seed and the same route is "
             .. "the same fight, so these %d attempts are fewer than %d "
             .. "different fights and their verdict is not evidence about the "
-            .. "encounter.  Spread the attempts, do not widen the ladder (#74).",
+            .. "encounter.  Spread the attempts, do not widen the sweep (#74).",
             L.tag, prev, n, s.seed, s.phase, #ran, #ran), 0)
         end
         bySeed[s.seed] = n
@@ -2662,7 +2662,7 @@ function M.newSeedLadder(tag, opts)
       M.log(string.format("[%s] %d attempt(s), %d distinct battle RNG seeds",
         L.tag, #ran, #ran))
       -- Go inert.  The exec callback cannot be removed from outside one
-      -- (Mesen wants that on the CPU's own thread), so a finished ladder's
+      -- (Mesen wants that on the CPU's own thread), so a finished sweep's
       -- watcher would otherwise keep charging later battles to its last
       -- attempt.
       cur = 0
@@ -6912,7 +6912,7 @@ function Driver:idle()
   if self.healSaid == "parked-out" then self.healSaid = nil end
   self.careActor, self.startSnap, self.planPulses = nil, nil, 0
   -- Everything the heal policy measured belongs to the battle that just
-  -- ended.  A retry ladder replays the same fight from a reload, and
+  -- ended.  A retry sweep replays the same fight from a reload, and
   -- carrying a round cost across the boundary would let one attempt's
   -- damage decide the next attempt's first turns.
   self.roundCost, self.turnSnap = {}, {}
@@ -6930,7 +6930,7 @@ function Driver:idle()
   execMon, execMonDone = nil, nil
   execMonCmd, execMonAtk = nil, nil
   -- The stall guard's verdict belongs to the battle it watched: a retry
-  -- ladder's reload is a different fight, and a recurrence should dump
+  -- sweep's reload is a different fight, and a recurrence should dump
   -- again there rather than inherit a dead lore line silently.
   self.loreSpinN, self.loreDead = 0, false
   self.skillDead = {}
@@ -7828,7 +7828,7 @@ end
 --
 -- HOW THE REPLAY IS CLEAN.  The step machine cannot be rewound: a step
 -- object holds its own counters, driveUntil has no reset at all, and the
--- generator's own upvalues (blobs, ladder tallies, "did we already buy it"
+-- generator's own upvalues (blobs, sweep tallies, "did we already buy it"
 -- flags) are the state that really matters.  So nothing is rewound.
 -- lib/compose.py wraps everything after the `local H = dofile(...)` line in
 -- `H.segmentBody(function() ... end)`, and an attempt is that function run
@@ -7850,11 +7850,11 @@ end
 -- emulator's own.
 --
 -- A GENERATOR WITH ITS OWN LADDER (gen_fc_alcove, gen_fc_escape,
--- gen_zozo4_dadaluma and the #163 ladders) is not double-retried: it runs
+-- gen_zozo4_dadaluma and the #163 sweeps) is not double-retried: it runs
 -- with allowGameOver, so its wipes never reach the canary, and when its
--- ladder is exhausted it raises its own message ("battle 69 not won in 3
+-- sweep is exhausted it raises its own message ("battle 69 not won in 3
 -- attempts"), which classifies as `other` and fails at once.  What the
--- default catches for those files is the part their ladder never covered:
+-- default catches for those files is the part their sweep never covered:
 -- the climb to the fight (#185 is exactly that).  A segment that wants out
 -- entirely passes opts.retries = 1.
 --
@@ -8390,9 +8390,9 @@ local function classify(msg)
   if msg:find("no path", 1, true) then return "nopath" end
   if msg:find("timeout after", 1, true) then return "timeout" end
   -- Only the lib's own wipe texts: the canary's verdict and the
-  -- unladdered encounter canary.  A generator's ladder reports its last
+  -- unswept encounter canary.  A generator's sweep reports its last
   -- loss inside its own exhaustion message ("not won in 3 attempts --
-  -- last loss: PARTY WIPED at f..."), and that is a ladder that already
+  -- last loss: PARTY WIPED at f..."), and that is a sweep that already
   -- retried, whose verdict is the balance finding: `other`, no re-roll.
   if msg:find("THE PARTY IS WIPED", 1, true)
      or msg:find("^GAME OVER fired") then return "wipe" end
@@ -8409,7 +8409,7 @@ RUN = {
   goUnhandled = nil,   -- { frame, what }: a counted game over no reload answered (#205)
   firstBattle = nil,   -- this attempt's first battle, as the seed store saw it (#208)
   firstBattles = {},   -- every earlier attempt's (and probe sample's), oldest first
-  nextShift = nil,     -- a replay's shift chosen by the caller, not the gap ladder
+  nextShift = nil,     -- a replay's shift chosen by the caller, not the gap sweep
   reroll = false,      -- the replay in flight re-runs this attempt (no count)
   rerolls = 0,
   tried = {},          -- shift % 60 -> true, every shift an attempt has run
@@ -8495,7 +8495,7 @@ function M.bootMark(what)
   -- the pad is captured and neutralised AFTER this frame's tick (the
   -- runner's frame(), below), before the game polls it, and handed back
   -- when the idle ends.  The idle's length is the game clock's own
-  -- movement ($021e ticks summed, as newSeedLadder counts them), not a
+  -- movement ($021e ticks summed, as newSeedSweep counts them), not a
   -- frame count, so a boot point that sits in a stopped clock (a map load,
   -- a fade the module does not tick through) still moves the seed.
   if RUN.shift > 0 then
@@ -8532,7 +8532,7 @@ end
 -- ------------------------------------------------ the first battle (#208) --
 -- What a seed shift is FOR is a different first battle, so every attempt
 -- records the RNG state its first battle starts from, at InitBattle's
--- seed store (M.seedStoreAddr, the exec watch newSeedLadder uses):
+-- seed store (M.seedStoreAddr, the exec watch newSeedSweep uses):
 --   $be      the battle seed about to be stored, ($021e * 4) & $FF: the
 --            whole in-battle stream (battle Rand walks RNGTbl from it)
 --   $11E0    the battle group the field or the event handed the battle
@@ -8582,7 +8582,7 @@ local function seedTraceTick()
   t.n = t.n + 1
   local ph = M.seedPhase()
   -- A running clock can read unmoved for one sampled frame (it is ticked at
-  -- the end of the owning module's vblank; newSeedLadder's note), so it
+  -- the end of the owning module's vblank; newSeedSweep's note), so it
   -- reads STOP only after two still frames in a row.
   t.still = ((ph - t.prev) % M.SEED_PERIOD) == 0 and (t.still or 0) + 1 or 0
   t.prev = ph
@@ -8622,7 +8622,7 @@ local function resetLibState()
   execCost = {}
   execHooks = false
   -- M.fizzles is NOT reset: a costed action the pool could not pay is a
-  -- finding whichever attempt made it, and the retry ladder's whole point
+  -- finding whichever attempt made it, and the retry sweep's whole point
   -- is that a lost attempt still happened (#230).
   M._killbitFired = false
   watchReset()
@@ -8704,7 +8704,7 @@ function M.run(opts, steps)
   -- after which the session has TIME-TRAVELED (roster and switches
   -- revert) while every naive predicate reads healthy.  So the default is
   -- LOUD: GameOver ends the attempt, unless the route declares it
-  -- survivable (opts.allowGameOver, or a ladder setting M.gameOverFired =
+  -- survivable (opts.allowGameOver, or a sweep setting M.gameOverFired =
   -- 0 after handling its reload).
   --
   -- READ watch, not exec: GameOver in bank $CC is EVENT SCRIPT DATA -- the
@@ -8879,7 +8879,7 @@ function M.run(opts, steps)
   end
 
   -- Restore the boot snapshot and replay the body; the reloading branch of
-  -- frame() re-executes it with RUN.nextShift (or the gap ladder's shift).
+  -- frame() re-executes it with RUN.nextShift (or the gap sweep's shift).
   local function scheduleReplay(why)
     M.log(string.format("[retry] attempt %d/%d: restoring the boot snapshot "
       .. "(%d bytes) and replaying the body %s",
@@ -9061,7 +9061,7 @@ function M.run(opts, steps)
         -- are the real game over, past which any A Continues the last save.
         if RUN.opts.allowGameOver then
           M.log(string.format("canary: allowGameOver -- the pad is not frozen on "
-            .. "this count; the body's ladder owns the loss (a stall after it "
+            .. "this count; the body's sweep owns the loss (a stall after it "
             .. "files as a wipe) (f%d)", M.frame))
         else
           M.freezePad("the party was wiped in battle")
@@ -9074,7 +9074,7 @@ function M.run(opts, steps)
       failed("wipe", string.format("GAME OVER fired (GameOver read x%d, " ..
         "TitleScreen exec x%d, battle wipe x%d) -- the run " ..
         "lost and any further input auto-Continues the last save, which " ..
-        "reads as silent time travel.  A ladder that can survive this " ..
+        "reads as silent time travel.  A sweep that can survive this " ..
         "must reload BEFORE the game-over lands, or clear " ..
         "M.gameOverFired after handling it (see #127's ambush finding).",
         goReadFired, titleExecFired, wipeFired), 3)

@@ -556,7 +556,7 @@ local function stepOnto(x, y, untilPred, what, budget)
   })
 end
 
--- ------------------------------------------------------ the retry ladder --
+-- ------------------------------------------------------ the retry sweep --
 -- One pursuit attempt: (attempt 2+) reload the checkpoint with a small
 -- stagger, escalate the fighter, walk onto the trigger, fight battle 44,
 -- and ride the whole tail to CYAN's control on map 121.  `lost` short-

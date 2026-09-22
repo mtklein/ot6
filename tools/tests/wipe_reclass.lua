@@ -5,7 +5,7 @@
 -- as the stall that follows the loss.
 --
 -- The shape of the bug (docs/design/sfigaro-gate.md): gen_sfigaro runs
--- with allowGameOver for its cider ladder; the seat-based wipe count fired
+-- with allowGameOver for its cider sweep; the seat-based wipe count fired
 -- on a lost battle 11, froze the pad, the Annihilated screen never got its
 -- press, and 1800 still frames later the no-progress watchdog filed the
 -- attempt as `noprogress` with a stale field signature -- the v0.17

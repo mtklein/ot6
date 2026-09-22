@@ -33,13 +33,13 @@
 -- damage window finishes the 1300 HP. This only works with pierce weapons
 -- in both of LOCKE's hands (a Genji Glove and a pierce weapon, given by
 -- name), because a shield chip goes by weapon class. A loss on this event
--- battle is game over, so the fight uses a retry ladder: the entry-point
+-- battle is game over, so the fight uses a retry sweep: the entry-point
 -- blob is captured beside entry-point generation, and each attempt
 -- reloads it and takes its own battle RNG phase before stepping onto the
--- trigger; H.newSeedLadder reads back what each attempt actually drew.
+-- trigger; H.newSeedSweep reads back what each attempt actually drew.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("TunnelArmr")
+local L = H.newSeedSweep("TunnelArmr")
 local DOOR = "build/states/celes_freed.mss.lua"
 
 -- map compares stay masked: loaders leave flag bits in $1F64's high byte
@@ -452,7 +452,7 @@ local function gearLine(tag)
     table.concat(out, " | "), table.concat(bag, " ")))
 end
 
--- The retry ladder.  The fight's RNG seed is the frame phase at battle
+-- The retry sweep.  The fight's RNG seed is the frame phase at battle
 -- init (`lda $021e / asl2 / sta $be`, gen_whelk_poweron's measurement), so a
 -- lost fight is retried by reloading the entry point blob captured beside the
 -- tunnelarmr_entry generate and waiting a different number of frames before
@@ -577,7 +577,7 @@ local function armrAttempt(n)
     -- A into the Annihilated screen for up to 3000 frames.  The lib's
     -- wipe predicate held 90 straight frames, or the run canary's count
     -- (it now counts a 300-frame battle-side wipe as a game over and
-    -- freezes the pad -- allowGameOver on the run keeps the ladder alive
+    -- freezes the pad -- allowGameOver on the run keeps the sweep alive
     -- for the reload), names the loss here instead and skips the taps.
     H.driveUntil(function()
       wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
@@ -633,7 +633,7 @@ local function armrAttempt(n)
   })
 end
 
--- allowGameOver: the TunnelArmr ladder deliberately survives a lost
+-- allowGameOver: the TunnelArmr sweep deliberately survives a lost
 -- battle 67 (#163); the fight drive reads H.gameOverFired as a loss and
 -- the next attempt reloads.
 H.run({ maxFrames = 300000, allowGameOver = true }, {
@@ -981,7 +981,7 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
   H.logStep(function()
     return string.format("tunnelarmr_entry generated at frame %d", H.frame)
   end),
-  -- capture the same entry point as the retry ladder's reload blob
+  -- capture the same entry point as the retry sweep's reload blob
   (function()
     local req
     return seq({

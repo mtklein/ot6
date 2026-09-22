@@ -182,7 +182,7 @@ local function mkFighter(tier, tag)
   -- The lib's wipe predicate held 90 straight frames is the loss; so is
   -- the run canary's count (it now counts a 300-frame battle-side wipe as
   -- a game over and freezes the pad -- allowGameOver on the run keeps the
-  -- ladder alive for the reload).
+  -- sweep alive for the reload).
   function F.watch()
     watch.frame()
     wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
@@ -269,7 +269,7 @@ local function mkFighter(tier, tag)
   return F
 end
 
--- ------------------------------------------------------ the fight ladder --
+-- ------------------------------------------------------ the fight sweep --
 local u2Blob, u2Won = nil, false
 local u2Lost = nil
 local function fightBody(tier)
@@ -353,7 +353,7 @@ end
 
 -- Budget: the battle-clear-write era ran in 90k frames; the input-driven
 -- fight costs real ATB rounds and the ladder may replay it three times.
--- allowGameOver: the ladder deliberately survives a lost battle 104
+-- allowGameOver: the sweep deliberately survives a lost battle 104
 -- (#163); F.watch reads H.gameOverFired as a loss and the next attempt
 -- reloads.
 H.run({ maxFrames = 400000, allowGameOver = true }, {
@@ -364,7 +364,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     H.assertEq(sw(0x005D), 0, "$005D clear before Setzer's bargain")
   end),
 
-  -- the ladder's checkpoint is the booted entry point
+  -- the sweep's checkpoint is the booted entry point
   (function()
     local ckReq
     return H.cond(function() return true end, {

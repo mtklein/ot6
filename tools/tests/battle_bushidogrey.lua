@@ -8,7 +8,7 @@
 --       tech (every tech is a boosted action, so its turn regens nothing).
 --       It opens at 1 in EVERY battle, so a ledger that spans a battle
 --       boundary is not a ledger -- every bank read below is gated on the
---       battle it was built in (passes 2-5 are retry ladders).
+--       battle it was built in (passes 2-5 are retry sweeps).
 --   MP: his real pool (92 on the fighting run), spent 4 a Dispatch and
 --       10 a Retort.
 
@@ -580,7 +580,7 @@ H.run({ maxFrames = 150000 }, {
   -- straight to 0, and it is the counter stance rather than a hit, so it
   -- does not end the fight the way a Dispatch does.  The read then checks
   -- the bank it was staged with, not the bank it was driven to, and the arm
-  -- is a three-attempt ladder (the house limit) because the trash can still
+  -- is a three-attempt sweep (the house limit) because the trash can still
   -- flee or kill the fight out from under an attempt.
   (function()
     local done = false

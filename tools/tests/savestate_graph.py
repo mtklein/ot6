@@ -573,9 +573,9 @@ STATES = [
     # (ai_script.asm:6267-6355), so the whole offense is elemental WEAPONS
     # (TERRA's Fire Rod / LOCKE's ThunderBlade = bolt) swung as physical
     # Fights and healing is item-only -- zero MAGIC commands, the form never
-    # arms.  A 5-rung seed ladder (H.newSeedLadder) retries a loss from a
+    # arms.  A 5-rung seed sweep (H.newSeedSweep) retries a loss from a
     # savestate taken just after the lore scene.  timeout=1800: the 22000-HP
-    # fight behind a seed ladder plus two warp-maze crossings runs past
+    # fight behind a seed sweep plus two warp-maze crossings runs past
     # run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
     # deliberate by-hand operation:
     #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/esper-mtn-save-v1 \
@@ -591,14 +591,14 @@ STATES = [
     # 375 (15,17) -- the save comp -> (11,51) $0097 shortcut -> the SE
     # compartment -> 372 (51,17) -> 372 (40,19) -> the pocket (16,9), all navTo
     # hops -- then ride the atomic massacre chain: solo Leo's battle 124 (a real
-    # loseable fight whose loss is a GAME OVER, behind a 5-rung seed ladder off a
+    # loseable fight whose loss is a GAME OVER, behind a 5-rung seed sweep off a
     # pre-fight savestate with a GameOver read-canary), the scripted theater
     # battles 105/97, Leo's death, the party restore, the burial and the
     # Blackjack's return, and the real world Save at the stop line world
     # (249,128) -- the `thamasa-done-v1` checkpoint.  checkpoint=, not prev=:
     # this state cold-Continues the tracked ultros-won-v1 battery rather than a
     # savestate link, the gen_ultros / gen_esper_mtn shape.  timeout=1800: the
-    # warp-maze climb, a seed-laddered solo fight, and the long scripted tail run
+    # warp-maze climb, a seed-swept solo fight, and the long scripted tail run
     # past run.sh's 600s default on a loaded machine.  Re-cutting the SRAM is a
     # deliberate by-hand operation:
     #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/ultros-won-v1 \

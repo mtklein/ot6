@@ -183,7 +183,7 @@ end
 local function isUltros() return H.formationHas({ [ULTROS4] = true, [CHUPON] = true }) end
 
 -- the seed every InitBattle draws, read off the `sta $be` store the way
--- H.newSeedLadder reads it (lib/ot6.lua "battle rng seed")
+-- H.newSeedSweep reads it (lib/ot6.lua "battle rng seed")
 local seeds, seedN = {}, 0
 local function armSeedWatch()
   local addr = H.seedStoreAddr()

@@ -185,7 +185,7 @@ Five of six, **no fizzle and no refusal on any of them** — the priced
 fighter never even asks for a row the confirm would buzz. Seed 25 is the
 failure `narshe-descent.md` already names and classifies: it is not an MP
 failure (0 fizzles, 0 refusals, 14 priced step-downs all going through),
-it is a bad draw, and the segment's own three-attempt ladder is what that
+it is a bad draw, and the segment's own three-attempt sweep is what that
 is for.
 
 ## Making it loud

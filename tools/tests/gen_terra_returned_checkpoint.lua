@@ -10,7 +10,7 @@
 -- See gen_mrf_save_room_checkpoint.lua for the codex-witness seeding and the
 -- $307ff0 sentinel this file reuses.
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("cranes ride")
+local L = H.newSeedSweep("cranes ride")
 
 local ZMENUSTATE = 0x26
 local saveArg = nil

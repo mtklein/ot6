@@ -162,7 +162,7 @@ local function mkFighter(tier, tag)
   return F
 end
 
--- ------------------------------------------------- the attempt ladder --
+-- ------------------------------------------------- the attempt sweep --
 local doorBlob, won, lostWhy = nil, false, nil
 
 local function attempt(n)
@@ -257,7 +257,7 @@ H.run({ maxFrames = 300000 }, {
       "at (19,36), KEFKA's entry point")
     H.assertEq(H.readByte(0x1a6d), 1, "party 1 (TERRA+EDGAR+CELES) active")
   end),
-  -- capture the entry point once: the retry ladder's rewind point (this
+  -- capture the entry point once: the retry sweep's rewind point (this
   -- boot's own state; nothing is written to the game)
   (function()
     local req

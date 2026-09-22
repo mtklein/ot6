@@ -14,7 +14,7 @@
 -- $010B (NUMBER 128) with both blades.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedLadder("minecart ride")
+local L = H.newSeedSweep("minecart ride")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -175,7 +175,7 @@ local function rideDriver(pred, lostRef, maxFrames, what)
       -- The lib's wipe predicate held 120 straight frames (this file's
       -- own debounce) is the loss; so is the run canary's count (it now
       -- counts a 300-frame battle-side wipe as a game over and freezes
-      -- the pad -- allowGameOver on the run keeps the ladder alive for
+      -- the pad -- allowGameOver on the run keeps the sweep alive for
       -- the reload).
       wipedN = H.partyWipedInBattle() and wipedN + 1 or 0
       if not lostRef.lost and (H.gameOverFired or 0) > 0 then
@@ -229,7 +229,7 @@ local function rideDriver(pred, lostRef, maxFrames, what)
         end
       end
       if battN >= 3 then
-        -- a wipe never sets $0069; catch it here so the ladder can act.
+        -- a wipe never sets $0069; catch it here so the sweep can act.
         -- Debounced 120 frames: the HP table can read zero for a moment
         -- while a battle deals the party in.
         local alive = false
@@ -314,7 +314,7 @@ local function rideAttempt(n)
       H.log(string.format("[ride] cutscene TRAIN entered at frame %d", H.frame))
       H.screenshot("minecart_ride")
     end),
-    -- ride it out; terminates early on a detected wipe so the ladder can
+    -- ride it out; terminates early on a detected wipe so the sweep can
     -- reload instead of timing out
     rideDriver(function()
       return map() == 240 and sw(0x0069) == 1 and settled()
@@ -333,7 +333,7 @@ local function rideAttempt(n)
   })
 end
 
--- allowGameOver: the ride ladder deliberately survives a lost ride
+-- allowGameOver: the ride sweep deliberately survives a lost ride
 -- (#163); rideDriver reads H.gameOverFired as a loss and the next attempt
 -- reloads.
 H.run({ maxFrames = 400000, allowGameOver = true }, {
@@ -451,7 +451,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0, "facing CID again")
     H.log(partyReport("ride entry point, prepared"))
   end),
-  -- capture the prepared entry point as the retry ladder's reload blob
+  -- capture the prepared entry point as the retry sweep's reload blob
   (function()
     local req
     return seq({
@@ -465,7 +465,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
     })
   end)(),
 
-  -- 2. the ride, on the phase-spread retry ladder
+  -- 2. the ride, on the phase-spread retry sweep
   L.watch(),
   rideAttempt(1),
   rideAttempt(2),

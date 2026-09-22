@@ -131,7 +131,7 @@ local function survey(tag, targets)
 end
 
 local CROSS_ATTEMPTS = 6
-local L = H.newSeedLadder("mrf crossing", { attempts = CROSS_ATTEMPTS })
+local L = H.newSeedSweep("mrf crossing", { attempts = CROSS_ATTEMPTS })
 local crossed, crossLost, crossBlob = false, nil, nil
 
 local function crossBody()
@@ -204,7 +204,7 @@ local function crossAttempt(n)
   }, {})
 end
 
--- allowGameOver: the crossing ladder deliberately loses attempts and
+-- allowGameOver: the crossing sweep deliberately loses attempts and
 -- reloads the full-healed crossBlob before taking the next battle-RNG
 -- phase, so a wipe's Game Over is expected.  Correctness is ground-truth
 -- guarded: every attempt rewinds to a known-good party, `crossed` only
@@ -236,7 +236,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
                 threshold = 0.85 }),
 
   -- Capture the pre-crossing checkpoint: the full-healed party at the
-  -- landing, the retry ladder's rewind point.  Nothing is written to the
+  -- landing, the retry sweep's rewind point.  Nothing is written to the
   -- game; this is just this boot's own state.
   (function()
     local req
@@ -263,7 +263,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.call(function()
     if not crossed then
       error(string.format("the Magitek Factory upper-floor crossing was not "
-        .. "survived in %d seed-ladder attempts (last loss: %s).  If every "
+        .. "survived in %d seed-sweep attempts (last loss: %s).  If every "
         .. "phase loses even from a full-healed party, that is a balance "
         .. "finding about this pincer, not a route bug -- capture the numbers.",
         CROSS_ATTEMPTS, tostring(crossLost)), 0)

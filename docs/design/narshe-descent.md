@@ -258,7 +258,7 @@ By distinct sample: control **4 of 10**, priced **8 of 10**, ration **9 of
 - It is **not** gradual. EDGAR's pool is gone after **two battles of
   seven**, both in the first 8,000 frames, and it never moves again. The 14
   battles in the failing log are the same five formations replayed by the
-  three-attempt ladder, not fourteen encounters draining a pool.
+  three-attempt sweep, not fourteen encounters draining a pool.
 - It is **not** general. Two of the three walkers spend no MP at all in
   `control` — TERRA and CELES are at `97/97` and `96/96` the whole way, and
   CELES's twenty Runic turns cost nothing and do nothing.
@@ -342,7 +342,7 @@ frames of the economy it had before #219 — on the #219 ROM, at the #219
 prices.
 
 The generate edge itself, run unmodified from the same tracked
-`reunion_ready` fixture with the graph's own retry ladder and nothing
+`reunion_ready` fixture with the graph's own retry sweep and nothing
 published (`build/lab/narshe-descent/shipped/narshe_battle.log`):
 
 ```
@@ -360,7 +360,7 @@ EDGAR still holds 27/87 and the ration is working (10 MP a turn, tools into
 battle 4), and attempt 2's battle 7 — four Troopers — takes **766 HP** off
 the party in nine turns (`ration/seed25.log`). That is an ordinary bad
 draw of the kind "lost battles are normal" covers, and the segment's own
-three-attempt ladder is what it is for.
+three-attempt sweep is what it is for.
 
 ### Options not taken, and what they would cost
 
