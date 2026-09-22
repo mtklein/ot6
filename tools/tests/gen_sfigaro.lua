@@ -391,8 +391,8 @@ local GATE = {
   -- healPercent 60 -> 30 reserves the scarce Potion for the endgame steer;
   -- see the SUPPLY note above.
   driver = { tactical = true, boost = true, bank = 0, items = true,
-             healPercent = 30, cadence = 12 },
-  endgameFloor = 175,      -- TekLaser measured up to 168 raw (the lab)
+             healPercent = 48, cadence = 12 },
+  endgameFloor = 135,      -- gear cuts the TekLaser to a measured 123 (was 175 for the ~168 raw laser)
   endgameTotalMon = 200,   -- the lib's finisher gate
   wipeFrames = 90,         -- the cider sweep's wipe hold
 }
@@ -635,10 +635,20 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
     H.assertEq(sw(0x0105), 1, "$0105 -- LOCKE's scenario is live")
     H.assertEq(sw(0x001E), 0, "$001E clear -- the scenario is not done")
   end),
+  -- LOCKE's kit for the three gate fights (#244).  He already CARRIES far
+  -- better gear than the Dirk this used to equip -- locke_scenario's bag holds
+  -- a MithrilBlade ($0A, battle power 38 vs the Dirk's 26), a HeavyShield
+  -- ($5B, def/mdef 22) and a PlumedHat ($6B, def/mdef 14/9) -- so this dresses
+  -- him in it (all three are LOCKE-equippable, checked against the item_prop
+  -- equip masks).  The HeavyShield is the load-bearing change: its +22 mdef
+  -- cuts the HeavyArmor's TekLaser from ~160 to a measured 123 and its Battle
+  -- from ~60 to ~48 (build/attempts/.../gear runs), which is what makes the
+  -- three fights survivable on the 2 Potions the route can carry.
   H.equipLoadout(1, {
-    { 0, 0x00 }, -- Dirk
-    { 2, 0x69 }, -- Leather Hat
-    { 3, 0x84 }, -- LeatherArmor
+    { 0, 0x0A }, -- MithrilBlade (was Dirk)
+    { 1, 0x5B }, -- HeavyShield (was empty -- the survivability change)
+    { 2, 0x6B }, -- PlumedHat (was Leather Hat)
+    { 3, 0x84 }, -- LeatherArmor (the only body armor he carries)
   }, { tag = "LOCKE occupied-town kit" }),
 
   -- The back row halves the soldier's physical.  It does not win battle 11.
