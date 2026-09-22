@@ -105,8 +105,9 @@ local function throwCall(c)
   end
 end
 
--- which tier test this ROM's Ot6BoostDmg carries: `cmp $3a7d` (CD 7D 3A,
--- v0.20) or `cmp $b6` (C5 B6, since 468b08ae)
+-- which tier test this ROM's Ot6BoostDmg carries: v0.20's `cmp $3a7d` alone,
+-- 468b08ae's executing pair (`cmp $b6`, C5 B6), or the queued pair (`lda
+-- $3a7c` against the fold commands, AD 7C 3A, then `cmp $3a7d`, CD 7D 3A)
 local function procVariant()
   local base = H.sym("Ot6BoostDmg") & 0x3FFFFF
   local hex, seen = {}, {}
@@ -115,9 +116,15 @@ local function procVariant()
     hex[#hex + 1] = string.format("%02X", b)
     local b1, b2 = H.readRomByte(base + i + 1), H.readRomByte(base + i + 2)
     if b == 0xCD and b1 == 0x7D and b2 == 0x3A then seen.a7d = i end
+    if b == 0xAD and b1 == 0x7C and b2 == 0x3A then seen.a7c = i end
     if b == 0xC5 and b1 == 0xB6 then seen.b6 = i end
   end
-  return seen, table.concat(hex, " ")
+  local form = seen.b6 and string.format("cmp $b6 at +%d (468b08ae: executing $b5/$b6)", seen.b6)
+    or (seen.a7c and seen.a7d) and string.format("lda $3a7c at +%d, cmp $3a7d at +%d "
+      .. "(queued command/attack)", seen.a7c, seen.a7d)
+    or seen.a7d and string.format("cmp $3a7d at +%d (v0.20: queued attack only)", seen.a7d)
+    or "NEITHER"
+  return form, table.concat(hex, " ")
 end
 
 local installed = false
@@ -134,12 +141,9 @@ local function installObservers()
     end
   end
   H.assertEq(#sites, 2, "Ot6BoostDmg has two call sites in bank $C2")
-  local seen, hex = procVariant()
+  local form, hex = procVariant()
   H.log(string.format("[rom] Ot6BoostDmg at $%06X, returns to $%06X/$%06X; "
-    .. "tier test: %s", bd, sites[1], sites[2],
-    seen.a7d and string.format("cmp $3a7d at +%d (v0.20 shape)", seen.a7d)
-    or seen.b6 and string.format("cmp $b6 at +%d (468b08ae shape)", seen.b6)
-    or "NEITHER"))
+    .. "tier test: %s", bd, sites[1], sites[2], form))
   H.log("[rom] Ot6BoostDmg bytes: " .. hex)
 
   emu.addMemoryCallback(function()

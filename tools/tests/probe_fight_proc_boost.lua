@@ -63,12 +63,16 @@ local function installObservers()
     end
   end
   H.assertEq(#sites, 2, "Ot6BoostDmg has two call sites in bank $C2")
-  local base, form = bd & 0x3FFFFF, "NEITHER"
+  local base, seen = bd & 0x3FFFFF, {}
   for i = 0, 159 do
     local a, b, c = H.readRomByte(base + i), H.readRomByte(base + i + 1), H.readRomByte(base + i + 2)
-    if a == 0xCD and b == 0x7D and c == 0x3A then form = "cmp $3a7d (v0.20 shape)" end
-    if a == 0xC5 and b == 0xB6 then form = "cmp $b6 (468b08ae shape)" end
+    if a == 0xCD and b == 0x7D and c == 0x3A then seen.a7d = true end
+    if a == 0xAD and b == 0x7C and c == 0x3A then seen.a7c = true end
+    if a == 0xC5 and b == 0xB6 then seen.b6 = true end
   end
+  local form = seen.b6 and "cmp $b6 (468b08ae: executing $b5/$b6)"
+    or (seen.a7c and seen.a7d) and "lda $3a7c / cmp $3a7d (queued command/attack)"
+    or seen.a7d and "cmp $3a7d (v0.20: queued attack only)" or "NEITHER"
   H.log(string.format("[rom] Ot6BoostDmg at $%06X; tier test: %s", bd, form))
 
   emu.addMemoryCallback(function()
