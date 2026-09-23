@@ -20,9 +20,11 @@
 --      instant slot 1 equals slot 3 and lifecycle reads 1.
 --   2. fight a Veldt battle, formation staged (see "Staging" below), until
 --      it teaches something through the party's real weapon classes.
---      Every changed byte must land in the slot-1 page and none in the
---      slot-3 or transient pages.  After this battle the pages differ by
---      exactly the earned bytes.
+--      Which formation is chosen from the fixture's own state, not named
+--      here: the one the save's history left teachable (see "Choosing the
+--      write formation").  Every changed byte must land in the slot-1 page
+--      and none in the slot-3 or transient pages.  After this battle the
+--      pages differ by exactly the earned bytes.
 --   3. stage a formation holding a just-taught species, and read the seed
 --      of that fresh battle before any input: the taught monster must
 --      enter pre-revealed with the taught bits, which is the read half.
@@ -38,10 +40,8 @@ local SLOT1, SLOT2, SLOT3, TEMP = 0x316000, 0x316400, 0x316800, 0x316C00
 local PAGE_USED = 0x310                 -- magic + elem@$10 + class@$190
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_CMD, ST_MAGIC, ST_TGT = 0x05, 0x0E, 0x38
+local ST_CMD, ST_TGT = 0x05, 0x38
 local CMDTBL = 0x202E
-local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
-local FIRE = 0x00
 
 local function sram(a) return emu.read(a, emu.memType.snesMemory) end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -60,13 +60,6 @@ local function offName(off)
   if off >= 0x10 then return string.format("elem species $%03X", off - 0x10) end
   return string.format("header+%X", off)
 end
-local function spellIndexOf(slot, id)
-  for i = 0, 15 do
-    local a = 0x2092 + SPELL_PTR[slot] + i * 4
-    if H.readByte(a) == id and (H.readByte(a + 1) & 0x80) == 0 then return i end
-  end
-  return nil
-end
 
 -- taught[species] = { elem = bits, class = bits }: what step 2 earned,
 -- keyed for step 3's seed check
@@ -78,35 +71,45 @@ local slot1Before, slot3Before, tempBefore = nil, nil, nil
 -- (field/battle.asm) moves its pointer $1fa5 one nonzero byte (a group of
 -- eight formations) per encounter and picks inside the group with
 -- UpdateBattleGrpRng, a counter at $1fa2/$1fa3.  Those counters are save
--- data, so which formations this fixture's encounters deal is fixed.  The
--- formation that taught in the measured run, f57 (Stray Cat, Beakor,
--- CrassHopper x2), is one of three in its group and is dealt only when the
--- counter lands on one start bit of eight (#244: the write half met it at
--- battle 8, and the read half's 40 encounters never dealt it again).  So
--- both halves choose the formation: an exec callback on the instruction
--- after GetVeldtBattle stores its pick to $11e0 replaces the pick while
--- `staged` is set.  What is under test -- which codex page the ROM writes
--- during the battle and which page it merges at the battle's seed -- is
--- untouched: the fight, the chips, the page writes and the seed merge are
--- the ROM's.  Declared in tools/state_write_waivers.txt.
-local VELDT_LIST, WRITE_FORMATION = 0x1DDD, 57
+-- data, so which formations this fixture's encounters deal is fixed, and a
+-- teaching formation can sit behind one start bit of eight (#244: the
+-- write half met its formation at battle 8, and the read half's 40
+-- encounters never dealt it again).  So both halves choose the formation,
+-- always one whose bit is set in $1ddd: an exec callback on the
+-- instruction after GetVeldtBattle stores its pick to $11e0 replaces the
+-- pick while `staged` is set.  What is under test -- which codex page the
+-- ROM writes during the battle and which page it merges at the battle's
+-- seed -- is untouched: the fight, the chips, the page writes and the seed
+-- merge are the ROM's.  Declared in tools/state_write_waivers.txt.
+local VELDT_LIST = 0x1DDD
 local FORMATIONS = H.sym("BattleMonsters") & 0x3FFFFF
 local staged = nil
 local function inVeldtList(f)
   return (H.readByte(VELDT_LIST + (f >> 3)) >> (f & 7)) & 1 == 1
 end
--- the first formation in the Veldt list that holds a species step 2 taught
-local function readFormation()
+local function formationAt(f)
+  return H.formationRecord(function(i)
+    return H.readRomByte(FORMATIONS + f * 15 + i)
+  end)
+end
+-- does formation f open with a species step 2 taught on stage?
+local function holdsTaught(f)
+  local rec = formationAt(f)
+  for slot = 0, 5 do
+    local sp = rec.species[slot]
+    if sp and (rec.present >> slot) & 1 == 1 and taught[sp] then return true end
+  end
+  return false
+end
+-- The read battle: the write formation itself when it opens with a taught
+-- species (the pack the party just beat), else the first formation in the
+-- Veldt list that does.  `writeF` is the write half's choice.
+local function readFormation(writeF)
+  if writeF ~= nil and inVeldtList(writeF) and holdsTaught(writeF) then
+    return writeF
+  end
   for f = 0, 511 do
-    if inVeldtList(f) then
-      local rec = H.formationRecord(function(i)
-        return H.readRomByte(FORMATIONS + f * 15 + i)
-      end)
-      for slot = 0, 5 do
-        local sp = rec.species[slot]
-        if sp and (rec.present >> slot) & 1 == 1 and taught[sp] then return f end
-      end
-    end
+    if inVeldtList(f) and holdsTaught(f) then return f end
   end
   return nil
 end
@@ -130,21 +133,47 @@ do
   end, emu.callbackType.exec, hook, hook)
 end
 
--- the in-battle action driver: everyone Fights; 4-frame-held presses on a
--- 5-on/5-off cadence.
+-- the in-battle action driver; 4-frame-held presses on a 5-on/5-off
+-- cadence.
 --
 -- Teach steering: when a live monster's weak mask still has a bit some
 -- party member can newly reveal, that member delivers it (Fight for a
--- weapon-class match, the Pummel list walk for the blitz class), the other
--- characters Defend, and Gau -- who has no Fight row to swap into Def --
--- burns his turn on a Tonic; when nothing present is teachable, everyone
--- taps A and the filler battle ends fast.  All of it is read from the
--- battle's own seeded state (weak mask $3e9c+off, revealed bits
--- $3e9d+off), so nothing here pins a species id.
-local ST_TOOLS, ST_ITEM = 0x30, 0x0A
+-- weapon-class match, aimed at that monster; the Pummel list walk for the
+-- blitz class, which OT6's Blitz commits with no target select, so the
+-- engine picks the body), the other characters Defend, and Gau -- who has
+-- no Fight row to swap into Def -- hands his window on with X; when
+-- nothing present is teachable, the library's full-kit driver finishes the
+-- battle (see battlePulse's modes).  All of it is read from the battle's
+-- own seeded state (weak mask $3e9c+off, revealed bits $3e9d+off), so
+-- nothing here pins a species id.
+local ST_TOOLS = 0x30
+-- The command window's side states and the transitional ones, as the
+-- library's driver measured them (ot6.lua, BATTLE.ST_ROW/ST_DEF and
+-- BATTLE.ST_TRANSITIONAL, plus $01 and the tools shell's $2E/$2F): RIGHT at
+-- $05 walks $01 -> $27 (Def.), where A commits the defend; a B in $01 or
+-- $27 cancels it.  None of the transitional states reads a button the
+-- driver needs, so they get none.
+local ST_ROW, ST_DEF = 0x24, 0x27
+local ST_WAIT = {}
+for _, st in ipairs({ 0x01, 0x02, 0x04, 0x06, 0x07, 0x09, 0x0F, 0x10, 0x26,
+                      0x2E, 0x2F, 0x31, 0x32, 0x33, 0x34, 0x39, 0x3A, 0x40,
+                      0x41 }) do
+  ST_WAIT[st] = true
+end
 local CMD_FIGHT, CMD_ITEM, CMD_BLITZ = 0x00, 0x01, 0x0A
-local ITEMLIST, PUMMEL, PUMMEL_COST, TONIC = 0x4005, 0x5D, 4, 0xE8
+local ITEMLIST, PUMMEL, PUMMEL_COST = 0x4005, 0x5D, 4
 local WEAPCLASS = H.sym("Ot6WeapClassTbl") & 0x3FFFFF
+-- an ability's class byte, the scan Ot6SkillClass makes: (id, class)
+-- pairs, $ff-terminated, absent = classless
+local function skillClassOf(id)
+  local a = H.sym("Ot6SkillClassTbl") & 0x3FFFFF
+  while H.readRomByte(a) ~= 0xFF do
+    if H.readRomByte(a) == id then return H.readRomByte(a + 1) end
+    a = a + 2
+  end
+  return 0
+end
+local PUMMEL_CLASS = skillClassOf(PUMMEL)
 local function attackClassOf(slot)
   return H.readRomByte(WEAPCLASS + H.readByte(0x3ca8 + slot * 2))
 end
@@ -155,13 +184,6 @@ local function cmdCellOf(slot, cmd)
   return nil
 end
 local function mpOf(slot) return H.readWord(0x3C08 + slot * 2) end
-local function battleBagIdxOf(id)
-  for i = 0, 251 do
-    if H.readByte(0x2686 + i * 5) == id
-       and H.readByte(0x2686 + i * 5 + 3) > 0 then return i end
-  end
-  return nil
-end
 local function canTeach(cls)
   for m = 0, 5 do
     if H.readByte(0x3aa8 + m * 2) % 2 == 1 then
@@ -173,13 +195,14 @@ local function canTeach(cls)
   return false
 end
 -- how this slot can still teach something present: "fight" (its weapon's
--- class, which needs a Fight command to swing), "blitz" (Pummel's $04,
--- which needs the Blitz command and its 4 MP), or nil
+-- class, which needs a Fight command to swing), "blitz" (Pummel's class,
+-- Ot6SkillClassTbl's $5d row, which needs the Blitz command and its 4 MP),
+-- or nil
 local function teachRoleOf(slot)
   if cmdCellOf(slot, CMD_FIGHT) ~= nil
      and canTeach(attackClassOf(slot)) then return "fight" end
   if cmdCellOf(slot, CMD_BLITZ) ~= nil and mpOf(slot) >= PUMMEL_COST
-     and canTeach(0x04) then return "blitz" end
+     and canTeach(PUMMEL_CLASS) then return "blitz" end
   return nil
 end
 local function teacherPresent()
@@ -190,34 +213,268 @@ local function teacherPresent()
   end
   return false
 end
+
+-- Choosing the write formation.  What a battle can teach the slot-1 page
+-- depends on the save's history: SaveAs copies slot 3's page, so every
+-- class the chain's post-save fights already revealed is known before the
+-- first write battle and teaches nothing again.  A named formation is
+-- luck: f57 (Stray Cat, Beakor, CrassHopper x2) taught Beakor's slash in
+-- one measured run, and after the chain was regenerated on the v0.21 ROM
+-- the slot-3 page already held every class bit f57's species have that this
+-- party can reveal (Beakor and Stray Cat slash, CrassHopper pierce, which
+-- nobody here swings), so sixteen f57 battles taught nothing.  So the
+-- formation is chosen from the fixture's own state at the start of step
+-- 2, and nothing about it is named here:
+--   * the Veldt list $1ddd: only a formation the Veldt deals here;
+--   * each present species' class-weak mask, the byte Ot6SeedShields
+--     seeds into $3e9c: its Ot6ShieldTbl row (4-byte records, word
+--     species, byte shields, byte classes, $ffff-ended, first match wins),
+--     else OT6_FLOOR_CLASS[species];
+--   * the party's teachers, fieldTeachers() below: teachRoleOf's two roles
+--     read off the field records before the battle exists;
+--   * the slot-1 page's class byte (and the transient page's, the other
+--     control the write half's discriminator is checked against).
+-- A candidate holds a species with a class bit its mask has, a teacher
+-- carries, and neither slot 1 nor the transient page knows.  The pick
+-- prefers a bit a Fight row can reveal (no MP to run out of), then the
+-- lightest pack by MonsterProp HP (the shortest fight to survive), then
+-- the lowest formation id.
+local CHAR_GAU = 0x0B
+local SHIELDTBL = H.sym("Ot6ShieldTbl") & 0x3FFFFF
+local FLOOR_CLASS = H.sym("OT6_FLOOR_CLASS") & 0x3FFFFF
+local MONPROP = H.sym("MonsterProp") & 0x3FFFFF
+local function classWeakOf(sp)
+  local a = SHIELDTBL
+  while H.readRomWord(a) ~= 0xFFFF do
+    if H.readRomWord(a) == sp then return H.readRomByte(a + 3) end
+    a = a + 4
+  end
+  return H.readRomByte(FLOOR_CLASS + sp)
+end
+local function monsterHp(sp) return H.readRomWord(MONPROP + sp * 32 + 8) end
+-- The driver's teachers as the battle will field them, from the field
+-- records ($1600 + 37*c) of the active party's standing members:
+--   * "fight": a Fight row swings the right hand ($1F, the item battle
+--     loads into $3ca8) at Ot6WeapClassTbl's class (H.weaponClass: a
+--     null-break weapon teaches nothing).  Not Gau: on the Veldt
+--     Ot6VeldtRow rewrites his Fight row to Leap.
+--   * "blitz": a Blitz row, Pummel known ($1d28 bit 0) and its MP.
+-- The command build has other rewrites (a relic's Fight -> Jump, say)
+-- that this does not model; every write battle checks the prediction
+-- against the battle's own command table (see `predictionHeld`).
+local function fieldTeachers()
+  local out = {}
+  local active = H.readByte(0x1A6D) & 0x07
+  for c = 0, 15 do
+    if (H.readByte(0x1850 + c) & 0x07) == active and H.charHp(c) > 0
+       and (H.charStatus1(c) & 0xC2) == 0 then
+      local rec = 0x1600 + 37 * c
+      local fight, blitz = false, false
+      for i = 0, 3 do
+        local cmd = H.readByte(rec + 0x16 + i)
+        if cmd == CMD_FIGHT then fight = true end
+        if cmd == CMD_BLITZ then blitz = true end
+      end
+      local rh = H.readByte(rec + 0x1F)
+      if fight and H.readByte(rec) ~= CHAR_GAU and H.weaponClass(rh) ~= 0 then
+        out[#out + 1] = { char = c, role = "fight", cls = H.weaponClass(rh),
+          what = string.format("char %d Fight rh=$%02X", c, rh) }
+      end
+      if blitz and (H.readByte(0x1D28) & 0x01) ~= 0
+         and H.charMp(c) >= PUMMEL_COST and PUMMEL_CLASS ~= 0 then
+        out[#out + 1] = { char = c, role = "blitz", cls = PUMMEL_CLASS,
+          what = string.format("char %d Pummel mp=%d", c, H.charMp(c)) }
+      end
+    end
+  end
+  return out
+end
+-- every teachable candidate, best first; each { f, sp, bits, fightBits,
+-- known, hp }
+local function writeCandidates(teachers)
+  local teach, fightTeach = 0, 0
+  for _, t in ipairs(teachers) do
+    teach = teach | t.cls
+    if t.role == "fight" then fightTeach = fightTeach | t.cls end
+  end
+  local out = {}
+  for f = 0, 511 do
+    if inVeldtList(f) then
+      local rec, hp, best = formationAt(f), 0, nil
+      for slot = 0, 5 do
+        local sp = rec.species[slot]
+        if sp and (rec.present >> slot) & 1 == 1 then
+          hp = hp + monsterHp(sp)
+          local known = sram(SLOT1 + 0x190 + sp) | sram(TEMP + 0x190 + sp)
+          local bits = classWeakOf(sp) & teach & ~known
+          if bits ~= 0 and (best == nil
+             or (best.fightBits == 0 and bits & fightTeach ~= 0)) then
+            best = { sp = sp, bits = bits, fightBits = bits & fightTeach,
+                     known = sram(SLOT1 + 0x190 + sp), weak = classWeakOf(sp) }
+          end
+        end
+      end
+      if best then
+        best.f, best.hp = f, hp
+        out[#out + 1] = best
+      end
+    end
+  end
+  table.sort(out, function(a, b)
+    if (a.fightBits ~= 0) ~= (b.fightBits ~= 0) then return a.fightBits ~= 0 end
+    if a.hp ~= b.hp then return a.hp < b.hp end
+    return a.f < b.f
+  end)
+  return out
+end
+local writeChoice = nil                 -- the chosen candidate, set in step 2
+-- The prediction, judged once a write battle's seed has settled
+-- (judgePrediction): with the chosen species on stage and its chosen bits
+-- still open, does the battle's own command table give some seated member
+-- a row that teaches them (HP aside: a teacher felled early is the fight's
+-- luck, not the model's error)?  true/false, or nil when the species was
+-- not on stage to judge.
+local predictionHeld = nil
+-- Set once a battle's seed has settled (settleSeed below): the species
+-- words, masks and command tables read before it can be half-written.
+-- Measured: an open-menu gate ($7BCA, already nonzero as the battle loads)
+-- read f21's slot 2 as weak=00 sh=0/0 beside its seeded twin in slot 3.
+local seeded = false
 -- Per-battle diagnostics: the [dbg] seeded-state dump, the [steer] role
 -- log, and the per-battle attack-class tally.
-local lastActor, mfM, actM = nil, 0, nil
+local lastActor, mfM = nil, 0
 local dbgLogged = false                 -- one [dbg] line per battle
 local steerLogged = {}                  -- one [steer] line per actor per battle
 local atkSeen = {}                      -- OT6_ATKCLASS writes, tallied per battle
 emu.addMemoryCallback(function(_, v)
   atkSeen[v] = (atkSeen[v] or 0) + 1
 end, emu.callbackType.write, 0x7e57b8, 0x7e57b8)
--- this fixture has no Terra: every live action here takes the ordinary
--- Fight branch.
+-- The battle runs in one of two modes, decided at every command window
+-- (and between windows), never inside a submenu:
+--   "teach"   a teacher stands and a live monster still has a class bit
+--             it can newly reveal: that teacher Fights with the target
+--             cursor steered onto the teachable monster (or Pummels, whose
+--             target the engine picks: measured, force_f21_trace.log
+--             f1644, a Pummel landing on slot 3's Rhodox beside slot 4's
+--             teachable GreaseMonk; the teacher Pummels again next turn),
+--             the bystanders Defend, and a bystander with no Fight row (Gau,
+--             whose Fight row is Leap on the Veldt) hands the window on
+--             with X;
+--   "finish"  nothing on stage is left to teach (taught, or never
+--             teachable): the library's full-kit fight driver wins the
+--             battle -- items, heals, revives, tactical skills, one healer
+--             -- the kit battle_gaufight hands a Veldt pack its flee cannot
+--             shake.  Gau's Veldt rows are outside its repertoire, so it
+--             hands his window on with X rather than Leap out of the fight.
+-- Nothing here names a formation, species or character: the teacher, the
+-- target and the healer are read from the battle's own tables.
+local mode, finisher = "teach", nil
+local chosenRole = {}                   -- the role a teacher walked into, per slot
+local T = H.targetCursor()              -- monster-side cursor steer
+local tapNo, tapAt = -1, 0              -- the steer's tap being pressed
 local function battleReset()
   lastActor = nil
   dbgLogged = false
   steerLogged = {}
   atkSeen = {}
+  predictionHeld = nil
+  seeded = false
+  mode, finisher, chosenRole = "teach", nil, {}
+  tapNo, tapAt = -1, 0
+end
+-- the live monster slot this class can teach, lowest first, or nil
+local function teachSlotFor(cls)
+  for m = 0, 5 do
+    if H.readByte(0x3aa8 + m * 2) % 2 == 1 then
+      local off = 8 + m * 2
+      local weak, rev = H.readByte(0x3e9c + off), H.readByte(0x3e9d + off)
+      if weak & ~rev & cls ~= 0 then return m end
+    end
+  end
+  return nil
+end
+-- the finisher's one healer: the last standing member with both a Fight
+-- and an Item row carries the bag (the library's heal-lock guard: a party
+-- whose every member heals can stop attacking)
+local function healerChid()
+  for s = 3, 0, -1 do
+    local chid = H.readByte(0x3ED8 + s * 2)
+    if chid ~= 0xFF and H.readWord(0x3BF4 + s * 2) > 0
+       and cmdCellOf(s, CMD_FIGHT) ~= nil and cmdCellOf(s, CMD_ITEM) ~= nil then
+      return chid
+    end
+  end
+  return nil
+end
+local function walkToCell(a, cell, hold)
+  local btn = "a"
+  local cur = H.readByte(0x890F + a)
+  if cur ~= cell then btn = (cur < cell) and "down" or "up" end
+  H.setPad(hold and { [btn] = true } or {})
+end
+local function judgePrediction()
+  local open = nil                      -- the chosen bits the seed left open
+  for m = 0, 5 do
+    if H.readByte(0x3aa8 + m * 2) % 2 == 1
+       and H.readWord(0x57C0 + m * 2) == writeChoice.sp then
+      local off = 8 + m * 2
+      open = H.readByte(0x3e9c + off) & ~H.readByte(0x3e9d + off)
+        & writeChoice.bits
+    end
+  end
+  if open ~= nil then
+    predictionHeld = false
+    for s = 0, 3 do
+      if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
+        if cmdCellOf(s, CMD_FIGHT) ~= nil and attackClassOf(s) & open ~= 0 then
+          predictionHeld = true
+        end
+        if cmdCellOf(s, CMD_BLITZ) ~= nil and mpOf(s) >= PUMMEL_COST
+           and PUMMEL_CLASS & open ~= 0 then
+          predictionHeld = true
+        end
+      end
+    end
+  end
+  H.log(string.format("[ctx] seeded: species $%03X %s; a seated member's "
+    .. "row can teach them: %s", writeChoice.sp,
+    open == nil and "not on stage"
+      or string.format("on stage with chosen bits %02X still open", open),
+    tostring(predictionHeld)))
+end
+-- A battle's seed, settled: the monsters populate, their alive bits land,
+-- then 90 frames with the pad released (the read half's settle), and only
+-- then is anything read off the seeded tables.
+local function settleSeed(tag)
+  return H.repeatN(1, {
+    H.call(function() H.setPad({}) end),
+    H.waitUntil(function() return H.monstersPresent() > 0 end, 1200,
+      tag .. ": monsters populate", 5),
+    H.waitUntil(function()
+      for slot = 0, 5 do
+        if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then return true end
+      end
+      return false
+    end, 900, tag .. ": alive bits seed", 5),
+    H.waitFrames(90),
+    H.call(function() seeded = true end),
+  })
 end
 local fightSpecies = {}
 local function battlePulse()
   if H.monstersPresent() > 0 then
+    -- species and the [dbg] dump are read once the seed has settled; a
+    -- word past the species range is not a species (measured: $5554 and
+    -- $5958 turn up in alive slots even after the settle) and is dropped
     local anyAlive = false
     for s = 0, 5 do
       if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
         anyAlive = true
-        fightSpecies[H.readWord(0x57C0 + s * 2)] = true
+        local sp = H.readWord(0x57C0 + s * 2)
+        if seeded and sp < 0x180 then fightSpecies[sp] = true end
       end
     end
-    if anyAlive and not dbgLogged then
+    if anyAlive and not dbgLogged and seeded then
       dbgLogged = true
       local t = {}
       for s = 0, 3 do
@@ -243,75 +500,68 @@ local function battlePulse()
       H.log("[dbg] " .. table.concat(t, " | "))
     end
   end
-  if H.readByte(MENU) == 0 then
+  T.observe()
+  local menu, st = H.readByte(MENU), H.readByte(MSTATE)
+  if st ~= ST_TGT then tapNo = -1 end
+  if menu == 0 or st == ST_CMD then
+    local present = teacherPresent()
+    local want = present and "teach" or "finish"
+    if want ~= mode then
+      H.log(string.format("[ctx] battle mode %s -> %s", mode, want))
+      mode = want
+    end
+  end
+  if mode == "finish" then
+    if finisher == nil then
+      local healer = healerChid()
+      H.log(string.format("[ctx] finishing with the full kit, healer chid %s",
+        healer and string.format("%02X", healer) or "none (everyone)"))
+      finisher = H.newFightDriver("codex-finish",
+        { items = true, tactical = true, healer = healer })
+    end
+    finisher.frame()
+    return
+  end
+  if menu == 0 then
     lastActor = nil
     H.setPad(H.frame % 8 < 4 and { "a" } or {})
     return
   end
   local a = H.readByte(ACTOR)
-  if lastActor ~= a then
-    lastActor, mfM = a, 0
-    actM = (H.readByte(0x3ED8 + a * 2) == 0x00) and "fire" or "fight"
-  end
+  if lastActor ~= a then lastActor, mfM = a, 0 end
   mfM = mfM + 1
   local hold = (mfM % 10) < 5
-  local st, btn = H.readByte(MSTATE), nil
+  local btn = nil
   if st == ST_CMD then
     -- teach steering (see the header above)
-    if actM ~= "fire" and teacherPresent() then
-      local role = teachRoleOf(a)
-      if not steerLogged[a] then
-        steerLogged[a] = true
-        H.log(string.format("[steer] slot %d (cls %02x): %s",
-          a, attackClassOf(a), role or "step aside"))
-      end
-      if role == "blitz" then
-        -- the teacher: walk onto the Blitz row; the ST_TOOLS branch below
-        -- takes the list to Pummel
-        local cell = cmdCellOf(a, CMD_BLITZ)
-        btn = "a"
-        local cur = H.readByte(0x890F + a)
-        if cur ~= cell then btn = (cur < cell) and "down" or "up" end
-        H.setPad(hold and { [btn] = true } or {})
-        return
-      elseif role == nil and cmdCellOf(a, CMD_FIGHT) ~= nil then
-        -- a bystander with a Fight row: real Defend (right swaps
-        -- Fight->Def, then A), slow cadence so the swap settles
-        local step = mfM % 40
-        if step < 4 then H.setPad({ right = true })
-        elseif step >= 20 and step < 24 then H.setPad({ a = true })
-        else H.setPad({}) end
-        return
-      elseif role == nil then
-        -- Gau: no Fight row to swap into Def, so burn the turn on a real
-        -- Tonic (the ST_ITEM branch below picks it)
-        local cell = cmdCellOf(a, CMD_ITEM)
-        btn = "a"
-        if cell ~= nil then
-          local cur = H.readByte(0x890F + a)
-          if cur ~= cell then btn = (cur < cell) and "down" or "up" end
-        end
-        H.setPad(hold and { [btn] = true } or {})
-        return
-      end
-      -- role "fight": fall through to the plain swing below
+    local role = teachRoleOf(a)
+    if not steerLogged[a] then
+      steerLogged[a] = true
+      H.log(string.format("[steer] slot %d (cls %02x): %s",
+        a, attackClassOf(a), role or "step aside"))
     end
-    btn = "a"
-    if actM == "fire" then
-      local cell = nil
-      for i = 0, 3 do
-        if H.readByte(CMDTBL + a * 12 + i * 3) == 0x02 then cell = i end
-      end
-      if cell == nil then actM = "fight"
-      else
-        local cur = H.readByte(0x890F + a)
-        if cur ~= cell then btn = (cur < cell) and "down" or "up" end
-      end
+    chosenRole[a] = role
+    if role == "fight" then
+      walkToCell(a, cmdCellOf(a, CMD_FIGHT), hold)
+    elseif role == "blitz" then
+      -- walk onto the Blitz row; the ST_TOOLS branch below takes the list
+      -- to Pummel
+      walkToCell(a, cmdCellOf(a, CMD_BLITZ), hold)
+    elseif cmdCellOf(a, CMD_FIGHT) ~= nil then
+      -- a bystander with a Fight row: a real Defend, RIGHT here opens the
+      -- Def. window and the ST_DEF branch below takes it with A
+      H.setPad(hold and { right = true } or {})
+    else
+      -- no Fight row to swap into Def (Gau, whose row 0 is Leap on the
+      -- Veldt): hand the window on with X, vanilla's turn-cycling key, as
+      -- the library's driver does for him
+      H.setPad(hold and { x = true } or {})
     end
+    return
   elseif st == ST_TOOLS then
     -- the blitz teacher's list (the tools-shell submenu): walk to Pummel
     -- and confirm; anyone else backs out
-    if actM ~= "fire" and teachRoleOf(a) == "blitz" then
+    if chosenRole[a] == "blitz" then
       local entry = nil
       for i = 0, 7 do
         if H.readByte(ITEMLIST + i * 3) == PUMMEL then entry = i end
@@ -325,37 +575,36 @@ local function battlePulse()
     else
       btn = "b"
     end
-  elseif st == ST_ITEM then
-    -- Gau's turn-burn: the Tonic row of the battle bag
-    local want = battleBagIdxOf(TONIC)
-    if want == nil then btn = "b"
-    else
-      local cur = H.readByte(0x8947 + a) + H.readByte(0x894F + a)
+  elseif st == ST_DEF then
+    -- the bystander's Defend commits here; a teacher never asked for it
+    btn = (chosenRole[a] == nil) and "a" or "b"
+  elseif st == ST_ROW then
+    btn = "b"                           -- never pressed for: back out
+  elseif ST_WAIT[st] then
+    H.setPad({})                        -- nothing here reads a button
+    return
+  elseif st == ST_TGT then
+    -- a teacher's swing goes to the monster it can teach (H.targetCursor:
+    -- "a" once the cursor sits there, else a tap; each decided tap is held
+    -- four frames from its decision, battle_assassinate's pattern); a
+    -- Pummel never comes here, its commit has no target select
+    local slot = nil
+    if chosenRole[a] == "fight" then slot = teachSlotFor(attackClassOf(a)) end
+    if slot == nil then
       btn = "a"
-      if cur < want then btn = "down"
-      elseif cur > want then btn = "up" end
-    end
-  elseif st == ST_MAGIC then
-    if actM ~= "fire" then btn = "b"
     else
-      local i = spellIndexOf(a, FIRE)
-      if i == nil then actM = "fight"; btn = "b"
-      else
-        local wantRow, wantCol = i // 2, i % 2
-        local absRow = H.readByte(0x8913 + a) + H.readByte(0x891B + a)
-        local col = H.readByte(0x8917 + a)
-        btn = "a"
-        if absRow ~= wantRow then btn = (absRow < wantRow) and "down" or "up"
-        elseif col ~= wantCol then btn = (col < wantCol) and "right" or "left" end
+      btn = T.steer(slot, mfM)
+      if btn ~= "a" then
+        if btn ~= nil and T.press ~= tapNo then tapNo, tapAt = T.press, mfM end
+        btn = (tapNo >= 0 and mfM - tapAt < 4) and T.dir or nil
+        H.setPad(btn and { [btn] = true } or {})
+        return
       end
     end
-  elseif st == ST_TGT then
-    btn = "a"
   else
-    -- transitional states and battle messages: the reveal banner blocks
-    -- the queue until dismissed.  Tap B, not A -- B dismisses banners and
-    -- messages just as well but can never confirm a just-opened command
-    -- window's row 0.
+    -- battle messages: the reveal banner blocks the queue until
+    -- dismissed.  Tap B, not A -- B dismisses banners and messages just as
+    -- well but can never confirm a just-opened command window's row 0.
     btn = "b"
   end
   H.setPad((hold and btn) and { [btn] = true } or {})
@@ -419,11 +668,10 @@ local actions = {
   end),
 
   -- Park on the fixture's plain Veldt tile: not a town entrance, so
-  -- ReloadMap on menu close cannot pull the party off the overworld.  Fled
-  -- rather than fought, because a fought battle chips shields and a chip
-  -- is exactly what this test's discriminator is made of: an incidental
-  -- win here would teach the transient page before the save copies it and
-  -- muddy the page diff step 2 asserts.
+  -- ReloadMap on menu close cannot pull the party off the overworld.  An
+  -- encounter on the way is fought (M.FIGHT_NOT_FLEE turns "flee" into the
+  -- tactical driver) and can only teach the ACTIVE page, slot 3's, before
+  -- the save: SaveAs then copies it, so step 2's diff starts after it.
   H.worldNavTo(214, 149, { maxFrames = 15000, playBattles = "flee" }),
 
   -- 1. save into EMPTY slot 1, pad input only (save-drive rule; the
@@ -476,15 +724,44 @@ local actions = {
     H.pressButtons({ "b" }, 4), H.waitFrames(20),
   }, "world control after menu close"),
 
-  -- 2. the write half: pace the Veldt into the staged formation, fight it,
-  -- and after each battle diff both pages.  The first battle that teaches
-  -- must have written the slot-1 page and only it.
+  -- 2. the write half: choose the formation (see "Choosing the write
+  -- formation"), pace the Veldt into it, fight it, and after each battle
+  -- diff both pages.  The first battle that teaches must have written the
+  -- slot-1 page and only it.  The choice is the precondition: a fixture
+  -- whose history left nothing teachable fails here, before any battle.
   H.call(function()
-    H.assertEq(inVeldtList(WRITE_FORMATION), true, string.format(
-      "the staged write formation f%d is one the Veldt deals here "
-      .. "(its bit is set in the fought list $1ddd)", WRITE_FORMATION))
-    H.log(string.format("[ctx] slot-1 class byte for Beakor ($029) before "
-      .. "the write half: %02X", sram(SLOT1 + 0x190 + 0x29)))
+    local teachers = fieldTeachers()
+    local tt = {}
+    for _, t in ipairs(teachers) do
+      tt[#tt + 1] = string.format("%s class %02X", t.what, t.cls)
+    end
+    local teacherText = #tt > 0 and table.concat(tt, ", ") or "none"
+    local fought = 0
+    for f = 0, 511 do if inVeldtList(f) then fought = fought + 1 end end
+    local cands = writeCandidates(teachers)
+    local ct = {}
+    for _, c in ipairs(cands) do
+      ct[#ct + 1] = string.format("f%d:$%03X/%02X/hp%d", c.f, c.sp, c.bits, c.hp)
+    end
+    H.log("[ctx] teachers the field records predict: " .. teacherText)
+    H.log(string.format("[ctx] teachable Veldt formations, %d of %d fought, "
+      .. "best first (f:species/new class bits/pack HP): %s", #cands, fought,
+      #ct > 0 and table.concat(ct, " ") or "none"))
+    H.assertEq(#cands > 0, true, string.format(
+      "PRECONDITION: of the %d formations the Veldt deals here ($1ddd), one "
+      .. "holds a species whose class-weak mask has a bit the party's "
+      .. "teachers (%s) carry and neither the slot-1 page nor the transient "
+      .. "page knows -- with none, no write battle can teach the slot-1 page "
+      .. "anything; the fixture's history already taught all of it",
+      fought, teacherText))
+    writeChoice = cands[1]
+    local c = writeChoice
+    H.log(string.format("[ctx] write formation f%d: species $%03X is class-"
+      .. "weak %02X and slot 1 knows %02X, so %02X is new (%s); pack HP %d; "
+      .. "best of %d by Fight-teachable, lightest pack, lowest id",
+      c.f, c.sp, c.weak, c.known, c.bits,
+      c.fightBits ~= 0 and "a Fight row reveals it" or "only Pummel reveals it",
+      c.hp, #cands))
   end),
   (function()
     local fights = 0
@@ -518,35 +795,46 @@ local actions = {
       H.log(string.format("[ctx] battle %d done, taught %d byte(s) so far " ..
         "(species %s; atkclass %s)", fights, taughtN,
         table.concat(sp, " "), table.concat(ac, " ")))
+      -- the choice's prediction, judged at this battle's settled seed
+      -- (predictionHeld): a battle that taught nothing with the species on
+      -- stage and no teaching row in the battle's own tables means the
+      -- field-side model disagrees with the battle's, and no retry can fix
+      -- that.  A species not on stage then is not judged: retried.
+      if taughtN == 0 then
+        H.assertEq(predictionHeld ~= false, true, string.format(
+          "write battle %d: with species $%03X on stage, the battle's command "
+          .. "table and seeded masks give a member a role that can teach its "
+          .. "class bits %02X, as the field records predicted", fights,
+          writeChoice.sp, writeChoice.bits))
+      end
       fightSpecies = {}
     end
-    -- One try per encounter: pace until a battle loads, fight it through
-    -- the real menus, diff the pages, and -- unless it taught -- heal
-    -- through the field menu (Tonics first) before pacing again.  The
-    -- Veldt serves the SAVE's recorded history, and the fighting run's
-    -- history (Shadow stays, so his battles are in it) serves this trio
-    -- packs that a party walking in half-dead does not survive: measured,
-    -- the un-healed search entered its seventh fight with SABIN at 64 HP
-    -- and wiped.  The formation is staged, so one battle normally teaches;
-    -- the bound only covers a staged battle whose teaching hit did not land.
+    -- One try per encounter: heal through the field menu (Tonics first),
+    -- pace until a battle loads, fight it through the real menus, and diff
+    -- the pages.  Care comes first, the first try included: the Veldt
+    -- serves the SAVE's recorded history, and a party walking in half-dead
+    -- does not survive every pack in it (measured, an un-healed search
+    -- entered its seventh fight with SABIN at 64 HP and wiped).  The formation is staged and chosen teachable, so one
+    -- battle normally teaches; the bound only covers a staged battle whose
+    -- teaching hit did not land.
     local function writeTry(n)
       return H.cond(function() return taughtN == 0 end, {
-        H.call(function() staged = WRITE_FORMATION end),
+        H.waitUntil(function()
+          return H.worldMode() and H.worldHasControl() and H.worldAligned()
+        end, 2400, "world control before write-half try " .. n, 5),
+        H.fieldCare({ tag = "codex write try " .. n, threshold = 0.95 }),
+        H.call(function() staged = writeChoice.f end),
         H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
           H.call(patrolPulse),
         }, "find write-half encounter " .. n),
         H.call(function() staged = nil end),
         H.call(battleReset),
-        H.driveUntil(function() return not H.battleLoadStarted() end, 15000, {
+        settleSeed("write-half battle " .. n),
+        H.call(judgePrediction),
+        H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
           H.call(battlePulse),
         }, "fight write-half battle " .. n),
         H.call(account),
-        H.cond(function() return taughtN == 0 end, {
-          H.waitUntil(function()
-            return H.worldMode() and H.worldHasControl() and H.worldAligned()
-          end, 2400, "world control after write-half battle " .. n, 5),
-          H.fieldCare({ tag = "codex write search " .. n, threshold = 0.95 }),
-        }, {}),
       }, {})
     end
     local tries = {}
@@ -573,11 +861,12 @@ local actions = {
   end),
 
   -- 3. the read half: a fresh battle's seed pre-reveals the taught bits,
-  -- knowledge only the slot-1 page carries.  Encounters without a taught
-  -- species are fled (no submenu is open at seed, so a bare L+R hold
-  -- releases) and retried, with a bound on the retries.  Searched as a
-  -- sequence of player-shaped episodes: seed-check one battle, resolve it,
-  -- then recover on the field before looking for the next.
+  -- knowledge only the slot-1 page carries.  The formation is staged
+  -- (readFormation), the seed checked, and the battle then fled (no
+  -- submenu is open at seed, so a bare L+R hold releases).  Each try is a
+  -- player-shaped episode: recover on the field, meet the battle,
+  -- seed-check it, resolve it; the bound covers an encounter that did not
+  -- load the staged formation.
 }
 
 local readChecked, readTries = 0, 0
@@ -651,10 +940,15 @@ end
 
 local function readTry(n)
   return H.cond(function() return readChecked == 0 end, {
+    H.waitUntil(function()
+      return H.worldMode() and H.worldHasControl() and H.worldAligned()
+    end, 2400, "world control before read-half try " .. n, 5),
+    H.fieldCare({ tag = "codex read try " .. n, threshold = 0.95 }),
     H.call(function()
-      staged = readFormation()
+      staged = readFormation(writeChoice and writeChoice.f)
       H.assertEq(staged ~= nil, true,
         "the Veldt list holds a formation with a species step 2 taught")
+      H.log(string.format("[ctx] read formation f%d", staged))
     end),
     H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
       H.call(patrolPulse),
@@ -674,14 +968,8 @@ local function readTry(n)
     end, 900, "read-half alive bits seed " .. n, 5),
     H.waitFrames(90),
     H.call(checkReadSeed),
-    H.call(battleReset),
+    H.call(function() battleReset(); seeded = true end),
     resolveReadBattle(n),
-    H.cond(function() return readChecked == 0 end, {
-      H.waitUntil(function()
-        return H.worldMode() and H.worldHasControl() and H.worldAligned()
-      end, 2400, "world control after read-half battle " .. n, 5),
-      H.fieldCare({ tag = "codex read search " .. n, threshold = 0.95 }),
-    }, {}),
   }, {})
 end
 

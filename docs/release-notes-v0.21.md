@@ -43,8 +43,9 @@ throwable weapon; nineteen of them, the Dirk and MithrilKnife among them, used
 to take the pips and throw no harder. The same rule trims two double payoffs.
 A boosted Fight buys extra swings, so the spell a weapon casts off one of them
 (Blizzard's Ice, Tempest's Wind Slash) now lands at its normal strength
-instead of multiplied as well. A boosted Rage buys the certainty of the
-beast's special, and no longer also hits harder or more often.
+instead of multiplied as well. A boosted Rage makes the beast's special
+likelier, certain at three pips, and no longer also hits harder or more
+often.
 
 **Saves carry over.** In-game saves from v0.20 load in v0.21. Emulator save
 states don't carry across versions, so load from an in-game save.

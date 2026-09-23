@@ -31,14 +31,37 @@
 --   magicite  LOCKE's Magicite from Item: any damage its esper deals leaves x8
 --           (which esper answers is the item's own roll; a harmless one is
 --           logged, not failed)
+--   and the Fight's swings: Ot6FightBoost raised its multi-attack count by 2
+--           per pending pip ($3a70 1 -> 7 at boost 3), the positive control
+--           for the swing observer the Rage row reads
 -- Then from gau_joined (GAU, SABIN, CYAN on the Veldt), the same shape:
---   rage    GAU's Rage at boost 3 (tier 3: the special every turn) on each of
---           the first RAGE_ENTRIES cells of his rage window: every damage the
---           start turn's attack deals leaves unmultiplied, and at least one
---           cell's special ran under a command other than Fight
+--   rage    GAU's Rage at boost 3 (tier 3: the special every turn) on EVERY
+--           cell of his rage window (every rage he has learned; the window
+--           lists at most eight).  The boost bought the special's certainty
+--           and nothing else (owner ruling, "boost pays once"), so for each:
+--           the start turn's attack is the beast's special; every damage it
+--           deals leaves unmultiplied; if it runs through FightAttack (the
+--           physical "Special", attack $EF, which GetCmdForAI maps to command
+--           $00) Ot6FightBoost leaves the multi-attack count where FightAttack
+--           put it; and the pips are charged exactly as for any boosted
+--           action (bank - 3, pending cleared).  At least one cell's special
+--           ran under a command other than Fight and at least one ran through
+--           FightAttack, so both classes stay covered.
+--
+-- Why $3a70 and not a count of hits.  FightAttack stores the vanilla count (1,
+-- or 7 with an Offering) and calls Ot6FightBoost on the next instruction, and
+-- the multi-attack loop runs $3a70 + 1 passes (`dec $3a70 / bmi`), so $3a70 at
+-- Ot6FightBoost's entry is exactly the unboosted count and $3a70 at the
+-- instruction after its call is exactly what the boost made of it; nothing
+-- else writes it in between.  A count of damage calls is not exact: an empty
+-- hand's pass whiffs, a miss or a death ends passes early, and the unboosted
+-- baseline for the SAME special needs the 0-pip coin to land on it (1 in 2).
 -- Negative controls: f0484b6f (OT6_ROM/OT6_DBG) fails `rod` (Ice 2 read as a
 -- folded cast); a build with Ot6WeaponSpellQueued's store NOPed fails `fight`;
--- 95fc3f30 (no queued-Rage test) fails `rage`.
+-- 95fc3f30 (no queued-Rage test) fails `rage` (a special multiplied);
+-- 8032a150 (no Rage gate in Ot6FightBoost) fails `rage` at the first physical
+-- Special ($3a70 1 -> 7: three pips bought six more swings on top of the
+-- special they had already made certain).
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/fc_alcove.mss.lua"
@@ -49,8 +72,9 @@ local TERRA, LOCKE, SHADOW = 0x00, 0x01, 0x03
 local ICE_ROD, MITHRIL_KNIFE, MAGICITE = 0x36, 0x01, 0xF9
 local FIRE, FIRE3 = 0x00, 0x09
 local FIGHT_TRIES, MAGICITE_TRIES, WAIT_STEP = 12, 6, 48
-local GAU, RAGE_ENTRIES = 0x0B, 4
+local GAU, RAGE_ENTRIES = 0x0B, 8          -- the rage window lists at most eight
 local GAU_STATE = "build/states/gau_joined.mss.lua"
+local RAGECOUNT, RAGEBEAST, MP = 0x3A9A, 0x33A8, 0x3C08
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL, CMDROW, BCHID = 0x202E, 0x890F, 0x3ED8
@@ -67,6 +91,7 @@ local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_THROW, CMD_RAGE = 0x00, 0x01, 0x02, 0x
 
 local slotOf, snap, armed = {}, nil, nil
 local weapspell                               -- OT6_WEAPSPELL, off the dbg
+local learned                                 -- GAU's rage-window length
 
 local function cmdRow(slot, cmd)
   for r = 0, 3 do
@@ -126,10 +151,40 @@ local function installObservers()
       if c.dout == nil then c.dout = H.readWord(0x11B0) end
     end, emu.callbackType.exec, ret, ret)
   end
+  -- Ot6FightBoost: $3a70 at its entry (FightAttack's vanilla count) and at
+  -- the instruction after its one call site (what the boost made of it)
+  local fb = H.sym("Ot6FightBoost")
+  local f0, f1, f2 = fb & 0xFF, (fb >> 8) & 0xFF, (fb >> 16) & 0xFF
+  local fsites = {}
+  for off = 0x020000, 0x02FFFC do
+    if H.readRomByte(off) == 0x22 and H.readRomByte(off + 1) == f0
+       and H.readRomByte(off + 2) == f1 and H.readRomByte(off + 3) == f2 then
+      fsites[#fsites + 1] = 0xC00000 + off + 4
+    end
+  end
+  H.assertEq(#fsites, 1, "Ot6FightBoost has one call site in bank $C2 (FightAttack)")
+  emu.addMemoryCallback(function()
+    if armed == nil or armed.endF then return end
+    local x = emu.getState()["cpu.x"] & 0xFFFF
+    if x ~= armed.slot * 2 then return end
+    armed.fb[#armed.fb + 1] = {
+      a7c = H.readByte(0x3A7C), a7d = H.readByte(0x3A7D), pend = H.readByte(PEND + x),
+      before = H.readByte(0x3A70) }
+  end, emu.callbackType.exec, fb, fb)
+  emu.addMemoryCallback(function()
+    if armed == nil or armed.endF or #armed.fb == 0 then return end
+    if (emu.getState()["cpu.x"] & 0xFFFF) ~= armed.slot * 2 then return end
+    local f = armed.fb[#armed.fb]
+    if f.after == nil then f.after = H.readByte(0x3A70) end
+  end, emu.callbackType.exec, fsites[1], fsites[1])
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if armed == nil or armed.endF then return end
-    if (emu.getState()["cpu.x"] & 0xFFFF) == armed.slot * 2 then armed.endF = H.frame end
+    local x = emu.getState()["cpu.x"] & 0xFFFF
+    if x == armed.slot * 2 then
+      armed.endF = H.frame
+      armed.beast = H.readByte(RAGEBEAST + x)
+    end
   end, emu.callbackType.exec, ae, ae)
 end
 
@@ -196,6 +251,12 @@ local CMD_OF = { fight = CMD_FIGHT, throw = CMD_THROW, item = CMD_ITEM, magic = 
                  rage = CMD_RAGE }
 local LIST_OF = { throw = ST_THROW, item = ST_ITEM, magic = ST_MAGIC, rage = ST_RAGE }
 local phase, held = "idle", nil
+-- the pending boost, bank and MP as the action is committed; arms the observers
+local function markConfirm(c)
+  local e = c.slot * 2
+  c.pendAtConfirm, c.bankAtConfirm = H.readByte(PEND + e), H.readByte(BANK + e)
+  c.mpAtConfirm, armed = H.readWord(MP + e), c
+end
 local function decide(c)
   local st, a = H.readByte(MSTATE), H.readByte(ACTOR) & 3
   if phase == "boost" then
@@ -217,7 +278,7 @@ local function decide(c)
     local b = listStep(c, st)
     if b == "a" then
       -- an item that picks its own target commits on this press
-      c.pendAtConfirm, armed = H.readByte(PEND + c.slot * 2), c
+      markConfirm(c)
       phase = "target"
     end
     return b
@@ -226,7 +287,7 @@ local function decide(c)
     if H.readByte(MENU) == 0 or a ~= c.slot then phase = "sent" return nil end
     if st == ST_CMD or st == LIST_OF[c.verb] then return "a" end   -- not taken
     if st ~= ST_TGT then return nil end
-    c.pendAtConfirm, armed = H.readByte(PEND + c.slot * 2), c
+    markConfirm(c)
     phase = "confirmed"
     return "a"
   end
@@ -236,6 +297,13 @@ local function describe(k)
   return string.format("b5=$%02X b6=$%02X 3a7c=$%02X 3a7d=$%02X p%d ws=$%02X %d->%s",
     k.b5, k.b6, k.a7c, k.a7d, k.pend, k.ws, k.din, tostring(k.dout))
 end
+local function describeFb(f)
+  return string.format("3a7c=$%02X 3a7d=$%02X p%d 3a70 %d->%s",
+    f.a7c, f.a7d, f.pend, f.before, tostring(f.after))
+end
+local function specialOf(beast)
+  return H.readRomByte((H.sym("MonsterRage") & 0x3FFFFF) + beast * 2 + 1)
+end
 
 -- one try of a case from the snapshot; `c.done(c)` says whether the try
 -- produced the thing the case is about (nil = any try does)
@@ -243,7 +311,7 @@ local function tryCase(c, n)
   local req, waited, skip = nil, 0, false
   return {
     H.call(function()
-      skip = c.hit ~= nil
+      skip = c.hit ~= nil or (c.present ~= nil and not c.present())
       if skip then return end
       H.setPad({})
       req = H.requestLoadState(snap.blob)
@@ -254,7 +322,8 @@ local function tryCase(c, n)
       H.checkReq(req, "snapshot load")
       H.rearmInputInjection()
       c.slot = slotOf[c.char]
-      c.calls, c.endF, c.pendAtConfirm = {}, nil, nil
+      c.calls, c.fb, c.endF, c.beast = {}, {}, nil, nil
+      c.pendAtConfirm, c.bankAtConfirm, c.mpAtConfirm = nil, nil, nil
       c.wait = (n - 1) * WAIT_STEP
       tick, phase, held, waited = 0, "reach", nil, 0
     end),
@@ -287,13 +356,26 @@ local function tryCase(c, n)
       if skip then return end
       armed = nil
       H.setPad({})
-      local parts = {}
+      local e = c.slot * 2
+      local bankAfter, pendAfter = H.readByte(BANK + e), H.readByte(PEND + e)
+      local mpAfter = H.readWord(MP + e)
+      local parts, fparts = {}, {}
       for _, k in ipairs(c.calls) do parts[#parts + 1] = describe(k) end
-      H.log(string.format("[procboost] %s try %d (wait %d): pending at confirm %s: %s",
-        c.name, n, c.wait, tostring(c.pendAtConfirm),
-        #parts > 0 and table.concat(parts, " | ") or "no Ot6BoostDmg call"))
+      for _, f in ipairs(c.fb) do fparts[#fparts + 1] = describeFb(f) end
+      local who = ""
+      if c.verb == "rage" and c.beast then
+        who = string.format("beast $%02X (special $%02X), ", c.beast, specialOf(c.beast))
+      end
+      H.log(string.format("[procboost] %s try %d (wait %d): %spending at confirm %s: %s"
+        .. " ; Ot6FightBoost: %s ; bank %s->%d pending %d, mp %s->%d",
+        c.name, n, c.wait, who, tostring(c.pendAtConfirm),
+        #parts > 0 and table.concat(parts, " | ") or "no Ot6BoostDmg call",
+        #fparts > 0 and table.concat(fparts, " | ") or "not reached",
+        tostring(c.bankAtConfirm), bankAfter, pendAfter, tostring(c.mpAtConfirm), mpAfter))
       if c.done == nil or c.done(c) then
-        c.hit = { calls = c.calls, n = n, pendAtConfirm = c.pendAtConfirm }
+        c.hit = { calls = c.calls, fb = c.fb, n = n, pendAtConfirm = c.pendAtConfirm,
+                  bankAtConfirm = c.bankAtConfirm, bankAfter = bankAfter, pendAfter = pendAfter,
+                  beast = c.beast }
       end
     end),
   }
@@ -422,6 +504,12 @@ steps[#steps + 1] = H.call(function()
     end
   end
 
+  -- fight: the boost bought swings, seen by the observer the Rage row reads
+  local f = by.fight.hit.fb[1]
+  H.assertEq(f ~= nil and f.after ~= nil, true, "fight: FightAttack reached Ot6FightBoost")
+  H.assertEq(f.after - f.before, 2 * BOOST, string.format(
+    "fight: the boosted Fight's swings ($3a70 %d -> %d at pending %d)", f.before, f.after, f.pend))
+
   -- throw: MithrilKnife's id is Ice's, and a Throw is not a cast
   k = one(by.throw, function(k) return k.b5 == CMD_THROW end, "the throw")
   H.assertEq(k.a7d, MITHRIL_KNIFE, "throw: the queued attack is the knife")
@@ -453,7 +541,8 @@ end)
 -- ---- the Rage row, from gau_joined ---------------------------------------
 local RAGE = {}
 for e = 0, RAGE_ENTRIES - 1 do
-  RAGE[#RAGE + 1] = { name = "rage entry " .. e, char = GAU, verb = "rage", entry = e, tries = 1 }
+  RAGE[#RAGE + 1] = { name = "rage entry " .. e, char = GAU, verb = "rage", entry = e, tries = 1,
+                      present = function() return e < learned end }
 end
 for _, s in ipairs({
   H.call(function() snap, armed = nil, nil end),
@@ -487,7 +576,10 @@ for _, s in ipairs({
     end
     assert(slotOf[GAU], "GAU is in the battle")
     assert(cmdRow(slotOf[GAU], CMD_RAGE), "GAU has a Rage row")
-    H.log(string.format("[procboost] GAU slot %d; %d rages learned", slotOf[GAU], H.readByte(0x3A9A)))
+    learned = H.readByte(RAGECOUNT)
+    H.assertEq(learned >= 1 and learned <= RAGE_ENTRIES, true, string.format(
+      "GAU's rage window lists 1..%d rages (%d)", RAGE_ENTRIES, learned))
+    H.log(string.format("[procboost] GAU slot %d; %d rages learned", slotOf[GAU], learned))
   end),
   H.driveUntil(function() return snap ~= nil end, 30000, {
     H.call(function()
@@ -505,27 +597,52 @@ for _, s in ipairs({
   H.call(function() H.checkReq(snap, "snapshot at GAU's window") end),
 }) do steps[#steps + 1] = s end
 for _, c in ipairs(RAGE) do
-  if c.entry < 8 then
-    for _, s in ipairs(tryCase(c, 1)) do steps[#steps + 1] = s end
-  end
+  for _, s in ipairs(tryCase(c, 1)) do steps[#steps + 1] = s end
 end
 steps[#steps + 1] = H.call(function()
-  local specials, dealt = 0, 0
+  local specials, dealt, covered, fights = 0, 0, 0, 0
   for _, c in ipairs(RAGE) do
-    if c.hit then
-      H.assertEq(c.hit.pendAtConfirm, BOOST, c.name .. ": pending boost at the confirm")
-      for _, k in ipairs(c.hit.calls) do
+    if c.entry < learned then
+      H.assertEq(c.hit ~= nil, true, c.name .. ": the case happened")
+      covered = covered + 1
+      local h = c.hit
+      H.assertEq(h.pendAtConfirm, BOOST, c.name .. ": pending boost at the confirm")
+      H.assertEq(h.beast ~= nil, true, c.name .. ": the action ended (Ot6ActionEnd)")
+      local special = specialOf(h.beast)
+      H.assertEq(#h.calls + #h.fb > 0, true, c.name .. ": the start turn's attack was observed")
+      for _, k in ipairs(h.calls) do
         H.assertEq(k.a7c, CMD_RAGE, c.name .. ": the queued command is Rage")
+        H.assertEq(k.a7d, special, string.format(
+          "%s: tier %d bought beast $%02X's special $%02X", c.name, BOOST, h.beast, special))
         if k.din > 0 then dealt = dealt + 1 end
         if k.b5 ~= CMD_FIGHT and k.b5 ~= CMD_RAGE and k.din > 0 then specials = specials + 1 end
         H.assertEq(k.dout, k.din, string.format(
           "%s: the beast's $%02X (command $%02X) leaves unmultiplied (%d in)", c.name, k.b6, k.b5, k.din))
       end
+      -- the special's certainty was the whole purchase: a special that runs
+      -- through FightAttack takes no swings on top of it
+      for _, f in ipairs(h.fb) do
+        fights = fights + 1
+        H.assertEq(f.a7c, CMD_RAGE, c.name .. ": FightAttack ran for the queued Rage ($3a7c)")
+        H.assertEq(f.a7d, special, string.format(
+          "%s: FightAttack ran beast $%02X's special $%02X", c.name, h.beast, special))
+        H.assertEq(f.after, f.before, string.format(
+          "%s: beast $%02X's special $%02X gets no extra swings ($3a70 %d -> %s at pending %d)",
+          c.name, h.beast, special, f.before, tostring(f.after), f.pend))
+      end
+      -- ...and the pips are charged exactly as for any boosted action
+      H.assertEq(h.pendAfter, 0, c.name .. ": the pending boost is cleared at the action's end")
+      H.assertEq(h.bankAfter, h.bankAtConfirm - BOOST, string.format(
+        "%s: the %d pips are charged (bank %d -> %d)", c.name, BOOST, h.bankAtConfirm, h.bankAfter))
     end
   end
+  H.assertEq(covered, learned, "every learned rage was played")
   H.assertEq(specials > 0, true, "a boosted Rage's special ran under its own command and dealt damage")
-  H.log(string.format("[procboost] rage verdict: %d damage call(s) unmultiplied, %d of them a "
-    .. "special under its own command", dealt, specials))
+  H.assertEq(fights > 0, true, "a boosted Rage's special ran through FightAttack (a physical Special)")
+  H.log(string.format("[procboost] rage verdict: %d of %d rages played; %d damage call(s) "
+    .. "unmultiplied, %d of them a special under its own command; %d FightAttack special(s) "
+    .. "with no extra swings; every start charged %d pips", covered, learned, dealt, specials,
+    fights, BOOST))
 end)
 
 H.run({ maxFrames = 400000 }, steps)

@@ -234,7 +234,11 @@ MithrilKnife, whose item ids equal Fire's and Ice's.
 
 Rage's exemption reads the queued command too (`$3a7c = $10`): the
 beast's attack runs under its own command, so the command gate's `$10`
-never sees it.
+never sees it.  The same queued-command test keeps a Rage off Fight's
+purchase: a beast whose special is the physical "Special" (`$EF`) runs it
+as command `$00` through `FightAttack`, and `Ot6FightBoost` adds no
+swings to an action queued as Rage (kit-gau.md §6.2).  A boosted Rage
+buys the coin's certainty and nothing else.
 
 One more thing is never multiplied, and it has no price to escalate: a
 weapon's own on-hit spell (Blizzard's Ice, Tempest's Wind Slash), whatever
@@ -254,8 +258,8 @@ else, and the price follows at 2.5x per level.
 **Flat — the boost buys certainty, and BP already paid for it:**
 **Steal**, **Rage** and **Slot**. These are the *chance verbs*, and the
 owner exempted them on 2026-09-17. Boost on them does not multiply
-anything: it converts variance into reliability across "a more
-interesting mix of effects than just damage boosts" — Steal's
+anything, and adds no swings: it converts variance into reliability
+across "a more interesting mix of effects than just damage boosts" — Steal's
 common/rare/guarantee ladder, Rage's coin and the tier it holds for
 the whole battle, Slot's rig. Boost already costs BP, which is the
 scarce resource. **MP scales with magnitude; BP alone pays for

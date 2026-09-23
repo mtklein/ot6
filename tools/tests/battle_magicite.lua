@@ -196,6 +196,70 @@ end
 local spells, mpWrites = {}, {}
 local R = {}   -- results; declared BEFORE enterBoss so its $3410 callback
                -- closes over this table
+
+-- What each divine did is read off the writes it made, not off a pool or an
+-- HP read at some earlier moment: NUMBER 024 muddles, a muddled Celes casts
+-- on her own, a bench member's hit lands on the boss, and every one of those
+-- moves the same cells a divine moves.  So every write to a party pool and
+-- to the boss's HP is kept with what the engine had loaded when it made it:
+-- $b5/$b6, the in-flight action's own queued command/attack ($3a7c/$3a7d,
+-- which InitPlayerAction loads as the action starts and the next ExecAction
+-- replaces), and X -- CalcAttackEffect's universal charge, `sta $3c08,x`,
+-- indexes the attacker, so a summon's charge is a write to the summoner's
+-- own cell with X = her offset.  The callback runs before the store, so
+-- `old` is the value as the write found it; the high byte's store (a 16-bit
+-- sta) completes `new`.  Installed once; callbacks survive loadState.
+local poolWrites, bossWrites = {}, {}
+local watchesOn = false
+local function watchCell(list, lo, tag)
+  emu.addMemoryCallback(function(_, v)
+    local old = H.readWord(lo)
+    list[#list + 1] = { frame = H.frame, tag = tag, old = old, new = (old & 0xFF00) | v,
+      cmd = H.readByte(0xB5), atk = H.readByte(0xB6), act = H.readWord(0x3A7C),
+      x = emu.getState()["cpu.x"] & 0xFFFF }
+  end, emu.callbackType.write, lo, lo)
+  emu.addMemoryCallback(function(_, v)
+    local w = list[#list]
+    if w and w.tag == tag and w.frame == H.frame and w.hi == nil then
+      w.hi = v
+      w.new = (v << 8) | (w.new & 0xFF)
+    end
+  end, emu.callbackType.write, lo + 1, lo + 1)
+end
+local function installWatches()
+  if watchesOn then return end
+  watchesOn = true
+  for slot = 0, 3 do watchCell(poolWrites, 0x7E3C08 + slot * 2, slot) end
+  watchCell(bossWrites, 0x7E3BFC + BOSS * 2, "boss")
+end
+local function writeStr(w)
+  return string.format("f%d %s %d->%d ($b5=%02X $b6=%02X $3a7c=%04X X=%02X)",
+    w.frame, tostring(w.tag), w.old, w.new, w.cmd, w.atk, w.act, w.x)
+end
+local function actOf(cmd, atk) return cmd | (atk << 8) end
+-- the first write after index `from` that is `slot`'s own action `act`
+-- charging its own pool
+local function chargeOf(slot, from, act)
+  for i = from + 1, #poolWrites do
+    local w = poolWrites[i]
+    if w.tag == slot and w.x == slot * 2 and w.act == act then return i end
+  end
+  return nil
+end
+-- the first write to the boss's HP in (from, to] made inside action `act`
+local function hitOf(from, to, act)
+  for i = from + 1, to do
+    if bossWrites[i].act == act then return i end
+  end
+  return nil
+end
+local function writesStr(list, from, to, pred)
+  local d = {}
+  for i = from + 1, to do
+    if pred == nil or pred(list[i]) then d[#d + 1] = writeStr(list[i]) end
+  end
+  return #d > 0 and table.concat(d, ", ") or "none"
+end
 local function sawSpell(id)
   for _, v in ipairs(spells) do if v == id then return true end end
   return false
@@ -289,9 +353,14 @@ local summonArmed = {}                   -- per summoner: this window came throu
 -- the party down -- the run ended in a GAME OVER instead of at the thing
 -- it measures.  Sampling at the confirm keeps the assertion word for word
 -- and stops it depending on nothing else touching her MP first.
-local mpAtArm = {}
+--
+-- The confirm is also where the watch starts looking for the charge: the
+-- first write to her pool after it under her own summon ($3a7c/$3a7d =
+-- $19/<the divine>, X = her offset) is the divine's, and what it took is
+-- measured from the pool that write found.
+local mpAtArm, armW = {}, {}
 local function armSummon(slot)
-  if not summonArmed[slot] then mpAtArm[slot] = mp(slot) end
+  if not summonArmed[slot] then mpAtArm[slot], armW[slot] = mp(slot), #poolWrites end
   summonArmed[slot] = true
 end
 -- Steering a Fight onto an ally: the Fight target screen opens on the
@@ -385,16 +454,26 @@ local function installObserver()
     -- shape, and at what.  A caster the engine re-aimed leaves its mark
     -- here, where the boss-HP wait can only report "nothing happened".
     if x < 8 and cmd == CMD_SUMMON and (atk == DDUST or atk == INFERNO) then
+      -- hp0 and bw: the boss's HP, and where its write list stood, as the
+      -- divine left ExecCmd -- the baseline its hit is measured from
       divineDispatch[atk] = divineDispatch[atk] or
         { frame = H.frame, slot = x // 2, tgt = tgt,
           st1 = H.readByte(0x3EE4 + (x // 2) * 2),
-          st2 = H.readByte(0x3EE5 + (x // 2) * 2), hp0 = bossHp() }
+          st2 = H.readByte(0x3EE5 + (x // 2) * 2), hp0 = bossHp(),
+          bw = #bossWrites, pw = #poolWrites }
     end
   end, emu.callbackType.exec, execA, execA)
   emu.addMemoryCallback(function()
     local x = emu.getState()["cpu.x"] & 0xffff
     if x % 2 ~= 0 or x >= 20 then return end
     if x >= 8 and monInFlight > 0 then monInFlight = monInFlight - 1 end
+    -- a divine's own return: its whole effect is in by now
+    for _, atk in ipairs({ DDUST, INFERNO }) do
+      local d = divineDispatch[atk]
+      if d and d.doneFrame == nil and x == d.slot * 2 then
+        d.doneFrame, d.hp1, d.bw1, d.pw1 = H.frame, bossHp(), #bossWrites, #poolWrites
+      end
+    end
     local hps, sts = partyLine()
     H.log(string.format("[done f%d] %s%d | hp=%s st=%s boss=%d/%s", H.frame,
       x < 8 and "party" or "mon", x < 8 and x // 2 or x // 2 - 4, hps, sts,
@@ -744,17 +823,14 @@ local function enterBoss(tag)
       end
       H.assertEq(locke ~= nil and celes ~= nil, true,
         tag .. ": LOCKE and CELES really fight this")
-      plans, planKey, summonArmed, mpAtArm = {}, {}, {}, {}
+      plans, planKey, summonArmed, mpAtArm, armW = {}, {}, {}, {}, {}
       divineDispatch, holdWhy, monInFlight = {}, {}, 0
       steerBails = 0
       R.osmoses = {}
       spells, mpWrites = {}, {}
+      installWatches()
       emu.addMemoryCallback(function(_, v)
         spells[#spells + 1] = v
-        -- actions serialize, so the boss HP at Inferno's own queue write is
-        -- the value after DDust fully resolved, which is the per-summon
-        -- damage baseline
-        if v == INFERNO and R.hpMid == nil then R.hpMid = bossHp() end
       end, emu.callbackType.write, 0x7e3410, 0x7e3410)
       emu.addMemoryCallback(function(_, v) mpWrites[#mpWrites + 1] = v end,
         emu.callbackType.write, 0x7e3C08 + celes*2, 0x7e3C08 + celes*2)
@@ -827,71 +903,101 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(bossSt3() & STATUS3_SLOW, 0, "[ddust] and it starts un-Slowed")
     H.assertEq(bossMp() >= 447, true,
       "[osmose] the real Facility-scale MP pool the reprice exists for")
-    R.hp0, R.mp0 = bossHp(), mp(celes)
+    R.mp0 = mp(celes)
   end),
   (function()
     local lm0
+    -- One divine, measured by what it wrote: the charge is the first write
+    -- to the summoner's pool after the confirm under the summoner's own
+    -- summon ($3a7c/$3a7d = $19/<divine>, X = the summoner's offset), taken
+    -- from the pool it found; the hit is the first write to the boss's HP
+    -- under the same action after it left ExecCmd, taken from the HP it
+    -- found.  Whatever else moved either cell in between (a muddled turn, a
+    -- bench member's hit, the boss's Rasp) is listed, not counted.
+    -- Measured on this fixture (2026-09-22): both land on the dispatch's own
+    -- frame, under $b5/$b6 = $19/<divine> -- "f1393 3 180->153 ($b5=19
+    -- $b6=38 $3a7c=3819 X=06)" and "f1393 boss 4734->4424 ($b5=19 $b6=38
+    -- $3a7c=3819 X=00)".
+    local function measure(tag, slot, atk, name, who)
+      local d = divineDispatch[atk]
+      local act = actOf(CMD_SUMMON, atk)
+      local ci = chargeOf(slot, armW[slot], act)
+      local hi = hitOf(d.bw, d.bw1, act)
+      H.log(string.format("%s %s's pool %d at the confirm; that pool's writes from "
+        .. "the confirm to the divine's return: %s", tag, who, mpAtArm[slot],
+        writesStr(poolWrites, armW[slot], d.pw1, function(w) return w.tag == slot end)))
+      H.log(string.format("%s boss HP %d as %s left ExecCmd (f%d), %d at its return "
+        .. "(f%d); the boss's HP writes in between: %s", tag, d.hp0, name, d.frame,
+        d.hp1, d.doneFrame, writesStr(bossWrites, d.bw, d.bw1)))
+      H.assertEq(ci ~= nil, true, string.format("%s %s's own summon charged "
+        .. "the pool: a write under $3a7c/$3a7d = $19/$%02X with X = the summoner's slot",
+        tag, who, atk))
+      local c = poolWrites[ci]
+      H.assertEq(c.cmd == CMD_SUMMON and c.atk == atk, true, string.format(
+        "%s ...made under $b5/$b6 = $19/$%02X, the summon itself", tag, atk))
+      H.assertEq(hi ~= nil, true, string.format("%s the boss's HP was written "
+        .. "under %s's own action ($3a7c/$3a7d = $19/$%02X), between its ExecCmd "
+        .. "and its return", tag, name, atk))
+      return c, bossWrites[hi], ci
+    end
+    local function divineReturned(atk)
+      local d = divineDispatch[atk]
+      return d ~= nil and d.doneFrame ~= nil
+    end
     return H.repeatN(1, {
       H.call(function()
-        R.hpMid = nil
         lm0 = mp(locke)
         celesMode = "summon"
       end),
       driveTo(function()
-        return H.readWord(SUMMONED) & mask(celes) ~= 0
-           and mpAtArm[celes] ~= nil
-           and mp(celes) == mpAtArm[celes] - DDUST_MP
-      end, 20000, "Celes's Diamond Dust is really queued and paid for"),
+        return H.readWord(SUMMONED) & mask(celes) ~= 0 and divineReturned(DDUST)
+      end, 20000, "Celes's Diamond Dust is queued, dispatched and returns"),
       H.call(function()
         celesMode = "defer"
         divineDispatched("[ddust]", DDUST, "Diamond Dust")
-      end),
-      driveTo(function() return bossHp() < R.hp0 end, 5000,
-        "Diamond Dust resolves against NUMBER 024"),
-      H.call(function()
-        -- $3410 is a shared numeric ability id: a monster action can also
-        -- write $37/$38.  Take the damage baseline only after Celes's flag,
-        -- debit and HP change have jointly identified her real summon.
-        R.hpMid = bossHp()
-        -- The debit is read here, at the queue, and remembered: boot A's
-        -- pool is her maximum, so the divine leaves 99 and every kit row
-        -- stays live without any refund.  (The engine re-derives a
-        -- character's enabled bits only at her action's END -- AfterAction2
-        -- consumes the $3204 request; CheckMagicEnabled is cost vs the pool
-        -- at that moment -- and again only on the L/R boost edge, which the
-        -- parked window never presses; a Defer was measured NOT to rebuild
-        -- them.  An earlier cut pinned 31 here and needed a live-RAM refund
-        -- ahead of that rebuild; the higher pin removes the write.)
-        R.ddustDebit = mpAtArm[celes] - mp(celes)
+        local c, hit, ci = measure("[ddust]", celes, DDUST, "Diamond Dust", "Celes")
+        -- The debit is read off the charge and remembered: boot A's pool is
+        -- her maximum, so the divine leaves plenty and every kit row stays
+        -- live without any refund.  (The engine re-derives a character's
+        -- enabled bits only at her action's END -- AfterAction2 consumes the
+        -- $3204 request; CheckMagicEnabled is cost vs the pool at that
+        -- moment -- and again only on the L/R boost edge, which the parked
+        -- window never presses; a Defer was measured NOT to rebuild them.
+        -- An earlier cut pinned 31 here and needed a live-RAM refund ahead
+        -- of that rebuild; the higher pin removes the write.)
+        R.ddCharge, R.ddHit, R.ddChargeIdx = c, hit, ci
+        R.ddustDebit = c.old - c.new
         lockeMode = "summon"
       end),
       driveTo(function()
-        return H.readWord(SUMMONED) & mask(locke) ~= 0
-           and mpAtArm[locke] ~= nil
-           and mp(locke) == mpAtArm[locke] - INFERNO_MP
-      end, 20000, "Locke's Inferno is really queued and paid for"),
+        return H.readWord(SUMMONED) & mask(locke) ~= 0 and divineReturned(INFERNO)
+      end, 20000, "Locke's Inferno is queued, dispatched and returns"),
       H.call(function()
         lockeMode = "medic"
         divineDispatched("[inferno]", INFERNO, "Inferno")
+        R.infCharge, R.infHit = measure("[inferno]", locke, INFERNO, "Inferno", "Locke")
       end),
-      driveTo(function() return bossHp() < R.hpMid end, 5000,
-        "Inferno resolves against NUMBER 024"),
       H.call(function()
-        H.log(string.format("[divines] boss hp %d->%d->%d st3=%02x | celes "
-          .. "mp %d->%d (fight opened at %d) | locke mp %d->%d (opened at "
-          .. "%d) | $3f2e=%04x", R.hp0, R.hpMid or -1,
-          bossHp(), bossSt3(), mpAtArm[celes], mp(celes), R.mp0,
-          mpAtArm[locke], mp(locke), lm0, H.readWord(SUMMONED)))
-        H.assertEq(R.hpMid ~= nil and R.hpMid < R.hp0, true,
+        local dd, inf = divineDispatch[DDUST], divineDispatch[INFERNO]
+        H.log(string.format("[divines] Diamond Dust hit %d->%d (boss %d at its "
+          .. "dispatch), Inferno hit %d->%d (boss %d at its dispatch) st3=%02x | "
+          .. "celes charged %d->%d (confirmed at %d, fight opened at %d) | locke "
+          .. "charged %d->%d (confirmed at %d, opened at %d) | $3f2e=%04x",
+          R.ddHit.old, R.ddHit.new, dd.hp0, R.infHit.old, R.infHit.new, inf.hp0,
+          bossSt3(), R.ddCharge.old, R.ddCharge.new, mpAtArm[celes], R.mp0,
+          R.infCharge.old, R.infCharge.new, mpAtArm[locke], lm0,
+          H.readWord(SUMMONED)))
+        H.assertEq(R.ddHit.new < R.ddHit.old, true,
           "[ddust] the divine HIT (positive control for the status result)")
-        H.assertEq(bossHp() < R.hpMid, true, "[inferno] the control divine hit too")
+        H.assertEq(R.infHit.new < R.infHit.old, true, "[inferno] the control divine hit too")
         H.assertEq(bossSt3() & STATUS3_SLOW, 0,
           "[ddust] the Slow rider was REFUSED where the species' authored "
           .. "immunity blocks it -- per-monster immunity is still consulted; "
           .. "[inferno] and Inferno carries no rider of its own")
-        H.assertEq(R.ddustDebit, DDUST_MP, "[ddust] the summon charged its 27 MP (the debit verified at the queue)")
-        H.assertEq(mpAtArm[locke] - mp(locke), INFERNO_MP,
-          "[inferno] charged its 26 MP")
+        H.assertEq(R.ddustDebit, DDUST_MP,
+          "[ddust] the summon charged its 27 MP (from the pool the charge found)")
+        H.assertEq(R.infCharge.old - R.infCharge.new, INFERNO_MP,
+          "[inferno] charged its 26 MP (from the pool the charge found)")
         H.assertEq(H.readWord(SUMMONED) & mask(celes) ~= 0, true,
           "[flag] the engine set Celes's once-per-battle bit in $3f2e")
         H.assertEq(H.readWord(SUMMONED) & mask(locke) ~= 0, true,
@@ -905,8 +1011,22 @@ H.run({ maxFrames = 150000 }, {
     celesMode = "park"
     -- Boot A's pool is her maximum, so nothing here needs a refund: the
     -- window below must show the summon row greyed by the flag alone,
-    -- with every kit row live by MP.
-    H.assertEq(mp(celes), mpAtArm[celes] - DDUST_MP, "[flag] her pool is the divine's debit and nothing else (no refund, nothing spent since the confirm)")
+    -- with every kit row live by MP.  What moved her pool since the divine
+    -- is the fight's (a muddled turn of her own, a Rasp): listed, and the
+    -- pool must still be the engine's -- the last write it made -- and
+    -- still pay the dearest row of her kit.
+    local last = nil
+    for i = #poolWrites, 1, -1 do
+      if poolWrites[i].tag == celes then last = poolWrites[i]; break end
+    end
+    H.log(string.format("[flag] her pool %d; the divine took %d->%d; her pool's "
+      .. "writes since: %s", mp(celes), R.ddCharge.old, R.ddCharge.new,
+      writesStr(poolWrites, R.ddChargeIdx, #poolWrites, function(w)
+        return w.tag == celes end)))
+    H.assertEq(mp(celes), last.new,
+      "[flag] her pool is what the engine's own last write left (no refund)")
+    H.assertEq(mp(celes) >= SHELL_MP, true,
+      "[flag] ...and it still pays her kit's dearest row (Shell, 15)")
   end),
   driveTo(function()
     return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC

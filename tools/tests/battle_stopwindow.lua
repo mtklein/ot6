@@ -22,20 +22,40 @@
 -- an open window is a Brainpan's roll on the FC descent, which no fixture
 -- near a save point draws on cue.  The battle itself is a natural Mt.
 -- Kolts cave encounter paced into from kolts_cave; the driver is the
--- route's own (M.newFightDriver, the walk options).
+-- route's own (M.newFightDriver, the walk options), called once per
+-- emulated frame the way the route's walkers call it.
+--
+-- The observation needs the fight to outlast the engine's own Stop:
+-- 18 counts is ~2,400 frames, and a party that is not stalled kills a
+-- cave formation well inside that (measured: the draw of three 134-HP
+-- Cirpius was dead 1,554 frames after the poke, with Stop still on).  So at
+-- the poke every standing monster's HP and max HP are also POKED up to
+-- FORMATION_HP, whatever the cave drew, and the verdict requires the
+-- formation to still stand when the observation closes.  The old version
+-- of this file passed only because EDGAR's window stalled (its driver
+-- ticked every other frame, every press ran into the menu's auto-repeat,
+-- and Tools on Fight/Tools/-/Item was never landed on), which left the
+-- monsters untouched; with the allies acting, the fight ended first and
+-- 2 read `the clear at nil`.
 --
 -- Asserted, from the poke frame:
 --   1. the driver said the [status] line for it, naming the kept window;
 --   2. it planned for the Stopped actor at that window, before Stop
 --      cleared, and the plan was an attack, never care;
 --   3. the window moved on: another actor's plan came inside 600 frames
---      (stop_stalls.py's stall threshold);
+--      (stop_stalls.py's stall threshold), and that actor's command
+--      EXECUTED (ExecCmd with X = its offset) after the plan and while
+--      Stop was still on -- a plan that never ran is a stall with a log
+--      line;
 --   4. the entered command executed (ExecCmd with X = the actor's offset)
 --      only after Stop cleared -- the engine held it for the counter, as
 --      the fix relies on -- and the actor's [status] CLEARED line came
---      first.
--- Negative control: stub M.windowKept to false (the old driver's shape)
--- and 2 goes red -- the actor gets no plan while its window sits open.
+--      first;
+--   5. the battle was still on throughout: the formation stood when the
+--      observation closed.
+-- Negative controls: stub M.windowKept to false (the old driver's shape)
+-- and 2 goes red -- the actor gets no plan while its window sits open;
+-- press nothing for the other actors (a stalled party) and 3 goes red.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 
@@ -43,11 +63,14 @@ local MENU, ACTOR, MSTATE, CMDTBL, BCHID = 0x7BCA, 0x62CA, 0x7BC2, 0x202E, 0x3ED
 local ST1, ST2, ST3, ATBFLAGS, STOP_COUNT = 0x3EE4, 0x3EE5, 0x3EF8, 0x3AA0, 0x3AF1
 local ST_CMD, CMD_FIGHT = 0x05, 0x00
 local STOP_TICKS = 0x12
+local MON_HP, MON_MAXHP = 0x3BFC, 0x3C24     -- entities 4..9, slot s at +s*2
+local FORMATION_HP = 30000
 
-local lines = {}
+local lines, lineFrame = {}, {}
 local rawLog = H.log
 H.log = function(msg)
   lines[#lines + 1] = tostring(msg)
+  lineFrame[#lines] = H.frame
   return rawLog(msg)
 end
 
@@ -66,6 +89,7 @@ local F = nil
 local stopped, pokeFrame, pokeLine = nil, nil, nil
 local clearedFrame, clearedLine, stallLine = nil, nil, nil
 local execFrame, execCmd = nil, nil
+local partyExec = {}   -- every party ExecCmd after the poke: { e, cmd, frame }
 
 H.run({ maxFrames = 90000 }, {
   H.waitFrames(20),
@@ -104,11 +128,18 @@ H.run({ maxFrames = 90000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "battle armed", 5),
 
   H.call(function()
+    local words = {}
+    for _, w in ipairs(H.formationWords()) do words[#words + 1] = string.format("%03X", w) end
+    H.log(string.format("[test] the cave drew species %s, battle type $%02X",
+      table.concat(words, " "), H.battleLayout().type))
     F = H.newFightDriver("stopwindow", { tactical = true, boost = true, bank = 2,
                                          items = true, healPercent = 50 })
     -- when the party's command executes: which entity, and which command
     emu.addMemoryCallback(function()
       local x = emu.getState()["cpu.x"] & 0xFFFF
+      if pokeFrame ~= nil and x < 8 and x % 2 == 0 and #partyExec < 64 then
+        partyExec[#partyExec + 1] = { e = x // 2, cmd = H.readByte(0xB5), frame = H.frame }
+      end
       if stopped ~= nil and x == stopped * 2 and execFrame == nil and pokeFrame ~= nil then
         execFrame, execCmd = H.frame, H.readByte(0xB5)
         H.log(string.format("[test] f%d entity %d's command $%02X executes (Stop %s)",
@@ -131,6 +162,16 @@ H.run({ maxFrames = 90000 }, {
     H.writeByte(ST3 + e * 2, H.readByte(ST3 + e * 2) | 0x10)
     H.writeByte(STOP_COUNT + e * 2, STOP_TICKS)
     H.writeByte(ATBFLAGS + e * 2, H.readByte(ATBFLAGS + e * 2) | 0x10)
+    -- ...and the formation held for the observation (see the header)
+    local was = {}
+    for _, m in ipairs(H.activeSlots()) do
+      was[#was + 1] = string.format("s%d:%d/%d", m.slot, H.readWord(MON_HP + m.slot * 2),
+        H.readWord(MON_MAXHP + m.slot * 2))
+      H.writeWord(MON_MAXHP + m.slot * 2, FORMATION_HP)
+      H.writeWord(MON_HP + m.slot * 2, FORMATION_HP)
+    end
+    H.log(string.format("[test] f%d formation HP raised to %d for the observation (was %s)",
+      H.frame, FORMATION_HP, table.concat(was, " ")))
     stopped, pokeFrame, pokeLine = e, H.frame, #lines
     H.log(string.format("[test] f%d Stop poked onto entity %d char %d at its open command "
       .. "window (menu=%02X st=%02X actor=%d atb=%04X $3AA0=%02X counter=%d); %d allies up",
@@ -140,13 +181,18 @@ H.run({ maxFrames = 90000 }, {
     return true
   end, 20000, {
     H.call(function() F.frame() end),
-    H.waitFrames(1),
   }, "a member's command window is open with an ally standing"),
 
   -- ...and keeps fighting until the Stopped member's command has executed
-  -- after Stop cleared, or the battle ends
+  -- after Stop cleared.  The battle ending first fails here, fast: every
+  -- check below is about a fight that is still going.
   H.driveUntil(function()
-    if not H.battleLoadStarted() then return true end
+    if not H.battleLoadStarted() or #H.activeSlots() == 0 then
+      error(string.format("the battle ended %d frames after the poke, before the "
+        .. "observation closed (Stop cleared %s, the Stopped member's command %s)",
+        H.frame - pokeFrame, clearedFrame and ("at f" .. clearedFrame) or "never",
+        execFrame and ("ran at f" .. execFrame) or "never ran"), 0)
+    end
     if stallLine == nil and H.frame >= pokeFrame + 600 then stallLine = #lines end
     if clearedFrame == nil and (H.readByte(ST3 + stopped * 2) & 0x10) == 0 then
       clearedFrame, clearedLine = H.frame, #lines
@@ -156,7 +202,6 @@ H.run({ maxFrames = 90000 }, {
     return execFrame ~= nil and clearedFrame ~= nil and H.frame - execFrame > 120
   end, 12000, {
     H.call(function() F.frame() end),
-    H.waitFrames(1),
   }, "the Stopped member's entered command executes after Stop clears"),
 
   H.call(function()
@@ -189,11 +234,23 @@ H.run({ maxFrames = 90000 }, {
         .. "pressed nothing there)", e, tostring(ownPlan), tostring(clearedLine)))
     H.assertEq(ownKind ~= "item" and ownKind ~= "heal" and ownKind ~= "summon", true,
       "...and the plan is an attack, not care (plan=" .. tostring(ownKind) .. ")")
-    -- 3. the window moved on: another actor planned inside 600 frames
+    -- 3. the window moved on: another actor planned inside 600 frames...
     H.assertEq(otherPlan ~= nil and stallLine ~= nil and otherPlan < stallLine, true,
       string.format("another actor got a plan inside 600 frames of the poke (plan at log "
         .. "line %s, the 600-frame mark at %s): the window moved on", tostring(otherPlan),
         tostring(stallLine)))
+    -- ...and that command RAN, while the Stopped member was still frozen
+    local otherActor = tonumber(lines[otherPlan]:match("actor=(%d) char=%d+ plan="))
+    local otherPlanFrame = lineFrame[otherPlan]
+    local otherExec = nil
+    for _, x in ipairs(partyExec) do
+      if x.e == otherActor and x.frame >= otherPlanFrame then otherExec = x; break end
+    end
+    H.assertEq(otherExec ~= nil and clearedFrame ~= nil and otherExec.frame < clearedFrame, true,
+      string.format("...and actor %d's command executed while Stop held entity %d "
+        .. "(planned f%d, executed %s, Stop cleared %s)", otherActor, e, otherPlanFrame,
+        otherExec and string.format("f%d cmd $%02X", otherExec.frame, otherExec.cmd) or "never",
+        clearedFrame and ("f" .. clearedFrame) or "never"))
     -- 4. the entered command ran only after Stop cleared
     H.assertEq(clearedFrame ~= nil, true, "Stop cleared on its counter")
     H.assertEq(execFrame ~= nil, true, "the Stopped member's command executed")
@@ -202,8 +259,17 @@ H.run({ maxFrames = 90000 }, {
       clearedFrame or -1))
     H.assertEq(execCmd == CMD_FIGHT or ownKind ~= "fight", true,
       string.format("...and it was the command entered ($%02X for plan=%s)", execCmd or 0xFF, ownKind))
+    -- 5. the fight was still on when the observation closed
+    local standing = {}
+    for _, m in ipairs(H.activeSlots()) do
+      standing[#standing + 1] = string.format("s%d:%d", m.slot, H.readWord(MON_HP + m.slot * 2))
+    end
+    H.assertEq(H.battleLoadStarted() and #standing > 0, true, string.format("the formation "
+      .. "still stands as the observation closes (%s)", table.concat(standing, " ")))
     H.log(string.format("[test] Stop on entity %d: poked f%d, plan=%s, cleared f%d (+%d), "
-      .. "command $%02X ran f%d (+%d after the clear)", e, pokeFrame, ownKind, clearedFrame,
-      clearedFrame - pokeFrame, execCmd, execFrame, execFrame - clearedFrame))
+      .. "command $%02X ran f%d (+%d after the clear); actor %d's command $%02X ran f%d "
+      .. "inside the Stop; standing at the close: %s", e, pokeFrame, ownKind, clearedFrame,
+      clearedFrame - pokeFrame, execCmd, execFrame, execFrame - clearedFrame, otherActor,
+      otherExec.cmd, otherExec.frame, table.concat(standing, " ")))
   end),
 })

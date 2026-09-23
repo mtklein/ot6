@@ -31,12 +31,13 @@
 # generator's copy-if-changed edges -- a checkout's mtime bump regenerates nothing):
 #   * the ROM (build/ot6.sfc),
 #   * the generator .lua,
-#   * all three composed-in lib halves: lib/ot6.lua, lib/ot6_field.lua and
-#     lib/ot6_contract.lua (the invariant-contract half rides in every
-#     composed script, so a contract edit re-runs every step that asserts it),
 #   * for checkpoint-booted states, the checkpoint's manifest.json and every
 #     *.sram payload,
 #   * the predecessor's generated state, transitively.
+# The lib halves (lib/ot6.lua, lib/ot6_field.lua, lib/ot6_contract.lua) are
+# NOT inputs: a lib edit re-runs the suites and is recorded as provenance
+# drift in the stamps, but regenerates no state (savestate_ninja.py's
+# emit_state_edges; docs/TESTING.md "Provenance and compatibility").
 #
 # S() takes keyword-only fields ON PURPOSE: a typo'd field name is a
 # TypeError here, not a silently-plain entry downstream.

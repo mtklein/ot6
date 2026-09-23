@@ -614,6 +614,7 @@ check("audit_chests",
 rel_dir = f"build/release/ot6-v{VERSION}"
 notes = f"docs/release-notes-v{VERSION}.md"
 
+qual_before_release = len(qual)
 check("release_branch",
       f"git show-ref --verify --quiet refs/heads/release/v{VERSION}"
       f" || {{ echo 'ERROR: no release/v{VERSION} branch -- cut it first:"
@@ -625,8 +626,15 @@ check("release_readme",
       f" current release'; exit 1; }}",
       ["VERSION", "README.md"], desc=f"README names v{VERSION}")
 
+# The two release preflights are not qualification: `ninja qual` runs every
+# qualifier on pushed main before the release commit (VERSION, notes,
+# README) exists; the zip still requires both.
+release_pre = qual[qual_before_release:]
+del qual[qual_before_release:]
+w.edge(["qual"], "phony", implicit=qual)
+
 bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
-w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual,
+w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
        cmd=f'mkdir -p "{rel_dir}" && tools/bin/flips --create --bps'
            f' "{BASE}" build/ot6.sfc "{bps}"',
        desc=f"bps patch v{VERSION}")

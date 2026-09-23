@@ -418,7 +418,21 @@ done:   rtl
 ; swings whiff, so +2 swings per pending bp = +1 real hit for a
 ; one-weapon character, and a genji-glove pair swings both hands
 ; again, doubling the bonus as it doubles everything else.
-; a8/i16, x = attacker entity offset.
+;
+; A Rage never swings extra (owner ruling, "boost pays once"): its boost
+; bought the coin's certainty (Ot6RageCoin, OT6_RAGETIER) and nothing else.
+; FightAttack still sees Rage actions, because GetCmdForAI maps the beast's
+; plain Battle ($ee) and its physical Special ($ef) to command $00, so a
+; boosted Rage-start whose special is $ef used to arrive here with its pending
+; pips live and buy the certain special AND six more passes of it at 3 pips
+; ($3a70 1 -> 7).  $b5 is $00 by then, so the test is on the queued command,
+; $3a7c = $10, which InitPlayerAction copied out of the queue and nothing
+; rewrites for the rest of the action -- the same test Ot6BoostDmg makes.  It
+; stands ahead of the pending read and of Ot6Retaliate, so a Rage turn keeps
+; the vanilla count whoever armed the byte, and a retaliation tally is not
+; spent on a turn that cannot deliver it.  The pips themselves are charged by
+; Ot6ActionEnd exactly as for a spell special.  battle_procboost asserts it.
+; a8/i16, x = attacker entity offset, db = $7e.
 
 .proc Ot6FightBoost
         .a8
@@ -431,6 +445,9 @@ done:   rtl
         bcs     done            ;   (battle_main.asm:12435) and ends at an
                                 ;   unhooked EndAction, so the pending
                                 ;   would be delivered but never charged
+        lda     $3a7c           ; a Rage buys no swings: its boost bought the
+        cmp     #$10            ;   coin (see the header), and a raging turn
+        beq     done            ;   dumps no retaliation tally either
         lda     OT6_BOOST_REVEALED,x         ; pending boost level
         bne     spend           ; the player bought this one: nothing to
                                 ;   decide, it just swings
@@ -441,9 +458,9 @@ done:   rtl
         lda     OT6_BOOST_REVEALED,x
         beq     done
         ; The `clc / adc $3a70 / sta $3a70` tail below is DERIVED by
-        ; battle_healpolicy.lua and battle_retaliate.lua out of the first 32
-        ; bytes of this proc, so the decision above stays short and the
-        ; arithmetic stays where those scans can still find it.
+        ; battle_healpolicy.lua and battle_retaliate*.lua out of the first 40
+        ; bytes of this proc (it ends at byte 37), so the decision above stays
+        ; short and the arithmetic stays where those scans can still find it.
 spend:  asl                     ; two swings per bp
         clc
         adc     $3a70
@@ -516,6 +533,13 @@ done:   rtl
 ;     arrives here like anyone else's (battle_retaliate_script.lua).  A
 ;     SwdTech the script picks instead carries no dump, as no non-Fight
 ;     command does.
+;
+; WHO DOES NOT: a Rage.  Berserk, muddle, charm and the Colosseum can pick
+; Rage for GAU (RandCharAction's tables allow it), and a beast's Battle or
+; physical Special then runs through FightAttack; Ot6FightBoost's queued-Rage
+; test stands ahead of this call, so a raging turn never dumps and the bank
+; and the retaliation tally wait, as they do for a possessed Gau's every turn
+; (kit-gau.md §6.2).
 ;
 ; jsr from Ot6FightBoost and Ot6UmaroRetaliate, each inside its counterattack
 ; guard, for a character, and only once it has established that nobody
