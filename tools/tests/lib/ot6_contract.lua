@@ -14,6 +14,7 @@
 -- What a contract can declare (all fields optional):
 --   slot     = 3                          -- SRAM $307ff0 last-saved slot, 1..3
 --   world    = { x = 137, y = 203 }       -- on the world map at this tile
+--                (map = 1 in the table for the World of Ruin; 0 by default)
 --   field    = { map = 270, x = 25, y = 10 }  -- on this field map at this tile
 --                (a save-point boundary: where a cold Continue of the
 --                boundary's checkpoint puts the party, which is the save
@@ -912,6 +913,61 @@ M.contracts["fc-alcove-v1"] = {
   },
 }
 
+-- wor-island-v1: the World of Ruin's first save, on the Solitary Island's
+-- own tile of the World of Ruin map (map 1), (76,239), before Cid is fed.
+-- Cid's clock (timer 0, FIELD_ONLY) is saved with the game ($1FA8,
+-- menu/save.asm PushTimers) and runs again once Celes walks back in.
+-- Neither Cid outcome has happened; CELES is alone (the opening reset the
+-- roster, event_main.asm:12431).
+M.contracts["wor-island-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 76, y = 239 },    -- the island's tile, off 396's west edge
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00B3, 0, "Cid not yet recovered (_ca5713)" },
+    { 0x00B4, 0, "Cid not lost (_caf461)" },
+  },
+  party = {
+    size = 1,                     -- CELES alone
+    members = {
+      { 0x06, "CELES" },
+    },
+  },
+  ram = {
+    { 0x1188, 0xFF, 0x80, "Cid's clock: timer 0 armed, FIELD_ONLY (:12448)" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-start-v1: the first save after the Solitary Island, the World of
+-- Ruin's boot.  Cid recovered ($00B3, _ca5713) and gave Celes the raft;
+-- the voyage set her down on the World of Ruin map (map 1) at (146,212)
+-- (_ca5633: load_map 1, {146, 212}), and she saved there through the real
+-- Save UI.  She is alone: the opening reset the roster ($02F0-$02FD = 0,
+-- event_main.asm:12431) and put her in party 1 (docs/design/wor-start.md).
+M.contracts["wor-start-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 146, y = 212 },   -- the raft's landing
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00B3, 1, "Cid recovered (_ca5713)" },
+    { 0x00B4, 0, "Cid was not lost (_caf461)" },
+  },
+  party = {
+    size = 1,                     -- CELES alone
+    members = {
+      { 0x06, "CELES" },
+    },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
@@ -954,7 +1010,8 @@ function M.contractDiffs(c)
       emu.read(0x307ff0, emu.memType.snesMemory))
   end
   if c.world then
-    field("on the world map (mapId & 0x1ff)", 0, M.mapId() & 0x1ff)
+    -- map 0 is the World of Balance (the default), map 1 the World of Ruin
+    field("on the world map (mapId & 0x1ff)", c.world.map or 0, M.mapId() & 0x1ff)
     field("world x", c.world.x, M.worldX())
     field("world y", c.world.y, M.worldY())
   end

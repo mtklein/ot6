@@ -454,7 +454,9 @@ before the `return` that hands control back, the opening sets `var 7 = 120`
 var 7 every 64 field frames — about 2:08 of field time until Cid dies unfed,
 which is the fork to the cliff scene. The escape gen's terminal (control at the
 bedside) therefore leaves a live clock in the seed it cuts; the first WoR gen
-must feed him (or accept the fork) before anything else.
+must feed him (or accept the fork) before anything else. `gen_wor_start`
+feeds him (`docs/design/wor-start.md`: the measured clock, the fish and the
+odds).
 
 **Equipment note — Nerapa.** Elsewhere on this route Celes's Fire Rod is
 fine (the enemies there absorb ice, not fire), but Nerapa is the

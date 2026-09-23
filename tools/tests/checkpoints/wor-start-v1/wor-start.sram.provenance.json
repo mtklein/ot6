@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "990aa6e6bb28c4be78f5e00b2622fa114ad980d31a107d2198debaed1c8f81b7",
+  "generator_sig": "bc5beaa2d6ae7b5247d297ec39263be76192ee74981297662cb8fe7366d3735a gen_wor_start tools/tests/checkpoints/wor-island-v1/manifest.json tools/tests/checkpoints/wor-island-v1/wor-island.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/wor-island-v1/manifest.json",
+      "sha256": "b652cb27ff1ec3eebe5149f15461b29f6f43673f385d4367e2d0d4f53b61ba0f"
+    }
+  ]
+}
