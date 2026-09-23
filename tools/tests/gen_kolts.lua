@@ -31,12 +31,11 @@
 -- 95's long entrance at y=37 (x=0..27) does the same, so every step there
 -- stays off y=37 until the deliberate exit.
 --
--- No state writes; every encounter is answered by the pad. The cave, town
--- and world steps flee (L+R); Mt. Kolts and map 98 are fought tactically
--- (EDGAR's Tools, boosted Fights, the fight driver's Potion medic line) --
--- crossing Mt. Kolts on foot is what levels the party for VARGAS. A
--- formation that will not release the party inside M.FLEE_CAP frames is
--- fought out by the same tactical driver.
+-- No state writes; every encounter is answered by the pad, and every one
+-- is fought: the cave, the town, the world and Mt. Kolts alike, by the
+-- lib's tactical fight driver (EDGAR's Tools, boosted Fights, its Potion
+-- medic line) -- the fights on the way are what level the party for
+-- VARGAS.  Nothing here holds L+R.
 --
 -- The care layer: every crossing ends with a check of the party's hit
 -- points, and the route stops at the shop in South Figaro.
@@ -129,7 +128,7 @@ local function settleField(what, dstMap, maxF, mode)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 24000, { playBattles = mode or "flee" }),
+    end), maxF or 24000, { playBattles = mode or "tactical" }),
     H.waitFrames(30),
   })
 end
@@ -152,10 +151,10 @@ local function crossTo(tx, ty, dstMap, what, mode, maxF)
   return seq({
     H.logStep(function()
       return string.format("cross %s: (%d,%d) -> (%d,%d) -> map %d [%s]",
-        what, H.fieldX(), H.fieldY(), tx, ty, dstMap, mode or "flee")
+        what, H.fieldX(), H.fieldY(), tx, ty, dstMap, mode or "tactical")
     end),
     H.navTo(tx, ty, { maxFrames = maxF or 40000, arrive = mapChanged(),
-             playBattles = mode or "flee", reserve = { [POTION] = 5 } }),
+             playBattles = mode or "tactical", reserve = { [POTION] = 5 } }),
     H.release(),
     settleField(what, dstMap, nil, mode),
     H.call(function()
@@ -421,7 +420,9 @@ local function shopTrip()
     -- party needs.  Fenix -> 15, Tonic -> 99 are ceilings; buyTo purse-clamps
     -- each, and whatever it leaves short of the supply band is on the
     -- town's bill the grind works to (the 2026-09-22 run came in with 4448
-    -- gil and left with 48: "FENIX DOWN to 15: have 2, buying 7").
+    -- gil and left with 48: "FENIX DOWN to 15: have 2, want 15, buying 7",
+    -- build/attempts/wt/gen-robust/lab/gen-robust/kolts_regen/
+    -- south_figaro.log).
     buyTo(0xF2, 1, 3, "ANTIDOTE to 3"),
     buyTo(0xF4, 2, 2, "SOFT to 2"),
     buyTo(0xF0, 5, 15, "FENIX DOWN to 15"),
@@ -530,11 +531,13 @@ end
 -- met and the purse covers the town's bill, checked between laps (never
 -- mid-battle), with each lap's steps built fresh the way the old fixed
 -- list of 24 built them.  The bound is GRIND_FRAMES of grinding: the last
--- fixed-lap run earned 8428 gil in 49834 frames (south_figaro.log of
--- 2026-09-22: "grind lap 1 ... gil=48 f22568" to "[grind] 24 laps ...
+-- fixed-lap run earned 8428 gil in 49834 frames (the old generator's
+-- south_figaro.log, quoted in build/attempts/review/gen-robust/
+-- extracts.txt: "grind lap 1 ... gil=48 f22568" to "[grind] 24 laps ...
 -- gil=8476" at f72402), and this loop met a bill near 10000 in 55028 and
--- 57475 frames (build/lab/gen-robust/kolts_pace3, kolts_pace9), so the
--- budget is between two and three times that.  Running out is a step
+-- 57475 frames (build/attempts/wt/gen-robust/lab/gen-robust/kolts_pace3/
+-- kolts_pace3.log, kolts_pace9/kolts_pace9.log), so the budget is between
+-- two and three times that.  Running out is a step
 -- timeout (a seed-dependent class, so the segment runner retries it) that
 -- says what the grind earned.
 local GRIND_FRAMES = 150000
@@ -1217,14 +1220,18 @@ H.run({ maxFrames = 700000 }, {
   -- before the Returner Hideout.  The gear, the relics and the inn -- the
   -- things the route asserts on -- are already paid for, so the top-up is
   -- the only purchase a short purse can short, and within it Fenix Downs
-  -- come before the Tonic soak.  Both go to the supply band at the
-  -- party's level; the grind's bill priced them a level higher.
+  -- come first, to the supply band at the party's level.  Then the Tonic
+  -- soak takes what is left, toward 99: the grind's bill priced the band a
+  -- level higher, and a person heading into the Returners stretch spends
+  -- the change on field care rather than carrying it (the last run left
+  -- the counter at "gil=1416 tonic=55" and reached the Returner Hideout
+  -- with 39 Tonics against a band of 65, build/attempts/review/gen-robust/
+  -- extracts.txt).  buyTo purse-clamps, so short gil buys what it can.
   enterDoor(44, 32, 85, "item shop (second visit)"),
   counterShop(106, 54, "shop 8 (item, top-up)", SHOP_ITEM),
   buyTo(FENIX, 5, function() return fenixBand() end,
     "FENIX DOWN to the band (~level, to 20)"),
-  buyTo(TONIC, 0, function() return tonicBand() end,
-    "TONIC to the band (~level x5, to 99)"),
+  buyTo(TONIC, 0, 99, "TONIC toward 99 with what is left"),
   closeShop(85, "shop 8"),
   H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (South Figaro item shop, second visit)" }),
   leaveDoor(104, 57, "the item shop"),
@@ -1236,6 +1243,11 @@ H.run({ maxFrames = 700000 }, {
     H.assertEq(invCount(TONIC) >= tonicBand(), true,
       string.format("and the band's Tonics (%d, band %d at L%d)",
         invCount(TONIC), tonicBand(), partyLevel()))
+    H.assertEq(invCount(TONIC) >= 99
+               or gil() < shopPrice(SHOP_ITEM, TONIC), true,
+      string.format("the change went on Tonics: %d in the bag, %d gil " ..
+        "left against a %d-gil Tonic", invCount(TONIC), gil(),
+        shopPrice(SHOP_ITEM, TONIC)))
     where("restocked")
   end),
 
