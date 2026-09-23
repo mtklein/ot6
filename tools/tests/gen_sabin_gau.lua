@@ -57,11 +57,14 @@
 -- back, pincer or side battle), so a formation that can only come as a
 -- pincer (BattleProp byte $B3, formation $29 on this pool) never counts.
 --
--- Only a lost battle reloads the pre-grind checkpoint (a three-attempt
--- seed sweep).  A stalled fight, a feed that did not land, or the odds cap
--- is a driver or detection defect that another seed would only hide, so
--- it fails at once.  Every reload of this file's ladders logs the segment
--- runner's own `[retry] attempt n/N FAILED class=...` line, which is what
+-- Only a lost battle reloads a checkpoint, in all four of this file's
+-- ladders (the shore transit, the staging walk, the grind's three-attempt
+-- seed sweep, the post-join route).  A stalled fight, a walk segment out of
+-- frames, a walk that never arrives, a feed that did not land, the odds
+-- cap, or a wipe the party walked into after it had stopped dealing damage
+-- is a driver or detection defect that another seed would only hide, so it
+-- fails the run at once (ladderLoss).  Every reload logs the segment
+-- runner's own `[retry] attempt n/N FAILED class=wipe` line, which is what
 -- tools/audit_retries.py and tools/audit_fenix.py read.
 --
 -- The generated state is verified by reload, not just a calm capture: a
@@ -369,12 +372,33 @@ local buyItem = H.buyItem
 -- the moment $2F4E holds with the meat still in the bag.  All cursor state
 -- read live, all input by pad.
 --
--- What ended an attempt: `lost` is the message, `lostClass` the runner's
--- failure class for it (wipe for a lost battle, timeout for a walk segment
--- out of frames, other for the rest), `lostContext` the battle that was up
--- when a wipe was read (the runner's own wipe-context shape).
+-- What ended an attempt: `lost` is the message, `lostClass` what kind of
+-- ending it was, `lostContext` the battle that was up (the runner's own
+-- wipe-context shape).  The classes: `wipe`, a lost battle -- the one
+-- ending any ladder here reloads its checkpoint for; `driver`, a fight or a
+-- feed that stopped making progress, or a wipe that came after the party
+-- had stopped dealing damage (see WIPE_QUIET_FRAMES); `stall`, a walk
+-- segment out of frames; `odds`, the grind's give-up cap; `other`, a walk
+-- that never arrived.  Everything but `wipe` is the controller or its
+-- reading of the game, which another seed would only hide, so it fails the
+-- run at once (ladderLoss).
 local lost, lostClass, lostContext = nil, nil, nil
 local wipeN = 0
+-- A wipe the party walked into after dealing no damage for this long is a
+-- stalled driver, not a lost battle.  Every turn the fight policies here
+-- spend is an attack or a heal, so a party taking its turns chips the
+-- formation every few hundred frames; half the grind's no-damage bound
+-- (NO_DAMAGE_FRAMES, below) is several turns for each member with no
+-- attack landing.  Measured: an idle party (a driver that never presses)
+-- wiped 6257 frames into a fight that took no damage from its opening
+-- (build/attempts/wt/gen-robust-fix/gau_ctl_wipe/gau_joined.log: "fight #1
+-- up f8250" .. "wiped in fight #1 at f14506"), and 9849 frames in on the
+-- regenerated falls_done (merge/gen_sabin_gau_nc_stallwipe); the longest
+-- quiet stretch of an honest fight, logged on every "fight #n over" line,
+-- ran 451 to 1579 frames over eight distinct grind fights, the 1579 the Templar
+-- and Soldier pack (build/attempts/wt/gen-robust-fix/merge/: nc_odds2,
+-- useup2, useup7, useup8).
+local WIPE_QUIET_FRAMES = 3000
 local function battleContext()
   if not H.battleLoadStarted() then
     return string.format("no battle table was live at the loss (f%d)", H.frame)
@@ -394,8 +418,23 @@ end
 local function lose(class, msg)
   if lost then return end
   lost, lostClass = msg, class
-  lostContext = class == "wipe" and battleContext() or nil
+  lostContext = (class == "wipe" or class == "driver") and battleContext()
+    or nil
   H.log("[gau] LOST -- " .. msg)
+end
+-- A wipe read on this frame: a lost battle, unless the party had dealt the
+-- formation no damage for WIPE_QUIET_FRAMES before it (`lastDmg` is the
+-- frame of the last monster-HP drop in the fight, or its opening frame).
+local function loseWipe(msg, lastDmg)
+  if lost then return end
+  local quiet = lastDmg and (H.frame - lastDmg) or nil
+  if quiet and quiet >= WIPE_QUIET_FRAMES then
+    lose("driver", string.format("%s, after the party had dealt no damage " ..
+      "for %d frames (since f%d): a stalled driver, not a lost battle", msg,
+      quiet, lastDmg))
+  else
+    lose("wipe", msg)
+  end
 end
 local function clearLoss()
   lost, lostClass, lostContext, wipeN = nil, nil, nil, 0
@@ -416,6 +455,21 @@ local function ladderFailed(ladder, n, of, shift)
     H.log(string.format("[retry] attempt %d/%d wipe context: %s", n, of,
       lostContext or "no battle was sampled"))
   end
+end
+-- The end of a ladder's attempt: nothing lost, carry on; a lost battle,
+-- count it and let the next attempt reload; anything else, fail the run
+-- now.  The raise carries no retryable text, so the segment runner files it
+-- as `other` and does not re-roll it either.
+local function ladderLoss(ladder, n, of, shift)
+  if lost == nil then return end
+  if lostClass ~= "wipe" then
+    error(string.format("gau: the %s stopped in attempt %d of %d (%s): %s.  " ..
+      "Only a lost battle reloads its checkpoint; this is the controller or " ..
+      "its reading of the game, and another seed would only hide it.%s",
+      ladder, n, of, lostClass, lost,
+      lostContext and ("  " .. lostContext) or ""), 0)
+  end
+  ladderFailed(ladder, n, of, shift)
 end
 local fed = false                        -- observed feed reaction completed
 local grind = { fights = 0, appearances = 0 }
@@ -553,6 +607,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
   local stuckN, battleFrames, segFrames = 0, 0, 0
   local segCalm, coasting = 0, false
   local missing = {}                     -- skills a list did not offer
+  local dmgAt, dmgHp = nil, nil          -- the last monster-HP drop
   local watch = newDeathWatch("gau walk")
   local function makePlan(actor)
     -- `worldWalkFight()` episodes are constructed before H.run starts, so
@@ -726,7 +781,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     if opts.segment then
       segFrames = segFrames + 1
       if segFrames > (budget or 40000) - 400 and lost == nil then
-        lose("timeout", string.format("segment %s timed out (%d frames, " ..
+        lose("stall", string.format("segment %s ran out of frames (%d, " ..
           "at %d,%d)", what, segFrames, H.worldX(), H.worldY()))
       end
     end
@@ -738,12 +793,20 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       -- a 300-frame battle-side wipe as a game over and freezes the pad;
       -- allowGameOver on the run keeps the sweeps alive for the reload)
       if (H.gameOverFired or 0) > 0 and not lost then
-        lose("wipe", string.format("GAME OVER counted by the canary " ..
-          "during %s at f%d [%s]", what, H.frame, partyLine()))
+        loseWipe(string.format("GAME OVER counted by the canary during " ..
+          "%s at f%d [%s]", what, H.frame, partyLine()), dmgAt)
       end
       if lost then H.setPad({}); return end
       if H.battleLoadStarted() then
         battleFrames = (battleFrames or 0) + 1
+        -- the formation's HP, for the wipe's stall reading (loseWipe): the
+        -- opening frame, then every frame it drops
+        local nmon, mhp = liveMonsters()
+        if battleFrames == 1 then dmgAt, dmgHp = H.frame, nil end
+        if nmon > 0 then
+          if dmgHp ~= nil and mhp < dmgHp then dmgAt = H.frame end
+          dmgHp = mhp
+        end
         if battleFrames == 120 then
           local sp = {}
           for s = 0, 5 do sp[#sp + 1] = string.format("%04X",
@@ -763,8 +826,8 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       end
       if H.battleLoadStarted() then
         if membersDown() then
-          lose("wipe", string.format("wiped walking %s at f%d [%s]", what,
-            H.frame, partyLine()))
+          loseWipe(string.format("wiped walking %s at f%d [%s]", what,
+            H.frame, partyLine()), dmgAt)
           H.setPad({})
           return
         end
@@ -790,8 +853,8 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
         if membersDown() then
           wipeN = wipeN + 1
           if wipeN >= 90 and not lost then
-            lose("wipe", string.format("wiped (game over) during %s at " ..
-              "f%d [%s]", what, H.frame, partyLine()))
+            loseWipe(string.format("wiped (game over) during %s at f%d " ..
+              "[%s]", what, H.frame, partyLine()), dmgAt)
           end
           H.setPad({})
           return
@@ -1128,10 +1191,11 @@ local function grindStep()
     local eligible = f.won and f.standing >= 2 and f.gauFlag
     if f.won then grind.wins = grind.wins + 1 end
     if eligible then grind.eligible = grind.eligible + 1 end
-    H.log(string.format("[gau] fight #%d over at f%d after %d frames: %s, " ..
+    H.log(string.format("[gau] fight #%d over at f%d after %d frames " ..
+      "(longest stretch without damage %d): %s, " ..
       "%d standing, battle type %s, GAU's flag %s, appearance=%s%s -- " ..
       "wins=%d eligible=%d appearances=%d, cap %d eligible", f.n, H.frame,
-      H.frame - f.start, f.won and "won" or "not won", f.standing,
+      H.frame - f.start, f.maxQuiet, f.won and "won" or "not won", f.standing,
       f.btype and string.format("%d", f.btype) or "?",
       f.gauFlag and "armed" or "cleared", tostring(f.appeared),
       joined and " (GAU joined)" or "", grind.wins, grind.eligible,
@@ -1175,12 +1239,13 @@ local function grindStep()
       -- count is a loss too.
       wipeN = membersDown() and wipeN + 1 or 0
       if (H.gameOverFired or 0) > 0 and not lost then
-        lose("wipe", string.format("GAME OVER counted by the canary in " ..
-          "fight #%d at f%d [%s]", grind.fights, H.frame, partyLine()))
+        loseWipe(string.format("GAME OVER counted by the canary in fight " ..
+          "#%d at f%d [%s]", grind.fights, H.frame, partyLine()),
+          F and F.lastDmg)
       end
       if wipeN >= 90 and not lost then
-        lose("wipe", string.format("wiped in fight #%d at f%d [%s]",
-          grind.fights, H.frame, partyLine()))
+        loseWipe(string.format("wiped in fight #%d at f%d [%s]",
+          grind.fights, H.frame, partyLine()), F and F.lastDmg)
       end
       if lost then H.setPad({}); return end
       if H.frame - hb >= 1800 then
@@ -1244,7 +1309,7 @@ local function grindStep()
           F = { n = grind.fights, start = H.frame, lastDmg = H.frame,
                 monHp = nil, missing = {}, standing = 2, won = false,
                 appeared = false, logged = false, gauFlag = true,
-                btype = nil }
+                btype = nil, maxQuiet = 0 }
         end
         -- progress: the formation's HP.  The first live reading seeds it;
         -- only a drop counts as damage dealt.
@@ -1265,9 +1330,13 @@ local function grindStep()
             H.log(string.format("[gau] fight #%d up f%d, %d monsters %d HP: " ..
               "%s", F.n, H.frame, nmon, mhp, fightLine()))
           end
-          if F.monHp ~= nil and mhp < F.monHp then F.lastDmg = H.frame end
+          if F.monHp ~= nil and mhp < F.monHp then
+            F.maxQuiet = math.max(F.maxQuiet, H.frame - F.lastDmg)
+            F.lastDmg = H.frame
+          end
           F.monHp = mhp
         elseif F.monHp ~= nil and F.monHp > 0 and not F.won then
+          F.maxQuiet = math.max(F.maxQuiet, H.frame - F.lastDmg)
           F.won, F.lastDmg = true, H.frame
         end
         local standing = 0
@@ -1335,10 +1404,11 @@ end
 -- line in the retry inventory: the next attempt reloads the grind
 -- checkpoint behind the seed sweep below, and the reload is logged in the
 -- segment runner's own `[retry] attempt n/N FAILED class=wipe` shape.  A
--- stalled fight, a fight past its budget, a feed that did not land, or the
--- odds cap (lostClass driver/odds) is a defect in this file's controller or
--- its reading of the game, which a fresh seed would only hide: it fails
--- the run at once, and the runner files it as `other`, not retried.
+-- stalled fight, a fight past its budget, a feed that did not land, the
+-- odds cap, or a wipe after WIPE_QUIET_FRAMES without damage (lostClass
+-- driver/odds) is a defect in this file's controller or its reading of the
+-- game, which a fresh seed would only hide: it fails the run at once
+-- (ladderLoss), and the runner files it as `other`, not retried.
 --
 -- The reload replays the same formation SEQUENCE whatever the attempt does
 -- on the way to its first battle: the Veldt picks from $1FA5/$1FA2, which
@@ -1380,15 +1450,7 @@ local function grindAttempt(n)
     end),
     grindStep(),
     H.call(function()
-      if lost == nil then return end
-      if lostClass ~= "wipe" then
-        error(string.format("gau: the Veldt grind stopped on a %s failure " ..
-          "in attempt %d of %d: %s.  Only a lost battle reloads the grind " ..
-          "checkpoint; this is the controller or its reading of the game, " ..
-          "and another seed would only hide it.", lostClass, n,
-          GRIND_ATTEMPTS, lost), 0)
-      end
-      ladderFailed("gau grind", n, GRIND_ATTEMPTS, GRIND_GAP * (n - 1))
+      ladderLoss("Veldt grind", n, GRIND_ATTEMPTS, GRIND_GAP * (n - 1))
     end),
     (function()
       local phase = 0
@@ -1544,17 +1606,17 @@ local function transitAttempt(n)
         "Mobliz in 20 segments; at (%d,%d) f%d", n, H.worldX(), H.worldY(),
         H.frame))
     end
-    if lost then ladderFailed("gau shore transit", n, 5, (n - 1) * 17) end
+    ladderLoss("shore transit", n, 5, (n - 1) * 17)
   end)
   return H.cond(function() return not transitDone end, steps, {})
 end
 
 -- The staging-walk sweep: the checkpoint is cut on the live world just
 -- south of Mobliz, and an attempt is the whole segmented walk -- fight one
--- battle, field-care, repeat -- ending parked at (215,119).  A loss reloads
--- (and logs its `[retry]` line) with the house
--- 17-frame stagger, which moves $021E 17 phases and so gives the attempt's
--- battles their own $BE seed.  It does not change which formations come:
+-- battle, field-care, repeat -- ending parked at (215,119).  A lost battle
+-- reloads (and logs its `[retry]` line) with the house 17-frame stagger,
+-- which moves $021E 17 phases and so gives the attempt's battles their own
+-- $BE seed.  It does not change which formations come:
 -- on the Veldt that sequence is fixed by $1FA5/$1FA2 (veldtPoolOdds), and
 -- the fighter here is the same one that crosses the whole Veldt.
 local walkBlob, walkDone = nil, false
@@ -1603,9 +1665,8 @@ local function walkAttempt(n)
       }, {}),
     }, {})
   end
-  -- no non-segmented closer here: a raising driveUntil inside an attempt
-  -- would abort the SWEEP, and 30 fought-and-cared segments that never
-  -- parked is a loss for THIS timeline, not for the step
+  -- no non-segmented closer here: 30 fought-and-cared segments that never
+  -- parked is a walk that never arrives, which ladderLoss fails loudly
   steps[#steps + 1] = H.call(function()
     if lost == nil and H.worldMode() and H.worldX() == 215
        and H.worldY() == 119 then
@@ -1616,7 +1677,7 @@ local function walkAttempt(n)
       lose("other", string.format("staging attempt %d never arrived (at " ..
         "%d,%d) f%d", n, H.worldX(), H.worldY(), H.frame))
     end
-    if lost then ladderFailed("gau staging walk", n, 3, (n - 1) * 17) end
+    ladderLoss("staging walk", n, 3, (n - 1) * 17)
   end)
   return H.cond(function() return not walkDone end, steps, {})
 end
@@ -1711,7 +1772,7 @@ local function routeAttempt(n)
       H.log(string.format("[gau] post-join route attempt %d ARRIVED at " ..
         "the Crescent entry point f%d [%s]", n, H.frame, partyLine()))
     else
-      ladderFailed("gau post-join route", n, 5, (n - 1) * 17)
+      ladderLoss("post-join route", n, 5, (n - 1) * 17)
     end
   end)
   return H.cond(function() return not routeDone end, steps, {})
@@ -1719,7 +1780,8 @@ end
 
 -- allowGameOver: the transit, grind, staging-walk and route ladders
 -- deliberately survive a lost fight (#163); the walk and the grind read
--- H.gameOverFired as a loss and the next attempt reloads.
+-- H.gameOverFired as a loss and the next attempt reloads (a wipe after the
+-- party stopped dealing damage excepted: see loseWipe).
 H.run({ maxFrames = 500000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
