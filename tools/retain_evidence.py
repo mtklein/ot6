@@ -128,6 +128,11 @@ def plan(worktree: str, branch: str, dest_root: str, max_bytes: int):
         src_root = os.path.join(worktree, "build", tree)
         if not os.path.isdir(src_root):
             continue
+        if os.path.islink(src_root):
+            # worktree-setup.sh links build/attempts to the main tree's, so
+            # its evidence is already there; walking it would copy the main
+            # tree's evidence into itself.
+            continue
         out_root = os.path.join(dest_root, "build", "attempts", branch, tree)
         for dirpath, dirnames, filenames in os.walk(src_root):
             dirnames.sort()
@@ -163,7 +168,8 @@ def retain(worktree: str, branch: str, dest_root: str, *, max_bytes: int,
     if branch.startswith("/") or os.path.pardir in branch.split("/"):
         print(f"refusing: unusable branch name {branch!r}", file=out)
         return 2
-    have = [t for t in TREES if os.path.isdir(os.path.join(worktree, "build", t))]
+    have = [t for t in TREES if os.path.isdir(os.path.join(worktree, "build", t))
+            and not os.path.islink(os.path.join(worktree, "build", t))]
     if not have:
         print(f"no build/{{{','.join(TREES)}}} in {worktree}; nothing to retain",
               file=out)

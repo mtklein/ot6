@@ -46,7 +46,13 @@
 --      pending boost raised with real R presses until a learned blitz costs
 --      more than the pool, then confirmed.  The row's font attribute is read
 --      off VRAM in the same breath, so the grey and the refusal are shown to
---      be one answer about one row.
+--      be one answer about one row.  Which row and which boost are CHOSEN
+--      from SABIN's live pool and learned set (the shallowest boost that
+--      prices out a row he pays unboosted), because every ROM change
+--      regenerates the chain and reshuffles both; a pool no legal boost can
+--      price anything out of (99 and up, say) is spent down first with real
+--      unboosted Blitzes until one can.  The tools arm is chosen and, if it
+--      has to be, spent down the same way from EDGAR's.
 --   2. BLITZ, affordable: the boost drops back to a level the pool covers and
 --      the same row commits and debits exactly what it drew.
 --   3. TOOLS, priced out by the same ladder.
@@ -72,6 +78,7 @@ local BLITZ_ATK0 = 0x5D
 local THIEF_STEAL = 0x56
 local GREY = 0x25
 local ANCHOR = 99
+local MAX_BOOST = 3                        -- Ot6Boost caps a spend at 3
 
 local function bp(s) return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
@@ -98,6 +105,39 @@ local function costOf(id)
   end
 end
 
+-- The (boost, row) a pool is priced out of, chosen from live state and the
+-- rule above rather than from the pool a fixture happened to hold: the
+-- shallowest boost 1..3 at which some row in `ids` costs more than `pool`.
+-- `payable` also asks that the pool cover the row unboosted, which is what
+-- makes the refusal a gate and not a wall (the blitz arm commits the same
+-- row at a shallower boost afterwards).
+local function pricedOut(ids, pool, payable)
+  for n = 1, MAX_BOOST do
+    for _, id in ipairs(ids) do
+      local base = costOf(id)
+      if base > 0 and boosted(base, n) > pool
+         and (not payable or base <= pool) then
+        return n, id
+      end
+    end
+  end
+  return nil
+end
+-- the cheapest row in `ids` the pool pays unboosted: the spend-down's row.
+-- Stepping the pool down by the cheapest price cannot skip over the pools
+-- pricedOut accepts, because each row's window [base, boosted(base, 3) - 1]
+-- is wider than its own base.
+local function cheapestPayable(ids, pool)
+  local pick
+  for _, id in ipairs(ids) do
+    local base = costOf(id)
+    if base > 0 and base <= pool and (pick == nil or base < costOf(pick)) then
+      pick = id
+    end
+  end
+  return pick
+end
+
 -- AttackName glyph runs, for the VRAM font-attribute read (battle_blitzgrey's
 -- idiom, reused so the grey this file reads is the grey that file asserts).
 local ATKNAME = H.sym("AttackName") & 0x3FFFFF
@@ -115,6 +155,7 @@ local function nameText(id)
   for _, b in ipairs(nameSeq(id)) do
     if b >= 0x80 and b <= 0x99 then s = s .. string.char(65 + b - 0x80)
     elseif b >= 0x9a and b <= 0xb3 then s = s .. string.char(97 + b - 0x9a)
+    elseif b == 0xfe or b == 0xff then s = s .. " "
     else s = s .. "?" end
   end
   return s
@@ -224,13 +265,32 @@ local function heartbeat()
     want.slot and mp(want.slot) or "?"))
 end
 
+-- Between battles, the route's own care stop (Tonics, never a cast;
+-- instantly done when nobody needs it), so a drive that crosses battles --
+-- a spend-down can take several -- does not carry one fight's attrition
+-- into the next.  recover() below still makes its own explicit stop.
+local care, careDue = nil, false
+
 local function pulse()
   ph = ph + 1
   heartbeat()
   local edge = ph % 10 < 5
   if not H.battleLoadStarted() then
+    -- a care stop in progress owns the pad until it is done, menu and all
+    -- (the menu takes field control away, so this comes first)
+    if care then
+      care.frame()
+      if care.done() then care, careDue = nil, false end
+      return
+    end
     if not (H.hasControl() and H.tileAligned()) then
       H.setPad(ph % 8 < 4 and { a = true } or {})
+      return
+    end
+    if careDue then
+      care = H.newCareDriver({ tag = "kitrefuse care", threshold = 0.65 })
+      care.frame()
+      if care.done() then care, careDue = nil, false end
       return
     end
     local x, y = H.fieldX(), H.fieldY()
@@ -247,6 +307,7 @@ local function pulse()
     return
   end
   lane = nil
+  care, careDue = nil, true     -- care at the next field control
   if H.readByte(MENU) == 0 then
     H.setPad(ph % 8 < 4 and { a = true } or {})
     return
@@ -435,6 +496,76 @@ local function assertRefused()
     "%s: the pool is unmoved", label))
 end
 
+-- Is the battle the refusal is read in still being fought?  Every monster
+-- slot's HP ($3BFC, battle RAM) and at least one of them above 0.
+local function monstersLive()
+  if not H.battleLoadStarted() then return false end
+  local live = false
+  for m = 0, 5 do
+    local h = H.readWord(0x3BFC + m * 2)
+    if h >= 10000 then return false end
+    if h > 0 then live = true end
+  end
+  return live
+end
+
+-- One refusal arm, asked again when the battle ends under it.  The read is
+-- made 120 frames after the buzz, and a battle whose last monster falls
+-- inside that span closes the list because the battle is OVER, not because
+-- anything was committed -- measured on a SABIN at level 14, where the arm
+-- takes boost 3 and so two banking Fights: every monster read 0 HP on the
+-- buzz frame and the close flag $7bcb rose one frame later
+-- (build/lab/live-state-suites/probe_kitrefuse_L14_settle.log,
+-- `[settle 2] menu=01 st=30 ... close=1 ... mons=0,0,0,0,0,0`).  Whether a
+-- banking swing kills is the draw, not the property under test, so such an
+-- attempt is void, said so, and the arm is asked again in the next battle.
+-- `o`: slotf, nf, verb, rowf, what (parkOn's), label, pre (run at the
+-- parked window before the press), shot, tries.
+local function refusalArm(o)
+  local done, tries = false, 0
+  local attempt = {
+    parkOn(o.slotf, o.nf, o.verb, o.rowf, o.what),
+    H.call(function()
+      tries = tries + 1
+      if o.pre then o.pre() end
+      snapshot(val(o.slotf), o.verb, o.label)
+      want.press = true
+    end),
+    H.driveUntil(function() return buzzes > before.buzzes end, 1800,
+      { H.call(pulse), H.waitFrames(1) },
+      "the greyed " .. o.verb .. " row is confirmed and buzzes"),
+    H.release(),
+    H.waitFrames(120),
+    H.call(function()
+      H.setPad({})
+      want.press = false
+      if not monstersLive() then
+        local cmd = CMD_OF[o.verb]
+        H.log(string.format("[%s] attempt %d void: the battle ended under the "
+          .. "read (no monster standing), so the list closed with it -- "
+          .. "state=%02x close=%d queued(+%d) qcount %d -> %d; asking again "
+          .. "in the next battle", o.label, tries, H.readByte(MSTATE),
+          H.readByte(CLOSEFLAG), seen[cmd] - before.seen, before.qcount,
+          H.readByte(QCOUNT)))
+        return
+      end
+      assertRefused()
+      H.screenshot(o.shot)
+      done = true
+    end),
+  }
+  return H.repeatN(1, {
+    H.repeatN(o.tries or 3, {
+      H.cond(function() return not done end, attempt, {}),
+    }),
+    H.call(function()
+      H.assertEq(done, true, string.format(
+        "%s: one of %d battles stayed live through the refusal's read "
+        .. "(tried %d)", o.label, o.tries or 3, tries))
+    end),
+  })
+end
+
 -- the charge, latched the frame it lands while the battle is still live
 local charge = nil
 local function charged()
@@ -448,6 +579,7 @@ end
 -- ------------------------------------------------------------- the arms --
 local blitzRow, blitzBoost, blitzPayBoost
 local toolRow, toolBoost
+local toolsOwned = {}                  -- EDGAR's tool rows, from the survey
 local stealPrice, lockeMp0
 
 H.run({ maxFrames = 620000 }, {
@@ -493,20 +625,43 @@ H.run({ maxFrames = 620000 }, {
     H.log(string.format("SABIN slot %d (%d MP), LOCKE slot %d (%d MP), "
       .. "EDGAR slot %d (%d MP)", sabin, mp(sabin), locke, mp(locke),
       edgar, mp(edgar)))
-    -- the shallowest boost that prices a learned blitz out of SABIN's real
-    -- pool (shallower is both cheaper to bank for and a stronger statement)
+  end),
+
+  -- The row and boost the refusal is shown on are read off SABIN's live
+  -- pool: the shallowest boost that prices out a learned blitz he pays
+  -- unboosted (shallower is both cheaper to bank for and a stronger
+  -- statement).  Both the pool and the learned set move whenever the chain
+  -- is regenerated -- a level is a new maximum and Ot6LevelUpHeal refills
+  -- to it -- so nothing here assumes the fixture's.  When no legal boost
+  -- prices anything out, SABIN spends the pool down first the way a
+  -- player would: real unboosted Blitzes of his cheapest row, each charged
+  -- by the ROM, until one does.
+  H.call(function()
     local pool = mp(sabin)
-    for n = 1, 3 do
-      for _, id in ipairs(learned) do
-        if blitzBoost == nil and boosted(costOf(id), n) > pool then
-          blitzBoost, blitzRow = n, id
-        end
+    if pricedOut(learned, pool, true) then return end
+    local row = cheapestPayable(learned, pool)
+    H.assertEq(row ~= nil, true, string.format(
+      "no boost 1..%d prices a payable blitz out of SABIN's %d MP, and he "
+      .. "pays some blitz unboosted to spend it down with (without one this "
+      .. "state cannot exercise the refusal)", MAX_BOOST, pool))
+    H.log(string.format("[pool] no boost 1..%d prices a payable blitz out of "
+      .. "SABIN's %d MP: spending down with unboosted %s (%d MP each)",
+      MAX_BOOST, pool, nameText(row), costOf(row)))
+    want.slot, want.bank, want.pend = sabin, 0, 0
+    want.mode, want.row, want.press = "blitz", row, true
+  end),
+  step("SABIN's pool is one some boost 1..3 prices a payable blitz out of",
+    function()
+      if not (H.battleLoadStarted() and H.monstersPresent() > 0) then
+        return false
       end
-    end
-    H.assertEq(blitzBoost ~= nil, true, string.format(
-      "some learned blitz prices out of SABIN's %d MP pool at boost 1..3 -- "
-      .. "otherwise this fixture cannot exercise the refusal at all and every "
-      .. "assertion below would be vacuous", pool))
+      local m = mp(sabin)
+      return m > 0 and m < 0x8000 and pricedOut(learned, m, true) ~= nil
+    end, 400000),
+  H.call(function()
+    want.mode, want.row, want.press = "idle", nil, false
+    local pool = mp(sabin)
+    blitzBoost, blitzRow = pricedOut(learned, pool, true)
     for n = blitzBoost - 1, 0, -1 do
       if blitzPayBoost == nil and boosted(costOf(blitzRow), n) <= pool then
         blitzPayBoost = n
@@ -523,35 +678,26 @@ H.run({ maxFrames = 620000 }, {
   end),
 
   -- ---- 1. BLITZ: a boost the pool cannot pay is greyed AND refused -------
-  parkOn(function() return sabin end, function() return blitzBoost end,
-    "blitz", function() return blitzRow end,
-    "SABIN's blitz window, boosted past his pool"),
-  H.call(function()
-    local price = boosted(costOf(blitzRow), blitzBoost)
-    local attr = attrOf(nameSeq(blitzRow))
-    H.log(string.format("[blitz] %s at boost %d costs %d, pool %d, attr %s",
-      nameText(blitzRow), blitzBoost, price, mp(sabin),
-      attr and string.format("$%02x", attr) or "nil"))
-    H.assertEq(attr, GREY, string.format(
-      "%s renders GREY at boost %d (%d MP against a %d pool) -- the grey and "
-      .. "the refusal below are the same Ot6AbilityGrey answer about the same "
-      .. "row, which is why routing the confirm through it cannot drift",
-      nameText(blitzRow), blitzBoost, price, mp(sabin)))
-    H.screenshot("kitrefuse_blitz_grey")
-    snapshot(sabin, "blitz", "blitz")
-    want.press = true
-  end),
-  H.driveUntil(function() return buzzes > before.buzzes end, 1800,
-    { H.call(pulse), H.waitFrames(1) },
-    "the greyed blitz is confirmed and buzzes"),
-  H.release(),
-  H.waitFrames(120),
-  H.call(function()
-    H.setPad({})
-    want.press = false
-    assertRefused()
-    H.screenshot("kitrefuse_blitz_refused")
-  end),
+  refusalArm({
+    slotf = function() return sabin end,
+    nf = function() return blitzBoost end,
+    verb = "blitz", rowf = function() return blitzRow end,
+    what = "SABIN's blitz window, boosted past his pool",
+    label = "blitz", shot = "kitrefuse_blitz_refused",
+    pre = function()
+      local price = boosted(costOf(blitzRow), blitzBoost)
+      local attr = attrOf(nameSeq(blitzRow))
+      H.log(string.format("[blitz] %s at boost %d costs %d, pool %d, attr %s",
+        nameText(blitzRow), blitzBoost, price, mp(sabin),
+        attr and string.format("$%02x", attr) or "nil"))
+      H.assertEq(attr, GREY, string.format(
+        "%s renders GREY at boost %d (%d MP against a %d pool) -- the grey and "
+        .. "the refusal below are the same Ot6AbilityGrey answer about the same "
+        .. "row, which is why routing the confirm through it cannot drift",
+        nameText(blitzRow), blitzBoost, price, mp(sabin)))
+      H.screenshot("kitrefuse_blitz_grey")
+    end,
+  }),
 
   -- ---- 2. ...and the same row, affordable, commits normally -------------
   H.call(function()
@@ -600,50 +746,54 @@ H.run({ maxFrames = 620000 }, {
     end),
     H.waitFrames(30),
     H.call(function()
-      local owned, pool, shown = {}, mp(edgar), {}
+      local pool, shown = mp(edgar), {}
       for i = 0, 7 do
         local id = H.readByte(ITEMLIST + i * 3)
         if id ~= 0xff then
-          owned[#owned + 1] = id
+          toolsOwned[#toolsOwned + 1] = id
           shown[#shown + 1] = string.format("$%02x(%d)", id, costOf(id))
         end
       end
       H.log(string.format("[tools] EDGAR's rows: %s (pool %d)",
         table.concat(shown, " "), pool))
-      H.assertEq(#owned >= 1, true, "EDGAR owns a tool to be refused")
-      for n = 1, 3 do
-        for _, id in ipairs(owned) do
-          if toolBoost == nil and costOf(id) > 0
-             and boosted(costOf(id), n) > pool then
-            toolBoost, toolRow = n, id
-          end
+      H.assertEq(#toolsOwned >= 1, true, "EDGAR owns a tool to be refused")
+      if pricedOut(toolsOwned, pool, false) then return end
+      -- the blitz arm's spend-down, on EDGAR: real unboosted Tools of his
+      -- cheapest row until some boost prices an owned tool out
+      local row = cheapestPayable(toolsOwned, pool)
+      H.assertEq(row ~= nil, true, string.format(
+        "no boost 1..%d prices an owned tool out of EDGAR's %d MP, and he "
+        .. "pays some tool unboosted to spend it down with", MAX_BOOST, pool))
+      H.log(string.format("[pool] no boost 1..%d prices an owned tool out of "
+        .. "EDGAR's %d MP: spending down with unboosted $%02x (%d MP each)",
+        MAX_BOOST, pool, row, costOf(row)))
+      want.row, want.press = row, true
+    end),
+    step("EDGAR's pool is one some boost 1..3 prices an owned tool out of",
+      function()
+        if not (H.battleLoadStarted() and H.monstersPresent() > 0) then
+          return false
         end
-      end
-      H.assertEq(toolBoost ~= nil, true, string.format(
-        "some owned tool prices out of EDGAR's %d MP pool at boost 1..3",
-        pool))
+        local m = mp(edgar)
+        return m > 0 and m < 0x8000 and pricedOut(toolsOwned, m, false) ~= nil
+      end, 400000),
+    H.call(function()
+      want.mode, want.row, want.press = "idle", nil, false
+      local pool = mp(edgar)
+      toolBoost, toolRow = pricedOut(toolsOwned, pool, false)
       H.log(string.format("[tools] $%02x base %d, boost %d costs %d > pool %d",
         toolRow, costOf(toolRow), toolBoost,
         boosted(costOf(toolRow), toolBoost), pool))
     end),
   }),
-  parkOn(function() return edgar end, function() return toolBoost end,
-    "tools", function() return toolRow end,
-    "EDGAR's tools window, boosted past his pool"),
+  refusalArm({
+    slotf = function() return edgar end,
+    nf = function() return toolBoost end,
+    verb = "tools", rowf = function() return toolRow end,
+    what = "EDGAR's tools window, boosted past his pool",
+    label = "tools", shot = "kitrefuse_tools_refused",
+  }),
   H.call(function()
-    snapshot(edgar, "tools", "tools")
-    want.press = true
-  end),
-  H.driveUntil(function() return buzzes > before.buzzes end, 1800,
-    { H.call(pulse), H.waitFrames(1) },
-    "the greyed tool is confirmed and buzzes"),
-  H.release(),
-  H.waitFrames(120),
-  H.call(function()
-    H.setPad({})
-    want.press = false
-    assertRefused()
-    H.screenshot("kitrefuse_tools_refused")
     want.mode, want.row = "idle", nil
     want.bank, want.pend = 0, 0
   end),

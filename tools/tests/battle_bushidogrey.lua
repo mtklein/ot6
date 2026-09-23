@@ -9,11 +9,17 @@
 --       It opens at 1 in EVERY battle, so a ledger that spans a battle
 --       boundary is not a ledger -- every bank read below is gated on the
 --       battle it was built in (passes 2-5 are retry sweeps).
---   MP: his real pool (92 on the fighting run), spent 4 a Dispatch and
---       10 a Retort.
+--   MP: his real pool, spent at each tech's Ot6AbilityCostTbl price.
+--
+-- Which techs his window shows, and so which names are read and which rows
+-- must grey, is DERIVED from his live level and learned set and the ROM's
+-- tables (BushidoLevelTbl, BushidoName, Cmd_07, Ot6AbilityCostTbl), never
+-- from the fixture's: every ROM change regenerates the chain, and the
+-- fighting run has delivered him at level 13 and at 14 so far -- at 15 the
+-- window slides to Retort/Slash/Quadra Slam and Dispatch is not drawn.
 
 -- Battles are real world encounters off the fixture tile; when the ledger's
--- casts end one (Dispatch kills; Retort is the counter stance and mostly
+-- casts end one (a hit tech kills; Retort is the counter stance and mostly
 -- does not), the drive paces to the next.  MP persists across battles, the
 -- bank does not.  SHADOW heals with real items while the bag has them, and
 -- passes his turn when it does not.
@@ -38,7 +44,83 @@ local KROW = 0x8967                       -- kit list cursor row (read!)
 local RESTAGE = 0x57D4                    -- the gate's request byte (read!)
 local WHITE, GREY = 0x21, 0x25
 local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
-local DISPATCH_MP, RETORT_MP = 4, 10
+local LEARNED, LOADOUT = 0x1CF7, 0x1E1D   -- known SwdTechs; Ot6 loadout word
+
+-- ------------------------------------------------ his ladder, from the ROM --
+-- (battle_bushido's derivation, the same tables)
+--   BushidoLevelTbl   the level each tech is learned at ($1CF7 follows it)
+--   BushidoName       the names the window draws (12 bytes, $fe a space)
+--   Cmd_07            `sbc #imm` (the first tech's attack id) and
+--                     `lda $b6 / cmp #imm / bne` (the Retort stance's index)
+--   Ot6AbilityCostTbl each tech's MP (H.abilityCost)
+local LEVELTBL = H.sym("BushidoLevelTbl") & 0x3FFFFF
+local NAMETBL, NAME_LEN = H.sym("BushidoName") & 0x3FFFFF, 12
+local CMD07 = H.sym("Cmd_07") & 0x3FFFFF
+local TECH_ATK0, STANCE
+for i = 0, 23 do
+  if TECH_ATK0 == nil and H.readRomByte(CMD07 + i) == 0xE9 then   -- sbc #imm
+    TECH_ATK0 = H.readRomByte(CMD07 + i + 1)
+  end
+  if STANCE == nil and H.readRomByte(CMD07 + i) == 0xA5           -- lda $b6
+     and H.readRomByte(CMD07 + i + 1) == 0xB6
+     and H.readRomByte(CMD07 + i + 2) == 0xC9                     -- cmp #imm
+     and H.readRomByte(CMD07 + i + 4) == 0xD0 then                -- bne
+    STANCE = H.readRomByte(CMD07 + i + 3)
+  end
+end
+local function techId(t) return TECH_ATK0 + t end
+local function techSeq(t)
+  local q = {}
+  for i = 0, NAME_LEN - 1 do q[#q + 1] = H.readRomByte(NAMETBL + t * NAME_LEN + i) end
+  while #q > 0 and q[#q] == 0xFF do table.remove(q) end
+  return q
+end
+local function techName(t)
+  local out = ""
+  for _, b in ipairs(techSeq(t)) do
+    if b >= 0x80 and b <= 0x99 then out = out .. string.char(65 + b - 0x80)
+    elseif b >= 0x9A and b <= 0xB3 then out = out .. string.char(97 + b - 0x9A)
+    elseif b == 0xFE then out = out .. " "
+    else out = out .. "?" end
+  end
+  return out
+end
+local function techCost(t) return H.abilityCost(techId(t)) end
+local function popcount(v)
+  local n = 0
+  while v > 0 do n = n + (v & 1); v = v >> 1 end
+  return n
+end
+local function learnedBy(level)
+  local n = 0
+  for i = 0, 7 do
+    if H.readRomByte(LEVELTBL + i) <= level then n = n + 1 end
+  end
+  return n
+end
+-- the AUTO window at a ceiling: his top three learned techs, weakest first,
+-- row r = boost r+1 (Ot6BushidoTech: base = max(0, ceiling-2))
+local function window(ceil)
+  local w = {}
+  for t = math.max(0, ceil - 2), ceil do w[#w + 1] = t end
+  return w
+end
+local REAL, WINDOW                         -- set at the first battle
+local MP_PIN                               -- the MP arm's boundary pool
+-- the lever that empties a bank of `b`: the stance row when its boost is
+-- exactly b (the counter stance, not a hit, so it seldom ends the fight --
+-- at ceiling 2 that is Retort at boost 2, at ceiling 3 Retort at boost 1),
+-- else the row whose boost is exactly b, else the deepest row
+local function stanceRow()
+  for r, t in ipairs(WINDOW) do if t == STANCE then return r - 1 end end
+  return nil
+end
+local function leverRow(b)
+  local sr = stanceRow()
+  if sr and sr + 1 == b then return sr end
+  if b >= 1 and b <= #WINDOW then return b - 1 end
+  return #WINDOW - 1
+end
 
 local cyan, shadow
 local restageTrace = {}          -- OT6_RESTAGE, sampled per frame
@@ -113,17 +195,6 @@ local function cyanStatusStr()
     H.readByte(0x3EE5 + cyan*2))
 end
 
-local function glyphs(s)
-  local t = {}
-  for i = 1, #s do
-    local c = s:sub(i, i)
-    t[i] = (c >= "A" and c <= "Z") and (0x80 + c:byte() - ("A"):byte())
-                                    or  (0x9a + c:byte() - ("a"):byte())
-  end
-  return t
-end
-local NM = { Dispatch = glyphs("Dispatch"), Retort = glyphs("Retort"),
-             Slash = glyphs("Slash") }
 local function findName(seq)
   local vr = emu.memType.snesVideoRam
   for w = 0x6000, 0x7FF0 do
@@ -157,6 +228,8 @@ local function attrOf(seq)
   if #m == 0 then return nil end
   return m[1].attr
 end
+local function rowAttr(r) return attrOf(techSeq(WINDOW[r + 1])) end
+local function rowName(r) return techName(WINDOW[r + 1]) end
 
 -- ------------------------------------------------------------- the drive --
 -- cyanMode: "defer" | "item" | "tech:<row>" | "park" (open submenu, hold)
@@ -354,25 +427,64 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(H.readByte(0x3BA4 + cyan*2) & 0x02, 0x02,
       "his real katana carries the SWDTECH flag ($3BA4 bit 1, read not written)")
     H.assertEq(bp(), 1, "the ledger opens at Ot6InitBP's 1")
-    H.assertEq(mp() >= 2 * RETORT_MP, true,
-      "his real pool isolates the BP grey (Retort is affordable)")
-    H.log(string.format("cyan slot %d bp=%d mp=%d; shadow slot %d",
-      cyan, bp(), mp(), shadow))
+    -- his window, derived (battle_bushido's reading): the learned set is
+    -- the one BushidoLevelTbl gives his live level, InitSkills' ceiling is
+    -- popcount($1CF7) - 1, and the AUTO loadout shows the top three
+    local level, known = H.readByte(0x1600 + 2*37 + 8), H.readByte(LEARNED)
+    local taught = learnedBy(level)
+    H.assertEq(known, (1 << taught) - 1, string.format(
+      "his learned set $1CF7 is the one BushidoLevelTbl gives level %d: "
+      .. "techs 0..%d", level, taught - 1))
+    H.assertEq(TECH_ATK0 ~= nil and STANCE ~= nil, true,
+      "Cmd_07 still reads `sbc #imm` (the first tech's id) and `cmp #imm / "
+      .. "bne` (the Retort stance's index)")
+    H.assertEq(H.readWord(LOADOUT), 0,
+      "his Bushido loadout is AUTO ($1E1D = 0), the moving top-three window")
+    REAL = math.max(0, popcount(known) - 1)
+    WINDOW = window(REAL)
+    H.assertEq(REAL >= 1, true, string.format(
+      "he knows at least two techs (level %d) -- a row the opening bank of "
+      .. "1 cannot reach has to exist for the BP grey", level))
+    local dearest, names = 0, {}
+    for r, t in ipairs(WINDOW) do
+      dearest = math.max(dearest, techCost(t))
+      names[#names + 1] = string.format("%d:%s(%d MP)", r - 1, techName(t),
+        techCost(t))
+    end
+    H.assertEq(mp() >= dearest, true, string.format(
+      "his real pool (%d) covers every row he is shown (the dearest costs "
+      .. "%d), so the BP greys below are the BP reason alone", mp(), dearest))
+    -- the MP arm's boundary: a pool row 0 pays and row 1 does not, midway
+    -- between their Ot6AbilityCostTbl prices (7 for Dispatch 4 / Retort 10)
+    local c0, c1 = techCost(WINDOW[1]), techCost(WINDOW[2])
+    H.assertEq(c1 > c0, true, string.format(
+      "row 1 (%s, %d MP) costs more than row 0 (%s, %d MP), so a pool "
+      .. "between them exists for the MP arm", techName(WINDOW[2]), c1,
+      techName(WINDOW[1]), c0))
+    MP_PIN = c0 + (c1 - c0) // 2
+    H.log(string.format("cyan slot %d L%d $1CF7=%02x bp=%d mp=%d; window "
+      .. "{%s}; shadow slot %d", cyan, level, known, bp(), mp(),
+      table.concat(names, " "), shadow))
   end),
 
   -- 1. BP grey at the natural bank -----------------------------------------
   parkRead("submenu at the opening bank"),
   H.call(function()
-    local aD, aR, aS = attrOf(NM.Dispatch), attrOf(NM.Retort), attrOf(NM.Slash)
-    H.log(string.format("bp=1 mp=%d -> attr Dispatch=%s Retort=%s Slash=%s",
-      mp(), tostring(aD), tostring(aR), tostring(aS)))
-    H.assertEq(aD, WHITE, "Dispatch (boost 1 <= bp 1) is white")
-    H.assertEq(aR, GREY,
-      "Retort (boost 2 > bp 1) is GREY -- the BP reason, with MP abundant")
-    H.assertEq(aS, GREY,
-      "Slash (boost 3 > bp 1) is GREY too -- the third row he learned at "
-      .. "level 12, on the same BP reason")
-    H.assertEq(aR - aD, 0x04, "grey - white == $04, magic's own disabled-bit delta")
+    local attrs, shown = {}, {}
+    for r = 0, #WINDOW - 1 do
+      attrs[r] = rowAttr(r)
+      shown[#shown + 1] = string.format("%s=%s", rowName(r), tostring(attrs[r]))
+    end
+    H.log(string.format("bp=1 mp=%d -> attr %s", mp(), table.concat(shown, " ")))
+    H.assertEq(attrs[0], WHITE, string.format(
+      "%s (row 0, boost 1 <= bp 1) is white", rowName(0)))
+    for r = 1, #WINDOW - 1 do
+      H.assertEq(attrs[r], GREY, string.format(
+        "%s (row %d, boost %d > bp 1) is GREY -- the BP reason, with MP "
+        .. "abundant", rowName(r), r, r + 1))
+    end
+    H.assertEq(attrs[1] - attrs[0], 0x04,
+      "grey - white == $04, magic's own disabled-bit delta")
     H.screenshot("bushidogrey_bp")
   end),
 
@@ -437,10 +549,11 @@ H.run({ maxFrames = 150000 }, {
             return liveBattle() and parked() and bp() >= 2 and pend() == 0
           end, {
             H.call(function()
-              H.assertEq(attrOf(NM.Retort), WHITE,
-                "at bp 2 Retort is white -- the grey tracks the bank, not "
-                .. "unconditional")
-              H.assertEq(attrOf(NM.Dispatch), WHITE, "Dispatch stays white")
+              H.assertEq(rowAttr(1), WHITE, string.format(
+                "at bp 2 %s (row 1) is white -- the grey tracks the bank, "
+                .. "not unconditional", rowName(1)))
+              H.assertEq(rowAttr(0), WHITE, string.format(
+                "%s (row 0) stays white", rowName(0)))
             end),
 
             H.call(function()
@@ -499,13 +612,14 @@ H.run({ maxFrames = 150000 }, {
               end
               local left = H.readByte(RESTAGE)
               local settle = H.frame - H.vars.restMark
-              local aD, aR = attrOf(NM.Dispatch), attrOf(NM.Retort)
+              local aD, aR = rowAttr(0), rowAttr(1)
               H.log(string.format("[#77] restage across the press: %s -> %02x "
                 .. "(60 frames on it read $%02x, at rest %d frame(s) later); "
-                .. "mstate=%02x menu=%d bp=%d pending=%d Dispatch=%s Retort=%s",
+                .. "mstate=%02x menu=%d bp=%d pending=%d %s=%s %s=%s",
                 table.concat(seen, " "), left, H.vars.restSeen, settle,
                 H.readByte(MSTATE),
-                H.readByte(MENU), bp(), pend(), tostring(aD), tostring(aR)))
+                H.readByte(MENU), bp(), pend(), rowName(0), tostring(aD),
+                rowName(1), tostring(aR)))
               -- positive control: the press has to have reached Ot6Boost at
               -- all.  Its @refold arm banks the pending boost and raises
               -- OT6_RESTAGE on the same instruction stream (ot6_hud.asm,
@@ -533,9 +647,10 @@ H.run({ maxFrames = 150000 }, {
                 settle, H.vars.restSeen))
               H.assertEq(H.readByte(MSTATE), ST_TOOLS,
                 "the window is still up: a re-stage must not walk it shut")
-              H.assertEq(aD, WHITE, "Dispatch is still white after the re-stage")
-              H.assertEq(aR, WHITE,
-                "Retort is still white after the re-stage (bp 2)")
+              H.assertEq(aD, WHITE, string.format(
+                "%s is still white after the re-stage", rowName(0)))
+              H.assertEq(aR, WHITE, string.format(
+                "%s is still white after the re-stage (bp 2)", rowName(1)))
             end),
             H.pressButtons({ "l" }, 6),
             H.waitFrames(60),
@@ -576,9 +691,12 @@ H.run({ maxFrames = 150000 }, {
     })
   end)(),
 
-  -- Retort is the lever.  It costs boost 2, so one cast takes a bank of 2
-  -- straight to 0, and it is the counter stance rather than a hit, so it
-  -- does not end the fight the way a Dispatch does.  The read then checks
+  -- Retort is the lever.  It is the counter stance rather than a hit, so it
+  -- does not end the fight the way a Dispatch does, and one cast takes a
+  -- bank of exactly its boost straight to 0: the bank is built to the
+  -- stance row's boost (2 at ceiling 2, where one item turn banks it; 1 at
+  -- ceiling 3, the opening bank) and each of his windows spends the bank it
+  -- opened at on leverRow's row until it reads 0.  The read then checks
   -- the bank it was staged with, not the bank it was driven to, and the arm
   -- is a three-attempt sweep (the house limit) because the trash can still
   -- flee or kill the fight out from under an attempt.
@@ -599,16 +717,28 @@ H.run({ maxFrames = 150000 }, {
             n, packStr(), cyan, bp(), cyanStatusStr(), bagStr()))
         end),
         driveTo(function()
-          return not liveBattle() or cyanLostMenu() or bp() >= 2
-        end, 40000, "the bank reaches 2 (attempt " .. n .. ")"),
+          return not liveBattle() or cyanLostMenu()
+            or bp() >= (stanceRow() or 0) + 1
+        end, 40000, "the bank reaches the lever's boost (attempt " .. n .. ")"),
         H.cond(function()
-          return liveBattle() and cyanCanMenu() and bp() >= 2
+          return liveBattle() and cyanCanMenu()
+            and bp() >= (stanceRow() or 0) + 1
         end, {
-          H.call(function() cyanMode = "tech:1" end),
-          driveTo(function()
+          H.call(function()
+            H.log(string.format("  [0-bank arm %d] bank %d: spending on %s "
+              .. "(row %d)", n, bp(), rowName(leverRow(bp())), leverRow(bp())))
+          end),
+          H.driveUntil(function()
             return not liveBattle() or cyanLostMenu() or bp() == 0
-          end, 40000,
-            "one real Retort (boost 2) empties the bank (attempt " .. n .. ")"),
+          end, 40000, {
+            H.call(function()
+              if liveBattle() and bp() <= 5 then
+                cyanMode = "tech:" .. leverRow(bp())
+              end
+              frame()
+            end),
+          }, "real boosted techs (the lever first) empty the bank (attempt "
+            .. n .. ")"),
           H.cond(function()
             return liveBattle() and cyanCanMenu() and bp() == 0
           end, {
@@ -625,21 +755,24 @@ H.run({ maxFrames = 150000 }, {
                 and bp() == 0
             end, {
               H.call(function()
-                local aD = attrOf(NM.Dispatch)
-                local aR = attrOf(NM.Retort)
-                local aS = attrOf(NM.Slash)
+                local attrs, shown, drawn = {}, {}, true
+                for r = 0, #WINDOW - 1 do
+                  attrs[r] = rowAttr(r)
+                  if attrs[r] == nil then drawn = false end
+                  shown[#shown + 1] = string.format("%s=%s", rowName(r),
+                    tostring(attrs[r]))
+                end
                 H.log(string.format("bp=%d pend=%d banks=%d/%d/%d/%d mp=%d " ..
-                  "-> attr Dispatch=%s Retort=%s Slash=%s",
-                  bp(), pend(),
+                  "-> attr %s", bp(), pend(),
                   H.readByte(0x3E9C), H.readByte(0x3E9E), H.readByte(0x3EA0),
-                  H.readByte(0x3EA2), mp(),
-                  tostring(aD), tostring(aR), tostring(aS)))
-                H.assertEq(aD ~= nil and aR ~= nil and aS ~= nil, true,
-                  "all three names are still DRAWN at 0 bp -- greyed, not "
-                  .. "absent (#38)")
-                H.assertEq(aD, GREY, "Dispatch (boost 1 > 0) is grey")
-                H.assertEq(aR, GREY, "Retort (boost 2 > 0) is grey")
-                H.assertEq(aS, GREY, "Slash (boost 3 > 0) is grey")
+                  H.readByte(0x3EA2), mp(), table.concat(shown, " ")))
+                H.assertEq(drawn, true, string.format(
+                  "all %d names are still DRAWN at 0 bp -- greyed, not "
+                  .. "absent (#38)", #WINDOW))
+                for r = 0, #WINDOW - 1 do
+                  H.assertEq(attrs[r], GREY, string.format(
+                    "%s (boost %d > 0) is grey", rowName(r), r + 1))
+                end
                 H.screenshot("bushidogrey_zero")
                 done = true
               end),
@@ -696,7 +829,7 @@ H.run({ maxFrames = 150000 }, {
         end, {
           H.call(function()
             -- the isolation write (waived, labeled): the boundary pool
-            H.writeWord(0x3C08 + cyan*2, 7)
+            H.writeWord(0x3C08 + cyan*2, MP_PIN)
             cyanMode = "park:"
           end),
           driveTo(function()
@@ -711,16 +844,18 @@ H.run({ maxFrames = 150000 }, {
             return liveBattle() and H.readByte(MSTATE) == ST_TOOLS
           end, {
             H.call(function()
-              local aD, aR = attrOf(NM.Dispatch), attrOf(NM.Retort)
-              H.log(string.format("bp=%d mp=%d -> attr Dispatch=%s Retort=%s",
-                bp(), mp(), tostring(aD), tostring(aR)))
-              H.assertEq(mp(), 7, "the isolation pool held for the read")
+              local aD, aR = rowAttr(0), rowAttr(1)
+              H.log(string.format("bp=%d mp=%d -> attr %s=%s %s=%s",
+                bp(), mp(), rowName(0), tostring(aD), rowName(1), tostring(aR)))
+              H.assertEq(mp(), MP_PIN, "the isolation pool held for the read")
               H.assertEq(bp() >= 2, true,
                 "the bank matches pass 2's (MP is the knob)")
-              H.assertEq(aD, WHITE, "Dispatch (4 MP) is white on 7 MP")
-              H.assertEq(aR, GREY,
-                "Retort (10 MP) is GREY on 7 MP with the bank full -- the "
-                .. "MP reason, where pass 2 read it WHITE at the same bank")
+              H.assertEq(aD, WHITE, string.format("%s (%d MP) is white on %d MP",
+                rowName(0), techCost(WINDOW[1]), MP_PIN))
+              H.assertEq(aR, GREY, string.format(
+                "%s (%d MP) is GREY on %d MP with the bank full -- the "
+                .. "MP reason, where pass 2 read it WHITE at the same bank",
+                rowName(1), techCost(WINDOW[2]), MP_PIN))
               H.screenshot("bushidogrey_mp")
               done = true
             end),
