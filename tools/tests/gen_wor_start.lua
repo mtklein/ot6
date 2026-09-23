@@ -18,16 +18,17 @@
 --      SLOWER one -16 (_ca5370).  He recovers when fed above 256, and is
 --      lost if Celes walks into the house with 30 or less (_caf42d).
 --      POLICY (visible cues only: a fish's swim speed, $0875), the lab's
---      pick: catch every fish but the slowest, fast one first, whether or
---      not the fast one swims (see POLICY below).
+--      pick: the fast fish when it swims, and a slow one beside it; no
+--      fast fish, straight back to Cid for the next reroll (see POLICY
+--      below).
 --   3. A lost Cid is a lost attempt: the body raises "LOST: ...", which the
 --      segment runner files as class `lost` and retries from the boot
 --      checkpoint like a wipe (bounded, `[retry]` lines, audit_retries).
 --      The draw a retry meets is moved by the runner's seed shift, idled
 --      on the fishing beach after the first visit's catches (the boot
 --      point, below), where the fish swim and spend the field RNG the
---      talk's reroll reads; each attempt asserts it did not draw an
---      earlier failed attempt's first reroll.
+--      talk's reroll reads; each attempt logs its first draw beside any
+--      earlier failed attempt's.
 --   4. His recovery scene reveals the stairs; walk down to the raft
 --      (397 (85,51)) and talk to it: his farewell, the voyage, and the
 --      landing on the World of Ruin map at (146,212).
@@ -38,9 +39,12 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- The fishing policy.  The lab (tools/tests/fishlab.py, docs/design/
--- wor-start.md "The lab") played each of these from this checkpoint; "all"
--- recovered Cid on 47 of 48 distinct draws (119 of 120 attempts), "near"
--- on 44 of 48, "fastslow" 27 of 34, "fast" 5 of 27, "wait" 0 of 15.
+-- wor-start.md "The lab") played each of these from this checkpoint, on
+-- the search shifts and again on held-out ones; "near" ships: like "all"
+-- it recovers Cid on nearly every draw this generator meets, held-out ones
+-- included, and it loses less than "all" when the talk's rolls are fair
+-- coins (a model of a person's timing): "all" leans on the RNG path this
+-- generator's fixed timing walks (the doc has the numbers).
 --   "near"      the fast fish if it swims, plus a slow fish that swims up
 --               beside her on the way, plus a slow one still within
 --               SLOW_AFTER_FAST frames once the fast one is caught; no fast
@@ -52,7 +56,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 --               does not
 --   "wait"      "near", but stand at WAIT_SPOT and let the fish come
 -- Never the slowest fish (-16) under any of them.
-local POLICY = "all"
+local POLICY = "near"
 local SLOW_AFTER_FAST = 240
 local WAIT_SPOT = { 8, 12 }   -- the land-edge tile beside the fast fish's two likeliest shore tiles
 
@@ -185,6 +189,7 @@ local function fishing()
       skip[target] = true; target = nil
     end
     -- no fast fish: the visit is over (the talk rerolls), except under "all"
+    -- and "allnear"
     if POLICY ~= "all" and POLICY ~= "allnear" and not fastSeen then return true end
     -- standing and waiting has the same patience as chasing one fish
     if POLICY == "wait" and H.frame - arrived > CATCH_GIVEUP then
@@ -308,30 +313,37 @@ end
 
 -- this attempt's first draw, the moment the first talk has rerolled: the
 -- spawn switches it set ($0369-$036C), where the field RNG index stood
--- ($1F6D, field/reset.asm Rand) and Cid's health after the feed.  An
--- earlier failed attempt's LOST line carries its own; the same three is
--- the same continuation, and a retry that replays it is no retry.
+-- ($1F6D, field/reset.asm Rand) and Cid's health after the feed.  Logged,
+-- and compared with every earlier failed attempt's (its LOST line carries
+-- it) -- a record, not a gate: the same first draw can still play on
+-- differently (the runner's shifted idle moves the fish that walk the RNG
+-- afterwards; the lab's near shifts 483 and 490 drew `roll 1100 rand $EC
+-- health 132` and one recovered Cid while the other lost him), so the
+-- runner's shifted attempts are the variation.
 local function noteFirstDraw()
   firstDraw = string.format("roll %d%d%d%d rand $%02X health %d", sw(0x369), sw(0x36A),
     sw(0x36B), sw(0x36C), H.readByte(0x1F6D), health())
-  H.log(string.format("[cid] first draw: %s", firstDraw))
+  local same = {}
   for _, f in ipairs(H.attemptFailures()) do
-    local d = tostring(f.msg):match("first draw %[(.-)%]")
-    if d then
-      H.assertEq(d ~= firstDraw, true, string.format(
-        "the first draw (%s) differs from attempt %d's: the seed shift moved the fish rolls", firstDraw, f.attempt))
-    end
+    if tostring(f.msg):match("first draw %[(.-)%]") == firstDraw then same[#same + 1] = tostring(f.attempt) end
   end
+  H.log(string.format("[cid] first draw: %s%s", firstDraw, #same > 0 and string.format(
+    " (the same first draw as failed attempt %s; the continuation can still differ)",
+    table.concat(same, ", ")) or ""))
 end
 
 local tripStart, healthBefore, beachMarked = 0, 0, false
 local function bright15() return bright() >= 15 end
--- maxFrames: one attempt's budget; the lab's slowest recovery under "all"
--- took 112 trips and 216,277 frames to it (docs/design/wor-start.md).
--- bootFallback = false: the boot point is marked on the beach (below),
--- f2300+ after the Continue, past the runner's own 2400-frame fallback.
+-- maxFrames: one attempt's budget, more than twice the slowest the lab saw:
+-- under "near" Cid recovered by f82,915 at most (62 trips;
+-- docs/design/wor-start.md).
+-- bootFallback = false: the boot point is marked on the beach after the
+-- first visit (below), whenever that visit ends: f2314 under this policy,
+-- just inside the runner's own 2400-frame fallback, but a visit that waits
+-- longer (the lab's "wait": past f2400) would be pre-empted by the
+-- fallback mid-visit, and every shift would then play one draw.
 -- retries: the runner's default 3 for a segment.
-H.run({ maxFrames = 600000, bootFallback = false }, {
+H.run({ maxFrames = 200000, bootFallback = false }, {
   -- ---- 0. cold Continue of wor-island-v1 -----------------------------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -345,8 +357,9 @@ H.run({ maxFrames = 600000, bootFallback = false }, {
   H.waitFrames(20),
   H.call(function()
     -- The entry contract WITHOUT the boot mark: a seed shift idled here, on
-    -- the world map, moves nothing the first draw reads (measured: shifts
-    -- 0/15/30/45 all drew "roll 1010 rand $BC health 139";
+    -- the world map, leaves the first draw as it was (measured: shifts
+    -- 0/15/30/45 all drew "roll 1010 rand $BC health 139", though they
+    -- went on to recover Cid on trips 37/42/37/54;
     -- docs/design/wor-start.md "What varies the draw").  The boot point is
     -- on the beach instead (below).
     H.assertContract("wor-island-v1", "entry")
@@ -383,7 +396,7 @@ H.run({ maxFrames = 600000, bootFallback = false }, {
       error(string.format("Cid neither recovered nor lost after %d trips (health %d)", trip, health()), 0)
     end
     return cidWell()
-  end, 560000, {
+  end, 180000, {
     H.call(function()
       trip = trip + 1; caughtTrip = {}; tripStart = H.frame; healthBefore = health()
     end),
@@ -394,8 +407,11 @@ H.run({ maxFrames = 600000, bootFallback = false }, {
     -- the boot point: this attempt's seed shift idles here, on the beach
     -- after the first visit's catches, a beat before the walk back.  The
     -- fish and the bird walk the field RNG ($1F6D) while Celes stands
-    -- there, and the next talk's reroll reads it; an idle anywhere else is
-    -- absorbed (docs/design/wor-start.md "What varies the draw")
+    -- there, and the next talk's reroll reads it.  An idle earlier (at the
+    -- Continue, or on first reaching the beach) leaves the first draw as
+    -- it was -- the first catch waits on the fish, which swim on the map's
+    -- own clock -- though not the rest of the run
+    -- (docs/design/wor-start.md "What varies the draw")
     H.cond(function() return not beachMarked end, {
       H.call(function()
         beachMarked = true

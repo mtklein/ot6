@@ -675,8 +675,10 @@ STATES = [
     # checkpoint, the boot for WoR generators (checkpoint=, entry contract
     # "wor-start-v1").  A lost Cid is a lost attempt (class `lost`), retried
     # from this checkpoint by the segment runner like a wipe (its default 3
-    # attempts).  timeout=7200: one attempt feeds Cid for up to 216k frames
-    # (the lab's slowest), and a retried run replays from the Continue.
+    # attempts).  timeout=7200: an attempt runs up to ~90k frames (the lab's
+    # slowest recovery under the shipped policy, 83k, plus the raft and the
+    # save), three of them replay from the Continue, and a loaded machine
+    # emulates ~80-100 frames/s.
     # Re-cutting the SRAM:
     #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-island-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-start-v1/wor-start.sram \

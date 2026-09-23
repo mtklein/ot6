@@ -157,18 +157,29 @@ arrive f180 $1F6D=$9E`, 600 frames later `$1F6D=$11 (88 distinct values so
 far)`). Measured with the runner's
 own seed shift (idle frames at the boot point), retries off:
 
-| boot point | shifts | first draws |
-|---|---|---|
-| the cold Continue, world map (`contboot`) | 0, 15, 30, 45 | all `roll 1010 rand $BC health 139` (`fish-firstlook/fishlab_drawcheck.txt`) |
-| the first look at the beach | 0, 15, 30, 45 | all `roll 1010 rand $BC health 139`: the idle is absorbed, since the first catch waits on the fish, whose swim runs from the map load |
-| the beach after the first visit's catches | 0, 15, 30, 45 | `rand $BC`, `$BE`, `$C1`, `$C3` (`fish-retryshifts/fishlab_drawcheck2.txt`) |
+| boot point | shifts | first draws | the rest of the run |
+|---|---|---|---|
+| the cold Continue, world map (`contboot`) | 0, 15, 30, 45 | all `roll 1010 rand $BC health 139` | differs: Cid recovered on trips 37, 42, 37, 54 (`fish-firstlook/fishlab_drawcheck.txt`) |
+| the first look at the beach | 0, 15, 30, 45 | all `roll 1010 rand $BC health 139` | the same: trips 37, 37, 37, 37 (the same file): the first catch waits on the fish, whose swim runs from the map load |
+| the beach after the first visit's catches | 0, 15, 30, 45 | `rand $BC`, `$BE`, `$C1`, `$C3` | differs: trips 37, 22, lost on 20, 39 (`fish-retryshifts/fishlab_drawcheck2.txt`) |
 
 So `gen_wor_start` asserts the entry contract without the boot mark and
 marks its boot point on the beach after the first visit's catches, a beat
-before the walk back (`H.run({ ..., bootFallback = false })` keeps the
-runner from marking one for it at frame 2400). Each attempt records its
-first draw (the spawn roll, the RNG index and Cid's health after the first
-feed) and asserts it differs from every earlier failed attempt's.
+before the walk back. That lands at f2314 under the shipped policy, inside
+the runner's own 2400-frame fallback, but a first visit that runs longer
+(the lab's `wait`) would be pre-empted by the fallback mid-visit and every
+shift would play one draw (it was: `fish-wait-fallback/`), so the generator
+passes `H.run({ ..., bootFallback = false })`.
+
+A first draw (the spawn roll, the RNG index and Cid's health after the
+first feed) does not fix the run: the same one can go on differently (the
+lab's `near` shifts 483 and 490 both drew `roll 1100 rand $EC health 132`;
+483 recovered Cid on trip 35, 490 lost him on trip 20), and under `all` and
+under `near` alike 15 of the 114 pairs of lab shifts 21 frames apart share a
+first draw
+(`build/attempts/review/wor-start/same_first_draw_21_apart.txt`). So each
+attempt logs its first draw beside any earlier failed attempt's, and does
+not gate on it: the runner's shifted attempts are the variation.
 
 ## The lab
 
@@ -191,73 +202,184 @@ speed; never the slowest fish):
   fish when it does not. Cut after 7 attempts: its runs were the lab's
   longest (82 trips, 149k frames) and it was already behind.
 
-Shifts 0-273 and 3-276 in steps of 7, and for the two leaders 280-553
-too. Two shifts that draw the same first draw (spawn roll, RNG index and
-health after the first feed) play the same continuation, so the rate that
-counts is over distinct first draws (`fish/fishlab_aggregate.txt`, from
-`python3 tools/tests/fishlab.py aggregate`):
+Each batch derived its variants from the generator as it then stood, so
+besides the POLICY line they differ from the shipped one in comments, in how
+the first draw is recorded (an assertion against earlier failed attempts
+then, a log line now; with retries off there is no earlier attempt, so it
+never fired), and in frame budgets: 400,000 or 600,000 frames an attempt
+(380,000 or 560,000 for the feeding) against the shipped 200,000 and
+180,000 (`fish/gen_wor_start_*.lua`, the last search batch's;
+`fish/heldout-variants/`, the held-out runs'). No lab run ran out of frames
+(`other=0` on every aggregate line). No `near` run came near the shipped
+budget; some `all` runs would not have fit it (below).
 
-| policy | attempts | recovered | distinct draws | recovered | lost | both |
+**The search set.** Shifts 0-273 and 3-276 in steps of 7, and for the two
+leaders 280-553 too. A first draw (the spawn roll, the RNG index and Cid's
+health after the first feed) is counted once however many shifts drew it,
+and one that went both ways is `mixed` (`fish/fishlab_aggregate.txt`, from
+`python3 tools/tests/fishlab.py aggregate --root
+build/attempts/wt/wor-start/fish`):
+
+| policy | attempts | recovered | distinct first draws | recovered | lost | mixed |
 |---|---|---|---|---|---|---|
-| **all** | 120 | 119 | 48 | **47** | 1 | 0 |
+| all | 120 | 119 | 48 | 47 | 1 | 0 |
 | near | 120 | 113 | 48 | 44 | 3 | 1 |
 | fastslow | 80 | 60 | 34 | 27 | 5 | 2 |
 | fast | 40 | 8 | 27 | 5 | 22 | 0 |
 | wait | 40 | 0 | 15 | 0 | 15 | 0 |
 | allnear (cut) | 7 | 5 | 5 | 3 | 2 | 0 |
 
-Raw: `all attempts=120 recovered=119 lost=1 other=0 rate=0.992 distinct
-first draws=48 ... trips median=44 max=112 cid-frames median=69582
-max=216277`, `all distinct samples=48 recovered=47 lost=1 mixed=0
-rate=0.979`; `near distinct samples=48 recovered=44 lost=3 mixed=1
-rate=0.917`; `fastslow distinct samples=34 recovered=27 lost=5 mixed=2
-rate=0.794`; `fast distinct samples=27 recovered=5 lost=22 mixed=0
-rate=0.185`; `wait distinct samples=15 recovered=0 lost=15 mixed=0
-rate=0.000`.
+Raw: `all distinct samples=48 recovered=47 lost=1 mixed=0 rate=0.979`;
+`near distinct samples=48 recovered=44 lost=3 mixed=1 rate=0.917`;
+`fastslow distinct samples=34 recovered=27 lost=5 mixed=2 rate=0.794`;
+`fast distinct samples=27 recovered=5 lost=22 mixed=0 rate=0.185`; `wait
+distinct samples=15 recovered=0 lost=15 mixed=0 rate=0.000`. These are
+search-set rates: the policy was picked on these draws.
 
-**Paired**, shift by shift (the same shift is the same boot): near lost on
-shifts 28/31/35 (`rand $C1`), 262 and 490/497/504; all recovered on every
-one of them (`OK/19`, `OK/31`, `OK/47`, `OK/38`, `OK/104` trips). all lost
-once, at shift 476 (`LOST: Cid died -- health 20 as Celes walked into the
-house on trip 7; first draw [roll 0011 rand $EA health 132]`: three
-rerolls running with no fast fish and the -4 fish the only slow one,
-`health 132 -> 111`, `111 -> 77`, `77 -> 51` with it caught each time;
-`fish/all/shift476.ot6.log`), where near recovered (`OK/56`).
+**Held-out draws** (docs/TESTING.md: test the discovered strategy
+separately from its search). Shifts 560-1113 in steps of 7 and 1120-1666 in
+steps of 14, retries off, scored only on the first draws none of the
+search's 90 ever drew (`python3 tools/tests/fishlab.py run --shifts
+560-1113:7 --dir all-heldout all`, then `--shifts 1120-1666:14`, the same
+for `near` and `fastslow`; `python3 tools/tests/fishlab.py heldout --root
+build/attempts/wt/wor-start/fish all-heldout all near fastslow fast wait
+allnear`, `fish/heldout_all.txt`, `fish/heldout_near.txt`,
+`fish/heldout_fastslow.txt`). The later shifts
+idle longer before the reroll the shift moves, so Cid's health after the
+first feed runs from 130 down to 113, against 139 down to 131 in the
+search: a harder start.
 
-**Why**, per trip (`fish/fishtrips.txt`: Cid's health change by what swam,
-over every trip of every run):
+| policy | search set: distinct draws recovered | held-out attempts | recovered | held-out distinct draws | recovered | lost | mixed |
+|---|---|---|---|---|---|---|---|
+| all | 47 of 48 (0.979) | 120 | 117 | 67 | 65 (0.970) | 2 | 0 |
+| **near** | 44 of 48 (0.917) | 120 | 117 | 67 | **64 (0.955)** | 3 | 0 |
+| fastslow | 27 of 34 (0.794) | 41 (stopped) | 18 | 25 | 10 (0.400) | 14 | 1 |
 
-| what swam | near | all | fast | wait |
-|---|---|---|---|---|
-| no fast fish, no slow | -11.00 | -11.00 | -11.00 | -11.00 |
-| no fast fish, one slow | -11.00 (back at once) | **-9.90** (catches it) | -11.00 | -10.99 |
-| the fast fish and one slow | +18.57 | **+21.90** | +12.24 | +2.11 |
-| the fast fish and two slow | +13.17 | +19.37 | +13.41 | -23.62 |
+Raw: `all-heldout held-out distinct samples=67 recovered=65 lost=2 mixed=0
+rate=0.970`; `near-heldout held-out distinct samples=67 recovered=64 lost=3
+mixed=0 rate=0.955`; `fastslow-heldout held-out distinct samples=25
+recovered=10 lost=14 mixed=1 rate=0.400` (stopped at 40 runs,
+`fish/fishlab_heldout_fastslow.txt`: it was losing more than half). Over
+the same runs (`fish/fishlab_aggregate_heldout.txt`): `all-heldout
+attempts=120 recovered=117 ... trips median=42 max=181 cid-frames
+median=65336 max=356481`, `near-heldout attempts=120 recovered=117 ...
+trips median=32 max=62 cid-frames median=46606 max=82915`. `all`'s long
+chases are its tail: 11 of its held-out recoveries came past f180,000
+(`fish/all-heldout/shift1064.ot6.log`: `Cid recovered on trip 181 at
+f356481`) and 4 of its search ones (up to f216,277), at or past the
+shipped budgets; `near`'s slowest in either set was f82,915.
 
-A slow fish is worth catching even when the fast one is absent: on
-average it more than pays for the extra walk (-9.90 against -11.00 for
-walking straight back), though a lone -4 fish does not, and that is how
-`all` lost its one draw. Waiting at a spot is ruinous: over the `wait` runs
-the fast fish swam beside (8,12) a median 1,589 frames after Celes reached
-the beach (94 catches, 237 to 2,181; `fish/catch_times.txt`;
-`fish/wait/shift00.ot6.log`: `caught fish 11 (speed 2) 1589 frames after
-arriving`), against a median 277 for the chase (4,808 catches over the
-`all` and `near` runs, p90 621). Catching only the fast fish leaves every
-no-fast trip at -11. The first 40 `wait` runs are kept in
-`fish-wait-fallback/`: their boot point fell to the runner's 2400-frame
-fallback mid-wait, so all 40 were one draw (0 recovered); the re-run above
-has the boot point on the beach.
+**Paired**, shift by shift (the same shift is the same boot). In the
+search, near lost on shifts 28/31/35 (`rand $C1`), 262 and 490/497/504, and
+all recovered on every one of them; all lost once, at shift 476 (`LOST: Cid
+died -- health 20 as Celes walked into the house on trip 7; first draw
+[roll 0011 rand $EA health 132]`: trips 2 to 4 met no fast fish and the -4
+fish as the only slow one, and caught it each time, `health 132 -> 111`,
+`111 -> 77`, `77 -> 51`; `fish/all/shift476.ot6.log`), where near
+recovered. Held out, all lost
+shifts 1260, 1302 and 1316 and near recovered them (`OK/42`, `OK/35`,
+`OK/35` trips); near lost 1190, 1400 and 1610 and all recovered them
+(`OK/103`, `OK/77`, `OK/66`). No draw was lost under both.
 
-**So the generator ships `all`**: every fish but the slowest, the fast one
-first, whether or not it swims. Measured from the island save it recovers
-Cid on 47 of 48 distinct draws, so a person playing this way saves him
-first try about 49 times in 50, and the runner's retry covers the rest.
-That is a ceiling of this bot's play, not of the game: the bot's timing is
-deterministic, so a run can lock into a repeating cycle of rerolls
-(`fish/allnear/shift00.ot6.log`: trips 11, 18 and 24 draw and catch the same
-fish), which a person's uneven timing would break; and the lab's long
-shifts cost Cid up to ~8 health before the first feed (the same for every
-policy).
+**What the numbers are made of.** The bot's timing is fixed, so each
+trip's length fixes how far the fish walk the field RNG before the next
+talk, and a run walks the RNG table along a path that can return on itself
+(`fish/allnear/shift00.ot6.log`: trips 11, 18 and 24 draw and catch the
+same fish). Which fish a policy meets is therefore a property of its path
+as much as of the coins. Over independent draws every fish swims half the
+time and a lone slow fish is the +16 one half the time; the lab's trips
+(`fish/fishcomp_search.txt`, `fish/fishcomp_heldout.txt`):
+
+| policy | draws | trips | the fast fish swam | a lone slow fish was the +16 one (the fast fish swam) | (it did not) |
+|---|---|---|---|---|---|
+| all | search | 5,684 | 0.465 | 0.711 | 0.686 |
+| all | held out | 6,146 | 0.482 | 0.659 | 0.658 |
+| near | search | 4,052 | 0.534 | 0.559 | 0.474 |
+| near | held out | 3,870 | 0.551 | 0.585 | 0.502 |
+| fastslow | search | 2,943 | 0.490 | 0.560 | 0.578 |
+| fastslow | held out | 1,693 | 0.425 | 0.573 | 0.562 |
+
+`all`'s trip lengths lead it to the +16 fish about two times in three on
+both sets; `near`'s are close to fair.
+
+**Per trip** (`fish/fishtrips.txt`, the search runs: Cid's health change
+by what swam, the fast fish and how many of the two slow ones, over every
+trip but the recovering one; the slowest fish is never chased):
+
+| what swam | all | near | fastslow | fast | wait |
+|---|---|---|---|---|---|
+| no fast fish, no slow | -11.00 | -11.00 | -11.00 | -11.00 | -11.00 |
+| no fast fish, one slow | -11.11 | -11.00 | -11.00 | -11.00 | -10.99 |
+| no fast fish, both slow | -8.61 (49 trips) | -10.99 | -11.00 | -11.00 | -11.00 |
+| the fast fish alone | +14.91 | +14.40 | +14.28 | +13.87 | -7.25 |
+| the fast fish and one slow | **+21.00** | +18.68 | +16.83 | +12.24 | +2.11 |
+| the fast fish and both slow | **+19.12** | +12.49 | +17.12 | +13.41 | -23.62 |
+
+Held out (`fish/fishtrips_heldout.txt`) the shape is the same: `all`
++18.43 and +18.73 with the fast fish and one or both slow, `near` +18.06
+and +12.69; with no fast fish and one slow, `all` -12.02, `near` -11.00.
+
+So `all`'s lead over `near` on the search set is in the fast-plus-slow
+trips. By exact fish set (`fish/fishsets_search.txt`, trip 1 left out: its
+cost holds the lab's idle; the digits are the fast fish, the +16, the -4
+and the slowest, 1 where it swam) part of that is the policy and part the
+path:
+
+| set | all | near | fastslow |
+|---|---|---|---|
+| `1100` fast and +16 | +27.14 | +28.46 | +28.86 |
+| `1010` fast and -4 | +7.62 | +8.78 | +7.47 |
+| `1110` fast and both slow | **+19.77** | +14.20 | +20.21 |
+| `1111` all four | **+17.21** | +10.03 | +15.19 |
+| `0100` the +16 alone | -1.44 | -11.00 | -11.00 |
+| `0010` the -4 alone | -30.34 | -11.00 | -10.99 |
+
+With both slow fish swimming, `all` and `fastslow` catch both and `near`
+only one that comes close: that is the policy, 5 to 7 health a trip. With
+one slow fish, `near` does as well set for set, and `all`'s +21.00 against
++18.68 is its path meeting the +16 fish 71% of the time against 56%.
+Without the fast fish `all` breaks even with `near` (-11.11 against -11.00)
+only because of that path: the -4 fish swims from the far corner (13,13),
+so a trip that chases it alone costs 30 health against 11 for walking
+straight back, and at even odds a lone slow fish costs `all` about 16 a
+trip. The one draw `all` lost in the search is three such trips running
+(shift 476 above).
+
+**Fair coins.** Resampling each policy's own trips per exact fish set
+under independent draws -- trip 1 the island save's `1101`, every later set
+four fair coins, Cid lost at 30 or less before a feed, saved past 256 --
+models what the policy is worth to a person, whose timing does not repeat
+(`fish/fishmodel.py`, 200,000 modelled runs each). From the search trips
+(`fish/fishmodel_search.txt`): `all P(recovered)=0.788`, `near
+P(recovered)=0.890`, `fastslow P(recovered)=0.917`, `fast
+P(recovered)=0.772`, `wait P(recovered)=0.000`. From the held-out trips
+(`fish/fishmodel_heldout.txt`): `all-heldout P(recovered)=0.738`,
+`near-heldout P(recovered)=0.850`, `fastslow-heldout P(recovered)=0.895`.
+It is a model, built from the bot's own trips; the lab is what this
+generator scores.
+
+**Waiting at a spot is ruinous.** Over the `wait` runs the fast fish swam
+beside (8,12) a median 1,589 frames after Celes reached the beach
+(`fish/catch_times.txt`: `wait (stand at (8,12)): n=94 min=237
+median=1589 p90=1765 max=2181`, against `all + near (chase): n=4808
+min=229 median=277 p90=621 max=1133`). A fish that is not swimming cannot
+be waited for at all: only a talk brings one. The first 40 `wait` runs are
+kept in `fish-wait-fallback/`: their boot point fell to the runner's
+2400-frame fallback mid-visit, so all 40 were one draw (0 recovered); the
+re-run above has the boot point on the beach.
+
+**So the generator ships `near`**: the fast fish when it swims and a slow
+one that comes near; no fast fish, straight back to Cid for the next
+reroll. On this generator's draws it is about as good as `all` (44 of 48
+searched and 64 of 67 held out, against 47 of 48 and 65 of 67), its slowest
+recovery is under a quarter of `all`'s (f82,915 against f356,481), and it
+keeps most of its rate under fair coins (0.85-0.89 against `all`'s
+0.74-0.79). A change to the bot's timing (a lib navigation edit, a
+different island save) moves the RNG path each policy walks, and with it
+each policy toward its fair-coin rate: `all` further than `near`.
+`fastslow`, the best under fair coins, loses on this bot's own paths (27 of
+34 searched, 10 of 25 held out): the same lesson from the other side. A
+lost first attempt is a retry (below).
 
 ## The retry
 
@@ -266,11 +388,13 @@ segment runner files it as class `lost` (`lib/ot6.lua` `classify`, one of
 the seed-dependent classes with the wipe) and replays the body from the
 boot snapshot at the next seed shift, bounded by its default 3 attempts,
 each a `[retry] attempt n/N FAILED class=lost ...` line that
-`tools/audit_retries.py` lists. Measured with the final generator
-(`retry/final/`, the variants derived from it by one line each):
+`tools/audit_retries.py` lists. Measured with the final generator: each
+variant in `retry/final/` is `tools/tests/gen_wor_start.lua` with the one
+line its name says changed (two for `nofish_contboot`); `diff` shows
+nothing else, frame budgets included:
 
-- `retry/final/fastslow14.log` (POLICY `fastslow`, which loses about one
-  draw in five, at `OT6_SEED_SHIFT=14`): `[retry] attempt 1/3 FAILED
+- `retry/final/fastslow14.log` (POLICY `fastslow`, which this generator's
+  paths lose often, at `OT6_SEED_SHIFT=14`): `[retry] attempt 1/3 FAILED
   class=lost ... LOST: Cid died -- health 24 as Celes walked into the house
   on trip 41; first draw [roll 1011 rand $BE health 139]`, attempt 2 at
   shift 34 draws `roll 1111 rand $C1 health 139` and is lost on trip 66,
@@ -281,21 +405,24 @@ each a `[retry] attempt n/N FAILED class=lost ...` line that
   `class=lost` on trip 9, then `[retry] attempts=3/3 exhausted; failed
   attempts: 1:lost 2:lost 3:lost`.
 - `retry/final/nofish_contboot.log` (the same mutant with the boot point
-  back on the world map: the draw assertion's negative control): attempt 2
-  draws attempt 1's `roll 1001 rand $09 health 105` and fails at once,
-  `class=assert`: `assertEq failed: the first draw (roll 1001 rand $09
-  health 105) differs from attempt 1's: the seed shift moved the fish
-  rolls: got false, want true`.
-- `retry/final/audit_retries.txt`: `lost x6 gen_wor_start_fastslow,
-  gen_wor_start_nofish, gen_wor_start_nofish_contboot`, `assert x1
-  gen_wor_start_nofish_contboot`.
-- `retry/pre-final/` holds the same three shapes from the generator before
-  its policy and budget settled (`shift30.log`: POLICY `near`, lost on the
-  `rand $C1` draw, recovered on attempt 2, `PASS (frame 41886)
-  attempts=2/4`).
+  back on the world map, where the shift does not move the first draw):
+  attempts 2 and 3 draw attempt 1's first draw and say so, `[cid] first
+  draw: roll 1001 rand $09 health 105 (the same first draw as failed
+  attempt 1, 2; the continuation can still differ)`, and play on: the log
+  line is a record, not a gate.
+- `retry/final/audit_retries.txt`: `lost x8 gen_wor_start_fastslow,
+  gen_wor_start_nofish, gen_wor_start_nofish_contboot`.
+- Superseded, kept for the record: `retry/final-fb9c5721/` (the same
+  three variants of the generator before a comment edit, with the same
+  verdict lines), `retry/superseded-assert/` (the
+  generator when the first-draw check was an assertion, with a 400,000 and
+  380,000-frame budget and POLICY `all`: its `nofish_contboot` stopped with
+  `class=assert`) and `retry/pre-final/` (earlier still: POLICY `near`,
+  4 attempts, `PASS (frame 41886) attempts=2/4` on the `rand $C1` draw).
 
-The runner's own suites still hold with the new class and option
-(`runner_suites_verdicts.txt`): `segment_retry: [ot6] PASS (frame 181)
+The runner's own suites still hold with the new class and option, on
+the merged tree (`tools/tests/run.sh tools/tests/<suite>.lua`,
+`runner_suites_final.txt`): `segment_retry: [ot6] PASS (frame 181)
 attempts=2/3`, `seed_reroll: [ot6] PASS (frame 313) attempts=2/3`,
 `wipe_reclass: [ot6] PASS (frame 1) attempts=2/2`, `step_reset: [ot6] PASS
 (frame 376) attempts=1/1`, `watchdog_cantrun` and `watchdog_listend`
@@ -310,9 +437,10 @@ opens the way down to the raft (397 (85,51)); `H.navTo` finds it once the
 cover is gone. Talking to it plays his farewell (dlg `$0891`) and the
 voyage: maps 397 -> 400 -> 1 -> 3 -> 1, control on the World of Ruin map at
 (146,212), outside Albrook (`wor_start_ninja.log`: `[wor] the voyage: map
-397 at f80242`, `dialog $0891`, `map 400 at f81043`, `map 1 at f82233`,
-`map 3 at f84204`, `map 1 at f84363`, `[wor] landed: world 1 at (146,212)
-f84464, CELES HP 1043/1043`), about 4,200 frames from the raft talk. No choice prompt anywhere on the island or the raft.
+397 at f52787`, `dialog $0891`, `map 400 at f53584`, `map 1 at f54774`,
+`map 3 at f56745`, `map 1 at f56905`, `[wor] landed: world 1 at (146,212)
+f57007, CELES HP 1043/1043`), about 4,200 frames from the raft talk. No
+choice prompt anywhere on the island or the raft.
 
 ## The checkpoints
 
@@ -338,18 +466,27 @@ after its save and by the next segment's cold Continue.
   (`ninja_wor_start.txt`, `wor_start_ninja.log`): `contract wor-island-v1
   (entry): all 12 fields hold`, `[retry] boot point: the fishing beach 398
   after trip 1's catches (health 100, rand $95) at f2314`, `[cid] first
-  draw: roll 1010 rand $BC health 139`, `Cid recovered on trip 56 at
-  f79386, health 266`, `[saved] wor-start-v1: slot 3 holds map 1 ($0401)
+  draw: roll 1010 rand $BC health 139`, `Cid recovered on trip 37 at
+  f51931, health 271`, `[saved] wor-start-v1: slot 3 holds map 1 ($0401)
   world tile (146,212)`, `contract wor-start-v1 (exit): all 11 fields
-  hold`, `PASS (frame 84778) attempts=1/3`. The capture
+  hold`, `PASS (frame 57321) attempts=1/3`. The capture
   (`capture_wor_start.log`) is the same run, `wor_start.mss` byte-identical;
   `validate_wor_start_v1.txt`: `holds=slot 3 world 1 (146,212)
   [$1F64=$0401] (saved: declared and checked)`.
-- **Other draws** (`python3 tools/tests/seed_sweep.py wor_start --seeds 4`,
-  `sweeps/wor_start-final3/`, retries off): `4/4 seeds passed`, first
-  draws `rand $BC`, `$BE`, `$C1`, `$C3`, recovered on trips 56, 43, 19, 26
-  (shift 30's `rand $C1` is the draw `near` loses). The lab above is the
-  wider version: 119 of 120 attempts, 47 of 48 distinct draws.
+- **Other draws**: the lab above is this policy over 240 shifts (120
+  searched, 120 held out), retries off, in variants that differ from the
+  generator only in comments, the first-draw record and budgets (above).
+  The graph's own sweep (`python3 tools/tests/seed_sweep.py wor_start
+  --seeds 4 --jobs 4 --out build/sweeps/wor_start-final5`, retries off,
+  `sweeps/wor_start-final5/`): `3/4 seeds passed; 4 distinct first
+  battle(s) across 4 seeds; 3/4 distinct samples passed`. First draws
+  `rand $BC`, `$BE`, `$C1`, `$C3`; Cid recovered on trips 37, 22 and 39,
+  and shift 30 lost him (`LOST: Cid died -- health 13 as Celes walked into
+  the house on trip 20; first draw [roll 1111 rand $C1 health 139]`), the
+  `rand $C1` draw `near` also lost at search shifts 28/31/35; in the graph
+  that is a retry at the next shift. The island has no battles, so the
+  sweep's distinct count is its seeds' (a seed with no first battle counts
+  as its own sample); the first-draw lines are what differ here.
 - **The cold Continue** of the sealed `wor-start-v1` on this ROM
   (`OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-start-v1
   tools/tests/run.sh tools/tests/probe_wor_start_continue.lua`,
@@ -357,11 +494,27 @@ after its save and by the next segment's cold Continue.
   fields hold`, `[continue] world 1 at (146,212): CELES L25 HP 1043/1043
   MP 227 kit 11 0E 76 8F D1 C1; Cid recovered $00B3=1; tonic=4 potion=39
   fenix=22 gil=215563`, `PASS (frame 1386)`.
-- **The graph**: `python3 tools/tests/lib/compose.py --check-states`
-  (`check_states.txt`): `fixtures: 96/96 fresh (ROM, generator, artifact and
-  ancestor bindings all verify)`; `ninja build/checks/checkpoint_saves.ok`
-  (`ninja_checks.txt`): `checkpoint-saves: PASS -- 29 checkpoints validate;
-  each line names the save its battery holds`.
+- **The graph** (after the merge of main): `nice ninja
+  build/checks/checkpoint_saves.ok build/checks/checkpoint_negatives.ok
+  build/checks/retry_negative.ok build/checks/state_writes.ok
+  build/checks/playthrough_honest.ok build/checks/test_registration.ok ...`
+  (`ninja_checks_final.txt`): `checkpoint-saves: PASS -- 29 checkpoints
+  validate; each line names the save its battery holds`, among them
+  `wor-island-v1: ... holds=slot 3 world 1 (76,239) [$1F64=$3001] (saved:
+  declared and checked)` and `wor-start-v1: ... sha256=990aa6e6... holds=slot
+  3 world 1 (146,212) [$1F64=$0401] (saved: declared and checked)`;
+  `checkpoint-negatives: PASS`, `retry-negative: PASS`, `OK -- every state
+  write is a declared unit-test expedient`. `python3
+  tools/tests/lib/compose.py --check-states` (`check_states_final.txt`):
+  `fixtures: 52 of 96 do not verify (52 STALE)`, every one a `gen_kolts` or
+  `gen_sabin_gau` fixture or a descendant, the two generators that merge
+  brought in (`check_states_stale_list.txt`: `fixture vargas_entry is STALE
+  -- its generator gen_kolts changed`, `fixture gau_joined is STALE -- its
+  generator gen_sabin_gau changed`, 48 more through their chains); none is
+  on this route, and `ninja -n build/states/wor_landing.mss.lua
+  build/states/wor_island.mss.lua build/states/wor_start.mss.lua`: `ninja:
+  no work to do`. Before the merge: `fixtures: 96/96 fresh`
+  (`check_states.txt`).
 
 **For the next leg:** Tonics are far below the band (4 against about
 L25 x 5, capped 99); Albrook, the town beside the landing, is the first

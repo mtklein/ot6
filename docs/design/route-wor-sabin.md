@@ -25,8 +25,10 @@ measurement.
    `remove_equip` on all thirteen playable characters (`:11979-11991`), and
    the fixture she came from shows every one of her slots empty
    (`gear: -, -, -, -, -, -`, `party_wor_landing.txt`). Her bag holds a full
-   kit (§5.2). Equipping her is the first action, unless the Solitary Island
-   segment that cuts `wor-start-v1` has already done it.
+   kit (§5.2). The Solitary Island segment `gen_wor_island` dresses her
+   before its save (`docs/design/wor-start.md`), so `wor-start-v1`'s Celes
+   wears `11 0E 76 8F D1 C1` (Break Blade, Blizzard, Gold Helmet, Gold
+   Armor, Genji Glove, Czarina Ring).
 2. **No story gates stand between the landing and Tzen.** The raft
    drops her on the World of Ruin map at **(146,212)** (`:13014`). Albrook's
    door is 20 steps away, Tzen's is 41 steps beyond that, and the direct
@@ -104,7 +106,7 @@ when he is fed, and `_ca5419` (`:12528-12533`) when he is not. So at the landing
 | party | CELES alone | `$1850+6` party bits; no other member with party bits |
 | World of Ruin | `$00A4=1` (`:12423`) | switch read |
 | event timers | none live | `$1189/$118F/$1195/$119B` all 0 (the harness's `eventTimerLive`) |
-| equipment | **possibly empty** (finding 1) | `$161F..$1624` for char 6 |
+| equipment | `11 0E 76 8F D1 C1` (finding 1; the cold Continue logs `kit 11 0E 76 8F D1 C1`) | `$161F..$1624` for char 6 |
 | Tzen switches | `$027D=0 $028A=0 $028B=0 $028C=0`; `$066C=1` (Sabin shown) | `roster_wor_landing.txt` |
 
 The fixture that precedes the checkpoint (`build/states/wor_landing.mss`, at
@@ -704,7 +706,8 @@ cuts:
 
 | checkpoint | where | why |
 |---|---|---|
-| `wor-start-v1` (the other agent) | world (146,212), Celes alone | the first WoR save |
+| `wor-island-v1` (`gen_wor_island`) | world (76,239), the Solitary Island's own tile, Celes alone, Cid not yet fed | the first WoR save |
+| `wor-start-v1` (`gen_wor_start`) | world (146,212), Celes alone, Cid recovered | the first save after the island |
 | `wor-albrook-v1` (optional) | world, outside Albrook after shopping, re-equip and any grind | the grind's resume point |
 | **`wor-tzen-door-v1`** | world (131,179), one step east of Tzen's door, *not* on the desert | the last save before the committed, timed scene; every house attempt retries from here |
 | **`wor-sabin-v1`** | world (130,179) after leaving Tzen with Sabin | the first save after he joins; the end of this route |
@@ -731,7 +734,15 @@ element bits are left untouched, and no `Ot6ElemAddTbl` rows are proposed.
 | Celes alone (to Tzen) | **slash** (every sword; pierce only on the 26-30-power daggers) | **ice** (own Ice; Blizzard), **bolt** (ThunderBlade, in the bag), **fire** and bolt (Maduin, worn); holy with Unicorn's Pearl (40 MP) |
 | Celes + Sabin | + **bludg** (fists, Pummel, Suplex), slash (claws) | + **holy** (AuraBolt), **fire** (Fire Dance) |
 
-### 8.2 The Solitary Island (world groups 29, 30; fought before `wor-start-v1`)
+### 8.2 The Solitary Island (world groups 29, 30; not met on the way to `wor-start-v1`)
+
+The island's field maps (396-400) have no random battles (`map_prop.dat` +5
+bit 7 clear), and the island segments (`gen_wor_island`, `gen_wor_start`)
+cross its world tiles for one step (onto (76,239) off 396's west edge, then
+(76,240) back in) and met no battle there in any run
+(`docs/design/wor-start.md`). A player who walks the island's world tiles
+can meet these; the table is for the break design, not a fight on the
+route.
 
 | id | body | L | HP | vanilla weak | absorbs | proposed row |
 |---|---|---|---|---|---|---|
@@ -890,9 +901,10 @@ Harness mechanics this stretch exercises, checked against
 
 Other unknowns:
 
-- **The Solitary Island segment's hand-off.** Whether `wor-start-v1`'s Celes
-  is equipped, and how many Potions and Softs the island spent, sets the
-  first Albrook shopping list. Read it on arrival.
+- **The Solitary Island segment's hand-off** (measured, `docs/design/wor-start.md`):
+  `wor-start-v1`'s Celes is dressed (above), in the back row, and the
+  island spent nothing (no battles): `tonic=4 potion=39 fenix=22
+  gil=215563` on the cold Continue.
 - **The load-onto-trigger at (16,9)** that starts "SABIN: Wait!" is vanilla
   behaviour. It is **verify-on-arrival**.
 - **The encounter draws are save data** (`$1FA1-$1FA5`, `docs/TESTING.md`).

@@ -8668,8 +8668,8 @@ end
 -- how tools/tests/seed_sweep.py turns retries off).  opts.watchdog:
 -- true/false to force the fast-failure watchdogs on or off (default: on
 -- for a segment, observation-only elsewhere).  opts.bootFallback = false:
--- the body marks its own boot point (M.bootMark) later than BOOT_FALLBACK,
--- so the runner must not mark one for it at that frame.
+-- the body marks its own boot point (M.bootMark), possibly later than
+-- BOOT_FALLBACK, so the runner must not mark one for it at that frame.
 local runnerStarted = false
 
 function M.run(opts, steps)
@@ -9182,9 +9182,11 @@ function M.run(opts, steps)
     -- calls M.bootMark, so the seed variation would have nowhere to go.
     -- Mark the run's own opening instead: idling there is the same
     -- legitimate thing -- a player who has not started pressing yet.
-    -- A body that marks its own boot point late (gen_wor_start: on the
-    -- fishing beach after its first catches, f2300+ after a cold Continue)
-    -- says so with opts.bootFallback = false, and is not pre-empted here.
+    -- A body that marks its own boot point at a place whose frame varies
+    -- (gen_wor_start: on the fishing beach once its first visit's catches
+    -- are done, f2314 under its shipped policy, past f2400 under a longer
+    -- first visit) says so with opts.bootFallback = false, and is not
+    -- pre-empted here.
     if not RUN.bootMarked and M.frame == BOOT_FALLBACK
        and RUN.opts.bootFallback ~= false then
       M.bootMark(string.format("no fixture load or entry contract in the "
