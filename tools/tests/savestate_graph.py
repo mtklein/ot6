@@ -652,4 +652,24 @@ STATES = [
     # running -- the escape-policy lab's fixture (one run, both states).
     S("wor_landing", gen="gen_fc_escape", checkpoint="fc-alcove-v1",
       also=["escape_start"], timeout=3600),
+
+    # ---- the World of Ruin ----------------------------------------------------
+    # wor_landing -> the first save after the Solitary Island: dress CELES
+    # (the opening leaves her every slot empty), save on the island's own
+    # World of Ruin map tile (76,239), save Cid by catching fish on the
+    # beach 398 and feeding him -- reloading the island save when he is
+    # lost, at most 4 attempts, each logged (docs/design/wor-start.md: his
+    # health is var 7, the fish reroll on every talk, and the measured
+    # policy recovers him about 4 times in 5) -- ride his recovery scene,
+    # the raft and the voyage to the World of Ruin map, and Save at the
+    # landing world (146,212): the `wor-start-v1` checkpoint, the boot for
+    # WoR generators (checkpoint=, entry contract "wor-start-v1").  prev=,
+    # not checkpoint=: nothing between the alcove and the island is a save
+    # point, so this link boots the wor_landing savestate.  timeout=3600: a
+    # slow draw feeds Cid for 60k+ frames.  Re-cutting the SRAM is a
+    # deliberate by-hand operation:
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-start-v1/wor-start.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_start.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-start-v1
+    S("wor_start", gen="gen_wor_start", prev="wor_landing", timeout=3600),
 ]

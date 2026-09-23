@@ -72,9 +72,16 @@ def saved_state(data: bytes) -> dict:
             "world_x": by(0x1F60), "world_y": by(0x1F61)}
 
 
+# The world maps a save can hold: map 0 is the World of Balance, map 1 the
+# World of Ruin (map 2, the Serpent Trench, never saves).  A world save's
+# tile is $1F60/$1F61; its $1FC0/$1FC1 is the last field tile, stale.
+WORLD_MAPS = {0: "World of Balance", 1: "World of Ruin"}
+
+
 def describe_saved(s: dict) -> str:
-    if s["map"] == 0:
-        return (f"slot {s['slot']} world ({s['world_x']},{s['world_y']}) "
+    if s["map"] in WORLD_MAPS:
+        where = "world" if s["map"] == 0 else f"world {s['map']}"
+        return (f"slot {s['slot']} {where} ({s['world_x']},{s['world_y']}) "
                 f"[$1F64=${s['map_word']:04X}]")
     return (f"slot {s['slot']} map {s['map']} ({s['x']},{s['y']}) "
             f"[$1F64=${s['map_word']:04X}]")
@@ -90,6 +97,10 @@ def saved_problem(declared, data: bytes) -> str | None:
 
         "saved": {"slot": 3, "field": {"map": 88, "x": 11, "y": 34}}
         "saved": {"slot": 3, "world": {"x": 249, "y": 128}}
+        "saved": {"slot": 3, "world": {"map": 1, "x": 146, "y": 212}}
+
+    A `world` block names the World of Balance (map 0) unless it carries
+    "map": 1, the World of Ruin.
     """
     if not isinstance(declared, dict):
         return f"saved must be an object, not {type(declared).__name__}"
@@ -106,10 +117,10 @@ def saved_problem(declared, data: bytes) -> str | None:
         want = declared["field"]
         if not isinstance(want, dict) or set(want) != {"map", "x", "y"}:
             return "saved.field must be {map, x, y}"
-        if want["map"] == 0:
-            return ("saved.field map 0 is how a WORLD save encodes; declare "
-                    "'world' instead")
-        if actual["map"] == 0:
+        if want["map"] in WORLD_MAPS:
+            return (f"saved.field map {want['map']} is how a WORLD save "
+                    "encodes; declare 'world' instead")
+        if actual["map"] in WORLD_MAPS:
             return (f"saved.field declares map {want['map']}, but the "
                     f"battery holds {describe_saved(actual)}")
         got = (actual["map"], actual["x"], actual["y"])
@@ -119,11 +130,15 @@ def saved_problem(declared, data: bytes) -> str | None:
                     f"{describe_saved(actual)}")
     else:
         want = declared["world"]
-        if not isinstance(want, dict) or set(want) != {"x", "y"}:
-            return "saved.world must be {x, y}"
-        if actual["map"] != 0:
-            return (f"saved.world declares a world save, but the battery "
-                    f"holds {describe_saved(actual)}")
+        if not isinstance(want, dict) or set(want) not in ({"x", "y"}, {"map", "x", "y"}):
+            return "saved.world must be {x, y} or {map, x, y}"
+        world = want.get("map", 0)
+        if world not in WORLD_MAPS:
+            return (f"saved.world map {world} is not a world map "
+                    f"({sorted(WORLD_MAPS)})")
+        if actual["map"] != world:
+            return (f"saved.world declares a {WORLD_MAPS[world]} save, but "
+                    f"the battery holds {describe_saved(actual)}")
         if (actual["world_x"], actual["world_y"]) != (want["x"], want["y"]):
             return (f"saved.world declares ({want['x']},{want['y']}), but "
                     f"the battery holds {describe_saved(actual)}")
@@ -485,6 +500,9 @@ def selftest() -> None:
             "the declaration refused the battery it describes"
         assert saved_problem({"slot": 3, "world": {"x": 249, "y": 128}},
                              world) is None, "world declaration refused"
+        ruin = battery(3, 0x0401, 29, 15, 146, 212)   # wor-start-v1's $1F64
+        assert saved_problem({"slot": 3, "world": {"map": 1, "x": 146, "y": 212}},
+                             ruin) is None, "World of Ruin declaration refused"
         for decl, blob, why in (
             ({"slot": 3, "field": {"map": 103, "x": 57, "y": 8}}, field,
              "the wrong map (#218's actual failure: the Kolts summit save)"),
@@ -496,6 +514,14 @@ def selftest() -> None:
              "a world claim over a field save"),
             ({"slot": 3, "field": {"map": 0, "x": 29, "y": 15}}, world,
              "a field claim over a world save"),
+            ({"slot": 3, "world": {"x": 146, "y": 212}}, ruin,
+             "a World of Balance claim over a World of Ruin save"),
+            ({"slot": 3, "world": {"map": 1, "x": 249, "y": 128}}, world,
+             "a World of Ruin claim over a World of Balance save"),
+            ({"slot": 3, "field": {"map": 1, "x": 29, "y": 15}}, ruin,
+             "a field claim over a World of Ruin save"),
+            ({"slot": 3, "world": {"map": 2, "x": 146, "y": 212}}, ruin,
+             "a world claim on a map that never saves"),
             ({"slot": 3}, field, "neither field nor world"),
             ({"slot": 3, "field": {"map": 88}}, field, "an incomplete field"),
             ("map 88", field, "a prose declaration"),
