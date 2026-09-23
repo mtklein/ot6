@@ -17,21 +17,24 @@
 -- universal charge at CalcAttackEffect later subtracts from, so the menu greys
 -- exactly what the charge would refuse.
 --
--- Boots vargas_won (the real post-boss Sabin, learned set read off $1d28:
--- Pummel 4 MP and AuraBolt 10 MP at his real level), fights real ledge
--- encounters, and drives his pool across the affordability line using the
--- blitzes themselves: AuraBolts while the pool is rich, one Pummel to
--- finish, until current MP lands in [4,9], where AuraBolt is unaffordable and
--- Pummel is still affordable. The charge and the grey are shown to read the
--- same cell, in both directions on the same rows (rich pool: every row
--- white; spent pool: the expensive row grey).
+-- Boots vargas_won (the real post-boss Sabin, learned set read off $1d28,
+-- priced off Ot6AbilityCostTbl: the cheapest and the dearest learned blitz
+-- are the boundary's two rows), fights real ledge encounters, and drives his
+-- pool across the affordability line using the blitzes themselves: the dear
+-- blitz while the pool is rich, the cheap one to finish, until current MP
+-- lands in [cheap, dear-1], where the dear row is unaffordable and the cheap
+-- one still affordable.  Whatever the ledge deals -- a status that takes
+-- Sabin's window, a party worn down, a level-up refill -- is played through
+-- the way a person plays it (the driver's notes below).  The charge and the
+-- grey are shown to read the same cell, in both directions on the same rows
+-- (rich pool: every row white; spent pool: the expensive row grey).
 --
 -- What is asserted (attribute byte = the odd/high byte of each name tile's
 -- tilemap word, $21 white / $25 grey):
 --   1. rich pool: every learned blitz the real pool affords renders white,
 --      including the row that greys below (so grey tracks MP, the old
 --      pass-2 claim, made first).
---   2. spent-to boundary: with MP spent into [4,9], the expensive
+--   2. spent-to boundary: with MP spent into the band, the expensive
 --      learned blitz renders grey and the cheap one white on one screen.
 --   3. the grey is the disabled bit: grey - white == $04, magic's own delta.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -111,58 +114,163 @@ local function planCast(mp)
   if mp >= cD then return cheap end
   return nil
 end
+local function inBand(mp) return mp >= costOf(cheap) and mp < costOf(dear) end
+
+-- Can Sabin's next full gauge open a command window?  The mirror of
+-- CheckPlayerAction's status gate (battle_main.asm:1470): STATUS1 $3EE4,x
+-- {ZOMBIE $02, PETRIFY $40, DEAD $80} and STATUS2 $3EE5,x {BERSERK $10,
+-- CONFUSE $20, SLEEP $80} each send the turn to CancelAction instead of the
+-- menu (battle_bushidogrey's canMenu).  The status bytes are the previous
+-- battle's until the pack's HP table fills, so this is only read off a
+-- battle whose pack has HP.
+local ST1_NOMENU, ST2_NOMENU = 0x02 | 0x40 | 0x80, 0x10 | 0x20 | 0x80
+local function packHp()
+  local t = 0
+  for s = 0, 5 do t = t + H.readWord(0x3BFC + s * 2) end
+  return t
+end
+local function sabinStatus()
+  if not sabinSlot then return 0, 0 end
+  return H.readByte(0x3EE4 + sabinSlot * 2), H.readByte(0x3EE5 + sabinSlot * 2)
+end
+local function sabinDenied()
+  if not (sabinSlot and H.battleLoadStarted()) or packHp() == 0 then return false end
+  local s1, s2 = sabinStatus()
+  return (s1 & ST1_NOMENU) ~= 0 or (s2 & ST2_NOMENU) ~= 0
+end
+-- Is anyone down, or badly hurt?  battle_kitrefuse's shape (and
+-- battle_stealmp's): an all-Defend party never ends a fight on its own.
+local function partyHurt()
+  for s = 0, 3 do
+    local h, m = H.readWord(0x3BF4 + s * 2), H.readWord(0x3C1C + s * 2)
+    if m > 0 and m < 9999 and (h == 0 or h * 100 // m < 55) then return true end
+  end
+  return false
+end
 
 -- ------------------------------------------------------------------------
--- the per-frame driver: "spend" casts planCast's blitz on Sabin's menu;
--- "open" holds the list up. Bystanders Defend; battle dialogs are paged
--- with A; off-battle the lane is paced for the next natural encounter.
+-- the per-frame driver: "open" holds Sabin's list up; "boundary" casts
+-- planCast's blitz at each of Sabin's windows and, once the pool is in the
+-- band, holds the list up instead.  Battle dialogs are paged with A.
+--
+-- Bystanders Defend, so Sabin gets the turns -- until the battle cannot
+-- serve the spend: Sabin has lost his window to a status (measured on the
+-- regenerated vargas_won, 2026-09-23: a Trilium's hit poisoned him at f4672
+-- and a Cirpius's petrified him at f5785, and three Defending bystanders
+-- were ground to 0 over the next 35,000 frames with the pool stuck at 15;
+-- build/attempts/wt/regen-suites/), or the party is hurt.  Then they swing
+-- and end it.  Off-battle, the route's own care stop runs after every
+-- battle (Tonics, a Soft for a statue, a Fenix Down for the fallen, never a
+-- cast, so Sabin's pool is his own), then the lane is paced for the next
+-- natural encounter.
 -- ------------------------------------------------------------------------
-local mode = "spend"
+local mode = "open"
 local ph, lane, hb = 0, nil, -600
 local BACK = { left = "right", right = "left", up = "down", down = "up" }
+local care, careDue = nil, false
+local swingSaid = nil
 local function pulse()
   ph = ph + 1
   if H.frame - hb >= 600 then
     hb = H.frame
+    local s1, s2 = sabinStatus()
     H.log(string.format("[hb f%d] mode=%s pool=%d batt=%s menu=%02x actor=%d "
-      .. "mstate=%02x map=%d", H.frame, mode, pool(),
+      .. "mstate=%02x map=%d sabin st1=%02x st2=%02x", H.frame, mode, pool(),
       tostring(H.battleLoadStarted()), H.readByte(MENU), H.readByte(ACTOR),
-      H.readByte(MSTATE), map()))
+      H.readByte(MSTATE), map(), s1, s2))
   end
   local edge = ph % 10 < 5
   if not H.battleLoadStarted() then
-    -- field: pace the lane for the next encounter; page victory/EXP dialogs
-    -- with A until control returns
+    -- a care stop in progress owns the pad until it is done, menu and all
+    -- (the menu takes field control away, so this comes first)
+    if care then
+      care.frame()
+      if care.done() then care, careDue = nil, false end
+      return
+    end
+    -- field: page victory/EXP dialogs with A until control returns
     if not (H.hasControl() and H.tileAligned()) then
       H.setPad(ph % 8 < 4 and { a = true } or {})
       return
     end
     if map() ~= 98 then error("paced off map 98 (now " .. map() .. ")", 0) end
+    if careDue then
+      care = H.newCareDriver({ tag = "blitzgrey care", threshold = 0.65 })
+      care.frame()
+      if care.done() then care, careDue = nil, false end
+      return
+    end
     local x, y = H.fieldX(), H.fieldY()
     if lane == nil then
       for _, d in ipairs({ "right", "left", "up", "down" }) do
         if H.canStep(x, y, d) then lane = { ax = x, ay = y, out = d, back = BACK[d] } break end
       end
+      if lane == nil then H.setPad({}) return end
     end
     H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
     return
   end
   lane = nil          -- re-anchor at the next field return
+  care, careDue = nil, true     -- care at the next field control
   if H.readByte(MENU) == 0 then
     H.setPad(ph % 8 < 4 and { a = true } or {})     -- page battle dialogs
     return
   end
   local a = H.readByte(ACTOR)
+  local st = H.readByte(MSTATE)
   if a ~= sabinSlot then
-    local step = ph % 40
-    if step < 4 then H.setPad({ right = true })
-    elseif step >= 20 and step < 24 then H.setPad({ a = true })
+    -- A bystander standing in a list window is backed out of it before the
+    -- command walk means anything (an A press there confirms a row).
+    if st == ST_TGT then
+      H.setPad(ph % 8 < 4 and { a = true } or {})   -- a swing needs a target
+      return
+    end
+    if st ~= ST_CMD then
+      H.setPad(ph % 8 < 4 and { b = true } or {})
+      return
+    end
+    local cur = H.readByte(0x890F + a) & 3
+    local sub = ph % 40
+    local denied, hurt = sabinDenied(), partyHurt()
+    if denied or hurt then
+      local why = denied and "sabin has lost his window" or "the party is hurt"
+      if why ~= swingSaid then
+        swingSaid = why
+        local s1, s2 = sabinStatus()
+        H.log(string.format("[swing f%d] bystanders swing: %s (sabin st1=%02x "
+          .. "st2=%02x, pool %d)", H.frame, why, s1, s2, pool()))
+      end
+      -- swing: row 0, with `left` putting Fight back in a row a previous
+      -- Defend swapped to Def. (battle_kitrefuse's walk)
+      if cur ~= 0 then H.setPad(sub < 4 and { up = true } or {})
+      elseif sub < 4 then H.setPad({ left = true })
+      elseif sub >= 20 and sub < 24 then H.setPad({ a = true })
+      else H.setPad({}) end
+      return
+    end
+    swingSaid = nil
+    if sub < 4 then H.setPad({ right = true })       -- Fight row -> Def.
+    elseif sub >= 20 and sub < 24 then H.setPad({ a = true })
     else H.setPad({}) end
     return
   end
-  local st = H.readByte(MSTATE)
-  local wantBlitz = (mode == "spend") and planCast(pool()) or cheap
-  if mode == "spend" and wantBlitz == nil then H.setPad({}) return end
+  local wantBlitz, hold
+  if mode == "open" then
+    wantBlitz, hold = cheap, true
+  else
+    wantBlitz = planCast(pool())
+    if wantBlitz == nil then
+      if not inBand(pool()) then
+        -- planCast never casts the pool below the cheap row (cMax >= 2*cMin,
+        -- asserted at boot), so this is a drain from outside the plan or a
+        -- wrong plan; either way no cast can reach the band now
+        error(string.format("PRECONDITION: Sabin's pool %d is below the cheap "
+          .. "blitz (%d), so the band [%d,%d] is out of reach", pool(),
+          costOf(cheap), costOf(cheap), costOf(dear) - 1), 0)
+      end
+      wantBlitz, hold = cheap, true
+    end
+  end
   if st == ST_CMD then
     local wantCell = nil
     for i = 0, 3 do
@@ -174,7 +282,7 @@ local function pulse()
     elseif cur < wantCell then H.setPad(edge and { down = true } or {})
     else H.setPad(edge and { up = true } or {}) end
   elseif st == ST_TOOLS then
-    if mode == "open" then H.setPad({}) return end
+    if hold then H.setPad({}) return end
     local entry = nil
     for i = 0, 7 do
       if H.readByte(ITEMLIST + i * 3) == wantBlitz then entry = i end
@@ -194,13 +302,16 @@ local function pulse()
   end
 end
 
+-- Sabin's own blitz list, up and held, at one of his real windows
+local function sabinListUp()
+  return H.battleLoadStarted() and H.readByte(MENU) ~= 0
+     and H.readByte(ACTOR) == sabinSlot and H.readByte(MSTATE) == ST_TOOLS
+end
+
 local function openBlitzWindow(what)
   return H.repeatN(1, {
     H.call(function() mode = "open" end),
-    H.driveUntil(function()
-      return H.battleLoadStarted() and H.readByte(MENU) ~= 0
-         and H.readByte(ACTOR) == sabinSlot and H.readByte(MSTATE) == ST_TOOLS
-    end, 30000, { H.call(pulse), H.waitFrames(1) }, what),
+    H.driveUntil(sabinListUp, 30000, { H.call(pulse), H.waitFrames(1) }, what),
     H.waitFrames(20),
   })
 end
@@ -231,9 +342,9 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(costOf(dear) > costOf(cheap), true,
       "the learned costs differ, so one screen can show white and grey at once")
     H.assertEq(costOf(dear) >= 2 * costOf(cheap), true,
-      "the spend plan's remainder arithmetic holds (cMax >= 2*cMin) -- for "
-      .. "Pummel 4 / AuraBolt 10 it does; a repricing that breaks this needs "
-      .. "a new plan, not a pin")
+      "the spend plan's remainder arithmetic holds (cMax >= 2*cMin), so "
+      .. "every cast leaves the pool at or above the cheap row; a repricing "
+      .. "that breaks this needs a new plan, not a pin")
     H.log(string.format("SABIN field MP as saved: %d", pool()))
     H.assertEq(pool() >= costOf(dear), true,
       "positive control: the saved pool can afford the dear blitz, so the "
@@ -272,10 +383,19 @@ H.run({ maxFrames = 200000 }, {
       "the rich-pool pass had the dear row white -- the row that greys below")
   end),
 
-  -- 2. spend to the boundary with the blitzes themselves --------------------
-  H.call(function() mode = "spend" end),
-  H.driveUntil(function() return pool() < costOf(dear) end, 150000,
-    { H.call(pulse), H.waitFrames(1) }, "the pool is spent into the boundary"),
+  -- 2. spend to the boundary with the blitzes themselves, and open the list
+  -- at the first of Sabin's windows that finds the pool in the band.  One
+  -- drive, because the pool is read where the grey is: a battle that ends
+  -- between the last cast and the next window can level Sabin up, and
+  -- Ot6LevelUpHeal refills his MP -- which the drive then spends again
+  -- rather than opening on a pool the plan no longer holds.
+  H.call(function() mode = "boundary" end),
+  H.driveUntil(function() return sabinListUp() and inBand(pool()) end, 150000,
+    { H.call(pulse), H.waitFrames(1) },
+    "the pool is spent into the boundary and Sabin's list is up"),
+  H.waitFrames(20),
+
+  -- ... and the boundary window: grey and white side by side ----------------
   H.call(function()
     local mp = pool()
     H.log(string.format("pool after real casts: %d MP", mp))
@@ -283,12 +403,6 @@ H.run({ maxFrames = 200000 }, {
       "the spend plan parked the pool in [%d,%d]: %s unaffordable, %s "
       .. "affordable -- both states on one screen",
       costOf(cheap), costOf(dear) - 1, nameText(dear), nameText(cheap)))
-  end),
-
-  -- ... and the boundary window: grey and white side by side ----------------
-  openBlitzWindow("sabin's blitz window, spent pool"),
-  H.call(function()
-    local mp = pool()
     H.screenshot("blitz_grey_display")
     local aC, aD = attrOf(nameSeq(cheap)), attrOf(nameSeq(dear))
     local fmt = function(a) return a and string.format("$%02x", a) or "nil" end

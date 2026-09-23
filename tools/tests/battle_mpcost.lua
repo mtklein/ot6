@@ -51,7 +51,10 @@
 --           which is the one hook point the universal insufficient-MP fizzle still
 --           exists for (an enemy Rasp between the choice and the swing).  The
 --           tech must fizzle, dealing no damage, leaving the 1 MP untouched
---           and never negative.  A ladder over
+--           and never negative.  "No damage" is read across the tech's OWN
+--           action, bracketed the way the charge's is (installWatches), not
+--           across a stretch of the battle: SHADOW's dog counters with no
+--           input at all, and so does a berserked ally.  A ladder over
 --           fresh battles: the fighting run's camp_escaped packs carry
 --           a Berserk special, and once it lands on CYAN ($3EE5,x bit 4)
 --           CheckPlayerAction (battle_main.asm:1470) auto-picks his turns
@@ -134,17 +137,6 @@ end
 -- lost his window" is only read off a battle whose pack has HP.
 local function cyanLostMenu()
   return monsterHpSum() > 0 and not cyanCanMenu() and cyanCure() == nil
-end
--- A live ally whose turns the game picks for him (BERSERK or CONFUSE) can
--- swing at the monsters with no pad input at all, so the no-damage half of
--- the refusal cannot be isolated while one is on the field.
-local function allyAutoActing()
-  for slot = 0, 3 do
-    if hp(slot) > 0 and (H.readByte(0x3EE5 + slot*2) & 0x30) ~= 0 then
-      return slot
-    end
-  end
-  return nil
 end
 local function packStr()
   local parts = {}
@@ -707,33 +699,31 @@ H.run({ maxFrames = 200000 }, {
               return menuRefused and H.battleLoadStarted() and bp() >= 1
             end, {
               (function()
-                local m0, g1, latched, packSeen = nil, nil, false, false
+                local m0, latched, packSeen = nil, false, false
+                local g1 = nil           -- the pack's HP at the latch, for the log
                 local rich2 = nil        -- the real pool 3b stages over
                 return H.repeatN(1, {
                   H.call(function()
                     spells = {}
                     rich2 = mp()
                     cyanMode = "tech:0"
-                    -- quiet the idle A-mash NOW, before the latch drive:
-                    -- with CYAN at level 13 the fixture's timing drifted so
-                    -- a bystander's Fight (a ~68 physical, not a ~280
-                    -- Dispatch) could be confirmed by the MENU==0 idle A
-                    -- and land inside the damage window, failing the
-                    -- fizzled-for-no-damage check.  CYAN's tech still drives
-                    -- (cyanMode routes it whenever his menu is open).
+                    -- quiet the idle A-mash before the latch drive: the
+                    -- MENU==0 idle A can confirm a bystander's just-opened
+                    -- window.  The damage verdict no longer depends on it
+                    -- (it is read inside CYAN's own action, below), but a
+                    -- stray bystander Fight still has no business here.
+                    -- CYAN's tech still drives (cyanMode routes it whenever
+                    -- his menu is open).
                     quietA = true
                   end),
                   -- the fizzled tech has no grant to signal on, so drive on
-                  -- the latch (pending banks 1 at the submenu confirm).
-                  -- The damage baseline is captured at the latch, and the
-                  -- pad goes quiet for the whole bounded window so nothing
-                  -- but the fizzle, or its absence, can touch the monsters.
-                  -- The drive also ends, unlatched, when the latch can no
-                  -- longer come: CYAN lost his window to a status, or the
-                  -- pack is dead (the EXP screen, which the quiet A cannot
-                  -- dismiss and battleLoadStarted() cannot see past).  Dead
-                  -- means seen alive first: a fresh battle's pack reads 0 HP
-                  -- for its first frames (see cyanLostMenu).
+                  -- the latch (pending banks 1 at the submenu confirm).  The
+                  -- drive also ends, unlatched, when the latch can no longer
+                  -- come: CYAN lost his window to a status, or the pack is
+                  -- dead (the EXP screen, which the quiet A cannot dismiss
+                  -- and battleLoadStarted() cannot see past).  Dead means
+                  -- seen alive first: a fresh battle's pack reads 0 HP for
+                  -- its first frames (see cyanLostMenu).
                   driveTo(function()
                     if not H.battleLoadStarted() then return true end
                     local packHp = monsterHpSum()
@@ -751,13 +741,32 @@ H.run({ maxFrames = 200000 }, {
                       H.writeWord(0x3C08 + cyan*2, 1)
                       m0 = 1
                       g1 = monsterHpSum()
+                      -- and the committed Dispatch is bracketed the way the
+                      -- charge's is (installWatches): from InitPlayerAction
+                      -- loading his SwdTech into $3a7c to the next action's
+                      -- start.  Actions serialize, so the pack's HP across
+                      -- that bracket is the refused tech's own doing and
+                      -- nobody else's -- not an Interceptor counter, not a
+                      -- berserked ally, not a bystander's queued Fight.
+                      -- Measured on the regenerated camp_escaped (2026-09-23):
+                      -- the pack took 156 in the old 400-frame window from
+                      -- SHADOW's dog ("Takedown", no pad input at all).
+                      tech, techArmed = nil, true
                     end
                     return latched
                   end, 30000, "the broke Dispatch is latched (attempt "
                     .. attempt .. ")"),
                   H.call(function() cyanMode = "defer" end),  -- quietA already on
-                  H.waitFrames(400),
-                  H.call(function() quietA = false end),
+                  -- the refused Dispatch runs, start to end, or the attempt
+                  -- is void: the battle ended or CYAN lost his window under
+                  -- the queued action
+                  driveTo(function()
+                    if not latched then return true end
+                    if tech then return tech.done end
+                    return not H.battleLoadStarted() or cyanLostMenu()
+                  end, 20000, "the broke Dispatch runs, start to end (attempt "
+                    .. attempt .. ")"),
+                  H.call(function() techArmed = false; quietA = false end),
                   H.call(function()
                    -- whatever this attempt decided, the staged poverty is put
                    -- back before the next one starts.  3b's write is the
@@ -769,35 +778,33 @@ H.run({ maxFrames = 200000 }, {
                    -- fighting chance (build/attempts/fix1).  A void attempt
                    -- must leave the fight's own economy behind it.
                    local function measure()
-                    if not H.battleLoadStarted() or not latched then
+                    if not latched or not (tech and tech.done) then
                       H.log(string.format("  [refusal arm %d] void before the "
-                        .. "latch: live=%s menuable=%s monsters %d hp %s",
-                        attempt, tostring(H.battleLoadStarted()),
-                        tostring(cyanCanMenu()), monsterHpSum(),
-                        cyanStatusStr()))
+                        .. "refused action ran: latched=%s dispatch=%s live=%s "
+                        .. "menuable=%s monsters %d hp %s", attempt,
+                        tostring(latched), tech and "in flight" or "never started",
+                        tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
+                        monsterHpSum(), cyanStatusStr()))
                       return
                     end
                     local left = mp()
-                    local auto = allyAutoActing()
+                    local dmg = tech.hp0 - tech.hp1
                     H.log(string.format(
-                      "refused Dispatch: MP %d -> %d, damage since %d, $3410 %s",
-                      m0, left, g1 - monsterHpSum(),
-                      sawSpell(DISPATCH) and "saw $55" or "quiet"))
+                      "refused Dispatch ($3a7c=%02X%02X) f%d..f%d (closed by $%02X): "
+                      .. "MP %d -> %d (pool %d at its start, %d at its end), "
+                      .. "pack damage inside it %d (%d -> %d), $3410 %s; the "
+                      .. "pack's HP moved %d since the latch, every action counted",
+                      tech.atk or 0xFF, CMD_SWDTECH, tech.frame, tech.doneFrame,
+                      tech.next, m0, left, tech.mp0, tech.mp1, dmg, tech.hp0,
+                      tech.hp1, sawSpell(DISPATCH) and "saw $55" or "quiet",
+                      g1 - monsterHpSum()))
+                    H.assertEq(tech.atk, DISPATCH,
+                      "ON: the action measured is his committed Dispatch "
+                      .. "($3a7c/$3a7d = $07/$55)")
                     H.assertEq(left, m0,
                       "ON: too little MP is REFUSED -- the 1 MP is untouched, "
                       .. "never negative")
-                    if auto ~= nil then
-                      -- the MP half held; the damage half cannot be read
-                      -- off a field where the game swings for an ally.
-                      -- A fresh battle measures it again.
-                      H.log(string.format("  [refusal arm %d] slot %d is "
-                        .. "auto-acting (st2=%02x) inside the damage window; "
-                        .. "the no-damage half is measured again in a fresh "
-                        .. "battle", attempt, auto,
-                        H.readByte(0x3EE5 + auto*2)))
-                      return
-                    end
-                    H.assertEq(g1 - monsterHpSum() <= 0, true,
+                    H.assertEq(dmg <= 0, true,
                       "ON: and the refused tech dealt no damage (fizzled)")
                     H.screenshot("mpcost_on_refused")
                     done = true
