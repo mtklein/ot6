@@ -46,6 +46,13 @@ if [ ! -d "$HERE/build/states" ]; then
   fi
 fi
 
+# Evidence a worktree cites goes under build/attempts/<branch>/ (docs/TESTING.md).
+# Link build/attempts to the main tree's so that evidence lands there as it is
+# written: the cited path resolves in both trees and survives `git worktree
+# remove` (which deletes the link, not the main tree's files).
+mkdir -p "$MAIN/build/attempts" "$HERE/build"
+[ -e "$HERE/build/attempts" ] || ln -s "$MAIN/build/attempts" "$HERE/build/attempts"
+
 SEED_BRANCH=$(git -C "${SEED:-$MAIN}" branch --show-current 2>/dev/null || echo '?')
 echo "worktree ready: ROM copied, Mesen/flips linked"
 echo "seeded from ${SEED:-$MAIN} ($SEED_BRANCH) into $HERE_BRANCH"

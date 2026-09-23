@@ -94,15 +94,48 @@ provenance, or silently disable checks. Use `H.requestSaveState`,
 snapshots, and the versioned SRAM checkpoint path for battery saves. Prefer
 these existing supported paths during iteration.
 
-Evidence must outlive the tree it was produced in. Merge messages and design
-docs quote lines out of logs under `build/attempts/`, `build/lab/` and
-`build/sweeps/`, and an agent worktree takes those with it when it is
-removed, leaving citations that resolve nowhere. Before `git worktree
-remove`, run `python3 tools/retain_evidence.py <worktree> <branch>`: it
-copies those three trees' text evidence into the main tree under
-`build/attempts/<branch>/`, so every cited path still resolves. Cite the
-retained path. A citation whose log was lost this way says so at the
+Evidence must outlive the tree it was produced in. Write evidence you will
+cite under `build/attempts/<branch>/` and cite it by that path. In an agent
+worktree, `tools/worktree-setup.sh` makes `build/attempts` a link to the
+main tree's, so the file lands in the main tree as it is written and the
+cited path is the same in both trees; nothing needs copying when the
+worktree is removed. Scratch output (`build/lab/`, `build/sweeps/`) stays in
+the worktree; for anything cited from there, run `python3
+tools/retain_evidence.py <worktree> <branch>` before `git worktree remove`
+and cite the retained path. A citation whose log was lost says so at the
 citation rather than dropping the number.
+
+## Tests that survive any draw
+
+A test, generator or driver must cope with every encounter, formation and
+draw the game can deal at its point in the route, not the one its fixture
+happens to hold. Every ROM change regenerates the fixture chain, and with it
+the RNG, the encounter history, levels, MP and what earlier fights taught or
+inflicted. Derive choices from the fixture's live state and the ROM's data;
+assert the true precondition early, with a message that names it. No
+hardcoded formation ids, draw indices, "the Nth battle", levels, or
+knowledge an earlier fight happened to produce. Take a baseline at the
+moment the property under test begins, and attribute a change (an MP
+charge, a hit, a revive) to the action that made it rather than to the
+first change seen.
+
+A seed shift does not re-draw encounters. `OT6_SEED_SHIFT` moves in-battle
+RNG only. When an encounter comes and which formation it is are save data
+(counters at `$1fa1`-`$1fa5`; the formation pick advances once per
+encounter), so replays and retries from one fixture meet the same
+formations. To vary the draw, use up
+encounters before the body (fight or run them), not idle frames or seeds.
+Budgets for "within N encounters" come from the map's decoded pool odds, not
+from one run.
+
+A new or changed test is ready to merge when its evidence shows:
+1. the old version failing where the draw or history moves (when fixing
+   fragility), by varying encounters, not only seeds;
+2. the new version passing across those variations;
+3. a negative control or mutant proving each changed assertion can fail
+   (a price off by one, the rule switched off, the reviver dead);
+4. no widened timeout, re-rolled seed, weakened or log-only assertion
+   standing in for the property.
 
 ## Synthetic mechanism tests
 
