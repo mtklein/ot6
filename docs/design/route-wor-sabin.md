@@ -65,13 +65,13 @@ measurement.
    (shop 54) stock Potions, Fenix Downs and Tinctures, and only Albrook
    sells Remedies (§5.4). During the timed scene Tzen's innkeeper heals the
    party for free (`_cc5c8d`, `:90562`).
-8. **Today's break data does not suit this stretch.** Every species on it
-   rides the generated floor at 4-5 shields
+8. **The shipped break data did not suit this stretch** (the rows §8
+   designs are authored since 2026-09-22). Every species on it rode the
+   generated floor at 4-5 shields
    (`audit_break_coverage.txt:275-277, 623-656`). Scorpion ×3 and the
-   HermitCrabs give a sword-carrying Celes no key at all (their floor class
-   is pierce, which she holds only on 26-30-power daggers). That covers
-   **62.5 %** and **37.5 %** of the house's draws. §8 proposes authored
-   rows.
+   HermitCrabs gave a sword-carrying Celes no key at all (their floor class
+   is pierce, which she holds only on 26-30-power daggers). That covered
+   **62.5 %** and **37.5 %** of the house's draws.
 9. **Espers grant spells while they are worn.** This is OT6's M5 rule
    (`ff6/src/menu/genju_prop.asm:53-63`). Maduin, which is in Celes's
    collection, gives her Fire, Ice and Bolt, so a solo Celes holds all three
@@ -501,9 +501,11 @@ Group 30 is identical to group 36 (EarthGuard + Peepers ×2, or Black Drgn).
 
 Species data are `MonsterProp` (+0 speed, +1 attack, +5 def, +6 mdef, +8 HP,
 +16 level, +23 absorb, +25 weak, +31 special; `battle_main.asm` LoadMonsterProp
-`:7601-7710`). The AI is from `ff6/src/battle/ai_script.asm`. "Today" is the
-row `Ot6SeedShields` seeds from the shipped ROM (`ot6_break.asm:54-113`: no
-authored row, so the floor class and `2 + level/8`).
+`:7601-7710`). The AI is from `ff6/src/battle/ai_script.asm`. Throughout
+this doc, "today" means main before the §8 rows were authored (the v0.21
+ROM): the row `Ot6SeedShields` seeded then (`ot6_break.asm:54-113`: no
+authored row, so the floor class and `2 + level/8`). §8's rows are now
+authored (battle_breakwor_sabin verifies them).
 
 | id | body | L | HP | def/mdef | weak | absorb | AI (`ai_script.asm`) | solo-relevant | today |
 |---|---|---|---|---|---|---|---|---|---|
@@ -725,7 +727,21 @@ its vanilla elements and the party that meets it, so that the party holds
 a key and the area teaches something. The rows follow the house curve:
 **2** for trash, **3** for tanks and stacks, **4** for miniboss-grade. Vanilla
 element bits are left untouched, and no `Ot6ElemAddTbl` rows are proposed.
-**No ROM edit is made here.** Authoring is the next step, after review.
+
+**Authored (2026-09-22), exactly as designed below, pending the owner's
+review of the table.** The twelve rows are one block in `Ot6ShieldTbl`
+(`ff6/src/battle/ot6_hud.asm`, "the world of ruin: the solitary island to
+tzen's collapsing house"), one row per species, so a row changed on review
+is a one-line edit there and one line in the suite's `WANT` table.
+`tools/tests/battle_breakwor_sabin.lua` (`@suite`) reads them back from the
+built ROM: each species' row, its vanilla weak byte and the absence of an
+`Ot6ElemAddTbl` row, and that every formation of the stretch (world groups
+29-31, 33-36 and 40, map 311, event group 150) has an authored row for each
+species and a key for Celes's sword or Ice. It is red on the ROM without
+the rows and on a mutant ROM for each assertion
+(`build/attempts/wt/wor-break-rows/`). The "proposed row" columns below
+are the authored rows. The tuning claim in `audit_break_coverage.py` is
+unchanged: it grows only once the driving has played these areas.
 
 ### 8.1 Who holds what
 
@@ -857,10 +873,11 @@ formation 204: Osprey $0E6, Chitonid $07C, Gigan Toad $098
 ```
 
 `Ot6SeedShields` takes the first match (`ot6_break.asm:54-113`), and
-`tools/check_shield_rows.py` refuses a second row for a species. It passes
-today (`check_shield_rows OK: 91 Ot6ShieldTbl rows, one per species, ROM
-matches source`), and none of the twelve species has a row, so there are no
-collisions. **WoB sharing:** none of the twelve appears in any WoB pool or
+`tools/check_shield_rows.py` refuses a second row for a species. It passed
+before authoring (`check_shield_rows OK: 91 Ot6ShieldTbl rows, one per
+species, ROM matches source`), when none of the twelve species had a row,
+and passes with them (`check_shield_rows OK: 103 Ot6ShieldTbl rows, one per
+species, ROM matches source`, `build/attempts/wt/wor-break-rows/`). **WoB sharing:** none of the twelve appears in any WoB pool or
 WoB event group (`species_sharing.txt`), so no existing WoB row is affected.
 They can come back later on the Veldt. `GetVeldtBattle`
 (`field/battle.asm:269-310`) serves any formation on the `$1DDD` list, and
@@ -870,10 +887,14 @@ the end of every battle adds its formation unless the formation opts out
 draws.
 One side effect of a row: it exempts the species from `Ot6HpScale`, which
 ships at 1× and is inert (`break-coverage-vector.md` §0). The authoring
-commit adds a suite in the `battle_breakgate.lua` shape that reads the rows
-back from the built ROM. The tuning claim in `audit_break_coverage.py`
-(`CLAIMED_WORLD_SECTORS`, `CLAIMED_FIELD`) grows only once the driving has
-played these areas.
+commit added `battle_breakwor_sabin.lua`, in the `battle_breakgate.lua`
+shape, which reads the rows back from the built ROM. With the rows,
+`audit_break_coverage.py` no longer lists any of the twelve as
+"unauthored" (the `floor` lines for map 311 and world groups 29-31, 33-36
+and 40 are gone; `audit.before.txt` / `audit.after.txt` in
+`build/attempts/wt/wor-break-rows/`). The tuning claim
+(`CLAIMED_WORLD_SECTORS`, `CLAIMED_FIELD`) is unchanged and grows only once
+the driving has played these areas.
 
 ---
 

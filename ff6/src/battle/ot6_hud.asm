@@ -1892,6 +1892,66 @@ Ot6ShieldTbl:
                                 ;   fire|holy vanilla is the elemental
                                 ;   reward for reading past the ninja's
                                 ;   absorb
+        ; ---- the world of ruin: the solitary island to tzen's collapsing
+        ; house (docs/design/route-wor-sabin.md section 8) ---------------
+        ; Celes is alone to Tzen and holds slash (every sword; pierce only
+        ; on the 26-30-power daggers); Sabin joins in Tzen and adds bludg.
+        ; Vanilla element bits stay and carry the plains' lesson: ice on
+        ; three of six bodies (her own spell), fire on the mantis, bolt on
+        ; the plated one.  Shields follow the house curve: 1 for the 1-hp
+        ; pests, 2 trash, 3 tanks, 4 miniboss-grade.  None of the twelve
+        ; is met in the WoB; they can come back on Gau's WoR Veldt.
+        ; tools/tests/battle_breakwor_sabin.lua reads them back from the ROM.
+        ; -- the solitary island (world groups 29, 30) --
+        .word   $0072
+        .byte   1, OT6_SLASH    ; peepers: 1 hp, dies to any hit; one shield
+                                ;   so the gauge reads right (the piranha
+                                ;   chum wave).  ice|water vanilla
+        .word   $00b2
+        .byte   1, OT6_SLASH    ; earthguard: the other 1-hp pest; the floor
+                                ;   (pierce) was keyless for a sword Celes.
+                                ;   water vanilla
+        .word   $00d5
+        .byte   4, OT6_SLASH    ; black drgn: 4000 hp on the beach and again
+                                ;   by tzen's door; a blade finds the gaps
+                                ;   in the scales.  fire|holy vanilla
+                                ;   (Maduin, Fire Dance, AuraBolt)
+        ; -- the plains (world groups 31, 34 on the route; 33, 35, 36 beside)
+        .word   $0021
+        .byte   3, OT6_SLASH|OT6_PIERCE ; mesosaur: a hide a blade or a
+                                ;   point opens.  ice vanilla
+        .word   $0031
+        .byte   3, OT6_SLASH|OT6_BLUDG  ; gilomantis: slash the limbs, bludg
+                                ;   the carapace.  fire vanilla is the
+                                ;   better key: its Sickle counter answers
+                                ;   only Fight
+        .word   $007c
+        .byte   3, OT6_BLUDG    ; chitonid: a plated shell, caved in, never
+                                ;   cut.  a sword-only Celes cannot chip it
+                                ;   by design; her key is its vanilla bolt
+                                ;   (the ThunderBlade in her bag, Maduin)
+        .word   $0098
+        .byte   2, OT6_SLASH|OT6_PIERCE ; gigan toad: trash.  ice vanilla
+        .word   $00ca
+        .byte   2, OT6_SLASH|OT6_PIERCE ; lunaris: no vanilla weakness, so
+                                ;   this row is its only key
+        .word   $00e6
+        .byte   2, OT6_SLASH|OT6_PIERCE ; osprey: a flier (pierce, the WoB
+                                ;   convention) plus slash for a solo
+                                ;   blade.  ice vanilla breaks it fast
+        ; -- tzen's collapsing house (map 311, group 128; event group 150)
+        .word   $00e1
+        .byte   2, OT6_SLASH|OT6_PIERCE ; scorpion: def 5 / mdef 215 -- the
+                                ;   blade, not the spell.  no vanilla
+                                ;   weakness
+        .word   $002c
+        .byte   2, OT6_SLASH|OT6_BLUDG  ; hermitcrab: the blade takes the
+                                ;   body outside the shell, a blow cracks
+                                ;   the shell.  water vanilla
+        .word   $00c0
+        .byte   2, OT6_SLASH    ; pm stalker: a floating ghost, the blade
+                                ;   in Celes's hand.  fire|holy vanilla;
+                                ;   absorbs poison
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian
