@@ -127,32 +127,75 @@ end
 -- and the boosted Fire each left two ({38,38} and {20,20}) and the boosted
 -- summon left one ({65}).  The watch keeps every store and takes the LAST,
 -- which is what the queue carries into CalcAttackEffect either way -- and
--- the pool's own movement below is the check on that reading.  X is the
+-- the charge write below is the check on that reading.  X is the
 -- attacker entity at that instruction (Ot6AbilityCost's and Ot6QueueFold's
 -- own site contract), which is what keeps a monster's queued action, or
 -- another party member's, out of the measurement.
+--
+-- Only a store made after this arm's own confirm counts (rec.drawn is set
+-- as the list's A is pressed): a muddled LOCKE queues actions of his own,
+-- through the same CreateAction, with no window at all.
 local rec = nil
+-- The charge itself is a write, and it is found by what made it rather
+-- than by the pool's first drop: NUMBER 024 muddles (a muddled caster casts
+-- on his own) and Rasps, and either moves the same cell between the queue
+-- and the charge.  CalcAttackEffect's universal charge (`sta $3c08,x`
+-- @32e0) indexes the attacker, and InitPlayerAction has loaded the queued
+-- command/attack into $3a7c/$3a7d as the action started, so the charge is
+-- the first write to his pool after the queue with X = his offset and
+-- $3a7c/$3a7d = the command and attack the queue carried; what it took is
+-- measured from the pool it found.  The callback runs before the store, so
+-- `old` is that pool; the high byte's store completes `new`.  Every write
+-- is kept, with $b5/$b6, so what else moved the pool is listed.
+local poolWrites = {}
+local function watchPools()
+  for slot = 0, 3 do
+    local lo = 0x7E3C08 + slot * 2
+    emu.addMemoryCallback(function(_, v)
+      local old = H.readWord(lo)
+      poolWrites[#poolWrites + 1] = { frame = H.frame, slot = slot, old = old,
+        new = (old & 0xFF00) | v, cmd = H.readByte(0xB5), atk = H.readByte(0xB6),
+        act = H.readWord(0x3A7C), x = emu.getState()["cpu.x"] & 0xFFFF,
+        st2 = H.readByte(0x3EE5 + slot * 2) }
+    end, emu.callbackType.write, lo, lo)
+    emu.addMemoryCallback(function(_, v)
+      local w = poolWrites[#poolWrites]
+      if w and w.slot == slot and w.frame == H.frame and w.hi == nil then
+        w.hi = v
+        w.new = (v << 8) | (w.new & 0xFF)
+      end
+    end, emu.callbackType.write, lo + 1, lo + 1)
+  end
+end
+local function writeStr(w)
+  return string.format("f%d slot%d %d->%d ($b5=%02X $b6=%02X $3a7c=%04X X=%02X STATUS2=$%02X)",
+    w.frame, w.slot, w.old, w.new, w.cmd, w.atk, w.act, w.x, w.st2)
+end
 local function armWatch()
+  watchPools()
   emu.addMemoryCallback(function(_, v)
-    if rec == nil or rec.spent ~= nil then return end
+    if rec == nil or rec.spent ~= nil or rec.drawn == nil then return end
     if (emu.getState()["cpu.x"] & 0xffff) ~= rec.slot * 2 then return end
     if H.readByte(0x3A7A) ~= rec.cmd then return end
     rec.stores[#rec.stores + 1] = v
     rec.qcost, rec.atk = v, H.readByte(0x3A7B)
     if not rec.queued then
       rec.queued = true
-      -- the pool AT QUEUE TIME, read inside the live battle: the charge
-      -- lands later, at CalcAttackEffect, and $3C08 reads $FFFF once a
-      -- battle tears down (battle_boostprice measured that as "spent
-      -- -65466"), so both ends are sampled while the battle is up
-      rec.mp0 = mp(rec.slot)
+      -- the pool AT QUEUE TIME, logged beside the pool the charge found
+      rec.mp0, rec.w0 = mp(rec.slot), #poolWrites
     end
   end, emu.callbackType.write, 0x7E3620, 0x7E3620 + 0xFE)
 end
 local function charged()
-  if rec.spent == nil and H.battleActive() and rec.mp0 then
-    local m = mp(rec.slot)
-    if m < 0x8000 and m < rec.mp0 then rec.spent = rec.mp0 - m end
+  if rec.spent == nil and rec.queued then
+    local act = rec.cmd | (rec.atk << 8)
+    for i = rec.w0 + 1, #poolWrites do
+      local w = poolWrites[i]
+      if w.slot == rec.slot and w.x == rec.slot * 2 and w.act == act then
+        rec.charge, rec.spent = i, w.old - w.new
+        break
+      end
+    end
   end
   return rec.spent ~= nil
 end
@@ -408,12 +451,22 @@ local function measure(spec)
           spec.queuedAs, spec.queuedAsWhy))
       end
     end),
-    step("[" .. spec.tag .. "] the action resolves and the pool moves",
+    step("[" .. spec.tag .. "] the action resolves and its charge lands",
       charged, 20000),
     H.call(function()
+      local c = poolWrites[rec.charge]
+      local moves = {}
+      for i = rec.w0 + 1, rec.charge - 1 do
+        if poolWrites[i].slot == rec.slot then moves[#moves + 1] = writeStr(poolWrites[i]) end
+      end
       H.log(string.format("[%s] CHARGE: LOCKE MP %d -> %d, spent %d (rule %d, "
-        .. "other rule %d, base %d)", spec.tag, rec.mp0, rec.mp0 - rec.spent,
-        rec.spent, rec.want, rec.notIt, rec.base))
+        .. "other rule %d, base %d); the pool was %d at the queue, moved before "
+        .. "the charge by: %s; the charge %s", spec.tag, c.old, c.new,
+        rec.spent, rec.want, rec.notIt, rec.base, rec.mp0,
+        #moves > 0 and table.concat(moves, ", ") or "none", writeStr(c)))
+      H.assertEq(c.cmd == rec.cmd and c.atk == rec.atk, true, string.format(
+        "[%s] the charge is made under the queued action's own $b5/$b6 "
+        .. "($%02X/$%02X)", spec.tag, rec.cmd, rec.atk))
       H.assertEq(rec.spent, rec.want, string.format(
         "[%s] %s at boost %d took exactly %d MP out of the pool -- %s.  It is "
         .. "NOT %d, which is what %s would have charged", spec.tag, spec.name,
