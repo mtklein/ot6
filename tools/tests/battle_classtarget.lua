@@ -20,8 +20,9 @@
 --      shape in place -- chipAim then returns nil, the engine's default
 --      cursor -- and the "aims at a Cirpius" assertion goes red.
 --   3. outcome (A/B from one snapshot, Tools off so the pierce Fight is the
---      only Cirpius chipper): aim-on breaks more Cirpius and ends the fight in
---      fewer frames than aim-off, the old shape.
+--      only Cirpius chipper): aim-on breaks at least as many Cirpius as
+--      aim-off, the old shape, and takes fewer frames from the opening, by a
+--      clear margin (more breaks, or a tenth fewer frames).
 --
 -- Reads only, save for the coherent battle snapshot the A/B branches from
 -- (requestSaveState / requestLoadState); no RAM is edited, so this is a
@@ -99,27 +100,40 @@ local S = { found = false, blob = nil, terra = nil, locke = nil,
 
 -- one measured A/B branch: drive to the end of the fight with Tools off so
 -- the pierce Fight is the only thing that can chip a Cirpius, and record how
--- many Cirpius broke and when the fight ended.
+-- many Cirpius broke and how many frames the fight took from the restored
+-- opening.  A break is the Cirpius's shield count ($3E40) reaching 0 or its
+-- broken ticks ($3E90) running, latched for every Cirpius the opening held,
+-- living or not: a pierce Fight that chips the last shield and kills with the
+-- same blow is a break too (kolts_cave regenerated 2026-09-22: TERRA's opening
+-- Fight took 134 off a Cirpius over two hits and left it "0/sh0", which a
+-- living-only read never saw).  The duration is this branch's own frames,
+-- not the absolute frame the fight ended on, which the second branch always
+-- reads higher because it runs after the first.
 local function measure(name, aim)
   local F = H.newFightDriver(name, { tactical = true, boost = true, items = true,
     bank = 0, healPercent = 55, tools = false, aim = aim })
   local out = S.ab[name]
   return H.seqStep({
-    H.call(function() out.broke, out.seen = {}, 0 end),
+    H.call(function()
+      out.broke, out.start, out.cirps = {}, H.frame, {}
+      for s = 0, 5 do
+        if alive(s) and speciesAt(s) == CIRPIUS then out.cirps[s] = true end
+      end
+    end),
     H.driveUntil(function() return not H.battleLoadStarted() end, 40000, {
       H.call(function()
         F.frame()
-        for s = 0, 5 do
-          if alive(s) and speciesAt(s) == CIRPIUS and broken(s) then out.broke[s] = true end
+        for s in pairs(out.cirps) do
+          if shields(s) == 0 or broken(s) then out.broke[s] = true end
         end
       end),
     }, name .. " drive"),
     H.call(function()
-      out.endframe = H.frame
+      out.frames = H.frame - out.start
       out.nbroke = 0
       for _ in pairs(out.broke) do out.nbroke = out.nbroke + 1 end
-      H.log(string.format("[classtarget] %s: cirpius broken=%d, fight ended at frame %d",
-        name, out.nbroke, out.endframe))
+      H.log(string.format("[classtarget] %s: cirpius broken=%d, fight took %d frames " ..
+        "(ended at frame %d)", name, out.nbroke, out.frames, H.frame))
     end),
   })
 end
@@ -254,12 +268,20 @@ steps[#steps + 1] = (function()
       H.assertEq(a.nbroke >= b.nbroke, true, string.format(
         "aim-on breaks at least as many Cirpius as the old shape (%d vs %d)",
         a.nbroke, b.nbroke))
-      H.assertEq(a.endframe < b.endframe, true, string.format(
+      H.assertEq(a.frames < b.frames, true, string.format(
         "aim-on ends the fight sooner than the old shape (%d vs %d frames)",
-        a.endframe, b.endframe))
-      H.assertEq(a.nbroke > b.nbroke or a.endframe * 5 < b.endframe * 4, true, string.format(
+        a.frames, b.frames))
+      -- The margin is what separates the aim from the stub: with aim off on
+      -- both branches the durations differ by 2 frames (4237 vs 4239), so
+      -- "sooner" alone would pass it.  Measured with aim on, three draws
+      -- ran 29.9%, 19.1% and 19.1% faster at equal breaks (2 vs 2 each;
+      -- build/attempts/wt/gen-robust-fix/suites/, classtarget_new_main,
+      -- classtarget_new_skip1, classtarget_nc_noaim), so a tenth is the
+      -- margin; the old "20%" compared the frame each branch ended on, which
+      -- the second branch always reads higher, and so never measured one.
+      H.assertEq(a.nbroke > b.nbroke or a.frames * 10 < b.frames * 9, true, string.format(
         "and does so by a clear margin: more Cirpius broken (%d vs %d) or "
-        .. ">20%% fewer frames (%d vs %d)", a.nbroke, b.nbroke, a.endframe, b.endframe))
+        .. "a tenth fewer frames (%d vs %d)", a.nbroke, b.nbroke, a.frames, b.frames))
     end),
   })
 end)()
