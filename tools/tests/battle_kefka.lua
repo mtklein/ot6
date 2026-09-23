@@ -31,9 +31,22 @@
 -- fight.  Losses are handled the way the generator handles them: the entry
 -- point is captured once at boot (a savestate blob in memory, with no
 -- writes), a wipe is read on every frame and ends the attempt at once, and
--- the next attempt reloads the entry point and escalates the policy tier,
--- for three attempts total.  A win on attempt 2 or 3 is a loss on the
--- record (the [kefka] ATTEMPT lines), not a hidden one.
+-- the next attempt reloads the entry point with the tier raised, for three
+-- attempts total.  Every lost attempt logs the segment runner's own
+-- `[retry] attempt n/3 FAILED class=wipe` and `wipe context` lines, so
+-- tools/audit_retries.py lists it; a win on attempt 2 or 3 is a loss on the
+-- record, not a hidden one (the runner's verdict line still says
+-- attempts=1/1: the ladder is this file's, not the runner's).
+--
+-- THE LADDER IS A COUNTED RELOAD, NOT AN ESCALATION, until #257 lands
+-- (https://github.com/mtklein/ot6/issues/257).  On this fixture tier 2 is
+-- weaker than tier 1, not stronger: the tool EDGAR's Tools row names is the
+-- Bio Blaster ($A4), his 3 MP cannot pay even its unboosted 8, so the turn
+-- falls back to Fight AND drops the boost -- he swings unboosted holding 5
+-- pips (build/attempts/wt/regen-suites/suites/: `want 3 -> 0 on $A4`,
+-- `cast f7752 slot=1 char=4 bp=5 seq=a,a`).  A win on attempt 2 is the
+-- changed action order landing differently, not a better plan.  #257 is the
+-- lab that fixes the fighter here and in both generators.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local ENTRY = "build/states/kefka_entry.mss.lua"
@@ -162,6 +175,23 @@ local function mkFighter(tier, tag)
   function F.watch()
     watch.frame()
     wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
+    -- the runner's sampleBattle, for this ladder's wipe context: the last
+    -- living reading, every 30 frames while the battle table is live
+    if H.battleLoadStarted() and wipeN == 0 and H.frame % 30 == 0 then
+      local seats = {}
+      for e = 0, 3 do
+        local a = H.readByte(BCHID + e * 2)
+        seats[#seats + 1] = (a == 0xFF) and "-" or
+          string.format("a%d:%d/%d bp%d", a, H.readWord(BCHP + e * 2),
+            H.readWord(BCMAXHP + e * 2), H.readByte(BP + e * 2))
+      end
+      local w = H.formationWords()
+      F.lastBattle = {
+        frame = H.frame, seats = table.concat(seats, " "),
+        formation = string.format("%04X %04X %04X %04X %04X %04X",
+          w[1], w[2], w[3], w[4], w[5], w[6]),
+      }
+    end
     if (H.gameOverFired or 0) > 0 and not F.lost then
       F.lost = string.format("GAME OVER counted by the canary at f%d " ..
         "(tier %d) -- party [%s]", H.frame, tier, partyLine())
@@ -233,7 +263,25 @@ local function mkFighter(tier, tag)
 end
 
 -- ------------------------------------------------- the attempt sweep --
+local ATTEMPTS = 3
 local doorBlob, won, lostWhy = nil, false, nil
+
+-- A lost attempt is counted the way the segment runner counts its own
+-- retries (gen_sabin_gau's ladders do the same): one `[retry] attempt n/N
+-- FAILED class=wipe frame=... totalframes=... shift=... phase=...: msg` line
+-- and one `wipe context:` line, which is what tools/audit_retries.py reads.
+-- `shift` is how far this ladder moved the seed from attempt 1's: every
+-- attempt reloads the same entry point, so 0.
+local function ladderFailed(n, F)
+  H.log(string.format("[retry] attempt %d/%d FAILED class=wipe frame=%d " ..
+    "totalframes=%d shift=0 phase=%d: [kefka ladder] %s", n, ATTEMPTS,
+    H.frame, H.totalFrames or 0, H.seedPhase(), tostring(lostWhy)))
+  local b = F and F.lastBattle
+  H.log(string.format("[retry] attempt %d/%d wipe context: %s", n, ATTEMPTS,
+    b and string.format("the last battle up (f%d) was formation %s; seats " ..
+      "at that reading %s (actor:hp/maxhp bp)", b.frame, b.formation, b.seats)
+      or "no battle was sampled in this attempt"))
+end
 
 local function attempt(n)
   local F, battN, ks, seedChecked = nil, 0, -1, false
@@ -326,6 +374,8 @@ local function attempt(n)
         H.vars.chippedTwice = F.chippedTwice
         H.log(string.format("[kefka] attempt %d WON battle 57 at f%d",
           n, H.frame))
+      else
+        ladderFailed(n, F)
       end
     end),
   }, {})
@@ -364,7 +414,8 @@ H.run({ maxFrames = 300000, allowGameOver = true }, {
 
   H.call(function()
     H.assertEq(won, true,
-      "KEFKA beaten within 3 attempts (real damage, real menus)")
+      string.format("KEFKA beaten within %d attempts (real damage, real menus)",
+        ATTEMPTS))
     H.assertEq(H.vars.chippedTwice, true,
       "two real class chips landed and revealed before the fight ended")
     local atSave = H.fieldX() == 25 and H.fieldY() == 5
