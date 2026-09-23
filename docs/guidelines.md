@@ -71,6 +71,15 @@ The harness plays OT6 the way a competent person with a controller would.
   multiplied. Tier spells: the tier. Rage: the special's likelihood. Slot,
   Steal, Bushido: their own ladders. Everything else: the damage
   multiplier. Boost never costs pips while buying nothing.
+- **Design break data for every encounter.** Each species the route meets
+  gets an authored shield row (shield count and break classes), designed
+  from its body, its vanilla elements and the party that meets it there, so
+  the party holds a key and the area teaches something. The generated floor
+  is a safety net against keyless formations, not a design. Each area gets a
+  design doc in the shape of
+  [break-coverage-gate.md](design/break-coverage-gate.md) and a suite that
+  verifies the rows from the built ROM; the tuning claim in
+  `tools/audit_break_coverage.py` grows only by play.
 - **Don't retune vanilla enemies** (AI scripts, spells, one-shots) to dodge
   a hard fight. OT6 changes battle systems, not individual enemy quirks;
   answer a hard fight with levels, gear, route or strategy.

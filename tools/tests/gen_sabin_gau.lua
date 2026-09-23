@@ -12,18 +12,60 @@
 -- row 5 = FENIX DOWN), then the
 -- Veldt grind.
 
--- The generator therefore selects Active battle mode through Config, arms
--- Cyan's delayed Retort, and parks a Tonic target cursor while Retort kills
--- the last monster.  When Gau appears, that already-selected Tonic is sent
--- left to his $20 monster target and submitted as the harmless normalizing
--- action.  The fresh menu then selects Dried Meat from inventory slot zero,
--- targets the now-normalized Gau the same way, and submits it.  AIScript::_370
+-- The grind is fought the way a person fights it: every Veldt battle is won
+-- with the house menu-episode machine (a boosted Fight on every pip banked,
+-- the default for random battles; Sabin's Blitz on a lone monster when he
+-- knows it and has the MP), a heal under 50% HP and a revive before
+-- anything else, because GAU comes only to a NORMAL battle won with two
+-- characters standing (battle_main.asm @4840: $3A76 >= 2, then Rand <
+-- $A0), and field care with the bag's Tonics after every fight, so the
+-- next one starts whole.  When he appears the feed takes
+-- whatever party menu opens: Item, then the Dried Meat, then LEFT onto the
+-- monster column until the $20 mask is his, and confirm.  AIScript::_370
 -- consumes the meat, sets battle switch 13, and recruits Gau in that same
--- encounter.  Every gameplay change is controller input; all addresses here
--- are observations used to close the loop. Wins are earned by the house
--- menu-episode machine (bank boost to 2, dump on Fight), with a self-heal
--- branch under 40% HP. A wipe reloads a pre-grind checkpoint behind a
--- three-attempt retry sweep (17-frame stagger).
+-- encounter.  If a menu opens while he is still in the one-shot $2F4E
+-- appearance model, the confirm there is a Tonic: an item confirmed on him
+-- in that model has no recipient but normalizes him into a present enemy.
+-- The Active battle mode is selected through Config first.  Every gameplay
+-- change is controller input; all addresses here are observations used to
+-- close the loop.
+--
+-- There is no parked menu.  This file used to arm Cyan's Retort and park a
+-- Tonic target cursor so that a menu was open when the counter killed the
+-- last monster; it bound the grind to last monsters that hit Cyan with a
+-- weapon, and against one that did not, both menus stayed parked with the
+-- 245000-frame deadline as the only bound.  Measured on this chain
+-- (2026-09-22) the park is not
+-- what makes the feed possible: with it off, fight #3's Templar died to a
+-- plain attack at f18292 and a fresh menu fed the meat to the already-
+-- normalized GAU at f18495
+-- (build/attempts/wt/gen-robust/lab/gen-robust/nopark/gau_nopark.log),
+-- and the park-on run fed him through a menu opened after its park had
+-- been backed out, too
+-- (build/attempts/wt/gen-robust/lab/gen-robust/park_v1/gau_joined.log: the
+-- menu backed out at f13634, APPEARANCE at f13929, the meat at f14175).
+--
+-- The Veldt deals whatever this save has fought (44 formations at
+-- falls_done), so the grind is bounded by what progress looks like rather
+-- than by a formation: a fight that deals no damage for NO_DAMAGE_FRAMES,
+-- or runs past FIGHT_FRAMES, fails with its formation named; an
+-- appearance not fed in FEED_FRAMES, or one that leaves unfed, fails with
+-- the menu state.  The grind stops on GAU, or after as many wins that
+-- could have brought him as the engine's odds say should have (MISS_ODDS),
+-- not on a timer.  A win counts toward that cap only when the engine left
+-- GAU's flag armed for it ($11E4 bit 0, which InitBattleType clears for a
+-- back, pincer or side battle), so a formation that can only come as a
+-- pincer (BattleProp byte $B3, formation $29 on this pool) never counts.
+--
+-- Only a lost battle reloads a checkpoint, in all four of this file's
+-- ladders (the shore transit, the staging walk, the grind's three-attempt
+-- seed sweep, the post-join route).  A stalled fight, a walk segment out of
+-- frames, a walk that never arrives, a feed that did not land, the odds
+-- cap, or a wipe the party walked into after it had stopped dealing damage
+-- is a driver or detection defect that another seed would only hide, so it
+-- fails the run at once (ladderLoss).  Every reload logs the segment
+-- runner's own `[retry] attempt n/N FAILED class=wipe` line, which is what
+-- tools/audit_retries.py and tools/audit_fenix.py read.
 --
 -- The generated state is verified by reload, not just a calm capture: a
 -- capture taken with full world control satisfied can still boot into a
@@ -74,9 +116,9 @@ end
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_ITEM, ST_RAGE, ST_TGT, ST_TOOLS =
   0x05, 0x0A, 0x1E, 0x38, 0x30
-local CMD_FIGHT, CMD_ITEM, CMD_SWDTECH, CMD_BLITZ, CMD_RAGE, CMD_LEAP =
-  0x00, 0x01, 0x07, 0x0A, 0x10, 0x11
-local RETORT, PUMMEL, SUPLEX = 0x56, 0x5D, 0x5F
+local CMD_FIGHT, CMD_ITEM, CMD_BLITZ, CMD_RAGE, CMD_LEAP =
+  0x00, 0x01, 0x0A, 0x10, 0x11
+local PUMMEL, SUPLEX = 0x5D, 0x5F
 local CMDTBL, CMDROW, ITEMLIST = 0x202E, 0x890F, 0x4005
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local BLCOL, BLROW = 0x8963, 0x8967
@@ -144,30 +186,6 @@ local function newDeathWatch(tag)
   end
   function W.fenix(actor, e) W.raise[e] = { by = actor, tick = W.tick } end
   return W
-end
--- #163: the wipe predicate, readable on EVERY frame rather than behind a
--- battleLoadStarted() gate.  A wipe zeroes every battle-HP word, which
--- that predicate reads as "no battle", so a gated watch misses the one
--- state it exists for (gen_sabin_falls, #159).  Two readings, OR'd: the
--- lib's M.partyWipedInBattle (the run canary's own), and this file's
--- slot-count reading -- the first `n` battle entities all showing a
--- plausible max (0 < max < 1000; module garbage reads tens of thousands)
--- with 0 HP.  The second is kept because this step's live party is two
--- (three once GAU is fed) and the unused slots retain stale nonzero HP
--- words from an earlier fight (gau_joined.log: "[0/363 0/358 394/394
--- 0/0]" at a real wipe), which the lib's all-sane-slots reading counts
--- as a survivor.
-local function partyDown(n)
-  if H.partyWipedInBattle() then return true end
-  local sane, alive = 0, 0
-  for e = 0, n - 1 do
-    local mx = pMaxHP(e)
-    if mx > 0 and mx < 1000 then
-      sane = sane + 1
-      if pHP(e) > 0 then alive = alive + 1 end
-    end
-  end
-  return sane >= n and alive == 0
 end
 local function partyLine()
   local p = {}
@@ -350,12 +368,109 @@ local buyItem = H.buyItem
 
 -- ------------------------------------------------------- the grind driver --
 -- One driveUntil to GAU's join: world wander for encounters; input-driven
--- fights (boost + Fight, Tonic-self under 40%); the FEED the moment $2F4E
--- holds with the meat still in the bag; hands-off-plus-taps for the return
--- visit.  All cursor state read live, all input by pad.
-local lost = nil
-local fightTier = 1
+-- fights (boost + Fight, a heal under 50%); field care after each; the FEED
+-- the moment $2F4E holds with the meat still in the bag.  All cursor state
+-- read live, all input by pad.
+--
+-- What ended an attempt: `lost` is the message, `lostClass` what kind of
+-- ending it was, `lostContext` the battle that was up (the runner's own
+-- wipe-context shape).  The classes: `wipe`, a lost battle -- the one
+-- ending any ladder here reloads its checkpoint for; `driver`, a fight or a
+-- feed that stopped making progress, or a wipe that came after the party
+-- had stopped dealing damage (see WIPE_QUIET_FRAMES); `stall`, a walk
+-- segment out of frames; `odds`, the grind's give-up cap; `other`, a walk
+-- that never arrived.  Everything but `wipe` is the controller or its
+-- reading of the game, which another seed would only hide, so it fails the
+-- run at once (ladderLoss).
+local lost, lostClass, lostContext = nil, nil, nil
 local wipeN = 0
+-- A wipe the party walked into after dealing no damage for this long is a
+-- stalled driver, not a lost battle.  Every turn the fight policies here
+-- spend is an attack or a heal, so a party taking its turns chips the
+-- formation every few hundred frames; half the grind's no-damage bound
+-- (NO_DAMAGE_FRAMES, below) is several turns for each member with no
+-- attack landing.  Measured: an idle party (a driver that never presses)
+-- wiped 6257 frames into a fight that took no damage from its opening
+-- (build/attempts/wt/gen-robust-fix/gau_ctl_wipe/gau_joined.log: "fight #1
+-- up f8250" .. "wiped in fight #1 at f14506"), and 9849 frames in on the
+-- regenerated falls_done (merge/gen_sabin_gau_nc_stallwipe); the longest
+-- quiet stretch of an honest fight, logged on every "fight #n over" line,
+-- ran 451 to 1579 frames over eight distinct grind fights, the 1579 the Templar
+-- and Soldier pack (build/attempts/wt/gen-robust-fix/merge/: nc_odds2,
+-- useup2, useup7, useup8).
+local WIPE_QUIET_FRAMES = 3000
+local function battleContext()
+  if not H.battleLoadStarted() then
+    return string.format("no battle table was live at the loss (f%d)", H.frame)
+  end
+  local seats = {}
+  for e = 0, 3 do
+    local a = H.readByte(0x3ED8 + e * 2)
+    seats[#seats + 1] = (a == 0xFF) and "-" or
+      string.format("a%d:%d/%d bp%d", a, H.readWord(0x3BF4 + e * 2),
+        H.readWord(0x3C1C + e * 2), H.readByte(0x3E9C + e * 2))
+  end
+  local w = H.formationWords()
+  return string.format("the battle up at f%d was formation %04X %04X %04X " ..
+    "%04X %04X %04X; seats %s (actor:hp/maxhp bp)", H.frame, w[1], w[2],
+    w[3], w[4], w[5], w[6], table.concat(seats, " "))
+end
+local function lose(class, msg)
+  if lost then return end
+  lost, lostClass = msg, class
+  lostContext = (class == "wipe" or class == "driver") and battleContext()
+    or nil
+  H.log("[gau] LOST -- " .. msg)
+end
+-- A wipe read on this frame: a lost battle, unless the party had dealt the
+-- formation no damage for WIPE_QUIET_FRAMES before it (`lastDmg` is the
+-- frame of the last monster-HP drop in the fight, or its opening frame).
+local function loseWipe(msg, lastDmg)
+  if lost then return end
+  local quiet = lastDmg and (H.frame - lastDmg) or nil
+  if quiet and quiet >= WIPE_QUIET_FRAMES then
+    lose("driver", string.format("%s, after the party had dealt no damage " ..
+      "for %d frames (since f%d): a stalled driver, not a lost battle", msg,
+      quiet, lastDmg))
+  else
+    lose("wipe", msg)
+  end
+end
+local function clearLoss()
+  lost, lostClass, lostContext, wipeN = nil, nil, nil, 0
+end
+-- A ladder in this file that reloads its checkpoint after a loss counts it
+-- the way the segment runner counts its own retries, one `[retry] attempt
+-- n/N FAILED class=... frame=... totalframes=... shift=... phase=...: msg`
+-- line (and a `wipe context:` line for a wipe), so tools/audit_retries.py
+-- lists the reload and tools/audit_fenix.py starts the reloaded bag afresh.
+-- `shift` is how far the failed attempt had moved the seed from attempt
+-- 1's (the grind's seed sweep phases, the other ladders' stagger frames).
+local function ladderFailed(ladder, n, of, shift)
+  H.log(string.format("[retry] attempt %d/%d FAILED class=%s frame=%d " ..
+    "totalframes=%d shift=%d phase=%d: [%s ladder] %s", n, of,
+    lostClass or "other", H.frame, H.totalFrames or 0, shift, H.seedPhase(),
+    ladder, tostring(lost)))
+  if lostClass == "wipe" then
+    H.log(string.format("[retry] attempt %d/%d wipe context: %s", n, of,
+      lostContext or "no battle was sampled"))
+  end
+end
+-- The end of a ladder's attempt: nothing lost, carry on; a lost battle,
+-- count it and let the next attempt reload; anything else, fail the run
+-- now.  The raise carries no retryable text, so the segment runner files it
+-- as `other` and does not re-roll it either.
+local function ladderLoss(ladder, n, of, shift)
+  if lost == nil then return end
+  if lostClass ~= "wipe" then
+    error(string.format("gau: the %s stopped in attempt %d of %d (%s): %s.  " ..
+      "Only a lost battle reloads its checkpoint; this is the controller or " ..
+      "its reading of the game, and another seed would only hide it.%s",
+      ladder, n, of, lostClass, lost,
+      lostContext and ("  " .. lostContext) or ""), 0)
+  end
+  ladderFailed(ladder, n, of, shift)
+end
 local fed = false                        -- observed feed reaction completed
 local grind = { fights = 0, appearances = 0 }
 local function gauOn()
@@ -372,6 +487,106 @@ local function gauPresent()
      and (H.readByte(0x3a40) & mask) ~= 0
 end
 local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
+
+-- Who is who in a battle.  A party entity's character id is $3ED8+2e (the
+-- actor number Ot6VeldtRow compares against CHAR::GAU), so a plan names
+-- SABIN or CYAN and asks which entity that is, rather than assuming Sabin
+-- sits in slot 0 and Cyan in slot 1.  The max-HP window skips the stale
+-- words an unused slot keeps from an earlier fight (see membersDown).
+local SABIN, CYAN, GAU = 5, 2, 11
+local function entityOf(char)
+  for e = 0, 3 do
+    local mx = H.readWord(0x3C1C + e * 2)
+    if mx > 0 and mx < 1000 and H.readByte(0x3ED8 + e * 2) == char then
+      return e
+    end
+  end
+  return nil
+end
+local function aliveEntity(char)
+  local e = entityOf(char)
+  if e and H.readWord(0x3BF4 + e * 2) > 0 then return e end
+  return nil
+end
+-- #163: the wipe predicate, readable on EVERY frame rather than behind a
+-- battleLoadStarted() gate.  A wipe zeroes every battle-HP word, which
+-- that predicate reads as "no battle", so a gated watch misses the one
+-- state it exists for (gen_sabin_falls, #159).  Two readings, OR'd: the
+-- lib's M.partyWipedInBattle (the run canary's own), and this party's
+-- members by character id -- every seat whose actor ($3ED8+2e) is SABIN,
+-- CYAN, or GAU once he is fed, with the seat's present bit ($3AA0+2e bit
+-- 0) and a plausible max HP, reads 0 HP.  By character, not by slot: the
+-- Veldt seats GAU's hidden character AI in seat 2 at full HP with the
+-- present bit clear (the lib's note on M.partyWipedInBattle; a real wipe
+-- read "[0/363 0/358 394/394 0/0]"), and nothing fixes which seat SABIN
+-- and CYAN take.
+local function membersDown()
+  if H.partyWipedInBattle() then return true end
+  local seated, alive = 0, 0
+  for e = 0, 3 do
+    local a = H.readByte(0x3ED8 + e * 2)
+    local mx = pMaxHP(e)
+    if (a == SABIN or a == CYAN or (fed and a == GAU))
+       and (H.readByte(0x3AA0 + e * 2) & 1) == 1 and mx > 0 and mx < 10000 then
+      seated = seated + 1
+      if pHP(e) > 0 then alive = alive + 1 end
+    end
+  end
+  return seated > 0 and alive == 0
+end
+-- Blitzes Sabin knows: $1D28 bit i is the blitz $5D+i (InitSkills,
+-- RandBlitz).  A plan never names one he has not learned.
+local function blitzKnown(skill)
+  return (H.readByte(0x1D28) >> (skill - 0x5D)) & 1 == 1
+end
+
+-- The Veldt's pool and the odds of GAU showing up after a win.  The Veldt
+-- deals formations from $1DDD's 512 bits -- every formation this save has
+-- fought anywhere (battle_main.asm @49e9 adds each one) -- picking the next
+-- nonzero byte after $1FA5 and a bit inside it from $1FA2's table
+-- (GetVeldtBattle, field/battle.asm).  Both counters advance once per
+-- battle and never per step, so the formation sequence after a snapshot is
+-- fixed; what pacing and idle frames vary is the in-battle roll ($BE): the
+-- battle type and GAU's appearance.
+--
+-- He appears only after a NORMAL battle (InitBattleType clears $11E4 bit 0
+-- for any other type) that ends with two or more characters standing, on
+-- a Rand < $A0 roll (160/256, battle_main.asm @4840).  A normal battle is
+-- the $CF+1 = 208 weight of RandBitRateTbl row 4; with fewer than three
+-- allies the side attack is dropped, so the others a formation allows
+-- (BattleProp byte 0 bits 5/6 after the eor $F0: back, pincer) carry 8
+-- each.  The chance a formation's win brings GAU is therefore
+-- 160/256 * 208/(208 + 8*allowed), and the pool's odds are the mean over
+-- the formations it holds.  This is the log's account of the pool; the
+-- grind's cap does not rest on it, because each fight reads the engine's
+-- own verdict on its type (GAU's flag, see P_APPEAR below) instead.  Returns the
+-- formation count, the mean chance, and the formations that can never
+-- come as a normal battle (formation $29 at falls_done: BattleProp byte 0
+-- $B3, pincer only).
+local function veldtPoolOdds()
+  local prop = H.sym("BattleProp") & 0x3FFFFF
+  local n, sum, never = 0, 0, {}
+  for i = 0, 63 do
+    local b = H.readByte(0x1DDD + i)
+    for k = 0, 7 do
+      if (b >> k) & 1 == 1 then
+        local f = i * 8 + k
+        local allowed = (H.readRomByte(prop + f * 4) ~ 0xF0) & 0xF0
+        local w = 208
+        if (allowed & 0x10) == 0 then w = 0 end
+        local others = ((allowed & 0x20) ~= 0 and 8 or 0)
+                     + ((allowed & 0x40) ~= 0 and 8 or 0)
+        local front = w > 0 and w / (w + others) or 0
+        n, sum = n + 1, sum + 160 / 256 * front
+        if w == 0 then
+          never[#never + 1] = string.format("$%02X (BattleProp byte 0 $%02X)",
+            f, H.readRomByte(prop + f * 4))
+        end
+      end
+    end
+  end
+  return n, (n > 0 and sum / n or 0), never
+end
 
 -- The "unrunnable" measurement is one formation at one tile, not a rule
 -- about the Veldt: nothing in the run path reads the Veldt flag ($11E4 is
@@ -391,15 +606,21 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
   local fought, wasBattle = 0, false
   local stuckN, battleFrames, segFrames = 0, 0, 0
   local segCalm, coasting = 0, false
+  local missing = {}                     -- skills a list did not offer
+  local dmgAt, dmgHp = nil, nil          -- the last monster-HP drop
   local watch = newDeathWatch("gau walk")
   local function makePlan(actor)
     -- `worldWalkFight()` episodes are constructed before H.run starts, so
     -- resolve this at execution time.  The field party byte is repurposed in
     -- battle; the observed completed feed is the durable third-member fact.
-    local partyEntities = fed and 3 or 2
+    -- The members are named by character, not by battle slot (entityOf).
+    local members = {}
+    for _, c in ipairs(fed and { SABIN, CYAN, GAU } or { SABIN, CYAN }) do
+      members[#members + 1] = entityOf(c)
+    end
     local row = cmdRowOf(actor, CMD_ITEM)
     if row then
-      for e = 0, partyEntities - 1 do
+      for _, e in ipairs(members) do
         if pMaxHP(e) > 0 and pHP(e) == 0 and battInvIdx(FENIX_DOWN) then
           H.log(string.format("[gau] walk revive e%d with Fenix Down [%s]",
             e, partyLine()))
@@ -407,7 +628,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
         end
       end
       local target, worst = nil, 8
-      for e = 0, partyEntities - 1 do
+      for _, e in ipairs(members) do
         if pHP(e) > 0 and pMaxHP(e) > 0 then
           local frac = pHP(e) * 10 // pMaxHP(e)
           local healBelow = 4
@@ -433,7 +654,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     -- Skipping Gau made every post-join encounter a two-character fight;
     -- the Nautiloid/Exocite/Pterodon pack then outdamaged Tonics on three
     -- staggered timelines.  Off the Veldt the real Fight row remains valid.
-    if fed and actor == 2 then
+    if fed and actor == entityOf(GAU) then
       local row0 = H.readByte(CMDTBL + actor * 12)
       if row0 == CMD_FIGHT then return { kind = "fight", boostLeft = 0 } end
       local rageRow = cmdRowOf(actor, CMD_RAGE)
@@ -443,10 +664,12 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       return { kind = "switch" }
     end
     local blitzRow = cmdRowOf(actor, CMD_BLITZ)
-    if fed and actor == 0 and pMP(actor) >= 4 and blitzRow then
-      return { kind = "blitz",
-               skill = pMP(actor) >= 13 and SUPLEX or PUMMEL,
-               row = blitzRow }
+    if fed and actor == entityOf(SABIN) and blitzRow then
+      local skill = (pMP(actor) >= 13 and blitzKnown(SUPLEX)
+                     and not missing[SUPLEX]) and SUPLEX
+                 or (pMP(actor) >= 4 and blitzKnown(PUMMEL)
+                     and not missing[PUMMEL]) and PUMMEL or nil
+      if skill then return { kind = "blitz", skill = skill, row = blitzRow } end
     end
     local bp = H.readByte(BP + actor * 2)
     local boost = bp >= 1 and math.min(bp, 3) or 0
@@ -521,6 +744,11 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
         if H.readByte(ITEMLIST + i * 3) == plan.skill then want = i end
       end
       if want == nil then
+        -- not on the list: plan around it from here on, rather than plan
+        -- it again on the next turn and back out again
+        H.log(string.format("[gau] walk: $%02X is not on actor %d's list " ..
+          "-- planning around it", plan.skill, actor))
+        missing[plan.skill] = true
         plan, planActor = nil, nil
         return { "b" }
       end
@@ -553,10 +781,8 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     if opts.segment then
       segFrames = segFrames + 1
       if segFrames > (budget or 40000) - 400 and lost == nil then
-        lost = string.format("segment %s timed out (%d frames, at %d,%d) " ..
-          "-- a stiff draw; the sweep reloads", what, segFrames,
-          H.worldX(), H.worldY())
-        H.log("[gau] " .. lost)
+        lose("stall", string.format("segment %s ran out of frames (%d, " ..
+          "at %d,%d)", what, segFrames, H.worldX(), H.worldY()))
       end
     end
     return lost ~= nil or (arriveOffWorld and not H.worldMode()) or calm >= 30
@@ -567,13 +793,20 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       -- a 300-frame battle-side wipe as a game over and freezes the pad;
       -- allowGameOver on the run keeps the sweeps alive for the reload)
       if (H.gameOverFired or 0) > 0 and not lost then
-        lost = string.format("GAME OVER counted by the canary during %s " ..
-          "at f%d [%s]", what, H.frame, partyLine())
-        H.log("[gau] LOST -- " .. lost)
+        loseWipe(string.format("GAME OVER counted by the canary during " ..
+          "%s at f%d [%s]", what, H.frame, partyLine()), dmgAt)
       end
       if lost then H.setPad({}); return end
       if H.battleLoadStarted() then
         battleFrames = (battleFrames or 0) + 1
+        -- the formation's HP, for the wipe's stall reading (loseWipe): the
+        -- opening frame, then every frame it drops
+        local nmon, mhp = liveMonsters()
+        if battleFrames == 1 then dmgAt, dmgHp = H.frame, nil end
+        if nmon > 0 then
+          if dmgHp ~= nil and mhp < dmgHp then dmgAt = H.frame end
+          dmgHp = mhp
+        end
         if battleFrames == 120 then
           local sp = {}
           for s = 0, 5 do sp[#sp + 1] = string.format("%04X",
@@ -592,24 +825,15 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
           tostring(H.battleLoadStarted()), partyLine()))
       end
       if H.battleLoadStarted() then
-        local partyEntities = fed and 3 or 2
-        local wiped = true
-        for e = 0, partyEntities - 1 do
-          if pMaxHP(e) > 0 and pHP(e) > 0 then wiped = false end
-        end
-        if wiped then
-          if not lost then
-            lost = string.format("wiped walking %s at f%d [%s]", what,
-              H.frame, partyLine())
-            H.log("[gau] LOST -- " .. lost)
-          end
+        if membersDown() then
+          loseWipe(string.format("wiped walking %s at f%d [%s]", what,
+            H.frame, partyLine()), dmgAt)
           H.setPad({})
           return
         end
         tick = tick + 1
-        -- #183: opts.flee (L+R first, fight only when refused or capped)
-        -- is gone; every encounter on the transit and the Veldt is fought
-        -- by the fighter below.
+        -- #183: every encounter on the transit and the Veldt is fought by
+        -- the fighter below; nothing here holds L+R.
         local ph = tick % 30
         if H.readByte(MENU) == 0 then
           plan, planActor, mstreak = nil, nil, 0
@@ -626,21 +850,11 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       local live = H.worldHasControl() and H.worldAligned()
          and bright() >= 15
       if not live then
-        local partyEntities = fed and 3 or 2
-        local sane, alive = 0, 0
-        for e = 0, partyEntities - 1 do
-          local mx = pMaxHP(e)
-          if mx > 0 and mx < 1000 then
-            sane = sane + 1
-            if pHP(e) > 0 then alive = alive + 1 end
-          end
-        end
-        if sane >= partyEntities and alive == 0 then
+        if membersDown() then
           wipeN = wipeN + 1
           if wipeN >= 90 and not lost then
-            lost = string.format("wiped (game over) during %s at f%d [%s]",
-              what, H.frame, partyLine())
-            H.log("[gau] LOST -- " .. lost)
+            loseWipe(string.format("wiped (game over) during %s at f%d " ..
+              "[%s]", what, H.frame, partyLine()), dmgAt)
           end
           H.setPad({})
           return
@@ -690,6 +904,62 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
   }, "walk fighting -> " .. what)
 end
 
+-- The grind's bounds.  None of them is a deadline on the whole grind: how
+-- many wins it may take comes from the engine's odds (the cap), and each
+-- fight is held to what a fight that is making progress looks like.  Each
+-- of them tripping is a driver or detection defect, not a draw: the grind
+-- fails at once rather than reloading (see grindAttempt).
+--
+--   NO_DAMAGE_FRAMES  a fight whose formation has not lost HP for this long
+--                     has stopped making progress: fail fast, naming the
+--                     formation.  Every turn the policy spends is a heal or
+--                     an attack, so the quiet stretches are heal turns and
+--                     misses, and 6000 frames is several turns for each
+--                     character: the slowest measured single monster, the
+--                     Templar, went from alone at its full 205 HP at f16868
+--                     to dead at f18292, 1424 frames for all of it
+--                     (build/attempts/wt/gen-robust/lab/gen-robust/nopark/
+--                     gau_nopark.log).
+--   FIGHT_FRAMES      one fight's whole budget (the slowest measured fight,
+--                     the Templar/Soldier pack, ran 4933 frames: "fight #3
+--                     up f13359" to the appearance at f18292,
+--                     build/attempts/wt/gen-robust/lab/gen-robust/
+--                     gau_on_old_chain/gau_joined.log).
+--   FEED_FRAMES       an appearance that has not recruited GAU in this long
+--                     is a failed feed (the measured feeds: 681 frames from
+--                     the appearance at f13927 to the join at f14608, the
+--                     old generator's gau_joined.log as quoted in
+--                     build/attempts/review/gen-robust/extracts.txt, and
+--                     478 from f18292 to f18770 in gau_on_old_chain's).
+--                     It sits under the runner's 1800-frame no-progress
+--                     watchdog on purpose: an unfed GAU freezes the battle
+--                     screen, and a feed that stops pressing tripped that
+--                     watchdog 1915 frames after the appearance, a class the
+--                     runner retries (build/attempts/wt/gen-robust-fix/
+--                     gau_nc_nofeed_3600/gau_joined.log), where this bound
+--                     fails it as the driver defect it is.
+--   P_APPEAR          GAU's roll after a win that can bring him: Rand < $A0,
+--                     160/256 (battle_main.asm @4840).  A win can bring him
+--                     when it ends with two or more standing ($3A76 >= 2)
+--                     and his flag, $11E4 bit 0, is still armed: the field
+--                     arms it for every Veldt battle, InitBattleType clears
+--                     it for a back, pincer or side battle, and InitParty
+--                     for a party of four (battle_main.asm @2e68, @2fc3).
+--   MISS_ODDS         the grind gives up after enough such wins that GAU
+--                     never appearing in any of them had at most this
+--                     chance at P_APPEAR -- "the dice say this should have
+--                     happened", not a timer.
+--   GRIND_CARE        field care after every fight tops each member up to
+--                     this fraction with the bag's Tonics: the transit and
+--                     staging walks' threshold on the same Veldt, since GAU
+--                     needs both standing when the last monster falls.
+local NO_DAMAGE_FRAMES = 6000
+local FIGHT_FRAMES = 20000
+local FEED_FRAMES = 1500
+local P_APPEAR = 160 / 256
+local MISS_ODDS = 0.001
+local GRIND_CARE = 0.9
+
 local function grindStep()
   local phase, tick = 0, 0
   local plan, planActor = nil, nil
@@ -697,25 +967,43 @@ local function grindStep()
   local decided = false
   local hb = -1800
   local mstreak = 0
-  local meatPrimed = {}
-  local retortArmed, retortUnavailable = false, false
-  local feeding, targetBankLogged = false, false
-  local feedConfirmUntil, feedSubmissions = nil, 0
+  local feeding = false
+  local feedConfirmUntil, feedSubmissions, feedStart = nil, 0, nil
+  local meatSubmitted = false
+  local cap = nil
+  local F = nil                          -- the fight in progress
+  local careD = nil                      -- the field care after a fight
   local watch = newDeathWatch("gau grind")
+
+  local function fightLine()
+    local sp = {}
+    for s = 0, 5 do
+      if monPresent(s) and monHP(s) > 0 then
+        sp[#sp + 1] = string.format("%04X:%d", H.readWord(0x57C0 + s * 2),
+          monHP(s))
+      end
+    end
+    return string.format("live monsters [%s] [%s]", table.concat(sp, " "),
+      partyLine())
+  end
+
   local function makePlan(actor)
     local row = cmdRowOf(actor, CMD_ITEM)
     local nmon = liveMonsters()
+    local eS, eC = entityOf(SABIN), entityOf(CYAN)
     if row then
-      for e = 0, 1 do
-        if pMaxHP(e) > 0 and pHP(e) == 0 and battInvIdx(FENIX_DOWN) then
+      -- GAU comes only to a win with two standing ($3A76 >= 2), so a
+      -- revive is always the first thing a turn is spent on
+      for _, e in ipairs({ eS, eC }) do
+        if e and pMaxHP(e) > 0 and pHP(e) == 0 and battInvIdx(FENIX_DOWN) then
           H.log(string.format("[gau] revive e%d with Fenix Down [%s]",
             e, partyLine()))
           return { kind = "item", item = FENIX_DOWN, target = e, row = row }
         end
       end
       local target, worst = nil, 8
-      for e = 0, 1 do
-        if pHP(e) > 0 and pMaxHP(e) > 0 then
+      for _, e in ipairs({ eS, eC }) do
+        if e and pHP(e) > 0 and pMaxHP(e) > 0 then
           local frac = pHP(e) * 10 // pMaxHP(e)
           if frac < worst and frac < 5 then target, worst = e, frac end
         end
@@ -732,36 +1020,7 @@ local function grindStep()
         end
       end
     end
-    local bushidoRow = cmdRowOf(actor, CMD_SWDTECH)
-    if actor == 1 and nmon == 1 and not retortArmed
-       and H.readByte(BP + actor * 2) < 2 and row then
-      local safeItem = battInvIdx(TONIC) and TONIC
-                    or battInvIdx(POTION) and POTION or nil
-      if safeItem then
-        H.log(string.format("[gau] Cyan banks BP with $%02X (bp=%d)",
-          safeItem, H.readByte(BP + actor * 2)))
-        return { kind = "item", item = safeItem, target = actor, row = row }
-      end
-    end
-    if actor == 1 and nmon == 1 and not retortArmed
-       and not retortUnavailable and bushidoRow then
-      H.log(string.format("[gau] Cyan plans Retort: row=%d bp=%d mp=%d",
-        bushidoRow, H.readByte(BP + actor * 2), pMP(actor)))
-      return { kind = "retort", skill = RETORT, row = bushidoRow }
-    end
-    if nmon == 1 and retortArmed and row and not meatPrimed[actor]
-       and battInvIdx(TONIC) then
-      H.log(string.format("[gau] park actor %d in Tonic targeting", actor))
-      return { kind = "prime", item = TONIC, row = row }
-    end
-    if actor == 0 and nmon == 1 and not retortArmed and row then
-      local safeItem = battInvIdx(TONIC) and TONIC
-                    or battInvIdx(POTION) and POTION or nil
-      if safeItem then
-        return { kind = "item", item = safeItem, target = 1, row = row }
-      end
-    end
-    if actor == 0 and nmon == 1 and pMP(actor) < 13 and row then
+    if actor == eS and nmon == 1 and pMP(actor) < 13 and row then
       local mpItem = battInvIdx(ETHER) and ETHER
                   or battInvIdx(TINCTURE) and TINCTURE or nil
       if mpItem then
@@ -769,14 +1028,18 @@ local function grindStep()
       end
     end
     local blitzRow = cmdRowOf(actor, CMD_BLITZ)
-    if actor == 0 and nmon == 1 and pMP(actor) >= 4 and blitzRow then
-      return { kind = "blitz",
-               skill = pMP(actor) >= 13 and SUPLEX or PUMMEL,
-               row = blitzRow }
+    if actor == eS and nmon == 1 and blitzRow then
+      local skill = (pMP(actor) >= 13 and blitzKnown(SUPLEX)) and SUPLEX
+                 or (pMP(actor) >= 4 and blitzKnown(PUMMEL)) and PUMMEL or nil
+      if skill and not (F and F.missing[skill]) then
+        return { kind = "blitz", skill = skill, row = blitzRow }
+      end
     end
+    -- boost-Fight on every pip banked: the house default for a random
+    -- battle (a one-pip boost restores vanilla pace against an unbroken
+    -- enemy), and the same policy on every attempt of the grind
     local bp = H.readByte(BP + actor * 2)
-    local boostMin = fightTier >= 2 and 1 or 2
-    local boost = bp >= boostMin and math.min(bp, 3) or 0
+    local boost = bp >= 1 and math.min(bp, 3) or 0
     return { kind = "fight", boostLeft = boost }
   end
   local function button()
@@ -807,7 +1070,7 @@ local function grindStep()
       if cur == plan.row then return { "a" } end
       return { cur < plan.row and "down" or "up" }
     end
-    if st == ST_ITEM and (plan.kind == "item" or plan.kind == "prime") then
+    if st == ST_ITEM and plan.kind == "item" then
       local want = battInvIdx(plan.item)
       if want == nil then return { "b" } end
       local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
@@ -815,13 +1078,17 @@ local function grindStep()
       if cur > want then return { "up" } end
       return { "a" }
     end
-    if st == ST_TOOLS and (plan.kind == "blitz" or plan.kind == "retort") then
+    if st == ST_TOOLS and plan.kind == "blitz" then
       local want
       for i = 0, 7 do
         if H.readByte(ITEMLIST + i * 3) == plan.skill then want = i end
       end
       if want == nil then
-        if plan.kind == "retort" then retortUnavailable = true end
+        -- not on the list: plan around it for the rest of this fight,
+        -- rather than plan it again next turn and back out again
+        H.log(string.format("[gau] $%02X is not on actor %d's list -- " ..
+          "planning around it", plan.skill, actor))
+        if F then F.missing[plan.skill] = true end
         plan, planActor = nil, nil
         return { "b" }
       end
@@ -829,19 +1096,9 @@ local function grindStep()
       local cc, cr = H.readByte(BLCOL + actor), H.readByte(BLROW + actor)
       if cc ~= wc then return { wc > cc and "right" or "left" } end
       if cr ~= wr then return { wr > cr and "down" or "up" } end
-      if plan.kind == "retort" then
-        retortArmed = true
-        H.log(string.format("[gau] Retort armed at f%d with monster HP=%d",
-          H.frame, select(2, liveMonsters())))
-        plan, planActor = nil, nil
-      end
       return { "a" }
     end
     if st == ST_TGT then
-      if plan.kind == "prime" then
-        meatPrimed[actor] = true
-        return nil
-      end
       if plan.kind == "item" then
         local chars, mons = H.readByte(TGTCHARS), H.readByte(TGTMONS)
         if mons ~= 0 then return { "right" } end
@@ -862,20 +1119,20 @@ local function grindStep()
     end
     return nil
   end
-  -- per-frame feed driver (see the call site).  Holds directions for the
-  -- engine's cursor auto-repeat; every branch reads live state.
+  -- The feed (see the header): a Tonic while GAU is still in the
+  -- appearance model, the Dried Meat once he is a normalized enemy.
+  local function feedItem() return gauOn() and TONIC or DRIED_MEAT end
   local function feedDrive()
     local st = H.readByte(MSTATE)
     local actor = H.readByte(ACTOR)
     phase = (phase + 1) % 8
     fed = fedSwitch() or invCount(DRIED_MEAT) == 0
-    if fed or feedSubmissions >= 2 then
+    if fed or meatSubmitted or feedSubmissions >= 3 then
       H.setPad({})
       return
     end
     if H.readByte(MENU) == 0 then
-      -- Dismiss Gau's hungry turn so the already-selected normalizing item
-      -- can execute.  This is safe only while no party menu owns input.
+      -- Advance GAU's hungry line; no party menu owns input yet.
       H.setPad(H.frame % 30 < 4 and { "a" } or {})
       return
     end
@@ -889,8 +1146,8 @@ local function grindStep()
       return
     end
     if st == ST_ITEM then
-      local want = battInvIdx(DRIED_MEAT)
-      if want == nil then H.setPad({}); return end
+      local want = battInvIdx(feedItem())
+      if want == nil then H.setPad(phase < 2 and { "b" } or {}); return end
       local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
       if cur == want then H.setPad(phase < 2 and { "a" } or {})
       else H.setPad(phase < 2 and
@@ -903,8 +1160,10 @@ local function grindStep()
         if feedConfirmUntil == nil then
           feedSubmissions = feedSubmissions + 1
           feedConfirmUntil = H.frame + 3
+          local item = H.readByte(0x7a85)
+          if item == DRIED_MEAT then meatSubmitted = true end
           H.log(string.format("[gau feed] confirm item $%02X submission #%d " ..
-            "on Gau (%s target model)", H.readByte(0x7a85), feedSubmissions,
+            "on Gau (%s target model)", item, feedSubmissions,
             gauOn() and "appearance" or gauPresent() and "normalized"
               or "unknown"))
         end
@@ -917,90 +1176,191 @@ local function grindStep()
     H.setPad({})
   end
 
-  local frames = 0
-  return H.driveUntil(function()
-    frames = frames + 1
-    if frames > 245000 and lost == nil then
-      lost = string.format("grind deadline (245000 frames): fights=%d " ..
-        "appearances=%d fed=%s [%s]", grind.fights, grind.appearances,
-        tostring(fed), partyLine())
-      H.log("[gau] LOST -- " .. lost)
+  -- A fight is over (the battle is gone and the world has control, or GAU
+  -- joined inside it): count it, and hold the grind to the engine's odds.
+  -- Only a win the engine left GAU's flag armed for counts toward the cap
+  -- (P_APPEAR): a back, pincer or side battle -- formation $29 can only
+  -- come as a pincer -- can never bring him, whatever the dice say.
+  local function closeFight(joined)
+    local f = F
+    F = nil
+    if f == nil or lost then return end
+    -- the appearance is proof of the win: CheckBattleEnd rolls for GAU only
+    -- once every monster is down ($3A77 = 0, battle_main.asm @4833)
+    if f.appeared then f.won = true end
+    local eligible = f.won and f.standing >= 2 and f.gauFlag
+    if f.won then grind.wins = grind.wins + 1 end
+    if eligible then grind.eligible = grind.eligible + 1 end
+    H.log(string.format("[gau] fight #%d over at f%d after %d frames " ..
+      "(longest stretch without damage %d): %s, " ..
+      "%d standing, battle type %s, GAU's flag %s, appearance=%s%s -- " ..
+      "wins=%d eligible=%d appearances=%d, cap %d eligible", f.n, H.frame,
+      H.frame - f.start, f.maxQuiet, f.won and "won" or "not won", f.standing,
+      f.btype and string.format("%d", f.btype) or "?",
+      f.gauFlag and "armed" or "cleared", tostring(f.appeared),
+      joined and " (GAU joined)" or "", grind.wins, grind.eligible,
+      grind.appearances, cap or -1))
+    if joined or fed then return end
+    if cap and grind.eligible >= cap then
+      lose("odds", string.format("%d Veldt wins that could bring GAU (two " ..
+        "standing, his flag armed) and he never came: at p=%.3f a win, " ..
+        "that many without him is under %.4f -- appearances=%d.  A driver " ..
+        "or detection defect, not a draw", grind.eligible, P_APPEAR,
+        MISS_ODDS, grind.appearances))
+    elseif cap and grind.fights >= 3 * cap then
+      lose("odds", string.format("%d fights (3x the %d-win cap) and only " ..
+        "%d that could bring GAU -- the fights are not ending with both " ..
+        "characters standing in a normal battle", grind.fights, cap,
+        grind.eligible))
     end
-    return lost ~= nil or inParty(11)
-  end, 250000, {
+  end
+
+  return H.cond(function() return true end, {
+  H.driveUntil(function()
+    return lost ~= nil or inParty(GAU)
+  end, 400000, {
     H.call(function()
       phase = (phase + 1) % 8
+      if cap == nil then
+        local poolN, poolMean, never = veldtPoolOdds()
+        cap = math.ceil(math.log(MISS_ODDS) / math.log(1 - P_APPEAR))
+        H.log(string.format("[gau] Veldt pool: %d formations, GAU per win " ..
+          "p=%.3f over the pool with battle types; never a normal battle: " ..
+          "%s.  A win that can bring him (two standing, his flag armed) " ..
+          "does so at p=%.3f -> give up after %d such wins without him " ..
+          "(miss odds %.4f)", poolN, poolMean,
+          #never > 0 and table.concat(never, ", ") or "none", P_APPEAR, cap,
+          MISS_ODDS))
+      end
       watch.frame()
       -- #163: the wipe watch runs before the battleLoadStarted() gate,
-      -- every frame (see partyDown): a two-character wipe with the unused
-      -- slots at 0 reads as "no battle" and the gated watch below never
-      -- ran, so the loss idled to the 245000-frame deadline.  The run
-      -- canary's count is a loss too.
-      wipeN = partyDown(2) and wipeN + 1 or 0
+      -- every frame (see membersDown): a two-character wipe reads as "no
+      -- battle" and the gated watch below never ran.  The run canary's
+      -- count is a loss too.
+      wipeN = membersDown() and wipeN + 1 or 0
       if (H.gameOverFired or 0) > 0 and not lost then
-        lost = string.format("GAME OVER counted by the canary in fight #%d " ..
-          "at f%d (tier %d) [%s]", grind.fights, H.frame, fightTier,
-          partyLine())
-        H.log("[gau] LOST -- " .. lost)
+        loseWipe(string.format("GAME OVER counted by the canary in fight " ..
+          "#%d at f%d [%s]", grind.fights, H.frame, partyLine()),
+          F and F.lastDmg)
       end
       if wipeN >= 90 and not lost then
-        lost = string.format("wiped in fight #%d at f%d (tier %d) [%s]",
-          grind.fights, H.frame, fightTier, partyLine())
-        H.log("[gau] LOST -- " .. lost)
+        loseWipe(string.format("wiped in fight #%d at f%d [%s]",
+          grind.fights, H.frame, partyLine()), F and F.lastDmg)
       end
       if lost then H.setPad({}); return end
       if H.frame - hb >= 1800 then
         hb = H.frame
         H.log(string.format(
           "[gau] grind f%d fights=%d apps=%d 2f4e=%02X fed=%s sw13=%s " ..
-          "tonics=%d [%s]", H.frame, grind.fights, grind.appearances,
+          "tonics=%d %s", H.frame, grind.fights, grind.appearances,
           H.readByte(0x2f4e), tostring(fed), tostring(fedSwitch()),
-          invCount(TONIC), partyLine()))
+          invCount(TONIC), F and fightLine() or ("[" .. partyLine() .. "]")))
+      end
+      -- the field care after a fight owns the pad until it is done (it
+      -- yields on its own if a battle opens under it)
+      if careD then
+        if careD.done() then careD = nil
+        else careD.frame(); return end
       end
       -- Gau's special appearance can flicker battleLoadStarted() false, so
-      -- latch it before the ordinary battle gate.  Retort has delivered the
-      -- final blow while a Tonic target screen remained open.
-      if not feeding and gauOn() then
-        feeding = true
-        grind.appeared = true
+      -- latch it before the ordinary battle gate -- but only inside a fight
+      -- this grind opened: he appears at a fight's end, never on the world
+      if not feeding and decided and gauOn() then
+        feeding, feedStart = true, H.frame
+        feedSubmissions, feedConfirmUntil, meatSubmitted = 0, nil, false
         grind.appearances = grind.appearances + 1
+        if F then F.appeared = true end
         H.log(string.format("[gau] *** APPEARANCE #%d at fight #%d f%d",
           grind.appearances, grind.fights, H.frame))
         H.screenshot(string.format("gau_appear%d", grind.appearances))
       end
       if feeding then
+        if not fed and H.frame - feedStart > FEED_FRAMES then
+          lose("driver", string.format("appearance #%d in fight #%d not " ..
+            "fed in %d frames: %d confirm(s) on him, meat submitted=%s, " ..
+            "menu=%02X state=%02X [%s]", grind.appearances, grind.fights,
+            FEED_FRAMES, feedSubmissions, tostring(meatSubmitted),
+            H.readByte(MENU), H.readByte(MSTATE), partyLine()))
+          H.screenshot(string.format("gau_unfed%d", grind.appearances))
+          H.setPad({})
+          return
+        end
+        if not fed and not H.battleLoadStarted() and H.worldMode()
+           and H.worldHasControl() then
+          -- he left and the battle closed with no meat in him: the feed
+          -- did not land, which a person holding the meat would not let
+          -- happen -- a driver defect, not a draw
+          lose("driver", string.format("appearance #%d in fight #%d left " ..
+            "unfed: back on the world at f%d (%d confirm(s) on him, meat " ..
+            "submitted=%s) [%s]", grind.appearances, grind.fights, H.frame,
+            feedSubmissions, tostring(meatSubmitted), partyLine()))
+          H.screenshot(string.format("gau_left%d", grind.appearances))
+          H.setPad({})
+          return
+        end
         feedDrive()
         return
       end
       if H.battleLoadStarted() then
         if not decided then
           decided = true
-          meatPrimed = {}
-          retortArmed = false
-          targetBankLogged = false
           plan, planActor = nil, nil
           grind.fights = grind.fights + 1
-          local w = H.formationWords()
-          H.log(string.format("[gau] fight #%d up f%d (%04X %04X %04X %04X)",
-            grind.fights, H.frame, w[1], w[2], w[3], w[4]))
+          F = { n = grind.fights, start = H.frame, lastDmg = H.frame,
+                monHp = nil, missing = {}, standing = 2, won = false,
+                appeared = false, logged = false, gauFlag = true,
+                btype = nil, maxQuiet = 0 }
         end
-        -- the wipe watch ran above, before this gate (#163); this step's
-        -- live party is exactly Sabin+Cyan and the unused battle slots
-        -- retain stale nonzero HP words, which is why partyDown(2) reads
-        -- the first two slots rather than all four
-        tick = tick + 1
-        local ph = tick % 30
-        local activeActor = H.readByte(ACTOR)
-        if (H.readByte(MSTATE) == ST_ITEM or H.readByte(MSTATE) == ST_TGT)
-           and meatPrimed[activeActor] then
-          if not targetBankLogged then
-            targetBankLogged = true
-            H.log(string.format("[gau] RETORT TONIC BANK READY f%d hp=%d",
-              H.frame, select(2, liveMonsters())))
+        -- progress: the formation's HP.  The first live reading seeds it;
+        -- only a drop counts as damage dealt.
+        local nmon, mhp = liveMonsters()
+        if nmon > 0 and not F.won then
+          -- the engine's verdict on this fight: GAU's flag ($11E4 bit 0)
+          -- and the battle type ($201F, 0 normal 1 back 2 pincer 3 side),
+          -- read while the formation lives.  Once cleared the flag stays
+          -- cleared until the end-of-battle roll clears it itself, and
+          -- the field arms it for every Veldt battle, so the AND over the
+          -- fight is the verdict whichever init frame the first read sees.
+          F.gauFlag = F.gauFlag and (H.readByte(0x11E4) & 1) == 1
+          F.btype = H.readByte(0x201F)
+        end
+        if nmon > 0 then
+          if not F.logged then
+            F.logged = true
+            H.log(string.format("[gau] fight #%d up f%d, %d monsters %d HP: " ..
+              "%s", F.n, H.frame, nmon, mhp, fightLine()))
           end
+          if F.monHp ~= nil and mhp < F.monHp then
+            F.maxQuiet = math.max(F.maxQuiet, H.frame - F.lastDmg)
+            F.lastDmg = H.frame
+          end
+          F.monHp = mhp
+        elseif F.monHp ~= nil and F.monHp > 0 and not F.won then
+          F.maxQuiet = math.max(F.maxQuiet, H.frame - F.lastDmg)
+          F.won, F.lastDmg = true, H.frame
+        end
+        local standing = 0
+        for _, c in ipairs({ SABIN, CYAN }) do
+          if aliveEntity(c) then standing = standing + 1 end
+        end
+        F.standing = standing
+        if nmon > 0 and H.frame - F.lastDmg > NO_DAMAGE_FRAMES then
+          lose("driver", string.format("fight #%d dealt no damage for %d " ..
+            "frames (f%d..f%d): %s", F.n, NO_DAMAGE_FRAMES, F.lastDmg,
+            H.frame, fightLine()))
+          H.screenshot(string.format("gau_nodamage%d", F.n))
           H.setPad({})
           return
         end
+        if H.frame - F.start > FIGHT_FRAMES then
+          lose("driver", string.format("fight #%d ran past its %d-frame " ..
+            "budget: %s", F.n, FIGHT_FRAMES, fightLine()))
+          H.screenshot(string.format("gau_longfight%d", F.n))
+          H.setPad({})
+          return
+        end
+        tick = tick + 1
+        local ph = tick % 30
         if H.readByte(MENU) == 0 then
           plan, planActor, mstreak = nil, nil, 0
           H.setPad(ph < 4 and { "a" } or {})
@@ -1012,17 +1372,55 @@ local function grindStep()
         H.setPad(ph < 6 and grind.btn or {})
         return
       end
-      decided = false
+      if decided and H.worldMode() and H.worldHasControl() then
+        local n = F and F.n or grind.fights
+        decided = false
+        closeFight()
+        if lost then H.setPad({}); return end
+        -- heal outside battles: the lib's between-battles care stop, with
+        -- the bag's items (never MP), before the next step on the Veldt
+        careD = H.newCareDriver({ tag = string.format("gau grind care " ..
+          "after fight #%d", n), threshold = GRIND_CARE })
+        H.setPad({})
+        return
+      end
       plan, planActor = nil, nil
       if not H.worldHasControl() then H.setPad({}); return end
       if not H.worldAligned() then return end
       dirFlip = not dirFlip
       H.setPad({ [dirFlip and "left" or "right"] = true })
     end),
-  }, "GAU joins the party")
+  }, "GAU joins the party"),
+  -- GAU joins inside the fight he appeared in, so that fight never reached
+  -- the world: count it here, so the join line counts it too
+  H.call(function()
+    if lost == nil and inParty(GAU) and F then closeFight(true) end
+  end),
+  }, {})
 end
 
 -- ------------------------------------------------------ the retry sweep --
+-- Only a lost battle reloads.  A wipe (or the canary's game over) is a
+-- line in the retry inventory: the next attempt reloads the grind
+-- checkpoint behind the seed sweep below, and the reload is logged in the
+-- segment runner's own `[retry] attempt n/N FAILED class=wipe` shape.  A
+-- stalled fight, a fight past its budget, a feed that did not land, the
+-- odds cap, or a wipe after WIPE_QUIET_FRAMES without damage (lostClass
+-- driver/odds) is a defect in this file's controller or its reading of the
+-- game, which a fresh seed would only hide: it fails the run at once
+-- (ladderLoss), and the runner files it as `other`, not retried.
+--
+-- The reload replays the same formation SEQUENCE whatever the attempt does
+-- on the way to its first battle: the Veldt picks from $1FA5/$1FA2, which
+-- move once per battle and never per step (see veldtPoolOdds).  Pacing
+-- steps before it would only move WHEN the first battle fires, and so its
+-- seed.  The retry varies that seed directly instead: the seed sweep
+-- spreads each attempt's first battle to its own $021E phase and so its
+-- own $BE seed (the battle type, every damage roll, GAU's 160/256), and
+-- its report fails the run if two attempts drew the same seed.
+local GRIND_ATTEMPTS = 3
+local grindSeeds = H.newSeedSweep("gau grind", { attempts = GRIND_ATTEMPTS })
+local GRIND_GAP = H.SEED_PERIOD // GRIND_ATTEMPTS
 local grindBlob, grindWon = nil, false
 local function grindAttempt(n)
   local ldReq
@@ -1030,7 +1428,7 @@ local function grindAttempt(n)
     H.cond(function() return n > 1 end, {
       H.logStep(function()
         return string.format("[gau] ATTEMPT %d -- reloading the grind " ..
-          "checkpoint after a loss (%s)", n, tostring(lost))
+          "checkpoint after a lost battle (%s)", n, tostring(lost))
       end),
       H.call(function() ldReq = H.requestLoadState(grindBlob) end),
       H.waitFrames(2),
@@ -1041,16 +1439,22 @@ local function grindAttempt(n)
         -- the lost attempt (#163)
         H.gameOverFired = 0
       end),
-      H.waitFrames(60 + (n - 1) * 17),
+      H.waitFrames(60),
     }, {}),
+    grindSeeds.spread(n),
     H.call(function()
-      lost, fightTier, wipeN, fed = nil, n, 0, false
+      clearLoss()
+      fed = false
       H.gameOverFired = 0
+      grind = { fights = 0, appearances = 0, wins = 0, eligible = 0 }
     end),
     grindStep(),
+    H.call(function()
+      ladderLoss("Veldt grind", n, GRIND_ATTEMPTS, GRIND_GAP * (n - 1))
+    end),
     (function()
       local phase = 0
-      return H.cond(function() return lost == nil and inParty(11) end, {
+      return H.cond(function() return lost == nil and inParty(GAU) end, {
         H.driveUntil(function()
           return H.worldMode() and H.worldHasControl() and H.worldAligned()
         end, 20000, {
@@ -1063,10 +1467,11 @@ local function grindAttempt(n)
     end)(),
     H.call(function()
       fed = fedSwitch() or invCount(DRIED_MEAT) == 0
-      if lost == nil and inParty(11) and fed then
+      if lost == nil and inParty(GAU) and fed then
         grindWon = true
-        H.log(string.format("[gau] attempt %d: GAU JOINED after %d fights, " ..
-          "%d appearances, fed=%s", n, grind.fights, grind.appearances,
+        H.log(string.format("[gau] attempt %d: GAU JOINED after %d fights " ..
+          "(%d wins, %d that could bring him), %d appearances, fed=%s", n,
+          grind.fights, grind.wins, grind.eligible, grind.appearances,
           tostring(fed)))
       end
     end),
@@ -1167,13 +1572,13 @@ local function transitAttempt(n)
   local jitterSteps = {}
   for j = 2, n do
     jitterSteps[#jitterSteps + 1] = worldWalkFight(193, 105, 12000,
-      string.format("transit a%d jitter %d out", n, j), false, { flee = true })
+      string.format("transit a%d jitter %d out", n, j), false)
     jitterSteps[#jitterSteps + 1] = worldWalkFight(192, 105, 12000,
-      string.format("transit a%d jitter %d back", n, j), false, { flee = true })
+      string.format("transit a%d jitter %d back", n, j), false)
   end
   local steps = {
     H.cond(function() return n > 1 end, reloadSteps, {}),
-    H.call(function() lost, wipeN = nil, 0; H.gameOverFired = 0 end),
+    H.call(function() clearLoss(); H.gameOverFired = 0 end),
     H.cond(function() return n > 1 end, jitterSteps, {}),
   }
   -- The transit ends OFF the world (Mobliz's entrance tile loads map 157),
@@ -1184,7 +1589,7 @@ local function transitAttempt(n)
     end, {
       worldWalkFight(220, 115, 12000,
         string.format("transit a%d seg %d", n, i), true,
-        { segment = true, flee = true }),
+        { segment = true }),
       H.cond(function() return lost == nil and H.worldMode() end, {
         H.fieldCare({ tag = string.format("transit a%d care %d", n, i),
                       threshold = 0.9, maxFrames = 12000 }),
@@ -1197,19 +1602,23 @@ local function transitAttempt(n)
       H.log(string.format("[gau] shore transit attempt %d ARRIVED at " ..
         "Mobliz f%d [%s]", n, H.frame, partyLine()))
     elseif lost == nil then
-      lost = string.format("transit attempt %d never reached Mobliz in 20 " ..
-        "segments; at (%d,%d) f%d", n, H.worldX(), H.worldY(), H.frame)
-      H.log("[gau] " .. lost)
+      lose("other", string.format("transit attempt %d never reached " ..
+        "Mobliz in 20 segments; at (%d,%d) f%d", n, H.worldX(), H.worldY(),
+        H.frame))
     end
+    ladderLoss("shore transit", n, 5, (n - 1) * 17)
   end)
   return H.cond(function() return not transitDone end, steps, {})
 end
 
--- The staging-walk sweep (see the SIEGE comment at the call site): the
--- checkpoint is cut on the live world just south of Mobliz, and an
--- attempt is the whole segmented siege -- fight one battle, field-care,
--- repeat -- ending parked at (215,119).  A wipe reloads with the house
--- 17-frame stagger for a different formation timeline.
+-- The staging-walk sweep: the checkpoint is cut on the live world just
+-- south of Mobliz, and an attempt is the whole segmented walk -- fight one
+-- battle, field-care, repeat -- ending parked at (215,119).  A lost battle
+-- reloads (and logs its `[retry]` line) with the house 17-frame stagger,
+-- which moves $021E 17 phases and so gives the attempt's battles their own
+-- $BE seed.  It does not change which formations come:
+-- on the Veldt that sequence is fixed by $1FA5/$1FA2 (veldtPoolOdds), and
+-- the fighter here is the same one that crosses the whole Veldt.
 local walkBlob, walkDone = nil, false
 local function walkCheckpoint()
   local ckReq
@@ -1240,7 +1649,7 @@ local function walkAttempt(n)
       end),
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
-    H.call(function() lost, wipeN = nil, 0; H.gameOverFired = 0 end),
+    H.call(function() clearLoss(); H.gameOverFired = 0 end),
   }
   for i = 1, 30 do
     steps[#steps + 1] = H.cond(function()
@@ -1249,16 +1658,15 @@ local function walkAttempt(n)
     end, {
       worldWalkFight(215, 119, 12000,
         string.format("staging a%d seg %d", n, i), nil,
-        { segment = true, flee = true }),
+        { segment = true }),
       H.cond(function() return lost == nil end, {
         H.fieldCare({ tag = string.format("staging a%d care %d", n, i),
                       threshold = 0.9, maxFrames = 12000 }),
       }, {}),
     }, {})
   end
-  -- no non-segmented closer here: a raising driveUntil inside an attempt
-  -- would abort the SWEEP, and 30 fought-and-cared segments that never
-  -- parked is a loss for THIS timeline, not for the step
+  -- no non-segmented closer here: 30 fought-and-cared segments that never
+  -- parked is a walk that never arrives, which ladderLoss fails loudly
   steps[#steps + 1] = H.call(function()
     if lost == nil and H.worldMode() and H.worldX() == 215
        and H.worldY() == 119 then
@@ -1266,10 +1674,10 @@ local function walkAttempt(n)
       H.log(string.format("[gau] staging walk attempt %d ARRIVED f%d",
         n, H.frame))
     elseif lost == nil then
-      lost = string.format("staging attempt %d never arrived (at %d,%d) " ..
-        "f%d", n, H.worldX(), H.worldY(), H.frame)
-      H.log("[gau] " .. lost)
+      lose("other", string.format("staging attempt %d never arrived (at " ..
+        "%d,%d) f%d", n, H.worldX(), H.worldY(), H.frame))
     end
+    ladderLoss("staging walk", n, 3, (n - 1) * 17)
   end)
   return H.cond(function() return not walkDone end, steps, {})
 end
@@ -1322,13 +1730,13 @@ local function routeAttempt(n)
   local jitterSteps = {}
   for j = 2, n do
     jitterSteps[#jitterSteps + 1] = worldWalkFight(217, 119, 12000,
-      string.format("route a%d jitter %d out", n, j), nil, { flee = true })
+      string.format("route a%d jitter %d out", n, j), nil)
     jitterSteps[#jitterSteps + 1] = worldWalkFight(219, 119, 12000,
-      string.format("route a%d jitter %d back", n, j), nil, { flee = true })
+      string.format("route a%d jitter %d back", n, j), nil)
   end
   local steps = {
     H.cond(function() return n > 1 end, reloadSteps, {}),
-    H.call(function() lost, wipeN = nil, 0; H.gameOverFired = 0 end),
+    H.call(function() clearLoss(); H.gameOverFired = 0 end),
     H.cond(function() return n > 1 end, jitterSteps, {}),
   }
   for w = 1, #ROUTE do
@@ -1341,7 +1749,7 @@ local function routeAttempt(n)
       end, {
         worldWalkFight(tx, ty, 12000,
           string.format("route a%d %s seg %d", n, name, i), nil,
-          { segment = true, flee = true }),
+          { segment = true }),
         H.cond(function() return lost == nil end, {
           H.fieldCare({ tag = string.format("route a%d %s care %d",
                           n, name, i),
@@ -1352,10 +1760,9 @@ local function routeAttempt(n)
     steps[#steps + 1] = H.call(function()
       if lost == nil and not (H.worldMode() and H.worldX() == tx
          and H.worldY() == ty) then
-        lost = string.format("route attempt %d never reached %s (%d,%d) " ..
-          "in 12 segments; at (%d,%d) f%d", n, name, tx, ty,
-          H.worldX(), H.worldY(), H.frame)
-        H.log("[gau] " .. lost)
+        lose("other", string.format("route attempt %d never reached %s " ..
+          "(%d,%d) in 12 segments; at (%d,%d) f%d", n, name, tx, ty,
+          H.worldX(), H.worldY(), H.frame))
       end
     end)
   end
@@ -1364,6 +1771,8 @@ local function routeAttempt(n)
       routeDone = true
       H.log(string.format("[gau] post-join route attempt %d ARRIVED at " ..
         "the Crescent entry point f%d [%s]", n, H.frame, partyLine()))
+    else
+      ladderLoss("post-join route", n, 5, (n - 1) * 17)
     end
   end)
   return H.cond(function() return not routeDone end, steps, {})
@@ -1371,7 +1780,8 @@ end
 
 -- allowGameOver: the transit, grind, staging-walk and route ladders
 -- deliberately survive a lost fight (#163); the walk and the grind read
--- H.gameOverFired as a loss and the next attempt reloads.
+-- H.gameOverFired as a loss and the next attempt reloads (a wipe after the
+-- party stopped dealing damage excepted: see loseWipe).
 H.run({ maxFrames = 500000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -1402,7 +1812,7 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
       error("gau: the Veldt transit to Mobliz was lost -- " .. tostring(lost)
         .. " (a #74-style balance finding; do not rig)", 0)
     end
-    lost, wipeN = nil, 0
+    clearLoss()
   end),
   settle(157, "Mobliz"),
   H.navTo(26, 22, { maxFrames = 10000, playBattles = "tactical", arrive = function()
@@ -1527,9 +1937,11 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
       end),
     }, {})
   end)(),
+  grindSeeds.watch(),
   grindAttempt(1),
   grindAttempt(2),
   grindAttempt(3),
+  grindSeeds.report(),
   H.call(function()
     if not grindWon then
       error(string.format("gau: the Veldt grind did not recruit GAU on " ..
@@ -1548,10 +1960,9 @@ H.run({ maxFrames = 500000, allowGameOver = true }, {
   H.waitFrames(120),
 
   -- park on Crescent Mountain's entry point (one short of the (214,148)
-  -- entrance) and generate.  The route rides the ladder defined above (the
-  -- SIEGE comment there carries the measurements); the Veldt's
-  -- encounters are unrunable, so every one is fought by the input-driven menu
-  -- fighter, one per segment, with field care between.
+  -- entrance) and generate.  The route rides the ladder defined above;
+  -- every Veldt encounter on it is fought by the input-driven menu fighter,
+  -- one per segment, with field care between.
   routeCheckpoint(),
   routeAttempt(1),
   routeAttempt(2),

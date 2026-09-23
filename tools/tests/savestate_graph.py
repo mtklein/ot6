@@ -198,9 +198,10 @@ STATES = [
     # surfaces in slot 5 off the piranhas' death script), SHADOW's exit, GAU
     # named on the Veldt shore.
     S("falls_done", gen="gen_sabin_falls", prev="train_done", timeout=1800),
-    # gen_sabin_gau: Mobliz's Dried Meat, the Veldt grind (GAU appears on the
-    # 3/8 end-of-battle roll), and his return-visit self-recruit -- the
-    # generator header documents the one concession ($3EBD bit 1).
+    # gen_sabin_gau: Mobliz's Dried Meat, the Veldt grind (GAU appears on a
+    # 5/8 end-of-battle roll, 160/256, after a normal battle won with two
+    # standing), the meat fed to him through the battle Item menu, and his
+    # recruit in that same encounter.
     S("gau_joined", gen="gen_sabin_gau", prev="falls_done", timeout=1800),
     # gen_sabin_trench: Crescent Mountain's helmet chain (GAU-gated), the
     # Serpent Trench ridden as a real VEHICLE script, Nikeah, and the ferry's

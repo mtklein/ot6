@@ -1010,18 +1010,175 @@ function M.worldCanStep(x, y, dir)
   return M.worldPassable(x + d[1], y + d[2])
 end
 
+-- ---- random-encounter pools ------------------------------------------
+-- Which formation a random encounter deals is the engine's two-step
+-- lookup (ff6/src/field/battle.asm):
+--   group  a field map's is SubBattleGroup[map] (CheckBattleSub).  On the
+--          world map it is WorldBattleGroup[world*256 + (zy & $E0) +
+--          ((zx >> 3) & $1C) + BattleBGGroupTbl[bg]] (CheckBattleWorld),
+--          from two DIFFERENT positions.  bg is the battle-background index
+--          of the tile the step lands on: the high byte of its property
+--          word, which world/move.asm stores to $11F9 just before the
+--          check.  (zx,zy) -- the zone -- is NOT that tile: it is the saved
+--          world position $1F60/$1F61 (field/battle.asm:123-126), which the
+--          engine writes only when the party enters the world map, opens
+--          the menu, boards the airship, or starts a battle (world/
+--          move.asm:889-893 stores the battle's own tile AFTER the check
+--          that fired it), never per step.  So an encounter rolls from the
+--          zone of the last of those events, with the background of the
+--          tile it fires on (M.worldEncounterGroup, M.worldCheckGroup).
+--          Measured at the engine's own `lda f:WorldBattleGroup,x`: its X
+--          matched the saved-position zone on all 93 and 85 checks of two
+--          walks, and on the 9 and 10 of them where that zone and the
+--          landed tile's differ, never the tile's (build/attempts/wt/
+--          draw-budgets-fix/lab/worldzone/probe_zone_{camp,narshe}.log,
+--          `[probe] TALLY`).
+--          The zone also picks the rate (WorldBattleRate, 2 bits a
+--          background; 3 = none).  A world group of $FF is a Veldt sector,
+--          drawn by GetVeldtBattle and not modeled here.
+--   word   RandBattleGroup[group*8 + 2*(slot-1)], the slot picked by one
+--          UpdateBattleGrpRng draw v: 1 below $50, 2 below $A0, 3 below
+--          $F0, else 4 -- 80, 80, 80 and 16 in 256.  A word with bit 15
+--          set deals formation (word & $1FF) plus a battle-RNG 0..3
+--          (battle_main.asm @30f3, after the CondBattle swaps).
+-- UpdateBattleGrpRng steps a SAVE-DATA counter once per encounter:
+--   $1fa2 += 1 (and on its wrap $1fa3 += $17); v = RNGTbl[$1fa2] + $1fa3.
+-- Steps ($1fa1/$1fa4) decide only WHEN an encounter comes, never which,
+-- and OT6_SEED_SHIFT (battle RNG $be) moves neither: a fixture's coming
+-- formations are fixed by two bytes, and every regeneration of the chain
+-- deals it different ones.  A test that must reach a formation budgets
+-- its encounters over every counter state (M.worstCaseEncounters), not
+-- the one its fixture happens to carry.
+M.ENCOUNTER_ODDS = { 80, 80, 80, 16 }     -- in 256, slots 1..4
+
+function M.encounterSlot(v)
+  if v < 0x50 then return 1 elseif v < 0xA0 then return 2
+  elseif v < 0xF0 then return 3 end
+  return 4
+end
+
+function M.fieldEncounterGroup(map)
+  return M.readRomByte((M.sym("SubBattleGroup") & 0x3FFFFF) + (map & 0x3FF))
+end
+
+-- The saved world position CheckBattleWorld takes the zone from, $1F60
+-- (x) and $1F61 (y): see the group line above for when it moves.
+function M.worldZonePos() return M.readByte(0x1f60), M.readByte(0x1f61) end
+
+-- The zone key of world position (x,y) on the current world, as
+-- CheckBattleWorld builds it in $1E/$1F.
+local function worldZone(x, y)
+  return M.worldId() * 256 + (y & 0xE0) + ((x >> 3) & 0x1C)
+end
+
+-- The group zone `zone` (worldZone) deals on battle background `bg`, or
+-- nil when that zone rolls none on it (rate 3).
+local function worldZoneGroup(zone, bg)
+  local rate = M.readRomByte((M.sym("WorldBattleRate") & 0x3FFFFF) + (zone >> 2))
+  rate = (rate >> (2 * M.readRomByte((M.sym("BattleBGRateTbl") & 0x3FFFFF) + bg))) & 3
+  if rate == 3 then return nil end
+  return M.readRomByte((M.sym("WorldBattleGroup") & 0x3FFFFF) + zone
+    + M.readRomByte((M.sym("BattleBGGroupTbl") & 0x3FFFFF) + bg))
+end
+
+-- The group a step onto world tile (x,y) of the current world rolls from
+-- when the saved position is (zx,zy) -- by default the live $1F60/$1F61,
+-- the input the NEXT check will read, so a caller asking about the tile
+-- the party is about to step onto gets the engine's answer.  nil when
+-- the tile rolls none (property bit 6 clear, which world/move.asm tests
+-- on the landed tile) or the zone's rate for its background is 3.  NOT
+-- the group of "the tile's own zone": the zone is the saved position's
+-- (see the group line above), which lags the party by every step since
+-- the last battle, menu or world entry.
+function M.worldEncounterGroup(x, y, zx, zy)
+  local prop = M.worldTileProp(x, y)
+  if (prop & 0x0040) == 0 then return nil end
+  if zx == nil then zx, zy = M.worldZonePos() end
+  return worldZoneGroup(worldZone(zx, zy), (prop >> 8) & 7)
+end
+
+-- The group CheckBattleWorld is rolling from right now, from its own
+-- inputs: the zone of the saved position and the landed tile's
+-- background, $11F9 (which world/move.asm stores just before the check).
+-- Exact at CheckBattleWorld's entry (an exec callback on
+-- M.sym("CheckBattleWorld")); anywhere else $11F9 is the last check's.
+function M.worldCheckGroup()
+  local zx, zy = M.worldZonePos()
+  return worldZoneGroup(worldZone(zx, zy), M.readByte(0x11F9) & 7)
+end
+
+-- A group's four words, decoded from the ROM: pool[slot] (slot 1..4) =
+-- { word, odds (of 256), formations = { { id, species = { sp, ... } }, ... } }
+-- with four formations for a +rand word and one otherwise.
+function M.encounterPool(group)
+  assert(group ~= 0xFF, "group $FF is a Veldt sector (GetVeldtBattle), not a four-word pool")
+  local rbg = M.sym("RandBattleGroup") & 0x3FFFFF
+  local bm = M.sym("BattleMonsters") & 0x3FFFFF
+  local pool = { group = group }
+  for slot = 1, 4 do
+    local word = M.readRomWord(rbg + group * 8 + (slot - 1) * 2)
+    local e = { slot = slot, word = word, odds = M.ENCOUNTER_ODDS[slot], formations = {} }
+    for k = 0, ((word & 0x8000) ~= 0) and 3 or 0 do
+      local id = (word & 0x1FF) + k
+      local rec = M.formationRecord(function(i) return M.readRomByte(bm + id * 15 + i) end)
+      local sp = {}
+      for s = 0, 5 do
+        if (rec.present >> s) & 1 == 1 and rec.species[s] then sp[#sp + 1] = rec.species[s] end
+      end
+      e.formations[#e.formations + 1] = { id = id, species = sp }
+    end
+    pool[slot] = e
+  end
+  return pool
+end
+
+-- The most encounters any encounter-counter state needs before a watch is
+-- satisfied, over all 65536 ($1fa2, $1fa3) pairs.  newWatch() returns a
+-- fresh function that is fed each draw's slot (1..4) in order and returns
+-- true once satisfied.  Returns worst and hist, hist[n] = how many pairs
+-- needed exactly n; a watch still unsatisfied after `cap` draws (default
+-- 1024) stops there, so worst == cap says the watch can go unmet.
+function M.worstCaseEncounters(newWatch, cap)
+  cap = cap or 1024
+  local base = M.sym("RNGTbl") & 0x3FFFFF
+  local t, slotOf = {}, {}
+  for i = 0, 255 do t[i] = M.readRomByte(base + i); slotOf[i] = M.encounterSlot(i) end
+  local worst, hist = 0, {}
+  for c = 0, 255 do
+    for s = 0, 255 do
+      local a, b, n, watch = s, c, 0, newWatch()
+      repeat
+        a = (a + 1) & 0xFF
+        if a == 0 then b = (b + 0x17) & 0xFF end
+        n = n + 1
+      until watch(slotOf[(t[a] + b) & 0xFF]) or n >= cap
+      hist[n] = (hist[n] or 0) + 1
+      if n > worst then worst = n end
+    end
+  end
+  return worst, hist
+end
+
+-- The share of counter states (0..1) a hist from M.worstCaseEncounters
+-- satisfies within n encounters.
+function M.encounterShare(hist, n)
+  local k = 0
+  for m, c in pairs(hist) do if m <= n then k = k + c end end
+  return k / 65536
+end
+
 local function worldEdgeKey(x, y, dir)
   return ((y & 0xFF) * 256 + (x & 0xFF)) * 4 + DIRIDX[dir]
 end
 
--- BFS a path from the party's current world tile to (tx,ty).  The map
--- wraps at 256 in both axes.  `blockedEdges` (keys from worldEdgeKey)
--- prunes edges the executor has proven wrong, same contract as the
--- field bfsPath.  The node cap is 60000 rather than the field's 4096,
--- since world segments can run over 100 tiles.
-function M.worldBfs(tx, ty, blockedEdges)
+-- BFS a path from the party's current world tile (or from (sx,sy) when
+-- given) to (tx,ty).  The map wraps at 256 in both axes.  `blockedEdges`
+-- (keys from worldEdgeKey) prunes edges the executor has proven wrong,
+-- same contract as the field bfsPath.  The node cap is 60000 rather than
+-- the field's 4096, since world segments can run over 100 tiles.
+function M.worldBfs(tx, ty, blockedEdges, sx, sy)
   blockedEdges = blockedEdges or {}
-  local sx, sy = M.worldX(), M.worldY()
+  sx, sy = sx or M.worldX(), sy or M.worldY()
   local function key(x, y) return (y & 0xFF) * 256 + (x & 0xFF) end
   local seen = { [key(sx, sy)] = true }
   local q, qi = { { sx, sy } }, 1
@@ -1054,6 +1211,63 @@ function M.worldBfs(tx, ty, blockedEdges)
   return nil
 end
 
+-- The encounter groups a world walk through `waypoints` ({ {x,y}, ... },
+-- each leg the M.worldBfs path from one to the next, as the walkers plan
+-- it) can roll from.  An encounter pairs the background of the tile it
+-- fires on with the zone of the saved position (M.worldEncounterGroup),
+-- and on the walk that position is the tile of its last battle or menu:
+-- so the walk's own groups are every pairing of a zone the walk stands in
+-- (waypoints and every tile stepped onto) with a background of a tile it
+-- steps onto that rolls battles.  That is a superset -- a pairing needs
+-- the zone's tile met before the background's, which a walk that laps
+-- meets both ways -- in first-met order.
+-- The second result is the ENTRY groups: pairings of the live saved
+-- position's zone (where the party last battled, opened the menu or
+-- entered the world, before this walk) with the walk's backgrounds, not
+-- already among the first result.  Only the walk's first encounter can
+-- roll from one -- that battle saves a tile on the walk -- and none can
+-- when the saved position is already in one of the walk's zones.
+-- Needs the world map loaded and settled (M.worldSettled: the tilemap is
+-- WRAM, rebuilt after every battle).  A leg with no path raises: a walk
+-- that cannot be planned has no pool.
+function M.worldPathGroups(waypoints)
+  local zones, zoneSeen, bgs, bgSeen = {}, {}, {}, {}
+  local function stand(x, y)
+    local z = worldZone(x, y)
+    if not zoneSeen[z] then zoneSeen[z] = true; zones[#zones + 1] = z end
+  end
+  local function step(x, y)
+    stand(x, y)
+    local prop = M.worldTileProp(x, y)
+    if (prop & 0x0040) ~= 0 then
+      local bg = (prop >> 8) & 7
+      if not bgSeen[bg] then bgSeen[bg] = true; bgs[#bgs + 1] = bg end
+    end
+  end
+  for i = 1, #waypoints - 1 do
+    local x, y = waypoints[i][1], waypoints[i][2]
+    stand(x, y)
+    local tx, ty = waypoints[i + 1][1], waypoints[i + 1][2]
+    local dirs = M.worldBfs(tx, ty, nil, x, y)
+    assert(dirs, string.format("no world path from (%d,%d) to (%d,%d)", x, y, tx, ty))
+    for _, d in ipairs(dirs) do
+      x, y = (x + DELTA[d][1]) & 0xFF, (y + DELTA[d][2]) & 0xFF
+      step(x, y)
+    end
+  end
+  local seen, order, entry = {}, {}, {}
+  local function pair(z, into)
+    for _, bg in ipairs(bgs) do
+      local g = worldZoneGroup(z, bg)
+      if g ~= nil and not seen[g] then seen[g] = true; into[#into + 1] = g end
+    end
+  end
+  for _, z in ipairs(zones) do pair(z, order) end
+  local zx, zy = M.worldZonePos()
+  if not zoneSeen[worldZone(zx, zy)] then pair(worldZone(zx, zy), entry) end
+  return order, entry
+end
+
 -- true when the world engine will accept a step this frame: on the world
 -- map, no world event script ($E7 bit0, which the Figaro/Narshe gate
 -- events run through), not fading out to a field map ($19), and none of
@@ -1067,6 +1281,20 @@ function M.worldHasControl()
      and (M.readByte(0x00e7) & 0x01) == 0
      and (M.readByte(0x00e8) & 0x31) == 0
      and not M.battleLoadStarted()
+end
+
+-- The world map is loaded AND faded in.  M.worldHasControl() alone reads
+-- true through the first frames of the post-battle reload, while world
+-- init is still decompressing the tilemap into $7F0000: measured one
+-- fight and one flee into battle_levelup's grass, the tiles at x=82
+-- y=50..52 read 00 00 00 on the first frame of control and their real
+-- 7D 1A 1A three frames later, with the screen at brightness 0 until
+-- the fade-in reaches 15 some sixty frames on (build/attempts/wt/
+-- draw-budgets/lab/draw-budgets/levelup/bfswatch2_f1_r1.log, f3702 and
+-- f3705).  Anything that reads the tilemap (M.worldTileProp,
+-- M.worldBfs, M.worldPathGroups) wants this instead.
+function M.worldSettled()
+  return M.worldHasControl() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
 end
 
 -- Walk to world tile (tx,ty): the field navTo's verified-step loop on

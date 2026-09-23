@@ -31,12 +31,11 @@
 -- 95's long entrance at y=37 (x=0..27) does the same, so every step there
 -- stays off y=37 until the deliberate exit.
 --
--- No state writes; every encounter is answered by the pad. The cave, town
--- and world steps flee (L+R); Mt. Kolts and map 98 are fought tactically
--- (EDGAR's Tools, boosted Fights, the fight driver's Potion medic line) --
--- crossing Mt. Kolts on foot is what levels the party for VARGAS. A
--- formation that will not release the party inside M.FLEE_CAP frames is
--- fought out by the same tactical driver.
+-- No state writes; every encounter is answered by the pad, and every one
+-- is fought: the cave, the town, the world and Mt. Kolts alike, by the
+-- lib's tactical fight driver (EDGAR's Tools, boosted Fights, its Potion
+-- medic line) -- the fights on the way are what level the party for
+-- VARGAS.  Nothing here holds L+R.
 --
 -- The care layer: every crossing ends with a check of the party's hit
 -- points, and the route stops at the shop in South Figaro.
@@ -129,7 +128,7 @@ local function settleField(what, dstMap, maxF, mode)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 24000, { playBattles = mode or "flee" }),
+    end), maxF or 24000, { playBattles = mode or "tactical" }),
     H.waitFrames(30),
   })
 end
@@ -152,10 +151,10 @@ local function crossTo(tx, ty, dstMap, what, mode, maxF)
   return seq({
     H.logStep(function()
       return string.format("cross %s: (%d,%d) -> (%d,%d) -> map %d [%s]",
-        what, H.fieldX(), H.fieldY(), tx, ty, dstMap, mode or "flee")
+        what, H.fieldX(), H.fieldY(), tx, ty, dstMap, mode or "tactical")
     end),
     H.navTo(tx, ty, { maxFrames = maxF or 40000, arrive = mapChanged(),
-             playBattles = mode or "flee", reserve = { [POTION] = 5 } }),
+             playBattles = mode or "tactical", reserve = { [POTION] = 5 } }),
     H.release(),
     settleField(what, dstMap, nil, mode),
     H.call(function()
@@ -283,13 +282,38 @@ local function leaveTo(dstMap, dirs, what, maxF)
   })
 end
 
--- Buy up to `target` of item `id`, sitting on buy-list row `row`.  Every step
--- is checked: the row is verified to hold the expected item before any money
--- moves, the quantity is steered to the number we want and read back, and the
--- purchase is confirmed by gil falling by quantity x price.  With too little
--- gil it buys what it can and logs the count.
-local function buyTo(id, row, target, unit, name)
-  local want, before = 0, 0
+-- Prices, off the ROM rather than typed in.  ItemProp +$1C is an item's
+-- price word, and ShopProp byte 0 bits 3-5 the shop's adjustment
+-- (shop.asm CalcShopPrice / AdjustShopPrice: 0 none, 1 +50%, 2 +100%,
+-- 3 -50%; 4-6 turn on the character showing, and are budgeted here at the
+-- dearer +50%).  South Figaro's four shops are all adjustment 0.  buyTo
+-- checks every price against the one the open menu drew ($7E9F09+2r,
+-- CalcShopPrice's store), so the budget and the till cannot disagree.
+local function itemPrice(id)
+  return H.readRomWord((H.sym("ItemProp") & 0x3FFFFF) + id * 30 + 0x1C)
+end
+local function shopPrice(shop, id)
+  local base = itemPrice(id)
+  local adj = (H.readRomByte((H.sym("ShopProp") & 0x3FFFFF) + shop * 9) >> 3)
+              & 0x07
+  if adj == 2 then return base * 2 end
+  if adj == 3 then return base >> 1 end
+  if adj ~= 0 then return base + (base >> 1) end
+  return base
+end
+local function drawnPrice(r) return H.readWord(0x9f09 + 2 * r) end
+-- South Figaro's four counters, by their ShopProp numbers
+local SHOP_WEAPON, SHOP_ARMOR, SHOP_RELIC, SHOP_ITEM = 5, 6, 7, 8
+
+-- Buy up to `target` of item `id` (a count, or a function answering one
+-- when the purchase starts), sitting on buy-list row `row`.  Every step is
+-- checked: the row is verified to hold the expected item before any money
+-- moves, the price the menu drew is checked against the ROM's, the
+-- quantity is steered to the number we want and read back, and the
+-- purchase is confirmed by gil falling by quantity x price.  With too
+-- little gil it buys what it can and logs the count.
+local function buyTo(id, row, target, name)
+  local want, before, unit = 0, 0, 0
   return seq({
     H.driveUntil(function() return shopRow() == row end, 3000, {
       H.call(function()
@@ -302,12 +326,17 @@ local function buyTo(id, row, target, unit, name)
     H.call(function()
       H.assertEq(rowItem(row), id,
         string.format("shop row %d really is item $%02X", row, id))
+      unit = shopPrice(H.shopId(), id)
+      H.assertEq(drawnPrice(row), unit,
+        string.format("shop %d row %d: the menu's price for $%02X is the " ..
+          "ROM's", H.shopId(), row, id))
       before = gil()
-      want = target - invCount(id)
+      local to = type(target) == "function" and target() or target
+      want = to - invCount(id)
       local afford = before // unit
       if want > afford then want = afford end
-      H.log(string.format("[shop] %s: have %d, buying %d at %d gp (gil %d)",
-        name, invCount(id), want, unit, before))
+      H.log(string.format("[shop] %s: have %d, want %d, buying %d at %d gp " ..
+        "(gil %d)", name, invCount(id), to, math.max(want, 0), unit, before))
     end),
     H.cond(function() return want >= 1 end, {
       tapUntil("a", inState(0x27), "shop: quantity window"),
@@ -373,7 +402,11 @@ local function shopTrip()
       end),
     }, "open the item shop (counter talk -> shop_menu 8)"),
     H.release(),
-    H.call(function() H.screenshot("sfigaro_shop") end),
+    H.call(function()
+      H.assertEq(H.shopId(), SHOP_ITEM,
+        "the item shop's counter opened shop 8, the one the bill prices")
+      H.screenshot("sfigaro_shop")
+    end),
     tapUntil("a", inState(0x26), "shop: the buy list opens"),
     H.release(), H.waitFrames(20),
     H.call(function()
@@ -385,12 +418,15 @@ local function shopTrip()
     -- LAST, so a short pre-grind purse shorts Tonics -- topped again at the
     -- post-grind counter below and downstream -- not the cures a fragile
     -- party needs.  Fenix -> 15, Tonic -> 99 are ceilings; buyTo purse-clamps
-    -- each.  (Pre-grind gil here is ~2.8k, so Fenix clamps near 5; the
-    -- ceiling matters when the purse is deeper.)
-    buyTo(0xF2, 1, 3, 50, "ANTIDOTE to 3"),
-    buyTo(0xF4, 2, 2, 200, "SOFT to 2"),
-    buyTo(0xF0, 5, 15, 500, "FENIX DOWN to 15"),
-    buyTo(0xE8, 0, 99, 50, "TONIC to 99"),   -- the rite of passage: a full bag of Tonics for field care
+    -- each, and whatever it leaves short of the supply band is on the
+    -- town's bill the grind works to (the 2026-09-22 run came in with 4448
+    -- gil and left with 48: "FENIX DOWN to 15: have 2, want 15, buying 7",
+    -- build/attempts/wt/gen-robust/lab/gen-robust/kolts_regen/
+    -- south_figaro.log).
+    buyTo(0xF2, 1, 3, "ANTIDOTE to 3"),
+    buyTo(0xF4, 2, 2, "SOFT to 2"),
+    buyTo(0xF0, 5, 15, "FENIX DOWN to 15"),
+    buyTo(0xE8, 0, 99, "TONIC to 99"),   -- the rite of passage: a full bag of Tonics for field care
     tapUntil("b", inState(0x25), "shop: back to the options window"),
     tapUntil("b", function() return H.hasControl() and map() == 85 end,
       "shop: closed"),
@@ -440,16 +476,90 @@ end
 local function levelOf(c) return H.readByte(0x1600 + 37 * c + 8) end
 
 local EXP_TARGET = 2250
-local GIL_TARGET = 8300   -- +250: the second Plumed Hat
-local grindLaps = 0
-local function grindDone()
-  return expOf(LOCKE) >= EXP_TARGET and gil() >= GIL_TARGET
+
+-- ------------------------------------------------------ the town's bill --
+-- What the rest of the stop buys, priced off the ROM for the shop that
+-- sells it (shopPrice) and counted against what the bag already holds, so
+-- the grind earns what this history needs rather than a constant.  The
+-- gear and the relics are fixed counts; the item shop's two lines follow
+-- the supply band (docs/design/level-curve.md: ~level x5 Tonics to 99,
+-- ~level Fenix Downs to 20) at the party's highest level; the inn's 80 GP
+-- closes it.  The shops are South Figaro's own (ShopProp 5, 6, 7 and 8);
+-- counterShop asserts each counter opens the one the bill priced.
+local MITHRILBLADE, HEAVYSHLD, PLUMEDHAT, STARPENDANT = 0x0A, 0x5B, 0x6B, 0xB1
+local JEWELRING = 0xB5
+local MITHRILKNIFE = 0x01
+local TONIC, FENIX = 0xE8, 0xF0
+local INN_GP = 80
+local function partyLevel()
+  local lv = 0
+  for _, c in ipairs(H.partyMembers()) do lv = math.max(lv, levelOf(c)) end
+  return lv
 end
-local function lap(n)
-  return H.cond(function() return not grindDone() end, {
-    H.logStep(function()
-      return string.format("grind lap %d: LOCKE L%d xp=%d/%d gil=%d f%d", n,
-        levelOf(LOCKE), expOf(LOCKE), EXP_TARGET, gil(), H.frame)
+-- `up` levels of headroom: the bill the grind works to is priced one level
+-- above the party's, because the walk back into town can fight, level the
+-- party and spend Tonics before the counter is reached
+local function tonicBand(up) return math.min(99, 5 * (partyLevel() + (up or 0))) end
+local function fenixBand(up) return math.min(20, partyLevel() + (up or 0)) end
+local TOWN_LIST = {
+  { shop = SHOP_WEAPON, id = MITHRILBLADE, to = 1 },
+  { shop = SHOP_WEAPON, id = MITHRILKNIFE, to = 1 },
+  { shop = SHOP_ARMOR, id = HEAVYSHLD, to = 2 },
+  { shop = SHOP_ARMOR, id = PLUMEDHAT, to = 2 },
+  { shop = SHOP_RELIC, id = STARPENDANT, to = 3 },
+  { shop = SHOP_RELIC, id = JEWELRING, to = 3 },
+  { shop = SHOP_ITEM, id = FENIX, to = fenixBand },
+  { shop = SHOP_ITEM, id = TONIC, to = tonicBand },
+}
+local function townBill(up)
+  local total, parts = INN_GP, {}
+  for _, it in ipairs(TOWN_LIST) do
+    local to = type(it.to) == "function" and it.to(up) or it.to
+    local need = math.max(0, to - invCount(it.id))
+    if need > 0 then
+      local cost = need * shopPrice(it.shop, it.id)
+      total = total + cost
+      parts[#parts + 1] = string.format("%dx$%02X=%d", need, it.id, cost)
+    end
+  end
+  parts[#parts + 1] = "inn=" .. INN_GP
+  return total, table.concat(parts, " ")
+end
+
+-- ------------------------------------------------------------ the grind --
+-- Laps between (100,105) and (87,105) until LOCKE's experience target is
+-- met and the purse covers the town's bill, checked between laps (never
+-- mid-battle), with each lap's steps built fresh the way the old fixed
+-- list of 24 built them.  The bound is GRIND_FRAMES of grinding: the last
+-- fixed-lap run earned 8428 gil in 49834 frames (the old generator's
+-- south_figaro.log, quoted in build/attempts/review/gen-robust/
+-- extracts.txt: "grind lap 1 ... gil=48 f22568" to "[grind] 24 laps ...
+-- gil=8476" at f72402), and this loop has met a bill near 10000 in 40580
+-- to 57475 frames: 55028 (build/attempts/wt/gen-robust/lab/gen-robust/
+-- kolts_pace3/kolts_pace3.log, a 10080-gil bill), 57475 (kolts_pace9/
+-- kolts_pace9.log, 9980), 57207 (the regenerated chain,
+-- build/attempts/wt/gen-robust-fix/chain/south_figaro.log, 10230) and 40580
+-- (build/attempts/wt/gen-robust-fix/kolts_desert3/south_figaro.log, 9380).
+-- So the budget is between two and three times that.  Running out is not a
+-- draw: the world picks each battle's formation from $1FA2, which moves once
+-- per battle and never per step (field/battle.asm UpdateBattleGrpRng), so a
+-- retry from the boot point meets the same sequence again.  It raises with
+-- no retryable text, the runner files it as `other`, and the message says
+-- what the grind earned.
+local GRIND_FRAMES = 150000
+local grindLaps, grindFrom = 0, nil
+local function grindDone()
+  return expOf(LOCKE) >= EXP_TARGET and gil() >= townBill(1)
+end
+local function lapSteps()
+  local n = grindLaps + 1
+  return {
+    H.call(function()
+      grindLaps = n
+      local bill, parts = townBill(1)
+      H.log(string.format("grind lap %d: LOCKE L%d xp=%d/%d gil=%d of the " ..
+        "town's %d (%s) f%d", n, levelOf(LOCKE), expOf(LOCKE), EXP_TARGET,
+        gil(), bill, parts, H.frame))
     end),
     H.worldNavTo(100, 105, { maxFrames = 40000, playBattles = "tactical",
                              reserve = { [POTION] = 3 } }),
@@ -457,9 +567,35 @@ local function lap(n)
     H.worldNavTo(87, 105, { maxFrames = 40000, playBattles = "tactical",
                             reserve = { [POTION] = 3 } }),
     H.release(),
-    H.call(function() grindLaps = n; where("grind lap " .. n) end),
+    H.call(function() where("grind lap " .. n) end),
     care("grind lap " .. n, 0.85),
-  }, {})
+  }
+end
+local function grindLoop()
+  local cur = nil
+  return {
+    tick = function()
+      while true do
+        if cur == nil then
+          if grindFrom == nil then grindFrom = H.frame end
+          if grindDone() then return "done" end
+          if H.frame - grindFrom > GRIND_FRAMES then
+            local bill, parts = townBill(1)
+            error(string.format("the South Figaro grind ran past its " ..
+              "%d-frame budget (%d frames, %d laps): LOCKE xp=%d of %d, " ..
+              "gil=%d of the town's %d-gil bill (%s).  Not a draw -- a " ..
+              "retry meets the same formations -- so not retried",
+              GRIND_FRAMES, H.frame - grindFrom, grindLaps, expOf(LOCKE),
+              EXP_TARGET, gil(), bill, parts), 0)
+          end
+          cur = seq(lapSteps())
+        end
+        if cur:tick() == "frame" then return "frame" end
+        cur = nil
+      end
+    end,
+    reset = function() cur = nil end,
+  }
 end
 
 local function grindTrip()
@@ -481,20 +617,23 @@ local function grindTrip()
       H.assertEq(H.worldX(), 84, "staged north of the gate, x=84")
       H.assertEq(H.worldY(), 108, "staged north of the gate, y=108")
       where("grind start")
+      local bill, parts = townBill(1)
+      H.log(string.format("[grind] the town's bill: %d gil (%s) at party " ..
+        "L%d+1; purse %d", bill, parts, partyLevel(), gil()))
     end),
-    lap(1), lap(2), lap(3), lap(4), lap(5), lap(6), lap(7), lap(8), lap(9),
-    lap(10), lap(11), lap(12), lap(13), lap(14), lap(15), lap(16), lap(17),
-    lap(18), lap(19), lap(20), lap(21), lap(22), lap(23), lap(24),
+    grindLoop(),
     H.call(function()
+      local bill, parts = townBill(1)
       H.log(string.format(
-        "[grind] %d laps: LOCKE L%d xp=%d (target %d), gil=%d",
-        grindLaps, levelOf(LOCKE), expOf(LOCKE), EXP_TARGET, gil()))
+        "[grind] %d laps in %d frames: LOCKE L%d xp=%d (target %d), " ..
+        "gil=%d of the town's %d (%s)", grindLaps, H.frame - grindFrom,
+        levelOf(LOCKE), expOf(LOCKE), EXP_TARGET, gil(), bill, parts))
       H.assertEq(expOf(LOCKE) >= EXP_TARGET, true,
         string.format("the grind reached its experience target in %d laps " ..
           "(LOCKE %d of %d)", grindLaps, expOf(LOCKE), EXP_TARGET))
-      H.assertEq(gil() >= GIL_TARGET, true,
+      H.assertEq(gil() >= bill, true,
         string.format("the grind paid for the town's whole shopping list " ..
-          "(%d of %d gil)", gil(), GIL_TARGET))
+          "(%d of %d gil)", gil(), bill))
     end),
     -- back in at (86,111) -> map 75 (1,28)
     H.worldNavTo(86, 111, { maxFrames = 40000, playBattles = "tactical",
@@ -555,7 +694,7 @@ end
 -- CheckNPCs reaches one tile past a counter (p1 & 7 == 7,
 -- field/player.asm:188-200), which is why these talk spots are two tiles
 -- below the merchant rather than adjacent to him.
-local function counterShop(sx, sy, what)
+local function counterShop(sx, sy, what, shop)
   return seq({
     H.navTo(sx, sy, { maxFrames = 20000, playBattles = "tactical" }),
     H.release(), H.waitFrames(20),
@@ -570,6 +709,10 @@ local function counterShop(sx, sy, what)
       end),
     }, what .. ": counter talk opens the shop"),
     H.release(),
+    H.call(function()
+      H.assertEq(H.shopId(), shop,
+        what .. ": the counter opened the shop the town's bill priced")
+    end),
     tapUntil("a", inState(0x26), what .. ": the buy list opens"),
     H.release(), H.waitFrames(20),
     H.call(function()
@@ -773,23 +916,19 @@ local function innRest(what)
   })
 end
 
-local MITHRILBLADE, HEAVYSHLD, PLUMEDHAT, STARPENDANT = 0x0A, 0x5B, 0x6B, 0xB1
-local JEWELRING = 0xB5
-local MITHRILKNIFE = 0x01
-
 local function gearTrip()
   return seq({
     enterDoor(29, 19, 77, "weapon shop"),
-    counterShop(103, 11, "shop 5 (weapon)"),
-    buyTo(MITHRILBLADE, 2, 1, 450, "MITHRILBLADE to 1"),
-    buyTo(MITHRILKNIFE, 1, 1, 300, "MITHRILKNIFE to 1"),
+    counterShop(103, 11, "shop 5 (weapon)", SHOP_WEAPON),
+    buyTo(MITHRILBLADE, 2, 1, "MITHRILBLADE to 1"),
+    buyTo(MITHRILKNIFE, 1, 1, "MITHRILKNIFE to 1"),
     closeShop(77, "shop 5"),
     H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (shop 5 (weapon))" }),
     leaveDoor(103, 16, "shop 5"),
     enterDoor(35, 19, 77, "armor shop"),
-    counterShop(114, 12, "shop 6 (armor)"),
-    buyTo(HEAVYSHLD, 1, 2, 400, "HEAVY SHLD to 2"),
-    buyTo(PLUMEDHAT, 3, 2, 250, "PLUMED HAT to 2 -- one per scenario order, the Heavy Shld precedent: the Locke run wears one onto a head before the split hands the bag to SABIN's train"),
+    counterShop(114, 12, "shop 6 (armor)", SHOP_ARMOR),
+    buyTo(HEAVYSHLD, 1, 2, "HEAVY SHLD to 2"),
+    buyTo(PLUMEDHAT, 3, 2, "PLUMED HAT to 2 -- one per scenario order, the Heavy Shld precedent: the Locke run wears one onto a head before the split hands the bag to SABIN's train"),
     closeShop(77, "shop 6"),
     H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (shop 6 (armor))" }),
     leaveDoor(114, 16, "shop 6"),
@@ -837,9 +976,9 @@ local function relicTrip()
     H.call(function()
       H.assertEq(sw(0x0358), 0, "the demonstrator has gone ($0358 cleared)")
     end),
-    counterShop(51, 11, "shop 7 (relics)"),
-    buyTo(STARPENDANT, 2, 3, 500, "STAR PENDANT to 3"),
-    buyTo(JEWELRING, 3, 3, 1000, "JEWEL RING to 3"),
+    counterShop(51, 11, "shop 7 (relics)", SHOP_RELIC),
+    buyTo(STARPENDANT, 2, 3, "STAR PENDANT to 3"),
+    buyTo(JEWELRING, 3, 3, "JEWEL RING to 3"),
     closeShop(76, "shop 7"),
     H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (shop 7 (relic))" }),
     H.call(function()
@@ -1077,29 +1216,48 @@ H.run({ maxFrames = 700000 }, {
   grindTrip(),
   gearTrip(),
 
-  -- Back to the item shop with the grind's money: the mountain is nine
-  -- crossings plus the map-98 approach, and this is the last counter
-  -- before the Returner Hideout.  Seven revives and thirty Tonics leave a
-  -- reserve while preserving gil for the relic shop and inn below.
-  enterDoor(44, 32, 85, "item shop (second visit)"),
-  counterShop(106, 54, "shop 8 (item, top-up)"),
-  buyTo(0xF0, 5, 7, 500, "FENIX DOWN to 7"),
-  buyTo(0xE8, 0, 30, 50, "TONIC to 30"),
-  closeShop(85, "shop 8"),
-  H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (South Figaro item shop, second visit)" }),
-  leaveDoor(104, 57, "the item shop"),
-  H.call(function()
-    H.assertEq(invCount(0xF0) >= 6, true,
-      "the mountain is walked with real revives now")
-    where("restocked")
-  end),
-
   H.openChest{ stand = {15, 46}, face = "up", bit = 22, what = "Antidote",
                item = 0xF2, nav = { playBattles = "tactical", avoid = M75_AVOID } },
   H.openChest{ stand = {15, 46}, face = "down", bit = 23, what = "Eyedrop",
                nav = { playBattles = "tactical", avoid = M75_AVOID } },
 
   relicTrip(),
+
+  -- Back to the item shop LAST with the grind's money: the mountain is
+  -- nine crossings plus the map-98 approach, and this is the last counter
+  -- before the Returner Hideout.  The gear, the relics and the inn -- the
+  -- things the route asserts on -- are already paid for, so the top-up is
+  -- the only purchase a short purse can short, and within it Fenix Downs
+  -- come first, to the supply band at the party's level.  Then the Tonic
+  -- soak takes what is left, toward 99: the grind's bill priced the band a
+  -- level higher, and a person heading into the Returners stretch spends
+  -- the change on field care rather than carrying it (the last run left
+  -- the counter at "gil=1416 tonic=55" and reached the Returner Hideout
+  -- with 39 Tonics against a band of 65, build/attempts/review/gen-robust/
+  -- extracts.txt).  buyTo purse-clamps, so short gil buys what it can.
+  enterDoor(44, 32, 85, "item shop (second visit)"),
+  counterShop(106, 54, "shop 8 (item, top-up)", SHOP_ITEM),
+  buyTo(FENIX, 5, function() return fenixBand() end,
+    "FENIX DOWN to the band (~level, to 20)"),
+  buyTo(TONIC, 0, 99, "TONIC toward 99 with what is left"),
+  closeShop(85, "shop 8"),
+  H.bagArrange({ 0xE9, 0xF0, 0xE8, 0xF2, 0xF5 }, { tag = "bag: combat items on top (South Figaro item shop, second visit)" }),
+  leaveDoor(104, 57, "the item shop"),
+  H.call(function()
+    H.assertEq(invCount(FENIX) >= fenixBand(), true,
+      string.format("the mountain is walked with the band's revives (%d " ..
+        "Fenix Downs, band %d at L%d)", invCount(FENIX), fenixBand(),
+        partyLevel()))
+    H.assertEq(invCount(TONIC) >= tonicBand(), true,
+      string.format("and the band's Tonics (%d, band %d at L%d)",
+        invCount(TONIC), tonicBand(), partyLevel()))
+    H.assertEq(invCount(TONIC) >= 99
+               or gil() < shopPrice(SHOP_ITEM, TONIC), true,
+      string.format("the change went on Tonics: %d in the bag, %d gil " ..
+        "left against a %d-gil Tonic", invCount(TONIC), gil(),
+        shopPrice(SHOP_ITEM, TONIC)))
+    where("restocked")
+  end),
 
   H.setRows({ [0] = true, [1] = false, [4] = true }, { tag = "rows" }),
 

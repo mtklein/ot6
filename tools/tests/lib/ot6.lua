@@ -7425,12 +7425,32 @@ function Driver:frame()
   if ph == 0 then
     self.held = self:button(actor) or {}
     self.heldFast, self.held.fast = self.held.fast or false, nil
+    self.pulseFrame = M.frame
   end
+  -- A press is held for a count of EMULATED frames from the pulse, not a
+  -- count of calls.  The command window auto-repeats a direction held
+  -- 10 frames (measured on first_battle's rider window: Down read at
+  -- f35 and again at f45 with the pad still down), and a caller that
+  -- ticks this driver every other frame (a driveUntil body of
+  -- `call(F.frame)` + `waitFrames(1)`) held every 6-call press for 12:
+  -- each Down moved the cursor two rows.  Where a blank row sits
+  -- between, the wanted row is never landed on -- EDGAR's Fight, Tools,
+  -- -, Item went 0 -> 1 -> 3 on Down and 3 -> 1 -> 0 on Up for 2,000
+  -- frames, and the Narshe riders' MagiTek, -, -, Item went 0 -> 3 -> 0,
+  -- so their Fenix Down plan parked at state $05 until the party wiped
+  -- (probe_mtek_cmd.log and stopwindow_trace.log, the $890F write traces,
+  -- in build/attempts/wt/stall-verdicts/lab/stall-verdicts/).  For a
+  -- caller that ticks every frame, the frames since the pulse ARE `ph`,
+  -- so nothing changes for it.
+  local held = M.frame - (self.pulseFrame or M.frame)
   -- `fast`: three 5-on/5-off presses in the pulse instead of one 6-on;
   -- each is a distinct press to the menu (a release between), so no
-  -- auto-repeat is involved and the count per pulse is exact.
-  if self.heldFast then M.setPad(ph % 10 < 5 and self.held or {})
-  else M.setPad(ph < 6 and self.held or {}) end
+  -- auto-repeat is involved and the count per pulse is exact (the
+  -- cadence bound keeps it three for a caller whose pulse spans more
+  -- frames than calls).
+  if self.heldFast then
+    M.setPad(held < (self.opts.cadence or 30) and held % 10 < 5 and self.held or {})
+  else M.setPad(held < 6 and self.held or {}) end
 end
 
 function M.newFightDriver(tag, opts)
