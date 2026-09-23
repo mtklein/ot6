@@ -534,12 +534,18 @@ end
 -- fixed-lap run earned 8428 gil in 49834 frames (the old generator's
 -- south_figaro.log, quoted in build/attempts/review/gen-robust/
 -- extracts.txt: "grind lap 1 ... gil=48 f22568" to "[grind] 24 laps ...
--- gil=8476" at f72402), and this loop met a bill near 10000 in 55028 and
--- 57475 frames (build/attempts/wt/gen-robust/lab/gen-robust/kolts_pace3/
--- kolts_pace3.log, kolts_pace9/kolts_pace9.log), so the budget is between
--- two and three times that.  Running out is a step
--- timeout (a seed-dependent class, so the segment runner retries it) that
--- says what the grind earned.
+-- gil=8476" at f72402), and this loop has met a bill near 10000 in 40580
+-- to 57475 frames: 55028 (build/attempts/wt/gen-robust/lab/gen-robust/
+-- kolts_pace3/kolts_pace3.log, a 10080-gil bill), 57475 (kolts_pace9/
+-- kolts_pace9.log, 9980), 57207 (the regenerated chain,
+-- build/attempts/wt/gen-robust-fix/chain/south_figaro.log, 10230) and 40580
+-- (build/attempts/wt/gen-robust-fix/kolts_desert3/south_figaro.log, 9380).
+-- So the budget is between two and three times that.  Running out is not a
+-- draw: the world picks each battle's formation from $1FA2, which moves once
+-- per battle and never per step (field/battle.asm UpdateBattleGrpRng), so a
+-- retry from the boot point meets the same sequence again.  It raises with
+-- no retryable text, the runner files it as `other`, and the message says
+-- what the grind earned.
 local GRIND_FRAMES = 150000
 local grindLaps, grindFrom = 0, nil
 local function grindDone()
@@ -575,9 +581,11 @@ local function grindLoop()
           if grindDone() then return "done" end
           if H.frame - grindFrom > GRIND_FRAMES then
             local bill, parts = townBill(1)
-            error(string.format("timeout after %d frames of grinding (%d " ..
-              "laps): LOCKE xp=%d of %d, gil=%d of the town's %d-gil bill " ..
-              "(%s)", H.frame - grindFrom, grindLaps, expOf(LOCKE),
+            error(string.format("the South Figaro grind ran past its " ..
+              "%d-frame budget (%d frames, %d laps): LOCKE xp=%d of %d, " ..
+              "gil=%d of the town's %d-gil bill (%s).  Not a draw -- a " ..
+              "retry meets the same formations -- so not retried",
+              GRIND_FRAMES, H.frame - grindFrom, grindLaps, expOf(LOCKE),
               EXP_TARGET, gil(), bill, parts), 0)
           end
           cur = seq(lapSteps())
