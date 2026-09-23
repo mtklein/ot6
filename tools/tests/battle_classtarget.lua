@@ -5,10 +5,10 @@
 -- The fixture is kolts_cave (map 96, the Mt. Kolts Cirpius pool).  Its
 -- weakness codex does NOT know Cirpius yet: a first Cirpius fight opens
 -- with no class shown (`encounter 1: s2=086 sh=2 crev=00 ...` on main,
--- build/states/suite_battle_classtarget.log).  A pierce hit on a Cirpius
--- teaches the codex (Ot6ClassChip stores the class to OT6_CODEX_CLASS), and
--- every later Cirpius fight opens with pierce shown on every Cirpius slot
--- (Ot6SeedShields pre-reveals it).  Walking the spawn tile's lane (the same
+-- build/attempts/wt/draw-budgets/lab/draw-budgets/baseline_classtarget.log).
+-- A pierce hit on a Cirpius teaches the codex (Ot6ClassChip stores the
+-- class to OT6_CODEX_CLASS), and every later Cirpius fight opens with
+-- pierce shown on every Cirpius slot (Ot6SeedShields pre-reveals it).  Walking the spawn tile's lane (the same
 -- oscillation gen_kolts_cave verifies the pool with) draws map 96's
 -- encounters; the mixed one -- Tusker (no class key) beside Cirpius x3
 -- (pierce) -- is the #157 picture: TERRA holds a MithrilKnife (pierce),
@@ -24,6 +24,10 @@
 -- encounter budget is the most any counter state needs to deal an
 -- all-Cirpius formation (which teaches) and after it the mixed one
 -- (H.worstCaseEncounters), not the handful this fixture happens to need.
+-- Every lane encounter that is not the one is fought out and followed by
+-- a field-care stop (H.careStop), as after any battle on the route: the
+-- hunt can fight a couple of dozen battles, and nothing it checks needs
+-- the party worn down.
 --
 -- What it checks, on the real fight the lane reaches:
 --   1. selection: the driver's chipAim aims the pierce hand (TERRA) at a
@@ -32,11 +36,15 @@
 --   2. negative control: opts.aim = false stubs the pick back to the old
 --      shape in place -- chipAim then returns nil, the engine's default
 --      cursor -- and the "aims at a Cirpius" assertion goes red.
---   3. outcome (A/B from one snapshot, Tools off so the pierce Fight is the
---      only Cirpius chipper): aim-on breaks at least as many Cirpius as
---      aim-off, the old shape, and ends the fight in fewer frames, each
---      branch timed from its own restore of the snapshot.  What that shows
---      and what it does not is at the A/B below.
+--   3. the aim's effect (A/B from one snapshot, Tools off so the pierce
+--      Fight is the only Cirpius chipper): through the whole fight, aim-on
+--      never aims TERRA's Fight at the unkeyed Tusker while a pierce-keyed
+--      Cirpius stands, and aim-off, the old shape, does -- each Fight's
+--      target read at the engine's hand-off of the confirmed input
+--      (GetPlayerTargets).  The pierce chips landed on a Cirpius (counted
+--      at Ot6ClassChip's store), the Cirpius broken and the frames each
+--      branch's fight took from its own restore are logged beside it, not
+--      asserted; why is at the A/B below.
 --
 -- Reads only, save for the coherent battle snapshot the A/B branches from
 -- (requestSaveState / requestLoadState); no RAM is edited, so this is a
@@ -104,6 +112,66 @@ local function formationText()
   return table.concat(parts, " ")
 end
 
+-- ---- pierce chips on a Cirpius, at the ROM's own store --------------------
+-- Ot6ClassChip (ot6_break.asm) is where a landed hit's class chip happens:
+-- `dec a / sta OT6_SHIELD_CUR,y` is its one store to a shield cell, so a
+-- write to a monster's cell ($3E40 + 2*slot, OT6_SHIELD_CUR + 8) made from
+-- inside that routine is exactly one chip.  It is a PIERCE chip when the
+-- attack's class (OT6_ATKCLASS, $57B8) and the target's class weaknesses
+-- (OT6_BP_CLASS + 8, $3EA4 + 2*slot) share the pierce bit -- the match the
+-- routine itself made.  The routine's end is the next proc in the file,
+-- Ot6RevealCommit.  Reads only; `branchRecord` is the record of the branch
+-- being measured, nil outside one.
+local SH_CUR, BP_CLASS, ATKCLASS = 0x3E40, 0x3EA4, 0x57B8
+local CLASSCHIP, CLASSCHIP_END = H.sym("Ot6ClassChip"), H.sym("Ot6RevealCommit")
+assert(CLASSCHIP < CLASSCHIP_END and CLASSCHIP_END - CLASSCHIP < 0x100,
+  "Ot6RevealCommit follows Ot6ClassChip in the ROM (the chip store's pc range)")
+local branchRecord = nil
+emu.addMemoryCallback(function(addr)
+  if branchRecord == nil then return end
+  local off = addr - (0x7E0000 + SH_CUR)
+  if off % 2 ~= 0 then return end
+  local st = emu.getState()
+  local pc = (st["cpu.k"] << 16) | st["cpu.pc"]
+  if pc < CLASSCHIP or pc >= CLASSCHIP_END then return end
+  local slot = off // 2
+  if speciesAt(slot) ~= CIRPIUS then return end
+  if (H.readByte(ATKCLASS) & H.readByte(BP_CLASS + slot * 2) & PIERCE) == 0 then return end
+  branchRecord.chips = branchRecord.chips + 1
+  branchRecord.on[slot] = (branchRecord.on[slot] or 0) + 1
+end, emu.callbackType.write, 0x7E0000 + SH_CUR, 0x7E0000 + SH_CUR + 11)
+
+-- ---- where the pierce hand's Fights were aimed ----------------------------
+-- GetPlayerTargets (battle_main.asm) turns a confirmed menu input into an
+-- action: X = the actor's entity offset, Y = its input-queue offset, and
+-- the queue holds the command ($2BAF), attack ($2BB0) and the target word
+-- the cursor confirmed ($2BB1: characters low, monsters high).  Each Fight
+-- TERRA confirms is recorded with the monster it was aimed at and whether
+-- a pierce-keyed Cirpius stood at that moment -- the input the aim
+-- changes, read at the engine's own hand-off.
+local TERRA_ENT = nil       -- TERRA's entity offset, set when the fight is found
+do
+  local gpt = H.sym("GetPlayerTargets")
+  emu.addMemoryCallback(function()
+    if branchRecord == nil or TERRA_ENT == nil then return end
+    local st = emu.getState()
+    local x, y = st["cpu.x"] & 0xFFFF, st["cpu.y"] & 0xFFFF
+    if x ~= TERRA_ENT or H.readByte(0x2BAF + y) ~= 0x00 then return end
+    local mons = (H.readWord(0x2BB1 + y) >> 8) & 0x3F
+    local slot = nil
+    for s = 0, 5 do if mons == (1 << s) then slot = s end end
+    local keyed = false
+    for s = 0, 5 do
+      if alive(s) and speciesAt(s) == CIRPIUS and (classRev(s) & PIERCE) ~= 0 then keyed = true end
+    end
+    local at = slot and speciesAt(slot) or nil
+    branchRecord.fights[#branchRecord.fights + 1] = string.format("%s%s",
+      slot and string.format("s%d=%03X", slot, at) or string.format("mask%02X", mons),
+      keyed and "" or "(no keyed Cirpius)")
+    if keyed and at ~= CIRPIUS then branchRecord.offKey = branchRecord.offKey + 1 end
+  end, emu.callbackType.exec, gpt, gpt)
+end
+
 -- ---- the spawn lane (gen_kolts_cave's own encounter-pool walk) ------------
 local BACK = { left = "right", right = "left", up = "down", down = "up" }
 local lane = nil
@@ -139,14 +207,19 @@ local S = { found = false, blob = nil, terra = nil, locke = nil,
 
 -- one measured A/B branch, from the restore that starts it: drive to the
 -- end of the fight with Tools off so the pierce Fight is the only thing
--- that can chip a Cirpius, and record how many Cirpius broke and how many
--- frames the fight took from the restored snapshot.
+-- that can chip a Cirpius, and record the pierce chips that landed on a
+-- Cirpius (branchRecord), how many Cirpius broke, and how many frames the
+-- fight took from the restored snapshot.
 local function measure(name, aim)
   local F = H.newFightDriver(name, { tactical = true, boost = true, items = true,
     bank = 0, healPercent = 55, tools = false, aim = aim })
   local out = S.ab[name]
   return H.seqStep({
-    H.call(function() out.broke = {} end),
+    H.call(function()
+      out.broke, out.chips, out.on, out.fights, out.offKey = {}, 0, {}, {}, 0
+      TERRA_ENT = S.terra * 2
+      branchRecord = out
+    end),
     H.driveUntil(function() return not H.battleLoadStarted() end, 40000, {
       H.call(function()
         F.frame()
@@ -156,12 +229,20 @@ local function measure(name, aim)
       end),
     }, name .. " drive"),
     H.call(function()
+      branchRecord = nil
       out.frames = H.frame - out.restored
       out.nbroke = 0
       for _ in pairs(out.broke) do out.nbroke = out.nbroke + 1 end
-      H.log(string.format("[classtarget] %s: cirpius broken=%d, fight took %d frames "
-        .. "from the restored snapshot (f%d..f%d)", name, out.nbroke, out.frames,
-        out.restored, H.frame))
+      local per = {}
+      for s = 0, 5 do
+        if out.on[s] then per[#per + 1] = string.format("s%d:%d", s, out.on[s]) end
+      end
+      H.log(string.format("[classtarget] %s: pierce chips on a Cirpius=%d (%s), cirpius "
+        .. "broken=%d, fight took %d frames from the restored snapshot (f%d..f%d); TERRA's "
+        .. "Fights aimed at: %s -- %d off the key while a keyed Cirpius stood", name,
+        out.chips, #per > 0 and table.concat(per, " ") or "none", out.nbroke, out.frames,
+        out.restored, H.frame, #out.fights > 0 and table.concat(out.fights, " ") or "none",
+        out.offKey))
     end),
   })
 end
@@ -194,7 +275,8 @@ local function huntStep(i)
         S.req = H.requestSaveState()
       end
     end),
-    -- not the one: fight it out with the ordinary driver, then walk on
+    -- not the one: fight it out with the ordinary driver, care for the
+    -- party on the field, then walk on
     H.cond(function() return not S.found end, {
       (function()
         local F = H.newFightDriver("skip" .. i, { tactical = true, boost = true, items = true, bank = 0, healPercent = 55 })
@@ -203,6 +285,7 @@ local function huntStep(i)
         }, "clear encounter " .. i)
       end)(),
       H.waitFrames(60),
+      H.careStop("care after lane encounter " .. i),
     }, {}),
   }, {})
 end
@@ -316,20 +399,28 @@ steps[#steps + 1] = H.call(function()
     "a multi-part self.parts wins: chipAim makes no class pick")
 end)
 
--- 3. outcome A/B: aim-on breaks at least as many Cirpius and ends the
--- fight sooner, each branch timed from its own restore of the one
--- snapshot.  (This used to compare H.frame at each branch's end; H.frame
--- runs on across a restore and aim-off runs second, so "sooner" held by
--- construction, and its ">20% fewer frames or more broken" margin
--- compared two counters that both carried the whole hunt, and aim-off's
--- carried aim-on's fight as well.)  Timed from the restore, across eight
--- different mixed fights -- shifts 0/1/9 at this fixture's draw, and the
--- fight found after 3 and after 36 lane encounters run from first
--- (build/lab/draw-budgets/classtarget/) -- aim-on took
--- 0.63 to 0.97 of aim-off's frames and broke as many Cirpius or more,
--- every time; a fixed 20% margin failed three of the eight (0.81, 0.93,
--- 0.97, each with the same Cirpius broken on both sides), so none is
--- asserted.  What this shows is the direction on one fight, not a size.
+-- 3. the aim's effect, A/B from the one snapshot.  What the aim changes is
+-- where the pierce hand's Fight is aimed: counted at the engine's own
+-- hand-off of each confirmed input (GetPlayerTargets, above), aim-on
+-- never aims TERRA's Fight at the unkeyed Tusker while a pierce-keyed
+-- Cirpius stands, and aim-off -- the engine's default cursor -- does, on
+-- this fight.  Across twelve different mixed fights (lab copies that flee
+-- 0, 1, 2, 3, 4, 5, 6, 8, 10, 13, 16 and 21 lane encounters before the
+-- body, so the hunt starts that far along the encounter counter:
+-- build/attempts/wt/draw-budgets-fix/lab/classtarget/final/ct_pre*.log,
+-- `[classtarget] A/B`), aim-on aimed 0 of its 3 to 5 Fights off the key
+-- and aim-off 1 to 3 of its 4 or 5, every time: once the Cirpius the
+-- default cursor starts on falls, the cursor sits on the Tusker.
+-- What is not asserted, and why.  The pierce chips landed on a Cirpius
+-- came out aim-on 4 against aim-off 4 in six of those fights, 5 in four
+-- and 3 in two -- a Cirpius takes two chips and then breaks, and the
+-- default cursor's first target is a Cirpius as well -- so "aim-on lands
+-- more chips" held in two of twelve (and failed seven of eight as an
+-- assertion: build/attempts/wt/draw-budgets-fix/lab/classtarget/r1/
+-- summary.tsv).  The frames each fight took, from its own restore, ran
+-- 0.70 to 1.07 of aim-off's, above 1 twice.  (An older form compared
+-- H.frame at each branch's end; H.frame runs on across a restore and
+-- aim-off ran second, so "sooner" held by construction.)
 steps[#steps + 1] = (function()
   S.ab["aim-on"], S.ab["aim-off"] = {}, {}
   return H.seqStep({
@@ -339,12 +430,18 @@ steps[#steps + 1] = (function()
     measure("aim-off", false),
     H.call(function()
       local a, b = S.ab["aim-on"], S.ab["aim-off"]
-      H.assertEq(a.nbroke >= b.nbroke, true, string.format(
-        "aim-on breaks at least as many Cirpius as the old shape (%d vs %d)",
-        a.nbroke, b.nbroke))
-      H.assertEq(a.frames < b.frames, true, string.format(
-        "aim-on ends the fight sooner than the old shape (%d vs %d frames from the restore)",
-        a.frames, b.frames))
+      H.log(string.format("[classtarget] A/B: TERRA Fights aimed off the key while a keyed "
+        .. "Cirpius stood %d of %d vs %d of %d; pierce chips on a Cirpius %d vs %d; cirpius "
+        .. "broken %d vs %d; frames from the restore %d vs %d (on/off %.3f)", a.offKey,
+        #a.fights, b.offKey, #b.fights, a.chips, b.chips, a.nbroke, b.nbroke, a.frames,
+        b.frames, a.frames / b.frames))
+      H.assertEq(#a.fights > 0, true, "TERRA Fought in the aim-on branch (the count below is "
+        .. "not vacuous)")
+      H.assertEq(a.offKey, 0, string.format("aim-on never aims TERRA's Fight at the unkeyed "
+        .. "Tusker while a pierce-keyed Cirpius stands (%d Fights)", #a.fights))
+      H.assertEq(b.offKey > a.offKey, true, string.format("and the old shape does, on this "
+        .. "fight: the A/B separates (%d of %d vs %d of %d)", b.offKey, #b.fights, a.offKey,
+        #a.fights))
     end),
   })
 end)()
