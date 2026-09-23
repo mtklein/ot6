@@ -7810,8 +7810,9 @@ end
 --      backstop.
 --
 --   2. RETRY FROM THE BOOT POINT.  A failure whose class is SEED-DEPENDENT
---      (a wipe, a navTo/worldNavTo "no path", a step timeout, a watchdog
---      trip, a recovery-cap trip) restores the snapshot taken at the run's
+--      (a wipe, a story loss raised as "LOST: ...", a navTo/worldNavTo "no
+--      path", a step timeout, a watchdog trip, a recovery-cap trip)
+--      restores the snapshot taken at the run's
 --      first frame, re-executes the generator's body from source -- fresh
 --      closures, fresh per-run tables, fresh step objects -- and replays it
 --      with the seed legitimately varied by idle frames at the boot point.
@@ -8371,9 +8372,14 @@ end
 -- ------------------------------------------------------- failure classes --
 -- Seed-dependent: the same route on another seed can pass, so it is
 -- retried.  Everything else is a bug and fails at once.
+--   lost: a loss the story itself offers outside a battle, raised by the
+--         body as "LOST: <what>" (Cid's death on the Solitary Island,
+--         gen_wor_start): the game goes on down its other branch, and a
+--         person who wanted the first one reloads the save, as after a
+--         wipe.  Retried and counted like one.
 local RETRYABLE = {
   wipe = true, nopath = true, timeout = true,
-  noeffect = true, noprogress = true, recovery_cap = true,
+  noeffect = true, noprogress = true, recovery_cap = true, lost = true,
 }
 
 local function classify(msg)
@@ -8384,6 +8390,7 @@ local function classify(msg)
      or msg:find("CONTRACT DIFF", 1, true)
      or msg:find("entry contract", 1, true)
      or msg:find("exit contract", 1, true) then return "assert" end
+  if msg:find("^LOST: ") then return "lost" end
   if msg:find("no-effect:", 1, true) then return "noeffect" end
   if msg:find("no-progress:", 1, true) then return "noprogress" end
   if msg:find("recovery cap:", 1, true) then return "recovery_cap" end
@@ -8640,7 +8647,9 @@ end
 -- 1 otherwise; OT6_RETRIES from the environment overrides both, which is
 -- how tools/tests/seed_sweep.py turns retries off).  opts.watchdog:
 -- true/false to force the fast-failure watchdogs on or off (default: on
--- for a segment, observation-only elsewhere).
+-- for a segment, observation-only elsewhere).  opts.bootFallback = false:
+-- the body marks its own boot point (M.bootMark) later than BOOT_FALLBACK,
+-- so the runner must not mark one for it at that frame.
 local runnerStarted = false
 
 function M.run(opts, steps)
@@ -9153,7 +9162,11 @@ function M.run(opts, steps)
     -- calls M.bootMark, so the seed variation would have nowhere to go.
     -- Mark the run's own opening instead: idling there is the same
     -- legitimate thing -- a player who has not started pressing yet.
-    if not RUN.bootMarked and M.frame == BOOT_FALLBACK then
+    -- A body that marks its own boot point late (gen_wor_start: on the
+    -- fishing beach after its first catches, f2300+ after a cold Continue)
+    -- says so with opts.bootFallback = false, and is not pre-empted here.
+    if not RUN.bootMarked and M.frame == BOOT_FALLBACK
+       and RUN.opts.bootFallback ~= false then
       M.bootMark(string.format("no fixture load or entry contract in the "
         .. "first %d frames: the run's own opening", BOOT_FALLBACK))
     end

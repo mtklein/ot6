@@ -1,36 +1,33 @@
--- gen_wor_start.lua -- the World of Ruin opening: from wor_landing (solo
--- CELES at Cid's bedside on the Solitary Island, map 397, the WoR flag
--- $00A4 set) to the first save the game allows after the island, on the
--- World of Ruin map where the raft lands.  Generates wor_start.mss, and
--- its capture run (OT6_CAPTURE_SRM) cuts the `wor-start-v1` battery.
+-- gen_wor_start.lua -- Cid saved, the raft, and the first save after the
+-- Solitary Island: cold-Continue the `wor-island-v1` battery (CELES on the
+-- island's own World of Ruin tile (76,239), Cid not yet fed), feed Cid
+-- until he recovers, ride his recovery scene, the raft and the voyage, and
+-- save on the World of Ruin map where the raft lands.  Generates
+-- wor_start.mss, and its capture run (OT6_CAPTURE_SRM) cuts the
+-- `wor-start-v1` battery.
 --
 -- The route (docs/design/wor-start.md has the measurements):
---   1. Dress CELES.  The WoR opening hands her over with every slot empty
---      (her escape kit went to the bag), and the menu costs Cid nothing:
---      his clock is timer 0 with the FIELD_ONLY flag ($1188 = $80), which
---      DecTimersMenuBattle skips.
---   2. The island save.  Off 396's west edge the island is a tile on the
---      World of Ruin map (76,239); the world map allows saving and Cid's
---      field clock stands still there.  A person who knows Cid can be lost
---      saves here first; so does this route (slot 3).
---   3. Save Cid by feeding him, the way a person does it: walk down onto
---      the fishing beach (396 row 14 -> 398 (4,2)), catch fish by facing
---      one from the shore and pressing A, walk back into the house (396
---      (8,6) -> 397) and talk to him from (99,38).  His health is event
---      var 7 ($1FD0): 120 at the landing, -1 each time the 64-frame field
---      timer fires (_ca533f), and every talk rerolls which of the four
---      fish swim (_ca534a, 50% each).  Eating: the NORMAL-speed fish +32,
---      the two SLOW ones +16 and -4, the SLOWER one -16 (_ca5370); he
---      recovers when fed above 256, and is lost if Celes walks into the
---      house with 30 or less (the map's init, _caf42d).
---      POLICY (visible cues only: a fish's swim speed, $0875): if the fast
---      fish is swimming, catch it, plus any slow fish that swims up beside
---      her on the way, plus a slow one still close when the fast one is
---      caught; if it is not, walk straight back and talk to him (the talk
---      is the reroll).  Never the slowest fish.  Measured, this recovers
---      him about 4 times in 5 from the island save (docs/design/
---      wor-start.md); a lost attempt reloads the island save and goes
---      again, bounded at 4 and every attempt logged.
+--   1. Back onto (76,240), the island's way in (-> 396 (8,12)).
+--   2. Feed Cid, the way a person does it: down onto the fishing beach
+--      (396 row 14 -> 398 (4,2)), catch fish by facing one from the shore
+--      and pressing A, back into the house (396 (8,6) -> 397) and talk to
+--      him from (99,38).  His health is event var 7 ($1FD0), -1 each time
+--      the 64-frame field timer fires (_ca533f); every talk rerolls which
+--      of the four fish swim (_ca534a, 50% each) and feeds him what Celes
+--      holds: the NORMAL-speed fish +32, the two SLOW ones +16 and -4, the
+--      SLOWER one -16 (_ca5370).  He recovers when fed above 256, and is
+--      lost if Celes walks into the house with 30 or less (_caf42d).
+--      POLICY (visible cues only: a fish's swim speed, $0875), the lab's
+--      pick: catch every fish but the slowest, fast one first, whether or
+--      not the fast one swims (see POLICY below).
+--   3. A lost Cid is a lost attempt: the body raises "LOST: ...", which the
+--      segment runner files as class `lost` and retries from the boot
+--      checkpoint like a wipe (bounded, `[retry]` lines, audit_retries).
+--      The draw a retry meets is moved by the runner's seed shift, idled
+--      on the fishing beach after the first visit's catches (the boot
+--      point, below), where the fish swim and spend the field RNG the
+--      talk's reroll reads; each attempt asserts it did not draw an
+--      earlier failed attempt's first reroll.
 --   4. His recovery scene reveals the stairs; walk down to the raft
 --      (397 (85,51)) and talk to it: his farewell, the voyage, and the
 --      landing on the World of Ruin map at (146,212).
@@ -40,6 +37,25 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
+-- The fishing policy.  The lab (tools/tests/fishlab.py, docs/design/
+-- wor-start.md "The lab") played each of these from this checkpoint; "all"
+-- recovered Cid on 47 of 48 distinct draws (119 of 120 attempts), "near"
+-- on 44 of 48, "fastslow" 27 of 34, "fast" 5 of 27, "wait" 0 of 15.
+--   "near"      the fast fish if it swims, plus a slow fish that swims up
+--               beside her on the way, plus a slow one still within
+--               SLOW_AFTER_FAST frames once the fast one is caught; no fast
+--               fish: straight back to Cid (the talk is the reroll)
+--   "fast"      the fast fish only
+--   "fastslow"  the fast fish, then every slow fish, however long it takes
+--   "all"       every fish but the slowest, whether or not the fast one swims
+--   "allnear"   "near" while the fast fish swims; every slow fish when it
+--               does not
+--   "wait"      "near", but stand at WAIT_SPOT and let the fish come
+-- Never the slowest fish (-16) under any of them.
+local POLICY = "all"
+local SLOW_AFTER_FAST = 240
+local WAIT_SPOT = { 8, 12 }   -- the land-edge tile beside the fast fish's two likeliest shore tiles
+
 local CELES = 6
 local MAP_HOUSE, MAP_ISLE, MAP_BEACH = 397, 396, 398
 local OBJ_RAFT = 0x13                               -- npc_prop 397 record 4 (the raft)
@@ -47,7 +63,7 @@ local GFX_FISH = 0x3A                               -- include/gfx/map_sprite_gf
 local SPEED_FAST, SPEED_SLOW = 2, 1                 -- $0875: NORMAL 2, SLOW 1, SLOWER 0
 local TALK_X, TALK_Y = 99, 38                       -- beside the bed, facing right
 local LANDING_X, LANDING_Y = 146, 212               -- _ca5633: load_map 1, {146, 212}
-local SLOW_AFTER_FAST = 240                         -- frames a slow fish is still chased after the fast one
+local CATCH_GIVEUP = 2400                           -- frames on one fish before leaving it
 local TRIP_CAP = 250
 
 local function map() return H.mapId() & 0x1ff end
@@ -73,8 +89,7 @@ local DIRS = {
 }
 local STEP = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
-local trip, fed, caughtTrip, spreadLeft = 0, {}, {}, 0
-local islandBlob, cidSaved, attemptLog, rolls, firstRoll = nil, false, {}, {}, nil
+local trip, fed, caughtTrip, firstDraw = 0, {}, {}, nil
 local function fishSet()
   local parts = {}
   for i = 0x10, 0x1F do
@@ -131,28 +146,30 @@ end
 -- fish's pixel position: a swimming fish owns its destination tile from
 -- the start of its move.
 local function fishing()
-  local seen, list, target, ph, fastCaughtAt, arrived = nil, nil, nil, 0, nil, nil
-  local present = {}
+  local seen, list, target, tStart, ph, fastSeen, fastCaughtAt, arrived =
+    nil, nil, nil, 0, 0, false, nil, nil
+  local present, skip = {}, {}
   local function wanted(i)
-    if not isFish(i) then return false end
+    if not isFish(i) or skip[i] then return false end
     local sp = objSpeed(i)
     if sp >= SPEED_FAST then return true end
     if sp ~= SPEED_SLOW then return false end                    -- never the slowest
-    -- a slow fish is worth a chase only beside the fast one's: while the
-    -- fast fish swims, or for a moment after it is caught
+    if POLICY == "fast" then return false end
+    if POLICY == "all" or POLICY == "fastslow" then return true end
+    -- "allnear" with no fast fish swimming: every slow fish
+    if POLICY == "allnear" and not fastSeen then return true end
+    -- "near" / "wait" / "allnear": a slow fish is worth it only beside the
+    -- fast one's catch: while the fast fish swims, or for a moment after it
+    -- is caught
     if fastCaughtAt then return H.frame - fastCaughtAt <= SLOW_AFTER_FAST end
     return true
-  end
-  local function fastSwimming()
-    for i = 0x10, 0x1F do if isFish(i) and objSpeed(i) >= SPEED_FAST then return true end end
-    return false
   end
   local function anyWanted()
     for i = 0x10, 0x1F do if wanted(i) then return true end end
     return false
   end
   local step = H.driveUntil(function()
-    if not arrived or spreadLeft > 0 then return false end
+    if not arrived then return false end
     for i = 0x10, 0x1F do
       if present[i] and not objOn(i) then
         caughtTrip[#caughtTrip + 1] = string.format("%02X:sp%d@%d", i, present[i], H.frame - arrived)
@@ -163,8 +180,17 @@ local function fishing()
         if target == i then target = nil end
       end
     end
-    -- the whole visit hangs on the fast fish: no fast fish, no chase
-    if not fastCaughtAt and not fastSwimming() then return true end
+    if target and H.frame - tStart > CATCH_GIVEUP then
+      H.log(string.format("[cid] trip %d: left fish %02X after %d frames", trip, target, H.frame - tStart))
+      skip[target] = true; target = nil
+    end
+    -- no fast fish: the visit is over (the talk rerolls), except under "all"
+    if POLICY ~= "all" and POLICY ~= "allnear" and not fastSeen then return true end
+    -- standing and waiting has the same patience as chasing one fish
+    if POLICY == "wait" and H.frame - arrived > CATCH_GIVEUP then
+      H.log(string.format("[cid] trip %d: left the spot after %d frames", trip, H.frame - arrived))
+      return true
+    end
     return not anyWanted()
   end, 12000, {
     H.call(function()
@@ -172,14 +198,15 @@ local function fishing()
       if not arrived then
         arrived = H.frame
         seen, list = reachable()
-        for i = 0x10, 0x1F do if isFish(i) then present[i] = objSpeed(i) end end
+        for i = 0x10, 0x1F do
+          if isFish(i) then
+            present[i] = objSpeed(i)
+            if objSpeed(i) >= SPEED_FAST then fastSeen = true end
+          end
+        end
         H.log(string.format("[cid] trip %d: the beach at f%d, health %d, fish %s",
           trip, H.frame, health(), fishSet()))
       end
-      -- a reloaded attempt's first look at the beach lingers (the ladder's
-      -- spread, below): the fish swim on meanwhile, so the next reroll
-      -- reads the field RNG somewhere else
-      if spreadLeft > 0 then spreadLeft = spreadLeft - 1; H.setPad({}); return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
       local px, py = H.fieldX(), H.fieldY()
@@ -191,6 +218,13 @@ local function fishing()
           H.setPad(ph < 4 and { a = true, [d[1]] = true } or { [d[1]] = true })
           return
         end
+      end
+      if POLICY == "wait" then
+        -- stand on the spot and let them come
+        if px == WAIT_SPOT[1] and py == WAIT_SPOT[2] then H.setPad({}); return end
+        local p = H.bfsPath(WAIT_SPOT[1], WAIT_SPOT[2])
+        H.setPad(p and #p > 0 and { [H.movePress(p[1])] = true } or {})
+        return
       end
       -- otherwise close in: the fast fish first, then the nearest
       if not target or not wanted(target) then
@@ -204,6 +238,7 @@ local function fishing()
           end
         end
         if not target then H.setPad({}); return end
+        tStart = H.frame
       end
       local ox, oy = H.objX(target), H.objY(target)
       local path
@@ -226,7 +261,8 @@ local function fishing()
     end),
   }, "fishing")
   return H.withReset(step, function()
-    seen, list, target, ph, fastCaughtAt, arrived, present = nil, nil, nil, 0, nil, nil, {}
+    seen, list, target, tStart, ph, fastSeen, fastCaughtAt, arrived = nil, nil, nil, 0, 0, false, nil, nil
+    present, skip = {}, {}
   end)
 end
 
@@ -270,20 +306,84 @@ local function talkCid()
   })
 end
 
-local tripStart, healthBefore = 0, 0
-local function seq(steps) return H.cond(function() return true end, steps) end
+-- this attempt's first draw, the moment the first talk has rerolled: the
+-- spawn switches it set ($0369-$036C), where the field RNG index stood
+-- ($1F6D, field/reset.asm Rand) and Cid's health after the feed.  An
+-- earlier failed attempt's LOST line carries its own; the same three is
+-- the same continuation, and a retry that replays it is no retry.
+local function noteFirstDraw()
+  firstDraw = string.format("roll %d%d%d%d rand $%02X health %d", sw(0x369), sw(0x36A),
+    sw(0x36B), sw(0x36C), H.readByte(0x1F6D), health())
+  H.log(string.format("[cid] first draw: %s", firstDraw))
+  for _, f in ipairs(H.attemptFailures()) do
+    local d = tostring(f.msg):match("first draw %[(.-)%]")
+    if d then
+      H.assertEq(d ~= firstDraw, true, string.format(
+        "the first draw (%s) differs from attempt %d's: the seed shift moved the fish rolls", firstDraw, f.attempt))
+    end
+  end
+end
 
--- One feeding run: trip after trip until he recovers ($00B3) or Celes
--- walks into the house with his health at 30 or less and the map's init
--- marks him lost ($00B4 -- a person finds out by talking to him; the run
--- stops at the mark instead of riding the death scene).
-local function feedCid()
-  return H.driveUntil(function()
-    if trip >= TRIP_CAP and not cidWell() and not cidDead() then
+local tripStart, healthBefore, beachMarked = 0, 0, false
+local function bright15() return bright() >= 15 end
+-- maxFrames: one attempt's budget; the lab's slowest recovery under "all"
+-- took 112 trips and 216,277 frames to it (docs/design/wor-start.md).
+-- bootFallback = false: the boot point is marked on the beach (below),
+-- f2300+ after the Continue, past the runner's own 2400-frame fallback.
+-- retries: the runner's default 3 for a segment.
+H.run({ maxFrames = 600000, bootFallback = false }, {
+  -- ---- 0. cold Continue of wor-island-v1 -----------------------------------
+  H.waitFrames(350),
+  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+  H.waitFrames(120),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
+  H.waitFrames(300),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
+  H.waitUntil(function() return H.worldMode() and H.worldHasControl() end, 3000,
+    "cold Continue onto the island's World of Ruin tile", 10),
+  H.waitUntil(bright15, 900, "cold Continue fade-in", 10),
+  H.waitFrames(20),
+  H.call(function()
+    -- The entry contract WITHOUT the boot mark: a seed shift idled here, on
+    -- the world map, moves nothing the first draw reads (measured: shifts
+    -- 0/15/30/45 all drew "roll 1010 rand $BC health 139";
+    -- docs/design/wor-start.md "What varies the draw").  The boot point is
+    -- on the beach instead (below).
+    H.assertContract("wor-island-v1", "entry")
+    local c = 0x1600 + 37 * CELES
+    H.log(string.format("[wor] boot f%d: world %d (%d,%d), CELES L%d HP %d/%d MP %d, Cid health %d, timer 0 $%02X/%d, fish %d%d%d%d, rand $%02X, policy %s",
+      H.frame, H.worldId(), H.worldX(), H.worldY(), H.readByte(c + 8), H.charHp(CELES),
+      H.charMaxHp(CELES), H.charMp(CELES), health(), H.readByte(0x1188), H.readWord(0x1189),
+      sw(0x369), sw(0x36A), sw(0x36B), sw(0x36C), H.readByte(0x1F6D), POLICY))
+    H.assertEq(health() > 30 and health() <= 256, true, "wor-island-v1: Cid's health is between the two outcomes")
+  end),
+
+  -- ---- 1. back onto the island ----------------------------------------------------
+  (function()
+    local W = H.newWalkFighter("the island's entrance")
+    return H.driveUntil(function()
+      return map() == MAP_ISLE and ready()
+    end, 3000, {
+      H.call(function()
+        if W.frame() then return end
+        if not H.worldMode() then H.setPad({}); return end
+        if not (H.worldHasControl() and H.worldAligned()) then H.setPad({}); return end
+        H.setPad(H.worldY() < 240 and { down = true } or { up = true })
+      end),
+    }, "onto the island's entrance (76,240)")
+  end)(),
+
+  -- ---- 2. feed Cid -----------------------------------------------------------------
+  H.driveUntil(function()
+    if cidDead() then
+      error(string.format("LOST: Cid died -- health %d as Celes walked into the house on trip %d; "
+        .. "first draw [%s]; fed %s", health(), trip, tostring(firstDraw), table.concat(fed, " ")), 0)
+    end
+    if trip >= TRIP_CAP and not cidWell() then
       error(string.format("Cid neither recovered nor lost after %d trips (health %d)", trip, health()), 0)
     end
-    return cidWell() or cidDead()
-  end, 400000, {
+    return cidWell()
+  end, 560000, {
     H.call(function()
       trip = trip + 1; caughtTrip = {}; tripStart = H.frame; healthBefore = health()
     end),
@@ -291,6 +391,18 @@ local function feedCid()
       { through(100, 46, "down", MAP_ISLE, "the house door -> 396") }, {}),
     through(8, 14, "down", MAP_BEACH, "396 -> the beach 398"),
     fishing(),
+    -- the boot point: this attempt's seed shift idles here, on the beach
+    -- after the first visit's catches, a beat before the walk back.  The
+    -- fish and the bird walk the field RNG ($1F6D) while Celes stands
+    -- there, and the next talk's reroll reads it; an idle anywhere else is
+    -- absorbed (docs/design/wor-start.md "What varies the draw")
+    H.cond(function() return not beachMarked end, {
+      H.call(function()
+        beachMarked = true
+        H.bootMark(string.format("the fishing beach 398 after trip 1's catches (health %d, rand $%02X)",
+          health(), H.readByte(0x1F6D)))
+      end),
+    }, {}),
     through(4, 1, "up", MAP_ISLE, "the beach -> 396"),
     through(8, 6, "up", MAP_HOUSE, "396 -> the house"),
     H.call(function()
@@ -300,198 +412,19 @@ local function feedCid()
     H.cond(function() return not cidDead() end, { talkCid() }, {}),
     H.call(function()
       fed[#fed + 1] = string.format("%d:{%s}", trip, table.concat(caughtTrip, ","))
-      if trip == 1 then
-        -- the first reroll this attempt drew (spawn switches $0369-$036C)
-        -- and where the field RNG stood ($1F6D): what the ladder's spread
-        -- has to move for a reload to be a different draw
-        firstRoll = string.format("%d%d%d%d rand $%02X", sw(0x369), sw(0x36A), sw(0x36B), sw(0x36C), H.readByte(0x1F6D))
-      end
+      if trip == 1 and not cidDead() then noteFirstDraw() end
       H.log(string.format("[cid] trip %d done: %d frames, caught {%s}, health %d -> %d%s",
         trip, H.frame - tripStart, table.concat(caughtTrip, ", "), healthBefore, health(),
         cidWell() and " -- RECOVERED" or ""))
     end),
-  }, "feeding Cid")
-end
-
--- The ladder.  Every attempt starts from the island save; a lost one is
--- reloaded from its snapshot, the moment the save completed -- what a
--- person who loses him and reloads that save plays on from.  The reload
--- repeats the machine exactly, so a reloaded attempt lingers SPREAD
--- frames more per rung on its first look at the beach (a person after a
--- reload does not replay the same frames either); the fish swim on
--- meanwhile and move the field RNG, and the first reroll it draws is
--- asserted to differ from every earlier attempt's, so a ladder of losses
--- is that many different draws and not one draw replayed.  The attempt
--- lines are the record: a recovery on attempt n is a search-selected
--- result, not a rate (docs/design/wor-start.md has the measured rate).
-local SPREAD = 23
-local function cidAttempt(n)
-  return H.cond(function() return cidSaved end, {}, {
-    n > 1 and seq({
-      (function()
-        local req
-        return seq({
-          H.call(function() req = H.requestLoadState(islandBlob) end),
-          H.waitFrames(2),
-          H.call(function()
-            H.checkReq(req, "reload the island save")
-            H.log(string.format("[cid] attempt %d: the island save reloaded at f%d, health %d", n, H.frame, health()))
-          end),
-          H.waitFrames(60),
-        })
-      end)(),
-    }) or seq({}),
-    H.call(function()
-      trip, fed, firstRoll = 0, {}, nil
-      spreadLeft = (n - 1) * SPREAD
-      H.log(string.format("[cid] attempt %d from the island save: health %d, the first look lingers %d frames",
-        n, health(), spreadLeft))
-    end),
-    -- back onto (76,240), the world entrance into 396 (8,12)
-    (function()
-      local W = H.newWalkFighter("the island's entrance")
-      return H.driveUntil(function()
-        return map() == MAP_ISLE and ready()
-      end, 3000, {
-        H.call(function()
-          if W.frame() then return end
-          if not H.worldMode() then H.setPad({}); return end
-          if not (H.worldHasControl() and H.worldAligned()) then H.setPad({}); return end
-          if H.worldX() == 76 and H.worldY() == 240 then H.setPad({ up = true })
-          elseif H.worldY() < 240 then H.setPad({ down = true })
-          else H.setPad({ up = true }) end
-        end),
-      }, "onto the island's entrance (76,240)")
-    end)(),
-    feedCid(),
-    H.call(function()
-      if cidWell() then
-        cidSaved = true
-        attemptLog[#attemptLog + 1] = string.format("attempt %d: Cid RECOVERED on trip %d at f%d, first reroll %s",
-          n, trip, H.frame, tostring(firstRoll))
-      else
-        attemptLog[#attemptLog + 1] = string.format("attempt %d: Cid LOST on trip %d at f%d (health %d entering the house), first reroll %s; fed %s",
-          n, trip, H.frame, health(), tostring(firstRoll), table.concat(fed, " "))
-        H.log("[cid] " .. attemptLog[#attemptLog])
-      end
-      for k = 1, n - 1 do
-        if rolls[k] ~= nil and rolls[k] == firstRoll then
-          error(string.format("attempt %d drew attempt %d's first reroll (%s): the reload's spread did not move the draw",
-            n, k, firstRoll), 0)
-        end
-      end
-      rolls[n] = firstRoll
-    end),
-  })
-end
-
-H.run({ maxFrames = 1700000 }, {
-  H.loadState("build/states/wor_landing.mss.lua"),
-  H.waitFrames(2),
+  }, "feeding Cid"),
   H.call(function()
-    local c = 0x1600 + 37 * CELES
-    local members = H.partyMembers()
-    H.log(string.format("[wor] boot f%d: map %d (%d,%d), party %d, CELES L%d HP %d/%d MP %d, Cid health %d, timer 0 flags $%02X at $%04X, fish %d%d%d%d, tonic=%d potion=%d fenix=%d",
-      H.frame, map(), H.fieldX(), H.fieldY(), #members, H.readByte(c + 8), H.charHp(CELES),
-      H.charMaxHp(CELES), H.charMp(CELES), health(), H.readByte(0x1188), H.readWord(0x118B),
-      sw(0x369), sw(0x36A), sw(0x36B), sw(0x36C), H.invCountOf(0xE8), H.invCountOf(0xE9), H.invCountOf(0xF0)))
-    H.assertEq(map(), MAP_HOUSE, "wor_landing: Cid's house on the Solitary Island (397)")
-    H.assertEq((H.readByte(0x1E94) >> 4) & 1, 1, "wor_landing: $00A4 set -- the World of Ruin")
-    H.assertEq(#members == 1 and members[1] == CELES, true, "wor_landing: the party is Celes alone")
-    H.assertEq(cidWell() or cidDead(), false, "wor_landing: Cid neither recovered nor lost yet")
-    H.assertEq(H.readByte(0x1188), 0x80, "wor_landing: Cid's clock (timer 0, FIELD_ONLY) is running")
-    H.assertEq(health() > 30 and health() <= 256, true, "wor_landing: Cid's health is between the two outcomes")
-  end),
-
-  -- ---- 1. dress CELES ---------------------------------------------------------
-  -- Relics first: the Genji Glove opens her left hand to a second weapon
-  -- (owner guideline: it stays on the boost-Fighter, and alone she is
-  -- that), and the Czarina Ring beside it (item_prop_en.dat byte $0D = $03:
-  -- Safe and Shell when her HP runs low, the Barrier Ring's $01 doubled --
-  -- a solo's insurance).  Leaving the Relic screen with the Genji Glove
-  -- changed runs the game's own Optimum on her gear (measured: 11 0E 76 8F,
-  -- Break Blade / Blizzard / Gold Helmet / Gold Armor, the bag's strongest
-  -- by item_prop_en.dat battle power and defense), so the gear session
-  -- below only confirms it: each slot's ladder lists what Optimum picks
-  -- first and the next-best in the bag after it.
-  H.call(function() healthBefore = health() end),
-  H.equipKit(CELES, { { 4, 0xD1 }, { 5, 0xC1 } }, { tag = "CELES relics" }),
-  H.equipKit(CELES, { { 0, 0x11 }, { 0, 0x0F },
-                      { 1, 0x0E }, { 1, 0x0F }, { 1, 0x5C },
-                      { 2, 0x76 }, { 2, 0x6E },
-                      { 3, 0x8F }, { 3, 0x89 } }, { tag = "CELES gear", ladder = true }),
-  H.call(function()
-    local c = 0x1600 + 37 * CELES
-    H.log(string.format("[wor] CELES dressed: %02X %02X %02X %02X %02X %02X; Cid health %d before the menus, %d after",
-      H.readByte(c + 0x1F), H.readByte(c + 0x20), H.readByte(c + 0x21), H.readByte(c + 0x22),
-      H.readByte(c + 0x23), H.readByte(c + 0x24), healthBefore, health()))
-    H.assertEq(H.readByte(c + 0x1F) ~= 0xFF, true, "CELES holds a weapon")
-    H.assertEq(H.readByte(c + 0x22) ~= 0xFF, true, "CELES wears armor")
-    H.assertEq(H.readByte(c + 0x23), 0xD1, "CELES wears the Genji Glove")
-  end),
-
-  -- ---- 2. the island save --------------------------------------------------------
-  -- Off 396's west edge onto the island's own tile on the World of Ruin
-  -- map (the opening's parent map, set_parent_map 1, {76, 240}; Celes
-  -- arrives on (76,239), one north of the entrance back in).  The world
-  -- map allows saving, and Cid's clock stands still there (the field
-  -- timer runs in the field loop only: 600 frames on the island, health
-  -- 114 -> 114, build/attempts/wt/wor-start/lab/probe_wor_islesave_1.log).
-  -- A person who knows he can be lost saves here first: it is the first
-  -- save the World of Ruin offers.
-  through(100, 46, "down", MAP_ISLE, "the house door -> 396"),
-  H.navTo(1, 7, { maxFrames = 3000, playBattles = "tactical" }),
-  (function()
-    local W = H.newWalkFighter("off the island's west edge")
-    return H.driveUntil(function()
-      return H.worldMode() and H.worldHasControl() and H.worldAligned() and bright() >= 15
-    end, 1800, {
-      H.call(function()
-        if W.frame() then return end
-        H.setPad(H.worldMode() and {} or { left = true })
-      end),
-    }, "the island's tile on the World of Ruin map")
-  end)(),
-  H.call(function()
-    H.log(string.format("[wor] the island on the world map: world %d at (%d,%d), Cid health %d",
-      H.worldId(), H.worldX(), H.worldY(), health()))
-    H.assertEq(H.worldId(), 1, "the island is on the World of Ruin map")
-  end),
-  H.saveGame({ slot = 3, tag = "the island save" }),
-  H.call(function()
-    local s = H.savedSlot()
-    H.log(string.format("[saved] the island save: slot %d holds map %d ($%04X) world tile (%d,%d), Cid health %d",
-      s.slot, s.map, s.mapWord, s.worldX, s.worldY, health()))
-    H.assertEq(s.map == 1 and s.worldX == H.worldX() and s.worldY == H.worldY(), true,
-      "the island save is the battery's slot 3")
-  end),
-  (function()
-    local req
-    return H.cond(function() return true end, {
-      H.call(function() req = H.requestSaveState() end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(req, "the island save's snapshot")
-        islandBlob = req.blob
-        H.log(string.format("[cid] the island save's snapshot at f%d, health %d", H.frame, health()))
-      end),
-    })
-  end)(),
-
-  -- ---- 3. feed Cid, reloading the island save if he is lost ---------------
-  cidAttempt(1), cidAttempt(2), cidAttempt(3), cidAttempt(4),
-  H.call(function()
-    for _, line in ipairs(attemptLog) do H.log("[cid] ladder: " .. line) end
-    if not cidSaved then
-      error(string.format("Cid died on all %d attempts from the island save; the attempt lines above "
-        .. "are the finding (a lab candidate)", #attemptLog), 0)
-    end
-    H.log(string.format("[cid] Cid recovered on attempt %d, trip %d, at f%d, health %d ($00B3=%d $00B4=%d, timer 0 flags $%02X)",
-      #attemptLog, trip, H.frame, health(), sw(0xB3), sw(0xB4), H.readByte(0x1188)))
+    H.log(string.format("[cid] Cid recovered on trip %d at f%d, health %d ($00B3=%d $00B4=%d, timer 0 flags $%02X), policy %s, first draw [%s]",
+      trip, H.frame, health(), sw(0xB3), sw(0xB4), H.readByte(0x1188), POLICY, tostring(firstDraw)))
     H.assertEq(cidDead(), false, "Cid is alive")
   end),
 
-  -- ---- 4. the raft ---------------------------------------------------------------
+  -- ---- 3. the raft ---------------------------------------------------------------
   H.navTo(85, 50, { maxFrames = 6000, playBattles = "tactical" }),
   H.talkToObj(OBJ_RAFT, "the raft"),
   (function()
@@ -525,7 +458,7 @@ H.run({ maxFrames = 1700000 }, {
     H.assertEq(sw(0xB3), 1, "Cid recovered ($00B3)")
   end),
 
-  -- ---- 5. the first save after the island ------------------------------------
+  -- ---- 4. the first save after the island ------------------------------------
   H.saveGame({ slot = 3, tag = "wor-start-v1 save" }),
   H.call(function()
     -- what the battery holds (#218), read back from the slot's own copy of

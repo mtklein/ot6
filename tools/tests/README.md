@@ -337,12 +337,17 @@ runs every script through the **segment runner** at the bottom of
   `local H = dofile(...)` line in `H.segmentBody(function() ... end)`. The
   runner snapshots the machine on the body's first frame (after a
   fixture load, when the body starts with one) and, on a **seed-dependent**
-  failure -- a wipe (the canary), a `navTo`/`worldNavTo` "no path", a step
-  timeout, or a watchdog trip -- restores it, re-executes the body from
-  source (fresh locals, fresh step objects; the previous attempt's emu
-  callbacks go inert through an epoch guard), and replays with the seed
-  moved by idle frames at the **boot point** (`H.bootMark`: the fixture
-  load, or `assertEntryContract` after a cold Continue). The idle starts
+  failure -- a wipe (the canary), a story loss the body raises as
+  `LOST: ...` (class `lost`: a branch the game plays on without the
+  player's goal, e.g. Cid dying in `gen_wor_start`, which a person answers
+  by reloading the save, as after a wipe), a `navTo`/`worldNavTo` "no
+  path", a step timeout, or a watchdog trip -- restores it, re-executes
+  the body from source (fresh locals, fresh step objects; the previous
+  attempt's emu callbacks go inert through an epoch guard), and replays
+  with the seed moved by idle frames at the **boot point** (`H.bootMark`:
+  the fixture load, or `assertEntryContract` after a cold Continue; a body
+  whose draw is read somewhere the boot point's idle cannot reach marks
+  its own, as `gen_wor_start` does on the fishing beach). The idle starts
   on the boot frame itself: whatever the body presses later in that same
   tick is held back until the idle ends, and the idle lasts until the game
   clock (`$021e`) has moved the shift's number of ticks, not a frame count

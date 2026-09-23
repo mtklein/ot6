@@ -1,13 +1,18 @@
-# The World of Ruin opening: the Solitary Island to the first save (`wor-start-v1`)
+# The World of Ruin opening: the Solitary Island, Cid, and the first saves (`wor-island-v1`, `wor-start-v1`)
 
-Authored 2026-09-22 for #253 (the first step of #250). The segment is
-`gen_wor_start` (`tools/tests/gen_wor_start.lua`): it boots `wor_landing`
-(solo CELES at Cid's bedside, map 397, `$00A4` set), saves Cid, rides the
-raft and saves on the World of Ruin map where it lands; that save is the
-battery checkpoint `wor-start-v1`. Every number below is quoted from a log
-under `build/attempts/wt/wor-start/` (`lab/` the probes and the earlier
-generator cuts, `sweeps/` the seed sweep, `probes/` the one-off scripts
-those logs came from). Nothing here was measured by writing game state.
+Authored 2026-09-22 for #253 (the first step of #250). Two segments, one per
+save point the game offers:
+
+| segment | boots | plays | ends at | checkpoint |
+|---|---|---|---|---|
+| `gen_wor_island` | `wor_landing` (solo CELES at Cid's bedside, map 397, `$00A4` set) | dress CELES, walk out, save | the island's World of Ruin tile (76,239) | `wor-island-v1` |
+| `gen_wor_start` | `wor-island-v1` (cold Continue) | feed Cid until he recovers, his scene, the raft, the voyage, save | the landing, World of Ruin (146,212) | `wor-start-v1` |
+
+Every number below is quoted from a log under `build/attempts/wt/wor-start/`
+(`lab/` the probes, `fish/` the fishing lab, `retry/` the runner's retry
+runs and mutants, `single-segment/` the superseded first cut, `probes/` the
+one-off scripts the probe logs came from). Nothing here was measured by
+writing game state.
 
 ## The island
 
@@ -22,20 +27,26 @@ those logs came from). Nothing here was measured by writing game state.
 through `include/field/*_entrance.inc`; `ff6/src/event/npc_prop.asm:17552`
 and `:17615`.) No random battles on 396-400 (`map_prop.dat` +5 bit 7 clear
 for all five), and no chests (`tools/audit_chests.py`'s table has none on
-396-400). Celes met no battle on the whole segment.
+396-400). Celes meets no battle in either segment.
 
 **Celes arrives bare.** At the landing every one of her six slots reads
 `$FF`; her escape kit (Break Blade, Star Pendant, Jewel Ring) is in the bag
 (`lab/probe_wor_kit.log`: `CELES equip FF FF FF FF FF FF`;
 `python3 tools/audit_readiness.py build/states/wor_landing.mss`: `CELES
-row=BACK def=0 mdef=0 NOTHING AT ALL`, six empty slots the bag could fill).
-She is L25, 1043/1043 HP, 227 MP, and the bag holds `tonic=4 potion=39
-fenix=22` (`[wor] boot f5: map 397 (99,38), party 1, CELES L25 HP 1043/1043
-MP 227, Cid health 120, timer 0 flags $80 at $533F, fish 1101, tonic=4
-potion=39 fenix=22`). The generator dresses her first: Genji Glove and
-Czarina Ring on the Relic screen, after which the game's own Optimum fills
-the gear (`[CELES relics] char=6 after=11 0E 76 8F D1 C1`: Break Blade,
-Blizzard, Gold Helmet, Gold Armor).
+row=BACK def=0 mdef=0 NOTHING AT ALL`). She is L25, 1043/1043 HP, 227 MP,
+and the bag holds `tonic=4 potion=39 fenix=22` (`wor_island_ninja.log`:
+`[wor] boot f5: map 397 (99,38), party 1, CELES L25 HP 1043/1043 MP 227,
+Cid health 120, timer 0 flags $80 at $533F, fish 1101, tonic=4 potion=39
+fenix=22`). `gen_wor_island` dresses her first: Genji Glove and Czarina
+Ring on the Relic screen, after which the game's own Optimum fills the gear
+(`[CELES relics] char=6 after=11 0E 76 8F D1 C1`: Break Blade, Blizzard,
+Gold Helmet, Gold Armor).
+
+**Her row is left for the next leg.** She stands in the BACK row
+(`audit_readiness`: `CELES row=BACK`), which halves the damage her Fight
+does and the physical damage she takes. Neither segment has a fight to
+measure the choice on; the first World of Ruin random battle is where it
+belongs (`H.setRows`, the field menu's Row).
 
 ## Cid's health
 
@@ -49,8 +60,8 @@ Event variable 7 (`$1FD0`), set to 120 as the opening hands over control
   frames (`lab/probe_wor_island_3.log`: `[isle boot] f33 ... var7=119 ...
   ctr=38` then `[isle boot+200] f233 ... var7=116 ... ctr=33`); walking and
   map changes stretch it to about one per 83 frames (a 909-frame trip with
-  no fishing costs 11: `[cid] trip 4 done: 910 frames, caught {}, health
-  184 -> 173`).
+  no fishing costs 11: `lab/gen_wor_start_2.log`, `[cid] trip 4 done: 910
+  frames, caught {}, health 184 -> 173`).
 - **Where it stops.** FIELD_ONLY sets `$1188` bit 7, which
   `DecTimersMenuBattle` (`field/event.asm:5562`) skips, so menus and
   battles cost nothing (dressing her, two menu sessions and the field
@@ -58,7 +69,8 @@ Event variable 7 (`$1FD0`), set to 120 as the opening hands over control
   world map does not run the field timer at all
   (`lab/probe_wor_islesave_1.log`: `[isle world] f451 ... health=114 timer0
   80/16`, 600 frames later `[isle world +600] f1051 ... health=114 timer0
-  80/16`).
+  80/16`). The save keeps the timer (`menu/save.asm` PushTimers, `$1FA8`):
+  a cold Continue of `wor-island-v1` reads `Cid health 112, timer 0 $80/48`.
 - **Feeding.** Talking to him (`_ca5370`, `:12477`) first rerolls the fish
   (`_ca534a`, `:12454`), then eats everything Celes holds: `$01D2` +32,
   `$01D3` +16, `$01D4` -4, `$01D5` -16 (`:12488-12506`), then compares:
@@ -95,8 +107,9 @@ entries of the field RNG table (`Rand`, `field/reset.asm:888`, index
 (`npc_prop.asm:17615-17660`, `event_main.asm:13088-13107`.) The landing's
 own roll is `1101`: the fast fish, the +16 and the -16. A caught fish is
 deleted and stays gone until the next reroll, so one reroll is one chance
-at each fish. The two SLOW fish look and swim alike; a player cannot tell
-the +16 from the -4.
+at each fish, and a fish that is not swimming cannot be waited for: only a
+talk brings one. The two SLOW fish look and swim alike; a player cannot
+tell the +16 from the -4.
 
 **Catching** is an ordinary NPC talk: `CheckNPCs` (`field/player.asm:142`)
 activates whatever the object map (`$7E2000`) holds on the tile Celes
@@ -109,74 +122,186 @@ water-edge tile and everything deeper (`lab/probe_wor_fishmove_1.log`,
 In 9000 frames the fast fish changed tile 447 times, a slow one 270, the
 slowest 126 (`[move] obj 11 speed 2: 447 tile changes in 9000 frames`,
 `[move] obj 12 speed 1: 270 ...`, `[move] obj 14 speed 0: 126 ...`). From
-the beach entry (4,2) the shore is 14 steps (224 frames of walking), and the
-fast fish is caught soon after Celes gets there (`catch_times.txt`:
-`fast-fish catch frames after arrival: n=287 mean=411.8 p10=237 median=333
-p90=685 max=701`), so the chase itself is not where the time goes: the
-walk is.
+the beach entry (4,2) the shore is 14 steps (224 frames of walking), and a
+chase catches the fast fish soon after Celes gets there
+(`single-segment/catch_times.txt`: `fast-fish catch frames after arrival:
+n=287 mean=411.8 p10=237 median=333 p90=685 max=701`): the walk, not the
+chase, is where Cid's health goes. Every leg is already the shortest walk:
+each is a BFS path over the engine's own passability (`H.navTo`), and the
+island's exits are fixed (the beach is entered only at (4,2), the house
+only at (100,45)).
 
-## The policy, and what it wins
-
-**Policy** (visible cues only: a fish's swim speed): if the fast fish is
-swimming, catch it, plus a slow fish that swims up beside her on the way,
-plus a slow one still within 240 frames once the fast one is caught; if
-it is not, walk straight back and talk to him, which is the reroll. Never
-the slowest fish.
-
-Why, measured on `wor_landing` with probe variants of the same loop:
-
-- **Fast fish only** drifts nowhere: 40 trips, health 120 -> 104
-  (`lab/probe_wor_fish_4_min2.log`: `[fish end] trip 40 f50008 ... var7=104
-  ... B3=0`). A trip that finds no fast fish costs 11; one that catches it
-  nets about +12 after the walk to the shore and back.
-- **Every fish but the slowest** recovered him in 18 trips on that seed
-  (`lab/probe_wor_fish_4_min1.log`: `[fish end] trip 18 f35461 ... var7=274
-  ... B3=1`), but chasing slow fish when the fast one is absent costs 14-34
-  a trip for an expected +6 a fish.
-- **The policy above**, over every trip of every generator log
-  (`trips_bootstrap.txt`: `probes/trips.py` over both sweeps and
-  `lab/gen_wor_start_{2,3}.log`; the recovering trip of each run left out):
-  `fast present: n=269 mean delta +15.94 min 2 max 30`, `slow only: n=170
-  mean delta -11.00 min -11 max -11`, `none: n=23 mean delta -11.00`.
-  Bootstrapped from the island save's health 112 with the fast fish
-  present half the time (its switch is one `if_rand`): `P(recovered)=0.8070;
-  trips median 41, p90 90, p99 158`.
-
-So an efficient, honest player saves Cid about **four times in five** per
-attempt; the rest of the time the draw starves him. That is vanilla FF6
-(every value above is the vanilla script), not an OT6 change, and it is a
-lab candidate by the owner's bar (a segment not won reliably on the first
-attempt).
-
-## The island save, and the reload
+## The island save (`wor-island-v1`)
 
 Off 396's west edge Celes stands on the island's own World of Ruin tile
-(76,239). The world map allows saving (`lab/probe_wor_islesave_1.log`: `ok:
-island save: $0201 bit7 SET -- the game allows saving here = true`; `[isle
-saved] slot 3 map 1 ($3001) world (76,239)`) and Cid's clock stands still
-there, so a person who knows
-he can be lost saves here before fishing. **This is the first save the
-World of Ruin offers**, before the raft. The generator does the same, and
-when an attempt loses him it reloads that save's snapshot and goes again,
-at most 4 attempts, every attempt logged (`[cid] ladder: attempt n: ...`).
-A reloaded attempt lingers 23 frames more per rung on its first look at the
-beach, so the fish move the field RNG and the next reroll is a different
-draw; the generator asserts each attempt's first reroll differs from every
-earlier one. At the measured 0.81 the chance of losing all four is about
-0.1% (`P(all 4 attempts lost) = 0.00139`).
+(76,239). The world map allows saving and Cid's clock stands still there
+(above), so a person who knows he can be lost saves here before fishing:
+**this is the first save the World of Ruin offers**, before the raft.
+`gen_wor_island` saves there through the real Save UI (`wor_island_ninja.log`:
+`[saved] wor-island-v1: slot 3 holds map 1 ($3001) world tile (76,239), Cid
+health 112`, `contract wor-island-v1 (exit): all 12 fields hold`). Its
+contract (`lib/ot6_contract.lua`) is world map 1 at (76,239), `$00A4` set,
+`$00B3`/`$00B4` clear, CELES alone, and Cid's clock armed (`$1188` = `$80`);
+`gen_wor_start` asserts it after its cold Continue (`contract wor-island-v1
+(entry): all 12 fields hold`).
 
-The negative control is a mutant that never catches a fish
-(`probes/mutant_wor_start_nofish.lua`, `SPEED_FAST = 9`): all four
-attempts lose him on trip 9, on four different draws, and the run fails
-naming the finding (`lab/mutant_nofish_1.log`):
+## What varies the draw
 
-```
-[cid] ladder: attempt 1: Cid LOST on trip 9 at f9586 (health 21 entering the house), first reroll 0101 rand $AA; ...
-[cid] ladder: attempt 2: Cid LOST on trip 9 at f17599 (health 20 entering the house), first reroll 1111 rand $B0; ...
-[cid] ladder: attempt 3: Cid LOST on trip 9 at f25636 (health 20 entering the house), first reroll 1001 rand $B3; ...
-[cid] ladder: attempt 4: Cid LOST on trip 9 at f33697 (health 20 entering the house), first reroll 1100 rand $B6; ...
-FAIL: Cid died on all 4 attempts from the island save; the attempt lines above are the finding (a lab candidate)
-```
+A retry (and a lab sample) must meet a different draw: the fish each talk
+rerolls. The rerolls read the field RNG index `$1F6D` (the cold Continue
+seeds it from the battery, `EventCmd_ab`: `rand $FB` at the island save's
+Continue), and what walks it on the island is the fish and the bird on the
+beach, about one step per 7 frames while Celes stands there
+(`lab/probe_wor_rand.log`: `world f5 $1F6D=$9A`, `396 f70 $1F6D=$9A`, `398
+arrive f180 $1F6D=$9E`, 600 frames later `$1F6D=$11 (88 distinct values so
+far)`). Measured with the runner's
+own seed shift (idle frames at the boot point), retries off:
+
+| boot point | shifts | first draws |
+|---|---|---|
+| the cold Continue, world map (`contboot`) | 0, 15, 30, 45 | all `roll 1010 rand $BC health 139` (`fish-firstlook/fishlab_drawcheck.txt`) |
+| the first look at the beach | 0, 15, 30, 45 | all `roll 1010 rand $BC health 139`: the idle is absorbed, since the first catch waits on the fish, whose swim runs from the map load |
+| the beach after the first visit's catches | 0, 15, 30, 45 | `rand $BC`, `$BE`, `$C1`, `$C3` (`fish-retryshifts/fishlab_drawcheck2.txt`) |
+
+So `gen_wor_start` asserts the entry contract without the boot mark and
+marks its boot point on the beach after the first visit's catches, a beat
+before the walk back (`H.run({ ..., bootFallback = false })` keeps the
+runner from marking one for it at frame 2400). Each attempt records its
+first draw (the spawn roll, the RNG index and Cid's health after the first
+feed) and asserts it differs from every earlier failed attempt's.
+
+## The lab
+
+`tools/tests/fishlab.py` derives `gen_wor_start.lua` once per policy (its
+`POLICY` line) and plays it from `wor-island-v1` once per seed shift,
+retries off, keeping every run. Policies (visible cues only: a fish's swim
+speed; never the slowest fish):
+
+- **near**: the fast fish if it swims, plus a slow fish that swims up beside
+  her on the way, plus a slow one still within 240 frames once the fast one
+  is caught; no fast fish: straight back to Cid (the talk is the reroll).
+- **fast**: the fast fish only.
+- **fastslow**: the fast fish, then every slow fish, however long it takes.
+- **all**: every fish but the slowest, whether or not the fast one swims.
+- **wait**: near, but stand on the land-edge tile beside the fast fish's two
+  likeliest shore tiles, (8,12) (`lab/probe_wor_fishmove_1.log`: the fast
+  fish sat on (9,12) 113 and (8,13) 92 of 2250 samples), and let the fish
+  come.
+- **allnear** (added mid-lab): near while the fast fish swims, every slow
+  fish when it does not. Cut after 7 attempts: its runs were the lab's
+  longest (82 trips, 149k frames) and it was already behind.
+
+Shifts 0-273 and 3-276 in steps of 7, and for the two leaders 280-553
+too. Two shifts that draw the same first draw (spawn roll, RNG index and
+health after the first feed) play the same continuation, so the rate that
+counts is over distinct first draws (`fish/fishlab_aggregate.txt`, from
+`python3 tools/tests/fishlab.py aggregate`):
+
+| policy | attempts | recovered | distinct draws | recovered | lost | both |
+|---|---|---|---|---|---|---|
+| **all** | 120 | 119 | 48 | **47** | 1 | 0 |
+| near | 120 | 113 | 48 | 44 | 3 | 1 |
+| fastslow | 80 | 60 | 34 | 27 | 5 | 2 |
+| fast | 40 | 8 | 27 | 5 | 22 | 0 |
+| wait | 40 | 0 | 15 | 0 | 15 | 0 |
+| allnear (cut) | 7 | 5 | 5 | 3 | 2 | 0 |
+
+Raw: `all attempts=120 recovered=119 lost=1 other=0 rate=0.992 distinct
+first draws=48 ... trips median=44 max=112 cid-frames median=69582
+max=216277`, `all distinct samples=48 recovered=47 lost=1 mixed=0
+rate=0.979`; `near distinct samples=48 recovered=44 lost=3 mixed=1
+rate=0.917`; `fastslow distinct samples=34 recovered=27 lost=5 mixed=2
+rate=0.794`; `fast distinct samples=27 recovered=5 lost=22 mixed=0
+rate=0.185`; `wait distinct samples=15 recovered=0 lost=15 mixed=0
+rate=0.000`.
+
+**Paired**, shift by shift (the same shift is the same boot): near lost on
+shifts 28/31/35 (`rand $C1`), 262 and 490/497/504; all recovered on every
+one of them (`OK/19`, `OK/31`, `OK/47`, `OK/38`, `OK/104` trips). all lost
+once, at shift 476 (`LOST: Cid died -- health 20 as Celes walked into the
+house on trip 7; first draw [roll 0011 rand $EA health 132]`: three
+rerolls running with no fast fish and the -4 fish the only slow one,
+`health 132 -> 111`, `111 -> 77`, `77 -> 51` with it caught each time;
+`fish/all/shift476.ot6.log`), where near recovered (`OK/56`).
+
+**Why**, per trip (`fish/fishtrips.txt`: Cid's health change by what swam,
+over every trip of every run):
+
+| what swam | near | all | fast | wait |
+|---|---|---|---|---|
+| no fast fish, no slow | -11.00 | -11.00 | -11.00 | -11.00 |
+| no fast fish, one slow | -11.00 (back at once) | **-9.90** (catches it) | -11.00 | -10.99 |
+| the fast fish and one slow | +18.57 | **+21.90** | +12.24 | +2.11 |
+| the fast fish and two slow | +13.17 | +19.37 | +13.41 | -23.62 |
+
+A slow fish is worth catching even when the fast one is absent: on
+average it more than pays for the extra walk (-9.90 against -11.00 for
+walking straight back), though a lone -4 fish does not, and that is how
+`all` lost its one draw. Waiting at a spot is ruinous: over the `wait` runs
+the fast fish swam beside (8,12) a median 1,589 frames after Celes reached
+the beach (94 catches, 237 to 2,181; `fish/catch_times.txt`;
+`fish/wait/shift00.ot6.log`: `caught fish 11 (speed 2) 1589 frames after
+arriving`), against a median 277 for the chase (4,808 catches over the
+`all` and `near` runs, p90 621). Catching only the fast fish leaves every
+no-fast trip at -11. The first 40 `wait` runs are kept in
+`fish-wait-fallback/`: their boot point fell to the runner's 2400-frame
+fallback mid-wait, so all 40 were one draw (0 recovered); the re-run above
+has the boot point on the beach.
+
+**So the generator ships `all`**: every fish but the slowest, the fast one
+first, whether or not it swims. Measured from the island save it recovers
+Cid on 47 of 48 distinct draws, so a person playing this way saves him
+first try about 49 times in 50, and the runner's retry covers the rest.
+That is a ceiling of this bot's play, not of the game: the bot's timing is
+deterministic, so a run can lock into a repeating cycle of rerolls
+(`fish/allnear/shift00.ot6.log`: trips 11, 18 and 24 draw and catch the same
+fish), which a person's uneven timing would break; and the lab's long
+shifts cost Cid up to ~8 health before the first feed (the same for every
+policy).
+
+## The retry
+
+A lost Cid is a lost attempt. The body raises `LOST: Cid died -- ...`; the
+segment runner files it as class `lost` (`lib/ot6.lua` `classify`, one of
+the seed-dependent classes with the wipe) and replays the body from the
+boot snapshot at the next seed shift, bounded by its default 3 attempts,
+each a `[retry] attempt n/N FAILED class=lost ...` line that
+`tools/audit_retries.py` lists. Measured with the final generator
+(`retry/final/`, the variants derived from it by one line each):
+
+- `retry/final/fastslow14.log` (POLICY `fastslow`, which loses about one
+  draw in five, at `OT6_SEED_SHIFT=14`): `[retry] attempt 1/3 FAILED
+  class=lost ... LOST: Cid died -- health 24 as Celes walked into the house
+  on trip 41; first draw [roll 1011 rand $BE health 139]`, attempt 2 at
+  shift 34 draws `roll 1111 rand $C1 health 139` and is lost on trip 66,
+  attempt 3 at shift 54 draws `roll 1101 rand $C4 health 138`, `Cid
+  recovered on trip 17`, `PASS (frame 34031) attempts=3/3`.
+- `retry/final/nofish.log` (SPEED constants 9: no fish is ever wanted):
+  three attempts, three first draws (`rand $09`, `$10`, `$13`), each
+  `class=lost` on trip 9, then `[retry] attempts=3/3 exhausted; failed
+  attempts: 1:lost 2:lost 3:lost`.
+- `retry/final/nofish_contboot.log` (the same mutant with the boot point
+  back on the world map: the draw assertion's negative control): attempt 2
+  draws attempt 1's `roll 1001 rand $09 health 105` and fails at once,
+  `class=assert`: `assertEq failed: the first draw (roll 1001 rand $09
+  health 105) differs from attempt 1's: the seed shift moved the fish
+  rolls: got false, want true`.
+- `retry/final/audit_retries.txt`: `lost x6 gen_wor_start_fastslow,
+  gen_wor_start_nofish, gen_wor_start_nofish_contboot`, `assert x1
+  gen_wor_start_nofish_contboot`.
+- `retry/pre-final/` holds the same three shapes from the generator before
+  its policy and budget settled (`shift30.log`: POLICY `near`, lost on the
+  `rand $C1` draw, recovered on attempt 2, `PASS (frame 41886)
+  attempts=2/4`).
+
+The runner's own suites still hold with the new class and option
+(`runner_suites_verdicts.txt`): `segment_retry: [ot6] PASS (frame 181)
+attempts=2/3`, `seed_reroll: [ot6] PASS (frame 313) attempts=2/3`,
+`wipe_reclass: [ot6] PASS (frame 1) attempts=2/2`, `step_reset: [ot6] PASS
+(frame 376) attempts=1/1`, `watchdog_cantrun` and `watchdog_listend`
+`PASS (frame 1) attempts=2/2`; `ninja build/checks/retry_negative.ok`:
+`retry-negative: PASS -- attempt 1/3 failed class=assert, no attempt 2/3,
+verdict names the class`.
 
 ## The raft and the landing
 
@@ -185,58 +310,60 @@ opens the way down to the raft (397 (85,51)); `H.navTo` finds it once the
 cover is gone. Talking to it plays his farewell (dlg `$0891`) and the
 voyage: maps 397 -> 400 -> 1 -> 3 -> 1, control on the World of Ruin map at
 (146,212), outside Albrook (`wor_start_ninja.log`: `[wor] the voyage: map
-397 at f30916`, `dialog $0891`, `map 400 at f31714`, `map 1 at f32904`,
-`map 3 at f34875`, `map 1 at f35034`, `[wor] landed: world 1 at (146,212)
-f35136, CELES HP 1043/1043`: about 4,200 frames from the raft talk to
-control). No choice prompt anywhere on the island or the raft.
+397 at f80242`, `dialog $0891`, `map 400 at f81043`, `map 1 at f82233`,
+`map 3 at f84204`, `map 1 at f84363`, `[wor] landed: world 1 at (146,212)
+f84464, CELES HP 1043/1043`), about 4,200 frames from the raft talk. No choice prompt anywhere on the island or the raft.
 
-## The checkpoint
+## The checkpoints
 
-`wor-start-v1` is the slot-3 save at the landing, through the real Save UI:
-`[saved] wor-start-v1: slot 3 holds map 1 ($0401) world tile (146,212)`.
-Its manifest declares `"saved": {"slot": 3, "world": {"map": 1, "x": 146,
-"y": 212}}` (`lib/sram_checkpoint.py` now reads map 1 as the World of Ruin
-world map), and `lib/ot6_contract.lua` carries its contract (world map 1
-at (146,212), `$00A4`/`$00B3` set, `$00B4` clear, CELES alone), asserted by
-the generator after the save and by a WoR generator's cold Continue
-(`H.assertEntryContract("wor-start-v1")`).
+Both are slot-3 saves through the real Save UI, captured from the
+generator's own run (`OT6_CAPTURE_SRM`), sealed and validated; each manifest
+declares its save (`"saved": {"slot": 3, "world": {"map": 1, ...}}`;
+`lib/sram_checkpoint.py` now reads map 1 as the World of Ruin world map) and
+each has a contract in `lib/ot6_contract.lua`, asserted by the generator
+after its save and by the next segment's cold Continue.
 
 ## The runs behind it
 
-- **The graph edge** (`nice ninja build/states/wor_start.mss.lua`,
-  `wor_start_ninja.log`): `[cid] ladder: attempt 1: Cid RECOVERED on trip
-  20 at f30060, first reroll 1110 rand $2B`, `contract wor-start-v1 (exit):
-  all 11 fields hold`, `PASS (frame 35450) attempts=1/3`, 2:11 of wall
-  clock (`ninja_wor_start_pre-comment-edit.txt`; the final edge is
-  `ninja_wor_start.txt`, same verdict after a comment-only generator edit).
-- **The capture** (`capture_wor_start.log`, `OT6_CAPTURE_SRM`, artifacts
-  kept out of `build/states`): the same run frame for frame, `PASS (frame
-  35450) attempts=1/3`, and its `wor_start.mss` byte-identical to the
-  edge's; sealed and validated (`validate_wor_start_v1.txt`): `valid
-  ot6.sram-checkpoint/v1: 32768 bytes sha256=1ae3a148... holds=slot 3
-  world 1 (146,212) [$1F64=$0401] (saved: declared and checked)`.
-- **Other draws** (`sweeps/wor_start-final/`, 8 seed shifts, retries off):
-  `8/8 seeds passed`, every one on attempt 1. The shifts reach four
-  different feeding runs: shifts 0 and 7 draw `first reroll 1110 rand $2B`
-  and recover him on trip 20; shifts 14, 21 and 49 draw `1000 rand $3C`
-  and need 35 trips (`[cid] ladder: attempt 1: Cid RECOVERED on trip 35 at
-  f50913, first reroll 1000 rand $3C`, `PASS (frame 56304)`); shift 28
-  recovers him on trip 21 and shifts 35/42 on trip 22 from the same first
-  reroll after the paths part. (A seed shift idles at the boot on 397,
-  where nothing draws from the field RNG; it moves the draw only through
-  when the timer event interrupts the first walk, so neighbouring shifts
-  often share a run.)
-- **The cold Continue** of the sealed battery on this ROM
+- **`gen_wor_island`**: `nice ninja build/states/wor_island.mss.lua`
+  (`ninja_wor_island.txt`, `wor_island_ninja.log`): `[saved] wor-island-v1:
+  slot 3 holds map 1 ($3001) world tile (76,239), Cid health 112`,
+  `contract wor-island-v1 (exit): all 12 fields hold`, `PASS (frame 1625)
+  attempts=1/3`. Its capture (`capture_wor_island.log`, `OT6_CAPTURE_SRM`,
+  artifacts outside `build/states`) is the same run, its `wor_island.mss`
+  byte-identical; sealed and validated (`validate_wor_island_v1.txt`):
+  `holds=slot 3 world 1 (76,239) [$1F64=$3001] (saved: declared and
+  checked)`. No draw varies it: nothing on its path reads the field RNG.
+- **`gen_wor_start`**: `nice ninja build/states/wor_start.mss.lua`
+  (`ninja_wor_start.txt`, `wor_start_ninja.log`): `contract wor-island-v1
+  (entry): all 12 fields hold`, `[retry] boot point: the fishing beach 398
+  after trip 1's catches (health 100, rand $95) at f2314`, `[cid] first
+  draw: roll 1010 rand $BC health 139`, `Cid recovered on trip 56 at
+  f79386, health 266`, `[saved] wor-start-v1: slot 3 holds map 1 ($0401)
+  world tile (146,212)`, `contract wor-start-v1 (exit): all 11 fields
+  hold`, `PASS (frame 84778) attempts=1/3`. The capture
+  (`capture_wor_start.log`) is the same run, `wor_start.mss` byte-identical;
+  `validate_wor_start_v1.txt`: `holds=slot 3 world 1 (146,212)
+  [$1F64=$0401] (saved: declared and checked)`.
+- **Other draws** (`python3 tools/tests/seed_sweep.py wor_start --seeds 4`,
+  `sweeps/wor_start-final3/`, retries off): `4/4 seeds passed`, first
+  draws `rand $BC`, `$BE`, `$C1`, `$C3`, recovered on trips 56, 43, 19, 26
+  (shift 30's `rand $C1` is the draw `near` loses). The lab above is the
+  wider version: 119 of 120 attempts, 47 of 48 distinct draws.
+- **The cold Continue** of the sealed `wor-start-v1` on this ROM
   (`OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-start-v1
   tools/tests/run.sh tools/tests/probe_wor_start_continue.lua`,
   `continue_wor_start_v1.log`): `contract wor-start-v1 (entry): all 11
   fields hold`, `[continue] world 1 at (146,212): CELES L25 HP 1043/1043
   MP 227 kit 11 0E 76 8F D1 C1; Cid recovered $00B3=1; tonic=4 potion=39
   fenix=22 gil=215563`, `PASS (frame 1386)`.
+- **The graph**: `python3 tools/tests/lib/compose.py --check-states`
+  (`check_states.txt`): `fixtures: 96/96 fresh (ROM, generator, artifact and
+  ancestor bindings all verify)`; `ninja build/checks/checkpoint_saves.ok`
+  (`ninja_checks.txt`): `checkpoint-saves: PASS -- 29 checkpoints validate;
+  each line names the save its battery holds`.
 
 **For the next leg:** Tonics are far below the band (4 against about
 L25 x 5, capped 99); Albrook, the town beside the landing, is the first
 shop. CELES wears Break Blade / Blizzard on the Genji Glove, Gold Helmet,
-Gold Armor and the Czarina Ring, and stands in the BACK row
-(`audit_readiness`: `CELES row=BACK`), which halves her own Fight damage;
-where a lone swordswoman stands is the first WoR fight's call.
+Gold Armor and the Czarina Ring, and stands in the back row (above).

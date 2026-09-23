@@ -2,7 +2,7 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "wor-start.sram",
   "size": 32768,
-  "sha256": "1ae3a1486eef92c16cbf0f25bcfacb45b9d62c3ee3b8fd0380bae910c3dedf07",
+  "sha256": "4f30a81e606acdcfac15bec682ae933ddd79be05ba84954c875de2d9a86fa728",
   "slot": 3,
   "milestone": "wor-start",
   "persistent_layout": "ot6-codex-o8-v1",
@@ -16,12 +16,12 @@
   },
   "provenance": {
     "format": "ot6-provenance/v1",
-    "payload_sha256": "1ae3a1486eef92c16cbf0f25bcfacb45b9d62c3ee3b8fd0380bae910c3dedf07",
-    "generator_sig": "6303f2d6cc75e5ccd2b853c65841f5fc81373015bffe2eb0bf83e6c96d5d6ea7 gen_wor_start",
+    "payload_sha256": "4f30a81e606acdcfac15bec682ae933ddd79be05ba84954c875de2d9a86fa728",
+    "generator_sig": "c0d02b8423aa62109fb8a2097713ba7c9de19758c2dbe1a0df2f8cc4cc361259 gen_wor_start tools/tests/checkpoints/wor-island-v1/manifest.json tools/tests/checkpoints/wor-island-v1/wor-island.sram",
     "ancestors": [
       {
-        "path": "build/states/wor_landing.stamp",
-        "sha256": "3f1d2c517fbf8800e4ac652f99503947c976f7461c164cfd35c9b669f3863e92"
+        "path": "tools/tests/checkpoints/wor-island-v1/manifest.json",
+        "sha256": "b652cb27ff1ec3eebe5149f15461b29f6f43673f385d4367e2d0d4f53b61ba0f"
       }
     ]
   }

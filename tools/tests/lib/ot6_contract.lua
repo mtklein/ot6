@@ -913,6 +913,35 @@ M.contracts["fc-alcove-v1"] = {
   },
 }
 
+-- wor-island-v1: the World of Ruin's first save, on the Solitary Island's
+-- own tile of the World of Ruin map (map 1), (76,239), before Cid is fed.
+-- Cid's clock (timer 0, FIELD_ONLY) is saved with the game ($1FA8,
+-- menu/save.asm PushTimers) and runs again once Celes walks back in.
+-- Neither Cid outcome has happened; CELES is alone (the opening reset the
+-- roster, event_main.asm:12431).
+M.contracts["wor-island-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 76, y = 239 },    -- the island's tile, off 396's west edge
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00B3, 0, "Cid not yet recovered (_ca5713)" },
+    { 0x00B4, 0, "Cid not lost (_caf461)" },
+  },
+  party = {
+    size = 1,                     -- CELES alone
+    members = {
+      { 0x06, "CELES" },
+    },
+  },
+  ram = {
+    { 0x1188, 0xFF, 0x80, "Cid's clock: timer 0 armed, FIELD_ONLY (:12448)" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- wor-start-v1: the first save after the Solitary Island, the World of
 -- Ruin's boot.  Cid recovered ($00B3, _ca5713) and gave Celes the raft;
 -- the voyage set her down on the World of Ruin map (map 1) at (146,212)

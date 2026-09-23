@@ -654,22 +654,32 @@ STATES = [
       also=["escape_start"], timeout=3600),
 
     # ---- the World of Ruin ----------------------------------------------------
-    # wor_landing -> the first save after the Solitary Island: dress CELES
-    # (the opening leaves her every slot empty), save on the island's own
-    # World of Ruin map tile (76,239), save Cid by catching fish on the
-    # beach 398 and feeding him -- reloading the island save when he is
-    # lost, at most 4 attempts, each logged (docs/design/wor-start.md: his
-    # health is var 7, the fish reroll on every talk, and the measured
-    # policy recovers him about 4 times in 5) -- ride his recovery scene,
-    # the raft and the voyage to the World of Ruin map, and Save at the
-    # landing world (146,212): the `wor-start-v1` checkpoint, the boot for
-    # WoR generators (checkpoint=, entry contract "wor-start-v1").  prev=,
-    # not checkpoint=: nothing between the alcove and the island is a save
-    # point, so this link boots the wor_landing savestate.  timeout=3600: a
-    # slow draw feeds Cid for 60k+ frames.  Re-cutting the SRAM is a
-    # deliberate by-hand operation:
+    # wor_landing -> the World of Ruin's first save: dress CELES (the opening
+    # leaves her every slot empty), walk out of Cid's house and off the
+    # island's west edge onto its own World of Ruin tile (76,239), and Save
+    # there -- the `wor-island-v1` checkpoint (docs/design/wor-start.md).
+    # prev=, not checkpoint=: nothing between the alcove and the island is a
+    # save point, so this link boots the wor_landing savestate.  Re-cutting
+    # the SRAM is a deliberate by-hand operation:
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-island-v1/wor-island.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_island.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-island-v1
+    S("wor_island", gen="gen_wor_island", prev="wor_landing"),
+
+    # wor-island-v1 -> the first save after the island: cold-Continue the
+    # island save, feed Cid until he recovers (his health is var 7, the fish
+    # reroll on every talk; the lab's policy and its measured rate are in
+    # docs/design/wor-start.md), ride his recovery scene, the raft and the
+    # voyage, and Save at the landing, world (146,212): the `wor-start-v1`
+    # checkpoint, the boot for WoR generators (checkpoint=, entry contract
+    # "wor-start-v1").  A lost Cid is a lost attempt (class `lost`), retried
+    # from this checkpoint by the segment runner like a wipe (its default 3
+    # attempts).  timeout=7200: one attempt feeds Cid for up to 216k frames
+    # (the lab's slowest), and a retried run replays from the Continue.
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-island-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-start-v1/wor-start.sram \
     #     tools/tests/run.sh tools/tests/gen_wor_start.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-start-v1
-    S("wor_start", gen="gen_wor_start", prev="wor_landing", timeout=3600),
+    S("wor_start", gen="gen_wor_start", checkpoint="wor-island-v1", timeout=7200),
 ]
