@@ -968,6 +968,51 @@ M.contracts["wor-start-v1"] = {
   },
 }
 
+-- wor-tzen-door-v1: the last save before Tzen's timed house, on the World
+-- of Ruin map one step east of Tzen's door (130,179), off the desert south
+-- and west of it (the Black Drgn's pool; docs/design/route-wor-sabin.md
+-- sections 2.3 and 7).  CELES alone, Cid recovered, and nothing of Tzen's
+-- story run yet: the Light of Judgment ($027D), the house scene ($028C),
+-- the child ($028B) and Sabin's joining ($028A) all clear, Sabin shown
+-- holding up the house ($066C), and no event timer counting (the house's
+-- 6:00 is timer 0, started only at (16,9) inside the town).
+M.contracts["wor-tzen-door-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 131, y = 179 },   -- one step east of Tzen's door
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00B3, 1, "Cid recovered (_ca5713)" },
+    { 0x00B4, 0, "Cid was not lost (_caf461)" },
+    { 0x027D, 0, "Tzen's Light of Judgment not yet seen (_cc583e)" },
+    { 0x028C, 0, "the house scene not started (_cc58ff)" },
+    { 0x028B, 0, "the child not yet rescued (_cc5958)" },
+    { 0x028A, 0, "Sabin not yet joined (_cc5980)" },
+    { 0x066C, 1, "Sabin shown holding up the house" },
+  },
+  party = {
+    size = 1,                     -- CELES alone
+    members = {
+      { 0x06, "CELES" },
+    },
+  },
+  ram = {
+    -- the four event timers' counters ($1189/$118F/$1195/$119B, words):
+    -- none counting (lib/ot6_field.lua M.eventTimerLive)
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
@@ -1191,13 +1236,15 @@ function M.assertSavedSlot(map, x, y, what, slot)
   M.assertEq(s.y, y, (what or "the battery") .. ": saved tile y")
 end
 
--- The world-save form: `map` reads 0 and the tile lives in $1F60/$1F61.
-function M.assertSavedSlotWorld(x, y, what, slot)
+-- The world-save form: the map word reads the world (0 the World of
+-- Balance, the default; `world` = 1 the World of Ruin) and the tile lives
+-- in $1F60/$1F61.
+function M.assertSavedSlotWorld(x, y, what, slot, world)
   local s = M.savedSlot(slot)
   M.log(string.format("[saved] %s: slot %d holds map %d ($%04X) world tile "
     .. "(%d,%d)", what or "the battery", s.slot, s.map, s.mapWord,
     s.worldX, s.worldY))
-  M.assertEq(s.map, 0, (what or "the battery") .. ": saved on the world map")
+  M.assertEq(s.map, world or 0, (what or "the battery") .. ": saved on the world map")
   M.assertEq(s.worldX, x, (what or "the battery") .. ": saved world x")
   M.assertEq(s.worldY, y, (what or "the battery") .. ": saved world y")
 end

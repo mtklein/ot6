@@ -2,8 +2,10 @@
 
 The route from the first World of Ruin save (Celes alone where the raft
 from the Solitary Island lands) to Sabin joining in Tzen, and on to the
-first save after he joins. It is planned from the game's own data; the
-driving comes next, once the `wor-start-v1` checkpoint exists.
+first save after he joins. It is planned from the game's own data. The
+first leg is driven: section 10 records what `gen_wor_tzen_door` measured
+from the landing to Tzen's door (`wor-tzen-door-v1`); the house and
+Sabin come next.
 
 Line numbers are into `ff6/src/event/event_main.asm` unless a path is given.
 Decodes come from `tools/route_data.py` (added with this doc: entrances,
@@ -80,6 +82,14 @@ measurement.
     (`norm_lvl` raises and never lowers; `field/event.asm:857-886`). The
     first save after he joins is on the world map outside Tzen, 35 steps
     and a door from where control returns (§2.6, §7).
+11. **Driven to Tzen's door** (§10, 2026-09-23): the back row, Maduin, the
+    Blizzard + ThunderBlade Genji pair and a Jewel Ring; Albrook before
+    and after a grind to L27; seven plains fights won, none lost, no Fenix
+    Down, the walk off the sand; saved at (131,179). Two plan items moved
+    on measurement: the back row beat the front on the same walk, and the
+    Chitonid, not the Osprey, is the body to take first (with the Jewel
+    Ring the Beak costs nothing; the Chitonid's Sneeze fires on its own
+    killing blow once one other body is left).
 
 ---
 
@@ -710,8 +720,8 @@ cuts:
 |---|---|---|
 | `wor-island-v1` (`gen_wor_island`) | world (76,239), the Solitary Island's own tile, Celes alone, Cid not yet fed | the first WoR save |
 | `wor-start-v1` (`gen_wor_start`) | world (146,212), Celes alone, Cid recovered | the first save after the island |
-| `wor-albrook-v1` (optional) | world, outside Albrook after shopping, re-equip and any grind | the grind's resume point |
-| **`wor-tzen-door-v1`** | world (131,179), one step east of Tzen's door, *not* on the desert | the last save before the committed, timed scene; every house attempt retries from here |
+| `wor-albrook-v1` (not cut) | world, outside Albrook after shopping, re-equip and any grind | the grind's resume point; `gen_wor_tzen_door` plays the kit, both Albrook stops and the grind in one segment, whose own retries start at the landing |
+| **`wor-tzen-door-v1`** (`gen_wor_tzen_door`, cut 2026-09-23) | world (131,179), one step east of Tzen's door, *not* on the desert | the last save before the committed, timed scene; every house attempt retries from here |
 | **`wor-sabin-v1`** | world (130,179) after leaving Tzen with Sabin | the first save after he joins; the end of this route |
 
 Each cut asserts its preconditions: the party, `$027D/$028A/$028B/$028C`,
@@ -905,19 +915,19 @@ Harness mechanics this stretch exercises, checked against
 
 | mechanic | where | coverage today | what the driving needs |
 |---|---|---|---|
-| a party of one; Death, Petrify or Zombie = loss | everywhere to Tzen | Petrify is "HANDLED (cured in battle) / not measured live"; a solo party gets no turn to cure it | Jewel Ring on; kill the Osprey first; kill order in 207; count every loss by cause |
+| a party of one; Death, Petrify or Zombie = loss | everywhere to Tzen | Petrify measured live (§10.2: without the Jewel Ring the Beak lost the second fight); the kit asserts the protection; the Zombie pool is off the walk (the avoid set) | the house: the Jewel Ring stays on; kill order in 207 |
 | Condemned (Doom Sting) | house, 209 | HANDLED (`M.doomCount` / `M.doomRule`) | plan the kill inside the count; solo, nobody can raise |
-| Sap (T. Lash, Slip Touch) | plains, house | **UNHANDLED** (no read; Remedy's STATUS2 `$48` does clear it) | at least log it; Remedy |
+| Sap (T. Lash, Slip Touch) | plains, house | HANDLED (planned around: 18-21 HP a tick every 429-608 frames, §10.3) | — |
 | Stop (Net) | house, 207 | HANDLED (planned around) | — |
-| Monster Escape (a Mesosaur with company) | group 31 (both formations), group 35 | **UNHANDLED** (slot liveness only) | a battle can end with bodies escaped; XP accounting must not assume kills |
-| Sneeze (Chitonid, last and hit) | formations 204 (group 34) and 201 (group 33) | **UNHANDLED** ("a character just ran away `$3A38`") | a solo sneeze ends the battle with no reward; the driver must not read it as a win or a wipe |
+| Monster Escape (a Mesosaur with company) | group 31 (both formations), group 35 | HANDLED (`[escape]`, the `[outcome]` reward check, §10.3) | — |
+| Sneeze (Chitonid, last and hit) | formations 204 (group 34) and 201 (group 33) | HANDLED for a party that leaves whole (`[left]`, `PARTY LEFT`, no reward, not a wipe) and avoided (the last-stand kill order, §10.3); a member leaving with others still in is not yet taken out of the care lines (Celes + Sabin) | — |
 | face up + A trigger | the child (117,12) | PARTIAL: generator-local in `gen_terra_caves.lua` | promote an "examine" step into the lib, or reuse it |
 | event timer through menus and battles | the house | HANDLED (`eventTimerLive` keeps menus out) | log the counter at each battle's start and end; no field care inside |
 | committed scene (the bounce) | Tzen after the LoJ | none needed | do not route to the exit before `$028A=1` |
 | map-init `mod_bg_tiles` | 305, 324 | the lib reads live RAM, so it is fine | the offline BFS counts here are **verify-on-arrival** |
-| equipping from nothing, Genji pair, esper | landing; Sabin at Tzen | `M.equipKit`, `M.equipEsper` exist | assert the result slot by slot |
-| world-map tiles to avoid | Tzen's door | `worldNavTo` has no avoid option (`worldBfs` takes only learned `blockedEdges`, `ot6_field.lua:1022`) | waypoint via (136,179), or add an avoid set; keep off the desert south and west of (130,179) |
-| no Tonic seller | whole stretch | the care kernel falls back to Potions | size Potions from the logged spend; extend `audit_supplies.py` into the WoR |
+| equipping from nothing, Genji pair, esper | landing; Sabin at Tzen | `M.equipKit`, `M.equipEsper`, now on the world map's menu too (§10.4) | assert the result slot by slot |
+| world-map tiles to avoid | Tzen's door | HANDLED: `worldNavTo` / `worldBfs` / `worldPathGroups` take an avoid set (§10.3) | — |
+| no Tonic seller | whole stretch | the care kernel falls back to Potions; Albrook tops them up to level x 1.5 + the measured field spend (§10.1) | extend `audit_supplies.py` into the WoR |
 | side attacks | — | masked out below three allies | none |
 
 Other unknowns:
@@ -942,6 +952,215 @@ them (`formation_species(f)` on the unmasked word). A `+rand 0..3` word
 (bit 15) therefore resolves to no species at all. None of this stretch's
 pools uses one, but any pool that does is silently unaudited.
 `audit_encounters.py` resolves them correctly (`Data.resolve`).
+
+---
+
+## 10. The landing to Tzen's door, played (`gen_wor_tzen_door`, `wor-tzen-door-v1`)
+
+Driven 2026-09-23 for #250 (the harness half is #255). The segment
+cold-Continues `wor-start-v1` (checkpoint=, so it regenerates without the
+World of Balance chain), dresses CELES on the world map's menu, stops in
+Albrook, fights the plains north of it to L27, stops in Albrook again,
+walks to Tzen off the desert and saves on the World of Ruin map at
+(131,179), one step east of the door: the `wor-tzen-door-v1` checkpoint,
+the boot for the timed house. Every number below is quoted from a log
+under `build/attempts/wt/wor-tzen-door/` (`runs/` the graph's own run, the
+capture and the cold Continue; `lab/` the probes and A/B labs, with the
+scripts that made them; `var-final/` and `var-prefinal/` the runs under
+real draw variation; `suites/` the lib suites). Nothing was measured by
+writing game state.
+
+### 10.1 The run (`runs/wor_tzen_door_ninja.log`, `nice ninja build/states/wor_tzen_door.mss.lua`)
+
+| step | what the log says |
+|---|---|
+| boot | `[wor] boot f1346: world 1 (146,212), CELES L25 xp 44072 HP 1043/1043 MP 227/227 status1 $00, row back, esper+kit FF 11 0E 76 8F D1 C1; tonic=4 potion=39 fenix=22 remedy=1 soft=18 tent=10 gil=215563` |
+| kit | `[wor] kit: esper+kit 06 0E 0F 76 8F D1 B5, row back; hands 0E (element ice) + 0F (element bolt); relics protect STATUS1 $40` |
+| the pools | `[route] avoid set: 65 tiles in (118..159, 160..223) off the plains pools: group 36 x65 (deals $0B2)`; every leg `the walk can roll groups {34, 31}` |
+| Albrook, before | `bought: tonic=4 potion=44 fenix=25 remedy=5 ... (spent 7000 GP)`, `CELES is whole; no night at the inn` |
+| the grind | 7 battles, `$0C7 x2, $0CC x3, $0C5 x1, $0CA x1`, all `WON`, `paid as due`; `[wor] grind done f44485 after 29 legs: CELES L27 xp 55924 HP 1211/1211 MP 251/251` |
+| Albrook, after | `bought: tonic=4 potion=47 fenix=27 remedy=5 ... (spent 2200 GP)`; no night (the level-up had filled her) |
+| Tzen | no battle on the walk; `[tzen] at the door f46538: world 1 (131,179)` |
+| the save | `[saved] wor-tzen-door-v1: slot 3 holds map 1 ($3001) world tile (131,179)`, `contract wor-tzen-door-v1 (exit): all 24 fields hold`, `PASS (frame 46853) attempts=1/3` |
+
+Fights met: Gilomantis + Mesosaur twice (2751, 3199 ticks), Osprey +
+Chitonid + Gigan Toad three times (9582, 4656, 9304), Mesosaur ×2 once
+(2478), Lunaris + Osprey once (3303). No death, no Fenix Down (22 held, 5
+bought, 27 at the save), so no boost at a death to classify. CELES chose
+Fight 24 times and Cure 9 times; the field care spent one Potion (`used
+$E9 on char 6: 679 -> 929 hp`); Sap landed once (`[status] f+749 ... SAP`)
+and Slow once (`[status] f+2150 ... SLOW`). Her lowest HP was 175 of 1125,
+in the third Osprey + Chitonid + Gigan Toad fight with only the Osprey
+left (`battle f+8100 ... partyhp=175`); that fight is the stretch's
+longest and hardest, taken Chitonid-first (10.3). The capture run
+(`runs/capture_wor_tzen_door.log`, `OT6_CAPTURE_SRM`) is the same run, its
+`wor_tzen_door.mss` byte-identical; sealed and validated
+(`runs/validate_wor_tzen_door_v1.txt`): `holds=slot 3 world 1 (131,179)
+[$1F64=$3001] (saved: declared and checked)`. The cold Continue
+(`runs/continue_wor_tzen_door_v1.log`, `probe_wor_tzen_door_continue.lua`):
+`contract wor-tzen-door-v1 (entry): all 24 fields hold`, `[continue] world
+1 at (131,179): CELES L27 HP 1211/1211 MP 251/251 row back esper+kit 06 0E
+0F 76 8F D1 B5; tonic=4 potion=47 fenix=27 remedy=5 gil=222473`, `PASS
+(frame 1386)`.
+
+### 10.2 The kit and the row, measured
+
+The same walk from the same landing snapshot, 14 battles, only the lever
+changed (the formations come in the same order: they are save data):
+
+| lever | frames for 14 battles | Potions of field care | Osprey + Chitonid + Gigan Toad | log |
+|---|---|---|---|---|
+| front row, Maduin | 49,791 | 6 (39 -> 33) | 7845, 8174, 6147 ticks | `lab/lab_grind.log` |
+| **back row, Maduin** | **41,439** | **3** (39 -> 36) | 3114 (sneezed out), 3605, 2717 | `lab/lab_grind_back.log` |
+| back row, Ifrit | 46,295 | 5 (39 -> 34) | 4957, 3846 (sneezed out), 5350 | `lab/lab_grind_ifrit.log` |
+
+A boosted Genji Fight kills a plains body a turn from either row (`took
+458 off`, `took 850 off`, the Gigan Toad and the Osprey, `lab_grind.log`),
+and the back row halves what she takes (`slot 0's smallest hit ... 132`
+front, `... 66` back), so the heal policy spends fewer turns on her: she
+stays in the BACK row she arrives in. Maduin stays over Ifrit's +6 vigor:
+no faster on this walk, and its +7 magic stands behind her Cure, her
+in-battle heal. The blades: Blizzard (ice: the Mesosaur, the Osprey, the
+Gigan Toad) and ThunderBlade (bolt: the Chitonid, whose authored row is
+bludgeoning only) on the Genji Glove, and the Jewel Ring in the second
+relic slot. Without it (`lab/lab_grind_noring.log`, the island's Czarina
+Ring kept) the second fight was lost: `[status] f+1864 ... SLOW`, `[status]
+f+2193 entity 0 char 6 is under PETRIFY`, `[outcome] battle $0CC LOST after
+2447 ticks`: the Osprey's Beak on a party of one, at 630/1043 HP
+(`lab/lab_grind_noring2.log`: `[wipe] ... class=lost to a status: 1
+member(s) Petrified or Zombied, no deaths`). The generator's kit assertion
+goes red without the ring (`lab/gen_wor_tzen_door_noring.log`: `a relic
+CELES wears protects her from Petrify (the Osprey's Beak): got 0 ($0), want
+64 ($40)`).
+
+### 10.3 The mechanics the plains deal (docs/design/mechanics-coverage.md)
+
+- **A monster escaping** (the Mesosaur with company): `[escape] f+350 slot
+  3 (species $021) ESCAPED at 1112 HP ($3A3A=08): no kill`, and the
+  battle's `[outcome] ... killed s2:$021; escaped s3:$021 ... reward due 918
+  ... (char 6 +918 (due 918)): paid as due` (`lab/lab_grind_back2.log`).
+  One escaped in 6 of that lab's 9 Mesosaur fights, each at f+262..366,
+  about when her first turn comes. WinBattle pays only for a killed
+  body; the generator asserts every battle paid as due. With the rule
+  switched off (an escaped body counted a kill) the same snapshot reads
+  `due 1836 ... +918 ... XP MISMATCH` (`lab/outcome/`).
+- **A member sneezed out** (the Chitonid): its retaliation is
+  `if_num_monsters 1 / if_hit / attack SNEEZE, NOTHING, NOTHING`, and
+  `AICond_13` counts the monsters alive AFTER the hit, so it fires on its
+  own killing blow once one other body is left. Left for last it sneezed
+  CELES out of 2 of the 6 back-row fights in the labs (`lab/lab_grind_back.log`,
+  `lab/lab_grind_ifrit.log`; 0 of 3 in the front row, `lab/lab_grind.log`) (`[left] f+2818 entity 0
+  (char 6) LEFT the battle ... the whole party is gone`, `PARTY LEFT ...
+  reward due 0`); taken before only the last plain body it still did, on
+  its killing blow, twice in three (`lab/gen4.log`). The driver now takes a
+  Sneeze-counter body first while the others stand (`[last stand] slot 1
+  ($07C) throws $CB (N=1) ... taken first`): from one snapshot, rule off
+  `party left`, rule on `won` (`lab/laststand/`), and none of the
+  segment's Chitonid fights since has sneezed. The price is time: those
+  fights run 4656-9582 ticks against 2717-3605 with the Chitonid last.
+- **Petrify**: above; the kit asserts a relic protecting STATUS1 `$40`
+  before the plains.
+- **Zombie**: the Black Drgn is on the desert south and west of Tzen's
+  door (group 36). The avoid set keeps every plan off it; from 816 start
+  tiles near the door, `without the avoid set: ... 192 plans step on the
+  sand`, `with the avoid set: ... 0` (`lab/lab_avoid.log`).
+- **Sap** (the Mesosaur's T. Lash): a tick every 429-608 frames of 18-21
+  HP at 1211 max HP (`lab/probe_sap.log`), gone with the battle: planned
+  around. **Slow** (the Gigan Toad's Slimer): planned around, the ATB
+  constant carries it. **Dark** (the Lunaris's Face Bite): planned around
+  in battle, cured in the field with a Remedy (`plan: cure dark char 6 with
+  $F5`); no shop from the landing to Tzen sells Eye Drops, so Albrook's
+  Remedies are the stock.
+
+### 10.4 The walk, the menus, the town
+
+- **The world map's menu** works for the kit now: the equip helpers used to
+  wait for the field's control after the menu, which the world map never
+  gives (`lab/lab_kit_mutant_menuback.log`: `timeout after 1200 frames
+  driving toward MADUIN -> CELES: back out`).
+- **Leaving a town**: the world map reads lit for a frame while the town
+  fades out, and its tilemap lands about 86 frames after the map word
+  turns (`lab/lab_exit2.log`); a plan read before then walks the town's
+  tiles (`lab/gen3.log`: `no world path from (141,208) to (141,203)`).
+  The generator waits 30 frames of a lit, controllable world with a
+  walkable tile under her.
+- **Albrook** (WoR map 324): in at (2,17); the item shop is shop 48
+  (`the counter opened shop 48`), out of town by the west edge to world
+  (141,208). The first stop comes BEFORE the grind: she lands with one
+  Remedy, and the first Lunaris took it (`lab/gen1.log`, the grind-first
+  cut: `remedy=0` after battle 1).
+- **The approach**: `worldNavTo` did not carry past (131,179) into the
+  door with the pad held (`lab/lab_approach_norelease.log`), so no
+  release-per-step walker was kept.
+
+- **The lib's suites** that call what this segment changed (the equip
+  helpers, the world BFS and navigator, the wipe class, the part roles,
+  the driver's per-frame watch), run through `run.sh` on this tree's
+  fixtures (`suites/`, `suites_verdicts.txt`): 15 of 16 PASS;
+  `battle_shadowstays` fails the same way on main's lib and on this branch's
+  (`suites/shadowstays/head.log`, `branch.log`: `the 1/16 Shadow-leave roll
+  never passed in 80 won battles`), from a `camp_escaped` fixture that is
+  stale against main's generators. Its first run on the branch found the
+  outcome watch reading the battle's RAM after the battle had handed it
+  back (`branch_before_endhook.log`: 320 false `[left]` lines); the
+  `[outcome]` is now judged on the battle's own end reading (`UpdateSRAM`),
+  and the rerun reads 80 of 80 `paid as due` and no `[left]`.
+
+### 10.5 Under real draw variation
+
+A seed shift moves only in-battle RNG; which formation comes next is save
+data (`$1FA1-$1FA5`), so every replay from `wor-start-v1` meets the same
+formations in the same order (docs/TESTING.md). `lab/varlab.py` derives
+the generator with one block inserted after the kit that fights K
+encounters on the grind's own walk first, so the body proper (the pools,
+the Albrook stops, the grind, the walk, the save) starts from another
+encounter counter, level, HP and bag -- a person who fought a while before
+heading for town -- and plays on from there. Retries off
+(`OT6_RETRIES=1`): every attempt is scored as it fell.
+
+| variant | the body starts at | battles | Osprey + Chitonid + Gigan Toad | escapes | lowest HP sampled | verdict |
+|---|---|---|---|---|---|---|
+| K=0, shift 23 | the landing (the runner's seed shift only) | 10 | 3 | 4 | 541 | `PASS (frame 41501) attempts=1/1` |
+| K=0, shift 41 | the landing | 10 | 3 | 4 | 539 | `PASS (frame 40751) attempts=1/1` |
+| K=1 | L25, 837 HP, Dark, `$1FA1-5 = 23 0A 09 09 09` | 10 | 2 | 3 | 397 | `PASS (frame 46566) attempts=1/1` |
+| K=2 | L25, 767 HP, `51 0B ...` | 10 | 2 | 5 | 410 | `PASS (frame 43038) attempts=1/1` |
+| K=3 | L25, 698 HP, `78 0C ...` | 10 | 3 | 3 | 461 | `PASS (frame 52924) attempts=1/1` |
+| K=3, shift 23 | L25, 749 HP | 10 | 3 | 2 | 398 | `PASS (frame 56070) attempts=1/1` |
+| K=3, shift 41 | L25, 768 HP | 10 | 3 | 3 | 128 | `PASS (frame 53735) attempts=1/1` |
+| K=4 | L25, 584 HP, `92 0D ...` | 10 | 2 | 3 | 418 | `PASS (frame 42383) attempts=1/1` |
+| K=5 | L26, `B6 0E ...` | 10 | 2 | 4 | 418 | `PASS (frame 36628) attempts=1/1` |
+| K=6 | L26, `DF 0F ...` | 10 | 3 | 4 | 411 | `PASS (frame 42667) attempts=1/1` |
+| K=6, shift 23 | L26, 942 HP | 10 | 3 | 3 | 323 | `PASS (frame 51886) attempts=1/1` |
+| K=6, shift 41 | L26, 980 HP | 10 | 3 | 3 | 295 | `PASS (frame 50070) attempts=1/1` |
+| K=7 | L26, `FF 10 ...` | 10 | 2 | 4 | 418 | `PASS (frame 41648) attempts=1/1` |
+| K=8 | L26, `34 11 09 1A 09` | 10 | 1 | 4 | 418 | `PASS (frame 39837) attempts=1/1` |
+
+(`var-final/summary.txt` and the logs beside it, on the shipped
+generator and lib: 140 `[outcome]` lines, every one `paid as due`; the
+lowest HP is the driver's 300-tick battle line, not a per-frame minimum.
+The same runs one lib change earlier, `var-final-prelib/` (the outcome
+judged on the last per-frame reading), and the K=1..6 runs one generator
+lever earlier, `var-prefinal/` (a release-per-step walker since dropped),
+end at the same frames with the same verdicts.) Every run reached L27 and saved at (131,179); across the 15
+runs (these and the graph's own) 38 Osprey + Chitonid + Gigan Toad fights
+were won with no sneeze, no death, no Fenix Down and no battle lost; the
+K=1 variant walked into Albrook blind and took the inn (`[Albrook inn]
+... after the night: c6 1043/1043 hp`, `status1 $00`). Two things to
+watch, both in that formation after the Chitonid falls: HP samples of 175
+(the graph's run, the Osprey alone) and 128 (K=3, shift 41, the Osprey
+and the Gigan Toad): fights won, but by the heal policy's margin, the
+stretch's attrition fight.
+
+### 10.6 For the house segment
+
+`wor-tzen-door-v1` boots CELES alone at world (131,179): L27 (xp 55,924),
+HP 1211/1211, MP 251/251, BACK row, Maduin, Blizzard + ThunderBlade on
+the Genji Glove, Gold Helmet, Gold Armor, Jewel Ring; Potion 47, Fenix
+Down 27, Remedy 5, Tonic 4, Tent 10, Soft 18, 222,473 GP. Sabin will join
+at max(26, 27) = 27 (§2.6). The house's HermitCrabs throw Rock only as
+last-stand counters; with the Jewel Ring on they cost nothing, and the
+driver's last-stand kill order covers only the Sneeze by default
+(`opts.lastStand = true` extends it to every last-stand body).
 
 ---
 

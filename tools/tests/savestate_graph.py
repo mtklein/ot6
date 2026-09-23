@@ -685,4 +685,21 @@ STATES = [
     #     tools/tests/run.sh tools/tests/gen_wor_start.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-start-v1
     S("wor_start", gen="gen_wor_start", checkpoint="wor-island-v1", timeout=7200),
+
+    # wor-start-v1 -> the last save before Tzen's timed house: cold-Continue
+    # the landing save (CELES alone at world (146,212)), dress her for the
+    # solo stretch on the world map's menu, stop in Albrook, fight the
+    # plains north of it to L27, stop in Albrook again, walk to Tzen off its
+    # desert (the Black Drgn's pool) and Save one step east of the door,
+    # world (131,179): the `wor-tzen-door-v1` checkpoint
+    # (docs/design/route-wor-sabin.md).  checkpoint=, not prev=: this
+    # segment regenerates from the landing battery, independently of the
+    # World of Balance chain.  Every random is fought; a wipe retries from
+    # the Continue (the runner's default 3 attempts).
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-start-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-tzen-door-v1/wor-tzen-door.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_tzen_door.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-tzen-door-v1
+    S("wor_tzen_door", gen="gen_wor_tzen_door", checkpoint="wor-start-v1", timeout=3600),
 ]

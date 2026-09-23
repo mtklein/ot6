@@ -787,6 +787,12 @@ end
 --   has    function(item) -> true when the bag holds one to spend
 --   items  the candidates in order (optional)
 M.GREEN_CHERRY, M.REMEDY, M.SOFT = 0xF8, 0xF5, 0xF4
+M.ANTIDOTE, M.EYEDROP = 0xF2, 0xF3
+-- The over-time statuses (#255): Blind (STATUS1 bit 0) halves the
+-- attacker's physical hit rate, Poison (STATUS1 bit 2) and Sap (STATUS2
+-- bit 6) drain on the dot trigger, Slow (STATUS3 bit 2) halves the ATB
+-- constant.  None denies a turn; the [status] line says each.
+M.ST1_BLIND, M.ST1_POISON, M.ST2_SAP, M.ST3_SLOW = 0x01, 0x04, 0x40, 0x04
 function M.statusCure(o)
   for _, item in ipairs(o.items or { M.GREEN_CHERRY, M.REMEDY }) do
     local rec
@@ -1567,6 +1573,13 @@ end
 -- "died with BP banked" when some member fell holding at least `banked`
 -- pips; both can hold, and neither is "no deaths recorded".  Returns the
 -- class string the [wipe] line and tools/audit_boost.py print.
+-- o.statues (#255): how many seated members stand Petrified or Zombied at
+-- the wipe -- a loss with no death in it, which the engine calls a wipe
+-- all the same (UpdateDead takes both out of the alive mask); measured on
+-- a solo CELES without a Jewel Ring, the Osprey's Beak at 630/1043 HP
+-- (build/attempts/wt/wor-tzen-door/lab/lab_grind_noring2.log: `class=lost
+-- to a status: 1 member(s) Petrified or Zombied, no deaths`, where the
+-- class read "no deaths recorded" before, lab_grind_noring.log).
 function M.wipeClass(deaths, o)
   o = o or {}
   local onePct, early, banked = o.onePct or 80, o.early or 1800, o.banked or 3
@@ -1578,12 +1591,108 @@ function M.wipeClass(deaths, o)
     end
     if (d.bp or 0) >= banked then held = math.max(held, d.bp) end
   end
+  if #(deaths or {}) == 0 and (o.statues or 0) > 0 then
+    return string.format("lost to a status: %d member(s) Petrified or Zombied, no deaths", o.statues)
+  end
   if #(deaths or {}) == 0 then return "no deaths recorded" end
   local parts = {}
   if oneShot then parts[#parts + 1] = "one-shot early" end
   if held > 0 then parts[#parts + 1] = string.format("died with %d BP banked", held) end
   if #parts == 0 then return "worn down (no one-shot, no pips banked)" end
   return table.concat(parts, " + ")
+end
+
+-- ---- how a battle ended, and what it pays (#255) ---------------------
+-- A walker sees "the battle is over"; FF6 ends one three ways.  The party
+-- wins (CheckBattleEnd: no monster left in the alive mask $3A77), is
+-- lost (M.wipeVerdict), or is GONE from it: every member it seated has
+-- left -- run away, sneezed away, a Smoke Bomb (TargetEffect_27/38/4b
+-- set the member's bit in $3A39 and $2F4C) -- and CheckBattleEnd's `lda
+-- $3a39 / bne BattleEnd_01` takes the escape ending, which pays nothing.
+-- A monster leaves the same way: the Mesosaur's own Escape (ai_script
+-- `attack ESCAPE`) sets its bit in $3A3A ("died or escaped") with its HP
+-- still on it, and WinBattle (battle_main @5db0) pays only for the slots
+-- whose STATUS1 ($3EEC + 2s) carries Wound, Petrify or Zombie ($C2), so an
+-- escaped body pays nothing.  Measured on the World of Ruin plains
+-- (build/attempts/wt/wor-tzen-door/lab/lab_grind.log): Gilomantis +
+-- Mesosaur with the Mesosaur escaped, `xp +1118` = the Gilomantis's 559
+-- x2; a sneeze on a lone CELES, `$3A39=01`, `xp +0`.
+--
+-- M.rewardDue is WinBattle's arithmetic: the slots' experience ($3D8C +
+-- 2s) summed over the $C2 slots, OT6's random-battle scale when
+-- OT6_RANDBTL is set (Ot6RewardScale_ext: x Ot6RewardMulW / 16, clamped
+-- to 24 bits), divided by the allies alive ($3A76).  An Exp. Egg ($3C59
+-- bit 3) doubles one member's share (AddExp twice); a member who is not
+-- in the alive mask ($3A74) at the win gets nothing; a Veldt battle
+-- ($11E4 bit 1) sums no experience at all.
+--   xp, st1   slot (0..5) -> experience word / STATUS1 byte
+--   random    OT6_RANDBTL set;  mul16  Ot6RewardMulW (16ths)
+--   alive     $3A76;  veldt  $11E4 bit 1
+function M.rewardDue(o)
+  local sum = 0
+  for s = 0, 5 do
+    if o.st1[s] and (o.st1[s] & 0xC2) ~= 0 and not o.veldt then sum = sum + (o.xp[s] or 0) end
+  end
+  sum = sum & 0xFFFFFF
+  if o.random then sum = math.min((sum * (o.mul16 or 16)) >> 4, 0xFFFFFF) end
+  if (o.alive or 0) == 0 then return 0 end
+  return sum // o.alive
+end
+
+-- The battle's outcome from its last reading (the driver's watchLeavers
+-- snapshot; see there): kind "won", "party left" (every seated member
+-- left: no reward), or "lost"; the slots killed and the slots that
+-- escaped; and each seated member's share.
+--   seated   entity -> true for the members seated at the start
+--   left     $3A39;  gone  $3A3A;  aliveMask  $3A74;  lost  wipe verdict
+--   hp       slot -> HP
+function M.battleOutcome(o)
+  -- kills by WinBattle's own test (STATUS1 $C2), escapes by the gone bit
+  -- with HP still on the body; both only over the slots the formation
+  -- filled (o.filled), since the reward sum reads all six as the engine does
+  local kills, escaped = {}, {}
+  for s = 0, 5 do
+    if o.filled == nil or o.filled[s] then
+      local st = o.st1[s] or 0
+      if (st & 0xC2) ~= 0 then
+        kills[#kills + 1] = s
+      elseif ((o.gone or 0) >> s) & 1 == 1 and (o.hp[s] or 0) > 0 then
+        escaped[#escaped + 1] = s
+      end
+    end
+  end
+  local seatedN, leftN = 0, 0
+  for e = 0, 3 do
+    if o.seated[e] then
+      seatedN = seatedN + 1
+      if ((o.left or 0) >> e) & 1 == 1 then leftN = leftN + 1 end
+    end
+  end
+  local kind
+  if o.lost then kind = "lost"
+  elseif seatedN > 0 and leftN == seatedN then kind = "party left"
+  else kind = "won" end
+  local due = kind == "won" and M.rewardDue(o) or 0
+  local share = {}
+  for e = 0, 3 do
+    if o.seated[e] then
+      local paid = kind == "won" and ((o.aliveMask or 0) >> e) & 1 == 1
+      share[e] = paid and due * ((o.egg and o.egg[e]) and 2 or 1) or 0
+    end
+  end
+  -- A win over bodies worth experience with no ally alive to take it
+  -- ($3A76 = 0) is not a win: the engine divides the reward among the
+  -- allies alive, so a party that is gone is paid nothing whatever the
+  -- kind says.  Said as a contradiction, so the kind cannot drift from
+  -- the engine's own count unnoticed.
+  local killedXp = 0
+  for _, s in ipairs(kills) do killedXp = killedXp + (o.veldt and 0 or (o.xp[s] or 0)) end
+  local contradiction = nil
+  if kind == "won" and killedXp > 0 and (o.alive or 0) == 0 then
+    contradiction = "a WIN over bodies worth experience with no ally alive to take it ($3A76 = 0)"
+  end
+  return { kind = kind, kills = kills, escaped = escaped, due = due, share = share,
+           leftN = leftN, seatedN = seatedN, contradiction = contradiction }
 end
 
 -- Which way the target cursor crosses, read off the battle rather than
@@ -3039,27 +3148,47 @@ end
 -- One species' script, byteAt(i) from its first byte, for the monster in
 -- `slot`.  Returns endsBattle, respawns, arms (the switches its death
 -- sets), reads (the switches its script tests), restores and kills (the
--- masks of OTHER slots it brings in or takes out anywhere in the script).
+-- masks of OTHER slots it brings in or takes out anywhere in the script),
+-- and lastStand: the attacks of a retaliation block whose conditions
+-- include `if_num_monsters N` (FC 13 01 N; lastStandN) -- a counter the
+-- monster throws once N or fewer monsters stand (#255: the Chitonid's
+-- `if_num_monsters 1 / if_hit / attack SNEEZE, NOTHING, NOTHING`, which
+-- sneezes a lone party out of the fight and its reward; the HermitCrab's
+-- Rock), NOTHING ($FE) left out.
 function M.partRoles(byteAt, slot)
-  local r = { endsBattle = false, respawns = false, arms = {}, reads = {}, restores = 0, kills = 0 }
+  local r = { endsBattle = false, respawns = false, arms = {}, reads = {}, restores = 0, kills = 0,
+              lastStand = {} }
   local own = 1 << slot
   local i, section = 0, 0
   local conds, inDeath = false, false  -- inside a block's conditions; the block's are if_self_dead
+  local condLast = false               -- the block's conditions include if_num_monsters N
+  local function lastAttack(a)
+    if a ~= 0xFE then r.lastStand[#r.lastStand + 1] = a end
+  end
   while section < 2 and i < M.AI_SCRIPT_MAX do
     local op = byteAt(i)
     local len = M.AI_OP_LEN[op] or 1
     if op == 0xFC then
-      if not conds then conds, inDeath = true, false end
+      if not conds then conds, inDeath, condLast = true, false, false end
       if section == 1 and byteAt(i + 1) == 0x12 and byteAt(i + 2) == 0 and byteAt(i + 3) == 0 then
         inDeath = true
+      end
+      if section == 1 and byteAt(i + 1) == 0x13 and byteAt(i + 2) == 1 then
+        condLast = true
+        r.lastStandN = byteAt(i + 3)
       end
       if byteAt(i + 1) == 0x14 then r.reads[#r.reads + 1] = { var = byteAt(i + 2), switch = byteAt(i + 3) } end
     else
       conds = false
+      if condLast and op < 0xF0 then
+        lastAttack(op)
+      elseif condLast and op == 0xF0 then
+        lastAttack(byteAt(i + 1)); lastAttack(byteAt(i + 2)); lastAttack(byteAt(i + 3))
+      end
       if op == 0xFE then
-        inDeath = false
+        inDeath, condLast = false, false
       elseif op == 0xFF then
-        section, inDeath = section + 1, false
+        section, inDeath, condLast = section + 1, false, false
       elseif op == 0xF5 then
         local anim, mode, mask = byteAt(i + 1), byteAt(i + 2), byteAt(i + 3)
         if mask == 0 then mask = own end
@@ -4382,6 +4511,12 @@ end
 function Driver:focusList()
   if self.opts.focus then return self.opts.focus end
   if self.parts then return self.parts.focus end
+  -- the last-stand focus holds while a counter body stands (readLastStand)
+  if self.lastStand then
+    for s = 0, 5 do
+      if monAlive(s) and self.lastStand.slots[s] then return self.lastStand.focus end
+    end
+  end
   return nil
 end
 
@@ -4409,6 +4544,7 @@ end
 -- Otherwise the strictly-best slot, lowest on a tie.
 function Driver:chipAim(actor, boost)
   if self.opts.aim == false or self.opts.focus or self.parts then return nil end
+  if self.lastStand and self:focusList() ~= nil then return nil end
   if livingMonsters() < 2 then return nil end
   local best, bestSlot, worst = -1, nil, nil
   for s = 0, 5 do
@@ -4440,7 +4576,11 @@ function Driver:readParts()
     end
   end
   local plan = M.partsPlan({ slots = slots })
-  if plan == nil then self.parts = false; return end
+  if plan == nil then
+    self.parts = false
+    self:readLastStand(slots)
+    return
+  end
   plan.focus, plan.slots = {}, slots
   for _, s in ipairs(plan.order) do plan.focus[#plan.focus + 1] = { slot = s, mask = 1 << s } end
   -- the switches the body's script reads, watched below for the moment
@@ -4463,6 +4603,71 @@ function Driver:readParts()
   M.log(string.format("[%s] [parts] a linked formation: %s; kill order %s%s", self.tag or "fight",
     table.concat(said, "; "), table.concat(order, " then "),
     self.opts.focus and " (an authored focus list is in force instead)" or ""))
+end
+
+-- The last-stand counters (#255), from the same scripts: a monster whose
+-- retaliation is gated on `if_num_monsters N` (M.partRoles' lastStand)
+-- answers any hit after which N or fewer monsters stand -- AICond_13 is
+-- `lda N / cmp $3A77`, the monsters alive, read when the retaliation
+-- runs, so its own killing blow counts once the others are down to N.
+-- So it is taken FIRST, while more than N others still stand: its death
+-- then leaves them above N and the counter never gets its condition.
+-- Measured on the World of Ruin plains (build/attempts/wt/wor-tzen-door/
+-- lab/): Osprey + Chitonid + Gigan Toad with the Chitonid left for last
+-- sneezed a lone back-row CELES out of the fight in 2 of 6 such fights,
+-- once on its killing blow (lab_grind_ifrit.log: `[outcome] ... PARTY LEFT
+-- ... killed s0:$0E6 s1:$07C s2:$098`); taken
+-- only before the LAST plain body, it sneezed her out on its killing
+-- blow with the Osprey still up, twice in three (gen4.log: `PARTY LEFT
+-- ... killed s1:$07C s2:$098`).  A kill order planned from the ROM's AI
+-- script, not from anything the fight has shown: an informed rule, said
+-- as such.  Only where the formation has a body WITHOUT such a counter.
+-- With two counter bodies (the house's HermitCrab pair beside a Pm
+-- Stalker) both go first, and only the second one's killing blow can
+-- still land on N.
+-- Scope, a lever (opts.lastStand): by default only the counters that take
+-- a member OUT of the fight -- the Sneeze (attack $CB), whose escape
+-- ending pays nothing -- since a kill order the route's other fights were
+-- never measured under is not a default to impose unmeasured (the ROM's
+-- other last-stand bodies, build/attempts/wt/wor-tzen-door/lab/
+-- laststand_census.txt: Apokryphos, Behemoth, Ing, Bug, Mind Candy,
+-- Coelecite and others on the World of Balance route, the HermitCrab's
+-- Rock in Tzen's house); true takes every last-stand counter first; false
+-- turns the rule off.
+M.SNEEZE = 0xCB
+function Driver:readLastStand(slots)
+  self.lastStand = false
+  if self.opts.lastStand == false then return end
+  local function counts(p)
+    if #p.roles.lastStand == 0 then return false end
+    if self.opts.lastStand == true then return true end
+    for _, a in ipairs(p.roles.lastStand) do
+      if a == M.SNEEZE then return true end
+    end
+    return false
+  end
+  local focus, said, plain, set = {}, {}, false, {}
+  for slot = 0, 5 do
+    local p = slots[slot]
+    if p and monAlive(slot) then
+      if counts(p) then
+        focus[#focus + 1] = { slot = slot, mask = 1 << slot }
+        set[slot] = true
+        local atk = {}
+        for _, a in ipairs(p.roles.lastStand) do atk[#atk + 1] = string.format("$%02X", a) end
+        said[#said + 1] = string.format("slot %d ($%03X) throws %s (N=%d)", slot, p.species,
+          table.concat(atk, "/"), p.roles.lastStandN or 1)
+      else
+        plain = true
+      end
+    end
+  end
+  if #focus == 0 or not plain then return end
+  self.lastStand = { focus = focus, slots = set }
+  M.log(string.format("[%s] [last stand] %s at a hit that leaves N or fewer monsters "
+    .. "standing, its own killing blow included (its retaliation's `if_num_monsters N`, "
+    .. "AICond_13; the ROM's AI script: an informed kill order) -- taken first, while the "
+    .. "others still stand", self.tag or "fight", table.concat(said, "; ")))
 end
 
 -- What the parts do as the fight runs (#189), for the ledger a person
@@ -6896,6 +7101,11 @@ function Driver:button(actor)
 end
 
 function Driver:idle()
+  if self.battleTick > 6 and self.reward ~= nil and self.seatXp ~= nil then
+    self:sayOutcome()
+  end
+  self.seatXp, self.seatChar, self.filled = nil, nil, nil
+  self.leftSaid, self.escSaid, self.reward = {}, {}, nil
   if self.recovery then
     self.recovery.close(M.frame, "battle_ended")
     if recoveryObserver == self.recovery then recoveryObserver = nil end
@@ -6906,6 +7116,7 @@ function Driver:idle()
   self.parkDropN = 0
   self.layout, self.layoutUnreadSaid, self.steerLast, self.steerDead = nil, false, nil, {}
   self.parts, self.partsLast, self.partsFell, self.partsSwitch = nil, {}, {}, {}
+  self.lastStand = nil
   self.tgtGraphs, self.tgtRouteSaid, self.tgtVisited, self.tgtCycled, self.tgtUnreach = {}, nil, {}, false, {}
   self.parkSt, self.parkN, self.idleSt, self.idleN = nil, 0, nil, 0
   self.unknownSt, self.unknownN, self.unknownSeen, self.sideWindowN = nil, 0, {}, 0
@@ -6936,6 +7147,153 @@ function Driver:idle()
   self.skillDead = {}
 end
 
+-- ---- what leaves a battle alive, and what the battle paid (#255) ----
+-- Read every battle frame once the seats are written (tick 6): the
+-- members seated and their experience, then each frame WinBattle's own
+-- inputs (M.rewardDue) and the two "left the battle" masks.  A member
+-- whose bit comes up in $3A39 (the Chitonid's Sneeze, a run, a Smoke
+-- Bomb) is out of the fight and its reward; a monster whose bit comes up
+-- in $3A3A with HP still on it has escaped (the Mesosaur's Escape) and
+-- pays nothing.  Each is said once, the frame it happens; idle() says
+-- the [outcome].
+--
+-- The reading the [outcome] is judged on is the one the battle takes at
+-- its own end: every ending -- a win after WinBattle has paid, a loss, the
+-- escape ending -- runs `_488f: jsr UpdateSRAM` before TerminateBattle,
+-- while the battle module still owns its RAM, and an exec hook there
+-- (endActivate) keeps that frame's reading.  The frames after it are not
+-- the battle's: measured on camp_escaped's world walk (battle_shadowstays,
+-- build/attempts/wt/wor-tzen-door/suites/), the HP table still read as a
+-- battle for ~35 frames after the fade while $3A39 read $03 and $3A76 0
+-- under a WON fight that paid all three members, so the per-frame watch
+-- stops at the end hook and the last per-frame reading is only a fallback.
+M.outcomes = {}          -- every [outcome] this run, oldest first
+M.lastOutcome = nil
+local rewardMul16 = nil
+local endHooked, endSnap = false, nil
+local function xpAt(off)
+  return M.readByte(0x1611 + off) + M.readByte(0x1612 + off) * 256
+       + M.readByte(0x1613 + off) * 65536
+end
+local function speciesAt(s) return M.readWord(M.FORMATION + s * 2) & 0x1FF end
+local function readReward()
+  if rewardMul16 == nil then rewardMul16 = M.readRomWord(M.sym("Ot6RewardMulW") & 0x3FFFFF) end
+  local r = { xp = {}, st1 = {}, hp = {}, egg = {} }
+  for s = 0, 5 do
+    r.xp[s] = M.readWord(0x3D8C + s * 2)
+    r.st1[s] = M.readByte(0x3EEC + s * 2)
+    r.hp[s] = M.readWord(BATTLE.MON_HP + s * 2)
+  end
+  for e = 0, 3 do r.egg[e] = (M.readByte(0x3C59 + e * 2) & 0x08) ~= 0 end
+  r.random, r.mul16 = M.readByte(M.RANDBTL) ~= 0, rewardMul16
+  r.alive, r.aliveMask = M.readByte(0x3A76), M.readByte(0x3A74)
+  r.left, r.gone = M.readByte(0x3A39), M.readByte(0x3A3A)
+  r.lost = M.partyWipedInBattle ~= nil and M.partyWipedInBattle() or false
+  r.form = M.readWord(0x11E0)
+  r.veldt = (M.readByte(0x11E4) & 0x02) ~= 0
+  return r
+end
+local function endActivate()
+  if endHooked then return end
+  endHooked = true
+  local a = M.sym("UpdateSRAM")
+  emu.addMemoryCallback(function()
+    endSnap = { frame = M.frame, reward = readReward() }
+  end, emu.callbackType.exec, a, a)
+end
+
+function Driver:watchLeavers()
+  if self.battleTick == 1 then self.startFrame = M.frame end
+  endActivate()
+  if self.battleTick < 6 then return end
+  -- past the battle's own end the RAM is being handed back: no more reads
+  if endSnap ~= nil and endSnap.frame >= (self.startFrame or 0) then return end
+  if self.seatXp == nil then
+    self.seatXp, self.seatChar, self.filled = {}, {}, {}
+    for e = 0, 3 do
+      local a, off = M.readByte(0x3ED8 + e * 2), M.readWord(0x3010 + e * 2)
+      if a < 16 and (M.readByte(0x3AA0 + e * 2) & 1) == 1 and off < 37 * 16 then
+        self.seatXp[e] = xpAt(off)
+        self.seatChar[e] = { actor = a, off = off }
+      end
+    end
+    local mask = M.readByte(M.FORMATION_MASK)
+    for s = 0, 5 do self.filled[s] = (mask >> s) & 1 == 1 end
+  end
+  local r = readReward()
+  self.reward = r
+  local seated, still = 0, 0
+  for e = 0, 3 do
+    if self.seatXp[e] then
+      seated = seated + 1
+      if (r.left >> e) & 1 == 0 then still = still + 1 end
+    end
+  end
+  for e = 0, 3 do
+    if self.seatXp[e] and (r.left >> e) & 1 == 1 and not self.leftSaid[e] then
+      self.leftSaid[e] = true
+      M.log(string.format("[%s] [left] f+%d entity %d (char %d) LEFT the battle at %d/%d HP "
+        .. "($3A39=%02X, STATUS4 $%02X): sneezed away or ran -- out of this fight and its "
+        .. "reward; %d of %d seated still in%s", self.tag or "fight", self.battleTick, e,
+        self.seatChar[e].actor, M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2),
+        r.left, M.readByte(BATTLE.ST4 + e * 2), still, seated,
+        still == 0 and " -- the whole party is gone: the escape ending, no reward "
+          .. "(neither a win nor a wipe)" or ""))
+    end
+  end
+  for s = 0, 5 do
+    if self.filled[s] and (r.gone >> s) & 1 == 1 and r.hp[s] > 0 and (r.st1[s] & 0xC2) == 0
+       and not self.escSaid[s] then
+      self.escSaid[s] = true
+      M.log(string.format("[%s] [escape] f+%d slot %d (species $%03X) ESCAPED at %d HP "
+        .. "($3A3A=%02X): no kill -- WinBattle pays only for a body with Wound, Petrify "
+        .. "or Zombie", self.tag or "fight", self.battleTick, s, speciesAt(s), r.hp[s], r.gone))
+    end
+  end
+end
+
+-- The [outcome] line: M.battleOutcome over the last reading, and each
+-- seated member's experience then and now.  A share the engine did not
+-- pay is said as a MISMATCH (the model of WinBattle is wrong, or a kill
+-- was assumed) and recorded in M.lastOutcome.ok for a caller to assert.
+function Driver:sayOutcome()
+  local atEnd = endSnap ~= nil and endSnap.frame >= (self.startFrame or 0)
+  local r = atEnd and endSnap.reward or self.reward
+  local seated = {}
+  for e = 0, 3 do seated[e] = self.seatXp[e] ~= nil end
+  local o = M.battleOutcome({ xp = r.xp, st1 = r.st1, hp = r.hp, egg = r.egg,
+    random = r.random, mul16 = r.mul16, alive = r.alive, aliveMask = r.aliveMask, veldt = r.veldt,
+    left = r.left, gone = r.gone, lost = r.lost, seated = seated, filled = self.filled })
+  local ok, paid, got = o.contradiction == nil, {}, {}
+  for e = 0, 3 do
+    if self.seatXp[e] then
+      local g = xpAt(self.seatChar[e].off) - self.seatXp[e]
+      got[e] = g
+      paid[#paid + 1] = string.format("char %d +%d (due %d)", self.seatChar[e].actor, g,
+        o.share[e] or 0)
+      if o.kind ~= "lost" and g ~= (o.share[e] or 0) then ok = false end
+    end
+  end
+  local function slots(list)
+    local t = {}
+    for _, s in ipairs(list) do t[#t + 1] = string.format("s%d:$%03X", s, speciesAt(s)) end
+    return #t > 0 and table.concat(t, " ") or "none"
+  end
+  local rec = { kind = o.kind, form = r.form, kills = o.kills, escaped = o.escaped,
+                due = o.due, share = o.share, got = got, ok = ok, leftN = o.leftN,
+                seatedN = o.seatedN, random = r.random, tick = self.battleTick }
+  M.lastOutcome = rec
+  M.outcomes[#M.outcomes + 1] = rec
+  M.log(string.format("[%s] [outcome] battle $%03X %s after %d ticks%s: killed %s; escaped %s; "
+    .. "%d of %d seated left; %s reward due %d a member (%s): %s%s", self.tag or "fight",
+    r.form & 0x1FF, o.kind:upper(), self.battleTick, atEnd and "" or " (no end reading: the last frame's)",
+    slots(o.kills), slots(o.escaped), o.leftN,
+    o.seatedN, r.random and "random" or "event", o.due, table.concat(paid, ", "),
+    o.contradiction and ("CONTRADICTION -- " .. o.contradiction)
+      or (ok and "paid as due" or "XP MISMATCH -- the engine paid what the model did not predict"),
+    o.kind == "party left" and " -- no reward for a party that left" or ""))
+end
+
 -- The [status] line (#187), once per landing per entity per status:
 -- what landed, what the engine does with it, and what the bag holds
 -- for it -- said the frame it lands, so the driver's next lines read
@@ -6952,6 +7310,12 @@ function Driver:watchStatuses()
         local den = M.turnDenied({ s1 = s1, s2 = s2, s3 = s3, s4 = s4 })
         if den then names[#names + 1] = den end
         if (s1 & M.ST1_IMP) ~= 0 then names[#names + 1] = "Imp" end
+        -- the statuses that cost a solo fighter over time rather than a
+        -- turn (#255): planned around, each said with the engine's reading
+        if (s1 & M.ST1_BLIND) ~= 0 then names[#names + 1] = "Blind" end
+        if (s1 & M.ST1_POISON) ~= 0 then names[#names + 1] = "Poison" end
+        if (s2 & M.ST2_SAP) ~= 0 then names[#names + 1] = "Sap" end
+        if (s3 & M.ST3_SLOW) ~= 0 then names[#names + 1] = "Slow" end
         -- once the count is running (M.doomCount's note), not on the bit
         local doom = M.doomCount({ s2 = s2, count = M.readByte(BATTLE.COUNTER.Doom + e * 2) })
         if doom ~= nil then names[#names + 1] = "Condemned" end
@@ -6983,12 +7347,46 @@ function Driver:watchStatuses()
                       bagCount(M.REMEDY)))
             elseif name == "Petrify" then
               local item = self:cureFor(e)
+              -- a member still able to take a turn, who could use the cure
+              local others = 0
+              for e2 = 0, 3 do
+                if e2 ~= e and M.readWord(0x3BF4 + e2 * 2) > 0 and M.readWord(0x3C1C + e2 * 2) > 0
+                   and (M.readByte(0x3AA0 + e2 * 2) & 1) == 1 and denied(e2) == nil then
+                  others = others + 1
+                end
+              end
               what = "dead to the engine (SetStatus_06: the dead flag, no window) until "
                 .. "a Soft; cure: "
-                .. (item and string.format("$%02X x%d (planned next turn)", item,
-                      bagCount(item))
+                .. (item and string.format("$%02X x%d (%s)", item, bagCount(item),
+                      others > 0 and "planned next turn"
+                      or "but no member is left to use it: a party of statues has lost")
                     or string.format("none in the bag (Soft %d, Remedy %d)",
                       bagCount(M.SOFT), bagCount(M.REMEDY)))
+            elseif name == "Sap" or name == "Poison" then
+              local item = M.statusCure({ byte = name == "Sap" and 2 or 1,
+                bit = name == "Sap" and M.ST2_SAP or M.ST1_POISON,
+                items = name == "Sap" and { M.REMEDY } or { M.ANTIDOTE, M.REMEDY },
+                has = function(it) return bagCount(it) > 0 end })
+              what = string.format("a drain tick (battle command $22, Cmd_22) each time its "
+                .. "status counter's dot trigger comes round -- measured on the World of "
+                .. "Ruin plains every 429-608 frames for 18-21 HP at 1211 max HP (Sap, "
+                .. "probe_sap) -- %s; no turn is spent on it: the heal policy's measured "
+                .. "round cost carries the drain%s", name == "Sap"
+                and "until the battle ends (STATUS2 does not outlive it)"
+                or "growing, and it stays after the battle (the field care's Antidote row)",
+                item and string.format("; cure in the bag: $%02X x%d", item, bagCount(item)) or "")
+            elseif name == "Blind" then
+              local item = M.statusCure({ byte = 1, bit = M.ST1_BLIND,
+                items = { M.EYEDROP, M.REMEDY }, has = function(it) return bagCount(it) > 0 end })
+              what = string.format("its physical hit rate is halved (battle_main @2347: `lsr $ee` "
+                .. "on the attacker's STATUS1 bit 0) for the rest of the fight; it stays after the "
+                .. "battle, where the field care cures it (%s); planned around here",
+                item and string.format("$%02X x%d in the bag", item, bagCount(item))
+                or "no Eye Drop or Remedy in the bag: the next town's shop or inn")
+            elseif name == "Slow" then
+              what = string.format("its ATB constant is recomputed at half rate (SetStatus_12 -> "
+                .. "$3AC8, now $%04X) and every gauge ETA the driver reads already carries it; no "
+                .. "item cures it; planned around", M.readWord(BATTLE.ATB_CONST + e * 2))
             elseif name == "Condemned" then
               what = string.format("the count reads %d (one count = %d frames; Doom at 0; "
                 .. "no item clears the bit): heals on it stop once the clock beats its "
@@ -7014,7 +7412,7 @@ function Driver:watchStatuses()
           end
         end
         for _, name in ipairs({ "Stop", "Frozen", "Petrify", "Sleep", "Berserk",
-                                "Imp", "Condemned" }) do
+                                "Imp", "Condemned", "Blind", "Poison", "Sap", "Slow" }) do
           local key = e .. ":" .. name
           if self.statusSaid[key] == "on" and not on[name] then
             self.statusSaid[key] = "off"
@@ -7273,8 +7671,15 @@ function Driver:watchHits()
       ds[#ds + 1] = string.format("e%d@f+%d:%d/%d:bp%d%s", d.e, d.tick, d.from,
         d.maxhp, d.bp, d.oneAction and ":one_action" or "")
     end
+    local statues = 0
+    for e = 0, 3 do
+      if M.readWord(0x3C1C + e * 2) > 0 and (M.readByte(0x3AA0 + e * 2) & 1) == 1
+         and (M.readByte(BATTLE.ST1 + e * 2) & (M.ST1_PETRIFY | M.ST1_ZOMBIE)) ~= 0 then
+        statues = statues + 1
+      end
+    end
     local cls = M.wipeClass(self.battleDeaths, { onePct = BATTLE.ONE_SHOT_PCT,
-      early = BATTLE.EARLY_TICKS, banked = BATTLE.BANKED_BP })
+      early = BATTLE.EARLY_TICKS, banked = BATTLE.BANKED_BP, statues = statues })
     M.log(string.format("[%s] [wipe] f+%d party_bp=%s deaths=%s class=%s",
       self.tag or "fight", self.battleTick, table.concat(pbp, ","),
       #ds > 0 and table.concat(ds, ";") or "none", cls))
@@ -7342,6 +7747,7 @@ function Driver:frame()
     self.startSnap = snap
   end
   self:watchStatuses()
+  self:watchLeavers()
   -- VICTORY-DEADLOCK guard (measured, Thamasa grind bake fight 37): the
   -- killing blow can land while an actor's spell/item window is still
   -- open; in Wait mode the open window freezes the battle clock, and
@@ -7594,6 +8000,14 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     -- the target steer (cross, in button) presses is derived from this
     -- reading rather than from a fixed idea of where they stand.
     layoutUnreadSaid = false,
+    -- How the battle ends (#255, M.battleOutcome): the members seated at
+    -- the start with their experience then (seatXp; seatChar the actor and
+    -- its $3010 record offset), the slots the formation filled, what has
+    -- left the battle alive (the [left] and [escape] lines, once each),
+    -- and the last reading of WinBattle's inputs (reward), which idle()
+    -- turns into the [outcome] line.
+    seatXp = nil, seatChar = nil, filled = nil,
+    leftSaid = {}, escSaid = {}, reward = nil,
   }, Driver)
   local F = { driver = D }
   function F.idle() D:idle() end
@@ -8652,6 +9066,8 @@ local function resetLibState()
   -- finding whichever attempt made it, and the retry sweep's whole point
   -- is that a lost attempt still happened (#230).
   M._killbitFired = false
+  M.outcomes, M.lastOutcome = {}, nil
+  endHooked, endSnap = false, nil
   watchReset()
   RUN.bootMarked, RUN.idle, RUN.idlePad, RUN.idleArm = false, 0, nil, false
   RUN.lastBattle, RUN.goUnhandled = nil, nil
