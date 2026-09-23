@@ -261,10 +261,12 @@ local function pulse()
     wantBlitz = planCast(pool())
     if wantBlitz == nil then
       if not inBand(pool()) then
-        error(string.format("PRECONDITION: Sabin's pool %d fell below the cheap "
-          .. "blitz (%d) without a cast of his own taking it there -- the band "
-          .. "[%d,%d] is out of reach", pool(), costOf(cheap), costOf(cheap),
-          costOf(dear) - 1), 0)
+        -- planCast never casts the pool below the cheap row (cMax >= 2*cMin,
+        -- asserted at boot), so this is a drain from outside the plan or a
+        -- wrong plan; either way no cast can reach the band now
+        error(string.format("PRECONDITION: Sabin's pool %d is below the cheap "
+          .. "blitz (%d), so the band [%d,%d] is out of reach", pool(),
+          costOf(cheap), costOf(cheap), costOf(dear) - 1), 0)
       end
       wantBlitz, hold = cheap, true
     end
