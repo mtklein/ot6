@@ -17,6 +17,6 @@ and the Black Drgn on the sand opens to a blade. The plains monsters carry
 two or three shields and reward reading the element: half of them are weak
 to ice, the Gilomantis to fire (its counter punishes a plain Fight), and a
 plain blade can't chip the plated Chitonid's shields: crack them with
-lightning (the ThunderBlade in Celes's bag, or Maduin's Bolt) or, later,
+lightning (a ThunderBlade, sold in Albrook and Tzen, or Maduin's Bolt) or, later,
 Sabin's fists. In Tzen's collapsing house every monster breaks to her sword,
 including the Scorpions that used to leave her no answer.

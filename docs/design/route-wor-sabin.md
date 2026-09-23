@@ -499,9 +499,11 @@ Group 30 is identical to group 36 (EarthGuard + Peepers ×2, or Black Drgn).
 
 Species data are `MonsterProp` (+0 speed, +1 attack, +5 def, +6 mdef, +8 HP,
 +16 level, +23 absorb, +25 weak, +31 special; `battle_main.asm` LoadMonsterProp
-`:7601-7710`). The AI is from `ff6/src/battle/ai_script.asm`. "Today" is the
-row `Ot6SeedShields` seeds from the shipped ROM (`ot6_break.asm:54-113`: no
-authored row, so the floor class and `2 + level/8`).
+`:7601-7710`). The AI is from `ff6/src/battle/ai_script.asm`. Throughout
+this doc, "today" means main before the §8 rows were authored (the v0.21
+ROM): the row `Ot6SeedShields` seeded then (`ot6_break.asm:54-113`: no
+authored row, so the floor class and `2 + level/8`). §8's rows are now
+authored (battle_breakwor_sabin verifies them).
 
 | id | body | L | HP | def/mdef | weak | absorb | AI (`ai_script.asm`) | solo-relevant | today |
 |---|---|---|---|---|---|---|---|---|---|
