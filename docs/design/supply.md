@@ -104,7 +104,10 @@ Terra scenario walks sells a Tincture, and Narshe's own inn and counter
 are behind the reunion trigger (`probe_narshe_preshop`).  The one counter
 before it is Figaro Castle at L5-7: `figaro_entry gil=5338`, and the stop
 spends 1300 on Tonics and 1250 on the two tools, leaving 2788, after which
-`gen_kolts` grinds to an 8300-gil target for South Figaro's gear.  A
+`gen_kolts` grinds until the purse covers South Figaro's whole bill (the
+gear, the relics, the inn and the supply band, priced off the ROM:
+"gil=10896 of the town's 10230" on the regenerated chain,
+build/attempts/wt/gen-robust-fix/chain/south_figaro.log).  A
 Tincture is 1500 there -- 28% of the purse, the same 1500 whose Tonic
 equivalent that generator's own note says starved South Figaro's Softs --
 and one bought at L7 would be drunk by the scenarios' care long before

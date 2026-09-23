@@ -12249,7 +12249,7 @@ CheckBattleEnd:
         beq     @4861       ; branch if gau can't appear after battle
         jsr     Rand
         cmp     #$a0
-        bcs     @4861       ; 5/8 chance to branch
+        bcs     @4861       ; 3/8 chance to branch (96/256): gau appears on the other 5/8
         lda     $3ebd
         bit     #$02
         bne     GauAppears       ; branch if gau has been obtained
