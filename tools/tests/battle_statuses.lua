@@ -15,26 +15,44 @@
 --
 -- The two battles the direct walk happens to draw are not the exposure,
 -- though.  SPECIAL is the monster's own roll inside a battle (a seed
--- sweep of the direct walk, build/sweeps/statuses-fix2, came away with
--- nothing on 2 of 8 seeds), and WHICH battles the walk draws is not
--- the seed's at all: the formation is picked by the save's encounter
--- counter (lib/ot6_field.lua, random-encounter pools), which every
--- regeneration of the chain moves.  The legs' pool is Stray Cat x3 (no
--- CrassHoppr) at 80/256 beside two CrassHoppr formations at 176/256, so
--- one fixture meets CrassHopprs every battle and the next can meet eight
--- Stray Cat packs in a row.  So the walk PACES the route's own leg
--- between (176,71) and (178,81) until a turn-denying status has actually
--- landed, and only then turns into the forest; and it bounds the pacing
--- by what can deny a turn, read from the ROM: an EXPOSURE battle is one
--- whose formation holds a species whose special (MonsterProp+31, decoded
--- as battle_main.asm @3318 does) inflicts a status H.turnDenied names
--- AND whose AI script can issue SPECIAL ($EF).  The walk stops after
--- EXPOSURES of those (the measured count, at EXPOSURES below), and caps
--- all battles at the most any encounter-counter state needs to deal
--- that many exposures from the legs' own pool (H.worstCaseEncounters),
--- so a walk that really cannot draw one still fails loudly at the same
--- assertion, and a fixture whose counter deals Stray Cats first still
--- gets its full count of exposures.
+-- sweep of the direct walk came away with nothing on 2 of 8 seeds,
+-- build/attempts/red-suite-triage/sweeps/statuses-fix2/summary.tsv), and
+-- WHICH battles the walk draws is not the seed's at all: the formation is
+-- picked by the save's encounter counter (lib/ot6_field.lua, random-
+-- encounter pools), which every regeneration of the chain moves.  The
+-- legs' pool is Stray Cat x3 (no CrassHoppr) at 80/256 beside two
+-- CrassHoppr formations at 176/256, so one fixture meets CrassHopprs every
+-- battle and the next can meet eight Stray Cat packs in a row.  So the
+-- walk PACES the route's own leg between (176,71) and (178,81) until a
+-- turn-denying status has actually landed, and only then turns into the
+-- forest; and it bounds the pacing by what can deny a turn, read from the
+-- ROM: an EXPOSURE battle is one whose formation holds a species whose
+-- special (MonsterProp+31, decoded as battle_main.asm @3318 does) inflicts
+-- a status H.turnDenied names AND whose AI script can issue SPECIAL ($EF).
+-- The walk stops after EXPOSURES of those (the measured count, at
+-- EXPOSURES below), and caps the paced battles at the most any
+-- encounter-counter state needs to deal that many exposures from the legs'
+-- own pool (H.worstCaseEncounters), so a walk that really cannot draw one
+-- still fails loudly at the same assertion, and a fixture whose counter
+-- deals Stray Cats first still gets its full count of exposures.
+--
+-- The residual risk: every exposure can miss, and then this test is red
+-- with nothing wrong.  EXPOSURES is measured per exposure battle: a lab
+-- copy of this walk that paces 20 battles whatever lands fought 48
+-- exposure battles at seed shifts 0, 7, 13 and 21 -- formation 57
+-- (Beakor, Stray Cat, CrassHoppr x2) 32 times, 51 (CrassHoppr x3) 16 --
+-- and a Berserk landed in 22 of them (0.458), shift 0 missing its first
+-- four in a row (build/attempts/wt/draw-budgets/lab/draw-budgets/
+-- statuses/measure_p/shift{0,7,13,21}.log; re-run on this tree with the
+-- same 22 of 48, build/attempts/wt/draw-budgets-fix/lab/statuses_measure/
+-- st_measure20_s{0,7,13,21}.log).  Sixteen exposures all miss about once
+-- in 18,000 walks at that rate, and about once in 673 at the rate's
+-- one-sided 95% lower bound, 0.334 (build/attempts/review/draw-budgets/
+-- landing_rate_bounds.log: `one-sided 95% lower 0.3343  all-16-miss 1 in
+-- 673`).  So a red at "a turn-denying status landed on the walk" that
+-- names all sixteen exposures fought is that residual until it repeats;
+-- two in a row is about one in 450,000 at the lower bound, and says the
+-- landing rate itself has moved.
 --
 -- The walk is navTo's playBattles="tactical" (M.newFightDriver with the
 -- walk options), the driver every route segment fights with.  The test
@@ -128,9 +146,18 @@ local last = {}
 -- the pacing legs below end on it
 local landedAny = false
 -- exposure battles fought so far (the formation held a denier as it
--- opened), and the world tile and group each battle fired on
+-- opened), and the world tile and group each battle fired on: read at
+-- each CheckBattleWorld entry (the exec callback armed at boot), from the
+-- engine's own inputs -- the landed tile, which world/move.asm's PushDP
+-- has copied to $0AE0/$0AE2 (the world's direct page is swapped out
+-- during the check, and move.asm reads the battle's tile from there), and
+-- H.worldCheckGroup's saved position and background -- so the last check
+-- before a battle is the one that fired it
 local exposures = 0
 local lastTile, lastGroup = nil, nil
+local function onWorldCheck()
+  lastTile, lastGroup = H.readByte(0x0AE2) * 256 + H.readByte(0x0AE0), H.worldCheckGroup()
+end
 local function observe()
   if not H.battleLoadStarted() then
     if cur then
@@ -145,14 +172,6 @@ local function observe()
       cur.open = {}
       cur.to = #lines
       battles[#battles + 1] = cur; cur = nil; last = {}
-    end
-    -- the tile a coming encounter fires on (CheckBattleWorld reads the
-    -- party's tile after the step) and the group it rolls from, read
-    -- while the world tilemap is still in WRAM
-    if H.worldMode() and H.worldAligned() then
-      local x, y = H.worldX(), H.worldY()
-      local k = y * 256 + x
-      if k ~= lastTile then lastTile, lastGroup = k, H.worldEncounterGroup(x, y) end
     end
     return
   end
@@ -207,61 +226,75 @@ end
 -- again, and draws from the same pool.
 local PACE_A, PACE_B = { 176, 71 }, { 178, 81 }
 -- How many exposure battles the walk gives a turn-denying special to
--- land in: measured per exposure battle -- see the note at the verdict.
+-- land in: measured per exposure battle -- see the residual risk in the
+-- file header.
 local EXPOSURES = 16
--- the most battles any encounter-counter state needs to deal EXPOSURES
--- exposures from the legs' pool; set once the world is loaded
-local battleBudget = nil
+-- the most battles the pacing may fight: what any encounter-counter state
+-- needs to deal EXPOSURES exposures from the legs' pool, counted from the
+-- pacing's own start (pacedFrom: battles on the way to A are not the
+-- legs'); set once the world is loaded
+local battleBudget, pacedFrom = nil, 0
 local function leftTheWorld() return not H.worldMode() end
 local function fought() return #battles + (cur and 1 or 0) end
 local function keepPacing()
-  return not landedAny and exposures < EXPOSURES and fought() < battleBudget
+  return not landedAny and exposures < EXPOSURES and fought() - pacedFrom < battleBudget
 end
 
 -- The legs' pool and the budget it implies.  The groups are the ones a
 -- lap's own paths roll from (H.worldPathGroups over A -> B -> A, the
--- walkers' BFS legs); a formation slot counts as an exposure only when
--- every formation it can deal holds a denier, in every one of those
--- groups.
+-- walkers' BFS legs: every zone the legs stand in, with every battle
+-- background they step on); a formation slot counts as an exposure only
+-- when every formation it can deal holds a denier, in every one of those
+-- groups.  The legs' first battle can instead roll from an ENTRY group --
+-- the zone of wherever the party last battled, opened the menu or entered
+-- the world before A, which the engine keeps until the next battle -- so
+-- when there is one, that first battle is budgeted as a loss: one more
+-- battle.
+local function poolLine(what, g, exposureSlot)
+  local pool = H.encounterPool(g)
+  for slot = 1, 4 do
+    local e = pool[slot]
+    local parts = {}
+    for _, f in ipairs(e.formations) do
+      local deny, names = nil, {}
+      for _, sp in ipairs(f.species) do
+        names[#names + 1] = string.format("%03X", sp)
+        deny = deny or denier(sp)
+      end
+      if deny == nil and exposureSlot then exposureSlot[slot] = false end
+      parts[#parts + 1] = string.format("%d [%s]%s", f.id, table.concat(names, " "),
+        deny and (" " .. deny) or "")
+    end
+    H.log(string.format("[test] %s pool: group %d slot %d (%d/256) %s", what, g, slot, e.odds,
+      table.concat(parts, ", ")))
+  end
+end
 local function budget()
   return H.call(function()
-    local order = H.worldPathGroups({ PACE_A, PACE_B, PACE_A })
+    local order, entry = H.worldPathGroups({ PACE_A, PACE_B, PACE_A })
     H.assertEq(#order > 0, true, "the pacing legs roll random battles somewhere on their paths")
     local exposureSlot = { true, true, true, true }
-    for _, g in ipairs(order) do
-      local pool = H.encounterPool(g)
-      for slot = 1, 4 do
-        local e = pool[slot]
-        local parts = {}
-        for _, f in ipairs(e.formations) do
-          local deny, names = nil, {}
-          for _, sp in ipairs(f.species) do
-            names[#names + 1] = string.format("%03X", sp)
-            deny = deny or denier(sp)
-          end
-          if deny == nil then exposureSlot[slot] = false end
-          parts[#parts + 1] = string.format("%d [%s]%s", f.id, table.concat(names, " "),
-            deny and (" " .. deny) or "")
-        end
-        H.log(string.format("[test] leg pool: group %d slot %d (%d/256) %s", g, slot, e.odds,
-          table.concat(parts, ", ")))
-      end
-    end
+    for _, g in ipairs(order) do poolLine("leg", g, exposureSlot) end
+    for _, g in ipairs(entry) do poolLine("entry", g, nil) end
     local any = false
     for slot = 1, 4 do any = any or exposureSlot[slot] end
     H.assertEq(any, true, "the legs' pool deals a formation with a turn-denying species")
-    local hist
-    battleBudget, hist = H.worstCaseEncounters(function()
+    local worst, hist = H.worstCaseEncounters(function()
       local n = 0
       return function(slot)
         if exposureSlot[slot] then n = n + 1 end
         return n >= EXPOSURES
       end
     end)
+    battleBudget, pacedFrom = worst + (#entry > 0 and 1 or 0), fought()
+    local zx, zy = H.worldZonePos()
     H.log(string.format("[test] budget: %d exposure battle(s), within at most %d battle(s) -- "
       .. "the most any encounter-counter state needs to deal that many from group(s) %s "
-      .. "(%.1f%% of states need no more than %d)", EXPOSURES, battleBudget,
-      table.concat(order, ","), 100 * H.encounterShare(hist, EXPOSURES), EXPOSURES))
+      .. "(%.1f%% of states need no more than %d)%s; the engine's saved position is (%d,%d), "
+      .. "%d battle(s) fought before the legs", EXPOSURES, battleBudget,
+      table.concat(order, ","), 100 * H.encounterShare(hist, EXPOSURES), EXPOSURES,
+      #entry > 0 and (", plus one for a first battle from entry group(s) "
+        .. table.concat(entry, ",")) or "", zx, zy, pacedFrom))
   end)
 end
 
@@ -301,6 +334,8 @@ H.run({ maxFrames = 200000 }, {
   H.call(function()
     H.assertEq(H.worldMode(), true, "camp_escaped boots on the World of Balance")
     emu.addEventCallback(function() observe() end, emu.eventType.startFrame)
+    local check = H.sym("CheckBattleWorld")
+    emu.addMemoryCallback(onWorldCheck, emu.callbackType.exec, check, check)
   end),
   H.worldNavTo(PACE_A[1], PACE_A[2], { maxFrames = 25000,
     playBattles = "tactical", arrive = leftTheWorld }),
@@ -384,18 +419,12 @@ H.run({ maxFrames = 200000 }, {
         end
       end
     end
-    -- EXPOSURES is measured per exposure battle.  A lab copy of this walk
-    -- that paced 20 battles whatever landed (build/lab/draw-budgets/
-    -- statuses/measure_p/shift{0,7,13,21}.log) fought 48 exposure battles
-    -- -- formation 57 (Beakor, Stray Cat, CrassHoppr x2) 32 times, 51
-    -- (CrassHoppr x3) 16 -- and a Berserk landed in 22 of them (0.46; 15 of
-    -- 32 and 7 of 16), shift 0 missing its first four in a row.  At that
-    -- rate sixteen exposures all miss about once in 18,000 walks (0.54^16);
-    -- at the rate's 95% lower bound (0.33), once in 600.  The battle budget
-    -- above then makes sure every counter state gets its sixteen.
+    -- EXPOSURES is measured per exposure battle; the numbers, and the red
+    -- they leave, are in the file header (the residual risk).
     H.assertEq(seen >= 1, true, string.format("a turn-denying status landed on the walk "
       .. "(the exposure; %d battle(s) fought, %d of them exposures, of a budget of %d "
-      .. "exposures within %d battles)", #battles, exposures, EXPOSURES, battleBudget or -1))
+      .. "exposures within %d paced battles)", #battles, exposures, EXPOSURES,
+      battleBudget or -1))
     -- #186: a preemptive layout line is followed by the free-round line
     -- before any top-up in that battle
     local pre, free, topUp = nil, nil, nil

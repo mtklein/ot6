@@ -248,17 +248,27 @@ add({
     end
     -- the least a win on the grass legs pays one member, from the ROM:
     -- every formation in every group the legs' paths roll from, with the
-    -- whole party standing
-    local groups = H.worldPathGroups({ { H.worldX(), H.worldY() }, GOALS[1], GOALS[2], GOALS[1] })
+    -- whole party standing -- and in any ENTRY group, the zone of the
+    -- engine's saved position (where the party entered the world), which
+    -- the first battle rolls from when that zone is not the legs' own
+    -- (H.worldPathGroups)
+    local groups, entry = H.worldPathGroups({ { H.worldX(), H.worldY() }, GOALS[1], GOALS[2],
+      GOALS[1] })
     H.assertEq(#groups > 0, true, "the grass legs roll random battles somewhere on their paths")
-    for _, g in ipairs(groups) do
-      local pool = H.encounterPool(g)
-      for slot = 1, 4 do
-        for _, f in ipairs(pool[slot].formations) do
-          local xp = winXp(f, #members)
-          H.log(string.format("grass pool: group %d slot %d (%d/256) formation %d pays %d XP "
-            .. "a member", g, slot, pool[slot].odds, f.id, xp))
-          if winMin == nil or xp < winMin then winMin = xp end
+    local zx, zy = H.worldZonePos()
+    H.log(string.format("grass legs: group(s) %s; the engine's saved position is (%d,%d)%s",
+      table.concat(groups, ","), zx, zy, #entry > 0 and (", entry group(s) "
+        .. table.concat(entry, ",")) or ", in the legs' own zones"))
+    for _, list in ipairs({ { "grass", groups }, { "entry", entry } }) do
+      for _, g in ipairs(list[2]) do
+        local pool = H.encounterPool(g)
+        for slot = 1, 4 do
+          for _, f in ipairs(pool[slot].formations) do
+            local xp = winXp(f, #members)
+            H.log(string.format("%s pool: group %d slot %d (%d/256) formation %d pays %d XP "
+              .. "a member", list[1], g, slot, pool[slot].odds, f.id, xp))
+            if winMin == nil or xp < winMin then winMin = xp end
+          end
         end
       end
     end
