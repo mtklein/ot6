@@ -393,7 +393,8 @@ why the `[refused]` line exists.
   sequence machines that are deliberately dumb (one button per 30-frame
   pulse). Worth doing if a segment ever needs a specific tool rather than
   whatever is first in the bag.
-- **Press R inside the window.** `probe_bushido` measured that R still
+- **Press R inside the window.** `probe_bushido` (deleted in 4b257a86; last
+  version at 5defce69) measured that R still
   raises the pending boost from inside the SwdTech window, which would let
   a fighter read the list *first* and then price exactly. Not measured for
   the Tools window, and it changes the sequence rather than the decision.

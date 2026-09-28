@@ -128,51 +128,18 @@ tools/tests/metrics_battle.lua	.writeByte(
 tools/tests/mines_pace.lua	.writeByte(
 tools/tests/mines_pace.lua	.writeWord(
 tools/tests/mines_pace.lua	emu.write
-tools/tests/probe16.lua	.writeWord(
-tools/tests/probe_896f.lua	.writeWord(
-tools/tests/probe_banquet_stage.lua	.writeByte(
-tools/tests/probe_banquet_timer.lua	.writeByte(
-tools/tests/probe_banquet_timer.lua	.writeWord(
-tools/tests/probe_banquet_timer.lua	emu.write
-tools/tests/probe_banquet_timer_save.lua	.writeByte(
-tools/tests/probe_banquet_timer_save.lua	.writeWord(
-tools/tests/probe_banquet_timer_save.lua	emu.write
-tools/tests/probe_banquet_timerwatch.lua	.writeByte(
-tools/tests/probe_banquet_timerwatch.lua	.writeWord(
-tools/tests/probe_banquet_timerwatch.lua	emu.write
-tools/tests/probe_bushido.lua	.writeByte(
-tools/tests/probe_bushido.lua	.writeWord(
-tools/tests/probe_canstep.lua	.writeByte(
-tools/tests/probe_canstep.lua	emu.write
 tools/tests/probe_ctrboost.lua	.writeByte(
 tools/tests/probe_ctrboost.lua	.writeWord(
-tools/tests/probe_cursorgutter.lua	.writeByte(
 tools/tests/probe_dottick.lua	.writeByte(
 tools/tests/probe_dottick.lua	.writeWord(
-tools/tests/probe_esperdetail_checkpoint.lua	.writeByte(
-tools/tests/probe_esperdetail_tube6_checkpoint.lua	.writeByte(
-tools/tests/probe_fieldicons.lua	.writeByte(
-tools/tests/probe_input.lua	.writeByte(
-tools/tests/probe_input.lua	emu.write
-tools/tests/probe_junk16.lua	.writeWord(
-tools/tests/probe_menucols.lua	.writeByte(
 tools/tests/probe_multihit.lua	.writeByte(
 tools/tests/probe_multihit.lua	.writeWord(
-tools/tests/probe_reveal_trace.lua	emu.write
 tools/tests/probe_shadow_overlap.lua	.writeByte(
 tools/tests/probe_slots.lua	emu.write
 tools/tests/probe_srmboot.lua	emu.write
-tools/tests/probe_train_tail.lua	.writeByte(
-tools/tests/probe_v07_h_negative.lua	.writeByte(
-tools/tests/probe_v07_i_negative.lua	.writeByte(
-tools/tests/probe_v07_j_negative.lua	.writeByte(
-tools/tests/probe_vargas.lua	.writeByte(
-tools/tests/probe_vargas.lua	.writeWord(
 tools/tests/probe_verbs_boost.lua	.writeByte(	quarantine: probe expedient -- one Tempest is written into an empty bag slot of forest_done, because Tempest is Cyan's katana alone and no fixture with Cyan carries one; the equip (field menu), the swing, the attacker-effect roll and the Wind Slash pass under measurement are the ROM's
 tools/tests/save_checksum.lua	emu.write	quarantine: the 1-in-65536 zero-checksum save (owner-named)
 tools/tests/battle_healerdown.lua	.writeByte(	quarantine: #128 regression staging -- the healer death (engine corpse shape hp=0+st1 $80) and a Fenix Down are poked because a real targeted kill couples to formation luck; the property under test is the driver policy, not the fight
 tools/tests/battle_healerdown.lua	.writeWord(	quarantine: #128 regression staging, same reason as its writeByte line
-tools/tests/probe_dancefreeze.lua	.writeWord(	quarantine: #129 instrument -- inherits battle_dancemp MP-pin staging in a probe that never produces fixtures
 tools/tests/probe_boy_passage.lua	.writeByte(	quarantine: #145 reachability probe -- sets the MERCHANT disguise flag $0104 (a labelled one-flag write) to drive the grandson boy's disguise-gated passage (_ca7bcd->_ca7bf8) and confirm he steps aside; read-mostly instrument, the write is the disguise it measures
-tools/tests/probe_m75_disguise_pass.lua	.writeByte(	quarantine: #145 reachability probe -- sets the IMPERIAL disguise flag $0103 to test whether it walks LOCKE past the gate soldier (it does not: his branch is "Halt!" with no hide_obj); labelled one-flag instrument write, read-mostly
 tools/tests/probe_richman_return.lua	.writeByte(	quarantine: #145 reachability probe -- sets the merchant disguise $0104 to drive the west-town bypass and map the (blocked) rich-man's-house return route; labelled disguise-flag instrument write, read-mostly

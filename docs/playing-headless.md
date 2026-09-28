@@ -182,8 +182,8 @@ bit and must not be exactly `$f7`; this branch consults nothing else. Up
 and down presses fall through to the cardinal path, as does a refused
 diagonal. A diagonal step costs the same 16 frames as a straight one.
 `canStep(x, y, "right")` is false where the engine would turn a right press
-into a diagonal. `probe_canstep.lua` validates both branches against real
-movement.
+into a diagonal. `probe_canstep.lua` (deleted in 4b257a86; last version at
+5defce69) validated both branches against real movement.
 
 ### Executing a route: navTo
 
