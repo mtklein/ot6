@@ -126,7 +126,11 @@ seed re-rolled; that every number in the commit messages is in a cited log
 and every cited path resolves; and that the change handles any draw. Its
 findings are fixed on the branch before the merge, not filed for later.
 Meanwhile read the diff yourself (`git diff main...wt/<topic>`), not the
-report. Merge with a merge commit (`git merge --no-ff wt/<topic>`),
+report. Merge the exact commit the agent's final report names: check
+`git rev-parse` of what you merge equals the report's head sha, and push
+the agent's local branch first -- an agent's fix round may exist only in
+its worktree (2026-09-28: a merge of the stale pushed branch shipped
+without the review fixes). Merge with a merge commit (`git merge --no-ff wt/<topic>`),
 resolve conflicts yourself, run the checks the change touches, and push
 main immediately (the laptop is a single point of failure; push wt/*
 branches holding real work as soon as they exist too). Close the issues the
