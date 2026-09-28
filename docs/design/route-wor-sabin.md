@@ -1237,7 +1237,12 @@ variation and the controls, with the scripts that made them). Nothing
 was measured by writing game state, except the one staged suite named in
 11.5.
 
-### 11.1 The run (`runs/capture_wor_sabin.log`, the capture; GRAPHRUN)
+### 11.1 The run (`runs/capture_wor_sabin.log`, the capture)
+
+The graph's own run (`suites/ninja_all.log`, `runs/wor_sabin_ninja.log`:
+`[199/340] generate wor_sabin <- gen_wor_sabin`, `PASS (frame 31550)
+attempts=1/3`) and the capture are the same run: `wor_sabin.mss`
+byte-identical.
 
 | step | what the log says |
 |---|---|
@@ -1306,7 +1311,7 @@ With the Back Guard kit, the shipped one (11.4), the same pair on the same
 
 Off, four of the eight left the house with under 40 seconds on the clock
 (`ab_bg_off/k0_s0.log`: `timer 0 at 0:02 (139 frames)`; k5 0:21, k6
-0:37, k7 0:22): the same draws that leave it with 1:08-1:32 on. The
+0:37, k7 0:22): the same draws that leave it with 1:08-1:29 on. The
 price of the levers is HP: fewer top-ups, so she runs lower (248 against
 550 at the worst), which the heal policy's one-round and kill-rounds
 rules still cover.
@@ -1318,7 +1323,10 @@ from `fc-alcove-v1`, 3 shifts a side (`lab/wob_fc_escape/`, `lab/wob_timed.py`):
 all six PASS; the timed battles (four escape-map fights and Nerapa)
 took 7145-9940 frames of Shadow's clock with the levers on against
 9127-10288 off, and Nerapa ended with 2:20 / 2:49 / 3:07 left on
-against 2:34 / 2:15 / 2:26. The rafter chase was not re-run.
+against 2:34 / 2:15 / 2:26. The rafter chase was regenerated under the
+rules by the suite run (`gen_opera6_rafter`, `suites/fixtures/ultros2_entry.log`):
+three rat fights, each 2389-2622 frames of the clock, the last ending
+with `timer 0 1:48 left`, `PASS (frame 19632) attempts=1/3`; not A/B'd.
 
 ### 11.3 Condemned, alone
 
@@ -1335,7 +1343,7 @@ C x 128 frames (f+D) ...`. Measured (`lab/housestats.py`: the first
 | kit | condemned fights | margin, min | margins under 1000 ticks |
 |---|---|---|---|
 | Genji pair (`ab_on/`) | 16 | 1846 | 0 |
-| Back Guard, one hand (`var/`) | 48 | 354 (`k1_s0`) | 6 |
+| Back Guard, one hand (`var-final/`) | 48 | 354 (`k1_s0`) | 5 (354, 694, 748, 772, 798) |
 
 No Doom landed in any run. With one hand the race is real: a Scorpion's
 two shields take a boosted Fight or two turns, so the fights run longer
@@ -1360,10 +1368,12 @@ So CELES wears the **Back Guard** in the Genji Glove's slot from before
 the clock until Sabin has joined (`HOUSE_BACK_GUARD`; leaving the Relic
 screen runs the game's Optimum: `after=11 5C 76 8F E1 B5`, the Break
 Blade and a shield). The **Jewel Ring** stays: the HermitCrab's Rock
-(special `$46`: no damage, Petrify) answers even its own killing blow
-once one body is left, and a statue is a lost fight alone. The kit's
+(special `$46`: no damage, Petrify) is gated like the Chitonid's
+Sneeze (`if_num_monsters 1`, which fired on the Chitonid's own killing
+blow, section 10.3), so no kill order keeps it quiet, and a statue is a
+lost fight alone. The kit's
 price is the second hand: Scorpion trios are won in 2274-4171 ticks
-(mean 3553, 48 fights, `var/`) against 2075-3227 (mean 2493) with the
+(mean 3553, 48 fights, `var-final/`) against 2075-3227 (mean 2493) with the
 pair, and that is where the Doom margin (11.3) and the clock's margin
 (11.6) went.
 
@@ -1377,7 +1387,12 @@ measured, and nothing measured asks to widen it.
   what)` in `lib/ot6_field.lua`, promoted from `gen_terra_caves.lua`,
   which now calls it. From one `terra_narshe` input the generator before
   and after the change wrote byte-identical `terra_caves.mss`
-  (`lab/terra/`: `047a1368...` both, from `terra_narshe.mss.lua sha=f79178a9a7c1`). At the child (`lab/face/`, one
+  (`lab/terra/`: `047a1368...` both, from the seeded `terra_narshe.mss.lua
+  sha=f79178a9a7c1`), and the graph's regeneration on this ROM's fresh chain
+  (`nice ninja build/states/terra_caves.mss.lua`: `terra_caves generated at
+  frame 1526`, `PASS (frame 1526) attempts=1/3`) wrote the same bytes as the
+  old generator from that input (`c7f4519d...` both,
+  `lab/terra/sha256_fresh_chain.txt`). At the child (`lab/face/`, one
   snapshot on (117,12)): the verb sets `$028B` in 140 frames (`[face] arm
   ok f148 the child's switch $028B=1`); with its A presses stripped (a
   mutant) or from (118,12) it times out (`timeout after 1200 frames
@@ -1390,7 +1405,11 @@ measured, and nothing measured asks to widen it.
   (`lab/left/`: `TOTAL: 18 left with others in; 0 plan(s) on a left
   member`, the mask on and stubbed off alike), every one above the
   fraction when it left. `battle_left` (`@suite`, kolts_cave) stages it
-  with declared waivers: LEFTSUITE.
+  with declared waivers: entity 2 marked in $3A39 and set to 80/241 HP at
+  actor 1's window, three windows later `a plan on the member who left:
+  nil`, `PASS (frame 2326)`; with `H.leftMask` stubbed to 0 the same
+  window reads `[left] actor=1 heal entity 2 (80/241) with $E8 ...
+  (covering an ally)` and the suite goes red (`lab/left_suite/`).
 - **The hand-back is not a battle.** A walk that ended on one battle's
   `[outcome]` and a new walker built on the next frame read the battle's
   hand-back as a second battle (`lab/ghost/k1_s0_before.log`: `[outcome]
@@ -1412,8 +1431,12 @@ Tzen (the grind waypoints, off every tile outside groups 31/34) and walks
 back to (131,179), so the body starts from another step counter,
 encounter counter, HP and bag: `$1FA1-$1FA5` moves with every step and
 every encounter, world and field alike, so the house deals other
-formations and battle counts. Retries off (`OT6_RETRIES=1`).
-`lab/var/summary.txt`, `lab/var/housestats.txt`:
+formations and battle counts (K is a floor: the count is checked between
+walk legs, and a leg can hold two battles, so K=7 fought 8). Retries off
+(`OT6_RETRIES=1`). `lab/var-final/summary.txt`, `housestats.txt`, `vartable.md` (the
+shipped generator; `lab/var/` is the same set on the file before its
+lowest-HP reading moved from her record to the battle's table, with the
+same verdicts and frames):
 
 | variant | the body starts at | house battles (the timer at each end) | the timer at the exit (frames) | lowest CELES HP on the 300-tick battle lines | verdict |
 |---|---|---|---|---|---|
@@ -1440,8 +1463,7 @@ Fenix Down. The K walks met the plains as the last leg did, a pincered
 Gilomantis + Mesosaur among them (`lab/ghost/after/k1_s0.log`, won). The
 clock is the margin to watch: every run with four house battles left the
 house with 3685-5559 frames (1:01-1:32), and a Scorpion trio costs 2232-4171
-ticks;
-a fifth battle (the pool model's P(5) = 3.3 %, section 3.3; none in these
+ticks; a fifth battle (the pool model's P(5) = 3.3 %, section 3.3; none in these
 15) would fit only when it is quick, a sixth would not. That is the
 price of the Back Guard kit (11.4), paid to take the pincer out.
 

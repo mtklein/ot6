@@ -355,7 +355,7 @@ H.run({ maxFrames = 200000 }, {
   inn("before the house", 0),
   H.cond(function() return HOUSE_BACK_GUARD end, {
     -- leaving the Relic screen runs the game's own Optimum on the hands:
-    -- the Break Blade and a shield (build/lab/ws/lab_bg.log: after=11 5C)
+    -- the Break Blade and a shield (build/attempts/wt/wor-sabin/lab/ws/lab_bg.log: after=11 5C)
     H.equipKit(CELES, { { 4, BACK_GUARD } }, { tag = "CELES: the Back Guard for the house" }),
   }, {}),
   H.call(function()
