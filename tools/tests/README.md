@@ -61,8 +61,11 @@ segment that starts from a saved checkpoint, that checkpoint's manifest and
 SRAM payload. Every one is a declared ninja dependency routed through a
 copy-if-changed edge (`cmp || cp` with `restat = 1`), so staleness is decided
 by content: a rebuild that bumps timestamps without moving bytes regenerates
-nothing; a changed input re-runs every transitive dependent. Editing one
-generator regenerates only the states it feeds; a ROM content change
+nothing; a changed input re-runs every transitive dependent. A generator is
+compared as its Lua token stream (`lib/lua_fingerprint.py`: comments and
+whitespace dropped, strings kept verbatim), so a comment-only or
+re-indenting edit regenerates nothing. Editing one generator's code
+regenerates only the states it feeds; a ROM content change
 regenerates the whole chain. The three lib halves `lib/compose.py` inlines
 (`ot6.lua`, `ot6_field.lua`, `ot6_contract.lua`) are **not** generate-edge
 inputs: editing one re-runs every suite test, audit and selftest that
@@ -79,9 +82,17 @@ generation stamps `build/states/<state>.stamp` with
            ot6_contract.lua ++ extras) <generator> [extras]
     rom <sha256 of the ROM the run booted>
     generator <sha256(GATE_CONTRACT ++ generator ++ extras)>
-    lib <path> <sha256 of that lib half>              (one per half)
+    lib <path> <sha256 of that lib half's token stream>  (one per half)
     artifact <sha256 of build/states/<state>.mss>
     ancestor <path> <sha256 of that file>
+
+Every `.lua` input above is hashed as its Lua token stream
+(`lib/lua_fingerprint.py`, the one definition `savestate_stamp.sh`,
+`compose.py` and the ninja copy rule all use): `--` and `--[[ ]]` /
+`--[==[ ]==]` comments and whitespace are dropped, string literals are kept
+byte for byte, and a `-- OT6_NAME:` harness directive is kept. A comment
+edit leaves every stamp valid; a code edit, including one inside a string,
+stales the fixture and its chain.
 
 The `rom`, `generator`, `artifact` and `ancestor` lines decide freshness;
 the sig and `lib` lines record exactly which harness sources produced the
@@ -89,9 +100,12 @@ fixture and are reported as drift when they move. `lib/compose.py`
 re-verifies all of it at consume time (the same `stamp_status()` behind
 `--check-states`), so the whole chain is verifiable transitively from files
 on disk, and the ninja graph and the checker agree on what is stale.
-`GATE_CONTRACT` (`ot6-provenance/v1`, one constant in `savestate_stamp.sh`)
+`GATE_CONTRACT` (`ot6-provenance/v2`, one constant in `savestate_stamp.sh`)
 is a fixed input to both sigs: bumping it deliberately stales every stamp
-in the checker (the graph does not track it; regenerate by hand).
+in the checker (the graph does not track it; regenerate by hand). v1
+hashed `.lua` inputs as bytes; `lib/migrate_fingerprints.py` re-stamps a
+v1 stamp that still verifies under v1 as v2, regenerating nothing, and
+`--check-states` names it when a tree still carries v1 stamps.
 
 The scenario split is played on **one pinned playthrough** — Locke, then Sabin,
 then Terra — the way a single player with one cartridge plays it: scenario

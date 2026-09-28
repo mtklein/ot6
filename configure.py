@@ -474,7 +474,8 @@ test_luas = glob("tools/tests/*.lua") + glob("tools/tests/lib/*.lua")
 # installed ninja's build-log columns on a mock graph.
 check("compose_selftest", "python3 tools/tests/lib/compose.py --selftest",
       ["tools/tests/lib/compose.py", "tools/tests/lib/decode_b64.py",
-       "tools/tests/lib/savestate_stamp.sh"]
+       "tools/tests/lib/savestate_stamp.sh",
+       "tools/tests/lib/lua_fingerprint.py"]
       + LIBS)
 check("sram_selftest", "python3 tools/tests/lib/sram_checkpoint.py selftest",
       ["tools/tests/lib/sram_checkpoint.py"])
@@ -552,10 +553,13 @@ check("ninja_py_selftest", "python3 tools/tests/lib/savestate_ninja.py --selftes
       ["tools/tests/lib/savestate_ninja.py"])
 check("ninja_sh_selftest", "sh tools/tests/lib/savestate_ninja_selftest.sh",
       ["tools/tests/lib/savestate_ninja_selftest.sh",
-       "tools/tests/lib/savestate_ninja.py"])
+       "tools/tests/lib/savestate_ninja.py",
+       "tools/tests/lib/savestate_stamp.sh",
+       "tools/tests/lib/lua_fingerprint.py"])
 check("stamp_selftest", "sh tools/tests/lib/savestate_stamp_selftest.sh",
       ["tools/tests/lib/savestate_stamp_selftest.sh",
-       "tools/tests/lib/savestate_stamp.sh"])
+       "tools/tests/lib/savestate_stamp.sh",
+       "tools/tests/lib/lua_fingerprint.py"])
 check("runner_isolation", "sh tools/tests/lib/runner_isolation_selftest.sh",
       ["tools/tests/lib/runner_isolation_selftest.sh", "tools/tests/run.sh"])
 check("shared_emulator", "sh tools/tests/lib/shared_emulator_selftest.sh",
@@ -586,6 +590,7 @@ check("retry_negative", "nice sh tools/tests/lib/retry_negative.sh",
 # use, so the check re-runs exactly when its answer can move.
 check("check_states", "python3 tools/tests/lib/compose.py --check-states",
       ["tools/tests/lib/compose.py", "tools/tests/lib/savestate_stamp.sh",
+       "tools/tests/lib/lua_fingerprint.py",
        sn.GRAPH, copy_if_changed_from("build/ot6.sfc")]
       + [copy_if_changed_from(f"tools/tests/{e['gen']}.lua") for e in states if e.get("gen")]
       + [copy_if_changed_from(h) for h in LIBS] + all_stamps)
@@ -651,7 +656,7 @@ w.edge([f"build/release/ot6-v{VERSION}.zip"], "sh",
 # ----------------------------------------------- copy_if_changed + regen ---
 w()
 for dep, src in sorted(copy_if_changed_edges.items()):
-    w.edge([dep], "copy_if_changed", [src])
+    w.edge([dep], sn.copy_rule(src, states), [src])
 w()
 w("rule configure")
 w("  command = python3 configure.py")
