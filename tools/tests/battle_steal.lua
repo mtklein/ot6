@@ -257,9 +257,58 @@ local needFb = false
 local function suitable()
   return rareT ~= nil and ((not needFb) or fbT1 ~= nil)
 end
+
+-- Field care before every desert battle, the way a person heals after each
+-- fight.  The party stands through every battle here without attacking
+-- (TERRA and EDGAR pass their turns so that LOCKE's arms run on the
+-- monsters' untouched slots), for 2000-7000 frames a battle, so this is a
+-- top-off before a known danger: 0.9, not the walker's 0.65.  Without it
+-- the fixture's own wounds and each battle's damage carried into the next,
+-- and whether the party outlived the arms came down to the draw: on the
+-- 2026-09-28 chain EDGAR walked in at 94/169, fell in battle 1, TERRA in
+-- battle 3, and LOCKE after two missed bare steals (GAME OVER, f18622);
+-- with one more encounter used up first the same file passed.
+-- A member the last fight felled is revived by the care (a Fenix Down) when
+-- the bag holds one; when it holds none, that member sits the next battle
+-- out, and that is asserted as the reason rather than failed on: TERRA
+-- (94 HP) fell in battle 1 in 6 of 46 lab runs; in 2 of them encounters
+-- used up before the file had already spent the fixture's one Fenix Down,
+-- and both passed with her down.
+local CARE, FENIX = 0.9, 0xF0
+local function careBefore(what)
+  return H.repeatN(1, {
+    H.careStop("care before " .. what, { threshold = CARE }),
+    H.call(function()
+      for _, c in ipairs(H.partyMembers()) do
+        if (H.readByte(0x1850 + c) & 0x07) == (H.readByte(0x1A6D) & 0x07) then
+          local hp, mx = H.charHp(c), H.charMaxHp(c)
+          if hp == 0 or (H.charStatus1(c) & 0x80) ~= 0 then
+            H.assertEq(H.invCountOf(FENIX), 0, string.format(
+              "c%d is down going into %s only because the bag holds no "
+              .. "Fenix Down", c, what))
+          else
+            H.assertEq(hp >= CARE * mx, true, string.format(
+              "c%d walks into %s topped up (%d/%d, care threshold %.2f)",
+              c, what, hp, mx, CARE))
+          end
+        end
+      end
+    end),
+  })
+end
+-- How many encounters a battle may take to draw a suitable formation, from
+-- the pool's own odds.  This desert rolls world battle group 1 (field/
+-- battle.asm CheckBattleWorld; rand_battle_group.dat): Sand Ray x2, Areneid
+-- x3, Sand Ray + 2 Areneid, Sand Ray + 3 Areneid, drawn 31.25/31.25/31.25/
+-- 6.25%.  Battles 1 and 2 need a Sand Ray (68.75% a draw); battle 3 needs a
+-- Sand Ray AND an Areneid (37.5%).  Six encounters, the old budget, miss
+-- battle 3's pair 0.625^6 = 6% of the time (a seed-13 draw did: six
+-- unsuitable in a row).  Twenty miss it 0.625^20 = 8e-5.  Unsuitable draws
+-- are fled, and the care above runs before every walk.
+local TRIES = 20
 local function enterDesertBattle(n, wantFb)
   local steps = { H.call(function() needFb = wantFb or false end) }
-  for try = 1, 6 do
+  for try = 1, TRIES do
     steps[#steps+1] = H.cond(function()
       return H.battleLoadStarted() and suitable()
     end, {}, {
@@ -269,6 +318,7 @@ local function enterDesertBattle(n, wantFb)
         H.waitFrames(240),
       }, {}),
       H.call(function() plan, goal = nil, nil end),
+      careBefore("desert battle " .. n .. " try " .. try),
       H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
         H.call(function()
           if not H.worldMode() or not H.worldHasControl() then
@@ -298,7 +348,8 @@ local function enterDesertBattle(n, wantFb)
   end
   steps[#steps+1] = H.call(function()
     H.assertEq(suitable(), true,
-      "a suitable desert formation drawn within six encounters")
+      string.format("a suitable desert formation drawn within %d encounters "
+        .. "(the pool's odds miss that 1 time in 12000)", TRIES))
   end)
   return H.repeatN(1, steps)
 end
