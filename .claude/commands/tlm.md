@@ -77,7 +77,7 @@ same files. Each agent works in its own worktree:
   and numbers copied from logs (never paraphrased), what was NOT done, and
   every out-of-scope finding.
 - Agents run their own checks (`ninja <the outputs they touched>`), but the
-  full `ninja qual` happens once, on the merged tree, by you.
+  full `ninja` (qualification) happens once, on the merged tree, by you.
 - Evidence the agent will cite goes under `build/attempts/<branch>/` (a link
   into the main tree, set up by worktree-setup.sh) and is cited by that
   path. A test change carries the evidence bar in docs/TESTING.md ("Tests
@@ -136,7 +136,7 @@ Milestones and releases get the full gate before the merge:
    line it needs pasted in (it has no context; a claim you don't evidence
    comes back "unverifiable"). Its contradictions go in your report
    verbatim.
-3. `ninja qual` on the merged tree, green.
+3. `ninja` (qualification) on the merged tree, green.
 
 Your milestone report to the owner carries headings: Done (with evidence),
 Ombudsman findings (or "no findings"), Critic contradictions (or "none"),
@@ -150,11 +150,11 @@ back. Steps, in order, none skipped:
 
 1. Freeze the ROM: no ROM change lands until the tag. Test, harness and doc
    changes keep landing and pushing.
-2. `ninja qual` from a clean git tree (`git status` empty; never `ninja -t
+2. `ninja` from a clean git tree (`git status` empty; never `ninja -t
    clean`, which deletes the tracked generated sources the ff6 encoders
    write and leaves the build unable to run), on pushed main. Green is the
    qualification; keep its log. Anything merged while it runs gets a
-   follow-up `ninja qual` before the tag.
+   follow-up `ninja` before the tag.
 3. Ombudsman + critic on docs/release-notes-next.md against the log since
    the last tag (every claim names a commit or a test). The notes were
    written as changes merged (AGENTS.md); this step checks them, not
@@ -165,8 +165,8 @@ back. Steps, in order, none skipped:
    start a fresh docs/release-notes-next.md; update README's "vX.Y is the
    current release" line and tag link. Commit as `release: vX.Y -- <Name>
    (version bump + release notes)`; fast-forward release/vX.Y to it.
-5. Bare `ninja` (qualification is up to date, so this is the preflights,
-   the patch and the zip): `build/release/ot6-vX.Y.zip` must build.
+5. `ninja release` (qualification is up to date, so this is the
+   preflights, the patch and the zip): `build/release/ot6-vX.Y.zip` must build.
 6. `git tag -a vX.Y -m "OT6 vX.Y -- <Name>"`, `git push origin main
    release/vX.Y vX.Y`, then
    `gh release create vX.Y build/release/ot6-vX.Y.zip --title "OT6 vX.Y — <Name>" --notes-file docs/release-notes-vX.Y.md`.

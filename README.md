@@ -41,8 +41,8 @@ and refuses anything else: `Final Fantasy III (USA).sfc`, sha1
 brew bundle                 # cc65, sdl2, ninja, ffmpeg
 python3 -m pip install numpy
 python3 configure.py        # writes build.ninja
-ninja                       # builds and tests everything; the default
-                            # target is the qualified release zip
+ninja                       # builds and tests everything (qualification)
+ninja release               # ...then the release preflights and the zip
 ```
 
 Mesen and Flips are not brew-installable; [docs/TOOLING.md](docs/TOOLING.md)
@@ -51,8 +51,8 @@ has those steps.
 `ninja` runs the whole graph: both ROMs, every generated savestate (the
 story-chain fixtures are multi-minute scripted playthroughs; a cold build
 takes upward of an hour and a half), all 94 suite tests, the audits and
-selftests, and the release packaging. Anything narrower is a real output
-path:
+selftests. `ninja release` adds the release preflights and packaging.
+Anything narrower is a real output path:
 
 ```sh
 ninja ff6/rom/ff6-en.sfc                    # just the ROM
