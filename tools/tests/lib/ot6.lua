@@ -7304,10 +7304,16 @@ function Driver:watchLeavers()
   -- camp_escaped measurement above), and no real battle opens that soon
   -- after another's end (the fade-out, the map's reload, a step and the
   -- encounter's own transition come between), so 90 frames is the tail.
-  -- The bound is measured, not assumed: every run's [watch] battle-gaps
-  -- line reports the smallest end-hook-to-next-battle gap it saw and the
-  -- tails' gaps (M.battleGaps), gathered over the whole chain in
-  -- build/attempts/wt/wor-sabin/review-fixes/gaps/.
+  -- The bound is measured: every run's [watch] battle-gaps line reports
+  -- the nearest end-hook-to-next-battle gap it saw and the tails' gaps
+  -- (M.battleGaps).  Over the whole regenerated chain and suite set (192
+  -- run logs, build/attempts/wt/wor-sabin/review-fixes/gaps/): 184 real
+  -- battles opened 112 frames or more after the last end hook (the
+  -- nearest, the opera's rafter rats one after another, ultros2_entry),
+  -- and the one tail came 73 frames after it (battle_classtarget's
+  -- aim-off driver).  90 sits between; a battle that opened sooner than
+  -- 90 frames after another's end would read as a tail and lose its
+  -- [outcome], which the generators' outcome-per-battle assertion catches.
   if endSnap ~= nil and endSnap.frame < (self.startFrame or 0)
      and (self.startFrame or 0) - endSnap.frame < 90 then
     if not self.tailSaid then

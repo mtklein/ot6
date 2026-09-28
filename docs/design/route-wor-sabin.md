@@ -1279,8 +1279,8 @@ expired clock ends at the house's exit.
 ### 11.2 The clock, read by the driver
 
 The timer is read off `$1188-$119F` (`M.sceneTimer`: the live timer that
-is not FIELD_ONLY, i.e. runs through menus and battles) and said at every
-step: the generator's own lines, the walkers' heartbeats (`nav f... |
+runs through menus and battles -- not FIELD_ONLY -- and is drawn there,
+MENU_BATTLE_VISIBLE; a clock a person can see) and said at every step: the generator's own lines, the walkers' heartbeats (`nav f... |
 timer 0 4:44 left ...`), and the fight driver's `[timer]` lines as each
 battle opens and at its end hook (`[timer] battle $0D1 over at f+2603:
 timer 0 5:13 left ...; the battle took 2568 frames of it`). No menu
@@ -1316,9 +1316,23 @@ price of the levers is HP: fewer top-ups, so she runs lower (248 against
 550 at the worst), which the heal policy's one-round and kill-rounds
 rules still cover.
 
-The same rules apply wherever a scene timer runs through battles; on the
-World of Balance that is the Floating Continent escape (the 6:00 master
-clock and Shadow's 5:55) and the opera's rafter chase. `gen_fc_escape`
+The same rules apply wherever a visible clock runs through battles; on the
+World of Balance that is the opera's rafter chase (flags `$70`), the
+banquet and its sparring window (`event_main.asm:97422`, `:98023`), and
+the Floating Continent escape (the 6:00 master clock and Shadow's 5:55,
+`$78`). The World of Balance also runs timers a person never sees -- the
+Sealed Gate cave's cycling puzzle timers (`start_timer 1, 144, _cb2c57`
+and its neighbours, `:44640-44858`, flags `$09`) and Owzer's mansion's
+(`:48206-48253`) -- and those do not count: the first cut read any timer
+that was not FIELD_ONLY, so the levers switched on for a Sealed Gate cave
+battle and every later battle of `gen_gate_cave_save` played differently
+from main's lib (the review's `build/attempts/review-wor-sabin/
+gate_cave_ab.txt`: battle `$097` 4252 ticks on main's lib against 4404,
+`[timer] ... flags $09`). With the visibility bit required, the same
+generator from `narshe-mission-v1` on this lib and on origin/main's plays
+the same run: six battles, 2733 / 1959 / 4252 / 3978 / 5342 / 3678
+ticks, `PASS (frame 41114) attempts=1/3` on both, no `[timer]` line
+(`build/attempts/wt/wor-sabin/review-fixes/gate/gate_cave_ab.txt`). `gen_fc_escape`
 from `fc-alcove-v1`, 3 shifts a side (`lab/wob_fc_escape/`, `lab/wob_timed.py`):
 all six PASS; the timed battles (four escape-map fights and Nerapa)
 took 7149-9940 frames of Shadow's clock with the levers on against
@@ -1327,6 +1341,13 @@ against 2:34 / 2:15 / 2:26. The rafter chase was regenerated under the
 rules by the suite run (`gen_opera6_rafter`, `suites/fixtures/ultros2_entry.log`):
 three rat fights, each 2389-2622 frames of the clock, the last ending
 with `timer 0 1:48 left`, `PASS (frame 19632) attempts=1/3`; not A/B'd.
+With the visible-clock check and the run rule, on the merged ROM
+(`review-fixes/suites/ultros2_entry.log`): four rat fights, each `an event
+battle: fought, never run from`, each under the levers, the last ending
+with `timer 0 1:27 left`, `PASS (frame 21184) attempts=1/3`; the escape
+likewise (`review-fixes/escape/gen_fc_escape.log`: the four escape-map
+fights and Nerapa under `timer 2 ... flags $78`, the escape map's two
+random fights `fits, fought`, `PASS (frame 76601) attempts=1/3`).
 
 ### 11.3 Condemned, alone
 
@@ -1419,7 +1440,14 @@ measured, and nothing measured asks to widen it.
   assertion went red). A driver whose watch begins within 90 frames after
   the last end hook now says `[tail]` and seats nothing
   (`lab/ghost/after/k1_s0.log`: `[tail] f+6 the last battle's end hook
-  fired 3 frames before this watch began`, and the run passes).
+  fired 3 frames before this watch began`, and the run passes) The 90-frame bound is measured, since the review: over the whole
+  regenerated chain and suite set on the merged ROM (192 run logs,
+  `build/attempts/wt/wor-sabin/review-fixes/gaps/summary.txt`), `184
+  battles opened after an earlier one's end hook, the nearest 112 frames
+  after it; 1 hand-back tails, the farthest 73 frames after it` -- the
+  nearest real one the opera's rafter rats in a row (`ultros2_entry.log`),
+  the tail `battle_classtarget`'s. The bound sits between them, with
+  39 frames on the near side.
 - **The lone fighter's race** (11.3) and the **timer** (11.2) are in
   `lib/ot6.lua` (`Driver:watchTimer`, `Driver:healPct`,
   `Driver:cadence`, makePlan's `[doom]` line).
@@ -1469,7 +1497,96 @@ ticks; a fifth battle (the pool model's P(5) = 3.3 %, section 3.3; none in these
 15) would fit only when it is quick, a sixth would not. That is the
 price of the Back Guard kit (11.4), paid to take the pincer out.
 
-### 11.7 For the next leg
+Measured against these 15, and before the run rule (11.8):
+
+- A house fight costs the clock 2197-4151 frames, mean 3526 (53 fights,
+  the sum of `the battle took N frames of it`). At the tightest
+  four-battle exit, 3685 frames, a fifth fight at the measured costs
+  loses 13 times in 53, about one attempt in four; over all nine
+  four-battle exits against all 53 costs it loses 15 times in 477. A
+  sixth loses in all but 18 of 12,402 pairings of two costs against the
+  nine exits: it always loses, for practical purposes.
+- The measured battle counts run above the model in section 3.3: over the
+  nine distinct draws (shift 0; a seed shift does not move the draw)
+  3.44 house battles a draw, four in 5 of 9, against the model's mean
+  2.78 and P(5) = 0.033. So that P(5) is not a bound on how often a
+  five-battle house comes.
+- The runner's retries replay the same formations: the encounter draw is
+  save data (`$1FA1-$1FA5`), so a second attempt from the checkpoint meets
+  the same house, and a lost five-battle draw would be lost again. A retry
+  does not decorrelate the clock.
+- The expiry is a lost attempt, said: a lab copy that stands still 16,000
+  frames at the house's door (`lab/forced/dawdle/k0_s0.log`, the LOST:
+  guard's negative control) ends `FAIL: LOST: the house's timer ran out at
+  f25886 on map 311 (124,24) -- child not rescued`.
+
+### 11.8 Running from what the clock cannot cover
+
+The owner's rule (docs/guidelines.md, "Fight, don't flee", 2026-09-28):
+inside a timed scene with a visible clock, a person runs from a random
+battle when the time left cannot cover another fight. The driver does it
+(`Driver:watchTimer`, `Driver:runFrame`): at a random battle's open
+(OT6_RANDBTL's copy for the battle, read at f+6) under a visible clock it
+says the arithmetic -- `[timer] f+6 battle $0D1 (random) fits, fought:
+8336 frames left, this fight costs ~4151 (the caller's measure), 1839
+frames of walk ahead: 4151 + 1839 = 5990 <= 8336` -- and when the sum is
+more than the time left it holds L+R (backing out of any open menu)
+until the party is gone, or fights on if the formation refuses the run
+(`$B1` bit 1, `$2F4B` bit 0) or has not let it go in 1200 frames. An event
+battle is never run from (`gen_fc_escape`: `battle $1A3 is an event
+battle: fought, never run from`), and nothing is decided outside a
+visible clock. `gen_wor_sabin` gives the fight's cost as the house's
+measured worst, 4151 frames, and the walk ahead as the steps still to
+walk to the exit (the current leg's plan from where she stands, the later
+legs whole: 44, 26, 27 and 43 steps) at 17 frames a step, plus the
+child's scene (150) and the links still to cross (40 each).
+
+The long houses, forced (`lab/forced/`, `varlab.py --dawdle` / `--pace`,
+the run rule on and off by `H.TIMED_RUN`; retries off). No natural draw
+in the variation set met a fifth house battle, so the clock was taken
+away instead, by a declared lab-only expedient: CELES stands still at the
+house's door for one fight's worth of clock -- 4151 frames, the measured
+worst, a fifth battle -- or two average ones, 7052, a sixth, on four-battle
+draws (`dawdle_summary.txt`):
+
+| stood still | rule | K0 s0 | K0 s41 | K6 | K7 |
+|---|---|---|---|---|---|
+| 4151 (a fifth) | off | `LOST: the house's timer ran out at f26148` | PASS, 476 left | PASS, 1492 | PASS, 1678 |
+| 4151 (a fifth) | on | PASS, 1 run, 3276 left | PASS, 476 | PASS, 1492 | PASS, 1678 |
+| 7052 (a sixth) | off | LOST (f26148) | LOST (f26238) | LOST (f47635) | LOST (f48571) |
+| 7052 (a sixth) | on | PASS, 1 run, 974 left | PASS, 1 run, 1815 | PASS, 1 run, 871 | PASS, 1 run, 330 |
+
+Where every fight fits the rule changes nothing: the runs it leaves alone
+end on the same frame in both arms (K6: `PASS (frame 56300)` twice; K7
+`57057`; K0 s41 `35254`). A first cut of the lab paced upstairs,
+(122,19) <-> (122,24), until 1-4 more battles came (`pace_summary.txt`):
+paces 1 and 2 met no extra battle (the danger counter spreads the same
+steps' encounters: still four), and paces 3 and 4 did (five to eight
+battles met), but the pacing itself walks the clock away after the rule
+has run -- off, 0 of 6 passed; on, 3 of 6 (`pace3_run/k6`, `k7`,
+`pace4_run/k7`, the last with eight battles met, four of them run, and
+210 frames left). In `pace3_run/k0` a fight the rule let through (7707
+left, 4151 + 1839 needed) cost 5248 frames, more than any of the 53
+measured: CELES opened it at 382 HP and spent two turns on Cure. The
+rule prices a fight at the measured worst and cannot see that one coming.
+
+On the natural draws the rule changes nothing: the variation set rerun on
+the final tree, with the run rule and the visible-clock check, and on the
+merged ROM (`build/attempts/wt/wor-sabin/review-fixes/var/`: the same 15
+variants) is 15 of 15 PASS with 53 house battles, 0 run decisions and a
+`fits, fought` decision for every house battle (`run_decisions=0` in all
+15 summaries); the house exit 3685-11839 frames, every `[outcome]` paid
+as due, the Doom margin at least 354 ticks, the clock cost of a house
+fight 2960-4151 frames (mean 3623). K0 s0, K0 s23, K0 s41, K1 and K3
+s41 end on the frames they ended on before; the others moved with the
+merged ROM's plains fights.
+
+The run itself, over the 19 run decisions in `lab/forced/`: 18 ended
+`PARTY LEFT` (the whole party gone, no reward, `paid as due`) after
+350-858 ticks, 314-822 frames of the clock; none was refused (the
+house's formations let a party run, `$B1`/`$2F4B` clear); the 19th was
+decided with 26 frames left and the clock ran out under it
+(`pace3_run/k0`).
 
 `wor-sabin-v1` boots CELES and SABIN at world (131,179), both L27, full;
 CELES in the plains kit again (`06 0E 0F 76 8F D1 B5`), SABIN `01 57 57
