@@ -84339,8 +84339,8 @@ _cc340b:
 _cc340f:
         dlg $0264
                 ; The ? marks next to the shield are weaknesses you haven’t found yet. A weakness is an element or a weapon type.
-                ; In battle, the Magic list shows a spell’s element as an icon after its name.
-                ; Fight uses your weapon’s type: swords slash, spears and knives pierce, rods and staves bludgeon.
+                ; In battle, the Magic list shows a spell’s element as an icon. A weapon’s icon shows its type.
+                ; Fight uses your weapon’s type: swords and claws slash, spears and knives pierce, rods bludgeon.
                 ; Hit a weakness and its ? turns into an icon. The game remembers it for every later battle.
         return
 _cc3413:
@@ -84702,9 +84702,10 @@ _cc36b9:
         dlg $0276
                 ; In OT6, Blitz, Tools, SwdTech, Steal, Dance and Rage cost MP. If you can’t pay, the skill is greyed out.
                 ; Sabin’s Blitz: pick one from a list. There are no button codes.
-                ; Cyan’s SwdTech: there is no charge gauge. Pick one of his best three techs, for 1, 2 or 3 Boost Points.
-                ; Steal, Slot and Rage: each Boost Point improves the odds. With 3, Steal always works and gets the rare item, if any.
-                ; Shadow: once each battle, his hit that breaks a monster kills it. Most bosses are only broken.
+                ; Cyan’s SwdTech: there is no charge gauge. It lists his three best skills, for 1, 2 and 3 Boost Points.
+                ; Steal, Slot and Rage: each Boost Point improves the odds instead of adding damage.
+                ; With 3 points, Steal always works and gets the rare item, if any, and Rage always uses its special.
+                ; Shadow: once a battle, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
         return
 _cc36bd:
         switch $02A0=1
