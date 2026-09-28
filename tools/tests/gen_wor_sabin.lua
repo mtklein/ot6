@@ -24,7 +24,10 @@
 --      (the walkers' field care stays out under a live counter,
 --      H.eventTimerLive), every battle is fought by the tactical driver,
 --      which reads the clock (lib/ot6.lua Driver:watchTimer: top-ups only
---      under the timed fraction, the menus pressed at the timed cadence),
+--      under the timed fraction, the menus pressed at the timed cadence,
+--      and a run from a random battle whose measured cost plus the walk
+--      still ahead the time left cannot cover -- the owner's rule for a
+--      visible clock, docs/guidelines.md "Fight, don't flee"),
 --      and a lone condemned CELES is played as the race it is (the Doom
 --      Sting every Scorpion opens with; makePlan's solo Doom rule).  The
 --      timer's remaining time is said at every step.  An expired clock is
@@ -91,6 +94,21 @@ local LINK_DOWN, LINK_DOWN_TO = { 126, 22 }, { 103, 52 }
 -- the plains' measured field care
 local FIELD_CARE_POTIONS = 6
 local HOUSE_FRAMES = 21600                          -- start_timer 0, 21600 (:90010)
+-- What a house fight costs of the clock, for the driver's run rule (lib/
+-- ot6.lua Driver:watchTimer; owner, 2026-09-28, docs/guidelines.md "Fight,
+-- don't flee": inside a visible clock, run from a random battle the time
+-- left cannot cover): the worst of 53 house fights under draw variation,
+-- 2197-4151 frames, mean 3526 (build/attempts/wt/wor-sabin/lab/var-final/,
+-- "the battle took N frames of it").
+local HOUSE_FIGHT_COST = 4151
+-- The house's legs in order, with the steps each walks when taken whole
+-- (the navigator's own plans: `nav: planned 44 steps from (123,60)`, 26
+-- from (125,23), 27 from (117,12), 43 from (103,52); build/attempts/wt/
+-- wor-sabin/lab/ws/lab3b.log), then the one step out.  A step costs about
+-- 17 frames (44 steps in 731, var-final/k2_s0.log), the child's scene about
+-- 150, and each same-map link about 40.
+local HOUSE_LEGS = { { 102, 53, 44 }, { 117, 12, 26 }, { 126, 22, 27 }, { 123, 60, 43 } }
+local STEP_FRAMES, CHILD_FRAMES, LINK_FRAMES = 17, 150, 40
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -278,12 +296,40 @@ local function inn(what, price)
   }, {})
 end
 
--- a walk inside the timed scene: the tactical driver fights what comes,
--- and the clock is watched every frame (guard) and said at the leg's end
-local function houseLeg(x, y, what, arrive)
+-- The walk still ahead to the house's exit, in frames, for the run rule:
+-- the current leg's remaining steps (a plan from where the party stands,
+-- re-read whenever it stands somewhere new on the house's field) plus the
+-- later legs whole, the child's scene if she is not rescued yet, and the
+-- links still to cross.
+local legNo, ahead, aheadAt = 1, 0, nil
+local function aheadFrames()
+  if map() == MAP_HOUSE and not H.battleLoadStarted() and H.hasControl() and H.tileAligned() then
+    local key = H.fieldX() * 256 + H.fieldY() + legNo * 65536
+    if key ~= aheadAt then
+      aheadAt = key
+      local leg = HOUSE_LEGS[legNo]
+      local p = leg and H.bfsPath(leg[1], leg[2]) or nil
+      local steps = p and #p or (leg and leg[3] or 0)
+      for i = legNo + 1, #HOUSE_LEGS do steps = steps + HOUSE_LEGS[i][3] end
+      local links = legNo <= 1 and 2 or (legNo <= 3 and 1 or 0)
+      ahead = (steps + 1) * STEP_FRAMES + links * LINK_FRAMES
+        + (sw(0x028B) == 0 and CHILD_FRAMES or 0)
+    end
+  end
+  return ahead
+end
+
+-- a walk inside the timed scene: the tactical driver fights what comes
+-- (and runs from what the clock cannot cover: HOUSE_FIGHT_COST, the walk
+-- ahead), and the clock is watched every frame (guard) and said at the
+-- leg's end
+local function houseLeg(n, what, arrive)
+  local x, y = HOUSE_LEGS[n][1], HOUSE_LEGS[n][2]
   return H.seqStep({
+    H.call(function() legNo, aheadAt = n, nil end),
     H.navTo(x, y, { maxFrames = 12000, playBattles = "tactical",
-      arrive = function() guard(); return arrive ~= nil and arrive() or false end }),
+      fight = { timedFightCost = HOUSE_FIGHT_COST, timedWalk = function() return aheadFrames() end },
+      arrive = function() guard(); aheadFrames(); return arrive ~= nil and arrive() or false end }),
     H.release(),
     H.waitUntil(function() guard(); return H.hasControl() and H.tileAligned() end, 900,
       what .. ": control", 2),
@@ -309,6 +355,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertEntryContract("wor-tzen-door-v1")
     tallyReset()
     clockOn, lowest, houseIn, houseOut = false, nil, nil, nil
+    legNo, ahead, aheadAt = 1, 0, nil
     H.log(string.format("[wor] boot f%d: world %d (%d,%d), %s, kit %s; %s", H.frame, H.worldId(),
       H.worldX(), H.worldY(), whereLine(), kit(CELES), supplies()))
   end),
@@ -392,13 +439,13 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- 4. the house ---------------------------------------------------------------
-  houseLeg(LINK_UP[1], LINK_UP[2], "up by the link (102,53) -> (125,23)",
+  houseLeg(1, "up by the link (102,53) -> (125,23)",
     function() return H.fieldY() < 40 end),
   H.call(function()
     H.assertEq(H.fieldX() == LINK_UP_TO[1] and H.fieldY() == LINK_UP_TO[2], true,
       "upstairs at (125,23)")
   end),
-  houseLeg(CHILD[1], CHILD[2], "at the child's tile (117,12)"),
+  houseLeg(2, "at the child's tile (117,12)"),
   H.faceAndHoldA("up", function() guard(); return sw(0x028B) == 1 end, 3000,
     "face up and hold A on (117,12) -- _cc5958"),
   H.release(),
@@ -411,13 +458,13 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(sw(0x066D), 0, "the child is hidden ($066D)")
     say("house", "the child is with her")
   end),
-  houseLeg(LINK_DOWN[1], LINK_DOWN[2], "down by the link (126,22) -> (103,52)",
+  houseLeg(3, "down by the link (126,22) -> (103,52)",
     function() return H.fieldY() > 40 end),
   H.call(function()
     H.assertEq(H.fieldX() == LINK_DOWN_TO[1] and H.fieldY() == LINK_DOWN_TO[2], true,
       "downstairs at (103,52)")
   end),
-  houseLeg(HOUSE_IN[1], HOUSE_IN[2], "back at the door (123,60)"),
+  houseLeg(4, "back at the door (123,60)"),
   H.driveUntil(function() guard(); return map() ~= MAP_HOUSE end, 900,
     { H.hold({ "down" }) }, "out by the exit (123,61)"),
   H.release(),

@@ -1321,8 +1321,8 @@ World of Balance that is the Floating Continent escape (the 6:00 master
 clock and Shadow's 5:55) and the opera's rafter chase. `gen_fc_escape`
 from `fc-alcove-v1`, 3 shifts a side (`lab/wob_fc_escape/`, `lab/wob_timed.py`):
 all six PASS; the timed battles (four escape-map fights and Nerapa)
-took 7145-9940 frames of Shadow's clock with the levers on against
-9127-10288 off, and Nerapa ended with 2:20 / 2:49 / 3:07 left on
+took 7149-9940 frames of Shadow's clock with the levers on against
+9131-10288 off (the sum of each run's `the battle took N frames of it`), and Nerapa ended with 2:20 / 2:49 / 3:07 left on
 against 2:34 / 2:15 / 2:26. The rafter chase was regenerated under the
 rules by the suite run (`gen_opera6_rafter`, `suites/fixtures/ultros2_entry.log`):
 three rat fights, each 2389-2622 frames of the clock, the last ending
@@ -1372,7 +1372,7 @@ Blade and a shield). The **Jewel Ring** stays: the HermitCrab's Rock
 Sneeze (`if_num_monsters 1`, which fired on the Chitonid's own killing
 blow, section 10.3), so no kill order keeps it quiet, and a statue is a
 lost fight alone. The kit's
-price is the second hand: Scorpion trios are won in 2274-4171 ticks
+price is the second hand: Scorpion trios are won in 2232-4171 ticks
 (mean 3553, 48 fights, `var-final/`) against 2075-3227 (mean 2493) with the
 pair, and that is where the Doom margin (11.3) and the clock's margin
 (11.6) went.
@@ -1401,9 +1401,10 @@ measured, and nothing measured asks to widen it.
   read by makePlan's `hpNow` / `maxOf`, the party's damage window and
   the raise rule's top-up race). Natural play never produced the case
   the rule changes: 43 members sneezed out with others still in on the
-  review's WoB lab and 18 more here at a 95% heal fraction
-  (`lab/left/`: `TOTAL: 18 left with others in; 0 plan(s) on a left
-  member`, the mask on and stubbed off alike), every one above the
+  review's WoB lab and 9 more here at a 95% heal fraction, 52 in all
+  (`lab/left/`: 5, 3 and 1 in `aware_s0/s7/s14`, the same 9 again in
+  the `mutant_*` arm with the mask stubbed off; `leftscan.py`: `0 plan(s)
+  on a left member` in both), every one above the
   fraction when it left. `battle_left` (`@suite`, kolts_cave) stages it
   with declared waivers: entity 2 marked in $3A39 and set to 80/241 HP at
   actor 1's window, three windows later `a plan on the member who left:
@@ -1432,7 +1433,8 @@ back to (131,179), so the body starts from another step counter,
 encounter counter, HP and bag: `$1FA1-$1FA5` moves with every step and
 every encounter, world and field alike, so the house deals other
 formations and battle counts (K is a floor: the count is checked between
-walk legs, and a leg can hold two battles, so K=7 fought 8). Retries off
+walk legs, and a leg can hold two battles: K=5 used 6, and K=6, 7
+and 8 each used 8). Retries off
 (`OT6_RETRIES=1`). `lab/var-final/summary.txt`, `housestats.txt`, `vartable.md` (the
 shipped generator; `lab/var/` is the same set on the file before its
 lowest-HP reading moved from her record to the battle's table, with the

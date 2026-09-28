@@ -14,7 +14,7 @@
 -- The natural case is rare: across the review's 43 members the Baskervor
 -- sneezed out with others still fighting (build/attempts/wt/wor-tzen-door/
 -- review-final/wob/off_s*.log) every one left above the heal fraction, and
--- so did the 10 of this change's lab at a 95% fraction
+-- so did the 9 of this change's lab at a 95% fraction, 52 in all
 -- (build/attempts/wt/wor-sabin/lab/left/).  So this is a focused mechanism
 -- test and stages with sanctioned expedient writes:
 --   * the member's bit is POKED into $3A39 in the engine's own shape (the
@@ -30,7 +30,7 @@
 -- may name the member who left (heal / cure / revive entity N).
 -- Negative control: stub H.leftMask to 0 (MUTANT below) and the hurt member
 -- is healed at the next window -- the assertion goes red
--- (build/attempts/wt/wor-sabin/lab/left/).
+-- (build/attempts/wt/wor-sabin/lab/left_suite/).
 local H = dofile("tools/tests/lib/ot6.lua")
 local MUTANT = false
 if MUTANT then H.leftMask = function() return 0 end end
