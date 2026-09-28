@@ -370,6 +370,7 @@ mimicreplace:
         lda     $3f22
         sta     $3520,y
         shorta
+        jsl     Ot6MimicFold            ; ot6 #260: the boost buys the copy's tier
         lda     $3f24
         cmp     #$12
         beq     _01d8                   ; return (can't mimic mimic)
@@ -13287,11 +13288,15 @@ CreateAction:
         sta     $3184,y     ; set the next-to-last pending action to reference the new last action
         asl
         tay
+        bit     $b1                     ; ot6 #260: V = $b1.6, "this is a mimic's
+        php                             ;   copy" (mimicreplace).  GetMPCost clears
+                                        ;   the bit, so Ot6QueueFold reads it here
         jsr     GetMPCost
 .if OT6_MP_COSTS
         jsl     Ot6AbilityCost          ; ot6 v0.4: price blitz/bushido/tools
 .endif
         sta     $3620,y     ; add to mp cost queue
+        plp                             ; ot6 #260: V back (widths unchanged)
         jsl     Ot6QueueFold            ; ot6: boost folds spell tiers
         longa
         lda     $3a7a       ; command/attack

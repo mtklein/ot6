@@ -153,13 +153,10 @@ async function tick(){ try{
     t.querySelector('.nm').textContent = w.name;
     t.querySelector('.fr').textContent = 'frame '+nf(w.frame);
     const badge = t.querySelector('.badge');
-    // stuck (red) takes priority over the live-view flag (cyan); otherwise a plain rim
+    // a frozen worker gets a red rim and badge; every other a plain rim
     if(w.stuck){ t.style.borderColor='#d24b4b';
       badge.textContent='\\u26A0 FROZEN'; badge.style.background='#d24b4b';
       badge.style.color='#fff'; }
-    else if(w.live){ t.style.borderColor='#57e9ff';
-      badge.textContent='\\u25B6 LIVE'; badge.style.background='#57e9ff';
-      badge.style.color='#03242b'; }
     else { t.style.borderColor='#2a322c'; badge.textContent=''; }
   });
   // reflow: drop tiles whose worker vanished
@@ -172,8 +169,8 @@ tick(); setInterval(tick, 1000);
 # The single-worker DETAIL view (was index.html; now live1.html).  With no
 # query it follows the server-tailed workspace (the classic big screenshot +
 # live notes, sourced from status.json).  With ?w=<id> it "follows by name":
-# any grid worker's big screenshot + frame + stuck, sourced from grid.json
-# (notes stream only for the server-followed worker).
+# any grid worker's big screenshot, frame, stuck flag and latest notes,
+# sourced from grid.json.
 DETAIL_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 live</title>
 <body style="margin:0;background:#111;color:#cdc;display:grid;place-items:center;min-height:100vh;font:14px ui-monospace,monospace">
 <div style="text-align:center;padding:12px">
@@ -217,8 +214,8 @@ async function tick(){
     // grid path: a worker the server isn't streaming in detail
     $('frame').textContent='frame '+nf(tgt.frame);
     $('pad').textContent='';
-    $('notes').textContent='(full notes stream on the live-view worker)';
-    $('s').textContent=tgt.name+(tgt.stuck?' · \\u26A0 frozen':' · live')+' · via grid';
+    $('notes').textContent=(tgt.notes||[]).join('\\n');
+    $('s').textContent=tgt.name+(tgt.stuck?' · \\u26A0 frozen':'');
     if(tgt.shot && tgt.shot!==curShot){ curShot=tgt.shot; const u=tgt.shot;
       const t=new Image(); t.onload=()=>{ $('f').src=u; }; t.src=u; }
   } else {
@@ -264,8 +261,7 @@ function render(j){
   document.getElementById('hdr').textContent =
     `${j.done}/${j.total} segments · ${j.elapsed_min} min elapsed · ~${j.eta_min} min left`;
   document.getElementById('cur').textContent =
-    (j.running.length ? ('now playing: ' + j.running.join(', ')) : '')
-    + (j.live ? ((j.running.length?'    ':'') + '▶ live view: ' + j.live) : '');
+    j.running.length ? ('now playing: ' + j.running.join(', ')) : '';
 }
 function renderWob(j){
   svg.setAttribute('viewBox','0 0 256 256');
@@ -290,26 +286,18 @@ function renderWob(j){
     // grid; the rest get a hairline dark rim so they read against the map
     const ring = e.ckpt ? ` stroke="#e8c94a" stroke-width=".55" stroke-dasharray="1 .8"`
                         : ` stroke="#0c100d" stroke-width=".35"`;
-    // the ONE segment on index.html's live view: a bright cyan halo, drawn
-    // under the node so the node fill stays crisp (server flags e.live)
-    if(e.live)
-      out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}"
-        r="${(rad+2.5).toFixed(1)}" fill="none" stroke="#57e9ff" stroke-width="1"
-        style="pointer-events:none">
-        <animate attributeName="r" values="${(rad+2).toFixed(1)};${(rad+5).toFixed(1)};${(rad+2).toFixed(1)}" dur="1.3s" repeatCount="indefinite"/>
-        <animate attributeName="stroke-opacity" values="1;.2;1" dur="1.3s" repeatCount="indefinite"/></circle>`;
     out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}"
       fill="${col}" fill-opacity="${e.status==='pending'?.75:1}"${ring}
       data-name="${esc(e.name)}" style="cursor:pointer">
       <title>${esc(e.name)}</title>${pulse}</circle>`;
-    // labels stay sparse at 76 nodes: the live node, running, most recent done
-    if(e.live || e.status==='running' || i===lastDone){
-      const txt = e.live ? '▶ '+e.name : e.name;   // ▶ pip on the live one
+    // labels stay sparse at 76 nodes: running, most recent done
+    if(e.status==='running' || i===lastDone){
+      const txt = e.name;
       const lw = 2.8*txt.length;   // ~half the label's width in units
       const lx = Math.min(Math.max(x, lw/2+2), 254-lw/2);
       const ly = y-rad-1.5 < 6 ? y+rad+5.5 : y-rad-1.5;
       labels += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}"
-        fill="${e.live?'#8af2ff':e.status==='running'?'#f4d27a':'#bfe3c8'}" font-size="5"
+        fill="${e.status==='running'?'#f4d27a':'#bfe3c8'}" font-size="5"
         text-anchor="middle" paint-order="stroke" stroke="#111"
         stroke-width=".9" style="pointer-events:none">${esc(txt)}</text>`;
     }
@@ -336,12 +324,6 @@ function renderGrid(j){
     // segments that boot from an SRAM save checkpoint rather than the
     // played chain wear a dotted yellow ring
     const ring = e.ckpt ? ` stroke="#e8c94a" stroke-width="2" stroke-dasharray="4 3"` : '';
-    // the one live-view segment: bright cyan halo + a "▶ LIVE" tag
-    if(e.live)
-      out += `<circle cx="${x}" cy="${y}" r="${rad+5}" fill="none" stroke="#57e9ff" stroke-width="2.5">
-        <animate attributeName="r" values="${rad+4};${rad+9};${rad+4}" dur="1.3s" repeatCount="indefinite"/>
-        <animate attributeName="stroke-opacity" values="1;.2;1" dur="1.3s" repeatCount="indefinite"/></circle>`
-        + `<text x="${x}" y="${y-rad-6}" fill="#8af2ff" font-size="10" font-weight="bold" text-anchor="middle" paint-order="stroke" stroke="#111" stroke-width="3">▶ LIVE</text>`;
     out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}"${ring}>${pulse}</circle>`
         + `<text x="${x}" y="${y+rad+12}" fill="${e.status==='pending'?'#565':'#aca'}" font-size="9" text-anchor="middle">${esc(e.name)}</text>`;
   });
@@ -428,6 +410,18 @@ def _last_note(data):
     return None
 
 
+def _last_notes(data, n):
+    """The newest n ordinary [ot6] lines in a log tail, oldest first: the
+    notes any worker's detail page shows."""
+    out = []
+    for line in reversed(data.splitlines()):
+        if line.startswith(b"[ot6] ") and not line.startswith(b"[ot6] [watch]"):
+            out.append(line[6:].decode("utf-8", "replace")[:300])
+            if len(out) >= n:
+                break
+    return out[::-1]
+
+
 def _tail_bytes(path, n):
     with open(path, "rb") as f:
         f.seek(0, 2)
@@ -488,8 +482,7 @@ def grid_thread(webroot, stop, live_ref=None):
     worker (build/test-runs/*/run.log touched within ACTIVE_SEC -- the same
     live-worker mtime filter stuck_detector uses).  Each entry carries the
     worker's latest decoded screenshot (cached to a PNG, rewritten only when
-    it changes), its frame, a stuck flag, and whether it is the one on the
-    server's live view.  Vanished workers' tiles are pruned so the grid
+    it changes), its frame, a stuck flag, and its latest notes.  Vanished workers' tiles are pruned so the grid
     shrinks as runs finish."""
     try:   # reuse stuck_detector's tuning so freeze thresholds stay single-source
         sd = _load_stream_module("stuck_detector")
@@ -501,7 +494,6 @@ def grid_thread(webroot, stop, live_ref=None):
     os.makedirs(gdir, exist_ok=True)
     written = {}   # id -> hash8 of the PNG currently on disk
     while not stop.is_set():
-        live_test = (live_ref or {}).get("test")
         now = time.time()
         workers, active = [], set()
         for log in run_logs():
@@ -531,7 +523,7 @@ def grid_thread(webroot, stop, live_ref=None):
                 "id": wid, "name": name, "frame": frame,
                 "shot": (f"grid/{wid}.png?{have}") if have else None,
                 "stuck": bool(stuck),
-                "live": bool(live_test and dirname.split(".")[0] == live_test)}
+                "notes": _last_notes(data, 8)}
             if not have:
                 # nothing to draw YET -- the broadcast is unconditional, so
                 # this worker is booting and will fill in.  Offer its latest

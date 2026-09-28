@@ -19,6 +19,9 @@ The harness plays OT6 the way a competent person with a controller would.
   are skipped XP, and the debt surfaces at a later, harder fight. Grinding
   is normal play; "the party is too low for this" is an acceptable finding,
   and the answer is healthy levels (not minimal ones) at each key point.
+- **Every area a player might reach is played and balanced**, not only the
+  story route: optional characters, areas and sidequests, as much of the
+  Colosseum as can be reached, and all eight dragons.
 - **Competence across the whole route.** Every segment of the reworked game
   is played confidently and capably; a segment the party can't reliably
   win on the first attempt gets a lab until it can.
@@ -28,6 +31,9 @@ The harness plays OT6 the way a competent person with a controller would.
   logged. One loss is a line in the retry inventory. Repeated losses, or a
   loss rate above the band, are a lab. Retry machinery engineered to re-roll
   a fight until it passes is not play.
+- **Spend like a person watching their gil.** Choices between supplies
+  (a Tent or Potions, which item heals) are priced in gil from what the bag
+  would actually spend, not from fixed thresholds.
 - **Classify every wipe by boost at death.** An early one-shot means the
   party is under-levelled (a level/kit finding). A wipe with pips still
   banked means the abilities were not used fully (a driver/policy finding).
@@ -83,6 +89,13 @@ The harness plays OT6 the way a competent person with a controller would.
 - **Don't retune vanilla enemies** (AI scripts, spells, one-shots) to dodge
   a hard fight. OT6 changes battle systems, not individual enemy quirks;
   answer a hard fight with levels, gear, route or strategy.
+- **Teach OT6 plainly, out of character.** In-game teaching (the Narshe
+  school) explains what is new relative to vanilla FF6, in terms that make
+  sense to the player: break the fourth wall, no need to stay in-universe,
+  no mystery or coyness. Each key OT6 mechanic is explained once and only
+  once.
+- **Mimic is free.** A mimic copies the action, never the price, at any
+  boost; the boost buys what it buys on the copied action.
 - **Octopath-style twists on FF6 characters are welcome** (Shadow's break
   that kills). Shadow stays in the party the whole game.
 - **The World of Balance / World of Ruin split is a storytelling boundary,

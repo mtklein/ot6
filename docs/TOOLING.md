@@ -12,7 +12,8 @@ ordered `ff6/src/battle/ot6_*.asm` modules (emitted by `ot6.asm` into
 expanded bank $F0) plus minimal jsl shims in vanilla banks.
 
 `python3 configure.py` writes `build.ninja`; `ninja` builds and tests
-everything, ending at the qualified release zip. Any narrower need is a
+everything (qualification), and `ninja release` goes on to the release
+preflights and the zip. Any narrower need is a
 real output path (`ninja ff6/rom/ff6-en.sfc`,
 `ninja build/results/suite/battle_break.ok`). The graph regenerates itself
 when `configure.py`, the savestate graph, `VERSION`, or any globbed

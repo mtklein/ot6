@@ -84228,8 +84228,8 @@ _cc338f:
 _cc339c:
         if_switch $00A4=1, _cc33a6
         dlg $0257
-                ; This is a classroom for the beginner. The war has new rules: shields, Breaks, Boosts.
-                ; Think of us as your advisors…
+                ; This is a classroom for beginners. Our advisors explain the basics, and what OT6 changes.
+                ; Also new: a level-up fully restores HP and MP. Random battles come half as often, but give double Exp. and GP.
         return
 _cc33a6:
         dlg $0258
@@ -84252,8 +84252,8 @@ _cc33b8:
                 dir DOWN
                 end
         dlg $0257
-                ; This is a classroom for the beginner. The war has new rules: shields, Breaks, Boosts.
-                ; Think of us as your advisors…
+                ; This is a classroom for beginners. Our advisors explain the basics, and what OT6 changes.
+                ; Also new: a level-up fully restores HP and MP. Random battles come half as often, but give double Exp. and GP.
         wait_30f
         obj_script NPC_27
                 dir RIGHT
@@ -84295,7 +84295,7 @@ _cc33f0:
         dlg $025D
                 ; Ha!
                 ; Sometimes monsters lurk inside of treasure chests!
-                ; The one beside me bites. Open it and practice your Breaks!
+                ; The chest beside me has monsters in it. Open it to practice what you learned here.
         return
 _cc33f4:
         dlg $025E
@@ -84338,9 +84338,10 @@ _cc340b:
         return
 _cc340f:
         dlg $0264
-                ; The “?” by a monster’s shields are weaknesses it hasn’t shown you. Probe with everything!
-                ; A true hit turns “?” into the weakness itself. What you learn, you know forever.
-                ; Each ability bears the mark of its element. Match the mark to the weakness.
+                ; The ? marks next to the shield are weaknesses you haven’t found yet. A weakness is an element or a weapon type.
+                ; In battle, the Magic list shows a spell’s element as an icon. A weapon’s icon shows its type.
+                ; Fight uses your weapon’s type: swords and claws slash, spears and knives pierce, rods bludgeon.
+                ; Hit a weakness and its ? turns into an icon. The game remembers it for every later battle.
         return
 _cc3413:
         dlg $0265
@@ -84354,8 +84355,9 @@ _cc3417:
         return
 _cc341b:
         dlg $0267
-                ; The number under a monster is its shields. Hit a weakness, the right element or weapon, and one falls.
-                ; At zero it Breaks: it loses its turns and takes double damage until it recovers. Strike NOW!
+                ; Under each monster is a shield icon with a number: its shields. While it has shields, it takes half damage.
+                ; Each hit on a weakness removes one shield. At zero it breaks: it can’t act for a while and takes double damage.
+                ; A broken monster’s shield icon shows an X. When it recovers, its shields come back.
         return
 _cc341f:
         dlg $0268
@@ -84641,13 +84643,16 @@ _cc368a:
         return
 _cc368e:
         dlg $026D
-                ; The dots by each name are Boost Points. You gain 1 a turn, and can bank 5.
-                ; The R Button spends up to 3 on the command you’re choosing. The L Button takes them back.
+                ; The dots after each name in battle are Boost Points.
+                ; Each character starts a battle with 1, and gains 1 after each of their turns, up to 5.
+                ; While choosing a command, press the R Button to add a point: up to 3, if you have them. Arrows show how many.
+                ; Press the L Button to take one back. Boosting uses up those points, and you gain no new point that turn.
         return
 _cc3692:
         dlg $026E
-                ; Boost folds magic: Fire becomes Fire 2, then Fire 3, for the base spell’s MP.
-                ; Watch the spell list as you tap the R Button. What you see is what will cast.
+                ; Fire, Ice, Bolt, Poison, Cure, Life, Slow and Haste work differently: a boost turns them into stronger spells.
+                ; Boost Fire by 1 point and it casts Fire 2. By 2 points, Fire 3. A 3rd point adds nothing.
+                ; You pay the MP of the spell that is cast. The Magic list shows its name and cost as you press the R Button.
         return
 _cc3696:
         dlg $026F
@@ -84660,8 +84665,9 @@ _cc3696:
         return
 _cc369a:
         dlg $0270
-                ; Boosting has a price: a turn you boost earns no Boost Point.
-                ; And shields blunt wrong hits to half strength. Greed loses. Spend into weakness, or into the Broken.
+                ; A boosted Fight hits once more for each point, and costs no MP.
+                ; Boosting a Blitz, Tool, Lore, Esper or most spells does 2x damage for 1 point, 4x for 2, and 8x for 3.
+                ; Those cost more MP when boosted: 2.5x per point, but never over 99.
         return
 _cc369e:
         dlg $0271
@@ -84684,11 +84690,8 @@ _cc36b1:
                 ; To use an Esper it must be equipped. Choose “Skills” from the menu, then select “Espers.”
                 ; During battle, select Magic, and press up on the Control Pad. Press the A Button to use the Esper.
                 ; Remember, an Esper can only be used once per battle.
-                ;
-                ; Learning Magic
-                ; Learn new spells by equipping Espers. Switch Espers to learn different sets of spells.
-                ; The higher the “Learning Speed” the faster a spell is learned.
-                ; When equipped, some Espers will raise qualities (Strength, HP, MP etc.) to their maximum limits at the next “level up.”
+                ; In OT6, the character who equips an Esper can cast its spells. Unequip it and the spells go too. Nothing is learned.
+                ; Many Espers also change their holder’s stats while equipped. There are no stat bonuses at level up.
         return
 _cc36b5:
         dlg $0275
@@ -84697,9 +84700,12 @@ _cc36b5:
         return
 _cc36b9:
         dlg $0276
-                ; A deserter from the Empire says their armored machines turn a careless blow aside.
-                ; “Every plate has its seam, and no two the same,” he said.
-                ; Bring the weapon that fits, and even the Empire Breaks.
+                ; In OT6, Blitz, Tools, SwdTech, Steal, Dance and Rage cost MP. If you can’t pay, the skill is greyed out.
+                ; Sabin’s Blitz: pick one from a list. There are no button codes.
+                ; Cyan’s SwdTech: there is no charge gauge. It lists his three best skills, for 1, 2 and 3 Boost Points.
+                ; Steal, Slot and Rage: each Boost Point improves the odds instead of adding damage.
+                ; With 3 points, Steal always works and gets the rare item, if any, and Rage always uses its special.
+                ; Shadow: once a battle, his hit that breaks a monster, or hits a broken one, kills it. Most bosses just stay broken.
         return
 _cc36bd:
         switch $02A0=1

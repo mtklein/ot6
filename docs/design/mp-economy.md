@@ -277,6 +277,21 @@ nothing happens. **Whenever one of them is given a price, the one test
 decides its column with no further ruling**, and that column is
 escalating unless its command joins the gate.
 
+Mimic is the exception to that last sentence, because it never runs as
+itself: it runs the copied action, which has a price of its own. A
+mimic copies the action and not the price, at every boost, and its boost
+buys what a boost buys on the copied action: a tier-family head folds
+(a 1-pip Mimic of Fire casts Fire 2, 3 pips cast Fire 3), a lore or any
+other spell takes `Ot6BoostDmg`'s multiplier, and so on down the list.
+The pips are spent as on any boosted turn; the MP is not. Before #260
+neither half held everywhere. A mimicked x-magic's second spell was
+re-priced at queue time, so a 1-pip Mimic of Fire + Drain cost 38 MP
+and of Drain + Fire 20. A plain copy of a tier-family head spent its pips
+and cast the unfolded spell with no multiplier, which is boost buying
+nothing (`probe_mimic_charge.lua`, `build/attempts/wt/mimic-charge/`).
+`Ot6MimicFold` folds the copy mimicreplace writes, and `Ot6QueueFold`
+folds but does not price the one copy that is queued afresh.
+
 Dance is the control that makes this a rule rather than a habit.
 `Ot6RageCost` tail-calls `Ot6DanceCost`, so Rage and Dance share one
 base price of 8, and they are still charged differently — Dance 8 / 20 /
@@ -528,7 +543,7 @@ price: a boosted use of it costs `min(99, floor(base * 2.5^boost +
 | Runic (Celes) | free — exception | 0 | an income verb: vanilla Runic already credits the absorbed spell's cost to her pool, kept, on top of +1 BP (kits.md) |
 | Throw (Shadow) | free — exception | 0 | the thrown item is consumed; a per-use price already exists |
 | Coin Toss, Hired Help (Setzer) | free — exception | 0 | GP-priced verbs stay GP-priced; Octopath's merchant skills also spend money rather than MP |
-| Mimic (Gogo) | free — exception | 0 | vanilla Mimic copies the action and not the price; the bonus-character jank is preserved |
+| Mimic (Gogo) | free — exception | 0 | vanilla Mimic copies the action and not the price, at every boost; the boost buys what it buys on the copied action (a tier on a tier-family head), see "Boosting costs MP"; the bonus-character jank is preserved |
 | Guest verbs: Health (Banon), Shock (Leo), magitek beams, Possess (Ghost) | free — exception | 0 | guests have no kit tables; their stretches are authored tutorial content (the Whelk line is balanced on free beams, balance-metrics.md), and Possess already costs the ghost |
 | Relic-morphed commands (Jump, GP Rain, X Magic, …) | inherit | — | assigned in the same records as everything else |
 
