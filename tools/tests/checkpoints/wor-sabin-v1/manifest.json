@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-sabin.sram",
+  "size": 32768,
+  "sha256": "757ee81aa0d894832635b4406c066c49ddfd664960105c9c84cf3610e433c3c1",
+  "slot": 3,
+  "milestone": "wor-sabin",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 131,
+      "y": 179
+    }
+  },
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "757ee81aa0d894832635b4406c066c49ddfd664960105c9c84cf3610e433c3c1",
+    "generator_sig": "e284017ec2a812549072361b019a39a0d9d71494ae08c14ad625584ac2b9764a gen_wor_sabin tools/tests/checkpoints/wor-tzen-door-v1/manifest.json tools/tests/checkpoints/wor-tzen-door-v1/wor-tzen-door.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-tzen-door-v1/manifest.json",
+        "sha256": "c166fbdbc96ab581750e547ac8b3c8c4d693608645e0b86aebc3e9031bfb08e9"
+      }
+    ]
+  }
+}

@@ -3,9 +3,10 @@
 The route from the first World of Ruin save (Celes alone where the raft
 from the Solitary Island lands) to Sabin joining in Tzen, and on to the
 first save after he joins. It is planned from the game's own data. The
-first leg is driven: section 10 records what `gen_wor_tzen_door` measured
-from the landing to Tzen's door (`wor-tzen-door-v1`); the house and
-Sabin come next.
+route is driven: section 10 records what `gen_wor_tzen_door` measured
+from the landing to Tzen's door (`wor-tzen-door-v1`), and section 11 what
+`gen_wor_sabin` measured from there through the house to the first save
+with Sabin (`wor-sabin-v1`).
 
 Line numbers are into `ff6/src/event/event_main.asm` unless a path is given.
 Decodes come from `tools/route_data.py` (added with this doc: entrances,
@@ -90,6 +91,17 @@ measurement.
     Chitonid, not the Osprey, is the body to take first (with the Jewel
     Ring the Beak costs nothing; the Chitonid's Sneeze fires on its own
     killing blow once one other body is left).
+12. **Driven through the house to Sabin** (§11, 2026-09-28): the Seraphim
+    stone, the Back Guard in the Genji Glove's slot for the house, the
+    timed scene played by a driver that reads the clock, the child by
+    "face up and hold A", Sabin dressed, saved at (131,179).  Three plan
+    items moved on measurement: pincers and back attacks came in 5 of 54
+    house fights with the Genji kit (ChooseBattleType's odds are 16 in
+    224), and both pincered Scorpion trios killed the lone CELES (177-186
+    a hit); the clock, not the
+    statuses, is the house's thin margin once the Back Guard is on (the
+    fights run longer without the Genji pair); and a Scorpion's Doom is a
+    real race with one hand (a fight ended 354 ticks before it).
 
 ---
 
@@ -722,7 +734,7 @@ cuts:
 | `wor-start-v1` (`gen_wor_start`) | world (146,212), Celes alone, Cid recovered | the first save after the island |
 | `wor-albrook-v1` (not cut) | world, outside Albrook after shopping, re-equip and any grind | the grind's resume point; `gen_wor_tzen_door` plays the kit, both Albrook stops and the grind in one segment, whose own retries start at the landing |
 | **`wor-tzen-door-v1`** (`gen_wor_tzen_door`, cut 2026-09-23) | world (131,179), one step east of Tzen's door, *not* on the desert | the last save before the committed, timed scene; every house attempt retries from here |
-| **`wor-sabin-v1`** | world (130,179) after leaving Tzen with Sabin | the first save after he joins; the end of this route |
+| **`wor-sabin-v1`** (`gen_wor_sabin`, cut 2026-09-28) | world (131,179), where Tzen's south exit returns the party (the parent map: the tile it entered from) | the first save after he joins; the end of this route |
 
 Each cut asserts its preconditions: the party, `$027D/$028A/$028B/$028C`,
 no live timer, and the equipment.
@@ -915,14 +927,15 @@ Harness mechanics this stretch exercises, checked against
 
 | mechanic | where | coverage today | what the driving needs |
 |---|---|---|---|
-| a party of one; Death, Petrify or Zombie = loss | everywhere to Tzen | Petrify measured live (§10.2: without the Jewel Ring the Beak lost the second fight); the kit asserts the protection; the Zombie pool is off the walk (the avoid set) | the house: the Jewel Ring stays on; kill order in 207 |
-| Condemned (Doom Sting) | house, 209 | HANDLED (`M.doomCount` / `M.doomRule`) | plan the kill inside the count; solo, nobody can raise |
+| a party of one; Death, Petrify or Zombie = loss | everywhere to Tzen | Petrify measured live (§10.2: without the Jewel Ring the Beak lost the second fight); the kit asserts the protection; the Zombie pool is off the walk (the avoid set) | the house: the Jewel Ring stays on (§11.4) |
+| Condemned (Doom Sting) | house, 209 | HANDLED (`M.doomCount` / `M.doomRule`); the lone fighter's race said (`[doom]`, §11.3) | measured: the fights end inside the count, the thinnest by 354 ticks |
 | Sap (T. Lash, Slip Touch) | plains, house | HANDLED (planned around: 18-21 HP a tick every 429-608 frames, §10.3) | — |
 | Stop (Net) | house, 207 | HANDLED (planned around) | — |
 | Monster Escape (a Mesosaur with company) | group 31 (both formations), group 35 | HANDLED (`[escape]`, the `[outcome]` reward check, §10.3) | — |
-| Sneeze (Chitonid, last and hit) | formations 204 (group 34) and 201 (group 33) | HANDLED for a party that leaves whole (`[left]`, `PARTY LEFT`, no reward, not a wipe) and avoided (the last-stand kill order, §10.3); a member leaving with others still in is not yet taken out of the care lines (Celes + Sabin) | — |
-| face up + A trigger | the child (117,12) | PARTIAL: generator-local in `gen_terra_caves.lua` | promote an "examine" step into the lib, or reuse it |
-| event timer through menus and battles | the house | HANDLED (`eventTimerLive` keeps menus out) | log the counter at each battle's start and end; no field care inside |
+| Sneeze (Chitonid, last and hit) | formations 204 (group 34) and 201 (group 33) | HANDLED for a party that leaves whole (`[left]`, `PARTY LEFT`, no reward, not a wipe) and avoided (the last-stand kill order, §10.3); a member leaving with others still in is out of the care lines (`M.leftMask`, §11.5) | — |
+| face up + A trigger | the child (117,12) | HANDLED: `H.faceAndHoldA` (§11.2) | — |
+| event timer through menus and battles | the house | HANDLED: `eventTimerLive` keeps menus out; the driver reads the clock and says it (`[timer]`), with timed levers (§11.1) | — |
+| pincer / back attack on a party of one | the house; the plains | HANDLED in the house by the Back Guard (§11.4) | the plains keep the Genji pair: a pincered Gilomantis + Mesosaur was won there (§11.6) |
 | committed scene (the bounce) | Tzen after the LoJ | none needed | do not route to the exit before `$028A=1` |
 | map-init `mod_bg_tiles` | 305, 324 | the lib reads live RAM, so it is fine | the offline BFS counts here are **verify-on-arrival** |
 | equipping from nothing, Genji pair, esper | landing; Sabin at Tzen | `M.equipKit`, `M.equipEsper`, now on the world map's menu too (§10.4) | assert the result slot by slot |
@@ -1207,6 +1220,260 @@ at max(26, 27) = 27 (§2.6). The house's HermitCrabs throw Rock only as
 last-stand counters; with the Jewel Ring on they cost nothing, and the
 driver's last-stand kill order covers only the Sneeze by default
 (`opts.lastStand = true` extends it to every last-stand body).
+
+---
+
+## 11. Tzen's door to Sabin, played (`gen_wor_sabin`, `wor-sabin-v1`)
+
+Driven 2026-09-28 for #250 (the harness half is #255). The segment
+cold-Continues `wor-tzen-door-v1` (checkpoint=), walks into Tzen, rides
+the Light of Judgment, buys the Seraphim stone, puts the Back Guard on
+CELES, starts the house's clock at (16,9), brings the child out of map
+311, rides Sabin's joining, dresses him and saves on the World of Ruin map
+at (131,179): the `wor-sabin-v1` checkpoint. Every number below is quoted
+from a log under `build/attempts/wt/wor-sabin/` (`runs/` the graph's run,
+the capture and the cold Continue; `lab/` the A/B labs, the draw
+variation and the controls, with the scripts that made them). Nothing
+was measured by writing game state, except the one staged suite named in
+11.5.
+
+### 11.1 The run (`runs/capture_wor_sabin.log`, the capture)
+
+The graph's own run (`suites/ninja_all.log`, `runs/wor_sabin_ninja.log`:
+`[199/340] generate wor_sabin <- gen_wor_sabin`, `PASS (frame 31550)
+attempts=1/3`) and the capture are the same run: `wor_sabin.mss`
+byte-identical.
+
+| step | what the log says |
+|---|---|
+| boot | `[wor] boot f1346: world 1 (131,179), CELES L27 HP 1211/1211 MP 251/251 status1 $00, kit 06 0E 0F 76 8F D1 B5; tonic=4 potion=47 fenix=27 remedy=5 soft=18 gil=222473` |
+| the Light of Judgment | `[tzen] f1913 after the Light of Judgment map 305 (23,25)` |
+| the prep | `[tzen] f2704 bought the stone` (gil 222473 -> 222463, SERAPHIM held); `supplies at the band (potion 47 >= 47, fenix 27 >= 27): no shop`; `the party is whole; no inn`; `[CELES: the Back Guard for the house] char=6 after=11 5C 76 8F E1 B5` |
+| the clock | `[house] f4026 the clock starts map 305 (16,9): ... timer 0 6:00 left (21600 frames; flags $72: runs through menus and battles; its expiry ends a battle)` |
+| the house | `in the house ... 5:57 left`; `up by the link ... HP 884/1211 ... 4:45 left`; `at the child's tile (117,12) ... HP 657/1211 ... 3:27 left`; `the child is with her ... 3:25`; `down by the link ... HP 409/1211 ... 2:28`; `back at the door (123,60) ... HP 374/1211 ... 1:08` |
+| the exit | `out of the house with the child: timer 0 at 1:08 (4099 frames) of 6:00, 17376 frames spent inside (5:57 at the door in); lowest CELES HP inside 248 (f19120, timer 1:57); house battles: $0D1 4:56, $0CF 3:35, $0D1 2:34, $0D1 1:09` |
+| Sabin | `[tzen] f24735 SABIN joined map 305 (15,14): ... SABIN L27 HP 1225/1225 MP 239/239`, nothing equipped |
+| the town | the inn, 350 GP (`c6 374/1211` -> full); `FIRE KNUCKLE x2 ... gil 230743 -> 210743`, `TIGER MASK ... -> 208243`, `POWER SASH ... -> 203243`; CELES back to `06 0E 0F 76 8F D1 B5`; SABIN `01 57 57 77 90 D1 D5` (IFRIT, Fire Knuckle x2, Tiger Mask, Power Sash, Genji Glove, Black Belt) |
+| the save | `[saved] wor-sabin-v1: slot 3 holds map 1 ($2001) world tile (131,179)`, `contract wor-sabin-v1 (exit): all 25 fields hold`, `PASS (frame 31550) attempts=1/3` |
+
+Sealed and validated (`runs/validate_wor_sabin_v1.txt`): `holds=slot 3
+world 1 (131,179) [$1F64=$2001] (saved: declared and checked)`, sha256
+`757ee81a...`. The cold Continue (`runs/continue_wor_sabin_v1.log`,
+`probe_wor_sabin_continue.lua`): `contract wor-sabin-v1 (entry): all 25
+fields hold`, `[continue] world 1 at (131,179): CELES L27 HP 1211/1211
+MP 251/251 row back esper+kit 06 0E 0F 76 8F D1 B5; SABIN L27 HP
+1225/1225 MP 239/239 row back esper+kit 01 57 57 77 90 D1 D5; tonic=5
+potion=47 fenix=27 remedy=5 gil=203243`, `PASS (frame 1386)`.
+
+What the plan (sections 2-7) had right: the Light of Judgment is on the
+way in and the bounce holds the party in town; the clock starts at (16,9)
+at 21,600 frames with flags `$72`; the links are (102,53) -> (125,23) and
+(126,22) -> (103,52); the child is "face up and hold A" on (117,12);
+Sabin joins at `max(26, 27)` = 27 with nothing equipped. What it did not
+know: Tzen's exit returns the party to (131,179), the tile it stepped
+into the door from (the parent map), not onto the door (130,179); and
+the house's timer is stopped by `stop_timer 0` early in Sabin's scene
+(`:90071`), well before `$028A` is set (`:90262`), so a watch for an
+expired clock ends at the house's exit.
+
+### 11.2 The clock, read by the driver
+
+The timer is read off `$1188-$119F` (`M.sceneTimer`: the live timer that
+is not FIELD_ONLY, i.e. runs through menus and battles) and said at every
+step: the generator's own lines, the walkers' heartbeats (`nav f... |
+timer 0 4:44 left ...`), and the fight driver's `[timer]` lines as each
+battle opens and at its end hook (`[timer] battle $0D1 over at f+2603:
+timer 0 5:13 left ...; the battle took 2568 frames of it`). No menu
+opens inside the house: the walkers' field care already stays out under
+any live counter (`eventTimerLive`). Under such a clock the driver's
+top-up fraction drops to 30% (`M.TIMED_HEAL_PERCENT`) and its menu
+cadence to a press every 12 frames (`M.TIMED_CADENCE`, against 30):
+"no dawdling", a heal only for a member inside the round or the rounds
+the kill needs, or under 30%.
+
+The A/B, both levers together, 8 draws a side (K = 0-7 encounters used
+up on the plains first, shift 0), with the Genji kit the plains leg
+wore (`lab/ab_on/`, `lab/ab_off/` = `H.TIMED_HEAL_PERCENT = 55`,
+`H.TIMED_CADENCE = 30`; `lab/abtable.py`, `lab/housestats.py`):
+
+| arm | runs | Scorpion trios won in (ticks) | timer at the house's exit (frames) | heal plans in the house | lost |
+|---|---|---|---|---|---|
+| timed levers on | 8 | 2075-3227, mean 2493 (23) | 7362-14076 | 1 | 1 (k3: a pincered Scorpion trio) |
+| timed levers off | 8 | 2491-6779, mean 3179 (23) | 3920-12796 | 9 | 1 (k0: a pincered Scorpion trio) |
+
+With the Back Guard kit, the shipped one (11.4), the same pair on the same
+8 draws (`lab/ab_bg/`, `lab/ab_bg_off/`):
+
+| arm | runs | Scorpion trios won in (ticks) | timer at the house's exit (frames) | Doom margin, min (11.3) | lowest CELES HP on the battle lines | heal plans | lost |
+|---|---|---|---|---|---|---|---|
+| timed levers on | 8 | 2274-4127, mean 3502 (24) | 4099-11730 | 354 | 248 | 3 | 0 |
+| timed levers off | 8 | 3667-4844, mean 4154 (24) | **139**-10930 | 133 | 550 | 12 | 0 |
+
+Off, four of the eight left the house with under 40 seconds on the clock
+(`ab_bg_off/k0_s0.log`: `timer 0 at 0:02 (139 frames)`; k5 0:21, k6
+0:37, k7 0:22): the same draws that leave it with 1:08-1:29 on. The
+price of the levers is HP: fewer top-ups, so she runs lower (248 against
+550 at the worst), which the heal policy's one-round and kill-rounds
+rules still cover.
+
+The same rules apply wherever a scene timer runs through battles; on the
+World of Balance that is the Floating Continent escape (the 6:00 master
+clock and Shadow's 5:55) and the opera's rafter chase. `gen_fc_escape`
+from `fc-alcove-v1`, 3 shifts a side (`lab/wob_fc_escape/`, `lab/wob_timed.py`):
+all six PASS; the timed battles (four escape-map fights and Nerapa)
+took 7145-9940 frames of Shadow's clock with the levers on against
+9127-10288 off, and Nerapa ended with 2:20 / 2:49 / 3:07 left on
+against 2:34 / 2:15 / 2:26. The rafter chase was regenerated under the
+rules by the suite run (`gen_opera6_rafter`, `suites/fixtures/ultros2_entry.log`):
+three rat fights, each 2389-2622 frames of the clock, the last ending
+with `timer 0 1:48 left`, `PASS (frame 19632) attempts=1/3`; not A/B'd.
+
+### 11.3 Condemned, alone
+
+Every Scorpion opens with Doom Sting (special `$48`, Condemned). Alone,
+CELES cannot be raised after the Doom and no item clears it, so the
+count is the fight's own clock. The plan (sections 5, 9) is the kill
+inside the count, and the driver plays it as it plays any fight (the
+Doom's last-turn rule spends every pip when the count beats her next
+turn); what is new is the race said out loud once per count:
+`[doom] f+T actor=0 fights ALONE and CONDEMNED at C: the Doom in about
+C x 128 frames (f+D) ...`. Measured (`lab/housestats.py`: the first
+`[doom]` line's projected Doom tick less the tick the battle ended):
+
+| kit | condemned fights | margin, min | margins under 1000 ticks |
+|---|---|---|---|
+| Genji pair (`ab_on/`) | 16 | 1846 | 0 |
+| Back Guard, one hand (`var-final/`) | 48 | 354 (`k1_s0`) | 5 (354, 694, 748, 772, 798) |
+
+No Doom landed in any run. With one hand the race is real: a Scorpion's
+two shields take a boosted Fight or two turns, so the fights run longer
+(11.4) and a low count roll (29 of 29-54) against a slow fight is the
+case to watch.
+
+### 11.4 The layouts, and the kit
+
+`ChooseBattleType` (`battle_main.asm` @2e3a) rolls pincer and back attack
+at 8 of 224 each for a party under three (side attacks are masked out).
+With the Genji kit they came in 5 of 54 house fights (`ab_on/`,
+`ab_off/`: 2 pincers, 3 back attacks). A pincer forces the row to front
+and the blows land from behind: the Scorpions hit 177, 186 and 122
+(`ab_off/k0_s0.log`: `slot 3's smallest hit this fight so far: 177, on
+entity 0 (793 -> 616)`), about three times the 60 they land on her in
+the back row, and both pincered Scorpion trios killed her (`[death] f+1592
+entity 0 char 6 from 124/1211 by slot 4`, `[wipe] ... class=worn down
+(no one-shot, no pips banked)`). A back attack costs time instead (6779
+and 4839 ticks, `ab_off/k1_s0.log`, `k3_s0.log`).
+
+So CELES wears the **Back Guard** in the Genji Glove's slot from before
+the clock until Sabin has joined (`HOUSE_BACK_GUARD`; leaving the Relic
+screen runs the game's Optimum: `after=11 5C 76 8F E1 B5`, the Break
+Blade and a shield). The **Jewel Ring** stays: the HermitCrab's Rock
+(special `$46`: no damage, Petrify) is gated like the Chitonid's
+Sneeze (`if_num_monsters 1`, which fired on the Chitonid's own killing
+blow, section 10.3), so no kill order keeps it quiet, and a statue is a
+lost fight alone. The kit's
+price is the second hand: Scorpion trios are won in 2274-4171 ticks
+(mean 3553, 48 fights, `var-final/`) against 2075-3227 (mean 2493) with the
+pair, and that is where the Doom margin (11.3) and the clock's margin
+(11.6) went.
+
+Per #258 the last-stand order stays at its default (the Sneeze only):
+the Jewel Ring answers the Rock, no Petrify landed in any house fight
+measured, and nothing measured asks to widen it.
+
+### 11.5 The harness pieces
+
+- **"Face up and hold A"** is `H.faceAndHoldA(dir, pred, maxFrames,
+  what)` in `lib/ot6_field.lua`, promoted from `gen_terra_caves.lua`,
+  which now calls it. From one `terra_narshe` input the generator before
+  and after the change wrote byte-identical `terra_caves.mss`
+  (`lab/terra/`: `047a1368...` both, from the seeded `terra_narshe.mss.lua
+  sha=f79178a9a7c1`), and the graph's regeneration on this ROM's fresh chain
+  (`nice ninja build/states/terra_caves.mss.lua`: `terra_caves generated at
+  frame 1526`, `PASS (frame 1526) attempts=1/3`) wrote the same bytes as the
+  old generator from that input (`c7f4519d...` both,
+  `lab/terra/sha256_fresh_chain.txt`). At the child (`lab/face/`, one
+  snapshot on (117,12)): the verb sets `$028B` in 140 frames (`[face] arm
+  ok f148 the child's switch $028B=1`); with its A presses stripped (a
+  mutant) or from (118,12) it times out (`timeout after 1200 frames
+  driving toward face up and hold A (noA)` / `(offtile)`).
+- **A member who left** is out of the care lines (`M.leftMask`, $3A39,
+  read by makePlan's `hpNow` / `maxOf`, the party's damage window and
+  the raise rule's top-up race). Natural play never produced the case
+  the rule changes: 43 members sneezed out with others still in on the
+  review's WoB lab and 18 more here at a 95% heal fraction
+  (`lab/left/`: `TOTAL: 18 left with others in; 0 plan(s) on a left
+  member`, the mask on and stubbed off alike), every one above the
+  fraction when it left. `battle_left` (`@suite`, kolts_cave) stages it
+  with declared waivers: entity 2 marked in $3A39 and set to 80/241 HP at
+  actor 1's window, three windows later `a plan on the member who left:
+  nil`, `PASS (frame 2326)`; with `H.leftMask` stubbed to 0 the same
+  window reads `[left] actor=1 heal entity 2 (80/241) with $E8 ...
+  (covering an ally)` and the suite goes red (`lab/left_suite/`).
+- **The hand-back is not a battle.** A walk that ended on one battle's
+  `[outcome]` and a new walker built on the next frame read the battle's
+  hand-back as a second battle (`lab/ghost/k1_s0_before.log`: `[outcome]
+  battle $0C7 WON after 59 ticks (no end reading: the last frame's) ...
+  XP MISMATCH`, and the generator's "judged on its own end reading"
+  assertion went red). A driver whose watch begins within 90 frames after
+  the last end hook now says `[tail]` and seats nothing
+  (`lab/ghost/after/k1_s0.log`: `[tail] f+6 the last battle's end hook
+  fired 3 frames before this watch began`, and the run passes).
+- **The lone fighter's race** (11.3) and the **timer** (11.2) are in
+  `lib/ot6.lua` (`Driver:watchTimer`, `Driver:healPct`,
+  `Driver:cadence`, makePlan's `[doom]` line).
+
+### 11.6 Under real draw variation
+
+`lab/varlab.py` (after `gen_wor_tzen_door`'s) derives the generator with
+one block after the boot that fights K encounters on the plains beside
+Tzen (the grind waypoints, off every tile outside groups 31/34) and walks
+back to (131,179), so the body starts from another step counter,
+encounter counter, HP and bag: `$1FA1-$1FA5` moves with every step and
+every encounter, world and field alike, so the house deals other
+formations and battle counts (K is a floor: the count is checked between
+walk legs, and a leg can hold two battles, so K=7 fought 8). Retries off
+(`OT6_RETRIES=1`). `lab/var-final/summary.txt`, `housestats.txt`, `vartable.md` (the
+shipped generator; `lab/var/` is the same set on the file before its
+lowest-HP reading moved from her record to the battle's table, with the
+same verdicts and frames):
+
+| variant | the body starts at | house battles (the timer at each end) | the timer at the exit (frames) | lowest CELES HP on the 300-tick battle lines | verdict |
+|---|---|---|---|---|---|
+| K=0, shift 0 | the checkpoint (`$1FA1-2` as saved) | 4 ($0D1 4:56, $0CF 3:35, $0D1 2:34, $0D1 1:09) | 1:08 (4099) | 248 | `PASS (frame 31550) attempts=1/1` |
+| K=0, shift 23 | the checkpoint (`$1FA1-2` as saved) | 4 ($0D1 4:57, $0CF 3:46, $0D1 2:36, $0D1 1:15) | 1:13 (4421) | 322 | `PASS (frame 31245) attempts=1/1` |
+| K=0, shift 41 | the checkpoint (`$1FA1-2` as saved) | 4 ($0D1 4:54, $0CF 3:43, $0D1 2:30, $0D1 1:02) | 1:01 (3685) | 309 | `PASS (frame 32046) attempts=1/1` |
+| K=1, shift 0 | L27, 991/1211 HP, `$1FA1-2 = 22 18` | 3 ($0CF 4:50, $0D1 3:36, $0D1 2:10) | 2:06 (7562) | 356 | `PASS (frame 31118) attempts=1/1` |
+| K=2, shift 0 | L27, 991/1211 HP, `$1FA1-2 = 5C 19` | 2 ($0D1 4:40, $0D1 3:22) | 3:15 (11730) | 657 | `PASS (frame 31806) attempts=1/1` |
+| K=3, shift 0 | L27, 910/1211 HP, `$1FA1-2 = 76 1A` | 3 ($0D1 5:09, $0D1 3:55, $0D1 2:44) | 2:38 (9537) | 603 | `PASS (frame 31625) attempts=1/1` |
+| K=3, shift 23 | L27, 989/1211 HP, `$1FA1-2 = 76 1A` | 3 ($0D1 4:45, $0D1 3:25, $0D1 2:17) | 2:12 (7938) | 650 | `PASS (frame 36634) attempts=1/1` |
+| K=3, shift 41 | L27, 824/1211 HP, `$1FA1-2 = 76 1A` | 3 ($0D1 4:43, $0D1 3:21, $0D1 2:07) | 2:02 (7344) | 673 | `PASS (frame 39330) attempts=1/1` |
+| K=4, shift 0 | L27, 813/1211 HP, `$1FA1-2 = B8 1B` | 3 ($0D1 4:56, $0D1 3:47, $0D1 2:31) | 2:21 (8490) | 665 | `PASS (frame 39778) attempts=1/1` |
+| K=5, shift 0 | L28, 1301/1301 HP, `$1FA1-2 = EC 1D` | 4 ($0D1 4:59, $0CF 3:50, $0D1 2:38, $0D1 1:23) | 1:15 (4549) | 390 | `PASS (frame 44305) attempts=1/1` |
+| K=6, shift 0 | L28, 878/1301 HP, `$1FA1-2 = FC 1F` | 4 ($0D1 4:49, $0D1 3:36, $0D1 2:39, $0D1 1:33) | 1:29 (5373) | 844 | `PASS (frame 50684) attempts=1/1` |
+| K=6, shift 23 | L28, 985/1301 HP, `$1FA1-2 = FC 1F` | 4 ($0D1 4:49, $0D1 3:35, $0D1 2:31, $0D1 1:25) | 1:21 (4887) | 788 | `PASS (frame 51500) attempts=1/1` |
+| K=6, shift 41 | L28, 1082/1301 HP, `$1FA1-2 = FC 1F` | 4 ($0D1 4:48, $0D1 3:25, $0D1 2:21, $0D1 1:36) | 1:32 (5559) | 533 | `PASS (frame 53194) attempts=1/1` |
+| K=7, shift 0 | L28, 862/1301 HP, `$1FA1-2 = 0C 1F` | 4 ($0D1 4:54, $0D1 3:44, $0D1 2:37, $0D1 1:30) | 1:22 (4949) | 441 | `PASS (frame 54781) attempts=1/1` |
+| K=8, shift 0 | L28, 900/1301 HP, `$1FA1-2 = 14 1F` | 4 ($0D1 4:55, $0D1 3:45, $0D1 2:38, $0D1 1:31) | 1:21 (4862) | 499 | `PASS (frame 52762) attempts=1/1` |
+
+15 of 15 PASS, 53 house battles (48 Scorpion trios, 5 HermitCrab pairs
+with the Pm Stalker), every layout normal (the Back Guard), every
+`[outcome]` said at the end hook and paid as due, no Doom, no Petrify, no
+Fenix Down. The K walks met the plains as the last leg did, a pincered
+Gilomantis + Mesosaur among them (`lab/ghost/after/k1_s0.log`, won). The
+clock is the margin to watch: every run with four house battles left the
+house with 3685-5559 frames (1:01-1:32), and a Scorpion trio costs 2232-4171
+ticks; a fifth battle (the pool model's P(5) = 3.3 %, section 3.3; none in these
+15) would fit only when it is quick, a sixth would not. That is the
+price of the Back Guard kit (11.4), paid to take the pincer out.
+
+### 11.7 For the next leg
+
+`wor-sabin-v1` boots CELES and SABIN at world (131,179), both L27, full;
+CELES in the plains kit again (`06 0E 0F 76 8F D1 B5`), SABIN `01 57 57
+77 90 D1 D5`; both in the BACK row (Sabin arrives there; unmeasured for
+him: his Fight and Blitz are melee); Potion 47, Fenix Down 27, Remedy 5,
+Tonic 5; SERAPHIM held; 203,243 GP.
 
 ---
 

@@ -1013,6 +1013,51 @@ M.contracts["wor-tzen-door-v1"] = {
   },
 }
 
+-- wor-sabin-v1: the first save after Sabin joins, on the World of Ruin map
+-- outside Tzen at (131,179), where leaving the town returns the party (its
+-- parent map; the door is (130,179)).  The Light of Judgment ($027D), the
+-- house scene ($028C), the child ($028B) and Sabin's joining ($028A,
+-- $02F5) have all run, Sabin no longer holds up the house ($066C clear),
+-- and the house's timer 0 was stopped as the party came out with the
+-- child (stop_timer 0, _cc5980): no event timer counts.  CELES and SABIN
+-- in party 1 (docs/design/route-wor-sabin.md sections 2.6-2.7 and 11).
+M.contracts["wor-sabin-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 131, y = 179 },   -- outside Tzen, where its exit returns
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00B3, 1, "Cid recovered (_ca5713)" },
+    { 0x027D, 1, "Tzen's Light of Judgment seen (_cc583e)" },
+    { 0x028C, 1, "the house scene started (_cc58ff)" },
+    { 0x028B, 1, "the child rescued (_cc5958)" },
+    { 0x028A, 1, "Sabin joined (_cc5980, :90262)" },
+    { 0x02F5, 1, "Sabin's joining finished (:90282)" },
+    { 0x066C, 0, "Sabin no longer shown holding up the house (:90267)" },
+  },
+  party = {
+    size = 2,                     -- CELES and SABIN
+    members = {
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+    },
+  },
+  ram = {
+    -- the four event timers' counters: none counting (timer 0 stopped)
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
