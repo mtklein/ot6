@@ -96,6 +96,10 @@ The harness plays OT6 the way a competent person with a controller would.
   sense to the player: break the fourth wall, no need to stay in-universe,
   no mystery or coyness. Each key OT6 mechanic is explained once and only
   once.
+- **Stronger spells come from boosting, never from a list.** No
+  character's natural magic and no Esper grants a higher tier (Fire 2,
+  Fire 3, ...); boosting the base spell is how a player reaches them, and
+  the rebalances assume that.
 - **Mimic is free.** A mimic copies the action, never the price, at any
   boost; the boost buys what it buys on the copied action.
 - **Octopath-style twists on FF6 characters are welcome** (Shadow's break
