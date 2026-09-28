@@ -813,7 +813,9 @@ def local_thread(board, stop, live_ref=None):
 
 def peer_thread(board, peer, stop):
     """Another machine: ssh there, feed it this file on stdin as --emit, and
-    ingest its snapshot lines.  Any failure (asleep, off the network, no
+    ingest its snapshot lines.  The emitter runs under `caffeinate -is`, so
+    the peer stays awake (idle sleep, and system sleep on AC) for as long as
+    this viewer watches it, and may sleep again once it stops.  Any failure (asleep, off the network, no
     repo) marks it down with the last diagnostic line and retries in 10s;
     ssh keepalives notice a peer that vanished mid-stream."""
     host, _, path = peer.partition(":")
@@ -824,7 +826,7 @@ def peer_thread(board, peer, stop):
     cmd = ["ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
            "-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=2", host,
            f"cd {shlex.quote(path)} && OT6_ROOT=\"$PWD\" "
-           "exec python3 - --emit 2>&1"]
+           "exec caffeinate -is python3 - --emit 2>&1"]
     with open(os.path.abspath(__file__), "rb") as f:
         src = f.read()
     while not stop.is_set():

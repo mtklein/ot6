@@ -38,8 +38,10 @@ interpreting runs.
   `eval "$(/opt/homebrew/bin/brew shellenv zsh)"` in non-login shells;
   clean clone at `~/ot6`, which stays on main -- work runs in separate
   clones under `~/work/`). Send heavy emulator runs there; cap it at about
-  6 concurrent emulators (10 cores). live.py's `--peer air.local` (in
-  the `ot6-live` launch config) shows its workers on the same page.
+  6 concurrent emulators (10 cores); run long jobs there under
+  `caffeinate -is` so it can't sleep mid-run. live.py's `--peer air.local`
+  (in the `ot6-live` launch config) shows its workers on the same page and
+  keeps it awake while watched. A closed lid on battery still sleeps.
 
 # 1. Start: state of the world
 
