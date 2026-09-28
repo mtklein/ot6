@@ -504,7 +504,7 @@ JIT_NEW = ("      -- fightvsabilitylab: FVA_JITTER shifts the in-battle RNG\n"
 # Mesen's Lua sandbox blocks os.getenv (lib/compose.py:2016), so
 # bal_party.lua's own `envcfg` reads are dead and the instrument is
 # configured by editing the file.  The derivation therefore substitutes
-# literals, the way m269lab_batch.sh does: @POLICY@ / @FIXTURE@ /
+# literals, the way m269lab_batch.sh (deleted in e1eb6313) did: @POLICY@ / @FIXTURE@ /
 # @JITTER@ are filled in per run, and a token left unfilled fails loudly
 # rather than silently measuring the default fixture.
 POLDEF_OLD = 'local POLICY = envcfg("BAL_POLICY") or "baseline"\n'

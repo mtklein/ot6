@@ -278,7 +278,8 @@ local MODES = {
   forest = { state = "build/states/camp_escaped.mss.lua", map = 132,
              world = { 178, 82 } },
   -- Pipsqueak ($041) special $45 = Imp, its script's SPECIAL on the
-  -- second line; map 269 (lab_map269_random's walk from the Ifrit &
+  -- second line; map 269 (lab_map269_random's walk, deleted in e1eb6313,
+  -- from the Ifrit &
   -- Shiva save: navTo (9,5) crosses onto 269)
   m269 = { state = "build/states/magicite_ifrit_shiva.mss.lua", map = 269,
            enter = { 9, 5 } },

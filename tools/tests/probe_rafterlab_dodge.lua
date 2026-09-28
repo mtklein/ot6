@@ -1,6 +1,7 @@
 -- probe_rafterlab_dodge.lua -- rafter-crossing lab, dodge experiment.
 --
--- Copied from probe_rafterlab_template.lua; adds the "dodge-*" strategy
+-- Copied from probe_rafterlab_template.lua (deleted in e1eb6313; last
+-- version at f94ef198); adds the "dodge-*" strategy
 -- family: walk the unrestricted BFS route, but gate each step on LOCAL
 -- safety only (rat distance to the next 1-2 route tiles), hold at a
 -- standoff tile (rat distance >= 3, backing away when a rat closes),

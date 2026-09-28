@@ -1,7 +1,7 @@
 # The map-269 random — the Trapper trio's L.4 Flare (#171)
 
 Authored 2026-09-07 from `tools/tests/lab_map269_random.lua` (the lab; its
-header carries the decoded rows) and the n024_entry regeneration log
+header carries the decoded rows; deleted in e1eb6313, last version at a7e12f45) and the n024_entry regeneration log
 `build/states/n024_entry.log`.  Every number below is quoted from a
 retained run log under `build/attempts/driver-boost/m269lab/` (formerly `build/m269lab/`) (the batch runner keeps every
 attempt; `tools/tests/m269lab_aggregate.py` prints them all).
@@ -102,7 +102,8 @@ works by *parity*, not by HP.
 ## The lab
 
 Fixture `build/states/m269lab_pre.mss`: the map-269 landing (44,53),
-baked by `tools/tests/probe_m269lab_bake.lua` = `gen_n024_entry`'s first
+baked by `tools/tests/probe_m269lab_bake.lua` (deleted in e1eb6313; last
+version at 338328ee) = `gen_n024_entry`'s first
 leg verbatim from `magicite_ifrit_shiva` -- no care, no menu, so the party
 stands there exactly as the route delivers it (`build/m269lab/bake.log`:
 `LOCKE L16 447/447 hp 103/118 mp front; EDGAR L17 502/502 hp 123/127 mp
@@ -122,7 +123,8 @@ cycle**; every policy drew 15 distinct `bseed` values.  `cared`,
 paired A/B: same `bseed` column); `control` spends no menu and `allback`
 spends a second one, so each of those draws its own 15.
 
-Policies (`tools/tests/m269lab_batch.sh <policy> <seeds>`; none reads
+Policies (`tools/tests/m269lab_batch.sh <policy> <seeds>`, deleted in
+e1eb6313, last version at 338328ee; none reads
 hidden state -- the keys are the weapons the party wears, and the
 level-multiple rule is what the screen says when "L.4 Flare" lands):
 
@@ -452,12 +454,12 @@ it (item $E8 +50 = 105) -- Fight at 1 BP`).
   member's turn both reach `ExecCmd` as command $12 with a stale `$b6`,
   so any observer reading `$b6` there attributes a phantom action (the
   Zozo lab's observers, copied here, would too).  Labelled in
-  `lab_map269_random.lua`; `tools/action_trace.py` should be checked for
+  `lab_map269_random.lua` (deleted in e1eb6313; last version at a7e12f45); `tools/action_trace.py` should be checked for
   the same read.
 - Trapper's Program 18 sets **Reflect** on a party member at no damage
   (`$57`); in a long fight CELES's Cure on a reflected ally bounces to the
   enemy.  Not seen to matter once the fight is keyed and short.
-- `m269lab_batch.sh` was first launched with an unquoted zsh variable for
+- `m269lab_batch.sh` (deleted in e1eb6313) was first launched with an unquoted zsh variable for
   the seed list, which produced one seed-0 run per policy under a
   mis-named log; those duplicates were deleted before the proper spread
   ran (all 80 retained logs are under `build/m269lab/`, plus the three

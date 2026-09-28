@@ -5,7 +5,8 @@
 -- reached by playing the opening from New Game instead of injecting a human
 -- play save into SRAM.  The SRM path did not work on a fresh clone: gen_whelk
 -- boots from build/states/playthrough_srm.mss.lua, a git-ignored fixture
--- generated from a human save by make_srm_sidecar.sh, so a fresh checkout
+-- generated from a human save by make_srm_sidecar.sh (deleted in e1eb6313;
+-- last version at 09a70f77), so a fresh checkout
 -- could not generate STATE3.
 
 -- The Whelk trigger, with semantics taken from gen_whelk and the disassembly:
@@ -192,7 +193,8 @@ end
 -- Keyed on the BUFFER, never on a drawer's instruction address.  This ROM's
 -- bank C1 sits 11 bytes below ff6/notes/ff3u.asm (DrawMagicListText is at
 -- C1/4DC0 per ff6/rom/ff6-en.map:539, not the notes' C1/4DB5), which is how
--- probe_shadow_overlap ended up with an exec watch on an operand byte that
+-- battle_hudoverlap (then probe_shadow_overlap) ended up with an exec watch
+-- on an operand byte that
 -- could never fire.  Vanilla's RAM reservations do not move; its code does.
 
 local listWrites = 0
@@ -323,7 +325,7 @@ local steps = {
   -- Phase 4: assert + generate + prove.  Mirrors gen_whelk.lua:56-112 so
   -- the two generators emit interchangeable states (downstream tests are
   -- documented generator-independent: battle_dlgmenu / battle_whelkwipe /
-  -- probe_shadow_overlap each load whelk_entry.mss and drive it onto the
+  -- battle_hudoverlap each load whelk_entry.mss and drive it onto the
   -- trigger themselves).
   -- ===================================================================== --
   H.cond(function() return whelk() end, {
