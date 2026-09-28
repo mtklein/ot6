@@ -22,3 +22,33 @@ Started without a named workspace it follows the newest run: when the
 followed run's log goes quiet it switches to the newest live run, so one
 viewer follows a whole `ninja` build.  Latency is Mesen's stdout block buffering -- bursts
 every second or so.
+
+## More than one machine
+
+```sh
+python3 tools/stream/live.py --peer air.local      # repeatable; host:path if not ~/ot6
+```
+
+The same pages then show every machine: a line per machine at the top
+(active, frozen, load average, and which branch/worktree each worker
+belongs to), tiles labelled with their machine, remote detail pages, and
+the route map with segments running or done elsewhere (teal: done only on
+another machine).  An unreachable peer reads `air: unreachable since
+HH:MM (<ssh's reason>)` and never holds up this machine's tiles.
+
+Nothing is started on the other machine.  For each peer the viewer runs
+`ssh <host> 'cd ot6 && python3 - --emit'` with its own `live.py` on stdin:
+the far side scans its run logs (every worktree, plus clones under
+`.claude/worktrees/` or wherever a running Mesen's command line points),
+prints a JSON snapshot a second, and exits when the connection drops.  It
+needs key-based ssh (BatchMode) and the repo checked out there; it opens no
+port.  A peer that goes silent for 20s is shown down and redialled every
+10s.
+
+Check it from the viewer's machine:
+
+```sh
+curl -s 127.0.0.1:8611/grid.json | python3 -c 'import sys,json; [print(m["name"], m["up"], m["err"], m["active"], m["frozen"]) for m in json.load(sys.stdin)["machines"]]'
+ssh air.local 'pgrep -fl -- "- --emit"'         # the far side, while connected
+ssh air.local 'cd ot6 && python3 - --emit' < tools/stream/live.py | head -c 300   # one snapshot by hand
+```

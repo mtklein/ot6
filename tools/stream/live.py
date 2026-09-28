@@ -17,6 +17,14 @@ tailing its growing run.log:
 
 Serves one page on --port (default 8611).  Latency is Mesen's stdout block
 buffering: bursts every second or so.
+
+More machines: `--peer air.local` (repeatable; `host:path` when the repo is
+not at ~/ot6 there) adds that machine's workers, load and route progress to
+the same pages.  The viewer runs `ssh <host> python3 - --emit` with this very
+file on stdin: the far side scans its own run logs with the code below and
+prints one JSON snapshot a second, and exits when the connection drops.
+Nothing is installed or left running there and no port is opened.  The local
+machine goes through the same snapshot path, minus the ssh.
 """
 import argparse
 import base64
@@ -25,6 +33,10 @@ import hashlib
 import json
 import os
 import re
+import shlex
+import signal
+import socket
+import subprocess
 import sys
 import importlib.util
 import runpy
@@ -33,32 +45,70 @@ import time
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# OT6_ROOT is set by the --emit transport, where this file arrives on stdin
+# and has no path of its own.
+ROOT = os.path.abspath(os.environ.get("OT6_ROOT") or os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+HOST = socket.gethostname().split(".")[0].lower()   # this machine's label
 
 # Runs happen in every git worktree of this repo (agents and the release
-# qualification each get their own), not only under ROOT.  The worker grid, the
-# progress view and the newest-workspace picker all look through the same
-# list, refreshed every 30s, so the owner sees what is actually running.
-_TREES = {"ts": 0.0, "roots": [ROOT]}
+# qualification each get their own), not only under ROOT, and in plain clones
+# parked where agent worktrees live (.claude/worktrees/ of the main tree) or
+# anywhere a running worker's command line points (<clone>/build/test-runs/).
+# The worker grid, the progress view and the newest-workspace picker all look
+# through the same list, refreshed every 5s, so the owner sees what is
+# actually running.  "main" is the main tree: its workers carry no tag.
+_TREES = {"ts": 0.0, "roots": [ROOT], "branch": {}, "main": ROOT}
+
+
+RUNNING_TREE = re.compile(r"(/\S+?)/build/test-runs/[^/\s]+/")
+
+
+def _refresh_trees():
+    roots, branch, main = [], {}, None
+    try:
+        out = subprocess.run(["git", "-C", ROOT, "worktree", "list",
+                              "--porcelain"], capture_output=True,
+                             text=True, timeout=5).stdout
+        cur = None
+        for line in out.splitlines():
+            if line.startswith("worktree "):
+                cur = line[len("worktree "):].strip()
+                main = main or cur
+                if cur and cur not in roots and os.path.isdir(cur):
+                    roots.append(cur)
+            elif line.startswith("branch ") and cur:
+                branch[cur] = line[len("branch "):].replace("refs/heads/", "", 1)
+            elif line == "detached" and cur:
+                branch[cur] = "(detached)"
+    except Exception:
+        pass
+    main = main or ROOT
+    if ROOT not in roots:
+        roots.insert(0, ROOT)
+    extra = set(glob.glob(os.path.join(main, ".claude/worktrees/*")))
+    try:   # clones anywhere else, found through their running workers' argv
+        ps = subprocess.run(["ps", "-Ao", "command"], capture_output=True,
+                            text=True, timeout=5).stdout
+        extra |= set(RUNNING_TREE.findall(ps))
+    except Exception:
+        pass
+    for d in sorted(extra):
+        if d in roots or not os.path.exists(os.path.join(d, ".git")):
+            continue
+        roots.append(d)   # a plain clone: not in the worktree list
+        try:
+            branch[d] = subprocess.run(
+                ["git", "-C", d, "branch", "--show-current"],
+                capture_output=True, text=True, timeout=5).stdout.strip() or "?"
+        except Exception:
+            branch[d] = "?"
+    _TREES.update(roots=roots, branch=branch, main=main, ts=time.time())
 
 
 def worktree_roots():
-    now = time.time()
-    if now - _TREES["ts"] > 30:
-        roots = [ROOT]
-        try:
-            import subprocess
-            out = subprocess.run(["git", "-C", ROOT, "worktree", "list",
-                                  "--porcelain"], capture_output=True,
-                                 text=True, timeout=5).stdout
-            for line in out.splitlines():
-                if line.startswith("worktree "):
-                    r = line[len("worktree "):].strip()
-                    if r and r not in roots and os.path.isdir(r):
-                        roots.append(r)
-        except Exception:
-            pass
-        _TREES["roots"], _TREES["ts"] = roots, now
+    if time.time() - _TREES["ts"] > 5:
+        _refresh_trees()
     return _TREES["roots"]
 
 
@@ -70,19 +120,24 @@ def run_logs():
     return logs
 
 
-def tree_tag(log):
-    """A short label for the worktree a run log lives in ("" for ROOT)."""
+def log_tree(log):
+    """(tag, branch) of the tree a run log lives in; tag is a short label
+    for the worktree ("" for the main tree)."""
     best = ""
     for r in worktree_roots():
         if log.startswith(r + os.sep) and len(r) > len(best):
-            best = r      # the longest match: agent trees live under ROOT
-    return "" if best in ("", ROOT) else os.path.basename(best)
+            best = r      # the longest match: agent trees live under the main one
+    tag = "" if best in ("", _TREES["main"]) else os.path.basename(best)
+    return tag, _TREES["branch"].get(best, "?")
+
 
 
 # The default landing: a worker grid of EVERY active run worker,
 # one tile per live workspace, growing/shrinking as workers start and finish.
-# Data comes from grid.json (grid_thread); each tile's screenshot is a cached
-# PNG under build/live/grid/.  A tile click opens the single-worker detail
+# Data comes from grid.json (Board.write); each tile's screenshot is a cached
+# PNG under build/live/grid/.  Above the tiles, one line per machine: up or
+# unreachable, load, active and frozen counts, and which branch/worktree each
+# of its workers belongs to.  A tile click opens the single-worker detail
 # (live1.html) for that worker.
 GRID_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 workers</title>
 <body style="margin:0;background:#111;color:#cdc;font:13px ui-monospace,monospace">
@@ -90,6 +145,7 @@ GRID_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 workers</title>
 <b style="font-size:16px">live workers</b>
 <span id=hdr style="color:#8a8"></span>
 <a href="progress.html" style="color:#8ac">route map &rarr;</a></div>
+<div id=machines style="padding:0 14px 10px;line-height:1.6"></div>
 <div id=grid style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;padding:0 14px 18px"></div>
 <div id=starting style="color:#575;padding:0 14px 14px;font-size:11px;line-height:1.7"></div>
 <div id=empty style="color:#575;padding:2px 14px">waiting for workers…</div>
@@ -120,12 +176,25 @@ async function tick(){ try{
   if(starting.length) html += '<div>' + starting.length
     + ' booting, no frame yet</div>';
   starting.forEach(w=>{ html += '<div style="margin-top:3px">'
-    + '<span style="color:#7a7">' + esc(w.name) + '</span>'
+    + '<span style="color:#7a7">' + esc(w.machine) + ' \u00b7 ' + esc(w.name) + '</span>'
     + (w.frame!=null ? ' · frame '+nf(w.frame) : '')
     + (w.last ? '<div style="color:#687;padding-left:14px;white-space:nowrap;'
       + 'overflow:hidden;text-overflow:ellipsis">' + esc(w.last) + '</div>' : '')
     + '</div>'; });
   $('starting').innerHTML = html;
+  const hm=t=>new Date(t*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  $('machines').innerHTML = (j.machines||[]).map(m=>{
+    if(!m.up) return '<div><b style="color:#d9a24b">'+esc(m.name)+'</b> <span style="color:#d9a24b">'
+      + (m.err==='connecting' ? 'connecting\u2026' : 'unreachable since '+hm(m.down_since))
+      + '</span>' + (m.err && m.err!=='connecting' ? ' <span style="color:#687">('+esc(m.err)+')</span>' : '') + '</div>';
+    let h = '<div><b>'+esc(m.name)+'</b> <span style="color:#8a8">'
+      + m.active+' active \u00b7 '
+      + '<span style="color:'+(m.frozen?'#e06060':'#8a8')+'">'+m.frozen+' frozen</span>'
+      + (m.load ? ' \u00b7 load '+m.load[0].toFixed(1)+' / '+m.ncpu+' cores' : '') + '</span></div>';
+    m.trees.forEach(t=>{ h += '<div style="color:#8a9;padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      + '<span style="color:#9bc">'+esc(t.branch)+'</span>'+(t.tree?' <span style="color:#687">@'+esc(t.tree)+'</span>':'')
+      + ' \u00b7 '+t.tests.length+': '+esc(t.tests.join(', '))+'</div>'; });
+    return h; }).join('');
   const seen = new Set();
   ws.forEach(w=>{
     seen.add(w.id);
@@ -141,6 +210,9 @@ async function tick(){ try{
         + 'image-rendering:pixelated;aspect-ratio:8/7;background:#000">'
         + '<span class=badge style="position:absolute;top:5px;right:5px;'
         + 'font-size:10px;font-weight:bold;padding:1px 5px;border-radius:3px"></span>'
+        + '<span class=mc style="position:absolute;top:5px;left:5px;'
+        + 'font-size:10px;padding:1px 5px;border-radius:3px;'
+        + 'background:#000a;color:#cdc"></span>'
         + '<div style="padding:5px 7px">'
         + '<div class=nm style="white-space:nowrap;overflow:hidden;'
         + 'text-overflow:ellipsis"></div>'
@@ -151,6 +223,7 @@ async function tick(){ try{
     if(w.shot && img.getAttribute('data-s')!==w.shot){
       img.setAttribute('data-s', w.shot); img.src = w.shot; }
     t.querySelector('.nm').textContent = w.name;
+    t.querySelector('.mc').textContent = w.machine;
     t.querySelector('.fr').textContent = 'frame '+nf(w.frame);
     const badge = t.querySelector('.badge');
     // a frozen worker gets a red rim and badge; every other a plain rim
@@ -196,11 +269,16 @@ async function tick(){
   // silent fall-back to the followed one when it has finished); no ?w means
   // the server-followed worker
   let tgt = null;
+  // (status.json streams a worker on THIS machine: a same-named worker on
+  // another machine is not it)
   if(grid){ tgt = wid ? (grid.find(w=>w.id===wid) || null)
-                      : (grid.find(w=>w.name===followed) || null); }
+                      : (grid.find(w=>w.local && w.name===followed) || null); }
   const targetName = wid ? (tgt ? tgt.name : null) : followed;
-  const isFollowed = !!st && !!targetName && targetName===st.test;
-  $('who').textContent = targetName || (wid ? '('+wid+')' : '(waiting)');
+  const isFollowed = !!st && !!targetName && targetName===st.test
+    && (!tgt || tgt.local);
+  $('who').textContent = (targetName || (wid ? '('+wid+')' : '(waiting)'))
+    + (tgt ? ' \u00b7 ' + tgt.machine
+       + (tgt.branch ? ' \u00b7 ' + tgt.branch : '') : '');
   if(isFollowed && st){
     // rich path: the server streams this worker frame-by-frame + notes
     $('frame').textContent=(st.exact?'frame ':'frame ~')+nf(st.frame);
@@ -215,7 +293,7 @@ async function tick(){
     $('frame').textContent='frame '+nf(tgt.frame);
     $('pad').textContent='';
     $('notes').textContent=(tgt.notes||[]).join('\\n');
-    $('s').textContent=tgt.name+(tgt.stuck?' · \\u26A0 frozen':'');
+    $('s').textContent=tgt.name+' on '+tgt.machine+(tgt.stuck?' · \\u26A0 frozen':'');
     if(tgt.shot && tgt.shot!==curShot){ curShot=tgt.shot; const u=tgt.shot;
       const t=new Image(); t.onload=()=>{ $('f').src=u; }; t.src=u; }
   } else {
@@ -241,6 +319,7 @@ PROGRESS_PAGE = """<!doctype html><meta charset="utf-8"><title>OT6 route</title>
 <svg id=map viewBox="0 0 256 256" width="100%" style="display:block;margin:auto;max-height:88vh"></svg>
 <div id=cur style="color:#9ac;padding-top:4px"></div>
 <div id=pick style="color:#aca;min-height:1.2em"></div>
+<div id=legend style="color:#687;font-size:11px"></div>
 <div style="color:#575;padding-top:6px"><a href="index.html" style="color:#8ac">&larr; live view</a></div>
 </div>
 <script>
@@ -254,14 +333,25 @@ document.getElementById('tog').onclick = (ev)=>{ ev.preventDefault();
   if(last) render(last); };
 svg.addEventListener('click', ev=>{
   const n = ev.target.getAttribute && ev.target.getAttribute('data-name');
-  document.getElementById('pick').textContent = n ? n : ''; });
+  const e = n && last ? last.edges.find(x=>x.name===n) : null;
+  document.getElementById('pick').textContent = e ? tip(e) : (n || ''); });
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+// done here: green; done only on another machine (merged from a --peer):
+// teal; running anywhere: amber.  e.on lists the machines.
+function doneCol(e, j){ return (e.on && j.local && e.on.length
+  && !e.on.includes(j.local)) ? '#3a8f9d' : '#3f9d63'; }
+function tip(e){ return e.name + (e.on && e.on.length
+  ? ' \u2014 ' + e.status + ' on ' + e.on.join(', ') : ''); }
 function render(j){
   if(view==='wob') renderWob(j); else renderGrid(j);
   document.getElementById('hdr').textContent =
     `${j.done}/${j.total} segments · ${j.elapsed_min} min elapsed · ~${j.eta_min} min left`;
   document.getElementById('cur').textContent =
     j.running.length ? ('now playing: ' + j.running.join(', ')) : '';
+  document.getElementById('legend').innerHTML = j.local ?
+    `<span style="color:#3f9d63">\u25cf</span> done on ${esc(j.local)} \u00b7 `
+    + `<span style="color:#3a8f9d">\u25cf</span> done only on another machine \u00b7 `
+    + `<span style="color:#e0a93e">\u25cf</span> running (machine named above)` : '';
 }
 function renderWob(j){
   svg.setAttribute('viewBox','0 0 256 256');
@@ -280,7 +370,7 @@ function renderWob(j){
   j.edges.forEach((e,i)=>{
     const [x,y] = P[i];
     const rad = 1.5 + Math.min(2.2, Math.sqrt(e.dur||30)/8);
-    const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#39413b';
+    const col = e.status==='done' ? doneCol(e,j) : e.status==='running' ? '#e0a93e' : '#39413b';
     const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+1.4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
     // checkpoint-booted segments wear the dotted yellow ring, as in the
     // grid; the rest get a hairline dark rim so they read against the map
@@ -289,7 +379,7 @@ function renderWob(j){
     out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}"
       fill="${col}" fill-opacity="${e.status==='pending'?.75:1}"${ring}
       data-name="${esc(e.name)}" style="cursor:pointer">
-      <title>${esc(e.name)}</title>${pulse}</circle>`;
+      <title>${esc(tip(e))}</title>${pulse}</circle>`;
     // labels stay sparse at 76 nodes: running, most recent done
     if(e.status==='running' || i===lastDone){
       const txt = e.name;
@@ -319,12 +409,12 @@ function renderGrid(j){
     const r = Math.floor(i/COLS), c = i%COLS;
     const x = 60 + (r%2 ? (COLS-1-c) : c)*DX, y = 30 + r*DY;
     const rad = R0 + Math.min(14, Math.sqrt(e.dur||30));
-    const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#3a423c';
+    const col = e.status==='done' ? doneCol(e,j) : e.status==='running' ? '#e0a93e' : '#3a423c';
     const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
     // segments that boot from an SRAM save checkpoint rather than the
     // played chain wear a dotted yellow ring
     const ring = e.ckpt ? ` stroke="#e8c94a" stroke-width="2" stroke-dasharray="4 3"` : '';
-    out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}"${ring}>${pulse}</circle>`
+    out += `<circle cx="${x}" cy="${y}" r="${rad}" fill="${col}"${ring}><title>${esc(tip(e))}</title>${pulse}</circle>`
         + `<text x="${x}" y="${y+rad+12}" fill="${e.status==='pending'?'#565':'#aca'}" font-size="9" text-anchor="middle">${esc(e.name)}</text>`;
   });
   svg.innerHTML = out;
@@ -477,25 +567,64 @@ def scan_worker(data, shots_stuck, frames_stuck):
     return (frame, png, h, stuck)
 
 
-def grid_thread(webroot, stop, live_ref=None):
-    """Write grid.json + grid/<id>.png every second: one entry per active run
+class Scanner:
+    """This machine's view, one JSON-able snapshot per call: every active run
     worker (build/test-runs/*/run.log touched within ACTIVE_SEC -- the same
-    live-worker mtime filter stuck_detector uses).  Each entry carries the
-    worker's latest decoded screenshot (cached to a PNG, rewritten only when
-    it changes), its frame, a stuck flag, and its latest notes.  Vanished workers' tiles are pruned so the grid
-    shrinks as runs finish."""
-    try:   # reuse stuck_detector's tuning so freeze thresholds stay single-source
-        sd = _load_stream_module("stuck_detector")
-        active_sec, tail_n = sd.ACTIVE_SEC, sd.TAIL_BYTES
-        s_stuck, f_stuck = sd.SHOTS_STUCK, sd.FRAMES_STUCK
-    except Exception:
-        active_sec, tail_n, s_stuck, f_stuck = 40, 200_000, 8, 2000
-    gdir = os.path.join(webroot, "grid")
-    os.makedirs(gdir, exist_ok=True)
-    written = {}   # id -> hash8 of the PNG currently on disk
-    while not stop.is_set():
+    live-worker mtime filter stuck_detector uses) with its frame, stuck flag,
+    latest notes and tree/branch; the load average; and, whenever a new one
+    is ready (about every 5s), the route progress (build_progress).  A worker's decoded screenshot rides along in
+    "pngs" only when it changed since the previous snapshot.
+
+    The local grid ingests snapshots directly; another machine's viewer gets
+    them over ssh from --emit.  Both go through Board.ingest."""
+
+    def __init__(self, live_ref=None):
+        try:   # stuck_detector's tuning, so freeze thresholds stay single-source
+            sd = _load_stream_module("stuck_detector")
+            self.tuning = (sd.ACTIVE_SEC, sd.TAIL_BYTES,
+                           sd.SHOTS_STUCK, sd.FRAMES_STUCK)
+        except Exception:
+            self.tuning = (40, 200_000, 8, 2000)
+        self.sent = {}         # worker id -> hash8 of the PNG last handed out
+        self.live_ref = live_ref
+        self.prog = None       # progress inputs, loaded on first use
+        self.fresh = None      # a progress payload not yet handed out
+        self.t0 = time.time()
+        # the stamp checks take seconds, so the route has its own thread and
+        # never holds up the 1s worker scan
+        threading.Thread(target=self._progress_loop, daemon=True).start()
+
+    def _progress_loop(self):
+        while True:
+            self.fresh = self.progress()
+            time.sleep(5)
+
+    def progress(self):
+        try:
+            if self.prog is None:
+                states = runpy.run_path(os.path.join(
+                    ROOT, "tools/tests/savestate_graph.py"))["STATES"]
+                xy = _route_coords([e["state"] for e in states])
+                # freshness check: compose.py's own stamp verification
+                # (signature over generator+libs+extras, artifact hash,
+                # ancestor chain).  A fresh stamp is what ninja will not
+                # re-run -- except for a ROM-content change, which the graph
+                # tracks separately and a mid-gate page can ignore honestly.
+                spec = importlib.util.spec_from_file_location(
+                    "compose", os.path.join(ROOT, "tools/tests/lib/compose.py"))
+                compose = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(compose)
+                from pathlib import Path
+                self.prog = (states, xy, compose, Path(ROOT))
+            live_test = (self.live_ref or {}).get("test")
+            return build_progress(*self.prog, self.t0, live_test)
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"[:200]}
+
+    def snapshot(self):
+        active_sec, tail_n, s_stuck, f_stuck = self.tuning
         now = time.time()
-        workers, active = [], set()
+        workers, pngs, active = [], {}, set()
         for log in run_logs():
             try:
                 if now - os.path.getmtime(log) > active_sec:
@@ -504,47 +633,248 @@ def grid_thread(webroot, stop, live_ref=None):
                 data = _tail_bytes(log, tail_n)
             except OSError:
                 continue
-            tag = tree_tag(log)
+            tag, branch = log_tree(log)
             wid = _safe_id((tag + "_" if tag else "") + dirname)
-            name = dirname.split(".")[0] + (f" @{tag}" if tag else "")
             frame, png, h, stuck = scan_worker(data, s_stuck, f_stuck)
             active.add(wid)
-            if png is not None and h is not None and written.get(wid) != h:
-                try:
-                    tmp = os.path.join(gdir, "." + wid + ".tmp")
-                    with open(tmp, "wb") as f:
-                        f.write(png)
-                    os.replace(tmp, os.path.join(gdir, wid + ".png"))
-                    written[wid] = h
-                except OSError:
-                    pass
-            have = written.get(wid)
-            rec = {
-                "id": wid, "name": name, "frame": frame,
-                "shot": (f"grid/{wid}.png?{have}") if have else None,
-                "stuck": bool(stuck),
-                "notes": _last_notes(data, 8)}
-            if not have:
+            if png is not None and h is not None and self.sent.get(wid) != h:
+                pngs[wid] = png
+                self.sent[wid] = h
+            rec = {"id": wid, "test": dirname.split(".")[0], "tree": tag,
+                   "branch": branch, "frame": frame, "h": self.sent.get(wid),
+                   "stuck": bool(stuck), "notes": _last_notes(data, 8)}
+            if not rec["h"]:
                 # nothing to draw YET -- the broadcast is unconditional, so
                 # this worker is booting and will fill in.  Offer its latest
                 # log line meanwhile, which is all it has.
                 rec["last"] = _last_note(data)
             workers.append(rec)
-        # prune tiles/PNGs for workers that finished
-        for wid in list(written):
+        for wid in list(self.sent):
             if wid not in active:
-                try:
-                    os.remove(os.path.join(gdir, wid + ".png"))
-                except OSError:
-                    pass
-                del written[wid]
-        workers.sort(key=lambda w: (w["name"], w["id"]))
-        out = {"workers": workers, "count": len(workers), "ts": int(now)}
-        tmp = os.path.join(webroot, ".grid.tmp")
+                del self.sent[wid]
+        try:
+            load = [round(x, 2) for x in os.getloadavg()]
+        except OSError:
+            load = None
+        snap = {"host": HOST, "ts": now, "load": load, "ncpu": os.cpu_count(),
+                "workers": workers, "pngs": pngs}
+        fresh, self.fresh = self.fresh, None
+        if fresh is not None:
+            snap["progress"] = fresh
+        return snap
+
+
+PEER_STALE_SEC = 20   # a peer silent this long is shown unreachable
+
+
+class Board:
+    """Every machine's latest snapshot, merged into grid.json (tiles plus a
+    per-machine summary) and progress.json (the route, from all machines).
+    Machine 0 is this one; the rest are --peer hosts, in flag order."""
+
+    def __init__(self, webroot, names):
+        self.webroot, self.names = webroot, list(names)
+        self.gdir = os.path.join(webroot, "grid")
+        os.makedirs(self.gdir, exist_ok=True)
+        self.lock = threading.Lock()
+        t = time.time()
+        # name -> {"snap", "progress", "ok_ts", "down_since", "err"}
+        self.m = {n: {"snap": None, "progress": None, "ok_ts": None,
+                      "down_since": t, "err": "connecting"} for n in names}
+        self.pngs = {n: set() for n in names}   # PNG files on disk per machine
+        self.procs = {}   # name -> its live ssh child (peer_thread)
+
+    def _png(self, name, wid):
+        return os.path.join(self.gdir, _safe_id(f"{name}_{wid}") + ".png")
+
+    def ingest(self, name, snap):
+        for wid, png in (snap.get("pngs") or {}).items():
+            if isinstance(png, str):
+                png = base64.b64decode(png)
+            try:
+                tmp = os.path.join(self.gdir, "." + _safe_id(name + wid) + ".tmp")
+                with open(tmp, "wb") as f:
+                    f.write(png)
+                os.replace(tmp, self._png(name, wid))
+                self.pngs[name].add(wid)
+            except OSError:
+                pass
+        live = {w["id"] for w in snap.get("workers", [])}
+        for wid in list(self.pngs[name] - live):   # finished workers
+            self._drop_png(name, wid)
+        with self.lock:
+            st = self.m[name]
+            st["snap"] = dict(snap, pngs=None)
+            if snap.get("progress") is not None:
+                st["progress"] = snap["progress"]
+            st.update(ok_ts=time.time(), down_since=None, err=None)
+
+    def _drop_png(self, name, wid):
+        try:
+            os.remove(self._png(name, wid))
+        except OSError:
+            pass
+        self.pngs[name].discard(wid)
+
+    def down(self, name, err):
+        with self.lock:
+            st = self.m[name]
+            if st["down_since"] is None:
+                st["down_since"] = st["ok_ts"] or time.time()
+            st.update(snap=None, progress=None, err=err)
+        for wid in list(self.pngs[name]):
+            self._drop_png(name, wid)
+
+    def write(self):
+        now = time.time()
+        with self.lock:
+            for n, st in self.m.items():   # a wedged stream reads as down
+                if st["snap"] and now - st["ok_ts"] > PEER_STALE_SEC:
+                    st.update(down_since=st["ok_ts"], snap=None, progress=None,
+                              err=f"no data for {int(now - st['ok_ts'])}s")
+                    p = self.procs.get(n)
+                    if p is not None:
+                        p.kill()     # and peer_thread reconnects
+            m = {n: dict(st) for n, st in self.m.items()}
+        workers, machines = [], []
+        for n in self.names:
+            st, snap = m[n], m[n]["snap"]
+            mine = []
+            for w in (snap or {}).get("workers", []):
+                rec = {k: v for k, v in w.items() if k != "h"}
+                rec.update(
+                    id=_safe_id(f"{n}_{w['id']}"), machine=n, local=(n == HOST),
+                    name=w["test"] + (f" @{w['tree']}" if w["tree"] else ""),
+                    shot=(f"grid/{_safe_id(n + '_' + w['id'])}.png?{w['h']}"
+                          if w.get("h") else None))
+                mine.append(rec)
+            mine.sort(key=lambda w: (w["name"], w["id"]))
+            workers += mine
+            trees = {}
+            for w in mine:
+                trees.setdefault((w["branch"], w["tree"]), []).append(w["test"])
+            machines.append({
+                "name": n, "local": n == HOST, "up": snap is not None,
+                "down_since": st["down_since"], "err": st["err"],
+                "load": (snap or {}).get("load"), "ncpu": (snap or {}).get("ncpu"),
+                "active": len(mine), "frozen": sum(w["stuck"] for w in mine),
+                "trees": [{"branch": b, "tree": t, "tests": sorted(ts)}
+                          for (b, t), ts in sorted(trees.items())]})
+        out = {"workers": workers, "count": len(workers), "ts": int(now),
+               "machines": machines, "local": HOST}
+        self._dump("grid.json", out)
+        prog = self.merge_progress(m)
+        if prog is not None:
+            self._dump("progress.json", prog)
+
+    def merge_progress(self, m):
+        """The local route (its coords, ETA and done/running) with every other
+        machine's running and done folded in by edge name.  Each edge's "on"
+        lists the machines it is running or done on, so the map can tell a
+        segment done here from one done only elsewhere."""
+        base = m[self.names[0]]["progress"]
+        if not base or "edges" not in base:
+            return None
+        out = dict(base, edges=[dict(e) for e in base["edges"]], local=HOST)
+        per = {n: {e["name"]: e["status"] for e in m[n]["progress"]["edges"]}
+               for n in self.names
+               if m[n]["progress"] and "edges" in m[n]["progress"]}
+        running = []
+        for e in out["edges"]:
+            run = [n for n in self.names if per.get(n, {}).get(e["name"]) == "running"]
+            done = [n for n in self.names if per.get(n, {}).get(e["name"]) == "done"]
+            e["status"] = "running" if run else "done" if done else "pending"
+            e["on"] = run or done
+            if run:
+                running.append(f"{e['name']} ({', '.join(run)})")
+        out["running"] = running
+        out["done"] = sum(e["status"] == "done" for e in out["edges"])
+        return out
+
+    def _dump(self, fname, obj):
+        tmp = os.path.join(self.webroot, "." + fname + ".tmp")
         with open(tmp, "w") as f:
-            json.dump(out, f)
-        os.replace(tmp, os.path.join(webroot, "grid.json"))
-        time.sleep(1.0)
+            json.dump(obj, f)
+        os.replace(tmp, os.path.join(self.webroot, fname))
+
+
+def local_thread(board, stop, live_ref=None):
+    """This machine: a Scanner snapshot into the Board every second, then
+    rewrite grid.json/progress.json from every machine's latest."""
+    sc = Scanner(live_ref)
+    while not stop.is_set():
+        try:
+            board.ingest(HOST, sc.snapshot())
+        except Exception as e:   # a bad scan must not stop the viewer
+            print(f"live: local scan failed: {e}", file=sys.stderr)
+        board.write()
+        stop.wait(1.0)
+
+
+def peer_thread(board, peer, stop):
+    """Another machine: ssh there, feed it this file on stdin as --emit, and
+    ingest its snapshot lines.  Any failure (asleep, off the network, no
+    repo) marks it down with the last diagnostic line and retries in 10s;
+    ssh keepalives notice a peer that vanished mid-stream."""
+    host, _, path = peer.partition(":")
+    name = host.split(".")[0].lower()
+    path = path or "ot6"
+    if path.startswith("~/"):
+        path = path[2:]      # ssh starts in $HOME; a quoted ~ would not expand
+    cmd = ["ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+           "-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=2", host,
+           f"cd {shlex.quote(path)} && OT6_ROOT=\"$PWD\" "
+           "exec python3 - --emit 2>&1"]
+    with open(os.path.abspath(__file__), "rb") as f:
+        src = f.read()
+    while not stop.is_set():
+        err = "connection closed"
+        try:
+            p = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT)
+            board.procs[name] = p
+            try:
+                p.stdin.write(src)
+                p.stdin.close()
+                for line in p.stdout:
+                    if line.startswith(b"{"):
+                        try:
+                            board.ingest(name, json.loads(line))
+                            continue
+                        except ValueError:
+                            pass
+                    line = line.decode("utf-8", "replace").strip()
+                    err = line[:200] if line else err
+            finally:
+                if p.poll() is None:
+                    p.kill()
+                p.wait()
+                board.procs.pop(name, None)
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"[:200]
+        board.down(name, err)
+        stop.wait(10)
+
+
+def peer_name(peer):
+    return peer.partition(":")[0].split(".")[0].lower()
+
+
+def emit():
+    """--emit: one Scanner snapshot a second on stdout, PNGs base64'd, until
+    the reader goes away (the ssh connection dropped: BrokenPipe)."""
+    sc = Scanner()
+    try:
+        while True:
+            snap = sc.snapshot()
+            snap["pngs"] = {k: base64.b64encode(v).decode("ascii")
+                            for k, v in snap["pngs"].items()}
+            sys.stdout.write(json.dumps(snap) + "\n")
+            sys.stdout.flush()
+            time.sleep(1.0)
+    except (BrokenPipeError, KeyboardInterrupt):
+        os._exit(0)
 
 
 B64 = re.compile(r"^\[b64:([^\]]+)\] (\S+)\s*$")
@@ -678,38 +1008,11 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
             "eta_min": int(eta / 60)}
 
 
-def progress_thread(webroot, stop, live_ref=None):
-    """Write progress.json every 5s (see build_progress).  live_ref is the
-    dict follow() keeps its currently-tailed test name in, shared so the one
-    live-view segment can be flagged without either thread blocking."""
-    states = runpy.run_path(
-        os.path.join(ROOT, "tools/tests/savestate_graph.py"))["STATES"]
-    xy = _route_coords([e["state"] for e in states])
-    # freshness check: compose.py's own stamp verification (signature over
-    # generator+libs+extras, artifact hash, ancestor chain).  A fresh stamp
-    # is what ninja will not re-run -- except for a ROM-content change, which
-    # the graph tracks separately and a mid-gate page can ignore honestly.
-    spec = importlib.util.spec_from_file_location(
-        "compose", os.path.join(ROOT, "tools/tests/lib/compose.py"))
-    compose = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(compose)
-    from pathlib import Path
-    rootp = Path(ROOT)
-    t0 = time.time()
-    while not stop.is_set():
-        live_test = (live_ref or {}).get("test")
-        out = build_progress(states, xy, compose, rootp, t0, live_test)
-        tmp = os.path.join(webroot, ".p.tmp")
-        with open(tmp, "w") as f:
-            json.dump(out, f)
-        os.replace(tmp, os.path.join(webroot, "progress.json"))
-        time.sleep(5)
-
-
 def newest_workspace():
+    """The workspace with the newest run.log, or None when there is none."""
     logs = run_logs()
     if not logs:
-        sys.exit("no run workspace found (is a run going?)")
+        return None
     return os.path.dirname(max(logs, key=os.path.getmtime))
 
 
@@ -737,6 +1040,8 @@ def follow(log_path, webroot, test, stop, hop=False, live_ref=None):
 
     while not stop.is_set():
         try:
+            if not log_path:
+                raise OSError("no run yet")
             with open(log_path, errors="replace") as f:
                 f.seek(pos)
                 chunk = f.read()
@@ -813,20 +1118,17 @@ def follow(log_path, webroot, test, stop, hop=False, live_ref=None):
             # channel-hop: this run went quiet; if a newer run is live,
             # follow it instead (started without a named workspace only)
             if hop and quiet > 10.0:
-                try:
-                    ws = newest_workspace()
-                    nl = os.path.join(ws, "run.log")
-                    if nl != log_path:
-                        log_path, pos, quiet = nl, 0, 0.0
-                        state["test"] = os.path.basename(ws).split(".")[0]
-                        # tell progress.json the live view moved segments
-                        if live_ref is not None:
-                            live_ref["test"] = state["test"]
-                        state["frame"], state["pad"] = 0, "-"
-                        state["exact"] = False
-                        state["notes"] = [f"— hopped to {state['test']} —"]
-                except SystemExit:
-                    pass
+                ws = newest_workspace()
+                nl = ws and os.path.join(ws, "run.log")
+                if nl and nl != log_path:
+                    log_path, pos, quiet = nl, 0, 0.0
+                    state["test"] = os.path.basename(ws).split(".")[0]
+                    # tell progress.json the live view moved segments
+                    if live_ref is not None:
+                        live_ref["test"] = state["test"]
+                    state["frame"], state["pad"] = 0, "-"
+                    state["exact"] = False
+                    state["notes"] = [f"— hopped to {state['test']} —"]
         time.sleep(0.25)
 
 
@@ -835,11 +1137,17 @@ def main():
     ap.add_argument("workspace", nargs="?", help="a build/test-runs/<ws> dir "
                     "(default: the one with the newest run.log)")
     ap.add_argument("--port", type=int, default=8611)
+    ap.add_argument("--peer", action="append", default=[], metavar="HOST[:PATH]",
+                    help="also show this machine's workers, over ssh (repo at "
+                    "~/ot6 there unless :PATH); repeatable")
+    ap.add_argument("--emit", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
+    if args.emit:     # the far end of a --peer connection
+        return emit()
 
     ws = os.path.abspath(args.workspace) if args.workspace else newest_workspace()
-    log = os.path.join(ws, "run.log")
-    test = os.path.basename(ws).split(".")[0]
+    log = os.path.join(ws, "run.log") if ws else None
+    test = os.path.basename(ws).split(".")[0] if ws else None
 
     # The webroot is stable, outside any run workspace: workspaces are
     # deleted when their run succeeds, and a server rooted inside one dies
@@ -850,28 +1158,35 @@ def main():
     ensure_map(webroot)
 
     stop = threading.Event()
-    # shared so progress_thread can flag the one edge follow() is tailing
+    # shared so the progress scan can flag the one edge follow() is tailing
     # (updated on channel-hop); starts on the workspace main() picked
     live_ref = {"test": test}
     threading.Thread(target=follow,
                      args=(log, webroot, test, stop, args.workspace is None,
                            live_ref),
                      daemon=True).start()
-    threading.Thread(target=progress_thread, args=(webroot, stop, live_ref),
+    board = Board(webroot, [HOST] + [peer_name(p) for p in args.peer])
+    threading.Thread(target=local_thread, args=(board, stop, live_ref),
                      daemon=True).start()
-    threading.Thread(target=grid_thread, args=(webroot, stop, live_ref),
-                     daemon=True).start()
+    for p in args.peer:
+        threading.Thread(target=peer_thread, args=(board, p, stop),
+                         daemon=True).start()
 
     httpd = ThreadingHTTPServer(("127.0.0.1", args.port),
                                 partial(SimpleHTTPRequestHandler,
                                         directory=webroot))
-    print(f"live: http://127.0.0.1:{args.port}/  (test {test}, log {log})")
+    # a plain kill runs the cleanup below too (the ssh children)
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    print(f"live: http://127.0.0.1:{args.port}/  (test {test}, log {log}, "
+          f"machines {', '.join(board.names)})")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         stop.set()
+        for p in list(board.procs.values()):   # the ssh children
+            p.kill()
 
 
 if __name__ == "__main__":
