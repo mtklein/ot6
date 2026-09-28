@@ -37,6 +37,17 @@
 --      done, the roster line says why, no menu opens, control stays.
 --   5. Step form, default policy, with the Potions reserved away: TERRA
 --      casts Cure out of her own MP, the bag untouched.
+--
+-- Cases 2-5 test the HP heal's fallbacks, so each switches the MP side's
+-- two arms off (opts.tent = false, opts.tincture = false).  The landing
+-- is on the world map, where the item list offers a Tent, and the care
+-- pitches one ahead of any heal whenever the party is 1200 HP short in
+-- total or anybody is under the MP band (docs/design/supply.md).  A walk
+-- that leaves that big a hole makes the Tent the right call, so with the
+-- arm on, "the Potion heals" held only for draws that left less (the
+-- 2026-09-28 chain's case 2: 1296 HP short, a Tent pitched, no Potion).
+-- With no Tent on offer the Potion is what heals under any draw, and with
+-- the Tincture arm off only a cast can move TERRA's MP.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local FIX = "build/states/crescent_landing.mss.lua"
@@ -268,7 +279,8 @@ H.run({ maxFrames = 1200000 }, {
   -- ---- 2. driver form, 0 Tonics: the Potion heals -------------------------
   walkUntilHurt(48),
   H.call(function() snap(); forget(); roster("case 2: before the driver-form care") end),
-  H.careStop("care with no Tonics (driver form)", { threshold = THRESH }),
+  H.careStop("care with no Tonics (driver form)",
+    { threshold = THRESH, tent = false, tincture = false }),
   H.call(function()
     roster("case 2: after")
     H.assertEq(H.invCountOf(TONIC), 0, "still no Tonics")
@@ -285,7 +297,8 @@ H.run({ maxFrames = 1200000 }, {
   -- ---- 3. step form, magic off, 0 Tonics: the Potion again -----------------
   walkUntilHurt(48),
   H.call(function() snap(); forget(); roster("case 3: before the step-form care") end),
-  H.fieldCare({ tag = "care with no Tonics (step form)", threshold = THRESH, magic = false }),
+  H.fieldCare({ tag = "care with no Tonics (step form)", threshold = THRESH, magic = false,
+    tent = false, tincture = false }),
   H.call(function()
     roster("case 3: after")
     H.assertEq(H.invCountOf(POTION) < b0.potion, true,
@@ -300,7 +313,8 @@ H.run({ maxFrames = 1200000 }, {
   walkUntilHurt(48),
   H.call(function() snap(); forget(); roster("case 4: before the bagless driver-form care") end),
   H.careStop("care with nothing spendable (driver form)",
-    { threshold = THRESH, reserve = { [TONIC] = 4, [POTION] = 99 } }),
+    { threshold = THRESH, reserve = { [TONIC] = 4, [POTION] = 99 },
+      tent = false, tincture = false }),
   H.call(function()
     local spent = H.frame - b0.frame
     roster("case 4: after")
@@ -319,7 +333,8 @@ H.run({ maxFrames = 1200000 }, {
   -- ---- 5. step form, default policy, Potions reserved: TERRA casts ---------
   H.call(function() snap(); forget() end),
   H.fieldCare({ tag = "care with nothing spendable (step form, casting allowed)",
-    threshold = THRESH, reserve = { [TONIC] = 4, [POTION] = 99 } }),
+    threshold = THRESH, reserve = { [TONIC] = 4, [POTION] = 99 },
+    tent = false, tincture = false }),
   H.call(function()
     roster("case 5: after")
     H.assertEq(H.charMp(0) < b0.mp, true,
