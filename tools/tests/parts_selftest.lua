@@ -138,6 +138,44 @@ local plan4 = H.partsPlan({ slots = s4 })
 assert(#s4[2].roles.arms == 0 and plan4 and orderOf(plan4) == "0" and plan4.skip[2],
   "$1CB with the gun clearing the switch instead: the gun is filler, order {0}")
 
+-- The last-stand counters (#255, M.partRoles' lastStand): a retaliation
+-- gated on `if_num_monsters N` (FC 13 01 N).  The Chitonid ($07C) sneezes
+-- (attack $CB) at N=1; the HermitCrab ($02C) throws its special (Rock,
+-- $EF: the SPECIAL attack) at N=1; the Mesosaur ($021) keeps its own
+-- `if_num_monsters 1` in the MAIN section (it stops escaping when alone),
+-- which is not a counter; the Osprey ($0E6) counters Magic, not a count.
+-- Formation $0CC (Osprey, Chitonid, Gigan Toad) carries exactly the one.
+local function lastStandOf(species, patch)
+  local r = H.partRoles(scriptOf(species, patch), 0)
+  local t = {}
+  for _, a in ipairs(r.lastStand) do t[#t + 1] = string.format("%02X", a) end
+  return table.concat(t, " "), r.lastStandN
+end
+local ls, n = lastStandOf(0x07C)
+assert(ls == "CB" and n == 1, "$07C Chitonid: last-stand SNEEZE at N=1 (got '" .. ls .. "' N=" .. tostring(n) .. ")")
+ls, n = lastStandOf(0x02C)
+assert(ls == "EF" and n == 1, "$02C HermitCrab: last-stand SPECIAL at N=1 (got '" .. ls .. "' N=" .. tostring(n) .. ")")
+assert(lastStandOf(0x021) == "", "$021 Mesosaur: its if_num_monsters is in the main section, no counter")
+assert(lastStandOf(0x0E6) == "", "$0E6 Osprey: counters Magic, no last-stand")
+local _, s204 = slotsOf(0x0CC)
+local holders = {}
+for slot = 0, 5 do
+  if s204[slot] and #s204[slot].roles.lastStand > 0 then holders[#holders + 1] = tostring(slot) end
+end
+assert(table.concat(holders, " ") == "1", "$0CC: the Chitonid in slot 1 is the one last-stand body")
+-- negative control: the Chitonid's `if_num_monsters 1` rewritten to
+-- `if_num_chars 1` (FC 13 00 01): a count of the party, not of the
+-- monsters -- no last-stand counter
+local chit = scriptOf(0x07C)
+local condAt = nil
+for i = 0, H.AI_SCRIPT_MAX do
+  if chit(i) == 0xFC and chit(i + 1) == 0x13 and chit(i + 2) == 0x01 then condAt = i; break end
+end
+assert(condAt, "$07C's if_num_monsters found")
+assert(lastStandOf(0x07C, { [condAt + 2] = 0x00 }) == "",
+  "$07C with its count turned on the party: no last-stand counter")
+
 print("parts_selftest: PASS -- $1BA {0} with the blades respawning, $1CB {2,0} with the gun "
   .. "arming 0.0 and the Speck the body's; 9 linked formations, " .. plain
-  .. " other multi-slot formations plan nothing")
+  .. " other multi-slot formations plan nothing; last-stand counters: $07C SNEEZE and $02C "
+  .. "SPECIAL at N=1, $021 and $0E6 none, $0CC's one in slot 1, the party-count mutant none")

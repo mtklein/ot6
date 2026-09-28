@@ -1176,10 +1176,16 @@ end
 -- (keys from worldEdgeKey) prunes edges the executor has proven wrong,
 -- same contract as the field bfsPath.  The node cap is 60000 rather than
 -- the field's 4096, since world segments can run over 100 tiles.
-function M.worldBfs(tx, ty, blockedEdges, sx, sy)
+-- `avoid` is a set of tiles the path must never step onto, keyed
+-- (y & $FF) * 256 + (x & $FF) (M.worldAvoidSet builds one from a list);
+-- the goal tile itself is exempt, as navTo's avoid list is.  It is how a
+-- walk stays off terrain whose encounter pool a party cannot take (Tzen's
+-- desert, the Black Drgn's pool, for a solo CELES: #255).
+function M.worldBfs(tx, ty, blockedEdges, sx, sy, avoid)
   blockedEdges = blockedEdges or {}
   sx, sy = sx or M.worldX(), sy or M.worldY()
   local function key(x, y) return (y & 0xFF) * 256 + (x & 0xFF) end
+  local goalKey = key(tx, ty)
   local seen = { [key(sx, sy)] = true }
   local q, qi = { { sx, sy } }, 1
   local parent = {}
@@ -1200,7 +1206,8 @@ function M.worldBfs(tx, ty, blockedEdges, sx, sy)
         local d = DELTA[dir]
         local nx, ny = (x + d[1]) & 0xFF, (y + d[2]) & 0xFF
         local k = key(nx, ny)
-        if not seen[k] and M.worldPassable(nx, ny) then
+        if not seen[k] and M.worldPassable(nx, ny)
+           and not (avoid and avoid[k] and k ~= goalKey) then
           seen[k] = true
           parent[k] = { key(x, y), dir }
           q[#q + 1] = { nx, ny }
@@ -1209,6 +1216,14 @@ function M.worldBfs(tx, ty, blockedEdges, sx, sy)
     end
   end
   return nil
+end
+
+-- A world avoid set (M.worldBfs, M.worldPathGroups, M.worldNavTo's
+-- opts.avoid) from a list of { x, y } tiles.
+function M.worldAvoidSet(list)
+  local set = {}
+  for _, t in ipairs(list or {}) do set[((t[2] & 0xFF) << 8) | (t[1] & 0xFF)] = true end
+  return set
 end
 
 -- The encounter groups a world walk through `waypoints` ({ {x,y}, ... },
@@ -1229,8 +1244,9 @@ end
 -- when the saved position is already in one of the walk's zones.
 -- Needs the world map loaded and settled (M.worldSettled: the tilemap is
 -- WRAM, rebuilt after every battle).  A leg with no path raises: a walk
--- that cannot be planned has no pool.
-function M.worldPathGroups(waypoints)
+-- that cannot be planned has no pool.  `avoid` (M.worldAvoidSet) plans
+-- each leg the way M.worldNavTo does with the same set.
+function M.worldPathGroups(waypoints, avoid)
   local zones, zoneSeen, bgs, bgSeen = {}, {}, {}, {}
   local function stand(x, y)
     local z = worldZone(x, y)
@@ -1248,7 +1264,7 @@ function M.worldPathGroups(waypoints)
     local x, y = waypoints[i][1], waypoints[i][2]
     stand(x, y)
     local tx, ty = waypoints[i + 1][1], waypoints[i + 1][2]
-    local dirs = M.worldBfs(tx, ty, nil, x, y)
+    local dirs = M.worldBfs(tx, ty, nil, x, y, avoid)
     assert(dirs, string.format("no world path from (%d,%d) to (%d,%d)", x, y, tx, ty))
     for _, d in ipairs(dirs) do
       x, y = (x + DELTA[d][1]) & 0xFF, (y + DELTA[d][2]) & 0xFF
@@ -1326,8 +1342,21 @@ end
 --                            zeroed, and the walker re-plans from it.
 --   opts.fight     the tactical driver's option table, merged over the
 --                  named options (M.fightDriverFor), as navTo's.
+--   opts.avoid     world tiles the plan never steps onto: a list of
+--                  { x, y } or a set from M.worldAvoidSet (the goal tile
+--                  is exempt), or a function returning either, read at
+--                  every plan (a set built from the live tilemap once the
+--                  run is under way).  A tile the party is knocked onto
+--                  anyway (a battle never moves it, but an event could) is
+--                  left by the next plan like any other.
 function M.worldNavTo(txIn, tyIn, opts)
   opts = opts or {}
+  local function avoidNow()
+    local a = opts.avoid
+    if type(a) == "function" then a = a() end
+    if a ~= nil and type(a[1]) == "table" then a = M.worldAvoidSet(a) end
+    return a
+  end
   local maxFrames = opts.maxFrames or 20000
   local arrive = opts.arrive
   local spareSet = {}
@@ -1498,18 +1527,20 @@ function M.worldNavTo(txIn, tyIn, opts)
       -- actually dead is re-condemned on the next pass.
       if plan and idx > #plan then plan = nil end
       if not plan then
-        plan = M.worldBfs(resolveT(txIn), resolveT(tyIn), blocked)
+        local avoid = avoidNow()
+        plan = M.worldBfs(resolveT(txIn), resolveT(tyIn), blocked, nil, nil, avoid)
         if not plan and nblocked > 0 then
           M.log(string.format(
             "wnav: no path with %d blocked edges; amnesty + re-plan", nblocked))
           blocked, nblocked = {}, 0
-          plan = M.worldBfs(resolveT(txIn), resolveT(tyIn), blocked)
+          plan = M.worldBfs(resolveT(txIn), resolveT(tyIn), blocked, nil, nil, avoid)
         end
         idx = 1
         if not plan then
           error(string.format(
-            "worldNavTo: no path (%d,%d)->(%d,%d) [%d edges blocklisted]",
-            x, y, resolveT(txIn), resolveT(tyIn), nblocked), 0)
+            "worldNavTo: no path (%d,%d)->(%d,%d) [%d edges blocklisted%s]",
+            x, y, resolveT(txIn), resolveT(tyIn), nblocked,
+            avoid and ", avoid set in force" or ""), 0)
         end
         M.log(string.format("wnav: planned %d steps from (%d,%d)", #plan, x, y))
         if #plan == 0 then M.setPad({}); return end
@@ -2341,6 +2372,30 @@ local function careClose(zmExtra)
     return M.hasControl() and M.tileAligned()
        and (zmExtra == nil or zmExtra())
   end
+end
+
+-- The equip helpers' settle and back-out checks (M.equipEsper,
+-- M.equipWeapon, M.equipKit, M.emptyEquip): on a field map, the field
+-- module's own control, true the first frame the field is back
+-- (M.hasControl, what these helpers always waited on); on the world map,
+-- careClose's debounced world reading.  M.hasControl reads the field
+-- party object, which the world map never hands back: measured on the
+-- wor-start-v1 landing (build/attempts/wt/wor-tzen-door/lab/lab_kit.log),
+-- `MADUIN -> CELES: verified: char 6 (pos 0) wears $06` and then "timeout
+-- after 1200 frames driving toward MADUIN -> CELES: back out" with the
+-- world map back under the menu.  menuBack() builds a fresh predicate per
+-- step (careClose's world half counts calm frames); menuHome() is the
+-- undebounced "the map has control" a session waits on before it opens.
+local function menuBack()
+  local worldClosed = careClose()
+  return function()
+    if M.worldMode() then return worldClosed() end
+    return M.hasControl()
+  end
+end
+local function menuHome()
+  if M.worldMode() then return M.worldHasControl() and M.worldAligned() end
+  return M.hasControl()
 end
 
 function M.charHp(c) return M.readWord(0x1600 + 37 * c + 9) end
@@ -4441,7 +4496,7 @@ function M.equipEsper(pos, esperIdx, opts)
 
   local function backOut(what)
     return {
-      M.driveUntil(function() return M.hasControl() end, 1200,
+      M.driveUntil(menuBack(), 1200,
         { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, what .. ": back out"),
       M.waitFrames(20),
     }
@@ -4654,7 +4709,7 @@ function M.equipWeapon(pos, itemId, opts)
         if opts.result then opts.result.found = false end
       end),
     }),
-    M.driveUntil(function() return M.hasControl() end, 1200,
+    M.driveUntil(menuBack(), 1200,
       { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),
     M.waitFrames(20),
   })
@@ -4772,7 +4827,7 @@ function M.equipKit(charId, items, opts)
       -- read the closing menu's $05 as its own: settle in the field first
       -- (the escape's post-Atma kit saw "main menu" in 3 frames and then
       -- steered a cursor that was not there)
-      M.waitUntil(function() return M.hasControl() and st() ~= ST_MAIN end, 600,
+      M.waitUntil(function() return menuHome() and st() ~= ST_MAIN end, 600,
         stag .. ": field settled before the menu", 5),
       M.waitFrames(20),
       M.driveUntil(function() return st() == ST_MAIN end, 1200,
@@ -4849,7 +4904,7 @@ function M.equipKit(charId, items, opts)
         M.waitFrames(10),
       }, {})
     end
-    steps[#steps + 1] = M.driveUntil(function() return M.hasControl() end, 1200,
+    steps[#steps + 1] = M.driveUntil(menuBack(), 1200,
       { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, stag .. ": back out")
     steps[#steps + 1] = M.waitFrames(20)
     -- the whole session is skipped when nothing in it is left to do
@@ -4957,7 +5012,7 @@ function M.emptyEquip(charId, opts)
       M.assertEq(four(), "FF FF FF FF", tag .. ": the four slots read empty")
       if opts.check then opts.check() end
     end),
-    M.driveUntil(function() return M.hasControl() end, 2400, {
+    M.driveUntil(menuBack(), 2400, {
       M.call(function() tap("b") end),
     }, tag .. ": back out to the field"),
     M.release(), M.waitFrames(20),

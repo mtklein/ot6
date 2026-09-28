@@ -92,9 +92,13 @@ def worker_of(path):
     return d.split(".")[0]
 
 
-def classify(deaths, one_pct=ONE_SHOT_PCT, early=EARLY_FRAMES, banked=BANKED_BP):
+def classify(deaths, one_pct=ONE_SHOT_PCT, early=EARLY_FRAMES, banked=BANKED_BP, statues=0):
     """The owner's reading of one wipe from its death records
-    (dicts with tick, from, max, bp, one_action)."""
+    (dicts with tick, from, max, bp, one_action), as lib/ot6.lua
+    M.wipeClass reads it.  statues: the seated members Petrified or
+    Zombied at the wipe (#255) -- a loss with no death in it."""
+    if not deaths and statues > 0:
+        return f"lost to a status: {statues} member(s) Petrified or Zombied, no deaths"
     if not deaths:
         return "no deaths recorded"
     one_shot = any(d.get("one_action") and d["tick"] <= early and d["max"] > 0
@@ -299,6 +303,13 @@ def selftest():
     late = [dict(tick=5000, **{"from": 447}, max=447, bp=2, one_action=True)]
     assert classify(late) == "worn down (no one-shot, no pips banked)", classify(late)
     assert classify([]) == "no deaths recorded"
+    # a statue wipe (#255), the driver's line verbatim from
+    # build/attempts/wt/wor-tzen-door/lab/lab_grind_noring2.log
+    stat = ("[ot6] [lab grind] [wipe] f+2357 party_bp=1,1,1,1 deaths=none "
+            "class=lost to a status: 1 member(s) Petrified or Zombied, no deaths")
+    m = WIPE.search(stat)
+    assert m and m["cls"] == classify([], statues=1), (m and m["cls"], classify([], statues=1))
+    assert classify([], statues=0) == "no deaths recorded"
     print("audit_boost selftest ok")
 
 

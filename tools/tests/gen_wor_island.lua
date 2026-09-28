@@ -110,8 +110,9 @@ H.run({ maxFrames = 12000 }, {
   H.saveGame({ slot = 3, tag = "wor-island-v1 save" }),
   H.call(function()
     -- what the battery holds (#218): the slot's own copy of $1F64 and
-    -- $1F60/$1F61 (map 1 is the World of Ruin, where
-    -- H.assertSavedSlotWorld expects the World of Balance's 0)
+    -- $1F60/$1F61 (map 1 is the World of Ruin; H.assertSavedSlotWorld
+    -- takes the world since #255, and this segment reads the slot itself
+    -- to log Cid's health beside it)
     local s = H.savedSlot()
     H.log(string.format("[saved] wor-island-v1: slot %d holds map %d ($%04X) world tile (%d,%d), Cid health %d",
       s.slot, s.map, s.mapWord, s.worldX, s.worldY, health()))

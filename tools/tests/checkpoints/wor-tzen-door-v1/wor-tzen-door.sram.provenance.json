@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "5965bc6b6edbb35bb8169dc9116135e1ee57c5b3101d126bbc284ddf9f99d412",
+  "generator_sig": "6736c2ad5904b39f923982819700429d63241bb2d4beba2c0ee991f830e8d279 gen_wor_tzen_door tools/tests/checkpoints/wor-start-v1/manifest.json tools/tests/checkpoints/wor-start-v1/wor-start.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/wor-start-v1/manifest.json",
+      "sha256": "08e82b92facc089bf128dcbf379bb755096b55f13f4aeb5dcdaba74dd6b3289c"
+    }
+  ]
+}
