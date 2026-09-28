@@ -10,6 +10,10 @@ edge:
 
 The copy re-runs on any mtime bump, rewrites its output only when bytes
 differ, and `restat = 1` prunes everything downstream when it did not move.
+A generator is copied by `copy_if_lua_changed` instead (lua_fingerprint.py
+copy-if-changed): the copy takes the new bytes but keeps its mtime when the
+Lua token stream did not move, so a comment or whitespace edit regenerates
+nothing, the same rule the stamps' generator hash follows (#247).
 Generated states themselves are not copied this way: a regenerated .mss is
 new bytes, and everything booted from it must replay.
 
@@ -204,6 +208,15 @@ def emit_state_rules(w):
       "cp build/states/$src.stamp build/states/$state.stamp")
     w("  description = stack seed $state <- $src")
     w("")
+    w("# A generator's copy: the new bytes always land, but the old mtime is")
+    w("# kept when the Lua token stream (comments and whitespace dropped) did")
+    w("# not move, so restat prunes a comment-only edit (#247).")
+    w("rule copy_if_lua_changed")
+    w("  command = python3 tools/tests/lib/lua_fingerprint.py "
+      "copy-if-changed $in $out")
+    w("  description = copy_if_lua_changed $in")
+    w("  restat = 1")
+    w("")
 
 
 def emit_state_edges(w, states, root, copy_if_changed_from):
@@ -283,6 +296,13 @@ def emit_state_edges(w, states, root, copy_if_changed_from):
     w("")
 
 
+def copy_rule(src, states):
+    """The copy rule for one copy_if_changed source: a generator the graph
+    runs is copied by its Lua token stream, anything else by its bytes."""
+    gens = {f"tools/tests/{e['gen']}.lua" for e in states if e.get("gen")}
+    return "copy_if_lua_changed" if src in gens else "copy_if_changed"
+
+
 def copy_if_changed_sources(states, root):
     """Every source path the state edges route through a copy_if_changed
     edge, in first-use order: the ROM, each generator, each checkpoint input."""
@@ -330,7 +350,7 @@ def emit(states, root):
     w(f"build {OUT}: regen {SELF} {GRAPH}")
     w("")
     for src in copy_if_changed_sources(states, root):
-        w(f"build {copy_if_changed_from(src)}: copy_if_changed {src}")
+        w(f"build {copy_if_changed_from(src)}: {copy_rule(src, states)} {src}")
     w("")
     emit_state_edges(w, states, root, copy_if_changed_from)
     sidecars = " ".join(f"build/states/{e['state']}.mss.lua" for e in states)

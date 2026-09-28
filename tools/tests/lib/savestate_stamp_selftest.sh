@@ -134,9 +134,11 @@ sh "$GATE" write fake gen_fake - "$extra"
 [ "$(sed -n 3p "$TMP/build/states/fake.stamp")" = "generator $(sh "$GATE" gensig gen_fake "$extra")" ] &&
   echo "  pass write records the generator's own sig (gensig)" ||
   { echo "  FAIL generator line wrong or missing"; ok=0; }
-want_lib="lib tools/tests/lib/ot6.lua $(shasum -a 256 "$TMP/tools/tests/lib/ot6.lua" | cut -c1-64)
-lib tools/tests/lib/ot6_field.lua $(shasum -a 256 "$TMP/tools/tests/lib/ot6_field.lua" | cut -c1-64)
-lib tools/tests/lib/ot6_contract.lua $(shasum -a 256 "$TMP/tools/tests/lib/ot6_contract.lua" | cut -c1-64)"
+# (a lib half's hash is of its Lua token stream, lua_fingerprint.py)
+FP="$(dirname "$GATE")/lua_fingerprint.py"
+want_lib="lib tools/tests/lib/ot6.lua $(python3 "$FP" hash "$TMP/tools/tests/lib/ot6.lua")
+lib tools/tests/lib/ot6_field.lua $(python3 "$FP" hash "$TMP/tools/tests/lib/ot6_field.lua")
+lib tools/tests/lib/ot6_contract.lua $(python3 "$FP" hash "$TMP/tools/tests/lib/ot6_contract.lua")"
 [ "$(sed -n 4,6p "$TMP/build/states/fake.stamp")" = "$want_lib" ] &&
   echo "  pass write records each lib half's hash (provenance)" ||
   { echo "  FAIL lib lines wrong or missing"; ok=0; }

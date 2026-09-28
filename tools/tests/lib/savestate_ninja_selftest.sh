@@ -14,6 +14,7 @@ ok=1
 mkdir -p "$TMP/tools/tests/lib" "$TMP/tools/tests/checkpoints/toy-v1" "$TMP/build"
 cp "$REAL/tools/tests/lib/savestate_ninja.py" "$TMP/tools/tests/lib/"
 cp "$REAL/tools/tests/lib/savestate_stamp.sh" "$TMP/tools/tests/lib/"
+cp "$REAL/tools/tests/lib/lua_fingerprint.py" "$TMP/tools/tests/lib/"
 printf 'lib v1\n'      > "$TMP/tools/tests/lib/ot6.lua"
 printf 'field v1\n'    > "$TMP/tools/tests/lib/ot6_field.lua"
 printf 'contract v1\n' > "$TMP/tools/tests/lib/ot6_contract.lua"
