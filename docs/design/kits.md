@@ -80,8 +80,8 @@ The 8 Tools, verbatim ✦, learned by acquisition.
 The MP column is mp-economy.md's "scaled by tier 3–20" (AutoCrossbow 3–4,
 Drill/Chain Saw 12–20, Debilitator 8–12): gil buys the tool once, and MP is
 the per-use operating cost. It lives in `Ot6AbilityCostTbl` keyed by **tool
-item id** ($a3–$aa, the same keying ot6_class.asm uses for tool classes),
-charged under `OT6_MP_COSTS`. The mid-kit gag Air Anchor ($a9, the findable
+item id** ($a3–$aa, the same keying ot6_class.asm uses for tool classes).
+The mid-kit gag Air Anchor ($a9, the findable
 harpoon) is costed 14 alongside them. **Overclock** fires two tools, so it has
 no single price; its cost is the **sum (Σ)** of the two it fires. That will be
 wired when Overclock is built, which has not happened yet.
@@ -116,8 +116,8 @@ Levels below are `BlitzLevelTbl` (`field/event.asm:1240`).
 | 7 | Spiraler | 50 | — | 42 |
 | 8 | **Bum Rush** (divine) | **99** | bludgeoning ×4 | 70 / Duncan |
 
-The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64,
-charged under `OT6_MP_COSTS`. Bum Rush is Sabin's ultimate and is
+The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64.
+Bum Rush is Sabin's ultimate and is
 fixed at **99**, which is 13.0% of his L70 pool of 760 and the same fraction
 Cleave is of Cyan's pool; both are pinned there so the fractions match. Mantra
 is priced under Fire Dance because it is a utility option rather than a damage
@@ -171,9 +171,8 @@ so it is the top of the table's range and not only its current maximum.
 Per-row measurement, and the baseline, are in mp-economy.md's "The baseline";
 checked by `tools/tests/battle_costtable.lua`.
 
-These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6_boost.asm),
-charged under the `OT6_MP_COSTS` build flag, which defaults ON, so the shipped
-ROM charges them (see mp-economy.md).
+These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6_boost.asm)
+(see mp-economy.md).
 
 **Every number in these tables is a base price for the rows that
 escalate.** Since #219, boosting an ability whose damage the boost
@@ -259,14 +258,11 @@ name + MP cost, greyed when the caster can't afford the MP *or* the BP, and
 gate Blitz, Tools and the thief submenu take, mp-economy.md ruling 2) refuses
 the MP reason and, since #232, the BP reason as well, reading the row's grey
 from the same `Ot6BushidoRowGrey` that coloured it; `Ot6BushidoConfirm`'s
-own bank test is the free build's path and the backstop. Either way it
+own bank test is the backstop. Either way it
 buzzes and leaves the list open, so a row the window draws as unreachable
 costs nothing to
 try. It reuses the Tools window shell,
-`Ot6CostFor`, and `Ot6AbilityGrey`, with all cost/grey/refusal logic gated
-`.if OT6_MP_COSTS` (in the battle object, and in btlgfx, which is assembled
-once per flag for the two confirm gates) so the nomp baseline is
-undisturbed. SwdTech's rows do **not**
+`Ot6CostFor`, and `Ot6AbilityGrey`. SwdTech's rows do **not**
 take #219's 2.5x escalation, for the reason the row already exists: the boost
 is the row, so the row's own price is the escalation (`Ot6KitRowCost`'s
 bushido arm, and `Ot6AbilityCost`'s). The thief window's three rows do not

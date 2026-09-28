@@ -352,7 +352,7 @@ roughly 40–60 (mp-economy.md).
 FF6's magic damage scales on power, level and mag.pwr; at Facility levels a
 single unboosted Osmose computes for several hundred, which is many times the
 caster's entire pool, so one cast is a full refill against any enemy with MP.
-With `OT6_MP_COSTS` live, every verb but Fight costs MP (mp-economy.md), so a
+Every verb but Fight costs MP (mp-economy.md), so a
 character who never runs out of MP is valuable.
 
 Compounding it: MP damage rides the same `$11b0` value the boost multiplier

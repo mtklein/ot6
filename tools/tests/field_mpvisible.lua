@@ -1,6 +1,6 @@
 -- @suite savestate=sfigaro_passage
 -- field_mpvisible.lua -- the field menu shows every character's MP, since
--- OT6_MP_COSTS returns has-MP unconditionally (Ot6MpUniversal idiom).
+-- CheckMPVisible returns has-MP unconditionally (Ot6MpUniversal idiom).
 --
 -- Fixture: sfigaro_passage, LOCKE solo, no spells known, no espers owned.
 --

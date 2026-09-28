@@ -194,7 +194,6 @@ subtract and its fizzle, `mp-economy.md`'s "Where it lands"), so the refusal
 surface is the standard one: a Gau under 8 MP is refused the start rather than
 given it for free, and the mid-trance zero-charge holds across a multi-turn
 trance exactly as Dance specifies.
-`.if OT6_MP_COSTS` gates it all; the nomp baseline is undisturbed.
 
 **Leap is free**, by owner ruling, and it is the exception to "only the basic
 Fight command is free" (`mp-economy.md`'s "Principles"). Two reasons, both about
@@ -502,7 +501,7 @@ drawn at col 2 under a cursor at `x = 8` puts the sprite on the leading glyph.
    in the gate; that pair is the rule in two rows. One payment still funds
    the whole trance; every possessed turn after the start stays free. See
    mp-economy.md's "Boosting costs MP".
-   `.if OT6_MP_COSTS`-gated like Steal's arm. No `cmd $11` arm: Leap is free
+   No `cmd $11` arm: Leap is free
    (§5). The flat price is drawn once on the configurator's title row via the
    `Ot6LoadoutDrawCost` pattern (`field_menu.asm:2831-2860`).
 5. **Boost** —

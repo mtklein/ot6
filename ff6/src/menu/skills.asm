@@ -1930,8 +1930,7 @@ DrawBlitzMenu:
 ;                blank and that is the correct answer: Mantra and Spiraler
 ;                carry neither an element nor a class.
 ;   col  16..20  "nn MP", from Ot6LoadoutCost -> Ot6CostFor, the same leaf the
-;                charge and the battle row read (blank under nomp, which prices
-;                nothing)
+;                charge and the battle row read
 ;
 ; The geometry.  The EN field-menu window shows a tilemap row pair in twelve
 ; scanlines, the odd row getting eight and the even row four, and nothing past
@@ -2001,7 +2000,7 @@ Ot6BlitzPageDraw:
         lda     $e2
         clc
         adc     #OT6_BLITZ_ATK0
-        jsl     Ot6LoadoutCost          ; F0: A = MP cost (0 under nomp)
+        jsl     Ot6LoadoutCost          ; F0: A = MP cost
         ldx     #OT6_BLITZ_COST_COL
         jsr     Ot6LoadoutDrawCost      ; the one field-menu price drawer
         bra     @next
@@ -2145,9 +2144,7 @@ Ot6BlitzCursorPos:
 ;     Ot6LoadoutCost($56) is a boosted SwdTech price, not Steal's.
 ;     Ot6ThiefCost is the shim built for exactly this: Steal resolves
 ;     through Ot6StealCost, the one authority for the 4, and Filch/Bestow
-;     through Ot6ThiefCostTbl, the same split the battle charge makes, and it
-;     returns 0 under nomp so the shared menu object stays byte-identical
-;     across the A/B builds (no flag-conditional bytes here).
+;     through Ot6ThiefCostTbl, the same split the battle charge makes.
 ;   * there is no probe-icon column.  Ot6SkillIconGlyph walks Ot6SkillClassTbl,
 ;     which keys $56/$57/$58 to Retort/Slash/Quadra Slam's slash class, so the
 ;     column would teach SwdTech's break classes on thief rows.  The battle
@@ -2203,7 +2200,7 @@ Ot6ThiefPageDraw:
         lda     $e2
         clc
         adc     #OT6_THIEF_ATK0         ; row id
-        jsl     Ot6ThiefCost            ; F0: A = MP cost (0 under nomp); the
+        jsl     Ot6ThiefCost            ; F0: A = MP cost; the
                                         ;   thief-keyed shim, NOT Ot6LoadoutCost
                                         ;   (see the header: $56-$58 collide
                                         ;   with SwdTech's cost keys)
