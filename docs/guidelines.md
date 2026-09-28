@@ -15,7 +15,9 @@ evidence); this file does not restate it.
 The harness plays OT6 the way a competent person with a controller would.
 
 - **Fight, don't flee.** Flee only where the game forces it. Win with
-  levels, gear, kill order and abilities. Fleeing compounds: skipped fights
+  levels, gear, kill order and abilities. Inside a timed scene with a
+  visible clock, run from a random battle when the time left can't cover
+  another fight (owner, 2026-09-28). Fleeing compounds: skipped fights
   are skipped XP, and the debt surfaces at a later, harder fight. Grinding
   is normal play; "the party is too low for this" is an acceptable finding,
   and the answer is healthy levels (not minimal ones) at each key point.
