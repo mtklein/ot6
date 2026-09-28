@@ -83,6 +83,8 @@ The harness plays OT6 the way a competent person with a controller would.
 - **Don't retune vanilla enemies** (AI scripts, spells, one-shots) to dodge
   a hard fight. OT6 changes battle systems, not individual enemy quirks;
   answer a hard fight with levels, gear, route or strategy.
+- **Mimic is free.** A mimic copies the action, never the price, at any
+  boost; the boost buys what it buys on the copied action.
 - **Octopath-style twists on FF6 characters are welcome** (Shadow's break
   that kills). Shadow stays in the party the whole game.
 - **The World of Balance / World of Ruin split is a storytelling boundary,
