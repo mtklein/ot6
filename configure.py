@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """configure.py -- emit ./build.ninja, the whole project as one ninja graph.
 
-Bare `ninja` builds and tests everything: the default target is `qual`,
-whose inputs are every ROM, every generated savestate, every suite test's
-result, every audit and every selftest.  `ninja release` is all of that
-plus the release preflights, the BPS patch and the zip.  Those two are the
-only aliases; any partial need is a real output path
+Bare `ninja` builds and tests everything: the default targets are every
+ROM, every generated savestate, every suite test's result, every audit and
+every selftest.  `ninja release` is all of that plus the release
+preflights, the BPS patch and the zip.  `release` is the only alias; any
+partial need is a real output path
 (`ninja build/states/vargas_entry.mss.lua`,
 `ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`).
 Parallelism is ninja's own, unbounded; emulator-running commands are
@@ -42,7 +42,7 @@ from the root):
   checks         the selftests and audits, each with its real inputs, so an
                  unchanged tree re-runs none of them.
   release        preflights (branch, README version, real notes), the BPS
-                 patch, and the zip (`ninja release`).  `default` is qual.
+                 patch, and the zip (`ninja release`).
 
 Regeneration: the `configure` edge below re-runs this script when it, the
 graph data, VERSION, or any globbed directory changes (the depfile lists
@@ -632,12 +632,11 @@ check("release_readme",
       f" current release'; exit 1; }}",
       ["VERSION", "README.md"], desc=f"README names v{VERSION}")
 
-# The two release preflights are not qualification: bare `ninja` (qual)
+# The two release preflights are not qualification: bare `ninja`
 # runs every qualifier on pushed main before the release commit (VERSION,
 # notes, README) exists; `ninja release` (the zip) still requires both.
 release_pre = qual[qual_before_release:]
 del qual[qual_before_release:]
-w.edge(["qual"], "phony", implicit=qual)
 
 bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
 w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
@@ -670,7 +669,7 @@ w.edge(["build.ninja"], "configure",
         "VERSION"])
 w()
 w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip"])
-w("default qual")
+w("default " + " ".join(esc(p) for p in qual))
 w()
 
 # ------------------------------------------------------------------ write --
