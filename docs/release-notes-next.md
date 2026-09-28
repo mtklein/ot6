@@ -20,3 +20,10 @@ plain blade can't chip the plated Chitonid's shields: crack them with
 lightning (a ThunderBlade, sold in Albrook and Tzen, or Maduin's Bolt) or, later,
 Sabin's fists. In Tzen's collapsing house every monster breaks to her sword,
 including the Scorpions that used to leave her no answer.
+
+**Gogo's Mimic never costs MP, boosted or not.** A boosted Mimic of a
+two-spell X-Magic turn used to charge Gogo MP for the second spell. Now
+every Mimic is free, and a boost on it buys what it would buy on the
+copied action: a copied Fire, Ice, Bolt or other spell with stronger
+versions casts the stronger one (Fire 2 for one boost, Fire 3 for two or
+more), where before the boost was spent on a plain Fire.

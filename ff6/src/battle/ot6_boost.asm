@@ -787,12 +787,27 @@ done:   pla
 ; through Ot6MagicPrice, so it already holds min(99, base x 2.5^boost), and
 ; it cannot be stale here: Ot6Boost re-prices it on the L/R edge itself
 ; (Ot6RecheckMagic), and the bank is frozen from the confirm on
-; (Ot6CommittedSlot).  A second pricing here would also bypass vanilla's
-; free Mimic, which GetMPCost honours with `trb $b1` before this proc runs,
-; so this proc cannot see it.  (The arm that used to sit here tested $3a7b
-; as an esper index, but FixPlayerAttack has already added the $36 record
+; (Ot6CommittedSlot).  A second pricing here would also have to honour
+; vanilla's free Mimic (next paragraph).  (The arm that used to sit here
+; tested $3a7b as an esper index, but FixPlayerAttack has already added the $36 record
 ; offset, so it never ran; probe_summon_price measured the list price
 ; being the whole charge.)
+;
+; ---- a mimic's copy folds but is never priced ----
+;
+; Mimic copies the action and not the price (mp-economy.md).  Vanilla makes
+; the copy free twice: mimicreplace overwrites the mimic's own queue slot,
+; whose cost was queued as command $12's 0, and the one copy it queues
+; afresh -- an x-magic's second spell -- reaches here through CreateAction
+; with $b1.6 set, which GetMPCost clears (`trb $b1`) and prices 0.  This
+; proc re-priced that second spell from the mimic's pending boost anyway: a
+; boost-1 Mimic of an x-magic Fire + Drain was charged Drain's 38, of Drain +
+; Fire the folded Fire 2's 20 (#260, probe_mimic_charge).  So CreateAction
+; reads $b1.6 before GetMPCost clears it and hands it here as the V flag of
+; the P this proc's own php pushes ($02,s after the pha): with V set the
+; tier still folds, since the boost buys the tier on a tier-family spell
+; whoever casts it (Ot6MimicFold does the same for the copy mimicreplace
+; writes itself), and the price is left at GetMPCost's 0.
 ;
 ; ---- the counterattack guard cannot use the global "counter executing" flag ----
 ;
@@ -867,6 +882,11 @@ done:   pla
                                 ;   multiplier, so neither its id nor its price
                                 ;   moves
         sta     $3a7b           ; queue the folded tier
+        xba                     ; (park it: the mimic test needs A)
+        lda     $02,s           ; the caller's P, pushed by the php above
+        and     #$40            ;   V: a mimic's copy (CreateAction, #260)
+        bne     @keep           ;   buys the tier and keeps GetMPCost's 0
+        xba
         jsl     Ot6SpellMP      ; and price it as that tier.  x is still
         sta     $3620,y         ;   the actor, y still the queue slot, so this
         bra     @keep           ;   overwrites the base cost :13249 just banked
@@ -877,9 +897,62 @@ done:   pla
         ; recheck (Ot6FoldPrices) having run first -- the same rule the fold
         ; above keeps.  Both arrive at one number because both walk
         ; MagicProp -> Ot6SpellMP -> Ot6BoostPriceFor.
+        lda     $02,s           ; but a mimic's copy is free at every boost
+        and     #$40            ;   (#260): its boost buys the multiplier and
+        bne     @keep           ;   GetMPCost's 0 stands
+        lda     $3a7b           ; the attack id again
         jsl     Ot6SpellMP      ; the base price, relics included
         jsl     Ot6BoostPriceFor
         sta     $3620,y
+@keep:  pla
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a boosted mimic's copy of a tier-family spell folds, free ]
+
+; #260.  jsl from mimicreplace (battle_main.asm), right after it copies the
+; mimicked command/attack/targets over the mimic's own queue slot.  That copy
+; never passes CreateAction, so Ot6QueueFold never sees it, and it keeps the
+; slot's queued cost: command $12's 0.  The copy's boost still has to buy
+; what a boost buys on that action.  Everything but a tier-family head gets
+; it without help (Ot6BoostDmg's multiplier, Fight's swings, a ladder), but
+; a tier-family head buys its tier, and Ot6BoostDmg gives a family spell no
+; multiplier because the fold is its purchase: a boosted Mimic of a plain
+; Fire spent its pips and cast plain, unmultiplied Fire (probe_mimic_charge,
+; 3 pips for 173 damage against 174 unboosted).  This is the fold alone, on
+; Ot6QueueFold's own gate and table, with no price: the mimic copies the
+; action and not the price at every boost (mp-economy.md).  A copy the
+; source already folded (Fire 2) is not a head and stays, the same answer a
+; direct cast of an owned tier gets.
+;
+; a8, either index width; x = the actor's entity offset, y = the queue slot
+; (mimicreplace's own).  Preserves A, x and y.
+
+.proc Ot6MimicFold
+        .a8
+        php
+        longi
+        .i16
+        pha
+        lda     $3420,y         ; the copied command: Ot6QueueFold's gate
+        cmp     #$02
+        beq     @cmdok          ; $02 magic
+        cmp     #$17
+        beq     @cmdok          ; $17 x-magic (an x-magic's first spell is
+                                ;   queued as $02; this is the belt)
+        cmp     #$0c
+        bne     @keep           ; $0c lore (no lore id is in the table)
+@cmdok: txa
+        cmp     #$08
+        bcs     @keep           ; monsters never mimic, or boost
+        jsl     Ot6FoldSteps    ; pending boost -> OT6_SCR_BIT tier steps
+        beq     @keep           ; unboosted: the copy stands
+        lda     $3421,y         ; the copied attack id
+        jsl     Ot6FoldTier     ; a head folds; anything else comes back as is
+        sta     $3421,y
 @keep:  pla
         plp
         rtl
