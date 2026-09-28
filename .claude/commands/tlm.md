@@ -34,6 +34,12 @@ interpreting runs.
   http://127.0.0.1:8611/) is how the owner watches runs: the worker grid,
   per-worker detail, the route map. It must be up and truthful whenever
   runs happen, and especially whenever you ask the owner for help.
+- **Second machine:** an M4 MacBook Air at `ssh air.local` (key auth;
+  `eval "$(/opt/homebrew/bin/brew shellenv zsh)"` in non-login shells;
+  clean clone at `~/ot6`, which stays on main -- work runs in separate
+  clones under `~/work/`). Send heavy emulator runs there; cap it at about
+  6 concurrent emulators (10 cores). live.py's `--peer air.local` (in
+  the `ot6-live` launch config) shows its workers on the same page.
 
 # 1. Start: state of the world
 
