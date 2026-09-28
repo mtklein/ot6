@@ -149,3 +149,13 @@ to zero. This policy adds no authorization to fabricate gameplay state.
 
 See [the harness guide](../tools/tests/README.md) for commands and
 [headless play](playing-headless.md) for navigation and checkpoint mechanics.
+
+## Scripts that stay in the tree
+
+A script stays in `tools/tests` only if it is a measuring instrument
+someone will run again, and qualification proves it still composes and
+starts. A one-off probe or lab answers its question and goes: its
+findings belong in the commit message that deletes it (and in the design
+doc where they are used), and git history keeps the script. Future work
+takes its context from the design docs, the suites and the library, which
+qualification keeps true, not from old experiments.
