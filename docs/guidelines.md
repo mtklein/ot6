@@ -19,6 +19,9 @@ The harness plays OT6 the way a competent person with a controller would.
   are skipped XP, and the debt surfaces at a later, harder fight. Grinding
   is normal play; "the party is too low for this" is an acceptable finding,
   and the answer is healthy levels (not minimal ones) at each key point.
+- **Every area a player might reach is played and balanced**, not only the
+  story route: optional characters, areas and sidequests, as much of the
+  Colosseum as can be reached, and all eight dragons.
 - **Competence across the whole route.** Every segment of the reworked game
   is played confidently and capably; a segment the party can't reliably
   win on the first attempt gets a lab until it can.
