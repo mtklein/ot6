@@ -54,7 +54,10 @@ mkdir -p "$MAIN/build/attempts" "$HERE/build"
 [ -e "$HERE/build/attempts" ] || ln -s "$MAIN/build/attempts" "$HERE/build/attempts"
 
 SEED_BRANCH=$(git -C "${SEED:-$MAIN}" branch --show-current 2>/dev/null || echo '?')
-echo "worktree ready: ROM copied, Mesen/flips linked"
+# ninja needs build.ninja, which configure.py writes and git does not track.
+(cd "$HERE" && python3 configure.py >/dev/null)
+
+echo "worktree ready: ROM copied, Mesen/flips linked, build.ninja written"
 echo "seeded from ${SEED:-$MAIN} ($SEED_BRANCH) into $HERE_BRANCH"
 
 # State the seed's freshness with the same code the runtime check uses.
