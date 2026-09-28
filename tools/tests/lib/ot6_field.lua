@@ -609,8 +609,9 @@ function M.navTo(txIn, tyIn, opts)
       end
       if M.frame - NAV.hb >= 600 then
         NAV.hb = M.frame
-        M.log(string.format("nav f%d (%d,%d) %s", M.frame, M.fieldX(),
-          M.fieldY(), M.navDump()))
+        local t = M.sceneTimer()
+        M.log(string.format("nav f%d (%d,%d) %s%s", M.frame, M.fieldX(),
+          M.fieldY(), M.navDump(), t and (" | " .. M.sceneTimerStr(t)) or ""))
       end
       -- classify the frame, debounced: the battle/dialog signals live in
       -- RAM the field module also writes to, so require 3 consecutive
@@ -868,11 +869,12 @@ function M.advanceStory(pred, maxFrames, opts)
       if M.frame - hb >= 600 then
         hb = M.frame
         M.log(string.format(
-          "story f%d map=%d (%d,%d) ctl=%s algn=%s dlg=%s batt=%s ev=%s",
+          "story f%d map=%d (%d,%d) ctl=%s algn=%s dlg=%s batt=%s ev=%s%s",
           M.frame, M.mapId(), M.fieldX(), M.fieldY(),
           tostring(M.hasControl()), tostring(M.tileAligned()),
           tostring(M.dialogWaiting()), tostring(M.battleLoadStarted()),
-          tostring(M.eventRunning())))
+          tostring(M.eventRunning()),
+          M.sceneTimer() and (" | " .. M.sceneTimerStr()) or ""))
       end
       if wipeCheck() then wipeSeen = true; M.setPad({}); return end
       if careD then
@@ -2825,6 +2827,57 @@ function M.eventTimerLive()
     if M.readWord(0x1189 + 6 * k) ~= 0 then return true end
   end
   return false
+end
+
+-- A timed scene's clock, read off the same records.  The flags byte at
+-- +0 is the top byte of `start_timer`'s far address
+-- (ff6/include/event_cmd.inc TIMER_FLAGS): bit 7 FIELD_ONLY (the clock
+-- stands still in menus and battles: DecTimersMenuBattle,
+-- field/event.asm:5562, skips it), bit 6 FIELD_VISIBLE, bit 5 BANQUET (at
+-- 0 in a battle it sets $1DD1 bit 5 and CheckBattleEnd ends the battle on
+-- the spot, battle_main.asm:12217), bit 4 MENU_BATTLE_VISIBLE.  The
+-- counter at +1 counts down one a frame on the field (DecTimers) and,
+-- without FIELD_ONLY, one a frame in menus and battles too.  Tzen's
+-- collapsing house is `start_timer 0, 21600, _cc592e, {FIELD_VISIBLE,
+-- BANQUET, MENU_BATTLE_VISIBLE}` (event_main.asm:90010): flags $72, 6:00
+-- that no menu or battle stops (docs/design/route-wor-sabin.md 3.1).
+M.TIMER_FIELD_ONLY, M.TIMER_BANQUET = 0x80, 0x20
+function M.sceneTimers()
+  local t = {}
+  for k = 0, 3 do
+    local frames = M.readWord(0x1189 + 6 * k)
+    if frames ~= 0 then
+      local flags = M.readByte(0x1188 + 6 * k)
+      t[#t + 1] = { slot = k, frames = frames, flags = flags,
+                    runsInBattle = (flags & M.TIMER_FIELD_ONLY) == 0,
+                    endsBattle = (flags & M.TIMER_BANQUET) ~= 0 }
+    end
+  end
+  return t
+end
+-- The live timer that keeps running through menus and battles, the one
+-- with the fewest frames left; nil when none is (a FIELD_ONLY clock, Cid's
+-- on the Solitary Island, stands still there and is not a race).
+function M.sceneTimer()
+  local best = nil
+  for _, t in ipairs(M.sceneTimers()) do
+    if t.runsInBattle and (best == nil or t.frames < best.frames) then best = t end
+  end
+  return best
+end
+-- m:ss at 60 frames a second, as the game draws it
+function M.clockStr(frames)
+  local s = frames // 60
+  return string.format("%d:%02d", s // 60, s % 60)
+end
+-- "timer 0 4:23 left (15811 frames; runs through menus and battles; its
+-- expiry ends a battle)" for the log, or nil with no scene timer running
+function M.sceneTimerStr(t)
+  t = t or M.sceneTimer()
+  if t == nil then return nil end
+  return string.format("timer %d %s left (%d frames; flags $%02X: runs through menus and "
+    .. "battles%s)", t.slot, M.clockStr(t.frames), t.frames, t.flags,
+    t.endsBattle and "; its expiry ends a battle" or "")
 end
 
 -- careKernel: the planning and menu-routing heart shared by M.fieldCare
@@ -5267,6 +5320,60 @@ end
 -- non-final table.unpack to one value); M.cond with an always-true
 -- predicate is the library's public way to wrap a list into one step
 local function seq(steps) return M.cond(function() return true end, steps) end
+
+-- "Face up and hold A": the examine action a trigger reads through the
+-- field engine's live control byte.  $01B0-$01B7 alias $1EB6, which
+-- UpdateCtrlFlags (field/event.asm:5415-5432) rewrites from the pad every
+-- frame: bits 0-3 the party's facing one-hot (0 up, 1 right, 2 down, 3
+-- left), bit 4 "A is held".  A step-on trigger guarded by `if_any $01B0=0
+-- / $01B4=0` (facing up, A held) does nothing to a party that only walks
+-- onto its tile: it runs, sees A up, and returns, every frame.  So the
+-- party stands on the tile, turns to `dir` (a press toward a tile it
+-- cannot walk into turns it in place), and edge-presses A (4 on, 4 off)
+-- until `pred` holds.  The trigger re-reads A inside its own event a few
+-- opcodes on, so the presses go on through the scene until `pred` -- a
+-- switch the scene sets -- rather than stopping when the event starts
+-- (gen_terra_caves' measurement: released at the event's start, the
+-- scene's own `if_any $01B4=0` took EventReturn and the trigger looped).
+-- The same presses page the scene's dialog.
+--   gen_terra_caves  Narshe's secret wall at (15,57), facing up
+--   gen_wor_sabin    the child in Tzen's collapsing house at (117,12)
+-- The party must already stand on the tile.  A press toward a tile it
+-- could walk into would walk instead of turning, so that is refused up
+-- front, naming the tile.
+function M.faceAndHoldA(dir, pred, maxFrames, what)
+  local want = TALK_FACE[dir]
+  assert(want ~= nil, "faceAndHoldA: dir is up/right/down/left, not " .. tostring(dir))
+  local aPh = 0
+  return M.withReset(M.seqStep({
+    M.call(function()
+      if partyFacing() ~= want then
+        local x, y = M.fieldX(), M.fieldY()
+        M.assertEq(M.canStep(x, y, dir), false, string.format("%s: the tile %s of (%d,%d), "
+          .. "(%d,%d), is one the party cannot walk into, so a press %s turns it in place",
+          what, dir, x, y, x + DELTA[dir][1], y + DELTA[dir][2], dir))
+      end
+    end),
+    M.driveUntil(pred, maxFrames, {
+      M.call(function()
+        aPh = (aPh + 1) % 8
+        if M.frame % 300 == 0 then
+          M.log(string.format("examining: f%d (%d,%d) face=%d $1EB6=%02X " ..
+            "($01B0=%d $01B4=%d) ctl=%s ev=%s dlg=%s", M.frame, M.fieldX(),
+            M.fieldY(), partyFacing(), M.readByte(0x1EB6), swv(0x01B0), swv(0x01B4),
+            tostring(M.hasControl()), tostring(M.eventRunning()),
+            tostring(M.dialogWaiting())))
+        end
+        -- the direction is pressed only to turn, and only while the party
+        -- is controllable and at rest; everything else is the A presses
+        if M.hasControl() and M.tileAligned() and partyFacing() ~= want then
+          M.setPad({ dir }); return
+        end
+        M.setPad(aPh < 4 and { "a" } or {})
+      end),
+    }, what),
+  }), function() aPh = 0 end)
+end
 
 -- Talk to a posted NPC: approach re-resolved from live object coords (NPCs
 -- wander), facing computed from the live delta, soft rounds before a hard

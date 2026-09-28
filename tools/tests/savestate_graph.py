@@ -702,4 +702,22 @@ STATES = [
     #     tools/tests/run.sh tools/tests/gen_wor_tzen_door.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-tzen-door-v1
     S("wor_tzen_door", gen="gen_wor_tzen_door", checkpoint="wor-start-v1", timeout=3600),
+
+    # wor-tzen-door-v1 -> the first save after Sabin joins: cold-Continue
+    # the save outside Tzen's door (CELES alone at world (131,179)), walk
+    # into Tzen, ride the Light of Judgment, buy the Seraphim stone, start
+    # the collapsing house's 6:00 clock at (16,9), bring the child out of
+    # the house (map 311; "face up and hold A" at (117,12)), ride Sabin's
+    # joining, dress him from Tzen's shops and the bag, and Save on the
+    # World of Ruin map outside Tzen, (131,179): the `wor-sabin-v1`
+    # checkpoint (docs/design/route-wor-sabin.md section 11).  checkpoint=:
+    # it regenerates from the battery, independently of the chain.  A
+    # house lost to a fight or to the clock (class `lost`) retries from the
+    # Continue (the runner's default 3 attempts).
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-tzen-door-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-sabin-v1/wor-sabin.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_sabin.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-sabin-v1
+    S("wor_sabin", gen="gen_wor_sabin", checkpoint="wor-tzen-door-v1", timeout=3600),
 ]

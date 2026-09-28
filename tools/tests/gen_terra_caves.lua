@@ -115,30 +115,14 @@ H.run({ maxFrames = 60000 }, {
   -- $01F0 never set.  So this phase ends on $01F0 only and keeps
   -- edge-pressing A through the scene, where the same press taps dlg $01AA
   -- and $01AB.
-  H.driveUntil(function() return sw(0x01F0) == 1 end, 8000, (function()
-    local aPh = 0
-    return {
-      H.call(function()
-        aPh = (aPh + 1) % 8
-        if H.frame % 300 == 0 then
-          H.log(string.format("examining: f%d (%d,%d) face=%d $1EB6=%02X " ..
-            "($01B0=%d $01B4=%d) ctl=%s ev=%s dlg=%s", H.frame, H.fieldX(),
-            H.fieldY(), facing(), ctrl(), sw(0x01B0), sw(0x01B4),
-            tostring(H.hasControl()), tostring(H.eventRunning()),
-            tostring(H.dialogWaiting())))
-        end
-        -- 0 = up (BitOrTbl's order, field/event.asm:5523).  UP is pressed
-        -- only to turn, and only while the party is controllable: (15,56)
-        -- is solid rock until the scene runs, so the press turns without
-        -- moving.  Once the hole is open the same press would walk the
-        -- party into map 41 ahead of the asserts below.
-        if H.hasControl() and H.tileAligned() and facing() ~= 0 then
-          H.setPad({ "up" }); return
-        end
-        H.setPad(aPh < 4 and { "a" } or {})
-      end),
-    }
-  end)(), "press A facing UP on (15,57) -- _ccb133 -> _ccb154"),
+  -- That is the lib's "face up and hold A" (H.faceAndHoldA): UP (0 in
+  -- BitOrTbl's order, field/event.asm:5523) is pressed only to turn, and
+  -- only while the party is controllable -- (15,56) is solid rock until
+  -- the scene runs, so the press turns without moving; once the hole is
+  -- open the same press would walk the party into map 41 ahead of the
+  -- asserts below.
+  H.faceAndHoldA("up", function() return sw(0x01F0) == 1 end, 8000,
+    "press A facing UP on (15,57) -- _ccb133 -> _ccb154"),
   H.release(),
 
   H.waitFrames(90),

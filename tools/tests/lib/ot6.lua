@@ -4756,6 +4756,13 @@ function Driver:cureFor(e)
   return nil, nil
 end
 
+-- The members who LEFT the battle alive (#255): $3A39, one bit per party
+-- entity, set by TargetEffect_27 (a Sneeze, a run, a Smoke Bomb) with the
+-- member's $3018 bit.  The care lines (makePlan's hpNow / maxOf), the
+-- party's damage window and the raise rule's top-up race read it here, so
+-- a member out of the fight is never a patient, a corpse or a hand.
+function M.leftMask() return M.readByte(0x3A39) end
+
 -- The party's measured window on one slot, the press rule's sum with
 -- the deciding actor left out (they are spending the turn elsewhere):
 -- each living member's last action in shielded-equivalent HP, x4 when
@@ -4763,8 +4770,9 @@ end
 function Driver:partyWindow(actor, slot)
   local broken = M.readByte(BATTLE.BRK_TICKS + slot * 2) ~= 0
   local window, parts = 0, {}
+  local leftMask = M.leftMask()          -- a member who left deals nothing more (#255)
   for e2 = 0, 3 do
-    if e2 ~= actor and M.readWord(0x3BF4 + e2 * 2) > 0
+    if e2 ~= actor and M.readWord(0x3BF4 + e2 * 2) > 0 and (leftMask >> e2) & 1 == 0
        and M.readWord(0x3C1C + e2 * 2) > 0 and self.dmgSeen[e2] then
       local mult = broken and 4 or 1
       window = window + self.dmgSeen[e2] * mult
@@ -4880,8 +4888,10 @@ function Driver:raiseOk(e, actor)
     local first, firstEta, firstPct = nil, nil, nil
     for p = 0, 3 do
       -- a Stopped, asleep or berserk member's gauge is not a turn the
-      -- party can plan on (#187): it is left out of the top-up race
+      -- party can plan on (#187), nor is one who left the battle (#255,
+      -- $3A39): each is left out of the top-up race
       if p ~= actor and p ~= e and M.readWord(0x3BF4 + p * 2) > 0
+         and (M.leftMask() >> p) & 1 == 0
          and M.readWord(0x3C1C + p * 2) > 0 and denied(p) == nil then
         local eta, pct = etaOf(p * 2)
         if eta ~= nil and (first == nil or eta < firstEta) then
@@ -4948,7 +4958,16 @@ function Driver:makePlan(actor)
   -- until the enemy has actually taken a round, which is what makes the
   -- opening turn fall through to the fraction rule below.
   local hpNow = {}
-  for e = 0, 3 do hpNow[e] = M.readWord(0x3BF4 + e * 2) end
+  -- A member who LEFT the battle (#255: the Chitonid's Sneeze, a run, a
+  -- Smoke Bomb -- $3A39, the bit TargetEffect_27 sets) keeps its HP and
+  -- its seat's words, but it is out of this fight: no heal, cure, raise
+  -- or round price is planned on it.  Every care line below reads HP and
+  -- max HP through hpNow and maxOf, so a member who left reads as
+  -- neither a patient nor a corpse.
+  local leftMask = M.leftMask()
+  local function inFight(e) return (leftMask >> e) & 1 == 0 end
+  local function maxOf(e) return inFight(e) and M.readWord(0x3C1C + e * 2) or 0 end
+  for e = 0, 3 do hpNow[e] = inFight(e) and M.readWord(0x3BF4 + e * 2) or 0 end
   if self.turnSnap[actor] then
     for e = 0, 3 do
       local lost = self.turnSnap[actor][e] - hpNow[e]
@@ -4991,7 +5010,7 @@ function Driver:makePlan(actor)
       end
     end
     for e = 0, 3 do
-      if hpNow[e] > 0 and hpNow[e] ~= 0xFFFF and M.readWord(0x3C1C + e * 2) > 0 then
+      if hpNow[e] > 0 and hpNow[e] ~= 0xFFFF and maxOf(e) > 0 then
         if not any then
           price[e] = self.roundCost[e] or 0
           priceWhy[e] = "no enemy action attributed yet: the measured inter-turn loss"
@@ -5029,6 +5048,38 @@ function Driver:makePlan(actor)
       end
     end
   end
+  -- A condemned member fighting ALONE (#250: CELES in Tzen's house, where
+  -- every Scorpion opens with Doom Sting).  Nobody can raise her after
+  -- the Doom and no item clears the bit (M.doomCount's note), so the
+  -- count is the fight's own clock: the battle has to be won inside it.
+  -- The plan is the one the fight already plays -- the kill, with care
+  -- only when a round could kill her or she is inside the rounds the kill
+  -- needs (and in the house the timed fraction, Driver:healPct) -- and
+  -- the Doom's last-turn rule above; what this adds is the race said out
+  -- loud, once per count she is seen at, so the log carries the margin
+  -- (the Doom's frame against the fight's end).  With an ally standing a
+  -- Fenix Down after the Doom is the out, and nothing is said.
+  do
+    local seated = 0
+    for e = 0, 3 do if maxOf(e) > 0 then seated = seated + 1 end end
+    local count = M.doomCount({ s2 = M.readByte(BATTLE.ST2 + actor * 2),
+                                count = M.readByte(BATTLE.COUNTER.Doom + actor * 2) })
+    if seated == 1 and count ~= nil then
+      local const = M.readWord(BATTLE.ATB_CONST + actor * 2)
+      local period = const > 0 and math.ceil(0xFF00 / const) * 2 or nil
+      local key = "solodoom:" .. count
+      if not self.statusSaid[key] then
+        self.statusSaid[key] = true
+        M.log(string.format("[%s] [doom] f+%d actor=%d fights ALONE and CONDEMNED at %d: the "
+          .. "Doom in about %d frames (f+%d), %s, %d bod(ies) standing -- the fight has to end "
+          .. "inside the count%s", self.tag or "fight", self.battleTick, actor, count,
+          count * M.COUNT_FRAMES, self.battleTick + count * M.COUNT_FRAMES,
+          period and string.format("her gauge refills in %d (the animations come on top)",
+          period) or "no gauge to fill", livingMonsters(),
+          self.timed and string.format(" (%s)", M.sceneTimerStr() or "the timer is spent") or ""))
+      end
+    end
+  end
   -- said once per change, beside the old measured figure, for the log
   for e = 0, 3 do
     if price[e] > 0 or (self.roundCost[e] or 0) > 0 then
@@ -5052,7 +5103,7 @@ function Driver:makePlan(actor)
     local s2, mx = {}, {}
     for e = 0, 3 do
       s2[e] = M.readByte(BATTLE.ST2 + e * 2)
-      mx[e] = M.readWord(0x3C1C + e * 2)
+      mx[e] = maxOf(e)
     end
     local r = M.muddleRule({ actor = actor, status2 = s2, hp = hpNow, maxhp = mx })
     if r == "defer" then
@@ -5118,7 +5169,7 @@ function Driver:makePlan(actor)
     local order = { actor }
     for e = 0, 3 do if e ~= actor then order[#order + 1] = e end end
     for _, e in ipairs(order) do
-      if hpNow[e] > 0 and M.readWord(0x3C1C + e * 2) > 0 then
+      if hpNow[e] > 0 and maxOf(e) > 0 then
         local item, what = self:cureFor(e)
         local queued = self.cureQueued[e]
         if what ~= nil and queued ~= nil then
@@ -5167,7 +5218,7 @@ function Driver:makePlan(actor)
     local healerAlive = false
     for e = 0, 3 do
       if M.readByte(BATTLE.BCHID + e * 2) == self.opts.healer
-         and M.readWord(0x3BF4 + e * 2) > 0 then
+         and hpNow[e] > 0 then
         healerAlive = true
         break
       end
@@ -5225,9 +5276,9 @@ function Driver:makePlan(actor)
   -- maxhp/8 (topUpOwed) reopens the budget for their top-up.
   if not careOpen then
     for e = 0, 3 do
-      local maxhp = M.readWord(0x3C1C + e * 2)
+      local maxhp = maxOf(e)
       if self.topUpOwed[e] and hpNow[e] > 0 and maxhp > 0
-         and hpNow[e] * 100 // maxhp < (self.opts.healPercent or 60) then
+         and hpNow[e] * 100 // maxhp < self:healPct() then
         careOpen = true
         local said = string.format("[%s] actor=%d: entity %d was raised to %d/%d "
           .. "at tick %d and is owed its top-up -- the round's care budget "
@@ -5338,7 +5389,7 @@ function Driver:makePlan(actor)
   -- one 1-BP Fight ended the fight.
   local function spendPlan(where)
     if self.opts.spend == false or livingMonsters() == 0 then return nil end
-    local hp, maxhp = hpNow[actor], M.readWord(0x3C1C + actor * 2)
+    local hp, maxhp = hpNow[actor], maxOf(actor)
     local cost = price[actor] or 0
     if hp <= 0 or cost <= 0 or hp > cost or have < 1 then return nil end
     -- the heals this actor could give themself right now, priced the
@@ -5353,14 +5404,14 @@ function Driver:makePlan(actor)
     if where == "care" then
       local allies = 0
       for e = 0, 3 do
-        if e ~= actor and hpNow[e] > 0 and M.readWord(0x3C1C + e * 2) > 0 then
+        if e ~= actor and hpNow[e] > 0 and maxOf(e) > 0 then
           allies = allies + 1
         end
       end
       local function taken(restore, mp)
         return restore == nil or M.healDecision({ hp = hp, maxhp = maxhp,
           restore = restore, roundCost = cost, allies = allies,
-          threshold = self.opts.healPercent or 60, mp = mp }) ~= nil
+          threshold = self:healPct(), mp = mp }) ~= nil
       end
       if cureRow ~= nil then
         for _, spell in ipairs(type(self.opts.cure) == "table" and self.opts.cure or BATTLE.CURES) do
@@ -5479,7 +5530,7 @@ function Driver:makePlan(actor)
       end
     end
     for e = 0, 3 do
-      local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
+      local hp, maxhp = hpNow[e], maxOf(e)
       local cost = price[e] or 0
       if hp > 0 and maxhp > 0 and hp < maxhp and (cost > 0 or (priceRate[e] or 0) > 0) then
         if cost > 0 and hp <= cost then
@@ -5534,9 +5585,9 @@ function Driver:makePlan(actor)
       -- to.  With nobody to care for, the attack lines below (summon,
       -- nuke, tool, the boost bank) keep their own order.
       local needsCare = false
-      local threshold = self.opts.healPercent or 60
+      local threshold = self:healPct()
       for e = 0, 3 do
-        local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
+        local hp, maxhp = hpNow[e], maxOf(e)
         if maxhp > 0 and hp == 0 and row ~= nil and self:battInvIdx(BATTLE.FENIX_DOWN)
            and self:raiseOk(e, actor) then
           needsCare = true
@@ -5554,7 +5605,7 @@ function Driver:makePlan(actor)
       -- below): the kill removes the threat now, a heal only delays it.
       local lethal = nil
       for e = 0, 3 do
-        local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
+        local hp, maxhp = hpNow[e], maxOf(e)
         if hp > 0 and hp < maxhp and hp <= (price[e] or 0) then
           lethal = e
           break
@@ -5574,7 +5625,7 @@ function Driver:makePlan(actor)
             .. "(%d/%d) is inside one round of death (%d) and %s lands %d "
             .. "chip(s) against %d shield(s) on slot %d -- caring first",
             self.tag or "fight", actor, lethal, hpNow[lethal],
-            M.readWord(0x3C1C + lethal * 2), price[lethal], best.what,
+            maxOf(lethal), price[lethal], best.what,
             best.chips, need, slot)
         end
         return nil, string.format("[%s] actor=%d no press: %s lands %d "
@@ -5614,7 +5665,7 @@ function Driver:makePlan(actor)
           broken and "BROKEN" or (sh .. " shield(s) up"), estWhy,
           lethal ~= nil and string.format(", with entity %d (%d/%d) inside "
             .. "one round of death (%d)", lethal, hpNow[lethal],
-            M.readWord(0x3C1C + lethal * 2), price[lethal]) or ""))
+            maxOf(lethal), price[lethal]) or ""))
         return best
       end
       if lethal ~= nil then
@@ -5622,7 +5673,7 @@ function Driver:makePlan(actor)
           .. "(%d/%d) is inside one round of death (%d) and %s would %s "
           .. "slot %d but not kill it (%s%s) -- caring first",
           self.tag or "fight", actor, lethal, hpNow[lethal],
-          M.readWord(0x3C1C + lethal * 2), price[lethal], best.what,
+          maxOf(lethal), price[lethal], best.what,
           broken and "hit broken" or ("chip " .. best.chips .. " of " .. need),
           slot, estWhy, last and "" or "; not the last monster")
       end
@@ -5682,7 +5733,7 @@ function Driver:makePlan(actor)
             .. "Fenix Down on them is confirmed (tick %d) and has not landed", self.tag or "fight",
             actor, e, queued.by, queued.tick)
           if said ~= self.healSaid then self.healSaid = said; M.log(said) end
-        elseif M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
+        elseif maxOf(e) > 0 and hpNow[e] == 0
            and self:battInvIdx(BATTLE.FENIX_DOWN) then
           local ok, raiseHp, hit, hitSlot, hitOn, why = self:raiseOk(e, actor)
           local hitStr = hit and string.format("%d (slot %d on entity %d)", hit, hitSlot, hitOn)
@@ -5691,14 +5742,14 @@ function Driver:makePlan(actor)
             M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down: "
               .. "raise to %d HP (1/8 of %d), the living enemy's smallest hit %s "
               .. "-- %s", self.tag or "fight", actor, e, raiseHp,
-              M.readWord(0x3C1C + e * 2), hitStr, why))
+              maxOf(e), hitStr, why))
             return { kind = "item", item = BATTLE.FENIX_DOWN, target = e, row = row,
                      idx = self:battInvIdx(BATTLE.FENIX_DOWN), reason = "revive" }
           end
           local said = string.format("[%s] actor=%d no raise: Fenix Down would put "
             .. "entity %d at %d HP (1/8 of %d), the living enemy's smallest hit %s "
             .. "-- %s; killing first, caring for the living instead",
-            self.tag or "fight", actor, e, raiseHp, M.readWord(0x3C1C + e * 2),
+            self.tag or "fight", actor, e, raiseHp, maxOf(e),
             hitStr, why)
           if said ~= self.healSaid then self.healSaid = said; M.log(said) end
         end
@@ -5710,7 +5761,7 @@ function Driver:makePlan(actor)
     -- up or standing inside one round of death, neediest first, and each is
     -- offered a cast before the bag for the reasons at opts.cure above.
     -- The first offer the policy says yes to gets the turn.
-    local threshold = self.opts.healPercent or 60
+    local threshold = self:healPct()
     local cands = {}
     -- The free round (#186): under a preemptive strike the party's
     -- gauges opened full and the monsters' empty, so until the first
@@ -5736,7 +5787,7 @@ function Driver:makePlan(actor)
         self.tag or "fight", actor))
     end
     for e = 0, 3 do
-      local hp, maxhp = hpNow[e], M.readWord(0x3C1C + e * 2)
+      local hp, maxhp = hpNow[e], maxOf(e)
       if freeRound then hp = 0 end
       -- hp < maxhp: a FULL character is never a patient.  Without it,
       -- the one-round-of-death rule (hp <= roundCost) deadlocked a
@@ -5776,7 +5827,7 @@ function Driver:makePlan(actor)
     end)
     local allies = 0
     for e = 0, 3 do
-      if e ~= actor and hpNow[e] > 0 and M.readWord(0x3C1C + e * 2) > 0 then
+      if e ~= actor and hpNow[e] > 0 and maxOf(e) > 0 then
         allies = allies + 1
       end
     end
@@ -7122,6 +7173,7 @@ function Driver:idle()
   self.outcomeSaid = false
   self.seatXp, self.seatChar, self.filled = nil, nil, nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
+  self.timed, self.tailSaid = nil, false
   if self.recovery then
     self.recovery.close(M.frame, "battle_ended")
     if recoveryObserver == self.recovery then recoveryObserver = nil end
@@ -7244,6 +7296,25 @@ function Driver:watchLeavers()
   if self.battleTick < 6 then return end
   -- past the battle's own end the RAM is being handed back: no more reads
   if endSnap ~= nil and endSnap.frame >= (self.startFrame or 0) then return end
+  -- ...and a driver that first watched the battle AFTER its end hook
+  -- fired is watching that hand-back, not a battle: measured on
+  -- gen_wor_sabin's draw-variation lab (build/attempts/wt/wor-sabin/lab/
+  -- ghost/), a walk that ended on the [outcome] of one battle and a new
+  -- walker built on the next frame read the tail as a second battle -- 59
+  -- ticks, "no end reading", its WON paying nothing (XP MISMATCH).  The
+  -- tail reads as a battle for about 35 frames after the fade (the
+  -- camp_escaped measurement above), and no real battle opens that soon
+  -- after another's end (the fade-out, the map's reload, a step and the
+  -- encounter's own transition come between), so 90 frames is the tail.
+  if endSnap ~= nil and (self.startFrame or 0) - endSnap.frame < 90 then
+    if not self.tailSaid then
+      self.tailSaid = true
+      M.log(string.format("[%s] [tail] f+%d the last battle's end hook fired %d frames before "
+        .. "this watch began: its hand-back, not a battle -- nothing seated, no [outcome]",
+        self.tag or "fight", self.battleTick, (self.startFrame or 0) - endSnap.frame))
+    end
+    return
+  end
   if self.seatXp == nil then
     self.seatXp, self.seatChar, self.filled = {}, {}, {}
     for e = 0, 3 do
@@ -7289,6 +7360,54 @@ function Driver:watchLeavers()
   end
 end
 
+-- ---- a timed scene (#250) ----
+-- A scene timer that runs through menus and battles (M.sceneTimer: Tzen's
+-- collapsing house, 6:00 from the moment Sabin asks for help) is a clock
+-- every frame of the fight is paid out of: the battle's own ATB may stand
+-- still while a command window is open (Wait mode), the scene's counter
+-- does not (DecTimersMenuBattle, field/event.asm:5562).  A person under
+-- that clock ends the fight fast and does not dawdle in the menus.  Read
+-- once as the battle opens and said then, beside the timer's remaining
+-- time on every 300-tick battle line, and again at the battle's end with
+-- what the battle cost of it.  Two levers follow it (opts):
+--   timedHealPercent  the top-up fraction while the clock runs
+--                     (M.TIMED_HEAL_PERCENT): a heal still goes to a
+--                     member inside the round, or inside the rounds the
+--                     kill needs (the finisher window), or under it
+--   timedCadence      the command-menu press cadence while the clock runs
+--                     (M.TIMED_CADENCE frames a press, against the default
+--                     30; 12 is newWalkFighter's, 6-on/6-off)
+-- Field care between battles already stays out under any live counter
+-- (M.eventTimerLive): no menus inside a timed scene.
+M.TIMED_HEAL_PERCENT, M.TIMED_CADENCE = 30, 12
+function Driver:watchTimer()
+  if self.timed ~= nil or self.battleTick < 1 then return end
+  local t = M.sceneTimer and M.sceneTimer() or nil
+  self.timed = t or false
+  if t then
+    self.timedOpen = { frame = M.frame, frames = t.frames }
+    M.log(string.format("[%s] [timer] f+%d a scene timer runs through this battle: %s -- "
+      .. "no dawdling: top-ups only under %d%% (not %d%%), a heal for a member inside the "
+      .. "round or the rounds the kill needs, and the menus pressed every %d frames",
+      self.tag or "fight", self.battleTick, M.sceneTimerStr(t), self:healPct(),
+      self.opts.healPercent or 60, self:cadence()))
+  end
+end
+-- The top-up fraction the heal policy reads: the caller's, or the timed
+-- scene's when a scene timer runs through the battle, whichever is lower.
+function Driver:healPct()
+  local base = self.opts.healPercent or 60
+  if self.timed then
+    return math.min(base, self.opts.timedHealPercent or M.TIMED_HEAL_PERCENT)
+  end
+  return base
+end
+function Driver:cadence()
+  local base = self.opts.cadence or 30
+  if self.timed then return math.min(base, self.opts.timedCadence or M.TIMED_CADENCE) end
+  return base
+end
+
 -- The [outcome] line: M.battleOutcome over the last reading, and each
 -- seated member's experience then and now.  A share the engine did not
 -- pay is said as a MISMATCH (the model of WinBattle is wrong, or a kill
@@ -7330,6 +7449,14 @@ function Driver:sayOutcome()
     o.contradiction and ("CONTRADICTION -- " .. o.contradiction)
       or (ok and "paid as due" or "XP MISMATCH -- the engine paid what the model did not predict"),
     o.kind == "party left" and " -- no reward for a party that left" or ""))
+  if self.timed and self.timedOpen then
+    local t = M.sceneTimer()
+    rec.timerLeft = t and t.frames or 0
+    M.log(string.format("[%s] [timer] battle $%03X over at f+%d: %s; the battle took %d frames "
+      .. "of it (%s at the opening)", self.tag or "fight", r.form & 0x1FF, self.battleTick,
+      t and M.sceneTimerStr(t) or "the timer is spent", self.timedOpen.frames - (t and t.frames or 0),
+      M.clockStr(self.timedOpen.frames)))
+  end
 end
 
 -- The [status] line (#187), once per landing per entity per status:
@@ -7613,7 +7740,7 @@ function Driver:watchPendingCare()
   for e, _ in pairs(self.topUpOwed) do
     local hp, maxhp = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
     if hp == 0 or hp == 0xFFFF or maxhp == 0
-       or hp * 100 // maxhp >= (self.opts.healPercent or 60) then
+       or hp * 100 // maxhp >= self:healPct() then
       self.topUpOwed[e] = nil
     end
   end
@@ -7762,12 +7889,14 @@ function Driver:logBattleLine(menu)
     -- declining to heal without showing why.
     local cost = {}
     for e = 0, 3 do cost[#cost + 1] = tostring(self.roundCost[e] or 0) end
+    local t = self.timed and M.sceneTimer() or nil
     M.log(string.format("[%s] battle f+%d menu=%02X state=%02X actor=%d " ..
-      "cursor=%d cmds=%s partyhp=%s roundcost=%s monhp=%s monsters=%d",
+      "cursor=%d cmds=%s partyhp=%s roundcost=%s monhp=%s monsters=%d%s",
       self.tag or "fight", self.battleTick, menu, state,
       actor, M.readByte(BATTLE.CMDROW + actor) & 3,
       table.concat(rows, ","), table.concat(hp, ","),
-      table.concat(cost, ","), table.concat(mhp, ","), #M.activeSlots()))
+      table.concat(cost, ","), table.concat(mhp, ","), #M.activeSlots(),
+      t and string.format(" timer%d=%s(%d)", t.slot, M.clockStr(t.frames), t.frames) or ""))
   end
 end
 
@@ -7786,6 +7915,7 @@ function Driver:frame()
   end
   self:watchStatuses()
   self:watchLeavers()
+  self:watchTimer()
   -- VICTORY-DEADLOCK guard (measured, Thamasa grind bake fight 37): the
   -- killing blow can land while an actor's spell/item window is still
   -- open; in Wait mode the open window freezes the battle clock, and
@@ -7859,7 +7989,7 @@ function Driver:frame()
   -- slower than a human pressing buttons, and it stays clear of the
   -- menu's auto-repeat threshold; callers that have a reason to be slow
   -- can ask for it.
-  local ph = self.tick % (self.opts.cadence or 30)
+  local ph = self.tick % self:cadence()
   local actor = M.readByte(BATTLE.ACTOR) & 3
   if self.plan and self.planActor ~= actor then self:dropPlan("actor_changed") end
   -- The stall guard's clock: frames spent on a LIVE lore plan, rather
@@ -7893,7 +8023,7 @@ function Driver:frame()
   -- cadence bound keeps it three for a caller whose pulse spans more
   -- frames than calls).
   if self.heldFast then
-    M.setPad(held < (self.opts.cadence or 30) and held % 10 < 5 and self.held or {})
+    M.setPad(held < self:cadence() and held % 10 < 5 and self.held or {})
   else M.setPad(held < 6 and self.held or {}) end
 end
 
