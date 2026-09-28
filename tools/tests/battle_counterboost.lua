@@ -1,5 +1,5 @@
 -- @suite
--- probe_ctrboost.lua -- measures whether a pending boost leaks into
+-- battle_counterboost.lua -- measures whether a pending boost leaks into
 -- counterattacks.
 --
 -- Counterattacks execute through ExecRetal, which never reaches

@@ -1,5 +1,5 @@
 -- @suite slow
--- probe_shadow_overlap.lua -- asserts OT6_SHADOW ($ecf1+) is written only
+-- battle_hudoverlap.lua -- asserts OT6_SHADOW ($ecf1+) is written only
 -- from bank F0, and that vanilla's old buffer ($5762+) sees no bank-F0 write.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"

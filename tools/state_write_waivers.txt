@@ -52,6 +52,8 @@ tools/tests/battle_clockwork.lua	.writeWord(
 tools/tests/battle_codex.lua	.writeByte(	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
 tools/tests/battle_codex.lua	.writeWord(	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
 tools/tests/battle_codex.lua	emu.write	quarantine: legacy O7-era save layout no build can produce by play (owner-named)
+tools/tests/battle_counterboost.lua	.writeByte(
+tools/tests/battle_counterboost.lua	.writeWord(
 tools/tests/battle_counterfold.lua	.writeByte(
 tools/tests/battle_dancemp.lua	.writeWord(
 tools/tests/battle_divines.lua	.writeByte(
@@ -67,6 +69,7 @@ tools/tests/battle_fleesolo.lua	.writeWord(	quarantine: #245 mechanism staging, 
 tools/tests/battle_fontrestore.lua	.writeByte(	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
 tools/tests/battle_fontrestore.lua	emu.write	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
 tools/tests/battle_gaufight.lua	.writeByte(
+tools/tests/battle_hudoverlap.lua	.writeByte(
 tools/tests/battle_kitrefuse.lua	.writeWord(	quarantine: Steal is a chance verb and stays flat at 4 MP at every boost level (#219), so no boost can price it out and the thief arm's only unaffordable Steal is a drained pool; the pin puts LOCKE one MP under the flat price with his own command window already up, and restores his real pool immediately after.  The blitz and tools arms are priced out by real R presses on real banked pips and take no write at all; the window, the grey, the confirm, the queue counter and the buzz under test are the ROM's in every arm
 tools/tests/battle_loadgate.lua	.writeWord(	quarantine: unit test of the harness's own load-gate predicate, not of play
 tools/tests/battle_lore.lua	.writeByte(
@@ -128,13 +131,10 @@ tools/tests/metrics_battle.lua	.writeByte(
 tools/tests/mines_pace.lua	.writeByte(
 tools/tests/mines_pace.lua	.writeWord(
 tools/tests/mines_pace.lua	emu.write
-tools/tests/probe_ctrboost.lua	.writeByte(
-tools/tests/probe_ctrboost.lua	.writeWord(
 tools/tests/probe_dottick.lua	.writeByte(
 tools/tests/probe_dottick.lua	.writeWord(
 tools/tests/probe_multihit.lua	.writeByte(
 tools/tests/probe_multihit.lua	.writeWord(
-tools/tests/probe_shadow_overlap.lua	.writeByte(
 tools/tests/probe_verbs_boost.lua	.writeByte(	quarantine: probe expedient -- one Tempest is written into an empty bag slot of forest_done, because Tempest is Cyan's katana alone and no fixture with Cyan carries one; the equip (field menu), the swing, the attacker-effect roll and the Wind Slash pass under measurement are the ROM's
 tools/tests/save_checksum.lua	emu.write	quarantine: the 1-in-65536 zero-checksum save (owner-named)
 tools/tests/battle_healerdown.lua	.writeByte(	quarantine: #128 regression staging -- the healer death (engine corpse shape hp=0+st1 $80) and a Fenix Down are poked because a real targeted kill couples to formation luck; the property under test is the driver policy, not the fight
