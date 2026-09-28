@@ -87,7 +87,7 @@ Three free-looking verbs were checked against the ROM rather than assumed:
   cost back, which for Runic is 0. Free.
 - **Health** (cmd `$1A`, BANON's) — the same two reads. `Cmd_1a` queues
   attack `$2E` (Cure 2), but the *command* is `$1A`, which `GetMPCost`
-  falls through at 0 and `Ot6QueueFold`'s `$02/$17/$0c/$19` gate does not
+  falls through at 0 and `Ot6QueueFold`'s `$02/$17/$0c` gate does not
   admit. Free, and a boosted Health keeps the bank's whole boost.
 - **Fight** and **Capture** — in `Ot6BoostDmg`'s gate, so the boost buys
   swings. Free.

@@ -3,18 +3,18 @@
 --
 -- mp-economy.md: a summon is outside the command gate, so its boost buys
 -- Ot6BoostDmg's x2/x4/x8 and its price escalates, min(99, base * 2.5^n)
--- (Ot6BoostPriceFor; Phoenix's base above 99 stands).  Ot6QueueFold's summon
--- arm re-prices the queued cast at queue time, but it tests `$3a7b < $1b`
--- (an esper index) while FixPlayerAttack has already added $36 to it
--- (CmdAttackOffsetTbl), so that arm may never run.  This measures what is
+-- (Ot6BoostPriceFor; Phoenix's base above 99 stands).  The esper row's list
+-- cost byte is the whole price: GetMPCost's summon arm reads it, and since
+-- #251 Ot6QueueFold has no summon arm (the one it had tested `$3a7b < $1b`
+-- after FixPlayerAttack's +$36, so it never ran).  This measures what is
 -- charged, not what the code says.
 --
 -- From fc_alcove: out onto the continent, pace to an encounter, everyone
 -- Defends until the party member wearing the cheapest esper has 3 pips,
 -- snapshot.  From it, boost 0, 1 and 3: R presses, Magic, UP into the esper
 -- window, A, target select.  Observed, never written: every store to the
--- MP-cost queue $3620,y while $3a7a is $19 (GetMPCost's, then Ot6QueueFold's
--- if it re-prices), Ot6QueueFold's entry ($3a7a/$3a7b, pending), the esper
+-- MP-cost queue $3620,y while $3a7a is $19 (a second store would be a
+-- re-price after GetMPCost's), Ot6QueueFold's entry ($3a7a/$3a7b, pending), the esper
 -- row's list cost byte at the confirm, and the caster's MP before the
 -- confirm and after the action.
 

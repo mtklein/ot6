@@ -775,11 +775,24 @@ done:   pla
 ;
 ; #219: every boosted ability but Fight costs escalating MP.  A spell outside
 ; the tier families has no tier to buy, so its boost buys Ot6BoostDmg's
-; x2/x4/x8 and its price takes x2.5 per level (Ot6BoostPriceFor).  That is the
-; same three commands plus summon ($19), which joins the gate here for its
-; price alone: espers are in no family, so the fold arm never sees one.
-; Lore ($0c) reaches this proc with the real lore id in $3a7b, the id
-; MagicProp is indexed by, so one arm serves magic, x-magic, lore and summon.
+; x2/x4/x8 and its price takes x2.5 per level (Ot6BoostPriceFor).  Lore ($0c)
+; reaches this proc with the real lore id in $3a7b, the id MagicProp is
+; indexed by, so one arm serves magic, x-magic and lore.
+;
+; ---- a summon is priced by the menu list, not here ----
+;
+; Summon ($19) is not in the gate (#251).  Its charge is the esper row's list
+; cost, row 0 byte 3, which GetMPCost's summon arm reads (battle_main.asm:
+; 13318 -> @4f24) into the A this proc sees.  Ot6FoldPrices writes that byte
+; through Ot6MagicPrice, so it already holds min(99, base x 2.5^boost), and
+; it cannot be stale here: Ot6Boost re-prices it on the L/R edge itself
+; (Ot6RecheckMagic), and the bank is frozen from the confirm on
+; (Ot6CommittedSlot).  A second pricing here would also bypass vanilla's
+; free Mimic, which GetMPCost honours with `trb $b1` before this proc runs,
+; so this proc cannot see it.  (The arm that used to sit here tested $3a7b
+; as an esper index, but FixPlayerAttack has already added the $36 record
+; offset, so it never ran; probe_summon_price measured the list price
+; being the whole charge.)
 ;
 ; ---- the counterattack guard cannot use the global "counter executing" flag ----
 ;
@@ -830,9 +843,7 @@ done:   pla
         cmp     #$17
         beq     @cmdok          ; $17 x-magic
         cmp     #$0c
-        beq     @cmdok          ; $0c lore
-        cmp     #$19
-        bne     @keep           ; $19 summon
+        bne     @keep           ; $0c lore (not $19 summon: see the header)
 @cmdok: txa                     ; width-neutral character test
         cmp     #$08
         bcs     @keep           ; monsters never boost
@@ -846,9 +857,6 @@ done:   pla
                                 ;   into the list row (battle_main.asm:14670)
                                 ;   and there is nothing here to re-derive it
                                 ;   from, so it stays vanilla on both surfaces
-        lda     $3a7a
-        cmp     #$19
-        beq     @summon
         lda     $3a7b           ; attack id: the real spell or lore id
         jsl     Ot6InFoldTbl    ; carry set = a tier family (A preserved)
         bcc     @escalate
@@ -862,15 +870,6 @@ done:   pla
         jsl     Ot6SpellMP      ; and price it as that tier.  x is still
         sta     $3620,y         ;   the actor, y still the queue slot, so this
         bra     @keep           ;   overwrites the base cost :13249 just banked
-@summon:
-        lda     $3a7b           ; Cmd_19 names the esper by index; the record
-        cmp     #$1b            ;   its MP lives in is index + $36, which is
-        bcs     @keep           ;   also what Ot6FoldPrices priced row 0 from.
-        clc                     ;   The range check is not decoration: the +$36
-        adc     #$36            ;   wraps in 8 bits, so a $ff attack byte (what
-                                ;   init_buf_input leaves, and what anything
-                                ;   that reaches command $19 without the esper
-                                ;   row carries) would price as spell $35
 @escalate:
         ; not a tier family: boost buys this cast Ot6BoostDmg's x2/x4/x8, so
         ; the price escalates with it (#219).  Re-derived here, on the same A
@@ -1341,15 +1340,14 @@ Ot6FoldTbl:
 ; same code path that raised them, and there is no stale state to leak into
 ; the next turn.  An early-out at steps == 0 would break that.
 ;
-; When it runs.  Vanilla's own recheck request: bit 7 of $3204,x, consumed by
-; the main loop's `asl $3204,x / bcc / jsr UpdateEnabledMagic`
-; (battle_main.asm:1367-1369).  Ot6Boost sets it on every L/R edge that moves
-; the bank, beside the OT6_RESTAGE repaint it already requested, and
-; Ot6ActionEnd sets it when it consumes a pending, so the prices track the
-; boost live and fall back when it is spent.  If no recheck ever
-; happens the list shows base prices, which is the correct answer for
-; an unboosted caster; the charge never depends on this having run
-; (Ot6QueueFold re-prices at queue time regardless).
+; When it runs.  Ot6Boost calls it on every L/R edge that moves the bank,
+; through Ot6RecheckMagic on the same instruction stream, and Ot6ActionEnd
+; sets vanilla's recheck request (bit 7 of $3204,x, consumed by AfterAction2's
+; `asl $3204,x / bcc / jsr UpdateEnabledMagic`) when it consumes a pending, so
+; the prices track the boost live and fall back when it is spent.  A spell's
+; charge never depends on this having run (Ot6QueueFold re-prices it at queue
+; time regardless).  A summon's does: row 0's byte is its only price
+; (#251, Ot6QueueFold's header), kept current by the L/R edge's direct call.
 ;
 ; entry (jsl from UpdateEnabledMagic's head): a8/i8, a battle-loop caller.
 ; x = the entity offset, db=$7e.  preserves a/x/y and P.
@@ -1385,10 +1383,10 @@ Ot6FoldTbl:
         shorta0
         lda     a:$0000,x       ; the esper index ValidateSpellList stored
         cmp     #$1b            ; $ff (no magicite) or anything outside the
-        bcs     @rows           ;   esper range: no summon row to price.  The
-                                ;   same range check Ot6QueueFold's @summon
-                                ;   makes, so the two cannot price different
-                                ;   records for one row
+        bcs     @rows           ;   esper range: no summon row to price.  This
+                                ;   byte is the summon's whole charge:
+                                ;   GetMPCost's summon arm reads it and
+                                ;   nothing re-prices it after (#251)
         clc
         adc     #$36            ; -> the esper's own MagicProp record
         phx                     ; the row
