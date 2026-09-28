@@ -31,6 +31,9 @@ The harness plays OT6 the way a competent person with a controller would.
   logged. One loss is a line in the retry inventory. Repeated losses, or a
   loss rate above the band, are a lab. Retry machinery engineered to re-roll
   a fight until it passes is not play.
+- **Spend like a person watching their gil.** Choices between supplies
+  (a Tent or Potions, which item heals) are priced in gil from what the bag
+  would actually spend, not from fixed thresholds.
 - **Classify every wipe by boost at death.** An early one-shot means the
   party is under-levelled (a level/kit finding). A wipe with pips still
   banked means the abilities were not used fully (a driver/policy finding).
