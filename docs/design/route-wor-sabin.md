@@ -1052,10 +1052,19 @@ CELES wears protects her from Petrify (the Osprey's Beak): got 0 ($0), want
   `lab/lab_grind_ifrit.log`; 0 of 3 in the front row, `lab/lab_grind.log`) (`[left] f+2818 entity 0
   (char 6) LEFT the battle ... the whole party is gone`, `PARTY LEFT ...
   reward due 0`); taken before only the last plain body it still did, on
-  its killing blow, twice in three (`lab/gen4.log`). The driver now takes a
-  Sneeze-counter body first while the others stand (`[last stand] slot 1
-  ($07C) throws $CB (N=1) ... taken first`): from one snapshot, rule off
-  `party left`, rule on `won` (`lab/laststand/`), and none of the
+  its killing blow, twice in three (`lab/gen4.log`). The driver takes a
+  Sneeze-counter body first while a plain body stands (`[last stand]
+  slot 1 ($07C) throws $CB (N=1) ... taken first, while 2 other(s) still
+  stand`), by default and on both routes: on the World of Balance it is
+  the Baskervor beside one partner (formation `$0A2`), where 40 fights a
+  side (`review-final/wob/summary.txt`) read 25 members sneezed out in 20
+  with the rule off and 2 in 1 with it on, at the same pace (mean 2046
+  against 2015 ticks). With one partner the killing blow can still fire
+  the counter (gen4 above); the order cuts the repeated sneezes of a
+  body left alone. From one snapshot, rule off `party left`, rule on
+  `won` (`lab/laststand/`): one run per arm, not sixteen -- all 16 seed
+  shifts of each arm end on the same frame (3110 off, 5998 on), the idle
+  absorbed before the mid-battle snapshot's fight moved. None of the
   segment's Chitonid fights since has sneezed. The price is time: those
   fights run 4656-9582 ticks against 2717-3605 with the Chitonid last.
 - **Petrify**: above; the kit asserts a relic protecting STATUS1 `$40`

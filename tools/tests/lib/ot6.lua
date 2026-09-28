@@ -4611,46 +4611,58 @@ end
 -- answers any hit after which N or fewer monsters stand -- AICond_13 is
 -- `lda N / cmp $3A77`, the monsters alive, read when the retaliation
 -- runs, so its own killing blow counts once the others are down to N.
--- So it is taken FIRST, while more than N others still stand: its death
--- then leaves them above N and the counter never gets its condition.
+-- So it is taken FIRST, while a body without such a counter stands.
+-- What that buys, exactly: every hit on it that does not kill leaves the
+-- others standing too, so with more than N others none of its hits fires
+-- the counter; with N or fewer others (one partner at N=1) its non-lethal
+-- hits still do not, but its killing blow can -- the order cuts the
+-- repeated counters of a body left alone, not necessarily the last one.
 -- Measured on the World of Ruin plains (build/attempts/wt/wor-tzen-door/
--- lab/): Osprey + Chitonid + Gigan Toad with the Chitonid left for last
--- sneezed a lone back-row CELES out of the fight in 2 of 6 such fights,
--- once on its killing blow (lab_grind_ifrit.log: `[outcome] ... PARTY LEFT
--- ... killed s0:$0E6 s1:$07C s2:$098`); taken
--- only before the LAST plain body, it sneezed her out on its killing
--- blow with the Osprey still up, twice in three (gen4.log: `PARTY LEFT
--- ... killed s1:$07C s2:$098`).  A kill order planned from the ROM's AI
--- script, not from anything the fight has shown: an informed rule, said
--- as such.  Only where the formation has a body WITHOUT such a counter.
--- With two counter bodies (the house's HermitCrab pair beside a Pm
--- Stalker) both go first, and only the second one's killing blow can
--- still land on N.
+-- lab/): Osprey + Chitonid + Gigan Toad (two others, N=1) with the
+-- Chitonid left for last sneezed a lone back-row CELES out of the fight
+-- in 2 of 6 such fights (lab_grind_ifrit.log: `[outcome] ... PARTY LEFT
+-- ... killed s0:$0E6 s1:$07C s2:$098`); taken with only one other body
+-- still up, it sneezed her out twice in three (gen4.log: `PARTY LEFT ...
+-- killed s1:$07C s2:$098`, the Osprey alive).  On the World of Balance,
+-- the Baskervor ($01D) beside one partner in formation $0A2, north of the
+-- Crescent Mountain landing (build/attempts/wt/wor-tzen-door/review-final/
+-- wob/summary.txt, 8 seed shifts a side from crescent_landing, 40 fights
+-- each): rule off, 25 members sneezed out in 20 of 40 fights; Baskervor
+-- first, 2 in 1 of 40; mean 2046 against 2015 ticks, every fight won.
+-- The WoB/WoR split is a storytelling boundary, not a technical one, so
+-- the order applies on both routes.  A kill order planned from the ROM's
+-- AI script, not from anything the fight has shown: an informed rule,
+-- said as such.  With two counter bodies beside one plain body (the
+-- house's HermitCrab pair beside a Pm Stalker) both go first: the first
+-- one's death leaves two standing, and only the second one's killing
+-- blow can still land on N.
 -- Scope, a lever (opts.lastStand): by default only the counters that take
 -- a member OUT of the fight -- the Sneeze (attack $CB), whose escape
--- ending pays nothing -- since a kill order the route's other fights were
--- never measured under is not a default to impose unmeasured (the ROM's
--- other last-stand bodies, build/attempts/wt/wor-tzen-door/lab/
--- laststand_census.txt: Apokryphos, Behemoth, Ing, Bug, Mind Candy,
--- Coelecite and others on the World of Balance route, the HermitCrab's
--- Rock in Tzen's house); true takes every last-stand counter first; false
--- turns the rule off.
+-- ending pays nothing: the Chitonid on the WoR plains and the Baskervor
+-- on the WoB route, the two measured above.  The ROM's other last-stand
+-- bodies (build/attempts/wt/wor-tzen-door/lab/laststand_census.txt:
+-- Apokryphos, Behemoth, Ing, Bug, Mind Candy, Coelecite and others, the
+-- HermitCrab's Rock in Tzen's house) are unmeasured under the order, so
+-- not defaulted; true takes every last-stand counter first; false turns
+-- the rule off.
 M.SNEEZE = 0xCB
 function Driver:readLastStand(slots)
   self.lastStand = false
-  if self.opts.lastStand == false then return end
+  local lever = self.opts.lastStand
+  if lever == false then return end
   local function counts(p)
     if #p.roles.lastStand == 0 then return false end
-    if self.opts.lastStand == true then return true end
+    if lever == true then return true end
     for _, a in ipairs(p.roles.lastStand) do
       if a == M.SNEEZE then return true end
     end
     return false
   end
-  local focus, said, plain, set = {}, {}, false, {}
+  local focus, said, plain, set, live = {}, {}, false, {}, 0
   for slot = 0, 5 do
     local p = slots[slot]
     if p and monAlive(slot) then
+      live = live + 1
       if counts(p) then
         focus[#focus + 1] = { slot = slot, mask = 1 << slot }
         set[slot] = true
@@ -4667,8 +4679,8 @@ function Driver:readLastStand(slots)
   self.lastStand = { focus = focus, slots = set }
   M.log(string.format("[%s] [last stand] %s at a hit that leaves N or fewer monsters "
     .. "standing, its own killing blow included (its retaliation's `if_num_monsters N`, "
-    .. "AICond_13; the ROM's AI script: an informed kill order) -- taken first, while the "
-    .. "others still stand", self.tag or "fight", table.concat(said, "; ")))
+    .. "AICond_13; the ROM's AI script: an informed kill order) -- taken first, while %d "
+    .. "other(s) still stand", self.tag or "fight", table.concat(said, "; "), live - 1))
 end
 
 -- What the parts do as the fight runs (#189), for the ledger a person
