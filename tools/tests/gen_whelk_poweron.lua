@@ -5,7 +5,8 @@
 -- reached by playing the opening from New Game instead of injecting a human
 -- play save into SRAM.  The SRM path did not work on a fresh clone: gen_whelk
 -- boots from build/states/playthrough_srm.mss.lua, a git-ignored fixture
--- generated from a human save by make_srm_sidecar.sh, so a fresh checkout
+-- generated from a human save by make_srm_sidecar.sh (deleted in e1eb6313;
+-- last version at 09a70f77), so a fresh checkout
 -- could not generate STATE3.
 
 -- The Whelk trigger, with semantics taken from gen_whelk and the disassembly:

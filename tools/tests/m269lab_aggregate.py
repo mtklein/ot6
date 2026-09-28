@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""m269lab_aggregate.py -- tabulate lab_map269_random.lua result lines.
+"""m269lab_aggregate.py -- tabulate lab_map269_random.lua result lines
+(the lab was deleted in e1eb6313; last version at a7e12f45).
 
     python3 tools/tests/m269lab_aggregate.py [build/m269lab/*.log ...]
 

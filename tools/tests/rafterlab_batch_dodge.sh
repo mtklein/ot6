@@ -3,7 +3,8 @@
 #
 #   tools/tests/rafterlab_batch_dodge.sh <strategy> <hold> [hold ...]
 #
-# Same contract as rafterlab_batch.sh (which is shared and untouchable),
+# Same contract as rafterlab_batch.sh (deleted in e1eb6313; last version at
+# 338328ee),
 # but substitutes into probe_rafterlab_dodge.lua and defaults JOBS=3 per
 # the lab's machine-etiquette rule.  Knobs ride in as environment
 # variables: RUNTRY, RADIUS (gate distance), STUCKCAP (wait budget),

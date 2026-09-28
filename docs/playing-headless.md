@@ -23,10 +23,9 @@ manual play:
   key.
 
 `run.sh` wipes `<saves>/*.srm` before every launch; tests that need a save
-inject it explicitly. `tools/tests/make_srm_sidecar.sh` snapshots the live
-play save to `build/states/playthrough_srm.mss.lua` (front 8 KB, the
-vanilla slots, as an embeddable base64 blob; the OT6 bank-31 pages are not
-included).
+inject it explicitly, through the versioned SRAM checkpoints below. The old
+front-8-KB sidecar of the live play save, `tools/tests/make_srm_sidecar.sh`,
+is gone (deleted in e1eb6313; last version at 09a70f77).
 
 ## Booting a save headless
 

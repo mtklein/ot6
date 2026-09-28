@@ -39,7 +39,7 @@ monster's own special attack, named per species in
 
 The lab re-runs the generator with three read-only CPU exec observers
 (`ExecCmd@battle_code` / `_writedamage` / `SaveForMimic`, the shape
-`lab_map269_random.lua` uses) and one stage line per battle, so every death
+`lab_map269_random.lua` used; deleted in e1eb6313, last version at a7e12f45) and one stage line per battle, so every death
 carries the formation it happened in, the species and slot of the killer,
 the attack's own name, and the raw damage word before `ApplyDmg` clamps it
 to HP. Control seed 0 reproduces the qualification frame for frame — same

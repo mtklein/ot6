@@ -23,7 +23,8 @@ published to build/states.  Every attempt is kept, failures included.
 Downs, descent attempts, mean frames) and every raw [death] line under it,
 with the formation the death happened in.
 
-The observers (lab_map269_random.lua's, verbatim in shape):
+The observers (lab_map269_random.lua's, verbatim in shape; deleted in
+e1eb6313, last version at a7e12f45):
 ExecCmd@battle_code runs with X = the acting entity's offset (party
 $00..$06, monsters $08..$12) and $b5/$b6/$b8 the command, attack and target
 after spell folding; _writedamage walks $33d0 + entity*2 (the 14-bit damage
@@ -195,7 +196,8 @@ function fclabHook()
       if p.hp[e] > 0 and after[e] == 0 then kills = kills + 1 end
     end
     -- the AI's "attack ... NOTHING" resolves as command $12 with a stale
-    -- $b6 (lab_map269_random.lua): label it rather than the leftover
+    -- $b6 (lab_map269_random.lua, deleted in e1eb6313): label it rather than
+    -- the leftover
     local atk = (p.cmd == 0x12) and 0x1FE or p.atk
     if dmg[1] + dmg[2] + dmg[3] + dmg[4] ~= 0 or kills > 0 then
       fclabEvents[#fclabEvents + 1] = string.format(
