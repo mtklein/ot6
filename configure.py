@@ -386,6 +386,10 @@ TEST_ENV = {
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
     "battle_slots":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1",
+    # Mimic (#260): no fixture has Gogo, so the test Continues fire-out-v1
+    # and declares a two-byte command expedient (state_write_waivers.txt)
+    "battle_mimic":
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",

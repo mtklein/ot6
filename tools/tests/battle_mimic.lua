@@ -1,9 +1,11 @@
--- @manual
+-- @suite
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- probe_mimic_charge.lua -- what does a boosted Mimic cost?  (#260)
+-- battle_mimic.lua -- a boosted Mimic is free and buys what the copied
+-- action's boost buys  (#260)
 --
+-- Boots fire-out-v1 by cold Continue (configure.py TEST_ENV).  By hand:
 --   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1 \
---     tools/tests/run.sh tools/tests/probe_mimic_charge.lua <log>
+--     tools/tests/run.sh tools/tests/battle_mimic.lua <log>
 --
 -- mp-economy.md: Mimic is free, "vanilla Mimic copies the action and not the
 -- price".  Vanilla makes it free twice over.  The copied action overwrites
@@ -15,14 +17,18 @@
 -- x-magic and lore from the caster's pending boost; before #260 it could not
 -- see $b1.6.  This measures what a boosted mimic is charged, and what its
 -- boost buys, not what the code says.  The verdict (last step): every case
--- charged 0 MP, a boosted copy of a tier-family head cast its tier, and the
--- pips were spent.  Main at 6f8382cb fails it (x-magic copies charged 38 and
--- 20; plain copies of Fire cast plain Fire); build/attempts/wt/mimic-charge/.
+-- charged 0 MP, a boosted copy of a tier-family head cast its tier (Fire 2
+-- at 1 pip, Fire 3 at 2 and 3), the pips were spent, and a boosted copy of
+-- anything outside the tier families -- Drain, a lore, a summon -- dealt
+-- the x2/x4/x8 of the same copy unboosted.  Main at 6f8382cb fails it
+-- (x-magic copies charged 38 and 20; plain copies of Fire cast plain Fire);
+-- build/attempts/wt/mimic-charge/, and the negative controls for the
+-- tier-3 and multiplier verdicts are under build/attempts/wt/mimic-suite/.
 --
 -- DECLARED EXPEDIENT (tools/state_write_waivers.txt).  No fixture has Gogo:
 -- he joins in the World of Ruin, past the route.  Nor does any fixture have
 -- an x-magic caster (the Gem Box is World of Ruin too).  So after the cold
--- Continue, before the first step, this probe writes two command bytes in
+-- Continue, before the first step, this test writes two command bytes in
 -- the field character records ($1600 + 37*id + $16..$19): the stand-in's
 -- second command becomes Mimic ($12), and TERRA's Morph row becomes X-Magic
 -- ($17).  Battle init builds the battle command lists from those bytes, so
@@ -35,23 +41,26 @@
 -- bytes, walk to an encounter, and snapshot TERRA's first window (X, for the
 -- x-magic cases: her second spell waits out its own delay, and a TERRA worn
 -- down by Defend rounds was killed in it), then Defend until the stand-in
--- has 3 pips banked and snapshot TERRA's window (T) and STRAGO's (S).  Each case restores one snapshot: the source casts
--- (unboosted unless the case says), everyone else Defends, and the
--- stand-in, once the source's cast has resolved (SaveForMimic has run for
--- it), presses R to the case's boost and picks Mimic.  Observed, never
+-- has 3 pips banked and snapshot TERRA's window (T) and STRAGO's (S).  Each
+-- case restores one snapshot: the source casts (unboosted unless the case
+-- says; a summon is TERRA's worn esper, from the top of her Magic list),
+-- everyone else Defends, and the stand-in, once the source's cast has
+-- resolved (SaveForMimic has run for it), presses R to the case's boost and
+-- picks Mimic.  Observed, never
 -- written: every store to the MP-cost queue ($3620-$371F) with the queue
 -- context, Ot6QueueFold's entries, mimicreplace's entry (what is copied,
 -- the pending there), the staged cost $3A4C the stand-in's actions start
--- with, Ot6BoostDmg's entries for the stand-in, damage numerals, and the
--- stand-in's MP and BP at the Mimic confirm and after Ot6ActionEnd.
+-- with, Ot6BoostDmg's entries for the stand-in, the damage a drain's calc
+-- hands FixDrainDmg, damage numerals, and the stand-in's MP and BP at the
+-- Mimic confirm and after Ot6ActionEnd.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL, CMDROW = 0x202E, 0x890F
 local ST_CMD, ST_DEF, ST_TGT, ST_MAGIC = 0x05, 0x27, 0x38, 0x0E
-local ST_LORE_OPEN, ST_LORE = 0x19, 0x1B
-local BANK, PEND, CURMP, MLISTPTR = 0x3E9C, 0x3E9D, 0x3C08, 0x302C
+local ST_LORE_OPEN, ST_LORE, ST_ESPER = 0x19, 0x1B, 0x16
+local BANK, PEND, CURMP, MLISTPTR, STONE = 0x3E9C, 0x3E9D, 0x3C08, 0x302C, 0x3344
 local MSCROLL, MCOL, MROW, LSCROLL, LROW = 0x8913, 0x8917, 0x891B, 0x891F, 0x8927
 local CMD_MAGIC, CMD_LORE, CMD_MIMIC, CMD_XMAGIC = 0x02, 0x0C, 0x12, 0x17
 local TERRA, LOCKE, STRAGO, RELM = 0, 1, 7, 8
@@ -133,6 +142,10 @@ local function installObservers()
     if armed == nil or armed.endF then return end
     armed.sfmAll[#armed.sfmAll + 1] = string.format("x=%02X:$%04X@f%d", cx(), rd16(0x3A7C), H.frame)
     if cx() == armed.src * 2 then
+      armed.srcTargets = string.format("$%04X", rd16(0x3A30))
+      local hp = {}
+      for m = 0, 5 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + (4 + m) * 2)) end
+      armed.monHpAtSave = table.concat(hp, ",")
       armed.srcSaved = armed.srcSaved + 1
       armed.srcActs[#armed.srcActs + 1] = string.format("$%04X", rd16(0x3A7C))
     end
@@ -166,7 +179,27 @@ local function installObservers()
     if w == 0xFFFF then return end
     local t = armed.inStand and armed.standNums or armed.srcNums
     t[#t + 1] = string.format("%d", w & 0x3FFF) .. ((w & 0x4000) ~= 0 and "m" or "")
+    -- the stand-in's HP damage numerals, for the multiplier verdict
+    if armed.inStand and (w & 0x4000) == 0 and (w & 0x3FFF) > 0 then
+      armed.standDmg[#armed.standDmg + 1] = w & 0x3FFF
+    end
   end, emu.callbackType.write, 0x7E33D0, 0x7E33E3)
+  -- A drain's numeral is not its damage: the drain caps it (FixDrainDmg and
+  -- the heal half after it), and on fire-out-v1 the cap that binds is the
+  -- stand-in's missing HP -- boost 0, 1 and 3 copies of Drain all showed 68
+  -- against a 750-HP target, with the stand-in at 1147/1215
+  -- (build/attempts/wt/mimic-suite/explore2-drain-615ed364.log).  So the
+  -- drain's multiplier is read where the damage calc hands the drain its
+  -- number: $f0 at FixDrainDmg's entry, after Ot6BoostDmg and the variance,
+  -- before either cap.
+  local fd = H.sym("FixDrainDmg")
+  emu.addMemoryCallback(function()
+    if armed == nil or armed.endF then return end
+    local x, y = cx(), cy()
+    armed.drainLog[#armed.drainLog + 1] = string.format("[x=%02X y=%02X f0=%d tgtHP=%d atkHP=%d/%d]",
+      x, y, H.readWord(0x00F0), H.readWord(0x3BF4 + y), H.readWord(0x3BF4 + x), H.readWord(0x3C1C + x))
+    if armed.inStand and x == standS * 2 and armed.drainPre == nil then armed.drainPre = H.readWord(0x00F0) end
+  end, emu.callbackType.exec, fd, fd)
   local ae = H.sym("Ot6ActionEnd")
   emu.addMemoryCallback(function()
     if armed == nil or armed.endF then return end
@@ -213,9 +246,12 @@ local function decide(c)
       return "a"
     end
     if st == ST_MAGIC then
+      -- a summon: from the top of the list UP opens the esper window
+      if c.summon then return "up" end
       if c.tgtSeen then c.tgtSeen = false; c.pickIdx = c.pickIdx + 1 end
       return steerMagic(c.src, c.picks[math.min(c.pickIdx, #c.picks)])
     end
+    if st == ST_ESPER and c.summon then return "a" end
     if st == ST_LORE_OPEN then return nil end
     if st == ST_LORE then
       local want = loreRow(c.src, c.picks[1])
@@ -260,7 +296,7 @@ local function runCase(snapRef, c)
       tick, held = 0, nil
       c.pickIdx, c.srcSaved, c.srcActs, c.srcQueued, c.tgtSeen = 1, 0, {}, 0, false
       c.stores, c.standStores, c.folds, c.staged, c.dmg, c.castIds = {}, {}, {}, {}, {}, {}
-      c.srcNums, c.standNums, c.sfmAll = {}, {}, {}
+      c.srcNums, c.standNums, c.sfmAll, c.standDmg, c.drainLog = {}, {}, {}, {}, {}
       armed = c
     end),
     H.driveUntil(function() return c.endF ~= nil and H.frame >= c.endF + 20 end, 12000, {
@@ -294,8 +330,10 @@ local function runCase(snapRef, c)
         c.name, table.concat(c.stores, " "), standS * 2, table.concat(c.standStores, ",")))
       H.log(string.format("[mimic] %s: stand-in staged cost $3A4C %s; Ot6BoostDmg %s",
         c.name, table.concat(c.staged, " "), table.concat(c.dmg, " ")))
-      H.log(string.format("[mimic] %s: damage numerals source {%s} stand-in {%s}",
-        c.name, table.concat(c.srcNums, ","), table.concat(c.standNums, ",")))
+      H.log(string.format("[mimic] %s: damage numerals source {%s} stand-in {%s}; source targets %s, monster HP at its SaveForMimic {%s}",
+        c.name, table.concat(c.srcNums, ","), table.concat(c.standNums, ","),
+        tostring(c.srcTargets), tostring(c.monHpAtSave)))
+      H.log(string.format("[mimic] %s: FixDrainDmg entries %s", c.name, table.concat(c.drainLog, " ")))
       H.log(string.format("[mimic] %s: RESULT boost %d: stand-in MP %d -> %d (charged %d); "
         .. "pending %d -> %d at ActionEnd entry, bank %d -> %d at ActionEnd entry, %d/%d two frames later",
         c.name, c.boost, c.mp0 or -1, c.mpEnd or -1, charged, c.pendAtConfirm or -1,
@@ -410,6 +448,21 @@ local steps = {
       H.readByte(CMDTBL + standS * 12), H.readByte(CMDTBL + standS * 12 + 3),
       H.readByte(CMDTBL + standS * 12 + 6), H.readByte(CMDTBL + standS * 12 + 9)))
     H.log("[mimic] TERRA list " .. dump(terraS))
+    H.log("[mimic] STRAGO list " .. dump(stragoS))
+    H.log("[mimic] stand-in list " .. dump(standS))
+    for _, s in ipairs({ terraS, standS, stragoS }) do
+      local b = listBase(s)
+      H.log(string.format("[mimic] slot %d list head %02X %02X %02X %02X (char %d field esper $%02X)", s,
+        H.readByte(b), H.readByte(b + 1), H.readByte(b + 2), H.readByte(b + 3), H.readByte(0x3ED8 + s * 2),
+        H.readByte(0x1600 + 37 * H.readByte(0x3ED8 + s * 2) + 0x1E)))
+    end
+    local ids = H.monsterIds()
+    local mon = {}
+    for m = 0, 5 do
+      mon[#mon + 1] = string.format("%d:%04X hp%d/%d", m, ids[m + 1],
+        H.readWord(0x3BF4 + (4 + m) * 2), H.readWord(0x3C1C + (4 + m) * 2))
+    end
+    H.log("[mimic] monsters " .. table.concat(mon, " "))
     H.log(string.format("[mimic] MP: TERRA %d STRAGO %d stand-in %d", mp(terraS), mp(stragoS), mp(standS)))
     for _, id in ipairs({ 0x00, 0x01, 0x02 }) do
       local cell, cost, fl = spellCell(terraS, id)
@@ -422,9 +475,18 @@ local steps = {
       local id = H.readByte(a)
       if id ~= 0xFF and loreOffered(id) then picks.lore = id break end
     end
-    H.log(string.format("[mimic] picks: family $%02X, non-family $%02X, lore %s",
-      picks.fam or 0xFF, picks.non or 0xFF, picks.lore and string.format("$%02X", picks.lore) or "none"))
+    -- the summon: TERRA's worn esper, whose attack is a spell outside every
+    -- tier family (FixPlayerAttack's +$36), so its boost buys Ot6BoostDmg's
+    -- multiplier; its numerals are not capped the way a drain's are
+    local stone = H.readByte(STONE + terraS * 2)
+    if stone ~= 0xFF then picks.esper = stone + 0x36 end
+    H.log(string.format("[mimic] picks: family $%02X, non-family $%02X, lore %s, summon %s (TERRA's esper $%02X, "
+      .. "esper row cost %d)", picks.fam or 0xFF, picks.non or 0xFF,
+      picks.lore and string.format("$%02X", picks.lore) or "none",
+      picks.esper and string.format("$%02X", picks.esper) or "none", stone, H.readByte(listBase(terraS) + 3)))
     assert(picks.fam and picks.non, "TERRA knows a family head and Drain")
+    assert(picks.lore, "STRAGO has a lore on offer")
+    assert(picks.esper, "TERRA wears an esper (the summon cases)")
     assert(cmdRow(standS, CMD_MIMIC), "the stand-in's battle list has Mimic")
     assert(cmdRow(terraS, CMD_XMAGIC), "TERRA's battle list has X-Magic")
   end),
@@ -493,6 +555,7 @@ end
 local CASES = {
   { "T", { name = "fam-b0",   cmd = CMD_MAGIC,  pickKeys = { "fam" },        boost = 0 } },
   { "T", { name = "fam-b1",   cmd = CMD_MAGIC,  pickKeys = { "fam" },        boost = 1 } },
+  { "T", { name = "fam-b2",   cmd = CMD_MAGIC,  pickKeys = { "fam" },        boost = 2 } },
   { "T", { name = "fam-b3",   cmd = CMD_MAGIC,  pickKeys = { "fam" },        boost = 3 } },
   { "T", { name = "non-b0",   cmd = CMD_MAGIC,  pickKeys = { "non" },        boost = 0 } },
   { "T", { name = "non-b1",   cmd = CMD_MAGIC,  pickKeys = { "non" },        boost = 1 } },
@@ -504,6 +567,21 @@ local CASES = {
   { "X", { name = "x-non-fam-b1", cmd = CMD_XMAGIC, pickKeys = { "non", "fam" }, boost = 1 } },
   { "S", { name = "lore-b0",  cmd = CMD_LORE,   pickKeys = { "lore" },       boost = 0 } },
   { "S", { name = "lore-b1",  cmd = CMD_LORE,   pickKeys = { "lore" },       boost = 1 } },
+  { "S", { name = "lore-b3",  cmd = CMD_LORE,   pickKeys = { "lore" },       boost = 3 } },
+  { "T", { name = "sum-b0",   cmd = CMD_MAGIC,  pickKeys = { "esper" }, summon = true, boost = 0 } },
+  { "T", { name = "sum-b1",   cmd = CMD_MAGIC,  pickKeys = { "esper" }, summon = true, boost = 1 } },
+  { "T", { name = "sum-b2",   cmd = CMD_MAGIC,  pickKeys = { "esper" }, summon = true, boost = 2 } },
+}
+-- The multiplier pairs: the same copy, from the same snapshot, unboosted and
+-- boosted.  mp-economy.md: a lore or any spell outside the tier families
+-- takes Ot6BoostDmg's x2/x4/x8 on a mimic's copy.  A lore and a summon are
+-- read off their damage numerals (neither is capped short of 9999); Drain,
+-- whose numeral the drain caps (see FixDrainDmg above), off the damage the
+-- calc hands the drain.
+local MULT = {
+  { base = "non-b0",  vs = { "non-b1", "non-b3" },  how = "drain" },
+  { base = "lore-b0", vs = { "lore-b1", "lore-b3" }, how = "numerals" },
+  { base = "sum-b0",  vs = { "sum-b1", "sum-b2" },  how = "numerals" },
 }
 local ONLY = nil                 -- a case-name prefix, or nil for all of them
 for _, e in ipairs(CASES) do
@@ -558,6 +636,51 @@ steps[#steps + 1] = H.call(function()
       for _, id in ipairs(c.casts) do t[#t + 1] = string.format("$%02X", id) end
       H.log(string.format("[mimic] VERDICT %s boost %d: charged %d, cast %s%s", c.name, c.boost,
         charged, table.concat(t, "+"), verdict))
+    end
+  end
+  -- The multiplier.  Each copy's damage carries vanilla's own variance,
+  -- x(224..255)/256, drawn independently, so the ratio of two copies of one
+  -- action at boosts b and 0 is 2^b within [224/255, 255/224] of it; the
+  -- band below is that, widened a little for the integer rounding.  x1 (a
+  -- boost that bought nothing) and the next multiplier up both fall
+  -- outside it at every boost.
+  local byName = {}
+  for _, e in ipairs(CASES) do byName[e[2].name] = e[2] end
+  local LO, HI = 0.86, 1.16
+  local function measure(c, how)
+    if how == "drain" then return c.drainPre, c.drainPre and "FixDrainDmg $f0" or "no drain calc" end
+    local sum, big = 0, 0
+    for _, v in ipairs(c.standDmg or {}) do sum = sum + v; if v > big then big = v end end
+    if #(c.standDmg or {}) == 0 then return nil, "no damage numeral" end
+    if big >= 9999 then return nil, "a numeral at the 9999 cap" end
+    return sum, string.format("%d numeral(s) {%s}", #c.standDmg, table.concat(c.standDmg, ","))
+  end
+  for _, m in ipairs(MULT) do
+    local c0 = byName[m.base]
+    for _, name in ipairs(m.vs) do
+      local c = byName[name]
+      if c0.mp0 and c.mp0 then
+        local v0, w0 = measure(c0, m.how)
+        local v, w = measure(c, m.how)
+        local k = 1 << c.boost
+        local line
+        if v0 == nil or v == nil or v0 == 0 then
+          line = string.format("unmeasured (%s: %s; %s: %s)", c0.name, w0, c.name, w)
+          bad[#bad + 1] = c.name .. "(unmeasured)"
+        elseif #(c0.standDmg or {}) ~= #(c.standDmg or {}) and m.how == "numerals" then
+          line = string.format("%s hit %d targets, %s %d", c0.name, #c0.standDmg, c.name, #c.standDmg)
+          bad[#bad + 1] = c.name .. "(targets)"
+        else
+          local r = v / v0
+          local ok = r >= k * LO and r <= k * HI
+          line = string.format("%d / %d = %.3f, want x%d in [%.2f, %.2f] (%s; %s)%s", v, v0, r, k,
+            k * LO, k * HI, w, w0, ok and "; ok" or "; NOT THE MULTIPLIER")
+          if not ok then bad[#bad + 1] = c.name .. "(x" .. k .. ")" end
+        end
+        H.log(string.format("[mimic] MULTIPLIER %s vs %s boost %d: %s", c.name, c0.name, c.boost, line))
+      elseif ONLY == nil then
+        bad[#bad + 1] = name .. "(not run)"
+      end
     end
   end
   assert(#bad == 0, "a boosted mimic was charged, or bought nothing: " .. table.concat(bad, " "))
