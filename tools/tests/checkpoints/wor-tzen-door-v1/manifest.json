@@ -15,9 +15,9 @@
     }
   },
   "provenance": {
-    "format": "ot6-provenance/v1",
+    "format": "ot6-provenance/v2",
     "payload_sha256": "5965bc6b6edbb35bb8169dc9116135e1ee57c5b3101d126bbc284ddf9f99d412",
-    "generator_sig": "07e120c45c78479956bddf75f52d4a0008a26a5bac536461b8a07fa8019aec0f gen_wor_tzen_door tools/tests/checkpoints/wor-start-v1/manifest.json tools/tests/checkpoints/wor-start-v1/wor-start.sram",
+    "generator_sig": "6736c2ad5904b39f923982819700429d63241bb2d4beba2c0ee991f830e8d279 gen_wor_tzen_door tools/tests/checkpoints/wor-start-v1/manifest.json tools/tests/checkpoints/wor-start-v1/wor-start.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/wor-start-v1/manifest.json",

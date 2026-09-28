@@ -967,8 +967,19 @@ the boot for the timed house. Every number below is quoted from a log
 under `build/attempts/wt/wor-tzen-door/` (`runs/` the graph's own run, the
 capture and the cold Continue; `lab/` the probes and A/B labs, with the
 scripts that made them; `var-final/` and `var-prefinal/` the runs under
-real draw variation; `suites/` the lib suites). Nothing was measured by
-writing game state.
+real draw variation; `suites/` the lib suites; `review-final/` the same
+on the tree after the review's fixes). Nothing was measured by writing
+game state.
+
+Re-cut after the review (`review-final/runs/`): the graph's run
+(`nice ninja build/states/wor_tzen_door.mss.lua`) and the capture play the
+same run to the frame, `PASS (frame 46853) attempts=1/3`, and the
+battery is byte-identical to the first cut (`sha256=5965bc6b...`); only
+its provenance moved (the generator's new fingerprint,
+`ot6-provenance/v2`). Each fight's ticks are
+now counted to the end hook, where its `[outcome]` is said: 61 fewer
+than the figures below, which were counted to the driver's idle
+(`$0C7 WON after 2690 ticks`, against 2751).
 
 ### 10.1 The run (`runs/wor_tzen_door_ninja.log`, `nice ninja build/states/wor_tzen_door.mss.lua`)
 
@@ -1104,16 +1115,29 @@ CELES wears protects her from Petrify (the Osprey's Beak): got 0 ($0), want
 
 - **The lib's suites** that call what this segment changed (the equip
   helpers, the world BFS and navigator, the wipe class, the part roles,
-  the driver's per-frame watch), run through `run.sh` on this tree's
-  fixtures (`suites/`, `suites_verdicts.txt`): 15 of 16 PASS;
-  `battle_shadowstays` fails the same way on main's lib and on this branch's
-  (`suites/shadowstays/head.log`, `branch.log`: `the 1/16 Shadow-leave roll
-  never passed in 80 won battles`), from a `camp_escaped` fixture that is
-  stale against main's generators. Its first run on the branch found the
-  outcome watch reading the battle's RAM after the battle had handed it
-  back (`branch_before_endhook.log`: 320 false `[left]` lines); the
-  `[outcome]` is now judged on the battle's own end reading (`UpdateSRAM`),
-  and the rerun reads 80 of 80 `paid as due` and no `[left]`.
+  the driver's per-frame watch and `[outcome]`, the last-stand rule).
+  On the final tree (the review fixes: the `[outcome]` said at the
+  `UpdateSRAM` end hook, the last-stand comment and its World of Balance
+  measurement; main merged through `bdc723f9`), run through `run.sh` on a
+  ROM built from the tree (`fdf9bacfafaa`, the ROM every fixture was cut
+  on: no suite log says STALE), the 16 below plus the 12 more the review
+  ran, 28 in all (`review-final/suites/`, `review-final/suites_verdicts.txt`):
+  28 of 28 PASS, every `[outcome]` line `paid as due`, none without an end
+  reading, one `[outcome]` for every battle opened (`field_care_emptybag`:
+  `PASS (frame 59324)`, `layout=19 out=19 paid=19`, 5 `[last stand]`
+  lines; the review counted 5 `[outcome]` lines for its 19 battles), and
+  `battle_shadowstays` passes (`PASS (frame 33898)`, 10 of 10 `paid as
+  due`). An earlier round of these fixes, with the last-stand rule made
+  opt-in (since reversed), is kept as history in `review-fixes/`.
+  *History, superseded:* the branch's first commit claimed "15 of 16
+  PASS" from `suites/` (06:51-06:56), but those runs were on the lib
+  BEFORE the end hook: there `battle_statuses` said 12 of 12 `[outcome]`
+  lines as CONTRADICTION and `field_care_emptybag` 5 of 5, and
+  `battle_shadowstays` failed (`suites/shadowstays/head.log`, `branch.log`:
+  `the 1/16 Shadow-leave roll never passed in 80 won battles`). Its
+  first run on the branch found the outcome watch reading the battle's
+  RAM after the battle had handed it back (`branch_before_endhook.log`:
+  320 false `[left]` lines), which is what the end hook fixed.
 
 ### 10.5 Under real draw variation
 
@@ -1127,38 +1151,51 @@ encounter counter, level, HP and bag -- a person who fought a while before
 heading for town -- and plays on from there. Retries off
 (`OT6_RETRIES=1`): every attempt is scored as it fell.
 
+On the final tree (`review-final/var/summary.txt` and the logs beside
+it; `review-final/lab/varlab.py`, the same derivation):
+
 | variant | the body starts at | battles | Osprey + Chitonid + Gigan Toad | escapes | lowest HP sampled | verdict |
 |---|---|---|---|---|---|---|
 | K=0, shift 23 | the landing (the runner's seed shift only) | 10 | 3 | 4 | 541 | `PASS (frame 41501) attempts=1/1` |
 | K=0, shift 41 | the landing | 10 | 3 | 4 | 539 | `PASS (frame 40751) attempts=1/1` |
-| K=1 | L25, 837 HP, Dark, `$1FA1-5 = 23 0A 09 09 09` | 10 | 2 | 3 | 397 | `PASS (frame 46566) attempts=1/1` |
-| K=2 | L25, 767 HP, `51 0B ...` | 10 | 2 | 5 | 410 | `PASS (frame 43038) attempts=1/1` |
-| K=3 | L25, 698 HP, `78 0C ...` | 10 | 3 | 3 | 461 | `PASS (frame 52924) attempts=1/1` |
-| K=3, shift 23 | L25, 749 HP | 10 | 3 | 2 | 398 | `PASS (frame 56070) attempts=1/1` |
-| K=3, shift 41 | L25, 768 HP | 10 | 3 | 3 | 128 | `PASS (frame 53735) attempts=1/1` |
-| K=4 | L25, 584 HP, `92 0D ...` | 10 | 2 | 3 | 418 | `PASS (frame 42383) attempts=1/1` |
-| K=5 | L26, `B6 0E ...` | 10 | 2 | 4 | 418 | `PASS (frame 36628) attempts=1/1` |
-| K=6 | L26, `DF 0F ...` | 10 | 3 | 4 | 411 | `PASS (frame 42667) attempts=1/1` |
-| K=6, shift 23 | L26, 942 HP | 10 | 3 | 3 | 323 | `PASS (frame 51886) attempts=1/1` |
-| K=6, shift 41 | L26, 980 HP | 10 | 3 | 3 | 295 | `PASS (frame 50070) attempts=1/1` |
-| K=7 | L26, `FF 10 ...` | 10 | 2 | 4 | 418 | `PASS (frame 41648) attempts=1/1` |
-| K=8 | L26, `34 11 09 1A 09` | 10 | 1 | 4 | 418 | `PASS (frame 39837) attempts=1/1` |
+| K=1 | L25, 837 HP, Dark, `$1FA1-5 = 23 0A 09 09 09` | 10 | 2 | 2 | 487 | `PASS (frame 51678) attempts=1/1` |
+| K=2 | L25, 767 HP, `51 0B ...` | 10 | 2 | 5 | 291 | `PASS (frame 46951) attempts=1/1` |
+| K=3 | L25, 698 HP, `78 0C ...` | 10 | 3 | 3 | 329 | `PASS (frame 47398) attempts=1/1` |
+| K=3, shift 23 | L25, 749 HP | 10 | 3 | 2 | 468 | `PASS (frame 44789) attempts=1/1` |
+| K=3, shift 41 | L25, 768 HP | 10 | 3 | 2 | 535 | `PASS (frame 51239) attempts=1/1` |
+| K=4 | L25, 584 HP, `92 0D ...` | 10 | 2 | 4 | 418 | `PASS (frame 41758) attempts=1/1` |
+| K=5 | L26, `B6 0E ...` | 10 | 2 | 4 | 418 | `PASS (frame 37385) attempts=1/1` |
+| K=6 | L26, `DF 0F ...` | 10 | 3 | 3 | 418 | `PASS (frame 39862) attempts=1/1` |
+| K=6, shift 23 | L26, 942 HP | 10 | 3 | 2 | 323 | `PASS (frame 48655) attempts=1/1` |
+| K=6, shift 41 | L26, 980 HP | 10 | 3 | 3 | 439 | `PASS (frame 46290) attempts=1/1` |
+| K=7 | L26, `FF 10 ...` | 10 | 2 | 4 | 418 | `PASS (frame 41664) attempts=1/1` |
+| K=8 | L26, `34 11 09 1A 09` | 10 | 1 | 4 | 418 | `PASS (frame 40088) attempts=1/1` |
 
-(`var-final/summary.txt` and the logs beside it, on the shipped
-generator and lib: 140 `[outcome]` lines, every one `paid as due`; the
-lowest HP is the driver's 300-tick battle line, not a per-frame minimum.
-The same runs one lib change earlier, `var-final-prelib/` (the outcome
-judged on the last per-frame reading), and the K=1..6 runs one generator
-lever earlier, `var-prefinal/` (a release-per-step walker since dropped),
-end at the same frames with the same verdicts.) Every run reached L27 and saved at (131,179); across the 15
-runs (these and the graph's own) 38 Osprey + Chitonid + Gigan Toad fights
-were won with no sneeze, no death, no Fenix Down and no battle lost; the
-K=1 variant walked into Albrook blind and took the inn (`[Albrook inn]
-... after the night: c6 1043/1043 hp`, `status1 $00`). Two things to
-watch, both in that formation after the Chitonid falls: HP samples of 175
-(the graph's run, the Osprey alone) and 128 (K=3, shift 41, the Osprey
-and the Gigan Toad): fights won, but by the heal policy's margin, the
-stretch's attrition fight.
+14 of 14 PASS; every run says one `[outcome]` for each of its 10 battles
+(`battles(layout lines)=10 outcome=10 paid_as_due=10 no_end_reading=0`),
+140 in all, every one `paid as due`, and no `[left]` line: across the
+15 runs (these and the graph's own) 38 Osprey + Chitonid + Gigan Toad
+fights were won with no sneeze, no death, no Fenix Down (`Fenix Downs
+held and bought 27, left 27` in all 14) and no battle lost; every run
+reached L27 and saved at (131,179). The lowest HP is the driver's
+300-tick battle line over every battle of the run, not a per-frame
+minimum. The K=0 runs end on the frames they ended on before the review;
+the K>0 runs do not, because the K block counts its encounters by
+`[outcome]` lines, which are now said at the battle's end hook rather
+than at the walk's next idle, so it hands over about 62 frames sooner
+(K=1: `[varlab] 1 encounter(s) used up before the body: f5649`, against
+`f5711`) and the body plays on from another frame. Two things to watch,
+both in that formation after the Chitonid falls: HP samples of 175 (the
+graph's run, the Osprey alone) and 291 (K=2, the Osprey and the Gigan
+Toad: `partyhp=291 ... monhp=s0:850/sh2,s1:0/sh3,s2:458/sh2`): fights
+won, but by the heal policy's margin, the stretch's attrition fight.
+
+Before the review, on the lib that said an `[outcome]` only from the
+driver's idle (`var-final/summary.txt`): 14 of 14 `PASS attempts=1/1`,
+140 `[outcome]` lines, every one `paid as due`, lowest HP samples 128
+(K=3, shift 41) to 541; `var-final-prelib/` (the outcome judged on the
+last per-frame reading) and `var-prefinal/` (a release-per-step walker
+since dropped) ended at the same frames with the same verdicts.
 
 ### 10.6 For the house segment
 
