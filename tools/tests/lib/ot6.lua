@@ -7173,7 +7173,7 @@ function Driver:idle()
   self.outcomeSaid = false
   self.seatXp, self.seatChar, self.filled = nil, nil, nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
-  self.timed, self.tailSaid = nil, false
+  self.timed, self.tailSaid, self.runDecided, self.running = nil, false, nil, nil
   if self.recovery then
     self.recovery.close(M.frame, "battle_ended")
     if recoveryObserver == self.recovery then recoveryObserver = nil end
@@ -7293,11 +7293,9 @@ end
 function Driver:watchLeavers()
   if self.battleTick == 1 then self.startFrame = M.frame end
   endActivate()
-  if self.battleTick < 6 then return end
-  -- past the battle's own end the RAM is being handed back: no more reads
-  if endSnap ~= nil and endSnap.frame >= (self.startFrame or 0) then return end
-  -- ...and a driver that first watched the battle AFTER its end hook
-  -- fired is watching that hand-back, not a battle: measured on
+  -- a driver that first watched the battle AFTER the last end hook fired
+  -- (said from its first frame, so nothing else is said or decided for it)
+  -- is watching that hand-back, not a battle: measured on
   -- gen_wor_sabin's draw-variation lab (build/attempts/wt/wor-sabin/lab/
   -- ghost/), a walk that ended on the [outcome] of one battle and a new
   -- walker built on the next frame read the tail as a second battle -- 59
@@ -7306,8 +7304,23 @@ function Driver:watchLeavers()
   -- camp_escaped measurement above), and no real battle opens that soon
   -- after another's end (the fade-out, the map's reload, a step and the
   -- encounter's own transition come between), so 90 frames is the tail.
-  if endSnap ~= nil and (self.startFrame or 0) - endSnap.frame < 90 then
+  -- The bound is measured: every run's [watch] battle-gaps line reports
+  -- the nearest end-hook-to-next-battle gap it saw and the tails' gaps
+  -- (M.battleGaps).  Over the whole regenerated chain and suite set (192
+  -- run logs, build/attempts/wt/wor-sabin/review-fixes/gaps/): 184 real
+  -- battles opened 112 frames or more after the last end hook (the
+  -- nearest, the opera's rafter rats one after another, ultros2_entry),
+  -- and the one tail came 73 frames after it (battle_classtarget's
+  -- aim-off driver).  90 sits between; a battle that opened sooner than
+  -- 90 frames after another's end would read as a tail and lose its
+  -- [outcome], which the generators' outcome-per-battle assertion catches.
+  if endSnap ~= nil and endSnap.frame < (self.startFrame or 0)
+     and (self.startFrame or 0) - endSnap.frame < 90 then
     if not self.tailSaid then
+      local g = M.battleGaps
+      local gap = (self.startFrame or 0) - endSnap.frame
+      g.tails = g.tails + 1
+      if g.tailMax == nil or gap > g.tailMax then g.tailMax = gap end
       self.tailSaid = true
       M.log(string.format("[%s] [tail] f+%d the last battle's end hook fired %d frames before "
         .. "this watch began: its hand-back, not a battle -- nothing seated, no [outcome]",
@@ -7315,7 +7328,16 @@ function Driver:watchLeavers()
     end
     return
   end
+  if self.battleTick < 6 then return end
+  -- past the battle's own end the RAM is being handed back: no more reads
+  if endSnap ~= nil and endSnap.frame >= (self.startFrame or 0) then return end
   if self.seatXp == nil then
+    if endSnap ~= nil then
+      local g = M.battleGaps
+      local gap = (self.startFrame or 0) - endSnap.frame
+      g.real = g.real + 1
+      if g.realMin == nil or gap < g.realMin then g.realMin = gap end
+    end
     self.seatXp, self.seatChar, self.filled = {}, {}, {}
     for e = 0, 3 do
       local a, off = M.readByte(0x3ED8 + e * 2), M.readWord(0x3010 + e * 2)
@@ -7361,15 +7383,21 @@ function Driver:watchLeavers()
 end
 
 -- ---- a timed scene (#250) ----
--- A scene timer that runs through menus and battles (M.sceneTimer: Tzen's
--- collapsing house, 6:00 from the moment Sabin asks for help) is a clock
--- every frame of the fight is paid out of: the battle's own ATB may stand
--- still while a command window is open (Wait mode), the scene's counter
--- does not (DecTimersMenuBattle, field/event.asm:5562).  A person under
--- that clock ends the fight fast and does not dawdle in the menus.  Read
--- once as the battle opens and said then, beside the timer's remaining
--- time on every 300-tick battle line, and again at the battle's end with
--- what the battle cost of it.  Two levers follow it (opts):
+-- A clock a person can see that runs through menus and battles
+-- (M.sceneTimer: MENU_BATTLE_VISIBLE and not FIELD_ONLY -- Tzen's
+-- collapsing house, 6:00 from the moment Sabin asks for help; the
+-- Floating Continent escape; the opera's rafter chase) is paid out of by
+-- every frame of the fight: the battle's own ATB may stand still while a
+-- command window is open (Wait mode), the scene's counter does not
+-- (DecTimersMenuBattle, field/event.asm:5562).  An invisible event timer
+-- (the Sealed Gate cave's puzzle timers) is not one: nobody hurries for a
+-- clock they cannot see.  A person under a visible clock ends the fight
+-- fast, does not dawdle in the menus, and runs from a random battle the
+-- time left cannot cover.  Read as the battle opens and said then, beside
+-- the timer's remaining time on every 300-tick battle line, and again at
+-- the battle's end with what the battle cost of it; re-read on every
+-- decision, so the levers drop the frame the clock is spent or stopped.
+-- The levers (opts):
 --   timedHealPercent  the top-up fraction while the clock runs
 --                     (M.TIMED_HEAL_PERCENT): a heal still goes to a
 --                     member inside the round, or inside the rounds the
@@ -7377,34 +7405,126 @@ end
 --   timedCadence      the command-menu press cadence while the clock runs
 --                     (M.TIMED_CADENCE frames a press, against the default
 --                     30; 12 is newWalkFighter's, 6-on/6-off)
+--   timedRun          false: never run (M.TIMED_RUN, default on)
+--   timedFightCost    what a fight costs of the clock, in frames: a number,
+--                     or fn(formation) -> frames (the caller's measurement:
+--                     gen_wor_sabin's house, the worst of 53 fights); by
+--                     default the most any won battle has taken of a
+--                     visible clock this run (M.timedCosts), and with
+--                     nothing measured the fight is fought
+--   timedWalk         frames of walking still ahead to where the clock
+--                     stops (a number or fn() -> frames; default 0)
+-- The run rule (owner, 2026-09-28, docs/guidelines.md "Fight, don't
+-- flee"): at a RANDOM battle's open (M.RANDBTL, OT6_RANDBTL's copy for
+-- this battle) under a visible clock, the fight fits when the time left
+-- covers its cost plus the walk still ahead; when it does not, the party
+-- runs (L+R held, the menus backed out of: M.fleePress), and the decision
+-- is said with its numbers.  An event battle is never run from, nor is
+-- any battle outside a visible clock.  A formation that refuses the run
+-- ($B1 bit 1, $2F4B bit 0, 60 frames running) or that has not let the
+-- party go after M.TIMED_RUN_CAP frames is fought out instead, and said.
 -- Field care between battles already stays out under any live counter
 -- (M.eventTimerLive): no menus inside a timed scene.
-M.TIMED_HEAL_PERCENT, M.TIMED_CADENCE = 30, 12
+M.TIMED_HEAL_PERCENT, M.TIMED_CADENCE, M.TIMED_RUN, M.TIMED_RUN_CAP = 30, 12, true, 1200
+M.timedCosts = {}                  -- clock frames each won battle took of a visible clock
+function Driver:clock()
+  if not self.timed then return nil end
+  return M.sceneTimer and M.sceneTimer() or nil
+end
 function Driver:watchTimer()
-  if self.timed ~= nil or self.battleTick < 1 then return end
-  local t = M.sceneTimer and M.sceneTimer() or nil
-  self.timed = t or false
-  if t then
-    self.timedOpen = { frame = M.frame, frames = t.frames }
-    M.log(string.format("[%s] [timer] f+%d a scene timer runs through this battle: %s -- "
-      .. "no dawdling: top-ups only under %d%% (not %d%%), a heal for a member inside the "
-      .. "round or the rounds the kill needs, and the menus pressed every %d frames",
-      self.tag or "fight", self.battleTick, M.sceneTimerStr(t), self:healPct(),
-      self.opts.healPercent or 60, self:cadence()))
+  -- a watch on the last battle's hand-back ([tail], watchLeavers) is no
+  -- battle: nothing is said or decided for it
+  if self.tailSaid then return end
+  if self.timed == nil and self.battleTick >= 1 then
+    local t = M.sceneTimer and M.sceneTimer() or nil
+    self.timed = t or false
+    if t then
+      self.timedOpen = { frame = M.frame, frames = t.frames }
+      M.log(string.format("[%s] [timer] f+%d a scene timer runs through this battle: %s -- "
+        .. "no dawdling: top-ups only under %d%% (not %d%%), a heal for a member inside the "
+        .. "round or the rounds the kill needs, and the menus pressed every %d frames",
+        self.tag or "fight", self.battleTick, M.sceneTimerStr(t), self:healPct(),
+        self.opts.healPercent or 60, self:cadence()))
+    end
+  end
+  -- the run decision, once, a few frames in: OT6_RANDBTL's copy and the
+  -- formation word are this battle's by then (the [outcome] reads them
+  -- from tick 6 on)
+  if self.runDecided == nil and self.battleTick >= 6 then
+    self.runDecided = true
+    local t = self:clock()
+    if not t or self.opts.timedRun == false or not M.TIMED_RUN then return end
+    local form = M.readWord(0x11E0) & 0x1FF
+    local random = M.readByte(M.RANDBTL) ~= 0
+    if not random then
+      M.log(string.format("[%s] [timer] f+%d battle $%03X is an event battle: fought, never "
+        .. "run from (%s)", self.tag or "fight", self.battleTick, form, M.sceneTimerStr(t)))
+      return
+    end
+    local cost, costWhy = self.opts.timedFightCost, "the caller's measure"
+    if type(cost) == "function" then cost = cost(form) end
+    if cost == nil then
+      for _, c in ipairs(M.timedCosts) do if cost == nil or c > cost then cost = c end end
+      costWhy = string.format("the most a won battle has taken of a visible clock this run, "
+        .. "of %d", #M.timedCosts)
+    end
+    local walk = self.opts.timedWalk
+    if type(walk) == "function" then walk = walk() end
+    walk = walk or 0
+    if cost == nil then
+      M.log(string.format("[%s] [timer] f+%d battle $%03X (random): %d frames left, no fight "
+        .. "measured under a clock yet -- fought", self.tag or "fight", self.battleTick, form,
+        t.frames))
+      return
+    end
+    local need = cost + walk
+    local run = t.frames < need
+    M.log(string.format("[%s] [timer] f+%d battle $%03X (random) %s: %d frames left, this fight "
+      .. "costs ~%d (%s), %d frames of walk ahead: %d + %d = %d %s %d", self.tag or "fight",
+      self.battleTick, form, run and "RUNS (L+R)" or "fits, fought", t.frames, cost, costWhy,
+      walk, cost, walk, need, run and ">" or "<=", t.frames))
+    if run then self.running = { tick = self.battleTick, refused = 0, left0 = t.frames } end
   end
 end
+-- Holding L+R for the run the rule above chose: true when it owns the pad
+-- this frame.  A formation that refuses the run, or does not let the party
+-- go inside M.TIMED_RUN_CAP frames, is fought out from here, and said.
+function Driver:runFrame()
+  local r = self.running
+  if r == nil or r.gaveUp then return false end
+  local refused = (M.readByte(0x00B1) & 0x02) ~= 0 or (M.readByte(0x2F4B) & 0x01) ~= 0
+  r.refused = refused and r.refused + 1 or 0
+  local held = self.battleTick - r.tick
+  if r.refused >= 60 or held > M.TIMED_RUN_CAP then
+    r.gaveUp = true
+    M.log(string.format("[%s] [timer] f+%d the run %s after %d frames ($B1=%02X $2F4B=%02X): "
+      .. "fighting it out", self.tag or "fight", self.battleTick,
+      r.refused >= 60 and "is refused" or "has not let the party go", held,
+      M.readByte(0x00B1), M.readByte(0x2F4B)))
+    return false
+  end
+  if held % 300 == 0 then
+    local t = M.sceneTimer()
+    M.log(string.format("[%s] [timer] f+%d running: L+R held %d frames ($2F45=%02X), %s",
+      self.tag or "fight", self.battleTick, held, M.readByte(0x2F45),
+      t and M.sceneTimerStr(t) or "the timer is spent"))
+  end
+  M.setPad(M.fleePress({ standing = 1, menu = M.readByte(BATTLE.MENU),
+    state = M.readByte(BATTLE.MSTATE), phase = self.battleTick }))
+  return true
+end
 -- The top-up fraction the heal policy reads: the caller's, or the timed
--- scene's when a scene timer runs through the battle, whichever is lower.
+-- scene's while a visible clock runs through the battle, whichever is lower.
 function Driver:healPct()
   local base = self.opts.healPercent or 60
-  if self.timed then
+  if self:clock() then
     return math.min(base, self.opts.timedHealPercent or M.TIMED_HEAL_PERCENT)
   end
   return base
 end
 function Driver:cadence()
   local base = self.opts.cadence or 30
-  if self.timed then return math.min(base, self.opts.timedCadence or M.TIMED_CADENCE) end
+  if self:clock() then return math.min(base, self.opts.timedCadence or M.TIMED_CADENCE) end
   return base
 end
 
@@ -7452,6 +7572,8 @@ function Driver:sayOutcome()
   if self.timed and self.timedOpen then
     local t = M.sceneTimer()
     rec.timerLeft = t and t.frames or 0
+    rec.timerCost = self.timedOpen.frames - (t and t.frames or 0)
+    if o.kind == "won" then M.timedCosts[#M.timedCosts + 1] = rec.timerCost end
     M.log(string.format("[%s] [timer] battle $%03X over at f+%d: %s; the battle took %d frames "
       .. "of it (%s at the opening)", self.tag or "fight", r.form & 0x1FF, self.battleTick,
       t and M.sceneTimerStr(t) or "the timer is spent", self.timedOpen.frames - (t and t.frames or 0),
@@ -7916,6 +8038,7 @@ function Driver:frame()
   self:watchStatuses()
   self:watchLeavers()
   self:watchTimer()
+  if self:runFrame() then return end
   -- VICTORY-DEADLOCK guard (measured, Thamasa grind bake fight 37): the
   -- killing blow can land while an actor's spell/item window is still
   -- open; in Wait mode the open window freezes the battle clock, and
@@ -8929,7 +9052,12 @@ local function watchTick()
   return nil
 end
 
+M.battleGaps = { real = 0, realMin = nil, tails = 0, tailMax = nil }
 local function watchReport()
+  local g = M.battleGaps
+  M.log(string.format("[watch] battle gaps: %d battle(s) opened after an earlier one's end hook, "
+    .. "the nearest %s frames after it; %d hand-back tail(s), the farthest %s frames after it "
+    .. "(the [tail] bound is 90)", g.real, tostring(g.realMin), g.tails, tostring(g.tailMax)))
   M.log(string.format("[watch] %d samples, pad down %d frames, %d trip(s); "
     .. "max quiet: ctl=%d prog=%d screen=%d frames (thresholds: no-effect "
     .. "%d with the pad down %d%% of it, no-progress %d on prog AND screen)",
@@ -9237,6 +9365,8 @@ local function resetLibState()
   M._killbitFired = false
   M.outcomes, M.lastOutcome = {}, nil
   endHooked, endSnap, endWatcher = false, nil, nil
+  M.timedCosts = {}
+  M.battleGaps = { real = 0, realMin = nil, tails = 0, tailMax = nil }
   watchReset()
   RUN.bootMarked, RUN.idle, RUN.idlePad, RUN.idleArm = false, 0, nil, false
   RUN.lastBattle, RUN.goUnhandled = nil, nil

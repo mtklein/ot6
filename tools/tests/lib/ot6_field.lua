@@ -2841,7 +2841,7 @@ end
 -- collapsing house is `start_timer 0, 21600, _cc592e, {FIELD_VISIBLE,
 -- BANQUET, MENU_BATTLE_VISIBLE}` (event_main.asm:90010): flags $72, 6:00
 -- that no menu or battle stops (docs/design/route-wor-sabin.md 3.1).
-M.TIMER_FIELD_ONLY, M.TIMER_BANQUET = 0x80, 0x20
+M.TIMER_FIELD_ONLY, M.TIMER_BANQUET, M.TIMER_MENU_BATTLE_VISIBLE = 0x80, 0x20, 0x10
 function M.sceneTimers()
   local t = {}
   for k = 0, 3 do
@@ -2850,18 +2850,30 @@ function M.sceneTimers()
       local flags = M.readByte(0x1188 + 6 * k)
       t[#t + 1] = { slot = k, frames = frames, flags = flags,
                     runsInBattle = (flags & M.TIMER_FIELD_ONLY) == 0,
+                    visibleInBattle = (flags & M.TIMER_MENU_BATTLE_VISIBLE) ~= 0,
                     endsBattle = (flags & M.TIMER_BANQUET) ~= 0 }
     end
   end
   return t
 end
--- The live timer that keeps running through menus and battles, the one
--- with the fewest frames left; nil when none is (a FIELD_ONLY clock, Cid's
--- on the Solitary Island, stands still there and is not a race).
+-- The live clock a person races: a timer that keeps running through menus
+-- and battles AND is drawn there (MENU_BATTLE_VISIBLE), the one with the
+-- fewest frames left; nil when none is.  A FIELD_ONLY clock (Cid's on the
+-- Solitary Island) stands still in battle and is not a race; an invisible
+-- timer is an event's own machinery a person never sees -- the Sealed
+-- Gate cave's cycling puzzle timers (`start_timer 1, 144, _cb2c57`,
+-- event_main.asm:44640-44858, flags $09) -- and hurrying for one is not
+-- play (#250 review: before this check the driver's timed levers fired on
+-- one in gen_gate_cave_save and every later battle diverged,
+-- build/attempts/review-wor-sabin/gate_cave_ab.txt).  The route's visible
+-- clocks: the opera's rafter chase (flags $70), the banquet and its
+-- sparring window, the Floating Continent escape ($78), Tzen's house ($72).
 function M.sceneTimer()
   local best = nil
   for _, t in ipairs(M.sceneTimers()) do
-    if t.runsInBattle and (best == nil or t.frames < best.frames) then best = t end
+    if t.runsInBattle and t.visibleInBattle and (best == nil or t.frames < best.frames) then
+      best = t
+    end
   end
   return best
 end
@@ -2876,7 +2888,7 @@ function M.sceneTimerStr(t)
   t = t or M.sceneTimer()
   if t == nil then return nil end
   return string.format("timer %d %s left (%d frames; flags $%02X: runs through menus and "
-    .. "battles%s)", t.slot, M.clockStr(t.frames), t.frames, t.flags,
+    .. "battles, drawn there%s)", t.slot, M.clockStr(t.frames), t.frames, t.flags,
     t.endsBattle and "; its expiry ends a battle" or "")
 end
 
