@@ -594,6 +594,9 @@ add({
           if alive(m) and (weak(m) & OT6_PIERCE) ~= 0 and sh(m) > 0
             and (best == nil or mhp(m) > bh) then best, bh = m, mhp(m) end
         end
+        H.assertEq(best ~= nil, true, string.format("isolation arm fight %d: a "
+          .. "PIERCE-weak shielded body stands to wear the boss bit (a fresh "
+          .. "battle's draw)", fights))
         H.vars.bossBody = best
         H.writeByte(0x3AA1 + ent(best), aa1(best) | 0x04)   -- the arm's one write (header)
         forced = best
@@ -628,6 +631,22 @@ add({
             m, mhp(m), counters, tostring(H.battleLoadStarted())))
         end
       end),
+      -- a fight whose bitted body went unbroken is fought to its end (the
+      -- spoils pressed out) before the next one is drawn: nextFight only
+      -- draws once the battle is over, and the bodies still standing here
+      -- carry no bit.  Whatever this tail does to the ledger or the flag,
+      -- the next fight is a fresh battle and resets both.
+      H.cond(function() return not broke and H.battleLoadStarted() end, {
+        H.call(function() forced = nil end),
+        drive(function() return not H.battleLoadStarted() end, 30000,
+          "the isolation arm's unbroken fight is fought out"),
+        H.call(function()
+          H.log(string.format("[isolation arm] fight %d fought out: hpDrops=%d "
+            .. "interceptor=%d divineKills=%d (a body without the bit)", fights,
+            hpDrops, counters, #divineKills))
+          watching = false
+        end),
+      }, {}),
       -- the hook point half, when the body outlived its doubled break: Shadow's
       -- next landed hit on the Broken 'boss' draws no mark either
       H.cond(function()
