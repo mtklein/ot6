@@ -62,8 +62,8 @@ bug (below, "The door step").
 ## The row, decoded
 
 The grind column x=34 (y=99..112) and 158 of the crossing's 177 tiles are
-world battle group 10 (`tools/tests/probe_zozo_zones.lua` reads the group
-per tile the way `CheckBattleWorld` does; the grid is
+world battle group 10 (`tools/tests/probe_zozo_zones.lua`, deleted in
+4b257a86 with its last version at 6061e470, read the group per tile the way `CheckBattleWorld` does; the grid is
 `build/lab/zozo-grind/zones.log`, lost with the worktree).  Group 10,
 decoded by `tools/tests/zozogrindlab/decode_group10.py`:
 
@@ -274,7 +274,8 @@ The two baseline timeouts are the generator's, not the grind's.
 DOWN for 4000 frames with no battle handling; a random on the last step
 put the party in a fight the hold could not play (seed 2's failure frame:
 `attempt1_timeout_f209734.png`, a Vulture and an Iron Fist with the
-command window open).  `probe_jidoor_door_walk.lua` shows `worldNavTo`
+command window open).  `probe_jidoor_door_walk.lua` (deleted in
+4b257a86; last version at dea94e46) showed `worldNavTo`
 cannot take that step itself: it reaches the entrance tile and the town
 does not load (`[probe] after the walk: map=0 world=true`).  The generator
 now takes both door steps (Jidoor and Zozo) with `enterDoor`: press toward

@@ -490,7 +490,8 @@ after its save and by the next segment's cold Continue.
 - **The cold Continue** of the sealed `wor-start-v1` on this ROM
   (`OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-start-v1
   tools/tests/run.sh tools/tests/probe_wor_start_continue.lua`,
-  `continue_wor_start_v1.log`): `contract wor-start-v1 (entry): all 11
+  `continue_wor_start_v1.log`; the probe was deleted in 4b257a86, last
+  version at 39f4bb23): `contract wor-start-v1 (entry): all 11
   fields hold`, `[continue] world 1 at (146,212): CELES L25 HP 1043/1043
   MP 227 kit 11 0E 76 8F D1 C1; Cid recovered $00B3=1; tonic=4 potion=39
   fenix=22 gil=215563`, `PASS (frame 1386)`.

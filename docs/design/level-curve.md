@@ -166,7 +166,8 @@ bag above), the chain from `dadaluma_entry` to `blackjack` regenerated
 under the segment runner (#178) with one counted retry: `dadaluma_entry`
 attempt 1 drew the J39-row fight as a back attack, where the fight
 driver's LEFT target steer cannot cross to the monster side (#185,
-`probe_j39_backattack`), and the no-effect watchdog cut it at frame
+`probe_j39_backattack`, deleted in 4b257a86; last version at f157c19b),
+and the no-effect watchdog cut it at frame
 23808 instead of the 9000-frame step budget; attempt 2, the seed moved 20
 frames at the boot point, climbed clean (16 fights played, no Fenix Down,
 `care after Dadaluma: nothing to do`) and passed at frame 46149.  Every

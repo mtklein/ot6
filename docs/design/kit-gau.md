@@ -269,7 +269,8 @@ The roll hook replaces `RandRage`'s `jsr RandCarry / rol` pick
   (`:3370`); without it, a 3-BP Rage-start would buy the guaranteed special and
   multiply it as well, which is the double-dip `kits.md`'s "Boost-tiered Steal"
   rules out.
-  Measured in v0.21 (`probe_rage_boost`): that `lda $b5 / cmp #$10` gate
+  Measured in v0.21 (`probe_rage_boost.lua`, deleted in 4b257a86; last
+  version at c9833346): that `lda $b5 / cmp #$10` gate
   never saw a Rage.  `Cmd_10` runs the beast's attack through `_c21554`, which
   sets `$b5` to the attack's own command (`$02` for a spell, `$0c` for a
   lore-range special) before any damage, so the start turn's special was
@@ -459,8 +460,9 @@ under 8/120 (`:1733`, `:1737` vs `:249-250`), rage at 5/19 under 24/136
 (`:1544`, `:1548` vs `:292-293`), and the Config menu's value column 14 under
 96 (`config.asm:50`). It also holds on the shipped ROM: the untouched
 magic list's `cursor_pos {8, 116}` lights screen `x 8..23, y 116..131`.
-`tools/tests/probe_menucols.lua` and `tools/tests/probe_cursorgutter.lua` are
-the isolated instruments, and both page tests carry the rule as a canary that
+`tools/tests/probe_menucols.lua` and `tools/tests/probe_cursorgutter.lua` were
+the isolated instruments (both deleted in 4b257a86; last version at
+5defce69), and both page tests carry the rule as a canary that
 reads the cursor table out of the ROM rather than restating it. A left column
 drawn at col 2 under a cursor at `x = 8` puts the sprite on the leading glyph.
 
