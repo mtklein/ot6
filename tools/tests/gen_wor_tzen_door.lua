@@ -40,7 +40,8 @@
 --   6. Tzen: the walk off the desert, with Tzen's door itself in the
 --      avoid set, to (131,179), and the real Save UI into slot 3.
 -- Every battle's [outcome] (lib/ot6.lua M.battleOutcome: a Mesosaur that
--- escapes, a Chitonid that sneezes her out) is asserted paid as due.
+-- escapes, a Chitonid that sneezes her out) is asserted said, judged on
+-- the battle's own end reading, and paid as due.
 -- Nothing is written; every step, menu and fight is a button press.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -200,27 +201,38 @@ end
 -- M.battleOutcome); each one's reward is asserted paid as the engine's
 -- own arithmetic says, which is what keeps an escaped Mesosaur or a
 -- sneezed-out party from being counted as a kill or a win.
-local seen, tally
+-- The count of battles fought is the runner's own (H.absorbGuardBattles,
+-- one per battle whatever fights it), so a battle whose [outcome] was
+-- never said is a red, not a silent gap.
+local seen, tally, outcome0, battles0
 local function tallyReset()
-  seen, tally = 0, { won = 0, ["party left"] = 0, lost = 0, escaped = 0, forms = {}, order = {} }
+  tally = { won = 0, ["party left"] = 0, lost = 0, escaped = 0, forms = {}, order = {} }
+  outcome0, battles0 = #H.outcomes, H.absorbGuardBattles
+  seen = outcome0
 end
 tallyReset()
 local function checkOutcomes(what)
   return H.call(function()
     for i = seen + 1, #H.outcomes do
       local o = H.outcomes[i]
+      H.assertEq(o.atEnd, true, string.format("%s: battle %d ($%03X, %s) was judged on its own "
+        .. "end reading (the UpdateSRAM hook), not the last per-frame one", what, i - outcome0,
+        o.form & 0x1FF, o.kind))
       H.assertEq(o.ok, true, string.format("%s: battle %d ($%03X, %s) paid its reward as due",
-        what, i, o.form & 0x1FF, o.kind))
+        what, i - outcome0, o.form & 0x1FF, o.kind))
       tally[o.kind] = (tally[o.kind] or 0) + 1
       tally.escaped = tally.escaped + #o.escaped
       local k = string.format("$%03X", o.form & 0x1FF)
       if not tally.forms[k] then tally.order[#tally.order + 1] = k end
       tally.forms[k] = (tally.forms[k] or 0) + 1
     end
+    H.assertEq(#H.outcomes - outcome0, H.absorbGuardBattles - battles0,
+      string.format("%s: an [outcome] said for every battle fought (the runner's battle count)", what))
     if #H.outcomes > seen then
       seen = #H.outcomes
-      H.log(string.format("[route] %s: %d battle(s) so far (%d won, %d the party left, %d monster escape(s)); %s; %s",
-        what, seen, tally.won, tally["party left"], tally.escaped, whereLine(), supplies()))
+      H.log(string.format("[route] %s: %d battle(s) so far, %d [outcome] line(s) (%d won, %d the party left, %d monster escape(s)); %s; %s",
+        what, H.absorbGuardBattles - battles0, seen - outcome0, tally.won, tally["party left"],
+        tally.escaped, whereLine(), supplies()))
     end
   end)
 end
@@ -476,7 +488,7 @@ H.run({ maxFrames = 600000 }, {
     local forms = {}
     for _, k in ipairs(tally.order) do forms[#forms + 1] = string.format("%s x%d", k, tally.forms[k]) end
     H.log(string.format("[wor] the stretch: %d battles (%s): %d won, %d the party left, %d monster "
-      .. "escape(s); Fenix Downs held and bought %d, left %d; %s; %s", seen, table.concat(forms, ", "), tally.won,
+      .. "escape(s); Fenix Downs held and bought %d, left %d; %s; %s", seen - outcome0, table.concat(forms, ", "), tally.won,
       tally["party left"], tally.escaped, fenix0 + fenixBought, H.invCountOf(FENIX), whereLine(),
       supplies()))
     H.screenshot("wor_tzen_door")

@@ -1639,8 +1639,9 @@ function M.rewardDue(o)
   return sum // o.alive
 end
 
--- The battle's outcome from its last reading (the driver's watchLeavers
--- snapshot; see there): kind "won", "party left" (every seated member
+-- The battle's outcome from its end reading (the UpdateSRAM hook's
+-- snapshot, or the driver's last watchLeavers reading when the hook did
+-- not see the end; see there): kind "won", "party left" (every seated member
 -- left: no reward), or "lost"; the slots killed and the slots that
 -- escaped; and each seated member's share.
 --   seated   entity -> true for the members seated at the start
@@ -7101,9 +7102,12 @@ function Driver:button(actor)
 end
 
 function Driver:idle()
-  if self.battleTick > 6 and self.reward ~= nil and self.seatXp ~= nil then
+  -- the fallback: a battle whose end the UpdateSRAM hook did not see
+  -- (the [outcome] says "no end reading")
+  if self.battleTick > 6 and self.reward ~= nil and self.seatXp ~= nil and not self.outcomeSaid then
     self:sayOutcome()
   end
+  self.outcomeSaid = false
   self.seatXp, self.seatChar, self.filled = nil, nil, nil
   self.leftSaid, self.escSaid, self.reward = {}, {}, nil
   if self.recovery then
@@ -7154,23 +7158,34 @@ end
 -- whose bit comes up in $3A39 (the Chitonid's Sneeze, a run, a Smoke
 -- Bomb) is out of the fight and its reward; a monster whose bit comes up
 -- in $3A3A with HP still on it has escaped (the Mesosaur's Escape) and
--- pays nothing.  Each is said once, the frame it happens; idle() says
--- the [outcome].
+-- pays nothing.  Each is said once, the frame it happens.
 --
--- The reading the [outcome] is judged on is the one the battle takes at
--- its own end: every ending -- a win after WinBattle has paid, a loss, the
--- escape ending -- runs `_488f: jsr UpdateSRAM` before TerminateBattle,
--- while the battle module still owns its RAM, and an exec hook there
--- (endActivate) keeps that frame's reading.  The frames after it are not
--- the battle's: measured on camp_escaped's world walk (battle_shadowstays,
+-- The [outcome] is judged, and said, at the battle's own end: every
+-- ending -- a win after WinBattle has paid, a loss, the escape ending --
+-- runs `_488f: jsr UpdateSRAM` before TerminateBattle, while the battle
+-- module still owns its RAM, and an exec hook there (endActivate) takes
+-- that frame's reading (the species in each slot and WinBattle's inputs)
+-- and has the driver watching the battle say its [outcome] then, with
+-- each member's experience read in the same instant (WinBattle has
+-- already added it to $1611).  The frames after it are not the battle's:
+-- measured on camp_escaped's world walk (battle_shadowstays,
 -- build/attempts/wt/wor-tzen-door/suites/), the HP table still read as a
 -- battle for ~35 frames after the fade while $3A39 read $03 and $3A76 0
--- under a WON fight that paid all three members, so the per-frame watch
--- stops at the end hook and the last per-frame reading is only a fallback.
+-- under a WON fight that paid all three members.  Saying it at the hook,
+-- not from idle(), is what makes every battle's outcome said: a walk that
+-- arrives on the frame the battle hands back (worldNavTo checks arrive()
+-- before its driver's idle) never runs idle() for it, and on the pre-hook
+-- lib field_care_emptybag said 5 [outcome] lines for 19 battles
+-- (build/attempts/review-wor-tzen-door/merged_field_care_emptybag.log).
+-- idle() says one only for a battle the hook did not see, marked "no end
+-- reading".
 M.outcomes = {}          -- every [outcome] this run, oldest first
 M.lastOutcome = nil
 local rewardMul16 = nil
 local endHooked, endSnap = false, nil
+-- the driver watching the battle now (watchLeavers), and the frame it last
+-- watched: the end hook has it say the [outcome]
+local endWatcher = nil
 local function xpAt(off)
   return M.readByte(0x1611 + off) + M.readByte(0x1612 + off) * 256
        + M.readByte(0x1613 + off) * 65536
@@ -7178,8 +7193,9 @@ end
 local function speciesAt(s) return M.readWord(M.FORMATION + s * 2) & 0x1FF end
 local function readReward()
   if rewardMul16 == nil then rewardMul16 = M.readRomWord(M.sym("Ot6RewardMulW") & 0x3FFFFF) end
-  local r = { xp = {}, st1 = {}, hp = {}, egg = {} }
+  local r = { xp = {}, st1 = {}, hp = {}, egg = {}, species = {} }
   for s = 0, 5 do
+    r.species[s] = speciesAt(s)
     r.xp[s] = M.readWord(0x3D8C + s * 2)
     r.st1[s] = M.readByte(0x3EEC + s * 2)
     r.hp[s] = M.readWord(BATTLE.MON_HP + s * 2)
@@ -7199,6 +7215,14 @@ local function endActivate()
   local a = M.sym("UpdateSRAM")
   emu.addMemoryCallback(function()
     endSnap = { frame = M.frame, reward = readReward() }
+    local d = endWatcher
+    endWatcher = nil
+    -- only the driver that watched THIS battle: one that stopped watching
+    -- a while ago (a battle it did not fight) says nothing here
+    if d ~= nil and d.seatXp ~= nil and not d.outcomeSaid
+       and M.frame - (d.watchFrame or -100000) <= 60 then
+      d:sayOutcome()
+    end
   end, emu.callbackType.exec, a, a)
 end
 
@@ -7220,6 +7244,7 @@ function Driver:watchLeavers()
     local mask = M.readByte(M.FORMATION_MASK)
     for s = 0, 5 do self.filled[s] = (mask >> s) & 1 == 1 end
   end
+  endWatcher, self.watchFrame = self, M.frame
   local r = readReward()
   self.reward = r
   local seated, still = 0, 0
@@ -7259,6 +7284,7 @@ end
 function Driver:sayOutcome()
   local atEnd = endSnap ~= nil and endSnap.frame >= (self.startFrame or 0)
   local r = atEnd and endSnap.reward or self.reward
+  self.outcomeSaid = true
   local seated = {}
   for e = 0, 3 do seated[e] = self.seatXp[e] ~= nil end
   local o = M.battleOutcome({ xp = r.xp, st1 = r.st1, hp = r.hp, egg = r.egg,
@@ -7276,12 +7302,12 @@ function Driver:sayOutcome()
   end
   local function slots(list)
     local t = {}
-    for _, s in ipairs(list) do t[#t + 1] = string.format("s%d:$%03X", s, speciesAt(s)) end
+    for _, s in ipairs(list) do t[#t + 1] = string.format("s%d:$%03X", s, r.species[s]) end
     return #t > 0 and table.concat(t, " ") or "none"
   end
   local rec = { kind = o.kind, form = r.form, kills = o.kills, escaped = o.escaped,
                 due = o.due, share = o.share, got = got, ok = ok, leftN = o.leftN,
-                seatedN = o.seatedN, random = r.random, tick = self.battleTick }
+                seatedN = o.seatedN, random = r.random, tick = self.battleTick, atEnd = atEnd }
   M.lastOutcome = rec
   M.outcomes[#M.outcomes + 1] = rec
   M.log(string.format("[%s] [outcome] battle $%03X %s after %d ticks%s: killed %s; escaped %s; "
@@ -8005,9 +8031,10 @@ M.newRecoveryTrace(tag, function(e) recoveryEvents[#recoveryEvents + 1] = e end)
     -- its $3010 record offset), the slots the formation filled, what has
     -- left the battle alive (the [left] and [escape] lines, once each),
     -- and the last reading of WinBattle's inputs (reward), which idle()
-    -- turns into the [outcome] line.
+    -- turns into the [outcome] line only when the end hook did not say it
+    -- (outcomeSaid; watchFrame, the frame this driver last watched).
     seatXp = nil, seatChar = nil, filled = nil,
-    leftSaid = {}, escSaid = {}, reward = nil,
+    leftSaid = {}, escSaid = {}, reward = nil, outcomeSaid = false, watchFrame = nil,
   }, Driver)
   local F = { driver = D }
   function F.idle() D:idle() end
@@ -9067,7 +9094,7 @@ local function resetLibState()
   -- is that a lost attempt still happened (#230).
   M._killbitFired = false
   M.outcomes, M.lastOutcome = {}, nil
-  endHooked, endSnap = false, nil
+  endHooked, endSnap, endWatcher = false, nil, nil
   watchReset()
   RUN.bootMarked, RUN.idle, RUN.idlePad, RUN.idleArm = false, 0, nil, false
   RUN.lastBattle, RUN.goUnhandled = nil, nil
