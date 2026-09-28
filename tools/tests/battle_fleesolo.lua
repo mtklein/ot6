@@ -87,6 +87,13 @@ H.run({ maxFrames = 120000 }, {
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000,
     "field control in cave 96"),
   H.call(function() H.assertEq(map(), 96, "kolts_cave on map 96") end),
+  -- the route's own driver, made before the pacing: a draw the engine
+  -- refuses to run from is fought out with it (it idles between battles),
+  -- and the draw that is kept is fought and staged with the same one
+  H.call(function()
+    F = H.newFightDriver("fleesolo", { tactical = true, boost = true, bank = 2,
+                                       items = true, healPercent = 50 })
+  end),
 
   -- pace the auto-detected lane until a natural encounter fires that the
   -- engine lets the party run from; one it refuses is fought out first
@@ -130,8 +137,6 @@ H.run({ maxFrames = 120000 }, {
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle armed", 5),
   H.call(function()
-    F = H.newFightDriver("fleesolo", { tactical = true, boost = true, bank = 2,
-                                       items = true, healPercent = 50 })
     H.assertEq(H.readByte(WAIT_MODE), 1, "the config is Wait mode ($3A8F), where a "
       .. "selection window stops the clock")
   end),

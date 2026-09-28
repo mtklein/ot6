@@ -20,12 +20,24 @@
 -- kolts_cave bag's own Fenix Downs.
 --
 -- Asserted, from the poke:
---   1. the acting member's plan is not a Fenix Down on the zombie, and
---      the driver said why (the ZOMBIE line, once);
+--   1. the driver said why it throws no Fenix Down at the zombie (the
+--      ZOMBIE line), and the plan that line governed -- the next plan
+--      made, in the same planning call -- is that same actor's and is
+--      not a Fenix Down on the zombie;
 --   2. no actor plans one over the next three windows, and the bag's
 --      Fenix count is what it was.
--- Negative control: stub H.raiseDecision to ignore `zombie` (the old
--- rule) and 1 goes red -- the actor plans the throw.
+-- The raise rule is not every plan's first question: the kill-this-turn
+-- press, a dying actor's boost spend (#175) and the finisher window
+-- (monsters at 200 HP or less) all plan ahead of it.  So the drive runs
+-- until the rule has spoken about the corpse, and 1 reads the plan the
+-- ZOMBIE line preceded, whichever actor's it was, rather than the poked
+-- window's own plan (a wor-sabin chain draw: actor 1 inside one round of
+-- death spent its pip on a Fight before any raise was weighed, and actor
+-- 2 said why at its window next, #290).
+-- Negative controls: stub H.raiseDecision to ignore `zombie` (the old
+-- rule) and 1 goes red -- the actor plans the throw; wrap the driver's
+-- plan call to throw the Fenix Down at the zombie after saying the ZOMBIE
+-- line anyway and 1's plan check goes red.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 
@@ -33,10 +45,17 @@ local MENU, ACTOR, MSTATE, CMDTBL, BCHID, BATTINV = 0x7BCA, 0x62CA, 0x7BC2, 0x20
 local ST1 = 0x3EE4
 local ST_CMD, CMD_ITEM, FENIX_DOWN = 0x05, 0x01, 0xF0
 
+local F = nil
 local lines = {}
+local plans = {}   -- log line -> the plan that line announced (item, target)
 local rawLog = H.log
 H.log = function(msg)
   lines[#lines + 1] = tostring(msg)
+  -- the driver sets its plan, then says "actor=A char=C plan=kind"
+  if F ~= nil and F.driver.plan ~= nil and lines[#lines]:find("actor=%d+ char=%d+ plan=") then
+    plans[#lines] = { kind = F.driver.plan.kind, item = F.driver.plan.item,
+                      target = F.driver.plan.target }
+  end
   return rawLog(msg)
 end
 
@@ -57,7 +76,6 @@ local function fenixCount()
   return 0
 end
 
-local F = nil
 local zombie, actor0, pokeFrame, pokeLine, fenix0 = nil, nil, nil, nil, nil
 local plansAfter = 0
 
@@ -126,18 +144,24 @@ H.run({ maxFrames = 90000 }, {
     H.waitFrames(1),
   }, "a member's command window is open with an ally standing"),
 
-  -- ...and on through three more plans, or the battle's end
+  -- ...and on through three more plans and the raise rule's word on the
+  -- corpse (the ZOMBIE line, or a throw), or the battle's end
   H.driveUntil(function()
     if not H.battleLoadStarted() then return true end
     plansAfter = 0
+    local spoke = false
     for i = pokeLine + 1, #lines do
       if lines[i]:find("actor=%d char=%d+ plan=") then plansAfter = plansAfter + 1 end
+      if lines[i]:find("no raise: Fenix Down would put entity " .. zombie .. " at", 1, true)
+         or lines[i]:find("revive entity " .. zombie .. " with Fenix Down", 1, true) then
+        spoke = true
+      end
     end
-    return plansAfter >= 4
+    return plansAfter >= 4 and spoke
   end, 9000, {
     H.call(function() F.frame() end),
     H.waitFrames(1),
-  }, "three more windows after the poke"),
+  }, "three more windows after the poke and the raise rule's word on the corpse"),
 
   H.call(function()
     H.setPad({})
@@ -149,13 +173,25 @@ H.run({ maxFrames = 90000 }, {
       if lines[i]:find("revive entity " .. e .. " with Fenix Down", 1, true) then revives[#revives + 1] = i end
       if firstPlan == nil and lines[i]:find("actor=" .. actor0 .. " char=%d+ plan=") then firstPlan = i end
     end
-    -- 1. the reason, said before the acting member's plan, and no throw
+    -- 1. the reason, and the plan it governed: the next plan line after
+    -- it, which the same planning call announces
     H.assertEq(whyLine ~= nil, true, string.format("the driver said why it throws no Fenix "
-      .. "Down at entity %d (the ZOMBIE line; first plan after the poke at log line %s)",
-      e, tostring(firstPlan)))
-    H.assertEq(firstPlan ~= nil and whyLine < firstPlan, true,
-      string.format("...before actor %d's plan (why at log line %s, plan at %s)", actor0,
-        tostring(whyLine), tostring(firstPlan)))
+      .. "Down at entity %d (the ZOMBIE line; actor %d's first plan after the poke at log "
+      .. "line %s)", e, actor0, tostring(firstPlan)))
+    local whyActor = tonumber(lines[whyLine]:match("actor=(%d+) no raise"))
+    local govLine = nil
+    for i = whyLine + 1, #lines do
+      if lines[i]:find("actor=%d char=%d+ plan=") then govLine = i; break end
+    end
+    local govActor = govLine and tonumber(lines[govLine]:match("actor=(%d+) char="))
+    local gov = govLine and plans[govLine]
+    H.assertEq(gov ~= nil and govActor == whyActor
+      and not (gov.item == FENIX_DOWN and gov.target == e), true,
+      string.format("...and the plan it governed is actor %s's own and no Fenix Down on "
+        .. "entity %d (why at log line %d; next plan at %s: actor %s, %s item %s target %s)",
+        tostring(whyActor), e, whyLine, tostring(govLine), tostring(govActor),
+        gov and gov.kind or "?", gov and gov.item and string.format("$%02X", gov.item) or "-",
+        gov and tostring(gov.target) or "-"))
     H.assertEq(#revives, 0, string.format("no actor planned a Fenix Down on the zombied "
       .. "entity %d over %d windows (revive lines at %s)", e, plansAfter,
       #revives > 0 and table.concat(revives, ",") or "none"))
