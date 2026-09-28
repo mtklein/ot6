@@ -288,9 +288,16 @@ neither half held everywhere. A mimicked x-magic's second spell was
 re-priced at queue time, so a 1-pip Mimic of Fire + Drain cost 38 MP
 and of Drain + Fire 20. A plain copy of a tier-family head spent its pips
 and cast the unfolded spell with no multiplier, which is boost buying
-nothing (`probe_mimic_charge.lua`, `build/attempts/wt/mimic-charge/`).
-`Ot6MimicFold` folds the copy mimicreplace writes, and `Ot6QueueFold`
-folds but does not price the one copy that is queued afresh.
+nothing (measured by the probe that became `battle_mimic.lua`,
+`build/attempts/wt/mimic-charge/`). `Ot6MimicFold` folds the copy
+mimicreplace writes, and `Ot6QueueFold` folds but does not price the one
+copy that is queued afresh. The `battle_mimic` suite holds both halves:
+0 MP at every boost, Fire 2 / Fire 3 / Fire 3 at 1 / 2 / 3 pips, and x2 /
+x4 / x8 on a copied Drain, lore and summon against the same copy
+unboosted (`build/attempts/wt/mimic-suite/`). A copied Drain's numeral
+does not show it: a drain takes no more than its caster is missing (a
+stand-in at 1147/1215 HP drew 68 at boost 0, 1 and 3 from a 750-HP
+target), so the suite reads the damage the calc hands the drain.
 
 Dance is the control that makes this a rule rather than a habit.
 `Ot6RageCost` tail-calls `Ot6DanceCost`, so Rage and Dance share one

@@ -802,7 +802,7 @@ done:   pla
 ; with $b1.6 set, which GetMPCost clears (`trb $b1`) and prices 0.  This
 ; proc re-priced that second spell from the mimic's pending boost anyway: a
 ; boost-1 Mimic of an x-magic Fire + Drain was charged Drain's 38, of Drain +
-; Fire the folded Fire 2's 20 (#260, probe_mimic_charge).  So CreateAction
+; Fire the folded Fire 2's 20 (#260, battle_mimic).  So CreateAction
 ; reads $b1.6 before GetMPCost clears it and hands it here as the V flag of
 ; the P this proc's own php pushes ($02,s after the pha): with V set the
 ; tier still folds, since the boost buys the tier on a tier-family spell
@@ -921,7 +921,7 @@ done:   pla
 ; it without help (Ot6BoostDmg's multiplier, Fight's swings, a ladder), but
 ; a tier-family head buys its tier, and Ot6BoostDmg gives a family spell no
 ; multiplier because the fold is its purchase: a boosted Mimic of a plain
-; Fire spent its pips and cast plain, unmultiplied Fire (probe_mimic_charge,
+; Fire spent its pips and cast plain, unmultiplied Fire (battle_mimic,
 ; 3 pips for 173 damage against 174 unboosted).  This is the fold alone, on
 ; Ot6QueueFold's own gate and table, with no price: the mimic copies the
 ; action and not the price at every boost (mp-economy.md).  A copy the
