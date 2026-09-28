@@ -23,6 +23,10 @@ interpreting runs.
 - **You -> owner:** your final message of a turn is the only channel the
   owner reliably reads. Lead with the outcome; when blocked, say exactly
   what you need. Screenshots and files go through SendUserFile.
+  Write only when something landed or a decision is needed. No liveness
+  or progress pings ("still running", "waiting on X"): the owner sees
+  background jobs in the app and runs in live.py. A notification that
+  carries no result gets no text at all.
 - **You -> critic:** `tools/critic.sh` (local qwen via ollama). Different
   weights, zero project context; self-contained prompts with raw evidence.
 - **You -> GitHub:** `gh`. GitHub Issues is the issue tracker; releases carry the zip.
