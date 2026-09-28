@@ -27,3 +27,11 @@ every Mimic is free, and a boost on it buys what it would buy on the
 copied action: a copied Fire, Ice, Bolt or other spell with stronger
 versions casts the stronger one (Fire 2 for one boost, Fire 3 for two or
 more), where before the boost was spent on a plain Fire.
+
+**The Beginner's House in Narshe now explains OT6 in plain words.** Its
+advisors used to speak in riddles. Now each one says what a new rule is,
+what you will see on screen and which button to press: shields and
+breaking, weaknesses, Boost Points and what a boost buys, stronger
+spells, the skills that now cost MP, and Espers, whose spells last only
+while they are equipped (the old line about learning spells from Espers
+was wrong for OT6 and is gone).
