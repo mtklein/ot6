@@ -20,16 +20,33 @@
 --      to its own end (if_b_switch $40 -> _ccbcb1): the party is not
 --      warped to the {25,5} lose-path save point and the win scene runs.
 --
--- The fight is driven by gen_narshe_battle's input-driven fighter, the code
--- that beats this battle to generate the fixture: one button per 30-frame
--- pulse once the menu flag holds, a per-turn sequence built live from the
--- actor's id and banked BP (boost to 2-3 and dump; EDGAR's AutoCrossbow at
--- tier 2+; CELES's Runic at tier 3+, which absorbs KEFKA's Ice 2; Fight
--- otherwise), and a stall-recovery tail (A, A, B, rebuild).  KEFKA runs on
--- real damage until his own script ends the fight.  Losses are handled the
--- way the generator handles them: the entry point is captured once at boot
--- (a savestate blob in memory, with no writes) and a lost attempt reloads
--- it and escalates the policy tier, for three attempts total.
+-- The fight is driven by gen_kefka_won's input-driven fighter (the one
+-- gen_narshe_battle also carries), the code that beats this battle to
+-- generate kefka_won: one button per 30-frame pulse once the menu flag
+-- holds, a per-turn sequence built live from the actor's id and banked BP
+-- (boost to 2-3 and dump, priced through H.boostPlan; EDGAR's AutoCrossbow
+-- at tier 2+ when his pool can pay it; CELES's Runic at tier 3+, which
+-- absorbs KEFKA's Ice 2; Fight otherwise), and a stall-recovery tail (A, A,
+-- B, rebuild).  KEFKA runs on real damage until his own script ends the
+-- fight.  Losses are handled the way the generator handles them: the entry
+-- point is captured once at boot (a savestate blob in memory, with no
+-- writes), a wipe is read on every frame and ends the attempt at once, and
+-- the next attempt reloads the entry point with the tier raised, for three
+-- attempts total.  Every lost attempt logs the segment runner's own
+-- `[retry] attempt n/3 FAILED class=wipe` and `wipe context` lines, so
+-- tools/audit_retries.py lists it; a win on attempt 2 or 3 is a loss on the
+-- record, not a hidden one (the runner's verdict line still says
+-- attempts=1/1: the ladder is this file's, not the runner's).
+--
+-- THE LADDER IS A COUNTED RELOAD, NOT AN ESCALATION, until #257 lands
+-- (https://github.com/mtklein/ot6/issues/257).  On this fixture tier 2 is
+-- weaker than tier 1, not stronger: the tool EDGAR's Tools row names is the
+-- Bio Blaster ($A4), his 3 MP cannot pay even its unboosted 8, so the turn
+-- falls back to Fight AND drops the boost -- he swings unboosted holding 5
+-- pips (build/attempts/wt/regen-suites/suites/: `want 3 -> 0 on $A4`,
+-- `cast f7752 slot=1 char=4 bp=5 seq=a,a`).  A win on attempt 2 is the
+-- changed action order landing differently, not a better plan.  #257 is the
+-- lab that fixes the fighter here and in both generators.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local ENTRY = "build/states/kefka_entry.mss.lua"
@@ -65,11 +82,24 @@ local function partyLine()
   return table.concat(p, " ")
 end
 
--- gen_narshe_battle's per-turn sequence, verbatim (party 1 carries EDGAR
--- id 4 and CELES id 6; TERRA and anyone else Fight)
+-- gen_kefka_won's per-turn sequence, verbatim (party 1 carries EDGAR id 4
+-- and CELES id 6; TERRA and anyone else Fight).  #230: pressing R is a claim
+-- the caster can pay for what the turn names, so the boost goes through
+-- H.boostPlan, and a Tools row the pool cannot pay even unboosted falls back
+-- to Fight -- EDGAR opens this fixture with a few MP, and an unpriced tier-2
+-- AutoCrossbow is refused at the confirm (Ot6KitConfirmMP), which is a stall.
 local function seqFor(id, tier, slot)
   local bp = H.readByte(BP + slot * 2)
   local boost = bp >= 2 and math.min(bp, 3) or 0
+  local costed = nil
+  if id == 4 and tier >= 2 then
+    costed = H.namedTool(slot)
+    if costed == nil then tier = 0 end   -- no tool in the bag: Fight
+  end
+  local ok
+  boost, ok = H.boostPlan({ slot = slot, id = costed, want = boost,
+                            tag = "kefka" })
+  if not ok then tier = 0 end          -- cannot pay even unboosted: Fight
   local seq = {}
   for _ = 1, boost do seq[#seq + 1] = "r" end
   local function push(...)
@@ -81,15 +111,98 @@ local function seqFor(id, tier, slot)
   return push("a", "a")
 end
 
--- gen_narshe_battle's fighter, trimmed to one battle: chips watched for
--- assertion 3, wipe watched for the retry verdict
+-- gen_kefka_won's [death] lines (newFightDriver's shape), so the pips a
+-- member held when they fell are on the record for tools/audit_boost.py.
+local function newDeathWatch(tag)
+  local W = {}
+  function W.reset()
+    W.tick, W.opened, W.hp, W.said = 0, false, {}, {}
+  end
+  W.reset()
+  function W.frame()
+    if not H.battleLoadStarted() then W.reset(); return end
+    if not W.opened and H.monstersPresent() == 0 then return end
+    W.tick = W.tick + 1
+    local pbp = {}
+    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(0x3E9C + p * 2)) end
+    local party_bp = table.concat(pbp, ",")
+    if not W.opened then
+      W.opened = true
+      local hp = {}
+      for e = 0, 3 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + e * 2)) end
+      H.log(string.format("[%s] battle f+%d partyhp=%s party_bp=%s monsters=%d",
+        tag, W.tick, table.concat(hp, ","), party_bp, H.monstersPresent()))
+    end
+    for e = 0, 3 do
+      local hp, maxhp = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+      local last = W.hp[e]
+      if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
+         and not W.said[e] then
+        W.said[e] = true
+        local bp = H.readByte(0x3E9C + e * 2)
+        H.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d by "
+          .. "nobody (no monster action attributed) bp=%d party_bp=%s%s", tag,
+          W.tick, e, H.readByte(0x3ED8 + e * 2), last, maxhp, bp, party_bp,
+          bp >= 3 and string.format(" -- died holding %d BP", bp) or ""))
+      elseif hp > 0 and hp ~= 0xFFFF then
+        W.said[e] = nil
+      end
+      W.hp[e] = hp
+    end
+  end
+  return W
+end
+
+-- gen_kefka_won's fighter, trimmed to one battle: chips watched for
+-- assertion 3, and the loss watched on EVERY frame of the drive (F.watch).
+-- #163: a wipe zeroes every battle-HP word, which battleLoadStarted() reads
+-- as "no battle", so a loss check behind that gate never sees the one state
+-- it exists for; and the run canary counts a 300-frame battle-side wipe as a
+-- game over.  This file's copy predated both: its wipe line was written, the
+-- drive rode on waiting for the {25,5} save point, and the canary ended the
+-- run at attempt 1 of 3 (2026-09-23, the regenerated kefka_entry: KEFKA's
+-- Ice 2 at f3851 took TERRA 244 and CELES 242 to 0 and EDGAR 354 to 96, then
+-- Drain took EDGAR; build/attempts/wt/regen-suites/).  Now a loss ends the
+-- drive at once and the next attempt reloads, the way both generators do.
 local function mkFighter(tier, tag)
   local F = { lost = nil, chippedTwice = false }
+  local watch = newDeathWatch(tag)
   local up = false
-  local wipedN = 0
+  local wipeN = 0
   local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
   local phase = 0
   local lastSh, lastRvc = 6, 0
+  function F.watch()
+    watch.frame()
+    wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
+    -- the runner's sampleBattle, for this ladder's wipe context: the last
+    -- living reading, every 30 frames while the battle table is live
+    if H.battleLoadStarted() and wipeN == 0 and H.frame % 30 == 0 then
+      local seats = {}
+      for e = 0, 3 do
+        local a = H.readByte(BCHID + e * 2)
+        seats[#seats + 1] = (a == 0xFF) and "-" or
+          string.format("a%d:%d/%d bp%d", a, H.readWord(BCHP + e * 2),
+            H.readWord(BCMAXHP + e * 2), H.readByte(BP + e * 2))
+      end
+      local w = H.formationWords()
+      F.lastBattle = {
+        frame = H.frame, seats = table.concat(seats, " "),
+        formation = string.format("%04X %04X %04X %04X %04X %04X",
+          w[1], w[2], w[3], w[4], w[5], w[6]),
+      }
+    end
+    if (H.gameOverFired or 0) > 0 and not F.lost then
+      F.lost = string.format("GAME OVER counted by the canary at f%d " ..
+        "(tier %d) -- party [%s]", H.frame, tier, partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+    end
+    if wipeN >= 90 and not F.lost then
+      F.lost = string.format("PARTY WIPED at f%d (tier %d) -- [%s]",
+        H.frame, tier, partyLine())
+      H.log("[" .. tag .. "] " .. F.lost)
+    end
+  end
   function F.frame(battN, ks)
     phase = (phase + 1) % 8
     if battN == 3 then
@@ -110,20 +223,7 @@ local function mkFighter(tier, tag)
           "[%s] two class chips landed (gauge %d, revC $%02X) at f%d -- " ..
           "the fight plays on, on real damage", tag, sh, rvc, H.frame))
       end
-      -- wipe watch: every fielded entity at 0 HP, 90 straight frames
-      local wiped, any = true, false
-      for e = 0, 3 do
-        if H.readWord(BCMAXHP + e * 2) > 0 then
-          any = true
-          if H.readWord(BCHP + e * 2) > 0 then wiped = false end
-        end
-      end
-      wipedN = (any and wiped) and wipedN + 1 or 0
-      if wipedN >= 90 and not F.lost then
-        F.lost = string.format("PARTY WIPED at f%d (tier %d) -- [%s]",
-          H.frame, tier, partyLine())
-        H.log("[" .. tag .. "] " .. F.lost)
-      end
+      -- the wipe verdict is F.watch's, taken before this gate (#163)
     end
     if not up or H.readByte(MENU) == 0 then
       mStreak, mSeq = 0, nil
@@ -163,7 +263,25 @@ local function mkFighter(tier, tag)
 end
 
 -- ------------------------------------------------- the attempt sweep --
+local ATTEMPTS = 3
 local doorBlob, won, lostWhy = nil, false, nil
+
+-- A lost attempt is counted the way the segment runner counts its own
+-- retries (gen_sabin_gau's ladders do the same): one `[retry] attempt n/N
+-- FAILED class=wipe frame=... totalframes=... shift=... phase=...: msg` line
+-- and one `wipe context:` line, which is what tools/audit_retries.py reads.
+-- `shift` is how far this ladder moved the seed from attempt 1's: every
+-- attempt reloads the same entry point, so 0.
+local function ladderFailed(n, F)
+  H.log(string.format("[retry] attempt %d/%d FAILED class=wipe frame=%d " ..
+    "totalframes=%d shift=0 phase=%d: [kefka ladder] %s", n, ATTEMPTS,
+    H.frame, H.totalFrames or 0, H.seedPhase(), tostring(lostWhy)))
+  local b = F and F.lastBattle
+  H.log(string.format("[retry] attempt %d/%d wipe context: %s", n, ATTEMPTS,
+    b and string.format("the last battle up (f%d) was formation %s; seats " ..
+      "at that reading %s (actor:hp/maxhp bp)", b.frame, b.formation, b.seats)
+      or "no battle was sampled in this attempt"))
+end
 
 local function attempt(n)
   local F, battN, ks, seedChecked = nil, 0, -1, false
@@ -177,25 +295,37 @@ local function attempt(n)
       end),
       H.call(function() ldReq = H.requestLoadState(doorBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(ldReq, "kefka attempt " .. n) end),
+      H.call(function()
+        H.checkReq(ldReq, "kefka attempt " .. n)
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count belongs to the lost attempt
+        H.gameOverFired = 0
+      end),
       H.waitFrames(60),
     }, {}),
     H.call(function()
       F, battN, ks, seedChecked, postN, evN = mkFighter(n, "kefka" .. n),
         0, -1, false, 0, 0
       lostWhy = nil
+      H.gameOverFired = 0
     end),
     H.hold({ "down" }), H.waitFrames(4), H.release(), H.waitFrames(8),
     H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
       H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
     }, "clean A into KEFKA -> battle 57"),
     H.waitUntil(function() return H.battleActive() end, 3000, "fight up", 10),
-    -- play it to the scripted verdict (gen_narshe_battle's discriminator:
-    -- both endings run events, so the save-point warp is the tell)
+    -- play it to the scripted verdict (the generators' discriminator:
+    -- both endings run events, so the save-point warp is the tell), or to a
+    -- loss, which ends the drive at once: reloading beats riding the fail
+    -- path into the canary
     H.driveUntil(function()
+      if F.lost then
+        lostWhy = F.lost
+        return true
+      end
       if battN > 0 or H.battleLoadStarted() then return false end
       if H.fieldX() == 25 and H.fieldY() == 5 then
-        lostWhy = (F and F.lost) or string.format(
+        lostWhy = string.format(
           "battle 57 LOST at f%d (tier %d): the lose path parked the " ..
           "party at the {25,5} save point", H.frame, n)
         return true
@@ -203,13 +333,14 @@ local function attempt(n)
       postN = postN + 1
       evN = (H.eventRunning() or H.dialogWaiting()) and evN + 1 or evN
       if postN >= 600 and evN >= 60 then
-        if F and F.lost then lostWhy = F.lost end
         H.vars.winSceneObserved = true
         return true
       end
       return false
     end, 90000, {
       H.call(function()
+        F.watch()                           -- every frame, outside the gate
+        if F.lost then H.setPad({}); return end
         battN = H.battleLoadStarted() and battN + 1 or 0
         if battN >= 3 then
           postN, evN = 0, 0
@@ -243,12 +374,18 @@ local function attempt(n)
         H.vars.chippedTwice = F.chippedTwice
         H.log(string.format("[kefka] attempt %d WON battle 57 at f%d",
           n, H.frame))
+      else
+        ladderFailed(n, F)
       end
     end),
   }, {})
 end
 
-H.run({ maxFrames = 300000 }, {
+-- allowGameOver: the sweep deliberately survives a lost battle 57, as both
+-- generators' do (#163); F.watch reads H.gameOverFired as a loss and the
+-- next attempt reloads the entry point.  The verdict below still requires
+-- the win.
+H.run({ maxFrames = 300000, allowGameOver = true }, {
   H.loadState(ENTRY),
   H.waitFrames(30),
   H.call(function()
@@ -277,7 +414,8 @@ H.run({ maxFrames = 300000 }, {
 
   H.call(function()
     H.assertEq(won, true,
-      "KEFKA beaten within 3 attempts (real damage, real menus)")
+      string.format("KEFKA beaten within %d attempts (real damage, real menus)",
+        ATTEMPTS))
     H.assertEq(H.vars.chippedTwice, true,
       "two real class chips landed and revealed before the fight ended")
     local atSave = H.fieldX() == 25 and H.fieldY() == 5
