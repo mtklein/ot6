@@ -46,7 +46,8 @@ so these are absolute zero-page addresses:
 Tile-aligned at rest iff `peek8($DF)==0 and peek8($E1)==0`. The tile
 byte flips at step completion when moving down/right, but on the first
 frame when moving up/left (the word borrows through its high byte);
-measured in `probe_world` step traces. Position samples therefore gate
+measured in `probe_world` step traces (`probe_world.lua`, deleted in
+4b257a86; last version at 5defce69). Position samples therefore gate
 on alignment, the same rule the field uses. Init seeds the tile bytes
 from `$1F60/$1F61` and inherits the fraction bytes (`world/init.asm`
 never zeroes `$DF`/`$E1`); measured after every observed transition

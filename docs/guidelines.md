@@ -85,6 +85,10 @@ The harness plays OT6 the way a competent person with a controller would.
   answer a hard fight with levels, gear, route or strategy.
 - **Octopath-style twists on FF6 characters are welcome** (Shadow's break
   that kills). Shadow stays in the party the whole game.
+- **The World of Balance / World of Ruin split is a storytelling boundary,
+  not a technical one.** What the World of Ruin teaches (driver
+  mechanics, kill orders, design fixes) is welcome in the World of Balance
+  too; measure it there and say that it applies there.
 - **Save compatibility is a contract.** The SRAM layout
   ([save-layout.md](design/save-layout.md)) must keep loading older
   in-game saves. A release is promoted to v1.0 retroactively once it is fun

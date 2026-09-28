@@ -5,7 +5,7 @@ PROVENANCE.  A checkpoint's `provenance` field records the ancestry of the
 chain of generated savestates above it, as a dict:
 
     "provenance": {
-      "format": "ot6-provenance/v1",
+      "format": "ot6-provenance/v2",          # the sig's scheme (v1 accepted)
       "payload_sha256": "<sha256 of the .sram bytes>",
       "generator_sig": "<sig> <gen> [extras]",     # savestate_stamp.sh sig of the
                                               # generator that drove the
@@ -41,8 +41,13 @@ import tempfile
 from pathlib import Path
 
 SCHEMA = "ot6.sram-checkpoint/v1"
-# Must match savestate_stamp.sh's GATE_CONTRACT.
-PROVENANCE_FORMAT = "ot6-provenance/v1"
+# Must match savestate_stamp.sh's GATE_CONTRACT: the scheme a new capture's
+# generator_sig is computed under.
+PROVENANCE_FORMAT = "ot6-provenance/v2"
+# Every scheme a sealed record may carry.  A record keeps the format it was
+# captured under; its sig is what that run computed, never recomputed here.
+# v1 hashed .lua sources as bytes, v2 as Lua token streams (#247).
+PROVENANCE_FORMATS = ("ot6-provenance/v1", PROVENANCE_FORMAT)
 SRAM_SIZE = 32768
 _HEX64 = re.compile(r"[0-9a-f]{64}")
 
@@ -157,9 +162,9 @@ def provenance_problem(prov: dict, payload_sha256: str) -> str | None:
     record documents what the capture run saw in its own tree, and the
     consuming tree's build/states changes on every regeneration.
     """
-    if prov.get("format") != PROVENANCE_FORMAT:
-        return (f"provenance format {prov.get('format')!r} is not "
-                f"{PROVENANCE_FORMAT!r}")
+    if prov.get("format") not in PROVENANCE_FORMATS:
+        return (f"provenance format {prov.get('format')!r} is not one of "
+                f"{', '.join(repr(f) for f in PROVENANCE_FORMATS)}")
     if prov.get("payload_sha256") != payload_sha256:
         return "provenance payload_sha256 does not match the payload bytes"
     sig = prov.get("generator_sig")
@@ -579,7 +584,7 @@ def main(argv: list[str]) -> int:
                 f"sha256={manifest['sha256']} "
                 f"persistent_layout={manifest['persistent_layout']} "
                 f"provenance="
-                + (PROVENANCE_FORMAT if isinstance(prov, dict)
+                + (prov["format"] if isinstance(prov, dict)
                    else "legacy-v0")
                 + f" holds={held}"
                 + (" (saved: declared and checked)"

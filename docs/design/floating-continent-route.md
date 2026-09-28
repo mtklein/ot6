@@ -205,9 +205,9 @@ A measured run at L24/24/25 with a bolt-leaning kit clears all six
 frames and AirForce in two rounds, landing on map 394 with the party at
 739/787/544 HP going in.
 
-`tools/tests/probe_iaf.lua` drives the whole entry headless (board →
-discovery → deck → "Find the FC" → the party-formation menu → the ambush)
-and reads `battle 126` in the emulator as **Sky Armor `$043` + Spit Fire
+`tools/tests/probe_iaf.lua` (deleted in 4b257a86; last version at 5defce69)
+drove the whole entry headless (board → discovery → deck → "Find the FC" →
+the party-formation menu → the ambush) and read `battle 126` in the emulator as **Sky Armor `$043` + Spit Fire
 `$0e3`**, matching formation 175's offline decode.
 
 The `AIRSHIP_CENTER`/`AIRSHIP_WOB`/`CLOUDS` arguments are battle **backgrounds**
@@ -563,7 +563,8 @@ clock 21,267). Four experiments from that one snapshot, all retained
   ("consumed 41 pulses in state $05 without landing", ten drops) on the
   second Naughty and the party bled out over 12,000 frames without a hit
   landing (V0 and V1, both wiped at (86,10)). Cause (#153, reproduced
-  from fc_alcove with `probe_nuke_park.lua`): Naughty Mutes LOCKE
+  from fc_alcove with `probe_nuke_park.lua`, deleted in 4b257a86; last
+  version at 2c2492b0): Naughty Mutes LOCKE
   (status 2 `$08`), the engine marks his Magic row disabled (`$202F`
   bit 7) and the command cursor skips it, so the steer's down/up hopped
   1 ↔ 3 around row 2 forever. `cmdRow` now reports a disabled row as

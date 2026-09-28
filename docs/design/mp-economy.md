@@ -538,7 +538,8 @@ The price is 4 MP, at every boost level: Steal is a chance verb and
 does not escalate ("Who pays it" above). This document's baseline measures
 an ability against the pool at the level it arrives, and Steal
 arrives at Narshe with Locke at LV6 holding 31 MP (measured,
-`probe_mppools.lua` off `worldmap_narshe`), where 4 MP is 12.9%,
+`probe_mppools.lua` off `worldmap_narshe`; deleted in 4b257a86, last
+version at 5defce69), where 4 MP is 12.9%,
 between Fire's 10.0% and Cure's 12.5%.
 
 Every signature dilutes as levels rise, in the same way Steal does:
@@ -642,7 +643,8 @@ Kit skills price on the vanilla spell baseline: cost as a fraction of the
 caster's real max MP at the level the ability is learned, pools computed
 the way `InitMaxMP` computes them (`CharProp+$01` plus the
 `LevelUpMP` running sum) and cross-checked against pools read
-out of generated savestates (`tools/tests/probe_mppools.lua`):
+out of generated savestates (`tools/tests/probe_mppools.lua`, deleted in
+4b257a86; last version at 5defce69):
 
 Spells learned below Terra's earliest measured level are
 priced at that level (L6, pool 40, read off `kolts_entry`),
@@ -738,9 +740,9 @@ fill in on their level schedules (kits.md). The tight period is
 early WoB, which is where the demo is set.
 
 Measured pools, read off the generated chain by
-`tools/tests/probe_mppools.lua`, which boots each state and dumps
-every `$1600` record. Max MP, in-party characters only (a
-character who has not joined yet carries a placeholder record:
+`tools/tests/probe_mppools.lua` (deleted in 4b257a86; last version at
+5defce69), which booted each state and dumped every `$1600` record.
+Max MP, in-party characters only (a character who has not joined yet carries a placeholder record:
 Cyan reads LV7/39 at `kolts_entry`, which is not a pool
 anyone can spend):
 

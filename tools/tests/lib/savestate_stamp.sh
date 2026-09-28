@@ -12,7 +12,10 @@
 # lib halves compose.py inlines into every composed script (ot6.lua,
 # ot6_field.lua, ot6_contract.lua, in that order), plus any declared extra
 # inputs (SRAM checkpoints hash manifest then payloads).  Content-keyed
-# throughout: an mtime bump changes no signature.
+# throughout: an mtime bump changes no signature.  A .lua input is hashed
+# as its Lua token stream, comments and whitespace dropped
+# (lua_fingerprint.py, #247): a comment-only edit changes no signature;
+# a code edit does.  Other inputs are hashed as bytes.
 #
 # A stamp file holds, one per line:
 #
@@ -20,7 +23,7 @@
 #             ot6_contract.lua ++ extras...)> <gen> [extras...]
 #     rom <sha256(the ROM the run booted)>
 #     generator <sha256(GATE_CONTRACT ++ gen ++ extras...)>
-#     lib <path> <sha256(<path>)>                      (one per lib half)
+#     lib <path> <sha256(<path>'s token stream)>      (one per lib half)
 #     artifact <sha256(build/states/<state>.mss)>
 #     ancestor <path> <sha256(<path> file bytes)>        (non-root states only)
 #
@@ -51,13 +54,18 @@ set -u
 # gensig both).  Bumping it stales every stamp in existence and forces a
 # full regeneration.  Both sides of the comparison (the `generate` edge and
 # compose.py) shell into this file, so there is exactly one definition to
-# bump.
-GATE_CONTRACT='ot6-provenance/v1'
+# bump.  v1 hashed .lua inputs as bytes; v2 hashes their token streams
+# (#247).  tools/tests/lib/migrate_fingerprints.py re-stamps a v1 stamp
+# that still verifies under v1, without regenerating anything.
+GATE_CONTRACT='ot6-provenance/v2'
 
 # OT6_ROOT lets selftests and compose.py point the sig at another tree; the
 # default is the real tree this script lives in (lib/ -> tests/ -> tools/ ->
 # root).
 ROOT="${OT6_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
+# The normalizer lives beside this script, not under OT6_ROOT: a mock tree
+# is hashed by the same definition as the real one.
+FINGERPRINT="$(cd "$(dirname "$0")" && pwd)/lua_fingerprint.py"
 STATES="$ROOT/build/states"
 # The ROM a generation run boots: run.sh's own default, overridable the same
 # way (OT6_ROM), so the stamp records the ROM that actually ran.  compose.py
@@ -89,13 +97,20 @@ extra_files() {
   done
 }
 
-# digest_of <newline-separated files>: sha256(GATE_CONTRACT ++ files...).
-# The GATE_CONTRACT version leads the byte stream, so bumping the constant
-# above moves every signature at once (see its comment).
+# digest_of <newline-separated files>: sha256(GATE_CONTRACT ++ files...),
+# each .lua file as its token stream (lua_fingerprint.py `digest`).  The
+# GATE_CONTRACT version leads the byte stream, so bumping the constant
+# above moves every signature at once (see its comment).  A file the
+# normalizer cannot lex is a hard error, never a partial digest.
 digest_of() {
-  { printf '%s\n' "$GATE_CONTRACT"
-    printf '%s\n' "$1" | while IFS= read -r file; do cat "$file"; done
-  } | shasum -a 256 | cut -c1-64
+  list="$1"
+  set --
+  while IFS= read -r file; do
+    [ -n "$file" ] && set -- "$@" "$file"
+  done <<EOF
+$list
+EOF
+  python3 "$FINGERPRINT" digest "$GATE_CONTRACT" "$@"
 }
 
 # sha256(<generator source> ++ <battle core> ++ <nav half> ++ <contract
@@ -116,7 +131,8 @@ $ROOT/$h"; done
 $ex"
   extras=""
   for extra in "$@"; do extras="$extras $extra"; done
-  printf '%s %s%s' "$(digest_of "$files")" "$gen" "$extras"
+  d=$(digest_of "$files") || exit 2
+  printf '%s %s%s' "$d" "$gen" "$extras"
 }
 
 # sha256(GATE_CONTRACT ++ <generator source> ++ extras): the generator's own
@@ -133,7 +149,7 @@ gensig() {
   ex=$(extra_files "$@") || exit 2
   [ -z "$ex" ] || files="$files
 $ex"
-  digest_of "$files"
+  digest_of "$files" || exit 2
 }
 
 # sha256 of the ROM the run boots: the compatibility binding for "is this
@@ -146,10 +162,15 @@ romsig() {
   shasum -a 256 "$ROM" | cut -c1-64
 }
 
-# sha256 of one file, bare.  Used for the artifact, ancestor and lib
-# bindings.
+# sha256 of one file, bare.  Used for the artifact and ancestor bindings.
 filehash() {
   shasum -a 256 "$1" | cut -c1-64
+}
+
+# sha256 of a lib half's token stream (lua_fingerprint.py `hash`): the
+# content the sig covers, so a comment-only lib edit is not drift.
+libhash() {
+  python3 "$FINGERPRINT" hash "$1"
 }
 
 cmd="${1:?usage: savestate_stamp.sh write|sig|gensig|romsig ...}"
@@ -192,13 +213,17 @@ case "$cmd" in
     gen_hash=$(gensig "$gen" "$@") || exit 2
     # Everything is computed; only now may the old stamp be replaced.
     sigline=$(sig "$gen" "$@") || exit 2
+    liblines=""
+    for h in $LIB_HALVES; do
+      lh=$(libhash "$ROOT/$h") || exit 2
+      liblines="${liblines}lib $h $lh
+"
+    done
     {
       printf '%s\n' "$sigline"
       printf 'rom %s\n' "$rom_hash"
       printf 'generator %s\n' "$gen_hash"
-      for h in $LIB_HALVES; do
-        printf 'lib %s %s\n' "$h" "$(filehash "$ROOT/$h")"
-      done
+      printf '%s' "$liblines"
       printf 'artifact %s\n' "$artifact"
       [ "$ancestor" = "-" ] ||
         printf 'ancestor %s %s\n' "$ancestor" "$anc_hash"
