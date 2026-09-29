@@ -1358,6 +1358,102 @@ Ot6FoldTbl:
 
 ; ------------------------------------------------------------------------------
 
+; [ Life 3 revives a KO'd body, then guards it (#327) ]
+;
+; Boosting Life twice casts Life 3 (the life row above).  Vanilla's Life 3
+; only marks a LIVING body to rise once when it falls: its record has no
+; resurrection-targeting flag (MagicProp +$02 bit $04), so a KO'd target is
+; dropped before the spell lands, and a two-point Life on a fallen ally spent
+; the pips and the MP and revived nobody (build/attempts/wt/wor-espers/
+; lab_lifedead_try1.log).  The owner's call (2026-09-29): on a KO'd body
+; Life 3 revives at full HP, as Life 2 does, AND grants its Life 3 status; on
+; a living body it grants the status as before.  It is the spell's effect,
+; so a monster that casts Life 3 gets it too.
+;
+; Two hooks, both keyed on the id LoadMagicProp just loaded (OT6_ATKID):
+;   Ot6RezTargeting  targeting (battle_main.asm @2761): Life 3 may target a
+;                    KO'd body, like Life and Life 2 ($ba bit $08).  The
+;                    record's own +$02 bit $04 stays clear, because CheckHit
+;                    reads that bit as "misses a living body", and Life 3
+;                    must still land on the living.
+;   Ot6Life3Revive   the per-target loop (@3440), before MagicStatusEffect:
+;                    for a KO'd target, the effect Life 2's record carries --
+;                    wound cleared ($3dfc, the cell Life's lifted status
+;                    lands in), healed by 16/16 of max HP ($11a4 $80
+;                    fraction | $01 heal, $11a6 power 16, $11a2 $04 so the
+;                    fraction is of max HP), ignoring defence ($11a2 $20)
+;                    -- on top of the record's own Life 3 status
+;                    (set mode, status 4 bit $04), which MagicStatusEffect
+;                    then applies as it always did.
+; The record edit is per action, and Life 3 targets one body ($11a0 = $03),
+; so it cannot leak to a second target.
+;
+; The revival is for characters.  A monster's Life 3 lands on a monster that
+; died after the spell was chosen only in a race, and a KO'd monster also has
+; to rejoin the live-monster mask ($2f2f), which Life 2's path does not do.
+; There the record's own Life 3 status lands on the body, and the post-action
+; death sweep's ReraiseEffect (battle_main.asm) revives it the engine's way:
+; back into $2f2f, then Life.
+
+OT6_LIFE3_ID = $35
+
+; in: a8, A = $11a2 (the record's +$02 flags).  out: A = $04 when the attack
+; may target a KO'd body (Life, Life 2, Life 3), else 0.  Index regs
+; untouched.  rtl.
+.proc Ot6RezTargeting
+        .a8
+        and     #$04            ; Life, Life 2: the record's own flag
+        bne     @out
+        lda     f:$7e0000+OT6_ATKID
+        eor     #OT6_LIFE3_ID   ; 0 exactly for Life 3
+        bne     @no
+        lda     #$04
+        rtl
+@no:    lda     #$00
+@out:   rtl
+.endproc
+
+; in: y = the target's entity offset, db = $7e, any widths.  Preserves A, X,
+; Y and P.  rtl.
+.proc Ot6Life3Revive
+        php
+        .a16
+        .i16
+        sep     #$20
+        .a8
+        pha
+        lda     f:$7e0000+OT6_ATKID
+        cmp     #OT6_LIFE3_ID
+        bne     @out
+        tya                     ; width-neutral: the offset fits a byte
+        cmp     #$08
+        bcs     @out            ; a monster target: see the header
+        lda     $3ee4,y         ; status 1
+        bpl     @out            ; not KO'd: the record's status alone
+        lda     $3dfc,y
+        ora     #$80            ; wound to clear, as Life's lift puts it
+        sta     $3dfc,y
+        lda     $11a4
+        ora     #$81            ; heal, by a fraction of max HP
+        sta     $11a4
+        lda     #$10            ; 16/16: full, Life 2's power
+        sta     $11a6
+        lda     $11a2
+        ora     #$24            ; ignore defence, and the resurrection flag,
+        sta     $11a2           ;   which is what makes CalcDmgRatio take
+                                ;   the fraction of MAX HP rather than of
+                                ;   current HP (0 on a KO'd body: without
+                                ;   it the revival heals to 1 HP,
+                                ;   lab_lifedead_revive1.log).  Targets and
+                                ;   the hit are settled by now, so the bit's
+                                ;   other reader, CheckHit, has already run
+@out:   pla
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ the magic list shows what a boosted cast will really cost, and greys on it ]
 ;
 ; Ot6QueueFold charges the folded tier; without this the list would still

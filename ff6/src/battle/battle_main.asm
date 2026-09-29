@@ -6679,7 +6679,8 @@ _2754:  jsr     LoadMagicProp
         sta     $bb
 @2761:  lda     $11a2       ;
         pha
-        and     #$04        ; isolate resurrection targetting flag
+        jsl     Ot6RezTargeting ; ot6: isolate resurrection targetting flag
+                                ;   (and $04 for Life 3, #327)
         asl
         tsb     $ba         ; copy to "can hit dead targets flag"
         lda     $01,s
@@ -8660,6 +8661,7 @@ CalcAttackEffect:
         cpy     $33f8
         beq     @346c
         stz     $3a48
+        jsl     Ot6Life3Revive  ; ot6: Life 3 on a KO'd body revives it (#327)
         jsr     MagicStatusEffect
         jsr     DoTargetEffect
         lda     $3a48

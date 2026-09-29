@@ -24,20 +24,30 @@
 --               boost never makes Life cheaper (b2 >= b1 >= b0);
 --   the effect  the target gains the Life 3 status (status 4 bit $04,
 --               MagicProp $35 +$0d) exactly when Life 3 is cast.
--- Every case targets LOCKE, alive: Life and Life 2 are revivals that only
+-- The b cases target LOCKE alive: Life and Life 2 are revivals that only
 -- hit a KO'd body (MagicProp +$02 bit $04), so on him they land nothing, and
--- Life 3 is the pre-emptive revival that only a living body takes.  Those
--- two misses are the effect's negative control.
+-- Life 3 marks a living body to rise once.  Those two misses are the
+-- effect's negative control.
+--
+-- The ko cases target LOCKE KO'd.  The owner's call (2026-09-29): Life 3
+-- on a KO'd body revives it at full HP, as Life 2 does, AND grants the
+-- Life 3 status (Ot6RezTargeting, Ot6Life3Revive).  ko-b1 (Life 2: full
+-- HP, no status) is the control that tells the two apart.
 --
 -- No state is written.  fire-out-v1 has TERRA (Life at 18, kits.md) with a
 -- 204-MP pool, LOCKE and STRAGO by Thamasa.  The run walks to an encounter,
--- Defends until TERRA has 3 pips banked, snapshots her command window, and
--- restores that one snapshot for each case: TERRA presses R to the case's
--- boost, opens Magic, casts Life on LOCKE; everyone else Defends.
+-- Defends until TERRA has 3 pips banked, snapshots her command window (T),
+-- and restores T for each b case: TERRA presses R to the case's boost,
+-- opens Magic, casts Life on LOCKE; everyone else Defends.  Then, from T,
+-- TERRA's two-point Fire and STRAGO's Fight knock LOCKE out (the party's
+-- own hands, through the real target cursor; LOCKE passes his turns), the
+-- two Defend until TERRA has 3 pips again, and that window (K) is restored
+-- for each ko case.
 --
 -- Red on a ROM whose life row stops at Life 2 (the name and the cast at
--- boost 2 and 3 are Life 2), and on one that keeps Life 3's vanilla 50 MP
--- (boost 2 charged less than boost 1); build/attempts/wt/wor-espers/.
+-- boost 2 and 3 are Life 2), on one that keeps Life 3's vanilla 50 MP
+-- (boost 2 charged less than boost 1), and on one without the revival
+-- (ko-b2 leaves LOCKE at 0 HP, KO'd); build/attempts/wt/wor-espers/.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -120,6 +130,10 @@ local function installObservers()
   emu.addMemoryCallback(function()
     if armed and armed.sent and not armed.endF and cx() == terraS * 2 then
       armed.endF, armed.mpEnd = H.frame, mp(terraS)
+      armed.hpEnd = H.readWord(0x3BF4 + lockeS * 2)
+      armed.hpMax = H.readWord(0x3C1C + lockeS * 2)
+      armed.koEnd = (H.readByte(STATUS1 + lockeS * 2) & KO) ~= 0
+      armed.statusEnd = H.readByte(STATUS4 + lockeS * 2)
     end
   end, emu.callbackType.exec, ae, ae)
 end
@@ -228,13 +242,73 @@ local function pulse(c)
   H.setPad(btn and { [btn] = true } or {})
 end
 
+-- The knockout: TERRA casts Fire at two points (Fire 3) on LOCKE when she
+-- has the pips and Fights him when she does not, STRAGO Fights him, LOCKE
+-- passes (X).  Every press goes through the real menus and target cursor.
+local STRAGO, FIRE, CMD_FIGHT = 7, 0x00, 0x00
+local stragoS
+local function killPulse()
+  tc.observe()
+  if H.readByte(MENU) == 0 then H.setPad({}); return end
+  mf = mf + 1
+  local edge = (mf - 1) % 8 < 4
+  local a, st = H.readByte(ACTOR) & 3, H.readByte(MSTATE)
+  if st ~= ST_TGT then tapNo = -1 end
+  if st ~= ST_MAGIC then inMagic = 0 end
+  local p
+  if a == terraS then
+    p = (bank(terraS) >= 2) and { cmd = CMD_MAGIC, spell = FIRE, boost = 2 }
+        or { cmd = CMD_FIGHT, boost = 0 }
+  elseif a == stragoS then
+    p = { cmd = CMD_FIGHT, boost = 0 }
+  end
+  local btn
+  if st == ST_TRANS then btn = nil
+  elseif p == nil then
+    btn = edge and ((st == ST_CMD) and "x" or "b") or nil
+  elseif st == ST_CMD then
+    if pend(a) < p.boost then btn = "r"
+    elseif pend(a) > p.boost then btn = "l"
+    else
+      local want, cur = cmdRow(a, p.cmd), H.readByte(CMDROW + a) & 3
+      btn = (cur == want) and "a" or ((cur < want) and "down" or "up")
+    end
+    if not edge then btn = nil end
+  elseif st == ST_MAGIC then
+    inMagic = inMagic + 1
+    if inMagic >= 20 then
+      local cell = spellCell(a, p.spell)
+      assert(cell, "TERRA's list holds Fire")
+      local wr, wc = cell // 2, cell % 2
+      local ar = H.readByte(MSCROLL + a) + H.readByte(MROW + a)
+      local col = H.readByte(MCOL + a)
+      if ar < wr then btn = "down" elseif ar > wr then btn = "up"
+      elseif col < wc then btn = "right" elseif col > wc then btn = "left" else btn = "a" end
+    end
+    if not edge then btn = nil end
+  elseif st == ST_TGT then
+    btn = tc.steer(lockeS, mf)
+    if btn == "a" then
+      if not edge then btn = nil end
+    else
+      if btn ~= nil and tc.press ~= tapNo then tapNo, tapAt = tc.press, mf end
+      btn = (tapNo >= 0 and mf - tapAt < 4) and tc.dir or nil
+    end
+  else btn = edge and "b" or nil end
+  H.setPad(btn and { [btn] = true } or {})
+end
+local function ko(s) return (H.readByte(STATUS1 + s * 2) & KO) ~= 0 end
+
 -- ---- the run -------------------------------------------------------------------
-local snap = nil
+local snap, snapK = nil, nil
 local CASES = {
   { name = "b0", boost = 0, cast = LIFE },
   { name = "b1", boost = 1, cast = LIFE2 },
   { name = "b2", boost = 2, cast = LIFE3 },
   { name = "b3", boost = 3, cast = LIFE3 },
+  { name = "ko-b1", boost = 1, cast = LIFE2, ko = true },
+  { name = "ko-b2", boost = 2, cast = LIFE3, ko = true },
+  { name = "ko-b3", boost = 3, cast = LIFE3, ko = true },
 }
 
 local steps = {
@@ -291,8 +365,9 @@ local steps = {
       local id = H.readByte(0x3ED8 + s * 2)
       if id == TERRA then terraS = s end
       if id == LOCKE then lockeS = s end
+      if id == STRAGO then stragoS = s end
     end
-    assert(terraS and lockeS, "TERRA and LOCKE are in the battle")
+    assert(terraS and lockeS and stragoS, "TERRA, LOCKE and STRAGO are in the battle")
     local cell, stamp = spellCell(terraS, LIFE)
     H.log(string.format("[lifefold] TERRA slot %d (%d MP, %d BP), LOCKE slot %d; Life cell %s "
       .. "stamp %s", terraS, mp(terraS), bank(terraS), lockeS, tostring(cell), tostring(stamp)))
@@ -319,10 +394,47 @@ local steps = {
   end),
 }
 
+local function knockout()
+  local req
+  return {
+    H.call(function() H.setPad({}); req = H.requestLoadState(snap.blob) end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(req, "snapshot load")
+      H.rearmInputInjection()
+      mf, tapNo, tapAt, inMagic = 0, -1, 0, 0
+    end),
+    H.driveUntil(function() return ko(lockeS) end, 40000, { H.call(killPulse) },
+      "LOCKE knocked out by his own party"),
+    H.driveUntil(function() return snapK ~= nil end, 40000, {
+      H.call(function()
+        if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD
+           and (H.readByte(ACTOR) & 3) == terraS and bank(terraS) >= 3 and pend(terraS) == 0 then
+          H.setPad({})
+          snapK = H.requestSaveState()
+          H.log(string.format("[lifefold] snapshot K f%d: TERRA bank %d MP %d; LOCKE HP %d/%d "
+            .. "status1 $%02X status4 $%02X", H.frame, bank(terraS), mp(terraS),
+            H.readWord(0x3BF4 + lockeS * 2), H.readWord(0x3C1C + lockeS * 2),
+            H.readByte(STATUS1 + lockeS * 2), H.readByte(STATUS4 + lockeS * 2)))
+          return
+        end
+        pulse(nil)
+      end),
+    }, "TERRA's command window with 3 pips, LOCKE down"),
+    H.waitFrames(2),
+    H.call(function() H.checkReq(snapK, "snapshot K") end),
+  }
+end
+
+local knocked = false
 for _, c in ipairs(CASES) do
   local req
+  if c.ko and not knocked then
+    knocked = true
+    for _, st in ipairs(knockout()) do steps[#steps + 1] = st end
+  end
   steps[#steps + 1] = H.call(function()
-    H.setPad({}); req = H.requestLoadState(snap.blob)
+    H.setPad({}); req = H.requestLoadState((c.ko and snapK or snap).blob)
   end)
   steps[#steps + 1] = H.waitFrames(2)
   steps[#steps + 1] = H.call(function()
@@ -331,7 +443,8 @@ for _, c in ipairs(CASES) do
     mf, tapNo, tapAt, inMagic = 0, -1, 0, 0
     c.casts, c.queued = {}, {}
     armed = c
-    H.assertEq((H.readByte(STATUS1 + lockeS * 2) & KO) == 0, true, "LOCKE is alive")
+    c.ko0 = ko(lockeS)
+    H.assertEq(c.ko0, c.ko == true, c.ko and "LOCKE is KO'd" or "LOCKE is alive")
     H.assertEq((H.readByte(STATUS4 + lockeS * 2) & LIFE3_STATUS) == 0, true,
       "LOCKE does not already carry Life 3")
     H.assertEq(mp(terraS) >= romPrice(LIFE3) and mp(terraS) >= romPrice(LIFE2), true,
@@ -343,14 +456,16 @@ for _, c in ipairs(CASES) do
     armed = nil
     H.setPad({})
     c.charged = c.mp0 - c.mpEnd
-    c.statusEnd = H.readByte(STATUS4 + lockeS * 2)
+    c.hpLater, c.statusLater = H.readWord(0x3BF4 + lockeS * 2), H.readByte(STATUS4 + lockeS * 2)
     local cs, qs = {}, {}
     for _, v in ipairs(c.casts) do cs[#cs + 1] = string.format("$%02X", v) end
     for _, v in ipairs(c.queued) do qs[#qs + 1] = tostring(v) end
     H.log(string.format("[lifefold] %s: boost %d (pending %d at confirm, bank %d); cast %s; "
-      .. "queued %s; MP %d -> %d (charged %d); LOCKE status4 $%02X -> $%02X, HP %d", c.name,
-      c.boost, c.pendAtConfirm, c.bank0, table.concat(cs, " "), table.concat(qs, " "), c.mp0,
-      c.mpEnd, c.charged, c.status0, c.statusEnd, H.readWord(0x3BF4 + lockeS * 2)))
+      .. "queued %s; MP %d -> %d (charged %d); LOCKE at TERRA's action end: status4 $%02X -> "
+      .. "$%02X, HP %d/%d, %s; 60 frames on: HP %d, status4 $%02X", c.name, c.boost,
+      c.pendAtConfirm, c.bank0, table.concat(cs, " "), table.concat(qs, " "), c.mp0, c.mpEnd,
+      c.charged, c.status0, c.statusEnd, c.hpEnd, c.hpMax, c.koEnd and "KO'd" or "standing",
+      c.hpLater, c.statusLater))
     H.screenshot("lifefold_" .. c.name .. "_after")
   end)
 end
@@ -389,6 +504,13 @@ steps[#steps + 1] = H.call(function()
       (want == LIFE3) and "gains" or "does not gain"))
     check(c.pendAtConfirm == c.boost, string.format("%s: %d boost was pending at the confirm "
       .. "(%s)", c.name, c.boost, tostring(c.pendAtConfirm)))
+    if c.ko then
+      -- Life 2 and (#327) Life 3 revive a KO'd body at full HP
+      check(not c.koEnd and c.hpEnd == c.hpMax, string.format("%s: LOCKE revived at full HP "
+        .. "(%d/%d, %s)", c.name, c.hpEnd, c.hpMax, c.koEnd and "KO'd" or "standing"))
+    else
+      check(not c.koEnd, string.format("%s: LOCKE still standing", c.name))
+    end
   end
   local by = {}
   for _, c in ipairs(CASES) do by[c.name] = c end
@@ -396,11 +518,12 @@ steps[#steps + 1] = H.call(function()
     string.format("a boost never makes Life cheaper: %d, %d, %d at boost 0, 1, 2",
       by.b0.charged, by.b1.charged, by.b2.charged))
   for _, c in ipairs(CASES) do
-    H.log(string.format("[lifefold] VERDICT %s: charged %d, Life 3 status %s", c.name,
-      c.charged, (c.statusEnd & LIFE3_STATUS) ~= 0 and "set" or "clear"))
+    H.log(string.format("[lifefold] VERDICT %s: charged %d, Life 3 status %s, LOCKE %d/%d %s",
+      c.name, c.charged, (c.statusEnd & LIFE3_STATUS) ~= 0 and "set" or "clear", c.hpEnd,
+      c.hpMax, c.koEnd and "KO'd" or "standing"))
   end
   for _, b in ipairs(bad) do H.log("[lifefold] FAIL " .. b) end
   assert(#bad == 0, "Life's fold: " .. table.concat(bad, "; "))
 end)
 
-H.run({ maxFrames = 200000 }, steps)
+H.run({ maxFrames = 300000 }, steps)

@@ -398,5 +398,13 @@ OT6_SHPEND           := $edcc
 .assert OT6_SHPEND = OT6_SHWANT + 6, error, "shield-tile pending mask must follow want without overlap"
 .assert OT6_SHPEND <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; the ability id LoadMagicProp last loaded (Ot6SkillClass writes it with the
+; class, on every load).  Ot6RezTargeting and Ot6Life3Revive read it to know
+; the record in $11a0 is Life 3's (#327); both run after the load of the
+; attack they serve, so no stale id reaches them.
+OT6_ATKID            := $edcd
+.assert OT6_ATKID = OT6_SHPEND + 1, error, "the attack id must follow the shield-tile mask without overlap"
+.assert OT6_ATKID <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 
 .endif
