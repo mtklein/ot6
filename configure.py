@@ -484,15 +484,18 @@ check("save_layout",
       ["tools/check_save_layout.py", "docs/design/save-layout.md",
        "ff6/src/battle/ot6_memory.inc",
        copy_if_changed_from("build/ot6.sfc")])
-# #305: no character's natural magic and no Esper grants a higher spell tier
-# (guidelines.md, "Stronger spells come from boosting, never from a list").
-# Reads the grant tables and Ot6FoldTbl out of the built ROM at the
-# addresses ff6-en.dbg records; the selftest puts one tier back in each table.
+# #305: the natural magic and the Esper spell lists are the planned ones
+# (kits.md, magicite.md, magicite-tube-six.md), and none grants a higher
+# spell tier (guidelines.md, "Stronger spells come from boosting, never from
+# a list").  Reads the grant tables and Ot6FoldTbl out of the built ROM at
+# the addresses ff6-en.dbg records; the selftest runs one mutant per rule.
 check("spell_grants",
       "python3 tools/check_spell_grants.py --selftest"
       " && python3 tools/check_spell_grants.py",
       ["tools/check_spell_grants.py", "ff6/src/battle/ot6_boost.asm",
        "ff6/include/const.inc", "ff6/src/text/genju_name_en.json",
+       "ff6/src/text/magic_name_en.json", "docs/design/kits.md",
+       "docs/design/magicite.md", "docs/design/magicite-tube-six.md",
        copy_if_changed_from("build/ot6.sfc")])
 # #292: the HUD's shield-count tiles are generated; the checked-in .inc must
 # be what the generator writes (counts 1-6 byte-identical to the old art is

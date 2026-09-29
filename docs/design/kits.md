@@ -40,7 +40,10 @@ the `$11` it writes is picked up by Leap's own vanilla availability test
 without extra code.
 
 Boost-tier folding means kits list **base spells only**: Fire is a
-kit entry, and Fire 2/3 are what boosting does to it.
+kit entry, and Fire 2/3 are what boosting does to it. Terra's and
+Celes's tables below are the natural magic the ROM ships ("join" is
+level 1): `tools/check_spell_grants.py` fails the build when
+`NaturalMagic` differs from them (#305).
 
 Physical chip classes are **slashing / piercing / bludgeoning /
 special ¤** (see weapon-classes.md). The weapon sets Fight's
@@ -342,23 +345,6 @@ lives on Terra, Fenix Downs, and Sraphim, and nowhere else.
 - **Trance keeps the divine slot** as her esper-state apex, usable
   only while an enemy is Broken.
 
-**What ships (#305).** The table above is the plan; the ROM still carries
-vanilla's 16-entry table at vanilla levels (`NaturalMagic`,
-`ff6/src/field/event.asm`), with one change: no entry is a higher tier
-(guidelines: "Stronger spells come from boosting, never from a list"). Her
-four tiers became other spells at the same level, because both learn loops
-walk all 16 slots and a slot cannot be left empty:
-
-| Level | Vanilla | Now | Why |
-|---|---|---|---|
-| 22 | Fire 2 | Regen | one boost of Fire casts Fire 2; the slot goes to her life side |
-| 33 | Cure 2 | Remedy | one boost of Cure casts Cure 2; Remedy is the cure line's status half |
-| 43 | Fire 3 | Flare | two boosts of Fire cast Fire 3; Flare is fire's no-element successor (vanilla gives it to Celes at 81) |
-| 49 | Life 2 | Float | one boost of Life casts Life 2; Float is her esper flight, and lifts its targets out of reach of earth attacks |
-
-`tools/check_spell_grants.py` (build check `spell_grants`) fails the build
-if any natural-magic slot or Esper names a tier.
-
 ### Locke — Thief (piercing: dagger)
 
 Story-verb learner. His kit covers more than repeated stealing: he
@@ -497,16 +483,6 @@ ice/order/tempo. The pairing is clearer here than in vanilla.
 | 6 | Safe | 22 (vanilla) |
 | 7 | Haste | 32 (vanilla) |
 | 8 | **RunicBlade** (divine, leaning) | Opera / Magitek factory (story) |
-
-**What ships (#305).** Her natural magic is vanilla's 16 entries at vanilla
-levels, less its three tiers, which became tempo and warding spells at the
-same level (see Terra's "What ships" for why no slot is left empty):
-
-| Level | Vanilla | Now | Why |
-|---|---|---|---|
-| 26 | Ice 2 | Slow | one boost of Ice casts Ice 2; Slow is tempo, Haste's partner (and boosts into Slow 2) |
-| 42 | Ice 3 | Stop | two boosts of Ice cast Ice 3; Stop is tempo |
-| 52 | Haste2 | Shell | one boost of Haste casts Haste2; Shell is warding, beside her Safe |
 
 - **Runic's absorb becomes MP and banks 1 BP** (`Ot6RunicBP`, ot6_boost.asm,
   hooked into vanilla's `RunicEffect`). Rulings, all covered by `battle_runic.lua`:

@@ -40,10 +40,12 @@
 -- through the menu as a player would):
 --   BASE  no esper equipped; leader's four stats and union recorded, union empty.
 --   RAMUH esper 0  stamina +4, mag.pwr +2; grants Bolt/Rasp.
---   SIREN esper 3  speed +4, mag.pwr +2; grants Sleep/Mute/Slow(base).
---   KIRIN esper 17 mag.pwr +4, stamina +2; grants Cure(base)/Regen/Antdot,
---                  and NOT Cure2 (dead pre-folded tier).
---   STRAY esper 8  mag.pwr +4, speed +2; grants Muddle/Imp/Float.
+--   SIREN esper 3  speed +4, mag.pwr +2; grants Mute/Sleep (magicite.md's
+--                  planned list), and not Slow or Fire.
+--   KIRIN esper 17 mag.pwr +4, stamina +2; grants Cure(base)/Regen (the
+--                  plan), and NOT Cure2 (a tier), Antdot or Scan.
+--   STRAY esper 8  mag.pwr +4, speed +2; grants Muddle/Imp (the plan), not
+--                  Float.
 --   IFRIT esper 1  vigor +6 (+12 doubled), stamina +4, mag.pwr -3; grants
 --                  Fire(base)/Drain, and not Fire2.
 --   SHIVA esper 2  mag.pwr +6, speed +4, vigor -3 (-6 doubled); grants
@@ -55,7 +57,7 @@ local STATE = "build/states/minecart_entry.mss.lua"
 local BOLT, RASP           = 0x02, 0x1a
 local SLEEP, MUTE, SLOW    = 0x1d, 0x1b, 0x19
 local MUDDLE, IMP, FLOAT   = 0x1e, 0x23, 0x22
-local CURE, CURE2, REGEN, ANTDOT = 0x2d, 0x2e, 0x34, 0x32
+local CURE, CURE2, REGEN, ANTDOT, SCAN = 0x2d, 0x2e, 0x34, 0x32, 0x18
 local FIRE, FIRE2, DRAIN   = 0x00, 0x05, 0x04
 local ICE, ICE2, OSMOSE, SHELL = 0x01, 0x06, 0x29, 0x25
 
@@ -329,7 +331,7 @@ local function checkEsper(tag, esper, deltas, grants, absents)
     end
     for _, a in ipairs(absents or {}) do
       H.assertEq(has(r.union, a[1]), false,
-        "[" .. tag .. "] " .. a[2] .. " NOT granted (fold-correct)")
+        "[" .. tag .. "] " .. a[2] .. " NOT granted")
     end
   end)
 end
@@ -344,19 +346,22 @@ add({ checkEsper("ramuh", RAMUH, { stam = 4, mag = 2 },
   { { BOLT, "Bolt" }, { RASP, "Rasp" } }) })
 add(driveSteps("siren", SIREN))
 add({ checkEsper("siren", SIREN, { spd = 4, mag = 2 },
-  { { SLEEP, "Sleep" }, { MUTE, "Mute" }, { SLOW, "Slow (base tier)" } }) })
+  { { SLEEP, "Sleep" }, { MUTE, "Mute" } },
+  { { SLOW, "Slow (not in the plan)" }, { FIRE, "Fire (not in the plan)" } }) })
 add(driveSteps("kirin", KIRIN))
 add({ checkEsper("kirin", KIRIN, { mag = 4, stam = 2 },
   { { CURE, "Cure (base tier -- PROOF here, no innate mage in the party)" },
-    { REGEN, "Regen" }, { ANTDOT, "Antidote" } },
-  { { CURE2, "Cure2 (pre-folded tier)" } }) })
+    { REGEN, "Regen" } },
+  { { CURE2, "Cure2 (a tier: boost Cure)" }, { ANTDOT, "Antdot (not in the plan)" },
+    { SCAN, "Scan (not in the plan)" } }) })
 add(driveSteps("stray", STRAY))
 add({ checkEsper("stray", STRAY, { mag = 4, spd = 2 },
-  { { MUDDLE, "Muddle" }, { IMP, "Imp" }, { FLOAT, "Float" } }) })
+  { { MUDDLE, "Muddle" }, { IMP, "Imp" } },
+  { { FLOAT, "Float (not in the plan)" } }) })
 add(driveSteps("ifrit", IFRIT))
 add({ checkEsper("ifrit", IFRIT, { vig = 12, stam = 4, mag = -3 },
   { { FIRE, "Fire (base tier -- PROOF here)" }, { DRAIN, "Drain" } },
-  { { FIRE2, "Fire2 (pre-folded tier)" } }) })
+  { { FIRE2, "Fire2 (a tier: boost Fire)" } }) })
 add(driveSteps("shiva", SHIVA))
 add({ checkEsper("shiva", SHIVA, { mag = 6, spd = 4, vig = -6 },
   { { ICE, "Ice (base tier)" }, { OSMOSE, "Osmose" }, { SHELL, "Shell" } },

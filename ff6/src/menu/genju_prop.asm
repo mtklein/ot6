@@ -68,9 +68,13 @@ GenjuProp:
 ;
 ; Ramuh (esper 0) carries base-tier Bolt (folds to Bolt2/Bolt3 under boost via
 ; Ot6FoldTbl, ot6.asm) plus Rasp (an MP attack, in no fold family so it
-; correctly never folds).  The other espers keep their vanilla spell-ids
-; (rates zeroed, bonuses stripped).  An esper's summon (Cmd_19,
-; battle_main.asm:3703) is not in this table, and is untouched.
+; correctly never folds).  Every World of Balance stone grants its planned
+; list: docs/design/magicite.md's roster table, with magicite-ifrit-shiva.md
+; for Ifrit and Shiva and magicite-tube-six.md for the tube room's six.  The
+; World of Ruin stones have no planned list and keep their vanilla spells,
+; less any higher tier (#305; tools/check_spell_grants.py checks both).  An
+; esper's summon (Cmd_19, battle_main.asm:3703) is not in this table, and is
+; untouched.
 ; ------------------------------------------------------------------------------
 
 ; 0: ramuh: base-tier Bolt (folds) + Rasp (MP attack)
@@ -95,8 +99,9 @@ make_genju_prop {FIRE, 0}, {DRAIN, 0}, {}, {}, {}
 ;   nothing to multiply.
 make_genju_prop {ICE, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
 
-; 3: siren
-make_genju_prop {SLEEP, 0}, {MUTE, 0}, {SLOW, 0}, {FIRE, 0}, {}
+; 3: siren.  Mute, Sleep: the planned list (docs/design/magicite.md's WoB roster table, "the
+;   controller job").  Vanilla's Slow and the leftover Fire are not in it.
+make_genju_prop {MUTE, 0}, {SLEEP, 0}, {}, {}, {}
 
 ; 4: terrato
 make_genju_prop {QUAKE, 0}, {QUARTR, 0}, {W_WIND, 0}, {}, {}
@@ -120,20 +125,19 @@ make_genju_prop {FIRE, 0}, {ICE, 0}, {BOLT, 0}, {}, {}
 ;   anyone can wear.
 make_genju_prop {HASTE, 0}, {SLOW, 0}, {}, {}, {}
 
-; 8: stray
-make_genju_prop {MUDDLE, 0}, {IMP, 0}, {FLOAT, 0}, {}, {}
+; 8: stray.  Muddle, Imp: the planned list (docs/design/magicite.md's WoB roster table, "the
+;   trickster job").  Vanilla's Float is not in it.
+make_genju_prop {MUDDLE, 0}, {IMP, 0}, {}, {}, {}
 
-; 9: palidor.  Haste, Slow, Float.  The vanilla HASTE2 and SLOW_2 grants are
-;   dropped (#305): they are the tiers of Haste and Slow (Ot6FoldTbl), which
-;   one boost of the Haste and Slow this stone already grants reaches.  Three
-;   base spells is a stone's size (magicite.md), so nothing replaces them.
+; 9: palidor.  No planned list exists (the magicite docs cover the World of
+;   Balance).  The vanilla row less its tiers (#305): Haste2 and Slow 2 are
+;   what one boost of the Haste and Slow it grants casts, so they go and
+;   nothing replaces them.
 make_genju_prop {HASTE, 0}, {SLOW, 0}, {FLOAT, 0}, {}, {}
 
-; 10: tritoch.  The vanilla FIRE_3/ICE_3/BOLT_3 become their family heads
-;   (#305): two boosts of Fire, Ice or Bolt cast the third tier, so the stone
-;   keeps its three-element kit and reaches the same spells.  This is
-;   Maduin's list; one copy of each stone exists, so it is a second pure-mage
-;   stone for a second character.
+; 10: tritoch.  No planned list exists.  The vanilla FIRE_3/ICE_3/BOLT_3,
+;   each replaced by its family head (#305): two boosts of Fire, Ice or Bolt
+;   cast the third tier.
 make_genju_prop {FIRE, 0}, {ICE, 0}, {BOLT, 0}, {}, {}
 
 ; 11: odin
@@ -154,16 +158,14 @@ make_genju_prop {MERTON, 0}, {METEOR, 0}, {}, {}, {}
 ; 16: ragnarok
 make_genju_prop {ULTIMA, 0}, {}, {}, {}, {}
 
-; 17: kirin, healer kit.  CURE is base-tier: it folds to Cure2/Cure3 under
-;   boost via Ot6FoldTbl (ot6.asm), so the vanilla pre-folded CURE_2 grant is
-;   dropped -- it would otherwise sit as an un-foldable dead tier beside the
-;   foldable Cure.  Regen/Antdot/Scan are in no fold family, so they are
-;   already correct as-is.
-make_genju_prop {CURE, 0}, {REGEN, 0}, {ANTDOT, 0}, {SCAN, 0}, {}
+; 17: kirin.  Cure, Regen: the planned list (docs/design/magicite.md's WoB roster table, "the
+;   medic job").  Cure folds to Cure 2/Cure 3 under boost (Ot6FoldTbl).
+;   Vanilla's Antdot and Scan are not in it.
+make_genju_prop {CURE, 0}, {REGEN, 0}, {}, {}, {}
 
-; 18: zoneseek (optional, Jidoor Auction House).  Rasp, Osmose, and Shell: no
-;   fold family touches these three, so all three stand as-is.
-make_genju_prop {RASP, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
+; 18: zoneseek (optional, Jidoor Auction House).  Shell, Haste: the planned
+;   list (docs/design/magicite.md's WoB roster table, "the abjurer").
+make_genju_prop {SHELL, 0}, {HASTE, 0}, {}, {}, {}
 
 ; 19: carbunkl.  Rflect (nobody else grants it) + Safe.  WARP is field
 ;   furniture, so it is not granted here.
@@ -173,17 +175,17 @@ make_genju_prop {RFLECT, 0}, {SAFE, 0}, {}, {}, {}
 ;   player control.
 make_genju_prop {VANISH, 0}, {DEMI, 0}, {}, {}, {}
 
-; 21: sraphim (optional, the man in the woods near Tzen).  LIFE folds to
-;   Life 2 under boost (Ot6FoldTbl), and CURE folds to Cure 2/Cure 3, so the
-;   vanilla pre-folded CURE_2 grant is dropped as a dead un-foldable tier; the
-;   foldable CURE covers every tier.
-make_genju_prop {LIFE, 0}, {CURE, 0}, {REGEN, 0}, {REMEDY, 0}, {}
+; 21: sraphim (optional, the man in the woods near Tzen).  Cure, Life: the
+;   planned list (docs/design/magicite.md's WoB roster table, "the white-mage job").  Both fold
+;   under boost (Cure 2/Cure 3, Life 2).
+make_genju_prop {CURE, 0}, {LIFE, 0}, {}, {}, {}
 
-; 22: golem (optional, Jidoor Auction House).  Its summon still raises the
-;   Earth Wall that soaks physical hits for the party (battle_main $3a81,
-;   preserved).  Safe + Stop.  The pre-folded CURE_2 is dropped -- a dead
-;   un-foldable tier.
-make_genju_prop {SAFE, 0}, {STOP, 0}, {}, {}, {}
+; 22: golem (optional, Jidoor Auction House).  The planned list is "Safe,
+;   Protect-alike" (docs/design/magicite.md's WoB roster table, "the wall job").  FF6 has
+;   no Protect spell beyond Safe itself, so only Safe is granted; the summon
+;   still raises the Earth Wall that soaks physical hits for the party
+;   (battle_main $3a81, preserved).
+make_genju_prop {SAFE, 0}, {}, {}, {}, {}
 
 ; 23: unicorn.  Pearl (its vanilla 40 MP keeps it a decision rather than the
 ;   default swing) + Remedy.  CURE_2 dropped (dead pre-folded tier).
@@ -192,16 +194,14 @@ make_genju_prop {PEARL, 0}, {REMEDY, 0}, {}, {}, {}
 ; 24: fenrir
 make_genju_prop {WARP, 0}, {X_ZONE, 0}, {STOP, 0}, {}, {}
 
-; 25: starlet.  Cure, Regen, Remedy.  CURE_2 and CURE_3 are dropped (#305):
-;   one and two boosts of the Cure this stone grants cast them.  The healer
-;   kit keeps its three kinds of care (at once, over time, status).
+; 25: starlet.  No planned list exists.  The vanilla row less its tiers
+;   (#305): Cure 2 and Cure 3 are what boosting the Cure it grants casts.
 make_genju_prop {CURE, 0}, {REGEN, 0}, {REMEDY, 0}, {}, {}
 
-; 26: phoenix.  Life, Life 3, Cure, Fire (#305).  LIFE_2 is dropped: one
-;   boost of Life casts it.  CURE_3 and FIRE_3 become their family heads,
-;   Cure and Fire, which two boosts turn back into Cure 3 and Fire 3.  Life 3
-;   stays: it is no tier (Ot6FoldTbl caps the life family at Life 2, so no
-;   boost reaches it), and it is the firebird's own spell.
+; 26: phoenix.  No planned list exists.  The vanilla row with its tiers
+;   removed (#305): Life 2 goes (boosting the Life it grants casts it), and
+;   Cure 3 and Fire 3 are replaced by their family heads.  Life 3 is no tier:
+;   Ot6FoldTbl stops the life family at Life 2.
 make_genju_prop {LIFE, 0}, {LIFE_3, 0}, {CURE, 0}, {FIRE, 0}, {}
 
 ; ------------------------------------------------------------------------------

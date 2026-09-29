@@ -419,11 +419,10 @@ the chip passive, goes into §12; the water identity stays on the divine.
 **Life is removed** from the vanilla row, restoring kits.md's revival rule
 (§1). Fire/Ice/Bolt are removed as Maduin's job.
 
-**The Slow collision.** Siren also grants Slow
-(`genju_prop.asm:119`), and Shiva's Diamond Dust carries a Slow rider. The
-differentiation is real, since Bismark folds Slow to all-enemies at 1 BP and
-pairs it with Haste while Siren's is one of three single-target control
-spells.
+**The Slow collision.** Siren used to grant Slow too; since #305 she
+grants magicite.md's planned Mute and Sleep only. Shiva's Diamond Dust
+still carries a Slow rider, and Bismark's Slow differs from it: it folds to
+all-enemies at 1 BP and pairs with Haste.
 
 **Stat.** +5 vigor, +3 stamina, −2 speed: high mass and low speed.
 On the cave party it gives Edgar, Sabin or Locke a second body stone, so Ifrit

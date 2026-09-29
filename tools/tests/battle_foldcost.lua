@@ -126,8 +126,8 @@ H.run({ maxFrames = 20000 }, {
     foldTbl      = romOfs(H.sym("Ot6FoldTbl"))
 
     -- check the helpers return real values before anything depends on them
-    H.assertEq(learnLevel(CHAR_TERRA, 0x00), 3,
-      "NaturalMagic says Terra learns Fire at 3")
+    H.assertEq(learnLevel(CHAR_TERRA, 0x00), 1,
+      "NaturalMagic says Terra learns Fire at 1 (join, kits.md)")
     H.assertEq(learnLevel(CHAR_TERRA, 0x30), 18,
       "...and Life at 18 (a later row, so the reader walks the table)")
     H.assertEq(learnLevel(CHAR_CELES, 0x01), 1,

@@ -1244,49 +1244,44 @@ BlitzLevelTbl:
 ; ec/e3c0
 NaturalMagic:
 
-; OT6 (#305): no entry grants a higher tier.  Fire 2/3, Ice 2/3, Cure 2 and
-; the rest (Ot6FoldTbl, battle/ot6_boost.asm) are what boosting the base
-; spell casts, so each vanilla tier here became another spell that fits the
-; kit (docs/design/kits.md), at the same level.  Every slot holds a real
-; spell: both learn loops walk all 16 pairs and index the learned table with
-; the spell byte, so a hole ($ff) would write past the character's table.
-; tools/check_spell_grants.py fails the build on a tier here.
+; OT6: the planned kits, exactly (docs/design/kits.md, Terra's and Celes's
+; tables), not vanilla's 16-spell lists.  Stronger tiers are never listed
+; (guidelines: "Stronger spells come from boosting, never from a list"):
+; boosting Fire casts Fire 2 and Fire 3.  "join" is level 1, so the spell is
+; known at whatever level she joins.  The kit's story entries (Terra's
+; Trance, Celes's Runic and RunicBlade) are not spells and are not here.
+;
+; Each list is 16 [spell, level] pairs.  The unused pairs are NATURAL_NONE
+; ($ff, $ff): no level reaches $ff (the cap is 99), so neither learn loop
+; ever takes one -- UpdateAbilities stops at the first pair above the
+; current level, and LearnAbilities takes only a pair whose level equals the
+; new one.  That is also why the real pairs must come first, in level order.
+; tools/check_spell_grants.py checks the built table against the doc.
+
+.define NATURAL_NONE $ff, $ff
 
 ; terra
-        .byte ATTACK::CURE, 1
-        .byte ATTACK::FIRE, 3
-        .byte ATTACK::ANTDOT, 6
+        .byte ATTACK::FIRE, 1           ; join
+        .byte ATTACK::CURE, 1           ; join
         .byte ATTACK::DRAIN, 12
         .byte ATTACK::LIFE, 18
-        .byte ATTACK::REGEN, 22         ; was FIRE_2: healing, her life side
-        .byte ATTACK::WARP, 26
-        .byte ATTACK::REMEDY, 33        ; was CURE_2: the cure line's status half
-        .byte ATTACK::DISPEL, 37
-        .byte ATTACK::FLARE, 43         ; was FIRE_3: fire's no-element successor
-        .byte ATTACK::FLOAT, 49         ; was LIFE_2: esper flight, earth-proof
-        .byte ATTACK::PEARL, 57
-        .byte ATTACK::BREAK, 68
-        .byte ATTACK::QUARTR, 75
-        .byte ATTACK::MERTON, 86
-        .byte ATTACK::ULTIMA, 99
+        .byte ATTACK::BREAK, 24
+        .byte ATTACK::PEARL, 30
+        .byte ATTACK::MERTON, 33
+.repeat 9
+        .byte NATURAL_NONE
+.endrep
 
 ; celes
-        .byte ATTACK::ICE, 1
+        .byte ATTACK::ICE, 1            ; join
         .byte ATTACK::CURE, 4
-        .byte ATTACK::ANTDOT, 8
         .byte ATTACK::IMP, 13
         .byte ATTACK::SCAN, 18
         .byte ATTACK::SAFE, 22
-        .byte ATTACK::SLOW, 26          ; was ICE_2: tempo, Haste's partner
         .byte ATTACK::HASTE, 32
-        .byte ATTACK::BSERK, 40
-        .byte ATTACK::MUDDLE, 32
-        .byte ATTACK::STOP, 42          ; was ICE_3: tempo
-        .byte ATTACK::VANISH, 48
-        .byte ATTACK::SHELL, 52         ; was HASTE2: warding, beside Safe
-        .byte ATTACK::PEARL, 72
-        .byte ATTACK::FLARE, 81
-        .byte ATTACK::METEOR, 98
+.repeat 10
+        .byte NATURAL_NONE
+.endrep
 
 .popseg
 

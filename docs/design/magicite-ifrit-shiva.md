@@ -73,9 +73,9 @@ What that party already brings:
 | need | who covers it today |
 |---|---|
 | ice | **Celes**, innate at join (kits.md, vanilla natural magic) |
-| fire | **Sabin**'s Fire Dance (blitz #4, L15, 9 MP — kits.md); **Siren** currently grants base Fire as a leftover vanilla row (`genju_prop.asm:95-96`) |
+| fire | **Sabin**'s Fire Dance (blitz #4, L15, 9 MP — kits.md) |
 | bolt | **Ramuh** (Bolt + Rasp, `genju_prop.asm:82-83`) |
-| heal | **Kirin** (Cure/Regen/Antdot/Scan, `genju_prop.asm:138`) |
+| heal | **Kirin** (Cure/Regen, `genju_prop.asm`; Antdot and Scan were dropped for magicite.md's planned list, #305) |
 | pierce chip | Locke, Edgar (AutoCrossbow, whole side) |
 | slash chip | Celes, Cyan (Quadra Slam ×4), Sabin-with-claws |
 | **MP sustain** | **nobody** |
@@ -372,7 +372,7 @@ priced Osmose at 1 MP in a game where only some characters spent MP at all;
 under OT6 every verb costs MP, and a 1-MP full refill would remove MP as a
 constraint altogether. 8 MP keeps the spell net-positive (still a refill),
 keeps it castable on a nearly empty pool, and stops it from being free. The
-change is one byte and applies globally, so ZoneSeek inherits it.
+change is one byte and applies globally, to every caster of Osmose.
 
 **A harness note for anyone measuring a spell here.** `LoadMagicProp` fills one
 shared property buffer (`$11a0..$11ad`), so on the generated Magitek intro
