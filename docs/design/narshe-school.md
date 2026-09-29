@@ -67,7 +67,7 @@ the Empire's plates), which players could not follow.
 | Shields, half damage while shielded, breaking (can't act, ×2 damage), recovery | $0267 | middle (106) |
 | Weaknesses: '?' cells, elements and weapon types, the Magic list's element icons and the weapon icons, the codex | $0264 | middle (106) |
 | Boost Points: 1 at the start, +1 a turn, cap 5; R adds (up to 3), L takes back; no point on a boosted turn | $026D | left (105) |
-| What a boost buys: Fight's extra hits (free); ×2/×4/×8 damage on other skills; MP ×2.5 a point, capped at 99 | $0270 | left (105) |
+| What a boost buys: Fight's extra hits (free); ×2/×4/×8 damage on other skills, Dance included; MP ×2.5 a point, capped at 99 and never below the unboosted price | $0270 | left (105) |
 | Stronger spells: Fire → Fire 2 → Fire 3 and the other families, at the cast spell's MP; the Magic list previews | $026E | left (105) |
 | Skills that changed: MP on Blitz/Tools/SwdTech/Steal/Dance/Rage; SwdTech rows; Steal/Slot/Rage odds (Steal and Rage certain at 3); Shadow's break kill | $0276 | left (105), far corner |
 | Runic earns a Boost Point | $026F page 1 | left (105) |
@@ -161,11 +161,11 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Boosting a Blitz, Tool, Lore, Esper or most spells does 2x damage for 1 point, 4x for 2, and 8x for 3.
+> Boosting a Blitz, Tool, Dance, Lore, Esper or most spells does 2x damage for 1 point, 4x for 2, and 8x for 3.
 >
 > *(next box)*
 >
-> Those cost more MP when boosted: 2.5x per point, but never over 99.
+> Those cost more MP when boosted: 2.5x per point, never over 99, and never less than unboosted.
 
 **$026E — stronger spells from a boost (left room):**
 
@@ -250,10 +250,12 @@ Every claim was checked against the code (2026-09-28):
   past the bank, L lowers it (`ot6_hud.asm`, the boost input handler).
 - What a boost buys: Fight/Capture swings (`Ot6FightBoost`); ×2/×4/×8
   on every other damage verb outside the gate list (`Ot6BoostDmg`); the
-  MP price `min(99, round(base × 2.5^boost))` on exactly those
-  (`Ot6BoostPriceFor`, [mp-economy.md](mp-economy.md)). Dance is left
-  out of $0270's list on purpose: only the dance's first step carries
-  the boost (the pending boost clears at that turn's end).
+  MP price `max(base, min(99, round(base × 2.5^boost)))` on exactly
+  those (`Ot6BoostPriceFor`, [mp-economy.md](mp-economy.md)): capped at
+  99, and a spell already dearer than 99 (Phoenix, 110) keeps its price.
+  Dance is in $0270's list because a boosted Dance multiplies every step
+  of that dance (#294, wt/battle-fixes-023; this line and the $0270 text
+  assume that branch has landed).
 - Stronger spells: `Ot6FoldTbl` (Fire, Ice, Bolt, Poison, Cure, Life,
   Slow, Haste), `Ot6FoldSteps` clamps a boost of 3 to two tiers, the
   cast tier's own MP (`Ot6QueueFold` → `Ot6SpellMP`), and the Magic
