@@ -14,168 +14,160 @@ evidence); this file does not restate it.
 
 The harness plays OT6 the way a competent person with a controller would.
 
-- **Fight, don't flee.** Flee only where the game forces it. Win with
-  levels, gear, kill order and abilities. Inside a timed scene with a
-  visible clock, run from a random battle when the time left can't cover
-  another fight (owner, 2026-09-28). Fleeing compounds: skipped fights
-  are skipped XP, and the debt surfaces at a later, harder fight. Grinding
-  is normal play; "the party is too low for this" is an acceptable finding,
-  and the answer is healthy levels (not minimal ones) at each key point.
-- **Every area a player might reach is played and balanced**, not only the
-  story route: optional characters, areas and sidequests, as much of the
-  Colosseum as can be reached, and all eight dragons.
-- **Competence across the whole route.** Every segment of the reworked game
-  is played confidently and capably; a segment the party can't reliably
-  win on the first attempt gets a lab until it can.
-- **A lost battle is normal.** A person who wipes reloads the save and goes
-  again. A segment retries from its boot checkpoint on a wipe, bounded and
-  counted, with the seed, the cause and every member's boost at death
-  logged. One loss is a line in the retry inventory. Repeated losses, or a
-  loss rate above the band, are a lab. Retry machinery engineered to re-roll
-  a fight until it passes is not play.
+- **Fight rather than flee.** Win with levels, gear, kill order and
+  abilities; flee where the game calls for it, such as a random battle
+  inside a timed scene when the visible clock can't cover another fight.
+  Skipped fights are skipped XP, and the debt tends to surface at a later,
+  harder fight. Grinding is normal play; "the party is too low for this" is
+  a fine finding, and the answer is usually healthy levels at key points.
+- **Play the whole game a player might reach**, not just the story route:
+  optional characters, areas and sidequests, as much of the Colosseum as is
+  practical, and the eight dragons.
+- **Aim for competence across the route.** Segments should be played
+  confidently; one the party can't usually win on the first attempt is a
+  good candidate for a lab.
+- **A lost battle is normal.** A person who wipes reloads and goes again.
+  Segments can retry from their boot checkpoint on a wipe, bounded and
+  counted, with the seed, cause and boosts at death logged. A loss here and
+  there is just a line in the retry inventory; repeated losses suggest a
+  lab. Retry machinery built to re-roll a fight until it passes isn't play.
 - **Spend like a person watching their gil.** Choices between supplies
-  (a Tent or Potions, which item heals) are priced in gil from what the bag
-  would actually spend, not from fixed thresholds.
-- **Only a loss is a loss, and a win is a win.** A fight won some other
-  way than planned (the boss killed before its break, a mechanic never
-  exercised) passes and is logged as a tuning note to circle back to; it is
-  never counted as a failure. Re-running it across draws to learn how often
-  it happens is good: one fight in five and four in five call for very
-  different decisions.
-- **Classify every wipe by boost at death.** An early one-shot means the
-  party is under-levelled (a level/kit finding). A wipe with pips still
-  banked means the abilities were not used fully (a driver/policy finding).
-  A member one round from death with boost banked spends it now.
-- **Heal outside battles.** Field care after every resolved battle, with
-  Tonics (stock about 99; where no shop sells Tonics, Potions, sized to the
-  field care the following legs actually spend). Automatic care uses items,
-  not MP; a deliberate pre-boss stop may cast first, since level-ups
-  restore MP. Timed scenes are exempt: no menus inside a live event timer.
-- **Turns are the scarce resource in combat.** Heal in battle with Potions,
-  not Tonics. Use the strong form of an effect once (a boosted Cure2/Cure3 on
-  the whole party) instead of several weak single-target turns. One care
-  action per round; ending the fight is the strongest heal. Needing much
-  healing in combat is a signal to level up or re-gear, not to budget more
-  heal turns.
-- **Supply band.** Carry about level × 5 Tonics and about level Fenix Downs
-  (caps 99 and about 20), and about level × 1.5 Potions before a boss
-  gauntlet. Below the band, detour to a town; every town stop tops up, buys
-  the scarcest item last, and puts the combat items at the top of the bag.
-- **Fenix Downs are a signal.** More than one or two in a hard fight, or any
-  in a random battle, points to under-levelling or a fight that needs a
-  strategy lab. A rare single death to a vanilla mechanic is fine; a lab is
-  for frequent deaths, wipes, or heavy Fenix use.
-- **Boost-Fight through random battles** by default: unbroken enemies take
-  about half damage and everyone starts with one pip, so a one-pip boosted
-  Fight restores vanilla pace. Break and boost are levers: no "never boost
-  the shield strip", no "never nuke before the break". Try the options and
-  measure.
+  (a Tent or Potions, which item heals) are best priced in gil from what the
+  bag would actually spend, rather than fixed thresholds.
+- **A win is a win and a loss is a loss.** A fight won some other way than
+  planned (the boss killed before its break, a mechanic not exercised)
+  counts as a win, with a tuning note to circle back to. Re-running it
+  across draws to learn how often that happens is useful: one fight in five
+  and four in five call for different decisions.
+- **Classify wipes by boost at death.** An early one-shot usually means the
+  party is under-levelled; a wipe with pips still banked suggests the
+  abilities weren't used fully. A member one round from death with boost
+  banked would do well to spend it.
+- **Heal outside battles** as the default: field care after battles, with
+  Tonics (stock about 99; where no shop sells Tonics, Potions sized to what
+  the following legs spend). Automatic care leans on items rather than MP;
+  a deliberate pre-boss stop may cast, since level-ups restore MP. Timed
+  scenes are the exception: no menus inside a live event timer.
+- **Turns are the scarce resource in combat.** Heal in battle with Potions
+  rather than Tonics, and prefer one strong effect (a boosted Cure on the
+  whole party) over several weak turns. About one care action per round;
+  ending the fight is often the strongest heal. Needing lots of healing in
+  combat is a hint to level up or re-gear.
+- **Supply band, roughly:** about level × 5 Tonics and about level Fenix
+  Downs (caps near 99 and 20), and about level × 1.5 Potions before a boss
+  gauntlet. Below the band, a detour to town makes sense; a town stop tops
+  up and buys the scarcest item last.
+- **Fenix Downs are a signal.** More than one or two in a hard fight, or
+  several in random battles, points to under-levelling or a fight worth a
+  lab. An occasional death to a vanilla mechanic is fine.
+- **Boost-Fight through random battles** is a good default: unbroken enemies
+  take about half damage and everyone starts with one pip, so a one-pip
+  boosted Fight restores vanilla pace. Break and boost are levers; try the
+  options and measure.
 - **Relics matter**, the Genji Glove especially: a pair doubles the hits
-  that land on a boosted Fight, so it stays on the main boost-Fighter.
-  Readiness-audit flags (an empty relic slot with a spare in the bag, a
-  second weapon on offer) are action items.
-- **Every command gets used.** A menu the driver doesn't know is a verb
-  left on the table (Throw, Rage, Slot, Dance, Sketch, Morph...): implement
-  it, measuring the menu on a fixture first.
+  that land on a boosted Fight, so it usually belongs on the main
+  boost-Fighter. Readiness-audit flags (an empty relic slot with a spare in
+  the bag, a better weapon on offer) are worth acting on.
+- **Use the commands the game offers.** A menu the driver doesn't know is a
+  verb left on the table (Throw, Rage, Slot, Dance, Sketch, Morph...):
+  implement it, measuring the menu on a fixture first.
 
 ## Designing the game
 
 - **Boost pays once.** One action's boost buys one payoff. Fight and
-  Capture: extra swings, and a weapon's own on-hit spell is not also
-  multiplied. Tier spells: the tier. Rage: the special's likelihood. Slot,
-  Steal, Bushido: their own ladders. Everything else: the damage
-  multiplier. Boost never costs pips while buying nothing.
-- **Design break data for every encounter.** Each species the route meets
-  gets an authored shield row (shield count and break classes), designed
-  from its body, its vanilla elements and the party that meets it there, so
-  the party holds a key and the area teaches something. The generated floor
-  is a safety net against keyless formations, not a design. Each area gets a
-  design doc in the shape of
+  Capture: extra swings (a weapon's own on-hit spell isn't also multiplied).
+  Tier spells: the tier. Rage: the special's likelihood. Slot, Steal,
+  Bushido: their own ladders. Everything else: the damage multiplier. A
+  boost that costs pips and buys nothing is a bug to fix.
+- **Design break data for the encounters players meet.** Each species gets
+  an authored shield row (shield count and break classes), designed from its
+  body, its vanilla elements and the party that meets it there, so the party
+  holds a key and the area teaches something. The generated floor is a
+  safety net, not a design. Each area gets a design doc like
   [break-coverage-gate.md](design/break-coverage-gate.md) and a suite that
-  verifies the rows from the built ROM; the tuning claim in
-  `tools/audit_break_coverage.py` grows only by play.
-- **Don't retune vanilla enemies** (AI scripts, spells, one-shots) to dodge
-  a hard fight. OT6 changes battle systems, not individual enemy quirks;
-  answer a hard fight with levels, gear, route or strategy.
+  checks the rows in the built ROM; `tools/audit_break_coverage.py`'s tuning
+  claim grows by play.
+- **Prefer not to retune vanilla enemies** (AI scripts, spells, one-shots)
+  to dodge a hard fight. OT6 changes battle systems more than individual
+  enemy quirks; a hard fight is usually answered with levels, gear, route or
+  strategy.
 - **Teach OT6 plainly, out of character.** In-game teaching (the Narshe
-  school) explains what is new relative to vanilla FF6, in terms that make
-  sense to the player: break the fourth wall, no need to stay in-universe,
-  no mystery or coyness. Each key OT6 mechanic is explained once and only
-  once.
-- **Stronger spells come from boosting, never from a list.** No
-  character's natural magic and no Esper grants a higher tier (Fire 2,
-  Fire 3, ...); boosting the base spell is how a player reaches them, and
-  the rebalances assume that.
-- **Mimic is free.** A mimic copies the action, never the price, at any
-  boost; the boost buys what it buys on the copied action.
+  school) explains what's new relative to vanilla FF6 in terms that make
+  sense to the player: breaking the fourth wall is fine, and mystery or
+  coyness doesn't help. Explaining each key mechanic once keeps it clear.
+- **Stronger spells come from boosting.** Characters' natural magic and
+  Espers grant base spells; boosting is how a player reaches Fire 2, Fire 3
+  and the rest, and the rebalances assume that.
+- **Mimic is free.** A mimic copies the action, not the price; a boost buys
+  what it buys on the copied action.
 - **Octopath-style twists on FF6 characters are welcome** (Shadow's break
   that kills). Shadow stays in the party the whole game.
 - **The World of Balance / World of Ruin split is a storytelling boundary,
-  not a technical one.** What the World of Ruin teaches (driver
-  mechanics, kill orders, design fixes) is welcome in the World of Balance
-  too; measure it there and say that it applies there.
+  not a technical one.** What the World of Ruin teaches (driver mechanics,
+  kill orders, design fixes) is welcome in the World of Balance too; measure
+  it there and say that it applies.
 - **MP tension is the target.** Having to choose between spending MP on
   abilities in random fights and saving it for the boss means the
   difficulty is balanced well; keep that choice alive when tuning.
-- **Save compatibility becomes a contract at v1.0.** While releases are
-  v0.x, keeping older saves loading ([save-layout.md](design/save-layout.md))
-  is nice but never a constraint: don't bend a change or add workarounds
-  for old saves; design for what is current (owner, 2026-09-29). A release
-  is promoted to v1.0 retroactively once it is fun and solid enough to keep
-  that promise for a long future.
-- **Priorities:** release reliability, then labs on fights won by
-  attrition or a coin flip (a measured success rate, not a selected win),
-  then fun and the Octopath feel. Take the highest of these with a
-  checkable unit ready. Quality over time: there are no deadlines; never
-  trim a protocol, skip a control or dodge a regeneration because it is
-  slow.
+- **Save compatibility becomes a promise at v1.0.** While releases are v0.x,
+  keeping older saves loading ([save-layout.md](design/save-layout.md)) is
+  nice to have, not a constraint; design for what is current rather than
+  adding workarounds for old saves. A release is promoted to v1.0
+  retroactively once it is fun and solid enough to keep that promise.
+- **Priorities, roughly:** release reliability, then labs on fights won by
+  attrition or a coin flip (a measured success rate rather than a selected
+  win), then fun and the Octopath feel. Quality over time: there are no
+  deadlines, and slow protocols, controls or regenerations are worth their
+  time.
 
 ## Testing and debugging
 
-- **Handle any encounter.** A test, generator or driver is correct only if
-  it copes with every encounter, formation and draw the game can deal at
-  that point, not the one its fixture happens to draw. Every ROM change
-  regenerates the fixture chain and reshuffles encounters and history; that
-  is routine, and fixing what it exposes is routine work. Details and the
-  evidence bar for test changes are in [TESTING.md](TESTING.md).
-- **Shifting randomness is never a blocker.** Any route change reshuffles
-  every later encounter. A segment retries from its boot snapshot on a
-  draw-dependent failure, counted and logged; sweep segments across draws
-  to find brittleness first, and fix each failure class at its root.
+- **Handle the encounters the game can deal.** A test, generator or driver
+  should cope with the encounters, formations and draws the game can deal at
+  that point, not just the one its fixture happened to draw. ROM changes
+  regenerate the fixture chain and reshuffle encounters; fixing what that
+  exposes is routine work. The evidence bar for test changes is in
+  [TESTING.md](TESTING.md).
+- **Shifting randomness isn't a blocker.** Route changes reshuffle later
+  encounters. Segments can retry from their boot snapshot on a
+  draw-dependent failure, counted and logged; sweeping across draws finds
+  brittleness early, and fixing a failure class at its root pays off.
 - **Luck standing in for a precondition** is the most common defect class.
-  When a suite goes red after an unrelated change, suspect the suite, but
-  prove it. Fix by reaching the precondition and asserting it; never by
-  widening a timeout, re-rolling a seed, or weakening an assertion.
-- **A regression ships with its test**: red on the regressed build, green
-  after. No tests of the test tooling; fix tooling defects directly.
-- **Look at the screen.** Scripts watch what they are doing and fail fast
-  with the failure frame; read the frame and the log before theorizing.
-- **No foreseeable surprises.** FF6's mechanics are finite and documented
-  (battle arrangements, statuses, specials, menus, vehicles). Keep
-  [mechanics-coverage.md](design/mechanics-coverage.md) current; when one
-  member of a class shows up unhandled, enumerate the whole class. An
-  unknown menu firing is a missing verb to implement.
-- **Never conclude "impossible"** or that the ROM "diverged" from a static
-  model or a partial trace. Check the source's history, trace the event
-  scripts and gates, and drive it in the emulator.
+  When a suite goes red after an unrelated change, suspect the suite, then
+  prove it. The good fix reaches the precondition and asserts it, rather
+  than widening a timeout, re-rolling a seed, or weakening an assertion.
+- **A regression ships with its test** where practical: red on the
+  regressed build, green after. Tooling defects are simplest to fix
+  directly, without tests of the test tooling.
+- **Look at the screen.** Scripts watch what they're doing and fail fast
+  with the failure frame; reading the frame and the log beats theorizing.
+- **Few foreseeable surprises.** FF6's mechanics are finite and documented
+  (battle arrangements, statuses, specials, menus, vehicles). Keeping
+  [mechanics-coverage.md](design/mechanics-coverage.md) current helps; when
+  one member of a class shows up unhandled, enumerate the class. An unknown
+  menu firing is a missing verb.
+- **Be slow to conclude "impossible"** or that the ROM "diverged" from a
+  static model or a partial trace. Check the source's history, trace the
+  event scripts and gates, and drive it in the emulator.
 - **Take observations literally; measure before theorizing.**
 
 ## Releases and the repository
 
-- **The release bar** is one fluid, honest playthrough of the supported
-  route with few game-overs. Every retry site in the qualification run is a
-  lab candidate, and every save point along it gets a checkpoint.
-- **Release notes are for players**: what you will notice, why to update,
-  what to watch for, in play terms. No map numbers, addresses, harness or
-  test names, and nothing about what was meant to happen but didn't.
+- **The release bar** is a fluid, honest playthrough of the supported route
+  with few game-overs. Retry sites in the qualification run are lab
+  candidates, and save points along it make good checkpoints.
+- **Release notes are for players**: what you'll notice, why to update,
+  what to watch for, in play terms. Map numbers, addresses, harness and
+  test names don't belong there, nor does what was meant to happen but
+  didn't.
 - **No-op releases are welcome** as progress and cadence markers; their
   notes say plainly that play is unchanged.
 - **A version in VERSION or README without a tag and a GitHub release is
-  drift.** An unshipped version number is reused, not skipped.
-- **Push early, push often.** `main` on GitHub is always current; the
+  drift.** An unshipped version number is reused rather than skipped.
+- **Push early, push often.** Keeping `main` on GitHub current matters: the
   laptop is a single point of failure, and agent worktrees branch from it.
-- **Git is the archive.** Delete stale probes, instruments and superseded
-  scripts (with their waiver lines and citations) instead of keeping or
-  archiving them in the tree.
-- **Plain names.** Boring, self-evident, industry-standard names; no
+- **Git is the archive.** Stale probes, instruments and superseded scripts
+  (with their waiver lines and citations) are better deleted than archived
+  in the tree.
+- **Plain names.** Boring, self-evident, industry-standard names rather than
   coinages.
