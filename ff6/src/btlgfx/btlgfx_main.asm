@@ -20,21 +20,12 @@
 
 .include "btlgfx_ram.inc"
 
-; ot6: the same build-time gate battle_main.asm carries, for the same reason.
-; Bank C1 owns the menu states, so the confirm half of "an unaffordable row is
-; greyed AND refused" (docs/design/mp-economy.md, ruling 2) has to be stated
+; ot6: bank C1 owns the menu states, so the confirm half of "an unaffordable
+; row is greyed AND refused" (docs/design/mp-economy.md, ruling 2) is stated
 ; here: Ot6KitConfirmMP at the tools-shell confirm, Ot6DanceConfirmMP at the
 ; dance confirm and Ot6RageConfirmMP at the rage confirm, each a couple of
-; bytes gated on this flag and answered in bank F0.  This module is therefore
-; assembled twice (configure.py), and with `-D OT6_MP_COSTS=0` not one byte of
-; the gates is emitted, so the nomp control ROM's C1 is the same object it
-; always was.  The Blitz, Tools and Dance row decorators are ALWAYS-defined F0
-; shims (code_ext.inc) so that drawing stays flag-free; the rage window's grey
-; (Ot6RageRowDecorate) came after the per-flag assembly and is gated like the
-; confirms.
-.ifndef OT6_MP_COSTS
-OT6_MP_COSTS = 1
-.endif
+; bytes answered in bank F0.  The Blitz, Tools, Dance and Rage row decorators
+; are F0 shims too (code_ext.inc).
 
 ; ------------------------------------------------------------------------------
 
@@ -10860,10 +10851,10 @@ DrawToolsListText:
         lda     w7e6168         ; ot6: blitz mode? both rows hand off to bank F0.
         bne     @blitz          ;   blitz swaps both names to AttackName ($0f) and
         jsl     Ot6ToolRowDecorate ; real tools: stamp each MP cost (leading, before
-        bra     @tfr               ;   the name).  both decorators are unconditional
-@blitz: jsl     Ot6BlitzRowDecorate ; here -- the cost gating lives in the battle
-@tfr:   jsr     InitListTextTfr ;   object, so the shared C1 bank pays one jsl either
-        jsr     DrawListText    ;   way and nomp stays byte-identical.
+        bra     @tfr               ;   the name).  the logic lives in the battle
+@blitz: jsl     Ot6BlitzRowDecorate ; object, so C1 pays one jsl either way
+@tfr:   jsr     InitListTextTfr
+        jsr     DrawListText
         ply
         rts
 
@@ -11111,11 +11102,9 @@ DrawRageListText:
         sta     w7e5755+5
         lda     $257f,y
         sta     w7e5755+11
-.if OT6_MP_COSTS
         jsl     Ot6RageRowDecorate      ; ot6: grey both columns when the flat
                                         ;   price is past the pool (#225); no
                                         ;   cost drawn, vanilla's layout kept
-.endif
         jsr     InitListTextTfr
         jsr     DrawListText
         ply
@@ -11140,7 +11129,7 @@ DrawDanceListText:
         lda     $267f,y
         sta     w7e5755+11
         jsl     Ot6DanceRowDecorate     ; ot6: leading MP cost + grey per
-                                        ;   column (no-op layout in nomp)
+                                        ;   column
         jsr     InitListTextTfr
         jsr     DrawListText
         ply
@@ -20303,7 +20292,6 @@ UpdateMenuState_1e:
         lda     $257e,x
         cmp     #$ff
         beq     @8548
-.if OT6_MP_COSTS
         ; ot6: the rage window is greyed too (Ot6RageRowDecorate), so it gets
         ; the confirm refusal the dance window has at @85f0.  It lands on
         ; @8548, vanilla's own "this row is not available" buzz, which sits
@@ -20311,7 +20299,6 @@ UpdateMenuState_1e:
         ; preserves X; the commit below reloads the id through X anyway.
         jsl     Ot6RageConfirmMP
         bcc     @8548
-.endif
         inc     $96
         lda     $257e,x
         sta     w7e7a85
@@ -20411,7 +20398,6 @@ UpdateMenuState_21:
         jsr     _c1849e
         lda     $267e,x
         bmi     @8609
-.if OT6_MP_COSTS
         ; ot6: the dance window is priced and greyed too (Ot6DanceRowDecorate),
         ; so it gets the same confirm refusal the kit windows do.  It lands on
         ; @8609, vanilla's own "this row is not available" buzz, which sits
@@ -20420,7 +20406,6 @@ UpdateMenuState_21:
         jsl     Ot6DanceConfirmMP
         bcc     @8609
         lda     $267e,x
-.endif
         inc     $96
         sta     w7e7a85
         lda     #$02                    ; self-target
@@ -20706,7 +20691,6 @@ UpdateMenuState_30:
         inc     $95
         bra     @8818
 @8809:
-.if OT6_MP_COSTS
         ; ot6: magic's other half.  A = the selected row's id (the $ff cell is
         ; already gone).  Ot6KitConfirmMP prices it through the very leaf the
         ; row drew through and asks Ot6AbilityGrey the very question the row's
@@ -20720,7 +20704,6 @@ UpdateMenuState_30:
         inc     $95             ; error sound; the menu stays open
         bra     @8818
 @ot6paid:
-.endif
         lda     w7e6168         ; ot6: blitz mode? queue it, no target select
         beq     :+
         cmp     #$03            ; ot6: thief submenu? take the SAME arm a

@@ -66,42 +66,30 @@ CODE_EXT_INC = 1
                                  ;   (BG1's 4bpp at $5000, BG2/BG3's 2bpp at
                                  ;   $6000), each hooked at the tail of the
                                  ;   vanilla loader that lays that copy down
-.global Ot6RageRowCost           ;   ALWAYS-defined price shim, Ot6LoadoutCost's
-                                 ;   twin (flat trance price / 0 under nomp)
-.global Ot6LoadoutCost           ;   ALWAYS-defined price shim (flag-gated body):
-                                 ;   forwards to Ot6CostFor under OT6_MP_COSTS,
-                                 ;   returns 0 under nomp so the shared menu links
-.global Ot6ThiefCost             ;   ALWAYS-defined price shim for the thief row
+.global Ot6RageRowCost           ;   price shim, Ot6LoadoutCost's twin (flat
+                                 ;   trance price)
+.global Ot6LoadoutCost           ;   price shim: forwards to Ot6CostFor
+.global Ot6ThiefCost             ;   price shim for the thief row
                                  ;   ids $56-$58 (Steal via Ot6StealCost, Filch/
-                                 ;   Bestow via Ot6ThiefCostTbl; 0 under nomp).
+                                 ;   Bestow via Ot6ThiefCostTbl).
                                  ;   #68's field Thief page prices through it --
                                  ;   NOT Ot6CostFor, whose table keys those ids
                                  ;   as SwdTech boost rows
 .global Ot6BlitzRowDecorate      ; menu-bank: DrawToolsListText's blitz row shim
-                                 ;   (name->$0f swap always; MP cost only under
-                                 ;   OT6_MP_COSTS). ALWAYS defined -- the stock C1
-                                 ;   btlgfx object jsl's it in both builds.
+                                 ;   (name->$0f swap and the MP cost)
 .global Ot6ToolRowDecorate       ; menu-bank: DrawToolsListText's real-tools row
                                  ;   shim -- a leading MP cost before each tool
-                                 ;   name (cost only under OT6_MP_COSTS; a no-op
-                                 ;   otherwise). ALWAYS defined -- the shared C1
-                                 ;   btlgfx object jsl's it in both builds.
+                                 ;   name
 .global Ot6KitConfirmMP          ; the confirm half of magic's affordance: the
 .global Ot6DanceConfirmMP        ;   C1 tools-shell (@8809), dance (@85f0) and
 .global Ot6RageConfirmMP         ;   rage (@852a) confirms ask these whether the
                                  ;   caster can pay the row, and buzz instead of
-                                 ;   committing when they cannot.  Defined and
-                                 ;   referenced only under OT6_MP_COSTS --
-                                 ;   btlgfx is assembled per flag, so the nomp
-                                 ;   C1 emits none of the calls
+                                 ;   committing when they cannot
 .global Ot6RageRowDecorate       ; #225: DrawRageListText's grey for both
-                                 ;   columns (flat Ot6RageCost, no cost drawn);
-                                 ;   gated with the confirms, unlike the dance
-                                 ;   decorator below
-.global Ot6AbilityCost           ; v0.4 mp-cost hook (only defined/referenced
-                                 ;   under OT6_MP_COSTS; a weak decl otherwise)
+                                 ;   columns (flat Ot6RageCost, no cost drawn)
+.global Ot6AbilityCost           ; v0.4 mp-cost hook
 .global Ot6CostFor               ; pure leaf: attack/tool id in A -> MP cost in A
-                                 ;   (OT6_MP_COSTS only; battle-object-internal)
+                                 ;   (battle-object-internal)
 .global Ot6PreviewList_ext
 .global Ot6EsperSpellKnown       ; M5 espers-as-sub-jobs: equipped esper grants
                                  ;   its spells to the in-battle Magic list
@@ -129,8 +117,7 @@ CODE_EXT_INC = 1
 ; not -8..+7.
 OT6_SM_NEG = $8
 .global Ot6DanceRowDecorate      ; #34: DrawDanceListText's per-row MP cost
-                                 ;   (flat Ot6DanceCost; ALWAYS defined, the
-                                 ;   stock C1 object jsl's it in both builds)
+                                 ;   (flat Ot6DanceCost)
 .global Ot6RestageGate_ext
 .global Ot6FontRestoreMark_ext
 .global Ot6DangerStep, Ot6MarkRandom, Ot6AllowSubBattle

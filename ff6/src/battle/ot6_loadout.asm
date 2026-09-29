@@ -3,7 +3,7 @@
 ;
 ; The bank-$F0 state logic behind the field configurator (field_menu.asm holds
 ; only the tilemap/DMA/cursor shell and jsl's in here for every decision), and
-; the two OT6_MP_COSTS-gated row-price leaves the menus draw with. The battle
+; the two row-price leaves the menus draw with. The battle
 ; side that reads the word this file writes is ot6_bushido.asm.
 
 ; ==============================================================================
@@ -358,32 +358,19 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
         rtl
 .endproc
 
-; [ price a loadout row: always defined, flag-gated body ]
-; The configurator lives in the shared menu object (built once, flag-agnostic),
-; but Ot6CostFor is OT6_MP_COSTS-only.  So the menu prices every row through
-; this always-present shim, the same as the
-; Ot6BlitzRowDecorate/Ot6ToolRowDecorate pattern.  On: tail-call Ot6CostFor
-; (its rtl returns to the menu).  nomp: return 0 (no cost table referenced, so
-; the shared menu object links against either battle object, and the row draws
-; no number).
-; in: A = attack id.  out: A = MP cost (0 under nomp).  rtl.
+; [ price a loadout row ]
+; The configurator lives in the menu object; it prices every row through this
+; shim, which tail-calls Ot6CostFor (its rtl returns to the menu).
+; in: A = attack id.  out: A = MP cost.  rtl.
 .proc Ot6LoadoutCost
         .a8
         .i16
-.if ::OT6_MP_COSTS                  ; :: is the file-scope flag, from in-proc
         jmp     Ot6CostFor          ; tail-call: same bank, its rtl returns for us
-.else
-        lda     #$00
-        rtl
-.endif
 .endproc
 
-; [ price a thief submenu row: always defined, flag-gated body ]
-; Ot6LoadoutCost's twin, for the second keyed table.  Ot6ThiefListOpen is
-; assembled in both builds (the C1 stub jsl's it either way), but the cost
-; leaves are OT6_MP_COSTS-only, so the list prices its rows through this shim:
-; on, resolve the row; nomp, return 0 so cmd $02 draws two blanks and the row
-; keeps the byte-identical unpriced layout.
+; [ price a thief submenu row ]
+; Ot6LoadoutCost's twin, for the second keyed table: Ot6ThiefListOpen and the
+; menus price their rows through this shim.
 ;
 ; The branch here is the same branch Ot6AbilityCost's @steal arm makes.  The
 ; Steal row is not in Ot6ThiefCostTbl, because Ot6StealCost is its one
@@ -391,17 +378,12 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
 ; 0 while the charge took 4.  Splitting on Ot6ThiefIsNew in both places means
 ; the drawn price and the charged price come out of the same leaf for every
 ; row.
-; in: A = row id.  out: A = MP cost (0 under nomp).  preserves X and Y.  rtl.
+; in: A = row id.  out: A = MP cost.  preserves X and Y.  rtl.
 .proc Ot6ThiefCost
         .a8
         .i16
-.if ::OT6_MP_COSTS                  ; :: is the file-scope flag, from in-proc
         jsl     Ot6ThiefIsNew       ; carry set = filch/bestow (A preserved)
         bcc     @steal
         jmp     Ot6ThiefCostFor     ; tail-call: same bank, its rtl returns for us
 @steal: jmp     Ot6StealCost        ; the Steal row's one authority
-.else
-        lda     #$00
-        rtl
-.endif
 .endproc

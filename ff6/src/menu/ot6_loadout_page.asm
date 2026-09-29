@@ -26,8 +26,7 @@
 ;               the R bit, so it cannot be told apart from the R-shoulder cycle.
 ;   B           save-and-exit (writes are already live in the checksummed block)
 ;
-; MP cost is priced through Ot6LoadoutCost (returns 0 under nomp, so that build
-; draws no number; the shared menu object links against either battle).
+; MP cost is priced through Ot6LoadoutCost.
 ; ------------------------------------------------------------------------------
 
 
@@ -161,7 +160,7 @@ Ot6LoadoutDrawSlots:
         lda     $e5
         clc
         adc     #$55                    ; tech index -> attack id
-        jsl     Ot6LoadoutCost          ; F0: A = MP cost (0 under nomp)
+        jsl     Ot6LoadoutCost          ; F0: A = MP cost
         ldx     #$0012                  ; cost column (18: "nn MP" is 18..22,
         jsr     Ot6LoadoutDrawCost      ;   right-aligned; 17 is the gap)
         ldx     $e2
@@ -184,8 +183,8 @@ Ot6LoadoutDrawSlots:
 ;     redraw (MenuState_7b @run), so a mode drawn at init would keep
 ;     reporting stale state;
 ;   * Ot6LoadoutDrawCost's zero-cost arm blanks the full five-cell price
-;     field (columns 18-22) on every redraw under nomp, so drawing the mode
-;     after the slot loop keeps the ordering safe.
+;     field (columns 18-22), so drawing the mode after the slot loop keeps
+;     the ordering safe.
 ; The hint is redrawn every time too; six cells is not worth a second code
 ; path to skip.
 Ot6LoadoutDrawMode:
@@ -304,8 +303,7 @@ Ot6DrawBushName:
 ; (menu_common.asm:906-918), and DrawNum2 prints the low two of those three
 ; (menu_common.asm:856-860), which is how the esper/magic detail
 ; window prints a spell's MP (skills.asm:2615-2621).  A cost of 0 blanks all
-; five cells: that is the nomp build (Ot6LoadoutCost returns 0 with no cost
-; table linked) and the Blitz page's locked rows, and blanking the full width
+; five cells: that is the Blitz page's locked rows, and blanking the full width
 ; keeps a redraw overwriting whatever was there.
 ;
 ; The arithmetic is a repeated subtract rather than a divide because 65816 has

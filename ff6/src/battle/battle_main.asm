@@ -18,29 +18,6 @@
 .include "macros.inc"
 .include "code_ext.inc"
 
-; ot6: "every ability costs MP" is live by default. The charge
-; machinery (Ot6AbilityCost + Ot6AbilityCostTbl, ot6.asm) prices Blitz,
-; Bushido and Tools at queue time. This symbol stays the one build-time gate:
-; the default (1) is the shipped, charging ROM, and an explicit
-; `-D OT6_MP_COSTS=0` reassembles the pre-feature vanilla-OT6 baseline, without
-; one byte of the machinery.
-.ifndef OT6_MP_COSTS
-OT6_MP_COSTS = 1
-.endif
-
-; ot6: the #219 boost escalation, the measurement control for it.  The
-; shipped default (1) is the owner's locked rule -- a boosted ability pays
-; min(99, floor(base * 2.5^boost + 0.5)), one authority, Ot6BoostPriceFor.
-; `-D OT6_BOOST_PRICE=0` reassembles the economy as it stood BEFORE #219:
-; every base price still charged, a boost still free.  It exists so a
-; balance question about the escalation can be answered with a before and an
-; after on the same ROM sources rather than with an assertion
-; (docs/design/narshe-descent.md).  It is not a gameplay option and nothing
-; in the graph ships it.
-.ifndef OT6_BOOST_PRICE
-OT6_BOOST_PRICE = 1
-.endif
-
 ; ------------------------------------------------------------------------------
 
 .include "battle/ai_script.inc"
@@ -221,7 +198,6 @@ ExecAction:
 @0100:  lda     #$12
         sta     $b5
         sta     $3a7c
-.if OT6_MP_COSTS
         ; ot6 #233: the placeholder above is a command, and the cost cell has
         ; to be a placeholder too.  $3a4c means "the in-flight action's staged
         ; MP cost" everywhere it is read -- CalcAttackEffect's universal
@@ -253,7 +229,6 @@ ExecAction:
         ; Ot6BoostPriceFor carries (mp-economy.md, ruling 1).  The number to
         ; remove is the one that was never a cost.
         stz     $3a4c       ; an action that was never staged costs nothing
-.endif
         lda     $32cc,x     ; command list pointer
         bmi     @0183       ; branch if not valid
         asl
@@ -3421,7 +3396,6 @@ _c21554:
 ; [ command $10: rage ]
 
 Cmd_10:
-.if OT6_MP_COSTS
         ; ot6: an unpayable rage start must not lock the hunter.  The
         ; universal insufficient-MP fizzle refuses the cast but runs after
         ; this command body, so a Gau who cannot pay would keep the
@@ -3432,7 +3406,6 @@ Cmd_10:
         bcc     @ot6_paid
         jmp     Cmd_02
 @ot6_paid:
-.endif
         ; ot6: record the trance's boost tier before anything else, and
         ; only on the start turn (the proc's own RAGE-bit test), because a
         ; mid-trance re-entry would read the already-consumed pending byte and
@@ -3831,7 +3804,6 @@ _1765:  sta     $3412
 ; [ command $13: dance ]
 
 Cmd_13:
-.if OT6_MP_COSTS
         ; ot6: an unpayable dance start must not lock the dancer.  the
         ; universal insufficient-MP fizzle (CalcAttackEffect @32ca) refuses
         ; the cast, but it runs after this command body, so a dancer who
@@ -3846,7 +3818,6 @@ Cmd_13:
         sta     $b7                     ; no background change either
         jmp     Cmd_02
 @paid:
-.endif
 @177d:  lda     $3ef8,y     ; set dance status
         ora     #STATUS3::DANCE
         sta     $3ef8,y
@@ -7055,7 +7026,7 @@ MAGIC_PROP_COUNT = 256
 
 ; ---- override 1: Osmose ($29) MP cost, 1 -> 8 -------------------------------
 ; Shiva grants Osmose, and Osmose is the party's only MP income once
-; OT6_MP_COSTS makes every verb but Fight cost MP.  Vanilla priced it at 1 MP
+; every verb but Fight costs MP.  Vanilla priced it at 1 MP
 ; in a game where four characters spent MP at all.  Under OT6 that 1 MP buys a
 ; full refill: Facility boss MP pools run 447-810 (monster_prop.dat +$0a)
 ; against party pools of 40-60, and magic damage at these levels computes for
@@ -13292,9 +13263,7 @@ CreateAction:
         php                             ;   copy" (mimicreplace).  GetMPCost clears
                                         ;   the bit, so Ot6QueueFold reads it here
         jsr     GetMPCost
-.if OT6_MP_COSTS
         jsl     Ot6AbilityCost          ; ot6 v0.4: price blitz/bushido/tools
-.endif
         sta     $3620,y     ; add to mp cost queue
         plp                             ; ot6 #260: V back (widths unchanged)
         jsl     Ot6QueueFold            ; ot6: boost folds spell tiers
@@ -14137,13 +14106,11 @@ InitCmdList:
         iny                 ; next command
         cpy     #$04
         bne     @53a5
-.if OT6_MP_COSTS
         jsl     Ot6MpUniversal  ; ot6: the MP economy prices every
                                 ;   kit, so EVERY character keeps the battle MP
                                 ;   LoadCharProp loaded -- sets the has-mp flag
                                 ;   ($f8 bit 0) unconditionally and the vanilla
                                 ;   spell-less clear below never fires
-.endif
         lsr     $f8         ; branch if $f8 was set (character has mp)
         bcs     @5408
         lda     $02,s       ; pointer to character data

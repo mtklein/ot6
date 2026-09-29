@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """configure.py -- emit ./build.ninja, the whole project as one ninja graph.
 
-Bare `ninja` builds and tests everything: the default targets are every
+Bare `ninja` builds and tests everything: the default targets are the
 ROM, every generated savestate, every suite test's result, every audit and
 every selftest.  `ninja release` is all of that plus the release
 preflights, the BPS patch and the zip.  `release` is the only alias; any
@@ -26,10 +26,7 @@ from the root):
   ff6 objects    ca65 with --create-dep; depfiles are rebased to root-relative
                  paths (tools/build/rebase_depfile.py) because ca65 runs with
                  cwd=ff6 and ninja resolves depfile paths against the root.
-  ROMs           ff6-en.sfc and the OT6_MP_COSTS=0 control ff6-en-nomp.sfc,
-                 each via tools/build/link_rom.sh.  The two links share the
-                 cfg-hardcoded temp_lz scratch dir, so nomp is order-only
-                 after en.
+  ROM            ff6-en.sfc via tools/build/link_rom.sh.
   build/ot6.sfc  copy_if_changed of ff6-en.sfc: mtime bumps with unchanged
                  bytes prune everything downstream (restat).
   savestates     the story-chain graph, embedded from
@@ -300,35 +297,20 @@ def module_obj(mod, obj, flags):
 
 
 objs_en = [module_obj(m, f"{m}_en", EN_FLAGS) for m in MODULES]
-# the OT6_MP_COSTS=0 control: two objects, flag forced off.  battle owns the
-# prices, the charge and the grey; btlgfx owns the menu states, so the confirm
-# half of "greyed AND refused" (mp-economy.md ruling 2) is a couple of gated
-# bytes in bank C1 calling into bank F0.  Assembling btlgfx per flag is what
-# keeps those bytes out of the control ROM: with the flag off neither gate is
-# emitted, so btlgfxnomp_en.o is the byte-for-byte object btlgfx_en.o used to
-# be for both links, and the nomp baseline does not move.
-NOMP_FLAGS = EN_FLAGS + " -D OT6_MP_COSTS=0"
-obj_nomp = module_obj("battle", "battlenomp_en", NOMP_FLAGS)
-obj_nomp_gfx = module_obj("btlgfx", "btlgfxnomp_en", NOMP_FLAGS)
-_swap = {"ff6/obj/battle_en.o": obj_nomp, "ff6/obj/btlgfx_en.o": obj_nomp_gfx}
-objs_nomp = [_swap.get(o, o) for o in objs_en]
 
 # ---------------------------------------------------------------- ROMs -----
-def rom_edge(out, objs, order=()):
+def rom_edge(out, objs):
     rel = [o[len("ff6/"):] for o in objs]
     w.edge([out, out[:-len(".sfc")] + ".dbg", out[:-len(".sfc")] + ".map"],
            "sh", ["ff6/cfg/ff6-en.cfg"] + objs,
            implicit=["tools/build/link_rom.sh", "ff6/tools/encode_cutscene.py",
                      "ff6/tools/fix_checksum.py"],
-           order=order,
            cmd=f"tools/build/link_rom.sh cfg/ff6-en.cfg {out[len('ff6/'):]} "
                + " ".join(rel),
            desc=f"link {Path(out).name}")
 
 
 rom_edge("ff6/rom/ff6-en.sfc", objs_en)
-# order-only after en: both links write the cfg-hardcoded temp_lz scratch
-rom_edge("ff6/rom/ff6-en-nomp.sfc", objs_nomp, order=["ff6/rom/ff6-en.sfc"])
 
 # ------------------------------------------------------------- ot6 layer ---
 qual = []   # every .ok the release patch depends on
@@ -343,15 +325,6 @@ qual.append("build/checks/base_rom.ok")
 # change: a relink that produces identical bytes regenerates nothing downstream.
 w.edge(["build/ot6.sfc"], "copy_if_changed", ["ff6/rom/ff6-en.sfc"])
 
-w.edge(["build/checks/nomp_distinct.ok"], "sh",
-       ["build/ot6.sfc", "ff6/rom/ff6-en-nomp.sfc"],
-       cmd="if cmp -s build/ot6.sfc ff6/rom/ff6-en-nomp.sfc; then "
-           "echo 'ERROR: OT6_MP_COSTS=0 baseline is byte-identical to the"
-           " shipped ROM -- flag is dead'; exit 1; fi"
-           " && mkdir -p build/checks && touch build/checks/nomp_distinct.ok",
-       desc="nomp baseline differs from shipped ROM")
-qual.append("build/checks/nomp_distinct.ok")
-
 # ------------------------------------------------------------ savestates ---
 states = sn.load(ROOT)
 read_deps.add(sn.GRAPH)
@@ -363,9 +336,8 @@ if errors:
 sn.emit_state_edges(w, states, ROOT, copy_if_changed_from)
 # Every name a test can reference includes the `also=` siblings: a state
 # like figaro_cleared is emitted by gen_edgar's edge as an also-artifact,
-# and fixture_deps() filtering against primary names only silently dropped
-# it -- the nomp qualifier edges then raced their fixtures on a from-scratch
-# build (caught by the 2026-08-27 simulated release).
+# and fixture_deps() filtering against primary names only would drop it,
+# leaving an edge that races its fixture on a from-scratch build.
 state_names = {e["state"] for e in states} \
             | {a for e in states if e["also"] for a in e["also"]}
 all_stamps = [f"build/states/{e['state']}.stamp" for e in states]
@@ -448,24 +420,6 @@ for f in glob("tools/tests/*.lua"):
     w.edge([f"build/results/suite/{t}.ok"], "suitetest", implicit=deps,
            test=t, env=env)
     qual.append(f"build/results/suite/{t}.ok")
-
-# the mpcost A/B: the OFF half (free -- the negative control) on the nomp ROM
-for t in ("battle_mpcost", "battle_stealmp"):
-    w.edge([f"build/results/nomp/{t}.ok"], "sh",
-           implicit=[copy_if_changed_from(f"tools/tests/{t}.lua"), "ff6/rom/ff6-en-nomp.sfc",
-                     copy_if_changed_from("build/ot6.sfc")]
-                    + [copy_if_changed_from(h) for h in LIBS] + HARNESS
-                    + fixture_deps(f"tools/tests/{t}.lua"),
-           cmd=f"mkdir -p build/results/nomp && "
-               f"OT6_ROM=$$PWD/ff6/rom/ff6-en-nomp.sfc OT6_WORKER=nomp_{t} "
-               f"nice tools/tests/run.sh tools/tests/{t}.lua"
-               f" build/states/nomp_{t}.log >/dev/null 2>&1"
-               f" && touch build/results/nomp/{t}.ok"
-               f" || {{ echo 'FAIL: nomp {t} -- build/states/nomp_{t}.log';"
-               f" grep -E 'FAIL|assertEq' build/states/nomp_{t}.log | tail -3;"
-               f" exit 1; }}",
-           desc=f"nomp A/B {t}")
-    qual.append(f"build/results/nomp/{t}.ok")
 
 # ------------------------------------------------------------------ checks --
 def check(name, cmd, deps, desc=None):

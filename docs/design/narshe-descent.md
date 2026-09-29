@@ -388,10 +388,7 @@ three-attempt sweep is what it is for.
 - **Refuse an unaffordable kit row at the confirm.** ~~Owner's call~~ —
   **taken, and landed in v0.19.** The gate went exactly where
   `Ot6AbilityGrey`'s header said it would (`UpdateMenuState_30 @8809`,
-  plus the dance confirm at @85f0), and the objection died with the build
-  graph rather than with the rule: btlgfx is now assembled once per flag,
-  the gates sit inside `.if OT6_MP_COSTS`, and the nomp ROM is still the
-  same bytes. The grey now means what `mp-economy.md` ruling 2 says it
+  plus the dance confirm at @85f0). The grey now means what `mp-economy.md` ruling 2 says it
   means, and this segment's failure is impossible for a blind fighter as
   well as for a person. `tools/tests/battle_kitrefuse.lua`.
 
@@ -421,8 +418,7 @@ from `build/ot6.sfc`. The run arm points **both** `OT6_ROM` and the new
 `OT6_DBG` at it — the flag adds a byte inside `Ot6BoostPriceFor` and so
 moves every label after it, and an observer hooked at the shipped ROM's
 `SaveForMimic` would be hooked at nothing. `OT6_BOOST_PRICE` is a
-measurement control, like `OT6_MP_COSTS` beside it; nothing in the ninja
-graph ships it.
+measurement control; nothing in the ninja graph ships it.
 
 Per-battle attribution is action-granular with one frame of slack at each
 boundary, the blind spot `balance-metrics.md` already documents: MP and

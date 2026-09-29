@@ -72,8 +72,8 @@ Ot6RageDrawC3:
         jmp     Ot6RageDrawCount
 
 ; ---- the flat trance price, stated once on the title row: "8 MP EACH" ----
-; Blank under nomp: the label rides the number, so a zero price prints
-; nothing rather than a bare "EACH".
+; The label rides the number, so a zero price prints nothing rather than a
+; bare "EACH".
 ;
 ; The price field is five cells wide and starts at column 16 so that "EACH"
 ; (a fixed pos_text at 22) keeps its gap at 21; growing rightwards instead
@@ -83,7 +83,7 @@ Ot6RageDrawC3:
 ; fits: "RAGE LOADOUT" ends at 14, so 15 is the gap, the price is 16-20, 21
 ; is the gap, "EACH" is 22-25.
 Ot6RagePrice:
-        jsl     Ot6RageRowCost          ; F0: A = MP cost (0 under nomp)
+        jsl     Ot6RageRowCost          ; F0: A = MP cost
         beq     @none                   ; (rtl preserves the lda's Z)
         pha
         lda     #$01                    ; the title row
@@ -135,8 +135,7 @@ Ot6RagePrice:
 ; because two ten-cell monster names plus two cursor columns plus two
 ; four-cell "n MP" fields is 30 columns, and the window's own right border is
 ; column 30.  The price is flat, so eight copies of the same number would not
-; fit, and one copy states the same rule.  Under nomp the cost is 0 and the
-; whole "8 MP EACH" group is skipped, label included.
+; fit, and one copy states the same rule.
 ;
 ; Slot order is the cursor framework's own index, $4b = cols*row + col
 ; (CalcShortListIndex), so slot even = left column, slot odd = right, and

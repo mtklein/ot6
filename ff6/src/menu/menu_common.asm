@@ -2327,26 +2327,17 @@ DrawHPMP:
 ; verb), so the field menu shows every pool unconditionally; vanilla's
 ; esper/Gogo/knows-a-spell gate below hid Locke's and Edgar's MP through the
 ; entire pre-Zozo stretch while Steal and Tools charged it.  Same idiom as
-; Ot6MpUniversal: gated on OT6_MP_COSTS, which this menu module defaults ON
-; exactly as battle_main.asm does (only the battle object is ever rebuilt
-; with the flag forced off; the shared menu object always assembles
-; flag-set).
+; Ot6MpUniversal.
 ;
 ; Size-neutral on purpose: the 2-byte sec/rts head is repaid by dropping the
 ; now-unreachable @0d63 tail, so every later C3 address is UNCHANGED.  A
 ; plain insert would shift the whole menu bank, which breaks any field state
 ; holding a live C3 return address.  The dead body's branches retarget the
-; head's own sec/rts; with the flag off the original tail assembles instead and
-; the routine is byte-for-byte vanilla.
-.ifndef OT6_MP_COSTS
-OT6_MP_COSTS = 1
-.endif
+; head's own sec/rts.
 
 CheckMPVisible:
-.if OT6_MP_COSTS
 @0d63:  sec                 ; every character has MP: always show the pool
         rts                 ; (also the @0d63 target of the dead gate below)
-.endif
 @0d2b:  lda     $1a69       ; set carry and return if the party has any espers
         ora     $1a6a
         ora     $1a6b
@@ -2372,10 +2363,6 @@ CheckMPVisible:
         bne     @0d56
 @0d61:  clc                 ; clear carry (don't show mp)
         rts
-.if !OT6_MP_COSTS
-@0d63:  sec                 ; set carry (show mp)
-        rts
-.endif
 
 ; ------------------------------------------------------------------------------
 

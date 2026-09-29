@@ -177,7 +177,7 @@ house rule stands with its one named exception (Osmose, below).
   Blitz/SwdTech/Tools. That number lives in the
   `Ot6StealCost` leaf rather than inline, in the same shape as
   `Ot6DanceCost`, so the charge and any future menu row read one
-  authority. With `OT6_MP_COSTS` off it reverts to free, byte-for-byte.
+  authority.
 - **One price scale.** Kit skills live in the same ability
   records as spells (research/data-formats.md), so they price
   on the vanilla spell baseline: Fire 4, Fire 2 20, Fire 3 51.
@@ -387,10 +387,7 @@ gate). The boost buys swings.
    commit and the resolve; it is no longer something a player can reach
    by hand.
 
-   Both gates are two branches in bank C1, inside `.if OT6_MP_COSTS`.
-   btlgfx is assembled once per flag for exactly this (`configure.py`),
-   so the `OT6_MP_COSTS=0` control ROM emits neither call and stays the
-   byte-for-byte baseline it was.
+   Both gates are two branches in bank C1.
 
    **Rage has the same surface, without a number** (#225). Rage's price
    is flat, so a per-row price would say the same thing on every row and
@@ -408,8 +405,7 @@ gate). The boost buys swings.
    the whole verb is out of reach together, as a 0-BP SwdTech window is)
    and the rage confirm (`UpdateMenuState_1e` @852a) asks
    `Ot6RageConfirmMP` the same question and lands on vanilla's own
-   not-available buzz, before the confirm sound. Both C1 calls sit
-   inside `.if OT6_MP_COSTS`; the control ROM is unchanged.
+   not-available buzz, before the confirm sound.
    `battle_ragerefuse` is the suite.
 3. **Rounding is computed once.** `Ot6BoostPriceFor` is the only place
    the arithmetic lives, and every surface that states a price -- the
@@ -839,14 +835,7 @@ already in `$3a7b` (attack id $5d–$64 Blitz, $55–$5c SwdTech;
 tool item id $a3–$aa Tools), in the same shape as the class and
 element tables. Numbers are kits.md's columns.
 
-The whole mechanic gates on the build-time flag
-`OT6_MP_COSTS`, which defaults ON, so the shipped ROM
-charges MP. An explicit
-`-D OT6_MP_COSTS=0` reassembles the pre-feature
-vanilla-OT6 baseline, with none of the machinery present, kept as the
-differ-checked regression control (`make -C ff6 ff6-en-nomp`
-→ `ff6-en-nomp.sfc`). The A/B is checked both ways by
-`tools/tests/battle_mpcost.lua` (self-detecting: charge+refusal
-on the shipped ON ROM, free+absent on the `nomp` baseline). Costs and
+The charge and the refusal are checked by
+`tools/tests/battle_mpcost.lua`. Costs and
 the level-up refill ship together, since costs alone would be
 attrition without income.
