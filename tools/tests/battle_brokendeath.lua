@@ -2,8 +2,15 @@
 -- battle_brokendeath.lua -- the Broken turn gate: that it holds, and where it
 -- may sit.
 
--- Ot6MayAct (ot6_break.asm) refuses a Broken monster's turn at execution
--- time.  Its one call site is inside CheckRetal (battle_main.asm), and
+-- Two execution-time gates: Ot6BrokenTurn (ot6_break.asm, #291) consumes at
+-- ExecAction a turn a monster queued before it broke -- no AI script, no
+-- command -- and Ot6MayAct refuses a Broken monster's counterattack.  This
+-- fight is where the first one is seen: IFRIT and SHIVA soak their breaks,
+-- so one of them reaches ExecAction with its timer running about once a run
+-- (the verdict counts it and asserts no script ran on it).
+--
+-- Ot6MayAct (ot6_break.asm) refuses a Broken monster's counterattack at
+-- execution time.  Its one call site is inside CheckRetal (battle_main.asm), and
 -- CheckRetal is not only the counterattack path: an AI script's
 -- `if_self_dead` block reaches it too, through the `bit $3a56`
 -- died-branch ($3a56 is "characters/monsters that have died",
@@ -36,7 +43,16 @@
 -- entities behind them, so the slot scan below prefers the lowest slot per
 -- species.
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedSweep("battle 70")
+-- Six rungs, not three: an attempt now counts only when it shows BOTH the
+-- mid-break kill and #291's window (a standing monster's queued turn meeting
+-- its break), and the window is a timeline event -- measured in some seed
+-- shifts' first fight and not others (review of bb984713: shifts 7, 33 and
+-- 55 saw none in the fight that ended the old three-rung ladder,
+-- build/attempts/review-battle-fixes-023/).  The property is asserted over
+-- every rung that ran, not only the one that counts.
+local ATTEMPTS = 6
+local L = H.newSeedSweep("battle 70", { attempts = ATTEMPTS })
+local rungs = {}   -- per attempt: { n, windows, scripts, kill } (the verdict's record)
 
 local STATE = "build/states/ifrit_entry.mss.lua"
 local IFRIT, SHIVA = 0x0109, 0x0108
@@ -111,7 +127,8 @@ local function armRetalDetector()
     emu.addMemoryCallback(function()
       local e = emu.getState()["cpu.x"] & 0xff
       execs[#execs + 1] = { f = H.frame, ent = e, tk = H.readByte(0x3E88 + e),
-                            kind = name }
+                            kind = name,
+                            up = (H.readByte(0x3EE4 + (e & 0x1F)) & 0xC0) == 0 }
     end, emu.callbackType.exec, s, s)
   end
   local ms = H.sym("ExecMonsterAction")
@@ -248,10 +265,31 @@ local function attempt(n)
     }, "battle 70 fought to the script's own ending"),
 
     -- evaluate: this attempt counts as the observation only if a boss died
-    -- with its broken timer running and the break was observed first
+    -- with its broken timer running, the break was observed first, and #291's
+    -- window happened in it (a standing monster's queued turn reached
+    -- ExecAction with its broken timer running).  Every rung's broken-timer
+    -- script turns are recorded for the verdict whether it counts or not.
     H.call(function()
       H.setPad({})
-      if deathFrame and deathTicks ~= 0 and sawBreak[deathSlot] then
+      local upto = deathFrame or H.frame
+      local nWin, nScr = 0, 0
+      for _, r in ipairs(execs) do
+        if r.f >= (startFrame or 0) and r.f <= upto and r.ent >= 0x08
+           and r.ent <= 0x12 and r.ent % 2 == 0 and r.tk ~= 0 then
+          if r.kind == "ExecAction" and r.up then nWin = nWin + 1 end
+          if r.kind == "ExecMonsterAction" then nScr = nScr + 1 end
+        end
+      end
+      local kill = deathFrame and deathTicks ~= 0 and sawBreak[deathSlot]
+      rungs[#rungs + 1] = { n = n, windows = nWin, scripts = nScr,
+                            kill = kill and true or false }
+      H.log(string.format("attempt %d: %d window(s), %d broken-timer script "
+        .. "turn(s) f%d..f%d", n, nWin, nScr, startFrame, upto))
+      if kill and nWin == 0 then
+        H.log(string.format("attempt %d: %s killed mid-break (tk=%d) but no "
+          .. "queued turn met a break in this timeline -- no observation of "
+          .. "#291's window; retrying", n, mname(deathSlot), deathTicks))
+      elseif kill then
         won = { slot = deathSlot, name = mname(deathSlot),
                 deathFrame = deathFrame, deathTicks = deathTicks,
                 breakFrame = sawBreak[deathSlot], endFrame = H.frame,
@@ -334,14 +372,29 @@ H.run({ maxFrames = 250000 }, {
   attempt(1),
   attempt(2),
   attempt(3),
+  attempt(4),
+  attempt(5),
+  attempt(6),
   L.report(),
 
   -- 4. The property under test: a mid-break kill happened, and the
   -- `if_self_dead` script still ran and ended the fight.
   H.call(function()
-    H.assertEq(won ~= nil, true,
-      "a Broken boss was killed mid-break within 3 attempts -- without "
-      .. "that kill this test cannot say anything about the gate")
+    local allScripts, ran = 0, {}
+    for _, r in ipairs(rungs) do
+      allScripts = allScripts + r.scripts
+      ran[#ran + 1] = string.format("%d:%dw/%ds%s", r.n, r.windows, r.scripts,
+        r.kill and "k" or "")
+    end
+    H.log("rungs (attempt:windows/broken scripts, k = mid-break kill): "
+      .. table.concat(ran, " "))
+    H.assertEq(allScripts, 0,
+      "no Broken monster ran its AI script in ANY rung that was fought "
+      .. "(#291: a turn queued before the break is consumed at ExecAction)")
+    H.assertEq(won ~= nil, true, string.format(
+      "a rung within %d attempts showed both a mid-break kill and #291's "
+      .. "window -- without them this test cannot say anything about either "
+      .. "gate", ATTEMPTS))
     H.assertEq(won.breakFrame <= won.deathFrame, true,
       "the break was OBSERVED before the kill: " .. won.name
       .. "'s shields chipped 6 -> 0 by real hits, timer seeded by the engine")
@@ -383,7 +436,14 @@ H.run({ maxFrames = 250000 }, {
     -- happened to hold.  A baseline run produced four of them at x=$ff, whose
     -- $3e88+$ff read lands outside the broken-timer table entirely.
     local function isEntity(e) return e <= 0x12 and e % 2 == 0 end
+    -- A turn that reached ExecAction after its monster broke is consumed
+    -- there (Ot6BrokenTurn, #291): ExecAction takes vanilla's removed-action
+    -- branch, which dispatches its own placeholder, command $12 --
+    -- CmdNoEffect, an rts.  A monster never mimics, so on a monster that
+    -- dispatch is the turn being thrown away, not taken, and it is counted
+    -- as consumed rather than as a leak.
     local leaks, ending, monsterCmds, charCmds, noEntity = {}, {}, 0, 0, {}
+    local consumed = {}
     for _, r in ipairs(cmds) do
       if r.f >= won.startFrame then
         if not isEntity(r.ent) then noEntity[#noEntity + 1] = r
@@ -391,22 +451,31 @@ H.run({ maxFrames = 250000 }, {
           if r.ent >= 0x08 and r.tk ~= 0 then ending[#ending + 1] = r end
         elseif r.ent < 0x08 then charCmds = charCmds + 1
         elseif r.tk == 0 then monsterCmds = monsterCmds + 1
+        elseif r.cmd == 0x12 then consumed[#consumed + 1] = r
         else leaks[#leaks + 1] = r end
       end
     end
-    local byKind = {}
+    local byKind, windows = {}, 0
     for _, r in ipairs(execs) do
       if r.f >= won.startFrame and r.f <= won.deathFrame
          and isEntity(r.ent) and r.ent >= 0x08 and r.tk ~= 0 then
         byKind[r.kind] = (byKind[r.kind] or 0) + 1
+        -- #291's window: a standing monster's turn, queued before its
+        -- break, reaching ExecAction with the timer running
+        if r.kind == "ExecAction" and r.up then windows = windows + 1 end
         H.log(string.format("  consumed and dropped: %-18s f%-6d ent=$%02X "
-          .. "timer=%d", r.kind, r.f, r.ent, r.tk))
+          .. "timer=%d%s", r.kind, r.f, r.ent, r.tk,
+          r.kind == "ExecAction" and (r.up and " standing" or " down") or ""))
       end
     end
     for _, r in ipairs(ending) do
       H.log(string.format("  after the kill: ExecCmd f%-6d ent=$%02X cmd=$%02X "
         .. "timer=%d (the `if_self_dead` ending, outside the window)",
         r.f, r.ent, r.cmd, r.tk))
+    end
+    for _, r in ipairs(consumed) do
+      H.log(string.format("  consumed: ExecCmd f%-6d ent=$%02X cmd=$12 "
+        .. "(CmdNoEffect, the turn thrown away) timer=%d", r.f, r.ent, r.tk))
     end
     for _, r in ipairs(leaks) do
       H.log(string.format("  LEAK: ExecCmd f%-6d ent=$%02X cmd=$%02X "
@@ -417,14 +486,15 @@ H.run({ maxFrames = 250000 }, {
         .. "(the immediate-action caller; not attributable)", r.f, r.ent, r.cmd))
     end
     H.log(string.format("f%d..f%d: %d command dispatches by monsters (%d by "
-      .. "characters); %d of the monster ones had a broken timer running.  "
+      .. "characters); %d of the monster ones had a broken timer running, "
+      .. "%d more were a turn consumed ($12).  "
       .. "%d turns began with the timer up "
       .. "(%d ExecAction, %d ExecRetal), %d of them after running the "
-      .. "monster's AI script -- #85's queue purge owes a zero here.  "
+      .. "monster's AI script (#291 owes a zero here).  "
       .. "%d dispatches by a broken actor after the kill (the ending), "
       .. "%d not attributable to an entity.",
       won.startFrame, won.deathFrame, monsterCmds + #leaks, charCmds, #leaks,
-      (byKind.ExecAction or 0) + (byKind.ExecRetal or 0),
+      #consumed, (byKind.ExecAction or 0) + (byKind.ExecRetal or 0),
       byKind.ExecAction or 0, byKind.ExecRetal or 0,
       byKind.ExecMonsterAction or 0, #ending, #noEntity))
     -- The positive control.  Without it, a detector that never fired and a
@@ -437,9 +507,42 @@ H.run({ maxFrames = 250000 }, {
       "no monster dispatched a command while its broken timer was running "
       .. "(issue #66: Ot6Gate answers at queue time, and before Ot6MayAct "
       .. "nothing re-checked between the queue entry and the turn)")
-    H.assertEq((byKind.ExecMonsterAction or 0) <= 3, true,
-      "broken-timer script turns stay near the measured ~1/run rate "
-      .. "(the channel is load-bearing for scripted fights -- battle 57; "
-      .. "only runaway would mean a new defect)")
+    -- what became of each window's monster: its next turn with the timer
+    -- down (ExecAction, then a real dispatch).  Logged, not asserted: the
+    -- fight often ends before a consumed monster's break does
+    for _, r in ipairs(execs) do
+      if r.kind == "ExecAction" and r.up and r.tk ~= 0 and r.ent >= 0x08
+         and r.f >= won.startFrame and r.f <= won.deathFrame then
+        local nextTurn, nextCmd = nil, nil
+        for _, q in ipairs(execs) do
+          if not nextTurn and q.kind == "ExecAction" and q.ent == r.ent
+             and q.f > r.f and q.tk == 0 then nextTurn = q.f end
+        end
+        for _, c in ipairs(cmds) do
+          if not nextCmd and c.ent == r.ent and c.f > r.f and c.tk == 0 then
+            nextCmd = c
+          end
+        end
+        H.log(string.format("  window f%d ent=$%02X: next turn with the timer "
+          .. "down %s, next dispatch %s", r.f, r.ent,
+          nextTurn and ("f" .. nextTurn) or "none before the log ends",
+          nextCmd and string.format("f%d cmd=$%02X", nextCmd.f, nextCmd.cmd)
+            or "none before the log ends"))
+      end
+    end
+    H.assertEq(windows >= 1, true,
+      "#291's window happened in this fight: a standing monster's queued "
+      .. "turn reached ExecAction with its broken timer running (IFRIT and "
+      .. "SHIVA soak their breaks; measured once or twice a run)")
+    -- #291.  This count was once bounded at <= 3 and called load-bearing:
+    -- #85's two attempts (a break-time queue purge, a skipped queue add)
+    -- were reverted when KEFKA at Narshe (battle 57) did not end on some
+    -- timeline, and both left the monster's command list standing.  A turn
+    -- consumed at ExecAction runs vanilla's removed-action path to its end
+    -- instead (Ot6BrokenTurn), so the channel closes; battle_kefka is the
+    -- guard that battle 57 still ends.
+    H.assertEq(byKind.ExecMonsterAction or 0, 0,
+      "no Broken monster ran its AI script: a turn it queued before it broke "
+      .. "was consumed at ExecAction (#291)")
   end),
 })

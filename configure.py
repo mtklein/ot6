@@ -365,6 +365,10 @@ TEST_ENV = {
     # #292: NUMBER 024 (7 shields) is two steps from this save point
     "battle_hudcount":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/n024-entry-save-v1",
+    # Phoenix (#293): no fixture has it, so the test Continues fire-out-v1
+    # and declares a one-byte esper expedient (state_write_waivers.txt)
+    "battle_phoenixprice":
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
@@ -380,6 +384,9 @@ TEST_ENV = {
     # ~115k; levelup's 40-battle step list ~85k -- at the ~100 frames/s a
     # loaded machine emulates, 11 to 19 minutes
     "battle_classtarget": "OT6_TIMEOUT=3600",
+    # up to six ~12k-frame rungs of battle 70 until one shows both a
+    # mid-break kill and #291's window (a queued turn meeting a break)
+    "battle_brokendeath": "OT6_TIMEOUT=3600",
     "battle_statuses": "OT6_TIMEOUT=3600",
     "battle_levelup": "OT6_TIMEOUT=3600",
 }

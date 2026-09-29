@@ -1,7 +1,7 @@
 ; ------------------------------------------------------------------------------
 ; The damage-verb half of the boost canon
 ;
-; Ot6BoostDmg: x2/x4/x8 on base damage for pending boost 1/2/3, with the gate
+; Ot6BoostDmg: x2/x4/x8 on base damage for boost 1/2/3, with the gate
 ; list that names every command boost buys something other than damage on.
 ; Each exempt command's own purchase is a chance verb: fight/capture buy swings
 ; (ot6_boost.asm), bushido buys the tech tier (ot6_bushido.asm), steal buys
@@ -10,7 +10,8 @@
 ; ------------------------------------------------------------------------------
 
 ; called at the tail of the physical and magic base-damage calcs.
-; damage x2/x4/x8 for pending boost 1/2/3; the per-target 9999 cap
+; damage x2/x4/x8 for boost 1/2/3 (Ot6BoostLevel: the pending boost, or on a
+; dance step the tier the dance's start bought, #294); the per-target 9999 cap
 ; still applies downstream. a8/i16, x = attacker, 16-bit damage $11b0.
 ; fight and capture spend their boost on extra swings (Ot6FightBoost),
 ; tier-family spells spend it on tiers (Ot6QueueFold), and bushido
@@ -91,8 +92,6 @@
         beq     done            ; $05 steal: boost buys the rare/guarantee
                                 ;   downstream (Ot6StealBoostLevel /
                                 ;   Ot6StealSlot), never a damage multiplier
-        lda     OT6_BOOST_REVEALED,x         ; pending boost level
-        beq     done
         lda     $3a7c           ; a Rage start turn: Cmd_10 hands the beast's
         cmp     #$10            ;   attack to _c21554, which rewrites $b5 to
         beq     done            ;   that attack's own command before any
@@ -117,8 +116,12 @@
         cpx     #$0018
         bcc     @scan
         plx
-@plain: lda     OT6_BOOST_REVEALED,x         ; pending boost level (reload)
-        bra     @mul0
+@plain: jsl     Ot6BoostLevel   ; the boost level: the pending boost, or a
+        bne     @mul0           ;   dance step's recorded tier (#294).  Asked
+        bra     done            ;   once, here, after the exemptions: the
+                                ;   dance tier made the old early `beq` on
+                                ;   the pending byte a wrong answer, and its
+                                ;   jsl put the gate's branches out of range
 @tier:  plx
         bra     done
 @mul0:

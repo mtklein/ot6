@@ -8,6 +8,19 @@ release's notes.
 
 ## What's changed
 
+**A monster you break loses the turn it was about to take.** When a
+monster's turn was already lined up and you broke it just before it
+acted, it used to take that turn anyway, attack and all. Now it loses
+that turn too: a broken monster gets no turns until its shields come
+back.
+
+**A boosted Dance stays boosted for the whole dance.** Boosting Mog's
+Dance used to multiply only its first step; every step after that hit
+for normal damage, although the boost's pips and MP had been paid. Now
+every step of that dance hits for the boosted amount (x2, x4 or x8)
+until the dance ends. The price is unchanged, paid once when the dance
+starts.
+
 **Terra and Celes learn short spell lists, Espers give short ones, and stronger
 spells come only from boosting.** Nobody learns Fire 2, Ice 3, Cure 2 or any
 other stronger version by level, and no Esper gives one: boost the plain

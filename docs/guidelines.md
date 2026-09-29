@@ -108,10 +108,12 @@ The harness plays OT6 the way a competent person with a controller would.
   not a technical one.** What the World of Ruin teaches (driver
   mechanics, kill orders, design fixes) is welcome in the World of Balance
   too; measure it there and say that it applies there.
-- **Save compatibility is a contract.** The SRAM layout
-  ([save-layout.md](design/save-layout.md)) must keep loading older
-  in-game saves. A release is promoted to v1.0 retroactively once it is fun
-  and solid enough to keep that promise for a long future.
+- **Save compatibility becomes a contract at v1.0.** While releases are
+  v0.x, keeping older saves loading ([save-layout.md](design/save-layout.md))
+  is nice but never a constraint: don't bend a change or add workarounds
+  for old saves; design for what is current (owner, 2026-09-29). A release
+  is promoted to v1.0 retroactively once it is fun and solid enough to keep
+  that promise for a long future.
 - **Priorities:** release reliability, then labs on fights won by
   attrition or a coin flip (a measured success rate, not a selected win),
   then fun and the Octopath feel. Take the highest of these with a
