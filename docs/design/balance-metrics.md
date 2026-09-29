@@ -63,8 +63,10 @@ known blind spots:
   blacklist written only on death (`:8662`), and `$3406` reads negative
   across the damage frames because `ExecAction`'s `sec / ror $3406`
   (`:194`) invalidates it on entry. The drivers publish a `_residual` per
-  metric and `bp_action_skew` as an independent cross-check, and
-  `bal_aggregate.py` fails the run on any nonzero residual.
+  metric and `bp_action_skew` as an independent cross-check, read off
+  the run log (`bal_aggregate.py`, which failed a multi-battle bench's run
+  on any nonzero residual, went with those benches: deleted in 62ac83f3,
+  last version at b4023415).
 - `$340a` **immediate actions** (battle-start scripts, final attacks)
   bypass all three queues, so they are uncounted and also leave the
   actor shadow stale. This is rare in WoB trash.
