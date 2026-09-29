@@ -183,7 +183,8 @@ end
 local WANT_FIGHTS = tonumber("@FIGHTS@") or 6
 local function enough() return fights >= WANT_FIGHTS end
 
--- Roll randoms by walking: a direction jitter (probe_throw's shape --
+-- Roll randoms by walking: a direction jitter (the shape of probe_throw,
+-- deleted in bd50a973 --
 -- every 24 frames the next of the four directions, pressed only while the
 -- party is in control and on a tile, so no map geometry is assumed) with
 -- the route's own walk fighter (M.newWalkFighter: newFightDriver with the

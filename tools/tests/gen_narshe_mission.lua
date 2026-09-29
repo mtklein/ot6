@@ -32,7 +32,8 @@
 -- a full party restore for 1200 gil, the save-point rest the world map
 -- allows (item.asm @84f8: Tent needs $0201 bit7, which the world map sets).
 -- Every purchase stop ends with the combat items arranged back on top of
--- the bag (#197).  Coordinates and menu flow measured by tools/tests/probe_jidoor.lua:
+-- the bag (#197).  Coordinates and menu flow measured by tools/tests/probe_jidoor.lua
+-- (deleted in 895b8e67; last version at eac98bb1):
 -- world (27,129) + DOWN -> map 198 (15,61); shop door 198 (27,41) -> map 201
 -- (34,20), keeper at (34,15) (npc_prop NPCProp::_201, event _cb4460 = shop
 -- 22); back out 201 (34,21) -> 198 (27,43); south edge (15,62)+DOWN -> the
@@ -250,7 +251,7 @@ end
 -- the same slot uses it; the item menu answers a Tent with return code $02
 -- and terminates after its fade (item.asm @84f8), and the world module
 -- runs the tent event (world_start.asm @02db: VehicleEvent_01), which
--- restores the party.  Measured by probe_jidoor.lua: 886 frames, every
+-- restores the party.  Measured by probe_jidoor.lua (deleted in 895b8e67): 886 frames, every
 -- member at max HP and MP, one Tent gone.
 --
 -- A battle that opens under the Tent (an encounter rolled on the step the
@@ -411,7 +412,8 @@ end
 -- this step with tonic=4 (terra-returned-v1) and left the plains with 4 --
 -- the care kernel's floor, i.e. no Tonics at all -- for the Sealed Gate.  A
 -- person holding an airship and 115k gil flies to a town that sells them.
--- Measured by tools/tests/probe_tonic_airship.lua off this same checkpoint:
+-- Measured by tools/tests/probe_tonic_airship.lua (deleted in 895b8e67;
+-- last version at 437e9105) off this same checkpoint:
 --   * South Figaro (shop 8) is still occupied: landable beside the gate at
 --     (84,112), but its troopers wall the street to the shop (navTo read
 --     no path 20 times).
@@ -498,7 +500,8 @@ local function nikeahTonics(tag)
     pressWalk("left", function() return H.worldMode() end, 1200,
       what .. ": Nikeah's x=0 column -> the world (116,61)"),
     -- the world flags read true a few frames early on the way out; the
-    -- position cells are what settle last (probe_tonic_airship)
+    -- position cells are what settle last (probe_tonic_airship, deleted in
+    -- 895b8e67)
     H.waitFrames(60),
     H.waitUntil(function()
       return H.worldMode() and H.worldHasControl() and H.worldAligned()

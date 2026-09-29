@@ -4,7 +4,7 @@ Authored 2026-09-07 from `tools/tests/lab_map269_random.lua` (the lab; its
 header carries the decoded rows; deleted in e1eb6313, last version at a7e12f45) and the n024_entry regeneration log
 `build/states/n024_entry.log`.  Every number below is quoted from a
 retained run log under `build/attempts/driver-boost/m269lab/` (formerly `build/m269lab/`) (the batch runner keeps every
-attempt; `tools/tests/m269lab_aggregate.py` prints them all).
+attempt; `tools/tests/m269lab_aggregate.py` (deleted in 8d350a73; last version at 48a26888) printed them all).
 
 ## What happened in the regeneration
 
@@ -115,7 +115,7 @@ encounter check from `RNGTbl[$1fa1]` once per step and the formation slot
 from `RNGTbl[$1fa2]` once per battle, both counters live in the snapshot,
 and neither an idle frame nor a menu moves them -- so every run rolls at
 the same tile, (48,38), and always rolls **$076 Trapper x3** (80 of 80
-runs: `python3 tools/tests/m269lab_aggregate.py`).  Idling before the
+runs: `python3 tools/tests/m269lab_aggregate.py` (deleted in 8d350a73)).  Idling before the
 first step varies only the battle seed (`$021e*4`), in 4-frame quanta, so
 the declared spread is **15 seeds (0..56 step 4), the whole 60-phase
 cycle**; every policy drew 15 distinct `bseed` values.  `cared`,
@@ -147,7 +147,7 @@ threshold 0.65, Tonics only) runs, so a Fenix spent there counts the way
 
 ### Results, 15 Trapper-trio fights per policy
 
-`python3 tools/tests/m269lab_aggregate.py` (deaths = members dead when the
+`python3 tools/tests/m269lab_aggregate.py` (deleted in 8d350a73) (deaths = members dead when the
 fight ended; fenixP/B/C = Fenix Downs at the landing care / in battle / at
 the care stop after; frames = mean battle length; flares = L4 Flare casts;
 maxraw = the largest damage word read at `_writedamage`):

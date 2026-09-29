@@ -1,10 +1,10 @@
 # The Zozo street — the SlamDancer that one-shots (#155)
 
-Authored 2026-09-07 from `tools/tests/lab_zozo_street.lua` (the lab; its
+Authored 2026-09-07 from `tools/tests/lab_zozo_street.lua` (deleted in 8d350a73; last version at f6507ff0) (the lab; its
 header carries the decoded rows) and the v0.16 qualification log
 `build/states/dadaluma_entry.log`.  Every number below is quoted from a
 retained run log under `build/zozolab/` (the batch runner keeps every
-attempt; `tools/tests/zozolab_aggregate.py` prints them all).
+attempt; `tools/tests/zozolab_aggregate.py` (deleted in 8d350a73; last version at b7406e74) printed them all).
 
 ## What happened in the qualification
 
@@ -72,7 +72,7 @@ route already carries, Runic is CELES's own command):
 
 ### Results, 15 SlamDancer-solo fights per policy
 
-`python3 tools/tests/zozolab_aggregate.py` (deaths = members dead when the
+`python3 tools/tests/zozolab_aggregate.py` (deleted in 8d350a73) (deaths = members dead when the
 fight ended; fenixB/fenixC = Fenix Downs spent in battle / at the care stop
 after it; frames = mean battle length):
 
@@ -141,7 +141,7 @@ What the numbers say:
 
 ## The whole street (arrival -> Dadaluma's door), once per policy
 
-`python3 tools/tests/zozolab_street.py run` derives one variant of the
+`python3 tools/tests/zozolab_street.py run` (deleted in 8d350a73; last version at c90e4931) derives one variant of the
 generator per policy (artifacts redirected to `build/zozolab/street/`, the
 tree's `dadaluma_entry` untouched):
 
@@ -209,7 +209,7 @@ keep flagging it.
   the per-hit chips from `zozo_arrival`.
 - Runic opens a target window in this ROM (`state $38` after the confirm),
   so `newFightDriver` will need a target step if it ever gains a Runic
-  line (the lab's steer is in `lab_zozo_street.lua`).
+  line (the lab's steer is in `lab_zozo_street.lua` (deleted in 8d350a73)).
 - The generator's care threshold (0.9) leaves EDGAR at 380/398 on the
   fixture; irrelevant to this finding but worth knowing for any HP-margin
   argument.

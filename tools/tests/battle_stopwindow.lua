@@ -43,7 +43,8 @@
 --   2. it planned for the Stopped actor at that window, before Stop
 --      cleared, and the plan was an attack, never care;
 --   3. the window moved on: another actor's plan came inside 600 frames
---      (stop_stalls.py's stall threshold), and that actor's command
+--      (the stall threshold of fcalcovelab/stop_stalls.py, deleted in
+--      07ca5f4e), and that actor's command
 --      EXECUTED (ExecCmd with X = its offset) after the plan and while
 --      Stop was still on -- a plan that never ran is a stall with a log
 --      line;

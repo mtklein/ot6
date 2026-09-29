@@ -1,13 +1,13 @@
 # Fight and the ability at #219's prices — what the MP still buys
 
-Authored 2026-09-18 from `tools/tests/fightvsabilitylab.py` (the lab; its
+Authored 2026-09-18 from `tools/tests/fightvsabilitylab.py` (deleted in 07ca5f4e; last version at 48a26888) (the lab; its
 docstring carries the policies and the observers), a static cross-reference
 of the route's own gear against the World of Balance's own bodies, and a
 four-shape, seven-policy, four-seed spread of the shipped party balance
 instrument. Every number below is quoted from a retained log under
 `build/lab/fight-vs-ability/` — the lab keeps every attempt, failures and
 superseded spreads included.
-`python3 tools/tests/fightvsabilitylab.py aggregate` prints the
+`python3 tools/tests/fightvsabilitylab.py aggregate` (deleted in 07ca5f4e) printed the
 head-to-head, `... mechanic` the swing ladder and `... reach` the static
 arm; `build/lab/fight-vs-ability/aggregate.txt`,
 `build/lab/fight-vs-ability/mechanic.txt` and
@@ -64,7 +64,7 @@ action of it:
   in each of the four fixture directories). The pools here are WoB pools of
   77 to 243 MP against 4-to-21-MP rows; the refusal has nothing to refuse.
 - **every fighter prices a boost before planning one**, through
-  `H.boostPlan` (`cc25e69b`). The lab's fighter is `bal_party.lua`'s, which
+  `H.boostPlan` (`cc25e69b`). The lab's fighter is `bal_party.lua`'s (deleted in 7f79dd93; last version at 9d49947c), which
   does not call it; with no unaffordable plan anywhere in the corpus there
   is nothing for it to step down. The prices actually charged are
   `mp-economy.md`'s table read back off the runs, exactly:
@@ -158,7 +158,7 @@ byte there reads `$01`, "weapon, record in use". This lab's own
 every character with a bare off hand was counted as a Genji pair. It is
 guarded in `M.isWeapon` now, with both halves pinned.
 
-**What the error actually cost, measured** (`tools/tests/fightswingslab.py`,
+**What the error actually cost, measured** (`tools/tests/fightswingslab.py` (deleted in 07ca5f4e; last version at 704dabdd),
 logs under `build/lab/fight-swings/`). The arithmetic first: running both
 models through the shipped `keyBoost` over every (shields, bank, hands)
 a WoB gauge presents, the chosen boost depth moves in **four** cells, all
@@ -707,7 +707,7 @@ his provoked scripted Fight dumping.
 
 ## 7. The lab
 
-`tools/tests/fightvsabilitylab.py`. Three arms.
+`tools/tests/fightvsabilitylab.py` (deleted in 07ca5f4e). Three arms.
 
 **`reach`** is static and needs no emulator: for every formation the
 route's own areas roll (`tools/check_break_reach.py`'s `AREAS`, whose
@@ -719,16 +719,16 @@ member's kit verbs would. A verb counts only at the level that learns it
 (`BlitzLevelTbl` / `BushidoLevelTbl`) and a tool only when the bag really
 holds it.
 
-**`write` / `run` / `aggregate` / `mechanic`** derive `tools/tests/bal_party.lua`
+**`write` / `run` / `aggregate` / `mechanic`** derive `tools/tests/bal_party.lua` (deleted in 7f79dd93)
 — the shipped, owner-sanctioned party balance instrument, whose protocol is
 already seeded `$1FA1`/`$1FA2` draws so battle *k* is the same battle in
 every arm, paired samples, per-character attribution — into
 `build/lab/fight-vs-ability/lab.lua`. The derivation adds seven policies,
-four fixtures beside `bal_party`'s own, an `FVA_JITTER` knob that shifts
+four fixtures beside `bal_party`'s (deleted in 7f79dd93) own, an `FVA_JITTER` knob that shifts
 the in-battle RNG phase so a policy is run over a spread, one aiming rule,
 and five read-only CPU exec observers. Every substitution asserts it
 matched exactly once, so an edit to the instrument fails the derivation
-instead of silently measuring something else. `bal_party`'s own `envcfg`
+instead of silently measuring something else. `bal_party`'s (deleted in 7f79dd93) own `envcfg`
 reads are dead — Mesen's Lua sandbox blocks `os.getenv`
 (`lib/compose.py:2016`) — so the policy, the fixture and the jitter are
 substituted into a per-run copy as literals, and an unsubstituted token
@@ -754,7 +754,7 @@ SaveForMimic          the action resolved: emit the row
 ```
 
 The one thing the derivation changes about how the instrument *plays*:
-`bal_party` presses A on whatever the target cursor happens to be lighting,
+`bal_party` (deleted in 7f79dd93) presses A on whatever the target cursor happens to be lighting,
 which on a formation that has lost a body is often a corpse. The derived
 copy taps the d-pad until the lit mask covers a body still standing and
 only then confirms — d-pad and A, nothing else, with a twelve-tap budget
@@ -780,7 +780,7 @@ action.
 spread is still there:
 
 - `pre-live/zozo_arrival/` — the first cut of the observers, with no
-  live-body count. `bal_party`'s stop rule reads a monster's presence bit
+  live-body count. `bal_party`'s (deleted in 7f79dd93) stop rule reads a monster's presence bit
   and status byte, never its HP, so a formation whose last body is at 0 HP
   keeps the fight "live" for a few hundred frames while the queued actions
   swing at nothing; those turns entered the ladder as 8-swing, 0-hit

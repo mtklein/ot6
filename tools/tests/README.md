@@ -426,7 +426,7 @@ runs every script through the **segment runner** at the bottom of
   is in the battle signature and, like the escape cells, judged on
   identity sample to sample rather than novelty (the same actor walking
   the same rows to the same Potion on its next turn is the list
-  answering). Measured 2026-09-16 (`probe_list_scroll.lua`): the scroll
+  answering). Measured 2026-09-16 (`probe_list_scroll.lua` (deleted in bd50a973; last version at 6346bb5c)): the scroll
   offset moves once per press through every row of the item, magic,
   throw and rage lists, and once a list has hit its end nothing in the
   block moves under a DOWN still pressed, so that still trips no-effect

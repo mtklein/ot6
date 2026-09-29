@@ -38,8 +38,8 @@
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
--- The fishing policy.  The lab (tools/tests/fishlab.py, docs/design/
--- wor-start.md "The lab") played each of these from this checkpoint, on
+-- The fishing policy.  The lab (tools/tests/fishlab.py, deleted in
+-- 07ca5f4e, last version at ab46b468; docs/design/wor-start.md "The lab") played each of these from this checkpoint, on
 -- the search shifts and again on held-out ones; "near" ships: like "all"
 -- it recovers Cid on nearly every draw this generator meets, held-out ones
 -- included, and it loses less than "all" when the talk's rolls are fair

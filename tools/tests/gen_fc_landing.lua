@@ -295,7 +295,8 @@ H.run({ maxFrames = 600000 }, flatten({
   end),
   -- The Blackjack's tile is $1f62/$1f63, one step north of the stop line;
   -- the step lands the party ON it, still on the world map (measured,
-  -- probe_p_ship.lua).  Boarding here is a TALK, not a walk: face WEST
+  -- probe_p_ship.lua, deleted in 895b8e67; last version at 3b51556d).
+  -- Boarding here is a TALK, not a walk: face WEST
   -- toward the parked ship (LEFT is blocked, so the press only turns) and
   -- tap A -- control drops, and the story-phase deck loads (map 10),
   -- whose flow plays the Sealed Gate cutscene (391), returns to the deck,

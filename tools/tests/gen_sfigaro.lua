@@ -458,7 +458,8 @@ H.run({ maxFrames = 350000, allowGameOver = true }, {
   -- BEAT 0 (#213): the item shop.  The shop's bump door (44,30) is in the
   -- starting pocket east of the gate soldier, and nowhere else: from the
   -- main street past the cafe the reachable set ends at x=37
-  -- (probe_locke_tonic.lua, whose first version booted sfigaro_town and
+  -- (probe_locke_tonic.lua, deleted in 895b8e67, last version at f9bca17b;
+  -- its first version booted sfigaro_town and
   -- read no path).  The counter keeper, map 85 npc at {106,52} (spawn
   -- $0300), runs `_ca7884`: `shop_menu 8` while $00A4 is clear, which it is
   -- for the whole scenario -- Tonic row 0, Fenix Down, no Potion.  It is

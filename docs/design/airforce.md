@@ -1,11 +1,11 @@
 # The Air Force -- the IAF gauntlet's last fight (#201)
 
-Authored 2026-09-16 from `tools/tests/lab_airforce_template.lua` (the lab;
-its header carries the decoded rows), `tools/tests/lab_airforce_bake.lua`
+Authored 2026-09-16 from `tools/tests/lab_airforce_template.lua` (deleted in 8d350a73; last version at 182bc361) (the lab;
+its header carries the decoded rows), `tools/tests/lab_airforce_bake.lua` (deleted in 8d350a73; last version at aff9dd45)
 (the fixture) and the v0.17 fc_landing regeneration log
 `build/states/fc_landing.log`.  Every number below is quoted from a retained
 run log under `build/attempts/airforce-lab/` (the batch runner keeps every
-attempt; `python3 tools/tests/airforcelab_aggregate.py` prints them all).
+attempt; `python3 tools/tests/airforcelab_aggregate.py` (deleted in 8d350a73; last version at 9ed3b849) printed them all).
 
 **The `build/attempts/airforce-lab/` tree is gone** (#222): it lived in the
 agent worktree this work was done in and went with it.  Every path under it
@@ -125,7 +125,7 @@ AutoCrossbow) carry the keys.
 ## The lab
 
 Fixture `build/states/airforcelab_teaser.mss`, baked by
-`lab_airforce_bake.lua` = `gen_fc_landing`'s route verbatim to the Ultros
+`lab_airforce_bake.lua` (deleted in 8d350a73) = `gen_fc_landing`'s route verbatim to the Ultros
 teaser ($01F0), the last field-control window of the chain (`[bake]
 airforcelab_teaser banked at f37770, $021e=39, at (14,6)`; `PASS (frame
 47750) attempts=1/3`).  The bake then fought Ultros IV + Chupon and
@@ -144,7 +144,7 @@ seed) is paired per idle: a policy column is an A/B against the control
 at the same seed.  The declared spread is **10 idles, 0..54 step 6**; the
 `[result]` line carries the seed the Air Force's InitBattle drew (`$be`).
 
-Policies (`tools/tests/airforcelab_batch.sh <policy> <idles>`; every one
+Policies (`tools/tests/airforcelab_batch.sh <policy> <idles>` (deleted in 8d350a73; last version at 338328ee); every one
 is fight-driver options the gen could carry; none reads hidden state):
 
 - **control** -- `gen_fc_landing`'s FIGHT as it ships: tactical, boost,
@@ -168,7 +168,7 @@ is the crossbow's all-three, `mons=08` the Speck's slot 3 -- bit = slot.
 
 ## Results
 
-`python3 tools/tests/airforcelab_aggregate.py` (full per-attempt rows in
+`python3 tools/tests/airforcelab_aggregate.py` (deleted in 8d350a73) (full per-attempt rows in
 `build/attempts/airforce-lab/table.txt`, lost with the worktree; frames =
 mean Air Force battle length; fenix/potion = spent in the Air Force fight;
 bp>=3 = deaths holding
@@ -256,7 +256,8 @@ itself, below.
 line: `[AF] focus steer gave up (mons=04 want=10) -- confirming on whoever
 is highlighted`.  `bay_trace_i6` logged the target window every frame
 (`python3 tools/tests/airforcelab_tgtwatch.py
-build/attempts/airforce-lab/bay_trace_i6.log`, lost with the worktree):
+build/attempts/airforce-lab/bay_trace_i6.log`, the tabulator deleted in 8d350a73, last
+version at 92c570bd; the log lost with the worktree):
 
     moves (from --button--> to):
         9  mons=04 chars=00 --left--> mons=01 chars=00

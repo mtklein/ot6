@@ -612,7 +612,7 @@ status bytes `st=00,00,80,80`), so "LOCKE's Bolt nuke" and every Ice the
 driver cast bounced onto the party for 275-1400 a cast and dealt Nerapa
 nothing — the only damage the control policy ever landed was Shiva once,
 the crossbow, and blade swings, and the turns after that went to raising
-the bare CELES. From one doorstep snapshot (`lab_nerapa_bake.lua`:
+the bare CELES. From one doorstep snapshot (`lab_nerapa_bake.lua` (deleted in 8d350a73; last version at 6d5e6307):
 `escape_start` → CELES's kit → the fought walk, doorstep at 3:50) over
 the same 8-seed spread, the current driver won 4 of 8 distinct seeds
 cleanly (1 more at 0:09 on 5 Fenix, 3 wipes); a no-magic policy (boosted Fight with

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Aggregate bal_*.lua [metrics] blocks into a per-policy summary table.
+"""Aggregate metrics_battle.lua [metrics] blocks (and the retired bal_*.lua
+benches' logs) into a per-policy summary table.
 
 Usage: bal_aggregate.py <log> [<log> ...]
 
@@ -11,16 +12,17 @@ player_actions/enemy_actions are real actions (the drivers de-duplicate
 the two-queue dequeue count as of 2026-07-17; logs from before then
 carry 2x on those two keys).
 
-MULTI-CHARACTER (2026-07-18). bal_party.lua adds a per-party-slot fan-out
-on top of the same protocol, using the `sN:value` CSV convention the
+MULTI-CHARACTER (2026-07-18). bal_party.lua (deleted in 7f79dd93; last
+version at 9d49947c) added a per-party-slot fan-out on top of the same
+protocol, using the `sN:value` CSV convention the
 monster lines already used, e.g.
 
     char_dmg=s0:15,s1:18        char_actions=s0:1,s1:1
     party=s0:01:LOCKE,s1:00:TERRA
 
 Nothing was renamed: the aggregate keys keep their old meaning, so
-bal_mines and metrics_battle logs from before the fan-out still tabulate
-exactly as they did -- the per-character sections do not render
+bal_mines (deleted in 7f79dd93) and metrics_battle logs from before the
+fan-out still tabulate exactly as they did -- the per-character sections do not render
 for a log that has no char_* lines. Where a column was solo-Terra
 specific (MP spent, ending HP) it now reads the party lines when they are
 present and falls back to the old `terra_*` keys when they are not.

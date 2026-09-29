@@ -360,7 +360,8 @@ H.run({ maxFrames = 90000 }, {
   -- from the common route on), is the dry-goods merchant beside the
   -- chocobo: `_cb0b7e` -> `shop_menu 39` on option 0 of dlg $01C2/$01BD
   -- (event_main.asm:39681).  He stands at (8,10) in the live object table,
-  -- not the table's {16,12} (probe_sabin_merchant.lua; the first stop here
+  -- not the table's {16,12} (probe_sabin_merchant.lua, deleted in 895b8e67;
+  -- last version at 276db754; the first stop here
   -- walked for (16,13) and read "no path" on three seeds), so he is talked
   -- to by object, like SHADOW, and A is edged through his two opening
   -- lines until the shop window is up; option 0 ("See the goods") is the

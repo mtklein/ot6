@@ -1,13 +1,13 @@
 # The Serpent Trench — Aspik's dying counter, and the one verb that draws it (#194)
 
-Authored 2026-09-18 from `tools/tests/trenchdivelab.py` (the lab; its
+Authored 2026-09-18 from `tools/tests/trenchdivelab.py` (deleted in 07ca5f4e; last version at 182bc361) (the lab; its
 docstring carries the policies), the v0.19 tree's own
 `build/states/sabin_done.log`, and a six-seed spread of `gen_sabin_trench`
 over seven policies — five cuts of the fight driver and the ROM on the
 shipped generator, and two candidate levers. Every number below is quoted
 from a retained log under `build/lab/trench-dive/` — the lab keeps every
-attempt, failures included. `python3 tools/tests/trenchdivelab.py aggregate`
-prints them all; `build/lab/trench-dive/aggregate.txt` is that output,
+attempt, failures included. `python3 tools/tests/trenchdivelab.py aggregate` (deleted in 07ca5f4e)
+printed them all; `build/lab/trench-dive/aggregate.txt` is that output,
 `counters-before.txt`, `counters-after.txt` and `counters-noblitz.txt` the
 who-provoked-what roll-ups, and `table-head-seed00.txt` /
 `table-focus-seed00.txt` the per-battle tables for the seed the route
@@ -351,7 +351,7 @@ generate edge played for its verdict only, with `OT6_NO_PUBLISH=1`.
 
 ## The lab
 
-`tools/tests/trenchdivelab.py`, `narshedescentlab.py`'s shape with one
+`tools/tests/trenchdivelab.py` (deleted in 07ca5f4e), `narshedescentlab.py`'s (deleted in 07ca5f4e; last version at c90e4931) shape with one
 difference that the segment forced.
 
 `gen_sabin_trench` has **no private fighter** — it plays every trench
@@ -361,7 +361,7 @@ is not a region of the generator but the driver itself, and the axes are
 resolves the lib by path with no override, so `run` swaps the file in,
 plays every seed of the policy, and puts the shipped copy back in a
 `finally`; policies run one at a time and seeds inside a policy run in
-parallel. `trenchdivelab.py restore` puts it back by hand if a run ever
+parallel. `trenchdivelab.py restore` (deleted in 07ca5f4e) puts it back by hand if a run ever
 dies mid-policy. The `noblitz` arm's lib is cut the same way, from the
 shipped copy plus two anchored substitutions that each assert they matched
 exactly once.
