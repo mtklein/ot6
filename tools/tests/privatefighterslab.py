@@ -76,8 +76,10 @@ SEQFOR = "local function seqFor(id, tier, slot)\n"
 SEQTAIL = "  local seq = {}\n"
 MARKER = "  -- #230: pressing R is a CLAIM"
 
+# (kefka_won left this table in #257: gen_kefka_won's KEFKA is the library
+# driver's now, so there is no private seqFor to derive; its #230 rows in
+# docs/design/private-fighters.md are history.)
 SEGMENTS = {
-    "kefka_won":   {"gen": "gen_kefka_won.lua",        "timeout": 1800},
     "blackjack":   {"gen": "gen_opera7_blackjack.lua", "timeout": 2400},
     "rapids":      {"gen": "gen_rapids.lua",           "timeout": 1800},
     "scenario":    {"gen": "gen_scenario.lua",         "timeout": 3000},
