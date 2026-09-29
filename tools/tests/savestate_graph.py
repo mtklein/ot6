@@ -747,4 +747,18 @@ STATES = [
     #     tools/tests/run.sh tools/tests/gen_wor_south_figaro.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-south-figaro-v1
     S("wor_south_figaro", gen="gen_wor_south_figaro", checkpoint="wor-nikeah-v1", timeout=3600),
+
+    # wor-south-figaro-v1 -> the World of Ruin map outside the surfaced
+    # Figaro Castle: a grind on the South Figaro continent's grass, forest and
+    # plain (not its desert) to L30 (SABIN's Air Blade), the Figaro cave behind
+    # the thieves (the turtle), the castle's basements, EDGAR and the
+    # Tentacles (event battle 84, a game over when lost: the runner retries
+    # from the checkpoint), the Soul Sabre, the engineer's surfacing, and Save at world (81,86): the
+    # `wor-edgar-v1` checkpoint (docs/design/route-wor-edgar.md section 12).
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-south-figaro-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-edgar-v1/wor-edgar.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_edgar.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-edgar-v1
+    S("wor_edgar", gen="gen_wor_edgar", checkpoint="wor-south-figaro-v1", timeout=7200),
 ]

@@ -54,12 +54,15 @@ measurement.
    muddles: Humpty (Hug), Cruller
    (BrainStorm), NeckHunter (Mad Sickle), Dante (L.3 Muddle as a counter
    to Magic -- and both members are **L27, a multiple of three**), Drop
-   (Mad Signal).
+   (Mad Signal). Measured, the pair at L30 won the cave's commonest
+   formation (232) 52 times in 53; the loss was Muddle (section 12.3).
 5. **The Tentacles seize.** Each Tentacle's Entwine Slows, a Slowed member
    is Seized (`TargetEffect_2e`, `battle_main.asm` @3cce: the member's menu
    is shut off and the Tentacle drains HP each turn), and it is Discarded
-   30 counts later or when that Tentacle dies (`TargetEffect_44`). The
-   harness has no Seize handling today (section 9).
+   30 counts later or when that Tentacle dies (`TargetEffect_44`). A
+   seized member simply gets no window; measured (section 12), the Seize
+   keeps the fight long, and SABIN's Air Blade, not levels alone, is what
+   made it reliable.
 6. **No shop on the stretch sells Tonics.** Nikeah (58) and South Figaro
    (63) sell Potions; field care stays on Potions, as on the Sabin
    stretch. Figaro Castle's shops refuse a party with SABIN or EDGAR in it
@@ -436,9 +439,9 @@ about L28-29 (**estimate**). Air Blade comes at SABIN's L30. EDGAR joins at
 
 "Healthy levels at each key point" (guidelines): the key point is the
 Tentacles, which retry from the cave's checkpoint on a loss (a game over).
-The level for them is set by a lab (section 9), not guessed; a grind on
-the South Figaro continent (groups 41-44, beside the cave's door) is the
-natural place.
+The level for them is set by a lab (section 12), not guessed: L30, SABIN's
+Air Blade, reached by a grind on the South Figaro continent (groups
+41-44, beside the cave's door), which also plays those pools.
 
 ### 4.2 Kit levers (to be measured)
 
@@ -542,7 +545,7 @@ anywhere on the world map. The cuts are the natural pauses:
 | `wor-sabin-v1` (exists) | world (131,179) outside Tzen | the start |
 | **`wor-nikeah-v1`** (`gen_wor_nikeah`, cut) | world (148,76), one step east of Nikeah's door | after the long walk, before the town and the ship; leg 1's end (section 10) |
 | **`wor-south-figaro-v1`** (`gen_wor_south_figaro`, cut) | world (113,96), where South Figaro's exit returns the party (one step south of the parent tile (113,95) the ship set; measured) | after Nikeah, the ship and South Figaro; the last save before the cave, and the retry point for the Tentacles (section 11) |
-| `wor-edgar-v1` (not cut) | world (81,86), where the surfaced castle's exit returns the party (measured) | the first save with EDGAR; the end of this arc (section 12: the Tentacles' lab is not done) |
+| **`wor-edgar-v1`** (`gen_wor_edgar`, cut) | world (81,86), where the surfaced castle's exit returns the party (measured) | the first save with EDGAR; the end of this arc (section 12) |
 
 Each cut asserts its preconditions (the party, the story switches the
 stretch set, no live timer, the kit) in a contract in
@@ -698,9 +701,11 @@ designed rows.
 | Imp | groups 37/39 (Lizard) | HANDLED (cured in battle) | — |
 | Muddle | the cave | HANDLED | L.3 Muddle on L27/L30 members |
 | the Black Drgn | group 40, unavoidable on the walk | never fought (#300) | a lab: first-attempt rate over draws that meet it |
-| Seize / Discard | the Tentacles | **none**: a seized member's menu never opens, which the driver reads as a stall | read `$3359,y` (the member's seizer) / `$3403`; treat a seized member as out of the turn order and out of the heal plan; kill or break its seizer |
-| an event battle whose loss is a game over | the Tentacles | the runner retries a lost segment from its boot | the lab decides the level and the kit |
-| three talks to a moving NPC | Gerad in Nikeah | `H.talkToObj` | each talk re-approaches |
+| Seize / Discard | the Tentacles | planned around (measured, section 12): a seized member gets no window and the driver plans for the others; taking the holder first measured no gain | — |
+| an event battle whose loss is a game over | the Tentacles | the runner retries a lost segment from its boot | the lab (section 12): L30 by a grind, Air Blade |
+| a weapon the Tentacles absorb | the Tentacles | the runner's absorb guard fails the fight | the stop before them: no element in any hand; the Enhancer bought in South Figaro keeps EDGAR's Optimum off the Blizzard and ThunderBlade |
+| three talks to a moving NPC | Gerad in Nikeah | `H.talkToObj` (the cafe's wandering thieves: `H.chaseTalk`) | each talk re-approaches |
+| a talk that opens a battle | Gerad at the engines | `H.talkToObj`'s approach plays battles by mashing A | walk up with the tactical walker, then face him and press A |
 | "face up and hold A" | the turtle (47,29) | HANDLED (`H.faceAndHoldA`) | — |
 | a ship ride | Nikeah -> South Figaro | none needed (event) | wait for control on map 91 |
 | map-init `mod_bg_tiles` | Nikeah, the basements | the lib reads live RAM | offline counts are verify-on-arrival |
@@ -833,21 +838,42 @@ Under variation (`leg2/var_sf/`, the leg-1 derivation with K encounters
 used up on the grass and plains beside Nikeah, groups 37-39): see
 `leg2/var_sf/summary.txt`; the segment has no battles of its own, so what
 varies is the party it inherits (HP, levels, the bag) and with it the inn
-and shop decisions.
+and shop decisions. K = 0-6: 7 of 7 `PASS`, each `[saved]
+wor-south-figaro-v1: slot 3 holds map 1 ($3001) world tile (113,96)`.
 
-## 12. South Figaro to Edgar: driven, not finished
+## 12. South Figaro to Edgar, played (`gen_wor_edgar`, `wor-edgar-v1`)
 
-`gen_wor_edgar.lua` (kept at `build/attempts/wt/wor-edgar/leg3/`, not in
-`tools/tests`: the leg is not played to the bar) plays the whole leg from
-`wor-south-figaro-v1` and has passed end to end once
-(`leg3/ed10.log`: `PASS (frame 124634) attempts=1/1`, `[wor] out of Figaro
-Castle f124320: world 1 (81,86)`). What it measured of the route:
+The segment cold-Continues `wor-south-figaro-v1`, grinds the South Figaro
+continent's grass, forest and plain to L30, walks the Figaro cave behind
+the thieves and up through the castle's basements, fights the Tentacles
+with EDGAR, sends the castle up and saves outside it: the `wor-edgar-v1`
+checkpoint. Logs under `build/attempts/wt/wor-edgar/leg3/` (`var_ed4/` the
+shipped generator's variation set; `var_ed_v1/`, `var_ed2/`, `var_ed3/`
+the sets before its fixes; the Tentacles' labs beside them). Nothing was
+measured by writing game state.
+
+### 12.1 The run (`leg3/capture_edgar_final.log`, the capture)
+
+| step | what the log says |
+|---|---|
+| boot | `[wor] boot f1346: world 1 (113,96), CELES L28 HP 1301/1301 ...; SABIN L27 HP 1225/1225 ...; kit CELES 06 13 0F 76 8F D1 B5, SABIN 01 57 57 77 90 D1 D5` |
+| the grind | `[wor] grind done f106952 after 37 legs: CELES L30 ...; SABIN L30 ...; potion=51` |
+| the cave | the turtle (`$0383`), the crossing, 92, 53, Gerad's scene in basement 1 (`$026E`); chests: X-Potion and Ether in map 68's second piece, the chest room's Ether, X-Potion, Gravity Rod and Crystal Helm |
+| the stop | `ready for Edgar: kit CELES 06 13 0B 76 8F D1 B5, SABIN 01 53 5C 77 90 D1 D5` (the Enhancer and the RegalCutlass; the MetalKnuckle and a Mithril Shld), the care to full |
+| the Tentacles | `battle $1C6 WON after 16199 ticks: killed s0:$13E s1:$13D s2:$13C s3:$11B`; `EDGAR's kit from the game's Optimum: FF 11 5C 7E 89 FF FF` (Break Blade, Mithril Shld, Crystal Helm, Mithril Vest) |
+| after | the kits back, EDGAR's Jewel Ring, Star Pendant and RAMUH, the Soul Sabre, the way back by basement 3's east stairs, the engineer: `the castle has surfaced` (`$00C7`, `$0106`) |
+| the save | `[saved] wor-edgar-v1: slot 3 holds map 1 ($2001) world tile (81,86)`; `[wor] the battles: 41 (...): 41 won, 0 the party left, 0 monster escape(s)`; `PASS (frame 173383) attempts=1/3` |
+
+Sealed and validated (`leg3/validate_wor-edgar-v1.txt`): sha256
+`5666aa8a...`, `holds=slot 3 world 1 (81,86)`.
+
+What the plan (sections 2.5-2.8) had right: the gates and their switches,
+the turtle's "face up and hold A", Edgar's join and `opt_equip`, the
+surfacing at (81,84) with the parent tile (81,85). What it did not know:
 
 - **The cave's map 68 is three pieces joined by same-map links**: in by
   (16,42), the link (14,33) -> (55,56), the link (61,57) -> (17,21), and
-  (10,2) on to map 90, whose arrival tile (55,31) is the turtle scene
-  (`$0383=1`). The crossing is (47,29), face up, A held: `[cave] across
-  on the turtle map 90 (47,25)`.
+  (10,2) on to map 90, whose arrival tile (55,31) is the turtle scene.
 - **Basement 1 is two rooms joined through the castle's lower hall**: from
   Gerad's scene, the stairs (27,31) -> 59 (14,48), (9,49) -> 61 (10,33),
   and (2,37) -> 62. **Basement 2's engine-room door is on a floor reached
@@ -857,46 +883,123 @@ Castle f124320: world 1 (81,86)`). What it measured of the route:
   the east stairs (87,5) -> (56,14), (53,5) -> 62 (13,7), (13,12) -> 61
   (3,36); the west pair (81,5)/(47,8) leads into a pocket of basement 2
   whose only exit is back (`no path (3,12)->(13,12)` off its (2,13) door).
+- **The castle's exit returns the party to (81,86)**, one step below the
+  parent tile.
 - **The runner's absorb guard refuses the Tentacles with the stretch's
   kit**: `char 5's R-hand item $57 (fire) is ABSORBED by slot 3 species
   $011B`, `char 6's R-hand item $0E (ice) ... $013C`, `... $0F (bolt) ...
-  $013D` (`leg3/tent1.log`). Before the scene CELES wears the Enhancer and
-  the RegalCutlass, SABIN the MetalKnuckle and a Mithril Shld; EDGAR's
-  Optimum then takes the bag's Break Blade: `EDGAR's kit from the game's
-  Optimum: FF 11 5C 6B 89 FF FF` (Break Blade, Mithril Shld, Plumed Hat,
-  Mithril Vest). He joined at L28 beside a L29/L28 party, at L30 after the
-  grind below.
-- **Talking to Gerad with `H.talkToObj` can fight the Tentacles by mashing
-  A**: its approach plays battles with `playBattles = true`, and the
-  scene opens battle 84 inside it; one run lost that way, every member
-  dead with 5 BP banked and no driver line (`leg3/ed9.log`). The draft
-  walks up with the tactical walker and presses A facing him.
+  $013D` (`leg3/tent1.log`); hence the stop's kit, and the Enhancer bought
+  in South Figaro so that EDGAR's Optimum takes the Break Blade, not a
+  Blizzard or ThunderBlade.
+- **`H.talkToObj`'s approach fights by mashing A** (its navTo plays
+  battles with `playBattles = true`). Talking to Gerad through it fought
+  the Tentacles by mashing -- no driver line, every member dead with 5 BP
+  banked (`leg3/ed9.log`) -- and a cave battle on the way to Siegfried went
+  unsaid, which the `[outcome]` count caught (`an [outcome] said for every
+  battle fought ... got 28 ($1C), want 29 ($1D)`, `leg3/var_ed3/k3_s0.log`).
+  The segment talks from the tile below with the tactical walker.
+- **The desert (world group 44) is a wall for the pair**: formation 222,
+  two Sand Horses, Sand Storm at 400-450 a member twice a round, wiped
+  CELES and SABIN at L28 (`leg3/var_ed_v1/k2_s0.log`: `class=died with 3 BP
+  banked`, the Sand Horses untouched) and again at L30 with three Fenix
+  Downs spent (`leg3/var_ed2/k2_s0.log`). The grind stays off the desert;
+  the pool is not played on this stretch (section 13).
 
-**The Tentacles are not reliably won on the first attempt.** From one
-snapshot at the engine room's stop, the in-battle draw varied by when the
-party talks to Gerad (the battle seeds its RNG from the frame counter,
-InitBattle `lda $021e`; a seed shift alone repeated runs frame for frame),
-12 draws an arm, retries off (`leg3/tentlab.py`, `lab_tent.lua`):
+### 12.2 The Tentacles
 
-| arm | party | won | lost | the fights |
+From one snapshot at the engine room's stop, the in-battle draw varied by
+when the party talks to Gerad (the battle seeds its RNG from the frame
+counter, InitBattle `lda $021e`; a seed shift alone repeated whole runs
+frame for frame), 12 draws an arm, retries off (`leg3/tentlab.py`,
+`lab_tent.lua`):
+
+| arm | party | won | lost | ticks of the wins |
 |---|---|---|---|---|
-| L29/28/28, no grind (`tent_off/`) | CELES 1396, SABIN 1315, EDGAR 1306 HP | 10 | 2 | 8086-32366 ticks; a won fight lost up to 7 members to death along the way |
-| the same, the holder of a seized member taken first (`tent_on/`, `seize_focus_lever.diff`) | the same | 9 | 3 | no gain; the lever was not shipped |
-| L31/30/30 after a grind on the South Figaro continent to L30 (`tent_l30/`) | CELES 1595, SABIN 1509, EDGAR 1500 | 10 | 2 | 8594-22035 ticks, 0 deaths in 9 of the 10 wins |
+| L29/28/28, SABIN's Pummel (`tent_l29/`) | CELES 1396, SABIN 1315, EDGAR 1306 HP | 10 | 2 | 7595-21342 |
+| the same, the talk by `H.talkToObj` (`tent_off/`) | the same | 10 | 2 | 8086-32366; a won fight lost 7 members to death along the way |
+| the same, the holder of a seized member taken first (`tent_on/`, `seize_focus_lever.diff`) | the same | 9 | 3 | no gain; not shipped |
+| L31/30/30 after the grind, Pummel (`tent_l30/`) | CELES 1595, SABIN 1509, EDGAR 1500 | 10 | 2 | 8594-22035 |
+| **L31/30/30, Air Blade** (`tent_l30_airblade/`) | the same | **11** | **1** | 8507-21227 |
 
-What loses it: the members spend most of the fight Seized. Each
-Tentacle's Entwine Slows, a Slowed member is Seized on the Tentacle's next
-turn and drained until it Discards (30 counts) or dies; a lost L30 fight
-issued 20 plans in 14,583 ticks for three members (`tent_l30/s9.log`), and
-the drain (`cmd $2D`) is the commonest cause of death. Levels shortened the
-wins but did not remove the losses. The leg needs a strategy lab before it
-can be sealed: the levers not yet tried are EDGAR's AutoCrossbow and Bio
-Blaster (every Tentacle at once), SABIN's Air Blade (learned at L30),
-boosted area attacks and breaking the Tentacle whose Entwine has just
-landed (its next turn is the Seize). The South Figaro continent's pools
-(41-44), which the walk to the cave barely touches, are played by that
-grind: 35 legs from L28/27 to L30/30 in `ed10.log` (`[wor] grind done
-f76852 after 35 legs`).
+What loses it: the members spend much of the fight Seized. Each
+Tentacle's Entwine Slows, a Slowed member is Seized on that Tentacle's
+next turn and drained (`cmd $2D`, the commonest cause of death) until it
+is Discarded or the Tentacle dies, and the drain heals the Tentacle; a
+lost L30 fight issued 20 plans in 14,583 ticks for three members
+(`tent_l30/s9.log`). Levels alone shortened the wins but not the losses;
+SABIN's Air Blade (wind, every Tentacle at once, none absorbs wind) cut
+them to one in twelve. The shipped segment grinds to L30 and sets his
+blitz to Air Blade for this fight.
+
+### 12.3 Under real draw variation
+
+The leg-1 derivation, K encounters used up on the continent's grass and
+plain before the body (the grind then starts from another counter, level
+and bag), retries off. `leg3/var_ed4/summary.txt`:
+
+| variant | the body starts at | grind legs | body battles | the Tentacles (ticks) | deaths there | deaths in all | Fenix Downs | lowest member HP | verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| K=0, shift 23 | the checkpoint | 37 | 41 | WON 8681 | 0 | 0 | 28 -> 28 | 109 | `PASS (frame 167063) attempts=1/1` |
+| K=0, shift 41 | the checkpoint | 37 | 41 | WON 8681 | 0 | 0 | 28 -> 28 | 682 | `PASS (frame 162098) attempts=1/1` |
+| K=1, shift 0 | C L28 1216/1301, S L27 1063/1225, `46 42` | 36 | 41 | WON 9286 | 0 | 0 | 28 -> 28 | 350 | `PASS (frame 164075) attempts=1/1` |
+| K=2, shift 0 | C L28 1088/1301, S L28 1315/1315, `76 43` | 36 | 41 | WON 16885 | 0 | 0 | 28 -> 28 | 409 | `PASS (frame 171547) attempts=1/1` |
+| K=3, shift 0 | C L28 1204/1301, S L28 1261/1315, `94 44` | 27 | 32 | WON 10658 | 0 | 1 | 28 -> 27 | 138 | `PASS (frame 152725) attempts=1/1` |
+| K=3, shift 23 | C L28 1301/1301, S L28 1315/1315, `94 44` | 27 | 32 | WON 10026 | 0 | 1 | 28 -> 27 | 201 | `PASS (frame 151205) attempts=1/1` |
+| K=3, shift 41 | C L28 1301/1301, S L28 1242/1315, `94 44` | 27 | 24 | - | 0 | 2 | - | 125 | `FAIL: GAME OVER fired (GameOver read x0,` |
+| K=4, shift 0 | C L28 1301/1301, S L28 1155/1315, `D0 45` | 31 | 36 | WON 18809 | 0 | 0 | 28 -> 28 | 193 | `PASS (frame 160042) attempts=1/1` |
+| K=5, shift 0 | C L29 1261/1396, S L28 1315/1315, `06 47` | 24 | 30 | WON 11240 | 0 | 1 | 28 -> 27 | 63 | `PASS (frame 144779) attempts=1/1` |
+| K=6, shift 0 | C L29 1396/1396, S L28 1209/1315, `1A 48` | 31 | 35 | WON 12608 | 0 | 0 | 28 -> 28 | 629 | `PASS (frame 162391) attempts=1/1` |
+| K=7, shift 0 | C L29 1322/1396, S L28 1315/1315, `30 49` | 28 | 34 | WON 10514 | 0 | 0 | 28 -> 28 | 145 | `PASS (frame 164367) attempts=1/1` |
+| K=8, shift 0 | C L29 1396/1396, S L28 1111/1315, `46 49` | 29 | 34 | WON 9786 | 0 | 0 | 28 -> 28 | 582 | `PASS (frame 162137) attempts=1/1` |
+| K=9, shift 0 | C L29 1396/1396, S L28 1315/1315, `96 4B` | 23 | 29 | WON 10966 | 0 | 1 | 28 -> 27 | 270 | `PASS (frame 157631) attempts=1/1` |
+| K=10, shift 0 | C L29 1396/1396, S L28 1139/1315, `BC 4C` | 23 | 29 | WON 9788 | 0 | 0 | 28 -> 28 | 424 | `PASS (frame 153758) attempts=1/1` |
+
+Thirteen of the fourteen runs pass; the 545 `[outcome]` lines are all
+`paid as due`, and each passing run's `[wor] the battles` line reads
+all won (for example `41 ($086 x12, $0DC x21, $0E8 x5, $0E7 x1, $1C6 x1,
+$0E5 x1): 41 won, 0 the party left, 0 monster escape(s)`). **The Tentacles
+were won in all 13 runs that reached them**, 8681-18809 ticks, no
+member dead in that fight. (K=0 at shifts 23 and 41 both won it in 8681
+ticks: the event battle's draw is the frame counter, not the seed, so
+those two may be one Tentacles draw.)
+
+**The one loss is the cave, not the Tentacles.** K=3 at shift 41: the
+first step into map 68, formation 232 (NeckHunter, Cruller, Humpty x2),
+the pair at L30 with CELES 1356/1495 and SABIN 1509/1509. SABIN is
+Muddled from the first window and CELES later; each Fight on the ally
+clears it and it lands again (`entity 1 (182/1509) is MUDDLED (STATUS2
+$22)`), CELES dies with no monster action attributed, and SABIN, reviving
+her with a Fenix Down, dies to slot 1's spell: `[death] f+3913 entity 1
+char 5 from 125/1509 by slot 1 cmd $02 atk $05`, `[wipe] ... class=worn
+down (no one-shot, no pips banked)`, `[outcome] battle $0E8 LOST after
+4187 ticks: killed s2:$049 s3:$049` (`var_ed4/k3_s41.log`). Across the set
+formation 232 was fought 53 times, about four a run on maps 68 and 63:
+**52 won, 1 lost**. So the leg's first-attempt rate under this set is 13
+of 14, and the loss is the Muddle the cave's bodies all carry (finding 4).
+No lever for it is measured (section 13).
+
+## 13. What is left, and what the owner may want to decide
+
+- **The cave's formation 232 against the pair**: 52 of 53 won, and the
+  loss was Muddle landing again and again (12.3). One loss in fourteen
+  runs of the leg. A Muddle guard in the kit, a longer grind or SABIN's
+  Air Blade for this formation are the levers; none is measured.
+- **The South Figaro desert** (world group 44) is reachable and unplayed:
+  its Sand Horse pair wiped CELES and SABIN at L28 and at L30 (12.1). With
+  EDGAR (the stretch after this one leaves the castle into that desert)
+  it may be a fair fight; for the pair it is a wall. Whether the Sand
+  Horse's row (2 shields, slash and pierce), its Sand Storm or the level
+  is the lever is a design call.
+- **South Figaro's rich man's basement passage** (maps 83, 84, 87, 89) is
+  not walked: the offline model finds no way across 84 or 89, and no live
+  visit was made (2.4).
+- The **Hero Ring** in map 90 (52,14) is not reachable from where the
+  crossing leaves the party (`no neighbour reachable from (47,25)`); the
+  **Regal Crown** in map 66 (by basement 2's (4,6)) is not visited.
+- The supply band after the leg: Potions 32-49 at the save across the
+  set (34 in the capture), under the combat band at L31 (47) in most
+  runs; the castle's shops refuse this party, so the next arc's first
+  stop is South Figaro's.
 
 ---
 

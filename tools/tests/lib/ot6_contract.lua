@@ -1147,6 +1147,49 @@ M.contracts["wor-south-figaro-v1"] = {
   },
 }
 
+-- wor-edgar-v1: the World of Ruin map outside Figaro Castle, surfaced by
+-- South Figaro, after EDGAR joined and the Tentacles fell in the engine
+-- room (docs/design/route-wor-edgar.md sections 2.7-2.8 and 7).  The turtle
+-- ($0383 cleared again by Gerad's basement scene), Edgar's joining ($02F4),
+-- the Tentacles ($00C6) and the surfacing ($00C7, $0106) have run; the
+-- castle's run to Kohlingen ($00DC) is v0.24's.  CELES, SABIN and EDGAR.
+M.contracts["wor-edgar-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 81, y = 86 },
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x00AC, 1, "the thieves' ship has sailed (_ca9282)" },
+    { 0x026E, 1, "Gerad's basement scene ran (_ca6a2c)" },
+    { 0x02F4, 1, "Edgar's joining ran (:15934)" },
+    { 0x00C6, 1, "the Tentacles are beaten (:16121)" },
+    { 0x00C7, 1, "the castle surfaced (_ca69fd)" },
+    { 0x0106, 1, "the castle stands by South Figaro (_ca69fd)" },
+    { 0x00DC, 0, "the castle has not yet sailed for Kohlingen" },
+  },
+  party = {
+    size = 3,                     -- CELES, SABIN and EDGAR
+    members = {
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+      { 0x04, "EDGAR" },
+    },
+  },
+  ram = {
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
