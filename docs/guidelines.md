@@ -112,6 +112,9 @@ The harness plays OT6 the way a competent person with a controller would.
   not a technical one.** What the World of Ruin teaches (driver
   mechanics, kill orders, design fixes) is welcome in the World of Balance
   too; measure it there and say that it applies there.
+- **MP tension is the target.** Having to choose between spending MP on
+  abilities in random fights and saving it for the boss means the
+  difficulty is balanced well; keep that choice alive when tuning.
 - **Save compatibility becomes a contract at v1.0.** While releases are
   v0.x, keeping older saves loading ([save-layout.md](design/save-layout.md))
   is nice but never a constraint: don't bend a change or add workarounds
