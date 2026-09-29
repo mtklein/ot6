@@ -20,6 +20,15 @@
 --      `if_attack PUMMEL` with `battle_event $09 / kill_monsters ALL,
 --      FADE_HORIZONTAL`, asserted by the battle tearing down within a
 --      bounded window of the Pummel that caused it.
+--   7. and it still ends when VARGAS is Broken (#314).  Two branches off the
+--      snapshot taken as SABIN first takes the field: (a) AuraBolt down to 2
+--      shields, then one Pummel, whose second hit breaks him; (b) AuraBolt
+--      until he is Broken, then one Pummel onto the Broken VARGAS.  Each
+--      asserts he is Broken once the Pummel has landed, that battle_event
+--      $09 ran after it, and that the battle tears down with SABIN holding
+--      (no second Pummel) inside the same window as 6.  A Broken monster's
+--      counters are refused (Ot6MayAct); this one ends the battle, so it is
+--      exempt (Ot6RetalEnds / Ot6AISkip, ot6_break.asm).
 
 -- BioBlaster's targeting byte is $6a = ONE_SIDE|INIT_GROUP|MULTI_TARGET|
 -- ENEMY without $01 MANUAL, so it aims at monster group A (the two Ipoohs)
@@ -94,9 +103,9 @@ local function spellIndexOf(slot, id)
   return nil
 end
 local healBusy = {}                     -- target -> frame a heal was queued
-local function needsHeal(thresh)
+local function needsHeal(thresh, only)
   local best, bestR = nil, 1.0
-  for e = 0, 2 do
+  for e = only or 0, only or 2 do
     if alive(e) and maxhp(e) > 0 then
       local r = hp(e) / maxhp(e)
       if r < thresh and r < bestR
@@ -132,6 +141,8 @@ local function ipoohsDown()
 end
 
 local function shields() return H.readByte(SH(vSlot)) end
+-- OT6_BROKEN_TICKS for his entity: nonzero while he is Broken
+local function brk() return H.readByte(0x3E88 + (8 + vSlot * 2)) end
 local function snap(t)
   H.log(string.format("[%s] f%d actor=%d mstate=$%02X vHP=%d shields=%d/%d " ..
     "revElem=$%02X revClass=$%02X weakElem=$%02X lastSkill=$%02X",
@@ -157,6 +168,9 @@ end
 -- (everyone hands off).  One input pulse per frame while a menu is up; a
 -- watchdog backs out with B and falls back to Fight, counting a nudge.
 local mode = "control"
+local stripTo = 0                       -- strip mode: AuraBolt down to this
+local brPummels = {}                    -- this branch's Pummel actions
+local brEvents = {}                     -- this branch's battle_event ids
 local bioFired, blitzFired = false, false
 local pressKind, pressName = nil, nil    -- a proof action's confirm is in flight
 local M = {}
@@ -179,6 +193,18 @@ end
 
 local function decidePlan(a)
   if a == SABIN_E then
+    if mode == "strip" then
+      if #brPummels > 0 then return { kind = "wait" } end   -- one Pummel only
+      local e = needsHeal(0.35, SABIN_E)
+      if e then
+        local slot = itemSlot(POTION) or itemSlot(TONIC)
+        if slot then return { kind = "potion", target = e, slot = slot } end
+      end
+      if brk() == 0 and shields() > stripTo then
+        return { kind = "blitz", skill = AURABOLT, name = "AURABOLT" }
+      end
+      return { kind = "blitz", skill = PUMMEL, name = "PUMMEL" }
+    end
     if mode == "aurabolt" and not blitzFired then
       return { kind = "blitz", skill = AURABOLT, name = "AURABOLT" }
     end
@@ -378,8 +404,97 @@ local function fightDriver()
 end
 
 local nBefore = 0                       -- gauge-write count before a chip
+local phase2Req, phase2Blob = nil, nil  -- SABIN's first menu, for 7
 
-H.run({ maxFrames = 150000 }, {
+-- 7: one branch off the phase-two snapshot.  SABIN AuraBolts while VARGAS
+-- is unbroken and above `to` shields, then Pummels once and holds; the
+-- battle must tear down to that one Pummel's counter.
+local function brokenBranch(tag, to, wantBrokenAtHit)
+  local req
+  local pummelF = nil
+  return {
+    H.call(function()
+      req = H.requestLoadState(phase2Blob)
+    end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(req, tag .. ": phase-two snapshot restore")
+      brPummels, brEvents = {}, {}
+      for k in pairs(healBusy) do healBusy[k] = nil end
+      resetM()
+      pressKind, blitzFired = nil, false
+      stripTo = to
+      H.assertEq(H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == SABIN_E, true,
+        tag .. ": restored onto SABIN's first menu")
+      H.assertEq(brk(), 0, tag .. ": VARGAS is not Broken at the snapshot")
+      local need = 10 * math.max(shields() - to, 0) + 4
+      H.log(string.format("[%s] start: shields=%d, SABIN %d MP (needs %d)",
+        tag, shields(), mp(SABIN_E), need))
+      H.assertEq(mp(SABIN_E) >= need, true, tag .. ": SABIN's MP covers " ..
+        "the AuraBolts and the Pummel (AuraBolt 10, Pummel 4)")
+      mode = "strip"
+    end),
+    H.driveUntil(function() return #brPummels > 0 end, 20000, {
+      fightDriver(),
+    }, tag .. ": SABIN's Pummel executes"),
+    H.call(function()
+      pummelF = brPummels[1].f
+      snap(tag .. " pummel")
+      if wantBrokenAtHit then
+        H.assertEq(brPummels[1].brk > 0, true, tag .. ": VARGAS is ALREADY " ..
+          "Broken as the Pummel executes (brk=" .. brPummels[1].brk .. ")")
+      else
+        H.assertEq(brPummels[1].brk, 0, tag .. ": VARGAS is unbroken as " ..
+          "the Pummel starts")
+        H.assertEq(brPummels[1].sh, 2, tag .. ": with exactly 2 shields, " ..
+          "so the Pummel's second hit is the one that breaks him")
+      end
+    end),
+    -- let the Pummel's hits resolve, then read the gauge before the counter
+    H.waitUntil(function()
+      return brk() > 0 or not H.battleLoadStarted()
+    end, 600, tag .. ": VARGAS reads Broken after the Pummel", 1),
+    H.call(function()
+      H.assertEq(H.battleLoadStarted(), true, tag .. ": still in battle")
+      H.log(string.format("[%s] after the Pummel: brk=%d shields=%d", tag,
+        brk(), shields()))
+      H.assertEq(brk() > 0, true, tag .. ": VARGAS is Broken when the " ..
+        "Pummel's counter is decided")
+    end),
+    -- The finish is the counter's battle_event $09.  Unbroken it runs
+    -- 602-847 frames after the Pummel executes (probe, main and
+    -- battle-fixes-023 ROMs, shifts 0/20/40, and section 6 here);
+    -- refused, it never runs, and SABIN, holding, is worn down to a game
+    -- over ~6,600 frames later.
+    -- 1500 frames names the refusal instead of waiting for the wipe.
+    H.driveUntil(function()
+      for _, e in ipairs(brEvents) do
+        if e.ev == 0x09 and e.f >= pummelF then return true end
+      end
+      return false
+    end, 1500, {
+      H.call(tapUnlessSabin),
+    }, tag .. ": the Pummel's finish (battle_event $09) runs with VARGAS Broken"),
+    H.driveUntil(function() return not H.battleLoadStarted() end, 9000, {
+      H.call(tapUnlessSabin),
+    }, tag .. ": the fight ends to the Pummel while VARGAS is Broken"),
+    H.call(function()
+      local ev9 = nil
+      for _, e in ipairs(brEvents) do
+        if e.ev == 0x09 and e.f >= pummelF then ev9 = ev9 or e.f end
+      end
+      H.log(string.format("[%s] PASSED: Pummel f%d, battle_event $09 f%s, " ..
+        "torn down f%d (%d frames after the Pummel), pummels=%d", tag,
+        pummelF, tostring(ev9), H.frame, H.frame - pummelF, #brPummels))
+      H.assertEq(ev9 ~= nil, true, tag .. ": battle_event $09 (the Pummel " ..
+        "finish) ran after the Pummel")
+      H.assertEq(#brPummels, 1, tag .. ": one Pummel, no second one")
+      H.screenshot("vargas_" .. tag)
+    end),
+  }
+end
+
+H.run({ maxFrames = 200000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -474,6 +589,26 @@ H.run({ maxFrames = 150000 }, {
       emu.callbackType.write, 0x7E3410, 0x7E3410)
     emu.addMemoryCallback(function(_, v) shWrites[#shWrites + 1] = { H.frame, v } end,
       emu.callbackType.write, 0x7E3E40 + vSlot * 2, 0x7E3E40 + vSlot * 2)
+    -- 7's instruments.  A Pummel action writes its id to $3410 once per hit
+    -- (two hits, 59-134 frames apart, $ff between them; SABIN's turns are
+    -- ~1000 frames apart), so a write within 300 frames of the last is the
+    -- same action.  battle_event's id is $3a2d as AICmd_f7 runs.
+    local lastPummel = nil
+    emu.addMemoryCallback(function(_, v)
+      if v ~= PUMMEL then return end
+      if lastPummel and H.frame - lastPummel < 300 then return end
+      lastPummel = H.frame
+      brPummels[#brPummels + 1] = { f = H.frame, brk = brk(), sh = shields() }
+      H.log(string.format("[vargas] PUMMEL executes f%d: brk=%d shields=%d",
+        H.frame, brk(), shields()))
+    end, emu.callbackType.write, 0x7E3410, 0x7E3410)
+    local f7 = H.sym("AICmd_f7")
+    emu.addMemoryCallback(function()
+      local ev = H.readByte(0x3A2D)
+      brEvents[#brEvents + 1] = { f = H.frame, ev = ev }
+      H.log(string.format("[vargas] battle_event $%02X f%d (brk=%d)", ev,
+        H.frame, brk()))
+    end, emu.callbackType.exec, f7, f7)
   end),
 
   -- ===================================================================== --
@@ -556,6 +691,12 @@ H.run({ maxFrames = 150000 }, {
       "and exactly ONE gauge write in all of phase one: the BioBlaster's")
     snap("phase two")
     H.screenshot("vargas_phase2")
+    phase2Req = H.requestSaveState()      -- 7 branches from this frame
+  end),
+  H.waitFrames(2),
+  H.call(function()
+    H.checkReq(phase2Req, "phase-two snapshot")
+    phase2Blob = phase2Req.blob
   end),
 
   -- ===================================================================== --
@@ -634,4 +775,11 @@ H.run({ maxFrames = 150000 }, {
     end
     H.screenshot("vargas_won")
   end),
+
+  -- ===================================================================== --
+  -- 7: a Broken VARGAS still ends to Pummel (#314): the break lands inside
+  -- the Pummel, then the Pummel lands on a VARGAS already Broken.
+  -- ===================================================================== --
+  H.cond(function() return true end, brokenBranch("breaking-pummel", 2, false), {}),
+  H.cond(function() return true end, brokenBranch("broken-pummel", 0, true), {}),
 })

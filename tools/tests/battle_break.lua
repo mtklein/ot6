@@ -285,6 +285,18 @@ H.run({ maxFrames = 60000 }, {
   -- 4. recovery: timer expires, shields restore, reveal persists.  Nothing
   -- is pressed from here on, so the head takes no further damage; the shell
   -- keeps acting, which is what the party's earlier Heal Force turns paid for.
+  -- The break stops the drive wherever its blind sequence was, and if that
+  -- is inside a submenu, wait mode holds battle time still ($2f41 & $3a8f,
+  -- UpdateBattleTime) and the timer can never run out: measured on the #314
+  -- ROM at shift 0, the MagiTek list (menu state $2a) up, $2f41=$01,
+  -- DecCounters frozen for 12000 frames.  So back out with B until battle
+  -- time runs, then hold.
+  H.driveUntil(function()
+    return (H.readByte(0x2F41) & H.readByte(0x3A8F)) == 0
+  end, 600, {
+    H.call(function() H.setPad(H.frame % 10 < 5 and { "b" } or {}) end),
+  }, "battle time running (no submenu holding it in wait mode)"),
+  H.release(),
   H.waitUntil(function() return timer() == 0 and shields() == 4 end,
     12000, "broken head to recover", 60),
   H.waitFrames(30),
