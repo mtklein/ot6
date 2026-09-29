@@ -109,6 +109,9 @@ Every agent prompt ends with this footer, verbatim:
 > docs/guidelines.md; keep failed attempts. Write cited evidence under
 > build/attempts/<your branch>/ and cite that path. Quote raw log lines for
 > every number you report.
+> Leave no background process behind: wait on a PID (`wait`, `while kill
+> -0 PID`), never `pgrep -f <pattern>`, which matches its own shell and
+> never exits; kill anything you started before you report.
 
 While agents run, keep live.py open (`preview_start` name `ot6-live`) and
 glance at the worker grid for frozen workers; a stuck worker is your problem,
