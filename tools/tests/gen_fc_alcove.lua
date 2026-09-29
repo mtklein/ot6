@@ -86,10 +86,11 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 -- stage, #190).
 --
 -- So the line is what a person does on seeing the Ninja fade out: while a
--- live monster is Vanished (or Imaged), TERRA casts Fire 2 (20 MP; the
--- plan-time absorb guard still refuses it on a fire absorber); otherwise
--- the lookup is empty and she Fights as before.
-local FIRE2 = 0x05
+-- live monster is Vanished (or Imaged), TERRA casts Fire, boosted when her
+-- bank allows, so the fold casts Fire 2 (#305: no one learns Fire 2 any
+-- more; the plan-time absorb guard still refuses it on a fire absorber);
+-- otherwise the lookup is empty and she Fights as before.
+local FIRE = 0x00
 local dodgeSaid = nil
 local MAGIC = setmetatable({}, { __index = function(_, id)
   if id ~= TERRA then return nil end
@@ -97,9 +98,9 @@ local MAGIC = setmetatable({}, { __index = function(_, id)
   if s == nil then dodgeSaid = nil; return nil end
   if dodgeSaid ~= s then
     dodgeSaid = s
-    H.log(string.format("[fc] slot %d wears %s (f%d): TERRA's attack turns go to Fire 2", s, what, H.frame))
+    H.log(string.format("[fc] slot %d wears %s (f%d): TERRA's attack turns go to Fire (boosted: Fire 2)", s, what, H.frame))
   end
-  return { spell = FIRE2 }
+  return { spell = FIRE }
 end })
 local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
                 healPercent = 50, magic = MAGIC }

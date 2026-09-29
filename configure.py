@@ -362,6 +362,9 @@ TEST_ENV = {
     # and declares a two-byte command expedient (state_write_waivers.txt)
     "battle_mimic":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
+    # #292: NUMBER 024 (7 shields) is two steps from this save point
+    "battle_hudcount":
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/n024-entry-save-v1",
     # Phoenix (#293): no fixture has it, so the test Continues fire-out-v1
     # and declares a one-byte esper expedient (state_write_waivers.txt)
     "battle_phoenixprice":
@@ -488,6 +491,24 @@ check("save_layout",
       ["tools/check_save_layout.py", "docs/design/save-layout.md",
        "ff6/src/battle/ot6_memory.inc",
        copy_if_changed_from("build/ot6.sfc")])
+# #305: the natural magic and the Esper spell lists are the planned ones
+# (kits.md, magicite.md, magicite-tube-six.md), and none grants a higher
+# spell tier (guidelines.md, "Stronger spells come from boosting, never from
+# a list").  Reads the grant tables and Ot6FoldTbl out of the built ROM at
+# the addresses ff6-en.dbg records; the selftest runs one mutant per rule.
+check("spell_grants",
+      "python3 tools/check_spell_grants.py --selftest"
+      " && python3 tools/check_spell_grants.py",
+      ["tools/check_spell_grants.py", "ff6/src/battle/ot6_boost.asm",
+       "ff6/include/const.inc", "ff6/src/text/genju_name_en.json",
+       "ff6/src/text/magic_name_en.json", "docs/design/kits.md",
+       "docs/design/magicite.md", "docs/design/magicite-tube-six.md",
+       copy_if_changed_from("build/ot6.sfc")])
+# #292: the HUD's shield-count tiles are generated; the checked-in .inc must
+# be what the generator writes (counts 1-6 byte-identical to the old art is
+# asserted inside the generator).
+check("shield_glyphs", "python3 ff6/tools/gen_shield_glyphs.py --check",
+      ["ff6/tools/gen_shield_glyphs.py", "ff6/src/battle/ot6_shield_glyphs.inc"])
 check("encounters_selftest", "python3 tools/audit_encounters.py --selftest",
       ["tools/audit_encounters.py"])
 check("chestvis_selftest", "python3 tools/chest_visibility.py --selftest",

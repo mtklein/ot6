@@ -513,7 +513,7 @@ cast recovers many times the caster's whole pool. 8 MP keeps
 it net-positive by a wide margin, measured on the shipped ROM at 30 MP
 against a 500 MP pool: 30 → 22 → 63, a +33 net refill for 8. It also
 stops the spell being free, and it stays castable on a nearly
-empty pool. The price applies globally, so ZoneSeek inherits it, which
+empty pool. The price applies globally, to every caster of Osmose, which
 is correct because it is the same spell. The byte lives in
 `battle_main.asm`'s `MagicProp` splice with its argument beside
 it, and `tools/tests/battle_magicite.lua` pins both the price and

@@ -2139,44 +2139,59 @@ M.seqStep = seqStep
 
 -- Wait n frames.
 -- ------------------------------------------------------------ ot6 canary --
+-- The battle-font cells OT6 claims, and what each must hold right now:
+-- { [cell] = { rom = snesPrgRom offset of its 16-byte tile, tag = what } }.
+-- One model for every test that checks the font (glyphCanary, battle_dlgmenu,
+-- battle_hudclobber), read from the ROM's own tables by symbol, so glyph art
+-- and table edits never stale it:
+--   * the eight element icons: Ot6ElemGlyphTbl names the cell of each tile
+--     of Ot6FontIcons;
+--   * the fixed-art hud cells: Ot6BgGlyphCellTbl names the cell of each
+--     tile of Ot6BgGlyphData, which follows it directly;
+--   * the six shield-count cells (#292): monster slot s's cell
+--     (Ot6ShieldSlotCellTbl) holds the Ot6ShieldGlyphs tile for the count its
+--     last upload named (OT6_SHHAVE).  A slot with nothing uploaded (0)
+--     claims nothing: its cell holds the vanilla font's blank.
+function M.ot6FontCells()
+  local rom = emu.memType.snesPrgRom
+  local cells = {}
+  local icons = M.sym("Ot6FontIcons") & 0x3FFFFF
+  local iconCells = M.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
+  for k = 0, 7 do
+    cells[emu.read(iconCells + k, rom)] = { rom = icons + k * 16, tag = "element icon" }
+  end
+  local bg = M.sym("Ot6BgGlyphData") & 0x3FFFFF
+  local bgCells = M.sym("Ot6BgGlyphCellTbl") & 0x3FFFFF
+  -- (a plain error, not assertEq: callers run this every frame)
+  if not (bg > bgCells and bg - bgCells <= 16) then
+    error("Ot6BgGlyphCellTbl must directly precede Ot6BgGlyphData", 2)
+  end
+  for k = 0, bg - bgCells - 1 do
+    cells[emu.read(bgCells + k, rom)] = { rom = bg + k * 16, tag = "hud glyph" }
+  end
+  local have = M.sym("OT6_SHHAVE")
+  local slotCells = M.sym("Ot6ShieldSlotCellTbl") & 0x3FFFFF
+  local glyphs = M.sym("Ot6ShieldGlyphs") & 0x3FFFFF
+  for s = 0, 5 do
+    local n = M.readByte(have + s)
+    if n >= 1 and n <= 99 then
+      cells[emu.read(slotCells + s, rom)] = { rom = glyphs + (n - 1) * 16,
+        tag = string.format("slot %d shield count %d", s, n) }
+    end
+  end
+  return cells
+end
+
 -- Every OT6 font cell in VRAM must match its ROM source data, byte for
--- byte.  Catches battle/effect art clobbering our claimed font cells; the
--- expected bytes come from the ROM itself, so glyph art edits never stale
--- the canary.
+-- byte.  Catches battle/effect art clobbering our claimed font cells.
 function M.glyphCanary()
   local vr, rom = emu.memType.snesVideoRam, emu.memType.snesPrgRom
-  local function findSig(sig)
-    -- scan the whole OT6 slice of bank F0
-    for base = 0x300000, 0x303FF0 do
-      local hit = true
-      for i = 1, 16 do
-        if emu.read(base+i-1, rom) ~= sig[i] then hit = false; break end
-      end
-      if hit then return base end
-    end
-    return nil
-  end
-  -- first 16 bytes of Ot6FontIcons (fire) and Ot6BgGlyphData (shield-1)
-  local icons = findSig({0x10,0x10,0x30,0x38,0x38,0x3c,0x6c,0x7c,
-                         0x6e,0x7e,0xee,0xfe,0x7e,0x7c,0x3c,0x00})
-  local bg    = findSig({0x7e,0x00,0x91,0x7e,0xb1,0x7e,0x91,0x7e,
-                         0x52,0x3c,0x3c,0x38,0x18,0x00,0x00,0x00})
-  M.assertEq(icons ~= nil, true, "Ot6FontIcons found in rom bank F0")
-  M.assertEq(bg ~= nil, true, "Ot6BgGlyphData found in rom bank F0")
-  local function checkTile(cell, romBase, tag)
+  for cell, c in pairs(M.ot6FontCells()) do
     local v = 0xB000 + cell*16          -- 2bpp font cell in vram
     for i = 0, 15 do
-      local got, want = emu.read(v+i, vr), emu.read(romBase+i, rom)
-      M.assertEq(got, want, string.format("%s: cell %02X byte %d", tag, cell, i))
+      M.assertEq(emu.read(v+i, vr), emu.read(c.rom+i, rom),
+        string.format("%s: cell %02X byte %d", c.tag, cell, i))
     end
-  end
-  local iconCells = {0xeb,0xec,0xed,0x64,0xef,0xfb,0xfc,0xfd}
-  for k, cell in ipairs(iconCells) do
-    checkTile(cell, icons + (k-1)*16, "element icon")
-  end
-  for k = 1, 16 do
-    local cell = emu.read(bg - 17 + k, rom)  -- Ot6BgGlyphCellTbl precedes the data
-    checkTile(cell, bg + (k-1)*16, "hud glyph")
   end
 end
 

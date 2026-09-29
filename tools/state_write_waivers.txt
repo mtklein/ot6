@@ -48,6 +48,7 @@ tools/tests/battle_counterboost.lua	.writeByte(
 tools/tests/battle_counterboost.lua	.writeWord(
 tools/tests/battle_counterfold.lua	.writeByte(
 tools/tests/battle_dancemp.lua	.writeWord(
+tools/tests/battle_dlgmenu.lua	.writeByte(	quarantine: #292 review, synthetic step -- one monster slot's shield-count upload planted pending mid-dialogue (OT6_SHWANT/OT6_SHPEND), because a count change landing while a battle dialogue is up is not a thing a fixture produces on cue; the property is that the nmi holds the upload until the dialogue and its re-lay are done
 tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(
 tools/tests/battle_doom.lua	.writeByte(	quarantine: #190 mechanism staging -- Condemned is poked in the engine's own shape (STATUS2 $01 and the $3B05 count, all StartCondemn writes) because the route's only source is Nerapa on the FC escape; the property under test is the driver's read of the count.  Also zeroes the battle-bag Fenix Down (BATTINV $2686 count) so the condemned member's care decision is the heal #190 refuses, not a legitimate revive of the corpse doomedA's own Doom leaves
@@ -62,6 +63,7 @@ tools/tests/battle_fontrestore.lua	.writeByte(	quarantine: deliberate VRAM corru
 tools/tests/battle_fontrestore.lua	emu.write	quarantine: deliberate VRAM corruption for the font-restore path (owner-named)
 tools/tests/battle_gaufight.lua	.writeByte(
 tools/tests/battle_hudoverlap.lua	.writeByte(
+tools/tests/battle_hudcount.lua	.writeByte(	quarantine: #292 synthetic step after the played check -- a monster's shield count written to 11 (AtmaWeapon's authored count, first met on the Floating Continent, far past any nearby fixture) to show the two-numeral HUD tile drawn; a mechanism check of the drawing, not play
 tools/tests/battle_kitrefuse.lua	.writeWord(	quarantine: Steal is a chance verb and stays flat at 4 MP at every boost level (#219), so no boost can price it out and the thief arm's only unaffordable Steal is a drained pool; the pin puts LOCKE one MP under the flat price with his own command window already up, and restores his real pool immediately after.  The blitz and tools arms are priced out by real R presses on real banked pips and take no write at all; the window, the grey, the confirm, the queue counter and the buzz under test are the ROM's in every arm
 tools/tests/battle_left.lua	.writeByte(	quarantine: #255 mechanism staging -- a member is marked as having LEFT the battle by its bit in $3A39, the byte TargetEffect_27 writes (a Sneeze, a run, a Smoke Bomb), because the natural case (a member sneezed out below the heal fraction with others still fighting) did not occur in 52 measured cases; the property under test is the driver's read of the mask
 tools/tests/battle_left.lua	.writeWord(	quarantine: #255 mechanism staging -- the member who left is hurt to a third so the heal line has a member it would otherwise take, battle_doom's and battle_healerdown's shape

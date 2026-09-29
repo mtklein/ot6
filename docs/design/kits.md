@@ -40,7 +40,10 @@ the `$11` it writes is picked up by Leap's own vanilla availability test
 without extra code.
 
 Boost-tier folding means kits list **base spells only**: Fire is a
-kit entry, and Fire 2/3 are what boosting does to it.
+kit entry, and Fire 2/3 are what boosting does to it. Terra's and
+Celes's tables below are the natural magic the ROM ships ("join" is
+level 1): `tools/check_spell_grants.py` fails the build when
+`NaturalMagic` differs from them (#305).
 
 Physical chip classes are **slashing / piercing / bludgeoning /
 special ¤** (see weapon-classes.md). The weapon sets Fight's

@@ -67,9 +67,9 @@ the Empire's plates), which players could not follow.
 | Shields, half damage while shielded, breaking (can't act, ×2 damage), recovery | $0267 | middle (106) |
 | Weaknesses: '?' cells, elements and weapon types, the Magic list's element icons and the weapon icons, the codex | $0264 | middle (106) |
 | Boost Points: 1 at the start, +1 a turn, cap 5; R adds (up to 3), L takes back; no point on a boosted turn | $026D | left (105) |
-| What a boost buys: Fight's extra hits (free); ×2/×4/×8 damage on other skills; MP ×2.5 a point, capped at 99 | $0270 | left (105) |
+| What a boost buys: Fight's extra hits (free); ×2/×4/×8 damage on other skills, Dance included; MP ×2.5 a point, capped at 99 and never below the unboosted price | $0270 | left (105) |
 | Stronger spells: Fire → Fire 2 → Fire 3 and the other families, at the cast spell's MP; the Magic list previews | $026E | left (105) |
-| Skills that changed: MP on Blitz/Tools/SwdTech/Steal/Dance/Rage; Blitz list; SwdTech rows; Steal/Slot/Rage odds (Steal and Rage certain at 3); Shadow's break kill | $0276 | left (105), far corner |
+| Skills that changed: MP on Blitz/Tools/SwdTech/Steal/Dance/Rage; SwdTech rows; Steal/Slot/Rage odds (Steal and Rage certain at 3); Shadow's break kill | $0276 | left (105), far corner |
 | Runic earns a Boost Point | $026F page 1 | left (105) |
 | Espers: spells only while equipped, stat changes while equipped, no level-up bonuses | $0274 pages 4-5 | hall (the magicite ghost) |
 | A practice fight | $025D page 2 | right (107), beside the monster chest |
@@ -78,8 +78,10 @@ Not taught here (each is shown where it is used, or is a detail of one
 character's menu): Locke's Filch and Bestow (named in his Steal menu),
 the boosted Runic stance, the True Knight cover's Boost Point, the Rage,
 Lore and SwdTech loadout pages in the field menu, and allies the game
-steers spending their points when hurt. Blitz's list is also taught at
-the Vargas fight, where the player first uses it.
+steers spending their points when hurt. Sabin's Blitz list is taught at
+the Vargas fight, where the player first uses it (battle dialog $54-$56 and
+$D4-$D8: choose Blitz, pick from the list, press A), and only there: $0276
+used to repeat it (#301).
 
 The player enters at the bottom-right; the door advisor speaks $0257
 and unlocks the door, and the hall greeter repeats it. There is no forced
@@ -159,11 +161,11 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Boosting a Blitz, Tool, Lore, Esper or most spells does 2x damage for 1 point, 4x for 2, and 8x for 3.
+> Boosting a Blitz, Tool, Dance, Lore, Esper or most spells does 2x damage for 1 point, 4x for 2, and 8x for 3.
 >
 > *(next box)*
 >
-> Those cost more MP when boosted: 2.5x per point, but never over 99.
+> Those cost more MP when boosted: 2.5x per point, never over 99, and never less than unboosted.
 
 **$026E — stronger spells from a boost (left room):**
 
@@ -180,10 +182,6 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 **$0276 — skills that work differently (left room, far corner):**
 
 > In OT6, Blitz, Tools, SwdTech, Steal, Dance and Rage cost MP. If you can't pay, the skill is greyed out.
->
-> *(next box)*
->
-> Sabin's Blitz: pick one from a list. There are no button codes.
 >
 > *(next box)*
 >
@@ -232,7 +230,8 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 Every claim was checked against the code (2026-09-28):
 
 - Shields and breaking: the shield cell under each monster draws the
-  count (1-6; a count above 6 draws as 6) and a grey shield with an X
+  count (any count 1-99: one numeral in the grey shield up to 9, two
+  numerals on a dark shield from 10; #292) and a grey shield with an X
   while broken (`ot6_hud.asm`, the BG3 cells under each sprite). Every
   damaging hit on a shielded, unbroken monster is ×0.5, on or off
   weakness (`Ot6ShieldedDmg`, `Ot6ShieldedMulW = $0008`); a hit on a
@@ -251,16 +250,17 @@ Every claim was checked against the code (2026-09-28):
   past the bank, L lowers it (`ot6_hud.asm`, the boost input handler).
 - What a boost buys: Fight/Capture swings (`Ot6FightBoost`); ×2/×4/×8
   on every other damage verb outside the gate list (`Ot6BoostDmg`); the
-  MP price `min(99, round(base × 2.5^boost))` on exactly those
-  (`Ot6BoostPriceFor`, [mp-economy.md](mp-economy.md)). Dance is left
-  out of $0270's list on purpose: only the dance's first step carries
-  the boost (the pending boost clears at that turn's end).
+  MP price `max(base, min(99, round(base × 2.5^boost)))` on exactly
+  those (`Ot6BoostPriceFor`, [mp-economy.md](mp-economy.md)): capped at
+  99, and a spell already dearer than 99 (Phoenix, 110) keeps its price.
+  Dance is in $0270's list because a boosted Dance multiplies every step
+  of that dance (#294, `Ot6DanceStartGate`).
 - Stronger spells: `Ot6FoldTbl` (Fire, Ice, Bolt, Poison, Cure, Life,
   Slow, Haste), `Ot6FoldSteps` clamps a boost of 3 to two tiers, the
   cast tier's own MP (`Ot6QueueFold` → `Ot6SpellMP`), and the Magic
   list's live names and prices (`Ot6PreviewList_ext`, `Ot6FoldPrices`).
 - Skills: prices and greys ([mp-economy.md](mp-economy.md),
-  `Ot6KitConfirmMP`); the Blitz list (`ot6_cmdmenu.asm`); SwdTech's three
+  `Ot6KitConfirmMP`); SwdTech's three
   rows at 1/2/3 BP over Cyan's top three techs (`ot6_bushido.asm`);
   Steal/Slot/Rage odds (`ot6_steal.asm`, `ot6_slot.asm`, `ot6_rage.asm`);
   Shadow's break kill (`ot6_divine.asm`, death-immune targets only

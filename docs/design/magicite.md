@@ -78,6 +78,20 @@ describes the *proposed* system, not the shipped one.
 The tube room grants Unicorn, Maduin, Shoat, Phantom, Carbunkl and Bismark
 together, in one scene; see `magicite-tube-six.md`.
 
+The **Spells** column ships for every row (#305): each stone grants exactly
+its listed spells, except the tube room's six, which grant the lists in
+`magicite-tube-six.md` §11, and Golem, whose "Protect-alike" names no FF6
+spell, so it grants Safe alone. `tools/check_spell_grants.py` checks this on
+the built ROM. The other columns of every row but Ifrit's and Shiva's are
+still proposals.
+
+The World of Ruin stones have no approved list yet (see the draft below). They keep their vanilla
+spells without the higher tiers (no stone grants one): Palidor Haste, Slow,
+Float; Tritoch Fire, Ice, Bolt (the heads of its Fire 3, Ice 3, Bolt 3);
+Starlet Cure, Regen, Remedy; Phoenix Life, Life 3, Cure, Fire (Cure 3 and
+Fire 3 to their heads; Life 3 is no tier, since boosting Life stops at
+Life 2).
+
 - The **kit-forming question** per character is which esper completes
   them (Celes+Carbunkl = the rune fortress; Locke+Stray = the
   ghost thief; Edgar+Golem = the siege engine; Sabin+Ifrit = the

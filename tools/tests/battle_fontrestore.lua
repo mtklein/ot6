@@ -1,6 +1,6 @@
 -- @suite
 -- battle_fontrestore: a battle dialogue uploads its text over our font
-local goodFire, goodShield
+local goodFire, goodShield, shieldCell
 -- cells at vram $5800, and the vanilla small-font restore on close brings
 -- back only the vanilla glyphs, so our element icons and hud glyphs
 -- vanish until the next battle.  The fix: the dialogue-close path
@@ -37,7 +37,18 @@ H.run({ maxFrames = 30000 }, {
   -- baseline: snapshot our icons before corruption
   H.call(function()
     goodFire = cellBytes(0xeb)
-    goodShield = cellBytes(0x65)
+    -- the shield cell of the first monster slot holding a count tile: since
+    -- #292 each slot owns one of $65-$6b and holds its own count's tile, so
+    -- a cell of an empty or shieldless slot has nothing to restore
+    local have, cells = H.sym("OT6_SHHAVE"), H.sym("Ot6ShieldSlotCellTbl") & 0x3FFFFF
+    for s = 0, 5 do
+      if shieldCell == nil and H.readByte(have + s) ~= 0 then
+        shieldCell = emu.read(cells + s, emu.memType.snesPrgRom)
+      end
+    end
+    H.assertEq(shieldCell ~= nil, true,
+      "precondition: a monster slot's shield-count cell holds a tile")
+    goodShield = cellBytes(shieldCell)
     H.log("baseline fire cell: " .. goodFire)
     H.assertEq(goodFire ~= string.rep("0,", 15) .. "0", true,
       "fire icon present before corruption")
@@ -46,7 +57,7 @@ H.run({ maxFrames = 30000 }, {
   -- font-restore DMA would (writing vram directly from lua is allowed)
   H.call(function()
     for _, cell in ipairs({ 0xeb, 0xec, 0xed, 0x64, 0xef, 0xfb, 0xfc, 0xfd,
-                            0x65, 0x66, 0x67, 0x71 }) do
+                            0x65, 0x66, 0x67, 0x69, 0x6a, 0x6b, 0x71 }) do
       for i = 0, 15 do emu.write(0xB000 + cell*16 + i, 0x5a, vr) end
     end
     H.log("corrupted fire cell: " .. cellBytes(0xeb))
@@ -62,7 +73,7 @@ H.run({ maxFrames = 30000 }, {
   H.call(function()
     H.log("restored fire cell: " .. cellBytes(0xeb))
     H.assertEq(cellBytes(0xeb), goodFire, "fire icon restored exactly")
-    H.assertEq(cellBytes(0x65), goodShield, "hud shield glyph restored exactly")
+    H.assertEq(cellBytes(shieldCell), goodShield, "hud shield glyph restored exactly")
     H.assertEq(H.readByte(FONTDIRTY), 0, "dirty flag cleared")
     H.glyphCanary()   -- full VRAM-vs-ROM check of every OT6 font cell
   end),

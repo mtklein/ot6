@@ -60,6 +60,16 @@
         shorta
         lda     #$80
         sta     hVMAINC         ; increment on high byte, +1 word
+        ; the six shield-count cells hold no known tile yet (#292): the
+        ; small font just landed over them.  forget every slot's tile and
+        ; any pending upload (power-on junk included), so the hud builder
+        ; asks for each shielded slot's count afresh.
+        ldx     #$000c
+        lda     #$00
+:       dex
+        sta     f:$7e0000+OT6_SHHAVE,x  ; OT6_SHHAVE and OT6_SHWANT
+        bne     :-
+        sta     f:$7e0000+OT6_SHPEND
         jsr     Ot6LoadElemIcons
         jsr     Ot6LoadBgGlyphsA
         jsr     Ot6LoadBgGlyphsB

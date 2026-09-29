@@ -1244,41 +1244,44 @@ BlitzLevelTbl:
 ; ec/e3c0
 NaturalMagic:
 
+; OT6: the planned kits, exactly (docs/design/kits.md, Terra's and Celes's
+; tables), not vanilla's 16-spell lists.  Stronger tiers are never listed
+; (guidelines: "Stronger spells come from boosting, never from a list"):
+; boosting Fire casts Fire 2 and Fire 3.  "join" is level 1, so the spell is
+; known at whatever level she joins.  The kit's story entries (Terra's
+; Trance, Celes's Runic and RunicBlade) are not spells and are not here.
+;
+; Each list is 16 [spell, level] pairs.  The unused pairs are NATURAL_NONE
+; ($ff, $ff): no level reaches $ff (the cap is 99), so neither learn loop
+; ever takes one -- UpdateAbilities stops at the first pair above the
+; current level, and LearnAbilities takes only a pair whose level equals the
+; new one.  That is also why the real pairs must come first, in level order.
+; tools/check_spell_grants.py checks the built table against the doc.
+
+.define NATURAL_NONE $ff, $ff
+
 ; terra
-        .byte ATTACK::CURE, 1
-        .byte ATTACK::FIRE, 3
-        .byte ATTACK::ANTDOT, 6
+        .byte ATTACK::FIRE, 1           ; join
+        .byte ATTACK::CURE, 1           ; join
         .byte ATTACK::DRAIN, 12
         .byte ATTACK::LIFE, 18
-        .byte ATTACK::FIRE_2, 22
-        .byte ATTACK::WARP, 26
-        .byte ATTACK::CURE_2, 33
-        .byte ATTACK::DISPEL, 37
-        .byte ATTACK::FIRE_3, 43
-        .byte ATTACK::LIFE_2, 49
-        .byte ATTACK::PEARL, 57
-        .byte ATTACK::BREAK, 68
-        .byte ATTACK::QUARTR, 75
-        .byte ATTACK::MERTON, 86
-        .byte ATTACK::ULTIMA, 99
+        .byte ATTACK::BREAK, 24
+        .byte ATTACK::PEARL, 30
+        .byte ATTACK::MERTON, 33
+.repeat 9
+        .byte NATURAL_NONE
+.endrep
 
 ; celes
-        .byte ATTACK::ICE, 1
+        .byte ATTACK::ICE, 1            ; join
         .byte ATTACK::CURE, 4
-        .byte ATTACK::ANTDOT, 8
         .byte ATTACK::IMP, 13
         .byte ATTACK::SCAN, 18
         .byte ATTACK::SAFE, 22
-        .byte ATTACK::ICE_2, 26
         .byte ATTACK::HASTE, 32
-        .byte ATTACK::BSERK, 40
-        .byte ATTACK::MUDDLE, 32
-        .byte ATTACK::ICE_3, 42
-        .byte ATTACK::VANISH, 48
-        .byte ATTACK::HASTE2, 52
-        .byte ATTACK::PEARL, 72
-        .byte ATTACK::FLARE, 81
-        .byte ATTACK::METEOR, 98
+.repeat 10
+        .byte NATURAL_NONE
+.endrep
 
 .popseg
 
