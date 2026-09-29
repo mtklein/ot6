@@ -27,13 +27,26 @@ Stated once, assumed by every block:
   all fire whether or not the boss is Broken. The gauge changes
   combat, not scripted story events. (Kefka's camp flees used to head
   this list. They have no state to override, because they have no
-  monster and no gauge; see 6.)
-- **Counters are disabled while Broken.** A Broken enemy loses its
-  counters along with its turns, so Whelk's shell does not counter
-  during the window. This matches Octopath. `Ot6MayAct`
-  (`ot6_break.asm:1666`) asks the same question at turn time that
-  `Ot6Gate` asks at queue time, at `battle_main.asm:274` and inside
-  `CheckRetal` at `:12761`.
+  monster and no gauge; see 6.) Vargas's finish is a counter, so it
+  rides the exception below; until #314 it did not, and a Pummel that
+  broke him or landed while he was Broken did not end the fight.
+- **Counters are disabled while Broken, except the one that ends the
+  battle.** A Broken enemy loses its counters along with its turns, so
+  Whelk's shell does not counter during the window. This matches
+  Octopath. `Ot6MayAct` (`ot6_break.asm`) asks the same question at
+  turn time that `Ot6Gate` asks at queue time, inside `CheckRetal`.
+  The exception is keyed on the script's own action, not on the
+  monster: a counter-script block that ends the battle
+  (`kill_monsters ALL`, `boss_death`, `end_battle`, `change_battle`,
+  or a block that holds one) still runs while Broken, and every other
+  block of that counter is skipped the way vanilla skips a Stopped
+  monster's counter commands (`Ot6RetalEnds`, `Ot6AISkip`). A dying
+  monster's counter (`if_self_dead`) runs in full, Broken or not, as
+  before. Measured for Vargas (`battle_vargas.lua` 7). From the code
+  and not measured here: Ultros ③'s interrupt block (`battle_event
+  $16`) holds an `if_self_dead` / `kill_monsters ALL`, so it runs
+  while Broken too; before #314 a Broken Ultros deferred it to the
+  first hit after he recovered.
 - **A nameplate with no shields is itself information.** Scripted
   set-pieces (Tritoch, Guardian, the Imperial Camp Kefka) draw no
   gauge at all, which tells the player the fight is scripted.
@@ -194,6 +207,20 @@ fire + slashing.
   fight. What the ×2 window buys is free turns to enter the Blitz
   input while he is Broken. Killing him by damage instead (11,600 HP
   at level 10) is still possible.
+- **Pummel ends it, Broken or not (#314).** MEASURED before the fix
+  (seed shifts 0/20/40, on main's ROM and on wt/battle-fixes-023's):
+  a Pummel landing on a Broken Vargas, or the Pummel whose second hit
+  broke him (from 2 shields), queued no counter (`Ot6MayAct`
+  refused it) and the fight went on; only the first Pummel after he
+  recovered ended it, 3,079-4,137 frames after the first one. It
+  never softlocked while SABIN kept Pummeling, but a SABIN who stopped
+  was worn down to a game over. Unbroken, Pummel ends it
+  1,084-1,332 frames after it lands, and now Broken does too
+  (1,030-1,191). The finish block is exempt from the break (above),
+  and `battle_vargas.lua` 7 asserts both Broken cases end to one
+  Pummel. The generator's route never reached the Broken case:
+  `gen_vargas` plays no weakness hit before SABIN's first Pummel,
+  which lands on 5 shields and takes him to 3 (measured, six runs).
 
 ## Lete River
 
