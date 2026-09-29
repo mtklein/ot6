@@ -1952,6 +1952,82 @@ Ot6ShieldTbl:
         .byte   2, OT6_SLASH    ; pm stalker: a floating ghost, the blade
                                 ;   in Celes's hand.  fire|holy vanilla;
                                 ;   absorbs poison
+        ; ---- the world of ruin: tzen to edgar (nikeah, south figaro, the
+        ; figaro cave, the castle's engine room; docs/design/route-wor-
+        ; edgar.md section 8) ------------------------------------------------
+        ; Celes and Sabin hold slash (swords, claws) and bludg (Pummel,
+        ; Suplex); Edgar joins at the Tentacles and adds pierce (the
+        ; AutoCrossbow).  Vanilla element bits stay.  Shields follow the
+        ; house curve (1 pests, 2 trash, 3 tanks, 4 miniboss-grade); the
+        ; Tentacles are a four-body boss at 5 each.  None of these species
+        ; is met in the WoB.  tools/tests/battle_breakwor_edgar.lua reads
+        ; them back from the ROM.
+        ; -- north of tzen to nikeah (world groups 37-39) --
+        .word   $0035
+        .byte   1, OT6_SLASH    ; bloompire: 12 hp behind def/mdef 254; the
+                                ;   first blade breaks it, and broken it
+                                ;   loses the turn its Energy Sap (zombie)
+                                ;   would take.  fire vanilla
+        .word   $0058
+        .byte   3, OT6_BLUDG    ; buffalax: the tank, a bull's hide dented
+                                ;   by fists; its counter answers only
+                                ;   magic.  fire|water vanilla
+        .word   $003c
+        .byte   3, OT6_SLASH|OT6_PIERCE ; lizard: scales a blade or a point
+                                ;   opens.  ice vanilla
+        .word   $0030
+        .byte   2, OT6_BLUDG|OT6_PIERCE ; delta bug: def 220 / mdef 5, a shell
+                                ;   cracked, not cut -- the spell, not
+                                ;   the blade.  fire vanilla
+        ; -- the south figaro continent (world groups 41-44) --
+        .word   $00c3
+        .byte   1, OT6_SLASH    ; nohrabbit: a 75-hp pest that cures the
+                                ;   party when struck; one shield so the
+                                ;   gauge reads right.  water vanilla
+        .word   $00b9
+        .byte   3, OT6_SLASH|OT6_PIERCE ; latimeria: the forest's tank,
+                                ;   filleted.  bolt vanilla
+        .word   $0097
+        .byte   2, OT6_SLASH|OT6_BLUDG  ; maliga: a sand crab, the hermitcrab
+                                ;   row.  ice|bolt|water vanilla
+        .word   $005f
+        .byte   2, OT6_SLASH|OT6_PIERCE ; sand horse: break it before its
+                                ;   jaws close (clamp, x5, every turn
+                                ;   once alone).  ice|water vanilla
+        ; -- the figaro cave and the castle's basements (groups 137-140) --
+        .word   $0049
+        .byte   2, OT6_BLUDG    ; humpty: an egg, cracked.  fire|holy
+                                ;   vanilla; absorbs poison
+        .word   $004b
+        .byte   3, OT6_BLUDG    ; cruller: dough, beaten; evade 100 makes
+                                ;   its fire|holy vanilla (and its runic
+                                ;   fire 2) the real handles
+        .word   $00a9
+        .byte   3, OT6_SLASH|OT6_PIERCE ; neckhunter: a reaper, a blade or a
+                                ;   point.  poison vanilla (bio blaster)
+        .word   $00d7
+        .byte   4, OT6_SLASH|OT6_BLUDG  ; dante: the cave's miniboss-grade
+                                ;   body; broken, it cannot counter with
+                                ;   L.3 Muddle.  poison vanilla
+        .word   $008b
+        .byte   2, OT6_BLUDG|OT6_PIERCE ; drop: a blade passes through water;
+                                ;   a fist or a point splashes it.
+                                ;   bolt|water vanilla
+        ; -- the engine room's tentacles (event group 84, formation 454) --
+        ; each absorbs one of the party's elements, so the classes carry
+        ; the fight; each member holds a class key on three of the four
+        .word   $011b
+        .byte   5, OT6_SLASH|OT6_PIERCE ; tentacle (7000 hp): weak ice|water,
+                                ;   absorbs fire
+        .word   $013c
+        .byte   5, OT6_SLASH|OT6_BLUDG  ; tentacle (6000): weak fire, absorbs
+                                ;   ice|water
+        .word   $013d
+        .byte   5, OT6_BLUDG|OT6_PIERCE ; tentacle (5000): no weakness,
+                                ;   absorbs bolt|water; not celes's
+        .word   $013e
+        .byte   5, OT6_SLASH|OT6_PIERCE ; tentacle (4000): no weakness,
+                                ;   absorbs earth|water
         ; scripted set-pieces: no gauge drawn
         .word   $0111
         .byte   0, $00          ; guardian

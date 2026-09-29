@@ -560,6 +560,26 @@ trash, **3** for tanks, **4** for miniboss-grade; bosses by bosses-wob's
 curve. Vanilla element bits stay; no `Ot6ElemAddTbl` rows. Today's floor
 (5-6 shields) puts every break here on a corpse.
 
+**Authored** as designed below, one block in `Ot6ShieldTbl`
+(`ff6/src/battle/ot6_hud.asm`, "the world of ruin: tzen to edgar"), pending
+the owner's review of the table. `tools/tests/battle_breakwor_edgar.lua`
+(`@suite`) reads them back from the built ROM: each row, its vanilla weak
+byte and the absence of an `Ot6ElemAddTbl` row; that every species of every
+formation of world groups 37-44, maps 68, 90, 92, 53, 62-64 and event group
+84 has an authored row and a key for the party that meets it; and that each
+member holds a class key on at least three of the four Tentacles. Evidence
+in `build/attempts/wt/wor-edgar/rows/`: green on the authored ROM
+(`suite.green.log`: `checked 17 designed rows`, `checked 23 formations, 36
+formation-species pairs`, `PASS (frame 31) attempts=1/1`), red on main's ROM
+(`suite.red.main-rom.log`: `got 52 ($34), want 0`), red on a mutant ROM
+with one line per mutant (`suite.mutant.log`, `mutate.py`: shields, class
+mask, a keyless Drop, a Tentacle CELES cannot key, a missing row, an
+element add, a vanilla weak byte: `got 12 ($C), want 0`).
+`check_shield_rows OK: 120 Ot6ShieldTbl rows, one per species, ROM matches
+source`; `audit_break_coverage.py` no longer lists any of the seventeen as
+unauthored (`audit.before.txt`, `audit.after.txt`); the tuning claim is
+unchanged and grows only by play.
+
 ### 8.1 Who holds what
 
 | hand | classes | elements |
@@ -646,10 +666,11 @@ Party: CELES, SABIN and EDGAR (who joins on the spot). Formation 454.
 | `$13D` | 33 | 5000 | — / **bolt**, water | **5 · bludg, pierce** |
 | `$13E` | 34 | 4000 | — / earth, water | **5 · slash, pierce** |
 
-- **Keys:** every body is keyed for the party; each member holds a key on
-  three of the four, and none alone holds all four: `$13D`, which absorbs
-  CELES's bolt and has no weakness, answers only SABIN's fists and EDGAR's
-  crossbow. `design_keys.txt`: `CELES + SABIN + EDGAR: designed
+- **Keys:** every body is keyed by class for the party, and each member
+  holds a class key on at least three of the four: SABIN (slash, bludg)
+  and EDGAR (slash, pierce) on all four, CELES (slash) on three. `$13D`,
+  which absorbs CELES's bolt and has no weakness, answers only SABIN's
+  fists and EDGAR's crossbow. `design_keys.txt`: `CELES + SABIN + EDGAR: designed
   Tentacle:Y Tentacle:Y Tentacle:Y Tentacle:Y`.
 - **Telegraph:** Entwine is the wind-up: a Slowed member is Seized on
   that Tentacle's next turn. Break the Tentacle whose Entwine landed and
