@@ -36,6 +36,13 @@
 --      spent, the bit stays, and the roster line names the cure the bag
 --      would not offer -- a zombie is never a Fenix Down's business.
 --   C. Petrify, Soft in the bag: the petrify row fires the same way.
+--   D. Zombie at 0 HP, the shape a battle leaves it in (measured north of
+--      Tzen: a Bloompire's Energy Sap left `c6 0/1396 hp status1=02`, no
+--      Wound bit, and the old care took the 0 HP for dead, planned a Fenix
+--      Down the game refused and walked on with the zombie --
+--      build/attempts/wt/wor-edgar/leg1/var1/k5_s0.log): the visit cures it
+--      with a Revivify and plans no revive.  Two more staged bytes, the HP
+--      word, in the same quarantine.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local LOCKE = 0x01
@@ -56,6 +63,7 @@ end
 local function forget() lines = {} end
 
 local function statusAddr(c) return 0x1600 + 37 * c + 20 end
+local function hpAddr(c) return 0x1600 + 37 * c + 9 end
 
 -- the one staged byte: `bit` onto LOCKE's status 1
 local function stage(bit, what)
@@ -150,5 +158,27 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.charStatus1(LOCKE) & PETRIFY, 0, "C: the Petrify bit is cleared")
     H.assertEq(H.invCountOf(SOFT), before.soft - 1, "C: one Soft spent")
     H.assertEq(H.invCountOf(FENIX), before.fenix, "C: no Fenix Down spent")
+  end),
+
+  -- D
+  reload("boot snapshot reload for D"),
+  stage(ZOMBIE, "D"),
+  H.call(function()
+    H.writeByte(hpAddr(LOCKE), 0)
+    H.writeByte(hpAddr(LOCKE) + 1, 0)
+    H.assertEq(H.charHp(LOCKE), 0, "D: LOCKE reads 0 HP")
+    H.assertEq(H.charStatus1(LOCKE) & 0x80, 0, "D: no Wound bit")
+    H.log(string.format("[D] staged: char %d at 0 HP, status1 %02X", LOCKE, H.charStatus1(LOCKE)))
+  end),
+  remember(),
+  H.fieldCare({ tag = "D" }),
+  H.call(function()
+    H.assertEq(said("[D] plan: cure zombie char 1 with $F1"), true,
+      "D: the visit plans the Revivify for the zombie at 0 HP")
+    H.assertEq(said("[D] used $F1 on char 1"), true, "D: the game accepted the Revivify")
+    H.assertEq(said("[D] plan: revive"), false, "D: no Fenix Down planned for a zombie")
+    H.assertEq(H.charStatus1(LOCKE) & ZOMBIE, 0, "D: the Zombie bit is cleared")
+    H.assertEq(H.invCountOf(FENIX), before.fenix, "D: no Fenix Down spent")
+    H.log(string.format("[D] LOCKE 0 -> %d hp across the cure", H.charHp(LOCKE)))
   end),
 })

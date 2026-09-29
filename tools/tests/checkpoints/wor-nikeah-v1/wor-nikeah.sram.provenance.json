@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "26e88fd1aaca7f66920bb80131bb5e8d04bc73ca099b25202a89a655c4986223",
+  "generator_sig": "73bd3ae0ae45b57cfe13b226bfe6d4b690d874ba355a13a43f715eba76c91c9b gen_wor_nikeah tools/tests/checkpoints/wor-sabin-v1/manifest.json tools/tests/checkpoints/wor-sabin-v1/wor-sabin.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/wor-sabin-v1/manifest.json",
+      "sha256": "3015f6695925384ba61800f1263c5c378bab004c1b81b64ef04655e4e9cb71fc"
+    }
+  ]
+}

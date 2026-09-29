@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-edgar.sram",
+  "size": 32768,
+  "sha256": "5666aa8a7e879f43da1c2718f68db564bbc9cf43958748473ae58119603bfb7b",
+  "slot": 3,
+  "milestone": "wor-edgar",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 81,
+      "y": 86
+    }
+  },
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "5666aa8a7e879f43da1c2718f68db564bbc9cf43958748473ae58119603bfb7b",
+    "generator_sig": "1d1b0107a40d04d1844e24ebacdc889f350ebfcdfd684175a3ceac02858d39a6 gen_wor_edgar tools/tests/checkpoints/wor-south-figaro-v1/manifest.json tools/tests/checkpoints/wor-south-figaro-v1/wor-south-figaro.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-south-figaro-v1/manifest.json",
+        "sha256": "390006f600b1b39588e7527274d896577ee1b439c10540b49d5af3c5c7b955ce"
+      }
+    ]
+  }
+}

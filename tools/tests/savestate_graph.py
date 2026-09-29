@@ -720,4 +720,58 @@ STATES = [
     #     tools/tests/run.sh tools/tests/gen_wor_sabin.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-sabin-v1
     S("wor_sabin", gen="gen_wor_sabin", checkpoint="wor-tzen-door-v1", timeout=3600),
+
+    # wor-sabin-v1 -> the World of Ruin map one step east of Nikeah's door:
+    # cold-Continue the save outside Tzen (CELES and SABIN at world
+    # (131,179)), walk north across the continent -- the Black Drgn's desert
+    # included, which no on-foot path avoids -- fighting everything, and
+    # Save at (148,76): the `wor-nikeah-v1` checkpoint
+    # (docs/design/route-wor-edgar.md section 10).  checkpoint=: it
+    # regenerates from the battery, independently of the chain.
+    # timeout=3600: an attempt runs ~24k frames from the Continue (the graph
+    # run: `PASS (frame 24350)`) and up to ~68k in the variation set's
+    # longest (K=20 encounters used up first, `frame 67702`); three such
+    # attempts are ~200k frames, ~2500 s at a loaded machine's ~80
+    # frames/s.
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-sabin-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-nikeah-v1/wor-nikeah.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_nikeah.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-nikeah-v1
+    S("wor_nikeah", gen="gen_wor_nikeah", checkpoint="wor-sabin-v1", timeout=3600),
+
+    # wor-nikeah-v1 -> the World of Ruin map outside South Figaro: Nikeah
+    # (the item seller, the cafe's four thieves, Gerad's three talks), the
+    # thieves' ship to South Figaro, Gerad upstairs in its inn, the item
+    # shop and the Enhancer, and Save at world (113,96): the
+    # `wor-south-figaro-v1` checkpoint (docs/design/route-wor-edgar.md
+    # section 11).  No random battles on the leg.  timeout=3600: an attempt
+    # runs 26k-44k frames (the variation set, `PASS (frame 26029)` from the
+    # Continue to `frame 43905` with K=6 used up first); three are ~132k
+    # frames, ~1650 s at ~80 frames/s.
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-nikeah-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-south-figaro-v1/wor-south-figaro.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_south_figaro.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-south-figaro-v1
+    S("wor_south_figaro", gen="gen_wor_south_figaro", checkpoint="wor-nikeah-v1", timeout=3600),
+
+    # wor-south-figaro-v1 -> the World of Ruin map outside the surfaced
+    # Figaro Castle: a grind on the South Figaro continent's grass, forest and
+    # plain (not its desert) to L30 (SABIN's Air Blade), the Figaro cave behind
+    # the thieves (the turtle), the castle's basements, EDGAR and the
+    # Tentacles (event battle 84, a game over when lost: the runner retries
+    # from the checkpoint), the Soul Sabre, the engineer's surfacing, and
+    # Save at world (81,86): the `wor-edgar-v1` checkpoint
+    # (docs/design/route-wor-edgar.md section 12).
+    # timeout=7200: an attempt ends at frame 144779-173383 (the variation
+    # set; the capture `PASS (frame 173383)`), ~1040 s at the ~158 frames/s
+    # the review's merged run emulated on the Air; three attempts are
+    # ~520k frames, ~6500 s at a loaded machine's ~80 frames/s.
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-south-figaro-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-edgar-v1/wor-edgar.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_edgar.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-edgar-v1
+    S("wor_edgar", gen="gen_wor_edgar", checkpoint="wor-south-figaro-v1", timeout=7200),
 ]

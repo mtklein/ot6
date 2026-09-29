@@ -97,7 +97,7 @@ tools/tests/field_mpband.lua	.writeByte(	quarantine: #231 mechanism staging -- t
 tools/tests/field_mpband.lua	.writeWord(	quarantine: #231 mechanism staging -- one member's MP word is zeroed (no shipped fixture arrives with a dry caster: the exit contract ships parties whole and a level-up refills the pool) and the HP words are lowered where a branch needs a hole, field_healpolicy's patient one currency over
 tools/tests/probe_tent_summit.lua	.writeByte(	quarantine: #231 instrument -- a Tent staged into an empty bag slot on a fixture that holds none, to watch the field's control cells after the tent event
 tools/tests/field_subjob.lua	.writeByte(
-tools/tests/field_zombiecure.lua	.writeByte(	quarantine: Zombie and Petrify are a monster special's roll (Zombone in the Sealed Gate cave is the walked route's one Zombie pool), not producible on cue, and the exit contract ships no fixture carrying either; the file writes the one status-1 bit onto LOCKE from the boot snapshot, and the plan, the menu walk, the item's acceptance, the bag delta and the cleared bit under test are the game's own, read back
+tools/tests/field_zombiecure.lua	.writeByte(	quarantine: Zombie and Petrify are a monster special's roll (Zombone in the Sealed Gate cave is the walked route's one Zombie pool), not producible on cue, and the exit contract ships no fixture carrying either; the file writes the one status-1 bit onto LOCKE from the boot snapshot (and for its branch D, the zombie at 0 HP a battle leaves, his HP word to 0), and the plan, the menu walk, the item's acceptance, the bag delta and the cleared bit under test are the game's own, read back
 tools/tests/gen_battle2.lua	.writeWord(
 tools/tests/lib/ot6.lua	.writeByte(
 tools/tests/lib/ot6.lua	.writeWord(
