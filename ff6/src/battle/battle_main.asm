@@ -6680,8 +6680,7 @@ _2754:  jsr     LoadMagicProp
         sta     $bb
 @2761:  lda     $11a2       ;
         pha
-        jsl     Ot6RezTargeting ; ot6: isolate resurrection targetting flag
-                                ;   (and $04 for Life 3, #327)
+        and     #$04        ; isolate resurrection targetting flag
         asl
         tsb     $ba         ; copy to "can hit dead targets flag"
         lda     $01,s
@@ -8453,6 +8452,8 @@ CalcAttackEffect:
         stz     $3a5a
         stz     $3a54
         jsr     ClearGfxParams
+        jsl     Ot6Life3Targeting  ; ot6: a character's Life 3 keeps a KO'd
+                                ;   target (#327); x = attacker
         jsr     ChooseTarget
         jsl     Ot6Oblivion     ; ot6: divine gate -- ChooseTarget has set $b8/$b9,
                                 ;   so the Broken/boss test finally has its target.

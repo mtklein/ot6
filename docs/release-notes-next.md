@@ -50,10 +50,10 @@ Cure, Regen and Remedy; Alexandr Dispel, Safe and Shell; Terrato Quake and
 Quartr; Tritoch Ice, Bolt and Poison; Odin Meteor and Bserk; Raiden
 Meteor, Bserk and Quick; Bahamut Flare and W Wind; Phoenix Life and Antdot;
 Ragnarok Ultima and Warp; Crusader Merton and Meteor. Boosting Life by one
-point casts Life 2, and by two points Life 3, for 60 MP. Life 3 works on
-a fallen ally too: it brings them back at full HP and protects them, so they
-rise again once the next time they fall. On a standing ally it gives only
-that protection.
+point casts Life 2, and by two points Life 3, for 60 MP. Cast by your
+party, Life 3 works on a fallen ally too: it brings them back at full HP and
+protects them, so they rise again once the next time they fall. On a
+standing ally it gives only that protection.
 
 **The shield under a monster shows its true count above 6.** A boss with
 more than six shields used to show 6 until enough had been broken; Number 024

@@ -287,10 +287,11 @@ once when it falls, and it cannot touch a KO'd body. Life and Life 2 only hit
 a KO'd body. As first built, a two-point Life on a fallen ally therefore cast
 Life 3, spent the pips and 60 MP, and left the ally down (LOCKE KO'd by his
 own party, then a two-point Life on him: `lab_lifedead_try1.log`, "hp0
-st1$80"). The owner's call (2026-09-29): **Life 3 revives too.** On a KO'd
-body it revives at full HP, as Life 2 does, and grants its Life 3 status; on
-a living body it grants the status as before. That is the spell's own
-effect, so a monster's Life 3 behaves the same way (below).
+st1$80"). The owner's call (2026-09-29): **Life 3 revives too.** When a
+character casts it through Magic or X-Magic (or Mimics such a cast), on a
+KO'd ally it revives at full HP, as Life 2 does, and grants its Life 3
+status; on a living ally it grants the status as before. Every other Life 3
+is vanilla's (below).
 
 | Boost | Casts | MP | On a KO'd ally | On a living ally |
 |---|---|---|---|---|
@@ -298,24 +299,31 @@ effect, so a monster's Life 3 behaves the same way (below).
 | 1 | Life 2 | 60 | revives at full HP | nothing |
 | 2 or 3 | Life 3 | 60 | revives at full HP, and marks it to revive | marks it to revive |
 
-How (`ot6_boost.asm`, two hooks keyed on the id `LoadMagicProp` just
-loaded): `Ot6RezTargeting` lets Life 3 target a KO'd body as Life and Life 2
-do, without the record's resurrection flag, which `CheckHit` reads as
-"misses the living"; `Ot6Life3Revive`, in the per-target loop, gives a KO'd
-character target Life 2's effect (wound cleared, healed by 16/16 of max HP)
-on top of the record's Life 3 status. `battle_lifefold` measures both
-targets at every boost: LOCKE KO'd, then a two- or three-point Life leaves
-him at 1215/1215 with the status (`build/attempts/wt/wor-espers/`).
+How (`ot6_boost.asm`): two hooks in `CalcAttackEffect`, both gated on the
+executing action itself (`Ot6Life3Cast`: the attacker is a character, the
+queued command is Magic `$02` or X-Magic `$17`, the attack is Life 3).
+`Ot6Life3Targeting`, just before `ChooseTarget`, lets that Life 3 keep a KO'd
+target, as Life and Life 2 do, without the record's resurrection flag, which
+`CheckHit` reads as "misses the living". `Ot6Life3Revive`, in the per-target
+loop, gives a KO'd character target Life 2's effect (wound cleared, healed by
+16/16 of max HP) on top of the record's Life 3 status. `battle_lifefold`
+measures both targets at every boost: LOCKE KO'd, then a two- or three-point
+Life leaves him at 1215/1215 with the status, and a Fenix Down right after a
+Life 3 still revives as a Fenix Down (`build/attempts/wt/wor-espers/`).
 
-**Monsters.** Madam, Magic (Magic Master), L.80 Magic and L.90 Magic cast
-Life 3 (`ai_script.asm`); Rhinox's script names it but its 35 MP never pays.
-All are World of Ruin monsters past the route, and none of those casts was
-measured. Their scripts aim Life 3 at living allies, where nothing changes.
-What changes is the race where the chosen ally dies before the spell lands:
-vanilla dropped the dead target, and now the spell keeps it, as a monster's
-Life would. A KO'd monster is not revived by the direct path (it would also
-need the live-monster mask); the record's Life 3 status lands on it, and the
-engine's own reraise sweep (`ReraiseEffect`) brings it back with Life.
+**Everyone else keeps vanilla Life 3.** The monsters that cast it (Madam,
+Magic Master, L.80 and L.90 Magic; Rhinox's script names it but its 35 MP
+never pays), Gau's Rhinox rage, Control and Sketch. A first cut gave every
+Life 3 the revival, and a review lab (every monster casting Life 3) showed
+monsters then picking their own dead and raising them
+(`build/attempts/review-wor-espers/lab_rv_monlife3_A.log`: 11 landings on
+KO'd bodies). That would retune those fights, and a raged Gau could raise a
+fallen ally in the World of Balance, where kits.md keeps revival to Terra,
+Fenix Downs and Sraphim. With the gate the same lab matches the vanilla
+control counter for counter (74 landings, 0 on a KO'd body, 8 reraises;
+`lab_monlife3_G.log` against `lab_rv_monlife3_B.log`). A rage turn is queued
+as command `$10` (`RandRageAction`) and keeps it in `$3a7c` while it runs,
+so the gate never matches it.
 
 ### Boost on these lists
 

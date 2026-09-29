@@ -1242,8 +1242,6 @@ done:   rts
         bra     @store
 @miss:  lda     #$00
 @store: sta     f:$7e0000+OT6_ATKCLASS
-        lda     $01,s           ; and the id itself, for Life 3's two hooks
-        sta     f:$7e0000+OT6_ATKID     ;   (Ot6RezTargeting, Ot6Life3Revive)
         pla
         plx
         plp

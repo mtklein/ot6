@@ -31,7 +31,7 @@
 --
 -- The ko cases target LOCKE KO'd.  The owner's call (2026-09-29): Life 3
 -- on a KO'd body revives it at full HP, as Life 2 does, AND grants the
--- Life 3 status (Ot6RezTargeting, Ot6Life3Revive).  ko-b1 (Life 2: full
+-- Life 3 status (Ot6Life3Targeting, Ot6Life3Revive).  ko-b1 (Life 2: full
 -- HP, no status) is the control that tells the two apart.
 --
 -- No state is written.  fire-out-v1 has TERRA (Life at 18, kits.md) with a
@@ -44,10 +44,17 @@
 -- two Defend until TERRA has 3 pips again, and that window (K) is restored
 -- for each ko case.
 --
+-- The revival is a character's Life 3 through Magic or X-Magic only
+-- (Ot6Life3Cast); ko-fenix checks that an item action right after a Life 3
+-- is not taken for one, and the b cases pin a living LOCKE's HP (no heal
+-- leaks onto the living).
+--
 -- Red on a ROM whose life row stops at Life 2 (the name and the cast at
 -- boost 2 and 3 are Life 2), on one that keeps Life 3's vanilla 50 MP
--- (boost 2 charged less than boost 1), and on one without the revival
--- (ko-b2 leaves LOCKE at 0 HP, KO'd); build/attempts/wt/wor-espers/.
+-- (boost 2 charged less than boost 1), on one without the revival (ko-b2
+-- leaves LOCKE at 0 HP, KO'd), on one whose gate says yes to every action
+-- (ko-fenix revives at 1215/1215), and on one whose revival skips the KO
+-- test (b2 heals the living LOCKE to 1215); build/attempts/wt/wor-espers/.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -111,7 +118,8 @@ local function romPrice(id)
 end
 
 -- ---- observers ---------------------------------------------------------------
-local terraS, lockeS
+local terraS, lockeS, stragoS
+local fx = nil           -- the Fenix Down case, while it runs
 local armed = nil
 local installed = false
 local function installObservers()
@@ -126,7 +134,22 @@ local function installObservers()
       armed.queued[#armed.queued + 1] = v
     end
   end, emu.callbackType.write, 0x7E3620, 0x7E371F)
+  emu.addMemoryCallback(function(_, v)
+    if fx and not fx.endF then fx.casts[#fx.casts + 1] = v end
+  end, emu.callbackType.write, 0x7E3410, 0x7E3410)
   local ae = H.sym("Ot6ActionEnd")
+  emu.addMemoryCallback(function()
+    if not fx or fx.endF then return end
+    if cx() == terraS * 2 and fx.sent[terraS] and not fx.terraEndF then
+      fx.terraEndF = H.frame
+      fx.stragoStatus = H.readByte(STATUS4 + stragoS * 2)
+    elseif cx() == stragoS * 2 and fx.sent[stragoS] then
+      fx.endF = H.frame
+      fx.hpEnd, fx.hpMax = H.readWord(0x3BF4 + lockeS * 2), H.readWord(0x3C1C + lockeS * 2)
+      fx.koEnd = (H.readByte(STATUS1 + lockeS * 2) & KO) ~= 0
+      fx.statusEnd = H.readByte(STATUS4 + lockeS * 2)
+    end
+  end, emu.callbackType.exec, ae, ae)
   emu.addMemoryCallback(function()
     if armed and armed.sent and not armed.endF and cx() == terraS * 2 then
       armed.endF, armed.mpEnd = H.frame, mp(terraS)
@@ -230,6 +253,7 @@ local function pulse(c)
       if edge then
         c.mp0, c.pendAtConfirm, c.bank0 = mp(terraS), pend(terraS), bank(terraS)
         c.status0 = H.readByte(STATUS4 + lockeS * 2)
+        c.hp0 = H.readWord(0x3BF4 + lockeS * 2)
         c.sent = true
       else btn = nil end
     else
@@ -246,7 +270,6 @@ end
 -- has the pips and Fights him when she does not, STRAGO Fights him, LOCKE
 -- passes (X).  Every press goes through the real menus and target cursor.
 local STRAGO, FIRE, CMD_FIGHT = 7, 0x00, 0x00
-local stragoS
 local function killPulse()
   tc.observe()
   if H.readByte(MENU) == 0 then H.setPad({}); return end
@@ -470,10 +493,123 @@ for _, c in ipairs(CASES) do
   end)
 end
 
+-- ko-fenix: from K, TERRA casts Life at two points (Life 3) on STRAGO,
+-- standing, and then STRAGO uses a Fenix Down on the KO'd LOCKE.  The
+-- Fenix Down must revive him as a Fenix Down does (a fraction of his HP, no
+-- Life 3 status): the Life 3 hooks key on the executing action -- a
+-- character, command Magic or X-Magic, attack Life 3 -- and an item action
+-- is none of those.  (The first cut keyed on the id the last spell load
+-- left behind, which an item action never refreshes;
+-- build/attempts/review-wor-espers/lab_rv_fenix_poke.log.)
+local ITEMSCR, ITEMROW, BATTINV, ST_ITEM, CMD_ITEM, FENIX = 0x8947, 0x894F, 0x2686, 0x0A, 0x01, 0xF0
+local inItem = 0
+local function fenixIdx()
+  for i = 0, 251 do if H.readByte(BATTINV + i * 5) == FENIX then return i end end
+end
+local function fenixPulse(f)
+  tc.observe()
+  if H.readByte(MENU) == 0 then H.setPad({}); return end
+  mf = mf + 1
+  local edge = (mf - 1) % 8 < 4
+  local a, st = H.readByte(ACTOR) & 3, H.readByte(MSTATE)
+  if st ~= ST_TGT then tapNo = -1 end
+  if st ~= ST_MAGIC then inMagic = 0 end
+  if st ~= ST_ITEM then inItem = 0 end
+  local p = f.plans[a]
+  local btn
+  if st == ST_TRANS then btn = nil
+  elseif p == nil or f.sent[a] then btn = defend(st, edge)
+  elseif st == ST_CMD then
+    local boost = p.boost or 0
+    if pend(a) < boost then btn = "r" elseif pend(a) > boost then btn = "l"
+    else
+      local want, cur = cmdRow(a, p.cmd), H.readByte(CMDROW + a) & 3
+      btn = (cur == want) and "a" or ((cur < want) and "down" or "up")
+    end
+    if not edge then btn = nil end
+  elseif st == ST_MAGIC and p.cmd == CMD_MAGIC then
+    inMagic = inMagic + 1
+    if inMagic >= 20 then
+      local cell = spellCell(a, LIFE)
+      assert(cell, "TERRA's list holds Life")
+      local wr, wc = cell // 2, cell % 2
+      local ar = H.readByte(MSCROLL + a) + H.readByte(MROW + a)
+      local col = H.readByte(MCOL + a)
+      if ar < wr then btn = "down" elseif ar > wr then btn = "up"
+      elseif col < wc then btn = "right" elseif col > wc then btn = "left" else btn = "a" end
+    end
+    if not edge then btn = nil end
+  elseif st == ST_ITEM and p.cmd == CMD_ITEM then
+    inItem = inItem + 1
+    if inItem >= 20 then
+      local want = fenixIdx()
+      assert(want, "the bag holds a Fenix Down")
+      local cur = H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
+      btn = (cur < want) and "down" or ((cur > want) and "up" or "a")
+    end
+    if not edge then btn = nil end
+  elseif st == ST_TGT then
+    btn = tc.steer(p.target, mf)
+    if btn == "a" then
+      if edge then
+        f.sent[a] = true
+        H.log(string.format("[lifefold] ko-fenix f%d: slot %d confirms command $%02X on slot %d",
+          H.frame, a, p.cmd, p.target))
+      else btn = nil end
+    else
+      if btn ~= nil and tc.press ~= tapNo then tapNo, tapAt = tc.press, mf end
+      btn = (tapNo >= 0 and mf - tapAt < 4) and tc.dir or nil
+    end
+  else btn = edge and "b" or nil end
+  H.setPad(btn and { [btn] = true } or {})
+end
+do
+  local f = { name = "ko-fenix" }
+  local req
+  steps[#steps + 1] = H.call(function() H.setPad({}); req = H.requestLoadState(snapK.blob) end)
+  steps[#steps + 1] = H.waitFrames(2)
+  steps[#steps + 1] = H.call(function()
+    H.checkReq(req, "snapshot load")
+    H.rearmInputInjection()
+    mf, tapNo, tapAt, inMagic, inItem = 0, -1, 0, 0, 0
+    f.casts, f.sent, f.plans = {}, {}, {}
+    f.plans[terraS] = { cmd = CMD_MAGIC, boost = 2, target = stragoS }
+    f.plans[stragoS] = { cmd = CMD_ITEM, target = lockeS }
+    H.assertEq(ko(lockeS), true, "LOCKE is KO'd")
+    H.assertEq(fenixIdx() ~= nil, true, "the bag holds a Fenix Down")
+    H.assertEq((H.readByte(STATUS4 + stragoS * 2) & LIFE3_STATUS) == 0, true,
+      "STRAGO does not already carry Life 3")
+    fx = f
+  end)
+  steps[#steps + 1] = H.driveUntil(function() return f.endF ~= nil and H.frame >= f.endF + 60 end,
+    20000, { H.call(function() fenixPulse(f) end) }, "ko-fenix resolves")
+  steps[#steps + 1] = H.call(function()
+    fx = nil
+    H.setPad({})
+    local cs = {}
+    for _, v in ipairs(f.casts) do cs[#cs + 1] = string.format("$%02X", v) end
+    H.log(string.format("[lifefold] ko-fenix: TERRA's action ended f%s (STRAGO status4 $%02X), "
+      .. "STRAGO's f%d; $3410 writes %s; LOCKE at STRAGO's action end: HP %d/%d, %s, status4 "
+      .. "$%02X", tostring(f.terraEndF), f.stragoStatus or 0, f.endF, table.concat(cs, " "),
+      f.hpEnd, f.hpMax, f.koEnd and "KO'd" or "standing", f.statusEnd))
+    H.screenshot("lifefold_ko-fenix_after")
+    CASES.fenix = f
+  end)
+end
+
 -- The verdict, once every case has logged.
 steps[#steps + 1] = H.call(function()
   local bad = {}
   local function check(ok, what) if not ok then bad[#bad + 1] = what end end
+  local f = CASES.fenix
+  local l3 = false
+  for _, v in ipairs(f.casts) do if v == LIFE3 then l3 = true end end
+  check(l3 and f.terraEndF ~= nil and f.terraEndF < f.endF and
+    ((f.stragoStatus or 0) & LIFE3_STATUS) ~= 0, "ko-fenix: TERRA's Life 3 landed on STRAGO "
+    .. "before STRAGO's Fenix Down (the precondition)")
+  check(not f.koEnd and f.hpEnd < f.hpMax and (f.statusEnd & LIFE3_STATUS) == 0, string.format(
+    "ko-fenix: the Fenix Down revived LOCKE as a Fenix Down does (%d/%d, %s, status4 $%02X), "
+    .. "not as Life 3", f.hpEnd, f.hpMax, f.koEnd and "KO'd" or "standing", f.statusEnd))
   for _, c in ipairs(CASES) do
     local want = c.cast
     local price = romPrice(want)
@@ -510,6 +646,11 @@ steps[#steps + 1] = H.call(function()
         .. "(%d/%d, %s)", c.name, c.hpEnd, c.hpMax, c.koEnd and "KO'd" or "standing"))
     else
       check(not c.koEnd, string.format("%s: LOCKE still standing", c.name))
+      -- a living target is healed by none of the tiers: Life and Life 2
+      -- miss him, and Life 3's revival is for a KO'd body only (#327).  A
+      -- monster may hit him in the window, so the pin is "no higher"
+      check(c.hpEnd <= c.hp0 and c.hpEnd < c.hpMax, string.format("%s: LOCKE's HP not raised "
+        .. "(%d at the confirm, %d/%d at TERRA's action end)", c.name, c.hp0, c.hpEnd, c.hpMax))
     end
   end
   local by = {}
