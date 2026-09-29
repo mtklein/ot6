@@ -720,4 +720,31 @@ STATES = [
     #     tools/tests/run.sh tools/tests/gen_wor_sabin.lua
     #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-sabin-v1
     S("wor_sabin", gen="gen_wor_sabin", checkpoint="wor-tzen-door-v1", timeout=3600),
+
+    # wor-sabin-v1 -> the World of Ruin map one step east of Nikeah's door:
+    # cold-Continue the save outside Tzen (CELES and SABIN at world
+    # (131,179)), walk north across the continent -- the Black Drgn's desert
+    # included, which no on-foot path avoids -- fighting everything, and
+    # Save at (148,76): the `wor-nikeah-v1` checkpoint
+    # (docs/design/route-wor-edgar.md section 10).  checkpoint=: it
+    # regenerates from the battery, independently of the chain.
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-sabin-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-nikeah-v1/wor-nikeah.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_nikeah.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-nikeah-v1
+    S("wor_nikeah", gen="gen_wor_nikeah", checkpoint="wor-sabin-v1", timeout=3600),
+
+    # wor-nikeah-v1 -> the World of Ruin map outside South Figaro: Nikeah
+    # (the item seller, the cafe's four thieves, Gerad's three talks), the
+    # thieves' ship to South Figaro, Gerad upstairs in its inn, the item
+    # shop and the Enhancer, and Save at world (113,96): the
+    # `wor-south-figaro-v1` checkpoint (docs/design/route-wor-edgar.md
+    # section 11).  No random battles on the leg.
+    # Re-cutting the SRAM:
+    #     OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/wor-nikeah-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/checkpoints/wor-south-figaro-v1/wor-south-figaro.sram \
+    #     tools/tests/run.sh tools/tests/gen_wor_south_figaro.lua
+    #     python3 tools/tests/lib/sram_checkpoint.py seal tools/tests/checkpoints/wor-south-figaro-v1
+    S("wor_south_figaro", gen="gen_wor_south_figaro", checkpoint="wor-nikeah-v1", timeout=3600),
 ]

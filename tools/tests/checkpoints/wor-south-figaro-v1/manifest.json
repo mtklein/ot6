@@ -1,0 +1,28 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "wor-south-figaro.sram",
+  "size": 32768,
+  "sha256": "d0e923e7fa0cb8d3b3527815a78fd7b41906ff77a6f580f7b2fabf7f93948806",
+  "slot": 3,
+  "milestone": "wor-south-figaro",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "map": 1,
+      "x": 113,
+      "y": 96
+    }
+  },
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "d0e923e7fa0cb8d3b3527815a78fd7b41906ff77a6f580f7b2fabf7f93948806",
+    "generator_sig": "6edc81fef1e26aff9fc4d516c6544d34b04d7f38ee6278bd53ba5862ebb9ccb4 gen_wor_south_figaro tools/tests/checkpoints/wor-nikeah-v1/manifest.json tools/tests/checkpoints/wor-nikeah-v1/wor-nikeah.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/wor-nikeah-v1/manifest.json",
+        "sha256": "2d18d64ff884a4e5e417a2a48b01e40d56e47473fab056756c9f8634f8f0926a"
+      }
+    ]
+  }
+}

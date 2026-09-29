@@ -1058,6 +1058,95 @@ M.contracts["wor-sabin-v1"] = {
   },
 }
 
+-- wor-nikeah-v1: the World of Ruin map one step east of Nikeah's door,
+-- (148,76), after the walk north from Tzen (docs/design/route-wor-edgar.md
+-- sections 2.2 and 7).  Sabin's joining has run; Nikeah's story has not:
+-- the thieves still sit in its cafe ($0374), none of them has talked
+-- ($00A7-$00AA), Gerad is not yet in the street ($0376) and the ship has
+-- not sailed ($00AC).  CELES and SABIN in party 1, no event timer.
+M.contracts["wor-nikeah-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 148, y = 76 },    -- one step east of Nikeah's door (147,76)
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x028A, 1, "Sabin joined (_cc5980, :90262)" },
+    { 0x02F5, 1, "Sabin's joining finished (:90282)" },
+    { 0x0374, 1, "the thieves in Nikeah's cafe (:13005)" },
+    { 0x0376, 0, "Gerad not yet in Nikeah's street (_ca91b1)" },
+    { 0x0378, 0, "Gerad's talks in Nikeah not done (_ca921a)" },
+    { 0x00AC, 0, "the thieves' ship not yet sailed (_ca9282)" },
+    { 0x037A, 1, "the thieves in South Figaro (:13007)" },
+  },
+  party = {
+    size = 2,                     -- CELES and SABIN
+    members = {
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+    },
+  },
+  ram = {
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
+-- wor-south-figaro-v1: the World of Ruin map outside South Figaro, where
+-- the town's exit returns the party (one step south of the parent tile the
+-- thieves' ship set, (113,95); docs/design/route-wor-edgar.md sections 2.3-2.4 and 7).
+-- Nikeah's story has run -- the thieves talked ($00A7-$00AA), Gerad dropped his act and the ship
+-- sailed ($00AC; the ride clears $0378 again, :22290) -- and Gerad in South Figaro's
+-- inn has sent the thieves to the cave ($037F, $0398); the turtle
+-- ($0383) and the castle ($00C6) are ahead.  CELES and SABIN, no timer.
+M.contracts["wor-south-figaro-v1"] = {
+  slot = 3,
+  world = { map = 1, x = 113, y = 96 },    -- one step south of the door (113,95), measured
+  switches = {
+    { 0x00A4, 1, "the World of Ruin (:12423)" },
+    { 0x028A, 1, "Sabin joined (_cc5980, :90262)" },
+    { 0x00A7, 1, "Nikeah's first thief talked (_ca9189)" },
+    { 0x00A8, 1, "Nikeah's second thief talked (_ca9193)" },
+    { 0x00A9, 1, "Nikeah's third thief talked (_ca919d)" },
+    { 0x00AA, 1, "Nikeah's fourth thief talked (_ca91a7)" },
+    { 0x00AC, 1, "the thieves' ship has sailed (_ca9282)" },
+    { 0x037E, 0, "Gerad no longer waits in South Figaro's inn (_ca808d)" },
+    { 0x037F, 1, "the thieves are bound for the cave (_ca808d)" },
+    { 0x0398, 1, "Siegfried waits at the cave's mouth (_ca808d)" },
+    { 0x0383, 0, "the turtle scene not yet seen (_ca76e1)" },
+    { 0x00C6, 0, "the Tentacles not yet fought (_ca6a48)" },
+  },
+  party = {
+    size = 2,                     -- CELES and SABIN
+    members = {
+      { 0x06, "CELES" },
+      { 0x05, "SABIN" },
+    },
+  },
+  ram = {
+    { 0x1189, 0xFF, 0x00, "timer 0 counter low" },
+    { 0x118A, 0xFF, 0x00, "timer 0 counter high" },
+    { 0x118F, 0xFF, 0x00, "timer 1 counter low" },
+    { 0x1190, 0xFF, 0x00, "timer 1 counter high" },
+    { 0x1195, 0xFF, 0x00, "timer 2 counter low" },
+    { 0x1196, 0xFF, 0x00, "timer 2 counter high" },
+    { 0x119B, 0xFF, 0x00, "timer 3 counter low" },
+    { 0x119C, 0xFF, 0x00, "timer 3 counter high" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)

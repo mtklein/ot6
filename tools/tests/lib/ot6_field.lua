@@ -3073,7 +3073,13 @@ local function careKernel(opts)
   -- or zombied member is served here: the $C2 mask belongs to the heals,
   -- which the game refuses on them (@8bc4).
   local function pickStatusCure(target)
-    if M.charHp(target) == 0 or (M.charStatus1(target) & 0x80) ~= 0 then
+    -- A member the battle left zombied reads 0 HP with no Wound bit (measured
+    -- north of Tzen: a Bloompire's Energy Sap, `c6 0/1396 hp status1=02`,
+    -- the Fenix Down REFUSED by the game, route-wor-edgar 10): the wound
+    -- branch is the $80 bit, not the HP, so it is served here like any
+    -- other zombie.
+    if (M.charStatus1(target) & 0x80) ~= 0
+       or (M.charHp(target) == 0 and (M.charStatus1(target) & 0x02) == 0) then
       return nil
     end
     for _, cure in ipairs(CARE_STATUS_CURES) do
@@ -3134,7 +3140,10 @@ local function careKernel(opts)
   local function pick()
     for _, c in ipairs(careParty()) do
       local w = { kind = "item", char = c, item = CARE_FENIX, why = "revive" }
-      if M.charHp(c) == 0 and avail(CARE_FENIX) > 0 and not failed[key(w)] then
+      -- a zombie is not dead to the game (no Wound bit): its cure is the
+      -- status pass's Revivify, never a Fenix Down
+      if M.charHp(c) == 0 and (M.charStatus1(c) & 0x02) == 0 and avail(CARE_FENIX) > 0
+         and not failed[key(w)] then
         return w
       end
     end
@@ -3190,7 +3199,7 @@ local function careKernel(opts)
     for _, c in ipairs(careParty()) do
       local hp, mx = M.charHp(c), M.charMaxHp(c)
       local why = {}
-      if hp == 0 then
+      if hp == 0 and (M.charStatus1(c) & 0x02) == 0 then
         local w = { kind = "item", char = c, item = CARE_FENIX, why = "revive" }
         why[#why + 1] = string.format("down; fenix %d in the bag%s",
           M.invCountOf(CARE_FENIX), failed[key(w)] and ", refused" or "")

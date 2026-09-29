@@ -540,9 +540,9 @@ anywhere on the world map. The cuts are the natural pauses:
 | checkpoint | where | why |
 |---|---|---|
 | `wor-sabin-v1` (exists) | world (131,179) outside Tzen | the start |
-| **`wor-nikeah-v1`** | world (148,76), one step east of Nikeah's door | after the long walk, before the town and the ship; leg 1's end |
-| **`wor-south-figaro-v1`** | world (113,95) region, outside South Figaro (where its exit returns the party: the ship set the parent tile to (113,95)) | after Nikeah, the ship and South Figaro; the last save before the cave, and the retry point for the Tentacles |
-| **`wor-edgar-v1`** | world outside the surfaced castle (its exit returns to the parent tile (81,85)) | the first save with EDGAR; the end of this arc |
+| **`wor-nikeah-v1`** (`gen_wor_nikeah`, cut) | world (148,76), one step east of Nikeah's door | after the long walk, before the town and the ship; leg 1's end (section 10) |
+| **`wor-south-figaro-v1`** (`gen_wor_south_figaro`, cut) | world (113,96), where South Figaro's exit returns the party (one step south of the parent tile (113,95) the ship set; measured) | after Nikeah, the ship and South Figaro; the last save before the cave, and the retry point for the Tentacles (section 11) |
+| `wor-edgar-v1` (not cut) | world (81,86), where the surfaced castle's exit returns the party (measured) | the first save with EDGAR; the end of this arc (section 12: the Tentacles' lab is not done) |
 
 Each cut asserts its preconditions (the party, the story switches the
 stretch set, no live timer, the kit) in a contract in
@@ -711,6 +711,192 @@ Out of scope, noted: Mobliz (v0.26), Duncan (north of Narshe, v0.32:
 "He's meditating just north of Narshe", `$0936`), and Kohlingen (v0.24)
 are the next arcs. South Figaro's basement passage is UNVERIFIED as
 open (2.4).
+
+---
+
+## 10. Tzen to Nikeah's door, played (`gen_wor_nikeah`, `wor-nikeah-v1`)
+
+Driven 2026-09-29 for #262. The segment cold-Continues `wor-sabin-v1`
+(checkpoint=), asserts that every pool the walk can roll deals only species
+with designed rows, walks the shortest on-foot path to (148,76) fighting
+everything (the Black Drgn's desert included), cares for the party after
+every battle, and saves there: the `wor-nikeah-v1` checkpoint. Every number
+below is quoted from a log under `build/attempts/wt/wor-edgar/leg1/`
+(`var4/` the shipped generator's variation set, `var1/`-`var3/` the sets
+before its two fixes, `zfix/`, `k12fix/`, `k12s41fix/` the fixes' own
+runs). Nothing was measured by writing game state.
+
+### 10.1 The run (`build/attempts/wt/wor-edgar/recut/capture_wor-nikeah-v1.log`, the capture)
+
+| step | what the log says |
+|---|---|
+| boot | `[wor] boot f1346: world 1 (131,179), CELES L27 xp 61090 HP 1211/1211 MP 251/251 status1 $00; SABIN L27 xp 55288 HP 1225/1225 ...; tonic=5 potion=47 fenix=27 remedy=5 soft=18 revivify=2 greencherry=5 gil=203243` |
+| the pools | `[route] Tzen -> Nikeah: the walk can roll groups {31, 34, 36, 37, 38, 40, 39}` (36 by the zone-and-terrain pairing; its Peepers and EarthGuard have rows) |
+| the walk | 6 battles: Osprey + Chitonid + Gigan Toad, Lunaris + Osprey, Delta Bug x4 three times, the Black Drgn (`battle $0C3 WON after 1560 ticks: killed s0:$0D5 ... paid as due`) |
+| the save | `[saved] wor-nikeah-v1: slot 3 holds map 1 ($2001) world tile (148,76)`, `contract wor-nikeah-v1 (exit): all 25 fields hold`, `[wor] the stretch: 6 battles ...: 6 won ...; Fenix Downs 27 -> 27; CELES L28 xp 66688 HP 997/1301 ...; SABIN L27 xp 60886 HP 988/1225 ...; tonic=4 potion=43 fenix=27`, `PASS (frame 24350) attempts=1/3` |
+
+Sealed and validated (`recut/validate_wor-nikeah-v1.txt`): `holds=slot 3
+world 1 (148,76) [$1F64=$2001] (saved: declared and checked)`, sha256
+`26e88fd1...`. The graph's own run (`nice ninja
+build/states/wor_nikeah.mss.lua`, `recut/wor_nikeah_ninja.log`) and the
+capture are the same run: `wor_nikeah.mss` byte-identical, `d354e578...`
+both (`recut/graph_vs_capture.sha256`). The next segment's cold Continue of it asserts its entry
+contract (`gen_wor_south_figaro`: `contract wor-nikeah-v1 (entry)`).
+
+### 10.2 Under real draw variation
+
+`leg1/varlab.py` (after route-wor-sabin's) derives the generator with a
+block after the boot that fights K encounters on the plains beside Tzen
+(groups 31/34) and walks back to (131,179), so the body starts from
+another encounter counter, level, HP and bag; K is a floor (a leg can hold
+two battles). Retries off (`OT6_RETRIES=1`). `leg1/var4/summary.txt`,
+`vartable.md` (`vartable.py`), the shipped generator:
+
+| variant | the body starts at | body battles | Black Drgn | deaths / zombie cures | Fenix Downs | lowest member HP | verdict |
+|---|---|---|---|---|---|---|---|
+| K=0, shifts 0 / 23 / 41 | the checkpoint | 6 | 1 | 0 / 0 | 27 -> 27 | 738 / 554 / 535 | `PASS (frame 24350)` / `(24303)` / `(25694)` |
+| K=1 | C L28 1301/1301, S L27 1085/1225, `$1FA1-2 = 62 27` | 6 | 0 | 0 / 0 | 27 -> 27 | 699 | `PASS (frame 26118)` |
+| K=2 | `7A 28` | 7 | 0 | 0 / 0 | 27 -> 27 | 627 | `PASS (frame 35023)` |
+| K=3, shifts 0 / 23 / 41 | `9A 29` | 7 | 0 | 0 / 0 | 27 -> 27 | 606 / 316 / 608 | `PASS (frame 38726)` / `(34662)` / `(37990)` |
+| K=4 | `A8 29` | 7 | 0 | 0 / 0 | 27 -> 27 | 462 | `PASS (frame 37710)` |
+| K=5 | `DA 2A` | 7 | 0 | 1 / 1 | 27 -> 27 | 788 | `PASS (frame 37279)` |
+| K=6, shifts 0 / 23 / 41 | `FA 2C` | 6 | 0 | 0 / 0 | 27 -> 27 | 763 / 533 / 561 | `PASS (frame 38870)` / `(36946)` / `(39023)` |
+| K=7 | `10 2D` | 5 | 0 | 1 / 1 | 27 -> 27 | 877 | `PASS (frame 34727)` |
+| K=8 | `2C 2D` | 6 | 0 | 0 / 0 | 27 -> 27 | 770 | `PASS (frame 38806)` |
+| K=9, shifts 0 / 23 / 41 | `4C 2F` | 4 | 1 | 0 / 0, 0 / 0, 1 / 1 | 27 -> 27 | 848 / 885 / 607 | `PASS (frame 37046)` / `(37094)` / `(40167)` |
+| K=10 | `58 2F` | 5 | 0 | 0 / 0 | 27 -> 27 | 845 | `PASS (frame 42502)` |
+| K=11 | `7A 30` | 5 | 1 | 0 / 0 | 27 -> 27 | 900 | `PASS (frame 43870)` |
+| K=12, shifts 0 / 23 / 41 | `AC 32` | 6 | 1 | 1 / 1 each | 27 -> 27 | 641 / 716 / 852 | `PASS (frame 51887)` / `(52567)` / `(53597)` |
+| K=13-20 | `C2 32` ... `BA 3A` | 5-7 | 1 (K=16), 2 (K=18) | 0 / 0 | 27 -> 27 | 737-1011 | `PASS` all eight |
+
+31 of 31 `PASS attempts=1/1`: 472 `[outcome]` lines, 472 `paid as due`, 0
+without an end reading; 183 battles in the bodies, every one won. The
+Black Drgn came 14 times (13 runs; K=18 met it twice) and fell every time,
+in 1239-3438 ticks, with no death in its own fights. The six deaths are
+all zombifications counted by the death watch (`atk $EF` Energy Sap five
+times, the Bloompire's; one attributed to a poison tick, K=9 shift 41),
+each cured after the battle with a Revivify; no Fenix Down was spent in
+any run. The lowest member HP on the 300-tick battle lines is 316 (K=3
+shift 23).
+
+Two defects found here and fixed before this set (their runs kept):
+
+- **A member the battle leaves zombied reads 0 HP with no Wound bit**, and
+  the field care took it for dead: it planned a Fenix Down, the game
+  refused it (`REFUSED by the game: revive char 6 with $F0 (0/1396 hp ...
+  status1 02)`), and the party walked on with a zombie (`var1/k5_s0.log`,
+  K=7 the same for SABIN: 2 of 9 runs red). The care's dead test is now
+  the Wound bit (`lib/ot6_field.lua` `pickStatusCure`, the revive pick):
+  the same draw reads `used $F1 on char 6: 0 -> 174 hp, ... status1 02 ->
+  00` (`zfix/k5_s0.log`).
+- **The step onto (148,76) can roll an encounter that opens after the
+  walker has arrived**, during the save's menu press (`var2/k12_s0.log`:
+  the save timed out on the Bloompire pair's reward screen). The segment
+  now stands 90 frames and walks to the tile again, fighting what came,
+  and runs the field care there (a battle on the goal tile ended the walker
+  before its after-battle care: `var3/k12_s41.log`, CELES zombied at the
+  save's assertion). `k12fix/`, `k12s41fix/`: both PASS.
+
+## 11. Nikeah, the ship and South Figaro, played (`gen_wor_south_figaro`, `wor-south-figaro-v1`)
+
+The segment cold-Continues `wor-nikeah-v1`, and plays the story's gates in
+order, asserting each switch as it passes (section 2.3-2.4). No map on it
+rolls a random battle. Logs under `build/attempts/wt/wor-edgar/leg2/`.
+
+| step | what the log says (`recut/capture_wor-south-figaro-v1.log`) |
+|---|---|
+| Nikeah's item seller (shop 58) | `[shop] Nikeah item seller: bought: tonic=4 potion=48 fenix=28 ... (spent 2000 GP)` |
+| the cafe's four thieves | chased where they wander between the tables (`H.chaseTalk`; the static approach timed out on the first: `timeout after 1020 frames driving toward the thief NPC_4`); `$00A7`-`$00AA` and `$0376` asserted |
+| Gerad, three talks | `[nikeah] f10342 Gerad gave up his act`: `$01F0`-`$01F3`, then `$0378` |
+| the inn (150 GP) | `[Nikeah inn] before the night: c5 988/1225 hp ... c6 997/1301 hp` -> `after the night: c5 1225/1225 ... gil=211431` |
+| the ship | `[ship] f13589 aboard map 187 (17,2)` -> `[sfigaro] f16633 off the ship map 91 (14,12)`; `$00AC=1`, `$037E=1` |
+| Gerad upstairs in the inn | `[sfigaro] f19225 the thieves leave for the cave map 76 (88,12)`: `$037F=1`, `$0398=1` |
+| South Figaro's item shop (63) | at the band already: `(spent 0 GP)` |
+| the arsenal (shop 60) | the Enhancer, 10,000 GP; `[sfigaro] ... CELES wears the Enhancer, kit 06 13 0F 76 8F D1 B5` |
+| the save | out by the west edge to world (113,96) (measured: one step south of the parent tile (113,95) the ship set); `[saved] wor-south-figaro-v1: slot 3 holds map 1 ($3001) world tile (113,96)`, `PASS (frame 26029) attempts=1/3` |
+
+The ride clears `$0378` again (`:22290`), so the checkpoint's contract
+carries `$00AC` rather than it. The Enhancer is CELES's upgrade (135 and
+no element against the Blizzard's 108 ice, the ThunderBlade kept in the
+other hand), and it keeps the bag's best sword for EDGAR's Optimum
+non-elemental (section 12). Sealed and validated
+(`recut/validate_wor-south-figaro-v1.txt`): sha256 `d0e923e7...`,
+`holds=slot 3 world 1 (113,96)`; the graph's run and the capture wrote
+the same `wor_south_figaro.mss` (`192b6363...` both); the cold Continue
+(`probe_wor_south_figaro_continue.lua`, `leg2/continue_sf.log`):
+`contract wor-south-figaro-v1 (entry): all 29 fields hold`, `[continue]
+world 1 at (113,96): CELES L28 HP 1301/1301 ... esper+kit 06 13 0F 76 8F D1
+B5; SABIN L27 HP 1225/1225 ... 01 57 57 77 90 D1 D5; tonic=4 potion=48
+fenix=28 remedy=5 gil=201431`, `PASS (frame 1386)`.
+
+Under variation (`leg2/var_sf/`, the leg-1 derivation with K encounters
+used up on the grass and plains beside Nikeah, groups 37-39): see
+`leg2/var_sf/summary.txt`; the segment has no battles of its own, so what
+varies is the party it inherits (HP, levels, the bag) and with it the inn
+and shop decisions.
+
+## 12. South Figaro to Edgar: driven, not finished
+
+`gen_wor_edgar.lua` (kept at `build/attempts/wt/wor-edgar/leg3/`, not in
+`tools/tests`: the leg is not played to the bar) plays the whole leg from
+`wor-south-figaro-v1` and has passed end to end once
+(`leg3/ed10.log`: `PASS (frame 124634) attempts=1/1`, `[wor] out of Figaro
+Castle f124320: world 1 (81,86)`). What it measured of the route:
+
+- **The cave's map 68 is three pieces joined by same-map links**: in by
+  (16,42), the link (14,33) -> (55,56), the link (61,57) -> (17,21), and
+  (10,2) on to map 90, whose arrival tile (55,31) is the turtle scene
+  (`$0383=1`). The crossing is (47,29), face up, A held: `[cave] across
+  on the turtle map 90 (47,25)`.
+- **Basement 1 is two rooms joined through the castle's lower hall**: from
+  Gerad's scene, the stairs (27,31) -> 59 (14,48), (9,49) -> 61 (10,33),
+  and (2,37) -> 62. **Basement 2's engine-room door is on a floor reached
+  only through basement 3**: (14,8) -> 63 (54,6), its link (56,15) -> the
+  chest room (87,7), the stairs (84,3) -> 62 (8,17), and the door (8,6) ->
+  64 (29,20). The way back is 64 (29,21) -> 62 (8,8), (8,18) -> 63 (84,5),
+  the east stairs (87,5) -> (56,14), (53,5) -> 62 (13,7), (13,12) -> 61
+  (3,36); the west pair (81,5)/(47,8) leads into a pocket of basement 2
+  whose only exit is back (`no path (3,12)->(13,12)` off its (2,13) door).
+- **The runner's absorb guard refuses the Tentacles with the stretch's
+  kit**: `char 5's R-hand item $57 (fire) is ABSORBED by slot 3 species
+  $011B`, `char 6's R-hand item $0E (ice) ... $013C`, `... $0F (bolt) ...
+  $013D` (`leg3/tent1.log`). Before the scene CELES wears the Enhancer and
+  the RegalCutlass, SABIN the MetalKnuckle and a Mithril Shld; EDGAR's
+  Optimum then takes the bag's Break Blade: `EDGAR's kit from the game's
+  Optimum: FF 11 5C 6B 89 FF FF` (Break Blade, Mithril Shld, Plumed Hat,
+  Mithril Vest). He joined at L28 beside a L29/L28 party, at L30 after the
+  grind below.
+- **Talking to Gerad with `H.talkToObj` can fight the Tentacles by mashing
+  A**: its approach plays battles with `playBattles = true`, and the
+  scene opens battle 84 inside it; one run lost that way, every member
+  dead with 5 BP banked and no driver line (`leg3/ed9.log`). The draft
+  walks up with the tactical walker and presses A facing him.
+
+**The Tentacles are not reliably won on the first attempt.** From one
+snapshot at the engine room's stop, the in-battle draw varied by when the
+party talks to Gerad (the battle seeds its RNG from the frame counter,
+InitBattle `lda $021e`; a seed shift alone repeated runs frame for frame),
+12 draws an arm, retries off (`leg3/tentlab.py`, `lab_tent.lua`):
+
+| arm | party | won | lost | the fights |
+|---|---|---|---|---|
+| L29/28/28, no grind (`tent_off/`) | CELES 1396, SABIN 1315, EDGAR 1306 HP | 10 | 2 | 8086-32366 ticks; a won fight lost up to 7 members to death along the way |
+| the same, the holder of a seized member taken first (`tent_on/`, `seize_focus_lever.diff`) | the same | 9 | 3 | no gain; the lever was not shipped |
+| L31/30/30 after a grind on the South Figaro continent to L30 (`tent_l30/`) | CELES 1595, SABIN 1509, EDGAR 1500 | 10 | 2 | 8594-22035 ticks, 0 deaths in 9 of the 10 wins |
+
+What loses it: the members spend most of the fight Seized. Each
+Tentacle's Entwine Slows, a Slowed member is Seized on the Tentacle's next
+turn and drained until it Discards (30 counts) or dies; a lost L30 fight
+issued 20 plans in 14,583 ticks for three members (`tent_l30/s9.log`), and
+the drain (`cmd $2D`) is the commonest cause of death. Levels shortened the
+wins but did not remove the losses. The leg needs a strategy lab before it
+can be sealed: the levers not yet tried are EDGAR's AutoCrossbow and Bio
+Blaster (every Tentacle at once), SABIN's Air Blade (learned at L30),
+boosted area attacks and breaking the Tentacle whose Entwine has just
+landed (its next turn is the Seize). The South Figaro continent's pools
+(41-44), which the walk to the cave barely touches, are played by that
+grind: 35 legs from L28/27 to L30/30 in `ed10.log` (`[wor] grind done
+f76852 after 35 legs`).
 
 ---
 
