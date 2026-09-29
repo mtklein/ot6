@@ -16975,7 +16975,8 @@ MonsterSpecialAnim:
 ; Placed under battle_cmd_prop (until 2026-09-01), the stub jumped to
 ; $C2:FE00 -- decompress code's data table -- and the CPU ran off into a
 ; STP: every 1/16 leave roll that passed after a won battle with Shadow
-; aboard froze the game (measured, probe_shadow_leaves_wedge.lua: cpu.k=$C2
+; aboard froze the game (measured, probe_shadow_leaves_wedge.lua, deleted in
+; 895b8e67, last version at aff9dd45: cpu.k=$C2
 ; pc=$FEFA, cycle count frozen).  The "$ca0029 stall" the encounter-
 ; suppression rectangles were authored against was this halt seen from
 ; the field.

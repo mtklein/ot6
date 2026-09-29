@@ -790,7 +790,8 @@ done:   pla
 ; (Ot6CommittedSlot).  A second pricing here would also have to honour
 ; vanilla's free Mimic (next paragraph).  (The arm that used to sit here
 ; tested $3a7b as an esper index, but FixPlayerAttack has already added the $36 record
-; offset, so it never ran; probe_summon_price measured the list price
+; offset, so it never ran; probe_summon_price (deleted in bd50a973; last
+; version at ed2aa51d) measured the list price
 ; being the whole charge.)
 ;
 ; ---- a mimic's copy folds but is never priced ----

@@ -387,7 +387,8 @@ Ot6RewardMulW:
 ; y 8..9) from 160ae8e, authored against ONE stall seen on a ROM whose
 ; Shadow-leave roll (1-in-16 after a won battle with Shadow aboard)
 ; jumped mis-banked into an STP -- fixed in 3fffb2a.  Re-measured on the
-; fixed ROM with the rectangle gone (probe_forest_bridge.lua, issue
+; fixed ROM with the rectangle gone (probe_forest_bridge.lua, deleted in
+; 895b8e67, last version at f202b0b5; issue
 ; #147, 2026-09-07): 40 attempts, 120 encounters fought and won with
 ; Shadow aboard, 50 of them rolled inside the old rectangle (10 on
 ; (16,8) itself), 4 passed Shadow rolls in all (one on (15,8)), and every one

@@ -49,7 +49,8 @@
 ; or shield used from Item runs as command $02 with the item's spell (Cmd_01)
 ; and a sketched attack under whatever command GetCmdForAI names, and neither
 ; was folded.  Measured: probe_throw_boost, probe_fight_proc_boost,
-; probe_verbs_boost; battle_procboost guards the table.
+; probe_verbs_boost (deleted in bd50a973; last versions at 913e60ec,
+; 913e60ec, 190dc1e1); battle_procboost guards the table.
 
 .proc Ot6BoostDmg
         php                     ; caller width varies: pin our own
