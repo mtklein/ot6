@@ -407,10 +407,16 @@ end
 -- corridor encounters by the library fighter (#183: they used to be fled,
 -- which earned no XP), the win-gated battle 47 by the custom boost
 -- machine plus wipe watch ("fight").
+-- A walk that meets random encounters carries nav's ENCOUNTER_ALLOWANCE
+-- on top of its walking budget: the budget is for the steps, and a random
+-- battle 60 frames into a 4000-frame "-> car B" took the rest of it on a
+-- varied draw (build/attempts/wt/train-mp/: K=3 encounters used up, shift
+-- 41, old and new library alike).
 local function holdDrive(dir, pred, what, budget, fightMode)
   local phase, hb = 0, -600
   local W = fightMode ~= "fight" and H.newWalkFighter("holdDrive " .. what) or nil
-  return H.driveUntil(pred, budget or 15000, {
+  budget = (budget or 15000) + (W and ENCOUNTER_ALLOWANCE or 0)
+  return H.driveUntil(pred, budget, {
     H.call(function()
       phase = (phase + 1) % 8
       if H.frame - hb >= 600 then
