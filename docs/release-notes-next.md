@@ -19,5 +19,10 @@ save from an earlier version keeps any stronger spell its characters
 already learned, and does not gain the new spell for a level already
 passed.
 
+**The shield under a monster shows its true count above 6.** A boss with
+more than six shields used to show 6 until enough had been broken; Number 024
+now shows 7, and AtmaWeapon 11. From 10 up the count is two white numerals
+on a dark shield.
+
 **The Beginner's House no longer repeats how to use Blitz.** Sabin's first
 battle against Vargas walks you through it, where you first need it.

@@ -1,8 +1,11 @@
 ; [ upload the bg hud glyphs into free font cells ]
 
-; 16 2bpp tiles (shield-with-count 1-6/B, pip clusters 0-5, boost cells)
-; written to the battle font at vram $5800 + cell*8, as two 8-tile
-; slices (~128 bytes each, one of which fits a vblank-tail re-lay stage).
+; 16 2bpp tiles written to the battle font at vram $5800 + cell*8, as two
+; 8-tile slices (~128 bytes each, one of which fits a vblank-tail re-lay
+; stage): slice A is the six monster slots' shield-count tiles (#292: each
+; slot's cell holds the tile for ITS live count, OT6_SHHAVE, so a slot with
+; nothing uploaded yet is skipped) plus the broken shield and pips-0; slice B
+; the other pip clusters and the boost cells.
 ; a8/i16, db = $00, vmainc $80. exits a8. clobbers a/x/y.
 
 .macro ot6_glyph_slice first, last
@@ -41,13 +44,69 @@
 .proc Ot6LoadBgGlyphsA
         .a8
         .i16
-        ot6_glyph_slice $0000, $0008
+        ldy     #$0000          ; monster slot 0-5
+@slot:  tyx
+        lda     f:$7e0000+OT6_SHHAVE,x
+        beq     @next           ; nothing uploaded for this slot yet
+        jsr     Ot6UploadSlotTile
+@next:  iny
+        cpy     #$0006
+        bcc     @slot
+        ot6_glyph_slice $0000, $0002
 .endproc
 
 .proc Ot6LoadBgGlyphsB
         .a8
         .i16
-        ot6_glyph_slice $0008, $0010
+        ot6_glyph_slice $0002, $000a
+.endproc
+
+; [ upload one monster slot's shield-count tile (#292) ]
+
+; a = the count 1..99, y = the monster slot 0-5.  writes Ot6ShieldGlyphs'
+; tile for the count into the slot's own font cell (Ot6ShieldSlotCellTbl).
+; 8 words.  a8/i16, db = $00, vmainc $80; vblank or forced blank only.
+; clobbers a/x, preserves y.
+
+.proc Ot6UploadSlotTile
+        .a8
+        .i16
+        dec     a               ; count 1..99 -> tile 0..98
+        longa
+        and     #$00ff
+        asl
+        asl
+        asl
+        asl                     ; * 16 bytes a tile
+        pha
+        tyx
+        lda     f:Ot6ShieldSlotCellTbl,x
+        and     #$00ff
+        asl
+        asl
+        asl
+        clc
+        adc     #$5800          ; vram word address of the slot's cell
+        sta     hVMADDL
+        plx
+        lda     f:Ot6ShieldGlyphs+0,x
+        sta     hVMDATAL
+        lda     f:Ot6ShieldGlyphs+2,x
+        sta     hVMDATAL
+        lda     f:Ot6ShieldGlyphs+4,x
+        sta     hVMDATAL
+        lda     f:Ot6ShieldGlyphs+6,x
+        sta     hVMDATAL
+        lda     f:Ot6ShieldGlyphs+8,x
+        sta     hVMDATAL
+        lda     f:Ot6ShieldGlyphs+10,x
+        sta     hVMDATAL
+        lda     f:Ot6ShieldGlyphs+12,x
+        sta     hVMDATAL
+        lda     f:Ot6ShieldGlyphs+14,x
+        sta     hVMDATAL
+        shorta
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------
@@ -229,15 +288,26 @@
         bra     @shld
 @count: lda     $3e40,y
         beq     @slots          ; shieldless
-        cmp     #$07
+        cmp     #100            ; the glyph table runs 1..99
         bcc     :+
-        lda     #$06
+        lda     #99
 :       phx
+        pha                     ; the count
         longa
-        and     #$00ff
+        tya
+        lsr                     ; monster slot 0-5 (y is the 2-byte offset)
         tax
-        shorta0
-        lda     f:Ot6ShieldCellTbl-1,x
+        shorta
+        pla
+        ; the slot's cell draws the count only once the flush has uploaded
+        ; its tile (#292); until then it still shows the last count, for a
+        ; frame or so.  ask for the upload when the cell holds another count.
+        cmp     OT6_SHHAVE,x    ; db = $7e here
+        beq     :+
+        sta     OT6_SHWANT,x
+        lda     f:Ot6ShieldBitTbl,x
+        tsb     OT6_SHPEND
+:       lda     f:Ot6ShieldSlotCellTbl,x
         plx
 @shld:  sta     f:$7e0000+OT6_SHADOW+4,x
         ; weakness slots into cells 1-4: elements first (vanilla's own
@@ -588,6 +658,31 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         bra     @nofont
 @s0:    jsr     Ot6LoadBgGlyphsB        ; 0: hud pip/boost glyphs
 @nofont:
+        ; a monster slot's shield count changed (#292): upload the tile for
+        ; its new count into the slot's cell.  change-only (zero words on a
+        ; quiet frame), one slot per nmi, and gated like the one-shot line
+        ; transitions below, since a dropped tile write has no next-frame
+        ; rewrite: OT6_SHPEND keeps the bit until an admitted nmi lands it.
+        lda     f:$7e0000+OT6_SHPEND
+        beq     @noslot
+        jsr     @late
+        bcs     @noslot         ; too late: the bit stays, next nmi
+        lda     f:$7e0000+OT6_SHPEND
+        ldy     #$0000
+@find:  lsr                     ; lowest pending slot
+        bcs     @got
+        iny
+        bra     @find
+@got:   tyx
+        lda     f:Ot6ShieldBitTbl,x
+        eor     #$ff
+        and     f:$7e0000+OT6_SHPEND    ; the main loop cannot run inside
+        sta     f:$7e0000+OT6_SHPEND    ;   this read-modify-write
+        lda     f:$7e0000+OT6_SHWANT,x
+        beq     @noslot         ; defensive: the builder never asks for 0
+        sta     f:$7e0000+OT6_SHHAVE,x
+        jsr     Ot6UploadSlotTile
+@noslot:
         ; two write disciplines below, on purpose.
         ; steady-state cell writes (prev == cur) are not v-gated: a write
         ; spilled past vblank is dropped by the PPU, and the rewrite-
@@ -1830,8 +1925,7 @@ Ot6ShieldTbl:
                                 ; speck: any weapon in the game breaks it
         .word   $0117
         .byte   11, OT6_SLASH|OT6_PIERCE ; atmaweapon: the WoB final exam
-                                ;   (hud shield glyphs cap at 6, so the
-                                ;   display saturates but the count is true)
+                                ;   (the hud draws 11 in two numerals, #292)
         .word   $0118
         .byte   5, OT6_SLASH|OT6_PIERCE ; nerapa: sprint fight, low gauge
         ; ---- audit_break_coverage.py's two break-dark areas ------------
@@ -1971,9 +2065,21 @@ Ot6ShieldTbl:
 ; generated by ff6/tools/gen_break_floor.py; do not edit the .inc by hand.
         .include "ot6_break_floor.inc"
 
-; shield-with-count glyph cells (counts 1-6)
-Ot6ShieldCellTbl:
+; each monster slot's own shield-count cell (#292): slot s draws its count
+; with the tile Ot6UploadSlotTile last put in cell s (OT6_SHHAVE).  Before
+; #292 these six cells held fixed tiles for the counts 1-6 and a higher
+; count drew as 6; now any count 1..99 draws true.  The cells are the six the
+; fixed tiles used, so no new font cell is claimed.
+Ot6ShieldSlotCellTbl:
         .byte   $65,$66,$67,$69,$6a,$6b
+
+; monster slot -> its OT6_SHPEND bit
+Ot6ShieldBitTbl:
+        .byte   $01,$02,$04,$08,$10,$20
+
+; the shield tiles, one per count 1..99
+; generated by ff6/tools/gen_shield_glyphs.py; do not edit the .inc by hand.
+        .include "ot6_shield_glyphs.inc"
 
 ; pip cluster cells (0-5 filled)
 Ot6PipCellTbl:
@@ -1983,14 +2089,9 @@ Ot6PipCellTbl:
 Ot6ArrowCellTbl:
         .byte   $68,$6c,$6d
 
-; bg hud glyph cells (2bpp, verified junk-free in both formations)
+; bg hud glyph cells with fixed art (2bpp, verified junk-free in both
+; formations); the six shield-count cells above are loaded per slot
 Ot6BgGlyphCellTbl:
-        .byte   $65
-        .byte   $66
-        .byte   $67
-        .byte   $69
-        .byte   $6a
-        .byte   $6b
         .byte   $71
         .byte   $72
         .byte   $73
@@ -2003,24 +2104,6 @@ Ot6BgGlyphCellTbl:
         .byte   $6d
 
 Ot6BgGlyphData:
-; shield-1
-        .byte   $7e,$00,$91,$7e,$b1,$7e,$91,$7e
-        .byte   $52,$3c,$3c,$38,$18,$00,$00,$00
-; shield-2
-        .byte   $7e,$00,$b1,$7e,$89,$7e,$91,$7e
-        .byte   $62,$3c,$3c,$38,$18,$00,$00,$00
-; shield-3
-        .byte   $7e,$00,$b1,$7e,$89,$7e,$91,$7e
-        .byte   $4a,$3c,$34,$38,$18,$00,$00,$00
-; shield-4
-        .byte   $7e,$00,$a9,$7e,$a9,$7e,$b9,$7e
-        .byte   $4a,$3c,$2c,$18,$18,$00,$00,$00
-; shield-5
-        .byte   $7e,$00,$b9,$7e,$a1,$7e,$b1,$7e
-        .byte   $4a,$3c,$3c,$38,$18,$00,$00,$00
-; shield-6
-        .byte   $7e,$00,$99,$7e,$a1,$7e,$b9,$7e
-        .byte   $6a,$3c,$3c,$38,$18,$00,$00,$00
 ; shield-broken: the plain grey shield, no numeral, with a big white X
 ; struck corner to corner across the whole cell, arms running the full
 ; 8x8 so they land on the background outside the shield's silhouette.

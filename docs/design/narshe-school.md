@@ -230,7 +230,8 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 Every claim was checked against the code (2026-09-28):
 
 - Shields and breaking: the shield cell under each monster draws the
-  count (1-6; a count above 6 draws as 6) and a grey shield with an X
+  count (any count 1-99: one numeral in the grey shield up to 9, two
+  numerals on a dark shield from 10; #292) and a grey shield with an X
   while broken (`ot6_hud.asm`, the BG3 cells under each sprite). Every
   damaging hit on a shielded, unbroken monster is ×0.5, on or off
   weakness (`Ot6ShieldedDmg`, `Ot6ShieldedMulW = $0008`); a hit on a

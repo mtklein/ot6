@@ -2156,13 +2156,16 @@ function M.glyphCanary()
     end
     return nil
   end
-  -- first 16 bytes of Ot6FontIcons (fire) and Ot6BgGlyphData (shield-1)
+  -- first 16 bytes of Ot6FontIcons (fire)
   local icons = findSig({0x10,0x10,0x30,0x38,0x38,0x3c,0x6c,0x7c,
                          0x6e,0x7e,0xee,0xfe,0x7e,0x7c,0x3c,0x00})
-  local bg    = findSig({0x7e,0x00,0x91,0x7e,0xb1,0x7e,0x91,0x7e,
-                         0x52,0x3c,0x3c,0x38,0x18,0x00,0x00,0x00})
   M.assertEq(icons ~= nil, true, "Ot6FontIcons found in rom bank F0")
-  M.assertEq(bg ~= nil, true, "Ot6BgGlyphData found in rom bank F0")
+  -- the fixed-art hud cells: Ot6BgGlyphCellTbl names one cell per tile of
+  -- Ot6BgGlyphData, which follows it directly
+  local bg = M.sym("Ot6BgGlyphData") & 0x3FFFFF
+  local bgCells = M.sym("Ot6BgGlyphCellTbl") & 0x3FFFFF
+  M.assertEq(bg > bgCells and bg - bgCells <= 16, true,
+    "Ot6BgGlyphCellTbl directly precedes Ot6BgGlyphData")
   local function checkTile(cell, romBase, tag)
     local v = 0xB000 + cell*16          -- 2bpp font cell in vram
     for i = 0, 15 do
@@ -2174,9 +2177,21 @@ function M.glyphCanary()
   for k, cell in ipairs(iconCells) do
     checkTile(cell, icons + (k-1)*16, "element icon")
   end
-  for k = 1, 16 do
-    local cell = emu.read(bg - 17 + k, rom)  -- Ot6BgGlyphCellTbl precedes the data
-    checkTile(cell, bg + (k-1)*16, "hud glyph")
+  for k = 1, bg - bgCells do
+    checkTile(emu.read(bgCells + k - 1, rom), bg + (k-1)*16, "hud glyph")
+  end
+  -- the six shield-count cells (#292): monster slot s's cell holds the
+  -- Ot6ShieldGlyphs tile for the count its last upload named (OT6_SHHAVE;
+  -- 0 = nothing uploaded, so nothing to hold)
+  local have = M.sym("OT6_SHHAVE")
+  local slotCells = M.sym("Ot6ShieldSlotCellTbl") & 0x3FFFFF
+  local glyphs = M.sym("Ot6ShieldGlyphs") & 0x3FFFFF
+  for s = 0, 5 do
+    local n = M.readByte(have + s)
+    if n >= 1 and n <= 99 then
+      checkTile(emu.read(slotCells + s, rom), glyphs + (n-1)*16,
+        string.format("slot %d shield count %d", s, n))
+    end
   end
 end
 

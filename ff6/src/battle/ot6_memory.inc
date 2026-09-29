@@ -363,5 +363,25 @@ OT6_WEAPSPELL        := $eda0
 .assert OT6_WEAPSPELL = OT6_HPMARK + 8, error, "the weapon-spell flag must follow the hurt line without a gap"
 .assert OT6_WEAPSPELL <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; the shield icon's count tiles (#292).  Each monster slot 0-5 owns one font
+; cell (Ot6ShieldSlotCellTbl), and the tile in it is the shield showing that
+; slot's live count (Ot6ShieldGlyphs, 1..99), so any count draws true.
+; One byte per slot, indexed by slot 0-5 (not the stride-2 entity offset):
+;   OT6_SHHAVE  the count whose tile the cell holds now (0 = none/unknown);
+;               written by the nmi flush when it uploads, zeroed by
+;               Ot6LoadFontIcons_ext at battle init (power-on junk here
+;               would name a tile the cell does not hold)
+;   OT6_SHWANT  the count the hud builder wants drawn, staged with its bit
+;               in OT6_SHPEND (bit s = slot s) when it differs from HAVE.
+; The flush uploads one pending slot per nmi, v-gated like the other one-shot
+; writes; the font re-lay after a dialog re-uploads every slot from HAVE.
+OT6_SHHAVE           := $edc0   ; 6 bytes
+OT6_SHWANT           := $edc6   ; 6 bytes
+OT6_SHPEND           := $edcc
+.assert OT6_SHHAVE > OT6_WEAPSPELL, error, "shield-tile state must not collide with the weapon-spell flag"
+.assert OT6_SHWANT = OT6_SHHAVE + 6, error, "shield-tile want must follow have without overlap"
+.assert OT6_SHPEND = OT6_SHWANT + 6, error, "shield-tile pending mask must follow want without overlap"
+.assert OT6_SHPEND <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 
 .endif

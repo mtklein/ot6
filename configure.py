@@ -362,6 +362,9 @@ TEST_ENV = {
     # and declares a two-byte command expedient (state_write_waivers.txt)
     "battle_mimic":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
+    # #292: NUMBER 024 (7 shields) is two steps from this save point
+    "battle_hudcount":
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/n024-entry-save-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",
@@ -491,6 +494,11 @@ check("spell_grants",
       ["tools/check_spell_grants.py", "ff6/src/battle/ot6_boost.asm",
        "ff6/include/const.inc", "ff6/src/text/genju_name_en.json",
        copy_if_changed_from("build/ot6.sfc")])
+# #292: the HUD's shield-count tiles are generated; the checked-in .inc must
+# be what the generator writes (counts 1-6 byte-identical to the old art is
+# asserted inside the generator).
+check("shield_glyphs", "python3 ff6/tools/gen_shield_glyphs.py --check",
+      ["ff6/tools/gen_shield_glyphs.py", "ff6/src/battle/ot6_shield_glyphs.inc"])
 check("encounters_selftest", "python3 tools/audit_encounters.py --selftest",
       ["tools/audit_encounters.py"])
 check("chestvis_selftest", "python3 tools/chest_visibility.py --selftest",
