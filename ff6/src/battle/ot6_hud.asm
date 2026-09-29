@@ -1965,9 +1965,12 @@ Ot6ShieldTbl:
         ; -- north of tzen to nikeah (world groups 37-39) --
         .word   $0035
         .byte   1, OT6_SLASH    ; bloompire: 12 hp behind def/mdef 254; the
-                                ;   first blade breaks it, and broken it
-                                ;   loses the turn its Energy Sap (zombie)
-                                ;   would take.  fire vanilla
+                                ;   first blade breaks it.  Energy Sap
+                                ;   (zombie) is a turn of its script, and a
+                                ;   broken monster takes no turn, not even
+                                ;   one queued before the break (#291,
+                                ;   battle_brokendeath); not measured on a
+                                ;   bloompire.  fire vanilla
         .word   $0058
         .byte   3, OT6_BLUDG    ; buffalax: the tank, a bull's hide dented
                                 ;   by fists; its counter answers only

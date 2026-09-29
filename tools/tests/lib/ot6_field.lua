@@ -3075,9 +3075,9 @@ local function careKernel(opts)
   local function pickStatusCure(target)
     -- A member the battle left zombied reads 0 HP with no Wound bit (measured
     -- north of Tzen: a Bloompire's Energy Sap, `c6 0/1396 hp status1=02`,
-    -- the Fenix Down REFUSED by the game, route-wor-edgar 10): the wound
-    -- branch is the $80 bit, not the HP, so it is served here like any
-    -- other zombie.
+    -- the Fenix Down REFUSED by the game, route-wor-edgar 10).  Skipped
+    -- here: the Wound bit, or 0 HP without the zombie bit (dead, the revive
+    -- pass's business); a zombie at 0 HP is served like any other zombie.
     if (M.charStatus1(target) & 0x80) ~= 0
        or (M.charHp(target) == 0 and (M.charStatus1(target) & 0x02) == 0) then
       return nil

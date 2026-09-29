@@ -61,8 +61,9 @@ measurement.
    is shut off and the Tentacle drains HP each turn), and it is Discarded
    30 counts later or when that Tentacle dies (`TargetEffect_44`). A
    seized member simply gets no window; measured (section 12), the Seize
-   keeps the fight long, and SABIN's Air Blade, not levels alone, is what
-   made it reliable.
+   keeps the fight long. With SABIN's Air Blade the variation set won it
+   13 times in 13; the lab's draws show no measured difference between
+   Air Blade (11 of 12) and Pummel (10 of 12).
 6. **No shop on the stretch sells Tonics.** Nikeah (58) and South Figaro
    (63) sell Potions; field care stays on Potions, as on the Sabin
    stretch. Figaro Castle's shops refuse a party with SABIN or EDGAR in it
@@ -441,7 +442,8 @@ about L28-29 (**estimate**). Air Blade comes at SABIN's L30. EDGAR joins at
 Tentacles, which retry from the cave's checkpoint on a loss (a game over).
 The level for them is set by a lab (section 12), not guessed: L30, SABIN's
 Air Blade, reached by a grind on the South Figaro continent (groups
-41-44, beside the cave's door), which also plays those pools.
+41-43, beside the cave's door; not the desert, 44), which also plays those
+pools.
 
 ### 4.2 Kit levers (to be measured)
 
@@ -699,10 +701,10 @@ designed rows.
 |---|---|---|---|
 | Zombie on one of two members | groups 37/39 (Bloompire), 40 (Black Drgn) | the driver refuses a Fenix Down on a zombie (#245); the field care cures it with a Revivify (#190) | measure: whether a zombied member costs the fight; the Amulet as a lever |
 | Imp | groups 37/39 (Lizard) | HANDLED (cured in battle) | — |
-| Muddle | the cave | HANDLED | L.3 Muddle on L27/L30 members |
+| Muddle | the cave | HANDLED; the pair lost formation 232 once in 53 to Muddle landing again and again (section 12.3) | L.3 Muddle on L27/L30 members; a Muddle guard |
 | the Black Drgn | group 40, unavoidable on the walk | never fought (#300) | a lab: first-attempt rate over draws that meet it |
 | Seize / Discard | the Tentacles | planned around (measured, section 12): a seized member gets no window and the driver plans for the others; taking the holder first measured no gain | — |
-| an event battle whose loss is a game over | the Tentacles | the runner retries a lost segment from its boot | the lab (section 12): L30 by a grind, Air Blade |
+| an event battle whose loss is a game over | the Tentacles | the runner retries a lost segment from its boot | the lab (section 12): L30 by a grind, Air Blade (no measured difference from Pummel) |
 | a weapon the Tentacles absorb | the Tentacles | the runner's absorb guard fails the fight | the stop before them: no element in any hand; the Enhancer bought in South Figaro keeps EDGAR's Optimum off the Blizzard and ThunderBlade |
 | three talks to a moving NPC | Gerad in Nikeah | `H.talkToObj` (the cafe's wandering thieves: `H.chaseTalk`) | each talk re-approaches |
 | a talk that opens a battle | Gerad at the engines | `H.talkToObj`'s approach plays battles by mashing A | walk up with the tactical walker, then face him and press A |
@@ -776,8 +778,8 @@ two battles). Retries off (`OT6_RETRIES=1`). `leg1/var4/summary.txt`,
 
 31 of 31 `PASS attempts=1/1`: 472 `[outcome]` lines, 472 `paid as due`, 0
 without an end reading; 183 battles in the bodies, every one won. The
-Black Drgn came 14 times (13 runs; K=18 met it twice) and fell every time,
-in 1239-3438 ticks, with no death in its own fights. The six deaths are
+Black Drgn came 13 times (12 of the 31 runs; K=18 met it twice) and fell
+every time, in 1239-3438 ticks, with no death in its own fights. The six deaths are
 all zombifications counted by the death watch (`atk $EF` Energy Sap five
 times, the Bloompire's; one attributed to a poison tick, K=9 shift 41),
 each cured after the battle with a Revivify; no Fenix Down was spent in
@@ -791,7 +793,10 @@ Two defects found here and fixed before this set (their runs kept):
   refused it (`REFUSED by the game: revive char 6 with $F0 (0/1396 hp ...
   status1 02)`), and the party walked on with a zombie (`var1/k5_s0.log`,
   K=7 the same for SABIN: 2 of 9 runs red). The care's dead test is now
-  the Wound bit (`lib/ot6_field.lua` `pickStatusCure`, the revive pick):
+  0 HP and not zombie (`lib/ot6_field.lua`: the revive pick takes a member
+  at 0 HP without the zombie bit `$02`; `pickStatusCure` skips a member with
+  the Wound bit, or at 0 HP without the zombie bit; the commit message's
+  "the Wound bit" says it short):
   the same draw reads `used $F1 on char 6: 0 -> 174 hp, ... status1 02 ->
   00` (`zfix/k5_s0.log`).
 - **The step onto (148,76) can roll an encounter that opens after the
@@ -898,12 +903,18 @@ surfacing at (81,84) with the parent tile (81,85). What it did not know:
   unsaid, which the `[outcome]` count caught (`an [outcome] said for every
   battle fought ... got 28 ($1C), want 29 ($1D)`, `leg3/var_ed3/k3_s0.log`).
   The segment talks from the tile below with the tactical walker.
-- **The desert (world group 44) is a wall for the pair**: formation 222,
-  two Sand Horses, Sand Storm at 400-450 a member twice a round, wiped
-  CELES and SABIN at L28 (`leg3/var_ed_v1/k2_s0.log`: `class=died with 3 BP
-  banked`, the Sand Horses untouched) and again at L30 with three Fenix
-  Downs spent (`leg3/var_ed2/k2_s0.log`). The grind stays off the desert;
-  the pool is not played on this stretch (section 13).
+- **The desert's Sand Horse pair (world group 44, formation 222) is a
+  coin flip as the driver plays it, not a level wall.** Across the
+  variation sets the pair won it 6 times and lost it twice (`$0DE WON`:
+  4 in `var_ed_v1/`, 1 in `var_ed2/`, 1 in `var_ed4/`; the pool's other
+  formations, 223 and 138, won 2 and 6). Both losses end `class=died with
+  3 BP banked` with both horses untouched (`monhp=s0:1025/sh2,s1:1025/sh2`),
+  the pair having spent its turns on heals and items: at L28 two heals
+  and an item before the one Fight (`leg3/var_ed_v1/k2_s0.log`), at L30
+  three Fenix Downs raising SABIN to 188 HP into Sand Storm (`atk $69`)
+  hits of 400 and more, the revive rule judging by `the living enemy's
+  smallest hit 162` (`leg3/var_ed2/k2_s0.log`). The grind stays off the
+  desert until that is measured (section 13).
 
 ### 12.2 The Tentacles
 
@@ -926,10 +937,14 @@ Tentacle's Entwine Slows, a Slowed member is Seized on that Tentacle's
 next turn and drained (`cmd $2D`, the commonest cause of death) until it
 is Discarded or the Tentacle dies, and the drain heals the Tentacle; a
 lost L30 fight issued 20 plans in 14,583 ticks for three members
-(`tent_l30/s9.log`). Levels alone shortened the wins but not the losses;
-SABIN's Air Blade (wind, every Tentacle at once, none absorbs wind) cut
-them to one in twelve. The shipped segment grinds to L30 and sets his
-blitz to Air Blade for this fight.
+(`tent_l30/s9.log`). Levels shortened the wins but not the losses. Air
+Blade (wind, every Tentacle at once, none absorbs wind) lost one draw in
+twelve against Pummel's two, but on the same twelve draws Pummel lost s5
+and s9, which Air Blade won, and Air Blade lost s8, which Pummel won
+(`tent_l30.out`, `tent_l30_airblade.out`): one loss against two is no
+measured difference. The shipped segment grinds to L30 and sets his blitz
+to Air Blade for this fight; with it the variation set below won the
+Tentacles in all 13 runs that reached them.
 
 ### 12.3 Under real draw variation
 
@@ -984,12 +999,14 @@ No lever for it is measured (section 13).
   loss was Muddle landing again and again (12.3). One loss in fourteen
   runs of the leg. A Muddle guard in the kit, a longer grind or SABIN's
   Air Blade for this formation are the levers; none is measured.
-- **The South Figaro desert** (world group 44) is reachable and unplayed:
-  its Sand Horse pair wiped CELES and SABIN at L28 and at L30 (12.1). With
-  EDGAR (the stretch after this one leaves the castle into that desert)
-  it may be a fair fight; for the pair it is a wall. Whether the Sand
-  Horse's row (2 shields, slash and pierce), its Sand Storm or the level
-  is the lever is a design call.
+- **The South Figaro desert** (world group 44) is off the grind: its Sand
+  Horse pair was won 6 times and lost 2 (12.1), both losses with the
+  horses untouched while the pair healed and revived into Sand Storm. That
+  is a driver finding (the revive rule's smallest-hit judgement; turns
+  spent on care against a pair that must be killed) and a lab candidate
+  (first-attempt rate over distinct draws, the driver as is and changed),
+  not a level wall. The stretch after this one leaves the castle into
+  that desert with EDGAR.
 - **South Figaro's rich man's basement passage** (maps 83, 84, 87, 89) is
   not walked: the offline model finds no way across 84 or 89, and no live
   visit was made (2.4).

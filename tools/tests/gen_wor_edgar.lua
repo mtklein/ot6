@@ -222,10 +222,12 @@ end
 -- The grind (a lever: GRIND_ON, TARGET_LEVEL; route-wor-edgar 12 has the
 -- lab): a loop through the grass, forest and plain (groups 41-43), off the
 -- desert and the doors, to TARGET_LEVEL.  Not the desert (group 44): its
--- Sand Horse pair (formation 222; Sand Storm, 400-450 a member, twice a
--- round) wiped the pair at L28 and again at L30 with three Fenix Downs
--- spent (build/attempts/wt/wor-edgar/leg3/var_ed_v1/k2_s0.log,
--- var_ed2/k2_s0.log) -- a finding for the owner (route-wor-edgar 12).
+-- Sand Horse pair (formation 222; Sand Storm, 400-450 a member) was won 6
+-- times and lost 2 across the variation sets, both losses with the horses
+-- untouched (monhp s0:1025/sh2 s1:1025/sh2) while the pair spent its turns
+-- on heals and items (build/attempts/wt/wor-edgar/leg3/var_ed_v1/k2_s0.log,
+-- var_ed2/k2_s0.log) -- a driver finding and a lab candidate, not a level
+-- wall (route-wor-edgar 12.1, 13); off the loop until it is measured.
 local GRIND_ON, TARGET_LEVEL = true, 30
 local GRIND = { { 106, 100 }, { 111, 101 }, { 101, 83 }, { 80, 103 } }
 local DOORS = { { 113, 95 }, { 106, 98 }, { 81, 85 }, { 82, 85 } }
@@ -371,7 +373,7 @@ H.run({ maxFrames = 600000 }, {
   -- runner's absorb guard refuses a fight entered with an absorbed weapon
   -- (measured with the plains kit: `char 5's R-hand item $57 (fire) is
   -- ABSORBED by slot 3 species $011B`, `char 6's ... $0E (ice) ... $013C`,
-  -- `... $0F (bolt) ... $013D`, build/attempts/wt/wor-edgar/leg3/lab/).
+  -- `... $0F (bolt) ... $013D`, build/attempts/wt/wor-edgar/leg3/tent1.log).
   -- CELES: the Enhancer and the RegalCutlass on the Genji Glove; SABIN: the
   -- MetalKnuckle and a Mithril Shld (the bag's one claw).  The bag's best
   -- blade left for EDGAR's Optimum is then the Break Blade (117).
@@ -403,8 +405,12 @@ H.run({ maxFrames = 600000 }, {
   -- SABIN's blitz there is Air Blade (wind, every Tentacle at once, and
   -- none of the four absorbs wind), learned at L30 -- the grind's level:
   -- the lab from one engine-room snapshot at L31/30/30, 12 in-battle draws
-  -- an arm, won 10 of 12 with his default Pummel and 12 of 12 with Air
-  -- Blade (route-wor-edgar 12, build/attempts/wt/wor-edgar/leg3/).
+  -- an arm, won 10 of 12 with his default Pummel and 11 of 12 with Air
+  -- Blade: on the same draws Pummel lost two that Air Blade won and Air
+  -- Blade lost one that Pummel won, so no measured difference (route-wor-
+  -- edgar 12.2; build/attempts/wt/wor-edgar/leg3/tent_l30.out,
+  -- tent_l30_airblade.out).  The variation set with Air Blade won the
+  -- Tentacles in all 13 runs that reached them (leg3/var_ed4/).
   H.call(function()
     H.assertEq((H.readByte(0x1D28) & 0x20) ~= 0, true,
       string.format("SABIN knows Air Blade ($1D28 bit 5; SABIN L%d, BlitzLevelTbl 30)", level(SABIN)))
