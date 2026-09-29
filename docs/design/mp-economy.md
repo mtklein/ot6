@@ -188,10 +188,14 @@ Owner direction, 2026-09-17 (#219): a boost that buys a damage
 multiplier costs escalating MP, the way boosted magic already does, so
 boosting is a tactical trade rather than a free multiplier.
 
-    price = min(99, floor(base * 2.5^boost + 0.5))
+    price = max(base, min(99, floor(base * 2.5^boost + 0.5)))
 
 with `boost` the pending boost level 0..3, i.e. x1 / x2.5 / x6.25 /
-x15.625 against the base price, every result capped at 99.
+x15.625 against the base price, capped at 99 and never below the base
+(ruling 1 below: the one base above 99 is Phoenix's 110, and a boost
+never makes it cheaper; `battle_phoenixprice` measures 110 at every
+level on the summon row's stamp, its drawn number and the charge,
+`build/attempts/wt/battle-fixes-023/`).
 
 The owner refined the scope the same day: the three *chance verbs* --
 Steal, Rage and Slot -- are exempt and stay flat at every level. "Who

@@ -784,7 +784,7 @@ done:   pla
 ; Summon ($19) is not in the gate (#251).  Its charge is the esper row's list
 ; cost, row 0 byte 3, which GetMPCost's summon arm reads (battle_main.asm:
 ; 13318 -> @4f24) into the A this proc sees.  Ot6FoldPrices writes that byte
-; through Ot6MagicPrice, so it already holds min(99, base x 2.5^boost), and
+; through Ot6MagicPrice, so it already holds the boosted price (Ot6BoostPriceFor), and
 ; it cannot be stale here: Ot6Boost re-prices it on the L/R edge itself
 ; (Ot6RecheckMagic), and the bank is frozen from the confirm on
 ; (Ot6CommittedSlot).  A second pricing here would also have to honour
@@ -988,9 +988,9 @@ done:   pla
 
 ; [ what a boost costs: the one price-scaling authority ]
 ;
-; price = min(99, floor(base * 2.5^boost + 0.5)) for boost 0..3, i.e. x1 /
-; x2.5 / x6.25 / x15.625 against the base price, every result capped at 99
-; (#219).  Boost multiplies a damage verb by x2/x4/x8 (Ot6BoostDmg), so MP
+; price = max(base, min(99, floor(base * 2.5^boost + 0.5))) for boost 0..3,
+; i.e. x1 / x2.5 / x6.25 / x15.625 against the base price, capped at 99 and
+; never below the base (#219; the floor is Phoenix's, see below and #293).  Boost multiplies a damage verb by x2/x4/x8 (Ot6BoostDmg), so MP
 ; scales slightly faster than damage; the ratio matches magic's own -ra -> -ga
 ; step, where vanilla pays ~2.5x the MP for ~2x the power.
 ;
