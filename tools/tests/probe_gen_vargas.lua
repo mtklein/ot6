@@ -1,0 +1,565 @@
+-- @manual one-off #314 lab; deleted by the next commit
+-- probe_gen_vargas.lua -- one-off (#314): gen_vargas with gauge logging at every Pummel; emits nothing.
+-- gen_vargas.lua -- from vargas_entry.mss: fight Vargas with real input,
+-- ride the reunion, and generate vargas_won.mss on the first controllable
+-- frame after it. Inputs in, observations out: no writes to emulated game
+-- state.
+
+-- The fight (bosses-wob.md section 3, which both human playtests rated well):
+-- Vargas (11600 hp, 5 shields, weak poison|holy + bludgeoning) plus two
+-- Ipoohs (360 hp, 2 shields, slash-weak).  Two phases; only the second
+-- has SABIN in it.  His turns start after Vargas's own reaction script
+-- runs `battle_event $07` at hp <= 10880 and `$08` at hp <= 10368
+-- (ai_script.asm:4392-4404), so real damage has to cross those thresholds.
+-- The kill is Pummel: the script answers `if_attack PUMMEL` with
+-- `battle_event $09 / kill_monsters ALL` (:4385-4388), so he dies to the
+-- script rather than to hp, which is the intended design ("Jank: the Blitz
+-- gate stays").
+
+-- The retry sweep is the game's own defeat flow made explicit: the
+-- entry point is captured once at boot (a savestate blob in memory, with no
+-- writes); a party wipe tears the battle down into Game Over instead of
+-- the reunion, the attempt's post-fight ride ends there rather than on
+-- "map 98, calm, SABIN in the party", and the next attempt reloads the entry
+-- point blob and takes a different battle RNG phase before the opening
+-- A-press, shifting every RNG draw downstream.  Three attempts, then fail.
+-- The ride is passed wipeEndsRide because the shared wipe canary otherwise
+-- raises on the first loss and no ladder here ever reaches rung two.
+
+-- The generate is verified by reload (gen_sabin_gau's discipline): capture,
+-- reload the capture as the consumer timeline, give it 300 frames, and
+-- require the same calm map-98 field before accepting the blob.
+local H = dofile("tools/tests/lib/ot6.lua")
+local L = H.newSeedSweep("battle 66")
+local DOOR = "build/states/vargas_entry.mss.lua"
+
+local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
+local ST_CMD, ST_TOOLS, ST_TGT, ST_ITEM, ST_MAGIC = 0x05, 0x30, 0x38, 0x0A, 0x0E
+local ITEMLIST = 0x4005                 -- wItemList: tools-shell rows, 3/entry
+local BATTINV  = 0x2686                 -- battle inventory, 5 bytes/entry
+local CMDTBL   = 0x202E                 -- in-battle commands, slot*12 + i*3
+local POTION, TONIC, PUMMEL = 0xE9, 0xE8, 0x5D
+local CURE_ID  = 0x2D
+-- packed per-character battle spell lists: $2092 + ptr[slot] + idx*4
+local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
+local SABIN_E, TERRA_E = 3, 2
+local VARGAS = 0x0103
+local PROBE_ARMED = false
+
+local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+local function hp(e) return H.readWord(0x3BF4 + e * 2) end
+local function maxhp(e) return H.readWord(0x3C1C + e * 2) end
+local function mp(e) return H.readWord(0x3C08 + e * 2) end
+local function bp(e) return H.readByte(0x3E9C + e * 2) end
+local function pend(e) return H.readByte(0x3E9D + e * 2) end
+local function alive(e) return hp(e) > 0 end
+local function vHp() return H.readWord(0x3BFC) end
+
+local function itemSlot(id)
+  for i = 0, 15 do
+    if H.readByte(BATTINV + i * 5) == id
+       and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
+  end
+  return nil
+end
+local function spellIndexOf(slot, id)
+  for i = 0, 15 do
+    local a = 0x2092 + SPELL_PTR[slot] + i * 4
+    if H.readByte(a) == id and (H.readByte(a + 1) & 0x80) == 0 then return i end
+  end
+  return nil
+end
+
+local healBusy = {}                      -- target -> frame a heal was queued
+-- The lib fight driver's battle-open and [death] lines (newFightDriver,
+-- lib/ot6.lua) for a fight this file drives itself, so tools/audit_boost.py
+-- sees the pips a member held when they fell and tools/audit_fenix.py the
+-- fight a Fenix Down answered (#220).  Ticks count from the first frame the
+-- battle table is live with monsters present; no monster action is
+-- attributed.
+local function newDeathWatch(tag)
+  local W = {}
+  function W.reset()
+    W.tick, W.opened, W.hp, W.said = 0, false, {}, {}
+  end
+  W.reset()
+  function W.frame()
+    if not H.battleLoadStarted() then W.reset(); return end
+    if not W.opened and H.monstersPresent() == 0 then return end
+    W.tick = W.tick + 1
+    local pbp = {}
+    for p = 0, 3 do pbp[#pbp + 1] = tostring(H.readByte(0x3E9C + p * 2)) end
+    local party_bp = table.concat(pbp, ",")
+    if not W.opened then
+      W.opened = true
+      local hp = {}
+      for e = 0, 3 do hp[#hp + 1] = tostring(H.readWord(0x3BF4 + e * 2)) end
+      H.log(string.format("[%s] battle f+%d partyhp=%s party_bp=%s monsters=%d",
+        tag, W.tick, table.concat(hp, ","), party_bp, H.monstersPresent()))
+    end
+    for e = 0, 3 do
+      local hp, maxhp = H.readWord(0x3BF4 + e * 2), H.readWord(0x3C1C + e * 2)
+      local last = W.hp[e]
+      if last ~= nil and last ~= 0xFFFF and last > 0 and hp == 0 and maxhp > 0
+         and not W.said[e] then
+        W.said[e] = true
+        local bp = H.readByte(0x3E9C + e * 2)
+        H.log(string.format("[%s] [death] f+%d entity %d char %d from %d/%d by "
+          .. "nobody (no monster action attributed) bp=%d party_bp=%s%s", tag,
+          W.tick, e, H.readByte(0x3ED8 + e * 2), last, maxhp, bp, party_bp,
+          bp >= 3 and string.format(" -- died holding %d BP", bp) or ""))
+      elseif hp > 0 and hp ~= 0xFFFF then
+        W.said[e] = nil
+      end
+      W.hp[e] = hp
+    end
+  end
+  return W
+end
+local vargasWatch = newDeathWatch("vargas")
+local function needsHeal(thresh)
+  local best, bestR = nil, 1.0
+  for e = 0, 2 do
+    if alive(e) and maxhp(e) > 0 then
+      local r = hp(e) / maxhp(e)
+      if r < thresh and r < bestR
+         and (not healBusy[e] or H.frame - healBusy[e] > 900) then
+        best, bestR = e, r
+      end
+    end
+  end
+  return best
+end
+
+local function hpLine()
+  local s = ""
+  for e = 0, 3 do
+    s = s .. string.format(" e%d=%d/%d(b%d,%dmp)", e, hp(e), maxhp(e),
+      bp(e), mp(e))
+  end
+  local pot = itemSlot(POTION)
+  return s .. string.format(" V=%d pots=%d", vHp(),
+    pot and H.readByte(BATTINV + pot * 5 + 3) or 0)
+end
+
+-- ------------------------------------------------- the per-menu machine --
+-- One pulse per frame while a menu is up.  M resets on every actor change
+-- and whenever the menu closes; the plan is decided once per fresh menu
+-- from live reads.  Presses are 5-on/5-off edges; every cursor move is
+-- verified by re-reading the cell it targets, and a watchdog backs out
+-- with B and falls back to a plain Fight rather than stalling.
+local M = {}
+local function resetM()
+  M.actor, M.n, M.plan, M.via, M.d = nil, 0, nil, nil, 0
+  M.lastCur, M.dirI = nil, nil
+end
+resetM()
+local sabinPummeled = false
+-- VARGAS's hp the last time the fight was live, latched per frame so a
+-- lost attempt can say how far it got after the battle RAM is gone
+local lastVargasHp = 0
+
+local function decidePlan(a)
+  if a == SABIN_E then return { kind = "pummel" } end
+  local emerg = needsHeal(0.30)
+  if emerg then
+    local slot = itemSlot(POTION) or itemSlot(TONIC)
+    if slot then return { kind = "potion", target = emerg, slot = slot } end
+  end
+  if a == TERRA_E and mp(TERRA_E) >= 10 then
+    local t = needsHeal(0.60)
+    if t then return { kind = "cure", target = t } end
+  end
+  return { kind = "fight" }
+end
+
+local function pulse()
+  local a = H.readByte(ACTOR)
+  if M.actor ~= a then
+    resetM()
+    M.actor, M.plan = a, decidePlan(a)
+    if M.plan.kind ~= "fight" then
+      H.log(string.format("[vargas plan f%d] actor=%d %s tgt=%s |%s",
+        H.frame, a, M.plan.kind, tostring(M.plan.target), hpLine()))
+    end
+  end
+  M.n = M.n + 1
+  local ph = M.n % 10
+  local st = H.readByte(MSTATE)
+  if M.n > 1200 then                     -- stall watchdog: back out, Fight
+    H.log(string.format("[vargas wd f%d] actor=%d st=%02X plan=%s",
+      H.frame, a, st, M.plan.kind))
+    M.n, M.via, M.d = 0, nil, 0
+    M.plan = { kind = "fight" }
+    return { "b" }
+  end
+  if st == ST_CMD then
+    M.via = nil
+    local wantCmd = 0x00                                    -- Fight
+    if M.plan.kind == "potion" then wantCmd = 0x01 end      -- Item
+    if M.plan.kind == "cure" then wantCmd = 0x02 end        -- Magic
+    if M.plan.kind == "pummel" then wantCmd = 0x0A end      -- Blitz
+    local wantCell = nil
+    for i = 0, 3 do
+      if H.readByte(CMDTBL + a * 12 + i * 3) == wantCmd then wantCell = i end
+    end
+    if wantCell == nil then M.plan = { kind = "fight" }; wantCell = 0 end
+    local cur = H.readByte(0x890F + a)
+    if cur == wantCell then
+      if M.plan.kind == "fight" then
+        local want = math.min(bp(a), 3)
+        if pend(a) < want then return (ph < 5) and { "r" } or {} end
+      end
+      return (ph < 5) and { "a" } or {}
+    end
+    local DIRS = { "down", "up", "left", "right" }
+    if ph == 0 then
+      if M.lastCur == cur then M.dirI = ((M.dirI or 0) % 4) + 1
+      else M.dirI = M.dirI or 1 end
+      M.lastCur = cur
+    end
+    return (ph < 5) and { DIRS[M.dirI or 1] } or {}
+  end
+  if st == ST_ITEM then
+    M.d = 0
+    if M.plan.kind ~= "potion" then return (ph < 5) and { "b" } or {} end
+    M.via = "item"
+    local cr = H.readByte(0x894F)
+    if cr ~= M.plan.slot then
+      return (ph < 5) and { (cr < M.plan.slot) and "down" or "up" } or {}
+    end
+    return (ph < 5) and { "a" } or {}
+  end
+  if st == ST_MAGIC then
+    M.d = 0
+    if M.plan.kind ~= "cure" then return (ph < 5) and { "b" } or {} end
+    M.via = "magic"
+    local idx = spellIndexOf(a, CURE_ID)
+    if idx == nil then
+      M.plan = { kind = "fight" }
+      return (ph < 5) and { "b" } or {}
+    end
+    local wantRow, wantCol = idx // 2, idx % 2
+    local absRow = H.readByte(0x8913 + a) + H.readByte(0x891B + a)
+    local col = H.readByte(0x8917 + a)
+    if absRow ~= wantRow then
+      return (ph < 5) and { (absRow < wantRow) and "down" or "up" } or {}
+    end
+    if col ~= wantCol then
+      return (ph < 5) and { (col < wantCol) and "right" or "left" } or {}
+    end
+    return (ph < 5) and { "a" } or {}
+  end
+  if st == ST_TOOLS then
+    M.d = 0
+    if M.plan.kind ~= "pummel" then return (ph < 5) and { "b" } or {} end
+    M.via = "blitz"
+    local row, col = nil, nil
+    for i = 0, 7 do
+      if H.readByte(ITEMLIST + i * 3) == PUMMEL then row, col = i // 2, i % 2 end
+    end
+    if row == nil then return {} end     -- list still building
+    local cr, cc = H.readByte(0x8967 + a), H.readByte(0x8963 + a)
+    if cr ~= row then return (ph < 5) and { (cr < row) and "down" or "up" } or {} end
+    if cc ~= col then return (ph < 5) and { (cc < col) and "right" or "left" } or {} end
+    if not sabinPummeled then
+      sabinPummeled = true
+      H.log(string.format("[vargas] PUMMEL chosen at f%d, V=%d", H.frame, vHp()))
+    end
+    return (ph < 5) and { "a" } or {}
+  end
+  if st == ST_TGT then
+    if M.plan.kind == "potion" or M.plan.kind == "cure" then
+      if M.via ~= "item" and M.via ~= "magic" then
+        return (ph < 5) and { "b" } or {}   -- reached via a stray Fight
+      end
+      local want = 1 << M.plan.target
+      if H.readByte(0x7B7E) ~= 0 then
+        return (ph < 5) and { "left" } or {}
+      end
+      if H.readByte(0x7B7D) ~= want then
+        M.d = M.d + 1
+        if M.d > 40 then                    -- take whoever is under it
+          healBusy[M.plan.target] = H.frame
+          return (ph < 5) and { "a" } or {}
+        end
+        return (ph < 5) and { "down" } or {}
+      end
+      healBusy[M.plan.target] = H.frame
+      return (ph < 5) and { "a" } or {}
+    end
+    if M.plan.kind == "pummel" then
+      if M.via ~= "blitz" then return (ph < 5) and { "b" } or {} end
+      -- the target window, when Pummel opens one at all; the flag is
+      -- already set by the row confirm above, which every path passes
+      return (ph < 5) and { "a" } or {}
+    end
+    return (ph < 5) and { "a" } or {}
+  end
+  return {}                              -- transient open/close: hands off
+end
+
+-- --------------------------------------------------- the retry sweep --
+local entryBlob = nil                 -- captured once, below
+local fightWon = false
+
+local function fightAttempt(n)
+  local aPh = 0
+  local loadReq
+  return H.cond(function() return not fightWon end, {
+    H.logStep(function()
+      return string.format("[vargas] attempt %d begins at f%d", n, H.frame)
+    end),
+    -- attempts past the first rewind to the entry point; every attempt then
+    -- takes its own battle RNG phase, below, before the opening A-press
+    H.cond(function() return n > 1 end, {
+      H.call(function()
+        loadReq = H.requestLoadState(entryBlob)
+      end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(loadReq, "attempt " .. n .. ": entry point reload")
+        -- the restored snapshot restarts the experiment: the canary's
+        -- count (and its pad freeze, which the reload thaws) belong to
+        -- the lost attempt (#163)
+        H.gameOverFired = 0
+      end),
+      -- The wait this replaces was 30 + n * 37, so a reloaded attempt had at
+      -- least 104 frames before it pressed anything.  Part of that number was
+      -- the RNG stagger and part of it was letting the loaded state settle;
+      -- only the stagger moved to L.spread, which can legitimately wait zero
+      -- frames.  90 is the settle every other reload in the tree uses.
+      H.waitFrames(90),
+    }, {}),
+    L.spread(n),                        -- spread the battle RNG phase (#83)
+    H.call(function()
+      resetM()
+      vargasWatch.reset()
+      sabinPummeled = false
+      lastVargasHp = 0
+      for k in pairs(healBusy) do healBusy[k] = nil end
+      H.gameOverFired = 0
+    end),
+    -- one interaction -> the scene -> battle 66
+    H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
+      H.call(function()
+        aPh = (aPh + 1) % 8
+        H.setPad(aPh < 4 and { "a" } or {})
+      end),
+    }, "the VARGAS scene reaches battle 66"),
+    H.release(),
+    H.waitUntil(function() return H.battleActive() end, 3000, "battle up", 10),
+    H.waitFrames(120),
+    H.call(function()
+      H.assertEq(H.readWord(0x57C0), VARGAS, "VARGAS ($0103) leads the formation")
+      H.log("[vargas seed]" .. hpLine())
+      -- probe (#314): VARGAS's gauge at every Pummel the route plays, and
+      -- every gauge write.  Armed once; callbacks survive attempt reloads.
+      if not PROBE_ARMED then
+        PROBE_ARMED = true
+        local lastP = nil
+        emu.addMemoryCallback(function(_, v)
+          if v ~= PUMMEL then return end
+          if lastP and H.frame - lastP < 300 then return end
+          lastP = H.frame
+          H.log(string.format("[probe] PUMMEL executes f%d: shields=%d brk=%d V=%d",
+            H.frame, H.readByte(0x3E40), H.readByte(0x3E90), vHp()))
+        end, emu.callbackType.write, 0x7E3410, 0x7E3410)
+        emu.addMemoryCallback(function(_, v)
+          H.log(string.format("[probe] VARGAS shields -> %d f%d (skill $%02X)", v,
+            H.frame, H.readByte(0x3410)))
+        end, emu.callbackType.write, 0x7E3E40, 0x7E3E40)
+        emu.addMemoryCallback(function(_, v)
+          if v == 16 then H.log(string.format("[probe] VARGAS BREAKS f%d", H.frame)) end
+        end, emu.callbackType.write, 0x7E3E90, 0x7E3E90)
+      end
+    end),
+    -- play it to teardown; the pred is the same for a win or a wipe
+    (function()
+      local hb = -600
+      return H.driveUntil(function()
+        return not H.battleLoadStarted()
+      end, 120000, {
+        H.call(function()
+          vargasWatch.frame()
+          lastVargasHp = vHp()
+          if H.frame - hb >= 600 then
+            hb = H.frame
+            H.log(string.format("[vargas f%d]%s", H.frame, hpLine()))
+          end
+          local aP = H.frame % 8
+          if H.readByte(MENU) == 0 then
+            resetM()
+            H.setPad(aP < 4 and { "a" } or {})
+            return
+          end
+          H.setPad(pulse())
+        end),
+      }, "battle 66 tears down (win or wipe)")
+    end)(),
+    H.call(function()
+      H.setPad({})
+      H.log(string.format("[vargas] teardown at f%d (pummeled=%s)",
+        H.frame, tostring(sabinPummeled)))
+    end),
+    (function()
+      local calmN, giveUp = 0, 0
+      return H.advanceStory(function()
+        giveUp = giveUp + 1
+        if giveUp > 28000 then return true end       -- soft timeout: no win
+        -- #163: the run canary's count is the loss too (it counts a
+        -- 300-frame battle-side wipe as a game over and freezes the pad;
+        -- allowGameOver on the run keeps the sweep alive for the reload)
+        if (H.gameOverFired or 0) > 0 then return true end
+        local ok = (H.mapId() & 0x1ff) == 98 and H.hasControl()
+          and H.tileAligned() and bright() >= 15
+          and not H.battleLoadStarted()
+          and (H.readByte(0x1855) & 0x07) ~= 0       -- SABIN joined
+        calmN = ok and calmN + 1 or 0
+        if calmN >= 30 then fightWon = true; return true end
+        return false
+      end, 30000, { playBattles = true, wipeEndsRide = true })
+    end)(),
+    H.logStep(function()
+      -- no hpLine() here: the battle module has handed its RAM back by now,
+      -- so $3BF4 would read whatever the field module put there
+      return string.format("[vargas] attempt %d verdict: %s (VARGAS was at " ..
+        "%d when the fight tore down, pummeled=%s)", n,
+        fightWon and "WON -- reunion settled" or "lost (retrying)",
+        lastVargasHp, tostring(sabinPummeled))
+    end),
+  }, {})
+end
+
+-- ------------------------------------- reload-verified generation (gau) --
+local genBlob, genDone = nil, false
+local function genAttempt(n)
+  local tag = string.format("[vargas_won] generation attempt %d", n)
+  local saveReq, loadReq
+  local mx, my
+  return H.cond(function() return not genDone end, {
+    H.call(function()
+      mx, my = H.fieldX(), H.fieldY()
+      saveReq = H.requestSaveState()
+    end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(saveReq, tag .. ": capture")
+      genBlob = saveReq.blob
+      H.log(string.format("%s: captured %d bytes at (%d,%d) f%d -- " ..
+        "reloading to verify the consumer's boot", tag, #genBlob, mx, my,
+        H.frame))
+      loadReq = H.requestLoadState(genBlob)
+    end),
+    H.waitFrames(2),
+    H.call(function() H.checkReq(loadReq, tag .. ": verify reload") end),
+    H.waitFrames(300),
+    H.cond(function()
+      return (H.mapId() & 0x1ff) == 98 and H.hasControl() and H.tileAligned()
+         and not H.battleLoadStarted()
+         and H.fieldX() == mx and H.fieldY() == my
+    end, {
+      H.call(function()
+        genDone = true
+        H.log(tag .. ": reload stayed calm on map 98 -- verified")
+      end),
+    }, {
+      H.logStep(function()
+        return string.format("%s: reload NOT calm (map=%d ctl=%s at %d,%d)",
+          tag, H.mapId() & 0x1ff, tostring(H.hasControl()),
+          H.fieldX(), H.fieldY())
+      end),
+      H.advanceStory(function()
+        return H.hasControl() and H.tileAligned()
+           and not H.battleLoadStarted()
+      end, 9000, { playBattles = true }),
+      H.waitFrames(60),
+    }),
+  }, {})
+end
+
+-- allowGameOver: the battle-66 sweep deliberately survives a lost fight
+-- (#163); the post-fight ride ends on the lib's wipe canary or on
+-- H.gameOverFired and the next attempt reloads.
+H.run({ maxFrames = 700000, allowGameOver = true }, {
+  H.loadState(DOOR),
+  H.waitFrames(30),
+  -- capture the entry point once: the retry sweep's rewind point.  The blob
+  -- is this boot's own state, and nothing is written to the game.
+  (function()
+    local req
+    return H.cond(function() return true end, {
+      H.call(function() req = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(req, "entry point capture")
+        entryBlob = req.blob
+        H.log(string.format("entry point captured (%d bytes) for the retry sweep",
+          #entryBlob))
+      end),
+    }, {})
+  end)(),
+
+  L.watch(),
+  fightAttempt(1),
+  fightAttempt(2),
+  fightAttempt(3),
+  L.report(),
+  H.call(function()
+    H.assertEq(fightWon, true,
+      "VARGAS beaten within 3 attempts (real damage, real menus)")
+  end),
+  H.waitFrames(30),
+
+  -- ===================================================================== --
+  -- Heal the party.  TERRA falls to a Gale Cut burst in most winning
+  -- runs, and this generator keeps that outcome, but leaving her down was
+  -- only ever a consequence of an empty bag: until gen_kolts
+  -- started shopping there was no Fenix Down within three chapters of
+  -- here, so the party walked into the Returner caves with her dead
+  -- because nothing could raise her, not because a player would leave her.
+  -- A player raises her immediately.  H.fieldCare does that through the real
+  -- Item windows, threshold 0.9, and it is a no-op that does not open the
+  -- menu if the fight ended with no casualties.
+  H.fieldCare({ tag = "post-vargas care", threshold = 0.9 }),
+
+  -- ===================================================================== --
+  -- Assert the reunion's outcome and generate, reload-verified.
+  -- ===================================================================== --
+  H.call(function()
+    H.assertEq(H.mapId() & 0x1ff, 98, "back on map 98 after the reunion")
+    H.assertEq(H.hasControl(), true, "controllable")
+    H.assertEq(H.tileAligned(), true, "tile-aligned")
+    H.assertEq(H.battleLoadStarted(), false, "no battle")
+    H.assertEq((H.readByte(0x1855) & 0x07) ~= 0, true,
+      "SABIN is in the party ($1855)")
+    -- and the whole party leaves here alive
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c) > 0, true,
+        string.format("char %d leaves Mt. Kolts alive", c))
+    end
+    for c = 0, 15 do
+      if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
+        local base = 0x1600 + 37 * c
+        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d mp=%d/%d",
+          c, H.readByte(base), H.readByte(base + 8),
+          H.readWord(base + 9), H.readWord(base + 11),
+          H.readWord(base + 13), H.readWord(base + 15)))
+      end
+    end
+    H.log(string.format("vargas_won: map=%d at (%d,%d)",
+      H.mapId() & 0x1ff, H.fieldX(), H.fieldY()))
+    H.screenshot("vargas_won")
+  end),
+  genAttempt(1),
+  genAttempt(2),
+  genAttempt(3),
+  H.call(function()
+    H.assertEq(genDone, true,
+      "a reload-verified calm vargas_won capture within 3 attempts")
+    H.log("[probe] generation verified; nothing emitted")
+  end),
+  H.logStep(function()
+    return string.format("vargas_won generated at frame %d", H.frame)
+  end),
+})
