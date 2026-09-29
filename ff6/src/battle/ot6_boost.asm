@@ -784,7 +784,7 @@ done:   pla
 ; Summon ($19) is not in the gate (#251).  Its charge is the esper row's list
 ; cost, row 0 byte 3, which GetMPCost's summon arm reads (battle_main.asm:
 ; 13318 -> @4f24) into the A this proc sees.  Ot6FoldPrices writes that byte
-; through Ot6MagicPrice, so it already holds min(99, base x 2.5^boost), and
+; through Ot6MagicPrice, so it already holds the boosted price (Ot6BoostPriceFor), and
 ; it cannot be stale here: Ot6Boost re-prices it on the L/R edge itself
 ; (Ot6RecheckMagic), and the bank is frozen from the confirm on
 ; (Ot6CommittedSlot).  A second pricing here would also have to honour
@@ -988,9 +988,9 @@ done:   pla
 
 ; [ what a boost costs: the one price-scaling authority ]
 ;
-; price = min(99, floor(base * 2.5^boost + 0.5)) for boost 0..3, i.e. x1 /
-; x2.5 / x6.25 / x15.625 against the base price, every result capped at 99
-; (#219).  Boost multiplies a damage verb by x2/x4/x8 (Ot6BoostDmg), so MP
+; price = max(base, min(99, floor(base * 2.5^boost + 0.5))) for boost 0..3,
+; i.e. x1 / x2.5 / x6.25 / x15.625 against the base price, capped at 99 and
+; never below the base (#219; the floor is Phoenix's, see below and #293).  Boost multiplies a damage verb by x2/x4/x8 (Ot6BoostDmg), so MP
 ; scales slightly faster than damage; the ratio matches magic's own -ra -> -ga
 ; step, where vanilla pays ~2.5x the MP for ~2x the power.
 ;
@@ -1656,9 +1656,12 @@ Ot6FoldTbl:
                                         ;   escalate: cmd $13 is not in
                                         ;   Ot6BoostDmg's gate list, so every
                                         ;   step of the dance the start pays
-                                        ;   for swings at x2/x4/x8.  One test,
-                                        ;   and Dance lands on the other side
-                                        ;   of it from Rage
+                                        ;   for swings at x2/x4/x8 (the start
+                                        ;   records its tier, OT6_DANCETIER,
+                                        ;   and Ot6BoostLevel hands it to each
+                                        ;   step, #294).  One test, and Dance
+                                        ;   lands on the other side of it
+                                        ;   from Rage
         plp
         rtl
 @rage:  ; rage is the other possess-verb: flat, charged once at Rage-start,
@@ -1799,8 +1802,19 @@ Ot6ThiefCostTbl:
 ; load, battle_main.asm:425) exceeds the attacker's current MP.  Cmd_13
 ; consults this before setting the DANCE status: the universal fizzle
 ; refuses only the cast, and the status set in the command body would
-; otherwise start the whole-battle state unpaid.  entry: jsl from Cmd_13,
-; a8/i8 (command context), y = attacker entity, db=$7e.  clobbers a.
+; otherwise start the whole-battle state unpaid.
+;
+; A paid start also records the dance's boost (#294).  The boost buys a Dance
+; its multiplier, and the dance it starts is a whole-battle state whose every
+; later step is an automatic turn with no menu, so no pending boost of its
+; own.  Ot6ActionEnd spends the pips at the end of this start turn, so the
+; tier the start bought is kept in OT6_DANCETIER and Ot6BoostLevel hands it
+; to every step of the dance (see @dance in Ot6AbilityCost for the price,
+; paid once at this start).  A locked-in step (DANCE already set) records
+; nothing: the dance keeps the tier its start bought.
+;
+; entry: jsl from Cmd_13, a8/i8 (command context), y = attacker entity,
+; db=$7e.  clobbers a; preserves x/y.
 .proc Ot6DanceStartGate
         .a8
         rep     #$20
@@ -1812,7 +1826,45 @@ Ot6ThiefCostTbl:
         bcs     @ok
         sec                     ; cannot pay: the start must not lock
         rtl
-@ok:    clc
+@ok:    lda     $3ef8,y         ; status 3
+        lsr                     ; bit 0 = already dancing: a locked-in step
+        bcs     @go
+        phx
+        tyx
+        lda     OT6_BOOST_REVEALED,x    ; the start's pending boost
+        sta     f:$7e0000+OT6_DANCETIER,x
+        plx
+@go:    clc
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the boost level this action's damage multiplier buys ]
+;
+; Ot6BoostDmg's one question, asked of the queued action: the actor's pending
+; boost, except on a Dance step, where it is the tier the dance's start
+; bought (OT6_DANCETIER, recorded by Ot6DanceStartGate).  On the start step
+; the two are the same number; on every later step the pending boost is 0,
+; since a dancer never opens a menu to raise one, and the recorded tier is
+; what the start paid for.  A step is the queued command Dance ($3a7c, which
+; InitPlayerAction copies out of the queue and nothing rewrites mid-action)
+; by an actor whose DANCE status is set; a stumbled start has cleared it.
+;
+; a8, either index width; x = the actor's entity offset (a character: the
+; caller has already refused monsters).  out: A = the level, Z set when 0.
+; preserves x/y.
+.proc Ot6BoostLevel
+        .a8
+        lda     $3a7c           ; the queued command
+        cmp     #$13
+        bne     @pend
+        lda     $3ef8,x         ; status 3
+        lsr                     ; bit 0 = dancing
+        bcc     @pend
+        lda     f:$7e0000+OT6_DANCETIER,x
+        rtl
+@pend:  lda     OT6_BOOST_REVEALED,x
         rtl
 .endproc
 
