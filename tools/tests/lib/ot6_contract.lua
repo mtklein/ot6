@@ -1334,7 +1334,31 @@ function M.assertContract(key, side) judge(lookup(key), key, side) end
 -- says it should.  M.bootMark tells the segment runner (lib/ot6.lua), which
 -- idles this attempt's seed shift here before the route walks on; on a
 -- savestate-booted segment M.loadState marks it instead.
+--
+-- Before the fields are read, the run must have booted from something:
+-- a savestate (M.lastState, whose SRAM rides it) or the SRAM checkpoint
+-- run.sh installed (the OT6_SRAM_CHECKPOINT preamble global, lib/compose.py).
+-- Which checkpoint is not checked here: checkpoint_negatives.sh hands
+-- gen_vector_entry a perturbed copy under another name on purpose, and the
+-- fields are what judge a checkpoint's content.  A by-hand
+-- run.sh without its configure.py TEST_ENV boots an empty battery (run.sh
+-- wipes every .srm before launch), the title's Continue drive starts a New
+-- Game instead, and every field then differs for a reason no field names --
+-- battle_hudcount's 16-field "save slot expected 3, read 0" (2026-09-29).
+local function assertBootedFor(key)
+  if M.lastState ~= nil then return end
+  local ck = rawget(_G, "OT6_SRAM_CHECKPOINT")
+  if ck == nil or ck == "" then
+    error(string.format("entry contract %s: this run booted neither a savestate "
+      .. "nor an SRAM checkpoint (OT6_SRAM_CHECKPOINT is unset), so the Continue "
+      .. "read an empty battery -- run it through ninja, or by hand with "
+      .. "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/%s (configure.py TEST_ENV)",
+      key, key), 0)
+  end
+end
+
 function M.assertEntryContract(key)
+  assertBootedFor(key)
   M.assertContract(key, "entry")
   M.bootMark("checkpoint " .. tostring(key))
 end
