@@ -7,3 +7,9 @@ title, the how-to-play section and the save note from the previous
 release's notes.
 
 ## What's changed
+
+**A monster you break loses the turn it was about to take.** When a
+monster's turn was already lined up and you broke it just before it
+acted, it used to take that turn anyway, attack and all. Now it loses
+that turn too: a broken monster gets no turns until its shields come
+back.

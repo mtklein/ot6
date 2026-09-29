@@ -1323,38 +1323,20 @@ done:   rtl
 
 ; [ may this entity act right now? ]
 
-; Ot6Gate above answers at queue time, which is the only place vanilla asks,
-; and that is the hole.  Nothing between a queue entry and the turn re-checks
-; anything: the action queue drains straight into ExecAction
-; (battle_main.asm:150-159), the counterattack queue straight into ExecRetal
-; (:103-112), and only QuetzEffect (:1814-1822) ever purges an entry.  So a
-; turn queued before a monster breaks can still execute or counterattack.
+; Ot6Gate above answers at queue time, which is the only place vanilla asks.
+; Nothing between a queue entry and the turn re-checks anything: the action
+; queue drains straight into ExecAction (battle_main.asm:150-159), the
+; counterattack queue straight into ExecRetal (:103-112), and only
+; QuetzEffect ever purges an entry.  So execution time needs its own answer,
+; at two sites:
+;   * ExecAction, Ot6BrokenTurn below (#291): a turn queued before the break
+;     is consumed without running.
+;   * CheckRetal (battle_main.asm, below the died-branch), this proc: a
+;     Broken monster creates no counterattack, matching the ruling that a
+;     Broken enemy loses its counters along with its turns.
 ;
-; This asks the same question at execution time, from one site: CheckRetal
-; (battle_main.asm:12762), +6 bytes.  A Broken monster creates no
-; counterattack, matching the ruling that a Broken enemy loses its counters
-; along with its turns.
-;
-; One site rather than two: the $C2 action path (ExecAction's pre-dispatch
-; check) has under 18 cycles of slack, not enough margin for a second hook
-; there without costing a missed vblank per battle-loop iteration.
-;
-; What one site leaves open.  The action queue is still ungated at
-; execution, so a turn queued before the break lands drains into
-; ExecAction (battle_main.asm:150-159) and runs.  ExecAction also runs the
-; monster's AI script before any dispatch -- the `cmp #$1f` arm calls
-; ExecMonsterAction (:238) and loops back to @0100 -- so that turn's script
-; side effects (e.g. kill_monsters/show_monsters tags) land regardless of
-; whether a command dispatches.  Closing that needs the queue entry purged
-; at break time (QuetzEffect's walk, battle_main.asm:1814-1822, spends bank
-; $F0 cycles rather than $C2 ones); gating earlier inside ExecAction is not
-; an option either, since @01a6's `lda $32cc,x / inc / bne @01d5` (:288-290)
-; would re-enter ExecAction forever on a command list that never got
-; consumed.
-;
-; Characters can never trip it.  Ot6Chip refuses entity < $08
-; (ot6_break.asm:843-845) and InitBattle's $3a20-$3ed3 clear
-; (battle_main.asm:6132-6133) zeroes the character rows of
+; Characters can never trip either.  Ot6Chip refuses entity < $08 and
+; InitBattle's $3a20-$3ed3 clear zeroes the character rows of
 ; OT6_BROKEN_TICKS, so their byte is always $00.
 ;
 ; a8 is required: under a 16-bit accumulator `lda OT6_BROKEN_TICKS,x` would
@@ -1375,6 +1357,75 @@ done:   rtl
         lsr                     ; carry = $3aa0.0, the presence bit
         rtl
 broken: clc
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ a Broken monster's queued turn is consumed, not run (#291) ]
+
+; ExecAction's command-list read (battle_main.asm @0100, was `lda $32cc,x`).
+; A monster queues its turn when its gauge fills: QueueAction writes the
+; command-$1f placeholder into its command list and gaugefull adds it to the
+; action queue, and the AI script only runs when that entry reaches
+; ExecAction.  Everything already in the queue runs first, so a party action
+; ahead of it can break the monster in between, and until this hook the
+; Broken monster then ran its script and its attack anyway.
+;
+; So a Broken actor's whole command list is emptied here, RemoveAction's own
+; unlink repeated to the end, and $ff is handed back.  ExecAction then takes
+; the branch vanilla already takes for an action removed after it was queued
+; (the `bmi @0183`): command $12 is CmdNoEffect, @01a6 finds no pending
+; action, and @01b7 resets the gauge and ends the action.  That is the whole
+; turn, consumed: no AI script, so none of its side effects, and no command.
+; The same read serves the resume of a multi-command turn ($3406, :155), so
+; an action already mid-execution when the monster breaks finishes -- its
+; hits are already landing -- and the rest of that turn does not run.
+;
+; What this does not touch, on purpose:
+;   * the counterattack queue.  A Broken monster queues no counter
+;     (Ot6MayAct), and ExecRetal is also how an `if_self_dead` block runs, so
+;     a dying Broken boss must reach it (battle_brokendeath).
+;   * the queue-time gate (Ot6Gate): after this turn is consumed the gauge
+;     refills and waits there until the break ends.
+; Two earlier attempts at this (#85, August: removing the monster's action
+; queue entry at the break, then skipping the queue add at gaugefull) were
+; reverted when KEFKA at Narshe did not end on some timeline (ce0e687f).
+; Both left the monster's command list standing with no ExecAction ever to
+; consume it; why that stalled battle 57 was never measured.  This one runs
+; vanilla's removed-action path end to end instead, and battle_kefka is the
+; guard on battle 57.  Nor is the per-action cost the old worry it was: a
+; jsl here adds a few dozen cycles per action, and the battle loop's
+; measured headroom is thousands per frame (battle_trueknight's canary,
+; #236).
+;
+; a8, either index width (entity offsets and list pointers are bytes, so the
+; walk runs i8).  x = actor.  out: A = the command list pointer ($ff when
+; Broken), N set from it for the caller's bmi.  preserves x/y.
+
+.proc Ot6BrokenTurn
+        .a8
+        lda     OT6_BROKEN_TICKS,x
+        bne     @purge
+        lda     $32cc,x         ; not Broken: the vanilla read
+        rtl
+@purge: phy                     ; the caller's y, in the caller's width
+        php
+        shorti
+        .i8
+@next:  ldy     $32cc,x         ; head of the command list
+        bmi     @empty
+        lda     $3184,y         ; next pointer (the last entry points at
+        cmp     $32cc,x         ;   itself)
+        bne     :+
+        lda     #$ff
+:       sta     $32cc,x
+        lda     #$ff
+        sta     $3184,y         ; free the slot
+        bra     @next
+@empty: plp
+        ply
+        lda     #$ff            ; N set: "no valid command list"
         rtl
 .endproc
 
