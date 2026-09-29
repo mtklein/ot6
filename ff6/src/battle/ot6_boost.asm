@@ -965,9 +965,9 @@ done:   pla
 ;
 ; the 0/1/2 clamp, shared by the three sites that need it: queue-time fold,
 ; list preview, and the price walk.  the cap is two tiers because that is
-; where every family's table runs out: Fire 3
-; is the top of the deepest line, and the shallow families (Poison, Life,
-; Slow, Haste) repeat their second entry so a 3-BP spend is never dead.
+; where every family's table runs out: Fire 3, Ice 3, Bolt 3, Cure 3 and
+; Life 3 top the deep lines, and the shallow families (Poison, Slow, Haste)
+; repeat their second entry so a 3-BP spend is never dead.
 ;
 ; in: x = the character's entity offset.  out: A = OT6_SCR_BIT = tier steps
 ; (0-2), Z set when the character has no boost pending.  a8, db=$7e;
@@ -1228,7 +1228,8 @@ done:   pla
 ;
 ; in: A = spell id, x = the caster's entity offset.  out: A = MP cost.
 ; a8/i16, db=$7e; preserves x/y.  Every folded tier in the shipped table
-; fits a byte with room to spare; the most expensive is Life 2 at 60.
+; fits a byte with room to spare; the most expensive are Life 2 and Life 3
+; at 60 (Life 3's 60 is OT6's, battle_main.asm's MagicProp override 6).
 .proc Ot6SpellMP
         .a8
         .i16
@@ -1351,9 +1352,132 @@ Ot6FoldTbl:
         .byte   $02,$07,$0b     ; bolt line
         .byte   $03,$08,$08     ; poison, bio (caps)
         .byte   $2d,$2e,$2f     ; cure line
-        .byte   $30,$31,$31     ; life, life 2 (caps)
+        .byte   $30,$31,$35     ; life, life 2, life 3 (#327)
         .byte   $19,$28,$28     ; slow, slow 2 (caps)
         .byte   $1f,$27,$27     ; haste, haste2 (caps)
+
+; ------------------------------------------------------------------------------
+
+; [ Life 3 revives a KO'd body, then guards it (#327) ]
+;
+; Boosting Life twice casts Life 3 (the life row above).  Vanilla's Life 3
+; only marks a LIVING body to rise once when it falls: its record has no
+; resurrection-targeting flag (MagicProp +$02 bit $04), so a KO'd target is
+; dropped before the spell lands, and a two-point Life on a fallen ally spent
+; the pips and the MP and revived nobody (build/attempts/wt/wor-espers/
+; lab_lifedead_try1.log).  The owner's call (2026-09-29): on a KO'd ally a
+; character's Life 3 revives at full HP, as Life 2 does, AND grants its
+; Life 3 status; on a living one it grants the status as before.
+;
+; Whose Life 3.  A character casting it through Magic ($02) or X-Magic ($17),
+; which includes a Mimic of such a cast (mimicreplace copies the command
+; into the mimic's queue slot).  Everything else keeps vanilla Life 3: the
+; monsters that cast it (Madam, Magic, L.80 and L.90 Magic -- given the
+; revival, their random picks would raise their own dead, a retune of those
+; fights), Rage (Gau's Rhinox rage, whose random pick would fully revive a
+; fallen party member in the World of Balance, where kits.md keeps revival
+; to Terra, Fenix Downs and Sraphim), Control and Sketch.  The test is on
+; the executing action itself -- the attacker in x (x < 8), the queued
+; command $3a7c and the attack $3a7d that InitPlayerAction loaded for this
+; action -- so no state outlives the action: an item, a throw or a tool
+; queues command $01/$08/$09 and never matches.  (The first cut keyed on
+; the id LoadMagicProp last loaded, which item actions never refresh;
+; build/attempts/review-wor-espers/lab_rv_fenix_poke.log.)
+;
+; Two hooks in CalcAttackEffect, where x is the attacker:
+;   Ot6Life3Targeting  just before ChooseTarget: sets $ba bit $08 ("can hit
+;                      dead targets", the flag Life and Life 2 get from their
+;                      record's +$02 bit $04 in InitTarget), so the KO'd
+;                      target is kept.  The record's own bit stays clear:
+;                      CheckHit reads it as "misses a living body", and
+;                      Life 3 must still land on the living.
+;   Ot6Life3Revive     the per-target loop (@3440), before MagicStatusEffect:
+;                      for a KO'd target, the effect Life 2's record carries
+;                      -- wound cleared ($3dfc, the cell Life's lifted status
+;                      lands in), healed by 16/16 of max HP ($11a4 $80
+;                      fraction | $01 heal, $11a6 power 16, $11a2 $04 so the
+;                      fraction is of max HP), ignoring defence ($11a2 $20)
+;                      -- on top of the record's own Life 3 status (set mode,
+;                      status 4 bit $04), which MagicStatusEffect then
+;                      applies as it always did.
+; The record edit is per action, and Life 3 targets one body ($11a0 = $03),
+; so it cannot leak to a second target.  A character's Life 3 aimed at a
+; monster (the cursor allows it) is left alone: only a character target is
+; revived, since a KO'd monster would also have to rejoin the live-monster
+; mask ($2f2f).
+
+OT6_LIFE3_ID = $35
+
+; is the executing action a character's Life 3 through Magic or X-Magic?
+; in: x = the attacker, db = $7e, a8.  out: Z set = yes.  A clobbered.  rts.
+.proc Ot6Life3Cast
+        .a8
+        txa                     ; width-neutral: the offset fits a byte
+        cmp     #$08
+        bcs     @no             ; a monster's cast
+        lda     $3a7d
+        cmp     #OT6_LIFE3_ID
+        bne     @out            ; Z clear: another attack
+        lda     $3a7c           ; the queued command
+        cmp     #$02            ; Magic (and a Mimic of it)
+        beq     @out
+        cmp     #$17            ; X-Magic
+@out:   rts
+@no:    lda     #$01            ; Z clear
+        rts
+.endproc
+
+; jsl from CalcAttackEffect just before ChooseTarget.  x = attacker, db =
+; $7e, any widths.  Preserves A, X, Y and P.  rtl.
+.proc Ot6Life3Targeting
+        php
+        sep     #$20
+        .a8
+        pha
+        jsr     Ot6Life3Cast
+        bne     @out
+        lda     #$08            ; can hit dead targets
+        tsb     $ba
+@out:   pla
+        plp
+        rtl
+.endproc
+
+; jsl from the per-target loop.  x = attacker, y = the target's entity
+; offset, db = $7e, any widths.  Preserves A, X, Y and P.  rtl.
+.proc Ot6Life3Revive
+        php
+        sep     #$20
+        .a8
+        pha
+        jsr     Ot6Life3Cast
+        bne     @out
+        tya                     ; width-neutral: the offset fits a byte
+        cmp     #$08
+        bcs     @out            ; a monster target: see the header
+        lda     $3ee4,y         ; status 1
+        bpl     @out            ; not KO'd: the record's status alone
+        lda     $3dfc,y
+        ora     #$80            ; wound to clear, as Life's lift puts it
+        sta     $3dfc,y
+        lda     $11a4
+        ora     #$81            ; heal, by a fraction of max HP
+        sta     $11a4
+        lda     #$10            ; 16/16: full, Life 2's power
+        sta     $11a6
+        lda     $11a2
+        ora     #$24            ; ignore defence, and the resurrection flag,
+        sta     $11a2           ;   which is what makes CalcDmgRatio take
+                                ;   the fraction of MAX HP rather than of
+                                ;   current HP (0 on a KO'd body: without
+                                ;   it the revival heals to 1 HP,
+                                ;   lab_lifedead_revive1.log).  Targets and
+                                ;   the hit are settled by now, so the bit's
+                                ;   other reader, CheckHit, has already run
+@out:   pla
+        plp
+        rtl
+.endproc
 
 ; ------------------------------------------------------------------------------
 

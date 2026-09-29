@@ -369,6 +369,9 @@ TEST_ENV = {
     # and declares a one-byte esper expedient (state_write_waivers.txt)
     "battle_phoenixprice":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
+    # #327: TERRA knows Life and pays Life 3 here; no write needed
+    "battle_lifefold":
+        "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/fire-out-v1",
     # walks from the Narshe exit spawn into the Beginner's House
     "school":
         "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1",

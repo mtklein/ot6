@@ -10,7 +10,8 @@ build's debug file (ff6/rom/ff6-en.dbg) records.
    Fire 3 or any other tier.  The tiers are whatever the built ROM's
    Ot6FoldTbl says (ff6/src/battle/ot6_boost.asm): rows of [head, +1 boost,
    +2 boosts]; a tier is any id in the second or third column that is not its
-   row's head.  The ROM's rows must equal the source's.
+   row's head (so Life 2 and Life 3, since the life row reaches Life 3,
+   #327).  The ROM's rows must equal the source's.
 
 2. The plan.  The grant tables implement the design docs exactly:
    * NaturalMagic (field/event.asm; TERRA's and CELES's 16 [spell, level]
@@ -375,6 +376,10 @@ def selftest(root, rom_path, dbg_path):
     plans = esper_plans(base_inp)
     planned = min(plans)
     first = base_inp.espers[planned]
+    # the deepest tier id (Life 3) on the last planned Esper, so a tier from
+    # the fold table's third column is caught as well as the first tier
+    deep, lastp = max(tiers), max(plans)
+    last = base_inp.espers[lastp]
 
     def rom_mutant(off, val):
         def f(inp):
@@ -398,6 +403,9 @@ def selftest(root, rom_path, dbg_path):
         ("%s's first spell -> %s (plan)" % (first, base_inp.name(tier)),
          rom_mutant(base_inp.genju + planned * GENJU_ROW + GENJU_SPELL_BYTES[0], tier),
          "%s (Esper %d) grants [" % (first, planned)),
+        ("%s's first spell -> %s" % (last, base_inp.name(deep)),
+         rom_mutant(base_inp.genju + lastp * GENJU_ROW + GENJU_SPELL_BYTES[0], deep),
+         "%s (Esper %d), spell slot 1 " % (last, lastp)),
         ("CELES's second natural level + 1",
          rom_mutant(base_inp.nat + NATURAL_PER_CHAR * 2 + 3,
                     base_inp.rom[base_inp.nat + NATURAL_PER_CHAR * 2 + 3] + 1),
