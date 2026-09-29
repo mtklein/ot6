@@ -254,8 +254,7 @@ Every claim was checked against the code (2026-09-28):
   those (`Ot6BoostPriceFor`, [mp-economy.md](mp-economy.md)): capped at
   99, and a spell already dearer than 99 (Phoenix, 110) keeps its price.
   Dance is in $0270's list because a boosted Dance multiplies every step
-  of that dance (#294, wt/battle-fixes-023; this line and the $0270 text
-  assume that branch has landed).
+  of that dance (#294, `Ot6DanceStartGate`).
 - Stronger spells: `Ot6FoldTbl` (Fire, Ice, Bolt, Poison, Cure, Life,
   Slow, Haste), `Ot6FoldSteps` clamps a boost of 3 to two tiers, the
   cast tier's own MP (`Ot6QueueFold` → `Ot6SpellMP`), and the Magic

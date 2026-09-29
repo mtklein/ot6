@@ -70,14 +70,15 @@ local EDGAR = 0x04            -- Shiva's bearer on the escape (the summon table)
 -- seven species, and the Ninja's "Inviz" is Vanish (STATUS1::INVISIBLE,
 -- bit 4 of $3ee4 + entity*2), under which every physical misses and a
 -- spell lands.  While a live monster is Vanished (or Imaged) her attack
--- turns cast Fire 2 ($05, 20 MP; the plan-time absorb guard still refuses
--- it on a fire absorber, and Nerapa absorbs fire); otherwise the lookup is
+-- turns cast Fire ($00), boosted when her bank allows so the fold casts
+-- Fire 2 (#305: no one learns Fire 2 any more; the plan-time absorb guard
+-- still refuses it on a fire absorber, and Nerapa absorbs fire); otherwise the lookup is
 -- empty and she Fights as before -- on AtmaWeapon (weak fire|ice|bolt +
 -- slash|pierce, 11 pips) her sword chips the slash row and unloaded 6964
 -- on him broken in that run, which a blanket cast line would preempt.
 -- Bolt stays the party nuke: Atma and Nerapa are bolt-weak, nothing on 394
 -- absorbs it, and LOCKE is the one who can pay it.
-local BOLT, FIRE2, ST1_INVISIBLE, ST2_IMAGE = 0x02, 0x05, 0x10, 0x04
+local BOLT, FIRE, ST1_INVISIBLE, ST2_IMAGE = 0x02, 0x00, 0x10, 0x04
 local dodgeSaid = nil
 local function dodgerUp()
   for s = 0, 5 do
@@ -95,9 +96,9 @@ local MAGIC = setmetatable({ [LOCKE] = { spell = BOLT } }, { __index = function(
   if s == nil then dodgeSaid = nil; return nil end
   if dodgeSaid ~= s then
     dodgeSaid = s
-    H.log(string.format("[fc] slot %d wears %s (f%d): TERRA's attack turns go to Fire 2", s, what, H.frame))
+    H.log(string.format("[fc] slot %d wears %s (f%d): TERRA's attack turns go to Fire (boosted: Fire 2)", s, what, H.frame))
   end
-  return { spell = FIRE2 }
+  return { spell = FIRE }
 end })
 local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
                 healPercent = 60, magic = MAGIC, nuke = { BOLT } }

@@ -106,6 +106,64 @@ local function assertStagingSane()
     .. (#s > 0 and ("; icons staged: " .. table.concat(s, " ")) or ""))
 end
 
+-- ---- #292 review: no shield-count upload into the dialogue's canvas ------
+-- A battle dialogue uses the whole $5800-$5fff font page as its text canvas,
+-- the six shield-count cells $65-$6b included, so the nmi flush must not
+-- upload a slot's count tile while the dialogue is up or its font re-lay is
+-- running (Ot6BgHudFlush_ext).  SYNTHETIC (declared in
+-- state_write_waivers.txt): once the dialogue has been up 30 frames, a
+-- pending upload is planted for one monster slot (OT6_SHWANT = 11, its
+-- OT6_SHPEND bit set), since a count change landing mid-dialogue is not a
+-- thing a fixture produces on cue.  While the dialogue stays up, the bit
+-- must stay pending, OT6_SHHAVE must not move, and the slot's cell must not
+-- hold the shield-11 tile.  Positive control: once the dialogue has closed
+-- and the re-lay finished, the upload lands (the bit clears, HAVE = 11).
+local SH = { planted = false, checks = 0, landed = false }
+local function shieldGuard()
+  local up = H.readByte(0x64d5) ~= 0
+  local dirty = H.readByte(0x57b9) ~= 0            -- OT6_FONTDIRTY
+  local have, want, pend = H.sym("OT6_SHHAVE"), H.sym("OT6_SHWANT"), H.sym("OT6_SHPEND")
+  if up then SH.upFrames = (SH.upFrames or 0) + 1 end
+  if not SH.planted and up and SH.upFrames >= 30 then
+    SH.slot = 0
+    SH.have = H.readByte(have + SH.slot)
+    SH.cell = emu.read((H.sym("Ot6ShieldSlotCellTbl") & 0x3FFFFF) + SH.slot, emu.memType.snesPrgRom)
+    SH.tile = H.sym("Ot6ShieldGlyphs") & 0x3FFFFF
+    SH.tile = SH.tile + (11 - 1) * 16
+    H.writeByte(want + SH.slot, 11)
+    H.writeByte(pend, H.readByte(pend) | 1)
+    SH.planted = true
+    H.log(string.format("[dlgmenu] SYNTHETIC: slot %d pending upload of count 11 planted "
+      .. "mid-dialogue (have=%d, cell $%02X)", SH.slot, SH.have, SH.cell))
+    return
+  end
+  if not SH.planted or SH.landed then return end
+  if up or dirty then
+    SH.checks = SH.checks + 1
+    local same = true
+    for i = 0, 15 do
+      if emu.read(0xB000 + SH.cell * 16 + i, emu.memType.snesVideoRam)
+         ~= emu.read(SH.tile + i, emu.memType.snesPrgRom) then same = false; break end
+    end
+    -- asserted only when broken, so a held frame logs nothing
+    local tag = string.format(" (dialogue frame check %d, dlg=%d fontdirty=%d)",
+      SH.checks, up and 1 or 0, dirty and 1 or 0)
+    if (H.readByte(pend) & 1) ~= 1 then
+      H.assertEq(H.readByte(pend) & 1, 1, "slot 0's shield upload stays pending" .. tag)
+    end
+    if H.readByte(have + SH.slot) ~= SH.have then
+      H.assertEq(H.readByte(have + SH.slot), SH.have, "slot 0's cell was not re-uploaded" .. tag)
+    end
+    if same then
+      H.assertEq(same, false, "the shield-11 tile is not in the dialogue canvas" .. tag)
+    end
+  elseif H.readByte(have + SH.slot) == 11 then
+    SH.landed = true
+    H.log(string.format("[dlgmenu] ok: the pending upload was held for %d dialogue frames, "
+      .. "then landed once the dialogue closed and the re-lay finished", SH.checks))
+  end
+end
+
 local execs = {}
 local aPhase = 0
 H.run({ maxFrames = 12000 }, {
@@ -138,9 +196,18 @@ H.run({ maxFrames = 12000 }, {
       local n = (H.vars.mn or 0) + 1
       H.vars.mn = n
       H.setPad(n % 60 < 4 and { "a" } or {})
+      shieldGuard()
     end),
   }, "first menu opens"),
   H.call(function() H.setPad({}) end),
+  H.driveUntil(function() return SH.landed end, 600, {
+    H.call(function() shieldGuard() end),
+  }, "the held shield upload lands after the dialogue"),
+  H.call(function()
+    H.assertEq(SH.planted, true, "precondition: a battle dialogue was up for 30 frames")
+    H.assertEq(SH.checks > 30, true, string.format(
+      "the upload was held across the dialogue (%d frames checked)", SH.checks))
+  end),
   H.waitFrames(300),
   H.call(function()
     local actor = H.readByte(0x62ca)

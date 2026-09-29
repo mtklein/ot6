@@ -663,8 +663,21 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ; quiet frame), one slot per nmi, and gated like the one-shot line
         ; transitions below, since a dropped tile write has no next-frame
         ; rewrite: OT6_SHPEND keeps the bit until an admitted nmi lands it.
+        ;
+        ; never while a battle dialog window is up (w7e64d5) or a font
+        ; re-lay is in flight (OT6_FONTDIRTY), the same two conditions that
+        ; veil the hud lines below: the dialog uses the whole $5800-$5fff
+        ; font page as its text canvas, cells $65-$6b included, so a tile
+        ; written then lands in the dialog box (review of #292, Whelk: a
+        ; synthetic upload mid-dialog drew a shield in the empty box).  the
+        ; bit stays pending, and the close's re-lay (slice A re-uploads
+        ; every slot from OT6_SHHAVE) runs first, so the upload lands after.
         lda     f:$7e0000+OT6_SHPEND
         beq     @noslot
+        lda     f:$7e0000+$64d5 ; dialog window open?
+        bne     @noslot
+        lda     f:$7e0000+OT6_FONTDIRTY ; font re-lay in flight?
+        bne     @noslot
         jsr     @late
         bcs     @noslot         ; too late: the bit stays, next nmi
         lda     f:$7e0000+OT6_SHPEND

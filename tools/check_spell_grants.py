@@ -26,8 +26,9 @@ build's debug file (ff6/rom/ff6-en.dbg) records.
      Esper that has one: docs/design/magicite.md's roster table ("Spells
      (base)"), overridden by the make_genju_prop rows of
      docs/design/magicite-tube-six.md §11 for the tube room's six.  A planned
-     entry that names no spell ("Protect-alike", "(Water lore-alike)") is
-     reported as not expressible and skipped.  An Esper with no planned list
+     entry that names no spell is reported and skipped only when it is in
+     INEXPRESSIBLE ("Protect-alike", "(Water lore-alike)"); any other
+     unknown name fails, so a typo cannot pass as inexpressible.  An Esper with no planned list
      is only held to property 1.
 
 Nothing else writes the learned-spell table: the new-game init clears it,
@@ -70,6 +71,9 @@ GENJU_SPELL_BYTES = (1, 3, 5, 7, 9)
 GENJU_NONE = 0xFF
 # kit rows learned at join or by level that are skills, not spells
 NOT_SPELLS = {"Runic"}
+# planned Esper entries that name no FF6 spell, reported rather than checked;
+# any other unknown name in a plan is a typo and fails
+INEXPRESSIBLE = {"Protect-alike", "(Water lore-alike)"}
 
 _VAL = re.compile(r"\bval=0x([0-9A-Fa-f]+)")
 _NAME = re.compile(r'\bname="([^"]*)"')
@@ -248,7 +252,14 @@ def esper_plans(inp):
         for n in cells[2].replace("*", "").split(","):
             n = n.strip()
             sp = spell_id(inp, n)
-            (ids.append(sp) if sp is not None else skipped.append(n))
+            if sp is not None:
+                ids.append(sp)
+            elif n in INEXPRESSIBLE:
+                skipped.append(n)
+            else:
+                raise SystemExit("check_spell_grants: %s's %s row plans '%s', which is no "
+                                 "spell name and not in INEXPRESSIBLE (a typo?)"
+                                 % (MAGICITE_MD, cells[0], n))
         plans[idx[cells[0].lower()]] = (ids, skipped, MAGICITE_MD)
     block = inp.tube_six.split("## 11. The data", 1)
     if len(block) < 2:
@@ -407,6 +418,18 @@ def selftest(root, rom_path, dbg_path):
         else:
             print("selftest FAIL: %s was not reported" % what)
             ok = False
+    # a misspelt spell in a planned Esper row must fail, not pass as
+    # inexpressible
+    inp = Input(root, rom_path, dbg_path)
+    inp.magicite, n = re.subn(r"(\| Stray \|[^|]*\| )Muddle", r"\g<1>Mudle", inp.magicite, count=1)
+    try:
+        if n != 1:
+            raise AssertionError("magicite.md has no Stray row to mutate")
+        esper_plans(inp)
+        print("selftest FAIL: magicite.md Stray 'Mudle' was not reported")
+        ok = False
+    except SystemExit as e:
+        print("selftest: magicite.md Stray 'Mudle' -> red: %s" % e)
     print("selftest: the untouched inputs report %d problem(s)" % len(base))
     print("selftest %s" % ("ok" if ok else "FAILED"))
     return 0 if ok else 1
