@@ -39,7 +39,9 @@ The harness plays OT6 the way a competent person with a controller would.
 - **Only a loss is a loss, and a win is a win.** A fight won some other
   way than planned (the boss killed before its break, a mechanic never
   exercised) passes and is logged as a tuning note to circle back to; it is
-  never retried or counted as a failure.
+  never counted as a failure. Re-running it across draws to learn how often
+  it happens is good: one fight in five and four in five call for very
+  different decisions.
 - **Classify every wipe by boost at death.** An early one-shot means the
   party is under-levelled (a level/kit finding). A wipe with pips still
   banked means the abilities were not used fully (a driver/policy finding).
