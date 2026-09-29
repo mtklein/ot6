@@ -46,14 +46,11 @@
         clc                     ;   stack has none and survives an nmi
         adc     #$5d            ; attack id $5d + blitz index
         sta     $4005,x         ; wItemList::Index
-.if ::OT6_MP_COSTS              ; :: because ca65 resolves .if in the proc's
-                                ;   local scope; force the file-scope flag
         jsl     Ot6CostFor      ; A(id) -> A(cost); preserves X and Y
         jsl     Ot6PendPrice    ; ...x2.5 per pending boost (#219), the same
                                 ;   number Ot6KitRowCost draws and the cmd-$0a
                                 ;   charge takes
         sta     $4006,x         ; wItemList::Qty = MP cost
-.endif
         inx
         inx
         inx                     ; next row
@@ -66,9 +63,7 @@
 @pad:   cpx     #$0018          ; 8 rows * 3 bytes
         bcs     @padded
         sta     $4005,x
-.if ::OT6_MP_COSTS              ; :: forces the file-scope flag from in-proc
         stz     $4006,x         ; Qty=0: an empty cell's cost draws as two blanks
-.endif
         inx
         inx
         inx
@@ -99,14 +94,13 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ draw one Blitz menu row: the names, and (priced build) their MP cost ]
+; [ draw one Blitz menu row: the names and their MP cost ]
 ;
-; DrawToolsListText (btlgfx, bank C1, the full build) jsl's here for a
-; blitz-mode row, in place of the two inline "$0e item-name -> $0f attack-name"
-; stores it used to do. Moving that swap into bank F0 gives the priced build
-; room to also stamp an MP cost after each name without growing the full C1
-; bank: the feature costs C1 a single 4-byte jsl (net -4 bytes there), and the
-; logic lives here.
+; DrawToolsListText (btlgfx, bank C1) jsl's here for a blitz-mode row, in
+; place of the two inline "$0e item-name -> $0f attack-name" stores vanilla
+; does. Moving that swap into bank F0 leaves room to also stamp an MP cost
+; after each name without growing the full C1 bank: C1 pays a single 4-byte
+; jsl (net -4 bytes there), and the logic lives here.
 ;
 ; the line buffer w7e5755 already holds the copied Tools template plus the two
 ; row ids (the caller wrote Index,y -> +5 and Index+3,y -> +11 before the jsl);
@@ -115,10 +109,7 @@
 ; cell's cost and Qty+3,y the right cell's. clobbers A only (the caller reloads
 ; it in InitListTextTfr and never re-uses this derived Y).
 ;
-; Always assembled: the stock C1 object jsl's it in both the priced and the
-; OT6_MP_COSTS=0 baseline build, so it must resolve in both. Only the cost
-; stamping is flag-gated; the nomp row stays the byte-identical two-name
-; layout. w7e5755 = $5755 near; the numeric literals below are its +4..+15.
+; w7e5755 = $5755 near; the numeric literals below are its +4..+15.
 .proc Ot6BlitzRowDecorate
         php
         sep     #$20            ; 8-bit A for the byte stores
@@ -126,7 +117,6 @@
         .i16
         lda     #$0f            ; left cell: render from AttackName, not ItemName
         sta     $5759           ; w7e5755+4: name command, column 1
-.if ::OT6_MP_COSTS              ; :: forces the file-scope flag from in-proc
         ; the name is a fixed 10-wide field; stamp a 2-digit MP cost right after
         ; it, a gap space, then column 2's name and its own cost. ListText cmd
         ; $02 draws two digits with a blank tens-place, so a 0 cost (a padded
@@ -173,10 +163,6 @@
         pla
         sta     $5763           ; +14                       (column-2 cost value)
         stz     $5764           ; +15  terminator
-.else
-        lda     #$0f            ; nomp baseline: the old layout, swap column 2's
-        sta     $575f           ;   name only (w7e5755+10), no cost, no re-layout
-.endif
         plp
         rtl
 .endproc
@@ -190,11 +176,7 @@
 ; not-blitz arm), the twin of the Ot6BlitzRowDecorate call one branch over.
 ; Unlike Blitz, the vanilla tools row already draws correctly, so this shim
 ; only stamps each tool's MP cost and greys the pair (name + price) the caster
-; cannot pay for, through Ot6AbilityGrey, the same $21->$25 magic uses.  In the
-; nomp battle object the OT6_MP_COSTS block below is empty and the proc is a
-; no-op that leaves the vanilla two-name layout byte for byte.  It is always
-; assembled, because the shared C1 object calls it in both builds, so the flag
-; gating lives here in the battle object rather than in btlgfx.
+; cannot pay for, through Ot6AbilityGrey, the same $21->$25 magic uses.
 ;
 ; Layout and fit finding: the tools window is two columns of 13-wide item
 ; names (AutoCrossbow, NoiseBlaster, ...), and those already fill the row
@@ -223,7 +205,6 @@
         sep     #$20
         .a8
         .i16
-.if ::OT6_MP_COSTS              ; :: forces the file-scope flag from in-proc
         ; Reorder each column to [font][cost][name] so one font command colors a
         ; tool's price and its name.  The just-landed price display put the cost
         ; tile before the column's font command, so greying the font (to match
@@ -260,7 +241,6 @@
         sta     $575d           ; +8: number command (column-2 cost)
         pla
         sta     $575e           ; +9: column-2 cost value
-.endif
         plp
         rtl
 .endproc
@@ -280,8 +260,7 @@
 ; and its "$04,$21 font" (+2/+3) become [font][cost], column 2's "$05,$02
 ; gap" (+6/+7) and font (+8/+9) likewise; the name commands (+4,+10) and ids
 ; (+5,+11) stay put.  Row width 2+12+2+12 = 28 tiles, narrower than vanilla's
-; 30.  In the nomp build the body is empty and the vanilla layout is
-; byte-identical.  Always assembled; the flag gating lives here.
+; 30.
 ;
 ; entry from a jsl: db=$7e, a8 on return, i16 (Ot6AbilityGrey needs it).
 ; w7e5755 = $5755 near; literals below are its offsets.  clobbers A only.
@@ -290,7 +269,6 @@
         sep     #$20
         .a8
         .i16
-.if ::OT6_MP_COSTS              ; :: forces the file-scope flag from in-proc
         lda     $575a           ; +5 = column-1 dance id (caller wrote it)
         jsl     Ot6DanceRowCost ;   id -> cost (0 for an $ff empty cell)
         pha                     ; park column-1 cost
@@ -315,12 +293,10 @@
         sta     $575d           ; +8: number command
         pla
         sta     $575e           ; +9: column-2 cost value
-.endif
         plp
         rtl
 .endproc
 
-.if OT6_MP_COSTS
 ; [ a dance row's price: the flat Ot6DanceCost, 0 for an empty cell ]
 ; in: A = the row's dance id ($ff = empty).  out: A = cost.  preserves X,Y.
 .proc Ot6DanceRowCost
@@ -353,10 +329,6 @@
 ; together -- the presentation a 0-BP SwdTech window gets from
 ; Ot6BushidoRowGrey.  An empty ($ff) cell stays white, as in the dance
 ; window.
-;
-; The C1 call sits inside `.if OT6_MP_COSTS` (unlike the dance decorator's),
-; so this proc is flag-gated with the confirm gates below and the nomp ROM
-; keeps its bytes.
 ;
 ; entry from a jsl: db=$7e, a8/i16 (DrawRageListText's own widths).
 ; w7e5755 = $5755 near; the literals below are its offsets.  clobbers A only.
@@ -471,13 +443,7 @@
 ; gate was built for, in the other currency.  The two greys are OR'd into
 ; one byte, so a row greyed for either reason is refused for that reason.
 ;
-; Where they are called from, and why that is affordable now.  Ot6AbilityGrey's
-; header used to say a confirm gate could not live in btlgfx because bank C1 is
-; a stock object linked into both the shipped ROM and the OT6_MP_COSTS=0
-; baseline, so gating there would move the nomp ROM.  That is no longer the
-; shape of the build: btlgfx is assembled once per flag (configure.py), the
-; gates below sit inside `.if OT6_MP_COSTS` blocks in btlgfx_main.asm, and the
-; nomp object therefore assembles to the same bytes it did before.  The kit
+; Where they are called from: the confirm states in btlgfx_main.asm.  The kit
 ; gate joins the confirm arms C1 already runs for us (@8809 dispatches on
 ; w7e6168 and jsl's Ot6BushidoConfirm), and Ot6BushidoConfirm's own BP refusal
 ; is the model: buzz, stay open, queue nothing.  Two reasons, one mechanism.
@@ -552,11 +518,9 @@
 @pay:   sec
         rtl
 .endproc
-.endif  ; OT6_MP_COSTS
 
 ; ------------------------------------------------------------------------------
 
-.if OT6_MP_COSTS
 ; [ add the Bushido "not enough BP" grey reason to a row's font ]
 ;
 ; In bushido mode (w7e6168 = 2) the submenu row is the boost level (Y/6 + 1
@@ -580,8 +544,7 @@
 ;
 ; Two callers, one answer: Ot6BlitzRowDecorate colours the row by it, and
 ; Ot6KitConfirmMP refuses the confirm by it (#232), so a row this greys is a
-; row the A button rejects, whichever arm greyed it.  Both live behind the
-; OT6_MP_COSTS flag, so this does too.
+; row the A button rejects, whichever arm greyed it.
 ;
 ; a8/i16.  in: A = the MP grey ($00/$04), Y = the row's wItemList offset
 ; (row*6: the decorator's drawn row, or the confirm's selected cell).
@@ -650,7 +613,6 @@
 @pass:  pla                     ; MP grey (unchanged)
         rtl
 .endproc
-.endif  ; OT6_MP_COSTS
 
 ; ------------------------------------------------------------------------------
 
@@ -678,7 +640,6 @@
         .a8
         .i16
         jsl     Ot6BushidoWindow    ; pack the <=4 window techs (left col) + $ff pad
-.if ::OT6_MP_COSTS                  ; :: forces the file-scope flag from in-proc
         ; stamp each cell's MP cost into wItemList::Qty (a $ff empty cell gets 0,
         ; which cmd $02 renders as two blanks and Ot6AbilityGrey leaves white).
         ldx     #$0000
@@ -694,7 +655,6 @@
         inx
         cpx     #$0018              ; 8 cells * 3 bytes
         bcc     @cost
-.endif
         ; --- honor Config>Cursor the same way Blitz/Tools do: leave the shared
         ; cursor triple alone (the command-window open already applied Memory/
         ; Reset), and force a fresh window re-init. A remembered row indexes the
@@ -786,10 +746,9 @@
 ; already rejected an $ff (empty) cell, so X points at a real left-column tech
 ; cell: X = row*6, and row = boost r. Refuse (buzz, stay open) a row the caster
 ; lacks the BP for, i.e. r > current bp (OT6_BP_CLASS,entity), the confirm twin of the
-; menu's bp-grey.  On the priced build Ot6KitConfirmMP has already refused
-; that row through Ot6BushidoRowGrey's own test one call earlier, so this
-; refusal is reached under nomp, where there is no grey and no gate, and
-; stands as the backstop otherwise. Otherwise bank the boost (OT6_BOOST_REVEALED,entity = r; Ot6ActionEnd then
+; menu's bp-grey.  Ot6KitConfirmMP has already refused that row through
+; Ot6BushidoRowGrey's own test one call earlier, so this refusal stands as
+; the backstop. Otherwise bank the boost (OT6_BOOST_REVEALED,entity = r; Ot6ActionEnd then
 ; charges r and skips that turn's regen, as an L/R spend would have),
 ; write the tech Ot6BushidoTier returns for boost r into the action queue, and
 ; close the menu. FixPlayerAttack's +$55 and Cmd_07's dispatch stay untouched.

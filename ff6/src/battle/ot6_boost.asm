@@ -1399,10 +1399,7 @@ Ot6FoldTbl:
 ;
 ; Three of those four live in bank C1.  A hook in any of them would be three
 ; hooks that have to agree; moving the byte they all read costs zero C1 bytes
-; and makes it structurally impossible for the four to disagree.  (C1 can now
-; carry flag-gated OT6 code -- btlgfx is assembled per flag, see
-; Ot6AbilityGrey's header -- so this is a design choice about single authority,
-; not a build constraint any more.)
+; and makes it structurally impossible for the four to disagree.
 ;
 ; It is self-restoring, which is why it runs at every tier including zero.
 ; The write is not a mutation of the previous value; it is recomputed
@@ -1525,10 +1522,8 @@ Ot6FoldTbl:
 .endproc
 
 ; ------------------------------------------------------------------------------
-.if OT6_MP_COSTS
-; ------------------------------------------------------------------------------
 
-; [ price a costed verb's action at queue time, OT6_MP_COSTS ]
+; [ price a costed verb's action at queue time ]
 
 ; vanilla's GetMPCost (battle_main.asm) returns a cost only for magic, lore,
 ; summon and x-magic; every other command (Blitz, SwdTech, Tools, the free
@@ -2030,15 +2025,9 @@ Ot6AbilityCostTbl:
 ; (UpdateMenuState_21 @85f0).  Both call in here, so a greyed row and a refused
 ; row are the same row by construction.
 ;
-; That used to be described as unaffordable, because btlgfx (bank C1) was a
-; stock object linked into both the shipped and the nomp ROM, so a gate there
-; would have moved the nomp baseline byte-for-byte -- the one thing this flag
-; must never do.  The build changed instead of the rule: btlgfx is assembled
-; once per flag (configure.py), the C1 gates sit inside `.if OT6_MP_COSTS`,
-; and the nomp object assembles to the same bytes it always did.
-; CalcAttackEffect's universal insufficient-MP fizzle is still there underneath
-; as the execution-side backstop; the menu no longer lets the player reach it
-; by hand and lose the turn and the banked BP to it.
+; CalcAttackEffect's universal insufficient-MP fizzle stays underneath as the
+; execution-side backstop; the menu does not let the player reach it by hand
+; and lose the turn and the banked BP to it.
 ;
 ; a8/i16, db=$7e (the decorators' bank; $3c08/$62ca are $7e battle RAM).  in:
 ; A = MP cost.  out: A = $00 (white) | $04 (grey).  preserves X and Y, because
@@ -2071,8 +2060,3 @@ Ot6AbilityCostTbl:
         lda     #$00            ; stays $21 white
         rtl
 .endproc
-
-; ------------------------------------------------------------------------------
-.endif   ; OT6_MP_COSTS
-; ------------------------------------------------------------------------------
-

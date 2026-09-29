@@ -453,8 +453,7 @@ Ot6LorePrev:                        ; L shoulder -> previous learned lore
 ; [ price a lore row: the vanilla spell price, read from the shipped table ]
 ; Lores are spell-shaped (spell id = lore id + $8b) and their MP costs are
 ; vanilla MagicProp data, charged by vanilla's own battle path -- these are
-; not OT6-added prices, so there is no OT6_MP_COSTS gate and the page draws
-; them under nomp too.  Per-row rather than flat because the prices differ
+; not OT6-added prices.  Per-row rather than flat because the prices differ
 ; per lore, which is the one display difference from the possess-verb pages.
 ; menu-caller only: uses menu scratch $e0 (D = 0).
 ; in: A = lore id (0..23).  out: A = MP cost.  clobbers A,X and $e0/$e1.

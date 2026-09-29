@@ -1,14 +1,8 @@
 -- @suite slow savestate=camp_escaped
--- battle_mpcost.lua -- every ability costs MP: the OT6_MP_COSTS A/B.
+-- battle_mpcost.lua -- every ability costs MP.
 --
--- One self-detecting instrument, run on both builds.  The shipped ROM
--- charges by default, so the flag-off build is the control.
---   * on the shipped, flag-on ROM (build/ot6.sfc, the suite's default) the
---     cost table is present in bank F0 with kits.md's numbers, so the test
---     asserts the charge and the insufficient-mp refusal.
---   * on the flag-off baseline (ff6/rom/ff6-en-nomp.sfc, handed here via
---     OT6_ROM) the cost table is absent, so the identical SwdTech tech is
---     free.  This is the negative control.
+-- The cost table is present in bank F0 with kits.md's numbers, and the test
+-- asserts the charge and the insufficient-mp refusal.
 
 -- The mechanism under test: vanilla's GetMPCost prices only magic/lore/
 -- summon/x-magic; Blitz/SwdTech/Tools fall through it at 0, so the universal
@@ -38,16 +32,15 @@
 --           taken across the tech's own action, from InitPlayerAction
 --           loading his SwdTech into $3a7c to the next action's ExecAction
 --           (see installWatches): the pool and the pack's HP as it began
---           and ended, every write to his pool inside it.  ON: exactly one write, under his own
---           SwdTech (X = his slot, CalcAttackEffect's `sta $3c08,x`), takes
---           the pool it found down by exactly the tech's table price.  OFF:
---           no write, the pool
---           does not move.  In both cases the tech lands its hit.  The
---           same Berserk special (below) can take CYAN's window before he
+--           and ended, every write to his pool inside it.  Exactly one
+--           write, under his own SwdTech (X = his slot, CalcAttackEffect's
+--           `sta $3c08,x`), takes the pool it found down by exactly the
+--           tech's table price, and the tech lands its hit.  The same
+--           Berserk special (below) can take CYAN's window before he
 --           gets to choose; that battle is void, it is fought out, and the
 --           next encounter measures.  A KO or Petrify, which the next
 --           encounter would inherit, SHADOW cures from the bag instead.
---   refusal (ON only), a labeled isolation arm in two halves: an
+--   refusal, a labeled isolation arm in two halves: an
 --           input-driven route to a broke kit-caster is out of reach on this
 --           pool's economy (a deferring party is ground down before real
 --           poverty arrives, and a Dispatch walk never spends the pool down
@@ -94,11 +87,10 @@ local LEARNED, LOADOUT = 0x1CF7, 0x1E1D
 local TECHNAME = { [0] = "Dispatch", "Retort", "Slash", "Quadra Slam",
   "Empowerer", "Stunner", "Quadra Slice", "Cleave" }
 
--- Read from the ROM in the first step, on whichever build this is:
-local COST = {}                          -- Ot6AbilityCostTbl (ON only)
+-- Read from the ROM in the first step:
+local COST = {}                          -- Ot6AbilityCostTbl
 local TECH_ATK0, STANCE                  -- Cmd_07's `sbc #imm` / `cmp #imm`
--- Cmd_07 (battle_main.asm, "command $07: swdtech") by its own bytes, since
--- OT6_SYMS is the ON build's and this file also runs on the nomp ROM:
+-- Cmd_07 (battle_main.asm, "command $07: swdtech") by its own bytes:
 --   tyx / lda $b6 / pha / sec / sbc #ATK0 / sta $b6 / pla / jsr / jsr /
 --   lda $b6 / cmp #STANCE / bne
 -- ATK0 is the first tech's attack id and STANCE the one tech index whose
@@ -393,7 +385,6 @@ local function driveTo(pred, maxF, tag)
   }, tag)
 end
 
-local mode                               -- "on" (charges) | "off" (free)
 local spells = {}
 local buzzes, confirms = 0, 0            -- every $95 / $96 write, anywhere
 -- ...and the same two counted only where arm 3a means them: the battle menu
@@ -422,10 +413,7 @@ local R = {}
 -- bracket opens on $3a7c := $07 with X = his offset and closes on the next
 -- write: his pool and the pack's HP as it began and as it ended, and the
 -- pool writes in between.  Actions serialize, so what moves inside it is
--- the tech's own doing.  A write
--- watch rather than an exec hook on ExecCmd because this file also runs
--- on the nomp control ROM, where OT6_SYMS (scraped from the ON build's
--- ff6-en.dbg) would hook a stale address.
+-- the tech's own doing.
 local poolWrites = {}
 local tech = nil                         -- the bracket, once CYAN's SwdTech starts
 local techArmed = false                  -- only the arm's own tech is bracketed
@@ -481,12 +469,7 @@ H.run({ maxFrames = 200000 }, {
       end
       if ok then base = a break end
     end
-    if not base then
-      mode = "off"
-      H.log("OFF build: Ot6AbilityCostTbl absent from bank F0 (dormant)")
-      return
-    end
-    mode = "on"
+    H.assertEq(base ~= nil, true, "Ot6AbilityCostTbl is found in bank F0")
     local cost, a = COST, base
     while H.readRomByte(a) ~= 0xFF and a < base + 0x200 do
       cost[H.readRomByte(a)] = H.readRomByte(a + 1)
@@ -504,7 +487,7 @@ H.run({ maxFrames = 200000 }, {
     for id, c in pairs(want) do
       H.assertEq(cost[id], c, string.format("cost table: id $%02x costs %d", id, c))
     end
-    H.log("ON build: cost table verified for Blitz + SwdTech + Tools")
+    H.log("cost table verified for Blitz + SwdTech + Tools")
   end),
 
   H.call(function()
@@ -624,28 +607,21 @@ H.run({ maxFrames = 200000 }, {
           H.assertEq(tech.atk, plan.id, string.format(
             "the action measured is his %s ($3a7c/$3a7d = $07/$%02X)",
             TECHNAME[plan.tech], plan.id))
-          H.assertEq(dmg > 0, true, "the tech landed its hit (both builds)")
-          if mode == "on" then
-            local price = COST[plan.id]
-            H.assertEq(tech.mp0 >= price, true, string.format(
-              "ON: his real pool (%d) affords the tech (%d)", tech.mp0, price))
-            H.assertEq(#inside, 1, "ON: one write to his pool inside the tech's own action")
-            local c = inside[1]
-            H.assertEq(c.cmd == CMD_SWDTECH and c.x == cyan * 2, true,
-              "ON: ...made under his own SwdTech ($b5 = $07, X = his slot)")
-            H.assertEq(c.old - c.new, price, string.format(
-              "ON: %s charged exactly its table cost (%d) from the pool the "
-              .. "charge found", TECHNAME[plan.tech], price))
-            H.assertEq(tech.mp1, tech.mp0 - price, string.format(
-              "ON: the pool he ended the tech on is the one he began it on, less %d",
-              price))
-          else
-            H.assertEq(#inside, 0, "OFF: nothing writes his pool inside the tech")
-            H.assertEq(tech.mp1, tech.mp0, string.format(
-              "OFF: %s is free -- vanilla behavior, the negative control",
-              TECHNAME[plan.tech]))
-          end
-          H.screenshot("mpcost_" .. mode .. "_affordable")
+          H.assertEq(dmg > 0, true, "the tech landed its hit")
+          local price = COST[plan.id]
+          H.assertEq(tech.mp0 >= price, true, string.format(
+            "ON: his real pool (%d) affords the tech (%d)", tech.mp0, price))
+          H.assertEq(#inside, 1, "ON: one write to his pool inside the tech's own action")
+          local c = inside[1]
+          H.assertEq(c.cmd == CMD_SWDTECH and c.x == cyan * 2, true,
+            "ON: ...made under his own SwdTech ($b5 = $07, X = his slot)")
+          H.assertEq(c.old - c.new, price, string.format(
+            "ON: %s charged exactly its table cost (%d) from the pool the "
+            .. "charge found", TECHNAME[plan.tech], price))
+          H.assertEq(tech.mp1, tech.mp0 - price, string.format(
+            "ON: the pool he ended the tech on is the one he began it on, less %d",
+            price))
+          H.screenshot("mpcost_on_affordable")
           R.charged = true
         end),
         H.cond(function() return not R.charged end, {
@@ -663,7 +639,7 @@ H.run({ maxFrames = 200000 }, {
     return H.repeatN(1, steps)
   end)(),
 
-  -- ------------------------------------------------- 3. refusal (ON only) --
+  -- ------------------------------------------------------------ 3. refusal --
   -- The labeled isolation arm; see the header.  The bank the planned row
   -- needs is built by real item turns (for row 0 it is Ot6InitBP's opening
   -- 1) and the attempt is a real menu drive; only the poverty itself is
@@ -679,335 +655,333 @@ H.run({ maxFrames = 200000 }, {
   -- never dismisses it -- the 30000-frame timeout, not a refusal.  A void
   -- attempt drains its battle (idle A back on) so the next one walks to a
   -- fresh encounter.
-  H.cond(function() return mode == "on" end, {
-    (function()
-      local done = false
-      local richMp, snap, menuRefused = nil, nil, false
-      local atWindow = false             -- was CYAN's own window really open?
-      local steps = {}
-      for attempt = 1, 4 do
-        steps[#steps+1] = H.cond(function() return done end, {}, {
-          driveTo(function()
-            return H.battleLoadStarted() and H.monstersPresent() > 0
-          end, 30000, "refusal battle (attempt " .. attempt .. ")"),
+  (function()
+    local done = false
+    local richMp, snap, menuRefused = nil, nil, false
+    local atWindow = false             -- was CYAN's own window really open?
+    local steps = {}
+    for attempt = 1, 4 do
+      steps[#steps+1] = H.cond(function() return done end, {}, {
+        driveTo(function()
+          return H.battleLoadStarted() and H.monstersPresent() > 0
+        end, 30000, "refusal battle (attempt " .. attempt .. ")"),
+        H.call(function()
+          refindSlots(); cyanMode = "item"
+          planBattle("refusal arm " .. attempt)
+          H.log(string.format(
+            "  [refusal arm %d] pack %s; cyan slot %d bp=%d mp=%d %s",
+            attempt, packStr(), cyan, bp(), mp(), cyanStatusStr()))
+        end),
+        driveTo(function()
+          return not H.battleLoadStarted() or cyanLostMenu()
+            or bp() >= plan.need
+        end, 40000, "real item turns bank the planned row's pips (attempt "
+          .. attempt .. ")"),
+        H.cond(function()
+          return H.battleLoadStarted() and not cyanLostMenu()
+            and bp() >= plan.need
+        end, {
+          -- 3a. THE MENU REFUSAL.  Poverty is staged (the isolation write,
+          -- waived and labeled) and the attempt then drives the real
+          -- SwdTech submenu at a real banked pip.  Since v0.19 the
+          -- tools-shell confirm asks Ot6KitConfirmMP whether the caster can
+          -- pay the row (btlgfx UpdateMenuState_30 @8809), so the greyed
+          -- row buzzes and the window stays open: CYAN keeps the turn and
+          -- the pip.  Before v0.19 this same press committed, and the turn
+          -- and the pip were gone by the time the fizzle below fired.
+          --
+          -- The arm's PRECONDITION is CYAN's own command window, OPEN, with
+          -- the turn still his.  It is established here, not hoped for.  A
+          -- fresh encounter already carries Ot6InitBP's opening 1, so the
+          -- item-turn drive above is satisfied at frame 0 of the battle,
+          -- before any window exists; staging the poverty there and then
+          -- waiting for "a buzz" took the battle's own opening $95 write
+          -- (and the "b" the driver presses in a state it does not know)
+          -- for the SwdTech row saying no, and read $7BC2 == $00 where the
+          -- submenu should have been.  So park in his command window first
+          -- and stage the pool there, which is also what makes the list
+          -- draw the row already greyed.
+          H.call(function() cyanMode = "park"; quietA = true end),
+          (function()
+            local packSeen = false
+            return driveTo(function()
+              if not H.battleLoadStarted() then return true end
+              local packHp = monsterHpSum()
+              if packHp > 0 then packSeen = true end
+              if cyanLostMenu() or (packSeen and packHp == 0) then
+                return true
+              end
+              return (H.readByte(ACTOR) & 3) == cyan
+                 and H.readByte(MSTATE) == ST_CMD
+            end, 30000, "CYAN's own command window opens (attempt "
+              .. attempt .. ")")
+          end)(),
           H.call(function()
-            refindSlots(); cyanMode = "item"
-            planBattle("refusal arm " .. attempt)
-            H.log(string.format(
-              "  [refusal arm %d] pack %s; cyan slot %d bp=%d mp=%d %s",
-              attempt, packStr(), cyan, bp(), mp(), cyanStatusStr()))
+            atWindow = H.battleLoadStarted() and not cyanLostMenu()
+              and (H.readByte(ACTOR) & 3) == cyan
+              and H.readByte(MSTATE) == ST_CMD
+            if not atWindow then
+              cyanMode = "defer"
+              quietA = false
+              H.log(string.format("  [refusal arm %d] 3a void before the "
+                .. "window: live=%s menuable=%s state=%02x actor=%d "
+                .. "monsters %d hp %s", attempt,
+                tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
+                H.readByte(MSTATE), H.readByte(ACTOR) & 3, monsterHpSum(),
+                cyanStatusStr()))
+              return
+            end
+            richMp = mp()
+            H.writeWord(0x3C08 + cyan*2, 1)
+            snap = { bp = bp(), pend = pend(),
+                     buzzes = buzzes, confirms = confirms,
+                     kitBuzzes = kitBuzzes, kitConfirms = kitConfirms }
+            spells = {}
+            listId = nil
+            cyanMode = "tech:" .. plan.row
+            H.log(string.format("  [refusal arm %d] 3a menu: pool %d -> 1, "
+              .. "bp=%d pend=%d; pressing %s", attempt, richMp, snap.bp,
+              snap.pend, planStr()))
           end),
+          -- and the stop is the A press ON THE ROW, inside the submenu
+          -- ($96 with $7BC2 == $30 and CYAN the actor), not "a $95 wrote
+          -- somewhere".  The buzz is then an ASSERTION below rather than
+          -- the thing the drive settles for.
           driveTo(function()
+            if not atWindow then return true end
             return not H.battleLoadStarted() or cyanLostMenu()
-              or bp() >= plan.need
-          end, 40000, "real item turns bank the planned row's pips (attempt "
-            .. attempt .. ")"),
+                or kitConfirms > snap.kitConfirms
+          end, 30000, "the broke SwdTech row is confirmed IN the submenu "
+            .. "(attempt " .. attempt .. ")"),
+          H.waitFrames(90),
+          H.call(function()
+            menuRefused = false
+            if atWindow and H.battleLoadStarted() and not cyanLostMenu()
+               and kitConfirms > snap.kitConfirms then
+              H.log(string.format("  [refusal arm %d] 3a: state=%02x mp=%d "
+                .. "bp=%d pend=%d kitbuzz(+%d) kitconfirm(+%d) "
+                .. "buzz(+%d) confirm(+%d) %s", attempt,
+                H.readByte(MSTATE), mp(), bp(), pend(),
+                kitBuzzes - snap.kitBuzzes, kitConfirms - snap.kitConfirms,
+                buzzes - snap.buzzes, confirms - snap.confirms,
+                sawSpell(plan.id) and string.format("saw $%02X", plan.id)
+                  or "quiet"))
+              H.assertEq(listId, plan.id, string.format(
+                "ON: the row pressed (%d) held the planned tech, %s ($%02X)",
+                plan.row, TECHNAME[plan.tech], plan.id))
+              H.assertEq(snap.bp >= plan.need, true, string.format(
+                "ON: the bank (%d) covered the row's %d pips, so the only "
+                .. "reason left to refuse it is the price", snap.bp, plan.need))
+              H.assertEq(kitConfirms > snap.kitConfirms, true,
+                "ON: the A press reached the SwdTech list ($96 with $7BC2 "
+                .. "== $30 and CYAN the actor, stamped before the gate) -- "
+                .. "the refusal is a rejection, not a press that never "
+                .. "arrived")
+              H.assertEq(kitBuzzes > snap.kitBuzzes, true,
+                "ON: and the confirm was REFUSED -- $95 buzzed inside "
+                .. "CYAN's own SwdTech list, where Ot6KitConfirmMP prices "
+                .. "the row")
+              H.assertEq(H.readByte(MSTATE), ST_TOOLS,
+                "ON: the SwdTech submenu is still open -- CYAN is still "
+                .. "choosing and the turn is still his")
+              H.assertEq(pend(), snap.pend,
+                "ON: no boost was banked -- Ot6BushidoConfirm was never "
+                .. "reached, because the MP gate refused first")
+              H.assertEq(bp(), snap.bp,
+                "ON: the pip is still in the bank")
+              H.assertEq(mp(), 1,
+                "ON: the 1 MP is untouched, never negative")
+              H.assertEq(sawSpell(plan.id), false,
+                "ON: and no tech was ever cast")
+              H.screenshot("mpcost_on_menu_refused")
+              menuRefused = true
+            elseif atWindow then
+              H.log(string.format("  [refusal arm %d] 3a void: live=%s "
+                .. "menuable=%s state=%02x kitconfirm(+%d) %s", attempt,
+                tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
+                H.readByte(MSTATE), kitConfirms - snap.kitConfirms,
+                cyanStatusStr()))
+            end
+            -- the real pool back: 3b's poverty is staged at the LATCH.
+            -- Nothing was staged at all on the void-before-the-window path,
+            -- so there is nothing to put back there.
+            if richMp ~= nil then
+              H.writeWord(0x3C08 + cyan*2, richMp)
+              richMp = nil
+            end
+            cyanMode = "defer"
+            quietA = false
+          end),
+          -- 3b. THE EXECUTION BACKSTOP.  The universal insufficient-MP
+          -- fizzle at CalcAttackEffect is still real code and still
+          -- reachable in play -- an enemy Rasp or Osmose between the choice
+          -- and the swing -- so it keeps its own arm.  The poverty is
+          -- staged AT THE LATCH, which is exactly that hook point: the
+          -- planned tech (a hit, so "no damage" means the fizzle) is chosen
+          -- and committed against a pool that could pay it, the
+          -- pool then goes broke under it, and the tech must fizzle for no
+          -- damage and leave the 1 MP alone.
           H.cond(function()
-            return H.battleLoadStarted() and not cyanLostMenu()
-              and bp() >= plan.need
+            return menuRefused and H.battleLoadStarted() and bp() >= plan.need
           end, {
-            -- 3a. THE MENU REFUSAL.  Poverty is staged (the isolation write,
-            -- waived and labeled) and the attempt then drives the real
-            -- SwdTech submenu at a real banked pip.  Since v0.19 the
-            -- tools-shell confirm asks Ot6KitConfirmMP whether the caster can
-            -- pay the row (btlgfx UpdateMenuState_30 @8809), so the greyed
-            -- row buzzes and the window stays open: CYAN keeps the turn and
-            -- the pip.  Before v0.19 this same press committed, and the turn
-            -- and the pip were gone by the time the fizzle below fired.
-            --
-            -- The arm's PRECONDITION is CYAN's own command window, OPEN, with
-            -- the turn still his.  It is established here, not hoped for.  A
-            -- fresh encounter already carries Ot6InitBP's opening 1, so the
-            -- item-turn drive above is satisfied at frame 0 of the battle,
-            -- before any window exists; staging the poverty there and then
-            -- waiting for "a buzz" took the battle's own opening $95 write
-            -- (and the "b" the driver presses in a state it does not know)
-            -- for the SwdTech row saying no, and read $7BC2 == $00 where the
-            -- submenu should have been.  So park in his command window first
-            -- and stage the pool there, which is also what makes the list
-            -- draw the row already greyed.
-            H.call(function() cyanMode = "park"; quietA = true end),
             (function()
-              local packSeen = false
-              return driveTo(function()
-                if not H.battleLoadStarted() then return true end
-                local packHp = monsterHpSum()
-                if packHp > 0 then packSeen = true end
-                if cyanLostMenu() or (packSeen and packHp == 0) then
-                  return true
-                end
-                return (H.readByte(ACTOR) & 3) == cyan
-                   and H.readByte(MSTATE) == ST_CMD
-              end, 30000, "CYAN's own command window opens (attempt "
-                .. attempt .. ")")
+              local m0, latched, packSeen = nil, false, false
+              local g1 = nil           -- the pack's HP at the latch, for the log
+              local rich2 = nil        -- the real pool 3b stages over
+              return H.repeatN(1, {
+                H.call(function()
+                  spells = {}
+                  rich2 = mp()
+                  listId = nil
+                  cyanMode = "tech:" .. plan.row
+                  -- quiet the idle A-mash before the latch drive: the
+                  -- MENU==0 idle A can confirm a bystander's just-opened
+                  -- window.  The damage verdict no longer depends on it
+                  -- (it is read inside CYAN's own action, below), but a
+                  -- stray bystander Fight still has no business here.
+                  -- CYAN's tech still drives (cyanMode routes it whenever
+                  -- his menu is open).
+                  quietA = true
+                end),
+                -- the fizzled tech has no grant to signal on, so drive on
+                -- the latch (pending banks 1 at the submenu confirm).  The
+                -- drive also ends, unlatched, when the latch can no longer
+                -- come: CYAN lost his window to a status, or the pack is
+                -- dead (the EXP screen, which the quiet A cannot dismiss
+                -- and battleLoadStarted() cannot see past).  Dead means
+                -- seen alive first: a fresh battle's pack reads 0 HP for
+                -- its first frames (see cyanLostMenu).
+                driveTo(function()
+                  if not H.battleLoadStarted() then return true end
+                  local packHp = monsterHpSum()
+                  if packHp > 0 then packSeen = true end
+                  if cyanLostMenu() or (packSeen and packHp == 0) then
+                    return true
+                  end
+                  if pend() >= 1 and not latched then
+                    latched = true
+                    -- the hook point: the action is committed, and the pool goes
+                    -- broke under it before it resolves (the isolation
+                    -- write, waived and labeled).  This is the only way
+                    -- left to reach the execution-side gate, now that the
+                    -- menu refuses an unaffordable row outright.
+                    H.writeWord(0x3C08 + cyan*2, 1)
+                    m0 = 1
+                    g1 = monsterHpSum()
+                    -- and the committed tech is bracketed the way the
+                    -- charge's is (installWatches): from InitPlayerAction
+                    -- loading his SwdTech into $3a7c to the next action's
+                    -- start.  Actions serialize, so the pack's HP across
+                    -- that bracket is the refused tech's own doing and
+                    -- nobody else's -- not an Interceptor counter, not a
+                    -- berserked ally, not a bystander's queued Fight.
+                    -- Measured on the regenerated camp_escaped (2026-09-23):
+                    -- the pack took 156 in the old 400-frame window from
+                    -- SHADOW's dog ("Takedown", no pad input at all).
+                    tech, techArmed = nil, true
+                  end
+                  return latched
+                end, 30000, "the broke tech is latched (attempt "
+                  .. attempt .. ")"),
+                H.call(function() cyanMode = "defer" end),  -- quietA already on
+                -- the refused tech runs, start to end, or the attempt
+                -- is void: the battle ended or CYAN lost his window under
+                -- the queued action
+                driveTo(function()
+                  if not latched then return true end
+                  if tech then return tech.done end
+                  return not H.battleLoadStarted() or cyanLostMenu()
+                end, 20000, "the broke tech runs, start to end (attempt "
+                  .. attempt .. ")"),
+                H.call(function() techArmed = false; quietA = false end),
+                H.call(function()
+                 -- whatever this attempt decided, the staged poverty is put
+                 -- back before the next one starts.  3b's write is the
+                 -- LAST thing that touches the pool, so leaving it at 1
+                 -- handed attempt N+1 a CYAN who can never afford the row
+                 -- it has to latch: 3a still refused (the pool was already
+                 -- broke), 3b could never commit, and the arm timed out on
+                 -- "the broke Dispatch is latched" having never had a
+                 -- fighting chance (build/attempts/fix1).  A void attempt
+                 -- must leave the fight's own economy behind it.
+                 local function measure()
+                  if not latched or not (tech and tech.done) then
+                    H.log(string.format("  [refusal arm %d] void before the "
+                      .. "refused action ran: latched=%s dispatch=%s live=%s "
+                      .. "menuable=%s monsters %d hp %s", attempt,
+                      tostring(latched), tech and "in flight" or "never started",
+                      tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
+                      monsterHpSum(), cyanStatusStr()))
+                    return
+                  end
+                  local left = mp()
+                  local dmg = tech.hp0 - tech.hp1
+                  H.log(string.format(
+                    "refused %s ($3a7c=%02X%02X; list row %d held $%02X) "
+                    .. "f%d..f%d (closed by $%02X): "
+                    .. "MP %d -> %d (pool %d at its start, %d at its end), "
+                    .. "pack damage inside it %d (%d -> %d), $3410 %s; the "
+                    .. "pack's HP moved %d since the latch, every action counted",
+                    TECHNAME[plan.tech], tech.atk or 0xFF, CMD_SWDTECH,
+                    plan.row, listId or 0xFF, tech.frame, tech.doneFrame,
+                    tech.next, m0, left, tech.mp0, tech.mp1, dmg, tech.hp0,
+                    tech.hp1, sawSpell(plan.id)
+                      and string.format("saw $%02X", plan.id) or "quiet",
+                    g1 - monsterHpSum()))
+                  H.assertEq(listId, plan.id, string.format(
+                    "ON: the row committed (%d) held the planned tech, %s "
+                    .. "($%02X)", plan.row, TECHNAME[plan.tech], plan.id))
+                  H.assertEq(tech.atk, plan.id, string.format(
+                    "ON: the action measured is his committed %s "
+                    .. "($3a7c/$3a7d = $07/$%02X)", TECHNAME[plan.tech], plan.id))
+                  H.assertEq(left, m0,
+                    "ON: too little MP is REFUSED -- the 1 MP is untouched, "
+                    .. "never negative")
+                  H.assertEq(dmg <= 0, true,
+                    "ON: and the refused tech dealt no damage (fizzled)")
+                  H.screenshot("mpcost_on_refused")
+                  done = true
+                 end
+                 measure()
+                 if rich2 ~= nil and mp() ~= rich2 then
+                   H.writeWord(0x3C08 + cyan*2, rich2)
+                   H.log(string.format("  [refusal arm %d] 3b: the staged "
+                     .. "poverty is put back, pool -> %d", attempt, rich2))
+                 end
+                end),
+              })
             end)(),
-            H.call(function()
-              atWindow = H.battleLoadStarted() and not cyanLostMenu()
-                and (H.readByte(ACTOR) & 3) == cyan
-                and H.readByte(MSTATE) == ST_CMD
-              if not atWindow then
-                cyanMode = "defer"
-                quietA = false
-                H.log(string.format("  [refusal arm %d] 3a void before the "
-                  .. "window: live=%s menuable=%s state=%02x actor=%d "
-                  .. "monsters %d hp %s", attempt,
-                  tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
-                  H.readByte(MSTATE), H.readByte(ACTOR) & 3, monsterHpSum(),
-                  cyanStatusStr()))
-                return
-              end
-              richMp = mp()
-              H.writeWord(0x3C08 + cyan*2, 1)
-              snap = { bp = bp(), pend = pend(),
-                       buzzes = buzzes, confirms = confirms,
-                       kitBuzzes = kitBuzzes, kitConfirms = kitConfirms }
-              spells = {}
-              listId = nil
-              cyanMode = "tech:" .. plan.row
-              H.log(string.format("  [refusal arm %d] 3a menu: pool %d -> 1, "
-                .. "bp=%d pend=%d; pressing %s", attempt, richMp, snap.bp,
-                snap.pend, planStr()))
-            end),
-            -- and the stop is the A press ON THE ROW, inside the submenu
-            -- ($96 with $7BC2 == $30 and CYAN the actor), not "a $95 wrote
-            -- somewhere".  The buzz is then an ASSERTION below rather than
-            -- the thing the drive settles for.
-            driveTo(function()
-              if not atWindow then return true end
-              return not H.battleLoadStarted() or cyanLostMenu()
-                  or kitConfirms > snap.kitConfirms
-            end, 30000, "the broke SwdTech row is confirmed IN the submenu "
-              .. "(attempt " .. attempt .. ")"),
-            H.waitFrames(90),
-            H.call(function()
-              menuRefused = false
-              if atWindow and H.battleLoadStarted() and not cyanLostMenu()
-                 and kitConfirms > snap.kitConfirms then
-                H.log(string.format("  [refusal arm %d] 3a: state=%02x mp=%d "
-                  .. "bp=%d pend=%d kitbuzz(+%d) kitconfirm(+%d) "
-                  .. "buzz(+%d) confirm(+%d) %s", attempt,
-                  H.readByte(MSTATE), mp(), bp(), pend(),
-                  kitBuzzes - snap.kitBuzzes, kitConfirms - snap.kitConfirms,
-                  buzzes - snap.buzzes, confirms - snap.confirms,
-                  sawSpell(plan.id) and string.format("saw $%02X", plan.id)
-                    or "quiet"))
-                H.assertEq(listId, plan.id, string.format(
-                  "ON: the row pressed (%d) held the planned tech, %s ($%02X)",
-                  plan.row, TECHNAME[plan.tech], plan.id))
-                H.assertEq(snap.bp >= plan.need, true, string.format(
-                  "ON: the bank (%d) covered the row's %d pips, so the only "
-                  .. "reason left to refuse it is the price", snap.bp, plan.need))
-                H.assertEq(kitConfirms > snap.kitConfirms, true,
-                  "ON: the A press reached the SwdTech list ($96 with $7BC2 "
-                  .. "== $30 and CYAN the actor, stamped before the gate) -- "
-                  .. "the refusal is a rejection, not a press that never "
-                  .. "arrived")
-                H.assertEq(kitBuzzes > snap.kitBuzzes, true,
-                  "ON: and the confirm was REFUSED -- $95 buzzed inside "
-                  .. "CYAN's own SwdTech list, where Ot6KitConfirmMP prices "
-                  .. "the row")
-                H.assertEq(H.readByte(MSTATE), ST_TOOLS,
-                  "ON: the SwdTech submenu is still open -- CYAN is still "
-                  .. "choosing and the turn is still his")
-                H.assertEq(pend(), snap.pend,
-                  "ON: no boost was banked -- Ot6BushidoConfirm was never "
-                  .. "reached, because the MP gate refused first")
-                H.assertEq(bp(), snap.bp,
-                  "ON: the pip is still in the bank")
-                H.assertEq(mp(), 1,
-                  "ON: the 1 MP is untouched, never negative")
-                H.assertEq(sawSpell(plan.id), false,
-                  "ON: and no tech was ever cast")
-                H.screenshot("mpcost_on_menu_refused")
-                menuRefused = true
-              elseif atWindow then
-                H.log(string.format("  [refusal arm %d] 3a void: live=%s "
-                  .. "menuable=%s state=%02x kitconfirm(+%d) %s", attempt,
-                  tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
-                  H.readByte(MSTATE), kitConfirms - snap.kitConfirms,
-                  cyanStatusStr()))
-              end
-              -- the real pool back: 3b's poverty is staged at the LATCH.
-              -- Nothing was staged at all on the void-before-the-window path,
-              -- so there is nothing to put back there.
-              if richMp ~= nil then
-                H.writeWord(0x3C08 + cyan*2, richMp)
-                richMp = nil
-              end
-              cyanMode = "defer"
-              quietA = false
-            end),
-            -- 3b. THE EXECUTION BACKSTOP.  The universal insufficient-MP
-            -- fizzle at CalcAttackEffect is still real code and still
-            -- reachable in play -- an enemy Rasp or Osmose between the choice
-            -- and the swing -- so it keeps its own arm.  The poverty is
-            -- staged AT THE LATCH, which is exactly that hook point: the
-            -- planned tech (a hit, so "no damage" means the fizzle) is chosen
-            -- and committed against a pool that could pay it, the
-            -- pool then goes broke under it, and the tech must fizzle for no
-            -- damage and leave the 1 MP alone.
-            H.cond(function()
-              return menuRefused and H.battleLoadStarted() and bp() >= plan.need
-            end, {
-              (function()
-                local m0, latched, packSeen = nil, false, false
-                local g1 = nil           -- the pack's HP at the latch, for the log
-                local rich2 = nil        -- the real pool 3b stages over
-                return H.repeatN(1, {
-                  H.call(function()
-                    spells = {}
-                    rich2 = mp()
-                    listId = nil
-                    cyanMode = "tech:" .. plan.row
-                    -- quiet the idle A-mash before the latch drive: the
-                    -- MENU==0 idle A can confirm a bystander's just-opened
-                    -- window.  The damage verdict no longer depends on it
-                    -- (it is read inside CYAN's own action, below), but a
-                    -- stray bystander Fight still has no business here.
-                    -- CYAN's tech still drives (cyanMode routes it whenever
-                    -- his menu is open).
-                    quietA = true
-                  end),
-                  -- the fizzled tech has no grant to signal on, so drive on
-                  -- the latch (pending banks 1 at the submenu confirm).  The
-                  -- drive also ends, unlatched, when the latch can no longer
-                  -- come: CYAN lost his window to a status, or the pack is
-                  -- dead (the EXP screen, which the quiet A cannot dismiss
-                  -- and battleLoadStarted() cannot see past).  Dead means
-                  -- seen alive first: a fresh battle's pack reads 0 HP for
-                  -- its first frames (see cyanLostMenu).
-                  driveTo(function()
-                    if not H.battleLoadStarted() then return true end
-                    local packHp = monsterHpSum()
-                    if packHp > 0 then packSeen = true end
-                    if cyanLostMenu() or (packSeen and packHp == 0) then
-                      return true
-                    end
-                    if pend() >= 1 and not latched then
-                      latched = true
-                      -- the hook point: the action is committed, and the pool goes
-                      -- broke under it before it resolves (the isolation
-                      -- write, waived and labeled).  This is the only way
-                      -- left to reach the execution-side gate, now that the
-                      -- menu refuses an unaffordable row outright.
-                      H.writeWord(0x3C08 + cyan*2, 1)
-                      m0 = 1
-                      g1 = monsterHpSum()
-                      -- and the committed tech is bracketed the way the
-                      -- charge's is (installWatches): from InitPlayerAction
-                      -- loading his SwdTech into $3a7c to the next action's
-                      -- start.  Actions serialize, so the pack's HP across
-                      -- that bracket is the refused tech's own doing and
-                      -- nobody else's -- not an Interceptor counter, not a
-                      -- berserked ally, not a bystander's queued Fight.
-                      -- Measured on the regenerated camp_escaped (2026-09-23):
-                      -- the pack took 156 in the old 400-frame window from
-                      -- SHADOW's dog ("Takedown", no pad input at all).
-                      tech, techArmed = nil, true
-                    end
-                    return latched
-                  end, 30000, "the broke tech is latched (attempt "
-                    .. attempt .. ")"),
-                  H.call(function() cyanMode = "defer" end),  -- quietA already on
-                  -- the refused tech runs, start to end, or the attempt
-                  -- is void: the battle ended or CYAN lost his window under
-                  -- the queued action
-                  driveTo(function()
-                    if not latched then return true end
-                    if tech then return tech.done end
-                    return not H.battleLoadStarted() or cyanLostMenu()
-                  end, 20000, "the broke tech runs, start to end (attempt "
-                    .. attempt .. ")"),
-                  H.call(function() techArmed = false; quietA = false end),
-                  H.call(function()
-                   -- whatever this attempt decided, the staged poverty is put
-                   -- back before the next one starts.  3b's write is the
-                   -- LAST thing that touches the pool, so leaving it at 1
-                   -- handed attempt N+1 a CYAN who can never afford the row
-                   -- it has to latch: 3a still refused (the pool was already
-                   -- broke), 3b could never commit, and the arm timed out on
-                   -- "the broke Dispatch is latched" having never had a
-                   -- fighting chance (build/attempts/fix1).  A void attempt
-                   -- must leave the fight's own economy behind it.
-                   local function measure()
-                    if not latched or not (tech and tech.done) then
-                      H.log(string.format("  [refusal arm %d] void before the "
-                        .. "refused action ran: latched=%s dispatch=%s live=%s "
-                        .. "menuable=%s monsters %d hp %s", attempt,
-                        tostring(latched), tech and "in flight" or "never started",
-                        tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
-                        monsterHpSum(), cyanStatusStr()))
-                      return
-                    end
-                    local left = mp()
-                    local dmg = tech.hp0 - tech.hp1
-                    H.log(string.format(
-                      "refused %s ($3a7c=%02X%02X; list row %d held $%02X) "
-                      .. "f%d..f%d (closed by $%02X): "
-                      .. "MP %d -> %d (pool %d at its start, %d at its end), "
-                      .. "pack damage inside it %d (%d -> %d), $3410 %s; the "
-                      .. "pack's HP moved %d since the latch, every action counted",
-                      TECHNAME[plan.tech], tech.atk or 0xFF, CMD_SWDTECH,
-                      plan.row, listId or 0xFF, tech.frame, tech.doneFrame,
-                      tech.next, m0, left, tech.mp0, tech.mp1, dmg, tech.hp0,
-                      tech.hp1, sawSpell(plan.id)
-                        and string.format("saw $%02X", plan.id) or "quiet",
-                      g1 - monsterHpSum()))
-                    H.assertEq(listId, plan.id, string.format(
-                      "ON: the row committed (%d) held the planned tech, %s "
-                      .. "($%02X)", plan.row, TECHNAME[plan.tech], plan.id))
-                    H.assertEq(tech.atk, plan.id, string.format(
-                      "ON: the action measured is his committed %s "
-                      .. "($3a7c/$3a7d = $07/$%02X)", TECHNAME[plan.tech], plan.id))
-                    H.assertEq(left, m0,
-                      "ON: too little MP is REFUSED -- the 1 MP is untouched, "
-                      .. "never negative")
-                    H.assertEq(dmg <= 0, true,
-                      "ON: and the refused tech dealt no damage (fizzled)")
-                    H.screenshot("mpcost_on_refused")
-                    done = true
-                   end
-                   measure()
-                   if rich2 ~= nil and mp() ~= rich2 then
-                     H.writeWord(0x3C08 + cyan*2, rich2)
-                     H.log(string.format("  [refusal arm %d] 3b: the staged "
-                       .. "poverty is put back, pool -> %d", attempt, rich2))
-                   end
-                  end),
-                })
-              end)(),
-            }, {}),
           }, {}),
-          -- a void attempt leaves whatever battle remains; fight it out
-          -- (idle A back on, so an EXP screen is dismissed, and every open
-          -- window takes Fight -- a berserked CYAN's own swings alone cannot
-          -- end a battle he is down in) so the next attempt starts from a
-          -- FRESH encounter
-          H.cond(function() return done end, {}, {
-            H.call(function()
-              H.log(string.format("  [refusal arm %d] void: live=%s "
-                .. "menuable=%s bp=%d mp=%d %s -- draining the battle",
-                attempt, tostring(H.battleLoadStarted()),
-                tostring(cyanCanMenu()), bp(), mp(), cyanStatusStr()))
-              cyanMode = "defer"
-              quietA = false
-              draining = true
-            end),
-            driveTo(function() return not H.battleLoadStarted() end, 60000,
-              "the failed attempt's battle drains away (attempt "
-              .. attempt .. ")"),
-            H.call(function() draining = false end),
-            H.waitFrames(240),
-          }),
-        })
-      end
-      steps[#steps+1] = H.call(function()
-        H.assertEq(done, true,
-          "the refusal completed inside one battle within four encounters")
-      end)
-      return H.repeatN(1, steps)
-    end)(),
-  }, {}),
+        }, {}),
+        -- a void attempt leaves whatever battle remains; fight it out
+        -- (idle A back on, so an EXP screen is dismissed, and every open
+        -- window takes Fight -- a berserked CYAN's own swings alone cannot
+        -- end a battle he is down in) so the next attempt starts from a
+        -- FRESH encounter
+        H.cond(function() return done end, {}, {
+          H.call(function()
+            H.log(string.format("  [refusal arm %d] void: live=%s "
+              .. "menuable=%s bp=%d mp=%d %s -- draining the battle",
+              attempt, tostring(H.battleLoadStarted()),
+              tostring(cyanCanMenu()), bp(), mp(), cyanStatusStr()))
+            cyanMode = "defer"
+            quietA = false
+            draining = true
+          end),
+          driveTo(function() return not H.battleLoadStarted() end, 60000,
+            "the failed attempt's battle drains away (attempt "
+            .. attempt .. ")"),
+          H.call(function() draining = false end),
+          H.waitFrames(240),
+        }),
+      })
+    end
+    steps[#steps+1] = H.call(function()
+      H.assertEq(done, true,
+        "the refusal completed inside one battle within four encounters")
+    end)
+    return H.repeatN(1, steps)
+  end)(),
 
-  H.logStep(function() return "mpcost A/B complete in " .. mode .. " mode" end),
+  H.logStep(function() return "mpcost complete" end),
 })
