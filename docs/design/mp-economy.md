@@ -532,7 +532,7 @@ Vanilla-free player verbs, with their cost shapes:
 | Tools (Edgar) | scaled by tier | 3–20 | bought once with gil and reusable, so MP is the per-use cost: AutoCrossbow 3–4, Drill/Chain Saw 12–20, Debilitator 8–12, Overclock costs the sum of the two tools it fires |
 | Blitz (Sabin) | scaled by tier | 4–99 | Pummel 4, mid-kit 10–17, then 28/50, then Bum Rush at the 99 maximum |
 | SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–99 | he pays both currencies (below), and Cleave costs 99 |
-| Dance (Mog) | flat, paid at start | 4–10 | one payment starts a whole-battle state; vanilla's can't-stop-dancing lock is preserved, so the price is per battle rather than per step |
+| Dance (Mog) | flat, paid at start | 4–10 | one payment starts a whole-battle state; vanilla's can't-stop-dancing lock is preserved, so the price is per battle rather than per step, and a boost bought at the start multiplies every step of that dance (#294, `battle_danceboost`) |
 | Rage (Gau) | flat, paid at start | 8 | one payment starts a whole-battle possession and every possessed turn after it is free, the same rule Dance takes; `Ot6RageCost` tail-calls `Ot6DanceCost` so the two cannot drift |
 
 Every row above that is not marked "free — exception" is a **base**
