@@ -179,7 +179,7 @@ make_genju_prop {VANISH, 0}, {DEMI, 0}, {}, {}, {}
 
 ; 21: sraphim (optional, the man in the woods near Tzen).  Cure, Life: the
 ;   planned list (docs/design/magicite.md's WoB roster table, "the white-mage job").  Both fold
-;   under boost (Cure 2/Cure 3, Life 2).
+;   under boost (Cure 2/Cure 3, Life 2/Life 3).
 make_genju_prop {CURE, 0}, {LIFE, 0}, {}, {}, {}
 
 ; 22: golem (optional, Jidoor Auction House).  The planned list is "Safe,
