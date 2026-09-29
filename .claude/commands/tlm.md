@@ -26,7 +26,8 @@ interpreting runs.
   Write only when something landed or a decision is needed. No liveness
   or progress pings ("still running", "waiting on X"): the owner sees
   background jobs in the app and runs in live.py. A notification that
-  carries no result gets no text at all.
+  carries no result gets one line: "FYI: " and what that agent is doing now
+  (owner, 2026-09-29; the app requires a visible reply).
 - **You -> critic:** `tools/critic.sh` (local qwen via ollama). Different
   weights, zero project context; self-contained prompts with raw evidence.
 - **You -> GitHub:** `gh`. GitHub Issues is the issue tracker; releases carry the zip.
