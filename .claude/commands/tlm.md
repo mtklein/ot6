@@ -115,9 +115,6 @@ Every agent prompt ends with this footer, verbatim:
 > Leave no background process behind: wait on a PID (`wait`, `while kill
 > -0 PID`), never `pgrep -f <pattern>`, which matches its own shell and
 > never exits; kill anything you started before you report.
-> Wait for your own long runs in the foreground (one blocking command with a
-> long timeout) rather than stopping while background work runs: each
-> stop wakes the coordinator with nothing to report.
 
 While agents run, keep live.py open (`preview_start` name `ot6-live`) and
 glance at the worker grid for frozen workers; a stuck worker is your problem,
