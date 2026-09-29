@@ -1244,18 +1244,26 @@ BlitzLevelTbl:
 ; ec/e3c0
 NaturalMagic:
 
+; OT6 (#305): no entry grants a higher tier.  Fire 2/3, Ice 2/3, Cure 2 and
+; the rest (Ot6FoldTbl, battle/ot6_boost.asm) are what boosting the base
+; spell casts, so each vanilla tier here became another spell that fits the
+; kit (docs/design/kits.md), at the same level.  Every slot holds a real
+; spell: both learn loops walk all 16 pairs and index the learned table with
+; the spell byte, so a hole ($ff) would write past the character's table.
+; tools/check_spell_grants.py fails the build on a tier here.
+
 ; terra
         .byte ATTACK::CURE, 1
         .byte ATTACK::FIRE, 3
         .byte ATTACK::ANTDOT, 6
         .byte ATTACK::DRAIN, 12
         .byte ATTACK::LIFE, 18
-        .byte ATTACK::FIRE_2, 22
+        .byte ATTACK::REGEN, 22         ; was FIRE_2: healing, her life side
         .byte ATTACK::WARP, 26
-        .byte ATTACK::CURE_2, 33
+        .byte ATTACK::REMEDY, 33        ; was CURE_2: the cure line's status half
         .byte ATTACK::DISPEL, 37
-        .byte ATTACK::FIRE_3, 43
-        .byte ATTACK::LIFE_2, 49
+        .byte ATTACK::FLARE, 43         ; was FIRE_3: fire's no-element successor
+        .byte ATTACK::FLOAT, 49         ; was LIFE_2: esper flight, earth-proof
         .byte ATTACK::PEARL, 57
         .byte ATTACK::BREAK, 68
         .byte ATTACK::QUARTR, 75
@@ -1269,13 +1277,13 @@ NaturalMagic:
         .byte ATTACK::IMP, 13
         .byte ATTACK::SCAN, 18
         .byte ATTACK::SAFE, 22
-        .byte ATTACK::ICE_2, 26
+        .byte ATTACK::SLOW, 26          ; was ICE_2: tempo, Haste's partner
         .byte ATTACK::HASTE, 32
         .byte ATTACK::BSERK, 40
         .byte ATTACK::MUDDLE, 32
-        .byte ATTACK::ICE_3, 42
+        .byte ATTACK::STOP, 42          ; was ICE_3: tempo
         .byte ATTACK::VANISH, 48
-        .byte ATTACK::HASTE2, 52
+        .byte ATTACK::SHELL, 52         ; was HASTE2: warding, beside Safe
         .byte ATTACK::PEARL, 72
         .byte ATTACK::FLARE, 81
         .byte ATTACK::METEOR, 98

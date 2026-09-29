@@ -78,6 +78,15 @@ describes the *proposed* system, not the shipped one.
 The tube room grants Unicorn, Maduin, Shoat, Phantom, Carbunkl and Bismark
 together, in one scene; see `magicite-tube-six.md`.
 
+No stone grants a higher tier (#305; `tools/check_spell_grants.py` gates it
+on the built ROM). The four that still did in vanilla's rows now ship:
+Palidor Haste, Slow, Float (Haste2 and Slow 2 dropped: one boost reaches
+them); Tritoch Fire, Ice, Bolt (the heads of its Fire 3/Ice 3/Bolt 3, so
+Maduin's list on a second stone); Starlet Cure, Regen, Remedy (Cure 2 and
+Cure 3 dropped); Phoenix Life, Life 3, Cure, Fire (Life 2 dropped, Cure 3
+and Fire 3 to their heads; Life 3 is no tier, since boosting Life stops at
+Life 2).
+
 - The **kit-forming question** per character is which esper completes
   them (Celes+Carbunkl = the rune fortress; Locke+Stray = the
   ghost thief; Edgar+Golem = the siege engine; Sabin+Ifrit = the

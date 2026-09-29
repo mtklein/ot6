@@ -123,11 +123,18 @@ make_genju_prop {HASTE, 0}, {SLOW, 0}, {}, {}, {}
 ; 8: stray
 make_genju_prop {MUDDLE, 0}, {IMP, 0}, {FLOAT, 0}, {}, {}
 
-; 9: palidor
-make_genju_prop {HASTE, 0}, {SLOW, 0}, {HASTE2, 0}, {SLOW_2, 0}, {FLOAT, 0}
+; 9: palidor.  Haste, Slow, Float.  The vanilla HASTE2 and SLOW_2 grants are
+;   dropped (#305): they are the tiers of Haste and Slow (Ot6FoldTbl), which
+;   one boost of the Haste and Slow this stone already grants reaches.  Three
+;   base spells is a stone's size (magicite.md), so nothing replaces them.
+make_genju_prop {HASTE, 0}, {SLOW, 0}, {FLOAT, 0}, {}, {}
 
-; 10: tritoch
-make_genju_prop {FIRE_3, 0}, {ICE_3, 0}, {BOLT_3, 0}, {}, {}
+; 10: tritoch.  The vanilla FIRE_3/ICE_3/BOLT_3 become their family heads
+;   (#305): two boosts of Fire, Ice or Bolt cast the third tier, so the stone
+;   keeps its three-element kit and reaches the same spells.  This is
+;   Maduin's list; one copy of each stone exists, so it is a second pure-mage
+;   stone for a second character.
+make_genju_prop {FIRE, 0}, {ICE, 0}, {BOLT, 0}, {}, {}
 
 ; 11: odin
 make_genju_prop {METEOR, 0}, {}, {}, {}, {}
@@ -185,10 +192,16 @@ make_genju_prop {PEARL, 0}, {REMEDY, 0}, {}, {}, {}
 ; 24: fenrir
 make_genju_prop {WARP, 0}, {X_ZONE, 0}, {STOP, 0}, {}, {}
 
-; 25: starlet
-make_genju_prop {CURE, 0}, {CURE_2, 0}, {CURE_3, 0}, {REGEN, 0}, {REMEDY, 0}
+; 25: starlet.  Cure, Regen, Remedy.  CURE_2 and CURE_3 are dropped (#305):
+;   one and two boosts of the Cure this stone grants cast them.  The healer
+;   kit keeps its three kinds of care (at once, over time, status).
+make_genju_prop {CURE, 0}, {REGEN, 0}, {REMEDY, 0}, {}, {}
 
-; 26: phoenix
-make_genju_prop {LIFE, 0}, {LIFE_2, 0}, {LIFE_3, 0}, {CURE_3, 0}, {FIRE_3, 0}
+; 26: phoenix.  Life, Life 3, Cure, Fire (#305).  LIFE_2 is dropped: one
+;   boost of Life casts it.  CURE_3 and FIRE_3 become their family heads,
+;   Cure and Fire, which two boosts turn back into Cure 3 and Fire 3.  Life 3
+;   stays: it is no tier (Ot6FoldTbl caps the life family at Life 2, so no
+;   boost reaches it), and it is the firebird's own spell.
+make_genju_prop {LIFE, 0}, {LIFE_3, 0}, {CURE, 0}, {FIRE, 0}, {}
 
 ; ------------------------------------------------------------------------------

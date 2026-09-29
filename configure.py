@@ -481,6 +481,16 @@ check("save_layout",
       ["tools/check_save_layout.py", "docs/design/save-layout.md",
        "ff6/src/battle/ot6_memory.inc",
        copy_if_changed_from("build/ot6.sfc")])
+# #305: no character's natural magic and no Esper grants a higher spell tier
+# (guidelines.md, "Stronger spells come from boosting, never from a list").
+# Reads the grant tables and Ot6FoldTbl out of the built ROM at the
+# addresses ff6-en.dbg records; the selftest puts one tier back in each table.
+check("spell_grants",
+      "python3 tools/check_spell_grants.py --selftest"
+      " && python3 tools/check_spell_grants.py",
+      ["tools/check_spell_grants.py", "ff6/src/battle/ot6_boost.asm",
+       "ff6/include/const.inc", "ff6/src/text/genju_name_en.json",
+       copy_if_changed_from("build/ot6.sfc")])
 check("encounters_selftest", "python3 tools/audit_encounters.py --selftest",
       ["tools/audit_encounters.py"])
 check("chestvis_selftest", "python3 tools/chest_visibility.py --selftest",
