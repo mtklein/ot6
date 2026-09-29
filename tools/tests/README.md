@@ -205,6 +205,25 @@ edge whose dependencies include the fixture and its chain. Hand-run
 instruments are marked `-- @manual`; `gen_`/`probe`/`shot_` files carry
 their status in the name.
 
+**Instruments.** A script stays in `tools/tests` only if it is a measuring
+instrument someone will run again ([docs/TESTING.md](../../docs/TESTING.md),
+"Scripts that stay in the tree"); a one-off probe or lab answers its
+question and goes, its findings in the commit that deletes it. Every
+`-- @manual` file is an instrument, and `ninja build/checks/instruments.ok`
+(`tools/check_instruments.py`, in qualification) proves each one still
+composes and starts: a `-- @manual standalone: lua ...` file runs under
+`lua`; any other must load only fixtures the graph makes, compose, and
+reach its own boot point in the emulator (it is stopped 600 frames later,
+or passes first). The instruments today:
+
+| instrument | what it measures |
+|---|---|
+| `battle_smoke.lua` | the harness end to end: `first_battle` loads, the battle RAM is live, a monster carries seeded shields |
+| `metrics_battle.lua` | one fight played by policy, per-side actions, damage, BP and breaks ([balance-metrics.md](../../docs/design/balance-metrics.md)) |
+| `parts_selftest.lua` | the multi-part reader and planner against the built ROM's formations (no emulator) |
+| `recovery_trace_selftest.lua` | the recovery-trace ledger (no emulator) |
+| `fight_drops_selftest.lua` | every plan drop goes through `Driver:dropPlan` (no emulator) |
+
 ### Library reference (abridged)
 
 Step constructors:
