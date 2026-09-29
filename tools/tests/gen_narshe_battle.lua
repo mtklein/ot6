@@ -30,6 +30,7 @@ local function cell9d(c) return H.readByte(0x7E9D89 + c) end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
 -- ----------------------------------------------- the input-driven fighter --
+-- The descent's fighter (KEFKA himself is the library driver's, below).
 -- Presses start only once the battle-menu flag has held 4 straight
 -- frames, then one button per 30-frame pulse (6 held, 24 released,
 -- because battle menus ignore input during their open animation every
@@ -121,9 +122,19 @@ local function seqFor(id, tier, slot)
   elseif id == 5 and tier >= 3 then costed = 0x5D      -- Pummel
   end
   local ok
+  local want = boost
   boost, ok = H.boostPlan({ slot = slot, id = costed, want = boost,
                             tag = "descent", ration = 4 })
-  if not ok then tier = 0 end                          -- cannot pay: Fight
+  if not ok then
+    -- cannot pay even the unboosted verb: Fight, which is free, so the
+    -- bank's boost stands (#257: the fallback used to drop it and swing
+    -- unboosted holding the pips)
+    tier, boost = 0, want
+    if want > 0 then
+      H.log(string.format("[descent] [boost] slot %d: the Fight keeps the " ..
+        "bank's %d", slot, want))
+    end
+  end
   local seq = {}
   for _ = 1, boost do seq[#seq + 1] = "r" end
   local function push(...)
@@ -458,46 +469,70 @@ end
 
 -- -------------------------------------------------------- the KEFKA step --
 -- One attempt: clean edge-A activation, the authored seed asserted, the
--- fight played to its end, and the verdict read off the scripted branch:
--- the win scene on the stage vs the {25,5} lose-path save point.
-local kefkaBlob, kefkaWon = nil, false
-local kefkaLost = nil
-local function kefkaBody(tier)
-  local F = mkFighter(tier, "kefka")
-  local battN, seedChecked, postN, evN = 0, false, 0, 0
+-- fight played to its end by the library's driver with FIGHT (the table
+-- battle_kefka and gen_kefka_won carry verbatim, #257; the lab behind it is
+-- under build/attempts/wt/kefka-lab/), and the verdict read off the scripted
+-- branch: the win scene on the stage vs the {25,5} lose-path save point.
+-- There is no KEFKA ladder.  The run allows a game over for the descent's
+-- sweep above, so a lost battle 57 is raised here as the wipe it is (the
+-- runner's class=wipe), and the segment runner's standard bounded retry is
+-- the only reload: the boot snapshot, a moved seed, a counted
+-- `[retry] attempt n/3 FAILED` line.
+-- The KEFKA fighter (#257), verbatim in battle_kefka, gen_narshe_battle and
+-- gen_kefka_won.  Each lever was measured in build/attempts/wt/kefka-lab/:
+--   runic   CELES holds Runic.  KEFKA's script is Fight plus spells, and a
+--           spell that lands unabsorbed can take a member in one action:
+--           every attributed [death] in the lab was Ice 2 (atk $06) or Drain
+--           ($04) on one member, from 282-349 HP.
+--   cure    false.  Runic absorbs the party's own casts too: with it up,
+--           TERRA's Cure never landed ("restores ?" on every cast, her HP
+--           falling while her MP paid).  The heal line is the bag.
+--   healer  TERRA (0) takes the one care turn a round, with Potions (the
+--           driver's own choice in battle), so CELES's turn stays Runic and
+--           EDGAR, the harder hitter, keeps swinging.  The top-up fraction is
+--           the driver's healPercent; 85 bought no margin over 70 and spent
+--           2-7 Potions a fight.
+--   tool    AutoCrossbow, from the ROM's data: $AA is OT6_PIERCE
+--           (Ot6WeapClassTbl), power 125, ignores defence, 4 MP
+--           (Ot6AbilityCostTbl), and pierce is one of KEFKA's shield classes
+--           (row $03).  The Bio Blaster ($A4) the old fighter's cursor named
+--           resolves as spell $7D (ThrowToolsItemTbl): power 20 poison, 8 MP.
+--           The driver names the tool by id, and the boost it cannot pay for
+--           stays on the Fight it falls back to.
+--   boost   banked to 2 and spent, up to 3; a member inside one priced round
+--           of death spends every pip first (the driver's spend rule).
+local FIGHT = { tactical = true, boost = true, bank = 2, items = true,
+  cure = false, runic = true, healer = 0, healPercent = 70,
+  tool = H.AUTOCROSSBOW }
+local function kefkaFight()
+  local F = H.newFightDriver("kefka", FIGHT)
+  local battN, seedChecked, postN, evN, wipeN = 0, false, 0, 0, 0
+  local lastParty = "?"
+  local function lost(what)
+    error(string.format("battle 57 (KEFKA): THE PARTY IS WIPED -- %s at f%d, " ..
+      "the last living reading [%s]; no ladder reloads it (#257)", what,
+      H.frame, lastParty), 0)
+  end
   return H.driveUntil(function()
-    if F.lost then
-      kefkaLost = F.lost
-      return true                       -- reload beats riding the fail path
-    end
-    -- the verdict is only readable once the battle module has gone (an
-    -- "Annihilated" screen zeroes the HP table, which battleLoadStarted
-    -- reads as NO battle -- #163: that is why F.watch above, not this
-    -- gate, is what sees a wipe).  Field coords are stale while the
-    -- battle owns the RAM, so nothing positional is read until then.
+    -- the loss is read on every frame, before the battle gate: a wipe
+    -- zeroes the HP table (#163)
+    if wipeN >= 90 then lost("the battle table read wiped for 90 frames") end
+    if (H.gameOverFired or 0) > 0 then lost("the run canary counted a game over") end
     if battN > 0 or H.battleLoadStarted() then return false end
     if H.fieldX() == 25 and H.fieldY() == 5 then
-      -- battle 57's scripted loss branch: the party parked at the {25,5}
-      -- save point (the defense-lost regroup)
-      kefkaLost = kefkaLost or F.lost or string.format(
-        "battle 57 LOST at f%d (tier %d): the lose path parked the party " ..
-        "at the {25,5} save point", H.frame, tier)
-      return true
+      lost("the lose path parked the party at the {25,5} save point")
     end
     postN = postN + 1
     evN = (H.eventRunning() or H.dialogWaiting()) and evN + 1 or evN
-    if postN >= 600 and evN >= 60 then
-      if F.lost then kefkaLost = F.lost end   -- wiped yet no warp: record it
-      return true
-    end
-    return false
+    return postN >= 600 and evN >= 60
   end, 90000, {
     H.call(function()
-      F.watch()                           -- every frame, outside the gate
-      if F.lost then H.setPad({}); return end
+      wipeN = H.partyWipedInBattle() and wipeN + 1 or 0
+      if wipeN > 0 then H.setPad({}); return end
       battN = H.battleLoadStarted() and battN + 1 or 0
       if battN >= 3 then
         postN, evN = 0, 0
+        lastParty = partyLine()
         if battN == 150 and not seedChecked then
           seedChecked = true
           local ks = -1
@@ -510,11 +545,11 @@ local function kefkaBody(tier)
           H.assertEq(H.readByte(0x3BE0 + 8 + ks * 2), 0x09,
             "weak byte exactly $09")
           H.log(string.format("[kefka] seed verified: hp=%d sh=%d -- " ..
-            "fighting him for real (tier %d)", monHp(ks), monShields(ks),
-            tier))
+            "fighting him for real, party [%s]", monHp(ks), monShields(ks),
+            partyLine()))
           H.screenshot("kefka_engaged")
         end
-        F.frame(battN)
+        F.frame()
         return
       end
       F.idle()
@@ -524,52 +559,15 @@ local function kefkaBody(tier)
       end
       H.setPad({})
     end),
-  }, "the KEFKA fight, played (tier " .. tier .. ")")
-end
-local function kefkaAttempt(n)
-  local ldReq
-  return H.cond(function() return not kefkaWon end, {
-    H.cond(function() return n > 1 end, {
-      H.logStep(function()
-        return string.format("[kefka] ATTEMPT %d -- reloading the entry point " ..
-          "after a loss (%s)", n, tostring(kefkaLost))
-      end),
-      H.call(function() ldReq = H.requestLoadState(kefkaBlob) end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ldReq, "kefka attempt " .. n)
-        H.gameOverFired = 0             -- the lost attempt's count
-      end),
-      H.waitFrames(60),
-    }, {}),
-    H.call(function() kefkaLost = nil; H.gameOverFired = 0 end),
-    -- activation: face him once (a held DOWN that cannot step), release,
-    -- then edge-A only, because a held direction starves CheckNPCs
-    H.hold({ "down" }), H.waitFrames(4), H.release(), H.waitFrames(8),
-    H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
-      H.cond(function() return true end, {
-        H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
-      }),
-    }, "clean A into KEFKA -> battle 57"),
-    H.waitUntil(function() return H.battleActive() end, 3000, "Kefka up", 10),
-    kefkaBody(n),
-    H.call(function()
-      if kefkaLost == nil then
-        kefkaWon = true
-        H.log(string.format("[kefka] attempt %d WON battle 57 " ..
-          "at f%d", n, H.frame))
-        H.screenshot("kefka_won_played")
-      end
-    end),
-  }, {})
+  }, "the KEFKA fight, played once")
 end
 
 -- Budgets: input-driven fights spend real ATB rounds on every descent
--- collision and on KEFKA himself, and the ladders may replay the descent
--- and the fight up to three times each.
--- allowGameOver: the descent and KEFKA sweeps deliberately survive a
--- lost fight (#163); F.watch reads H.gameOverFired as a loss and the
--- next attempt reloads.
+-- collision and on KEFKA himself, and the descent's ladder may replay it
+-- up to three times.
+-- allowGameOver: the descent's sweep deliberately survives a lost fight
+-- (#163); F.watch reads H.gameOverFired as a loss and the next attempt
+-- reloads.  KEFKA's fight raises its loss instead (kefkaFight).
 H.run({ maxFrames = 600000, allowGameOver = true }, {
   H.loadState(BOOT),
   H.waitFrames(30),
@@ -736,32 +734,18 @@ H.run({ maxFrames = 600000, allowGameOver = true }, {
   H.saveState("kefka_entry.mss"),
 
   -- ==================================================================== --
-  -- 4. KEFKA, played with real input: up to three attempts off the entry point
-  --    just generated.  The checkpoint is re-captured in memory so a loss
-  --    reloads the exact state battle_kefka and gen_kefka_won will boot.
+  -- 4. KEFKA, played with real input, once, off the entry point just
+  --    generated: the exact state battle_kefka and gen_kefka_won will boot.
   -- ==================================================================== --
-  (function()
-    local ckReq
-    return H.cond(function() return true end, {
-      H.call(function() ckReq = H.requestSaveState() end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ckReq, "entry point checkpoint")
-        kefkaBlob = ckReq.blob
-        H.log(string.format("[kefka] entry point checkpoint captured " ..
-          "(%d bytes) f%d", #kefkaBlob, H.frame))
-      end),
-    })
-  end)(),
-  kefkaAttempt(1),
-  kefkaAttempt(2),
-  kefkaAttempt(3),
+  H.hold({ "down" }), H.waitFrames(4), H.release(), H.waitFrames(8),
+  H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
+    H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
+  }, "clean A into KEFKA -> battle 57"),
+  H.waitUntil(function() return H.battleActive() end, 3000, "Kefka up", 10),
+  kefkaFight(),
   H.call(function()
-    if not kefkaWon then
-      error(string.format("[kefka] battle 57 not won in 3 attempts " ..
-        "-- last loss: %s -- the per-attempt numbers above are the balance " ..
-        "finding (#74-style); do not rig this fight", tostring(kefkaLost)), 0)
-    end
+    H.log(string.format("[kefka] battle 57 WON at f%d", H.frame))
+    H.screenshot("kefka_won_played")
   end),
 
   H.call(function()
