@@ -31,9 +31,9 @@ Stated once, assumed by every block:
 - **Counters are disabled while Broken.** A Broken enemy loses its
   counters along with its turns, so Whelk's shell does not counter
   during the window. This matches Octopath. `Ot6MayAct`
-  (`ot6_break.asm:1666`) asks the same question at turn time that
-  `Ot6Gate` asks at queue time, at `battle_main.asm:274` and inside
-  `CheckRetal` at `:12761`.
+  (`ot6_break.asm`) asks the same question inside `CheckRetal` that
+  `Ot6Gate` asks at queue time, and `Ot6BrokenTurn` asks it at
+  `ExecAction` for a turn queued before the break.
 - **A nameplate with no shields is itself information.** Scripted
   set-pieces (Tritoch, Guardian, the Imperial Camp Kefka) draw no
   gauge at all, which tells the player the fight is scripted.
@@ -722,14 +722,15 @@ Party: Locke, Celes + two.
 - This is vanilla's tag fight: they swap in and out. Each keeps its
   own gauge across swaps, and a swapped-out sibling's break timer
   keeps running; it is not frozen behind the `$3aa0.0` presence gate.
-- **A Broken sibling takes no turns.** `Ot6Gate` (`ot6_break.asm:1654`,
-  consulted at `battle_main.asm:1421`) refuses to queue a broken
-  monster's turn, and `Ot6MayAct` (`ot6_break.asm:1666`) refuses one
-  that was queued before the break landed, at `battle_main.asm:274`
-  and `:12761`. A turn queued before the break still runs its AI
-  script and lands side effects — `ExecAction` (`battle_main.asm:238`)
-  runs the script before it reaches the gate (`:274`) — so only the
-  command dispatch is refused.
+- **A Broken sibling takes no turns.** `Ot6Gate` (`ot6_break.asm`,
+  consulted where a full gauge queues a turn) refuses to queue a broken
+  monster's turn, and `Ot6BrokenTurn` (`ot6_break.asm`, at the head of
+  `ExecAction`) consumes one that was already on its way when the break
+  landed, before its AI script runs: no script, no command, the gauge
+  reset the way vanilla resets it for a removed action (#291).
+  `Ot6MayAct` refuses a Broken sibling's counterattacks. This fight is
+  where a queued turn meets a break about once a run, and
+  `battle_brokendeath` asserts no script runs on it.
 
 - **Telegraph:** Ifrit inhales and the air shimmers → **Fire 2**;
   Shiva does the same with **Ice 2**. Whichever one is on the field

@@ -229,7 +229,13 @@ ExecAction:
         ; Ot6BoostPriceFor carries (mp-economy.md, ruling 1).  The number to
         ; remove is the one that was never a cost.
         stz     $3a4c       ; an action that was never staged costs nothing
-        lda     $32cc,x     ; command list pointer
+        jsl     Ot6BrokenTurn   ; ot6: was `lda $32cc,x` (command list
+                            ;   pointer).  A Broken monster's command list is
+                            ;   emptied here and $ff handed back, so a turn
+                            ;   it queued before it broke takes the branch
+                            ;   below exactly as a removed action does: no
+                            ;   AI script, no command, the gauge reset at
+                            ;   @01b7 (#291; see Ot6BrokenTurn)
         bmi     @0183       ; branch if not valid
         asl
         tay
@@ -2797,12 +2803,10 @@ gaugefull:
 @11aa:  lda     #$ff
         sta     $322c,x     ; disable advance wait
         jsr     _c24e77       ; add action to queue
-                            ; (a broken monster's script turn is load-bearing
-                            ;   for scripted fights: KEFKA's retreat script
-                            ;   rides his own turn, queued or fresh, so a
-                            ;   broken Kefka silenced either way is a battle
-                            ;   that never ends.  DISPATCH is left running on
-                            ;   purpose here, and that is the equilibrium.)
+                            ; (queued even for a Broken monster: the turn is
+                            ;   refused where it would run, Ot6BrokenTurn at
+                            ;   ExecAction, which consumes it the way vanilla
+                            ;   consumes a removed action (#291))
         lda     #$20
 
 SetFlag0:

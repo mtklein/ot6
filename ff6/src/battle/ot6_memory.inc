@@ -363,5 +363,20 @@ OT6_WEAPSPELL        := $eda0
 .assert OT6_WEAPSPELL = OT6_HPMARK + 8, error, "the weapon-spell flag must follow the hurt line without a gap"
 .assert OT6_WEAPSPELL <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
+; a boosted Dance multiplies every step of that dance (#294).  One byte per
+; character, stride 2, indexed by the entity offset (0/2/4/6) like
+; OT6_RUNICTURNS; odd bytes unused.  Ot6DanceStartGate records the dancer's
+; pending boost here on the dance's start turn (the DANCE status is still
+; clear then), before Ot6ActionEnd spends the pips at the end of that turn;
+; Ot6BoostLevel hands it to Ot6BoostDmg on every dance step after, whose own
+; turns carry no pending boost because a dancer never opens a menu.  The
+; OT6_RAGETIER shape at per-character range (Mog and a Gogo can both dance):
+; read only while the DANCE status is set and the queued command is Dance,
+; and the one writer of that status (Cmd_13's start) always records first,
+; so a stale byte is never read and InitBP need not clear it.
+OT6_DANCETIER        := $eda1   ; 8 bytes (4 characters, stride 2)
+.assert OT6_DANCETIER = OT6_WEAPSPELL + 1, error, "the dance tier must follow the weapon-spell flag without a gap"
+.assert OT6_DANCETIER + 8 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+
 
 .endif

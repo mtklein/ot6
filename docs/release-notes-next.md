@@ -19,3 +19,16 @@ and breaking the Dante stops its confusing counter. The four Tentacles in
 the engine room have five shields each and absorb fire, ice or lightning
 between them, so blades, fists and Edgar's crossbow break them, not
 spells.
+
+**A monster you break loses the turn it was about to take.** When a
+monster's turn was already lined up and you broke it just before it
+acted, it used to take that turn anyway, attack and all. Now it loses
+that turn too: a broken monster gets no turns until its shields come
+back.
+
+**A boosted Dance stays boosted for the whole dance.** Boosting Mog's
+Dance used to multiply only its first step; every step after that hit
+for normal damage, although the boost's pips and MP had been paid. Now
+every step of that dance hits for the boosted amount (x2, x4 or x8)
+until the dance ends. The price is unchanged, paid once when the dance
+starts.
