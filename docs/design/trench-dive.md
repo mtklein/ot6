@@ -152,7 +152,9 @@ v0.18 shipped produces **11 deaths and 2 wipes on seed 0**, against today's
 12 and 2, on a run that also takes all three dive attempts. The three
 commits the coordinator named are not what did this.
 
-The `-D OT6_BOOST_PRICE=0` control is a different ROM, so every later RNG
+The `-D OT6_BOOST_PRICE=0` control (the flag is retired since e6323c3d,
+"Retire the OT6_BOOST_PRICE flag"; these runs are the record) is a
+different ROM, so every later RNG
 consumer moves and its seed-0 timeline is its own (9 deaths, 1 wipe, 2
 attempts). It is not cleaner than the shipped economy by any margin worth
 reading, and it is not the axis.
