@@ -1596,6 +1596,95 @@ Tonic 5; SERAPHIM held; 203,243 GP.
 
 ---
 
+## 12. The Black Drgn on the sand, played (#300)
+
+Played 2026-09-29. Until now §2.3 and §10 kept every walk off the desert
+beside Tzen's door (world group 36), so the Black Drgn was designed
+(§8.2: `4 · slash`) but never fought. `tools/tests/probe_black_drgn.lua`
+cold-Continues a battery that saves at (131,179) and optionally uses up K
+plains encounters first. It then walks onto the sand, the way someone who
+does not know what is there would, and paces a six-step stretch,
+(130,180) <-> (125,179), until formation 195 has been fought once. Every
+battle is fought by the walkers' tactical driver on its defaults, with
+field care after each one; nothing is written. Every battle's open logs
+its RNG key: the seed `$be`, the formation and `$1FA1-$1FA4`, in lib's
+`firstBattleKey` shape. `tools/tests/probe_black_drgn.py` runs the
+variants with `OT6_RETRIES=1` and tallies them. The logs are under
+`build/attempts/wt/black-drgn/`, in `solo-final/`, `solo-sweep/`,
+`pair-final/` and `pair-sweep/`, each with a `tally.txt`.
+
+The pool comes from the ROM: `[drgn] the sand: 65 tiles of group 36 ...;
+pool slot1:194 slot2:195 slot3:194 slot4:195`. Slot odds are
+80/80/80/16, so the dragon is 37.5% of the sand's draws and EarthGuard +
+Peepers x2 is 62.5%.
+
+| arm | runs | draws | dragon won / lost | distinct battle keys | ticks when won | Zombie landed |
+|---|---|---|---|---|---|---|
+| CELES alone, `wor-tzen-door-v1` (L27, Maduin, Blizzard + ThunderBlade on the Genji Glove, Gold Helmet, Gold Armor, Jewel Ring, back row) | 36 | K = 0-11 plains encounters first, shifts 0/23/41 | **34 / 2** | 33 | 2533-3276, median 2719 | 2 (both losses) |
+| the same | 60 | K = 0, shifts 0-59 | **60 / 0** | 35 | 1982-3806, median 2742 | 0 |
+| CELES + SABIN, `wor-sabin-v1` (both L27; SABIN IFRIT, Fire Knuckle x2 on the Genji Glove, Tiger Mask, Power Sash, Black Belt) | 36 | K = 0-11, shifts 0/23/41 | **36 / 0** | 33 | 1227-4661, median 2048 | 1 (SABIN) |
+| the same | 60 | K = 0, shifts 0-59 | **60 / 0** | 60 | 1235-2442, median 2106 | 0 |
+
+Across both arms: **CELES alone won 94 of 96 on the first attempt; the pair
+won 96 of 96.** The solo runs drew 66 distinct keys and the pair runs 90.
+A seed shift that lands on the same `$021e` phase and the same encounter
+counters replays the same fight. The first solo set was rerun on the
+final lab, which only adds logging, and every run ended on the same frame
+(`solo/` against `solo-final/`, and `pair/` against `pair-final/`). No
+dragon fight spent a Fenix Down or a Remedy. Three spent a Potion in
+battle. 23 of the 192 fights dropped a Tent (`tent 10->11`).
+
+**How the two losses happened.** Both drew seed `$14`. Both opened below
+full HP: `battle open ... key be14-g00C3-eFB1F1717; CELES L28 ... HP
+890/1301`, and in `k10_s41`, `HP 1084/1396`. The dragon's first action
+was the first-cycle Sand Storm (`trace f+197 e0 hp 449/1301`). The driver
+then spent CELES's turn on Cure, `no press: Fight at 1 BP lands 0 chip(s)
+against 4 shield(s) ... -- caring`. That gave the dragon time for its
+second-cycle action (`attack BATTLE, SPECIAL, SAND_STORM`, and SPECIAL is
+BonePowder): `trace f+1068 e0 hp 0/1301 st1 $02`, then `[outcome] battle
+$0C3 LOST after 1319 ticks` (`solo-final/k5_s41.log`). The same seed from
+1168/1211 HP was won in 2854 ticks (`solo-sweep/k0_s17`). A won solo fight
+is three boosted Genji Fights. The first one breaks all four shields,
+for example `[outcome] battle $0C3 WON after 2767 ticks ... random
+reward due 1560 a member (char 6 +1560 (due 1560)): paid as due`
+(`solo-final/k0_s0.log`, lowest HP 1143/1211).
+
+**The Zombie in the pair.** In `pair-final/k6_s0` the fight opened at
+1141/1301 and 1157/1225. The Sand Storm hit, CELES spent a turn on a
+party Cure, and BonePowder took SABIN (`trace f+1478 e1 hp 0/1225 st1
+$02`). CELES won alone in 4661 ticks, and SABIN's share was 0 (`char 5
++0`). The field care then planned a Fenix Down, the game refused it,
+and it left him a zombie: `REFUSED by the game: revive char 5 with $F0
+(0/1225 hp, 211/239 mp, status1 02)` and `nothing more can be done: c5
+0/1225 hp: down`. The bag held `revivify=2`.
+
+**What the sand pays.** The dragon pays 1560 XP to each member and 1004
+GP (`gil 222473->223477`; vanilla 780 XP and 502 GP, doubled for a
+random battle). The other 62.5%, EarthGuard + Peepers x2, pays `10 a
+member` in 700-1428 ticks. It also poisons: the field care spent 46
+Antidotes on the 60 sweep EarthGuard fights (`plan: cure poison char 6
+with $F2`), and neither Albrook nor Tzen sells Antidotes. Per 1000 ticks
+of battle, the solo K runs' plains formations paid 400-813 XP and the
+dragon paid 552 (`$0C3` including the two losses). Per sand encounter,
+at 0.375 x 1560 + 0.625 x 10, the sand pays about 590 XP against the
+plains' 1100-1600 a fight. The sand is worth meeting once and not worth
+grinding.
+
+**Recommendation.** The route plays the sand solo, where a person first
+reaches it: on the walk to Tzen's door in `gen_wor_tzen_door`, after the
+second Albrook stop and before the save. It meets the Black Drgn once
+and then carries the avoid set as what the party has learned. The
+measured first-attempt rate there is 94 of 96. Both losses are one
+seed, entered below full HP, and a loss retries the segment. The cost is
+about 1.7 EarthGuard fights (about 1050 ticks each, most of them Poison
+and an Antidote), about 2700 ticks for the dragon, and about 0.2 Potions.
+The party gains 1560 XP and 1004 GP. Meeting it after Sabin instead also
+wins every time. There, though, a Zombie costs SABIN his share, and
+today's field care cannot cure a real BonePowder Zombie, whose HP reads
+0 (the pair-final line above). That arm would need the care fix first.
+
+---
+
 ## Appendix — key addresses
 
 | thing | citation |

@@ -37,7 +37,9 @@ interpreting runs.
 - **Second machine:** an M4 MacBook Air at `ssh air.local` (key auth;
   `eval "$(/opt/homebrew/bin/brew shellenv zsh)"` in non-login shells;
   clean clone at `~/ot6`, which stays on main -- work runs in separate
-  clones under `~/work/`). Send heavy emulator runs there; cap it at about
+  clones under `~/work/`). Agents default to the machine they start on,
+  so each launch prompt names where its batches run: draw-variation sets and
+  chain regeneration on the Air, single checks on the Mac; cap it at about
   6 concurrent emulators (10 cores); run long jobs there under
   `caffeinate -is` so it can't sleep mid-run. live.py's `--peer air.local`
   (in the `ot6-live` launch config) shows its workers on the same page and
