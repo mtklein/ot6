@@ -9,8 +9,8 @@
 -- so one of them reaches ExecAction with its timer running about once a run
 -- (the verdict counts it and asserts no script ran on it).
 --
--- Ot6MayAct (ot6_break.asm) refuses a Broken monster's turn at execution
--- time.  Its one call site is inside CheckRetal (battle_main.asm), and
+-- Ot6MayAct (ot6_break.asm) refuses a Broken monster's counterattack at
+-- execution time.  Its one call site is inside CheckRetal (battle_main.asm), and
 -- CheckRetal is not only the counterattack path: an AI script's
 -- `if_self_dead` block reaches it too, through the `bit $3a56`
 -- died-branch ($3a56 is "characters/monsters that have died",
@@ -43,7 +43,16 @@
 -- entities behind them, so the slot scan below prefers the lowest slot per
 -- species.
 local H = dofile("tools/tests/lib/ot6.lua")
-local L = H.newSeedSweep("battle 70")
+-- Six rungs, not three: an attempt now counts only when it shows BOTH the
+-- mid-break kill and #291's window (a standing monster's queued turn meeting
+-- its break), and the window is a timeline event -- measured in some seed
+-- shifts' first fight and not others (review of bb984713: shifts 7, 33 and
+-- 55 saw none in the fight that ended the old three-rung ladder,
+-- build/attempts/review-battle-fixes-023/).  The property is asserted over
+-- every rung that ran, not only the one that counts.
+local ATTEMPTS = 6
+local L = H.newSeedSweep("battle 70", { attempts = ATTEMPTS })
+local rungs = {}   -- per attempt: { n, windows, scripts, kill } (the verdict's record)
 
 local STATE = "build/states/ifrit_entry.mss.lua"
 local IFRIT, SHIVA = 0x0109, 0x0108
@@ -256,10 +265,31 @@ local function attempt(n)
     }, "battle 70 fought to the script's own ending"),
 
     -- evaluate: this attempt counts as the observation only if a boss died
-    -- with its broken timer running and the break was observed first
+    -- with its broken timer running, the break was observed first, and #291's
+    -- window happened in it (a standing monster's queued turn reached
+    -- ExecAction with its broken timer running).  Every rung's broken-timer
+    -- script turns are recorded for the verdict whether it counts or not.
     H.call(function()
       H.setPad({})
-      if deathFrame and deathTicks ~= 0 and sawBreak[deathSlot] then
+      local upto = deathFrame or H.frame
+      local nWin, nScr = 0, 0
+      for _, r in ipairs(execs) do
+        if r.f >= (startFrame or 0) and r.f <= upto and r.ent >= 0x08
+           and r.ent <= 0x12 and r.ent % 2 == 0 and r.tk ~= 0 then
+          if r.kind == "ExecAction" and r.up then nWin = nWin + 1 end
+          if r.kind == "ExecMonsterAction" then nScr = nScr + 1 end
+        end
+      end
+      local kill = deathFrame and deathTicks ~= 0 and sawBreak[deathSlot]
+      rungs[#rungs + 1] = { n = n, windows = nWin, scripts = nScr,
+                            kill = kill and true or false }
+      H.log(string.format("attempt %d: %d window(s), %d broken-timer script "
+        .. "turn(s) f%d..f%d", n, nWin, nScr, startFrame, upto))
+      if kill and nWin == 0 then
+        H.log(string.format("attempt %d: %s killed mid-break (tk=%d) but no "
+          .. "queued turn met a break in this timeline -- no observation of "
+          .. "#291's window; retrying", n, mname(deathSlot), deathTicks))
+      elseif kill then
         won = { slot = deathSlot, name = mname(deathSlot),
                 deathFrame = deathFrame, deathTicks = deathTicks,
                 breakFrame = sawBreak[deathSlot], endFrame = H.frame,
@@ -342,14 +372,29 @@ H.run({ maxFrames = 250000 }, {
   attempt(1),
   attempt(2),
   attempt(3),
+  attempt(4),
+  attempt(5),
+  attempt(6),
   L.report(),
 
   -- 4. The property under test: a mid-break kill happened, and the
   -- `if_self_dead` script still ran and ended the fight.
   H.call(function()
-    H.assertEq(won ~= nil, true,
-      "a Broken boss was killed mid-break within 3 attempts -- without "
-      .. "that kill this test cannot say anything about the gate")
+    local allScripts, ran = 0, {}
+    for _, r in ipairs(rungs) do
+      allScripts = allScripts + r.scripts
+      ran[#ran + 1] = string.format("%d:%dw/%ds%s", r.n, r.windows, r.scripts,
+        r.kill and "k" or "")
+    end
+    H.log("rungs (attempt:windows/broken scripts, k = mid-break kill): "
+      .. table.concat(ran, " "))
+    H.assertEq(allScripts, 0,
+      "no Broken monster ran its AI script in ANY rung that was fought "
+      .. "(#291: a turn queued before the break is consumed at ExecAction)")
+    H.assertEq(won ~= nil, true, string.format(
+      "a rung within %d attempts showed both a mid-break kill and #291's "
+      .. "window -- without them this test cannot say anything about either "
+      .. "gate", ATTEMPTS))
     H.assertEq(won.breakFrame <= won.deathFrame, true,
       "the break was OBSERVED before the kill: " .. won.name
       .. "'s shields chipped 6 -> 0 by real hits, timer seeded by the engine")

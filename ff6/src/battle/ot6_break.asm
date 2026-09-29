@@ -1383,6 +1383,19 @@ broken: clc
 ; hits are already landing -- and the rest of that turn does not run.
 ;
 ; What this does not touch, on purpose:
+;   * the landing of a Jump already in the air.  A jumping monster
+;     (Dadaluma's `cmd JUMP`, ai_script.asm) runs its command $16 through
+;     ExecAction twice: the first pass takes off (_00e4 sets its $3f2c bit
+;     and queues the advance wait, and _c22188 sets Hide, $3ef9 bit 5), the
+;     second lands (the bit is set, so Cmd_16 runs and clears Hide).  The
+;     landing is the second half of an action that began before the break,
+;     the same case as the rest of a multi-command turn above except that
+;     consuming it would strand the monster Hidden -- untargetable until its
+;     script jumps again.  So a Broken actor whose list head is command $16
+;     with its $3f2c bit set is let through to land.  A take-off is consumed
+;     like any turn.  (An airborne monster is untargetable, so only damage
+;     that needs no target -- a status tick on a weakness -- could break one
+;     mid-jump; the exemption makes that case safe rather than measured.)
 ;   * the counterattack queue.  A Broken monster queues no counter
 ;     (Ot6MayAct), and ExecRetal is also how an `if_self_dead` block runs, so
 ;     a dying Broken boss must reach it (battle_brokendeath).
@@ -1413,6 +1426,22 @@ broken: clc
         php
         shorti
         .i8
+        lda     $32cc,x         ; head of the command list
+        bmi     @empty
+        asl
+        tay
+        lda     $3420,y         ; its command
+        cmp     #$16
+        bne     @next           ; not a Jump: consume the turn
+        longa
+        lda     $3018,x         ; this actor's mask
+        and     $3f2c           ;   in the "jumped, waiting to land" set?
+        shorta
+        beq     @next           ; a take-off: consume it
+        plp                     ; a landing (see the header): let it run
+        ply
+        lda     $32cc,x
+        rtl
 @next:  ldy     $32cc,x         ; head of the command list
         bmi     @empty
         lda     $3184,y         ; next pointer (the last entry points at
