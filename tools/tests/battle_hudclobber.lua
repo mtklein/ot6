@@ -29,21 +29,13 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/moogle_entry.mss.lua"
 local VR, ROM = emu.memType.snesVideoRam, emu.memType.snesPrgRom
 
--- OT6 glyph cells + their rom source
+-- OT6 glyph cells + their rom source: H.ot6FontCells, the one model of what
+-- each OT6 cell must hold.  Re-read every scan, because a monster slot's
+-- shield-count cell holds the tile for that slot's live count (#292).
 local allCells, claimed = {}, {}
 local function findRom()
-  local function findSig(sig)
-    for base = 0x300000, 0x303FF0 do
-      local hit = true
-      for i = 1, 16 do if emu.read(base+i-1, ROM) ~= sig[i] then hit = false break end end
-      if hit then return base end
-    end
-  end
-  local ic = findSig({0x10,0x10,0x30,0x38,0x38,0x3c,0x6c,0x7c,0x6e,0x7e,0xee,0xfe,0x7e,0x7c,0x3c,0x00})
-  local bg = findSig({0x7e,0x00,0x91,0x7e,0xb1,0x7e,0x91,0x7e,0x52,0x3c,0x3c,0x38,0x18,0x00,0x00,0x00})
-  H.assertEq(ic ~= nil and bg ~= nil, true, "OT6 glyph data found in rom")
-  for k,c in ipairs({0xeb,0xec,0xed,0x64,0xef,0xfb,0xfc,0xfd}) do allCells[c]=ic+(k-1)*16; claimed[c]=true end
-  for k=1,16 do local c=emu.read(bg-17+k,ROM); allCells[c]=bg+(k-1)*16; claimed[c]=true end
+  allCells, claimed = {}, {}
+  for c, t in pairs(H.ot6FontCells()) do allCells[c] = t.rom; claimed[c] = true end
   claimed[0xbf]=true                     -- '?' (vanilla's own glyph; a HUD char)
 end
 local function tileClobbered(cell)
@@ -54,6 +46,7 @@ end
 local function fieldBaseW() local r=H.readByte(0x897b); return (r-(r%4))*256 end
 -- (junk cells this frame, whether any OT6 tile is clobbered this frame)
 local function scan()
+  findRom()
   local dirty = {}
   local anyDirty = false
   for c in pairs(allCells) do if tileClobbered(c) then dirty[c]=true; anyDirty=true end end

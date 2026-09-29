@@ -24,14 +24,15 @@
 --      price drawer renders two digits (ListText cmd $02), so 100 prints as
 --      punctuation.
 --
---   4a. the fold still buys something.  Folding is source-agnostic, so a
---      tier is reachable as soon as the base spell is known and 2 BP are
+--   4a. the fold is the only way to a tier.  Folding is source-agnostic, so
+--      a tier is reachable as soon as the base spell is known and 2 BP are
 --      banked, which is a character's second action of their first battle.
 --      Charging the tier's real MP changes affordability, not reachability:
---      the pool has to cover the price.  So for every family whose base
---      spell is learned naturally, the level at which the folded tier first
---      becomes payable must be strictly below the level that tier is
---      learned.
+--      the pool has to cover the price, and the level it first does is
+--      logged.  No tier has a natural learn level to beat (#305: nobody
+--      learns Fire 2 by level; tools/check_spell_grants.py gates every
+--      grant table), and this asserts that for the natural-magic table it
+--      reads.
 --
 --   4b. and MP buys the power: every folded tier costs at least 2x its base
 --      spell.  Stated as a ratio because pools cancel, so no choice of
@@ -127,8 +128,8 @@ H.run({ maxFrames = 20000 }, {
     -- check the helpers return real values before anything depends on them
     H.assertEq(learnLevel(CHAR_TERRA, 0x00), 3,
       "NaturalMagic says Terra learns Fire at 3")
-    H.assertEq(learnLevel(CHAR_TERRA, 0x09), 43,
-      "...and Fire 3 at 43 -- the level folding is measured against")
+    H.assertEq(learnLevel(CHAR_TERRA, 0x30), 18,
+      "...and Life at 18 (a later row, so the reader walks the table)")
     H.assertEq(learnLevel(CHAR_CELES, 0x01), 1,
       "NaturalMagic says Celes learns Ice at 1")
     H.assertEq(learnLevel(CHAR_TERRA, 0x01), nil,
@@ -216,16 +217,17 @@ H.run({ maxFrames = 20000 }, {
               pct(cost, pool(measureWho, tierLv))) or "-",
             pay or 99))
 
-          -- only meaningful where the tier has a real learn level to be
-          -- earlier than.
-          if tierLv and baseLv then
-            checked = checked + 1
-            assert(pay ~= nil and pay < tierLv, string.format(
-              "%s costs %d, first payable at L%d, but %s learns it at L%d. "
-              .. "Folding would then buy NOTHING -- you could only afford the "
-              .. "tier after you already knew it -- which is the failure mode "
-              .. "#64's repricing has to avoid, not cause",
-              name, cost, pay or 99, measureName, tierLv))
+          -- #305: boosting the base spell is the only way to a tier, so
+          -- neither natural-magic list may name one
+          checked = checked + 1
+          H.assertEq(learnLevel(CHAR_TERRA, id), nil, string.format(
+            "%s is no natural spell of Terra's (boost %s to cast it)", name, baseName))
+          H.assertEq(learnLevel(CHAR_CELES, id), nil, string.format(
+            "%s is no natural spell of Celes's (boost %s to cast it)", name, baseName))
+          if baseLv then
+            assert(pay ~= nil, string.format(
+              "%s costs %d, and %s's pool never covers it -- the fold would "
+              .. "buy nothing", name, cost, measureName))
           end
           -- a folded tier must cost at least twice its base, stated as a
           -- ratio rather than a %-of-pool bracket, because pools cancel, so
@@ -241,10 +243,10 @@ H.run({ maxFrames = 20000 }, {
         end
       end
     end
-    assert(checked >= 4, string.format(
-      "only %d families had both a base and a tier learn level -- assertion 4 "
-      .. "must not quietly measure nothing", checked))
-    H.log(string.format("the fold-buys-something check covered %d tiers",
+    assert(checked >= 12, string.format(
+      "only %d tiers were checked -- assertion 4 must cover all twelve "
+      .. "(Fire/Ice/Bolt 2 and 3, Bio, Cure 2 and 3, Life 2, Slow 2, Haste2)",
       checked))
+    H.log(string.format("the no-natural-tier check covered %d tiers", checked))
   end),
 })

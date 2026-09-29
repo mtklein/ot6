@@ -16,38 +16,18 @@ local function whelk()
 end
 
 -- Whole-font correctness: vram $5800-$5fff words (bytes $B000-$BFFF) must
--- be SmallFontGfx (rom C4/7FC0) everywhere except the 24 OT6-claimed cells
--- (8 element icons and 16 hud glyphs), which must equal their bank-F0 data.
--- Derivation mirrors H.glyphCanary (signature scan; cell table precedes
--- the glyph data in rom) so art edits never stale this test.
+-- be SmallFontGfx (rom C4/7FC0) everywhere except the OT6-claimed cells,
+-- which must hold what H.ot6FontCells says (the element icons, the fixed hud
+-- glyphs, and each monster slot's shield-count tile, #292).  The model reads
+-- the ROM's own cell tables by symbol, so art edits never stale this test.
 local SMALLFONT_ROM = H.sym("SmallFontGfx") & 0x3FFFFF  -- headerless-image offset
 local function claimedCells()
   local rom = emu.memType.snesPrgRom
-  local function findSig(sig)
-    -- the scan window reaches past the first 4K, since bank F0 extends
-    -- ahead of the bg glyph table (~$F0109A).
-    for base = 0x300000, 0x303FF0 do
-      local hit = true
-      for i = 1, 16 do
-        if emu.read(base+i-1, rom) ~= sig[i] then hit = false; break end
-      end
-      if hit then return base end
-    end
-    return nil
-  end
-  local icons = findSig({0x10,0x10,0x30,0x38,0x38,0x3c,0x6c,0x7c,
-                         0x6e,0x7e,0xee,0xfe,0x7e,0x7c,0x3c,0x00})
-  local bg    = findSig({0x7e,0x00,0x91,0x7e,0xb1,0x7e,0x91,0x7e,
-                         0x52,0x3c,0x3c,0x38,0x18,0x00,0x00,0x00})
-  H.assertEq(icons ~= nil and bg ~= nil, true, "OT6 glyph data found in rom")
   local claimed, elemIcons = {}, {}
-  local iconCells = {0xeb,0xec,0xed,0x64,0xef,0xfb,0xfc,0xfd}
-  for k, cell in ipairs(iconCells) do
-    claimed[cell] = icons + (k-1)*16
-    elemIcons[cell] = k                  -- 1-based element index, fire..water
-  end
-  for k = 1, 16 do
-    claimed[emu.read(bg - 17 + k, rom)] = bg + (k-1)*16
+  for cell, c in pairs(H.ot6FontCells()) do claimed[cell] = c.rom end
+  local iconCells = H.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
+  for k = 1, 8 do
+    elemIcons[emu.read(iconCells + k - 1, rom)] = k  -- 1-based element index, fire..water
   end
   return claimed, elemIcons
 end

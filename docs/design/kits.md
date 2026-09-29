@@ -354,7 +354,7 @@ walk all 16 slots and a slot cannot be left empty:
 | 22 | Fire 2 | Regen | one boost of Fire casts Fire 2; the slot goes to her life side |
 | 33 | Cure 2 | Remedy | one boost of Cure casts Cure 2; Remedy is the cure line's status half |
 | 43 | Fire 3 | Flare | two boosts of Fire cast Fire 3; Flare is fire's no-element successor (vanilla gives it to Celes at 81) |
-| 49 | Life 2 | Float | one boost of Life casts Life 2; Float is her esper flight, and makes the party earth-proof |
+| 49 | Life 2 | Float | one boost of Life casts Life 2; Float is her esper flight, and lifts its targets out of reach of earth attacks |
 
 `tools/check_spell_grants.py` (build check `spell_grants`) fails the build
 if any natural-magic slot or Esper names a tier.
