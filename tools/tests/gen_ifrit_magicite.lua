@@ -198,7 +198,8 @@ local function ifritAttempt(n)
   local sawBreak, ideathFrame, ideathTicks, sdeathFrame = false, nil, nil, nil
   local hb, ph, giveUp = 0, 0, 0
   local wiped, wipeReq = 0, nil
-  -- tactical=FALSE is load-bearing here (thamlab measured 37.5%->62.5%/
+  -- tactical=FALSE is load-bearing here (the Thamasa lab, probe_thamlab_*,
+  -- deleted in e1eb6313, last versions at 6f8382cb: 37.5%->62.5%/
   -- attempt).  Ifrit & Shiva are a tag-team -- only one sibling is on
   -- stage, and killing EITHER ends the fight -- broken by weapon CLASS
   -- (Shiva = 6 SLASH shields), not element.  The party wears four slash

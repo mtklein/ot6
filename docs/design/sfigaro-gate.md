@@ -27,13 +27,13 @@
 > longer describes the shipped route.  The `GATE`/`clearGate` apparatus it
 > refers to came out of `gen_sfigaro.lua` with the disguise route.
 
-Authored 2026-09-16 from `tools/tests/lab_sfigaro_gate.lua` (the lab; its
+Authored 2026-09-16 from `tools/tests/lab_sfigaro_gate.lua` (deleted in 8d350a73; last version at 68b1cad1) (the lab; its
 header carries the decoded rows), the v0.17 qualification log
 (`build/attempts/baseline-2026-09-16/v017-requal2.log` in the main tree)
 and the 10-seed baseline sweep of `sfigaro_town`.  Every number below is
 quoted from a retained log under `build/attempts/locke-solo-lab/` (the
-batch runner keeps every attempt; `tools/tests/sfigarolab_aggregate.py`
-prints them all).
+batch runner keeps every attempt; `tools/tests/sfigarolab_aggregate.py` (deleted in 8d350a73; last version at 68b1cad1)
+printed them all).
 
 **The `build/attempts/locke-solo-lab/` tree is gone** (#222): it lived in
 the agent worktree this work was done in and went with it.  Every path
@@ -144,8 +144,9 @@ generator-level answer is below.
 
 ## The lab
 
-`tools/tests/lab_sfigaro_gate.lua`, run by `tools/tests/sfigarolab_batch.sh
-<policy> <seeds...>`, aggregated by `tools/tests/sfigarolab_aggregate.py`.
+`tools/tests/lab_sfigaro_gate.lua` (deleted in 8d350a73), run by `tools/tests/sfigarolab_batch.sh
+<policy> <seeds...>` (deleted in 8d350a73; last version at 338328ee), aggregated by
+`tools/tests/sfigarolab_aggregate.py` (deleted in 8d350a73).
 Fixture: `build/states/locke_scenario.mss`, gen_sfigaro's own boot state,
 so an attempt is the generator's opening beat exactly (the kit, the back
 row, the walk, the talk).  The declared spread is 15 seeds (0..56 step 4:
@@ -171,7 +172,7 @@ Policies (none reads hidden state):
 
 ### Results
 
-`python3 tools/tests/sfigarolab_aggregate.py` (n = attempts; seeds = distinct
+`python3 tools/tests/sfigarolab_aggregate.py` (deleted in 8d350a73) (n = attempts; seeds = distinct
 battle seeds drawn; potions/tonics = spent in fights that ended, since a
 wiped fight's bag is never written back; maxraw = the largest damage word
 the engine wrote; lasers = TekLasers that landed):

@@ -10,8 +10,8 @@
 -- 43-row walk to the Potion tripped three times).  The rule's narrow half
 -- is what this suite holds: once the list has hit its end nothing in the
 -- block moves under a DOWN still pressed, and the trip must land 300
--- frames later.  Measured 2026-09-16 with probe_list_scroll.lua on this
--- fixture: the item scroll offset ($8947+actor) moves once per press
+-- frames later.  Measured 2026-09-16 with probe_list_scroll.lua (deleted
+-- in bd50a973; last version at 6346bb5c) on this fixture: the item scroll offset ($8947+actor) moves once per press
 -- through every row, then sits.
 --
 -- A suite cannot expect a red run, so the trip is observed through the
@@ -24,8 +24,7 @@
 -- least the no-effect window.  The verdict of a healthy tree is PASS
 -- attempts=2/2.  A widened exemption shows as attempt 1 pressing DOWN for
 -- PRESS_MAX frames with no trip, a contract failure (no replay): the suite
--- is red at once, naming the widening.  probe_list_scroll.lua stays the
--- hand-run instrument that traces every cell of every list.
+-- is red at once, naming the widening.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local DOOR = "build/states/vargas_entry.mss.lua"
@@ -34,7 +33,8 @@ local ST_CMD, ST_ITEM, ST_SCROLL, ST_ITEM2, ST_TGT = 0x05, 0x0A, 0x17, 0x18, 0x3
 local CMD_ITEM = 0x01
 local ITEM_SCROLL, ITEM_ROW = 0x8947, 0x894F
 local END_QUIET = 200      -- the block still this long = the list's end, logged before the
-                           -- 300-frame trip lands (probe_list_scroll measured 360 to be sure)
+                           -- 300-frame trip lands (probe_list_scroll, deleted in bd50a973,
+                           -- measured 360 to be sure)
 local PRESS_MAX = 4500     -- the item list here walks ~251 rows at 10 frames a press
                            -- (scroll 00 -> FB, measured), then the 300-frame window
 

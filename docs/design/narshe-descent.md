@@ -1,6 +1,6 @@
 # The Narshe descent — EDGAR's 57 MP, and the turns it threw away (#219)
 
-Authored 2026-09-17 from `tools/tests/narshedescentlab.py` (the lab; its
+Authored 2026-09-17 from `tools/tests/narshedescentlab.py` (deleted in 07ca5f4e; last version at c90e4931) (the lab; its
 docstring carries the policies), the v0.18 tree's failing
 `build/states/narshe_battle.log`, and a 12-seed spread of
 `gen_narshe_battle` over four policies — three cuts of the generator's own
@@ -8,7 +8,8 @@ fighter on the shipped ROM, and one on a pre-#219 control ROM assembled
 from the same sources. Every number below is quoted from a retained log
 under `build/lab/narshe-descent/` — the lab keeps every attempt, failures
 included. `python3 tools/tests/narshedescentlab.py aggregate control priced
-ration preprice --seeds 0,5,10,15,20,25,30,35,40,45,50,55` prints them all;
+ration preprice --seeds 0,5,10,15,20,25,30,35,40,45,50,55` printed them all
+(the lab was deleted in 07ca5f4e);
 `build/lab/narshe-descent/aggregate.txt` is that output,
 `build/lab/narshe-descent/sweep.txt` the run's own,
 and `build/lab/narshe-descent/tables-seed00.txt` the four per-battle tables
@@ -91,7 +92,7 @@ every third turn. **57 MP is two of those.**
 
 ### Per battle, control seed 0
 
-`python3 tools/tests/narshedescentlab.py table build/lab/narshe-descent/control/seed00.log`
+`python3 tools/tests/narshedescentlab.py table build/lab/narshe-descent/control/seed00.log` (deleted in 07ca5f4e)
 (`mp_sp` = MP the party spent in the fight, `fizz` = turns under a costed
 verb that neither spent MP nor moved a monster, `mp_end` = TERRA, EDGAR,
 CELES at the last live frame):
@@ -213,7 +214,9 @@ The four policies, all on the same fixture and the same 12 shifts:
 - **preprice** — `control`'s fighter on a control ROM assembled from the
   same sources with `-D OT6_BOOST_PRICE=0`, which makes `Ot6BoostPriceFor`
   return the base at every level: every base price still charged, a boost
-  free again. **The pre-#219 economy**, and the "before".
+  free again. **The pre-#219 economy**, and the "before". (The flag is
+  retired, e6323c3d "Retire the OT6_BOOST_PRICE flag"; these runs are
+  the record.)
 
 ### Results
 
@@ -393,14 +396,14 @@ three-attempt sweep is what it is for.
 
 ## The lab
 
-`tools/tests/narshedescentlab.py`. Each policy is a derived copy of
+`tools/tests/narshedescentlab.py` (deleted in 07ca5f4e). Each policy is a derived copy of
 `gen_narshe_battle.lua` — the generator verbatim, plus two read-only CPU
 exec observers and one settled per-battle line, plus the policy's own
 `seqFor` body — run once per seed under `run.sh` with retries off and
 `OT6_SEED_SHIFT` idle frames at the boot point. Every substitution asserts
 it matched exactly once.
 
-The observers are `fcalcovelab`'s in shape: `ExecCmd@battle_code` runs with
+The observers are `fcalcovelab`'s (deleted in 07ca5f4e; last version at 48a26888) in shape: `ExecCmd@battle_code` runs with
 X = the acting entity's offset and `$b5`/`$b6` the command and attack after
 queue-time folding, and parks the actor's MP (`$3c08+x`), banked BP
 (`$3e9c+x`), revealed boost (`$3e9d+x`) and every monster's HP;
@@ -410,14 +413,16 @@ because the insufficient-MP path aborts *inside* `ExecCmd` and returns to
 observer still fires and reports the same MP and no damage. They read, they
 never write.
 
-`narshedescentlab.py rom` builds the pre-#219 control: the battle module
+`narshedescentlab.py rom` (deleted in 07ca5f4e) built the pre-#219 control: the battle module
 reassembled with `-D OT6_BOOST_PRICE=0` and linked through the graph's own
 `link_rom.sh` recipe against the graph's own objects, checked byte-distinct
 from `build/ot6.sfc`. The run arm points **both** `OT6_ROM` and the new
 `OT6_DBG` at it — the flag adds a byte inside `Ot6BoostPriceFor` and so
 moves every label after it, and an observer hooked at the shipped ROM's
-`SaveForMimic` would be hooked at nothing. `OT6_BOOST_PRICE` is a
-measurement control; nothing in the ninja graph ships it.
+`SaveForMimic` would be hooked at nothing. `OT6_BOOST_PRICE` was a
+measurement control nothing in the ninja graph shipped; it is retired
+(e6323c3d, "Retire the OT6_BOOST_PRICE flag"), so this control can no
+longer be built from the tree.
 
 Per-battle attribution is action-granular with one frame of slack at each
 boundary, the blind spot `balance-metrics.md` already documents: MP and

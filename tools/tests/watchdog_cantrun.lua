@@ -11,7 +11,8 @@
 -- the formation cannot be run from ($B1 bit 1 or $2F4B bit 0) the press is
 -- unanswered whatever the counters do, and the trip must land.  The Whelk
 -- event fight (battle 64) is that formation: measured 2026-09-16 with
--- probe_noeffect_cantrun.lua, $B1=07 $2F4B=0C, counters ticking under the
+-- probe_noeffect_cantrun.lua (deleted in bd50a973; last version at
+-- 6346bb5c), $B1=07 $2F4B=0C, counters ticking under the
 -- held L+R, "can't run away!!" from the run command itself.
 --
 -- A suite cannot expect a red run, so the trip is observed through the
@@ -23,8 +24,7 @@
 -- verdict of a healthy tree is PASS attempts=2/2.  A widened exemption
 -- shows as attempt 1 holding L+R for HOLD_MAX frames with no trip, which
 -- is a contract failure (no replay): the suite is red at once, naming the
--- widening.  probe_noeffect_cantrun.lua stays the hand-run instrument
--- that prints the cells themselves every 120 frames.
+-- widening.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local STATE = "build/states/whelk_entry.mss.lua"

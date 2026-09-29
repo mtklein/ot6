@@ -372,7 +372,8 @@ H.run({ maxFrames = 3000 }, {
   -- 9. the wipe verdict (#166) on the bytes the old scan misread.  rows are
   -- the four battle seats { actor = $3ed8+2e, present = $3aa0+2e bit 0,
   -- hp = $3bf4+2e, maxhp = $3c1c+2e }; flags is $3ebc.  The rows are
-  -- probe_wipe166's measured ones (2026-09-07).
+  -- probe_wipe166's measured ones (2026-09-07; deleted in bd50a973, last
+  -- version at 998278f3).
   H.call(function()
     local function row(a, hp, mx, hidden)
       return { actor = a, present = a ~= 0xFF and not hidden, hp = hp, maxhp = mx }

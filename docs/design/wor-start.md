@@ -183,7 +183,7 @@ not gate on it: the runner's shifted attempts are the variation.
 
 ## The lab
 
-`tools/tests/fishlab.py` derives `gen_wor_start.lua` once per policy (its
+`tools/tests/fishlab.py` (deleted in 07ca5f4e; last version at ab46b468) derives `gen_wor_start.lua` once per policy (its
 `POLICY` line) and plays it from `wor-island-v1` once per seed shift,
 retries off, keeping every run. Policies (visible cues only: a fish's swim
 speed; never the slowest fish):
@@ -218,7 +218,7 @@ leaders 280-553 too. A first draw (the spawn roll, the RNG index and Cid's
 health after the first feed) is counted once however many shifts drew it,
 and one that went both ways is `mixed` (`fish/fishlab_aggregate.txt`, from
 `python3 tools/tests/fishlab.py aggregate --root
-build/attempts/wt/wor-start/fish`):
+build/attempts/wt/wor-start/fish`; the lab was deleted in 07ca5f4e):
 
 | policy | attempts | recovered | distinct first draws | recovered | lost | mixed |
 |---|---|---|---|---|---|---|
@@ -240,10 +240,10 @@ search-set rates: the policy was picked on these draws.
 separately from its search). Shifts 560-1113 in steps of 7 and 1120-1666 in
 steps of 14, retries off, scored only on the first draws none of the
 search's 90 ever drew (`python3 tools/tests/fishlab.py run --shifts
-560-1113:7 --dir all-heldout all`, then `--shifts 1120-1666:14`, the same
+560-1113:7 --dir all-heldout all`, the lab deleted in 07ca5f4e, then `--shifts 1120-1666:14`, the same
 for `near` and `fastslow`; `python3 tools/tests/fishlab.py heldout --root
 build/attempts/wt/wor-start/fish all-heldout all near fastslow fast wait
-allnear`, `fish/heldout_all.txt`, `fish/heldout_near.txt`,
+allnear` (the lab was deleted in 07ca5f4e), `fish/heldout_all.txt`, `fish/heldout_near.txt`,
 `fish/heldout_fastslow.txt`). The later shifts
 idle longer before the reroll the shift moves, so Cid's health after the
 first feed runs from 130 down to 113, against 139 down to 131 in the

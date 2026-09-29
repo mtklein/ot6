@@ -1,12 +1,13 @@
 # The Floating Continent alcove — SHADOW crosses it naked, in the front row (#221)
 
-Authored 2026-09-17 from `tools/tests/fcalcovelab.py` (the lab; its
+Authored 2026-09-17 from `tools/tests/fcalcovelab.py` (deleted in 07ca5f4e; last version at 48a26888) (the lab; its
 docstring carries the policies), the v0.18 qualification's
 `build/states/fc_alcove.log`, and a 12-seed spread of `gen_fc_alcove` over
 three policies (plus a 6-seed fourth). Every number below is quoted from a
 retained log under `build/lab/fc-alcove/` — the lab keeps every attempt,
 failures included. `python3 tools/tests/fcalcovelab.py aggregate control
-back dressback --seeds 0,5,10,15,20,25,30,35,40,45,50,55` prints them all;
+back dressback --seeds 0,5,10,15,20,25,30,35,40,45,50,55` printed them all
+(the lab was deleted in 07ca5f4e);
 `build/lab/fc-alcove/aggregate.txt` is that output and
 `build/lab/fc-alcove/aggregate-dress.txt` the fourth policy's.
 
@@ -100,7 +101,7 @@ SHADOW,1` with every slot empty — and nothing dresses him until the alcove.
 
 ## The pool, decoded
 
-`python3 tools/tests/fcalcovelab/decode_group112.py` (offline, from
+`python3 tools/tests/fcalcovelab/decode_group112.py` (deleted in 07ca5f4e; last version at f053a3f2) (offline, from
 `battle_monsters.dat` / `monster_prop.dat` / the shipped text tables):
 
 | roll | formation | bodies |
@@ -148,7 +149,7 @@ the back row halves: `battle_main.asm` @3392 skips the halving only when
 
 ## The lab
 
-`tools/tests/fcalcovelab.py`. Each policy is a derived copy of
+`tools/tests/fcalcovelab.py` (deleted in 07ca5f4e). Each policy is a derived copy of
 `gen_fc_alcove.lua` — the generator verbatim, plus the observers, plus the
 policy's own field steps at the landing — run once per seed under `run.sh`
 with the lib's retries OFF (`OT6_RETRIES=1`, so every seed reports its
@@ -349,7 +350,8 @@ counters down and pressing nothing (`lib/ot6.lua`, the #187 block: "The
 engine is about to take the window away ... or never meant to open one, so
 nothing here is a stall"). Measured, that does not hold for Stop:
 `python3 tools/tests/fcalcovelab/stop_stalls.py
-build/lab/fc-alcove/control/seed*.log` (kept as
+build/lab/fc-alcove/control/seed*.log` (deleted in 07ca5f4e; last version at
+f053a3f2; its output kept as
 `build/lab/fc-alcove/stop-stalls-control.txt`) reports **19 Stop landings
 across the 12 control seeds, 11 of which left the party with no plan at all
 for 600+ ticks**. The worst:

@@ -6,7 +6,8 @@
 -- Phantom Forest entrance (178,82) rolls CrassHoppr ($02F, special $4C =
 -- Berserk, its script's SPECIAL on the first line) -- on this boot's
 -- seed the first random lands Berserk on SHADOW as his window opens
--- (probe_statuses.lua, 2026-09-16: `[landed f610] Berserk on entity 1
+-- (probe_statuses.lua, deleted in fe9d1ff7, last version at b4023415;
+-- 2026-09-16: `[landed f610] Berserk on entity 1
 -- INTO ITS OWN OPEN WINDOW: atb=0097 $3AA0=8F menu=01 st=01 actor=1`),
 -- and the second on CYAN.  Before the fix the driver logged `actor=1
 -- char=3 plan=fight` for the berserked SHADOW and lost the plan as

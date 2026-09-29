@@ -15,7 +15,8 @@
 --
 -- The dry lookups at the top mirror the row asserts the generators used to
 -- carry by hand (gen_narshe_mission, gen_sabin_trench, gen_vector_entry,
--- gen_voyage, gen_zozo1_submerge, probe_nikeah_town): the lib reads the
+-- gen_voyage, gen_zozo1_submerge, and probe_nikeah_town, deleted in 895b8e67):
+-- the lib reads the
 -- same bytes, so those callers can drop theirs.
 local H = dofile("tools/tests/lib/ot6.lua")
 

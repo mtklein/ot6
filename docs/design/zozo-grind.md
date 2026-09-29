@@ -1,12 +1,12 @@
 # The Zozo grind — the Iron Fist that casts Stone (#195)
 
-Authored 2026-09-16 from `tools/tests/zozogrindlab.py` (the lab; its
+Authored 2026-09-16 from `tools/tests/zozogrindlab.py` (deleted in 07ca5f4e; last version at c90e4931) (the lab; its
 docstring carries the policies), the v0.17 tree's
 `build/states/zozo_arrival.log` (2026-09-16 14:15, copied to
 `build/lab/zozo-grind/baseline-coordinating-tree.log`) and two 6-seed
 sweeps of `zozo_arrival`, before and after the change.  Every number below
 is quoted from a retained log under `build/lab/zozo-grind/` (the lab keeps
-every attempt; `python3 tools/tests/zozogrindlab.py aggregate` prints them
+every attempt; `python3 tools/tests/zozogrindlab.py aggregate` (deleted in 07ca5f4e) printed them
 all, and `build/lab/zozo-grind/aggregate.txt` is that output).
 
 **The `build/lab/zozo-grind/` tree is gone** (#222): it lived in the agent
@@ -65,7 +65,7 @@ The grind column x=34 (y=99..112) and 158 of the crossing's 177 tiles are
 world battle group 10 (`tools/tests/probe_zozo_zones.lua`, deleted in
 4b257a86 with its last version at 6061e470, read the group per tile the way `CheckBattleWorld` does; the grid is
 `build/lab/zozo-grind/zones.log`, lost with the worktree).  Group 10,
-decoded by `tools/tests/zozogrindlab/decode_group10.py`:
+decoded by `tools/tests/zozogrindlab/decode_group10.py` (deleted in 07ca5f4e; last version at 6061e470):
 
 | roll | formation | bodies |
 |---|---|---|
@@ -162,8 +162,8 @@ the "nobody" deaths are Stone's too.
 
 ## The lab
 
-`tools/tests/zozogrindlab.py`.  **Fixture**: `build/states/zozogrind_landing.mss`,
-baked by `zozogrindlab.py bake` — the generator itself with a `saveState`
+`tools/tests/zozogrindlab.py` (deleted in 07ca5f4e).  **Fixture**: `build/states/zozogrind_landing.mss`,
+baked by `zozogrindlab.py bake` (deleted in 07ca5f4e) — the generator itself with a `saveState`
 after "west landing" (`build/lab/zozo-grind/bake/bake.log`, lost with the
 worktree: boots `figaro_submerged.mss.lua`, plays the castle exit,
 `[west landing] c1 L13 xp=6831 314/314 hp ... | gil=12501 tonic=99
@@ -199,7 +199,7 @@ Policies (a person's levers):
 
 ### Results
 
-`python3 tools/tests/zozogrindlab.py aggregate` (n = attempts; done =
+`python3 tools/tests/zozogrindlab.py aggregate` (deleted in 07ca5f4e) (n = attempts; done =
 reached "grind done"; fenix = Fenix Downs resolved, care + battle; wipe =
 canary wipes; frames = mean over done attempts, from the landing fixture;
 laps = mean x=34 laps + gentle laps; stone = Stone casts; kills = members
@@ -328,7 +328,7 @@ not because that branch was proven.
 
 ## #194: the deaths holding BP
 
-`tools/tests/zozogrindlab/banked_deaths.py` prints, for every death holding
+`tools/tests/zozogrindlab/banked_deaths.py` (deleted in 07ca5f4e; last version at dea94e46) printed, for every death holding
 BP, the battle's status lines once the member's HP sat inside their
 measured round cost and every line naming that actor
 (`build/lab/zozo-grind/banked-sweep.txt`, lost with the worktree).  The

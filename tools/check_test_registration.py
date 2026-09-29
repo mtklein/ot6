@@ -64,7 +64,7 @@ def selftest() -> int:
     check("probe16 (no underscore) is exempt", is_exempt("probe16.lua"), True)
     check("shot_ is exempt", is_exempt("shot_mines.lua"), True)
     check("a battle_ test is NOT exempt", is_exempt("battle_break.lua"), False)
-    check("an instrument is NOT exempt", is_exempt("whelkbal_tek.lua"), False)
+    check("an instrument is NOT exempt", is_exempt("metrics_battle.lua"), False)
 
     # The marker must be a real comment line, not a mention in prose.
     check("bare @suite line declares", declares_itself("-- @suite slow\ncode"),
@@ -76,7 +76,7 @@ def selftest() -> int:
     check("prose mention does NOT declare",
           declares_itself("-- run this like a @suite member by hand"), False)
     check("no marker does not declare",
-          declares_itself("-- whelkbal_tek.lua -- an instrument\nlocal H"),
+          declares_itself("-- metrics_battle.lua -- an instrument\nlocal H"),
           False)
 
     print("check_test_registration selftest: " + ("ok" if ok else "FAILED"))
@@ -100,10 +100,10 @@ def main() -> int:
         print("\nEach must open with one of:\n"
               "  -- @suite [savestate=<fixture>] [slow]   (a pass/fail member "
               "the suite runs)\n"
-              "  -- @manual <why it is run by hand>       (a deliberate "
-              "instrument, off the gate)\n"
+              "  -- @manual <why it is run by hand>       (an instrument: "
+              "build/checks/instruments.ok composes and starts it)\n"
               "A file with neither is invisible: it can fail on main and "
-              "nobody notices (#78, whelkbal_tek).")
+              "nobody notices (#78: whelkbal_tek, deleted in 7f79dd93).")
         return 1
     print("test registration: every non-exempt tools/tests file declares "
           "@suite or @manual")

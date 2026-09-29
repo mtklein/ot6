@@ -169,7 +169,8 @@ end
 -- (the seeded narshe-mission-v1 boots tonic=0 potion=0).  Same threshold
 -- as #210's: 3/4 of the band for Tonics, the L25 Potion band (38) for
 -- Potions.  Nikeah (shop 15: Tonic, Potion, Fenix Down) coordinates are
--- probe_tonic_airship's: land on (116,61), world (117,61) -> town 169
+-- probe_tonic_airship's (deleted in 895b8e67; last version at 437e9105):
+-- land on (116,61), world (117,61) -> town 169
 -- (1,35), the keeper at (24,39), the x=0 column back out onto (116,61).
 local TONIC, POTION, FENIX = 0xE8, 0xE9, 0xF0
 local ANTIDOTE, REMEDY = 0xF2, 0xF5

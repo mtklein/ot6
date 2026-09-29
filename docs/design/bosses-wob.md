@@ -359,7 +359,7 @@ whatever the walk cost it.
 **Absorbs:** water.
 
 Decoded, not recalled (`monster_prop.dat` row `$155`, 32 bytes at
-`+$2AA0`, ROM `$CF2AA0`; `tools/tests/lab_rizopas_template.lua` header):
+`+$2AA0`, ROM `$CF2AA0`; `tools/tests/lab_rizopas_template.lua` (deleted in 8d350a73; last version at 182bc361) header):
 `28 0e 64 00 00 6e af 03 07 03 27 00 00 00 00 00 0d e0 00 cd e6 09 00 80
 00 04 ff 00 00 01 00 20` — speed 40, attack 14, hit 100, evade 0,
 m.block 0, defense 110, m.def 175, m.pow 3, **HP 775**, MP 39, level 13;
@@ -384,7 +384,7 @@ the school and surfaces MONSTER_6 from the water: **the wave is a
 fixed-length tax**, ~4,450-5,500 frames in every attempt logged
 (`t_surface` in the `[result]` lines), whatever the party does.
 
-**What the party carries** (`lab_rizopas_bake.lua`, read at the falls):
+**What the party carries** (`lab_rizopas_bake.lua` (deleted in 8d350a73; last version at 182bc361), read at the falls):
 CYAN L14, 358 HP, Ashura `$2B` (katana: slash), Heavy Shld, Leather Hat,
 LeatherArmor, no relics, SwdTech `$07` = Dispatch/Retort/Slash. SABIN
 L14, 363 HP, MetalKnuckle `$53` (claw: slash on Fight; Pummel and Suplex
@@ -420,9 +420,9 @@ hp=0 (-552) sh=0 (-1) brk=16` — **dead in one action, 645 frames after
 surfacing**. Pummel (2 bludgeoning hits) chips less than a boosted Fight
 and costs Blitz MP; Dispatch is one slash and is not in the driver.
 
-**Policy × seed** (`tools/tests/rizopaslab_batch.sh`, aggregate by
-`rizopaslab_aggregate.py`, per-run digests by `rizopaslab_actions.py`;
-the fixture is `falls_prejump.mss` from `lab_rizopas_bake.lua`, the
+**Policy × seed** (`tools/tests/rizopaslab_batch.sh` (deleted in 8d350a73; last version at 338328ee), aggregate by
+`rizopaslab_aggregate.py` (deleted in 8d350a73; last version at 2e305abc), per-run digests by `rizopaslab_actions.py` (deleted in 8d350a73; last version at 432944a7);
+the fixture is `falls_prejump.mss` from `lab_rizopas_bake.lua` (deleted in 8d350a73), the
 generator's own walk; seeds are what InitBattle drew, `$be` at the store;
 the seed knob is a stand on the jump row plus an exact-frame delay at
 "Jump?" — the walk quantizes a plain idle, so twelve idles drew nine
@@ -471,7 +471,7 @@ hunting `$E4` and the gen path's `$18`: `$C0` won 1539 1Po, `$E0` won
 3224 2Po 1d, `$08` won 4768 2Po 5To — the last two are the
 qualification's shape (a member down, the other soloing on the bag).
 `$18` itself, the seed the generator's own path drew in this tree
-(`lab_rizopas_bake.lua`: `store seed=$18`), was not landed by any prompt
+(`lab_rizopas_bake.lua` (deleted in 8d350a73): `store seed=$18`), was not landed by any prompt
 tried (35, 36 and 37 drew `$14`, 38 and 39 `$28` — the knob steps over
 phase 6); the
 qualification run's actual seed is unrecorded (the gen never logged
@@ -970,7 +970,7 @@ collapse, under the 6:00 escape clock.
 **Absorbs:** fire · **Opens with REFLECT and FLOAT.**
 
 Decoded, not recalled (`monster_prop.dat` row `$118`, 32 bytes at
-`+$2300`, ROM `$CF2300`; `tools/tests/lab_nerapa_template.lua` header):
+`+$2300`, ROM `$CF2300`; `tools/tests/lab_nerapa_template.lua` (deleted in 8d350a73; last version at 182bc361) header):
 speed 48, attack 11, hit 100, evade 0, m.block 0, defense 105, m.def 150,
 m.pow 10, **HP 2800**, MP 280, level 26; absorb `$01` fire; null `$D8`
 poison|wind|earth|water; weak `$26` ice|bolt|holy. `Ot6ShieldTbl`
@@ -993,8 +993,8 @@ overflow of that character; at 1 it casts Doom (`:15296-15303`).
 Measured onsets: slot 0 at t≈650-750, then one slot every ~280 frames,
 counts 31-55; the first Doom lands at t≈5,400-7,000.
 
-**The fight as measured** (`lab_nerapa_template.lua`, doorstep fixture
-from `lab_nerapa_bake.lua`, TERRA L26 / LOCKE L29 / EDGAR L27 / CELES
+**The fight as measured** (`lab_nerapa_template.lua` (deleted in 8d350a73), doorstep fixture
+from `lab_nerapa_bake.lua` (deleted in 8d350a73; last version at 6d5e6307), TERRA L26 / LOCKE L29 / EDGAR L27 / CELES
 L23, doorstep at 3:50). Nerapa's opening costs the clock **~1,350
 frames** (dialogue 232, four Condemned casts of ~270) before any party
 action resolves. The engine writes an action's result one frame after
@@ -1030,8 +1030,8 @@ counts toward Roulette, but the fight is over by the second Fight. The
 telegraph line the earlier draft claimed ("it gathers the curse again")
 is not in the script; the Condemned cast is once.
 
-**Policy × seed** (`tools/tests/nerapalab_batch.sh`, aggregate by
-`nerapalab_aggregate.py`; seeds are what InitBattle drew, `$be`; a
+**Policy × seed** (`tools/tests/nerapalab_batch.sh` (deleted in 8d350a73; last version at 338328ee), aggregate by
+`nerapalab_aggregate.py` (deleted in 8d350a73; last version at 7ab4eca8); seeds are what InitBattle drew, `$be`; a
 repeated seed is a replicate and is not counted twice; `won_late` = Nerapa
 fell with under 900 frames of clock, gen_fc_escape's margin — the escape
 is still lost). Every attempt is retained under `build/nerapalab/`.

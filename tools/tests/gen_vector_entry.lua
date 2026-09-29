@@ -262,7 +262,8 @@ H.run({ maxFrames = 160000 }, {
   -- minecart-platform-v1), so the field care of the whole Vector stretch
   -- came out of the Potion stack.  No Tonic counter is reachable before the
   -- factory escape: Albrook's 24 and Vector sell none, and the Blackjack
-  -- does not fly yet (probe_tonic_airship: _caf532 returns at the wheel).
+  -- does not fly yet (probe_tonic_airship, deleted in 895b8e67: _caf532
+  -- returns at the wheel).
   -- So the Potion target covers it (owner, #176): the band at L21 (32) plus
   -- the stretch's measured spend, 37 -> 20 = 17, is 49; 50.
   H.call(function()

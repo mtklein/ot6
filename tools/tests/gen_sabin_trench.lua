@@ -408,7 +408,8 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
   -- The last Potion shop before the reunion: the Terra scenario never walks
   -- a town with control (its Narshe arrival is the isolated clifftop ledge,
   -- Arvis's front door lies past the reunion trigger, and the map-22
-  -- staging boxes the party -- probe_narshe_preshop), so what SABIN's party
+  -- staging boxes the party -- probe_narshe_preshop, deleted in 895b8e67;
+  -- last version at 07e6dadf), so what SABIN's party
   -- buys here is the bag TERRA's party and the Battle for Narshe carry.
   -- Shop 15, the counter NPC at (24,39) on Nikeah's town map 169 (_ca8f4a
   -- opens 15 while $00A4 is clear, which it is), rows TONIC 0 / POTION 1 /
@@ -436,12 +437,14 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
   settle(169, "Nikeah town", 3000),
   H.saveState("_scratch_nikeah169.mss"),   -- cheap re-entry for route iteration
   -- The passability model reads nothing useful for a while after the map
-  -- load (probe_nikeah_town: bfs finds no path at all at +20 and at +150
+  -- load (probe_nikeah_town, deleted in 895b8e67; last version at ad7a0104:
+  -- bfs finds no path at all at +20 and at +150
   -- frames, and a 44-step path to the counter's talk tile at +300/+400),
   -- and shopTalk caches its staging pick on the first survey, so let the
   -- town settle before pathfinding.  A fixed settle is not enough: the
   -- town's walkers cross the one street to the counter, so the talk tile
-  -- (24,41) reads reachable or not by the frame (probe_nikeah_town2 off
+  -- (24,41) reads reachable or not by the frame (probe_nikeah_town2,
+  -- deleted in 895b8e67, last version at f8ec607e, off
   -- this generator's library-fighter dive: bfs 32 at +0, none at +100, 44
   -- at +200, none at +400, then 32..44 to +1000), and the 400-frame settle
   -- landed on a blocked frame -- shopTalk cached the (24,40) counter-tile

@@ -544,7 +544,8 @@ end
 -- needing that extra live-measurement step.
 local function loreOfferedA(id) return H.readByte(TBL_306A_A + id) == id + 0x8B end
 -- The battle lore window is POSITIONAL by lore id: one row per id, with
--- unlearned/unoffered ids rendering as empty rows (thamlab, measured:
+-- unlearned/unoffered ids rendering as empty rows (the Thamasa lab,
+-- probe_thamlab_*, deleted in e1eb6313, last versions at 6f8382cb; measured:
 -- learned {3,7,20} -> Aqua Rake (id 3) renders on row index 3; the old
 -- compacted-count model computed row 0, and the driver A-tapped the empty
 -- first row for ~61k frames -- the stall the owner watched twice).
@@ -662,7 +663,8 @@ local function newAmbushPlan(tag)
         -- across episodes): up/down only -- left/right switch target
         -- GROUPS in this pincer formation; single 2-frame taps with a
         -- long dwell, because battle d-pad input is auto-repeat, not
-        -- edge, driven.  (thamlab, measured: the old blind rotation's
+        -- edge, driven.  (the Thamasa lab, deleted in e1eb6313, measured: the
+        -- old blind rotation's
         -- first press exiled the cursor into a monster group and the
         -- 240-spin blind A fed Fenix Downs to a Balloon -- eight ~1740-
         -- frame whiff episodes on one seed; this steer confirms in ~35
@@ -961,7 +963,8 @@ local L79 = H.newSeedSweep("FlameEater (battle 79)", { attempts = 5 })
 local feBlob, feWon = nil, false
 
 local function flameEaterAttempt(n)
-  -- The nuke repertoire is what wins this board (thamlab, 8-seed protocol
+  -- The nuke repertoire is what wins this board (the Thamasa lab, deleted
+  -- in e1eb6313, last versions at 6f8382cb; 8-seed protocol
   -- at the routed levels: libnuke 5/8 with its win set strictly
   -- containing the plain driver's 3/8; at healthy levels 3 of its wins
   -- are 0-death 0-item).  TERRA/LOCKE lead boosted Ice (the fold pays the

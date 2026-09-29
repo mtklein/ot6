@@ -42,7 +42,7 @@ M.FLEE_CAP = 1800
 -- InitParty sets only for an actor who is IN the party -- never a head
 -- count of $1850.  The old scan counted every slot with a plausible max HP
 -- and compared against $1850's count.  Measured (probe_wipe166.lua,
--- 2026-09-07): a Veldt random from falls_done seats SABIN and CYAN in 0/1
+-- 2026-09-07; deleted in bd50a973, last version at 998278f3): a Veldt random from falls_done seats SABIN and CYAN in 0/1
 -- and, in seat 2, actor 11 -- GAU, the formation's hidden character AI,
 -- 394/394 HP, present bit clear, absent from the engine's alive mask
 -- ($3a74=$03) -- so the real two-character wipe read [0/363 0/358 394/394
@@ -134,14 +134,16 @@ end
 -- is monster_prop +19 bit 0, which adds 6 instead of 2 to $3a3b.  So the
 -- 15609 comment "clear can't run flag and harder to run flag" for #$06
 -- does not mean bit 1 is the soft one, and CANT_RUN stays $02.
--- Measured (probe_flee_world.lua, camp_escaped, two world-map randoms):
+-- Measured (probe_flee_world.lua, deleted in bd50a973, last version at
+-- e1118e01; camp_escaped, two world-map randoms):
 -- $b1 read 00, L+R was held from battle frame 3, $2f45 went 1, $3a38
 -- flagged "a character just ran away" at frames 243 and 371, and both
 -- fights ended with the party gone and the monsters alive.  On the FC
 -- escape map 393 the one formation is Naughty ($169, +19 = $8D: bit 3
 -- no-run AND bit 0 harder-to-run), so $b1 reads $06 from frame 3 and the
 -- helper's refusal there was the engine's own answer, not a wrong bit;
--- Vargas ($3c88 = $DD) refuses the same way (probe_flee_boss.lua).
+-- Vargas ($3c88 = $DD) refuses the same way (probe_flee_boss.lua, deleted
+-- in bd50a973, last version at e1118e01).
 -- The formation flag $2f4b bit 0 is a refusal as well: btlgfx escape_set
 -- never raises $2f45 while it is up, so holding L+R there is the cap's
 -- worth of free damage (asm-derived; no fixture on the route carries it).
@@ -523,7 +525,8 @@ function M.navTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
   -- The walk budget pays for WALKING.  A mid-walk battle's frames are the
-  -- battle's own cost: measured (thamlab deadboard probe, the P5 Fire Rod
+  -- battle's own cost: measured (the Thamasa lab's deadboard probe,
+  -- deleted in e1eb6313, last versions at 6f8382cb; the P5 Fire Rod
   -- spur), one 20000-frame walk drew three full Balloon fights -- ~18900
   -- battle frames -- and timed out ~110 frames AFTER the killing blow of
   -- a fight it had already won.  Battle frames and between-battles care
@@ -3343,7 +3346,7 @@ local function careKernel(opts)
     -- frame after it was made by $B5's battle value, the cast plan's
     -- presses walked the battle's Item list, and the close drive's B's
     -- went into the fight for 2400 frames.  (probe_care_race.lua, 2026-09-
-    -- 16: with the care asked for 0..47 frames before the encounter step
+    -- 16, deleted in bd50a973, last version at a30c21ad: with the care asked for 0..47 frames before the encounter step
     -- ends, $26 read $00/$01/$4C/$C0 through the fight's first 400
     -- frames; the 05 is not what a battle always shows, only what one
     -- can.)  So the kernel serves nothing while a battle is up: it logs
@@ -3791,7 +3794,8 @@ function M.newCareDriver(opts)
     n = n + 1
     -- A battle under the stop (#184): every mode below reads menu cells
     -- that are battle RAM once a fight owns the screen.  Measured on the
-    -- world map (probe_care_race.lua, the encounter step ending 0..47
+    -- world map (probe_care_race.lua, deleted in bd50a973; the encounter
+    -- step ending 0..47
     -- frames after the stop starts): the open wait pressed X into the
     -- fight until its 240-frame no-control cap gave the stop up, 378-512
     -- frames with the party idle in the battle; had $26 read 05 there,

@@ -38,7 +38,8 @@ local function partyLine()
   return table.concat(p, " ")
 end
 -- THE FIGHT (3rd pass, the #162 lab -- docs/design/bosses-wob.md §9,
--- tools/tests/lab_rizopas_template.lua): the lib's fight driver, steered
+-- tools/tests/lab_rizopas_template.lua, deleted in 8d350a73; last version
+-- at 182bc361): the lib's fight driver, steered
 -- the way the lab's `bankboss` policy plays and a person does.  Battle
 -- 18 is a fixed-length Piranha wave (~4,500 frames: the school restores
 -- itself until its timer passes 60, then Rizopas surfaces) and then a
@@ -78,7 +79,8 @@ end
 -- sat on the annihilated screen (event PC parked at $CBC0C1, the byte
 -- after `battle 18`; the battle module waits for a press that a
 -- no-control ride never gives) from f18833 to the 39000-frame deadline
--- (probe_falls_wedge.lua: 2 wipes in 24 varied entries, seed $EE, both
+-- (probe_falls_wedge.lua, deleted in 895b8e67; last version at f202b0b5:
+-- 2 wipes in 24 varied entries, seed $EE, both
 -- caught 90 frames after the last HP word hit 0).  The lib's canary now
 -- counts the same wipe as a game over at 300 frames and freezes the pad;
 -- allowGameOver below keeps the run alive for the reload, and the counter

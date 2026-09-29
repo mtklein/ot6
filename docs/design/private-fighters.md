@@ -1,10 +1,10 @@
 # Pressing R is a claim — the private fighters and the boost they could not pay for (#230)
 
-Authored 2026-09-18 from `tools/tests/privatefighterslab.py` (the lab; its
+Authored 2026-09-18 from `tools/tests/privatefighterslab.py` (deleted in 07ca5f4e; last version at 338328ee) (the lab; its
 docstring carries the policies) and a six-seed spread of six generators
 over two policies. Every number below is quoted from a retained log under
 `build/lab/private-fighters/` — the lab keeps every attempt, failures
-included. `python3 tools/tests/privatefighterslab.py aggregate` prints
+included. `python3 tools/tests/privatefighterslab.py aggregate` (deleted in 07ca5f4e) printed
 them all.
 
 This is the class behind [narshe-descent.md](narshe-descent.md), which is
@@ -70,7 +70,7 @@ Two the list did not have:
 | generator | presses R for | needed the change |
 |---|---|---|
 | `gen_thamasa_fire` | TERRA/LOCKE **Ice**, a boosted cast that folds Ice → Ice 2 → Ice 3 | **yes** |
-| `lab_zozo4_j39_snap` | EDGAR Tools, SABIN Pummel (a verbatim copy of `gen_zozo4_dadaluma`'s fighter) | yes (latent) |
+| `lab_zozo4_j39_snap` (deleted in 895b8e67; last version at 182bc361) | EDGAR Tools, SABIN Pummel (a verbatim copy of `gen_zozo4_dadaluma`'s fighter) | yes (latent) |
 
 `gen_thamasa_fire` is the one the list missed and the most interesting of
 them: its `makePlan` *does* check affordability — `spellCellA(actor,
@@ -231,7 +231,7 @@ Two falsifications:
   Dispatch, 4 MP, against a 1 MP pool). The observer reports exactly one,
   and reports none on the same test's charge arm.
 - The Narshe descent's `control` policy on seed 0: the library counted
-  **16**, and `narshedescentlab`'s independent observer — which asks the
+  **16**, and `narshedescentlab`'s (deleted in 07ca5f4e; last version at c90e4931) independent observer — which asks the
   outcome question instead (a costed command that spent no MP and moved no
   monster) — counted **16**. Different predicates, same number, and they
   are the sixteen #228 named.
@@ -311,7 +311,7 @@ fixture, not here.
 
 ## Results
 
-`python3 tools/tests/privatefighterslab.py aggregate`, retained verbatim at
+`python3 tools/tests/privatefighterslab.py aggregate` (deleted in 07ca5f4e), retained verbatim at
 `build/lab/private-fighters/aggregate.txt`; the run's own output is
 `run-v019.txt` and every log is under `<segment>/<policy>/seedNN.log`.
 72 runs, **all 72 PASS**, on the v0.19 ROM.
@@ -415,7 +415,7 @@ why the `[refused]` line exists.
 
 ## The lab
 
-`tools/tests/privatefighterslab.py`, narshedescentlab's shape. Each
+`tools/tests/privatefighterslab.py` (deleted in 07ca5f4e), narshedescentlab's (deleted in 07ca5f4e) shape. Each
 policy is a derived copy of the shipped generator — the generator verbatim
 plus one read-only observer pair, plus (for `control`) the region of the
 fighter being measured replaced by its pre-#230 body. `write` derives,

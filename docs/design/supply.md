@@ -101,7 +101,7 @@ Narshe maps is the lose-path regroup, 34 (25,5)).  EDGAR walks in at 2 of
 (`terra_clifftop`) -- and the bag holds `tincture=0 elixir=2 sleepbag=3
 tent=2`; the bags and Tents are greyed off a save point.  Nothing the
 Terra scenario walks sells a Tincture, and Narshe's own inn and counter
-are behind the reunion trigger (`probe_narshe_preshop`).  The one counter
+are behind the reunion trigger (`probe_narshe_preshop` (deleted in 895b8e67; last version at 07e6dadf)).  The one counter
 before it is Figaro Castle at L5-7: `figaro_entry gil=5338`, and the stop
 spends 1300 on Tonics and 1250 on the two tools, leaving 2788, after which
 `gen_kolts` grinds until the purse covers South Figaro's whole bill (the

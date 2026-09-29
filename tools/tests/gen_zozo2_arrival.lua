@@ -72,8 +72,8 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- the policy --
 -- The levers the Zozo grind lab measured (#195, docs/design/zozo-grind.md;
--- tools/tests/zozogrindlab.py derives one variant per policy by rewriting
--- this table).  Each field is one thing a person at the controller decides.
+-- tools/tests/zozogrindlab.py, deleted in 07ca5f4e, last version at
+-- c90e4931, derived one variant per policy by rewriting this table).  Each field is one thing a person at the controller decides.
 local GRIND = {
   crossingCare = 0.9,    -- the care stop after every crossing hop
   lapCare = 0.6,         -- the care stop after every grind lap

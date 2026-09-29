@@ -3,8 +3,8 @@
 -- interaction before battle 104 (Ultros②, $012d, 6 shields, slash|pierce).
 --
 -- The crossing was rebuilt 2026-08-27 against a catwalk lab (the
--- probe_rafterlab_* instruments; per-experiment seconds instead of full
--- replays), which measured, across four strategies and ~90 runs
+-- probe_rafterlab_* scripts and their runners, deleted in cdd9631f; last
+-- versions at f94ef198; per-experiment seconds instead of full replays), which measured, across four strategies and ~90 runs
 -- (evidence: build/rafterlab/*.log):
 --
 --   * the chase clock $1189 ticks 1/frame INCLUDING inside battles; a
@@ -32,7 +32,8 @@
 -- Re-measured 2026-09-07 on the v0.16 run (issue #160: the
 -- qualification crossed seven times chasing a 6000-frame bar).  35
 -- crossings of this policy from the qualification's own catwalk snapshot
--- -- its 7, plus 28 through tools/tests/rafterlab_batch_gen.sh over holds
+-- -- its 7, plus 28 through tools/tests/rafterlab_batch_gen.sh (deleted in
+-- cdd9631f; last version at aff9dd45) over holds
 -- 0..3000 and the PANIC floor at 6000 and at 3000 (build/rafterlab/) --
 -- every one arrived standing, and:
 --   * the 181 rat fights cost 1648..3296 clock frames each (median 2284)
@@ -54,10 +55,11 @@
 -- Re-measured 2026-09-07 for issue #164 (the max/8 gate banked LOCKE one
 -- boss hit from KO): 12 crossings per policy from the same catwalk snapshot
 -- (timer 14852; holds {0,250,550,900,1300,1750} and {100,400,700,1100,
--- 1500,2200}; tools/tests/rafterlab_batch_gen.sh with RAFTERLAB_DRIVER),
+-- 1500,2200}; rafterlab_batch_gen.sh, deleted in cdd9631f, with RAFTERLAB_DRIVER),
 -- every arrival saved and battle 104 played from it with
 -- gen_opera7_blackjack's own fighter (rafterlab_ultros_gen.sh; the table
--- is rafterlab_arrivals.py over build/rafterlab/):
+-- is rafterlab_arrivals.py over build/rafterlab/; both deleted in
+-- cdd9631f, last versions at aff9dd45 and 41c9da24):
 --   * a crossing replayed from the same approach is exact: two policies
 --     that make the same fight decisions arrive in byte-identical
 --     snapshots, so the policies below are paired per seed;
@@ -182,7 +184,8 @@ end
 -- that reloads and tries again.  `hold` (number or thunk) is that ladder's
 -- arrangement seed: aligned frames to stand still before setting off.
 --
--- The policy is the lab's "dodge-h" (probe_rafterlab_dodge.lua); what it
+-- The policy is the lab's "dodge-h" (probe_rafterlab_dodge.lua, deleted
+-- in cdd9631f; last version at 48a26888); what it
 -- yields on the current run is measured in the header above:
 --   * pulsed walking: every press is released on the first unaligned
 --     frame (a begun 16px step completes on its own); a press held
@@ -212,8 +215,9 @@ end
 --     inside one round of death, because the boss after these fights
 --     opens with a hit of up to 281 on LOCKE (#164, header).
 -- The rat fights' driver options, on one line: tools/tests/
--- rafterlab_batch_gen.sh substitutes it (RAFTERLAB_DRIVER) to measure a
--- candidate policy against the shipped one from the same catwalk snapshot.
+-- rafterlab_batch_gen.sh (deleted in cdd9631f) substituted it
+-- (RAFTERLAB_DRIVER) to measure a candidate policy against the shipped one
+-- from the same catwalk snapshot.
 local RAT_DRIVER = { tactical = true, boost = false, cure = false, items = true, healPercent = 70, cadence = 12 }
 local function crossRafters(tx, ty, maxF, hold, res, what)
   local hb, battN, wipeN, notBattN = 0, 0, 0, 0
@@ -626,7 +630,8 @@ local MIN_CROSS_TIMER = 900
 local HOLDS = { 0, 250, 550, 900, 1300, 1750 }
 -- the all-standing gate: every member above max/ARRIVAL_HP_DIV at (14,7)
 local ARRIVAL_HP_DIV = 8
--- lab only (rafterlab_batch_gen.sh RAFTERLAB_ARRIVALS=1): a prefix here
+-- lab only (rafterlab_batch_gen.sh RAFTERLAB_ARRIVALS=1; deleted in
+-- cdd9631f, last version at aff9dd45): a prefix here
 -- saves every arrival at (14,7), banked or not, as <prefix>arrival_<n>.mss
 -- so the Ultros 2 fight can be measured from each.  nil in the run.
 local LAB_ARRIVAL_PREFIX = nil
