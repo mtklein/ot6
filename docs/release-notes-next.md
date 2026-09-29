@@ -18,3 +18,6 @@ Starlet Cure, Regen and Remedy; Phoenix Life, Life 3, Cure and Fire. A
 save from an earlier version keeps any stronger spell its characters
 already learned, and does not gain the new spell for a level already
 passed.
+
+**The Beginner's House no longer repeats how to use Blitz.** Sabin's first
+battle against Vargas walks you through it, where you first need it.

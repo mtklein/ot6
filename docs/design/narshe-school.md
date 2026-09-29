@@ -69,7 +69,7 @@ the Empire's plates), which players could not follow.
 | Boost Points: 1 at the start, +1 a turn, cap 5; R adds (up to 3), L takes back; no point on a boosted turn | $026D | left (105) |
 | What a boost buys: Fight's extra hits (free); ×2/×4/×8 damage on other skills; MP ×2.5 a point, capped at 99 | $0270 | left (105) |
 | Stronger spells: Fire → Fire 2 → Fire 3 and the other families, at the cast spell's MP; the Magic list previews | $026E | left (105) |
-| Skills that changed: MP on Blitz/Tools/SwdTech/Steal/Dance/Rage; Blitz list; SwdTech rows; Steal/Slot/Rage odds (Steal and Rage certain at 3); Shadow's break kill | $0276 | left (105), far corner |
+| Skills that changed: MP on Blitz/Tools/SwdTech/Steal/Dance/Rage; SwdTech rows; Steal/Slot/Rage odds (Steal and Rage certain at 3); Shadow's break kill | $0276 | left (105), far corner |
 | Runic earns a Boost Point | $026F page 1 | left (105) |
 | Espers: spells only while equipped, stat changes while equipped, no level-up bonuses | $0274 pages 4-5 | hall (the magicite ghost) |
 | A practice fight | $025D page 2 | right (107), beside the monster chest |
@@ -78,8 +78,10 @@ Not taught here (each is shown where it is used, or is a detail of one
 character's menu): Locke's Filch and Bestow (named in his Steal menu),
 the boosted Runic stance, the True Knight cover's Boost Point, the Rage,
 Lore and SwdTech loadout pages in the field menu, and allies the game
-steers spending their points when hurt. Blitz's list is also taught at
-the Vargas fight, where the player first uses it.
+steers spending their points when hurt. Sabin's Blitz list is taught at
+the Vargas fight, where the player first uses it (battle dialog $54-$56 and
+$D4-$D8: choose Blitz, pick from the list, press A), and only there: $0276
+used to repeat it (#301).
 
 The player enters at the bottom-right; the door advisor speaks $0257
 and unlocks the door, and the hall greeter repeats it. There is no forced
@@ -183,10 +185,6 @@ runs past four lines, measured in game (`tools/tests/school.lua`, below).
 >
 > *(next box)*
 >
-> Sabin's Blitz: pick one from a list. There are no button codes.
->
-> *(next box)*
->
 > Cyan's SwdTech: there is no charge gauge. It lists his three best skills, for 1, 2 and 3 Boost Points.
 >
 > *(next box)*
@@ -260,7 +258,7 @@ Every claim was checked against the code (2026-09-28):
   cast tier's own MP (`Ot6QueueFold` → `Ot6SpellMP`), and the Magic
   list's live names and prices (`Ot6PreviewList_ext`, `Ot6FoldPrices`).
 - Skills: prices and greys ([mp-economy.md](mp-economy.md),
-  `Ot6KitConfirmMP`); the Blitz list (`ot6_cmdmenu.asm`); SwdTech's three
+  `Ot6KitConfirmMP`); SwdTech's three
   rows at 1/2/3 BP over Cyan's top three techs (`ot6_bushido.asm`);
   Steal/Slot/Rage odds (`ot6_steal.asm`, `ot6_slot.asm`, `ot6_rage.asm`);
   Shadow's break kill (`ot6_divine.asm`, death-immune targets only
