@@ -7,14 +7,14 @@ boost-point turn economy.
 
 ## Status
 
-v0.21 is the current release
-([tag](https://github.com/mtklein/ot6/releases/tag/v0.21)); Shadow's hit
-that breaks an enemy now kills it outright, and greyed Rage and Bestow
-picks are refused instead of wasting the turn (details in the release
-notes). The game is playable from the start through the end of
+v0.22 is the current release
+([tag](https://github.com/mtklein/ot6/releases/tag/v0.22)); the World of
+Ruin's opening has designed break weaknesses, Gogo's Mimic is always free,
+and the Narshe Beginner's House explains OT6 in plain words (details in the
+release notes). The game is playable from the start through the end of
 the World of Balance: the whole Thamasa arc, the world tour aboard the
 repaired Blackjack, the IAF gauntlet, the Floating Continent and AtmaWeapon,
-and the escape — stopping where the game sets you down in the World of Ruin.
+and the escape — and into the World of Ruin as far as Sabin rejoining in Tzen.
 
 Break and boost are the two central systems. Enemies carry shields and hidden
 weaknesses, hitting a weakness chips a shield, and breaking drops defenses
