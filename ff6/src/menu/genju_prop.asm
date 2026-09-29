@@ -71,10 +71,10 @@ GenjuProp:
 ; correctly never folds).  Every World of Balance stone grants its planned
 ; list: docs/design/magicite.md's roster table, with magicite-ifrit-shiva.md
 ; for Ifrit and Shiva and magicite-tube-six.md for the tube room's six.  The
-; World of Ruin stones have no planned list and keep their vanilla spells,
-; less any higher tier (#305; tools/check_spell_grants.py checks both).  An
-; esper's summon (Cmd_19, battle_main.asm:3703) is not in this table, and is
-; untouched.
+; twelve World of Ruin stones grant the lists in magicite.md's "World of Ruin
+; Espers" table, in the order written there (#327).  No row grants a higher
+; tier (#305); tools/check_spell_grants.py checks both.  An esper's summon
+; (Cmd_19, battle_main.asm:3703) is not in this table, and is untouched.
 ; ------------------------------------------------------------------------------
 
 ; 0: ramuh: base-tier Bolt (folds) + Rasp (MP attack)
@@ -103,8 +103,10 @@ make_genju_prop {ICE, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
 ;   controller job").  Vanilla's Slow and the leftover Fire are not in it.
 make_genju_prop {MUTE, 0}, {SLEEP, 0}, {}, {}, {}
 
-; 4: terrato
-make_genju_prop {QUAKE, 0}, {QUARTR, 0}, {W_WIND, 0}, {}, {}
+; 4: terrato, "the Landslide" (magicite.md's World of Ruin table).  Quake hits
+;   every body on the field that does not float; Quartr is the enemy-only
+;   fraction.  Vanilla's W Wind moves to Bahamut.
+make_genju_prop {QUAKE, 0}, {QUARTR, 0}, {}, {}, {}
 
 ; 5: shoat.  Break + Doom.  BIO is dropped: it is the pre-folded cap of the
 ;   poison family (Ot6FoldTbl row 3, ot6_boost.asm:344, a 26 MP dead tier
@@ -129,34 +131,34 @@ make_genju_prop {HASTE, 0}, {SLOW, 0}, {}, {}, {}
 ;   trickster job").  Vanilla's Float is not in it.
 make_genju_prop {MUDDLE, 0}, {IMP, 0}, {}, {}, {}
 
-; 9: palidor.  No planned list exists (the magicite docs cover the World of
-;   Balance).  The vanilla row less its tiers (#305): Haste2 and Slow 2 are
-;   what one boost of the Haste and Slow it grants casts, so they go and
-;   nothing replaces them.
-make_genju_prop {HASTE, 0}, {SLOW, 0}, {FLOAT, 0}, {}, {}
+; 9: palidor, "the Tailwind".  Float (its own verb) and Slow (folds to Slow 2).
+;   Vanilla's Haste is on three other sources, and Haste2/Slow 2 are tiers.
+make_genju_prop {FLOAT, 0}, {SLOW, 0}, {}, {}, {}
 
-; 10: tritoch.  No planned list exists.  The vanilla FIRE_3/ICE_3/BOLT_3,
-;   each replaced by its family head (#305): two boosts of Fire, Ice or Bolt
-;   cast the third tier.
-make_genju_prop {FIRE, 0}, {ICE, 0}, {BOLT, 0}, {}, {}
+; 10: tritoch, "the second caster".  Ice and Bolt (a second copy of the caster
+;   job for a split party) and Poison in place of Fire; all three fold.
+make_genju_prop {ICE, 0}, {BOLT, 0}, {POISON, 0}, {}, {}
 
-; 11: odin
-make_genju_prop {METEOR, 0}, {}, {}, {}, {}
+; 11: odin, "the Warlord".  Meteor, and Bserk: Odin's berserkers, a fighter's
+;   stone that turns an enemy caster into a brawler.
+make_genju_prop {METEOR, 0}, {BSERK, 0}, {}, {}, {}
 
-; 12: raiden
-make_genju_prop {QUICK, 0}, {}, {}, {}, {}
+; 12: raiden, "the Warlord, ascended".  Raiden replaces Odin (take_genju ODIN,
+;   give_genju RAIDEN), so it keeps Odin's list and adds Quick.
+make_genju_prop {METEOR, 0}, {BSERK, 0}, {QUICK, 0}, {}, {}
 
-; 13: bahamut
-make_genju_prop {FLARE, 0}, {}, {}, {}, {}
+; 13: bahamut, "the Dragon King".  Flare, and W Wind (the wingbeat).
+make_genju_prop {FLARE, 0}, {W_WIND, 0}, {}, {}, {}
 
-; 14: alexandr
-make_genju_prop {PEARL, 0}, {SHELL, 0}, {SAFE, 0}, {DISPEL, 0}, {REMEDY, 0}
+; 14: alexandr, "the Bastion".  Dispel, Safe, Shell.  Vanilla's Pearl and Remedy
+;   are Unicorn's job.
+make_genju_prop {DISPEL, 0}, {SAFE, 0}, {SHELL, 0}, {}, {}
 
-; 15: crusader
+; 15: crusader, "the Capstone".  Merton, Meteor.
 make_genju_prop {MERTON, 0}, {METEOR, 0}, {}, {}, {}
 
-; 16: ragnarok
-make_genju_prop {ULTIMA, 0}, {}, {}, {}, {}
+; 16: ragnarok, "the Last Word".  Ultima to end a fight, or Warp to leave it.
+make_genju_prop {ULTIMA, 0}, {WARP, 0}, {}, {}, {}
 
 ; 17: kirin.  Cure, Regen: the planned list (docs/design/magicite.md's WoB roster table, "the
 ;   medic job").  Cure folds to Cure 2/Cure 3 under boost (Ot6FoldTbl).
@@ -191,17 +193,17 @@ make_genju_prop {SAFE, 0}, {}, {}, {}, {}
 ;   default swing) + Remedy.  CURE_2 dropped (dead pre-folded tier).
 make_genju_prop {PEARL, 0}, {REMEDY, 0}, {}, {}, {}
 
-; 24: fenrir
-make_genju_prop {WARP, 0}, {X_ZONE, 0}, {STOP, 0}, {}, {}
+; 24: fenrir, "the Banisher".  Stop and X-Zone.  Vanilla's Warp moves to
+;   Ragnarok.
+make_genju_prop {STOP, 0}, {X_ZONE, 0}, {}, {}, {}
 
-; 25: starlet.  No planned list exists.  The vanilla row less its tiers
-;   (#305): Cure 2 and Cure 3 are what boosting the Cure it grants casts.
+; 25: starlet, "the second medic".  Cure (folds to Cure 2/Cure 3), Regen,
+;   Remedy: a medic for the second party of a split.
 make_genju_prop {CURE, 0}, {REGEN, 0}, {REMEDY, 0}, {}, {}
 
-; 26: phoenix.  No planned list exists.  The vanilla row with its tiers
-;   removed (#305): Life 2 goes (boosting the Life it grants casts it), and
-;   Cure 3 and Fire 3 are replaced by their family heads.  Life 3 is no tier:
-;   Ot6FoldTbl stops the life family at Life 2.
-make_genju_prop {LIFE, 0}, {LIFE_3, 0}, {CURE, 0}, {FIRE, 0}, {}
+; 26: phoenix, "the Rebirth".  Life, which boosts to Life 2 and Life 3
+;   (Ot6FoldTbl, #327), so Life 2 and Life 3 are tiers and not granted; and
+;   Antdot.
+make_genju_prop {LIFE, 0}, {ANTDOT, 0}, {}, {}, {}
 
 ; ------------------------------------------------------------------------------

@@ -321,8 +321,9 @@ Test: `tools/tests/battle_bushido.lua`.
 
 Vanilla's natural-magic table, trimmed to base tiers with the levels
 compressed so the list completes late-WoB. Vanilla makes her the
-game's only natural raise-learner (Life at 18), which is kept, so revival
-lives on Terra, Fenix Downs, and Sraphim, and nowhere else.
+game's only natural raise-learner (Life at 18), which is kept, so in the
+World of Balance revival lives on Terra, Fenix Downs, and Sraphim, and
+nowhere else. The World of Ruin adds Phoenix's Life (magicite.md, #327).
 
 | # | Spell | Level |
 |---|---|---|

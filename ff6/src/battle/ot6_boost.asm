@@ -965,9 +965,9 @@ done:   pla
 ;
 ; the 0/1/2 clamp, shared by the three sites that need it: queue-time fold,
 ; list preview, and the price walk.  the cap is two tiers because that is
-; where every family's table runs out: Fire 3
-; is the top of the deepest line, and the shallow families (Poison, Life,
-; Slow, Haste) repeat their second entry so a 3-BP spend is never dead.
+; where every family's table runs out: Fire 3, Ice 3, Bolt 3, Cure 3 and
+; Life 3 top the deep lines, and the shallow families (Poison, Slow, Haste)
+; repeat their second entry so a 3-BP spend is never dead.
 ;
 ; in: x = the character's entity offset.  out: A = OT6_SCR_BIT = tier steps
 ; (0-2), Z set when the character has no boost pending.  a8, db=$7e;
@@ -1228,7 +1228,8 @@ done:   pla
 ;
 ; in: A = spell id, x = the caster's entity offset.  out: A = MP cost.
 ; a8/i16, db=$7e; preserves x/y.  Every folded tier in the shipped table
-; fits a byte with room to spare; the most expensive is Life 2 at 60.
+; fits a byte with room to spare; the most expensive are Life 2 and Life 3
+; at 60 (Life 3's 60 is OT6's, battle_main.asm's MagicProp override 6).
 .proc Ot6SpellMP
         .a8
         .i16
@@ -1351,7 +1352,7 @@ Ot6FoldTbl:
         .byte   $02,$07,$0b     ; bolt line
         .byte   $03,$08,$08     ; poison, bio (caps)
         .byte   $2d,$2e,$2f     ; cure line
-        .byte   $30,$31,$31     ; life, life 2 (caps)
+        .byte   $30,$31,$35     ; life, life 2, life 3 (#327)
         .byte   $19,$28,$28     ; slow, slow 2 (caps)
         .byte   $1f,$27,$27     ; haste, haste2 (caps)
 

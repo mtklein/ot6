@@ -7009,7 +7009,7 @@ LoadMagicProp:
 .export MagicProp
 
 ; ------------------------------------------------------------------------------
-; OT6 v0.6: MagicProp is the vanilla blob plus three named byte overrides.
+; OT6 v0.6: MagicProp is the vanilla blob plus named byte overrides.
 ;
 ; Why the splice and not an edited .dat.  magic_prop_en.dat is 256 fixed 14-byte
 ; records with no source form; a byte changed inside it is invisible in a diff,
@@ -7112,12 +7112,30 @@ PUMMEL_POWER_OT6      = 55
 PUMMEL_POWER_VANILLA  = 110             ; the byte this replaces
 BUM_RUSH_POWER_OT6    = 32
 BUM_RUSH_POWER_VANILLA = 128            ; the byte this replaces
+
+; ---- override 6: Life 3 ($35) MP cost, 50 -> 60 (#327) ----------------------
+; Boosting Life twice casts Life 3 (Ot6FoldTbl's life row, ot6_boost.asm), and
+; a folded cast pays its tier's own MagicProp price (Ot6SpellMP).  Vanilla
+; prices Life 3 at 50, under Life 2's 60, so the second boost point would buy
+; a cheaper cast than the first: the discount the fold's pricing exists to
+; close (a boost may not make a family cheaper, and a folded tier costs at
+; least twice its base; battle_foldcost holds both).  60 is the least price
+; that meets both: Life 2's 60, and twice Life's 30.
+;
+; Life 3 is a tier, so no stone and no natural list grants it
+; (tools/check_spell_grants.py); the fold is the only way a player casts it.
+; The monsters whose scripts cast it (ai_script.asm: Madam 900 MP, Magic
+; 10000, L.80 Magic 2800, L.90 Magic 9000, and Rhinox, whose 35 MP paid
+; neither price) keep casting it.
+LIFE3_MP_OT6       = 60
+LIFE3_MP_VANILLA   = 50                 ; the byte this replaces
 ; ------------------------------------------------------------------------------
 
 ; c4/6ac0
 ; byte offsets of the overridden bytes within the blob.  They must stay in
 ; ascending order: the splice below walks the blob once.
 OSMOSE_MP_AT       = ATTACK::OSMOSE   * MAGIC_PROP_REC + 5
+LIFE3_MP_AT        = ATTACK::LIFE_3   * MAGIC_PROP_REC + 5
 DDUST_POWER_AT     = ATTACK::SHIVA    * MAGIC_PROP_REC + 6
 DDUST_STATUS3_AT   = ATTACK::SHIVA    * MAGIC_PROP_REC + 12
 PUMMEL_POWER_AT    = ATTACK::PUMMEL   * MAGIC_PROP_REC + 6
@@ -7129,7 +7147,9 @@ MAGIC_PROP_END     = MAGIC_PROP_COUNT * MAGIC_PROP_REC
 MagicProp:
         .incbin magic_prop_dat, 0, OSMOSE_MP_AT
         .byte   OSMOSE_MP_OT6                           ; $29 +$05 (was 1)
-        .incbin magic_prop_dat, OSMOSE_MP_AT + 1, DDUST_POWER_AT - OSMOSE_MP_AT - 1
+        .incbin magic_prop_dat, OSMOSE_MP_AT + 1, LIFE3_MP_AT - OSMOSE_MP_AT - 1
+        .byte   LIFE3_MP_OT6                            ; $35 +$05 (was 50)
+        .incbin magic_prop_dat, LIFE3_MP_AT + 1, DDUST_POWER_AT - LIFE3_MP_AT - 1
         .byte   DDUST_POWER_OT6                         ; $38 +$06 (was 52)
         .incbin magic_prop_dat, DDUST_POWER_AT + 1, DDUST_STATUS3_AT - DDUST_POWER_AT - 1
         .byte   DDUST_STATUS3_OT6                       ; $38 +$0c (was $00)
