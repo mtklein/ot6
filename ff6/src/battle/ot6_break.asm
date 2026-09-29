@@ -1351,14 +1351,223 @@ done:   rtl
 ; x = entity.  clobbers a; preserves x/y.
 ; out: carry set = may act (present and not broken); carry clear = skip.
 
+;
+; The one exception (#314): a Broken monster whose counter script can END
+; THE BATTLE is still admitted (Ot6RetalEnds below), and while it is Broken
+; only the blocks of that script that end the battle run (Ot6AISkip, at
+; NextAICmd).  VARGAS's finish is such a block -- `if_attack PUMMEL /
+; battle_event $09 / kill_monsters ALL` -- and without this a Pummel that
+; landed while he was Broken (or that broke him) did not end the fight;
+; only a Pummel after he recovered did (build/attempts/wt/vargas-pummel/).
+
 .proc Ot6MayAct
         .a8
         lda     OT6_BROKEN_TICKS,x
-        bne     broken
+        beq     present
+        jsr     Ot6RetalEnds    ; Broken: admitted only if this monster's
+        bcc     done            ;   counter script can end the battle
+present:
         lda     $3aa0,x
         lsr                     ; carry = $3aa0.0, the presence bit
-        rtl
-broken: clc
+done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the story-ending counter, exempt from the break (#314) ]
+
+; "Scripts run regardless of break state; the gauge changes combat, not
+; scripted story events" (bosses-wob.md).  A Broken monster loses its
+; counterattacks, but a counter-script block that ENDS THE BATTLE is a story
+; event, not an attack, so it still runs.  What counts as ending the battle
+; is the script's own action, never the monster's id:
+;   kill_monsters ALL (and its _wait/_debug forms, and boss_death):
+;       $f5 anim op mask, op 1/4/5, mask $ff
+;   end_battle:     $fb $02 xx
+;   change_battle:  $f2 ...
+; A block is the run from a command to the next end_if ($fe) or end ($ff),
+; the same span vanilla's conditionmiss skips (FindAIScriptEnd).
+;
+; Two halves:
+;   * Ot6RetalEnds, from Ot6MayAct at CheckRetal: a Broken monster's counter
+;     is queued only if its counter script holds such an action anywhere.
+;     Every other Broken monster is refused exactly as before.
+;   * Ot6AISkip, at NextAICmd: while that counter runs for a Broken, living
+;     monster, every command outside a battle-ending block is skipped the
+;     way vanilla skips a Stopped monster's counter commands ($f8, set in
+;     ExecAIRetal): conditionmiss, to the end of the block.  So VARGAS's
+;     Pummel block runs while Broken, and his other counter blocks (the
+;     phase-two triggers) wait for the break to end, as they did before.
+; A dying monster is untouched: its counter already bypasses the gate
+; (CheckRetal's $3a56 branch, battle_brokendeath), and Ot6AISkip leaves any
+; monster at 0 HP or with wound/petrify to vanilla.
+
+; x = offset into AIScript.  a8/i16.  out: a = the command's size in bytes
+; (vanilla's own AICmdSizeTbl: 1 for an attack id, the table for $f0-$ff).
+; preserves x/y.
+.proc Ot6AIOpSize
+        .a8
+        .i16
+        lda     f:AIScript,x
+        cmp     #$f0
+        bcs     tbl
+        lda     #$01
+        rts
+tbl:    phx
+        sbc     #$f0            ; carry set by the bcs
+        longa
+        and     #$000f
+        tax
+        shorta
+        lda     f:AICmdSizeTbl,x
+        plx
+        rts
+.endproc
+
+; x = offset into AIScript of a command.  a8/i16.  out: carry set if that
+; command ends the battle (the list above).  preserves x/y.
+.proc Ot6AIEndOp
+        .a8
+        .i16
+        lda     f:AIScript,x
+        cmp     #$f2            ; change_battle
+        beq     yes
+        cmp     #$fb
+        beq     misc
+        cmp     #$f5
+        bne     no
+        lda     f:AIScript+3,x  ; monster mask
+        cmp     #$ff
+        bne     no              ; not ALL
+        lda     f:AIScript+2,x  ; op: 1 kill, 4 kill+wait, 5 kill (debug)
+        cmp     #$01
+        beq     yes
+        cmp     #$04
+        beq     yes
+        cmp     #$05
+        beq     yes
+        bra     no
+misc:   lda     f:AIScript+1,x
+        cmp     #$02            ; end_battle
+        beq     yes
+no:     clc
+        rts
+yes:    sec
+        rts
+.endproc
+
+; x = entity (either index width).  a8.  out: carry set if the entity's
+; counter script ($3268,x, to its end_retal) holds a battle-ending action.
+; preserves x/y.
+.proc Ot6RetalEnds
+        .a8
+        php
+        longi
+        .i16
+        phx
+        phy
+        lda     $3269,x
+        bmi     no              ; no counter script ($ffff)
+        longa
+        lda     $3268,x
+        tax
+        shorta
+loop:   lda     f:AIScript,x
+        cmp     #$ff
+        beq     no              ; end_retal: nothing in it ends the battle
+        jsr     Ot6AIEndOp
+        bcs     yes
+        jsr     Ot6AIOpSize
+fwd:    inx
+        dec
+        bne     fwd
+        bra     loop
+no:     ply
+        plx
+        plp
+        clc
+        rts
+yes:    ply
+        plx
+        plp
+        sec
+        rts
+.endproc
+
+; from NextAICmd, the command already fetched ($3a2c..) and $f0 already
+; stepped past it.  a8/i8.  out: carry set if the block from this command
+; to its end_if/end holds a battle-ending action.  preserves y.
+.proc Ot6AIBlockEnds
+        .a8
+        php
+        longi
+        .i16
+        ldx     $f0             ; the byte after the current command
+        lda     $3a2c
+        cmp     #$f0
+        bcs     wide
+        dex                     ; an attack id is one byte
+        bra     scan
+wide:   phx                     ; step back over the command's own size
+        sbc     #$f0            ; carry set by the bcs
+        longa
+        and     #$000f
+        tax
+        shorta
+        lda     f:AICmdSizeTbl,x
+        plx
+back:   dex
+        dec
+        bne     back
+scan:   lda     f:AIScript,x
+        cmp     #$fe
+        bcs     no              ; end_if / end: the block ends nothing
+        jsr     Ot6AIEndOp
+        bcs     yes
+        jsr     Ot6AIOpSize
+fwd:    inx
+        dec
+        bne     fwd
+        bra     scan
+no:     plp
+        clc
+        rts
+yes:    plp
+        sec
+        rts
+.endproc
+
+; NextAICmd's skip test, was `lda $f8 / beq / lda $3a2c / cmp #$fc / bcc
+; conditionmiss`: vanilla's rule (in a counter whose monster is Stopped,
+; Confused and so on, $f8 is set and every command below $fc skips to the
+; end of its block) plus the Broken rule above.  a8/i8.  out: carry clear =
+; skip to the end of the block (conditionmiss), carry set = run the command.
+; clobbers a/x (the caller reloads both).
+.proc Ot6AISkip
+        .a8
+        .i8
+        lda     $3a2c
+        cmp     #$fc
+        bcs     done            ; conditions, wait, end_if, end: never skipped
+        lda     $f8
+        bne     skip            ; vanilla's skip
+        lda     $b1
+        lsr
+        bcc     run             ; not a counterattack
+        ldx     $f6             ; the monster whose script this is
+        lda     OT6_BROKEN_TICKS,x
+        beq     run             ; not Broken
+        lda     $3ee4,x
+        bit     #$c0
+        bne     run             ; wound/petrify: a dying monster's counter
+        lda     $3bf4,x         ;   runs as it always has
+        ora     $3bf5,x
+        beq     run             ; 0 HP: likewise
+        jsr     Ot6AIBlockEnds  ; Broken and alive: only a battle-ending
+        rtl                     ;   block runs
+run:    sec
+done:   rtl
+skip:   clc
         rtl
 .endproc
 

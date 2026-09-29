@@ -4490,11 +4490,12 @@ NextAICmd:
         bne     @1ae2
         sty     $f0
         shorti
-        lda     $f8         ; branch if not a counterattack
-        beq     @1af5
-        lda     $3a2c       ; current ai command
-        cmp     #$fc
-        bcc     _c31a9b     ; branch if < $fc
+        jsl     Ot6AISkip   ; ot6 #314: was `lda $f8 / beq @1af5 / lda $3a2c
+        bcc     _c31a9b     ;   / cmp #$fc / bcc _c31a9b` (a skipped counter
+                            ;   runs no command below $fc).  Same test, plus:
+                            ;   a Broken monster's counter runs only the
+                            ;   blocks that end the battle (Ot6AISkip,
+                            ;   ot6_break.asm)
 @1af5:  ldy     $f6         ; y = pointer to character/monster data in ram
         lda     $3a2c
         cmp     #$f0
@@ -12863,7 +12864,10 @@ CheckRetal:
         ora     $b9
         beq     @4cbe       ; branch if there are no retaliation targets
         jsl     Ot6MayAct   ; ot6: a Broken monster does not counter; Broken
-        bcc     @4cbe       ;   have no turns.  Two things about where this
+        bcc     @4cbe       ;   have no turns (#314: except a counter script
+                            ;   that can end the battle, and then only its
+                            ;   battle-ending blocks run; Ot6AISkip).
+                            ;   Two things about where this
                             ;   sits.  It is below the $3a56 died-branch
                             ;   above, because `if_self_dead` scripts reach
                             ;   CheckRetal by that same path and a break's x2
