@@ -36,6 +36,10 @@ The harness plays OT6 the way a competent person with a controller would.
 - **Spend like a person watching their gil.** Choices between supplies
   (a Tent or Potions, which item heals) are priced in gil from what the bag
   would actually spend, not from fixed thresholds.
+- **Only a loss is a loss, and a win is a win.** A fight won some other
+  way than planned (the boss killed before its break, a mechanic never
+  exercised) passes and is logged as a tuning note to circle back to; it is
+  never retried or counted as a failure.
 - **Classify every wipe by boost at death.** An early one-shot means the
   party is under-levelled (a level/kit finding). A wipe with pips still
   banked means the abilities were not used fully (a driver/policy finding).
