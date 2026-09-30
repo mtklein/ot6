@@ -237,11 +237,15 @@ def emit_state_rules(w):
     w("# bytes, so the source's stamp -- its sig, its artifact hash, its")
     w("# ancestor -- records the copy verbatim, and the copied stamp is")
     w("# what lets a stacked generate edge bind ITS ancestor line to a real file (#75).")
+    w("# Each file is rewritten only when its bytes differ (restat), so a source")
+    w("# regenerated to the same bytes -- a clean qualification on an unchanged")
+    w("# ROM -- does not make the chain from power-on replay behind it.")
     w("rule seed")
-    w("  command = cp build/states/$src.mss build/states/$state.mss && "
-      "cp build/states/$src.mss.lua build/states/$state.mss.lua && "
-      "cp build/states/$src.stamp build/states/$state.stamp")
+    w("  command = for x in mss mss.lua stamp; do "
+      "cmp -s build/states/$src.$$x build/states/$state.$$x || "
+      "cp build/states/$src.$$x build/states/$state.$$x || exit 1; done")
     w("  description = stack seed $state <- $src")
+    w("  restat = 1")
     w("")
     w("# A generator's copy: the new bytes always land, but the old mtime is")
     w("# kept when the Lua token stream (comments and whitespace dropped) did")
@@ -750,7 +754,10 @@ def selftest():
               "seed build/states/b.mss.lua build/states/b.mss "
               "build/states/b.stamp" in text)
         check("seed copies the stamp with the state (#75)",
-              "cp build/states/$src.stamp build/states/$state.stamp" in text)
+              "for x in mss mss.lua stamp;" in text
+              and "cp build/states/$src.$$x build/states/$state.$$x" in text)
+        check("seed rewrites only changed bytes (restat)",
+              text.split("rule seed")[1].split("rule ")[0].count("restat = 1") == 1)
         # provenance ancestors: what each edge tells savestate_stamp.sh to
         # hash into its `ancestor` line.
         check("generate rule runs the per-edge stamp chain",
