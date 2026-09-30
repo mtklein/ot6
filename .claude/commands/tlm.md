@@ -63,7 +63,9 @@ interpreting runs.
   builds up from normal work; recent runs weigh more, so it follows other
   load, heat and power. A machine's room is its knee (the fewest emulators
   within 5% of its best total, one more when that is the most it has run,
-  so it keeps learning) minus what it runs now. Launch prompts give agents
+  so it keeps learning) minus what it runs now. Batches fill px13 first,
+  then the Air, then the Pro, which keeps a reserve and backs off by the
+  owner's load (`PREFER` and `RESERVE` in live.py). Launch prompts give agents
   that command rather than a cap, and agents run it before each batch; it
   is a guide, and a machine an agent is told to leave alone stays alone.
   `tools/bench_throughput.py` (K copies of one test, K from 1 to 1.5x the

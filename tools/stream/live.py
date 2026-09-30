@@ -46,6 +46,7 @@ import collections
 import glob
 import hashlib
 import json
+import math
 import os
 import re
 import shlex
@@ -821,6 +822,14 @@ PEER_STALE_SEC = 20   # a peer silent this long is shown unreachable
 # ---- placement: where the next emulators should go ------------------------
 HALF_LIFE_H = 6.0   # a run this old weighs half as much as one finishing now
 PEAK_FRAC = 0.95    # the knee: the fewest emulators within 5% of the best total
+# Whose machines they are.  Batches fill px13 (ours alone) first, then the
+# Air (the owner's travel laptop, often away), then the Pro (the owner's
+# desk machine); a machine not named here comes after these, in --peer
+# order.  On a machine with a reserve, a batch leaves that many emulators'
+# worth of the knee free, and backs off further by the load its own
+# emulators do not explain (the owner's work).  Capacities stay measured.
+PREFER = ("px13", "air", "mbp")
+RESERVE = {"mbp": 4}
 
 
 def curve(records, now):
@@ -864,9 +873,10 @@ def placement(machines, records, now):
     """placement.json: per machine its curve, its knee (the fewest emulators
     whose total is within 5% of the best measured total, one more when
     that is the most ever measured, so the curve keeps learning), room =
-    knee - its active emulators now; and "order", the machines for the next
-    emulators, greedily by how much each one adds to its machine's total."""
-    out, gains = [], []
+    knee - its active emulators now (less RESERVE and the owner's load where
+    a reserve is set); and "order", the machines for the next emulators:
+    each machine's room, in PREFER order."""
+    out = []
     for m in machines:
         mine = [r for r in records if r.get("machine") == m["name"]]
         cv = curve(mine, now)
@@ -884,15 +894,21 @@ def placement(machines, records, now):
                    if total(cv, k) >= PEAK_FRAC * best)
         if knee == top:
             knee += 1
-        busy = m["active"]
-        room = max(0, knee - busy)
-        rec.update(peak=knee, room=room)
-        for j in range(1, room + 1):
-            gains.append((total(cv, busy + j) - total(cv, busy + j - 1),
-                          m["name"]))
-    gains.sort(key=lambda g: -g[0])
-    return {"ts": int(now), "half_life_h": HALF_LIFE_H, "machines": out,
-            "order": [n for _g, n in gains], "room": len(gains)}
+        room = knee - m["active"]
+        if m["name"] in RESERVE:
+            # load our emulators do not account for; generous to the owner,
+            # since on macOS one emulator can add more than 1 to the load
+            owner = max(0.0, (rec["load1"] or 0.0) - m["active"])
+            room -= RESERVE[m["name"]] + math.ceil(owner)
+            rec.update(reserve=RESERVE[m["name"]], owner_load=round(owner, 1))
+        rec.update(peak=knee, room=max(0, room))
+    rank = {n: i for i, n in enumerate(PREFER)}
+    ranked = sorted((r for r in out if r.get("room")),
+                    key=lambda r: rank.get(r["name"], len(PREFER)))
+    order = [r["name"] for r in ranked for _ in range(r["room"])]
+    return {"ts": int(now), "half_life_h": HALF_LIFE_H, "prefer": PREFER,
+            "reserve": RESERVE, "machines": out, "order": order,
+            "room": len(order)}
 
 
 def place_line(p):
@@ -1472,9 +1488,10 @@ def place(n, port):
             p = json.load(r)
     except Exception as e:
         sys.exit(f"no placement: is live.py running on port {port}? ({e})")
-    counts = collections.Counter(p["order"][:n])
-    got = ", ".join(f"{m} {c}" for m, c in counts.most_common()) or "nowhere"
-    print(f"place {n}: {got}")
+    counts = collections.Counter(p["order"][:n])   # keeps PREFER order
+    got = ", ".join(f"{m} {c}" for m, c in counts.items()) or "nowhere"
+    print(f"place {n}: {got}  (fill order {', '.join(p['prefer'])}; "
+          f"reserve {', '.join(f'{k} {v}' for k, v in p['reserve'].items())})")
     if n > p["room"]:
         print(f"  only {p['room']} have room now; the other {n - p['room']} "
               "would slow every emulator where they land: queue them")
@@ -1484,8 +1501,11 @@ def place(n, port):
             print(f"  {m['name']}: {why}")
             continue
         cv = " ".join(f"{k}:{v[0]:.0f}" for k, v in m["curve"].items())
+        held = (f" - reserve {m['reserve']} - owner load {m['owner_load']}"
+                if "reserve" in m else "")
         print(f"  {m['name']}: room {m['room']} = knee {m['peak']} - "
-              f"{m['active']} running (load {m['load1']}, {m['ncpu']} cores)"
+              f"{m['active']} running{held} (load {m['load1']}, "
+              f"{m['ncpu']} cores)"
               f" · frames/s per emulator by emulators running: {cv} "
               f"({m['runs']} runs)")
     return 0
