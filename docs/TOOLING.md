@@ -46,12 +46,15 @@ fails in qualification: the chain says whether the story still plays
 through.
 
 A tracked checkpoint drifts from today's play as the route changes above
-it. At each cut the chain prints the drift, decoded from both saves:
-`tools/tests/lib/checkpoint_drift.py` compares the party (levels,
-experience, max HP/MP, gear), gil, the bag and the story switches.
-`ninja release` fails while any tracked checkpoint differs from its fresh
-capture in those fields. Re-cut at every release, and during a cycle
-whenever the report shows a material change:
+it. At each cut the chain prints the drift (`tools/tests/lib/checkpoint_drift.py`),
+explained in play terms: every character's level, experience, HP/MP and
+gear, gil and the bag, story switches, encounter counters, spells and
+skills, the OT6 codex, and any other differing byte by address.
+`ninja release` fails while any tracked checkpoint's battery differs from
+its fresh capture byte for byte (play time and checksums aside; the chain
+is deterministic), or while a capture is older than today's generator, lib
+halves or ROM. Re-cut at every release, and during a cycle whenever the
+report shows a material change:
 
     ninja chain
     python3 tools/tests/lib/checkpoint_drift.py --recut <key>...

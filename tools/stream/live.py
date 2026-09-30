@@ -1243,8 +1243,11 @@ def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
             done += 1
         ed = {"name": n, "dur": cost, "status": st,
               "ckpt": bool(e.get("checkpoint")),
-              # what it waits on, so merge_progress can redo the ETA
-              "deps": [d for d in (e.get("prev"), e.get("seed"), e.get("after"))
+              # what it waits on, so merge_progress can redo the ETA.  A
+              # cut (prev= with checkpoint=, savestate_graph.py) boots its
+              # tracked checkpoint in qualification and waits on no prev.
+              "deps": [d for d in (None if e.get("checkpoint") else e.get("prev"),
+                                   e.get("seed"), e.get("after"))
                        if d]}
         if n in xy:   # WoB world-tile coords for the map view
             ed["x"], ed["y"] = round(xy[n][0], 1), round(xy[n][1], 1)

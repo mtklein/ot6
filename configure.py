@@ -665,9 +665,17 @@ if chain_end:
     tracked = [a for key in sorted(captures)
                for a in sn.checkpoint_inputs(ROOT, key)]
     out = "build/checks/checkpoint_drift.ok"
+    # ...and every capture must be today's: the lib halves, the stamp tool
+    # and the ROM are inputs here, so a lib-only edit (which re-runs no
+    # chain edge) re-runs this check, and the check refuses the capture
+    # whose provenance sig no longer matches
     w.edge([out], "sh",
            implicit=["tools/tests/lib/checkpoint_drift.py",
-                     "tools/tests/lib/sram_checkpoint.py"]
+                     "tools/tests/lib/sram_checkpoint.py",
+                     "tools/tests/lib/savestate_stamp.sh",
+                     "tools/tests/lib/lua_fingerprint.py",
+                     "tools/tests/lib/savestate_ninja.py", sn.GRAPH,
+                     "build/ot6.sfc"] + LIBS
            + [p for key in sorted(captures) for p in captures[key]] + tracked,
            cmd="python3 tools/tests/lib/checkpoint_drift.py --strict "
                + " ".join(sorted(captures))
