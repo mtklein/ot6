@@ -56,6 +56,9 @@ measurement.
    to Magic -- and both members are **L27, a multiple of three**), Drop
    (Mad Signal). Measured, the pair at L30 won the cave's commonest
    formation (232) 52 times in 53; the loss was Muddle (section 12.3).
+   Labbed (12.4): the damage a Muddled party takes is mostly its own, and
+   the bag's Peace Ring on SABIN (the NeckHunter drops more) takes the
+   fights that cost a member from 9 in 164 to 2.
 5. **The Tentacles seize.** Each Tentacle's Entwine Slows, a Slowed member
    is Seized (`TargetEffect_2e`, `battle_main.asm` @3cce: the member's menu
    is shut off and the Tentacle drains HP each turn), and it is Discarded
@@ -991,14 +994,149 @@ down (no one-shot, no pips banked)`, `[outcome] battle $0E8 LOST after
 formation 232 was fought 53 times, about four a run on maps 68 and 63:
 **52 won, 1 lost**. So the leg's first-attempt rate under this set is 13
 of 14, and the loss is the Muddle the cave's bodies all carry (finding 4).
-No lever for it is measured (section 13).
+Section 12.4 labs it.
+
+### 12.4 The cave's Muddle, labbed (#320)
+
+The question: how often does each cave and basement formation kill a
+member or the party at the first attempt, why, and what moves it. The
+review of the merged ROM (`build/attempts/review-wor-edgar/merged/
+merged_k3_s0.log`) had lost the walk back to formation 234, Drop x3, with
+every death `by nobody (no monster action attributed)` and `class=died
+with 5 BP banked`, the Drops untouched at `1000/sh2`.
+
+**The lab** (`build/attempts/wt/figaro-muddle/lab/`: `lab_muddle.lua`,
+`labrun.py`, `arms.py`). Snapshots cut inside the generator's own runs
+(`varlab.py --snap`, the leg's own variation: K = 0-10 encounters used up
+before the body) at the cave's mouth (map 68, the pair: `c68`) and in the
+engine room after the Tentacles (map 64, the trio, EDGAR dressed:
+`e64t`). From each, the party walks between two tiles and fights what
+comes with the tactical driver and its field care, as the generator walks:
+6 battles at the cave's mouth, 8 in the engine room, retries off. The
+draw moves by idle frames before the first step (the battle's seed is the
+frame phase, InitBattle `lda $021e`): waits 1, 21 and 41, 33 runs an arm,
+156 distinct battle keys in 164 of formation 232's fights. The formations
+come in each snapshot's own order, and only one snapshot met the Drops
+(K=3's engine room, as its first battle), so the Drops are 15 waits
+there, 28 to 84 by 4 (the first 25 frames of waiting fold into one phase).
+Every battle's key, every Muddle landing and every death is in the logs.
+
+**Why the party dies.** Every body here Muddles (Hug, BrainStorm, Mad
+Sickle; the Drop's script is Mad Signal on two turns in three and a
+counter), and the damage a Muddled party takes is mostly its own:
+
+- a Muddled member's turns are the engine's (RandCharAction), and its
+  Fight, Blitz, Tools or spell lands on the party -- 8 of the baseline's
+  13 deaths at the cave's mouth were a member's own action;
+- a command entered before the Muddle landed goes out re-aimed: SABIN's
+  Pummel, committed at f+300, killed him from over 1000 HP after Hug
+  landed at f+490 (`attr/attr_self2`: `[death] f+886 entity 1 char 5
+  from 31/1509 by entity 1 char 5 cmd $0A atk $5D (its own action; it was
+  Muddled at f+490)`);
+- the Muddle rule's cure-hit (#170) is a real hit, and a Genji pair of
+  Fire Knuckles is a big one: SABIN's measured 178, 268 and 186, and 947
+  and 898 where it landed after a monster's hit had already cleared the
+  Muddle (`attr/attr_unmuddle`: `[unmuddle] actor 1 (char 5)'s hit on
+  entity 0 took 947 (1134 -> 187)`); at 75 HP it killed her (`by entity 1
+  char 5 cmd $00 atk $FF (the Muddle rule's unmuddle hit)`).
+
+**The death watch** now names the party's hand (`Driver:allyAct`): a
+member's HP falling with no monster action attributed, while a member's
+command executes or settles, is that member's action, said with whether
+the actor was Muddled as it began. The same fight twice, the attribution
+on and switched off (`H.ALLY_ATTRIBUTION = false`), frame for frame
+(`attr/attr_drop_on`, `attr/attr_drop_off`, the Drops):
+
+    [death] f+762 entity 0 char 6 from 1260/1696 by entity 1 char 5 cmd $0A atk $5D (a MUDDLED member's action) bp=1 party_bp=1,1,1,1
+    [death] f+762 entity 0 char 6 from 1260/1696 by nobody (no monster action attributed) bp=1 party_bp=1,1,1,1
+
+and a monster's kill is still the monster's (`by slot 1 cmd $00 atk $EE`
+in both, `attr/attr_on`, `attr/attr_off`). The `[wipe]` line tags such
+deaths `:by_muddled_e1`.
+
+**The arms** (`arms.py`; formation 232 at the cave's mouth unless said):
+
+| arm | fights | won | lost | with a death | deaths (by the party) | Fenix landed |
+|---|---|---|---|---|---|---|
+| baseline (`base_c68`) | 164 | 163 | 1 | 9 | 13 (8) | 9 |
+| the Peace Ring on SABIN (`peace_c68`) | 164 | 162 | 2 | 2 | 6 (2) | 2 |
+| ...and the Muddle rule's floor (`peace_guard_c68`) | 164 | 162 | 2 | 2 | 4 (2) | 0 |
+| ...and no cure-hit at all (`peace_nocure_c68`) | 167 | 166 | 1 | 2 | 3 (3) | 1 |
+| the landers' kill order (`lander_c68`; 4 runs cut short by a lab crash) | 149 | 149 | 0 | 7 | 9 (3) | 9 |
+| the bank spent while Muddle threatens (`spend_c68`) | 165 | 163 | 2 | 15 | 23 (13) | 18 |
+| trio, engine room: baseline / the ring (`base_e64t`, `peace_e64t`) | 264 / 264 | all | 0 | 0 | 0 | 0 |
+
+The ring works as a guard: SABIN was Muddled 43 times in the baseline
+and never with it on (`Muddle landings by entity ... e0=54 e1=43` against
+`e0=86`). It takes the deaths from 9 fights in 164 to 2, and the Fenix
+Downs spent from 9 to 2. It does not measurably move the losses: 1, 2, 2
+and 1 in about 165, the ring's two the same hard pincer draw at two
+snapshots (seed `be4C`, CELES Muddled at f+330, then the cure-hit's 947).
+The floor and no cure-hit at all read the same as the ring alone at this
+size. The landers' kill order changed nothing a person would notice. The
+bank spent on the keyed line while Muddle threatens was worse on every
+count: a pip spent goes out with the action Muddle re-aims.
+
+The Drops, the trio in the engine room (15 draws an arm, 15 distinct
+battle keys):
+
+| arm | won | lost | with a death | deaths (by the party) | Fenix landed | Muddle landings |
+|---|---|---|---|---|---|---|
+| main's rule, no ring (`drop_main`) | 10 | 5 | 7 | 21 (20) | 3 | 93 |
+| the ring on SABIN only (`drop_peace1`) | 15 | 0 | 0 | 0 | 0 | 9 |
+| every ring the bag holds, SABIN and EDGAR here (`drop_final`) | 15 | 0 | 0 | 0 | 0 | 1 |
+
+Without a ring the trio loses a third of these fights, 20 of its 21
+deaths by its own members; with one ring, on SABIN, it won all 15.
+
+**What changed.** gen_wor_edgar puts the bag's Peace Rings on (the
+checkpoint's bag holds one; NeckHunters drop more, 1 to 5 in the bag by
+the engine room across the draws): SABIN before the cave, then on each
+arrival in the cave and the basements whoever lacks one, SABIN, EDGAR,
+CELES in that order, and at the stops around the Tentacles. A relic
+change on a Genji Glove wearer re-runs the game's Optimum (menu
+`CheckReequipRelics`), so the rings go on before each stop's kit, and the
+hands go back where no kit step follows; the first cut of this lost the
+Tentacles to the absorb guard when CELES's Optimum took the Break Blade
+and EDGAR's took the Blizzard (`final_v1/k3_s0.log`). The Muddle rule
+keeps its cure-hit, but not on an ally at or under the hitter's largest
+measured cure-hit (a quarter of max HP until measured), on by default
+(`opts.unmuddleGuard = false` is the old rule).
+
+**The leg under the same variation** (K = 0-10 at shift 0, then K = 0
+and 3 at shifts 23 and 41; retries off; the cave's and the basements'
+formations counted from each run's `[outcome]` and `[death]` lines):
+
+| set | runs passed | formation 232: fought, won, with a death | other cave formations | Tentacles |
+|---|---|---|---|---|
+| main's gen (`base/`, K 0-10) | 11 of 11 | 42, 42, 2 (`k4`: CELES from 1116, `k5`: CELES from 372 holding 3 BP, both `by nobody` under main's death watch) | 31, all won, no death | 11 of 11 |
+| this gen (`final/`, K 0-10) | 11 of 11 | 42, 42, 1 (`k0`: CELES from 71 by slot 1, holding 4 BP) | 31, all won, no death (the Drops once) | 11 of 11 |
+| this gen (`final/`, K 0 and 3 at shifts 23, 41) | 3 of 4 | 19, 19, 0 | 5, all won, no death (the Drops once) | 3 of 4 (`k3_s23`: `battle $1C6 LOST after 26675 ticks: killed none`) |
+
+The fifteen runs of this gen lost no cave or basement fight; the one
+loss is the Tentacles (14 of 15 won here, 11 of 12 in 12.2's lab), fought
+with SABIN and CELES both in Peace Rings for the Black Belt and the Jewel
+Ring -- whether that swap costs the Tentacles anything is not measured.
+
+The one death left is a monster's hit on a member worn down in a long
+fight, holding 4 pips; the capture's own draw is that one (K = 0).
+`final_v1/` is the first cut of the rings, kept: its K = 3 lost the
+Tentacles to the absorb guard (above) and its K = 5 lost formation 232
+in a pincer, CELES Muddled at f+327 and SABIN's cure-hit then taking
+898 off her after a monster's hit had already cleared it (`[unmuddle]
+actor 1 (char 5)'s hit on entity 0 took 898 (1132 -> 234)`); the same
+K passes in `final/`, whose frames part from it inside the cave (map 53 at f113218 against f112513).
 
 ## 13. What is left, and what the owner may want to decide
 
-- **The cave's formation 232 against the pair**: 52 of 53 won, and the
-  loss was Muddle landing again and again (12.3). One loss in fourteen
-  runs of the leg. A Muddle guard in the kit, a longer grind or SABIN's
-  Air Blade for this formation are the levers; none is measured.
+- **The cave's Muddle** (12.4): with the Peace Rings the pair still
+  loses 1 or 2 formation-232 fights in about 165 in the lab, each with
+  CELES Muddled; the fights that cost a member went
+  from 9 in 164 to 2, and the Drops from a third lost to none. The cure-
+  hit itself is the next lever: SABIN's Genji pair lands 900 on CELES, and
+  lands even when a monster has cleared the Muddle first; switching it
+  off read the same at this size (1 loss against 2). SABIN's blitz
+  (Air Blade, Fire Dance) in these fights was not measured.
 - **The South Figaro desert** (world group 44) is off the grind: its Sand
   Horse pair was won 6 times and lost 2 (12.1), both losses with the
   horses untouched while the pair healed and revived into Sand Storm. That
