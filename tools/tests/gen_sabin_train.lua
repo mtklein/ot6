@@ -64,6 +64,13 @@ end
 local GHOSTTRAIN = 0x0106
 local OT6_BLUDG, HOLY = 0x04, 0x20
 local PUMMEL, AURABOLT, SUPLEX = 0x5D, 0x5E, 0x5F
+-- frames between a reveal and the chip its hit landed: the reveal banks
+-- (OT6_RVPEND_*) and the shield comes off in the same damage calc, and the
+-- observer sees both on one frame (build/attempts/wt/train-win/review:
+-- "HOLY: AuraBolt ($5E) cast f1347, its first chip f1409, revealed f1409",
+-- "OT6_BLUDG: Pummel ($5D) cast f2427, its first chip f2893, revealed
+-- f2893").  Two frames of slack for a hit that straddles a frame edge.
+local REVEAL_SLACK = 2
 local SHURIKEN = 0x41                   -- the ghost merchant's row 6
 local FIRE_SKEAN = 0xAB                 -- his row 7, OT6's (const.inc:271)
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
@@ -200,6 +207,16 @@ local function cmdRowOf(actor, cmdId)
     if H.readByte(CMDTBL + actor * 12 + i * 3) == cmdId then return i end
   end
   return nil
+end
+-- the battle inventory's count of an item (what an in-battle decision
+-- reads; the field inventory at $1969 is not kept in step during a battle)
+local function battCount(id)
+  for i = 0, 251 do
+    if H.readByte(BATTINV + i * 5) == id then
+      return H.readByte(BATTINV + i * 5 + 3)
+    end
+  end
+  return 0
 end
 local function battInvIdx(id)
   for i = 0, 251 do
@@ -560,7 +577,7 @@ local function closeShop()
 end
 
 local b68 = {
-  casts = 0, chips = {}, plan = nil, planActor = nil, impCure = {},
+  casts = 0, chips = {}, plan = nil, planActor = nil, impCure = {}, chipAt = {}, castAt = {},
   brokeAt = nil, impossible = nil, itemsOut = false,
   lastSH, lastHP,
 }
@@ -631,9 +648,9 @@ local function makePlan(actor)
       end
       if not b68.impSaid then
         b68.impSaid = true
-        b68Log(string.format("e%d is an IMP and the bag holds no cure " ..
-          "(Green Cherry %d, Remedy %d) -- fighting on [%s]", e,
-          invCount(H.GREEN_CHERRY), invCount(REMEDY), partyLine()))
+        b68Log(string.format("e%d is an IMP and the battle inventory holds " ..
+          "no cure (Green Cherry %d, Remedy %d) -- fighting on [%s]", e,
+          battCount(H.GREEN_CHERRY), battCount(REMEDY), partyLine()))
       end
     end
   end
@@ -773,6 +790,7 @@ local function b68Button()
     if cc ~= wc then return { wc > cc and "right" or "left" } end
     if cr ~= wr then return { wr > cr and "down" or "up" } end
     b68.casts = b68.casts + 1                 -- the cast is committing NOW
+    b68.castAt[plan.skill] = b68.castAt[plan.skill] or H.frame
     b68.plan, b68.planActor = nil, nil        -- done: next menu replans fresh
     return { "a" }                            -- confirm; blitzes self-target
   end
@@ -847,10 +865,20 @@ local function b68Observe()
   local hp = H.readWord(MHP(gSlot))
   if (H.readByte(RVE(gSlot)) & HOLY) == HOLY
      or (H.readByte(RVPE(gSlot)) & HOLY) == HOLY then
+    if not b68.holyRevealed then
+      b68.holyAt = H.frame
+      b68Log(string.format("HOLY revealed at f%d (lastSkill=$%02X)", H.frame,
+        H.readByte(0x3410)))
+    end
     b68.holyRevealed = true
   end
   if (H.readByte(RVC(gSlot)) & OT6_BLUDG) == OT6_BLUDG
      or (H.readByte(RVPC(gSlot)) & OT6_BLUDG) == OT6_BLUDG then
+    if not b68.bludgRevealed then
+      b68.bludgAt = H.frame
+      b68Log(string.format("OT6_BLUDG revealed at f%d (lastSkill=$%02X)",
+        H.frame, H.readByte(0x3410)))
+    end
     b68.bludgRevealed = true
   end
   -- Every hit the train takes, attributed.  Without this the log only shows
@@ -868,6 +896,8 @@ local function b68Observe()
       b68.lastSH, shields, H.frame, H.readByte(0x3410), hp,
       sabinE and pMP(sabinE) or -1, partyLine())
     b68.chips[#b68.chips + 1] = row
+    local sk = H.readByte(0x3410)
+    b68.chipAt[sk] = b68.chipAt[sk] or H.frame   -- first chip by each skill
     -- Shields off, not chip rows.  A double-hitting Pummel takes two shields
     -- in one transition (6->5->4->2 is three rows and four shields), so the
     -- row count undercounts the break and cannot be the thing asserted on.
@@ -986,10 +1016,12 @@ end
 -- One fight, played out.  A win is a win however many shields came off
 -- (the owner's ruling on #311, docs/guidelines.md "A win is a win and a
 -- loss is a loss"): a train killed before its break is logged as a
--- [tuning] line and the segment moves on.  Only a loss is a loss -- the
--- party wiped (or the canary's game over) -- and it is raised as LOST,
--- which the segment runner retries from the boot point, bounded and
--- counted like any wipe.  (This used to be a five-rung reload ladder that
+-- [tuning] line and the segment moves on; a 6/6 break asserts its
+-- mechanism (each reveal tied to the chip its skill landed).  Only a loss
+-- is a loss -- the party wiped -- and it is the canary's: allowGameOver
+-- ends with battle 47's ladder, so the wipe is counted and filed as class
+-- wipe, which the segment runner retries from the boot point, bounded and
+-- counted.  (This used to be a five-rung reload ladder that
 -- also re-rolled a WON fight with fewer than six shields off, and gave up
 -- on a live fight when SABIN was Imp'd or down before the break.)
 --
@@ -1019,7 +1051,8 @@ local function b68Fight()
       b68.casts, b68.chips = 0, {}
       b68.plan, b68.planActor = nil, nil
       b68.brokeAt, b68.killedAt, b68.brokeHP = nil, nil, nil
-      b68.killParty = nil
+      b68.killParty, b68.wiped = nil, false
+      b68.holyAt, b68.bludgAt, b68.chipAt, b68.castAt = nil, nil, {}, {}
       b68.shieldsOff = 0
       b68.holyRevealed, b68.bludgRevealed = false, false
       b68.itemsOut = false
@@ -1138,33 +1171,52 @@ local function b68Fight()
     end)(),
     H.waitFrames(60),
     H.call(function()
-      local standing = false
-      for _, e in ipairs({ sabinE, cyanE, shadowE }) do
-        if e and pHP(e) > 0 and pHP(e) ~= 0xFFFF then standing = true end
-      end
-      if lost == nil and b68.killedAt == nil and not standing then
-        lost = string.format("battle 68 ended without the train at 0 HP " ..
-          "and every member down (a wipe-teardown) at f%d [%s]", H.frame,
-          partyLine())
-        H.log("[b68] " .. lost)
-      end
       for _, row in ipairs(b68.chips) do H.log("[b68 chip] " .. row) end
-      if lost ~= nil then
-        if lost:find("deadline", 1, true) then
-          error("battle 68: timeout after 145000 frames -- " .. lost, 0)
-        end
+      if lost and lost:find("deadline", 1, true) then
+        error("battle 68: timeout after 145000 frames -- " .. lost, 0)
+      end
+      -- every member reading 0 HP: the wiped table (a won battle's
+      -- teardown reads $FFFF instead)
+      local allDown = true
+      for _, e in ipairs({ sabinE, cyanE, shadowE }) do
+        if e and pHP(e) ~= 0 then allDown = false end
+      end
+      if lost ~= nil or (b68.killedAt == nil and allDown) then
+        b68.wiped = true
+        b68Log(string.format("the party is down at f%d (%s) [%s] -- a wipe, " ..
+          "the canary's to count and file", H.frame, tostring(lost or
+          "every member at 0 HP, the train not seen at 0 HP"), partyLine()))
         H.screenshot("train_b68_lost")
-        error("LOST: battle 68 -- " .. lost .. " -- the runner's retry " ..
-          "reloads the segment's boot point", 0)
+      end
+    end),
+    -- A wipe is the canary's (allowGameOver is off since battle 47's
+    -- ladder): the pad stays neutral at the Annihilated screen, the canary
+    -- counts the wiped battle table (300 frames), freezes the pad and ends
+    -- the attempt as class wipe with its context line.  Reaching the call
+    -- below means it never did, which is a harness finding, not a loss.
+    H.cond(function() return b68.wiped == true end, {
+      H.call(function() H.setPad({}) end),
+      H.waitFrames(900),
+      H.call(function()
+        error(string.format("battle 68: the party was down but the canary " ..
+          "counted no wipe in 900 frames (gameOverFired=%d) [%s]",
+          H.gameOverFired or 0, partyLine()), 0)
+      end),
+    }, {}),
+    H.call(function()
+      if b68.killedAt == nil then
+        error(string.format("battle 68 ended at f%d with a member standing " ..
+          "and the train never seen at 0 HP (last train HP %s, %d of 6 " ..
+          "shields off) -- neither a win nor a wipe this driver can read [%s]",
+          H.frame, tostring(b68.lastHP), b68.shieldsOff or 0, partyLine()), 0)
       end
       H.assertEq(inParty(3), true, "SHADOW aboard after battle 68's win (the leave roll is a no-op by design)")
       b68won = true
       local off = b68.shieldsOff or 0
-      if b68.killedAt == nil then
-        H.log(string.format("[tuning] battle 68 ended at f%d with the train " ..
-          "never seen at 0 HP and the party standing: counted as a win, and " ..
-          "the ride out confirms it", H.frame))
-      end
+      H.log(string.format("[b68] WON: %d of 6 shields off, killedAt=f%s " ..
+        "brokeAt=%s casts=%d chips=%d holy=%s bludg=%s", off,
+        tostring(b68.killedAt), tostring(b68.brokeAt), b68.casts, #b68.chips,
+        tostring(b68.holyRevealed), tostring(b68.bludgRevealed)))
       if off < 6 then
         H.log(string.format("[tuning] battle 68 won with %d of 6 shields off " ..
           "-- the train died before its break (killedAt=f%s casts=%d " ..
@@ -1172,18 +1224,34 @@ local function b68Fight()
           tostring(b68.killedAt), b68.casts, #b68.chips,
           tostring(b68.holyRevealed), tostring(b68.bludgRevealed),
           tostring(b68.killParty)))
-      else
-        H.log(string.format(
-          "[b68] break margin: train at %s of 1900 HP when the sixth shield " ..
-          "came off, dead %s frames later (brokeAt=%s killedAt=%s)",
-          tostring(b68.brokeHP), b68.brokeAt and b68.killedAt
-            and tostring(b68.killedAt - b68.brokeAt) or "?",
-          tostring(b68.brokeAt), tostring(b68.killedAt)))
+        return
       end
-      H.log(string.format("[b68] WON: %d of 6 shields off, killedAt=f%s " ..
-        "brokeAt=%s casts=%d chips=%d holy=%s bludg=%s", off,
-        tostring(b68.killedAt), tostring(b68.brokeAt), b68.casts, #b68.chips,
-        tostring(b68.holyRevealed), tostring(b68.bludgRevealed)))
+      H.log(string.format(
+        "[b68] break margin: train at %s of 1900 HP when the sixth shield " ..
+        "came off, dead %s frames later (brokeAt=%s killedAt=%s)",
+        tostring(b68.brokeHP), b68.brokeAt and b68.killedAt
+          and tostring(b68.killedAt - b68.brokeAt) or "?",
+        tostring(b68.brokeAt), tostring(b68.killedAt)))
+      -- The break happened, so its mechanism did: each reveal is tied to
+      -- the chip its skill landed.  HOLY is AuraBolt's ($5E, the holy
+      -- weakness), OT6_BLUDG is Pummel's ($5D, the train's class row); the
+      -- reveal banks at damage calc (OT6_RVPEND_*) and the shield comes off
+      -- on the same hit, so the two are seen within a few frames.
+      H.assertEq(#b68.chips >= 2, true,
+        "a 6/6 break: at least two shield chips landed")
+      local function tied(what, at, skill, name)
+        local cast, chip = b68.castAt[skill], b68.chipAt[skill]
+        local ok = at ~= nil and cast ~= nil and chip ~= nil
+          and at >= cast and math.abs(at - chip) <= REVEAL_SLACK
+        H.log(string.format("[b68] %s: %s cast f%s, its first chip f%s, " ..
+          "revealed f%s", what, name, tostring(cast), tostring(chip),
+          tostring(at)))
+        H.assertEq(ok, true, string.format("a 6/6 break: %s revealed by the " ..
+          "%s that chipped (cast f%s, chip f%s, reveal f%s, slack %d)", what,
+          name, tostring(cast), tostring(chip), tostring(at), REVEAL_SLACK))
+      end
+      tied("HOLY", b68.holyAt, AURABOLT, "AuraBolt ($5E)")
+      tied("OT6_BLUDG", b68.bludgAt, PUMMEL, "Pummel ($5D)")
     end),
     }),
   }, {})
@@ -1191,7 +1259,7 @@ end
 
 -- allowGameOver: the battle-47 ladder below deliberately survives a lost
 -- fight (#163); wipeWatch reads H.gameOverFired as a loss and the next
--- attempt reloads.  Battle 68 reads it the same way and raises LOST.
+-- attempt reloads.  It ends with that ladder (H.setAllowGameOver below).
 H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -1390,6 +1458,12 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
         tostring(lost)), 0)
     end
   end),
+  -- Battle 47's ladder is the only thing here that survives a lost fight.
+  -- From now on a wipe (a corridor random, battle 68) is the canary's: it
+  -- counts it, freezes the pad and files the attempt as class wipe, with
+  -- its context line, for the segment runner's bounded retry.
+  H.setAllowGameOver(false, "battle 47's ladder is done; battle 68 and the " ..
+    "rest of the train lose the way every other fight does"),
 
   nav(40, 8, { maxFrames = 4000 }),
   holdDrive("up", function()
@@ -1495,7 +1569,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   b68KeyWatch(),
   b68Fight(),
   H.call(function()
-    H.assertEq(b68Won(), true, "battle 68 won (a loss raised LOST above)")
+    H.assertEq(b68Won(), true, "battle 68 won (a wipe ended the attempt above)")
   end),
 
   -- ---- the ride out: victory scene, the station, the timer, the world ----

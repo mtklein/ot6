@@ -9695,6 +9695,30 @@ end
 -- BOOT_FALLBACK, so the runner must not mark one for it at that frame.
 local runnerStarted = false
 
+-- Step: end (or restart) this attempt's allowGameOver from here on.  A run
+-- whose early ladder survives a lost fight (gen_sabin_train's battle 47)
+-- declares allowGameOver for the whole body, but a later fight it does not
+-- ladder should lose the way every other fight does: the canary counts the
+-- wipe, freezes the pad and files it as class `wipe` with its context line.
+-- The change lasts for this attempt only (a replayed body installs its own
+-- opts).  Turning it off with a counted game over still unanswered would
+-- fail the run on the spot, so that is an error that names the count.
+function M.setAllowGameOver(on, why)
+  return M.call(function()
+    if not on and (M.gameOverFired or 0) > 0 then
+      error(string.format("setAllowGameOver(false): %d counted game over(s) "
+        .. "the body never answered with a snapshot restore -- %s",
+        M.gameOverFired, tostring(why)), 0)
+    end
+    local o = {}
+    for k, v in pairs(RUN.opts or {}) do o[k] = v end
+    o.allowGameOver = on and true or nil
+    RUN.opts = o
+    M.log(string.format("[retry] allowGameOver %s from f%d: %s",
+      on and "ON" or "OFF", M.frame, tostring(why)))
+  end)
+end
+
 function M.run(opts, steps)
   opts = opts or {}
   -- Attempt 2+: the body has just been re-executed and this is its new

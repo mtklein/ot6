@@ -392,7 +392,10 @@ runs every script through the **segment runner** at the bottom of
   contract failure (`assertEq`, a checkpoint contract, a Lua error) is a
   bug and fails at once. Generators with their own ladders keep them: a
   ladder runs with `allowGameOver`, so its wipes never reach the canary,
-  and its exhaustion message classifies as `other`. Under `allowGameOver`
+  and its exhaustion message classifies as `other`. A run whose ladder
+  covers only an early fight ends the permission after it with
+  `H.setAllowGameOver(false, why)` (gen_sabin_train after battle 47), so a
+  later wipe is the canary's, class `wipe`. Under `allowGameOver`
   the canary's battle-wipe count leaves the pad live (the GameOver-read
   and TitleScreen watches still freeze it): a scripted loss moves on only
   with the press a person makes at the Annihilated screen (#205). A
