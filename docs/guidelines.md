@@ -12,7 +12,10 @@ evidence); this file does not restate it.
 
 ## Playing the game
 
-The harness plays OT6 the way a competent person with a controller would.
+The harness plays OT6 the way a competent person with a controller would. It may
+read anything (memory, the ROM's data, an experienced player's knowledge of
+what's ahead) and acts only through the inputs a person has: read with full
+power, write like a human (owner, 2026-09-30).
 
 - **Fight rather than flee.** Win with levels, gear, kill order and
   abilities; flee where the game forces it, or from a random battle inside

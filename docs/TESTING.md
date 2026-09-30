@@ -50,11 +50,13 @@ attempts and varied states/seeds, retaining all outcomes. Do not splice chosen
 successful branches into an apparent uninterrupted clear, first-try win, or
 inflated success rate. Test the discovered strategy separately from its search.
 
-Memory access itself is unrestricted, but a blind-player policy must not
-silently use unrevealed weaknesses, exact hidden enemy HP, future RNG outcomes,
-or knowledge obtained by exploring alternate futures. Label informed or
-privileged-information experiments explicitly. Reading cursor positions or
-command acceptance to implement an intended input is normal control machinery.
+**Reading is full power; writing is human (owner, 2026-09-30).** A policy
+may read anything: memory, the ROM's data, hidden HP, weaknesses, AI
+scripts, encounter tables, what an experienced player would know. It may
+act only through inputs a person could make on the controller; any other
+write to emulated state is a declared unit-test expedient (see the waiver
+list), never part of play. A measured rate describes the policy that
+produced it, so say what an informed policy read when you quote its rate.
 
 Cold boots, in-game save/load checks, long-route runs, and uninterrupted clears
 remain useful for the properties they exercise. They are not prerequisites for
