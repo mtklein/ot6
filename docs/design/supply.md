@@ -194,6 +194,19 @@ route carries the inn, and the sixth is the fight driver's.
   and among the three the cheapest that refills the plan's price goes
   first (Ether +150, then X-Ether, then Elixir).  Not implemented here.
 
+The supply above only refills what the fights spend, so the fight
+driver's own spending is part of the band.  In a random battle the
+library driver's kit lines (Blitz, Tools) keep a quarter of the member's
+maximum MP, rounded up, and spend at most a quarter on one turn's boost
+(`M.kitBudget`, checked by `battle_healpolicy`); below the reserve the
+member Fights, which is free.  The reserve is for the next boss, which
+is paid out of whatever the randoms before it left: on the Phantom
+Train one boost-3 Pummel (63 MP) in the first random took SABIN from
+84/94 to 21/94, the train sells no Tincture, and he met the Ghost Train
+at 3/94 with nothing to chip its six shields
+(`build/attempts/review/tiers-hud-school/combined/train_done-FAIL.log`).
+An event battle spends the kit as before.
+
 ## 4. The band gains an MP column
 
 | item | band | first counter on the route |

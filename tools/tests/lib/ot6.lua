@@ -1493,11 +1493,14 @@ function M.boostPlan(o)
   end
   -- The ration is applied by handing affordBoost a SMALLER pool, not a
   -- smaller want: it then steps the boost down to the deepest level the
-  -- rationed budget covers, exactly as it does for a short pool.
+  -- rationed budget covers, exactly as it does for a short pool.  The
+  -- ration caps what the turn SPENDS, so it sits on top of the reserve
+  -- (affordBoost subtracts the reserve from whatever pool it is handed):
+  -- the turn may spend min(pool - reserve, maxMP / ration).
   local budget = pool
   if o.ration then
     local maxMp = o.maxPool or M.readWord(0x3C30 + (o.slot or 0) * 2)
-    budget = math.min(pool, maxMp // o.ration)
+    budget = math.min(pool, (o.reserve or 0) + maxMp // o.ration)
   end
   local got, price, why = M.affordBoost({ base = base, want = want,
     pool = budget, reserve = o.reserve or 0, priceAt = priceAt })
@@ -1518,6 +1521,46 @@ function M.boostPlan(o)
   why = string.format("%s -- dropping the verb", why)
   boostPlanSaid(o, want, 0, false, why)
   return 0, false, why, floor
+end
+
+-- What the library driver's kit lines (Blitz, Tools) may spend in a
+-- RANDOM battle.  A person watching their MP does not pour it into trash:
+-- Fight is free and ends a random battle anyway, MP refills only at a
+-- level-up, a save point's Tent or an inn, and the next boss is paid for
+-- out of whatever the randoms before it left.  gen_sabin_train showed the
+-- cost of not doing this: one boost-3 Pummel (63 MP) in the train's first
+-- random took SABIN from 84/94 to 21/94, the stepped-down Pummels after it
+-- took him to 3/94, and he met the Ghost Train with no AuraBolt and no
+-- Pummel to chip its six shields.
+--
+-- So in a random battle the kit keeps two limits, both from numbers the
+-- library already uses:
+--   reserve  a quarter of max MP, rounded UP, is never spent: the nuke
+--            line's floor (Driver:nukeFloor), rounded so the member it
+--            leaves stands at or above field care's MP band (0.25 of max,
+--            supply.md) rather than a point under it, which would have
+--            the next care stop buy a Tincture for the rounding
+--   ration   one turn spends at most a quarter of max MP on the boost
+--            (M.boostPlan's o.ration = 4, gen_narshe_battle's measured
+--            ration: unrationed, EDGAR's 57 MP bought two x4 crossbows
+--            and then nothing for five battles)
+-- The unboosted verb above the reserve still goes (the ration is the
+-- boost's cap, not the ability's), and below the reserve the line is
+-- not offered, so the member Fights.  An event battle (a boss, a scripted
+-- fight: OT6_RANDBTL clear) is what the reserve was kept for, and spends
+-- the kit as before.
+--
+--   o.random   the battle is a random encounter (OT6_RANDBTL, $57BD)
+--   o.maxPool  the member's max MP
+-- Returns reserve, ration (nil = unrationed), and the reason.
+function M.kitBudget(o)
+  if not o.random then
+    return 0, nil, "an event battle: the kit spends what the pool has"
+  end
+  local maxPool = o.maxPool or 0
+  local reserve = (maxPool + 3) // 4
+  return reserve, 4, string.format("a random battle: %d of %d MP kept for the "
+    .. "next boss, at most %d spent on a turn's boost", reserve, maxPool, maxPool // 4)
 end
 
 -- Spend it before you die (#175): a member inside one round of death who
@@ -4382,8 +4425,22 @@ end
 --
 -- A kit verb (Blitz, Tools) keeps one id at every boost and takes the
 -- flat 2.5x ladder off Ot6AbilityCostTbl (Ot6AbilityCost's @boosted arm).
-local function skillBoost(actor, id, want)
-  local b, ok, why, price = M.boostPlan({ slot = actor, id = id, want = want })
+-- In a random battle it is priced inside M.kitBudget's reserve and ration.
+--
+-- M.kitBoost is that decision as the driver makes it, reading the battle's
+-- own cells: the random flag (OT6_RANDBTL), the caster's MP and max MP.
+-- `mem` is optional { byte = f(addr), word = f(addr) } in place of the live
+-- reads, so battle_healpolicy can put a battle's bytes through the same
+-- code the driver runs (the wiring, not only the arithmetic).
+function M.kitBoost(actor, id, want, mem)
+  local byte = mem and mem.byte or M.readByte
+  local word = mem and mem.word or M.readWord
+  local reserve, ration = M.kitBudget({
+    random = byte(M.RANDBTL) ~= 0,
+    maxPool = word(BATTLE.MAXMP + actor * 2) })
+  local b, ok, why, price = M.boostPlan({ slot = actor, id = id, want = want,
+    pool = word(BATTLE.CURMP + actor * 2), maxPool = word(BATTLE.MAXMP + actor * 2),
+    reserve = reserve, ration = ration })
   if not ok then return nil, price, why end
   return b, price, why
 end
@@ -5359,7 +5416,7 @@ function Driver:makePlan(actor)
     local tool = self.opts.tool or BATTLE.AUTOCROSSBOW
     if self.opts.tactical and self.opts.tools ~= false and id == 4
        and cmdRow(actor, BATTLE.CMD_TOOLS) and self:battInvIdx(tool) then
-      local tb = skillBoost(actor, tool, bp)
+      local tb = M.kitBoost(actor, tool, bp)
       if tb ~= nil then
         offer({ kind = "skill", cmd = BATTLE.CMD_TOOLS, skill = tool,
                 row = cmdRow(actor, BATTLE.CMD_TOOLS), boostLeft = tb,
@@ -5369,7 +5426,7 @@ function Driver:makePlan(actor)
     end
     if self.opts.tactical and id == 5 and (self.opts.blitz or BATTLE.PUMMEL) == BATTLE.PUMMEL
        and cmdRow(actor, BATTLE.CMD_BLITZ) and not self.skillDead[BATTLE.CMD_BLITZ] then
-      local bb = skillBoost(actor, BATTLE.PUMMEL, bp)
+      local bb = M.kitBoost(actor, BATTLE.PUMMEL, bp)
       if bb ~= nil then
         offer({ kind = "skill", cmd = BATTLE.CMD_BLITZ, skill = BATTLE.PUMMEL,
                 row = cmdRow(actor, BATTLE.CMD_BLITZ), boostLeft = bb,
@@ -6213,7 +6270,7 @@ function Driver:makePlan(actor)
   -- the same thing again, forever.  Without the tool Edgar Fights.
   -- The MP gate on this line is the tool's own priced boost (#219),
   -- not a flat 4: AutoCrossbow's base IS 4, but a boosted one is 10 /
-  -- 25 / 63, and the Drill's base alone is 16.  skillBoost answers
+  -- 25 / 63, and the Drill's base alone is 16.  M.kitBoost answers
   -- both halves -- the deepest boost the pool pays for, or nil for a
   -- tool the pool cannot pay at all, in which case EDGAR falls through
   -- to the free boosted Fight below.
@@ -6221,7 +6278,7 @@ function Driver:makePlan(actor)
   if self.opts.tactical and self.opts.tools ~= false and id == 4
      and cmdRow(actor, BATTLE.CMD_TOOLS)
      and self:battInvIdx(self.opts.tool or BATTLE.AUTOCROSSBOW) then
-    toolBp, toolMp, toolWhy = skillBoost(actor, self.opts.tool or BATTLE.AUTOCROSSBOW, boost)
+    toolBp, toolMp, toolWhy = M.kitBoost(actor, self.opts.tool or BATTLE.AUTOCROSSBOW, boost)
   end
   if toolBp ~= nil then
     -- The chip model picks between the tool and the sword (#156): against
@@ -6260,7 +6317,7 @@ function Driver:makePlan(actor)
     -- (#219).  Suplex at boost 3 is 81 MP against SABIN's 80-MP pool at
     -- the level he joins, so this line steps down far more often than
     -- it drops; when even the base is out of reach SABIN Fights.
-    local bp, mp, why = skillBoost(actor, self.opts.blitz or BATTLE.PUMMEL, boost)
+    local bp, mp, why = M.kitBoost(actor, self.opts.blitz or BATTLE.PUMMEL, boost)
     if bp ~= nil then
       if bp ~= boost then
         M.log(string.format("[%s] actor=%d Blitz $%02X, %d MP of %d -- %s",

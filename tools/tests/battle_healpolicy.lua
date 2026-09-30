@@ -55,7 +55,10 @@
 --      the engine's actor table, LoseBattle's $3ebc bit 0 is a verdict on
 --      its own, and bytes another module owns are never a wipe;
 --  14. the target graph (#189, H.newTargetGraph) on the Air Force's
---      measured cursor, and a focus entry naming a part by species.
+--      measured cursor, and a focus entry naming a part by species;
+--  15. the kit's MP in a random battle (H.kitBudget): a quarter of max MP
+--      kept for the next boss and a turn's boost rationed to a quarter,
+--      on SABIN's Phantom Train numbers; an event battle spends as before.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TONIC, POTION = 0xE8, 0xE9
@@ -782,6 +785,80 @@ H.run({ maxFrames = 3000 }, {
     H.assertEq(fs[2].slot .. "/" .. fs[2].mask, "3/8", "Speck $146 is slot 3 before it enters")
     H.assertEq(fs[3].slot .. "/" .. fs[3].mask, "0/1", "the slot form still reads")
     H.log("battle_healpolicy: the target graph and species focus (#189) checked")
+  end),
+
+  -- 15. the kit's MP in a random battle (H.kitBudget into H.boostPlan) on
+  -- the Phantom Train's numbers: SABIN 84/94 wanting a boost-3 Pummel in
+  -- the first random, which unpriced by the budget cost 63 MP and left
+  -- him 21 (then 3) for the Ghost Train's AuraBolt and Pummels.
+  H.call(function()
+    local PUMMEL = 0x5D
+    H.assertEq(H.abilityCost(PUMMEL), 4, "Pummel's base price is 4 MP (Ot6AbilityCostTbl)")
+    local res, ration, why = H.kitBudget({ random = true, maxPool = 94 })
+    H.assertEq(res, 24, "a random keeps a quarter of 94, rounded up: 24 (" .. why .. ")")
+    H.assertEq(ration, 4, "...and rations a turn's boost to a quarter of max")
+    local eres, eration = H.kitBudget({ random = false, maxPool = 94 })
+    H.assertEq(eres, 0, "an event battle keeps nothing back: the boss is what it was kept for")
+    H.assertEq(eration, nil, "...and rations nothing")
+    local function pummel(pool, random)
+      local r, n = H.kitBudget({ random = random, maxPool = 94 })
+      local b, ok, w, price = H.boostPlan({ id = PUMMEL, want = 3, pool = pool,
+        maxPool = 94, reserve = r, ration = n })
+      return b, ok, price, w
+    end
+    local b, ok, price, w = pummel(84, false)
+    H.assertEq(b .. "/" .. price, "3/63", "the boss spends the bank's boost-3 Pummel, 63 MP (" .. w .. ")")
+    b, ok, price, w = pummel(84, true)
+    H.assertEq(b .. "/" .. price, "1/10",
+      "a random at 84/94 buys the boost-1 Pummel, 10 MP: the ration's 23 over the reserve (" .. w .. ")")
+    b, ok, price, w = pummel(30, true)
+    H.assertEq(b .. "/" .. tostring(ok) .. "/" .. price, "0/true/4",
+      "at 30/94 no boost fits over the reserve, but the unboosted Pummel does (" .. w .. ")")
+    b, ok, price, w = pummel(27, true)
+    H.assertEq(ok, false, "at 27/94 the Pummel would breach the 24 kept: SABIN Fights (" .. w .. ")")
+    -- the ration alone (gen_narshe_battle's private fighter: EDGAR 57 MP,
+    -- AutoCrossbow base 4, no reserve) prices as it did before the two met
+    b = H.boostPlan({ id = H.AUTOCROSSBOW, want = 3, pool = 57, maxPool = 57, ration = 4 })
+    H.assertEq(b, 1, "the descent's ration alone: 14 of 57 buys the boost-1 crossbow")
+    -- spent down from 94 by the random rule, turn after turn at the bank's
+    -- boost 3: what is left is the reserve's 24 or the few MP just above it
+    local pool, spent = 94, 0
+    for _ = 1, 20 do
+      local bb, okk, pp = pummel(pool, true)
+      if not okk then break end
+      pool, spent = pool - pp, spent + 1
+    end
+    H.assertEq(pool >= 24, true, string.format(
+      "a run of randoms leaves SABIN %d/94 after %d Pummels, never under the 24 kept", pool, spent))
+    -- The wiring: H.kitBoost is the driver's own decision (every Blitz and
+    -- Tools line calls it), reading the random flag OT6_RANDBTL ($57BD) and
+    -- the caster's MP ($3C08) and max MP ($3C30) from the battle.  The
+    -- battle here is a table of those bytes; every other byte reads 0, so
+    -- the neighbouring $57BC (RANDPEND) reads clear.
+    local function battle(random, mp, maxMp)
+      local bytes = { [0x57BD] = random and 1 or 0 }
+      local words = { [0x3C08] = mp, [0x3C30] = maxMp }
+      return { byte = function(a) return bytes[a] or 0 end,
+               word = function(a) return words[a] or 0 end }
+    end
+    local kb, kprice, kwhy = H.kitBoost(0, PUMMEL, 3, battle(true, 84, 94))
+    H.assertEq(tostring(kb) .. "/" .. tostring(kprice), "1/10",
+      "the driver's Pummel at 84/94 in a random: boost 3 steps down to 1 (" .. tostring(kwhy) .. ")")
+    kb, kprice, kwhy = H.kitBoost(0, PUMMEL, 3, battle(false, 84, 94))
+    H.assertEq(tostring(kb) .. "/" .. tostring(kprice), "3/63",
+      "...and in an event battle the bank's boost 3, 63 MP (" .. tostring(kwhy) .. ")")
+    -- the ration under the base price: EDGAR's Drill (base 16) at 30 of 57
+    -- in a random -- the turn may spend min(30 - 15, 14) = 14, under 16,
+    -- and the unboosted Drill would breach the 15 kept, so he Fights
+    local DRILL = 0xA8
+    H.assertEq(H.abilityCost(DRILL), 16, "the Drill's base price is 16 MP (Ot6AbilityCostTbl)")
+    kb, kprice, kwhy = H.kitBoost(0, DRILL, 2, battle(true, 30, 57))
+    H.assertEq(kb, nil, "the Drill at 30/57 in a random: nothing fits over the 15 kept, "
+      .. "the line is not offered and EDGAR Fights (" .. tostring(kwhy) .. ")")
+    kb, kprice = H.kitBoost(0, DRILL, 2, battle(false, 30, 57))
+    H.assertEq(tostring(kb) .. "/" .. tostring(kprice), "0/16",
+      "...the same pool in an event battle pays the unboosted Drill")
+    H.log("battle_healpolicy: the kit's random-battle MP budget checked")
   end),
 
   -- 8. the table was not skipped
