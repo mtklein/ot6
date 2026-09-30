@@ -25,9 +25,23 @@ file on stdin: the far side scans its own run logs with the code below and
 prints one JSON snapshot a second, and exits when the connection drops.
 Nothing is installed or left running there and no port is opened.  The local
 machine goes through the same snapshot path, minus the ssh.
+
+Throughput and placement.  Each machine's line shows its emulated frames per
+second, summed over its active emulators across the last 30 s.  Every run
+watched from its start on any machine appends one line to the main tree's
+build/throughput.jsonl when it finishes: machine, test, frames, wall seconds,
+and the concurrency it ran at (emulators, and the load average).  From that
+log tools/stream/placement.py gives each machine a curve and a knee that
+follow other load, heat and power as they change, and from the knee and what
+the machine runs right now, how many more emulators it can take.  That is
+placement.json, one line on the page, and:
+
+    python3 tools/stream/live.py --place 8     # where the next 8 should go
+    python3 tools/stream/live.py --place 8 --claim wt/foo   # and hold them
 """
 import argparse
 import base64
+import collections
 import glob
 import hashlib
 import json
@@ -190,11 +204,14 @@ async function tick(){ try{
     let h = '<div><b>'+esc(m.name)+'</b> <span style="color:#8a8">'
       + m.active+' active \u00b7 '
       + '<span style="color:'+(m.frozen?'#e06060':'#8a8')+'">'+m.frozen+' frozen</span>'
-      + (m.load ? ' \u00b7 load '+m.load[0].toFixed(1)+' / '+m.ncpu+' cores' : '') + '</span></div>';
+      + (m.load ? ' \u00b7 load '+m.load[0].toFixed(1)+' / '+m.ncpu+' cores' : '')
+      + (m.fps!=null ? ' \u00b7 '+nf(Math.round(m.fps))+' frames/s' : '')
+      + (m.room!=null ? ' \u00b7 room '+m.room+' (peak '+m.peak+')' : '') + '</span></div>';
     m.trees.forEach(t=>{ h += '<div style="color:#8a9;padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
       + '<span style="color:#9bc">'+esc(t.branch)+'</span>'+(t.tree?' <span style="color:#687">@'+esc(t.tree)+'</span>':'')
       + ' \u00b7 '+t.tests.length+': '+esc(t.tests.join(', '))+'</div>'; });
-    return h; }).join('');
+    return h; }).join('')
+    + (j.place ? '<div style="color:#687">' + esc(j.place) + '</div>' : '');
   const seen = new Set();
   ws.forEach(w=>{
     seen.add(w.id);
@@ -271,11 +288,14 @@ async function tick(){
   let tgt = null;
   // (status.json streams a worker on THIS machine: a same-named worker on
   // another machine is not it)
+  // With no ?w and the tailed worker not live, follow the first worker with
+  // a picture on any machine, rather than wait for one here.
   if(grid){ tgt = wid ? (grid.find(w=>w.id===wid) || null)
-                      : (grid.find(w=>w.local && w.name===followed) || null); }
-  const targetName = wid ? (tgt ? tgt.name : null) : followed;
-  const isFollowed = !!st && !!targetName && targetName===st.test
-    && (!tgt || tgt.local);
+                      : (grid.find(w=>w.local && w.test===followed)
+                         || grid.find(w=>w.shot) || null); }
+  const targetName = tgt ? tgt.name : (wid ? null : followed);
+  const isFollowed = !!st && !!followed
+    && (tgt ? (tgt.local && tgt.test===followed) : !wid);
   $('who').textContent = (targetName || (wid ? '('+wid+')' : '(waiting)'))
     + (tgt ? ' \u00b7 ' + tgt.machine
        + (tgt.branch ? ' \u00b7 ' + tgt.branch : '') : '');
@@ -336,10 +356,8 @@ svg.addEventListener('click', ev=>{
   const e = n && last ? last.edges.find(x=>x.name===n) : null;
   document.getElementById('pick').textContent = e ? tip(e) : (n || ''); });
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
-// done here: green; done only on another machine (merged from a --peer):
-// teal; running anywhere: amber.  e.on lists the machines.
-function doneCol(e, j){ return (e.on && j.local && e.on.length
-  && !e.on.includes(j.local)) ? '#3a8f9d' : '#3f9d63'; }
+// done on any machine: green; running on any: amber.  e.on names the
+// machines, in the tooltip.
 function tip(e){ return e.name + (e.on && e.on.length
   ? ' \u2014 ' + e.status + ' on ' + e.on.join(', ') : ''); }
 function render(j){
@@ -348,10 +366,10 @@ function render(j){
     `${j.done}/${j.total} segments · ${j.elapsed_min} min elapsed · ~${j.eta_min} min left`;
   document.getElementById('cur').textContent =
     j.running.length ? ('now playing: ' + j.running.join(', ')) : '';
-  document.getElementById('legend').innerHTML = j.local ?
-    `<span style="color:#3f9d63">\u25cf</span> done on ${esc(j.local)} \u00b7 `
-    + `<span style="color:#3a8f9d">\u25cf</span> done only on another machine \u00b7 `
-    + `<span style="color:#e0a93e">\u25cf</span> running (machine named above)` : '';
+  document.getElementById('legend').innerHTML =
+    `<span style="color:#3f9d63">\u25cf</span> done \u00b7 `
+    + `<span style="color:#e0a93e">\u25cf</span> running (machine named above;`
+    + ` click a node for where it ran)`;
 }
 function renderWob(j){
   svg.setAttribute('viewBox','0 0 256 256');
@@ -370,7 +388,7 @@ function renderWob(j){
   j.edges.forEach((e,i)=>{
     const [x,y] = P[i];
     const rad = 1.5 + Math.min(2.2, Math.sqrt(e.dur||30)/8);
-    const col = e.status==='done' ? doneCol(e,j) : e.status==='running' ? '#e0a93e' : '#39413b';
+    const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#39413b';
     const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+1.4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
     // checkpoint-booted segments wear the dotted yellow ring, as in the
     // grid; the rest get a hairline dark rim so they read against the map
@@ -409,7 +427,7 @@ function renderGrid(j){
     const r = Math.floor(i/COLS), c = i%COLS;
     const x = 60 + (r%2 ? (COLS-1-c) : c)*DX, y = 30 + r*DY;
     const rad = R0 + Math.min(14, Math.sqrt(e.dur||30));
-    const col = e.status==='done' ? doneCol(e,j) : e.status==='running' ? '#e0a93e' : '#3a423c';
+    const col = e.status==='done' ? '#3f9d63' : e.status==='running' ? '#e0a93e' : '#3a423c';
     const pulse = e.status==='running' ? `<animate attributeName="r" values="${rad};${rad+4};${rad}" dur="1.2s" repeatCount="indefinite"/>` : '';
     // segments that boot from an SRAM save checkpoint rather than the
     // played chain wear a dotted yellow ring
@@ -567,6 +585,45 @@ def scan_worker(data, shots_stuck, frames_stuck):
     return (frame, png, h, stuck)
 
 
+# ---- throughput: frames emulated per second, and one record per run -------
+FRAME_B = re.compile(rb"^\[ot6(?:shot|pad|note)\] (\d+) ")
+FPS_WINDOW = 30.0      # seconds the per-machine frames/s figure averages over
+
+
+def run_progress(data):
+    """(latest frame, verdict) from a run.log tail.  The frame is M.frame on
+    the newest complete [ot6shot]/[ot6pad]/[ot6note] line: the harness's own
+    count of frames it has advanced, reset to 0 when an attempt restarts.  A
+    partial trailing line is skipped, since a half-written number would read
+    as a reset.  verdict is "pass", "fail" or None."""
+    lines = data.split(b"\n")[:-1]
+    frame = None
+    for line in reversed(lines):
+        m = FRAME_B.match(line)
+        if m:
+            frame = int(m.group(1))
+            break
+    verdict = None
+    p, f = data.rfind(b"\n[ot6] PASS (frame "), data.rfind(b"\n[ot6] FAIL: ")
+    if max(p, f) >= 0:
+        verdict = "pass" if p > f else "fail"
+    return frame, verdict
+
+
+def _run_start(ws):
+    """(start time, script name) of a run workspace: run.sh writes
+    composed_live.lua once, just before it launches the emulator, and its
+    third line names the script (compose.py's OT6_SCRIPT)."""
+    try:
+        path = os.path.join(ws, "composed_live.lua")
+        with open(path, "rb") as f:
+            head = f.read(400)
+        m = re.search(rb'^OT6_SCRIPT = "([^"]+)"', head, re.M)
+        return os.path.getmtime(path), (m.group(1).decode() if m else None)
+    except OSError:
+        return None, None
+
+
 class Scanner:
     """This machine's view, one JSON-able snapshot per call: every active run
     worker (build/test-runs/*/run.log touched within ACTIVE_SEC -- the same
@@ -588,8 +645,13 @@ class Scanner:
         self.sent = {}         # worker id -> hash8 of the PNG last handed out
         self.live_ref = live_ref
         self.prog = None       # progress inputs, loaded on first use
+        self.route_ts = 0      # commit time of ROOT's HEAD: the route's age
+        self.memo, self.memo_fp = {}, None   # stamp verdicts, and their inputs
         self.fresh = None      # a progress payload not yet handed out
         self.t0 = time.time()
+        self.runs = {}         # worker id -> what one run has done so far
+        self.recorded = set()  # worker ids already finished and reported
+        self.incs = collections.deque()   # (ts, frames) advanced, all workers
         # the stamp checks take seconds, so the route has its own thread and
         # never holds up the 1s worker scan
         threading.Thread(target=self._progress_loop, daemon=True).start()
@@ -616,8 +678,22 @@ class Scanner:
                 spec.loader.exec_module(compose)
                 from pathlib import Path
                 self.prog = (states, xy, compose, Path(ROOT))
+                try:   # which machine's route is newest, for merge_progress
+                    self.route_ts = int(subprocess.run(
+                        ["git", "-C", ROOT, "log", "-1", "--format=%ct"],
+                        capture_output=True, text=True, timeout=5).stdout)
+                except (ValueError, OSError, subprocess.SubprocessError):
+                    self.route_ts = 0
             live_test = (self.live_ref or {}).get("test")
-            return build_progress(*self.prog, self.t0, live_test)
+            # The stamp checks cost seconds of CPU a pass (a whole core on
+            # px13), so their verdicts are kept until a file they read
+            # changes: the ROM, a state or stamp, or anything under
+            # tools/tests (generators, lib, the stamp tool, checkpoints).
+            fp = route_inputs()
+            if fp != self.memo_fp:
+                self.memo, self.memo_fp = {}, fp
+            return dict(build_progress(*self.prog, self.t0, live_test,
+                                       self.memo), route_ts=self.route_ts)
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"[:200]}
 
@@ -627,7 +703,8 @@ class Scanner:
         workers, pngs, active = [], {}, set()
         for log in run_logs():
             try:
-                if now - os.path.getmtime(log) > active_sec:
+                mtime = os.path.getmtime(log)
+                if now - mtime > active_sec:
                     continue
                 dirname = os.path.basename(os.path.dirname(log))
                 data = _tail_bytes(log, tail_n)
@@ -636,6 +713,7 @@ class Scanner:
             tag, branch = log_tree(log)
             wid = _safe_id((tag + "_" if tag else "") + dirname)
             frame, png, h, stuck = scan_worker(data, s_stuck, f_stuck)
+            self._track(wid, log, tag, branch, data, mtime, now)
             active.add(wid)
             if png is not None and h is not None and self.sent.get(wid) != h:
                 pngs[wid] = png
@@ -656,15 +734,94 @@ class Scanner:
             load = [round(x, 2) for x in os.getloadavg()]
         except OSError:
             load = None
+        done = self._settle(active, len(workers), load, now)
         snap = {"host": HOST, "ts": now, "load": load, "ncpu": os.cpu_count(),
-                "workers": workers, "pngs": pngs}
+                "workers": workers, "pngs": pngs, "fps": self._fps(now)}
+        if done:
+            snap["done"] = done
         fresh, self.fresh = self.fresh, None
         if fresh is not None:
             snap["progress"] = fresh
         return snap
 
+    def _track(self, wid, log, tag, branch, data, mtime, now):
+        """Fold one scan of one worker into its run: frames advanced since
+        the last scan (a drop in M.frame is a restarted attempt, counted from
+        0) and the newest log mtime, which is where the run ends."""
+        r = self.runs.get(wid)
+        if r is None:
+            if wid in self.recorded:   # a retained failed workspace, touched
+                return
+            ws = os.path.dirname(log)
+            start, script = _run_start(ws)
+            label = os.path.basename(ws).split(".")[0]
+            # a run is whole when it began after this scanner did, so every
+            # frame it advanced was seen; only whole runs are recorded
+            whole = start is not None and start >= self.t0 - 2
+            r = self.runs[wid] = {
+                "test": script or label, "label": label, "tree": tag,
+                "branch": branch, "start": start, "end": mtime, "whole": whole,
+                "last": None if not whole else 0, "frames": 0, "verdict": None,
+                "n": 0, "conc": 0.0, "load": 0.0, "busy": 0.0}
+        frame, verdict = run_progress(data)
+        if frame is not None:
+            if r["last"] is not None:
+                inc = frame - r["last"] if frame >= r["last"] else frame
+                r["frames"] += inc
+                self.incs.append((now, inc))
+            r["last"] = frame
+        r["end"] = max(r["end"], mtime)
+        r["verdict"] = verdict or r["verdict"]
+
+    def _settle(self, active, n_active, load, now):
+        """Sample the concurrency every live run is seeing, and turn the runs
+        that stopped (workspace deleted on a pass, or gone quiet) into
+        records."""
+        load1 = load[0] if load else 0.0
+        busy = max(n_active, load1)
+        done = []
+        for wid in list(self.runs):
+            r = self.runs[wid]
+            if wid in active:
+                r["n"] += 1
+                r["conc"] += n_active
+                r["load"] += load1
+                r["busy"] += busy
+                continue
+            del self.runs[wid]
+            self.recorded.add(wid)
+            wall = r["end"] - (r["start"] or r["end"])
+            if not r["whole"] or not r["n"] or r["frames"] <= 0 or wall <= 0:
+                continue
+            n = r["n"]
+            done.append({
+                "ts": int(r["end"]), "id": wid, "test": r["test"],
+                "label": r["label"], "tree": r["tree"], "branch": r["branch"],
+                "frames": r["frames"], "wall": round(wall, 1),
+                "fps": round(r["frames"] / wall, 1),
+                "conc": round(r["conc"] / n, 2), "busy": round(r["busy"] / n, 2),
+                "load": round(r["load"] / n, 2), "ncpu": os.cpu_count(),
+                "verdict": r["verdict"]})
+        return done
+
+    def _fps(self, now):
+        """Frames per second advanced by all of this machine's emulators over
+        the last FPS_WINDOW seconds (less while the scanner is younger)."""
+        while self.incs and self.incs[0][0] < now - FPS_WINDOW:
+            self.incs.popleft()
+        span = min(FPS_WINDOW, now - self.t0)
+        if span < 5:
+            return None
+        return round(sum(i for _t, i in self.incs) / span, 1)
+
 
 PEER_STALE_SEC = 20   # a peer silent this long is shown unreachable
+
+# ---- placement: where the next emulators should go ------------------------
+# The model (curves, knees, claims, fill order) is tools/stream/placement.py;
+# only the viewer and --place need it, never a peer's emitter.
+def _placement():
+    return _load_stream_module("placement")
 
 
 class Board:
@@ -683,6 +840,39 @@ class Board:
                       "down_since": t, "err": "connecting"} for n in names}
         self.pngs = {n: set() for n in names}   # PNG files on disk per machine
         self.procs = {}   # name -> its live ssh child (peer_thread)
+        # The run log lives in the main tree, like build/attempts, so every
+        # viewer (whichever tree it runs from) adds to and reads one history.
+        worktree_roots()
+        self.log = os.path.join(_TREES["main"], "build", "throughput.jsonl")
+        self.claims = os.path.join(_TREES["main"], "build",
+                                   "placement-claims.jsonl")
+        self.pl = _placement()
+        self.records, self.seen = self.pl.load_records(self.log, t)
+        self.pruned = t
+        self.mods, self.mods_key = {}, None
+
+    def _remember(self, rec):
+        """Keep one finished-run record; False if it is already known (two
+        viewers watching the same machine both report its runs)."""
+        key = (rec["machine"], rec["id"])
+        if key in self.seen:
+            return False
+        self.seen.add(key)
+        self.records.append(rec)
+        return True
+
+    def _log_runs(self, name, done):
+        lines = []
+        with self.lock:
+            for d in done:
+                rec = dict(d, machine=name)
+                if self._remember(rec):
+                    lines.append(json.dumps(rec) + "\n")
+        if lines:
+            try:   # under the lock the daily prune takes, so none is lost
+                self.pl.append(self.log, lines)
+            except OSError as e:
+                print(f"live: {self.log}: {e}", file=sys.stderr)
 
     def _png(self, name, wid):
         return os.path.join(self.gdir, _safe_id(f"{name}_{wid}") + ".png")
@@ -702,6 +892,8 @@ class Board:
         live = {w["id"] for w in snap.get("workers", [])}
         for wid in list(self.pngs[name] - live):   # finished workers
             self._drop_png(name, wid)
+        if snap.get("done"):
+            self._log_runs(name, snap["done"])
         with self.lock:
             st = self.m[name]
             st["snap"] = dict(snap, pngs=None)
@@ -757,28 +949,47 @@ class Board:
                 "name": n, "local": n == HOST, "up": snap is not None,
                 "down_since": st["down_since"], "err": st["err"],
                 "load": (snap or {}).get("load"), "ncpu": (snap or {}).get("ncpu"),
+                "fps": (snap or {}).get("fps"),
                 "active": len(mine), "frozen": sum(w["stuck"] for w in mine),
                 "trees": [{"branch": b, "tree": t, "tests": sorted(ts)}
                           for (b, t), ts in sorted(trees.items())]})
+        pl = self.pl
+        with self.lock:
+            if now - self.pruned > 86400:   # once a day, as at start-up
+                self.records, self.seen = pl.load_records(self.log, now)
+                self.pruned = now
+            # the curves change only with a new record, or slowly with age
+            key = (len(self.records), int(now // 60))
+            if key != self.mods_key:
+                self.mods, self.mods_key = pl.models(self.records, now), key
+        place = pl.placement(machines, self.mods,
+                             pl.read_claims(self.claims, now), now)
+        for mc, pm in zip(machines, place["machines"]):
+            mc.update({k: pm[k] for k in ("room", "peak") if k in pm})
         out = {"workers": workers, "count": len(workers), "ts": int(now),
-               "machines": machines, "local": HOST}
+               "machines": machines, "local": HOST,
+               "place": pl.place_line(place)}
         self._dump("grid.json", out)
+        self._dump("placement.json", place)
         prog = self.merge_progress(m)
         if prog is not None:
             self._dump("progress.json", prog)
 
     def merge_progress(self, m):
-        """The local route (its coords, ETA and done/running) with every other
-        machine's running and done folded in by edge name.  Each edge's "on"
-        lists the machines it is running or done on, so the map can tell a
-        segment done here from one done only elsewhere."""
-        base = m[self.names[0]]["progress"]
-        if not base or "edges" not in base:
+        """One route from every machine: the route definition (edges, coords,
+        ETA) of whichever machine's tree has the newest commit, every
+        machine's running and done folded in by edge name.  No machine is
+        special: each edge's "on" lists the machines it is running or done
+        on, and the map colours done as done wherever it happened."""
+        per_p = {n: m[n]["progress"] for n in self.names
+                 if m[n]["progress"] and "edges" in m[n]["progress"]}
+        if not per_p:
             return None
+        # max() keeps the first of equals, so ties go to flag order
+        base = per_p[max(per_p, key=lambda n: per_p[n].get("route_ts") or 0)]
         out = dict(base, edges=[dict(e) for e in base["edges"]], local=HOST)
-        per = {n: {e["name"]: e["status"] for e in m[n]["progress"]["edges"]}
-               for n in self.names
-               if m[n]["progress"] and "edges" in m[n]["progress"]}
+        per = {n: {e["name"]: e["status"] for e in p["edges"]}
+               for n, p in per_p.items()}
         running = []
         for e in out["edges"]:
             run = [n for n in self.names if per.get(n, {}).get(e["name"]) == "running"]
@@ -789,6 +1000,17 @@ class Board:
                 running.append(f"{e['name']} ({', '.join(run)})")
         out["running"] = running
         out["done"] = sum(e["status"] == "done" for e in out["edges"])
+        if all("deps" in e for e in out["edges"]):
+            # time left from the merged statuses, not the base tree's own: a
+            # segment done on any machine is done.  The suite phase is the
+            # least any machine that has run the suites has left.
+            rem = sum((e["dur"] or 60) for e in out["edges"]
+                      if e["status"] != "done")
+            suite = min((p.get("suite_s") or 0.0 for p in per_p.values()
+                         if p.get("suites")), default=0.0)
+            eta = max(critical_path(out["edges"]),
+                      (rem + suite) / (base.get("par") or 1))
+            out["eta_min"] = int(eta / 60)
         return out
 
     def _dump(self, fname, obj):
@@ -876,17 +1098,35 @@ def peer_name(peer):
     return peer.partition(":")[0].split(".")[0].lower()
 
 
+EMIT_STALL_SEC = 30   # a snapshot this long unwritten: the viewer is gone
+
+
 def emit():
     """--emit: one Scanner snapshot a second on stdout, PNGs base64'd, until
-    the reader goes away (the ssh connection dropped: BrokenPipe)."""
+    the reader goes away: the ssh connection closed (BrokenPipe), or cut
+    without a close (a laptop carried off the network), which shows here
+    only as a write that never finishes once the buffers fill.  A watchdog
+    ends the emitter then, and with it the caffeinate or systemd-inhibit
+    keeping this machine awake."""
     sc = Scanner()
+    writing = [None]    # when the write in progress began
+
+    def watchdog():
+        while True:
+            time.sleep(5)
+            t = writing[0]
+            if t is not None and time.time() - t > EMIT_STALL_SEC:
+                os._exit(0)
+    threading.Thread(target=watchdog, daemon=True).start()
     try:
         while True:
             snap = sc.snapshot()
             snap["pngs"] = {k: base64.b64encode(v).decode("ascii")
                             for k, v in snap["pngs"].items()}
+            writing[0] = time.time()
             sys.stdout.write(json.dumps(snap) + "\n")
             sys.stdout.flush()
+            writing[0] = None
             time.sleep(1.0)
     except (BrokenPipeError, KeyboardInterrupt):
         os._exit(0)
@@ -902,7 +1142,27 @@ PLAIN = re.compile(r"^\[ot6\] (.*)")
 HINT = re.compile(r"(?:\bframe[= ]|[ (]f)(\d{3,})\b")
 
 
-def build_progress(states, xy, compose, rootp, t0, live_test):
+def route_inputs():
+    """(path, mtime, size) of every file a stamp check reads, as one hash."""
+    h = hashlib.sha1()
+    tops = [os.path.join(ROOT, "build/ot6.sfc")]
+    try:
+        tops += [e.path for e in os.scandir(os.path.join(ROOT, "build/states"))
+                 if e.is_file() and not e.name.endswith(".log")]
+    except OSError:
+        pass
+    for d, _dirs, files in os.walk(os.path.join(ROOT, "tools/tests")):
+        tops += [os.path.join(d, f) for f in files]
+    for p in sorted(tops):
+        try:
+            st = os.stat(p)
+            h.update(f"{p} {st.st_mtime_ns} {st.st_size}\n".encode())
+        except OSError:
+            pass
+    return h.hexdigest()
+
+
+def build_progress(states, xy, compose, rootp, t0, live_test, memo=None):
     """One progress.json payload: every graph edge's status (done when its
     stamp passes compose's freshness check, running when a live workspace
     bears its name, pending otherwise), WoB coords for the map, a
@@ -916,6 +1176,29 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
     is on the live view.  Its name may be an edge's primary state or one of
     its `also` artifacts, so the marked node is the primary edge either way.
     """
+    memo = {} if memo is None else memo
+    verdicts = memo.setdefault("fresh", {})
+    # compose's own memo, shared across the pass: each stamp's ancestors
+    # are checked once, not again for every descendant (a pass was
+    # quadratic in the chain: 300-400 s on the peers)
+    chain = memo.setdefault("stamp", {})
+    stale = (compose.STALE, compose.UNBOUND, compose.UNVERIFIED)
+
+    def fresh(x):   # compose's verdict, remembered while its inputs stand
+        if x not in verdicts:
+            try:
+                verdicts[x] = (compose.stamp_status(x, rootp, chain)[0]
+                               not in stale)
+            except Exception:
+                # A check that raised (a checkpoint extra gone missing) is
+                # not fresh, and the in-progress marks it left in compose's
+                # memo would read as "nothing to check" next time: drop
+                # them.
+                for k in [k for k, v in chain.items() if v is None]:
+                    del chain[k]
+                verdicts[x] = False
+        return verdicts[x]
+
     dur, qdur = {}, {}
     try:
         with open(os.path.join(ROOT, "build/ninja/.ninja_log")) as f:
@@ -952,15 +1235,17 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
             try:
                 if all(os.path.exists(
                            os.path.join(ROOT, f"build/states/{x}.stamp"))
-                       and compose.stamp_check(x, rootp) is None
-                       for x in names):
+                       and fresh(x) for x in names):
                     st = "done"
             except Exception:
                 pass
         if st == "done":
             done += 1
         ed = {"name": n, "dur": cost, "status": st,
-              "ckpt": bool(e.get("checkpoint"))}
+              "ckpt": bool(e.get("checkpoint")),
+              # what it waits on, so merge_progress can redo the ETA
+              "deps": [d for d in (e.get("prev"), e.get("seed"), e.get("after"))
+                       if d]}
         if n in xy:   # WoB world-tile coords for the map view
             ed["x"], ed["y"] = round(xy[n][0], 1), round(xy[n][1], 1)
         if live_test and live_test in names:
@@ -972,21 +1257,9 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
     for e in states:
         for x in [e["state"]] + list(e.get("also") or []):
             owner[x] = e["state"]
-    fin = {}
-    idx = {e["state"]: d for e, d in zip(states, edges)}
-    def finish(e):
-        n = e["state"]
-        if n in fin:
-            return fin[n]
-        b = 0.0
-        for dep in (e.get("prev"), e.get("seed"), e.get("after")):
-            if dep:
-                b = max(b, finish(next(x for x in states
-                                       if x["state"] == owner[dep])))
-        mine = 0.0 if idx[n]["status"] == "done" else (idx[n]["dur"] or 60)
-        fin[n] = b + mine
-        return fin[n]
-    eta = max((finish(e) for e in states), default=0.0)
+    for ed in edges:
+        ed["deps"] = [owner[d] for d in ed["deps"] if d in owner]
+    eta = critical_path(edges)
     # `eta` so far is the savestate critical path -- the serial savestate
     # chain.  A full build has a phase the chain does not see: the suite
     # tests, many of which run in parallel once the ROM is built and their
@@ -1001,16 +1274,15 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
         rom_m = os.path.getmtime(os.path.join(ROOT, "build/ot6.sfc"))
     except OSError:
         rom_m = 0.0
-    rem_state = sum((idx[e["state"]]["dur"] or 60)
-                    for e in states if idx[e["state"]]["status"] != "done")
+    rem_state = sum((e["dur"] or 60) for e in edges if e["status"] != "done")
     rem_suite = 0.0
     for name, secs in qdur.items():
         ok = os.path.join(ROOT, f"build/results/suite/{name}.ok")
         try:
-            fresh = os.path.exists(ok) and os.path.getmtime(ok) >= rom_m
+            passed = os.path.exists(ok) and os.path.getmtime(ok) >= rom_m
         except OSError:
-            fresh = False
-        if not fresh:
+            passed = False
+        if not passed:
             rem_suite += secs
     par = max((os.cpu_count() or 4) // 2, 1)
     eta = max(eta, (rem_state + rem_suite) / par)
@@ -1020,7 +1292,28 @@ def build_progress(states, xy, compose, rootp, t0, live_test):
             # or None when nothing is on the live view
             "live": owner.get(live_test) if live_test else None,
             "elapsed_min": int((time.time() - t0) / 60),
-            "eta_min": int(eta / 60)}
+            "eta_min": int(eta / 60), "suite_s": rem_suite, "par": par,
+            # suites this tree's ninja log knows: 0 means it never ran them,
+            # so its suite_s of 0 says nothing
+            "suites": len(qdur)}
+
+
+def critical_path(edges):
+    """Seconds left on the longest chain of not-done edges: each edge's
+    ninja-log duration (60 s when it has none), after the edges it waits
+    on (its "deps")."""
+    by = {e["name"]: e for e in edges}
+    fin = {}
+
+    def finish(n):
+        if n not in fin:
+            fin[n] = 0.0                        # a cycle reads as no wait
+            e = by[n]
+            b = max((finish(d) for d in e.get("deps", []) if d in by),
+                    default=0.0)
+            fin[n] = b + (0.0 if e["status"] == "done" else (e["dur"] or 60))
+        return fin[n]
+    return max((finish(n) for n in by), default=0.0)
 
 
 def newest_workspace():
@@ -1147,6 +1440,48 @@ def follow(log_path, webroot, test, stop, hop=False, live_ref=None):
         time.sleep(0.25)
 
 
+def place(n, port, who=None):
+    """--place N [--claim WHO]: the running viewer's placement.json, read for
+    N emulators.  With --claim, the N are also held for WHO (placement.py's
+    CLAIM_SEC, or until they show up running), so a parallel --place does
+    not hand out the same room."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/placement.json", timeout=5) as r:
+            p = json.load(r)
+    except Exception as e:
+        sys.exit(f"no placement: is live.py running on port {port}? ({e})")
+    if who:
+        worktree_roots()
+        take = _placement().claim(os.path.join(
+            _TREES["main"], "build", "placement-claims.jsonl"), p, n, who)
+    else:
+        take = p["order"][:n]
+    counts = collections.Counter(take)   # keeps the fill order
+    got = ", ".join(f"{m} {c}" for m, c in counts.items()) or "nowhere"
+    reserve = ", ".join(f"{k} {v}" for k, v in p["reserve"].items())
+    print(f"place {n}: {got}  (fill order {', '.join(p['prefer'])}; "
+          f"reserve {reserve}" + (f"; claimed for {who}" if who else "") + ")")
+    if n > len(take):
+        print(f"  only {len(take)} have room now; the other {n - len(take)} "
+              "would slow every emulator where they land: queue them")
+    for m in p["machines"]:
+        if "room" not in m:
+            why = ("down" if not m["up"] else "no runs logged yet"
+                   if not m.get("curve") else "no room figure")
+            print(f"  {m['name']}: {why}")
+            continue
+        held = "".join(f" - {k.replace('_', ' ')} {m[k]}"
+                       for k in ("claimed", "reserve", "owner_load") if k in m)
+        cv = " ".join(f"{k}:{v[0]:.2f}" for k, v in m["curve"].items())
+        print(f"  {m['name']}: room {m['room']} = knee {m['peak']} - "
+              f"{m['active']} running{held} (shift {m['shift']}, load "
+              f"{m['load1']}, {m['ncpu']} cores) · speed per emulator (1 = "
+              f"the test alone) by emulators running: {cv} ({m['runs']} runs)")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("workspace", nargs="?", help="a build/test-runs/<ws> dir "
@@ -1155,10 +1490,18 @@ def main():
     ap.add_argument("--peer", action="append", default=[], metavar="HOST[:PATH]",
                     help="also show this machine's workers, over ssh (repo at "
                     "~/ot6 there unless :PATH); repeatable")
+    ap.add_argument("--place", type=int, metavar="N",
+                    help="ask the running viewer (on --port) where the next N "
+                    "emulators should go, and exit")
+    ap.add_argument("--claim", metavar="WHO",
+                    help="with --place: hold those emulators for WHO for a "
+                    "couple of minutes, so parallel callers do not double-book")
     ap.add_argument("--emit", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
     if args.emit:     # the far end of a --peer connection
         return emit()
+    if args.place is not None:
+        return place(args.place, args.port, args.claim)
 
     ws = os.path.abspath(args.workspace) if args.workspace else newest_workspace()
     log = os.path.join(ws, "run.log") if ws else None
