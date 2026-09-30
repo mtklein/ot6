@@ -2,7 +2,7 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "wor-nikeah.sram",
   "size": 32768,
-  "sha256": "26e88fd1aaca7f66920bb80131bb5e8d04bc73ca099b25202a89a655c4986223",
+  "sha256": "ebd880b343ccc087cb63442258141d0329946dcb5e09d55096519c4e95dd5751",
   "slot": 3,
   "milestone": "wor-nikeah",
   "persistent_layout": "ot6-codex-o8-v1",
@@ -16,12 +16,12 @@
   },
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "26e88fd1aaca7f66920bb80131bb5e8d04bc73ca099b25202a89a655c4986223",
-    "generator_sig": "73bd3ae0ae45b57cfe13b226bfe6d4b690d874ba355a13a43f715eba76c91c9b gen_wor_nikeah tools/tests/checkpoints/wor-sabin-v1/manifest.json tools/tests/checkpoints/wor-sabin-v1/wor-sabin.sram",
+    "payload_sha256": "ebd880b343ccc087cb63442258141d0329946dcb5e09d55096519c4e95dd5751",
+    "generator_sig": "36cd8a98e5e24f5e65a51ceca68226f2e8ffb82cd31ec2227c4f8a7a17ac29df gen_wor_nikeah tools/tests/checkpoints/wor-sabin-v1/manifest.json tools/tests/checkpoints/wor-sabin-v1/wor-sabin.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/wor-sabin-v1/manifest.json",
-        "sha256": "3015f6695925384ba61800f1263c5c378bab004c1b81b64ef04655e4e9cb71fc"
+        "sha256": "3c9bdacfc6c5742e6558944b87ababaf212890f78c8ce5311cc92f6e93541a50"
       }
     ]
   }
