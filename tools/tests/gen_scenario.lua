@@ -815,6 +815,10 @@ H.run({ maxFrames = 700000, allowGameOver = true }, {
   end),
   H.saveState("scenario_hub.mss"),
   H.call(function()
+    assert(u1Req ~= nil, "ultros1_entry: no field dialog waited for a press " ..
+      "between the battle before Ultros's and his (u1Cand was never set " ..
+      "on that stretch), so there is no pre-seed point to capture; the " ..
+      "river's lead-in to Ultros changed")
     H.checkReq(u1Req, "ultros1_entry capture")
     H.emitBlob("ultros1_entry.mss", u1Req.blob)
   end),

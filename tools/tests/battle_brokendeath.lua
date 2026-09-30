@@ -45,16 +45,22 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 -- An attempt counts only when it shows BOTH the mid-break kill and #291's
 -- window (a standing monster's queued turn meeting its break), and that is a
--- property of the draw.  Four rungs, ten phases apart, derived from a sweep
--- of this door (build/attempts/wt/suite-honesty/brokendeath/): one rung
--- drawn at each of the 60 game-clock phases lands on 30 distinct seeds
--- (only those are drawable from here), 21 of which count; walking every
--- ladder base over that map -- rung 1 draws its base minus 3, a later rung
--- anything from its target minus 17 to minus 15, and a rung is credited
--- only if every seed it could draw counts -- the worst base needs its 4th
--- rung (N = 3 leaves bases with none).  The whole six-rung ladder, run from
--- all 60 seed shifts, needed at most 3.  The property is asserted over
--- every rung that ran, not only the one that counts.
+-- property of the draw.  Four rungs, ten phases apart, derived from this
+-- door's measured draws (build/attempts/wt/suite-honesty/brokendeath/
+-- round2/): 214 rungs, on three paths (rung 1 in place, a lab's one-rung
+-- sweep, and rungs after a reload), drew only the 30 phases that are 0 or 3
+-- mod 4, all of them measured, 22 counting in every measurement.  Rung 1
+-- draws its base minus 3.  A later rung's target falls, in runs of four,
+-- on a phase q = 3 mod 4 or on q + 1, and which one follows rung 1's own
+-- residue mod 4 (all 88 later rungs measured: 60 in a sweep of every target
+-- after a reload, 28 in the suite's ladders).  On that model the worst of
+-- the 30 bases this door can boot to needs its 3rd rung at gap 10, so four
+-- leaves one to spare; gap 15 leaves a base with no counting rung at N = 4.
+-- Crediting a later rung only when both q and q + 1 count, no gap-10 ladder
+-- of up to six rungs covers every base.  The six-rung gap-10 ladder run from
+-- all 60 seed shifts needed at most 3.  A regenerated fixture redraws this
+-- map.  The property is asserted over every rung that ran, not only the one
+-- that counts.
 local ATTEMPTS, GAP = 4, 10
 local L = H.newSeedSweep("battle 70", { attempts = ATTEMPTS, gap = GAP })
 local rungs = {}   -- per attempt: { n, windows, scripts, kill } (the verdict's record)
