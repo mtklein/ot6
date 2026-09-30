@@ -38,7 +38,9 @@ HH:MM (<ssh's reason>)` and never holds up this machine's tiles.
 
 Nothing is started on the other machine.  For each peer the viewer runs
 `ssh <host> 'cd ot6 && caffeinate -is python3 - --emit'` with its own
-`live.py` on stdin, so the peer stays awake while it is watched:
+`live.py` on stdin, so the peer stays awake while it is watched (on a
+Linux peer, `systemd-inhibit --what=idle` in place of `caffeinate -is`;
+see docs/TOOLING.md "Linux worker"):
 the far side scans its run logs (every worktree, plus clones under
 `.claude/worktrees/` or wherever a running Mesen's command line points),
 prints a JSON snapshot a second, and exits when the connection drops.  It

@@ -18,7 +18,19 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/ot6-shared-emulator-selftest.XXXXXXXX") || exit 1
 trap 'rm -rf "$TMP"' EXIT INT TERM
 CACHE="$TMP/cache"
-APP="$CACHE/Mesen-test.app"
+# The shapes run.sh provisions: a bundle on macOS, a directory holding the
+# single-file binary on Linux (docs/TOOLING.md "Linux worker").
+if [ "$(uname -s)" = Darwin ]; then
+  APP="$CACHE/Mesen-test.app"; BIN_SUB=/Contents/MacOS; TOP=Contents
+  SRC_BIN="$ROOT/tools/Mesen.app/Contents/MacOS/Mesen"
+  DEFAULT_CACHE=Library/Caches/ot6; DEFAULT_APP=Mesen-test.app
+  file_stamp() { stat -Lf '%z %m' "$1"; }
+else
+  APP="$CACHE/Mesen-test"; BIN_SUB=; TOP=Mesen
+  SRC_BIN="$ROOT/tools/Mesen-linux/Mesen"
+  DEFAULT_CACHE=.cache/ot6; DEFAULT_APP=Mesen-test
+  file_stamp() { stat -Lc '%s %Y' "$1"; }
+fi
 N=16
 fails=0
 fail() { echo "  FAIL  $*"; fails=$((fails + 1)); }
@@ -50,20 +62,20 @@ wave() {  # <label> <stagger seconds> <builds wanted>
 }
 
 bundle_ok() {  # the shape the gate promises, and nothing the build leaves behind
-  [ -x "$APP/Contents/MacOS/Mesen" ] || fail "$1: no executable at $APP/Contents/MacOS/Mesen"
-  [ ! -e "$APP/Contents/MacOS/settings.json" ] || fail "$1: settings.json survived into the shared copy"
-  [ "$(ls "$APP")" = Contents ] || fail "$1: the bundle holds more than Contents: $(ls "$APP" | tr '\n' ' ')"
-  [ "$(cat "$APP.stamp")" = "$(stat -Lf '%z %m' "$ROOT/tools/Mesen.app/Contents/MacOS/Mesen")" ] || fail "$1: stamp does not name the source binary"
+  [ -x "$APP$BIN_SUB/Mesen" ] || fail "$1: no executable at $APP$BIN_SUB/Mesen"
+  [ ! -e "$APP$BIN_SUB/settings.json" ] || fail "$1: settings.json survived into the shared copy"
+  [ "$(ls "$APP")" = "$TOP" ] || fail "$1: the bundle holds more than $TOP: $(ls "$APP" | tr '\n' ' ')"
+  [ "$(cat "$APP.stamp")" = "$(file_stamp "$SRC_BIN")" ] || fail "$1: stamp does not name the source binary"
   [ ! -e "$CACHE/.build.lock" ] || fail "$1: the lock was left held"
   [ -z "$(ls -d "$CACHE"/.build.* 2>/dev/null)" ] || fail "$1: build leftovers: $(ls -d "$CACHE"/.build.* | tr '\n' ' ')"
 }
 
 # The override's default is the machine-wide path: a worker given no
 # OT6_MESEN_CACHE provisions under HOME, here a scratch one.
-( HOME="$TMP/home" OT6_PROVISION_PROBE_OUT="$TMP/default.app" \
+( HOME="$TMP/home" XDG_CACHE_HOME= OT6_PROVISION_PROBE_OUT="$TMP/default.app" \
     "$ROOT/tools/tests/run.sh" "$TMP/probe.lua" "$TMP/default.log" > "$TMP/default.out" 2>&1 ) || fail "default cache: $(tail -n 1 "$TMP/default.out")"
-if [ "$(cat "$TMP/default.app" 2>/dev/null)" = "$TMP/home/Library/Caches/ot6/Mesen-test.app" ]; then
-  echo "  pass  OT6_MESEN_CACHE unset provisions under \$HOME/Library/Caches/ot6"
+if [ "$(cat "$TMP/default.app" 2>/dev/null)" = "$TMP/home/$DEFAULT_CACHE/$DEFAULT_APP" ]; then
+  echo "  pass  OT6_MESEN_CACHE unset provisions under \$HOME/$DEFAULT_CACHE"
 else fail "OT6_MESEN_CACHE unset provisioned at '$(cat "$TMP/default.app" 2>/dev/null)'"; fi
 rm -rf "$TMP/home"
 

@@ -811,10 +811,23 @@ def local_thread(board, stop, live_ref=None):
         stop.wait(1.0)
 
 
+# The peer's keep-awake wrapper, chosen on the peer.  macOS: caffeinate -is
+# (idle sleep, and system sleep on AC).  Linux: systemd-inhibit --what=idle,
+# which logind grants an ssh session without authentication; sleep and
+# lid-switch locks need interactive polkit auth, so a closed lid still
+# suspends there.  Neither available: run unwrapped rather than not at all.
+def awake(cmd):
+    """A remote shell line running cmd under the peer's keep-awake wrapper."""
+    return ("if command -v caffeinate >/dev/null 2>&1; then exec caffeinate -is "
+            f"{cmd}; elif systemd-inhibit --what=idle --who=ot6 --why=probe true"
+            " >/dev/null 2>&1; then exec systemd-inhibit --what=idle --who=ot6"
+            f" --why='live.py is watching' {cmd}; else exec {cmd}; fi")
+
+
 def peer_thread(board, peer, stop):
     """Another machine: ssh there, feed it this file on stdin as --emit, and
-    ingest its snapshot lines.  The emitter runs under `caffeinate -is`, so
-    the peer stays awake (idle sleep, and system sleep on AC) for as long as
+    ingest its snapshot lines.  The emitter runs under awake(), so
+    the peer stays awake for as long as
     this viewer watches it, and may sleep again once it stops.  Any failure (asleep, off the network, no
     repo) marks it down with the last diagnostic line and retries in 10s;
     ssh keepalives notice a peer that vanished mid-stream."""
@@ -825,8 +838,8 @@ def peer_thread(board, peer, stop):
         path = path[2:]      # ssh starts in $HOME; a quoted ~ would not expand
     cmd = ["ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
            "-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=2", host,
-           f"cd {shlex.quote(path)} && OT6_ROOT=\"$PWD\" "
-           "exec caffeinate -is python3 - --emit 2>&1"]
+           f"cd {shlex.quote(path)} && export OT6_ROOT=\"$PWD\" && "
+           + awake("python3 - --emit 2>&1")]
     with open(os.path.abspath(__file__), "rb") as f:
         src = f.read()
     while not stop.is_set():

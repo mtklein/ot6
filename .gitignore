@@ -6,6 +6,7 @@
 # no trailing slash: in agent worktrees these are SYMLINKS to the main
 # tree (tools/worktree-setup.sh), and dir-only patterns do not match those
 /tools/Mesen.app
+/tools/Mesen-linux
 /tools/bin
 /tools/calypsi/
 __pycache__/

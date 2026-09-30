@@ -13,8 +13,8 @@
 #   decoded into build/states/ and build/states/shots/ afterwards.
 # * Every invocation gets a fresh workspace under build/test-runs/.  OT6_WORKER
 #   is only a diagnostic label.  Every worker execs one shared read-only
-#   Mesen bundle and is kept apart by CFFIXED_USER_HOME (see "shared
-#   emulator" below).
+#   Mesen bundle and is kept apart by CFFIXED_USER_HOME (XDG_CONFIG_HOME on
+#   Linux; see "shared emulator" below).
 # * Exit code: 0 = pass, 1 = assertion/Lua error, 2 = frame budget exceeded.
 #   The [ot6] PASS/FAIL verdict in the log takes precedence over the raw
 #   process code.
@@ -141,19 +141,40 @@ COMPOSED="$PRELUDE"
 # or one per worktree: Mesen is ad-hoc signed but not notarized (see
 # docs/TOOLING.md), so macOS runs a Gatekeeper assessment on every new bundle
 # path.
-SRC_APP="$ROOT/tools/Mesen.app"
+#
+# Linux (docs/TOOLING.md "Linux worker") runs the official single-file x64
+# binary from tools/Mesen-linux/ the same way: one shared copy with no
+# settings.json beside it, under ~/.cache/ot6, and a private home per worker.
+# There .NET finds the home through XDG_CONFIG_HOME, which is the isolation
+# boundary in place of CFFIXED_USER_HOME.  The native libraries live inside
+# the binary, so the pre-seed loop below finds none and Mesen extracts them
+# into each fresh home itself (~0.05s).
 # OT6_MESEN_CACHE relocates the cache (shared_emulator_selftest.sh provisions
 # into a scratch one); the default is the machine-wide path above.
-MESEN_CACHE="${OT6_MESEN_CACHE:-$HOME/Library/Caches/ot6}"
-SHARED_APP="$MESEN_CACHE/Mesen-test.app"
+if [ "$(uname -s)" = Darwin ]; then
+  SRC_APP="$ROOT/tools/Mesen.app"
+  MESEN_CACHE="${OT6_MESEN_CACHE:-$HOME/Library/Caches/ot6}"
+  SHARED_APP="$MESEN_CACHE/Mesen-test.app"
+  BIN_SUB=/Contents/MacOS          # the executable's directory in the bundle
+  file_stamp() { stat -Lf '%z %m' "$1"; }
+  clone_cp() { cp -c "$@" 2>/dev/null || cp "$@"; }   # APFS clonefile
+  GATEKEEPER_NOTE="; expect a Gatekeeper scan"
+else
+  SRC_APP="$ROOT/tools/Mesen-linux"
+  MESEN_CACHE="${OT6_MESEN_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/ot6}"
+  SHARED_APP="$MESEN_CACHE/Mesen-test"
+  BIN_SUB=
+  file_stamp() { stat -Lc '%s %Y' "$1"; }
+  clone_cp() { cp --reflink=auto "$@"; }
+fi
 # Rebuild the shared copy when the source bundle changes (a Mesen upgrade).
 # -L: in a worktree tools/Mesen.app is a symlink into the main tree.
-SRC_STAMP=$(stat -Lf '%z %m' "$SRC_APP/Contents/MacOS/Mesen" 2>/dev/null) || {
+SRC_STAMP=$(file_stamp "$SRC_APP$BIN_SUB/Mesen" 2>/dev/null) || {
   echo "no Mesen at $SRC_APP (run tools/worktree-setup.sh?)"; exit 2; }
 
 shared_app_ready() {
-  [ -x "$SHARED_APP/Contents/MacOS/Mesen" ] &&
-  [ ! -e "$SHARED_APP/Contents/MacOS/settings.json" ] &&
+  [ -x "$SHARED_APP$BIN_SUB/Mesen" ] &&
+  [ ! -e "$SHARED_APP$BIN_SUB/settings.json" ] &&
   [ "$(cat "$SHARED_APP.stamp" 2>/dev/null)" = "$SRC_STAMP" ]
 }
 
@@ -179,22 +200,22 @@ if ! shared_app_ready; then
     # finished bundle down under every worker between its own look and its
     # exec (#242: three generate edges died that way on a cold cache).
     if ! shared_app_ready; then
-      echo "creating shared test emulator (one-time; expect a Gatekeeper scan)..."
+      echo "creating shared test emulator (one-time${GATEKEEPER_NOTE})..."
       TMP="$MESEN_CACHE/.build.$$"
       rm -rf "$TMP" "$SHARED_APP" "$SHARED_APP.stamp"
       # cp -c = APFS clonefile: instant and ~zero physical disk.  -L because
       # in a worktree the source is a symlink and cp -R would copy the LINK.
-      cp -c -RL "$SRC_APP" "$TMP" 2>/dev/null || cp -RL "$SRC_APP" "$TMP" || {
+      clone_cp -RL "$SRC_APP" "$TMP" || {
         rm -rf "$TMP"; echo "could not copy $SRC_APP"; exit 2; }
       # No settings.json (nor the .bak rotation Mesen leaves beside it) may
       # survive into the copy, or portable mode wins and every worker is back
       # on one shared config.
-      rm -f "$TMP/Contents/MacOS/settings.json" "$TMP"/Contents/MacOS/settings.*.bak
+      rm -f "$TMP$BIN_SUB/settings.json" "$TMP$BIN_SUB"/settings.*.bak
       # Profile dirs the source bundle accumulated while it was portable
       # belong to the user's play profile, not to the tests; they must not
       # ride along.
-      rm -rf "$TMP/Contents/MacOS/Saves" "$TMP/Contents/MacOS/SaveStates" \
-             "$TMP/Contents/MacOS/RecentGames" "$TMP/Contents/MacOS/Debugger"
+      rm -rf "$TMP$BIN_SUB/Saves" "$TMP$BIN_SUB/SaveStates" \
+             "$TMP$BIN_SUB/RecentGames" "$TMP$BIN_SUB/Debugger"
       mv "$TMP" "$SHARED_APP"
       printf '%s' "$SRC_STAMP" > "$SHARED_APP.stamp"
     fi
@@ -221,13 +242,26 @@ if [ -L "$STALE_APP" ] || [ -e "$STALE_APP" ]; then rm -rf "$STALE_APP"; fi
 # and -p keeps the mtimes it stamps them with.  Re-seed from scratch when the
 # emulator changes, so a home cannot serve a stale MesenCore.dylib to a newer
 # binary.
-MESEN2="$MESEN_HOME/Library/Application Support/Mesen2"
+if [ "$(uname -s)" = Darwin ]; then
+  MESEN2="$MESEN_HOME/Library/Application Support/Mesen2"
+  USER_SETTINGS="$HOME/Library/Application Support/Mesen2/settings.json"
+  # exec: backgrounded, the watchdog below must see Mesen's own pid.
+  run_mesen() { exec env CFFIXED_USER_HOME="$MESEN_HOME" "$@"; }
+else
+  MESEN2="$MESEN_HOME/.config/Mesen2"
+  USER_SETTINGS="${XDG_CONFIG_HOME:-$HOME/.config}/Mesen2/settings.json"
+  # DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: without it .NET loads ICU, which
+  # pulls the system libstdc++ in ahead of MesenCore.so; the official build
+  # links its own libstdc++ statically, the two collide, and MesenCore dies
+  # as it loads (std::bad_cast from a static std::regex; Ubuntu 26.04).
+  run_mesen() { exec env XDG_CONFIG_HOME="$MESEN_HOME/.config" \
+                  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 "$@"; }
+fi
 if [ "$(cat "$MESEN_HOME/.stamp" 2>/dev/null)" != "$SRC_STAMP" ]; then
   rm -rf "$MESEN_HOME"; mkdir -p "$MESEN2"
   for f in MesenCore.dylib MesenNesDB.txt libHarfBuzzSharp.dylib libSkiaSharp.dylib Satellaview; do
-    [ -e "$SHARED_APP/Contents/MacOS/$f" ] || continue   # let Mesen seed it itself
-    cp -c -Rp "$SHARED_APP/Contents/MacOS/$f" "$MESEN2/$f" 2>/dev/null ||
-      cp -Rp "$SHARED_APP/Contents/MacOS/$f" "$MESEN2/$f"
+    [ -e "$SHARED_APP$BIN_SUB/$f" ] || continue   # let Mesen seed it itself
+    clone_cp -Rp "$SHARED_APP$BIN_SUB/$f" "$MESEN2/$f"
   done
   printf '%s' "$SRC_STAMP" > "$MESEN_HOME/.stamp"
 fi
@@ -239,7 +273,7 @@ fi
 # With no settings.json at all Mesen ignores --testrunner and opens the GUI
 # setup wizard, so this is also what keeps a fresh home headless.
 python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
-  "$HOME/Library/Application Support/Mesen2/settings.json" \
+  "$USER_SETTINGS" \
   "$MESEN2/settings.json" \
   "$TEST_SAVES" || { echo "pin_test_saves.py failed; refusing to run unpinned"; exit 2; }
 
@@ -275,7 +309,7 @@ fi
 # carry Lua errors or watchdog kills; those go to the script log, which
 # nothing reads headless.  print() is the only channel out of a script, so a
 # script that stops printing reports nothing.  Kept for the ROM-info banner.
-# CFFIXED_USER_HOME is the isolation boundary measured above.
+# run_mesen's home variable is the isolation boundary measured above.
 CAP="${OT6_TIMEOUT:-600}"
 # A timeout kill carries no result, so the harness retries it instead of
 # reporting it.  The cap is wall clock and `nice` does not slow the wall, so
@@ -305,8 +339,7 @@ while :; do
   # its first seconds (the tiles record at frame 21 at the latest), so a
   # log with no [ot6] line after OT6_LOAD_GRACE seconds is that death:
   # kill it and say so as a FAIL, which is deterministic and never retried.
-  env CFFIXED_USER_HOME="$MESEN_HOME" \
-    "$SHARED_APP/Contents/MacOS/Mesen" --testrunner --timeout="$CAP" --enableStdout \
+  run_mesen "$SHARED_APP$BIN_SUB/Mesen" --testrunner --timeout="$CAP" --enableStdout \
     "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1 &
   mesen_pid=$!
   load_grace="${OT6_LOAD_GRACE:-120}"
