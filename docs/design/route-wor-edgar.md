@@ -66,7 +66,9 @@ measurement.
    seized member simply gets no window; measured (section 12), the Seize
    keeps the fight long. With SABIN's Air Blade the variation set won it
    13 times in 13; the lab's draws show no measured difference between
-   Air Blade (11 of 12) and Pummel (10 of 12).
+   Air Blade (11 of 12) and Pummel (10 of 12). Air Blade and the stop's
+   kit are informed choices (the party has not met the Tentacles; section
+   12.2).
 6. **No shop on the stretch sells Tonics.** Nikeah (58) and South Figaro
    (63) sell Potions; field care stays on Potions, as on the Sabin
    stretch. Figaro Castle's shops refuse a party with SABIN or EDGAR in it
@@ -898,7 +900,9 @@ surfacing at (81,84) with the parent tile (81,85). What it did not know:
   $011B`, `char 6's R-hand item $0E (ice) ... $013C`, `... $0F (bolt) ...
   $013D` (`leg3/tent1.log`); hence the stop's kit, and the Enhancer bought
   in South Figaro so that EDGAR's Optimum takes the Break Blade, not a
-  Blizzard or ThunderBlade.
+  Blizzard or ThunderBlade. The kit is informed: the absorbs are the ROM's
+  data, and the party has not met the Tentacles (#324 is the in-battle
+  hand swap a first-time player would make on seeing a heal).
 - **`H.talkToObj`'s approach fights by mashing A** (its navTo plays
   battles with `playBattles = true`). Talking to Gerad through it fought
   the Tentacles by mashing -- no driver line, every member dead with 5 BP
@@ -946,8 +950,9 @@ twelve against Pummel's two, but on the same twelve draws Pummel lost s5
 and s9, which Air Blade won, and Air Blade lost s8, which Pummel won
 (`tent_l30.out`, `tent_l30_airblade.out`): one loss against two is no
 measured difference. The shipped segment grinds to L30 and sets his blitz
-to Air Blade for this fight; with it the variation set below won the
-Tentacles in all 13 runs that reached them.
+to Air Blade for this fight (informed: "none absorbs wind" is read from
+the ROM, not seen); with it the variation set below won the Tentacles in
+all 13 runs that reached them.
 
 ### 12.3 Under real draw variation
 
@@ -1095,8 +1100,8 @@ first: from then on each arrival in the cave and the basements puts them
 on whoever lacks one, SABIN, EDGAR, CELES in that order (the checkpoint's
 bag holds one; NeckHunters drop more, 1 to 5 in the bag by the engine
 room across the draws). The usual relics go back for the Tentacles, none
-of which Muddles, and again out of the castle, so wor-edgar-v1 saves in
-them. A relic change on a Genji Glove wearer re-runs the game's Optimum
+of which Muddles (informed: read from their scripts, not met), and again
+out of the castle, so wor-edgar-v1 saves in them. A relic change on a Genji Glove wearer re-runs the game's Optimum
 (menu `CheckReequipRelics`), so relics change before a stop's kit step,
 and the hands go back where no kit step follows; the first cut lost the
 Tentacles to the absorb guard when CELES's Optimum took the Break Blade
@@ -1114,7 +1119,7 @@ formations counted from each run's `[outcome]` and `[death]` lines):
 | main's gen (`base/`, K 0-10) | 11 of 11 | 42, 42, 2 (`k4`: CELES from 1116, `k5`: CELES from 372 holding 3 BP, both `by nobody` under main's death watch) | 31, all won, no death | 11 of 11 |
 | rings from the start (`final/`, K 0-10) | 11 of 11 | 42, 42, 1 (`k0`: CELES from 71 by slot 1, holding 4 BP) | 31, all won, no death (the Drops once) | 11 of 11 |
 | rings from the start (`final/`, K 0 and 3 at shifts 23, 41) | 3 of 4 | 19, 19, 0 | 5, all won, no death (the Drops once) | 3 of 4 (`k3_s23`: `battle $1C6 LOST after 26675 ticks: killed none`) |
-| **this gen** (`final2/`, K 0-10; main merged, ROM `1ef410a3`) | **11 of 11** | **41, 41, 0** | 32, all won, no death (the Drops once) | 11 of 11 |
+| **this gen** (`final2/`, K 0-10; main merged, ROM `1ef410a3`) | **11 of 11** | **41, 41, 0** | 30, all won, no death (the Drops once) | 11 of 11 |
 | **this gen** (`final2/`, K 0 and 3 at shifts 23, 41) | **4 of 4** | **20, 20, 0** | 6, all won, no death (the Drops twice) | 4 of 4 |
 
 `final/` put SABIN's ring on before the cave, which is foreknowledge, and
@@ -1183,7 +1188,8 @@ the encounter counter, and three things that draw finds:
   (one draw, K = 3 at shift 23, met twice), its 139 normal fights lost 3
   (`analysis/battle_type_*.txt`; `before_snap/k9_s0` has no `[outcome]`
   line). The bag holds a Back Guard ($E1, the relic
-  #250 put on CELES for Tzen's house): on CELES in place of her Jewel Ring,
+  #250 put on CELES for Tzen's house, where it goes on before the house's
+  clock, so no pincer happens there): on CELES in place of her Jewel Ring,
   330 lab fights, all normal, none lost, 6 with a death
   (`arms/new_bg_nocure_c68`, `arms/new_bg_ringnow_nocure_c68`).
 - **The cure-hit with the Peace Ring on.** With SABIN's ring on, Muddle
@@ -1207,7 +1213,11 @@ the encounter counter, and three things that draw finds:
 **What changed.** gen_wor_edgar wears the Back Guard on CELES from the
 cave's door to the stop before Edgar and again after the Tentacles (her
 Jewel Ring back for the Tentacles and the save; the Peace Rings go to
-SABIN and EDGAR), leaves a Muddled ally to the monsters in the cave and
+SABIN and EDGAR). That is informed: it goes on at the door whatever the
+run has met, on the lab numbers above. The lineage has been pincered on
+the way here (the re-cut captures: 1 pincer in `wor-tzen-door-v1.log`, 2
+in `wor-nikeah-v1.log`, `build/attempts/wt/recut/capture/`), but those
+are draws, and the generator does not read them. It also leaves a Muddled ally to the monsters in the cave and
 the basements (`unmuddle = false`, CAVE_FIGHT), and cares to full again on
 the tile below Gerad. The leg under the same variation (K = 0-10 at shift
 0, K = 0 and 3 at shifts 23 and 41; `after2/`): **13 of 15**; formation 232
@@ -1222,26 +1232,36 @@ frames as the re-cut's). `wor-edgar-v1` is re-cut through the generator
 (`capture/capture_edgar.log`: `PASS (frame 101654) attempts=1/3`, sealed
 `bd3d3dce...`, `holds=slot 3 world 1 (81,86)`; the Continue probe passes).
 
-**The Tentacles stay a coin flip.** Every in-battle draw of the fight is
-one of 60 (`$021e`), so a sweep of 60 waits from one engine-room snapshot
-covers them: 59 of 60 and 54 of 60 from two re-cut states at
-L31/31/31 (`tent/sweep60_k0`, `tent/sweep60_k2`); across the re-cut
-chain's generator runs 45 of 52. Levels are not the lever at this
-size: a grind to L32 (48-52 legs against 17) meets the Tentacles at
-L33-34 and won 59 of 60 from each of its K = 0 and K = 2 states
-(`tent/sweep60_L32_k0`, `tent/sweep60_L32_k2`: 118 of 120 against 113 of
-120 at L31),
-while the old chain's L32/31/31 states lost 4 of 33 (`tent/old_base`);
-the cave at L32 lost 2 of 176 against 2 of 150 at L30 from the same two
-draws (`arms/L32_base_c68`, `arms/L30_k02_c68`). The grind stays at L30.
+**The Tentacles are lost now and then, more from some states than
+others.** The fight's in-battle draw seeds from `$021e` (one of 60), but
+60 waits from one engine-room snapshot did not reach 60 distinct draws:
+counted by battle key (`$be` with the group and the encounter counters,
+the runner's `[seed] first battle` line), the two re-cut states at
+L31/31/31 won 59 of 60 runs over 39 distinct keys, 38 all won and one
+key won once and lost once (`tent/sweep60_k0`), and 54 of 60 over 40
+keys, 4 of them lost every time (`tent/sweep60_k2`); across the re-cut
+chain's generator runs 45 of 52 (runs, not keys: a generator log keys
+only a run's first battle). The grind to L32 (48-52 legs against 17)
+meets the Tentacles at L33-34 and won 59 of 60 from each of its K = 0
+and K = 2 states: 49 keys with 1 lost, and 44 keys with 1 won once and
+lost once (`tent/sweep60_L32_k0`, `tent/sweep60_L32_k2`). So 2 of 93
+keys lost at L32 against 5 of 79 at L31 (118 of 120 runs against 113 of
+120): suggestive of a gain from levels, from two states each, not a
+measured null. The old chain's L32/31/31 states lost 4 of 33, 33
+distinct keys (`tent/old_base`); the cave at L32 lost 2 of 176 against 2
+of 150 at L30 from the same two draws (`arms/L32_base_c68`,
+`arms/L30_k02_c68`). The grind stays at L30. (Key counts:
+`build/attempts/wt/edgar-honest/tent_keys.txt`.)
 
 ## 13. What is left, and what the owner may want to decide
 
-- **The Tentacles** (12.2, 12.5): lost from full HP in about one draw in
-  ten (1 and 6 of 60 in two states' sweeps; 7 of 52 re-cut generator
-  runs), most deaths the Seize's drain (`cmd $2D`). A lab on the Seize (who acts while a
-  member is held, and whether Air Blade's turns are the right ones) is the
-  next step; levels did not move it measurably.
+- **The Tentacles** (12.2, 12.5): lost from full HP at a rate that
+  depends on the state: 1 of 39 and 4 of 40 distinct draws in two L31
+  states' sweeps (1 and 6 of 60 runs), 7 of 52 re-cut generator runs;
+  most deaths the Seize's drain (`cmd $2D`). A lab on the Seize (who acts
+  while a member is held, and whether Air Blade's turns are the right
+  ones) is the next step. A grind to L32 lost 2 of 93 distinct draws
+  against 5 of 79 at L31, from two states each: suggestive, not settled.
 
 - **The cave's Muddle** (12.4): with the Peace Rings the pair still
   loses 1 or 2 formation-232 fights in about 165 in the lab, each with
