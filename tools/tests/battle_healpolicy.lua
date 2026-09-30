@@ -369,6 +369,27 @@ H.run({ maxFrames = 3000 }, {
       "a dead muddled ally is the raise rule's business, not a hit")
     H.assertEq(H.muddleRule({ actor = 2, status2 = { [0] = 0, [1] = 0, [2] = 0, [3] = 0 },
                               hp = full, maxhp = full }), nil, "nobody muddled: nothing to do")
+    -- the floor (#320): the cure-hit is not aimed at an ally it would
+    -- kill -- the lab's SABIN, Peace Ring on, killed CELES at 75/1595
+    -- with it; the ally comes back as `held`, and one above it is hit
+    local r, held = H.muddleRule({ actor = 1, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
+      hp = { [0] = 75, [1] = 1509, [2] = 0, [3] = 0 }, maxhp = { [0] = 1595, [1] = 1609, [2] = 0, [3] = 0 },
+      floor = { [0] = 398 } })
+    H.assertEq(r, nil, "a muddled ally at 75 under a floor of 398: no cure-hit")
+    H.assertEq(held, 0, "...and it is said as held")
+    H.assertEq(H.muddleRule({ actor = 1, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
+      hp = { [0] = 1134, [1] = 1509, [2] = 0, [3] = 0 }, maxhp = { [0] = 1595, [1] = 1609, [2] = 0, [3] = 0 },
+      floor = { [0] = 398 } }), 0, "a muddled ally above the floor: hit it to clear it")
+    -- the boundary: an ally standing exactly on the floor is one the
+    -- measured hit would kill (hp - hit = 0), so it is held too
+    r, held = H.muddleRule({ actor = 1, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
+      hp = { [0] = 398, [1] = 1509, [2] = 0, [3] = 0 }, maxhp = { [0] = 1595, [1] = 1609, [2] = 0, [3] = 0 },
+      floor = { [0] = 398 } })
+    H.assertEq(r, nil, "a muddled ally exactly at the floor (398 of a 398 hit): no cure-hit")
+    H.assertEq(held, 0, "...and it is said as held")
+    H.assertEq(H.muddleRule({ actor = 1, status2 = { [0] = 0x20, [1] = 0, [2] = 0, [3] = 0 },
+      hp = { [0] = 399, [1] = 1509, [2] = 0, [3] = 0 }, maxhp = { [0] = 1595, [1] = 1609, [2] = 0, [3] = 0 },
+      floor = { [0] = 398 } }), 0, "one HP above the floor: hit it")
     H.log("battle_healpolicy: refined raise gate, ATB read and Muddle rule checked")
   end),
 
