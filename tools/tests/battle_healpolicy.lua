@@ -830,6 +830,34 @@ H.run({ maxFrames = 3000 }, {
     end
     H.assertEq(pool >= 24, true, string.format(
       "a run of randoms leaves SABIN %d/94 after %d Pummels, never under the 24 kept", pool, spent))
+    -- The wiring: H.kitBoost is the driver's own decision (every Blitz and
+    -- Tools line calls it), reading the random flag OT6_RANDBTL ($57BD) and
+    -- the caster's MP ($3C08) and max MP ($3C30) from the battle.  The
+    -- battle here is a table of those bytes; every other byte reads 0, so
+    -- the neighbouring $57BC (RANDPEND) reads clear.
+    local function battle(random, mp, maxMp)
+      local bytes = { [0x57BD] = random and 1 or 0 }
+      local words = { [0x3C08] = mp, [0x3C30] = maxMp }
+      return { byte = function(a) return bytes[a] or 0 end,
+               word = function(a) return words[a] or 0 end }
+    end
+    local kb, kprice, kwhy = H.kitBoost(0, PUMMEL, 3, battle(true, 84, 94))
+    H.assertEq(tostring(kb) .. "/" .. tostring(kprice), "1/10",
+      "the driver's Pummel at 84/94 in a random: boost 3 steps down to 1 (" .. tostring(kwhy) .. ")")
+    kb, kprice, kwhy = H.kitBoost(0, PUMMEL, 3, battle(false, 84, 94))
+    H.assertEq(tostring(kb) .. "/" .. tostring(kprice), "3/63",
+      "...and in an event battle the bank's boost 3, 63 MP (" .. tostring(kwhy) .. ")")
+    -- the ration under the base price: EDGAR's Drill (base 16) at 30 of 57
+    -- in a random -- the turn may spend min(30 - 15, 14) = 14, under 16,
+    -- and the unboosted Drill would breach the 15 kept, so he Fights
+    local DRILL = 0xA8
+    H.assertEq(H.abilityCost(DRILL), 16, "the Drill's base price is 16 MP (Ot6AbilityCostTbl)")
+    kb, kprice, kwhy = H.kitBoost(0, DRILL, 2, battle(true, 30, 57))
+    H.assertEq(kb, nil, "the Drill at 30/57 in a random: nothing fits over the 15 kept, "
+      .. "the line is not offered and EDGAR Fights (" .. tostring(kwhy) .. ")")
+    kb, kprice = H.kitBoost(0, DRILL, 2, battle(false, 30, 57))
+    H.assertEq(tostring(kb) .. "/" .. tostring(kprice), "0/16",
+      "...the same pool in an event battle pays the unboosted Drill")
     H.log("battle_healpolicy: the kit's random-battle MP budget checked")
   end),
 
