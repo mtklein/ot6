@@ -33,6 +33,12 @@ every step of that dance hits for the boosted amount (x2, x4 or x8)
 until the dance ends. The price is unchanged, paid once when the dance
 starts.
 
+**A Dance that stumbles costs nothing.** Away from its own terrain, a
+Dance still stumbles half the time, as in the original. A stumble used to
+take the Dance's MP and any boost pips even though no dance started. Now
+a stumble costs no MP and no pips, and Mog gains his pip for the turn as
+he would after any unboosted action.
+
 **Terra and Celes learn short spell lists, Espers give short ones, and stronger
 spells come only from boosting.** Nobody learns Fire 2, Ice 3, Cure 2 or any
 other stronger version by level, and no Esper gives one: boost the plain
