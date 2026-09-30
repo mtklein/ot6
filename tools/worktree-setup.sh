@@ -13,7 +13,9 @@ HERE=$(pwd)
 
 ROM="Final Fantasy III (USA).sfc"
 [ -f "$HERE/$ROM" ] || cp "$MAIN/$ROM" "$HERE/$ROM"
-[ -e "$HERE/tools/Mesen.app" ] || ln -s "$MAIN/tools/Mesen.app" "$HERE/tools/Mesen.app"
+# Linux runs the single-file binary in tools/Mesen-linux/ (docs/TOOLING.md).
+MESEN=Mesen.app; [ "$(uname -s)" = Darwin ] || MESEN=Mesen-linux
+[ -e "$HERE/tools/$MESEN" ] || ln -s "$MAIN/tools/$MESEN" "$HERE/tools/$MESEN"
 [ -e "$HERE/tools/bin" ] || ln -s "$MAIN/tools/bin" "$HERE/tools/bin"
 
 # Seed generated savestates so boot-chain fixtures don't replay the whole
