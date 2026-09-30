@@ -31,12 +31,14 @@
 -- No emulator state writes: random/ungated battles are fought by the
 -- library fighter (H.newWalkFighter, #183); battle 47
 -- (the trap ghost) and battle 68 (the Ghost Train) are played with real
--- input, each behind a checkpoint retry sweep. SABIN's first two turns
--- against the Ghost Train are AuraBolt (chips a shield, reveals HOLY) and
--- Pummel (chips another, reveals OT6_BLUDG); after that all three attack
--- with banked-boost Fights, healing under 50% from the ghost merchant's
--- bag. Fenix Down is never selected, so the generated state records a
--- real fight.
+-- input; battle 47 sits behind a checkpoint retry sweep, battle 68 is
+-- fought once and a wipe there is the segment runner's to retry. SABIN's
+-- first two turns against the Ghost Train are AuraBolt (chips a shield,
+-- reveals HOLY) and Pummel (chips another, reveals OT6_BLUDG); after that
+-- all three attack with banked-boost Fights, healing under 50% from the
+-- ghost merchant's bag, reviving the fallen with Fenix Down and curing an
+-- Imp with the bag's cure. The train killed before its sixth shield comes
+-- off is a win (docs/guidelines.md, #311), logged as a [tuning] line.
 --
 -- Win tail: victory scene -> the souls' station (Cyan's family) -> map 137
 -- (1200-frame timer) -> auto-exit to the world at (178,93). SHADOW steps
@@ -207,11 +209,12 @@ local function battInvIdx(id)
   return nil
 end
 
-local ENCOUNTER_ALLOWANCE = 12000
+-- maxFrames is a walking budget: navTo charges only the frames spent
+-- walking, not those in a battle or a care stop (lib/ot6_field.lua), so a
+-- leg that meets encounters needs no allowance on top of it.
 local function nav(x, y, o)
   o = o or {}
   o.playBattles = "tactical"
-  o.maxFrames = (o.maxFrames or 20000) + ENCOUNTER_ALLOWANCE
   return H.navTo(x, y, o)
 end
 
@@ -557,7 +560,7 @@ local function closeShop()
 end
 
 local b68 = {
-  casts = 0, chips = {}, plan = nil, planActor = nil,
+  casts = 0, chips = {}, plan = nil, planActor = nil, impCure = {},
   brokeAt = nil, impossible = nil, itemsOut = false,
   lastSH, lastHP,
 }
@@ -603,6 +606,38 @@ local function makePlan(actor)
     return { kind = "item", item = ANTIDOTE, target = actor,
              row = itemRow }
   end
+  -- Imp: an imp's Fight lands for 0 and its Blitz and Throw are greyed
+  -- (lib/ot6.lua's ST1_IMP note), so a person cures it -- the actor's own
+  -- first, then SABIN's (his Blitz is the chip engine), then anyone's --
+  -- with the bag's cure, read from the ROM's item records (Green Cherry,
+  -- then Remedy).  With no cure in the bag the imp fights on below.
+  -- One cure per imp: a cure an ally has already planned on it is not
+  -- doubled while it is in flight -- until that ally's next command menu
+  -- (its queued action has run by then) or its death.
+  for e, rec in pairs(b68.impCure) do
+    if rec.by == actor or pHP(rec.by) == 0 then b68.impCure[e] = nil end
+  end
+  local impOrder = { actor, sabinE, cyanE, shadowE }
+  for _, e in ipairs(impOrder) do
+    if e and itemRow and pHP(e) > 0 and not b68.impCure[e]
+       and (H.readByte(0x3EE4 + e * 2) & H.ST1_IMP) ~= 0 then
+      local cure = H.statusCure({ byte = 1, bit = H.ST1_IMP,
+        has = function(item) return battInvIdx(item) ~= nil end })
+      if cure then
+        b68Log(string.format("cure e%d: e%d is an IMP -- item $%02X [%s]",
+          actor, e, cure, partyLine()))
+        b68.impCure[e] = { by = actor }
+        return { kind = "item", item = cure, target = e, row = itemRow }
+      end
+      if not b68.impSaid then
+        b68.impSaid = true
+        b68Log(string.format("e%d is an IMP and the bag holds no cure " ..
+          "(Green Cherry %d, Remedy %d) -- fighting on [%s]", e,
+          invCount(H.GREEN_CHERRY), invCount(REMEDY), partyLine()))
+      end
+    end
+  end
+  local imp = (H.readByte(0x3EE4 + actor * 2) & H.ST1_IMP) ~= 0
   local hp, mx = pHP(actor), pMaxHP(actor)
   local broken = shields == 0
   local cyanLimit, sabinLimit, shadowLimit = 15, 13, 9
@@ -643,7 +678,7 @@ local function makePlan(actor)
     local p = healPlan(tgt, miss)
     if p then return p end
   end
-  if actor == sabinE and shields > 0 then
+  if actor == sabinE and shields > 0 and not imp then
     if not b68.holyRevealed and pMP(sabinE) >= 10 then
       b68Log(string.format("plan chip 1: AURABOLT (mp %d, sh %d, trainHP %d) " ..
         "[%s]", pMP(sabinE), shields, H.readWord(MHP(gSlot)), partyLine()))
@@ -660,7 +695,7 @@ local function makePlan(actor)
       "Pummel costs 4 and AuraBolt 10, so the rest of this break is not " ..
       "fundable and he falls back to Fight", shields, pMP(sabinE)))
   end
-  if actor == shadowE and shields > 0 and b68.holyRevealed
+  if actor == shadowE and shields > 0 and b68.holyRevealed and not imp
      and battInvIdx(FIRE_SKEAN) then
     b68Log(string.format("throw: SHADOW FIRE SKEAN (%d left, sh %d) " ..
       "trainHP=%d [%s]", invCount(FIRE_SKEAN), shields,
@@ -668,21 +703,23 @@ local function makePlan(actor)
     return { kind = "throw", item = FIRE_SKEAN,
              row = cmdRowOf(actor, CMD_THROW) }
   end
-  if actor == shadowE and battInvIdx(SHURIKEN) then
+  if actor == shadowE and not imp and battInvIdx(SHURIKEN) then
     b68Log(string.format("throw: SHADOW Shuriken (%d left) trainHP=%d [%s]",
       invCount(SHURIKEN), H.readWord(MHP(gSlot)), partyLine()))
     return { kind = "throw", item = SHURIKEN,
              row = cmdRowOf(actor, CMD_THROW) }
   end
-  if actor == sabinE and pMP(sabinE) >= 13 then
+  if actor == sabinE and not imp and pMP(sabinE) >= 13 then
     b68Log(string.format("cast: SABIN Suplex (mp %d) trainHP=%d [%s]",
       pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
     return { kind = "blitz", skill = SUPLEX,
              row = cmdRowOf(actor, CMD_BLITZ) }
   end
-  local bp = math.min(H.readByte(BP + actor * 2), 3)
-  b68Log(string.format("cast e%d: Fight boost=%d trainHP=%d sh=%d [%s]",
-    actor, bp, H.readWord(MHP(gSlot)), shields, partyLine()))
+  -- an imp's Fight lands for 0: the pips stay banked for after the cure
+  local bp = imp and 0 or math.min(H.readByte(BP + actor * 2), 3)
+  b68Log(string.format("cast e%d: Fight boost=%d%s trainHP=%d sh=%d [%s]",
+    actor, bp, imp and " (an IMP)" or "", H.readWord(MHP(gSlot)), shields,
+    partyLine()))
   return { kind = "fight", boost = bp }
 end
 
@@ -848,6 +885,7 @@ local function b68Observe()
   end
   if hp == 0 and b68.killedAt == nil and b68.lastHP and b68.lastHP > 0 then
     b68.killedAt = H.frame
+    b68.killParty = partyLine()
     b68Log(string.format("train at 0 HP at f%d (brokeAt=%s)", H.frame,
       tostring(b68.brokeAt)))
   end
@@ -856,7 +894,6 @@ end
 
 
 local L47 = H.newSeedSweep("battle 47")
-local L68 = H.newSeedSweep("battle 68", { attempts = 5 })
 local b47Blob, b47won = nil, false
 local function b47Won() return b47won end
 local function b47Checkpoint()
@@ -945,56 +982,57 @@ end
 -- two cars back: Antidotes, used inside battle 47 before the ghosts are
 -- killed.)
 
--- ------------------------------------------------- the battle-68 ladder --
-local b68Blob, b68won = nil, false
+-- ------------------------------------------------------- battle 68 --
+-- One fight, played out.  A win is a win however many shields came off
+-- (the owner's ruling on #311, docs/guidelines.md "A win is a win and a
+-- loss is a loss"): a train killed before its break is logged as a
+-- [tuning] line and the segment moves on.  Only a loss is a loss -- the
+-- party wiped (or the canary's game over) -- and it is raised as LOST,
+-- which the segment runner retries from the boot point, bounded and
+-- counted like any wipe.  (This used to be a five-rung reload ladder that
+-- also re-rolled a WON fight with fewer than six shields off, and gave up
+-- on a live fight when SABIN was Imp'd or down before the break.)
+--
+-- The fight's draw is logged at InitBattle's seed store as a key -- the
+-- battle seed $be and the battle group ($11E0), the lib's first-battle key
+-- shape -- so a set of runs can count distinct fights rather than runs.
+local b68won = false
+local b68Arm = false
 local function b68Won() return b68won end
-local function b68Checkpoint()
-  local ckReq
-  return H.cond(function() return true end, {
-    H.call(function() ckReq = H.requestSaveState() end),
-    H.waitFrames(2),
-    H.call(function()
-      H.checkReq(ckReq, "b68 checkpoint")
-      b68Blob = ckReq.blob
-      H.log(string.format("[train] b68 checkpoint captured (%d bytes) f%d",
-        #b68Blob, H.frame))
-    end),
-  }, {})
+local function b68KeyWatch()
+  return H.call(function()
+    local addr = H.seedStoreAddr()
+    emu.addMemoryCallback(function()
+      if not b68Arm then return end
+      b68Arm = false
+      -- exec callbacks fire before the instruction: A is the seed
+      local seed = emu.getState()["cpu.a"] & 0xff
+      H.log(string.format("[b68] battle key be%02X-g%04X ($021e=%d f%d)",
+        seed, H.readWord(0x11e0), H.seedPhase(), H.frame))
+    end, emu.callbackType.exec, addr, addr)
+  end)
 end
-local function b68Attempt(n)
-  local ldReq
-  return H.cond(function() return not b68won end, {
-    H.cond(function() return n > 1 end, {
-      H.logStep(function()
-        return string.format("[train] b68 ATTEMPT %d -- reloading (%s)",
-          n, tostring(lost))
-      end),
-      H.call(function() ldReq = H.requestLoadState(b68Blob) end),
-      H.waitFrames(2),
-      H.call(function()
-        H.checkReq(ldReq, "b68 attempt " .. n)
-        H.gameOverFired = 0             -- the lost attempt's count
-      end),
-      H.waitFrames(60),                 -- settle the reload before driving
-    }, {}),
-    L68.spread(n),                      -- spread the battle RNG phase (#83)
+local function b68Fight()
+  return H.cond(function() return true end, {
     H.call(function()
       lost, wipeN = nil, 0
-      H.gameOverFired = 0
       b68.casts, b68.chips = 0, {}
       b68.plan, b68.planActor = nil, nil
       b68.brokeAt, b68.killedAt, b68.brokeHP = nil, nil, nil
+      b68.killParty = nil
       b68.shieldsOff = 0
       b68.holyRevealed, b68.bludgRevealed = false, false
       b68.itemsOut = false
       b68.lastSH, b68.lastHP = nil, nil
-      b68.tornDown, b68.mstreak, b68.sabinDeadN = 0, 0, 0
-      b68.oddState, b68.oddN, b68.sabinImpN = nil, 0, 0
+      b68.tornDown, b68.mstreak = 0, 0
+      b68.oddState, b68.oddN, b68.impSaid = nil, 0, false
+      b68.impCure = {}
       gSlot, sabinE, cyanE, shadowE = nil, nil, nil, nil
       b68Watch.reset()
     end),
     H.cond(function() return lost ~= nil end, { H.waitFrames(1) }, {
     nav(32, 7, { maxFrames = 8000 }),
+    H.call(function() b68Arm = true end),   -- the next battle seeded is 68
     upA(function() return sw(0x3A) == 1 end, "smokestack switch", 4000),
     (function()
       local phase = 0
@@ -1028,9 +1066,9 @@ local function b68Attempt(n)
       H.assertEq(shadowE ~= nil, true, "SHADOW found in a party entity")
       local lv = H.readByte(0x3B18 + sabinE * 2)
       H.log(string.format(
-        "[b68] attempt %d: slot %d, SABIN e%d lv%d mp %d/%d, CYAN e%d, " ..
+        "[b68] entry: slot %d, SABIN e%d lv%d mp %d/%d, CYAN e%d, " ..
         "SHADOW e%d | tonics=%d potions=%d gil=%d",
-        n, gSlot, sabinE, lv, pMP(sabinE), H.readWord(0x3C30 + sabinE * 2),
+        gSlot, sabinE, lv, pMP(sabinE), H.readWord(0x3C30 + sabinE * 2),
         cyanE, shadowE, invCount(TONIC), invCount(POTION), gil()))
       H.assertEq(lv >= 6, true, "SABIN level 6+ -- AuraBolt learned")
       -- the authored row, live: the runtime proof of GhostTrain's 6-shield
@@ -1052,9 +1090,9 @@ local function b68Attempt(n)
       return H.driveUntil(function()
         frames = frames + 1
         if frames > 145000 and lost == nil then
-          lost = string.format("b68 attempt %d deadline (145000 frames) " ..
-            "[%s]", n, partyLine())
-          H.log("[b68] LOST -- " .. lost)
+          lost = string.format("b68 deadline (145000 frames) with no win " ..
+            "and no wipe seen [%s]", partyLine())
+          H.log("[b68] STALLED -- " .. lost)
         end
         return lost ~= nil or b68.tornDown >= 3
       end, 150000, {
@@ -1071,32 +1109,9 @@ local function b68Attempt(n)
           end
           b68.tornDown = 0
           b68Observe()
-          -- SABIN down pre-break: the chip engine is gone, and there is no
-          -- Fenix Down on the pacifist line, so this attempt is over
-          if pHP(sabinE) == 0 and H.readByte(SH(gSlot)) > 0 then
-            b68.sabinDeadN = b68.sabinDeadN + 1
-            if b68.sabinDeadN >= 90 and not lost then
-              lost = string.format("SABIN down pre-break at f%d " ..
-                "(shields=%d casts=%d) [%s]", H.frame,
-                H.readByte(SH(gSlot)), b68.casts, partyLine())
-              H.log("[b68] LOST -- " .. lost)
-              H.screenshot("train_b68_lost")
-            end
-          else
-            b68.sabinDeadN = 0
-          end
-          if (H.readByte(0x3EE4 + sabinE * 2) & 0x20) ~= 0
-             and H.readByte(SH(gSlot)) > 0 then
-            b68.sabinImpN = (b68.sabinImpN or 0) + 1
-            if b68.sabinImpN >= 90 and not lost then
-              lost = string.format("SABIN is Imp'd pre-break at f%d, so no " ..
-                "Blitz and no more chips (shields=%d casts=%d) [%s]",
-                H.frame, H.readByte(SH(gSlot)), b68.casts, partyLine())
-              H.log("[b68] LOST -- " .. lost)
-            end
-          else
-            b68.sabinImpN = 0
-          end
+          -- SABIN down or Imp'd before the break is not a lost fight: the
+          -- plan revives him (Fenix Down) or cures him (the bag's Imp
+          -- cure), and CYAN and SHADOW fight on.  Only a wipe ends it.
           if lost then H.setPad({}); return end
           tick = tick + 1
           local ph = tick % 30
@@ -1119,58 +1134,64 @@ local function b68Attempt(n)
           if ph == 0 then b68.btn = b68Button() end
           H.setPad(ph < 6 and b68.btn or {})
         end),
-      }, "battle 68, the pacifist line (attempt " .. n .. ")")
+      }, "battle 68, the pacifist line")
     end)(),
     H.waitFrames(60),
     H.call(function()
-      if lost == nil and b68.killedAt == nil then
+      local standing = false
+      for _, e in ipairs({ sabinE, cyanE, shadowE }) do
+        if e and pHP(e) > 0 and pHP(e) ~= 0xFFFF then standing = true end
+      end
+      if lost == nil and b68.killedAt == nil and not standing then
         lost = string.format("battle 68 ended without the train at 0 HP " ..
-          "(a wipe-teardown) at f%d [%s]", H.frame, partyLine())
+          "and every member down (a wipe-teardown) at f%d [%s]", H.frame,
+          partyLine())
         H.log("[b68] " .. lost)
       end
-      H.assertEq(inParty(3), true, "SHADOW aboard after battle 68's win (the leave roll is a no-op by design)")
-      if lost == nil and (b68.shieldsOff or 0) < 6 then
-        lost = string.format("battle 68 won at f%d but only %d of 6 shields " ..
-          "came off -- the break did not complete, so this attempt does not " ..
-          "meet the step's obligation (casts=%d) [%s]", H.frame,
-          b68.shieldsOff or 0, b68.casts, partyLine())
-        H.log("[b68] LOST -- " .. lost)
-        for _, row in ipairs(b68.chips) do
-          H.log("[b68 attempt " .. n .. "] " .. row)
+      for _, row in ipairs(b68.chips) do H.log("[b68 chip] " .. row) end
+      if lost ~= nil then
+        if lost:find("deadline", 1, true) then
+          error("battle 68: timeout after 145000 frames -- " .. lost, 0)
         end
+        H.screenshot("train_b68_lost")
+        error("LOST: battle 68 -- " .. lost .. " -- the runner's retry " ..
+          "reloads the segment's boot point", 0)
       end
-      if lost == nil then
-        H.assertEq((b68.shieldsOff or 0) >= 6, true,
-          "six chips landed -- all six shields came off (#74's break)")
+      H.assertEq(inParty(3), true, "SHADOW aboard after battle 68's win (the leave roll is a no-op by design)")
+      b68won = true
+      local off = b68.shieldsOff or 0
+      if b68.killedAt == nil then
+        H.log(string.format("[tuning] battle 68 ended at f%d with the train " ..
+          "never seen at 0 HP and the party standing: counted as a win, and " ..
+          "the ride out confirms it", H.frame))
+      end
+      if off < 6 then
+        H.log(string.format("[tuning] battle 68 won with %d of 6 shields off " ..
+          "-- the train died before its break (killedAt=f%s casts=%d " ..
+          "chips=%d holy=%s bludg=%s) [party at the kill: %s]", off,
+          tostring(b68.killedAt), b68.casts, #b68.chips,
+          tostring(b68.holyRevealed), tostring(b68.bludgRevealed),
+          tostring(b68.killParty)))
+      else
         H.log(string.format(
           "[b68] break margin: train at %s of 1900 HP when the sixth shield " ..
           "came off, dead %s frames later (brokeAt=%s killedAt=%s)",
           tostring(b68.brokeHP), b68.brokeAt and b68.killedAt
             and tostring(b68.killedAt - b68.brokeAt) or "?",
           tostring(b68.brokeAt), tostring(b68.killedAt)))
-        H.assertEq(#b68.chips >= 2, true,
-          "at least two shield chips landed (the mechanism proofs)")
-        H.assertEq(b68.holyRevealed, true,
-          "AuraBolt's HOLY reveal went live (banked or committed)")
-        H.assertEq(b68.bludgRevealed, true,
-          "Pummel's OT6_BLUDG class reveal went live (banked or committed)")
-        b68won = true
-        H.log(string.format("[b68] attempt %d WON: killedAt=f%s " ..
-          "brokeAt=%s casts=%d chips=%d", n, tostring(b68.killedAt),
-          tostring(b68.brokeAt), b68.casts, #b68.chips))
-      else
-        for _, row in ipairs(b68.chips) do
-          H.log("[b68 attempt " .. n .. "] " .. row)
-        end
       end
+      H.log(string.format("[b68] WON: %d of 6 shields off, killedAt=f%s " ..
+        "brokeAt=%s casts=%d chips=%d holy=%s bludg=%s", off,
+        tostring(b68.killedAt), tostring(b68.brokeAt), b68.casts, #b68.chips,
+        tostring(b68.holyRevealed), tostring(b68.bludgRevealed)))
     end),
     }),
   }, {})
 end
 
--- allowGameOver: the battle-47 and battle-68 ladders below deliberately
--- survive a lost fight (#163); wipeWatch reads H.gameOverFired as a loss
--- and the next attempt reloads.
+-- allowGameOver: the battle-47 ladder below deliberately survives a lost
+-- fight (#163); wipeWatch reads H.gameOverFired as a loss and the next
+-- attempt reloads.  Battle 68 reads it the same way and raises LOST.
 H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -1460,9 +1481,7 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   -- walk-off (battle_main.asm:11976-11991).  He is checked at the end of the
   -- run too, but by then the failure reads as a missing party entity inside
   -- battle 68's setup; naming it at the last point he was definitely aboard
-  -- says which walk lost him.  This is also the checkpoint's entry contract:
-  -- every b68 attempt reloads a blob taken below, so a SHADOW who is gone now
-  -- is gone from all three attempts.
+  -- says which walk lost him.
   H.call(function()
     H.assertEq(inParty(3), true,
       "SHADOW still aboard after the strip walk (a fought-out corridor " ..
@@ -1473,19 +1492,10 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
       invCount(FENIX_DOWN), gil()))
   end),
 
-  b68Checkpoint(),
-  L68.watch(),
-  b68Attempt(1),
-  b68Attempt(2),
-  b68Attempt(3),
-  b68Attempt(4),
-  b68Attempt(5),
-  L68.report(),
+  b68KeyWatch(),
+  b68Fight(),
   H.call(function()
-    if not b68Won() then
-      error(string.format("train: battle 68 did not complete cleanly on " ..
-        "any of 5 attempts -- last: %s", tostring(lost)), 0)
-    end
+    H.assertEq(b68Won(), true, "battle 68 won (a loss raised LOST above)")
   end),
 
   -- ---- the ride out: victory scene, the station, the timer, the world ----
@@ -1547,8 +1557,8 @@ H.run({ maxFrames = 400000, allowGameOver = true }, {
   H.saveState("train_done.mss"),
   H.logStep(function()
     return string.format("train_done generated at frame %d world (%d,%d) -- " ..
-      "battle 68 won with all six shields chipped off (the margin to the " ..
-      "kill is in the [b68] break margin line, not asserted)",
-      H.frame, H.worldX(), H.worldY())
+      "battle 68 won with %d of 6 shields off (the [b68] WON line; a " ..
+      "[tuning] line when the train died before its break)",
+      H.frame, H.worldX(), H.worldY(), b68.shieldsOff or 0)
   end),
 })
