@@ -1,11 +1,11 @@
 {
-  "format": "ot6-provenance/v1",
-  "payload_sha256": "8035b2c0803e7145aa9e2674e2f129d80046abdac692efacae9e437c8aad5f34",
-  "generator_sig": "4c24696dd9360b45fd1cc1ce90e77dd429d8f9bd00929951006e711b86731a25 gen_banquet_done tools/tests/checkpoints/vector-crash-v1/manifest.json tools/tests/checkpoints/vector-crash-v1/vector-crash.sram",
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "285123a9e742e03fac7d02cc31fa1ee6b72bb9e77ef1d75f656a102f8252e997",
+  "generator_sig": "7c29780c6018c28897ba09c9934aad30a83e6b42ba5b3d35e2966aab5fdbdeb4 gen_banquet_done tools/tests/checkpoints/vector-crash-v1/manifest.json tools/tests/checkpoints/vector-crash-v1/vector-crash.sram",
   "ancestors": [
     {
       "path": "tools/tests/checkpoints/vector-crash-v1/manifest.json",
-      "sha256": "c614287d1b7e2ccc436e3d049b49fdf3c4ef331872f7a92e39870119214994f4"
+      "sha256": "0cda6048377bae15062934f1913801762376dc90afcb4af69bbc7954d812a9d3"
     }
   ]
 }
