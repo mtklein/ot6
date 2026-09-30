@@ -1089,14 +1089,16 @@ battle keys):
 Without a ring the trio loses a third of these fights, 20 of its 21
 deaths by its own members; with one ring, on SABIN, it won all 15.
 
-**What changed.** gen_wor_edgar puts the bag's Peace Rings on (the
-checkpoint's bag holds one; NeckHunters drop more, 1 to 5 in the bag by
-the engine room across the draws): SABIN before the cave, then on each
-arrival in the cave and the basements whoever lacks one, SABIN, EDGAR,
-CELES in that order, and at the stops around the Tentacles. A relic
-change on a Genji Glove wearer re-runs the game's Optimum (menu
-`CheckReequipRelics`), so the rings go on before each stop's kit, and the
-hands go back where no kit step follows; the first cut of this lost the
+**What changed.** gen_wor_edgar puts the bag's Peace Rings on once a
+Muddle has been seen this run, the way a person reaches for one after the
+first: from then on each arrival in the cave and the basements puts them
+on whoever lacks one, SABIN, EDGAR, CELES in that order (the checkpoint's
+bag holds one; NeckHunters drop more, 1 to 5 in the bag by the engine
+room across the draws). The usual relics go back for the Tentacles, none
+of which Muddles, and again out of the castle, so wor-edgar-v1 saves in
+them. A relic change on a Genji Glove wearer re-runs the game's Optimum
+(menu `CheckReequipRelics`), so relics change before a stop's kit step,
+and the hands go back where no kit step follows; the first cut lost the
 Tentacles to the absorb guard when CELES's Optimum took the Break Blade
 and EDGAR's took the Blizzard (`final_v1/k3_s0.log`). The Muddle rule
 keeps its cure-hit, but not on an ally at or under the hitter's largest
@@ -1110,16 +1112,31 @@ formations counted from each run's `[outcome]` and `[death]` lines):
 | set | runs passed | formation 232: fought, won, with a death | other cave formations | Tentacles |
 |---|---|---|---|---|
 | main's gen (`base/`, K 0-10) | 11 of 11 | 42, 42, 2 (`k4`: CELES from 1116, `k5`: CELES from 372 holding 3 BP, both `by nobody` under main's death watch) | 31, all won, no death | 11 of 11 |
-| this gen (`final/`, K 0-10) | 11 of 11 | 42, 42, 1 (`k0`: CELES from 71 by slot 1, holding 4 BP) | 31, all won, no death (the Drops once) | 11 of 11 |
-| this gen (`final/`, K 0 and 3 at shifts 23, 41) | 3 of 4 | 19, 19, 0 | 5, all won, no death (the Drops once) | 3 of 4 (`k3_s23`: `battle $1C6 LOST after 26675 ticks: killed none`) |
+| rings from the start (`final/`, K 0-10) | 11 of 11 | 42, 42, 1 (`k0`: CELES from 71 by slot 1, holding 4 BP) | 31, all won, no death (the Drops once) | 11 of 11 |
+| rings from the start (`final/`, K 0 and 3 at shifts 23, 41) | 3 of 4 | 19, 19, 0 | 5, all won, no death (the Drops once) | 3 of 4 (`k3_s23`: `battle $1C6 LOST after 26675 ticks: killed none`) |
+| **this gen** (`final2/`, K 0-10; main merged, ROM `1ef410a3`) | **11 of 11** | **41, 41, 0** | 32, all won, no death (the Drops once) | 11 of 11 |
+| **this gen** (`final2/`, K 0 and 3 at shifts 23, 41) | **4 of 4** | **20, 20, 0** | 6, all won, no death (the Drops twice) | 4 of 4 |
 
-The fifteen runs of this gen lost no cave or basement fight; the one
-loss is the Tentacles (14 of 15 won here, 11 of 12 in 12.2's lab), fought
-with SABIN and CELES both in Peace Rings for the Black Belt and the Jewel
-Ring -- whether that swap costs the Tentacles anything is not measured.
+`final/` put SABIN's ring on before the cave, which is foreknowledge, and
+fought the Tentacles with SABIN and CELES in Peace Rings for the Black
+Belt and the Jewel Ring; its one loss was the Tentacles. `final2/` is the
+shipped gen: the rings only after a Muddle is seen (SABIN's went on in
+map 68 in 2 runs, across the water in 10, in basement 2 in 1, and never
+in 2, k4 and k9, where no Muddle landed before the way out; back on after
+the Tentacles in the 13), the usual relics for the Tentacles and the save. Its fifteen runs
+passed with no death in any cave or basement fight and no Fenix Down
+spent there (`final2/cavestats.txt`: `$0E8: 61 battles, 61 won, 0 lost,
+0 with a death`).
 
-The one death left is a monster's hit on a member worn down in a long
-fight, holding 4 pips; the capture's own draw is that one (K = 0).
+The one death in `final/` (K = 0, the first capture's own draw) is the cure-hit
+again: SABIN's Fight, queued on a Muddled CELES, landed after a monster's
+hit had already cleared her Muddle and took 906 of her 977 (`[unmuddle]
+actor 1 (char 5)'s hit on entity 0 took 906 (977 -> 71); char 5's
+largest this run: 906`), and a monster finished her (`[death] f+3171
+entity 0 char 6 from 71/1595 by slot 1 cmd $00 atk $EE bp=4`). The floor
+was his largest measured hit so far, 277 (`took 277 (1595 -> 1318)`),
+which underestimated this one; and the floor is read when the hit is
+planned, not when it lands.
 `final_v1/` is the first cut of the rings, kept: its K = 3 lost the
 Tentacles to the absorb guard (above) and its K = 5 lost formation 232
 in a pincer, CELES Muddled at f+327 and SABIN's cure-hit then taking

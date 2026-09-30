@@ -8228,6 +8228,9 @@ end
 -- arms/lander_c68, base_c68) -- so no plan reads it; git has the lever
 -- (#320).
 M.statusLanders = {}                  -- species -> { [status] = landings this run }
+-- every landing on a member this run, attributed to a monster or not: what
+-- a person has SEEN happen (a kit step that answers a status reads it, #320)
+M.statusSeen = {}                     -- status name -> landings this run
 M.LANDER_STATUSES = {
   { name = "Muddle", byte = 2, bit = M.ST2_MUDDLE },
   { name = "Sleep", byte = 2, bit = M.ST2_SLEEP },
@@ -8247,6 +8250,13 @@ function Driver:watchLanders()
       -- [death] line's "Muddled at" (Driver:allyActSaid)
       if last ~= nil and (s[2] & M.ST2_MUDDLE) ~= 0 and (last[2] & M.ST2_MUDDLE) == 0 then
         self.muddledAt[e] = self.battleTick
+      end
+      if last ~= nil then
+        for _, st in ipairs(M.LANDER_STATUSES) do
+          if (s[st.byte] & st.bit) ~= 0 and (last[st.byte] & st.bit) == 0 then
+            M.statusSeen[st.name] = (M.statusSeen[st.name] or 0) + 1
+          end
+        end
       end
       if last ~= nil and self.monAct ~= nil then
         for _, st in ipairs(M.LANDER_STATUSES) do
