@@ -85,8 +85,6 @@ local NAME = {
   REMEDY = { 0xe8, 0x91, 0x9e, 0xa6, 0x9e, 0x9d, 0xb2 },
   QUAKE  = { 0xe9, 0x90, 0xae, 0x9a, 0xa4, 0x9e, 0xff },
   QUARTR = { 0xe9, 0x90, 0xae, 0x9a, 0xab, 0xad, 0xab },
-  -- "W Wind": tile 2 is $fe, the narrow-space glyph, not the $ff blank.
-  W_WIND = { 0xe9, 0x96, 0xfe, 0x96, 0xa2, 0xa7, 0x9d },
 }
 
 -- Ot6GenjuStatNameTbl entries (skills.asm:3058, menu_text_en.inc:110-113),
@@ -318,9 +316,9 @@ add(page(TERRATO, "Terrato"))
 add({ H.call(function()
   H.assertEq(H.readByte(Z99), TERRATO, "detail page is TERRATO's")
   logPage("terrato")
-  assertRow("terrato", 0, NAME.QUAKE,  "Quake (untouched vanilla row)")
-  assertRow("terrato", 1, NAME.QUARTR, "Quartr (untouched vanilla row)")
-  assertRow("terrato", 2, NAME.W_WIND, "W Wind (untouched vanilla row)")
+  assertRow("terrato", 0, NAME.QUAKE,  "Quake (magicite.md's WoR list, #327)")
+  assertRow("terrato", 1, NAME.QUARTR, "Quartr (magicite.md's WoR list, #327)")
+  assertRowEmpty("terrato", 2)
   assertRowEmpty("terrato", 3)
   assertRowEmpty("terrato", 4)
   assertCaption("terrato", false)

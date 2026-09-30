@@ -21,7 +21,8 @@
 --      priced by the Ot6StealCost leaf, read at the source and held to the
 --      same baseline against the pool Locke joins with (LV6, 31 MP).
 --   4. the magic MP column. MagicProp is spliced in battle_main.asm and
---      OT6 owns exactly one byte of that column (Osmose, 1 -> 8), pinned
+--      OT6 owns two bytes of that column (Osmose, 1 -> 8; Life 3, 50 -> 60,
+--      the least price its place atop the Life fold allows, #327), pinned
 --      literally like step 1. The chain: battle init seeds each spell-list
 --      row's cost from MagicProp+5 through _c25723; ValidateSpellList runs
 --      it through CalcMPCost for the caster's relics; GetMPCost reads the
@@ -121,11 +122,11 @@ local MAGIC_MP = {
   { 0x2a, 20, "Warp" },   { 0x2b, 99, "Quick" },  { 0x2c, 25, "Dispel" },
   { 0x2d,  5, "Cure" },   { 0x2e, 25, "Cure 2" }, { 0x2f, 40, "Cure 3" },
   { 0x30, 30, "Life" },   { 0x31, 60, "Life 2" }, { 0x32,  3, "Antdot" },
-  { 0x33, 15, "Remedy" }, { 0x34, 10, "Regen" },  { 0x35, 50, "Life 3" },
+  { 0x33, 15, "Remedy" }, { 0x34, 10, "Regen" },  { 0x35, 60, "Life 3" },
 }
 local MAGIC_PROP_REC = 14
 local MAGIC_PROP_MP = 5
-local MAGIC_OT6 = { [0x29] = 1 }        -- id -> the vanilla byte OT6 replaced
+local MAGIC_OT6 = { [0x29] = 1, [0x35] = 50 }  -- id -> the vanilla byte OT6 replaced
 -- the one record in the whole column above the ceiling, and legal there:
 -- summons draw through ListText command $16, which prints three digits.
 local PHOENIX_ID, PHOENIX_MP = 0x50, 110
@@ -300,13 +301,16 @@ H.run({ maxFrames = 20000 }, {
     -- Guard the guard.  A base that resolved somewhere harmless would let the
     -- loop above agree with itself: the record after the last pinned spell is
     -- Ramuh's summon ($36), whose price is not in the pinned range, and the
-    -- one OT6-authored byte must read as authored rather than as vanilla.
+    -- OT6-authored bytes must read as authored rather than as vanilla.
     H.assertEq(checked, 54, "all 54 published spell prices were read")
-    H.assertEq(ot6, 1, "exactly one price in this column is OT6's")
+    H.assertEq(ot6, 2, "exactly two prices in this column are OT6's")
     H.assertEq(H.readRomByte(base + 0x29 * MAGIC_PROP_REC + MAGIC_PROP_MP)
                ~= MAGIC_OT6[0x29], true,
       "Osmose no longer carries its vanilla 1 -- the splice is live, so this "
       .. "column is MagicProp and not an untouched copy of the .dat")
+    H.assertEq(H.readRomByte(base + 0x35 * MAGIC_PROP_REC + MAGIC_PROP_MP)
+               ~= MAGIC_OT6[0x35], true,
+      "Life 3 no longer carries its vanilla 50 (#327)")
     H.assertEq(H.readRomByte(base + 0x36 * MAGIC_PROP_REC + MAGIC_PROP_MP), 25,
       "the record past the pinned range is Ramuh at 25 MP -- the stride and "
       .. "the base both land where they should")

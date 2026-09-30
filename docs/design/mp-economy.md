@@ -136,10 +136,14 @@ house rule stands with its one named exception (Osmose, below).
   the Fight row itself.
 - **BP buys tempo and MP buys power.** One Fire 3 instead of three Fires
   saves two turns, which is what the boost buys, and the magnitude is
-  paid for at the tier's own price. Measured out of `magic_prop_en.dat`:
-  the spread is 2.0× (Life → Life 2, 30 → 60) to 8.7× (Poison →
-  Bio, 3 → 26), with Fire 4 → 20 → 51. Dearest folded tier is Life 2 at
-  60, under the 99 ceiling. `tools/tests/battle_foldcost.lua`
+  paid for at the tier's own price. Measured out of `MagicProp`:
+  the spread is 2.0× (Life → Life 2 and Life 3, 30 → 60 → 60) to 8.7×
+  (Poison → Bio, 3 → 26), with Fire 4 → 20 → 51. Dearest folded tiers
+  are Life 2 and Life 3 at 60, under the 99 ceiling. Life 3 is the one
+  tier OT6 reprices: vanilla's 50 sat under Life 2's 60, so the second
+  boost point would have bought a cheaper cast than the first; 60 is the
+  least price that keeps both checks below (#327, `battle_main.asm`'s
+  MagicProp override 6). `tools/tests/battle_foldcost.lua`
   recomputes the whole table from the ROM and holds it to the ceiling, to
   monotonicity, and to a two-sided check that the fold still buys
   something without buying it too cheaply.
@@ -330,7 +334,7 @@ Poison -> Bio, so Bio is Poison's tier, `Ot6BoostDmg` gives it no
 multiplier, and boosting into it already buys nothing. Charging 2.5x
 for that would be charging for nothing, so Bio is exempt with the rest
 of the families. The same holds for **Cure/Cure 2/Cure 3**,
-**Life/Life 2**, **Slow/Slow 2** and **Haste/Haste2**.
+**Life/Life 2/Life 3**, **Slow/Slow 2** and **Haste/Haste2**.
 
 **Already escalating by tier, so unchanged:** SwdTech (cmd `$07`, in
 the gate). The boost picks the tech, and the tech is charged at its own

@@ -41,9 +41,19 @@ spell to cast it. Terra knows Fire and Cure when she joins and learns Drain
 Ice when she joins and learns Cure (4), Imp (13), Scan (18), Safe (22) and
 Haste (32). Equipped Espers now give: Siren Mute and Sleep; Stray Muddle and
 Imp; Kirin Cure and Regen; ZoneSeek Shell and Haste; Sraphim Cure and Life;
-Golem Safe; Palidor Haste, Slow and Float; Tritoch Fire, Ice and Bolt;
-Starlet Cure, Regen and Remedy; Phoenix Life, Life 3, Cure and Fire. Saves
-from earlier versions may keep spells their characters already learned.
+Golem Safe (the World of Ruin's Espers are below). Saves from earlier
+versions may keep spells their characters already learned.
+
+**The World of Ruin's Espers give new lists, and Life boosts to Life 3.**
+Equipped, Palidor gives Float and Slow; Fenrir Stop and X-Zone; Starlet
+Cure, Regen and Remedy; Alexandr Dispel, Safe and Shell; Terrato Quake and
+Quartr; Tritoch Ice, Bolt and Poison; Odin Meteor and Bserk; Raiden
+Meteor, Bserk and Quick; Bahamut Flare and W Wind; Phoenix Life and Antdot;
+Ragnarok Ultima and Warp; Crusader Merton and Meteor. Boosting Life by one
+point casts Life 2, and by two points Life 3, for 60 MP. Cast by your
+party, Life 3 works on a fallen ally too: it brings them back at full HP and
+protects them, so they rise again once the next time they fall. On a
+standing ally it gives only that protection.
 
 **The shield under a monster shows its true count above 6.** A boss with
 more than six shields used to show 6 until enough had been broken; Number 024

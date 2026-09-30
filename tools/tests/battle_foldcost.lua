@@ -14,8 +14,8 @@
 --
 --   1. the family table is the shipped one.  8 rows x [base, +1, +2], pinned
 --      by spell id.  The shallow families repeat their second entry
---      (Poison/Life/Slow/Haste have no third tier in vanilla), so a 3-BP
---      spend is never dead.
+--      (Poison/Slow/Haste have no third tier), so a 3-BP spend is never
+--      dead.  Life's third tier is Life 3 (#327).
 --
 --   2. monotonic.  Within a family, cost(+2) >= cost(+1) >= cost(base): a
 --      boost may not buy a discount.
@@ -64,7 +64,7 @@ local FAMILIES = {
   { "Bolt",   0x02, 0x07, 0x0b, "Bolt 2",  "Bolt 3"  },
   { "Poison", 0x03, 0x08, 0x08, "Bio",     "Bio"     },
   { "Cure",   0x2d, 0x2e, 0x2f, "Cure 2",  "Cure 3"  },
-  { "Life",   0x30, 0x31, 0x31, "Life 2",  "Life 2"  },
+  { "Life",   0x30, 0x31, 0x35, "Life 2",  "Life 3"  },
   { "Slow",   0x19, 0x28, 0x28, "Slow 2",  "Slow 2"  },
   { "Haste",  0x1f, 0x27, 0x27, "Haste2",  "Haste2"  },
 }
@@ -243,10 +243,10 @@ H.run({ maxFrames = 20000 }, {
         end
       end
     end
-    assert(checked >= 12, string.format(
-      "only %d tiers were checked -- assertion 4 must cover all twelve "
-      .. "(Fire/Ice/Bolt 2 and 3, Bio, Cure 2 and 3, Life 2, Slow 2, Haste2)",
-      checked))
+    assert(checked >= 13, string.format(
+      "only %d tiers were checked -- assertion 4 must cover all thirteen "
+      .. "(Fire/Ice/Bolt 2 and 3, Bio, Cure 2 and 3, Life 2 and 3, Slow 2, "
+      .. "Haste2)", checked))
     H.log(string.format("the no-natural-tier check covered %d tiers", checked))
   end),
 })

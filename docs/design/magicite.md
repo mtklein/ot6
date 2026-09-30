@@ -1,6 +1,7 @@
 # Magicite as sub-jobs
 
-Scope: World of Balance espers. Locked ✦. Pillar (DESIGN.md ✦):
+Scope: the espers; the World of Balance roster, then the World of Ruin's
+twelve (last section). Locked ✦. Pillar (DESIGN.md ✦):
 equipping a magicite grants its kit *while equipped*. Spells are
 never taught permanently, level-up stat bonuses are deleted, one
 copy of each exists, and summon = once per battle as the sub-job's
@@ -85,12 +86,8 @@ spell, so it grants Safe alone. `tools/check_spell_grants.py` checks this on
 the built ROM. The other columns of every row but Ifrit's and Shiva's are
 still proposals.
 
-The World of Ruin stones have no approved list yet (see the draft below). They keep their vanilla
-spells without the higher tiers (no stone grants one): Palidor Haste, Slow,
-Float; Tritoch Fire, Ice, Bolt (the heads of its Fire 3, Ice 3, Bolt 3);
-Starlet Cure, Regen, Remedy; Phoenix Life, Life 3, Cure, Fire (Cure 3 and
-Fire 3 to their heads; Life 3 is no tier, since boosting Life stops at
-Life 2).
+The World of Ruin stones grant the lists in the last section's table
+(#327), checked the same way.
 
 - The **kit-forming question** per character is which esper completes
   them (Celes+Carbunkl = the rune fortress; Locke+Stray = the
@@ -111,66 +108,67 @@ Passives, including the stat bump: learned by battles-carried
 vanilla's stat-bonus grind with collecting passives. Character
 passives (kits.md) and esper passives share the same slots.
 
-## World of Ruin Espers (draft for owner review)
+## World of Ruin Espers
 
-**DRAFT: not approved, not built.** Every name in this table's first column
-carries " (draft)", so `tools/check_spell_grants.py` (#305), which reads any
-row of this file whose first cell is exactly an Esper's name, skips these
-rows. Approving a row means deleting its " (draft)"; from then on the check
-holds that Esper's `GenjuProp` row to the Spells cell. Every spell name below
-is spelled as `magic_name_en.json` spells it, so each approved row parses
-with nothing skipped; the check compares order too, so a row's spells go
-into `GenjuProp` in the order written
-(`build/attempts/wt/wor-esper-plan/verify_draft.log`).
+Owner-approved 2026-09-29 (#327) and built. The table below is what
+`GenjuProp` grants: `tools/check_spell_grants.py` (#305) reads every row of
+this file whose first cell is exactly an Esper's name and holds that
+Esper's `GenjuProp` row to the Spells cell, in the order written. Every spell
+name is spelled as `magic_name_en.json` spells it.
 
 These are the twelve stones the World of Balance plans leave out, and all
 twelve are World of Ruin rewards. Each is planned the way
 `magicite-ifrit-shiva.md` and `magicite-tube-six.md` plan theirs: one job
 per stone, one to three **base-tier** spells (nothing in `Ot6FoldTbl`'s
-second or third column: Fire 2/3, Ice 2/3, Bolt 2/3, Bio, Cure 2/3, Life 2,
+second or third column: Fire 2/3, Ice 2/3, Bolt 2/3, Bio, Cure 2/3, Life 2/3,
 Slow 2, Haste2), a while-worn stat package in `Ot6EsperStatTbl`'s four signed
 nibbles, and the vanilla summon kept as the divine, unchanged. There is no
 passive or permit channel, so none is planned.
 
-**What the player already holds.** The route lands in the World of Ruin with
+**What ships.** The Spells column. The stat column is still a proposal:
+`Ot6EsperStatTbl`'s rows for these twelve are zero (no while-worn change).
+
+**Every base spell has a source.** The route lands in the World of Ruin with
 twelve stones (Ramuh, Ifrit, Shiva, Siren, Shoat, Maduin, Bismark, Stray,
 Kirin, Carbunkl, Phantom, Unicorn; `route-wor-sabin.md`'s party dump); Golem,
-ZoneSeek and Sraphim are optional WoB pickups. Between those fifteen plans and
-Terra's and Celes's natural magic (kits.md), every base spell has a source
-except **Poison, Flare, Quartr, X-Zone, Meteor, Ultima, Quake, W Wind, Stop,
-Bserk, Float, Warp, Quick, Dispel, Antdot and Life 3**, and Merton and Scan
-come only from natural magic. That list is what these twelve stones hand out.
-Twelve of the sixteen are planned below; W Wind, Bserk, Warp and Antdot are
-dropped (reasons in the notes).
+ZoneSeek and Sraphim are optional WoB pickups. Between those fifteen and
+Terra's and Celes's natural magic (kits.md), the base spells with no source
+were Poison, Flare, Quartr, X-Zone, Meteor, Ultima, Quake, W Wind, Stop,
+Bserk, Float, Warp, Quick, Dispel and Antdot (Merton and Scan come only from
+natural magic). These twelve stones grant all fifteen. The owner's direction
+was to place the four the first draft dropped (W Wind, Bserk, Warp, Antdot)
+on the stones that carried one spell, stretching a little to fit. Life 3,
+which vanilla Phoenix granted, is now Life's third tier (below), so no stone
+grants it.
 
 **Why a few copies are deliberate.** "WoR deepens via magicite" (kits.md)
 means new verbs, but the World of Ruin also splits the party: the Phoenix
 Cave takes two parties (`party_menu 2` in `EnterPhoenixCave`) and Kefka's
 Tower three (`party_menu 3` in `EnterKefkasTower_proc`). There is one copy of
 each stone, so the WoB medic and caster jobs can serve only one of those
-parties each. Starlet and Tritoch are therefore planned as a second copy of a
-core job, each with a verb no WoB stone has.
+parties each. Starlet and Tritoch are therefore a second copy of a core job,
+each with a verb no WoB stone has (owner, 2026-09-29: keep both).
 
 **Stat tiers** are the tube six's (`magicite-tube-six.md` §3): FIELD is +6
 over two stats with no downside, STORY +8 with a −2, BOSS +10 with a −3.
 Nibbles cap at ±7, so a late stone cannot out-stat Maduin; the World of Ruin
-stones differ by shape instead. Crusader is the one proposed exception (see
-its note).
+stones differ by shape instead. Crusader is the one exception: +3 in all
+four stats, the capstone (owner, 2026-09-29: fine for now).
 
 | Esper | Source | Spells (base) | Stat vig/spd/stm/mag | Job | Notes |
 |---|---|---|---|---|---|
-| Palidor (draft) | Solitary Island beach, once the Falcon flies | Float, Slow | +2 / +4 / 0 / 0 (FIELD) | **the Tailwind**: lift the party, drag the enemy | first WoR stone; Float has no other source |
-| Fenrir (draft) | Mobliz, when Terra rejoins (Phunbaba) | Stop, X-Zone | 0 / +6 / −3 / +4 (BOSS) | **the Banisher**: take one enemy out of time, or a group out of the fight | no WoB plan grants Stop |
-| Starlet (draft) | Jidoor, Owzer's mansion (Relm joins) | Cure, Regen, Remedy | 0 / +4 / −3 / +6 (BOSS) | **the second medic**: a heal-and-cleanse stone for a second party | deliberate copy of Kirin + Unicorn's Remedy |
-| Alexandr (draft) | Doma Castle, the end of Cyan's dream | Dispel, Safe, Shell | +4 / −3 / +6 / 0 (BOSS) | **the Bastion**: strip the enemy's buffs, wall the party | Dispel has no other source |
-| Terrato (draft) | Umaro's cave, the carving's eye | Quake, Quartr | 0 / −3 / +4 / +6 (BOSS) | **the Landslide**: whole-field attrition | Quake hits the party too, so wear it beside Palidor |
-| Tritoch (draft) | Narshe cliffs, after its fight | Ice, Bolt, Poison | 0 / +3 / −3 / +7 (BOSS) | **the second caster**: three fold families, Poison in place of Fire | Poison has no other source |
-| Odin (draft) | the Ancient Castle | Meteor | +4 / +4 / −2 / 0 (STORY) | **the Warlord**: a fighter's stone with one field-wide spell | becomes Raiden |
-| Raiden (draft) | the Ancient Castle's queen statue (replaces Odin) | Meteor, Quick | +6 / +4 / −3 / 0 (BOSS) | **the Warlord, ascended**: Odin's list plus the extra turn | Quick has no other source |
-| Bahamut (draft) | Doom Gaze, in the sky | Flare | +3 / 0 / −3 / +7 (BOSS) | **the Dragon King**: the untyped single-target nuke | Flare has no other source |
-| Phoenix (draft) | the Phoenix Cave (Locke) | Life, Life 3 | −2 / +2 / +6 / 0 (STORY) | **the Rebirth**: revive now, or before the blow lands | Life 3 has no other source; see open question 3 |
-| Ragnarok (draft) | Narshe weapon shop, chosen over the sword | Ultima | +5 / 0 / −3 / +5 (BOSS) | **the Last Word**: Ultima for any wearer | kits.md already routes Ultima here |
-| Crusader (draft) | all eight dragons | Merton, Meteor | +3 / +3 / +3 / +3 (apex) | **the Capstone**: the two biggest field spells | Merton's only stone; the one four-stat package |
+| Palidor | Solitary Island beach, once the Falcon flies | Float, Slow | +2 / +4 / 0 / 0 (FIELD) | **the Tailwind**: lift the party, drag the enemy | first WoR stone; Float has no other source |
+| Fenrir | Mobliz, when Terra rejoins (Phunbaba) | Stop, X-Zone | 0 / +6 / −3 / +4 (BOSS) | **the Banisher**: take one enemy out of time, or a group out of the fight | no WoB plan grants Stop |
+| Starlet | Jidoor, Owzer's mansion (Relm joins) | Cure, Regen, Remedy | 0 / +4 / −3 / +6 (BOSS) | **the second medic**: a heal-and-cleanse stone for a second party | deliberate copy of Kirin + Unicorn's Remedy |
+| Alexandr | Doma Castle, the end of Cyan's dream | Dispel, Safe, Shell | +4 / −3 / +6 / 0 (BOSS) | **the Bastion**: strip the enemy's buffs, wall the party | Dispel has no other source |
+| Terrato | Umaro's cave, the carving's eye | Quake, Quartr | 0 / −3 / +4 / +6 (BOSS) | **the Landslide**: whole-field attrition | Quake hits the party too, so wear it beside Palidor |
+| Tritoch | Narshe cliffs, after its fight | Ice, Bolt, Poison | 0 / +3 / −3 / +7 (BOSS) | **the second caster**: three fold families, Poison in place of Fire | Poison has no other source |
+| Odin | the Ancient Castle | Meteor, Bserk | +4 / +4 / −2 / 0 (STORY) | **the Warlord**: a fighter's stone with one field-wide spell, and a berserker's rage for an enemy caster | becomes Raiden |
+| Raiden | the Ancient Castle's queen statue (replaces Odin) | Meteor, Bserk, Quick | +6 / +4 / −3 / 0 (BOSS) | **the Warlord, ascended**: Odin's list plus the extra turn | Quick has no other source |
+| Bahamut | Doom Gaze, in the sky | Flare, W Wind | +3 / 0 / −3 / +7 (BOSS) | **the Dragon King**: the untyped single-target nuke, and the wingbeat | Flare has no other source |
+| Phoenix | the Phoenix Cave (Locke) | Life, Antdot | −2 / +2 / +6 / 0 (STORY) | **the Rebirth**: revive, or boost into the revival before the blow | Life boosts to Life 2 and Life 3 |
+| Ragnarok | Narshe weapon shop, chosen over the sword | Ultima, Warp | +5 / 0 / −3 / +5 (BOSS) | **the Last Word**: end the fight, or leave it | kits.md already routes Ultima here |
+| Crusader | all eight dragons | Merton, Meteor | +3 / +3 / +3 / +3 (capstone) | **the Capstone**: the two biggest field spells | Merton's only stone; the one four-stat package |
 
 ### Where each stone comes from
 
@@ -200,17 +198,17 @@ than holding both. Ragnarok's shop door has its own gate (`if_switch $01A1=0`
   vigor and speed, a pairing no WoB stone has. Divine: Sonic Dive (`$3F`, the
   party jumps).
 - **Fenrir, the Banisher.** Vanilla's Warp, X-Zone and Stop hold no tiers.
-  Warp is a field escape, and escape is not what the party does (guidelines,
-  "Fight, don't flee"), so it is dropped. Stop (10 MP, single) and X-Zone
-  (53 MP, a group, death-class, hit 85) differ from Shoat's Break/Doom by
-  target (a group, not one body) and by a non-lethal option. Terra rejoins
-  here with Break in her own list, so Fenrir brings deletion that reaches a
-  whole group. Divine: Moon Song (`$4E`, Image on the party).
+  Stop (10 MP, single) and X-Zone (53 MP, a group, death-class, hit 85)
+  differ from Shoat's Break/Doom by target (a group, not one body) and by a
+  non-lethal option. Terra rejoins here with Break in her own list, so Fenrir
+  brings deletion that reaches a whole group. Warp moves to Ragnarok, the
+  one-spell stone. Divine: Moon Song (`$4E`, Image on the party).
 - **Starlet, the second medic.** Vanilla's list is Cure, Cure 2, Cure 3,
-  Regen, Remedy; the two tiers go, and the plan keeps the rest. It duplicates
-  Kirin (Cure, Regen) and Unicorn's Remedy on purpose: a split party needs a
-  medic in each group. Relm joins in the same scene with Sketch as her kit
-  (kits.md), so Starlet is what makes her a healer. Divine: the party heal (`$4F`).
+  Regen, Remedy; the two tiers go, and the rest stays. It duplicates Kirin
+  (Cure, Regen) and Unicorn's Remedy on purpose: a split party needs a medic
+  in each group. Relm joins in the same scene with Sketch as her kit
+  (kits.md), so Starlet is what makes her a healer. Divine: the party heal
+  (`$4F`).
 - **Alexandr, the Bastion.** Vanilla's five are Pearl, Shell, Safe, Dispel,
   Remedy. Pearl and Remedy are Unicorn's job and are dropped. Dispel (25 MP)
   is new. Safe and Shell are each already on two stones, but no stone grants
@@ -221,47 +219,111 @@ than holding both. Ragnarok's shop door has its own gate (`if_switch $01A1=0`
 - **Terrato, the Landslide.** Vanilla's Quake, Quartr and W Wind hold no
   tiers. Quake (50 MP, earth, `targ $04`) hits every body on the field, the
   caster's side included, unless it floats; Quartr (48 MP, all enemies, a
-  fraction of current HP) is the enemy-only version of the same attrition. W Wind
-  (75 MP, a fraction of every body's HP, both sides) is dropped: it is the
-  both-sides copy of Quartr and it costs a party-wide heal after every cast. Divine:
+  fraction of current HP) is the enemy-only version of the same attrition. W
+  Wind (75 MP, a fraction of every body's HP, both sides) is the both-sides
+  copy of Quartr, so it moves to Bahamut rather than sit beside it. Divine:
   Earth Aura (`$3A`, earth, all enemies).
 - **Tritoch, the second caster.** Vanilla's list is Fire 3, Ice 3, Bolt 3, all
-  tiers; #305's interim row keeps their heads, which is Maduin's list exactly.
-  The plan keeps Ice and Bolt as the second copy of the caster job and
+  tiers. The stone keeps Ice and Bolt as the second copy of the caster job and
   replaces Fire with Poison. Fire is the best-covered element (Ifrit, Maduin,
   Terra, Sabin's Fire Dance), while Poison, the fourth fold family (3 MP, Bio
-  at 1 BP), is on no stone. Its divine Tri-Dazer (`$40`, fire|ice|bolt) keeps
-  all three of vanilla's elements.
+  at 1 BP), is on no other stone. Its divine Tri-Dazer (`$40`, fire|ice|bolt)
+  keeps all three of vanilla's elements.
 - **Odin and Raiden, the Warlord.** Vanilla's lists are Meteor and Quick. The
-  two are one stone: Raiden replaces Odin. So Raiden keeps Odin's Meteor and
-  adds Quick, and the upgrade shows as a second spell, a larger stat package
+  two are one stone: Raiden replaces Odin, so Raiden keeps Odin's list and
+  adds Quick, and the upgrade shows as a third spell, a larger stat package
   and True Edge's hit 140 over Atom Edge's 110 (`$42`, `$41`). Their stat
-  package is for fighters (vigor and speed). Quick (99 MP) is the game's
-  dearest spell and the only extra-turn verb.
+  package is for fighters (vigor and speed). Bserk (16 MP, single) is the
+  stretch that fits a warlord: Odin's berserkers. Cast on an enemy, it turns
+  a spellcaster into a brawler that can only Fight; cast on an ally, it takes
+  that ally out of the player's hands (Phantom's recorded reason for dropping
+  it), so it is an enemy verb in practice. Quick (99 MP) is the game's dearest
+  spell and the only extra-turn verb.
 - **Bahamut, the Dragon King.** Vanilla's Flare holds no tier. Flare (45 MP,
   single, untyped) is never absorbed, so it is the answer for a body that
-  absorbs or nulls every element the other stones carry. Mega Flare (`$43`)
-  is the all-enemies version, the same single-to-all shape as Shoat's Break
-  and Demon Eye.
+  absorbs or nulls every element the other stones carry. W Wind is the
+  dragon's wingbeat: it cuts every body on the field, the party included, to
+  a fraction of its HP, so it opens a fight against a group before Flare
+  finishes one body. Mega Flare (`$43`) is the all-enemies version of Flare,
+  the same single-to-all shape as Shoat's Break and Demon Eye.
 - **Phoenix, the Rebirth.** Vanilla's list is Life, Life 2, Life 3, Cure 3,
-  Fire 3. Life 2, Cure 3 and Fire 3 are tiers. #305's interim row takes
-  Cure 3 and Fire 3 to their heads; the plan drops them (Cure is Kirin's and
-  Starlet's; Fire is Ifrit's and Maduin's and in Terra's list). What is left is the revival job:
-  Life (folds to Life 2 at 1 BP) and Life 3 (50 MP, pre-emptive revival).
-  Life 3 is not a tier: `Ot6FoldTbl`'s life row caps at Life 2. The Phoenix
-  Cave is the two-party dungeon, and Phoenix is the second party's revival.
-  Divine: Rebirth (`$50`, revives the party).
+  Fire 3. The owner's call (2026-09-29): Phoenix grants Life, which boosts to
+  Life 2 and then Life 3, so `Ot6FoldTbl`'s life row is Life, Life 2, Life 3
+  and Life 2 and Life 3 are both tiers that no stone grants. Cure 3 and Fire 3
+  go (Cure is Kirin's and Starlet's; Fire is Ifrit's and Maduin's and in
+  Terra's list). Antdot (3 MP, cures Poison) is the stretch: phoenix tears
+  cure venom, and Tritoch's Poison is new in this world. The Phoenix Cave is
+  the two-party dungeon, and Phoenix is the second party's revival. Divine:
+  Rebirth (`$50`, revives the party).
 - **Ragnarok, the Last Word.** Vanilla's Ultima holds no tier, and kits.md's
   Terra section already says "Everyone else gets Ultima by equipping
-  Ragnarok". The stone competes with the Ragnarok sword that the same
-  choice would give, so it carries a BOSS package split between vigor and
-  magic.
+  Ragnarok". Warp (20 MP) is its second word: in battle it takes the party
+  out of a fight it can run from, and in the field it leaves a dungeon.
+  Ragnarok ends the fight one way or the other. The stone competes with the
+  Ragnarok sword that the same choice would give, so it carries a BOSS
+  package split between vigor and magic.
 - **Crusader, the Capstone.** Vanilla's Merton and Meteor hold no tiers.
   Merton (85 MP, fire|wind, every body on the field) is otherwise Terra's
-  alone at L33; Meteor is a copy of Raiden's, accepted on the stone that
-  closes the eight-dragon hunt. Its stat, +3 in all four stats, is outside the
+  alone at L33; Meteor is a copy of Odin's, accepted on the stone that closes
+  the eight-dragon hunt. Its stat, +3 in all four stats, is outside the
   three tiers (+12, no downside) and is the only four-stat package in the
-  game. It is the owner's call (open question 5).
+  game.
+
+### Life 3 is Life's third tier
+
+Boosting Life by one point casts Life 2 and by two or three points Life 3
+(`Ot6FoldTbl`, `ot6_boost.asm`), with the name and the price in the Magic
+list following the boost like every other family. A folded cast pays its
+tier's own MagicProp price, and vanilla priced Life 3 at 50, under Life 2's
+60, so the second point would have bought a cheaper cast than the first.
+OT6 prices Life 3 at 60 (`battle_main.asm`, MagicProp override 6), the least
+price at which the fold's two pricing rules hold: a boost never makes a
+family cheaper, and a folded tier costs at least twice its base
+(`battle_foldcost`). `battle_lifefold` measures the name, the price, the cast
+and the effect at every boost (`build/attempts/wt/wor-espers/`).
+
+Vanilla's Life 3 is the pre-emptive revival: it marks a living body to rise
+once when it falls, and it cannot touch a KO'd body. Life and Life 2 only hit
+a KO'd body. As first built, a two-point Life on a fallen ally therefore cast
+Life 3, spent the pips and 60 MP, and left the ally down (LOCKE KO'd by his
+own party, then a two-point Life on him: `lab_lifedead_try1.log`, "hp0
+st1$80"). The owner's call (2026-09-29): **Life 3 revives too.** When a
+character casts it through Magic or X-Magic (or Mimics such a cast), on a
+KO'd ally it revives at full HP, as Life 2 does, and grants its Life 3
+status; on a living ally it grants the status as before. Every other Life 3
+is vanilla's (below).
+
+| Boost | Casts | MP | On a KO'd ally | On a living ally |
+|---|---|---|---|---|
+| 0 | Life | 30 | revives | nothing |
+| 1 | Life 2 | 60 | revives at full HP | nothing |
+| 2 or 3 | Life 3 | 60 | revives at full HP, and marks it to revive | marks it to revive |
+
+How (`ot6_boost.asm`): two hooks in `CalcAttackEffect`, both gated on the
+executing action itself (`Ot6Life3Cast`: the attacker is a character, the
+queued command is Magic `$02` or X-Magic `$17`, the attack is Life 3).
+`Ot6Life3Targeting`, just before `ChooseTarget`, lets that Life 3 keep a KO'd
+target, as Life and Life 2 do, without the record's resurrection flag, which
+`CheckHit` reads as "misses the living". `Ot6Life3Revive`, in the per-target
+loop, gives a KO'd character target Life 2's effect (wound cleared, healed by
+16/16 of max HP) on top of the record's Life 3 status. `battle_lifefold`
+measures both targets at every boost: LOCKE KO'd, then a two- or three-point
+Life leaves him at 1215/1215 with the status, and a Fenix Down right after a
+Life 3 still revives as a Fenix Down (`build/attempts/wt/wor-espers/`).
+
+**Everyone else keeps vanilla Life 3.** The monsters that cast it (Madam,
+Magic Master, L.80 and L.90 Magic; Rhinox's script names it but its 35 MP
+never pays), Gau's Rhinox rage, Control and Sketch. A first cut gave every
+Life 3 the revival, and a review lab (every monster casting Life 3) showed
+monsters then picking their own dead and raising them
+(`build/attempts/review-wor-espers/lab_rv_monlife3_A.log`: 11 landings on
+KO'd bodies). That would retune those fights, and a raged Gau could raise a
+fallen ally in the World of Balance, where kits.md keeps revival to Terra,
+Fenix Downs and Sraphim. With the gate the same lab matches the vanilla
+control counter for counter (74 landings, 0 on a KO'd body, 8 reraises;
+`lab_monlife3_G.log` against `lab_rv_monlife3_B.log`). A rage turn is queued
+as command `$10` (`RandRageAction`) and keeps it in `$3a7c` while it runs,
+so the gate never matches it.
 
 ### Boost on these lists
 
@@ -269,34 +331,15 @@ Poison, Ice, Bolt, Cure, Life and Slow fold. Flare, Meteor, Merton, Ultima,
 Quake and the damaging divines (Earth Aura, Tri-Dazer, Mega Flare, Justice,
 Purifier) take `Ot6BoostDmg`'s ×2/×4/×8 at the escalating price
 (mp-economy.md). Float, Stop, X-Zone, Quick, Dispel, Safe, Shell, Regen,
-Remedy and Life 3 deal no damage and fold nowhere, so they are outside both
-boost axes: the gap `magicite-tube-six.md` §12.4 records for Shoat and
-Phantom. Six of the twelve stones carry at least one such verb. Whether
-Quartr's fraction damage takes the multiplier was not checked.
+Remedy, Bserk, Warp and Antdot deal no damage and fold nowhere, so they are
+outside both boost axes: the gap `magicite-tube-six.md` §12.4 records for
+Shoat and Phantom. Whether Quartr's and W Wind's fraction damage takes the
+multiplier was not checked.
 
 ### Open questions for the owner
 
-1. **Copies.** Starlet and Tritoch are planned as second copies of the medic
-   and caster jobs, justified by the two- and three-party dungeons. The
-   alternative for each is a short unique list: Starlet Regen alone, Tritoch
-   Poison alone.
-2. **Single-spell stones.** Odin, Bahamut and Ragnarok carry one spell each,
-   as in vanilla; the WoB plans carry two or three (Golem's one is forced by
-   an inexpressible entry). Is a single top-end spell plus the divine
-   enough, or should each gain a second verb?
-3. **Revival.** kits.md (Terra) says revival "lives on Terra, Fenix Downs, and
-   Sraphim, and nowhere else". That section is scoped to the World of
-   Balance; Phoenix's plan puts Life and Life 3 on a second stone for the
-   World of Ruin. Does that rule extend to the World of Ruin? And a player
-   will read "Life 3" as a tier even though the fold table says it is not.
-   Keep the name, or leave the pre-emptive revival to the divine?
-4. **Dropped verbs.** W Wind, Bserk, Warp and Antdot would then have no
-   source in the game. Bserk and Warp follow recorded reasons (Phantom's
-   "removes player control"; field escape). W Wind and Antdot are dropped
-   here for the first time.
-5. **Magnitudes.** The ±7 nibble cap puts every late stone in the WoB's
-   magnitude band. Crusader's +3 in all four stats (+12) is the only package
-   above the BOSS tier. Is a capstone tier wanted, and is this its shape?
-6. **Verbs that boost cannot touch.** This table carries ten verbs outside
+1. **Stat packages.** The stat column above is not built; the twelve rows of
+   `Ot6EsperStatTbl` are zero.
+2. **Verbs that boost cannot touch.** This table carries twelve verbs outside
    both boost axes. Whether BP should buy duration or certainty on them is
    DESIGN.md's open canon, not this table's to settle.
