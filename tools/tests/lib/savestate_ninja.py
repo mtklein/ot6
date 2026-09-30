@@ -286,8 +286,9 @@ def emit_state_edges(w, states, root, copy_if_changed_from):
         explicit = ""
         order = ""
         # The provenance ancestor: what savestate_stamp.sh write hashes into
-        # the stamp's `ancestor` line.  Exactly one of prev= / checkpoint=
-        # can be set (validate() enforces it); a state with neither is a
+        # the stamp's `ancestor` line: the checkpoint's manifest when
+        # checkpoint= is set (a cut, prev= with checkpoint=, boots the
+        # checkpoint here), else prev='s stamp; a state with neither is a
         # power-on root and records no ancestor.
         ancestor = "-"
         if e.get("prev") and not e.get("checkpoint"):
@@ -409,6 +410,24 @@ def write_authored(manifest, out):
     return 0
 
 
+def chain_captures(states, root):
+    """{checkpoint key: [the paths `ninja chain` seals it into]} for every
+    cut on the chain from power-on; {} with no cut."""
+    plan = chain_plan(states)
+    if plan is None:
+        return {}
+    names = {e["state"] for e in plan[0]}
+    owner = _owners(states)
+    out = {}
+    for e in states:
+        if e.get("prev") and e.get("checkpoint") and owner[e["prev"]] in names:
+            key = e["checkpoint"]
+            payload = Path(checkpoint_inputs(root, key)[1]).name
+            out[key] = [f"{CAPTURE_DIR}/{key}/manifest.json",
+                        f"{CAPTURE_DIR}/{key}/{payload}"]
+    return out
+
+
 def emit_chain_edges(w, states, root, copy_if_changed_from):
     """The chain_ copies (see chain_plan).  Returns the chain's last
     output path, or None when there is no cut."""
@@ -493,9 +512,13 @@ def emit_chain_edges(w, states, root, copy_if_changed_from):
             # the tracked manifest's authored fields (its `saved` above
             # all) judge the capture; seal refuses a battery holding
             # another save
+            # ...and the drift report prints how far the tracked checkpoint
+            # is from this capture (report only; `ninja release` gates on
+            # it, configure.py)
             seal = (f"cp {authored} {cdir}/manifest.json && "
                     f"python3 tools/tests/lib/sram_checkpoint.py seal {cdir} && "
-                    f"python3 tools/tests/lib/sram_checkpoint.py validate {cdir}")
+                    f"python3 tools/tests/lib/sram_checkpoint.py validate {cdir} && "
+                    f"python3 tools/tests/lib/checkpoint_drift.py {key}")
         w(f"build {outs} {stamp_outs}{capture_outs}: {rule}{explicit} | "
           f"{' '.join(deps)}")
         w(f"  state = {names[0]}")

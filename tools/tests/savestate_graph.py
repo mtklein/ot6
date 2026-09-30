@@ -13,9 +13,9 @@
 #   S("vector_entry", gen="gen_vector_entry", checkpoint="post-opera-v1")
 #       generated from a CHECKPOINT: cold-boot the tracked SRAM checkpoint in
 #       tools/tests/checkpoints/<key>/ instead of a predecessor savestate.
-#       Cutting a step loose at a save-point boundary (the A-F sequence
-#       lettered in the boundary comments below) is exactly this: prev=
-#       becomes checkpoint=.
+#       The Vector-area boundaries (the A-F sequence lettered in the
+#       comments below) were cut this way by hand; the cut form below keeps
+#       prev= as well, so the chain from power-on still joins the legs.
 #
 #   S("figaro_entry", gen="gen_figaro", prev="worldmap_narshe",
 #     checkpoint="world-narshe-v1")
@@ -28,10 +28,10 @@
 #       `ninja chain` (savestate_ninja.py chain_plan): chain_<state> copies
 #       in which each cut's consumer Continues the save its producer's copy
 #       just made (build/checkpoints/<key>/), which is also how a tracked
-#       checkpoint is re-cut (docs/TESTING.md).
+#       checkpoint is re-cut (docs/TOOLING.md).
 #
-#   S("south_figaro", gen="gen_kolts", prev="figaro_cleared",
-#     also=["kolts_entry", "vargas_entry"])
+#   S("figaro_intro", gen="gen_edgar", prev="figaro_entry",
+#     also=["figaro_matron", "figaro_cleared"])
 #       one generator run that publishes several states: one edge, one
 #       play-through, all the artifacts the script emits along the way.
 #

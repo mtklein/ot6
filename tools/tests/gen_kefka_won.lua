@@ -342,9 +342,7 @@ H.run({ maxFrames = 400000 }, {
   H.driveUntil(function() return H.worldMode() end, 900, {
     H.hold({ "down" }), H.waitFrames(4),
   }, "off the south edge to the world"),
-  H.waitUntil(function()
-    return H.worldHasControl() and H.worldAligned() and bright() >= 15
-  end, 1200, "world control", 5),
+  H.waitWorldSettled("world control", 1200),
   H.waitFrames(30),
   H.call(function()
     H.log(string.format("[world] at (%d,%d)", H.worldX(), H.worldY()))

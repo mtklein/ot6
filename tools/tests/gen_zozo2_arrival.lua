@@ -402,9 +402,7 @@ H.run({ maxFrames = 1200000 }, {
   H.driveUntil(function() return H.worldMode() end, 900, {
     H.hold({ "down" }), H.waitFrames(4),
   }, "off the castle to the world"),
-  H.waitUntil(function()
-    return H.worldHasControl() and H.worldAligned() and bright() >= 15
-  end, 1500, "world control", 5),
+  H.waitWorldSettled("world control", 1500),
   H.waitFrames(30),
   H.call(function()
     H.log(string.format("[world] west landing at (%d,%d)",
@@ -492,19 +490,9 @@ H.run({ maxFrames = 1200000 }, {
   H.driveUntil(function() return H.worldMode() end, 6000, {
     H.hold({ "down" }), H.waitFrames(4),
   }, "off Jidoor's south edge"),
-  -- 30 settled frames in a row, not one: a single poll can land in the
-  -- town's fade-out with the world flags already up and $E0/$E2 still 0
-  -- (measured: satisfied after 15 frames, then world (0,0), where the
-  -- chain's run took 155; build/attempts/wt/chain-cut/)
-  (function()
-    local n = 0
-    return H.withReset(H.waitUntil(function()
-      local ok = H.worldHasControl() and H.worldAligned() and bright() >= 15
-         and (H.worldX() ~= 0 or H.worldY() ~= 0)
-      n = ok and n + 1 or 0
-      return n >= 30
-    end, 2000, "world control", 1), function() n = 0 end)
-  end)(),
+  -- 30 settled frames in a row, not one poll: a single poll once landed in
+  -- the town's fade-out and read world (0,0) (H.waitWorldSettled)
+  H.waitWorldSettled("world control", 2000),
   H.waitFrames(30),
   H.call(function() where("left Jidoor") end),
   -- The south edge puts the party back on the approach tile (27,129),

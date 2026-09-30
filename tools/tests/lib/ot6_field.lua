@@ -1318,6 +1318,23 @@ function M.worldSettled()
   return M.worldHasControl() and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
 end
 
+-- Step: wait until the world map has held worldSettled(), tile-aligned,
+-- with a live position, for n consecutive frames (default 30).  A single
+-- poll is not enough after a field -> world load: one read inside the
+-- town's fade-out saw the world flags up and $E0/$E2 still 0, and the
+-- route then planned from world (0,0) (gen_zozo2_arrival leaving Jidoor,
+-- build/attempts/wt/chain-cut/bootstrap/NOTES.txt).
+function M.waitWorldSettled(what, maxFrames, n)
+  local run = 0
+  n = n or 30
+  return M.withReset(M.waitUntil(function()
+    local ok = M.worldSettled() and M.worldAligned()
+       and (M.worldX() ~= 0 or M.worldY() ~= 0)
+    run = ok and run + 1 or 0
+    return run >= n
+  end, maxFrames or 3000, what or "world settled", 1), function() run = 0 end)
+end
+
 -- Walk to world tile (tx,ty): the field navTo's verified-step loop on
 -- the world engine.  Differences:
 --  * hold-through: input is read only at tile boundaries, so the walker

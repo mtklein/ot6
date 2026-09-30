@@ -350,10 +350,7 @@ H.run({ maxFrames = 250000, allowGameOver = true }, {
   -- (savestate_graph.py; lib/ot6_contract.lua "falls-done-v1").
   H.navTo(8, 14, { maxFrames = 6000, playBattles = "tactical", arrive = function()
     return H.worldMode() end }),
-  H.waitUntil(function()
-    return H.worldMode() and H.worldHasControl() and H.worldAligned()
-       and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
-  end, 3000, "on the world", 5),
+  H.waitWorldSettled("on the world", 3000),
   H.waitFrames(30),
   H.saveAtCheckpoint("falls-done-v1"),
 })

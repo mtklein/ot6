@@ -578,6 +578,9 @@ checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
 check("checkpoint_saves", "sh tools/tests/lib/checkpoint_saves.sh",
       ["tools/tests/lib/checkpoint_saves.sh",
        "tools/tests/lib/sram_checkpoint.py"] + checkpoint_files)
+check("checkpoint_drift_selftest",
+      "python3 tools/tests/lib/checkpoint_drift.py --selftest",
+      ["tools/tests/lib/checkpoint_drift.py", "tools/tests/lib/sram_checkpoint.py"])
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
        copy_if_changed_from("build/ot6.sfc")] + LIBS + checkpoint_files)
@@ -652,9 +655,25 @@ release_pre = qual[qual_before_release:]
 del qual[qual_before_release:]
 # The chain from power-on is a release preflight too: the legs
 # qualification booted from tracked checkpoints must also play through
-# from power-on, each from the save the leg before it made.
+# from power-on, each from the save the leg before it made.  And every
+# tracked cut checkpoint must be the save that chain makes today
+# (checkpoint_drift.py: levels, gear, gil, the bag, story switches); the fix
+# for a drifted one is `checkpoint_drift.py --recut`, then qualify again.
 if chain_end:
     release_pre.append(chain_end)
+    captures = sn.chain_captures(states, ROOT)
+    tracked = [a for key in sorted(captures)
+               for a in sn.checkpoint_inputs(ROOT, key)]
+    out = "build/checks/checkpoint_drift.ok"
+    w.edge([out], "sh",
+           implicit=["tools/tests/lib/checkpoint_drift.py",
+                     "tools/tests/lib/sram_checkpoint.py"]
+           + [p for key in sorted(captures) for p in captures[key]] + tracked,
+           cmd="python3 tools/tests/lib/checkpoint_drift.py --strict "
+               + " ".join(sorted(captures))
+               + f" && mkdir -p build/checks && touch {out}",
+           desc="tracked cut checkpoints are today's play")
+    release_pre.append(out)
 
 bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
 w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,

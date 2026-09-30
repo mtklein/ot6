@@ -23,7 +23,9 @@ directory changes.
 
 A `.mss` belongs to one ROM, so after a ROM change every generated state
 regenerates, each from the one before it. To keep that from being one long
-serial run, the World of Balance chain is cut at save points: an entry in
+serial run, the World of Balance chain is cut where the play saves (at a
+save point, or on the world map, where the game lets you save anywhere):
+an entry in
 `tools/tests/savestate_graph.py` with both `prev=` and `checkpoint=` is a
 cut. The leg before it ends by saving there through the real Save UI and
 asserting the checkpoint's contract as its exit
@@ -41,8 +43,22 @@ before it and, at a cut, from the save the producing copy just made
 because the chain's last state moves as cuts and legs are added.
 `ninja release` depends on it. Run it too when a leg's exit contract
 fails in qualification: the chain says whether the story still plays
-through, and re-cutting a tracked checkpoint from current play is copying
-`build/checkpoints/<key>/` over `tools/tests/checkpoints/<key>/`.
+through.
+
+A tracked checkpoint drifts from today's play as the route changes above
+it. At each cut the chain prints the drift, decoded from both saves:
+`tools/tests/lib/checkpoint_drift.py` compares the party (levels,
+experience, max HP/MP, gear), gil, the bag and the story switches.
+`ninja release` fails while any tracked checkpoint differs from its fresh
+capture in those fields. Re-cut at every release, and during a cycle
+whenever the report shows a material change:
+
+    ninja chain
+    python3 tools/tests/lib/checkpoint_drift.py --recut <key>...
+
+`--recut` copies the chain's sealed capture over the tracked checkpoint;
+then commit and qualify again. The contracts stay light: a suite that
+needs a level or an item asserts its own precondition.
 
 ## Installed pieces
 

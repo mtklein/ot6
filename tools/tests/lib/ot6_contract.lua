@@ -1723,11 +1723,11 @@ function M.saveAtCheckpoint(key)
 end
 
 -- The consuming leg's boot: Continue the battery run.sh installed
--- (OT6_SRAM_CHECKPOINT) from the title, wait for control wherever the load
--- lands, and assert the contract as the entry, which is what names a
--- checkpoint that landed somewhere else.  A is pressed only while the
--- screen is lit and nothing has control yet, so no press lands on the
--- field after the load.
+-- (OT6_SRAM_CHECKPOINT) from the title, pressing A (only while the screen
+-- is lit and the party is not yet on the checkpoint's tile) until it stands
+-- there or 1200 frames pass, then wait for control wherever the load
+-- landed and assert the contract as the entry, which is what names a
+-- checkpoint that landed somewhere else.
 function M.bootCheckpoint(key, opts)
   opts = opts or {}
   local c = lookup(key)

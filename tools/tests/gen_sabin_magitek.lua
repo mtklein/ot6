@@ -191,8 +191,7 @@ H.run({ maxFrames = 120000 }, {
   end, "ride the finale cutscene onto the world map", 40000),
 
   -- settle on the world map: control + full brightness + 30f margin
-  H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end,
-    3000, "world control", 5),
+  H.waitWorldSettled("world control", 3000),
   H.waitUntil(function() return bright() >= 15 end, 1200, "world fade-in", 10),
   H.waitFrames(30),
   H.call(function()
