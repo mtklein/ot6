@@ -120,8 +120,10 @@ STATES = [
     # failed experiment on the river replays 530 frames, not the whole hideout
     S("lete_river", gen="gen_lete", prev="banon_joined"),
     # gen_scenario: the river (steered past its vanilla loop), ULTROS, and
-    # the three-way split -- the entry point of the v0.3 arc
-    S("scenario_hub", gen="gen_scenario", prev="lete_river"),
+    # the three-way split -- the entry point of the v0.3 arc.  ultros1_entry
+    # is Ultros's battle as it loads (battle_ultros1).
+    S("scenario_hub", gen="gen_scenario", prev="lete_river",
+      also=["ultros1_entry"]),
     # one step PAST the hub: proves the split is dispatchable and hands the
     # v0.3 Locke chain its entry point.  The Sabin and Terra/Banon branches
     # start from scenario_hub the same way.

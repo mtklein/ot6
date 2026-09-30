@@ -114,7 +114,10 @@ local function armRetalDetector()
   detectorArmed = true
   local a = H.sym("ExecAIRetal")
   emu.addMemoryCallback(function()
-    retals[#retals + 1] = { f = H.frame, ent = emu.getState()["cpu.x"] & 0xff }
+    local e = emu.getState()["cpu.x"] & 0xff
+    retals[#retals + 1] = { f = H.frame, ent = e,
+      tk = e <= 0x12 and H.readByte(0x3E88 + e) or 0,
+      hp = e <= 0x12 and H.readWord(0x3BF4 + e) or 0 }
   end, emu.callbackType.exec, a, a)
   local d = H.sym("_dispatcher")
   emu.addMemoryCallback(function()
@@ -503,6 +506,27 @@ H.run({ maxFrames = 250000 }, {
       "control: inside this same window the ExecCmd detector saw monsters "
       .. "dispatch commands while unbroken, so a count of zero below means "
       .. "the gate held rather than that nothing was watching")
+    -- #329's block rule.  IFRIT's and SHIVA's counter scripts hold a story
+    -- command (the if_self_dead ending), so a Broken one's counter is
+    -- queued on every hit; their living blocks (`if_hit` / `if_cmd MAGIC`:
+    -- an attack and a battle variable) hold none, so each is skipped whole.
+    -- Run, their variable command would be dispatched above as a leak.
+    -- The count is the rule's positive control (14 in the #329 run; with
+    -- every block taken as a story block, the leaks below were Shiva's
+    -- variable command, $2E, fifteen times, one per such counter).
+    local brokenRetals = 0
+    for _, r in ipairs(retals) do
+      if r.f >= won.startFrame and r.f < won.deathFrame and r.ent >= 0x08
+         and r.ent <= 0x12 and r.tk ~= 0 and r.hp > 0 then
+        brokenRetals = brokenRetals + 1
+      end
+    end
+    H.log(string.format("%d counter(s) of a Broken, living boss ran in the "
+      .. "window (their story-less blocks skipped: the leak count below)",
+      brokenRetals))
+    H.assertEq(brokenRetals > 0, true, "control: a Broken, living boss's "
+      .. "counter ran in the window, so the zero leaks below cover #329's "
+      .. "block rule (a counter block with no story command is skipped)")
     H.assertEq(#leaks, 0,
       "no monster dispatched a command while its broken timer was running "
       .. "(issue #66: Ot6Gate answers at queue time, and before Ot6MayAct "

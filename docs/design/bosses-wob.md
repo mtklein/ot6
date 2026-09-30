@@ -63,16 +63,22 @@ Stated once, assumed by every block:
   Measured (build/attempts/wt/story-while-broken/): Ultros ④'s Chupon
   entry plays on cue while Ultros is Broken (`battle_ultros4.lua`; on
   main's ROM it came only as his dying counter); the Lete Ultros's fire
-  line (`dlg $0b`) plays when Terra's Fire hits him Broken, and his
-  Special does not follow (on main's ROM, no line until he died);
-  Ultros ③'s Relm interrupt runs while Broken on both ROMs, as #314
-  made it. Two of the route's story counters cannot come due while
-  their monster is Broken, because the party that meets them cannot
-  break it before the beat: Vargas (below), and the South Figaro
-  Merchant, whose Steal-for-clothes beat needs him alive and Broken,
-  but LOCKE's dagger hit that breaks him takes his last 92-93 HP (the
-  unbroken hit before it did 26-27), seven draws of seven
+  line (`dlg $0b`) plays when Terra's Fire hits him Broken, and the
+  Special behind it does not follow (`battle_ultros1.lua`; on main's
+  ROM, no line until he died); a Broken Ifrit's or Shiva's story-less
+  counter blocks are skipped whole (`battle_brokendeath.lua`); Ultros
+  ③'s Relm interrupt runs while Broken on both ROMs, as #314 made it.
+  Two of the route's story counters did not come due while their
+  monster was Broken: Vargas's (below), and the South Figaro Merchant's,
+  whose Steal-for-clothes beat needs him alive and Broken, but LOCKE's
+  dagger hit that breaks him takes his last 92-93 HP (the unbroken hit
+  before it did 26-27), seven draws of seven
   (fix/merchant-sweep-fix-s*.log, failed/merchant-*).
+  Two things shorten or sidestep a break around these beats: Haste on
+  the monster (Umaro's Green Cherry block, Doom's phase change) runs its
+  break timer about 24% faster (the #329 review's reading, not measured
+  here), and a body swap (the opera Ultros's slot
+  moves, Chadarnook's) brings in an unbroken body.
 - **A nameplate with no shields is itself information.** Scripted
   set-pieces (Tritoch, Guardian, the Imperial Camp Kefka) draw no
   gauge at all, which tells the player the fight is scripted.
@@ -247,18 +253,22 @@ fire + slashing.
   Pummel. The generator's route never reached the Broken case:
   `gen_vargas` plays no weakness hit before SABIN's first Pummel,
   which lands on 5 shields and takes him to 3 (measured, six runs).
-- **His other story comes before any break (#329).** The counter blocks
-  that bring SABIN in (`battle_event $07`, under 10,880 HP) and the one
-  after it (`battle_event $08`, under 10,368) would play while Vargas is
-  Broken, but the party cannot break him before either line. In phase
-  one the only key is BioBlaster, one chip for 227-255 HP here, and five
-  chips cost more than the 720 HP above the $07 line. In phase two
-  SABIN's MetalKnuckle is a claw (slashing) and chips nothing on
-  Vargas's bludgeoning row; AuraBolt chips one for about 390 HP against
-  the ~480 above the $08 line; and Pummel ends the fight. MEASURED:
-  SABIN's Fights took him from 10,850 to 10,230 HP with his shields at 4
-  throughout, and $08 ran unbroken
-  (build/attempts/wt/story-while-broken/failed/vargas8-*).
+- **His other story on the route comes before any break (#329).** The
+  counter blocks that bring SABIN in (`battle_event $07`, under 10,880
+  HP) and the one after it (`battle_event $08`, under 10,368) would play
+  while Vargas is Broken, but the route's play reaches both lines
+  unbroken. In phase two, `$08` is not reachable Broken: SABIN's
+  MetalKnuckle is a claw (slashing) and chips nothing on Vargas's
+  bludgeoning row, AuraBolt's one chip cost 393 and 406 HP (10,850 ->
+  10,457 and 10,879 -> 10,473) against the ~480 above the line, and
+  Pummel ends the fight. MEASURED: SABIN's Fights took him from 10,850
+  to 10,230 HP with his shields at 4 throughout, and `$08` ran unbroken
+  (build/attempts/wt/story-while-broken/failed/vargas8-*;
+  fix/vargas-fix-s0-regress.log). In phase one the only key is
+  BioBlaster; `battle_vargas`'s first BioBlaster turn took him from
+  11,582 to 11,327 (the party's weapon hits in that stretch included),
+  and 720 HP lie above the `$07` line. Whether five BioBlasters with
+  the others holding back can break him above it was not measured.
 
 ## Lete River
 
