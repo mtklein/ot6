@@ -147,6 +147,9 @@ No worker owns a copy of the emulator. Every worker execs one shared
 read-only bundle at `~/Library/Caches/ot6/Mesen-test.app`, cloned from
 `tools/Mesen.app` once per machine with its `settings.json` stripped, and
 each gets its own `CFFIXED_USER_HOME`, so nothing is written inside the app.
+On Linux the same shape is `~/.cache/ot6/Mesen-test/` cloned from
+`tools/Mesen-linux/`, with a per-worker `XDG_CONFIG_HOME`
+([docs/TOOLING.md](../../docs/TOOLING.md#linux-worker)).
 `OT6_MESEN_CACHE` relocates that cache (`lib/shared_emulator_selftest.sh`
 provisions into a scratch one). Many workers arriving at a cold cache build
 it exactly once -- the builder looks again under the lock before the
@@ -532,7 +535,8 @@ to overwrite. `--dry-run` plans without writing, `--selftest` is the check
   out of a script; a test that goes quiet has told you nothing.
 - stdout carries `[CPU] Uninitialized memory read` debug spam from the
   testrunner's force-enabled debugger; filter for `[ot6]`.
-- Do not delete `~/Library/Application Support/Mesen2/settings.json`:
+- Do not delete `~/Library/Application Support/Mesen2/settings.json`
+  (`~/.config/Mesen2/settings.json` on Linux):
   run.sh feeds it to `pin_test_saves.py` as the base config and aborts
   (exit 2) if it cannot be read.
 
