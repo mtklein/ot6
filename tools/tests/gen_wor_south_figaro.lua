@@ -90,6 +90,51 @@ local function holdOut(dir, dst, what)
     H.waitFrames(20),
   })
 end
+-- Gerad's first walk-off (event_main.asm _ca91da: after the first talk
+-- NPC_11 moves RIGHT 2, DOWN 4, LEFT 1, DOWN 4 from his post, and sets
+-- $01F1 only at the end).  The walk waits on a tile the party stands on,
+-- and talkToObj ends adjacent on whichever side the approach reached: in
+-- the #326 re-cut the party talked from (21,46), his first step, and
+-- $01F1 never came (build/attempts/wt/recut/capture/
+-- wor-south-figaro-v1.fail1-gerad.log, 3 of 3 attempts: `timeout after
+-- 1200 frames waiting for Gerad walks off ($01F1)`).  So after the talk
+-- the party steps off his walk when it stands on it.
+local GERAD_POST = { 20, 46 }
+local GERAD_WALK1 = {}
+do
+  local x, y = GERAD_POST[1], GERAD_POST[2]
+  for _, m in ipairs({ { 1, 0, 2 }, { 0, 1, 4 }, { -1, 0, 1 }, { 0, 1, 4 } }) do
+    for _ = 1, m[3] do
+      x, y = x + m[1], y + m[2]
+      GERAD_WALK1[y * 256 + x] = true
+    end
+  end
+end
+local function offGeradsWalk()
+  local goal = nil
+  return H.cond(function() return GERAD_WALK1[H.fieldY() * 256 + H.fieldX()] == true end, {
+    H.call(function()
+      goal = nil
+      local px, py = H.fieldX(), H.fieldY()
+      for r = 1, 3 do
+        for dy = -r, r do
+          for dx = -r, r do
+            local x, y = px + dx, py + dy
+            if goal == nil and math.abs(dx) + math.abs(dy) == r and not GERAD_WALK1[y * 256 + x]
+               and not (x == GERAD_POST[1] and y == GERAD_POST[2]) and H.bfsPath(x, y) then
+              goal = { x, y }
+            end
+          end
+        end
+      end
+      H.assertEq(goal ~= nil, true, "a tile off Gerad's walk within 3 steps")
+      H.log(string.format("[nikeah] the party stands on Gerad's walk at (%d,%d): stepping to (%d,%d)",
+        px, py, goal[1], goal[2]))
+    end),
+    H.navTo(function() return goal[1] end, function() return goal[2] end, { maxFrames = 3000 }),
+  }, {})
+end
+
 local function settled(what)
   return H.advanceStory(function()
     return H.hasControl() and H.tileAligned() and not H.dialogWaiting() and bright() >= 15
@@ -177,8 +222,13 @@ H.run({ maxFrames = 120000 }, {
   holdOut("down", MAP_NIKEAH, "the cafe's (26,38) exit -> Nikeah 169"),
 
   -- ---- 4. Gerad: three talks, the NPC walking off between them ---------------------------
+  H.call(function()
+    H.assertEq(H.objX(OBJ_GERAD) == GERAD_POST[1] and H.objY(OBJ_GERAD) == GERAD_POST[2], true,
+      string.format("Gerad stands at his post (%d,%d) before the first talk", GERAD_POST[1], GERAD_POST[2]))
+  end),
   H.talkToObj(OBJ_GERAD, "Gerad (NPC_11), first talk"), settled("Gerad 1"),
   H.call(function() H.assertEq(sw(0x01F0), 1, "Gerad's first talk ($01F0)") end),
+  offGeradsWalk(),
   H.waitUntil(function() return sw(0x01F1) == 1 end, 1200, "Gerad walks off ($01F1)", 5),
   H.talkToObj(OBJ_GERAD, "Gerad (NPC_11), second talk"), settled("Gerad 2"),
   H.call(function() H.assertEq(sw(0x01F2), 1, "Gerad's second talk ($01F2)") end),
