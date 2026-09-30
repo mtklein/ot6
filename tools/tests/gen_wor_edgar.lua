@@ -17,6 +17,10 @@
 --      CELES from the cave's door (no back or pincer attacks), and a
 --      Muddled ally left to the monsters' hits, no cure-hit from a Genji
 --      pair (backGuard, CAVE_FIGHT; route-wor-edgar 12.5).
+--      Informed choices (an experienced player's knowledge, from the labs
+--      and the ROM, not from what this run has met): the Back Guard at the
+--      door, the relics and the hands at the stop before the Tentacles,
+--      and Air Blade there (backGuard, section 4 below).
 --   2. The Figaro cave behind the thieves: map 68's three pieces by their
 --      links, the turtle scene on 90's arrival tile, the crossing (face up
 --      and hold A on (47,29)), 92, 53, and the castle's basement 61, where
@@ -80,9 +84,10 @@ end
 -- basements puts the bag's rings on whoever lacks one, in order SABIN
 -- (for his Black Belt), EDGAR once he has joined (for his Star Pendant),
 -- CELES (for her Jewel Ring).  The bag holds one at the checkpoint and
--- the NeckHunter drops more.  At the Tentacles (none of which Muddles)
--- and out of the castle for the save, each member's own relic goes back
--- (usualRelics).  The lab behind it is route-wor-edgar 12.4
+-- the NeckHunter drops more.  At the Tentacles (none of which Muddles;
+-- informed: read from their scripts, not met) and out of the castle for
+-- the save, each member's own relic goes back (usualRelics).  The lab
+-- behind it is route-wor-edgar 12.4
 -- (build/attempts/wt/figaro-muddle/).
 -- A relic change on a Genji Glove wearer (SABIN and CELES) re-runs the
 -- game's Optimum on leaving the Relic screen (CheckReequipRelics, menu
@@ -112,12 +117,15 @@ end
 -- Ring for the cave and the basements: it takes the back and pincer
 -- attacks off the table, and a back attack or a pincer turns the pair's
 -- back row to the front, where the monsters' blows and a Muddled ally's
--- Genji pair land in full.  The party has met that already (Tzen's house,
--- where gen_wor_sabin wears it for the same reason, #250); a person with
--- one in the bag wears it into a cave.  Measured on the re-cut chain's cave
--- mouth (route-wor-edgar 12.5): without it 96 of 651 formation-232 fights
--- were a back attack or a pincer and 4 of those were lost (2 of the 555
--- normal ones); with it 330 fights, all normal, none lost.  CELES rather
+-- Genji pair land in full.  Informed: it goes on at the cave's door
+-- whatever this run has met, on the lab's measurement (route-wor-edgar
+-- 12.5, the re-cut chain's cave mouth): without it 96 of 651
+-- formation-232 fights were a back attack or a pincer and 4 of those were
+-- lost (2 of the 555 normal ones); with it 330 fights, all normal, none
+-- lost.  The lineage has been pincered before (the re-cut captures: one in
+-- wor-tzen-door-v1, two in wor-nikeah-v1, build/attempts/wt/recut/capture/),
+-- but not in Tzen's house: gen_wor_sabin wears the Back Guard before the
+-- house's clock starts (HOUSE_BACK_GUARD), so no pincer happens there.  CELES rather
 -- than SABIN: the Peace Ring goes to SABIN first (peaceRings), and nothing
 -- in the cave Petrifies (her Jewel Ring's guard).
 local function backGuard(what, hands)
@@ -508,6 +516,10 @@ H.run({ maxFrames = 600000 }, {
   checkOutcomes("the cave and the basements"),
 
   -- ---- the stop before Edgar and the Tentacles ---------------------------------------
+  -- Informed (the party has not met the Tentacles; an experienced player
+  -- knows them): the hands, the relics and the blitz below are chosen for
+  -- this boss.  #324 would have the driver swap hands in battle on seeing
+  -- an absorb instead.
   -- No element: the four absorb fire, ice and bolt between them, and the
   -- runner's absorb guard refuses a fight entered with an absorbed weapon
   -- (measured with the plains kit: `char 5's R-hand item $57 (fire) is
@@ -553,7 +565,8 @@ H.run({ maxFrames = 600000 }, {
   -- Blade lost one that Pummel won, so no measured difference (route-wor-
   -- edgar 12.2; build/attempts/wt/wor-edgar/leg3/tent_l30.out,
   -- tent_l30_airblade.out).  The variation set with Air Blade won the
-  -- Tentacles in all 13 runs that reached them (leg3/var_ed4/).
+  -- Tentacles in all 13 runs that reached them (leg3/var_ed4/).  Informed:
+  -- "none absorbs wind" is the ROM's data, not something the party has seen.
   H.call(function()
     H.assertEq((H.readByte(0x1D28) & 0x20) ~= 0, true,
       string.format("SABIN knows Air Blade ($1D28 bit 5; SABIN L%d, BlitzLevelTbl 30)", level(SABIN)))
