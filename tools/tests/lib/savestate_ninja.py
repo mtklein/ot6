@@ -34,6 +34,10 @@ reached a test without passing any freshness check, and reports a moved lib
 half as provenance drift rather than staleness -- the same rule this graph
 schedules by.
 
+A cut (prev= with checkpoint=) boots the tracked checkpoint here; the
+chain from power-on (chain_plan, emit_chain_edges) keeps the prev= path as
+chain_<state> copies, built by `ninja chain`.
+
 Usage:
     python3 tools/tests/lib/savestate_ninja.py             # (re)write build/build.ninja
     python3 tools/tests/lib/savestate_ninja.py --list      # state names, play order
@@ -116,8 +120,14 @@ def validate(states, root):
                 err(e, f"seed source {seed!r} is not an earlier state")
         if gen and not (root / "tools/tests" / f"{gen}.lua").is_file():
             err(e, f"no such generator tools/tests/{gen}.lua")
-        if sum(map(bool, (prev, checkpoint, after))) > 1:
-            err(e, "prev=, checkpoint= and after= are mutually exclusive")
+        # prev= and checkpoint= together are a cut: qualification boots the
+        # tracked checkpoint, and the power-on chain (chain_plan) boots the
+        # save prev's own run made there.  after= orders a power-on root
+        # and excludes both.
+        if after and (prev or checkpoint):
+            err(e, "after= excludes prev= and checkpoint=")
+        if prev and checkpoint and e.get("stack"):
+            err(e, "a cut (prev= with checkpoint=) cannot also be stack=")
         if prev and prev not in seen:
             err(e, f"prev {prev!r} is not an earlier state")
         if after and after not in seen:
@@ -163,7 +173,32 @@ def validate(states, root):
         seen.add(s)
         for a in (e.get("also") or []):
             seen.add(a)
+    # A cut's producer run saves once, so it can stand for one checkpoint,
+    # and the power-on chain captures that checkpoint's one payload.
+    owner = _owners(states)
+    made = {}
+    for e in states:
+        if not (e.get("prev") and e.get("checkpoint")):
+            continue
+        key = e["checkpoint"]
+        if len(checkpoint_inputs(root, key)) != 2:
+            err(e, f"a cut's checkpoint {key!r} must hold exactly one *.sram")
+        p = owner.get(e["prev"])
+        if p is not None and made.setdefault(p, key) != key:
+            err(e, f"{p}'s run already saves checkpoint {made[p]!r}; "
+                   f"one run cannot also stand for {key!r}")
     return errors
+
+
+def _owners(states):
+    """name -> the entry name whose run publishes it (itself, or the state
+    an also= sibling rides with)."""
+    owner = {}
+    for e in states:
+        owner[e["state"]] = e["state"]
+        for a in (e.get("also") or []):
+            owner[a] = e["state"]
+    return owner
 
 
 def copy_if_changed_from(rel):
@@ -202,11 +237,15 @@ def emit_state_rules(w):
     w("# bytes, so the source's stamp -- its sig, its artifact hash, its")
     w("# ancestor -- records the copy verbatim, and the copied stamp is")
     w("# what lets a stacked generate edge bind ITS ancestor line to a real file (#75).")
+    w("# Each file is rewritten only when its bytes differ (restat), so a source")
+    w("# regenerated to the same bytes -- a clean qualification on an unchanged")
+    w("# ROM -- does not make the chain from power-on replay behind it.")
     w("rule seed")
-    w("  command = cp build/states/$src.mss build/states/$state.mss && "
-      "cp build/states/$src.mss.lua build/states/$state.mss.lua && "
-      "cp build/states/$src.stamp build/states/$state.stamp")
+    w("  command = for x in mss mss.lua stamp; do "
+      "cmp -s build/states/$src.$$x build/states/$state.$$x || "
+      "cp build/states/$src.$$x build/states/$state.$$x || exit 1; done")
     w("  description = stack seed $state <- $src")
+    w("  restat = 1")
     w("")
     w("# A generator's copy: the new bytes always land, but the old mtime is")
     w("# kept when the Lua token stream (comments and whitespace dropped) did")
@@ -251,11 +290,12 @@ def emit_state_edges(w, states, root, copy_if_changed_from):
         explicit = ""
         order = ""
         # The provenance ancestor: what savestate_stamp.sh write hashes into
-        # the stamp's `ancestor` line.  Exactly one of prev= / checkpoint=
-        # can be set (validate() enforces it); a state with neither is a
+        # the stamp's `ancestor` line: the checkpoint's manifest when
+        # checkpoint= is set (a cut, prev= with checkpoint=, boots the
+        # checkpoint here), else prev='s stamp; a state with neither is a
         # power-on root and records no ancestor.
         ancestor = "-"
-        if e.get("prev"):
+        if e.get("prev") and not e.get("checkpoint"):
             p = e["prev"]
             explicit = (f" build/states/{p}.mss.lua build/states/{p}.mss"
                         f" build/states/{p}.stamp")
@@ -296,6 +336,212 @@ def emit_state_edges(w, states, root, copy_if_changed_from):
     w("")
 
 
+# ------------------------------------------------ the chain from power-on --
+# A cut (prev= with checkpoint=) lets qualification boot a leg from its
+# tracked checkpoint, so the legs regenerate at once.  The chain from
+# power-on is kept as its own copy of the states: chain_<state>, each
+# generated by the same generator under OT6_STACK=chain_ (compose.py
+# prefixes every .mss name the script boots or emits), booted from the
+# previous chain_ state.  At a cut, the producer's copy captures the save
+# its run made (OT6_CAPTURE_SRM) into build/checkpoints/<key>/, sealed with
+# the tracked manifest, and the consumer's copy Continues that save instead
+# of the tracked one.  Nothing in qualification depends on the copies;
+# `ninja chain` builds them (configure.py).
+CHAIN_PREFIX = "chain_"
+CAPTURE_DIR = "build/checkpoints"
+
+
+def chain_plan(states):
+    """The chain from power-on, or None when the graph has no cut.
+
+    Returns (entries, seeds, end): the graph entries that get a chain_
+    copy, in play order; the states copied (seed rule) into chain_ names
+    because the first copied run boots them; and the last state of the
+    chain.  The chain is the prev= ancestry of the last state in play
+    order whose ancestry, cuts joined, holds a cut and reaches a power-on
+    root; the copies start at the first cut's producer (everything before
+    it plays the same way in both graphs)."""
+    by = {e["state"]: e for e in states}
+    owner = _owners(states)
+    cuts = [e for e in states if e.get("prev") and e.get("checkpoint")]
+    if not cuts:
+        return None
+    producers = {owner[e["prev"]] for e in cuts}
+
+    def ancestry(name):
+        line = []
+        e = by[name]
+        while True:
+            line.append(e["state"])
+            if not e.get("prev"):
+                break
+            e = by[owner[e["prev"]]]
+        line.reverse()
+        return line, not e.get("checkpoint") and not e.get("seed")
+
+    end, line = None, None
+    for e in reversed(states):
+        cand, poweron = ancestry(e["state"])
+        if poweron and any(by[n].get("checkpoint") for n in cand):
+            end, line = e["state"], cand
+            break
+    if end is None:
+        return None
+    first = next(i for i, n in enumerate(line) if n in producers)
+    entries = [by[n] for n in line[first:]]
+    seeds = []
+    head = entries[0]
+    if head.get("prev"):
+        seeds.append(head["prev"])
+    return entries, seeds, end
+
+
+SEALED_FIELDS = ("size", "sha256", "provenance")
+
+
+def write_authored(manifest, out):
+    """A tracked manifest minus what `seal` writes (size, sha256,
+    provenance): the template the chain's capture is sealed against.  Written
+    only when it changed, so re-cutting the tracked checkpoint from the
+    chain's own capture does not make the chain stale (restat)."""
+    import json
+    m = json.loads(manifest.read_text())
+    text = json.dumps({k: v for k, v in m.items() if k not in SEALED_FIELDS},
+                      indent=2) + "\n"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if not (out.exists() and out.read_text() == text):
+        out.write_text(text)
+    return 0
+
+
+def chain_captures(states, root):
+    """{checkpoint key: [the paths `ninja chain` seals it into]} for every
+    cut on the chain from power-on; {} with no cut."""
+    plan = chain_plan(states)
+    if plan is None:
+        return {}
+    names = {e["state"] for e in plan[0]}
+    owner = _owners(states)
+    out = {}
+    for e in states:
+        if e.get("prev") and e.get("checkpoint") and owner[e["prev"]] in names:
+            key = e["checkpoint"]
+            payload = Path(checkpoint_inputs(root, key)[1]).name
+            out[key] = [f"{CAPTURE_DIR}/{key}/manifest.json",
+                        f"{CAPTURE_DIR}/{key}/{payload}"]
+    return out
+
+
+def emit_chain_edges(w, states, root, copy_if_changed_from):
+    """The chain_ copies (see chain_plan).  Returns the chain's last
+    output path, or None when there is no cut."""
+    plan = chain_plan(states)
+    if plan is None:
+        return None
+    entries, seeds, end = plan
+    owner = _owners(states)
+    # the producer entry whose run saves each cut's checkpoint
+    saves = {owner[e["prev"]]: e["checkpoint"]
+             for e in states if e.get("prev") and e.get("checkpoint")}
+    P = CHAIN_PREFIX
+    w("# The chain from power-on (savestate_ninja.py chain_plan): chain_<state>")
+    w("# copies, each booted from the previous copy, and at a cut from the save")
+    w("# the producer's copy captured.  Not qualification: `ninja chain`.")
+    w("rule generate_capture")
+    w("  command = OT6_WORKER=$state OT6_EXPECT_ARTIFACT='$expect' $env "
+      "tools/tests/run.sh tools/tests/$gen.lua build/states/$state.log "
+      "&& $stamps && $seal")
+    w("  description = generate $state <- $gen (captures $key)")
+    w("")
+    w("rule checkpoint_authored")
+    w("  command = python3 tools/tests/lib/savestate_ninja.py --authored $in $out")
+    w("  description = checkpoint_authored $in")
+    w("  restat = 1")
+    w("")
+    for key in sorted(set(saves.values())):
+        w(f"build build/ninja/authored/{key}.json: checkpoint_authored "
+          f"tools/tests/checkpoints/{key}/manifest.json")
+    w("")
+    for s in seeds:
+        w(f"build build/states/{P}{s}.mss.lua build/states/{P}{s}.mss "
+          f"build/states/{P}{s}.stamp: seed build/states/{s}.mss.lua "
+          f"build/states/{s}.mss build/states/{s}.stamp")
+        w(f"  state = {P}{s}")
+        w(f"  src = {s}")
+    for e in entries:
+        gen, s = e["gen"], e["state"]
+        names = [P + n for n in [s] + list(e.get("also") or [])]
+        outs = " ".join(f"build/states/{n}.mss.lua build/states/{n}.mss"
+                        for n in names)
+        # Unlike qualification's generate edges, a chain_ copy depends on
+        # the lib halves too: the chain is where a tracked checkpoint is
+        # re-cut from, and checkpoint_drift.py refuses a capture sealed
+        # under older lib halves, so a lib edit has to re-run the chain.
+        deps = [copy_if_changed_from(ROM),
+                copy_if_changed_from(f"tools/tests/{gen}.lua")] \
+            + [copy_if_changed_from(h) for h in LIB_HALVES]
+        env = [f"OT6_STACK={P}",
+               f"OT6_TIMEOUT={e.get('timeout') or 1800}"]
+        explicit, extras = "", ""
+        if e.get("prev") and e.get("checkpoint"):
+            key = e["checkpoint"]
+            ins = [f"{CAPTURE_DIR}/{key}/{Path(a).name}"
+                   for a in checkpoint_inputs(root, key)]
+            explicit = " " + " ".join(ins)
+            env.append(f"OT6_SRAM_CHECKPOINT={CAPTURE_DIR}/{key}")
+            extras = " ".join(ins)
+            ancestor = ins[0]
+        elif e.get("prev"):
+            p = P + e["prev"]
+            explicit = (f" build/states/{p}.mss.lua build/states/{p}.mss"
+                        f" build/states/{p}.stamp")
+            ancestor = f"build/states/{p}.stamp"
+        else:
+            ancestor = "-"
+        stamp_cmds, anc = [], ancestor
+        for n in names:
+            cmd = f"sh tools/tests/lib/savestate_stamp.sh write {n} {gen} {anc}"
+            if extras:
+                cmd += f" {extras}"
+            stamp_cmds.append(cmd)
+            anc = f"build/states/{n}.stamp"
+        stamp_outs = " ".join(f"build/states/{n}.stamp" for n in names)
+        rule, capture_outs, seal = "generate", "", ""
+        key = saves.get(s)
+        if key:
+            tracked = checkpoint_inputs(root, key)
+            payload = Path(tracked[1]).name
+            cdir = f"{CAPTURE_DIR}/{key}"
+            rule = "generate_capture"
+            env.append(f"OT6_CAPTURE_SRM={cdir}/{payload}")
+            capture_outs = (f" {cdir}/manifest.json {cdir}/{payload}"
+                            f" {cdir}/{payload}.provenance.json")
+            authored = f"build/ninja/authored/{key}.json"
+            deps.append(authored)
+            # the tracked manifest's authored fields (its `saved` above
+            # all) judge the capture; seal refuses a battery holding
+            # another save
+            # ...and the drift report prints how far the tracked checkpoint
+            # is from this capture (report only; `ninja release` gates on
+            # it, configure.py)
+            seal = (f"cp {authored} {cdir}/manifest.json && "
+                    f"python3 tools/tests/lib/sram_checkpoint.py seal {cdir} && "
+                    f"python3 tools/tests/lib/sram_checkpoint.py validate {cdir} && "
+                    f"python3 tools/tests/lib/checkpoint_drift.py {key}")
+        w(f"build {outs} {stamp_outs}{capture_outs}: {rule}{explicit} | "
+          f"{' '.join(deps)}")
+        w(f"  state = {names[0]}")
+        w(f"  gen = {gen}")
+        w(f"  expect = {' '.join(f'{n}.mss {n}.mss.lua' for n in names)}")
+        w(f"  stamps = {' && '.join(stamp_cmds)}")
+        w(f"  env = {' '.join(env)}")
+        if seal:
+            w(f"  seal = {seal}")
+            w(f"  key = {key}")
+    w("")
+    return f"build/states/{P}{end}.mss.lua"
+
+
 def copy_rule(src, states):
     """The copy rule for one copy_if_changed source: a generator the graph
     runs is copied by its Lua token stream, anything else by its bytes."""
@@ -316,6 +562,8 @@ def copy_if_changed_sources(states, root):
             for a in checkpoint_inputs(root, e["checkpoint"]):
                 if a not in out:
                     out.append(a)
+    if chain_plan(states) is not None:     # the chain_ copies' lib inputs
+        out += [h for h in LIB_HALVES if h not in out]
     return out
 
 
@@ -353,8 +601,11 @@ def emit(states, root):
         w(f"build {copy_if_changed_from(src)}: {copy_rule(src, states)} {src}")
     w("")
     emit_state_edges(w, states, root, copy_if_changed_from)
+    end = emit_chain_edges(w, states, root, copy_if_changed_from)
     sidecars = " ".join(f"build/states/{e['state']}.mss.lua" for e in states)
     w(f"build savestates: phony {sidecars}")
+    if end:
+        w(f"build chain: phony {end}")
     w("default savestates")
     w("")
     return "\n".join(o)
@@ -373,9 +624,14 @@ def main(argv):
     ap.add_argument("--list", action="store_true",
                     help="print state names in play order and exit")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--authored", nargs=2, metavar=("MANIFEST", "OUT"),
+                    help="write MANIFEST's authored fields to OUT, only "
+                         "when they changed (the chain's seal template)")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
+    if args.authored:
+        return write_authored(Path(args.authored[0]), Path(args.authored[1]))
 
     root = args.root.resolve()
     states = load(root)
@@ -415,6 +671,9 @@ def selftest():
         (root / "tools/tests/checkpoints/good-v1").mkdir(parents=True)
         (root / "tools/tests/checkpoints/good-v1/manifest.json").write_text("{}")
         (root / "tools/tests/checkpoints/good-v1/a.sram").write_text("x")
+        (root / "tools/tests/checkpoints/two-v1").mkdir(parents=True)
+        (root / "tools/tests/checkpoints/two-v1/manifest.json").write_text("{}")
+        (root / "tools/tests/checkpoints/two-v1/b.sram").write_text("x")
         (root / "tools/tests/checkpoints/empty-v1").mkdir(parents=True)
         (root / "tools/tests/checkpoints/empty-v1/manifest.json").write_text("{}")
         (root / "tools/tests/gen_ok.lua").write_text("-- ok")
@@ -441,9 +700,17 @@ def selftest():
             ("unknown generator", [s(state="a", gen="gen_missing")]),
             ("prev not earlier",
              [s(state="a", gen="gen_ok", prev="zzz")]),
-            ("prev+checkpoint together",
+            ("after+prev together",
              [s(state="a", gen="gen_ok"),
-              s(state="b", gen="gen_ok", prev="a", checkpoint="good-v1")]),
+              s(state="b", gen="gen_ok", prev="a", after="a")]),
+            ("a cut that is also stacked",
+             [s(state="a", gen="gen_ok"),
+              s(state="b", gen="gen_ok", prev="a", checkpoint="good-v1",
+                stack="t9_")]),
+            ("one run standing for two checkpoints",
+             [s(state="a", gen="gen_ok"),
+              s(state="b", gen="gen_ok", prev="a", checkpoint="good-v1"),
+              s(state="c", gen="gen_ok", prev="a", checkpoint="two-v1")]),
             ("negative-* checkpoint refused",
              [s(state="a", gen="gen_ok", checkpoint="negative-x")]),
             ("checkpoint without manifest",
@@ -494,7 +761,10 @@ def selftest():
               "seed build/states/b.mss.lua build/states/b.mss "
               "build/states/b.stamp" in text)
         check("seed copies the stamp with the state (#75)",
-              "cp build/states/$src.stamp build/states/$state.stamp" in text)
+              "for x in mss mss.lua stamp;" in text
+              and "cp build/states/$src.$$x build/states/$state.$$x" in text)
+        check("seed rewrites only changed bytes (restat)",
+              text.split("rule seed")[1].split("rule ")[0].count("restat = 1") == 1)
         # provenance ancestors: what each edge tells savestate_stamp.sh to
         # hash into its `ancestor` line.
         check("generate rule runs the per-edge stamp chain",
@@ -525,6 +795,66 @@ def selftest():
               any("build/states/h.mss" in line
                   for line in text.splitlines()
                   if line.startswith("build build/states/i.")))
+        check("a graph without a cut has no chain copies",
+              "chain_" not in text and "build chain:" not in text)
+
+        # A cut: q boots good-v1 in qualification; its chain copy boots the
+        # save p's copy captured.  r rides on q; x is a branch off r.
+        cut = [s(state="o", gen="gen_ok"),
+               s(state="p", gen="gen_ok", prev="o", also=["p2"]),
+               s(state="q", gen="gen_ok", prev="p2", checkpoint="good-v1"),
+               s(state="r", gen="gen_ok", prev="q"),
+               s(state="x", gen="gen_ok", prev="o"),
+               s(state="z", gen="gen_ok", checkpoint="two-v1")]
+        check("a cut validates", validate(cut, root) == [])
+        text = emit(cut, root)
+        lines = text.splitlines()
+
+        def edge(out):
+            return next((l for l in lines if l.startswith(f"build {out}")), "")
+        check("qualification boots the cut from its tracked checkpoint",
+              "build/states/p2.mss" not in edge("build/states/q.mss.lua")
+              and "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/good-v1" in text)
+        check("the chain seeds the first producer's boot",
+              ": seed build/states/o.mss.lua" in edge("build/states/chain_o.mss.lua"))
+        check("the producer's copy captures and seals the checkpoint",
+              "build/checkpoints/good-v1/manifest.json" in edge("build/states/chain_p.mss.lua")
+              and "OT6_CAPTURE_SRM=build/checkpoints/good-v1/a.sram" in text
+              and "sram_checkpoint.py seal build/checkpoints/good-v1" in text)
+        check("the seal's template is the manifest's authored fields, so a "
+              "re-cut of the tracked checkpoint does not stale the chain",
+              "build/ninja/authored/good-v1.json" in edge("build/states/chain_p.mss.lua")
+              and "tools/tests/checkpoints/good-v1/manifest.json"
+                  not in edge("build/states/chain_p.mss.lua"))
+        check("the consumer's copy Continues the captured save",
+              "generate build/checkpoints/good-v1/manifest.json "
+              "build/checkpoints/good-v1/a.sram" in edge("build/states/chain_q.mss.lua")
+              and "OT6_SRAM_CHECKPOINT=build/checkpoints/good-v1" in text)
+        check("a copy after the cut boots the copy before it",
+              "build/states/chain_q.mss" in edge("build/states/chain_r.mss.lua"))
+        check("branches and checkpoint-only roots get no copy",
+              "chain_x" not in text and "chain_z" not in text)
+        lib = [f"{COPY_IF_CHANGED_DIR}/{h}" for h in LIB_HALVES]
+        check("every chain_ copy depends on the lib halves",
+              all(h in edge(f"build/states/chain_{n}.mss.lua") for n in "pqr"
+                  for h in lib))
+        check("...and still no qualification generate edge does",
+              not any(h in l for l in lines
+                      if ": generate" in l and "build/states/chain_" not in l
+                      for h in lib))
+        check("`chain` names the chain's last copy",
+              "build chain: phony build/states/chain_r.mss.lua" in text)
+        def body(i):
+            out = []
+            for l in lines[i + 1:]:
+                if not l.startswith("  "):
+                    break
+                out.append(l)
+            return "\n".join(out)
+        copies = [i for i, l in enumerate(lines)
+                  if l.startswith("build build/states/chain_") and ": generate" in l]
+        check("every copy runs stacked", len(copies) == 3 and all(
+            "OT6_STACK=chain_" in body(i) for i in copies))
     print("savestate_ninja selftest:", "ok" if ok else "FAILED")
     return 0 if ok else 1
 

@@ -1,17 +1,19 @@
--- gen_kolts.lua -- from figaro_cleared.mss (TERRA + LOCKE + EDGAR on a
--- chocobo in the Figaro desert) to the Vargas entry point on Mt. Kolts.
--- Generates three states:
+-- gen_kolts.lua -- from the world-figaro-v1 save (TERRA + LOCKE + EDGAR on
+-- foot in the Figaro desert, where gen_edgar's chocobo set them down) to
+-- the Mt. Kolts summit save point, where it saves (kolts-summit-v1, the cut
+-- gen_vargas boots from).
+-- Generates two states:
 --   south_figaro.mss map 75 (1,28), the town's west gate
 --   kolts_entry.mss  map 95 (14,35), the mountain's entrance map
---   vargas_entry.mss map 98, party tile-aligned next to VARGAS with his
---                    approach event already run, one interaction short
---                    of `battle 66`
 --
--- The party arrives on a chocobo, and the world navigator cannot read its
--- position until it dismounts (InitChoco never writes $E0/$E2; InitWorld
--- does). Dismounting is B held while riding; LandAirship sets $19=3 and
--- locks input, the descent sets $19=($19&$FE)|$04 once grounded, and
--- ExitVehicle's ReloadMap dispatch then runs InitWorld, seeding $E0/$E2.
+-- The chapter hands the party over on a chocobo, and the world navigator
+-- cannot read its position until it dismounts (InitChoco never writes
+-- $E0/$E2; InitWorld does). gen_edgar dismounts (B held while riding;
+-- LandAirship sets $19=3 and locks input, the descent sets
+-- $19=($19&$FE)|$04 once grounded, and ExitVehicle's ReloadMap dispatch
+-- then runs InitWorld, seeding $E0/$E2) and saves there, and this leg
+-- Continues that save: a cut in savestate_graph.py, contract
+-- lib/ot6_contract.lua "world-figaro-v1".
 --
 -- The Figaro desert does not reach South Figaro on foot: it is a separate
 -- flood-fill region from South Figaro/Mt. Kolts. The link is a cave (named
@@ -40,7 +42,7 @@
 -- The care layer: every crossing ends with a check of the party's hit
 -- points, and the route stops at the shop in South Figaro.
 local H = dofile("tools/tests/lib/ot6.lua")
-local CLEARED = "build/states/figaro_cleared.mss.lua"
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 
 -- map compares stay masked: loaders leave flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end
@@ -1038,26 +1040,14 @@ local function relicTrip()
 end
 
 H.run({ maxFrames = 700000 }, {
-  H.loadState(CLEARED),
-  H.waitFrames(20),
+  -- ===================================================================== --
+  -- PHASE 1: gen_edgar got off the chocobo and saved where it set the
+  -- party down; Continue that save.
+  -- ===================================================================== --
+  H.bootCheckpoint("world-figaro-v1"),
+  settleWorld("booted"),
   H.call(function()
     H.assertEq(H.worldMode(), true, "booted on the world map")
-    H.assertEq(H.readByte(0x11fa) & 3, 2, "booted riding the chocobo")
-    where("booted")
-  end),
-
-  -- ===================================================================== --
-  -- PHASE 1: get off the chocobo.  Hold B; LandAirship stages the tile into
-  -- $1F60/$1F61, the descent releases the exit, ExitVehicle clears $11FA
-  -- and ReloadMap comes back through InitWorld with $E0/$E2 finally live.
-  -- ===================================================================== --
-  H.hold({ "b" }),
-  H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
-    H.waitFrames(1),
-  }, "chocobo dismount ($11FA cleared)"),
-  H.release(),
-  settleWorld("dismount"),
-  H.call(function()
     H.assertEq(H.readByte(0x11fa) & 3, 0, "off the chocobo")
     H.assertEq(H.worldX(), H.readByte(0x1f60), "$E0 seeded from $1F60")
     H.assertEq(H.worldY(), H.readByte(0x1f61), "$E2 seeded from $1F61")
@@ -1319,115 +1309,11 @@ H.run({ maxFrames = 700000 }, {
   crossTo(58, 45, 97, "K7 shelf B -> cave 97", "tactical"),
   crossTo(55, 10, 103, "K8 cave 97 -> the summit", "tactical"),
   -- The summit save point (57,8) -- vanilla's pre-Vargas save, taken the
-  -- way a person takes it.  The battery save rides inside kolts-era .mss
-  -- states (vargas_entry included), so gen_seed_summit.lua lifts it as
-  -- the kolts-summit-v1 SRM seed with no replay.
-  H.navTo(57, 8, { maxFrames = 8000, playBattles = "tactical" }),
-  H.waitFrames(30),
-  H.call(function()
-    H.assertEq((H.readByte(0x1EB7) & 0x80) ~= 0, true,
-      "$01BF SET -- stood on the summit save point (57,8)")
-  end),
-  H.saveGame({ tag = "summit save" }),
-  crossTo(60, 9, 98, "K9 summit -> VARGAS's ledge", "tactical"),
-
-  H.call(function()
-    H.assertEq(map(), 98, "on map 98")
-    H.assertEq(sw(0x010A), 0, "$010A still clear -- Vargas has not appeared")
-    where("map 98 arrival")
-  end),
-  care("map 98 arrival"),
-  H.navTo(11, 32, { maxFrames = 40000, playBattles = "tactical",
-    reserve = { [POTION] = 5 },
-    arrive = function() return sw(0x010A) == 1 end }),
-  H.release(),
-  H.advanceStory(function()
-    return H.hasControl() and H.tileAligned() and sw(0x010A) == 1
-       and objX(16) == 23 and objY(16) == 32
-  end, 20000, { playBattles = "tactical", reserve = { [POTION] = 5 } }),
-  H.call(function()
-    H.assertEq(sw(0x010A), 1, "the approach trigger ran ($010A set)")
-    H.assertEq(sw(0x031C), 1, "$031C set (Vargas NPC armed)")
-    H.log(string.format("VARGAS (obj 16) at (%d,%d)", objX(16), objY(16)))
-    where("vargas spawned")
-    H.screenshot("vargas_spawn")
-  end),
-  care("vargas spawned"),
-
-  H.navTo(22, 32, { maxFrames = 40000, playBattles = "tactical",
-                    reserve = { [POTION] = 5 } }),
-  H.release(),
-  H.driveUntil(function()
-    return H.readByte(0x087f + H.readWord(0x0803)) == 1
-       and H.hasControl() and H.tileAligned()
-       and H.fieldX() == 22 and H.fieldY() == 32
-  end, 900, {
-    H.hold({ "right" }), H.waitFrames(4),
-  }, "face VARGAS (facing byte = 1)"),
-  H.release(),
-  H.waitFrames(30),
-
-  care("vargas entry point", 0.95),
-  H.driveUntil(function()
-    return H.readByte(0x087f + H.readWord(0x0803)) == 1
-       and H.hasControl() and H.tileAligned()
-       and H.fieldX() == 22 and H.fieldY() == 32
-  end, 900, {
-    H.hold({ "right" }), H.waitFrames(4),
-  }, "face VARGAS again after the care stop"),
-  H.release(),
-  H.waitFrames(30),
-  H.call(function()
-    H.assertEq(map(), 98, "on map 98")
-    H.assertEq(H.fieldX(), 22, "party at x=22")
-    H.assertEq(H.fieldY(), 32, "party at y=32")
-    H.assertEq(objX(16), 23, "VARGAS at x=23, one tile east")
-    H.assertEq(objY(16), 32, "VARGAS at y=32, same row")
-    H.assertEq(H.hasControl(), true, "controllable")
-    H.assertEq(H.tileAligned(), true, "tile-aligned")
-    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 1, "facing RIGHT, at him")
-    H.assertEq(H.battleLoadStarted(), false, "not in a battle")
-    -- the tools this route carries to the fight
-    H.assertEq(invCount(0xA4), 1, "BioBlaster still carried (the poison key)")
-    H.assertEq(invCount(0xA3), 1, "NoiseBlaster still carried")
-    H.assertEq(invCount(0xAA), 1, "AutoCrossbow still carried")
-    for c = 0, 15 do
-      if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
-        local base = 0x1600 + 37 * c
-        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d mp=%d/%d",
-          c, H.readByte(base), H.readByte(base + 8),
-          H.readWord(base + 9), H.readWord(base + 11),
-          H.readWord(base + 13), H.readWord(base + 15)))
-      end
-    end
-    for _, c in ipairs(H.partyMembers()) do
-      H.assertEq(H.charHp(c) > 0, true,
-        string.format("char %d reached VARGAS alive", c))
-      H.assertEq(H.charHp(c) * 2 >= H.charMaxHp(c), true,
-        string.format("char %d is at or above half hp (%d/%d)",
-          c, H.charHp(c), H.charMaxHp(c)))
-    end
-    local terra = 0
-    H.assertEq(H.charMaxMp(terra) > 0, true, "TERRA has an MP pool to check")
-    H.assertEq(H.charMp(terra) * 3 >= H.charMaxMp(terra) * 2, true,
-      string.format("TERRA reaches VARGAS with her Cure line intact " ..
-        "(%d/%d mp)", H.charMp(terra), H.charMaxMp(terra)))
-    -- The party also still has a way to answer a death.  gen_vargas raises
-    -- TERRA after the fight; an entry point with an empty bag makes that
-    -- impossible, and the failure would surface an edge later.
-    H.assertEq(invCount(0xF0) >= 1, true,
-      string.format("a Fenix Down is still in reserve for the fight (%d)",
-        invCount(0xF0)))
-    -- the rows the shop stop set are still set (nothing on this mountain
-    -- rearranges the party, and if something did we want to know here)
-    H.assertEq((H.readByte(0x1850 + 0) & 0x20) ~= 0, true, "TERRA back row")
-    H.assertEq((H.readByte(0x1854 + 0) & 0x20) ~= 0, true, "EDGAR back row")
-    H.assertEq((H.readByte(0x1851 + 0) & 0x20) == 0, true, "LOCKE front row")
-    where("vargas entry point")
-    H.screenshot("vargas_entry")
-  end),
-  H.saveState("vargas_entry.mss"),
+  -- way a person takes it, and the cut gen_vargas boots from
+  -- (savestate_graph.py; lib/ot6_contract.lua "kolts-summit-v1").  The
+  -- walk from here to VARGAS's ledge, and vargas_entry, are gen_vargas's.
+  H.saveAtCheckpoint("kolts-summit-v1"),
   H.logStep(function()
-    return string.format("vargas_entry generated at frame %d", H.frame)
+    return string.format("kolts summit saved at frame %d", H.frame)
   end),
 })

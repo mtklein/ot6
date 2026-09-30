@@ -191,8 +191,7 @@ H.run({ maxFrames = 120000 }, {
   end, "ride the finale cutscene onto the world map", 40000),
 
   -- settle on the world map: control + full brightness + 30f margin
-  H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end,
-    3000, "world control", 5),
+  H.waitWorldSettled("world control", 3000),
   H.waitUntil(function() return bright() >= 15 end, 1200, "world fade-in", 10),
   H.waitFrames(30),
   H.call(function()
@@ -225,4 +224,8 @@ H.run({ maxFrames = 120000 }, {
     return string.format("camp_escaped generated at frame %d world (%d,%d)",
       H.frame, H.worldX(), H.worldY())
   end),
+  -- A world save where the escape leaves the party, the cut
+  -- gen_sabin_forest boots from (savestate_graph.py; lib/ot6_contract.lua
+  -- "camp-escaped-v1").
+  H.saveAtCheckpoint("camp-escaped-v1"),
 })

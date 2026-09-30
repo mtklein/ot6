@@ -47,6 +47,198 @@ assert(type(M) == "table",
 
 M.contracts = {}
 
+-- ---- the cuts in the World of Balance chain (tools/tests/savestate_graph.py,
+-- prev= with checkpoint=).  The leg before each saves there and asserts the
+-- table as its exit (M.saveAtCheckpoint); the leg after Continues it and
+-- asserts it as its entry (M.bootCheckpoint).  Each names where the save
+-- is, who is in the party, and the story switches the next leg is
+-- written against.
+
+-- world-narshe-v1: the World of Balance outside Narshe's south gate, the
+-- first world tile (gen_worldmap); gen_figaro walks to Figaro from here.
+M.contracts["world-narshe-v1"] = {
+  slot = 3,
+  world = { x = 84, y = 34 },
+  switches = {
+    { 0x010B, 1, "the Figaro gate trigger is live" },
+    { 0x012E, 1, "the mines' collapse chain has run" },
+  },
+  party = {
+    size = 2,
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+    },
+  },
+}
+
+-- world-figaro-v1: the Figaro desert where the chapter's chocobo sets the
+-- party down (gen_edgar); gen_kolts walks to the South Figaro cave.
+M.contracts["world-figaro-v1"] = {
+  slot = 3,
+  world = { x = 65, y = 77 },     -- where the chocobo lands
+  switches = {
+    { 0x0108, 1, "the cave guards recognise EDGAR" },
+    { 0x001A, 0, "the Lete River not yet run (the cave's map-73 copy)" },
+  },
+  party = {
+    size = 3,
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x04, "EDGAR" },
+    },
+  },
+}
+
+-- kolts-summit-v1: Mt. Kolts's summit save point, map 103 (57,8), before
+-- VARGAS (gen_kolts); gen_vargas walks to his ledge.
+M.contracts["kolts-summit-v1"] = {
+  slot = 3,
+  field = { map = 103, x = 57, y = 8 },
+  switches = {
+    { 0x010A, 0, "VARGAS has not appeared" },
+  },
+  party = {
+    size = 3,
+    members = {
+      { 0x00, "TERRA" },
+      { 0x01, "LOCKE" },
+      { 0x04, "EDGAR" },
+    },
+  },
+  items = {
+    { 0xA4, 1, "BioBlaster" },
+    { 0xA3, 1, "NoiseBlaster" },
+    { 0xAA, 1, "AutoCrossbow" },
+  },
+}
+
+-- The scenario hub (map 9): three saves at its save point (8,6), one per
+-- scenario still to play.  The hub reduces the party to the SCENARIO_MOG
+-- cursor (char 13) and shows one NPC per scenario not yet done.
+M.contracts["hub-v1"] = {
+  slot = 3,
+  field = { map = 9, x = 8, y = 6 },
+  switches = {
+    { 0x001A, 1, "the Lete River was run" },
+    { 0x001E, 0, "LOCKE's scenario not done" },
+    { 0x0044, 0, "SABIN's scenario not done" },
+    { 0x0021, 0, "TERRA/BANON's scenario not done" },
+  },
+  party = { size = 1, members = { { 0x0D, "SCENARIO_MOG" } } },
+}
+
+-- locke-done-v1: back at the hub after TunnelArmr (gen_tunnelarmr), before
+-- gen_sabin_world picks SABIN.
+M.contracts["locke-done-v1"] = {
+  slot = 3,
+  field = { map = 9, x = 8, y = 6 },
+  switches = {
+    { 0x001E, 1, "LOCKE's scenario done" },
+    { 0x0044, 0, "SABIN's scenario not done" },
+    { 0x0021, 0, "TERRA/BANON's scenario not done" },
+  },
+  party = { size = 1, members = { { 0x0D, "SCENARIO_MOG" } } },
+}
+
+-- sabin-done-v1: back at the hub after the Nikeah ferry (gen_sabin_trench),
+-- before gen_rapids picks TERRA.
+M.contracts["sabin-done-v1"] = {
+  slot = 3,
+  field = { map = 9, x = 8, y = 6 },
+  switches = {
+    { 0x001E, 1, "LOCKE's scenario done" },
+    { 0x0044, 1, "SABIN's scenario done" },
+    { 0x0021, 0, "TERRA/BANON's scenario not done" },
+  },
+  party = { size = 1, members = { { 0x0D, "SCENARIO_MOG" } } },
+}
+
+-- falls-done-v1: the World of Balance past the Veldt shore where Baren
+-- Falls washes the party up (gen_sabin_falls); gen_sabin_gau walks to
+-- Mobliz and the Veldt.
+M.contracts["falls-done-v1"] = {
+  slot = 3,
+  world = { x = 192, y = 105 },   -- the parent tile the route last pushed
+  switches = {
+    { 0x003B, 1, "the Phantom Train is behind the party" },
+    { 0x003F, 1, "GAU met and named" },
+    { 0x0044, 0, "SABIN's scenario not done" },
+  },
+  party = {
+    size = 2,
+    members = {
+      { 0x05, "SABIN" },
+      { 0x02, "CYAN" },
+    },
+  },
+}
+
+-- kefka-won-v1: the World of Balance outside Narshe's south gate after the
+-- Battle for Narshe and the town's item shop (gen_kefka_won);
+-- gen_zozo1_submerge walks to Figaro Castle.
+M.contracts["kefka-won-v1"] = {
+  slot = 3,
+  world = { x = 84, y = 34 },
+  switches = {
+    { 0x0139, 1, "the Battle for Narshe won" },
+    { 0x010B, 1, "Figaro Castle parked EAST" },
+    { 0x0048, 1, "the engine-room attendant will offer the ride" },
+  },
+  party = {
+    size = 4,
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x06, "CELES" },
+      { 0x04, "EDGAR" },
+      { 0x05, "SABIN" },
+    },
+  },
+}
+
+-- zozo-outside-v1: the World of Balance one tile above Zozo's entrance
+-- (22,92), the grind done and Jidoor's shop visited (gen_zozo2_arrival);
+-- gen_zozo4_dadaluma walks in.
+M.contracts["zozo-outside-v1"] = {
+  slot = 3,
+  world = { x = 22, y = 91 },
+  switches = {
+    { 0x010C, 1, "Figaro Castle parked WEST" },
+    { 0x034A, 1, "the gentleman waits in Zozo" },
+    { 0x0053, 0, "the Ramuh scene has not run" },
+  },
+  party = {
+    size = 4,
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x06, "CELES" },
+      { 0x04, "EDGAR" },
+      { 0x05, "SABIN" },
+    },
+  },
+}
+
+-- camp-escaped-v1: the World of Balance after the Magitek escape from the
+-- Imperial Camp (gen_sabin_magitek), before gen_sabin_forest walks into
+-- the Phantom Forest.
+M.contracts["camp-escaped-v1"] = {
+  slot = 3,
+  world = { x = 179, y = 71 },
+  switches = {
+    { 0x0037, 1, "the Magitek escape is done" },
+    { 0x0044, 0, "SABIN's scenario not done" },
+  },
+  party = {
+    size = 3,
+    members = {
+      { 0x05, "SABIN" },
+      { 0x02, "CYAN" },
+      { 0x03, "SHADOW" },
+    },
+  },
+}
+
 -- post-opera-v1: world save at (137,203), slot 3, party LOCKE CELES SABIN
 -- EDGAR.  Entry contract for gen_vector_entry (step A->B of the save-point
 -- boundary sequence lettered in tools/tests/savestate_graph.py); the exit
@@ -1435,6 +1627,144 @@ function M.assertSavedSlot(map, x, y, what, slot)
   M.assertEq(s.map, map, (what or "the battery") .. ": saved map")
   M.assertEq(s.x, x, (what or "the battery") .. ": saved tile x")
   M.assertEq(s.y, y, (what or "the battery") .. ": saved tile y")
+end
+
+-- ------------------------------------------------------ the ends of a cut --
+-- A cut (tools/tests/savestate_graph.py: prev= with checkpoint=) splits the
+-- chain at a save.  The leg before it ends with M.saveAtCheckpoint: save
+-- there through the real Save UI and assert the checkpoint's contract as
+-- its exit.  The leg after it starts with M.bootCheckpoint: Continue that
+-- save from the title and assert the same contract as its entry.  In
+-- qualification the save it Continues is the tracked checkpoint; in the
+-- chain from power-on it is the one the leg before it just made.
+
+local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+local function onSaveTile(x, y)
+  return M.fieldX() == x and M.fieldY() == y
+     and (M.readByte(0x1E80 + (0x01BF >> 3)) >> (0x01BF & 7)) & 1 == 1
+end
+
+-- Standing on the contract's save tile (field) or world tile, at rest.
+local function atBoundary(c)
+  if c.world then
+    return M.worldMode() and (M.mapId() & 0x1ff) == (c.world.map or 0)
+       and M.worldX() == c.world.x and M.worldY() == c.world.y
+  end
+  return not M.worldMode() and (M.mapId() & 0x1ff) == c.field.map
+     and M.fieldX() == c.field.x and M.fieldY() == c.field.y
+end
+
+-- Walk onto a field save point at (x,y): straight there when the map's
+-- BFS reaches it, else to the tile below it (opts.from = {x, y, dir} for
+-- another side) and a held step onto it, since the save point's sparkle
+-- object blocks the BFS.  $01BF (the shared SavePoint script's switch)
+-- is the arrival witness.
+function M.stepOntoSavePoint(x, y, opts)
+  opts = opts or {}
+  local from = opts.from or { x, y + 1, "up" }
+  local nav = { maxFrames = opts.maxFrames or 8000, playBattles = "tactical" }
+  local ph, calm = 0, 0
+  return M.seqStep({
+    M.cond(function() return M.bfsPath(x, y) ~= nil end,
+      { M.navTo(x, y, nav) },
+      { M.navTo(from[1], from[2], nav),
+        M.withReset(M.driveUntil(function()
+          calm = (onSaveTile(x, y) and M.tileAligned()
+                  and not M.dialogWaiting()) and calm + 1 or 0
+          return calm >= 8
+        end, 3000, {
+          M.call(function()
+            ph = (ph + 1) % 32
+            if M.dialogWaiting() then
+              M.setPad(ph % 8 < 4 and { "a" } or {}); return
+            end
+            if onSaveTile(x, y) then M.setPad({}); return end
+            M.setPad(ph < 8 and { [from[3]] = true } or {})
+          end),
+        }, string.format("onto the save point (%d,%d)", x, y)),
+        function() ph, calm = 0, 0 end) }),
+    M.waitFrames(30),
+    M.call(function()
+      M.assertEq(onSaveTile(x, y), true, string.format(
+        "on the save point (%d,%d) with $01BF set", x, y))
+    end),
+  })
+end
+
+-- The producing leg's last steps: save at the checkpoint's place (a field
+-- contract walks onto its save point first; a world contract saves where
+-- the leg stands, which must be its tile), check the battery holds that
+-- save, and assert the whole contract as the exit.
+function M.saveAtCheckpoint(key)
+  local c = lookup(key)
+  local slot = c.slot or 3
+  local steps = {}
+  if c.field then
+    steps[#steps + 1] = M.stepOntoSavePoint(c.field.x, c.field.y)
+  else
+    steps[#steps + 1] = M.call(function()
+      M.assertEq(atBoundary(c), true, string.format(
+        "%s: on world %d tile (%d,%d), where the save is made (standing on "
+        .. "world=%s map %d (%d,%d))", key, c.world.map or 0, c.world.x,
+        c.world.y, tostring(M.worldMode()), M.mapId() & 0x1ff, M.worldX(),
+        M.worldY()))
+    end)
+  end
+  steps[#steps + 1] = M.saveGame({ slot = slot, tag = key .. " save" })
+  steps[#steps + 1] = M.call(function()
+    if c.field then
+      M.assertSavedSlot(c.field.map, c.field.x, c.field.y, key, slot)
+    else
+      M.assertSavedSlotWorld(c.world.x, c.world.y, key, slot, c.world.map)
+    end
+    M.assertExitContract(key)
+  end)
+  return M.seqStep(steps)
+end
+
+-- The consuming leg's boot: Continue the battery run.sh installed
+-- (OT6_SRAM_CHECKPOINT) from the title, pressing A (only while the screen
+-- is lit and the party is not yet on the checkpoint's tile) until it stands
+-- there or 1200 frames pass, then wait for control wherever the load
+-- landed and assert the contract as the entry, which is what names a
+-- checkpoint that landed somewhere else.
+function M.bootCheckpoint(key, opts)
+  opts = opts or {}
+  local c = lookup(key)
+  local ph, n = 0, 0
+  -- one frame of control is enough: on a save point tile the SavePoint
+  -- script re-fires under the party every ~30 frames, so control there
+  -- comes and goes
+  local function control()
+    if M.worldMode() then return M.worldHasControl() end
+    return M.hasControl() and M.tileAligned()
+  end
+  -- The A presses stop once the party stands on the checkpoint's tile, or
+  -- after 1200 frames when it never does (a checkpoint for somewhere else;
+  -- a Continue lands in 245-351 frames, and the runner's no-progress
+  -- watchdog fires at 1800); then the entry contract names what differs
+  -- rather than a timeout.
+  local SOFT = opts.maxFrames or 1200
+  return M.seqStep({
+    M.waitFrames(350),
+    M.repeatN(5, { M.pressButtons({ "start" }, 8), M.waitFrames(25) }),
+    M.waitFrames(120),
+    M.withReset(M.driveUntil(function()
+      n = n + 1
+      return (atBoundary(c) and bright() >= 15) or n > SOFT
+    end, SOFT + 60, {
+      M.call(function()
+        ph = (ph + 1) % 48
+        if atBoundary(c) or bright() < 15 then M.setPad({}); return end
+        M.setPad(ph < 8 and { "a" } or {})
+      end),
+    }, "Continue " .. key .. " -> its save tile"), function() ph, n = 0, 0 end),
+    M.release(),
+    M.waitUntil(function() return control() and bright() >= 15 end, 1800,
+      "Continue " .. key .. ": control after the load", 1),
+    M.waitFrames(30),
+    M.call(function() M.assertEntryContract(key) end),
+  })
 end
 
 -- The world-save form: the map word reads the world (0 the World of

@@ -1,0 +1,27 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "world-figaro.sram",
+  "slot": 3,
+  "milestone": "world-figaro",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 65,
+      "y": 77
+    }
+  },
+  "size": 32768,
+  "sha256": "f4864a29a07dbe318e99a91475222b6fddb1c617efc942b1620d39cf6c7c5b29",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "f4864a29a07dbe318e99a91475222b6fddb1c617efc942b1620d39cf6c7c5b29",
+    "generator_sig": "24cfc736e34b2886a2c4ea7a6f3b49b01f6743e9ff7dc710cc6f76df57a3dad8 gen_edgar",
+    "ancestors": [
+      {
+        "path": "build/states/chain_figaro_entry.stamp",
+        "sha256": "052ab18b9dfff3e49e41ac1a9f944d772072f3e9bf2765bcadc60a6363dbcebc"
+      }
+    ]
+  }
+}

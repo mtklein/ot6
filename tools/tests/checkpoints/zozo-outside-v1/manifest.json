@@ -1,0 +1,27 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "zozo-outside.sram",
+  "slot": 3,
+  "milestone": "zozo-outside",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 22,
+      "y": 91
+    }
+  },
+  "size": 32768,
+  "sha256": "0036be6c3288f1ce4f8335b4c80f619839e5210897226f1551dfdd9068b87345",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "0036be6c3288f1ce4f8335b4c80f619839e5210897226f1551dfdd9068b87345",
+    "generator_sig": "0ed8ea70856be47f1c1178a1869181366e0b3dd9e46d6870e89eb634297fda7c gen_zozo2_arrival",
+    "ancestors": [
+      {
+        "path": "build/states/chain_figaro_submerged.stamp",
+        "sha256": "c30563fcd7c58b94d7570aad673326fbf3fc628a16b54537bae1e94e6abf5db7"
+      }
+    ]
+  }
+}

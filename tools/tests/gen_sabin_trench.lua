@@ -534,4 +534,7 @@ H.run({ maxFrames = 200000, allowGameOver = true }, {
     return string.format("sabin_done generated at frame %d -- the scenario arc "..
       "closes at the hub", H.frame)
   end),
+  -- The hub's save point, the cut gen_rapids boots from
+  -- (savestate_graph.py; lib/ot6_contract.lua "sabin-done-v1").
+  H.saveAtCheckpoint("sabin-done-v1"),
 })

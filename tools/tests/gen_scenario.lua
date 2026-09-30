@@ -825,4 +825,7 @@ H.run({ maxFrames = 700000, allowGameOver = true }, {
   H.logStep(function()
     return string.format("scenario_hub generated at frame %d", H.frame)
   end),
+  -- The hub's save point, the cut gen_scenario_locke boots from
+  -- (savestate_graph.py; lib/ot6_contract.lua "hub-v1").
+  H.saveAtCheckpoint("hub-v1"),
 })

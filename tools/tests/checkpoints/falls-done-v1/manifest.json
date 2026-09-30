@@ -1,0 +1,27 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "falls-done.sram",
+  "slot": 3,
+  "milestone": "falls-done",
+  "persistent_layout": "ot6-codex-o8-v1",
+  "saved": {
+    "slot": 3,
+    "world": {
+      "x": 192,
+      "y": 105
+    }
+  },
+  "size": 32768,
+  "sha256": "29e32418580ce62e407c02c9fcd3d582b92259d6917ba179b769d944fd25a234",
+  "provenance": {
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "29e32418580ce62e407c02c9fcd3d582b92259d6917ba179b769d944fd25a234",
+    "generator_sig": "c9c58333f4b0bdc18279285efb3447b4528f6039ea0d25bc66e65dc44abfa39c gen_sabin_falls",
+    "ancestors": [
+      {
+        "path": "build/states/chain_train_done.stamp",
+        "sha256": "7706a823f794cf4e14e483a5d2e57c89b72f495ff29b9029c045bff30406e2cd"
+      }
+    ]
+  }
+}

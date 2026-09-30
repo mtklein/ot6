@@ -4,8 +4,10 @@
 Bare `ninja` builds and tests everything: the default targets are the
 ROM, every generated savestate, every suite test's result, every audit and
 every selftest.  `ninja release` is all of that plus the release
-preflights, the BPS patch and the zip.  `release` is the only alias; any
-partial need is a real output path
+preflights (the chain from power-on among them), the BPS patch and the
+zip.  `ninja chain` is the chain from power-on alone (savestate_ninja.py
+chain_plan).  Those are the only aliases; any partial need is a real
+output path
 (`ninja build/states/vargas_entry.mss.lua`,
 `ninja build/results/suite/battle_break.ok`, `ninja ff6/rom/ff6-en.sfc`).
 Parallelism is ninja's own, unbounded; emulator-running commands are
@@ -334,6 +336,11 @@ if errors:
         print(f"savestate_graph: {e}", file=sys.stderr)
     sys.exit(1)
 sn.emit_state_edges(w, states, ROOT, copy_if_changed_from)
+# The chain from power-on (savestate_ninja.py chain_plan): qualification
+# boots each cut leg from its tracked checkpoint; `ninja chain` plays the
+# whole chain from power-on as chain_<state> copies, each leg booted from
+# the save the one before it made.  `release` depends on it.
+chain_end = sn.emit_chain_edges(w, states, ROOT, copy_if_changed_from)
 # Every name a test can reference includes the `also=` siblings: a state
 # like figaro_cleared is emitted by gen_edgar's edge as an also-artifact,
 # and fixture_deps() filtering against primary names only would drop it,
@@ -571,6 +578,9 @@ checkpoint_files = glob("tools/tests/checkpoints/*/manifest.json") \
 check("checkpoint_saves", "sh tools/tests/lib/checkpoint_saves.sh",
       ["tools/tests/lib/checkpoint_saves.sh",
        "tools/tests/lib/sram_checkpoint.py"] + checkpoint_files)
+check("checkpoint_drift_selftest",
+      "python3 tools/tests/lib/checkpoint_drift.py --selftest",
+      ["tools/tests/lib/checkpoint_drift.py", "tools/tests/lib/sram_checkpoint.py"])
 check("checkpoint_negatives", "nice sh tools/tests/lib/checkpoint_negatives.sh",
       ["tools/tests/lib/checkpoint_negatives.sh", "tools/tests/run.sh",
        copy_if_changed_from("build/ot6.sfc")] + LIBS + checkpoint_files)
@@ -643,6 +653,35 @@ check("release_readme",
 # notes, README) exists; `ninja release` (the zip) still requires both.
 release_pre = qual[qual_before_release:]
 del qual[qual_before_release:]
+# The chain from power-on is a release preflight too: the legs
+# qualification booted from tracked checkpoints must also play through
+# from power-on, each from the save the leg before it made.  And every
+# tracked cut checkpoint must be the save that chain makes today
+# (checkpoint_drift.py: levels, gear, gil, the bag, story switches); the fix
+# for a drifted one is `checkpoint_drift.py --recut`, then qualify again.
+if chain_end:
+    release_pre.append(chain_end)
+    captures = sn.chain_captures(states, ROOT)
+    tracked = [a for key in sorted(captures)
+               for a in sn.checkpoint_inputs(ROOT, key)]
+    out = "build/checks/checkpoint_drift.ok"
+    # ...and every capture must be today's: the lib halves, the stamp tool
+    # and the ROM are inputs here, so a lib-only edit (which re-runs no
+    # chain edge) re-runs this check, and the check refuses the capture
+    # whose provenance sig no longer matches
+    w.edge([out], "sh",
+           implicit=["tools/tests/lib/checkpoint_drift.py",
+                     "tools/tests/lib/sram_checkpoint.py",
+                     "tools/tests/lib/savestate_stamp.sh",
+                     "tools/tests/lib/lua_fingerprint.py",
+                     "tools/tests/lib/savestate_ninja.py", sn.GRAPH,
+                     "build/ot6.sfc"] + LIBS
+           + [p for key in sorted(captures) for p in captures[key]] + tracked,
+           cmd="python3 tools/tests/lib/checkpoint_drift.py --strict "
+               + " ".join(sorted(captures))
+               + f" && mkdir -p build/checks && touch {out}",
+           desc="tracked cut checkpoints are today's play")
+    release_pre.append(out)
 
 bps = f"{rel_dir}/{BASE[:-len('.sfc')]}.bps"
 w.edge([bps], "sh", [BASE, "build/ot6.sfc"], implicit=qual + release_pre,
@@ -675,6 +714,10 @@ w.edge(["build.ninja"], "configure",
         "VERSION"])
 w()
 w.edge(["release"], "phony", [f"build/release/ot6-v{VERSION}.zip"])
+# `chain` is the one other alias: the chain from power-on's last state
+# moves whenever a cut or a leg is added, and this name does not.
+if chain_end:
+    w.edge(["chain"], "phony", [chain_end])
 w("default " + " ".join(esc(p) for p in qual))
 w()
 

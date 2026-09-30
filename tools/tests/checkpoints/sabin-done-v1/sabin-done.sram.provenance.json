@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v2",
+  "payload_sha256": "e82e4ad5b986b33c7ac4cf53a9424f4ce594ebbbbbbea43421deaca8a92acaaa",
+  "generator_sig": "5dab8f22027708ea244c2bd2bae756dcfe048d0085e65889a7b69002caab1619 gen_sabin_trench",
+  "ancestors": [
+    {
+      "path": "build/states/chain_gau_joined.stamp",
+      "sha256": "de00a63a2ce33bfe20e043a0c34fbbe670a91bf61e18e98eedd50d40bd15db36"
+    }
+  ]
+}

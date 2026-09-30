@@ -19,6 +19,50 @@ real output path (`ninja ff6/rom/ff6-en.sfc`,
 when `configure.py`, the savestate graph, `VERSION`, or any globbed
 directory changes.
 
+### Cuts and the chain from power-on
+
+A `.mss` belongs to one ROM, so after a ROM change every generated state
+regenerates, each from the one before it. To keep that from being one long
+serial run, the World of Balance chain is cut where the play saves (at a
+save point, or on the world map, where the game lets you save anywhere):
+an entry in
+`tools/tests/savestate_graph.py` with both `prev=` and `checkpoint=` is a
+cut. The leg before it ends by saving there through the real Save UI and
+asserting the checkpoint's contract as its exit
+(`H.saveAtCheckpoint`, `lib/ot6_contract.lua`); the leg after it
+Continues the save and asserts the same contract as its entry
+(`H.bootCheckpoint`). Qualification boots each cut leg from the tracked
+checkpoint in `tools/tests/checkpoints/`, which still loads after a ROM
+change, so the legs regenerate at once.
+
+`ninja chain` plays the whole chain from power-on instead: `chain_<state>`
+copies of every state from the first cut on, each booted from the copy
+before it and, at a cut, from the save the producing copy just made
+(captured with `OT6_CAPTURE_SRM` and sealed into
+`build/checkpoints/<key>/`). It is the one alias besides `release`,
+because the chain's last state moves as cuts and legs are added.
+`ninja release` depends on it. Run it too when a leg's exit contract
+fails in qualification: the chain says whether the story still plays
+through.
+
+A tracked checkpoint drifts from today's play as the route changes above
+it. At each cut the chain prints the drift (`tools/tests/lib/checkpoint_drift.py`),
+explained in play terms: every character's level, experience, HP/MP and
+gear, gil and the bag, story switches, encounter counters, spells and
+skills, the OT6 codex, and any other differing byte by address.
+`ninja release` fails while any tracked checkpoint's battery differs from
+its fresh capture byte for byte (play time and checksums aside; the chain
+is deterministic), or while a capture is older than today's generator, lib
+halves or ROM. Re-cut at every release, and during a cycle whenever the
+report shows a material change:
+
+    ninja chain
+    python3 tools/tests/lib/checkpoint_drift.py --recut <key>...
+
+`--recut` copies the chain's sealed capture over the tracked checkpoint;
+then commit and qualify again. The contracts stay light: a suite that
+needs a level or an item asserts its own precondition.
+
 ## Installed pieces
 
 Homebrew pieces are in the root `Brewfile`; `brew bundle` installs them.

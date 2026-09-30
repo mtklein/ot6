@@ -1,4 +1,4 @@
--- gen_rapids.lua -- from scenario_hub.mss into TERRA/BANON/EDGAR's scenario:
+-- gen_rapids.lua -- from the sabin-done-v1 save at the hub into TERRA/BANON/EDGAR's scenario:
 -- the resumed raft ride down the lower Lete River and the landing on the
 -- World of Balance north-east of Narshe.
 -- Generates two states:
@@ -65,9 +65,10 @@
 -- are read off battle RAM on each fight's rising edge and logged, because a
 -- balance claim about this step has to rest on what the ROM seeds.
 local H = dofile("tools/tests/lib/ot6.lua")
--- the pinned run: TERRA plays last, so the hub dispatch boots
--- SABIN's ending (back at the hub, $001E and $0044 set)
-local HUB = "build/states/sabin_done.mss.lua"
+-- Boots the sabin-done-v1 checkpoint: gen_sabin_trench saves there as sabin_done ends,
+-- and this leg Continues that save (a cut in savestate_graph.py;
+-- the contract is lib/ot6_contract.lua's "sabin-done-v1").
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -633,7 +634,7 @@ end
 -- (#163); rideUntil reads H.gameOverFired as a loss and the next attempt
 -- reloads.
 H.run({ maxFrames = 200000, allowGameOver = true }, {
-  H.loadState(HUB),
+  H.bootCheckpoint("sabin-done-v1"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 9, "booted on map 9, the scenario hub")

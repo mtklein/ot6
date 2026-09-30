@@ -27,7 +27,10 @@
 -- (Ot6ShadowLeaves, battle_main.asm). This generator makes no state writes.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/camp_escaped.mss.lua"
+-- Boots the camp-escaped-v1 checkpoint: gen_sabin_magitek saves there as camp_escaped ends,
+-- and this leg Continues that save (a cut in savestate_graph.py;
+-- the contract is lib/ot6_contract.lua's "camp-escaped-v1").
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 
 local function mapIdx() return H.readWord(0x1f64) & 0x3FF end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -118,7 +121,7 @@ local function crossTo(tx, ty, toMap, what)
 end
 
 H.run({ maxFrames = 120000 }, {
-  H.loadState(DOOR),
+  H.bootCheckpoint("camp-escaped-v1"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.worldMode(), true, "start on the World of Balance")

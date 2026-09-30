@@ -47,6 +47,9 @@
 --           because the trash dies first), so the arm keeps the write MP := 1
 --           with the bank the planned row needs built by real item turns.
 --           3a, the MENU: CYAN's own command window is driven open FIRST,
+--           with CYAN alive and free to choose (the game opens a KO'd
+--           CYAN's window for a frame and then closes it itself, and one
+--           KO'd or berserked before the check is a void attempt), and
 --           with a bank that covers the row (so the only reason left to
 --           refuse it is the price), the pool is put at 1 there, and then
 --           the planned SwdTech row is greyed
@@ -205,6 +208,16 @@ local function canMenu(slot)
      and (H.readByte(0x3EE5 + slot*2) & ST2_NOMENU) == 0
 end
 local function cyanCanMenu() return canMenu(cyan) end
+-- Arm 3a's precondition, read the way the menu reads it: CYAN alive (HP
+-- above 0 and no KO bit) and free to choose.  cyanLostMenu() below
+-- excuses a KO SHADOW can still cure, which is right for waiting but not
+-- for staging: the game opens a KO'd CYAN's command window for a frame
+-- and closes it on its own (measured on c433d8ce's camp_escaped: KO at
+-- f7522, window $05 at f7598, the list closed at f7637 with no input;
+-- build/attempts/wt/chain-cut/mpcost/).
+local function cyanCanChoose()
+  return hp(cyan) > 0 and cyanCanMenu()
+end
 -- A status that outlives its battle (KO, Petrify) is not waited out by
 -- walking to the next encounter: it comes along.  Measured on the original
 -- file at a 17-frame idle before the walk (build/lab/mpb/mc_sweep1/
@@ -712,25 +725,28 @@ H.run({ maxFrames = 200000 }, {
                 return true
               end
               return (H.readByte(ACTOR) & 3) == cyan
-                 and H.readByte(MSTATE) == ST_CMD
+                 and H.readByte(MSTATE) == ST_CMD and cyanCanChoose()
             end, 30000, "CYAN's own command window opens (attempt "
               .. attempt .. ")")
           end)(),
           H.call(function()
             atWindow = H.battleLoadStarted() and not cyanLostMenu()
               and (H.readByte(ACTOR) & 3) == cyan
-              and H.readByte(MSTATE) == ST_CMD
+              and H.readByte(MSTATE) == ST_CMD and cyanCanChoose()
             if not atWindow then
               cyanMode = "defer"
               quietA = false
               H.log(string.format("  [refusal arm %d] 3a void before the "
                 .. "window: live=%s menuable=%s state=%02x actor=%d "
-                .. "monsters %d hp %s", attempt,
+                .. "monsters %d hp, CYAN hp %d %s", attempt,
                 tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
                 H.readByte(MSTATE), H.readByte(ACTOR) & 3, monsterHpSum(),
-                cyanStatusStr()))
+                hp(cyan), cyanStatusStr()))
               return
             end
+            H.assertEq(cyanCanChoose(), true, string.format("3a's precondition: "
+              .. "CYAN is alive (hp %d) and free to choose (%s) at his own "
+              .. "open command window, the turn his", hp(cyan), cyanStatusStr()))
             richMp = mp()
             H.writeWord(0x3C08 + cyan*2, 1)
             snap = { bp = bp(), pend = pend(),
@@ -749,14 +765,18 @@ H.run({ maxFrames = 200000 }, {
           -- the thing the drive settles for.
           driveTo(function()
             if not atWindow then return true end
-            return not H.battleLoadStarted() or cyanLostMenu()
+            return not H.battleLoadStarted() or not cyanCanChoose()
                 or kitConfirms > snap.kitConfirms
           end, 30000, "the broke SwdTech row is confirmed IN the submenu "
             .. "(attempt " .. attempt .. ")"),
           H.waitFrames(90),
           H.call(function()
             menuRefused = false
-            if atWindow and H.battleLoadStarted() and not cyanLostMenu()
+            -- A CYAN KO'd or berserked between the staging and here has
+            -- had his window closed by the game, which says nothing about
+            -- the price: that attempt is void (logged below) and the next
+            -- encounter measures.  A CYAN still free to choose is judged.
+            if atWindow and H.battleLoadStarted() and cyanCanChoose()
                and kitConfirms > snap.kitConfirms then
               H.log(string.format("  [refusal arm %d] 3a: state=%02x mp=%d "
                 .. "bp=%d pend=%d kitbuzz(+%d) kitconfirm(+%d) "
@@ -797,10 +817,10 @@ H.run({ maxFrames = 200000 }, {
               menuRefused = true
             elseif atWindow then
               H.log(string.format("  [refusal arm %d] 3a void: live=%s "
-                .. "menuable=%s state=%02x kitconfirm(+%d) %s", attempt,
-                tostring(H.battleLoadStarted()), tostring(cyanCanMenu()),
-                H.readByte(MSTATE), kitConfirms - snap.kitConfirms,
-                cyanStatusStr()))
+                .. "menuable=%s state=%02x kitconfirm(+%d) CYAN hp %d %s",
+                attempt, tostring(H.battleLoadStarted()),
+                tostring(cyanCanMenu()), H.readByte(MSTATE),
+                kitConfirms - snap.kitConfirms, hp(cyan), cyanStatusStr()))
             end
             -- the real pool back: 3b's poverty is staged at the LATCH.
             -- Nothing was staged at all on the void-before-the-window path,

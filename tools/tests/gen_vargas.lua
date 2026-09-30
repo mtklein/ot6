@@ -1,7 +1,10 @@
--- gen_vargas.lua -- from vargas_entry.mss: fight Vargas with real input,
--- ride the reunion, and generate vargas_won.mss on the first controllable
--- frame after it. Inputs in, observations out: no writes to emulated game
--- state.
+-- gen_vargas.lua -- from the kolts-summit-v1 save (the Mt. Kolts summit
+-- save point, map 103 (57,8)): walk to VARGAS's ledge and generate
+-- vargas_entry.mss beside him, fight him with real input, ride the
+-- reunion, and generate vargas_won.mss on the first controllable frame
+-- after it. Inputs in, observations out: no writes to emulated game state.
+--
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 
 -- The fight (bosses-wob.md section 3, which both human playtests rated well):
 -- Vargas (11600 hp, 5 shields, weak poison|holy + bludgeoning) plus two
@@ -29,7 +32,6 @@
 -- require the same calm map-98 field before accepting the blob.
 local H = dofile("tools/tests/lib/ot6.lua")
 local L = H.newSeedSweep("battle 66")
-local DOOR = "build/states/vargas_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_TOOLS, ST_TGT, ST_ITEM, ST_MAGIC = 0x05, 0x30, 0x38, 0x0A, 0x0E
@@ -455,12 +457,150 @@ local function genAttempt(n)
   }, {})
 end
 
+-- ----------------------------------------- the summit to VARGAS's ledge --
+-- This walk was gen_kolts's tail: gen_kolts now ends at the summit save
+-- point (57,8) on map 103, and this leg Continues that save (a cut in
+-- savestate_graph.py; lib/ot6_contract.lua "kolts-summit-v1"), walks to
+-- VARGAS's ledge, lets his approach event run, and generates vargas_entry
+-- at the tile next to him before the fight.
+local function map() return H.mapId() & 0x1ff end
+local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end
+local function objX(i) return H.readWord(0x086a + 0x29 * i) >> 4 end
+local function objY(i) return H.readWord(0x086d + 0x29 * i) >> 4 end
+local function invCount(id)
+  for i = 0, 255 do
+    if H.readByte(0x1869 + i) == id then return H.readByte(0x1969 + i) end
+  end
+  return 0
+end
+local function where(tag)
+  local out = {}
+  for c = 0, 15 do
+    if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
+      local b = 0x1600 + 37 * c
+      out[#out + 1] = string.format("c%d L%d %d/%d hp %d/%d mp", c,
+        H.readByte(b + 8), H.readWord(b + 9), H.readWord(b + 11),
+        H.readWord(b + 13), H.readWord(b + 15))
+    end
+  end
+  H.log(string.format("[%s] f%d map=%d field=(%d,%d) $010A=%d | %s | tonic=%d potion=%d fenix=%d",
+    tag, H.frame, map(), H.fieldX(), H.fieldY(), sw(0x010A),
+    table.concat(out, " | "), invCount(0xE8), invCount(0xE9), invCount(0xF0)))
+end
+local function care(tag, threshold)
+  return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.85,
+                       reserve = { [POTION] = 5 }, mpFloor = 0.75 })
+end
+local function faceVargas(what)
+  return H.driveUntil(function()
+    return H.readByte(0x087f + H.readWord(0x0803)) == 1
+       and H.hasControl() and H.tileAligned()
+       and H.fieldX() == 22 and H.fieldY() == 32
+  end, 900, {
+    H.hold({ "right" }), H.waitFrames(4),
+  }, what)
+end
+
+local toVargas = {
+  H.bootCheckpoint("kolts-summit-v1"),
+  -- K9: the summit -> VARGAS's ledge (map 103 (60,9) -> map 98)
+  H.navTo(60, 9, { maxFrames = 40000, playBattles = "tactical",
+                   reserve = { [POTION] = 5 },
+                   arrive = function() return map() == 98 end }),
+  H.release(),
+  H.waitFrames(90),
+  (function()
+    local n = 0
+    return H.withReset(H.advanceStory(function()
+      local ok = map() == 98 and not H.worldMode() and H.tileAligned()
+         and not H.battleLoadStarted() and not H.dialogWaiting()
+         and bright() >= 15
+      n = ok and n + 1 or 0
+      return n >= 20
+    end, 24000, { playBattles = "tactical" }), function() n = 0 end)
+  end)(),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq(map(), 98, "on map 98")
+    H.assertEq(sw(0x010A), 0, "$010A still clear -- Vargas has not appeared")
+    where("map 98 arrival")
+  end),
+  care("map 98 arrival"),
+  H.navTo(11, 32, { maxFrames = 40000, playBattles = "tactical",
+    reserve = { [POTION] = 5 },
+    arrive = function() return sw(0x010A) == 1 end }),
+  H.release(),
+  H.advanceStory(function()
+    return H.hasControl() and H.tileAligned() and sw(0x010A) == 1
+       and objX(16) == 23 and objY(16) == 32
+  end, 20000, { playBattles = "tactical", reserve = { [POTION] = 5 } }),
+  H.call(function()
+    H.assertEq(sw(0x010A), 1, "the approach trigger ran ($010A set)")
+    H.assertEq(sw(0x031C), 1, "$031C set (Vargas NPC armed)")
+    H.log(string.format("VARGAS (obj 16) at (%d,%d)", objX(16), objY(16)))
+    where("vargas spawned")
+    H.screenshot("vargas_spawn")
+  end),
+  care("vargas spawned"),
+  H.navTo(22, 32, { maxFrames = 40000, playBattles = "tactical",
+                    reserve = { [POTION] = 5 } }),
+  H.release(),
+  faceVargas("face VARGAS (facing byte = 1)"),
+  H.release(),
+  H.waitFrames(30),
+  care("vargas entry point", 0.95),
+  faceVargas("face VARGAS again after the care stop"),
+  H.release(),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq(map(), 98, "on map 98")
+    H.assertEq(H.fieldX(), 22, "party at x=22")
+    H.assertEq(H.fieldY(), 32, "party at y=32")
+    H.assertEq(objX(16), 23, "VARGAS at x=23, one tile east")
+    H.assertEq(objY(16), 32, "VARGAS at y=32, same row")
+    H.assertEq(H.hasControl(), true, "controllable")
+    H.assertEq(H.tileAligned(), true, "tile-aligned")
+    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 1, "facing RIGHT, at him")
+    H.assertEq(H.battleLoadStarted(), false, "not in a battle")
+    -- the tools this route carries to the fight
+    H.assertEq(invCount(0xA4), 1, "BioBlaster still carried (the poison key)")
+    H.assertEq(invCount(0xA3), 1, "NoiseBlaster still carried")
+    H.assertEq(invCount(0xAA), 1, "AutoCrossbow still carried")
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c) > 0, true,
+        string.format("char %d reached VARGAS alive", c))
+      H.assertEq(H.charHp(c) * 2 >= H.charMaxHp(c), true,
+        string.format("char %d is at or above half hp (%d/%d)",
+          c, H.charHp(c), H.charMaxHp(c)))
+    end
+    local terra = 0
+    H.assertEq(H.charMaxMp(terra) > 0, true, "TERRA has an MP pool to check")
+    H.assertEq(H.charMp(terra) * 3 >= H.charMaxMp(terra) * 2, true,
+      string.format("TERRA reaches VARGAS with her Cure line intact " ..
+        "(%d/%d mp)", H.charMp(terra), H.charMaxMp(terra)))
+    -- the party still has a way to answer a death: this leg raises TERRA
+    -- after the fight
+    H.assertEq(invCount(0xF0) >= 1, true,
+      string.format("a Fenix Down is still in reserve for the fight (%d)",
+        invCount(0xF0)))
+    -- the rows the South Figaro shop stop set are still set
+    H.assertEq((H.readByte(0x1850 + 0) & 0x20) ~= 0, true, "TERRA back row")
+    H.assertEq((H.readByte(0x1854 + 0) & 0x20) ~= 0, true, "EDGAR back row")
+    H.assertEq((H.readByte(0x1851 + 0) & 0x20) == 0, true, "LOCKE front row")
+    where("vargas entry point")
+    H.screenshot("vargas_entry")
+  end),
+  H.saveState("vargas_entry.mss"),
+  H.logStep(function()
+    return string.format("vargas_entry generated at frame %d", H.frame)
+  end),
+}
+
 -- allowGameOver: the battle-66 sweep deliberately survives a lost fight
 -- (#163); the post-fight ride ends on the lib's wipe canary or on
 -- H.gameOverFired and the next attempt reloads.
 H.run({ maxFrames = 700000, allowGameOver = true }, {
-  H.loadState(DOOR),
-  H.waitFrames(30),
+  H.cond(function() return true end, toVargas),
   -- capture the entry point once: the retry sweep's rewind point.  The blob
   -- is this boot's own state, and nothing is written to the game.
   (function()
