@@ -1175,11 +1175,14 @@ the encounter counter, and three things that draw finds:
 
 - **Back attacks and pincers.** They turn the pair's back row to the
   front, and a Muddled ally's Genji pair and the monsters' blows land in
-  full. Across the re-cut chain's runs formation 232 lost 2 of its 11 back
-  attacks (5 with a death) against 2 of 139 normal fights
-  (`analysis/battle_type_*.txt`); in the lab 4 of 96 back attacks and
-  pincers were lost against 2 of 555 normal fights, and the old chain's
-  one loss is a back attack. The bag holds a Back Guard ($E1, the relic
+  full. In the lab 4 of 96 back attacks and pincers of formation 232 were
+  lost against 2 of 555 normal fights, and the old chain's one lab loss
+  is a back attack (`analysis/battle_type_lab_new.txt`, `arms/old_base_c68`).
+  In the re-cut chain's generator runs (the recut, `before_snap/`,
+  `after1/`) its 11 back attacks cost a member in 5 and were lost twice
+  (one draw, K = 3 at shift 23, met twice), its 139 normal fights lost 3
+  (`analysis/battle_type_*.txt`; `before_snap/k9_s0` has no `[outcome]`
+  line). The bag holds a Back Guard ($E1, the relic
   #250 put on CELES for Tzen's house): on CELES in place of her Jewel Ring,
   330 lab fights, all normal, none lost, 6 with a death
   (`arms/new_bg_nocure_c68`, `arms/new_bg_ringnow_nocure_c68`).
@@ -1225,7 +1228,9 @@ covers them: 59 of 60 and 54 of 60 from two re-cut states at
 L31/31/31 (`tent/sweep60_k0`, `tent/sweep60_k2`); across the re-cut
 chain's generator runs 45 of 52. Levels are not the lever at this
 size: a grind to L32 (48-52 legs against 17) meets the Tentacles at
-L33-34 and won 59 of 60 from its K = 2 state (`tent/sweep60_L32_k2`),
+L33-34 and won 59 of 60 from each of its K = 0 and K = 2 states
+(`tent/sweep60_L32_k0`, `tent/sweep60_L32_k2`: 118 of 120 against 113 of
+120 at L31),
 while the old chain's L32/31/31 states lost 4 of 33 (`tent/old_base`);
 the cave at L32 lost 2 of 176 against 2 of 150 at L30 from the same two
 draws (`arms/L32_base_c68`, `arms/L30_k02_c68`). The grind stays at L30.
