@@ -233,9 +233,18 @@ H.run({ maxFrames = 6000000, allowGameOver = true }, {
     H.log(string.format("[ot6] in the pocket f%d (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
   end),
+  -- The pocket is encounter group 90, and a random battle on the way is
+  -- fought like any other: the walk ends on the trigger's own switch.
+  -- The trigger's event (_cbf848 onward) runs its dialogs and sets $0099
+  -- before any battle or the load of 341, so no scripted battle comes
+  -- first.  (The walk used to end on any battle start as well: in the
+  -- re-cut for #326 a random formation $0A4 opened at (14,15) and was
+  -- taken for the trigger -- build/attempts/wt/recut/massacre/
+  -- lab_pocket.log: `after the pocket navTo f9196 map=375 (14,15)
+  -- battleLoadStarted=true $11E0=00A4 group=90 $0099=0`.)
   H.navTo(15, 17, { maxFrames = 20000, playBattles = "tactical",
     arrive = function()
-      return sw(0x0099) == 1 or map() == 341 or H.battleLoadStarted()
+      return sw(0x0099) == 1 or map() == 341
     end }),
   H.release(),
   H.waitFrames(90),

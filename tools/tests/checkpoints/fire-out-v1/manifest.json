@@ -5,15 +5,15 @@
   "milestone": "fire-out",
   "persistent_layout": "ot6-codex-o8-v1",
   "size": 32768,
-  "sha256": "7f9791781077256215354eb92a0be50dc6c473eb17b1dd7bf012df81578d6993",
+  "sha256": "8c48483309e8c63cedc170b94d7c2922477c5983fe9ea975cbf21d8e32ab5fd1",
   "provenance": {
-    "format": "ot6-provenance/v1",
-    "payload_sha256": "7f9791781077256215354eb92a0be50dc6c473eb17b1dd7bf012df81578d6993",
-    "generator_sig": "0d717bd0d757160a0bdc353fa038580ad6dbdb7fecaae4957a4c8369c8a90615 gen_thamasa_fire tools/tests/checkpoints/thamasa-night-v1/manifest.json tools/tests/checkpoints/thamasa-night-v1/thamasa-night.sram",
+    "format": "ot6-provenance/v2",
+    "payload_sha256": "8c48483309e8c63cedc170b94d7c2922477c5983fe9ea975cbf21d8e32ab5fd1",
+    "generator_sig": "51c29a60112b1afc891d2de569551b8c7b4cff83831241044f1da36e23696382 gen_thamasa_fire tools/tests/checkpoints/thamasa-night-v1/manifest.json tools/tests/checkpoints/thamasa-night-v1/thamasa-night.sram",
     "ancestors": [
       {
         "path": "tools/tests/checkpoints/thamasa-night-v1/manifest.json",
-        "sha256": "7633f085cd66497493f66f4c18daa9fb23374e3bdbd7744dc4d2a6e88fbea870"
+        "sha256": "6cfdcfdf721ef93b5df061b2e2eedb0fe196611f26906288d50351e0c619b62a"
       }
     ]
   }

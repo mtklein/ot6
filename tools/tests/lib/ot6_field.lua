@@ -4339,7 +4339,7 @@ function M.setRows(spec, opts)
     return table.concat(out, " ")
   end
 
-  local phase, done, want, before, tries = 0, false, nil, nil, 0
+  local phase, done, want, before, tries, fieldZm = 0, false, nil, nil, 0, false
 
   local function serveFrame()
     phase = (phase + 1) % 12
@@ -4395,14 +4395,31 @@ function M.setRows(spec, opts)
     M.logStep(function()
       return string.format("[%s] opening the Order screen: %s", tag, rowLine())
     end),
-    M.driveUntil(function() return M.readByte(ZM) == 0x05 end, 1800, {
+    -- $26 is the menu's state only while the menu runs; on the map it is
+    -- field RAM and can read $05, then $0F, with the party still walkable.
+    -- Measured (#326, the fire-out-v1 re-cut, build/attempts/wt/recut/
+    -- capture/fire-out-v1.log): X presses dropped after the Esper menu
+    -- closed, "field menu open" was satisfied 14 frames later by the
+    -- field's $05, the LEFT presses walked the map, "Order screen" by its
+    -- $0F, the slot table read "0,0,0,208", and "back to the field" was
+    -- satisfied after 0 frames.  So the menu counts as up only while the
+    -- map has no control (careBackOnMap: false for the whole menu
+    -- lifetime on a field map).
+    M.driveUntil(function()
+      local st = M.readByte(ZM)
+      if st == 0x05 and careBackOnMap() and not fieldZm then
+        fieldZm = true
+        M.log(string.format("[%s] $26 reads $05 with the map in control: not the menu yet", tag))
+      end
+      return st == 0x05 and not careBackOnMap()
+    end, 1800, {
       M.call(function()
         phase = (phase + 1) % 12
         M.setPad(phase < 4 and { "x" } or {})
       end),
     }, tag .. ": field menu open"),
     M.release(), M.waitFrames(10),
-    M.driveUntil(function() return M.readByte(ZM) == 0x0f end, 1800, {
+    M.driveUntil(function() return M.readByte(ZM) == 0x0f and not careBackOnMap() end, 1800, {
       M.call(function()
         phase = (phase + 1) % 12
         M.setPad(phase < 4 and { "left" } or {})
@@ -4448,7 +4465,7 @@ function M.setRows(spec, opts)
   }), function()
     -- as-built (#196): "done" and the skip list would otherwise let a
     -- repeated pass open the Order screen and flip nothing
-    skip, phase, done, want, before, tries = {}, 0, false, nil, nil, 0
+    skip, phase, done, want, before, tries, fieldZm = {}, 0, false, nil, nil, 0, false
   end)
 end
 

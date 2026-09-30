@@ -1683,6 +1683,33 @@ wins every time. There, though, a Zombie costs SABIN his share, and
 today's field care cannot cure a real BonePowder Zombie, whose HP reads
 0 (the pair-final line above). That arm would need the care fix first.
 
+**In the route (#317).** `gen_wor_tzen_door` now does this: after the
+second Albrook stop and the walk to (131,179) it steps onto the sand and
+paces the same beat, (130,180) <-> (125,179), until formation 195 has
+been fought, then walks back and saves. EarthGuard, Peepers and the Black
+Drgn are allowed on that leg only; every other walk keeps the avoid set.
+The leg's budget is the pool's own worst case: `the worst of the 65536
+encounter-counter states needs 19 sand encounter(s) to deal the Black
+Drgn ($0D5), 73.2% need no more than 3, 99.89% no more than 15`, asserted
+at most 20. Under draw variation with retries off
+(`build/attempts/wt/recut/`, the review-final varlab):
+
+| boot | runs | K, shifts | PASS | dragon met in sand battle | losses |
+|---|---|---|---|---|---|
+| `wor-start-v1` before the #326 re-cut (`t317/var/`) | 36 | 0-11 x 0/23/41 | **33** | 2 in every run | 3, all one fight |
+| `wor-start-v1` re-cut (`var/wor_tzen_door/`) | 18 | 0-5 x 0/23/41 | **18** | 5 to 8 | none |
+
+The three losses (`k4_s0`, `k5_s41`, `k11_s0`) are the same fight: the
+Sand Storm opener, a boosted Fight that breaks all four shields, then
+`no press: Fight at 0 BP would hit broken slot 0 but the window's damage
+1736 (e0:434x4) is short of its 3026 HP -- caring`, a Cure, a Fight that
+takes it to `monhp=s0:66/sh0` (24 with its shields back by the next
+sample), and BonePowder: `[death] f+3064 entity 0 char 6 from 1008/1211
+by slot 0 cmd $00 atk $EF` in all three. That is the care-policy lab
+named above (a Cure turn that gives the dragon its second cycle).
+The re-cut `wor-tzen-door-v1` met it in sand battle 5 and won in 2567
+ticks; CELES saves at L28.
+
 ---
 
 ## Appendix — key addresses

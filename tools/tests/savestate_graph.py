@@ -694,9 +694,10 @@ STATES = [
     # the landing save (CELES alone at world (146,212)), dress her for the
     # solo stretch on the world map's menu, stop in Albrook, fight the
     # plains north of it to L27, stop in Albrook again, walk to Tzen off its
-    # desert (the Black Drgn's pool) and Save one step east of the door,
-    # world (131,179): the `wor-tzen-door-v1` checkpoint
-    # (docs/design/route-wor-sabin.md).  checkpoint=, not prev=: this
+    # desert, then pace the desert beside the door (the Black Drgn's pool)
+    # until the Black Drgn has been fought once (#317), and Save one step
+    # east of the door, world (131,179): the `wor-tzen-door-v1` checkpoint
+    # (docs/design/route-wor-sabin.md sections 10 and 12).  checkpoint=, not prev=: this
     # segment regenerates from the landing battery, independently of the
     # World of Balance chain.  Every random is fought; a wipe retries from
     # the Continue (the runner's default 3 attempts).
