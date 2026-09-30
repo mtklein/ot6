@@ -1099,17 +1099,35 @@ def peer_name(peer):
     return peer.partition(":")[0].split(".")[0].lower()
 
 
+EMIT_STALL_SEC = 30   # a snapshot this long unwritten: the viewer is gone
+
+
 def emit():
     """--emit: one Scanner snapshot a second on stdout, PNGs base64'd, until
-    the reader goes away (the ssh connection dropped: BrokenPipe)."""
+    the reader goes away: the ssh connection closed (BrokenPipe), or cut
+    without a close (a laptop carried off the network), which shows here
+    only as a write that never finishes once the buffers fill.  A watchdog
+    ends the emitter then, and with it the caffeinate or systemd-inhibit
+    keeping this machine awake."""
     sc = Scanner()
+    writing = [None]    # when the write in progress began
+
+    def watchdog():
+        while True:
+            time.sleep(5)
+            t = writing[0]
+            if t is not None and time.time() - t > EMIT_STALL_SEC:
+                os._exit(0)
+    threading.Thread(target=watchdog, daemon=True).start()
     try:
         while True:
             snap = sc.snapshot()
             snap["pngs"] = {k: base64.b64encode(v).decode("ascii")
                             for k, v in snap["pngs"].items()}
+            writing[0] = time.time()
             sys.stdout.write(json.dumps(snap) + "\n")
             sys.stdout.flush()
+            writing[0] = None
             time.sleep(1.0)
     except (BrokenPipeError, KeyboardInterrupt):
         os._exit(0)
