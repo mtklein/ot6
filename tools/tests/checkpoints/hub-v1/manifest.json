@@ -1,8 +1,6 @@
 {
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "hub.sram",
-  "size": 32768,
-  "sha256": "b8a074270ac4ec8f97b0d4a4f11be0c7ee2c7bd19aea6f84c6c8ce8788c5f26b",
   "slot": 3,
   "milestone": "hub",
   "persistent_layout": "ot6-codex-o8-v1",
@@ -14,14 +12,16 @@
       "y": 6
     }
   },
+  "size": 32768,
+  "sha256": "b61440fd2610a503e08e2b3dc6f4e70608c16173e304d5aba5ff55b4c6e31c3f",
   "provenance": {
     "format": "ot6-provenance/v2",
-    "payload_sha256": "b8a074270ac4ec8f97b0d4a4f11be0c7ee2c7bd19aea6f84c6c8ce8788c5f26b",
-    "generator_sig": "fede8f9a0432a37de7cc4fd6c445aad756064423ac6e8105d48426c1885f7c5a gen_scenario",
+    "payload_sha256": "b61440fd2610a503e08e2b3dc6f4e70608c16173e304d5aba5ff55b4c6e31c3f",
+    "generator_sig": "75232f8cab0c5c5753a6972fc43b116121f1a7a1c722faeafd63da31e681eac8 gen_scenario",
     "ancestors": [
       {
         "path": "build/states/chain_lete_river.stamp",
-        "sha256": "7a8973b20350240f6242fbcf97e0697e876d297c1e848fbea5fe4dcf023799e3"
+        "sha256": "d739f357b008ae1e2683d9d9afca86c2cfbe10c7e7181170ad89a08a9b36ad20"
       }
     ]
   }
